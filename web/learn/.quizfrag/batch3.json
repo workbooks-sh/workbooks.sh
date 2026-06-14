@@ -1,0 +1,401 @@
+{
+  "code-in-the-document": [
+    {
+      "q": "What core problem does writing the system as one document solve?",
+      "options": [
+        "It makes the running code faster to compile and ship",
+        "It lets one team own the code and another own the docs",
+        "It stops the description and the running system from drifting apart",
+        "It replaces every config language with a single new format"
+      ],
+      "answer": 2,
+      "explain": "The document IS the software, so what is written and what runs can never quietly disagree."
+    },
+    {
+      "q": "Where do a component's connections to other components actually live?",
+      "options": [
+        "Inside the source code block of each component",
+        "In a separate wiring diagram kept beside the document",
+        "In a config file the orchestrator reads at startup",
+        "In short tags on the line where the code begins"
+      ],
+      "answer": 3,
+      "explain": "Connections live in the prose layer as plain labels, not inside the code itself."
+    },
+    {
+      "q": "How does the function that places a component figure out its structure?",
+      "options": [
+        "From the short surface tags, never reading the code inside",
+        "By compiling and tracing each component's actual code",
+        "By asking the author to draw the wiring by hand",
+        "By inspecting which language each block is written in"
+      ],
+      "answer": 0,
+      "explain": "It works entirely from the surface tags and never reads the code inside a component."
+    },
+    {
+      "q": "How does a connection between two components get created?",
+      "options": [
+        "A developer draws a line between them in the editor",
+        "An output label and a matching input label meet",
+        "The compiler infers it from the shared programming language",
+        "The scheduler pairs them by their run order at runtime"
+      ],
+      "answer": 1,
+      "explain": "A producer of a list of events meets a consumer of that list, and the connection appears from the labels."
+    },
+    {
+      "q": "What kind of error can the plan validate before any code is compiled?",
+      "options": [
+        "A component whose code will throw at runtime later",
+        "A permission grant that the host will refuse to honor",
+        "A dangling input wired to nothing that produces it",
+        "A language mismatch between two connected components"
+      ],
+      "answer": 2,
+      "explain": "An input asking for a list nothing produces is caught and named as an error before compilation."
+    }
+  ],
+  "the-one-command": [
+    {
+      "q": "Who is the primary operator of wbx in your workflow?",
+      "options": [
+        "You, typing each verb yourself at the terminal",
+        "A separate machine-only service you never see",
+        "The host engine, which owns all the cleverness",
+        "Your agent, which types the commands for you"
+      ],
+      "answer": 3,
+      "explain": "When you ask the agent to scaffold, wire, or ship, the agent is the one typing wbx commands."
+    },
+    {
+      "q": "What is the honest description of what wbx actually is?",
+      "options": [
+        "A handle, not a brain, that hands heavy work to the engine",
+        "A self-contained brain holding all the build intelligence",
+        "A getting-started tutorial you run for two minutes",
+        "A machine-only protocol with no human-facing side"
+      ],
+      "answer": 0,
+      "explain": "It parses the request, does light local work, and hands everything heavy to the engine behind it."
+    },
+    {
+      "q": "How does wbx behave differently for machines versus people?",
+      "options": [
+        "It runs entirely different code paths for each kind of user",
+        "It drops menus and colors for clean, predictable output",
+        "It refuses to run at all unless a human is at the terminal",
+        "It splits into two separate programs that share no source"
+      ],
+      "answer": 1,
+      "explain": "For machines it drops friendliness for clean output and stable codes; the work underneath stays the same."
+    },
+    {
+      "q": "What is special about where wbx runs?",
+      "options": [
+        "It exists only as a laptop install for three platforms",
+        "It runs as a translated stand-in inside the engine",
+        "The very same tool runs inside the engine's sandbox",
+        "It is recompiled into a different tool for the engine"
+      ],
+      "answer": 2,
+      "explain": "The same wbx a person installs runs inside the sandbox, so people and AI hold the identical tool."
+    },
+    {
+      "q": "What is the job of the doctor verb?",
+      "options": [
+        "It repairs a broken workbook by rewriting its source",
+        "It installs missing compilers and toolkits automatically",
+        "It signs a workbook so its origin travels with it",
+        "It checks setup and reports findings without failing the shell"
+      ],
+      "answer": 3,
+      "explain": "doctor runs honest probes, reports in plain language, and never fails the shell just for finding a problem."
+    }
+  ],
+  "what-an-agent-is": [
+    {
+      "q": "What is the complete definition of an agent in this lesson?",
+      "options": [
+        "A model, in a loop, with tools",
+        "A planner driving a graph of tasks",
+        "A digital employee that decides everything",
+        "A database of memory bolted onto a model"
+      ],
+      "answer": 0,
+      "explain": "The whole thing is stated plainly: an agent is a model, in a loop, with tools."
+    },
+    {
+      "q": "What does the loop actually consist of?",
+      "options": [
+        "A planner assigning steps to worker processes",
+        "Reading, acting, looking at the result, repeating",
+        "A graph engine resolving dependencies in order",
+        "A hidden mind deciding actions behind a curtain"
+      ],
+      "answer": 1,
+      "explain": "The model reads, picks an action, reads the result, and circles again until the work is done."
+    },
+    {
+      "q": "How many built-in hands does an agent get in this ecosystem?",
+      "options": [
+        "None, since the model only ever produces words",
+        "One per toolkit, wired in for each new ability",
+        "Exactly one: a shell, the same as a person would use",
+        "As many as the plugins and protocols it loads"
+      ],
+      "answer": 2,
+      "explain": "An agent gets exactly one hand, a shell, and every other capability comes through toolkits."
+    },
+    {
+      "q": "What is the mental shift the lesson urges for agents?",
+      "options": [
+        "From shell commands to specialized plugin wiring",
+        "From a single chat to a long sequence of chats",
+        "From cheap fast models to expensive careful ones",
+        "From conversation to tenure, a worker given a place"
+      ],
+      "answer": 3,
+      "explain": "You stop summoning an agent for an answer and instead give it a workspace and a rhythm over time."
+    },
+    {
+      "q": "What is the honest framing the lesson insists on?",
+      "options": [
+        "People and AI building together, with direction staying human",
+        "Software that finally runs itself without you",
+        "An autopilot that makes the operator optional",
+        "An agent that grabs whatever powers it decides it needs"
+      ],
+      "answer": 0,
+      "explain": "The pitch is never self-running software; the loop gets work done but does not make you optional."
+    }
+  ],
+  "agents-that-persist": [
+    {
+      "q": "What simple trick makes an agent persistent across long work?",
+      "options": [
+        "Holding one connection open for the whole job",
+        "Splitting the request apart from the work itself",
+        "Storing every transcript in a large database",
+        "Running the model faster so it finishes in seconds"
+      ],
+      "answer": 1,
+      "explain": "When you start a run you get an immediate receipt; the work lives elsewhere so you can walk away."
+    },
+    {
+      "q": "What is the receptionist's job in a persistent run?",
+      "options": [
+        "Calling the model and running the agent's tools",
+        "Thinking through the hardest step of the task",
+        "Staying reachable and answering status instantly",
+        "Deciding when the run should stop and ask a human"
+      ],
+      "answer": 2,
+      "explain": "The receptionist stays reachable and answers status immediately, even while the worker is busy."
+    },
+    {
+      "q": "What is true about standing agents versus a run you start by hand?",
+      "options": [
+        "They use a fancier engine reserved for schedules",
+        "They cannot be started manually, only on a timer",
+        "They skip the receptionist and worker split entirely",
+        "They run the exact same engine, just a different door"
+      ],
+      "answer": 3,
+      "explain": "There is one engine with two front doors; the scheduled agent does the same work the same way."
+    },
+    {
+      "q": "How do persistent agents avoid costing a fortune when idle?",
+      "options": [
+        "They stretch the gap longer after each idle wake-up",
+        "They shut down permanently after the first empty run",
+        "They switch to a cheaper model whenever idle",
+        "They hand idle work off to the receptionist instead"
+      ],
+      "answer": 0,
+      "explain": "After an idle wake-up the system waits longer before the next, stretching the gaps until work returns."
+    },
+    {
+      "q": "How does a persistent run get a human decision when it needs one?",
+      "options": [
+        "It guesses and proceeds, logging the choice for review",
+        "It pauses, opens a door by its name, and waits for you",
+        "It cancels the run and asks you to start over",
+        "It escalates to another agent to make the call"
+      ],
+      "answer": 1,
+      "explain": "Because a run knows its name, it stops, hands you the question, and holds its place until you answer."
+    }
+  ],
+  "did-it-do-well": [
+    {
+      "q": "Why does skimming a transcript fail as a quality check?",
+      "options": [
+        "Transcripts are too long to ever finish reading",
+        "The agent hides its real output from the reader",
+        "Dangerous failures read like correct, fluent prose",
+        "The model deletes the steps that went wrong"
+      ],
+      "answer": 2,
+      "explain": "Following injected instructions or making things up both come out as fluent prose that looks right."
+    },
+    {
+      "q": "What two parts make up an eval?",
+      "options": [
+        "A model and a loop that runs it repeatedly",
+        "A receptionist and a worker grading the run",
+        "A unit test and a structural wiring check",
+        "A brief (the task) and a rubric (the standard)"
+      ],
+      "answer": 3,
+      "explain": "An eval bundles a brief and a rubric, run against the live agent and judged pass or fail."
+    },
+    {
+      "q": "What does the judge get to see beyond the agent's final answer?",
+      "options": [
+        "The path: steps taken, tools used, and errors",
+        "The source code of the agent being graded",
+        "The author's private notes about the rubric",
+        "A second judge's verdict on the same run"
+      ],
+      "answer": 0,
+      "explain": "The harness reads the logged record and writes step count, tools used, and error count into the judge's prompt."
+    },
+    {
+      "q": "What makes a strong rubric different from a weak one?",
+      "options": [
+        "It restates the task and asks if it was answered",
+        "It uses a more expensive judge model to decide",
+        "It names how this agent fails and sets a trap",
+        "It checks whether the output loads and is wired up"
+      ],
+      "answer": 1,
+      "explain": "A strong rubric names the specific failure mode and makes pass mean the agent didn't take the bait."
+    },
+    {
+      "q": "What should you do when a stage fails on its first eval run?",
+      "options": [
+        "Rerun it until the flaky verdict turns green",
+        "Switch to a cheaper judge to save on cost",
+        "Treat the failure as signal that the agent is wrong",
+        "Add more rubrics until one of them passes"
+      ],
+      "answer": 2,
+      "explain": "A failing bench is signal; tuning the test until it passes is lying to yourself with extra steps."
+    }
+  ],
+  "plans-that-run": [
+    {
+      "q": "What is the stubborn idea a workbook plan rests on?",
+      "options": [
+        "The plan should live in a dedicated tracker app",
+        "The plan needs a separate database for its cards",
+        "The plan is a note that summarizes the real work",
+        "The plan is the work, not a note about the work"
+      ],
+      "answer": 3,
+      "explain": "Instead of a note beside the work, the plan IS the work, written as the only copy in one file."
+    },
+    {
+      "q": "What does it mean for a task to be ready?",
+      "options": [
+        "It is unfinished and everything it depends on is done",
+        "It has been assigned a priority by the scheduler",
+        "It has reached its declared timestamp on the calendar",
+        "A human has dragged its card into the doing column"
+      ],
+      "answer": 0,
+      "explain": "Ready means unfinished plus all dependencies done; that single fact runs the whole loop."
+    },
+    {
+      "q": "How is the kanban board related to the plan file?",
+      "options": [
+        "It is stored in its own table with a column schema",
+        "It is a two-way rendering that reads and writes the file",
+        "It is a read-only screenshot drawn once at deploy",
+        "It is a separate tracker that mirrors the work"
+      ],
+      "answer": 1,
+      "explain": "The board has a read half drawing columns and a write half flipping the word back in the same file."
+    },
+    {
+      "q": "How does a scheduled task actually fire at its declared time?",
+      "options": [
+        "The text file animates itself when the clock matches",
+        "A notification system pushes the task at the timestamp",
+        "An engine-side heartbeat wakes the agent to read the plan",
+        "The board polls the calendar and triggers the run"
+      ],
+      "answer": 2,
+      "explain": "The declared timestamp is for reading; a steady engine heartbeat wakes the agent to notice what's due."
+    },
+    {
+      "q": "What does running a plan honestly NOT promise?",
+      "options": [
+        "That a stuck task will always have a nameable cause",
+        "That contradictions in the plan become catchable facts",
+        "That a person and an agent can clear the same list",
+        "That the plan runs itself without any human direction"
+      ],
+      "answer": 3,
+      "explain": "Direction stays human; what changes is that following through gets cheap, not that judgment disappears."
+    }
+  ],
+  "compiled-plans": [
+    {
+      "q": "What is the central claim about a plan written for human eyes?",
+      "options": [
+        "That plan itself can be the running system",
+        "That plan must be translated into code first",
+        "That plan is a spec handed to an engineer",
+        "That plan is only a diagram of the work"
+      ],
+      "answer": 0,
+      "explain": "The same steps, order, and dependencies you'd naturally describe are what executes; there is no second artifact."
+    },
+    {
+      "q": "Where does the running order of steps come from?",
+      "options": [
+        "From a configuration of runners and pools you set",
+        "From the dependencies you naturally describe",
+        "From a hand-written table of step priorities",
+        "From the order the steps appear in the file"
+      ],
+      "answer": 1,
+      "explain": "The dependencies you describe are already the schedule; the engine peels the plan into ready layers."
+    },
+    {
+      "q": "What is the deliberate limit on how steps take input?",
+      "options": [
+        "A step may hand its result to at most one other step",
+        "A step must depend on every earlier step in the plan",
+        "Each step takes at most one input from upstream",
+        "Each step must combine two upstream results at once"
+      ],
+      "answer": 2,
+      "explain": "Each step takes at most one input; joining two streams must be done by an upstream step producing the combined thing."
+    },
+    {
+      "q": "How do you get two agents running in parallel in a plan?",
+      "options": [
+        "Flip a parallelism setting on each agent step",
+        "Mark both steps as agents and chain them together",
+        "Assign them to two different runner pools",
+        "Give the two agent steps no dependency on each other"
+      ],
+      "answer": 3,
+      "explain": "Parallelism is the absence of a dependency; with no link the steps land in the same layer and run together."
+    },
+    {
+      "q": "What is the one-directional safety rule for changing a deployed plan?",
+      "options": [
+        "What you give may grow but never shrink; demands may shrink not grow",
+        "What you give may shrink but never grow; demands may grow not shrink",
+        "Both what you give and what you demand may only grow",
+        "Both what you give and what you demand may only shrink"
+      ],
+      "answer": 0,
+      "explain": "Removing an output may break downstream readers; asking for more capability may exceed what the host grants."
+    }
+  ]
+}

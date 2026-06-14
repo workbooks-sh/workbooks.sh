@@ -1,0 +1,401 @@
+{
+  "why-workbooks": [
+    {
+      "q": "According to the lesson, what is the new skill that lets a non-coder build software?",
+      "options": [
+        "Saying what you want and judging what comes back",
+        "Learning enough syntax to read the agent's code",
+        "Memorizing the names of common frameworks and tools",
+        "Configuring servers and budgets before you begin"
+      ],
+      "answer": 0,
+      "explain": "The lesson says you cross the gap by getting good at saying what you want and judging the result, not by becoming an engineer."
+    },
+    {
+      "q": "The lesson describes Workbooks not as one product but as what?",
+      "options": [
+        "A subscription service that hosts your finished apps",
+        "An ecosystem: a way to hold software, an engine, and agents",
+        "A programming language designed for plain-English input",
+        "A single app you log into to manage your projects"
+      ],
+      "answer": 1,
+      "explain": "It states Workbooks isn't one product you adopt but an ecosystem: a way to hold software, an engine to run it, and agents that build."
+    },
+    {
+      "q": "What is the lesson's answer to an organization's fear of letting AI touch real systems?",
+      "options": [
+        "Trust the agent because modern models rarely make errors",
+        "Keep a human watching every single command the agent runs",
+        "The agent runs in a sandbox you own, with revocable powers",
+        "Limit the agent to reading data and never writing anything"
+      ],
+      "answer": 2,
+      "explain": "The bet is the opposite of trusting the agent: it runs inside a sandbox you own with deliberate, revocable powers and secrets kept off the computer."
+    },
+    {
+      "q": "Why does the lesson call this 'the durable shape' rather than just an AI tool?",
+      "options": [
+        "Because the agents improve faster than any rival product",
+        "Because a company guarantees it will support the format forever",
+        "Because it hides its complexity behind a polished interface",
+        "Because it's built on standards that outlived a dozen trends"
+      ],
+      "answer": 3,
+      "explain": "It's steadier than an AI tool because every part rests on lasting standards: an ordinary file, a plain format, an engine you can run yourself."
+    },
+    {
+      "q": "For a team, what is the 'quiet idea' underneath Workbooks?",
+      "options": [
+        "Work can travel as one thing that explains itself on arrival",
+        "Every tool a team uses should be replaced by a single vendor",
+        "Slack threads should be the permanent record of every decision",
+        "Teams should grant the agent access to all six of their services"
+      ],
+      "answer": 0,
+      "explain": "The idea is that a piece of work, its screen, data, and history can travel as one thing you hand off, explaining itself on arrival."
+    }
+  ],
+  "why-you-can-build-now": [
+    {
+      "q": "The lesson says the wall to building software is gone primarily because of what change?",
+      "options": [
+        "Coding languages became dramatically simpler to learn",
+        "The job changed: you describe and an agent does the building",
+        "Hiring an engineer is now far cheaper than it used to be",
+        "Computers got fast enough to write their own programs alone"
+      ],
+      "answer": 1,
+      "explain": "It states the wall is gone because the job changed: you describe what you want and an agent builds it, not because coding got easier."
+    },
+    {
+      "q": "In the tip-calculator example, what did the user notably leave out of the prompt?",
+      "options": [
+        "Who the tool was for and what feeling it should have",
+        "The exact tip percentages the calculator should offer",
+        "How it should be built and which technology to use",
+        "Any request that the numbers be easy to read on a phone"
+      ],
+      "answer": 2,
+      "explain": "The lesson highlights that the prompt described the outcome and audience but never said how, or named a single piece of technology."
+    },
+    {
+      "q": "How does the lesson say a non-coder can direct something they can't read?",
+      "options": [
+        "By learning to skim the code for obvious errors first",
+        "By trusting the agent's own description of what it built",
+        "By giving the agent extremely detailed technical instructions",
+        "By judging the result, the way an editor judges a writer"
+      ],
+      "answer": 3,
+      "explain": "You direct by judging the result, not the method, the way an editor directs a writer or a client directs a designer."
+    },
+    {
+      "q": "According to the lesson, what makes the sandbox the part 'that makes this sane'?",
+      "options": [
+        "The agent can't reach the rest of your machine from it",
+        "The agent promises not to touch your files or passwords",
+        "It backs up your real computer before the agent runs",
+        "It scans the agent's work for dangerous commands first"
+      ],
+      "answer": 0,
+      "explain": "Safety comes from the shape of the room: a sealed workspace the agent can't reach out of, so there's nothing of yours to break."
+    },
+    {
+      "q": "What is the lesson's honest framing of what Workbooks is?",
+      "options": [
+        "A tool that runs itself once you set it up correctly",
+        "Software built in workbooks, by people and agents together",
+        "An app you log into where agents work without supervision",
+        "A way to finally make the human director optional"
+      ],
+      "answer": 1,
+      "explain": "The lesson insists it is software built in workbooks by people and agents together, not software that runs itself while you walk away."
+    }
+  ],
+  "tell-it-what-you-want": [
+    {
+      "q": "The lesson says the most important skill for a first request is what?",
+      "options": [
+        "Knowing a programming language well enough to check work",
+        "Writing a complete, flawless spec before you ever send it",
+        "Asking well: saying clearly what you want a capable builder to do",
+        "Spelling out the exact steps the agent should follow"
+      ],
+      "answer": 2,
+      "explain": "It frames the key skill as the old human skill of asking well, saying what you want clearly enough that someone capable can do it."
+    },
+    {
+      "q": "Why is the to-do-list request better than the flexbox-and-divs request?",
+      "options": [
+        "It is far longer and lists more technical requirements",
+        "It tells the agent exactly which sorting function to write",
+        "It names a popular layout the agent should always prefer",
+        "It describes the outcome, so the agent can pick a better road"
+      ],
+      "answer": 3,
+      "explain": "The second is shorter and better because it gives purpose, audience, and feel, letting the agent choose a better construction than you'd spell out."
+    },
+    {
+      "q": "Which of these does the lesson present as a key thing a first request should include?",
+      "options": [
+        "How you'll know it worked, a finish line you can check",
+        "A list of the specific files the agent should create",
+        "The framework and database the agent ought to choose",
+        "A guess at the layout so the agent doesn't have to decide"
+      ],
+      "answer": 0,
+      "explain": "The four things a new colleague would need include 'how will you know it worked' — a finish line the agent can aim at and you can check."
+    },
+    {
+      "q": "What rule does the lesson tell you to carry away about quality?",
+      "options": [
+        "Magic phrasing matters more than the detail you provide",
+        "Vague in, vague out; specific in, specific out",
+        "Always keep requests as short as possibly can be",
+        "Technical wording produces a more specific result"
+      ],
+      "answer": 1,
+      "explain": "The rule is 'vague in, vague out; specific in, specific out' — detail about the outcome is the biggest lever on result quality."
+    },
+    {
+      "q": "What does the lesson mean when it says 'specific does not mean technical'?",
+      "options": [
+        "You should add code only after the first draft comes back",
+        "Technical detail is fine as long as it's also very specific",
+        "Rich, specific description of the outcome can use no code at all",
+        "Specific requests must name at least one piece of technology"
+      ],
+      "answer": 2,
+      "explain": "The better dog-walking request had not one word of code; being richly specific about the outcome while staying out of construction is the move."
+    }
+  ],
+  "the-loop-prompt-look-redirect": [
+    {
+      "q": "What does the lesson say experienced people actually have that beginners lack?",
+      "options": [
+        "A secret set of magic words that produce perfect output",
+        "The ability to read and fix the agent's code themselves",
+        "A better, more detailed first prompt than everyone else",
+        "A loop they trust: say it, look hard, say the next thing"
+      ],
+      "answer": 3,
+      "explain": "There are no magic words; experienced people have a loop they trust — say what they want, look hard, redirect — run over and over."
+    },
+    {
+      "q": "What are the three beats of the loop, in order?",
+      "options": [
+        "Prompt, Look, Redirect",
+        "Plan, Build, Deploy",
+        "Describe, Wait, Accept",
+        "Ask, Approve, Repeat"
+      ],
+      "answer": 0,
+      "explain": "The loop has three beats run in order: Prompt (say what you want), Look (examine what came back), Redirect (name what's off)."
+    },
+    {
+      "q": "Which beat does the lesson warn people most often skip, causing projects to go wrong?",
+      "options": [
+        "The prompt, because people overthink the wording",
+        "The look, actually examining whether it's really right",
+        "The redirect, because corrections feel confrontational",
+        "The restart, because people refuse to begin again"
+      ],
+      "answer": 1,
+      "explain": "Look is the beat people skip — actually examining whether it is right, not whether it sounds right — and skipping it is where projects go wrong."
+    },
+    {
+      "q": "In the pottery-workshop example, what made the redirect effective?",
+      "options": [
+        "It re-explained the entire project from the beginning",
+        "It told the agent to make the whole thing better overall",
+        "It named exactly what was seen: a notes box and remaining spots",
+        "It started over rather than building on the prior version"
+      ],
+      "answer": 2,
+      "explain": "The redirect worked because it named the specific results seen — add a notes box, show remaining spots — giving the agent concrete targets."
+    },
+    {
+      "q": "Why does the lesson say it's safe to run a tight loop fast?",
+      "options": [
+        "Because the agent rarely makes a wrong turn in practice",
+        "Because a human approves each change before it is saved",
+        "Because bold redirects are tested in a separate copy first",
+        "Because the workbook records its history, so you can undo"
+      ],
+      "answer": 3,
+      "explain": "It's safe because a workbook keeps its own history with a way back, so the cost of a bad lap is just one more lap."
+    }
+  ],
+  "reading-what-it-did": [
+    {
+      "q": "What mindset does the lesson recommend taking toward the agent?",
+      "options": [
+        "A talented, fast, slightly overconfident colleague to verify",
+        "An infallible oracle whose output you can safely accept",
+        "An enemy that is probably trying to deceive you each time",
+        "A junior who needs every step spelled out in advance"
+      ],
+      "answer": 0,
+      "explain": "Treat the agent as a talented, fast, slightly overconfident colleague on their first week — verify the work rather than assume it."
+    },
+    {
+      "q": "Why does the lesson call 'it looks fine' a coin flip?",
+      "options": [
+        "Because skimming takes longer than a proper review does",
+        "Because confident fiction and wrong-thing-done-well look correct",
+        "Because the agent always hides its mistakes deliberately",
+        "Because reading the agent's description is enough to be sure"
+      ],
+      "answer": 1,
+      "explain": "Two mistakes sail through a skim — confident fiction and doing the wrong thing well — because both produce output that looks like correct work."
+    },
+    {
+      "q": "What is 'drift' as the lesson defines it?",
+      "options": [
+        "The agent slowing down as a project grows larger",
+        "A dramatic failure where the agent crashes mid-task",
+        "Slowly solving a slightly different problem than yours",
+        "The agent forgetting earlier parts of the conversation"
+      ],
+      "answer": 2,
+      "explain": "Drift is the agent slowly solving a slightly different problem than the one you have, accumulating small wrong turns that each looked reasonable."
+    },
+    {
+      "q": "What makes the ledger a record the agent 'can't fake'?",
+      "options": [
+        "The agent reviews and signs the log before it is sealed",
+        "A second agent rewrites the log to confirm it is honest",
+        "The agent chooses which steps are important enough to record",
+        "The system writes each action at a chokepoint, then seals it"
+      ],
+      "answer": 3,
+      "explain": "The agent doesn't hold the pen; the system records every action at a chokepoint and seals the log, so any later edit breaks the stamp."
+    },
+    {
+      "q": "What does the lesson say the best evals are?",
+      "options": [
+        "Traps that plant the exact mistake this task tends to make",
+        "Checklists that confirm every feature is present and working",
+        "Final-answer graders that read only the agent's conclusion",
+        "One-time reviews you run by hand on each individual change"
+      ],
+      "answer": 0,
+      "explain": "The best evals aren't checklists, they're traps: you plant the exact mistake the task tends to make, and a pass means the agent didn't bite."
+    }
+  ],
+  "first-workbook-end-to-end": [
+    {
+      "q": "What is the whole skill Dana brings, according to the lesson?",
+      "options": [
+        "A little hidden coding ability she rarely admits to",
+        "Describing clearly what she wants, like briefing a new hire",
+        "Knowing which framework and database to choose up front",
+        "Reading the agent's code closely to catch its errors"
+      ],
+      "answer": 1,
+      "explain": "Dana can't code; her whole skill is describing what she wants clearly, the way she'd brief a sharp new hire."
+    },
+    {
+      "q": "What did the agent do after reading Dana's first brief?",
+      "options": [
+        "Silently guessed at the unclear parts and built immediately",
+        "Returned a wall of code for Dana to review line by line",
+        "Asked two decisions that change the result: live-update and dropdowns",
+        "Refused to start until Dana provided a complete spec"
+      ],
+      "answer": 2,
+      "explain": "The agent showed up as a collaborator, finding the two decisions that change the result — live updates and dropdown vs. free text — and asking."
+    },
+    {
+      "q": "When Dana reviews the tool, what is she actually judging?",
+      "options": [
+        "The quality and structure of the underlying code",
+        "Whether the agent's description sounds accurate",
+        "How fast the agent finished the build",
+        "The result against what she asked for, like any draft"
+      ],
+      "answer": 3,
+      "explain": "Dana doesn't read code; she reviews the result against what she asked for, and is more qualified than the agent because she knows her team."
+    },
+    {
+      "q": "What are the 'three levels' the lesson names for the agent?",
+      "options": [
+        "It answers, it checks itself, it works with you over time",
+        "It plans, it codes, it deploys without your involvement",
+        "It listens, it remembers, it eventually runs on its own",
+        "It drafts, it tests, it replaces the human director"
+      ],
+      "answer": 0,
+      "explain": "The three levels are: Level 1 it answers, Level 2 it checks itself, Level 3 it works with you over time as a collaborator."
+    },
+    {
+      "q": "What does the lesson say about putting Dana's workbook on the web?",
+      "options": [
+        "It requires rebuilding the tool for a different environment",
+        "It's closer to flipping one setting than the dreaded deploy",
+        "It demands a separate hosting account and a build step",
+        "It only works after engineers review the whole project"
+      ],
+      "answer": 1,
+      "explain": "Going live is closer to flipping one setting than the white-knuckle deploy engineers dread; the same thing runs, just somewhere else."
+    }
+  ],
+  "the-one-file": [
+    {
+      "q": "What is the core unit of everything in Workbooks, per the lesson?",
+      "options": [
+        "The runtime server that hosts and scales the projects",
+        "The org layer that records the intent and the tasks",
+        "A workbook, which at first glance looks like an HTML page",
+        "The SQLite database that holds the saved data"
+      ],
+      "answer": 2,
+      "explain": "The thing you walk away with is a workbook, the core unit; it looks like a web page, an .html file, the format the internet is built on."
+    },
+    {
+      "q": "What does the lesson correct about 'a workbook is just one HTML file'?",
+      "options": [
+        "A workbook is actually a proprietary archive, not HTML",
+        "A workbook can't run without being connected to a server",
+        "A workbook is only the visible screen, never the data",
+        "When it travels it's a small bundle, and the bundle is the unit"
+      ],
+      "answer": 3,
+      "explain": "The first correction: a workbook is not only a single HTML file; when it travels it's a small bundle, and the bundle is what you own and send."
+    },
+    {
+      "q": "Which four standards are bound into the workbook bundle?",
+      "options": [
+        "HTML, SQLite, org, and a one-line manifest",
+        "HTML, JSON, Python, and a config file",
+        "HTML, CSS, JavaScript, and a database driver",
+        "HTML, zip, Elixir, and a manifest"
+      ],
+      "answer": 0,
+      "explain": "The bundle binds four standards: workbook.html for the face, vfs.sqlite for the disk, workbook.org for the why, and manifest.json to bind them."
+    },
+    {
+      "q": "What does the lesson identify as the over-claim it wants to retire?",
+      "options": [
+        "That a workbook is a plain zip you can open with unzip",
+        "That single workbooks can open and run on their own",
+        "That a workbook is self-contained, so there's no server",
+        "That the bundle's formats are boring and openable"
+      ],
+      "answer": 1,
+      "explain": "The claim to retire is 'no server': a single workbook runs alone, but for agents, other languages, or scale it stands on a runtime."
+    },
+    {
+      "q": "How does the lesson describe the relationship between the file and the runtime?",
+      "options": [
+        "The runtime replaces the file once a project gets large",
+        "The file and runtime are two competing ways to ship software",
+        "The file is the unit you hold; the runtime is the ground it stands on",
+        "The runtime is bundled inside every single workbook file"
+      ],
+      "answer": 2,
+      "explain": "The workbook is the core unit you hold and hand off; the runtime is the ground it stands on when you want more than a single page."
+    }
+  ]
+}

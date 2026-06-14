@@ -1,0 +1,401 @@
+{
+  "the-system-improves-itself": [
+    {
+      "q": "What is the autopoet?",
+      "options": [
+        "A new kind of engine that rewrites its own deep machinery over time",
+        "A standing agent working a maintenance plan, aimed at the system itself",
+        "A chat window where you ask the system to fix problems on demand",
+        "A separate model trained only to detect bugs in shipped software"
+      ],
+      "answer": 1,
+      "explain": "The autopoet is just an agent and a plan pointed inward at the system."
+    },
+    {
+      "q": "What layer is the autopoet allowed to change?",
+      "options": [
+        "The running engine, but only after a full reboot completes",
+        "Any code, as long as the change passes the verify gates first",
+        "The declarative layer of plain text: tools, skills, docs, job descriptions",
+        "The compiled binaries, since plain text would be too slow to edit"
+      ],
+      "answer": 2,
+      "explain": "It edits only the declarative, plain-text layer; the engine is fixed."
+    },
+    {
+      "q": "How does the autopoet learn what needs fixing?",
+      "options": [
+        "It scans live performance data and forecasts problems on its own",
+        "A human reopens the project and assigns it a list of fixes",
+        "It reboots agents periodically and watches which ones fail",
+        "Working agents file tickets when their own tools fall short"
+      ],
+      "answer": 3,
+      "explain": "Working agents notice tool gaps and file tickets the autopoet reads."
+    },
+    {
+      "q": "Why is 'software that edits itself' safe here?",
+      "options": [
+        "Every change is a reviewable text diff that runs the same gates",
+        "The autopoet is trusted, so its changes skip the usual checks",
+        "Changes apply only after a human approves each one by hand",
+        "The engine quietly reboots to undo anything that goes wrong"
+      ],
+      "answer": 0,
+      "explain": "Changes are reviewable, revertible text diffs facing the normal gates."
+    },
+    {
+      "q": "What is true about the autopoet today?",
+      "options": [
+        "It already reads live performance data and improves with no prompting",
+        "Phase 1, the issue backlog, is built and running on this project",
+        "It can edit the engine as long as the change is well documented",
+        "It is purely a planned idea with nothing actually shipped yet"
+      ],
+      "answer": 1,
+      "explain": "Phase 1, the ticket backlog, is real; the self-reading bet is unfinished."
+    }
+  ],
+  "proving-origin": [
+    {
+      "q": "Where does a workbook's proof of origin have to live?",
+      "options": [
+        "On a registry server that anyone can query to confirm it",
+        "In a separate signature file shipped alongside the workbook",
+        "Inside the file itself, surviving a byte-for-byte copy",
+        "On the platform the workbook was originally published from"
+      ],
+      "answer": 2,
+      "explain": "The proof must ride inside the artifact so it survives copying offline."
+    },
+    {
+      "q": "How does the signer's identity work in the seal?",
+      "options": [
+        "It is a name that points at a key stored on a server",
+        "It is a certificate fetched from a trusted authority on check",
+        "It is a username registered in the platform's account system",
+        "The identity string is itself the signer's public verifying key"
+      ],
+      "answer": 3,
+      "explain": "The identity is the key written out, so nothing needs looking up."
+    },
+    {
+      "q": "Why does verifying a signed workbook ask two questions?",
+      "options": [
+        "To separate whether the seal is genuine from whether bytes changed",
+        "To check the signer's name against a master list of trusted authors",
+        "To confirm both the timestamp and the network connection are valid",
+        "To compare the file against the original copy stored on the server"
+      ],
+      "answer": 0,
+      "explain": "One question checks the signature, the other checks the bytes unchanged."
+    },
+    {
+      "q": "How is the self-referencing fingerprint problem solved?",
+      "options": [
+        "The seal is stored in a second file so the bytes never move",
+        "Fingerprint the page as if the seal weren't there, stripping it first",
+        "The fingerprint is recomputed and re-signed until the bytes settle",
+        "Only the seal block is fingerprinted, never the rest of the page"
+      ],
+      "answer": 1,
+      "explain": "Strip any seal, fingerprint what remains, so adding it back can't spoil it."
+    },
+    {
+      "q": "What does a valid seal actually prove?",
+      "options": [
+        "That the workbook's contents are trustworthy and safe to run",
+        "That a trusted authority has vouched for the signer's real name",
+        "The bytes are untouched since signing, by the holder of this key",
+        "That the signing timestamp was witnessed by a neutral clock"
+      ],
+      "answer": 2,
+      "explain": "It proves continuity under a claimed key, not trustworthiness or true name."
+    }
+  ],
+  "who-sees-what": [
+    {
+      "q": "Why is a password box inside a single file not real protection?",
+      "options": [
+        "The password is too short for browsers to check it securely",
+        "The file forgets the password whenever it is forwarded by email",
+        "The check only works while the original server stays online",
+        "The file carries both the lock and the data, readable via view source"
+      ],
+      "answer": 3,
+      "explain": "A single file ships the guard with the treasure; you can read past it."
+    },
+    {
+      "q": "What is the real rule for keeping a secret out of the wrong hands?",
+      "options": [
+        "Keep the secret out of the file entirely, not hidden or encrypted in it",
+        "Encrypt the secret strongly enough that no one can decrypt it",
+        "Hide the secret in a part of the file most readers won't open",
+        "Ask the program to refuse access to the secret on load"
+      ],
+      "answer": 0,
+      "explain": "The only way to guard a secret is to keep it out of the file."
+    },
+    {
+      "q": "Which stance means the shell is public but the data isn't in the file?",
+      "options": [
+        "Public, where everything including the data is baked in openly",
+        "Gated data, where contents are fetched from a server that checks first",
+        "Gated route, where even the app's existence is hidden entirely",
+        "Sealed, where the data ships encrypted but travels with the file"
+      ],
+      "answer": 1,
+      "explain": "Gated data means a public shell but contents fetched after a check."
+    },
+    {
+      "q": "When does the system enforce the stance you declared?",
+      "options": [
+        "When someone opens the file, by running a check on page load",
+        "When the recipient tries to read the gated data over the wire",
+        "When the workbook is being turned into a file, refusing to build",
+        "When the file is uploaded, by stripping the secret before sending"
+      ],
+      "answer": 2,
+      "explain": "The guard lives at build time; a leaking file is never created."
+    },
+    {
+      "q": "What does the seal carried inside a workbook claim?",
+      "options": [
+        "That the file is high quality and safe for the recipient to trust",
+        "That the contents are hidden from anyone who lacks the key",
+        "That a trusted app store has approved the maker's identity",
+        "Who stamped it, and that the file hasn't changed a character since"
+      ],
+      "answer": 3,
+      "explain": "The seal proves origin and integrity, not goodness and not secrecy."
+    }
+  ],
+  "secrets-in-the-open": [
+    {
+      "q": "Why are hidden sheets and scrambled blobs called theater?",
+      "options": [
+        "The holder owns the file and the program, so any check is skippable",
+        "They slow the app down enough that users give up reading the data",
+        "Browsers refuse to render files that contain encrypted-looking noise",
+        "They only work until the original publishing server goes offline"
+      ],
+      "answer": 0,
+      "explain": "The holder owns file and program, so any enforced gate is walked through."
+    },
+    {
+      "q": "What is actually shipped in a sealed section of the file?",
+      "options": [
+        "The plaintext, guarded by a password the program checks on open",
+        "Genuine encrypted gibberish, with the key never riding in the file",
+        "A link that fetches the real contents from the runtime each time",
+        "A scrambled copy that the app unscrambles using a bundled key"
+      ],
+      "answer": 1,
+      "explain": "A sealed section is real ciphertext; the key was never shipped at all."
+    },
+    {
+      "q": "Where is the key, and how is it obtained?",
+      "options": [
+        "Baked into each copy, unlocked once the user enters a password",
+        "Stored in the file's metadata, readable only by the original maker",
+        "Held at the runtime; a copy asks the engine, which checks who's asking",
+        "Cached in the browser after the first successful unlock of the file"
+      ],
+      "answer": 2,
+      "explain": "The key lives at the runtime and is released only after an identity check."
+    },
+    {
+      "q": "How does the design stop a swapped or relabeled section from opening?",
+      "options": [
+        "It logs every key request so misuse can be traced afterward",
+        "It checks the section's name against a list of allowed sections",
+        "It hides the section names so attackers can't find the right one",
+        "Each key is welded to one section, baked into the cryptographic seal"
+      ],
+      "answer": 3,
+      "explain": "The section's identity is baked into the seal, so a mismatch won't open."
+    },
+    {
+      "q": "What is the 'dead-man switch' property of keeping the key home?",
+      "options": [
+        "Delete the one key and every copy everywhere goes dark at once",
+        "A remote command reaches out and erases all distributed copies",
+        "Each copy self-destructs after a set number of failed unlocks",
+        "The runtime tracks copies and revokes them one device at a time"
+      ],
+      "answer": 0,
+      "explain": "All copies fetch the same key, so deleting it darkens every copy instantly."
+    }
+  ],
+  "a-disk-that-travels": [
+    {
+      "q": "Where does a workbook keep the things its project remembers?",
+      "options": [
+        "In a cloud bucket rented separately for each workbook's data",
+        "On its own disk that rides inside the file and travels with it",
+        "On the user's real computer, in a folder the workbook controls",
+        "In a data center server that the workbook connects to on open"
+      ],
+      "answer": 1,
+      "explain": "The disk rides inside the file; it belongs to the project, not a machine."
+    },
+    {
+      "q": "What lets the disk answer questions a normal disk can't?",
+      "options": [
+        "It runs a background indexer that crawls folders on every open",
+        "It connects to a database server whenever a query is needed",
+        "Underneath the paths, the disk is built out of database tables",
+        "It keeps a separate README cataloging every file by hand"
+      ],
+      "answer": 2,
+      "explain": "Built on tables, the disk answers path access and database queries both."
+    },
+    {
+      "q": "What happens when you unbundle a workbook's disk?",
+      "options": [
+        "It stays locked in an invented format only workbooks can read",
+        "It uploads its files to the cloud and leaves a reference behind",
+        "It deletes the originals once the copies are safely extracted",
+        "It unpacks into ordinary files in ordinary folders on your computer"
+      ],
+      "answer": 3,
+      "explain": "The disk unpacks to plain files; the format never holds them hostage."
+    },
+    {
+      "q": "Why is an agent working inside a workbook's disk safe?",
+      "options": [
+        "Its writing can reach nothing beyond that one project-sized disk",
+        "It runs in read-only mode and cannot change any files at all",
+        "A human reviews every file the agent writes before it is saved",
+        "Its access to your computer is limited to a small scratch folder"
+      ],
+      "answer": 0,
+      "explain": "The disk is its whole world, so even a hijacked agent can't reach beyond."
+    },
+    {
+      "q": "What is the honest limit of a workbook's disk?",
+      "options": [
+        "It cannot store structured data, only loose unorganized files",
+        "It is project-scale, meant for megabytes, not a media warehouse",
+        "It evaporates the moment you stop paying for the storage meter",
+        "It can only be read on the machine that originally created it"
+      ],
+      "answer": 1,
+      "explain": "It's project-scale; big freight belongs behind a bigger machine."
+    }
+  ],
+  "the-disk-grows": [
+    {
+      "q": "How does a workbook reach live data outside the file?",
+      "options": [
+        "An agent is handed the password and an open connection directly",
+        "An export is pasted into the file by hand whenever data is needed",
+        "Certain names are registered to point outside, fetched live on ask",
+        "The seal is opened so the file can connect to the outside source"
+      ],
+      "answer": 2,
+      "explain": "Registered names fetch live; unregistered names fall through to the file."
+    },
+    {
+      "q": "Where does the password for an outside source actually live?",
+      "options": [
+        "Inside the description file that registers the outside name",
+        "In the agent's memory, so it can reauthenticate when needed",
+        "Baked into each copy of the workbook that needs the data",
+        "With the host, which makes the request through one audited path"
+      ],
+      "answer": 3,
+      "explain": "The host holds the credential; the description only names it, never holds it."
+    },
+    {
+      "q": "What is the structurally airtight way to give an agent outside data?",
+      "options": [
+        "A background worker pulls data in and writes it to the disk",
+        "The agent reaches out itself but only on a gentle schedule",
+        "The agent is granted the password for read-only requests only",
+        "The agent queries the source live but caches results locally"
+      ],
+      "answer": 0,
+      "explain": "The worker crosses the bridge; the agent only ever reads a local file."
+    },
+    {
+      "q": "Why is meaning-based search cheap enough to leave switched on?",
+      "options": [
+        "It calls an outside model fresh for every query a user runs",
+        "Meaning is computed once when content is saved, not at search time",
+        "It only searches a small summary instead of the real files",
+        "It matches exact letters, which is fast but misses meaning"
+      ],
+      "answer": 1,
+      "explain": "Expensive thinking happens on the rare save; searching is a fast lookup."
+    },
+    {
+      "q": "How does a workbook move from a local disk to cloud storage?",
+      "options": [
+        "By migrating the code to a vendor's tools threaded through it",
+        "By tearing the seal so the program can name the cloud directly",
+        "A few lines of configuration outside the program, not code changes",
+        "By rewriting each storage call to point at the new backend"
+      ],
+      "answer": 2,
+      "explain": "The code never names where bytes live; configuration swaps the backend."
+    }
+  ],
+  "under-the-hood": [
+    {
+      "q": "What reads the grammar across the whole ecosystem?",
+      "options": [
+        "A separate reader for the browser, the CLI, and the server each",
+        "A server reader that every other surface calls over the network",
+        "A library that each surface configures to its own needs",
+        "A single program, the kernel, a small Rust crate of ~500 lines"
+      ],
+      "answer": 3,
+      "explain": "One kernel reads the grammar everywhere, so every surface agrees."
+    },
+    {
+      "q": "What does it mean that the reading core 'has no hands'?",
+      "options": [
+        "It takes text and returns text; it can't touch files or network",
+        "It runs only on the server where the operating system guards it",
+        "It needs a human to feed it every file it is asked to read",
+        "It delegates all reading to toolkits that hold the real powers"
+      ],
+      "answer": 0,
+      "explain": "Text in, text out; touching nothing is why it runs everywhere safely."
+    },
+    {
+      "q": "Why can the renderer, planner, and safety gate be one machine?",
+      "options": [
+        "They share a server that coordinates the three separate tools",
+        "They're the same move: read text, understand structure, answer a question",
+        "They each load a different copy of the kernel for their own job",
+        "They run in sequence, each one feeding its output to the next"
+      ],
+      "answer": 1,
+      "explain": "All four jobs are one machine asked different questions about the text."
+    },
+    {
+      "q": "Why is the reader deliberately built to do so little?",
+      "options": [
+        "To keep it small enough to fit inside a single browser tab",
+        "To make it faster than a reader that can touch the disk",
+        "Because hands are where danger lives; powerless code is safe anywhere",
+        "Because adding powers would require rewriting it for each surface"
+      ],
+      "answer": 2,
+      "explain": "A powerless core can't touch disk or network, so it's safe to put anywhere."
+    },
+    {
+      "q": "Where do new powers come from if the core stays small?",
+      "options": [
+        "From secretly making the reader bigger over each release",
+        "From a server tier that lends capabilities to the reader on demand",
+        "From the kernel's six functions growing more abilities over time",
+        "From toolkits added on the outside, granted deliberately one at a time"
+      ],
+      "answer": 3,
+      "explain": "Toolkits add the hands at the edges; the center stays small and trustworthy."
+    }
+  ]
+}

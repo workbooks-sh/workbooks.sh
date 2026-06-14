@@ -27,23 +27,12 @@
    "dek": "Why you can build real software now — and how to do it by describing what you want to an agent that does the building.",
    "lessons": [
     {
-     "slug": "why-you-can-build-now",
-     "title": "Why you can build software now",
+     "slug": "tell-it-what-you-want",
+     "title": "Telling your agent what to build",
      "status": "live",
-     "teaches": "The job-to-be-done framing: you don't want 'a workbook', you want software shipped. Workbooks is an ecosystem where you describe outcomes in plain English and an agent builds them in a safe sandbox. This is the activation 'why' that replaces the file-format opener.",
+     "teaches": "The activation lesson for the whole center: the wall between idea and shipping is gone because you describe outcomes and an agent does the building. Then the actionable core — describe the outcome not the implementation, give complete and consistent context, specificity is the single biggest factor in output quality — and 3 editable starter-prompt cards (madlibs: 'Build me a [tool] that [does X] from [my data]'). Merged with the former 'why you can build now' opener.",
      "docs": [
       "workbook",
-      "agents"
-     ],
-     "mins": "8 min",
-     "audio": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/why-you-can-build-now.mp3?v=459"
-    },
-    {
-     "slug": "tell-it-what-you-want",
-     "title": "Telling your agent what you want",
-     "status": "live",
-     "teaches": "Level 1->2 of the maturity ladder: describe the outcome, not the implementation; give complete, consistent context; specificity is the single biggest factor in output quality. Includes 3 editable starter-prompt cards (madlibs: 'Build me a [tool] that [does X] from [my data]').",
-     "docs": [
       "agents",
       "authoring"
      ],

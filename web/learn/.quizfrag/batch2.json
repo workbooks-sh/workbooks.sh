@@ -1,0 +1,401 @@
+{
+  "carries-its-story": [
+    {
+      "q": "How does a workbook keep knowing what it is after you rename the file to anything?",
+      "options": [
+        "Its file extension is locked so a rename can never alter the type.",
+        "The browser caches the original name and restores it on open.",
+        "A hidden magic header in the first bytes declares its true type.",
+        "It carries an internal marker block that describes what it is."
+      ],
+      "answer": 3,
+      "explain": "Identity lives inside the file as a marker block, so a rename never reaches it."
+    },
+    {
+      "q": "What is the filename's one humble remaining job during a library scan?",
+      "options": [
+        "It narrows the pile so the scan need not crack open every file.",
+        "It is the only way the tool decides which files are workbooks.",
+        "It stores the workbook's embedded source for fast retrieval later.",
+        "It records the author and timestamp of the most recent change."
+      ],
+      "answer": 0,
+      "explain": "The extension narrows the haystack for economy, but the marker is still the needle."
+    },
+    {
+      "q": "Why can a workbook carry its own source while still looking like one finished thing?",
+      "options": [
+        "The browser compiles the source on load and discards the original text.",
+        "The readable source folds into a second inert block the browser ignores.",
+        "The source is fetched from a server the moment someone unpacks the file.",
+        "A binary section stores the recipe in a sealed, unreadable container."
+      ],
+      "answer": 1,
+      "explain": "The human-written source rides along in a second inert block the browser leaves untouched."
+    },
+    {
+      "q": "How does a workbook project keep its history instead of scattering it?",
+      "options": [
+        "It uploads every revision to a vendor dashboard's activity log.",
+        "It saves periodic snapshots in a separate folder beside the files.",
+        "Its working space is a version-controlled repository kept inside it.",
+        "It records only the final published version and discards the rest."
+      ],
+      "answer": 2,
+      "explain": "The project's working space is a version-controlled repo, so history travels with it."
+    },
+    {
+      "q": "What makes the author of each recorded change trustworthy rather than a typed label?",
+      "options": [
+        "The name is verified against a central company directory at publish time.",
+        "Each change requires a fresh password confirming the author manually.",
+        "The author field is locked once written and can never be edited again.",
+        "A real cryptographic identity backs the name and survives a wipe."
+      ],
+      "answer": 3,
+      "explain": "Authorship rests on a portable cryptographic identity, not a name typed into a field."
+    }
+  ],
+  "the-one-language": [
+    {
+      "q": "What is the central claim this lesson makes about what an agent writes?",
+      "options": [
+        "The material underneath is just readable plain text you can check.",
+        "The agent hides its real plan in a private machine language.",
+        "Only experts trained on the tooling can decode what was written.",
+        "The running result is all there is; nothing underlies it."
+      ],
+      "answer": 0,
+      "explain": "The whole idea is that the layer you and the agent stand on is just readable."
+    },
+    {
+      "q": "What trade do the two usual ways of writing software's story force on you?",
+      "options": [
+        "You must pick a vendor's format and stay locked inside its tools.",
+        "You get prose or structure in one place, never both together.",
+        "You choose between speed and accuracy when the machine parses it.",
+        "You sacrifice readability for a smaller file that loads faster."
+      ],
+      "answer": 1,
+      "explain": "Pretty prose is meaningless to a machine; tidy structure has no room for human thought."
+    },
+    {
+      "q": "Where did the org convention come from?",
+      "options": [
+        "It was invented fresh for this project to unify its layers.",
+        "It is a proprietary dialect owned by a single vendor.",
+        "It is a roughly twenty-year-old convention for plain-text notes.",
+        "It is a rebranding of HTML extended to describe meaning."
+      ],
+      "answer": 2,
+      "explain": "Org is a ~20-year-old open convention for notes, to-dos, and schedules, not newly invented."
+    },
+    {
+      "q": "What does org's readability actually give you about agent drift?",
+      "options": [
+        "It prevents an agent from ever repeating or contradicting itself.",
+        "It compresses the text so contradictions cannot fit in the file.",
+        "It locks the document so only the host can change a line.",
+        "It makes drift catchable, since a checker can walk it and notice."
+      ],
+      "answer": 3,
+      "explain": "Org doesn't prevent drift; being machine-readable makes the drift catchable instead of hidden."
+    },
+    {
+      "q": "Why does learning to read one format let you read every corner of a project?",
+      "options": [
+        "The same org grammar shows up in intent, manuals, deploys, and plans.",
+        "A translator converts each part into your preferred file format.",
+        "Every part is rewritten into prose whenever you open it.",
+        "Each layer uses its own dialect that the reader auto-detects."
+      ],
+      "answer": 0,
+      "explain": "The same readable grammar appears everywhere, so you learn it once and read it all."
+    }
+  ],
+  "coming-alive": [
+    {
+      "q": "What changes when a workbook on your laptop comes alive?",
+      "options": [
+        "The file is rewritten into a server-specific binary format.",
+        "Nothing about the file changes; the thing it stands on does.",
+        "The browser injects new code so the page can run on its own.",
+        "Its source is stripped out to make room for live state."
+      ],
+      "answer": 1,
+      "explain": "The same byte-for-byte file comes alive because of what it stands on, not any file change."
+    },
+    {
+      "q": "What is the Nexus in this system?",
+      "options": [
+        "A file format you hand around like any other workbook.",
+        "A cloud-only subscription metered per request you make.",
+        "The engine — a place you run that workbooks are set down on.",
+        "A converter that exports a workbook into a deployable app."
+      ],
+      "answer": 2,
+      "explain": "The Nexus is the load-bearing engine, a place you stand on, not a file you carry."
+    },
+    {
+      "q": "How do the three words Nexus, dock, and the Dock relate?",
+      "options": [
+        "They are three separate systems you configure independently.",
+        "They are older names for one deprecated deployment step.",
+        "They describe three competing engines you pick between.",
+        "One motion seen three ways: the place, the act, the doorway."
+      ],
+      "answer": 3,
+      "explain": "Nexus is the place, to dock is the act, the Dock is the doorway between them."
+    },
+    {
+      "q": "Which trio of lights switches on when you dock a workbook?",
+      "options": [
+        "Isolated, stateful, and agentic.",
+        "Compiled, encrypted, and signed.",
+        "Cached, indexed, and replicated.",
+        "Public, billed, and metered."
+      ],
+      "answer": 0,
+      "explain": "Docking flips three lights at once: isolated, stateful, and agentic."
+    },
+    {
+      "q": "Why can one ordinary machine carry many workbooks at once?",
+      "options": [
+        "Each workbook is paused unless someone is actively viewing it.",
+        "The BEAM juggles huge numbers of tiny isolated processes.",
+        "Workbooks share one process so overhead stays near zero.",
+        "The engine rents extra virtual machines per workbook by the second."
+      ],
+      "answer": 1,
+      "explain": "The BEAM was built to juggle vast numbers of lightweight, isolated processes."
+    }
+  ],
+  "why-a-sandbox": [
+    {
+      "q": "What are the two things that actually go wrong with an agent doing real work?",
+      "options": [
+        "It runs too slowly and it forgets earlier parts of the task.",
+        "It writes buggy code and it picks the wrong AI model.",
+        "It reaches where it shouldn't, and it gets hijacked through the work.",
+        "It costs too much per run and it crashes the host machine."
+      ],
+      "answer": 2,
+      "explain": "The two nightmares are excess reach and prompt injection riding in on the work."
+    },
+    {
+      "q": "How does a sandbox differ from putting a guard in front of your secrets?",
+      "options": [
+        "It checks permissions twice instead of once before each action.",
+        "It encrypts the secrets so a guard can't read them if fooled.",
+        "It logs every access so a fooled guard can be caught later.",
+        "It builds a room that doesn't contain the secrets at all."
+      ],
+      "answer": 3,
+      "explain": "There's no door to guard because the secrets were never in the agent's room."
+    },
+    {
+      "q": "What does the phrase \"grant the verb, keep the noun\" mean here?",
+      "options": [
+        "The agent gets the ability to act, never the dangerous thing itself.",
+        "The agent is given verbs to log but nouns to execute directly.",
+        "The host renames secrets so the agent can't recognize them.",
+        "The agent may read keys but is forbidden from sending them."
+      ],
+      "answer": 0,
+      "explain": "The agent gets the ability to sign or fetch, never the key or network that's dangerous."
+    },
+    {
+      "q": "What's the difference between \"forbidden\" and \"doesn't exist\" for a capability?",
+      "options": [
+        "Forbidden means slower access; doesn't exist means no access at all.",
+        "Forbidden has a check that can fail; doesn't exist has nothing to check.",
+        "Forbidden applies to data; doesn't exist applies only to networks.",
+        "Forbidden is temporary; doesn't exist means revoked for this run."
+      ],
+      "answer": 1,
+      "explain": "A forbidden capability still exists and is checked; an absent one has nothing to check."
+    },
+    {
+      "q": "Which wall in the sandbox is described as the most thoroughly tested?",
+      "options": [
+        "The memory limit, pinned down by a dedicated automated suite.",
+        "The file-system wall, verified by checks after a past leak.",
+        "The network wall, pinned by checks after an early leak was caught.",
+        "The shell wall, proven by repeated red-team attempts."
+      ],
+      "answer": 2,
+      "explain": "The network wall is the most tested, pinned by checks after an early version leaked."
+    }
+  ],
+  "safe-powers": [
+    {
+      "q": "What is the narrower, more honest claim this lesson actually makes?",
+      "options": [
+        "Every dangerous power is silently filtered before it can run.",
+        "The powers are removed entirely so nothing risky remains.",
+        "A smarter guard catches every misuse before it happens.",
+        "You hand powers over deliberately and can take any back."
+      ],
+      "answer": 3,
+      "explain": "The claim is deliberate, named, revocable grants, not danger magically erased."
+    },
+    {
+      "q": "What happens when a workbook reaches for a power it was never granted?",
+      "options": [
+        "It fails to even start, because it asked for a tool never wired in.",
+        "It gets a quiet \"no\" and continues with reduced abilities.",
+        "It pauses and prompts the host to grant the power on demand.",
+        "It logs the attempt and silently skips that one action."
+      ],
+      "answer": 0,
+      "explain": "An ungranted power doesn't exist, so the workbook fails to start rather than being denied."
+    },
+    {
+      "q": "What does the minimal profile actually include?",
+      "options": [
+        "Only a disk and nothing else, a fully sealed scratch space.",
+        "Disk, commands, storage, a queue, plus secrets and brokered sockets.",
+        "Everything except the ability to call a language model.",
+        "Outbound web and browsing but no local disk or storage."
+      ],
+      "answer": 1,
+      "explain": "Minimal is a working surface that also grants secrets and brokered sockets, not a sealed space."
+    },
+    {
+      "q": "What happens if someone names a profile that doesn't exist, like a typo?",
+      "options": [
+        "It grants the network rung so the run isn't blocked.",
+        "It refuses to run until a valid profile name is supplied.",
+        "It falls closed to the pure-compute floor, disk and nothing else.",
+        "It inherits the last profile that successfully ran before it."
+      ],
+      "answer": 2,
+      "explain": "Unknown profiles fall closed to the most restrictive disk-only floor, pinned by a test."
+    },
+    {
+      "q": "How can a workbook use a secret without ever being able to leak it?",
+      "options": [
+        "The secret is encrypted inside the workbook and decrypted on use.",
+        "The workbook reads the key but is audited every time it does.",
+        "The host rotates the key fast enough that a leak goes stale.",
+        "It names and uses the secret but never reads it; the host signs."
+      ],
+      "answer": 3,
+      "explain": "With secrets granted it can name and use a secret but never read it; the host holds the key."
+    }
+  ],
+  "going-live": [
+    {
+      "q": "Why is going live usually terrifying, according to the lesson?",
+      "options": [
+        "Many separate services must all agree at once for the move to work.",
+        "The new place runs different code than your local prototype did.",
+        "Deploying always erases your data unless you back it up first.",
+        "The cloud charges unpredictable fees the moment you publish."
+      ],
+      "answer": 0,
+      "explain": "The fear is the committee of services that must all line up, not the new place itself."
+    },
+    {
+      "q": "What is a deployment, in this system's terms?",
+      "options": [
+        "A scripted sequence of steps that must run in the right order.",
+        "A short list of five decisions the engine converges reality to.",
+        "A configuration file packed with hooks and embedded commands.",
+        "A one-time export that bakes the current state into a binary."
+      ],
+      "answer": 1,
+      "explain": "A deployment is five decisions described as an end state the engine converges to."
+    },
+    {
+      "q": "What does the validation check do before letting you go live?",
+      "options": [
+        "It starts a test machine to confirm the deploy actually boots.",
+        "It rewrites the config to fix problems for you automatically.",
+        "It refuses configurations that would quietly betray you, read-only.",
+        "It flags style issues so the file reads more cleanly."
+      ],
+      "answer": 2,
+      "explain": "The read-only check refuses lying configs, like many tenants with single-user storage."
+    },
+    {
+      "q": "What does the public /_changes endpoint serve, and how?",
+      "options": [
+        "A full admin console gated behind a required login.",
+        "A live edit surface where anyone can push new commits.",
+        "The secrets and build tools, available only to authorized users.",
+        "The history feed, anonymous and read-only, newest first."
+      ],
+      "answer": 3,
+      "explain": "/_changes is an anonymous, read-only GET serving recent changes and agent status."
+    },
+    {
+      "q": "How does moving from your laptop to production actually work?",
+      "options": [
+        "You change one setting; local and cloud are values of one axis.",
+        "You rebuild the app for the cloud's different engine and runtime.",
+        "You migrate through a separate deploy pipeline and rebuild train.",
+        "You re-author the prototype into a production-grade version."
+      ],
+      "answer": 0,
+      "explain": "Local and cloud are two values of one setting; the same engine and bytes run on both."
+    }
+  ],
+  "giving-it-abilities": [
+    {
+      "q": "What does an agent reach for when it needs an ability it doesn't have?",
+      "options": [
+        "A plugin locked to whichever platform supplied it.",
+        "A toolkit: one packaged ability it can find, learn, and run safely.",
+        "A raw package installed onto your machine at your own risk.",
+        "A custom protocol bolted onto the agent for each new tool."
+      ],
+      "answer": 1,
+      "explain": "An agent reaches for a toolkit, one packaged ability bundled to be found and run safely."
+    },
+    {
+      "q": "What three things does a toolkit bundle into one object?",
+      "options": [
+        "A license, a price, and a support contract.",
+        "A protocol, a server, and a registry entry.",
+        "The program, the manual, and the sandbox-shaped wrapper.",
+        "A name, an icon, and a version number."
+      ],
+      "answer": 2,
+      "explain": "A toolkit ships code, manual, and the sandbox wrapper bound together as one object."
+    },
+    {
+      "q": "How is a toolkit's \"muscle\" layer built?",
+      "options": [
+        "A fresh program written from scratch for every new toolkit.",
+        "A description of a program the agent interprets at run time.",
+        "A cloud service the toolkit calls out to over the network.",
+        "A real program compiled into the portable form browsers run."
+      ],
+      "answer": 3,
+      "explain": "The muscle is a real program brought across into the portable form that runs in browsers."
+    },
+    {
+      "q": "Why can the manual double as the agent's instructions for the tool?",
+      "options": [
+        "It is structured text precise enough to be how the tool is reached.",
+        "A separate hidden spec is generated from it for the agent to read.",
+        "The agent rewrites the loose prose into commands before each use.",
+        "The manual is compiled into the program so they never diverge."
+      ],
+      "answer": 0,
+      "explain": "Structured manual text is precise enough to reach the tool, so docs can't drift from it."
+    },
+    {
+      "q": "How does the shared collection of toolkits actually grow?",
+      "options": [
+        "A central team writes and approves each new toolkit in advance.",
+        "Useful things built inside workbooks get promoted into toolkits.",
+        "Vendors submit toolkits to an app store for paid distribution.",
+        "The engine auto-generates toolkits from popular agent requests."
+      ],
+      "answer": 1,
+      "explain": "Build something useful inside a workbook and one step promotes it into a shared toolkit."
+    }
+  ]
+}
