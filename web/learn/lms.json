@@ -3,6 +3,25 @@
  "units": [
   {
    "n": 1,
+   "title": "Why Workbooks",
+   "dek": "The shift underneath all of this — and who it changes things for.",
+   "lessons": [
+    {
+     "slug": "why-workbooks",
+     "title": "Why Workbooks",
+     "status": "live",
+     "teaches": "The problem/solution case for the ecosystem across people, teams, and organizations — and why this is the durable, future-proof shape, framed indirectly around the shift to directing software rather than hand-building it.",
+     "docs": [
+      "workbook",
+      "nexus",
+      "agents"
+     ],
+     "mins": "6 min"
+    }
+   ]
+  },
+  {
+   "n": 2,
    "title": "Build by talking to your agent",
    "dek": "Why you can build real software now — and how to do it by describing what you want to an agent that does the building.",
    "lessons": [
@@ -64,7 +83,7 @@
    ]
   },
   {
-   "n": 2,
+   "n": 3,
    "title": "The whole thing",
    "dek": "Now that you've built something, here's what you were standing on — the ecosystem, and the one file you walk away holding.",
    "lessons": [
@@ -109,7 +128,7 @@
    ]
   },
   {
-   "n": 3,
+   "n": 4,
    "title": "The engine & the sandbox",
    "dek": "Why it's safe to hand an agent real power — the runtime you stand on, and the sandbox that means your secrets never touch the OS.",
    "lessons": [
@@ -167,7 +186,7 @@
    ]
   },
   {
-   "n": 4,
+   "n": 5,
    "title": "Giving it abilities",
    "dek": "How your agent gets real tools to work with — now that you know the engine that runs them safely.",
    "lessons": [
@@ -212,7 +231,7 @@
    ]
   },
   {
-   "n": 5,
+   "n": 6,
    "title": "Agents that work on their own",
    "dek": "Once you trust the agent for one task, here's how it works when you're not watching — and how you keep it honest.",
    "lessons": [
@@ -257,7 +276,7 @@
    ]
   },
   {
-   "n": 6,
+   "n": 7,
    "title": "Plans that run & the system that improves itself",
    "dek": "Your plans become the running work — and the climax: a system that helps improve itself.",
    "lessons": [
@@ -301,7 +320,7 @@
    ]
   },
   {
-   "n": 7,
+   "n": 8,
    "title": "Trust, sharing & the disk",
    "dek": "How something you can copy infinitely stays trustworthy, private, and useful when you hand it out.",
    "lessons": [
@@ -369,7 +388,7 @@
    ]
   },
   {
-   "n": 8,
+   "n": 9,
    "title": "Under the hood",
    "dek": "Optional, for the curious — the why behind the magic, and the one idea everything is wearing different clothes of.",
    "lessons": [
