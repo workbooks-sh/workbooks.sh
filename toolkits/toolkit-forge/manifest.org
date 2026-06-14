@@ -10,6 +10,7 @@
 * toolkit-forge — build toolkits for the toolkit substrate         :toolkit:
   :PROPERTIES:
   :ID:        toolkit-forge
+  :VERSION:        0.1.0
   :CLI_BIN:   git
   :STATUS:    experimental
   :SKILL_DIR: skills/

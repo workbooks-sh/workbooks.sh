@@ -11,6 +11,7 @@
 * tauri — desktop app shell                                       :toolkit:
   :PROPERTIES:
   :ID:        tauri
+  :VERSION:        0.1.0
   :CLI_BIN:   cargo-tauri
   :STATUS:    experimental
   :SKILL_DIR: skills/

@@ -9,6 +9,7 @@
 * ctk — the Component ToolKit                                       :toolkit:
   :PROPERTIES:
   :ID:        ctk
+  :VERSION:        0.1.0
   :KIND:      render
   :STATUS:    experimental
   :SKILL_DIR: skills/

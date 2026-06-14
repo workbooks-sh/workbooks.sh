@@ -9,6 +9,7 @@
 * asana — task federation connector                              :toolkit:
   :PROPERTIES:
   :ID:        asana
+  :VERSION:        0.1.0
   :KIND:      federation
   :STATUS:    experimental
   :SKILL_DIR: skills/

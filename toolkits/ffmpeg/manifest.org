@@ -10,6 +10,7 @@
 * ffmpeg — multimedia processing                                 :toolkit:
   :PROPERTIES:
   :ID:        ffmpeg
+  :VERSION:        0.3.0
   :CLI_BIN:   ffmpeg
   :STATUS:    stable
   :SKILL_DIR: skills/

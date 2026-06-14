@@ -984,10 +984,23 @@ defmodule Workbooks.Toolkits do
   defp exec_checks(%{exec: other}), do: [{false, "exec: unknown mode #{inspect(other)}"}]
 
   defp tk_dir(id, root) do
-    case Enum.find(discover_dir(root), &(&1.id == id)) do
+    case Enum.find(tk_dirs_lite(root), &(&1.id == id)) do
       %{dir: dir} -> dir
       _ -> nil
     end
+  end
+
+  # Lightweight toolkit lister for the release/version verbs: pure filesystem +
+  # text regex (kw/drawer), NO OQL NIF — so it runs from the host escript without
+  # a live runtime. id = manifest TOOLKIT/ID keyword/drawer, else the dir name.
+  defp tk_dirs_lite(root) do
+    Path.wildcard(Path.join(root, "*/manifest.org"))
+    |> Enum.map(fn manifest ->
+      dir = Path.dirname(manifest)
+      body = File.read!(manifest)
+      id = kw(body, "TOOLKIT") || kw(body, "ID") || drawer(body, "ID") || Path.basename(dir)
+      %{id: id, dir: dir}
+    end)
   end
 
   # SECURITY (wb-sec, findings #4/#5): a skill slug is agent/LLM-supplied. It must
@@ -1064,6 +1077,157 @@ defmodule Workbooks.Toolkits do
   @doc "Whether :role bash execution is opted-in. DISABLED (wb-9ja): always false — native exec is banned, regardless of WB_TOOLKIT_EXEC."
   def exec_allowed?, do: false
 
+  # ── Versioned releases (wbx-verbs) ─────────────────────────────────────────
+  # A toolkit is mirrored to its own repo and managed as a versioned RELEASE. The
+  # available versions come from `toolkits/releases.json` (a release index keyed by
+  # toolkit id) UNIONED with the manifest's own `#+VERSION:`/`:VERSION:` — so a
+  # toolkit always has at least its in-tree version even before any release lands.
+  # The currently-LIVE version is pinned in `toolkits/.live.json`; `rollback`
+  # rewrites that pin. Pure-Elixir, no network — these are plain file reads/writes
+  # over the toolkits root, mirroring discovery (a toolkit is a directory).
+
+  @doc "`wbx toolkit versions <id>` — available versions/tags for a toolkit (releases.json ∪ manifest VERSION)."
+  def versions_text(id, root \\ default_root()) do
+    case tk_dir(id, root) do
+      nil ->
+        "no such toolkit: #{id}"
+
+      dir ->
+        live = live_version(id, root)
+        vs = available_versions(id, dir, root)
+
+        if vs == [] do
+          "#{id}: no versions (add a #+VERSION: to manifest.org or an entry in toolkits/releases.json)"
+        else
+          "#{id} versions:\n" <>
+            Enum.map_join(vs, "\n", fn v ->
+              "  #{if v == live, do: "* ", else: "  "}#{v}#{if v == live, do: "  (live)", else: ""}"
+            end)
+        end
+    end
+  end
+
+  @doc """
+  `wbx toolkit live [<id>]` — the currently-live version. With an id, that one
+  toolkit; without, every toolkit's live pin (the manifest VERSION when unpinned).
+  """
+  def live_text(id_or_root \\ nil, root \\ default_root())
+  def live_text(nil, root), do: live_all_text(root)
+
+  def live_text(id, root) do
+    case tk_dir(id, root) do
+      nil -> "no such toolkit: #{id}"
+      dir -> "#{id}: #{live_version(id, root) || manifest_version(dir) || "(no version)"}"
+    end
+  end
+
+  defp live_all_text(root) do
+    case tk_dirs_lite(root) do
+      [] ->
+        "(no toolkits under #{root})"
+
+      tks ->
+        tks
+        |> Enum.sort_by(& &1.id)
+        |> Enum.map_join("\n", fn t ->
+          v = live_version(t.id, root) || manifest_version(t.dir) || "-"
+          pinned = if pinned?(t.id, root), do: " (pinned)", else: ""
+          "#{String.pad_trailing(t.id, 16)} #{v}#{pinned}"
+        end)
+    end
+  end
+
+  @doc """
+  `wbx toolkit rollback <id> <version>` — set the live version back to an older
+  release. Validates the version exists for the toolkit, then writes the pin into
+  `toolkits/.live.json` (created/merged in place). Idempotent.
+  """
+  def rollback_text(id, version, root \\ default_root()) do
+    case tk_dir(id, root) do
+      nil ->
+        "no such toolkit: #{id}"
+
+      dir ->
+        vs = available_versions(id, dir, root)
+
+        cond do
+          version in [nil, ""] ->
+            "rollback #{id}: no version given (try `wbx toolkit versions #{id}`)"
+
+          version not in vs ->
+            "rollback #{id}: no such version #{inspect(version)} (have: #{Enum.join(vs, ", ")})"
+
+          true ->
+            prev = live_version(id, root)
+            write_live_pin(id, version, root)
+
+            "rolled back #{id} → #{version}" <>
+              if(prev && prev != version, do: " (was #{prev})", else: "")
+        end
+    end
+  end
+
+  # All known versions for a toolkit: releases.json entry ∪ the in-tree manifest
+  # VERSION, newest-first by version sort. Never empty when the manifest declares one.
+  defp available_versions(id, dir, root) do
+    from_releases =
+      case releases(root)[id] do
+        vs when is_list(vs) -> Enum.map(vs, &to_string/1)
+        %{"versions" => vs} when is_list(vs) -> Enum.map(vs, &to_string/1)
+        _ -> []
+      end
+
+    ([manifest_version(dir)] ++ from_releases)
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.uniq()
+    |> Enum.sort({:desc, Version})
+    |> sort_fallback()
+  end
+
+  # Version.compare needs valid semver; if any tag isn't, fall back to string sort
+  # so non-semver tags (e.g. "v1", "edge") still list deterministically.
+  defp sort_fallback(vs) do
+    if Enum.all?(vs, &match?({:ok, _}, Version.parse(&1))),
+      do: vs,
+      else: Enum.sort(vs, :desc)
+  end
+
+  # The live version for a toolkit: the .live.json pin, else nil (caller falls
+  # back to the manifest VERSION — the natural "live = what's in tree" default).
+  defp live_version(id, root), do: live_pins(root)[id]
+
+  defp pinned?(id, root), do: Map.has_key?(live_pins(root), id)
+
+  defp manifest_version(dir) do
+    body = File.read!(Path.join(dir, "manifest.org"))
+    kw(body, "VERSION") || drawer(body, "VERSION")
+  end
+
+  # toolkits/releases.json — the release index (id → versions). Absent/corrupt → %{}.
+  defp releases(root) do
+    read_json(Path.join(root, "releases.json"))
+  end
+
+  # toolkits/.live.json — the live-version pins (id → version). Absent/corrupt → %{}.
+  defp live_pins(root) do
+    read_json(Path.join(root, ".live.json"))
+  end
+
+  defp read_json(path) do
+    with {:ok, body} <- File.read(path),
+         {:ok, %{} = map} <- Jason.decode(body) do
+      map
+    else
+      _ -> %{}
+    end
+  end
+
+  defp write_live_pin(id, version, root) do
+    path = Path.join(root, ".live.json")
+    pins = live_pins(root) |> Map.put(id, version)
+    File.write!(path, Jason.encode!(pins, pretty: true) <> "\n")
+  end
+
   defp agent(hs, id), do: Enum.find(hs, &("agent" in &1["tags"] and &1["id"] == id))
 
   defp names(nil), do: []
@@ -1075,6 +1239,7 @@ defmodule Workbooks.Toolkits do
     %{
       id: h["id"],
       title: h["title"],
+      version: h["props"]["VERSION"],
       cli: h["props"]["CLI_BIN"],
       status: h["props"]["STATUS"],
       skill_dir: h["props"]["SKILL_DIR"]

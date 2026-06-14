@@ -12,6 +12,7 @@
 * mono — grayscale kernel                                       :toolkit:
   :PROPERTIES:
   :ID:        mono
+  :VERSION:        0.1.0
   :CLI_BIN:   mono
   :STATUS:    exp
   :SKILL_DIR: skills/

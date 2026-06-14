@@ -11,6 +11,7 @@
 * capacitor — native iOS wrapper for workbooks                   :toolkit:
   :PROPERTIES:
   :ID:        capacitor
+  :VERSION:        0.1.0
   :CLI_BIN:   cap
   :STATUS:    experimental
   :SKILL_DIR: skills/

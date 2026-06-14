@@ -11,6 +11,7 @@
 * docs — the documentation pipeline, as a toolkit                 :toolkit:
   :PROPERTIES:
   :ID:        docs
+  :VERSION:        0.1.0
   :KIND:      knowledge+pipeline
   :STATUS:    partial
   :CLI_BIN:   wbx

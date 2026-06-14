@@ -11,6 +11,7 @@
 * open-avatars — deterministic SVG avatars for any site            :toolkit:
   :PROPERTIES:
   :ID:        open-avatars
+  :VERSION:        0.2.0
   :KIND:      knowledge+assets
   :STATUS:    experimental
   :SKILL_DIR: skills/

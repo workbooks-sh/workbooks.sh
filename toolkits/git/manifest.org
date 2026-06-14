@@ -10,6 +10,7 @@
 * git — distributed version control                              :toolkit:
   :PROPERTIES:
   :ID:        git
+  :VERSION:        0.1.0
   :CLI_BIN:   git
   :STATUS:    stable
   :SKILL_DIR: skills/

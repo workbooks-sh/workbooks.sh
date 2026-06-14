@@ -11,6 +11,7 @@
 * cloudflare — D1 + Workers AI + Pages, one account                :toolkit:
   :PROPERTIES:
   :ID:        cloudflare
+  :VERSION:        0.1.0
   :CLI_BIN:   wrangler
   :STATUS:    experimental
   :SKILL_DIR: skills/

@@ -16,6 +16,7 @@
 * icons — the universal icon library CLI                          :toolkit:
   :PROPERTIES:
   :ID:        icons
+  :VERSION:        0.1.0
   :KIND:      toolkit
   :STATUS:    experimental
   :SKILL_DIR: skills/

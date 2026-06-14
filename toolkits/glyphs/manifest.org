@@ -11,6 +11,7 @@
 * glyphs — one mark resolver for any site                          :toolkit:
   :PROPERTIES:
   :ID:        glyphs
+  :VERSION:        0.1.0
   :KIND:      knowledge+assets
   :STATUS:    experimental
   :SKILL_DIR: skills/

@@ -11,6 +11,7 @@
 * byod — workbook → app with a live backend + auth                :toolkit:
   :PROPERTIES:
   :ID:        byod
+  :VERSION:        0.1.0
   :CLI_BIN:   wb
   :STATUS:    experimental
   :SKILL_DIR: skills/

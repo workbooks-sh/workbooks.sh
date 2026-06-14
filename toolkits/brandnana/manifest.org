@@ -12,6 +12,7 @@
 * brandnana — brand-intelligence CLI                              :toolkit:
   :PROPERTIES:
   :ID:        brandnana
+  :VERSION:        0.1.0
   :KIND:      toolkit
   :STATUS:    experimental
   :SKILL_DIR: skills/

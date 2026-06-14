@@ -1,0 +1,89 @@
+# toolkits-release — mirror toolkits/ to its own repo + cut per-toolkit releases.
+#
+# toolkits/ STAYS in this monorepo (the runtime references it directly). This
+# workflow publishes a READ-ONLY versioned mirror to
+# github.com/workbooks-sh/toolkits so each toolkit is consumable + versioned on
+# its own. It is the CI twin of scripts/sync-toolkits-subtree.sh.
+#
+# On push to main touching toolkits/**:
+#   1. subtree-split toolkits/ and force-push it to the mirror's main.
+#   2. for every toolkit whose manifest.org CHANGED in this push, read its
+#      #+VERSION: and, if no <toolkit>-v<version> tag/release exists on the
+#      mirror yet, create the tag + a GitHub Release there.
+#
+# ── ONE-TIME SETUP (a maintainer does this once) ─────────────────────────────
+#   * Create the mirror:   gh repo create workbooks-sh/toolkits --public
+#   * Add a repo secret WB_TOOLKITS_TOKEN = a PAT with `repo` scope on
+#     workbooks-sh/toolkits (push + release perms). The default GITHUB_TOKEN
+#     cannot push to a DIFFERENT repo, hence the PAT.
+name: toolkits-release
+on:
+  push:
+    branches: [main]
+    paths: ["toolkits/**"]
+  workflow_dispatch:
+concurrency:
+  group: toolkits-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      PREFIX: toolkits
+      MIRROR: workbooks-sh/toolkits
+      WB_TOOLKITS_TOKEN: ${{ secrets.WB_TOOLKITS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # subtree split needs full history; the version diff needs the parent.
+          fetch-depth: 0
+
+      - name: Subtree split + push mirror
+        run: |
+          set -euo pipefail
+          git config user.name  "workbooks-bot"
+          git config user.email "bot@workbooks.sh"
+          URL="https://x-access-token:${WB_TOOLKITS_TOKEN}@github.com/${MIRROR}.git"
+          git subtree split --prefix="$PREFIX" -b toolkits-split
+          git push "$URL" toolkits-split:refs/heads/main --force
+
+      - name: Cut releases for changed toolkit versions
+        env:
+          # gh targets the MIRROR repo with the PAT (releases live there).
+          GH_TOKEN: ${{ secrets.WB_TOOLKITS_TOKEN }}
+        run: |
+          set -euo pipefail
+          URL="https://x-access-token:${WB_TOOLKITS_TOKEN}@github.com/${MIRROR}.git"
+
+          # Manifests touched by this push (added/modified). On workflow_dispatch
+          # (no before-sha) fall back to every manifest.
+          BEFORE="${{ github.event.before }}"
+          if [ -n "$BEFORE" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            CHANGED="$(git diff --name-only "$BEFORE" "${{ github.sha }}" -- "$PREFIX/*/manifest.org" || true)"
+          else
+            CHANGED="$(ls "$PREFIX"/*/manifest.org)"
+          fi
+          [ -n "$CHANGED" ] || { echo "no manifest changes; nothing to release"; exit 0; }
+
+          for manifest in $CHANGED; do
+            [ -f "$manifest" ] || continue
+            name="$(grep -m1 -E '^#\+TOOLKIT:' "$manifest" | sed -E 's/^#\+TOOLKIT:[[:space:]]*//;s/[[:space:]]*$//')"
+            version="$(grep -m1 -E '^#\+VERSION:' "$manifest" | sed -E 's/^#\+VERSION:[[:space:]]*//;s/[[:space:]]*$//')"
+            if [ -z "$name" ] || [ -z "$version" ]; then
+              echo "skip $manifest (missing TOOLKIT/VERSION)"; continue
+            fi
+            tag="${name}-v${version}"
+
+            # Skip if the release already exists on the mirror (re-run safe).
+            if gh release view "$tag" -R "$MIRROR" >/dev/null 2>&1; then
+              echo "= $tag already released"; continue
+            fi
+
+            echo "+ releasing $tag"
+            # Tag the mirror's main tip (the just-pushed subtree commit).
+            git tag -f "$tag" toolkits-split
+            git push "$URL" "refs/tags/${tag}" --force
+            gh release create "$tag" -R "$MIRROR" \
+              --title "$tag" \
+              --notes "Release of the \`${name}\` toolkit, version ${version}. Mirrored from the workbooks monorepo."
+          done

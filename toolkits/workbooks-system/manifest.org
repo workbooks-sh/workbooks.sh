@@ -14,6 +14,7 @@
 * workbooks-system — in-runtime platform knowledge               :toolkit:
   :PROPERTIES:
   :ID:        workbooks-system
+  :VERSION:        0.1.0
   :KIND:      toolkit
   :STATUS:    experimental
   :SKILL_DIR: skills/

@@ -10,6 +10,7 @@
 * publish — federation + identity for workbooks                  :toolkit:
   :PROPERTIES:
   :ID:        publish
+  :VERSION:        0.1.0
   :CLI_BIN:   wb-publish
   :STATUS:    stable
   :SKILL_DIR: skills/

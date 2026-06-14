@@ -9,6 +9,7 @@
 * orgitorial — org-mode blogging for any site                    :toolkit:
   :PROPERTIES:
   :ID:        orgitorial
+  :VERSION:        0.2.0
   :KIND:      knowledge+assets
   :STATUS:    experimental
   :SKILL_DIR: skills/

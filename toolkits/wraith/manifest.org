@@ -9,6 +9,7 @@
 * wraith — codebase analyzer                                     :toolkit:
   :PROPERTIES:
   :ID:        wraith
+  :VERSION:        0.1.0
   :CLI_BIN:   wraith
   :STATUS:    stable
   :SKILL_DIR: skills/

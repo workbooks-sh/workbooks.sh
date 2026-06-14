@@ -8,6 +8,7 @@
 * workbooks-browser — control the desktop shell                  :toolkit:
   :PROPERTIES:
   :ID:        workbooks-browser
+  :VERSION:        0.1.0
   :CLI_BIN:   wb
   :STATUS:    alpha
   :SKILL_DIR: skills/

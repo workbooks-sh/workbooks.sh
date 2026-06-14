@@ -10,6 +10,7 @@
 * wavelet — motion-graphics video CLI                            :toolkit:
   :PROPERTIES:
   :ID:        wavelet
+  :VERSION:        0.1.0
   :CLI_BIN:   wavelet
   :STATUS:    experimental
   :SKILL_DIR: skills/

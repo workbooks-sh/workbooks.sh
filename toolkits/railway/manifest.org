@@ -11,6 +11,7 @@
 * railway — Railway PaaS CLI                                      :toolkit:
   :PROPERTIES:
   :ID:        railway
+  :VERSION:        0.1.0
   :CLI_BIN:   railway
   :STATUS:    experimental
   :SKILL_DIR: skills/

@@ -11,6 +11,7 @@
 * wrangler — Cloudflare Workers + Pages CLI                       :toolkit:
   :PROPERTIES:
   :ID:        wrangler
+  :VERSION:        0.1.0
   :CLI_BIN:   wrangler
   :STATUS:    experimental
   :SKILL_DIR: skills/

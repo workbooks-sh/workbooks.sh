@@ -44,6 +44,13 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
+      # Release/version verbs are HOST-side & LOCAL (read toolkits/releases.json +
+      # .live.json from the repo) — no runtime needed, so handle before the RCP branch.
+      ["toolkit", "versions", id] -> IO.puts(Workbooks.Toolkits.versions_text(id))
+      ["toolkit", "live"] -> IO.puts(Workbooks.Toolkits.live_text())
+      ["toolkit", "live", id] -> IO.puts(Workbooks.Toolkits.live_text(id, Workbooks.Toolkits.default_root()))
+      ["toolkit", "rollback", id, version] -> IO.puts(Workbooks.Toolkits.rollback_text(id, version))
+
       # `wbx toolkit …` — toolkit surface over RCP (server-side; the escript can't
       # load the NIFs). HOST-side HTTP client → /rcp/toolkit/*. In-process callers
       # (an agent running wb as a tool) still use `call/2` directly.
@@ -301,6 +308,10 @@ defmodule Workbooks.CLI do
   def call(["toolkit", "verify", id], _t), do: Toolkits.verify_text(id)
   def call(["toolkit", "eval", id], _t), do: Toolkits.eval_text(id)
   def call(["toolkit", "sign", id], t), do: Toolkits.sign_text(id, t)
+  def call(["toolkit", "versions", id], _t), do: Toolkits.versions_text(id)
+  def call(["toolkit", "live"], _t), do: Toolkits.live_text()
+  def call(["toolkit", "live", id], _t), do: Toolkits.live_text(id, Toolkits.default_root())
+  def call(["toolkit", "rollback", id, version], _t), do: Toolkits.rollback_text(id, version)
   def call(["toolkit", "build", id], _t), do: Toolkits.build_text(id)
   def call(["toolkit", "build", id, which], _t), do: Toolkits.build_text(id, which, Toolkits.default_root())
   def call(["toolkit", "build-inline", name, lang, file], _t), do: Toolkits.build_inline_text(name, lang, file)
@@ -557,6 +568,9 @@ defmodule Workbooks.CLI do
       wbx toolkit show <id> [<skill>]       manifest + skill index, or one skill (with CAPTION TOC)
       wbx toolkit search <query>            substring search across all skills
       wbx toolkit verify <id>               structural checks + #+EXEC satisfiable + run :role pre blocks
+      wbx toolkit versions <id>             list available versions/tags (releases.json ∪ manifest VERSION)
+      wbx toolkit live [<id>]               show the currently-live version (all toolkits, or one)
+      wbx toolkit rollback <id> <version>   pin the live version back to an older release
       wbx toolkit build <id>                declarative auto-wrap: build #+BUILD_SRC → register the command
       wbx toolkit build-inline <name> <lang> <file>  self-author: build a source file → register a command (rust/c/zig/js/ts/go)
       wbx toolkit promote <name> <lang> <file>       promote a session command → durable workspace toolkit (source-owned, packable)

@@ -9,6 +9,7 @@
 * video — motion + clips                                  :toolkit:capability:video:
   :PROPERTIES:
   :ID:         video
+  :VERSION:         0.1.0
   :CAPABILITY: video
   :IMPL:       hyperframes
   :STATUS:     beta

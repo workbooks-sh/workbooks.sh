@@ -9,6 +9,7 @@
 * presentation — slide decks                       :toolkit:capability:presentation:
   :PROPERTIES:
   :ID:         presentation
+  :VERSION:         0.1.0
   :CAPABILITY: presentation
   :IMPL:       reveal.js
   :STATUS:     stable

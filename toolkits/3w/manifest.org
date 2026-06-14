@@ -13,6 +13,7 @@
 * 3w — keyless web research from inside the sandbox             :toolkit:
   :PROPERTIES:
   :ID:        3w
+  :VERSION:        0.1.0
   :KIND:      toolkit
   :CLI_BIN:   3w
   :STATUS:    experimental
