@@ -21,6 +21,19 @@ defmodule Workbooks.AutopoetTest do
       assert [%{id: ^id, status: :open, kind: :capability, title: "need a slugify tool"}] = Autopoet.list(:open)
     end
 
+    test "the agent's file_issue TOOL wiring maps args → backlog + returns a filed message" do
+      # The self-editing seam: an agent calling its file_issue tool must land a
+      # real backlog entry (exec_one maps title/need/tenant → Autopoet.file_issue).
+      {out, _st} =
+        Workbooks.Agent.__exec_one_for_test__(
+          %{name: "file_issue", args: %{"title" => "need a foobar tool", "need" => "foobar"}},
+          %{tenant: "lander"}
+        )
+
+      assert out =~ "issue filed"
+      assert [%{title: "need a foobar tool", status: :open}] = Autopoet.list(:open)
+    end
+
     test "an empty title is rejected" do
       assert {:error, :no_title} = Autopoet.file_issue(%{title: "  "})
     end
