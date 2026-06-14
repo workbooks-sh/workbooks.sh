@@ -1,0 +1,73 @@
+#+TITLE: Multi-tenant isolation model (wb-g1yo)
+#+OPTIONS: toc:nil
+
+* What this is
+
+How the runtime keeps tenants apart on a SHARED nexus (multiple users against one
+runtime — e.g. a cloud Fly deploy). The desktop is single-tenant (=local=) and
+trusted; this model is what engages when more than one tenant shares a runtime.
+
+* The one rule
+
+All scoping decisions go through *=Workbooks.Tenant.visible?(owner, caller)=*
+(host/tenant.ex) — one source of truth so the rule can't diverge:
+
+- same tenant → visible;
+- a =nil= OWNER (a pre-scoping/legacy or local/dev resource) → visible to all;
+- a =nil= CALLER (admin / internal / unauthenticated-dev) → sees all owners.
+
+So scoping only ever DENIES a *definite cross-tenant mismatch*. It never breaks
+the single-tenant desktop or dev (=x-tenant= fallback) flows — those see =nil= on
+one side and pass.
+
+* How `caller` (the tenant) is established
+
+=Workbooks.Auth= (host/auth.ex) assigns =conn.assigns.tenant= per request, in
+order: desktop per-boot token (=WB_DESKTOP=1= → tenant =local=) · shared public
+bearer (locked cloud → =WB_TENANT=) · BetterAuth JWT (=organizationId= claim) ·
+=x-tenant= dev fallback (unlocked single-tenant). The WS upgrade carries the
+authed tenant into the socket so per-session/per-push gates can use it.
+
+* What is scoped (every surface)
+
+- *Sessions* — =SessionLedger= records + lists by tenant; =GET /api/sessions= and
+  =GET /api/run/:id= (live + persisted transcript) gated. Transcripts persist
+  tenant-stamped so a past chat survives restart, still gated.
+- *Telemetry / ledger* — run dirs stamped with a =.tenant= marker;
+  =/api/telemetry[/:slug]=, =/api/ledger/:slug=, and the CLI =wb telemetry= /
+  =wb ledger= filter/gate via =Telemetry.run_visible?=.
+- *Instances / workbooks* — =ControlPlane.list/1= + =workbook_visible?/2= scope
+  =/instances=, =/api/workbooks=, =/api/w/:id/{org,html}=. (PUBLISHED workbooks are
+  served by the separate, unauthenticated =PublicWeb= plane — not these.)
+- *:tenant-path endpoints* — =/api/library/:tenant= (+query), =/api/search/:tenant=,
+  =/api/mirror/:tenant= (repo push), =/api/radicle/:tenant/publish= require
+  caller == path (=path_tenant_ok?=) — no IDOR by URL.
+- *WS pushes* — session join/cancel gated by ownership; the env / workgate /
+  desktop-control pushes (=wb env request=, =wb app theme/tab/…=) fan out only to
+  the requesting tenant's connected shell.
+- *Config* — =wb model set= is per-tenant (the =Vars= store, key =wb.model=), not a
+  process-global env.
+- *Agent workdir* — confined per-tenant on cloud (=WB_DATA/wb-runs/<tenant>/<run>=);
+  the trusted desktop keeps its local workbook path (=confined_workdir/4=).
+- *Arbitrary-file read* — =/api/oql/query?path== and =wb query/tangle/lint= confined
+  to =.org= + no traversal.
+
+* Brokers (stateful) vs visibility
+
+Note =Workbooks.Tenant= also resolves the broker PRINCIPAL (=resolve/1=,
+=ephemeral/0=, wb-an2v): StorageBroker/SecretBroker/RateLimiter partition state by
+it, and a missing tenant gets a unique ephemeral scope (fail-isolated), never a
+shared constant.
+
+* Not yet built (need product decisions)
+
+- *Admin role* (wb-g1yo.5) — no RBAC today; an admin who sees ALL tenants would
+  parse a role from the JWT identity and pass =nil= as the caller (= sees all).
+- *Explicit session sharing* (wb-g1yo.6) — a =session_shares= relation so a user
+  can invite another to observe/steer a session; the WS gate would honor it.
+- *Frontend* (wb-g1yo.7/.8) — chat-as-a-tab + server-sourced session log/replay.
+
+* Tests
+
+Per-surface unit tests + =tenant_isolation_http_test= (router-level) + the
+canonical =tenant_visible_test=. Run with =mix test= (fast, deterministic).
