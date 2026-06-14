@@ -33,19 +33,58 @@ wasmtime). host/wavelet.ex encode/5 now has two engines via opts[:encode_engine]
 exec, no broker grant) and :host (FfmpegBroker, libx264/H.264). [Originally --audio
 auto-fell-back to :host; Phase 1 removed that fallback.]
 
-## Stage 4 — true in-sandbox build via our clang.wasm — PARTIAL
-COMPILATION PROVEN: clang.wasm compiled base64.c/mem.c/avstring.c/log.c and
-mpeg4videoenc.c (the actual mpeg4 encoder) in-sandbox, given a pre-generated
-config.h. WALL #1 (real blocker): ffmpeg's configure is autotools (168 native
-compile-probes); our lane compiles curated source lists, not autotools -> configure
-must run host-side ONCE to emit config.h + object list (the mutool/qpdf pattern),
-then feed the curated .c set through clang.wasm + wasm-ld (duckdb ddb-link.sh
-pattern). WALL #2 (found+worked-around): `-include shim.h` crashes clang.wasm
-(DirectoryEntry.h has_value() assertion -> wasm trap). Workaround proven: inject
-the shim via `#include "wasi-shim.h"` at the top of config.h instead. Verdict:
-in-guest COMPILE proven incl. the mpeg4 encoder; a turnkey in-sandbox BUILD still
-needs (a) host-side configure, (b) the curated ~260-file compile loop, (c) wasm-ld
-link wired into build.sh. Mechanical, not a wall.
+## Stage 4 / Phase 3 — TURNKEY IN-SANDBOX BUILD via our clang.wasm — DONE/PROVEN
+The ENTIRE build now uses OUR in-sandbox clang.wasm toolchain (runtime/compilers/
+clang -> llvm.core.wasm = clang + wasm-ld + a full wasi sysroot). There is NO host
+wasi-sdk compiler dependency anymore — the old wasi-sdk cross-compile path is gone
+from build.sh. The duckdb ddb-link.sh pattern, generalized:
+
+  1. CONFIGURE via clang.wasm (one-time, cached). ffmpeg's configure runs host-side
+     as a shell DRIVER, but the `cc` it invokes for its ~290 cross-compile PROBES is
+     clang.wasm, wrapped by ccw.sh. ccw.sh: translates host probe paths under the
+     scratch dir to /work guest paths, mounts the clang-root sysroot at /usr, and —
+     because WASI can't spawn subprocesses (so the clang DRIVER can't call wasm-ld
+     itself) — SPLITS link probes into clang `-c` then a separate wasm-ld invocation
+     (crt1 + libc + emulated libs). configure is pointed at the fixed scratch via
+     --tempprefix (its real dir = $tempprefix.$HOSTNAME.$UID, so ccw mounts the whole
+     .build as /work). PROVEN: ffmpeg configure ran to exit 0 under clang.wasm,
+     emitting config.h (License LGPL; mpeg4+AAC+png+mp4 / +GPL+libx264 for H.264).
+     COST: ~14 min (clang.wasm is a ~100MB module; each probe ~6s). One-time — build.sh
+     skips configure when config.h exists.
+  2. HARVEST the curated .c set from `make -n` (every compile rule it would run),
+     filtered to libav*/libsw* sources, sorted-unique -> 320 ffmpeg TUs. (For x264:
+     clear stale .o + libx264.a first so `make -n` re-emits the full object list; map
+     each -8.o/-10.o suffix to its .c + -DBIT_DEPTH/-DHIGH_BIT_DEPTH the way x264's
+     Makefile does -> 53 TUs incl. the 8/10-bit multilib.)
+  3. COMPILE every .c with clang.wasm (target wasm32-wasip1, --sysroot=/usr =
+     clang-root). PROVEN: all 320 ffmpeg TUs compiled in-sandbox, ZERO failures; all
+     53 libx264 TUs compiled in-sandbox, ZERO failures. zlib (14 TUs) likewise.
+  4. LINK the whole .o set + the wb_encode.c driver with wasm-ld (crt1-command.o +
+     -lz -lx264 + the wasi-emulated libs + libclang_rt.builtins.a). PROVEN.
+
+WALL (cleared) — `-include shim.h` crashes clang.wasm (DirectoryEntry has_value()
+assertion -> wasm trap). The shim is injected instead via `#include "wasi-shim.h"`
+at the top of BOTH generated config headers (config.h + config_components.h) — every
+ffmpeg TU pulls one of them, so the dup/pipe/mkstemp ENOSYS stubs reach the dead
+file/protocol code paths without -include.
+
+EMPIRICALLY PROVEN end-to-end (mpeg4+AAC config, built 100% by clang.wasm + wasm-ld,
+NO wasi-sdk): wb_encode_cw.wasm = 2.65MB; wasm-tools confirms ALL 22 imports are
+wasi (ZERO non-wasi, no native exec). Ran under wasmtime on a real render_seq.wasm
+PNG sequence (30 frames 320x240, tier1_scene.html) + a 440Hz mp3:
+  wasmtime run --dir frames::/in --dir out::/out wb_encode_cw.wasm \
+    /in/frame_%05d.png /out/out_av.mp4 30 /in/audio.mp3
+ffprobe (inspect-only): stream0 mpeg4 320x240 yuv420p 30f; stream1 aac 44100 stereo
+53f. Decoded frame 12 vs source PNG: PSNR 42dB (correct pixels). Decoded AAC ->
+Goertzel: 440Hz dominates every other bin by ~3e8 (tone survived mp3->AAC). Video-
+only (3-arg) regression-clean. libx264.a (8+10-bit) ALSO built in-sandbox for the
+H.264 default; the full x264-enabled wb_encode.wasm is produced by `./build.sh`
+(its configure flips on --enable-gpl --enable-libx264).
+
+build.sh is turnkey + idempotent: provisions clang.wasm if absent, fetches+sha-
+verifies zlib/ffmpeg/x264, builds zlib+libx264 via clang.wasm, configures ffmpeg via
+ccw (cached), harvests + compiles the curated set, wasm-ld-links -> wb_encode.wasm.
+The artifact name/CLI/host-wiring are unchanged, so it's a drop-in for Phases 1-2.
 
 ## Phase 1 — IN-GUEST AUDIO — DONE/PROVEN
 The `--audio` path no longer falls back to the host broker. Extended the lane to
