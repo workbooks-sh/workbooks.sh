@@ -31,6 +31,19 @@ defmodule Workbooks.SearchProviderTest do
     assert Search.provider_for_test([]) == :exa
   end
 
+  test ":prefer is the no-config fallback (agent web_search uses it) — never overrides explicit/env" do
+    # no config → :prefer beats the keyless default (so Waldo's web_search isn't empty)
+    assert Search.provider_for_test(prefer: "openrouter") == :openrouter
+    # an explicit opt still wins
+    assert Search.provider_for_test(provider: "exa", prefer: "openrouter") == :exa
+    # env still wins over prefer
+    System.put_env("WB_SEARCH_PROVIDER", "perplexity")
+    assert Search.provider_for_test(prefer: "openrouter") == :perplexity
+    System.delete_env("WB_SEARCH_PROVIDER")
+    # no prefer, no config → keyless (the desktop auto-search endpoint's behavior)
+    assert Search.provider_for_test([]) == :keyless
+  end
+
   test "a keyed provider with NO key falls back to keyless — returns a list, never crashes" do
     assert is_list(Search.query("test query", provider: :exa, api_key: nil, limit: 1))
   end

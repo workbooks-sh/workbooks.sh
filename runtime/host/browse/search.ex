@@ -74,7 +74,12 @@ defmodule Workbooks.Browse.Search do
   def provider_for_test(opts), do: provider(opts)
 
   defp provider(opts) do
-    raw = opts[:provider] || tenant_provider(opts[:tenant]) || System.get_env("WB_SEARCH_PROVIDER") || "keyless"
+    # Resolution order: explicit opt → tenant Settings (Vars) → env → caller's
+    # `:prefer` fallback → keyless. `:prefer` lets a deliberate caller (the agent's
+    # web_search tool) change the no-config default away from the unreliable
+    # keyless scrape WITHOUT overriding a tenant/env choice. The desktop's
+    # auto-search endpoint passes no :prefer, so it stays keyless-unless-opted-in.
+    raw = opts[:provider] || tenant_provider(opts[:tenant]) || System.get_env("WB_SEARCH_PROVIDER") || opts[:prefer] || "keyless"
 
     case raw |> to_string() |> String.downcase() do
       "exa" -> :exa

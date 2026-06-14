@@ -417,13 +417,18 @@ defmodule Workbooks.Agent do
 
   defp exec_one(%{name: "fetch", args: a}, st), do: {fetch_url(a["url"]), st, nil}
 
-  # web_search: host-brokered keyless SERP (the research capability the agents
-  # lost when the native `run`/curl hatch was removed — wb-9ja — which silently
-  # blocked all SERP work and made the lander mislabel itself "env-gated"). No
-  # keys, no native exec; the host queries the engine and returns parsed results.
+  # web_search: host-brokered SERP (the research capability the agents lost when
+  # the native `run`/curl hatch was removed — wb-9ja). No native exec; the host
+  # queries the engine and returns parsed results.
   defp exec_one(%{name: "web_search", args: a}, st) do
-    # tenant: lets Browse.Search pick the tenant's configured provider (Settings).
-    {format_search_results(Workbooks.Browse.Search.query(a["query"] || "", limit: 8, tenant: st[:tenant])), st, nil}
+    # tenant lets Browse.Search pick the tenant's configured provider (Settings).
+    # prefer: openrouter — the agent deliberately chose to search, and its own LLM
+    # already runs through OpenRouter, so that key is present; default to the
+    # reliable web plugin instead of the unreliable keyless scrape (falls back to
+    # keyless if no key, and a tenant/env choice still wins). Without this Waldo's
+    # web_search returned empty out-of-box.
+    opts = [limit: 8, tenant: st[:tenant], prefer: "openrouter"]
+    {format_search_results(Workbooks.Browse.Search.query(a["query"] || "", opts)), st, nil}
   end
 
   # file_issue: the metacognitive seam (wb-9ae). An agent that hits a wall files
