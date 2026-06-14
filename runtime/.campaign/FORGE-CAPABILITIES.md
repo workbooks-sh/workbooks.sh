@@ -38,6 +38,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **tree-sitter** (code -> AST, real C grammar) | from-C-source -> wasi (build_c_dir) | treesitter_lane_test (parse C source) |
 | **mini-gmp** (arbitrary-precision bignum) | from-C-source -> wasi (build_c_dir) | minigmp_lane_test (2^200, 30!) |
 | **stb_image_write** (image encode/generate PNG/JPG) | from-C-source -> wasi (build_c_dir) | stbwrite_lane_test (encode->decode roundtrip) |
+| **md4c** (Markdown -> HTML) | from-C-source -> wasi (build_c_dir) | md4c_lane_test (render headings/emphasis/links) |
 
 ## PROVEN — ran in an experiment, not yet wired+tested
 

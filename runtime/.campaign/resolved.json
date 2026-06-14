@@ -2673,6 +2673,13 @@
    "proof": "stb_image_write via build_c_dir encodes 2x2 pixels -> PNG (76 bytes) and decodes back (stb_image) to w=2 h=2 ch=4 with the orange pixel intact (255,128,0); stbwrite_lane_test.exs green. Complements stb_image (decode).",
    "lane": "compilers/stbwrite/build.sh (fetch stb headers pinned commit, gitignored) + build_c_dir",
    "since": "iter163"
+  },
+  "md4c": {
+   "capability": "Markdown -> HTML rendering in-sandbox",
+   "status": "live",
+   "proof": "md4c 0.5.2 via build_c_dir renders CommonMark to HTML: # Hello -> <h1>Hello</h1>, **bold** -> <strong>, [link](http://x) -> <a href>; md4c_lane_test.exs green. Promoted from c_leaf_libs proven -> own live lane.",
+   "lane": "compilers/md4c/build.sh (fetch sha-pinned, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {
