@@ -277,10 +277,16 @@ interactive CLI*: HIGH and partly gated on a capability (PTY) the request/respon
 does not have. (*INFERRED* sizing.)
 
 ** Recommended build sequence (smallest first slice that proves the path end-to-end)
-1. *SLICE 0 — load-bootstrap proof.* Make a *trivial* Node-shaped script (just
-   =require('node:path')= + =process.argv= + a =fetch=) instantiate and run on SM. Proves the
-   =node:= resolver + global injection + first ported shims. This alone clears the wall the
-   probe hit. (No tools, no streaming yet.)
+1. *SLICE 0 — load-bootstrap proof.* [DONE — PROVEN LIVE 2026-06-14, wb-b9xv.8]
+   Make a *trivial* Node-shaped script (just =require('node:path')= + =process.argv= + a
+   =fetch=) instantiate and run on SM. Proves the =node:= resolver + global injection + first
+   ported shims. This alone clears the wall the probe hit. (No tools, no streaming yet.)
+   Landed as =Workbooks.JsEngine.run_node/2= + =runtime/compilers/js/node-prelude.js=, evaluated
+   in the source layer (no wasm-host rebuild). Resolves =path/events/util/os/querystring/url/
+   string_decoder/assert/timers= (bare, =node:=, and =./relative= between shims) + host-injected
+   =process= (env/argv) + =Buffer=. =require('node:fs')= / =child_process= correctly throw
+   "Cannot find module" (SLICE 1). Sync half fully correct through =run_node=; async =fetch=
+   output capture deferred (proven via =eval/2= which awaits — see HONEST LIMITATION in handoff).
 2. *SLICE 1 — one buffered tool call.* Bind =host_exec= into the SM world, route a single
    =child_process.execFileSync('rg', …)= to CommandRegistry, get buffered stdout back. Proves
    the security spine (default-deny, registered-only, sandbox-invariant green) on the SM lane.
@@ -333,9 +339,11 @@ auth.
 
 * BD SUB-ISSUES TO FILE UNDER wb-b9xv
 (Track-B harness-in-guest spike; complements existing .1–.7. Suggested ids continue the series.)
-- *wb-b9xv.8 — SM node-bootstrap layer:* =node:= builtin resolver + inject
+- *wb-b9xv.8 — SM node-bootstrap layer:* [DONE 2026-06-14] =node:= builtin resolver + inject
   =process/Buffer/require/global= globals into the componentize-js world; SLICE 0 proof
-  (=require('node:path')= + =process.argv= + =fetch= runs on SM). [P1, MEDIUM]
+  (=require('node:path')= + =process.argv= + =fetch= runs on SM). [P1, MEDIUM] — landed in
+  =Workbooks.JsEngine.run_node/2= + =node-prelude.js=; verified =mix test
+  test/js_node_bootstrap_test.exs --include build --include netdeps= → 4 tests, 0 failures.
 - *wb-b9xv.9 — Port pure-JS shims off =Javy.*= to SM host imports:* events/path/util/
   querystring/url/string_decoder/assert/timers/stream/os, plus fs (host VFS) and process
   (env/argv/stdout/exit) rebound to SM imports, not =Javy.IO/VFS=. [P1, MEDIUM]

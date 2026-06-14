@@ -28,6 +28,15 @@ defmodule Workbooks.JsEngine do
   @cache Path.join(@root, "build/cache/jsengine")
   @host Path.join(@cache, "eval-host-023.wasm")
 
+  # Node-compat layer (SLICE 0, wb-b9xv). The prelude installs require/module/process/Buffer +
+  # a node:/bare resolver backed by these pure-JS shims (no caps, zero Javy.* refs). fs/child_process
+  # are OUT OF SCOPE for SLICE 0 (those shims call Javy.* / need host imports — later slices).
+  @js_root Path.join(@root, "compilers/js")
+  @node_prelude Path.join(@js_root, "node-prelude.js")
+  # Pure-JS Node builtins resolvable on StarlingMonkey. process is injected by the prelude itself
+  # (host-supplied env/argv, buffered stdout) — NOT loaded from the Javy-bound process.js shim.
+  @node_builtins ~w(path events util os querystring url string_decoder assert timers)
+
   # the fixed eval bootstrap — exports `run(input)` (the workbook world), eval's the JS, returns a string.
   # ASYNC bootstrap (wb js-ecosystem async-eventloop): eval the src, and if it yields a thenable, AWAIT it.
   # StarlingMonkey drives its internal event loop until this async export settles — so Promises, async/await,
@@ -141,6 +150,81 @@ defmodule Workbooks.JsEngine do
       "while((globalThis.__pend>0||__s<6)&&(Date.now()-__t)<12000){await new Promise(r=>setTimeout(r,10));" <>
       "if(globalThis.__wbout.length===__l){__s++}else{__l=globalThis.__wbout.length;__s=0}}\n" <>
       "return globalThis.__wbout.join(\"\\n\");})()"
+  end
+
+  @doc """
+  Run a Node-shaped JS script on StarlingMonkey (SLICE 0, wb-b9xv): prepend the Node-compat prelude
+  (require/module/process/Buffer + a `node:`/bare resolver over the embedded pure-JS shims) so a
+  bundle that `require('node:path')`/reads `process.argv`/`fetch`es loads instead of dying on line 1.
+
+  Returns `{:ok, %{stdout: binary, stderr: binary, result: binary, exit_code: integer}}` | `{:error, why}`.
+
+  opts:
+    * `:env`     — map of String=>String injected as `process.env` (default `%{}`)
+    * `:argv`    — list of strings for `process.argv` (default `["node", "script"]`)
+    * `:timeout` — ms (default 12_000)
+
+  Resolvable `node:` builtins this slice: #{Enum.join(@node_builtins, ", ")} (+ `process`, host-injected).
+  `fs`/`child_process` are deliberately NOT resolvable yet (later slices wire host imports).
+  """
+  def run_node(src, opts \\ []) when is_binary(src) do
+    env = Keyword.get(opts, :env, %{})
+    argv = Keyword.get(opts, :argv, ["node", "script"])
+
+    with {:ok, prelude} <- File.read(@node_prelude),
+         {:ok, shims} <- load_node_shims() do
+      boot =
+        Jason.encode!(%{
+          "shims" => shims,
+          "env" => env,
+          "argv" => argv
+        })
+
+      # One eval payload: (1) set the host-injection seam, (2) run the prelude IIFE (installs globals),
+      # (3) run the user script, (4) return the buffered stdout/stderr + exit code as JSON.
+      composed =
+        "globalThis.__wbNode=" <>
+          boot <>
+          ";\n" <>
+          prelude <>
+          "\n;(function(){\n" <>
+          src <>
+          "\n})();\n" <>
+          "JSON.stringify({stdout:(globalThis.__wbStdout||[]).join(\"\"),stderr:(globalThis.__wbStderr||[]).join(\"\"),exit_code:(globalThis.process&&globalThis.process.exitCode)|0});"
+
+      case eval(composed, opts) do
+        {:ok, "ERR: " <> msg} ->
+          {:error, {:node_eval_failed, msg}}
+
+        {:ok, json} ->
+          case Jason.decode(json) do
+            {:ok, %{"stdout" => o, "stderr" => e, "exit_code" => c}} ->
+              {:ok, %{stdout: o, stderr: e, result: json, exit_code: c}}
+
+            _ ->
+              {:ok, %{stdout: json, stderr: "", result: json, exit_code: 0}}
+          end
+
+        {:error, _} = err ->
+          err
+      end
+    end
+  end
+
+  # Read each pure-JS Node shim into a name=>source map for the prelude's registry. Misses are skipped
+  # (a builtin simply won't resolve) rather than failing the whole run.
+  defp load_node_shims do
+    shims =
+      Enum.reduce(@node_builtins, %{}, fn name, acc ->
+        path = Path.join([@js_root, "shims", name <> ".js"])
+
+        case File.read(path) do
+          {:ok, src} -> Map.put(acc, name, src)
+          {:error, _} -> acc
+        end
+      end)
+
+    {:ok, shims}
   end
 
   # QuickJS fallback: compile the bundle to a wasm command in-sandbox, run it; its console.log → stdout.
