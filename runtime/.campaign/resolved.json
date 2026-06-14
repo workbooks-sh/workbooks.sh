@@ -2680,6 +2680,13 @@
    "proof": "md4c 0.5.2 via build_c_dir renders CommonMark to HTML: # Hello -> <h1>Hello</h1>, **bold** -> <strong>, [link](http://x) -> <a href>; md4c_lane_test.exs green. Promoted from c_leaf_libs proven -> own live lane.",
    "lane": "compilers/md4c/build.sh (fetch sha-pinned, gitignored) + build_c_dir",
    "since": "iter163"
+  },
+  "utf8proc": {
+   "capability": "Unicode normalization (NFC/NFD/case-fold) in-sandbox",
+   "status": "live",
+   "proof": "utf8proc 2.9.0 via build_c_dir case-folds + NFC-composes UTF-8: HeLLo->hello, e+U+0301->\u00e9 (c3a9); utf8proc_lane_test.exs green. Promoted from c_leaf_libs proven -> own live lane.",
+   "lane": "compilers/utf8proc/build.sh (fetch sha-pinned, gitignored) + build_c_dir(include_only utf8proc_data.c)",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {

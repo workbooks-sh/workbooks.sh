@@ -39,6 +39,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **mini-gmp** (arbitrary-precision bignum) | from-C-source -> wasi (build_c_dir) | minigmp_lane_test (2^200, 30!) |
 | **stb_image_write** (image encode/generate PNG/JPG) | from-C-source -> wasi (build_c_dir) | stbwrite_lane_test (encode->decode roundtrip) |
 | **md4c** (Markdown -> HTML) | from-C-source -> wasi (build_c_dir) | md4c_lane_test (render headings/emphasis/links) |
+| **utf8proc** (Unicode NFC/NFD/case-fold) | from-C-source -> wasi (build_c_dir) | utf8proc_lane_test (casefold + NFC) |
 
 ## PROVEN — ran in an experiment, not yet wired+tested
 
