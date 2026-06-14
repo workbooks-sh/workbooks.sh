@@ -75,7 +75,7 @@ defmodule Workbooks.Agent do
     }},
     %{type: "function", function: %{
       name: "fetch",
-      description: "HTTP GET a URL and return its page text (HTML stripped, truncated). Use to research a brand's website / fetch data.",
+      description: "Visit a web page: HTTP GET a URL and return its readable text (HTML stripped + entities decoded, chrome dropped, truncated). Use to pull data from a page or read a source you found via web_search.",
       parameters: %{type: "object", properties: %{url: %{type: "string"}}, required: ["url"]}
     }},
     %{type: "function", function: %{
@@ -529,6 +529,8 @@ defmodule Workbooks.Agent do
   # (Workbooks.NetGuard — the SAME SSRF floor + resolve-then-pin + redirect
   # re-checking + body cap the brokers use, wb-j3n8/wb-dmk1), then strip HTML to
   # readable text and truncate for the model. One SSRF implementation, not two.
+  defp fetch_url(url) when not is_binary(url) or url == "", do: "fetch error: no url given"
+
   defp fetch_url(url) do
     case Workbooks.NetGuard.get(url, max_bytes: 1024 * 1024) do
       {:ok, body} -> body |> html_to_text() |> String.slice(0, 4000)

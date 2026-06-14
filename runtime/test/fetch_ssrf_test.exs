@@ -25,3 +25,15 @@ defmodule Workbooks.FetchSsrfTest do
     end
   end
 end
+
+defmodule Workbooks.FetchMissingUrlTest do
+  use ExUnit.Case, async: true
+  alias Workbooks.Agent
+  defp fetch(args), do: elem(Agent.__exec_one_for_test__(%{name: "fetch", args: args}, %{tenant: "t"}), 0)
+
+  test "missing or empty url → clean error, not a crash" do
+    assert fetch(%{}) =~ "no url given"
+    assert fetch(%{"url" => ""}) =~ "no url given"
+    assert fetch(%{"url" => nil}) =~ "no url given"
+  end
+end
