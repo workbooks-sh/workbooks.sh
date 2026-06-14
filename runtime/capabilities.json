@@ -4,7 +4,7 @@
   "suite": {
     "tests": 755,
     "failures": 0,
-    "verified": "2026-06-14 (seeds 12345 + 999 both green, 365 heavy-tagged excluded; flaky agent_prompt + browse_dock fixed)"
+    "verified": "2026-06-14 (seeds 12345+999 green, 365 heavy-tagged excluded; agent_prompt+browse_dock flakes fixed). KNOWN: a seed-dependent HANG in the broker-exec area wedges some runs (seed 259781) — wb-ggyg, pre-existing infra, not a test failure. This session's changes verified clean via targeted files (37/37)."
   },
   "note": "Canonical, agent-maintained ledger. The /capabilities dashboard reads it LIVE (re-poll). `units` = ACTUAL test-case count of each capability's dedicated test file(s) (no file is shared across two rows, so the sum is real, not double-counted). `suite.tests` is the authoritative full deterministic suite total. status: done | wip | gated | planned.",
   "areas": [
