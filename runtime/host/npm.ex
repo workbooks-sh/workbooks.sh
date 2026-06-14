@@ -259,9 +259,55 @@ defmodule Workbooks.Npm do
 
     cond do
       File.exists?(npm) -> parse_npm_lock(npm)
-      File.exists?(Path.join(dir, "pnpm-lock.yaml")) -> {:error, {:unsupported_lockfile, :pnpm}}
-      File.exists?(Path.join(dir, "yarn.lock")) -> {:error, {:unsupported_lockfile, :yarn}}
+      File.exists?(Path.join(dir, "pnpm-lock.yaml")) -> parse_pnpm_lock(Path.join(dir, "pnpm-lock.yaml"))
+      File.exists?(Path.join(dir, "yarn.lock")) -> parse_yarn_lock(Path.join(dir, "yarn.lock"))
       true -> {:error, :no_lockfile}
+    end
+  end
+
+  # pnpm-lock.yaml (v6/v9): the `packages:`/`snapshots:` keys are `name@version` (optionally `/`-prefixed,
+  # quoted, with a `(peer@x)` suffix). Pull name@version from each key — no YAML dep needed.
+  defp parse_pnpm_lock(path) do
+    specs =
+      ~r/^  '?\/?(@?[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)?)@(\d[^:'\s(]*)/m
+      |> Regex.scan(File.read!(path))
+      |> Enum.map(fn [_, name, version] -> %{name: name, req: nil, pin: version} end)
+      |> Enum.uniq_by(& &1.name)
+
+    {:ok, specs}
+  end
+
+  # yarn.lock — classic (v1: `spec:` header + `  version "x"`) and berry (v2+: `"spec@npm:range":` +
+  # `  version: x`). Track the current header; each version line pins the header's package.
+  defp parse_yarn_lock(path) do
+    {specs, _} =
+      File.read!(path)
+      |> String.split("\n")
+      |> Enum.reduce({[], nil}, fn line, {acc, header} ->
+        cond do
+          Regex.match?(~r/^["']?\S.*:\s*$/, line) and String.contains?(line, "@") ->
+            {acc, yarn_name_from_header(line)}
+
+          (m = Regex.run(~r/^\s+version:?\s+"?(\d[^"\s]*)"?/, line)) && header ->
+            {[%{name: header, req: nil, pin: hd(tl(m))} | acc], nil}
+
+          true ->
+            {acc, header}
+        end
+      end)
+
+    {:ok, specs |> Enum.uniq_by(& &1.name) |> Enum.reverse()}
+  end
+
+  # First spec in a yarn header → package name. Handles scoped (@s/p), quotes, classic ranges, berry npm:.
+  defp yarn_name_from_header(line) do
+    spec =
+      line |> String.trim() |> String.trim_trailing(":") |> String.split(",") |> List.first()
+      |> String.trim() |> String.trim("\"")
+
+    case String.split(spec, "@") do
+      ["", scope_pkg | _] -> "@" <> scope_pkg
+      [name | _] -> name
     end
   end
 

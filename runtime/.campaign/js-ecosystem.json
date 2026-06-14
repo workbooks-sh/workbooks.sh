@@ -49,7 +49,8 @@
             "peer/hoist resolution",
             "catalog:"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "pnpm-lock.yaml parsed (name@version keys, peer-suffix stripped, scoped) -> pinned install_tree. We normalize to flat node_modules rather than replicating the .pnpm content-addressed store (esbuild resolves from node_modules \u2014 same outcome). workspace: protocol = monorepo surface."
         },
         {
           "id": "yarn",
@@ -61,7 +62,8 @@
             "workspace protocol",
             "PnP (.pnp.cjs) note"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "yarn.lock classic (version \"x\") + berry (npm: protocol, version: x) parsed -> pinned install_tree. PnP (.pnp.cjs) sidestepped \u2014 we install to node_modules (same resolution outcome)."
         },
         {
           "id": "dep-types",
