@@ -41,7 +41,7 @@ typedef struct {
 
 /* Build the audio decode->resample->AAC encode->mux pipeline. Returns 1 if audio
  * was wired, 0 if there's no usable audio stream (caller proceeds video-only). */
-static int audio_open(Audio*A, const char*path, AVFormatContext*ofmt){
+static int audio_open(Audio*A, const char*path, AVFormatContext*ofmt, int bit_rate){
   memset(A,0,sizeof *A);
   int ret;
   if((ret=avformat_open_input(&A->ifmt,path,NULL,NULL))<0) die("audio open_input",ret);
@@ -68,7 +68,7 @@ static int audio_open(Audio*A, const char*path, AVFormatContext*ofmt){
   A->enc->sample_rate=44100;
   av_channel_layout_default(&A->enc->ch_layout,2);
   A->enc->sample_fmt=AV_SAMPLE_FMT_FLTP;
-  A->enc->bit_rate=128000;
+  A->enc->bit_rate = bit_rate>0 ? bit_rate : 128000;
   A->enc->time_base=(AVRational){1,A->enc->sample_rate};
   if(ofmt->oformat->flags&AVFMT_GLOBALHEADER) A->enc->flags|=AV_CODEC_FLAG_GLOBAL_HEADER;
   if((ret=avcodec_open2(A->enc,aenc,NULL))<0) die("audio open enc",ret);
@@ -170,8 +170,44 @@ static void audio_run(Audio*A, AVFormatContext*ofmt){
   fprintf(stderr,"audio: muxed AAC track\n");
 }
 
+/* ---------------- audio-only mode -------------------------------------------
+ * `wb_encode audio <in.{mp3,aac,wav,m4a}> <out.m4a> [bitrate_kbps]`
+ *   decode (mp3/aac/wav/pcm) | aresample+aformat | native AAC encode | mp4 muxer
+ *   into an AUDIO-ONLY .m4a — NO video stream, NO frames required. Transcode or
+ *   extract (an .m4a/aac input is re-encoded to a clean AAC/mp4 track). Fully
+ *   in-guest; same libav* lane as the muxed audio sub-pipeline above.
+ *
+ * The mp4 muxer is forced by NAME ("mp4") so the .m4a extension (which has no
+ * registered guess) still selects ISO-BMFF; an audio-only mp4 is a valid .m4a. */
+static int audio_only(int argc,char**argv){
+  if(argc<4){ fprintf(stderr,"usage: %s audio <in.{mp3,aac,wav,m4a}> <out.m4a> [bitrate_kbps]\n",argv[0]); return 2; }
+  const char*inpath=argv[2]; const char*outpath=argv[3];
+  int br_kbps = argc>4 && argv[4][0] ? atoi(argv[4]) : 128; if(br_kbps<=0) br_kbps=128;
+  int ret;
+
+  /* mp4 muxer forced by name so .m4a (no extension-guess) resolves to ISO-BMFF. */
+  AVFormatContext*ofmt=NULL;
+  if((ret=avformat_alloc_output_context2(&ofmt,NULL,"mp4",outpath))<0) die("audio-only alloc out",ret);
+
+  Audio A;
+  if(!audio_open(&A,inpath,ofmt,br_kbps*1000)){ fprintf(stderr,"audio-only: no usable audio stream in %s\n",inpath); return 1; }
+
+  if(!(ofmt->oformat->flags&AVFMT_NOFILE))
+    if((ret=avio_open(&ofmt->pb,outpath,AVIO_FLAG_WRITE))<0) die("audio-only avio_open",ret);
+  if((ret=avformat_write_header(ofmt,NULL))<0) die("audio-only write_header",ret);
+
+  audio_run(&A,ofmt);
+  av_write_trailer(ofmt);
+  fprintf(stderr,"DONE audio-only AAC %dk -> %s\n",br_kbps,outpath);
+  return 0;
+}
+
 int main(int argc,char**argv){
-  if(argc<3){ fprintf(stderr,"usage: %s <in_%%05d.png> <out.mp4> [fps] [audio.mp3] [vcodec]\n",argv[0]); return 2; }
+  /* audio-only subcommand: `wb_encode audio <in> <out.m4a> [bitrate_kbps]` */
+  if(argc>=2 && strcmp(argv[1],"audio")==0) return audio_only(argc,argv);
+
+  if(argc<3){ fprintf(stderr,"usage: %s <in_%%05d.png> <out.mp4> [fps] [audio.mp3] [vcodec]\n"
+                              "       %s audio <in.{mp3,aac,wav,m4a}> <out.m4a> [bitrate_kbps]\n",argv[0],argv[0]); return 2; }
   const char*inpat=argv[1]; const char*outpath=argv[2];
   int fps = argc>3?atoi(argv[3]):30; if(fps<=0)fps=30;
   const char*audiopath = argc>4 && argv[4][0] ? argv[4] : NULL;
@@ -249,7 +285,7 @@ int main(int argc,char**argv){
   /* ---- optional audio: wire decoder/resampler/AAC encoder + 2nd output stream
    *      BEFORE write_header so the mp4 declares both streams up front. ---- */
   Audio A; int have_audio=0;
-  if(audiopath) have_audio=audio_open(&A,audiopath,ofmt);
+  if(audiopath) have_audio=audio_open(&A,audiopath,ofmt,0);
 
   if(!(ofmt->oformat->flags&AVFMT_NOFILE))
     if((ret=avio_open(&ofmt->pb,outpath,AVIO_FLAG_WRITE))<0) die("avio_open",ret);

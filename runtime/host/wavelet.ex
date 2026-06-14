@@ -97,6 +97,8 @@ defmodule Workbooks.Wavelet do
 
   Verbs:
     * `render <composition.html> -o <out.mp4> [--fps N] [--w N] [--h N] [--duration SECS] [--crf N] [--audio mp3]`
+    * `audio <in.{mp3,aac,wav,m4a}> -o <out.m4a> [--bitrate KBPS]` — AUDIO-ONLY:
+      no frames, no video; decode → native AAC → `.m4a`, entirely in the wasm guest.
 
   Returns {:ok, out_path} | {:error, reason}. `opts` threads non-argv concerns
   (`:allow` for the encode cap, `:principal`, `:rate`, `:roots`, `:timeout_ms`).
@@ -104,8 +106,69 @@ defmodule Workbooks.Wavelet do
   def command(argv, opts \\ []) when is_list(argv) do
     case argv do
       ["render" | rest] -> render(rest, opts)
+      ["audio" | rest] -> audio(rest, opts)
       [verb | _] -> {:error, {:unknown_verb, verb}}
       [] -> {:error, :no_verb}
+    end
+  end
+
+  @doc """
+  `wavelet audio <in.{mp3,aac,wav,m4a}> -o <out.m4a> [--bitrate KBPS]`.
+
+  AUDIO-ONLY output: decode an audio file → native AAC → ISO-BMFF `.m4a`, with NO
+  frames and NO video stream, ENTIRELY in the wasm guest via the same `wb_encode`
+  ffmpeg lane (`Workbooks.WaveletEncode.encode_audio/3`). Transcode or extract —
+  NO host ffmpeg, NO native exec, NO broker grant. `argv` is the verb's tokens.
+
+  Returns {:ok, out_path} | {:error, reason}.
+  """
+  def audio(argv, opts \\ []) when is_list(argv) do
+    with {:ok, p} <- parse_audio_args(argv),
+         :ok <- validate_audio(p) do
+      out_abs = Path.expand(p.out)
+
+      Workbooks.WaveletEncode.encode_audio(p.in, out_abs,
+        bitrate_kbps: p.bitrate,
+        timeout_ms: Keyword.get(opts, :timeout_ms, 600_000)
+      )
+    end
+  end
+
+  defp parse_audio_args(argv), do: parse_audio_args(argv, %{in: nil, out: nil, bitrate: 128})
+
+  defp parse_audio_args([], acc), do: {:ok, acc}
+
+  defp parse_audio_args([flag, val | rest], acc) when flag in ["-o", "--out", "--output"],
+    do: parse_audio_args(rest, %{acc | out: val})
+
+  defp parse_audio_args([flag, val | rest], acc) when flag == "--bitrate",
+    do: with_audio_int(val, :bitrate, acc, rest)
+
+  defp parse_audio_args(["-o"], _acc), do: {:error, {:flag_needs_value, "-o"}}
+
+  defp parse_audio_args([flag | _], _acc)
+       when binary_part(flag, 0, min(2, byte_size(flag))) == "--",
+       do: {:error, {:flag_needs_value, flag}}
+
+  defp parse_audio_args([pos | rest], %{in: nil} = acc),
+    do: parse_audio_args(rest, %{acc | in: pos})
+
+  defp parse_audio_args([pos | _rest], _acc), do: {:error, {:unexpected_arg, pos}}
+
+  defp with_audio_int(val, key, acc, rest) do
+    case Integer.parse(val) do
+      {n, ""} -> parse_audio_args(rest, Map.put(acc, key, n))
+      _ -> {:error, {:invalid, key}}
+    end
+  end
+
+  defp validate_audio(p) do
+    cond do
+      is_nil(p.in) -> {:error, :missing_audio_input}
+      is_nil(p.out) -> {:error, :missing_output}
+      not String.ends_with?(p.out, ".m4a") -> {:error, :output_not_m4a}
+      p.bitrate < 8 or p.bitrate > 512 -> {:error, {:invalid, :bitrate}}
+      true -> :ok
     end
   end
 

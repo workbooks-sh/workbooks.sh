@@ -190,6 +190,96 @@ defmodule Workbooks.WaveletCommandTest do
     refute File.exists?(out)
   end
 
+  test "wavelet audio: mp3 -> AUDIO-ONLY .m4a (AAC, no video, in-guest, no broker)",
+       %{root: root} do
+    mp3 = Path.join(root, "src.mp3")
+
+    {_, 0} =
+      System.cmd(
+        "ffmpeg",
+        ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+         "sine=frequency=440:duration=2", mp3],
+        stderr_to_stdout: true
+      )
+
+    out = Path.join(root, "out.m4a")
+
+    # The bash-tenant audio-only surface: NO frames, NO video, NO broker grant.
+    # The whole decode->AAC->mp4 mux runs in the wasm guest (wb_encode `audio` mode).
+    assert {:ok, delivered} =
+             Wavelet.command(["audio", mp3, "-o", out, "--bitrate", "192"], roots: [root])
+
+    assert delivered == Path.expand(out)
+    assert File.regular?(delivered)
+    # ISO-BMFF magic: bytes 4..7 == "ftyp"
+    assert <<_::32, "ftyp", _::binary>> = File.read!(delivered)
+
+    # audio stream is AAC...
+    {a, 0} =
+      System.cmd(
+        "ffprobe",
+        ["-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name",
+         "-of", "default=nw=1:nk=1", delivered],
+        stderr_to_stdout: true
+      )
+
+    assert String.trim(a) == "aac"
+
+    # ...and there is NO video stream (audio-only).
+    {v, 0} =
+      System.cmd(
+        "ffprobe",
+        ["-v", "error", "-select_streams", "v", "-show_entries", "stream=codec_name",
+         "-of", "default=nw=1:nk=1", delivered],
+        stderr_to_stdout: true
+      )
+
+    assert String.trim(v) == ""
+  end
+
+  test "wavelet audio: wav -> .m4a transcode (extract/convert)", %{root: root} do
+    wav = Path.join(root, "src.wav")
+
+    {_, 0} =
+      System.cmd(
+        "ffmpeg",
+        ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+         "sine=frequency=330:duration=1", wav],
+        stderr_to_stdout: true
+      )
+
+    out = Path.join(root, "from_wav.m4a")
+
+    assert {:ok, delivered} = Wavelet.command(["audio", wav, "-o", out], roots: [root])
+    assert File.regular?(delivered)
+
+    {a, 0} =
+      System.cmd(
+        "ffprobe",
+        ["-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name",
+         "-of", "default=nw=1:nk=1", delivered],
+        stderr_to_stdout: true
+      )
+
+    assert String.trim(a) == "aac"
+  end
+
+  test "wavelet audio argv validation: bad ext, missing input/output, bad bitrate",
+       %{root: root} do
+    mp3 = Path.join(root, "v.mp3")
+    File.write!(mp3, "stub")
+
+    assert {:error, :output_not_m4a} = Wavelet.audio([mp3, "-o", Path.join(root, "x.mp3")])
+    assert {:error, :missing_output} = Wavelet.audio([mp3])
+    assert {:error, :missing_audio_input} = Wavelet.audio(["-o", Path.join(root, "x.m4a")])
+    assert {:error, {:invalid, :bitrate}} = Wavelet.audio([mp3, "-o", Path.join(root, "x.m4a"), "--bitrate", "9999"])
+  end
+
+  test "wavelet audio: missing input file is refused", %{root: root} do
+    out = Path.join(root, "nope.m4a")
+    assert {:error, {:audio_missing, _}} = Wavelet.audio(["/nonexistent/a.mp3", "-o", out])
+  end
+
   test "missing composition is refused before any work", %{root: root} do
     out = Path.join(root, "nope.mp4")
 

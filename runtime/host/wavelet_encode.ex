@@ -117,6 +117,83 @@ defmodule Workbooks.WaveletEncode do
     end
   end
 
+  @doc """
+  AUDIO-ONLY encode — no frames, no video. Decode an audio file (`mp3` / `aac` /
+  `wav` / `m4a`) → resample → native AAC → ISO-BMFF `.m4a`, ENTIRELY in the wasm
+  guest via the same `wb_encode.wasm` lane (the `audio` subcommand). Transcode or
+  extract: an `.m4a`/`aac` input is re-encoded to a clean AAC track. NO host
+  ffmpeg, NO native exec.
+
+  The input is STAGED into a private scratch dir preopened at `/in` (wasi grants
+  no host paths beyond explicit preopens); the output's parent is preopened at
+  `/out`. Returns `{:ok, out_path}` | `{:error, reason}`.
+
+  opts:
+    * `:bitrate_kbps` (int, default 128) — target AAC bitrate.
+    * `:timeout_ms` (int, default 600_000) — wall-clock cap on the wasm encode.
+  """
+  def encode_audio(in_path, out_path, opts \\ [])
+      when is_binary(in_path) and is_binary(out_path) and is_list(opts) do
+    bitrate = Keyword.get(opts, :bitrate_kbps, 128)
+    timeout_ms = Keyword.get(opts, :timeout_ms, 600_000)
+
+    src = Path.expand(in_path)
+    out_abs = Path.expand(out_path)
+    out_dir = Path.dirname(out_abs)
+    out_base = Path.basename(out_abs)
+
+    cond do
+      not File.regular?(src) ->
+        {:error, {:audio_missing, in_path}}
+
+      true ->
+        File.mkdir_p!(out_dir)
+        # Private scratch so the wasm sees ONLY the one staged input under /in.
+        scratch = Path.join(System.tmp_dir!(), "wb_audio_#{:erlang.unique_integer([:positive])}")
+        File.mkdir_p!(scratch)
+        ext = Path.extname(src)
+        in_name = "in" <> if(ext == "", do: ".mp3", else: ext)
+        staged = Path.join(scratch, in_name)
+
+        try do
+          with :ok <- cp(src, staged),
+               {:ok, _name} <- ensure_registered() do
+            argv = [
+              "audio",
+              "/in/#{in_name}",
+              "/out/#{out_base}",
+              Integer.to_string(bitrate)
+            ]
+
+            dirs = ["#{scratch}::/in", "#{out_dir}::/out"]
+            ropts = [timeout_ms: timeout_ms, fuel: :unlimited]
+
+            case Workbooks.CommandRegistry.run_status(@command, "", argv, dirs, ropts) do
+              {:ok, _out, 0} ->
+                if File.regular?(out_abs),
+                  do: {:ok, out_abs},
+                  else: {:error, :encode_produced_no_m4a}
+
+              {:ok, out, status} ->
+                {:error, {:encode_failed, status, String.slice(out, 0, 400)}}
+
+              {:error, reason} ->
+                {:error, {:encode_failed, reason}}
+            end
+          end
+        after
+          File.rm_rf(scratch)
+        end
+    end
+  end
+
+  defp cp(src, dest) do
+    case File.cp(src, dest) do
+      :ok -> :ok
+      {:error, reason} -> {:error, {:audio_stage_failed, reason}}
+    end
+  end
+
   @doc "The frame-filename pattern the in-guest encoder expects (wavelet render_seq layout)."
   def frame_pattern, do: @frame_pattern
 
