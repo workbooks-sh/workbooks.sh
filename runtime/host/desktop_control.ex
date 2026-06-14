@@ -39,9 +39,9 @@ defmodule Workbooks.DesktopControl do
     Registry.register(@registry, @key, {tenant, join_ref})
   end
 
-  # Same grandfather rule as the rest of wb-g1yo: nil on either side passes.
+  # Tenant scoping (wb-g1yo) — the one shared rule.
   defp tenant_visible?(socket_tenant, req_tenant),
-    do: is_nil(socket_tenant) or is_nil(req_tenant) or socket_tenant == req_tenant
+    do: Workbooks.Tenant.visible?(socket_tenant, req_tenant)
 
   @doc "How many desktop shells are currently listening (diagnostics / no-op guard)."
   def listeners do

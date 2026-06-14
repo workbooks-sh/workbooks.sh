@@ -233,11 +233,9 @@ defmodule Workbooks.PhoenixSocket do
   end
 
   @doc false
-  # Pure tenant-match rule (wb-g1yo.2), public for testing: reject ONLY on a
-  # definite cross-tenant mismatch (both known + different); a nil on either side
-  # (dev/single-tenant socket, or a legacy/unknown run) is grandfathered through.
+  # Pure tenant-match rule (wb-g1yo.2), public for testing — the one shared rule.
   def tenant_match?(session_tenant, socket_tenant),
-    do: is_nil(socket_tenant) or is_nil(session_tenant) or session_tenant == socket_tenant
+    do: Workbooks.Tenant.visible?(session_tenant, socket_tenant)
 
   defp track_topic(state, topic, join_ref) do
     Map.update(state, :topics, %{topic => join_ref}, &Map.put(&1, topic, join_ref))

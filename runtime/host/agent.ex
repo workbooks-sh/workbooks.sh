@@ -17,7 +17,7 @@ defmodule Workbooks.Agent do
   run is fully observable and OQL-queryable, like brandnana's events.org.
   """
   require Logger
-  alias Workbooks.{Llm, Shell, VFS}
+  alias Workbooks.{Shell, VFS}
 
   # HOST-BROKERED tools — only granted to trusted (exec) agents. These let the
   # keeper agent (Waldo) commit/push and publish to the site WITHOUT any native

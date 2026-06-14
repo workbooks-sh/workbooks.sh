@@ -38,10 +38,9 @@ defmodule Workbooks.EnvBroker do
     _ -> false
   end
 
-  # Tenant scoping (wb-g1yo): a prompt is pushed to a socket only if their tenants
-  # match; a nil on either side (dev/single-tenant/legacy socket) is grandfathered.
+  # Tenant scoping (wb-g1yo) — the one shared rule.
   defp tenant_visible?(socket_tenant, req_tenant),
-    do: is_nil(socket_tenant) or is_nil(req_tenant) or socket_tenant == req_tenant
+    do: Workbooks.Tenant.visible?(socket_tenant, req_tenant)
 
   @doc """
   Ask `tenant`'s user for `name` (with optional `reason`) and BLOCK until they

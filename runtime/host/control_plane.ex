@@ -22,7 +22,7 @@ defmodule Workbooks.ControlPlane do
   def list(tenant) do
     list()
     |> Enum.filter(fn
-      [_id, t, _state] -> is_nil(tenant) or is_nil(t) or t == tenant
+      [_id, t, _state] -> Workbooks.Tenant.visible?(t, tenant)
       _ -> true
     end)
   end
@@ -52,7 +52,7 @@ defmodule Workbooks.ControlPlane do
   def workbook_visible?(id, caller_tenant) do
     case workbook_tenant(id) do
       :not_found -> true
-      t -> is_nil(caller_tenant) or is_nil(t) or t == caller_tenant
+      t -> Workbooks.Tenant.visible?(t, caller_tenant)
     end
   end
 

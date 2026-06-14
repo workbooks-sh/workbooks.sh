@@ -152,10 +152,8 @@ defmodule Workbooks.Workflow.Telemetry do
   only on a definite cross-tenant mismatch; a nil on either side (admin/internal
   view, or a legacy/local run with no marker) is grandfathered through.
   """
-  def run_visible?(workdir, caller_tenant) do
-    rt = run_tenant(workdir)
-    is_nil(caller_tenant) or is_nil(rt) or rt == caller_tenant
-  end
+  def run_visible?(workdir, caller_tenant),
+    do: Workbooks.Tenant.visible?(run_tenant(workdir), caller_tenant)
 
   # Run recency = the last time its always-on step log was touched (falls back to
   # the dir itself for runs that never logged a step).

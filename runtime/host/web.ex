@@ -425,10 +425,8 @@ defmodule Workbooks.Web do
 
   # IDOR guard (wb-g1yo.9): a `:tenant` PATH param must equal the authenticated
   # caller's tenant. A nil caller (admin/internal/dev-unset) is grandfathered.
-  defp path_tenant_ok?(conn) do
-    caller = conn.assigns[:tenant]
-    is_nil(caller) or caller == conn.params["tenant"]
-  end
+  defp path_tenant_ok?(conn),
+    do: Workbooks.Tenant.visible?(conn.params["tenant"], conn.assigns[:tenant])
 
   # Session-ownership guard (wb-g1yo.9): only the run's owning tenant may act on
   # it by id (CTK review pull/commit). Same grandfather rule; a not-found run is
@@ -437,7 +435,7 @@ defmodule Workbooks.Web do
     caller = conn.assigns[:tenant]
 
     case Workbooks.AgentSession.status(id) do
-      %{tenant: st} -> is_nil(caller) or is_nil(st) or st == caller
+      %{tenant: st} -> Workbooks.Tenant.visible?(st, caller)
       _ -> true
     end
   rescue

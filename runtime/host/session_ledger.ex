@@ -59,10 +59,8 @@ defmodule Workbooks.SessionLedger do
 
   # nil tenant = no scoping (admin/internal). Otherwise show only this tenant's
   # rows + legacy rows that predate scoping (tenant == nil on the entry).
-  defp scope_to_tenant(rows, nil), do: rows
-
   defp scope_to_tenant(rows, tenant),
-    do: Enum.filter(rows, fn r -> r.tenant in [nil, tenant] end)
+    do: Enum.filter(rows, fn r -> Workbooks.Tenant.visible?(r.tenant, tenant) end)
 
   defp decode(line) do
     Jason.decode!(line)

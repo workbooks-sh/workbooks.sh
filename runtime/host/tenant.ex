@@ -30,4 +30,20 @@ defmodule Workbooks.Tenant do
   def ephemeral do
     "eph-" <> Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)
   end
+
+  @doc """
+  The ONE multi-tenant VISIBILITY rule (wb-g1yo). Every tenant-scoped surface —
+  the session ledger, telemetry, instances, workbooks, the env/workgate/desktop
+  pushes, the WS session gate, the `:tenant`-path endpoints — decides access with
+  this single function so the rule can't silently diverge across surfaces.
+
+  A `caller` may see/act on a resource owned by `owner` iff same tenant. A `nil`
+  on EITHER side is grandfathered: a nil OWNER = a pre-scoping/legacy or local/dev
+  resource (those deployments are single-tenant); a nil CALLER = an admin/internal
+  /dev context. So it only ever DENIES a definite cross-tenant mismatch — never
+  breaks the single-tenant desktop or dev flows.
+  """
+  @spec visible?(owner :: String.t() | nil, caller :: String.t() | nil) :: boolean()
+  def visible?(owner, caller),
+    do: is_nil(owner) or is_nil(caller) or owner == caller
 end

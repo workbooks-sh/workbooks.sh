@@ -35,10 +35,9 @@ defmodule Workbooks.WorkgateBroker do
     _ -> false
   end
 
-  # Tenant scoping (wb-g1yo): a capability prompt reaches a socket only if their
-  # tenants match; a nil on either side (dev/single-tenant/legacy) is grandfathered.
+  # Tenant scoping (wb-g1yo) — the one shared rule.
   defp tenant_visible?(socket_tenant, req_tenant),
-    do: is_nil(socket_tenant) or is_nil(req_tenant) or socket_tenant == req_tenant
+    do: Workbooks.Tenant.visible?(socket_tenant, req_tenant)
 
   @doc "Ask `tenant`'s user to Allow/Deny `capability`. Blocks. Returns :allow | :deny | {:error, reason}."
   def request(capability, reason \\ nil, timeout \\ 120_000, tenant \\ nil) do
