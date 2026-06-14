@@ -24,14 +24,14 @@ export const SEARCH_MODES: Record<SearchMode, SearchModeInfo> = {
     label: "Browse",
     tagline: "Your stuff + the open web",
     blurb:
-      "Everything Workspace finds, plus live web results — click any of them to open the page right here in a tab.",
+      "Everything Workspace finds, plus live web results — click any to open the page in a tab. Web search is opt-in: enable a provider in Settings (or turn on OpenRouter web).",
   },
   ai: {
     id: "ai",
     label: "Ask",
     tagline: "Answers, not just links",
     blurb:
-      "Prompt it like a question. It reads your files and the web, then writes a short answer with the sources it used and a few follow-ups.",
+      "Prompt it like a question. It reads your files and writes a short answer with the sources and a few follow-ups (and the web too, once you've enabled web search).",
   },
 };
 

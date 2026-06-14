@@ -193,7 +193,7 @@
       <!-- AI search — prompt → synthesised answer + sources + follow-ups. -->
       <div class="results ai-results">
         {#if !aiResult}
-          <div class="empty">Ask anything and press Enter — I'll answer from your files and the web, with sources.</div>
+          <div class="empty">Ask anything and press Enter — I'll answer from your files, with sources (and the web too, once you've enabled web search).</div>
         {:else}
           <div class="ai-answer">{aiResult.answer.replace(/\*\*/g, "")}</div>
           <div class="ai-h">Sources</div>
