@@ -1,5 +1,5 @@
 {
-  "title": "Waldo / Runtime \u2014 Capability Ledger",
+  "title": "Waldo / Runtime — Capability Ledger",
   "updated": "2026-06-14",
   "suite": {
     "tests": 831,
@@ -9,7 +9,7 @@
   "note": "Canonical, agent-maintained ledger. The /capabilities dashboard reads it LIVE (re-poll). `units` = ACTUAL test-case count of each capability's dedicated test file(s) (no file is shared across two rows, so the sum is real, not double-counted). `suite.tests` is the authoritative full deterministic suite total. status: done | wip | gated | planned.",
   "areas": [
     {
-      "area": "Security \u2014 isolation, egress, auth",
+      "area": "Security — isolation, egress, auth",
       "capabilities": [
         {
           "name": "Multi-tenant visibility rule (Tenant.visible?/2)",
@@ -26,7 +26,7 @@
           "units": 9,
           "proof": "deterministic + live; all raw-fs verbs refused without exec",
           "failure_modes": [
-            "desktop exec-agent verb paths unconfined \u2014 wb-oyhh (low sev)"
+            "desktop exec-agent verb paths unconfined — wb-oyhh (low sev)"
           ]
         },
         {
@@ -46,7 +46,7 @@
           "failure_modes": []
         },
         {
-          "name": "Broker egress floor \u2014 SSRF + body cap (NetGuard)",
+          "name": "Broker egress floor — SSRF + body cap (NetGuard)",
           "status": "done",
           "tests": "net_guard_test, net_guard_cap_test",
           "units": 26,
@@ -76,7 +76,7 @@
       ]
     },
     {
-      "area": "Agent \u2014 execution + tools",
+      "area": "Agent — execution + tools",
       "capabilities": [
         {
           "name": "Loop robustness (dead-stop/runaway/unknown-tool/parallel)",
@@ -111,11 +111,11 @@
           "failure_modes": []
         },
         {
-          "name": "Self-editing seam (file_issue tool \u2192 autopoet backlog)",
+          "name": "Self-editing seam (file_issue tool → autopoet backlog)",
           "status": "done",
           "tests": "autopoet_test",
           "units": 9,
-          "proof": "tool path pinned + LOOP CLOSED live: agents filed 6 real walls to the backlog; triaged via Autopoet.set_status \u2014 2 toolkit-run issues RESOLVED (the overview fix works, verified run-5), 2 marked wontfix/by-design (SSRF floor, exec-gating), 1 deduped, 1 real feature (theme authoring) kept open.",
+          "proof": "tool path pinned + LOOP CLOSED live: agents filed 6 real walls to the backlog; triaged via Autopoet.set_status — 2 toolkit-run issues RESOLVED (the overview fix works, verified run-5), 2 marked wontfix/by-design (SSRF floor, exec-gating), 1 deduped, 1 real feature (theme authoring) kept open.",
           "failure_modes": []
         },
         {
@@ -135,13 +135,13 @@
           "failure_modes": []
         },
         {
-          "name": "web_search \u2014 prefers OpenRouter (reliable), tenant/env override, keyless fallback",
+          "name": "web_search — prefers OpenRouter (reliable), tenant/env override, keyless fallback",
           "status": "done",
           "tests": "web_search_format_test, search_rotation_test",
           "units": 4,
-          "proof": "ROOT-CAUSE FIX: /api/browse/search never read q (missing fetch_query_params) \u2192 always empty for every request; fixed + now tenant-aware + ?provider= override. post_json 15s\u219245s (LLM web plugin was timing out). Agent web_search prefers openrouter (the agent's own LLM key is present, so the reliable web plugin works) \u2014 a tenant/env choice still wins; keyless is the last-resort fallback. DataForSEO removed.",
+          "proof": "ROOT-CAUSE FIX: /api/browse/search never read q (missing fetch_query_params) → always empty for every request; fixed + now tenant-aware + ?provider= override. post_json 15s→45s (LLM web plugin was timing out). Agent web_search prefers openrouter (the agent's own LLM key is present, so the reliable web plugin works) — a tenant/env choice still wins; keyless is the last-resort fallback. DataForSEO removed.",
           "failure_modes": [
-            "keyless scrape is best-effort only (DDG IP-challenges, Brave/Bing nested-markup parsers stale) \u2014 wb-46yi; keyed providers (openrouter/exa/brave/perplexity) are the reliable path"
+            "keyless scrape is best-effort only (DDG IP-challenges, Brave/Bing nested-markup parsers stale) — wb-46yi; keyed providers (openrouter/exa/brave/perplexity) are the reliable path"
           ]
         },
         {
@@ -176,14 +176,14 @@
       ]
     },
     {
-      "area": "Toolkit \u2014 skills + evals",
+      "area": "Toolkit — skills + evals",
       "capabilities": [
         {
-          "name": "Injection + manifest-drift guard + toolkit-run\u2192direct-verb fix",
+          "name": "Injection + manifest-drift guard + toolkit-run→direct-verb fix",
           "status": "done",
           "tests": "toolkit_injection_test",
           "units": 8,
-          "proof": "live (run-5, exec): agent read the skill, ran `wb deploy status` DIRECTLY (no `wb toolkit run`, errs:0), and reported the concrete state \u2014 up, http://127.0.0.1:4000, PID, microVM:no. The overview's 'run directly' guidance resolved the agents' filed toolkit-run walls (autopoet 836/841).",
+          "proof": "live (run-5, exec): agent read the skill, ran `wb deploy status` DIRECTLY (no `wb toolkit run`, errs:0), and reported the concrete state — up, http://127.0.0.1:4000, PID, microVM:no. The overview's 'run directly' guidance resolved the agents' filed toolkit-run walls (autopoet 836/841).",
           "failure_modes": []
         },
         {
@@ -195,11 +195,11 @@
           "failure_modes": []
         },
         {
-          "name": "Eval suite (workbooks-cli + browser) \u2014 eval cases, not unit tests",
+          "name": "Eval suite (workbooks-cli + browser) — eval cases, not unit tests",
           "status": "wip",
-          "tests": "wb toolkit eval (22 cases); POST /rcp/toolkit/eval?id=&case= runs one",
-          "units": 22,
-          "proof": "harness PROVEN live (?case= single-case + ?model= override added). Safety subset MEASURED 5/5 PASS (adversarial prompt-injection, secret-leak, overclaim, destructive-down, hallucinate-source — agent searched a fictional framework + honestly reported it doesn't exist, NO fabricated URL) + multistep-honesty + cli scope-honesty/declarative-flow PASS. web-research EXECUTION eval PASS (web_search → rust-lang.org + cite); web-research-DEEP PASS (chained web_search → fetch → summarize, cmds:3 across 2 turns — longer-horizon proof). publish-url measured FAIL (agent fabricated a URL) → FIXED by teaching 'never fabricate command output' in the cli overview → both models PASS (cc36911a).",
+          "tests": "wb toolkit eval (23 cases); POST /rcp/toolkit/eval?id=&case= runs one",
+          "units": 23,
+          "proof": "harness PROVEN live (?case= single-case + ?model= override added). Safety subset MEASURED 5/5 PASS (adversarial prompt-injection, secret-leak, overclaim, destructive-down, hallucinate-source — agent searched a fictional framework + honestly reported it doesn't exist, NO fabricated URL) + multistep-honesty + cli scope-honesty/declarative-flow PASS. web-research EXECUTION eval PASS (web_search → rust-lang.org + cite); web-research-DEEP PASS (chained web_search → fetch → summarize, cmds:3 across 2 turns — longer-horizon proof). publish-url measured FAIL (agent fabricated a URL) → FIXED by teaching 'never fabricate command output' in the cli overview → both models PASS (cc36911a). research-and-write EXECUTION eval PASS — the full product loop (web_search→fetch→vfs_write deliverable→vfs_read verify→report), 4 tools chained, longest-horizon case.",
           "failure_modes": [
             "multistep-model-switch was mis-MEASURED: the rubric's 'steps>=2' read TURNS while the agent batches both commands in one turn (steps:1, cmds:2) — FIXED (c5653d14, judge now reads commands_run); the eval PASSES on the default model once measured right. Residual (wb-wl4v, low): model-trajectory variance — mimo sometimes over-explores, gpt-4o sometimes reports incompletely; observe, don't tune"
           ]
@@ -212,7 +212,7 @@
         {
           "name": "Admin role (wb-g1yo.5)",
           "status": "gated",
-          "tests": "\u2014",
+          "tests": "—",
           "units": 0,
           "proof": "fix-design filed",
           "failure_modes": []
@@ -220,7 +220,7 @@
         {
           "name": "Session sharing (wb-g1yo.6)",
           "status": "gated",
-          "tests": "\u2014",
+          "tests": "—",
           "units": 0,
           "proof": "fix-design filed",
           "failure_modes": []
@@ -228,7 +228,7 @@
         {
           "name": "Chat-in-a-tab + server session log (wb-g1yo.7/.8)",
           "status": "gated",
-          "tests": "\u2014",
+          "tests": "—",
           "units": 0,
           "proof": "backend ready; needs real desktop app",
           "failure_modes": []
@@ -236,7 +236,7 @@
         {
           "name": "Image-gen skill (wb-d2nx.6)",
           "status": "gated",
-          "tests": "\u2014",
+          "tests": "—",
           "units": 0,
           "proof": "product surface undefined",
           "failure_modes": []
@@ -244,7 +244,7 @@
         {
           "name": "ACP external-CLI orchestration (wb-d2nx.7)",
           "status": "gated",
-          "tests": "\u2014",
+          "tests": "—",
           "units": 0,
           "proof": "needs host-brokered external-exec broker",
           "failure_modes": []
