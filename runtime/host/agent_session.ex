@@ -38,9 +38,12 @@ defmodule Workbooks.AgentSession do
   def start_link({id, _, _, _} = spec), do: GenServer.start_link(__MODULE__, spec, name: via(id))
   defp via(id), do: {:via, Registry, {__MODULE__.Registry, id}}
 
+  @doc "Cancel a running session — kills the run process and tells subscribers."
+  def cancel(id), do: call(id, :cancel)
+
   @impl true
   def init({id, system, task, opts}) do
-    {:ok, %{id: id, status: :running, run: nil, live: [], subs: [], reviews: [], review_log: []},
+    {:ok, %{id: id, status: :running, run: nil, run_pid: nil, live: [], subs: [], reviews: [], review_log: []},
      {:continue, {:run, system, task, opts}}}
   end
 
@@ -49,7 +52,7 @@ defmodule Workbooks.AgentSession do
     parent = self()
     run_id = state.id
 
-    spawn(fn ->
+    run_pid = spawn(fn ->
       {:ok, vfs} = Workbooks.VFS.open(Keyword.get(opts, :vfs, ":memory:"))
 
       run =
@@ -72,7 +75,14 @@ defmodule Workbooks.AgentSession do
       send(parent, {:run_done, run})
     end)
 
-    {:noreply, state}
+    {:noreply, %{state | run_pid: run_pid}}
+  end
+
+  @impl true
+  def handle_call(:cancel, _from, state) do
+    if is_pid(state.run_pid) and Process.alive?(state.run_pid), do: Process.exit(state.run_pid, :kill)
+    Enum.each(state.subs, &send(&1, {:agent_done, "(cancelled)"}))
+    {:reply, :ok, %{state | status: :cancelled}}
   end
 
   @impl true

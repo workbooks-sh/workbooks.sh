@@ -123,6 +123,12 @@ defmodule Workbooks.PhoenixSocket do
     Map.update(state, :topics, %{}, &Map.delete(&1, topic))
   end
 
+  # Client→server cancel on a session channel (ws.cancelSession) — stop the run.
+  defp maybe_track("cancel", "session:" <> id, _join_ref, state) do
+    Workbooks.AgentSession.cancel(id)
+    state
+  end
+
   defp maybe_track(_event, _topic, _join_ref, state), do: state
 
   # Subscribe this socket to the AgentSession behind a joined session topic so
