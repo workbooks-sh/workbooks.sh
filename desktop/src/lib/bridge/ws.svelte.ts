@@ -223,6 +223,10 @@ class WsBridgeStore {
   #handlers = new Set<Handler>();
   #initStarted = false;
   #lastUrl: string | null = null;
+  // The per-boot token we last connected with. A runtime RESTART keeps the same
+  // url but rotates this token; without tracking it the bridge would keep using
+  // the dead token and never re-authenticate against the new runtime.
+  #lastToken: string | null = null;
 
   init() {
     if (this.#initStarted) return;
@@ -232,7 +236,10 @@ class WsBridgeStore {
     $effect.root(() => {
       $effect(() => {
         const { state, url, token } = daemon.status;
-        if (state === "ready" && url && url !== this.#lastUrl) {
+        // Reconnect when the endpoint OR the per-boot token changes — a runtime
+        // restart keeps the url but rotates the token, and a fast restart can
+        // skip the unhealthy beat entirely, so url-only would miss it.
+        if (state === "ready" && url && (url !== this.#lastUrl || token !== this.#lastToken)) {
           void this.#connect(url, token);
         } else if (state === "stopped" || state === "unhealthy") {
           this.#disconnect();
@@ -439,6 +446,7 @@ class WsBridgeStore {
   async #connect(httpUrl: string, token: string | null) {
     this.#disconnect();
     this.#lastUrl = httpUrl;
+    this.#lastToken = token;
     const wsUrl = httpUrl.replace(/^http/, "ws") + "/socket";
     // Lazy-load phoenix only when actually connecting — keeps it out of the
     // entry chunk (wb-aakl.13).
@@ -517,6 +525,7 @@ class WsBridgeStore {
     this.#socket?.disconnect();
     this.#socket = null;
     this.#lastUrl = null;
+    this.#lastToken = null;
   }
 
   #join(topic: string) {

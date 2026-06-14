@@ -346,9 +346,17 @@ pub fn engine_disconnect_cloud() -> DaemonStatus {
 pub fn spawn_state_poll(app: AppHandle) {
     std::thread::spawn(move || {
         let mut last: Option<DaemonStatus> = None;
+        let mut ticks: u32 = 0;
         loop {
             let cur = status();
-            if last.as_ref() != Some(&cur) {
+            // Emit on every CHANGE, and also a periodic heartbeat (every ~5th
+            // tick ≈ 15s) even when unchanged. A webview that reloads (HMR, or a
+            // navigation) sets up a fresh `daemon-state` listener and would
+            // otherwise wait indefinitely for the next change — the heartbeat
+            // guarantees it converges to the live status, and with it the bridge
+            // (re)connects to a runtime that restarted under the same url.
+            ticks += 1;
+            if last.as_ref() != Some(&cur) || ticks % 5 == 0 {
                 let _ = app.emit("daemon-state", &cur);
                 last = Some(cur);
             }
