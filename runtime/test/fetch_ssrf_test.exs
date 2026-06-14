@@ -49,10 +49,14 @@ defmodule Workbooks.BrowseFetchSsrfTest do
   use ExUnit.Case, async: true
   alias Workbooks.Browse.Fetch
 
-  test "Browse.Fetch.get refuses metadata/loopback/private IP literals" do
+  # NOTE: loopback (127.0.0.1) is exempted in :test builds ONLY (compile-time, so
+  # prod/dev releases stay strict) so integration tests can crawl a local fixture
+  # server — see Browse.Fetch @allow_test_loopback. Loopback-at-the-floor blocking
+  # is covered by net_guard_test. Here we pin the targets blocked in ALL builds:
+  # cloud metadata + RFC1918 (the real SSRF pivots), which the exemption never touches.
+  test "Browse.Fetch.get refuses metadata + private IP literals (blocked in all builds)" do
     for url <- [
           "http://169.254.169.254/latest/meta-data/",
-          "http://127.0.0.1:4000/health",
           "http://10.0.0.5/x",
           "http://192.168.1.1/admin",
           "http://172.16.0.9/y"

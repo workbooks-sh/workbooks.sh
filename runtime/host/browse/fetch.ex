@@ -47,15 +47,32 @@ defmodule Workbooks.Browse.Fetch do
   defp request(_url, _profile, _headers, redirects) when redirects < 0,
     do: {:error, :too_many_redirects}
 
+  # Loopback fixtures (127.0.0.1:<port>) are how the integration tests serve a
+  # page to crawl. Allowed ONLY in :test builds — captured at COMPILE time, so a
+  # prod/dev release (compiled MIX_ENV=prod) can never relax the floor (no runtime
+  # flag to misconfigure).
+  @allow_test_loopback Mix.env() == :test
+
   defp request(url, profile, headers, redirects) do
     # SSRF floor (same as the headless path): refuse private/link-local/metadata
     # targets BEFORE connecting. Checked on every hop so an open redirect can't
     # bounce a public URL onto 169.254.169.254 or 192.168.x.
-    if Workbooks.NetGuard.allowed?(url) do
+    if Workbooks.NetGuard.allowed?(url) or test_loopback?(url) do
       request_allowed(url, profile, headers, redirects)
     else
       {:error, :blocked}
     end
+  end
+
+  if @allow_test_loopback do
+    defp test_loopback?(url) do
+      case URI.parse(url).host do
+        h when is_binary(h) -> h == "localhost" or h == "::1" or String.starts_with?(h, "127.")
+        _ -> false
+      end
+    end
+  else
+    defp test_loopback?(_url), do: false
   end
 
   defp request_allowed(url, profile, headers, redirects) do
