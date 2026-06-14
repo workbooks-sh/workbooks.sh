@@ -345,14 +345,19 @@ defmodule Workbooks.Toolkits do
 
         # Telemetry from the run's tool trace (the universal step record): step
         # count, tools used, and errors — the judge factors execution, not just text.
+        # `steps` = LLM TURNS; `commands` = actual tool CALLS (one per event). An
+        # agent can run several commands in a single turn (batched/parallel tool
+        # calls), so a rubric that wants "ran >= 2 commands" must read `commands`,
+        # NOT `steps` — else a batching agent shows steps:1 and is wrongly failed.
         tel = %{
           steps: run.steps,
+          commands: length(run.events),
           tools: run.events |> Enum.map(& &1.tool) |> Enum.uniq(),
           errors: Enum.count(run.events, &(&1[:error] || (&1[:exit_code] && &1[:exit_code] != 0)))
         }
 
         {verdict, reason} = judge(task, rubric, run.result, tel)
-        {verdict, "#{name} [steps:#{tel.steps} tools:#{Enum.join(tel.tools, ",")} errs:#{tel.errors}] — #{reason}"}
+        {verdict, "#{name} [steps:#{tel.steps} cmds:#{tel.commands} tools:#{Enum.join(tel.tools, ",")} errs:#{tel.errors}] — #{reason}"}
     end
   end
 
@@ -367,7 +372,8 @@ defmodule Workbooks.Toolkits do
     RUBRIC:
     #{rubric}
 
-    AGENT TELEMETRY: steps=#{tel.steps}, tools=[#{Enum.join(tel.tools, ", ")}], errors=#{tel.errors}
+    AGENT TELEMETRY: commands_run=#{tel.commands}, turns=#{tel.steps}, tools=[#{Enum.join(tel.tools, ", ")}], errors=#{tel.errors}
+    (NOTE: commands_run = actual tool calls; turns = LLM round-trips. An agent may run several commands in one turn. When a rubric says "ran N commands / steps>=N", judge by commands_run, NOT turns.)
 
     AGENT RESULT:
     #{String.slice(result || "(no result)", 0, 4000)}
