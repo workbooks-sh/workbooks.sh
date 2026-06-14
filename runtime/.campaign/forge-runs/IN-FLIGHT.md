@@ -1,18 +1,17 @@
-# In-flight background agents (update on launch + completion)
+# In-flight background agents
 
 Kill a runaway with `TaskStop <agentId>`. On resume, re-launch any that `failed` without a verdict.
 
-| agentId | mission | checkpoint | status |
-|---|---|---|---|
-| a3386da7a380ec9bc | light sweep2: cJSON/tinyexpr/tomlc99/utf8proc + itoa Rust crate | forge-runs/light-sweep2.md | DONE — 5/5 proven (5 domains + a real crates.io crate); committed |
-| aa992f6f8fa8a5bc7 | DuckDB to-live (heavy full build) | forge-runs/duckdb-tolive.md | FULL BUILD RUNNING — agent COMPLETED, left a bounded build: /tmp/run-duckdb-build.sh (perl-alarm 3600s + ulimit -v 13GB, conc=2), 71 TUs → link → SELECT. log /tmp/duckdb-build.log. (I killed my accidental duplicate b5gpmu4mp — was double-loading.) THE solo heavy build. |
-| ac2172afdee7a1851 | light sweep: SIMD-intrinsic runtime proof + C leaf-lib vein | forge-runs/light-sweep.md | DONE — SIMD intrinsics LIVE + 4 C libs (xxHash/miniz/cmark/libyaml) proven; committed |
-| (orphaned ab497938) | DuckDB conc-2 detached build | n/a | DEAD (0 procs); revealed real portability errors (mbedtls entropy, fcntl F_*LCK) — folded into the to-live agent |
+**STATUS: IDLE — loop paused (CronDelete ad8434f7), nothing in-flight, all committed + pushed.**
 
-## Recently completed (this session)
-- rayon-core + llvm.wasm.* codegen patch → **LIVE**, committed `d32f9437` (verified through crash recovery).
-- DuckDB split-amalgamation → **proven** (compiles 9/9; full build RAM-bound). Recipe: forge-runs/duckdb-recipe.md.
-- Rust threads, Rust SIMD (-msimd128), C++ exceptions (both lanes), Go/esbuild → live.
+## Session result — Forge campaign (banked, see FORGE-CAPABILITIES.md)
+- **LIVE (14):** C, C++ (+exceptions, both lanes), Zig, Rust, Rust threads, Rust SIMD, wasm SIMD intrinsics,
+  rayon-core, C/pthread threads, Go/esbuild, SQLite, crates.io deps.
+- **PROVEN:** 12 C leaf-libs (9 domains); DuckDB (compiles, reached link).
+- Levers: `--cfg target_feature=atomics`, the mrustc codegen patch (`mrustc-patch/`), `WB_CC_CONC`, crash protocol.
 
-_Convention: heavy builds (mrustc rebuild, DuckDB-scale) run SOLO + resource-bounded; ≤1 heavy build at a
-time on this RAM-sensitive box. Light single-file/single-crate compiles can share._
+## Deferred (dedicated-session work, NOT loop work)
+- **DuckDB to-live** — NOT a one-line fix (verified): fcntl `F_*LCK` (-D-able) + a libc++ `ldiv_t`
+  `#include_next` breakage on duckdb-5/6/42/mbedtls (sensitive to defines; same class as the C++ EH build).
+  Needs `build_c_dir` include-handling matched precisely + source patches + a clean build on a stable box
+  with `.o` caching. Recipe/finding in resolved.json + forge-runs/duckdb-recipe.md.
