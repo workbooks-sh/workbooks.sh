@@ -1067,7 +1067,17 @@ defmodule Workbooks.PackageManager do
           wasmtime_cache_args() ++
             ["-W", "exceptions=y", "-W", "memory64=y", "-W", "threads=y", "-W", "shared-memory=y", "-W", "bulk-memory=y", "-S", "threads=y"]
         else
-          wasmtime_cache_args() ++ ["-W", "exceptions=y", "-W", "memory64=y", "-W", "timeout=#{timeout_ms}ms", "-W", "fuel=#{fuel}"]
+          # `fuel: :unlimited` (or 0) DROPS the fuel cap, relying solely on the wall-clock
+          # `-W timeout` for DoS. Fuel is the wrong bound for a legitimately compute-heavy
+          # lane (e.g. an H.264 encode of a multi-second clip burns far more than the
+          # generic default before finishing); the wall-clock cap still kills a runaway.
+          fuel_arg =
+            if fuel in [:unlimited, 0],
+              do: [],
+              else: ["-W", "fuel=#{fuel}"]
+
+          wasmtime_cache_args() ++
+            ["-W", "exceptions=y", "-W", "memory64=y", "-W", "timeout=#{timeout_ms}ms"] ++ fuel_arg
         end
       envs = Enum.flat_map(env, &["--env", &1])
       parts = wopts ++ envs ++ Enum.flat_map(dirs, &["--dir", &1]) ++ [wasm_path | argv]

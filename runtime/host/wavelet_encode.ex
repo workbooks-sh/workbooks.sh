@@ -96,7 +96,11 @@ defmodule Workbooks.WaveletEncode do
         ["/in/#{@frame_pattern}", "/out/#{out_base}", Integer.to_string(fps)] ++ tail
 
       dirs = ["#{frames_abs}::/in", "#{out_dir}::/out"]
-      ropts = [timeout_ms: timeout_ms, fuel: 500_000_000_000]
+      # The encode is legitimately compute-heavy (H.264 of a multi-second clip burns far
+      # more than any generic fuel default before finishing). Bound it by WALL-CLOCK
+      # (`timeout_ms`) only — fuel: :unlimited drops the `-W fuel` cap so a real encode
+      # isn't trapped mid-stream, while the wall-clock timeout still kills a runaway.
+      ropts = [timeout_ms: timeout_ms, fuel: :unlimited]
 
       case Workbooks.CommandRegistry.run_status(@command, "", argv, dirs, ropts) do
         {:ok, _out, 0} ->

@@ -172,7 +172,55 @@ rebuilt wasm hot-swaps the persisted registration by content hash. mix test 18/1
 green (wavelet_command + ffmpeg_broker): default render = h264, vcodec:mpeg4 fallback,
 --audio = h264+aac in-guest, encode_engine::host still default-deny.
 
-## Left
-The in-guest H.264+AAC lane fully matches the broker; `encode_engine: :host` is now a
-legacy escape hatch only. Remaining follow-on: wire the Stage-4 curated in-sandbox
-compile loop into build.sh behind a flag (a true clang.wasm self-build).
+## Phase 4 — INTEGRATE + FINISH — DONE/PROVEN
+`:in_guest` (H.264+AAC, no broker grant) is the full-quality DEFAULT. The host
+`FfmpegBroker` survives ONLY as an explicit `encode_engine: :host` legacy/opt-in —
+nothing the default path needs. wavelet.ex / wavelet_encode.ex were already wired
+this way from Phases 1-3; Phase 4 closed the one remaining real-encode wall and ran
+the live end-to-end.
+
+WALL (cleared) — FUEL EXHAUSTION on a real encode. The in-guest run lane bounded the
+wasm with BOTH `-W timeout` AND `-W fuel=5e9` (and WaveletEncode passed `fuel: 5e11`).
+A legitimate H.264 encode of a 12s 720p clip (360 frames + AAC) burns FAR more than
+5e11 fuel before finishing, so wasmtime trapped mid-stream (`wasm trap: all fuel
+consumed`, exit 134) — even though the identical run with no fuel cap completed (8.9MB
+mp4, "DONE encoded 360 frames + audio"). Fuel is the wrong DoS bound for a
+legitimately compute-heavy lane. Fix: `run_wasmtime` now accepts `fuel: :unlimited`
+(or `0`) → it OMITS `-W fuel` entirely and relies on the wall-clock `-W timeout` to
+kill a runaway (the threads path already drops fuel for the same reason).
+`WaveletEncode.encode/3` passes `fuel: :unlimited` (bounded by `timeout_ms`). The
+generic default fuel is untouched, so every other command keeps its CPU-DoS guard.
+
+LIVE END-TO-END (PROVEN, NO broker grant): an agent-authored composition (`comp.html`
+— a fade-in WORKBOOKS title card + sliding green box + growing progress bar) WITH
+ElevenLabs narration (`narration.mp3`, ~12s) was driven through the REAL
+`Workbooks.Wavelet.command(["render", comp, "-o", out, "--w","1280","--h","720",
+"--fps","30","--duration","12","--audio", mp3], roots: [root])` — DEFAULT engine,
+`:allow` NOT passed:
+  - render_seq.wasm rasterized 360 frames IN-SANDBOX (no GPU);
+  - wb_encode.wasm encoded H.264+AAC IN-GUEST under wasmtime (NO native exec — all 22
+    imports are wasi_snapshot_preview1, verified via wasm-tools);
+  - result: `wavelet-final.mp4` 8,987,053 bytes. ffprobe (inspect only): video h264
+    High yuv420p 1280x720 360 frames; audio aac 44100 stereo; duration 11.97s.
+  - VISION-VERIFIED via `tools/record/lib/verify-only.mjs` (OPENROUTER_API_KEY in env,
+    google/gemini-3.5-flash): verdict **pass**, confidence 1.0, skipped=false — the
+    model confirmed the title card, body text, the "H.264 + AAC · in-guest · no native
+    exec" pill, the sliding box and the growing progress bar.
+  - UPLOADED to R2: `wrangler r2 object put workbooks-media/demos/wavelet-final.mp4
+    --content-type=video/mp4 --remote` → "Upload complete."
+
+The whole build was produced by OUR in-sandbox clang.wasm toolchain (Phase 3): a clean
+`./build.sh` compiled all 320 ffmpeg TUs + 53 libx264 + zlib in-sandbox and wasm-ld-
+linked wb_encode.wasm (3.96MB) under wasmtime — NO host wasi-sdk compiler.
+
+mix compile clean; `mix test test/wavelet_command_test.exs test/ffmpeg_broker_test.exs`
+= 18/18 green (default render = in-guest h264 no grant; default + --audio = in-guest
+h264+aac no grant; vcodec:mpeg4 in-guest fallback; encode_engine::host = legacy broker
+still default-deny).
+
+## Nothing remains
+The wavelet mp4-encode bedrock gap is fully closed: H.264 + AAC (incl. narration audio)
+encode runs IN-GUEST under wasmtime as the zero-trust DEFAULT, at broker-matching
+quality, with NO native exec and NO broker grant — proven by a live agent-authored,
+vision-verified, R2-published video. The host FfmpegBroker remains only as an explicit
+opt-in escape hatch; it is no longer a quality requirement for anything.
