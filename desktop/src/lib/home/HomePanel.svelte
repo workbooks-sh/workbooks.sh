@@ -22,6 +22,7 @@
   import { ArrowUp, ArrowUUpLeft as Undo2, Waveform as AudioLines, Microphone as Mic, MicrophoneSlash as MicOff, PhoneSlash as PhoneOff, WarningCircle as AlertCircle, Wrench, CircleNotch as Loader2, Check, XCircle } from "phosphor-svelte";
   import { chatSession } from "$lib/chat/session.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
+  import { keys } from "$lib/bridge/keys.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { packageStore } from "$lib/bridge/package.svelte";
   import PaletteModal from "$lib/palette/PaletteModal.svelte";
@@ -310,13 +311,21 @@
 
   onMount(() => {
     chatSession.init();
+    // Know whether a model key exists so the composer can prompt to wake Waldo
+    // instead of silently no-opping (wb-2s09.3/.4). Best-effort; offline → empty.
+    void keys.init().catch(() => {});
     // agents.init() fires from the gated $effect above (flag-on only).
     // Wait a tick so the textarea is mounted, then focus.
     queueMicrotask(() => textareaEl?.focus());
   });
 
+  // Waldo's text brain runs on OpenRouter. Ready runtime + no model key = the
+  // composer would silently fail; surface a "wake Waldo" CTA instead.
+  const hasModelKey = $derived(keys.keys.some((k) => k.provider === "openrouter"));
+  const needsKey = $derived(sidecar.status.state === "ready" && !hasModelKey);
+
   const canSend = $derived(
-    !sending && prompt.trim().length > 0 && sidecar.status.state === "ready",
+    !sending && prompt.trim().length > 0 && sidecar.status.state === "ready" && hasModelKey,
   );
 
   async function submit() {
@@ -391,6 +400,10 @@
           <span class="hint">
             {#if sidecar.status.state !== "ready"}
               <span class="muted">{sidecar.status.state}</span>
+            {:else if needsKey}
+              <button type="button" class="wake-cta" onclick={() => chrome.navigateTo("settings", "general")}>
+                Add a model key to wake Waldo →
+              </button>
             {:else}
               <span class="muted">⌘↵</span>
             {/if}
@@ -674,6 +687,19 @@
     color: var(--color-fg-subtle);
   }
   .muted { color: var(--color-fg-muted); }
+  /* Missing-key prompt — a quiet inline CTA that jumps to settings so the user
+     can wake Waldo instead of hitting a dead send button (wb-2s09.3/.4). */
+  .wake-cta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-brand);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .wake-cta:hover { text-decoration: underline; }
 
   .btn {
     display: inline-flex;
