@@ -678,6 +678,19 @@ defmodule Workbooks.Git do
 
   defp has?(bin), do: match?({_, 0}, System.cmd("sh", ["-c", "command -v #{bin}"], stderr_to_stdout: true))
 
+  @doc "Backup status for a tenant → `%{connected: bool, url: nil | binary}` (the `origin` remote)."
+  def backup_status(tenant) do
+    dir = ensure_repo(tenant)
+    url = remote_url(dir, "origin")
+    %{connected: not is_nil(url), url: url}
+  end
+
+  @doc "Disconnect a tenant's backup — remove the `origin` remote. Idempotent `:ok`."
+  def backup_disconnect(tenant) do
+    git(ensure_repo(tenant), ["remote", "remove", "origin"])
+    :ok
+  end
+
   @doc """
   Publish (federate) the tenant's repo over Radicle. Ensures the rad profile +
   the repo (with at least one commit), then `rad init`s it public if not already

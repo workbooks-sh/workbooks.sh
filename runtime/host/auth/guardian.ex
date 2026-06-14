@@ -20,12 +20,12 @@ defmodule Workbooks.Auth.Guardian do
 
   @impl true
   def resource_from_claims(claims) do
-    {:ok,
-     %{
-       user_id: claims["sub"],
-       tenant_id: claims["organizationId"] || claims["sub"],
-       session_id: claims["sessionId"]
-     }}
+    # The tenant/user claim NAMES are configurable (Workbooks.AuthIntegrations) so a
+    # non-BetterAuth IdP (Clerk/WorkOS/Auth0/OIDC) that names the org differently
+    # still scopes correctly. Defaults stay `organizationId`/`sub` (BetterAuth).
+    {tenant_id, user_id} = Workbooks.AuthIntegrations.identity_from_claims(claims)
+
+    {:ok, %{user_id: user_id, tenant_id: tenant_id, session_id: claims["sessionId"]}}
   end
 
   @doc """

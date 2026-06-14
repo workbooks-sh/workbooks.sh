@@ -1437,7 +1437,7 @@ defmodule Workbooks.Web do
   # the AUTHENTICATED tenant's repo (the :id is the workspace context). RBAC-gated:
   # :view to list/diff, :edit to create/keep/discard. Draft enforces name confinement.
   get "/api/nexuses/:id/drafts" do
-    if draft_can?(conn, :view) do
+    if nexus_can?(conn, :view) do
       conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(Workbooks.Draft.list(conn.assigns[:tenant])))
     else
       forbidden(conn)
@@ -1448,7 +1448,7 @@ defmodule Workbooks.Web do
     {:ok, raw, conn} = read_body(conn)
     name = with {:ok, %{"name" => n}} <- Jason.decode(raw), do: n, else: (_ -> nil)
 
-    if draft_can?(conn, :edit) do
+    if nexus_can?(conn, :edit) do
       case Workbooks.Draft.create(conn.assigns[:tenant], name) do
         {:ok, d} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(d))
         {:error, :exists} -> conn |> put_resp_content_type("application/json") |> send_resp(409, ~s({"error":"exists"}))
@@ -1460,7 +1460,7 @@ defmodule Workbooks.Web do
   end
 
   get "/api/nexuses/:id/drafts/:name/diff" do
-    if draft_can?(conn, :view) do
+    if nexus_can?(conn, :view) do
       case Workbooks.Draft.diff(conn.assigns[:tenant], conn.params["name"]) do
         {:ok, changes} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(changes))
         _ -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
@@ -1471,7 +1471,7 @@ defmodule Workbooks.Web do
   end
 
   post "/api/nexuses/:id/drafts/:name/keep" do
-    if draft_can?(conn, :edit) do
+    if nexus_can?(conn, :edit) do
       case Workbooks.Draft.keep(conn.assigns[:tenant], conn.params["name"]) do
         {:ok, r} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(r))
         {:error, :conflict} -> conn |> put_resp_content_type("application/json") |> send_resp(409, ~s({"error":"conflict"}))
@@ -1483,7 +1483,7 @@ defmodule Workbooks.Web do
   end
 
   post "/api/nexuses/:id/drafts/:name/discard" do
-    if draft_can?(conn, :edit) do
+    if nexus_can?(conn, :edit) do
       case Workbooks.Draft.discard(conn.assigns[:tenant], conn.params["name"]) do
         :ok -> conn |> put_resp_content_type("application/json") |> send_resp(200, ~s({"ok":true}))
         _ -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
@@ -1493,8 +1493,60 @@ defmodule Workbooks.Web do
     end
   end
 
-  # A Draft acts on the caller's own workspace → the RBAC resource is their own nexus.
-  defp draft_can?(conn, cap) do
+  # --- Backup + app-auth integrations (Phase 6) ------------------------------
+  # Backup mirrors the caller's own workspace to a git host. View status with :view;
+  # connect/push/disconnect need :manage (admin+). App-auth integration config is
+  # read-only here (set by deployment env) — the dashboard surfaces it.
+  get "/api/nexuses/:id/backup" do
+    if nexus_can?(conn, :view),
+      do: conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(Workbooks.Backup.status(conn.assigns[:tenant]))),
+      else: forbidden(conn)
+  end
+
+  post "/api/nexuses/:id/backup/connect" do
+    {:ok, raw, conn} = read_body(conn)
+    p = case Jason.decode(raw), do: ({:ok, %{} = m} -> m; _ -> %{})
+    opts = [url: p["url"], forge: p["forge"]] |> Enum.reject(fn {_, v} -> is_nil(v) end)
+
+    if nexus_can?(conn, :manage) do
+      case Workbooks.Backup.connect(conn.assigns[:tenant], opts) do
+        {:ok, r} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(r))
+        {:skip, reason} -> conn |> put_resp_content_type("application/json") |> send_resp(409, Jason.encode!(%{error: "unavailable", reason: reason}))
+        _ -> conn |> put_resp_content_type("application/json") |> send_resp(400, ~s({"error":"backup failed"}))
+      end
+    else
+      forbidden(conn)
+    end
+  end
+
+  post "/api/nexuses/:id/backup/push" do
+    if nexus_can?(conn, :manage) do
+      case Workbooks.Backup.push(conn.assigns[:tenant]) do
+        {:ok, r} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(r))
+        {:skip, reason} -> conn |> put_resp_content_type("application/json") |> send_resp(409, Jason.encode!(%{error: "unavailable", reason: reason}))
+        _ -> conn |> put_resp_content_type("application/json") |> send_resp(400, ~s({"error":"backup failed"}))
+      end
+    else
+      forbidden(conn)
+    end
+  end
+
+  post "/api/nexuses/:id/backup/disconnect" do
+    if nexus_can?(conn, :manage),
+      do: (Workbooks.Backup.disconnect(conn.assigns[:tenant]); conn |> put_resp_content_type("application/json") |> send_resp(200, ~s({"ok":true}))),
+      else: forbidden(conn)
+  end
+
+  # The app-auth integration surface (which IdP the tenant's own app uses). Public
+  # config only — no secrets; the active provider + claim-map come from deploy env.
+  get "/api/auth-integrations" do
+    if nexus_can?(conn, :view),
+      do: conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(Workbooks.AuthIntegrations.config())),
+      else: forbidden(conn)
+  end
+
+  # A nexus-level action acts on the caller's own workspace → RBAC resource is their nexus.
+  defp nexus_can?(conn, cap) do
     t = conn.assigns[:tenant]
     Workbooks.RBAC.can?(caller_subject(conn), cap, %{tenant: t, level: :nexus, id: t})
   end
