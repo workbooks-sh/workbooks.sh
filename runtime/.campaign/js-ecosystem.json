@@ -623,7 +623,8 @@
             "svelte SSR",
             "preact-render-to-string"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "React (react-dom/server, needs MessageChannel shim), Preact, Vue (@vue/server-renderer async) all render markup in-sandbox (js_ssr_test)"
         }
       ]
     },

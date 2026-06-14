@@ -2002,7 +2002,15 @@ defmodule Workbooks.Compilers do
                  # StarlingMonkey has setTimeout/queueMicrotask but not setImmediate — node libs (streams) need it.
                  "globalThis.setImmediate=globalThis.setImmediate||function(f){var a=[].slice.call(arguments,1);" <>
                  "return setTimeout(function(){f.apply(null,a)},0)};" <>
-                 "globalThis.clearImmediate=globalThis.clearImmediate||function(id){return clearTimeout(id)};"
+                 "globalThis.clearImmediate=globalThis.clearImmediate||function(id){return clearTimeout(id)};" <>
+                 # MessageChannel: React's scheduler (react-dom/server) references it; StarlingMonkey lacks it.
+                 # Minimal queueMicrotask-backed port pair — enough for postMessage-based task scheduling.
+                 "globalThis.MessageChannel=globalThis.MessageChannel||function(){var a={onmessage:null},b={onmessage:null};" <>
+                 "a.postMessage=function(d){queueMicrotask(function(){if(b.onmessage)b.onmessage({data:d})})};" <>
+                 "b.postMessage=function(d){queueMicrotask(function(){if(a.onmessage)a.onmessage({data:d})})};" <>
+                 "a.close=b.close=function(){};a.start=b.start=function(){};" <>
+                 "a.addEventListener=function(t,f){if(t===\"message\")a.onmessage=f};" <>
+                 "b.addEventListener=function(t,f){if(t===\"message\")b.onmessage=f};this.port1=a;this.port2=b;};"
 
   # Inject `Buffer` as a GLOBAL (libraries use the bare global, not `import {Buffer} from 'buffer'`).
   # esbuild `--inject` rewrites free `Buffer` references to this shim's export of the aliased buffer polyfill.
