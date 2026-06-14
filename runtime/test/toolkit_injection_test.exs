@@ -10,6 +10,16 @@ defmodule Workbooks.ToolkitInjectionTest do
 
   alias Workbooks.Toolkits
 
+  setup do
+    # Pin to the default in-tree toolkit root (wb-q2qg): a leaked WB_TOOLKITS_ROOT
+    # from an earlier serial test would otherwise point discovery at a fixture/
+    # empty dir, so the real workbooks-browser toolkit wouldn't be found.
+    prev = System.get_env("WB_TOOLKITS_ROOT")
+    System.delete_env("WB_TOOLKITS_ROOT")
+    on_exit(fn -> if prev, do: System.put_env("WB_TOOLKITS_ROOT", prev), else: System.delete_env("WB_TOOLKITS_ROOT") end)
+    :ok
+  end
+
   test "no toolkits → empty string (nothing injected)" do
     assert Toolkits.injection_text([]) == ""
   end

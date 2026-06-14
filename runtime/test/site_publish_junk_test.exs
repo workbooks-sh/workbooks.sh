@@ -9,7 +9,15 @@ defmodule Workbooks.SitePublishJunkTest do
 
   setup do
     File.rm_rf!(@data)
-    on_exit(fn -> File.rm_rf!(@data) end)
+    # Restore WB_DATA on exit (wb-q2qg): previously this left WB_DATA pointing at
+    # @data — a DELETED dir — for every later test, silently breaking their ledger
+    # writes. Save + restore the env var, not just the directory.
+    prev = System.get_env("WB_DATA")
+    on_exit(fn ->
+      File.rm_rf!(@data)
+      if prev, do: System.put_env("WB_DATA", prev), else: System.delete_env("WB_DATA")
+    end)
+
     System.put_env("WB_DATA", @data)
     System.delete_env("WB_PUBLIC_APP")
     :ok

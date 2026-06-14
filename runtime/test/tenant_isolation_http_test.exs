@@ -12,12 +12,41 @@ defmodule Workbooks.TenantIsolationHttpTest do
 
   alias Workbooks.SessionLedger
 
+  # All auth-mode env that must be CLEARED so the dev x-tenant fallback is active
+  # (not locked / not multi / not desktop / no leaked JWT secret). Includes
+  # WB_AUTH_SECRET + a Guardian config reset so a JWT-mode test that ran earlier in
+  # the serial phase can't leave this test in multi/JWT mode (wb-q2qg isolation).
+  @auth_env ~w(WB_PUBLIC_BEARER WB_TENANCY_MODE WB_DESKTOP WB_AUTH_SECRET)
+
   setup do
-    # Ensure the dev x-tenant fallback is active (not locked / not multi / not desktop).
-    saved = for k <- ~w(WB_PUBLIC_BEARER WB_TENANCY_MODE WB_DESKTOP), do: {k, System.get_env(k)}
-    for k <- ~w(WB_PUBLIC_BEARER WB_TENANCY_MODE WB_DESKTOP), do: System.delete_env(k)
-    on_exit(fn -> for {k, v} <- saved, do: if(v, do: System.put_env(k, v), else: System.delete_env(k)) end)
+    saved = for k <- @auth_env, do: {k, System.get_env(k)}
+    for k <- @auth_env, do: System.delete_env(k)
+    reset_guardian()
+
+    # Own WB_DATA (wb-q2qg): a leaked WB_DATA pointing at a deleted dir would make
+    # SessionLedger writes silently fail → this test sees no sessions. Use a fresh
+    # temp dir. Also pin the toolkit root to the in-tree default.
+    prev_data = System.get_env("WB_DATA")
+    prev_tk = System.get_env("WB_TOOLKITS_ROOT")
+    data = Path.join(System.tmp_dir!(), "wb-tenant-http-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(data)
+    System.put_env("WB_DATA", data)
+    System.delete_env("WB_TOOLKITS_ROOT")
+
+    on_exit(fn ->
+      for {k, v} <- saved, do: if(v, do: System.put_env(k, v), else: System.delete_env(k))
+      reset_guardian()
+      if prev_data, do: System.put_env("WB_DATA", prev_data), else: System.delete_env("WB_DATA")
+      if prev_tk, do: System.put_env("WB_TOOLKITS_ROOT", prev_tk), else: System.delete_env("WB_TOOLKITS_ROOT")
+      File.rm_rf(data)
+    end)
+
     :ok
+  end
+
+  defp reset_guardian do
+    if function_exported?(Workbooks.Auth.Guardian, :install_config, 0),
+      do: Workbooks.Auth.Guardian.install_config()
   end
 
   defp req(method, path, tenant, body \\ nil) do
