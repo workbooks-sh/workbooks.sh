@@ -215,7 +215,6 @@
           </div>
         {/if}
       </div>
-    {:else}
     {:else if mode === "web"}
       <!-- Browse — a discovery BOARD (masonry). Your files + the live web
            blended as mixed tiles: image-cover web tiles + compact file tiles.
