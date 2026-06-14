@@ -2550,7 +2550,8 @@
    "to_live": "apply the additional portability shims (mbedtls entropy define, fcntl file-locking constants+stub, duckdb-6/42 fixes) then full build at low concurrency + link + SELECT",
    "validates": "the C++ exceptions keystone (build_c_dir EH) on a real large C++ codebase",
    "since": "iter160",
-   "full_build_finding": "conc-2 full build (to-live attempt) hit REAL portability errors (not OOM) on ~4 TUs: duckdb-mbedtls (#error needs -DMBEDTLS_NO_PLATFORM_ENTROPY + an entropy source), duckdb-5 (fcntl F_RDLCK/F_WRLCK/F_SETLK/F_GETLK undeclared \u2014 wasi-libc omits file-locking; needs -D constants + stub), + duckdb-6/42. So the FULL build needs ~6 trivial-portability patches, not the 3 the 9-TU subset showed. Still NO toolchain wall \u2014 all the omitted-POSIX class \u2014 but more source-patching than first characterized."
+   "full_build_finding": "conc-2 full build (to-live attempt) hit REAL portability errors (not OOM) on ~4 TUs: duckdb-mbedtls (#error needs -DMBEDTLS_NO_PLATFORM_ENTROPY + an entropy source), duckdb-5 (fcntl F_RDLCK/F_WRLCK/F_SETLK/F_GETLK undeclared \u2014 wasi-libc omits file-locking; needs -D constants + stub), + duckdb-6/42. So the FULL build needs ~6 trivial-portability patches, not the 3 the 9-TU subset showed. Still NO toolchain wall \u2014 all the omitted-POSIX class \u2014 but more source-patching than first characterized.",
+   "to_live_status": "DEFERRED to a stable/headroom box \u2014 the ~60min full build keeps dying to this machine's process crashes (3 heavy agents killed early). DuckDB stays PROVEN (compiles, characterized, ~6 shims documented); the loop is pivoted to LIGHT reliable wins meanwhile (heavy builds die here; light agents complete)."
   },
   "wasm_simd_intrinsics": {
    "capability": "wasm SIMD intrinsics (llvm.wasm.* \u2014 bitmask/swizzle/narrow/relaxed/etc.) in the Rust lane",

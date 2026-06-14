@@ -4,7 +4,8 @@ Kill a runaway with `TaskStop <agentId>`. On resume, re-launch any that `failed`
 
 | agentId | mission | checkpoint | status |
 |---|---|---|---|
-| aa992f6f8fa8a5bc7 | DuckDB to-live: apply the ~6 portability shims + low-concurrency full build + SELECT | forge-runs/duckdb-tolive.md | running (heavy, solo, bounded) |
+| a3386da7a380ec9bc | light sweep2: diverse small libs (cJSON/tomlc99/tinyexpr/utf8proc + a Rust crate) | forge-runs/light-sweep2.md | running (light, reliable) |
+| aa992f6f8fa8a5bc7 | DuckDB to-live (heavy full build) | forge-runs/duckdb-tolive.md | DIED early (no checkpoint, 3rd heavy agent killed by crashes) — DuckDB to-live DEFERRED to a stable box; stays proven |
 | ac2172afdee7a1851 | light sweep: SIMD-intrinsic runtime proof + C leaf-lib vein | forge-runs/light-sweep.md | DONE — SIMD intrinsics LIVE + 4 C libs (xxHash/miniz/cmark/libyaml) proven; committed |
 | (orphaned ab497938) | DuckDB conc-2 detached build | n/a | DEAD (0 procs); revealed real portability errors (mbedtls entropy, fcntl F_*LCK) — folded into the to-live agent |
 
