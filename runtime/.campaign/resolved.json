@@ -2623,6 +2623,13 @@
    "proof": "stb_image (single-header) via build_c_dir decodes a PNG from stdin -> w=2 h=2 ch=4, red pixel (255,0,0); stb_image_lane_test.exs green (self-contained embedded PNG)",
    "lane": "compilers/stb/build.sh (fetch stb_image.h pinned commit, gitignored) + build_c_dir",
    "since": "iter163"
+  },
+  "pcre2": {
+   "capability": "PCRE2 Perl-compatible regex in-sandbox",
+   "status": "live",
+   "proof": "PCRE2 10.44 8-bit library (31 C files) compiles via build_c_dir + matches (\\w+)@(\\w+) on user@host extracting capture groups g1=user g2=host; pcre2_lane_test.exs green",
+   "lane": "compilers/pcre2/build.sh (fetch sha-pinned, stage lib src minus tools, gitignored) + build_c_dir(-DPCRE2_CODE_UNIT_WIDTH=8 -DHAVE_CONFIG_H, include_only the 3 #included .c)",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {
