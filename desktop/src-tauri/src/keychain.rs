@@ -1,18 +1,24 @@
-// Secrets live in the OS keychain; only redacted metadata indices live on disk
-// (keys.json / env-vars.json / connections.json under ~/.oql/desktop). The raw
-// value crosses the IPC boundary only on an explicit user reveal / copy. This
-// module owns: API keys, scoped env-vars, and third-party connections.
+// Secrets live in a local owner-only (0600) file (secrets.json under
+// ~/.oql/desktop); only redacted metadata indices live alongside it (keys.json
+// / env-vars.json / connections.json). The raw value crosses the IPC boundary
+// only on an explicit user reveal / copy. This module owns: API keys, scoped
+// env-vars, and third-party connections.
 //
-// Keychain services (Entry(service, account)):
+// Secret store keys ("service\x01account"):
 //   sh.workbooks.keys  / <id>        — provider API keys
 //   sh.workbooks.env   / <id>        — user env-vars
 //   sh.workbooks.conn  / <service>   — one connection per service
 //
-// A best-effort POST to the runtime's /internal/secrets/refresh nudges a live
-// daemon to re-read env without a restart; offline it's silently skipped.
+// SECURITY (wb-2s09): plaintext-at-rest behind 0600 + FileVault for now — the OS
+// keychain was dropped because it prompted on every read (unusable, and broke
+// credential forwarding). A future pass encrypts secrets.json at rest with a
+// non-prompting key (machine-derived / the local did:key) — see wb-2s09 backlog.
+//
+// On save the desktop forwards the full secret set to the runtime's
+// /internal/secrets/refresh so the engine's env-based loaders (OPENROUTER_API_KEY
+// etc) see them; offline it's silently skipped.
 
 use crate::paths;
-use keyring::Entry;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::AppHandle;
@@ -21,28 +27,61 @@ const SVC_KEYS: &str = "sh.workbooks.keys";
 const SVC_ENV: &str = "sh.workbooks.env";
 const SVC_CONN: &str = "sh.workbooks.conn";
 
-fn entry(service: &str, account: &str) -> Result<Entry, String> {
-    Entry::new(service, account).map_err(|e| e.to_string())
+// Secrets live in a local, owner-only (0600) file under the app dir — NOT the
+// OS keychain. The keychain made macOS prompt for a passkey on every read, and
+// an unsigned/dev build isn't trusted so it nagged constantly AND failed to read
+// (so forwarded creds came back empty). A 0600 file is the right local-first
+// trade: single-user desktop, no prompts ever, reliable reads. No keychain at
+// all — keys saved before this change must be re-entered once (they then live
+// in the file and are forwarded to the runtime without a single prompt).
+
+fn secrets_path() -> PathBuf {
+    paths::oql_desktop_dir().join("secrets.json")
+}
+
+fn secrets_load() -> serde_json::Map<String, serde_json::Value> {
+    std::fs::read_to_string(secrets_path())
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn secrets_save(map: &serde_json::Map<String, serde_json::Value>) -> Result<(), String> {
+    let path = secrets_path();
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    std::fs::write(&path, serde_json::to_string_pretty(map).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
+}
+
+fn sk(service: &str, account: &str) -> String {
+    format!("{service}\u{1}{account}")
 }
 
 fn kc_set(service: &str, account: &str, value: &str) -> Result<(), String> {
-    entry(service, account)?
-        .set_password(value)
-        .map_err(|e| e.to_string())
+    let mut m = secrets_load();
+    m.insert(sk(service, account), serde_json::Value::String(value.to_string()));
+    secrets_save(&m)
 }
 
 fn kc_get(service: &str, account: &str) -> Result<String, String> {
-    entry(service, account)?
-        .get_password()
-        .map_err(|e| e.to_string())
+    match secrets_load().get(&sk(service, account)) {
+        Some(serde_json::Value::String(v)) => Ok(v.clone()),
+        _ => Err("no matching secret".to_string()),
+    }
 }
 
 fn kc_delete(service: &str, account: &str) -> Result<(), String> {
-    match entry(service, account)?.delete_credential() {
-        Ok(_) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    let mut m = secrets_load();
+    m.remove(&sk(service, account));
+    secrets_save(&m)
 }
 
 fn mask() -> String {
