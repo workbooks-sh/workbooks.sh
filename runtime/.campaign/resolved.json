@@ -2607,5 +2607,6 @@
  },
  "cfg_lever_scope": {
   "note": "The mrustc --cfg bypass (cfg.cpp checks CLI --cfg before the hardcoded callback) is NOT a universal key \u2014 proven by the sweep. It unlocks exactly ONE real thing: threads/atomics (target_feature=atomics, the only target_feature with real std gates). panic= has no cfg gates; simd128 has no std cfg gates (it is a clang -msimd128 autovec win, not cfg). NOT-cfg-fixable (confirmed empirically): edition-2024 (PARSER ceiling \u2014 gen blocks crash mrustc in Parse_Expr2), proc-macros (separate mechanism), ~40 llvm.wasm.* SIMD intrinsics (codegen_c.cpp aborts on Extern LLVM \u2014 i8x16_bitmask/swizzle/narrow/relaxed_* etc.; autovec is the mitigation). Stop hoping --cfg reaches these."
- }
+ },
+ "go_wasip1_tool_rule": "Go->wasip1 CLI selection rule (empirical): STDIN->STDOUT filters cross-compile clean (yq/gojq/dasel/jsonnet all live). TTY-DEPENDENT CLIs do NOT \u2014 shfmt (editorconfig walk + stdin handling hangs through PackageManager.run), gron (build fails: fatih/color -> isatty.IsTerminal undefined on wasip1). Avoid tools pulling isatty/mattn-color/term/readline/editorconfig. Pick pure stdin->stdout data filters."
 }

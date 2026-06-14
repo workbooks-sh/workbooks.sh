@@ -36,7 +36,7 @@ defmodule Workbooks.PhoenixSocket do
   def handle_in({text, [opcode: :text]}, state) do
     case Jason.decode(text) do
       {:ok, [join_ref, ref, topic, event, _payload]} ->
-        {:push, {:text, ack(join_ref, ref, topic)}, maybe_track(event, topic, state)}
+        {:push, {:text, ack(join_ref, ref, topic)}, maybe_track(event, topic, join_ref, state)}
 
       _ ->
         {:ok, state}
@@ -65,14 +65,17 @@ defmodule Workbooks.PhoenixSocket do
   end
 
   # Remember the join_ref per topic so future server-initiated pushes address the
-  # right channel instance. (Inbound leaves drop it.)
-  defp maybe_track("phx_join", topic, state) do
-    Map.update(state, :topics, %{topic => true}, &Map.put(&1, topic, true))
+  # right channel instance. (Inbound leaves drop it.) For desktop:control we also
+  # register in the DesktopControl registry — that's how an agent's `wb desktop`
+  # push finds this connected shell.
+  defp maybe_track("phx_join", topic, join_ref, state) do
+    if topic == "desktop:control", do: Workbooks.DesktopControl.register(join_ref)
+    Map.update(state, :topics, %{topic => join_ref}, &Map.put(&1, topic, join_ref))
   end
 
-  defp maybe_track("phx_leave", topic, state) do
+  defp maybe_track("phx_leave", topic, _join_ref, state) do
     Map.update(state, :topics, %{}, &Map.delete(&1, topic))
   end
 
-  defp maybe_track(_event, _topic, state), do: state
+  defp maybe_track(_event, _topic, _join_ref, state), do: state
 end

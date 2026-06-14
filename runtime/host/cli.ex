@@ -119,6 +119,26 @@ defmodule Workbooks.CLI do
 
   def call(["var", "ref" | rest], t), do: Vars.ref(t, Enum.join(rest, " "))
 
+  # `wb app …` — IN-PROCESS app control (wb-d2nx.1): an agent (Waldo) drives the
+  # connected desktop shell by pushing `desktop:control` events the shell already
+  # acts on. Distinct from the host-side `wb desktop` installer verb in main/1.
+  # No shell connected → reports "(no desktop shell connected)" rather than failing.
+  def call(["app", "status"], _t) do
+    case Workbooks.DesktopControl.listeners() do
+      0 -> "(no desktop shell connected)"
+      n -> "#{n} desktop shell#{if n == 1, do: "", else: "s"} connected"
+    end
+  end
+
+  def call(["app", verb, path], _t) when verb in ["open-tab", "close-tab", "focus-tab"] do
+    action = verb |> String.replace_suffix("-tab", "")
+    {:ok, n} = Workbooks.DesktopControl.tab(action, path)
+    if n == 0, do: "(no desktop shell connected — nothing to #{action})", else: "#{action} tab → #{path} (#{n} shell#{if n == 1, do: "", else: "s"})"
+  end
+
+  def call(["app" | _], _t),
+    do: "usage: wb app <status | open-tab PATH | close-tab PATH | focus-tab PATH>"
+
   # "Memory" is removed by design: the org/code files ARE the context. Recall =
   # `wb search` (semantic) / `wbx library query` (literal); "remember" = write an
   # org file. No separate store to drift. See docs/VECTOR-QUERY.org.

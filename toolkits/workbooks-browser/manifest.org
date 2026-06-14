@@ -1,0 +1,38 @@
+#+TITLE: workbooks-browser toolkit
+#+TOOLKIT: workbooks-browser
+#+VERSION: 0.1.0
+#+CLI_BIN: wb
+#+STATUS: alpha
+#+TAGLINE: Drive the Workbooks desktop shell — open and focus tabs, and (soon) bookmarks, themes, workspaces, key prompts.
+
+* workbooks-browser — control the desktop shell                  :toolkit:
+  :PROPERTIES:
+  :ID:        workbooks-browser
+  :CLI_BIN:   wb
+  :STATUS:    alpha
+  :SKILL_DIR: skills/
+  :END:
+
+  This toolkit lets an agent running inside a connected runtime drive
+  the *Workbooks desktop shell* (the "browser"): the same UI the user
+  is looking at. Every verb pushes a =desktop:control= event the shell
+  already acts on — there is no separate API for the agent to manage.
+
+  The bridge is one in-process command surface, =wb app …=, fulfilled
+  by the runtime → desktop control bus (epic =wb-d2nx=, keystone
+  =wb-d2nx.1=). If no shell is connected the verbs are safe no-ops that
+  say so, so an agent can always probe with =wb app status= first.
+
+  *Live now*
+
+  | Skill          | Use when                                            |
+  |----------------+-----------------------------------------------------|
+  | =overview=     | First contact — what this toolkit can drive         |
+  | =tab-control=  | Open / focus / close a tab by path in the shell     |
+
+  *Planned (epic wb-d2nx — not yet wired, do not promise these)*
+
+  - =theme-control= — switch or author the app theme
+  - =bookmarks= — add / manage bookmarks
+  - =workspaces= — create / switch workspaces, manage folders
+  - =key-prompt= — pop the "add an API key" modal for the user

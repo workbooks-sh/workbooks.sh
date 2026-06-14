@@ -21,6 +21,9 @@ defmodule Workbooks.Application do
         Workbooks.BrokerTables,
         {Registry, keys: :unique, name: Workbooks.Instance.Registry},
         {Registry, keys: :unique, name: Workbooks.AgentSession.Registry},
+        # Runtime → desktop control bus: connected shells register here so an
+        # agent's `wb desktop …` call can push tab/theme/key events to them.
+        Workbooks.DesktopControl,
         Workbooks.OQL,
         Workbooks.ControlPlane,
         Workbooks.Vars,

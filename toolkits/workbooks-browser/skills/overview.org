@@ -1,0 +1,38 @@
+#+TITLE: workbooks-browser — overview
+
+* What this toolkit is
+
+  You are an agent running in a Workbooks runtime that a desktop shell
+  (the "browser") is connected to. This toolkit lets you *drive that
+  shell* — the live UI the user sees — through one command surface:
+
+  : wb app <verb> [args]
+
+  Each verb pushes a control event the shell already knows how to act
+  on. You are not asked to manage a hidden API; you speak the same
+  =desktop:control= channel the app listens on.
+
+* The golden rule: probe first
+
+  A shell may or may not be connected (the user could be headless, or
+  the app closed). ALWAYS check before assuming a command landed:
+
+  : wb app status
+  ;; → "1 desktop shell connected"   (good)
+  ;; → "(no desktop shell connected)"  (your command would no-op)
+
+  Every verb is a *safe no-op* when nothing is connected — it tells you
+  so rather than erroring — so you can act optimistically and report
+  honestly what happened.
+
+* What's live
+
+  - =tab-control= — open, focus, and close tabs by path. See
+    =wb toolkit show workbooks-browser tab-control=.
+
+* What's coming (epic wb-d2nx)
+
+  Theme switching, bookmarks, workspace + folder management, and an
+  agent-triggered "add an API key" modal are designed but NOT wired
+  yet. Do not tell the user you can do these until the skills appear
+  here. If a user asks for one, say it's coming and offer what IS live.

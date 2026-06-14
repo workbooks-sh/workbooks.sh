@@ -216,35 +216,55 @@
         {/if}
       </div>
     {:else}
-    <!-- One cohesive feed. Internal = your files only; Browse = files + web
-         blended into a single result list (no provider group headers) —
-         file matches as compact rows, web as rich cards. -->
-    <div class="results" class:browse={mode === "web"} role="listbox" aria-label="Search results">
-      {#if flat.length === 0}
-        <div class="empty">
-          {busy ? "Searching…" : query ? "No matches." : mode === "internal" ? "Search your files + runtime." : "Search your files + the open web."}
-        </div>
-      {:else}
-        {#each flat as r, i (i)}
-          {#if r.kind === "web"}
-            <button
-              type="button"
-              class="web-card"
-              class:active={i === highlighted}
-              role="option"
-              aria-selected={i === highlighted}
-              onmouseenter={() => (highlighted = i)}
-              onclick={() => open(r)}
-              title={r.url ?? r.title}
-            >
-              {#if r.image}<img class="web-thumb" src={r.image} alt="" />{/if}
-              <span class="web-tx">
-                <span class="web-host">{r.host ?? r.url}</span>
-                <span class="web-title">{r.title}</span>
-                {#if r.subtitle}<span class="web-snip">{r.subtitle}</span>{/if}
-              </span>
-            </button>
-          {:else}
+    {:else if mode === "web"}
+      <!-- Browse — a discovery BOARD (masonry). Your files + the live web
+           blended as mixed tiles: image-cover web tiles + compact file tiles.
+           A different vibe from the Workspace list + the Ask answer page. -->
+      <div class="board" aria-label="Browse results">
+        {#if flat.length === 0}
+          <div class="empty">{busy ? "Searching…" : query ? "No matches." : "Search your files + the open web."}</div>
+        {:else}
+          {#each flat as r, i (i)}
+            {#if r.kind === "web"}
+              <button
+                type="button"
+                class="tile web"
+                class:active={i === highlighted}
+                onmouseenter={() => (highlighted = i)}
+                onclick={() => open(r)}
+                title={r.url ?? r.title}
+              >
+                <span class="cover" style="background-image:url('{r.image}')"></span>
+                <span class="t-host">{r.host ?? r.url}</span>
+                <span class="t-title">{r.title}</span>
+                {#if r.subtitle}<span class="t-snip">{r.subtitle}</span>{/if}
+              </button>
+            {:else}
+              <button
+                type="button"
+                class="tile file"
+                class:active={i === highlighted}
+                draggable="true"
+                ondragstart={(e) => onDragStart(e, r)}
+                onmouseenter={() => (highlighted = i)}
+                onclick={() => open(r)}
+                title={r.path ?? r.title}
+              >
+                <span class="chip kind-{r.kind}" aria-hidden="true"></span>
+                <span class="t-title file">{r.title}</span>
+                {#if r.subtitle}<span class="t-path">{r.subtitle}</span>{/if}
+              </button>
+            {/if}
+          {/each}
+        {/if}
+      </div>
+    {:else}
+      <!-- Workspace — the compact list of your files. -->
+      <div class="results" role="listbox" aria-label="Search results">
+        {#if flat.length === 0}
+          <div class="empty">{busy ? "Searching…" : query ? "No matches." : "Search your files + runtime."}</div>
+        {:else}
+          {#each flat as r, i (i)}
             <button
               type="button"
               class="result"
@@ -261,10 +281,9 @@
               <span class="name">{r.title}</span>
               {#if r.subtitle}<span class="path">{r.subtitle}</span>{/if}
             </button>
-          {/if}
-        {/each}
-      {/if}
-    </div>
+          {/each}
+        {/if}
+      </div>
     {/if}
 </aside>
 
@@ -466,55 +485,93 @@
   }
   .ai-q:hover { border-color: var(--color-border-strong); color: var(--color-fg); background: var(--color-surface-soft); }
 
-  /* Web — search-engine-style cards (thumbnail + host + snippet). */
-  .web-card {
+  /* Browse — a masonry discovery board: mixed tiles, files + web. */
+  .board {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    columns: 158px;
+    column-gap: 8px;
+    padding: 10px 10px 14px;
+  }
+  .tile {
     display: flex;
-    gap: 10px;
-    width: calc(100% - 16px);
-    margin: 0 8px 6px;
+    flex-direction: column;
+    gap: 3px;
+    width: 100%;
+    break-inside: avoid;
+    margin: 0 0 8px;
     padding: 8px;
     border: 1px solid var(--color-border);
-    border-radius: 11px;
+    border-radius: 12px;
     background: var(--color-surface-soft);
     text-align: left;
     cursor: pointer;
-    transition: border-color 0.14s, background 0.14s;
+    transition: border-color 0.14s, background 0.14s, transform 0.14s;
   }
-  .web-card:hover,
-  .web-card.active { border-color: var(--color-border-strong); background: var(--color-surface); }
-  .web-thumb {
-    flex: 0 0 auto;
-    width: 56px;
-    height: 56px;
-    border-radius: 8px;
-    object-fit: cover;
+  .tile:hover,
+  .tile.active {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface);
+    transform: translateY(-1px);
+  }
+  .tile .cover {
     display: block;
+    width: 100%;
+    height: 94px;
+    border-radius: 8px;
+    background-size: cover;
+    background-position: center;
+    margin-bottom: 5px;
   }
-  .web-tx { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
-  .web-host {
+  .t-host {
     font-family: var(--font-mono);
-    font-size: 0.66rem;
+    font-size: 0.6rem;
     color: var(--color-fg-subtle);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .web-title {
-    font-size: 0.85rem;
-    font-weight: 550;
+  .t-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.25;
     color: var(--color-fg);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .web-snip {
-    font-size: 0.74rem;
-    line-height: 1.4;
-    color: var(--color-fg-muted);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  .t-snip {
+    font-size: 0.7rem;
+    line-height: 1.4;
+    color: var(--color-fg-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .t-path {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--color-fg-subtle);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* File tile — no cover; a colored chip block so the board stays visual. */
+  .tile.file { gap: 5px; }
+  .chip {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    margin-bottom: 2px;
+    background: var(--color-fg-subtle);
+  }
+  .chip.kind-file { background: var(--color-chip-blue); }
+  .chip.kind-workbook { background: var(--color-brand); }
+  .chip.kind-bookmark { background: var(--color-chip-peach); }
+  .chip.kind-tab { background: var(--color-chip-lavender); }
 </style>
