@@ -112,10 +112,11 @@ defmodule Workbooks.Workflow.Telemetry do
   isolation. Pure scan over the same always-on `_steps.jsonl`/`_status.json` —
   no extra writes, so it's free and can't drift from the per-run truth.
   """
-  def index(base \\ @runs_base, limit \\ 50) do
+  def index(tenant \\ nil, base \\ @runs_base, limit \\ 50) do
     case File.ls(base) do
       {:ok, slugs} ->
         slugs
+        |> Enum.filter(fn slug -> run_visible?(Path.join(base, slug), tenant) end)
         |> Enum.map(fn slug ->
           wd = Path.join(base, slug)
           s = summary(wd)
@@ -128,6 +129,32 @@ defmodule Workbooks.Workflow.Telemetry do
 
       _ -> []
     end
+  end
+
+  @doc "Stamp a run dir with its owning tenant (wb-g1yo.3). No-op for a nil tenant."
+  def tag_tenant(_workdir, nil), do: :ok
+  def tag_tenant(workdir, tenant) when is_binary(tenant) do
+    File.write(Path.join(workdir, ".tenant"), tenant)
+  rescue
+    _ -> :ok
+  end
+
+  @doc "The tenant that owns a run dir, or nil (legacy/local run)."
+  def run_tenant(workdir) do
+    case File.read(Path.join(workdir, ".tenant")) do
+      {:ok, t} -> String.trim(t)
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Is this run visible to `caller_tenant`? Same rule as the session gate: reject
+  only on a definite cross-tenant mismatch; a nil on either side (admin/internal
+  view, or a legacy/local run with no marker) is grandfathered through.
+  """
+  def run_visible?(workdir, caller_tenant) do
+    rt = run_tenant(workdir)
+    is_nil(caller_tenant) or is_nil(rt) or rt == caller_tenant
   end
 
   # Run recency = the last time its always-on step log was touched (falls back to

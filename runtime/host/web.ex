@@ -193,6 +193,7 @@ defmodule Workbooks.Web do
     workdir = "/tmp/bb/#{slug}"
     File.rm_rf!(workdir)
     File.mkdir_p!(workdir)
+    Workbooks.Workflow.Telemetry.tag_tenant(workdir, conn.assigns[:tenant])
     File.write(Path.join(workdir, "_status.json"), Jason.encode!(%{slug: slug, stage: "running"}))
 
     spawn(fn ->
@@ -570,6 +571,7 @@ defmodule Workbooks.Web do
     # the strategist can't ground on. Each brand-book run starts from a clean dir.
     File.rm_rf!(workdir)
     File.mkdir_p!(workdir)
+    Workbooks.Workflow.Telemetry.tag_tenant(workdir, conn.assigns[:tenant])
     # Capture any crash so a dead spawn is diagnosable (else status freezes silently).
     spawn(fn ->
       try do
@@ -594,6 +596,7 @@ defmodule Workbooks.Web do
     workdir = "/tmp/bb/#{slug}"
     File.rm_rf!(workdir)
     File.mkdir_p!(workdir)
+    Workbooks.Workflow.Telemetry.tag_tenant(workdir, conn.assigns[:tenant])
     File.write(Path.join(workdir, "_status.json"), Jason.encode!(%{slug: slug, request: request, stage: "running"}))
 
     spawn(fn ->
@@ -635,8 +638,14 @@ defmodule Workbooks.Web do
   # Telemetry feedback loop (CLI reads this): task states + tool-call count +
   # total time + errors (bash exit codes / tool failures) for a run.
   get "/api/telemetry/:slug" do
-    summary = Workbooks.Workflow.Telemetry.summary("/tmp/bb/#{conn.params["slug"]}")
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(summary))
+    wd = "/tmp/bb/#{conn.params["slug"]}"
+    # Tenant-gate (wb-g1yo.3): don't serve another tenant's run telemetry.
+    if Workbooks.Workflow.Telemetry.run_visible?(wd, conn.assigns[:tenant]) do
+      summary = Workbooks.Workflow.Telemetry.summary(wd)
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(summary))
+    else
+      conn |> put_resp_content_type("application/json") |> send_resp(404, Jason.encode!(%{error: "no such run"}))
+    end
   end
 
   # Library (Phase 3) — the tenant's access graph: workspaces + their members.
@@ -968,7 +977,7 @@ defmodule Workbooks.Web do
   # Cross-session index (0d) — every run, newest first, each rolled up. The
   # "see across runs" view for the CLI: catch an error trend, not one run.
   get "/api/telemetry" do
-    runs = Workbooks.Workflow.Telemetry.index()
+    runs = Workbooks.Workflow.Telemetry.index(conn.assigns[:tenant])
     rollup = %{runs: length(runs), with_errors: Enum.count(runs, &(&1.errors > 0)),
                tool_calls: Enum.reduce(runs, 0, fn r, a -> a + r.tool_calls end)}
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{rollup: rollup, runs: runs}))
