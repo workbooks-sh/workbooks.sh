@@ -25,6 +25,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **Async JS** (await/promises/timers/streams) | async eval-host bootstrap + clocks + draining capture | js_async_test — await/setTimeout/promise-chain/stream all settle (unblocks async libs: http clients, I/O) |
 | **fetch + URL/Headers + HTTP clients** | StarlingMonkey wasi:http → NetGuard (SSRF-safe); fetch in-flight drain | js_fetch_test — example.com 200 + `ky` real client end-to-end |
 | **node:crypto + crypto libs** | `node_polyfills` crypto→crypto-browserify | js_crypto_test — createHash/createHmac/randomBytes/pbkdf2 + crypto-js end-to-end |
+| **exports-map resolution** (subpath/conditional/scoped/patterns) | esbuild bundle-time resolution | js_exports_map_test — date-fns/fp, nanoid conditional, date-fns/locale/* |
 | **yq** (YAML processor) | Go-wasip1 artifact | yq_lane_test (.name/.tags through PackageManager.run) |
 | **gojq** (jq for JSON) | Go-wasip1 artifact | gojq_lane_test (filter/arithmetic/raw) |
 | **dasel** (JSON/YAML/TOML/XML/CSV query) | Go-wasip1 artifact | dasel_lane_test (3 formats) |

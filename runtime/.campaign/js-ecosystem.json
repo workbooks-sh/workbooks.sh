@@ -120,7 +120,8 @@
             "subpath patterns",
             "#imports internal"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "esbuild resolves exports map at bundle time: subpath/conditional/scoped/subpath-pattern all proven (js_exports_map_test)"
         },
         {
           "id": "dynamic-import",
@@ -432,6 +433,18 @@
             "AbortController/AbortSignal"
           ],
           "verdict": "pending"
+        },
+        {
+          "id": "intl",
+          "item": "Intl (i18n)",
+          "surfaces": [
+            "Intl.NumberFormat",
+            "Intl.DateTimeFormat",
+            "Intl.Collator",
+            "Intl.PluralRules"
+          ],
+          "verdict": "pending",
+          "note": "GAP (forge): Intl absent on BOTH StarlingMonkey AND QuickJS (ICU stripped from both engine builds) \u2014 no fallback. Affects i18n/number/date-format libs. Options: (a) rebuild StarlingMonkey with ICU/Intl (multi-MB locale data; may not be exposed by componentize-js), (b) inject a @formatjs/intl-* pure-JS polyfill at bundle time (bulky, per-locale data). Defer-leaning; revisit if a lib category needs it."
         }
       ]
     },
