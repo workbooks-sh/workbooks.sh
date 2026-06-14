@@ -9,8 +9,8 @@
   if (window.__wbSearch) return; // singleton
   window.__wbSearch = true;
 
-  // resolve the index + css relative to the site root regardless of page depth
-  var root = /\/learn\//.test(location.pathname) ? "../" : "";
+  // absolute base: works from any path + the docs domain (cross-site → main site)
+  var root = (location.hostname === "docs.workbooks.sh") ? "https://workbooks.sh/" : "/";
 
   // ── matcher ───────────────────────────────────────────────────────────────
   // score 0 = no match; higher = better. Substring beats subsequence; a hit in

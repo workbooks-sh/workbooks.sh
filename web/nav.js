@@ -4,7 +4,10 @@
    per-page navs is what this file exists to kill. Feature flags bake here. */
 (function () {
   var FLAGS = { desktopDownload: false };
-  var root = /\/learn\//.test(location.pathname) ? "../" : "";
+  // Absolute base so links work from ANY path (/blog/, /toolkits/, /learn/<slug>)
+  // and from the docs domain (cross-site → the main site). Was path-relative,
+  // which 404'd Learn/Blog/lessons.json from non-/learn pages.
+  var root = (location.hostname === "docs.workbooks.sh") ? "https://workbooks.sh/" : "/";
 
   var css = [
     '.nav { position: fixed; top: 22px; left: 50%; transform: translateX(-50%); z-index: 10;',
@@ -276,6 +279,19 @@
   });
 
   // search trigger — fire the event the search overlay listens for, and close
+  // Self-load the search overlay assets (absolute) so EVERY page with the nav has
+  // working search — not just the learn pages that include search.js directly.
+  if (!document.querySelector('link[data-wb-search]')) {
+    var scss = document.createElement("link");
+    scss.rel = "stylesheet"; scss.href = root + "search.css"; scss.setAttribute("data-wb-search", "1");
+    document.head.appendChild(scss);
+  }
+  if (!window.__wbSearchLoaded && !document.querySelector('script[data-wb-search]')) {
+    var sjs = document.createElement("script");
+    sjs.src = root + "search.js?v=2"; sjs.defer = true; sjs.setAttribute("data-wb-search", "1");
+    document.body.appendChild(sjs);
+  }
+
   // the mobile sheet so the overlay isn't behind it.
   var srch = nav.querySelector("button.srch");
   if (srch) srch.addEventListener("click", function () {
