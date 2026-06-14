@@ -184,16 +184,18 @@ defmodule Workbooks.Agent do
           content not in [nil, ""] ->
             finish(st, content)
 
-          # Silent dead-stop: the model ran tools then returned empty content with
-          # no further tool call (common on cheap models). Nudge ONCE for a final
-          # answer so the user (and the eval judge) gets a real reply, not "(no
-          # result)" after the work was actually done.
-          st.step > 0 and not st.summarized ->
+          # Silent dead-stop: the model returned empty content with no tool call
+          # (common on cheap models — whether after tool use, or even a first-turn
+          # hiccup). Nudge ONCE for a real answer so the user (and the eval judge)
+          # never gets "(no result)" when a reply was recoverable. The summarized
+          # flag guards against re-nudging forever.
+          not st.summarized ->
             nudge = %{
               role: "user",
               content:
-                "Now give your final answer to my original request in plain language, " <>
-                  "using what your tools returned. Don't call any more tools."
+                "Please give your answer to my request now, in plain language" <>
+                  if(st.step > 0, do: " using what your tools returned", else: "") <>
+                  ". Don't call any more tools."
             }
 
             loop(messages ++ [nudge], %{st | summarized: true, step: st.step + 1})

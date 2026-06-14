@@ -46,6 +46,18 @@ defmodule Workbooks.AgentLoopTest do
     assert r.result == "Immediate answer."
   end
 
+  test "a FIRST-TURN empty hiccup (no tools yet) is nudged once and recovers" do
+    r =
+      run(
+        scripted([
+          {:ok, %{tool_calls: [], content: nil}},
+          {:ok, %{tool_calls: [], content: "Recovered on the nudge."}}
+        ])
+      )
+
+    assert r.result == "Recovered on the nudge."
+  end
+
   test "runaway protection: a model that NEVER stops calling tools terminates at max_steps" do
     # An unbounded tool-call loop must hit the step cap, not run forever.
     always_tool = fn _m, _o ->
