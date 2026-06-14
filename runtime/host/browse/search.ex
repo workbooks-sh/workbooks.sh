@@ -203,11 +203,16 @@ defmodule Workbooks.Browse.Search do
   end
 
   # Trusted FIXED API endpoints (not agent-supplied URLs → no SSRF surface).
+  # LLM-backed providers (OpenRouter web plugin, Perplexity) run a model AND a
+  # live web search server-side, so a single call legitimately takes 20-40s — a
+  # 15s cap silently timed out and fell back to the (often-empty) keyless scrape.
+  @post_timeout 45_000
+
   defp post_json(url, headers, body, parse) do
     _ = Application.ensure_all_started(:inets)
     _ = Application.ensure_all_started(:ssl)
 
-    case :httpc.request(:post, {String.to_charlist(url), headers, ~c"application/json", body}, [timeout: 15_000], body_format: :binary) do
+    case :httpc.request(:post, {String.to_charlist(url), headers, ~c"application/json", body}, [timeout: @post_timeout, connect_timeout: 10_000], body_format: :binary) do
       {:ok, {{_, 200, _}, _, resp}} -> decode_then(resp, parse)
       _ -> []
     end
