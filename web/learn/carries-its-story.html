@@ -182,6 +182,11 @@ article hr{ border:0; border-top:1px solid var(--line); margin:44px 0; }
 .play .lab{ font:700 12px var(--mono); letter-spacing:.05em; text-transform:uppercase; }
 .play .time{ font:500 11px var(--mono); color:var(--dim); margin-left:auto; }
 .play.playing .ico{ background:var(--bloomd); }
+.scrub{ margin:12px 4px 0; }
+.scrub .sbar{ height:6px; border-radius:999px; background:color-mix(in srgb,var(--ink) 14%,transparent);
+  cursor:pointer; overflow:hidden; }
+.scrub .sbar i{ display:block; height:100%; width:0; background:var(--pc); border-radius:999px; transition:width .08s linear; }
+.scrub .stime{ display:flex; justify-content:space-between; margin-top:7px; font:500 10.5px var(--mono); color:var(--dim); }
 /* ── custom video player (reusable: lesson rail + splash hype reel) ── */
 .vplayer{ position:relative; border:2px solid var(--stroke); border-radius:12px; overflow:hidden;
   box-shadow:4px 4px 0 var(--shadow); background:var(--video-bg); aspect-ratio:16/9; cursor:pointer; }
@@ -467,7 +472,7 @@ receive not just the thing, but the truth about the thing. Everything
 else this Learning Center explores about workbooks leans on that quiet,
 durable honesty: the file carries its own story, and the story can’t be
 taken away from it.</p>
-</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="ddl" href="/learn/specs"><b>specs</b><span>the deep doc</span></a><a class="ddl" href="/learn/git"><b>git</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 7 of 27</div><div class="audio"><div class="play" id="play" data-src="https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/carries-its-story.mp3?v=504"><span class="ico" id="playico"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><span class="lab" id="playlab">Listen</span><span class="time">8 min</span></div></div><button class="quizbtn" type="button" data-quiz-lesson="carries-its-story"><span class="ico"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="lab">Take the quiz</span><span class="score" data-lscore="carries-its-story"></span></button><button class="cont" id="cc" data-next="the-one-language"><span>Complete & continue</span> →</button><textarea class="notes" id="notes" data-slug="carries-its-story" spellcheck="false" placeholder="Notes are taken here — saved to your browser cache."></textarea></aside></div></div>
+</article><div class="deeper"><div class="dh">Go deeper — the technical docs</div><p>That was the idea. When you want the literal version — the actual format, the bytes, the proof — start here.</p><div class="links"><a class="ddl" href="/learn/specs"><b>specs</b><span>the deep doc</span></a><a class="ddl" href="/learn/git"><b>git</b><span>the deep doc</span></a></div></div></div><aside class="rail"><div class="pos">Lesson 7 of 27</div><div class="audio"><div class="play" id="play" data-src="https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/carries-its-story.mp3?v=504"><span class="ico" id="playico"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span><span class="lab" id="playlab">Listen</span><span class="time">8 min</span></div><div class="scrub"><div class="sbar" id="sbar"><i id="sbfill"></i></div><div class="stime"><span id="scur">0:00</span><span id="sdur">--:--</span></div></div></div><button class="quizbtn" type="button" data-quiz-lesson="carries-its-story"><span class="ico"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="lab">Take the quiz</span><span class="score" data-lscore="carries-its-story"></span></button><button class="cont" id="cc" data-next="the-one-language"><span>Complete & continue</span> →</button><textarea class="notes" id="notes" data-slug="carries-its-story" spellcheck="false" placeholder="Notes are taken here — saved to your browser cache."></textarea></aside></div></div>
 </div>
 <div class="scrim" id="scrim"></div>
 <div class="qmodal" id="qmodal"><div class="qcard" id="qcard"><div class="qhead"><div><div class="qk" id="qkick">Quiz</div><h3 id="qtitle"></h3></div><button class="qclose" id="qclose" aria-label="Close">×</button></div><div class="qbody" id="qbody"></div><div class="qfoot"><button class="qsubmit" id="qsubmit">Submit answers</button><button class="qretry" id="qretry" style="display:none">Try again</button><span class="qresult" id="qresult"></span></div></div></div>
@@ -508,14 +513,27 @@ taken away from it.</p>
   if(b) b.addEventListener("click",function(){ side.classList.toggle("open"); scrim.classList.toggle("show"); });
   if(scrim) scrim.addEventListener("click",close);
   var pl=document.getElementById("play");
-  if(pl){ var au=null, lab=document.getElementById("playlab"), pico=document.getElementById("playico");
+  if(pl){ var lab=document.getElementById("playlab"), pico=document.getElementById("playico");
+    var fill=document.getElementById("sbfill"), sbar=document.getElementById("sbar");
+    var scur=document.getElementById("scur"), sdur=document.getElementById("sdur");
     var PLAYSVG='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
     var PAUSESVG='<svg viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1"></rect><rect x="13.5" y="5" width="4" height="14" rx="1"></rect></svg>';
+    var au=new Audio(); au.preload="metadata"; au.src=pl.dataset.src;
     function setPlaying(p){ pl.classList.toggle("playing",p); if(lab) lab.textContent=p?"Pause":"Listen"; if(pico) pico.innerHTML=p?PAUSESVG:PLAYSVG; }
-    pl.addEventListener("click",function(){
-      if(!au){ au=new Audio(pl.dataset.src); au.addEventListener("ended",function(){ setPlaying(false); }); }
-      if(au.paused){ au.play(); setPlaying(true); } else { au.pause(); setPlaying(false); }
-    });
+    function fmt(t){ if(!isFinite(t)) return "--:--"; t=Math.max(0,t|0); var m=(t/60)|0,s=t%60; return m+":"+(s<10?"0":"")+s; }
+    au.addEventListener("loadedmetadata",function(){ if(sdur) sdur.textContent=fmt(au.duration); });
+    au.addEventListener("timeupdate",function(){ if(au.duration){ if(fill) fill.style.width=(au.currentTime/au.duration*100)+"%"; if(scur) scur.textContent=fmt(au.currentTime); } });
+    au.addEventListener("ended",function(){ setPlaying(false); if(fill) fill.style.width="0%"; });
+    pl.addEventListener("click",function(){ if(au.paused){ au.play(); setPlaying(true); } else { au.pause(); setPlaying(false); } });
+    if(sbar){
+      var drag=false;
+      function seek(cx){ var r=sbar.getBoundingClientRect(); var x=Math.min(1,Math.max(0,(cx-r.left)/r.width)); if(au.duration){ au.currentTime=x*au.duration; if(fill) fill.style.width=(x*100)+"%"; } }
+      sbar.addEventListener("mousedown",function(e){ drag=true; seek(e.clientX); e.preventDefault(); });
+      document.addEventListener("mousemove",function(e){ if(drag) seek(e.clientX); });
+      document.addEventListener("mouseup",function(){ drag=false; });
+      sbar.addEventListener("touchstart",function(e){ if(e.touches[0]) seek(e.touches[0].clientX); },{passive:true});
+      sbar.addEventListener("touchmove",function(e){ if(e.touches[0]) seek(e.touches[0].clientX); },{passive:true});
+    }
   }
   var nt=document.getElementById("notes");
   if(nt){ var nk="wb-lms-notes:"+nt.dataset.slug;
