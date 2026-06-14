@@ -115,6 +115,15 @@
   );
   const composerDisabled = $derived(!ready || chatSession.sending);
   const blocks: ChatBlock[] = $derived(chatSession.blocks);
+  // Typing indicator: a message was sent and the agent is working but no
+  // assistant message block has appeared yet (the gap between send and the
+  // first streamed token / tool step). Hides as soon as a message block exists.
+  const thinking = $derived(
+    !!chatSession.userPrompt &&
+      !blocks.some((b) => b.kind === "message") &&
+      (chatSession.sending ||
+        ["pending", "running"].includes(chatSession.session?.status ?? "")),
+  );
 
   async function handleSubmit(text: string) {
     const skillsForSend = attachedSkills.slice();
@@ -342,6 +351,15 @@
       {#if chatSession.userPrompt}
         <div class="msg user">
           <div class="bubble user-bubble">{chatSession.userPrompt}</div>
+        </div>
+      {/if}
+
+      {#if thinking}
+        <div class="msg agent">
+          <div class="typing" aria-live="polite">
+            <span class="typing-label">Waldo is thinking</span>
+            <span class="typing-dots"><span></span><span></span><span></span></span>
+          </div>
         </div>
       {/if}
 
@@ -611,6 +629,36 @@
   }
   .agent-bubble.errored {
     border-color: rgba(239, 68, 68, 0.4);
+  }
+  /* "Waldo is thinking …" — shown between send and the first streamed token. */
+  .typing {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.7rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    border-bottom-left-radius: 4px;
+    font-size: 12.5px;
+    color: var(--color-fg-muted);
+  }
+  .typing-dots {
+    display: inline-flex;
+    gap: 3px;
+  }
+  .typing-dots span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--color-fg-subtle);
+    animation: typing-bounce 1.2s infinite ease-in-out both;
+  }
+  .typing-dots span:nth-child(1) { animation-delay: -0.24s; }
+  .typing-dots span:nth-child(2) { animation-delay: -0.12s; }
+  @keyframes typing-bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+    40% { transform: translateY(-3px); opacity: 1; }
   }
   .agent-head {
     display: flex;
