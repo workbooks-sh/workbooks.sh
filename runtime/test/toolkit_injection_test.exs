@@ -71,6 +71,23 @@ defmodule Workbooks.ToolkitInjectionTest do
     end
   end
 
+  test "toolkit run on a direct-verb toolkit guides to the DIRECT wb command (self-correction)" do
+    # The real eval-failure root cause: agents tried `wb toolkit run workbooks-cli
+    # deploy status` (refused) instead of `wb deploy status`. The refusal now names
+    # the exact direct command so the agent self-corrects at the point of error.
+    cli = Toolkits.run_task_text("workbooks-cli", "deploy", ["status"])
+    assert cli =~ "direct-verb"
+    assert cli =~ "wb deploy status"
+    assert cli =~ "don't use `wb toolkit run`"
+
+    browser = Toolkits.run_task_text("workbooks-browser", "app", ["status"])
+    assert browser =~ "wb app status"
+  end
+
+  test "toolkit run on an unknown toolkit says so, not a crash" do
+    assert Toolkits.run_task_text("ghost-zzz", "x", []) =~ "no such toolkit"
+  end
+
   test "eval_text case-filter: a non-matching filter selects no case (no LLM run)" do
     # The filter narrows to one eval by filename substring — cheap iteration vs
     # the full suite. A bogus filter must short-circuit to a clear message rather

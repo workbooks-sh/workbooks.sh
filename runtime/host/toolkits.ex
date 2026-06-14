@@ -909,8 +909,32 @@ defmodule Workbooks.Toolkits do
   code. The toolkit's CLI is meant to ship as a WASM command (the Dock-gated
   `run-command` path); convert it and invoke that instead.
   """
-  def run_task_text(id, task, _args, _root \\ default_root()) do
-    "refusing to run #{id}/#{task}: native :role bash execution removed (wb-9ja). Ship the toolkit CLI as a WASM command and run it via the Dock-gated run-command path."
+  def run_task_text(id, task, args, root \\ default_root()) do
+    # If this toolkit ships no compiled command (no CLI_BIN / BUILD_SRC), its
+    # skills document built-in `wb` verbs — so `toolkit run` was never the right
+    # path. Guide the agent to the DIRECT invocation instead of a cryptic refusal
+    # (this is the point-of-error self-correction for the toolkit-run confusion).
+    case tk_dir(id, root) do
+      nil ->
+        "no such toolkit: #{id}"
+
+      dir ->
+        d = parse_descriptor(File.read!(Path.join(dir, "manifest.org")))
+
+        # CLI_BIN: wb means the toolkit's "binary" IS the built-in wb — its skills
+        # document `wb <verb>` commands (vs a compiled command-toolkit like huniq
+        # whose CLI_BIN is its own binary).
+        if d.cli_bin == "wb" do
+          suggested = String.trim("wb #{task} " <> Enum.join(List.wrap(args), " "))
+
+          "#{id} is a direct-verb toolkit — its skills document built-in `wb` verbs, " <>
+            "not a runnable command. Run it DIRECTLY through your `wb` tool: `#{suggested}` " <>
+            "(don't use `wb toolkit run` for #{id})."
+        else
+          "refusing to run #{id}/#{task}: native :role bash execution removed (wb-9ja). " <>
+            "Ship the toolkit CLI as a WASM command and run it via the Dock-gated run-command path."
+        end
+    end
   end
 
   # Count :role pre blocks across a toolkit's skills (for the verify SKIPPED note).
