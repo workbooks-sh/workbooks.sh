@@ -430,7 +430,8 @@
             "WritableStream",
             "TransformStream"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "ReadableStream/WritableStream/TransformStream = StarlingMonkey globals (js_webapi_test)"
         },
         {
           "id": "blob-file",
@@ -441,7 +442,8 @@
             "FormData",
             "AbortController/AbortSignal"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "Blob/File/FormData = SM globals; AbortController/AbortSignal shimmed in node_polyfills banner (absent on SM)"
         },
         {
           "id": "intl",
@@ -538,7 +540,8 @@
             "mustache",
             "ejs"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "handlebars + mustache render in-sandbox (js_webapi_test)"
         },
         {
           "id": "lib-ast",

@@ -2015,7 +2015,16 @@ defmodule Workbooks.Compilers do
                  "b.postMessage=function(d){queueMicrotask(function(){if(a.onmessage)a.onmessage({data:d})})};" <>
                  "a.close=b.close=function(){};a.start=b.start=function(){};" <>
                  "a.addEventListener=function(t,f){if(t===\"message\")a.onmessage=f};" <>
-                 "b.addEventListener=function(t,f){if(t===\"message\")b.onmessage=f};this.port1=a;this.port2=b;};"
+                 "b.addEventListener=function(t,f){if(t===\"message\")b.onmessage=f};this.port1=a;this.port2=b;};" <>
+                 # AbortController/AbortSignal: absent on StarlingMonkey; used widely for cancellation/timeouts.
+                 "if(typeof AbortController===\"undefined\"){(function(){function S(){this.aborted=false;this.reason=undefined;" <>
+                 "this.onabort=null;this._l=[]}S.prototype.addEventListener=function(t,f){if(t===\"abort\")this._l.push(f)};" <>
+                 "S.prototype.removeEventListener=function(t,f){var i=this._l.indexOf(f);if(i>=0)this._l.splice(i,1)};" <>
+                 "S.prototype.dispatchEvent=function(){return true};function C(){this.signal=new S()}" <>
+                 "C.prototype.abort=function(r){var s=this.signal;if(s.aborted)return;s.aborted=true;s.reason=r;" <>
+                 "var e={type:\"abort\"};if(s.onabort)s.onabort(e);s._l.slice().forEach(function(f){f(e)})};" <>
+                 "S.timeout=function(ms){var c=new C();setTimeout(function(){c.abort(new Error(\"TimeoutError\"))},ms);return c.signal};" <>
+                 "S.abort=function(r){var c=new C();c.abort(r);return c.signal};globalThis.AbortSignal=S;globalThis.AbortController=C;})();}"
 
   # Inject `Buffer` as a GLOBAL (libraries use the bare global, not `import {Buffer} from 'buffer'`).
   # esbuild `--inject` rewrites free `Buffer` references to this shim's export of the aliased buffer polyfill.
