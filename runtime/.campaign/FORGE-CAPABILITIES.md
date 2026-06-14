@@ -42,6 +42,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **utf8proc** (Unicode NFC/NFD/case-fold) | from-C-source -> wasi (build_c_dir) | utf8proc_lane_test (casefold + NFC) |
 | **xdiff** (text diffing / unified diff) | from-C-source -> wasi (build_c_dir) | xdiff_lane_test (diff -> unified hunk) |
 | **xxHash** (fast non-crypto hashing XXH32/64/XXH3) | from-C-source -> wasi (build_c_dir) | xxhash_lane_test (deterministic digests) |
+| **tinyexpr** (math-expression evaluator) | from-C-source -> wasi (build_c_dir) | tinyexpr_lane_test (expr + bound vars) |
 
 ## PROVEN — ran in an experiment, not yet wired+tested
 

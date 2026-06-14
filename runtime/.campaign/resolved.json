@@ -2701,6 +2701,13 @@
    "proof": "xxHash 0.8.2 (single-header) via build_c_dir computes deterministic digests: xxh64=fda087eddf672be9, xxh32=b6e02b92, xxh3=248a66b67c86cb78; xxhash_lane_test.exs green. Distinct from monocypher crypto-hash (speed for content-addressing/dedup). Promoted from c_leaf_libs proven.",
    "lane": "compilers/xxhash/build.sh (fetch single-header pinned v0.8.2, gitignored) + build_c_dir",
    "since": "iter163"
+  },
+  "tinyexpr": {
+   "capability": "math-expression evaluation (with variables/functions) in-sandbox",
+   "status": "live",
+   "proof": "tinyexpr via build_c_dir evaluates expressions: 3+4*2=11, sqrt(9)+pow(2,3)=11, 2*x+1 with x=5->11 then x=10->21; tinyexpr_lane_test.exs green. Promoted from c_leaf_libs proven.",
+   "lane": "compilers/tinyexpr/build.sh (fetch content-sha-pinned, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {
