@@ -35,6 +35,8 @@
       <b>Workbooks</b><span class="cl">cloud</span>
     </div>
 
+    <div class="dna-wrap"><DnaStrip seed={7} height={10} /></div>
+
     <div class="org">
       <div class="av">SO</div>
       <div class="nm">shinyobjectz</div>
@@ -49,8 +51,6 @@
       <a href="/usage" class:on={active('/usage')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M4 13h4v7H4v-7Zm6-6h4v13h-4V7Zm6 3h4v10h-4V10Z"/></svg>Usage &amp; billing</a>
       <a href="/settings" class:on={active('/settings')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4c0-.6 0-1.2-.1-1.7l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-3-1.7L15 0H9l-.5 2.6a7.6 7.6 0 0 0-3 1.7l-2.4-1-2 3.4 2 1.6c-.1.5-.1 1.1-.1 1.7s0 1.2.1 1.7l-2 1.6 2 3.4 2.4-1c.9.7 1.9 1.3 3 1.7L9 24h6l.5-2.6c1.1-.4 2.1-1 3-1.7l2.4 1 2-3.4-2-1.6c.1-.5.1-1.1.1-1.7Z"/></svg>Settings</a>
     </nav>
-
-    <div class="dna-wrap"><DnaStrip seed={7} height={12} /></div>
 
     <a href="/settings" class="acct">
       <div class="av">S</div>

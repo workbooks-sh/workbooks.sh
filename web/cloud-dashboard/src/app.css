@@ -71,7 +71,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; col
 .nav a.on { background: var(--panel); color: var(--ink); box-shadow: inset 2px 0 0 var(--ink); }
 /* each nav item's icon carries its own pastel-deep when active */
 .nav a.on .ico { color: var(--ink); }
-.dna-wrap { padding: 8px 6px 4px; }
+.dna-wrap { padding: 2px 8px 16px; }
 .acct { display: flex; align-items: center; gap: 9px; padding: 9px 8px; border-top: 1px solid var(--line); margin-top: 8px; cursor: pointer; border-radius: 8px; }
 .acct:hover { background: var(--panel-2); }
 .acct .av { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg,var(--peach),var(--blue)); flex: none; display: grid; place-items: center; font: 600 11px var(--sans); color: var(--ink); }
