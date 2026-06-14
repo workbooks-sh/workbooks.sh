@@ -39,6 +39,8 @@
   import AgentScopesModal from "./AgentScopesModal.svelte";
   import AgentEditor from "./AgentEditor.svelte";
   import SkillPicker from "./SkillPicker.svelte";
+  import ModelPicker from "./ModelPicker.svelte";
+  import { getLlmModel, setLlmModel } from "$lib/bridge/llmModel.svelte";
   import { moonshineStt } from "$lib/stt/moonshine.svelte";
   import { geminiLive } from "$lib/live/gemini.svelte";
   import { agents } from "$lib/bridge/agents.svelte";
@@ -93,6 +95,8 @@
     attachedSkills = attachedSkills.filter((s) => s !== slug);
   }
   let composerRef = $state<ChatComposer | undefined>(undefined);
+  // Waldo's model, switchable right from the composer (next to send).
+  let model = $state(getLlmModel());
   let threadEl = $state<HTMLDivElement | undefined>(undefined);
   let openTools = $state<Record<string, boolean>>({});
 
@@ -477,6 +481,9 @@
       liveActive={geminiLive.active}
       liveDisabled={geminiLive.busy}
     >
+      {#snippet actions()}
+        <ModelPicker compact bind:value={model} onchange={(m) => void setLlmModel(m)} />
+      {/snippet}
       {#snippet leading()}
         {#each attachedSkills as slug (slug)}
           <span

@@ -19,7 +19,7 @@
    */
   import { onMount, onDestroy } from "svelte";
   import { fade, fly } from "svelte/transition";
-  import { ArrowRight, ArrowUUpLeft as Undo2, Waveform as AudioLines, Microphone as Mic, MicrophoneSlash as MicOff, PhoneSlash as PhoneOff, WarningCircle as AlertCircle, Wrench, CircleNotch as Loader2, Check, XCircle } from "phosphor-svelte";
+  import { ArrowUp, ArrowUUpLeft as Undo2, Waveform as AudioLines, Microphone as Mic, MicrophoneSlash as MicOff, PhoneSlash as PhoneOff, WarningCircle as AlertCircle, Wrench, CircleNotch as Loader2, Check, XCircle } from "phosphor-svelte";
   import { chatSession } from "$lib/chat/session.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
@@ -411,7 +411,7 @@
             disabled={!canSend}
           >
             {sending ? "…" : ""}
-            <ArrowRight weight="bold" size={13} />
+            <ArrowUp weight="fill" size={16} color="var(--color-page)" />
           </button>
         </div>
       </form>
@@ -691,7 +691,10 @@
     transition: opacity 0.15s, filter 0.15s, background 0.15s, color 0.15s;
   }
   .btn:disabled { opacity: 0.35; cursor: default; }
+  /* Send: monochrome — fg fill with a page-colored glyph. Inverts cleanly in
+     both themes (white button/dark glyph in dark mode, and vice-versa). */
   .btn.primary { background: var(--color-fg); color: var(--color-page); }
+  .btn.primary :global(svg) { color: var(--color-page); fill: currentColor; }
   .btn.primary:not(:disabled):hover { filter: brightness(1.08); }
 
   .err {

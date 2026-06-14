@@ -36,7 +36,7 @@
   // The user's chosen LLM model (recommended picks pinned in the picker).
   let model = $state(getLlmModel());
 
-  const STEPS = ["welcome", "titlebar", "sidebar", "sidebar-tour", "glyph", "search", "theme", "connect", "waldo"] as const;
+  const STEPS = ["welcome", "titlebar", "sidebar", "sidebar-tour", "glyph", "search", "theme", "connect", "waldo", "waldo-voice"] as const;
   type Step = (typeof STEPS)[number];
   let step = $state<Step>("welcome");
   const stepIdx = $derived(STEPS.indexOf(step));
@@ -54,13 +54,13 @@
   type Lesson = { target: string; title: string; body: string };
   const LEARN: Record<string, Lesson[]> = {
     titlebar: [
+      { target: ".new-tab", title: "Create", body: "The + at the left of your tabs — start a new workbook, folder or board. Your create surface is always one click up here." },
       { target: ".bench-host", title: "The bench", body: "Toolkit shortcuts. Each icon opens a panel on the right — click again to close. Build your own." },
       { target: ".search-badge", title: "Search", body: "A built-in toolkit with a global ⌘K — summon it anywhere to find files, tabs, the web." },
       { target: ".nexus-badge", title: "Nexus", body: "Your runtime connection. The badge shows engine status; click it to manage or switch." },
       { target: ".dock-host", title: "Waldo", body: "Your resident agent, top-right. Ask by text or voice; it works issues with you." },
     ],
     "sidebar-tour": [
-      { target: ".create-cta", title: "Create", body: "Start a new workbook or folder. The branded button, always at the bottom of the sidebar." },
       { target: ".folder-row", title: "Folders", body: "Twirl one open to see its files; drag to reorder, or drop a file in to move it. Folders nest." },
       { target: ".sb-body", title: "Your library", body: "Everything in the active workspace lives here. The layout you just picked shapes how it reads." },
     ],
@@ -156,7 +156,7 @@
     // "search" focuses the sidebar's own file-search bar (inline, shown by
     // the sidebarTop pick) — NOT the titlebar's ⌘K drawer, so nothing opens.
     if (s === "sidebar" || s === "sidebar-tour" || s === "glyph") chrome.sidebarOpen = true;
-    else if (s === "waldo") dock.open("waldo");
+    else if (s === "waldo" || s === "waldo-voice") dock.open("waldo");
     // "search" previews the everything-search drawer (right) in the current mode.
     if (s === "search") {
       search.demoQuery = "data pipelines";
@@ -368,11 +368,12 @@
             <!-- The coach expands to host the agent scan + cards inline. -->
             <OnboardingAgents embedded />
 
-          {:else}
+          {:else if step === "waldo"}
+            <!-- Meet Waldo — the resident agent's TEXT brain, on OpenRouter. -->
             <div class="text">
               <span class="kicker">Your resident agent</span>
               <h1>Meet Waldo</h1>
-              <p>Add your keys to wake Waldo. Stored locally on this device — never synced. You can change these later in Settings.</p>
+              <p>Waldo thinks on OpenRouter — one key, every model. Add it to wake him, then pick the model he runs on. Stored locally on this device, never synced.</p>
             </div>
             <div class="keys">
               <div class="keyrow" class:done={orConnected}>
@@ -394,6 +395,24 @@
                 {#if orErr}<div class="kerr">{orErr}</div>{/if}
               </div>
 
+              <div class="kget">
+                <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">Get OpenRouter key ↗</a>
+              </div>
+
+              <div class="modelrow">
+                <span class="klabel">Model <span class="kfor">cheaper-but-better, multimodal first</span></span>
+                <ModelPicker bind:value={model} onchange={(m) => void setLlmModel(m)} />
+              </div>
+            </div>
+
+          {:else}
+            <!-- Waldo Voice — the separate voice lane, on Gemini Live. -->
+            <div class="text">
+              <span class="kicker">Talk to Waldo</span>
+              <h1>Waldo Voice</h1>
+              <p>For voice chat, Waldo speaks through Gemini Live. Optional — add a Gemini key to talk out loud; skip it and Waldo still works by text.</p>
+            </div>
+            <div class="keys">
               <div class="keyrow" class:done={gemConnected}>
                 <span class="klabel">
                   <Icon value="lobe:gemini-color" name="Gemini" size={15} />
@@ -414,13 +433,7 @@
               </div>
 
               <div class="kget">
-                <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">Get OpenRouter key ↗</a>
                 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get Gemini key ↗</a>
-              </div>
-
-              <div class="modelrow">
-                <span class="klabel">Model <span class="kfor">cheaper-but-better, multimodal first</span></span>
-                <ModelPicker bind:value={model} onchange={(m) => void setLlmModel(m)} />
               </div>
             </div>
           {/if}
@@ -431,7 +444,7 @@
         <div class="nav">
           <button type="button" class="ghost" onclick={back}>Back</button>
           <button type="button" class="primary" onclick={next} disabled={!canContinue}>
-            {step === "waldo" ? "Open the browser" : "Continue"}
+            {step === "waldo-voice" ? "Open the browser" : "Continue"}
             <ArrowRight size={14} weight="bold" />
           </button>
         </div>

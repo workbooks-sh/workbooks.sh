@@ -45,10 +45,14 @@
     value = $bindable(""),
     placeholder = "Pick a model",
     onchange,
+    compact = false,
   }: {
     value: string;
     placeholder?: string;
     onchange?: (v: string) => void;
+    // compact = model-name-only trigger sized for an action row (e.g. the chat
+    // composer next to send) — drops the vendor prefix to stay narrow.
+    compact?: boolean;
   } = $props();
 
   let triggerEl = $state<HTMLButtonElement | null>(null);
@@ -233,13 +237,13 @@
     bind:this={triggerEl}
     class="trigger"
     class:open
+    class:compact
     onclick={toggle}
     aria-expanded={open}
     aria-haspopup="listbox"
   >
     {#if value && selectedModel}
-      <span class="vendor">{vendorLabel(selectedModel.vendor)}</span>
-      <span class="sep">/</span>
+      {#if !compact}<span class="vendor">{vendorLabel(selectedModel.vendor)}</span><span class="sep">/</span>{/if}
       <span class="model">{selectedModel.name}</span>
     {:else if value}
       <span class="model">{value}</span>
@@ -350,6 +354,14 @@
     cursor: pointer;
     max-width: 320px;
     min-width: 0;
+  }
+  .trigger.compact {
+    height: 28px;
+    border-radius: 999px;
+    padding: 0 0.5rem;
+    max-width: 150px;
+    font-size: 12px;
+    color: var(--color-fg-subtle);
   }
   .trigger:hover,
   .trigger.open {

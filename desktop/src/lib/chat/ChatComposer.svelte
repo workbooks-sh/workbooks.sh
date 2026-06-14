@@ -30,6 +30,7 @@
     liveActive = false,
     liveDisabled = true,
     leading,
+    actions,
   }: {
     value?: string;
     placeholder?: string;
@@ -45,6 +46,9 @@
     liveActive?: boolean;
     liveDisabled?: boolean;
     leading?: Snippet;
+    // Rendered at the start of the action row (left of mic/live/send) — e.g. a
+    // compact model picker so the user can switch Waldo's model right by send.
+    actions?: Snippet;
   } = $props();
 
   let textareaEl = $state<HTMLTextAreaElement | undefined>(undefined);
@@ -103,6 +107,9 @@
     </div>
 
     <div class="composer-actions">
+    {#if actions}
+      <div class="composer-actions-lead">{@render actions()}</div>
+    {/if}
     <button
       type="button"
       class="composer-action"
@@ -221,6 +228,11 @@
     align-items: center;
     gap: 0.25rem;
     align-self: flex-end;
+  }
+  .composer-actions-lead {
+    display: flex;
+    align-items: center;
+    margin-right: 0.15rem;
   }
   .composer-action {
     flex: 0 0 28px;
