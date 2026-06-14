@@ -89,4 +89,59 @@ take wasm-tools/build.sh
 take esbuild/esbuild.wasm      # AOT bundler (wasip1) — the fast lane, replaces QuickJS bundlejob for JS/TS/JSX
 take esbuild/build.sh          # the recipe, so the dist slice can self-heal/rebuild it too
 
+# --- AGGRESSIVE PRUNE (opt-in: STAGE_PRUNE=1) ----------------------------------
+# Two removals that the RUNTIME compile paths were traced not to read, but which
+# need a provisioned-machine smoke test to confirm before becoming default. Each
+# is OFF by default so a normal `stage-tools.sh` run ships the proven-safe slice.
+#
+# VERIFY (on a provisioned machine, after STAGE_PRUNE=1 stage-tools.sh):
+#   cd runtime
+#   # Rust on-demand compile (links libstd from *.rlib.o, never the *.rlib.c):
+#   mix run --no-start -e 'IO.inspect(Workbooks.Compilers.rust_compile_to_wasm("test/fixtures/hello.rs"))' \
+#     -e 'or any rust eval case' ; mix test --only build   # rust/zig compile suites
+#   # Zig on-demand compile (target wasm32-wasi only):
+#   mix run --no-start -e 'IO.inspect(Workbooks.Compilers.compile("zig", "<a .zig>"))'
+# If both still produce a runnable .wasm, fold these into the default staging.
+if [ "${STAGE_PRUNE:-0}" = "1" ]; then
+  echo "stage-tools: AGGRESSIVE PRUNE on (STAGE_PRUNE=1)" >&2
+
+  # (1) mrustc transpiled-C INTERMEDIATES for the PREBUILT libstd crates (~88 MB).
+  # Traced: the runtime Rust link globs output-wasi-174/*.rlib.o (compilers.ex:730)
+  # and guards on libstd.rlib.o (L601) — it NEVER reads the std crates' *.rlib.c
+  # (that C was already compiled to *.rlib.o at provision time). Dep-crate .rlib.c
+  # are regenerated per-compile by mrustc (L1137 File.rm + emit), so dropping the
+  # SHIPPED std *.rlib.c does not affect them. Keep wbrt.rlib.c? No — it too is
+  # regenerated at runtime (compilers.ex:1478). So drop ALL *.rlib.c here.
+  for od in output-wasi-174 output-wasi-174-threads; do
+    d="$DST/rust/mrustc-root/mrustc/$od"
+    [ -d "$d" ] || continue
+    before=$(du -sk "$d" | cut -f1)
+    find "$d" -maxdepth 1 -name '*.rlib.c' -delete
+    after=$(du -sk "$d" | cut -f1)
+    echo "  - pruned $od/*.rlib.c: $(( (before-after)/1024 )) MB" >&2
+  done
+
+  # (2) zig libc headers/sources for NON-wasi targets (~150 MB). The zig lane only
+  # ever compiles `-target wasm32-wasi` (compilers.ex:82,108) against --zig-lib-dir
+  # zig-root/lib. wasm needs lib/libc/{wasi, include/{wasm-wasi-musl, generic-musl,
+  # any-* fallbacks}} + lib/libc/musl. The per-OS trees (windows/freebsd/netbsd/
+  # openbsd/darwin/glibc/mingw) and their include/ arch dirs are dead for wasi.
+  # CONSERVATIVE set kept; everything else dropped. If a wasi compile breaks on a
+  # missing header, widen the keep-list rather than reverting.
+  zl="$DST/zig/zig-root/lib/libc"
+  if [ -d "$zl" ]; then
+    before=$(du -sk "$zl" | cut -f1)
+    # drop whole per-OS libc trees not used by wasm32-wasi
+    for os in mingw glibc darwin netbsd freebsd openbsd; do rm -rf "$zl/$os"; done
+    # drop non-wasi/non-musl include arch dirs (keep wasm/musl + any-* generic fallbacks)
+    if [ -d "$zl/include" ]; then
+      find "$zl/include" -mindepth 1 -maxdepth 1 -type d \
+        ! -name 'wasm-wasi-musl' ! -name 'generic-musl' ! -name 'any-linux-any' \
+        ! -name 'any-darwin-any' -exec rm -rf {} +
+    fi
+    after=$(du -sk "$zl" | cut -f1)
+    echo "  - pruned zig libc non-wasi: $(( (before-after)/1024 )) MB" >&2
+  fi
+fi
+
 echo "stage-tools: done — $(du -sh "$DST" | cut -f1) total" >&2
