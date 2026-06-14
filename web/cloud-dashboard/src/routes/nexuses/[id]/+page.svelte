@@ -5,6 +5,7 @@
   import { nexusStore } from '$lib/nexusStore.svelte.js';
   import { toast } from '$lib/toastStore.svelte.js';
   import Confirm from '$lib/Confirm.svelte';
+  import History from '$lib/History.svelte';
 
   const id = $derived(page.params.id);
   const detail = $derived(nexusStore.detail(id));
@@ -137,6 +138,8 @@
       {/each}
     </div>
   </div>
+
+  <History scope={id} />
 
   <div class="card danger-zone">
     <h3>Danger zone</h3>
