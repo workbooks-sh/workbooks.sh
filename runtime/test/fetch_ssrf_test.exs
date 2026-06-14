@@ -37,3 +37,27 @@ defmodule Workbooks.FetchMissingUrlTest do
     assert fetch(%{"url" => nil}) =~ "no url given"
   end
 end
+
+defmodule Workbooks.BrowseFetchSsrfTest do
+  @moduledoc """
+  The NATIVE fetch/crawl path (Browse.Fetch.get → the default crawl provider,
+  what POST /api/browse mode:crawl uses) must enforce the SSRF floor too — once
+  it didn't (only the headless path did), so a crawl could reach 169.254.169.254.
+  A blocked URL returns {:error, :blocked} BEFORE any connection — deterministic,
+  no DNS for IP literals, no network.
+  """
+  use ExUnit.Case, async: true
+  alias Workbooks.Browse.Fetch
+
+  test "Browse.Fetch.get refuses metadata/loopback/private IP literals" do
+    for url <- [
+          "http://169.254.169.254/latest/meta-data/",
+          "http://127.0.0.1:4000/health",
+          "http://10.0.0.5/x",
+          "http://192.168.1.1/admin",
+          "http://172.16.0.9/y"
+        ] do
+      assert Fetch.get(url) == {:error, :blocked}, "expected #{url} SSRF-blocked"
+    end
+  end
+end
