@@ -1,31 +1,44 @@
 <script lang="ts">
   /**
-   * Workgate approval modal (wb-80q0.10).
+   * Workgate approval modal — the desktop safety prompt for `os.*` capabilities.
    *
-   * Renders when the workgate store has a pending request. One-modal-
-   * at-a-time by construction — the store advances only after the
-   * user clicks Allow or Deny.
-   *
-   * The modal is the entire safety mitigation for `os.*` capabilities.
-   * Every time the agent asks for camera / mic / screen / real-FS-
-   * outside-monorepo / launch-app, the user sees a prompt here with:
-   *   - the capability name (verbatim — no marketing copy)
-   *   - the agent's stated reason
-   *   - the scope shape (verbatim — the user sees exactly what was
-   *     requested)
-   *   - Allow / Deny buttons + a remember dropdown
-   *
-   * Per docs/desktop/agent-sandbox.md §5.4 the chrome must be
-   * consistent across prompts so users build a mental model. This
-   * component is the one place that chrome lives.
+   * Minimal + legible: an icon for the capability TYPE, one clear question, the
+   * agent's reason, the exact scope (kept — it's the security signal), a
+   * remember choice, and Deny / Allow. The chrome stays consistent with the
+   * env-request modal so users build one mental model.
    */
   import { workgate, type RememberKind } from "./store.svelte";
+  import {
+    File,
+    Globe,
+    Camera,
+    Microphone,
+    Monitor,
+    Rocket,
+    ShieldCheck,
+  } from "phosphor-svelte";
 
   let remember = $state<RememberKind>("one_time");
   let acting = $state(false);
 
-  // Show the modal only when there's a pending request.
   const req = $derived(workgate.current);
+
+  // Capability → a type icon + a plain-language phrase.
+  const cap = $derived.by(() => {
+    const c = (req?.capability ?? "").toLowerCase();
+    if (c.startsWith("fs") || c.includes("file"))
+      return { icon: File, phrase: "read and write files on your computer" };
+    if (c.startsWith("net") || c.includes("http") || c.includes("fetch"))
+      return { icon: Globe, phrase: "reach the network" };
+    if (c.includes("camera")) return { icon: Camera, phrase: "use your camera" };
+    if (c.includes("mic") || c.includes("audio"))
+      return { icon: Microphone, phrase: "use your microphone" };
+    if (c.includes("screen") || c.includes("display"))
+      return { icon: Monitor, phrase: "capture your screen" };
+    if (c.includes("launch") || c.includes("app") || c.includes("exec"))
+      return { icon: Rocket, phrase: "launch an app" };
+    return { icon: ShieldCheck, phrase: `use ${req?.capability ?? "a capability"}` };
+  });
 
   async function onAllow() {
     if (!req || acting) return;
@@ -53,38 +66,25 @@
 {#if req}
   <div class="overlay" data-testid="workgate-overlay">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wg-title">
-      <header>
-        <span class="badge">Workgate</span>
-        <h2 id="wg-title">{req.capability}</h2>
-      </header>
+      <div class="logo" aria-hidden="true">
+        {@const CapIcon = cap.icon}
+        <CapIcon weight="fill" size={24} />
+      </div>
 
-      <p class="reason">{req.reason}</p>
+      <h2 id="wg-title">Let Waldo {cap.phrase}?</h2>
+      {#if req.reason}<p class="sub">{req.reason}</p>{/if}
+
+      <code class="cap">{req.capability}</code>
 
       {#if Object.keys(req.scope).length > 0}
-        <div class="scope">
-          <div class="scope-label">Scope</div>
-          <pre>{JSON.stringify(req.scope, null, 2)}</pre>
-        </div>
+        <pre class="scope">{JSON.stringify(req.scope, null, 2)}</pre>
       {/if}
 
-      <div class="meta">
-        {#if req.workspace}
-          <span>workspace: <code>{req.workspace}</code></span>
-        {/if}
-        {#if req.session}
-          <span>session: <code>{req.session}</code></span>
-        {/if}
-        <span>id: <code>{req.id}</code></span>
-      </div>
-
-      <div class="remember">
-        <label for="wg-remember">Remember</label>
-        <select id="wg-remember" bind:value={remember} disabled={acting}>
-          <option value="one_time">Just this once</option>
-          <option value="this_session">For this session</option>
-          <option value="this_workspace">For this workspace</option>
-        </select>
-      </div>
+      <select id="wg-remember" bind:value={remember} disabled={acting} class="remember">
+        <option value="one_time">Just this once</option>
+        <option value="this_session">For this session</option>
+        <option value="this_workspace">For this workspace</option>
+      </select>
 
       <div class="actions">
         <button class="btn deny" onclick={onDeny} disabled={acting} data-testid="workgate-deny">
@@ -102,145 +102,120 @@
   .overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 1rem;
   }
-
   .modal {
-    background: var(--color-surface, #fff);
-    color: var(--color-fg, #111);
-    border: 1px solid var(--color-border, #ddd);
-    border-radius: 12px;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
-    padding: 1.25rem 1.25rem 1rem;
+    background: var(--color-surface);
+    color: var(--color-fg);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+    padding: 1.6rem 1.5rem 1.25rem;
     width: 100%;
-    max-width: 440px;
+    max-width: 360px;
     display: flex;
     flex-direction: column;
-    gap: 0.85rem;
-  }
-
-  header {
-    display: flex;
     align-items: center;
+    text-align: center;
     gap: 0.5rem;
   }
-
-  .badge {
-    background: var(--color-fg, #111);
-    color: var(--color-page, #fff);
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 0.15rem 0.45rem;
-    border-radius: 999px;
+  .logo {
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 13px;
+    background: var(--color-surface-soft);
+    border: 1px solid var(--color-border);
+    color: var(--color-fg);
+    margin-bottom: 0.15rem;
   }
-
   h2 {
     margin: 0;
     font-size: 1.05rem;
     font-weight: 600;
-    letter-spacing: -0.015em;
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: -0.01em;
   }
-
-  .reason {
+  .sub {
     margin: 0;
-    font-size: 0.9rem;
-    line-height: 1.45;
-    color: var(--color-fg, #111);
-  }
-
-  .scope {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-  }
-  .scope-label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-fg-muted, #555);
-  }
-  .scope pre {
-    margin: 0;
-    background: var(--color-surface-soft, #f5f5f5);
-    border: 1px solid var(--color-border, #e0e0e0);
-    border-radius: 6px;
-    padding: 0.5rem 0.6rem;
-    font-size: 0.78rem;
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    overflow-x: auto;
-  }
-
-  .meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 0.9rem;
-    font-size: 0.7rem;
-    color: var(--color-fg-muted, #777);
-  }
-  .meta code {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  }
-
-  .remember {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-  }
-  .remember label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-fg-muted, #555);
-  }
-  .remember select {
-    padding: 0.4rem 0.5rem;
-    border: 1px solid var(--color-border, #ddd);
-    border-radius: 6px;
-    background: var(--color-surface-soft, #f5f5f5);
-    color: var(--color-fg, #111);
     font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--color-fg-muted);
+    max-width: 32ch;
+  }
+  .cap {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.74rem;
+    color: var(--color-fg-subtle);
+    background: var(--color-surface-soft);
+    border: 1px solid var(--color-border);
+    border-radius: 5px;
+    padding: 0.1rem 0.4rem;
+    margin-top: 0.1rem;
+  }
+  .scope {
+    width: 100%;
+    margin: 0.3rem 0 0;
+    padding: 0.5rem 0.6rem;
+    background: var(--color-surface-soft);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    text-align: left;
+    overflow-x: auto;
+    color: var(--color-fg-muted);
+  }
+  .remember {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    background: var(--color-surface-soft);
+    color: var(--color-fg);
+    font-size: 0.84rem;
     font-family: inherit;
   }
-
   .actions {
     display: flex;
     gap: 0.5rem;
-    justify-content: flex-end;
-    margin-top: 0.25rem;
+    width: 100%;
+    margin-top: 0.6rem;
   }
   .btn {
-    height: 34px;
-    padding: 0 0.85rem;
-    border-radius: 7px;
-    font-size: 0.85rem;
-    font-weight: 500;
+    flex: 1;
+    height: 38px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 550;
     font-family: inherit;
     cursor: pointer;
-    border: 1px solid var(--color-border, #ddd);
-    background: var(--color-surface-soft, #f5f5f5);
-    color: var(--color-fg, #111);
-    transition: opacity 0.12s, background 0.12s;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-soft);
+    color: var(--color-fg);
+    transition: opacity 0.12s, filter 0.12s, background 0.12s;
   }
   .btn:disabled {
-    opacity: 0.5;
+    opacity: 0.45;
     cursor: default;
   }
   .btn.allow {
-    background: var(--color-fg, #111);
-    color: var(--color-page, #fff);
-    border-color: var(--color-fg, #111);
+    background: var(--color-brand, var(--color-fg));
+    color: #fff;
+    border-color: transparent;
   }
-  .btn.deny:hover:not(:disabled) {
+  .btn.allow:not(:disabled):hover {
+    filter: brightness(1.06);
+  }
+  .btn.deny:not(:disabled):hover {
     background: rgba(239, 68, 68, 0.12);
     border-color: rgba(239, 68, 68, 0.4);
   }
