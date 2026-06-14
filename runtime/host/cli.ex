@@ -246,8 +246,10 @@ defmodule Workbooks.CLI do
 
   # Observability through the CLI (not a dashboard) — the telemetry + ledger
   # feedback loop over the always-on _steps.jsonl any run writes.
-  def call(["telemetry"], _t) do
-    runs = Workbooks.Workflow.Telemetry.index()
+  def call(["telemetry"], t) do
+    # Tenant-scoped (wb-g1yo): the CLI sibling of GET /api/telemetry — an agent's
+    # `wb telemetry` must only see its own tenant's runs, not every run on a nexus.
+    runs = Workbooks.Workflow.Telemetry.index(t)
     if runs == [] do
       "(no runs)"
     else
@@ -259,7 +261,15 @@ defmodule Workbooks.CLI do
     end
   end
 
-  def call(["telemetry", slug], _t) do
+  def call(["telemetry", slug], t) do
+    cond do
+      String.contains?(slug, "/") or String.contains?(slug, "..") -> "bad slug"
+      not Workbooks.Workflow.Telemetry.run_visible?(wd(slug), t) -> "no such run: #{slug}"
+      true -> telemetry_summary_text(slug)
+    end
+  end
+
+  defp telemetry_summary_text(slug) do
     case Workbooks.Workflow.Telemetry.summary(wd(slug)) do
       %{error: e} -> e
       s ->
@@ -269,7 +279,15 @@ defmodule Workbooks.CLI do
     end
   end
 
-  def call(["ledger", slug], _t) do
+  def call(["ledger", slug], t) do
+    cond do
+      String.contains?(slug, "/") or String.contains?(slug, "..") -> "bad slug"
+      not Workbooks.Workflow.Telemetry.run_visible?(wd(slug), t) -> "no such run: #{slug}"
+      true -> ledger_verify_text(slug)
+    end
+  end
+
+  defp ledger_verify_text(slug) do
     case Workbooks.Ledger.verify(wd(slug)) do
       %{error: e} -> e
       v ->
