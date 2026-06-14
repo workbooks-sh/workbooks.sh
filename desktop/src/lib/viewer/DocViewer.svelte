@@ -12,6 +12,7 @@
   import { panes } from "$lib/viewer/panes.svelte";
   import type { Tab } from "$lib/tabs/types";
   import WorkbookView from "./WorkbookView.svelte";
+  import WaveletPlayer from "./WaveletPlayer.svelte";
   import CodeView from "./CodeView.svelte";
   import TextView from "./TextView.svelte";
   import OrgEditor from "$lib/org-renderer/OrgEditor.svelte";
@@ -46,6 +47,8 @@
   {#key tab.id}
     {#if tab.kind === "workbook"}
       <WorkbookView path={tab.path} />
+    {:else if tab.kind === "wavelet"}
+      <WaveletPlayer path={tab.path} />
     {:else if tab.kind === "org"}
       <OrgEditor path={tab.path} tabId={tab.id} />
     {:else if tab.kind === "code"}

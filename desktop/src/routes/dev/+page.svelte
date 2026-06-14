@@ -8,9 +8,13 @@
    * (kept inline for now; promote to a shared control kit if this grows).
    */
   import FolderIcon from "$lib/ui/FolderIcon.svelte";
+  import WaveletPlayer from "$lib/viewer/WaveletPlayer.svelte";
 
-  const STORIES = ["FolderIcon"] as const;
+  const STORIES = ["FolderIcon", "WaveletPlayer"] as const;
   let story = $state<(typeof STORIES)[number]>("FolderIcon");
+
+  // ── WaveletPlayer controls ──
+  let compPath = $state("/mock/compositions/clip/clip.html");
 
   // ── FolderIcon controls ──
   let icon = $state("📋");
@@ -109,6 +113,23 @@
           {/each}
         </div>
         <p class="hint">The strip uses the live color so you can judge folders next to bare apps at rail size (31px).</p>
+      </section>
+    {:else if story === "WaveletPlayer"}
+      <section class="controls">
+        <label>
+          <span>Composition path</span>
+          <input bind:value={compPath} placeholder="/mock/compositions/clip/clip.html" />
+        </label>
+        <p class="hint">
+          Plays the SAME composition source the render core consumes. Scrub to a
+          frame → that frame equals what `wavelet render` writes to
+          frame_%05dN.png (Web Animations API seek = Stylo clock seek).
+        </p>
+      </section>
+      <section class="player-stage">
+        {#key compPath}
+          <WaveletPlayer path={compPath} />
+        {/key}
       </section>
     {/if}
   </main>
@@ -307,5 +328,14 @@
   .bare {
     font-size: 19px;
     line-height: 1;
+  }
+  .player-stage {
+    display: flex;
+    flex-direction: column;
+    height: 70vh;
+    min-height: 360px;
+    border: 1px solid var(--color-border, #0001);
+    border-radius: 12px;
+    overflow: hidden;
   }
 </style>

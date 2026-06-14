@@ -22,6 +22,8 @@
  * already exists, the bootstrap is skipped, and this module no-ops.
  */
 
+import { classifyKind } from "$lib/tabs/classify";
+
 type Invoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 
 declare global {
@@ -155,18 +157,14 @@ function ensureStore(path: string): Record<string, unknown> {
 
 type MockTab = { id: string; path: string; title: string; kind: string; dirty: boolean };
 
-/** Derive a tab title + kind from a path. `.html` → workbook (so the
- *  WorkbookView renderer + provenance header kick in), else text. */
+/** Derive a tab title + kind from a path. Classification is shared with the
+ *  packaged host via $lib/tabs/classify (wavelet → player, `.html` →
+ *  workbook, `.org` → org, else text). */
 function tabFromPath(path: string, id: string): MockTab {
   const file = path.split("/").pop() ?? path;
   const base = file.replace(/\.[^.]+$/, "");
   const title = base.charAt(0).toUpperCase() + base.slice(1);
-  const kind = /\.html?$/i.test(path)
-    ? "workbook"
-    : /\.org$/i.test(path)
-      ? "org"
-      : "text";
-  return { id, path, title, kind, dirty: false };
+  return { id, path, title, kind: classifyKind(path), dirty: false };
 }
 
 /** Stub workbook HTML for any app that lacks a real workbook on disk.
