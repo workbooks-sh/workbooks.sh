@@ -1,5 +1,6 @@
 <script>
   import WorkOSWidget from '$lib/WorkOSWidget.svelte';
+  import { toast } from '$lib/toastStore.svelte.js';
   let { data } = $props();
 </script>
 
@@ -18,7 +19,7 @@
       <div class="bar"><i style="width:30%"></i></div>
       <div class="faint" style="font-size:11.5px">Seats sync automatically — adding a member bumps your Polar subscription; removing one drops it.</div>
     </div>
-    <button class="btn sm">Upgrade plan</button>
+    <button class="btn sm" onclick={() => toast('Upgrade flow opening…')}>Upgrade plan</button>
   </div>
 
   <!-- WorkOS User Management widget (live, embedded) -->

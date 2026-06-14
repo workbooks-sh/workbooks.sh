@@ -1,15 +1,23 @@
 <script>
   import { onMount } from 'svelte';
+  import { page } from '$app/state';
+  import { goto } from '$app/navigation';
+  import { nexusStore } from '$lib/nexusStore.svelte.js';
+  import { toast } from '$lib/toastStore.svelte.js';
+  import Confirm from '$lib/Confirm.svelte';
 
-  let { data } = $props();
-  const nexus = $derived(data.nexus);
-  const config = $derived(data.config);
-  const month = $derived(data.month);
+  const id = $derived(page.params.id);
+  const detail = $derived(nexusStore.detail(id));
+  const nexus = $derived(detail?.nexus);
+  const config = $derived(detail?.config);
+  const month = $derived(detail?.month);
+
+  let confirmOpen = $state(false);
 
   // live-jitter metrics (ported from the prototype's setInterval)
-  let cpu = $state(data.metrics.cpu);
-  let memMb = $state(data.metrics.memMb);
-  let reqMin = $state(data.metrics.reqMin);
+  let cpu = $state(18);
+  let memMb = $state(412);
+  let reqMin = $state(37);
 
   // fake live logs
   const LOGLINES = [
@@ -23,12 +31,12 @@
     ['', 'GET /assets/hero.png  200  (R2, 0 egress)']
   ];
   let logs = $state([]);
-  let i = 0;
+  let li = 0;
   const stamp = () => new Date().toLocaleTimeString('en-US', { hour12: false });
   function addLog() {
-    const [c, txt] = LOGLINES[i % LOGLINES.length];
+    const [c, txt] = LOGLINES[li % LOGLINES.length];
     logs = [...logs.slice(-39), { t: stamp(), c, txt }];
-    i++;
+    li++;
   }
 
   onMount(() => {
@@ -41,8 +49,39 @@
     }, 2000);
     return () => { clearInterval(lt); clearInterval(mt); };
   });
+
+  // ── state-aware actions ──
+  function sleepIt() {
+    nexusStore.setState(id, 'sleep');
+    toast(`${nexus.name} is sleeping`);
+  }
+  function wake() {
+    nexusStore.setState(id, 'run');
+    toast(`${nexus.name} is waking…`);
+  }
+  function restart() {
+    nexusStore.setState(id, 'build');
+    toast(`Restarting ${nexus.name}…`);
+    const target = id;
+    setTimeout(() => nexusStore.setState(target, 'run'), 2500);
+  }
+  function reallyDelete() {
+    confirmOpen = false;
+    const nm = nexus.name;
+    nexusStore.remove(id);
+    toast(`Deleted ${nm}`, 'bad');
+    goto('/');
+  }
 </script>
 
+{#if !nexus}
+  <section>
+    <a class="dim" href="/" style="font-size:13px;display:inline-flex;gap:6px;align-items:center;margin-bottom:16px">← all nexuses</a>
+    <div class="card" style="text-align:center;color:var(--dim)">
+      Nexus “{id}” not found. It may have been deleted.
+    </div>
+  </section>
+{:else}
 <section>
   <a class="dim" href="/" style="font-size:13px;display:inline-flex;gap:6px;align-items:center;margin-bottom:16px">← all nexuses</a>
 
@@ -53,8 +92,12 @@
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn sm" onclick={() => window.open('https://' + nexus.url, '_blank')}>Open ↗</button>
-      <button class="btn sm">Restart</button>
-      <button class="btn sm">Sleep</button>
+      <button class="btn sm" onclick={restart} disabled={nexus.state === 'build'}>Restart</button>
+      {#if nexus.state === 'sleep'}
+        <button class="btn sm" onclick={wake}>Wake</button>
+      {:else if nexus.state === 'run'}
+        <button class="btn sm" onclick={sleepIt}>Sleep</button>
+      {/if}
       <a class="btn sm" href="/settings">Settings</a>
     </div>
   </div>
@@ -63,7 +106,7 @@
     <div class="stat"><div class="k">CPU</div><div class="v">{cpu}<small>%</small></div><div class="d up">▲ active</div></div>
     <div class="stat"><div class="k">Memory</div><div class="v">{memMb}<small>MB / {config.plan.split('· ')[1] || '1 GB'}</small></div><div class="d dim">{Math.round((memMb / 1024) * 100)}% of cap</div></div>
     <div class="stat"><div class="k">Requests</div><div class="v">{reqMin}<small>/min</small></div><div class="d up">▲ steady</div></div>
-    <div class="stat"><div class="k">Est. this month</div><div class="v">${data.metrics.costMonth}</div><div class="d dim">at current rate</div></div>
+    <div class="stat"><div class="k">Est. this month</div><div class="v">${detail.metrics.costMonth}</div><div class="d dim">at current rate</div></div>
   </div>
 
   <div class="grid-2">
@@ -99,7 +142,18 @@
     <h3>Danger zone</h3>
     <div style="display:flex;align-items:center;justify-content:space-between">
       <p class="dim" style="font-size:13px">Permanently delete this nexus and its storage. This cannot be undone.</p>
-      <button class="btn danger sm">Delete nexus</button>
+      <button class="btn danger sm" onclick={() => (confirmOpen = true)}>Delete nexus</button>
     </div>
   </div>
 </section>
+
+<Confirm
+  open={confirmOpen}
+  title="Delete {nexus.name}?"
+  body="This permanently deletes the nexus and its storage. This cannot be undone."
+  confirmLabel="Delete nexus"
+  danger
+  onconfirm={reallyDelete}
+  oncancel={() => (confirmOpen = false)}
+/>
+{/if}

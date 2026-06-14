@@ -1,7 +1,9 @@
 <script>
   import { STATE_LABEL } from '$lib/api.js';
   import Sparkline from '$lib/Sparkline.svelte';
-  let { data } = $props();
+  import { nexusStore } from '$lib/nexusStore.svelte.js';
+
+  const rows = $derived(nexusStore.filtered);
 </script>
 
 <section>
@@ -13,7 +15,7 @@
   </div>
 
   <div>
-    {#each data.nexuses as n, i (n.id)}
+    {#each rows as n, i (n.id)}
       <a class="row" href="/nexuses/{n.id}">
         <div class="nx">
           <b><span class="dot {n.state}"></span>{n.name}</b>
@@ -31,5 +33,10 @@
         </div>
       </a>
     {/each}
+    {#if rows.length === 0}
+      <div class="card" style="text-align:center;color:var(--dim)">
+        No nexuses match “{nexusStore.query}”.
+      </div>
+    {/if}
   </div>
 </section>

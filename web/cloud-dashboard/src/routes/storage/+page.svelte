@@ -1,5 +1,15 @@
 <script>
+  import { toast } from '$lib/toastStore.svelte.js';
   let { data } = $props();
+
+  let buckets = $state([...data.buckets]);
+  let n = 0;
+  function newBucket() {
+    n += 1;
+    const name = `bucket-${(Math.random().toString(36).slice(2, 6))}`;
+    buckets = [...buckets, { name, nexus: '—', objects: 0, size: '0 GB', egress: '$0.00' }];
+    toast(`Created bucket ${name}`);
+  }
 </script>
 
 <section>
@@ -8,7 +18,7 @@
       <h2>Storage</h2>
       <p>Object storage for your nexuses — images &amp; files. Served zero-egress via Cloudflare R2.</p>
     </div>
-    <button class="btn sm">New bucket</button>
+    <button class="btn sm" onclick={newBucket}>New bucket</button>
   </div>
 
   <div class="card" style="padding:0;overflow:hidden">
@@ -17,7 +27,7 @@
         <tr><th>Bucket</th><th>Attached to</th><th class="num">Objects</th><th class="num">Size</th><th class="num">Egress</th></tr>
       </thead>
       <tbody>
-        {#each data.buckets as b (b.name)}
+        {#each buckets as b (b.name)}
           <tr>
             <td class="mono">{b.name}</td>
             <td class="dim">{b.nexus}</td>

@@ -3,9 +3,19 @@
   import { page } from '$app/state';
   import NewNexusModal from '$lib/NewNexusModal.svelte';
   import DnaStrip from '$lib/DnaStrip.svelte';
+  import Toast from '$lib/Toast.svelte';
+  import { nexusStore } from '$lib/nexusStore.svelte.js';
+  import { goto } from '$app/navigation';
 
   let { children } = $props();
   let modalOpen = $state(false);
+  let orgOpen = $state(false);
+
+  // when searching, make sure results are visible on the list page
+  function onSearch(e) {
+    nexusStore.query = e.currentTarget.value;
+    if (nexusStore.query && page.url.pathname !== '/') goto('/');
+  }
 
   // theme — dark default; the inline script in app.html sets data-theme before paint
   let theme = $state('dark');
@@ -52,10 +62,20 @@
       </button>
     </div>
 
-    <div class="org">
-      <div class="av">SO</div>
-      <div class="nm">shinyobjectz</div>
-      <svg class="ico ch" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+    <div class="orgwrap">
+      <div class="org" onclick={() => (orgOpen = !orgOpen)} role="button" tabindex="0">
+        <div class="av">SO</div>
+        <div class="nm">shinyobjectz</div>
+        <svg class="ico ch" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+      </div>
+      {#if orgOpen}
+        <div class="orgmenu" role="menu">
+          <div class="omcur"><div class="av sm">SO</div><span>shinyobjectz</span><span class="omtick">✓</span></div>
+          <div class="omdiv"></div>
+          <button class="omitem" disabled>Create workspace<small>soon</small></button>
+          <a class="omitem" href="/settings" onclick={() => (orgOpen = false)}>Workspace settings</a>
+        </div>
+      {/if}
     </div>
 
     <nav class="nav">
@@ -82,7 +102,7 @@
       <div class="crumb">{crumb.label}{#if crumb.tail}<span> / {crumb.tail}</span>{/if}</div>
       <div class="search">
         <svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M10 2a8 8 0 1 0 4.9 14.3l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z"/></svg>
-        <input placeholder="Search…" />
+        <input placeholder="Search nexuses…" value={nexusStore.query} oninput={onSearch} />
       </div>
       <button class="btn primary" onclick={() => (modalOpen = true)}>
         <svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/></svg>
@@ -97,3 +117,66 @@
 </div>
 
 <NewNexusModal open={modalOpen} onclose={() => (modalOpen = false)} />
+<Toast />
+
+<style>
+  .orgwrap { position: relative; }
+  .orgmenu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 35;
+    background: var(--card);
+    border: 2px solid var(--stroke);
+    border-radius: 11px;
+    box-shadow: 4px 4px 0 var(--shadow);
+    padding: 6px;
+    animation: org-in 0.12s ease;
+  }
+  @keyframes org-in {
+    from { transform: translateY(-4px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .omcur {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 9px;
+    font: 600 13px var(--read);
+    color: var(--ink);
+  }
+  .omcur .av.sm {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--mint), var(--sky));
+    display: grid;
+    place-items: center;
+    font: 700 9px var(--read);
+    color: var(--ink);
+    flex: none;
+  }
+  .omcur span:nth-child(2) { flex: 1; }
+  .omtick { color: var(--run); }
+  .omdiv { height: 1px; background: var(--line); margin: 5px 4px; }
+  .omitem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    text-align: left;
+    padding: 8px 9px;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    color: var(--ink);
+    font: 500 13px var(--read);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .omitem:hover { background: var(--line); }
+  .omitem[disabled] { color: var(--dim); cursor: default; }
+  .omitem[disabled]:hover { background: none; }
+  .omitem small { color: var(--dim); font-size: 10px; }
+</style>

@@ -1,3 +1,7 @@
+<script>
+  import { toast } from '$lib/toastStore.svelte.js';
+</script>
+
 <section>
   <div class="sechead"><div><h2>Settings</h2><p>Account &amp; organization</p></div></div>
 
@@ -20,7 +24,7 @@
     <h3>Sessions</h3>
     <div style="display:flex;align-items:center;justify-content:space-between">
       <p class="dim" style="font-size:13px">Sign out of Workbooks Cloud on this device.</p>
-      <button class="btn sm">Sign out</button>
+      <button class="btn sm" onclick={() => toast('Signed out')}>Sign out</button>
     </div>
   </div>
 </section>

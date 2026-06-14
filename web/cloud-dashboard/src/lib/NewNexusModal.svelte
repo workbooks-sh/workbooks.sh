@@ -1,8 +1,9 @@
 <script>
   // New-nexus modal (ported from the prototype). On deploy it calls the mock
   // PCP client and routes to the new nexus's list, then closes.
-  import { goto, invalidateAll } from '$app/navigation';
-  import { createNexus } from '$lib/api.js';
+  import { goto } from '$app/navigation';
+  import { nexusStore } from '$lib/nexusStore.svelte.js';
+  import { toast } from '$lib/toastStore.svelte.js';
 
   let { open = false, onclose } = $props();
 
@@ -27,13 +28,18 @@
 
   function selectPlan(p) { plan = p.id; est = p.pr; }
 
-  async function deploy() {
+  function deploy() {
     const addons = [];
     if (storageOn) addons.push('storage');
     if (dbOn) addons.push('database');
-    const nx = await createNexus({ name, region, plan, addons });
+    const nx = nexusStore.create({ name, region, plan, addons });
     onclose?.();
-    await invalidateAll();
+    toast(`Deploying ${nx.name}…`);
+    // flip build → run once the (mock) weave finishes
+    setTimeout(() => {
+      nexusStore.setState(nx.id, 'run');
+      toast(`${nx.name} is live`);
+    }, 3000);
     goto('/nexuses/' + nx.id);
   }
 </script>

@@ -1,4 +1,5 @@
 <script>
+  import { toast } from '$lib/toastStore.svelte.js';
   let { data } = $props();
   const u = $derived(data.usage);
   const s = $derived(u.summary);
@@ -7,7 +8,7 @@
 <section>
   <div class="sechead">
     <div><h2>Usage &amp; billing</h2><p>{u.period}</p></div>
-    <button class="btn sm">Download invoice</button>
+    <button class="btn sm" onclick={() => toast('Invoice downloading…')}>Download invoice</button>
   </div>
 
   <div class="stats">
