@@ -8,7 +8,7 @@
    * Header carries the title + a close affordance; a left-edge handle
    * resizes the dock, persisted via the dock store.
    */
-  import { X } from "phosphor-svelte";
+  import { CaretRight } from "phosphor-svelte";
   import { dock } from "$lib/bridge/dock.svelte";
   import { themes } from "$lib/bridge/themes.svelte";
   import { tabs } from "$lib/tabs/store.svelte";
@@ -151,12 +151,14 @@
       aria-label="Resize dock"
       onpointerdown={startResize}
     ></div>
-    <header class="dock-head">
-      <span class="dock-title">{active.title}</span>
-      <button type="button" class="close" title="Close" aria-label="Close panel" onclick={() => dock.close()}>
-        <X weight="bold" size={13} />
-      </button>
-    </header>
+    {#if !active.headerless}
+      <header class="dock-head">
+        <span class="dock-title">{active.title}</span>
+        <button type="button" class="close" title="Collapse" aria-label="Collapse panel" onclick={() => dock.close()}>
+          <CaretRight weight="bold" size={14} />
+        </button>
+      </header>
+    {/if}
     <div class="dock-body">
       {#if active.iframeSrc}
         <iframe bind:this={iframeEl} src={active.iframeSrc} title={active.title} onload={postTokens}></iframe>

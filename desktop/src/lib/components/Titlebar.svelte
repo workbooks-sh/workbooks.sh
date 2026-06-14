@@ -42,6 +42,7 @@
   import { DEMO_ACTIVE_WORKSPACE } from "$lib/onboarding/demo";
   import DockToolbar from "$lib/components/DockToolbar.svelte";
   import NexusMark from "$lib/components/NexusMark.svelte";
+  import { tip } from "$lib/ui/tip";
   import { commands } from "$lib/chrome/commands.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import { dnd } from "$lib/ui/dnd.svelte";
@@ -464,7 +465,7 @@
     class="engine search-badge"
     class:ob-hide={!onboarding.shows("bench")}
     data-tauri-drag-region="false"
-    title="Search (⌘K)"
+    use:tip={"Search  ⌘K"}
     aria-label="Search"
     onclick={() => chrome.toggleSearch()}
   >
@@ -476,7 +477,7 @@
     class="engine nexus-badge engine-{engine.cls}"
     class:alive={engine.cls === "ok"}
     data-tauri-drag-region="false"
-    title={engine.title}
+    use:tip={engine.title}
     aria-label={engine.title}
     onclick={(e) => {
       // Open the nexus switcher (wb-aakl.9). The engine-install wizard is

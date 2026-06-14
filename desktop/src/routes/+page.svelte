@@ -526,10 +526,10 @@
     // with a single voice). Lazy-loaded like any dock panel.
     dock.register({
       id: "waldo",
-      // No header label — the panel's own toolbar (Chats / New) is the chrome.
-      title: "",
+      title: "Waldo", // tab tooltip; the panel is headerless (own Chats/collapse row)
       icon: WaldoMark,
       iconOnly: true,
+      headerless: true,
       load: () => import("$lib/components/WaldoPanel.svelte"),
     });
     // (The old multi-agent chat panel — AgentPanel/ChatPanel/ChatHeader/

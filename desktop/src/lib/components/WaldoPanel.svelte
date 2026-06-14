@@ -17,9 +17,11 @@
     ClockCounterClockwise,
     Plus,
     CaretLeft,
+    CaretRight,
   } from "phosphor-svelte";
   import { chatSession } from "$lib/chat/session.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
+  import { dock } from "$lib/bridge/dock.svelte";
   import { sessionHistory, type SavedSession } from "$lib/chat/session_history.svelte";
   import AssistantMessageView from "$lib/chat/AssistantMessageView.svelte";
 
@@ -154,6 +156,9 @@
         <Plus size={13} weight="bold" /> New
       </button>
     {/if}
+    <button type="button" class="bar-btn icon-only" onclick={() => dock.close()} title="Collapse" aria-label="Collapse panel">
+      <CaretRight size={15} weight="bold" />
+    </button>
   </div>
 
   {#if view === "history"}
@@ -272,6 +277,7 @@
     transition: background 0.12s, color 0.12s;
   }
   .bar-btn:hover { background: var(--color-surface-soft); color: var(--color-fg); }
+  .bar-btn.icon-only { padding: 3px 5px; }
 
   /* ── empty state ─────────────────────────────────────────────────────────── */
   .intro {
