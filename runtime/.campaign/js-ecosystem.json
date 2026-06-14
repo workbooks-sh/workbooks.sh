@@ -131,7 +131,8 @@
             "await import()",
             "code-split chunks under one bundle"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "await import() inlined by esbuild; proven"
         },
         {
           "id": "interop",
@@ -141,7 +142,8 @@
             "require an esm pkg",
             "default interop (esModuleInterop)"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "CJS<->ESM default interop (import _ from cjs lodash) proven"
         },
         {
           "id": "json-asset",
@@ -151,7 +153,8 @@
             "import assertions with {type:'json'}",
             "text/binary asset import via esbuild loader"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "esbuild JSON loader (import d from ./x.json) proven"
         },
         {
           "id": "browser-field",
@@ -169,7 +172,8 @@
             "circular require/import",
             "top-level await in a module"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "circular imports + top-level await both proven"
         }
       ]
     },

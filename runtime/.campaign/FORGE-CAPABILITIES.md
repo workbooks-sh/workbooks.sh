@@ -29,6 +29,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **AST/compiler libs + TS strip** | esbuild bundle + run_program | js_ast_test — acorn/@babel/parser/postcss; esbuild strips TS (full tsc ~10MB hits the bundle ceiling) |
 | **Framework SSR** (React/Preact/Vue render-to-string) | esbuild bundle + run_program (+ MessageChannel shim for React) | js_ssr_test — react-dom/server, preact-render-to-string, @vue/server-renderer |
 | **Lib breadth** (data/reactive/DOM/schema/text) | esbuild bundle + run_program | js_lib_breadth_test — mathjs/decimal/immutable/rxjs/node-html-parser/graphql/picocolors |
+| **Module system** (dynamic import/interop/JSON/circular/TLA) | esbuild bundle + run_program | js_modules_test — await import(), CJS↔ESM, JSON loader, circular deps, top-level await |
 | **yq** (YAML processor) | Go-wasip1 artifact | yq_lane_test (.name/.tags through PackageManager.run) |
 | **gojq** (jq for JSON) | Go-wasip1 artifact | gojq_lane_test (filter/arithmetic/raw) |
 | **dasel** (JSON/YAML/TOML/XML/CSV query) | Go-wasip1 artifact | dasel_lane_test (3 formats) |
