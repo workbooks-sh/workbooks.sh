@@ -29,6 +29,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **DuckDB** (full SQL engine) | from-C++-source -> wasi | duckdb_lane_test (CREATE/INSERT/SELECT GROUP BY, 34MB wasm) |
 | **Lua 5.4** (scripting language) | from-C-source -> wasi (build_c_dir) | lua_lane_test (arith/math/loop) |
 | **zstd** (compression) | from-C-source -> wasi (build_c_dir) | zstd_lane_test (compress/decompress roundtrip) |
+| **monocypher** (crypto: Ed25519/Blake2b/ChaCha20) | from-C-source -> wasi (build_c_dir) | monocypher_lane_test (sign/verify/tamper) |
 
 ## PROVEN — ran in an experiment, not yet wired+tested
 

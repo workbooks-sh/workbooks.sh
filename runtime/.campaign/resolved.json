@@ -2609,6 +2609,13 @@
    "proof": "zstd 1.5.6 single-file amalgam compiles via build_c_dir + compress->decompress roundtrip (orig=72 comp=49 match=1); zstd_lane_test.exs green. Promoted from c_leaf_libs proven -> own live lane.",
    "lane": "compilers/zstd/build.sh (fetch+combine.py amalgam, sha-pinned, gitignored) + build_c_dir",
    "since": "iter163"
+  },
+  "monocypher": {
+   "capability": "cryptography (Ed25519 signatures, Blake2b, ChaCha20) in-sandbox",
+   "status": "live",
+   "proof": "monocypher 4.0.2 via build_c_dir: Ed25519 keygen+sign+verify (sign_verify=1), tamper-rejection (tamper_rejected=1), Blake2b hash; monocypher_lane_test.exs green",
+   "lane": "compilers/monocypher/build.sh (fetch sha-pinned, gitignored) + build_c_dir",
+   "since": "iter163"
   }
  },
  "verdict_ladder": {
