@@ -8,6 +8,8 @@ defmodule Workbooks.ImageGenTest do
     2. happy path — the tool writes the bytes under the workdir + returns "ok ...".
     3. budget — the 3rd image call in a run is refused (2/run cap).
     4. path traversal — a `..` path escaping the workdir is rejected, nothing written.
+    5. malformed args — empty prompt/path error honestly and do NOT burn a budget
+       slot (the 2/run cap is for real generations, not typos).
 
   No System.cmd / native exec anywhere — the capability is pure brokered Elixir
   (asserted globally by no_native_exec_test).
@@ -83,5 +85,20 @@ defmodule Workbooks.ImageGenTest do
   test "image tool requires exec capability" do
     {out, _s} = Agent.__exec_one_for_test__(call("x", "content/images/x.webp"), st("/tmp", exec: false))
     assert out =~ "image not permitted (no exec capability)"
+  end
+
+  test "empty prompt errors honestly and does NOT burn a budget slot", %{wd: wd} do
+    {out, s2} = Agent.__exec_one_for_test__(call("", "content/images/x.webp"), st(wd))
+    assert out =~ "required arg `prompt` is empty"
+    # A malformed call is rejected BEFORE the budget increment — the 2/run cap is
+    # for real generations, not typos (regression guard if the counter moves up).
+    assert s2.images_used == 0
+    refute File.exists?(Path.join(wd, "content/images/x.webp"))
+  end
+
+  test "empty path errors honestly and does NOT burn a budget slot", %{wd: wd} do
+    {out, s2} = Agent.__exec_one_for_test__(call("a real prompt", ""), st(wd))
+    assert out =~ "required arg `path` is empty"
+    assert s2.images_used == 0
   end
 end
