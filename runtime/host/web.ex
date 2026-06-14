@@ -302,8 +302,31 @@ defmodule Workbooks.Web do
       |> then(&if params["workdir"], do: [{:workdir, params["workdir"]} | &1], else: &1)
 
     {:ok, _} = Workbooks.AgentSession.start(id, system, prompt, opts)
+    Workbooks.SessionLedger.record(id, slug, prompt, params["workdir"])
     json = Jason.encode!(%{session_id: id, status: "running"})
     conn |> put_resp_content_type("application/json") |> send_resp(202, json)
+  end
+
+  # Session list + navigation (wb-kbq5 / wb-t3mr): the desktop browses past
+  # conversations here. ?active=true narrows to running. Empty until a chat runs.
+  get "/api/sessions" do
+    active_only? = conn.params["active"] == "true"
+    sessions = Workbooks.SessionLedger.list(active_only?)
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{sessions: sessions}))
+  end
+
+  # Engine identity for the settings "About" pane (wb-kbq5). Soft-fails to null
+  # on the desktop, but a real payload lets it show the version/build it runs on.
+  get "/api/about" do
+    doc = Workbooks.Web.Capabilities.doc()
+
+    about = %{
+      version: doc[:runtime] || doc["runtime"] || "0.1.0",
+      tenancy: doc[:tenancy] || doc["tenancy"] || "single",
+      mode: if(Workbooks.Desktop.enabled?(), do: "desktop", else: "server")
+    }
+
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(about))
   end
 
   # Agent picker catalog (wb-kbq5): project-scope (<workdir>/.oql/agents/*.org) →
