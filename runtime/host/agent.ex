@@ -398,16 +398,7 @@ defmodule Workbooks.Agent do
   # blocked all SERP work and made the lander mislabel itself "env-gated"). No
   # keys, no native exec; the host queries the engine and returns parsed results.
   defp exec_one(%{name: "web_search", args: a}, st) do
-    out =
-      case Workbooks.Browse.Search.query(a["query"] || "", limit: 8) do
-        [] -> "no results"
-        hits ->
-          Enum.map_join(hits, "\n", fn h ->
-            "• #{h.title}\n  #{h.url}#{if h[:snippet] && h.snippet != "", do: "\n  " <> String.slice(h.snippet, 0, 160), else: ""}"
-          end)
-      end
-
-    {out, st, nil}
+    {format_search_results(Workbooks.Browse.Search.query(a["query"] || "", limit: 8)), st, nil}
   end
 
   # file_issue: the metacognitive seam (wb-9ae). An agent that hits a wall files
@@ -544,6 +535,28 @@ defmodule Workbooks.Agent do
       {:error, :denied} -> "fetch blocked: internal/non-routable address (SSRF guard)"
       {:error, reason} -> "fetch error: #{inspect(reason)}"
     end
+  end
+
+  @doc false
+  # test seam for the web_search result formatter
+  def format_search_results_for_test(hits), do: format_search_results(hits)
+
+  # An EMPTY result is ambiguous: it can mean "nothing matched" OR "the search
+  # backend was unavailable from this host" (keyless engines are captcha-blocked
+  # from datacenter IPs; only DataForSEO is reliable there). Say so, so the agent
+  # doesn't conclude a topic is empty when search merely failed — the exact
+  # mislabel the file_issue seam exists to catch.
+  defp format_search_results([]) do
+    "no results — NOTE: this can mean the search backend was unavailable from this " <>
+      "host, not only that nothing matched. Don't conclude the topic is empty; " <>
+      "file_issue if a search you expected to work returned empty."
+  end
+
+  defp format_search_results(hits) do
+    Enum.map_join(hits, "\n", fn h ->
+      snip = if h[:snippet] && h.snippet != "", do: "\n  " <> String.slice(h.snippet, 0, 160), else: ""
+      "• #{h.title}\n  #{h.url}#{snip}"
+    end)
   end
 
   defp html_to_text(html) do

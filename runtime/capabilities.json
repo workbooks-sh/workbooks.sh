@@ -2,7 +2,7 @@
   "title": "Waldo / Runtime \u2014 Capability Ledger",
   "updated": "2026-06-14",
   "suite": {
-    "tests": 642,
+    "tests": 644,
     "failures": 0,
     "verified": "2026-06-14 (seed 0, 365 heavy-tagged excluded)"
   },
@@ -123,6 +123,16 @@
           "units": 4,
           "proof": "embed live (256-dim); degrades to term-rank when embed unavailable",
           "failure_modes": []
+        },
+        {
+          "name": "web_search honest empty (failure-vs-empty disambiguation)",
+          "status": "done",
+          "tests": "web_search_format_test",
+          "units": 2,
+          "proof": "empty result signals possible backend-unavailable + nudges file_issue",
+          "failure_modes": [
+            "query() still folds DataForSEO-error into empty; richer source signal not yet exposed"
+          ]
         }
       ]
     },
