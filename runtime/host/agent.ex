@@ -51,6 +51,11 @@ defmodule Workbooks.Agent do
         path: %{type: "string", description: "workdir-relative output path under content/images/, e.g. content/images/x.webp"},
         aspect: %{type: "string", description: "16:9 (default) | 1:1 | 3:1"}
       }, required: ["prompt", "path"]}
+    }},
+    %{type: "function", function: %{
+      name: "browse",
+      description: "Load a web page in a HEADLESS BROWSER (runs its JavaScript) and return the rendered text — host-brokered local Chrome, no remote service. Use for JS-heavy/dynamic pages where plain `fetch` returns little (single-page apps, content rendered client-side). Slower than fetch; prefer fetch for static pages + APIs. e.g. url=\"https://example.com/app\".",
+      parameters: %{type: "object", properties: %{url: %{type: "string"}}, required: ["url"]}
     }}
   ]
 
@@ -376,6 +381,25 @@ defmodule Workbooks.Agent do
   end
 
   defp exec_one(%{name: "image"}, st), do: {"image not permitted (no exec capability)", st, nil}
+
+  # Headless browse (JS-rendered page) — host-brokered local Chrome, SSRF-floored,
+  # exec-gated (it spawns a host process, like git/publish). The rendered DOM goes
+  # through the same html_to_text extraction as fetch.
+  defp exec_one(%{name: "browse", args: a}, %{exec: true} = st) do
+    out =
+      case Workbooks.Browse.Headless.render(a["url"]) do
+        {:ok, dom} -> dom |> html_to_text() |> String.slice(0, 6000)
+        {:error, :no_url} -> "browse error: no url given"
+        {:error, :blocked} -> "browse blocked: internal/non-routable address (SSRF guard)"
+        {:error, :no_browser} -> "browse unavailable: no headless browser on this host (set WB_CHROME_BIN)"
+        {:error, :timeout} -> "browse error: render timed out"
+        {:error, reason} -> "browse error: #{inspect(reason)}"
+      end
+
+    {out, st, nil}
+  end
+
+  defp exec_one(%{name: "browse"}, st), do: {"browse not permitted (no exec capability)", st, nil}
 
   # Semantic recall over the agent's working org/code context — the files ARE the
   # memory (no separate store to drift). Stateless: always the current files.

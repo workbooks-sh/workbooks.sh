@@ -2,7 +2,7 @@
   "title": "Waldo / Runtime \u2014 Capability Ledger",
   "updated": "2026-06-14",
   "suite": {
-    "tests": 659,
+    "tests": 669,
     "failures": 0,
     "verified": "2026-06-14 (seed 0, 365 heavy-tagged excluded)"
   },
@@ -132,6 +132,16 @@
           "proof": "DataForSEO removed; engines ROTATED per query (spread load, avoid hammering one into 429); 429/anomaly \u2192 honest 'may be unavailable' + file_issue nudge; proxy rotation = future cloud add-on",
           "failure_modes": [
             "all keyless engines anomaly/429 from datacenter or rate-limited IPs \u2014 real fix is a headless browser tier (wb-70mi), not a SERP API"
+          ]
+        },
+        {
+          "name": "Headless browse (JS-rendered page, local Chrome --dump-dom)",
+          "status": "done",
+          "tests": "browse_headless_test",
+          "units": 4,
+          "proof": "render proven (example.com -> rendered text); SSRF-floored before launch (NetGuard); exec-gated; no CDP/Node/remote service",
+          "failure_modes": [
+            "spawns a host Chrome process - multi-tenant resource cap is a follow-up; cloud (exec-off) agents use fetch"
           ]
         }
       ]
