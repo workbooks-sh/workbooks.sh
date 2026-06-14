@@ -241,6 +241,49 @@ defmodule Workbooks.Npm do
     install_loop(queue, nm, %{}, [])
   end
 
+  @doc """
+  Install the EXACT pinned tree from a lockfile in `dir` (npm `package-lock.json`; pnpm/yarn added per
+  their own surfaces). Reproducible: every locked package installs at its pinned version — no fresh range
+  resolution. Returns `install_tree/2`'s result, or `{:error, :no_lockfile}` / `{:error, {:unsupported_lockfile, _}}`.
+  """
+  def install_from_lockfile(dir) do
+    case parse_lockfile(dir) do
+      {:ok, specs} -> install_tree(specs, dir)
+      err -> err
+    end
+  end
+
+  @doc "Parse a lockfile in `dir` into pinned specs `[%{name, req: nil, pin: version}]`."
+  def parse_lockfile(dir) do
+    npm = Path.join(dir, "package-lock.json")
+
+    cond do
+      File.exists?(npm) -> parse_npm_lock(npm)
+      File.exists?(Path.join(dir, "pnpm-lock.yaml")) -> {:error, {:unsupported_lockfile, :pnpm}}
+      File.exists?(Path.join(dir, "yarn.lock")) -> {:error, {:unsupported_lockfile, :yarn}}
+      true -> {:error, :no_lockfile}
+    end
+  end
+
+  # npm package-lock.json v2/v3: the "packages" map keys are node_modules paths; the LAST `node_modules/`
+  # segment is the package name, `version` the pin. The root key "" and dev-only entries are skipped.
+  defp parse_npm_lock(path) do
+    with {:ok, doc} <- Jason.decode(File.read!(path)) do
+      specs =
+        for {key, meta} <- doc["packages"] || %{},
+            key != "",
+            is_map(meta),
+            not (meta["dev"] == true),
+            (v = meta["version"]) && is_binary(v) do
+          name = key |> String.split("node_modules/") |> List.last()
+          %{name: name, req: nil, pin: v}
+        end
+        |> Enum.uniq_by(& &1.name)
+
+      {:ok, specs}
+    end
+  end
+
   defp install_loop([], _nm, installed, []), do: {:ok, installed}
   defp install_loop([], _nm, installed, errors), do: {:ok, installed, Enum.reverse(errors)}
 

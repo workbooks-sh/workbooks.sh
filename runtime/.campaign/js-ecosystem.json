@@ -36,7 +36,8 @@
             "install exact pinned tree",
             "honor integrity"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "Npm.parse_lockfile + install_from_lockfile: package-lock.json v2/v3 -> exact pinned tree (reproducible). Proven: pinned lodash@4.17.20 installs not latest (js_lockfile_test). pnpm/yarn = own surfaces."
         },
         {
           "id": "pnpm",
