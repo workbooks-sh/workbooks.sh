@@ -1,0 +1,48 @@
+# Forge capabilities — what the wasm sandbox can do (canonical summary)
+
+The single scannable answer to "where are we." Verdict ladder: **roadmap** (not solved) < **proven**
+(works in an experiment) < **wired** (in a lane) < **live** (lane + green test). Source of record:
+`.campaign/resolved.json`; the walls model: `.campaign/WALLS.md`.
+
+## LIVE — wired + green test, runs in-sandbox
+
+| Capability | Lane | Proof |
+|---|---|---|
+| C → wasi | clang.wasm | the C lane |
+| C++ (STL/RTTI, no-exceptions) | clang.wasm `-x c++` | cpp_lane_test |
+| **C++ exceptions** (try/throw/catch + RAII unwind) | from-source EH libc++ (`compile_cpp`/`build_c_dir`) | cpp_lane_test 3/3 — single- AND multi-file |
+| Zig → wasi | zig1.wasm → clang.wasm | zig lane |
+| Rust (single-thread) → wasi | mrustc → clang.wasm | build_to_tool_test |
+| **Rust threads** (std::thread, Arc<Atomic>) | `compile_rust_threads` + threads libstd | rust_threads_lane_test (4 threads → 1,000,000) |
+| **Rust SIMD** (autovec v128) | `rust_compile_to_wasm(simd: true)` `-msimd128 -O2` | rust_simd_test |
+| **wasm SIMD intrinsics** (llvm.wasm.*) | mrustc codegen patch → `__builtin_wasm_*` | rust_simd_test (bitmask/swizzle/narrow…) |
+| **rayon-core** (data-parallel Rust) | threads lane + dep lane + codegen patch | rust_rayon_lane_test (join → 499999500000, 4 threads) |
+| C/pthread threads (shared-mem) | `compile_threads` wasm32-wasi-threads | threads_lane_test |
+| **Go → wasi** | native `GOOS=wasip1` (provision-time) | go_wasip1 |
+| **esbuild** (JS/TS bundler) | Go-wasip1 artifact | wired in JS/TS/Svelte lanes (~23min QuickJS → ~0.4s) |
+| SQLite | clean-wasi prebuilt | ships in-tree |
+| crates.io dep (real crate) | Rust dep lane | itoa@1.0.11 fetched+compiled+ran |
+
+## PROVEN — ran in an experiment, not yet wired+tested
+
+| Capability | Lane | Note |
+|---|---|---|
+| **12 C leaf-libs** | `build_c_dir` | zstd, brotli, md4c, tinyscheme, xxHash, miniz, cmark, libyaml, cJSON, tinyexpr, tomlc99, utf8proc (9 domains). Recipes in resolved.json |
+| **DuckDB** (SQL engine) | `build_c_dir` from C++ source | 71 split TUs compile; to-live build in progress (driver fixed; ~6 portability shims) |
+
+## ROADMAP — not reachable in-guest (the walls)
+
+- **BEDROCK** (no native exec in the sandbox): V8/Deno JIT, JVM, native binaries, GPU compute. Only via a
+  trusted host-service broker, or the rejected microVM. Engines must be compiled-to-wasm jitless (SpiderMonkey).
+- **BRIDGE** (no browser/JS host): prebuilt emscripten/wasm-bindgen libs (DuckDB-wasm, ONNX-web) — browser-bound.
+  Forge-rebuild from source instead where possible.
+- **FORGE ceilings** (mrustc parser limits, NOT `--cfg`-fixable): Rust edition-2024 (`gen` blocks crash mrustc),
+  proc-macro language features; top-level `rayon` par_iter sugar (trait-resolution ceiling — use rayon-core).
+
+## Session levers worth remembering
+- **mrustc `--cfg target_feature=atomics`** bypassed the hardcoded target_feature=false → Rust threads, NO fork.
+- **mrustc codegen patch** (`compilers/rust/mrustc-patch/`) lowers llvm.wasm.* intrinsics → rayon + SIMD intrinsics.
+  Surgical + reproducible mrustc-source patches are now allowed (not version-chasing forks).
+- **`WB_CC_CONC`** env caps clang-build concurrency so heavy C++ (DuckDB) doesn't OOM.
+- **Crash resilience** (`.campaign/CRASH-PROTOCOL.md`): commit every win immediately; heavy agents die on this
+  box (light agents land) — heavy builds run as bounded background bash, ≤1 at a time.
