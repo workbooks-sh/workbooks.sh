@@ -25,4 +25,15 @@ defmodule Workbooks.OQLRenderTest do
   test "empty org → valid string, no crash" do
     assert is_binary(Workbooks.OQL.render(""))
   end
+
+  test "parse_headlines extracts the org outline (level + title)" do
+    hs = Workbooks.OQL.parse_headlines("* Demo\n** Section A\n** Section B")
+    titles = Enum.map(hs, &(Map.get(&1, "title") || Map.get(&1, :title)))
+    assert length(hs) == 3
+    assert "Demo" in titles and "Section A" in titles and "Section B" in titles
+  end
+
+  test "validate of a well-formed org returns no errors (empty list)" do
+    assert Workbooks.OQL.validate("* Title\nsome text") == []
+  end
 end

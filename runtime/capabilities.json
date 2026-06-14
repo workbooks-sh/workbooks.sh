@@ -182,11 +182,11 @@
           ]
         },
         {
-          "name": "Org→HTML render (OQL kernel — workbook viewing + publish)",
+          "name": "OQL kernel surface — render (Org→HTML), parse outline, validate",
           "status": "done",
           "tests": "oql_render_test",
-          "units": 2,
-          "proof": "Workbooks.OQL.render/1 (the oql.wasm kernel) renders Org → HTML — the product's core output (GET /w/:id viewer + the publish path). PROVEN live: GET /w/render-test → 200, rendered HTML (<h1>/<h2>/<pre><code>) in ~1ms. Deterministic test (headings + list → HTML).",
+          "units": 4,
+          "proof": "Workbooks.OQL.render/parse_headlines/validate (the oql.wasm kernel) — the product's core: GET /w/:id viewer + publish render, the /w/:id/call surface (parse/tangle/validate). PROVEN live: render → HTML (<h1>/<pre><code>) ~1ms; parse → correct outline (level+title); validate → [] for well-formed org; tangle → worlds plan. Deterministic tests (oql_render_test, 4).",
           "failure_modes": []
         }
       ]
