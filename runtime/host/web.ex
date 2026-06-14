@@ -1285,16 +1285,33 @@ defmodule Workbooks.Web do
     {:ok, body, conn} = read_body(conn)
     to = with {:ok, %{"to" => to}} <- Jason.decode(body), do: to, else: (_ -> nil)
 
-    with :ok <- valid_scope(conn.params["scope"]),
-         {:ok, change} <- Workbooks.History.restore(conn.params["scope"], to, conn.assigns[:tenant]) do
-      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(change))
-    else
-      _ -> conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
+    result =
+      case valid_scope(conn.params["scope"]) do
+        :ok -> Workbooks.History.restore(conn.params["scope"], to, conn.assigns[:tenant])
+        _ -> {:error, :not_found}
+      end
+
+    case result do
+      {:ok, %{} = change} ->
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(change))
+
+      # no-op: working copy already matched the target. A SUCCESS, not an error —
+      # answer with a shape the frontend reads as success (not as a Change object).
+      {:ok, :unchanged} ->
+        conn |> put_resp_content_type("application/json") |> send_resp(200, ~s({"unchanged":true}))
+
+      # cross-tenant / unknown scope / bad change id → not found.
+      {:error, reason} when reason in [:not_found, :bad_id] ->
+        conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"not found"}))
+
+      # a genuine restore (commit) failure — never reported as success.
+      _ ->
+        conn |> put_resp_content_type("application/json") |> send_resp(500, ~s({"error":"restore failed"}))
     end
   end
 
-  # A scope is an opaque workbook id: letters/digits/_/-/. only, no separators or
-  # traversal (`/`, `..`). Confinement floor (wb-g1yo.10) — never a host path.
+  # A scope is an opaque workbook id: letters/digits/_/- only, no `.`, no separators
+  # or traversal (`/`, `..`). Confinement floor (wb-g1yo.10) — never a host path.
   defp valid_scope(s)
        when is_binary(s) and s != "" do
     if s =~ ~r/\A[A-Za-z0-9_-]+\z/, do: :ok, else: :error

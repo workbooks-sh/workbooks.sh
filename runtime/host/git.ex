@@ -402,8 +402,10 @@ defmodule Workbooks.Git do
   `to_id` as a NEW commit. Reads the file content at `to_id`, writes it as the
   working copy, stages + commits under the tenant identity. NEVER resets/rewrites
   history — it only moves the tree FORWARD, so every prior change stays intact.
-  Returns `{:ok, new_sha}`, `{:nochange, :identical}` (already at that content), or
-  `{:error, reason}`.
+  Returns `{:ok, new_sha}`, `{:ok, :unchanged}` (working copy already IDENTICAL to
+  `to_id`'s content — git had nothing to commit), or `{:error, reason}` on a genuine
+  commit failure. The two were collapsed before, masking real failures of a
+  'nothing is lost' feature — now a clean tree and a failed commit are distinct.
   """
   def restore(tenant, scope, to_id) do
     dir = ensure_repo(tenant)
@@ -417,13 +419,34 @@ defmodule Workbooks.Git do
         case git(dir, ["-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", "restore #{scope}"],
                env: commit_env(identity(tenant))
              ) do
-          {_, 0} -> {sha, _} = git(dir, ["rev-parse", "--short", "HEAD"]); {:ok, String.trim(sha)}
-          {_, _} -> {:nochange, :identical}
+          {_, 0} ->
+            {sha, _} = git(dir, ["rev-parse", "--short", "HEAD"])
+            {:ok, String.trim(sha)}
+
+          {out, _} ->
+            # Distinguish git's specific "nothing to commit" (content already
+            # identical — a no-op, not an error) from a genuine commit failure. git
+            # prints "nothing to commit" / "no changes added" / "working tree clean"
+            # only when the staged tree matches HEAD; anything else is a real fault.
+            if nothing_to_commit?(out) or not dirty?(dir) do
+              {:ok, :unchanged}
+            else
+              {:error, "restore commit failed: #{String.slice(String.trim(out), 0, 160)}"}
+            end
         end
 
       {out, _} ->
         {:error, String.slice(String.trim(out), 0, 160)}
     end
+  end
+
+  # git's clean-tree signature on a failed `commit` — the no-op case (identical
+  # content), as opposed to a real failure (hook reject, lock, fs error, …).
+  defp nothing_to_commit?(out) do
+    o = String.downcase(out)
+
+    String.contains?(o, "nothing to commit") or String.contains?(o, "nothing added to commit") or
+      String.contains?(o, "no changes added") or String.contains?(o, "working tree clean")
   end
 
   @doc """

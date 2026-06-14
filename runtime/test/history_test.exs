@@ -93,6 +93,79 @@ defmodule Workbooks.HistoryTest do
     assert restored == "* version one\n"
   end
 
+  test "restore to a sha NOT in this scope's own timeline is rejected (:bad_id)" do
+    t = uniq("alice")
+    scope = uniq("aurora")
+    other = uniq("nebula")
+    commit(t, scope, "* aurora v1\n", t)
+    commit(t, scope, "* aurora v2\n", t)
+    # a SEPARATE workbook in the SAME tenant repo — its commits are real shas in the
+    # repo but never touch <scope>.org, so they must NOT be a valid restore target.
+    commit(t, other, "* nebula v1\n", t)
+    commit(t, other, "* nebula v2\n", t)
+
+    {:ok, other_changes} = History.timeline(other, t)
+    foreign_id = hd(other_changes).id
+
+    # the foreign sha is a real change, just not in `scope`'s timeline
+    {:ok, scope_changes} = History.timeline(scope, t)
+    refute Enum.any?(scope_changes, &(&1.id == foreign_id))
+
+    assert History.restore(scope, foreign_id, t) == {:error, :bad_id}
+
+    # scope's timeline is untouched (no spurious restore commit added)
+    assert {:ok, after_changes} = History.timeline(scope, t)
+    assert length(after_changes) == 2
+  end
+
+  test "a genuine restore COMMIT FAILURE surfaces as an error, not a false success" do
+    t = uniq("alice")
+    scope = uniq("aurora")
+    commit(t, scope, "* v1\n", t)
+    commit(t, scope, "* v2\n", t)
+
+    {:ok, [newest, oldest]} = History.timeline(scope, t)
+
+    # A REAL commit failure (not the clean-tree no-op): the working tree IS dirty
+    # (restore writes the older content back) but git cannot write the commit object
+    # because the object store is read-only. This must surface as {:error, _}, never
+    # {:ok, :unchanged} — the bug the fix closed (a failed restore reported as a
+    # no-op "success").
+    dir = Git.repo_path(t)
+    objects = Path.join([dir, ".git", "objects"])
+    File.chmod!(objects, 0o500)
+
+    result =
+      try do
+        History.restore(scope, oldest.id, t)
+      after
+        File.chmod!(objects, 0o755)
+      end
+
+    assert {:error, reason} = result
+    assert is_binary(reason)
+
+    # nothing falsely recorded: the timeline still has exactly the original 2 changes
+    File.chmod!(objects, 0o755)
+    assert {:ok, changes} = History.timeline(scope, t)
+    assert length(changes) == 2
+    assert hd(changes).id == newest.id
+  end
+
+  test "restoring identical content is :unchanged (no-op success), not a failure" do
+    t = uniq("alice")
+    scope = uniq("aurora")
+    commit(t, scope, "* only\n", t)
+    {:ok, [c]} = History.timeline(scope, t)
+
+    # working copy already equals HEAD's content — restoring HEAD is a clean no-op.
+    assert History.restore(scope, c.id, t) == {:ok, :unchanged}
+
+    # APPEND-ONLY invariant intact: no spurious change added
+    assert {:ok, changes} = History.timeline(scope, t)
+    assert length(changes) == 1
+  end
+
   test "human vs agent attribution" do
     t = uniq("alice")
     scope = uniq("aurora")

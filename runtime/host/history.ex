@@ -10,7 +10,9 @@ defmodule Workbooks.History do
   ## Confinement (wb-g1yo.10)
   `scope` is an OPAQUE WORKBOOK ID — never a filesystem path. Every function first
   resolves the scope's owning tenant via `ControlPlane.workbook_tenant/1` and gates
-  it with `Tenant.visible?/2`. This fails CLOSED:
+  it with the CANONICAL ownership rule `ControlPlane.workbook_visible?/2` (the same
+  gate the rest of wb-g1yo uses — `/instances`, `/api/sessions`), so there is one
+  ownership rule, not a parallel hand-rolled one. This fails CLOSED:
 
     * unknown scope (`:not_found`)      -> `{:error, :not_found}`
     * cross-tenant scope (owner != me)  -> `{:error, :not_found}`
@@ -33,7 +35,7 @@ defmodule Workbooks.History do
   author-type tag is a later phase (named workspace members).
   """
 
-  alias Workbooks.{Git, ControlPlane, Tenant}
+  alias Workbooks.{Git, ControlPlane}
 
   @agent_markers ~w(agent ledger keeper waldo)
 
@@ -85,27 +87,50 @@ defmodule Workbooks.History do
   fully intact; restore only ever ADDS an entry.
 
   `{:ok, %{id, when, author_type, author_name, title}}` (the new Change) on success;
-  `{:error, :not_found}` cross-tenant/unknown scope; `{:error, :bad_id}` bad change.
+  `{:ok, :unchanged}` if the working copy already equals `to_id`'s content (no new
+  Change, not an error); `{:error, :not_found}` cross-tenant/unknown scope;
+  `{:error, :bad_id}` if `to_id` isn't a real change in THIS scope's own timeline;
+  `{:error, reason}` if the commit genuinely failed.
   """
   def restore(scope, to_id, tenant) do
     with {:ok, owner} <- authorize(scope, tenant),
          true <- valid_id?(to_id),
-         {:ok, sha} <- Git.restore(owner, scope, to_id) do
-      [change] =
-        owner
-        |> Git.log_entries(scope)
-        |> Enum.filter(&(&1.sha == sha))
-        |> Enum.map(fn %{sha: s, ts: ts, author: author, msg: msg} ->
-          %{id: s, when: ts, author_type: author_type(author), author_name: author, title: msg}
-        end)
+         true <- in_timeline?(owner, scope, to_id) do
+      case Git.restore(owner, scope, to_id) do
+        {:ok, :unchanged} ->
+          # already at that exact content — no new Change, but not an error
+          {:ok, :unchanged}
 
-      {:ok, change}
+        {:ok, sha} ->
+          [change] =
+            owner
+            |> Git.log_entries(scope)
+            |> Enum.filter(&(&1.sha == sha))
+            |> Enum.map(fn %{sha: s, ts: ts, author: author, msg: msg} ->
+              %{id: s, when: ts, author_type: author_type(author), author_name: author, title: msg}
+            end)
+
+          {:ok, change}
+
+        # a genuine commit failure — surfaced, never reported as success
+        {:error, _} = e ->
+          e
+      end
     else
       {:error, _} = e -> e
       false -> {:error, :bad_id}
-      # already at that exact content — no new Change, but not an error
-      {:nochange, :identical} -> {:ok, :unchanged}
     end
+  end
+
+  # The restore target MUST be a change that appears in THIS scope's own timeline
+  # (the `<scope>.org` file's git history), not merely any sha in the tenant repo —
+  # otherwise a caller could restore a workbook to an unrelated revision that touched
+  # a different file. `to_id` is a short-sha; match against either the short sha or a
+  # prefix of a full sha in the scope's log.
+  defp in_timeline?(owner, scope, to_id) do
+    owner
+    |> Git.log_entries(scope)
+    |> Enum.any?(fn %{sha: s} -> s == to_id or String.starts_with?(s, to_id) or String.starts_with?(to_id, s) end)
   end
 
   # --- gating -----------------------------------------------------------------
@@ -122,12 +147,17 @@ defmodule Workbooks.History do
         {:error, :not_found}
 
       true ->
+        # Resolve the owner so we know which repo backs this scope, then gate with
+        # the ONE canonical ownership rule (`ControlPlane.workbook_visible?/2`) — no
+        # parallel hand-rolled check. An unknown scope has no backing repo, so it is
+        # fail-closed to :not_found here even though `workbook_visible?` grandfathers
+        # unknown ids; we only ever consult it for the cross-tenant DECISION.
         case ControlPlane.workbook_tenant(scope) do
           :not_found ->
             {:error, :not_found}
 
           owner ->
-            if Tenant.visible?(owner, tenant),
+            if ControlPlane.workbook_visible?(scope, tenant),
               do: {:ok, owner || tenant},
               else: {:error, :not_found}
         end
