@@ -46,13 +46,9 @@ defmodule Workbooks.Application do
         Workbooks.ControlPlane,
         Workbooks.Vars,
         Workbooks.Instance.Supervisor,
-        # Brokered-EXEC loopback for the StarlingMonkey eval lane (SLICE 1, wb-b9xv.9): a 127.0.0.1-only
-        # listener the SM `child_process` shim fetches (sentinel host pinned by the WasiHttpView override)
-        # → ExecBroker (same default-deny spine as the JsDock host_exec import). Always-on; cheap.
-        Workbooks.ExecLoopback,
         Workbooks.Domains,
         {DynamicSupervisor, strategy: :one_for_one, name: Workbooks.AgentSession.Sup}
-      ] ++ web() ++ keeper() ++ autopoet() ++ channels() ++ groundskeeper()
+      ] ++ harness() ++ web() ++ keeper() ++ autopoet() ++ channels() ++ groundskeeper()
 
     # Start children ONE BY ONE with a boot-trace, so a child that blocks in init
     # is pinpointed (and visible in <WB_DATA>/boot-trace.txt) instead of hanging
@@ -254,6 +250,16 @@ defmodule Workbooks.Application do
       s when s in [nil, ""] -> []
       _ -> [Workbooks.Groundskeeper.Tasks]
     end
+  end
+
+  # Harness surface (FIX 2 — POSTURE GAP): the brokered-EXEC loopback for the StarlingMonkey eval lane
+  # (SLICE 1, wb-b9xv.9) — a 127.0.0.1-only listener the SM `child_process` shim fetches (sentinel host
+  # pinned by the WasiHttpView override) → ExecBroker (same default-deny spine as the JsDock host_exec
+  # import). It is DESKTOP-FIRST: started ONLY when the harness surface is permitted (WB_DESKTOP/WB_HARNESS
+  # AND not a multi-tenant hosted posture). In a hosted/multi-tenant runtime the loopback is NOT started, so
+  # the whole exec + creds + oauth surface is off. Cloud-nexus harness is DEFERRED (wb-b9xv.17).
+  defp harness do
+    if Workbooks.Harness.enabled?(), do: [Workbooks.ExecLoopback], else: []
   end
 
   # Channels (wb messaging adapters, official-API tier): each inbound poller is

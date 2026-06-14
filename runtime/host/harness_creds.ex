@@ -74,11 +74,32 @@ defmodule Workbooks.HarnessCreds do
 
   # ── provider selection ─────────────────────────────────────────────────────────────────────────
 
+  # FIX 3 (MULTI-TENANT CREDS CO-LOCATION): the `:file` backend pools creds in ONE shared 0600 JSON. That is
+  # safe ONLY on a single-user desktop. In a multi-tenant posture (`Tenancy.multi?`) — or any posture where
+  # the harness surface isn't even permitted (`not Harness.enabled?`) — the `:file` backend is REFUSED:
+  # keychain/desktop only. The desktop (`WB_HARNESS_CREDS=desktop`) backend is always allowed.
   defp backend do
     case System.get_env("WB_HARNESS_CREDS") do
-      "desktop" -> :desktop
-      _ -> :file
+      "desktop" ->
+        :desktop
+
+      _ ->
+        if file_backend_allowed?() do
+          :file
+        else
+          raise ArgumentError,
+                "HarnessCreds :file backend is co-located (one shared store) and is REFUSED in a multi-tenant / " <>
+                  "non-desktop posture. Set WB_HARNESS_CREDS=desktop (keychain) for a hosted/multi-tenant runtime."
+        end
     end
+  end
+
+  @doc """
+  True when the co-located `:file` creds backend is permitted: single-user desktop only — i.e. the harness
+  surface is enabled AND this is NOT a multi-tenant posture.
+  """
+  def file_backend_allowed? do
+    Workbooks.Harness.enabled?() and not Workbooks.Tenancy.multi?()
   end
 
   # ── :file provider — mirrors keychain.rs kc_set/kc_get/kc_delete exactly ─────────────────────────
@@ -86,10 +107,22 @@ defmodule Workbooks.HarnessCreds do
   # store key "<service>\x01<account>" — byte-for-byte the desktop `sk(service, account)` shape.
   defp sk(service, account), do: service <> <<1>> <> account
 
+  # FIX 3: the `:file` store is scoped PER-TENANT (single-user desktop has exactly one tenant, but a
+  # per-tenant directory means one tenant's shared store is never the SAME file as another's even if the
+  # posture is later widened). The store key already embeds the user id; the path embeds the tenant id.
   defp store_path do
-    dir = System.get_env("WB_HARNESS_CREDS_DIR") || Path.join(System.tmp_dir!(), "wb-harness-creds")
+    base = System.get_env("WB_HARNESS_CREDS_DIR") || Path.join(System.tmp_dir!(), "wb-harness-creds")
+    dir = Path.join(base, "tenant-" <> tenant_id())
     File.mkdir_p!(dir)
     Path.join(dir, "harness-creds.json")
+  end
+
+  # The current tenant (single-user desktop default "local"). Sanitized to a safe path segment.
+  defp tenant_id do
+    raw =
+      System.get_env("WB_TENANT") || System.get_env("WB_TENANT_ID") || "local"
+
+    String.replace(raw, ~r/[^A-Za-z0-9_.-]/, "_")
   end
 
   defp store_load do

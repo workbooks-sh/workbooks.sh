@@ -74,7 +74,7 @@ defmodule Workbooks.HarnessSessionTest do
 
       true ->
         harness = File.read!(@harness_js)
-        {:ok, pid} = HarnessSession.start_link(session_id: "turn-#{System.unique_integer([:positive])}", exec: [allow: true])
+        {:ok, pid} = HarnessSession.start_link(session_id: "turn-#{System.unique_integer([:positive])}", exec: [allow: true, principal: "test-tenant"])
 
         # one session token minted (reused for every round-trip this turn makes).
         assert HarnessSession.exec_token(pid) != nil
@@ -109,7 +109,7 @@ defmodule Workbooks.HarnessSessionTest do
   test "the measured wall: a multi-fetch entry yields its value but poisons re-entry; recycle recovers", %{ready?: ready?} do
     if skip_unless(ready?) do
       url = Workbooks.ExecLoopback.llm_url()
-      {:ok, pid} = HarnessSession.start_link(session_id: "wall-#{System.unique_integer([:positive])}", exec: [allow: true])
+      {:ok, pid} = HarnessSession.start_link(session_id: "wall-#{System.unique_integer([:positive])}", exec: [allow: true, principal: "test-tenant"])
       tok = HarnessSession.exec_token(pid)
       h = "{'content-type':'application/json','x-wb-exec':#{inspect(tok)}}"
       one = "fetch(#{inspect(url)},{method:'POST',headers:#{h},body:'{}'}).then(r=>r.text())"

@@ -25,6 +25,38 @@ defmodule Workbooks.JsHarnessAuthTest do
 
   alias Workbooks.{HarnessCreds, ExecLoopback, JsEngine}
 
+  setup_all do
+    # The CI/test substrate is a SINGLE-USER DESKTOP posture: enable the harness surface so the
+    # ExecLoopback listener + the HarnessCreds :file backend are permitted (FIX 2 / FIX 3). Start the
+    # loopback listener once for the host-route tests (the app does NOT start it in test env now that it's
+    # posture-gated). Force single-tenant so the file backend is allowed.
+    prev_harness = System.get_env("WB_HARNESS")
+    prev_mode = System.get_env("WB_TENANCY_MODE")
+    System.put_env("WB_HARNESS", "1")
+    System.delete_env("WB_TENANCY_MODE")
+
+    # Start the listener UNLINKED so it survives this ephemeral test process across modules (Bandit.start_link
+    # links to its caller; a linked listener would die with this setup_all and leave a stale recorded port).
+    {:ok, _} =
+      Task.start(fn ->
+        Workbooks.ExecLoopback.start_listener()
+        Process.sleep(:infinity)
+      end)
+
+    Enum.reduce_while(1..100, :ok, fn _, _ ->
+      if is_integer(:persistent_term.get({Workbooks.ExecLoopback, :port}, nil)),
+        do: {:halt, :ok},
+        else: (Process.sleep(10); {:cont, :ok})
+    end)
+
+    on_exit(fn ->
+      if prev_harness, do: System.put_env("WB_HARNESS", prev_harness), else: System.delete_env("WB_HARNESS")
+      if prev_mode, do: System.put_env("WB_TENANCY_MODE", prev_mode)
+    end)
+
+    :ok
+  end
+
   setup do
     # isolate the file-backed creds store per test run (owner-only 0600, like keychain.rs).
     dir = Path.join(System.tmp_dir!(), "wb-harness-creds-test-#{System.unique_integer([:positive])}")
@@ -140,7 +172,7 @@ defmodule Workbooks.JsHarnessAuthTest do
 
       {:ok, %{stdout: out}} =
         JsEngine.run_node(src,
-          exec: [allow: true, commands: :all, creds_scope: %{user: "sm-user", provider: "claude"}]
+          exec: [allow: true, commands: :all, principal: "test-tenant", creds_scope: %{user: "sm-user", provider: "claude"}]
         )
 
       assert out =~ "ROUNDTRIP-OK"

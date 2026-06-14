@@ -64,12 +64,25 @@ defmodule Workbooks.ExecLoopback do
   end
 
   def start_listener do
+    # idempotent: if a listener is already bound + recorded (e.g. started by another caller / a prior test
+    # setup), reuse it rather than binding a second listener and overwriting the recorded port.
+    case :persistent_term.get({__MODULE__, :pid}, nil) do
+      pid when is_pid(pid) ->
+        if Process.alive?(pid), do: {:ok, pid}, else: do_start_listener()
+
+      _ ->
+        do_start_listener()
+    end
+  end
+
+  defp do_start_listener do
     port = configured_port()
 
     case Bandit.start_link(plug: __MODULE__, scheme: :http, ip: {127, 0, 0, 1}, port: port) do
       {:ok, pid} ->
         bound = bound_port(pid, port)
         :persistent_term.put({__MODULE__, :port}, bound)
+        :persistent_term.put({__MODULE__, :pid}, pid)
         Logger.info("exec-loopback — brokered SM-lane exec listening on 127.0.0.1:#{bound}")
         {:ok, pid}
 
@@ -78,12 +91,16 @@ defmodule Workbooks.ExecLoopback do
     end
   end
 
-  # WB_EXEC_LOOPBACK_PORT pins the port (the Rust sentinel must agree); default 0 = OS-assigned, then read
-  # back. We default to a FIXED port so the Rust override can hard-code it without a discovery channel.
+  # FIX 5 (fixed loopback port / token visibility): default to a RANDOM (OS-assigned, port 0) ephemeral port
+  # instead of the predictable fixed 8919, so a local process cannot pre-target the loopback by hard-coded
+  # port (it would also need the 24-byte single-run token). The bound port is read back from the listener and
+  # published to `sentinel_url/0`; the guest receives the full URL (host + bound port) in its grant seam, and
+  # the store.rs sentinel pin honors whatever port the guest fetched (it reads `uri.port_u16()`), so nothing
+  # needs a hard-coded port. `WB_EXEC_LOOPBACK_PORT` still pins a fixed port when a deployment requires one.
   defp configured_port do
     case System.get_env("WB_EXEC_LOOPBACK_PORT") do
-      nil -> 8919
-      "" -> 8919
+      nil -> 0
+      "" -> 0
       s -> String.to_integer(s)
     end
   end
@@ -107,9 +124,25 @@ defmodule Workbooks.ExecLoopback do
   shim sends it back as `x-wb-exec`; `revoke/1` removes it when the run ends.
   """
   def mint(grant) when is_map(grant) do
+    :ok = assert_principal!(grant)
     token = Base.url_encode64(:crypto.strong_rand_bytes(24), padding: false)
     :ets.insert(grants(), {token, grant})
     token
+  end
+
+  # FIX 1 (principal-OPTIONAL minting): an EXEC-capable grant (`allow: true`) MUST carry a non-nil principal —
+  # that principal is the only handle the broker has for rate-limit / concurrency-cap / revocation. A grant
+  # minted with `allow: true` and a nil principal would, via the loopback, call ExecBroker with principal:nil,
+  # which is the reserved HOST-INTERNAL (uncapped, unrevocable) path → a granted harness could fork-bomb the
+  # host with no cap and no kill-switch. Refuse it at mint time. Creds-only grants (no `:allow`) are unaffected.
+  defp assert_principal!(grant) do
+    if Map.get(grant, :allow) == true and not valid_principal?(Map.get(grant, :principal)) do
+      raise ArgumentError,
+            "exec-capable loopback grant (allow: true) requires a non-nil :principal (tenant/session id) — got " <>
+              "#{inspect(Map.get(grant, :principal))}. nil-principal is reserved for trusted host-internal callers."
+    end
+
+    :ok
   end
 
   @doc "Revoke a minted token (run finished)."
@@ -124,6 +157,27 @@ defmodule Workbooks.ExecLoopback do
 
   defp lookup(_), do: :error
 
+  # FIX 1 (defense-in-depth at the loopback route): an exec-capable grant reaching the broker MUST carry a
+  # non-nil principal so the broker's rate/concurrency/revocation guards engage. `mint/1` already refuses to
+  # create such a grant, but the route NEVER calls ExecBroker with a nil principal from the loopback — a
+  # principal-less exec/llm grant is DENIED here (403). nil-principal stays reserved for trusted HOST-INTERNAL
+  # callers (e.g. JsDock direct ExecBroker.exec calls), which never traverse this loopback.
+  defp principal_gate(grant) do
+    cond do
+      Map.get(grant, :allow) != true -> :ok
+      valid_principal?(Map.get(grant, :principal)) -> :ok
+      true -> {:error, :no_principal}
+    end
+  end
+
+  defp valid_principal?(p), do: is_binary(p) and p != ""
+
+  # FIX 5 (token visibility): the grant table stays `:public` because mint/revoke run in the JsEngine /
+  # HarnessSession processes while lookup runs in Bandit handler processes — none of them is the table's
+  # owner (BrokerTables), so `:protected` (owner-only writes) would break mint/revoke from those callers.
+  # The residual exposure is mitigated structurally instead: tokens are 24 bytes of CSPRNG entropy, are
+  # single-run scoped (revoked when the run/session ends), and now sit behind a RANDOM loopback port (FIX 5),
+  # and every exec-capable grant is principal-governed (FIX 1).
   defp grants, do: Workbooks.BrokerTables.ensure(@grants, [:named_table, :public, :set])
 
   # ── route ────────────────────────────────────────────────────────────────────────────────────
@@ -141,7 +195,8 @@ defmodule Workbooks.ExecLoopback do
     stdin = conn.body_params["stdin"] || ""
 
     with {:ok, grant} <- lookup(token),
-         true <- is_binary(name) and is_list(argv) do
+         true <- is_binary(name) and is_list(argv),
+         :ok <- principal_gate(grant) do
       case ExecBroker.exec(name, Enum.map(argv, &to_string/1), to_string(stdin),
              allow: Map.get(grant, :allow, false),
              commands: Map.get(grant, :commands, :all),
@@ -180,7 +235,8 @@ defmodule Workbooks.ExecLoopback do
     token = get_req_header(conn, "x-wb-exec") |> List.first()
     messages = conn.body_params["messages"] || []
 
-    with {:ok, _grant} <- lookup(token) do
+    with {:ok, grant} <- lookup(token),
+         :ok <- principal_gate(grant) do
       conn
       |> put_resp_content_type("application/json")
       |> send_resp(200, Jason.encode!(llm_complete(messages)))

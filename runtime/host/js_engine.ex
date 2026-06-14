@@ -316,10 +316,12 @@ defmodule Workbooks.JsEngine do
     # events is child_process's require dep; ensure it's present (it's in @node_builtins already, defensive).
     events = Map.get(shims, "events") || File.read!(Path.join([@js_root, "shims", "events.js"]))
 
+    allow = Keyword.get(exec_opts, :allow, false)
+
     grant = %{
-      allow: Keyword.get(exec_opts, :allow, false),
+      allow: allow,
       commands: Keyword.get(exec_opts, :commands, :all),
-      principal: Keyword.get(exec_opts, :principal),
+      principal: require_principal!(allow, exec_opts),
       depth: Keyword.get(exec_opts, :depth, 0),
       # SLICE 3: per-(user, provider) creds scope for dock.creds.{get,put}.
       creds_scope: Keyword.get(exec_opts, :creds_scope, nil)
@@ -333,6 +335,27 @@ defmodule Workbooks.JsEngine do
     dock_auth = File.read!(Path.join(@sm_shim_dir, "dock_auth.js"))
     shims = shims |> Map.put("child_process", cp) |> Map.put("events", events) |> Map.put("dock-auth", dock_auth)
     {shims, seam, token}
+  end
+
+  # FIX 1 (principal-OPTIONAL minting): an EXEC-CAPABLE harness grant (`allow: true`) MUST carry a non-nil
+  # principal (the tenant/session id). The principal is what the broker rate-limits, concurrency-caps, and
+  # revokes on — without it the loopback would hand ExecBroker a nil principal, which is the reserved
+  # HOST-INTERNAL (uncapped, unrevocable) path, giving a granted harness UNCAPPED brokered exec. Refuse to
+  # mint a principal-less exec grant here. A non-exec grant (`allow: false` — a creds-only / default-deny
+  # grant where nothing runs) keeps its (possibly nil) principal unchanged.
+  defp require_principal!(false, exec_opts), do: Keyword.get(exec_opts, :principal)
+
+  defp require_principal!(true, exec_opts) do
+    case Keyword.get(exec_opts, :principal) do
+      p when is_binary(p) and p != "" ->
+        p
+
+      other ->
+        raise ArgumentError,
+              "exec-capable harness grant (allow: true) requires a non-nil :principal (the tenant/session id) — " <>
+                "got #{inspect(other)}. nil-principal is reserved for trusted host-internal callers (e.g. JsDock " <>
+                "direct calls), never the loopback."
+    end
   end
 
   # Read each pure-JS Node shim into a name=>source map for the prelude's registry. Misses are skipped

@@ -66,7 +66,9 @@ defmodule Workbooks.JsNodeExecTest do
         process.stdout.write('GREP:' + out);
         """
 
-        assert {:ok, %{stdout: out, exit_code: 0}} = JsEngine.run_node(src, exec: [allow: true])
+        assert {:ok, %{stdout: out, exit_code: 0}} =
+                 JsEngine.run_node(src, exec: [allow: true, principal: "test-tenant"])
+
         assert out =~ "GREP:"
         assert out =~ "hello world"
         assert out =~ "hello again"
@@ -88,7 +90,7 @@ defmodule Workbooks.JsNodeExecTest do
       catch (e) { process.stdout.write('REFUSED:' + e.message); }
       """
 
-      assert {:ok, %{stdout: out}} = JsEngine.run_node(src, exec: [allow: true])
+      assert {:ok, %{stdout: out}} = JsEngine.run_node(src, exec: [allow: true, principal: "test-tenant"])
       assert out =~ "REFUSED:"
       refute out =~ "UNEXPECTED"
     end
@@ -150,7 +152,7 @@ defmodule Workbooks.JsNodeExecTest do
       catch (e) { process.stdout.write('SSRF-DENIED'); }
       """
 
-      assert {:ok, %{stdout: out}} = JsEngine.run_node(src, exec: [allow: true])
+      assert {:ok, %{stdout: out}} = JsEngine.run_node(src, exec: [allow: true, principal: "test-tenant"])
       assert out == "SSRF-DENIED"
     end
   end

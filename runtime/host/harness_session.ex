@@ -225,10 +225,15 @@ defmodule Workbooks.HarnessSession do
   defp maybe_mint(nil), do: {nil, nil}
 
   defp maybe_mint(exec_opts) when is_list(exec_opts) do
+    allow = Keyword.get(exec_opts, :allow, false)
+
     grant = %{
-      allow: Keyword.get(exec_opts, :allow, false),
+      allow: allow,
       commands: Keyword.get(exec_opts, :commands, :all),
-      principal: Keyword.get(exec_opts, :principal),
+      # FIX 1 (principal-OPTIONAL minting): an exec-capable session grant (`allow: true`) MUST carry a
+      # non-nil principal (the tenant/session id) — it is the broker's only handle for rate-limit /
+      # concurrency-cap / revocation. ExecLoopback.mint/1 enforces the same; required here too.
+      principal: require_principal!(allow, exec_opts),
       depth: Keyword.get(exec_opts, :depth, 0),
       # SLICE 3: per-(user, provider) creds scope for dock.creds.{get,put}. The harness can only touch the
       # user+provider the host granted — one tenant's grant never reaches another's keychain blob.
@@ -236,6 +241,21 @@ defmodule Workbooks.HarnessSession do
     }
 
     {ExecLoopback.mint(grant), grant}
+  end
+
+  # An exec-capable session grant (`allow: true`) MUST carry a non-nil principal; refuse to mint one
+  # without it (see FIX 1). A non-exec grant keeps its principal unchanged.
+  defp require_principal!(false, exec_opts), do: Keyword.get(exec_opts, :principal)
+
+  defp require_principal!(true, exec_opts) do
+    case Keyword.get(exec_opts, :principal) do
+      p when is_binary(p) and p != "" ->
+        p
+
+      other ->
+        raise ArgumentError,
+              "exec-capable harness session grant (allow: true) requires a non-nil :principal (tenant/session id) — got #{inspect(other)}."
+    end
   end
 
   defp normalize({:ok, _} = ok), do: ok

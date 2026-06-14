@@ -51,9 +51,23 @@ defmodule Workbooks.OAuthLoopback do
   Returns `{:ok, %{code: code, redirect_uri: redirect_uri}}` | `{:error, reason}`. The harness then
   exchanges `code` (+ its private verifier) at the provider's token endpoint over its own NetGuard fetch.
   """
+  # FIX 4 (oauth.loopback arbitrary URL): `authorize_base` is fully harness-controlled and is handed to the
+  # desktop `open::that`. WITHOUT validation a harness could open ANY URL in the user's browser (phishing /
+  # local-app deep-link). Require an https scheme AND a host on the provider allow-list. The list is
+  # configurable via `config :workbooks, :oauth_authorize_hosts`; defaults to the known Claude/OpenAI hosts.
+  @default_authorize_hosts ~w(
+    claude.ai
+    anthropic.com
+    console.anthropic.com
+    openai.com
+    chatgpt.com
+    auth.openai.com
+  )
+
   def start(params) when is_map(params) do
     with {:ok, base} <- require_str(params, "authorize_base"),
-         {:ok, challenge} <- require_str(params, "code_challenge") do
+         {:ok, challenge} <- require_str(params, "code_challenge"),
+         :ok <- validate_authorize_base(base) do
       args = %{
         authorize_base: base,
         code_challenge: challenge,
@@ -69,6 +83,40 @@ defmodule Workbooks.OAuthLoopback do
         {:error, :desktop_only}
       end
     end
+  end
+
+  @doc "The configured allow-list of authorize hosts (overridable via app config)."
+  def authorize_hosts do
+    Application.get_env(:workbooks, :oauth_authorize_hosts, @default_authorize_hosts)
+  end
+
+  # Reject a non-https or off-allow-list authorize_base before any browser open. A host matches if it is
+  # exactly an allow-list entry or a subdomain of one (e.g. `console.anthropic.com` ⊂ `anthropic.com`).
+  defp validate_authorize_base(base) do
+    uri = URI.parse(base)
+
+    cond do
+      uri.scheme != "https" ->
+        {:error, {:invalid_authorize_base, :https_required}}
+
+      is_nil(uri.host) or uri.host == "" ->
+        {:error, {:invalid_authorize_base, :no_host}}
+
+      not host_allowed?(uri.host) ->
+        {:error, {:invalid_authorize_base, {:host_not_allowed, uri.host}}}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp host_allowed?(host) do
+    host = String.downcase(host)
+
+    Enum.any?(authorize_hosts(), fn allowed ->
+      allowed = String.downcase(allowed)
+      host == allowed or String.ends_with?(host, "." <> allowed)
+    end)
   end
 
   defp require_str(map, key) do

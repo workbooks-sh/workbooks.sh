@@ -650,7 +650,21 @@ impl WasiHttpView for ComponentStoreData {
         // allow-list hole and NOT a general loopback opening (any OTHER internal/loopback host still
         // resolves through wb_resolve_pinned below and is denied). Pin straight to 127.0.0.1 on the
         // configured loopback port; the request is plain HTTP and falls through to the authority rewrite.
-        if host == "wb-exec.internal" {
+        // FIX 2 (POSTURE GAP — sentinel scope): the sentinel pin must RESPECT the per-instance egress scope.
+        // Previously this early-returned for EVERY instance, BEFORE the net_allow check below — so even a
+        // guest with a restrictive egress allow-list (that did NOT include the exec sentinel) could reach the
+        // privileged loopback. Now the pin resolves ONLY for an instance whose egress scope permits it: an
+        // UNRESTRICTED instance (net_allow None/empty — the harness/exec grant) OR one whose allow-list
+        // explicitly carries "wb-exec.internal". A restrictive-egress guest falls through to wb_resolve_pinned,
+        // where 127.0.0.1 is internal and the SSRF floor denies it. (NOTE: editing the vendored wasmex NIF —
+        // the wasmex Rust NIF must be REBUILT for this to take effect at runtime; the Elixir-side posture gate
+        // in Workbooks.Application holds regardless and is the primary control.)
+        let exec_sentinel_allowed = match &self.net_allow {
+            None => true,
+            Some(list) if list.is_empty() => true,
+            Some(list) => wb_host_in_allowlist("wb-exec.internal", port, list),
+        };
+        if host == "wb-exec.internal" && exec_sentinel_allowed {
             let pinned = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
             let mut request = request;
             if let Ok(hv) = hyper::header::HeaderValue::from_str(&format!("{}:{}", host, port)) {
