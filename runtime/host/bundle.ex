@@ -498,9 +498,19 @@ defmodule Workbooks.Bundle do
       tmp = Path.join(System.tmp_dir!(), "wb-bundle-compile-#{:erlang.unique_integer([:positive])}")
       File.rm_rf!(tmp)
 
+      root = Path.expand(tmp)
+
       try do
         Enum.each(parts, fn {name, content} ->
-          p = Path.join(tmp, name)
+          p = Path.expand(Path.join(tmp, name))
+
+          # Defense-in-depth: the parts may be an untrusted tree (e.g. unbundled
+          # then rebuilt). Confine the compile-tmp write the same way write_tree
+          # does so a `..`/absolute member can't escape the throwaway dir.
+          unless safe_member?(name) and String.starts_with?(p <> "/", root <> "/") do
+            raise ArgumentError, "unsafe bundle path in compile tree: #{name}"
+          end
+
           File.mkdir_p!(Path.dirname(p))
           File.write!(p, content)
         end)
