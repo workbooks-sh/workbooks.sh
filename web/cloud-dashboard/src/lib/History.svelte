@@ -1,5 +1,5 @@
 <script>
-  import { nexusHistory, changeDiff, restoreVersion } from '$lib/api.js';
+  import { nexusHistory, changeDiff, restoreVersion, undoLast } from '$lib/api.js';
   import { toast } from '$lib/toastStore.svelte.js';
   import Confirm from '$lib/Confirm.svelte';
 
@@ -29,6 +29,18 @@
     openId = c.id; diff = null; diffLoading = true;
     diff = await changeDiff(scope, c.id);
     diffLoading = false;
+  }
+
+  let undoing = $state(false);
+  async function undo() {
+    undoing = true;
+    const when = new Date().toISOString();
+    const entry = await undoLast(scope, when);
+    undoing = false;
+    if (!entry) { toast('Nothing to undo'); return; }
+    changes = [entry, ...changes];   // append-only: undo is a NEW change on top
+    openId = null; diff = null;
+    toast(entry.title);
   }
 
   async function reallyRestore() {
@@ -71,8 +83,13 @@
 
 <div class="card" style="padding:0;overflow:hidden">
   <div class="hh">
-    <b style="font-size:13.5px">History <span class="dim mono" style="font-weight:400">· {changes.length} change{changes.length === 1 ? '' : 's'}</span></b>
-    <span class="faint" style="font-size:11.5px">Nothing is lost — restore any version.</span>
+    <div style="display:flex;flex-direction:column;gap:1px">
+      <b style="font-size:13.5px">History <span class="dim mono" style="font-weight:400">· {changes.length} change{changes.length === 1 ? '' : 's'}</span></b>
+      <span class="faint" style="font-size:11.5px">Nothing is lost — undo or restore any version.</span>
+    </div>
+    <button class="btn sm" onclick={undo} disabled={undoing || changes.length < 2} title="Undo the most recent change">
+      ⟲ Undo last change
+    </button>
   </div>
 
   {#if loading}

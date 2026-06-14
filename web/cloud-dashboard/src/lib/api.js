@@ -169,4 +169,19 @@ export async function restoreVersion(scope, changeId, when) {
   return { id: 'r' + changeId, when, authorType: 'human', authorName: 'You', title: `Restored the version from ${label}` };
 }
 
+/**
+ * Undo the most recent change to a scope — append-only (re-applies the prior
+ * version as a NEW change, reversible). Returns the new Change, or null if there
+ * is nothing earlier to undo to.
+ * @param {string} scope @param {string} when ISO (caller-stamped)
+ * @returns {Promise<Change|null>}
+ */
+export async function undoLast(scope, when) {
+  // MOCK — swap for fetch(`/api/history/${scope}/undo`, {method:'POST'})
+  const list = MOCK_HISTORY[scope] || [];
+  if (list.length < 2) return null;            // only the initial change → nothing to undo
+  const previous = list[1];                    // [latest, previous, …] — undo returns to `previous`
+  return restoreVersion(scope, previous.id, when);
+}
+
 export { STATE_LABEL, MOCK_NEXUSES, MOCK_DETAIL, MOCK_HISTORY };
