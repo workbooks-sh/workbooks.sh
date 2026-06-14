@@ -75,7 +75,8 @@
             "overrides",
             "git/url/file/tarball deps"
           ],
-          "verdict": "pending"
+          "verdict": "live",
+          "note": "devDeps skipped + peerDeps NOT auto-installed (correct) + overrides force versions (js_deptypes_test). optionalDeps skipped-safe; git/url/file/workspace deps gracefully skipped (need git/local/tarball \u2014 bedrock-leaning, deferred sub-surface)."
         },
         {
           "id": "monorepo",

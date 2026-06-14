@@ -35,6 +35,7 @@ The single scannable answer to "where are we." Verdict ladder: **roadmap** (not 
 | **Web Streams / Blob / AbortController + templating** | SM globals + AbortController banner shim | js_webapi_test — ReadableStream/Blob/FormData/AbortController + handlebars/mustache |
 | **TS decorators + reflect-metadata** | esbuild experimentalDecorators + reflect-metadata | js_decorators_test — legacy decorators + emitDecoratorMetadata (TC39 stage-3 = partial) |
 | **Lockfile installs** (npm/pnpm/yarn, reproducible) | `Npm.parse_lockfile` + `install_from_lockfile` | js_lockfile_test — package-lock v2/3, pnpm-lock.yaml, yarn.lock classic+berry → exact pinned tree |
+| **Dep-type resolution** (prod/dev/peer/overrides) | `Npm.install_tree` | js_deptypes_test — devDeps skipped, peerDeps not auto-installed, overrides force versions |
 | **yq** (YAML processor) | Go-wasip1 artifact | yq_lane_test (.name/.tags through PackageManager.run) |
 | **gojq** (jq for JSON) | Go-wasip1 artifact | gojq_lane_test (filter/arithmetic/raw) |
 | **dasel** (JSON/YAML/TOML/XML/CSV query) | Go-wasip1 artifact | dasel_lane_test (3 formats) |

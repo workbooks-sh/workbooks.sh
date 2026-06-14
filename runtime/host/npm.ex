@@ -237,8 +237,21 @@ defmodule Workbooks.Npm do
   def install_tree(deps, dest) when is_list(deps) do
     nm = Path.join(dest, "node_modules")
     File.mkdir_p!(nm)
+    # package.json `overrides` force a version for a (possibly transitive) package — honored everywhere a
+    # name is resolved (security pins / dedup). Only simple `name => version` string overrides are applied.
+    overrides = read_overrides(dest)
     queue = Enum.map(deps, fn d -> {d.name, d.pin || d.req} end)
-    install_loop(queue, nm, %{}, [])
+    install_loop(queue, nm, overrides, %{}, [])
+  end
+
+  defp read_overrides(dest) do
+    with {:ok, body} <- File.read(Path.join(dest, "package.json")),
+         {:ok, j} <- Jason.decode(body),
+         o when is_map(o) <- j["overrides"] do
+      for {k, v} <- o, is_binary(v), into: %{}, do: {k, v}
+    else
+      _ -> %{}
+    end
   end
 
   @doc """
@@ -330,19 +343,19 @@ defmodule Workbooks.Npm do
     end
   end
 
-  defp install_loop([], _nm, installed, []), do: {:ok, installed}
-  defp install_loop([], _nm, installed, errors), do: {:ok, installed, Enum.reverse(errors)}
+  defp install_loop([], _nm, _ov, installed, []), do: {:ok, installed}
+  defp install_loop([], _nm, _ov, installed, errors), do: {:ok, installed, Enum.reverse(errors)}
 
-  defp install_loop([{name, spec} | rest], nm, installed, errors) do
+  defp install_loop([{name, spec} | rest], nm, ov, installed, errors) do
     if Map.has_key?(installed, name) do
-      install_loop(rest, nm, installed, errors)
+      install_loop(rest, nm, ov, installed, errors)
     else
-      case install_one(name, spec, nm) do
+      case install_one(name, Map.get(ov, name, spec), nm) do
         {:ok, version, child_deps} ->
-          install_loop(rest ++ child_deps, nm, Map.put(installed, name, version), errors)
+          install_loop(rest ++ child_deps, nm, ov, Map.put(installed, name, version), errors)
 
         {:error, reason} ->
-          install_loop(rest, nm, installed, [reason | errors])
+          install_loop(rest, nm, ov, installed, [reason | errors])
       end
     end
   end
