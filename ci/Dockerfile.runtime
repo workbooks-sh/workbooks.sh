@@ -63,14 +63,22 @@ RUN curl -fsSL https://wasmtime.dev/install.sh | bash -s -- --version ${WASMTIME
     && cp /root/.wasmtime/bin/wasmtime /usr/local/bin/wasmtime
 COPY --from=wbxcli /repo/cli/target/release/wbx /usr/local/bin/wbx
 
-# Bake the default semantic embedding model (Model2Vec/potion, ~30 MB) so the
-# runtime never downloads it. Checked before the WB_DATA cache.
+# Semantic embedding model (Model2Vec/potion, ~30 MB). The DEFAULT text embedder
+# is WB_EMBED=hash (lexical, no model) — so on the default path this model is NEVER
+# loaded and baking it is pure dead weight. It only matters for WB_EMBED=local
+# tenants, and Model2Vec.ensure_downloaded/0 already lazy-fetches it to the WB_DATA
+# volume cache (downloaded once, survives redeploys). So the bake is OPT-IN: off by
+# default (−30 MB image), on via --build-arg BAKE_EMBED_MODEL=true for operators who
+# want the no-first-request-stall / no-network-on-cold-start guarantee.
+ARG BAKE_EMBED_MODEL=false
 ENV WB_MODELS_DIR=/opt/models
-RUN mkdir -p /opt/models/potion-base-8M \
-    && for f in config.json vocab.txt model.safetensors; do \
-         curl -fsSL "https://huggingface.co/minishlab/potion-base-8M/resolve/main/$f" \
-           -o "/opt/models/potion-base-8M/$f"; \
-       done
+RUN if [ "$BAKE_EMBED_MODEL" = "true" ]; then \
+      mkdir -p /opt/models/potion-base-8M \
+      && for f in config.json vocab.txt model.safetensors; do \
+           curl -fsSL "https://huggingface.co/minishlab/potion-base-8M/resolve/main/$f" \
+             -o "/opt/models/potion-base-8M/$f"; \
+         done; \
+    fi
 
 COPY --from=build /app/_build/prod/rel/workbooks ./
 COPY --from=build /app/build ./build
