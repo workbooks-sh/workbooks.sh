@@ -5424,44 +5424,44 @@
   },
   {
    "slug": "tell-it-what-you-want",
-   "title": "Telling your agent what you want",
-   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/tell-it-what-you-want.mp3?v=516",
-   "dur": 516,
+   "title": "Telling your agent what to build",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/tell-it-what-you-want.mp3?v=600",
+   "dur": 600,
    "chapters": [
     {
      "id": "intro",
-     "title": "The first request",
+     "title": "The wall is gone",
      "t": 2
     },
     {
      "id": "outcome",
      "title": "Describe the outcome, not the steps",
-     "t": 75
+     "t": 86
     },
     {
      "id": "back-and-forth",
-     "title": "It builds, then you react",
-     "t": 164
+     "title": "Describe, look, correct",
+     "t": 183
     },
     {
      "id": "whole-picture",
      "title": "Give it the whole picture",
-     "t": 212
+     "t": 264
     },
     {
      "id": "specificity",
      "title": "Specificity is the dial",
-     "t": 316
+     "t": 369
     },
     {
      "id": "templates",
      "title": "Three starter requests you can steal",
-     "t": 379
+     "t": 457
     },
     {
      "id": "outro",
      "title": "An honest note",
-     "t": 472
+     "t": 550
     }
    ]
   },
