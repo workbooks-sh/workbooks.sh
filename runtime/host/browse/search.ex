@@ -21,10 +21,114 @@ defmodule Workbooks.Browse.Search do
 
   @engines [:brave, :duckduckgo, :bing]
 
-  @doc "Search `query` across engines (first non-empty wins). Opts: `:limit`, `:engine`."
+  @doc """
+  Search `query`. The PROVIDER is resolved from `opts[:provider]` → `$WB_SEARCH_PROVIDER`
+  → `"keyless"`. Keyed providers (`exa`, `brave_api`) are more reliable than scraping
+  but need the user's API key (`opts[:api_key]` or the provider's env key, settable in
+  Settings) — on a missing key OR an empty/failed result they FALL BACK to the keyless
+  scrape engines, so search always degrades to working. Opts: `:limit`, `:engine`,
+  `:provider`, `:api_key`.
+  """
   @spec query(String.t(), keyword()) :: [%{title: String.t(), url: String.t(), snippet: String.t() | nil}]
   def query(q, opts \\ []) do
-    query_scrape(q, Keyword.get(opts, :limit, 8), Keyword.get(opts, :engine))
+    limit = Keyword.get(opts, :limit, 8)
+
+    case provider(opts) do
+      :exa -> keyed(q, limit, opts, "EXA_API_KEY", &exa/3)
+      :brave_api -> keyed(q, limit, opts, "BRAVE_API_KEY", &brave_api/3)
+      :keyless -> query_scrape(q, limit, opts[:engine])
+    end
+  end
+
+  @doc false
+  def provider_for_test(opts), do: provider(opts)
+
+  defp provider(opts) do
+    case (opts[:provider] || System.get_env("WB_SEARCH_PROVIDER") || "keyless") |> to_string() |> String.downcase() do
+      "exa" -> :exa
+      p when p in ["brave_api", "brave-api"] -> :brave_api
+      _ -> :keyless
+    end
+  end
+
+  # Run a keyed provider; missing key OR empty/error → fall back to keyless scrape.
+  defp keyed(q, limit, opts, key_env, fun) do
+    case opts[:api_key] || System.get_env(key_env) do
+      k when is_binary(k) and k != "" ->
+        case fun.(q, k, limit) do
+          [_ | _] = hits -> hits
+          _ -> query_scrape(q, limit, opts[:engine])
+        end
+
+      _ ->
+        query_scrape(q, limit, opts[:engine])
+    end
+  end
+
+  # Exa (api.exa.ai) — POST /search, x-api-key → {results:[{title,url,text}]}.
+  defp exa(q, key, limit) do
+    body = Jason.encode!(%{query: q, numResults: limit, contents: %{text: %{maxCharacters: 400}}})
+
+    headers = [
+      {~c"x-api-key", String.to_charlist(key)},
+      {~c"content-type", ~c"application/json"}
+    ]
+
+    post_json("https://api.exa.ai/search", headers, body, fn json ->
+      (json["results"] || [])
+      |> Enum.map(fn r -> %{title: r["title"] || "", url: r["url"] || "", snippet: r["text"]} end)
+      |> Enum.reject(&(&1.url == ""))
+      |> Enum.take(limit)
+    end)
+  end
+
+  # Brave Search API — GET, X-Subscription-Token → {web:{results:[{title,url,description}]}}.
+  defp brave_api(q, key, limit) do
+    url = "https://api.search.brave.com/res/v1/web/search?q=#{URI.encode_www_form(q)}&count=#{limit}"
+
+    headers = [
+      {~c"x-subscription-token", String.to_charlist(key)},
+      {~c"accept", ~c"application/json"}
+    ]
+
+    get_json(url, headers, fn json ->
+      (get_in(json, ["web", "results"]) || [])
+      |> Enum.map(fn r -> %{title: r["title"] || "", url: r["url"] || "", snippet: r["description"]} end)
+      |> Enum.reject(&(&1.url == ""))
+      |> Enum.take(limit)
+    end)
+  end
+
+  # Trusted FIXED API endpoints (not agent-supplied URLs → no SSRF surface).
+  defp post_json(url, headers, body, parse) do
+    _ = Application.ensure_all_started(:inets)
+    _ = Application.ensure_all_started(:ssl)
+
+    case :httpc.request(:post, {String.to_charlist(url), headers, ~c"application/json", body}, [timeout: 15_000], body_format: :binary) do
+      {:ok, {{_, 200, _}, _, resp}} -> decode_then(resp, parse)
+      _ -> []
+    end
+  rescue
+    _ -> []
+  end
+
+  defp get_json(url, headers, parse) do
+    _ = Application.ensure_all_started(:inets)
+    _ = Application.ensure_all_started(:ssl)
+
+    case :httpc.request(:get, {String.to_charlist(url), headers}, [timeout: 15_000], body_format: :binary) do
+      {:ok, {{_, 200, _}, _, resp}} -> decode_then(resp, parse)
+      _ -> []
+    end
+  rescue
+    _ -> []
+  end
+
+  defp decode_then(resp, parse) do
+    case Jason.decode(resp) do
+      {:ok, json} -> parse.(json)
+      _ -> []
+    end
   end
 
   defp query_scrape(q, limit, engine_opt) do

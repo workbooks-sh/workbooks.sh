@@ -2,7 +2,7 @@
   "title": "Waldo / Runtime \u2014 Capability Ledger",
   "updated": "2026-06-14",
   "suite": {
-    "tests": 672,
+    "tests": 675,
     "failures": 0,
     "verified": "2026-06-14 (seed 0, 365 heavy-tagged excluded)"
   },
@@ -153,6 +153,16 @@
           "proof": "LIVE: agent researched 'what is Elixir' via web_search + fetch and returned a correct 2-sentence cited answer (Jose Valim, 2012, BEAM; elixir-lang.org)",
           "failure_modes": [
             "converges but can be step-heavy (16 steps observed for a simple query) - efficiency, not correctness; observe don't tune"
+          ]
+        },
+        {
+          "name": "Pluggable search providers (Exa/Brave-API seam, keyless fallback)",
+          "status": "done",
+          "tests": "search_provider_test",
+          "units": 3,
+          "proof": "provider routing (opts/env -> exa/brave_api/keyless) + key-from-opts/env + fallback-to-keyless proven; Exa+Brave-API impls ready (work when keyed)",
+          "failure_modes": [
+            "per-tenant Vars/settings key wiring + Perplexity + OpenRouter-web pending (wb-vgga/wb-e4jl)"
           ]
         }
       ]
