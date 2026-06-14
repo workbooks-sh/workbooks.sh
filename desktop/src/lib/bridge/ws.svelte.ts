@@ -449,6 +449,13 @@ class WsBridgeStore {
       params: token ? { token } : {},
       // Be quieter than Phoenix's default logger in dev.
       logger: () => {},
+      // Back off hard. A simplified runtime may not serve /socket (telemetry +
+      // agent tab-control channels); without this, Phoenix's default curve
+      // settles to a 5s retry and spams the console. Try a couple of quick
+      // reconnects, then a slow 30s heartbeat so a runtime that comes to support
+      // the socket still reconnects, without hammering one that doesn't.
+      reconnectAfterMs: (tries: number) =>
+        [1000, 3000, 10000][tries - 1] ?? 30000,
     });
     sock.onOpen(() => {
       this.connected = true;
