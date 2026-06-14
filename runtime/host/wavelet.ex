@@ -35,6 +35,7 @@ defmodule Workbooks.Wavelet do
   """
 
   @render_command "wavelet-render-seq"
+  @present_command "wavelet-render-present"
 
   # The render-core binary, compiled to wasm32-wasip1. Built from the wavelet
   # submodule (crates/wavelet-render-core, bin render_seq) by its release build;
@@ -44,6 +45,17 @@ defmodule Workbooks.Wavelet do
                      "../wavelet/crates/wavelet-render-core/target/wasm32-wasip1/release/render_seq.wasm",
                      __DIR__
                    )
+
+  # The presentation-export binary (bin render_present). Renders each SCENE of a
+  # multi-scene composition to a full-bleed slide PNG then assembles a valid OOXML
+  # .pptx ZIP — ENTIRELY in-guest (pure-Rust `zip`, NO ffmpeg/native exec). Same
+  # submodule build output, content-addressed + registered on first use.
+  @render_present_wasm Path.expand(
+                         "../wavelet/crates/wavelet-render-core/target/wasm32-wasip1/release/render_present.wasm",
+                         __DIR__
+                       )
+
+  @default_present_frame 0
 
   @default_w 1280
   @default_h 720
@@ -62,8 +74,14 @@ defmodule Workbooks.Wavelet do
   @doc "The CommandRegistry name the render-core wasm is registered under."
   def render_command, do: @render_command
 
+  @doc "The CommandRegistry name the presentation-export wasm is registered under."
+  def present_command, do: @present_command
+
   @doc "The path to the render-core wasm artifact (submodule build output)."
   def render_seq_wasm, do: @render_seq_wasm
+
+  @doc "The path to the presentation-export wasm artifact (submodule build output)."
+  def render_present_wasm, do: @render_present_wasm
 
   @doc """
   Register the render-core wasm as a CommandRegistry command (idempotent). It is
@@ -91,6 +109,34 @@ defmodule Workbooks.Wavelet do
   end
 
   @doc """
+  Register the presentation-export wasm as a CommandRegistry command (idempotent).
+  Content-addressed + bound under `#{@present_command}` with `:argv` mode. Returns
+  {:ok, name} | {:error, reason}.
+  """
+  def ensure_present_registered do
+    case Workbooks.CommandRegistry.current(@present_command) do
+      nil ->
+        cond do
+          not File.regular?(@render_present_wasm) ->
+            {:error, {:render_present_missing, @render_present_wasm}}
+
+          true ->
+            case Workbooks.CommandRegistry.register_artifact(
+                   @present_command,
+                   @render_present_wasm,
+                   :argv
+                 ) do
+              {:ok, _addressed} -> {:ok, @present_command}
+              {:error, reason} -> {:error, reason}
+            end
+        end
+
+      _spec ->
+        {:ok, @present_command}
+    end
+  end
+
+  @doc """
   The `wavelet` command entry point: a CLI-style argv dispatcher a bash-only tenant
   drives. `argv` is the token list AFTER the command name, e.g.
   `["render", "clip.html", "-o", "out.mp4", "--fps", "24"]`.
@@ -99,6 +145,9 @@ defmodule Workbooks.Wavelet do
     * `render <composition.html> -o <out.mp4> [--fps N] [--w N] [--h N] [--duration SECS] [--crf N] [--audio mp3]`
     * `audio <in.{mp3,aac,wav,m4a}> -o <out.m4a> [--bitrate KBPS]` — AUDIO-ONLY:
       no frames, no video; decode → native AAC → `.m4a`, entirely in the wasm guest.
+    * `present <composition.html> -o <out.pptx> [--w N] [--h N] [--frame N] [--fps N]` —
+      PRESENTATION export: one full-bleed slide per scene, assembled as a valid
+      OOXML `.pptx` ENTIRELY in-guest (pure-Rust zip; NO ffmpeg, NO native exec).
 
   Returns {:ok, out_path} | {:error, reason}. `opts` threads non-argv concerns
   (`:allow` for the encode cap, `:principal`, `:rate`, `:roots`, `:timeout_ms`).
@@ -107,8 +156,37 @@ defmodule Workbooks.Wavelet do
     case argv do
       ["render" | rest] -> render(rest, opts)
       ["audio" | rest] -> audio(rest, opts)
+      ["present" | rest] -> present(rest, opts)
       [verb | _] -> {:error, {:unknown_verb, verb}}
       [] -> {:error, :no_verb}
+    end
+  end
+
+  @doc """
+  `wavelet present <composition.html> -o <out.pptx> [--w N] [--h N] [--frame N] [--fps N]`.
+
+  PRESENTATION export: a multi-scene composition becomes a PowerPoint `.pptx`
+  deck — ONE full-bleed slide per scene — rendered ENTIRELY in-guest. Each scene
+  is isolated + painted to a PNG by the render-core wasm, then a valid OOXML
+  `.pptx` ZIP is assembled (pure-Rust `zip`), all inside the wasm sandbox: NO
+  ffmpeg, NO native exec, NO GPU, NO broker grant. `argv` is the verb's tokens.
+
+  Scene convention (matches the render-core): elements with a `data-scene`
+  attribute (any tag) → else top-level `<section>` elements → else the whole doc
+  is one scene. `--frame`/`--fps` seek the CSS timeline for the per-slide still.
+
+  `opts`:
+    * `:roots` — scratch-root allow-list for the wasm preopen. Defaults to
+      `Workbooks.FfmpegBroker.default_roots/0`.
+    * `:timeout_ms` — wall-clock cap on the render.
+
+  Returns {:ok, out_path} | {:error, reason}.
+  """
+  def present(argv, opts \\ []) when is_list(argv) do
+    with {:ok, p} <- parse_present_args(argv),
+         :ok <- validate_present(p),
+         {:ok, _name} <- ensure_present_registered() do
+      run_present_pipeline(p, opts)
     end
   end
 
@@ -169,6 +247,124 @@ defmodule Workbooks.Wavelet do
       not String.ends_with?(p.out, ".m4a") -> {:error, :output_not_m4a}
       p.bitrate < 8 or p.bitrate > 512 -> {:error, {:invalid, :bitrate}}
       true -> :ok
+    end
+  end
+
+  # ── present (.pptx) argv parsing + validation ─────────────────────────────────
+
+  defp parse_present_args(argv) do
+    parse_present_args(argv, %{
+      comp: nil,
+      out: nil,
+      w: @default_w,
+      h: @default_h,
+      frame: @default_present_frame,
+      fps: @default_fps
+    })
+  end
+
+  defp parse_present_args([], acc), do: {:ok, acc}
+
+  defp parse_present_args([flag, val | rest], acc) when flag in ["-o", "--out", "--output"],
+    do: parse_present_args(rest, %{acc | out: val})
+
+  defp parse_present_args([flag, val | rest], acc) when flag == "--w",
+    do: with_present_int(val, :w, acc, rest)
+
+  defp parse_present_args([flag, val | rest], acc) when flag == "--h",
+    do: with_present_int(val, :h, acc, rest)
+
+  defp parse_present_args([flag, val | rest], acc) when flag == "--frame",
+    do: with_present_int(val, :frame, acc, rest)
+
+  defp parse_present_args([flag, val | rest], acc) when flag == "--fps",
+    do: with_present_int(val, :fps, acc, rest)
+
+  defp parse_present_args(["-o"], _acc), do: {:error, {:flag_needs_value, "-o"}}
+
+  defp parse_present_args([flag | _], _acc)
+       when binary_part(flag, 0, min(2, byte_size(flag))) == "--",
+       do: {:error, {:flag_needs_value, flag}}
+
+  defp parse_present_args([pos | rest], %{comp: nil} = acc),
+    do: parse_present_args(rest, %{acc | comp: pos})
+
+  defp parse_present_args([pos | _rest], _acc), do: {:error, {:unexpected_arg, pos}}
+
+  defp with_present_int(val, key, acc, rest) do
+    case Integer.parse(val) do
+      {n, ""} -> parse_present_args(rest, Map.put(acc, key, n))
+      _ -> {:error, {:invalid, key}}
+    end
+  end
+
+  defp validate_present(p) do
+    cond do
+      is_nil(p.comp) -> {:error, :missing_composition}
+      is_nil(p.out) -> {:error, :missing_output}
+      not String.ends_with?(p.out, ".pptx") -> {:error, :output_not_pptx}
+      p.w < @min_dim or p.w > @max_dim -> {:error, {:invalid, :w}}
+      p.h < @min_dim or p.h > @max_dim -> {:error, {:invalid, :h}}
+      p.fps < @min_fps or p.fps > @max_fps -> {:error, {:invalid, :fps}}
+      p.frame < 0 -> {:error, {:invalid, :frame}}
+      true -> :ok
+    end
+  end
+
+  # ── the present pipeline: in-sandbox render scenes → assemble pptx → deliver ───
+  #
+  # ALL in-guest: the render_present wasm renders each scene to a PNG and assembles
+  # the .pptx ZIP itself (pure-Rust zip), so there is NO encode step, NO ffmpeg, NO
+  # broker grant. We only stage the composition into a gated scratch (so the wasm
+  # preopen is confined + relative assets resolve) and deliver the output.
+  defp run_present_pipeline(p, opts) do
+    roots = Keyword.get(opts, :roots, Workbooks.FfmpegBroker.default_roots())
+    root = List.first(roots) || System.tmp_dir!()
+    File.mkdir_p!(root)
+
+    scratch = Path.join(root, "wavelet-present-#{:erlang.unique_integer([:positive])}")
+
+    try do
+      File.mkdir_p!(scratch)
+      gated_out = Path.join(scratch, "out.pptx")
+
+      with {:ok, comp_guest} <- stage_composition(p.comp, scratch),
+           :ok <- render_present_pptx(scratch, comp_guest, p, opts),
+           {:ok, delivered} <- deliver(gated_out, p.out) do
+        {:ok, delivered}
+      end
+    after
+      File.rm_rf(scratch)
+    end
+  end
+
+  # Run the presentation-export wasm through the generic CommandRegistry lane.
+  # Preopens the scratch root at /work (read composition + assets, write the
+  # .pptx). render_present writes the deck to /work/out.pptx.
+  defp render_present_pptx(scratch, comp_guest, p, opts \\ []) do
+    argv = [
+      comp_guest,
+      "/work/out.pptx",
+      "--w",
+      Integer.to_string(p.w),
+      "--h",
+      Integer.to_string(p.h),
+      "--frame",
+      Integer.to_string(p.frame),
+      "--fps",
+      Integer.to_string(p.fps)
+    ]
+
+    dirs = ["#{Path.expand(scratch)}::/work"]
+
+    # Rendering N scenes is CPU-heavy; grant the same generous ceilings as the
+    # frame-sequence render.
+    ropts = [timeout_ms: Keyword.get(opts, :timeout_ms, 300_000), fuel: 500_000_000_000]
+
+    case Workbooks.CommandRegistry.run_status(@present_command, "", argv, dirs, ropts) do
+      {:ok, _out, 0} -> :ok
+      {:ok, out, status} -> {:error, {:present_failed, status, String.slice(out, 0, 400)}}
+      {:error, reason} -> {:error, {:present_failed, reason}}
     end
   end
 

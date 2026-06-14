@@ -47,6 +47,9 @@ defmodule Workbooks.WaveletCommandTest do
     unless File.regular?(Wavelet.render_seq_wasm()),
       do: raise("render-core wasm not built: #{Wavelet.render_seq_wasm()}")
 
+    unless File.regular?(Wavelet.render_present_wasm()),
+      do: raise("presentation-export wasm not built: #{Wavelet.render_present_wasm()}")
+
     # A dedicated gated root for the encode broker AND the wasm preopen scratch.
     root = Path.join(System.tmp_dir!(), "wb_wavelet_root_#{System.unique_integer([:positive])}")
     File.mkdir_p!(root)
@@ -301,5 +304,140 @@ defmodule Workbooks.WaveletCommandTest do
   test "unknown verb is refused" do
     assert {:error, {:unknown_verb, "frobnicate"}} = Wavelet.command(["frobnicate"])
     assert {:error, :no_verb} = Wavelet.command([])
+  end
+
+  # ── present (.pptx) export ──────────────────────────────────────────────────
+
+  # A multi-scene composition: three top-level <section>s with distinct solid
+  # backgrounds -> one full-bleed slide per scene.
+  @deck """
+  <!doctype html>
+  <html><head><style>
+    html,body{margin:0;padding:0;width:100%;height:100%}
+    section{position:absolute;inset:0}
+    .a{background:#3fe081}.b{background:#149157}.c{background:#0b1020}
+    h1{color:#fff;font-family:sans-serif;font-size:40px;margin:30px}
+  </style></head><body>
+    <section class="a"><h1>One</h1></section>
+    <section class="b"><h1>Two</h1></section>
+    <section class="c"><h1>Three</h1></section>
+  </body></html>
+  """
+
+  # Names inside the pptx zip (Erlang :zip yields charlists).
+  defp pptx_names(path) do
+    {:ok, list} = :zip.list_dir(String.to_charlist(path))
+
+    for {:zip_file, name, _info, _comment, _offset, _comp} <- list,
+        do: List.to_string(name)
+  end
+
+  test "ensure_present_registered binds the presentation-export wasm as a command" do
+    assert {:ok, name} = Wavelet.ensure_present_registered()
+    assert name == Wavelet.present_command()
+    assert {:wasm, path, :argv} = Workbooks.CommandRegistry.current(name)
+    assert File.regular?(path)
+    assert {:ok, ^name} = Wavelet.ensure_present_registered()
+  end
+
+  test "wavelet present: multi-scene composition -> valid .pptx, one slide per scene (in-guest)",
+       %{root: root} do
+    comp = Path.join(root, "deck.html")
+    File.write!(comp, @deck)
+    out = Path.join(root, "deck.pptx")
+
+    # The bash-tenant present surface — ALL in-guest (render scenes -> assemble
+    # pptx), NO ffmpeg, NO native exec, NO broker grant (no allow: needed).
+    assert {:ok, delivered} =
+             Wavelet.command(
+               ["present", comp, "-o", out, "--w", "320", "--h", "180"],
+               roots: [root]
+             )
+
+    assert delivered == Path.expand(out)
+    assert File.regular?(delivered)
+    # OOXML/zip magic: starts with "PK\x03\x04".
+    assert <<"PK", 3, 4, _::binary>> = File.read!(delivered)
+
+    names = pptx_names(delivered)
+
+    # Required OOXML parts.
+    for required <- [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "ppt/presentation.xml",
+          "ppt/_rels/presentation.xml.rels",
+          "ppt/slideMasters/slideMaster1.xml",
+          "ppt/slideLayouts/slideLayout1.xml",
+          "ppt/theme/theme1.xml"
+        ] do
+      assert required in names, "pptx missing part: #{required}"
+    end
+
+    # THREE scenes -> three slides + three media images.
+    for i <- 1..3 do
+      assert "ppt/slides/slide#{i}.xml" in names
+      assert "ppt/slides/_rels/slide#{i}.xml.rels" in names
+      assert "ppt/media/image#{i}.png" in names
+    end
+
+    # ...and no phantom 4th slide.
+    refute "ppt/slides/slide4.xml" in names
+
+    # The three slide images are genuinely different scenes (distinct backgrounds),
+    # so their PNG bytes must differ.
+    read = fn name ->
+      {:ok, [{_n, bytes}]} =
+        :zip.extract(String.to_charlist(delivered),
+          [:memory, {:file_list, [String.to_charlist(name)]}]
+        )
+
+      bytes
+    end
+
+    i1 = read.("ppt/media/image1.png")
+    i2 = read.("ppt/media/image2.png")
+    i3 = read.("ppt/media/image3.png")
+    assert i1 != i2, "scene 1 and 2 rendered identically — isolation failed"
+    assert i2 != i3, "scene 2 and 3 rendered identically — isolation failed"
+  end
+
+  test "wavelet present: a single-section/no-section doc -> a one-slide deck",
+       %{root: root} do
+    comp = Path.join(root, "one.html")
+    # No <section>, no data-scene -> the whole doc is ONE scene.
+    File.write!(comp, @composition)
+    out = Path.join(root, "one.pptx")
+
+    assert {:ok, delivered} =
+             Wavelet.command(["present", comp, "-o", out, "--w", "320", "--h", "180"],
+               roots: [root]
+             )
+
+    names = pptx_names(delivered)
+    assert "ppt/slides/slide1.xml" in names
+    refute "ppt/slides/slide2.xml" in names
+  end
+
+  test "wavelet present argv validation: bad ext, missing input/output, bad dim",
+       %{root: root} do
+    comp = Path.join(root, "p.html")
+    File.write!(comp, @deck)
+
+    assert {:error, :output_not_pptx} =
+             Wavelet.present([comp, "-o", Path.join(root, "x.key")], roots: [root])
+
+    assert {:error, :missing_output} = Wavelet.present([comp], roots: [root])
+    assert {:error, :missing_composition} = Wavelet.present(["-o", Path.join(root, "x.pptx")])
+
+    assert {:error, {:invalid, :w}} =
+             Wavelet.present([comp, "-o", Path.join(root, "x.pptx"), "--w", "999999"], roots: [root])
+  end
+
+  test "wavelet present: missing composition is refused", %{root: root} do
+    out = Path.join(root, "nope.pptx")
+
+    assert {:error, {:composition_missing, _}} =
+             Wavelet.present(["/nonexistent/deck.html", "-o", out], roots: [root])
   end
 end
