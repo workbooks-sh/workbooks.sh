@@ -1,6 +1,6 @@
 # wrangler
 
-A wrapper around the standard `wrangler` CLI for one job: ship a built workbook (`dist/<slug>.html`) to Cloudflare Pages on the user's own Cloudflare account. `wb forge web --to cloudflare` drives it through the deploy recipe.
+A wrapper around the standard `wrangler` CLI for one job: ship a built workbook (`dist/<slug>.html`) to Cloudflare Pages on the user's own Cloudflare account, via raw `wrangler pages deploy`.
 
 ## When to reach for it
 
@@ -9,8 +9,9 @@ Reach for `wrangler` when you want to host a forged workbook on Cloudflare Pages
 ## Example
 
 ```
-wrangler login
-wb forge web --to cloudflare      # ship dist/<slug>.html to Cloudflare Pages
+wrangler login                                          # browser OAuth, once
+mkdir -p site && cp dist/<slug>.html site/index.html    # stage as index.html
+wrangler pages deploy site --project-name <slug> --commit-dirty=true
 ```
 
 ## What it grants
