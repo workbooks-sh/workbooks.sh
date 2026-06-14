@@ -72,6 +72,7 @@ defmodule Workbooks.JsDock do
     allow_tcp = "tcp" in Policy.caps(profile)
     allow_udp = "udp" in Policy.caps(profile)
     allow_tls = "tls" in Policy.caps(profile)
+    allow_encode = "encode" in Policy.caps(profile)
 
     %{
       "host_http_get" =>
@@ -147,6 +148,31 @@ defmodule Workbooks.JsDock do
                 {:ok, out} <- Workbooks.ExecBroker.exec(name, argv, stdin, allow: true, principal: tenant, depth: depth + 1) do
              n = min(byte_size(out), max(out_cap, 0))
              :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(out, 0, n))
+             n
+           else
+             _ -> -1
+           end
+         end},
+      # host_ffmpeg_encode(req_ptr,req_len, out_ptr,out_cap) -> i32 : brokered native ENCODE (frames->mp4)
+      # via Workbooks.FfmpegBroker (the one bedrock escape — ffmpeg can't run in-wasm). Gated on the `encode`
+      # cap; the broker path-gates inputs/output, validates intent, and runs ffmpeg with structural argv.
+      # Writes the produced mp4's OUT PATH (utf-8) into the guest buffer on success; -1 on deny/failure.
+      "host_ffmpeg_encode" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, req_ptr, req_len, out_ptr, out_cap ->
+           with true <- allow_encode,
+                req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len),
+                {:ok, frames, out, audio, fps, crf} <- Workbooks.FfmpegBroker.parse_request(req),
+                {:ok, path} <-
+                  Workbooks.FfmpegBroker.encode(frames, out,
+                    allow: true,
+                    principal: tenant,
+                    audio: audio,
+                    fps: fps,
+                    crf: crf
+                  ) do
+             n = min(byte_size(path), max(out_cap, 0))
+             :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(path, 0, n))
              n
            else
              _ -> -1

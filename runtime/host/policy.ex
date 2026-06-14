@@ -25,12 +25,15 @@ defmodule Workbooks.Policy do
   #     a caller selecting it still authorizes signing + raw-socket egress, so pick `compute` for true sandbox.
   #   * network — minimal + net/llm/browse (host HTTP egress + LLM).
   #   * posix — network + posix + parallel (the full surface).
+  # `encode` (host_ffmpeg_encode) is a DEDICATED least-privilege cap for the host ffmpeg ENCODE broker (the
+  # one bedrock escape — native ffmpeg the guest cannot run in-wasm). Granted to the local-cap profiles
+  # (minimal+); a true sandbox (`compute`) gets vfs only and cannot encode.
   @profiles %{
-    minimal: %{memory: 64 * 1024 * 1024, caps: ~w(vfs commands exec kv secrets queue tcp udp tls), timeout: 5_000},
-    network: %{memory: 128 * 1024 * 1024, caps: ~w(vfs commands exec kv secrets queue tcp udp tls net llm browse), timeout: 30_000},
+    minimal: %{memory: 64 * 1024 * 1024, caps: ~w(vfs commands exec kv secrets queue tcp udp tls encode), timeout: 5_000},
+    network: %{memory: 128 * 1024 * 1024, caps: ~w(vfs commands exec kv secrets queue tcp udp tls net llm browse encode), timeout: 30_000},
     posix: %{
       memory: 256 * 1024 * 1024,
-      caps: ~w(vfs commands exec kv secrets queue tcp udp tls net llm browse posix parallel),
+      caps: ~w(vfs commands exec kv secrets queue tcp udp tls net llm browse posix parallel encode),
       timeout: 60_000
     },
     compute: %{memory: 64 * 1024 * 1024, caps: ~w(vfs), timeout: 5_000}

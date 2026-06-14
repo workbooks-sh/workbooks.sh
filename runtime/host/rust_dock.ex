@@ -43,6 +43,7 @@ defmodule Workbooks.RustDock do
       |> maybe("tcp" in caps, fn -> tcp_caps(tenant, net_allow) end)
       |> maybe("udp" in caps, fn -> udp_caps(tenant, net_allow) end)
       |> maybe("tls" in caps, fn -> tls_caps(tenant, net_allow) end)
+      |> maybe("encode" in caps, fn -> encode_caps(tenant) end)
 
     %{"env" => env}
   end
@@ -89,6 +90,37 @@ defmodule Workbooks.RustDock do
              else
                -1
              end
+           else
+             _ -> -1
+           end
+         end}
+    }
+  end
+
+  # Native ENCODE — merged on the "encode" cap. The one bedrock escape: ffmpeg is a native binary the guest
+  # cannot run in-wasm, so the host owns it. The guest writes a length-prefixed request
+  # (Workbooks.FfmpegBroker.parse_request: frames_dir, out_path, audio?, fps, crf); the broker path-gates
+  # every path, validates the numeric intent, and runs ffmpeg with structural argv (frames -> h264/yuv420p
+  # +faststart mp4, optional AAC audio). On success the produced OUT PATH is written back; -1 on deny/error.
+  defp encode_caps(principal) do
+    %{
+      "host_ffmpeg_encode" =>
+        {:fn, [:i32, :i32, :i32, :i32], [:i32],
+         fn ctx, req_ptr, req_len, out_ptr, out_cap ->
+           req = Wasmex.Memory.read_binary(ctx.caller, ctx.memory, req_ptr, req_len)
+
+           with {:ok, frames, out, audio, fps, crf} <- Workbooks.FfmpegBroker.parse_request(req),
+                {:ok, path} <-
+                  Workbooks.FfmpegBroker.encode(frames, out,
+                    allow: true,
+                    principal: principal,
+                    audio: audio,
+                    fps: fps,
+                    crf: crf
+                  ) do
+             n = min(byte_size(path), max(out_cap, 0))
+             :ok = Wasmex.Memory.write_binary(ctx.caller, ctx.memory, out_ptr, binary_part(path, 0, n))
+             n
            else
              _ -> -1
            end
