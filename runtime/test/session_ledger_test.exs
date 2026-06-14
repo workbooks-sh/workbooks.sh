@@ -46,9 +46,32 @@ defmodule Workbooks.SessionLedgerTest do
 
   test "active_only? filters out completed runs (none live → empty)" do
     SessionLedger.record("run-done", "waldo", "done one", "/wd")
-    assert SessionLedger.list(true) == []
+    assert SessionLedger.list(nil, true) == []
     # but the unfiltered list still has it
     assert length(SessionLedger.list()) == 1
+  end
+
+  test "tenant scoping: a caller sees only its own tenant's sessions (wb-g1yo.1)" do
+    SessionLedger.record("run-a", "waldo", "alice work", "/wd", "alice")
+    SessionLedger.record("run-b", "waldo", "bob work", "/wd", "bob")
+
+    alice = SessionLedger.list("alice")
+    assert Enum.map(alice, & &1.session_id) == ["run-a"]
+    refute Enum.any?(alice, &(&1.session_id == "run-b"))
+
+    bob = SessionLedger.list("bob")
+    assert Enum.map(bob, & &1.session_id) == ["run-b"]
+
+    # nil tenant = unscoped (admin/internal view) → sees both
+    assert length(SessionLedger.list(nil)) == 2
+  end
+
+  test "tenant scoping: legacy entries (no recorded tenant) are visible to all" do
+    SessionLedger.record("run-legacy", "waldo", "old run", "/wd")
+    SessionLedger.record("run-bob", "waldo", "bob run", "/wd", "bob")
+    # bob sees his own + the legacy (grandfathered), not... well there's no other tenant here
+    ids = SessionLedger.list("bob") |> Enum.map(& &1.session_id) |> Enum.sort()
+    assert ids == ["run-bob", "run-legacy"]
   end
 
   test "record is best-effort and list is resilient to a malformed line" do

@@ -302,7 +302,7 @@ defmodule Workbooks.Web do
       |> then(&if params["workdir"], do: [{:workdir, params["workdir"]} | &1], else: &1)
 
     {:ok, _} = Workbooks.AgentSession.start(id, system, prompt, opts)
-    Workbooks.SessionLedger.record(id, slug, prompt, params["workdir"])
+    Workbooks.SessionLedger.record(id, slug, prompt, params["workdir"], conn.assigns.tenant)
     json = Jason.encode!(%{session_id: id, status: "running"})
     conn |> put_resp_content_type("application/json") |> send_resp(202, json)
   end
@@ -312,7 +312,8 @@ defmodule Workbooks.Web do
   get "/api/sessions" do
     conn = fetch_query_params(conn)
     active_only? = conn.query_params["active"] == "true"
-    sessions = Workbooks.SessionLedger.list(active_only?)
+    # Tenant-scoped (wb-g1yo.1): a caller sees only their own tenant's sessions.
+    sessions = Workbooks.SessionLedger.list(conn.assigns.tenant, active_only?)
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{sessions: sessions}))
   end
 
