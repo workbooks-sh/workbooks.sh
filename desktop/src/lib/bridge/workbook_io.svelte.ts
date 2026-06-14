@@ -1,10 +1,18 @@
-// files domain — workbook bundle / unbundle / spec bridge (Phase B).
+// files domain — workbook bundle / unbundle / spec bridge.
 //
-// Thin reactive wrapper over the native Rust `workbook_bundle`,
-// `workbook_unbundle`, and `workbook_spec_read` Tauri commands. All
-// native/offline — no runtime/control-plane calls. Owns:
-//   * an in-flight set so the UI can disable the menu item while
-//     a bundle is running
+// De-Tauri'd (WORKBOOK-BUNDLE.md "Native everywhere"): the bundler is NOT a
+// desktop Rust command — it's `Workbooks.Bundle` on the engine, reached over
+// `/rcp/bundle` + `/rcp/unbundle` (the same BYTES-over-RCP seam checkout/checkin
+// use, because the engine runs in a container and can't see host paths). The
+// desktop is a pure caller: it only does file IO (read the dir tree / write the
+// result) via the `bundle_read_tree` / `bundle_write_tree` Rust commands, then
+// the engine does ALL zip/embed/loader/sign work. No bespoke Rust bundler.
+//
+//   bundle:   read tree → POST /rcp/bundle  → write returned .html
+//   unbundle: POST /rcp/unbundle(.html)     → write returned tree
+//
+// Owns:
+//   * an in-flight set so the UI can disable the menu item while running
 //   * the path-derivation rules:
 //       bundle:    <dir>           → <dir>.html  (sibling of dir)
 //       unbundle:  <name>.html     → <name>-unbundled/
@@ -14,6 +22,17 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { toasts } from "$lib/bridge/toasts.svelte";
+import { engineRequest } from "$lib/engine-api/gen";
+
+/** base64 ↔ bytes for the HTML round-trip through the engine. The tree's parts
+ *  are base64'd by the Rust IO commands; the .html itself is base64'd here so a
+ *  binary-clean payload survives the JSON hop in both directions. */
+function b64encode(s: string): string {
+  return btoa(unescape(encodeURIComponent(s)));
+}
+function b64decode(b: string): string {
+  return decodeURIComponent(escape(atob(b)));
+}
 
 export interface BundleResult {
   output: string;
@@ -67,10 +86,23 @@ class WorkbookIoStore {
       message: `Bundling ${dir} …`,
     });
     try {
-      const result = await invoke<BundleResult>("workbook_bundle", {
+      // 1. Desktop reads the dir tree (raw bytes, base64) — file IO only.
+      const files = await invoke<Record<string, string>>("bundle_read_tree", {
         dir,
-        output,
       });
+      // 2. Engine does ALL the bundling (zip + embed + loader) — the one home.
+      const resp = await engineRequest<{ html_b64: string; files: string[] }>(
+        "/rcp/bundle",
+        { method: "POST", body: { files } },
+      );
+      // 3. Desktop writes the engine's self-contained .html out.
+      const html = b64decode(resp.html_b64);
+      await invoke("fs_write_file", { path: output, content: html });
+      const result: BundleResult = {
+        output,
+        stdout: `bundled ${resp.files.length} files → ${output}`,
+        stderr: "",
+      };
       toasts.update(toastId, {
         kind: "success",
         message: `Bundled to ${result.output}`,
@@ -98,10 +130,22 @@ class WorkbookIoStore {
       message: `Unbundling ${htmlPath} …`,
     });
     try {
-      const result = await invoke<UnbundleResult>("workbook_unbundle", {
-        htmlPath,
-        outputDir,
+      // 1. Desktop reads the .html source.
+      const html = await invoke<string>("fs_read_file", { path: htmlPath });
+      // 2. Engine extracts + unpacks the embedded bundle — the one home.
+      const resp = await engineRequest<{ files: Record<string, string> }>(
+        "/rcp/unbundle",
+        { method: "POST", body: { b64: b64encode(html) } },
+      );
+      // 3. Desktop writes the parts (raw bytes, base64) back to disk — file IO.
+      await invoke<number>("bundle_write_tree", {
+        files: resp.files,
+        dir: outputDir,
       });
+      const result: UnbundleResult = {
+        output_dir: outputDir,
+        files: Object.keys(resp.files),
+      };
       toasts.update(toastId, {
         kind: "success",
         message: `Unbundled ${result.files.length} files to ${result.output_dir}`,

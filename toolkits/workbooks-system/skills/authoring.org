@@ -13,12 +13,13 @@ three projections, read =concepts= first.
 
 * Source-vs-artifact discipline (the one rule)
 
-Edit *source*, never the runnable artifact. A workbook ships as compiled
-HTML with embedded =.wasm= / bundles; that file is an output. If you receive
-a workbook as a single file and must change it: unbundle it to source, edit
-the source, rebuild. Never patch compiled HTML, and never let raw build
-inputs (un-compiled sources) leak into the shipped artifact — only WASM or
-built bundles belong in it.
+Edit *source*, never the runnable artifact. A workbook ships as one =.html=
+that carries its whole filesystem packed inside it — a base64
+=<script id="wb-bundle">= deflate-zip holding the org source, the compiled
+=.wasm=, and the assets; that file is an output. If you receive a workbook as
+a file and must change it: unbundle it to source, edit the source, rebuild.
+Never patch the compiled HTML, and never let raw build inputs (un-compiled
+sources) leak into the shipped artifact — only WASM or built bundles belong in it.
 
 * The authoring loop (commands available to you)
 
@@ -26,12 +27,12 @@ built bundles belong in it.
 rather than memorizing them — the verbs are the stable contract):
 
 #+begin_src bash
-wb build <workspace>        # compile components → WASM; reports built/unbuilt
-wb pack <workspace> <out>   # compose members into one workbook (--build to build first)
-wb unpack <bundle> <dest>   # disassemble a workbook back into a flat source tree
+wb build <workspace>            # compile components → WASM; reports built/unbuilt
+wb bundle <dir> <out.html>      # tangle + compile + pack the tree into one self-contained .html
+wb unbundle <in.html> <dir>     # extract the wb-bundle block back into an editable filesystem tree
 wb query | tangle | lint <file.org>   # headlines / build plan / diagnostics
-wb sign <file.html>         # embed a did:key provenance manifest
-wb verify <file.html>       # check signature + asset integrity
+wb sign <file.html>             # embed a did:key provenance manifest
+wb verify <file.html>           # check signature + asset integrity
 #+end_src
 
 An =unbuilt= component is a to-do, not an error to suppress — it names the

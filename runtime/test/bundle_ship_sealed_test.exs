@@ -5,6 +5,12 @@ defmodule BundleShipSealedTest do
   manifest carries only key_refs; release happens through the escrow store gated by
   Workbooks.Access (the runtime POST /rcp/key/:id path is exercised at the Access +
   Escrow level here, and end-to-end in WebKeyReleaseTest).
+
+  These pin the LEGACY raw-zip egress (`egress: :wbundle`) — the form where the
+  page (`workbook.html`) is a PACKED entry and so can itself be sealed. The new
+  self-contained `.html` egress makes the page the carrier (unsealable, it must be
+  readable to load); its sealing of FILESYSTEM entries is pinned in
+  `bundle_egress_migration_test.exs`.
   """
   use ExUnit.Case, async: false
 
@@ -14,6 +20,7 @@ defmodule BundleShipSealedTest do
   test "ship with gated paths seals them, escrows keys, and writes key_refs" do
     blob =
       Bundle.ship("wb-ship-1", "<html>public shell</html>", "VFSBYTES",
+        egress: :wbundle,
         gated: ["workbook.html"]
       )
 
@@ -36,7 +43,7 @@ defmodule BundleShipSealedTest do
 
   test "round-trip: release key → Bundle.open unseals to the original bytes" do
     original = "<html>SECRET DASHBOARD $$$</html>"
-    blob = Bundle.ship("wb-ship-2", original, "VFS", gated: ["workbook.html"])
+    blob = Bundle.ship("wb-ship-2", original, "VFS", egress: :wbundle, gated: ["workbook.html"])
     {manifest, _sealed, _vfs} = Bundle.restore(blob)
     key_id = manifest["key_refs"]["workbook.html"]["key_id"]
 
@@ -48,7 +55,7 @@ defmodule BundleShipSealedTest do
   end
 
   test "public entries stay plaintext; only gated paths are sealed" do
-    blob = Bundle.ship("wb-ship-3", "<html>shell</html>", "VFSDATA", gated: ["vfs.sqlite"])
+    blob = Bundle.ship("wb-ship-3", "<html>shell</html>", "VFSDATA", egress: :wbundle, gated: ["vfs.sqlite"])
     {manifest, html, vfs} = Bundle.restore(blob)
 
     assert html == "<html>shell</html>"
@@ -58,7 +65,7 @@ defmodule BundleShipSealedTest do
   end
 
   test "no gated opt → no key_refs, nothing sealed (backwards compatible)" do
-    blob = Bundle.ship("wb-ship-4", "<html/>", "VFS")
+    blob = Bundle.ship("wb-ship-4", "<html/>", "VFS", egress: :wbundle)
     {manifest, html, _vfs} = Bundle.restore(blob)
     refute Map.has_key?(manifest, "key_refs")
     assert html == "<html/>"

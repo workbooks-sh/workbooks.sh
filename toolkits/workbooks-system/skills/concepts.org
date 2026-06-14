@@ -13,11 +13,16 @@ LOADED — before acting on it. This is the "what things are" skill; the
 
 * Workbook — document and program
 
-A workbook is one HTML file that is an entire app. Inside it: the interface
-(markup/styles/script), the data it carries, its own source (so it can be
-unbundled), and — when it computes — WebAssembly modules run by an embedded
-kernel or by the runtime's wasmtime. It does not need a server to simply be
-used; it is opened, not hosted.
+A workbook is one =.html= file that carries its *entire filesystem* inside
+it, compressed. That filesystem holds the interface (markup/styles/script),
+the data it carries, its own source (so it can be unbundled), and — when it
+computes — the WebAssembly modules run by an embedded kernel or by the
+runtime's wasmtime. The filesystem rides as a single base64 block,
+=<script type="application/zip" id="wb-bundle">…</script>= — a deflate-zip,
+so the served page unpacks itself in any browser with no dependency
+(=DecompressionStream('deflate-raw')= is native; zstd/xz are not). It does not
+need a server to simply be used; it is opened, not hosted. (The separate
+=.wbundle= is legacy back-compat; new artifacts are the self-contained =.html=.)
 
 Every buildable workbook exists in three projections — keep them straight:
 
@@ -39,10 +44,14 @@ projection — unbundle, edit source, rebuild.
   their =:workflow:= / =:component:= headlines into the executable plan. A
   component whose toolchain is unavailable is reported *unbuilt with a
   reason* — the platform never fakes an artifact. Treat =unbuilt= as a to-do.
-- *Unbundle* (artifact → source): reverses the pack, extracting the embedded
-  source into an editable tree. This is the intended editing loop for any
-  workbook you receive as a file: unbundle → edit source → rebuild. Neither
-  direction is lossy; round-tripping is first-class.
+- *Unbundle* (artifact → source): extracts the =wb-bundle= block and unpacks
+  the deflate-zip back into an editable filesystem tree. This is the intended
+  editing loop for any workbook you receive as a file: unbundle → edit source →
+  rebuild. Neither direction is lossy; round-tripping is byte-exact.
+
+Bundle/unbundle is the workbook's native edit-and-compile lifecycle, not a
+one-off export: you always edit *source* (never the compiled =.wasm=), and
+re-bundling replaces the embedded payload cleanly.
 
 * Runtime — one server, many apps
 

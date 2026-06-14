@@ -345,7 +345,7 @@ sequenceDiagram
   <pre class="mermaid">
 flowchart TD
   edit["author edits<br/>workbook.html"] --> ship
-  ship["ship on egress<br/>Bundle.ship + :tenant"] -->|"sign · c2pa.action.published<br/>manifest.json: signed=true"| out["the .wbundle leaves"]
+  ship["ship on egress<br/>Bundle.ship + :tenant"] -->|"sign · c2pa.action.published<br/>manifest.json: signed=true"| out["the signed .html leaves"]
   edit --> checkin["library check-in"]
   checkin -->|"re-sign · c2pa.action.updated"| lib["versioned in the library"]
   out --> gate{"third-party install<br/>require_signature?"}
@@ -450,12 +450,13 @@ flowchart TD
   </details>
   <details>
     <summary>Does the signature survive bundling?</summary>
-    <p>Yes — the manifest lives in <code>workbook.html</code>, which sits inside
-    the <code>.wbundle</code>. <code>Bundle.verify</code> unpacks the bundle and
-    runs the same two-check verify over that <code>workbook.html</code>. The
-    bundle also records a <code>signed</code> bool in its
-    <code>manifest.json</code>; the <a href="bundles">bundles</a> lesson covers
-    that side.</p>
+    <p>Yes — the manifest lives in the <code>workbook.html</code> itself, and the
+    signature is taken with the embedded bundle <em>stripped</em>, so it's invariant
+    under bundle/unbundle; the embedded zip is then bound by a signed
+    <code>wb.bundle.sha256</code> assertion. <code>Bundle.verify</code> runs the same
+    two-check verify over that <code>workbook.html</code> and catches a swapped
+    payload. The manifest also records a <code>signed</code> bool; the
+    <a href="bundles">bundles</a> lesson covers that side.</p>
   </details>
   <details>
     <summary>Can I sign on one machine and verify on another?</summary>

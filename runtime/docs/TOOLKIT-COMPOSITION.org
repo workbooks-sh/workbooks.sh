@@ -63,7 +63,7 @@
   | *Capability*  | any subset of Dock caps it's granted (vfs/commands/llm/browse/net/…)    |
   | *Invocation*  | agent(bash) · workbook HTML(Dock) · workflow · fabric(hot loop) · another toolkit |
   | *Packaging*   | standalone · bundled inside a workbook · published to the registry      |
-  | *Distribution*| session-local → workspace(.wbundle) → registry → desktop/server tiers    |
+  | *Distribution*| session-local → workspace(self-contained .html) → registry → desktop/server tiers |
   | *Trust*       | first-party · third-party(granted) · signed(did:key)                    |
 
   No axis forces another. A Zig =kernel= can be agent-invoked; a JS =command= can
@@ -73,11 +73,15 @@
 * Toolkit × Workbook — the relationships (the "can I…?" answers)
 
 ** A toolkit INSIDE a workbook (the workbook as carrier)
-   A workbook's bundle (=.wbundle=: HTML + SQLite VFS + manifest) can carry
-   toolkits — source (=.org=) plus their compiled =.wasm= (library.ex packs a
-   workspace → one parent workbook, source inputs + build outputs). So a workbook
-   is *self-contained*: open it, its toolkits travel with it. No external fetch
-   required to run what it ships.
+   A workbook is *one =.html=* carrying its entire filesystem inside it — the
+   filesystem (org source + SQLite VFS + manifest + compiled =.wasm=) is packed as
+   a deflate-zip and embedded as a base64 =<script id="wb-bundle">= block in the
+   page (see WORKBOOK-BUNDLE.org). So it can carry toolkits — source (=.org=) plus
+   their compiled =.wasm= (library.ex packs a workspace → one parent workbook,
+   source inputs + build outputs). The workbook is *self-contained*: open the one
+   file, its toolkits travel with it. No external fetch required to run what it
+   ships. (The separate =.wbundle= raw zip is legacy/back-compat; new artifacts are
+   the embedded =.html=.)
 
 ** A toolkit USED BY a workbook's HTML (the closed loop)
    The workbook's HTML calls a toolkit through the Dock (=run-command= for a

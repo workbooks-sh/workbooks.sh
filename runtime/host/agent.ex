@@ -75,7 +75,7 @@ defmodule Workbooks.Agent do
     }},
     %{type: "function", function: %{
       name: "wb",
-      description: "Run the wb CLI. Args as one string. Subcommands: `var set/get/list/ref` (variable store; secrets ref-only); `toolkit list` · `toolkit show <id> [skill]` (READ a skill recipe before using a toolkit) · `toolkit search <q>` · `toolkit run <id> <task> -- <args>`. e.g. args=\"toolkit show ffmpeg extract-audio\".",
+      description: "Run the wb CLI. Args as one string. Subcommands: `var set/get/list/ref` (variable store; secrets ref-only); `toolkit list` · `toolkit show <id> [skill]` (READ a skill recipe before using a toolkit) · `toolkit search <q>` · `toolkit run <id> <task> -- <args>`. The workbook edit loop (host performs the zip IO, no shelling out): `unbundle <in.html> <dir>` extracts a workbook's embedded source tree to a dir, then after you edit the native source, `bundle <dir> <out.html>` re-packs the tree back into one self-contained .html (idempotent — replaces the old payload). e.g. args=\"toolkit show ffmpeg extract-audio\".",
       parameters: %{type: "object", properties: %{args: %{type: "string"}}, required: ["args"]}
     }},
     %{type: "function", function: %{
@@ -514,14 +514,16 @@ defmodule Workbooks.Agent do
   defp exec_one(%{name: n}, st), do: {"unknown tool: #{n}", st, nil}
 
   # Platform / build verbs that modify infra (deploy) or read+write the host fs by
-  # RAW, unconfined path (bundle/sign/verify/pack/unpack/fetch all do File.read!/
-  # write! on caller-supplied paths and are NOT tenant-scoped). Reachable via the
+  # RAW, unconfined path (bundle/unbundle/sign/verify/pack/unpack/fetch all do
+  # File.read!/write! on caller-supplied paths and are NOT tenant-scoped). unbundle
+  # is the edit-loop's first step (`.html` → working tree) and writes a whole tree
+  # to a caller path, so it is gated like its `bundle` inverse. Reachable via the
   # wb tool, they'd let an exec-denied (cloud/shared) tenant's agent read another
   # tenant's files or secrets / write anywhere — so they require exec, like
   # git/publish. The tenant-scoped verbs (model/var/app/env/telemetry/ledger/…)
   # stay open. (Confining these verbs' paths to the workdir even WITH exec — a
   # desktop prompt-injection hardening — is tracked in wb-oyhh.)
-  @effectful_wb ~w(deploy bundle sign verify pack unpack fetch)
+  @effectful_wb ~w(deploy bundle unbundle sign verify pack unpack fetch)
   defp effectful_wb?([verb | _]) when verb in @effectful_wb, do: true
   defp effectful_wb?(_), do: false
 

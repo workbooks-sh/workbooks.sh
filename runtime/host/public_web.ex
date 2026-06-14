@@ -262,7 +262,28 @@ defmodule Workbooks.PublicWeb do
   end
 
   defp serve_html(conn, body),
-    do: conn |> put_resp_content_type("text/html") |> send_resp(200, inject_marker(body))
+    do: conn |> put_resp_content_type("text/html") |> csp() |> send_resp(200, inject_marker(body))
+
+  # CSP on served Workbooks: a self-contained `.html` hydrates an in-page VFS from
+  # its embedded `wb-bundle` zip. Those entries are DATA, not scripts — the runtime
+  # treats hydrated HTML/JS/.wasm as inert until it EXPLICITLY evaluates them. The
+  # header is a defense-in-depth floor so a hostile bundle's embedded markup can't
+  # auto-execute with the serving origin's privileges (cookies / same-origin fetch /
+  # control-plane session). `'unsafe-inline'` covers the page's own inline styles +
+  # the wb-bundle-loader; `object-src 'none'`/`base-uri 'self'` close the obvious
+  # injection vectors. The `wb-bundle` block itself is `type=application/zip`
+  # (non-executable by type) — CSP is the belt to that suspenders.
+  defp csp(conn) do
+    policy =
+      "default-src 'self'; " <>
+        "script-src 'self' 'unsafe-inline'; " <>
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " <>
+        "font-src 'self' https://fonts.gstatic.com; " <>
+        "img-src 'self' data: blob:; " <>
+        "connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+
+    put_resp_header(conn, "content-security-policy", policy)
+  end
 
   # Published static trees live under the durable data dir (WB_DATA → the volume)
   # so they survive machine restarts / scale-to-zero; fall back to cwd in dev.
@@ -319,7 +340,8 @@ defmodule Workbooks.PublicWeb do
     |> String.starts_with?(["<!doctype html", "<html"])
   end
 
-  defp static_doc(id, rendered) do
+  @doc false
+  def static_doc(id, rendered) do
     """
     <!doctype html><html lang="en"><head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -359,7 +381,9 @@ defmodule Workbooks.PublicWeb do
     </header>
     #{rendered}
     <footer>Rendered by the Workbooks OQL kernel · <a href="https://github.com/workbooks-sh/workbooks.sh">workbooks-sh/workbooks.sh</a></footer>
-    </main></body></html>
+    </main>
+    #{Workbooks.Bundle.loader_block()}
+    </body></html>
     """
   end
 

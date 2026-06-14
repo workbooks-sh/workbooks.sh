@@ -18,7 +18,8 @@ callbacks. Adding a provider = one adapter module + one config line, never a
 fork.
 
 * Two data classes (they want different backends)
-- *Blobs / repos* — tenant git repos, `.wbundle`s, signed artifacts, VFS files,
+- *Blobs / repos* — tenant git repos, self-contained workbook `.html`s (legacy
+  `.wbundle`s too), signed artifacts, VFS files,
   sealed ledgers. Large, opaque, content-addressed. → object store (R2/S3) or a
   volume. Interface: `Workbooks.Storage`.
 - *Structured / queryable* — vars, agent memory, the telemetry+ledger index, the

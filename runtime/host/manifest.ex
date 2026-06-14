@@ -32,26 +32,39 @@ defmodule Workbooks.Manifest do
   @version "v1"
   @generator "workbooks-runtime/0.1"
 
+  # The self-contained Workbook embeds its filesystem zip in a `wb-bundle` <script>
+  # block (`Workbooks.Bundle.embed/2`). Signing must be STABLE across embed/extract:
+  # if `asset_sha256` covered those bytes, embedding (or swapping) the bundle would
+  # invalidate a valid signature and vice-versa. So both `sign` and `verify` hash the
+  # page with the wb-bundle block STRIPPED — the signature binds the PAGE; the bundle
+  # blob is bound separately, by a `bundle_sha256` assertion the packer adds (so the
+  # signed manifest still pins the embedded filesystem, tamper-evidently). This regex
+  # mirrors `Bundle`'s @bundle_re — kept here so Manifest has no compile dep on Bundle.
+  @bundle_re ~r/<script[^>]*id="wb-bundle"[^>]*>.*?<\/script>/s
+
   @doc """
   Sign `html` as `tenant`, embedding a signed manifest. `assertions` is a list of
   plain maps (e.g. `%{"type" => "c2pa.action.published", "actor" => did}`).
   Idempotent — re-signing strips any prior manifest first. Returns the signed HTML.
   """
   def sign(html, tenant, assertions \\ [], opts \\ []) when is_binary(html) do
-    stripped = strip(html)
-
+    # The HASH is over the page with BOTH the prior manifest AND any embedded
+    # wb-bundle block stripped (so the signature is invariant under embed/extract).
+    # But the OUTPUT must PRESERVE the wb-bundle block (the embedded filesystem) —
+    # only the prior manifest is removed before re-injecting. The bundle blob is
+    # bound separately by a `wb.bundle.sha256` assertion the embedded-form ship adds.
     manifest = %{
       "version" => @version,
       "issuer_did" => Git.did(tenant),
       "claim_generator" => Keyword.get(opts, :claim_generator, @generator),
       "issued_at" => Keyword.get_lazy(opts, :issued_at, &iso_now/0),
-      "asset_sha256" => sha256_hex(stripped),
+      "asset_sha256" => sha256_hex(strip(html)),
       "assertions" => assertions
     }
 
     sig = Git.sign(tenant, canonical(manifest)) |> Base.encode64()
     block = @tag_open <> Jason.encode!(Map.put(manifest, "signature", sig)) <> @tag_close
-    inject(stripped, block)
+    inject(strip_manifest(html), block)
   end
 
   @doc "Verify a signed artifact: signature + asset integrity. Pure-read, no key needed for the asset half."
@@ -82,7 +95,15 @@ defmodule Workbooks.Manifest do
   defp canonical(other), do: Jason.encode!(other)
 
   # ── html embedding ───────────────────────────────────────────────────────────
-  defp strip(html), do: String.replace(html, ~r/#{Regex.escape(@tag_open)}.*?#{Regex.escape(@tag_close)}/s, "")
+  # For HASHING: strip BOTH the prior C2PA manifest AND any embedded wb-bundle block,
+  # so the signed `asset_sha256` is invariant under embed/extract (the signature
+  # binds the page; the bundle binds via the `wb.bundle.sha256` assertion).
+  defp strip(html), do: html |> strip_manifest() |> then(&Regex.replace(@bundle_re, &1, "", global: true))
+
+  # For RE-INJECTION: strip only the prior manifest, PRESERVING the wb-bundle block
+  # so a signed self-contained `.html` keeps its embedded filesystem.
+  defp strip_manifest(html),
+    do: String.replace(html, ~r/#{Regex.escape(@tag_open)}.*?#{Regex.escape(@tag_close)}/s, "")
 
   defp extract(html) do
     case Regex.run(~r/#{Regex.escape(@tag_open)}(.*?)#{Regex.escape(@tag_close)}/s, html) do

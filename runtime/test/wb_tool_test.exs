@@ -30,10 +30,12 @@ defmodule Workbooks.WbToolTest do
   end
 
   test "the raw-fs platform verbs are ALL exec-gated (no arbitrary host-fs read/write via wb)" do
-    # bundle/sign/verify/pack/unpack/fetch each do File.read!/write! on raw paths;
-    # an exec-denied agent must not reach any of them.
+    # bundle/unbundle/sign/verify/pack/unpack/fetch each do File.read!/write! on raw
+    # paths; an exec-denied agent must not reach any of them. unbundle is the edit
+    # loop's first step and writes a whole tree to a caller path — gated like bundle.
     for cmd <- [
           "bundle /etc/passwd /tmp/leak",
+          "unbundle /etc/passwd /tmp/leak",
           "sign /etc/hosts",
           "verify /etc/hosts",
           "pack secret /tmp/out",

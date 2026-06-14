@@ -847,6 +847,69 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(json_safe(result)))
   end
 
+  # `wb bundle` over RCP — the engine-side home of the format for callers (the
+  # desktop, a remote CLI) whose working tree isn't on the engine's filesystem.
+  # BYTES in, BYTES out, same as checkout/checkin: the caller packs its dir tree
+  # into the SAME :zip parts map (Workbooks.Bundle.pack) and ships it b64; the
+  # engine derives the page html, embeds the bundle + the hydration loader, and
+  # (when sign=1) signs it as the tenant via Workbooks.Manifest — so the returned
+  # .html is byte-identical to what `Workbooks.CLI.call(["bundle", …])` writes.
+  # No second bundler anywhere: this is `Workbooks.Bundle`, the one home. The
+  # caller ships a raw parts map (`files: %{"rel/path" => base64-bytes}`) — NOT a
+  # pre-built zip — so the desktop shell only does file IO, never any zip/embed/
+  # sign work. All of that is `Workbooks.Bundle` on the engine.
+  post "/rcp/bundle" do
+    {:ok, body, conn} = read_body(conn, length: 100_000_000)
+    t = conn.assigns.tenant
+
+    result =
+      try do
+        %{"files" => files} = Jason.decode!(body)
+        parts = Map.new(files, fn {k, v} -> {k, Base.decode64!(v)} end)
+        blob = Workbooks.Bundle.pack(parts)
+
+        html =
+          parts["index.html"] || parts["workbook.html"] ||
+            Workbooks.OQL.render(parts["source.org"] || parts["workbook.org"] || "")
+
+        html = html |> Workbooks.Bundle.embed(blob) |> Workbooks.Bundle.embed_loader()
+        sign? = Plug.Conn.fetch_query_params(conn).query_params["sign"] == "1"
+        html = if sign?, do: Workbooks.Manifest.sign(html, t), else: html
+        %{ok: true, html_b64: Base.encode64(html), files: Map.keys(parts)}
+      rescue
+        e -> %{error: Exception.message(e)}
+      end
+
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
+  # `wb unbundle` over RCP — inverse of the above. The caller ships the .html
+  # bytes b64; the engine extracts + unpacks the embedded bundle and returns the
+  # raw parts map (`files: %{"rel/path" => base64-bytes}`) so the desktop shell
+  # only writes bytes to disk — no engine-side path, no Rust unzip.
+  post "/rcp/unbundle" do
+    {:ok, body, conn} = read_body(conn, length: 100_000_000)
+
+    result =
+      try do
+        %{"b64" => b64} = Jason.decode!(body)
+        html = Base.decode64!(b64)
+
+        case Workbooks.Bundle.extract(html) do
+          nil ->
+            %{error: "no wb-bundle in html"}
+
+          blob ->
+            files = Map.new(Workbooks.Bundle.unpack(blob), fn {k, v} -> {k, Base.encode64(v)} end)
+            %{ok: true, files: files}
+        end
+      rescue
+        e -> %{error: Exception.message(e)}
+      end
+
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
+  end
+
   # `wb store` / `wb store --list` — archive a workspace / list stored keys.
   get "/rcp/store" do
     t = conn.assigns.tenant
