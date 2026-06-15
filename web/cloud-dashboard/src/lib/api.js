@@ -218,13 +218,13 @@ const normChange = (c) => ({ id: c.id, when: c.when, authorType: c.author_type ?
 
 export async function nexusHistory(scope) {
   if (live()) return (await rt(`/api/history/${scope}`)).map(normChange);
-  return structuredClone(MOCK_HISTORY[scope] || []);
+  return []; // honest empty — per-nexus history streams from the tenant runtime (not yet wired)
 }
 
 /** @param {string} scope @param {string} changeId @returns {Promise<{before:string, after:string}>} */
 export async function changeDiff(scope, changeId) {
   if (live()) return rt(`/api/history/${scope}/${changeId}/diff`);
-  return structuredClone(MOCK_DIFF[changeId] || { before: '', after: '' });
+  return { before: '', after: '' };
 }
 
 /**
@@ -285,7 +285,7 @@ const MOCK_SHARED = {
 
 export async function sharedFolders() {
   if (live()) return rt('/api/shared-folders');
-  return structuredClone(MOCK_SHARED);
+  return { shareable: [], shared_by: [], shared_with: [] }; // honest empty
 }
 
 /** @param {{folder:string, recipient:string, mode?:'read'|'draft'}} opts */
@@ -333,7 +333,7 @@ const MOCK_DRAFTS = {
 
 export async function listDrafts(nexus) {
   if (live()) return rt(`/api/nexuses/${nexus}/drafts`);
-  return structuredClone(MOCK_DRAFTS[nexus] || []);
+  return []; // honest empty
 }
 
 export async function createDraft(nexus, name) {

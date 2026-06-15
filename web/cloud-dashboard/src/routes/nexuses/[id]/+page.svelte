@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { nexusStore } from '$lib/nexusStore.svelte.js';
+  import { nexusUsage } from '$lib/api.js';
   import { toast } from '$lib/toastStore.svelte.js';
   import Confirm from '$lib/Confirm.svelte';
   import History from '$lib/History.svelte';
@@ -12,47 +13,29 @@
   const detail = $derived(nexusStore.detail(id));
   const nexus = $derived(detail?.nexus);
   const config = $derived(detail?.config);
-  const month = $derived(detail?.month);
 
   let confirmOpen = $state(false);
 
-  // live-jitter metrics (ported from the prototype's setInterval)
-  let cpu = $state(18);
-  let memMb = $state(412);
-  let reqMin = $state(37);
-
-  // fake live logs
-  const LOGLINES = [
-    ['g', '▸ nexus woke from sleep in 1.4s'],
-    ['', 'GET /  200  12ms'],
-    ['', 'weave workbook "sales-pulse" → ok'],
-    ['a', '⚙ compiling rust toolkit (shared build)…'],
-    ['g', '✓ toolkit ready · cached'],
-    ['', 'POST /agent/run  202'],
-    ['', 'snapshot saved ok'],
-    ['', 'GET /assets/hero.png  200  (cached, 0 egress)']
-  ];
-  let logs = $state([]);
-  let li = 0;
-  const stamp = () => new Date().toLocaleTimeString('en-US', { hour12: false });
-  function addLog() {
-    const [c, txt] = LOGLINES[li % LOGLINES.length];
-    logs = [...logs.slice(-39), { t: stamp(), c, txt }];
-    li++;
+  // Real per-nexus usage from the platform rollup (Fly-grounded compute + cost).
+  let usageRow = $state(null);
+  async function loadUsage() {
+    try {
+      const u = await nexusUsage();
+      usageRow = (u.rows || []).find((r) => r.name === id) || null;
+    } catch {
+      usageRow = null;
+    }
   }
+  onMount(loadUsage);
 
-  onMount(() => {
-    for (let k = 0; k < 6; k++) addLog();
-    const lt = setInterval(addLog, 2200);
-    const mt = setInterval(() => {
-      cpu = 12 + Math.floor(Math.random() * 20);
-      memMb = 380 + Math.floor(Math.random() * 90);
-      reqMin = 28 + Math.floor(Math.random() * 30);
-    }, 2000);
-    return () => { clearInterval(lt); clearInterval(mt); };
-  });
+  const stateLabel = $derived(
+    nexus?.state === 'run' ? 'Running' : nexus?.state === 'sleep' ? 'Sleeping' : 'Building'
+  );
+  const activeHrs = $derived(usageRow?.activeHrs ?? '0.0');
+  const costMonth = $derived(usageRow?.cost ?? '$0.00');
+  const dbLabel = $derived(usageRow?.database ?? config?.database ?? 'none');
 
-  // ── state-aware actions ──
+  // ── state-aware actions (real lifecycle via the provisioner) ──
   function sleepIt() {
     nexusStore.setState(id, 'sleep');
     toast(`${nexus.name} is sleeping`);
@@ -61,11 +44,11 @@
     nexusStore.setState(id, 'run');
     toast(`${nexus.name} is waking…`);
   }
-  function restart() {
-    nexusStore.setState(id, 'build');
+  async function restart() {
     toast(`Restarting ${nexus.name}…`);
-    const target = id;
-    setTimeout(() => nexusStore.setState(target, 'run'), 2500);
+    await nexusStore.setState(id, 'sleep');
+    await nexusStore.setState(id, 'run');
+    toast(`${nexus.name} restarted`);
   }
   function reallyDelete() {
     confirmOpen = false;
@@ -105,10 +88,10 @@
   </div>
 
   <div class="stats">
-    <div class="stat"><div class="k">CPU</div><div class="v">{cpu}<small>%</small></div><div class="d up">▲ active</div></div>
-    <div class="stat"><div class="k">Memory</div><div class="v">{memMb}<small>MB / {config.plan.split('· ')[1] || '1 GB'}</small></div><div class="d dim">{Math.round((memMb / 1024) * 100)}% of cap</div></div>
-    <div class="stat"><div class="k">Requests</div><div class="v">{reqMin}<small>/min</small></div><div class="d up">▲ steady</div></div>
-    <div class="stat"><div class="k">Est. this month</div><div class="v">${detail.metrics.costMonth}</div><div class="d dim">at current rate</div></div>
+    <div class="stat"><div class="k">State</div><div class="v">{stateLabel}</div><div class="d dim">scale-to-zero</div></div>
+    <div class="stat"><div class="k">Plan</div><div class="v" style="font-size:18px">{config.plan}</div><div class="d dim">unlimited users</div></div>
+    <div class="stat"><div class="k">Active compute</div><div class="v">{activeHrs}<small>hrs</small></div><div class="d dim">this cycle</div></div>
+    <div class="stat"><div class="k">Est. this cycle</div><div class="v">{costMonth}</div><div class="d dim">at current rate</div></div>
   </div>
 
   <div class="grid-2">
@@ -122,21 +105,12 @@
       <div class="kv"><span class="k">Created</span><span class="v">{config.created}</span></div>
     </div>
     <div class="card">
-      <h3>This month</h3>
-      <div class="kv"><span class="k">Active compute</span><span class="v">{month.activeCompute}</span></div>
-      <div class="kv"><span class="k">Sleeping</span><span class="v">{month.sleeping}</span></div>
-      <div class="kv"><span class="k">Storage</span><span class="v">{month.storage}</span></div>
-      <div class="kv"><span class="k">Egress</span><span class="v">{month.egress}</span></div>
-      <div class="kv"><span class="k">Subtotal</span><span class="v" style="color:var(--live)">{month.subtotal}</span></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3><span class="dot run"></span> Live logs</h3>
-    <div class="logs">
-      {#each logs as ln}
-        <div class="ln"><span class="t">{ln.t}</span> <span class={ln.c}>{ln.txt}</span></div>
-      {/each}
+      <h3>This cycle</h3>
+      <div class="kv"><span class="k">Active compute</span><span class="v">{activeHrs} hrs</span></div>
+      <div class="kv"><span class="k">Storage</span><span class="v">{usageRow?.storage || '—'}</span></div>
+      <div class="kv"><span class="k">Database</span><span class="v faint">{dbLabel}</span></div>
+      <div class="kv"><span class="k">Egress</span><span class="v">$0.00</span></div>
+      <div class="kv"><span class="k">Subtotal</span><span class="v" style="color:var(--live)">{costMonth}</span></div>
     </div>
   </div>
 
