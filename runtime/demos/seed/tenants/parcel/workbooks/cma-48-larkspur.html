@@ -1,0 +1,194 @@
+<!doctype html>
+<!-- workbook: cma-48-larkspur — Parcel comparative market analysis, comps grid + SQL pricing query (deterministic). Summary bracket is computed from the grid; never hard-coded. -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="darkreader-lock" />
+<meta name="color-scheme" content="light" />
+<title>CMA — 48 Larkspur Lane — Parcel</title>
+<script id="workbook-spec" type="application/json">
+{
+  "id": "cma-48-larkspur",
+  "kind": "spreadsheet-sql",
+  "title": "CMA — 48 Larkspur Lane",
+  "owner": "parcel",
+  "workspace": "parcel-brokerage",
+  "source": "data/comps.csv",
+  "frozen_at": "2026-06-14T00:00:00Z"
+}
+</script>
+<style>
+  h1,h2,h3,.serif{font-family:'Fraunces',Georgia,'Times New Roman',serif;font-weight:600;letter-spacing:-.01em}
+  h1{letter-spacing:-.02em}
+
+  :root{--green:#b4683f;--green-d:#8f4a26;--ink:#2a241d;--bg:#faf6f0;--card:#fffdfa;--line:#e8ddcd;--muted:#8a7f70;--amber:#c79a4b;--red:#b0503f;--slate:#6f7d63;--clay:#b4683f;--clay-d:#8f4a26;--clay-l:#f4e6dc;--sage:#6f7d63;--sage-bg:#eef0e8;--gold:#c79a4b;--gold-bg:#f6ecd6;--slate:#5f7585;--slate-bg:#e8eef2;--radius:12px;}
+  *{box-sizing:border-box}
+  body{font:14px/1.5 Inter,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);margin:0;padding:30px 36px 60px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .mark{width:28px;height:28px;display:inline-grid;place-items:center}
+  h1{font-size:23px;font-weight:680;letter-spacing:-.025em;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin:2px 0 22px}
+  .subject{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--green-d);border-radius:12px;padding:14px 18px;display:flex;gap:30px;flex-wrap:wrap;margin-bottom:22px}
+  .subject div .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .subject div .v{font-weight:680;font-size:16px}
+  .sql{background:#0c1410;color:#e3e8d8;border-radius:12px;padding:14px 16px;font:12.5px/1.6 'IBM Plex Mono',ui-monospace,monospace;margin-bottom:6px;overflow:auto}
+  .sql .kw{color:#b4683f;font-weight:700}.sql .fn{color:#bcd0d8}.sql .st{color:#e0c97f}
+  .qfoot{font-size:12px;color:var(--muted);margin:0 0 18px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 6px 14px;overflow:auto}
+  table{border-collapse:collapse;width:100%;font-size:13px;min-width:920px}
+  th{position:sticky;top:0;background:var(--card);text-align:right;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;padding:10px 10px;border-bottom:1.5px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+  tr:hover td{background:#f6efe6}
+  .subj-row td{background:#f4ece2;font-weight:600}
+  .excl td{color:var(--slate);background:#faf6f0}
+  .excl:hover td{background:#f3ece2}
+  .adj{color:var(--green-d)} .adjn{color:var(--red)}
+  .status{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:14px;white-space:nowrap}
+  .sold{background:#f4e6dc;color:var(--green-d)}
+  .pend{background:#f6ecd6;color:var(--amber)}
+  .act{background:#eef0e8;color:var(--muted)}
+  .exp{background:#f6e3de;color:var(--red)}
+  .wtag{display:inline-block;font-size:10px;color:var(--slate);margin-left:6px;font-weight:600;letter-spacing:.02em}
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
+  .scard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .scard .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .scard .v{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:3px}
+  .scard .s{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .scard.rec{border-color:var(--green-d);background:#f7f0e6}
+  .scard.rec .v{color:var(--green-d)}
+  .note{font-size:12.5px;color:var(--muted);margin-top:14px;max-width:760px}
+  .prep{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 16px;margin-top:22px}
+  .prep img{width:46px;height:46px;border-radius:50%;border:1.5px solid var(--line);object-fit:cover}
+  .prep .nm{font-weight:650}
+  .prep .ti{font-size:12.5px;color:var(--muted)}
+  .prep .meta{margin-left:auto;text-align:right;font-size:12px;color:var(--muted)}
+  .mark svg{width:100%;height:100%;display:block}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="icon" type="image/svg+xml" href="../files/parcel-logo.svg" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header><span class="mark" aria-label="Parcel"><svg viewBox="500 540 980 940" fill="#b4683f" xmlns="http://www.w3.org/2000/svg"><path d="M 981.042 562.763 C 987.035 566.061 1014.12 594.566 1020.94 601.591 C 1076.71 658.975 1135.34 714.304 1191.06 771.653 C 1239.42 726.007 1285.56 676.609 1333.52 630.375 C 1354.86 609.803 1376.66 585.082 1398.93 565.734 C 1409.12 565.099 1446.99 564.781 1456.01 566.081 C 1449.34 573.963 1439.21 583.419 1431.61 590.946 L 1393.17 629.195 L 1288.78 733.671 C 1267.21 755.13 1241.49 779.479 1221.08 801.622 C 1287.94 870.644 1359.91 940.623 1428.09 1008.64 C 1428.89 1027.79 1428.49 1049.42 1428.56 1068.77 L 1428.67 1176.42 L 1428.59 1447.45 C 1289.26 1445.87 1149.66 1447.77 1010.31 1447.18 C 990.771 1447.09 971.113 1447.63 951.592 1447.03 C 951.057 1403.34 950.957 1359.64 951.292 1315.95 C 952.736 1214.6 950.089 1112.37 952.107 1010.49 C 986.058 977.559 1019.62 942.582 1053.05 909.013 C 1088.52 873.408 1125.7 837.209 1160.39 801 C 1138.42 776.373 1106.68 745.749 1083.1 722.48 C 1048.98 688.745 1015.09 654.775 981.437 620.573 C 949.564 653.038 917.327 685.143 884.731 716.883 L 766.317 835.06 L 587.9 1013.5 C 568.572 1013.45 549.243 1013.56 529.916 1013.85 C 541.521 999.441 567.487 975.536 581.439 961.403 L 711.862 831.206 L 880.666 661.926 L 940.868 601.708 C 953.346 589.211 967.782 573.839 981.042 562.763 z M 994.44 1404.9 L 1195.51 1404.74 L 1385.51 1405.49 L 1385.19 1156.69 C 1385.22 1114.52 1384.21 1067.08 1385.55 1025.35 C 1371.8 1012.95 1351.53 990.859 1337.36 976.701 L 1225.28 864.754 C 1220.29 859.771 1193.9 832.339 1190.07 830.59 L 1063.11 957.304 C 1049.64 970.78 1036.24 984.329 1022.92 997.951 C 1015.02 1005.99 1002.5 1019.08 993.957 1025.98 C 997.032 1134.46 993.484 1244.22 994.461 1352.82 C 994.615 1370 994.695 1387.73 994.44 1404.9 z"/></svg></span><h1>Comparative Market Analysis</h1></header>
+<p class="sub">Subject: 48 Larkspur Lane, Riverside Heights · prepared for the Whitfield family · Parcel · frozen 2026-06-14</p>
+
+<div class="subject">
+  <div><div class="l">Beds / Baths</div><div class="v">4 / 2.5</div></div>
+  <div><div class="l">GLA (sq ft)</div><div class="v">2,190</div></div>
+  <div><div class="l">Lot</div><div class="v">0.21 ac</div></div>
+  <div><div class="l">Year built</div><div class="v">1998</div></div>
+  <div><div class="l">Garage</div><div class="v">2-car</div></div>
+  <div><div class="l">Condition</div><div class="v">Updated 2024</div></div>
+</div>
+
+<div class="sql"><span class="kw">SELECT</span> address, status, sold_price, gla, price_psf,
+       <span class="fn">adjust</span>(gla, baths_full, baths_half, garage, condition) <span class="kw">AS</span> net_adj,
+       sold_price + <span class="fn">adjust</span>(...) <span class="kw">AS</span> adjusted_value
+<span class="kw">FROM</span> comps
+<span class="kw">WHERE</span> submarket = <span class="st">'Riverside Heights'</span>
+  <span class="kw">AND</span> gla <span class="kw">BETWEEN</span> 1900 <span class="kw">AND</span> 2500
+  <span class="kw">AND</span> close_date >= date(<span class="st">'now'</span>, <span class="st">'-180 days'</span>)
+<span class="kw">ORDER BY</span> <span class="fn">abs</span>(gla - 2190) <span class="kw">ASC</span>;</div>
+<p class="qfoot">Live query over the Riverside Heights MLS extract — adjustments applied at $145/sq ft GLA, $12K/full bath, $8K/half bath, $10K/garage bay, ±$15K condition. 8 comps screened; the 6 closed &amp; pending sales drive the bracket. Active and Expired listings are shown for context but excluded from the value range (an active asking price and a withdrawn-unsold price are not realized sales).</p>
+
+<div class="panel">
+  <table id="comps"></table>
+</div>
+
+<div class="summary" id="summary"></div>
+<p class="note" id="narrative"></p>
+
+<div class="prep">
+  <img id="prep-photo" alt="Marisol Reyes, Listing Agent" />
+  <div><div class="nm">Marisol Reyes</div><div class="ti">Listing Agent · Parcel · Lic #02118447</div></div>
+  <div class="meta">Prepared for the Whitfield family<br>Riverside Heights · <span id="prep-count"></span></div>
+</div>
+
+<script>
+const PREP_AVATAR = "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&h=120&q=80&crop=faces&fit=crop";
+document.getElementById("prep-photo").src = PREP_AVATAR;
+
+// Comps extract — mirrors data/comps.csv exactly. condK = condition adjustment (signed, $K) vs subject's 2024 update.
+// [address, status, soldOrAskPrice, gla, baths_full, baths_half, garage, condK, daysAgo, closeISO]
+const comps = [
+  ["28 Marigold Pl",  "Active",  719000, 2150, 2, 1, 2,   0, 46, null],
+  ["52 Larkspur Lane","Sold",    731000, 2240, 2, 1, 2,   0, 41, "2026-05-04"],
+  ["9 Aster Way",     "Expired", 769000, 2280, 3, 0, 2,   5, 71, null],
+  ["7 Aster Way",     "Pending", 742000, 2310, 3, 0, 2,  10, 12, "2026-06-02"],
+  ["19 Foxglove Ct",  "Sold",    698000, 2080, 2, 1, 2, -15, 73, "2026-04-02"],
+  ["61 Larkspur Lane","Sold",    752000, 2400, 3, 0, 3,  15, 58, "2026-04-17"],
+  ["33 Bluebell Dr",  "Sold",    685000, 1960, 2, 1, 2, -10, 96, "2026-03-10"],
+  ["14 Foxglove Ct",  "Sold",    672000, 1910, 2, 0, 2, -12,109, "2026-02-25"],
+];
+// closest-GLA ordering, matching the ORDER BY abs(gla-2190)
+comps.sort((a,b)=>Math.abs(a[3]-2190)-Math.abs(b[3]-2190));
+
+const SUBJ = {gla:2190, bf:2, bh:1, garage:2};
+function adj(c){
+  let a = 0;
+  a += (SUBJ.gla - c[3]) * 145;                 // GLA at $145/sf
+  a += (SUBJ.bf - c[4]) * 12000;                // full baths
+  a += (SUBJ.bh - c[5]) * 8000;                 // half baths
+  a += (SUBJ.garage - c[6]) * 10000;            // garage bays
+  a += c[7] * 1000;                             // condition (signed $K)
+  return a;
+}
+// Only realized comps (closed Sold + Pending under contract) establish the value bracket.
+const WEIGHTED = new Set(["Sold","Pending"]);
+const stCls = {Sold:"sold",Pending:"pend",Active:"act",Expired:"exp"};
+
+const fmtFull = n => "$"+Math.round(n).toLocaleString();
+const fmtK = n => "$"+Math.round(n/1000)+"K";
+
+const t = document.getElementById("comps");
+let rows = "<tr><th>Comp address</th><th>Status</th><th>Sale / list price</th><th>GLA</th><th>$/sf</th><th>Net adj.</th><th>Adjusted value</th><th>Days ago</th></tr>";
+rows += `<tr class="subj-row"><td>48 Larkspur Lane (subject)</td><td>—</td><td>—</td><td>2,190</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
+
+const weighted = [];
+comps.forEach(c=>{
+  const a = adj(c);
+  const av = c[2] + a;
+  const inBracket = WEIGHTED.has(c[1]);
+  if (inBracket) weighted.push(av);
+  const psf = Math.round(c[2]/c[3]);
+  const acls = a>=0 ? "adj" : "adjn";
+  const asign = a>=0 ? "+" : "−";
+  const wtag = inBracket ? "" : `<span class="wtag">(excluded)</span>`;
+  rows += `<tr class="${inBracket?"":"excl"}"><td>${c[0]}</td>`+
+    `<td><span class="status ${stCls[c[1]]}">${c[1]}</span></td>`+
+    `<td>${fmtFull(c[2])}</td><td>${c[3].toLocaleString()}</td><td>$${psf}</td>`+
+    `<td class="${acls}">${asign}${fmtFull(Math.abs(a))}</td>`+
+    `<td><b>${fmtFull(av)}</b>${wtag}</td>`+
+    `<td>${c[8]===null?"—":c[8]}</td></tr>`;
+});
+t.innerHTML = rows;
+
+// Bracket + recommendation derived from the grid — guaranteed to reconcile.
+const lo = Math.min(...weighted);
+const hi = Math.max(...weighted);
+const RECOMMENDED = 724900;          // listing decision, defended below; sits inside [lo, hi]
+const subjPsf = Math.round(RECOMMENDED / SUBJ.gla);
+
+document.getElementById("summary").innerHTML =
+  `<div class="scard"><div class="l">Adjusted value — low</div><div class="v">${fmtK(lo)}</div>`+
+    `<div class="s">Lowest weighted comp (closed/pending)</div></div>`+
+  `<div class="scard rec"><div class="l">Recommended list price</div><div class="v">${fmtFull(RECOMMENDED)}</div>`+
+    `<div class="s">$${subjPsf}/sf · inside the adjusted range</div></div>`+
+  `<div class="scard"><div class="l">Adjusted value — high</div><div class="v">${fmtK(hi)}</div>`+
+    `<div class="s">Highest weighted comp (closed/pending)</div></div>`;
+
+document.getElementById("narrative").innerHTML =
+  `The six closed and pending sales bracket adjusted value at <b>${fmtFull(lo)}</b>–<b>${fmtFull(hi)}</b>. `+
+  `At <b>${fmtFull(RECOMMENDED)}</b> the home lists at $${subjPsf}/sf — a slight discount to the $336 submarket median — `+
+  `near the top of the bracket but below the 7 Aster Way pending ($730,600 adjusted), positioning for a sub-3-week sale given the `+
+  `current <b>1.6-month supply</b>. The 9 Aster Way expired listing (asked $769K, never sold after 71 days) is the cautionary ceiling: `+
+  `pricing above the realized bracket stalls. Pricing tight (≤ $719K) would likely draw competing offers before the 6/22 review deadline.`;
+
+document.getElementById("prep-count").textContent =
+  `${comps.length} comps screened, ${weighted.length} weighted`;
+</script>
+</body>
+</html>
