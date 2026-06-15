@@ -16,16 +16,40 @@ import { sidecar } from "./sidecar.svelte";
 
 export type NexusMode = "local" | "remote";
 
+/** How a nexus authenticates. `token` = static per-nexus bearer (or the
+ *  local discovery token); `oidc` = the WorkOS keychain session (auto-renewing
+ *  JWT via the cloudClient adapter). The cloud control plane is `oidc`. */
+export type NexusAuth = "token" | "oidc";
+
 export interface NexusEndpoint {
   id: string;
   name: string;
   /** Resolved base URL, e.g. https://nexus.example.com:4000. Empty for
    *  the local entry (it reads the live discovery URL instead). */
   url: string;
-  /** Per-nexus bearer. Empty for local (reads the discovery token). */
+  /** Per-nexus bearer. Empty for local (reads the discovery token) and for
+   *  oidc nexuses (the bearer comes from the WorkOS keychain session). */
   token: string;
   mode: NexusMode;
+  /** Auth rung. Defaults to "token"; the cloud entry is "oidc". */
+  auth?: NexusAuth;
 }
+
+/** Built-in cloud control-plane nexus. Always present, authenticates via the
+ *  WorkOS keychain session (oidc) — after the user signs in, selecting this
+ *  Just Works. URL overridable for dev via VITE_WB_CLOUD_NEXUS_URL. */
+const CLOUD_ID = "cloud";
+const CLOUD_URL =
+  (import.meta.env as Record<string, string | undefined>)?.VITE_WB_CLOUD_NEXUS_URL ??
+  "https://wb-nexus-cp.fly.dev";
+const CLOUD_NEXUS: NexusEndpoint = {
+  id: CLOUD_ID,
+  name: "Workbooks Cloud",
+  url: CLOUD_URL,
+  token: "",
+  mode: "remote",
+  auth: "oidc",
+};
 
 export type NexusHealth = "ok" | "down" | "checking" | "unknown";
 
@@ -73,9 +97,11 @@ class NexusStore {
     };
   }
 
-  /** All endpoints, local first. */
+  /** All endpoints: local first, the built-in cloud nexus second, then any
+   *  user-saved remotes (deduped against the built-in cloud id). */
   get endpoints(): NexusEndpoint[] {
-    return [this.local, ...this.remotes];
+    const saved = this.remotes.filter((e) => e.id !== CLOUD_ID);
+    return [this.local, CLOUD_NEXUS, ...saved];
   }
 
   get active(): NexusEndpoint {
@@ -91,7 +117,15 @@ class NexusStore {
 
   get activeToken(): string | null {
     const a = this.active;
+    // OIDC nexuses carry no static token — the bearer comes from the WorkOS
+    // keychain session via the OidcAdapter (see providers/tauri-local.ts).
+    if (a.auth === "oidc") return null;
     return a.mode === "local" ? (sidecar.status.token ?? null) : a.token || null;
+  }
+
+  /** Auth rung of the active nexus — drives which adapter the RCP client uses. */
+  get activeAuth(): NexusAuth {
+    return this.active.auth ?? "token";
   }
 
   healthOf(id: string): NexusHealth {
@@ -141,7 +175,7 @@ class NexusStore {
   }
 
   remove(id: string) {
-    if (id === LOCAL_ID) return;
+    if (id === LOCAL_ID || id === CLOUD_ID) return;
     this.remotes = this.remotes.filter((e) => e.id !== id);
     if (this.activeId === id) this.activeId = LOCAL_ID;
     const { [id]: _drop, ...rest } = this.health;
@@ -151,7 +185,8 @@ class NexusStore {
 
   /** Probe a remote nexus's /health. Local is covered by the sidecar. */
   async probe(id: string) {
-    const ep = this.remotes.find((e) => e.id === id);
+    if (id === LOCAL_ID) return;
+    const ep = this.endpoints.find((e) => e.id === id);
     if (!ep || !ep.url) return;
     this.health = { ...this.health, [id]: "checking" };
     try {
@@ -166,7 +201,9 @@ class NexusStore {
   }
 
   probeAll() {
-    for (const ep of this.remotes) void this.probe(ep.id);
+    for (const ep of this.endpoints) {
+      if (ep.id !== LOCAL_ID) void this.probe(ep.id);
+    }
   }
 }
 
