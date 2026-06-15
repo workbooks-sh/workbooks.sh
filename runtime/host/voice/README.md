@@ -40,6 +40,8 @@ Client: `desktop/src/lib/live/inworld.svelte.ts` + `pcm.ts`.
 
 ## Status
 
-Server loop verified end-to-end (brain → streamed PCM). Open: UI mount
-(`wb-091n.5`), `write_code` → mercury-2 → editor canvas (`wb-091n.6`), in-app mic
-E2E. Fly GPUs are EOL (Jul 2026) but this loop needs none — TTS is a token API.
+Epic `wb-091n` complete. Spoken loop + code lane (`write_code` → mercury-2 →
+editor) both verified end-to-end in-process. Mounted in `WaldoPanel` (replaced
+Gemini Live). Only open item: in-app mic E2E (webview getUserMedia, needs a
+running runtime + desktop). Fly GPUs are EOL (Jul 2026) but this loop needs none
+— TTS is a token API.
