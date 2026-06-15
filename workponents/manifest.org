@@ -1,0 +1,49 @@
+#+TITLE: workponents toolkit
+#+TOOLKIT: workponents
+#+VERSION: 0.0.0
+#+KIND: web-components
+#+STATUS: experimental
+#+TAGLINE: The themed-UI tier of the toolkit substrate. A registry of framework-agnostic <wb-*> custom elements, organized by domain (ai/video/tables/data-viz/maps/docs/presentation/live/git/forms/records/search/auth/code/files). Zero-dependency, native custom elements — run in a browser <script>, as ESM, in the desktop app, and dropped into any workbook HTML. One token set themes them all; capability flows through the Dock; the artifact is its own source.
+#+FLOW: read this front door → the design contract lives in src/theme/tokens.css; the base element + variant system in src/core/; one element per file in src/elements/<wb-name>.js; the proof page is demo/index.html. Each domain is (or becomes) its own component-KIND toolkit shipping its dist/ elements + a specimen + skills. To USE: link src/theme/tokens.css, import src/index.js (or a single element), drop the tag.
+
+* workponents — Workbooks web-component SDK                        :toolkit:
+  :PROPERTIES:
+  :ID:        workponents
+  :VERSION:   0.0.0
+  :KIND:      web-components
+  :STATUS:    experimental
+  :SKILL_DIR: skills/
+  :ASSETS:    src/index.js, src/theme/tokens.css, src/core/element.js, src/core/variants.js, src/elements/*.js, demo/index.html
+  :END:
+
+  A *web-components* toolkit: themed, framework-agnostic `<wb-*>` custom elements.
+  Like the glyphs toolkit, it ships zero-dependency JS that runs in a browser
+  `<script>`, as an ES module, in Node, and in the runtime's wasm JS lane — and,
+  because they are native custom elements, inside ANY workbook HTML with no build.
+
+  The substrate (one architecture, many domains):
+  - *Composition-as-source* — the element's definition is declarative source the
+    artifact carries; preview ≡ source; agent-editable.
+  - *In-nexus compute* — the element that renders the data also runs it (DuckDB /
+    wavelet render-core / the OQL kernel), brokered through the Dock.
+  - *One token set* — every element styles only from `--wb-*` CSS custom
+    properties, so one theme governs all domains AND the workbook artifacts.
+  - *One Dock seam* — capabilities resolve `local` / `runtime` (RCP) / `kernel`
+    behind the Host; the same element swaps providers per target.
+
+  Parts that ship together —
+  - =src/theme/tokens.css= — the design contract: the `--wb-*` token set + the
+    `[data-wb-theme]` light/dark/brand presets. The single source of cohesion.
+  - =src/core/element.js= — `WbElement`, the thin base class (shadow DOM, reactive
+    attributes, token-aware styling, the render seam). Zero dependencies.
+  - =src/core/variants.js= — the variant contract (cva-style: variant/size/tone as
+    reflected attributes the component CSS targets via `:host([…])`).
+  - =src/elements/<wb-name>.js= — one element per file. `wb-button` is the
+    reference element (proves tokens + variants + theming + the base class).
+  - =src/index.js= — registers every element + re-exports the classes.
+  - =demo/index.html= — the specimen / proof page (drops the elements in plain
+    HTML, light + dark, no build).
+
+  Relationship to toolkits: workponents ARE component-KIND toolkits — the themed
+  UI tier over capability toolkits (a `wb-table` is the view; the DuckDB engine is
+  a capability toolkit it consumes through the Dock). See docs/WORKPONENTS.md.
