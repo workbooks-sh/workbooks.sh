@@ -2,30 +2,35 @@ defmodule Workbooks.Harness do
   @moduledoc """
   Posture predicate for the in-wasm HARNESS surface (the SLICE-1/2/3 exec + creds + oauth loopback).
 
-  FIX 2 (POSTURE GAP — surface ALWAYS-ON): the `Workbooks.ExecLoopback` listener (and the whole exec +
-  subscription-creds + oauth-loopback surface that bottoms out in it) was started UNCONDITIONALLY in
-  `Workbooks.Application`. That surface is a DESKTOP-FIRST primitive — a 127.0.0.1 loopback the local
-  harness fetches, the user's own keychain, the user's own browser. It has NO place in a multi-tenant
-  hosted runtime: there, tenants share a process and the loopback's token table is :public, so an
-  always-on exec broker is an unnecessary blast-radius.
+  CLOUD-ENABLE (acp-cloud-enable): the harness surface is now PERMITTED in a multi-tenant hosted runtime when
+  explicitly enabled (`WB_HARNESS=1`). The blanket `not Tenancy.multi?()` guard is DROPPED — but ONLY because
+  per-tenant isolation is now the real safety, NOT the on/off switch:
+    * resident SM instances are pool-capped PER TENANT + globally (`Workbooks.HarnessPool`, gap #1);
+    * the grant principal + creds_scope are BOUND to the AUTH-VERIFIED tenant, never a caller-supplied id
+      (`HarnessPool.start_session/2`, gap #2) — so the broker's rate/concurrency/budget/revocation key and the
+      keychain scope are tenant-true;
+    * exec/LLM aggregate budgets are per-tenant (`Workbooks.TenantBudget`, gaps #4/#5);
+    * the `:file` creds backend stays REFUSED in multi-tenant (keychain/desktop only — HarnessCreds), and the
+      `:desktop` backend HARD-FAILS rather than pooling into a co-located file when no bridge is present.
 
-  This is the single source of truth for "is the harness surface permitted?". It is true ONLY when:
-    * the harness is explicitly wanted — `WB_DESKTOP=1` (the packaged desktop) OR `WB_HARNESS=1`
-      (an explicit opt-in for a single-user/dev runtime), AND
-    * the runtime is NOT a multi-tenant hosted posture (`Workbooks.Tenancy.multi?/0`).
+  This is the single source of truth for "is the harness surface permitted?". It is true when the harness is
+  explicitly wanted — `WB_DESKTOP=1` (the packaged desktop), `WB_HARNESS=1` (an explicit opt-in for a single-
+  user/dev runtime OR a hosted multi-tenant runtime), OR a multi-tenant hosted posture (`Tenancy.multi?/0`),
+  which always wants the per-tenant harness path.
 
-  `Workbooks.Application` gates the `ExecLoopback` child-spec start on `enabled?/0`, so in a hosted /
-  multi-tenant runtime the loopback is never started → the exec + creds + oauth surface is OFF entirely.
-  The other layers (HarnessCreds :file backend, the loopback routes) consult this too as defense-in-depth.
+  `Workbooks.Application` gates the `ExecLoopback` child-spec start on `enabled?/0`. The other layers
+  (HarnessCreds backend selection, the loopback routes) consult this + the tenancy posture as defense-in-depth.
   """
 
   @doc """
   True when the in-wasm harness surface (ExecLoopback + creds + oauth) is permitted.
 
-  Permitted iff (`WB_DESKTOP=1` or `WB_HARNESS=1`) AND NOT multi-tenant hosted.
+  Permitted iff explicitly requested (`WB_DESKTOP=1` / `WB_HARNESS=1`) OR multi-tenant hosted
+  (`Tenancy.multi?` — the per-tenant isolation path is always wanted there). Isolation, not this switch, is
+  the safety in multi-tenant (HarnessPool + verified-tenant binding + per-tenant budgets).
   """
   def enabled? do
-    requested?() and not Workbooks.Tenancy.multi?()
+    requested?() or Workbooks.Tenancy.multi?()
   end
 
   @doc "True when the harness surface was explicitly requested (desktop or explicit opt-in)."

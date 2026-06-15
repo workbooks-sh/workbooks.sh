@@ -82,6 +82,23 @@ defmodule Workbooks.CommandRegistry do
   @doc "Reserved (built-in) command names that may not be dynamically registered."
   def reserved_names, do: @reserved
 
+  # SECURITY (acp-cloud-enable gap #6): the dynamic command registry is node-global (:persistent_term) and
+  # the resolved wasm/secrets it points at are visible to EVERY tenant. In a multi-tenant posture, mutating
+  # that shared catalog must be an OPERATOR / control-plane op, NOT a tenant-agent op — otherwise one tenant
+  # could register/rebuild a command (or a poisoned artifact) that another tenant resolves. So a registration
+  # is permitted iff:
+  #   * NOT multi-tenant (single-user desktop/dev — the catalog is the one user's), OR
+  #   * an explicit OPERATOR context: WB_CONTROL_PLANE=1 / WB_REGISTRY_ADMIN=1 (boot seeding + the control
+  #     plane run in this role; a tenant web request does not).
+  # Built-in reservation + content-addressing still limit poisoning; this closes the multi-tenant who-may-write
+  # hole on top of that. Tenant-agent EXEC never reaches here — it only reaches `run/4` (resolve + run).
+  @doc false
+  def registration_allowed? do
+    not Workbooks.Tenancy.multi?() or
+      System.get_env("WB_CONTROL_PLANE") == "1" or
+      System.get_env("WB_REGISTRY_ADMIN") == "1"
+  end
+
   @doc """
   All commands: dynamically registered ones OVERLAID with the static built-ins
   (built-ins LAST → built-ins always win). Even if a poisoned dynamic key for a
@@ -164,6 +181,9 @@ defmodule Workbooks.CommandRegistry do
 
   def register(name, wasm_path, mode) do
     cond do
+      not registration_allowed?() ->
+        {:error, :registration_forbidden_multitenant}
+
       name in @reserved ->
         {:error, :reserved_name}
 
@@ -192,6 +212,7 @@ defmodule Workbooks.CommandRegistry do
   """
   def register(name, wasm_path, mode, opts) when is_map(opts) do
     cond do
+      not registration_allowed?() -> {:error, :registration_forbidden_multitenant}
       not is_binary(name) or name == "" -> {:error, :invalid_name}
       name in @reserved -> {:error, :reserved_name}
       not Regex.match?(@name_re, name) -> {:error, :invalid_name}
@@ -218,6 +239,7 @@ defmodule Workbooks.CommandRegistry do
   def register_pynet(name, script, mode \\ :argv, opts \\ %{})
       when is_binary(script) and is_map(opts) do
     cond do
+      not registration_allowed?() -> {:error, :registration_forbidden_multitenant}
       not is_binary(name) or name == "" -> {:error, :invalid_name}
       name in @reserved -> {:error, :reserved_name}
       not Regex.match?(@name_re, name) -> {:error, :invalid_name}
@@ -235,6 +257,25 @@ defmodule Workbooks.CommandRegistry do
 
   defp maybe_put(kw, _k, nil), do: kw
   defp maybe_put(kw, k, v), do: Keyword.put(kw, k, v)
+
+  # TRUSTED registration (boot reload / operator) — same guards as register/3 EXCEPT the multi-tenant posture
+  # gate, since the caller is node-local boot state, not a tenant request. Never exported.
+  defp register_trusted(name, wasm_path, mode) do
+    cond do
+      name in @reserved -> {:error, :reserved_name}
+      not Regex.match?(@name_re, name) -> {:error, :invalid_name}
+      not confined_command_path?(wasm_path) -> {:error, :path_not_confined}
+      true ->
+        cur = :persistent_term.get(@dynamic, %{})
+
+        if not Map.has_key?(cur, name) and map_size(cur) >= @max_dynamic do
+          {:error, :registry_full}
+        else
+          :persistent_term.put(@dynamic, Map.put(cur, name, {:wasm, wasm_path, mode}))
+          :ok
+        end
+    end
+  end
 
   # A registered path must canonicalize to a file strictly inside the content-
   # addressed commands store. Confines registration to managed build outputs.
@@ -307,7 +348,9 @@ defmodule Workbooks.CommandRegistry do
           name in @reserved -> n
           not Regex.match?(@name_re, name) -> n
           not File.regular?(path) -> n
-          register(name, path, mode_atom) == :ok -> n + 1
+          # reload is TRUSTED boot/operator state from a node-local manifest (never tenant request input), so it
+          # bypasses the multi-tenant registration posture gate but keeps every other guard (reserved/name/path).
+          register_trusted(name, path, mode_atom) == :ok -> n + 1
           true -> n
         end
 

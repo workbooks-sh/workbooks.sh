@@ -55,6 +55,7 @@ defmodule Workbooks.Tenancy do
   """
   def assert_safe_posture! do
     if safe_posture?() do
+      assert_multitenant_isolation!()
       :ok
     else
       raise """
@@ -65,5 +66,38 @@ defmodule Workbooks.Tenancy do
       Set WB_TENANCY_MODE=multi (isolation) or WB_PUBLIC_BEARER (lock) before boot.
       """
     end
+  end
+
+  @doc """
+  Fail-fast (acp-cloud-enable gaps #6/#7): a MULTI-TENANT instance must have the per-tenant isolation
+  substrate configured before boot:
+    * a DURABLE per-deployment var store — `WB_VARS` must NOT be the default `:memory:` (a fresh in-process
+      SQLite would lose every tenant's vars/keys on restart and isn't shared across nodes);
+    * a keychain/desktop creds backend — `WB_HARNESS_CREDS=desktop` (never the co-located `:file` store) so
+      one tenant's subscription tokens are never pooled.
+  No-op outside multi-tenant. Returns `:ok` or raises.
+  """
+  def assert_multitenant_isolation! do
+    if multi?() do
+      vars = System.get_env("WB_VARS")
+
+      if vars in [nil, "", ":memory:"] do
+        raise """
+        Multi-tenant runtime requires a DURABLE per-deployment var store (acp-cloud-enable gap #6).
+        WB_VARS is unset/`:memory:` — a fresh in-process SQLite loses every tenant's vars + per-tenant
+        keys on restart and is not shared across nodes. Set WB_VARS to a durable file path before boot.
+        """
+      end
+
+      if System.get_env("WB_HARNESS_CREDS") != "desktop" do
+        raise """
+        Multi-tenant runtime requires a keychain/desktop creds backend (acp-cloud-enable gap #7).
+        WB_HARNESS_CREDS must be `desktop` — the co-located `:file` store pools every tenant's subscription
+        tokens into one shared file and is forbidden in multi-tenant. Set WB_HARNESS_CREDS=desktop.
+        """
+      end
+    end
+
+    :ok
   end
 end

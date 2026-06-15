@@ -26,6 +26,8 @@
     XCircle,
     CircleNotch,
     WarningCircle,
+    ArrowsOut,
+    ArrowsIn,
   } from "phosphor-svelte";
   import { onMount, onDestroy } from "svelte";
   import { chatSession } from "$lib/chat/session.svelte";
@@ -38,6 +40,10 @@
   import { geminiLive } from "$lib/live/gemini.svelte";
 
   const WALDO_SLUG = "waldo";
+
+  // When popped out into a full tab the panel owns the whole canvas; the
+  // top bar swaps its dock affordance (pop-out → dock-back) accordingly.
+  let { fullscreen = false }: { fullscreen?: boolean } = $props();
 
   const SUGGESTIONS = [
     { icon: MagnifyingGlass, label: "Search my files", text: "Search my files for " },
@@ -264,7 +270,7 @@
 
 </script>
 
-<div class="waldo">
+<div class="waldo" class:fullscreen>
   <div class="bar">
     {#if view === "history" || viewing}
       <button type="button" class="bar-btn" onclick={() => { view = "chat"; viewing = null; }}>
@@ -293,9 +299,30 @@
         <Mic size={15} weight="fill" />
       </button>
     {/if}
-    <button type="button" class="bar-btn icon-only" onclick={() => dock.close()} title="Collapse" aria-label="Collapse panel">
-      <CaretRight size={15} weight="bold" />
-    </button>
+    {#if fullscreen}
+      <button
+        type="button"
+        class="bar-btn icon-only"
+        onclick={() => dock.dockIn()}
+        title="Dock to side panel"
+        aria-label="Dock Waldo back into the side panel"
+      >
+        <ArrowsIn size={15} weight="bold" />
+      </button>
+    {:else}
+      <button
+        type="button"
+        class="bar-btn icon-only"
+        onclick={() => dock.popOut("waldo")}
+        title="Open as full tab"
+        aria-label="Open Waldo as a full tab"
+      >
+        <ArrowsOut size={15} weight="bold" />
+      </button>
+      <button type="button" class="bar-btn icon-only" onclick={() => dock.close()} title="Collapse" aria-label="Collapse panel">
+        <CaretRight size={15} weight="bold" />
+      </button>
+    {/if}
   </div>
 
   {#if voiceMode}
@@ -468,6 +495,20 @@
     flex-direction: column;
     background: var(--color-surface);
   }
+
+  /* Full-tab mode: the panel owns the whole canvas. Center the thread +
+   * composer on a comfortable reading column so a 1400px window doesn't
+   * stretch bubbles edge-to-edge. The bar stays full-width. */
+  .waldo.fullscreen { background: var(--color-page); }
+  .waldo.fullscreen .thread,
+  .waldo.fullscreen .composer,
+  .waldo.fullscreen .intro,
+  .waldo.fullscreen .history {
+    width: 100%;
+    max-width: 760px;
+    margin-inline: auto;
+  }
+  .waldo.fullscreen .thread { padding-inline: 16px; }
 
   /* Slim in-panel toolbar — history / back / new. */
   .bar {

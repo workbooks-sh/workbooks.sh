@@ -38,6 +38,7 @@ export interface DockPanel {
 }
 
 const WIDTH_KEY = "wb.dock.width";
+const FULLSCREEN_KEY = "wb.dock.fullscreen";
 const MIN_W = 320;
 const MAX_W = 720;
 
@@ -47,13 +48,68 @@ function initialWidth(): number {
   return Number.isFinite(raw) && raw >= MIN_W && raw <= MAX_W ? raw : 420;
 }
 
+function initialFullscreen(): string | null {
+  if (typeof localStorage === "undefined") return null;
+  return localStorage.getItem(FULLSCREEN_KEY) || null;
+}
+
 class DockStore {
   panels = $state<DockPanel[]>([]);
   activeId = $state<string | null>(null);
   width = $state<number>(initialWidth());
+  /** Panel id currently popped out into a full-screen tab (or null when
+   *  every panel sits in the right-side dock). One panel can be full at a
+   *  time; it owns the whole canvas as its own tab. Persisted so the
+   *  pop-out survives reloads. */
+  fullscreenId = $state<string | null>(initialFullscreen());
 
   get active(): DockPanel | null {
     return this.panels.find((p) => p.id === this.activeId) ?? null;
+  }
+
+  /** The panel rendered full-screen (popped into a tab), if any. */
+  get fullscreen(): DockPanel | null {
+    return this.panels.find((p) => p.id === this.fullscreenId) ?? null;
+  }
+
+  isFullscreen(id: string): boolean {
+    return this.fullscreenId === id;
+  }
+
+  #persistFullscreen(): void {
+    if (typeof localStorage === "undefined") return;
+    try {
+      if (this.fullscreenId) localStorage.setItem(FULLSCREEN_KEY, this.fullscreenId);
+      else localStorage.removeItem(FULLSCREEN_KEY);
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  /** Pop a docked panel out into a full-screen tab. Clears the right-dock
+   *  active slot (the panel now lives in the canvas, not the dock). */
+  popOut(id: string): void {
+    if (!this.panels.some((p) => p.id === id)) return;
+    this.fullscreenId = id;
+    if (this.activeId === id) this.activeId = null;
+    this.#persistFullscreen();
+  }
+
+  /** Send the full-screen panel back into the right-side dock, open. */
+  dockIn(): void {
+    const id = this.fullscreenId;
+    this.fullscreenId = null;
+    if (id) this.activeId = id;
+    this.#persistFullscreen();
+  }
+
+  /** Focus the full-screen panel's tab (no-op if it isn't popped out). */
+  focusFullscreen(id: string): void {
+    if (this.fullscreenId === id) return;
+    if (this.panels.some((p) => p.id === id)) {
+      this.fullscreenId = id;
+      this.#persistFullscreen();
+    }
   }
 
   /** Register a panel (idempotent by id). Keeps registration order =
@@ -69,10 +125,14 @@ class DockStore {
   }
 
   toggle(id: string): void {
+    // A popped-out panel is shown in its tab, not the dock — the badge
+    // just focuses it (the canvas already owns it).
+    if (this.fullscreenId === id) return;
     this.activeId = this.activeId === id ? null : id;
   }
 
   open(id: string): void {
+    if (this.fullscreenId === id) return;
     if (this.panels.some((p) => p.id === id)) this.activeId = id;
   }
 

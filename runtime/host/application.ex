@@ -252,12 +252,15 @@ defmodule Workbooks.Application do
     end
   end
 
-  # Harness surface (FIX 2 — POSTURE GAP): the brokered-EXEC loopback for the StarlingMonkey eval lane
+  # Harness surface (acp-cloud-enable): the brokered-EXEC loopback for the StarlingMonkey eval lane
   # (SLICE 1, wb-b9xv.9) — a 127.0.0.1-only listener the SM `child_process` shim fetches (sentinel host
   # pinned by the WasiHttpView override) → ExecBroker (same default-deny spine as the JsDock host_exec
-  # import). It is DESKTOP-FIRST: started ONLY when the harness surface is permitted (WB_DESKTOP/WB_HARNESS
-  # AND not a multi-tenant hosted posture). In a hosted/multi-tenant runtime the loopback is NOT started, so
-  # the whole exec + creds + oauth surface is off. Cloud-nexus harness is DEFERRED (wb-b9xv.17).
+  # import). Started when `Workbooks.Harness.enabled?/0` permits it — now INCLUDING multi-tenant hosted
+  # (WB_HARNESS=1 or Tenancy.multi?), because the safety is per-tenant ISOLATION, not the on/off switch:
+  # HarnessPool caps resident instances per tenant + globally, the grant principal/creds_scope are bound to
+  # the verified tenant (Workbooks.Web /api/harness/session → HarnessPool.start_session), and per-tenant
+  # exec/LLM budgets (TenantBudget) bound sustained spend. The loopback token table stays :public but every
+  # token is 24-byte CSPRNG single-run on a random port, and every exec-capable grant is principal-governed.
   defp harness do
     if Workbooks.Harness.enabled?(), do: [Workbooks.ExecLoopback], else: []
   end

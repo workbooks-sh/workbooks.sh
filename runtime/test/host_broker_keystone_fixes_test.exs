@@ -64,23 +64,22 @@ defmodule Workbooks.HostBrokerKeystoneFixesTest do
   # ── FIX 1: the host-call seam DEFAULT-DENIES in a forbidden posture ─────────────────────────────
 
   describe "FIX 1 — posture gate on the sync host-call import" do
-    test "multi-tenant posture (WB_TENANCY_MODE=multi) DENIES exec/fs/oauth/llm even with a minted grant" do
+    # acp-cloud-enable: the harness surface is now PERMITTED in multi-tenant (gate relaxed behind per-tenant
+    # isolation). The seam therefore CARRIES the grant in multi-tenant — the safety is the grant being bound
+    # to the verified tenant (HarnessPool), not nil-ing the seam. A principal'd llm op succeeds; the surface
+    # is no longer denied wholesale by the posture.
+    test "multi-tenant posture (WB_TENANCY_MODE=multi) PERMITS the surface (isolation, not kill-switch)" do
       clear_posture()
-      # Desktop is requested AND it's multi-tenant → Harness.enabled? is false (multi? overrides).
-      System.put_env("WB_DESKTOP", "1")
       System.put_env("WB_TENANCY_MODE", "multi")
-      refute Harness.enabled?()
+      assert Harness.enabled?()
 
       grant = full_grant()
-
-      assert %{"ok" => false} = call(grant, %{"op" => "exec", "name" => "echo", "argv" => ["hi"]})
-      assert %{"ok" => false} = call(grant, %{"op" => "fs", "fsop" => "read", "path" => "x"})
-      assert %{"ok" => false} = call(grant, %{"op" => "oauth.loopback", "authorize_base" => "https://x"})
-      assert %{"ok" => false} = call(grant, %{"op" => "llm", "messages" => []})
-      assert %{"ok" => false} = call(grant, %{"op" => "creds.get", "provider" => "github"})
+      # llm needs only a principal'd grant; the deterministic mock returns tool_use (no network).
+      assert %{"ok" => true, "resp" => %{"stop_reason" => "tool_use"}} =
+               call(grant, %{"op" => "llm", "messages" => []})
     end
 
-    test "no WB_DESKTOP/WB_HARNESS (hosted default) DENIES even with a minted grant" do
+    test "BARE single-tenant (no WB_DESKTOP/WB_HARNESS, not multi) DENIES even with a minted grant" do
       clear_posture()
       refute Harness.enabled?()
 
