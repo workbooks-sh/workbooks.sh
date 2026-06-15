@@ -184,11 +184,16 @@ export async function listWorkspaces(opts = {}) {
 }
 
 export async function createWorkspace(name, opts = {}) {
-  return plat('/workspaces', { method: 'POST', body: { name, nexus_id: opts.nexus_id } });
+  return plat('/workspaces', { method: 'POST', body: { name, icon: opts.icon, nexus_id: opts.nexus_id } });
+}
+
+/** Patch a workspace — pass only the fields to change ({name} and/or {icon}). */
+export async function updateWorkspace(id, attrs) {
+  return plat(`/workspaces/${id}`, { method: 'PATCH', body: attrs });
 }
 
 export async function renameWorkspace(id, name) {
-  return plat(`/workspaces/${id}`, { method: 'PATCH', body: { name } });
+  return updateWorkspace(id, { name });
 }
 
 export async function deleteWorkspace(id) {

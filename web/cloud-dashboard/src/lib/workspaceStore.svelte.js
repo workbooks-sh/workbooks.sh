@@ -4,7 +4,7 @@
 // (named after the org) so the switcher is never empty. The active workspace
 // persists in localStorage so it survives reloads.
 
-import { listWorkspaces, createWorkspace, renameWorkspace, deleteWorkspace } from '$lib/api.js';
+import { listWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from '$lib/api.js';
 
 let list = $state([]);
 let activeId = $state(null);
@@ -59,14 +59,15 @@ export const workspaceStore = {
     activeId = id;
     saveActive(id);
   },
-  async create(name) {
-    const ws = await createWorkspace(name);
+  async create(name, icon = '') {
+    const ws = await createWorkspace(name, { icon });
     list = [...list, ws];
     this.setActive(ws.id);
     return ws;
   },
-  async rename(id, name) {
-    const ws = await renameWorkspace(id, name);
+  /** Patch a workspace — pass only what changes ({name} and/or {icon}). */
+  async update(id, attrs) {
+    const ws = await updateWorkspace(id, attrs);
     list = list.map((w) => (w.id === id ? ws : w));
     return ws;
   },

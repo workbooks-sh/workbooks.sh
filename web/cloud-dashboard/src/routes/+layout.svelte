@@ -12,8 +12,6 @@
   let { children, data } = $props();
   let modalOpen = $state(false);
   let orgOpen = $state(false);
-  let creating = $state(false);
-  let newWsName = $state('');
 
   // Load the org's REAL nexuses + workspaces from the platform API (client-side only —
   // the stores are module singletons, so loading during SSR could bleed one org's data
@@ -24,18 +22,43 @@
     workspaceStore.load(defaultWs);
   });
 
-  async function createWs() {
-    const n = newWsName.trim();
+  // ── workspace edit/create (inline in the switcher) ──
+  // a curated emoji set — like the desktop app's IconPicker (empty = render initials).
+  const WS_EMOJIS = ['💼','🚀','🎨','📊','🧪','🌱','⚡','📦','🛠️','🔮','🌍','💡','🎯','🔥','✨','🧩','📈','🗂️','🎬','🛰️','🏷️','🧭','🔭','🪄'];
+  let editingId = $state(null); // a workspace id, or 'new', or null
+  let editName = $state('');
+  let editIcon = $state('');
+  const editingWs = $derived(workspaceStore.list.find((w) => w.id === editingId) || null);
+
+  function startEdit(w) { editingId = w.id; editName = w.name; editIcon = w.icon || ''; }
+  function startNew() { editingId = 'new'; editName = ''; editIcon = ''; }
+  function cancelEdit() { editingId = null; editName = ''; editIcon = ''; }
+
+  async function saveEdit() {
+    const n = editName.trim();
     if (!n) return;
     try {
-      const ws = await workspaceStore.create(n);
-      toast(`Created workspace “${ws.name}”`);
+      if (editingId === 'new') {
+        const ws = await workspaceStore.create(n, editIcon);
+        toast(`Created “${ws.name}”`);
+      } else {
+        await workspaceStore.update(editingId, { name: n, icon: editIcon });
+        toast('Workspace updated');
+      }
+      cancelEdit();
+      orgOpen = false;
     } catch {
-      toast('Couldn’t create the workspace', 'bad');
+      toast('Couldn’t save the workspace', 'bad');
     }
-    newWsName = '';
-    creating = false;
-    orgOpen = false;
+  }
+
+  async function deleteWs() {
+    const w = editingWs;
+    if (!w) return;
+    const ok = await workspaceStore.remove(w.id);
+    if (!ok) { toast('Can’t delete your only workspace', 'bad'); return; }
+    toast(`Deleted “${w.name}”`);
+    cancelEdit();
   }
 
   // /welcome + /denied render full-bleed, without the app chrome.
@@ -128,9 +151,34 @@
       </button>
     </div>
 
+    {#snippet wsEditor(isNew)}
+      <div class="wsedit">
+        <div class="emojis">
+          <button class="emo clear" class:sel={editIcon === ''} onclick={() => (editIcon = '')} title="Use initials" aria-label="Use initials">Aa</button>
+          {#each WS_EMOJIS as e}
+            <button class="emo" class:sel={editIcon === e} onclick={() => (editIcon = e)}>{e}</button>
+          {/each}
+        </div>
+        <!-- svelte-ignore a11y_autofocus -->
+        <input
+          class="wsinput"
+          autofocus
+          bind:value={editName}
+          placeholder="Workspace name"
+          onkeydown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+        />
+        <div class="wsactions">
+          {#if !isNew}<button class="wsdel" onclick={deleteWs}>Delete</button>{/if}
+          <span style="flex:1"></span>
+          <button class="wscancel" onclick={cancelEdit}>Cancel</button>
+          <button class="wssave" onclick={saveEdit}>{isNew ? 'Add' : 'Save'}</button>
+        </div>
+      </div>
+    {/snippet}
+
     <div class="orgwrap">
       <div class="org" onclick={() => (orgOpen = !orgOpen)} role="button" tabindex="0">
-        <div class="av">{wsInitials}</div>
+        <div class="av">{activeWs?.icon || wsInitials}</div>
         <div class="nm">
           <div class="wsname">{wsLabel}</div>
           <div class="wsorg">{orgLabel}</div>
@@ -141,27 +189,27 @@
         <div class="orgmenu" role="menu">
           <div class="omhead">{orgLabel}</div>
           {#each workspaceStore.list as w (w.id)}
-            <button class="omitem" onclick={() => { workspaceStore.setActive(w.id); orgOpen = false; }}>
-              <span class="av sm">{(w.name[0] || 'W').toUpperCase()}</span>
-              <span class="omname">{w.name}</span>
-              {#if activeWs?.id === w.id}<span class="omtick">✓</span>{/if}
-            </button>
+            {#if editingId === w.id}
+              {@render wsEditor(false)}
+            {:else}
+              <div class="wsrow" class:on={activeWs?.id === w.id}>
+                <button class="wsmain" onclick={() => { workspaceStore.setActive(w.id); orgOpen = false; }}>
+                  <span class="av sm">{w.icon || (w.name[0] || 'W').toUpperCase()}</span>
+                  <span class="omname">{w.name}</span>
+                  {#if activeWs?.id === w.id}<span class="omtick">✓</span>{/if}
+                </button>
+                <button class="wsedit-btn" onclick={() => startEdit(w)} title="Edit workspace" aria-label="Edit workspace">✎</button>
+              </div>
+            {/if}
           {/each}
           {#if workspaceStore.list.length === 0}
             <div class="omempty">No workspaces yet</div>
           {/if}
           <div class="omdiv"></div>
-          {#if creating}
-            <div class="omnew">
-              <input
-                placeholder="Workspace name"
-                bind:value={newWsName}
-                onkeydown={(e) => { if (e.key === 'Enter') createWs(); if (e.key === 'Escape') { creating = false; newWsName = ''; } }}
-              />
-              <button class="omadd" onclick={createWs}>Add</button>
-            </div>
+          {#if editingId === 'new'}
+            {@render wsEditor(true)}
           {:else}
-            <button class="omitem" onclick={() => (creating = true)}>
+            <button class="omitem" onclick={startNew}>
               <span class="av sm plus">+</span><span class="omname">New workspace</span><small>free</small>
             </button>
           {/if}
@@ -294,10 +342,43 @@
   }
   .av.sm.plus { background: var(--line); color: var(--ink); font-size: 13px; }
   .omempty { padding: 8px 9px; font: 500 12px var(--read); color: var(--dim); }
-  .omnew { display: flex; gap: 6px; padding: 4px; }
-  .omnew input {
-    flex: 1; min-width: 0; font: 500 13px var(--read); padding: 7px 9px;
-    border: 1px solid var(--stroke); border-radius: 7px; background: var(--card); color: var(--ink); outline: none;
+
+  /* workspace rows: switch (main) + edit (pencil, on hover) */
+  .wsrow { display: flex; align-items: center; border-radius: 8px; }
+  .wsrow:hover { background: var(--line); }
+  .wsrow.on .wsmain { font-weight: 600; }
+  .wsmain {
+    display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
+    padding: 8px 9px; border: none; background: none; color: var(--ink);
+    font: 500 13px var(--read); cursor: pointer; text-align: left;
   }
-  .omadd { flex: none; padding: 7px 11px; border: none; border-radius: 7px; background: var(--ink); color: var(--paper); font: 600 12px var(--read); cursor: pointer; }
+  .wsmain .av.sm { font-size: 12px; }
+  .wsedit-btn {
+    flex: none; width: 26px; height: 26px; margin-right: 5px; border: none; border-radius: 6px;
+    background: none; color: var(--dim); cursor: pointer; opacity: 0; font-size: 12px;
+  }
+  .wsrow:hover .wsedit-btn { opacity: 1; }
+  .wsedit-btn:hover { background: var(--card); color: var(--ink); }
+
+  /* inline editor (create + edit) */
+  .wsedit { padding: 8px 7px; display: flex; flex-direction: column; gap: 8px; }
+  .emojis { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+  .emo {
+    aspect-ratio: 1; display: grid; place-items: center; border: 1px solid transparent;
+    border-radius: 7px; background: none; cursor: pointer; font-size: 15px; padding: 0;
+  }
+  .emo:hover { background: var(--line); }
+  .emo.sel { border-color: var(--ink); background: var(--line); }
+  .emo.clear { font: 700 10px var(--read); color: var(--dim); }
+  .wsinput {
+    width: 100%; font: 500 13px var(--read); padding: 8px 10px;
+    border: 1px solid var(--stroke); border-radius: 8px; background: var(--card); color: var(--ink); outline: none;
+  }
+  .wsinput:focus { border-color: var(--ink); }
+  .wsactions { display: flex; align-items: center; gap: 6px; }
+  .wsactions button { border: none; border-radius: 7px; padding: 6px 11px; font: 600 12px var(--read); cursor: pointer; }
+  .wsdel { background: none; color: var(--bad, #d4604a); }
+  .wsdel:hover { background: color-mix(in srgb, var(--bad, #d4604a) 14%, transparent); }
+  .wscancel { background: var(--line); color: var(--ink); }
+  .wssave { background: var(--ink); color: var(--paper); }
 </style>
