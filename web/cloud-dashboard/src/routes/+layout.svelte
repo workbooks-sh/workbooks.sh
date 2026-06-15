@@ -6,6 +6,7 @@
   import Toast from '$lib/Toast.svelte';
   import { nexusStore } from '$lib/nexusStore.svelte.js';
   import { workspaceStore } from '$lib/workspaceStore.svelte.js';
+  import EmojiPicker from '$lib/EmojiPicker.svelte';
   import { toast } from '$lib/toastStore.svelte.js';
   import { goto } from '$app/navigation';
 
@@ -23,16 +24,16 @@
   });
 
   // ── workspace edit/create (inline in the switcher) ──
-  // a curated emoji set — like the desktop app's IconPicker (empty = render initials).
-  const WS_EMOJIS = ['💼','🚀','🎨','📊','🧪','🌱','⚡','📦','🛠️','🔮','🌍','💡','🎯','🔥','✨','🧩','📈','🗂️','🎬','🛰️','🏷️','🧭','🔭','🪄'];
+  // Uses the same emoji picker as the desktop app ($lib/EmojiPicker → emoji-picker-element).
   let editingId = $state(null); // a workspace id, or 'new', or null
   let editName = $state('');
   let editIcon = $state('');
+  let pickerOpen = $state(false);
   const editingWs = $derived(workspaceStore.list.find((w) => w.id === editingId) || null);
 
-  function startEdit(w) { editingId = w.id; editName = w.name; editIcon = w.icon || ''; }
-  function startNew() { editingId = 'new'; editName = ''; editIcon = ''; }
-  function cancelEdit() { editingId = null; editName = ''; editIcon = ''; }
+  function startEdit(w) { editingId = w.id; editName = w.name; editIcon = w.icon || ''; pickerOpen = false; }
+  function startNew() { editingId = 'new'; editName = ''; editIcon = ''; pickerOpen = false; }
+  function cancelEdit() { editingId = null; editName = ''; editIcon = ''; pickerOpen = false; }
 
   async function saveEdit() {
     const n = editName.trim();
@@ -153,20 +154,25 @@
 
     {#snippet wsEditor(isNew)}
       <div class="wsedit">
-        <div class="emojis">
-          <button class="emo clear" class:sel={editIcon === ''} onclick={() => (editIcon = '')} title="Use initials" aria-label="Use initials">Aa</button>
-          {#each WS_EMOJIS as e}
-            <button class="emo" class:sel={editIcon === e} onclick={() => (editIcon = e)}>{e}</button>
-          {/each}
+        <div class="wsiconrow">
+          <button class="wstile" class:on={pickerOpen} onclick={() => (pickerOpen = !pickerOpen)} title="Change icon" aria-label="Change icon">
+            {editIcon || (editName.trim()[0] || 'W').toUpperCase()}
+          </button>
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            class="wsinput"
+            autofocus
+            bind:value={editName}
+            placeholder="Workspace name"
+            onkeydown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+          />
         </div>
-        <!-- svelte-ignore a11y_autofocus -->
-        <input
-          class="wsinput"
-          autofocus
-          bind:value={editName}
-          placeholder="Workspace name"
-          onkeydown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
-        />
+        {#if pickerOpen}
+          <div class="wspicker">
+            <EmojiPicker onpick={(u) => { editIcon = u; pickerOpen = false; }} />
+            <button class="wsinitials" onclick={() => { editIcon = ''; pickerOpen = false; }}>Use initials instead</button>
+          </div>
+        {/if}
         <div class="wsactions">
           {#if !isNew}<button class="wsdel" onclick={deleteWs}>Delete</button>{/if}
           <span style="flex:1"></span>
@@ -362,16 +368,21 @@
 
   /* inline editor (create + edit) */
   .wsedit { padding: 8px 7px; display: flex; flex-direction: column; gap: 8px; }
-  .emojis { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
-  .emo {
-    aspect-ratio: 1; display: grid; place-items: center; border: 1px solid transparent;
-    border-radius: 7px; background: none; cursor: pointer; font-size: 15px; padding: 0;
+  .wsiconrow { display: flex; align-items: center; gap: 7px; }
+  .wstile {
+    flex: none; width: 34px; height: 34px; display: grid; place-items: center;
+    border: 1px solid var(--stroke); border-radius: 9px; background: var(--card);
+    color: var(--ink); cursor: pointer; font: 600 14px var(--read);
   }
-  .emo:hover { background: var(--line); }
-  .emo.sel { border-color: var(--ink); background: var(--line); }
-  .emo.clear { font: 700 10px var(--read); color: var(--dim); }
+  .wstile:hover, .wstile.on { border-color: var(--ink); }
+  .wspicker { display: flex; flex-direction: column; gap: 5px; }
+  .wsinitials {
+    align-self: flex-start; border: none; background: none; color: var(--dim);
+    font: 500 11.5px var(--read); cursor: pointer; padding: 2px 0;
+  }
+  .wsinitials:hover { color: var(--ink); }
   .wsinput {
-    width: 100%; font: 500 13px var(--read); padding: 8px 10px;
+    flex: 1; min-width: 0; font: 500 13px var(--read); padding: 8px 10px;
     border: 1px solid var(--stroke); border-radius: 8px; background: var(--card); color: var(--ink); outline: none;
   }
   .wsinput:focus { border-color: var(--ink); }
