@@ -39,27 +39,45 @@ defmodule Workbooks.WorkdirConfine do
   # Canonicalize the nearest EXISTING ancestor of `abs` (resolving every symlink component) and verify it is
   # still inside the workdir — so a symlink planted inside the workdir can't be used to read/write OUTSIDE it.
   defp no_symlink_escape(workdir, abs) do
+    # Canonicalize BOTH sides: the workdir itself may sit under a symlinked ancestor (e.g. macOS
+    # /var -> /private/var, or /tmp), so the resolved `abs` must be compared against the resolved
+    # root, not the raw workdir, or every legit path would falsely read as an escape.
+    root = realpath(workdir)
     probe = if File.exists?(abs), do: abs, else: Path.dirname(abs)
     canon = realpath(probe)
 
-    if canon == workdir or String.starts_with?(canon, workdir <> "/"),
+    if canon == root or String.starts_with?(canon, root <> "/"),
       do: abs,
       else: :escape
   end
 
-  # Best-effort realpath: walk down resolving any symlink component, capped to avoid link cycles.
-  defp realpath(path), do: realpath(Path.expand(path), 64)
-  defp realpath(path, 0), do: path
+  # Canonicalize `path` by resolving EVERY symlink component — not just the leaf — walking from the
+  # filesystem root down. A leaf-only resolve (the prior impl) missed an INTERMEDIATE DIRECTORY symlink:
+  # `<root>/link -> <other-tenant>` then reading `link/file` left `link` unresolved (read_link on the full
+  # path is :einval for a regular leaf), so it passed the prefix check and escaped. Resolving per-component
+  # closes that. Capped (fuel) to avoid symlink cycles; a component with no link is taken literally.
+  defp realpath(path) do
+    [_root | segs] = Path.split(Path.expand(path))
+    resolve(segs, "/", 64)
+  end
 
-  defp realpath(path, fuel) do
-    case :file.read_link_all(String.to_charlist(path)) do
+  defp resolve(_segs, acc, 0), do: acc
+  defp resolve([], acc, _fuel), do: acc
+
+  defp resolve([seg | rest], acc, fuel) do
+    joined = if acc == "/", do: "/" <> seg, else: acc <> "/" <> seg
+
+    case :file.read_link_all(String.to_charlist(joined)) do
       {:ok, target} ->
         t = to_string(target)
-        resolved = if String.starts_with?(t, "/"), do: t, else: Path.expand(t, Path.dirname(path))
-        realpath(resolved, fuel - 1)
+        base = if String.starts_with?(t, "/"), do: t, else: Path.join(Path.dirname(joined), t)
+        # Re-resolve the (possibly relative, possibly itself-symlinked) target from the root, then
+        # continue with the remaining segments — so chained/relative dir symlinks resolve too.
+        [_root | newsegs] = Path.split(Path.expand(base))
+        resolve(newsegs ++ rest, "/", fuel - 1)
 
       _ ->
-        path
+        resolve(rest, joined, fuel)
     end
   end
 end

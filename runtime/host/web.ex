@@ -422,7 +422,7 @@ defmodule Workbooks.Web do
   get "/api/oql/query" do
     conn = fetch_query_params(conn)
 
-    case read_workspace_org(conn.query_params["path"]) do
+    case read_workspace_org(conn.assigns.tenant, conn.query_params["path"]) do
       {:ok, org} ->
         headlines = Workbooks.OQL.parse_headlines(org)
         conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{headlines: headlines, parse_warnings: []}))
@@ -442,13 +442,19 @@ defmodule Workbooks.Web do
     op = params["op"]
     args = Map.drop(params, ["path", "op"])
 
+    # Resolve the confined abs path ONCE and use it for both read AND write — an
+    # unconfined File.write(Path.expand(path)) was the arbitrary cross-tenant .org
+    # WRITE vector (wb-u6su).
     result =
-      with {:ok, org} <- read_workspace_org(path),
+      with {:ok, abs} <- confine_workspace_org(Workbooks.Desktop.enabled?(), conn.assigns.tenant, path),
+           true <- File.regular?(abs) || {:error, :enoent},
+           {:ok, org} <- File.read(abs),
            {:ok, new_org} <- Workbooks.OrgEdit.patch(org, id, op, args),
-           :ok <- File.write(Path.expand(path), new_org) do
+           :ok <- File.write(abs, new_org) do
         {200, %{ok: true}}
       else
         {:error, reason} -> {422, %{error: inspect(reason)}}
+        false -> {422, %{error: "enoent"}}
       end
 
     {status, payload} = result
@@ -459,7 +465,7 @@ defmodule Workbooks.Web do
     conn = fetch_query_params(conn)
 
     views =
-      case read_workspace_org(conn.query_params["path"]) do
+      case read_workspace_org(conn.assigns.tenant, conn.query_params["path"]) do
         {:ok, org} -> Workbooks.OQL.parse_headlines(org) |> Enum.map(&headline_to_view/1)
         _ -> []
       end
@@ -1735,23 +1741,39 @@ defmodule Workbooks.Web do
   # Read an absolute workspace org file for the trusted desktop. Guards: must be
   # an absolute path to an existing regular file (no traversal games — it's an
   # absolute path the desktop already resolved from its own workspace folder).
-  defp read_workspace_org(path) when is_binary(path) and path != "" do
-    abs = Path.expand(path)
+  defp read_workspace_org(tenant, path) do
+    with {:ok, abs} <- confine_workspace_org(Workbooks.Desktop.enabled?(), tenant, path) do
+      if File.regular?(abs), do: File.read(abs), else: {:error, :enoent}
+    end
+  end
 
+  @doc false
+  # Resolve a workspace .org path for `tenant` to a confined absolute path (wb-u6su).
+  # Desktop = trusted single-user machine: an absolute local path the desktop already
+  # resolved from its own workspace folder (`..` text still rejected). Cloud/shared =
+  # confined UNDER the tenant's workspace root (`<WB_DATA>/wb-runs/<tenant>`) via the
+  # shared WorkdirConfine spine — a leading "/" is stripped, `..` and symlink-escape
+  # are refused — so an authenticated tenant can never read OR patch another tenant's
+  # (or an arbitrary host) .org file by absolute path. Pure (testable): takes desktop?
+  # as an arg, same shape as confined_workdir/4.
+  def confine_workspace_org(desktop?, tenant, path) when is_binary(path) and path != "" do
     cond do
-      # Reject traversal + non-org targets (wb-g1yo.10): the only legit use is
-      # parsing an Org workbook, so this blocks the arbitrary host-file read
-      # (/etc/*, secrets, dotfiles) that an unconfined ?path= otherwise allowed.
-      String.contains?(path, "..") -> {:error, :badpath}
-      Path.extname(abs) != ".org" -> {:error, :badpath}
-      File.regular?(abs) -> File.read(abs)
-      true -> {:error, :enoent}
+      Path.extname(path) != ".org" ->
+        {:error, :badpath}
+
+      desktop? ->
+        if String.contains?(path, ".."), do: {:error, :badpath}, else: {:ok, Path.expand(path)}
+
+      true ->
+        base = System.get_env("WB_DATA") || System.tmp_dir!()
+        root = Path.expand(Path.join([base, "wb-runs", safe_segment(tenant, "anon")]))
+        Workbooks.WorkdirConfine.confine(root, path)
     end
   rescue
     _ -> {:error, :badpath}
   end
 
-  defp read_workspace_org(_), do: {:error, :nopath}
+  def confine_workspace_org(_desktop?, _tenant, _path), do: {:error, :nopath}
 
   defp send_json(conn, status, payload) do
     conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))

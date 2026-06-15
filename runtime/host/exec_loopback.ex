@@ -483,7 +483,7 @@ defmodule Workbooks.ExecLoopback do
          :ok <- principal_gate(grant),
          false <- principal_revoked?(grant),
          {:ok, workdir} <- fs_workdir(grant),
-         {:ok, abs} <- confine(workdir, raw_path) do
+         {:ok, abs} <- Workbooks.WorkdirConfine.confine(workdir, raw_path) do
       fs_dispatch(conn, fsop, abs, conn.body_params)
     else
       {:error, :no_workdir} ->
@@ -506,58 +506,8 @@ defmodule Workbooks.ExecLoopback do
     end
   end
 
-  # Resolve `raw` INSIDE `workdir` and refuse any escape. A path is treated as workdir-relative (a leading
-  # "/" is stripped so an "absolute" guest path still lands in the workdir); `..` segments that would climb
-  # above the workdir are rejected. The final real path (symlinks resolved on the existing prefix) must still
-  # be a prefix-descendant of the workdir — so a symlink inside the workdir can't be used to read outside it.
-  defp confine(workdir, raw) when is_binary(raw) and raw != "" do
-    rel = String.trim_leading(raw, "/")
-
-    case Path.safe_relative(rel) do
-      {:ok, safe} ->
-        abs = Path.expand(safe, workdir)
-        # belt: the expanded path must be the workdir itself or strictly inside it.
-        if abs == workdir or String.starts_with?(abs, workdir <> "/"),
-          do: {:ok, no_symlink_escape(workdir, abs)},
-          else: {:error, :escape}
-
-      :error ->
-        {:error, :escape}
-    end
-  end
-
-  defp confine(_workdir, _raw), do: {:error, :escape}
-
-  # Canonicalize the nearest EXISTING ancestor of `abs` (resolving every symlink component) and verify it is
-  # still inside the workdir — so a symlink planted inside the workdir can't be used to read/write OUTSIDE it.
-  # A fresh file to be created has no real path yet, so we canonicalize its nearest existing parent. Returns
-  # the (lexically-confined) `abs` when safe, or `:escape`.
-  defp no_symlink_escape(workdir, abs) do
-    probe = if File.exists?(abs), do: abs, else: Path.dirname(abs)
-    canon = realpath(probe)
-
-    if canon == workdir or String.starts_with?(canon, workdir <> "/"),
-      do: abs,
-      else: :escape
-  end
-
-  # Best-effort realpath: walk down from root resolving any symlink component, capped to avoid link cycles.
-  # Falls back to the lexical path on any read error (a non-existent leaf simply has no link to resolve).
-  defp realpath(path), do: realpath(Path.expand(path), 64)
-
-  defp realpath(path, 0), do: path
-
-  defp realpath(path, fuel) do
-    case :file.read_link_all(String.to_charlist(path)) do
-      {:ok, target} ->
-        t = to_string(target)
-        resolved = if String.starts_with?(t, "/"), do: t, else: Path.expand(t, Path.dirname(path))
-        realpath(resolved, fuel - 1)
-
-      _ ->
-        path
-    end
-  end
+  # fs-path confinement is the shared Workbooks.WorkdirConfine spine (used by HostBroker too) — one
+  # implementation so the security behavior can't drift between the fetch-loopback and the sync host-import.
 
   # Execute one fs verb against the (already-confined) absolute path. Errors map to HTTP the shim understands:
   # 404 => ENOENT, 403 => EACCES/denied, 5xx => EIO. Bytes are base64 on the wire.
