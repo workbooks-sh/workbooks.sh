@@ -41,9 +41,6 @@
   import { cubicOut } from "svelte/easing";
   import { invoke } from "@tauri-apps/api/core";
   import { chrome } from "$lib/ui/chrome.svelte";
-  import { nav } from "$lib/bridge/nav.svelte";
-  import { workspaces } from "$lib/bridge/workspaces.svelte";
-  import { DEMO_ACTIVE_WORKSPACE } from "$lib/onboarding/demo";
   import DockToolbar from "$lib/components/DockToolbar.svelte";
   import { nexus } from "$lib/bridge/nexus.svelte";
   import { tip } from "$lib/ui/tip";
@@ -71,10 +68,6 @@
     // The canvas renders dock.fullscreen regardless of chrome.mode, but
     // drop out of doc mode so a stray active tab doesn't shadow it.
   }
-
-  // Active workspace for the Shelf titlebar selector (demo during the tour).
-  const wsName = $derived(onboarding.active ? DEMO_ACTIVE_WORKSPACE.name : (workspaces.active?.name ?? "Workspace"));
-  const wsIcon = $derived(onboarding.active ? DEMO_ACTIVE_WORKSPACE.icon : (workspaces.active?.icon ?? ""));
 
   // Engine connection state, surfaced (offline-first: the app runs without it).
   const engine = $derived.by(() => {
@@ -328,21 +321,7 @@
     <ChevronDown size={12} weight="bold" />
   </button>
 
-  <!-- Shelf moves the workspace selector up here (optimised for one / few
-       workspaces) — between the sidebar toggle and the ⌄ menu. -->
-  {#if nav.layout === "shelf"}
-    <button
-      type="button"
-      class="ws-pick"
-      data-tauri-drag-region="false"
-      title="Switch workspace ({wsName})"
-      aria-label="Switch workspace ({wsName})"
-      aria-haspopup="menu"
-      onclick={(e) => chrome.openWorkspace(e.currentTarget)}
-    >
-      <IconResolver value={wsIcon} name={wsName} size={15} />
-    </button>
-  {/if}
+  <!-- (the workspace selector now lives in the sidebar top for every layout) -->
 
   <button
     type="button"
@@ -685,29 +664,6 @@
     background: var(--color-page);
     color: var(--color-fg);
   }
-
-  /* Shelf workspace selector — just the workspace logo in a square (it's a
-   * switch; no name, no caret). */
-  .ws-pick {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    align-self: center;
-    height: 26px;
-    width: 26px;
-    border-radius: 8px;
-    border: 1px solid var(--color-border);
-    background: var(--color-surface-soft);
-    color: var(--color-fg);
-    cursor: pointer;
-    flex-shrink: 0;
-    line-height: 0;
-    overflow: hidden;
-    transition: border-color 0.15s, background 0.15s;
-  }
-  .ws-pick:hover { border-color: var(--color-border-strong); }
-  .ws-pick :global(svg),
-  .ws-pick :global(img) { display: block; }
 
   /* Org / nexus switcher chip — left of the titlebar, all layouts. The dot carries
      the engine/connection state (replacing the old green mark on the right). */

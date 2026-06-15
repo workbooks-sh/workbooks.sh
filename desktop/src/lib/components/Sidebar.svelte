@@ -585,12 +585,12 @@
   {/if}
 
   <div class="sb-body">
-  <!-- Workspace header. Hub: the icon-rail IS the switcher → plain label.
-       Map: the clickable switcher dropdown. Shelf: nothing here — the
-       selector lives in the titlebar (optimised for one / few workspaces). -->
+  <!-- Workspace switcher — ALWAYS at the top of the sidebar. Hub: the icon-rail IS
+       the switcher → plain label. Shelf + Map: the clickable switcher dropdown (the
+       titlebar no longer carries the workspace selector). -->
   {#if nav.layout === "hub"}
     <div class="ws-label-hub">{workspaceName || "Workspace"}</div>
-  {:else if nav.layout === "map"}
+  {:else}
   <button
     type="button"
     class="ws-header"
