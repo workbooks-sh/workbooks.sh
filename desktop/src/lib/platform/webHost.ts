@@ -68,6 +68,22 @@ const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
   Archive: { icon: "mi:zip", kind: "folder" }, // red
   Brand: { icon: "mi:rocket", kind: "folder" }, // fuchsia
   Marketing: { icon: "mi:video", kind: "folder" }, // blue
+  // ── demo brand-workspace apps (each is a real workbook served from
+  // static/brands/<brand>/). These back the four distinct demo workspaces
+  // (Brand Nana / UGC Pro / Parcel) so the browser preview shows real,
+  // visibly-different brands instead of generic placeholders.
+  "Brand Health": { icon: "mi:chart", kind: "app" },
+  "Tecovas Battlecard": { icon: "mi:table", kind: "app" },
+  "Creative Vault": { icon: "mi:image", kind: "app" },
+  "Client Roster": { icon: "mi:lib", kind: "app" },
+  "Creator HQ": { icon: "mi:rocket", kind: "app" },
+  "Deal Pipeline": { icon: "mi:table", kind: "app" },
+  "Earnings Ledger": { icon: "mi:table", kind: "app" },
+  "Match Marketplace": { icon: "mi:database", kind: "app" },
+  "Market Pulse": { icon: "mi:chart", kind: "app" },
+  "Listing — 48 Larkspur": { icon: "mi:document", kind: "app" },
+  "Deal Pipeline (RE)": { icon: "mi:table", kind: "app" },
+  "Neighborhood Intel": { icon: "mi:database", kind: "app" },
 };
 
 /** Workbook path served per app. The real Kanban workbook lives as a
@@ -75,6 +91,21 @@ const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
  *  labeled stub page generated on the fly by `read_file_bytes_base64`. */
 const APP_WORKBOOK_PATH: Record<string, string> = {
   Kanban: "/mock/kanban.html",
+  // Brand Nana (brand-intelligence agency)
+  "Brand Health": "/brands/brand-nana/brand-health-dashboard.html",
+  "Tecovas Battlecard": "/brands/brand-nana/battlecard-tecovas.html",
+  "Creative Vault": "/brands/brand-nana/creative-vault.html",
+  "Client Roster": "/brands/brand-nana/client-roster.html",
+  // UGC Pro (creator marketplace)
+  "Creator HQ": "/brands/ugc-pro/creator-hq.html",
+  "Deal Pipeline": "/brands/ugc-pro/deal-pipeline.html",
+  "Earnings Ledger": "/brands/ugc-pro/earnings-ledger.html",
+  "Match Marketplace": "/brands/ugc-pro/match-marketplace.html",
+  // Parcel (real estate brokerage)
+  "Market Pulse": "/brands/parcel/market-pulse.html",
+  "Listing — 48 Larkspur": "/brands/parcel/listing-48-larkspur.html",
+  "Deal Pipeline (RE)": "/brands/parcel/deal-pipeline.html",
+  "Neighborhood Intel": "/brands/parcel/neighborhood-intel-riverside-heights.html",
 };
 const PKG_WORKBOOKS: Record<string, { path: string; title: string }[]> = {
   Clients: [
@@ -102,6 +133,27 @@ const WORKSPACES = [
     icon: "💼",
     package_names: ["Acme", "Internal"],
     created_at: 1_700_000_100_000,
+  },
+  {
+    id: "ws_brand_nana",
+    name: "Brand Nana",
+    icon: "🍌",
+    package_names: ["Brand Health", "Tecovas Battlecard", "Creative Vault", "Client Roster"],
+    created_at: 1_700_000_200_000,
+  },
+  {
+    id: "ws_ugc_pro",
+    name: "UGC Pro",
+    icon: "🎬",
+    package_names: ["Creator HQ", "Deal Pipeline", "Earnings Ledger", "Match Marketplace"],
+    created_at: 1_700_000_300_000,
+  },
+  {
+    id: "ws_parcel",
+    name: "Parcel",
+    icon: "🏡",
+    package_names: ["Market Pulse", "Listing — 48 Larkspur", "Deal Pipeline (RE)", "Neighborhood Intel"],
+    created_at: 1_700_000_400_000,
   },
 ];
 
@@ -216,14 +268,14 @@ const ORG = {
   id: "org_acme",
   name: "Acme Studio",
   members: [
-    { handle: "you", display_name: "You", avatar: "https://randomuser.me/api/portraits/men/32.jpg", email: "you@workbooks.sh", title: "Owner" },
-    { handle: "amara", display_name: "Amara Okafor", avatar: "https://randomuser.me/api/portraits/women/68.jpg", email: "amara@acme.studio", title: "Design Lead" },
-    { handle: "ravi", display_name: "Ravi Patel", avatar: "https://randomuser.me/api/portraits/men/45.jpg", email: "ravi@acme.studio", title: "Engineer" },
-    { handle: "mei", display_name: "Mei Lin", avatar: "https://randomuser.me/api/portraits/women/24.jpg", email: "mei@acme.studio", title: "PM" },
-    { handle: "diego", display_name: "Diego Santos", avatar: "https://randomuser.me/api/portraits/men/76.jpg", email: "diego@acme.studio", title: "Data" },
-    { handle: "nora", display_name: "Nora Haddad", avatar: "https://randomuser.me/api/portraits/women/12.jpg", email: "nora@acme.studio", title: "Research" },
-    { handle: "kenji", display_name: "Kenji Watanabe", avatar: "https://randomuser.me/api/portraits/men/3.jpg", email: "kenji@acme.studio", title: "Engineer" },
-    { handle: "priya", display_name: "Priya Nair", avatar: "https://randomuser.me/api/portraits/women/55.jpg", email: "priya@acme.studio", title: "Marketing" },
+    { handle: "you", display_name: "You", avatar: "https://i.pravatar.cc/120?img=11", email: "you@workbooks.sh", title: "Owner" },
+    { handle: "amara", display_name: "Amara Okafor", avatar: "https://i.pravatar.cc/120?img=45", email: "amara@acme.studio", title: "Design Lead" },
+    { handle: "ravi", display_name: "Ravi Patel", avatar: "https://i.pravatar.cc/120?img=12", email: "ravi@acme.studio", title: "Engineer" },
+    { handle: "mei", display_name: "Mei Lin", avatar: "https://i.pravatar.cc/120?img=47", email: "mei@acme.studio", title: "PM" },
+    { handle: "diego", display_name: "Diego Santos", avatar: "https://i.pravatar.cc/120?img=33", email: "diego@acme.studio", title: "Data" },
+    { handle: "nora", display_name: "Nora Haddad", avatar: "https://i.pravatar.cc/120?img=49", email: "nora@acme.studio", title: "Research" },
+    { handle: "kenji", display_name: "Kenji Watanabe", avatar: "https://i.pravatar.cc/120?img=14", email: "kenji@acme.studio", title: "Engineer" },
+    { handle: "priya", display_name: "Priya Nair", avatar: "https://i.pravatar.cc/120?img=44", email: "priya@acme.studio", title: "Marketing" },
   ] as OrgMember[],
   roles: ["Viewer", "Editor", "Owner"],
 };

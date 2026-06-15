@@ -1,0 +1,366 @@
+<!doctype html>
+<!-- workbook: ugc-university — the flagship UGC Pro LMS course player (deterministic, offline, self-contained). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UGC Pro — UGC University</title>
+  <script id="workbook-spec" type="application/json">
+    {
+      "id": "ugc-university",
+      "kind": "lms",
+      "title": "UGC University",
+      "owner": "kelly",
+      "workspace": "ugc-pro",
+      "source": "data/curriculum.json",
+      "frozen_at": "2026-06-14T00:00:00Z"
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--pink:#FF2D78;--violet:#7C3AED;--yellow:#FFD93D;--mint:#16E0A3;--grad:linear-gradient(135deg,#FF2D78 0%,#7C3AED 100%);--green:#FF2D78;--green-d:#7C3AED;--ink:#1A0B2E;--bg:#FFF6FB;--card:#fff;--line:#F0E2EE;--muted:#7B6E8C;--amber:#a8730a;}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    h1,h2,h3,h4{font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em}
+    h1{font-weight:800}
+    body{font:15px/1.55 Plus Jakarta Sans,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);margin:0;display:grid;grid-template-columns:336px 1fr;height:100vh;overflow:hidden}
+
+    /* ---- sidebar ---- */
+    aside{border-right:1px solid var(--line);overflow:auto;background:var(--card);display:flex;flex-direction:column}
+    .brandbar{padding:20px 22px 18px;border-bottom:1px solid var(--line)}
+    .crumb{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+    .brandbar h1{font-size:19px;font-weight:700;margin:6px 0 0;letter-spacing:-.015em;display:flex;align-items:center;gap:8px}
+    .brandbar h1 .seal{font-size:10px;font-weight:700;color:var(--green-d);background:rgba(22,224,163,.16);border-radius:6px;padding:3px 7px;letter-spacing:.04em}
+    .brandbar .p{font-size:12px;color:var(--muted);margin:8px 0 0}
+    .inst{display:flex;align-items:center;gap:9px;margin:14px 0 4px}
+    .inst img{width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid var(--green)}
+    .inst b{font-size:13px;font-weight:650}
+    .inst span{display:block;font-size:11px;color:var(--muted)}
+    .progwrap{margin-top:14px}
+    .progress{height:7px;background:#FBEFF7;border-radius:4px;overflow:hidden}
+    .progress i{display:block;height:7px;background:linear-gradient(90deg,var(--green-d),var(--green));transition:width .35s ease}
+    .progmeta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:7px}
+    .progmeta b{color:var(--ink);font-weight:650}
+
+    .modwrap{padding-bottom:8px}
+    .mod{padding:16px 22px 7px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;display:flex;justify-content:space-between}
+    .mod .mc{color:#9aa6a0;font-weight:600}
+    .les{display:flex;align-items:center;gap:11px;padding:9px 22px;cursor:pointer;font-size:14px;border-left:3px solid transparent}
+    .les:hover{background:#FBEFF7}
+    .les.active{background:rgba(22,224,163,.16);border-left-color:var(--green-d)}
+    .les .ck{width:19px;height:19px;border-radius:50%;border:2px solid #cfdad4;flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:700}
+    .les.done .ck{background:var(--green-d);border-color:var(--green-d)}
+    .les.active:not(.done) .ck{border-color:var(--green-d)}
+    .les .lt{flex:1;min-width:0}
+    .les .dur{font-size:12px;color:var(--muted);flex:none}
+    .les.locked{opacity:.55}
+    .les .lock{font-size:12px;color:#b6c0ba}
+    .sidefoot{margin-top:auto;border-top:1px solid var(--line);padding:14px 22px;font-size:12px;color:var(--muted)}
+    .sidefoot a{color:var(--green-d);text-decoration:none;font-weight:600}
+
+    /* ---- main ---- */
+    main{overflow:auto;background:var(--bg)}
+    .player{background:#0a0d0b;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;position:relative;color:#fff;overflow:hidden}
+    .player .poster{position:absolute;inset:0;object-fit:cover;width:100%;height:100%;opacity:.42}
+    .player .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,13,11,.25),rgba(10,13,11,.75))}
+    .player .play{position:relative;width:78px;height:78px;border-radius:50%;background:rgba(255,45,120,.95);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 10px 40px rgba(124,58,237,.45);transition:transform .15s}
+    .player .play:hover{transform:scale(1.06)}
+    .player .play:after{content:"";border-left:24px solid #0a0d0b;border-top:14px solid transparent;border-bottom:14px solid transparent;margin-left:7px}
+    .player .topcap{position:absolute;top:16px;left:20px;font-size:12px;color:#cfe8d8;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+    .player .cap{position:absolute;bottom:16px;left:20px;right:20px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+    .player .cap .ttl{font-size:15px;font-weight:600}
+    .player .bar{position:absolute;bottom:0;left:0;right:0;height:4px;background:rgba(255,255,255,.18)}
+    .player .bar i{display:block;height:4px;width:0;background:var(--green)}
+
+    .body{padding:30px 44px 56px;max-width:780px}
+    .tagrow{display:flex;gap:8px;margin-bottom:10px}
+    .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:20px}
+    .tag.g{background:rgba(22,224,163,.16);color:var(--green-d)}
+    .tag.a{background:#fff4dd;color:var(--amber)}
+    .tag.n{background:#eef1f0;color:var(--muted)}
+    .body h2{font-size:27px;font-weight:700;letter-spacing:-.02em;margin:0 0 8px;line-height:1.18}
+    .meta{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:13px;margin-bottom:22px}
+    .meta img{width:26px;height:26px;border-radius:50%;object-fit:cover}
+    .meta .dot{width:3px;height:3px;border-radius:50%;background:#cdd6d1}
+    .lede{font-size:17px;line-height:1.6;color:#202824;margin:0 0 18px}
+    .body p{color:#27302b}
+
+    .keys{background:#FBEFF7;border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:22px 0}
+    .keys h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 12px}
+    .keys ul{margin:0;padding-left:20px}
+    .keys li{margin:8px 0;color:#222b26}
+    .keys li b{font-weight:650}
+
+    .sec-h{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin:26px 0 12px}
+    .swipe{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .chip{display:block;text-decoration:none;color:inherit;border:1px solid var(--line);border-radius:13px;padding:14px;background:#fff;transition:border-color .15s,box-shadow .15s}
+    .chip:hover{border-color:var(--green);box-shadow:0 6px 20px rgba(124,58,237,.08)}
+    .chip .ct{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+    .chip .logo{width:30px;height:30px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid var(--line);padding:4px}
+    .chip .bn{font-weight:650;font-size:13px}
+    .chip .fmt{font-size:11px;color:var(--muted)}
+    .chip .hook{font-size:13px;color:#27302b;line-height:1.4;margin:0}
+    .chip .hold{margin-top:9px;font-size:11px;color:var(--green-d);font-weight:700}
+
+    .res{display:flex;flex-direction:column;gap:8px}
+    .res a{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit;border:1px solid var(--line);border-radius:11px;padding:11px 14px;background:#fff;font-size:14px}
+    .res a:hover{border-color:var(--green)}
+    .res .ic{width:30px;height:30px;border-radius:8px;background:rgba(22,224,163,.16);color:var(--green-d);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:none}
+    .res .rmeta{margin-left:auto;font-size:12px;color:var(--muted)}
+
+    .nav{display:flex;justify-content:space-between;align-items:center;margin-top:32px;border-top:1px solid var(--line);padding-top:18px}
+    .nav .pinfo{font-size:12px;color:var(--muted)}
+    .nav .acts{display:flex;gap:10px}
+    .nav button{font:inherit;background:var(--green-d);color:#fff;border:0;border-radius:11px;padding:11px 20px;font-weight:650;cursor:pointer;transition:filter .15s}
+    .nav button:hover{filter:brightness(1.06)}
+    .nav button:disabled{opacity:.4;cursor:not-allowed}
+    .nav button.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+    .nav button.done{background:rgba(22,224,163,.16);color:var(--green-d);border:1px solid rgba(22,224,163,.4)}
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:12px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all .3s;z-index:9}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .toast b{color:var(--green)}
+  </style>
+</head>
+<body>
+  <aside id="side"></aside>
+  <main>
+    <div class="player">
+      <img class="poster" id="poster" alt="" />
+      <div class="scrim"></div>
+      <div class="topcap" id="topcap"></div>
+      <div class="play"></div>
+      <div class="cap"><div class="ttl" id="playttl"></div><div id="playdur"></div></div>
+      <div class="bar"><i id="playbar"></i></div>
+    </div>
+    <div class="body" id="body"></div>
+  </main>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ---- swipe file (mirrors files/swipe-file-index.csv) ----
+    const SWIPE = {
+      glossier:{brand:"Glossier",dom:"glossier.com",fmt:"Testimonial",hook:'"POV: your skin barrier finally healed"',hold:"71% hold"},
+      ag1:{brand:"AG1",dom:"drinkag1.com",fmt:"Skeptic→believer",hook:'"I tried it for 30 days so you don’t have to"',hold:"63% hold"},
+      ritual:{brand:"Ritual",dom:"ritual.com",fmt:"Demo",hook:'"the only vitamin I actually take"',hold:"56% hold"},
+      olipop:{brand:"Olipop",dom:"drinkolipop.com",fmt:"Reaction",hook:'"fridge restock, then the first sip"',hold:"52% hold"},
+      caraway:{brand:"Caraway",dom:"carawayhome.com",fmt:"Demo",hook:'"the egg-slide test that sold me"',hold:"49% hold"},
+    };
+    const logo = d => `https://logo.clearbit.com/${d}`;
+
+    // ---- curriculum: 4 modules / 11 lessons ----
+    const curriculum=[
+      {mod:"Foundations",n:1,lessons:[
+        {t:"What UGC actually is (and isn’t)",dur:"8:24",done:true,
+         poster:"https://images.unsplash.com/photo-1551817958-d9d86fb29431?w=1280&q=70",
+         lede:"The mental model that separates creators who earn $100 a video from the ones who earn $2,000.",
+         desc:"UGC isn’t influencer marketing. You are not selling your audience — you have no audience to sell. You are selling a <b>deliverable</b>: a piece of ad-ready content a brand can run as paid media. Get this one distinction right and everything downstream — your pricing, your pitch, your portfolio — falls into place.",
+         k:["<b>You sell content, not influence.</b> Followers are irrelevant; a brand pays for footage it can put behind ad spend.","<b>The three buyers:</b> DTC brands (in-house), performance agencies, and creative-strategy clients who pay you to think.","<b>Deliverables &gt; reach.</b> One 30-second hook variation is the unit of sale — price it, multiply it, and you have a business."],
+         res:[{n:"The UGC business model — 1-page map",ext:"PDF",size:"1 page"}]},
+        {t:"Setting up your kit on any budget",dur:"11:02",done:true,
+         poster:"https://images.unsplash.com/photo-1606983340126-99ab4feaa64a?w=1280&q=70",
+         lede:"You do not need a camera. Here is the exact phone, light, and mic setup Kelly used to bill her first $50k.",
+         desc:"Brands are buying believability, not cinema. A phone shot against window light with clean audio beats a $3,000 mirrorless rig in a dark room every time. We walk the three things that actually move conversion — framing, light, and sound — and the cheapest way to nail each.",
+         k:["<b>Phone + window light</b> beats a bad studio. Shoot facing the window, never with it behind you.","<b>The $40 shotgun mic</b> fixes ~80% of the audio problems that make UGC feel cheap.","<b>One reflector ($15)</b> kills under-eye shadow and reads as “professional” on a sub-$100 kit."],
+         res:[{n:"Kelly’s sub-$100 gear list (with links)",ext:"PDF",size:"2 pages"}]},
+      ]},
+      {mod:"The Direct-Response Formula",n:2,lessons:[
+        {t:"The hook – problem – demo – proof – CTA beat",dur:"14:47",done:true,featured:true,
+         poster:"https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=1280&q=70",
+         lede:"The five-beat structure every winning direct-response ad follows. Internalize it and you can script a converting video in 20 minutes.",
+         desc:"Performance ads don’t freestyle. They march through five beats in order: <b>Hook</b> (stop the scroll), <b>Problem</b> (name the pain), <b>Demo</b> (show the product solving it), <b>Proof</b> (make it believable), <b>CTA</b> (tell them exactly what to do). Skip a beat and the ad leaks. We dissect three winners frame-by-frame against the formula.",
+         k:["<b>Hooks earn the next 3 seconds.</b> The scroll is the only competition — stop it in under 2.","<b>Proof beats features every time.</b> “8 weeks on my hyperpigmentation” outsells any spec sheet.","<b>The CTA is a beat, not an afterthought.</b> Name the action and the reason in one breath."],
+         swipe:["glossier","ag1","ritual"],
+         res:[{n:"The 5-beat scripting template",ext:"DOC",size:"editable"},{n:"3 ads dissected against the formula",ext:"PDF",size:"6 pages"}]},
+        {t:"Writing 5 hooks for any product",dur:"9:33",done:true,featured:true,
+         poster:"https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=1280&q=70",
+         lede:"Brands pay $50 per extra hook. This lesson makes hook-writing mechanical so you can sell hook variations as an upsell on every deal.",
+         desc:"You should never deliver one hook. Every brief is worth five, because performance teams want options to A/B test — and they’ll pay for each one. We turn the blank page into a checklist: six hook archetypes you rotate through until you have five strong openers for any product, in any niche.",
+         k:["<b>Six hook archetypes:</b> curiosity, callout, contrarian, transformation, listicle, and POV — run the product through each.","<b>Always ship 2+ hooks per deliverable.</b> Brands A/B test openers; extra hooks are pure-margin upsell.","<b>Hook = first 2 seconds only.</b> If they keep watching, the hook did its single job."],
+         swipe:["glossier","caraway","olipop"],
+         res:[{n:"The 6-archetype hook worksheet",ext:"DOC",size:"editable"},{n:"50 proven hooks, by niche",ext:"PDF",size:"4 pages"}]},
+        {t:"Scripting without sounding scripted",dur:"12:18",done:false,active:true,
+         poster:"https://images.unsplash.com/photo-1516542076529-1ea3854896f2?w=1280&q=70",
+         lede:"The reason your reads feel stiff — and the “bad take” method that fixes it in one shoot.",
+         desc:"Scripted UGC dies because creators perform <i>at</i> an audience. The fix is to write the way you’d text one friend, then shoot a deliberately “bad” throwaway take first to burn off the performance instinct. Take two is almost always the keeper.",
+         k:["<b>Talk to one person,</b> not “everyone watching.” Write the script to a single name.","<b>The bad-take method:</b> shoot one intentionally over-the-top take to relax — the real one comes next.","<b>Read it aloud while writing.</b> If you wouldn’t say it out loud, cut it."],
+         res:[{n:"Conversational rewrite checklist",ext:"PDF",size:"1 page"}]},
+      ]},
+      {mod:"Landing Brand Deals",n:3,lessons:[
+        {t:"Building a portfolio that books",dur:"10:55",done:false,
+         poster:"https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1280&q=70",
+         lede:"Three sharp spec videos beat thirty mediocre ones. Here’s exactly what goes in your reel — and what to cut.",
+         desc:"Brands hire from a 60-second scan. Lead with three spec videos for brands you’d actually want to work with, each showing a different beat structure. No personal vlogs, no “about me” — just proof you can produce ad-ready content. We build it live in the included Notion template.",
+         k:["<b>3 spec videos &gt; 30 real ones.</b> Quality and relevance, never volume.","<b>Make spec ads for dream brands,</b> not the ones already paying you — it pulls them in.","<b>One look per video.</b> Show range across the reel, not within a single clip."],
+         res:[{n:"UGC portfolio Notion template",ext:"LINK",size:"duplicate"}]},
+        {t:"Cold outreach that gets 11% replies",dur:"15:40",done:false,
+         poster:"https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1280&q=70",
+         lede:"The four-line pitch that out-converts paragraphs — and how to find the inbox that actually reads it.",
+         desc:"Most pitches die at <code>info@</code>. The reply rate lives with the brand-partnerships or growth lead — find that person, send four tight lines (who you are, proof, a specific idea for <i>their</i> product, a soft ask), and you’ll clear 10–12% replies. Spray-and-pray sits under 2%.",
+         k:["<b>Find the partnerships email,</b> not <code>info@</code>. LinkedIn + Hunter.io closes most of the gap.","<b>Four lines, one idea.</b> Reference their actual product; generic templates get filtered.","<b>Lead with proof, not a pitch.</b> One relevant spec link does more than a paragraph."],
+         res:[{n:"The 4-line cold pitch template",ext:"DOC",size:"editable"},{n:"Outreach tracker (sheet)",ext:"LINK",size:"duplicate"}]},
+        {t:"Pricing, usage rights & negotiation",dur:"18:09",done:false,
+         poster:"https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1280&q=70",
+         lede:"Never send a flat rate. Send a rate card — and stack usage rights and whitelisting on top.",
+         desc:"The flat fee is where creators leave the most money. Price the base deliverable, then add usage rights (30–50% of base, per platform, per term) and whitelisting (a recurring 30%/month while they run it on your handle). A $300 video becomes a $700 deal without shooting a second more.",
+         k:["<b>Base + usage rights (30–50%) + whitelisting (30%/mo).</b> Three lines, one invoice.","<b>Never quote a single number.</b> A rate card anchors the conversation and signals professionalism.","<b>Usage is time- and channel-bound.</b> Organic-only is cheap; paid + 12 months is a premium."],
+         res:[{n:"UGC Pro rate card (2026)",ext:"PDF",size:"2 pages"},{n:"Usage-rights pricing calculator",ext:"LINK",size:"duplicate"}]},
+      ]},
+      {mod:"Scaling to Strategist",n:4,lessons:[
+        {t:"From creator to creative strategist",dur:"16:22",done:false,
+         poster:"https://images.unsplash.com/photo-1531482615713-2afd69097998?w=1280&q=70",
+         lede:"The jump from $2k deliverables to $8k retainers is a positioning change, not a skill change.",
+         desc:"Strategists get paid for the thinking that produces the content — concepts, hook angles, test plans — not just the shoot. You move from “make me a video” to “own my UGC pipeline.” That’s a retainer, and retainers compound where one-off deliverables reset to zero every month.",
+         k:["<b>Charge for thinking, not just shooting.</b> Concepts and test plans are the high-margin product.","<b>Retainers &gt; one-offs.</b> Predictable revenue and you stop re-selling yourself monthly.","<b>Own the pipeline,</b> not the clip — it makes you expensive to replace."],
+         res:[{n:"Strategist retainer proposal template",ext:"DOC",size:"editable"}]},
+        {t:"Reading the data brands care about",dur:"13:51",done:false,
+         poster:"https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1280&q=70",
+         lede:"Four metrics decide whether your content gets re-ordered — and each one is the seed of your next pitch.",
+         desc:"Speak the brand’s language: <b>hook rate</b> (3-sec views / impressions), <b>hold rate</b> (how far they watch), <b>thumbstop</b> (the scroll-stop), and <b>CTR</b>. When you can read your own creative’s numbers, you stop guessing and start pitching the next test off the data — which is exactly what a strategist does.",
+         k:["<b>Hook rate, hold rate, thumbstop, CTR.</b> Know what each measures and what “good” looks like.","<b>Turn a metric into a pitch:</b> “The contrarian hook held 12% better — let’s test three more.”","<b>Bring the data first.</b> A creator who reads performance is the one who gets the retainer."],
+         res:[{n:"UGC metrics cheat sheet",ext:"PDF",size:"1 page"},{n:"Creative performance tracker",ext:"LINK",size:"duplicate"}]},
+        {t:"Building a repeatable book of business",dur:"19:30",done:false,
+         poster:"https://images.unsplash.com/photo-1556155092-490a1ba16284?w=1280&q=70",
+         lede:"The final move: turn happy one-off clients into a referral engine and a waitlist you control.",
+         desc:"A great UGC business isn’t a stream of cold pitches forever — it’s a small set of brands on retainer plus a referral loop that fills the rest. We map the close-out ritual after every deal (results recap → testimonial ask → referral ask → next-quarter pitch) that turns one win into three, and how to run a quiet waitlist so you’re never negotiating from scarcity.",
+         k:["<b>The four-part close-out:</b> recap results, ask for a testimonial, ask for a referral, pitch next quarter.","<b>Referrals beat outreach.</b> A warm intro converts at 5–10× a cold pitch — engineer them deliberately.","<b>Run a waitlist.</b> Booked-out is the strongest pricing lever you’ll ever have."],
+         res:[{n:"Deal close-out ritual checklist",ext:"PDF",size:"1 page"},{n:"Referral & testimonial ask scripts",ext:"DOC",size:"editable"}]},
+      ]},
+    ];
+
+    // flatten with module context
+    const flat=[];
+    curriculum.forEach(m=>m.lessons.forEach((l,li)=>flat.push(Object.assign({modName:m.mod,modN:m.n},l))));
+    let cur=flat.findIndex(l=>l.active);
+    if(cur<0)cur=0;
+
+    const fmtMod = l => `Module ${l.modN} · ${l.modName}`;
+
+    function renderSide(){
+      const done=flat.filter(l=>l.done).length;
+      // active (started-but-not-finished) lesson earns partial credit toward the bar
+      const partial=(!flat[cur].done)?0.62:0;
+      const pct=Math.round((done+partial)/flat.length*100);
+      let html=`
+        <div class="brandbar">
+          <div class="crumb">UGC Pro Academy</div>
+          <h1>UGC University <span class="seal">A–Z SYSTEM</span></h1>
+          <div class="p">9 hrs of video · 11 lessons · 233-page companion guide</div>
+          <div class="inst">
+            <img src="https://i.pravatar.cc/96?img=47" alt="Kelly Rocklein" />
+            <div><b>Kelly Rocklein</b><span>Instructor · $1.4M in UGC billed</span></div>
+          </div>
+          <div class="progwrap">
+            <div class="progress"><i style="width:${pct}%"></i></div>
+            <div class="progmeta"><span><b>${pct}%</b> complete</span><span><b>${done}</b>/${flat.length} lessons</span></div>
+          </div>
+        </div>
+        <div class="modwrap">`;
+      let idx=0;
+      curriculum.forEach(m=>{
+        const total=m.lessons.length, mdone=m.lessons.filter(l=>l.done).length;
+        html+=`<div class="mod"><span>Module ${m.n} · ${m.mod}</span><span class="mc">${mdone}/${total}</span></div>`;
+        m.lessons.forEach(()=>{
+          const l=flat[idx], i=idx;
+          html+=`<div class="les ${l.done?'done':''} ${i===cur?'active':''}" onclick="go(${i})">
+            <span class="ck">${l.done?'✓':''}</span>
+            <span class="lt">${l.t}</span>
+            <span class="dur">${l.dur}</span></div>`;
+          idx++;
+        });
+      });
+      html+=`</div>
+        <div class="sidefoot">Companion guide &amp; swipe file in <a href="#">Files</a> · Apply lessons in your <a href="#">Deliverables Board</a></div>`;
+      document.getElementById("side").innerHTML=html;
+    }
+
+    function renderView(){
+      const l=flat[cur];
+      // player
+      document.getElementById("poster").src=l.poster;
+      document.getElementById("topcap").textContent=fmtMod(l);
+      document.getElementById("playttl").textContent=l.t;
+      document.getElementById("playdur").textContent=l.dur;
+      document.getElementById("playbar").style.width=l.done?"100%":"0%";
+
+      const tags=[];
+      if(l.featured)tags.push('<span class="tag g">Core lesson</span>');
+      if(l.done)tags.push('<span class="tag g">Completed</span>');
+      else if(l.active)tags.push('<span class="tag a">In progress</span>');
+      tags.push(`<span class="tag n">Lesson ${cur+1} of ${flat.length}</span>`);
+
+      let html=`
+        <div class="tagrow">${tags.join("")}</div>
+        <h2>${l.t}</h2>
+        <div class="meta">
+          <img src="https://i.pravatar.cc/52?img=47" alt="Kelly Rocklein" />
+          <span>Kelly Rocklein</span><span class="dot"></span>
+          <span>${fmtMod(l)}</span><span class="dot"></span>
+          <span>${l.dur}</span>
+        </div>
+        ${l.lede?`<p class="lede">${l.lede}</p>`:""}
+        <p>${l.desc}</p>
+        ${l.k?`<div class="keys"><h3>Key takeaways</h3><ul>${l.k.map(x=>`<li>${x}</li>`).join("")}</ul></div>`:""}`;
+
+      if(l.swipe&&l.swipe.length){
+        html+=`<div class="sec-h">From the 150+ swipe file</div><div class="swipe">`+
+          l.swipe.map(id=>{const s=SWIPE[id];return `
+            <a class="chip" href="#" title="${s.brand} — ${s.fmt}">
+              <div class="ct">
+                <img class="logo" src="${logo(s.dom)}" alt="${s.brand}" onerror="this.style.display='none'" />
+                <div><div class="bn">${s.brand}</div><div class="fmt">${s.fmt}</div></div>
+              </div>
+              <p class="hook">${s.hook}</p>
+              <div class="hold">▶ ${s.hold}</div>
+            </a>`}).join("")+`</div>`;
+      }
+
+      if(l.res&&l.res.length){
+        html+=`<div class="sec-h">Lesson resources</div><div class="res">`+
+          l.res.map(r=>`<a href="#"><span class="ic">${r.ext}</span><span>${r.n}</span><span class="rmeta">${r.size}</span></a>`).join("")+`</div>`;
+      }
+
+      const isLast=cur===flat.length-1;
+      html+=`
+        <div class="nav">
+          <div class="pinfo">${l.done?"Completed — revisit anytime":"Watch, then mark complete to track progress"}</div>
+          <div class="acts">
+            <button class="ghost" onclick="go(${cur-1})" ${cur===0?'disabled':''}>← Previous</button>
+            ${l.done
+              ? `<button class="done" onclick="go(${Math.min(flat.length-1,cur+1)})" ${isLast?'disabled':''}>${isLast?'✓ Course complete':'Next lesson →'}</button>`
+              : `<button onclick="complete()">Mark complete &amp; continue</button>`}
+          </div>
+        </div>`;
+      document.getElementById("body").innerHTML=html;
+      document.querySelector("main").scrollTop=0;
+    }
+
+    let toastTimer;
+    function toast(msg){
+      const t=document.getElementById("toast");
+      t.innerHTML=msg;t.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer=setTimeout(()=>t.classList.remove("show"),2200);
+    }
+
+    function go(i){
+      flat[cur].active=false;
+      cur=Math.max(0,Math.min(flat.length-1,i));
+      flat[cur].active=true;
+      renderSide();renderView();
+    }
+    function complete(){
+      if(!flat[cur].done){
+        flat[cur].done=true;
+        const done=flat.filter(l=>l.done).length;
+        const pct=Math.round(done/flat.length*100);
+        toast(`Lesson complete · <b>${pct}%</b> through the course`);
+      }
+      if(cur<flat.length-1) go(cur+1);
+      else {renderSide();renderView();}
+    }
+
+    renderSide();renderView();
+  </script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+#+TITLE: Workbooks Desktop — product showcase
+#+TARGET: web
+#+URL: http://localhost:5320/
+#+FPS: 30
+#+VIEWPORT: 1440x900
+#+VERIFY_FRAMES: 12
+
+# One window, every workspace. Three distinct real brands run side by side in
+# the Workbooks desktop app: Brand Nana (brand intelligence), UGC Pro (creator
+# marketplace), Parcel (real-estate brokerage) — plus Waldo, the agent, voice,
+# search, and sharing to your org. Hard cuts only; product over chrome.
+#
+# Order matters: the agent + voice live on the home canvas, which only shows
+# before any workbook tab is opened. So the agent beats run first, the brand
+# tabs after.
+
+* 00:00 navigate [url:http://localhost:5320/] [waitUntil:networkidle]
+  This is Workbooks — one desktop for every workspace you run.
+
+* 00:03 wait [ms:1500]
+  Your whole working life in a single window.
+
+* 00:05 click
+  At the center sits Waldo — the agent that lives right in your workspace.
+  :PROPERTIES:
+  :selector: button[aria-label="Waldo"]
+  :checkpoint: the Waldo agent dock is open on the right with a chat input
+  :END:
+
+* 00:09 wait [ms:2000]
+  Ask it anything — search your files, set up agents, get real work done.
+
+* 00:12 click
+  Close the dock —
+  :PROPERTIES:
+  :selector: button[aria-label="Waldo"]
+  :END:
+
+* 00:14 click
+  — and just talk to it. Voice, built in.
+  :PROPERTIES:
+  :selector: button[aria-label="Start voice session"]
+  :checkpoint: a voice session is active showing a Listening bar and a Workhorse transcript
+  :END:
+
+* 00:17 wait [ms:3000]
+  A hands-free agent that drives the terminal for you, one tap away.
+
+* 00:21 click
+  Now the workspaces. Switch from one menu — each a completely different business.
+  :PROPERTIES:
+  :selector: button[aria-label^="Switch workspace"]
+  :END:
+
+* 00:24 click
+  First — Brand Nana, a brand-intelligence studio.
+  :PROPERTIES:
+  :selector: button:has-text("Brand Nana")
+  :checkpoint: the workspace menu was open and 'Brand Nana' is being chosen
+  :END:
+
+* 00:27 click
+  Open its live Brand Health board — share of voice, sentiment, the competitive set.
+  :PROPERTIES:
+  :selector: button:has-text("BRAND HEALTH")
+  :END:
+
+* 00:30 wait [ms:2400]
+  Real charts, grounded in real counted sources — a cream-and-amber brand world.
+
+* 00:34 click
+  A totally different business — UGC Pro, a creator marketplace.
+  :PROPERTIES:
+  :selector: button[aria-label^="Switch workspace"]
+  :END:
+
+* 00:37 click
+  :PROPERTIES:
+  :selector: button:has-text("UGC Pro")
+  :END:
+
+* 00:39 click
+  Creator HQ — pipeline value, active brand deals, revenue by content type.
+  :PROPERTIES:
+  :selector: button:has-text("CREATOR HQ")
+  :END:
+
+* 00:42 wait [ms:2400]
+  A different brand, a different palette — bold pink and magenta — the same window.
+
+* 00:46 click
+  And a third — Parcel, a real-estate brokerage.
+  :PROPERTIES:
+  :selector: button[aria-label^="Switch workspace"]
+  :END:
+
+* 00:49 click
+  :PROPERTIES:
+  :selector: button:has-text("Parcel")
+  :END:
+
+* 00:51 click
+  Market Pulse — median price, days on market, submarket scorecards.
+  :PROPERTIES:
+  :selector: button:has-text("MARKET PULSE")
+  :END:
+
+* 00:55 wait [ms:2800]
+  Three real brands. One workbook each. Zero context-switching cost.
+
+* 00:59 click
+  And everything you've made is one keystroke away — open search.
+  :PROPERTIES:
+  :selector: button[aria-label="Search"]
+  :checkpoint: a search surface or drawer is open
+  :END:
+
+* 01:03 wait [ms:2000]
+  Files, bookmarks, and the web — one search across all of it.
+
+* 01:06 navigate [url:http://localhost:5320/dev] [waitUntil:networkidle]
+  And when the work is ready, share it with your whole organization.
+
+* 01:09 click
+  :PROPERTIES:
+  :selector: button:has-text("Share…")
+  :checkpoint: a share-to-organization modal is open listing org members with avatars
+  :END:
+
+* 01:13 wait [ms:1800]
+  Pick the people, assign a role, send it — real teammates, real photos.
+
+* 01:16 click
+  :PROPERTIES:
+  :selector: button:has-text("Amara Okafor")
+  :END:
+
+* 01:18 click
+  :PROPERTIES:
+  :selector: button:has-text("Mei Lin")
+  :END:
+
+* 01:20 click
+  :PROPERTIES:
+  :selector: button:has-text("Diego Santos")
+  :END:
+
+* 01:23 wait [ms:2600]
+  Workbooks — every workspace, every agent, your whole team. One window.

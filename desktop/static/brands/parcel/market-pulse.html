@@ -1,0 +1,142 @@
+<!doctype html>
+<!-- workbook: market-pulse — Parcel market dashboard (deterministic, no network). -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Parcel — Market Pulse · Riverside & Eastside</title>
+<script id="workbook-spec" type="application/json">
+{
+  "id": "market-pulse",
+  "kind": "dashboard",
+  "title": "Market Pulse — Riverside & Eastside",
+  "owner": "parcel",
+  "workspace": "parcel-brokerage",
+  "source": "data/market-metrics.csv",
+  "frozen_at": "2026-06-14T00:00:00Z"
+}
+</script>
+<style>
+  h1,h2,h3,.serif{font-family:'Fraunces',Georgia,'Times New Roman',serif;font-weight:600;letter-spacing:-.01em}
+  h1{letter-spacing:-.02em}
+
+  :root{--green:#b4683f;--green-d:#8f4a26;--ink:#2a241d;--bg:#faf6f0;--card:#fffdfa;--line:#e8ddcd;--muted:#8a7f70;--amber:#c79a4b;--red:#b0503f;--clay:#b4683f;--clay-d:#8f4a26;--clay-l:#f4e6dc;--sage:#6f7d63;--sage-bg:#eef0e8;--gold:#c79a4b;--gold-bg:#f6ecd6;--slate:#5f7585;--slate-bg:#e8eef2;--radius:12px;}
+  *{box-sizing:border-box}
+  body{font:15px/1.5 Inter,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);margin:0;padding:32px 40px 60px;}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:4px}
+  .mark{width:30px;height:30px;display:inline-grid;place-items:center}
+  h1{font-weight:680;letter-spacing:-.025em;font-size:26px;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin:2px 0 26px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:26px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .kpi .val{font-size:28px;font-weight:680;letter-spacing:-.02em;margin-top:4px}
+  .kpi .chg{font-size:12.5px;font-weight:600;margin-top:3px}
+  .up{color:var(--green-d)} .down{color:var(--red)} .flat{color:var(--muted)}
+  .row{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin-bottom:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .card h2{font-size:14px;font-weight:650;margin:0 0 14px;letter-spacing:-.01em}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th{text-align:left;color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--line)}
+  td{padding:8px;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:0}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+  .seller{background:#f4e6dc;color:var(--green-d)} .balanced{background:#f6ecd6;color:var(--amber)} .buyer{background:#f6e3de;color:var(--red)}
+  .bars{display:flex;flex-direction:column;gap:10px}
+  .barrow{display:grid;grid-template-columns:120px 1fr 52px;align-items:center;gap:10px;font-size:13px}
+  .track{height:9px;background:#eef0e8;border-radius:6px;overflow:hidden}
+  .fill{height:100%;background:var(--green);border-radius:6px}
+  .spark{display:flex;align-items:flex-end;gap:3px;height:46px;margin-top:8px}
+  .spark span{flex:1;background:linear-gradient(180deg,var(--green),#e6c8b4);border-radius:2px 2px 0 0}
+  .foot{color:var(--muted);font-size:12px;margin-top:8px}
+  .byline{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-top:8px}
+  .byline .ava{width:42px;height:42px;border-radius:50%;flex:none;display:grid;place-items:center;color:#ffffff;font-weight:700;font-size:15px;letter-spacing:.02em;background:linear-gradient(135deg,var(--green),var(--green-d))}
+  .byline .nm{font-weight:650;font-size:14px}
+  .byline .ti{font-size:12px;color:var(--muted)}
+  .byline .stamp{margin-left:auto;font-size:11.5px;color:var(--muted);text-align:right;line-height:1.4}
+  .byline .stamp b{color:var(--ink);font-weight:600}
+  .mark svg{width:100%;height:100%;display:block}
+</style>
+<meta name="darkreader-lock" />
+<meta name="color-scheme" content="light only" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="icon" type="image/svg+xml" href="../files/parcel-logo.svg" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header><span class="mark" aria-label="Parcel"><svg viewBox="500 540 980 940" fill="#b4683f" xmlns="http://www.w3.org/2000/svg"><path d="M 981.042 562.763 C 987.035 566.061 1014.12 594.566 1020.94 601.591 C 1076.71 658.975 1135.34 714.304 1191.06 771.653 C 1239.42 726.007 1285.56 676.609 1333.52 630.375 C 1354.86 609.803 1376.66 585.082 1398.93 565.734 C 1409.12 565.099 1446.99 564.781 1456.01 566.081 C 1449.34 573.963 1439.21 583.419 1431.61 590.946 L 1393.17 629.195 L 1288.78 733.671 C 1267.21 755.13 1241.49 779.479 1221.08 801.622 C 1287.94 870.644 1359.91 940.623 1428.09 1008.64 C 1428.89 1027.79 1428.49 1049.42 1428.56 1068.77 L 1428.67 1176.42 L 1428.59 1447.45 C 1289.26 1445.87 1149.66 1447.77 1010.31 1447.18 C 990.771 1447.09 971.113 1447.63 951.592 1447.03 C 951.057 1403.34 950.957 1359.64 951.292 1315.95 C 952.736 1214.6 950.089 1112.37 952.107 1010.49 C 986.058 977.559 1019.62 942.582 1053.05 909.013 C 1088.52 873.408 1125.7 837.209 1160.39 801 C 1138.42 776.373 1106.68 745.749 1083.1 722.48 C 1048.98 688.745 1015.09 654.775 981.437 620.573 C 949.564 653.038 917.327 685.143 884.731 716.883 L 766.317 835.06 L 587.9 1013.5 C 568.572 1013.45 549.243 1013.56 529.916 1013.85 C 541.521 999.441 567.487 975.536 581.439 961.403 L 711.862 831.206 L 880.666 661.926 L 940.868 601.708 C 953.346 589.211 967.782 573.839 981.042 562.763 z M 994.44 1404.9 L 1195.51 1404.74 L 1385.51 1405.49 L 1385.19 1156.69 C 1385.22 1114.52 1384.21 1067.08 1385.55 1025.35 C 1371.8 1012.95 1351.53 990.859 1337.36 976.701 L 1225.28 864.754 C 1220.29 859.771 1193.9 832.339 1190.07 830.59 L 1063.11 957.304 C 1049.64 970.78 1036.24 984.329 1022.92 997.951 C 1015.02 1005.99 1002.5 1019.08 993.957 1025.98 C 997.032 1134.46 993.484 1244.22 994.461 1352.82 C 994.615 1370 994.695 1387.73 994.44 1404.9 z"/></svg></span><h1>Market Pulse</h1></header>
+<p class="sub">Parcel Brokerage · Riverside &amp; Eastside submarkets · single-family + condo · data through May 2026 · frozen 2026-06-14</p>
+
+<div class="grid">
+  <div class="kpi"><div class="lbl">Median Sale Price</div><div class="val">$642,000</div><div class="chg up">▲ 4.2% YoY</div></div>
+  <div class="kpi"><div class="lbl">Median Days on Market</div><div class="val">19</div><div class="chg down">▼ 7 days YoY</div></div>
+  <div class="kpi"><div class="lbl">Months of Supply</div><div class="val">2.1</div><div class="chg flat">seller's market</div></div>
+  <div class="kpi"><div class="lbl">Sale-to-List Ratio</div><div class="val">101.3%</div><div class="chg up">▲ 1.1 pts YoY</div></div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <h2>Submarket scorecard — May 2026</h2>
+    <table id="subs"></table>
+    <p class="foot">MOS = months of supply. Market type derived from absorption: &lt;4 mo seller's · 4–6 mo balanced · &gt;6 mo buyer's.</p>
+  </div>
+  <div class="card">
+    <h2>Median sale price — trailing 12 mo</h2>
+    <div class="spark" id="spark"></div>
+    <p class="foot" id="sparkfoot"></p>
+  </div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <h2>Price tier velocity (avg DOM by price band)</h2>
+    <div class="bars" id="bars"></div>
+    <p class="foot">Sub-$700K inventory clears fastest; luxury (&gt;$1.2M) sits 3–4× longer.</p>
+  </div>
+  <div class="card">
+    <h2>Inventory mix — active listings</h2>
+    <table id="mix"></table>
+  </div>
+</div>
+
+<div class="byline">
+  <div class="ava" aria-label="Marisol Reyes">MR</div>
+  <div><div class="nm">Marisol Reyes</div><div class="ti">Managing Broker · Parcel Brokerage · Lic #02118447</div></div>
+  <div class="stamp">Source: MLS regional feed + Parcel closings ledger<br><b>371</b> active · <b>137</b> May closings · revised monthly</div>
+</div>
+
+<script>
+const subs = [
+  // name, medianPrice, dom, mos, saleToList
+  ["Riverside Heights", 712000, 14, 1.6, 102.4],
+  ["Old Town Eastside", 598000, 18, 2.0, 101.0],
+  ["Maple Grove",       534000, 22, 2.7, 100.2],
+  ["Cedar Bluff",       889000, 31, 3.9,  99.1],
+  ["Harbor District",  1240000, 58, 6.4,  96.8],
+];
+// Market type is DERIVED from months-of-supply, never hardcoded:
+// <4 mo seller's · 4–6 mo balanced · >6 mo buyer's.
+const marketType = mos => mos < 4 ? ["Seller's","seller"] : mos <= 6 ? ["Balanced","balanced"] : ["Buyer's","buyer"];
+document.getElementById("subs").innerHTML =
+ "<tr><th>Submarket</th><th class=num>Median</th><th class=num>DOM</th><th class=num>MOS</th><th class=num>SP/LP</th><th>Market</th></tr>" +
+ subs.map(r=>{const[lbl,cls]=marketType(r[3]);return`<tr><td>${r[0]}</td><td class=num>$${(r[1]/1000).toFixed(0)}K</td><td class=num>${r[2]}</td><td class=num>${r[3]}</td><td class=num>${r[4]}%</td><td><span class="pill ${cls}">${lbl}</span></td></tr>`;}).join("");
+
+const trail = [598,604,609,601,615,622,618,629,633,640,636,642]; // $K, Jun'25→May'26
+const mx = Math.max(...trail), mn = Math.min(...trail);
+document.getElementById("spark").innerHTML = trail.map(v=>`<span style="height:${18+((v-mn)/(mx-mn))*82}%" title="$${v}K"></span>`).join("");
+document.getElementById("sparkfoot").textContent = `Jun 2025 $${trail[0]}K → May 2026 $${trail[11]}K  ·  +${(((trail[11]-trail[0])/trail[0])*100).toFixed(1)}% over 12 mo`;
+
+const bands = [["< $500K",16],["$500–700K",21],["$700K–1M",37],["$1–1.2M",54],["> $1.2M",71]];
+const bmax = 71;
+document.getElementById("bars").innerHTML = bands.map(b=>`<div class="barrow"><span>${b[0]}</span><div class="track"><div class="fill" style="width:${(b[1]/bmax)*100}%"></div></div><span class="num">${b[1]}d</span></div>`).join("");
+
+const mix = [["Single-family detached",214,58],["Townhome / row",83,22],["Condo / co-op",61,16],["Multi-family (2–4 unit)",13,4]];
+document.getElementById("mix").innerHTML =
+ "<tr><th>Type</th><th class=num>Active</th><th class=num>Share</th></tr>" +
+ mix.map(m=>`<tr><td>${m[0]}</td><td class=num>${m[1]}</td><td class=num>${m[2]}%</td></tr>`).join("") +
+ "<tr><td><b>Total</b></td><td class=num><b>371</b></td><td class=num><b>100%</b></td></tr>";
+</script>
+</body>
+</html>
