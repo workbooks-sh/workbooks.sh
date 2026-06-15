@@ -42,6 +42,10 @@ function splitCmd(cmd) {
   return { name: parts[0], argv: parts.slice(1) };
 }
 
+// Derive the streaming endpoints from the exec sentinel base (…/__wb/exec → …/__wb/{spawn,stream,stdin}).
+function base() { return cfg().url.replace(/\/__wb\/exec$/, "/__wb"); }
+function shdr() { return { "content-type": "application/json", "x-wb-exec": cfg().token }; }
+
 // ── async surface (idiomatic on SM) ──────────────────────────────────────────────────────────
 
 // exec(command[, opts], cb) — cb(err, stdout, stderr). Returns an EventEmitter ('close'/'error').
@@ -73,19 +77,73 @@ function execFile(file, args, opts, cb) {
   return child;
 }
 
-// spawn(file, args[, opts]) -> child with stdout/stderr EventEmitters + 'close'.
+// spawn(file, args[, opts]) -> a LONG-LIVED streaming child (wb-b9xv.11). Unlike exec/execFile (buffered
+// one-shot), this drives the streaming protocol: POST /__wb/spawn → handle, then long-poll /__wb/stream/<h>
+// emitting each incremental chunk as a stdout 'data' event (the harness sees output as the inner CLI flushes
+// it, NOT all-at-end), and child.stdin.write() POSTs /__wb/stdin/<h>. On exit it emits stdout 'end' then
+// 'exit'/'close' with the propagated code. A broker denial (no handle) emits 'error'. Honest granularity:
+// chunk cadence == the inner wasm CLI's own stdout flush cadence (wasmtime doesn't buffer the guest's fd 1).
 function spawn(file, args, opts) {
   if (!Array.isArray(args)) { opts = args; args = []; }
   opts = opts || {};
   var child = new EventEmitter();
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
-  run(file, args, opts.input).then(function (out) {
-    if (out === null) { child.emit("close", 1); return; }
-    child.stdout.emit("data", out);
-    child.stdout.emit("end");
-    child.emit("close", 0);
-  }).catch(function (e) { child.emit("error", e); });
+  child.killed = false;
+
+  // a writable stdin: write(bytes)->POST /__wb/stdin/<handle>. Buffered until the handle exists.
+  var handle = null, pendingStdin = [];
+  child.stdin = {
+    write: function (data) {
+      if (handle) { fetch(base() + "/stdin/" + handle, { method: "POST", headers: shdr(), body: JSON.stringify({ data: String(data) }) }); }
+      else { pendingStdin.push(String(data)); }
+      return true;
+    },
+    end: function (data) { if (data != null) this.write(data); }
+  };
+
+  fetch(base() + "/spawn", { method: "POST", headers: shdr(), body: JSON.stringify({ name: String(file), argv: args || [] }) })
+    .then(function (res) {
+      if (!res.ok) { child.emit("error", new Error("spawn denied: " + file)); return; }
+      return res.json();
+    })
+    .then(function (j) {
+      if (!j || !j.handle) return;
+      handle = j.handle;
+      // flush any stdin queued before the handle landed.
+      var q = pendingStdin; pendingStdin = [];
+      q.forEach(function (d) { fetch(base() + "/stdin/" + handle, { method: "POST", headers: shdr(), body: JSON.stringify({ data: d }) }); });
+      if (opts.input != null) child.stdin.write(opts.input);
+
+      // long-poll loop: each /__wb/stream/<handle> returns the bytes produced since the last poll. A
+      // non-empty body is emitted immediately as an incremental 'data' (the streaming proof). x-wb-done:1
+      // ends the loop, emitting 'end' + 'exit'/'close' with the propagated exit code.
+      function pump() {
+        if (child.killed) return;
+        fetch(base() + "/stream/" + handle, { method: "POST", headers: shdr() })
+          .then(function (res) {
+            if (!res.ok) { child.emit("error", new Error("stream denied")); return; }
+            var done = res.headers.get("x-wb-done") === "1";
+            var code = res.headers.get("x-wb-exit");
+            return res.text().then(function (chunk) {
+              if (chunk && chunk.length) child.stdout.emit("data", chunk);
+              if (done) {
+                child.stdout.emit("end");
+                var ec = code == null ? 0 : parseInt(code, 10);
+                child.emit("exit", ec, null);
+                child.emit("close", ec);
+              } else {
+                pump();
+              }
+            });
+          })
+          .catch(function (e) { child.emit("error", e); });
+      }
+      pump();
+    })
+    .catch(function (e) { child.emit("error", e); });
+
+  child.kill = function () { child.killed = true; child.emit("close", 137); };
   return child;
 }
 

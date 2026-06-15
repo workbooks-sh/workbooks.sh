@@ -43,7 +43,7 @@ defmodule Workbooks.HarnessSession do
   @idle_ms 5 * 60_000
   @default_timeout 30_000
 
-  defstruct [:wasm, :sm_pid, :session_id, :exec_token, :grant, last_active_ms: 0]
+  defstruct [:wasm, :sm_pid, :session_id, :exec_token, :grant, :workdir, last_active_ms: 0]
 
   # ── public API ───────────────────────────────────────────────────────────────────────────────
 
@@ -53,6 +53,10 @@ defmodule Workbooks.HarnessSession do
     * `:exec`       — exec/llm grant `[allow: true, commands: …, principal: …]`. Mints ONE long-lived
                       ExecLoopback token for the SESSION (revoked on terminate), so the resident harness can
                       make many tool calls + LLM fetches across the turn without re-minting per round-trip.
+    * `:fs`         — fs grant `[workdir: "/abs/dir", principal: …]`. Folds a confined `:workdir` into the
+                      SAME session token's grant so `require('node:fs')` / `'fs/promises'` work on the resident
+                      heap, routed over the pinned sentinel to `/__wb/fs`, confined to the workdir. The fs and
+                      exec/LLM caps ride ONE token (one mint, one revoke) for the whole session.
   Returns `{:ok, pid}`. The cold-start (instantiate the ~10MB SM component) is paid HERE, once.
   """
   def start_link(opts \\ []) do
@@ -125,10 +129,11 @@ defmodule Workbooks.HarnessSession do
   def init(opts) do
     session_id = Keyword.get(opts, :session_id, make_ref())
     exec_opts = Keyword.get(opts, :exec, nil)
+    fs_opts = Keyword.get(opts, :fs, nil)
 
     with {:ok, wasm} <- JsEngine.build_host(),
          {:ok, sm_pid} <- instantiate(wasm) do
-      {exec_token, grant} = maybe_mint(exec_opts)
+      {exec_token, grant, workdir} = maybe_mint(exec_opts, fs_opts)
 
       {:ok,
        %__MODULE__{
@@ -137,6 +142,7 @@ defmodule Workbooks.HarnessSession do
          session_id: session_id,
          exec_token: exec_token,
          grant: grant,
+         workdir: workdir,
          last_active_ms: now()
        }, @idle_ms}
     else
@@ -162,6 +168,9 @@ defmodule Workbooks.HarnessSession do
     boot_opts =
       [env: Keyword.get(opts, :env, %{}), argv: Keyword.get(opts, :argv, ["node", "harness"])]
       |> then(fn o -> if exec_seam, do: Keyword.put(o, :exec_seam, exec_seam), else: o end)
+      # the session's confined fs root rides the SAME token; pass it so node_boot_payload registers the SM fs
+      # shim (require('node:fs')/'fs/promises') on this resident heap. nil => no fs shim, fs ops would 403.
+      |> then(fn o -> if st.workdir, do: Keyword.put(o, :fs, workdir: st.workdir), else: o end)
 
     case JsEngine.node_boot_payload(boot_opts) do
       {:ok, boot_js, _token} ->
@@ -222,31 +231,41 @@ defmodule Workbooks.HarnessSession do
     end
   end
 
-  defp maybe_mint(nil), do: {nil, nil}
+  # Mint ONE session token carrying BOTH the exec/LLM grant AND the (optional) confined fs workdir. Either
+  # cap alone is enough to mint (an fs-only session is valid: it can fetch the LLM seam + read/write its
+  # workdir without spawning). No grant at all => no token. Returns {token | nil, grant | nil, workdir | nil}.
+  defp maybe_mint(nil, nil), do: {nil, nil, nil}
 
-  defp maybe_mint(exec_opts) when is_list(exec_opts) do
+  defp maybe_mint(exec_opts, fs_opts) do
+    exec_opts = exec_opts || []
+    fs_opts = fs_opts || []
     allow = Keyword.get(exec_opts, :allow, false)
+    workdir = JsEngine.fs_workdir!(fs_opts)
+
+    # principal: an exec-capable grant MUST carry one (broker rate/concurrency/revoke handle); otherwise prefer
+    # whichever opt list supplies it (fs ops are principal-revocable too).
+    principal =
+      if allow,
+        do: require_principal!(true, exec_opts),
+        else: Keyword.get(exec_opts, :principal) || Keyword.get(fs_opts, :principal)
 
     grant = %{
       allow: allow,
       commands: Keyword.get(exec_opts, :commands, :all),
-      # FIX 1 (principal-OPTIONAL minting): an exec-capable session grant (`allow: true`) MUST carry a
-      # non-nil principal (the tenant/session id) — it is the broker's only handle for rate-limit /
-      # concurrency-cap / revocation. ExecLoopback.mint/1 enforces the same; required here too.
-      principal: require_principal!(allow, exec_opts),
+      principal: principal,
       depth: Keyword.get(exec_opts, :depth, 0),
       # SLICE 3: per-(user, provider) creds scope for dock.creds.{get,put}. The harness can only touch the
       # user+provider the host granted — one tenant's grant never reaches another's keychain blob.
-      creds_scope: Keyword.get(exec_opts, :creds_scope, nil)
+      creds_scope: Keyword.get(exec_opts, :creds_scope, nil),
+      # headless-JS path: the confined fs root. nil => every /__wb/fs op 403s (no fs reach).
+      workdir: workdir
     }
 
-    {ExecLoopback.mint(grant), grant}
+    {ExecLoopback.mint(grant), grant, workdir}
   end
 
   # An exec-capable session grant (`allow: true`) MUST carry a non-nil principal; refuse to mint one
-  # without it (see FIX 1). A non-exec grant keeps its principal unchanged.
-  defp require_principal!(false, exec_opts), do: Keyword.get(exec_opts, :principal)
-
+  # without it (see FIX 1) — it is the broker's only handle for rate-limit / concurrency-cap / revocation.
   defp require_principal!(true, exec_opts) do
     case Keyword.get(exec_opts, :principal) do
       p when is_binary(p) and p != "" ->

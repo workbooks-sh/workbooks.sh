@@ -991,6 +991,57 @@ defmodule Workbooks.CommandRegistry do
     end
   end
 
+  @doc """
+  Resolve a registered command to a concrete, RUNNABLE wasm + the argv/dirs/run-opts the streaming lane
+  (`Workbooks.ExecBroker.spawn_stream` → `HarnessProc` → `PackageManager.run_streaming`) needs. Returns
+  `{:ok, wasm_path, argv_prefix, dirs, run_opts}` | `{:error, reason}`.
+
+  Streaming runs a bare wasm guest under the wasmtime CLI via an Erlang Port, so only commands whose work
+  IS a plain wasm-on-wasmtime run are streamable: `:wasm` (and `:wasm`+default-opts) and `:src` (built once,
+  then a plain run). `:pynet` (brokered Python net transport) and `:argv`-via-stdin1 protocols don't have a
+  bare-wasm streaming shape; they stay on the buffered `exec/4` path. The artifact is RE-VERIFIED here
+  (same TOCTOU close as `run_builtin`) before any spawn.
+
+  Arg mode: `:argv` passes argv straight through; `:stdin1` folds argv into stdin, which is NOT compatible
+  with the streaming-stdin model (stdin is written live, not pre-known), so :stdin1 streaming is refused —
+  the caller falls back to buffered exec.
+  """
+  def resolve_wasm(name) when is_binary(name) do
+    case registry()[name] do
+      nil ->
+        {:error, {:unknown_command, name}}
+
+      {:wasm, path, :argv} ->
+        with :ok <- verify_artifact(path), do: {:ok, path, [], [], []}
+
+      {:wasm, path, :argv, opts} ->
+        with :ok <- verify_artifact(path) do
+          {:ok, path, Map.get(opts, :argv, []), Map.get(opts, :dirs, []), Map.get(opts, :run_opts, [])}
+        end
+
+      {:wasm, _path, :stdin1} ->
+        {:error, :stdin1_not_streamable}
+
+      {:wasm, _path, :stdin1, _opts} ->
+        {:error, :stdin1_not_streamable}
+
+      {:src, lang, src, :argv} ->
+        case Workbooks.PackageManager.build(%{"name" => "cmd", "lang" => lang, "src" => src}) do
+          {_, _, {:ok, wasm, _}} -> {:ok, wasm, [], [], []}
+          {_, _, err} -> {:error, {:build_failed, err}}
+        end
+
+      {:src, _lang, _src, :stdin1} ->
+        {:error, :stdin1_not_streamable}
+
+      {:pynet, _, _, _} ->
+        {:error, :pynet_not_streamable}
+
+      _ ->
+        {:error, :not_streamable}
+    end
+  end
+
   defp run_builtin({:wasm, path, mode}, input, argv, dirs, ropts) do
     # SECURITY (wb-sec): content-addressed artifacts in build/commands/<sha>.wasm
     # are verified at RUN time, not just at register time — closing the TOCTOU
