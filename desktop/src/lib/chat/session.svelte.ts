@@ -24,7 +24,10 @@ import type {
   ToolCallBlock,
   StatusBanner,
   RawEventRow,
+  ArtifactBlock,
 } from "./types";
+import { componentArtifacts } from "./artifacts.svelte";
+import { mockMode, runMockComponentAgent } from "./mockAgent.svelte";
 
 interface RawEntry {
   event: BridgeEvent;
@@ -89,6 +92,24 @@ class ChatSessionStore {
     this.userPrompt = t;
     this.session = null;
     try {
+      // Browser preview: no runtime/Phoenix. Drive the scripted mock agent
+      // (component-toolkit artifact flow) through the same event pipeline so
+      // the chat surface behaves identically to a live run.
+      if (mockMode()) {
+        const id = `mock-${Date.now()}`;
+        this.session = {
+          id,
+          status: "pending",
+          startedAt: Date.now(),
+          finishedAt: null,
+          detail: null,
+          prompt: t,
+          attachments: opts.attachments ?? [],
+        };
+        this.#reproject();
+        void runMockComponentAgent(id, t);
+        return;
+      }
       const id = await ws.sendUserInput(t, {
         agentSlug: opts.agentSlug,
         skills: opts.skills,
@@ -270,6 +291,36 @@ class ChatSessionStore {
             };
             blocks.push(synth);
           }
+          break;
+        }
+        case "component_artifact": {
+          // The component-toolkit EXEC shape produced an artifact. Surface
+          // an opener card and auto-open it as a tab so the user lands on the
+          // component to keep iterating with the agent. Reproject runs on
+          // every ingest, so the auto-open is idempotent (the store tracks
+          // which artifact keys have been opened this session).
+          const path = (payload.path as string | undefined) ?? "";
+          if (!path) break;
+          const title =
+            (payload.title as string | undefined) ??
+            (path.split("/").pop() ?? "Component");
+          const action =
+            (payload.action as string | undefined) === "updated"
+              ? "updated"
+              : "created";
+          const block: ArtifactBlock = {
+            kind: "artifact",
+            key: `artifact-${path}-${event.receivedAt}`,
+            path,
+            title,
+            action,
+            ts: event.receivedAt,
+          };
+          blocks.push(block);
+          // Open the artifact as a tab (once per event), and on an update
+          // reload an already-open tab so the new revision shows. Both are
+          // idempotent — reproject re-walks every event on each ingest.
+          componentArtifacts.handle(block.key, path, action);
           break;
         }
         case "session_completed": {

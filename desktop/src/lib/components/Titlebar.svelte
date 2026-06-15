@@ -30,6 +30,7 @@
     FileCode,
     Hash,
     Cube as Box,
+    Robot as AgentGlyph,
     SidebarSimple,
     MagnifyingGlass,
   } from "phosphor-svelte";
@@ -56,6 +57,17 @@
   import type { Tab } from "$lib/tabs/types";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
+  import { dock } from "$lib/bridge/dock.svelte";
+
+  // A dock panel popped out into a full tab (wb: Waldo-as-tab) shows as a
+  // pill in the strip, alongside document tabs. Clicking focuses it (the
+  // canvas already owns it); the × docks it back into the side panel.
+  const fullPanel = $derived(dock.fullscreen);
+  function focusFullPanel() {
+    chrome.mode = "app";
+    // The canvas renders dock.fullscreen regardless of chrome.mode, but
+    // drop out of doc mode so a stray active tab doesn't shadow it.
+  }
 
   // Active workspace for the Shelf titlebar selector (demo during the tour).
   const wsName = $derived(onboarding.active ? DEMO_ACTIVE_WORKSPACE.name : (workspaces.active?.name ?? "Workspace"));
@@ -73,6 +85,7 @@
   function kindIcon(kind: Tab["kind"]) {
     switch (kind) {
       case "workbook": return Box;
+      case "agent": return AgentGlyph;
       case "org": return Hash;
       case "code": return FileCode;
       case "text":
@@ -447,6 +460,41 @@
         </div>
       {/if}
     {/each}
+
+    {#if fullPanel}
+      <!-- popped-out dock panel (Waldo) as a full tab -->
+      {@const PanelIcon = fullPanel.icon}
+      <div
+        class="tab agent-tab active"
+        role="tab"
+        aria-selected="true"
+        title={fullPanel.title}
+        in:fly={{ y: 8, duration: 180, easing: cubicOut }}
+        out:fade={{ duration: 90 }}
+      >
+        <button
+          type="button"
+          class="tab-body"
+          data-tauri-drag-region="false"
+          onclick={focusFullPanel}
+        >
+          <span class="favicon">
+            {#if PanelIcon}<PanelIcon size={13} weight="fill" />{/if}
+          </span>
+          <span class="title">{fullPanel.title}</span>
+        </button>
+        <button
+          type="button"
+          class="close"
+          data-tauri-drag-region="false"
+          aria-label="Dock {fullPanel.title} back into the side panel"
+          title="Dock to side panel"
+          onclick={(e) => { e.stopPropagation(); dock.dockIn(); }}
+        >
+          <X size={12} weight="bold" />
+        </button>
+      </div>
+    {/if}
   </div>
 
   <span class="spacer" data-tauri-drag-region></span>
@@ -774,6 +822,20 @@
   .new-tab:hover { background: var(--color-page); color: var(--color-fg); }
 
   .spacer { flex: 0 0 0.25rem; }
+
+  /* Popped-out agent (Waldo) full-tab pill — brand-tinted so it reads as
+   * the resident agent, distinct from document tabs. */
+  .tab.agent-tab {
+    flex: 0 1 auto;
+    max-width: 200px;
+    border-color: color-mix(in srgb, var(--color-brand) 35%, var(--color-border));
+  }
+  .tab.agent-tab.active {
+    border-color: color-mix(in srgb, var(--color-brand) 55%, var(--color-border-strong));
+    box-shadow: 0 1px 2px rgba(15, 15, 15, 0.06);
+  }
+  .tab.agent-tab .favicon { color: var(--color-brand); opacity: 1; }
+  .tab.agent-tab .close { opacity: 0.7; }
 
   /* ── combined tab (split pill) ─────────────────────────────────── */
   .tab.combined {

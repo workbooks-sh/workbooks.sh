@@ -27,6 +27,7 @@
   import { onMount, onDestroy } from "svelte";
   import { themes } from "$lib/bridge/themes.svelte";
   import WorkbookProvenance from "$lib/network/components/WorkbookProvenance.svelte";
+  import { componentArtifacts } from "$lib/chat/artifacts.svelte";
 
   let { path }: { path: string } = $props();
 
@@ -46,6 +47,11 @@
    *  double-load and double-mount the iframe — root-cause of the
    *  freeze reported on kitchen-sink). */
   let loadedPath: string | null = null;
+
+  /** Last artifact reload counter we loaded for this path. When the agent
+   *  re-writes the same component (an "updated" event), this bumps and the
+   *  load effect re-reads the new bytes into the iframe. */
+  let loadedRevision = -1;
 
   /** activeId we last posted to the workbook; lets the theme-change
    *  effect early-out when nothing actually changed (effects often
@@ -142,8 +148,10 @@
   // bare $effect produced previously (mounting two iframes back to
   // back, with the first one destroyed mid-script-execution).
   $effect(() => {
-    if (path && path !== loadedPath) {
+    const rev = componentArtifacts.revisionOf(path);
+    if (path && (path !== loadedPath || rev !== loadedRevision)) {
       loadedPath = path;
+      loadedRevision = rev;
       void load(path);
     }
   });

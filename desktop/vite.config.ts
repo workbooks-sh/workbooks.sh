@@ -46,5 +46,19 @@ export default defineConfig({
     watch: {
       ignored: ["**/src-tauri/**"],
     },
+    /* When node_modules is symlinked from another checkout (disk-safe
+     * worktree dev), the SvelteKit runtime resolves to a realpath outside
+     * Vite's default fs root and gets 403'd. Either WB_FS_ALLOW or
+     * WB_VITE_FS_ALLOW (colon-separated absolute roots) opts those paths
+     * back in. Unset in normal builds — no effect. */
+    fs: (() => {
+      const extra = [
+        process.env.WB_FS_ALLOW,
+        process.env.WB_VITE_FS_ALLOW,
+      ]
+        .filter(Boolean)
+        .flatMap((v) => (v as string).split(":"));
+      return extra.length ? { allow: [".", ...extra] } : undefined;
+    })(),
   },
 });

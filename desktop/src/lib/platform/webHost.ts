@@ -123,6 +123,111 @@ const IDENTITY = {
 };
 const DAEMON = { state: "running", url: "http://127.0.0.1:8787", pid: 4242, manager: "krunvm" };
 
+// ── agents (AgentDef) seed — backs the agent-as-workbook-tab editor.
+// The catalog itself is served over HTTP (engineRequest), which a
+// browser preview can't reach; the agents store falls back to
+// AGENTS_CATALOG_PREVIEW (exported below) for the list. These sources
+// back agents_read / agents_patch so editing a seeded agent in a tab
+// round-trips through the host seam.
+export interface PreviewAgent {
+  slug: string;
+  title: string;
+  tagline: string;
+  icon: string;
+  model: string | null;
+  scope: "user" | "project" | "builtin";
+  toolkits: string[];
+  system_prompt_preview: string;
+}
+export const AGENTS_CATALOG_PREVIEW: PreviewAgent[] = [
+  {
+    slug: "workhorse",
+    title: "Workhorse",
+    tagline: "The default Workbooks agent — knows the ecosystem, can do anything reasonable.",
+    icon: "lucide:Bot",
+    model: null,
+    scope: "builtin",
+    toolkits: ["bash", "wb"],
+    system_prompt_preview: "You are Workhorse, the default Workbooks agent.",
+  },
+  {
+    slug: "researcher",
+    title: "Researcher",
+    tagline: "Fans out web searches, verifies claims, writes a cited report.",
+    icon: "lucide:Telescope",
+    model: "google/gemini-3.5-flash",
+    scope: "user",
+    toolkits: ["bash", "wb", "git"],
+    system_prompt_preview:
+      "You are a meticulous research agent. Gather sources, verify each claim against at least two independent references, and synthesize a cited report.",
+  },
+];
+
+const AGENTS_MOCK: Record<string, { source: string; scope: "user" | "project" | "builtin" }> = {
+  workhorse: {
+    scope: "builtin",
+    source: `* Workhorse                                                          :agent:
+  :PROPERTIES:
+  :ID:           workhorse
+  :TYPE:         ai
+  :ICON:         lucide:Bot
+  :TOOLKITS:     bash wb
+  :END:
+** System prompt
+You are Workhorse, the default Workbooks agent.
+`,
+  },
+  researcher: {
+    scope: "user",
+    source: `#+EXTENSIONS: ICON TAGLINE TOOLKITS
+
+* Researcher                                                          :agent:
+  :PROPERTIES:
+  :ID:           researcher
+  :TYPE:         ai
+  :MODEL:        google/gemini-3.5-flash
+  :ICON:         lucide:Telescope
+  :TAGLINE:      Fans out web searches, verifies claims, writes a cited report.
+  :TOOLKITS:     bash wb git
+  :HUMAN_IN_LOOP: true
+  :END:
+** System prompt
+You are a meticulous research agent. Gather sources, verify each claim against at least two independent references, and synthesize a cited report.
+`,
+  },
+};
+
+const agentSettingsMock = { default_model: "", default_agent_slug: "workhorse" };
+
+// ── organization members (share-to-organization surface) ──────────────────
+// Real people in the active org. `avatar` is a real photo URL (pravatar
+// serves stable headshots keyed by the numeric seed) so the stacked-avatar
+// UI renders actual images, not just initials. `roles` are the assignable
+// tags the share modal offers. The real web build routes org.members to the
+// runtime; this seed lets the browser preview exercise the full flow.
+type OrgMember = {
+  handle: string;
+  display_name: string;
+  avatar: string;
+  email: string;
+  title: string;
+};
+const ORG = {
+  id: "org_acme",
+  name: "Acme Studio",
+  members: [
+    { handle: "you", display_name: "You", avatar: "https://randomuser.me/api/portraits/men/32.jpg", email: "you@workbooks.sh", title: "Owner" },
+    { handle: "amara", display_name: "Amara Okafor", avatar: "https://randomuser.me/api/portraits/women/68.jpg", email: "amara@acme.studio", title: "Design Lead" },
+    { handle: "ravi", display_name: "Ravi Patel", avatar: "https://randomuser.me/api/portraits/men/45.jpg", email: "ravi@acme.studio", title: "Engineer" },
+    { handle: "mei", display_name: "Mei Lin", avatar: "https://randomuser.me/api/portraits/women/24.jpg", email: "mei@acme.studio", title: "PM" },
+    { handle: "diego", display_name: "Diego Santos", avatar: "https://randomuser.me/api/portraits/men/76.jpg", email: "diego@acme.studio", title: "Data" },
+    { handle: "nora", display_name: "Nora Haddad", avatar: "https://randomuser.me/api/portraits/women/12.jpg", email: "nora@acme.studio", title: "Research" },
+    { handle: "kenji", display_name: "Kenji Watanabe", avatar: "https://randomuser.me/api/portraits/men/3.jpg", email: "kenji@acme.studio", title: "Engineer" },
+    { handle: "priya", display_name: "Priya Nair", avatar: "https://randomuser.me/api/portraits/women/55.jpg", email: "priya@acme.studio", title: "Marketing" },
+  ] as OrgMember[],
+  roles: ["Viewer", "Editor", "Owner"],
+};
+
 /** Resolve the workbook path an `app` package opens as a window/tab.
  *  Real Kanban workbook for Kanban; a labeled stub path for every other
  *  app. Folders never call this (they open the folder viewer instead). */
@@ -161,6 +266,16 @@ type MockTab = { id: string; path: string; title: string; kind: string; dirty: b
  *  packaged host via $lib/tabs/classify (wavelet → player, `.html` →
  *  workbook, `.org` → org, else text). */
 function tabFromPath(path: string, id: string): MockTab {
+  // Agent tabs: `agent://<slug>` → titled by the agent (or "New agent").
+  const am = path.match(/^agent:\/\/(.+)$/i);
+  if (am) {
+    const slug = decodeURIComponent(am[1]);
+    const title =
+      slug === "__new__"
+        ? "New agent"
+        : AGENTS_CATALOG_PREVIEW.find((x) => x.slug === slug)?.title ?? slug;
+    return { id, path, title, kind: "agent", dirty: false };
+  }
   const file = path.split("/").pop() ?? path;
   const base = file.replace(/\.[^.]+$/, "");
   const title = base.charAt(0).toUpperCase() + base.slice(1);
@@ -215,6 +330,13 @@ function makeInvoke(): Invoke {
     typeof location !== "undefined" &&
     new URLSearchParams(location.search).get("onboarding") === "fresh";
   const freshState = { signedIn: false, runtime: false, hasKey: false };
+
+  // Stateful share-to-org mock — per-resource recipient list. Keyed by the
+  // resource id the share modal targets; each entry records who it's shared
+  // with + the role assigned, so re-opening the modal reflects prior shares
+  // and the trigger can render the shared-with stacked avatars.
+  type ShareRecipient = { handle: string; role: string; shared_at: number };
+  const sharesByResource = new Map<string, ShareRecipient[]>();
 
   // Stateful bookmark mock — backs the sidebar bookmark grid.
   let bookmarksMock: {
@@ -409,8 +531,63 @@ function makeInvoke(): Invoke {
       case "theme_list": return { active_id: null, themes: [] };
       case "theme_set_active": case "theme_create": case "theme_update":
       case "theme_delete": return { active_id: null, themes: [] };
-      case "agent_settings_get": return { default_agent: "workhorse", default_model: null, catalog: [] };
-      case "agent_settings_set": return null;
+      case "agent_settings_get":
+        return { default_model: agentSettingsMock.default_model, default_agent_slug: agentSettingsMock.default_agent_slug };
+      case "agent_settings_set": {
+        const req = (a.req ?? {}) as { default_model?: string; default_agent_slug?: string };
+        if (req.default_model !== undefined) agentSettingsMock.default_model = req.default_model;
+        if (req.default_agent_slug !== undefined) agentSettingsMock.default_agent_slug = req.default_agent_slug;
+        return { ...agentSettingsMock };
+      }
+
+      // ── agents (AgentDef CRUD — runtime cap; mocked for preview) ──
+      // The agent editor opens as a workbook tab and reads/writes the
+      // agent's .org source through these verbs (feat/agent-tab).
+      case "agents_read": {
+        const slug = String(a.slug ?? "");
+        const src = AGENTS_MOCK[slug]?.source;
+        if (src === undefined) throw new Error(`agent not found: ${slug}`);
+        return { source: src };
+      }
+      case "agents_create": {
+        const req = a.req as { slug: string; source: string };
+        AGENTS_MOCK[req.slug] = { source: req.source, scope: "user" };
+        return { source: req.source };
+      }
+      case "agents_patch": {
+        const req = a.req as {
+          slug: string;
+          properties?: Record<string, string>;
+          title?: string | null;
+          system_prompt?: string;
+        };
+        const cur = AGENTS_MOCK[req.slug] ?? (AGENTS_MOCK[req.slug] = { source: "", scope: "user" });
+        // Mock patch: regenerate a minimal source so a re-read reflects
+        // the saved values (the real runtime patches verbatim).
+        const props = req.properties ?? {};
+        const lines: string[] = [];
+        lines.push(`* ${req.title ?? req.slug}                                                          :agent:`);
+        lines.push(`  :PROPERTIES:`);
+        lines.push(`  :ID:           ${req.slug}`);
+        lines.push(`  :TYPE:         ai`);
+        for (const [k, v] of Object.entries(props)) {
+          if (v && v.trim()) lines.push(`  :${k}:         ${v.trim()}`);
+        }
+        lines.push(`  :END:`);
+        if (req.system_prompt?.trim()) {
+          lines.push(`** System prompt`);
+          lines.push(req.system_prompt.trim());
+        }
+        cur.source = lines.join("\n") + "\n";
+        return { source: cur.source };
+      }
+      case "agents_delete":
+        delete AGENTS_MOCK[String(a.slug ?? "")];
+        return null;
+      case "agent_publish":
+        // Best-effort publish/send. Returns a fake nexus URL so the
+        // editor can show a "Published → …" confirmation in preview.
+        return { ok: true, url: `https://nexus.workbooks.sh/a/${a.slug}` };
 
       // ── keychain-backed lists (empty) ──
       case "keys_list": case "env_vars_list": case "connections_list":
@@ -433,11 +610,25 @@ function makeInvoke(): Invoke {
       case "read_file_bytes_base64": {
         const path = String(a.path ?? "");
         let html: string | null = null;
-        try {
-          const res = await fetch(path);
-          if (res.ok) html = await res.text();
-        } catch {
-          /* fall through to stub */
+        // Component-toolkit artifacts the mock agent produced live in an
+        // in-memory registry (no runtime to write them to disk in the
+        // browser preview). Serve those first so an agent-created
+        // component renders in its tab.
+        const artifacts = (
+          window as unknown as {
+            __WB_ARTIFACTS__?: { read(p: string): string | undefined };
+          }
+        ).__WB_ARTIFACTS__;
+        const registered = artifacts?.read(path);
+        if (registered !== undefined) {
+          html = registered;
+        } else {
+          try {
+            const res = await fetch(path);
+            if (res.ok) html = await res.text();
+          } catch {
+            /* fall through to stub */
+          }
         }
         if (html === null) html = stubWorkbookHtml(path);
         // base64-encode UTF-8 (mirror Rust's read_file_bytes_base64).
@@ -445,6 +636,30 @@ function makeInvoke(): Invoke {
         let bin = "";
         for (const b of bytes) bin += String.fromCharCode(b);
         return btoa(bin);
+      }
+
+      // ── organization + share-to-org (runtime domain in a real build) ──
+      case "org_current": return { id: ORG.id, name: ORG.name, roles: ORG.roles };
+      case "org_members": return ORG.members;
+      case "org_shares_for": return sharesByResource.get(String(a.resource_id)) ?? [];
+      case "org_share": {
+        const rid = String(a.resource_id);
+        const incoming = (a.recipients ?? []) as { handle: string; role: string }[];
+        const now = Date.now();
+        const list = sharesByResource.get(rid) ?? [];
+        const byHandle = new Map(list.map((r) => [r.handle, r]));
+        for (const rec of incoming) {
+          byHandle.set(rec.handle, { handle: rec.handle, role: rec.role, shared_at: byHandle.get(rec.handle)?.shared_at ?? now });
+        }
+        const next = [...byHandle.values()];
+        sharesByResource.set(rid, next);
+        return next;
+      }
+      case "org_unshare": {
+        const rid = String(a.resource_id);
+        const list = sharesByResource.get(rid) ?? [];
+        sharesByResource.set(rid, list.filter((r) => r.handle !== a.handle));
+        return sharesByResource.get(rid);
       }
 
       // ── workbook helpers ──
