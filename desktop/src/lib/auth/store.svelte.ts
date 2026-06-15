@@ -97,7 +97,8 @@ class AuthStore {
 
     // 1. Sidecar probe — best-effort. Failure does NOT gate auth; it
     //    only nulls the bound identity and raises the engine-offline
-    //    flag (consumed by the titlebar/Sidebar/SidecarOfflineOverlay).
+    //    flag (surfaced in the titlebar engine chip / Sidebar — never a
+    //    blocking overlay; mandatory sign-in is the only hard gate).
     try {
       this.identity = await loadIdentity();
       this.sidecarOffline = false;
