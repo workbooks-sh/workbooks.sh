@@ -50,7 +50,14 @@ workponents/
 
 ## Status
 
-Phase 0 (scaffold + theming + variants + Host seam + `wb-button` reference). Verified: native
-custom element upgrades + shadow-renders, themes via tokens across light/dark/signal, zero deps,
-no build. Next: seed `video` (wrap wavelet) + `ai` (port the chat elements) + `docs` + `git`, then
-the DuckDB trio (`tables`/`data-viz`/`maps`).
+**Phase 0** — scaffold + theming + variants + Host seam + `wb-button` reference. Verified: native
+custom-element upgrades + shadow-render, themes via tokens across light/dark/signal, zero deps, no build.
+
+**Phase 1 seeds (done)** — four domains, 14 elements, all following the Phase-0 conventions, themed
+across light/dark/signal, registering from one import with zero console errors:
+- `ai` — `wb-thread` / `wb-message` / `wb-gen-block` / `wb-composer` (conversation-as-source).
+- `docs` — `wb-doc` / `wb-doc-cell` / `wb-doc-outline` (the doc IS its org/markdown source; live cells).
+- `git` — `wb-diff` (semantic org-block diff + line fallback, in-JS) / `wb-history-graph` / `wb-restore` / `wb-undo`.
+- `video` — `wb-video` / `wb-video-source` (themed wrappers over the shipped wavelet player).
+
+**Next** — Phase 2, the DuckDB trio: `tables` → `data-viz` → `maps` (one in-WASM engine, three surfaces).
