@@ -98,6 +98,15 @@ defmodule Workbooks.Web do
     |> halt()
   end
 
+  # Voice agent audio socket (wb-091n). Client-side Moonshine sends finalized
+  # transcripts + barge-in signals as JSON; the server streams Inworld TTS audio
+  # back as binary PCM frames. The INWORLD_API_KEY stays host-side.
+  get "/api/voice/:session_id" do
+    conn
+    |> WebSockAdapter.upgrade(Workbooks.Voice.Stream, %{session_id: conn.params["session_id"]}, timeout: 600_000)
+    |> halt()
+  end
+
   # Workspace sync (wb-e95f). The desktop's offline-first registry calls this to
   # reconcile local workspaces with the engine. This runtime keeps no remote
   # workspace registry, so it acks (local-first) and the desktop just refreshes
