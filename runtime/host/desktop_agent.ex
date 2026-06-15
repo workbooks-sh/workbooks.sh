@@ -10,9 +10,14 @@ defmodule Workbooks.DesktopAgent.Gate do
   primitive that has no place in a hosted runtime), so it gates on the same posture.
   """
 
-  @doc "True iff (WB_DESKTOP=1 or WB_ACP_DESKTOP=1) AND NOT multi-tenant hosted."
+  @doc """
+  True iff (WB_DESKTOP=1 or WB_ACP_DESKTOP=1) AND NOT a hosted runtime. The native
+  spawn is desktop-only; gating on BOTH `multi?` and `cloud_role?` makes the broker
+  provably off on ANY cloud role regardless of tenancy mode (so a hypothetical
+  hosted-single-tenant deploy that also set WB_DESKTOP can never open it).
+  """
   def enabled? do
-    requested?() and not Workbooks.Tenancy.multi?()
+    requested?() and not Workbooks.Tenancy.multi?() and not Workbooks.Tenancy.cloud_role?()
   end
 
   @doc "True when the ACP desktop broker was explicitly requested (desktop or explicit opt-in)."
