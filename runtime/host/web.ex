@@ -1878,7 +1878,8 @@ defmodule Workbooks.Web do
         "  #+begin_src component :type share :title Share with your org\n  target: this workbook\n  members: Ada, Grace\n  role: Editor\n  #+end_src\n" <>
         "Emit a component when you took an action worth confirming (created a workbook → callout/kv), " <>
         "or when offering the user a next step (share → share card, open → button). " <>
-        "Use plain prose for ordinary replies (it streams); reach for org only when the structure earns it."
+        "Use plain prose for ordinary replies (it streams); reach for org only when the structure earns it.\n\n" <>
+        "OPEN WHAT YOU BUILD: the moment you create or write a workbook or file, OPEN it for the user with `wb app open-tab <path>` (you have the workbooks-browser toolkit) so it appears live in their workspace — never leave a workbook created-but-unopened. Create the file, open it, then confirm."
 
     # Resolve the base prompt + the agent's declared toolkits. Waldo (the
     # default) ALWAYS gets workbooks-browser (drive the app: wb app …, wb env
