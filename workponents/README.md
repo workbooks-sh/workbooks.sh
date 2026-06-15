@@ -67,5 +67,16 @@ contract; all aggregation/spatial work runs as SQL in the engine, not JS:
 - `data-viz` — `wb-chart` (bar/line/area/scatter/pie, zero-dep SVG) / `wb-spark` / `wb-metric`.
 - `maps` — `wb-map` (points/heat/choropleth; zero-dep themed projection, Host tiles when configured).
 
-**Next** — Phase 3: `forms` / `records` / `search` / `auth` (`records` + `search` build on `src/data`;
-`forms` + `auth` add a shared validation layer + the Host identity seam).
+**Phase 3 — records & identity (done)** — closes the core SDK at nine domains / 31 elements:
+- `forms` — `src/validate/` (shared rule contract → `{valid, errors:[{path,rule,message}]}`, sync floor + Host `/validate`) + `wb-form`/`wb-field`/`wb-field-group` (the form IS its schema).
+- `records` — `wb-record`/`wb-record-list`/`wb-field-value` (entity views as queries over the shared engine; typed values; Host write).
+- `search` — `wb-search` (search IS a query) + `wb-command` (⌘K; in-WASM fuzzy over commands + live data).
+- `auth` — `wb-auth`/`wb-user`/`wb-gate` over a provider-agnostic identity seam on `this.host`.
+
+**Adoption pass (in progress)** — per the [build posture](../docs/WORKPONENTS.md): the zero-dep render is the
+*floor*, not a refusal. Re-base `WbElement` onto **Lit**, add **Shoelace/Web Awesome** primitives, wire
+best-in-class engines (Plot/uPlot, MapLibre+PMTiles, CodeMirror/ProseMirror, MiniSearch, Standard Schema)
+as the powered tier behind the same floor→wasm→Host seam, retrofit **ElementInternals/FACE** for `forms`,
+and emit a **Custom Elements Manifest** + the shadcn-style copy-in registry.
+
+**Then** — Phase 4: `presentation` / `live` / `code` / `files`, then the wrap domains.
