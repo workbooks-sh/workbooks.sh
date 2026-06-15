@@ -121,10 +121,14 @@ defmodule Workbooks.NexusProvisioner do
 
   # ── ownership-gated lifecycle verbs ──────────────────────────────────────────────
 
-  @doc "Tear down a nexus: destroy the machine, then the registry row. Ownership-gated."
+  @doc "Tear down a nexus: destroy the machine + Fly app, then the registry row. Ownership-gated."
   def teardown(nexus_id, org_id, opts \\ []) do
     with_owned(nexus_id, org_id, opts, fn nexus, fly, h ->
       _ = fly.destroy_machine(nexus.fly_app, nexus.fly_machine, fly_opts(opts))
+      # Also delete the Fly app so a torn-down nexus leaves no suspended app shell
+      # (the app IS the nexus). Best-effort: app cleanup must not block the registry
+      # delete, else a half-deleted nexus stays visible/ownable.
+      _ = if function_exported?(fly, :delete_app, 2), do: fly.delete_app(nexus.fly_app, fly_opts(opts)), else: :ok
       :ok = NexusRegistry.delete(nexus_id, org_id, h)
       {:ok, :torn_down}
     end)
