@@ -336,6 +336,62 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(202, json)
   end
 
+  # In-wasm HARNESS session entrypoint (acp-cloud-enable, gaps #1/#2). The PRODUCTION web path that
+  # creates/looks up a resident StarlingMonkey harness session bound to the AUTH-VERIFIED tenant. This is the
+  # binding the audit found MISSING (the surface was pid-driven thesis-only with no request path carrying
+  # identity). Identity is NEVER caller-supplied:
+  #   * `conn.assigns.tenant` is the verified tenant (Workbooks.Auth — in multi-tenant the anon/x-tenant
+  #     fallback is already rejected by the auth plug + Tenancy);
+  #   * `HarnessPool.start_session/2` namespaces the session id by that tenant AND overrides the grant
+  #     principal + creds_scope.user with it, so a caller cannot charge/scope another tenant;
+  #   * the fs workdir is the per-tenant confined scratch (effective_workdir) — never a caller path;
+  #   * the per-tenant resident-instance cap + global ceiling apply (host OOM defense).
+  # Body: {session?, exec?, commands?, creds_provider?}. Returns {session_id, status} | a cap/denied error.
+  post "/api/harness/session" do
+    {:ok, body, conn} = read_body(conn)
+    params = if body == "", do: %{}, else: Jason.decode!(body)
+    tenant = conn.assigns.tenant
+
+    # SANITIZE the caller-supplied session sub-id to a single flat path segment
+    # BEFORE it touches the FS workdir or the namespaced Registry/ETS key. The
+    # caller controls `params["session"]`; left raw it interpolated into both the
+    # run_id (-> path-traversal escape of the per-tenant scratch root) and the
+    # global session key. One sanitize at the boundary closes both.
+    sub = harness_sub(params["session"])
+    workdir = effective_workdir(tenant, "harness-#{sub}", nil)
+
+    # exec is a TRUST grant; honored only for the trusted local case or explicit WB_AGENT_EXEC — never for an
+    # arbitrary multi-tenant caller (same posture as /api/run). The principal is forced to the tenant by the
+    # pool regardless of what the caller passes.
+    exec_allowed? = Workbooks.Desktop.enabled?() or System.get_env("WB_AGENT_EXEC") == "1"
+    want_exec? = params["exec"] == true and exec_allowed?
+
+    exec_grant =
+      [allow: want_exec?, commands: commands_param(params["commands"]), principal: tenant]
+      |> then(fn g ->
+        case params["creds_provider"] do
+          p when is_binary(p) and p != "" -> Keyword.put(g, :creds_scope, %{user: tenant, provider: p})
+          _ -> g
+        end
+      end)
+
+    opts = [session: sub, exec: exec_grant, fs: [workdir: workdir, principal: tenant]]
+
+    case Workbooks.HarnessPool.start_session(tenant, opts) do
+      {:ok, _pid} ->
+        send_json(conn, 202, %{session_id: Workbooks.HarnessPool.namespaced_id(tenant, sub), status: "live"})
+
+      {:error, :tenant_session_cap} ->
+        send_json(conn, 429, %{error: "per-tenant harness session cap reached"})
+
+      {:error, :host_session_cap} ->
+        send_json(conn, 503, %{error: "host harness capacity reached"})
+
+      {:error, reason} ->
+        send_json(conn, 422, %{error: inspect(reason)})
+    end
+  end
+
   # Session list + navigation (wb-kbq5 / wb-t3mr): the desktop browses past
   # conversations here. ?active=true narrows to running. Empty until a chat runs.
   get "/api/sessions" do
@@ -474,6 +530,22 @@ defmodule Workbooks.Web do
   defp effective_workdir(tenant, run_id, requested),
     do: confined_workdir(Workbooks.Desktop.enabled?(), tenant, run_id, requested)
 
+  # Normalize a harness-session :commands cap from request params: a list of command names scopes the grant
+  # to those; anything else (incl. absent) => :all (the broker still default-denies past the registry).
+  defp commands_param(list) when is_list(list), do: Enum.map(list, &to_string/1)
+  defp commands_param(_), do: :all
+
+  # The caller-supplied harness session sub-id, reduced to one flat traversal-proof
+  # segment (same charset filter as a path segment). A blank/absent value gets a
+  # fresh host-generated id. This keeps the FS workdir confined AND the namespaced
+  # Registry/ETS key a clean tenant-scoped token.
+  defp harness_sub(requested) do
+    case requested |> to_string() |> String.replace(~r/[^A-Za-z0-9_-]/, "_") do
+      "" -> "h-#{System.unique_integer([:positive])}"
+      s -> s
+    end
+  end
+
   @doc false
   # Pure (testable): desktop-trusted callers keep their requested local path; any
   # other (cloud/shared) caller is confined to a per-tenant scratch root — no
@@ -484,9 +556,25 @@ defmodule Workbooks.Web do
     else
       base = System.get_env("WB_DATA") || System.tmp_dir!()
       # Strip dots too (not just separators) so a tenant like "../../etc" can't
-      # smuggle ".." into the path.
-      safe_tenant = (tenant || "anon") |> to_string() |> String.replace(~r/[^A-Za-z0-9_-]/, "_")
-      Path.join([base, "wb-runs", safe_tenant, run_id])
+      # smuggle ".." into the path. BOTH segments are sanitized: `run_id` is
+      # caller-derived on the harness route (= "harness-" <> caller session), so
+      # an unsanitized `run_id` was a path-traversal escape (e.g.
+      # session "x/../../tenantB" -> /data/wb-runs/<t>/harness-x/../../tenantB).
+      # Sanitizing here confines EVERY caller of confined_workdir, not just the
+      # one route — defense-in-depth so a future caller can't reintroduce it.
+      safe_tenant = safe_segment(tenant, "anon")
+      safe_run_id = safe_segment(run_id, "run")
+      Path.join([base, "wb-runs", safe_tenant, safe_run_id])
+    end
+  end
+
+  # A single, flat, traversal-proof path segment: collapse every char outside
+  # [A-Za-z0-9_-] (separators, dots, NUL, whitespace) to "_", so neither a
+  # tenant nor a caller session id can smuggle "/" or ".." into the FS path.
+  defp safe_segment(value, fallback) do
+    case (value || fallback) |> to_string() |> String.replace(~r/[^A-Za-z0-9_-]/, "_") do
+      "" -> fallback
+      s -> s
     end
   end
 

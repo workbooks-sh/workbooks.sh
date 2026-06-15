@@ -50,22 +50,66 @@ defmodule Workbooks.Llm do
     deadline = (retries + 1) * 120_000 + 15_000
     t0 = System.monotonic_time(:millisecond)
     key = resolve_key(opts)
-    task = Task.async(fn -> if on_delta, do: post_stream(body, on_delta, retries, key), else: post(body, retries, key) end)
+    principal = opts[:principal]
 
-    result =
-      case Task.yield(task, deadline) || Task.shutdown(task, :brutal_kill) do
-        {:ok, r} -> r
-        {:exit, reason} -> {:error, {:llm_crash, reason}}
-        nil -> {:error, :llm_hard_timeout}
+    # PER-TENANT LLM BUDGET (cloud-enable gaps #4/#5): in a multi-tenant posture, refuse the turn UP FRONT if
+    # the tenant has already breached its rolling-window LLM-token ceiling (a tenant cannot run unbounded LLM
+    # spend on the platform key). No-op single-tenant / nil-principal. The actual tokens spent are metered
+    # AFTER the turn from the parsed usage, so the ceiling reflects real spend over the window.
+    if budget_pre_denied?(principal) do
+      Logger.info("Llm.complete: tenant LLM budget exceeded for principal #{inspect(principal)}")
+      {:error, :budget_exceeded}
+    else
+      task = Task.async(fn -> if on_delta, do: post_stream(body, on_delta, retries, key), else: post(body, retries, key) end)
+
+      result =
+        case Task.yield(task, deadline) || Task.shutdown(task, :brutal_kill) do
+          {:ok, r} -> r
+          {:exit, reason} -> {:error, {:llm_crash, reason}}
+          nil -> {:error, :llm_hard_timeout}
+        end
+
+      meter_usage(principal, result)
+      ms = System.monotonic_time(:millisecond) - t0
+
+      if ms > 30_000 or match?({:error, _}, result) do
+        Logger.info("Llm.complete: #{inspect(elem(result, 0))} after #{ms}ms")
       end
 
-    ms = System.monotonic_time(:millisecond) - t0
-
-    if ms > 30_000 or match?({:error, _}, result) do
-      Logger.info("Llm.complete: #{inspect(elem(result, 0))} after #{ms}ms")
+      result
     end
+  end
 
-    result
+  # Up-front budget check: deny the turn when the tenant's LLM-token window is already over the ceiling. The
+  # 0-cost probe never debits — it only reads whether the window total already exceeds the cap.
+  defp budget_pre_denied?(principal) when is_binary(principal) and principal != "" do
+    Workbooks.TenantBudget.spent(principal, :llm) > Workbooks.TenantBudget.llm_budget() and
+      Workbooks.Tenancy.multi?()
+  end
+
+  defp budget_pre_denied?(_), do: false
+
+  # Charge the tenant's LLM budget the REAL tokens this turn spent (prompt+completion), parsed from usage.
+  defp meter_usage(principal, {:ok, %{usage: usage}}) when is_binary(principal) and principal != "" do
+    tokens = total_tokens(usage)
+    if tokens > 0, do: Workbooks.TenantBudget.charge(principal, :llm, tokens)
+    :ok
+  end
+
+  defp meter_usage(_principal, _result), do: :ok
+
+  defp total_tokens(usage) when is_map(usage) do
+    get_n(usage, "total_tokens") ||
+      get_n(usage, "prompt_tokens", 0) + get_n(usage, "completion_tokens", 0)
+  end
+
+  defp total_tokens(_), do: 0
+
+  defp get_n(map, key, default \\ nil) do
+    case Map.get(map, key) do
+      n when is_integer(n) -> n
+      _ -> default
+    end
   end
 
   # Resolve the OpenRouter key for THIS call, host-side (never crosses the membrane):

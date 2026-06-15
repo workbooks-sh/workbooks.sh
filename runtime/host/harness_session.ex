@@ -227,6 +227,11 @@ defmodule Workbooks.HarnessSession do
   def terminate(_reason, st) do
     if st.exec_token, do: ExecLoopback.revoke(st.exec_token)
     if st.sm_pid && Process.alive?(st.sm_pid), do: Process.exit(st.sm_pid, :normal)
+    # release the per-tenant resident-instance pool slot (gap #1) so an idle-evicted/crashed session frees its
+    # tenant's cap. The slot is keyed by the namespaced session id, which (under HarnessPool) IS st.session_id.
+    if is_binary(st.session_id) and Code.ensure_loaded?(Workbooks.HarnessPool),
+      do: Workbooks.HarnessPool.release(st.session_id)
+
     :ok
   end
 

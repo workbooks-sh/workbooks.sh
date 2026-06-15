@@ -51,6 +51,13 @@ defmodule Workbooks.ExecBroker do
         deny(name, "rate limited")
         {:error, :rate_limited}
 
+      # PER-TENANT AGGREGATE BUDGET (cloud-enable gap #5): beyond instantaneous rate/concurrency, a tenant's
+      # SUSTAINED brokered-exec cost is capped per window. No-op single-tenant/nil-principal; fail-closed in
+      # multi-tenant once the window ceiling is breached.
+      principal && budget_denied?(principal) ->
+        deny(name, "tenant exec budget exceeded")
+        {:error, :budget_exceeded}
+
       not allow ->
         deny(name, "not granted (no commands cap)")
         {:error, :denied}
@@ -119,6 +126,10 @@ defmodule Workbooks.ExecBroker do
       principal && rate && rate_denied?(principal, rate) ->
         deny(name, "rate limited")
         {:error, :rate_limited}
+
+      principal && budget_denied?(principal) ->
+        deny(name, "tenant exec budget exceeded")
+        {:error, :budget_exceeded}
 
       not allow ->
         deny(name, "not granted (no commands cap)")
@@ -203,6 +214,11 @@ defmodule Workbooks.ExecBroker do
 
   defp rate_denied?(principal, {max, window}),
     do: Workbooks.RateLimiter.check(principal, max, window) == {:error, :rate_limited}
+
+  # per-tenant aggregate exec budget (cloud-enable gap #5): charge one cost unit for this brokered exec and
+  # deny when the tenant's rolling-window ceiling is breached. No-op single-tenant / nil-principal.
+  defp budget_denied?(principal),
+    do: Workbooks.TenantBudget.charge(principal, :exec, 1) == {:error, :budget_exceeded}
 
   # concurrent-exec slot: bump the principal's live count; if it exceeds the cap, roll back and refuse. nil
   # principal (host-internal calls) is uncapped. Atomic via :ets.update_counter on the long-lived table.

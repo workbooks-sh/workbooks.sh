@@ -103,13 +103,17 @@ defmodule Workbooks.JsEngine do
   this seam). This is the transport that DISSOLVES the cross-entry wasi:http re-entry trap — the agent loop's
   llm/fs/exec go through this sync import, completing in-call, so no pollable ever straddles a run() boundary.
 
-  POSTURE GATE (keystone safe:false FIX 1): the exec/fs/creds/oauth/llm ops this seam reaches are the SAME
-  desktop-first surface `Workbooks.Harness.enabled?/0` governs (the loopback is only started in that posture).
-  The sync import bypassed that gate — a minted grant reached those ops directly even in a multi-tenant hosted
-  runtime where the loopback is deliberately absent. So the import is wired with the grant ONLY when the
-  harness surface is permitted; in a forbidden posture (cloud / multi-tenant, or no WB_DESKTOP/WB_HARNESS) the
-  grant is FORCED to nil → every op default-denies, exactly as if the loopback were never started. The import
-  stays LINKED (harmless — instantiation still succeeds) but carries no capability.
+  POSTURE GATE: the exec/fs/creds/oauth/llm ops this seam reaches are the SAME surface `Workbooks.Harness.
+  enabled?/0` governs. The import is wired with the grant ONLY when the harness surface is permitted; in a
+  forbidden posture (bare single-tenant with no WB_DESKTOP/WB_HARNESS) the grant is FORCED to nil → every op
+  default-denies. The import stays LINKED (harmless — instantiation still succeeds) but carries no capability.
+
+  CLOUD-ENABLE (acp-cloud-enable): the harness surface is now PERMITTED in multi-tenant, so the seam carries
+  the grant there too. Safety is per-tenant ISOLATION on the grant itself, not nil-ing the seam: the grant
+  principal + creds_scope are bound to the AUTH-VERIFIED tenant (Workbooks.HarnessPool.start_session, reached
+  via the /api/harness/session web entrypoint), so a guest reaches only its OWN tenant's caps, and the broker
+  rate/concurrency/budget/revocation key + keychain scope are tenant-true. A caller can never mint a grant for
+  another tenant's principal (mint refuses principal-less exec; the pool overrides the principal).
   """
   def host_broker_imports(grant) do
     effective = if Workbooks.Harness.enabled?(), do: grant, else: nil
