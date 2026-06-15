@@ -18,12 +18,55 @@ const SUB = {
   pause: 'paused'
 };
 
+// onboarding tier id → the plan label shown on a nexus row ("Name · Storage").
+const TIER_PLAN = {
+  free: 'Free · 2 GB',
+  starter: 'Starter · 50 GB',
+  team: 'Team · 250 GB',
+  scale: 'Scale · 1 TB',
+  ent: 'Enterprise · custom'
+};
+
+const slug = (s) =>
+  (s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
+
+// Seed only once per session — repeated calls (layout re-renders) are no-ops.
+let seeded = false;
+
 export const nexusStore = {
   get all() {
     return nexuses;
   },
   list() {
     return nexuses;
+  },
+  /**
+   * Replace the demo fleet with the user's real first nexus, derived from what
+   * they told us in onboarding. No profile (a fresh dev with no cookie) → keep
+   * the mock fleet so the dashboard still demos populated. Runs once per session.
+   * SWAP SEAM: when the PCP API lands, the seed comes from a real registry fetch
+   * instead of the profile cookie — the row shape is identical.
+   */
+  seedFromProfile(profile) {
+    if (seeded) return;
+    seeded = true;
+    if (!profile) return;
+    const base =
+      slug(profile.orgName) ||
+      (profile.accountType === 'personal' && slug(profile.firstName)) ||
+      'workspace';
+    nexuses = [
+      {
+        id: base,
+        name: base,
+        region: 'sfo',
+        plan: TIER_PLAN[profile.tier] || TIER_PLAN.free,
+        state: 'run',
+        sub: SUB.run,
+        url: `${base}.nexus.workbooks.cloud`,
+        addons: []
+      }
+    ];
   },
   /** filtered by the shared search query */
   get filtered() {

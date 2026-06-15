@@ -84,6 +84,14 @@
   const useLabels = $derived(usecases.map((id) => (USECASES.find((u) => u[0] === id) || [, id])[1]));
   const canNextOrg = $derived(orgName.trim().length > 0 && orgSize !== '');
   const ENT_GIF = 'https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExem1wZTAzajMzb3JndW95dnh0MW9vaGVxaWlpcnd5N3Y3d2F2ZXc1ayZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/JROxfRtFCVgSgz8uRd/giphy.gif';
+
+  // Everything we learned in the wizard, serialized once and posted with whichever
+  // form finishes onboarding. The server persists it (cookie now; the runtime nexus
+  // registry later) and the dashboard seeds the org identity + first nexus from it.
+  const profileJSON = $derived(JSON.stringify({
+    accountType, deploy, orgName: orgName.trim(), orgSize, heard,
+    usecases, tier: selTier.id, region: REGION, firstName: first
+  }));
 </script>
 
 <div class="ob-canvas">
@@ -229,6 +237,7 @@
         <h1>You’re on Free</h1>
         <p class="sub">Unlimited users and {selTier.storage}. Upgrade anytime when you need more storage — never for more people.</p>
         <form method="POST" action="?/finish" use:enhance>
+          <input type="hidden" name="profile" value={profileJSON} />
           <div class="foot"><button class="btn primary big" type="submit">Enter your dashboard →</button></div>
         </form>
       {:else}
@@ -240,12 +249,13 @@
         </div>
         <form method="POST" action="?/pay" use:enhance>
           <input type="hidden" name="tier" value={selTier.id} />
+          <input type="hidden" name="profile" value={profileJSON} />
           <div class="foot">
             <button class="btn" type="button" onclick={back}>Back</button>
             <button class="btn primary big" type="submit">Continue to payment →</button>
           </div>
         </form>
-        <form method="POST" action="?/finish" use:enhance><button class="skip" type="submit">I’ll set up billing later</button></form>
+        <form method="POST" action="?/finish" use:enhance><input type="hidden" name="profile" value={profileJSON} /><button class="skip" type="submit">I’ll set up billing later</button></form>
       {/if}
 
     {:else if stepKey === 'local'}
@@ -256,7 +266,7 @@
         <button class="btn" onclick={back}>Back</button>
         <a class="btn primary" href="https://workbooks.sh" target="_blank" rel="noreferrer">Download the desktop app ↗</a>
       </div>
-      <form method="POST" action="?/finish" use:enhance><button class="skip" type="submit">Continue to the dashboard anyway</button></form>
+      <form method="POST" action="?/finish" use:enhance><input type="hidden" name="profile" value={profileJSON} /><button class="skip" type="submit">Continue to the dashboard anyway</button></form>
     {/if}
   </div>
 </div>

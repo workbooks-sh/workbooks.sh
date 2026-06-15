@@ -11,6 +11,11 @@
   let modalOpen = $state(false);
   let orgOpen = $state(false);
 
+  // Seed the dashboard from onboarding (once, client-side only — the store is a
+  // module singleton, so seeding it during SSR could bleed one user's profile into
+  // another request). The user's first nexus reflects the org name + plan they chose.
+  $effect(() => { nexusStore.seedFromProfile(data?.profile); });
+
   // /welcome + /denied render full-bleed, without the app chrome.
   const bare = $derived(page.url.pathname === '/welcome' || page.url.pathname === '/denied');
 
@@ -28,6 +33,17 @@
   const userName = $derived(data?.user ? ([data.user.firstName, data.user.lastName].filter(Boolean).join(' ') || data.user.email.split('@')[0]) : 'Account');
   const userEmail = $derived(data?.user?.email || '');
   const initial = $derived((userName[0] || 'A').toUpperCase());
+
+  // org/workspace identity in the switcher — from onboarding, falling back to the
+  // signed-in user (personal accounts) or their email handle.
+  const orgLabel = $derived(
+    data?.profile?.orgName ||
+    (data?.profile?.accountType === 'personal' ? userName : null) ||
+    (data?.user?.email ? data.user.email.split('@')[0] : 'workspace')
+  );
+  const orgInitials = $derived(
+    orgLabel.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'W'
+  );
 
   // when searching, make sure results are visible on the list page
   function onSearch(e) {
@@ -85,13 +101,13 @@
 
     <div class="orgwrap">
       <div class="org" onclick={() => (orgOpen = !orgOpen)} role="button" tabindex="0">
-        <div class="av">SO</div>
-        <div class="nm">shinyobjectz</div>
+        <div class="av">{orgInitials}</div>
+        <div class="nm">{orgLabel}</div>
         <svg class="ico ch" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
       </div>
       {#if orgOpen}
         <div class="orgmenu" role="menu">
-          <div class="omcur"><div class="av sm">SO</div><span>shinyobjectz</span><span class="omtick">✓</span></div>
+          <div class="omcur"><div class="av sm">{orgInitials}</div><span>{orgLabel}</span><span class="omtick">✓</span></div>
           <div class="omdiv"></div>
           <button class="omitem" disabled>Create workspace<small>soon</small></button>
           <a class="omitem" href="/settings" onclick={() => (orgOpen = false)}>Workspace settings</a>
