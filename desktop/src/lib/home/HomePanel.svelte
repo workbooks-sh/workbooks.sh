@@ -32,7 +32,7 @@
 
   // Multi-agent chrome (the agents catalog + its picker) is gated by
   // WB_FF_AGENTS (wb-aakl.2) and lazily imported so a flags-off build
-  // excludes the catalog store. The single Workhorse chatSession + voice
+  // excludes the catalog store. The single Waldo chatSession + voice
   // below are NOT gated — they're the transport Waldo (wb-aakl.21) lifts.
   let agents = $state<typeof import("$lib/bridge/agents.svelte").agents | null>(null);
   let AgentPickerDropdown =
@@ -62,7 +62,7 @@
   //
   // Toggling voice morphs the composer in place: textarea hides, the
   // status strip + transcript take its place. The session runs against
-  // Workhorse with the brainstorming skill attached — same Gemini Live
+  // Waldo with the brainstorming skill attached — same Gemini Live
   // transport that used to live in the palette.
   type Bubble =
     | { kind: "msg"; id: number; who: "user" | "agent"; text: string }
@@ -77,7 +77,7 @@
         kind: "tool";
         id: number;
         callId: string;
-        /** The terminal command Workhorse is running (the `bash`
+        /** The terminal command Waldo is running (the `bash`
          *  tool's `command` arg). Shown verbatim so the user can
          *  read exactly what was executed. */
         command: string;
@@ -140,7 +140,7 @@
     {
       name: "set_active_agent",
       description:
-        "Propose switching the host's active agent to a different slug from the catalog. Use when the user's described work fits a specialist agent better than the current Workhorse.",
+        "Propose switching the host's active agent to a different slug from the catalog. Use when the user's described work fits a specialist agent better than Waldo, the resident assistant.",
       parameters: {
         type: "object",
         properties: {
@@ -204,7 +204,7 @@
     voiceError = null;
     const workdir = packageStore.active?.folders?.[0] ?? null;
     await geminiLive.start(
-      "workhorse",
+      "waldo",
       workdir,
       {
         onUserTranscript: (t) => appendChunk("user", t),
@@ -413,7 +413,7 @@
             class="btn voice-toggle"
             onclick={startVoice}
             disabled={sidecar.status.state !== "ready"}
-            title="Talk to Workhorse by voice"
+            title="Talk to Waldo by voice"
             aria-label="Start voice session"
           >
             <AudioLines weight="fill" size={13} />
@@ -450,7 +450,7 @@
             {:else if geminiLive.state === "error"}
               {geminiLive.error ?? "Voice session error"}
             {:else}
-              Workhorse
+              Waldo
             {/if}
           </span>
           <div class="voice-trailing">
@@ -511,14 +511,14 @@
             <span class="muted">
               {geminiLive.state === "connecting"
                 ? "Opening mic…"
-                : "Workhorse is about to speak."}
+                : "Waldo is about to speak."}
             </span>
           </div>
         {/if}
         {#each bubbles as b (b.id)}
           {#if b.kind === "msg"}
             <div class="bubble" class:agent={b.who === "agent"}>
-              <span class="who">{b.who === "agent" ? "Workhorse" : "You"}</span>
+              <span class="who">{b.who === "agent" ? "Waldo" : "You"}</span>
               <span class="text">{b.text}</span>
             </div>
           {:else if b.kind === "tool"}
@@ -1033,7 +1033,7 @@
     border-radius: 7px;
   }
 
-  /* Tool-call block — each terminal command Workhorse runs gets a
+  /* Tool-call block — each terminal command Waldo runs gets a
    * card with status icon. Tap to expand the full output. */
   .tool-block {
     display: flex;

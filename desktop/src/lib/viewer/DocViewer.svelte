@@ -17,6 +17,7 @@
   import TextView from "./TextView.svelte";
   import OrgEditor from "$lib/org-renderer/OrgEditor.svelte";
   import AgentTabView from "./AgentTabView.svelte";
+  import WaldoPanel from "$lib/components/WaldoPanel.svelte";
 
   // Closing a tab anywhere must release its pane.
   $effect(() => {
@@ -46,7 +47,9 @@
 
 {#snippet docBody(tab: Tab)}
   {#key tab.id}
-    {#if tab.kind === "agent"}
+    {#if tab.kind === "chat"}
+      <WaldoPanel fullscreen={true} />
+    {:else if tab.kind === "agent"}
       <AgentTabView path={tab.path} tabId={tab.id} />
     {:else if tab.kind === "workbook"}
       <WorkbookView path={tab.path} />

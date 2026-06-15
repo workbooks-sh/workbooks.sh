@@ -1,3 +1,17 @@
+// A live-voice transcript bubble — either a spoken message (you/waldo) or a
+// bash/tool call Waldo ran mid-conversation. Shared store state so the voice
+// transcript survives WaldoPanel remounting into a tab.
+export type VoiceBubble =
+  | { kind: "msg"; id: number; who: "you" | "waldo"; text: string }
+  | {
+      kind: "tool";
+      id: number;
+      callId: string;
+      command: string;
+      status: "running" | "ok" | "error";
+      output: string | null;
+    };
+
 // wb-i38o.4 — chat surface types.
 //
 // The OQL agent broadcasts a small set of telemetry events on the

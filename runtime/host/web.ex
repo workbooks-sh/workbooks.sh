@@ -1737,9 +1737,14 @@ defmodule Workbooks.Web do
         "do NOT wrap a plain answer in a tool call. Your text streams to the user as you write it.\n\n" <>
         "RICH REPLIES (optional): when a structured or visual answer helps, begin your message with " <>
         "`#+RENDER: org` on its own first line and write the body in Org. You may embed inline component " <>
-        "blocks the chat renders as cards:\n" <>
+        "blocks the chat renders as interactive cards (like a tool-call result):\n" <>
         "  #+begin_src component :type callout :tone ok :title Done\n  short body text\n  #+end_src\n" <>
         "  #+begin_src component :type kv :title Stats\n  key: value\n  other: value\n  #+end_src\n" <>
+        "  #+begin_src component :type button :label Open it :action open\n  #+end_src\n" <>
+        "  #+begin_src component :type link :label Docs :href https://workbooks.sh\n  #+end_src\n" <>
+        "  #+begin_src component :type share :title Share with your org\n  target: this workbook\n  members: Ada, Grace\n  role: Editor\n  #+end_src\n" <>
+        "Emit a component when you took an action worth confirming (created a workbook → callout/kv), " <>
+        "or when offering the user a next step (share → share card, open → button). " <>
         "Use plain prose for ordinary replies (it streams); reach for org only when the structure earns it."
 
     # Resolve the base prompt + the agent's declared toolkits. Waldo (the

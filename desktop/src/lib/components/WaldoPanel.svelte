@@ -11,7 +11,6 @@
    */
   import {
     PaperPlaneRight,
-    MagnifyingGlass,
     Wrench,
     Compass,
     ClockCounterClockwise,
@@ -29,7 +28,7 @@
     CircleNotch,
     WarningCircle,
   } from "phosphor-svelte";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import { chatSession } from "$lib/chat/session.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { dock } from "$lib/bridge/dock.svelte";
@@ -38,6 +37,7 @@
   import ArtifactCard from "$lib/chat/ArtifactCard.svelte";
   import { componentArtifacts } from "$lib/chat/artifacts.svelte";
   import { geminiLive } from "$lib/live/gemini.svelte";
+  import { openChatTab } from "$lib/tabs/chatTab";
 
   const WALDO_SLUG = "waldo";
 
@@ -46,8 +46,8 @@
   let { fullscreen = false }: { fullscreen?: boolean } = $props();
 
   const SUGGESTIONS = [
-    { icon: MagnifyingGlass, label: "Search my files", text: "Search my files for " },
-    { icon: Wrench, label: "Set up my agents", text: "Help me connect Claude Code to this workspace" },
+    { icon: Plus, label: "Create a workbook", text: "Can you create a workbook for me?" },
+    { icon: Wrench, label: "Set up an agent", text: "Set me up an agent that summarizes my notes" },
     { icon: Compass, label: "What can you do?", text: "What can you do in this browser?" },
   ];
 
@@ -56,7 +56,10 @@
   let composerEl = $state<HTMLTextAreaElement | null>(null);
   let view = $state<"chat" | "history">("chat");
   let viewing = $state<SavedSession | null>(null); // a past session opened read-only
-  let myLines = $state<{ text: string; ts: number }[]>([]);
+  // User-message echoes live on the chatSession store (not local state) so the
+  // transcript survives this panel remounting — opening the live chat as a tab
+  // and switching back re-mounts WaldoPanel, and the conversation must persist.
+  const myLines = $derived(chatSession.userEchoes);
   let lastSavedId: string | null = null;
 
   const ready = $derived(sidecar.status.state === "ready");
@@ -122,9 +125,7 @@
     composerEl?.focus();
   }
   function newChat() {
-    myLines = [];
-    chatSession.blocks = [];
-    chatSession.session = null;
+    chatSession.clearTranscript();
     componentArtifacts.reset();
     viewing = null;
     view = "chat";
@@ -144,8 +145,13 @@
     if (!t || sending || !ready) return;
     sending = true;
     viewing = null;
-    myLines = [...myLines, { text: t, ts: Date.now() }];
+    const firstMessage = myLines.length === 0;
+    chatSession.pushEcho(t);
     prompt = "";
+    // First message of a conversation opens a returnable tab bound to this
+    // chat (Feature 2). The dock panel + the tab share the chatSession
+    // singleton, so the user can switch tabs and come back to the live thread.
+    if (firstMessage && !fullscreen) void openChatTab(WALDO_SLUG);
     try {
       await chatSession.send(t, { agentSlug: WALDO_SLUG });
     } catch (e) {
@@ -171,69 +177,35 @@
   // "waldo" slug. Survives tool/bash calls (the breakage that's fixed
   // in gemini.svelte: a failed exec degrades gracefully instead of
   // tearing down the session).
-  type VoiceBubble =
-    | { kind: "msg"; id: number; who: "you" | "waldo"; text: string }
-    | {
-        kind: "tool";
-        id: number;
-        callId: string;
-        command: string;
-        status: "running" | "ok" | "error";
-        output: string | null;
-      };
-  let voiceMode = $state(false);
-  let voiceBubbles = $state<VoiceBubble[]>([]);
-  let voiceError = $state<string | null>(null);
-  let voiceSeq = 0;
+  // Voice transcript + error live on the chatSession store (shared) so a voice
+  // conversation started in the dock stays visible in the returnable chat tab,
+  // surviving panel remounts. "Voice mode" = a live session is present, so any
+  // mount of this panel reflects the same voice state.
+  const voiceMode = $derived(geminiLive.present);
+  const voiceBubbles = $derived(chatSession.voiceBubbles);
+  const voiceError = $derived(chatSession.voiceError);
   let voiceScrollEl = $state<HTMLDivElement | null>(null);
   let toolExpanded = $state<Record<string, boolean>>({});
 
-  function voiceAppend(who: "you" | "waldo", chunk: string) {
-    const last = voiceBubbles[voiceBubbles.length - 1];
-    if (last && last.kind === "msg" && last.who === who) {
-      voiceBubbles = [...voiceBubbles.slice(0, -1), { ...last, text: last.text + chunk }];
-    } else {
-      voiceBubbles = [...voiceBubbles, { kind: "msg", id: ++voiceSeq, who, text: chunk }];
-    }
-  }
-
-  function voicePushTool(callId: string, command: string) {
-    voiceBubbles = [
-      ...voiceBubbles,
-      { kind: "tool", id: ++voiceSeq, callId, command, status: "running", output: null },
-    ];
-  }
-
-  function voiceCompleteTool(callId: string, output: string) {
-    voiceBubbles = voiceBubbles.map((b) => {
-      if (b.kind !== "tool" || b.callId !== callId) return b;
-      const status: "ok" | "error" = output.startsWith("exit=0") ? "ok" : "error";
-      return { ...b, status, output };
-    });
-  }
-
   async function startVoice() {
-    if (voiceMode || geminiLive.present) return;
-    voiceMode = true;
-    voiceBubbles = [];
-    voiceError = null;
+    if (geminiLive.present) return;
+    chatSession.voiceReset();
+    // A voice conversation is a conversation — open the returnable tab too
+    // (Feature 2), unless we're already the full-tab surface.
+    if (!fullscreen) void openChatTab(WALDO_SLUG);
     await geminiLive.start(WALDO_SLUG, null, {
-      onUserTranscript: (t) => voiceAppend("you", t),
-      onAgentTranscript: (t) => voiceAppend("waldo", t),
-      onToolCallStart: (id, command) => voicePushTool(id, command),
-      onToolCallEnd: (id, output) => voiceCompleteTool(id, output),
+      onUserTranscript: (t) => chatSession.voiceAppend("you", t),
+      onAgentTranscript: (t) => chatSession.voiceAppend("waldo", t),
+      onToolCallStart: (id, command) => chatSession.voicePushTool(id, command),
+      onToolCallEnd: (id, output) => chatSession.voiceCompleteTool(id, output),
       onError: (msg) => {
-        voiceError = msg;
-      },
-      onClose: () => {
-        voiceMode = false;
+        chatSession.voiceError = msg;
       },
     });
   }
 
   async function endVoice() {
     await geminiLive.end();
-    voiceMode = false;
   }
 
   // Auto-scroll the voice transcript as chunks arrive.
@@ -246,9 +218,10 @@
     }
   });
 
-  onDestroy(() => {
-    if (geminiLive.present) void geminiLive.end();
-  });
+  // NOTE: do NOT tear the voice session down on unmount. The session is a
+  // module singleton shared by the dock panel and the chat tab; unmounting one
+  // surface (e.g. popping out into the tab) must not kill a live call. The
+  // session ends only via the explicit END control (endVoice).
 
   const voiceStatus = $derived.by(() => {
     switch (geminiLive.state) {

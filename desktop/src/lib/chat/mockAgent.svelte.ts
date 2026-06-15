@@ -132,8 +132,28 @@ function componentHtml(title: string, prompt: string, revision: number): string 
  *  so a follow-up reads as an "update" (rev N+1) rather than a new file. */
 const revisions = new Map<string, number>();
 
-/** Run the scripted component-toolkit agent for one prompt. Emits the same
- *  telemetry event shape the real runtime does, on `session:<id>`. */
+/** Intent buckets the scripted Waldo recognizes. Discovered from the prompt
+ *  so the browser preview answers REAL, compelling requests as Waldo would —
+ *  create a workbook, share it, stand up an agent — not "list the files". */
+type Intent = "create" | "share" | "agent" | "default";
+
+function detectIntent(prompt: string): Intent {
+  const p = prompt.toLowerCase();
+  if (/\b(share|invite|send (it|this)|collaborat|org|team|with (someone|my))/i.test(p))
+    return "share";
+  if (/\b(set ?up|create|build|make|spin up).*\bagent\b|\bagent that\b/i.test(p))
+    return "agent";
+  if (/\b(create|make|build|new|set ?up|start).*\b(workbook|app|dashboard|tracker|page)/i.test(p))
+    return "create";
+  return "default";
+}
+
+/** Run the scripted Waldo agent for one prompt. Emits the same telemetry
+ *  event shape the real runtime does, on `session:<id>`, so the chat surface
+ *  renders it with zero special-casing. Branches on intent so the demo reads
+ *  like a real Waldo result — and at least one branch renders a custom inline
+ *  component (a `#+begin_src component …` block the renderer treats like a
+ *  tool-call result). */
 export async function runMockComponentAgent(
   sessionId: string,
   prompt: string,
@@ -144,45 +164,114 @@ export async function runMockComponentAgent(
 
   emit("session_started", { agent: { name: "Waldo" } });
   await sleep(220);
-
-  emit("llm_turn_start", { metadata: { provider: "openrouter", model: "component-toolkit" } });
+  emit("llm_turn_start", { metadata: { provider: "openrouter", model: "waldo" } });
   await sleep(120);
 
-  const { path, title } = artifactPathFor(prompt);
-  const rev = (revisions.get(path) ?? 0) + 1;
-  revisions.set(path, rev);
-  const action = rev === 1 ? "created" : "updated";
+  const intent = detectIntent(prompt);
 
-  // The EXEC: the component-toolkit produces the artifact. Surface it as a
-  // tool call (as the runtime would), then write the bytes + announce it.
-  emit("tool_call_start", {
-    metadata: { tool_name: "component_build", tool_call_id: `tc-${rev}`, args: { title } },
-  });
-  await sleep(380);
+  if (intent === "create") {
+    // Create + open a workbook, then confirm with an inline component card.
+    const { path, title } = artifactPathFor(prompt);
+    const rev = (revisions.get(path) ?? 0) + 1;
+    revisions.set(path, rev);
+    const action = rev === 1 ? "created" : "updated";
 
-  componentArtifacts.register(path, componentHtml(title, prompt, rev));
+    emit("tool_call_start", {
+      metadata: { tool_name: "workbook_create", tool_call_id: `tc-${rev}`, args: { title } },
+    });
+    await sleep(420);
+    componentArtifacts.register(path, componentHtml(title, prompt, rev));
+    emit("tool_call_stop", {
+      metadata: { tool_name: "workbook_create", tool_call_id: `tc-${rev}`, status: "ok", result_size: 1 },
+    });
+    await sleep(80);
+    emit("component_artifact", { path, title, kind: "workbook", action });
+    await sleep(140);
 
-  emit("tool_call_stop", {
-    metadata: { tool_name: "component_build", tool_call_id: `tc-${rev}`, status: "ok", result_size: 1 },
-  });
-  await sleep(80);
+    emit("llm_turn_stop", {
+      metadata: {
+        provider: "openrouter",
+        model: "waldo",
+        status: "ok",
+        content:
+          action === "created"
+            ? `#+RENDER: org\nDone — I built *${title}* and opened it as a tab.\n\n` +
+              `#+begin_src component :type callout :tone ok :title Workbook created\n` +
+              `${title} is live in a new tab. Tell me what to change and I'll edit it in place.\n` +
+              `#+end_src\n\n` +
+              `#+begin_src component :type kv :title What I set up\n` +
+              `Name: ${title}\n` +
+              `Type: single-file workbook\n` +
+              `Status: open in a tab\n` +
+              `Next: say "share this" to invite your team\n` +
+              `#+end_src`
+            : `Updated *${title}* (revision ${rev}). The tab reflects the latest version — keep iterating.`,
+      },
+    });
+  } else if (intent === "share") {
+    // Offer a share action as an inline component (a clickable card/button).
+    await sleep(300);
+    emit("llm_turn_stop", {
+      metadata: {
+        provider: "openrouter",
+        model: "waldo",
+        status: "ok",
+        content:
+          `#+RENDER: org\nYes — you can share this with anyone in your organization. ` +
+          `Pick who gets access and I'll send the invite.\n\n` +
+          `#+begin_src component :type share :title Share with your org\n` +
+          `target: this workbook\n` +
+          `members: Ada Lovelace, Grace Hopper, Alan Turing\n` +
+          `role: Editor\n` +
+          `#+end_src`,
+      },
+    });
+  } else if (intent === "agent") {
+    // Stand up a new agent, confirm with an inline component + an open action.
+    await sleep(320);
+    emit("tool_call_start", {
+      metadata: { tool_name: "agent_create", tool_call_id: "tc-agent", args: { slug: "summarizer" } },
+    });
+    await sleep(360);
+    emit("tool_call_stop", {
+      metadata: { tool_name: "agent_create", tool_call_id: "tc-agent", status: "ok", result_size: 1 },
+    });
+    await sleep(80);
+    emit("llm_turn_stop", {
+      metadata: {
+        provider: "openrouter",
+        model: "waldo",
+        status: "ok",
+        content:
+          `#+RENDER: org\nSet up. I created an agent and pinned it to your workspace.\n\n` +
+          `#+begin_src component :type callout :tone ok :title Agent ready\n` +
+          `Your new agent is configured and available to sessions. Open its tab to tweak the prompt or toolkits.\n` +
+          `#+end_src\n\n` +
+          `#+begin_src component :type kv :title Agent config\n` +
+          `Slug: summarizer\n` +
+          `Model: inherits your default\n` +
+          `Toolkits: workbooks-browser, library-search\n` +
+          `Human in the loop: off\n` +
+          `#+end_src`,
+      },
+    });
+  } else {
+    // A plain, streaming prose answer (the common case) — as Waldo.
+    await sleep(280);
+    emit("llm_turn_stop", {
+      metadata: {
+        provider: "openrouter",
+        model: "waldo",
+        status: "ok",
+        content:
+          `I'm Waldo, your resident assistant in here. I can create workbooks, ` +
+          `share them to your org, set up agents, search your files, and open ` +
+          `things for you — by voice or text. Try "create a workbook for me" or ` +
+          `"set me up an agent that summarizes my notes."`,
+      },
+    });
+  }
 
-  // The artifact event — this is what opens the tab.
-  emit("component_artifact", { path, title, kind: "workbook", action });
-  await sleep(120);
-
-  emit("llm_turn_stop", {
-    metadata: {
-      provider: "openrouter",
-      model: "component-toolkit",
-      status: "ok",
-      content:
-        action === "created"
-          ? `Built **${title}** and opened it as a tab. Tell me what to change and I'll update the component in place.`
-          : `Updated **${title}** (revision ${rev}). The tab reflects the latest version — keep iterating.`,
-    },
-  });
   await sleep(60);
-
   emit("session_completed", { result: { ok: true } });
 }

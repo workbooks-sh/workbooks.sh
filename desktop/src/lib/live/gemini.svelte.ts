@@ -479,7 +479,7 @@ class GeminiLiveSession {
 
     // Agent greets (streamed in fragments, mirroring real transcription).
     this.#mockAt(1200, () => cb.onAgentTranscript?.("Hey — "));
-    this.#mockAt(1500, () => cb.onAgentTranscript?.("I'm Workhorse. "));
+    this.#mockAt(1500, () => cb.onAgentTranscript?.("I'm Waldo. "));
     this.#mockAt(1900, () =>
       cb.onAgentTranscript?.("Want me to take a look at your project?"),
     );

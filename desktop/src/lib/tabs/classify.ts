@@ -15,6 +15,11 @@ const WAVELET_EXT = /\.(?:wave|comp)\.html?$/i;
 const WAVELET_DIR = /(?:^|\/)(?:compositions|wavelet)\//i;
 
 export function classifyKind(path: string): TabKind {
+  // A live conversation with Waldo opens as its OWN tab (`chat://<slug>`)
+  // so the user can navigate away and return to the same running session.
+  // The tab renders WaldoPanel (fullscreen); both it and the dock share the
+  // module-singleton chatSession/geminiLive, so they reflect one conversation.
+  if (/^chat:\/\//i.test(path)) return "chat";
   // An agent opens as a workbook tab of its own. The `agent://<slug>`
   // scheme (or any `.agent.org` file) routes to the in-tab AgentTabView
   // editor rather than the generic org/workbook viewers. The agent IS a

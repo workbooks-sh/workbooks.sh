@@ -209,14 +209,15 @@ export interface PreviewAgent {
 }
 export const AGENTS_CATALOG_PREVIEW: PreviewAgent[] = [
   {
-    slug: "workhorse",
-    title: "Workhorse",
-    tagline: "The default Workbooks agent — knows the ecosystem, can do anything reasonable.",
+    slug: "waldo",
+    title: "Waldo",
+    tagline: "Your resident assistant inside Workbooks — navigate and operate your workspace by voice or text.",
     icon: "lucide:Bot",
     model: null,
     scope: "builtin",
-    toolkits: ["bash", "wb"],
-    system_prompt_preview: "You are Workhorse, the default Workbooks agent.",
+    toolkits: ["workbooks-browser", "workbooks-cli"],
+    system_prompt_preview:
+      "You are Waldo, the user's resident assistant inside Workbooks. You work problems WITH the user; you never run off on your own.",
   },
   {
     slug: "researcher",
@@ -232,17 +233,20 @@ export const AGENTS_CATALOG_PREVIEW: PreviewAgent[] = [
 ];
 
 const AGENTS_MOCK: Record<string, { source: string; scope: "user" | "project" | "builtin" }> = {
-  workhorse: {
+  waldo: {
     scope: "builtin",
-    source: `* Workhorse                                                          :agent:
+    source: `* Waldo                                                          :agent:
   :PROPERTIES:
-  :ID:           workhorse
+  :ID:           waldo
   :TYPE:         ai
   :ICON:         lucide:Bot
-  :TOOLKITS:     bash wb
+  :TOOLKITS:     workbooks-browser workbooks-cli
   :END:
 ** System prompt
-You are Workhorse, the default Workbooks agent.
+You are Waldo, the user's resident assistant inside Workbooks. Be concise, warm, and helpful.
+Help them navigate and operate their workspace — answer questions, search, open things,
+create workbooks, share to their org, set up agents — by voice or text. You work problems
+WITH the user; you never run off on your own.
 `,
   },
   researcher: {
@@ -265,7 +269,7 @@ You are a meticulous research agent. Gather sources, verify each claim against a
   },
 };
 
-const agentSettingsMock = { default_model: "", default_agent_slug: "workhorse" };
+const agentSettingsMock = { default_model: "", default_agent_slug: "waldo" };
 
 // ── organization members (share-to-organization surface) ──────────────────
 // Real people in the active org. `avatar` is a real photo URL (pravatar
@@ -657,8 +661,23 @@ function makeInvoke(): Invoke {
         // editor can show a "Published → …" confirmation in preview.
         return { ok: true, url: `https://nexus.workbooks.sh/a/${a.slug}` };
 
-      // ── keychain-backed lists (empty) ──
-      case "keys_list": case "env_vars_list": case "connections_list":
+      // ── keychain-backed lists ──
+      // Seed an OpenRouter key so Waldo is awake out of the box in the browser
+      // preview (the home composer gates "send" on a model key). The value is a
+      // visible placeholder — the mock agent never makes a real LLM call.
+      case "keys_list":
+        return [
+          {
+            id: "mock-openrouter",
+            name: "OpenRouter",
+            provider: "openrouter",
+            custom_provider: null,
+            created_at: Date.now(),
+            masked: "sk-or-…demo",
+            length: 51,
+          },
+        ];
+      case "env_vars_list": case "connections_list":
       case "mcp_list": case "plugins_list": case "skills_list": return [];
       case "keys_known_providers": return ["openrouter", "anthropic", "openai", "google"];
       case "connections_detect_local_cli": return [];

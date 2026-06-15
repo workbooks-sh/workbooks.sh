@@ -1,6 +1,6 @@
 // wb-i38o.8 — tab types mirror src-tauri/src/tabs.rs.
 
-export type TabKind = "workbook" | "wavelet" | "org" | "code" | "text" | "agent";
+export type TabKind = "workbook" | "wavelet" | "org" | "code" | "text" | "agent" | "chat";
 
 export interface Tab {
   id: string;
