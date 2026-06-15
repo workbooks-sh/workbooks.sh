@@ -5,16 +5,38 @@
   import DnaStrip from '$lib/DnaStrip.svelte';
   import Toast from '$lib/Toast.svelte';
   import { nexusStore } from '$lib/nexusStore.svelte.js';
+  import { workspaceStore } from '$lib/workspaceStore.svelte.js';
+  import { toast } from '$lib/toastStore.svelte.js';
   import { goto } from '$app/navigation';
 
   let { children, data } = $props();
   let modalOpen = $state(false);
   let orgOpen = $state(false);
+  let creating = $state(false);
+  let newWsName = $state('');
 
-  // Load the org's REAL nexuses from the platform API (client-side only — the store
-  // is a module singleton, so loading during SSR could bleed one org's list into
-  // another request). Empty until a runtime is connected; never a fabricated fleet.
-  $effect(() => { nexusStore.load(); });
+  // Load the org's REAL nexuses + workspaces from the platform API (client-side only —
+  // the stores are module singletons, so loading during SSR could bleed one org's data
+  // into another request). Empty until a runtime is connected; never fabricated.
+  $effect(() => {
+    nexusStore.load();
+    const defaultWs = data?.profile?.orgName || (data?.user?.email || '').split('@')[0] || 'Workspace';
+    workspaceStore.load(defaultWs);
+  });
+
+  async function createWs() {
+    const n = newWsName.trim();
+    if (!n) return;
+    try {
+      const ws = await workspaceStore.create(n);
+      toast(`Created workspace “${ws.name}”`);
+    } catch {
+      toast('Couldn’t create the workspace', 'bad');
+    }
+    newWsName = '';
+    creating = false;
+    orgOpen = false;
+  }
 
   // /welcome + /denied render full-bleed, without the app chrome.
   const bare = $derived(page.url.pathname === '/welcome' || page.url.pathname === '/denied');
@@ -43,6 +65,13 @@
   );
   const orgInitials = $derived(
     orgLabel.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'W'
+  );
+
+  // the active workspace drives the switcher (org is the parent context shown above it)
+  const activeWs = $derived(workspaceStore.active);
+  const wsLabel = $derived(activeWs?.name || orgLabel);
+  const wsInitials = $derived(
+    wsLabel.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'W'
   );
 
   // when searching, make sure results are visible on the list page
@@ -101,16 +130,44 @@
 
     <div class="orgwrap">
       <div class="org" onclick={() => (orgOpen = !orgOpen)} role="button" tabindex="0">
-        <div class="av">{orgInitials}</div>
-        <div class="nm">{orgLabel}</div>
+        <div class="av">{wsInitials}</div>
+        <div class="nm">
+          <div class="wsname">{wsLabel}</div>
+          <div class="wsorg">{orgLabel}</div>
+        </div>
         <svg class="ico ch" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
       </div>
       {#if orgOpen}
         <div class="orgmenu" role="menu">
-          <div class="omcur"><div class="av sm">{orgInitials}</div><span>{orgLabel}</span><span class="omtick">✓</span></div>
+          <div class="omhead">{orgLabel}</div>
+          {#each workspaceStore.list as w (w.id)}
+            <button class="omitem" onclick={() => { workspaceStore.setActive(w.id); orgOpen = false; }}>
+              <span class="av sm">{(w.name[0] || 'W').toUpperCase()}</span>
+              <span class="omname">{w.name}</span>
+              {#if activeWs?.id === w.id}<span class="omtick">✓</span>{/if}
+            </button>
+          {/each}
+          {#if workspaceStore.list.length === 0}
+            <div class="omempty">No workspaces yet</div>
+          {/if}
           <div class="omdiv"></div>
-          <button class="omitem" disabled>Create workspace<small>soon</small></button>
-          <a class="omitem" href="/settings" onclick={() => (orgOpen = false)}>Workspace settings</a>
+          {#if creating}
+            <div class="omnew">
+              <input
+                placeholder="Workspace name"
+                bind:value={newWsName}
+                onkeydown={(e) => { if (e.key === 'Enter') createWs(); if (e.key === 'Escape') { creating = false; newWsName = ''; } }}
+              />
+              <button class="omadd" onclick={createWs}>Add</button>
+            </div>
+          {:else}
+            <button class="omitem" onclick={() => (creating = true)}>
+              <span class="av sm plus">+</span><span class="omname">New workspace</span><small>free</small>
+            </button>
+          {/if}
+          <div class="omdiv"></div>
+          <button class="omitem" disabled>Switch organization<small>soon</small></button>
+          <a class="omitem" href="/settings" onclick={() => (orgOpen = false)}>Settings</a>
         </div>
       {/if}
     </div>
@@ -172,9 +229,8 @@
     right: 0;
     z-index: 35;
     background: var(--card);
-    border: 2px solid var(--stroke);
+    border: 1px solid var(--line);
     border-radius: 11px;
-    box-shadow: 4px 4px 0 var(--shadow);
     padding: 6px;
     animation: org-in 0.12s ease;
   }
@@ -223,4 +279,25 @@
   .omitem[disabled] { color: var(--dim); cursor: default; }
   .omitem[disabled]:hover { background: none; }
   .omitem small { color: var(--dim); font-size: 10px; }
+
+  /* workspace switcher */
+  .org .nm { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+  .wsname { font: 600 13px var(--read); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wsorg { font: 500 10.5px var(--read); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .omhead { font: 700 9.5px var(--read); letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); padding: 6px 9px 4px; }
+  .omitem { gap: 8px; }
+  .omname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .omitem .av.sm {
+    width: 20px; height: 20px; border-radius: 6px; flex: none;
+    background: linear-gradient(135deg, var(--mint), var(--sky));
+    display: grid; place-items: center; font: 700 9px var(--read); color: var(--ink);
+  }
+  .av.sm.plus { background: var(--line); color: var(--ink); font-size: 13px; }
+  .omempty { padding: 8px 9px; font: 500 12px var(--read); color: var(--dim); }
+  .omnew { display: flex; gap: 6px; padding: 4px; }
+  .omnew input {
+    flex: 1; min-width: 0; font: 500 13px var(--read); padding: 7px 9px;
+    border: 1px solid var(--stroke); border-radius: 7px; background: var(--card); color: var(--ink); outline: none;
+  }
+  .omadd { flex: none; padding: 7px 11px; border: none; border-radius: 7px; background: var(--ink); color: var(--paper); font: 600 12px var(--read); cursor: pointer; }
 </style>

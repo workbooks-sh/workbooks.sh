@@ -172,6 +172,29 @@ export async function listBuckets(opts = {}) {
   }
 }
 
+// ── Workspaces — FREE, named divisions within the org (Org → Nexus → Workspaces) ──
+
+/** @returns {Promise<Array<{id,name,nexus_id,created}>>} */
+export async function listWorkspaces(opts = {}) {
+  try {
+    return (await plat('/workspaces', { fetch: opts.fetch })).workspaces;
+  } catch {
+    return [];
+  }
+}
+
+export async function createWorkspace(name, opts = {}) {
+  return plat('/workspaces', { method: 'POST', body: { name, nexus_id: opts.nexus_id } });
+}
+
+export async function renameWorkspace(id, name) {
+  return plat(`/workspaces/${id}`, { method: 'PATCH', body: { name } });
+}
+
+export async function deleteWorkspace(id) {
+  return plat(`/workspaces/${id}`, { method: 'DELETE' });
+}
+
 // ── History + Restore ────────────────────────────────────────────────────────
 // "Nothing is lost — restore anything." A reverse-chron list of Changes, each a
 // before → after, restorable append-only. Mirrors the runtime endpoints:
