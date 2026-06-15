@@ -111,6 +111,8 @@
     background:
       radial-gradient(120% 120% at 50% -20%, color-mix(in srgb, var(--mint) 22%, #fbfaf6), #fbfaf6 60%);
   }
+  /* absolute so the blobs DON'T take a grid row (which pushed the card off-center) */
+  .ob-blobs { position:absolute; inset:0; pointer-events:none; }
   .ob-blobs span {
     position:absolute; width:42vw; height:42vw; max-width:560px; max-height:560px; border-radius:50%;
     background:var(--c); filter:blur(80px); opacity:.55;
