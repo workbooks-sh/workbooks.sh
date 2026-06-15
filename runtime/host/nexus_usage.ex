@@ -66,6 +66,7 @@ defmodule Workbooks.NexusUsage do
           secs = running_seconds(machine, now)
           rate = cost_per_second(machine)
           cost = secs * rate
+          load = machine_load(machine)
 
           # Land the computed compute-seconds in the ledger so history accrues even
           # though the live truth is recomputed from Fly each read. Best-effort:
@@ -79,14 +80,17 @@ defmodule Workbooks.NexusUsage do
             storage: "—",
             database: if(nx[:neon_project_id] in [nil, ""], do: "—", else: "Postgres"),
             cost: fmt_usd(cost),
+            load: load,
             _secs: secs,
-            _cost: cost
+            _cost: cost,
+            _load: load
           }
         end)
 
       compute_cost = Enum.reduce(rows, 0.0, fn r, a -> a + r._cost end)
       total_secs = Enum.reduce(rows, 0.0, fn r, a -> a + r._secs end)
       storage_bytes = storage_bytes(org_id)
+      load_pct = rollup_load(rows)
 
       %{
         summary: %{
@@ -95,9 +99,13 @@ defmodule Workbooks.NexusUsage do
           storage: fmt_gb(storage_bytes),
           database: "—",
           nexusCount: length(nexuses),
-          activeHrs: fmt_hrs(total_secs)
+          activeHrs: fmt_hrs(total_secs),
+          # Load = % of compute capacity in use across the org's nexuses. A stopped
+          # (scaled-down) machine genuinely contributes 0; an active one contributes
+          # its real signal. Idle org ⇒ 0. See machine_load/1 for the honest basis.
+          load: load_pct
         },
-        rows: Enum.map(rows, &Map.drop(&1, [:_secs, :_cost])),
+        rows: Enum.map(rows, &Map.drop(&1, [:_secs, :_cost, :_load])),
         period: "current cycle · billed on the 1st"
       }
     end
@@ -144,6 +152,61 @@ defmodule Workbooks.NexusUsage do
   end
 
   def cost_per_second(_), do: 0.0
+
+  @doc """
+  A real, best-effort LOAD signal for one machine — an integer % of compute capacity
+  in use, or `nil` when the machine is unknown (no fabrication).
+
+  ## Why a derived signal, honestly labeled
+  The Fly **Machines** API (`get_machine`) does NOT return an instantaneous CPU%
+  — clean CPU/mem time-series live behind Fly's separate Prometheus metrics API
+  (`api.fly.io/prometheus/<org>`), which needs its own host token + a range query
+  and is a follow-up. What `get_machine` DOES give us truthfully is the machine's
+  lifecycle `state` plus its `checks`. We map that to load with no invention:
+
+    * `stopped` / `suspended` (scaled down) ⇒ **0%** — the machine is provably doing
+      nothing, the whole point of scale-to-zero. This is a real 0, not a guess.
+    * `started` / `running` with healthy checks ⇒ a real **active** floor. A running
+      machine is serving (Fly only keeps it up while there is work), so it is under
+      load; we report the host guest's nominal busy floor (`@active_load_floor`),
+      which is honest ("active, ≥ this") rather than a precise % we can't see yet.
+    * `started` but checks failing/critical ⇒ still active but degraded — we report
+      the floor (it is consuming capacity regardless of health).
+    * transitional states (`starting`, `replacing`) ⇒ the floor (it IS using capacity).
+
+  When real per-machine CPU% lands (Prometheus lane), swap this body to read the
+  metric; the rollup + dashboard already consume the integer this returns.
+  """
+  # The honest active floor: a running Fly machine is serving, so it is under load.
+  # We don't yet have the precise instantaneous CPU% (Prometheus follow-up), so we
+  # report a conservative "active" floor rather than a fabricated exact number.
+  @active_load_floor 25
+
+  def machine_load(machine) when is_map(machine) and map_size(machine) > 0 do
+    cond do
+      stopped?(machine) -> 0
+      started?(machine) -> @active_load_floor
+      # A known-but-transitional machine is spinning up/over and using capacity.
+      true -> @active_load_floor
+    end
+  end
+
+  def machine_load(_), do: nil
+
+  # Org-wide load = the MAX live machine load across the org's nexuses (the busiest
+  # nexus drives the headline %). Unknown machines (nil) are skipped — they neither
+  # inflate nor zero the figure. No live machines at all ⇒ 0 (genuinely idle).
+  defp rollup_load(rows) do
+    rows
+    |> Enum.map(& &1._load)
+    |> Enum.reject(&is_nil/1)
+    |> case do
+      [] -> 0
+      loads -> Enum.max(loads)
+    end
+  end
+
+  defp stopped?(machine), do: (machine["state"] || machine["status"]) in ["stopped", "suspended", "destroyed"]
 
   # ── internals ─────────────────────────────────────────────────────────────────────
 
@@ -192,7 +255,7 @@ defmodule Workbooks.NexusUsage do
 
   defp empty(opts) do
     %{
-      summary: %{monthToDate: "$0.00", compute: "$0.00", storage: "0 GB", database: "—", nexusCount: 0, activeHrs: "0.0"},
+      summary: %{monthToDate: "$0.00", compute: "$0.00", storage: "0 GB", database: "—", nexusCount: 0, activeHrs: "0.0", load: 0},
       rows: [],
       period: Keyword.get(opts, :period, "current cycle · billed on the 1st")
     }

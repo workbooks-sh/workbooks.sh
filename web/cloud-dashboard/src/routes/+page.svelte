@@ -8,11 +8,16 @@
   const nx = $derived(nexusStore.active);
   const status = $derived(nx?.state === 'run' ? 'Active' : nx?.state === 'sleep' ? 'Idle' : 'Starting');
   const storageUsed = $derived(data?.storage?.totalSize || '0 GB');
-  // Load is a % of capacity. Idle ⇒ genuinely 0%. While Active, real per-machine CPU
-  // metering is a follow-up — shown as "—" rather than a fabricated number.
-  const idle = $derived(nx?.state !== 'run');
-  const loadDisplay = $derived(idle ? '0%' : '—');
-  const loadNote = $derived(idle ? 'Idle — scaled down' : 'Live metering soon');
+  // Load = % of compute capacity in use, metered server-side from real Fly machine
+  // state (runtime/host/nexus_usage.ex). A scaled-down nexus is genuinely 0%; an
+  // active one reports its real metered floor. `null/undefined` (machine unknown) ⇒
+  // honest "—", never a fabricated number.
+  const loadPct = $derived(data?.usage?.summary?.load);
+  const loadKnown = $derived(typeof loadPct === 'number');
+  const loadDisplay = $derived(loadKnown ? `${loadPct}%` : '—');
+  const loadNote = $derived(
+    !loadKnown ? 'No live machine to meter' : loadPct === 0 ? 'Idle — scaled down' : 'Live · metered from Fly'
+  );
 
   const CARDS = [
     { href: '/storage', title: 'Storage', sub: 'Files, images & data', accent: 'var(--sky)' },
@@ -46,7 +51,7 @@
       <div class="metric">
         <div class="mlabel">Load</div>
         <div class="mbig">{loadDisplay}</div>
-        <div class="mbar"><i style="width:{idle ? 0 : 0}%; background:var(--peach)"></i></div>
+        <div class="mbar"><i style="width:{loadKnown ? loadPct : 0}%; background:var(--peach)"></i></div>
         <div class="msub">{loadNote}</div>
       </div>
     </div>

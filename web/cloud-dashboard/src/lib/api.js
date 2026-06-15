@@ -151,7 +151,8 @@ export async function sleepNexus(id) {
 }
 
 const EMPTY_USAGE = {
-  summary: { monthToDate: '$0.00', compute: '$0.00', storage: '0 GB', database: '—', nexusCount: 0, activeHrs: '0.0' },
+  // `load` = % of compute capacity in use across the org's nexuses (idle ⇒ 0).
+  summary: { monthToDate: '$0.00', compute: '$0.00', storage: '0 GB', database: '—', nexusCount: 0, activeHrs: '0.0', load: 0 },
   period: 'current cycle · billed on the 1st',
   rows: []
 };
