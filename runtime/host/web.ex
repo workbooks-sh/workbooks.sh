@@ -1866,7 +1866,7 @@ defmodule Workbooks.Web do
 
     %{
       id: nx[:id],
-      name: nx[:id],
+      name: nx[:name] || nx[:id],
       region: nx[:region] || "",
       plan: nx[:plan] || "starter",
       state: map_state(nx[:state]),
@@ -1879,11 +1879,11 @@ defmodule Workbooks.Web do
   defp map_state("stopped"), do: "sleep"
   defp map_state(_), do: "build"
 
-  # Only region/plan are accepted from the body; the org, secrets, image and Fly org
-  # are all pinned server-side in the provisioner — never caller input.
+  # Only name/region/plan are accepted from the body; the org, secrets, image and Fly
+  # org are all pinned server-side in the provisioner — never caller input.
   defp provision_opts(body) do
     case Jason.decode(body) do
-      {:ok, %{} = m} -> [] |> put_opt(:region, m["region"]) |> put_opt(:plan, m["plan"])
+      {:ok, %{} = m} -> [] |> put_opt(:name, m["name"]) |> put_opt(:region, m["region"]) |> put_opt(:plan, m["plan"])
       _ -> []
     end
   end

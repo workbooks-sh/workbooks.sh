@@ -79,6 +79,8 @@ defmodule Workbooks.NexusProvisioner do
         # predict or collide org A's app name.
         nexus_id = "nx-" <> rand_token(12)
         fly_app = "nexus-" <> nexus_id
+        # Friendly display name (what the user typed); the id stays the routing key.
+        name = clean_name(Keyword.get(opts, :name)) || nexus_id
 
         # Per-nexus secrets — minted fresh, isolated, never shared.
         bearer = rand_secret()
@@ -93,6 +95,7 @@ defmodule Workbooks.NexusProvisioner do
           attrs = %{
             id: nexus_id,
             org_id: org_id,
+            name: name,
             fly_app: fly_app,
             fly_machine: machine_id,
             region: region,
@@ -239,6 +242,15 @@ defmodule Workbooks.NexusProvisioner do
   # Hex keeps it to [a-z0-9] so it is always a valid Fly app-name segment.
   defp rand_token(bytes),
     do: bytes |> :crypto.strong_rand_bytes() |> Base.encode16(case: :lower)
+
+  # A friendly display name: trimmed, control-chars stripped, capped. nil/blank → nil
+  # so the caller falls back to the nexus id.
+  defp clean_name(name) when is_binary(name) do
+    cleaned = name |> String.replace(~r/[\x00-\x1f\x7f]/, "") |> String.trim() |> String.slice(0, 60)
+    if cleaned == "", do: nil, else: cleaned
+  end
+
+  defp clean_name(_), do: nil
 
   defp blank?(nil), do: true
   defp blank?(""), do: true
