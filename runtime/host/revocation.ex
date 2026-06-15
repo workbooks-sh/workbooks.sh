@@ -15,9 +15,31 @@ defmodule Workbooks.Revocation do
   """
   @table :wb_revoked
 
-  def revoke(principal), do: :ets.insert(table(), {principal, true}) && :ok
+  def revoke(principal) do
+    :ets.insert(table(), {principal, true})
+    # PRINCIPAL-LEVEL kill-switch: flipping the ETS flag denies the principal's NEXT brokered op, but an
+    # already-in-flight STREAMING child (a long-lived HarnessProc held across loopback drains) would keep
+    # running until its next request. Kill every live streaming child of this principal NOW so a revoked
+    # principal's live streams die mid-flight, not just on the next call. Best-effort + decoupled: the
+    # loopback owns the proc registry; we reach it by runtime dispatch so this low-level module carries no
+    # compile-time dependency on it, and a missing/not-started loopback is a no-op (nothing to kill).
+    kill_streaming_children(principal)
+    :ok
+  end
+
   def unrevoke(principal), do: :ets.delete(table(), principal) && :ok
   def revoked?(principal), do: :ets.member(table(), principal)
+
+  defp kill_streaming_children(principal) do
+    if Code.ensure_loaded?(Workbooks.ExecLoopback) and
+         function_exported?(Workbooks.ExecLoopback, :kill_procs_for_principal, 1) do
+      Workbooks.ExecLoopback.kill_procs_for_principal(principal)
+    end
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
+  end
 
   defp table, do: Workbooks.BrokerTables.ensure(@table, [:named_table, :public, :set])
 end

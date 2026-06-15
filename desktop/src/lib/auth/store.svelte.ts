@@ -32,14 +32,17 @@ import {
 
 export type AuthStatus =
   | "checking"          // probe in flight
-  | "sidecar-offline"   // Tauri bridge / Workhorse not reachable
-  | "signed-out"        // sidecar OK, no Workbooks session
-  | "signed-in";        // sidecar OK + session cookie valid
+  | "sidecar-offline"   // Tauri bridge / Workhorse not reachable (no session either)
+  | "signed-out"        // no Workbooks session
+  | "signed-in";        // valid keychain session
 
 export interface AuthUser {
   /** WorkOS sub (or magic-link user id) — opaque identifier. */
   sub: string;
   email: string;
+  /** WorkOS organization the session belongs to. Null for personal
+   *  (no-org) sessions. Surfaced for org-provisioned features (keys). */
+  organizationId: string | null;
   /** Display name from the user record, when present. */
   displayName: string | null;
   /** Profile picture URL — absolute (WorkOS-hosted) or
@@ -58,8 +61,14 @@ function envOverride(key: string): string | undefined {
 class AuthStore {
   status = $state<AuthStatus>("checking");
   user = $state<AuthUser | null>(null);
-  /** Bound identity from Workhorse — null until the user mints one. */
+  /** Bound identity from Workhorse — null until the user mints one, OR
+   *  null whenever the sidecar is offline (identity needs the daemon). */
   identity = $state<IdentityView | null>(null);
+  /** Engine/sidecar reachability — decoupled from auth. The keychain
+   *  session determines signed-in/out REGARDLESS of this flag
+   *  (offline-first boot canon: the engine shows in the titlebar, it is
+   *  never an auth gate). True only when the sidecar probe failed. */
+  sidecarOffline = $state(false);
   /** Last init/refresh error (if any), for surfacing in overlays. */
   lastError = $state<string | null>(null);
 
@@ -73,28 +82,35 @@ class AuthStore {
     await this.refresh();
   }
 
-  /** Probe sidecar + read any keychain-stored session. Idempotent. */
+  /** Probe sidecar + read any keychain-stored session. Idempotent.
+   *
+   *  Offline-first: the keychain SESSION read is what determines
+   *  signed-in/out, and it runs REGARDLESS of whether the sidecar is
+   *  reachable. The Workhorse `identity` does need the sidecar, so it
+   *  becomes null (and `sidecarOffline` flips true) when the daemon is
+   *  down — but a user with a stored session is still "signed-in". This
+   *  is the offline-first boot canon: the engine state belongs in the
+   *  titlebar chip, never as an auth gate. */
   async refresh(): Promise<void> {
     this.status = "checking";
     this.lastError = null;
 
-    // 1. Sidecar probe — loadIdentity hits a Tauri command.
-    let identity: IdentityView | null = null;
+    // 1. Sidecar probe — best-effort. Failure does NOT gate auth; it
+    //    only nulls the bound identity and raises the engine-offline
+    //    flag (surfaced in the titlebar engine chip / Sidebar — never a
+    //    blocking overlay; mandatory sign-in is the only hard gate).
     try {
-      identity = await loadIdentity();
-    } catch (e) {
-      this.status = "sidecar-offline";
-      this.lastError = e instanceof Error ? e.message : String(e);
+      this.identity = await loadIdentity();
+      this.sidecarOffline = false;
+    } catch {
       this.identity = null;
-      this.user = null;
-      return;
+      this.sidecarOffline = true;
     }
-    this.identity = identity;
 
-    // 2. Session probe — read the keychain. The desktop owns its
-    //    own bearer token (loopback+PKCE flow); no cross-origin cookie
-    //    fetch involved. If the keychain entry exists the user is
-    //    signed in until they explicitly sign out.
+    // 2. Session probe — read the keychain. The desktop owns its own
+    //    bearer token (loopback+PKCE flow); no daemon involved. If the
+    //    keychain entry exists the user is signed in until they sign
+    //    out — even with the engine offline.
     try {
       const session = await loadStoredSession();
       if (session) {
@@ -143,6 +159,7 @@ class AuthStore {
     this.user = {
       sub: session.sub,
       email: session.email,
+      organizationId: session.organization_id ?? null,
       displayName: session.display_name ?? null,
       picture: this.#resolvePicture(session.picture_url ?? null),
     };

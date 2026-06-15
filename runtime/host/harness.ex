@@ -1,31 +1,60 @@
 defmodule Workbooks.Harness do
   @moduledoc """
-  Posture predicate for the in-wasm HARNESS surface (the SLICE-1/2/3 exec + creds + oauth loopback).
+  Posture predicate for the in-wasm HARNESS surface (the SLICE-1/2/3 exec + creds + oauth loopback) — a.k.a.
+  the ACP / in-nexus-agent surface.
 
-  FIX 2 (POSTURE GAP — surface ALWAYS-ON): the `Workbooks.ExecLoopback` listener (and the whole exec +
-  subscription-creds + oauth-loopback surface that bottoms out in it) was started UNCONDITIONALLY in
-  `Workbooks.Application`. That surface is a DESKTOP-FIRST primitive — a 127.0.0.1 loopback the local
-  harness fetches, the user's own keychain, the user's own browser. It has NO place in a multi-tenant
-  hosted runtime: there, tenants share a process and the loopback's token table is :public, so an
-  always-on exec broker is an unnecessary blast-radius.
+  EXPERIMENTAL (v2 — NOT production). The entire harness/ACP surface is gated behind `experimental?/0` and is
+  OFF by default in a production release. It is RETAINED in the tree (so it can be developed and reasoned
+  about) but does not go live in production and is not a shipping/published feature. Turning it on is an
+  explicit, deliberate act:
 
-  This is the single source of truth for "is the harness surface permitted?". It is true ONLY when:
-    * the harness is explicitly wanted — `WB_DESKTOP=1` (the packaged desktop) OR `WB_HARNESS=1`
-      (an explicit opt-in for a single-user/dev runtime), AND
-    * the runtime is NOT a multi-tenant hosted posture (`Workbooks.Tenancy.multi?/0`).
+    * production releases (`MIX_ENV=prod`) default it OFF — `enabled?/0` is false even with `WB_DESKTOP=1`,
+      `WB_HARNESS=1`, or a multi-tenant posture, UNLESS `WB_ACP_EXPERIMENTAL=1` is also set;
+    * dev/test default it ON (so the suites + local experimentation exercise it) — `WB_ACP_EXPERIMENTAL=0`
+      force-disables even there;
+    * the multi-tenant cloud-enablement path (`Tenancy.multi?/0`) is likewise OFF in production without the
+      experimental flag — the per-tenant isolation it relies on (`HarnessPool`, verified-tenant binding,
+      `TenantBudget`) stays in code but the surface is not exposed in prod until the v2 review clears.
 
-  `Workbooks.Application` gates the `ExecLoopback` child-spec start on `enabled?/0`, so in a hosted /
-  multi-tenant runtime the loopback is never started → the exec + creds + oauth surface is OFF entirely.
-  The other layers (HarnessCreds :file backend, the loopback routes) consult this too as defense-in-depth.
+  When the experimental flag IS set, the surface is permitted when explicitly wanted — `WB_DESKTOP=1` (the
+  packaged desktop), `WB_HARNESS=1` (single-user/dev or hosted opt-in), OR a multi-tenant hosted posture
+  (`Tenancy.multi?/0`). In multi-tenant, per-tenant isolation — NOT this switch — is the safety:
+    * resident SM instances are pool-capped PER TENANT + globally (`Workbooks.HarnessPool`);
+    * the grant principal + creds_scope are BOUND to the AUTH-VERIFIED tenant, never a caller-supplied id;
+    * exec/LLM aggregate budgets are per-tenant (`Workbooks.TenantBudget`);
+    * the `:file` creds backend stays REFUSED in multi-tenant (keychain/desktop only), and the `:desktop`
+      backend HARD-FAILS rather than pooling into a co-located file when no bridge is present.
+
+  This is the single source of truth for "is the harness/ACP surface permitted?". `Workbooks.Application`
+  gates the `ExecLoopback` child-spec start on `enabled?/0`; the other layers (HarnessCreds backend
+  selection, the loopback routes, the `js_engine` host-call import) consult it as defense-in-depth.
   """
+
+  # EXPERIMENTAL default: OFF in a production release, ON in dev/test. `WB_ACP_EXPERIMENTAL=1|0` overrides
+  # either way. Baked at compile time (same pattern as Workbooks.Browse.Fetch's @allow_test_loopback).
+  @experimental_default Mix.env() != :prod
 
   @doc """
-  True when the in-wasm harness surface (ExecLoopback + creds + oauth) is permitted.
+  True when the in-wasm harness surface (ExecLoopback + creds + oauth + host-call import) is permitted.
 
-  Permitted iff (`WB_DESKTOP=1` or `WB_HARNESS=1`) AND NOT multi-tenant hosted.
+  Requires the EXPERIMENTAL gate (`experimental?/0`) AND that the surface is wanted — explicitly requested
+  (`WB_DESKTOP=1` / `WB_HARNESS=1`) OR multi-tenant hosted (`Tenancy.multi?`). Without the experimental gate
+  the whole surface is OFF, regardless of the other flags — that is the v2/production posture.
   """
   def enabled? do
-    requested?() and not Workbooks.Tenancy.multi?()
+    experimental?() and (requested?() or Workbooks.Tenancy.multi?())
+  end
+
+  @doc """
+  True when the ACP / in-wasm-harness surface is experimentally enabled. OFF in production releases unless
+  `WB_ACP_EXPERIMENTAL=1`; ON in dev/test unless `WB_ACP_EXPERIMENTAL=0`.
+  """
+  def experimental? do
+    case System.get_env("WB_ACP_EXPERIMENTAL") do
+      "1" -> true
+      "0" -> false
+      _ -> @experimental_default
+    end
   end
 
   @doc "True when the harness surface was explicitly requested (desktop or explicit opt-in)."

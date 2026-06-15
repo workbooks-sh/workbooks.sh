@@ -4,6 +4,11 @@
 #+WORKTREE: /Users/shinyobjectz/Apps/workbooks-acpspike
 #+DATE: 2026-06-14
 #+STATUS: GO-WITH-CAVEATS (headless slice) / NO-GO (interactive CLI, near-term)
+#+PRODUCTION_STATUS: EXPERIMENTAL — v2, NOT production. The whole harness/ACP surface is gated behind
+#+  Workbooks.Harness.experimental? (env WB_ACP_EXPERIMENTAL; defaults OFF in MIX_ENV=prod). It is RETAINED
+#+  for development + reasoning, but does NOT ship to production and is NOT a published feature. Owner has
+#+  major security reservations; a dedicated v2 security review is owed before any go-live. Do not present
+#+  this as a shipping capability.
 
 * TL;DR — VERDICT
 

@@ -136,13 +136,15 @@ defmodule Workbooks.Toolkits do
   bodies stay on demand (`wb toolkit show <id> <skill>`), never in the prompt.
   """
   def injection_text(names, root \\ default_root())
-  def injection_text([], _root), do: ""
 
   def injection_text(names, root) do
     tks = discover_dir(root) |> Map.new(&{&1.id, &1})
 
     rows =
-      names
+      # `acp` is connection-aware and injected by Workbooks.Acp (only when the ACP
+      # surface is experimentally enabled), so drop any declared `acp` to avoid a
+      # duplicate static row.
+      (List.wrap(names) -- ["acp"])
       |> Enum.map(fn id ->
         case tks[id] do
           nil ->
@@ -162,15 +164,21 @@ defmodule Workbooks.Toolkits do
         end
       end)
 
-    """
-    ## Toolkits
+    all = rows ++ Workbooks.Acp.injection_rows()
 
-    You have these toolkits. Before using one, read the relevant skill — call the
-    `wb` tool: `toolkit show <id> <skill>` (or `toolkit search <query>` to find one).
+    if all == [] do
+      ""
+    else
+      """
+      ## Toolkits
 
-    #{Enum.join(rows, "\n")}
-    """
-    |> String.trim()
+      You have these toolkits. Before using one, read the relevant skill — call the
+      `wb` tool: `toolkit show <id> <skill>` (or `toolkit search <query>` to find one).
+
+      #{Enum.join(all, "\n")}
+      """
+      |> String.trim()
+    end
   end
 
   @doc "`wb toolkit show <id>` — the manifest front door + the skill index."

@@ -49,6 +49,39 @@ defmodule Workbooks.Web do
     serve_repo_file(conn, "capabilities.json", "application/json")
   end
 
+  # Org-provisioned agent keys (wb-xiei.2). An organization can provision the
+  # OpenRouter / Gemini keys for its members so onboarding doesn't have to ask — the
+  # desktop fetches these on sign-in and applies them locally. Stored per-tenant in
+  # Workbooks.Vars (secret); the tenant is the AUTH-verified WorkOS org (OIDC maps
+  # `org_id` -> tenant). GET = any org member reads its org's keys; POST sets them
+  # (admin-gating is enforced in the dashboard, wb-xiei.4 — this is the storage seam).
+  get "/api/org-secrets" do
+    tenant = conn.assigns.tenant
+
+    keys =
+      for k <- org_secret_keys(),
+          v = Workbooks.Vars.host_secret(tenant, k),
+          is_binary(v) and v != "",
+          into: %{},
+          do: {k, v}
+
+    send_json(conn, 200, %{keys: keys})
+  end
+
+  post "/api/org-secrets" do
+    {:ok, body, conn} = read_body(conn)
+    tenant = conn.assigns.tenant
+    incoming = (Jason.decode!(body)["keys"] || %{})
+
+    set =
+      for {k, v} <- incoming, k in org_secret_keys(), is_binary(v) and v != "" do
+        Workbooks.Vars.set(tenant, k, v, true)
+        k
+      end
+
+    send_json(conn, 200, %{ok: true, set: set})
+  end
+
   # Secret injection (wb-2s09). The desktop holds the user's API keys in the OS
   # keychain; the runtime — especially containerized — can't read that, yet the
   # host-side loaders pull creds from the process ENV (e.g. llm.ex reads
@@ -434,6 +467,62 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(202, json)
   end
 
+  # In-wasm HARNESS session entrypoint (acp-cloud-enable, gaps #1/#2). The PRODUCTION web path that
+  # creates/looks up a resident StarlingMonkey harness session bound to the AUTH-VERIFIED tenant. This is the
+  # binding the audit found MISSING (the surface was pid-driven thesis-only with no request path carrying
+  # identity). Identity is NEVER caller-supplied:
+  #   * `conn.assigns.tenant` is the verified tenant (Workbooks.Auth — in multi-tenant the anon/x-tenant
+  #     fallback is already rejected by the auth plug + Tenancy);
+  #   * `HarnessPool.start_session/2` namespaces the session id by that tenant AND overrides the grant
+  #     principal + creds_scope.user with it, so a caller cannot charge/scope another tenant;
+  #   * the fs workdir is the per-tenant confined scratch (effective_workdir) — never a caller path;
+  #   * the per-tenant resident-instance cap + global ceiling apply (host OOM defense).
+  # Body: {session?, exec?, commands?, creds_provider?}. Returns {session_id, status} | a cap/denied error.
+  post "/api/harness/session" do
+    {:ok, body, conn} = read_body(conn)
+    params = if body == "", do: %{}, else: Jason.decode!(body)
+    tenant = conn.assigns.tenant
+
+    # SANITIZE the caller-supplied session sub-id to a single flat path segment
+    # BEFORE it touches the FS workdir or the namespaced Registry/ETS key. The
+    # caller controls `params["session"]`; left raw it interpolated into both the
+    # run_id (-> path-traversal escape of the per-tenant scratch root) and the
+    # global session key. One sanitize at the boundary closes both.
+    sub = harness_sub(params["session"])
+    workdir = effective_workdir(tenant, "harness-#{sub}", nil)
+
+    # exec is a TRUST grant; honored only for the trusted local case or explicit WB_AGENT_EXEC — never for an
+    # arbitrary multi-tenant caller (same posture as /api/run). The principal is forced to the tenant by the
+    # pool regardless of what the caller passes.
+    exec_allowed? = Workbooks.Desktop.enabled?() or System.get_env("WB_AGENT_EXEC") == "1"
+    want_exec? = params["exec"] == true and exec_allowed?
+
+    exec_grant =
+      [allow: want_exec?, commands: commands_param(params["commands"]), principal: tenant]
+      |> then(fn g ->
+        case params["creds_provider"] do
+          p when is_binary(p) and p != "" -> Keyword.put(g, :creds_scope, %{user: tenant, provider: p})
+          _ -> g
+        end
+      end)
+
+    opts = [session: sub, exec: exec_grant, fs: [workdir: workdir, principal: tenant]]
+
+    case Workbooks.HarnessPool.start_session(tenant, opts) do
+      {:ok, _pid} ->
+        send_json(conn, 202, %{session_id: Workbooks.HarnessPool.namespaced_id(tenant, sub), status: "live"})
+
+      {:error, :tenant_session_cap} ->
+        send_json(conn, 429, %{error: "per-tenant harness session cap reached"})
+
+      {:error, :host_session_cap} ->
+        send_json(conn, 503, %{error: "host harness capacity reached"})
+
+      {:error, reason} ->
+        send_json(conn, 422, %{error: inspect(reason)})
+    end
+  end
+
   # Session list + navigation (wb-kbq5 / wb-t3mr): the desktop browses past
   # conversations here. ?active=true narrows to running. Empty until a chat runs.
   get "/api/sessions" do
@@ -464,7 +553,7 @@ defmodule Workbooks.Web do
   get "/api/oql/query" do
     conn = fetch_query_params(conn)
 
-    case read_workspace_org(conn.query_params["path"]) do
+    case read_workspace_org(conn.assigns.tenant, conn.query_params["path"]) do
       {:ok, org} ->
         headlines = Workbooks.OQL.parse_headlines(org)
         conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{headlines: headlines, parse_warnings: []}))
@@ -484,13 +573,19 @@ defmodule Workbooks.Web do
     op = params["op"]
     args = Map.drop(params, ["path", "op"])
 
+    # Resolve the confined abs path ONCE and use it for both read AND write — an
+    # unconfined File.write(Path.expand(path)) was the arbitrary cross-tenant .org
+    # WRITE vector (wb-u6su).
     result =
-      with {:ok, org} <- read_workspace_org(path),
+      with {:ok, abs} <- confine_workspace_org(Workbooks.Desktop.enabled?(), conn.assigns.tenant, path),
+           true <- File.regular?(abs) || {:error, :enoent},
+           {:ok, org} <- File.read(abs),
            {:ok, new_org} <- Workbooks.OrgEdit.patch(org, id, op, args),
-           :ok <- File.write(Path.expand(path), new_org) do
+           :ok <- File.write(abs, new_org) do
         {200, %{ok: true}}
       else
         {:error, reason} -> {422, %{error: inspect(reason)}}
+        false -> {422, %{error: "enoent"}}
       end
 
     {status, payload} = result
@@ -501,7 +596,7 @@ defmodule Workbooks.Web do
     conn = fetch_query_params(conn)
 
     views =
-      case read_workspace_org(conn.query_params["path"]) do
+      case read_workspace_org(conn.assigns.tenant, conn.query_params["path"]) do
         {:ok, org} -> Workbooks.OQL.parse_headlines(org) |> Enum.map(&headline_to_view/1)
         _ -> []
       end
@@ -572,6 +667,22 @@ defmodule Workbooks.Web do
   defp effective_workdir(tenant, run_id, requested),
     do: confined_workdir(Workbooks.Desktop.enabled?(), tenant, run_id, requested)
 
+  # Normalize a harness-session :commands cap from request params: a list of command names scopes the grant
+  # to those; anything else (incl. absent) => :all (the broker still default-denies past the registry).
+  defp commands_param(list) when is_list(list), do: Enum.map(list, &to_string/1)
+  defp commands_param(_), do: :all
+
+  # The caller-supplied harness session sub-id, reduced to one flat traversal-proof
+  # segment (same charset filter as a path segment). A blank/absent value gets a
+  # fresh host-generated id. This keeps the FS workdir confined AND the namespaced
+  # Registry/ETS key a clean tenant-scoped token.
+  defp harness_sub(requested) do
+    case requested |> to_string() |> String.replace(~r/[^A-Za-z0-9_-]/, "_") do
+      "" -> "h-#{System.unique_integer([:positive])}"
+      s -> s
+    end
+  end
+
   @doc false
   # Pure (testable): desktop-trusted callers keep their requested local path; any
   # other (cloud/shared) caller is confined to a per-tenant scratch root — no
@@ -582,9 +693,25 @@ defmodule Workbooks.Web do
     else
       base = System.get_env("WB_DATA") || System.tmp_dir!()
       # Strip dots too (not just separators) so a tenant like "../../etc" can't
-      # smuggle ".." into the path.
-      safe_tenant = (tenant || "anon") |> to_string() |> String.replace(~r/[^A-Za-z0-9_-]/, "_")
-      Path.join([base, "wb-runs", safe_tenant, run_id])
+      # smuggle ".." into the path. BOTH segments are sanitized: `run_id` is
+      # caller-derived on the harness route (= "harness-" <> caller session), so
+      # an unsanitized `run_id` was a path-traversal escape (e.g.
+      # session "x/../../tenantB" -> /data/wb-runs/<t>/harness-x/../../tenantB).
+      # Sanitizing here confines EVERY caller of confined_workdir, not just the
+      # one route — defense-in-depth so a future caller can't reintroduce it.
+      safe_tenant = safe_segment(tenant, "anon")
+      safe_run_id = safe_segment(run_id, "run")
+      Path.join([base, "wb-runs", safe_tenant, safe_run_id])
+    end
+  end
+
+  # A single, flat, traversal-proof path segment: collapse every char outside
+  # [A-Za-z0-9_-] (separators, dots, NUL, whitespace) to "_", so neither a
+  # tenant nor a caller session id can smuggle "/" or ".." into the FS path.
+  defp safe_segment(value, fallback) do
+    case (value || fallback) |> to_string() |> String.replace(~r/[^A-Za-z0-9_-]/, "_") do
+      "" -> fallback
+      s -> s
     end
   end
 
@@ -1818,27 +1945,48 @@ defmodule Workbooks.Web do
   # Read an absolute workspace org file for the trusted desktop. Guards: must be
   # an absolute path to an existing regular file (no traversal games — it's an
   # absolute path the desktop already resolved from its own workspace folder).
-  defp read_workspace_org(path) when is_binary(path) and path != "" do
-    abs = Path.expand(path)
+  defp read_workspace_org(tenant, path) do
+    with {:ok, abs} <- confine_workspace_org(Workbooks.Desktop.enabled?(), tenant, path) do
+      if File.regular?(abs), do: File.read(abs), else: {:error, :enoent}
+    end
+  end
 
+  @doc false
+  # Resolve a workspace .org path for `tenant` to a confined absolute path (wb-u6su).
+  # Desktop = trusted single-user machine: an absolute local path the desktop already
+  # resolved from its own workspace folder (`..` text still rejected). Cloud/shared =
+  # confined UNDER the tenant's workspace root (`<WB_DATA>/wb-runs/<tenant>`) via the
+  # shared WorkdirConfine spine — a leading "/" is stripped, `..` and symlink-escape
+  # are refused — so an authenticated tenant can never read OR patch another tenant's
+  # (or an arbitrary host) .org file by absolute path. Pure (testable): takes desktop?
+  # as an arg, same shape as confined_workdir/4.
+  def confine_workspace_org(desktop?, tenant, path) when is_binary(path) and path != "" do
     cond do
-      # Reject traversal + non-org targets (wb-g1yo.10): the only legit use is
-      # parsing an Org workbook, so this blocks the arbitrary host-file read
-      # (/etc/*, secrets, dotfiles) that an unconfined ?path= otherwise allowed.
-      String.contains?(path, "..") -> {:error, :badpath}
-      Path.extname(abs) != ".org" -> {:error, :badpath}
-      File.regular?(abs) -> File.read(abs)
-      true -> {:error, :enoent}
+      Path.extname(path) != ".org" ->
+        {:error, :badpath}
+
+      desktop? ->
+        if String.contains?(path, ".."), do: {:error, :badpath}, else: {:ok, Path.expand(path)}
+
+      true ->
+        base = System.get_env("WB_DATA") || System.tmp_dir!()
+        root = Path.expand(Path.join([base, "wb-runs", safe_segment(tenant, "anon")]))
+        Workbooks.WorkdirConfine.confine(root, path)
     end
   rescue
     _ -> {:error, :badpath}
   end
 
-  defp read_workspace_org(_), do: {:error, :nopath}
+  def confine_workspace_org(_desktop?, _tenant, _path), do: {:error, :nopath}
 
   defp send_json(conn, status, payload) do
     conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
   end
+
+  # The agent keys an org may provision for its members (wb-xiei.2). Allowlisted so
+  # GET /api/org-secrets can never exfiltrate arbitrary tenant vars and POST can't
+  # write outside this set.
+  defp org_secret_keys, do: ~w(OPENROUTER_API_KEY GEMINI_API_KEY)
 
   # Map a parsed headline (a board-views file entry) to a desktop BoardView.
   defp headline_to_view(h) do

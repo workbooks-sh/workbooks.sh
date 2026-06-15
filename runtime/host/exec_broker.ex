@@ -51,6 +51,13 @@ defmodule Workbooks.ExecBroker do
         deny(name, "rate limited")
         {:error, :rate_limited}
 
+      # PER-TENANT AGGREGATE BUDGET (cloud-enable gap #5): beyond instantaneous rate/concurrency, a tenant's
+      # SUSTAINED brokered-exec cost is capped per window. No-op single-tenant/nil-principal; fail-closed in
+      # multi-tenant once the window ceiling is breached.
+      principal && budget_denied?(principal) ->
+        deny(name, "tenant exec budget exceeded")
+        {:error, :budget_exceeded}
+
       not allow ->
         deny(name, "not granted (no commands cap)")
         {:error, :denied}
@@ -93,6 +100,88 @@ defmodule Workbooks.ExecBroker do
   end
 
   @doc """
+  STREAMING spawn (wb-b9xv.11) — start a LONG-LIVED `Workbooks.HarnessProc` for a registered wasm CLI,
+  returning `{:ok, proc_pid}` | `{:error, reason}`. The child streams stdout/stderr incrementally, takes
+  stdin writes, and propagates its exit code; it is killed if the principal is revoked.
+
+  This runs the EXACT SAME default-deny / registered-only / command-scope / depth / concurrency / revocation
+  gate as `exec/4` — the only difference is the work is a long-lived streaming child rather than a buffered
+  one-shot. The per-principal concurrency slot is acquired HERE and held for the child's whole lifetime
+  (released by HarnessProc on exit), so a streaming child counts against the fork-bomb width cap identically.
+  NO native exec: the child is a sha-pinned registered wasm guest run by wasmtime (same substrate as `exec`).
+  """
+  def spawn_stream(name, argv, opts \\ [])
+      when is_binary(name) and is_list(argv) do
+    allow = Keyword.get(opts, :allow, false)
+    commands = Keyword.get(opts, :commands, :all)
+    depth = Keyword.get(opts, :depth, 0)
+    principal = Keyword.get(opts, :principal)
+    rate = Keyword.get(opts, :rate, Workbooks.RateLimiter.default_quota())
+
+    cond do
+      principal && Workbooks.Revocation.revoked?(principal) ->
+        deny(name, "principal revoked")
+        {:error, :revoked}
+
+      principal && rate && rate_denied?(principal, rate) ->
+        deny(name, "rate limited")
+        {:error, :rate_limited}
+
+      principal && budget_denied?(principal) ->
+        deny(name, "tenant exec budget exceeded")
+        {:error, :budget_exceeded}
+
+      not allow ->
+        deny(name, "not granted (no commands cap)")
+        {:error, :denied}
+
+      depth > @max_depth ->
+        deny(name, "nesting depth exceeded")
+        {:error, :max_depth}
+
+      commands != :all and name not in commands ->
+        deny(name, "not in the granted command list")
+        {:error, :command_not_granted}
+
+      name not in CommandRegistry.list() ->
+        deny(name, "unknown/unregistered command")
+        {:error, :unknown_command}
+
+      true ->
+        case CommandRegistry.resolve_wasm(name) do
+          {:ok, wasm, run_argv, dirs, run_opts} ->
+            max_conc = Keyword.get(opts, :max_concurrent, @max_concurrent_exec)
+
+            if acquire_slot(principal, max_conc) do
+              proc_opts = [
+                wasm: wasm,
+                argv: run_argv ++ Enum.map(argv, &to_string/1),
+                dirs: dirs,
+                run_opts: Keyword.put(run_opts, :depth, depth + 1),
+                principal: principal,
+                on_release: fn -> release_slot(principal) end
+              ]
+
+              case Workbooks.HarnessProc.start_link(proc_opts) do
+                {:ok, proc} ->
+                  {:ok, proc}
+
+                other ->
+                  release_slot(principal)
+                  {:error, {:spawn_failed, other}}
+              end
+            else
+              deny(name, "concurrent-exec cap exceeded")
+              {:error, :too_many_processes}
+            end
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+    end
+  end
+
+  @doc """
   Parse the wire request a guest writes into wasm memory for `host_exec`. Length-prefixed, little-endian
   (wasm32 is LE), so binary args/stdin are safe (no delimiter ambiguity):
 
@@ -125,6 +214,11 @@ defmodule Workbooks.ExecBroker do
 
   defp rate_denied?(principal, {max, window}),
     do: Workbooks.RateLimiter.check(principal, max, window) == {:error, :rate_limited}
+
+  # per-tenant aggregate exec budget (cloud-enable gap #5): charge one cost unit for this brokered exec and
+  # deny when the tenant's rolling-window ceiling is breached. No-op single-tenant / nil-principal.
+  defp budget_denied?(principal),
+    do: Workbooks.TenantBudget.charge(principal, :exec, 1) == {:error, :budget_exceeded}
 
   # concurrent-exec slot: bump the principal's live count; if it exceeds the cap, roll back and refuse. nil
   # principal (host-internal calls) is uncapped. Atomic via :ets.update_counter on the long-lived table.

@@ -36,7 +36,27 @@ function routeUrl(route) {
   return base.replace(/\/__wb\/exec$/, "/__wb/" + route);
 }
 
+// route (…/creds/get|creds/put|oauth/loopback) -> the host-import op id.
+function opFor(route) {
+  if (route === "creds/get") return "creds.get";
+  if (route === "creds/put") return "creds.put";
+  if (route === "oauth/loopback") return "oauth.loopback";
+  return route;
+}
+
+// KEYSTONE: prefer the SYNCHRONOUS host-import. The callers below treat the result like a fetch Response
+// ({ok, status, json()}), so the import branch returns a Response-shaped adapter over the {ok,…} envelope.
+// No wasi:http future -> a resident harness can do creds/oauth ops across turns with no recycle. Falls back
+// to the fetch loopback on a legacy eval-host.
 function post(route, body) {
+  if (typeof globalThis !== "undefined" && typeof globalThis.__wbHostCall === "function") {
+    var req = Object.assign({ op: opFor(route) }, body || {});
+    var raw = globalThis.__wbHostCall(JSON.stringify(req));
+    var j = null; try { j = JSON.parse(raw); } catch (_) {}
+    var okFlag = !!(j && j.ok === true);
+    var status = okFlag ? 200 : ((j && j.status) || 403);
+    return Promise.resolve({ ok: okFlag, status: status, json: function () { return Promise.resolve(j || {}); } });
+  }
   var c = seam();
   return fetch(routeUrl(route), {
     method: "POST",
