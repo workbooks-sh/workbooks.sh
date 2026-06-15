@@ -4,8 +4,11 @@
 # Deploy:  fly deploy        (the single credentialed step — Shane's Fly account)
 # Volume:  fly volumes create workbooks_data --size 10
 # Secrets: fly secrets set OPENROUTER_API_KEY=...  (agents — POST /api/run) \
+#            INWORLD_API_KEY=...   (voice agent TTS — /api/voice, wb-091n; base64 client:secret) \
 #            WB_AUTH_SECRET=... WB_JWKS_URL=... \
 #            LITESTREAM_REPLICA_URL=s3://bucket/path AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
+# Voice brain (optional): WB_VOICE_BRAIN_MODEL=<fast model> tunes the spoken-reply
+#   LLM for low TTFT; falls back to the default LLM model when unset.
 # Agents: once OPENROUTER_API_KEY is set, `POST /api/run {system,task}` runs a
 # long-horizon agent in the deployed engine, identical to local; GET /api/run/:id
 # polls status + the observable events.org. The jq/grep wasm commands are baked in.

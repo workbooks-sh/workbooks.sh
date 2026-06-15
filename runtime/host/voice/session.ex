@@ -54,7 +54,10 @@ defmodule Workbooks.Voice.Session do
         Enum.map(history, &Map.take(&1, [:role, :content])) ++
         [%{role: "user", content: user_text}]
 
-    result = Workbooks.Llm.complete(messages, on_delta: on_delta, model: opts[:model])
+    # The voice brain wants low TTFT over raw smarts; WB_VOICE_BRAIN_MODEL lets a
+    # deploy point it at a fast provider without touching the code lane (mercury-2).
+    model = opts[:model] || System.get_env("WB_VOICE_BRAIN_MODEL")
+    result = Workbooks.Llm.complete(messages, on_delta: on_delta, model: model)
 
     # Flush whatever sentence fragment is left, then close the worker.
     case Agent.get(buf, & &1) |> String.trim() do
