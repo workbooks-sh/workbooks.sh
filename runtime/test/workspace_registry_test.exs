@@ -58,6 +58,23 @@ defmodule Workbooks.WorkspaceRegistryTest do
     assert length(WR.list("org-a", h)) == 1
   end
 
+  test "icon: create with an emoji, update it, clear it", %{h: h} do
+    {:ok, ws} = WR.create("org-a", "Design", [icon: "🎨"], h)
+    assert ws.icon == "🎨"
+    assert {:ok, %{icon: "🚀"}} = WR.update(ws.id, "org-a", %{icon: "🚀"}, h)
+    # updating just the icon must NOT blank the name
+    assert {:ok, %{name: "Design", icon: "🚀"}} = WR.get(ws.id, "org-a", h)
+    # updating just the name must NOT blank the icon
+    assert {:ok, %{name: "Design Lab", icon: "🚀"}} = WR.update(ws.id, "org-a", %{name: "Design Lab"}, h)
+    # empty icon clears it → render initials
+    assert {:ok, %{icon: ""}} = WR.update(ws.id, "org-a", %{icon: ""}, h)
+  end
+
+  test "update is ownership-gated", %{h: h} do
+    {:ok, ws} = WR.create("org-a", "Mine", [], h)
+    assert {:error, :not_found} = WR.update(ws.id, "org-b", %{icon: "😈"}, h)
+  end
+
   test "fails closed on blank org + empty name", %{h: h} do
     assert {:error, :no_org} = WR.create("", "X", [], h)
     assert {:error, :invalid_name} = WR.create("org-a", "   ", [], h)

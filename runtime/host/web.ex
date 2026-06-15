@@ -331,9 +331,9 @@ defmodule Workbooks.Web do
   post "/api/platform/workspaces" do
     org = conn.assigns[:tenant]
     {:ok, body, conn} = read_body(conn)
-    {name, nexus_id} = workspace_params(body)
+    %{name: name, icon: icon, nexus_id: nexus_id} = workspace_params(body)
 
-    case Workbooks.WorkspaceRegistry.create(org, name, nexus_id: nexus_id) do
+    case Workbooks.WorkspaceRegistry.create(org, name, icon: icon, nexus_id: nexus_id) do
       {:ok, ws} -> j(conn, 201, ws)
       {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
     end
@@ -342,9 +342,13 @@ defmodule Workbooks.Web do
   patch "/api/platform/workspaces/:id" do
     org = conn.assigns[:tenant]
     {:ok, body, conn} = read_body(conn)
-    {name, _} = workspace_params(body)
+    # Only the keys the caller included — PATCHing just the icon must not blank the name.
+    attrs = case Jason.decode(body) do
+      {:ok, %{} = m} -> Map.take(m, ["name", "icon"])
+      _ -> %{}
+    end
 
-    case Workbooks.WorkspaceRegistry.rename(conn.params["id"], org, name) do
+    case Workbooks.WorkspaceRegistry.update(conn.params["id"], org, attrs) do
       {:ok, ws} -> j(conn, 200, ws)
       {:error, :not_found} -> j(conn, 404, %{error: "not found"})
       {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
@@ -1887,12 +1891,12 @@ defmodule Workbooks.Web do
   defp put_opt(opts, _k, v) when v in [nil, ""], do: opts
   defp put_opt(opts, k, v), do: Keyword.put(opts, k, v)
 
-  # Workspace create/rename body → {name, nexus_id}. Only these two fields are read;
+  # Workspace create body → %{name, icon, nexus_id}. Only these fields are read;
   # the org comes from the tenant, never the body.
   defp workspace_params(body) do
     case Jason.decode(body) do
-      {:ok, %{} = m} -> {m["name"], blank_to_nil(m["nexus_id"])}
-      _ -> {nil, nil}
+      {:ok, %{} = m} -> %{name: m["name"], icon: m["icon"], nexus_id: blank_to_nil(m["nexus_id"])}
+      _ -> %{name: nil, icon: nil, nexus_id: nil}
     end
   end
 

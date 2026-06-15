@@ -18,7 +18,7 @@ defmodule Workbooks.WorkspaceRegistry do
   alias Workbooks.DB
 
   @table "workspaces"
-  @cols ~w(id org_id name nexus_id created)
+  @cols ~w(id org_id name icon nexus_id created)
 
   @doc "Open the store and ensure the table exists (idempotent). Returns a DB handle."
   def open do
@@ -29,10 +29,21 @@ defmodule Workbooks.WorkspaceRegistry do
       id TEXT PRIMARY KEY,
       org_id TEXT,
       name TEXT,
+      icon TEXT,
       nexus_id TEXT,
       created INTEGER
     )
     """)
+
+    # Migration: a table created before `icon` existed gets the column added.
+    # SQLite/Postgres both support ADD COLUMN; ignore the "already exists" error.
+    try do
+      DB.execute(h, "ALTER TABLE #{@table} ADD COLUMN icon TEXT")
+    rescue
+      _ -> :ok
+    catch
+      _, _ -> :ok
+    end
 
     h
   end
@@ -45,6 +56,7 @@ defmodule Workbooks.WorkspaceRegistry do
   """
   def create(org_id, name, opts \\ [], h \\ nil) do
     name = clean_name(name)
+    icon = clean_icon(opts[:icon])
 
     cond do
       blank?(org_id) -> {:error, :no_org}
@@ -58,11 +70,11 @@ defmodule Workbooks.WorkspaceRegistry do
 
         DB.query(
           h,
-          "INSERT INTO #{@table} (id, org_id, name, nexus_id, created) VALUES (?1, ?2, ?3, ?4, ?5)",
-          [id, org_id, name, nexus_id, created]
+          "INSERT INTO #{@table} (id, org_id, name, icon, nexus_id, created) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+          [id, org_id, name, icon, nexus_id, created]
         )
 
-        {:ok, %{id: id, org_id: org_id, name: name, nexus_id: nexus_id, created: created}}
+        {:ok, %{id: id, org_id: org_id, name: name, icon: icon, nexus_id: nexus_id, created: created}}
     end
   end
 
@@ -101,15 +113,34 @@ defmodule Workbooks.WorkspaceRegistry do
   end
 
   @doc "Rename a workspace, only if `org_id` owns it. Else `{:error, :not_found}`."
-  def rename(id, org_id, name, h \\ nil) do
-    name = clean_name(name)
+  def rename(id, org_id, name, h \\ nil), do: update(id, org_id, %{name: name}, h)
+
+  @doc """
+  Update a workspace's `name` and/or `icon`, SCOPED to `org_id`. Only those two
+  fields are writable; `id`/`org_id`/`created` are immutable. A blank/whitespace
+  name is rejected; an icon is optional (empty clears it → render initials).
+  """
+  def update(id, org_id, attrs, h \\ nil) do
     h = h || open()
+    attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+    has_name = Map.has_key?(attrs, "name")
+    name = if has_name, do: clean_name(attrs["name"]), else: nil
 
     cond do
-      name == "" -> {:error, :invalid_name}
+      has_name and name == "" ->
+        {:error, :invalid_name}
+
       true ->
         with {:ok, _} <- get(id, org_id, h) do
-          DB.query(h, "UPDATE #{@table} SET name = ?1 WHERE id = ?2 AND org_id = ?3", [name, id, org_id])
+          if has_name do
+            DB.query(h, "UPDATE #{@table} SET name = ?1 WHERE id = ?2 AND org_id = ?3", [name, id, org_id])
+          end
+
+          if Map.has_key?(attrs, "icon") do
+            icon = clean_icon(attrs["icon"])
+            DB.query(h, "UPDATE #{@table} SET icon = ?1 WHERE id = ?2 AND org_id = ?3", [icon, id, org_id])
+          end
+
           get(id, org_id, h)
         end
     end
@@ -154,6 +185,18 @@ defmodule Workbooks.WorkspaceRegistry do
     |> String.replace(~r/[\x00-\x1f\x7f]/, "")
     |> String.trim()
     |> String.slice(0, 80)
+  end
+
+  # An icon is a short display glyph (emoji or a couple chars). Strip control chars,
+  # cap length. Empty = render initials. nil → "".
+  defp clean_icon(nil), do: ""
+
+  defp clean_icon(icon) do
+    icon
+    |> to_string()
+    |> String.replace(~r/[\x00-\x1f\x7f]/, "")
+    |> String.trim()
+    |> String.slice(0, 8)
   end
 
   defp rand_token(bytes), do: bytes |> :crypto.strong_rand_bytes() |> Base.encode16(case: :lower)
