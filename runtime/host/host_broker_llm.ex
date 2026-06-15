@@ -95,6 +95,15 @@ defmodule Workbooks.HostBrokerLLM do
   defp live(messages, tools, grant) do
     opts = if is_map(grant) and is_binary(grant[:model]), do: [model: grant[:model]], else: []
     opts = if tools == [], do: opts, else: Keyword.put(opts, :tools, tools)
+    # FIX 2 (per-tenant LLM key): route this egress with the TENANT's OWN key, not one global
+    # platform key. The grant's `:principal` IS the tenant/session id; `Workbooks.Llm` resolves a
+    # tenant-scoped `OPENROUTER_API_KEY` (Vars secret) from it, falling back to the platform key.
+    # The key stays host-side (this whole call is host-performed — the guest never sees it).
+    opts =
+      case is_map(grant) and grant[:principal] do
+        p when is_binary(p) and p != "" -> Keyword.put(opts, :principal, p)
+        _ -> opts
+      end
 
     case Workbooks.Llm.complete(messages, opts) do
       {:ok, result} -> reshape(result)

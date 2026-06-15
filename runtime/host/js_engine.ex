@@ -102,9 +102,18 @@ defmodule Workbooks.JsEngine do
   HOST-SIDE in the closure, so a guest reaches only exactly the caps its session was granted (no token over
   this seam). This is the transport that DISSOLVES the cross-entry wasi:http re-entry trap — the agent loop's
   llm/fs/exec go through this sync import, completing in-call, so no pollable ever straddles a run() boundary.
+
+  POSTURE GATE (keystone safe:false FIX 1): the exec/fs/creds/oauth/llm ops this seam reaches are the SAME
+  desktop-first surface `Workbooks.Harness.enabled?/0` governs (the loopback is only started in that posture).
+  The sync import bypassed that gate — a minted grant reached those ops directly even in a multi-tenant hosted
+  runtime where the loopback is deliberately absent. So the import is wired with the grant ONLY when the
+  harness surface is permitted; in a forbidden posture (cloud / multi-tenant, or no WB_DESKTOP/WB_HARNESS) the
+  grant is FORCED to nil → every op default-denies, exactly as if the loopback were never started. The import
+  stays LINKED (harmless — instantiation still succeeds) but carries no capability.
   """
   def host_broker_imports(grant) do
-    %{@broker_namespace => %{@broker_func => {:fn, Workbooks.HostBroker.import_fn(grant)}}}
+    effective = if Workbooks.Harness.enabled?(), do: grant, else: nil
+    %{@broker_namespace => %{@broker_func => {:fn, Workbooks.HostBroker.import_fn(effective)}}}
   end
 
   @doc """
