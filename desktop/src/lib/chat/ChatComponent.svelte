@@ -53,6 +53,14 @@
       .map((m) => m.trim())
       .filter(Boolean),
   );
+  // An `:action open` button carries its target path in the body
+  // (`target: /workbooks/Foo.org`). Surface it on the fired event so the
+  // chat surface can open it (chat-left / workbook-right split).
+  const buttonTarget = $derived(
+    type === "button"
+      ? (Object.fromEntries(parseKvBody(body)).target ?? props.target ?? "")
+      : "",
+  );
   let actioned = $state(false);
   const ToneIcon = $derived(
     tone === "warn"
@@ -104,7 +112,7 @@
       type="button"
       class="action-btn"
       class:done={actioned}
-      onclick={() => fire(props.action ?? "button", { label: props.label ?? body })}
+      onclick={() => fire(props.action ?? "button", { label: props.label ?? body, target: buttonTarget })}
     >
       {#if actioned}<CheckCircle weight="fill" size={14} />{:else}<PaperPlaneTilt weight="fill" size={14} />{/if}
       {actioned ? (props.doneLabel ?? "Done") : (props.label ?? body ?? "Run")}

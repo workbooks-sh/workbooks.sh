@@ -10,6 +10,7 @@
    * underneath shows through.
    */
   import { onMount } from "svelte";
+  import { chatBackdrop } from "$lib/home/chatBackdrop.svelte";
 
   let canvas: HTMLCanvasElement;
 
@@ -25,6 +26,7 @@
     uniform float u_cell;   // px per grid cell (device px)
     uniform vec3 u_bg;
     uniform vec4 u_line;    // rgba
+    uniform float u_chat;   // 0 = normal backdrop, 1 = chat-mode inverted vignette
 
     float gridMask(vec2 pos, float cellPx) {
       vec2 g = abs(fract(pos / cellPx - 0.5) - 0.5) * cellPx; // px to nearest line
@@ -54,8 +56,15 @@
 
       vec2 pos = center + rot + warp * amp;
       float mask = gridMask(pos, u_cell);
-      // Faint, and fainter still toward the edges (crisp in the middle).
-      float a = 0.12 * (1.0 - edge * 0.6);
+      // Normal backdrop: faint, fainter toward the edges (crisp in the middle).
+      float aNormal = 0.12 * (1.0 - edge * 0.6);
+      // Chat mode (FIX 3): INVERTED vignette — clear centre, faint grid only at
+      // the edges. r is the normalized radius (0 centre to 1 corner); the grid
+      // ramps in from a clear hole behind the conversation out to the rim.
+      float r = length(d);
+      float ring = smoothstep(0.45, 1.05, r);
+      float aChat = 0.13 * ring;
+      float a = mix(aNormal, aChat, u_chat);
       vec3 col = mix(u_bg, u_line.rgb, a * mask);
       gl_FragColor = vec4(col, 1.0);
     }
@@ -91,7 +100,11 @@
       cell: gl.getUniformLocation(prog, "u_cell"),
       bg: gl.getUniformLocation(prog, "u_bg"),
       line: gl.getUniformLocation(prog, "u_line"),
+      chat: gl.getUniformLocation(prog, "u_chat"),
     };
+    // Eased chat-mode amount — ramps toward chatBackdrop.active so the
+    // vignette inverts in (and back out) smoothly instead of snapping.
+    let chatAmt = 0;
 
     // Resolve theme colours from CSS vars via a 2D canvas (normalises hex/rgb/rgba).
     const probe = document.createElement("canvas").getContext("2d")!;
@@ -147,6 +160,11 @@
       // u_bg on its dark default → a pure-black backdrop in light mode. A
       // cheap periodic re-read guarantees the backdrop always tracks the theme.
       if (ticks++ % 15 === 0) readColors();
+      // Ease toward the chat-mode target (~0.4s in/out at this 30fps cap).
+      const target = chatBackdrop.active ? 1 : 0;
+      chatAmt += (target - chatAmt) * 0.12;
+      if (Math.abs(target - chatAmt) < 0.001) chatAmt = target;
+      gl!.uniform1f(U.chat, chatAmt);
       gl!.uniform1f(U.time, now * 0.001);
       gl!.drawArrays(gl!.TRIANGLES, 0, 3);
     }

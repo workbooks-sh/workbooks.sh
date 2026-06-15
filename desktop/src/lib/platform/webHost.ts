@@ -686,6 +686,26 @@ function makeInvoke(): Invoke {
       case "fs_tree_walk": return { path: a.root ?? "/mock", name: "mock", is_dir: true, children: [] };
       case "fs_dir_read": return [];
       case "fs_read_file": return "";
+
+      // OrgEditor/TextView read documents via read_file_text + file_mtime.
+      // In the browser preview the mock has no disk — but when the dev
+      // runtime override is active (VITE_WB_RUNTIME_URL), the real file the
+      // agent just wrote DOES exist on disk under WB_FS_ALLOW. Serve it
+      // through Vite's /@fs/ static path so an agent-opened workbook renders
+      // its REAL org content in the right split pane (demo FIX 2). On a
+      // shipped web build (no override) this falls back to empty.
+      case "read_file_text": {
+        const p = String(a.path ?? "");
+        if (!p) return "";
+        try {
+          const res = await fetch(`/@fs${p.startsWith("/") ? "" : "/"}${p}`);
+          if (res.ok) return await res.text();
+        } catch {
+          /* fall through to empty — preview without a reachable file */
+        }
+        return "";
+      }
+      case "file_mtime": return Date.now();
       case "fs_write_file": case "fs_create_file": case "fs_mkdir":
       case "fs_rename": case "fs_delete": case "fs_reveal":
       case "fs_watch_start": case "fs_watch_stop": case "config_watch_start": return null;

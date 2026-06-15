@@ -195,7 +195,11 @@ function isRuntimeEnvelope(v: unknown): v is RuntimeEnvelope {
  *  The pure dispatcher in `./tab-command-dispatcher.ts` exists so unit
  *  tests can swap these for spies without booting Phoenix or Svelte. */
 export const tabCommandHandlers: TabCommandHandlers = {
-  open: (path) => tabs.open(path),
+  // Agent-driven open → chat-left / workbook-right split when a foreground
+  // create chat is active (demo FIX 2); ordinary open otherwise. Lazy import
+  // keeps the panes/chrome/home graph out of the bridge's eager chunk.
+  open: (path) =>
+    import("$lib/tabs/agentOpen").then((m) => m.openFromAgent(path)),
   close: (path) => tabs.closeByPath(path),
   focus: (path) => tabs.focusByPath(path),
 };

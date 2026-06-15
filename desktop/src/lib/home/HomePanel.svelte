@@ -28,6 +28,8 @@
   import { dock } from "$lib/bridge/dock.svelte";
   import AssistantMessageView from "$lib/chat/AssistantMessageView.svelte";
   import ArtifactCard from "$lib/chat/ArtifactCard.svelte";
+  import { chatBackdrop } from "./chatBackdrop.svelte";
+  import { onDestroy } from "svelte";
 
   const WALDO_SLUG = "waldo";
 
@@ -62,6 +64,13 @@
   // chatSession store (the same store WaldoPanel uses), so opening the
   // dock panel later shows the identical conversation.
   const inConversation = $derived(chatSession.userEchoes.length > 0 || sending);
+
+  // Invert the background vignette while the page is a thread (FIX 3):
+  // clear centre behind the conversation, faint grid only at the edges.
+  // GridShader (root layout) reads this singleton and eases both ways.
+  $effect(() => {
+    chatBackdrop.active = inConversation;
+  });
 
   type Line = {
     who: "you" | "waldo";
@@ -160,10 +169,28 @@
     }
   }
 
+  // An `:action open` button in an agent reply (or any chat-action with a
+  // target path) opens the workbook chat-left / workbook-right (FIX 2) — the
+  // same split the agent's `wb app open-tab` drives, but user-clickable and
+  // deterministic. Other actions are ignored here.
+  function onChatAction(e: Event) {
+    const detail = (e as CustomEvent).detail as { action?: string; target?: string } | null;
+    if (!detail || detail.action !== "open") return;
+    const target = (detail.target ?? "").trim();
+    if (!target) return;
+    void import("$lib/tabs/agentOpen").then((m) => m.openFromAgent(target));
+  }
+
   onMount(() => {
     chatSession.init();
     void keys.init().catch(() => {});
+    window.addEventListener("wb-chat-action", onChatAction);
     queueMicrotask(() => textareaEl?.focus());
+  });
+  onDestroy(() => {
+    window.removeEventListener("wb-chat-action", onChatAction);
+    // Leaving the create surface must not strand the inverted backdrop.
+    chatBackdrop.active = false;
   });
 
   // Waldo's text brain runs on OpenRouter. Ready runtime + no model key = the
