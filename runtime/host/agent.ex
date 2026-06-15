@@ -19,6 +19,44 @@ defmodule Workbooks.Agent do
   require Logger
   alias Workbooks.{Shell, VFS}
 
+  # ── Context-economy knobs (token cost + quality over long horizons) ──────────
+  # Inference is EXTERNAL (OpenRouter), so memory is NOT the constraint — TOKENS
+  # are. An unbounded `messages ++ [...]` re-sends the WHOLE growing transcript
+  # every turn, so cost grows quadratically in the number of turns and the model
+  # rots on a wall of stale tool dumps. Two defences, both configurable:
+  #
+  #   1. TOOL-OUTPUT TRUNCATION — a single oversized tool result (a 200 KB fetch,
+  #      a huge file dump) would otherwise bloat EVERY later turn. Cap it to
+  #      head+tail with a clear marker before it's appended.
+  #   2. CONTEXT COMPACTION — once the transcript passes a byte threshold, keep
+  #      the system + original task + a sliding window of the most-recent turns
+  #      verbatim, and replace the older middle with one concise rolling summary
+  #      (an LLM condensation that preserves what the agent still needs).
+  #
+  # Defaults are deliberately generous so short runs are untouched; long-horizon
+  # runs (the ones that actually cost) get the savings. All overridable by env so
+  # operators can tune without a redeploy.
+  @tool_output_cap_default 8_000
+  @compact_threshold_default 24_000
+  @compact_keep_recent_default 6
+
+  defp env_int(name, default) do
+    case System.get_env(name) do
+      v when is_binary(v) ->
+        case Integer.parse(v) do
+          {n, _} when n > 0 -> n
+          _ -> default
+        end
+
+      _ ->
+        default
+    end
+  end
+
+  defp tool_output_cap, do: env_int("WB_AGENT_TOOL_OUTPUT_CAP", @tool_output_cap_default)
+  defp compact_threshold, do: env_int("WB_AGENT_COMPACT_THRESHOLD", @compact_threshold_default)
+  defp compact_keep_recent, do: env_int("WB_AGENT_COMPACT_KEEP_RECENT", @compact_keep_recent_default)
+
   # HOST-BROKERED tools — only granted to trusted (exec) agents. These let the
   # keeper agent (Waldo) commit/push and publish to the site WITHOUT any native
   # exec from the agent: the agent calls the TOOL, trusted host Elixir
@@ -170,6 +208,16 @@ defmodule Workbooks.Agent do
       # Set once we've nudged the model for a final answer after a silent
       # dead-stop (empty content + no tool call). Guards against re-nudging.
       summarized: false,
+      # Rolling token accounting — summed from every completion's `usage` so a run
+      # can be costed (and the bench can prove the savings) without external
+      # metering. {prompt, completion, total, turns}.
+      usage_total: %{prompt: 0, completion: 0, total: 0, turns: 0},
+      # Context compaction can be turned off for tasks that must keep the full
+      # verbatim transcript (default on). Tool-output truncation likewise.
+      compact: Keyword.get(opts, :compact, true),
+      truncate_tools: Keyword.get(opts, :truncate_tools, true),
+      # Count of compactions performed this run (telemetry).
+      compactions: 0,
       # The LLM completion fn — injectable so the loop is testable without the
       # network (default is the real Llm.complete/2). Same {messages, opts} shape.
       complete_fn: opts[:complete_fn] || (&Workbooks.Llm.complete/2)
@@ -183,8 +231,14 @@ defmodule Workbooks.Agent do
     do: finish(st, "stopped: reached max_steps (#{max})")
 
   defp loop(messages, st) do
+    # Compact BEFORE the call so the (smaller) transcript is what we send + pay
+    # for. system + original task are always preserved; only the stale middle is
+    # condensed into a rolling summary.
+    {messages, st} = maybe_compact(messages, st)
+
     case st.complete_fn.(messages, model: st.model, tools: tools(st), on_delta: st.on_delta) do
-      {:ok, %{tool_calls: [], content: content}} ->
+      {:ok, %{tool_calls: [], content: content} = turn} ->
+        st = account(st, turn)
         cond do
           content not in [nil, ""] ->
             finish(st, content)
@@ -209,7 +263,8 @@ defmodule Workbooks.Agent do
             finish(st, content || "(no result)")
         end
 
-      {:ok, %{tool_calls: calls, raw_message: assistant}} ->
+      {:ok, %{tool_calls: calls, raw_message: assistant} = turn} ->
+        st = account(st, turn)
         {tool_msgs, st2, done} = exec_tools(calls, st)
         msgs = messages ++ [strip(assistant) | tool_msgs]
         if done, do: finish(st2, done), else: loop(msgs, %{st2 | step: st2.step + 1})
@@ -224,7 +279,11 @@ defmodule Workbooks.Agent do
       # step-start marker: if a run stalls, the logs show what was in flight
       Logger.info("agent: step #{s.step} #{call.name} starting")
       t0 = System.monotonic_time(:millisecond)
-      {out, s2, d} = exec_bounded(call, Map.put(s, :last, %{}))
+      {out0, s2, d} = exec_bounded(call, Map.put(s, :last, %{}))
+      # TOOL-OUTPUT TRUNCATION: cap an oversized result (head+tail with a marker)
+      # BEFORE it enters the transcript, so one huge dump doesn't get re-sent on
+      # every later turn. The agent still sees both ends + an explicit byte count.
+      out = if s.truncate_tools, do: truncate_output(out0), else: out0
       meta = Map.get(s2, :last, %{})
 
       ev = %{
@@ -611,13 +670,215 @@ defmodule Workbooks.Agent do
     |> String.trim()
   end
 
+  # ── Tool-output truncation ───────────────────────────────────────────────────
+  # Keep head + tail (so the agent sees how a result starts AND ends — the tail
+  # often holds the answer/error) with a clear, machine-parseable middle marker.
+  defp truncate_output(out) when is_binary(out) do
+    cap = tool_output_cap()
+    size = byte_size(out)
+
+    if size <= cap do
+      out
+    else
+      half = div(cap, 2)
+      head = binary_part(out, 0, half)
+      tail = binary_part(out, size - half, half)
+      dropped = size - byte_size(head) - byte_size(tail)
+      head <> "\n\n...[#{dropped} bytes truncated]...\n\n" <> tail
+    end
+  end
+
+  defp truncate_output(out), do: out
+
+  # ── Token accounting ─────────────────────────────────────────────────────────
+  # Sum each turn's `usage` so a run is costable without external metering. Cheap
+  # models (and our streaming path) sometimes omit usage; default to 0 then.
+  defp account(st, turn) do
+    u = Map.get(turn, :usage) || %{}
+    p = num(u["prompt_tokens"])
+    c = num(u["completion_tokens"])
+    t = num(u["total_tokens"]) |> nonzero_or(p + c)
+    cur = st.usage_total
+
+    %{st | usage_total: %{
+        prompt: cur.prompt + p,
+        completion: cur.completion + c,
+        total: cur.total + t,
+        turns: cur.turns + 1
+      }}
+  end
+
+  defp num(n) when is_integer(n), do: n
+  defp num(n) when is_float(n), do: trunc(n)
+  defp num(_), do: 0
+  defp nonzero_or(0, alt), do: alt
+  defp nonzero_or(n, _), do: n
+
+  # ── Context compaction ───────────────────────────────────────────────────────
+  # When the transcript passes the byte threshold, condense the STALE MIDDLE into
+  # one rolling summary, preserving:
+  #   • the system prompt (messages[0]) and original task (messages[1]) verbatim,
+  #   • the most-recent `keep_recent` messages verbatim (the live working set),
+  #   • a prior rolling summary if one exists (folded into the new one).
+  # The middle is summarized by the SAME model (a cheap extra call amortised over
+  # the many turns it shrinks). On any summarizer failure we keep the original
+  # messages — compaction must never lose information by breaking.
+  defp maybe_compact(messages, %{compact: false} = st), do: {messages, st}
+
+  defp maybe_compact(messages, st) do
+    if transcript_bytes(messages) <= compact_threshold() do
+      {messages, st}
+    else
+      compact(messages, st)
+    end
+  end
+
+  defp compact(messages, st) do
+    keep_recent = compact_keep_recent()
+    # messages[0]=system, [1]=user task. The tail we keep verbatim; the head
+    # (after system+task) we condense. We split on message boundaries but never
+    # orphan a tool message from its assistant call — keep a tool-leading tail
+    # from including a dangling tool result with no preceding assistant.
+    {head, recent} = split_for_compaction(messages, keep_recent)
+
+    case head do
+      # Nothing substantial to compact (head is just system+task) — leave as-is.
+      [_system, _task] ->
+        {messages, st}
+
+      [system, task | middle] ->
+        prior = extract_prior_summary(middle)
+        summary = summarize_middle(system, task, prior, middle, st)
+
+        summary_msg = %{
+          role: "user",
+          content:
+            "[CONTEXT SUMMARY — earlier turns were condensed to save context; " <>
+              "treat this as established fact and continue the task]\n" <> summary
+        }
+
+        new_messages = [system, task, summary_msg | recent]
+        {new_messages, %{st | compactions: st.compactions + 1}}
+
+      _ ->
+        {messages, st}
+    end
+  end
+
+  # Split into {head_to_condense, recent_verbatim}. recent = last keep_recent
+  # messages, but if the first kept message is a `tool` result, pull one more in
+  # so its originating assistant message comes with it (a tool message with no
+  # preceding assistant call is invalid for the API).
+  defp split_for_compaction(messages, keep_recent) do
+    n = length(messages)
+    take = min(keep_recent, max(n - 2, 0))
+    split_at = n - take
+    {head, recent} = Enum.split(messages, split_at)
+
+    case recent do
+      [%{role: "tool"} | _] when split_at > 2 ->
+        Enum.split(messages, split_at - 1)
+
+      _ ->
+        {head, recent}
+    end
+  end
+
+  # If the head already carries a previous rolling summary, lift its text so the
+  # new summary folds it in (chained compaction stays cumulative, not lossy).
+  defp extract_prior_summary(middle) do
+    Enum.find_value(middle, "", fn
+      %{role: "user", content: "[CONTEXT SUMMARY" <> _ = c} -> c
+      _ -> ""
+    end)
+  end
+
+  # One condensation call. Stale tool dumps become a compact factual brief of what
+  # was learned/done/written so far. Falls back to a structured non-LLM condensation
+  # if the summarizer turn errors — never breaks the run.
+  defp summarize_middle(_system, task, prior, middle, st) do
+    transcript = render_for_summary(middle)
+
+    sys = %{
+      role: "system",
+      content:
+        "You compress an AI agent's working transcript. Produce a TIGHT brief " <>
+          "(<= 300 words) capturing ONLY what the agent must remember to keep " <>
+          "working: facts/data discovered, files written (paths + what's in them), " <>
+          "decisions made, and the current state/next step. Drop chatter and raw " <>
+          "dumps. Be concrete. No preamble."
+    }
+
+    user = %{
+      role: "user",
+      content:
+        "TASK: #{task["content"] || task[:content]}\n\n" <>
+          (if prior != "", do: "EARLIER SUMMARY:\n#{prior}\n\n", else: "") <>
+          "TRANSCRIPT TO COMPRESS:\n#{transcript}"
+    }
+
+    case st.complete_fn.([sys, user], model: st.model, on_delta: fn _ -> :ok end) do
+      {:ok, %{content: c}} when is_binary(c) and c != "" -> c
+      _ -> structured_condense(middle)
+    end
+  rescue
+    _ -> structured_condense(middle)
+  end
+
+  # Flatten the messages we're about to compress into a readable transcript,
+  # capping each block so the summarizer call itself stays cheap.
+  defp render_for_summary(middle) do
+    Enum.map_join(middle, "\n", fn m ->
+      role = m[:role] || m["role"]
+      content = m[:content] || m["content"] || ""
+      calls = m[:tool_calls] || m["tool_calls"]
+
+      tool_note =
+        case calls do
+          [_ | _] = cs -> " " <> Enum.map_join(cs, ",", &call_name/1)
+          _ -> ""
+        end
+
+      "[#{role}#{tool_note}] #{String.slice(to_string(content), 0, 1200)}"
+    end)
+  end
+
+  defp call_name(%{"function" => %{"name" => n}}), do: n
+  defp call_name(%{function: %{name: n}}), do: n
+  defp call_name(_), do: "tool"
+
+  # No-LLM fallback: a deterministic structured condensation (truncated heads of
+  # each block). Guarantees compaction never loses the run on a summarizer hiccup.
+  defp structured_condense(middle) do
+    middle
+    |> Enum.map_join("\n", fn m ->
+      role = m[:role] || m["role"]
+      content = to_string(m[:content] || m["content"] || "")
+      "- #{role}: #{String.slice(content, 0, 240) |> String.replace("\n", " ")}"
+    end)
+    |> then(&("(auto-condensed earlier turns)\n" <> &1))
+  end
+
+  defp transcript_bytes(messages) do
+    Enum.reduce(messages, 0, fn m, acc ->
+      acc + byte_size(to_string(m[:content] || m["content"] || ""))
+    end)
+  end
+
+  @doc false
+  # Test seams for the context-economy primitives (unit-testable without the net).
+  def truncate_output_for_test(out), do: truncate_output(out)
+  def maybe_compact_for_test(messages, st), do: maybe_compact(messages, st)
+  def transcript_bytes_for_test(messages), do: transcript_bytes(messages)
+
   # Keep only the fields the API needs back (content + tool_calls).
   defp strip(assistant), do: Map.take(assistant, ["role", "content", "tool_calls"])
 
   defp finish(st, result) do
     log = event_log(st.events, result)
     VFS.put(st.vfs, "/events.org", log)
-    %{result: result, steps: st.step, events: st.events, log: log}
+    %{result: result, steps: st.step, events: st.events, log: log,
+      usage: st.usage_total, compactions: st.compactions}
   end
 
   # Org-mode event log — fully observable, OQL-queryable (like brandnana's events.org).
