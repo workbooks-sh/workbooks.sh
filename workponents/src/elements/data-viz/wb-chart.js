@@ -178,6 +178,7 @@ export class WbChart extends WbElement {
     this._busy = true; this._error = null; this.update();
     try {
       if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
+      else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
       await this._run();
     } catch (e) {
       this._error = String((e && e.message) || e);

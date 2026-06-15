@@ -53,6 +53,22 @@ export class WbDataEngine {
     this._provider = null;            // resolved on first use
     this._duck = null;                // { db, conn } once duckdb-wasm boots
     this._initPromise = null;
+    this._regWaiters = new Map();     // name -> [resolve, ...] awaiting registration
+  }
+
+  /**
+   * Resolve once `name` is registered (and live on the active provider). Returns
+   * immediately if it already is. Lets a declarative element with `src-name`
+   * upgrade BEFORE the page calls register() without racing an unknown table —
+   * the one ordering hazard shared by all three surfaces.
+   */
+  whenRegistered(name) {
+    if (this._sources.has(name)) return Promise.resolve();
+    return new Promise((resolve) => {
+      const arr = this._regWaiters.get(name) || [];
+      arr.push(resolve);
+      this._regWaiters.set(name, arr);
+    });
   }
 
   /** Which tier answers queries: "runtime" | "duckdb-wasm" | "memory". */
@@ -79,6 +95,9 @@ export class WbDataEngine {
     } else if (this._provider === "duckdb-wasm" && this._duck) {
       await this._duckRegister(name, norm);
     }
+    // Now queryable on the active provider — release anyone awaiting this source.
+    const waiters = this._regWaiters.get(name);
+    if (waiters) { this._regWaiters.delete(name); for (const r of waiters) r(); }
   }
 
   /** query(sql, params?) -> Promise<WbQueryResult>. The trio's one call. */
