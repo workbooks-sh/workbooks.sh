@@ -35,7 +35,11 @@
     {/each}
     {#if rows.length === 0}
       <div class="card" style="text-align:center;color:var(--dim)">
-        No nexuses match “{nexusStore.query}”.
+        {#if nexusStore.query}
+          No nexuses match “{nexusStore.query}”.
+        {:else}
+          No nexuses yet — hit <b>New nexus</b> to spin up your first hosted runtime.
+        {/if}
       </div>
     {/if}
   </div>
