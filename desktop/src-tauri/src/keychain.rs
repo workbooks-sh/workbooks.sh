@@ -111,11 +111,28 @@ pub fn refresh_runtime_secrets() {
         }
     }
     // Third-party connections (Gemini, …) — keyed by service's env-var name.
+    // local_cli rows have no secret of ours; instead they advertise an ACP
+    // agent to the runtime via WB_ACP_AGENTS.
     let conns: ConnIndex = paths::read_json(&conn_path());
+    let mut acp_agents: Vec<&str> = Vec::new();
     for c in &conns.connections {
+        if is_local_cli(c) {
+            if let Some(agent) = acp_agent_name(&c.service) {
+                if !acp_agents.contains(&agent) {
+                    acp_agents.push(agent);
+                }
+            }
+            continue;
+        }
         if let Ok(v) = kc_get(SVC_CONN, &c.service) {
             env.insert(conn_env_var(&c.service), serde_json::Value::String(v));
         }
+    }
+    if !acp_agents.is_empty() {
+        env.insert(
+            "WB_ACP_AGENTS".into(),
+            serde_json::Value::String(acp_agents.join(" ")),
+        );
     }
     // User-scoped env vars — forwarded verbatim by name.
     let envs: EnvIndex = paths::read_json(&env_path());
@@ -487,6 +504,28 @@ struct ConnRow {
     service: String,
     account_label: Option<String>,
     created_at: u64,
+    // Backward-compatible local-CLI fields (existing connections.json predates
+    // these and must still deserialize). `kind: Some("local_cli")` marks a row
+    // whose auth lives in the CLI's own store — no keychain secret of ours.
+    #[serde(default)]
+    kind: Option<String>,
+    #[serde(default)]
+    path: Option<String>,
+    #[serde(default)]
+    version: Option<String>,
+}
+
+fn is_local_cli(row: &ConnRow) -> bool {
+    row.kind.as_deref() == Some("local_cli")
+}
+
+/// Coding-agent service id → ACP agent name. Drives the runtime's `WB_ACP_AGENTS`.
+fn acp_agent_name(service: &str) -> Option<&'static str> {
+    match service {
+        "codex" => Some("codex"),
+        "claude_code" => Some("claude"),
+        _ => None,
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -541,13 +580,22 @@ fn conn_dashboard_url(service: &str) -> String {
 }
 
 fn redact_conn(row: &ConnRow) -> ConnectionRedacted {
-    let key_length = kc_get(SVC_CONN, &row.service).map(|v| v.len()).unwrap_or(0);
+    // local_cli rows store no secret of ours — auth lives in the CLI's own
+    // store — so there's no key to measure and no env var name to surface.
+    let (key_length, env_var_name) = if is_local_cli(row) {
+        (0, "—".to_string())
+    } else {
+        (
+            kc_get(SVC_CONN, &row.service).map(|v| v.len()).unwrap_or(0),
+            conn_env_var(&row.service),
+        )
+    };
     ConnectionRedacted {
         id: row.id.clone(),
         service: row.service.clone(),
         account_label: row.account_label.clone(),
         dashboard_url: conn_dashboard_url(&row.service),
-        env_var_name: conn_env_var(&row.service),
+        env_var_name,
         created_at: row.created_at,
         key_length,
     }
@@ -570,6 +618,9 @@ pub fn connections_create(req: ConnectionCreate) -> Result<ConnectionRedacted, S
         service: req.service,
         account_label: req.account_label,
         created_at: paths::now_ms(),
+        kind: None,
+        path: None,
+        version: None,
     };
     idx.connections.push(row.clone());
     paths::write_json(&conn_path(), &idx)?;
@@ -581,8 +632,11 @@ pub fn connections_create(req: ConnectionCreate) -> Result<ConnectionRedacted, S
 pub fn connections_delete(id: String) -> Result<(), String> {
     let mut idx: ConnIndex = paths::read_json(&conn_path());
     if let Some(row) = idx.connections.iter().find(|c| c.id == id) {
-        let svc = row.service.clone();
-        kc_delete(SVC_CONN, &svc)?;
+        // local_cli rows have no stored secret — nothing to delete from the store.
+        if !is_local_cli(row) {
+            let svc = row.service.clone();
+            kc_delete(SVC_CONN, &svc)?;
+        }
     }
     idx.connections.retain(|c| c.id != id);
     paths::write_json(&conn_path(), &idx)
@@ -593,6 +647,151 @@ pub fn connections_delete(id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn connections_reveal_api_key(service: String) -> Result<String, String> {
     kc_get(SVC_CONN, &service)
+}
+
+// ── Local-CLI connections (ACP coding agents) ─────────────────────
+//
+// Some "connections" aren't a pasted API key — they're a CLI already installed
+// on the user's machine (claude, codex). The connect flow detects the binary on
+// PATH and persists its resolved path; auth stays in the CLI's own store
+// (~/.codex, ~/.claude, OS keychain). No secret of ours is stored.
+
+/// Result of probing for a local CLI. Field names mirror the frontend `Probe`
+/// type exactly (found/path/version/error) — do NOT rename_all.
+#[derive(Serialize)]
+pub struct CliProbe {
+    found: bool,
+    path: Option<String>,
+    version: Option<String>,
+    error: Option<String>,
+}
+
+/// Extra dirs a GUI app's minimal PATH commonly misses. A Tauri app inherits a
+/// sparse PATH (no shell rc), so codex (/opt/homebrew/bin) and claude
+/// (~/.local/bin) won't be found by $PATH alone.
+fn extra_cli_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(home) = std::env::var_os("HOME") {
+        dirs.push(PathBuf::from(&home).join(".local/bin"));
+    }
+    for d in ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"] {
+        dirs.push(PathBuf::from(d));
+    }
+    dirs
+}
+
+/// Resolve `name` to an executable: scan $PATH first, then the extra GUI-missed dirs.
+fn resolve_cli(name: &str) -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(path) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&path) {
+            candidates.push(dir.join(name));
+        }
+    }
+    for dir in extra_cli_dirs() {
+        candidates.push(dir.join(name));
+    }
+    candidates.into_iter().find(|p| is_executable(p))
+}
+
+fn is_executable(p: &std::path::Path) -> bool {
+    let Ok(meta) = std::fs::metadata(p) else {
+        return false;
+    };
+    if !meta.is_file() {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        return meta.permissions().mode() & 0o111 != 0;
+    }
+    #[cfg(not(unix))]
+    {
+        true
+    }
+}
+
+/// Detect a local CLI on PATH (+ common GUI-missed dirs) and read its version.
+#[tauri::command]
+pub fn connections_detect_local_cli(name: String) -> CliProbe {
+    let Some(path) = resolve_cli(&name) else {
+        return CliProbe {
+            found: false,
+            path: None,
+            version: None,
+            error: Some(format!(
+                "`{name}` not found on PATH or in ~/.local/bin, /opt/homebrew/bin, /usr/local/bin, /usr/bin, /bin"
+            )),
+        };
+    };
+    let path_str = path.to_string_lossy().to_string();
+    // Run `<path> --version` with a ~3s budget; a missing version doesn't
+    // un-find the binary — found stays true.
+    let version = cli_version(&path);
+    CliProbe {
+        found: true,
+        path: Some(path_str),
+        version,
+        error: None,
+    }
+}
+
+/// Run `<path> --version` with a ~3s timeout; trimmed stdout, or None on any failure.
+fn cli_version(path: &std::path::Path) -> Option<String> {
+    use std::process::{Command, Stdio};
+    use std::sync::mpsc;
+
+    let path = path.to_path_buf();
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let out = Command::new(&path)
+            .arg("--version")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output();
+        let _ = tx.send(out);
+    });
+    match rx.recv_timeout(std::time::Duration::from_secs(3)) {
+        Ok(Ok(out)) if out.status.success() => {
+            let v = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if v.is_empty() {
+                None
+            } else {
+                Some(v)
+            }
+        }
+        _ => None,
+    }
+}
+
+#[derive(Deserialize)]
+pub struct LocalCliCreate {
+    pub service: String,
+    pub path: Option<String>,
+    pub version: Option<String>,
+}
+
+/// Persist a local-CLI connection. No keychain secret — auth is the CLI's own.
+/// One per service; surfaces the version as the account label.
+#[tauri::command]
+pub fn connections_create_local_cli(req: LocalCliCreate) -> Result<ConnectionRedacted, String> {
+    let mut idx: ConnIndex = paths::read_json(&conn_path());
+    idx.connections.retain(|c| c.service != req.service);
+    let row = ConnRow {
+        id: uuid::Uuid::new_v4().to_string(),
+        service: req.service,
+        account_label: req.version.clone(),
+        created_at: paths::now_ms(),
+        kind: Some("local_cli".to_string()),
+        path: req.path,
+        version: req.version,
+    };
+    idx.connections.push(row.clone());
+    paths::write_json(&conn_path(), &idx)?;
+    refresh_runtime_secrets();
+    Ok(redact_conn(&row))
 }
 
 // ── Harness subscription-creds store (SLICE 3, wb-b9xv.7) ──────────────────────────────────────

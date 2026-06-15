@@ -16,6 +16,7 @@ use tauri::{
     AppHandle, Emitter, Manager,
 };
 
+mod acp;
 mod agent_settings;
 mod bundle_io;
 mod daemon;
@@ -225,6 +226,10 @@ pub fn run() {
             keychain::connections_create,
             keychain::connections_delete,
             keychain::connections_reveal_api_key,
+            keychain::connections_detect_local_cli,
+            keychain::connections_create_local_cli,
+            // ACP local coding-agent runner (experimental local microVM).
+            acp::acp_run_agent,
             // Harness subscription-creds store (SLICE 3, wb-b9xv.7) — dock.creds.{get,put}.
             keychain::harness_creds_get,
             keychain::harness_creds_put,

@@ -32,11 +32,13 @@ defmodule Workbooks.Acp do
 
   @doc """
   The coding agents connected for this runtime (e.g. `["codex"]`). Empty unless the
-  ACP surface is available here. Source: `WB_ACP_AGENTS`.
+  ACP surface is available here. Source: `WB_ACP_AGENTS` — pushed by the desktop over
+  `/internal/secrets/refresh` when a coding-agent CLI is connected (so it resolves
+  via `Workbooks.Secrets`, which falls through persistent_term → file → process env).
   """
   def connected_agents do
     if available?() do
-      (System.get_env("WB_ACP_AGENTS") || "")
+      Workbooks.Secrets.get("WB_ACP_AGENTS", "")
       |> String.split(~r/[,\s]+/, trim: true)
       |> Enum.uniq()
     else
