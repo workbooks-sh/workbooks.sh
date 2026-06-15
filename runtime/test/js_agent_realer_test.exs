@@ -14,13 +14,13 @@ defmodule Workbooks.JsAgentRealerTest do
 
   The fs grant + exec grant ride ONE session token (one mint, one revoke).
 
-  MEASURED RUNTIME SHAPE (honest, from this engine): each host-seam op (fs/llm/exec) is a GUEST fetch on the
-  SM lane. The vendored wasmtime/Wasmex wasi:http component handles MANY sequential awaited fetches WITHIN a
-  single run() entry fine — so the whole multi-step turn is driven in ONE entry and returns the right answer,
-  with the heap state accumulating across its phases. But that entry leaves the component non-re-enterable
-  (the next run() traps), so a turn is FOLLOWED BY recycle/1 (cost #2 — poison recovery) before the next.
-  The streaming capstone is likewise a single terminal entry. This test PROVES the full turn + the streaming
-  capstone + recycle recovery + a second turn on the recycled heap, all on the LIVE engine.
+  RUNTIME SHAPE (KEYSTONE host-import): each host-seam op (fs/llm/exec/stream) now goes through the
+  SYNCHRONOUS `wb:jseval/broker.host-call` import (`globalThis.__wbHostCall`), NOT a guest wasi:http fetch.
+  The host performs the op and returns IN-CALL, so no async future ever straddles a run() boundary — the
+  multi-step turn drives across MANY entries on ONE resident instance with NO recycle, heap state accumulating
+  throughout. This test PROVES the full turn + a SECOND turn on the same instance (no recycle) + the streaming
+  capstone + that recycle still works + workdir confinement, all on the LIVE engine. (The legacy wasi:http
+  re-entry ceiling is characterized separately in harness_session_test's "the measured wall".)
 
   `:build` — needs the SM eval-host. `:pallet` — needs coreutils.wasm (the streaming producer) seeded via
   Pallet. Skips cleanly otherwise. async: false (shared loopback listener + registered CLIs).
@@ -127,22 +127,25 @@ defmodule Workbooks.JsAgentRealerTest do
         assert File.read!(Path.join(dir, "ANSWER.txt")) == "The repository has 3 matching lines."
         assert File.read!(Path.join(dir, "PLAN.md")) =~ "# plan"
 
-        # the turn's many sequential fetches leave the instance non-re-enterable — the MEASURED ceiling.
-        assert {:error, msg} = HarnessSession.eval(pid, "7*7")
-        assert msg =~ "cannot enter component instance" or msg =~ "out of bounds"
-
-        # recycle recovers a fresh heap under the same session id (cost #2 — poison recovery), then re-boot:
-        # PROVES a SECOND turn runs on the recycled instance (the resident-session lifecycle, end-to-end).
-        assert :ok = HarnessSession.recycle(pid)
+        # KEYSTONE: re-entry after the multi-step turn is now CLEAN — every host op went through the SYNCHRONOUS
+        # host-import (no wasi:http future straddled the entry boundary), so the resident instance is NOT
+        # poisoned. A plain compute eval re-enters fine with NO recycle.
         assert {:ok, "49"} = HarnessSession.eval(pid, "7*7")
-        assert {:ok, _} = HarnessSession.boot(pid, agent, env: %{"WB_MODEL" => "wb-mock-claude"})
+
+        # PROVE a SECOND turn runs on the SAME resident instance with NO recycle — the conversation/scratchpad/
+        # phase cursor from turn 1 are still live on the heap. Reset the agent's phase cursor for the new turn.
+        assert {:ok, _} = HarnessSession.eval(pid, "globalThis.__agent.phase='plan';'ok'")
         t2 = drive_turn(pid, "again")
         assert t2["answer"] == "The repository has 3 matching lines."
 
-        # ── (b) the STREAMING capstone: spawn a long-running CLI and CONSUME its INCREMENTAL stdout. Run it on
-        # a clean recycled+booted instance, fast-forwarded straight to the stream phase (no prior fetch in this
-        # entry), so the streaming long-poll loop is the only thing the entry does. ──────────────────────────
+        # recycle STILL works (the isolation/poison-recovery lever is intact even though the loop no longer
+        # needs it) — a fresh heap under the same session id, then re-boot the resident agent.
         assert :ok = HarnessSession.recycle(pid)
+        assert {:ok, "49"} = HarnessSession.eval(pid, "7*7")
+
+        # ── (b) the STREAMING capstone: spawn a long-running CLI and CONSUME its INCREMENTAL stdout. The
+        # streaming protocol now runs over the host-import (spawn/stream/stdin host-calls), so it too leaves the
+        # instance re-enterable. Boot a fresh agent and fast-forward to the stream phase. ─────────────────────
         assert {:ok, _} = HarnessSession.boot(pid, agent, env: %{})
         assert {:ok, _} = HarnessSession.eval(pid, "globalThis.__agent.phase='stream';'ok'")
         cap = drive_stream(pid)
@@ -155,11 +158,8 @@ defmodule Workbooks.JsAgentRealerTest do
         assert cap["chunks"] > 1, "expected incremental streaming (chunks>1), got #{cap["chunks"]}"
         assert cap["bytes"] > 1_000_000
 
-        # ── (a) confinement under a live token: a traversal escape is refused (no host-FS leak). Use a FRESH
-        # recycled+booted instance so this read is the first guest fetch of its entry. ───────────────────────
-        assert :ok = HarnessSession.recycle(pid)
-        assert {:ok, _} = HarnessSession.boot(pid, agent, env: %{})
-
+        # ── (a) confinement under a live token: a traversal escape is refused (no host-FS leak) — on the SAME
+        # resident instance (re-entry is clean over the host-import; no recycle needed). ─────────────────────
         {:ok, denied} =
           HarnessSession.eval(
             pid,

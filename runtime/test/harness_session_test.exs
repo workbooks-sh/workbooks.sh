@@ -31,6 +31,14 @@ defmodule Workbooks.HarnessSessionTest do
   @harness_js Path.join(__DIR__, "fixtures/harness_min.js")
 
   setup_all do
+    # the legacy wasi:http loopback (ExecLoopback) is needed by the "measured wall" characterization test
+    # (a DIRECT fetch probe of raw wasi:http) and as the fetch fallback seam; start it best-effort. The
+    # keystone host-import path does NOT need it.
+    case Workbooks.ExecLoopback.start_listener() do
+      {:ok, _} -> :ok
+      _ -> :ok
+    end
+
     {:ok, ready?: match?({:ok, _}, JsEngine.build_host())}
   end
 
@@ -97,6 +105,55 @@ defmodule Workbooks.HarnessSessionTest do
         # state is gone after recycle (fresh heap) — that's the isolation guarantee; re-boot proves recovery.
         assert {:ok, _} = HarnessSession.boot(pid, harness, env: %{})
         assert {:ok, "The repository has 3 matching lines."} = HarnessSession.turn(pid, "again")
+
+        HarnessSession.stop(pid)
+    end
+  end
+
+  # ── THE KEYSTONE: RESIDENT multi-turn loop on ONE instance, NO recycle (host-import transport) ───
+
+  @tag :build
+  @tag timeout: 180_000
+  test "RESIDENT agent loop: MANY turns on ONE instance, each doing brokered exec + an LLM call, NO recycle", %{ready?: ready?} do
+    cond do
+      not skip_unless(ready?) ->
+        :skip
+
+      "grep" not in CommandRegistry.list() ->
+        IO.puts("\n[skip] grep not registered")
+
+      true ->
+        harness = File.read!(@harness_js)
+
+        {:ok, pid} =
+          HarnessSession.start_link(
+            session_id: "resident-#{System.unique_integer([:positive])}",
+            exec: [allow: true, principal: "test-tenant"]
+          )
+
+        assert {:ok, boot} = HarnessSession.boot(pid, harness, env: %{"WB_MODEL" => "wb-mock-claude"})
+        assert boot =~ "installed model=wb-mock-claude"
+
+        # Drive FIVE consecutive turns on the SAME pid. Each turn is the full agent loop: an LLM host-call ->
+        # a brokered exec host-call (grep) -> a second LLM host-call -> the answer. Under the OLD wasi:http
+        # transport, turn 2 would trap ("cannot enter component instance" / guest `unreachable`) because a
+        # fetch future straddled the entry boundary. Over the SYNCHRONOUS host-import, every host op completes
+        # IN-CALL, so re-entry is clean — all five turns succeed on one resident instance with NO recycle.
+        for i <- 1..5 do
+          assert {:ok, answer} = HarnessSession.turn(pid, "turn #{i}: how many lines match 'needle'?"),
+                 "turn #{i} should re-enter the resident instance cleanly (no recycle)"
+
+          assert answer == "The repository has 3 matching lines.", "turn #{i} answer"
+        end
+
+        # The conversation state ACCUMULATED on the live heap across all five turns (proves it's one resident
+        # instance, not a fresh heap per turn): 5 turns, 5 tool calls, 20 messages (4 per turn).
+        assert {:ok, "5"} = HarnessSession.eval(pid, "String(globalThis.__harness.turns)")
+        assert {:ok, "5"} = HarnessSession.eval(pid, "String(globalThis.__harness.toolCalls)")
+        assert {:ok, "20"} = HarnessSession.eval(pid, "String(globalThis.__harness.messages.length)")
+
+        # A plain compute eval STILL works right after the fetch-free turns — re-entry is not poisoned.
+        assert {:ok, "42"} = HarnessSession.eval(pid, "6*7")
 
         HarnessSession.stop(pid)
     end

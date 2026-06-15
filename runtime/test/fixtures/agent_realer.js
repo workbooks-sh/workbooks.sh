@@ -53,9 +53,17 @@ function installAgent() {
 
     tools: [{ name: "run_command", description: "Run a registered command; return its stdout line count." }],
 
-    // (c) ONE fetch to the LLM-shaped endpoint per call — each lives in its own run() entry.
+    // (c) one model call. KEYSTONE: prefer the SYNCHRONOUS host-import — host-performed completion (host-held
+    // key) that completes in-call, so no wasi:http future straddles a run() boundary and the whole loop stays
+    // re-enterable on one resident instance. Falls back to the LLM-seam fetch on a legacy eval-host.
     callModel: function () {
       var self = this;
+      if (typeof globalThis.__wbHostCall === "function") {
+        var raw = globalThis.__wbHostCall(JSON.stringify({ op: "llm", model: self.model, messages: self.messages, tools: self.tools }));
+        var j = JSON.parse(raw);
+        if (!j || j.ok !== true) throw new Error("LLM denied: " + (j && j.error));
+        return Promise.resolve(j.resp);
+      }
       return fetch(self.llmUrl, {
         method: "POST",
         headers: { "content-type": "application/json", "x-wb-exec": self.token },

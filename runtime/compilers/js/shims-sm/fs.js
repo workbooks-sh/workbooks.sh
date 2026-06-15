@@ -57,8 +57,23 @@ function toBytes(data) {
   return new TextEncoder().encode(String(data));
 }
 
-// One verb over the loopback. body {op, path, ...}. Resolves to the parsed JSON, or throws a mapped error.
+// One verb to the host. KEYSTONE: prefer the SYNCHRONOUS host-import (globalThis.__wbHostCall) over guest
+// fetch() — the import completes in-call (no wasi:http future straddles a run() boundary), so a resident
+// session can do fs ops across many turns with no recycle. The import returns a JSON envelope {ok, status, …}.
+// Falls back to the fetch loopback when the import isn't present (legacy eval-host without the broker world).
 function op(body) {
+  if (typeof globalThis !== "undefined" && typeof globalThis.__wbHostCall === "function") {
+    var raw = globalThis.__wbHostCall(JSON.stringify({ op: "fs", fsop: body.op, path: body.path, data: body.data, recursive: body.recursive }));
+    var j = null; try { j = JSON.parse(raw); } catch (_) {}
+    if (!j || j.ok !== true) {
+      var status = (j && j.status) || 0;
+      if (status === 404) return Promise.reject(enoent(body.path));
+      if (status === 403) return Promise.reject(eacces(body.path, (j && j.error) || "fs op denied / outside workdir"));
+      var e = new Error("EIO: fs op failed for '" + body.path + "'"); e.code = "EIO";
+      return Promise.reject(e);
+    }
+    return Promise.resolve(j);
+  }
   var c = cfg();
   return fetch(fsUrl(), { method: "POST", headers: hdr(), body: JSON.stringify(body) })
     .then(function (res) {

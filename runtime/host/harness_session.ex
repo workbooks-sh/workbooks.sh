@@ -131,9 +131,10 @@ defmodule Workbooks.HarnessSession do
     exec_opts = Keyword.get(opts, :exec, nil)
     fs_opts = Keyword.get(opts, :fs, nil)
 
+    {exec_token, grant, workdir} = maybe_mint(exec_opts, fs_opts)
+
     with {:ok, wasm} <- JsEngine.build_host(),
-         {:ok, sm_pid} <- instantiate(wasm) do
-      {exec_token, grant, workdir} = maybe_mint(exec_opts, fs_opts)
+         {:ok, sm_pid} <- instantiate(wasm, grant) do
 
       {:ok,
        %__MODULE__{
@@ -160,27 +161,38 @@ defmodule Workbooks.HarnessSession do
   def handle_call(:exec_token, _from, st), do: {:reply, st.exec_token, st, @idle_ms}
 
   def handle_call({:boot, harness_js, opts}, _from, st) do
-    # exec seam = the SESSION token (reused across every round-trip this session makes). The LLM endpoint
-    # shares the same pinned sentinel host + token gate, exposed to the harness as __wbHarness.{llmUrl,token}.
+    # KEYSTONE: the resident agent loop reaches the host over the SYNCHRONOUS host-import seam
+    # (`globalThis.__wbHostCall`, wired into this instance's grant at instantiate) — NOT the wasi:http loopback.
+    # The legacy ExecLoopback fetch seam (sentinel/llm URL + token) is still exposed for FALLBACK on a legacy
+    # eval-host, but it is now BEST-EFFORT: if the loopback listener isn't running (e.g. unit tests that don't
+    # supervise it), boot must NOT crash — the host-import carries the loop. So the seam URLs are nil when the
+    # listener is down, and the shims silently prefer __wbHostCall anyway.
+    # Always pass a seam MAP when the session carries a token — node_boot_payload's `{seam, _}` branch registers
+    # the child_process + fs shims off this (no NEW token mint). The `url` is best-effort: the loopback URL when
+    # the listener is up (legacy fetch fallback), else "" — the shims prefer __wbHostCall and never read the url
+    # under the host-import, so an empty url is harmless.
     exec_seam =
-      if st.exec_token, do: %{"url" => ExecLoopback.sentinel_url(), "token" => st.exec_token}, else: nil
+      if st.exec_token,
+        do: %{"url" => safe_sentinel_url() || "", "token" => st.exec_token},
+        else: nil
 
     boot_opts =
       [env: Keyword.get(opts, :env, %{}), argv: Keyword.get(opts, :argv, ["node", "harness"])]
       |> then(fn o -> if exec_seam, do: Keyword.put(o, :exec_seam, exec_seam), else: o end)
-      # the session's confined fs root rides the SAME token; pass it so node_boot_payload registers the SM fs
+      # the session's confined fs root rides the SAME grant; pass it so node_boot_payload registers the SM fs
       # shim (require('node:fs')/'fs/promises') on this resident heap. nil => no fs shim, fs ops would 403.
       |> then(fn o -> if st.workdir, do: Keyword.put(o, :fs, workdir: st.workdir), else: o end)
 
     case JsEngine.node_boot_payload(boot_opts) do
       {:ok, boot_js, _token} ->
         # 1) install the Node platform (require/process/Buffer/__wbExec) on the live heap;
-        # 2) expose the LLM seam the harness reads;
+        # 2) expose the (best-effort) LLM fallback seam the harness reads when no host-import is present;
         # 3) eval the harness JS (installs the resident harness object).
         llm_seam =
-          if st.exec_token,
-            do: Jason.encode!(%{"llmUrl" => ExecLoopback.llm_url(), "token" => st.exec_token}),
-            else: "null"
+          case st.exec_token && safe_llm_url() do
+            lurl when is_binary(lurl) -> Jason.encode!(%{"llmUrl" => lurl, "token" => st.exec_token})
+            _ -> "null"
+          end
 
         platform = boot_js <> "\nglobalThis.__wbHarness=" <> llm_seam <> ";\n'platform-ready'"
 
@@ -199,7 +211,7 @@ defmodule Workbooks.HarnessSession do
   def handle_call(:recycle, _from, st) do
     if Process.alive?(st.sm_pid), do: Process.exit(st.sm_pid, :normal)
 
-    case instantiate(st.wasm) do
+    case instantiate(st.wasm, st.grant) do
       {:ok, sm_pid} -> {:reply, :ok, %{st | sm_pid: sm_pid, last_active_ms: now()}, @idle_ms}
       {:error, reason} -> {:stop, {:recycle_failed, reason}, {:error, reason}, st}
     end
@@ -220,11 +232,15 @@ defmodule Workbooks.HarnessSession do
 
   # ── internals ────────────────────────────────────────────────────────────────────────────────
 
-  # The whole point: NO `after Process.exit`. Keep the pid alive for the session's lifetime.
-  defp instantiate(wasm) do
+  # The whole point: NO `after Process.exit`. Keep the pid alive for the session's lifetime. The session GRANT
+  # is bound into the synchronous host-broker import (`wb:jseval/broker.host-call`) HOST-SIDE, so the resident
+  # agent loop's llm/fs/exec ops run through that sync import (host performs them in-call) rather than guest
+  # wasi:http — which is what lets run() be re-entered across many turns with NO recycle (the keystone fix).
+  defp instantiate(wasm, grant) do
     case Wasmex.Components.start_link(%{
            path: wasm,
-           wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}
+           wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true},
+           imports: JsEngine.host_broker_imports(grant)
          }) do
       {:ok, pid} -> {:ok, pid}
       {:error, reason} -> {:error, {:instantiate_failed, reason}}
@@ -280,6 +296,21 @@ defmodule Workbooks.HarnessSession do
   defp normalize({:ok, _} = ok), do: ok
   defp normalize({:error, _} = err), do: err
   defp normalize(other), do: {:error, other}
+
+  # Best-effort loopback URLs for the LEGACY fetch fallback seam. nil when the ExecLoopback listener isn't
+  # running (unit tests, host-import-only deployments) — boot must not crash, since the resident loop reaches
+  # the host over the synchronous host-import, not these URLs.
+  defp safe_sentinel_url do
+    ExecLoopback.sentinel_url()
+  rescue
+    _ -> nil
+  end
+
+  defp safe_llm_url do
+    ExecLoopback.llm_url()
+  rescue
+    _ -> nil
+  end
 
   defp now, do: System.monotonic_time(:millisecond)
 end
