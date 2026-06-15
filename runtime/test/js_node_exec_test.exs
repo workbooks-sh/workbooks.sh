@@ -20,6 +20,10 @@ defmodule Workbooks.JsNodeExecTest do
   alias Workbooks.{JsEngine, CommandRegistry}
 
   setup_all do
+    # the SSRF-floor probe hits the loopback listener's bound port directly, so ensure it's running
+    # (idempotent). The exec/fs ops in the other tests now ride the host-import and don't need it, but the
+    # direct-port probe does.
+    _ = Workbooks.ExecLoopback.start_listener()
     {:ok, ready?: match?({:ok, _}, JsEngine.build_host())}
   end
 

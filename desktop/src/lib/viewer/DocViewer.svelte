@@ -16,6 +16,7 @@
   import CodeView from "./CodeView.svelte";
   import TextView from "./TextView.svelte";
   import OrgEditor from "$lib/org-renderer/OrgEditor.svelte";
+  import AgentTabView from "./AgentTabView.svelte";
 
   // Closing a tab anywhere must release its pane.
   $effect(() => {
@@ -45,7 +46,9 @@
 
 {#snippet docBody(tab: Tab)}
   {#key tab.id}
-    {#if tab.kind === "workbook"}
+    {#if tab.kind === "agent"}
+      <AgentTabView path={tab.path} tabId={tab.id} />
+    {:else if tab.kind === "workbook"}
       <WorkbookView path={tab.path} />
     {:else if tab.kind === "wavelet"}
       <WaveletPlayer path={tab.path} />

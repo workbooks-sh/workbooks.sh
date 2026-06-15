@@ -34,9 +34,18 @@ function installHarness() {
     // the one tool the harness exposes to the model; executes via the brokered child_process path.
     tools: [{ name: "run_command", description: "Run a registered command and return its stdout." }],
 
-    // one round-trip to the LLM-shaped endpoint (real fetch -> HTTP -> JSON).
+    // one round-trip to the LLM. KEYSTONE: prefer the SYNCHRONOUS host-import (globalThis.__wbHostCall) — the
+    // host performs the completion in-call (host-held key, never crosses the membrane) and NO wasi:http future
+    // straddles a run() boundary, so the harness can drive many turns on one resident instance with no recycle.
+    // Falls back to the LLM-seam fetch on a legacy eval-host (no broker import).
     callModel: function () {
       var self = this;
+      if (typeof globalThis.__wbHostCall === "function") {
+        var raw = globalThis.__wbHostCall(JSON.stringify({ op: "llm", model: self.model, messages: self.messages, tools: self.tools }));
+        var j = JSON.parse(raw);
+        if (!j || j.ok !== true) throw new Error("LLM denied: " + (j && j.error));
+        return Promise.resolve(j.resp);
+      }
       return fetch(self.llmUrl, {
         method: "POST",
         headers: { "content-type": "application/json", "x-wb-exec": self.token },

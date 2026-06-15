@@ -198,6 +198,31 @@ class AgentsStore {
         }));
       this.#reconcileSelection();
     } catch (e) {
+      // Browser preview: the catalog is an HTTP cap the webHost mock
+      // can't serve over fetch, so seed from the exported preview list
+      // (feat/agent-tab) — this keeps the agent rail + tab editor
+      // demoable without a runtime.
+      if (typeof window !== "undefined" && (window as { __WB_DEV_MOCK__?: boolean }).__WB_DEV_MOCK__) {
+        try {
+          const { AGENTS_CATALOG_PREVIEW } = await import("$lib/platform/webHost");
+          this.agents = AGENTS_CATALOG_PREVIEW.map((a) => ({
+            slug: a.slug,
+            path: `agents/${a.slug}.org`,
+            scope: a.scope,
+            title: a.title,
+            tagline: a.tagline,
+            icon: a.icon,
+            model: a.model,
+            toolkits: a.toolkits,
+            system_prompt_preview: a.system_prompt_preview,
+          }));
+          this.lastError = null;
+          this.#reconcileSelection();
+          return;
+        } catch {
+          /* fall through to default handling */
+        }
+      }
       // Daemon offline (or route pending) → degrade to an empty
       // catalog without surfacing an error to the picker. Any persisted
       // selection stays put so it re-resolves once the daemon returns.

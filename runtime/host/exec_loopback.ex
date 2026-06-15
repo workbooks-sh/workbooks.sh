@@ -661,9 +661,11 @@ defmodule Workbooks.ExecLoopback do
 
     with {:ok, grant} <- lookup(token),
          :ok <- principal_gate(grant) do
+      tools = conn.body_params["tools"] || []
+
       conn
       |> put_resp_content_type("application/json")
-      |> send_resp(200, Jason.encode!(llm_complete(messages)))
+      |> send_resp(200, Jason.encode!(Workbooks.HostBrokerLLM.complete(messages, tools, grant)))
     else
       _ ->
         conn
@@ -763,60 +765,6 @@ defmodule Workbooks.ExecLoopback do
     conn
     |> put_resp_content_type("application/json")
     |> send_resp(status, Jason.encode!(body))
-  end
-
-  # Has the conversation already carried a tool_result back? (a user-role message containing a tool_result
-  # block). If not, ask for a tool call; if yes, emit the final answer quoting the tool's stdout.
-  defp llm_complete(messages) do
-    tool_result = find_tool_result(messages)
-
-    if tool_result do
-      answer = "The repository has #{String.trim(tool_result)} matching lines."
-
-      %{
-        "id" => "msg_wb_llm_final",
-        "type" => "message",
-        "role" => "assistant",
-        "stop_reason" => "end_turn",
-        "content" => [%{"type" => "text", "text" => answer}]
-      }
-    else
-      %{
-        "id" => "msg_wb_llm_tool",
-        "type" => "message",
-        "role" => "assistant",
-        "stop_reason" => "tool_use",
-        "content" => [
-          %{"type" => "text", "text" => "I'll count the matching lines."},
-          %{
-            "type" => "tool_use",
-            "id" => "toolu_wb_1",
-            "name" => "run_command",
-            "input" => %{"command" => "grep", "args" => ["needle"], "stdin" => "needle\nhay\nneedle\nstraw\nneedle\n"}
-          }
-        ]
-      }
-    end
-  end
-
-  # Find a tool_result block anywhere in the message history (a user-role message whose content array
-  # carries a {"type":"tool_result", ...}); return its text content, or nil.
-  defp find_tool_result(messages) do
-    Enum.find_value(messages, fn m ->
-      content = (is_map(m) && m["content"]) || nil
-
-      if is_list(content) do
-        Enum.find_value(content, fn b ->
-          if is_map(b) and b["type"] == "tool_result" do
-            case b["content"] do
-              t when is_binary(t) -> t
-              [%{"text" => t} | _] -> t
-              _ -> nil
-            end
-          end
-        end)
-      end
-    end)
   end
 
   match _ do

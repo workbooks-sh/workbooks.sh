@@ -22,8 +22,20 @@ function cfg() {
   return c;
 }
 
-// run(name, argv, stdin) -> Promise<string|null>. null = broker denial (non-200). Buffered one-shot.
+// True when the synchronous host-import seam is present (the keystone transport).
+function hasHostCall() { return typeof globalThis !== "undefined" && typeof globalThis.__wbHostCall === "function"; }
+
+// run(name, argv, stdin) -> Promise<string|null>. null = broker denial. Buffered one-shot.
+// KEYSTONE: prefer the SYNCHRONOUS host-import — exec completes in-call, so no wasi:http future straddles a
+// run() boundary and a resident session can make many tool calls across turns with no recycle. Falls back to
+// the fetch loopback on a legacy eval-host (no broker import).
 function run(name, argv, stdin) {
+  if (hasHostCall()) {
+    var raw = globalThis.__wbHostCall(JSON.stringify({ op: "exec", name: String(name), argv: argv || [], stdin: stdin == null ? "" : String(stdin) }));
+    var j = null; try { j = JSON.parse(raw); } catch (_) {}
+    if (!j || j.ok !== true) return Promise.resolve(null);   // denied / failed
+    return Promise.resolve(j.out);
+  }
   var c = cfg();
   var body = JSON.stringify({ name: String(name), argv: argv || [], stdin: stdin == null ? "" : String(stdin) });
   return fetch(c.url, {
@@ -90,6 +102,53 @@ function spawn(file, args, opts) {
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
   child.killed = false;
+
+  // KEYSTONE host-import streaming path: spawn/stdin/stream are synchronous host calls; the stream poll loop
+  // is driven by setTimeout between sync drains so the event loop isn't monopolized while a child runs. Same
+  // incremental-'data' / 'end' / 'exit' / 'close' shape as the fetch path. No wasi:http involved, so a resident
+  // session can hold a streaming child across turns.
+  if (hasHostCall()) {
+    var hHandle = null, hPending = [];
+    function hc(req) { var r = globalThis.__wbHostCall(JSON.stringify(req)); try { return JSON.parse(r); } catch (_) { return null; } }
+
+    child.stdin = {
+      write: function (data) {
+        if (hHandle) { hc({ op: "stdin", handle: hHandle, data: String(data) }); }
+        else { hPending.push(String(data)); }
+        return true;
+      },
+      end: function (data) { if (data != null) this.write(data); }
+    };
+
+    var sp = hc({ op: "spawn", name: String(file), argv: args || [] });
+    if (!sp || sp.ok !== true || !sp.handle) {
+      setTimeout(function () { child.emit("error", new Error("spawn denied: " + file)); }, 0);
+    } else {
+      hHandle = sp.handle;
+      var q = hPending; hPending = [];
+      q.forEach(function (d) { hc({ op: "stdin", handle: hHandle, data: d }); });
+      if (opts.input != null) child.stdin.write(opts.input);
+
+      var hpump = function () {
+        if (child.killed) return;
+        var s = hc({ op: "stream", handle: hHandle });
+        if (!s || s.ok !== true) { child.emit("error", new Error("stream denied")); return; }
+        if (s.chunk && s.chunk.length) child.stdout.emit("data", s.chunk);
+        if (s.done) {
+          child.stdout.emit("end");
+          var ec = s.exit == null ? 0 : (s.exit | 0);
+          child.emit("exit", ec, null);
+          child.emit("close", ec);
+        } else {
+          setTimeout(hpump, 5);
+        }
+      };
+      setTimeout(hpump, 0);
+    }
+
+    child.kill = function () { child.killed = true; child.emit("close", 137); };
+    return child;
+  }
 
   // a writable stdin: write(bytes)->POST /__wb/stdin/<handle>. Buffered until the handle exists.
   var handle = null, pendingStdin = [];
