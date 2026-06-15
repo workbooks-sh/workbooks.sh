@@ -645,7 +645,20 @@
         class:bare={chrome.mode === "app" && active === "home"}
       >
         <DropOverlay />
-        {#if chrome.mode === "doc"}
+        {#if dock.fullscreen}
+          <!-- A dock panel popped out into a full tab (wb: Waldo-as-tab):
+               it owns the whole canvas. Rendered above the doc/section
+               surfaces; "dock back" (in the panel) returns it to the
+               right-side dock. -->
+          {#await dock.fullscreen.load?.() then mod}
+            {#if mod?.default}
+              {@const Full = mod.default}
+              <div class="full-panel">
+                <Full {...dock.fullscreen.props ?? {}} fullscreen={true} />
+              </div>
+            {/if}
+          {/await}
+        {:else if chrome.mode === "doc"}
           <DocViewer />
         {:else}
           {@const Section = sectionFor(active)}
@@ -926,6 +939,14 @@
     opacity: 0;
     transform: translateY(10px);
     pointer-events: none;
+  }
+  /* A popped-out dock panel filling the canvas as its own tab. */
+  .full-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
   /* Style danger context-menu items — ContextMenu uses :global(.ctx-item),
    * so this hook also has to be :global. */

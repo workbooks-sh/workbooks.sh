@@ -39,22 +39,46 @@
     document.body.appendChild(node);
     return { destroy: () => node.remove() };
   }
+
+  // The badge reads as "active" whether the panel is open in the dock OR
+  // popped out into a full tab; clicking a popped-out panel docks it back.
+  function isActive(id: string): boolean {
+    return dock.isOpen(id) || dock.isFullscreen(id);
+  }
+  function onClick(id: string) {
+    if (dock.isFullscreen(id)) dock.dockIn();
+    else dock.toggle(id);
+  }
+
+  // Drag the badge out (toward the canvas) → pop the panel into a full tab.
+  function onDragStart(id: string, e: DragEvent) {
+    e.dataTransfer?.setData("text/plain", `dock-panel:${id}`);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  }
+  function onDragEnd(id: string) {
+    // dragend fires after a successful drop anywhere; pop out the panel so
+    // "drag the agent out" produces the full tab even without a drop zone.
+    if (!dock.isFullscreen(id)) dock.popOut(id);
+  }
 </script>
 
 {#each panels as p (p.id)}
   <button
     type="button"
     class="dock-btn"
-    class:active={dock.isOpen(p.id)}
+    class:active={isActive(p.id)}
     class:icon-only={p.iconOnly}
     data-tauri-drag-region="false"
+    draggable={kind === "agent"}
     aria-label={p.title}
-    aria-pressed={dock.isOpen(p.id)}
+    aria-pressed={isActive(p.id)}
     onmouseenter={(e) => showTip(e, p.title)}
     onmouseleave={hideTip}
     onfocus={(e) => showTip(e, p.title)}
     onblur={hideTip}
-    onclick={() => dock.toggle(p.id)}
+    ondragstart={kind === "agent" ? (e) => onDragStart(p.id, e) : undefined}
+    ondragend={kind === "agent" ? () => onDragEnd(p.id) : undefined}
+    onclick={() => onClick(p.id)}
   >
     {#if p.icon}
       {@const Icon = p.icon}
