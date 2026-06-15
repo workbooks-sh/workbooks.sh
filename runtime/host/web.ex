@@ -49,6 +49,39 @@ defmodule Workbooks.Web do
     serve_repo_file(conn, "capabilities.json", "application/json")
   end
 
+  # Org-provisioned agent keys (wb-xiei.2). An organization can provision the
+  # OpenRouter / Gemini keys for its members so onboarding doesn't have to ask — the
+  # desktop fetches these on sign-in and applies them locally. Stored per-tenant in
+  # Workbooks.Vars (secret); the tenant is the AUTH-verified WorkOS org (OIDC maps
+  # `org_id` -> tenant). GET = any org member reads its org's keys; POST sets them
+  # (admin-gating is enforced in the dashboard, wb-xiei.4 — this is the storage seam).
+  get "/api/org-secrets" do
+    tenant = conn.assigns.tenant
+
+    keys =
+      for k <- org_secret_keys(),
+          v = Workbooks.Vars.host_secret(tenant, k),
+          is_binary(v) and v != "",
+          into: %{},
+          do: {k, v}
+
+    send_json(conn, 200, %{keys: keys})
+  end
+
+  post "/api/org-secrets" do
+    {:ok, body, conn} = read_body(conn)
+    tenant = conn.assigns.tenant
+    incoming = (Jason.decode!(body)["keys"] || %{})
+
+    set =
+      for {k, v} <- incoming, k in org_secret_keys(), is_binary(v) and v != "" do
+        Workbooks.Vars.set(tenant, k, v, true)
+        k
+      end
+
+    send_json(conn, 200, %{ok: true, set: set})
+  end
+
   # Secret injection (wb-2s09). The desktop holds the user's API keys in the OS
   # keychain; the runtime — especially containerized — can't read that, yet the
   # host-side loaders pull creds from the process ENV (e.g. llm.ex reads
@@ -1778,6 +1811,11 @@ defmodule Workbooks.Web do
   defp send_json(conn, status, payload) do
     conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
   end
+
+  # The agent keys an org may provision for its members (wb-xiei.2). Allowlisted so
+  # GET /api/org-secrets can never exfiltrate arbitrary tenant vars and POST can't
+  # write outside this set.
+  defp org_secret_keys, do: ~w(OPENROUTER_API_KEY GEMINI_API_KEY)
 
   # Map a parsed headline (a board-views file entry) to a desktop BoardView.
   defp headline_to_view(h) do
