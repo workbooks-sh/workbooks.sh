@@ -1,0 +1,97 @@
+#+TITLE: UGC Pro
+#+WORKSPACE: ugc-pro
+#+OWNER: kelly
+#+DESCRIPTION: The operating system for a professional UGC creator + the UGC Pro academy — brand deals, deliverables, course/LMS, creator<->brand matching, and the business behind the content. Eight folders run the whole creator business.
+
+* Creator HQ Dashboard                      :member:
+  :PROPERTIES:
+  :PATH: workbooks/creator-hq.html
+  :SCOPE: write
+  :FOLDER: Creator HQ
+  :END:
+
+  The home screen of a working UGC creator — pipeline value, monthly revenue,
+  active deals, and content shipped this month.
+
+* Brand Deal Pipeline (CRM)                 :member:
+  :PROPERTIES:
+  :PATH: workbooks/deal-pipeline.html
+  :SCOPE: write
+  :FOLDER: Brand Deals
+  :END:
+
+  A drag-stage CRM of every brand from cold pitch to paid + repeat.
+
+* Deliverables Board                        :member:
+  :PROPERTIES:
+  :PATH: workbooks/deliverables-board.html
+  :SCOPE: write
+  :FOLDER: Production
+  :END:
+
+  Kanban of every video/photo deliverable across live deals — script, shoot,
+  edit, revision, delivered.
+
+* Earnings Ledger (SQL)                      :member:
+  :PROPERTIES:
+  :PATH: workbooks/earnings-ledger.html
+  :SCOPE: write
+  :FOLDER: Money
+  :END:
+
+  A spreadsheet-with-SQL ledger of invoices, usage-rights add-ons, and realised
+  earnings — query your own book of business.
+
+* UGC University (LMS)                       :member:
+  :PROPERTIES:
+  :PATH: workbooks/ugc-university.html
+  :SCOPE: write
+  :FOLDER: Academy (LMS)
+  :END:
+
+  The flagship A-Z course player — modules, lessons, progress, swipe file.
+
+* Creator <-> Brand Match                    :member:
+  :PROPERTIES:
+  :PATH: workbooks/match-marketplace.html
+  :SCOPE: write
+  :FOLDER: Marketplace
+  :END:
+
+  Brand briefs matched to creators on niche, rate, and platform fit.
+
+* ugc.pro Landing Page                       :member:
+  :PROPERTIES:
+  :PATH: workbooks/landing.html
+  :SCOPE: write
+  :FOLDER: Marketing & Brand
+  :END:
+
+  The public marketing page — Create Content That Converts.
+
+* Partner Deck                               :member:
+  :PROPERTIES:
+  :PATH: workbooks/pitch-deck.html
+  :SCOPE: write
+  :FOLDER: Marketing & Brand
+  :END:
+
+  Mouse-flippable slide deck for the UGC Pro academy.
+
+* Portfolio One-Sheet                        :member:
+  :PROPERTIES:
+  :PATH: workbooks/portfolio.html
+  :SCOPE: write
+  :FOLDER: Marketing & Brand
+  :END:
+
+  A creator's public portfolio + rate sheet to send to brands.
+
+* Creative Strategy Report                   :member:
+  :PROPERTIES:
+  :PATH: workbooks/strategy-report.html
+  :SCOPE: write
+  :FOLDER: Strategy
+  :END:
+
+  Quarterly performance read on what's winning in paid: hooks, formats, CTRs.

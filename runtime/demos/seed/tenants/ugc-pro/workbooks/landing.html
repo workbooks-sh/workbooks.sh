@@ -1,0 +1,335 @@
+<!doctype html>
+<!-- workbook: landing — the public ugc.pro marketing page (Create Content That Converts). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UGC Pro — Create Content That Converts</title>
+  <meta name="description" content="Join 5,000+ creators landing brand deals with Nike, Sephora & Shopify. The A–Z system from the team behind $500M+ in ad revenue." />
+  <script id="workbook-spec" type="application/json">
+    {
+      "id": "landing",
+      "kind": "landing",
+      "title": "ugc.pro Landing Page",
+      "owner": "kelly",
+      "workspace": "ugc-pro",
+      "frozen_at": "2026-06-14T00:00:00Z"
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --green:#FF2D78;--green-d:#7C3AED;--green-dd:#6D28D9;
+      --ink:#1A0B2E;--bg:#FFF6FB;--card:#fff;--line:#F0E2EE;--muted:#7B6E8C;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{font:16px/1.6 Plus Jakarta Sans,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);background:var(--bg);margin:0;-webkit-font-smoothing:antialiased}
+    a{color:inherit;text-decoration:none}
+    img{display:block}
+    h2,h3,h4,.ministat .n,.tier .price,.tier h3{font-family:"Bricolage Grotesque",sans-serif}
+    .stars{filter:hue-rotate(0)}
+    .stories h2,.pricing h2,.mentors h2,.final h2{font-weight:800;letter-spacing:-.03em}
+    .ministat .n,.tier .price{font-weight:800}
+
+    /* nav */
+    nav{display:flex;align-items:center;justify-content:space-between;padding:16px 7vw;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(251,253,251,.86);backdrop-filter:saturate(160%) blur(10px);z-index:20}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:-.01em}
+    .brand{font-family:"Bricolage Grotesque",sans-serif;font-weight:800}
+    .mark{width:34px;height:34px;border-radius:11px;background:var(--grad,linear-gradient(135deg,#FF2D78,#7C3AED));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;letter-spacing:-.02em;box-shadow:0 6px 16px rgba(255,45,120,.32)}
+    .nlinks{display:flex;gap:28px;font-size:14px;color:var(--muted);align-items:center;font-weight:600}
+    .nlinks a:hover{color:var(--ink)}
+    .nlinks .new{display:inline-flex;align-items:center;background:var(--yellow,#FFD93D);color:var(--ink);font-size:9px;font-weight:800;letter-spacing:.06em;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle}
+    .btn{display:inline-block;background:linear-gradient(135deg,#FF2D78,#7C3AED);color:#fff;border:0;border-radius:999px;padding:13px 24px;font-weight:700;font-size:14px;cursor:pointer;transition:transform .12s,box-shadow .12s;box-shadow:0 10px 24px rgba(255,45,120,.32)}
+    .btn:hover{transform:translateY(-2px)}
+    .btn:active{transform:translateY(1px)}
+    .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+    .btn.ghost:hover{border-color:#cdded4;background:#fff}
+
+    /* hero */
+    .hero{text-align:center;padding:84px 7vw 54px;max-width:940px;margin:0 auto}
+    .eyebrow{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:linear-gradient(135deg,#FF2D78,#7C3AED);padding:6px 14px;border-radius:999px}
+    h1{font-family:"Bricolage Grotesque",sans-serif;font-size:clamp(42px,6.8vw,72px);font-weight:800;letter-spacing:-.04em;line-height:1;margin:20px 0 0}
+    h1 em{font-style:normal;background:linear-gradient(135deg,#FF2D78,#7C3AED);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    .lede{font-size:19px;color:var(--muted);max-width:620px;margin:22px auto 30px}
+    .lede b{color:var(--ink);font-weight:650}
+    .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+    .ministat{display:flex;gap:30px;justify-content:center;margin-top:40px;flex-wrap:wrap}
+    .ministat div{text-align:center}
+    .ministat .n{font-size:26px;font-weight:720;letter-spacing:-.02em;color:var(--ink)}
+    .ministat .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+
+    /* brand strip */
+    .brands{padding:8px 7vw 36px;max-width:780px;margin:0 auto;text-align:center}
+    .brands .cap{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#9aa6a0;font-weight:700}
+    .brands .row{display:flex;gap:38px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:16px}
+    .brands .row span{font-weight:800;font-size:20px;color:#aab4ae;letter-spacing:.01em}
+
+    /* trust / press */
+    .press{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#FBEFF7}
+    .press .inner{max-width:880px;margin:0 auto;padding:26px 7vw;display:flex;align-items:center;justify-content:center;gap:40px;flex-wrap:wrap}
+    .press .cap{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+    .press .logo{font-weight:800;font-size:21px;color:#3a443e;letter-spacing:-.01em;opacity:.78}
+
+    /* stories */
+    .stories{padding:68px 7vw;background:var(--ink);color:#eaf2ed}
+    .stories h2{text-align:center;font-size:clamp(26px,3.4vw,34px);font-weight:700;letter-spacing:-.025em;margin:0 0 6px}
+    .stories .sub{text-align:center;color:#A99BB8;margin:0 0 38px}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;max-width:1120px;margin:0 auto}
+    .tcard{background:#141a16;border:1px solid #25302a;border-radius:16px;padding:24px;display:flex;flex-direction:column}
+    .stars{color:var(--yellow,#FFD93D);font-size:13px;letter-spacing:2px;margin-bottom:12px}
+    .tcard .q{font-size:15.5px;line-height:1.55;flex:1}
+    .tcard .amt{color:var(--green);font-weight:700}
+    .tcard .who{display:flex;align-items:center;gap:11px;margin-top:20px}
+    .tcard img{width:44px;height:44px;border-radius:50%;border:2px solid #2c3a32}
+    .tcard .nm{font-weight:650;font-size:14px}
+    .tcard .rl{font-size:12px;color:#A99BB8;margin-top:1px}
+
+    /* pricing */
+    .pricing{padding:72px 7vw 16px;max-width:1140px;margin:0 auto}
+    .pricing h2{text-align:center;font-size:clamp(26px,3.4vw,34px);font-weight:700;letter-spacing:-.025em;margin:0 0 8px}
+    .pricing .ps{text-align:center;color:var(--muted);margin:0 0 40px}
+    .tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+    .tier{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px;display:flex;flex-direction:column;position:relative}
+    .tier.feat{border:2px solid var(--green-d);box-shadow:0 16px 50px rgba(124,58,237,.14)}
+    .tier .ribbon{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#FF2D78,#7C3AED);color:#fff;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:4px 12px;border-radius:20px}
+    .tier .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--green-d)}
+    .tier h3{font-size:21px;font-weight:700;margin:8px 0 2px;letter-spacing:-.01em}
+    .tier .tline{font-size:13px;color:var(--muted);margin-bottom:14px}
+    .tier .price{font-size:36px;font-weight:720;letter-spacing:-.025em;display:flex;align-items:baseline;gap:8px}
+    .tier .was{color:var(--muted);text-decoration:line-through;font-size:16px;font-weight:400}
+    .tier .save{font-size:12px;color:var(--green-d);font-weight:700;margin-top:4px}
+    .tier ul{list-style:none;padding:0;margin:18px 0 22px;font-size:14px;flex:1}
+    .tier li{padding:7px 0 7px 26px;position:relative;color:#27302b;line-height:1.45}
+    .tier li:before{content:"✓";position:absolute;left:0;top:7px;color:var(--green-d);font-weight:800}
+    .tier .btn{display:block;text-align:center}
+    .guarantee{text-align:center;color:var(--muted);font-size:13px;margin:26px 0 0}
+
+    /* mentors */
+    .mentors{padding:64px 7vw 8px;max-width:1000px;margin:0 auto;text-align:center}
+    .mentors h2{font-size:clamp(24px,3vw,30px);font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
+    .mentors .sub{color:var(--muted);margin:0 0 34px}
+    .mgrid{display:grid;grid-template-columns:1fr 1fr;gap:22px;text-align:left}
+    .mcard{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;display:flex;gap:18px;align-items:flex-start}
+    .mcard img{width:72px;height:72px;border-radius:14px;flex:none}
+    .mcard .mn{font-weight:700;font-size:17px;letter-spacing:-.01em}
+    .mcard .mt{font-size:13px;color:var(--green-d);font-weight:650;margin:2px 0 8px}
+    .mcard .mb{font-size:14px;color:#36403a;line-height:1.5}
+
+    /* final cta */
+    .final{text-align:center;padding:72px 7vw 8px;max-width:720px;margin:0 auto}
+    .final h2{font-size:clamp(26px,3.6vw,36px);font-weight:720;letter-spacing:-.03em;margin:0 0 14px}
+    .final p{color:var(--muted);margin:0 0 26px;font-size:18px}
+
+    /* footer */
+    footer{margin-top:64px;border-top:1px solid var(--line);background:#FBEFF7}
+    .fcols{max-width:1100px;margin:0 auto;padding:48px 7vw 28px;display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:28px}
+    .fcols h4{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+    .fcols a{display:block;font-size:14px;color:#36403a;padding:5px 0}
+    .fcols a:hover{color:var(--green-d)}
+    .fcols .blurb{font-size:14px;color:var(--muted);line-height:1.6;max-width:260px}
+    .fbar{border-top:1px solid var(--line);text-align:center;padding:20px;color:var(--muted);font-size:13px}
+
+    @media(max-width:860px){
+      .tiers{grid-template-columns:1fr}
+      .mgrid{grid-template-columns:1fr}
+      .fcols{grid-template-columns:1fr 1fr}
+      .nlinks a:nth-child(1),.nlinks a:nth-child(2){display:none}
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="brand"><span class="mark">UP</span> UGC&nbsp;Pro</div>
+    <div class="nlinks">
+      <a href="#pricing">Courses</a>
+      <a href="#community">Community<span class="new">NEW</span></a>
+      <a href="#">Login</a>
+      <a class="btn" href="#pricing">Become a UGC Pro</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="eyebrow">The fastest path to UGC &amp; beyond</div>
+    <h1>Create content that <em>converts</em>.</h1>
+    <p class="lede">Join <b>5,000+ creators</b> landing brand deals with <b>Nike</b>, <b>Sephora</b> &amp; <b>Shopify</b> — taught by the team behind <b>$500M+ in ad revenue</b>.</p>
+    <div class="cta">
+      <a class="btn" href="#pricing">Start your UGC journey</a>
+      <a class="btn ghost" href="#">Watch the free 50-min masterclass</a>
+    </div>
+    <div class="ministat">
+      <div><div class="n">5,000+</div><div class="l">Creators trained</div></div>
+      <div><div class="n">$500M+</div><div class="l">Ad revenue driven</div></div>
+      <div><div class="n">4.9★</div><div class="l">Avg. rating</div></div>
+    </div>
+  </header>
+
+  <section class="brands">
+    <div class="cap">Trusted by creators working with</div>
+    <div class="row"><span>NIKE</span><span>Sephora</span><span>shopify</span><span>GLOSSIER</span><span>HelloFresh</span></div>
+  </section>
+
+  <section class="press">
+    <div class="inner">
+      <span class="cap">Featured in</span>
+      <span class="logo">Forbes</span>
+      <span class="logo">Business&nbsp;Insider</span>
+      <span class="logo">Yahoo&nbsp;Finance</span>
+    </div>
+  </section>
+
+  <section class="stories" id="community">
+    <h2>UGC Pro success stories</h2>
+    <p class="sub">Real members. Real deals. Real receipts.</p>
+    <div class="cards">
+      <div class="tcard">
+        <div class="stars">★★★★★</div>
+        <div class="q">"Just landed a <span class="amt">$2,500</span> deal for a single video after using the negotiation scripts. I used to undercharge by 4×."</div>
+        <div class="who"><img src="https://i.pravatar.cc/88?img=5" alt="Skye C."><div><div class="nm">Skye C.</div><div class="rl">UGC Creator · Austin, TX</div></div></div>
+      </div>
+      <div class="tcard">
+        <div class="stars">★★★★★</div>
+        <div class="q">"Went from total novice to full-time creator in <span class="amt">3 months</span>. The swipe file alone made me look like I'd done this for years."</div>
+        <div class="who"><img src="https://i.pravatar.cc/88?img=32" alt="Brianna T."><div><div class="nm">Brianna T.</div><div class="rl">UGC Pro Member · Atlanta, GA</div></div></div>
+      </div>
+      <div class="tcard">
+        <div class="stars">★★★★★</div>
+        <div class="q">"Kelly's insider knowledge on usage rights and retainers <span class="amt">tripled my earning potential</span>. I stopped leaving money on the table."</div>
+        <div class="who"><img src="https://i.pravatar.cc/88?img=11" alt="Zenaiah M."><div><div class="nm">Zenaiah M.</div><div class="rl">Expert UGC Creator · Toronto</div></div></div>
+      </div>
+      <div class="tcard">
+        <div class="stars">★★★★★</div>
+        <div class="q">"This free training helped me land my first <span class="amt">$2K</span> client within 2 weeks. I almost didn't sign up — so glad I did."</div>
+        <div class="who"><img src="https://i.pravatar.cc/88?img=9" alt="Sarah R."><div><div class="nm">Sarah R.</div><div class="rl">Beginner · Phoenix, AZ</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pricing" id="pricing">
+    <h2>Choose your path</h2>
+    <p class="ps">From your first $2K client to a six-figure creative-strategy business.</p>
+    <div class="tiers">
+
+      <div class="tier">
+        <div class="tag">Start here</div>
+        <h3>UGC University</h3>
+        <div class="tline">The complete A–Z creator system</div>
+        <div class="price">$149.99 <span class="was">$199</span></div>
+        <div class="save">Save $49 · limited launch price</div>
+        <ul>
+          <li>9+ hours of step-by-step video, A to Z</li>
+          <li>233-page guide + plug-and-play Notion dashboard</li>
+          <li>150+ winning videos in the swipe file</li>
+          <li>2026 trend reports &amp; hook library</li>
+          <li>Rate-card calculator &amp; pricing scripts</li>
+          <li>Private member community access</li>
+        </ul>
+        <a class="btn ghost" href="#">Enroll now</a>
+      </div>
+
+      <div class="tier feat">
+        <div class="ribbon">Most popular</div>
+        <div class="tag">Level up</div>
+        <h3>Creative Strategist</h3>
+        <div class="tline">Charge for strategy, not just shoots</div>
+        <div class="price">$299 <span class="was">$499</span></div>
+        <div class="save">Save $200 · best value</div>
+        <ul>
+          <li>Everything in UGC University</li>
+          <li>Position &amp; sell creative strategy retainers</li>
+          <li>Pitching playbooks that win $3K–$8K/mo deals</li>
+          <li>Reading the performance data brands pay for</li>
+          <li>Brand-side decision-maker outreach templates</li>
+          <li>Live monthly Q&amp;A with Kelly</li>
+        </ul>
+        <a class="btn" href="#">Become a strategist</a>
+      </div>
+
+      <div class="tier">
+        <div class="tag">Master class</div>
+        <h3>Strategy × Paid Media</h3>
+        <div class="tline">Think like the agency buying the ads</div>
+        <div class="price">$599 <span class="was">$899</span></div>
+        <div class="save">Save $300</div>
+        <ul>
+          <li>8+ hours with Lamees Barnett, MBA</li>
+          <li>Full-funnel paid-media strategy &amp; testing</li>
+          <li>Budget allocation &amp; channel-mix frameworks</li>
+          <li>The $5B+ media-spend playbook, distilled</li>
+          <li>Creative-to-conversion measurement</li>
+          <li>Live Q&amp;A &amp; deal-review sessions</li>
+        </ul>
+        <a class="btn ghost" href="#">Go pro</a>
+      </div>
+
+    </div>
+    <p class="guarantee">14-day money-back guarantee · One-time payment · Lifetime access &amp; updates</p>
+  </section>
+
+  <section class="mentors">
+    <h2>Learn from people who've actually done it</h2>
+    <p class="sub">Not influencers selling a course about courses. Operators with receipts.</p>
+    <div class="mgrid">
+      <div class="mcard">
+        <img src="https://i.pravatar.cc/144?img=47" alt="Kelly Rocklein">
+        <div>
+          <div class="mn">Kelly Rocklein</div>
+          <div class="mt">Founder, UGC Pro · 7-figure creator</div>
+          <div class="mb">Built a full-time UGC business from a phone camera, landing recurring deals with Nike, Sephora &amp; Shopify. Now teaches the exact pricing, pitching, and negotiation system that took her from $250 videos to $2,500+ retainers.</div>
+        </div>
+      </div>
+      <div class="mcard">
+        <img src="https://i.pravatar.cc/144?img=12" alt="Lamees Barnett, MBA">
+        <div>
+          <div class="mn">Lamees Barnett, MBA</div>
+          <div class="mt">Paid-media strategist · $5B+ managed spend</div>
+          <div class="mb">Spent a decade on the brand side allocating nine-figure ad budgets and deciding which creative actually ships. Teaches creators to think like the buyer — so your content gets picked, scaled, and paid like a strategist.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="final">
+    <h2>Your first $2K client is closer than you think.</h2>
+    <p>5,000+ creators started exactly where you are. Pick your path and start today.</p>
+    <div class="cta" style="justify-content:center">
+      <a class="btn" href="#pricing">Become a UGC Pro</a>
+      <a class="btn ghost" href="#">Watch the free masterclass</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="fcols">
+      <div>
+        <div class="brand" style="margin-bottom:12px"><span class="mark">UP</span> UGC&nbsp;Pro</div>
+        <p class="blurb">The fastest path to UGC and beyond. Real systems from creators and strategists who've driven $500M+ in ad revenue.</p>
+      </div>
+      <div>
+        <h4>Courses</h4>
+        <a href="#pricing">UGC University</a>
+        <a href="#pricing">Creative Strategist</a>
+        <a href="#pricing">Strategy × Paid Media</a>
+        <a href="#">Free masterclass</a>
+      </div>
+      <div>
+        <h4>Community</h4>
+        <a href="#community">Success stories</a>
+        <a href="#">Member Discord</a>
+        <a href="#">Live Q&amp;A calendar</a>
+        <a href="#">Mentors</a>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <a href="#">About</a>
+        <a href="#">Contact</a>
+        <a href="#">Terms</a>
+        <a href="#">Privacy</a>
+      </div>
+    </div>
+    <div class="fbar">© 2026 UGC Pro · Led by Kelly Rocklein &amp; Lamees Barnett, MBA · ugc.pro</div>
+  </footer>
+
+</body>
+</html>
