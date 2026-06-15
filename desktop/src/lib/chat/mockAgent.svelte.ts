@@ -1,0 +1,188 @@
+// Browser-preview mock agent for the component-toolkit artifact flow.
+//
+// In the packaged app, `ws.sendUserInput()` POSTs `/api/agent/run` and the
+// runtime streams telemetry over Phoenix. The browser preview (webHost
+// mock) has neither a runtime nor a socket, so this module stands in: it
+// scripts a believable agent run that exercises the component-toolkit EXEC
+// shape end-to-end — produce a component artifact, write it (in-memory),
+// emit the `component_artifact` event, and finish.
+//
+// The scripted events are pushed through `ws.emitLocal()` on the live
+// `session:<id>` topic, so the existing `chatSession` projection renders
+// them with zero special-casing. Iterating: a follow-up prompt that
+// mentions the same artifact emits an "updated" artifact event so the user
+// can keep working the component WITH the agent (the feature's whole point).
+
+import { ws } from "$lib/bridge/ws.svelte";
+import { componentArtifacts } from "./artifacts.svelte";
+
+/** True only in the browser preview where webHost installed its mock. */
+export function mockMode(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    (window as unknown as { __WB_DEV_MOCK__?: boolean }).__WB_DEV_MOCK__ === true
+  );
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Stable artifact path derived from the user's prompt — so a follow-up
+ *  referencing the same thing updates the same component (and tab) instead
+ *  of spawning a new one. */
+function artifactPathFor(prompt: string): { path: string; title: string } {
+  const slug =
+    prompt
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .split("-")
+      .slice(0, 4)
+      .join("-") || "component";
+  const title = slug
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+  return { path: `/mock/components/${slug}.html`, title };
+}
+
+/** A real, branded, self-contained component the agent "built". This is the
+ *  kind of artifact a component-toolkit EXEC produces: a single HTML file
+ *  that opens in a workbook tab. Dark-first, live-green accent. */
+function componentHtml(title: string, prompt: string, revision: number): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>${title}</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    font: 15px/1.6 ui-sans-serif, system-ui, "Geist", sans-serif;
+    color: #e8eaed; background: #0e1014;
+    display: grid; place-items: center; padding: 32px;
+    background-image:
+      radial-gradient(circle at 20% 0%, rgba(63,224,129,.10), transparent 45%),
+      radial-gradient(circle at 80% 100%, rgba(63,224,129,.06), transparent 40%);
+  }
+  .card {
+    width: min(560px, 100%);
+    border: 1px solid #23262e; border-radius: 16px;
+    background: linear-gradient(180deg, #15181e, #111419);
+    padding: 28px 30px; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  .tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 11px; border-radius: 999px;
+    background: rgba(63,224,129,.12); color: #3fe081;
+    font: 600 11px/1 ui-monospace, "Geist Mono", monospace;
+    letter-spacing: .06em; text-transform: uppercase;
+  }
+  .tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #3fe081; }
+  h1 { font-size: 22px; margin: 16px 0 6px; letter-spacing: -.01em; }
+  p.sub { margin: 0 0 22px; color: #9aa0aa; font-size: 13.5px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat {
+    flex: 1 1 120px; padding: 14px 16px; border: 1px solid #23262e;
+    border-radius: 12px; background: #0f1217;
+  }
+  .stat .k { font: 600 10px/1 ui-monospace, monospace; text-transform: uppercase;
+    letter-spacing: .08em; color: #6b7280; }
+  .stat .v { font-size: 24px; font-weight: 650; margin-top: 6px; color: #3fe081; }
+  .actions { display: flex; gap: 10px; }
+  button {
+    flex: 1; padding: 11px 14px; border: 0; border-radius: 10px; cursor: pointer;
+    font: 600 14px/1 inherit; transition: transform .08s, filter .12s;
+  }
+  button:active { transform: translateY(1px); }
+  .primary { background: #3fe081; color: #06140c; }
+  .primary:hover { filter: brightness(1.07); }
+  .ghost { background: #1a1e25; color: #e8eaed; border: 1px solid #2a2e37; }
+  .ghost:hover { background: #21262f; }
+  .count { text-align: center; margin-top: 18px; font-size: 13px; color: #9aa0aa; }
+  .count b { color: #3fe081; font-variant-numeric: tabular-nums; }
+  .rev { margin-top: 20px; font: 11px/1.4 ui-monospace, monospace; color: #5b616b; }
+</style></head>
+<body>
+  <main class="card">
+    <span class="tag">Component artifact</span>
+    <h1>${title}</h1>
+    <p class="sub">Generated by the component-toolkit from: “${prompt.replace(/"/g, "&quot;")}”</p>
+    <div class="row">
+      <div class="stat"><div class="k">Status</div><div class="v">Live</div></div>
+      <div class="stat"><div class="k">Revision</div><div class="v">${revision}</div></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="inc">Increment</button>
+      <button class="ghost" id="reset">Reset</button>
+    </div>
+    <p class="count">Interactions: <b id="n">0</b></p>
+    <p class="rev">artifact · rev ${revision} · keep iterating with the agent →</p>
+  </main>
+  <script>
+    let n = 0;
+    const el = document.getElementById('n');
+    document.getElementById('inc').onclick = () => { el.textContent = ++n; };
+    document.getElementById('reset').onclick = () => { n = 0; el.textContent = 0; };
+  </script>
+</body></html>`;
+}
+
+/** Track how many times each artifact path has been produced this session
+ *  so a follow-up reads as an "update" (rev N+1) rather than a new file. */
+const revisions = new Map<string, number>();
+
+/** Run the scripted component-toolkit agent for one prompt. Emits the same
+ *  telemetry event shape the real runtime does, on `session:<id>`. */
+export async function runMockComponentAgent(
+  sessionId: string,
+  prompt: string,
+): Promise<void> {
+  const topic = `session:${sessionId}`;
+  const emit = (name: string, payload: Record<string, unknown> = {}) =>
+    ws.emitLocal(name, { session_id: sessionId, ...payload }, topic);
+
+  emit("session_started", { agent: { name: "Waldo" } });
+  await sleep(220);
+
+  emit("llm_turn_start", { metadata: { provider: "openrouter", model: "component-toolkit" } });
+  await sleep(120);
+
+  const { path, title } = artifactPathFor(prompt);
+  const rev = (revisions.get(path) ?? 0) + 1;
+  revisions.set(path, rev);
+  const action = rev === 1 ? "created" : "updated";
+
+  // The EXEC: the component-toolkit produces the artifact. Surface it as a
+  // tool call (as the runtime would), then write the bytes + announce it.
+  emit("tool_call_start", {
+    metadata: { tool_name: "component_build", tool_call_id: `tc-${rev}`, args: { title } },
+  });
+  await sleep(380);
+
+  componentArtifacts.register(path, componentHtml(title, prompt, rev));
+
+  emit("tool_call_stop", {
+    metadata: { tool_name: "component_build", tool_call_id: `tc-${rev}`, status: "ok", result_size: 1 },
+  });
+  await sleep(80);
+
+  // The artifact event — this is what opens the tab.
+  emit("component_artifact", { path, title, kind: "workbook", action });
+  await sleep(120);
+
+  emit("llm_turn_stop", {
+    metadata: {
+      provider: "openrouter",
+      model: "component-toolkit",
+      status: "ok",
+      content:
+        action === "created"
+          ? `Built **${title}** and opened it as a tab. Tell me what to change and I'll update the component in place.`
+          : `Updated **${title}** (revision ${rev}). The tab reflects the latest version — keep iterating.`,
+    },
+  });
+  await sleep(60);
+
+  emit("session_completed", { result: { ok: true } });
+}

@@ -99,4 +99,30 @@ export interface RawEventRow {
   ts: number;
 }
 
-export type ChatBlock = AssistantMessage | ToolCallBlock | StatusBanner | RawEventRow;
+/** The component-toolkit EXEC shape: the agent produced a component
+ *  artifact (an HTML/workbook file) the user opens as a tab and keeps
+ *  iterating on with the agent.
+ *
+ *  Emitted as a `component_artifact` telemetry event on the session
+ *  channel with payload `{ path, title, kind, action }`. `action` is
+ *  "created" the first time the artifact is written and "updated" on
+ *  every subsequent edit of the same path — so the card can say
+ *  "Updated" rather than re-announce a new artifact. */
+export interface ArtifactBlock {
+  kind: "artifact";
+  key: string;
+  /** Absolute (or mock) path the artifact was written to — opens as a tab. */
+  path: string;
+  /** Display title for the card + tab. */
+  title: string;
+  /** "created" | "updated" — drives the card verb. */
+  action: "created" | "updated";
+  ts: number;
+}
+
+export type ChatBlock =
+  | AssistantMessage
+  | ToolCallBlock
+  | StatusBanner
+  | RawEventRow
+  | ArtifactBlock;

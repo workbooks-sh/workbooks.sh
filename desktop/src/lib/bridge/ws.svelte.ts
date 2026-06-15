@@ -253,6 +253,14 @@ class WsBridgeStore {
     return () => this.#handlers.delete(h);
   }
 
+  /** Inject a synthetic bridge event into the local handler set. Used by
+   *  the browser-preview mock agent (webHost) to drive the chat surface
+   *  without a live runtime/Phoenix socket — the real transport never
+   *  calls this. Mirrors the runtime's per-session telemetry shape. */
+  emitLocal(name: string, payload: unknown, topic: string): void {
+    this.#emit({ name, payload, topic });
+  }
+
   /** Push the channel-level `cancel` event for a session. The channel
    *  is expected to already be joined (sendUserInput joins it). Silent
    *  no-op if the session isn't known. */

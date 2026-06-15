@@ -46,5 +46,12 @@ export default defineConfig({
     watch: {
       ignored: ["**/src-tauri/**"],
     },
+    /* WB_FS_ALLOW — extra dirs added to Vite's serving allow-list. Used in
+     * git-worktree dev where node_modules is symlinked to the main checkout
+     * (outside the worktree root), which Vite otherwise 403s. Colon-separated
+     * absolute paths. No effect when unset (normal builds). */
+    fs: process.env.WB_FS_ALLOW
+      ? { allow: [".", ...process.env.WB_FS_ALLOW.split(":")] }
+      : undefined,
   },
 });

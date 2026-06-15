@@ -12,7 +12,10 @@ const MAX = 60;
 export interface SavedLine {
   who: "you" | "waldo";
   text: string;
-  kind: string; // "msg" | "tool" | "status"
+  kind: string; // "msg" | "tool" | "status" | "artifact"
+  /** Present on `artifact` lines — the component-toolkit artifact the agent
+   *  produced, so a past chat can re-open it. */
+  artifact?: { path: string; title: string; action: "created" | "updated" };
 }
 
 export interface SavedSession {

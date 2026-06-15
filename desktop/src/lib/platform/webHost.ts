@@ -433,11 +433,25 @@ function makeInvoke(): Invoke {
       case "read_file_bytes_base64": {
         const path = String(a.path ?? "");
         let html: string | null = null;
-        try {
-          const res = await fetch(path);
-          if (res.ok) html = await res.text();
-        } catch {
-          /* fall through to stub */
+        // Component-toolkit artifacts the mock agent produced live in an
+        // in-memory registry (no runtime to write them to disk in the
+        // browser preview). Serve those first so an agent-created
+        // component renders in its tab.
+        const artifacts = (
+          window as unknown as {
+            __WB_ARTIFACTS__?: { read(p: string): string | undefined };
+          }
+        ).__WB_ARTIFACTS__;
+        const registered = artifacts?.read(path);
+        if (registered !== undefined) {
+          html = registered;
+        } else {
+          try {
+            const res = await fetch(path);
+            if (res.ok) html = await res.text();
+          } catch {
+            /* fall through to stub */
+          }
         }
         if (html === null) html = stubWorkbookHtml(path);
         // base64-encode UTF-8 (mirror Rust's read_file_bytes_base64).
