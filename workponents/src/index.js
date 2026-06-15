@@ -18,6 +18,10 @@ export * from "./elements/video/index.js";    // wb-video, wb-video-source
 export * from "./elements/tables/index.js";   // wb-table, wb-column
 export * from "./elements/data-viz/index.js"; // wb-chart, wb-spark, wb-metric
 export * from "./elements/maps/index.js";     // wb-map
+export * from "./elements/forms/index.js";    // wb-form, wb-field, wb-field-group (+ the src/validate layer)
+export * from "./elements/records/index.js";  // wb-record, wb-record-list, wb-field-value
+export * from "./elements/search/index.js";   // wb-search, wb-command
+export * from "./elements/auth/index.js";     // wb-auth, wb-user, wb-gate (+ the identity seam)
 
 // shared in-WASM data layer (DuckDB-wasm / memory floor, behind the Host seam) —
 // the one engine the DuckDB trio (tables/data-viz/maps) queries.

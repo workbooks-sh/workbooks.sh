@@ -1,0 +1,219 @@
+// <wb-form> — the form surface. THE reinvention: a form IS its schema. The form
+// owns one declarative schema (inline JSON `schema` attr/property, OR built from
+// its child <wb-field> rules), runs `src/validate` against the live values on
+// input + on submit, blocks submit while invalid, and writes errors back down to
+// each field — validation is never hand-wired per control. Themed entirely from
+// --wb-* tokens.
+//
+// Events:
+//   wb-submit  { detail: { values } }  — fired only when the record is valid
+//   wb-invalid { detail: { errors } }  — fired when a submit is blocked
+//   wb-change  { detail: { values, valid } } — on every field input (live)
+//
+// Standalone (sync floor) by default; when a Host with a /validate route is
+// reachable (this.host.available("validate")) it merges server/derived errors
+// on submit via validateRecordAsync — the floor stays authoritative for what it
+// can decide, the Host only adds what it alone knows (uniqueness, cross-record).
+//
+// Usage:
+//   <wb-form>
+//     <wb-field name="email" type="email" label="Email" required></wb-field>
+//     <wb-field name="pw" type="password" label="Password" required min="8"></wb-field>
+//     <wb-button type="submit" slot="actions">Create</wb-button>
+//   </wb-form>
+import { WbElement, define } from "../../core/element.js";
+import { validateRecord, validateRecordAsync, parseSchema } from "../../validate/index.js";
+
+export class WbForm extends WbElement {
+  static props = ["schema", "submit-label", "novalidate", "live"];
+
+  static styles = `
+    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
+    form { display: block; }
+    .fields { display: block; }
+    .actions { display: flex; gap: var(--wb-space-3); align-items: center; margin-top: var(--wb-space-4); }
+    .summary { margin: 0 0 var(--wb-space-4); padding: var(--wb-space-3) var(--wb-space-4);
+      border-radius: var(--wb-radius); background: rgba(201,47,47,0.10);
+      border: 1px solid var(--wb-err); color: var(--wb-err); font-size: var(--wb-text-sm);
+      font-weight: 500; line-height: 1.5; display: none; }
+    :host([invalid]) .summary[data-has] { display: block; }
+    .submit { font: 600 var(--wb-text) var(--wb-font); padding: var(--wb-space-3) var(--wb-space-5);
+      border-radius: var(--wb-radius); border: 1.5px solid transparent;
+      background: var(--wb-brand); color: var(--wb-on-brand); cursor: pointer;
+      transition: transform var(--wb-dur) var(--wb-ease), box-shadow var(--wb-dur) var(--wb-ease); }
+    .submit:hover { transform: translateY(-1px); }
+    .submit:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); }
+    .submit[disabled] { opacity: 0.5; pointer-events: none; }
+  `;
+
+  /** The form's schema — explicit property/attr wins; otherwise built from the
+   *  child <wb-field> rules (the form IS its schema). */
+  get schema() {
+    if (this._schema) return this._schema;
+    const attr = this.attr("schema");
+    if (attr) { try { return parseSchema(JSON.parse(attr)); } catch { /* fall through */ } }
+    return this._schemaFromFields();
+  }
+  set schema(v) { this._schema = v; }
+
+  _fields() {
+    return Array.from(this.querySelectorAll("wb-field"));
+  }
+
+  _schemaFromFields() {
+    const s = {};
+    for (const f of this._fields()) {
+      const name = f.getAttribute("name");
+      if (name && f.rule) s[name] = f.rule;
+    }
+    return s;
+  }
+
+  /** Current { name: value } record across all child fields. */
+  get values() {
+    const out = {};
+    for (const f of this._fields()) {
+      const name = f.getAttribute("name");
+      if (name) out[name] = f.value;
+    }
+    return out;
+  }
+
+  render() {
+    const label = this.attr("submit-label", "Submit");
+    return `
+      <form novalidate>
+        <p class="summary" role="alert"></p>
+        <div class="fields"><slot></slot></div>
+        <div class="actions">
+          <slot name="actions"><button class="submit" type="submit">${label}</button></slot>
+        </div>
+      </form>`;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    const form = this.shadowRoot.querySelector("form");
+
+    // Live validation: any field input bubbles wb-field-input / wb-field-blur.
+    this.addEventListener("wb-field-input", (e) => {
+      this.dispatchEvent(new CustomEvent("wb-change", {
+        bubbles: true, composed: true,
+        detail: { values: this.values, valid: validateRecord(this.values, this.schema).valid },
+      }));
+      // Re-validate just the touched field if it currently shows an error (clear-on-fix),
+      // or always when `live` is set.
+      const touched = e.detail && e.detail.name;
+      if (this.boolAttr("live") || this._submitted || this._fieldInvalid(touched)) this._revalidateField(touched);
+    });
+    this.addEventListener("wb-field-blur", (e) => {
+      if (this._submitted || this.boolAttr("live")) this._revalidateField(e.detail && e.detail.name);
+    });
+
+    // Submit (native submit from a slotted <wb-button type=submit> or the default).
+    form.addEventListener("submit", (e) => { e.preventDefault(); this.submit(); });
+    // A slotted action button might be a <wb-button> not a real submit; catch clicks.
+    this.addEventListener("click", (e) => {
+      const t = e.target;
+      const tag = t && t.tagName && t.tagName.toLowerCase();
+      if ((tag === "wb-button" || (t && t.getAttribute && t.getAttribute("type") === "submit")) &&
+          (t.slot === "actions" || t.getAttribute("slot") === "actions")) {
+        e.preventDefault(); this.submit();
+      }
+    });
+  }
+
+  _fieldByName(name) {
+    return this._fields().find((f) => f.getAttribute("name") === name);
+  }
+  _fieldInvalid(name) {
+    const f = this._fieldByName(name);
+    return f && f.hasAttribute("invalid");
+  }
+
+  /** Validate one field and write/clear its error (live path). */
+  _revalidateField(name) {
+    if (!name) return;
+    const schema = this.schema;
+    const rule = schema[name];
+    if (!rule) return;
+    const { errors } = validateRecord(this.values, { [name]: rule });
+    const f = this._fieldByName(name);
+    if (f) f.setError(errors.length ? errors[0].message : null);
+    this._refreshSummary();
+  }
+
+  /** Apply a full error list down to the fields + the summary. */
+  _applyErrors(errors) {
+    const byField = {};
+    for (const e of errors) { if (!byField[e.path]) byField[e.path] = e.message; }
+    for (const f of this._fields()) {
+      const name = f.getAttribute("name");
+      f.setError(byField[name] || null);
+    }
+    if (errors.length) this.setAttribute("invalid", ""); else this.removeAttribute("invalid");
+    this._refreshSummary(errors);
+  }
+
+  _refreshSummary(errors) {
+    const sum = this.shadowRoot.querySelector(".summary");
+    if (!sum) return;
+    const list = errors || this._fields()
+      .filter((f) => f.hasAttribute("invalid"))
+      .map((f) => ({ message: f.getAttribute("error") }));
+    if (list.length) {
+      sum.setAttribute("data-has", "");
+      sum.textContent = list.length === 1
+        ? list[0].message
+        : `${list.length} fields need attention.`;
+    } else {
+      sum.removeAttribute("data-has");
+      sum.textContent = "";
+    }
+  }
+
+  /** Run validation; on valid → wb-submit, on invalid → wb-invalid + mark fields. */
+  async submit() {
+    this._submitted = true;
+    const values = this.values;
+    const schema = this.schema;
+    if (this.boolAttr("novalidate")) {
+      this.dispatchEvent(new CustomEvent("wb-submit", { bubbles: true, composed: true, detail: { values } }));
+      return { valid: true, values };
+    }
+    // Sync floor first (instant), then optional Host merge.
+    let result = validateRecord(values, schema);
+    this._applyErrors(result.errors);
+    if (!result.valid) {
+      this.dispatchEvent(new CustomEvent("wb-invalid", { bubbles: true, composed: true, detail: { errors: result.errors } }));
+      return result;
+    }
+    // Floor passed — consult the Host for server/derived errors when reachable.
+    const merged = await validateRecordAsync(values, schema, this.host);
+    if (!merged.valid) {
+      this._applyErrors(merged.errors);
+      this.dispatchEvent(new CustomEvent("wb-invalid", { bubbles: true, composed: true, detail: { errors: merged.errors } }));
+      return merged;
+    }
+    this.removeAttribute("invalid");
+    this._refreshSummary([]);
+    this.dispatchEvent(new CustomEvent("wb-submit", { bubbles: true, composed: true, detail: { values } }));
+    return { valid: true, values };
+  }
+
+  /** Programmatic validate without firing submit (useful for records/tables). */
+  validate() {
+    const r = validateRecord(this.values, this.schema);
+    this._applyErrors(r.errors);
+    return r;
+  }
+
+  reset() {
+    this._submitted = false;
+    for (const f of this._fields()) { f.value = ""; f.clearError(); }
+    this.removeAttribute("invalid");
+    this._refreshSummary([]);
+  }
+}
+
+define("wb-form", WbForm);
