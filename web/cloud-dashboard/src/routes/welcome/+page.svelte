@@ -124,8 +124,8 @@
   }
   .ob-rail { display:flex; gap:7px; margin-bottom:24px; }
   .ob-dot { height:5px; flex:1; border-radius:3px; background:#eceae2; }
-  .ob-dot.on { background:var(--bloomd); }
-  .ob-dot.done { background:color-mix(in srgb, var(--bloomd) 50%, #eceae2); }
+  .ob-dot.on { background:#121316; }
+  .ob-dot.done { background:color-mix(in srgb, #121316 42%, #eceae2); }
   .ob-badge { width:46px; height:46px; border-radius:13px; display:grid; place-items:center;
     font-size:22px; border:2px solid #1a1b1e; margin-bottom:16px; box-shadow:2px 2px 0 #1a1b1e; }
   h1 { font-size:25px; margin:0 0 10px; letter-spacing:-.01em; }
@@ -142,11 +142,13 @@
   .opt.sel small { color:#3a3f36; }
   .done-row { border:2px solid #1a1b1e; border-radius:11px; padding:11px 14px; font-size:13.5px; margin-bottom:6px; }
   .foot { display:flex; justify-content:flex-end; gap:8px; margin-top:26px; }
-  .btn { padding:10px 18px; border:2px solid #1a1b1e; border-radius:10px; box-shadow:2px 2px 0 #1a1b1e;
-    font-weight:700; font-size:13px; cursor:pointer; background:#fff; color:#1a1b1e; text-decoration:none;
-    display:inline-flex; align-items:center; transition:transform .06s, box-shadow .06s; }
-  .btn:hover { transform:translate(1px,1px); box-shadow:1px 1px 0 #1a1b1e; }
-  .btn.primary { background:var(--bloomd); color:#fff; border-color:#1a1b1e; box-shadow:2px 2px 0 #1a1b1e; }
-  .btn:disabled { opacity:.45; cursor:default; transform:none; box-shadow:2px 2px 0 #1a1b1e; }
+  /* buttons use Geist Mono, like the live site; PRIMARY is ink (not green) */
+  .btn { padding:11px 18px; border:2px solid #121316; border-radius:10px; box-shadow:2px 2px 0 #121316;
+    font:600 12.5px/1 var(--mono); letter-spacing:-.01em; cursor:pointer; background:#fff; color:#121316;
+    text-decoration:none; display:inline-flex; align-items:center; transition:transform .06s, box-shadow .06s; }
+  .btn:hover { transform:translate(1px,1px); box-shadow:1px 1px 0 #121316; }
+  .btn.primary { background:#121316; color:#fbfaf3; border-color:#121316; }
+  .btn.primary:hover { background:#000; }
+  .btn:disabled { opacity:.4; cursor:default; transform:none; box-shadow:2px 2px 0 #121316; }
   .big-btn { padding:12px 22px; font-size:14.5px; }
 </style>
