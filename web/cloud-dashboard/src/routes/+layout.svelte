@@ -74,6 +74,7 @@
     if (p.startsWith('/shared')) return 'var(--cream)';
     if (p.startsWith('/usage')) return 'var(--sage)';
     if (p.startsWith('/settings')) return 'var(--violet)';
+    if (p.startsWith('/workspace')) return 'var(--peach)';
     return 'var(--mint)'; // nexuses / home / detail
   });
   // the signed-in user (from the WorkOS session via +layout.server.js)
@@ -134,6 +135,7 @@
     if (p.startsWith('/shared')) return { label: 'Sharing' };
     if (p.startsWith('/usage')) return { label: 'Usage & billing' };
     if (p.startsWith('/settings')) return { label: 'Settings' };
+    if (p.startsWith('/workspace')) return { label: 'Workspace' };
     return { label: 'Nexus' };
   });
 
@@ -252,7 +254,7 @@
               <span class="av sm plus">+</span><span class="omname">New workspace</span><small>free</small>
             </button>
           {/if}
-          <a class="omitem" href="/settings" onclick={() => (wsMenuOpen = false)}>Workspace settings</a>
+          <a class="omitem" href="/workspace" onclick={() => (wsMenuOpen = false)}>Workspace settings</a>
         </div>
       {/if}
     </div>
