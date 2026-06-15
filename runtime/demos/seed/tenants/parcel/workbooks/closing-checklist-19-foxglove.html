@@ -1,0 +1,585 @@
+<!doctype html>
+<!-- workbook: closing-checklist-19-foxglove — Parcel transaction-coordinator PM board for one deal, deadline-driven (deterministic, no network). -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="darkreader-lock" />
+<meta name="color-scheme" content="light dark" />
+<title>Closing Checklist — 19 Foxglove Ct · Parcel</title>
+<script id="workbook-spec" type="application/json">
+{
+  "id": "closing-checklist-19-foxglove",
+  "kind": "board",
+  "title": "Closing Checklist — 19 Foxglove Ct",
+  "owner": "parcel",
+  "workspace": "parcel-brokerage",
+  "folder": "Transactions",
+  "deal": {
+    "address": "19 Foxglove Ct, Riverside Heights, Cedar County 53704",
+    "status": "Under Contract",
+    "ratified": "2026-06-11",
+    "coe": "2026-07-02",
+    "price": "$742,000",
+    "buyers": "Daniel & Priya Okafor",
+    "sellers": "Margaret Whitlock",
+    "tc": "Sandra Liu"
+  },
+  "frozen_at": "2026-06-14T00:00:00Z"
+}
+</script>
+<style>
+  h1,h2,h3,.serif{font-family:'Fraunces',Georgia,'Times New Roman',serif;font-weight:600;letter-spacing:-.01em}
+  h1{letter-spacing:-.02em}
+
+  :root{--green:#b4683f;--green-d:#8f4a26;--ink:#2a241d;--bg:#faf6f0;--card:#fffdfa;--line:#e8ddcd;--muted:#8a7f70;--amber:#c79a4b;--amber-bg:#f6ecd6;--blue:#5f7585;--blue-bg:#e8eef2;--red:#b0503f;--red-bg:#f6e3de;--clay:#b4683f;--clay-d:#8f4a26;--clay-l:#f4e6dc;--sage:#6f7d63;--sage-bg:#eef0e8;--gold:#c79a4b;--gold-bg:#f6ecd6;--slate:#5f7585;--slate-bg:#e8eef2;--radius:12px;}
+  *{box-sizing:border-box}
+  body{font:15px/1.55 Inter,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);margin:0}
+  .wrap{max-width:1060px;margin:0 auto;padding:24px 28px 80px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700}
+  .mark{width:26px;height:26px;display:inline-grid;place-items:center}
+  .status{font-size:12px;font-weight:700;color:var(--green-d);background:#f4e6dc;padding:4px 10px;border-radius:20px}
+
+  .deal{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 22px;margin-bottom:18px}
+  .deal-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}
+  h1{font-size:25px;font-weight:680;letter-spacing:-.025em;margin:0}
+  .sub{color:var(--muted);font-size:13.5px;margin-top:4px}
+  .pill{font-size:11.5px;font-weight:700;border-radius:20px;padding:4px 11px;letter-spacing:.01em;white-space:nowrap}
+  .pill.uc{color:#7a4a00;background:var(--amber-bg)}
+  .meta{display:flex;gap:26px;flex-wrap:wrap;margin-top:16px;padding-top:15px;border-top:1px solid var(--line)}
+  .meta .m{min-width:108px}
+  .meta .ml{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .meta .mv{font-size:15px;font-weight:650;letter-spacing:-.01em;margin-top:2px}
+  .countdown{color:var(--amber)}
+
+  .progwrap{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 22px;margin-bottom:22px}
+  .progtop{display:flex;align-items:baseline;justify-content:space-between}
+  .progtop .pl{font-size:13.5px;font-weight:650}
+  .progtop .pc{font-size:13.5px;color:var(--muted)}
+  .progtop .pc b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .track{height:12px;border-radius:7px;background:var(--line);margin-top:11px;overflow:hidden;display:flex}
+  .track .done{height:100%;background:linear-gradient(90deg,var(--green-d),var(--green))}
+  .track .prog{height:100%;background:repeating-linear-gradient(45deg,var(--amber) 0 6px,#eaa45f 6px 12px)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:11px;font-size:12px;color:var(--muted)}
+  .legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:6px;vertical-align:middle}
+
+  .sec{margin-bottom:22px}
+  .sechead{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:0 2px}
+  .sechead h2{font-size:16px;font-weight:650;letter-spacing:-.01em;margin:0}
+  .sechead .num{font-size:11px;font-weight:700;color:var(--muted)}
+  .sechead .due{margin-left:auto;font-size:11.5px;font-weight:700;border-radius:20px;padding:3px 10px}
+  .due.soon{color:#7a4a00;background:var(--amber-bg)}
+  .due.ok{color:var(--green-d);background:#f4e6dc}
+  .due.done{color:var(--muted);background:#eef2ef}
+  .sechead .cnt{font-size:11.5px;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+  .sechead .due + .cnt{margin-left:14px}
+
+  .tasks{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .task{display:flex;align-items:flex-start;gap:13px;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .task:last-child{border-bottom:0}
+  .task.is-done{background:#fcfefd}
+  .ck{flex:none;width:20px;height:20px;border-radius:6px;border:1.5px solid #e7d8c6;margin-top:1px;display:grid;place-items:center}
+  .ck.done{background:var(--green-d);border-color:var(--green-d)}
+  .ck.done svg{width:12px;height:12px}
+  .ck.prog{border-color:var(--amber);background:var(--amber-bg)}
+  .ck.prog::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--amber)}
+  .body{flex:1;min-width:0}
+  .tt{font-size:14px;font-weight:600;letter-spacing:-.005em}
+  .task.is-done .tt{color:var(--muted);text-decoration:line-through;text-decoration-color:#ddccb8;font-weight:550}
+  .note{font-size:12.5px;color:var(--muted);margin-top:3px}
+  .row2{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .owner{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+  .owner img{width:20px;height:20px;border-radius:50%}
+  .tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;letter-spacing:.02em}
+  .tag.tc{color:var(--green-d);background:#f4e6dc}
+  .tag.agent{color:#5f7585;background:var(--blue-bg)}
+  .tag.lender{color:#9a6b8c;background:#efeafa}
+  .tag.title{color:#7a4a00;background:var(--amber-bg)}
+  .tag.buyer{color:#155e44;background:#f7f0e6}
+  .meta-r{margin-left:auto;display:flex;align-items:center;gap:14px;text-align:right;flex:none}
+  .when{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .when b{color:var(--ink)}
+  .when.late b{color:var(--red)}
+  .rel{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:1px}
+  .stat-chip{font-size:10.5px;font-weight:700;border-radius:20px;padding:2px 9px;text-transform:uppercase;letter-spacing:.03em}
+  .stat-chip.done{color:var(--green-d);background:#f4e6dc}
+  .stat-chip.prog{color:#7a4a00;background:var(--amber-bg)}
+  .stat-chip.pend{color:var(--muted);background:#eef2ef}
+
+  .footer{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin-top:8px}
+  .footer img{width:46px;height:46px;border-radius:50%}
+  .footer .nm{font-weight:650;font-size:14px}
+  .footer .ti{font-size:12px;color:var(--muted)}
+  .footer .right{margin-left:auto;text-align:right;font-size:12px;color:var(--muted)}
+  .src{font-size:11.5px;color:var(--muted);margin-top:18px;line-height:1.5}
+  @media(max-width:680px){.meta-r{margin-left:0;width:100%;justify-content:space-between;margin-top:4px}.task{flex-wrap:wrap}}
+  .mark svg{width:100%;height:100%;display:block}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="icon" type="image/svg+xml" href="../files/parcel-logo.svg" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><span class="mark" aria-label="Parcel"><svg viewBox="500 540 980 940" fill="#b4683f" xmlns="http://www.w3.org/2000/svg"><path d="M 981.042 562.763 C 987.035 566.061 1014.12 594.566 1020.94 601.591 C 1076.71 658.975 1135.34 714.304 1191.06 771.653 C 1239.42 726.007 1285.56 676.609 1333.52 630.375 C 1354.86 609.803 1376.66 585.082 1398.93 565.734 C 1409.12 565.099 1446.99 564.781 1456.01 566.081 C 1449.34 573.963 1439.21 583.419 1431.61 590.946 L 1393.17 629.195 L 1288.78 733.671 C 1267.21 755.13 1241.49 779.479 1221.08 801.622 C 1287.94 870.644 1359.91 940.623 1428.09 1008.64 C 1428.89 1027.79 1428.49 1049.42 1428.56 1068.77 L 1428.67 1176.42 L 1428.59 1447.45 C 1289.26 1445.87 1149.66 1447.77 1010.31 1447.18 C 990.771 1447.09 971.113 1447.63 951.592 1447.03 C 951.057 1403.34 950.957 1359.64 951.292 1315.95 C 952.736 1214.6 950.089 1112.37 952.107 1010.49 C 986.058 977.559 1019.62 942.582 1053.05 909.013 C 1088.52 873.408 1125.7 837.209 1160.39 801 C 1138.42 776.373 1106.68 745.749 1083.1 722.48 C 1048.98 688.745 1015.09 654.775 981.437 620.573 C 949.564 653.038 917.327 685.143 884.731 716.883 L 766.317 835.06 L 587.9 1013.5 C 568.572 1013.45 549.243 1013.56 529.916 1013.85 C 541.521 999.441 567.487 975.536 581.439 961.403 L 711.862 831.206 L 880.666 661.926 L 940.868 601.708 C 953.346 589.211 967.782 573.839 981.042 562.763 z M 994.44 1404.9 L 1195.51 1404.74 L 1385.51 1405.49 L 1385.19 1156.69 C 1385.22 1114.52 1384.21 1067.08 1385.55 1025.35 C 1371.8 1012.95 1351.53 990.859 1337.36 976.701 L 1225.28 864.754 C 1220.29 859.771 1193.9 832.339 1190.07 830.59 L 1063.11 957.304 C 1049.64 970.78 1036.24 984.329 1022.92 997.951 C 1015.02 1005.99 1002.5 1019.08 993.957 1025.98 C 997.032 1134.46 993.484 1244.22 994.461 1352.82 C 994.615 1370 994.695 1387.73 994.44 1404.9 z"/></svg></span>Parcel</div>
+    <div class="status">● Transactions · TC board · updated Jun 14, 2026</div>
+  </header>
+
+  <div class="deal">
+    <div class="deal-top">
+      <div>
+        <h1>19 Foxglove Ct</h1>
+        <div class="sub">Riverside Heights, Cedar County 53704 · Single-family · Listing #PCL-2261</div>
+      </div>
+      <span class="pill uc">● Under Contract</span>
+    </div>
+    <div class="meta">
+      <div class="m"><div class="ml">Purchase price</div><div class="mv">$742,000</div></div>
+      <div class="m"><div class="ml">Ratified</div><div class="mv">Jun 11, 2026</div></div>
+      <div class="m"><div class="ml">Close of escrow</div><div class="mv">Jul 2, 2026</div></div>
+      <div class="m"><div class="ml">Days to close</div><div class="mv countdown">18 days</div></div>
+      <div class="m"><div class="ml">Buyers</div><div class="mv">Daniel &amp; Priya Okafor</div></div>
+      <div class="m"><div class="ml">Seller</div><div class="mv">Margaret Whitlock</div></div>
+    </div>
+  </div>
+
+  <div class="progwrap">
+    <div class="progtop">
+      <div class="pl">Closing progress</div>
+      <div class="pc"><b>10</b> of <b>27</b> complete · <b>3</b> in progress · <b>14</b> pending</div>
+    </div>
+    <div class="track">
+      <div class="done" style="width:37.04%"></div>
+      <div class="prog" style="width:11.11%"></div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--green-d)"></i>Complete · 10</span>
+      <span><i style="background:var(--amber)"></i>In progress · 3</span>
+      <span><i style="background:var(--line)"></i>Pending · 14</span>
+    </div>
+  </div>
+
+  <!-- 1 · CONTRACT EXECUTION -->
+  <section class="sec">
+    <div class="sechead">
+      <span class="num">1</span><h2>Contract Execution</h2>
+      <span class="due done">Cleared Jun 12</span>
+      <span class="cnt">4 / 4</span>
+    </div>
+    <div class="tasks">
+      <div class="task is-done">
+        <div class="ck done"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="body">
+          <div class="tt">Ratified contract distributed to all parties</div>
+          <div class="note">Fully-executed PSA + addenda emailed to buyers, seller, both agents, lender, and Pinnacle Title. Saved to deal folder.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&q=80&crop=faces&fit=crop" alt="Sandra Liu"/>Sandra Liu</span>
+            <span class="tag tc">TC</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip done">Done</span><div><div class="when"><b>Jun 11</b></div><div class="rel">Day 0 · ratification</div></div></div>
+      </div>
+
+      <div class="task is-done">
+        <div class="ck done"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="body">
+          <div class="tt">Earnest money deposited &amp; receipt confirmed</div>
+          <div class="note">$22,260 (3%) wired by buyers to Pinnacle Title escrow. EMD receipt received and filed; cleared bank Jun 12.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&q=80&crop=faces&fit=crop" alt="Theresa Cho"/>Theresa Cho</span>
+            <span class="tag title">Title / Escrow</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip done">Done</span><div><div class="when"><b>Jun 12</b></div><div class="rel">COE − 20 days</div></div></div>
+      </div>
+
+      <div class="task is-done">
+        <div class="ck done"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="body">
+          <div class="tt">Critical dates calendared &amp; reminders set</div>
+          <div class="note">Inspection (6/18), loan commitment (6/25), appraisal (6/23), CD delivery (6/29), walkthrough (7/1), COE (7/2) entered with 48h pre-alerts to all parties.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&q=80&crop=faces&fit=crop" alt="Sandra Liu"/>Sandra Liu</span>
+            <span class="tag tc">TC</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip done">Done</span><div><div class="when"><b>Jun 11</b></div><div class="rel">Day 0 · ratification</div></div></div>
+      </div>
+
+      <div class="task is-done">
+        <div class="ck done"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="body">
+          <div class="tt">Escrow opened &amp; file number issued</div>
+          <div class="note">Escrow #PT-26-04417 opened with Pinnacle Title. Welcome packet and wiring-fraud advisory sent to buyers.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&q=80&crop=faces&fit=crop" alt="Theresa Cho"/>Theresa Cho</span>
+            <span class="tag title">Title / Escrow</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip done">Done</span><div><div class="when"><b>Jun 12</b></div><div class="rel">COE − 20 days</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · INSPECTION PERIOD -->
+  <section class="sec">
+    <div class="sechead">
+      <span class="num">2</span><h2>Inspection Period</h2>
+      <span class="due soon">Contingency expires Jun 18</span>
+      <span class="cnt">1 / 3</span>
+    </div>
+    <div class="tasks">
+      <div class="task is-done">
+        <div class="ck done"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="body">
+          <div class="tt">General &amp; termite inspection scheduled</div>
+          <div class="note">Booked with Hartley Home Inspections for Jun 16, 9:00 AM. Seller notified; access confirmed via lockbox. Combo WDO report included.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&q=80&crop=faces&fit=crop" alt="Marcus Bell"/>Marcus Bell</span>
+            <span class="tag agent">Buyer's agent</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip done">Done</span><div><div class="when"><b>Jun 13</b></div><div class="rel">COE − 19 days</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck prog"></div>
+        <div class="body">
+          <div class="tt">Review inspection report with buyers</div>
+          <div class="note">Inspection runs 6/16; report expected same evening. Walkthrough call with the Okafors scheduled 6/17 AM to triage findings before the repair-request deadline.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&q=80&crop=faces&fit=crop" alt="Marcus Bell"/>Marcus Bell</span>
+            <span class="tag agent">Buyer's agent</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip prog">In progress</span><div><div class="when">due <b>Jun 17</b></div><div class="rel">COE − 15 days</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Submit repair request &amp; negotiate response</div>
+          <div class="note">Repair/credit addendum must be delivered to seller before the inspection contingency expires at 5:00 PM on Jun 18. Drafting against report findings; seller has 3 days to respond.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&q=80&crop=faces&fit=crop" alt="Marcus Bell"/>Marcus Bell</span>
+            <span class="tag agent">Buyer's agent</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">due <b>Jun 18</b></div><div class="rel">Inspection deadline</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · LOAN & APPRAISAL -->
+  <section class="sec">
+    <div class="sechead">
+      <span class="num">3</span><h2>Loan &amp; Appraisal</h2>
+      <span class="due soon">Loan commitment due Jun 25</span>
+      <span class="cnt">2 / 5</span>
+    </div>
+    <div class="tasks">
+      <div class="task is-done">
+        <div class="ck done"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="body">
+          <div class="tt">Loan application submitted &amp; confirmed</div>
+          <div class="note">Buyers' full 1003 application on file with Cedar Valley Mortgage. Conventional 30-yr, 20% down, rate locked at 6.375% through 7/9. Disclosures signed.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=40&h=40&q=80&crop=faces&fit=crop" alt="Raymond Patel"/>Raymond Patel</span>
+            <span class="tag lender">Lender</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip done">Done</span><div><div class="when"><b>Jun 12</b></div><div class="rel">COE − 20 days</div></div></div>
+      </div>
+
+      <div class="task is-done">
+        <div class="ck done"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="body">
+          <div class="tt">Appraisal ordered</div>
+          <div class="note">Ordered through lender AMC; $650 appraisal fee collected from buyers. Appraiser to coordinate access with listing side. On-site appraisal set for Jun 20.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=40&h=40&q=80&crop=faces&fit=crop" alt="Raymond Patel"/>Raymond Patel</span>
+            <span class="tag lender">Lender</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip done">Done</span><div><div class="when"><b>Jun 13</b></div><div class="rel">COE − 19 days</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck prog"></div>
+        <div class="body">
+          <div class="tt">Appraisal completed &amp; report received</div>
+          <div class="note">On-site appraisal scheduled Jun 20; report expected back Jun 23. Watching for any value gap against the $742K contract price — appraisal contingency in force.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=40&h=40&q=80&crop=faces&fit=crop" alt="Raymond Patel"/>Raymond Patel</span>
+            <span class="tag lender">Lender</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip prog">In progress</span><div><div class="when">due <b>Jun 23</b></div><div class="rel">COE − 9 days</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Underwriting conditions cleared</div>
+          <div class="note">Awaiting conditional approval; expect VOE, updated bank statements, and HOI binder requests. TC to chase buyer docs as conditions land.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=40&h=40&q=80&crop=faces&fit=crop" alt="Raymond Patel"/>Raymond Patel</span>
+            <span class="tag lender">Lender</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">due <b>Jun 24</b></div><div class="rel">COE − 8 days</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Final loan commitment / clear-to-close issued</div>
+          <div class="note">Financing contingency expires Jun 25 at 5:00 PM. Need written loan commitment from Cedar Valley before releasing the contingency.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=40&h=40&q=80&crop=faces&fit=crop" alt="Raymond Patel"/>Raymond Patel</span>
+            <span class="tag lender">Lender</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">due <b>Jun 25</b></div><div class="rel">Loan deadline</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · TITLE & DISCLOSURES -->
+  <section class="sec">
+    <div class="sechead">
+      <span class="num">4</span><h2>Title &amp; Disclosures</h2>
+      <span class="due ok">On track · 3 of 5 cleared</span>
+      <span class="cnt">3 / 5</span>
+    </div>
+    <div class="tasks">
+      <div class="task is-done">
+        <div class="ck done"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="body">
+          <div class="tt">Title search ordered &amp; commitment requested</div>
+          <div class="note">Title order placed with Pinnacle Title at escrow open; preliminary commitment requested with 7-day turnaround.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&q=80&crop=faces&fit=crop" alt="Theresa Cho"/>Theresa Cho</span>
+            <span class="tag title">Title / Escrow</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip done">Done</span><div><div class="when"><b>Jun 12</b></div><div class="rel">COE − 20 days</div></div></div>
+      </div>
+
+      <div class="task is-done">
+        <div class="ck done"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="body">
+          <div class="tt">Preliminary title report reviewed</div>
+          <div class="note">Prelim received Jun 14 — clean except a $1,840 utility lien from 2021. Payoff requested; will be cleared from seller proceeds at closing. No easement issues.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&q=80&crop=faces&fit=crop" alt="Sandra Liu"/>Sandra Liu</span>
+            <span class="tag tc">TC</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip done">Done</span><div><div class="when"><b>Jun 14</b></div><div class="rel">COE − 18 days</div></div></div>
+      </div>
+
+      <div class="task is-done">
+        <div class="ck done"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="body">
+          <div class="tt">Seller property disclosures signed &amp; delivered</div>
+          <div class="note">TDS, SPQ, and lead-based-paint disclosure (home built 1978) signed by Margaret Whitlock and acknowledged by buyers. Saved to file.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=40&h=40&q=80&crop=faces&fit=crop" alt="Marisol Reyes"/>Marisol Reyes</span>
+            <span class="tag agent">Listing agent</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip done">Done</span><div><div class="when"><b>Jun 13</b></div><div class="rel">COE − 19 days</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck prog"></div>
+        <div class="body">
+          <div class="tt">HOA documents ordered &amp; delivered to buyers</div>
+          <div class="note">Foxglove Court HOA resale packet ordered ($175 fee). CC&amp;Rs, budget, and reserve study due Jun 19; buyers have a 5-day review window once received.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=40&h=40&q=80&crop=faces&fit=crop" alt="Marisol Reyes"/>Marisol Reyes</span>
+            <span class="tag agent">Listing agent</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip prog">In progress</span><div><div class="when">due <b>Jun 19</b></div><div class="rel">COE − 13 days</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Buyer signs &amp; approves HOA / disclosure package</div>
+          <div class="note">Collect buyer signoff on HOA docs and disclosure acknowledgments before the review window closes; release contingency.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&q=80&crop=faces&fit=crop" alt="Marcus Bell"/>Marcus Bell</span>
+            <span class="tag agent">Buyer's agent</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">due <b>Jun 24</b></div><div class="rel">COE − 8 days</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · CLOSING PREP -->
+  <section class="sec">
+    <div class="sechead">
+      <span class="num">5</span><h2>Closing Prep</h2>
+      <span class="due soon">Final week · Jun 29 – Jul 2</span>
+      <span class="cnt">0 / 5</span>
+    </div>
+    <div class="tasks">
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Closing Disclosure (CD) reviewed with buyers</div>
+          <div class="note">Lender must deliver the CD by Jun 29 to satisfy the 3-business-day rule before a Jul 2 close. TC to reconcile figures against the contract and fee sheet.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=40&h=40&q=80&crop=faces&fit=crop" alt="Raymond Patel"/>Raymond Patel</span>
+            <span class="tag lender">Lender</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">due <b>Jun 29</b></div><div class="rel">COE − 3 days (TRID)</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Final walkthrough scheduled</div>
+          <div class="note">Walkthrough set for Jul 1, 4:00 PM — verify agreed repairs complete and property in contract condition. Confirm utilities still on for the inspection.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&q=80&crop=faces&fit=crop" alt="Marcus Bell"/>Marcus Bell</span>
+            <span class="tag agent">Buyer's agent</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">due <b>Jul 1</b></div><div class="rel">COE − 1 day</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Wire instructions verified by phone</div>
+          <div class="note">Buyers to call Pinnacle Title on a known number to confirm wiring details before sending cash-to-close — anti-fraud step. Never trust emailed changes.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&q=80&crop=faces&fit=crop" alt="Daniel Okafor"/>Daniel Okafor</span>
+            <span class="tag buyer">Buyer</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">due <b>Jul 1</b></div><div class="rel">COE − 1 day</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Utilities &amp; insurance transfer arranged</div>
+          <div class="note">Buyers to set electric, water, and gas transfer effective Jul 2; bind homeowner's policy and send proof + paid receipt to lender for the file.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=40&h=40&q=80&crop=faces&fit=crop" alt="Priya Okafor"/>Priya Okafor</span>
+            <span class="tag buyer">Buyer</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">due <b>Jun 30</b></div><div class="rel">COE − 2 days</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Signing appointment confirmed</div>
+          <div class="note">Buyer &amp; seller signing booked with mobile notary at Pinnacle Title, Jul 2, 10:00 AM. Confirm cash-to-close wired and funding authorized.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&q=80&crop=faces&fit=crop" alt="Theresa Cho"/>Theresa Cho</span>
+            <span class="tag title">Title / Escrow</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">due <b>Jul 2</b></div><div class="rel">Close of escrow</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · POST-CLOSE -->
+  <section class="sec">
+    <div class="sechead">
+      <span class="num">6</span><h2>Post-Close</h2>
+      <span class="due done">After Jul 2</span>
+      <span class="cnt">0 / 5</span>
+    </div>
+    <div class="tasks">
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Confirm recording &amp; funding</div>
+          <div class="note">Verify the deed records with Cedar County and the loan funds. Notify all parties the transaction has officially closed.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&q=80&crop=faces&fit=crop" alt="Theresa Cho"/>Theresa Cho</span>
+            <span class="tag title">Title / Escrow</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">~ <b>Jul 2</b></div><div class="rel">COE day</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Keys &amp; possession delivered</div>
+          <div class="note">Hand over keys, garage remotes, and HOA gate fobs to the Okafors at funding/recording per the contract's possession terms.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&q=80&crop=faces&fit=crop" alt="Marcus Bell"/>Marcus Bell</span>
+            <span class="tag agent">Buyer's agent</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">~ <b>Jul 2</b></div><div class="rel">COE day</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Commission disbursement &amp; broker file closeout</div>
+          <div class="note">Confirm DA matches the CD; submit closed file with all signed docs to Parcel compliance for archive and audit.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&q=80&crop=faces&fit=crop" alt="Sandra Liu"/>Sandra Liu</span>
+            <span class="tag tc">TC</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">~ <b>Jul 3</b></div><div class="rel">COE + 1 day</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Send closing gift &amp; review request</div>
+          <div class="note">Deliver closing gift to the Okafors; request a Parcel review and referral once they've settled in.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&q=80&crop=faces&fit=crop" alt="Marcus Bell"/>Marcus Bell</span>
+            <span class="tag agent">Buyer's agent</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">~ <b>Jul 5</b></div><div class="rel">COE + 3 days</div></div></div>
+      </div>
+
+      <div class="task">
+        <div class="ck"></div>
+        <div class="body">
+          <div class="tt">Final settlement statement to clients for taxes</div>
+          <div class="note">Email the finalized ALTA settlement statement to buyers and seller for their records and tax preparation.</div>
+          <div class="row2">
+            <span class="owner"><img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&q=80&crop=faces&fit=crop" alt="Sandra Liu"/>Sandra Liu</span>
+            <span class="tag tc">TC</span>
+          </div>
+        </div>
+        <div class="meta-r"><span class="stat-chip pend">Pending</span><div><div class="when">~ <b>Jul 5</b></div><div class="rel">COE + 3 days</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">
+    <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=92&h=92&q=80&crop=faces&fit=crop" alt="Sandra Liu" />
+    <div><div class="nm">Sandra Liu</div><div class="ti">Transaction Coordinator · Parcel · Lic #02240913</div></div>
+    <div class="right">Listing agent: Marisol Reyes · Lic #02118447<br/>Buyer's agent: Marcus Bell · Cedar Realty Group</div>
+  </div>
+
+  <p class="src">Board reflects the live status of file PCL-2261 / escrow #PT-26-04417. Critical dates derive from the ratified purchase agreement (Jun 11, 2026) and a Jul 2, 2026 close of escrow; business-day deadlines per state contract and TRID. Snapshot frozen Jun 14, 2026 for deterministic display.</p>
+</div>
+</body>
+</html>
