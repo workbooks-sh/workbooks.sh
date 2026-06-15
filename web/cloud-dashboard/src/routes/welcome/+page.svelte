@@ -26,11 +26,13 @@
   // (WorkOS auth is free to 1M MAU, so seats cost us ~nothing; compute + storage do).
   // each tier carries a representative team size, so the stack comparison scales with
   // the SELECTED tier (the value gap widens dramatically at Scale/Enterprise).
+  // No hosted Free tier — running locally (desktop / open-source) is the free path; a
+  // HOSTED nexus starts at Starter. Each tier bundles compute + storage + included
+  // nexuses, unlimited users + workspaces, database + egress-free object storage.
   const TIERS = [
-    { id: 'free', name: 'Free', price: 0, storage: '2 GB', users: 2, blurb: 'Kick the tires.' },
-    { id: 'starter', name: 'Starter', price: 29, storage: '50 GB', users: 6, blurb: 'A small team or project.' },
+    { id: 'starter', name: 'Starter', price: 29, storage: '50 GB', users: 6, blurb: 'A project or small team.' },
     { id: 'team', name: 'Team', price: 99, storage: '250 GB', users: 25, blurb: 'A growing team.' },
-    { id: 'scale', name: 'Scale', price: 249, storage: '1 TB', users: 100, blurb: 'Serious storage + compute.' },
+    { id: 'scale', name: 'Scale', price: 249, storage: '1 TB', users: 100, blurb: 'Serious compute + storage.' },
     { id: 'ent', name: 'Enterprise', price: null, storage: 'Custom', users: 250, blurb: 'SSO · SCIM · dedicated.' }
   ];
   // the "usual stack" they'd otherwise pay per seat — real comp prices (verify before a deck).
