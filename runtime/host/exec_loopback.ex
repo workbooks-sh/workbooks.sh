@@ -480,6 +480,7 @@ defmodule Workbooks.ExecLoopback do
     raw_path = conn.body_params["path"]
 
     with {:ok, grant} <- lookup(token),
+         :ok <- principal_gate(grant),
          false <- principal_revoked?(grant),
          {:ok, workdir} <- fs_workdir(grant),
          {:ok, abs} <- confine(workdir, raw_path) do
