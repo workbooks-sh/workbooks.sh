@@ -1,0 +1,52 @@
+{
+  "comparison": "allbirds-vs-rothys",
+  "compiled_by": "brand-nana research agent",
+  "frozen_at": "2026-06-14T00:00:00Z",
+  "subjects": [
+    {
+      "brand": "Allbirds",
+      "domain": "allbirds.com",
+      "ticker": "NASDAQ: BIRD",
+      "positioning": "Comfort + carbon-neutral wool",
+      "palette": { "oat": "#E9E2D0", "charcoal": "#2B2B2B", "kea_red": "#D8472B" },
+      "typography": { "display": "Founders Grotesk", "body": "Tiempos / Georgia" },
+      "hero_price_usd": { "low": 98, "high": 135 },
+      "catalog_size": "≈48 active styles (footwear, apparel, socks)",
+      "top_skus": [
+        { "name": "Tree Runner", "price_usd": 98 },
+        { "name": "Wool Runner", "price_usd": 110 },
+        { "name": "Tree Dasher 2", "price_usd": 135 }
+      ],
+      "instagram": { "handle": "@allbirds", "followers_est": 1100000 },
+      "sustainability_claim": "Carbon-neutral; per-product CO2e label (avg ~7.6 kg), offset remainder",
+      "voice_quote": { "name": "Tim Brown", "role": "Co-founder", "text": "We didn't set out to disrupt fashion. We set out to make better things in a better way." },
+      "radar": { "price_accessibility": 9, "sustainability_messaging": 9, "design_distinctiveness": 6, "social_reach": 9, "catalog_breadth": 8 },
+      "where_wins": ["Comfort authority", "Price accessibility ($98 entry)", "Carbon literacy (per-product CO2e)", "Category breadth"]
+    },
+    {
+      "brand": "Rothy's",
+      "domain": "rothys.com",
+      "ticker": "private (DTC)",
+      "positioning": "Machine-washable recycled-plastic flats",
+      "palette": { "blush": "#E8C9C1", "navy": "#1F2A44", "black": "#161616" },
+      "typography": { "display": "GT Super / Didot", "body": "Söhne / Helvetica" },
+      "hero_price_usd": { "low": 125, "high": 295 },
+      "catalog_size": "≈60+ active styles (flats, points, loafers, bags)",
+      "top_skus": [
+        { "name": "The Flat", "price_usd": 145 },
+        { "name": "The Point II", "price_usd": 165 },
+        { "name": "The Loafer", "price_usd": 185 }
+      ],
+      "instagram": { "handle": "@rothys", "followers_est": 480000 },
+      "sustainability_claim": "Made from recycled plastic bottles (153M+ transformed); machine-washable for longevity",
+      "voice_quote": { "name": "Roth Martin", "role": "Co-founder", "text": "Sustainability shouldn't mean sacrifice. It should look this good and survive the laundry." },
+      "radar": { "price_accessibility": 4, "sustainability_messaging": 8, "design_distinctiveness": 9, "social_reach": 6, "catalog_breadth": 6 },
+      "where_wins": ["Design distinctiveness", "Premium positioning (up to $295)", "Washability", "Aesthetic loyalty"]
+    }
+  ],
+  "radar_axes": ["price_accessibility", "sustainability_messaging", "design_distinctiveness", "social_reach", "catalog_breadth"],
+  "provenance": {
+    "allbirds": "allbirds.com US store; on-PDP carbon labels; @allbirds Instagram; allbirds.com/pages/our-story. Retrieved 2026-06-14.",
+    "rothys": "rothys.com US store; rothys.com/sustainability; @rothys Instagram; PDP & marketing copy. Retrieved 2026-06-14."
+  }
+}

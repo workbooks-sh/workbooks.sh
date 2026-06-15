@@ -1,0 +1,9 @@
+name,hex,rgb,role,source,contrast_on_white,contrast_on_black
+Saddle Tan,#C8924A,"200,146,74",primary,vision,2.31,9.10
+Boot Black,#1A1714,"26,23,20",neutral,theme-color,18.74,1.12
+Bone,#F4EEE2,"244,238,226",neutral,css-var,1.07,19.69
+Cactus,#5B6E4F,"91,110,79",accent,vision,5.27,3.99
+Clay,#A6543C,"166,84,60",accent,vendor,4.42,4.75
+Sky,#8FB3C9,"143,179,201",accent,css-var,1.97,10.68
+Dust,#D9CEB8,"217,206,184",secondary,vendor,1.34,15.69
+Mesquite,#6B5F4E,"107,95,78",secondary,theme-color,5.94,3.54
