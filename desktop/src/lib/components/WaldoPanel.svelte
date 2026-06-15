@@ -3,7 +3,7 @@
    * WaldoPanel — the browser's ONE resident agent (the canonical chat surface).
    *
    * A single voice you summon to set up + work the system: text via OpenRouter
-   * (chatSession) + voice via geminiLive. Talks to the "waldo" slug. The older
+   * (chatSession) + voice via inworldLive. Talks to the "waldo" slug. The older
    * multi-agent ChatPanel/ChatHeader chrome is flagged off; the good pieces
    * (session history, rich org/component render, typing) live HERE now.
    *
@@ -36,7 +36,7 @@
   import AssistantMessageView from "$lib/chat/AssistantMessageView.svelte";
   import ArtifactCard from "$lib/chat/ArtifactCard.svelte";
   import { componentArtifacts } from "$lib/chat/artifacts.svelte";
-  import { geminiLive } from "$lib/live/gemini.svelte";
+  import { inworldLive } from "$lib/live/inworld.svelte";
   import { openChatTab } from "$lib/tabs/chatTab";
 
   const WALDO_SLUG = "waldo";
@@ -181,23 +181,21 @@
   // conversation started in the dock stays visible in the returnable chat tab,
   // surviving panel remounts. "Voice mode" = a live session is present, so any
   // mount of this panel reflects the same voice state.
-  const voiceMode = $derived(geminiLive.present);
+  const voiceMode = $derived(inworldLive.present);
   const voiceBubbles = $derived(chatSession.voiceBubbles);
   const voiceError = $derived(chatSession.voiceError);
   let voiceScrollEl = $state<HTMLDivElement | null>(null);
   let toolExpanded = $state<Record<string, boolean>>({});
 
   async function startVoice() {
-    if (geminiLive.present) return;
+    if (inworldLive.present) return;
     chatSession.voiceReset();
     // A voice conversation is a conversation — open the returnable tab too
     // (Feature 2), unless we're already the full-tab surface.
     if (!fullscreen) void openChatTab(WALDO_SLUG);
-    await geminiLive.start(WALDO_SLUG, null, {
+    await inworldLive.start({
       onUserTranscript: (t) => chatSession.voiceAppend("you", t),
       onAgentTranscript: (t) => chatSession.voiceAppend("waldo", t),
-      onToolCallStart: (id, command) => chatSession.voicePushTool(id, command),
-      onToolCallEnd: (id, output) => chatSession.voiceCompleteTool(id, output),
       onError: (msg) => {
         chatSession.voiceError = msg;
       },
@@ -205,7 +203,7 @@
   }
 
   async function endVoice() {
-    await geminiLive.end();
+    await inworldLive.end();
   }
 
   // Auto-scroll the voice transcript as chunks arrive.
@@ -224,11 +222,10 @@
   // session ends only via the explicit END control (endVoice).
 
   const voiceStatus = $derived.by(() => {
-    switch (geminiLive.state) {
+    switch (inworldLive.state) {
       case "connecting": return "Connecting…";
-      case "live": return geminiLive.muted ? "Muted" : "Listening";
-      case "paused": return "Paused";
-      case "error": return geminiLive.error ?? "Voice session error";
+      case "live": return inworldLive.muted ? "Muted" : "Listening";
+      case "error": return inworldLive.error ?? "Voice session error";
       default: return "Waldo";
     }
   });
@@ -300,20 +297,20 @@
 
   {#if voiceMode}
     <!-- Live voice conversation: status strip + transcript pane. -->
-    <div class="voice-shell" class:errored={geminiLive.state === "error"}>
+    <div class="voice-shell" class:errored={inworldLive.state === "error"}>
       <div class="voice-strip">
-        <span class="voice-dot" class:muted={geminiLive.muted} class:off={geminiLive.state !== "live"}></span>
+        <span class="voice-dot" class:muted={inworldLive.muted} class:off={inworldLive.state !== "live"}></span>
         <span class="voice-status">{voiceStatus}</span>
         <div class="voice-actions">
           <button
             type="button"
             class="voice-btn"
-            onclick={() => geminiLive.toggleMute()}
-            disabled={geminiLive.state !== "live"}
-            title={geminiLive.muted ? "Unmute" : "Mute"}
-            aria-label={geminiLive.muted ? "Unmute" : "Mute"}
+            onclick={() => inworldLive.toggleMute()}
+            disabled={inworldLive.state !== "live"}
+            title={inworldLive.muted ? "Unmute" : "Mute"}
+            aria-label={inworldLive.muted ? "Unmute" : "Mute"}
           >
-            {#if geminiLive.muted}<MicOff size={15} weight="fill" />{:else}<Mic size={15} weight="fill" />{/if}
+            {#if inworldLive.muted}<MicOff size={15} weight="fill" />{:else}<Mic size={15} weight="fill" />{/if}
           </button>
           <button type="button" class="voice-btn end" onclick={endVoice} title="End session" aria-label="End voice conversation">
             <PhoneOff size={15} weight="fill" />
@@ -322,10 +319,10 @@
       </div>
     </div>
     <div class="voice-transcript" bind:this={voiceScrollEl}>
-      {#if voiceBubbles.length === 0 && geminiLive.state !== "error"}
+      {#if voiceBubbles.length === 0 && inworldLive.state !== "error"}
         <div class="voice-empty">
           <Waveform size={15} weight="fill" />
-          <span>{geminiLive.state === "connecting" ? "Opening mic…" : "Waldo is about to speak."}</span>
+          <span>{inworldLive.state === "connecting" ? "Opening mic…" : "Waldo is about to speak."}</span>
         </div>
       {/if}
       {#each voiceBubbles as b (b.id)}

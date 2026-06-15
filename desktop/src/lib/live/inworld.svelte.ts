@@ -42,6 +42,9 @@ class InworldLiveSession {
   error = $state<string | null>(null);
   /** True while the agent is speaking (between speaking_start/end). */
   speaking = $state(false);
+  /** When muted, committed utterances aren't sent — the mic stays open (so
+   *  barge-in still works) but the user's words don't reach the agent. */
+  muted = $state(false);
   outputLevel = $state(0);
 
   active = $derived(this.state === "live");
@@ -110,10 +113,15 @@ class InworldLiveSession {
     this.#cb.onClose?.();
   }
 
+  toggleMute(): void {
+    this.muted = !this.muted;
+  }
+
   async #startStt(): Promise<void> {
     await moonshineStt.start(
       (text) => {
-        // Finalized utterance → respond.
+        // Finalized utterance → respond (unless muted).
+        if (this.muted) return;
         this.#cb.onUserTranscript?.(text);
         this.#send({ type: "transcript", text });
       },
@@ -180,6 +188,7 @@ class InworldLiveSession {
     this.#raf = 0;
     this.outputLevel = 0;
     this.speaking = false;
+    this.muted = false;
     await moonshineStt.stop().catch(() => {});
     try {
       this.#ws?.close();
