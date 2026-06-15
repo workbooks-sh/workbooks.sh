@@ -68,6 +68,26 @@ const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
   Archive: { icon: "mi:zip", kind: "folder" }, // red
   Brand: { icon: "mi:rocket", kind: "folder" }, // fuchsia
   Marketing: { icon: "mi:video", kind: "folder" }, // blue
+  // ── demo brand-workspace apps (each is a real workbook served from
+  // static/brands/<brand>/). These back the four distinct demo workspaces
+  // (Brand Nana / UGC Pro / Parcel / Signal) so the browser preview shows
+  // real, visibly-different brands instead of generic placeholders.
+  "Brand Health": { icon: "mi:chart", kind: "app" },
+  "Tecovas Battlecard": { icon: "mi:table", kind: "app" },
+  "Creative Vault": { icon: "mi:image", kind: "app" },
+  "Client Roster": { icon: "mi:lib", kind: "app" },
+  "Creator HQ": { icon: "mi:rocket", kind: "app" },
+  "Deal Pipeline": { icon: "mi:table", kind: "app" },
+  "Earnings Ledger": { icon: "mi:table", kind: "app" },
+  "Match Marketplace": { icon: "mi:database", kind: "app" },
+  "Market Pulse": { icon: "mi:chart", kind: "app" },
+  "Listing — 48 Larkspur": { icon: "mi:document", kind: "app" },
+  "Deal Pipeline (RE)": { icon: "mi:table", kind: "app" },
+  "Neighborhood Intel": { icon: "mi:database", kind: "app" },
+  "Global Cash Position": { icon: "mi:chart", kind: "app" },
+  "Counterparty Risk": { icon: "mi:database", kind: "app" },
+  "Treasury Board Deck": { icon: "mi:document", kind: "app" },
+  "Transaction Ledger": { icon: "mi:table", kind: "app" },
 };
 
 /** Workbook path served per app. The real Kanban workbook lives as a
@@ -75,6 +95,26 @@ const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
  *  labeled stub page generated on the fly by `read_file_bytes_base64`. */
 const APP_WORKBOOK_PATH: Record<string, string> = {
   Kanban: "/mock/kanban.html",
+  // Brand Nana (brand-intelligence agency)
+  "Brand Health": "/brands/brand-nana/brand-health-dashboard.html",
+  "Tecovas Battlecard": "/brands/brand-nana/battlecard-tecovas.html",
+  "Creative Vault": "/brands/brand-nana/creative-vault.html",
+  "Client Roster": "/brands/brand-nana/client-roster.html",
+  // UGC Pro (creator marketplace)
+  "Creator HQ": "/brands/ugc-pro/creator-hq.html",
+  "Deal Pipeline": "/brands/ugc-pro/deal-pipeline.html",
+  "Earnings Ledger": "/brands/ugc-pro/earnings-ledger.html",
+  "Match Marketplace": "/brands/ugc-pro/match-marketplace.html",
+  // Parcel (real estate brokerage)
+  "Market Pulse": "/brands/parcel/market-pulse.html",
+  "Listing — 48 Larkspur": "/brands/parcel/listing-48-larkspur.html",
+  "Deal Pipeline (RE)": "/brands/parcel/deal-pipeline.html",
+  "Neighborhood Intel": "/brands/parcel/neighborhood-intel-riverside-heights.html",
+  // Signal (institutional treasury terminal)
+  "Global Cash Position": "/brands/signal/global-cash-position.html",
+  "Counterparty Risk": "/brands/signal/counterparty-risk-board.html",
+  "Treasury Board Deck": "/brands/signal/treasury-board-deck.html",
+  "Transaction Ledger": "/brands/signal/transaction-ledger-sql.html",
 };
 const PKG_WORKBOOKS: Record<string, { path: string; title: string }[]> = {
   Clients: [
@@ -102,6 +142,34 @@ const WORKSPACES = [
     icon: "💼",
     package_names: ["Acme", "Internal"],
     created_at: 1_700_000_100_000,
+  },
+  {
+    id: "ws_brand_nana",
+    name: "Brand Nana",
+    icon: "🍌",
+    package_names: ["Brand Health", "Tecovas Battlecard", "Creative Vault", "Client Roster"],
+    created_at: 1_700_000_200_000,
+  },
+  {
+    id: "ws_ugc_pro",
+    name: "UGC Pro",
+    icon: "🎬",
+    package_names: ["Creator HQ", "Deal Pipeline", "Earnings Ledger", "Match Marketplace"],
+    created_at: 1_700_000_300_000,
+  },
+  {
+    id: "ws_parcel",
+    name: "Parcel",
+    icon: "🏡",
+    package_names: ["Market Pulse", "Listing — 48 Larkspur", "Deal Pipeline (RE)", "Neighborhood Intel"],
+    created_at: 1_700_000_400_000,
+  },
+  {
+    id: "ws_signal",
+    name: "Signal",
+    icon: "📡",
+    package_names: ["Global Cash Position", "Counterparty Risk", "Treasury Board Deck", "Transaction Ledger"],
+    created_at: 1_700_000_500_000,
   },
 ];
 

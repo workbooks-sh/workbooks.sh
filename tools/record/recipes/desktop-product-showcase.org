@@ -1,20 +1,21 @@
 #+TITLE: Workbooks Desktop — product showcase
 #+TARGET: web
-#+URL: http://localhost:5320/
+#+URL: http://localhost:5188/
 #+FPS: 30
 #+VIEWPORT: 1440x900
-#+VERIFY_FRAMES: 12
+#+VERIFY_FRAMES: 14
 
-# One window, every workspace. Three distinct real brands run side by side in
+# One window, every workspace. Four distinct real brands run side by side in
 # the Workbooks desktop app: Brand Nana (brand intelligence), UGC Pro (creator
-# marketplace), Parcel (real-estate brokerage) — plus Waldo, the agent, voice,
-# search, and sharing to your org. Hard cuts only; product over chrome.
+# marketplace), Parcel (real-estate brokerage), Signal (institutional treasury)
+# — plus Waldo, the agent, voice, search, and sharing to your org. Hard cuts
+# only; product over chrome.
 #
 # Order matters: the agent + voice live on the home canvas, which only shows
 # before any workbook tab is opened. So the agent beats run first, the brand
 # tabs after.
 
-* 00:00 navigate [url:http://localhost:5320/] [waitUntil:networkidle]
+* 00:00 navigate [url:http://localhost:5188/] [waitUntil:networkidle]
   This is Workbooks — one desktop for every workspace you run.
 
 * 00:03 wait [ms:1500]
@@ -105,45 +106,65 @@
   :selector: button:has-text("MARKET PULSE")
   :END:
 
-* 00:55 wait [ms:2800]
-  Three real brands. One workbook each. Zero context-switching cost.
+* 00:55 wait [ms:2600]
+  Terracotta and warm neutrals — a real-estate world that knows its market.
 
-* 00:59 click
+* 00:58 click
+  And a fourth — Signal, an institutional treasury terminal.
+  :PROPERTIES:
+  :selector: button[aria-label^="Switch workspace"]
+  :END:
+
+* 01:01 click
+  :PROPERTIES:
+  :selector: button:has-text("Signal")
+  :END:
+
+* 01:03 click
+  Global Cash Position — every account, every counterparty, one signal.
+  :PROPERTIES:
+  :selector: button:has-text("GLOBAL CASH POSITION")
+  :END:
+
+* 01:06 wait [ms:2800]
+  Dark, institutional, dense — four real brands, one window, zero context-switching.
+
+* 01:10 click
   And everything you've made is one keystroke away — open search.
   :PROPERTIES:
   :selector: button[aria-label="Search"]
   :checkpoint: a search surface or drawer is open
   :END:
 
-* 01:03 wait [ms:2000]
+* 01:14 wait [ms:2000]
   Files, bookmarks, and the web — one search across all of it.
 
-* 01:06 navigate [url:http://localhost:5320/dev] [waitUntil:networkidle]
+* 01:17 navigate [url:http://localhost:5188/dev] [waitUntil:networkidle]
   And when the work is ready, share it with your whole organization.
 
-* 01:09 click
+* 01:20 click
   :PROPERTIES:
   :selector: button:has-text("Share…")
   :checkpoint: a share-to-organization modal is open listing org members with avatars
   :END:
 
-* 01:13 wait [ms:1800]
+* 01:24 wait [ms:1800]
   Pick the people, assign a role, send it — real teammates, real photos.
 
-* 01:16 click
+* 01:27 click
   :PROPERTIES:
   :selector: button:has-text("Amara Okafor")
   :END:
 
-* 01:18 click
+* 01:29 click
   :PROPERTIES:
   :selector: button:has-text("Mei Lin")
   :END:
 
-* 01:20 click
+* 01:31 click
   :PROPERTIES:
   :selector: button:has-text("Diego Santos")
   :END:
 
-* 01:23 wait [ms:2600]
+* 01:34 wait [ms:2600]
   Workbooks — every workspace, every agent, your whole team. One window.
