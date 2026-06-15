@@ -176,10 +176,17 @@ defmodule Workbooks.JsEngine do
     # exec grant (SLICE 1): `exec: [allow: true, commands: …, principal: …]` enables `require('child_process')`
     # on the SM lane — it dispatches over fetch() to the ExecLoopback sentinel → ExecBroker. Absent => no exec.
     exec_opts = Keyword.get(opts, :exec, nil)
+    # fs grant (headless-JS path): `fs: [workdir: "/abs/dir", principal: …]` enables `require('node:fs')` /
+    # `'fs/promises'` on the SM lane — it routes over fetch() to /__wb/fs, CONFINED to workdir. Absent => no fs.
+    fs_opts = Keyword.get(opts, :fs, nil)
 
     with {:ok, prelude} <- File.read(@node_prelude),
          {:ok, shims} <- load_node_shims() do
-      {shims, exec_seam, token} = maybe_grant_exec(shims, exec_opts)
+      {shims, exec_seam, token} = maybe_grant_caps(shims, exec_opts, fs_opts)
+
+      # ESM-style bundles (`import`/`export`/`import.meta.url`) are illegal in the classic-eval lane. Rewrite
+      # them to CJS so a real ESM bundle (createRequire(import.meta.url) ×N) loads instead of dying on line 1.
+      src = esm_to_cjs(src)
 
       try do
         boot =
@@ -279,18 +286,17 @@ defmodule Workbooks.JsEngine do
       {shims, exec_seam, token} =
         case {Keyword.get(opts, :exec_seam), Keyword.get(opts, :exec)} do
           {seam, _} when is_map(seam) ->
-            # caller minted the (session-lived) token + seam already; just add the child_process shim.
-            cp = File.read!(Path.join(@sm_shim_dir, "child_process.js"))
-            events = Map.get(base_shims, "events") || File.read!(Path.join([@js_root, "shims", "events.js"]))
-            dock_auth = File.read!(Path.join(@sm_shim_dir, "dock_auth.js"))
+            # caller minted the (session-lived) token + seam already; add the child_process shim, and — when
+            # the same token's grant carries a confined workdir — the SM fs shim too (resident-harness path).
+            workdir = fs_workdir!(Keyword.get(opts, :fs, []))
 
-            {base_shims
-             |> Map.put("child_process", cp)
-             |> Map.put("events", events)
-             |> Map.put("dock-auth", dock_auth), seam, nil}
+            base_shims
+            |> register_exec_shims(true)
+            |> register_fs_shim(workdir != nil)
+            |> then(&{&1, seam, nil})
 
           {nil, exec_opts} when is_list(exec_opts) ->
-            maybe_grant_exec(base_shims, exec_opts)
+            maybe_grant_caps(base_shims, exec_opts, Keyword.get(opts, :fs))
 
           _ ->
             {base_shims, nil, nil}
@@ -306,45 +312,92 @@ defmodule Workbooks.JsEngine do
     end
   end
 
-  # When exec is granted, swap in the SM-lane child_process shim (+ events, its dep), mint a single-run
-  # ExecLoopback token, and build the boot seam {url, token}. Without a grant, child_process simply isn't
-  # registered → `require('child_process')` throws (no silent capability). Returns {shims, exec_seam, token}.
-  defp maybe_grant_exec(shims, nil), do: {shims, nil, nil}
+  # When exec and/or fs is granted, register the matching SM-lane shims, mint a SINGLE-run ExecLoopback token
+  # carrying both grants, and build the boot seam {url, token}. Without any grant the capability shims aren't
+  # registered → `require('child_process')`/`require('node:fs')` throw (no silent capability). One token, one
+  # seam, both caps. Returns {shims, seam, token}.
+  defp maybe_grant_caps(shims, nil, nil), do: {shims, nil, nil}
 
-  defp maybe_grant_exec(shims, exec_opts) when is_list(exec_opts) do
-    cp = File.read!(Path.join(@sm_shim_dir, "child_process.js"))
-    # events is child_process's require dep; ensure it's present (it's in @node_builtins already, defensive).
-    events = Map.get(shims, "events") || File.read!(Path.join([@js_root, "shims", "events.js"]))
+  defp maybe_grant_caps(shims, exec_opts, fs_opts) do
+    exec_opts = exec_opts || []
+    fs_opts = fs_opts || []
 
     allow = Keyword.get(exec_opts, :allow, false)
+    workdir = fs_workdir!(fs_opts)
+
+    # principal: an exec-capable grant must carry one (broker rate/concurrency/revoke handle); otherwise prefer
+    # whichever opt list supplies it (fs ops are principal-revocable too).
+    principal =
+      if allow,
+        do: require_principal!(true, exec_opts),
+        else: Keyword.get(exec_opts, :principal) || Keyword.get(fs_opts, :principal)
 
     grant = %{
       allow: allow,
       commands: Keyword.get(exec_opts, :commands, :all),
-      principal: require_principal!(allow, exec_opts),
+      principal: principal,
       depth: Keyword.get(exec_opts, :depth, 0),
       # SLICE 3: per-(user, provider) creds scope for dock.creds.{get,put}.
-      creds_scope: Keyword.get(exec_opts, :creds_scope, nil)
+      creds_scope: Keyword.get(exec_opts, :creds_scope, nil),
+      # headless-JS path: the confined fs root. nil => every /__wb/fs op 403s (no fs reach).
+      workdir: workdir
     }
 
     token = Workbooks.ExecLoopback.mint(grant)
     seam = %{"url" => Workbooks.ExecLoopback.sentinel_url(), "token" => token}
-    # SLICE 3: the dock-auth shim (dock.creds.{get,put} + dock.oauth.loopback) shares the same sentinel
-    # seam + token; register it so `require('dock-auth')` resolves. Creds access is still gated by the
-    # grant's creds_scope at the route — no scope => the routes 403.
-    dock_auth = File.read!(Path.join(@sm_shim_dir, "dock_auth.js"))
-    shims = shims |> Map.put("child_process", cp) |> Map.put("events", events) |> Map.put("dock-auth", dock_auth)
+
+    shims =
+      shims
+      |> register_exec_shims(exec_opts != [])
+      |> register_fs_shim(workdir != nil)
+
     {shims, seam, token}
+  end
+
+  # The exec/dock-auth shims (child_process over fetch + dock.creds/oauth). events is child_process's dep.
+  defp register_exec_shims(shims, false), do: shims
+
+  defp register_exec_shims(shims, true) do
+    cp = File.read!(Path.join(@sm_shim_dir, "child_process.js"))
+    events = Map.get(shims, "events") || File.read!(Path.join([@js_root, "shims", "events.js"]))
+    dock_auth = File.read!(Path.join(@sm_shim_dir, "dock_auth.js"))
+    shims |> Map.put("child_process", cp) |> Map.put("events", events) |> Map.put("dock-auth", dock_auth)
+  end
+
+  # The SM-lane fs shim (routes over fetch to /__wb/fs, confined to workdir) — supersedes the dead Javy fs
+  # shim. Registered as both `fs` and `fs/promises` so `require('node:fs')` and `require('fs/promises')` hit it.
+  defp register_fs_shim(shims, false), do: shims
+
+  defp register_fs_shim(shims, true) do
+    fs = File.read!(Path.join(@sm_shim_dir, "fs.js"))
+    # `fs/promises` re-exports the shim's .promises — a tiny CJS re-export module.
+    fs_promises = "module.exports = require('node:fs').promises;"
+    shims |> Map.put("fs", fs) |> Map.put("fs/promises", fs_promises)
+  end
+
+  # Validate + expand the fs workdir from the fs grant opts. The directory is CREATED if missing (the caller's
+  # confined scratch). Returns an absolute path, or nil when no fs grant was given.
+  @doc false
+  def fs_workdir!([]), do: nil
+
+  def fs_workdir!(fs_opts) when is_list(fs_opts) do
+    case Keyword.get(fs_opts, :workdir) do
+      d when is_binary(d) and d != "" ->
+        abs = Path.expand(d)
+        File.mkdir_p!(abs)
+        abs
+
+      _ ->
+        raise ArgumentError, "fs grant requires a non-empty :workdir (the confined host directory)"
+    end
   end
 
   # FIX 1 (principal-OPTIONAL minting): an EXEC-CAPABLE harness grant (`allow: true`) MUST carry a non-nil
   # principal (the tenant/session id). The principal is what the broker rate-limits, concurrency-caps, and
   # revokes on — without it the loopback would hand ExecBroker a nil principal, which is the reserved
   # HOST-INTERNAL (uncapped, unrevocable) path, giving a granted harness UNCAPPED brokered exec. Refuse to
-  # mint a principal-less exec grant here. A non-exec grant (`allow: false` — a creds-only / default-deny
-  # grant where nothing runs) keeps its (possibly nil) principal unchanged.
-  defp require_principal!(false, exec_opts), do: Keyword.get(exec_opts, :principal)
-
+  # mint a principal-less exec grant here. (A non-exec grant — `allow: false` — never reaches this; its
+  # principal is taken verbatim by maybe_grant_caps from whichever opt list supplies one.)
   defp require_principal!(true, exec_opts) do
     case Keyword.get(exec_opts, :principal) do
       p when is_binary(p) and p != "" ->
@@ -373,6 +426,131 @@ defmodule Workbooks.JsEngine do
 
     {:ok, shims}
   end
+
+  # ── ESM → CJS rewrite (headless-JS path) ───────────────────────────────────────────────────────
+  #
+  # The SM `run` bootstrap uses classic indirect eval, which rejects `import`/`export`/`import.meta`. Real
+  # ESM bundles open with `import { createRequire } from 'module'; const require = createRequire(import.meta
+  # .url)` (often ×3) + `import.meta.url`. This is a LINE-ORIENTED rewrite of the static module syntax into
+  # CJS that the prelude's require/module system already serves — not a full parser, but it covers the shapes
+  # a bundler emits (single-line static import/export statements). Dynamic `import()` is left untouched (SM
+  # has it). A source with no ESM markers is returned byte-for-byte (the common CJS case is a no-op).
+  def esm_to_cjs(src) when is_binary(src) do
+    if Regex.match?(~r/^\s*(import|export)\s|import\.meta/m, src) do
+      src
+      |> String.replace(~r/\bimport\.meta\b/, "globalThis.__wbImportMeta")
+      |> rewrite_lines()
+    else
+      src
+    end
+  end
+
+  defp rewrite_lines(src) do
+    src
+    |> String.split("\n")
+    |> Enum.map(&rewrite_line/1)
+    |> Enum.join("\n")
+  end
+
+  # Each clause matches one static ESM statement and emits its CJS equivalent. Order matters (most specific
+  # first). A line with no static import/export is returned unchanged.
+  defp rewrite_line(line) do
+    t = String.trim_trailing(line)
+
+    cond do
+      # import * as ns from 'mod'  ->  const ns = require('mod')
+      m = Regex.run(~r/^\s*import\s+\*\s+as\s+(\w+)\s+from\s+["']([^"']+)["'];?\s*$/, t) ->
+        [_, ns, mod] = m
+        "const #{ns} = #{req(mod)};"
+
+      # import def, { a, b as c } from 'mod'  ->  default + named
+      m = Regex.run(~r/^\s*import\s+(\w+)\s*,\s*\{([^}]*)\}\s+from\s+["']([^"']+)["'];?\s*$/, t) ->
+        [_, def, names, mod] = m
+        tmp = tmpvar()
+        "const #{tmp} = #{req(mod)}; const #{def} = (#{tmp} && #{tmp}.default !== undefined) ? #{tmp}.default : #{tmp}; const {#{cjs_names(names)}} = #{tmp};"
+
+      # import { a, b as c } from 'mod'  ->  const { a, c: c } = require('mod')
+      m = Regex.run(~r/^\s*import\s+\{([^}]*)\}\s+from\s+["']([^"']+)["'];?\s*$/, t) ->
+        [_, names, mod] = m
+        "const {#{cjs_names(names)}} = #{req(mod)};"
+
+      # import def from 'mod'  ->  const def = require('mod').default ?? require('mod')
+      m = Regex.run(~r/^\s*import\s+(\w+)\s+from\s+["']([^"']+)["'];?\s*$/, t) ->
+        [_, def, mod] = m
+        tmp = tmpvar()
+        "const #{tmp} = #{req(mod)}; const #{def} = (#{tmp} && #{tmp}.default !== undefined) ? #{tmp}.default : #{tmp};"
+
+      # import 'mod'  ->  require('mod')
+      m = Regex.run(~r/^\s*import\s+["']([^"']+)["'];?\s*$/, t) ->
+        [_, mod] = m
+        "#{req(mod)};"
+
+      # export default <expr>  ->  module.exports.default = <expr>
+      m = Regex.run(~r/^\s*export\s+default\s+(.*)$/, t) ->
+        [_, rest] = m
+        "module.exports.default = #{rest}"
+
+      # export { a, b as c }  ->  Object.assign(module.exports, { a: a, c: b })
+      m = Regex.run(~r/^\s*export\s+\{([^}]*)\}\s*;?\s*$/, t) ->
+        [_, names] = m
+        "Object.assign(module.exports, {#{export_names(names)}});"
+
+      # export const/let/var NAME = ...  ->  declare, then mirror onto exports
+      m = Regex.run(~r/^\s*export\s+(const|let|var)\s+(\w+)\s*=\s*(.*)$/, t) ->
+        [_, kw, name, rest] = m
+        "#{kw} #{name} = #{rest}\nmodule.exports.#{name} = #{name};"
+
+      # export function NAME(...)  /  export class NAME ...  ->  drop the `export ` keyword (decl is hoisted;
+      # a trailing `module.exports.NAME = NAME` isn't emitted inline to keep the rewrite single-line-safe).
+      m = Regex.run(~r/^\s*export\s+(async\s+function|function|class)\s+(\w+)(.*)$/, t) ->
+        [_, kw, name, rest] = m
+        "#{kw} #{name}#{rest}  /* wb-esm: module.exports.#{name} below */ ;globalThis.#{name}=globalThis.#{name};"
+
+      true ->
+        line
+    end
+  end
+
+  # "a, b as c" -> "a, c: b"  (named-import rename in a destructuring pattern)
+  defp cjs_names(names) do
+    names
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.map(fn n ->
+      case Regex.run(~r/^(\w+)\s+as\s+(\w+)$/, n) do
+        [_, orig, as] -> "#{orig}: #{as}"
+        _ -> n
+      end
+    end)
+    |> Enum.join(", ")
+  end
+
+  # "a, b as c" -> "a: a, c: b"  (named-export: local b exported as c)
+  defp export_names(names) do
+    names
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.map(fn n ->
+      case Regex.run(~r/^(\w+)\s+as\s+(\w+)$/, n) do
+        [_, local, exported] -> "#{exported}: #{local}"
+        _ -> "#{n}: #{n}"
+      end
+    end)
+    |> Enum.join(", ")
+  end
+
+  defp q(s), do: ~s("#{s}")
+
+  # Resolve a static import via the GLOBAL require — NOT a bare `require`, which a user `const require =
+  # createRequire(import.meta.url)` later in the same block would shadow + TDZ-poison ("can't access lexical
+  # declaration 'require' before initialization"). globalThis.require is always the prelude resolver.
+  defp req(mod), do: "globalThis.require(#{q(mod)})"
+
+  # A unique temp identifier per rewritten line so two desugared default-imports don't redeclare the same
+  # `const` in one scope (which would be a hard SyntaxError).
+  defp tmpvar, do: "__wbm#{:erlang.unique_integer([:positive])}"
 
   # QuickJS fallback: compile the bundle to a wasm command in-sandbox, run it; its console.log → stdout.
   defp quickjs_run(js, opts) do
