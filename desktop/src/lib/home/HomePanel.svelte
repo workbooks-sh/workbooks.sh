@@ -1,25 +1,22 @@
 <script lang="ts">
   /**
-   * HomePanel — the locked-in create surface (wb-5hc0.1).
+   * HomePanel — the create surface AND the foreground text-chat thread.
    *
    * Conceptual model: this is where you land when you want to start
-   * or create something but haven't picked which thing yet. The visual
-   * anchor is the composer. Above it, an "Ask the workspace" chip
-   * opens a minimalist AI palette (wb-5hc0.2). The agent picker lives
-   * in the composer footer so the active agent is always visible.
-   * Below, a short row of explicit "+ X" create entry points for
-   * things the palette can't disambiguate quickly (boards, packages,
-   * workbooks, skills).
+   * something. The visual anchor is the composer, centered on empty calm.
    *
-   * No bookmarks. No recents. No suggestions grid. Empty calm.
+   * Sending from the composer turns the PAGE itself into the conversation
+   * (demo TASK 2): the composer animates to the bottom, the thread renders
+   * in the main area, and the agent's reply streams in-session. Text chat
+   * does NOT open the Waldo side panel — the page IS the thread.
    *
-   * Submit behavior: pushes the prompt into chatSession.send() AND
-   * opens the right-side AgentPanel so the user immediately sees the
-   * thread their input started.
+   * Voice (demo TASK 3) is reached from the composer's "+" menu (a Waveform
+   * entry). Starting voice opens the Waldo dock panel on the right — voice
+   * lives in the panel, not on this page.
    */
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import { fade, fly } from "svelte/transition";
-  import { ArrowUp, ArrowUUpLeft as Undo2, Waveform as AudioLines, Microphone as Mic, MicrophoneSlash as MicOff, PhoneSlash as PhoneOff, WarningCircle as AlertCircle, Wrench, CircleNotch as Loader2, Check, XCircle } from "phosphor-svelte";
+  import { ArrowUp, ArrowUUpLeft as Undo2, Waveform, Plus, ChatCircle } from "phosphor-svelte";
   import { chatSession } from "$lib/chat/session.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { keys } from "$lib/bridge/keys.svelte";
@@ -29,11 +26,14 @@
   import { chrome } from "$lib/ui/chrome.svelte";
   import { features } from "$lib/bridge/features";
   import { dock } from "$lib/bridge/dock.svelte";
+  import AssistantMessageView from "$lib/chat/AssistantMessageView.svelte";
+  import ArtifactCard from "$lib/chat/ArtifactCard.svelte";
+
+  const WALDO_SLUG = "waldo";
 
   // Multi-agent chrome (the agents catalog + its picker) is gated by
   // WB_FF_AGENTS (wb-aakl.2) and lazily imported so a flags-off build
-  // excludes the catalog store. The single Waldo chatSession + voice
-  // below are NOT gated — they're the transport Waldo (wb-aakl.21) lifts.
+  // excludes the catalog store.
   let agents = $state<typeof import("$lib/bridge/agents.svelte").agents | null>(null);
   let AgentPickerDropdown =
     $state<typeof import("$lib/chat/AgentPickerDropdown.svelte").default | null>(null);
@@ -48,260 +48,111 @@
     );
   });
   import { createPackage } from "./createPackage.svelte";
-  import {
-    geminiLive,
-    type ExtraFunctionDecl,
-  } from "$lib/live/gemini.svelte";
 
   let prompt = $state("");
   let textareaEl: HTMLTextAreaElement | null = $state(null);
+  let threadEl: HTMLDivElement | null = $state(null);
   let sending = $state(false);
   let error = $state<string | null>(null);
 
-  // ── Voice mode (wb-nlts) ──
+  // ── Foreground conversation (demo TASK 2) ──
   //
-  // Toggling voice morphs the composer in place: textarea hides, the
-  // status strip + transcript take its place. The session runs against
-  // Waldo with the brainstorming skill attached — same Gemini Live
-  // transport that used to live in the palette.
-  type Bubble =
-    | { kind: "msg"; id: number; who: "user" | "agent"; text: string }
-    | {
-        kind: "chip";
-        id: number;
-        tool: "drop_into_composer" | "set_active_agent";
-        args: Record<string, unknown>;
-        status: "open" | "accepted";
-      }
-    | {
-        kind: "tool";
-        id: number;
-        callId: string;
-        /** The terminal command Waldo is running (the `bash`
-         *  tool's `command` arg). Shown verbatim so the user can
-         *  read exactly what was executed. */
-        command: string;
-        status: "running" | "ok" | "error";
-        /** Tool output once the exec returns. exit=<n> head; full
-         *  output rendered when the user expands the tool block. */
-        output: string | null;
-      };
-  let voiceMode = $state(false);
-  let bubbles = $state<Bubble[]>([]);
-  let bubbleSeq = 0;
-  let transcriptEl: HTMLDivElement | null = $state(null);
-  let voiceError = $state<string | null>(null);
-  /** Per-tool-call expand state — tap a tool block to toggle the
-   *  full output drawer. Keyed by the Gemini Live call id. */
-  let toolExpanded = $state<Record<string, boolean>>({});
+  // The page is a thread once the user has sent at least one message. We
+  // read the user's echoes + the agent blocks straight off the shared
+  // chatSession store (the same store WaldoPanel uses), so opening the
+  // dock panel later shows the identical conversation.
+  const inConversation = $derived(chatSession.userEchoes.length > 0 || sending);
 
-  function pushTool(callId: string, command: string) {
-    bubbles = [
-      ...bubbles,
-      {
-        kind: "tool",
-        id: ++bubbleSeq,
-        callId,
-        command,
-        status: "running",
-        output: null,
-      },
-    ];
-  }
+  type Line = {
+    who: "you" | "waldo";
+    text: string;
+    ts: number;
+    kind: string;
+    pending?: boolean;
+    error?: boolean;
+    artifact?: { path: string; title: string; action: "created" | "updated" };
+  };
+  const transcript = $derived.by<Line[]>(() => {
+    const mine: Line[] = chatSession.userEchoes.map((m) => ({
+      who: "you", text: m.text, ts: m.ts, kind: "msg",
+    }));
+    const theirs = chatSession.blocks
+      .map((b): Line | null => {
+        if (b.kind === "message") return { who: "waldo", text: b.text, ts: b.ts, kind: "msg", pending: b.pending, error: b.error };
+        if (b.kind === "tool") return { who: "waldo", text: `${b.toolName}${b.pending ? "…" : ""}`, ts: b.ts, kind: "tool" };
+        if (b.kind === "status") return { who: "waldo", text: b.label, ts: b.ts, kind: "status" };
+        if (b.kind === "artifact") return { who: "waldo", text: b.title, ts: b.ts, kind: "artifact", artifact: { path: b.path, title: b.title, action: b.action } };
+        return null;
+      })
+      .filter((x): x is Line => x !== null);
+    return [...mine, ...theirs].sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
+  });
 
-  function completeTool(callId: string, output: string) {
-    bubbles = bubbles.map((b) => {
-      if (b.kind !== "tool" || b.callId !== callId) return b;
-      const status: "ok" | "error" = output.startsWith("exit=0") ? "ok" : "error";
-      return { ...b, status, output };
-    });
-  }
+  // "Thinking" dots between send and the first agent output.
+  const thinking = $derived(
+    (sending ||
+      chatSession.session?.status === "pending" ||
+      chatSession.session?.status === "running") &&
+      !transcript.some((m) => m.who === "waldo" && (m.text || m.pending)),
+  );
 
-  /** Chip tools the brainstorming agent can call (drop a composer
-   *  prompt; switch the active agent). `start_wizard` deliberately
-   *  absent — wizards don't open wizards (wb-nlts). */
-  const VOICE_CHIP_TOOLS: ExtraFunctionDecl[] = [
-    {
-      name: "drop_into_composer",
-      description:
-        "Propose text the user can drop into the chat composer. Use when the conversation has converged on a specific actionable task. Keep text 1–4 sentences, declarative, ready to send.",
-      parameters: {
-        type: "object",
-        properties: {
-          text: {
-            type: "string",
-            description:
-              "The proposed composer text — a concrete prompt the user could send next.",
-          },
-        },
-        required: ["text"],
-      },
-    },
-    {
-      name: "set_active_agent",
-      description:
-        "Propose switching the host's active agent to a different slug from the catalog. Use when the user's described work fits a specialist agent better than Waldo, the resident assistant.",
-      parameters: {
-        type: "object",
-        properties: {
-          slug: {
-            type: "string",
-            description: "Slug of the agent to switch to (kebab-case).",
-          },
-        },
-        required: ["slug"],
-      },
-    },
-  ];
-
-  function appendChunk(who: "user" | "agent", chunk: string) {
-    const last = bubbles[bubbles.length - 1];
-    if (last && last.kind === "msg" && last.who === who) {
-      bubbles = [
-        ...bubbles.slice(0, -1),
-        { ...last, text: last.text + chunk },
-      ];
-    } else {
-      bubbles = [
-        ...bubbles,
-        { kind: "msg", id: ++bubbleSeq, who, text: chunk },
-      ];
-    }
-  }
-
-  function pushChip(
-    tool: "drop_into_composer" | "set_active_agent",
-    args: Record<string, unknown>,
-  ) {
-    bubbles = [
-      ...bubbles,
-      { kind: "chip", id: ++bubbleSeq, tool, args, status: "open" },
-    ];
-  }
-
-  function acceptChip(chip: Extract<Bubble, { kind: "chip" }>) {
-    if (chip.status !== "open") return;
-    if (chip.tool === "drop_into_composer") {
-      const text = typeof chip.args.text === "string" ? chip.args.text : "";
-      if (text) {
-        priorPrompt = prompt;
-        prompt = text;
-        queueMicrotask(() => textareaEl?.focus());
-      }
-    } else if (chip.tool === "set_active_agent") {
-      const slug = typeof chip.args.slug === "string" ? chip.args.slug : "";
-      if (slug) agents?.select(slug);
-    }
-    bubbles = bubbles.map((b) =>
-      b.kind === "chip" && b.id === chip.id ? { ...b, status: "accepted" } : b,
-    );
-  }
-
-  async function startVoice() {
-    if (voiceMode || geminiLive.present) return;
-    voiceMode = true;
-    bubbles = [];
-    voiceError = null;
-    const workdir = packageStore.active?.folders?.[0] ?? null;
-    await geminiLive.start(
-      "waldo",
-      workdir,
-      {
-        onUserTranscript: (t) => appendChunk("user", t),
-        onAgentTranscript: (t) => appendChunk("agent", t),
-        onChip: (_id, name, args) => {
-          if (name === "drop_into_composer" || name === "set_active_agent") {
-            pushChip(name, args);
-          }
-        },
-        onToolCallStart: (id, command) => pushTool(id, command),
-        onToolCallEnd: (id, output) => completeTool(id, output),
-        onError: (msg) => {
-          voiceError = msg;
-        },
-        onClose: () => {
-          voiceMode = false;
-        },
-      },
-      {
-        skills: ["brainstorming"],
-        extraTools: VOICE_CHIP_TOOLS,
-      },
-    );
-  }
-
-  async function endVoice() {
-    await geminiLive.end();
-    voiceMode = false;
-  }
-
-  // Auto-scroll transcript as new chunks arrive.
+  // Auto-scroll the thread to the newest line.
   $effect(() => {
-    void bubbles.length;
-    if (transcriptEl) {
-      queueMicrotask(() => {
-        transcriptEl!.scrollTop = transcriptEl!.scrollHeight;
-      });
+    void transcript.length;
+    void thinking;
+    if (threadEl) {
+      queueMicrotask(() => { threadEl!.scrollTop = threadEl!.scrollHeight; });
     }
   });
 
-  onDestroy(() => {
-    if (geminiLive.present) void geminiLive.end();
-  });
+  // ── "+" create/voice menu ──
+  let menuOpen = $state(false);
+  function toggleMenu() { menuOpen = !menuOpen; }
+  function closeMenu() { menuOpen = false; }
+
+  async function startVoiceFromMenu() {
+    closeMenu();
+    if (sidecar.status.state !== "ready") return;
+    // Voice lives in the Waldo panel — open it on the right, then start the
+    // session wired to the shared store the panel renders.
+    dock.open("waldo");
+    try {
+      await chatSession.startVoice();
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
 
   // ── AI palette (wb-5hc0.2/.3/.4) ──
   let paletteOpen = $state(false);
-  // wb-dj5r — when non-null, the palette opens in wizard mode instead
-  // of the ask/enhance Q→A flow. All wizards run through this path
-  // now; chips on this surface set the mode and open the palette.
   let paletteWizardMode = $state<{ id: string; title: string } | null>(null);
-  // Undo chip state (wb-5hc0.5). When the palette writes to the
-  // composer, stash the prior text here so the user can revert.
-  // Lifetime: until the user edits the composer themselves OR sends
-  // OR opens the palette again. Any of those flips priorPrompt to
-  // null and hides the chip.
   let priorPrompt = $state<string | null>(null);
 
   function openPalette() {
-    // Opening the palette invalidates a pending undo — the user is
-    // moving past the prior rewrite by initiating a new one.
     priorPrompt = null;
     paletteWizardMode = null;
     paletteOpen = true;
   }
-
-  function openWizardInPalette(id: string, title: string) {
-    priorPrompt = null;
-    paletteWizardMode = { id, title };
-    paletteOpen = true;
-  }
-
   function closePalette() {
     paletteOpen = false;
     paletteWizardMode = null;
   }
-
   function onPaletteWrite(text: string) {
     priorPrompt = prompt;
     prompt = text;
     queueMicrotask(() => textareaEl?.focus());
   }
-
   function undoPaletteWrite() {
     if (priorPrompt === null) return;
     prompt = priorPrompt;
     priorPrompt = null;
     queueMicrotask(() => textareaEl?.focus());
   }
-
-  // Edits to the composer dismiss the undo chip — user has signaled
-  // they intend to keep the rewrite.
   function onPromptInput() {
     if (priorPrompt !== null) priorPrompt = null;
   }
 
-  // Global ⌘/ shortcut — opens the palette from anywhere on the
-  // start surface, peer affordance to clicking the chip.
+  // Global ⌘/ shortcut — opens the palette from anywhere on the start surface.
   function onWindowKey(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key === "/") {
       e.preventDefault();
@@ -311,11 +162,7 @@
 
   onMount(() => {
     chatSession.init();
-    // Know whether a model key exists so the composer can prompt to wake Waldo
-    // instead of silently no-opping (wb-2s09.3/.4). Best-effort; offline → empty.
     void keys.init().catch(() => {});
-    // agents.init() fires from the gated $effect above (flag-on only).
-    // Wait a tick so the textarea is mounted, then focus.
     queueMicrotask(() => textareaEl?.focus());
   });
 
@@ -323,33 +170,40 @@
   // composer would silently fail; surface a "wake Waldo" CTA instead.
   const hasModelKey = $derived(keys.keys.some((k) => k.provider === "openrouter"));
   const needsKey = $derived(sidecar.status.state === "ready" && !hasModelKey);
+  const ready = $derived(sidecar.status.state === "ready");
 
   const canSend = $derived(
-    !sending && prompt.trim().length > 0 && sidecar.status.state === "ready" && hasModelKey,
+    !sending && prompt.trim().length > 0 && ready && hasModelKey,
   );
 
   async function submit() {
     const t = prompt.trim();
     if (!t || sending) return;
-    if (sidecar.status.state !== "ready") {
+    if (!ready) {
       error = "Agent isn't ready yet.";
       return;
     }
     sending = true;
     error = null;
-    // Sending = the user is keeping the (possibly palette-enhanced)
-    // prompt. Drop the undo chip.
     priorPrompt = null;
+    // Foreground text chat: render the conversation HERE (TASK 2). Echo the
+    // user's message into the shared store and clear the composer — the page
+    // becomes the thread; we do NOT open the Waldo side panel for text.
+    chatSession.pushEcho(t);
+    prompt = "";
     try {
-      // Open the agent dock panel so the user sees the thread (wb-aakl.14).
-      if (features.agents) dock.open("agent");
-      await chatSession.send(t);
-      prompt = "";
+      await chatSession.send(t, { agentSlug: WALDO_SLUG });
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
       sending = false;
     }
+  }
+
+  function newChat() {
+    chatSession.clearTranscript();
+    error = null;
+    queueMicrotask(() => textareaEl?.focus());
   }
 
   function onKey(e: KeyboardEvent) {
@@ -359,132 +213,118 @@
       void submit();
     }
   }
-
-  function newPackage(e: MouseEvent) {
-    const wsActive = workspaces.active;
-    if (!wsActive) return;
-    const target = e.currentTarget;
-    if (!(target instanceof HTMLElement)) return;
-    createPackage.openMenu(target.getBoundingClientRect());
-  }
-
-
 </script>
 
 <svelte:window onkeydown={onWindowKey} />
 
-<div class="home">
-  <div class="hero">
-    {#if !voiceMode}
-      <form
-        class="composer"
-        onsubmit={(e) => { e.preventDefault(); submit(); }}
-        in:fade={{ duration: 180 }}
-      >
-        <textarea
-          bind:this={textareaEl}
-          bind:value={prompt}
-          onkeydown={onKey}
-          oninput={onPromptInput}
-          placeholder="What would you like to do?"
-          rows="3"
-          spellcheck="false"
-          disabled={sending}
-        ></textarea>
-        <div class="composer-foot">
-          <div class="foot-left">
-            {#if features.agents && AgentPickerDropdown}
-              <AgentPickerDropdown oncreate={() => { /* TBD */ }} />
-            {/if}
-          </div>
-          <span class="hint">
-            {#if sidecar.status.state !== "ready"}
-              <span class="muted">{sidecar.status.state}</span>
-            {:else if needsKey}
-              <button type="button" class="wake-cta" onclick={() => chrome.navigateTo("settings", "general")}>
-                Add a model key to wake Waldo →
-              </button>
-            {:else}
-              <span class="muted">⌘↵</span>
-            {/if}
-          </span>
-          <button
-            type="button"
-            class="btn voice-toggle"
-            onclick={startVoice}
-            disabled={sidecar.status.state !== "ready"}
-            title="Talk to Waldo by voice"
-            aria-label="Start voice session"
-          >
-            <AudioLines weight="fill" size={13} />
-          </button>
-          <button
-            type="submit"
-            class="btn primary"
-            disabled={!canSend}
-          >
-            {#if sending}…{:else}<ArrowUp weight="fill" size={16} />{/if}
-          </button>
-        </div>
-      </form>
-    {:else}
-      <!-- Voice mode: the composer morphs into a status strip + the
-           quick-chip row below morphs into a transcript pane. Same
-           position, same visual anchor — no layout jump. -->
-      <div
-        class="voice-shell"
-        class:errored={geminiLive.state === "error"}
-        in:fade={{ duration: 240 }}
-      >
-        <div class="voice-strip">
-          <span class="leading" aria-hidden="true">
-            <span class="voice-dot" class:muted={geminiLive.muted}></span>
-          </span>
-          <span class="voice-status">
-            {#if geminiLive.state === "connecting"}
-              Connecting…
-            {:else if geminiLive.state === "live"}
-              {geminiLive.muted ? "Muted" : "Listening"}
-            {:else if geminiLive.state === "paused"}
-              Paused
-            {:else if geminiLive.state === "error"}
-              {geminiLive.error ?? "Voice session error"}
-            {:else}
-              Waldo
-            {/if}
-          </span>
-          <div class="voice-trailing">
-            <button
-              type="button"
-              class="voice-btn"
-              onclick={() => geminiLive.toggleMute()}
-              disabled={geminiLive.state !== "live"}
-              title={geminiLive.muted ? "Unmute" : "Mute"}
-              aria-label={geminiLive.muted ? "Unmute" : "Mute"}
-            >
-              {#if geminiLive.muted}
-                <MicOff weight="fill" size={14} />
+<div class="home" class:conversing={inConversation}>
+  {#if inConversation}
+    <!-- The page IS the thread (TASK 2). Composer is pinned to the bottom. -->
+    <div class="thread" bind:this={threadEl}>
+      <div class="thread-inner">
+        {#each transcript as m, i (m.ts + "-" + i)}
+          {#if m.kind === "artifact" && m.artifact}
+            <div class="artifact-line">
+              <ArtifactCard path={m.artifact.path} title={m.artifact.title} action={m.artifact.action} />
+            </div>
+          {:else if m.kind === "status"}
+            <div class="status-line">{m.text}</div>
+          {:else}
+            <div class="bubble {m.who}" class:tool={m.kind === "tool"} class:err={m.error}>
+              {#if m.who === "waldo" && m.kind === "msg"}
+                <span class="tag">Waldo</span>
+                {#if m.text}<AssistantMessageView text={m.text} />{:else if m.pending}<span class="dim">…</span>{/if}
               {:else}
-                <Mic weight="fill" size={14} />
+                <span class="text">{m.text}</span>
               {/if}
-            </button>
+            </div>
+          {/if}
+        {/each}
+        {#if thinking}
+          <div class="bubble waldo">
+            <span class="tag">Waldo</span>
+            <span class="typing"><span></span><span></span><span></span></span>
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
+  <div class="hero" class:docked={inConversation}>
+    {#if inConversation}
+      <button type="button" class="new-chat" onclick={newChat} transition:fade={{ duration: 140 }}>
+        <ChatCircle weight="fill" size={13} /> New chat
+      </button>
+    {/if}
+
+    <form
+      class="composer"
+      onsubmit={(e) => { e.preventDefault(); submit(); }}
+      in:fade={{ duration: 180 }}
+    >
+      <textarea
+        bind:this={textareaEl}
+        bind:value={prompt}
+        onkeydown={onKey}
+        oninput={onPromptInput}
+        placeholder="What would you like to do?"
+        rows={inConversation ? 1 : 3}
+        spellcheck="false"
+        disabled={sending}
+      ></textarea>
+      <div class="composer-foot">
+        <div class="foot-left">
+          <div class="plus-wrap">
             <button
               type="button"
-              class="voice-btn end"
-              onclick={endVoice}
-              title="End session"
-              aria-label="End voice session"
+              class="btn plus-btn"
+              onclick={toggleMenu}
+              title="Create or talk by voice"
+              aria-label="Open create menu"
+              aria-expanded={menuOpen}
             >
-              <PhoneOff weight="fill" size={14} />
+              <Plus weight="bold" size={15} />
             </button>
+            {#if menuOpen}
+              <div class="plus-menu" transition:fly={{ y: 6, duration: 140 }}>
+                <button
+                  type="button"
+                  class="plus-item"
+                  onclick={startVoiceFromMenu}
+                  disabled={!ready}
+                >
+                  <Waveform weight="fill" size={15} />
+                  <span>Talk by voice</span>
+                </button>
+              </div>
+              <!-- click-away -->
+              <button type="button" class="plus-scrim" aria-hidden="true" tabindex="-1" onclick={closeMenu}></button>
+            {/if}
           </div>
+          {#if features.agents && AgentPickerDropdown}
+            <AgentPickerDropdown oncreate={() => { /* TBD */ }} />
+          {/if}
         </div>
+        <span class="hint">
+          {#if sidecar.status.state !== "ready"}
+            <span class="muted">{sidecar.status.state}</span>
+          {:else if needsKey}
+            <button type="button" class="wake-cta" onclick={() => chrome.navigateTo("settings", "general")}>
+              Add a model key to wake Waldo →
+            </button>
+          {:else}
+            <span class="muted">⌘↵</span>
+          {/if}
+        </span>
+        <button type="submit" class="btn primary" disabled={!canSend}>
+          {#if sending}…{:else}<ArrowUp weight="fill" size={16} />{/if}
+        </button>
       </div>
-    {/if}
+    </form>
 
     {#if error}<div class="err">{error}</div>{/if}
 
-    {#if priorPrompt !== null && !voiceMode}
+    {#if priorPrompt !== null}
       <button
         type="button"
         class="undo-chip"
@@ -495,88 +335,6 @@
         <Undo2 weight="bold" size={11} aria-hidden="true" />
         <span>Undo</span>
       </button>
-    {/if}
-
-    {#if voiceMode}
-      <div
-        class="voice-transcript"
-        bind:this={transcriptEl}
-        in:fly={{ y: 8, duration: 220 }}
-      >
-        {#if bubbles.length === 0 && geminiLive.state !== "error"}
-          <div class="voice-empty">
-            <span class="dots" aria-hidden="true">
-              <span></span><span></span><span></span>
-            </span>
-            <span class="muted">
-              {geminiLive.state === "connecting"
-                ? "Opening mic…"
-                : "Waldo is about to speak."}
-            </span>
-          </div>
-        {/if}
-        {#each bubbles as b (b.id)}
-          {#if b.kind === "msg"}
-            <div class="bubble" class:agent={b.who === "agent"}>
-              <span class="who">{b.who === "agent" ? "Waldo" : "You"}</span>
-              <span class="text">{b.text}</span>
-            </div>
-          {:else if b.kind === "tool"}
-            <button
-              type="button"
-              class="tool-block"
-              class:running={b.status === "running"}
-              class:done={b.status === "ok"}
-              class:errored={b.status === "error"}
-              onclick={() => (toolExpanded[b.callId] = !toolExpanded[b.callId])}
-            >
-              <span class="tool-head">
-                <Wrench weight="fill" size={11} aria-hidden="true" />
-                <span class="tool-name">terminal</span>
-                {#if b.status === "running"}
-                  <Loader2 weight="bold" size={11} aria-hidden="true" class="spin" />
-                {:else if b.status === "ok"}
-                  <Check weight="bold" size={11} aria-hidden="true" />
-                {:else}
-                  <XCircle weight="fill" size={11} aria-hidden="true" />
-                {/if}
-              </span>
-              <code class="tool-cmd">{b.command}</code>
-              {#if toolExpanded[b.callId] && b.output}
-                <pre class="tool-output">{b.output}</pre>
-              {/if}
-            </button>
-          {:else}
-            <button
-              type="button"
-              class="voice-chip"
-              class:accepted={b.status === "accepted"}
-              disabled={b.status !== "open"}
-              onclick={() => acceptChip(b)}
-            >
-              <span class="voice-chip-label">
-                {#if b.tool === "drop_into_composer"}
-                  Drop into composer
-                {:else}
-                  Switch to @{String(b.args.slug ?? "")}
-                {/if}
-              </span>
-              {#if b.tool === "drop_into_composer" && typeof b.args.text === "string"}
-                <span class="voice-chip-detail">{b.args.text}</span>
-              {/if}
-              {#if b.status === "accepted"}
-                <span class="voice-chip-check">✓</span>
-              {/if}
-            </button>
-          {/if}
-        {/each}
-        {#if voiceError}
-          <div class="voice-err">
-            <AlertCircle weight="fill" size={12} />
-            <span>{voiceError}</span>
-          </div>
-        {/if}
-      </div>
     {/if}
   </div>
 </div>
@@ -593,15 +351,21 @@
 <style>
   .home {
     flex: 1 1 auto;
-    overflow: auto;
-    /* No surface of its own — the create page shows the graph-paper shader
-     * backdrop, with the composer + chips floating on top. */
+    overflow: hidden;
     background: transparent;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     padding: 4rem 2rem 8rem;
+    transition: padding 0.25s ease;
   }
+  /* Conversation mode: thread fills the canvas, composer pins to the bottom. */
+  .home.conversing {
+    justify-content: flex-end;
+    padding: 0;
+  }
+
   .hero {
     width: 100%;
     max-width: 640px;
@@ -609,44 +373,114 @@
     flex-direction: column;
     align-items: stretch;
   }
+  /* Docked composer: anchored to the bottom of the canvas, full-width band. */
+  .hero.docked {
+    position: relative;
+    max-width: 760px;
+    margin-inline: auto;
+    padding: 0.75rem 1rem 1.25rem;
+    flex: 0 0 auto;
+  }
 
-  /* The AI palette chip — minimalist, inviting, NOT a button that
-   * looks like an action. Visually a soft pill that says "you can
-   * ask me about this workspace." Disabled state for now (wb-5hc0.2
-   * wires the modal). */
-  .palette-chip {
+  /* ── thread (foreground text chat) ── */
+  .thread {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    justify-content: center;
+  }
+  .thread-inner {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 1.5rem 1rem 1rem;
+  }
+  .bubble {
+    max-width: 88%;
+    padding: 9px 12px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .bubble.you {
+    align-self: flex-end;
+    background: var(--color-fg);
+    color: var(--color-page);
+  }
+  .bubble.waldo {
+    align-self: flex-start;
+    background: var(--color-surface-soft);
+    color: var(--color-fg);
+  }
+  .bubble.tool {
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--color-fg-muted);
+    background: transparent;
+    padding: 2px 12px;
+  }
+  .bubble.err { color: var(--color-err); }
+  .bubble .tag {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-fg-subtle);
+    margin-bottom: 3px;
+  }
+  .dim { color: var(--color-fg-subtle); }
+  .artifact-line { align-self: flex-start; max-width: 90%; }
+  .status-line {
+    align-self: center;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    color: var(--color-fg-subtle);
+    padding: 2px 0;
+  }
+
+  .typing { display: inline-flex; gap: 3px; padding: 2px 0; }
+  .typing span {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: var(--color-fg-subtle);
+    animation: typing-bounce 1.2s infinite ease-in-out both;
+  }
+  .typing span:nth-child(1) { animation-delay: -0.24s; }
+  .typing span:nth-child(2) { animation-delay: -0.12s; }
+  @keyframes typing-bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+    40% { transform: translateY(-3px); opacity: 1; }
+  }
+
+  /* ── new-chat chip ── */
+  .new-chat {
     align-self: center;
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.45rem 0.85rem;
-    margin-bottom: 1rem;
-    background: var(--color-surface-soft);
+    gap: 0.3rem;
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0.6rem;
     border: 1px solid var(--color-border);
     border-radius: 999px;
+    background: var(--color-surface);
     color: var(--color-fg-muted);
     font: inherit;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
   }
-  .palette-chip:hover:not(:disabled) {
-    background: var(--color-surface);
+  .new-chat:hover {
+    background: var(--color-surface-soft);
     color: var(--color-fg);
     border-color: var(--color-border-strong);
-  }
-  .palette-chip:disabled {
-    cursor: default;
-    opacity: 0.55;
-  }
-  .palette-chip kbd {
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    padding: 0.1rem 0.35rem;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    background: var(--color-surface);
-    color: var(--color-fg-subtle);
   }
 
   .composer {
@@ -671,23 +505,29 @@
     color: var(--color-fg);
     resize: none;
     line-height: 1.5;
-    min-height: 84px;
+    min-height: 32px;
   }
+  .conversing .composer textarea { min-height: 32px; }
+  .home:not(.conversing) .composer textarea { min-height: 84px; }
   .composer textarea::placeholder { color: var(--color-fg-subtle); }
   .composer-foot {
     display: flex;
     align-items: center;
     gap: 0.5rem;
   }
-  .foot-left { flex: 1 1 auto; min-width: 0; }
+  .foot-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
   .hint {
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--color-fg-subtle);
   }
   .muted { color: var(--color-fg-muted); }
-  /* Missing-key prompt — a quiet inline CTA that jumps to settings so the user
-     can wake Waldo instead of hitting a dead send button (wb-2s09.3/.4). */
   .wake-cta {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -716,16 +556,65 @@
     transition: opacity 0.15s, filter 0.15s, background 0.15s, color 0.15s;
   }
   .btn:disabled { opacity: 0.35; cursor: default; }
-  /* THE bug behind the "invisible send icon": an inline <svg> flex-item has a
-     min-content width of 0, so flex-shrink collapsed it to width:0 (height
-     stayed 16px — only the main axis shrinks). flex:none pins it to its 16px
-     intrinsic size. It was never a color problem. */
   .btn :global(svg) { flex: none; }
-  /* Send: fg-filled button; the glyph uses mix-blend-mode:difference so it always
-     contrasts with the button regardless of theme-token resolution. */
   .btn.primary { background: var(--color-fg); isolation: isolate; }
   .btn.primary :global(svg) { color: #fff; fill: currentColor; mix-blend-mode: difference; }
   .btn.primary:not(:disabled):hover { filter: brightness(1.08); }
+
+  /* "+" create/voice menu */
+  .plus-wrap { position: relative; display: inline-flex; }
+  .plus-btn {
+    width: 30px;
+    height: 30px;
+    background: transparent;
+    color: var(--color-fg-muted);
+  }
+  .plus-btn:hover {
+    background: var(--color-surface-soft);
+    color: var(--color-fg);
+  }
+  .plus-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    z-index: 20;
+    min-width: 168px;
+    padding: 4px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-pop);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .plus-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.45rem 0.55rem;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--color-fg);
+    font: inherit;
+    font-size: 0.84rem;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s, color 0.1s;
+  }
+  .plus-item:hover:not(:disabled) { background: var(--color-surface-soft); }
+  .plus-item:disabled { opacity: 0.4; cursor: default; }
+  .plus-item :global(svg) { color: var(--color-brand, #3fe081); flex: none; }
+  .plus-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    background: transparent;
+    border: 0;
+    cursor: default;
+  }
 
   .err {
     margin-top: 0.6rem;
@@ -734,11 +623,6 @@
     text-align: center;
   }
 
-  /* Undo chip — appears between the composer and the quick-action
-   * chips when the palette has written to the composer. Soft,
-   * non-shouty; it's an "if you didn't want this" affordance, not
-   * a primary action. Lifetime is bounded by HomePanel.svelte's
-   * priorPrompt state (cleared on edit / send / next-palette-open). */
   .undo-chip {
     align-self: flex-end;
     margin-top: 0.55rem;
@@ -761,38 +645,7 @@
     border-color: var(--color-border-strong);
   }
 
-  .quick {
-    margin-top: 1rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    justify-content: center;
-  }
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    height: 26px;
-    padding: 0 0.65rem;
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    background: transparent;
-    color: var(--color-fg-muted);
-    font: inherit;
-    font-size: 0.74rem;
-    cursor: pointer;
-    transition: background 0.1s, color 0.1s;
-  }
-  .chip:hover:not(:disabled) {
-    background: var(--color-surface-soft);
-    color: var(--color-fg);
-  }
-  .chip:disabled { opacity: 0.5; cursor: default; }
-
-  /* Tighten the AgentPickerDropdown when embedded in the composer
-   * footer (override its default chip styling so it doesn't look
-   * like a primary action). The selector reaches into the rendered
-   * child via :global. */
+  /* Tighten the AgentPickerDropdown when embedded in the composer footer. */
   .foot-left :global(.agent-picker) {
     font-size: 0.74rem;
     padding: 0.2rem 0.5rem !important;
@@ -804,308 +657,5 @@
     background: var(--color-surface-soft) !important;
     border-color: var(--color-border) !important;
     color: var(--color-fg) !important;
-  }
-
-  /* ── Voice mode (wb-nlts) ──
-   *
-   * The voice strip takes the composer's place when voiceMode is on,
-   * with the same shell dimensions so the page doesn't reflow. Border
-   * is the aurora gradient flowing slowly — same visual language as
-   * the global LiveBar but scoped to the home composer. */
-  .voice-toggle {
-    /* Sits next to the send button in text mode. Subtle until live. */
-    padding: 0 0.55rem;
-    background: transparent;
-    color: var(--color-fg-muted);
-  }
-  .voice-toggle:not(:disabled):hover {
-    background: var(--color-surface-soft);
-    color: var(--color-fg);
-  }
-
-  .voice-shell {
-    display: flex;
-    flex-direction: column;
-    border: 1.5px solid transparent;
-    border-radius: 10px;
-    background:
-      linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
-      linear-gradient(
-        90deg,
-        var(--gradient-aurora-a),
-        var(--gradient-aurora-b),
-        var(--gradient-aurora-c),
-        var(--gradient-aurora-d),
-        var(--gradient-aurora-a)
-      ) border-box;
-    background-size: 100% 100%, 200% 100%;
-    animation: voice-aurora-flow 12s linear infinite;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  }
-  @keyframes voice-aurora-flow {
-    from { background-position: 0% 0%, 0% 0%; }
-    to   { background-position: 0% 0%, 200% 0%; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .voice-shell { animation: none; }
-  }
-  .voice-shell.errored {
-    border: 1.5px solid color-mix(in srgb, var(--color-err) 50%, var(--color-border-strong));
-    background: var(--color-surface);
-    animation: none;
-  }
-
-  .voice-strip {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    padding: 0.65rem 0.7rem 0.65rem 0.95rem;
-  }
-  .voice-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--color-brand);
-    box-shadow: 0 0 0 0 var(--color-ring);
-    animation: voice-dot-pulse 1.6s ease-out infinite;
-  }
-  .voice-dot.muted {
-    background: var(--color-warn);
-    box-shadow: none;
-    animation: none;
-  }
-  @keyframes voice-dot-pulse {
-    0%   { box-shadow: 0 0 0 0 var(--color-ring); }
-    70%  { box-shadow: 0 0 0 5px transparent; }
-    100% { box-shadow: 0 0 0 0 transparent; }
-  }
-  .voice-status {
-    flex: 1 1 auto;
-    color: var(--color-fg);
-    font-size: 0.92rem;
-    line-height: 1.4;
-  }
-  .voice-trailing {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-  }
-  .voice-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    border: 0;
-    background: transparent;
-    color: var(--color-fg-muted);
-    border-radius: 7px;
-    cursor: pointer;
-    transition: background 0.1s, color 0.1s, opacity 0.1s;
-  }
-  .voice-btn:not(:disabled):hover {
-    background: var(--color-surface-soft);
-    color: var(--color-fg);
-  }
-  .voice-btn:disabled { opacity: 0.35; cursor: default; }
-  .voice-btn.end {
-    background: color-mix(in srgb, var(--color-err) 14%, var(--color-surface));
-    color: var(--color-err);
-  }
-  .voice-btn.end:hover {
-    background: color-mix(in srgb, var(--color-err) 22%, var(--color-surface));
-  }
-
-  .voice-transcript {
-    display: flex;
-    flex-direction: column;
-    gap: 0.55rem;
-    margin-top: 0.6rem;
-    padding: 0.55rem 0;
-    max-height: 40vh;
-    overflow-y: auto;
-  }
-  .voice-empty {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 0;
-    color: var(--color-fg-muted);
-    font-size: 0.85rem;
-  }
-  .dots {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-  }
-  .dots span {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: var(--color-fg-muted);
-    animation: voice-dot 1.1s ease-in-out infinite;
-  }
-  .dots span:nth-child(2) { animation-delay: 0.18s; }
-  .dots span:nth-child(3) { animation-delay: 0.36s; }
-  @keyframes voice-dot {
-    0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
-    40% { opacity: 1; transform: translateY(-2px); }
-  }
-  .muted {
-    color: var(--color-fg-muted);
-  }
-
-  .bubble {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-  }
-  .bubble .who {
-    font-size: 0.66rem;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--color-fg-subtle);
-    font-weight: 600;
-  }
-  .bubble.agent .who { color: var(--color-fg-muted); }
-  .bubble .text {
-    color: var(--color-fg);
-    line-height: 1.55;
-    white-space: pre-wrap;
-    font-size: 0.92rem;
-  }
-
-  .voice-chip {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.2rem;
-    padding: 0.55rem 0.75rem;
-    border: 1px solid var(--color-border-strong);
-    background: var(--color-surface-soft);
-    color: var(--color-fg);
-    border-radius: 9px;
-    cursor: pointer;
-    text-align: left;
-    font: inherit;
-    transition: background 0.1s, border-color 0.1s, opacity 0.12s;
-    max-width: 100%;
-    position: relative;
-    align-self: flex-start;
-  }
-  .voice-chip:hover:not(:disabled) {
-    background: var(--color-surface);
-    border-color: var(--color-fg-muted);
-  }
-  .voice-chip:disabled { cursor: default; }
-  .voice-chip.accepted {
-    opacity: 0.65;
-    border-color: var(--color-border);
-  }
-  .voice-chip-label {
-    font-size: 0.82rem;
-    font-weight: 600;
-  }
-  .voice-chip-detail {
-    font-size: 0.82rem;
-    color: var(--color-fg-muted);
-    line-height: 1.45;
-    white-space: pre-wrap;
-  }
-  .voice-chip-check {
-    position: absolute;
-    top: 0.4rem;
-    right: 0.55rem;
-    font-size: 0.78rem;
-    color: var(--color-ok);
-    font-weight: 700;
-  }
-
-  .voice-err {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.55rem;
-    font-size: 0.82rem;
-    color: var(--color-err);
-    background: color-mix(in srgb, var(--color-err) 8%, transparent);
-    border: 1px solid color-mix(in srgb, var(--color-err) 30%, var(--color-border));
-    border-radius: 7px;
-  }
-
-  /* Tool-call block — each terminal command Waldo runs gets a
-   * card with status icon. Tap to expand the full output. */
-  .tool-block {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.35rem;
-    padding: 0.5rem 0.7rem;
-    border: 1px solid var(--color-border);
-    background: var(--color-surface-soft);
-    color: var(--color-fg);
-    border-radius: 8px;
-    cursor: pointer;
-    text-align: left;
-    font: inherit;
-    transition: background 0.1s, border-color 0.1s;
-    align-self: flex-start;
-    max-width: 100%;
-  }
-  .tool-block:hover {
-    background: var(--color-surface);
-    border-color: var(--color-fg-muted);
-  }
-  .tool-block.running {
-    border-color: color-mix(in srgb, var(--color-warn) 50%, var(--color-border-strong));
-  }
-  .tool-block.done {
-    border-color: color-mix(in srgb, var(--color-ok) 35%, var(--color-border-strong));
-  }
-  .tool-block.errored {
-    border-color: color-mix(in srgb, var(--color-err) 50%, var(--color-border-strong));
-    background: color-mix(in srgb, var(--color-err) 5%, var(--color-surface-soft));
-  }
-  .tool-head {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-fg-muted);
-    font-weight: 600;
-  }
-  .tool-block.done .tool-head { color: var(--color-ok); }
-  .tool-block.errored .tool-head { color: var(--color-err); }
-  .tool-name { color: inherit; }
-  :global(.tool-head .spin) {
-    animation: tool-spin 1s linear infinite;
-  }
-  @keyframes tool-spin {
-    to { transform: rotate(360deg); }
-  }
-  .tool-cmd {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    color: var(--color-fg);
-    background: transparent;
-    white-space: pre-wrap;
-    word-break: break-all;
-    line-height: 1.45;
-  }
-  .tool-output {
-    margin: 0.4rem 0 0;
-    padding: 0.55rem 0.7rem;
-    background: var(--color-page);
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    font-family: var(--font-mono);
-    font-size: 0.74rem;
-    color: var(--color-fg-muted);
-    white-space: pre-wrap;
-    word-break: break-all;
-    max-height: 240px;
-    overflow-y: auto;
   }
 </style>

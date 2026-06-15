@@ -11,6 +11,10 @@
 import { tabs } from "$lib/tabs/store.svelte";
 
 export type SplitSide = "left" | "right";
+/** How the panes tile. `row` = side-by-side resizable columns (the 2-up
+ *  default). `grid` = a real 2-column grid that quadrants 4-up (2×2) and
+ *  lays 3-up out sensibly — never N skinny columns (wb demo TASK 5). */
+export type PaneLayout = "row" | "grid";
 
 export interface Pane {
   id: number;
@@ -22,12 +26,53 @@ const MAX_PANES = 4;
 class PaneStore {
   panes = $state<Pane[]>([]);
   focused = $state(0);
-  /** Width fractions, same length as panes (empty in implicit mode). */
+  /** Width fractions, same length as panes (empty in implicit mode).
+   *  Only meaningful in `row` layout. */
   sizes = $state<number[]>([]);
+  /** Tiling mode. Auto-set: 2-up → row, 3/4-up → grid; the split-control
+   *  glyphs (columns / squares-four) let the user force either. */
+  layout = $state<PaneLayout>("row");
   #nextId = 1;
 
   get isSplit(): boolean {
     return this.panes.length > 1;
+  }
+
+  /** True when the current layout tiles as a grid (3+ panes default, or
+   *  forced grid). Drives DocViewer's grid-vs-row branch. */
+  get isGrid(): boolean {
+    return this.layout === "grid" && this.panes.length > 1;
+  }
+
+  /** CSS grid-template for the doc area when `isGrid`. 2 cols always; rows
+   *  derive from pane count. 4 panes → 2×2 quadrants; 3 → 2 cols, the 3rd
+   *  spanning the full bottom row. */
+  get gridColumns(): string {
+    return "1fr 1fr";
+  }
+  get gridRows(): string {
+    const n = this.panes.length;
+    const rows = Math.max(1, Math.ceil(n / 2));
+    return Array.from({ length: rows }, () => "1fr").join(" ");
+  }
+  /** Per-pane grid-column span. With an odd count, the LAST pane spans both
+   *  columns so 3-up reads as two-on-top, one-full-width-below. */
+  spanFor(index: number): string {
+    const n = this.panes.length;
+    const odd = n % 2 === 1;
+    if (odd && index === n - 1) return "1 / -1";
+    return "auto";
+  }
+
+  /** Force a tiling mode (split-control glyphs). */
+  setLayout(mode: PaneLayout) {
+    this.layout = mode;
+  }
+
+  /** Pick the natural layout for the current pane count: 2-up is a resizable
+   *  row, 3/4-up quadrants into a grid. Called whenever the pane set grows. */
+  #autoLayout() {
+    this.layout = this.panes.length >= 3 ? "grid" : "row";
   }
 
   /** Split: put `tabId` in a new pane on `side`. From implicit mode the
@@ -60,6 +105,7 @@ class PaneStore {
     }
     this.sizes = this.panes.map(() => 1 / this.panes.length);
     this.focused = side === "left" ? 0 : this.panes.length - 1;
+    this.#autoLayout();
   }
 
   /** Show a tab in an existing pane (center-drop / strip click while split). */
@@ -76,6 +122,7 @@ class PaneStore {
     this.panes = kept.length > 1 ? kept : [];
     this.sizes = this.panes.map(() => 1 / this.panes.length);
     this.focused = Math.min(this.focused, Math.max(0, this.panes.length - 1));
+    this.#autoLayout();
   }
 
   /** Drop panes whose tab no longer exists. Call when tabs change. */
@@ -86,6 +133,7 @@ class PaneStore {
       this.panes = kept.length > 1 ? kept : [];
       this.sizes = this.panes.map(() => 1 / this.panes.length);
       this.focused = Math.min(this.focused, Math.max(0, this.panes.length - 1));
+      this.#autoLayout();
     }
   }
 

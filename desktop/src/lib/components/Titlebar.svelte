@@ -33,6 +33,9 @@
     Robot as AgentGlyph,
     SidebarSimple,
     MagnifyingGlass,
+    Columns,
+    SquaresFour,
+    SquareSplitHorizontal,
   } from "phosphor-svelte";
   import { fly, fade } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
@@ -552,8 +555,21 @@
     </button>
     <div class="ctx-sep"></div>
   {/if}
-  <button class="ctx-item" onclick={() => menuSplit("left")}>Split left</button>
-  <button class="ctx-item" onclick={() => menuSplit("right")}>Split right</button>
+  <button class="ctx-item" onclick={() => menuSplit("left")}>
+    <SquareSplitHorizontal size={14} weight="regular" /> Split left
+  </button>
+  <button class="ctx-item" onclick={() => menuSplit("right")}>
+    <SquareSplitHorizontal size={14} weight="regular" /> Split right
+  </button>
+  {#if panes.isSplit}
+    <div class="ctx-sep"></div>
+    <button class="ctx-item" onclick={() => { panes.setLayout("row"); tabMenuOpen = false; }}>
+      <Columns size={14} weight={panes.layout === "row" ? "fill" : "regular"} /> Columns
+    </button>
+    <button class="ctx-item" onclick={() => { panes.setLayout("grid"); tabMenuOpen = false; }}>
+      <SquaresFour size={14} weight={panes.layout === "grid" ? "fill" : "regular"} /> Grid
+    </button>
+  {/if}
   <button
     class="ctx-item"
     onclick={menuBookmarkTab}

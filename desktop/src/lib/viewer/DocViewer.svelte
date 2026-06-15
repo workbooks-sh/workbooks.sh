@@ -65,8 +65,33 @@
   {/key}
 {/snippet}
 
-<div class="doc" bind:this={docEl}>
-  {#if panes.isSplit}
+<div
+  class="doc"
+  class:grid={panes.isGrid}
+  bind:this={docEl}
+  style={panes.isGrid
+    ? `grid-template-columns: ${panes.gridColumns}; grid-template-rows: ${panes.gridRows};`
+    : ""}
+>
+  {#if panes.isGrid}
+    <!-- Real grid (TASK 5): 4 panes → 2×2 quadrants, 3 → two-up + a
+         full-width bottom pane. No skinny columns. -->
+    {#each panes.panes as pane, i (pane.id)}
+      {@const tab = tabById(pane.tabId)}
+      <section
+        class="pane"
+        class:focused={panes.focused === i}
+        style="grid-column: {panes.spanFor(i)};"
+        onpointerdown={() => (panes.focused = i)}
+      >
+        {#if tab}
+          {@render docBody(tab)}
+        {:else}
+          <div class="empty"><p>Closed.</p></div>
+        {/if}
+      </section>
+    {/each}
+  {:else if panes.isSplit}
     {#each panes.panes as pane, i (pane.id)}
       {@const tab = tabById(pane.tabId)}
       <section
@@ -113,6 +138,18 @@
     flex-direction: row;
     background: var(--color-page);
     overflow: hidden;
+  }
+  /* Grid tiling (TASK 5): quadrants instead of skinny columns. The 1px
+     gap + page-colored backdrop reads as hairline gutters between panes. */
+  .doc.grid {
+    display: grid;
+    gap: 1px;
+    background: var(--color-border);
+  }
+  .doc.grid > .pane {
+    background: var(--color-page);
+    min-width: 0;
+    min-height: 0;
   }
   .pane {
     display: flex;

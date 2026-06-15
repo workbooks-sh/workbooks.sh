@@ -94,6 +94,31 @@ class ChatSessionStore {
       return { ...b, status, output };
     });
   }
+
+  /** Start a live Waldo voice session wired to THIS store's voice transcript.
+   *  The single home for "start voice" so every entry point (the home
+   *  composer's "+" menu, the Waldo panel) drives the same conversation that
+   *  the panel renders — voice lives in the panel (wb demo TASK 3). Idempotent
+   *  when a session is already present. */
+  async startVoice(): Promise<void> {
+    const { inworldLive } = await import("$lib/live/inworld.svelte");
+    if (inworldLive.present) return;
+    this.voiceReset();
+    await inworldLive.start({
+      onUserTranscript: (t) => this.voiceAppend("you", t),
+      onAgentTranscript: (t) => this.voiceAppend("waldo", t),
+      onCode: (task, code) => {
+        // The code lane output — surface it as a tool block in the transcript
+        // so it's visible, not spoken.
+        const id = crypto.randomUUID();
+        this.voicePushTool(id, `write_code: ${task}`);
+        this.voiceCompleteTool(id, code);
+      },
+      onError: (msg) => {
+        this.voiceError = msg;
+      },
+    });
+  }
   /** non-fatal error (e.g. failed to POST /api/run); cleared on next send */
   sendError = $state<string | null>(null);
   sending = $state(false);

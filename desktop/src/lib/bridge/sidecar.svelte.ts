@@ -98,6 +98,32 @@ class DaemonStore {
   async init() {
     if (this.#initStarted) return;
     this.#initStarted = true;
+
+    // Dev runtime override (browser preview): when VITE_WB_RUNTIME_URL points
+    // at a live runtime, connect the real frontend to it instead of the
+    // webHost mock. Probe /health; on success flip __WB_DEV_MOCK__ off so the
+    // chat surface (mockMode()) sends real /api/agent/run turns, and report
+    // `ready` with the override URL so ws.svelte connects the Phoenix socket.
+    const override = import.meta.env.VITE_WB_RUNTIME_URL as string | undefined;
+    if (override) {
+      const url = override.replace(/\/+$/, "");
+      try {
+        const r = await fetch(`${url}/health`, { method: "GET" });
+        if (r.ok) {
+          if (typeof window !== "undefined") {
+            (window as unknown as { __WB_DEV_MOCK__?: boolean }).__WB_DEV_MOCK__ = false;
+          }
+          this.#apply({ state: "ready", url, token: null, mode: "dev", message: null });
+          // Skip the native daemon listen/poll path — there's no Tauri daemon
+          // here; the override IS the runtime.
+          return;
+        }
+        console.warn(`[daemon] VITE_WB_RUNTIME_URL probe failed (${r.status}) — falling back to mock`);
+      } catch (e) {
+        console.warn("[daemon] VITE_WB_RUNTIME_URL unreachable — falling back to mock", e);
+      }
+    }
+
     // Listen first so we don't miss the transition between the invoke()
     // snapshot below and the next poll emit (~3s, daemon::spawn_state_poll).
     this.#unlisten = await listen<DaemonStatus>("daemon-state", (e) => {

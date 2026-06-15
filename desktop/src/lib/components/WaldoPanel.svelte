@@ -187,28 +187,6 @@
   let voiceScrollEl = $state<HTMLDivElement | null>(null);
   let toolExpanded = $state<Record<string, boolean>>({});
 
-  async function startVoice() {
-    if (inworldLive.present) return;
-    chatSession.voiceReset();
-    // A voice conversation is a conversation — open the returnable tab too
-    // (Feature 2), unless we're already the full-tab surface.
-    if (!fullscreen) void openChatTab(WALDO_SLUG);
-    await inworldLive.start({
-      onUserTranscript: (t) => chatSession.voiceAppend("you", t),
-      onAgentTranscript: (t) => chatSession.voiceAppend("waldo", t),
-      onCode: (task, code) => {
-        // The code lane (mercury-2) output — surface it as a tool block in the
-        // transcript so it's visible, not spoken.
-        const id = crypto.randomUUID();
-        chatSession.voicePushTool(id, `write_code: ${task}`);
-        chatSession.voiceCompleteTool(id, code);
-      },
-      onError: (msg) => {
-        chatSession.voiceError = msg;
-      },
-    });
-  }
-
   async function endVoice() {
     await inworldLive.end();
   }
@@ -262,18 +240,6 @@
     {#if !voiceMode && view === "chat" && !viewing && (transcript.length > 0 || sending)}
       <button type="button" class="bar-btn" onclick={newChat} title="New chat">
         <Plus size={13} weight="bold" /> New
-      </button>
-    {/if}
-    {#if !voiceMode}
-      <button
-        type="button"
-        class="bar-btn icon-only mic-toggle"
-        onclick={startVoice}
-        disabled={!ready}
-        title="Talk to Waldo by voice"
-        aria-label="Start voice conversation"
-      >
-        <Mic size={15} weight="fill" />
       </button>
     {/if}
     {#if fullscreen}

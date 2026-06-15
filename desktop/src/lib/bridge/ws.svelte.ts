@@ -61,6 +61,10 @@ export type { TabCommandPayload } from "./tab-command-dispatcher";
 // active selection from `agents.selected` overrides it.
 const FALLBACK_AGENT_SLUG = "workhorse";
 
+// Dev/single-tenant tenant for the `x-tenant` Auth-plug fallback (used only
+// when no per-boot bearer is present — i.e. the VITE_WB_RUNTIME_URL override).
+const DEV_TENANT = (import.meta.env.VITE_WB_TENANT as string | undefined) || "dev";
+
 export interface BridgeEvent {
   // Phoenix-channel event name (e.g. "session_started", "llm_turn_start").
   // We also synthesize bridge-level events: "bridge:connected",
@@ -309,11 +313,14 @@ class WsBridgeStore {
 
     // New slug-resolving endpoint (returns {session_id}); avoids the
     // legacy POST /api/run shape ({system,task,max_steps,model}).
+    // When no per-boot bearer is present (dev runtime override / single-tenant
+    // dev), carry the `x-tenant` dev header so the runtime's Auth plug scopes
+    // the run to our tenant. A bearer, when present, supersedes it.
     const r = await fetch(`${url}/api/agent/run`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : { "x-tenant": DEV_TENANT }),
       },
       body: JSON.stringify(reqBody),
     });
