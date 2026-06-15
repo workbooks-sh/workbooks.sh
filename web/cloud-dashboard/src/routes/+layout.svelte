@@ -12,7 +12,8 @@
 
   let { children, data } = $props();
   let modalOpen = $state(false);
-  let orgOpen = $state(false);
+  let wsMenuOpen = $state(false);
+  let nxMenuOpen = $state(false);
 
   // Load the org's REAL nexuses + workspaces from the platform API (client-side only —
   // the stores are module singletons, so loading during SSR could bleed one org's data
@@ -47,7 +48,7 @@
         toast('Workspace updated');
       }
       cancelEdit();
-      orgOpen = false;
+      wsMenuOpen = false;
     } catch {
       toast('Couldn’t save the workspace', 'bad');
     }
@@ -91,12 +92,22 @@
     orgLabel.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'W'
   );
 
-  // the active workspace drives the switcher (org is the parent context shown above it)
+  // the active workspace drives the workspace switcher
   const activeWs = $derived(workspaceStore.active);
-  const wsLabel = $derived(activeWs?.name || orgLabel);
+  const wsLabel = $derived(activeWs?.name || 'Workspace');
   const wsInitials = $derived(
     wsLabel.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'W'
   );
+
+  // the active NEXUS is the top-level concept (≈ your org; the isolation unit). Falls
+  // back to the onboarding org name until a real nexus exists.
+  const activeNx = $derived(nexusStore.active);
+  const nxLabel = $derived(activeNx?.name || orgLabel);
+  const nxInitials = $derived(
+    nxLabel.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'N'
+  );
+
+  function pickNexus(id) { nexusStore.setActive(id); nxMenuOpen = false; goto('/'); }
 
   // when searching, make sure results are visible on the list page
   function onSearch(e) {
@@ -116,15 +127,14 @@
   // crumb derived from the current route
   const crumb = $derived.by(() => {
     const p = page.url.pathname;
-    if (p === '/' || p.startsWith('/nexuses')) {
-      const m = p.match(/^\/nexuses\/(.+)$/);
-      return m ? { label: 'Nexuses', tail: m[1] } : { label: 'Nexuses' };
-    }
-    if (p.startsWith('/team')) return { label: 'Team' };
+    if (p.startsWith('/nexuses')) { const m = p.match(/^\/nexuses\/(.+)$/); return m ? { label: 'Nexus', tail: m[1] } : { label: 'Nexus' }; }
     if (p.startsWith('/storage')) return { label: 'Storage' };
+    if (p.startsWith('/database')) return { label: 'Database' };
+    if (p.startsWith('/team')) return { label: 'Team' };
+    if (p.startsWith('/shared')) return { label: 'Sharing' };
     if (p.startsWith('/usage')) return { label: 'Usage & billing' };
     if (p.startsWith('/settings')) return { label: 'Settings' };
-    return { label: 'Nexuses' };
+    return { label: 'Nexus' };
   });
 
   function active(...prefixes) {
@@ -182,24 +192,49 @@
       </div>
     {/snippet}
 
-    <div class="orgwrap">
-      <div class="org" onclick={() => (orgOpen = !orgOpen)} role="button" tabindex="0">
-        <div class="av">{activeWs?.icon || wsInitials}</div>
-        <div class="nm">
-          <div class="wsname">{wsLabel}</div>
-          <div class="wsorg">{orgLabel}</div>
-        </div>
+    <!-- NEXUS switcher — the top concept (your isolated unit, ≈ an org; cloud or local) -->
+    <div class="swrap">
+      <div class="swlabel">Nexus</div>
+      <div class="sw" onclick={() => { nxMenuOpen = !nxMenuOpen; wsMenuOpen = false; }} role="button" tabindex="0">
+        <span class="av sm">{activeNx?.icon || nxInitials}</span>
+        <span class="swname">{nxLabel}</span>
         <svg class="ico ch" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
       </div>
-      {#if orgOpen}
-        <div class="orgmenu" role="menu">
-          <div class="omhead">{orgLabel}</div>
+      {#if nxMenuOpen}
+        <div class="swmenu" role="menu">
+          {#each nexusStore.list as n (n.id)}
+            <button class="omitem" onclick={() => pickNexus(n.id)}>
+              <span class="av sm">{(n.name?.[0] || 'N').toUpperCase()}</span>
+              <span class="omname">{n.name}</span>
+              {#if activeNx?.id === n.id}<span class="omtick">✓</span>{/if}
+            </button>
+          {/each}
+          {#if nexusStore.list.length === 0}<div class="omempty">No nexus yet</div>{/if}
+          <div class="omdiv"></div>
+          <button class="omitem" onclick={() => { modalOpen = true; nxMenuOpen = false; }}>
+            <span class="av sm plus">+</span><span class="omname">New nexus</span>
+          </button>
+          <a class="omitem" href="/settings" onclick={() => (nxMenuOpen = false)}>Nexus settings</a>
+        </div>
+      {/if}
+    </div>
+
+    <!-- WORKSPACE switcher — free divisions inside the nexus -->
+    <div class="swrap">
+      <div class="swlabel">Workspace</div>
+      <div class="sw" onclick={() => { wsMenuOpen = !wsMenuOpen; nxMenuOpen = false; }} role="button" tabindex="0">
+        <span class="av sm">{activeWs?.icon || wsInitials}</span>
+        <span class="swname">{wsLabel}</span>
+        <svg class="ico ch" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+      </div>
+      {#if wsMenuOpen}
+        <div class="swmenu" role="menu">
           {#each workspaceStore.list as w (w.id)}
             {#if editingId === w.id}
               {@render wsEditor(false)}
             {:else}
               <div class="wsrow" class:on={activeWs?.id === w.id}>
-                <button class="wsmain" onclick={() => { workspaceStore.setActive(w.id); orgOpen = false; }}>
+                <button class="wsmain" onclick={() => { workspaceStore.setActive(w.id); wsMenuOpen = false; }}>
                   <span class="av sm">{w.icon || (w.name[0] || 'W').toUpperCase()}</span>
                   <span class="omname">{w.name}</span>
                   {#if activeWs?.id === w.id}<span class="omtick">✓</span>{/if}
@@ -208,9 +243,7 @@
               </div>
             {/if}
           {/each}
-          {#if workspaceStore.list.length === 0}
-            <div class="omempty">No workspaces yet</div>
-          {/if}
+          {#if workspaceStore.list.length === 0}<div class="omempty">No workspaces yet</div>{/if}
           <div class="omdiv"></div>
           {#if editingId === 'new'}
             {@render wsEditor(true)}
@@ -219,22 +252,12 @@
               <span class="av sm plus">+</span><span class="omname">New workspace</span><small>free</small>
             </button>
           {/if}
-          <div class="omdiv"></div>
-          <button class="omitem" disabled>Switch organization<small>soon</small></button>
-          <a class="omitem" href="/settings" onclick={() => (orgOpen = false)}>Settings</a>
+          <a class="omitem" href="/settings" onclick={() => (wsMenuOpen = false)}>Workspace settings</a>
         </div>
       {/if}
     </div>
 
-    <nav class="nav">
-      <a href="/" class:on={active('/', '/nexuses')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/></svg>Nexuses</a>
-      <a href="/storage" class:on={active('/storage')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3c4.4 0 8 1.3 8 3v12c0 1.7-3.6 3-8 3s-8-1.3-8-3V6c0-1.7 3.6-3 8-3Zm6 6.6c-1.5.8-3.7 1.4-6 1.4s-4.5-.6-6-1.4V12c0 .6 2.4 2 6 2s6-1.4 6-2V9.6ZM12 5C8.7 5 6 5.8 6 6s2.7 1 6 1 6-.8 6-1-2.7-1-6-1Z"/></svg>Storage</a>
-      <span class="lbl">workspace</span>
-      <a href="/team" class:on={active('/team')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 2c-2.7 0-8 1.3-8 4v3h10v-3c0-1 .4-1.9 1-2.6-.9-.3-2-.4-3-.4Zm8 0c-.4 0-.8 0-1.3.1C16.1 14 17 15.3 17 17v3h7v-3c0-2.7-5.3-4-8-4Z"/></svg>Team</a>
-      <a href="/shared" class:on={active('/shared')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2Zm8 12h-2v2h-2v-2h-2v-2h2v-2h2v2h2v2Z"/></svg>Shared folders</a>
-      <a href="/usage" class:on={active('/usage')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M4 13h4v7H4v-7Zm6-6h4v13h-4V7Zm6 3h4v10h-4V10Z"/></svg>Usage &amp; billing</a>
-      <a href="/settings" class:on={active('/settings')}><svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4c0-.6 0-1.2-.1-1.7l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-3-1.7L15 0H9l-.5 2.6a7.6 7.6 0 0 0-3 1.7l-2.4-1-2 3.4 2 1.6c-.1.5-.1 1.1-.1 1.7s0 1.2.1 1.7l-2 1.6 2 3.4 2.4-1c.9.7 1.9 1.3 3 1.7L9 24h6l.5-2.6c1.1-.4 2.1-1 3-1.7l2.4 1 2-3.4-2-1.6c.1-.5.1-1.1.1-1.7Z"/></svg>Settings</a>
-    </nav>
+    <div class="navspacer"></div>
 
     <div class="acct" style="display:flex;align-items:center;gap:4px">
       <a href="/settings" style="display:flex;align-items:center;gap:9px;flex:1;text-decoration:none;color:inherit;min-width:0">
@@ -254,14 +277,6 @@
   <div class="main">
     <div class="topbar">
       <div class="crumb">{crumb.label}{#if crumb.tail}<span> / {crumb.tail}</span>{/if}</div>
-      <div class="search">
-        <svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M10 2a8 8 0 1 0 4.9 14.3l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z"/></svg>
-        <input placeholder="Search nexuses…" value={nexusStore.query} oninput={onSearch} />
-      </div>
-      <button class="btn primary" onclick={() => (modalOpen = true)}>
-        <svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/></svg>
-        New nexus
-      </button>
     </div>
 
     <div class="wrap">
@@ -275,6 +290,37 @@
 <Toast />
 
 <style>
+  /* slim, flat switchers (Nexus + Workspace) — the only persistent sidebar chrome */
+  .swrap { position: relative; margin: 0 0 4px; }
+  .swlabel {
+    font: 700 9.5px var(--read); letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--dim); padding: 0 4px 4px; margin-top: 10px;
+  }
+  .sw {
+    display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 9px;
+    cursor: pointer; color: var(--ink); transition: background 0.1s;
+  }
+  .sw:hover { background: var(--line); }
+  .swname { flex: 1; min-width: 0; font: 600 13.5px var(--read); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sw .ico.ch { width: 15px; height: 15px; color: var(--dim); flex: none; }
+  .sw .av.sm {
+    width: 22px; height: 22px; border-radius: 6px; flex: none; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--mint), var(--sky)); color: var(--ink); font: 700 10px var(--read);
+  }
+  .navspacer { flex: 1; }
+
+  .swmenu, .orgmenu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 35;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    padding: 6px;
+    animation: org-in 0.12s ease;
+  }
   .orgwrap { position: relative; }
   .orgmenu {
     position: absolute;

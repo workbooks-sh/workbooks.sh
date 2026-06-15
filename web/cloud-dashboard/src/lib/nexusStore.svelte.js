@@ -10,9 +10,12 @@ import { listNexuses, createNexus, deleteNexus, wakeNexus, sleepNexus } from '$l
 
 let nexuses = $state([]);
 let loaded = $state(false);
+let activeId = $state(null);
 
 /** shared topbar search query — filters the list on `/` */
 let query = $state('');
+
+const NX_LS = 'wb-active-nexus';
 
 const SUB = {
   run: 'active',
@@ -39,7 +42,18 @@ export const nexusStore = {
     if (loaded && !force) return nexuses;
     nexuses = await listNexuses();
     loaded = true;
+    let saved = null;
+    try { saved = localStorage.getItem(NX_LS); } catch {}
+    activeId = saved && nexuses.some((n) => n.id === saved) ? saved : (nexuses[0]?.id ?? null);
     return nexuses;
+  },
+  /** the active nexus — the one whose overview the dashboard shows (falls back to first) */
+  get active() {
+    return nexuses.find((n) => n.id === activeId) || nexuses[0] || null;
+  },
+  setActive(id) {
+    activeId = id;
+    try { localStorage.setItem(NX_LS, id); } catch {}
   },
   /** filtered by the shared search query */
   get filtered() {
@@ -79,6 +93,7 @@ export const nexusStore = {
   async provision({ name, region, plan, database } = {}) {
     const nexus = await createNexus({ name, region, plan, database });
     nexuses = [nexus, ...nexuses];
+    this.setActive(nexus.id);
     return nexus;
   },
   /** Tear down a nexus — optimistic removal, real teardown in the background. */
