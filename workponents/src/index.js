@@ -15,3 +15,8 @@ export * from "./elements/ai/index.js";       // wb-thread, wb-message, wb-gen-b
 export * from "./elements/docs/index.js";     // wb-doc, wb-doc-cell, wb-doc-outline
 export * from "./elements/git/index.js";      // wb-diff, wb-history-graph, wb-restore, wb-undo
 export * from "./elements/video/index.js";    // wb-video, wb-video-source
+export * from "./elements/tables/index.js";   // wb-table, wb-column
+
+// shared in-WASM data layer (DuckDB-wasm / memory floor, behind the Host seam) —
+// the one engine the DuckDB trio (tables/data-viz/maps) queries.
+export { getEngine } from "./data/index.js";
