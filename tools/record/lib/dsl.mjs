@@ -43,6 +43,7 @@ const NUM_KEYS = new Set(["x", "y", "ms", "perkeyms", "timeoutms", "verifyframes
 // drawer/inline key -> canonical arg name on the step
 const KEY_ALIAS = {
   selector: "selector",
+  to: "to",
   url: "url",
   x: "x",
   y: "y",
@@ -57,7 +58,8 @@ const KEY_ALIAS = {
 };
 
 const INTENTS = new Set([
-  "navigate", "click", "type", "hover", "wait", "screenshot", "eval_js", "dom_read",
+  "navigate", "click", "rightclick", "type", "hover", "move", "drag",
+  "wait", "screenshot", "eval_js", "dom_read",
 ]);
 
 function coerce(key, raw) {

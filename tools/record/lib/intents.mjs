@@ -5,6 +5,9 @@
 // Intent kinds (the seam):
 //   navigate { url }            web-only; MCP backend ignores (app drives itself)
 //   click    { selector | x,y } resolve + synthetic click
+//   rightclick { selector | x,y } travel cursor + native right-click (ctx menu)
+//   move     { selector | x,y } travel the visible cursor (no click)
+//   drag     { selector, to }   travel to source, press, travel to target, release
 //   type     { selector?, text, perKeyMs? }  realistic typing
 //   hover    { selector }
 //   wait     { ms } | { selector, timeoutMs }
@@ -18,8 +21,11 @@
 export const INTENT_KINDS = new Set([
   "navigate",
   "click",
+  "rightclick",
   "type",
   "hover",
+  "move",
+  "drag",
   "wait",
   "screenshot",
   "eval_js",
@@ -33,6 +39,15 @@ export function validateStep(step, i) {
   }
   if (step.intent === "click" && !step.selector && !(typeof step.x === "number")) {
     throw new Error(`step ${i}: click needs a selector or x,y`);
+  }
+  if (step.intent === "rightclick" && !step.selector && !(typeof step.x === "number")) {
+    throw new Error(`step ${i}: rightclick needs a selector or x,y`);
+  }
+  if ((step.intent === "move" || step.intent === "hover") && !step.selector && !(typeof step.x === "number")) {
+    throw new Error(`step ${i}: ${step.intent} needs a selector or x,y`);
+  }
+  if (step.intent === "drag" && (!step.selector || !step.to)) {
+    throw new Error(`step ${i}: drag needs a selector (source) and to (target selector)`);
   }
   if (step.intent === "type" && typeof step.text !== "string") {
     throw new Error(`step ${i}: type needs text`);

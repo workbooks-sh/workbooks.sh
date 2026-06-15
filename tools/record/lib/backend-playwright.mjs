@@ -34,8 +34,10 @@ const INIT_SCRIPT = `(()=>{
     const s=document.createElement('style'); s.textContent=${JSON.stringify(CURSOR_CSS)}; document.head.appendChild(s);
     const d=document.createElement('div'); d.innerHTML=${JSON.stringify(CURSOR_HTML)}; document.body.appendChild(d.firstElementChild);
   }
-  window.__wb_cursor_move=(x,y)=>{const c=document.getElementById('__wb_cursor__'); if(c) c.style.transform='translate('+x+'px,'+y+'px)';};
+  window.__wb_cursor_move=(x,y)=>{const c=document.getElementById('__wb_cursor__'); if(c) c.style.transform='translate('+x+'px,'+y+'px)'; const g=document.getElementById('__wb_drag_ghost__'); if(g&&g.style.display!=='none') g.style.transform='translate('+(x+12)+'px,'+(y+8)+'px)';};
   window.__wb_cursor_click=on=>{const c=document.getElementById('__wb_cursor__'); if(c) c.classList.toggle('click',on);};
+  window.__wb_drag_ghost=(label,x,y)=>{let g=document.getElementById('__wb_drag_ghost__'); if(!g){g=document.createElement('div'); g.id='__wb_drag_ghost__'; g.style.cssText='position:fixed;z-index:2147483646;pointer-events:none;left:0;top:0;padding:5px 10px;border-radius:8px;background:#1a1a1a;color:#fff;font:600 12px/1.2 ui-sans-serif,system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.18);max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.96;'; document.body.appendChild(g);} g.textContent=label; g.style.display='block'; g.style.transform='translate('+(x+12)+'px,'+(y+8)+'px)';};
+  window.__wb_drag_ghost_hide=()=>{const g=document.getElementById('__wb_drag_ghost__'); if(g) g.style.display='none';};
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',ensure); else ensure();
   try{
     var root=document.documentElement;
@@ -124,6 +126,79 @@ export class PlaywrightBackend {
         await sleep(60);
         await this.page.mouse.click(x, y);
         await this.page.evaluate(() => window.__wb_cursor_click?.(false));
+        return {};
+      }
+      case "rightclick": {
+        const { x, y } = step.selector ? await this._center(step.selector) : { x: step.x, y: step.y };
+        await this._moveTo(x, y);
+        await this.page.evaluate(() => window.__wb_cursor_click?.(true));
+        await sleep(60);
+        await this.page.mouse.click(x, y, { button: "right" });
+        await this.page.evaluate(() => window.__wb_cursor_click?.(false));
+        return {};
+      }
+      case "move": {
+        const { x, y } = step.selector ? await this._center(step.selector) : { x: step.x, y: step.y };
+        await this._moveTo(x, y);
+        return {};
+      }
+      case "drag": {
+        // Travel the visible cursor from source to target on a human arc while
+        // synthesizing the HTML5 drag-and-drop events the app's dnd store reads
+        // (dragstart on the source, dragenter/dragover on the target, drop +
+        // dragend). Playwright's native mouse drag doesn't reliably emit the
+        // HTML5 DnD lifecycle for custom drop zones, so we dispatch it directly
+        // AND move the real cursor so the recording shows the drag travelling.
+        const from = await this._center(step.selector);
+        const to = await this._center(step.to);
+        await this._moveTo(from.x, from.y);
+        await this.page.evaluate(() => window.__wb_cursor_click?.(true));
+        await this.page.evaluate(
+          ([sel, fx, fy]) => {
+            const el = document.querySelector(sel);
+            if (!el) return;
+            window.__wb_dnd_dt = new DataTransfer();
+            el.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: window.__wb_dnd_dt, clientX: fx, clientY: fy }));
+            // Show a visible drag ghost carrying the file's label so the recording
+            // reads the drag as motion, not a teleport.
+            const label = (el.textContent || "File").trim().replace(/\s+/g, " ").slice(0, 28);
+            window.__wb_drag_ghost?.(label, fx, fy);
+          },
+          [step.selector, from.x, from.y],
+        );
+        await sleep(220);
+        // Travel toward the target, firing dragover along the way so the drop
+        // zone's hover affordance (insertion marker) shows during the move.
+        const steps = 10;
+        for (let k = 1; k <= steps; k++) {
+          const t = k / steps;
+          const px = from.x + (to.x - from.x) * t;
+          const py = from.y + (to.y - from.y) * t;
+          await this.page.mouse.move(px, py);
+          await this.page.evaluate(([x, y]) => window.__wb_cursor_move?.(x, y), [px, py]);
+          await this.page.evaluate(
+            ([sel, x, y]) => {
+              const el = document.querySelector(sel);
+              if (!el) return;
+              el.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: window.__wb_dnd_dt, clientX: x, clientY: y }));
+              el.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: window.__wb_dnd_dt, clientX: x, clientY: y }));
+            },
+            [step.to, px, py],
+          );
+          await sleep(55);
+        }
+        this.pos = { x: to.x, y: to.y };
+        await this.page.evaluate(
+          ([sel, src, tx, ty]) => {
+            const el = document.querySelector(sel);
+            const s = document.querySelector(src);
+            if (el) el.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: window.__wb_dnd_dt, clientX: tx, clientY: ty }));
+            if (s) s.dispatchEvent(new DragEvent("dragend", { bubbles: true, cancelable: true, dataTransfer: window.__wb_dnd_dt, clientX: tx, clientY: ty }));
+          },
+          [step.to, step.selector, to.x, to.y],
+        );
+        await this.page.evaluate(() => { window.__wb_cursor_click?.(false); window.__wb_drag_ghost_hide?.(); });
+        await sleep(500);
         return {};
       }
       case "type": {
