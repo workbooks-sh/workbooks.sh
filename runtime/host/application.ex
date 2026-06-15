@@ -48,10 +48,7 @@ defmodule Workbooks.Application do
         Workbooks.Instance.Supervisor,
         Workbooks.Domains,
         {DynamicSupervisor, strategy: :one_for_one, name: Workbooks.AgentSession.Sup}
-      ] ++
-        harness() ++
-        Workbooks.DesktopAgent.child_specs() ++
-        web() ++ keeper() ++ autopoet() ++ channels() ++ groundskeeper()
+      ] ++ harness() ++ web() ++ keeper() ++ autopoet() ++ channels() ++ groundskeeper()
 
     # Start children ONE BY ONE with a boot-trace, so a child that blocks in init
     # is pinpointed (and visible in <WB_DATA>/boot-trace.txt) instead of hanging
