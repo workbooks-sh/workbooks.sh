@@ -1,37 +1,25 @@
 // ── Stateful nexus store (runes module) ──────────────────────────────────────
-// Holds the live nexus list so create/delete/state-changes persist and reflect
-// across pages. Seeded once from the api.js mock; thereafter THIS is the source
-// of truth for the list page and the detail page. Swap the seed + ops for real
-// PCP calls when the API lands — the shapes are identical.
+// Holds the org's nexus list so the list + detail pages share one source of truth.
+// Seeded EMPTY and filled from the REAL platform API (`listNexuses` → the same-origin
+// /api/platform proxy → the runtime registry). No fabricated fleet: an org with no
+// nexuses shows an honest empty state. create/remove/setState update locally for
+// responsive UI; wiring them to real provisioning is the next step (needs a connected
+// runtime + FLY_API_TOKEN).
 
-import { MOCK_NEXUSES, MOCK_DETAIL } from '$lib/api.js';
+import { listNexuses } from '$lib/api.js';
 
-let nexuses = $state(structuredClone(MOCK_NEXUSES));
+let nexuses = $state([]);
+let loaded = $state(false);
 
 /** shared topbar search query — filters the list on `/` */
 let query = $state('');
 
 const SUB = {
-  run: 'active · 37 req/min',
-  sleep: 'sleeping · idle',
+  run: 'active',
+  sleep: 'sleeping',
   build: 'building · weaving…',
   pause: 'paused'
 };
-
-// onboarding tier id → the plan label shown on a nexus row ("Name · Storage").
-const TIER_PLAN = {
-  free: 'Free · 2 GB',
-  starter: 'Starter · 50 GB',
-  team: 'Team · 250 GB',
-  scale: 'Scale · 1 TB',
-  ent: 'Enterprise · custom'
-};
-
-const slug = (s) =>
-  (s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
-
-// Seed only once per session — repeated calls (layout re-renders) are no-ops.
-let seeded = false;
 
 export const nexusStore = {
   get all() {
@@ -40,33 +28,18 @@ export const nexusStore = {
   list() {
     return nexuses;
   },
+  get loaded() {
+    return loaded;
+  },
   /**
-   * Replace the demo fleet with the user's real first nexus, derived from what
-   * they told us in onboarding. No profile (a fresh dev with no cookie) → keep
-   * the mock fleet so the dashboard still demos populated. Runs once per session.
-   * SWAP SEAM: when the PCP API lands, the seed comes from a real registry fetch
-   * instead of the profile cookie — the row shape is identical.
+   * Load the org's REAL nexuses from the platform API (once per session unless
+   * forced). Empty until a runtime is connected — never a fabricated fleet.
    */
-  seedFromProfile(profile) {
-    if (seeded) return;
-    seeded = true;
-    if (!profile) return;
-    const base =
-      slug(profile.orgName) ||
-      (profile.accountType === 'personal' && slug(profile.firstName)) ||
-      'workspace';
-    nexuses = [
-      {
-        id: base,
-        name: base,
-        region: 'sfo',
-        plan: TIER_PLAN[profile.tier] || TIER_PLAN.free,
-        state: 'run',
-        sub: SUB.run,
-        url: `${base}.nexus.workbooks.cloud`,
-        addons: []
-      }
-    ];
+  async load(force = false) {
+    if (loaded && !force) return nexuses;
+    nexuses = await listNexuses();
+    loaded = true;
+    return nexuses;
   },
   /** filtered by the shared search query */
   get filtered() {
@@ -76,20 +49,27 @@ export const nexusStore = {
       (n) =>
         n.name.toLowerCase().includes(q) ||
         n.url.toLowerCase().includes(q) ||
-        n.region.toLowerCase().includes(q)
+        (n.region || '').toLowerCase().includes(q)
     );
   },
   get(id) {
     return nexuses.find((n) => n.id === id) || null;
   },
-  /** detail = nexus row + config/month/metrics (config region/plan reflect the row) */
+  /** detail = nexus row + config/month/metrics derived from the real row (no mock). */
   detail(id) {
     const nexus = this.get(id);
     if (!nexus) return null;
-    const d = structuredClone(MOCK_DETAIL);
-    d.config.region = `${nexus.region} · ${nexus.region}`;
-    d.config.plan = nexus.plan;
-    return { nexus, ...d };
+    const config = {
+      region: nexus.region || '—',
+      plan: nexus.plan || '—',
+      scaleToZero: 'on · 5 min idle',
+      storage: '—',
+      database: 'none',
+      created: '—'
+    };
+    const month = { activeCompute: '0.0 hrs', sleeping: '—', storage: '—', egress: '$0.00', subtotal: '$0.00' };
+    const metrics = { cpu: 0, memMb: 0, memCapGb: 1, reqMin: 0, costMonth: '0.00' };
+    return { nexus, config, month, metrics };
   },
   create({ name, region, plan, addons } = {}) {
     const base = (name || 'nova').trim() || 'nova';
@@ -113,9 +93,7 @@ export const nexusStore = {
     nexuses = nexuses.filter((n) => n.id !== id);
   },
   setState(id, state) {
-    nexuses = nexuses.map((n) =>
-      n.id === id ? { ...n, state, sub: SUB[state] || n.sub } : n
-    );
+    nexuses = nexuses.map((n) => (n.id === id ? { ...n, state, sub: SUB[state] || n.sub } : n));
   },
   // ── shared search query ──
   get query() {

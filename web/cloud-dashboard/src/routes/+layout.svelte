@@ -11,10 +11,10 @@
   let modalOpen = $state(false);
   let orgOpen = $state(false);
 
-  // Seed the dashboard from onboarding (once, client-side only — the store is a
-  // module singleton, so seeding it during SSR could bleed one user's profile into
-  // another request). The user's first nexus reflects the org name + plan they chose.
-  $effect(() => { nexusStore.seedFromProfile(data?.profile); });
+  // Load the org's REAL nexuses from the platform API (client-side only — the store
+  // is a module singleton, so loading during SSR could bleed one org's list into
+  // another request). Empty until a runtime is connected; never a fabricated fleet.
+  $effect(() => { nexusStore.load(); });
 
   // /welcome + /denied render full-bleed, without the app chrome.
   const bare = $derived(page.url.pathname === '/welcome' || page.url.pathname === '/denied');

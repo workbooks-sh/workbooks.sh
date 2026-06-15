@@ -1,5 +1,5 @@
 import { listBuckets } from '$lib/api.js';
 
-export async function load() {
-  return await listBuckets();
+export async function load({ fetch }) {
+  return await listBuckets({ fetch });
 }

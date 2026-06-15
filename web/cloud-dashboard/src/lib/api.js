@@ -69,61 +69,107 @@ const MOCK_DETAIL = {
   metrics: { cpu: 18, memMb: 412, memCapGb: 1, reqMin: 37, costMonth: '11.40' }
 };
 
-/** @returns {Promise<Nexus[]>} */
-export async function listNexuses() {
-  // MOCK — swap for fetch('/api/platform/nexuses') when the PCP API lands
-  return structuredClone(MOCK_NEXUSES);
+// ── Platform control-plane (REAL, via the same-origin /api/platform proxy) ──────
+// The proxy (src/routes/api/platform/[...rest]) forwards to the runtime with the
+// WorkOS bearer → org-scoped. On no-runtime / error we return honest EMPTY data —
+// never a fabricated fleet — so the dashboard always reflects reality.
+
+// `fetchFn` defaults to global fetch (browser); SSR load fns pass SvelteKit's `fetch`
+// so a relative same-origin path resolves server-side too.
+async function plat(path, { method = 'GET', body, fetch: fetchFn = globalThis.fetch } = {}) {
+  const res = await fetchFn(`/api/platform${path}`, {
+    method,
+    headers: body ? { 'content-type': 'application/json' } : {},
+    body: body && JSON.stringify(body),
+    credentials: 'include'
+  });
+  if (!res.ok) throw new Error(`${method} /api/platform${path} → ${res.status}`);
+  return res.status === 204 ? null : res.json();
+}
+
+const SUB_FOR = { run: 'active', sleep: 'sleeping', build: 'building · weaving…', pause: 'paused' };
+const withSub = (n) => ({ ...n, sub: n.sub || SUB_FOR[n.state] || '' });
+
+/** @param {{fetch?: Function}} [opts] @returns {Promise<Nexus[]>} */
+export async function listNexuses(opts = {}) {
+  try {
+    return (await plat('/nexuses', { fetch: opts.fetch })).nexuses.map(withSub);
+  } catch {
+    return []; // honest empty — no fake fleet until a runtime is connected
+  }
 }
 
 /** @param {string} id @returns {Promise<{nexus: Nexus, config: object, month: object, metrics: object}|null>} */
 export async function getNexus(id) {
-  // MOCK — swap for fetch(`/api/platform/nexuses/${id}`) when the PCP API lands
-  const nexus = MOCK_NEXUSES.find((n) => n.id === id);
-  if (!nexus) return null;
-  return structuredClone({ nexus, ...MOCK_DETAIL });
+  try {
+    const nexus = withSub(await plat(`/nexuses/${id}`));
+    let row;
+    try {
+      row = (await plat('/usage')).rows.find((r) => r.name === id);
+    } catch {}
+    const config = {
+      region: nexus.region,
+      plan: nexus.plan,
+      scaleToZero: 'on · 5 min idle',
+      storage: row?.storage || '—',
+      database: row?.database || 'none',
+      created: '—'
+    };
+    const month = {
+      activeCompute: row ? `${row.activeHrs} hrs` : '0.0 hrs',
+      sleeping: '—',
+      storage: row?.storage || '—',
+      egress: '$0.00',
+      subtotal: row?.cost || '$0.00'
+    };
+    const metrics = { cpu: 0, memMb: 0, memCapGb: 1, reqMin: 0, costMonth: (row?.cost || '$0').replace(/[$,]/g, '') };
+    return { nexus, config, month, metrics };
+  } catch {
+    return null;
+  }
 }
 
 /**
- * @param {{name: string, region: string, plan: string, addons?: string[]}} opts
+ * Provision a REAL nexus (a Fly machine via the runtime provisioner).
+ * @param {{region?: string, plan?: string}} opts
  * @returns {Promise<Nexus>}
  */
 export async function createNexus(opts) {
-  // MOCK — swap for fetch('/api/platform/nexuses', {method:'POST', body:...}) when the PCP API lands
-  const name = (opts.name || 'nova').trim();
-  return {
-    id: name,
-    name,
-    region: opts.region || 'sfo',
-    plan: opts.plan || 'Starter · 1 GB',
-    state: 'build',
-    sub: 'building · weaving…',
-    url: `${name}.nexus.workbooks.cloud`
-  };
+  return withSub(await plat('/nexuses', { method: 'POST', body: { region: opts.region, plan: opts.plan } }));
 }
 
-/** Usage & billing rollup for the org. MOCK. */
-export async function nexusUsage() {
-  // MOCK — swap for fetch('/api/platform/usage') when the PCP API lands
-  return structuredClone({
-    summary: { monthToDate: '38.10', compute: '24.60', storage: '3.50', database: '10.00', nexusCount: 3, activeHrs: '19.2' },
-    period: 'June 2026 · billed on the 1st',
-    rows: [
-      { name: 'aurora', plan: 'Starter · 1 GB', activeHrs: '6.4',  storage: '2.1 GB', database: '—',        cost: '$11.40' },
-      { name: 'atlas',  plan: 'Pro · 2 GB',     activeHrs: '12.8', storage: '0.4 GB', database: 'Postgres', cost: '$24.20' },
-      { name: 'relay',  plan: 'Starter · 1 GB', activeHrs: '0.0',  storage: '0.1 GB', database: '—',        cost: '$2.50' }
-    ]
-  });
+export async function deleteNexus(id) {
+  return plat(`/nexuses/${id}`, { method: 'DELETE' });
+}
+export async function wakeNexus(id) {
+  return plat(`/nexuses/${id}/wake`, { method: 'POST' });
+}
+export async function sleepNexus(id) {
+  return plat(`/nexuses/${id}/sleep`, { method: 'POST' });
 }
 
-/** Object-storage buckets for the org. MOCK. */
-export async function listBuckets() {
-  // MOCK — swap for fetch('/api/platform/storage') when the PCP API lands
-  return structuredClone({
-    buckets: [
-      { name: 'aurora-assets', nexus: 'aurora', objects: 1284, size: '2.1 GB', egress: '$0.00' },
-      { name: 'atlas-uploads', nexus: 'atlas',  objects: 96,   size: '0.4 GB', egress: '$0.00' }
-    ]
-  });
+const EMPTY_USAGE = {
+  summary: { monthToDate: '$0.00', compute: '$0.00', storage: '0 GB', database: '—', nexusCount: 0, activeHrs: '0.0' },
+  period: 'current cycle · billed on the 1st',
+  rows: []
+};
+
+/** Usage & billing rollup for the org — REAL (Fly-grounded compute + cost). */
+export async function nexusUsage(opts = {}) {
+  try {
+    return await plat('/usage', { fetch: opts.fetch });
+  } catch {
+    return structuredClone(EMPTY_USAGE);
+  }
+}
+
+/** Object-storage buckets for the org — REAL per-org total. */
+export async function listBuckets(opts = {}) {
+  try {
+    return await plat('/storage', { fetch: opts.fetch });
+  } catch {
+    return { buckets: [], totalSize: '0 GB' };
+  }
 }
 
 // ── History + Restore ────────────────────────────────────────────────────────
