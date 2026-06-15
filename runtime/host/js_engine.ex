@@ -44,7 +44,17 @@ defmodule Workbooks.JsEngine do
   # ASYNC bootstrap (wb js-ecosystem async-eventloop): eval the src, and if it yields a thenable, AWAIT it.
   # StarlingMonkey drives its internal event loop until this async export settles — so Promises, async/await,
   # and (with clocks enabled) setTimeout/streams all complete before we return. Sync programs are unaffected.
-  @bootstrap ~S|export async function run(src){ try{ let r=(0,eval)(src); if(r&&typeof r.then==="function") r=await r; if(r===undefined) return "undefined"; if(typeof r==="object"&&r!==null){ try{ return JSON.stringify(r); }catch(_){ return String(r); } } return String(r); }catch(e){ return "ERR: "+(e&&e.message?e.message:String(e)); } }|
+  #
+  # HOST-IMPORT seam (the keystone residency fix — wb-b9xv host-import): the world ALSO imports the
+  # synchronous `wb:jseval/broker.host-call: func(req: string) -> string`. componentize-js binds it as the JS
+  # `hostCall` import here; we stash it on `globalThis.__wbHostCall` so the RUNTIME-eval'd shims (which run
+  # under classic `eval`, not ESM, so they cannot `import`) can reach it. A guest calls __wbHostCall(json) and
+  # the BEAM host performs the actual op (exec/fs/creds/llm egress with the host-held key) and returns the
+  # bytes WITHIN THE SAME synchronous call — so NO wasi:http future ever straddles a run() boundary, the http
+  # resource table is never poisoned, and the component-model reentrancy guard is never tripped. This DISSOLVES
+  # the cross-entry trap that forced "one turn per instance then recycle" — re-entry is a non-issue by
+  # construction (componentize-js@0.18.5 README: imported funcs are always synchronous — exactly what we need).
+  @bootstrap ~S|import { hostCall } from 'wb:jseval/broker'; globalThis.__wbHostCall = hostCall; export async function run(src){ try{ let r=(0,eval)(src); if(r&&typeof r.then==="function") r=await r; if(r===undefined) return "undefined"; if(typeof r==="object"&&r!==null){ try{ return JSON.stringify(r); }catch(_){ return String(r); } } return String(r); }catch(e){ return "ERR: "+(e&&e.message?e.message:String(e)); } }|
 
   @doc """
   Build the eval-host component once (componentize-js@0.18.5 / StarlingMonkey, cached). `{:ok, wasm_path}` |
@@ -61,7 +71,10 @@ defmodule Workbooks.JsEngine do
       import { componentize } from 'componentize-js-023';
       import { writeFileSync } from 'node:fs';
       const src = #{Jason.encode!(@bootstrap)};
-      const wit = "package wb:jseval;\\nworld workbook { export run: func(input: string) -> string; }";
+      // workbook world: exports run(), and IMPORTS the synchronous host-broker seam (wb:host/broker.host-call).
+      // The import is what dissolves the cross-entry wasi:http trap — the agent loop's llm/fs/exec ops go
+      // through this sync import (host performs them in-call), not through guest fetch()/wasi:http.
+      const wit = "package wb:jseval;\\ninterface broker { host-call: func(req: string) -> string; }\\nworld workbook { import broker; export run: func(input: string) -> string; }";
       const { component } = await componentize(src, { witWorld: wit, worldName: "workbook", disableFeatures: ["random","stdio"] });
       writeFileSync(#{Jason.encode!(@host)}, component);
       console.log("OK " + component.length);
@@ -77,6 +90,32 @@ defmodule Workbooks.JsEngine do
     end
   end
 
+  # The component-model namespace the eval-host imports the sync broker from — must match the WIT
+  # interface id (`package wb:jseval; interface broker`) the bootstrap imports as `wb:jseval/broker`.
+  @broker_namespace "wb:jseval/broker"
+  @broker_func "host-call"
+
+  @doc """
+  Build the `imports:` map for `Wasmex.Components.start_link` wiring the synchronous host-broker seam
+  (`wb:jseval/broker.host-call`) to `Workbooks.HostBroker`. ALWAYS supplied (the eval-host now IMPORTS this
+  func, so instantiation would fail without it); a `nil` grant default-denies every op. The grant is captured
+  HOST-SIDE in the closure, so a guest reaches only exactly the caps its session was granted (no token over
+  this seam). This is the transport that DISSOLVES the cross-entry wasi:http re-entry trap — the agent loop's
+  llm/fs/exec go through this sync import, completing in-call, so no pollable ever straddles a run() boundary.
+
+  POSTURE GATE (keystone safe:false FIX 1): the exec/fs/creds/oauth/llm ops this seam reaches are the SAME
+  desktop-first surface `Workbooks.Harness.enabled?/0` governs (the loopback is only started in that posture).
+  The sync import bypassed that gate — a minted grant reached those ops directly even in a multi-tenant hosted
+  runtime where the loopback is deliberately absent. So the import is wired with the grant ONLY when the
+  harness surface is permitted; in a forbidden posture (cloud / multi-tenant, or no WB_DESKTOP/WB_HARNESS) the
+  grant is FORCED to nil → every op default-denies, exactly as if the loopback were never started. The import
+  stays LINKED (harmless — instantiation still succeeds) but carries no capability.
+  """
+  def host_broker_imports(grant) do
+    effective = if Workbooks.Harness.enabled?(), do: grant, else: nil
+    %{@broker_namespace => %{@broker_func => {:fn, Workbooks.HostBroker.import_fn(effective)}}}
+  end
+
   @doc """
   Evaluate JS `src` in a fresh full-SpiderMonkey instance; `{:ok, result_string}` | `{:error, why}`. The result
   is the last expression coerced to a string (objects -> JSON). Spec-complete modern ECMAScript. opts:
@@ -86,11 +125,13 @@ defmodule Workbooks.JsEngine do
   """
   def eval(src, opts \\ []) when is_binary(src) do
     timeout = Keyword.get(opts, :timeout, 12_000)
+    grant = Keyword.get(opts, :grant, nil)
 
     with {:ok, host} <- build_host() do
       case Wasmex.Components.start_link(%{
              path: host,
-             wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}
+             wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true},
+             imports: host_broker_imports(grant)
            }) do
         {:ok, pid} ->
           try do
@@ -182,7 +223,10 @@ defmodule Workbooks.JsEngine do
 
     with {:ok, prelude} <- File.read(@node_prelude),
          {:ok, shims} <- load_node_shims() do
-      {shims, exec_seam, token} = maybe_grant_caps(shims, exec_opts, fs_opts)
+      {shims, exec_seam, token, grant} = maybe_grant_caps(shims, exec_opts, fs_opts)
+      # bind the SAME grant into the host-import so child_process/fs/dock-auth/llm ops over __wbHostCall are
+      # authorized identically to the legacy fetch loopback (the shims prefer the sync import).
+      opts = Keyword.put(opts, :grant, grant)
 
       # ESM-style bundles (`import`/`export`/`import.meta.url`) are illegal in the classic-eval lane. Rewrite
       # them to CJS so a real ESM bundle (createRequire(import.meta.url) ×N) loads instead of dying on line 1.
@@ -283,23 +327,24 @@ defmodule Workbooks.JsEngine do
 
     with {:ok, prelude} <- File.read(@node_prelude),
          {:ok, base_shims} <- load_node_shims() do
-      {shims, exec_seam, token} =
+      {shims, exec_seam, token, _grant} =
         case {Keyword.get(opts, :exec_seam), Keyword.get(opts, :exec)} do
           {seam, _} when is_map(seam) ->
             # caller minted the (session-lived) token + seam already; add the child_process shim, and — when
             # the same token's grant carries a confined workdir — the SM fs shim too (resident-harness path).
+            # The grant is bound into the host-import at instantiate time by HarnessSession, not here.
             workdir = fs_workdir!(Keyword.get(opts, :fs, []))
 
             base_shims
             |> register_exec_shims(true)
             |> register_fs_shim(workdir != nil)
-            |> then(&{&1, seam, nil})
+            |> then(&{&1, seam, nil, nil})
 
           {nil, exec_opts} when is_list(exec_opts) ->
             maybe_grant_caps(base_shims, exec_opts, Keyword.get(opts, :fs))
 
           _ ->
-            {base_shims, nil, nil}
+            {base_shims, nil, nil, nil}
         end
 
       boot_seam =
@@ -315,8 +360,9 @@ defmodule Workbooks.JsEngine do
   # When exec and/or fs is granted, register the matching SM-lane shims, mint a SINGLE-run ExecLoopback token
   # carrying both grants, and build the boot seam {url, token}. Without any grant the capability shims aren't
   # registered → `require('child_process')`/`require('node:fs')` throw (no silent capability). One token, one
-  # seam, both caps. Returns {shims, seam, token}.
-  defp maybe_grant_caps(shims, nil, nil), do: {shims, nil, nil}
+  # seam, both caps. The GRANT is returned too so it can be bound into the synchronous host-import (which the
+  # shims prefer over the fetch loopback). Returns {shims, seam, token, grant}.
+  defp maybe_grant_caps(shims, nil, nil), do: {shims, nil, nil, nil}
 
   defp maybe_grant_caps(shims, exec_opts, fs_opts) do
     exec_opts = exec_opts || []
@@ -344,14 +390,22 @@ defmodule Workbooks.JsEngine do
     }
 
     token = Workbooks.ExecLoopback.mint(grant)
-    seam = %{"url" => Workbooks.ExecLoopback.sentinel_url(), "token" => token}
+    # best-effort loopback URL for the legacy fetch fallback; "" when the listener isn't running (host-import
+    # deployments). The shims prefer __wbHostCall and never read this url under the host-import.
+    seam = %{"url" => safe_sentinel_url() || "", "token" => token}
 
     shims =
       shims
       |> register_exec_shims(exec_opts != [])
       |> register_fs_shim(workdir != nil)
 
-    {shims, seam, token}
+    {shims, seam, token, grant}
+  end
+
+  defp safe_sentinel_url do
+    Workbooks.ExecLoopback.sentinel_url()
+  rescue
+    _ -> nil
   end
 
   # The exec/dock-auth shims (child_process over fetch + dock.creds/oauth). events is child_process's dep.

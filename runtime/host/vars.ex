@@ -24,6 +24,21 @@ defmodule Workbooks.Vars do
   def list(tenant), do: GenServer.call(__MODULE__, {:list, tenant})
 
   @doc """
+  HOST-ONLY raw read of a tenant's value (plain OR secret) for egress. Returns the
+  plaintext string, or `nil` if unset. NEVER expose this to a guest — it bypasses the
+  secret redaction `get/2` enforces. Used host-side (e.g. resolving a tenant's own
+  OPENROUTER_API_KEY for an LLM egress) where the value never crosses the membrane.
+  Returns `nil` (not crash) when the store isn't running, so callers fall back cleanly.
+  """
+  def host_secret(tenant, key) do
+    GenServer.call(__MODULE__, {:host_secret, tenant, key})
+  rescue
+    _ -> nil
+  catch
+    :exit, _ -> nil
+  end
+
+  @doc """
   Inject `{{var:KEY}}` / `{{secret:KEY}}` from the store into a template.
   `:guest` (default) resolves plain vars but leaves SECRET placeholders intact —
   an agent never sees a secret's plaintext. `:host` resolves everything and is
@@ -51,6 +66,16 @@ defmodule Workbooks.Vars do
         [value, 1] -> {:secret, :redacted, byte_size(value)}
         [value, 0] -> {:ok, value}
         nil -> :error
+      end
+
+    {:reply, reply, s}
+  end
+
+  def handle_call({:host_secret, tenant, key}, _from, %{conn: c} = s) do
+    reply =
+      case row(c, "SELECT value FROM vars WHERE tenant=?1 AND key=?2", [tenant, key]) do
+        [value] -> value
+        nil -> nil
       end
 
     {:reply, reply, s}

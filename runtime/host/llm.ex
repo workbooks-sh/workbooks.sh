@@ -49,7 +49,8 @@ defmodule Workbooks.Llm do
     retries = opts[:retries] || 2
     deadline = (retries + 1) * 120_000 + 15_000
     t0 = System.monotonic_time(:millisecond)
-    task = Task.async(fn -> if on_delta, do: post_stream(body, on_delta, retries), else: post(body, retries) end)
+    key = resolve_key(opts)
+    task = Task.async(fn -> if on_delta, do: post_stream(body, on_delta, retries, key), else: post(body, retries, key) end)
 
     result =
       case Task.yield(task, deadline) || Task.shutdown(task, :brutal_kill) do
@@ -67,10 +68,34 @@ defmodule Workbooks.Llm do
     result
   end
 
-  defp post(body, retries) do
+  # Resolve the OpenRouter key for THIS call, host-side (never crosses the membrane):
+  #   1. an explicit `:api_key` opt (caller already resolved it), else
+  #   2. the TENANT's own key — a Vars secret `OPENROUTER_API_KEY` scoped to `:principal`
+  #      (the tenant/session id). Host-side raw read (`Vars.host_secret/2`), so every tenant
+  #      bills/authenticates as ITSELF rather than as the platform, else
+  #   3. the platform key (`Workbooks.Secrets`) — the intended fallback for single-tenant /
+  #      unconfigured tenants.
+  # Public for the per-tenant-key PoC (`HostBrokerKeystoneFixesTest`) to assert the REAL selection.
+  @doc false
+  def resolve_key(opts) do
+    cond do
+      is_binary(opts[:api_key]) and opts[:api_key] != "" -> opts[:api_key]
+      true -> tenant_key(opts[:principal]) || Workbooks.Secrets.get("OPENROUTER_API_KEY", "")
+    end
+  end
+
+  defp tenant_key(principal) when is_binary(principal) and principal != "" do
+    case Workbooks.Vars.host_secret(principal, "OPENROUTER_API_KEY") do
+      v when is_binary(v) and v != "" -> v
+      _ -> nil
+    end
+  end
+
+  defp tenant_key(_), do: nil
+
+  defp post(body, retries, key) do
     :inets.start()
     :ssl.start()
-    key = Workbooks.Secrets.get("OPENROUTER_API_KEY", "")
     headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}]
 
     case :httpc.request(:post, {@endpoint, headers, ~c"application/json", body}, [timeout: 120_000], body_format: :binary) do
@@ -79,14 +104,14 @@ defmodule Workbooks.Llm do
 
       {:ok, {{_, status, _}, _, _resp}} when status in [408, 429, 500, 502, 503] and retries > 0 ->
         Process.sleep(1000)
-        post(body, retries - 1)
+        post(body, retries - 1, key)
 
       {:ok, {{_, status, _}, _, resp}} ->
         {:error, {:http, status, String.slice(to_string(resp), 0, 200)}}
 
       {:error, _reason} when retries > 0 ->
         Process.sleep(1000)
-        post(body, retries - 1)
+        post(body, retries - 1, key)
 
       {:error, reason} ->
         {:error, reason}
@@ -98,21 +123,20 @@ defmodule Workbooks.Llm do
   # choices[0].delta carries incremental `content` (text tokens) and tool_call
   # fragments, terminated by `data: [DONE]`. We accumulate into the same result
   # shape as parse/1 and call on_delta with each text chunk as it lands.
-  defp post_stream(body, on_delta, retries) do
+  defp post_stream(body, on_delta, retries, key) do
     :inets.start()
     :ssl.start()
-    key = Workbooks.Secrets.get("OPENROUTER_API_KEY", "")
     headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}]
     http_opts = [timeout: 120_000]
     req_opts = [sync: false, stream: :self, body_format: :binary]
 
     case :httpc.request(:post, {@endpoint, headers, ~c"application/json", body}, http_opts, req_opts) do
       {:ok, request_id} ->
-        collect_stream(request_id, on_delta, %{content: "", tool_calls: %{}, finish: nil, usage: %{}}, "", retries, body)
+        collect_stream(request_id, on_delta, %{content: "", tool_calls: %{}, finish: nil, usage: %{}}, "", retries, body, key)
 
       {:error, _reason} when retries > 0 ->
         Process.sleep(1000)
-        post_stream(body, on_delta, retries - 1)
+        post_stream(body, on_delta, retries - 1, key)
 
       {:error, reason} ->
         {:error, reason}
@@ -121,14 +145,14 @@ defmodule Workbooks.Llm do
 
   # Receive loop over the async :httpc stream messages. `buf` holds a partial SSE
   # tail between chunks; `acc` is the running result.
-  defp collect_stream(req_id, on_delta, acc, buf, retries, body) do
+  defp collect_stream(req_id, on_delta, acc, buf, retries, body, key) do
     receive do
       {:http, {^req_id, :stream_start, _headers}} ->
-        collect_stream(req_id, on_delta, acc, buf, retries, body)
+        collect_stream(req_id, on_delta, acc, buf, retries, body, key)
 
       {:http, {^req_id, :stream, chunk}} ->
         {acc, buf} = consume_sse(buf <> chunk, on_delta, acc)
-        collect_stream(req_id, on_delta, acc, buf, retries, body)
+        collect_stream(req_id, on_delta, acc, buf, retries, body, key)
 
       {:http, {^req_id, :stream_end, _headers}} ->
         {:ok, finalize_stream(acc)}
@@ -136,14 +160,14 @@ defmodule Workbooks.Llm do
       # A non-200 arrives as a single non-streamed reply; retry transient codes.
       {:http, {^req_id, {{_, status, _}, _hdrs, _resp}}} when status in [408, 429, 500, 502, 503] and retries > 0 ->
         Process.sleep(1000)
-        post_stream(body, on_delta, retries - 1)
+        post_stream(body, on_delta, retries - 1, key)
 
       {:http, {^req_id, {{_, status, _}, _hdrs, resp}}} ->
         {:error, {:http, status, String.slice(to_string(resp), 0, 200)}}
 
       {:http, {^req_id, {:error, _reason}}} when retries > 0 ->
         Process.sleep(1000)
-        post_stream(body, on_delta, retries - 1)
+        post_stream(body, on_delta, retries - 1, key)
 
       {:http, {^req_id, {:error, reason}}} ->
         {:error, reason}
