@@ -1,0 +1,261 @@
+<!doctype html>
+<!-- workbook: deal-pipeline — Parcel transaction-coordinator Kanban board (deterministic, no network). -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="darkreader-lock" />
+<meta name="color-scheme" content="light" />
+<title>Parcel — Deal Pipeline · Under Contract to Close</title>
+<script id="workbook-spec" type="application/json">
+{
+  "id": "deal-pipeline",
+  "kind": "board",
+  "title": "Deal Pipeline — Under Contract to Close",
+  "owner": "parcel",
+  "workspace": "parcel-brokerage",
+  "source": "data/transactions.csv",
+  "folder": "Transactions",
+  "frozen_at": "2026-06-14T00:00:00Z"
+}
+</script>
+<style>
+  h1,h2,h3,.serif{font-family:'Fraunces',Georgia,'Times New Roman',serif;font-weight:600;letter-spacing:-.01em}
+  h1{letter-spacing:-.02em}
+
+  :root{
+    --green:#b4683f;--green-d:#8f4a26;--ink:#2a241d;--bg:#faf6f0;--card:#fffdfa;
+    --line:#e8ddcd;--muted:#8a7f70;--faint:#8a958f;
+    --amber:#c79a4b;--red:#b0503f;--blue:#5f7585;
+    --col-bg:#eef0e8;
+  ;--clay:#b4683f;--clay-d:#8f4a26;--clay-l:#f4e6dc;--sage:#6f7d63;--sage-bg:#eef0e8;--gold:#c79a4b;--gold-bg:#f6ecd6;--slate:#5f7585;--slate-bg:#e8eef2;--radius:12px;}
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font:14px/1.5 Inter,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);padding:26px 28px 60px}
+  header{display:flex;align-items:center;gap:13px;margin-bottom:3px}
+  .mark{width:30px;height:30px;display:inline-grid;place-items:center}
+  h1{font-weight:680;letter-spacing:-.025em;font-size:24px;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin:2px 0 0 43px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:20px 0 18px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:5px 12px 5px 9px;font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap}
+  .chip .ct{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:6px;background:var(--col-bg);color:var(--ink);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+  .chip .cd{width:8px;height:8px;border-radius:50%}
+  .chip.tot{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .chip.tot .ct{background:rgba(255,255,255,.16);color:#fff}
+  .health{display:flex;gap:14px;align-items:center;font-size:12px;color:var(--muted)}
+  .health span{display:flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;position:relative}
+  .dot.g{background:var(--green-d)} .dot.a{background:var(--amber)} .dot.r{background:var(--red)} .dot.n{background:var(--faint)}
+  .dot.pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1.5px solid currentColor;opacity:.4}
+  .dot.r.pulse{color:var(--red)} .dot.a.pulse{color:var(--amber)}
+
+  .board{display:grid;grid-template-columns:repeat(6,minmax(232px,1fr));gap:14px;overflow-x:auto;padding-bottom:8px}
+  .col{background:var(--col-bg);border:1px solid var(--line);border-radius:14px;padding:10px;display:flex;flex-direction:column;min-width:232px}
+  .colhead{display:flex;align-items:center;justify-content:space-between;padding:4px 6px 10px;border-bottom:1px solid #f0e4d5;margin-bottom:10px}
+  .colhead .t{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:#2e3a34}
+  .colhead .swatch{width:8px;height:8px;border-radius:2px}
+  .colhead .n{font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 7px}
+  .stack{display:flex;flex-direction:column;gap:10px}
+
+  .deal{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 12px 12px;box-shadow:0 1px 2px rgba(12,15,13,.04);cursor:default;transition:box-shadow .15s,transform .15s}
+  .deal:hover{box-shadow:0 4px 14px rgba(12,15,13,.09);transform:translateY(-1px)}
+  .deal .top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .deal .addr{font-weight:680;letter-spacing:-.01em;font-size:14px;line-height:1.25}
+  .deal .mls{font-size:10.5px;color:var(--faint);margin-top:1px;letter-spacing:.02em}
+  .side{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:5px;padding:2px 6px;white-space:nowrap}
+  .side.buy{background:#eaf1fc;color:#5f7585}
+  .side.sell{background:#f4e6dc;color:var(--green-d)}
+  .side.dual{background:#f4ecd9;color:#a96f1f}
+  .price{font-size:16px;font-weight:700;letter-spacing:-.02em;margin:9px 0 9px}
+  .keyrow{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;border-top:1px dashed var(--line);padding-top:8px}
+  .keyrow .kl{color:var(--muted)}
+  .keyrow .kv{font-weight:650;font-variant-numeric:tabular-nums}
+  .keyrow .kv.late{color:var(--red)}
+  .countdown{display:flex;align-items:center;gap:7px;margin:9px 0 2px}
+  .cdbar{flex:1;height:5px;border-radius:3px;background:#e9efeb;overflow:hidden}
+  .cdbar i{display:block;height:100%;border-radius:3px}
+  .cdtxt{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .cardfoot{display:flex;align-items:center;justify-content:space-between;margin-top:11px;padding-top:9px;border-top:1px solid var(--line)}
+  .agent{display:flex;align-items:center;gap:7px}
+  .agent img{width:24px;height:24px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px var(--line)}
+  .agent .an{font-size:11.5px;font-weight:600;color:#3a443e}
+  .hdot{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700}
+  .deal.done{opacity:.82;background:#f6faf7}
+  .deal.done .price{color:var(--green-d)}
+  .sold{font-size:10px;font-weight:800;letter-spacing:.05em;color:var(--green-d);text-transform:uppercase}
+  .foot{margin-top:24px;color:var(--faint);font-size:11.5px;display:flex;gap:16px;flex-wrap:wrap}
+  .mark svg{width:100%;height:100%;display:block}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="icon" type="image/svg+xml" href="../files/parcel-logo.svg" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header>
+    <span class="mark" aria-label="Parcel"><svg viewBox="500 540 980 940" fill="#b4683f" xmlns="http://www.w3.org/2000/svg"><path d="M 981.042 562.763 C 987.035 566.061 1014.12 594.566 1020.94 601.591 C 1076.71 658.975 1135.34 714.304 1191.06 771.653 C 1239.42 726.007 1285.56 676.609 1333.52 630.375 C 1354.86 609.803 1376.66 585.082 1398.93 565.734 C 1409.12 565.099 1446.99 564.781 1456.01 566.081 C 1449.34 573.963 1439.21 583.419 1431.61 590.946 L 1393.17 629.195 L 1288.78 733.671 C 1267.21 755.13 1241.49 779.479 1221.08 801.622 C 1287.94 870.644 1359.91 940.623 1428.09 1008.64 C 1428.89 1027.79 1428.49 1049.42 1428.56 1068.77 L 1428.67 1176.42 L 1428.59 1447.45 C 1289.26 1445.87 1149.66 1447.77 1010.31 1447.18 C 990.771 1447.09 971.113 1447.63 951.592 1447.03 C 951.057 1403.34 950.957 1359.64 951.292 1315.95 C 952.736 1214.6 950.089 1112.37 952.107 1010.49 C 986.058 977.559 1019.62 942.582 1053.05 909.013 C 1088.52 873.408 1125.7 837.209 1160.39 801 C 1138.42 776.373 1106.68 745.749 1083.1 722.48 C 1048.98 688.745 1015.09 654.775 981.437 620.573 C 949.564 653.038 917.327 685.143 884.731 716.883 L 766.317 835.06 L 587.9 1013.5 C 568.572 1013.45 549.243 1013.56 529.916 1013.85 C 541.521 999.441 567.487 975.536 581.439 961.403 L 711.862 831.206 L 880.666 661.926 L 940.868 601.708 C 953.346 589.211 967.782 573.839 981.042 562.763 z M 994.44 1404.9 L 1195.51 1404.74 L 1385.51 1405.49 L 1385.19 1156.69 C 1385.22 1114.52 1384.21 1067.08 1385.55 1025.35 C 1371.8 1012.95 1351.53 990.859 1337.36 976.701 L 1225.28 864.754 C 1220.29 859.771 1193.9 832.339 1190.07 830.59 L 1063.11 957.304 C 1049.64 970.78 1036.24 984.329 1022.92 997.951 C 1015.02 1005.99 1002.5 1019.08 993.957 1025.98 C 997.032 1134.46 993.484 1244.22 994.461 1352.82 C 994.615 1370 994.695 1387.73 994.44 1404.9 z"/></svg></span>
+    <h1>Deal Pipeline</h1>
+  </header>
+  <div class="sub">Transactions · Under Contract to Close — coordinator board · workspace <code>parcel-brokerage</code> · as of Sat 6/14</div>
+
+  <div class="topbar">
+    <div class="chips" id="chips"></div>
+    <div class="health">
+      <span><i class="dot g"></i> On track</span>
+      <span><i class="dot a"></i> Watch</span>
+      <span><i class="dot r"></i> At risk</span>
+    </div>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <div class="foot">
+    <span>Source: <code>data/transactions.csv</code> · 9 active &amp; recently-closed transactions</span>
+    <span>Health = days remaining vs. next contractual deadline (R ≤ 3d, A ≤ 7d, G &gt; 7d)</span>
+  </div>
+
+<script>
+// ----- Deterministic board model (frozen to 2026-06-14 so every recording matches) -----
+const TODAY = new Date(2026, 5, 14); // Jun 14 2026
+const fmtUSD = n => "$" + n.toLocaleString("en-US");
+const md = d => (d.getMonth()+1) + "/" + d.getDate();
+const D = (m,day) => new Date(2026, m-1, day);
+const days = d => Math.round((d - TODAY) / 86400000);
+
+const STAGES = [
+  {id:"active",  name:"Active Listing",          color:"#5f7585"},
+  {id:"uc",      name:"Under Contract",          color:"#9a6b8c"},
+  {id:"insp",    name:"Inspection",              color:"#c79a4b"},
+  {id:"appr",    name:"Appraisal & Financing",   color:"#c98a9a"},
+  {id:"prep",    name:"Closing Prep",            color:"#6f7d63"},
+  {id:"closed",  name:"Closed",                  color:"#8f4a26"},
+];
+
+// key date is the next contractual gate driving the countdown
+const DEALS = [
+  // --- Active Listing ---
+  {stage:"active", addr:"48 Larkspur Lane",  area:"Riverside Heights", mls:"RH-2026-04417",
+   price:724900, side:"sell", keyLbl:"Offer review", keyDate:D(6,22), milestone:"Listed",
+   agent:{n:"Marisol Reyes", img:47}},
+  {stage:"active", addr:"126 Sycamore Court", area:"Eastside",        mls:"RH-2026-04501",
+   price:589000, side:"sell", keyLbl:"Price review", keyDate:D(6,27), milestone:"Listed",
+   agent:{n:"David Okafor", img:12}},
+
+  // --- Under Contract ---
+  {stage:"uc", addr:"19 Foxglove Drive",  area:"Riverside Heights", mls:"RH-2026-04388",
+   price:642500, side:"buy", keyLbl:"COE (close)", keyDate:D(7,2), milestone:"Offer accepted 6/8",
+   agent:{n:"Priya Nair", img:32}},
+  {stage:"uc", addr:"305 Magnolia Ridge", area:"Northgate",         mls:"RH-2026-04275",
+   price:815000, side:"sell", keyLbl:"COE (close)", keyDate:D(7,9), milestone:"Offer accepted 6/11",
+   agent:{n:"David Okafor", img:12}},
+
+  // --- Inspection ---
+  {stage:"insp", addr:"7 Aster Way", area:"Eastside", mls:"RH-2026-04190",
+   price:498000, side:"buy", keyLbl:"Inspection deadline", keyDate:D(6,18), milestone:"Inspection 6/15",
+   agent:{n:"Marisol Reyes", img:47}},
+
+  // --- Appraisal & Financing ---
+  {stage:"appr", addr:"33 Bluebell Terrace", area:"Riverside Heights", mls:"RH-2026-04102",
+   price:705000, side:"buy", keyLbl:"Appraisal due", keyDate:D(6,25), milestone:"Loan in underwriting",
+   agent:{n:"Priya Nair", img:32}},
+
+  // --- Closing Prep ---
+  {stage:"prep", addr:"211 Cedar Street", area:"Riverside Heights", mls:"RH-2026-03988",
+   price:467500, side:"dual", keyLbl:"Clear-to-close", keyDate:D(6,17), milestone:"CTC pending · final HUD",
+   agent:{n:"Aaron Whitfield", img:60}},
+  {stage:"prep", addr:"54 Juniper Bend", area:"Northgate", mls:"RH-2026-03954",
+   price:639900, side:"sell", keyLbl:"COE (close)", keyDate:D(6,20), milestone:"CTC received 6/13",
+   agent:{n:"Aaron Whitfield", img:60}},
+
+  // --- Closed ---
+  {stage:"closed", addr:"88 Maple Avenue", area:"Eastside", mls:"RH-2026-03801",
+   price:552000, side:"sell", keyLbl:"Closed", keyDate:D(6,9), milestone:"Funded & recorded",
+   agent:{n:"Marisol Reyes", img:47}},
+];
+
+// health: red <=3 days, amber <=7, green otherwise; closed = neutral
+function health(deal){
+  if(deal.stage === "closed") return {cls:"n", lbl:"Closed", pulse:false};
+  const dleft = days(deal.keyDate);
+  if(dleft <= 3) return {cls:"r", lbl:"At risk", pulse:true};
+  if(dleft <= 7) return {cls:"a", lbl:"Watch", pulse:true};
+  return {cls:"g", lbl:"On track", pulse:false};
+}
+
+function countdown(deal){
+  const dleft = days(deal.keyDate);
+  if(deal.stage === "closed") return {txt:"Closed " + md(deal.keyDate), pct:100, color:"var(--green-d)", late:false};
+  const late = dleft < 0;
+  // progress assumes a ~30-day contract window; shrinking bar = time elapsing
+  const pct = Math.max(6, Math.min(100, Math.round((1 - dleft/30) * 100)));
+  const color = dleft <= 3 ? "var(--red)" : dleft <= 7 ? "var(--amber)" : "var(--green-d)";
+  const txt = late ? Math.abs(dleft) + "d overdue" : dleft === 0 ? "Due today" : dleft + "d to close";
+  return {txt, pct, color, late};
+}
+
+const sideMeta = {buy:["buy","Buyer side"], sell:["sell","Seller side"], dual:["dual","Dual agency"]};
+
+// ----- render stage chips -----
+const chipWrap = document.getElementById("chips");
+let chipHtml = STAGES.map(s => {
+  const n = DEALS.filter(d => d.stage === s.id).length;
+  return `<span class="chip"><span class="cd" style="background:${s.color}"></span>${s.name}<span class="ct">${n}</span></span>`;
+}).join("");
+chipHtml += `<span class="chip tot">Total in pipeline<span class="ct">${DEALS.length}</span></span>`;
+chipWrap.innerHTML = chipHtml;
+
+// ----- render board -----
+const board = document.getElementById("board");
+board.innerHTML = STAGES.map(s => {
+  const cards = DEALS.filter(d => d.stage === s.id).map(d => {
+    const h = health(d);
+    const c = countdown(d);
+    const [sc, sl] = sideMeta[d.side];
+    const closed = d.stage === "closed";
+    return `
+    <div class="deal${closed ? " done" : ""}">
+      <div class="top">
+        <div>
+          <div class="addr">${d.addr}</div>
+          <div class="mls">${d.area} · MLS# ${d.mls}</div>
+        </div>
+        <span class="side ${sc}">${sl}</span>
+      </div>
+      <div class="price">${fmtUSD(d.price)}${closed ? ' <span class="sold">Sold</span>' : ''}</div>
+      <div class="countdown">
+        <div class="cdbar"><i style="width:${c.pct}%;background:${c.color}"></i></div>
+        <span class="cdtxt" style="color:${c.color}">${c.txt}</span>
+      </div>
+      <div class="keyrow">
+        <span class="kl">${d.keyLbl}</span>
+        <span class="kv${c.late ? " late" : ""}">${md(d.keyDate)}</span>
+      </div>
+      <div class="keyrow" style="border-top:0;padding-top:4px">
+        <span class="kl">Milestone</span>
+        <span class="kv" style="font-weight:600;color:var(--muted)">${d.milestone}</span>
+      </div>
+      <div class="cardfoot">
+        <div class="agent">
+          <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=48&h=48&q=80&crop=faces&fit=crop" alt="${d.agent.n}" />
+          <span class="an">${d.agent.n}</span>
+        </div>
+        <span class="hdot" style="color:${h.cls==='r'?'var(--red)':h.cls==='a'?'var(--amber)':h.cls==='g'?'var(--green-d)':'var(--faint)'}">
+          <i class="dot ${h.cls}${h.pulse?' pulse':''}"></i>${h.lbl}
+        </span>
+      </div>
+    </div>`;
+  }).join("");
+  const n = DEALS.filter(d => d.stage === s.id).length;
+  return `
+  <div class="col">
+    <div class="colhead">
+      <span class="t"><span class="swatch" style="background:${s.color}"></span>${s.name}</span>
+      <span class="n">${n}</span>
+    </div>
+    <div class="stack">${cards}</div>
+  </div>`;
+}).join("");
+</script>
+</body>
+</html>

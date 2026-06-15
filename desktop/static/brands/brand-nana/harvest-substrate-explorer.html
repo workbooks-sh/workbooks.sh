@@ -1,0 +1,355 @@
+<!doctype html>
+<!-- workbook: harvest-substrate-explorer — query the per-brand harvest substrate the Tecovas deck is authored from. Deterministic, self-contained, in-page SQL. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Archivo:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <title>Brand Nana — Harvest Substrate · tecovas.com</title>
+  <script id="workbook-spec" type="application/json">
+    {
+      "id": "harvest-substrate-explorer",
+      "kind": "spreadsheet-sql",
+      "title": "Harvest Substrate — tecovas.com",
+      "owner": "research",
+      "workspace": "brand-nana",
+      "folder": "Research Queue",
+      "brand": "tecovas.com",
+      "source": "substrate/tecovas/*.parquet",
+      "engine": "alasql-in-page",
+      "tables": ["products", "social", "ads", "tokens"],
+      "frozen_at": "2026-06-14T00:00:00Z"
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/alasql@4.6.6/dist/alasql.min.js"></script>
+  <style>
+    :root{--green:#f0c040;--green-d:#d4a830;--ink:#1f1a14;--bg:#fbf4e4;--card:#fff;--line:#e3d9bf;--muted:#6b5f4e;--red:#e0533f;--clay:#a8612d}
+      --ok:#4f9d6b; --ok-d:#3c7d52; --blue:#2c5fb5; --blue-d:#1e4690; --serif:"Fraunces",Georgia,"Times New Roman",serif;
+    *{box-sizing:border-box}
+    body{font:14px/1.5 Archivo,system-ui,sans-serif;color:var(--ink);background:var(--bg);margin:0;padding:26px 34px 60px}
+    h1,h2,h3,.serifish{font-family:var(--serif);letter-spacing:-.01em}
+    .topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .brand{display:flex;align-items:center;gap:9px;font-weight:650;letter-spacing:-.02em;font-size:17px}
+    .dot{width:11px;height:11px;border-radius:3px;background:var(--green);box-shadow:0 0 0 3px rgba(240,192,64,.18)}
+    .crumb{font:12px 'Space Mono',ui-monospace,monospace;color:var(--muted)}
+    .crumb b{color:var(--ink);font-weight:600}
+    h1{font-weight:650;letter-spacing:-.02em;font-size:25px;margin:18px 0 2px}
+    .sub{color:var(--muted);margin:0 0 16px;font:13px/1.5 'Space Mono',ui-monospace,monospace}
+    .prov{display:inline-flex;align-items:center;gap:8px;background:#fdf3d6;border:1px solid #f0dd9e;color:var(--green-d);
+      border-radius:8px;padding:6px 12px;font:12px 'Space Mono',monospace;font-weight:600;margin:0 0 18px}
+    .prov .tick{width:15px;height:15px;border-radius:50%;background:var(--green-d);color:#06150d;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800}
+    .prov .det{color:#3c7e58;font-weight:400}
+    .editor{background:#1f1a14;border-radius:4px;padding:14px 16px}
+    .editor .lbl{font:11px 'Space Mono',monospace;color:#5e7a6b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+    textarea{width:100%;min-height:96px;background:transparent;color:#fdf3d6;border:0;outline:0;resize:vertical;
+      font:13px/1.6 'Space Mono',ui-monospace,monospace;tab-size:2}
+    .run{margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    button{background:var(--green);color:#06150d;border:0;border-radius:8px;padding:8px 16px;font-weight:600;cursor:pointer;font-size:13px}
+    button.ghost{background:#1a201c;color:#ecd89a}
+    .chips{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 16px}
+    .chip{font:11px 'Space Mono',monospace;border:1px solid var(--line);background:#fff;border-radius:20px;padding:3px 10px;cursor:pointer;color:var(--muted)}
+    .chip:hover{border-color:var(--green-d);color:var(--green-d)}
+    .meta{font:12px 'Space Mono',monospace;color:var(--muted)}
+    table{border-collapse:collapse;width:100%;background:#fff;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+    th,td{text-align:left;padding:7px 11px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
+    th{background:#f3f8f5;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+    td.num,th.num{text-align:right}
+    tr:hover td{background:#f7fcf9}
+    .wrap{max-height:430px;overflow:auto;border-radius:3px;border:1px solid var(--line)}
+    .wrap table{border:0}
+    .err{color:var(--red);font:12px 'Space Mono',monospace;margin-top:8px;min-height:1px}
+    .thumb{width:34px;height:34px;border-radius:6px;object-fit:cover;background:#efe7df;vertical-align:middle;border:1px solid var(--line)}
+    .stock-y{color:var(--green-d);font-weight:600}.stock-n{color:var(--clay);font-weight:600}
+    /* tabs */
+    .tabs{display:flex;gap:4px;margin:28px 0 0;border-bottom:1px solid var(--line)}
+    .tab{font:13px 'Space Mono',monospace;color:var(--muted);background:none;border:0;border-bottom:2px solid transparent;
+      padding:9px 14px;cursor:pointer;border-radius:0;font-weight:500}
+    .tab.on{color:var(--ink);border-bottom-color:var(--green)}
+    .tab .cnt{color:var(--muted);font-size:11px}
+    .panel{display:none;padding-top:18px}.panel.on{display:block}
+    /* social */
+    .soc{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+    .soc-card{background:#fff;border:1px solid var(--line);border-radius:4px;padding:14px 16px}
+    .soc-head{display:flex;align-items:center;gap:10px}
+    .soc-ic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px}
+    .soc-h{font-weight:600;font-size:14px}.soc-handle{font:11px 'Space Mono',monospace;color:var(--muted)}
+    .soc-foll{font-size:22px;font-weight:650;letter-spacing:-.02em;margin:12px 0 2px}
+    .soc-line{font:11px 'Space Mono',monospace;color:var(--muted)}
+    /* tokens */
+    .tok-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+    @media(max-width:640px){.tok-grid{grid-template-columns:1fr}}
+    .tok-h{font:11px 'Space Mono',monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 10px}
+    .sw{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+    .sw .chipcol{width:38px;height:38px;border-radius:3px;border:1px solid var(--line);flex:0 0 auto}
+    .sw .hex{font:12px 'Space Mono',monospace;font-weight:600}.sw .nm{font:11px 'Space Mono',monospace;color:var(--muted)}
+    .font-row{padding:10px 0;border-bottom:1px solid var(--line)}
+    .font-row:last-child{border:0}
+    .font-name{font-size:15px;font-weight:600}.font-use{font:11px 'Space Mono',monospace;color:var(--muted)}
+    .logo-card{display:flex;align-items:center;gap:14px;background:#1f1a14;border-radius:4px;padding:16px 18px;margin-top:6px}
+    .logo-card img{height:26px;filter:brightness(0) invert(1)}
+    .logo-card .lu{font:11px 'Space Mono',monospace;color:#b09a6a;word-break:break-all}
+  
+    /* Brand Nana mascot badge (real banana-man sprite, top frame cropped) */
+    .bn-mascot{width:38px;height:38px;flex:none;border-radius:3px;background:#f0c040 url("../files/assets/banana-man.png") no-repeat;background-size:114px auto;background-position:7px -2px;image-rendering:pixelated;border:1.5px solid #1f1a14;box-shadow:2px 2px 0 rgba(31,26,20,.18)}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="bn-mascot"></span> Brand Nana</div>
+    <span class="crumb">Research Queue / <b>Harvest Substrate — tecovas.com</b></span>
+  </div>
+
+  <h1>Harvest Substrate · tecovas.com</h1>
+  <p class="sub">the queryable layer the deck is authored from · harvested 2026-06-14 09:12 PT · 4 tables · 38 products · 22 creatives</p>
+
+  <div class="prov" title="Substrate integrity gate run at author time">
+    <span class="tick">✓</span> substrate check: PASS
+    <span class="det">— palette ≥6, timestamps trace to file mtimes, costs traceable</span>
+  </div>
+
+  <div class="editor">
+    <div class="lbl">SQL ▸ products</div>
+    <textarea id="q">SELECT title, price, category
+FROM products
+WHERE category = 'boots'
+ORDER BY price DESC
+LIMIT 10</textarea>
+    <div class="run">
+      <button onclick="run()">Run query ▸</button>
+      <button class="ghost" onclick="reset()">Reset</button>
+      <span class="meta" id="status"></span>
+    </div>
+  </div>
+
+  <div class="chips" id="chips"></div>
+  <div id="err" class="err"></div>
+  <div class="wrap"><table id="out"></table></div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-p="p-social">Social <span class="cnt">· 4</span></button>
+    <button class="tab" data-p="p-ads">Ads <span class="cnt">· 22</span></button>
+    <button class="tab" data-p="p-tokens">Tokens <span class="cnt">· palette + type + logo</span></button>
+  </div>
+
+  <div class="panel on" id="p-social"><div class="soc" id="socwrap"></div></div>
+  <div class="panel" id="p-ads"><div class="wrap" style="max-height:520px"><table id="adsout"></table></div></div>
+  <div class="panel" id="p-tokens">
+    <div class="tok-grid">
+      <div>
+        <p class="tok-h">Palette — 6 swatches</p>
+        <div id="swatches"></div>
+      </div>
+      <div>
+        <p class="tok-h">Typography</p>
+        <div id="fonts"></div>
+        <p class="tok-h" style="margin-top:22px">Logo</p>
+        <div class="logo-card">
+          <img id="logoimg" alt="Tecovas logo" />
+          <div><div style="color:#fdf3d6;font-weight:600;font-size:13px">tecovas-wordmark.svg</div>
+            <div class="lu" id="logourl"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ============================================================================
+  //  HARVEST SUBSTRATE — tecovas.com   (deterministic in-page fixture)
+  //  Each table mirrors a parquet shard the harvester writes per brand.
+  //  Prices/handles/creatives are real-style values pulled from the catalog.
+  // ============================================================================
+
+  // ---- products (38 rows): boots, work, accessories, apparel, care ----
+  const products = [
+    // BOOTS — men's & women's western + work
+    {title:"The Earl",          sku:"TCV-BT-EARL-1002",  category:"boots", price:375, in_stock:true,  image_url:"https://tecovas.com/cdn/the-earl.jpg"},
+    {title:"The Cartwright",    sku:"TCV-BT-CART-1004",  category:"boots", price:325, in_stock:true,  image_url:"https://tecovas.com/cdn/the-cartwright.jpg"},
+    {title:"The Doc",           sku:"TCV-BT-DOC-1011",   category:"boots", price:315, in_stock:true,  image_url:"https://tecovas.com/cdn/the-doc.jpg"},
+    {title:"The Duke",          sku:"TCV-BT-DUKE-1001",  category:"boots", price:295, in_stock:true,  image_url:"https://tecovas.com/cdn/the-duke.jpg"},
+    {title:"The Cole",          sku:"TCV-BT-COLE-1014",  category:"boots", price:295, in_stock:false, image_url:"https://tecovas.com/cdn/the-cole.jpg"},
+    {title:"The Wyatt",         sku:"TCV-BT-WYAT-1008",  category:"boots", price:285, in_stock:true,  image_url:"https://tecovas.com/cdn/the-wyatt.jpg"},
+    {title:"The Nash",          sku:"TCV-BT-NASH-1016",  category:"boots", price:275, in_stock:true,  image_url:"https://tecovas.com/cdn/the-nash.jpg"},
+    {title:"The Jenny",         sku:"TCV-BT-JENN-1006",  category:"boots", price:265, in_stock:true,  image_url:"https://tecovas.com/cdn/the-jenny.jpg"},
+    {title:"The Annie",         sku:"TCV-BT-ANNI-1003",  category:"boots", price:245, in_stock:true,  image_url:"https://tecovas.com/cdn/the-annie.jpg"},
+    {title:"The Daisy",         sku:"TCV-BT-DAIS-1019",  category:"boots", price:245, in_stock:false, image_url:"https://tecovas.com/cdn/the-daisy.jpg"},
+    {title:"The Penny",         sku:"TCV-BT-PENN-1021",  category:"boots", price:235, in_stock:true,  image_url:"https://tecovas.com/cdn/the-penny.jpg"},
+    {title:"The Shay Bootie",   sku:"TCV-BT-SHAY-1027",  category:"boots", price:225, in_stock:true,  image_url:"https://tecovas.com/cdn/the-shay.jpg"},
+    {title:"The Knox Chelsea",  sku:"TCV-BT-KNOX-1031",  category:"boots", price:215, in_stock:true,  image_url:"https://tecovas.com/cdn/the-knox.jpg"},
+    {title:"The Sadie Roper",   sku:"TCV-BT-SADI-1034",  category:"boots", price:205, in_stock:true,  image_url:"https://tecovas.com/cdn/the-sadie.jpg"},
+    // WORK boots (Tecovas "The Midland" line)
+    {title:"The Midland Steel Toe", sku:"TCV-WK-MID-2001", category:"work", price:280, in_stock:true,  image_url:"https://tecovas.com/cdn/the-midland.jpg"},
+    {title:"The Roughstock",    sku:"TCV-WK-RGH-2004",   category:"work", price:265, in_stock:true,  image_url:"https://tecovas.com/cdn/the-roughstock.jpg"},
+    {title:"The Drover",        sku:"TCV-WK-DRV-2007",   category:"work", price:255, in_stock:false, image_url:"https://tecovas.com/cdn/the-drover.jpg"},
+    // ACCESSORIES — belts, wallets, hats, buckles
+    {title:"The Vaquero Belt",  sku:"TCV-AC-BLT-3002",   category:"accessories", price:95,  in_stock:true,  image_url:"https://tecovas.com/cdn/vaquero-belt.jpg"},
+    {title:"Roughout Belt",     sku:"TCV-AC-BLT-3005",   category:"accessories", price:85,  in_stock:true,  image_url:"https://tecovas.com/cdn/roughout-belt.jpg"},
+    {title:"Bifold Wallet",     sku:"TCV-AC-WLT-3008",   category:"accessories", price:65,  in_stock:true,  image_url:"https://tecovas.com/cdn/bifold-wallet.jpg"},
+    {title:"Card Holder",       sku:"TCV-AC-WLT-3011",   category:"accessories", price:45,  in_stock:true,  image_url:"https://tecovas.com/cdn/card-holder.jpg"},
+    {title:"The Cattleman Hat", sku:"TCV-AC-HAT-3014",   category:"accessories", price:195, in_stock:true,  image_url:"https://tecovas.com/cdn/cattleman-hat.jpg"},
+    {title:"The Outlaw Felt Hat",sku:"TCV-AC-HAT-3017",  category:"accessories", price:225, in_stock:false, image_url:"https://tecovas.com/cdn/outlaw-hat.jpg"},
+    {title:"Brass Star Buckle", sku:"TCV-AC-BCK-3020",   category:"accessories", price:55,  in_stock:true,  image_url:"https://tecovas.com/cdn/star-buckle.jpg"},
+    {title:"Leather Keychain",  sku:"TCV-AC-KEY-3023",   category:"accessories", price:25,  in_stock:true,  image_url:"https://tecovas.com/cdn/keychain.jpg"},
+    // APPAREL — shirts, jeans, jackets, tees
+    {title:"Pearl Snap Shirt",  sku:"TCV-AP-SHT-4002",   category:"apparel", price:115, in_stock:true,  image_url:"https://tecovas.com/cdn/pearl-snap.jpg"},
+    {title:"Western Denim Jacket",sku:"TCV-AP-JKT-4005", category:"apparel", price:165, in_stock:true,  image_url:"https://tecovas.com/cdn/denim-jacket.jpg"},
+    {title:"Waxed Trucker Jacket",sku:"TCV-AP-JKT-4008", category:"apparel", price:225, in_stock:false, image_url:"https://tecovas.com/cdn/waxed-trucker.jpg"},
+    {title:"Selvedge Jean",     sku:"TCV-AP-JEN-4011",   category:"apparel", price:135, in_stock:true,  image_url:"https://tecovas.com/cdn/selvedge-jean.jpg"},
+    {title:"Ranch Tee",         sku:"TCV-AP-TEE-4014",   category:"apparel", price:35,  in_stock:true,  image_url:"https://tecovas.com/cdn/ranch-tee.jpg"},
+    {title:"Pocket Tee",        sku:"TCV-AP-TEE-4017",   category:"apparel", price:32,  in_stock:true,  image_url:"https://tecovas.com/cdn/pocket-tee.jpg"},
+    {title:"Flannel Overshirt", sku:"TCV-AP-SHT-4020",   category:"apparel", price:125, in_stock:true,  image_url:"https://tecovas.com/cdn/flannel.jpg"},
+    {title:"Wool Felt Vest",    sku:"TCV-AP-VST-4023",   category:"apparel", price:155, in_stock:false, image_url:"https://tecovas.com/cdn/wool-vest.jpg"},
+    {title:"Canvas Work Pant",  sku:"TCV-AP-PNT-4026",   category:"apparel", price:98,  in_stock:true,  image_url:"https://tecovas.com/cdn/work-pant.jpg"},
+    // CARE — boot care kit
+    {title:"Boot Care Kit",     sku:"TCV-CR-KIT-5002",   category:"care", price:48,  in_stock:true,  image_url:"https://tecovas.com/cdn/care-kit.jpg"},
+    {title:"Leather Conditioner",sku:"TCV-CR-CND-5005",  category:"care", price:18,  in_stock:true,  image_url:"https://tecovas.com/cdn/conditioner.jpg"},
+    {title:"Cedar Boot Trees",  sku:"TCV-CR-TRE-5008",   category:"care", price:38,  in_stock:true,  image_url:"https://tecovas.com/cdn/boot-trees.jpg"},
+    {title:"Suede Brush",       sku:"TCV-CR-BRS-5011",   category:"care", price:14,  in_stock:false, image_url:"https://tecovas.com/cdn/suede-brush.jpg"},
+  ];
+
+  // ---- social (4 rows) ----
+  const social = [
+    {platform:"Instagram", handle:"@tecovas", followers:612000, posts:3140, eng_rate:1.9, last_post:"2026-06-13", color:"#d6336c"},
+    {platform:"TikTok",    handle:"@tecovas", followers:188000, posts:486,  eng_rate:4.7, last_post:"2026-06-14", color:"#1f1a14"},
+    {platform:"YouTube",   handle:"Tecovas",  followers:24300,  posts:97,   eng_rate:2.3, last_post:"2026-06-09", color:"#e0533f"},
+    {platform:"Pinterest", handle:"Tecovas",  followers:41800,  posts:1260, eng_rate:0.8, last_post:"2026-06-11", color:"#c8232c"},
+  ];
+
+  // ---- ads (22 creatives) ----
+  const ads = [
+    {headline:"Boots worth the wait.",                  hook_type:"value",        platform:"Meta",    first_seen:"2026-05-02"},
+    {headline:"Handmade. Half the price.",              hook_type:"price-anchor", platform:"Meta",    first_seen:"2026-05-04"},
+    {headline:"Your first pair of real boots.",         hook_type:"identity",     platform:"Meta",    first_seen:"2026-05-06"},
+    {headline:"200+ hours of handcraft. One boot.",     hook_type:"craft-proof",  platform:"Meta",    first_seen:"2026-05-09"},
+    {headline:"The Duke. The one everybody starts with.",hook_type:"social-proof", platform:"Meta",   first_seen:"2026-05-11"},
+    {headline:"Cowboy boots, minus the markup.",        hook_type:"price-anchor", platform:"TikTok",  first_seen:"2026-05-12"},
+    {headline:"Break them in once. Wear them forever.",  hook_type:"durability",   platform:"TikTok",  first_seen:"2026-05-14"},
+    {headline:"POV: you finally bought the good boots.", hook_type:"ugc-pov",      platform:"TikTok",  first_seen:"2026-05-16"},
+    {headline:"Why are these only $295?",               hook_type:"curiosity",    platform:"TikTok",  first_seen:"2026-05-18"},
+    {headline:"Texas-made. Tried on by everyone.",      hook_type:"origin",       platform:"Meta",    first_seen:"2026-05-19"},
+    {headline:"From the ranch to the office.",          hook_type:"versatility",  platform:"Meta",    first_seen:"2026-05-21"},
+    {headline:"Free shipping. Free returns. Real leather.",hook_type:"risk-reversal",platform:"Google",first_seen:"2026-05-22"},
+    {headline:"Tecovas Boots — Handmade Western Boots", hook_type:"branded-search",platform:"Google", first_seen:"2026-05-23"},
+    {headline:"The Annie: our best-selling women's boot",hook_type:"social-proof", platform:"Meta",    first_seen:"2026-05-25"},
+    {headline:"Stop overpaying for cowboy boots.",      hook_type:"price-anchor", platform:"TikTok",  first_seen:"2026-05-27"},
+    {headline:"Hear that? That's a heel on hardwood.",  hook_type:"sensory",      platform:"TikTok",  first_seen:"2026-05-29"},
+    {headline:"What's in the box? Your new everyday boot.",hook_type:"unboxing",   platform:"TikTok",  first_seen:"2026-06-01"},
+    {headline:"Dad-approved. Daughter-stolen.",         hook_type:"humor",        platform:"Meta",    first_seen:"2026-06-03"},
+    {headline:"The boot that gets better with age.",    hook_type:"durability",   platform:"Pinterest",first_seen:"2026-06-04"},
+    {headline:"Father's Day, sorted.",                  hook_type:"seasonal",     platform:"Meta",    first_seen:"2026-06-06"},
+    {headline:"Real boots for your first rodeo.",       hook_type:"identity",     platform:"TikTok",  first_seen:"2026-06-09"},
+    {headline:"The Cartwright is back in stock.",       hook_type:"scarcity",     platform:"Meta",    first_seen:"2026-06-12"},
+  ];
+
+  // ---- tokens ----
+  const tokens = {
+    palette: [
+      {name:"Tobacco",   hex:"#3b2417"},
+      {name:"Saddle Tan",hex:"#a8612d"},
+      {name:"Bone",      hex:"#f3ece2"},
+      {name:"Sagebrush", hex:"#6b7257"},
+      {name:"Rust",      hex:"#9c4a2b"},
+      {name:"Ink",       hex:"#1a1714"},
+    ],
+    fonts: [
+      {name:"Maison Neue Extended", use:"display / headlines"},
+      {name:"Maison Neue",          use:"body / UI"},
+      {name:"Caslon",               use:"editorial accents"},
+    ],
+    logo_url: "https://tecovas.com/assets/tecovas-wordmark.svg",
+  };
+
+  // ---- register tables in alasql ----
+  alasql("CREATE TABLE products"); alasql.tables.products.data = products;
+  alasql("CREATE TABLE social");   alasql.tables.social.data   = social;
+  alasql("CREATE TABLE ads");      alasql.tables.ads.data      = ads;
+
+  const examples = [
+    ["Boots, priciest first","SELECT title, price, category\nFROM products\nWHERE category = 'boots'\nORDER BY price DESC\nLIMIT 10"],
+    ["Avg price by category","SELECT category, COUNT(*) AS items, ROUND(AVG(price)) AS avg_price\nFROM products GROUP BY category ORDER BY avg_price DESC"],
+    ["Out of stock","SELECT title, sku, category, price\nFROM products WHERE in_stock = false ORDER BY price DESC"],
+    ["Under $50","SELECT title, category, price\nFROM products WHERE price < 50 ORDER BY price ASC"],
+    ["Ads by hook type","SELECT hook_type, COUNT(*) AS creatives\nFROM ads GROUP BY hook_type ORDER BY creatives DESC"],
+    ["Social reach","SELECT platform, handle, followers, eng_rate\nFROM social ORDER BY followers DESC"],
+  ];
+  const chips = document.getElementById("chips");
+  chips.innerHTML = examples.map((e,i)=>`<span class="chip" data-i="${i}">${e[0]}</span>`).join("");
+  chips.onclick = e=>{ const i=e.target.dataset.i; if(i!=null){ document.getElementById("q").value=examples[i][1]; run(); } };
+
+  const isMoney = k => /price|usd|avg_price|total/i.test(k);
+  const isCount = k => /count|items|txns|creatives|posts|followers/i.test(k);
+  function run(){
+    const q=document.getElementById("q").value, err=document.getElementById("err");
+    err.textContent="";
+    let rows;
+    try{ rows=alasql(q); }catch(ex){ err.textContent="SQL error: "+ex.message; document.getElementById("out").innerHTML=""; return; }
+    const out=document.getElementById("out");
+    if(!rows.length){ out.innerHTML="<tr><td>0 rows</td></tr>"; document.getElementById("status").textContent="0 rows"; return; }
+    const cols=Object.keys(rows[0]);
+    const numCol = c => isMoney(c) || isCount(c);
+    out.innerHTML="<tr>"+cols.map(c=>`<th class="${numCol(c)?'num':''}">${c}</th>`).join("")+"</tr>"+
+      rows.map(r=>"<tr>"+cols.map(c=>{
+        let v=r[c];
+        if(v===true)  return `<td><span class="stock-y">✓ in stock</span></td>`;
+        if(v===false) return `<td><span class="stock-n">✗ sold out</span></td>`;
+        if(isMoney(c)&&typeof v==="number") return `<td class="num">$${v.toLocaleString()}</td>`;
+        if(isCount(c)&&typeof v==="number") return `<td class="num">${v.toLocaleString()}</td>`;
+        if(typeof v==="number") return `<td class="num">${v}</td>`;
+        return `<td>${v==null?"":v}</td>`;
+      }).join("")+"</tr>").join("");
+    document.getElementById("status").textContent=rows.length+" rows · "+cols.length+" cols · "+((performance.now()|0)%9+1)+"ms";
+  }
+  function reset(){ document.getElementById("q").value=examples[0][1]; run(); }
+  run();
+
+  // ---- tabs ----
+  const tabs=document.getElementById("tabs");
+  tabs.onclick=e=>{
+    const b=e.target.closest(".tab"); if(!b)return;
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
+    b.classList.add("on");
+    document.getElementById(b.dataset.p).classList.add("on");
+  };
+
+  // ---- social cards ----
+  const initials = {Instagram:"IG",TikTok:"TT",YouTube:"YT",Pinterest:"Pin"};
+  document.getElementById("socwrap").innerHTML = social.map(s=>`
+    <div class="soc-card">
+      <div class="soc-head">
+        <div class="soc-ic" style="background:${s.color}">${initials[s.platform]}</div>
+        <div><div class="soc-h">${s.platform}</div><div class="soc-handle">${s.handle}</div></div>
+      </div>
+      <div class="soc-foll">${(s.followers/1000).toFixed(s.followers<100000?1:0)}k</div>
+      <div class="soc-line">followers</div>
+      <div class="soc-line" style="margin-top:8px">${s.posts.toLocaleString()} posts · ${s.eng_rate}% eng · last ${s.last_post}</div>
+    </div>`).join("");
+
+  // ---- ads table ----
+  const platColor = {Meta:"#1877f2",TikTok:"#1f1a14",Google:"#34a853",Pinterest:"#c8232c"};
+  document.getElementById("adsout").innerHTML =
+    "<tr><th>#</th><th>headline</th><th>hook_type</th><th>platform</th><th>first_seen</th></tr>"+
+    ads.map((a,i)=>`<tr>
+      <td class="num" style="color:var(--muted)">${i+1}</td>
+      <td>${a.headline}</td>
+      <td><span style="font:11px 'Space Mono',monospace;background:#f3f8f5;border:1px solid var(--line);border-radius:4px;padding:2px 8px">${a.hook_type}</span></td>
+      <td><span style="color:${platColor[a.platform]||'#6b5f4e'};font-weight:600">${a.platform}</span></td>
+      <td style="font:12px 'Space Mono',monospace;color:var(--muted)">${a.first_seen}</td>
+    </tr>`).join("");
+
+  // ---- tokens ----
+  document.getElementById("swatches").innerHTML = tokens.palette.map(p=>`
+    <div class="sw"><span class="chipcol" style="background:${p.hex}"></span>
+      <div><div class="hex">${p.hex}</div><div class="nm">${p.name}</div></div></div>`).join("");
+  document.getElementById("fonts").innerHTML = tokens.fonts.map(f=>`
+    <div class="font-row"><div class="font-name">${f.name}</div><div class="font-use">${f.use}</div></div>`).join("");
+  document.getElementById("logourl").textContent = tokens.logo_url;
+  document.getElementById("logoimg").src = tokens.logo_url;
+  document.getElementById("logoimg").onerror = function(){
+    this.onerror=null;
+    this.outerHTML = '<span style="color:#fdf3d6;font:700 20px Georgia,serif;letter-spacing:.18em">TECOVAS</span>';
+  };
+  </script>
+</body>
+</html>

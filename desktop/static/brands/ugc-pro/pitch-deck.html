@@ -1,0 +1,283 @@
+<!doctype html>
+<!-- workbook: pitch-deck — mouse/keyboard-flippable partner & investor slide deck for UGC Pro. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UGC Pro — Partner Deck</title>
+  <script id="workbook-spec" type="application/json">
+    {
+      "id": "pitch-deck",
+      "kind": "presentation",
+      "title": "UGC Pro Partner Deck",
+      "owner": "kelly",
+      "workspace": "ugc-pro",
+      "folder": "Marketing & Brand",
+      "frozen_at": "2026-06-14T00:00:00Z"
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--pink:#FF2D78;--violet:#7C3AED;--yellow:#FFD93D;--mint:#16E0A3;--grad:linear-gradient(135deg,#FF2D78 0%,#7C3AED 100%);
+      --green:#FF2D78;--green-d:#7C3AED;--ink:#1A0B2E;--muted:#A99BB8;
+      --bg:#070a08;--panel:#101713;--line:#1f2b24;--text:#eaf2ed;
+    }
+    *{box-sizing:border-box}
+    html,body{
+      margin:0;height:100%;
+      font:16px/1.55 Plus Jakarta Sans,system-ui,-apple-system,sans-serif;
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(255,45,120,.10), transparent 60%),
+        radial-gradient(900px 500px at -10% 110%, rgba(124,58,237,.10), transparent 55%),
+        var(--bg);
+      color:var(--text);overflow:hidden;
+      -webkit-font-smoothing:antialiased;
+    }
+    h1,h2,h3,h4{font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em}
+    h1{font-weight:800}
+    .stage{
+      height:100vh;display:flex;align-items:center;justify-content:center;
+      padding:7vh 8vw;position:relative;cursor:pointer;
+    }
+    .slide{display:none;width:100%;max-width:1040px}
+    .slide.on{display:block;animation:in .42s cubic-bezier(.2,.7,.2,1)}
+    @keyframes in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+    .eyebrow{font-size:13px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--green)}
+    h1{font-size:clamp(38px,6.2vw,72px);font-weight:740;letter-spacing:-.03em;line-height:1.01;margin:16px 0}
+    h2{font-size:clamp(28px,4vw,46px);font-weight:700;letter-spacing:-.02em;margin:0 0 26px}
+    .lede{font-size:20px;color:var(--muted);max-width:700px}
+    .lede.dim{font-size:18px}
+
+    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:14px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:14px}
+    .stat{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;position:relative;overflow:hidden}
+    .stat:before{content:"";position:absolute;inset:0 auto auto 0;width:100%;height:2px;
+      background:linear-gradient(90deg,var(--green),transparent)}
+    .stat .n{font-size:clamp(34px,4.4vw,48px);font-weight:760;letter-spacing:-.02em;color:var(--green);line-height:1}
+    .stat .l{color:var(--muted);font-size:14px;margin-top:10px;line-height:1.5}
+
+    ul{font-size:19px;line-height:1.85;padding-left:0;list-style:none;margin:0}
+    li{position:relative;padding-left:30px;margin:14px 0}
+    li:before{content:"→";position:absolute;left:0;color:var(--green);font-weight:700}
+    li b{color:var(--text);font-weight:650}
+
+    .two{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
+
+    /* revenue bars */
+    .bars{margin-top:22px;max-width:760px}
+    .barrow{display:grid;grid-template-columns:96px 1fr 78px;align-items:center;gap:16px;margin:14px 0;font-size:15px;color:var(--muted)}
+    .bwrap{background:#1a241e;height:16px;border-radius:8px;overflow:hidden}
+    .bar{height:16px;background:linear-gradient(90deg,var(--green-d),var(--green));border-radius:8px;width:0;transition:width .9s cubic-bezier(.2,.7,.2,1)}
+    .barval{text-align:right;color:var(--text);font-weight:650;font-variant-numeric:tabular-nums}
+    .qoq{margin-top:18px;color:var(--muted);font-size:15px}
+    .qoq b{color:var(--green)}
+
+    /* business model */
+    .modelrows{font-size:18px}
+    .mrow{display:flex;justify-content:space-between;align-items:baseline;gap:18px;
+      padding:14px 0;border-bottom:1px solid var(--line)}
+    .mrow:last-child{border-bottom:0}
+    .mrow .src{color:var(--text);font-weight:600}
+    .mrow .pr{color:var(--muted);font-size:15px;text-align:right;white-space:nowrap}
+
+    /* mentors */
+    .founders{display:flex;gap:34px;margin-top:30px;flex-wrap:wrap}
+    .founder{text-align:center;width:170px}
+    .founder img{width:112px;height:112px;border-radius:50%;border:3px solid var(--green);object-fit:cover;
+      box-shadow:0 8px 30px rgba(255,45,120,.18)}
+    .founder .nm{font-weight:680;margin-top:14px;font-size:17px}
+    .founder .rl{color:var(--muted);font-size:13px;line-height:1.5;margin-top:4px}
+
+    /* chrome */
+    .chrome{position:fixed;bottom:24px;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:16px;color:var(--muted);font-size:13px}
+    #num{font-variant-numeric:tabular-nums;min-width:46px;text-align:right}
+    .dots{display:flex;gap:8px}
+    .dot{width:8px;height:8px;border-radius:50%;background:#27332c;cursor:pointer;transition:background .2s,transform .2s}
+    .dot:hover{transform:scale(1.25)}
+    .dot.on{background:var(--green)}
+    .hint{position:fixed;top:22px;right:28px;color:#3f4d45;font-size:12px;letter-spacing:.02em}
+    .mark{display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+    .mark span{width:30px;height:30px;border-radius:9px;background:var(--green);color:var(--ink);
+      display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+    .nav{position:fixed;bottom:18px;display:flex;gap:8px}
+    .nav.l{left:24px}.nav.r{right:24px}
+    .arrow{width:38px;height:38px;border-radius:11px;border:1px solid var(--line);background:var(--panel);
+      color:var(--muted);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+      transition:border-color .2s,color .2s}
+    .arrow:hover{border-color:var(--green);color:var(--green)}
+    @media(max-width:760px){.two{grid-template-columns:1fr;gap:26px}.grid3{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="hint">click / → / space to advance · ← back · dots to jump</div>
+
+  <div class="stage" id="stage">
+
+    <!-- 1 · TITLE -->
+    <section class="slide on">
+      <div class="mark"><span>UP</span> UGC Pro</div>
+      <div class="eyebrow" style="margin-top:44px">Partner &amp; investor overview · 2026</div>
+      <h1>The academy turning<br>creators into <span style="color:var(--green)">businesses</span>.</h1>
+      <p class="lede">We train the creators behind the ads you scroll past — and we match them to the brands that keep coming back.</p>
+    </section>
+
+    <!-- 2 · PROBLEM -->
+    <section class="slide">
+      <div class="eyebrow">The problem</div>
+      <h2>UGC is a $10B line item run by amateurs.</h2>
+      <p class="lede dim">User-generated content is the highest-performing format in DTC paid media — yet the supply side has no standard, no pricing, and no infrastructure.</p>
+      <ul style="margin-top:28px">
+        <li>Most creators earn <b>under $100 / video</b> — no rate card, no usage rights, no negotiation</li>
+        <li>Brands burn budget on footage that <b>never makes it into a paid ad</b></li>
+        <li>No system connects <b>trained creators to live briefs</b> — it's all DMs and luck</li>
+      </ul>
+    </section>
+
+    <!-- 3 · WHAT WE BUILT -->
+    <section class="slide">
+      <div class="eyebrow">What we built</div>
+      <h2>One operating system for a UGC career.</h2>
+      <div class="grid3">
+        <div class="stat"><div class="n">9 hrs</div><div class="l">A–Z curriculum + a 233-page playbook that takes a beginner to their first $2K client.</div></div>
+        <div class="stat"><div class="n">150+</div><div class="l">Swipe-file ads and a creator-business dashboard — pipeline, deliverables, and invoicing in one place.</div></div>
+        <div class="stat"><div class="n">1:1</div><div class="l">Creative-strategy &amp; paid-media masterclass, taught by a CMO behind $5B in revenue.</div></div>
+      </div>
+    </section>
+
+    <!-- 4 · TRACTION -->
+    <section class="slide">
+      <div class="eyebrow">Traction</div>
+      <h2>Revenue tripled in four quarters.</h2>
+      <div class="grid3">
+        <div class="stat"><div class="n">5,000+</div><div class="l">enrolled creators</div></div>
+        <div class="stat"><div class="n">$500M+</div><div class="l">ad revenue our team has generated</div></div>
+        <div class="stat"><div class="n">$2.5K</div><div class="l">top single-video deal landed by a student</div></div>
+      </div>
+      <div class="bars" id="bars">
+        <div class="barrow"><span>Q3 '25</span><div class="bwrap"><div class="bar" data-w="34"></div></div><span class="barval">$118k</span></div>
+        <div class="barrow"><span>Q4 '25</span><div class="bwrap"><div class="bar" data-w="52"></div></div><span class="barval">$181k</span></div>
+        <div class="barrow"><span>Q1 '26</span><div class="bwrap"><div class="bar" data-w="71"></div></div><span class="barval">$247k</span></div>
+        <div class="barrow"><span>Q2 '26</span><div class="bwrap"><div class="bar" data-w="100"></div></div><span class="barval">$348k</span></div>
+      </div>
+      <div class="qoq">Quarterly revenue · <b>+195% YoY</b> · last QoQ <b>+41%</b> ($247k → $348k)</div>
+    </section>
+
+    <!-- 5 · BUSINESS MODEL -->
+    <section class="slide">
+      <div class="eyebrow">Business model</div>
+      <h2>Digital-first margins, four ways to earn.</h2>
+      <div class="two">
+        <div class="modelrows">
+          <div class="mrow"><span class="src">Courses</span><span class="pr">$150 / $299 / $599 tiers</span></div>
+          <div class="mrow"><span class="src">Community membership</span><span class="pr">$39 / mo recurring</span></div>
+          <div class="mrow"><span class="src">Creator ↔ brand match</span><span class="pr">12% take rate on placed briefs</span></div>
+          <div class="mrow"><span class="src">Brand strategy retainers</span><span class="pr">$8k–$25k / mo (Lamees)</span></div>
+        </div>
+        <div class="stat" style="text-align:center;padding:34px">
+          <div class="n">68%</div>
+          <div class="l">blended gross margin — digital-first, low cost of delivery, compounding course catalog</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6 · MENTORS -->
+    <section class="slide">
+      <div class="eyebrow">Who you'd partner with</div>
+      <h2>Meet your mentors.</h2>
+      <div class="founders">
+        <div class="founder">
+          <img src="https://i.pravatar.cc/224?img=47" alt="Kelly Rocklein" />
+          <div class="nm">Kelly Rocklein</div>
+          <div class="rl">Co-Founder · UGC Pioneer<br>10+ yrs · $500M+ ad revenue</div>
+        </div>
+        <div class="founder">
+          <img src="https://i.pravatar.cc/224?img=31" alt="Lamees Barnett" />
+          <div class="nm">Lamees Barnett, MBA</div>
+          <div class="rl">Fractional CMO · $5B+ revenue<br>$250M+ ad spend managed</div>
+        </div>
+        <div class="founder">
+          <img src="https://i.pravatar.cc/224?img=12" alt="Shane Murphy" />
+          <div class="nm">Shane Murphy</div>
+          <div class="rl">Co-Founder · Growth &amp; Product<br>scaled the platform to 5,000 creators</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7 · WHY NOW -->
+    <section class="slide">
+      <div class="eyebrow">Why now</div>
+      <h2>The window is wide open.</h2>
+      <ul style="margin-top:28px">
+        <li>Performance-marketing spend is shifting <b>from polished studio to authentic UGC</b> — and brands can't hire fast enough</li>
+        <li>We're the <b>only player teaching the business</b>, not just the camera — pricing, rights, and the deal flow</li>
+        <li>Every trained creator becomes <b>supply for our marketplace</b> — the academy and the matching engine compound each other</li>
+      </ul>
+    </section>
+
+    <!-- 8 · CTA -->
+    <section class="slide" style="text-align:center">
+      <div class="eyebrow">Ready to go UGC Pro?</div>
+      <h1>Let's build the<br>standard together.</h1>
+      <p class="lede" style="margin:18px auto 0">partners@ugc.pro · ugc.pro</p>
+    </section>
+
+  </div>
+
+  <div class="nav l"><div class="arrow" id="prevBtn" title="Previous">‹</div></div>
+  <div class="nav r"><div class="arrow" id="nextBtn" title="Next">›</div></div>
+
+  <div class="chrome">
+    <span id="num"></span>
+    <div class="dots" id="dots"></div>
+  </div>
+
+  <script>
+    const slides = [...document.querySelectorAll(".slide")];
+    let i = 0;
+
+    const dotsEl = document.getElementById("dots");
+    dotsEl.innerHTML = slides.map((_, n) => `<span class="dot" data-n="${n}"></span>`).join("");
+    const dots = [...dotsEl.querySelectorAll(".dot")];
+
+    function animateBars(slide) {
+      slide.querySelectorAll(".bar").forEach(b => {
+        b.style.width = "0";
+        // next frame so the transition fires
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          b.style.width = b.dataset.w + "%";
+        }));
+      });
+    }
+
+    function show() {
+      slides.forEach((s, n) => s.classList.toggle("on", n === i));
+      dots.forEach((d, n) => d.classList.toggle("on", n === i));
+      document.getElementById("num").textContent = `${i + 1} / ${slides.length}`;
+      animateBars(slides[i]);
+    }
+    function go(n) { i = (n + slides.length) % slides.length; show(); }
+    function next() { go(i + 1); }
+    function prev() { go(i - 1); }
+
+    // advance on stage click (ignore clicks on the nav arrows / dots / links)
+    document.getElementById("stage").addEventListener("click", e => {
+      if (e.target.closest("a")) return;
+      next();
+    });
+    document.getElementById("nextBtn").addEventListener("click", e => { e.stopPropagation(); next(); });
+    document.getElementById("prevBtn").addEventListener("click", e => { e.stopPropagation(); prev(); });
+    dots.forEach(d => d.addEventListener("click", e => { e.stopPropagation(); go(+d.dataset.n); }));
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); next(); }
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); prev(); }
+      else if (e.key === "Home") go(0);
+      else if (e.key === "End") go(slides.length - 1);
+    });
+
+    show();
+  </script>
+</body>
+</html>

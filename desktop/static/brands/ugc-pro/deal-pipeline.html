@@ -1,0 +1,207 @@
+<!doctype html>
+<!-- workbook: deal-pipeline — brand-deal CRM with draggable 5-stage board + live weighted recompute. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UGC Pro — Brand Deal Pipeline</title>
+  <script id="workbook-spec" type="application/json">
+    {
+      "id": "deal-pipeline",
+      "kind": "board",
+      "title": "Brand Deal Pipeline",
+      "owner": "kelly",
+      "workspace": "ugc-pro",
+      "source": "data/deals.json",
+      "frozen_at": "2026-06-14T00:00:00Z"
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--pink:#FF2D78;--violet:#7C3AED;--yellow:#FFD93D;--mint:#16E0A3;--grad:linear-gradient(135deg,#FF2D78 0%,#7C3AED 100%);
+      --green:#FF2D78;--green-d:#7C3AED;--ink:#1A0B2E;--bg:#FFF6FB;
+      --card:#fff;--line:#F0E2EE;--muted:#7B6E8C;--soft:#FBEFF7;
+    }
+    *{box-sizing:border-box}
+    body{font:14px/1.5 Plus Jakarta Sans,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);margin:0;padding:28px 32px 48px;-webkit-font-smoothing:antialiased;}
+    h1,h2,h3,h4{font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em}
+    h1{font-weight:800}
+    h1{font-weight:660;letter-spacing:-.022em;font-size:23px;margin:0;display:flex;align-items:center;gap:10px}
+    .sub{color:var(--muted);font-size:13px;margin:3px 0 22px}
+    .sub code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12px}
+
+    /* top metrics */
+    .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;max-width:920px}
+    .metric{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative;overflow:hidden}
+    .metric::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--green)}
+    .metric.alt::before{background:var(--green-d)}
+    .metric .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+    .metric .num{font-size:24px;font-weight:680;letter-spacing:-.02em;margin-top:3px;font-variant-numeric:tabular-nums}
+    .metric .hint{font-size:11.5px;color:var(--muted);margin-top:2px}
+    .metric .hint b{color:var(--green-d)}
+
+    /* board */
+    .board{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;align-items:start}
+    .col{background:var(--soft);border:1px solid var(--line);border-radius:14px;padding:11px 11px 6px;min-height:240px;transition:outline .12s,background .12s}
+    .col h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:3px 5px 11px;display:flex;justify-content:space-between;align-items:center;font-weight:650}
+    .col h2 .cnt{background:#F0E2EE;border-radius:20px;padding:1px 8px;color:var(--ink);font-weight:600;font-size:11px}
+    .col .colsum{display:block;font-size:11px;color:var(--green-d);font-weight:680;margin:-7px 5px 11px;font-variant-numeric:tabular-nums}
+    .col.over{outline:2px dashed var(--green);outline-offset:-3px;background:rgba(255,45,120,.06)}
+
+    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;cursor:grab;box-shadow:0 1px 2px rgba(12,15,13,.04);transition:box-shadow .12s,transform .12s}
+    .card:hover{box-shadow:0 4px 14px rgba(12,15,13,.08);transform:translateY(-1px)}
+    .card:active{cursor:grabbing}
+    .card.drag{opacity:.4}
+    .card .top{display:flex;align-items:center;gap:9px}
+    .logo{width:26px;height:26px;border-radius:7px;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:-.02em}
+    .card .brand{font-weight:640;font-size:13.5px;letter-spacing:-.01em}
+    .card .niche{font-size:11px;color:var(--muted);margin-top:-1px}
+    .card .deli{color:var(--muted);font-size:12px;margin-top:8px}
+    .card .row{display:flex;align-items:center;justify-content:space-between;margin-top:9px}
+    .card .val{font-weight:680;color:var(--green-d);font-size:14px;font-variant-numeric:tabular-nums}
+    .card .who{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11px}
+    .card .who img{width:18px;height:18px;border-radius:50%;object-fit:cover;border:1px solid var(--line)}
+    .card .plat{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:0 5px;margin-top:7px;display:inline-block}
+
+    .foot{color:var(--muted);font-size:12px;margin-top:26px;max-width:760px;line-height:1.6}
+    .foot b{color:var(--ink);font-weight:600}
+    @media(max-width:1080px){.metrics{grid-template-columns:repeat(2,1fr)}.board{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+  <h1>
+    <svg width="20" height="20" viewBox="0 0 113.444 65.6002" aria-hidden="true"><path fill="#FF2D78" d="M56.722 0C40.6 17.1 22.4 28.3 0 32.8c22.4 4.5 40.6 15.7 56.722 32.8C72.844 48.5 91.044 37.3 113.444 32.8 91.044 28.3 72.844 17.1 56.722 0Z"/></svg>
+    Brand Deal Pipeline
+  </h1>
+  <p class="sub">UGC Pro · Kelly Rocklein · <code>ugc-pro</code> · drag a card across stages to recompute · frozen 2026-06-14</p>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="lbl">Open pipeline</div>
+      <div class="num" id="m-open">$18,450</div>
+      <div class="hint">6 live deals, not yet paid</div>
+    </div>
+    <div class="metric">
+      <div class="lbl">Weighted</div>
+      <div class="num" id="m-weighted">$11,900</div>
+      <div class="hint">probability-adjusted by stage</div>
+    </div>
+    <div class="metric alt">
+      <div class="lbl">Won this quarter</div>
+      <div class="num" id="m-won">$24,300</div>
+      <div class="hint">3 paid · <b>2 repeat</b> brands</div>
+    </div>
+    <div class="metric alt">
+      <div class="lbl">Reply rate</div>
+      <div class="num" id="m-reply">11%</div>
+      <div class="hint">47 pitched · 5 replied (Q2)</div>
+    </div>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <p class="foot">
+    <b>Brand-deal CRM.</b> Five stages mirror how UGC creators actually run outbound: cold pitch → reply → negotiating terms → booked &amp; scheduled → paid (and chasing the repeat). Each stage carries a close probability — <b>Pitched 10% · Replied 30% · Negotiating 60% · Booked 90% · Paid 100%</b> — so the weighted number is what you can realistically bank. Drag any card to a new stage and every total recomputes.
+  </p>
+
+  <script>
+    // ---- Stage model (probability per stage drives the weighted pipeline) ----
+    const stages = [
+      { id:"Pitched",     prob:0.10 },
+      { id:"Replied",     prob:0.30 },
+      { id:"Negotiating", prob:0.60 },
+      { id:"Booked",      prob:0.90 },
+      { id:"Paid",        prob:1.00 },
+    ];
+    const PROB = Object.fromEntries(stages.map(s => [s.id, s.prob]));
+    const OPEN = new Set(["Pitched","Replied","Negotiating","Booked"]);
+
+    // ---- Real deals (values reconcile to the headline metrics) ----
+    const deals = [
+      { b:"Hydro Flask",   niche:"Outdoor · drinkware", s:"Pitched",     d:"1× unboxing, 7-day usage",        v:1100, plat:"TikTok",    c:"#0b5563",
+        name:"Chris Lawson",  role:"Brand",                avatar:"https://i.pravatar.cc/64?img=12" },
+      { b:"AG1",           niche:"Wellness · supplements", s:"Pitched",   d:"2× testimonial + cut-downs",      v:1300, plat:"Instagram", c:"#1b6b3a",
+        name:"Reena Patel",   role:"Creator Mgmt",         avatar:"https://i.pravatar.cc/64?img=45" },
+      { b:"Sephora",       niche:"Beauty · retail",     s:"Replied",      d:"3× GRWM, dream-brand pilot",      v:1800, plat:"TikTok",    c:"#111111",
+        name:"Naomi Frost",   role:"Creator Program",      avatar:"https://i.pravatar.cc/64?img=32" },
+      { b:"Ritual",        niche:"Wellness · vitamins", s:"Negotiating",  d:"1× ad + 90-day paid usage",       v:3200, plat:"Instagram", c:"#caa24b",
+        name:"Dana Kerr",     role:"Influencer Lead",      avatar:"https://i.pravatar.cc/64?img=47" },
+      { b:"Jones Road",    niche:"Beauty · cosmetics",  s:"Negotiating",  d:"2× tutorial + whitelisting",      v:2500, plat:"TikTok",    c:"#9a5a2c",
+        name:"Sam Whitaker",  role:"Partnerships",         avatar:"https://i.pravatar.cc/64?img=15" },
+      { b:"Glossier",      niche:"Beauty · DTC",        s:"Booked",       d:"3-mo retainer · 12 spots + Spark", v:8550, plat:"TikTok",    c:"#d98aa0",
+        name:"Priya Nair",    role:"Creator Partnerships", avatar:"https://i.pravatar.cc/64?img=5"  },
+      { b:"Olipop",        niche:"Beverage · soda",     s:"Paid",         d:"2× IG Reel + raw (3rd deal)",     v:6800, plat:"TikTok",    c:"#c0392b",
+        name:"Marcus Reyes",  role:"Brand Marketing",      avatar:"https://i.pravatar.cc/64?img=51" },
+      { b:"Caraway",       niche:"Home · cookware",     s:"Paid",         d:"4× UGC bundle (−19%) + usage",    v:9100, plat:"Instagram", c:"#b8693d",
+        name:"Alyssa Tran",   role:"Social Lead",          avatar:"https://i.pravatar.cc/64?img=20" },
+      { b:"Liquid Death",  niche:"Beverage · water",    s:"Paid",         d:"2× skit + 1× hero cut",           v:8400, plat:"TikTok",    c:"#1a1a1a",
+        name:"Tony Behar",    role:"Creative",             avatar:"https://i.pravatar.cc/64?img=68" },
+    ];
+
+    const fmt = n => "$" + Math.round(n).toLocaleString("en-US");
+
+    function recompute(){
+      let open = 0, weighted = 0, won = 0;
+      for (const d of deals){
+        if (d.s === "Paid") won += d.v;
+        if (OPEN.has(d.s)){ open += d.v; weighted += d.v * PROB[d.s]; }
+      }
+      document.getElementById("m-open").textContent     = fmt(open);
+      document.getElementById("m-weighted").textContent = fmt(weighted);
+      document.getElementById("m-won").textContent      = fmt(won);
+    }
+
+    function render(){
+      const board = document.getElementById("board");
+      board.innerHTML = stages.map(st => {
+        const items = deals.filter(d => d.s === st.id);
+        const sum = items.reduce((a,d) => a + d.v, 0);
+        const pct = Math.round(st.prob * 100);
+        return `<div class="col" data-st="${st.id}">
+          <h2>${st.id} · ${pct}% <span class="cnt">${items.length}</span></h2>
+          <span class="colsum">${fmt(sum)}</span>
+          ${items.map(d => `
+            <div class="card" draggable="true" data-b="${d.b}">
+              <div class="top">
+                <span class="logo" style="background:${d.c}">${d.b.replace(/[^A-Za-z]/g,"").slice(0,2).toUpperCase()}</span>
+                <div>
+                  <div class="brand">${d.b}</div>
+                  <div class="niche">${d.niche}</div>
+                </div>
+              </div>
+              <div class="deli">${d.d}</div>
+              <span class="plat">${d.plat}</span>
+              <div class="row">
+                <span class="val">${fmt(d.v)}</span>
+                <span class="who"><img src="${d.avatar}" alt="${d.name}" loading="lazy">${d.name.split(" ")[0]}</span>
+              </div>
+            </div>`).join("")}
+        </div>`;
+      }).join("");
+      wire();
+      recompute();
+    }
+
+    // ---- Drag & drop ----
+    let dragged = null;
+    function wire(){
+      document.querySelectorAll(".card").forEach(c => {
+        c.addEventListener("dragstart", () => { dragged = c.dataset.b; c.classList.add("drag"); });
+        c.addEventListener("dragend",   () => c.classList.remove("drag"));
+      });
+      document.querySelectorAll(".col").forEach(col => {
+        col.addEventListener("dragover",  e => { e.preventDefault(); col.classList.add("over"); });
+        col.addEventListener("dragleave", () => col.classList.remove("over"));
+        col.addEventListener("drop", e => {
+          e.preventDefault(); col.classList.remove("over");
+          const d = deals.find(x => x.b === dragged);
+          if (d && d.s !== col.dataset.st){ d.s = col.dataset.st; render(); }
+        });
+      });
+    }
+
+    render();
+  </script>
+</body>
+</html>

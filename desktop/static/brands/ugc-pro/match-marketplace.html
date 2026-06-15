@@ -1,0 +1,339 @@
+<!doctype html>
+<!-- workbook: match-marketplace — Creator ↔ Brand Match marketplace with live filters + computed fit score (deterministic, no network). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UGC Pro — Creator ↔ Brand Match</title>
+  <script id="workbook-spec" type="application/json">
+    {
+      "id": "match-marketplace",
+      "kind": "marketplace",
+      "title": "Creator ↔ Brand Match",
+      "owner": "kelly",
+      "workspace": "ugc-pro",
+      "source": "data/briefs.json",
+      "frozen_at": "2026-06-14T00:00:00Z"
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--pink:#FF2D78;--violet:#7C3AED;--yellow:#FFD93D;--mint:#16E0A3;--grad:linear-gradient(135deg,#FF2D78 0%,#7C3AED 100%);
+      --green:#FF2D78;--green-d:#7C3AED;--ink:#1A0B2E;--bg:#FFF6FB;
+      --card:#fff;--line:#F0E2EE;--muted:#7B6E8C;--soft:#FBEFF7;
+    }
+    *{box-sizing:border-box}
+    body{font:15px/1.5 Plus Jakarta Sans,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);margin:0;padding:32px 40px;max-width:1240px;}
+    h1,h2,h3,h4{font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em}
+    h1{font-weight:800}
+    a{color:inherit}
+    /* header */
+    .top{display:flex;align-items:center;gap:14px}
+    .av{width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid var(--green)}
+    h1{font-weight:650;letter-spacing:-.02em;font-size:24px;margin:0}
+    .sub{color:var(--muted);font-size:13px;margin:2px 0 0}
+    .sub code{background:#FBEFF7;border-radius:5px;padding:1px 6px;font-size:12px}
+    /* profile bar */
+    .profile{display:flex;align-items:center;gap:18px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin:22px 0 6px;flex-wrap:wrap}
+    .profile .lab{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+    .profile .v{font-weight:650;font-size:14px}
+    .profile .seg{display:flex;flex-direction:column;gap:1px}
+    .profile .div{width:1px;align-self:stretch;background:var(--line)}
+    .tag{font-size:11px;background:rgba(22,224,163,.16);color:var(--green-d);border-radius:6px;padding:2px 8px;font-weight:600;margin-right:4px;display:inline-block}
+    /* filter bar */
+    .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:18px 0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+    .field{display:flex;flex-direction:column;gap:5px}
+    .field label{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+    select{font:13px Plus Jakarta Sans,system-ui,sans-serif;padding:8px 28px 8px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235b6660' stroke-width='1.5' fill='none'/%3E%3C/svg%3E") no-repeat right 10px center;color:var(--ink);cursor:pointer;appearance:none}
+    .toggle{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;cursor:pointer;padding-bottom:8px}
+    .toggle input{width:16px;height:16px;accent-color:var(--green-d);cursor:pointer}
+    .reset{margin-left:auto;font:13px Plus Jakarta Sans,sans-serif;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 14px;cursor:pointer;color:var(--muted)}
+    .reset:hover{color:var(--ink);border-color:#c4d2cb}
+    .count{font-size:13px;color:var(--muted);margin:0 0 16px}
+    .count b{color:var(--ink)}
+    /* grid */
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(370px,1fr));gap:18px}
+    .brief{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;position:relative;display:flex;flex-direction:column;transition:box-shadow .15s,transform .15s}
+    .brief:hover{box-shadow:0 6px 22px rgba(124,58,237,.09);transform:translateY(-2px)}
+    .brief.strong{border-color:rgba(22,224,163,.4)}
+    .brow{display:flex;align-items:center;gap:12px;padding-right:64px}
+    .blogo{width:44px;height:44px;border-radius:11px;object-fit:contain;background:#fff;border:1px solid var(--line);padding:6px;flex-shrink:0}
+    .brand{font-weight:650;font-size:17px;letter-spacing:-.01em;line-height:1.15}
+    .niche{color:var(--muted);font-size:12.5px;margin-top:1px}
+    .verified{color:var(--green-d);font-size:11px;font-weight:600}
+    /* fit badge */
+    .fit{position:absolute;top:18px;right:18px;width:54px;height:54px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:conic-gradient(var(--score-c) calc(var(--score)*1%),#FBEFF7 0);}
+    .fit .inner{width:44px;height:44px;border-radius:50%;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+    .fit .n{font-size:18px;font-weight:700;color:var(--ink)}
+    .fit .l{font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:1px}
+    /* pay */
+    .payrow{display:flex;align-items:baseline;gap:8px;margin:15px 0 2px}
+    .pay{font-weight:700;font-size:24px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+    .pay .per{font-size:12px;color:var(--muted);font-weight:500}
+    .vs-base{font-size:12px;font-weight:600;color:var(--green-d)}
+    .vs-base.low{color:var(--muted)}
+    /* spec chips */
+    .specs{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0}
+    .spec{font-size:11.5px;background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:4px 9px;color:#27302b;font-weight:500;display:flex;align-items:center;gap:4px}
+    .spec.deal{background:rgba(22,224,163,.16);border-color:rgba(22,224,163,.4);color:var(--green-d)}
+    .desc{color:#3a443e;font-size:13.5px;line-height:1.5;margin:2px 0 14px}
+    /* fit breakdown */
+    .why{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+    .why span{font-size:11px;font-weight:600;border-radius:6px;padding:3px 8px}
+    .why .hit{background:rgba(22,224,163,.16);color:var(--green-d)}
+    .why .miss{background:#f4ece9;color:#9a5a2c}
+    /* meta footer of card */
+    .cmeta{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);margin-top:auto;padding-top:12px;border-top:1px solid var(--line)}
+    .cmav{width:22px;height:22px;border-radius:50%;object-fit:cover}
+    .cmeta-r{margin-left:auto;font-weight:600;color:#3a443e}
+    .deadline.soon{color:#a8730a}
+    .actions{display:flex;gap:9px;margin-top:14px}
+    .apply{flex:1;background:var(--green-d);color:#fff;border:0;border-radius:10px;padding:11px 0;font:600 14px Plus Jakarta Sans,sans-serif;cursor:pointer}
+    .apply:hover{background:#6D28D9}
+    .save{width:44px;border:1px solid var(--line);background:#fff;border-radius:10px;cursor:pointer;font-size:16px;color:var(--muted)}
+    .save:hover{color:var(--green-d);border-color:rgba(22,224,163,.4)}
+    .save.on{color:var(--green-d);border-color:rgba(22,224,163,.4);background:rgba(22,224,163,.16)}
+    /* empty */
+    .empty{grid-column:1/-1;text-align:center;padding:54px 20px;color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:16px}
+    .empty .big{font-size:17px;font-weight:600;color:var(--ink);margin-bottom:6px}
+    .empty button{margin-top:14px;font:600 13px Plus Jakarta Sans,sans-serif;border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 16px;cursor:pointer}
+    .foot{color:var(--muted);font-size:12px;margin-top:26px}
+    .foot code{background:#FBEFF7;border-radius:5px;padding:1px 6px}
+    @media(max-width:880px){body{padding:22px}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <img class="av" id="me-av" alt="Kelly Rocklein" />
+    <div>
+      <h1>Creator ↔ Brand Match</h1>
+      <p class="sub">UGC Pro · workspace <code>ugc-pro</code> · 6 open briefs · fit score weights niche, platform &amp; rate against your profile · frozen 2026-06-14</p>
+    </div>
+  </div>
+
+  <div class="profile">
+    <div class="seg"><span class="lab">Creator</span><span class="v">Kelly Rocklein</span></div>
+    <div class="div"></div>
+    <div class="seg"><span class="lab">Niches</span><span class="v"><span class="tag">Beauty</span><span class="tag">Wellness</span></span></div>
+    <div class="div"></div>
+    <div class="seg"><span class="lab">Platforms</span><span class="v"><span class="tag">TikTok</span><span class="tag">Instagram</span></span></div>
+    <div class="div"></div>
+    <div class="seg"><span class="lab">Base rate</span><span class="v">$550 / video</span></div>
+    <div class="div"></div>
+    <div class="seg"><span class="lab">Experience</span><span class="v">10+ yrs · 4.9★ (38 deals)</span></div>
+  </div>
+
+  <div class="filters">
+    <div class="field"><label for="f-niche">Niche</label>
+      <select id="f-niche"><option value="">All niches</option><option>Beauty</option><option>Wellness</option><option>Beverage</option><option>Home</option><option>Fitness</option></select></div>
+    <div class="field"><label for="f-plat">Platform</label>
+      <select id="f-plat"><option value="">All platforms</option><option>TikTok</option><option>Instagram</option><option>YouTube</option></select></div>
+    <div class="field"><label for="f-pay">Min pay</label>
+      <select id="f-pay"><option value="0">Any budget</option><option value="1000">$1,000+</option><option value="1500">$1,500+</option><option value="2000">$2,000+</option><option value="2500">$2,500+</option></select></div>
+    <label class="toggle"><input type="checkbox" id="f-fit"> Strong fit only <span style="color:var(--muted);font-weight:400">(80+)</span></label>
+    <button class="reset" id="reset">Reset filters</button>
+  </div>
+
+  <p class="count" id="count"></p>
+  <div class="grid" id="grid"></div>
+
+  <p class="foot">
+    Live marketplace over <code>data/briefs.json</code>. <b>Fit score</b> = 40 base + 30 niche match + 20 platform match + a rate bonus scaled against your $550 base
+    (capped 35–98). Filters re-sort by fit and re-render instantly. The shipped artifact bundles a real runtime; this seed fixture is fully offline —
+    every brand mark and avatar is an inline SVG (no third-party endpoints), so each recording renders identically.
+  </p>
+
+  <script>
+    // ---- Creator profile the fit score is computed against ----
+    const me = { niches:["Beauty","Wellness"], plats:["TikTok","Instagram"], base:550 };
+
+    // ---- 6 open brand briefs (real brands, real-looking deal terms, real brand contacts) ----
+    // logo = self-contained inline-SVG brand mark (data: URI, zero network). `mark` is the
+    // inner SVG body rendered on a white tile so every recording is identical online or off.
+    const briefs = [
+      {
+        brand:"Glossier", domain:"glossier.com", color:"#e995ad", niche:"Beauty", platform:"TikTok",
+        // lowercase serif "g" wordmark in Glossier millennial pink
+        mark:`<rect width='100' height='100' fill='#fff'/><text x='50' y='70' font-family='Georgia,"Times New Roman",serif' font-size='62' fill='#e995ad' text-anchor='middle'>g</text>`,
+        pay:1650, posted:"2 days ago", deadline:"Applications close Jun 20", applicants:34, verified:true,
+        contact:{name:"Mara Quint", role:"Influencer Mktg Lead", color:"#e995ad"},
+        specs:["3 videos","2 hooks each","30s vertical","90-day paid usage"],
+        desc:"Cloud Paint blush — natural 'get ready with me' angle, shot on phone, no studio lighting. Show the cream-to-skin blend on bare face."
+      },
+      {
+        brand:"Ritual", domain:"ritual.com", color:"#f6e84e", niche:"Wellness", platform:"Instagram",
+        // Ritual's signature lemon-yellow capsule mark
+        mark:`<rect width='100' height='100' fill='#1a1a1a'/><rect x='30' y='22' width='40' height='56' rx='20' fill='#f6e84e'/><rect x='30' y='22' width='40' height='28' rx='20' fill='#fff' opacity='.9'/><rect x='30' y='48' width='40' height='4' fill='#1a1a1a'/>`,
+        pay:2200, posted:"5 days ago", deadline:"Applications close Jun 24", applicants:21, verified:true,
+        contact:{name:"Devon Ashby", role:"Brand Partnerships", color:"#c9a24a"},
+        specs:["1 ad-style","raw footage","whitelisting","exclusivity 30d"],
+        desc:"Essential for Women 18+ multivitamin. Skeptic-to-believer arc — open the capsule, show the traceable ingredients, lead with the science."
+      },
+      {
+        brand:"OLIPOP", domain:"drinkolipop.com", color:"#e84d3d", niche:"Beverage", platform:"TikTok",
+        // OLIPOP's tomato-red ring/can lid mark
+        mark:`<rect width='100' height='100' fill='#fdf0e6'/><circle cx='50' cy='50' r='30' fill='none' stroke='#e84d3d' stroke-width='10'/><circle cx='50' cy='50' r='9' fill='#e84d3d'/>`,
+        pay:1400, posted:"1 day ago", deadline:"Applications close Jun 18", applicants:52, verified:true,
+        contact:{name:"Priya Naidoo", role:"Creator Programs", color:"#e84d3d"},
+        specs:["2 Reels","raw footage","trending audio"],
+        desc:"Vintage Cola — fridge restock POV + genuine first-sip reaction. Lean Gen-Z energy, fast cuts, prebiotic-soda-vs-regular-soda framing."
+      },
+      {
+        brand:"Caraway", domain:"carawayhome.com", color:"#c47d4a", niche:"Home", platform:"Instagram",
+        // Caraway's warm terracotta + cream serif "C"
+        mark:`<rect width='100' height='100' fill='#f5ede2'/><text x='50' y='73' font-family='Georgia,serif' font-size='66' fill='#c47d4a' text-anchor='middle'>C</text>`,
+        pay:2800, posted:"3 days ago", deadline:"Applications close Jun 27", applicants:17, verified:true,
+        contact:{name:"Holt Berger", role:"Sr. Growth Marketer", color:"#c47d4a"},
+        specs:["4-video bundle","bundle deal","demo + voiceover"],
+        desc:"Non-toxic ceramic cookware. The egg-slide demo plus a 'why I threw out my old nonstick pans' confessional. Warm kitchen, morning light."
+      },
+      {
+        brand:"Topicals", domain:"mytopicals.com", color:"#7c4fb0", niche:"Beauty", platform:"TikTok",
+        // Topicals' bold purple lowercase "t" on yellow — playful clinical
+        mark:`<rect width='100' height='100' fill='#f6e84e'/><text x='50' y='74' font-family='Helvetica,Arial,sans-serif' font-weight='800' font-size='66' fill='#7c4fb0' text-anchor='middle'>t</text>`,
+        pay:1500, posted:"4 days ago", deadline:"Applications close Jun 22", applicants:29, verified:true,
+        contact:{name:"Imani Cole", role:"Community & UGC", color:"#7c4fb0"},
+        specs:["3 testimonials","organic-style","8-week story"],
+        desc:"Faded Brightening Serum for hyperpigmentation + dark marks. Real before/after, document an 8-week routine. Honest, unfiltered, melanin-rich skin."
+      },
+      {
+        brand:"Alo Yoga", domain:"aloyoga.com", color:"#111111", niche:"Fitness", platform:"YouTube",
+        // Alo's minimalist black lowercase "alo" wordmark
+        mark:`<rect width='100' height='100' fill='#fff'/><text x='50' y='62' font-family='Helvetica,Arial,sans-serif' font-weight='400' font-size='30' letter-spacing='1' fill='#111' text-anchor='middle'>alo</text>`,
+        pay:1800, posted:"6 days ago", deadline:"Applications close Jun 30", applicants:11, verified:false,
+        contact:{name:"Skyler Faye", role:"Creator Partnerships", color:"#1b6b3a"},
+        specs:["1 long-form","b-roll package","8-12 min"],
+        desc:"Airbrush legging try-on haul folded into a slow flow session. Aesthetic, aspirational, calm pacing — studio or sunlit home setup."
+      },
+    ];
+
+    // ---- fit score: 40 base + niche(30) + platform(20) + rate bonus, capped 35–98 ----
+    function score(b){
+      let s = 40;
+      const nicheHit = me.niches.includes(b.niche);
+      const platHit  = me.plats.includes(b.platform);
+      if(nicheHit) s += 30;
+      if(platHit)  s += 20;
+      const rateBonus = Math.max(0, Math.min(15, Math.round((b.pay - me.base) / 180)));
+      s += rateBonus;
+      const total = Math.max(35, Math.min(98, s));
+      const why = [];
+      why.push({hit:nicheHit, text:nicheHit ? `${b.niche} match` : `${b.niche} off-niche`});
+      why.push({hit:platHit,  text:platHit  ? `${b.platform} match` : `${b.platform} not your platform`});
+      why.push({hit:rateBonus>=10, text:`+${rateBonus} rate (${b.pay/me.base|0}× base)`});
+      return {total, why};
+    }
+    function tier(s){ return s>=80 ? "var(--green-d)" : s>=65 ? "#a8730a" : "#9aa5a0"; }
+
+    const saved = new Set();
+    const initials = b => b.replace(/[^A-Za-z ]/g,"").split(" ").filter(Boolean).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+
+    // Self-contained brand mark: inline SVG (data: URI). No network, identical every recording.
+    function logo(b){
+      return "data:image/svg+xml,"+encodeURIComponent(
+        `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>${b.mark}</svg>`);
+    }
+
+    // Self-contained avatar: deterministic on-brand portrait built from initials over a
+    // two-stop gradient seeded by the name. Replaces network stock photos so offline recordings
+    // render identically. `size` only affects the intrinsic SVG box; CSS controls display size.
+    function hashHue(str){ let h=0; for(let i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0; return h%360; }
+    function avatar(name, accent){
+      const ini = initials(name);
+      const hue = hashHue(name);
+      const c1 = accent || `hsl(${hue} 55% 52%)`;
+      const c2 = `hsl(${(hue+38)%360} 60% 38%)`;
+      const id = "g"+hue;
+      return "data:image/svg+xml,"+encodeURIComponent(
+        `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>`+
+        `<defs><linearGradient id='${id}' x1='0' y1='0' x2='1' y2='1'>`+
+        `<stop offset='0' stop-color='${c1}'/><stop offset='1' stop-color='${c2}'/></linearGradient></defs>`+
+        `<rect width='100' height='100' fill='url(#${id})'/>`+
+        `<text x='50' y='50' dy='.36em' font-family='Plus Jakarta Sans,system-ui,sans-serif' font-weight='600' `+
+        `font-size='40' fill='#fff' text-anchor='middle'>${ini}</text></svg>`);
+    }
+
+    function render(){
+      const n=val("f-niche"), p=val("f-plat"), minPay=+val("f-pay"), fitOnly=document.getElementById("f-fit").checked;
+      const rows = briefs
+        .map(b => ({...b, ...score(b)}))
+        .filter(b => (!n||b.niche===n) && (!p||b.platform===p) && b.pay>=minPay && (!fitOnly || b.total>=80))
+        .sort((a,b)=> b.total-a.total || b.pay-a.pay);
+
+      const totalPay = rows.reduce((a,b)=>a+b.pay,0);
+      document.getElementById("count").innerHTML = rows.length
+        ? `Showing <b>${rows.length}</b> of ${briefs.length} briefs · <b>$${totalPay.toLocaleString()}</b> total opportunity · sorted by fit`
+        : "";
+
+      const g = document.getElementById("grid");
+      if(!rows.length){
+        g.innerHTML = `<div class="empty"><div class="big">No briefs match your filters</div>
+          <div>Try a higher budget tier, switching platforms, or turning off strong-fit-only.</div>
+          <button id="clear">Clear all filters</button></div>`;
+        document.getElementById("clear").addEventListener("click", reset);
+        return;
+      }
+
+      g.innerHTML = rows.map(b=>{
+        const deltaPct = Math.round((b.pay/me.base - 1)*100);
+        return `<div class="brief ${b.total>=80?'strong':''}">
+          <div class="fit" style="--score:${b.total};--score-c:${tier(b.total)}">
+            <div class="inner"><div class="n">${b.total}</div><div class="l">fit</div></div>
+          </div>
+          <div class="brow">
+            <img class="blogo" src="${logo(b)}" alt="${b.brand} logo">
+            <div>
+              <div class="brand">${b.brand}</div>
+              <div class="niche">${b.niche} · ${b.platform}${b.verified?' · <span class="verified">✓ Verified brand</span>':''}</div>
+            </div>
+          </div>
+          <div class="payrow">
+            <span class="pay">$${b.pay.toLocaleString()}</span>
+            <span class="pay per">per deal</span>
+            <span class="vs-base ${deltaPct<50?'low':''}">${deltaPct>0?'+':''}${deltaPct}% vs base</span>
+          </div>
+          <div class="specs">${b.specs.map(s=>{
+            const deal = /usage|whitelist|bundle|exclusiv/i.test(s);
+            return `<span class="spec${deal?' deal':''}">${deal?'★ ':''}${s}</span>`;
+          }).join("")}</div>
+          <div class="desc">${b.desc}</div>
+          <div class="why">${b.why.map(w=>`<span class="${w.hit?'hit':'miss'}">${w.hit?'✓':'·'} ${w.text}</span>`).join("")}</div>
+          <div class="cmeta">
+            <img class="cmav" src="${avatar(b.contact.name, b.contact.color)}" alt="${b.contact.name}">
+            <span>${b.contact.name} · ${b.contact.role}</span>
+            <span class="cmeta-r">${b.applicants} applied</span>
+          </div>
+          <div class="cmeta" style="border:0;padding-top:6px">
+            <span>Posted ${b.posted}</span>
+            <span class="cmeta-r deadline ${/18|20/.test(b.deadline)?'soon':''}">${b.deadline}</span>
+          </div>
+          <div class="actions">
+            <button class="apply">Apply with portfolio</button>
+            <button class="save ${saved.has(b.brand)?'on':''}" data-b="${b.brand}" title="Save brief">${saved.has(b.brand)?'★':'☆'}</button>
+          </div>
+        </div>`;
+      }).join("");
+
+      g.querySelectorAll(".save").forEach(btn=>btn.addEventListener("click",()=>{
+        const k=btn.dataset.b; saved.has(k)?saved.delete(k):saved.add(k); render();
+      }));
+    }
+
+    function val(id){ return document.getElementById(id).value; }
+    function reset(){
+      document.getElementById("f-niche").value="";
+      document.getElementById("f-plat").value="";
+      document.getElementById("f-pay").value="0";
+      document.getElementById("f-fit").checked=false;
+      render();
+    }
+
+    document.getElementById("me-av").src = avatar("Kelly Rocklein", "#7C3AED");
+
+    ["f-niche","f-plat","f-pay","f-fit"].forEach(id=>document.getElementById(id).addEventListener("change",render));
+    document.getElementById("reset").addEventListener("click",reset);
+    render();
+  </script>
+</body>
+</html>
