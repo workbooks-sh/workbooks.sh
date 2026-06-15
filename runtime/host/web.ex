@@ -288,6 +288,41 @@ defmodule Workbooks.Web do
     j(conn, 200, %{totalBytes: total, totalSize: gb(total), buckets: buckets})
   end
 
+  # ── Workspaces: FREE, named divisions within the org (no compute) ──────────────
+  # A workspace runs on a nexus but creating one provisions nothing — it's a logical
+  # partition. Org-scoped via the tenant, same isolation rule as nexuses.
+  get "/api/platform/workspaces" do
+    j(conn, 200, %{workspaces: Workbooks.WorkspaceRegistry.list(conn.assigns[:tenant])})
+  end
+
+  post "/api/platform/workspaces" do
+    org = conn.assigns[:tenant]
+    {:ok, body, conn} = read_body(conn)
+    {name, nexus_id} = workspace_params(body)
+
+    case Workbooks.WorkspaceRegistry.create(org, name, nexus_id: nexus_id) do
+      {:ok, ws} -> j(conn, 201, ws)
+      {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
+    end
+  end
+
+  patch "/api/platform/workspaces/:id" do
+    org = conn.assigns[:tenant]
+    {:ok, body, conn} = read_body(conn)
+    {name, _} = workspace_params(body)
+
+    case Workbooks.WorkspaceRegistry.rename(conn.params["id"], org, name) do
+      {:ok, ws} -> j(conn, 200, ws)
+      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+      {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
+    end
+  end
+
+  delete "/api/platform/workspaces/:id" do
+    org = conn.assigns[:tenant]
+    platform_lifecycle(conn, fn -> Workbooks.WorkspaceRegistry.delete(conn.params["id"], org) end)
+  end
+
   # Deploy a Workbook: store its Org source under :id.
   put "/w/:id" do
     {:ok, org, conn} = read_body(conn)
@@ -1724,6 +1759,18 @@ defmodule Workbooks.Web do
 
   defp put_opt(opts, _k, v) when v in [nil, ""], do: opts
   defp put_opt(opts, k, v), do: Keyword.put(opts, k, v)
+
+  # Workspace create/rename body → {name, nexus_id}. Only these two fields are read;
+  # the org comes from the tenant, never the body.
+  defp workspace_params(body) do
+    case Jason.decode(body) do
+      {:ok, %{} = m} -> {m["name"], blank_to_nil(m["nexus_id"])}
+      _ -> {nil, nil}
+    end
+  end
+
+  defp blank_to_nil(v) when v in [nil, ""], do: nil
+  defp blank_to_nil(v), do: v
 
   defp platform_lifecycle(conn, fun) do
     case fun.() do
