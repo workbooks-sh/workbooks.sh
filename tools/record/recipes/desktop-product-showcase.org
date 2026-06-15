@@ -1,170 +1,229 @@
 #+TITLE: Workbooks Desktop — product showcase
 #+TARGET: web
-#+URL: http://localhost:5188/
+#+URL: http://localhost:5178/
 #+FPS: 30
 #+VIEWPORT: 1440x900
 #+VERIFY_FRAMES: 14
 
-# One window, every workspace. Four distinct real brands run side by side in
-# the Workbooks desktop app: Brand Nana (brand intelligence), UGC Pro (creator
-# marketplace), Parcel (real-estate brokerage), Signal (institutional treasury)
-# — plus Waldo, the agent, voice, search, and sharing to your org. Hard cuts
-# only; product over chrome.
+# SILENT product cut. No voiceover, no audio. Tight hard cuts, short dwell,
+# ~60-90s. The narration lines below are documentation/anchors for the verifier
+# only — the pipeline is run WITHOUT --voiceover, so the final MP4 has no audio.
 #
-# Order matters: the agent + voice live on the home canvas, which only shows
-# before any workbook tab is opened. So the agent beats run first, the brand
-# tabs after.
+# Five scenes, hard cuts between them:
+#   1. Four distinct brands — switch workspace + open each dashboard.
+#   2. Multi-tab split — grow one pane to 2 -> 3 -> 4 side by side.
+#   3. Drag a file into Bookmarks — it sticks.
+#   4. Chat with Waldo (text) — "Create a workbook for me" opens a component tab.
+#   5. Voice — start the session, Waldo (identity = Waldo) replies, END cleanly.
+#
+# Splits + the bookmark drop are driven by eval_js: the tab context menu and the
+# HTML5 drag are synthesized in-page (the same dnd store the shell drop zones
+# read), since the intent seam has no native right-click / drag.
 
-* 00:00 navigate [url:http://localhost:5188/] [waitUntil:networkidle]
-  This is Workbooks — one desktop for every workspace you run.
+# ── Scene 1 — four distinct brands ───────────────────────────────────────────
+* 00:00 navigate [url:http://localhost:5178/] [waitUntil:networkidle]
+  One window, every workspace you run.
 
-* 00:03 wait [ms:1500]
-  Your whole working life in a single window.
-
-* 00:05 click
-  At the center sits Waldo — the agent that lives right in your workspace.
-  :PROPERTIES:
-  :selector: button[aria-label="Waldo"]
-  :checkpoint: the Waldo agent dock is open on the right with a chat input
-  :END:
-
-* 00:09 wait [ms:2000]
-  Ask it anything — search your files, set up agents, get real work done.
-
-* 00:12 click
-  Close the dock —
-  :PROPERTIES:
-  :selector: button[aria-label="Waldo"]
-  :END:
-
-* 00:14 click
-  — and just talk to it. Voice, built in.
-  :PROPERTIES:
-  :selector: button[aria-label="Start voice session"]
-  :checkpoint: a voice session is active showing a Listening bar and a Workhorse transcript
-  :END:
-
-* 00:17 wait [ms:3000]
-  A hands-free agent that drives the terminal for you, one tap away.
-
-* 00:21 click
-  Now the workspaces. Switch from one menu — each a completely different business.
+* 00:02 click
+  Four real businesses live here — switch from one menu.
   :PROPERTIES:
   :selector: button[aria-label^="Switch workspace"]
   :END:
 
-* 00:24 click
+* 00:03 click
   First — Brand Nana, a brand-intelligence studio.
   :PROPERTIES:
   :selector: button:has-text("Brand Nana")
-  :checkpoint: the workspace menu was open and 'Brand Nana' is being chosen
   :END:
 
-* 00:27 click
-  Open its live Brand Health board — share of voice, sentiment, the competitive set.
+* 00:04 click
+  Open its live Brand Health board — cream and amber.
   :PROPERTIES:
   :selector: button:has-text("BRAND HEALTH")
+  :checkpoint: a warm cream-and-amber brand dashboard with charts is open in a tab
   :END:
 
-* 00:30 wait [ms:2400]
-  Real charts, grounded in real counted sources — a cream-and-amber brand world.
-
-* 00:34 click
+* 00:07 click
   A totally different business — UGC Pro, a creator marketplace.
   :PROPERTIES:
   :selector: button[aria-label^="Switch workspace"]
   :END:
 
-* 00:37 click
+* 00:08 click
   :PROPERTIES:
   :selector: button:has-text("UGC Pro")
   :END:
 
-* 00:39 click
-  Creator HQ — pipeline value, active brand deals, revenue by content type.
+* 00:09 click
+  Creator HQ — bold pink and magenta.
   :PROPERTIES:
   :selector: button:has-text("CREATOR HQ")
+  :checkpoint: a bold pink/magenta creator dashboard is open in a tab
   :END:
 
-* 00:42 wait [ms:2400]
-  A different brand, a different palette — bold pink and magenta — the same window.
-
-* 00:46 click
-  And a third — Parcel, a real-estate brokerage.
+* 00:12 click
+  A third — Parcel, a real-estate brokerage.
   :PROPERTIES:
   :selector: button[aria-label^="Switch workspace"]
   :END:
 
-* 00:49 click
+* 00:13 click
   :PROPERTIES:
   :selector: button:has-text("Parcel")
   :END:
 
-* 00:51 click
-  Market Pulse — median price, days on market, submarket scorecards.
+* 00:14 click
+  Market Pulse — terracotta and warm neutrals.
   :PROPERTIES:
   :selector: button:has-text("MARKET PULSE")
+  :checkpoint: a terracotta real-estate market dashboard is open in a tab
   :END:
 
-* 00:55 wait [ms:2600]
-  Terracotta and warm neutrals — a real-estate world that knows its market.
-
-* 00:58 click
+* 00:17 click
   And a fourth — Signal, an institutional treasury terminal.
   :PROPERTIES:
   :selector: button[aria-label^="Switch workspace"]
   :END:
 
-* 01:01 click
+* 00:18 click
   :PROPERTIES:
   :selector: button:has-text("Signal")
   :END:
 
-* 01:03 click
-  Global Cash Position — every account, every counterparty, one signal.
+* 00:19 click
+  Global Cash Position — dark, dense, institutional.
   :PROPERTIES:
   :selector: button:has-text("GLOBAL CASH POSITION")
+  :checkpoint: a fully dark institutional treasury dashboard is open in a tab
   :END:
 
-* 01:06 wait [ms:2800]
-  Dark, institutional, dense — four real brands, one window, zero context-switching.
+* 00:22 wait [ms:1400]
+  Four real brands, one window.
 
-* 01:10 click
-  And everything you've made is one keystroke away — open search.
+# ── Scene 2 — multi-tab split (2 -> 3 -> 4 panes) ────────────────────────────
+* 00:24 eval_js
+  Right-click a tab — split the view.
+  :PROPERTIES:
+  :code: (() => { const t=[...document.querySelectorAll('[role="tab"]')].find(t=>/Global-cash-position/.test(t.textContent)); const r=t.getBoundingClientRect(); t.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:r.x+r.width/2,clientY:r.y+r.height/2})); return 'menu'; })()
+  :END:
+
+* 00:25 click
+  Split right — two brands side by side.
+  :PROPERTIES:
+  :selector: button:has-text("Split right")
+  :checkpoint: the view is split into two panes showing two different brand dashboards
+  :END:
+
+* 00:27 eval_js
+  :PROPERTIES:
+  :code: (() => { const t=[...document.querySelectorAll('[role="tab"]')].find(t=>/Market-pulse/.test(t.textContent)); const r=t.getBoundingClientRect(); t.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:r.x+r.width/2,clientY:r.y+r.height/2})); return 'menu'; })()
+  :END:
+
+* 00:28 click
+  Again — three panes.
+  :PROPERTIES:
+  :selector: button:has-text("Split right")
+  :checkpoint: the view is split into three panes side by side
+  :END:
+
+* 00:30 eval_js
+  :PROPERTIES:
+  :code: (() => { const t=[...document.querySelectorAll('[role="tab"]')].find(t=>/Creator-hq/.test(t.textContent)); const r=t.getBoundingClientRect(); t.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:r.x+r.width/2,clientY:r.y+r.height/2})); return 'menu'; })()
+  :END:
+
+* 00:31 click
+  Four panes — every workspace at once.
+  :PROPERTIES:
+  :selector: button:has-text("Split right")
+  :checkpoint: the view is split into four panes side by side, each a different brand
+  :END:
+
+* 00:33 wait [ms:1600]
+  Four brands, four panes, one window.
+
+# ── Scene 3 — drag a file into Bookmarks ─────────────────────────────────────
+* 00:36 navigate [url:http://localhost:5178/] [waitUntil:networkidle]
+  Everything you've made is one keystroke away.
+
+* 00:38 click
+  Open search.
   :PROPERTIES:
   :selector: button[aria-label="Search"]
-  :checkpoint: a search surface or drawer is open
+  :checkpoint: a search drawer is open on the right showing a list of files
   :END:
 
-* 01:14 wait [ms:2000]
-  Files, bookmarks, and the web — one search across all of it.
+* 00:40 wait [ms:1000]
+  Files, bookmarks, and the web — one search.
 
-* 01:17 navigate [url:http://localhost:5188/dev] [waitUntil:networkidle]
-  And when the work is ready, share it with your whole organization.
-
-* 01:20 click
+* 00:41 eval_js
+  Drag a file onto Bookmarks — and it sticks.
   :PROPERTIES:
-  :selector: button:has-text("Share…")
-  :checkpoint: a share-to-organization modal is open listing org members with avatars
+  :code: (async () => { const file=document.querySelector('.result[draggable="true"], .tile.file[draggable="true"]'); const bm=document.querySelector('[role="group"][aria-label="Bookmarks"]'); if(!file||!bm) return 'missing'; const dt=new DataTransfer(); const fr=file.getBoundingClientRect(); const br=bm.getBoundingClientRect(); const ev=(type,el,x,y)=>el.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:dt,clientX:x,clientY:y})); ev('dragstart',file,fr.x+fr.width/2,fr.y+fr.height/2); await new Promise(r=>setTimeout(r,60)); ev('dragenter',bm,br.x+br.width/2,br.y+br.height/2); ev('dragover',bm,br.x+br.width/2,br.y+br.height/2); await new Promise(r=>setTimeout(r,60)); ev('drop',bm,br.x+br.width/2,br.y+br.height/2); ev('dragend',file,br.x+br.width/2,br.y+br.height/2); await new Promise(r=>setTimeout(r,700)); return 'dropped'; })()
+  :checkpoint: a bookmark tile now sits in the sidebar Bookmarks group (the dashed placeholder is gone)
   :END:
 
-* 01:24 wait [ms:1800]
-  Pick the people, assign a role, send it — real teammates, real photos.
-
-* 01:27 click
+* 00:44 click
+  Close search — the bookmark stays pinned.
   :PROPERTIES:
-  :selector: button:has-text("Amara Okafor")
+  :selector: button[aria-label="Search"]
   :END:
 
-* 01:29 click
+* 00:45 wait [ms:1500]
+  Pinned to your sidebar.
+
+# ── Scene 4 — chat with Waldo (text) ─────────────────────────────────────────
+* 00:48 type [text:Create a workbook for me] [perKeyMs:55]
+  Just ask Waldo, in plain language.
   :PROPERTIES:
-  :selector: button:has-text("Mei Lin")
+  :selector: textarea[placeholder="What would you like to do?"]
   :END:
 
-* 01:31 click
+* 00:51 eval_js
+  Send it.
   :PROPERTIES:
-  :selector: button:has-text("Diego Santos")
+  :code: (() => { const b=document.querySelector('button.primary[type="submit"]')||[...document.querySelectorAll('button[type="submit"]')][0]; b&&b.click(); return 'sent'; })()
+  :checkpoint: a new tab opens rendering a live interactive component (a card with Increment / Reset buttons)
   :END:
 
-* 01:34 wait [ms:2600]
+* 00:54 wait [ms:1800]
+  Waldo builds it and opens it as a tab — a live component.
+
+* 00:56 click
+  His reply renders inline components, right in the conversation.
+  :PROPERTIES:
+  :selector: button[aria-label="Waldo"]
+  :checkpoint: the Waldo dock shows the conversation with inline component cards (a Workbook-created card and a Component-built card with an Open button)
+  :END:
+
+* 00:59 wait [ms:1800]
+  Identity reads Waldo. The conversation persists.
+
+* 01:01 click
+  Tuck the dock away — the work stays open.
+  :PROPERTIES:
+  :selector: button[aria-label="Waldo"]
+  :END:
+
+# ── Scene 5 — voice ──────────────────────────────────────────────────────────
+* 01:03 navigate [url:http://localhost:5178/] [waitUntil:networkidle]
+  And you can just talk to it.
+
+* 01:05 click
+  Start a voice session.
+  :PROPERTIES:
+  :selector: button[aria-label="Start voice session"]
+  :checkpoint: a voice session is active showing a Listening bar and a Waldo transcript (identity reads Waldo, NOT Workhorse)
+  :END:
+
+* 01:08 wait [ms:5000]
+  Waldo answers — hands-free.
+
+* 01:13 click
+  End the session cleanly.
+  :PROPERTIES:
+  :selector: button[aria-label="End voice session"]
+  :checkpoint: the voice session has ended and the composer (What would you like to do?) is back — not left hanging
+  :END:
+
+* 01:15 wait [ms:2200]
   Workbooks — every workspace, every agent, your whole team. One window.

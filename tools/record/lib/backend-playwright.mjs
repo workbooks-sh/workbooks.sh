@@ -72,6 +72,10 @@ export class PlaywrightBackend {
     this.browser = await chromium.launch({ headless: this.headless });
     this.ctx = await this.browser.newContext({
       viewport: this.viewport,
+      // The Workbooks shell is dark-first and picks its variant from
+      // prefers-color-scheme; Chromium defaults to light, which washes the
+      // shell out on capture. Force dark so the recording matches the app.
+      colorScheme: "dark",
       recordVideo: { dir: this.outDir, size: this.viewport },
     });
     await this.ctx.addInitScript(INIT_SCRIPT);

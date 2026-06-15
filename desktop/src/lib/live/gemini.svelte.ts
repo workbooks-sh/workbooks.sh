@@ -485,25 +485,25 @@ class GeminiLiveSession {
     );
     this.#mockAt(2200, () => cb.onTurnComplete?.());
 
-    // Simulated user reply.
-    this.#mockAt(3200, () => cb.onUserTranscript?.("Yes, "));
-    this.#mockAt(3450, () => cb.onUserTranscript?.("list the files."));
+    // Simulated user reply — a real, compelling request, never a throwaway.
+    this.#mockAt(3200, () => cb.onUserTranscript?.("Create "));
+    this.#mockAt(3450, () => cb.onUserTranscript?.("a workbook for me."));
     this.#mockAt(3700, () => cb.onTurnComplete?.());
 
-    // A bash tool call — the regression-prone path. Routes through the
-    // mock-aware `#handleToolCall`, which simulates exec output and sends
-    // a tool_response so the session continues normally afterward.
+    // A tool call — the regression-prone path. Routes through the
+    // mock-aware `#handleToolCall`; a non-bash function_call surfaces as a
+    // transcript chip and acks immediately so the session keeps running.
     this.#mockAt(4300, () => {
-      void this.#handleToolCall("mock-call-1", "bash", {
-        command: "ls -la",
+      void this.#handleToolCall("mock-call-1", "workbook_create", {
+        title: "New workbook",
       });
     });
 
     // Agent continues talking AFTER the tool call returns — proving the
-    // session survived the bash call.
-    this.#mockAt(6200, () => cb.onAgentTranscript?.("Found "));
+    // session survived the tool call.
+    this.#mockAt(6200, () => cb.onAgentTranscript?.("Done — "));
     this.#mockAt(6500, () =>
-      cb.onAgentTranscript?.("a few files. What would you like to do next?"),
+      cb.onAgentTranscript?.("I opened it in a new tab. What should it track?"),
     );
     this.#mockAt(6900, () => cb.onTurnComplete?.());
   }
