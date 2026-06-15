@@ -59,8 +59,8 @@ GUEST
     ;;
   claude)
     # Claude Code's subscription token lives in the macOS Keychain (no file), so
-    # bridge it into a guest credentials file. NOTE: unproven end-to-end (codex is
-    # the proven path); the credential location inside the guest may need tuning.
+    # bridge it into a guest credentials file at CLAUDE_CONFIG_DIR. PROVEN
+    # (2026-06-15): claude 2.1.177 authenticated + replied from the bridged creds.
     tok="$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null)" \
       || { echo "no Claude Code keychain credential — sign in with 'claude' on the host first" >&2; exit 5; }
     printf '%s' "$tok" > "$AUTHTMP/.credentials.json"; chmod 600 "$AUTHTMP/.credentials.json"
