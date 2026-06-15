@@ -11,7 +11,7 @@ feature. Orchestration runs **host-side** (krunvm uses libkrun/HVF on the bare
 Mac and can't nest inside the runtime container) — this spike is a shell harness;
 productionizing moves it into the Tauri desktop layer.
 
-## Proven end-to-end (2026-06-15) — Codex
+## Proven end-to-end (2026-06-15) — Codex AND Claude Code
 
 A krunvm microVM (Linux aarch64 via libkrun/HVF):
 - boots from the host; reads a **bidirectional** worktree volume mount;
@@ -22,7 +22,9 @@ A krunvm microVM (Linux aarch64 via libkrun/HVF):
 - **edited the mounted worktree** (`codex exec` created `HELLO.txt`; the host saw
   the change) — the full read→reason→edit→write-back loop, ~8s once installed.
 
-Claude Code path is implemented (keychain bridge) but **not yet proven** end-to-end.
+Claude Code path **also proven** (2026-06-15): the macOS-Keychain bridge carries the
+subscription into the VM — `claude 2.1.177` authenticated and replied from the
+bridged credentials.
 
 ### Gotchas (all encoded in `acp-run.sh`)
 1. **Scrub to an ASCII environment** before invoking krunvm — a non-ASCII host env
@@ -47,7 +49,7 @@ Claude Code path is implemented (keychain bridge) but **not yet proven** end-to-
 |-------------|-------------------------------------------|----------------|
 | **Codex** ✅ | `~/.codex/auth.json` (file)               | copy `auth.json`+`config.toml` → `/agentauth`, `CODEX_HOME=/agentauth` (PROVEN: carries the ChatGPT subscription) |
 | OpenRouter  | API key (env)                             | pass as env var (trivial) |
-| **Claude Code** | **macOS Keychain** (`Claude Code-credentials`) | bridge: `security find-generic-password -s "Claude Code-credentials" -w` → temp `.credentials.json`, mount → `/agentauth`, `CLAUDE_CONFIG_DIR=/agentauth` (unproven) |
+| **Claude Code** | **macOS Keychain** (`Claude Code-credentials`) | bridge: `security find-generic-password -s "Claude Code-credentials" -w` → temp `.credentials.json`, mount → `/agentauth`, `CLAUDE_CONFIG_DIR=/agentauth` (PROVEN: carries the Claude subscription) |
 
 Claude Code has **no** file credential on macOS, so mounting `~/.claude` alone does
 NOT carry the subscription — the keychain bridge is required.
