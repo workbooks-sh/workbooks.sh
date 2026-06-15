@@ -22,6 +22,10 @@ export * from "./elements/forms/index.js";    // wb-form, wb-field, wb-field-gro
 export * from "./elements/records/index.js";  // wb-record, wb-record-list, wb-field-value
 export * from "./elements/search/index.js";   // wb-search, wb-command
 export * from "./elements/auth/index.js";     // wb-auth, wb-user, wb-gate (+ the identity seam)
+export * from "./elements/presentation/index.js"; // wb-deck, wb-slide
+export * from "./elements/code/index.js";     // wb-editor, wb-repl
+export * from "./elements/files/index.js";    // wb-drive, wb-file, wb-dropzone
+export * from "./elements/live/index.js";     // wb-room, wb-presence, wb-live-value
 
 // shared in-WASM data layer (DuckDB-wasm / memory floor, behind the Host seam) —
 // the one engine the DuckDB trio (tables/data-viz/maps) queries.

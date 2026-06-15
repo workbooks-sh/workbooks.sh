@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en" data-wb-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="darkreader-lock" />
+  <meta name="color-scheme" content="dark light" />
+  <title>workponents · code — specimen</title>
+  <!-- the design contract: one token set themes everything -->
+  <link rel="stylesheet" href="../src/theme/tokens.css" />
+  <!-- the code domain: native custom elements, ESM, NO build step -->
+  <script type="module" src="../src/elements/code/index.js"></script>
+  <style>
+    body { margin: 0; background: var(--wb-bg); color: var(--wb-fg); font-family: var(--wb-font, system-ui); transition: background .2s, color .2s; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 48px 24px 96px; }
+    h1 { font-family: var(--wb-font-display, sans-serif); font-weight: 600; letter-spacing: -.01em; margin-bottom: 4px; }
+    h2 { font-family: var(--wb-font, sans-serif); font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: var(--wb-fg-subtle); margin: 44px 0 12px; }
+    p.sub { color: var(--wb-fg-muted); max-width: 64ch; }
+    .bar { display: flex; gap: 8px; align-items: center; margin: 20px 0 8px; }
+    .bar button { font: 600 12px var(--wb-font-mono, monospace); padding: 7px 12px; border-radius: var(--wb-radius-sm); border: 1.5px solid var(--wb-border-strong); background: var(--wb-surface); color: var(--wb-fg); cursor: pointer; }
+    .bar button[aria-pressed="true"] { background: var(--wb-fg); color: var(--wb-surface); }
+    .evlog { font-family: var(--wb-font-mono); font-size: 12px; color: var(--wb-fg-muted); margin: 8px 0 0; min-height: 1.4em; }
+    .evlog b { color: var(--wb-brand); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>workponents · code</h1>
+    <p class="sub">The code <em>is</em> the artifact's source, edited in place. Standalone, JavaScript runs in a sandboxed worker (never <code>eval</code> in the page); compiled languages route through the Workbooks compiler lane when a runtime is reachable. Native custom elements, one token set, no build. Toggle the theme; everything re-themes.</p>
+
+    <div class="bar" role="group" aria-label="theme">
+      <span style="font:700 10px var(--wb-font-mono,monospace);letter-spacing:.18em;text-transform:uppercase;color:var(--wb-fg-subtle)">theme</span>
+      <button data-theme="light" aria-pressed="true">light</button>
+      <button data-theme="dark" aria-pressed="false">dark</button>
+      <button data-theme="signal" aria-pressed="false">signal</button>
+    </div>
+    <p class="evlog" id="evlog">events appear here</p>
+
+    <h2>&lt;wb-repl&gt; — JavaScript, run in a sandbox</h2>
+    <p class="sub">Press Run. The snippet executes in a Web Worker — no DOM, no page globals — and <code>console.log</code> + the returned value stream into the output pane.</p>
+    <wb-repl id="js" language="js">const fib = n =&gt; n &lt; 2 ? n : fib(n - 1) + fib(n - 2);
+const xs = Array.from({ length: 10 }, (_, i) =&gt; fib(i));
+console.log("fib(0..9):", xs.join(", "));
+// the returned value is shown too
+return { sum: xs.reduce((a, b) =&gt; a + b, 0), max: Math.max(...xs) };</wb-repl>
+
+    <h2>&lt;wb-editor&gt; — highlight + line numbers</h2>
+    <p class="sub">A themed editor: transparent textarea over a token-highlighted overlay, gutter line numbers, <code>language</code> attr. Edit it — it emits <code>wb-code-change</code> (watch the events line above). The editing surface is swap-stable: a CodeMirror engine backs it later behind this same API.</p>
+    <wb-editor id="ed" language="rust">// edit me — keywords, strings, numbers, comments highlight
+fn main() {
+    let greeting = "hello from workponents";
+    let answer = 42;
+    for i in 0..3 {
+        println!("{} #{}", greeting, i + answer);
+    }
+}</wb-editor>
+
+    <h2>&lt;wb-repl&gt; — compiled language, standalone</h2>
+    <p class="sub">No runtime connected, so C can't run here — the REPL says so plainly instead of faking output. Connect a runtime (<code>host.available("compile")</code>) and the same code compiles + runs in-sandbox via the compiler lane.</p>
+    <wb-repl id="c" language="c">#include &lt;stdio.h&gt;
+
+int main(void) {
+    for (int i = 0; i &lt; 3; i++) {
+        printf("compiled in-sandbox: %d\n", i * i);
+    }
+    return 0;
+}</wb-repl>
+  </div>
+
+  <script>
+    // honor ?theme=… (handy for screenshots / deep links); buttons still work.
+    const qsTheme = new URLSearchParams(location.search).get("theme");
+    if (qsTheme) {
+      document.documentElement.setAttribute("data-wb-theme", qsTheme);
+      document.querySelectorAll(".bar button").forEach((x) =>
+        x.setAttribute("aria-pressed", String(x.dataset.theme === qsTheme)));
+    }
+
+    const buttons = document.querySelectorAll(".bar button");
+    buttons.forEach((b) => b.addEventListener("click", () => {
+      document.documentElement.setAttribute("data-wb-theme", b.dataset.theme);
+      buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    }));
+
+    const log = document.getElementById("evlog");
+    document.addEventListener("wb-code-change", (e) => {
+      const v = e.detail.value || "";
+      log.innerHTML = `<b>wb-code-change</b> · ${v.length} chars`;
+    });
+    document.addEventListener("wb-run", (e) => {
+      const d = e.detail;
+      log.innerHTML = `<b>wb-run</b> · ${d.language} · ${d.ok ? "ok" : "error"} · ${(d.output || "").split("\n").length} line(s)`;
+    });
+  </script>
+</body>
+</html>
