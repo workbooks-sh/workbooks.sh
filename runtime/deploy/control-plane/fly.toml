@@ -35,6 +35,10 @@ primary_region = "sjc"
   WB_FLY_ORG = "personal"
   WB_DATA = "/data"
   WB_REGISTRY = "/data/registry.db"
+  # Multi-tenant boot gates (acp-cloud-enable #6/#7): a DURABLE per-deployment var
+  # store on the volume (not :memory:), and the non-pooled creds backend.
+  WB_VARS = "/data/vars.db"
+  WB_HARNESS_CREDS = "desktop"
 
 [[mounts]]
   source = "cpdata"
