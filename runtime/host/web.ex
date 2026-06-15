@@ -225,6 +225,69 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, json)
   end
 
+  # ── Platform control-plane API (the hosted "nexus" dashboard) ──────────────────
+  # tenant = the owning org (the Auth plug maps a WorkOS-issued JWT's org → :tenant).
+  # Every call is org-scoped through NexusRegistry / NexusProvisioner (WHERE org_id =
+  # tenant), so a caller can only ever see or act on its OWN nexuses — ownership IDOR
+  # is closed at the data layer, not re-derived here.
+  get "/api/platform/nexuses" do
+    org = conn.assigns[:tenant]
+    j(conn, 200, %{nexuses: Enum.map(Workbooks.NexusRegistry.list(org), &nexus_view/1)})
+  end
+
+  post "/api/platform/nexuses" do
+    org = conn.assigns[:tenant]
+    {:ok, body, conn} = read_body(conn)
+
+    case Workbooks.NexusProvisioner.provision(org, provision_opts(body)) do
+      {:ok, nx} -> j(conn, 201, nexus_view(stringify(nx)))
+      {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
+    end
+  end
+
+  get "/api/platform/nexuses/:id" do
+    org = conn.assigns[:tenant]
+
+    case Workbooks.NexusRegistry.get(conn.params["id"], org) do
+      {:ok, nx} -> j(conn, 200, nexus_view(nx))
+      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+    end
+  end
+
+  delete "/api/platform/nexuses/:id" do
+    org = conn.assigns[:tenant]
+    platform_lifecycle(conn, fn -> Workbooks.NexusProvisioner.teardown(conn.params["id"], org) end)
+  end
+
+  post "/api/platform/nexuses/:id/wake" do
+    org = conn.assigns[:tenant]
+    platform_lifecycle(conn, fn -> Workbooks.NexusProvisioner.wake(conn.params["id"], org) end)
+  end
+
+  post "/api/platform/nexuses/:id/sleep" do
+    org = conn.assigns[:tenant]
+    platform_lifecycle(conn, fn -> Workbooks.NexusProvisioner.sleep(conn.params["id"], org) end)
+  end
+
+  # Real Fly-grounded usage + cost rollup for the org (compute from machine event logs).
+  get "/api/platform/usage" do
+    j(conn, 200, Workbooks.NexusUsage.rollup(conn.assigns[:tenant]))
+  end
+
+  # Real per-org storage total + a bucket per nexus.
+  get "/api/platform/storage" do
+    org = conn.assigns[:tenant]
+    nexuses = Workbooks.NexusRegistry.list(org)
+    total = platform_storage_bytes(org)
+
+    buckets =
+      Enum.map(nexuses, fn nx ->
+        %{name: "#{nx["id"]}-storage", nexus: nx["id"], objects: nil, size: "—", egress: "$0.00"}
+      end)
+
+    j(conn, 200, %{totalBytes: total, totalSize: gb(total), buckets: buckets})
+  end
+
   # Deploy a Workbook: store its Org source under :id.
   put "/w/:id" do
     {:ok, org, conn} = read_body(conn)
@@ -1625,6 +1688,69 @@ defmodule Workbooks.Web do
     uid = (conn.assigns[:identity] && conn.assigns[:identity].user_id) || t
     Workbooks.RBAC.subject(t || "", uid || "")
   end
+
+  # ── platform-API helpers ────────────────────────────────────────────────────────
+  defp j(conn, code, data),
+    do: conn |> put_resp_content_type("application/json") |> send_resp(code, Jason.encode!(data))
+
+  # Shape a registry row (string keys) OR a provision result (run through stringify/1)
+  # into the dashboard's nexus view. The bearer/DSN are never in either source.
+  defp nexus_view(nx) do
+    app = nx["fly_app"] || ""
+
+    %{
+      id: nx["id"],
+      name: nx["id"],
+      region: nx["region"] || "",
+      plan: nx["plan"] || "starter",
+      state: map_state(nx["state"]),
+      url: nx["url"] || (if app != "", do: "https://#{app}.fly.dev", else: "")
+    }
+  end
+
+  # registry lifecycle vocab → the dashboard's vocab.
+  defp map_state("running"), do: "run"
+  defp map_state("stopped"), do: "sleep"
+  defp map_state(_), do: "build"
+
+  defp stringify(map), do: Map.new(map, fn {k, v} -> {to_string(k), v} end)
+
+  # Only region/plan are accepted from the body; the org, secrets, image and Fly org
+  # are all pinned server-side in the provisioner — never caller input.
+  defp provision_opts(body) do
+    case Jason.decode(body) do
+      {:ok, %{} = m} -> [] |> put_opt(:region, m["region"]) |> put_opt(:plan, m["plan"])
+      _ -> []
+    end
+  end
+
+  defp put_opt(opts, _k, v) when v in [nil, ""], do: opts
+  defp put_opt(opts, k, v), do: Keyword.put(opts, k, v)
+
+  defp platform_lifecycle(conn, fun) do
+    case fun.() do
+      {:ok, _} -> j(conn, 200, %{ok: true})
+      :ok -> j(conn, 200, %{ok: true})
+      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+      {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
+    end
+  end
+
+  defp platform_storage_bytes(org) do
+    Workbooks.Storage.usage_bytes(org)
+  rescue
+    _ -> 0
+  catch
+    _, _ -> 0
+  end
+
+  defp gb(bytes) when is_number(bytes),
+    do: :erlang.float_to_binary(bytes / 1_000_000_000, decimals: 2) <> " GB"
+
+  defp gb(_), do: "0 GB"
+
+  defp reason_str(r) when is_atom(r), do: Atom.to_string(r)
+  defp reason_str(r), do: inspect(r)
 
   # The role→capability legend, for the dashboard "Roles & access" surface.
   defp rbac_matrix do
