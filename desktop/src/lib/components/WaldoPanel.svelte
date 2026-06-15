@@ -196,6 +196,13 @@
     await inworldLive.start({
       onUserTranscript: (t) => chatSession.voiceAppend("you", t),
       onAgentTranscript: (t) => chatSession.voiceAppend("waldo", t),
+      onCode: (task, code) => {
+        // The code lane (mercury-2) output — surface it as a tool block in the
+        // transcript so it's visible, not spoken.
+        const id = crypto.randomUUID();
+        chatSession.voicePushTool(id, `write_code: ${task}`);
+        chatSession.voiceCompleteTool(id, code);
+      },
       onError: (msg) => {
         chatSession.voiceError = msg;
       },

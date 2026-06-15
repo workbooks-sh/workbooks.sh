@@ -28,6 +28,9 @@ export interface InworldCallbacks {
   onAgentTranscript?: (text: string) => void;
   /** Agent finished speaking a turn. */
   onTurnComplete?: () => void;
+  /** The code lane produced code (write_code → mercury-2). Shown in the editor,
+   *  never spoken. */
+  onCode?: (task: string, code: string) => void;
   onError?: (message: string) => void;
   onClose?: () => void;
 }
@@ -143,7 +146,7 @@ class InworldLiveSession {
       this.#player?.push(data);
       return;
     }
-    let msg: { type?: string; text?: string };
+    let msg: { type?: string; text?: string; task?: string; code?: string };
     try {
       msg = JSON.parse(data);
     } catch {
@@ -155,6 +158,9 @@ class InworldLiveSession {
         break;
       case "reply_text":
         if (msg.text) this.#cb.onAgentTranscript?.(msg.text);
+        break;
+      case "code":
+        this.#cb.onCode?.(msg.task ?? "", msg.code ?? "");
         break;
       case "speaking_end":
         this.speaking = false;

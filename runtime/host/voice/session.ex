@@ -25,7 +25,39 @@ defmodule Workbooks.Voice.Session do
   spoken to and your replies are read aloud, so keep them short and conversational
   — usually one or two sentences. Don't read code or long lists out loud; briefly
   say what you did or ask a clarifying question. Be direct and warm.
+
+  When the user asks you to write, generate, or change code, call the `write_code`
+  tool with a clear, self-contained task description. The code is shown to the user
+  in the editor — never speak it. After the tool returns, just say briefly what you
+  did (e.g. "Done, I wrote the handler — want me to add tests?").
   """
+
+  # Code generation goes to mercury-2, not the voice brain — fast diffusion model
+  # tuned for code. Its output lands in the editor canvas, never spoken.
+  @code_model "inception/mercury-2"
+
+  @tools [
+    %{
+      type: "function",
+      function: %{
+        name: "write_code",
+        description:
+          "Generate or modify code for the user. The code is rendered in the editor, not spoken. " <>
+            "Use whenever the user asks to write, build, fix, or change code.",
+        parameters: %{
+          type: "object",
+          properties: %{
+            task: %{
+              type: "string",
+              description:
+                "A clear, self-contained description of the code to produce, including language and any relevant context."
+            }
+          },
+          required: ["task"]
+        }
+      }
+    }
+  ]
 
   @doc """
   Begin speaking a reply to `user_text`. Returns the driving `Task` (kill it to
@@ -57,7 +89,7 @@ defmodule Workbooks.Voice.Session do
     # The voice brain wants low TTFT over raw smarts; WB_VOICE_BRAIN_MODEL lets a
     # deploy point it at a fast provider without touching the code lane (mercury-2).
     model = opts[:model] || System.get_env("WB_VOICE_BRAIN_MODEL")
-    result = Workbooks.Llm.complete(messages, on_delta: on_delta, model: model)
+    reply = agent_loop(messages, on_delta, ws_pid, model, 0)
 
     # Flush whatever sentence fragment is left, then close the worker.
     case Agent.get(buf, & &1) |> String.trim() do
@@ -74,15 +106,55 @@ defmodule Workbooks.Voice.Session do
       120_000 -> :ok
     end
 
-    reply =
-      case result do
-        {:ok, %{content: c}} -> c
-        _ -> ""
-      end
-
     push(ws_pid, %{type: "speaking_end"})
     {:ok, reply}
   end
+
+  # Run the brain until it stops calling tools (bounded). Spoken content streams
+  # through on_delta on every pass; a write_code call routes to mercury-2 and its
+  # output is pushed to the editor, then the brain narrates the result.
+  defp agent_loop(_messages, _on_delta, _ws_pid, _model, depth) when depth >= 3, do: ""
+
+  defp agent_loop(messages, on_delta, ws_pid, model, depth) do
+    case Workbooks.Llm.complete(messages, on_delta: on_delta, model: model, tools: @tools) do
+      {:ok, %{tool_calls: [], content: content}} ->
+        content || ""
+
+      {:ok, %{tool_calls: calls, raw_message: assistant}} ->
+        tool_msgs = Enum.map(calls, &exec_tool(&1, ws_pid))
+        agent_loop(messages ++ [strip(assistant) | tool_msgs], on_delta, ws_pid, model, depth + 1)
+
+      {:error, _} ->
+        ""
+    end
+  end
+
+  defp exec_tool(%{name: "write_code", id: id, args: args}, ws_pid) do
+    task = args["task"] || args["description"] || ""
+    code = generate_code(task)
+    push(ws_pid, %{type: "code", task: task, code: code})
+    %{role: "tool", tool_call_id: id, content: "Done — code written and shown in the editor."}
+  end
+
+  defp exec_tool(%{id: id}, _ws_pid) do
+    %{role: "tool", tool_call_id: id, content: "Unknown tool."}
+  end
+
+  defp generate_code(task) do
+    case Workbooks.Llm.complete(
+           [
+             %{role: "system", content: "You are a code generator. Output only the code, no prose, no markdown fences."},
+             %{role: "user", content: task}
+           ],
+           model: @code_model
+         ) do
+      {:ok, %{content: c}} when is_binary(c) -> c
+      _ -> ""
+    end
+  end
+
+  # Keep only the fields the chat API needs echoed back (mirrors Agent.strip/1).
+  defp strip(assistant), do: Map.take(assistant, ["role", "content", "tool_calls"])
 
   # Pull every COMPLETE sentence out of the buffer and enqueue it for TTS, leaving
   # any trailing fragment for the next delta.
