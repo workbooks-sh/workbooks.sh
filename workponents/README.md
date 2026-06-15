@@ -31,7 +31,7 @@ ancestor — every element re-themes from the tokens. See `demo/index.html` for 
   the render seam. Register idempotently with `define(name, ctor)`.
 - **Capability via the Host/Dock seam** (`src/core/host.js`) — elements reach compute through
   `this.host`, which resolves `local` / `runtime` (RCP) / `kernel`; the same element swaps
-  providers per target. Capability toolkits (DuckDB, wavelet, the OQL kernel) back the views.
+  providers per target. Capability toolkits (SQLite, wavelet, the OQL kernel) back the views.
 
 ## Layout
 
@@ -60,12 +60,19 @@ across light/dark/signal, registering from one import with zero console errors:
 - `git` — `wb-diff` (semantic org-block diff + line fallback, in-JS) / `wb-history-graph` / `wb-restore` / `wb-undo`.
 - `video` — `wb-video` / `wb-video-source` (themed wrappers over the shipped wavelet player).
 
-**Phase 2 — the DuckDB trio (done)** — one in-WASM engine (`src/data/`: DuckDB-wasm / runtime tier /
-in-JS memory floor, behind the Host seam), three surfaces binding the `{columns, rows[][], types}`
-contract; all aggregation/spatial work runs as SQL in the engine, not JS:
+**Phase 2 — the data trio (done)** — one SQLite engine (`src/data/`), Host-resolved per context:
+the workbook's **native SQLite VFS** over the runtime (Dock `vfs-query`), **in-page sqlite-wasm**
+(~1.3MB) when static, or an in-JS subset floor — all behind the Host seam, one SQL dialect everywhere.
+Three surfaces bind the `{columns, rows[][], types}` contract; all aggregation/spatial work runs as
+SQL in the engine, not JS:
 - `tables` — `wb-table` (virtualized grid = a view over a query) / `wb-column`.
 - `data-viz` — `wb-chart` (bar/line/area/scatter/pie, zero-dep SVG) / `wb-spark` / `wb-metric`.
 - `maps` — `wb-map` (points/heat/choropleth; zero-dep themed projection, Host tiles when configured).
+
+> SQLite, not DuckDB: a workbook already ships SQLite (its VFS), so the data tier rides it rather than
+> bolting on a 34MB second engine. Data components never pick a tier — the Host resolves runtime-VFS
+> (durable, server-side) vs in-page sqlite-wasm (static) vs floor. See `../docs/WORKBOOK-DATA-LEAK-AUDIT.md`
+> for the volume-travels-with-the-file contract.
 
 **Phase 3 — records & identity (done)** — closes the core SDK at nine domains / 31 elements:
 - `forms` — `src/validate/` (shared rule contract → `{valid, errors:[{path,rule,message}]}`, sync floor + Host `/validate`) + `wb-form`/`wb-field`/`wb-field-group` (the form IS its schema).

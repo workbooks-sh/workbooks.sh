@@ -1,45 +1,50 @@
 // workponents · data — THE shared query/result contract.
 //
-// This is the single data interface the whole DuckDB trio consumes:
-// `tables`, `data-viz`, and `maps` all talk to ONE engine through this shape.
-// It is framework-agnostic, zero-dependency, and TOKEN-UNAWARE (pure data — no
-// CSS, no DOM). An element imports `getEngine()` from ./engine.js, registers its
-// source once, and runs queries; the element owns rendering + theming.
+// This is the single data interface every data surface consumes:
+// `tables`, `data-viz`, `maps`, `records`, and `search` all talk to ONE engine
+// through this shape. It is framework-agnostic, zero-dependency, and TOKEN-UNAWARE
+// (pure data — no CSS, no DOM). An element imports `getEngine()` from ./engine.js,
+// registers its source once, and runs queries; the element owns render + theme.
+//
+// The engine is SQLite, resolved by the Host per context: the workbook's native
+// SQLite VFS over the runtime (Dock `vfs-query`), in-page sqlite-wasm when static,
+// or the in-JS subset floor. One SQL dialect everywhere — write SQLite SQL.
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// Result shape — every query (live engine, browser DuckDB, or the in-JS
-// fallback) returns EXACTLY this. data-viz/maps must code against this and
-// nothing else:
+// Result shape — every query (runtime VFS, in-page sqlite-wasm, or the in-JS
+// floor) returns EXACTLY this. Every surface must code against this and nothing
+// else:
 //
 //   /** @typedef {Object} WbQueryResult
 //    *  @property {string[]}    columns  ordered column names
 //    *  @property {any[][]}     rows     row-major; rows[i][j] is column j of row i
 //    *  @property {WbColType[]} types    per-column logical type (columns.length)
 //    *  @property {number}      rowCount rows.length (convenience)
-//    *  @property {string}      [engine] which provider answered: runtime|duckdb-wasm|memory
+//    *  @property {string}      [engine] which tier answered: runtime|sqlite-wasm|memory
 //    *  @property {string}      [sql]    the SQL actually executed (debug)
 //    */
 //
 //   WbColType ∈ "number" | "integer" | "string" | "boolean" | "date" | "json"
 //
-// Engine surface (engine.js implements this; data-viz/maps reuse it verbatim):
+// Engine surface (engine.js implements this; every surface reuses it verbatim):
 //
 //   query(sql: string, params?: any[]) -> Promise<WbQueryResult>
 //   register(name: string, source: WbSource) -> Promise<void>   // makes a table
-//   available() -> boolean      // is a real engine reachable (vs the JS fallback)
-//   provider() -> string        // "runtime" | "duckdb-wasm" | "memory"
+//   whenRegistered(name: string) -> Promise<void>  // await before querying it
+//   available() -> boolean      // is a real SQLite tier reachable (vs the floor)
+//   writable() -> boolean       // are writes durable (runtime VFS) vs local/none
+//   provider() -> string        // "runtime" | "sqlite-wasm" | "memory"
 //
-// Source registration — "a workbook's data IS its source." A source is one of:
+// Source registration — "a workbook's data IS its source" (for INLINE data; a
+// real workbook's tables already live in its SQLite VFS, no registration). One of:
 //
 //   { rows: object[] }                         inline array of row objects
 //   { columns: string[], rows: any[][] }       columnar inline
 //   { csv: string }                            CSV text (header row)
 //   { json: string | object[] }                JSON text or parsed array
 //   { url: string, format?: "csv"|"json" }     fetched (browser/runtime)
-//   { arrow: ArrayBuffer }                     Arrow IPC (duckdb-wasm/runtime only)
 //
-// `params` use positional `?` placeholders (DuckDB/SQLite style). The memory
-// engine supports the same `?` binding for its SQL subset.
+// `params` use positional `?` placeholders (SQLite style). All tiers bind the same.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Normalize any WbSource into { columns, rows(object[]) } for registration. */

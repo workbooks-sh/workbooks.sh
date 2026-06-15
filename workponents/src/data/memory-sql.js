@@ -1,11 +1,12 @@
 // workponents · data — the in-JS fallback engine (zero-dep, offline).
 //
-// A small SQL-subset interpreter so the trio computes REAL sort/filter/aggregate
+// A small SQL-subset interpreter so the surfaces compute REAL sort/filter/aggregate
 // IN an engine even with no runtime tier AND no network (CDN blocked). It is the
-// last resort behind ./engine.js — when a runtime exposes DuckDB (Host) or
-// browser duckdb-wasm loads, those answer instead and this is never touched.
+// LAST RESORT behind ./engine.js — when the runtime VFS (Host) or in-page
+// sqlite-wasm is reachable, real SQLite answers instead and this is never touched.
+// It is a SUBSET (no CAST, joins, window fns) — not real SQLite; prefer the tiers.
 //
-// Supported (one flat table per query, the trio's grid/chart/geo-query needs):
+// Supported (one flat table per query, the basic grid/chart/geo-query needs):
 //   SELECT <proj> FROM <table>
 //     [WHERE <cond> [AND/OR <cond>]...]
 //     [GROUP BY <col>[, <col>]...]
@@ -14,7 +15,7 @@
 //   proj: *, col, col AS alias, AGG(col) [AS alias], COUNT(*)
 //   agg:  COUNT | SUM | AVG | MIN | MAX
 //   cond: col OP value   OP ∈ = != <> < <= > >= LIKE   value: number|'str'|?
-//   ? params bind positionally (same as DuckDB/SQLite).
+//   ? params bind positionally (SQLite style).
 //
 // Deliberately small. For anything beyond this, a real engine is required — the
 // element degrades by surfacing the engine name so authors know which tier ran.

@@ -24,8 +24,9 @@
   The substrate (one architecture, many domains):
   - *Composition-as-source* — the element's definition is declarative source the
     artifact carries; preview ≡ source; agent-editable.
-  - *In-nexus compute* — the element that renders the data also runs it (DuckDB /
-    wavelet render-core / the OQL kernel), brokered through the Dock.
+  - *In-nexus compute* — the element that renders the data also runs it (the
+    workbook's SQLite VFS / wavelet render-core / the OQL kernel), brokered through
+    the Dock; the same element runs in-page (sqlite-wasm) or on the runtime tier.
   - *One token set* — every element styles only from `--wb-*` CSS custom
     properties, so one theme governs all domains AND the workbook artifacts.
   - *One Dock seam* — capabilities resolve `local` / `runtime` (RCP) / `kernel`
@@ -45,5 +46,5 @@
     HTML, light + dark, no build).
 
   Relationship to toolkits: workponents ARE component-KIND toolkits — the themed
-  UI tier over capability toolkits (a `wb-table` is the view; the DuckDB engine is
-  a capability toolkit it consumes through the Dock). See docs/WORKPONENTS.md.
+  UI tier over capability toolkits (a `wb-table` is the view; the workbook's SQLite
+  engine is a capability it consumes through the Dock). See docs/WORKPONENTS.md.

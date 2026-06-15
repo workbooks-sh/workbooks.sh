@@ -24,7 +24,7 @@ for us and not for shadcn/Vercel/Liveblocks/Mapbox:
    or on the runtime tier for huge data, no code fork (platform-model canon).
 
 **The shared engines** (the reason the domains compose instead of duplicating):
-- **DuckDB-wasm** (+ Arrow) — the data engine behind `tables`, `data-viz`, `maps` (spatial), and `records`. Already a compiled in-sandbox artifact (`runtime/compilers/duckdb/duckdb.wasm`).
+- **SQLite** — the data engine behind `tables`, `data-viz`, `maps`, `records`, and `search`. A workbook already SHIPS SQLite (its VFS — `Workbooks.VFS`), so the data tier rides it, NOT a bolted-on DuckDB. Host-resolved per context: native `exqlite` over the runtime (Dock `vfs-query`, durable/server-side — "the unbundling"), in-page **sqlite-wasm** (~1.3MB) when static, or an in-JS subset floor. One SQL dialect everywhere. (DuckDB-wasm was evaluated and dropped: 34MB, divergent dialect, redundant.)
 - **Wavelet render-core + `wb_encode.wasm`** — behind `video`, `presentation` (a deck = a wavelet timeline with discrete keyframe bands → "export to video" is free), and `audio`.
 - **The OQL/org kernel** (`runtime/kernel`, `oql.wasm`) — behind `docs`, `ai` (conversation-as-source), and the composition-as-source model everywhere.
 - **RCP + the BEAM runtime** — behind `live` (Phoenix Presence/PubSub = realtime with no provisioned backend) and every element's provider seam.
@@ -65,13 +65,13 @@ Each is a wavelet-level reinvention, not a widget pack. Status: ✅ substrate ex
 | **ai** | Conversation-as-source: agent edits a living org artifact; generated UI = in-nexus `#+EXEC` blocks, not a JSON IR | `<wb-gen-block>` | OQL kernel | ✅ prototype in `desktop/src/lib/chat/*` |
 | **docs** | The doc IS its org source, directly editable in the rendered view (no second model); live computed cells | `<wb-doc-cell>` | OQL kernel | ✅ OQL renderer exists |
 | **git** | Mechanistic, system-managed VC: no git verbs surfaced; jj op-log = undo-anything; semantic in-WASM diffs; josh subtree share | `<wb-history-graph>` / `<wb-diff>` | jj/josh + in-WASM diff | ✅ backends headless (`history.ex`/`jj.ex`/`draft.ex`) |
-| **tables** | The table IS a query: a thin Arrow viewport over DuckDB; sort/filter/pivot push to SQL; millions of rows, zero server | `<wb-table>` | DuckDB-wasm | ○ greenfield (bundle/VFS exists) |
-| **data-viz** | Composition-as-source charts computed in-WASM; the chart-vs-data gap dissolves; a live query you can talk to | `<wb-chart>` / `<wb-dashboard>` | DuckDB-wasm | ○ greenfield |
-| **maps** | Composition-as-source maps; geo compute in-WASM (DuckDB-spatial); PMTiles serverless tiles; offline, emailable | `<wb-map>` + `<wb-geo-query>` | DuckDB-spatial + PMTiles | ○ greenfield |
+| **tables** | The table IS a query over the workbook's SQLite; sort/filter/pivot push to SQL; runtime VFS or in-page sqlite-wasm | `<wb-table>` | SQLite | ✅ done |
+| **data-viz** | Composition-as-source charts; aggregation computed in SQL on the shared SQLite engine; a live query you can talk to | `<wb-chart>` / `<wb-spark>` / `<wb-metric>` | SQLite | ✅ done |
+| **maps** | Composition-as-source maps; geo compute in SQL; zero-dep themed projection standalone, PMTiles tiles via Host | `<wb-map>` | SQLite (+ PMTiles via Host) | ✅ done |
 | **presentation** | A deck = a wavelet timeline (keyframe bands); shares the render-core → export-to-video free; live blocks on slides | `<wb-deck>` / `<wb-slide>` | render-core | ◐ rides wavelet |
 | **live** | Realtime is a routing config: presence/pubsub free off the BEAM over RCP; CRDT opt-in per workbook; voice the one keyed exception | `<wb-room>` / `<wb-presence>` | RCP + BEAM | ◐ RCP exists |
 | **forms** | Schema-and-validation-as-source: fields/types/rules ARE OQL records driving form + table + DB + API; validate in-WASM | `<wb-form>` / `<wb-field>` | OQL kernel | ○ |
-| **records/CRM** | Relational object model on the OQL kernel (relations/rollups/views as kernel constructs) — the Notion/Airtable killer | `<wb-collection>` | OQL + DuckDB | ○ |
+| **records/CRM** | Entity views as queries over the shared SQLite engine; master-detail; typed values; Host write-back | `<wb-record>` / `<wb-record-list>` | SQLite | ✅ done |
 | **search/command** | ⌘K over the live OQL graph + in-WASM FTS5/vector; actions = agent-invokable Dock capabilities | `<wb-command>` | in-WASM FTS | ○ |
 | **auth** | Gating reveals/withholds *capabilities* (the Dock grant model), not booleans; WorkOS/Clerk plug one Host seam | `<wb-gate>` / `<wb-user>` | Dock | ○ |
 | **code** | Real in-sandbox eval via the compiler lane (C/Rust/Zig/Go/JS); editor edits composition-as-source live | `<wb-repl>` / `<wb-editor>` | compiler lane | ○ (lane exists) |
@@ -94,15 +94,15 @@ the headless/agent path). Both are *loaded* artifacts (not host engines).
 The five integration points:
 
 1. **Declared capabilities, one Dock seam.** A workponent declares the toolkits it needs (`<wb-table>`
-   → `needs: duckdb`); the Host/Dock provisions them with the same grant model toolkits use, resolving
+   → `needs: sqlite`); the Host/Dock provisions them with the same grant model toolkits use, resolving
    `local`/`runtime`/`kernel` per platform-model — no second capability mechanism.
-2. **Toolkits stay shared + headless — one engine, many views.** One DuckDB toolkit backs `wb-table`,
-   `wb-chart`, `wb-map`, `wb-records`. A workponent *consumes* a toolkit, never *contains* one (else you
-   duplicate the engine and lose the agent's no-UI invocation path). This is the reason not to merge.
+2. **Toolkits stay shared + headless — one engine, many views.** One SQLite engine (the workbook's VFS)
+   backs `wb-table`, `wb-chart`, `wb-map`, `wb-record`, `wb-search`. A workponent *consumes* a toolkit,
+   never *contains* one (else you duplicate the engine and lose the agent's no-UI invocation path).
 3. **The `component` EXEC shape is the bridge** (the "renderer = kernel-shape toolkits" idea, concrete):
    a workponent is the **curated, themed, registry-distributed tier** of the component shape; an author's
    bespoke `#+EXEC component` is the **open tier**. Same kernel render path, same Dock seam.
-4. **One registry, one install** — installing `<wb-table>` pulls its declared capability (DuckDB)
+4. **One registry, one install** — installing `<wb-table>` pulls its declared capability (SQLite)
    automatically; the shadcn-style install handles both layers. One dev-kit surface, not two.
 5. **One contract for authors and agents** — capability via the Dock, theme via the token system. The
    build-by-talking loop is identical whether the agent emits a `<wb-chart>` or hand-rolls a component.
@@ -117,10 +117,10 @@ Net: **workponents are the themed UI tier of the toolkit substrate.**
 - **Phase 1 — Seeds (substrate exists; mostly surfacing).** `video` (wrap wavelet) · `ai` (port the chat
   elements) · `docs` (the OQL renderer) · `git` (surface the headless `history/jj/draft` backends). Fastest
   wins, proves the conventions.
-- **Phase 2 — The DuckDB trio.** `tables` → `data-viz` → `maps`. One engine, three surfaces; build the
-  Arrow/DuckDB binding once.
-- **Phase 3 — The no-code essentials.** `forms` · `records/CRM` · `search/command` · `auth`. The floor every
-  app needs; each with a genuine OQL/Dock edge.
+- **Phase 2 — The data trio (done).** `tables` → `data-viz` → `maps`. One SQLite engine, three surfaces;
+  the SQLite seam (runtime VFS / in-page sqlite-wasm / floor) built once.
+- **Phase 3 — The no-code essentials (done).** `forms` · `records/CRM` · `search/command` · `auth`. The floor
+  every app needs; `records`/`search` ride the SQLite engine, `forms` owns the shared validate layer.
 - **Phase 4 — Composers.** `presentation` (rides wavelet) · `live` (rides RCP) · `code` (compiler lane) ·
   `files` (wavelet encode).
 - **Later.** `automation` + `whiteboard`; wrap payments/comms/scheduling/3d.
@@ -130,13 +130,18 @@ Net: **workponents are the themed UI tier of the toolkit substrate.**
 - **Render tier** — wavelet's render path is CSS-only (no JS in Blitz); interactive elements need the
   JS-capable tier while deterministic render/export uses the CSS-clock path. Reconciling these is the core
   tension for `video`/`presentation`/animated UI.
-- **In-WASM bundle weight** — DuckDB-wasm/render-core are multi-MB; lazy-load per the `oql.ts` pattern;
-  consider a slim Polars-wasm default for `tables`.
+- **In-WASM bundle weight** — sqlite-wasm (~1.3MB) and render-core are multi-MB; lazy-load per the `oql.ts`
+  pattern (sqlite-wasm boots only when there's no runtime tier, and only on first query). DuckDB (34MB) was
+  rejected for exactly this reason — SQLite is an order of magnitude smaller and already shipped.
 - **Reactive graph** — incremental recalc spanning SQL views + scalar cells (`tables`/`docs`); clean-room
   it (avoid GPLv3 HyperFormula), scope to view-level + UDF cells.
 - **Agent-block sandboxing** — agent-authored `<wb-gen-block>` runs untrusted output; double-iframe / kernel
   isolation; never execute model output directly (the `ChatComponent.svelte` model).
-- **Editable-rows writeback** — DuckDB-wasm is read-optimized; route edits through the SQLite VFS.
+- **Editable-rows writeback** — in-page sqlite-wasm edits are local/ephemeral; durable writes route through
+  the runtime's native SQLite VFS (Host write seam). Elements reflect `engine.writable()`, never assume.
+- **VFS travels with the file (data-leak guardrail)** — a static workbook embeds its SQLite VFS in the HTML,
+  so the `workspace` volume is PUBLIC-to-recipient; durable/private data belongs server-side (runtime VFS /
+  Postgres), never authored into an embedded volume. See `WORKBOOK-DATA-LEAK-AUDIT.md`.
 - **Keyed exceptions (be honest)** — voice needs an STT/TTS key + media transport; map basemap *pixels*
   still need PMTiles you host or brokered tiles; payments are a trusted host broker. Disclose via the
   capability handshake so elements degrade cleanly.
