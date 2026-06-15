@@ -5,10 +5,12 @@
 
   let stepKey = $state('intro');
   let history = $state([]);
-  let accountType = $state('');   // 'personal' | 'org'
-  let deploy = $state('');        // personal: 'local' | 'cloud'
+  // A nexus is the user's isolated space (≈ an org). 'solo' = one nexus, just them;
+  // 'team' = a shared nexus with members + roles. Server still keys on 'personal'|'org'.
+  let accountType = $state('');   // 'personal' (solo) | 'org' (team)
+  let deploy = $state('');        // solo: 'local' | 'cloud'
   let usecases = $state([]);
-  let orgName = $state('');
+  let nexusName = $state('');
   let orgSize = $state('');
   let heard = $state('');
   let tier = $state('');          // chosen tier id
@@ -22,13 +24,13 @@
   const SIZES = ['Just me', '2–10', '11–50', '51–200', '200+'];
   const HEARD = ['Search', 'X / social', 'A friend', 'YouTube', 'Other'];
 
-  // PLACEHOLDER tiers — gate on STORAGE, never seats. Unlimited users on every tier
-  // (WorkOS auth is free to 1M MAU, so seats cost us ~nothing; compute + storage do).
-  // each tier carries a representative team size, so the stack comparison scales with
-  // the SELECTED tier (the value gap widens dramatically at Scale/Enterprise).
-  // No hosted Free tier — running locally (desktop / open-source) is the free path; a
-  // HOSTED nexus starts at Starter. Each tier bundles compute + storage + included
-  // nexuses, unlimited users + workspaces, database + egress-free object storage.
+  // Tiers gate on STORAGE + LOAD, never seats. Unlimited users + workspaces on every
+  // tier (auth costs us ~nothing; compute + storage do). Each tier carries a
+  // representative team size, so the stack comparison scales with the SELECTED tier
+  // (the value gap widens at Scale/Enterprise). No hosted free tier — running a LOCAL
+  // nexus in the desktop app is the free path; a HOSTED nexus starts at Starter. Each
+  // tier bundles compute + storage + included nexuses, unlimited users + workspaces,
+  // database + egress-free object storage.
   const TIERS = [
     { id: 'starter', name: 'Starter', price: 29, storage: '50 GB', users: 6, blurb: 'A project or small team.' },
     { id: 'team', name: 'Team', price: 99, storage: '250 GB', users: 25, blurb: 'A growing team.' },
@@ -84,14 +86,15 @@
 
   const toggleUse = (id) => (usecases = usecases.includes(id) ? usecases.filter((x) => x !== id) : [...usecases, id]);
   const useLabels = $derived(usecases.map((id) => (USECASES.find((u) => u[0] === id) || [, id])[1]));
-  const canNextOrg = $derived(orgName.trim().length > 0 && orgSize !== '');
+  const canNextOrg = $derived(nexusName.trim().length > 0 && orgSize !== '');
   const ENT_GIF = 'https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExem1wZTAzajMzb3JndW95dnh0MW9vaGVxaWlpcnd5N3Y3d2F2ZXc1ayZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/JROxfRtFCVgSgz8uRd/giphy.gif';
 
   // Everything we learned in the wizard, serialized once and posted with whichever
   // form finishes onboarding. The server persists it (cookie now; the runtime nexus
-  // registry later) and the dashboard seeds the org identity + first nexus from it.
+  // registry later) and the dashboard seeds the nexus identity + first workspace from
+  // it. Wire key stays `orgName` for the server contract; it carries the nexus name.
   const profileJSON = $derived(JSON.stringify({
-    accountType, deploy, orgName: orgName.trim(), orgSize, heard,
+    accountType, deploy, orgName: nexusName.trim(), orgSize, heard,
     usecases, tier: selTier.id, region: REGION, firstName: first
   }));
 </script>
@@ -117,27 +120,27 @@
       <div class="foot"><button class="btn primary" onclick={next}>Get started</button></div>
 
     {:else if stepKey === 'account'}
-      <h1>Who’s this for?</h1>
-      <p class="sub">This sets up your account — you can add teammates anytime.</p>
+      <h1>Who’s your nexus for?</h1>
+      <p class="sub">A nexus is your own isolated space. Start with one — add teammates or more nexuses anytime.</p>
       <div class="picks">
         <button class="pick" class:sel={accountType === 'personal'} onclick={() => (accountType = 'personal')}>
-          <span class="pic" style="background:var(--sky)">◦</span><b>Personal</b><small>Just me — build and run my own software.</small>
+          <span class="pic" style="background:var(--sky)">◦</span><b>Just me</b><small>A personal nexus — build and run my own software.</small>
         </button>
         <button class="pick" class:sel={accountType === 'org'} onclick={() => (accountType = 'org')}>
-          <span class="pic" style="background:var(--peach)">◇</span><b>Organization</b><small>A team — shared nexus, members, and roles.</small>
+          <span class="pic" style="background:var(--peach)">◇</span><b>A team</b><small>A shared nexus — members, roles, unlimited workspaces.</small>
         </button>
       </div>
       <div class="foot"><button class="btn" onclick={back}>Back</button><button class="btn primary" onclick={next} disabled={!accountType}>Continue</button></div>
 
     {:else if stepKey === 'deploy'}
-      <h1>Where should it run?</h1>
-      <p class="sub">Workbooks runs anywhere. Pick how you want yours hosted.</p>
+      <h1>Where should your nexus run?</h1>
+      <p class="sub">A nexus can live in the cloud or on your own machine. Pick how to start — you can run both.</p>
       <div class="picks">
         <button class="pick" class:sel={deploy === 'cloud'} onclick={() => (deploy = 'cloud')}>
-          <span class="pic" style="background:var(--mint)">☁</span><b>Cloud</b><small>We host it — always on, nothing to install.</small>
+          <span class="pic" style="background:var(--mint)">☁</span><b>Cloud nexus</b><small>We host it — always on, nothing to install.</small>
         </button>
         <button class="pick" class:sel={deploy === 'local'} onclick={() => (deploy = 'local')}>
-          <span class="pic" style="background:var(--cream)">▢</span><b>Local <span class="free">free</span></b><small>Run it on your own machine with the desktop app.</small>
+          <span class="pic" style="background:var(--cream)">▢</span><b>Local nexus <span class="free">free</span></b><small>Run it on your own machine with the desktop app.</small>
         </button>
       </div>
       <div class="foot"><button class="btn" onclick={back}>Back</button><button class="btn primary" onclick={next} disabled={!deploy}>Continue</button></div>
@@ -153,10 +156,10 @@
       <div class="foot"><button class="btn" onclick={back}>Back</button><button class="btn primary" onclick={next} disabled={usecases.length === 0}>Continue</button></div>
 
     {:else if stepKey === 'org'}
-      <h1>About your organization</h1>
+      <h1>Name your nexus</h1>
       <p class="sub">A couple details so we can tailor your setup.</p>
-      <div class="lab">Organization name</div>
-      <div class="field"><input placeholder="Acme Inc." bind:value={orgName} /></div>
+      <div class="lab">Nexus name</div>
+      <div class="field"><input placeholder="Acme" bind:value={nexusName} /></div>
       <div class="lab">How big is your team?</div>
       <div class="chips">{#each SIZES as s}<button class="chip" class:sel={orgSize === s} onclick={() => (orgSize = s)}>{s}</button>{/each}</div>
       <div class="lab">How did you hear about us? <span class="opt-tag">optional</span></div>
@@ -168,16 +171,16 @@
       <h1>Here’s your setup</h1>
       <p class="sub">Based on what you told us — change anything later.</p>
       <div class="mirror">
-        <div class="mrow"><span>Account</span><b>{accountType === 'org' ? (orgName || 'Your organization') : 'Personal'}</b></div>
+        <div class="mrow"><span>Nexus</span><b>{accountType === 'org' ? (nexusName || 'Your nexus') : 'Personal nexus'}</b></div>
         <div class="mrow"><span>Hosted in</span><b>{REGION} <small>auto-detected</small></b></div>
         <div class="mrow"><span>Starters</span><b>{useLabels.length ? useLabels.join(', ') : 'A blank workspace'}</b></div>
-        <div class="mrow"><span>Pricing</span><b>No seat billing · pay for storage</b></div>
+        <div class="mrow"><span>Pricing</span><b>Unlimited users · pay for storage + load</b></div>
       </div>
       <div class="foot"><button class="btn" onclick={back}>Back</button><button class="btn primary" onclick={next}>Looks good</button></div>
 
     {:else if stepKey === 'plan'}
-      <h1>No seat billing. Unlimited users.</h1>
-      <p class="sub">Invite your whole {accountType === 'org' ? 'organization' : 'team'} — you only pay for storage.</p>
+      <h1>One nexus. Unlimited users.</h1>
+      <p class="sub">Invite everyone — no seat billing. You pay for storage and load, never headcount.</p>
 
       <div class="vs-h">For a ~{cmpUsers}-person team — Workbooks vs the stack it replaces</div>
       <div class="vs-cols">
@@ -228,37 +231,27 @@
 
     {:else if stepKey === 'team'}
       <h1>Invite your team</h1>
-      <p class="sub">Add teammates now or later — and there’s no per-seat charge, so invite everyone.</p>
+      <p class="sub">Add teammates now or later — no per-seat charge, so invite everyone in your nexus.</p>
       <div class="field"><input placeholder="teammate@company.com" /></div>
       <div class="field"><input placeholder="another@company.com" /></div>
       <div class="foot"><button class="btn" onclick={back}>Back</button><button class="btn primary" onclick={next}>Continue</button></div>
 
     {:else if stepKey === 'pay'}
-      {#if selTier.price === 0}
-        <div class="ob-badge" style="background:{accent}">🎉</div>
-        <h1>You’re on Free</h1>
-        <p class="sub">Unlimited users and {selTier.storage}. Upgrade anytime when you need more storage — never for more people.</p>
-        <form method="POST" action="?/finish" use:enhance>
-          <input type="hidden" name="profile" value={profileJSON} />
-          <div class="foot"><button class="btn primary big" type="submit">Enter your dashboard →</button></div>
-        </form>
-      {:else}
-        <h1>Bring your nexus online</h1>
-        <p class="sub">Your nexus spins up the moment payment goes through. Cancel anytime.</p>
-        <div class="summary">
-          <div class="srow"><b>{selTier.name}</b><b>${selTier.price}<small>/mo</small></b></div>
-          <div class="sfeat">Unlimited users · {selTier.storage} · hosted in {REGION}</div>
+      <h1>Bring your nexus online</h1>
+      <p class="sub">Your nexus spins up the moment payment goes through. Cancel anytime.</p>
+      <div class="summary">
+        <div class="srow"><b>{selTier.name}</b><b>${selTier.price}<small>/mo</small></b></div>
+        <div class="sfeat">Unlimited users · {selTier.storage} · DB + egress-free object storage · hosted in {REGION}</div>
+      </div>
+      <form method="POST" action="?/pay" use:enhance>
+        <input type="hidden" name="tier" value={selTier.id} />
+        <input type="hidden" name="profile" value={profileJSON} />
+        <div class="foot">
+          <button class="btn" type="button" onclick={back}>Back</button>
+          <button class="btn primary big" type="submit">Continue to payment →</button>
         </div>
-        <form method="POST" action="?/pay" use:enhance>
-          <input type="hidden" name="tier" value={selTier.id} />
-          <input type="hidden" name="profile" value={profileJSON} />
-          <div class="foot">
-            <button class="btn" type="button" onclick={back}>Back</button>
-            <button class="btn primary big" type="submit">Continue to payment →</button>
-          </div>
-        </form>
-        <form method="POST" action="?/finish" use:enhance><input type="hidden" name="profile" value={profileJSON} /><button class="skip" type="submit">I’ll set up billing later</button></form>
-      {/if}
+      </form>
+      <form method="POST" action="?/finish" use:enhance><input type="hidden" name="profile" value={profileJSON} /><button class="skip" type="submit">I’ll set up billing later</button></form>
 
     {:else if stepKey === 'local'}
       <div class="ob-badge" style="background:{accent}">▢</div>
