@@ -181,7 +181,7 @@
         <div class="vs-x">vs</div>
         {#each STACK as s}
           <div class="vs-col">
-            <img class="vs-logo brand" src={logo(s.slug)} alt={s.name} loading="lazy" />
+            <span class="vs-logo brand" style="--u:url('{logo(s.slug)}')" role="img" aria-label={s.name}></span>
             <div class="vs-name">{s.name}</div>
             <div class="vs-price strike">${(s.per * estUsers).toLocaleString()}<small>/mo</small></div>
             <div class="vs-cat">{s.cat}</div>
@@ -317,9 +317,12 @@
   .vs-col { display:flex; flex-direction:column; align-items:center; text-align:center; gap:5px;
     padding:14px 8px 12px; border:1px solid rgba(18,19,22,.1); border-radius:12px; background:#fff; }
   .vs-col.us { background:color-mix(in srgb, var(--accent) 22%, #fff); border-color:#121316; }
-  .vs-logo { width:24px; height:24px; object-fit:contain; }
+  /* the Workbooks mark is an inline svg (wide aspect → height-driven); brand logos are
+     CSS masks so they size + colour reliably (the source SVGs have no intrinsic size). */
+  .vs-logo { height:30px; width:auto; display:block; margin-bottom:2px; }
   .vs-col.us .vs-logo { color:#121316; }
-  .vs-logo.brand { opacity:.5; filter:grayscale(1); }
+  .vs-logo.brand { width:30px; height:30px; background:#8a8f86;
+    -webkit-mask:var(--u) center/contain no-repeat; mask:var(--u) center/contain no-repeat; }
   .vs-name { font:600 12px var(--read); }
   .vs-price { font-size:17px; font-weight:600; line-height:1.1; } .vs-price small { font:500 9.5px var(--mono); color:#a0a59a; }
   .vs-price.strike { color:#8a8f86; text-decoration:line-through; text-decoration-color:rgba(18,19,22,.3); }
