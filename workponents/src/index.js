@@ -5,5 +5,13 @@ export { WbElement, define } from "./core/element.js";
 export { WbHost, configureHost, getHost } from "./core/host.js";
 export { defineVariants, resolveVariant, variantAttrs, lintVariants } from "./core/variants.js";
 
-// elements (one per domain grows here: wb-table, wb-chart, wb-thread, ...)
+// base element
 export { WbButton } from "./elements/wb-button.js";
+
+// domains — importing a barrel registers its elements (idempotent) + re-exports
+// the classes. Import the whole set here, or a single ./elements/<domain>/index.js
+// (or one file) to keep a workbook lean.
+export * from "./elements/ai/index.js";       // wb-thread, wb-message, wb-gen-block, wb-composer
+export * from "./elements/docs/index.js";     // wb-doc, wb-doc-cell, wb-doc-outline
+export * from "./elements/git/index.js";      // wb-diff, wb-history-graph, wb-restore, wb-undo
+export * from "./elements/video/index.js";    // wb-video, wb-video-source

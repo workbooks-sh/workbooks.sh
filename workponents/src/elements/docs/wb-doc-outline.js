@@ -1,0 +1,91 @@
+// <wb-doc-outline> — a clickable heading tree for a document, auto-synced.
+//
+// Binds to a <wb-doc> by id (`for="my-doc"`) or, with no `for`, to the nearest
+// preceding/containing <wb-doc>. It reads that doc's `.outline` and re-syncs on
+// the doc's `wb-doc:rendered` event — so editing the source (composition-as-
+// source) keeps the outline live with no manual wiring. Clicking a heading
+// scrolls it into view inside the doc's shadow root.
+import { WbElement, define } from "../../core/element.js";
+import { escapeHtml } from "./render.js";
+
+export class WbDocOutline extends WbElement {
+  static props = ["for"];
+
+  static styles = `
+    :host { display: block; font-family: var(--wb-font); }
+    nav { border-left: 2px solid var(--wb-border); padding-left: var(--wb-space-3); }
+    .label { font-family: var(--wb-font-mono); font-size: 0.62rem; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--wb-fg-subtle);
+      margin: 0 0 var(--wb-space-2); }
+    ol { list-style: none; margin: 0; padding: 0; }
+    li { margin: 1px 0; }
+    a { display: block; text-decoration: none; color: var(--wb-fg-muted);
+      font-size: var(--wb-text-sm); line-height: 1.5; padding: 3px var(--wb-space-2);
+      border-radius: var(--wb-radius-sm); cursor: pointer;
+      transition: color var(--wb-dur) var(--wb-ease), background var(--wb-dur) var(--wb-ease); }
+    a:hover { color: var(--wb-fg); background: var(--wb-surface-soft); }
+    a.active { color: var(--wb-brand); background: var(--wb-brand-soft); font-weight: 600; }
+    .l2 { padding-left: var(--wb-space-3); }
+    .l3 { padding-left: var(--wb-space-5); font-size: 0.95em; }
+    .l4, .l5, .l6 { padding-left: calc(var(--wb-space-5) + var(--wb-space-3)); font-size: 0.9em; }
+    .empty { color: var(--wb-fg-subtle); font-size: var(--wb-text-sm); }
+  `;
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._bind();
+  }
+
+  disconnectedCallback() {
+    if (this._doc && this._onRender) this._doc.removeEventListener("wb-doc:rendered", this._onRender);
+  }
+
+  _findDoc() {
+    const ref = this.attr("for");
+    if (ref) {
+      const root = this.getRootNode();
+      return (root.getElementById && root.getElementById(ref)) || document.getElementById(ref);
+    }
+    // nearest wb-doc: a previous sibling, or anywhere in the document
+    let n = this.previousElementSibling;
+    while (n) { if (n.tagName === "WB-DOC") return n; n = n.previousElementSibling; }
+    return document.querySelector("wb-doc");
+  }
+
+  _bind() {
+    const doc = this._findDoc();
+    if (!doc) { this._outline = []; this.update(); return; }
+    this._doc = doc;
+    this._onRender = (e) => { this._outline = (e.detail && e.detail.outline) || doc.outline; this.update(); };
+    doc.addEventListener("wb-doc:rendered", this._onRender);
+    // doc may have already rendered before we bound — read it now if so
+    if (doc.outline && doc.outline.length) { this._outline = doc.outline; this.update(); }
+    else if (doc._source == null) { /* will fire on load */ }
+    else { this._outline = doc.outline || []; this.update(); }
+  }
+
+  _scrollTo(id) {
+    if (!this._doc) return;
+    const root = this._doc.shadowRoot || this._doc;
+    const target = root.getElementById ? root.getElementById(id) : root.querySelector(`#${CSS.escape(id)}`);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    this.shadowRoot.querySelectorAll("a").forEach((a) => a.classList.toggle("active", a.dataset.id === id));
+  }
+
+  render() {
+    const items = this._outline || [];
+    if (!items.length) return `<nav><p class="label">Outline</p><p class="empty">No headings yet.</p></nav>`;
+    return `<nav>
+      <p class="label">Outline</p>
+      <ol>${items.map((h) => `<li><a class="l${h.level}" data-id="${h.id}" href="#${h.id}">${escapeHtml(h.text)}</a></li>`).join("")}</ol>
+    </nav>`;
+  }
+
+  update() {
+    super.update();
+    this.shadowRoot.querySelectorAll("a").forEach((a) =>
+      a.addEventListener("click", (e) => { e.preventDefault(); this._scrollTo(a.dataset.id); }));
+  }
+}
+
+define("wb-doc-outline", WbDocOutline);
