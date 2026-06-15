@@ -23,6 +23,8 @@
   import ToastStack from "$lib/components/ToastStack.svelte";
   import WorkspaceOnboarding from "$lib/workspace/WorkspaceOnboarding.svelte";
   import OnboardingFlow from "$lib/onboarding/OnboardingFlow.svelte";
+  import SignInGate from "$lib/auth/SignInGate.svelte";
+  import { auth } from "$lib/auth/store.svelte";
   import { setupStatus } from "$lib/bridge/setup.svelte";
   import WorkspaceSwitcher from "$lib/workspace/WorkspaceSwitcher.svelte";
   import EditNameModal from "$lib/workspace/EditNameModal.svelte";
@@ -584,8 +586,16 @@
 
 <svelte:window onkeydown={onKey} />
 
-{#if !initialized}
+{#if !initialized || auth.status === "checking"}
+  <!-- Initial app + auth probe in flight — don't flash the sign-in
+       screen before we know whether a session already exists. -->
   <div class="loading"></div>
+{:else if auth.status !== "signed-in"}
+  <!-- Mandatory sign-in (wb-xiei.1): no workspace, no app until the
+       user has a Workbooks session. Sign-in is free; it secures their
+       data. A stored session counts even when the engine is offline
+       (offline-first), so signed-in users skip this regardless. -->
+  <SignInGate />
 {:else if needsWorkspace}
   <!-- Core file-system UX (wb-aakl.5): create the first workspace so
        packages have somewhere to live. Not a setup gate. -->

@@ -482,7 +482,7 @@
   const accountRow = $derived.by(() => {
     if (auth.status === "signed-in")
       return { label: "Signed in", dot: "ok" as const };
-    if (auth.status === "sidecar-offline")
+    if (auth.sidecarOffline)
       return { label: "Unavailable", dot: "warn" as const };
     if (auth.status === "checking")
       return { label: "Checking…", dot: "pending" as const };
@@ -499,7 +499,7 @@
   const accountLabel = $derived.by(() => {
     if (auth.status === "signed-in")
       return auth.user?.displayName ?? auth.user?.email ?? "Account";
-    if (auth.status === "sidecar-offline") return "Engine offline";
+    if (auth.sidecarOffline) return "Engine offline";
     if (auth.status === "checking") return "Checking…";
     return "Sign in";
   });
@@ -849,7 +849,7 @@
           {:else}
             <span class="account-avatar lg2">{accountInitial()}</span>
           {/if}
-        {:else if auth.status === "sidecar-offline"}
+        {:else if auth.sidecarOffline}
           <span class="account-anon lg2 offline">
             <ArrowsClockwise size={14} weight="fill" class={accountBusy ? "spinning" : ""} />
           </span>

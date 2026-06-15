@@ -75,12 +75,12 @@
   <LiveBar />
 </div>
 
-<!-- Sidecar gate at the app root. Sign-in is OPTIONAL — the rail
-     avatar (and Settings → Account) are the entry points, and the
-     app stays usable in the anonymous default state. Only the
-     sidecar-unreachable overlay is a hard gate, because without
-     Workhorse we can't do anything network-adjacent. -->
-{#if auth.status === "sidecar-offline"}
+<!-- Engine-offline gate at the app root. Only shown to a SIGNED-IN user:
+     sign-in (SignInGate, in +page) must come first and does NOT need the
+     engine, so this overlay must never cover it on first run (engine not
+     installed yet + signed-out). Once signed in, the engine is required
+     for network-adjacent work, so its absence is still a hard gate here. -->
+{#if auth.status === "signed-in" && auth.sidecarOffline}
   <SidecarOfflineOverlay />
 {/if}
 
