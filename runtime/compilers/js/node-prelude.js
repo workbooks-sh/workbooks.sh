@@ -181,6 +181,29 @@
   // `process` is a builtin module too (require('node:process')) AND a global (Node exposes both).
   registry["process"] = { factory: null, exports: process, loaded: true };
 
+  // ---- node:module — createRequire / builtinModules (ESM-bundle support) -------------------------
+  // A real ESM bundle does `import { createRequire } from 'module'; const require = createRequire(import.meta.url)`
+  // (often ×3) to reach CJS deps. createRequire(url) hands back THIS prelude's require (the same node:/bare
+  // resolver) — the `url`/`path` arg only seeds a base for relative ids, which all canon() to bare anyway.
+  var moduleExports = {
+    createRequire: function (_from) {
+      // a require bound to a base; relative ids still canon() into the shared registry.
+      var r = function (id) { return require(id); };
+      r.resolve = require.resolve;
+      r.cache = require.cache;
+      r.main = undefined;
+      return r;
+    },
+    builtinModules: Object.keys(registry),
+    Module: { createRequire: function (u) { return moduleExports.createRequire(u); } }
+  };
+  registry["module"] = { factory: null, exports: moduleExports, loaded: true };
+
+  // ---- import.meta.url stub ----------------------------------------------------------------------
+  // Classic eval has no `import.meta`; the host's ESM->CJS rewrite replaces every `import.meta` token with
+  // `globalThis.__wbImportMeta`. Provide a file: URL so createRequire(import.meta.url) gets a usable base.
+  globalThis.__wbImportMeta = { url: "file://" + ((boot.env && boot.env.PWD) || "/") + "/script.mjs" };
+
   // ---- install globals -------------------------------------------------------------------------
   globalThis.process = process;
   globalThis.Buffer = Buffer;
