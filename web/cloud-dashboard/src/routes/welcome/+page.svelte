@@ -85,7 +85,7 @@
       <h1>Connect billing</h1>
       <p class="sub">Add a payment method to go beyond the free allowance — or skip and add it later. Your nexus keeps running on the starter allowance.</p>
       {#if createdNexus}
-        <div class="done-row" style="background:color-mix(in srgb, {accent} 30%, var(--card))">✓ Nexus <b>{createdNexus.name}</b> is building in {region}.</div>
+        <div class="done-row" style="background:color-mix(in srgb, {accent} 42%, #fff); color:#1a1b1e">✓ Nexus <b>{createdNexus.name}</b> is building in {region}.</div>
       {/if}
       <div class="foot">
         <button class="btn" onclick={back}>Back</button>
