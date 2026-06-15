@@ -60,4 +60,12 @@ across light/dark/signal, registering from one import with zero console errors:
 - `git` — `wb-diff` (semantic org-block diff + line fallback, in-JS) / `wb-history-graph` / `wb-restore` / `wb-undo`.
 - `video` — `wb-video` / `wb-video-source` (themed wrappers over the shipped wavelet player).
 
-**Next** — Phase 2, the DuckDB trio: `tables` → `data-viz` → `maps` (one in-WASM engine, three surfaces).
+**Phase 2 — the DuckDB trio (done)** — one in-WASM engine (`src/data/`: DuckDB-wasm / runtime tier /
+in-JS memory floor, behind the Host seam), three surfaces binding the `{columns, rows[][], types}`
+contract; all aggregation/spatial work runs as SQL in the engine, not JS:
+- `tables` — `wb-table` (virtualized grid = a view over a query) / `wb-column`.
+- `data-viz` — `wb-chart` (bar/line/area/scatter/pie, zero-dep SVG) / `wb-spark` / `wb-metric`.
+- `maps` — `wb-map` (points/heat/choropleth; zero-dep themed projection, Host tiles when configured).
+
+**Next** — Phase 3: `forms` / `records` / `search` / `auth` (`records` + `search` build on `src/data`;
+`forms` + `auth` add a shared validation layer + the Host identity seam).
