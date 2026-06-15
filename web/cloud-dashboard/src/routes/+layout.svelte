@@ -13,6 +13,17 @@
 
   // /welcome + /denied render full-bleed, without the app chrome.
   const bare = $derived(page.url.pathname === '/welcome' || page.url.pathname === '/denied');
+
+  // each section gets its own pastel "little touch" (progress bars, accents) via --section
+  const sectionAccent = $derived.by(() => {
+    const p = page.url.pathname;
+    if (p.startsWith('/storage')) return 'var(--sky)';
+    if (p.startsWith('/team')) return 'var(--peach)';
+    if (p.startsWith('/shared')) return 'var(--cream)';
+    if (p.startsWith('/usage')) return 'var(--sage)';
+    if (p.startsWith('/settings')) return 'var(--violet)';
+    return 'var(--mint)'; // nexuses / home / detail
+  });
   // the signed-in user (from the WorkOS session via +layout.server.js)
   const userName = $derived(data?.user ? ([data.user.firstName, data.user.lastName].filter(Boolean).join(' ') || data.user.email.split('@')[0]) : 'Account');
   const userEmail = $derived(data?.user?.email || '');
@@ -56,7 +67,7 @@
 {#if bare}
   {@render children()}
 {:else}
-<div id="app">
+<div id="app" style="--section:{sectionAccent}">
   <!-- sidebar -->
   <aside class="side">
     <div class="topdna"><DnaStrip seed={7} height={8} /></div>
