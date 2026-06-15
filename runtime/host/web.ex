@@ -307,6 +307,21 @@ defmodule Workbooks.Web do
     j(conn, 200, Workbooks.NexusUsage.rollup(conn.assigns[:tenant]))
   end
 
+  # The signed-in user's identity + the ORGS they belong to, each with their role.
+  # An org ≈ a nexus (the isolation unit), so this powers the desktop/dashboard
+  # org/nexus switcher. `active_org` is the org of the current token. Fail-soft:
+  # without a WorkOS API key (or for a personal/no-org session) `orgs` is [].
+  get "/api/platform/me" do
+    claims = me_claims(conn)
+    user_id = claims["sub"]
+
+    j(conn, 200, %{
+      user: %{id: user_id, name: claims["name"] || claims["given_name"] || ""},
+      active_org: conn.assigns[:tenant],
+      orgs: if(is_binary(user_id), do: Workbooks.WorkOS.orgs_for_user(user_id), else: [])
+    })
+  end
+
   # Real per-org storage total + a bucket per nexus.
   get "/api/platform/storage" do
     org = conn.assigns[:tenant]
@@ -1927,6 +1942,19 @@ defmodule Workbooks.Web do
 
   defp reason_str(r) when is_atom(r), do: Atom.to_string(r)
   defp reason_str(r), do: inspect(r)
+
+  # Re-verify the bearer to read the user identity claims (sub/name) for /me. The Auth
+  # plug already authenticated this request (it only assigned the tenant); this pulls
+  # the full claims. JWKS is cached, so the extra verify is cheap. {} if absent/invalid.
+  defp me_claims(conn) do
+    with [h | _] <- get_req_header(conn, "authorization"),
+         "Bearer " <> token <- h,
+         {:ok, claims} <- Workbooks.OIDC.verify_claims(token) do
+      claims
+    else
+      _ -> %{}
+    end
+  end
 
   # The role→capability legend, for the dashboard "Roles & access" surface.
   defp rbac_matrix do

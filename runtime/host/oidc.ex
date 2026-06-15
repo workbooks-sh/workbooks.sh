@@ -18,16 +18,31 @@ defmodule Workbooks.OIDC do
   WB_OIDC_JWKS_URL when nil). Returns `{:ok, tenant}` or `:error`.
   """
   def verify_token(token, jwks \\ nil) when is_binary(token) do
+    case verify_claims(token, jwks) do
+      {:ok, claims} ->
+        case tenant_from(claims) do
+          t when is_binary(t) and t != "" -> {:ok, t}
+          _ -> :error
+        end
+
+      :error ->
+        :error
+    end
+  end
+
+  @doc """
+  Like `verify_token/2` but returns the FULL verified claims map (`sub`, `org_id`,
+  `name`, …) — for callers that need the user identity, not just the tenant.
+  `{:ok, claims}` or `:error`.
+  """
+  def verify_claims(token, jwks \\ nil) when is_binary(token) do
     with %{"keys" => _} = ks <- jwks || fetch_jwks(),
          {:ok, kid} <- header_kid(token),
          {:ok, jwk} <- jwk_for_kid(ks, kid),
          {true, %JOSE.JWT{fields: claims}, _} <- JOSE.JWT.verify_strict(jwk, ["RS256"], token),
          true <- not_expired?(claims),
          true <- issuer_ok?(claims) do
-      case tenant_from(claims) do
-        t when is_binary(t) and t != "" -> {:ok, t}
-        _ -> :error
-      end
+      {:ok, claims}
     else
       _ -> :error
     end
