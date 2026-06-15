@@ -20,6 +20,8 @@
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import PaletteModal from "$lib/palette/PaletteModal.svelte";
   import { packageStore as workspace } from "$lib/bridge/package.svelte";
+  import { openAgentTab, openNewAgentTab } from "$lib/tabs/agentTab";
+  import { chrome } from "$lib/ui/chrome.svelte";
 
   /** undefined = closed, string slug = edit-existing. Create-new
    *  no longer routes through this slot — it opens the create-agent
@@ -70,9 +72,18 @@
     await agentSettings.setDefaultAgent(pinned === a.slug ? "" : a.slug);
   }
 
-  function openEdit(a: AgentCatalogEntry) {
+  // Edit opens the agent as a workbook TAB (feat/agent-tab) — the
+  // agent editor IS a workbook surface, not a modal. Switch the canvas
+  // to doc mode so the new tab is visible.
+  async function openEdit(a: AgentCatalogEntry) {
     menuOpen = false;
-    editorSlug = a.slug;
+    await openAgentTab(a.slug);
+    chrome.mode = "doc";
+  }
+
+  async function openCreateTab() {
+    await openNewAgentTab();
+    chrome.mode = "doc";
   }
 
   function openCreate() {
@@ -117,7 +128,7 @@
   <h2>Agents</h2>
   <span class="count">{agents.agents.length}</span>
   <span class="spacer"></span>
-  <button type="button" class="primary" onclick={openCreate}>
+  <button type="button" class="primary" onclick={openCreateTab}>
     <Plus weight="bold" size={12} aria-hidden="true" />
     New agent
   </button>
@@ -193,13 +204,13 @@
       </li>
     {/each}
     <li>
-      <button type="button" class="row create" onclick={openCreate}>
+      <button type="button" class="row create" onclick={openCreateTab}>
         <span class="row-icon dashed">
           <Plus weight="bold" size={12} aria-hidden="true" />
         </span>
         <span class="row-body">
           <span class="row-title">Create new agent</span>
-          <span class="row-meta">Opens the editor</span>
+          <span class="row-meta">Opens in a workbook tab</span>
         </span>
       </button>
     </li>

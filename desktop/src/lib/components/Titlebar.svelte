@@ -30,6 +30,7 @@
     FileCode,
     Hash,
     Cube as Box,
+    Robot as AgentGlyph,
     SidebarSimple,
     MagnifyingGlass,
   } from "phosphor-svelte";
@@ -73,6 +74,7 @@
   function kindIcon(kind: Tab["kind"]) {
     switch (kind) {
       case "workbook": return Box;
+      case "agent": return AgentGlyph;
       case "org": return Hash;
       case "code": return FileCode;
       case "text":

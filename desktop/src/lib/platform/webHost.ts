@@ -123,6 +123,82 @@ const IDENTITY = {
 };
 const DAEMON = { state: "running", url: "http://127.0.0.1:8787", pid: 4242, manager: "krunvm" };
 
+// ── agents (AgentDef) seed — backs the agent-as-workbook-tab editor.
+// The catalog itself is served over HTTP (engineRequest), which a
+// browser preview can't reach; the agents store falls back to
+// AGENTS_CATALOG_PREVIEW (exported below) for the list. These sources
+// back agents_read / agents_patch so editing a seeded agent in a tab
+// round-trips through the host seam.
+export interface PreviewAgent {
+  slug: string;
+  title: string;
+  tagline: string;
+  icon: string;
+  model: string | null;
+  scope: "user" | "project" | "builtin";
+  toolkits: string[];
+  system_prompt_preview: string;
+}
+export const AGENTS_CATALOG_PREVIEW: PreviewAgent[] = [
+  {
+    slug: "workhorse",
+    title: "Workhorse",
+    tagline: "The default Workbooks agent — knows the ecosystem, can do anything reasonable.",
+    icon: "lucide:Bot",
+    model: null,
+    scope: "builtin",
+    toolkits: ["bash", "wb"],
+    system_prompt_preview: "You are Workhorse, the default Workbooks agent.",
+  },
+  {
+    slug: "researcher",
+    title: "Researcher",
+    tagline: "Fans out web searches, verifies claims, writes a cited report.",
+    icon: "lucide:Telescope",
+    model: "google/gemini-3.5-flash",
+    scope: "user",
+    toolkits: ["bash", "wb", "git"],
+    system_prompt_preview:
+      "You are a meticulous research agent. Gather sources, verify each claim against at least two independent references, and synthesize a cited report.",
+  },
+];
+
+const AGENTS_MOCK: Record<string, { source: string; scope: "user" | "project" | "builtin" }> = {
+  workhorse: {
+    scope: "builtin",
+    source: `* Workhorse                                                          :agent:
+  :PROPERTIES:
+  :ID:           workhorse
+  :TYPE:         ai
+  :ICON:         lucide:Bot
+  :TOOLKITS:     bash wb
+  :END:
+** System prompt
+You are Workhorse, the default Workbooks agent.
+`,
+  },
+  researcher: {
+    scope: "user",
+    source: `#+EXTENSIONS: ICON TAGLINE TOOLKITS
+
+* Researcher                                                          :agent:
+  :PROPERTIES:
+  :ID:           researcher
+  :TYPE:         ai
+  :MODEL:        google/gemini-3.5-flash
+  :ICON:         lucide:Telescope
+  :TAGLINE:      Fans out web searches, verifies claims, writes a cited report.
+  :TOOLKITS:     bash wb git
+  :HUMAN_IN_LOOP: true
+  :END:
+** System prompt
+You are a meticulous research agent. Gather sources, verify each claim against at least two independent references, and synthesize a cited report.
+`,
+  },
+};
+
+const agentSettingsMock = { default_model: "", default_agent_slug: "workhorse" };
+
 /** Resolve the workbook path an `app` package opens as a window/tab.
  *  Real Kanban workbook for Kanban; a labeled stub path for every other
  *  app. Folders never call this (they open the folder viewer instead). */
@@ -161,6 +237,16 @@ type MockTab = { id: string; path: string; title: string; kind: string; dirty: b
  *  packaged host via $lib/tabs/classify (wavelet → player, `.html` →
  *  workbook, `.org` → org, else text). */
 function tabFromPath(path: string, id: string): MockTab {
+  // Agent tabs: `agent://<slug>` → titled by the agent (or "New agent").
+  const am = path.match(/^agent:\/\/(.+)$/i);
+  if (am) {
+    const slug = decodeURIComponent(am[1]);
+    const title =
+      slug === "__new__"
+        ? "New agent"
+        : AGENTS_CATALOG_PREVIEW.find((x) => x.slug === slug)?.title ?? slug;
+    return { id, path, title, kind: "agent", dirty: false };
+  }
   const file = path.split("/").pop() ?? path;
   const base = file.replace(/\.[^.]+$/, "");
   const title = base.charAt(0).toUpperCase() + base.slice(1);
@@ -409,8 +495,63 @@ function makeInvoke(): Invoke {
       case "theme_list": return { active_id: null, themes: [] };
       case "theme_set_active": case "theme_create": case "theme_update":
       case "theme_delete": return { active_id: null, themes: [] };
-      case "agent_settings_get": return { default_agent: "workhorse", default_model: null, catalog: [] };
-      case "agent_settings_set": return null;
+      case "agent_settings_get":
+        return { default_model: agentSettingsMock.default_model, default_agent_slug: agentSettingsMock.default_agent_slug };
+      case "agent_settings_set": {
+        const req = (a.req ?? {}) as { default_model?: string; default_agent_slug?: string };
+        if (req.default_model !== undefined) agentSettingsMock.default_model = req.default_model;
+        if (req.default_agent_slug !== undefined) agentSettingsMock.default_agent_slug = req.default_agent_slug;
+        return { ...agentSettingsMock };
+      }
+
+      // ── agents (AgentDef CRUD — runtime cap; mocked for preview) ──
+      // The agent editor opens as a workbook tab and reads/writes the
+      // agent's .org source through these verbs (feat/agent-tab).
+      case "agents_read": {
+        const slug = String(a.slug ?? "");
+        const src = AGENTS_MOCK[slug]?.source;
+        if (src === undefined) throw new Error(`agent not found: ${slug}`);
+        return { source: src };
+      }
+      case "agents_create": {
+        const req = a.req as { slug: string; source: string };
+        AGENTS_MOCK[req.slug] = { source: req.source, scope: "user" };
+        return { source: req.source };
+      }
+      case "agents_patch": {
+        const req = a.req as {
+          slug: string;
+          properties?: Record<string, string>;
+          title?: string | null;
+          system_prompt?: string;
+        };
+        const cur = AGENTS_MOCK[req.slug] ?? (AGENTS_MOCK[req.slug] = { source: "", scope: "user" });
+        // Mock patch: regenerate a minimal source so a re-read reflects
+        // the saved values (the real runtime patches verbatim).
+        const props = req.properties ?? {};
+        const lines: string[] = [];
+        lines.push(`* ${req.title ?? req.slug}                                                          :agent:`);
+        lines.push(`  :PROPERTIES:`);
+        lines.push(`  :ID:           ${req.slug}`);
+        lines.push(`  :TYPE:         ai`);
+        for (const [k, v] of Object.entries(props)) {
+          if (v && v.trim()) lines.push(`  :${k}:         ${v.trim()}`);
+        }
+        lines.push(`  :END:`);
+        if (req.system_prompt?.trim()) {
+          lines.push(`** System prompt`);
+          lines.push(req.system_prompt.trim());
+        }
+        cur.source = lines.join("\n") + "\n";
+        return { source: cur.source };
+      }
+      case "agents_delete":
+        delete AGENTS_MOCK[String(a.slug ?? "")];
+        return null;
+      case "agent_publish":
+        // Best-effort publish/send. Returns a fake nexus URL so the
+        // editor can show a "Published → …" confirmation in preview.
+        return { ok: true, url: `https://nexus.workbooks.sh/a/${a.slug}` };
 
       // ── keychain-backed lists (empty) ──
       case "keys_list": case "env_vars_list": case "connections_list":
