@@ -43,6 +43,10 @@ COPY runtime/vendor ./vendor
 RUN if [ "$INCLUDE_CLIP" = "true" ]; then export WB_CLIP=1; fi \
     && mix deps.get --only prod && mix deps.compile
 COPY runtime/ .
+# host/bundle.ex inlines web/wb-bundle-loader.js at compile time via @external_resource
+# (`__DIR__/../../web/wb-bundle-loader.js` → /web/...). The image COPYs only runtime/ into
+# /app, so place the loader where bundle.ex resolves it, or `mix compile` fails.
+COPY web/wb-bundle-loader.js /web/wb-bundle-loader.js
 RUN if [ "$INCLUDE_CLIP" = "true" ]; then export WB_CLIP=1; fi \
     && mix compile && mix release
 
