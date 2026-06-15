@@ -131,11 +131,13 @@ export async function getNexus(id) {
 
 /**
  * Provision a REAL nexus (a Fly machine via the runtime provisioner).
- * @param {{region?: string, plan?: string}} opts
+ * `database` carries the "comes with a database" intent; full Postgres/Neon
+ * provisioning is a creds-gated follow-up (the runtime honours it when configured).
+ * @param {{region?: string, plan?: string, database?: boolean}} opts
  * @returns {Promise<Nexus>}
  */
 export async function createNexus(opts) {
-  return withSub(await plat('/nexuses', { method: 'POST', body: { region: opts.region, plan: opts.plan } }));
+  return withSub(await plat('/nexuses', { method: 'POST', body: { region: opts.region, plan: opts.plan, database: opts.database } }));
 }
 
 export async function deleteNexus(id) {
