@@ -3,7 +3,7 @@
  *
  * Single-pane is the default and is IMPLICIT: `panes` stays empty and
  * DocViewer follows tabs.active as before. A split materializes the
- * pane list (left→right, max 3); each pane shows one tab. Closing a
+ * pane list (left→right, max 4); each pane shows one tab. Closing a
  * tab drops its pane (reconcile); dropping back to one pane returns
  * to implicit mode. Pure frontend state — the host's tab list stays
  * the single source of truth for what's open.
@@ -17,7 +17,7 @@ export interface Pane {
   tabId: string;
 }
 
-const MAX_PANES = 3;
+const MAX_PANES = 4;
 
 class PaneStore {
   panes = $state<Pane[]>([]);

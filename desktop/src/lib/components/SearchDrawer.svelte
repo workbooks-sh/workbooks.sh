@@ -16,6 +16,7 @@
   import { aiAnswerLive, type AiAnswer } from "$lib/search/aiPreview";
   import { setSearch, type SearchApi } from "$lib/search/context";
   import type { SearchResult } from "$lib/search/types";
+  import { dnd } from "$lib/ui/dnd.svelte";
 
   const mode = $derived(search.mode);
   let aiResult = $state<AiAnswer | null>(null);
@@ -127,7 +128,17 @@
     e.dataTransfer.effectAllowed = "copy";
     e.dataTransfer.setData("text/uri-list", r.path ? `file://${target}` : target);
     e.dataTransfer.setData("text/plain", target);
-    if (r.path) e.dataTransfer.setData("application/x-workbooks-file-path", r.path);
+    if (r.path) {
+      e.dataTransfer.setData("application/x-workbooks-file-path", r.path);
+      // Mirror into the shared shell drag store so the existing shell
+      // drop zones (the sidebar bookmark grid, the doc-area split
+      // overlay) light up and accept this drag — dataTransfer is
+      // unreadable during dragover, so dnd.payload is the truth.
+      dnd.start({ type: "workbook", path: r.path, title: r.title }, e);
+    }
+  }
+  function onDragEnd() {
+    dnd.end();
   }
 
   function openSource(s: { url?: string; path?: string }) {
@@ -267,6 +278,7 @@
                 class:active={i === highlighted}
                 draggable="true"
                 ondragstart={(e) => onDragStart(e, r)}
+                ondragend={onDragEnd}
                 onmouseenter={() => (highlighted = i)}
                 onclick={() => open(r)}
                 title={r.path ?? r.title}
@@ -294,6 +306,7 @@
               aria-selected={i === highlighted}
               draggable="true"
               ondragstart={(e) => onDragStart(e, r)}
+              ondragend={onDragEnd}
               onmouseenter={() => (highlighted = i)}
               onclick={() => open(r)}
               title={r.path ?? r.url ?? r.title}
