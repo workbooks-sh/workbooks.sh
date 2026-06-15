@@ -199,6 +199,35 @@ You are a meticulous research agent. Gather sources, verify each claim against a
 
 const agentSettingsMock = { default_model: "", default_agent_slug: "workhorse" };
 
+// ── organization members (share-to-organization surface) ──────────────────
+// Real people in the active org. `avatar` is a real photo URL (pravatar
+// serves stable headshots keyed by the numeric seed) so the stacked-avatar
+// UI renders actual images, not just initials. `roles` are the assignable
+// tags the share modal offers. The real web build routes org.members to the
+// runtime; this seed lets the browser preview exercise the full flow.
+type OrgMember = {
+  handle: string;
+  display_name: string;
+  avatar: string;
+  email: string;
+  title: string;
+};
+const ORG = {
+  id: "org_acme",
+  name: "Acme Studio",
+  members: [
+    { handle: "you", display_name: "You", avatar: "https://randomuser.me/api/portraits/men/32.jpg", email: "you@workbooks.sh", title: "Owner" },
+    { handle: "amara", display_name: "Amara Okafor", avatar: "https://randomuser.me/api/portraits/women/68.jpg", email: "amara@acme.studio", title: "Design Lead" },
+    { handle: "ravi", display_name: "Ravi Patel", avatar: "https://randomuser.me/api/portraits/men/45.jpg", email: "ravi@acme.studio", title: "Engineer" },
+    { handle: "mei", display_name: "Mei Lin", avatar: "https://randomuser.me/api/portraits/women/24.jpg", email: "mei@acme.studio", title: "PM" },
+    { handle: "diego", display_name: "Diego Santos", avatar: "https://randomuser.me/api/portraits/men/76.jpg", email: "diego@acme.studio", title: "Data" },
+    { handle: "nora", display_name: "Nora Haddad", avatar: "https://randomuser.me/api/portraits/women/12.jpg", email: "nora@acme.studio", title: "Research" },
+    { handle: "kenji", display_name: "Kenji Watanabe", avatar: "https://randomuser.me/api/portraits/men/3.jpg", email: "kenji@acme.studio", title: "Engineer" },
+    { handle: "priya", display_name: "Priya Nair", avatar: "https://randomuser.me/api/portraits/women/55.jpg", email: "priya@acme.studio", title: "Marketing" },
+  ] as OrgMember[],
+  roles: ["Viewer", "Editor", "Owner"],
+};
+
 /** Resolve the workbook path an `app` package opens as a window/tab.
  *  Real Kanban workbook for Kanban; a labeled stub path for every other
  *  app. Folders never call this (they open the folder viewer instead). */
@@ -301,6 +330,13 @@ function makeInvoke(): Invoke {
     typeof location !== "undefined" &&
     new URLSearchParams(location.search).get("onboarding") === "fresh";
   const freshState = { signedIn: false, runtime: false, hasKey: false };
+
+  // Stateful share-to-org mock — per-resource recipient list. Keyed by the
+  // resource id the share modal targets; each entry records who it's shared
+  // with + the role assigned, so re-opening the modal reflects prior shares
+  // and the trigger can render the shared-with stacked avatars.
+  type ShareRecipient = { handle: string; role: string; shared_at: number };
+  const sharesByResource = new Map<string, ShareRecipient[]>();
 
   // Stateful bookmark mock — backs the sidebar bookmark grid.
   let bookmarksMock: {
@@ -600,6 +636,30 @@ function makeInvoke(): Invoke {
         let bin = "";
         for (const b of bytes) bin += String.fromCharCode(b);
         return btoa(bin);
+      }
+
+      // ── organization + share-to-org (runtime domain in a real build) ──
+      case "org_current": return { id: ORG.id, name: ORG.name, roles: ORG.roles };
+      case "org_members": return ORG.members;
+      case "org_shares_for": return sharesByResource.get(String(a.resource_id)) ?? [];
+      case "org_share": {
+        const rid = String(a.resource_id);
+        const incoming = (a.recipients ?? []) as { handle: string; role: string }[];
+        const now = Date.now();
+        const list = sharesByResource.get(rid) ?? [];
+        const byHandle = new Map(list.map((r) => [r.handle, r]));
+        for (const rec of incoming) {
+          byHandle.set(rec.handle, { handle: rec.handle, role: rec.role, shared_at: byHandle.get(rec.handle)?.shared_at ?? now });
+        }
+        const next = [...byHandle.values()];
+        sharesByResource.set(rid, next);
+        return next;
+      }
+      case "org_unshare": {
+        const rid = String(a.resource_id);
+        const list = sharesByResource.get(rid) ?? [];
+        sharesByResource.set(rid, list.filter((r) => r.handle !== a.handle));
+        return sharesByResource.get(rid);
       }
 
       // ── workbook helpers ──

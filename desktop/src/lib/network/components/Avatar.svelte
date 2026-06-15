@@ -38,7 +38,13 @@
       .toUpperCase()
       .padEnd(2, handle.slice(0, 1).toUpperCase()),
   );
-  const isImage = $derived(!!avatar && avatar.startsWith("data:image/"));
+  const isImage = $derived(
+    !!avatar &&
+      (avatar.startsWith("data:image/") ||
+        avatar.startsWith("http://") ||
+        avatar.startsWith("https://") ||
+        avatar.startsWith("/")),
+  );
 </script>
 
 <span

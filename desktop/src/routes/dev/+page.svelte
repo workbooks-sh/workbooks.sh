@@ -9,9 +9,36 @@
    */
   import FolderIcon from "$lib/ui/FolderIcon.svelte";
   import WaveletPlayer from "$lib/viewer/WaveletPlayer.svelte";
+  import ShareOrgModal from "$lib/network/components/ShareOrgModal.svelte";
+  import StackedAvatars from "$lib/network/components/StackedAvatars.svelte";
+  import { sharesFor, listMembers, type ShareRecipient, type OrgMember } from "$lib/bridge/org.svelte";
 
-  const STORIES = ["FolderIcon", "WaveletPlayer"] as const;
-  let story = $state<(typeof STORIES)[number]>("FolderIcon");
+  const STORIES = ["ShareOrg", "FolderIcon", "WaveletPlayer"] as const;
+  let story = $state<(typeof STORIES)[number]>("ShareOrg");
+
+  // ── ShareOrg controls ──
+  const SHARE_RESOURCE = "wb_quarterly_plan";
+  let shareOpen = $state(false);
+  let shareRecipients = $state<ShareRecipient[]>([]);
+  let orgMembers = $state<OrgMember[]>([]);
+  // Map recipient handles → members for the trigger's stacked avatars.
+  const sharedMembers = $derived(
+    shareRecipients
+      .map((r) => orgMembers.find((m) => m.handle === r.handle))
+      .filter((m): m is OrgMember => !!m),
+  );
+  async function refreshShares() {
+    [shareRecipients, orgMembers] = await Promise.all([
+      sharesFor(SHARE_RESOURCE),
+      orgMembers.length ? Promise.resolve(orgMembers) : listMembers(),
+    ]);
+  }
+  let shareBoot = false;
+  $effect(() => {
+    if (shareBoot) return;
+    shareBoot = true;
+    void refreshShares();
+  });
 
   // ── WaveletPlayer controls ──
   let compPath = $state("/mock/compositions/clip/clip.html");
@@ -50,7 +77,51 @@
   </aside>
 
   <main class="canvas">
-    {#if story === "FolderIcon"}
+    {#if story === "ShareOrg"}
+      <section class="controls">
+        <p class="hint">
+          Share-to-organization. Click the stacked avatars (or the button) to open
+          the modal — pick org members (real photos), assign a role, Share. The
+          shared state reflects back as stacked avatars on this card.
+        </p>
+      </section>
+
+      <section class="row">
+        <h2>Shared with</h2>
+        <div class="share-trigger-row">
+          <StackedAvatars
+            members={sharedMembers}
+            size="lg"
+            max={6}
+            interactive
+            onclick={() => (shareOpen = true)}
+          />
+          <button class="share-btn" onclick={() => (shareOpen = true)}>
+            {sharedMembers.length === 0 ? "Share…" : "Manage sharing"}
+          </button>
+        </div>
+        <p class="hint">
+          {#if sharedMembers.length === 0}
+            Not shared with anyone yet.
+          {:else}
+            Shared with {sharedMembers.length}
+            {sharedMembers.length === 1 ? "member" : "members"} of the org.
+          {/if}
+        </p>
+      </section>
+
+      {#if shareOpen}
+        <ShareOrgModal
+          resourceId={SHARE_RESOURCE}
+          resourceTitle="Quarterly Plan"
+          onclose={() => {
+            shareOpen = false;
+            void refreshShares();
+          }}
+          onshared={(r) => (shareRecipients = r)}
+        />
+      {/if}
+    {:else if story === "FolderIcon"}
       <section class="controls">
         <label>
           <span>Icon</span>
@@ -328,6 +399,26 @@
   .bare {
     font-size: 19px;
     line-height: 1;
+  }
+  .share-trigger-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 16px;
+    border: 1px solid var(--color-border, #0001);
+    border-radius: 12px;
+    background: var(--color-surface, #fff);
+  }
+  .share-btn {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 0;
+    background: #3fe081;
+    color: #06281a;
+    cursor: pointer;
   }
   .player-stage {
     display: flex;
