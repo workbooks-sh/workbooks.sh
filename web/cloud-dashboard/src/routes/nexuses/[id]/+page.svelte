@@ -73,10 +73,10 @@
   <div class="sechead">
     <div>
       <h2 style="display:flex;align-items:center;gap:11px"><span class="dot {nexus.state}"></span><span>{nexus.name}</span></h2>
-      <p class="mono">{nexus.url}</p>
+      <p class="mono">{config.plan} · {config.region}</p>
     </div>
     <div style="display:flex;gap:8px">
-      <button class="btn sm" onclick={() => window.open('https://' + nexus.url, '_blank')}>Open ↗</button>
+      <button class="btn sm" onclick={() => window.open(nexus.url, '_blank')}>Open ↗</button>
       <button class="btn sm" onclick={restart} disabled={nexus.state === 'build'}>Restart</button>
       {#if nexus.state === 'sleep'}
         <button class="btn sm" onclick={wake}>Wake</button>
@@ -99,7 +99,7 @@
       <h3>Configuration</h3>
       <div class="kv"><span class="k">Region</span><span class="v">{config.region}</span></div>
       <div class="kv"><span class="k">Plan</span><span class="v">{config.plan}</span></div>
-      <div class="kv"><span class="k">Scale-to-zero</span><span class="v" style="color:var(--live)">{config.scaleToZero}</span></div>
+      <div class="kv"><span class="k">Status</span><span class="v" style="color:var(--live)">{config.status}</span></div>
       <div class="kv"><span class="k">Storage addon</span><span class="v">{config.storage}</span></div>
       <div class="kv"><span class="k">Database</span><span class="v faint">{config.database}</span></div>
       <div class="kv"><span class="k">Created</span><span class="v">{config.created}</span></div>

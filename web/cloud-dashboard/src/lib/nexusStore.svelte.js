@@ -62,7 +62,7 @@ export const nexusStore = {
     const config = {
       region: nexus.region || '—',
       plan: nexus.plan || '—',
-      scaleToZero: 'on · 5 min idle',
+      status: nexus.state === 'run' ? 'Active' : nexus.state === 'sleep' ? 'Idle' : 'Starting',
       storage: '—',
       database: 'none',
       created: '—'
@@ -76,8 +76,8 @@ export const nexusStore = {
    * The backend assigns a non-guessable id (nx-…); the returned row is the source of
    * truth. Throws on failure so the caller can surface it.
    */
-  async provision({ region, plan } = {}) {
-    const nexus = await createNexus({ region, plan });
+  async provision({ name, region, plan, database } = {}) {
+    const nexus = await createNexus({ name, region, plan, database });
     nexuses = [nexus, ...nexuses];
     return nexus;
   },

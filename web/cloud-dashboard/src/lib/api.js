@@ -39,7 +39,7 @@ async function rt(path, { method = 'GET', body } = {}) {
  * @property {string} url       public hostname
  */
 
-const STATE_LABEL = { run: 'Running', sleep: 'Sleeping', build: 'Building', pause: 'Paused' };
+const STATE_LABEL = { run: 'Active', sleep: 'Idle', build: 'Starting', pause: 'Paused' };
 
 /** @type {Nexus[]} */
 const MOCK_NEXUSES = [
@@ -110,7 +110,7 @@ export async function getNexus(id) {
     const config = {
       region: nexus.region,
       plan: nexus.plan,
-      scaleToZero: 'on · 5 min idle',
+      status: nexus.state === 'run' ? 'Active' : nexus.state === 'sleep' ? 'Idle' : 'Starting',
       storage: row?.storage || '—',
       database: row?.database || 'none',
       created: '—'
@@ -137,7 +137,7 @@ export async function getNexus(id) {
  * @returns {Promise<Nexus>}
  */
 export async function createNexus(opts) {
-  return withSub(await plat('/nexuses', { method: 'POST', body: { region: opts.region, plan: opts.plan, database: opts.database } }));
+  return withSub(await plat('/nexuses', { method: 'POST', body: { name: opts.name, region: opts.region, plan: opts.plan, database: opts.database } }));
 }
 
 export async function deleteNexus(id) {

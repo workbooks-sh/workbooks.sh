@@ -25,7 +25,7 @@
   const SIZES = [
     { id: '1 GB', nm: 'Small',  ds: '1 GB · a project or a few agents' },
     { id: '2 GB', nm: 'Medium', ds: '2 GB · a busy app · more headroom' },
-    { id: '4 GB', nm: 'Large',  ds: '4 GB · heavy / always-warm · dedicated' }
+    { id: '4 GB', nm: 'Large',  ds: '4 GB · heavy workloads · dedicated' }
   ];
 
   async function deploy() {
@@ -36,7 +36,7 @@
     onclose?.();
     toast('Provisioning your nexus…');
     try {
-      const nx = await nexusStore.provision({ region: flyRegion, plan: size, database: dbOn });
+      const nx = await nexusStore.provision({ name: name.trim(), region: flyRegion, plan: size, database: dbOn });
       toast(`${nx.name} is provisioning`);
       goto('/nexuses/' + nx.id);
     } catch {
@@ -51,7 +51,7 @@
   <div class="modal" onclick={(e) => { if (e.target === e.currentTarget) onclose?.(); }}>
     <div class="sheet">
       <h2>New nexus</h2>
-      <p class="sub">A hosted runtime that builds and runs your workbooks. Sleeps when idle.</p>
+      <p class="sub">A hosted runtime that builds and runs your workbooks.</p>
 
       <div class="lab">Name</div>
       <div class="field"><input bind:value={name} placeholder="my-nexus" /></div>

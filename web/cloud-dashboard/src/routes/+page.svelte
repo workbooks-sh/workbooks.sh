@@ -19,7 +19,7 @@
       <a class="row" href="/nexuses/{n.id}">
         <div class="nx">
           <b><span class="dot {n.state}"></span>{n.name}</b>
-          <div class="url">{n.url}</div>
+          <div class="url">{n.plan}</div>
         </div>
         {#if n.state === 'run'}
           <Sparkline seed={i + 1} />
