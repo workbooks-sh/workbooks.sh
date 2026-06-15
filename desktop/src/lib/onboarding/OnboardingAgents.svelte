@@ -1,48 +1,73 @@
 <script lang="ts">
   /**
-   * OnboardingAgents — the "bring your agents" page that renders ABOVE the
+   * OnboardingAgents — the "connect your agents" page that renders ABOVE the
    * coach (in the content area, centered + lifted) during the connect step.
    *
-   * Workbooks integrates natively with the agents already on your machine
-   * (Claude Code, Codex, Cursor, …). We detect them and set them up FOR you
-   * with the Workbooks skill — check the ones to wire up; copy is the manual
-   * fallback. Brand icons come from LobeHub (github.com/lobehub/lobe-icons).
+   * Workbooks runs the coding agents already on your machine (Claude Code, Codex,
+   * Cursor) in isolated local microVMs. We DETECT them on PATH and, when you check
+   * one, CONNECT it — which lights up the experimental `acp` toolkit for Waldo
+   * (the runtime learns the connected agents via WB_ACP_AGENTS). Brand icons from
+   * LobeHub (github.com/lobehub/lobe-icons).
    *
-   * SCAFFOLD: detection here is demo data and "Set up" only toggles selection.
-   * Real filesystem detection + writing each agent's config (and ACP connect)
-   * are Tauri/Rust follow-ups — the seams (detected, configPath, command) are
-   * shaped for them.
+   * Detection + connect are REAL (Tauri connections_detect_local_cli /
+   * connections_create_local_cli, wb-xiei.9). Claude Desktop has no CLI — it stays
+   * a copy-the-MCP-command fallback. Graceful: outside Tauri / not found → the card
+   * is disabled with the manual command.
    */
   import { CheckCircle, Copy, Circle, MagnifyingGlass } from "phosphor-svelte";
   import { onMount } from "svelte";
   import { fly, fade } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
+  import { invoke } from "@tauri-apps/api/core";
+  import { connections } from "$lib/bridge/connections.svelte";
   import Icon from "$lib/ui/Icon.svelte";
 
   interface AgentTarget {
     id: string;
     name: string;
     icon: string; // lobe: brand slug
-    detected: boolean;
-    where: string; // where it was found / would be configured
-    command: string; // manual setup fallback
+    binary: string | null; // CLI to detect on PATH (null = no CLI, manual only)
+    service: string; // connection service id (matches the Rust conn store)
+    where: string; // default hint when not yet detected
+    command: string; // manual setup fallback (copied)
   }
 
-  // Demo set for the tour — the real list comes from a system scan later.
   const AGENTS: AgentTarget[] = [
-    { id: "claude-code", name: "Claude Code", icon: "lobe:claude-color", detected: true, where: "~/.claude", command: "npx skills add workbooks-sh/workbooks.sh" },
-    { id: "codex", name: "Codex", icon: "lobe:openai", detected: true, where: "~/.codex", command: "npx skills add workbooks-sh/workbooks.sh" },
-    { id: "cursor", name: "Cursor", icon: "lobe:cursor", detected: true, where: "~/.cursor", command: "cursor: add MCP — wb desktop mcp" },
-    { id: "claude-desktop", name: "Claude Desktop", icon: "lobe:claude-color", detected: false, where: "not found", command: "claude mcp add workbooks -- wb desktop mcp" },
+    { id: "claude-code", name: "Claude Code", icon: "lobe:claude-color", binary: "claude", service: "claude_code", where: "~/.claude", command: "npx skills add workbooks-sh/workbooks.sh" },
+    { id: "codex", name: "Codex", icon: "lobe:openai", binary: "codex", service: "codex", where: "~/.codex", command: "npx skills add workbooks-sh/workbooks.sh" },
+    { id: "cursor", name: "Cursor", icon: "lobe:cursor", binary: "cursor", service: "cursor", where: "~/.cursor", command: "cursor: add MCP — wb desktop mcp" },
+    { id: "claude-desktop", name: "Claude Desktop", icon: "lobe:claude-color", binary: null, service: "claude_desktop", where: "app", command: "claude mcp add workbooks -- wb desktop mcp" },
   ];
 
-  // Selected = will be set up on finish (detected ones default on).
-  let selected = $state<Record<string, boolean>>(
-    Object.fromEntries(AGENTS.filter((a) => a.detected).map((a) => [a.id, true])),
-  );
-  function toggle(a: AgentTarget) {
-    if (!a.detected) return;
-    selected = { ...selected, [a.id]: !selected[a.id] };
+  interface Probe { found: boolean; path: string | null; version: string | null; error: string | null }
+
+  // Detection results (by id) + which services have a live connection.
+  let probes = $state<Record<string, Probe>>({});
+  let selected = $state<Record<string, boolean>>({});
+  let busy = $state<Record<string, boolean>>({});
+
+  const isDetected = (a: AgentTarget) => !!probes[a.id]?.found;
+  const whereOf = (a: AgentTarget) => probes[a.id]?.path || a.where;
+  const foundCount = $derived(AGENTS.filter(isDetected).length);
+
+  async function toggle(a: AgentTarget) {
+    if (!isDetected(a) || busy[a.id]) return;
+    busy = { ...busy, [a.id]: true };
+    try {
+      if (selected[a.id]) {
+        const c = connections.forService(a.service as never);
+        if (c) await connections.disconnect(c.id);
+        selected = { ...selected, [a.id]: false };
+      } else {
+        const p = probes[a.id];
+        await invoke("connections_create_local_cli", {
+          req: { service: a.service, path: p?.path ?? null, version: p?.version ?? null },
+        });
+        await connections.refresh();
+        selected = { ...selected, [a.id]: true };
+      }
+    } catch { /* leave the prior state; the card reflects reality on next mount */ }
+    finally { busy = { ...busy, [a.id]: false }; }
   }
 
   let copied = $state<string | null>(null);
@@ -54,19 +79,34 @@
     } catch { /* selectable */ }
   }
 
-  // `embedded` drops the standalone card chrome so this sits inside the coach
-  // (the coach expands to hold it) rather than floating as its own page.
+  // `embedded` drops the standalone card chrome so this sits inside the coach.
   let { embedded = false }: { embedded?: boolean } = $props();
 
-  const foundCount = $derived(AGENTS.filter((a) => a.detected).length);
-
-  // Scan-then-reveal: even though detection is instant here, show a brief
-  // "scanning your machine" beat so the real (slower) filesystem scan later
-  // has a polished home. Cards stagger in once found.
+  // Scan-then-reveal: a brief "scanning" beat (the real PATH probe is fast) so
+  // detection has a polished home, then reflect detected + already-connected.
   let scanning = $state(true);
   onMount(() => {
-    const t = setTimeout(() => (scanning = false), 1300);
-    return () => clearTimeout(t);
+    let alive = true;
+    void (async () => {
+      try { await connections.refresh(); } catch { /* offline */ }
+      const next: Record<string, Probe> = {};
+      const sel: Record<string, boolean> = {};
+      for (const a of AGENTS) {
+        if (a.binary) {
+          try {
+            next[a.id] = await invoke<Probe>("connections_detect_local_cli", { name: a.binary });
+          } catch {
+            next[a.id] = { found: false, path: null, version: null, error: "not running in desktop" };
+          }
+        }
+        if (connections.forService(a.service as never)) sel[a.id] = true;
+      }
+      if (!alive) return;
+      probes = next;
+      selected = sel;
+    })();
+    const t = setTimeout(() => { if (alive) scanning = false; }, 1300);
+    return () => { alive = false; clearTimeout(t); };
   });
 </script>
 
@@ -76,9 +116,8 @@
     {#if scanning}
       <p in:fade={{ duration: 150 }}>Scanning your machine for installed agents…</p>
     {:else}
-      <p in:fade={{ duration: 200 }}>Workbooks works with the agents already on your machine. We found
-        <strong>{foundCount}</strong> — check the ones to wire up and we'll set
-        them up with the Workbooks skill. Or copy the command.</p>
+      <p in:fade={{ duration: 200 }}>Workbooks runs the coding agents already on your machine in isolated microVMs. We found
+        <strong>{foundCount}</strong> — check the ones to connect; Waldo can then hand them tasks. Or copy the command.</p>
     {/if}
   </header>
 
@@ -97,9 +136,9 @@
       <button
         type="button"
         class="card"
-        class:detected={a.detected}
+        class:detected={isDetected(a)}
         class:sel={selected[a.id]}
-        disabled={!a.detected}
+        disabled={!isDetected(a) || busy[a.id]}
         aria-pressed={!!selected[a.id]}
         onclick={() => toggle(a)}
         in:fly={{ y: 12, duration: 300, delay: i * 80, easing: cubicOut }}
@@ -107,10 +146,10 @@
         <span class="brand"><Icon value={a.icon} name={a.name} size={26} /></span>
         <span class="meta">
           <span class="name">{a.name}</span>
-          <span class="where">{a.detected ? a.where : "Not found"}</span>
+          <span class="where">{isDetected(a) ? whereOf(a) : "Not found"}</span>
         </span>
         <span class="state">
-          {#if !a.detected}
+          {#if !isDetected(a)}
             <span class="copy-link" role="button" tabindex="0"
               onclick={(e) => { e.stopPropagation(); void copy(a.command); }}
               onkeydown={(e) => { if (e.key === "Enter") { e.stopPropagation(); void copy(a.command); } }}>
@@ -129,7 +168,7 @@
 
   <footer>
     <span class="hint">
-      {scanning ? "Looking in your home folder + app configs…" : "We'll set the checked agents up when you finish — no copy-paste."}
+      {scanning ? "Looking on your PATH + home configs…" : "Checked agents are connected now — Waldo runs them in isolated microVMs."}
     </span>
   </footer>
 </div>
