@@ -31,14 +31,16 @@
     { id: 'scale', name: 'Scale', price: 249, storage: '1 TB', blurb: 'Serious storage + compute.' },
     { id: 'ent', name: 'Enterprise', price: null, storage: 'Custom', blurb: 'SSO · SCIM · dedicated.' }
   ];
-  // the "usual stack" they'd otherwise pay per seat — real comp prices (verify before a deck)
+  // the "usual stack" they'd otherwise pay per seat — real comp prices (verify before a deck).
+  // logos via Simple Icons (the lobe pack only covers AI/dev brands; this set is uniform).
   const STACK = [
-    { name: 'Slack', cat: 'chat', per: 18 },
-    { name: 'Notion', cat: 'docs', per: 20 },
-    { name: 'Linear', cat: 'project mgmt', per: 16 },
-    { name: 'Retool', cat: 'internal tools', per: 20 },
-    { name: 'Vercel', cat: 'dev hosting', per: 20 }
+    { name: 'Slack', cat: 'Chat', per: 18, slug: 'slack' },
+    { name: 'Notion', cat: 'Docs', per: 20, slug: 'notion' },
+    { name: 'Linear', cat: 'Project mgmt', per: 16, slug: 'linear' },
+    { name: 'Retool', cat: 'Internal tools', per: 20, slug: 'retool' },
+    { name: 'Vercel', cat: 'Dev hosting', per: 20, slug: 'vercel' }
   ];
+  const logo = (slug) => `https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/${slug}.svg`;
   const STACK_PER_USER = STACK.reduce((a, s) => a + s.per, 0); // ≈ $94/user
 
   const estUsers = $derived.by(() => {
@@ -168,15 +170,25 @@
       <h1>No seat billing. Unlimited users.</h1>
       <p class="sub">Invite your whole {accountType === 'org' ? 'organization' : 'team'} — you only pay for storage.</p>
 
-      <div class="vs">
-        <div class="vs-h">A ~{estUsers}-person team pays this across the usual stack</div>
-        <div class="vs-rows">
-          {#each STACK as s}
-            <div class="vs-row"><span class="vs-b">{s.name}</span><span class="vs-cat">{s.cat}</span><span class="vs-amt">${(s.per * estUsers).toLocaleString()}</span></div>
-          {/each}
+      <div class="vs-h">For a ~{estUsers}-person team — Workbooks vs the stack it replaces</div>
+      <div class="vs-cols">
+        <div class="vs-col us">
+          <svg class="vs-logo" viewBox="0 0 113 66"><path fill="currentColor" d="M48 0h17v30l1 2c6 2 18-18 25-20 3 1 9 8 11 11-4 6-19 18-21 22v2c2 1 27 1 32 1 0 6 0 11-1 17-12 0-27 1-37-4-8-4-15-12-18-20l-2-8-2 14c-12 21-31 18-52 18 0-6 0-11 0-17 6 0 28 1 31-1l0-1c1-4-17-19-20-24 2-3 8-9 11-11 4-1 18 18 22 20 2 1 2 1 3 0 2-2 1-9 1-12V0Z"/></svg>
+          <div class="vs-name">Workbooks</div>
+          <div class="vs-price">{selTier.price === null ? "Let's talk" : selTier.price === 0 ? 'Free' : `$${selTier.price}`}{#if selTier.price}<small>/mo</small>{/if}</div>
+          <div class="vs-cat">∞ users · {selTier.storage}</div>
         </div>
-        <div class="vs-total"><span>Their stack <s>≈${stackCost.toLocaleString()}/mo</s></span><span class="vs-us">Workbooks {selTier.price === null ? '' : '$' + selTier.price}{selTier.price ? '/mo' : ''}</span></div>
+        <div class="vs-x">vs</div>
+        {#each STACK as s}
+          <div class="vs-col">
+            <img class="vs-logo brand" src={logo(s.slug)} alt={s.name} loading="lazy" />
+            <div class="vs-name">{s.name}</div>
+            <div class="vs-price strike">${(s.per * estUsers).toLocaleString()}<small>/mo</small></div>
+            <div class="vs-cat">{s.cat}</div>
+          </div>
+        {/each}
       </div>
+      <div class="vs-sum">Their stack ≈ <s>${stackCost.toLocaleString()}/mo</s> · Workbooks {selTier.price === null ? 'Enterprise' : selTier.price === 0 ? 'Free' : `$${selTier.price}/mo`} — unlimited users</div>
 
       <div class="tiers">
         {#each TIERS as t}
@@ -300,16 +312,21 @@
   .mrow span { color:#6a6f64; font-size:12.5px; }
   .mrow b { font-size:14px; text-align:right; } .mrow b small { color:#a0a59a; font:500 11px var(--mono); margin-left:6px; }
 
-  .vs { border:1px dashed rgba(18,19,22,.22); border-radius:13px; padding:15px 17px; margin-bottom:16px; background:color-mix(in srgb, var(--accent) 13%, #fff); }
-  .vs-h { font-size:12.5px; font-weight:600; color:#3a3f36; margin-bottom:11px; }
-  .vs-rows { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:7px 22px; }
-  .vs-row { display:flex; align-items:baseline; gap:8px; font-size:12.5px; }
-  .vs-b { font-weight:600; color:#1a1b1e; }
-  .vs-cat { color:#9b9f93; font:500 10.5px var(--mono); flex:1; }
-  .vs-amt { font:600 12.5px var(--mono); color:#5f635c; }
-  .vs-total { display:flex; justify-content:space-between; align-items:baseline; margin-top:12px; padding-top:11px; border-top:1px solid rgba(18,19,22,.1); font-size:13px; font-weight:600; }
-  .vs-total s { color:#8a8f86; font:700 15px var(--read); margin-left:7px; }
-  .vs-us { font:700 14px var(--read); color:#1a1b1e; }
+  .vs-h { font-size:12.5px; font-weight:600; color:#3a3f36; margin:0 0 11px; }
+  .vs-cols { display:grid; grid-template-columns:1.25fr auto repeat(5, 1fr); gap:8px; align-items:stretch; }
+  .vs-col { display:flex; flex-direction:column; align-items:center; text-align:center; gap:5px;
+    padding:14px 8px 12px; border:1px solid rgba(18,19,22,.1); border-radius:12px; background:#fff; }
+  .vs-col.us { background:color-mix(in srgb, var(--accent) 22%, #fff); border-color:#121316; }
+  .vs-logo { width:24px; height:24px; object-fit:contain; }
+  .vs-col.us .vs-logo { color:#121316; }
+  .vs-logo.brand { opacity:.5; filter:grayscale(1); }
+  .vs-name { font:600 12px var(--read); }
+  .vs-price { font-size:17px; font-weight:600; line-height:1.1; } .vs-price small { font:500 9.5px var(--mono); color:#a0a59a; }
+  .vs-price.strike { color:#8a8f86; text-decoration:line-through; text-decoration-color:rgba(18,19,22,.3); }
+  .vs-col .vs-cat { font:500 9.5px var(--mono); color:#9b9f93; line-height:1.4; }
+  .vs-x { align-self:center; font:600 11px var(--mono); color:#b0b4a9; padding:0 2px; }
+  .vs-sum { font:500 11.5px var(--mono); color:#6a6f64; margin:11px 0 18px; text-align:center; }
+  .vs-sum s { color:#8a8f86; }
 
   .tiers { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; }
   .tier { position:relative; text-align:left; padding:13px 10px 12px; border:1px solid rgba(18,19,22,.12); border-radius:12px;
