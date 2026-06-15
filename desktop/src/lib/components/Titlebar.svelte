@@ -45,7 +45,7 @@
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { DEMO_ACTIVE_WORKSPACE } from "$lib/onboarding/demo";
   import DockToolbar from "$lib/components/DockToolbar.svelte";
-  import NexusMark from "$lib/components/NexusMark.svelte";
+  import { nexus } from "$lib/bridge/nexus.svelte";
   import { tip } from "$lib/ui/tip";
   import { commands } from "$lib/chrome/commands.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
@@ -307,6 +307,27 @@
     <SidebarSimple size={16} weight={chrome.sidebarOpen ? "fill" : "regular"} />
   </button>
 
+  <!-- Nexus / organization switcher — the unit you're in (personal or an org
+       you've been added to). Lives on the LEFT in the titlebar for every layout;
+       the engine-state dot replaces the old green mark on the right. -->
+  <button
+    type="button"
+    class="nexus-chip engine-{engine.cls}"
+    data-tauri-drag-region="false"
+    use:tip={engine.title}
+    aria-label="Switch nexus ({nexus.active.name})"
+    aria-haspopup="menu"
+    aria-expanded={chrome.nexusOpen}
+    onclick={(e) => {
+      chrome.nexusAnchor = e.currentTarget as HTMLElement;
+      chrome.nexusOpen = !chrome.nexusOpen;
+    }}
+  >
+    <span class="nexus-dot"></span>
+    <span class="nexus-name">{nexus.active.name}</span>
+    <ChevronDown size={12} weight="bold" />
+  </button>
+
   <!-- Shelf moves the workspace selector up here (optimised for one / few
        workspaces) — between the sidebar toggle and the ⌄ menu. -->
   {#if nav.layout === "shelf"}
@@ -523,22 +544,8 @@
     <MagnifyingGlass size={15} weight="bold" />
   </button>
 
-  <button
-    type="button"
-    class="engine nexus-badge engine-{engine.cls}"
-    class:alive={engine.cls === "ok"}
-    data-tauri-drag-region="false"
-    use:tip={engine.title}
-    aria-label={engine.title}
-    onclick={(e) => {
-      // Open the nexus switcher (wb-aakl.9). The engine-install wizard is
-      // only reachable when onboarding is flagged on (CLI owns setup).
-      chrome.nexusAnchor = e.currentTarget as HTMLElement;
-      chrome.nexusOpen = !chrome.nexusOpen;
-    }}
-  >
-    <NexusMark size={15} />
-  </button>
+  <!-- (the green nexus mark used to live here; the nexus switcher now opens from
+       the org/nexus chip on the LEFT of the titlebar) -->
 
   <!-- The resident agent (Waldo) — its own badge, far right. Reveals at the
        onboarding agent step; always shown once onboarding is done. -->
@@ -701,6 +708,22 @@
   .ws-pick:hover { border-color: var(--color-border-strong); }
   .ws-pick :global(svg),
   .ws-pick :global(img) { display: block; }
+
+  /* Org / nexus switcher chip — left of the titlebar, all layouts. The dot carries
+     the engine/connection state (replacing the old green mark on the right). */
+  .nexus-chip {
+    display: inline-flex; align-items: center; gap: 6px; align-self: center;
+    height: 26px; padding: 0 8px 0 9px; border-radius: 8px;
+    border: 1px solid var(--color-border); background: var(--color-surface-soft);
+    color: var(--color-fg); cursor: pointer; flex-shrink: 0; max-width: 200px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .nexus-chip:hover { border-color: var(--color-border-strong); }
+  .nexus-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nexus-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-fg-subtle); flex: none; }
+  .nexus-chip.engine-ok .nexus-dot { background: var(--color-ok); }
+  .nexus-chip.engine-pending .nexus-dot { background: var(--color-warn); animation: engine-pulse 1.4s ease-in-out infinite; }
+  .nexus-chip :global(svg) { color: var(--color-fg-subtle); flex: none; }
 
   .ctx-shortcut {
     margin-left: auto;
