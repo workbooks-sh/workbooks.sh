@@ -1,41 +1,35 @@
-// workponents · data — the shared DuckDB engine, behind the Host/Dock seam.
+// workponents · data — the shared SQLite seam, behind the Host/Dock membrane.
 //
-// ONE engine, three surfaces: `tables`, `data-viz`, and `maps` all import
-// `getEngine()` here and consume the contract in ./contract.js. The engine is a
-// lazy, idempotent singleton — a single shared connection — so registering a
-// dataset for a table makes it queryable by a chart and a map on the same page.
+// ONE engine, every data surface: `tables`, `data-viz`, `maps`, `records`, and
+// `search` all import `getEngine()` and consume the contract in ./contract.js.
+// A component NEVER picks where SQL runs — the Host resolves the tier by context
+// (the platform-model `local | runtime` seam):
 //
-// Provider resolution (platform-model: same element, swap provider per target):
+//   • runtime — a Workbooks runtime/nexus is connected. SQL routes over the Dock
+//     to the workbook's native SQLite VFS (`exqlite`, server-side) via the
+//     tenant query route. Data stays OUT of the client; writes are durable
+//     (Litestream). This is "the unbundling" — the SQLite is docked out to the
+//     nexus so it can be edited live.
 //
-//   1. runtime      — when the Host exposes DuckDB (`host.available("duckdb")`
-//                     or a configured runtime URL), queries route to the runtime
-//                     tier over the Dock seam (POST /data/query, POST /data/register).
-//                     This is where the in-repo `runtime/compilers/duckdb/duckdb.wasm`
-//                     engine lives — built in-sandbox, run server-side under wasmtime.
-//                     Best for huge datasets (no multi-MB browser download).
+//   • sqlite-wasm — no runtime. Real SQLite in the page (./sqlite-wasm.js): the
+//     full dialect, byte-compatible with the runtime's `exqlite`. ~1MB, lazily
+//     loaded once. "The SQLite layer in the workbook itself" — and, ahead, the
+//     engine that opens a static workbook's hydrated embedded VFS (the single-HTML
+//     format: VFS embedded as a compressed blob, hydrated via DecompressionStream).
 //
-//   2. duckdb-wasm  — browser-local in-WASM DuckDB. Lazily imported from the
-//                     official ESM build (no bundler, no `bun install` — a module
-//                     URL loaded at runtime). Real SQL in the browser, offline.
-//                     Override the URL via window.__WB_DUCKDB_WASM__ to self-host.
+//   • memory — last-resort floor (./memory-sql.js): the zero-dep in-JS SQL subset,
+//     used only if sqlite-wasm can't load (offline, no CDN/self-host). It is a
+//     SUBSET — not real SQLite — so sqlite-wasm is preferred whenever reachable.
 //
-//   3. memory       — the zero-dep in-JS SQL subset (./memory-sql.js). Guarantees
-//                     a real, engine-computed grid with no runtime AND no network.
-//                     Always present; the floor the trio degrades to cleanly.
-//
-// NOTE on the in-repo artifact: `runtime/compilers/duckdb/duckdb.wasm` is a WASI
-// *command* whose main() runs a fixed CREATE/INSERT/SELECT and exits (a proof
-// artifact, not an arbitrary-SQL engine). It is therefore the RUNTIME-tier engine
-// reached via Host — not directly instantiable as a query engine in the browser.
-// Browser-local SQL uses duckdb-wasm; the JS memory engine is the offline floor.
+// One SQLite dialect everywhere — native `exqlite` (runtime) and sqlite-wasm
+// (browser) are two builds of the same engine, and a workbook's `.sqlite` is
+// byte-portable between them. (DuckDB-wasm was removed: 34MB, a divergent dialect,
+// and redundant — the workbook already ships SQLite.)
 
 import { getHost } from "../core/host.js";
 import { normalizeSource, resultFromObjects } from "./contract.js";
+import { WasmSqlite, bootSqlite } from "./sqlite-wasm.js";
 import { MemorySql } from "./memory-sql.js";
-
-// Official duckdb-wasm ESM (MVP bundle — broad browser support, no bundler).
-const DEFAULT_DUCKDB_WASM =
-  "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/+esm";
 
 let _engine = null;
 
@@ -48,19 +42,22 @@ export function getEngine() {
 export class WbDataEngine {
   constructor() {
     this._host = getHost();
-    this._memory = new MemorySql();
+    this._sqlite = new WasmSqlite();  // real in-page SQLite (the local tier)
+    this._memory = new MemorySql();   // zero-dep subset (load-failure floor only)
     this._sources = new Map();        // name -> normalized {columns, rows}
     this._provider = null;            // resolved on first use
-    this._duck = null;                // { db, conn } once duckdb-wasm boots
     this._initPromise = null;
     this._regWaiters = new Map();     // name -> [resolve, ...] awaiting registration
+    // Runtime SQL-over-VFS route (tenant SQLite via the Dock). `{tenant}` is
+    // filled from the Host. Override per deploy if a runtime exposes another path.
+    this.vfsQueryPath = "/api/library/{tenant}/query";
   }
 
   /**
    * Resolve once `name` is registered (and live on the active provider). Returns
    * immediately if it already is. Lets a declarative element with `src-name`
    * upgrade BEFORE the page calls register() without racing an unknown table —
-   * the one ordering hazard shared by all three surfaces.
+   * the one ordering hazard shared by every surface.
    */
   whenRegistered(name) {
     if (this._sources.has(name)) return Promise.resolve();
@@ -71,48 +68,54 @@ export class WbDataEngine {
     });
   }
 
-  /** Which tier answers queries: "runtime" | "duckdb-wasm" | "memory". */
-  provider() { return this._provider || (this._runtimeReady() ? "runtime" : "memory"); }
+  /** Which tier answers: "runtime" (native VFS) | "sqlite-wasm" (local) | "memory". */
+  provider() { return this._provider || (this._runtimeReady() ? "runtime" : "sqlite-wasm"); }
 
-  /** Is a real DuckDB engine reachable (vs the in-JS fallback)? */
-  available() { return this._runtimeReady() || this._provider === "duckdb-wasm"; }
+  /** Is a real SQLite engine reachable (runtime VFS or in-page sqlite-wasm)? */
+  available() { return this._runtimeReady() || this._provider === "sqlite-wasm"; }
+
+  /** Are writes durable (runtime/nexus `exqlite`) vs local/ephemeral or none? */
+  writable() { return this._runtimeReady(); }
 
   _runtimeReady() {
-    return this._host.available("duckdb") || (this._host.runtimeUrl != null);
+    return this._host.available("vfs") || (this._host.runtimeUrl != null);
   }
 
   /** Register a named source so SQL can `FROM <name>`. Idempotent per name. */
   async register(name, source) {
     const norm = normalizeSource(source);
     this._sources.set(name, norm);
-    // Always seed the memory engine (the floor); also push to a live tier if up.
+    // Seed the floor too, so a sqlite-wasm load failure still answers.
     this._memory.register(name, norm);
     await this._ensureProvider();
     if (this._provider === "runtime") {
+      // Inline data pushed into a docked workbook (best-effort). Real workbook
+      // tables already live in the VFS and need no registration.
       try {
-        await this._host.request("/data/register", { body: { name, columns: norm.columns, rows: norm.rows } });
-      } catch { /* runtime register best-effort; memory still answers */ }
-    } else if (this._provider === "duckdb-wasm" && this._duck) {
-      await this._duckRegister(name, norm);
+        await this._host.request(this._regPath(), { body: { name, columns: norm.columns, rows: norm.rows } });
+      } catch { /* runtime ingest best-effort; the floor still answers */ }
+    } else if (this._provider === "sqlite-wasm") {
+      await this._sqlite.register(name, norm);
     }
     // Now queryable on the active provider — release anyone awaiting this source.
     const waiters = this._regWaiters.get(name);
     if (waiters) { this._regWaiters.delete(name); for (const r of waiters) r(); }
   }
 
-  /** query(sql, params?) -> Promise<WbQueryResult>. The trio's one call. */
+  /** query(sql, params?) -> Promise<WbQueryResult>. Every surface's one call. */
   async query(sql, params = []) {
     await this._ensureProvider();
     if (this._provider === "runtime") {
       try {
-        const res = await this._host.request("/data/query", { body: { sql, params } });
-        if (res && res.columns) return shapeRuntime(res, sql);
-      } catch { /* fall through to local */ }
+        const res = await this._host.request(this._queryPath(), { body: { sql, params } });
+        const shaped = shapeRuntime(res, sql);
+        if (shaped) return shaped;
+      } catch { /* fall through to the local engine */ }
     }
-    if (this._provider === "duckdb-wasm" && this._duck) {
-      try { return await this._duckQuery(sql, params); }
-      catch (e) { /* fall through to memory on browser-engine error */ }
+    if (this._provider === "sqlite-wasm") {
+      return this._sqlite.query(sql, params);
     }
+    // Last-resort floor — the zero-dep in-JS subset (sqlite-wasm unavailable).
     return this._memory.query(sql, params);
   }
 
@@ -120,14 +123,17 @@ export class WbDataEngine {
   async _ensureProvider() {
     if (this._provider) return;
     if (this._initPromise) return this._initPromise;
+    // Runtime/nexus SQLite VFS when connected; else real in-page sqlite-wasm;
+    // the in-JS subset only if sqlite-wasm can't load (offline, no CDN/self-host).
     this._initPromise = (async () => {
       if (this._runtimeReady()) { this._provider = "runtime"; return; }
-      // Try browser duckdb-wasm; if anything fails, settle on memory.
       try {
-        await this._bootDuckWasm();
-        this._provider = "duckdb-wasm";
-        // re-register any sources captured before boot
-        for (const [name, norm] of this._sources) await this._duckRegister(name, norm);
+        await bootSqlite();
+        this._provider = "sqlite-wasm";
+        // No re-registration here: every source arrives via register(), which
+        // registers into the resolved provider after awaiting this boot. Looping
+        // here too would double-register the same table concurrently (DROP/CREATE
+        // racing a sibling's DDL) → transient "no such table".
       } catch {
         this._provider = "memory";
       }
@@ -135,60 +141,31 @@ export class WbDataEngine {
     return this._initPromise;
   }
 
-  async _bootDuckWasm() {
-    if (typeof window === "undefined") throw new Error("no window");
-    const url = (typeof window !== "undefined" && window.__WB_DUCKDB_WASM__) || DEFAULT_DUCKDB_WASM;
-    const duckdb = await import(/* @vite-ignore */ url);
-    const bundles = duckdb.getJsDelivrBundles();
-    const bundle = await duckdb.selectBundle(bundles);
-    const worker = await duckdb.createWorker(bundle.mainWorker);
-    const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING);
-    const db = new duckdb.AsyncDuckDB(logger, worker);
-    await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-    const conn = await db.connect();
-    this._duck = { duckdb, db, conn };
+  _queryPath() {
+    return this.vfsQueryPath.replace("{tenant}", encodeURIComponent(this._host.tenant || "local"));
   }
-
-  async _duckRegister(name, norm) {
-    const { conn } = this._duck;
-    await conn.query(`DROP TABLE IF EXISTS ${ident(name)}`);
-    const json = JSON.stringify(norm.rows);
-    const fname = `__wb_${name}.json`;
-    await this._duck.db.registerFileText(fname, json);
-    await conn.query(`CREATE TABLE ${ident(name)} AS SELECT * FROM read_json_auto('${fname}')`);
-  }
-
-  async _duckQuery(sql, params) {
-    const { conn } = this._duck;
-    let table;
-    if (params && params.length) {
-      const stmt = await conn.prepare(sql);
-      table = await stmt.query(...params);
-      await stmt.close();
-    } else {
-      table = await conn.query(sql);
-    }
-    const columns = table.schema.fields.map((f) => f.name);
-    const rowObjs = table.toArray().map((r) => {
-      const o = r.toJSON ? r.toJSON() : r;
-      const out = {};
-      for (const c of columns) out[c] = normVal(o[c]);
-      return out;
-    });
-    return resultFromObjects(rowObjs, columns, "duckdb-wasm", sql);
+  _regPath() {
+    return this._queryPath().replace(/\/query$/, "/register");
   }
 }
 
-function ident(name) { return '"' + String(name).replace(/"/g, '""') + '"'; }
-function normVal(v) {
-  if (typeof v === "bigint") return Number(v);
-  return v;
-}
-
-/** Shape a runtime /data/query response into a WbQueryResult. */
+/**
+ * Shape a runtime SQL response into a WbQueryResult. Tolerant of the row shapes a
+ * runtime may return ({columns, rows[][]} columnar, or an array of row-objects).
+ * Returns null when unrecognized so query() falls back to the local floor.
+ */
 function shapeRuntime(res, sql) {
-  const columns = res.columns || [];
-  const rows = res.rows || [];
-  const types = res.types || columns.map(() => "string");
-  return { columns, rows, types, rowCount: rows.length, engine: "runtime", sql };
+  if (!res) return null;
+  if (Array.isArray(res)) {
+    return resultFromObjects(res, res.length ? Object.keys(res[0]) : [], "runtime", sql);
+  }
+  if (Array.isArray(res.rows) && Array.isArray(res.columns)) {
+    const types = res.types || res.columns.map(() => "string");
+    return { columns: res.columns, rows: res.rows, types, rowCount: res.rows.length, engine: "runtime", sql };
+  }
+  if (Array.isArray(res.rows)) {
+    const cols = res.columns || (res.rows.length ? Object.keys(res.rows[0]) : []);
+    return resultFromObjects(res.rows, cols, "runtime", sql);
+  }
+  return null;
 }

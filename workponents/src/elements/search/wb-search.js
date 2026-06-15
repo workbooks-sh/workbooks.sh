@@ -150,13 +150,11 @@ export class WbSearch extends WbElement {
     const fields = this._searchFields;
     const limit = parseInt(this.attr("limit", "8"), 10) || 8;
     const term = this._value.replace(/'/g, "''");
-    // Case-insensitive match portably: DuckDB tiers honor ILIKE; the in-JS memory
-    // floor's LIKE is already case-insensitive (and rejects ILIKE), so pick the
-    // operator the active provider understands — same compute path, no fork.
-    const op = this._engine.available() ? "ILIKE" : "LIKE";
+    // SQLite LIKE is case-insensitive for ASCII on every tier (native exqlite and
+    // the in-JS floor), so one operator works everywhere — no per-provider fork.
     let sql = `SELECT * FROM ${from}`;
     if (term && fields.length) {
-      const ors = fields.map((c) => `CAST(${ident(c)} AS VARCHAR) ${op} '%${term}%'`);
+      const ors = fields.map((c) => `CAST(${ident(c)} AS VARCHAR) LIKE '%${term}%'`);
       sql += ` WHERE ${ors.join(" OR ")}`;
     }
     sql += ` LIMIT ${limit}`;

@@ -114,12 +114,15 @@ export class WbTable extends WbElement {
   }
 
   _captureSource() {
-    // src-name wins; else inline rows/csv become an auto-named source.
+    // src-name wins; else inline rows/csv become an auto-named source. The auto
+    // name is assigned ONCE per element — re-capture (e.g. an attr change) must
+    // not mint a new id, or the query would target a name we never registered.
     this._srcName = this.attr("src-name");
     if (!this._srcName) {
       const rowsAttr = this.attr("rows");
       const csvAttr = this.attr("csv");
-      this._srcName = `wb_inline_${++_autoId}`;
+      if (!this._autoName) this._autoName = `wb_inline_${++_autoId}`;
+      this._srcName = this._autoName;
       if (rowsAttr) this._pendingSource = { json: rowsAttr };
       else if (csvAttr) this._pendingSource = { csv: csvAttr };
       else {
@@ -157,18 +160,27 @@ export class WbTable extends WbElement {
   }
 
   async _load() {
-    this._busy = true; this._error = null; this.update();
-    try {
-      if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
-      else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
-      await this._run();
-    } catch (e) {
-      this._error = String(e && e.message || e);
-      this._tier = "error";
-    }
-    this._busy = false;
-    this.update();
-    this._emit("wb-table-ready", { columns: this._result?.columns || [], types: this._result?.types || [], engine: this._tier });
+    // Single-flight: overlapping loads would let one load's register()
+    // (DROP+CREATE) yank the table out from under another's in-flight query.
+    // Coalesce instead — re-run once more if asked while a load is active.
+    if (this._loading) { this._loadAgain = true; return; }
+    this._loading = true;
+    do {
+      this._loadAgain = false;
+      this._busy = true; this._error = null; this.update();
+      try {
+        if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
+        else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
+        await this._run();
+      } catch (e) {
+        this._error = String(e && e.message || e);
+        this._tier = "error";
+      }
+      this._busy = false;
+      this.update();
+      this._emit("wb-table-ready", { columns: this._result?.columns || [], types: this._result?.types || [], engine: this._tier });
+    } while (this._loadAgain);
+    this._loading = false;
   }
 
   /** Build SQL from query attr (+ engine filter/sort) and run it. */

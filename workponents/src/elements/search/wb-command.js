@@ -206,10 +206,10 @@ export class WbCommand extends WbElement {
       await this._resolveDataFields();
       const limit = parseInt(this.attr("data-limit", "6"), 10) || 6;
       const term = this._value.replace(/'/g, "''");
-      const op = this._engine.available() ? "ILIKE" : "LIKE";
+      // SQLite LIKE is case-insensitive for ASCII on every tier — no provider fork.
       let sql = `SELECT * FROM ${this._dataFrom()}`;
       if (this._dataFields.length) {
-        const ors = this._dataFields.map((c) => `CAST(${ident(c)} AS VARCHAR) ${op} '%${term}%'`);
+        const ors = this._dataFields.map((c) => `CAST(${ident(c)} AS VARCHAR) LIKE '%${term}%'`);
         sql += ` WHERE ${ors.join(" OR ")}`;
       }
       sql += ` LIMIT ${limit}`;
