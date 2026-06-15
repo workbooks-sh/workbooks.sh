@@ -6,7 +6,7 @@
 // responsive UI; wiring them to real provisioning is the next step (needs a connected
 // runtime + FLY_API_TOKEN).
 
-import { listNexuses } from '$lib/api.js';
+import { listNexuses, createNexus, deleteNexus, wakeNexus, sleepNexus } from '$lib/api.js';
 
 let nexuses = $state([]);
 let loaded = $state(false);
@@ -71,29 +71,30 @@ export const nexusStore = {
     const metrics = { cpu: 0, memMb: 0, memCapGb: 1, reqMin: 0, costMonth: '0.00' };
     return { nexus, config, month, metrics };
   },
-  create({ name, region, plan, addons } = {}) {
-    const base = (name || 'nova').trim() || 'nova';
-    let id = base;
-    let n = 2;
-    while (this.get(id)) id = `${base}-${n++}`;
-    const nexus = {
-      id,
-      name: id,
-      region: region || 'sfo',
-      plan: plan || 'Starter · 1 GB',
-      state: 'build',
-      sub: SUB.build,
-      url: `${id}.nexus.workbooks.cloud`,
-      addons: addons || []
-    };
+  /**
+   * Provision a REAL nexus (a Fly machine via the runtime provisioner) and prepend it.
+   * The backend assigns a non-guessable id (nx-…); the returned row is the source of
+   * truth. Throws on failure so the caller can surface it.
+   */
+  async provision({ region, plan } = {}) {
+    const nexus = await createNexus({ region, plan });
     nexuses = [nexus, ...nexuses];
     return nexus;
   },
-  remove(id) {
+  /** Tear down a nexus — optimistic removal, real teardown in the background. */
+  async remove(id) {
     nexuses = nexuses.filter((n) => n.id !== id);
+    try {
+      await deleteNexus(id);
+    } catch {}
   },
-  setState(id, state) {
+  /** Lifecycle — optimistic state flip, real wake/sleep in the background. */
+  async setState(id, state) {
     nexuses = nexuses.map((n) => (n.id === id ? { ...n, state, sub: SUB[state] || n.sub } : n));
+    try {
+      if (state === 'run') await wakeNexus(id);
+      else if (state === 'sleep') await sleepNexus(id);
+    } catch {}
   },
   // ── shared search query ──
   get query() {

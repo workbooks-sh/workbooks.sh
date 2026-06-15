@@ -28,19 +28,24 @@
 
   function selectPlan(p) { plan = p.id; est = p.pr; }
 
-  function deploy() {
-    const addons = [];
-    if (storageOn) addons.push('storage');
-    if (dbOn) addons.push('database');
-    const nx = nexusStore.create({ name, region, plan, addons });
+  let deploying = $state(false);
+
+  async function deploy() {
+    if (deploying) return;
+    deploying = true;
+    // Fly uses 'sjc' for the SF bay; the rest of our region ids are valid Fly regions.
+    const flyRegion = region === 'sfo' ? 'sjc' : region;
     onclose?.();
-    toast(`Deploying ${nx.name}…`);
-    // flip build → run once the (mock) weave finishes
-    setTimeout(() => {
-      nexusStore.setState(nx.id, 'run');
-      toast(`${nx.name} is live`);
-    }, 3000);
-    goto('/nexuses/' + nx.id);
+    toast('Provisioning your nexus…');
+    try {
+      const nx = await nexusStore.provision({ region: flyRegion, plan });
+      toast(`${nx.name} is provisioning`);
+      goto('/nexuses/' + nx.id);
+    } catch {
+      toast('Couldn’t provision a nexus — check the runtime connection');
+    } finally {
+      deploying = false;
+    }
   }
 </script>
 
