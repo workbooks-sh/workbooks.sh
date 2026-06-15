@@ -240,7 +240,7 @@ defmodule Workbooks.Web do
     {:ok, body, conn} = read_body(conn)
 
     case Workbooks.NexusProvisioner.provision(org, provision_opts(body)) do
-      {:ok, nx} -> j(conn, 201, nexus_view(stringify(nx)))
+      {:ok, nx} -> j(conn, 201, nexus_view(nx))
       {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
     end
   end
@@ -282,7 +282,7 @@ defmodule Workbooks.Web do
 
     buckets =
       Enum.map(nexuses, fn nx ->
-        %{name: "#{nx["id"]}-storage", nexus: nx["id"], objects: nil, size: "—", egress: "$0.00"}
+        %{name: "#{nx[:id]}-storage", nexus: nx[:id], objects: nil, size: "—", egress: "$0.00"}
       end)
 
     j(conn, 200, %{totalBytes: total, totalSize: gb(total), buckets: buckets})
@@ -1693,18 +1693,18 @@ defmodule Workbooks.Web do
   defp j(conn, code, data),
     do: conn |> put_resp_content_type("application/json") |> send_resp(code, Jason.encode!(data))
 
-  # Shape a registry row (string keys) OR a provision result (run through stringify/1)
-  # into the dashboard's nexus view. The bearer/DSN are never in either source.
+  # Shape a registry row OR a provision result (both atom-keyed) into the dashboard's
+  # nexus view. The per-nexus bearer/DSN are never in either source.
   defp nexus_view(nx) do
-    app = nx["fly_app"] || ""
+    app = nx[:fly_app] || ""
 
     %{
-      id: nx["id"],
-      name: nx["id"],
-      region: nx["region"] || "",
-      plan: nx["plan"] || "starter",
-      state: map_state(nx["state"]),
-      url: nx["url"] || (if app != "", do: "https://#{app}.fly.dev", else: "")
+      id: nx[:id],
+      name: nx[:id],
+      region: nx[:region] || "",
+      plan: nx[:plan] || "starter",
+      state: map_state(nx[:state]),
+      url: nx[:url] || (if app != "", do: "https://#{app}.fly.dev", else: "")
     }
   end
 
@@ -1712,8 +1712,6 @@ defmodule Workbooks.Web do
   defp map_state("running"), do: "run"
   defp map_state("stopped"), do: "sleep"
   defp map_state(_), do: "build"
-
-  defp stringify(map), do: Map.new(map, fn {k, v} -> {to_string(k), v} end)
 
   # Only region/plan are accepted from the body; the org, secrets, image and Fly org
   # are all pinned server-side in the provisioner — never caller input.
