@@ -1,0 +1,667 @@
+<!doctype html>
+<!-- workbook: cobalt-landing — the public Signal marketing page. Single-file artifact, deterministic, offline. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="darkreader-lock" />
+  <meta name="color-scheme" content="light" />
+  <title>Signal — Treasury intelligence for finance teams</title>
+  <meta name="description" content="Signal connects your banks, ERPs and markets into one live treasury workspace — with real SQL on top. Every position, every counterparty, one signal." />
+  <script id="workbook-spec" type="application/json">
+    {
+      "id": "cobalt-landing",
+      "kind": "landing",
+      "title": "Signal — Product Landing",
+      "owner": "signal",
+      "workspace": "board-reporting",
+      "frozen_at": "2026-06-14T00:00:00Z"
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+    /* ===== Signal design system override — institutional / data-dense ===== */
+    .dot, .dot.sm {
+      border-radius:0 !important; background:transparent !important; box-shadow:none !important;
+      width:16px !important; height:16px !important; position:relative; display:inline-block;
+      background-image:
+        linear-gradient(var(--green) 0 0), linear-gradient(var(--green) 0 0),
+        linear-gradient(var(--green) 0 0), linear-gradient(var(--green) 0 0) !important;
+      background-repeat:no-repeat !important;
+      background-size:3px 40%, 3px 62%, 3px 84%, 3px 100% !important;
+      background-position:0 100%, 4.3px 100%, 8.6px 100%, 13px 100% !important;
+    }
+    .dot.sm { width:13px !important; height:13px !important;
+      background-size:2px 40%, 2px 62%, 2px 84%, 2px 100% !important;
+      background-position:0 100%, 3.6px 100%, 7.2px 100%, 10.8px 100% !important; }
+    .brand .name { letter-spacing:-.02em !important; }
+    :root {
+      --green:#3da9fc; --green-deep:#1d6fd6; --ink:#e9edf4; --bg:#0a0d13;
+      --muted:#8893a6; --line:#1c232f; --card:#10151f;
+      --warn:#f5a524; --warn-bg:#241a08; --trapped:#ff7a45;
+      --ink-2:#141a16; --ink-line:#25302a;
+    }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body {
+      font:16px/1.6 'Space Grotesk',system-ui,-apple-system,sans-serif; color:var(--ink);
+      background:var(--bg); margin:0; -webkit-font-smoothing:antialiased;
+    }
+    a { color:inherit; text-decoration:none; }
+    .num { font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+
+    /* ---------- shared mark ---------- */
+    .dot {
+      width:18px; height:18px; background:var(--green); border-radius:2px;
+      flex:none; display:inline-block;
+    }
+    .dot.lg { width:24px; height:24px; box-shadow:0 0 0 5px color-mix(in srgb, var(--green) 22%, transparent), 0 0 20px color-mix(in srgb, var(--green) 60%, transparent); }
+    .dot.sm { width:9px; height:9px; }
+
+    /* ---------- nav ---------- */
+    nav {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:16px 7vw; border-bottom:1px solid var(--line);
+      position:sticky; top:0; z-index:20;
+      background:rgba(10,13,19,.82); backdrop-filter:blur(10px);
+    }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:680; font-size:19px; letter-spacing:-.03em; }
+    .nlinks { display:flex; gap:28px; font-size:14px; color:var(--muted); align-items:center; }
+    .nlinks a:hover { color:var(--ink); }
+    .nlinks .login { color:var(--ink); font-weight:500; }
+    .btn {
+      background:var(--green-deep); color:#10151f; border:0; border-radius:2px;
+      padding:9px 16px; font-weight:600; font-size:14px; font-family:inherit; cursor:pointer;
+      display:inline-flex; align-items:center; gap:7px; line-height:1;
+    }
+    .btn:hover { background:#0f7a48; }
+    .btn.ghost { background:#10151f; color:var(--ink); border:1px solid var(--line); }
+    .btn.ghost:hover { border-color:#cdd9d2; background:#141a24; }
+    .btn.lg { padding:13px 22px; font-size:15px; border-radius:2px; }
+    .btn .arr { font-size:13px; }
+
+    @media (max-width:760px){ .nlinks .hide-sm { display:none; } }
+
+    /* ---------- hero ---------- */
+    .hero {
+      position:relative; overflow:hidden; text-align:center;
+      padding:84px 7vw 56px;
+      background:var(--bg)
+        linear-gradient(transparent 27px, color-mix(in srgb, var(--line) 46%, transparent) 28px),
+        linear-gradient(90deg, transparent 27px, color-mix(in srgb, var(--line) 46%, transparent) 28px);
+      background-size:auto, 28px 28px, 28px 28px;
+    }
+    .hero:after {
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background:radial-gradient(ellipse 70% 55% at 50% 8%, color-mix(in srgb, var(--green) 16%, transparent), transparent 70%);
+    }
+    .hero > * { position:relative; z-index:1; }
+    .hero-inner { max-width:880px; margin:0 auto; }
+    .eyebrow {
+      display:inline-flex; align-items:center; gap:8px; font-size:12px; font-weight:600;
+      letter-spacing:.04em; color:var(--green-deep); background:#141a24;
+      border:1px solid color-mix(in srgb, var(--green) 30%, var(--line));
+      padding:5px 12px; border-radius:2px; margin-bottom:22px;
+    }
+    h1 {
+      font-size:clamp(40px,6.4vw,68px); font-weight:680; letter-spacing:-.04em;
+      line-height:1.02; margin:0 0 20px;
+    }
+    h1 em { font-style:normal; color:var(--green-deep); }
+    .lede { font-size:19px; line-height:1.55; color:var(--muted); max-width:620px; margin:0 auto 30px; }
+    .cta { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+    .micro { margin-top:18px; font-size:12.5px; color:var(--muted); }
+    .micro .num { color:var(--ink); }
+
+    /* ---------- hero mock ---------- */
+    .mock-wrap { max-width:1080px; margin:48px auto 0; }
+    .mock {
+      background:var(--card); border:1px solid var(--line); border-radius:2px;
+      box-shadow:0 24px 70px -28px rgba(12,15,13,.28), 0 2px 8px rgba(12,15,13,.04);
+      overflow:hidden; text-align:left;
+    }
+    .mock-bar { display:flex; align-items:center; gap:10px; padding:11px 16px; border-bottom:1px solid var(--line); background:#0e131c; }
+    .mock-bar .dots { display:flex; gap:6px; }
+    .mock-bar .dots i { width:10px; height:10px; border-radius:50%; background:#2a3342; display:block; }
+    .mock-bar .path { font-size:12px; color:var(--muted); }
+    .mock-bar .path code { background:#161c27; padding:1px 7px; border-radius:2px; font-size:11.5px; }
+    .mock-bar .live { margin-left:auto; display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:var(--green-deep); font-weight:600; }
+    .mock-body { padding:18px 20px 22px; }
+    .mock-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+    .mk { border:1px solid var(--line); border-radius:2px; padding:12px 14px; background:#10151f; }
+    .mk .l { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+    .mk .v { font-size:21px; font-weight:600; letter-spacing:-.02em; margin-top:6px; }
+    .mk .d { font-size:11px; margin-top:3px; color:var(--green-deep); }
+    .mk .d.down { color:#ff7a45; }
+    .mock-low { display:grid; grid-template-columns:1.3fr 1fr; gap:14px; margin-top:14px; }
+    .mpanel { border:1px solid var(--line); border-radius:2px; padding:14px 15px; }
+    .mpanel h4 { margin:0 0 11px; font-size:11px; font-weight:640; letter-spacing:-.01em; }
+    .row { display:flex; align-items:center; gap:9px; padding:6px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+    .row:last-child { border-bottom:0; }
+    .row .ico { width:22px; height:22px; border-radius:2px; flex:none; display:grid; place-items:center; font-size:9px; font-weight:700; color:#10151f; }
+    .row .nm { flex:1; }
+    .row .v { font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; }
+    .badge { display:inline-block; font-size:10px; font-weight:600; padding:1px 6px; border-radius:2px; background:#161c27; color:var(--green-deep); letter-spacing:.02em; }
+    .badge.a2 { background:#2a1408; color:var(--trapped); }
+    .badge.aaa { background:#11233b; color:#3da9fc; }
+    .track { height:6px; background:#161c27; overflow:hidden; width:70px; flex:none; }
+    .track .fill { height:100%; background:var(--green); }
+    .track .fill.t { background:var(--trapped); }
+    .ccy-bar { display:flex; height:13px; overflow:hidden; border:1px solid var(--line); margin-bottom:10px; }
+    .ccy-bar span { display:block; }
+    .crow { display:flex; align-items:center; justify-content:space-between; font-size:12px; padding:4px 0; }
+    .crow .l { display:flex; align-items:center; gap:7px; }
+    .crow .sw { width:9px; height:9px; border-radius:2px; flex:none; }
+    .crow .num { color:var(--muted); }
+
+    /* ---------- trust strip ---------- */
+    .trust { padding:42px 7vw; border-bottom:1px solid var(--line); text-align:center; }
+    .trust .h { font-size:13px; color:var(--muted); letter-spacing:.02em; }
+    .trust .h b { color:var(--ink); font-weight:600; }
+    .logos { display:flex; gap:40px; justify-content:center; flex-wrap:wrap; margin-top:20px; }
+    .lg-item { display:flex; align-items:center; gap:8px; color:#8893a6; font-weight:600; font-size:16px; letter-spacing:-.01em; }
+    .lg-item .rat { font-size:10px; font-weight:600; padding:1px 6px; border-radius:2px; background:#161c27; color:#8893a6; letter-spacing:.02em; }
+
+    /* ---------- sections ---------- */
+    .section { max-width:1120px; margin:0 auto; padding:74px 7vw; }
+    .sec-head { max-width:620px; }
+    .kicker { font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--green-deep); }
+    .section h2 { font-size:clamp(28px,3.6vw,38px); font-weight:680; letter-spacing:-.03em; margin:12px 0 14px; line-height:1.08; }
+    .section .blurb { font-size:17px; color:var(--muted); margin:0; }
+
+    .feat { display:grid; grid-template-columns:1fr 1.05fr; gap:48px; align-items:center; padding:60px 7vw; max-width:1120px; margin:0 auto; border-top:1px solid var(--line); }
+    .feat.flip .copy { order:2; }
+    .feat .copy h3 { font-size:26px; font-weight:660; letter-spacing:-.03em; margin:10px 0 12px; line-height:1.1; }
+    .feat .copy p { color:var(--muted); font-size:16px; margin:0 0 18px; }
+    .feat ul { list-style:none; padding:0; margin:0; }
+    .feat li { position:relative; padding:7px 0 7px 26px; font-size:14.5px; color:#27302b; border-bottom:1px solid var(--line); }
+    .feat li:last-child { border-bottom:0; }
+    .feat li:before { content:""; position:absolute; left:2px; top:13px; width:9px; height:9px; background:var(--green); border-radius:2px; ; }
+    .feat .stat-inline { display:inline-flex; align-items:center; gap:8px; margin-top:18px; font-size:13px; color:var(--muted); }
+    .feat .stat-inline b { font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; color:var(--ink); font-weight:600; font-size:15px; }
+    @media (max-width:880px){ .feat{grid-template-columns:1fr; gap:28px} .feat.flip .copy{order:0} }
+
+    /* ---------- mini mockups in features ---------- */
+    .vis {
+      background:var(--card); border:1px solid var(--line); border-radius:2px; overflow:hidden;
+      box-shadow:0 16px 44px -26px rgba(12,15,13,.24);
+      background-image:
+        linear-gradient(transparent 21px, color-mix(in srgb, var(--line) 34%, transparent) 22px),
+        linear-gradient(90deg, transparent 21px, color-mix(in srgb, var(--line) 34%, transparent) 22px);
+      background-size:22px 22px, 22px 22px;
+    }
+    .vis-bar { display:flex; align-items:center; gap:8px; padding:9px 13px; border-bottom:1px solid var(--line); background:#0e131c; font-size:11.5px; color:var(--muted); }
+    .vis-bar code { background:#161c27; padding:1px 6px; border-radius:2px; font-size:11px; }
+    .vis-bar .live { margin-left:auto; display:inline-flex; align-items:center; gap:5px; color:var(--green-deep); font-weight:600; }
+    .vis-body { padding:15px 16px; background:rgba(16,21,31,.72); }
+    .vis table { border-collapse:collapse; width:100%; }
+    .vis th { text-align:left; font-size:9.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:600; padding:0 8px 7px 0; border-bottom:1px solid var(--line); }
+    .vis td { padding:7px 8px 7px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+    .vis tr:last-child td { border-bottom:0; }
+    .vis td.r, .vis th.r { text-align:right; }
+    .vis td.mono, .vis .mono { font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; }
+    .pill { display:inline-flex; align-items:center; gap:5px; font-size:10px; font-weight:600; padding:2px 7px; border-radius:2px; background:var(--warn-bg); color:var(--trapped); border:1px solid #3a2a14; }
+    .pill .d { width:7px; height:7px; background:var(--trapped); border-radius:2px; flex:none; }
+    .pill.ok { background:#141a24; color:var(--green-deep); border-color:color-mix(in srgb,var(--green) 28%,var(--line)); }
+    .pill.ok .d { background:var(--green); }
+
+    /* forecast chart */
+    .chart { display:flex; align-items:flex-end; gap:4px; height:118px; padding-top:8px; }
+    .chart .col { flex:1; display:flex; flex-direction:column; justify-content:flex-end; gap:2px; }
+    .chart .bar { background:var(--green); width:100%; }
+    .chart .bar.proj { background:repeating-linear-gradient(45deg, color-mix(in srgb,var(--green) 55%, #10151f) 0 4px, color-mix(in srgb,var(--green) 30%, #10151f) 4px 8px); border:1px solid color-mix(in srgb,var(--green) 45%, var(--line)); }
+    .chart .lbl { font-size:8.5px; color:var(--muted); text-align:center; font-family:"IBM Plex Mono",monospace; }
+    .chart-legend { display:flex; gap:16px; font-size:11px; color:var(--muted); margin-top:10px; }
+    .chart-legend i { width:10px; height:10px; display:inline-block; margin-right:5px; vertical-align:-1px; }
+
+    /* sql editor */
+    .sql { background:var(--ink-2); border-radius:2px; padding:12px 14px; font-family:"IBM Plex Mono",monospace; font-size:12px; line-height:1.7; color:#bcd6ff; overflow-x:auto; }
+    .sql .kw { color:#7fe9ad; } .sql .fn { color:#8fc3ff; } .sql .str { color:#f6b97a; } .sql .cm { color:#5f7068; }
+
+    /* fx grid */
+    .fx { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; }
+    .fxc { border:1px solid var(--line); border-radius:2px; padding:10px 12px; background:#10151f; }
+    .fxc .p { font-size:11px; color:var(--muted); display:flex; justify-content:space-between; }
+    .fxc .e { font-size:17px; font-weight:600; margin-top:3px; font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; }
+    .fxc .h { font-size:10.5px; margin-top:4px; color:var(--green-deep); }
+    .fxc .h.warn { color:var(--trapped); }
+
+    /* sox approvals */
+    .appr { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+    .appr:last-child { border-bottom:0; }
+    .appr .step { width:20px; height:20px; border-radius:2px; flex:none; display:grid; place-items:center; font-size:11px; font-weight:700; color:#10151f; background:var(--green-deep); }
+    .appr .step.wait { background:#2a3342; color:#8893a6; }
+    .appr .who { flex:1; }
+    .appr .who b { font-weight:600; } .appr .who span { color:var(--muted); }
+
+    /* ---------- metrics band ---------- */
+    .band { background:var(--ink); color:#eaf2ed; padding:60px 7vw; }
+    .band-inner { max-width:1000px; margin:0 auto; display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+    .metric { border:1px solid var(--ink-line); border-radius:2px; padding:26px 24px; background:linear-gradient(180deg,#141a16,#10150f); }
+    .metric .v { font-size:42px; font-weight:680; letter-spacing:-.03em; font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; color:#10151f; }
+    .metric .v em { font-style:normal; color:var(--green); }
+    .metric .l { font-size:13.5px; color:#9bb0a5; margin-top:8px; }
+    @media (max-width:760px){ .band-inner{grid-template-columns:1fr} }
+
+    /* ---------- testimonial ---------- */
+    .quote-sec { max-width:840px; margin:0 auto; padding:74px 7vw; }
+    .qcard { background:var(--card); border:1px solid var(--line); border-radius:2px; padding:38px 40px; box-shadow:0 18px 50px -32px rgba(12,15,13,.28); }
+    .qcard .mark-q { font-size:46px; line-height:0.6; color:var(--green); font-family:Georgia,serif; }
+    .qcard blockquote { margin:14px 0 26px; font-size:23px; line-height:1.45; font-weight:500; letter-spacing:-.02em; }
+    .qcard .who { display:flex; align-items:center; gap:13px; }
+    .qcard .who img { width:52px; height:52px; border-radius:50%; object-fit:cover; }
+    .qcard .who .nm { font-weight:600; font-size:15px; }
+    .qcard .who .rl { font-size:13px; color:var(--muted); }
+    .qcard .who .logo { margin-left:auto; font-weight:600; color:#8893a6; font-size:14px; }
+
+    /* ---------- pricing ---------- */
+    .pricing { max-width:1120px; margin:0 auto; padding:30px 7vw 80px; }
+    .pricing .sec-head { text-align:center; margin:0 auto 40px; }
+    .tiers { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+    .tier { background:var(--card); border:1px solid var(--line); border-radius:2px; padding:28px 26px; display:flex; flex-direction:column; }
+    .tier.feat { border:2px solid var(--green-deep); box-shadow:0 16px 48px -24px rgba(20,145,87,.32); position:relative; }
+    .tier.feat .ribbon { position:absolute; top:-11px; right:22px; background:var(--green-deep); color:#10151f; font-size:10.5px; font-weight:700; letter-spacing:.04em; padding:3px 10px; border-radius:2px; text-transform:uppercase; }
+    .tier .tag { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--green-deep); }
+    .tier h3 { font-size:21px; font-weight:680; margin:8px 0 4px; letter-spacing:-.02em; }
+    .tier .tdesc { font-size:13px; color:var(--muted); min-height:38px; margin:0 0 14px; }
+    .tier .price { font-size:34px; font-weight:680; letter-spacing:-.02em; font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; }
+    .tier .price small { font-size:14px; font-weight:400; color:var(--muted); font-family:'Space Grotesk',sans-serif; }
+    .tier .price.custom { font-size:26px; }
+    .tier ul { list-style:none; padding:0; margin:20px 0 22px; flex:1; }
+    .tier li { padding:7px 0 7px 24px; position:relative; font-size:13.5px; color:#27302b; }
+    .tier li:before { content:""; position:absolute; left:2px; top:13px; width:8px; height:8px; background:var(--green); border-radius:2px; }
+    .tier .btn { width:100%; justify-content:center; }
+    @media (max-width:880px){ .tiers{grid-template-columns:1fr} }
+
+    /* ---------- footer ---------- */
+    footer.site { border-top:1px solid var(--line); background:#0e131c; }
+    .foot-top { max-width:1120px; margin:0 auto; padding:56px 7vw 36px; display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr; gap:32px; }
+    .foot-brand .brand { margin-bottom:14px; }
+    .foot-brand p { color:var(--muted); font-size:13.5px; max-width:260px; margin:0 0 18px; }
+    .badges { display:flex; gap:8px; flex-wrap:wrap; }
+    .secbadge { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#56615b; border:1px solid var(--line); background:#10151f; border-radius:2px; padding:5px 9px; }
+    .secbadge .dot.sm { width:7px; height:7px; }
+    .fcol h5 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 14px; font-weight:600; }
+    .fcol a { display:block; font-size:13.5px; color:#3a443e; padding:5px 0; }
+    .fcol a:hover { color:var(--green-deep); }
+    .foot-bot { border-top:1px solid var(--line); max-width:1120px; margin:0 auto; padding:18px 7vw 30px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; font-size:12.5px; color:var(--muted); }
+    @media (max-width:760px){ .foot-top{grid-template-columns:1fr 1fr} .mock-kpis{grid-template-columns:repeat(2,1fr)} .mock-low{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <!-- ===================== NAV ===================== -->
+  <nav>
+    <a class="brand" href="#"><span class="dot" aria-hidden="true"></span> Signal</a>
+    <div class="nlinks">
+      <a class="hide-sm" href="#product">Product</a>
+      <a class="hide-sm" href="#pricing">Pricing</a>
+      <a class="hide-sm" href="#security">Security</a>
+      <a class="login" href="#">Log in</a>
+      <a class="btn" href="#demo">Book a demo</a>
+    </div>
+  </nav>
+
+  <!-- ===================== HERO ===================== -->
+  <header class="hero" id="demo">
+    <div class="hero-inner">
+      <div class="eyebrow"><span class="dot sm" aria-hidden="true"></span> Treasury intelligence — every position, one signal.</div>
+      <h1>Every position, every counterparty,<br><em>one signal.</em></h1>
+      <p class="lede">Signal connects your banks, ERPs and markets into one live treasury workspace — with real SQL on top.</p>
+      <div class="cta">
+        <a class="btn lg" href="#demo">Book a demo <span class="arr">→</span></a>
+        <a class="btn ghost lg" href="#product">See it live</a>
+      </div>
+      <div class="micro">SOC 2 Type II · read-only bank connections · <span class="num">12-second</span> consolidated position</div>
+    </div>
+
+    <!-- hero product mock -->
+    <div class="mock-wrap">
+      <div class="mock">
+        <div class="mock-bar">
+          <span class="dots"><i></i><i></i><i></i></span>
+          <span class="path">signal · <code>workspace/daily-operations</code> · Global Cash Position</span>
+          <span class="live"><span class="dot sm" aria-hidden="true"></span> live · synced 07:12 ET</span>
+        </div>
+        <div class="mock-body">
+          <div class="mock-kpis">
+            <div class="mk"><div class="l">Total cash &amp; equiv</div><div class="v num">$487.2M</div><div class="d">▲ $12.4M wk</div></div>
+            <div class="mk"><div class="l">Operating available</div><div class="v num">$311.6M</div><div class="d" style="color:var(--muted)">64.0% liquid</div></div>
+            <div class="mk"><div class="l">Trapped / restricted</div><div class="v num">$41.8M</div><div class="d down">8.6% of total</div></div>
+            <div class="mk"><div class="l">Yield on cash</div><div class="v num">4.62%</div><div class="d down">▼ 6 bps wk</div></div>
+          </div>
+          <div class="mock-low">
+            <div class="mpanel">
+              <h4>Cash by banking counterparty</h4>
+              <div class="row"><span class="ico" style="background:#1a3b8a">JPM</span><span class="nm">JPMorgan <span class="badge">A-1</span></span><span class="v">$164.3M</span><span class="track"><span class="fill" style="width:100%"></span></span></div>
+              <div class="row"><span class="ico" style="background:#0066b3">CITI</span><span class="nm">Citibank <span class="badge">A-1</span></span><span class="v">$121.7M</span><span class="track"><span class="fill" style="width:74%"></span></span></div>
+              <div class="row"><span class="ico" style="background:#c8102e">HSBC</span><span class="nm">HSBC <span class="badge">A-1</span></span><span class="v">$78.4M</span><span class="track"><span class="fill" style="width:48%"></span></span></div>
+              <div class="row"><span class="ico" style="background:#007749">BNP</span><span class="nm">BNP Paribas <span class="badge">A-1</span></span><span class="v">$54.9M</span><span class="track"><span class="fill" style="width:33%"></span></span></div>
+              <div class="row"><span class="ico" style="background:#0473ea">SC</span><span class="nm">Std Chartered <span class="badge a2">A-2</span></span><span class="v">$41.8M</span><span class="track"><span class="fill t" style="width:25%"></span></span></div>
+            </div>
+            <div class="mpanel">
+              <h4>Currency mix</h4>
+              <div class="ccy-bar">
+                <span style="width:61.2%;background:#1d6fd6"></span>
+                <span style="width:19.4%;background:#3da9fc"></span>
+                <span style="width:8.5%;background:#7fe9ad"></span>
+                <span style="width:5.9%;background:#0066b3"></span>
+                <span style="width:3.0%;background:#ff7a45"></span>
+                <span style="width:2.0%;background:#ff7a45"></span>
+              </div>
+              <div class="crow"><span class="l"><span class="sw" style="background:#1d6fd6"></span>USD</span><span class="num">61.2% · $298.2M</span></div>
+              <div class="crow"><span class="l"><span class="sw" style="background:#3da9fc"></span>EUR</span><span class="num">19.4% · $94.5M</span></div>
+              <div class="crow"><span class="l"><span class="sw" style="background:#7fe9ad"></span>GBP</span><span class="num">8.5% · $41.4M</span></div>
+              <div class="crow"><span class="l"><span class="sw" style="background:#0066b3"></span>SGD</span><span class="num">5.9% · $28.7M</span></div>
+              <div class="crow"><span class="l"><span class="sw" style="background:#ff7a45"></span>INR</span><span class="num">3.0% · $14.7M</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== TRUST STRIP ===================== -->
+  <section class="trust">
+    <div class="h">Trusted by treasury teams managing <b class="num">$40B+</b> in combined cash &amp; investments</div>
+    <div class="logos">
+      <span class="lg-item">Lattice Industries <span class="rat">$8.4B</span></span>
+      <span class="lg-item">Meridian Logistics <span class="rat">$6.1B</span></span>
+      <span class="lg-item">Halden BioSciences <span class="rat">$5.7B</span></span>
+      <span class="lg-item">Northwind Energy <span class="rat">$9.2B</span></span>
+      <span class="lg-item">Sable Retail Group <span class="rat">$4.3B</span></span>
+      <span class="lg-item">Corvus Semiconductor <span class="rat">$6.8B</span></span>
+    </div>
+  </section>
+
+  <!-- ===================== SECTION INTRO ===================== -->
+  <section class="section" id="product" style="padding-bottom:24px">
+    <div class="sec-head">
+      <div class="kicker">The treasury workspace</div>
+      <h2>One source of truth for cash, risk and controls.</h2>
+      <p class="blurb">Stop reconciling exports across nine bank portals and a dozen spreadsheets. Signal ingests balances, transactions, FX and forecasts into one live workspace your whole team can query.</p>
+    </div>
+  </section>
+
+  <!-- ===================== FEATURE 1 — cash visibility ===================== -->
+  <section class="feat">
+    <div class="copy">
+      <div class="kicker">Cash visibility</div>
+      <h3>Real-time cash across 50+ banks.</h3>
+      <p>Direct API and SWIFT MT940/942 feeds normalize every balance and transaction into one ledger. No nightly exports, no portal roulette — your consolidated position is always current.</p>
+      <ul>
+        <li>52 banking connections live, read-only by default</li>
+        <li>Auto-normalized to USD-functional with policy FX rates</li>
+        <li>Trapped-cash and concentration flags applied automatically</li>
+        <li>Drill from group total to a single account in two clicks</li>
+      </ul>
+      <div class="stat-inline"><span class="dot sm" aria-hidden="true"></span> <b>52</b> banks connected · <b>14</b> entities · refreshed every <b>15 min</b></div>
+    </div>
+    <div class="vis">
+      <div class="vis-bar"><code>accounts.balances</code> <span class="live"><span class="dot sm"></span> live</span></div>
+      <div class="vis-body">
+        <table>
+          <thead><tr><th>Entity</th><th>Counterparty</th><th>Ccy</th><th class="r">Balance</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Signal Holdings Inc</td><td>JPMorgan</td><td class="mono">USD</td><td class="r mono">$98.4M</td><td><span class="pill ok"><span class="d"></span>available</span></td></tr>
+            <tr><td>Signal EMEA Ltd</td><td>HSBC</td><td class="mono">EUR</td><td class="r mono">$54.2M</td><td><span class="pill ok"><span class="d"></span>available</span></td></tr>
+            <tr><td>Signal Asia Pte Ltd</td><td>Std Chartered</td><td class="mono">INR</td><td class="r mono">$14.7M</td><td><span class="pill"><span class="d"></span>trapped · IN</span></td></tr>
+            <tr><td>Signal LatAm Ltda</td><td>Std Chartered</td><td class="mono">BRL</td><td class="r mono">$9.8M</td><td><span class="pill"><span class="d"></span>trapped · BR</span></td></tr>
+            <tr><td>Signal Project Fin SPV</td><td>Citibank</td><td class="mono">USD</td><td class="r mono">$11.5M</td><td><span class="pill"><span class="d"></span>DSRA locked</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FEATURE 2 — forecasting ===================== -->
+  <section class="feat flip">
+    <div class="copy">
+      <div class="kicker">Forecasting</div>
+      <h3>13-week forecasting that learns.</h3>
+      <p>Signal builds a rolling 13-week direct cash forecast from your actuals, AR/AP aging and recurring patterns — then back-tests itself every week so the model tightens as it goes.</p>
+      <ul>
+        <li>Driver-based: payroll, AP runs, tax, debt service, sweeps</li>
+        <li>Scenario layers for FX shocks and delayed receipts</li>
+        <li>Variance-to-actual tracked and fed back automatically</li>
+        <li>Export board-ready waterfalls to PDF or the SQL layer</li>
+      </ul>
+      <div class="stat-inline"><span class="dot sm" aria-hidden="true"></span> 13-week MAPE: <b>4.1%</b> · back-tested across <b>26</b> rolling weeks</div>
+    </div>
+    <div class="vis">
+      <div class="vis-bar"><code>forecast.13week</code> <span class="live"><span class="dot sm"></span> MAPE 4.1%</span></div>
+      <div class="vis-body">
+        <div class="chart" id="fc-chart"></div>
+        <div class="chart-legend"><span><i style="background:var(--green)"></i>Actual</span><span><i style="background:repeating-linear-gradient(45deg,#161c27 0 3px,#161c27 3px 6px);border:1px solid #9fefc6"></i>Projected</span><span style="margin-left:auto" class="mono">wk 1–13 · ending cash $M</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FEATURE 3 — SQL ===================== -->
+  <section class="feat">
+    <div class="copy">
+      <div class="kicker">Query layer</div>
+      <h3>Query your ledger like a database.</h3>
+      <p>Every balance, transaction, counterparty and forecast row is a table. Write real SQL against your treasury — no exports, no BI middleman — and save any query as a live tile, alert or scheduled report.</p>
+      <ul>
+        <li>ANSI SQL over a governed, read-only treasury schema</li>
+        <li>Joins across banks, entities, FX rates and forecasts</li>
+        <li>Save as live tile, threshold alert, or board export</li>
+        <li>Row-level permissions inherited from entity access</li>
+      </ul>
+      <div class="stat-inline"><span class="dot sm" aria-hidden="true"></span> Query the consolidated position in <b>&lt; 12s</b></div>
+    </div>
+    <div class="vis">
+      <div class="vis-bar"><code>query.sql</code> <span class="live"><span class="dot sm"></span> 14 rows · 0.18s</span></div>
+      <div class="vis-body">
+        <div class="sql"><span class="cm">-- available cash by entity, ex-trapped</span><br>
+<span class="kw">SELECT</span> entity, <span class="fn">SUM</span>(available_usd) <span class="kw">AS</span> liquid<br>
+<span class="kw">FROM</span> accounts.balances<br>
+<span class="kw">WHERE</span> status = <span class="str">'available'</span><br>
+<span class="kw">GROUP BY</span> entity <span class="kw">ORDER BY</span> liquid <span class="kw">DESC</span>;</div>
+        <table style="margin-top:12px">
+          <thead><tr><th>Entity</th><th class="r">Liquid (USD)</th></tr></thead>
+          <tbody>
+            <tr><td>Signal Holdings Inc</td><td class="r mono">$164.3M</td></tr>
+            <tr><td>Signal EMEA Ltd</td><td class="r mono">$94.5M</td></tr>
+            <tr><td>Signal Asia Pte Ltd</td><td class="r mono">$41.5M</td></tr>
+            <tr><td>Signal Payments LLC</td><td class="r mono">$23.8M</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FEATURE 4 — FX & counterparty risk ===================== -->
+  <section class="feat flip">
+    <div class="copy">
+      <div class="kicker">Risk</div>
+      <h3>Counterparty &amp; FX risk in one view.</h3>
+      <p>See concentration by bank against rating, plus net open FX exposure and hedge coverage by pair — all in real time. Signal flags drift past policy thresholds before it becomes a board question.</p>
+      <ul>
+        <li>Counterparty concentration vs S&amp;P / Moody's rating</li>
+        <li>Net open FX exposure and hedge coverage by pair</li>
+        <li>Policy thresholds with automatic breach alerts</li>
+        <li>Single-counterparty limit enforced at $175M</li>
+      </ul>
+      <div class="stat-inline"><span class="dot sm" aria-hidden="true"></span> Net open exposure <b>$28.4M</b> · hedged to <b>92%</b></div>
+    </div>
+    <div class="vis">
+      <div class="vis-bar"><code>risk.fx_exposure</code> <span class="live"><span class="dot sm"></span> policy 90% min</span></div>
+      <div class="vis-body">
+        <div class="fx">
+          <div class="fxc"><div class="p"><span>EUR/USD</span><span class="mono">1.0842</span></div><div class="e">€87.2M</div><div class="h">hedged 94%</div></div>
+          <div class="fxc"><div class="p"><span>GBP/USD</span><span class="mono">1.2731</span></div><div class="e">£32.6M</div><div class="h">hedged 91%</div></div>
+          <div class="fxc"><div class="p"><span>SGD/USD</span><span class="mono">0.7402</span></div><div class="e">S$38.9M</div><div class="h">hedged 88%</div></div>
+          <div class="fxc"><div class="p"><span>INR/USD</span><span class="mono">0.0120</span></div><div class="e">₹1.22B</div><div class="h warn">hedged 61% · review</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FEATURE 5 — SOX controls ===================== -->
+  <section class="feat">
+    <div class="copy">
+      <div class="kicker">Controls</div>
+      <h3>SOX-ready payment controls.</h3>
+      <p>Approval workflows, segregation of duties and an immutable audit trail are built in. Every payment is dual-controlled, every change is logged, and your auditors get read-only evidence on demand.</p>
+      <ul>
+        <li>Configurable dual / tri-approval by amount and entity</li>
+        <li>Enforced segregation of duties (maker ≠ checker)</li>
+        <li>Immutable, exportable audit log of every action</li>
+        <li>Sanctions and beneficiary screening pre-release</li>
+      </ul>
+      <div class="stat-inline"><span class="dot sm" aria-hidden="true"></span> <b>100%</b> of payments dual-controlled · zero SOX exceptions YTD</div>
+    </div>
+    <div class="vis">
+      <div class="vis-bar"><code>controls.approval</code> · Wire $4.20M → Meridian Logistics <span class="live"><span class="dot sm"></span> in review</span></div>
+      <div class="vis-body">
+        <div class="appr"><span class="step">✓</span><span class="who"><b>Initiated</b> · <span>Daniel Osei, Treasury Analyst</span></span><span class="mono" style="color:var(--muted);font-size:11px">07:02 ET</span></div>
+        <div class="appr"><span class="step">✓</span><span class="who"><b>Approved (1 of 2)</b> · <span>Priya Nair, Cash Manager</span></span><span class="mono" style="color:var(--muted);font-size:11px">07:18 ET</span></div>
+        <div class="appr"><span class="step wait">2</span><span class="who"><b>Awaiting approval (2 of 2)</b> · <span>Maya Okonkwo, Group Treasurer</span></span><span class="pill"><span class="d"></span>pending</span></div>
+        <div class="appr"><span class="step wait">·</span><span class="who"><span>Sanctions &amp; beneficiary screen</span></span><span class="pill ok"><span class="d"></span>cleared</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== METRICS BAND ===================== -->
+  <section class="band">
+    <div class="band-inner">
+      <div class="metric"><div class="v"><em>12</em> sec</div><div class="l">to a consolidated, group-wide cash position — across every bank and entity.</div></div>
+      <div class="metric"><div class="v">99.98%</div><div class="l">data uptime across bank feeds over the trailing 12 months.</div></div>
+      <div class="metric"><div class="v">SOC 2</div><div class="l">Type II certified, audited annually. SSO, RBAC and full audit trail.</div></div>
+    </div>
+  </section>
+
+  <!-- ===================== TESTIMONIAL ===================== -->
+  <section class="quote-sec">
+    <div class="qcard">
+      <div class="mark-q">"</div>
+      <blockquote>We killed the morning Excel scramble. I used to spend the first ninety minutes of every day stitching nine bank exports into one workbook. Now I open Signal with my coffee and the group position is already there — current, reconciled, and I can SQL into any number the board asks about.</blockquote>
+      <div class="who">
+        <img src="https://i.pravatar.cc/96?img=47" alt="Maya Okonkwo" />
+        <div>
+          <div class="nm">Maya Okonkwo</div>
+          <div class="rl">Group Treasurer, Meridian Logistics</div>
+        </div>
+        <div class="logo">Meridian</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PRICING ===================== -->
+  <section class="pricing" id="pricing">
+    <div class="sec-head">
+      <div class="kicker">Pricing</div>
+      <h2>Priced per workspace, not per seat.</h2>
+      <p class="blurb">Connect your whole team. Every plan includes unlimited read-only viewers, SSO, and the SQL query layer.</p>
+    </div>
+    <div class="tiers">
+      <div class="tier">
+        <div class="tag">Team</div>
+        <h3>Team</h3>
+        <p class="tdesc">For a single-entity treasury getting to one live position.</p>
+        <div class="price">$2,400<small> / mo</small></div>
+        <ul>
+          <li>Up to 10 bank connections</li>
+          <li>1 legal entity · unlimited accounts</li>
+          <li>Real-time cash position &amp; SQL layer</li>
+          <li>13-week forecasting</li>
+          <li>Email &amp; in-app support</li>
+        </ul>
+        <a class="btn ghost" href="#demo">Start with Team</a>
+      </div>
+      <div class="tier feat">
+        <span class="ribbon">Most popular</span>
+        <div class="tag">Growth</div>
+        <h3>Growth</h3>
+        <p class="tdesc">For multi-entity groups that need risk, FX and controls.</p>
+        <div class="price">$6,900<small> / mo</small></div>
+        <ul>
+          <li>Up to 30 bank connections</li>
+          <li>Up to 10 entities · multi-currency</li>
+          <li>Counterparty &amp; FX risk views</li>
+          <li>SOX-ready payment controls</li>
+          <li>SSO/SAML · priority support</li>
+        </ul>
+        <a class="btn" href="#demo">Book a demo</a>
+      </div>
+      <div class="tier">
+        <div class="tag">Enterprise</div>
+        <h3>Enterprise</h3>
+        <p class="tdesc">For global treasuries with custom feeds and audit needs.</p>
+        <div class="price custom">Custom</div>
+        <ul>
+          <li>Unlimited bank connections &amp; entities</li>
+          <li>SWIFT, custom ERP &amp; market feeds</li>
+          <li>Dedicated VPC &amp; data residency</li>
+          <li>Custom SLAs · 99.99% uptime</li>
+          <li>Named CSM &amp; implementation team</li>
+        </ul>
+        <a class="btn ghost" href="#demo">Talk to sales</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="site" id="security">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <a class="brand" href="#"><span class="dot" aria-hidden="true"></span> Signal</a>
+        <p>Treasury intelligence for finance teams. Every position, every counterparty, one signal.</p>
+        <div class="badges">
+          <span class="secbadge"><span class="dot sm" aria-hidden="true"></span> SOC 2 Type II</span>
+          <span class="secbadge"><span class="dot sm" aria-hidden="true"></span> GDPR</span>
+          <span class="secbadge"><span class="dot sm" aria-hidden="true"></span> ISO 27001</span>
+        </div>
+      </div>
+      <div class="fcol">
+        <h5>Product</h5>
+        <a href="#product">Cash visibility</a>
+        <a href="#product">13-week forecasting</a>
+        <a href="#product">SQL query layer</a>
+        <a href="#product">FX &amp; counterparty risk</a>
+        <a href="#product">Payment controls</a>
+      </div>
+      <div class="fcol">
+        <h5>Resources</h5>
+        <a href="#">Documentation</a>
+        <a href="#">SQL reference</a>
+        <a href="#">Bank coverage</a>
+        <a href="#">Security &amp; trust</a>
+        <a href="#">Status</a>
+      </div>
+      <div class="fcol">
+        <h5>Company</h5>
+        <a href="#">About</a>
+        <a href="#">Customers</a>
+        <a href="#">Careers</a>
+        <a href="#">Blog</a>
+        <a href="#demo">Book a demo</a>
+      </div>
+    </div>
+    <div class="foot-bot">
+      <span>© 2026 Signal Treasury, Inc. · signal.ml</span>
+      <span class="num">every position, one signal.</span>
+    </div>
+  </footer>
+
+  <script>
+    // ---- deterministic 13-week forecast mini-chart (ending cash $M) ----
+    // weeks 1-8 actual, 9-13 projected; mirrors forecast.13week fixture
+    const fc = [
+      [487, 0], [479, 0], [492, 0], [468, 0], [474, 0], [501, 0], [495, 0], [488, 0],
+      [496, 1], [503, 1], [491, 1], [509, 1], [517, 1]
+    ];
+    const max = Math.max(...fc.map(d => d[0]));
+    const min = Math.min(...fc.map(d => d[0])) * 0.92;
+    document.getElementById("fc-chart").innerHTML = fc.map((d, i) => {
+      const h = Math.round(((d[0] - min) / (max - min)) * 92) + 8;
+      return `<div class="col" title="wk ${i+1}: $${d[0]}M${d[1] ? ' (proj)' : ''}">
+        <div class="bar ${d[1] ? 'proj' : ''}" style="height:${h}px"></div>
+        <div class="lbl">${i+1}</div>
+      </div>`;
+    }).join("");
+  </script>
+</body>
+</html>

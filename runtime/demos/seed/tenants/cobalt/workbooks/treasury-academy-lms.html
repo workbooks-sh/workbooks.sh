@@ -1,0 +1,450 @@
+<!doctype html>
+<!-- workbook: treasury-academy-lms — onboarding LMS for new treasury analysts. Deterministic, self-contained, no network (except avatar imgs). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="darkreader-lock" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Signal — Treasury Analyst Academy</title>
+  <script id="workbook-spec" type="application/json">
+    {
+      "id": "treasury-academy-lms",
+      "kind": "lms",
+      "title": "Treasury Analyst Academy",
+      "owner": "p.raman",
+      "workspace": "signal-treasury",
+      "folder": "Onboarding & Training",
+      "learner": "Jordan Lee",
+      "learner_started": "2026-06-02",
+      "modules": 7,
+      "lessons_total": 28,
+      "lessons_done": 12,
+      "completion_basis": "lesson-weighted (12/28)",
+      "overall_completion_pct": 43,
+      "links": ["transaction-ledger-sql", "cash-forecast-13week", "global-cash-position"],
+      "frozen_at": "2026-06-13T18:00:00Z"
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+    /* ===== Signal design system override — institutional / data-dense ===== */
+    .dot, .dot.sm {
+      border-radius:0 !important; background:transparent !important; box-shadow:none !important;
+      width:16px !important; height:16px !important; position:relative; display:inline-block;
+      background-image:
+        linear-gradient(var(--green) 0 0), linear-gradient(var(--green) 0 0),
+        linear-gradient(var(--green) 0 0), linear-gradient(var(--green) 0 0) !important;
+      background-repeat:no-repeat !important;
+      background-size:3px 40%, 3px 62%, 3px 84%, 3px 100% !important;
+      background-position:0 100%, 4.3px 100%, 8.6px 100%, 13px 100% !important;
+    }
+    .dot.sm { width:13px !important; height:13px !important;
+      background-size:2px 40%, 2px 62%, 2px 84%, 2px 100% !important;
+      background-position:0 100%, 3.6px 100%, 7.2px 100%, 10.8px 100% !important; }
+    .brand .name { letter-spacing:-.02em !important; }
+    :root{
+      --green:#3da9fc; --green-d:#1d6fd6; --ink:#e9edf4; --bg:#0a0d13;
+      --card:#10151f; --line:#1c232f; --muted:#8893a6; --red:#e0533f; --amber:#e0a23f;
+    }
+    *{box-sizing:border-box}
+    body{font:14px/1.5 'Space Grotesk',system-ui,sans-serif;color:var(--ink);
+      background:var(--bg);margin:0;padding:30px 38px 60px;
+      background-image:linear-gradient(rgba(12,15,13,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(12,15,13,.018) 1px,transparent 1px);
+      background-size:26px 26px;background-position:-1px -1px}
+    .top{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px;border-bottom:1px solid var(--line);padding-bottom:14px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:-.02em;font-size:18px}
+    .dot{width:11px;height:11px;border-radius:2px;background:var(--green);}
+    .tag{color:var(--muted);font:11px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:.03em}
+    .crumb{color:var(--muted);font:12px 'IBM Plex Mono',monospace;margin:18px 0 4px}
+    h1{font-weight:650;letter-spacing:-.02em;font-size:26px;margin:0 0 2px}
+    .sub{color:var(--muted);margin:0;font:13px/1.5 'IBM Plex Mono',ui-monospace,monospace}
+
+    /* ---- Learner profile banner ---- */
+    .profile{display:grid;grid-template-columns:auto 1fr auto;gap:22px;align-items:center;
+      background:var(--card);border:1px solid var(--line);border-radius:2px;padding:20px 24px;margin:22px 0 8px;
+      background-image:radial-gradient(120% 140% at 0% 0%, rgba(61,169,252,.07), transparent 55%)}
+    .pf-id{display:flex;align-items:center;gap:14px}
+    .pf-id img{width:54px;height:54px;border-radius:2px;object-fit:cover;border:1px solid var(--line)}
+    .pf-id .nm{font-size:17px;font-weight:650;letter-spacing:-.01em;line-height:1.2}
+    .pf-id .rl{font:11px 'IBM Plex Mono',monospace;color:var(--muted);margin-top:2px}
+    .pf-meta{display:flex;gap:30px;flex-wrap:wrap}
+    .pf-meta .blk .k{font:10px 'IBM Plex Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+    .pf-meta .blk .v{font-size:18px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:3px}
+    .pf-meta .blk .v small{font-size:11px;font-weight:500;color:var(--muted);font-variant-numeric:normal}
+    .pf-ring{display:flex;flex-direction:column;align-items:center;gap:6px}
+    .ring{width:84px;height:84px;border-radius:50%;flex:none;display:grid;place-items:center}
+    .ring .inner{width:64px;height:64px;border-radius:50%;background:var(--card);display:grid;place-items:center;text-align:center}
+    .ring .pct{font-size:19px;font-weight:650;letter-spacing:-.02em;line-height:1}
+    .ring .pl{font:9px 'IBM Plex Mono',monospace;color:var(--muted);margin-top:1px}
+    .pf-ring .cap{font:9px 'IBM Plex Mono',monospace;color:var(--muted);text-align:center}
+
+    .progress-track{height:8px;border-radius:2px;background:#161c27;overflow:hidden;margin-top:14px}
+    .progress-fill{height:100%;background:linear-gradient(90deg,var(--green-d),var(--green));border-radius:2px}
+
+    .certnote{display:flex;align-items:center;gap:10px;font:12px/1.4 'IBM Plex Mono',monospace;color:var(--muted);
+      background:rgba(61,169,252,.06);border:1px solid var(--line);border-radius:2px;padding:10px 14px;margin:0 0 26px}
+    .certnote b{color:var(--green-d);font-family:'Space Grotesk',sans-serif;font-weight:600}
+    .seal{width:18px;height:18px;border-radius:2px;background:var(--green);;flex:none}
+
+    .shelf-h{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+    .shelf-h h2{font-size:14px;font-weight:600;margin:0;letter-spacing:-.01em}
+    .shelf-h .leg{display:flex;gap:14px;font:11px 'IBM Plex Mono',monospace;color:var(--muted);flex-wrap:wrap}
+    .shelf-h .leg span{display:inline-flex;align-items:center;gap:6px}
+    .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+    /* ---- Course shelf ---- */
+    .shelf{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+    .mod{background:var(--card);border:1px solid var(--line);border-radius:2px;padding:18px 20px;display:flex;flex-direction:column;gap:13px;position:relative;overflow:hidden}
+    .mod.locked{opacity:.92}
+    .mod .num{position:absolute;top:14px;right:16px;font:11px 'IBM Plex Mono',monospace;color:#c4cfc8;font-weight:600}
+    .mod-head{display:flex;gap:14px;align-items:flex-start}
+    .mod-ring{flex:none}
+    .ring-sm{width:58px;height:58px;border-radius:50%;display:grid;place-items:center}
+    .ring-sm .inner{width:44px;height:44px;border-radius:50%;background:var(--card);display:grid;place-items:center;text-align:center}
+    .ring-sm .pct{font-size:14px;font-weight:650;letter-spacing:-.02em;line-height:1}
+    .ring-sm .pl{font:8px 'IBM Plex Mono',monospace;color:var(--muted)}
+    .mod-title{font-size:15px;font-weight:600;letter-spacing:-.01em;line-height:1.25;padding-right:30px}
+    .mod-meta{font:11px 'IBM Plex Mono',monospace;color:var(--muted);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap}
+    .mod-meta .x{color:#c4cfc8}
+    .mod-abs{font-size:12.5px;line-height:1.55;color:#39433d;margin:0}
+    .mod-abs .gl{border-bottom:1px dotted var(--green-d);cursor:help;color:var(--ink);font-weight:500}
+    .mod-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding-top:4px}
+    .instr{display:flex;align-items:center;gap:8px}
+    .instr img{width:28px;height:28px;border-radius:2px;object-fit:cover;border:1px solid var(--line)}
+    .instr .nm{font-size:12px;font-weight:550;line-height:1.15}
+    .instr .rl{font:9px 'IBM Plex Mono',monospace;color:var(--muted)}
+    .btn{font:12px 'Space Grotesk',sans-serif;font-weight:600;border-radius:2px;padding:8px 16px;border:1px solid var(--green-d);
+      background:var(--green-d);color:#10151f;cursor:pointer;text-decoration:none;white-space:nowrap;transition:filter .12s}
+    .btn:hover{filter:brightness(1.08)}
+    .btn.ghost{background:var(--card);color:var(--green-d)}
+    .btn.done{background:rgba(61,169,252,.1);color:var(--green-d);border-color:rgba(20,145,87,.3)}
+    .btn.lock{background:#141a24;color:#9aa39d;border-color:var(--line);cursor:not-allowed}
+
+    .chips{display:flex;gap:7px;flex-wrap:wrap}
+    .pill{display:inline-flex;align-items:center;gap:5px;font:10px 'IBM Plex Mono',monospace;padding:2px 9px;border-radius:2px;border:1px solid var(--line);white-space:nowrap}
+    .pill.ok{color:var(--green-d);border-color:rgba(20,145,87,.3);background:rgba(61,169,252,.08)}
+    .pill.warn{color:#8a5a00;border-color:rgba(224,162,63,.35);background:rgba(224,162,63,.1)}
+    .pill.idle{color:var(--muted)}
+    .pill.link{color:var(--green-d);border-color:rgba(20,145,87,.3);background:rgba(61,169,252,.06)}
+    .qz{font:10px 'IBM Plex Mono',monospace}
+
+    /* lessons list (collapsible feel, static) */
+    .lessons{margin:0;padding:0;list-style:none;border-top:1px solid var(--line);padding-top:11px}
+    .lessons li{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12.5px;color:#39433d}
+    .lessons li .ld{width:14px;height:14px;border-radius:2px;flex:none;display:grid;place-items:center;font-size:9px;color:#10151f;font-weight:700}
+    .ld.d{background:var(--green-d)} .ld.p{background:var(--amber)} .ld.t{background:#2a3342;color:#8a948d}
+    .lessons li .lt{flex:1}
+    .lessons li .le{font:10px 'IBM Plex Mono',monospace;color:var(--muted);font-variant-numeric:tabular-nums}
+    .lessons li.cur{color:var(--ink);font-weight:550}
+    .lessons li.cur .lt::after{content:" · in progress";color:var(--amber);font:10px 'IBM Plex Mono',monospace;font-weight:400}
+
+    /* glossary tooltip */
+    .tip{position:fixed;z-index:50;max-width:280px;background:var(--ink);color:#eaf3ee;
+      font:11.5px/1.5 'IBM Plex Mono',monospace;padding:10px 12px;border-radius:2px;box-shadow:0 8px 24px rgba(0,0,0,.22);
+      pointer-events:none;opacity:0;transition:opacity .1s;letter-spacing:.01em}
+    .tip b{color:var(--green);font-family:'Space Grotesk',sans-serif;letter-spacing:0}
+    .tip.show{opacity:1}
+
+    .foot{color:var(--muted);font:12px/1.6 'IBM Plex Mono',monospace;margin-top:30px;border-top:1px solid var(--line);padding-top:12px}
+    code{font:12px 'IBM Plex Mono',monospace;background:#141a24;padding:1px 5px;border-radius:2px}
+    a.xref{color:var(--green-d);text-decoration:none;border-bottom:1px solid rgba(20,145,87,.3)}
+    @media(max-width:980px){.shelf{grid-template-columns:1fr}.profile{grid-template-columns:1fr;gap:16px}.pf-meta{gap:22px}}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand"><span class="dot"></span> Signal</div>
+    <div class="tag">treasury intelligence · every position, every counterparty, one signal</div>
+  </div>
+
+  <p class="crumb">Onboarding &amp; Training / <b style="color:#39433d">Treasury Analyst Academy</b></p>
+  <h1>Treasury Analyst Academy</h1>
+  <p class="sub">New-analyst onboarding · 7 modules · 28 lessons · self-paced · owner p.raman · frozen 2026-06-13 18:00 UTC</p>
+
+  <!-- ---- Learner profile ---- -->
+  <div class="profile">
+    <div class="pf-id">
+      <img src="https://i.pravatar.cc/108?img=11" alt="Jordan Lee" />
+      <div>
+        <div class="nm">Jordan Lee</div>
+        <div class="rl">Treasury Analyst I · cohort 2026-Q2 · reports to p.raman</div>
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap" class="chips" id="pf-chips"></div>
+      </div>
+    </div>
+    <div class="pf-meta">
+      <div class="blk"><div class="k">Started</div><div class="v">Jun 2 <small>2026</small></div></div>
+      <div class="blk"><div class="k">Lessons done</div><div class="v"><span id="pf-done">—</span> <small>/ <span id="pf-total">28</span></small></div></div>
+      <div class="blk"><div class="k">Est. time left</div><div class="v">~<span id="pf-left">—</span></div></div>
+      <div class="blk"><div class="k">Quizzes passed</div><div class="v">3 <small>/ 3 available</small></div></div>
+    </div>
+    <div class="pf-ring">
+      <div class="ring" id="pf-ring">
+        <div class="inner"><div><div class="pct" id="pf-pct">—</div><div class="pl">overall</div></div></div>
+      </div>
+      <div class="cap">lesson-weighted · on track</div>
+    </div>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="pf-bar" style="width:0"></div></div>
+
+  <div class="certnote">
+    <span class="seal"></span>
+    <span>Certificate on completion — finish all 7 modules and pass each quiz to earn <b>Signal Certified Treasury Analyst (Level I)</b>. Issued by p.raman, countersigned by VP Treasury; recorded to the learner ledger and renewable annually.</span>
+  </div>
+
+  <div class="shelf-h">
+    <h2>Course shelf</h2>
+    <div class="leg">
+      <span><i class="sw" style="background:var(--green-d)"></i> complete</span>
+      <span><i class="sw" style="background:var(--amber)"></i> in progress</span>
+      <span><i class="sw" style="background:#2a3342"></i> not started</span>
+    </div>
+  </div>
+
+  <div class="shelf" id="shelf"></div>
+
+  <div class="foot" id="foot"></div>
+
+  <div class="tip" id="tip"></div>
+
+  <script>
+  // =====================================================================
+  // Treasury Analyst Academy — onboarding LMS. Deterministic + self-contained.
+  // SINGLE SOURCE OF TRUTH: per-lesson state drives everything. Overall
+  // completion is lesson-weighted (lessons done / lessons total). The profile
+  // ring, the progress bar, the profile chips and the footer all derive from
+  // the same computed values — no figure is hand-typed, so nothing can drift.
+  // =====================================================================
+
+  // Real treasury glossary — surfaced as hover tooltips on key terms.
+  const GLOSSARY = {
+    WAM: "Weighted Average Maturity — the average time to maturity of holdings in a money-market portfolio, weighted by position size. Treasury policy typically caps operating-cash WAM at 60 days to limit duration risk.",
+    DSRA: "Debt Service Reserve Account — a segregated reserve, often 6 months of principal + interest, that a borrower must keep funded to cover debt service if operating cash falls short. A standard covenant in term-loan and project finance.",
+    ZBA: "Zero-Balance Account — a subsidiary account swept to (or from) a master concentration account at end of day so it ends at zero, centralizing idle cash while preserving per-entity disbursement controls.",
+    netting: "Netting — offsetting receivables against payables between the same counterparties (or intercompany entities) so only the net amount settles, cutting FX conversions, wire fees and settlement risk."
+  };
+
+  // Lesson state codes: d = done, p = in-progress (current), t = to-do.
+  const MODULES = [
+    {
+      n:1, title:"Signal & the cash cycle", est:"35m",
+      instr:["Priya Raman","Treasury Manager",12],
+      quiz:{state:"passed", score:"9/10"},
+      abstract:`How cash actually moves through the company — collections to concentration to disbursement — and where Signal sits as the system of record. You'll trace one euro of revenue from an EMEA <span class="gl" data-g="ZBA">ZBA</span> through the master sweep to the US operating account.`,
+      lessons:[
+        ["d","What treasury does (and doesn't) own","6m"],
+        ["d","The order-to-cash → cash conversion cycle","9m"],
+        ["d","Concentration, sweeps & the account map","11m"],
+        ["d","Where Signal is the source of truth","9m"],
+      ],
+    },
+    {
+      n:2, title:"Reading the daily cash position", est:"28m",
+      instr:["Hannah Lindqvist","Cash Analyst, EMEA",52],
+      quiz:{state:"passed", score:"8/10"},
+      abstract:`Open the morning position, reconcile prior-day actuals against the bank feeds, and flag breaks before 10:00. Covers bank-reported vs. ledger balances, value-dating, and how the <span class="gl" data-g="WAM">WAM</span> of the MMF sleeve shows up on the position.`,
+      lessons:[
+        ["d","Anatomy of the global cash position","10m"],
+        ["d","Bank feeds, value dates & float","9m"],
+        ["d","Reconciling actuals & clearing breaks","9m"],
+      ],
+      link:{id:"global-cash-position", label:"Global Cash Position"},
+    },
+    {
+      n:3, title:"Building the 13-week forecast — direct method", est:"52m",
+      instr:["Daniel Cho","FP&A Liaison",3],
+      quiz:{state:"locked"},
+      cur:true,
+      abstract:`Build a rolling direct-method forecast from receipts and disbursements — not an indirect P&L roll-forward. You'll lay in AR collections, AP run-rate, payroll and tax timing, then pressure-test closing cash against the term-loan floor and the <span class="gl" data-g="DSRA">DSRA</span>.`,
+      lessons:[
+        ["d","Direct vs. indirect: why treasury uses direct","8m"],
+        ["d","Receipts: AR collections & intercompany","11m"],
+        ["d","Disbursements: AP, payroll & tax timing","12m"],
+        ["p","Covenant headroom & stress scenarios","13m"],
+        ["t","Forecast accuracy: MAPE & bias review","8m"],
+      ],
+      link:{id:"cash-forecast-13week", label:"13-Week Cash Forecast"},
+    },
+    {
+      n:4, title:"Counterparty risk & exposure limits", est:"44m",
+      instr:["Priya Raman","Treasury Manager",12],
+      quiz:{state:"locked"},
+      cur:true,
+      abstract:`Set and monitor where the firm's cash is allowed to sit. Bank credit ratings, single-name concentration caps, and money-fund eligibility — plus how a downgrade triggers a forced reallocation off a named counterparty.`,
+      lessons:[
+        ["d","Why deposits are a credit decision","9m"],
+        ["p","Ratings, tiers & approved counterparty list","13m"],
+        ["t","Concentration & single-name limits","11m"],
+        ["t","Downgrade triggers & reallocation playbook","11m"],
+      ],
+    },
+    {
+      n:5, title:"FX exposure, netting & forwards", est:"58m",
+      instr:["Hannah Lindqvist","Cash Analyst, EMEA",52],
+      quiz:{state:"locked"},
+      abstract:`Identify EUR/GBP transaction exposure across entities, reduce it through <span class="gl" data-g="netting">netting</span>, then hedge the residual with a forward ladder. Covers exposure capture, the netting cycle, forward pricing basics, and hedge-accounting hygiene.`,
+      lessons:[
+        ["t","Where FX exposure comes from","10m"],
+        ["t","The intercompany netting cycle","12m"],
+        ["t","Forwards: pricing & the forward ladder","13m"],
+        ["t","Designating & documenting hedges","11m"],
+        ["t","Mark-to-market & settlement","12m"],
+      ],
+    },
+    {
+      n:6, title:"Payment runs & maker-checker controls", est:"34m",
+      instr:["Daniel Cho","FP&A Liaison",3],
+      quiz:{state:"locked"},
+      abstract:`Release money safely. The maker-checker (four-eyes) workflow, payment-run approval thresholds, sanctions/beneficiary screening, and the audit trail every disbursement leaves behind. Includes a walk-through of a held payment and how to clear it.`,
+      lessons:[
+        ["t","Maker-checker & segregation of duties","11m"],
+        ["t","Approval thresholds & dual release","11m"],
+        ["t","Screening, holds & the audit trail","12m"],
+      ],
+    },
+    {
+      n:7, title:"Writing SQL against the ledger", est:"41m",
+      instr:["Priya Raman","Treasury Manager",12],
+      quiz:{state:"passed", score:"7/10"},
+      cur:true,
+      abstract:`Answer your own questions. Query the consolidated transaction ledger directly — filter by entity and value date, group flows by category, and reconcile a day's net movement. Runs live against the same data as the ledger workbook.`,
+      lessons:[
+        ["d","The ledger schema: tables & keys","10m"],
+        ["p","SELECT, WHERE & value-date filters","11m"],
+        ["t","GROUP BY: flows by category & entity","10m"],
+        ["t","Reconciling net movement in SQL","10m"],
+      ],
+      link:{id:"transaction-ledger-sql", label:"Transaction Ledger — SQL"},
+    },
+  ];
+
+  // ---- Render shelf ----------------------------------------------------
+  function ringStyle(pct){
+    const c = pct===100 ? "var(--green-d)" : pct>0 ? "var(--amber)" : "#2a3342";
+    return `background:conic-gradient(${c} 0 ${pct}%, #161c27 ${pct}% 100%)`;
+  }
+  function ldClass(s){ return s==="d"?"d":s==="p"?"p":"t"; }
+  function ldMark(s){ return s==="d"?"✓":s==="p"?"›":""; }
+
+  function cta(m){
+    if(m.pct===100) return `<a class="btn done" href="#m${m.n}">Review</a>`;
+    if(m.pct>0)     return `<a class="btn" href="#m${m.n}">Resume</a>`;
+    // gate module 5 & 6 behind prerequisites (forecast + counterparty first)
+    if(m.n===5 || m.n===6) return `<span class="btn lock" title="Unlocks after module ${m.n-1}">Locked</span>`;
+    return `<a class="btn ghost" href="#m${m.n}">Start</a>`;
+  }
+  function quizPill(q){
+    if(q.state==="passed") return `<span class="pill ok">✓ quiz ${q.score}</span>`;
+    return `<span class="pill idle">quiz · ${ /*locked*/ "after lessons"}</span>`;
+  }
+
+  // Module completion is derived from lesson states — never hand-typed.
+  function modPct(m){
+    const done = m.lessons.filter(l=>l[0]==="d").length;
+    return Math.round(done / m.lessons.length * 100);
+  }
+
+  const shelf = MODULES.map(m=>{
+    const done = m.lessons.filter(l=>l[0]==="d").length;
+    m.pct = modPct(m);
+    const lessonsHtml = m.lessons.map(l=>{
+      const cur = l[0]==="p";
+      return `<li class="${cur?'cur':''}"><span class="ld ${ldClass(l[0])}">${ldMark(l[0])}</span>`+
+        `<span class="lt">${l[1]}</span><span class="le">${l[2]}</span></li>`;
+    }).join("");
+    const linkChip = m.link
+      ? `<a class="pill link" href="${m.link.id}.html">↗ ${m.link.label}</a>` : "";
+    return `
+    <div class="mod ${m.pct===0?'locked':''}" id="m${m.n}">
+      <div class="num">MODULE ${String(m.n).padStart(2,'0')}</div>
+      <div class="mod-head">
+        <div class="mod-ring">
+          <div class="ring-sm" style="${ringStyle(m.pct)}">
+            <div class="inner"><div><div class="pct">${m.pct}%</div><div class="pl">${done}/${m.lessons.length}</div></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="mod-title">${m.title}</div>
+          <div class="mod-meta">
+            <span>${m.lessons.length} lessons</span><span class="x">·</span>
+            <span>${m.est} est.</span><span class="x">·</span>
+            <span>${m.pct===100?'completed':m.pct>0?'in progress':'not started'}</span>
+          </div>
+        </div>
+      </div>
+      <p class="mod-abs">${m.abstract}</p>
+      <ul class="lessons">${lessonsHtml}</ul>
+      <div class="chips">${quizPill(m.quiz)}${linkChip}</div>
+      <div class="mod-foot">
+        <div class="instr">
+          <img src="https://i.pravatar.cc/56?img=${m.instr[2]}" alt="${m.instr[0]}" />
+          <div><div class="nm">${m.instr[0]}</div><div class="rl">${m.instr[1]} · instructor</div></div>
+        </div>
+        ${cta(m)}
+      </div>
+    </div>`;
+  }).join("");
+  document.getElementById("shelf").innerHTML = shelf;
+
+  // ---- Single source of truth: derive ALL roll-up figures from lessons -
+  const lessonsTotal = MODULES.reduce((a,m)=>a+m.lessons.length,0);
+  const lessonsDone  = MODULES.reduce((a,m)=>a+m.lessons.filter(l=>l[0]==="d").length,0);
+  // Overall completion is lesson-weighted — the one canonical definition.
+  const overall  = Math.round(lessonsDone / lessonsTotal * 100);
+  const complete = MODULES.filter(m=>m.pct===100).length;
+  const inprog   = MODULES.filter(m=>m.pct>0 && m.pct<100).length;
+  const notstart = MODULES.filter(m=>m.pct===0).length;
+
+  // Est. time left = sum of durations of lessons not yet done (p + t).
+  const minsLeft = MODULES.reduce((a,m)=>
+    a + m.lessons.filter(l=>l[0]!=="d").reduce((b,l)=>b+parseInt(l[2],10),0), 0);
+  const fmtDur = mins => { const h=Math.floor(mins/60), mm=mins%60;
+    return h ? `${h}h ${String(mm).padStart(2,'0')}m` : `${mm}m`; };
+
+  // Paint the learner profile from the same numbers (ring, bar, chips, counts).
+  document.getElementById("pf-pct").textContent   = overall + "%";
+  document.getElementById("pf-ring").style.background =
+    `conic-gradient(var(--green) 0 ${overall}%, #161c27 ${overall}% 100%)`;
+  document.getElementById("pf-bar").style.width   = overall + "%";
+  document.getElementById("pf-done").textContent  = lessonsDone;
+  document.getElementById("pf-total").textContent = lessonsTotal;
+  document.getElementById("pf-left").textContent  = fmtDur(minsLeft);
+  document.getElementById("pf-chips").innerHTML =
+    `<span class="pill ok">✓ ${complete} modules complete</span>`+
+    `<span class="pill warn">${inprog} in progress</span>`+
+    `<span class="pill idle">${notstart} not started</span>`;
+
+  document.getElementById("foot").innerHTML =
+    `Learner <b style="color:#39433d">Jordan Lee</b> · ${lessonsDone}/${lessonsTotal} lessons complete · `+
+    `${complete} modules done, ${inprog} in progress, ${notstart} not started · lesson-weighted completion <b style="color:#39433d">${overall}%</b> (single source of truth — profile ring, progress bar and these counts all derive from it). `+
+    `Modules 2, 3 &amp; 7 link straight into the live working artifacts — `+
+    `<a class="xref" href="global-cash-position.html">Global Cash Position</a>, `+
+    `<a class="xref" href="cash-forecast-13week.html">13-Week Cash Forecast</a> and `+
+    `<a class="xref" href="transaction-ledger-sql.html">Transaction Ledger — SQL</a> — so analysts learn on real data. `+
+    `Self-paced snapshot; estimated time left (~${fmtDur(minsLeft)}) is recomputed from the durations of lessons not yet done. `+
+    `Glossary tooltips (WAM · DSRA · ZBA · netting) are standard treasury definitions.`;
+
+  // ---- Glossary tooltips ----------------------------------------------
+  const tip = document.getElementById("tip");
+  document.querySelectorAll(".gl").forEach(el=>{
+    const key = el.dataset.g;
+    const def = GLOSSARY[key];
+    el.addEventListener("mouseenter", e=>{
+      tip.innerHTML = `<b>${key}</b><br>${def}`;
+      tip.classList.add("show");
+      position(e);
+    });
+    el.addEventListener("mousemove", position);
+    el.addEventListener("mouseleave", ()=> tip.classList.remove("show"));
+    function position(e){
+      const pad=14; let x=e.clientX+pad, y=e.clientY+pad;
+      const w=tip.offsetWidth||280, h=tip.offsetHeight||80;
+      if(x+w>innerWidth-8) x=e.clientX-w-pad;
+      if(y+h>innerHeight-8) y=e.clientY-h-pad;
+      tip.style.left=x+"px"; tip.style.top=y+"px";
+    }
+  });
+  </script>
+</body>
+</html>

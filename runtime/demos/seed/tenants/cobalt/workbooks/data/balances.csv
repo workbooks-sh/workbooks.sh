@@ -1,0 +1,15 @@
+entity,account_name,counterparty,currency,account_type,balance_usd,rating,trapped
+Signal Inc. (US parent),Operating - USD,JPMorgan Chase,USD,Operating,142900000,A-1,false
+Signal Inc. (US parent),MMF sweep,Brex Treasury MMF,USD,MMF sweep,87300000,AAAm,false
+Signal Inc. (US parent),Term loan DSRA,JPMorgan Chase,USD,Collateral,17500000,A-1,true
+Signal Inc. (US parent),Payroll funding (ZBA),JPMorgan Chase,USD,Zero-balance,34900000,A-1,false
+Signal Inc. (US parent),Tax reserve,Citibank N.A.,USD,Restricted,18000000,A-1,false
+Signal Europe B.V. (NL),Operating - EUR,Citibank N.A.,EUR,Operating,61400000,A-1,false
+Signal Europe B.V. (NL),FX settlement,BNP Paribas,EUR,Operating,15900000,A-1,false
+Signal UK Ltd.,Operating - GBP,HSBC Holdings,GBP,Operating,41200000,A-1,false
+Signal APAC Pte. (SG),Operating - SGD,Standard Chartered,SGD,Operating,28600000,A-1,false
+Signal APAC Pte. (SG),Working capital,Standard Chartered,SGD,Operating,16100000,A-1,false
+Signal India Pvt. Ltd.,Operating - INR,Standard Chartered,INR,Operating,14500000,A-1,true
+Signal do Brasil Ltda.,Operating - BRL,Citibank N.A.,BRL,Operating,9800000,A-1,true
+Signal Inc. (US parent),Money market - reserve,HSBC Holdings,USD,MMF sweep,62500000,A-1,false
+Signal Europe B.V. (NL),Notional pool header,BNP Paribas,EUR,Operating,17400000,A-1,false
