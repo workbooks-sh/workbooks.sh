@@ -146,7 +146,8 @@ export class WbChart extends WbElement {
     if (!this._srcName) {
       const rowsAttr = this.attr("rows");
       const csvAttr = this.attr("csv");
-      this._srcName = `wb_chart_${++_autoId}`;
+      if (!this._autoName) this._autoName = `wb_chart_${++_autoId}`;
+      this._srcName = this._autoName;
       if (rowsAttr) this._pendingSource = { json: rowsAttr };
       else if (csvAttr) this._pendingSource = { csv: csvAttr };
       else {
@@ -175,26 +176,34 @@ export class WbChart extends WbElement {
   }
 
   async _load() {
-    this._busy = true; this._error = null; this.update();
-    try {
-      if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
-      else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
-      await this._run();
-    } catch (e) {
-      this._error = String((e && e.message) || e);
-      this._tier = "error";
-    }
-    this._busy = false;
-    this.update();
-    this._draw();
-    this._emit("wb-chart-ready", {
-      type: this.variant("type"),
-      columns: this._result?.columns || [],
-      types: this._result?.types || [],
-      engine: this._tier,
-      series: this._series.map((s) => s.key),
-      rowCount: this._result?.rowCount || 0,
-    });
+    // Single-flight: overlapping loads would let one load's register()
+    // (DROP+CREATE) yank the table out from under another's in-flight query.
+    if (this._loading) { this._loadAgain = true; return; }
+    this._loading = true;
+    do {
+      this._loadAgain = false;
+      this._busy = true; this._error = null; this.update();
+      try {
+        if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
+        else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
+        await this._run();
+      } catch (e) {
+        this._error = String((e && e.message) || e);
+        this._tier = "error";
+      }
+      this._busy = false;
+      this.update();
+      this._draw();
+      this._emit("wb-chart-ready", {
+        type: this.variant("type"),
+        columns: this._result?.columns || [],
+        types: this._result?.types || [],
+        engine: this._tier,
+        series: this._series.map((s) => s.key),
+        rowCount: this._result?.rowCount || 0,
+      });
+    } while (this._loadAgain);
+    this._loading = false;
   }
 
   async _run() {

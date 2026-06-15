@@ -200,28 +200,35 @@ export class WbCommand extends WbElement {
 
   async _runData() {
     if (!this._hasData() || !this._value) { this._dataRows = null; this.update(); return; }
-    this._busy = true; this._error = null; this.update();
-    try {
-      if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this.attr("src-name"));
-      await this._resolveDataFields();
-      const limit = parseInt(this.attr("data-limit", "6"), 10) || 6;
-      const term = this._value.replace(/'/g, "''");
-      // SQLite LIKE is case-insensitive for ASCII on every tier — no provider fork.
-      let sql = `SELECT * FROM ${this._dataFrom()}`;
-      if (this._dataFields.length) {
-        const ors = this._dataFields.map((c) => `CAST(${ident(c)} AS VARCHAR) LIKE '%${term}%'`);
-        sql += ` WHERE ${ors.join(" OR ")}`;
+    // Single-flight, last-wins across debounced keystrokes.
+    if (this._loading) { this._loadAgain = true; return; }
+    this._loading = true;
+    do {
+      this._loadAgain = false;
+      this._busy = true; this._error = null; this.update();
+      try {
+        if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this.attr("src-name"));
+        await this._resolveDataFields();
+        const limit = parseInt(this.attr("data-limit", "6"), 10) || 6;
+        const term = this._value.replace(/'/g, "''");
+        // SQLite LIKE is case-insensitive for ASCII on every tier — no provider fork.
+        let sql = `SELECT * FROM ${this._dataFrom()}`;
+        if (this._dataFields.length) {
+          const ors = this._dataFields.map((c) => `CAST(${ident(c)} AS VARCHAR) LIKE '%${term}%'`);
+          sql += ` WHERE ${ors.join(" OR ")}`;
+        }
+        sql += ` LIMIT ${limit}`;
+        this._dataRows = await this._engine.query(sql);
+        this._tier = this._dataRows.engine || this._engine.provider();
+        this._emit("wb-command-query", { sql, rowCount: this._dataRows.rowCount, engine: this._tier, value: this._value });
+      } catch (e) {
+        this._error = String((e && e.message) || e);
+        this._dataRows = null;
       }
-      sql += ` LIMIT ${limit}`;
-      this._dataRows = await this._engine.query(sql);
-      this._tier = this._dataRows.engine || this._engine.provider();
-      this._emit("wb-command-query", { sql, rowCount: this._dataRows.rowCount, engine: this._tier, value: this._value });
-    } catch (e) {
-      this._error = String((e && e.message) || e);
-      this._dataRows = null;
-    }
-    this._busy = false;
-    this.update();
+      this._busy = false;
+      this.update();
+    } while (this._loadAgain);
+    this._loading = false;
   }
 
   // ── build the visible, grouped, ranked entry list ────────────────────────────

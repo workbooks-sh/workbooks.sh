@@ -59,7 +59,8 @@ export class WbSpark extends WbElement {
     this._srcName = this.attr("src-name");
     if (!this._srcName) {
       const rowsAttr = this.attr("rows"), csvAttr = this.attr("csv");
-      this._srcName = `wb_spark_${++_autoId}`;
+      if (!this._autoName) this._autoName = `wb_spark_${++_autoId}`;
+      this._srcName = this._autoName;
       if (rowsAttr) this._pendingSource = { json: rowsAttr };
       else if (csvAttr) this._pendingSource = { csv: csvAttr };
     }
@@ -75,28 +76,35 @@ export class WbSpark extends WbElement {
   }
 
   async _load() {
-    try {
-      if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
-      const sql = this.attr("query") || `SELECT * FROM ${ident(this._srcName)}`;
-      const res = await this._engine.query(sql);
-      this._tier = res.engine || this._engine.provider();
-      const yName = this.attr("y");
-      let j = yName ? res.columns.indexOf(yName) : -1;
-      if (j < 0) j = res.types.findIndex((t) => t === "number" || t === "integer");
-      if (j < 0) j = res.columns.length - 1;
-      this._values = res.rows.map((row) => { const n = Number(row[j]); return Number.isNaN(n) ? null : n; });
-    } catch (e) {
-      this._values = null;
-    }
-    this.update();
-    const vs = (this._values || []).filter((v) => v != null);
-    this._emit("wb-spark-ready", {
-      points: this._values?.length || 0,
-      min: vs.length ? Math.min(...vs) : null,
-      max: vs.length ? Math.max(...vs) : null,
-      last: vs.length ? vs[vs.length - 1] : null,
-      engine: this._tier,
-    });
+    if (this._loading) { this._loadAgain = true; return; }
+    this._loading = true;
+    do {
+      this._loadAgain = false;
+      try {
+        if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
+        else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
+        const sql = this.attr("query") || `SELECT * FROM ${ident(this._srcName)}`;
+        const res = await this._engine.query(sql);
+        this._tier = res.engine || this._engine.provider();
+        const yName = this.attr("y");
+        let j = yName ? res.columns.indexOf(yName) : -1;
+        if (j < 0) j = res.types.findIndex((t) => t === "number" || t === "integer");
+        if (j < 0) j = res.columns.length - 1;
+        this._values = res.rows.map((row) => { const n = Number(row[j]); return Number.isNaN(n) ? null : n; });
+      } catch (e) {
+        this._values = null;
+      }
+      this.update();
+      const vs = (this._values || []).filter((v) => v != null);
+      this._emit("wb-spark-ready", {
+        points: this._values?.length || 0,
+        min: vs.length ? Math.min(...vs) : null,
+        max: vs.length ? Math.max(...vs) : null,
+        last: vs.length ? vs[vs.length - 1] : null,
+        engine: this._tier,
+      });
+    } while (this._loadAgain);
+    this._loading = false;
   }
 
   render() {

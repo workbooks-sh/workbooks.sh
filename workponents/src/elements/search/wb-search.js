@@ -113,7 +113,8 @@ export class WbSearch extends WbElement {
   _captureSource() {
     this._srcName = this.attr("src-name");
     if (!this._srcName) {
-      this._srcName = `wb_search_${++_autoId}`;
+      if (!this._autoName) this._autoName = `wb_search_${++_autoId}`;
+      this._srcName = this._autoName;
       const rowsAttr = this.attr("rows");
       const csvAttr = this.attr("csv");
       if (rowsAttr) this._pendingSource = { json: rowsAttr };
@@ -179,23 +180,31 @@ export class WbSearch extends WbElement {
   }
 
   async _runQuery() {
-    this._busy = true; this._error = null; this.update();
-    try {
-      if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
-      else if (this._pendingSource) await this._engine.whenRegistered(this._srcName);
-      await this._resolveFields();
-      const sql = this._buildSql();
-      this._result = await this._engine.query(sql);
-      this._tier = this._result.engine || this._engine.provider();
-      this._active = 0;
-      this._emit("wb-search-query", { sql, rowCount: this._result.rowCount, engine: this._tier, value: this._value });
-    } catch (e) {
-      this._error = String((e && e.message) || e);
-      this._tier = "error";
-      this._result = null;
-    }
-    this._busy = false;
-    this.update();
+    // Single-flight, last-wins: a newer keystroke query supersedes an in-flight
+    // one (and never races a register()'s DROP/CREATE on the same table).
+    if (this._loading) { this._loadAgain = true; return; }
+    this._loading = true;
+    do {
+      this._loadAgain = false;
+      this._busy = true; this._error = null; this.update();
+      try {
+        if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
+        else if (this._pendingSource) await this._engine.whenRegistered(this._srcName);
+        await this._resolveFields();
+        const sql = this._buildSql();
+        this._result = await this._engine.query(sql);
+        this._tier = this._result.engine || this._engine.provider();
+        this._active = 0;
+        this._emit("wb-search-query", { sql, rowCount: this._result.rowCount, engine: this._tier, value: this._value });
+      } catch (e) {
+        this._error = String((e && e.message) || e);
+        this._tier = "error";
+        this._result = null;
+      }
+      this._busy = false;
+      this.update();
+    } while (this._loadAgain);
+    this._loading = false;
   }
 
   // ── render ──────────────────────────────────────────────────────────────────

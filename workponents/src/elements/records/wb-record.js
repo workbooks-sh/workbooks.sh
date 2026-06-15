@@ -137,28 +137,35 @@ export class WbRecord extends WbElement {
   }
 
   async _load() {
-    this._busy = true; this._error = null; this.update();
-    try {
-      const name = this.attr("src-name");
-      if (name) await this._engine.whenRegistered(name);
-      const sql = this._buildSql();
-      this._result = await this._engine.query(sql);
-      this._tier = this._result.engine || this._engine.provider();
-      this._row = this._result.rows.length ? this._result.rows[0] : null;
-    } catch (e) {
-      this._error = String((e && e.message) || e);
-      this._tier = "error";
-      this._row = null;
-    }
-    this._busy = false;
-    this.update();
-    this._emit("wb-record-ready", {
-      row: this._rowObject(),
-      columns: this._result?.columns || [],
-      types: this._result?.types || [],
-      engine: this._tier,
-      found: this._row != null,
-    });
+    // Single-flight, last-wins — master-detail selection drives rapid re-loads.
+    if (this._loading) { this._loadAgain = true; return; }
+    this._loading = true;
+    do {
+      this._loadAgain = false;
+      this._busy = true; this._error = null; this.update();
+      try {
+        const name = this.attr("src-name");
+        if (name) await this._engine.whenRegistered(name);
+        const sql = this._buildSql();
+        this._result = await this._engine.query(sql);
+        this._tier = this._result.engine || this._engine.provider();
+        this._row = this._result.rows.length ? this._result.rows[0] : null;
+      } catch (e) {
+        this._error = String((e && e.message) || e);
+        this._tier = "error";
+        this._row = null;
+      }
+      this._busy = false;
+      this.update();
+      this._emit("wb-record-ready", {
+        row: this._rowObject(),
+        columns: this._result?.columns || [],
+        types: this._result?.types || [],
+        engine: this._tier,
+        found: this._row != null,
+      });
+    } while (this._loadAgain);
+    this._loading = false;
   }
 
   /** A query returning the ONE selected row (LIMIT 1) — a record is a row. */

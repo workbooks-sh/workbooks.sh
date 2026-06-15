@@ -125,23 +125,29 @@ export class WbRecordList extends WbElement {
   }
 
   async _load() {
-    this._busy = true; this._error = null; this.update();
-    try {
-      const sname = this.attr("src-name");
-      if (sname) await this._engine.whenRegistered(sname);
-      await this._run();
-    } catch (e) {
-      this._error = String((e && e.message) || e);
-      this._tier = "error";
-    }
-    this._busy = false;
-    this.update();
-    this._emit("wb-record-list-ready", {
-      rowCount: this._result?.rowCount || 0,
-      columns: this._result?.columns || [],
-      types: this._result?.types || [],
-      engine: this._tier,
-    });
+    if (this._loading) { this._loadAgain = true; return; }
+    this._loading = true;
+    do {
+      this._loadAgain = false;
+      this._busy = true; this._error = null; this.update();
+      try {
+        const sname = this.attr("src-name");
+        if (sname) await this._engine.whenRegistered(sname);
+        await this._run();
+      } catch (e) {
+        this._error = String((e && e.message) || e);
+        this._tier = "error";
+      }
+      this._busy = false;
+      this.update();
+      this._emit("wb-record-list-ready", {
+        rowCount: this._result?.rowCount || 0,
+        columns: this._result?.columns || [],
+        types: this._result?.types || [],
+        engine: this._tier,
+      });
+    } while (this._loadAgain);
+    this._loading = false;
   }
 
   async _run() {

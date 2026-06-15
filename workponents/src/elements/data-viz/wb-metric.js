@@ -79,7 +79,8 @@ export class WbMetric extends WbElement {
     if (!this._srcName) {
       const rowsAttr = this.attr("rows"), csvAttr = this.attr("csv");
       if (rowsAttr || csvAttr) {
-        this._srcName = `wb_metric_${++_autoId}`;
+        if (!this._autoName) this._autoName = `wb_metric_${++_autoId}`;
+        this._srcName = this._autoName;
         this._pendingSource = rowsAttr ? { json: rowsAttr } : { csv: csvAttr };
       }
     }
@@ -94,25 +95,32 @@ export class WbMetric extends WbElement {
   }
 
   async _load() {
-    this._error = null;
-    try {
-      if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
-      const sql = this.attr("query") || (this._srcName ? `SELECT * FROM ${ident(this._srcName)} LIMIT 1` : null);
-      if (!sql) throw new Error("wb-metric needs a query or a source");
-      const res = await this._engine.query(sql);
-      this._tier = res.engine || this._engine.provider();
-      const vCol = this.attr("value-col");
-      let vj = vCol ? res.columns.indexOf(vCol) : 0;
-      if (vj < 0) vj = 0;
-      this._value = res.rows.length ? Number(res.rows[0][vj]) : null;
-      const dCol = this.attr("delta-col");
-      const dj = dCol ? res.columns.indexOf(dCol) : -1;
-      this._delta = dj >= 0 && res.rows.length ? Number(res.rows[0][dj]) : null;
-    } catch (e) {
-      this._error = String((e && e.message) || e);
-    }
-    this.update();
-    this._emit("wb-metric-ready", { value: this._value, delta: this._delta, engine: this._tier });
+    if (this._loading) { this._loadAgain = true; return; }
+    this._loading = true;
+    do {
+      this._loadAgain = false;
+      this._error = null;
+      try {
+        if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
+        else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
+        const sql = this.attr("query") || (this._srcName ? `SELECT * FROM ${ident(this._srcName)} LIMIT 1` : null);
+        if (!sql) throw new Error("wb-metric needs a query or a source");
+        const res = await this._engine.query(sql);
+        this._tier = res.engine || this._engine.provider();
+        const vCol = this.attr("value-col");
+        let vj = vCol ? res.columns.indexOf(vCol) : 0;
+        if (vj < 0) vj = 0;
+        this._value = res.rows.length ? Number(res.rows[0][vj]) : null;
+        const dCol = this.attr("delta-col");
+        const dj = dCol ? res.columns.indexOf(dCol) : -1;
+        this._delta = dj >= 0 && res.rows.length ? Number(res.rows[0][dj]) : null;
+      } catch (e) {
+        this._error = String((e && e.message) || e);
+      }
+      this.update();
+      this._emit("wb-metric-ready", { value: this._value, delta: this._delta, engine: this._tier });
+    } while (this._loadAgain);
+    this._loading = false;
   }
 
   render() {

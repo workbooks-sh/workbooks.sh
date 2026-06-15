@@ -48,6 +48,7 @@ export class WbDataEngine {
     this._provider = null;            // resolved on first use
     this._initPromise = null;
     this._regWaiters = new Map();     // name -> [resolve, ...] awaiting registration
+    this._inflightRegs = new Set();   // register() promises still settling
     // Runtime SQL-over-VFS route (tenant SQLite via the Dock). `{tenant}` is
     // filled from the Host. Override per deploy if a runtime exposes another path.
     this.vfsQueryPath = "/api/library/{tenant}/query";
@@ -82,7 +83,17 @@ export class WbDataEngine {
   }
 
   /** Register a named source so SQL can `FROM <name>`. Idempotent per name. */
-  async register(name, source) {
+  register(name, source) {
+    // Track the in-flight promise so a query that references this table before
+    // it lands (an element querying a table a SIBLING registers — no src-name
+    // declared) can await it and retry, instead of failing "no such table".
+    const p = this._doRegister(name, source);
+    this._inflightRegs.add(p);
+    p.finally(() => this._inflightRegs.delete(p));
+    return p;
+  }
+
+  async _doRegister(name, source) {
     const norm = normalizeSource(source);
     this._sources.set(name, norm);
     // Seed the floor too, so a sqlite-wasm load failure still answers.
@@ -113,7 +124,17 @@ export class WbDataEngine {
       } catch { /* fall through to the local engine */ }
     }
     if (this._provider === "sqlite-wasm") {
-      return this._sqlite.query(sql, params);
+      try {
+        return await this._sqlite.query(sql, params);
+      } catch (e) {
+        // The table may simply not be registered YET (a sibling's register() is
+        // mid-flight). Wait for pending registrations, then retry once.
+        if (/no such table/i.test(String(e && e.message || e)) && this._inflightRegs.size) {
+          await Promise.allSettled([...this._inflightRegs]);
+          return this._sqlite.query(sql, params);
+        }
+        throw e;
+      }
     }
     // Last-resort floor — the zero-dep in-JS subset (sqlite-wasm unavailable).
     return this._memory.query(sql, params);
