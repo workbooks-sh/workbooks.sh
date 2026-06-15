@@ -19,11 +19,14 @@
     CaretLeft,
     CaretRight,
   } from "phosphor-svelte";
+  import { onMount } from "svelte";
   import { chatSession } from "$lib/chat/session.svelte";
   import { sidecar } from "$lib/bridge/sidecar.svelte";
   import { dock } from "$lib/bridge/dock.svelte";
   import { sessionHistory, type SavedSession } from "$lib/chat/session_history.svelte";
   import AssistantMessageView from "$lib/chat/AssistantMessageView.svelte";
+  import ArtifactCard from "$lib/chat/ArtifactCard.svelte";
+  import { componentArtifacts } from "$lib/chat/artifacts.svelte";
 
   const WALDO_SLUG = "waldo";
 
@@ -43,8 +46,21 @@
 
   const ready = $derived(sidecar.status.state === "ready");
 
+  // Subscribe the chat session to the bridge stream (idempotent). Without
+  // this, agent telemetry — including the component_artifact event the
+  // component-toolkit emits — never reaches the panel.
+  onMount(() => chatSession.init());
+
   // Merge user echoes + agent blocks into one time-ordered transcript.
-  type Line = { who: "you" | "waldo"; text: string; ts: number; kind: string; pending?: boolean; error?: boolean };
+  type Line = {
+    who: "you" | "waldo";
+    text: string;
+    ts: number;
+    kind: string;
+    pending?: boolean;
+    error?: boolean;
+    artifact?: { path: string; title: string; action: "created" | "updated" };
+  };
   const transcript = $derived.by<Line[]>(() => {
     const mine: Line[] = myLines.map((m) => ({ who: "you", text: m.text, ts: m.ts, kind: "msg" }));
     const theirs = chatSession.blocks
@@ -52,6 +68,7 @@
         if (b.kind === "message") return { who: "waldo", text: b.text, ts: b.ts, kind: "msg", pending: b.pending, error: b.error };
         if (b.kind === "tool") return { who: "waldo", text: `${b.toolName}${b.pending ? "…" : ""}`, ts: b.ts, kind: "tool" };
         if (b.kind === "status") return { who: "waldo", text: b.label, ts: b.ts, kind: "status" };
+        if (b.kind === "artifact") return { who: "waldo", text: b.title, ts: b.ts, kind: "artifact", artifact: { path: b.path, title: b.title, action: b.action } };
         return null;
       })
       .filter((x): x is Line => x !== null);
@@ -70,8 +87,8 @@
     const s = chatSession.session;
     if (s && s.status === "completed" && s.id !== lastSavedId) {
       const lines = transcript
-        .filter((m) => m.kind === "msg" || m.kind === "tool")
-        .map((m) => ({ who: m.who, text: m.text, kind: m.kind }));
+        .filter((m) => m.kind === "msg" || m.kind === "tool" || m.kind === "artifact")
+        .map((m) => ({ who: m.who, text: m.text, kind: m.kind, artifact: m.artifact }));
       if (lines.length > 0) {
         sessionHistory.save({
           id: s.id,
@@ -93,6 +110,7 @@
     myLines = [];
     chatSession.blocks = [];
     chatSession.session = null;
+    componentArtifacts.reset();
     viewing = null;
     view = "chat";
     composerEl?.focus();
@@ -177,26 +195,38 @@
   {:else if viewing}
     <div class="thread">
       {#each viewing.lines as m, i (i)}
-        <div class="bubble {m.who}" class:tool={m.kind === "tool"}>
-          {#if m.who === "waldo" && m.kind === "msg"}
-            <span class="tag">Waldo</span><AssistantMessageView text={m.text} />
-          {:else}
-            <span class="text">{m.text}</span>
-          {/if}
-        </div>
+        {#if m.kind === "artifact" && m.artifact}
+          <div class="artifact-line">
+            <ArtifactCard path={m.artifact.path} title={m.artifact.title} action={m.artifact.action} />
+          </div>
+        {:else}
+          <div class="bubble {m.who}" class:tool={m.kind === "tool"}>
+            {#if m.who === "waldo" && m.kind === "msg"}
+              <span class="tag">Waldo</span><AssistantMessageView text={m.text} />
+            {:else}
+              <span class="text">{m.text}</span>
+            {/if}
+          </div>
+        {/if}
       {/each}
     </div>
   {:else if transcript.length > 0}
     <div class="thread">
       {#each transcript as m, i (m.ts + "-" + i)}
-        <div class="bubble {m.who}" class:tool={m.kind === "tool"} class:err={m.error}>
-          {#if m.who === "waldo" && m.kind === "msg"}
-            <span class="tag">Waldo</span>
-            {#if m.text}<AssistantMessageView text={m.text} />{:else if m.pending}<span class="text dim">…</span>{/if}
-          {:else}
-            <span class="text">{m.text}</span>
-          {/if}
-        </div>
+        {#if m.kind === "artifact" && m.artifact}
+          <div class="artifact-line">
+            <ArtifactCard path={m.artifact.path} title={m.artifact.title} action={m.artifact.action} />
+          </div>
+        {:else}
+          <div class="bubble {m.who}" class:tool={m.kind === "tool"} class:err={m.error}>
+            {#if m.who === "waldo" && m.kind === "msg"}
+              <span class="tag">Waldo</span>
+              {#if m.text}<AssistantMessageView text={m.text} />{:else if m.pending}<span class="text dim">…</span>{/if}
+            {:else}
+              <span class="text">{m.text}</span>
+            {/if}
+          </div>
+        {/if}
       {/each}
       {#if thinking}
         <div class="bubble waldo">
@@ -378,6 +408,10 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+  .artifact-line {
+    align-self: flex-start;
+    max-width: 90%;
   }
   .bubble {
     max-width: 90%;
