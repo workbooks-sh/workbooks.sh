@@ -244,6 +244,10 @@ class GeminiLiveSession {
   #rafHandle = 0;
   #analyserBuf: Uint8Array | null = null;
 
+  /** Pending setTimeout handles for the simulated browser-preview
+   *  session, so teardown can cancel the script if the user ends early. */
+  #mockTimers: number[] = [];
+
   async start(
     agentSlug: string,
     workdir: string | null,
@@ -265,6 +269,15 @@ class GeminiLiveSession {
     this.agentSlug = agentSlug;
     this.state = "connecting";
     this.error = null;
+
+    // Browser-preview path: no real Gemini key, no mic in a plain tab,
+    // and the mock daemon URL doesn't serve HTTP. Run a fully simulated
+    // session so the voice UI — including a bash tool call — is
+    // exercisable end-to-end against the webHost mock providers.
+    if (isMockHost()) {
+      this.#runMockSession();
+      return;
+    }
 
     try {
       console.log("[gemini-live] step 1: fetching api key");
@@ -425,6 +438,76 @@ class GeminiLiveSession {
     this.#ws.send(JSON.stringify(msg));
   }
 
+  // ── Browser-preview simulated session ──────────────────────────────
+  //
+  // Drives the real callbacks on a timed script so the voice UI is fully
+  // exercisable without a Gemini key, a mic, or a live runtime. Crucially
+  // it includes a `bash` tool call routed through the SAME
+  // `#handleToolCall` path as production — so the transcript's tool block
+  // renders and the session keeps running after the call returns (the
+  // exact flow the bash-call breakage used to kill).
+
+  #mockAt(ms: number, fn: () => void): void {
+    this.#mockTimers.push(window.setTimeout(fn, ms));
+  }
+
+  #runMockSession(): void {
+    const cb = this.#callbacks;
+    // Animate the audio-level meters so the LiveBar / dot react.
+    let phase = 0;
+    const tick = () => {
+      if (this.state !== "live" && this.state !== "connecting") {
+        this.#rafHandle = 0;
+        this.inputLevel = 0;
+        this.outputLevel = 0;
+        return;
+      }
+      phase += 0.12;
+      const wobble = (Math.sin(phase) + 1) / 2;
+      this.outputLevel = this.state === "live" ? wobble * 0.7 : 0;
+      this.inputLevel = this.muted ? 0 : wobble * 0.25;
+      this.#rafHandle = requestAnimationFrame(tick);
+    };
+    this.#rafHandle = requestAnimationFrame(tick);
+
+    // connect → live
+    this.#mockAt(700, () => {
+      if (this.state !== "connecting") return;
+      this.state = "live";
+      playConnectChime();
+    });
+
+    // Agent greets (streamed in fragments, mirroring real transcription).
+    this.#mockAt(1200, () => cb.onAgentTranscript?.("Hey — "));
+    this.#mockAt(1500, () => cb.onAgentTranscript?.("I'm Workhorse. "));
+    this.#mockAt(1900, () =>
+      cb.onAgentTranscript?.("Want me to take a look at your project?"),
+    );
+    this.#mockAt(2200, () => cb.onTurnComplete?.());
+
+    // Simulated user reply.
+    this.#mockAt(3200, () => cb.onUserTranscript?.("Yes, "));
+    this.#mockAt(3450, () => cb.onUserTranscript?.("list the files."));
+    this.#mockAt(3700, () => cb.onTurnComplete?.());
+
+    // A bash tool call — the regression-prone path. Routes through the
+    // mock-aware `#handleToolCall`, which simulates exec output and sends
+    // a tool_response so the session continues normally afterward.
+    this.#mockAt(4300, () => {
+      void this.#handleToolCall("mock-call-1", "bash", {
+        command: "ls -la",
+      });
+    });
+
+    // Agent continues talking AFTER the tool call returns — proving the
+    // session survived the bash call.
+    this.#mockAt(6200, () => cb.onAgentTranscript?.("Found "));
+    this.#mockAt(6500, () =>
+      cb.onAgentTranscript?.("a few files. What would you like to do next?"),
+    );
+    this.#mockAt(6900, () => cb.onTurnComplete?.());
+  }
+
   // ── Wire helpers ───────────────────────────────────────────────────
 
   async #fetchApiKey(): Promise<string> {
@@ -556,6 +639,20 @@ class GeminiLiveSession {
 
     const command = typeof args.command === "string" ? args.command : "";
     this.#callbacks.onToolCallStart?.(id, command);
+
+    // Browser-preview path: synthesize plausible exec output instead of
+    // hitting a daemon that isn't there. Same callback shape as the live
+    // path so the transcript renders identically.
+    if (isMockHost()) {
+      this.#mockAt(1400, () => {
+        const output = mockExecOutput(command);
+        this.#callbacks.onToolCallEnd?.(id, output);
+        // No WS in mock mode — sendToolResponse is a safe no-op, but the
+        // session continues because the script keeps firing.
+        this.#sendToolResponse(id, name, { output });
+      });
+      return;
+    }
 
     // RUNTIME cap: POST /api/agents/:slug/exec via the control-plane
     // transport. Graceful-offline — a daemon-down exec returns a polite
@@ -724,6 +821,10 @@ class GeminiLiveSession {
   // ── Lifecycle ──────────────────────────────────────────────────────
 
   async #teardown(): Promise<void> {
+    // Cancel any pending simulated-session timers (browser preview).
+    for (const t of this.#mockTimers) clearTimeout(t);
+    this.#mockTimers = [];
+
     try {
       this.#ws?.close();
     } catch {}
@@ -761,14 +862,68 @@ class GeminiLiveSession {
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-/** True when an error is the "daemon offline" signal from the engine
- *  transport. Locked schema renames this code `sidecar_down`→`daemon_down`;
- *  match both so this bridge is correct before and after gen.ts flips. */
+/** True when an error means the agent server can't be reached, so the
+ *  caller should degrade gracefully instead of throwing into the live
+ *  session.
+ *
+ *  Covers BOTH:
+ *    - the engine transport's explicit offline code
+ *      (`daemon_down`/`sidecar_down`, before/after the locked-schema
+ *      rename), and
+ *    - a raw network failure — `fetch()` rejects with a `TypeError`
+ *      ("Failed to fetch") when the daemon URL points at a port that
+ *      isn't actually listening (e.g. the browser-preview mock daemon,
+ *      or a daemon that died mid-session). This was the bash-call
+ *      breakage: a tool call hit `POST …/exec`, the fetch rejected with
+ *      a TypeError that `isDaemonDown` didn't recognize, the catch
+ *      rethrew, and the whole voice session fell over instead of just
+ *      reporting "command not run". */
 function isDaemonDown(err: unknown): boolean {
-  return (
+  if (
     err instanceof EngineApiError &&
     (err.code === "daemon_down" || err.code === "sidecar_down")
-  );
+  ) {
+    return true;
+  }
+  // A rejected fetch (connection refused / DNS / CORS) surfaces as a
+  // TypeError. Treat it as "server unreachable" — the same graceful
+  // degrade path — rather than a fatal session error.
+  return err instanceof TypeError;
+}
+
+/** True in the browser-preview (webHost) build — Tauri is absent and the
+ *  app.html bootstrap installed the mock invoke seam. Voice mode runs a
+ *  simulated session here. */
+function isMockHost(): boolean {
+  return typeof window !== "undefined" && window.__WB_DEV_MOCK__ === true;
+}
+
+/** Synthesize believable `bash` output for the simulated session so the
+ *  tool block shows real-looking content. Leads with the `exit=<n>`
+ *  marker the production exec path emits (HomePanel keys ok/error off
+ *  `exit=0`). */
+function mockExecOutput(command: string): string {
+  const cmd = command.trim();
+  if (/^ls/.test(cmd)) {
+    return [
+      "exit=0",
+      "total 24",
+      "drwxr-xr-x   6 you  staff   192 Jun 14 09:12 .",
+      "drwxr-xr-x  14 you  staff   448 Jun 14 09:01 ..",
+      "-rw-r--r--   1 you  staff  1024 Jun 14 09:12 README.md",
+      "-rw-r--r--   1 you  staff   512 Jun 14 09:10 index.html",
+      "drwxr-xr-x   4 you  staff   128 Jun 14 09:11 src",
+    ].join("\n");
+  }
+  if (/^pwd/.test(cmd)) return "exit=0\n/Users/you/project";
+  if (/^echo /.test(cmd)) return `exit=0\n${cmd.replace(/^echo\s+/, "")}`;
+  return `exit=0\n(simulated output for: ${cmd})`;
+}
+
+declare global {
+  interface Window {
+    __WB_DEV_MOCK__?: boolean;
+  }
 }
 
 function int16ToBase64(pcm: Int16Array): string {
