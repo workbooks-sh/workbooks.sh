@@ -31,7 +31,15 @@
     { id: 'scale', name: 'Scale', price: 249, storage: '1 TB', blurb: 'Serious storage + compute.' },
     { id: 'ent', name: 'Enterprise', price: null, storage: 'Custom', blurb: 'SSO · SCIM · dedicated.' }
   ];
-  const STACK_PER_USER = 80; // typical per-seat stack: Slack+Notion+Linear+Retool+Vercel ≈ $80–99/user
+  // the "usual stack" they'd otherwise pay per seat — real comp prices (verify before a deck)
+  const STACK = [
+    { name: 'Slack', cat: 'chat', per: 18 },
+    { name: 'Notion', cat: 'docs', per: 20 },
+    { name: 'Linear', cat: 'project mgmt', per: 16 },
+    { name: 'Retool', cat: 'internal tools', per: 20 },
+    { name: 'Vercel', cat: 'dev hosting', per: 20 }
+  ];
+  const STACK_PER_USER = STACK.reduce((a, s) => a + s.per, 0); // ≈ $94/user
 
   const estUsers = $derived.by(() => {
     if (accountType === 'personal') return 1;
@@ -86,7 +94,7 @@
     <span style="--c:var(--sage);  top:38%; left:42%"></span>
   </div>
 
-  <div class="ob-card" style="--accent:{accent}">
+  <div class="ob-card" class:wide={stepKey === 'plan'} style="--accent:{accent}">
     {#if stepKey !== 'intro' && stepKey !== 'local'}
       <div class="ob-rail"><i style="--p:{progress * 100}%"></i></div>
     {/if}
@@ -161,8 +169,13 @@
       <p class="sub">Invite your whole {accountType === 'org' ? 'organization' : 'team'} — you only pay for storage.</p>
 
       <div class="vs">
-        <div class="vs-top"><span>A ~{estUsers}-person team across the usual stack</span><s>≈${stackCost}/mo</s></div>
-        <div class="vs-rep">Replaces chat · docs · project mgmt · internal tools · dev hosting</div>
+        <div class="vs-h">A ~{estUsers}-person team pays this across the usual stack</div>
+        <div class="vs-rows">
+          {#each STACK as s}
+            <div class="vs-row"><span class="vs-b">{s.name}</span><span class="vs-cat">{s.cat}</span><span class="vs-amt">${(s.per * estUsers).toLocaleString()}</span></div>
+          {/each}
+        </div>
+        <div class="vs-total"><span>Their stack <s>≈${stackCost.toLocaleString()}/mo</s></span><span class="vs-us">Workbooks {selTier.price === null ? '' : '$' + selTier.price}{selTier.price ? '/mo' : ''}</span></div>
       </div>
 
       <div class="tiers">
@@ -244,7 +257,10 @@
   .ob-blobs span { position:absolute; width:42vw; height:42vw; max-width:560px; max-height:560px; border-radius:50%;
     background:var(--c); filter:blur(80px); opacity:.55; }
   .ob-card { position:relative; z-index:1; width:560px; max-width:100%; background:#fff; color:#1a1b1e;
-    border:1px solid rgba(18,19,22,.1); border-radius:18px; padding:34px 36px 28px; }
+    border:1px solid rgba(18,19,22,.1); border-radius:18px; padding:34px 36px 28px;
+    transition:width .42s cubic-bezier(.3,.8,.3,1); }
+  /* the pricing step needs room — grow the card so tiers + brand breakdown aren't squished */
+  .ob-card.wide { width:880px; }
 
   .ob-rail { position:relative; height:6px; border-radius:3px; background:#eceae2; overflow:hidden; margin-bottom:24px; }
   .ob-rail i { position:absolute; inset:0; border-radius:3px;
@@ -284,10 +300,16 @@
   .mrow span { color:#6a6f64; font-size:12.5px; }
   .mrow b { font-size:14px; text-align:right; } .mrow b small { color:#a0a59a; font:500 11px var(--mono); margin-left:6px; }
 
-  .vs { border:1px dashed rgba(18,19,22,.22); border-radius:12px; padding:13px 15px; margin-bottom:14px; background:color-mix(in srgb, var(--accent) 16%, #fff); }
-  .vs-top { display:flex; justify-content:space-between; align-items:baseline; gap:12px; font-size:13px; font-weight:600; }
-  .vs-top s { color:#8a8f86; font:600 15px var(--read); }
-  .vs-rep { font:500 11px var(--mono); color:#6a6f64; margin-top:6px; }
+  .vs { border:1px dashed rgba(18,19,22,.22); border-radius:13px; padding:15px 17px; margin-bottom:16px; background:color-mix(in srgb, var(--accent) 13%, #fff); }
+  .vs-h { font-size:12.5px; font-weight:600; color:#3a3f36; margin-bottom:11px; }
+  .vs-rows { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:7px 22px; }
+  .vs-row { display:flex; align-items:baseline; gap:8px; font-size:12.5px; }
+  .vs-b { font-weight:600; color:#1a1b1e; }
+  .vs-cat { color:#9b9f93; font:500 10.5px var(--mono); flex:1; }
+  .vs-amt { font:600 12.5px var(--mono); color:#5f635c; }
+  .vs-total { display:flex; justify-content:space-between; align-items:baseline; margin-top:12px; padding-top:11px; border-top:1px solid rgba(18,19,22,.1); font-size:13px; font-weight:600; }
+  .vs-total s { color:#8a8f86; font:700 15px var(--read); margin-left:7px; }
+  .vs-us { font:700 14px var(--read); color:#1a1b1e; }
 
   .tiers { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; }
   .tier { position:relative; text-align:left; padding:13px 10px 12px; border:1px solid rgba(18,19,22,.12); border-radius:12px;
