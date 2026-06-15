@@ -24,12 +24,14 @@
 
   // PLACEHOLDER tiers — gate on STORAGE, never seats. Unlimited users on every tier
   // (WorkOS auth is free to 1M MAU, so seats cost us ~nothing; compute + storage do).
+  // each tier carries a representative team size, so the stack comparison scales with
+  // the SELECTED tier (the value gap widens dramatically at Scale/Enterprise).
   const TIERS = [
-    { id: 'free', name: 'Free', price: 0, storage: '2 GB', blurb: 'Kick the tires.' },
-    { id: 'starter', name: 'Starter', price: 29, storage: '50 GB', blurb: 'A small team or project.' },
-    { id: 'team', name: 'Team', price: 99, storage: '250 GB', blurb: 'A growing team.' },
-    { id: 'scale', name: 'Scale', price: 249, storage: '1 TB', blurb: 'Serious storage + compute.' },
-    { id: 'ent', name: 'Enterprise', price: null, storage: 'Custom', blurb: 'SSO · SCIM · dedicated.' }
+    { id: 'free', name: 'Free', price: 0, storage: '2 GB', users: 2, blurb: 'Kick the tires.' },
+    { id: 'starter', name: 'Starter', price: 29, storage: '50 GB', users: 6, blurb: 'A small team or project.' },
+    { id: 'team', name: 'Team', price: 99, storage: '250 GB', users: 25, blurb: 'A growing team.' },
+    { id: 'scale', name: 'Scale', price: 249, storage: '1 TB', users: 100, blurb: 'Serious storage + compute.' },
+    { id: 'ent', name: 'Enterprise', price: null, storage: 'Custom', users: 250, blurb: 'SSO · SCIM · dedicated.' }
   ];
   // the "usual stack" they'd otherwise pay per seat — real comp prices (verify before a deck).
   // logos via Simple Icons (the lobe pack only covers AI/dev brands; this set is uniform).
@@ -43,10 +45,6 @@
   const logo = (slug) => `https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/${slug}.svg`;
   const STACK_PER_USER = STACK.reduce((a, s) => a + s.per, 0); // ≈ $94/user
 
-  const estUsers = $derived.by(() => {
-    if (accountType === 'personal') return 1;
-    return ({ 'Just me': 1, '2–10': 6, '11–50': 25, '51–200': 100, '200+': 250 })[orgSize] || 6;
-  });
   const recommended = $derived.by(() => {
     if (accountType === 'personal') return 'starter';
     if (orgSize === '200+') return 'ent';
@@ -54,8 +52,9 @@
     if (orgSize === '11–50') return 'team';
     return 'starter';
   });
-  const stackCost = $derived(Math.round(estUsers * STACK_PER_USER));
   const selTier = $derived(TIERS.find((t) => t.id === (tier || recommended)) || TIERS[1]);
+  const cmpUsers = $derived(selTier.users);              // comparison scales with the SELECTED tier
+  const stackCost = $derived(cmpUsers * STACK_PER_USER);
   const isEnt = $derived(selTier.id === 'ent');
 
   function nextKey(k) {
@@ -170,7 +169,7 @@
       <h1>No seat billing. Unlimited users.</h1>
       <p class="sub">Invite your whole {accountType === 'org' ? 'organization' : 'team'} — you only pay for storage.</p>
 
-      <div class="vs-h">For a ~{estUsers}-person team — Workbooks vs the stack it replaces</div>
+      <div class="vs-h">For a ~{cmpUsers}-person team — Workbooks vs the stack it replaces</div>
       <div class="vs-cols">
         <div class="vs-col us">
           <svg class="vs-logo" viewBox="0 0 113 66"><path fill="currentColor" d="M48 0h17v30l1 2c6 2 18-18 25-20 3 1 9 8 11 11-4 6-19 18-21 22v2c2 1 27 1 32 1 0 6 0 11-1 17-12 0-27 1-37-4-8-4-15-12-18-20l-2-8-2 14c-12 21-31 18-52 18 0-6 0-11 0-17 6 0 28 1 31-1l0-1c1-4-17-19-20-24 2-3 8-9 11-11 4-1 18 18 22 20 2 1 2 1 3 0 2-2 1-9 1-12V0Z"/></svg>
@@ -183,7 +182,7 @@
           <div class="vs-col">
             <span class="vs-logo brand" style="--u:url('{logo(s.slug)}')" role="img" aria-label={s.name}></span>
             <div class="vs-name">{s.name}</div>
-            <div class="vs-price strike">${(s.per * estUsers).toLocaleString()}<small>/mo</small></div>
+            <div class="vs-price strike">${(s.per * cmpUsers).toLocaleString()}<small>/mo</small></div>
             <div class="vs-cat">{s.cat}</div>
           </div>
         {/each}
