@@ -38,6 +38,7 @@ defmodule Workbooks.Llm do
       }
       |> maybe_put(:tools, opts[:tools])
       |> maybe_put(:tool_choice, opts[:tools] && "auto")
+      |> maybe_put(:provider, opts[:provider])
       |> maybe_put(:stream, on_delta && true)
       |> maybe_put(:stream_options, on_delta && %{include_usage: true})
       |> Jason.encode!()

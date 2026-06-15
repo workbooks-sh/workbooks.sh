@@ -74,8 +74,10 @@ defmodule Workbooks.Voice.Session do
     worker = spawn_link(fn -> tts_loop(ws_pid, voice) end)
     mref = Process.monitor(worker)
     {:ok, buf} = Agent.start_link(fn -> "" end)
+    {:ok, flags} = Agent.start_link(fn -> %{spoke: false, code: false} end)
 
     on_delta = fn delta ->
+      if delta != "", do: Agent.update(flags, &%{&1 | spoke: true})
       push(ws_pid, %{type: "reply_text", text: delta})
       Agent.update(buf, &(&1 <> delta))
       flush_sentences(buf, worker)
@@ -89,15 +91,30 @@ defmodule Workbooks.Voice.Session do
     # The voice brain wants low TTFT over raw smarts; WB_VOICE_BRAIN_MODEL lets a
     # deploy point it at a fast provider without touching the code lane (mercury-2).
     model = opts[:model] || System.get_env("WB_VOICE_BRAIN_MODEL")
-    reply = agent_loop(messages, on_delta, ws_pid, model, 0)
+    reply = agent_loop(messages, on_delta, ws_pid, model, flags, 0)
 
-    # Flush whatever sentence fragment is left, then close the worker.
+    # Flush whatever sentence fragment is left.
     case Agent.get(buf, & &1) |> String.trim() do
       "" -> :ok
       tail -> send(worker, {:sentence, tail})
     end
 
+    # Never go silent: if the model said nothing (some fast brains stop after a
+    # tool call without narrating), speak a deterministic fallback.
+    st = Agent.get(flags, & &1)
+
+    reply =
+      if not st.spoke do
+        fallback = if st.code, do: "Done — I've put that in the editor.", else: "Sorry, I didn't catch that."
+        push(ws_pid, %{type: "reply_text", text: fallback})
+        send(worker, {:sentence, fallback})
+        fallback
+      else
+        reply
+      end
+
     Agent.stop(buf)
+    Agent.stop(flags)
     send(worker, :done)
 
     receive do
@@ -113,30 +130,40 @@ defmodule Workbooks.Voice.Session do
   # Run the brain until it stops calling tools (bounded). Spoken content streams
   # through on_delta on every pass; a write_code call routes to mercury-2 and its
   # output is pushed to the editor, then the brain narrates the result.
-  defp agent_loop(_messages, _on_delta, _ws_pid, _model, depth) when depth >= 3, do: ""
+  defp agent_loop(_messages, _on_delta, _ws_pid, _model, _flags, depth) when depth >= 3, do: ""
 
-  defp agent_loop(messages, on_delta, ws_pid, model, depth) do
-    case Workbooks.Llm.complete(messages, on_delta: on_delta, model: model, tools: @tools) do
+  defp agent_loop(messages, on_delta, ws_pid, model, flags, depth) do
+    # Offer tools only on the first turn; after a tool runs, force a spoken
+    # narration turn (otherwise fast brains keep re-calling the tool and never talk).
+    tools = if depth == 0, do: @tools, else: []
+
+    case Workbooks.Llm.complete(messages, on_delta: on_delta, model: model, tools: tools, provider: brain_provider()) do
       {:ok, %{tool_calls: [], content: content}} ->
         content || ""
 
       {:ok, %{tool_calls: calls, raw_message: assistant}} ->
-        tool_msgs = Enum.map(calls, &exec_tool(&1, ws_pid))
-        agent_loop(messages ++ [strip(assistant) | tool_msgs], on_delta, ws_pid, model, depth + 1)
+        tool_msgs = Enum.map(calls, &exec_tool(&1, ws_pid, flags))
+        agent_loop(messages ++ [strip(assistant) | tool_msgs], on_delta, ws_pid, model, flags, depth + 1)
 
       {:error, _} ->
         ""
     end
   end
 
-  defp exec_tool(%{name: "write_code", id: id, args: args}, ws_pid) do
+  defp exec_tool(%{name: "write_code", id: id, args: args}, ws_pid, flags) do
     task = args["task"] || args["description"] || ""
     code = generate_code(task)
     push(ws_pid, %{type: "code", task: task, code: code})
-    %{role: "tool", tool_call_id: id, content: "Done — code written and shown in the editor."}
+    Agent.update(flags, &%{&1 | code: true})
+
+    %{
+      role: "tool",
+      tool_call_id: id,
+      content: "The code is now shown in the editor. Reply with one short spoken sentence telling the user what you did."
+    }
   end
 
-  defp exec_tool(%{id: id}, _ws_pid) do
+  defp exec_tool(%{id: id}, _ws_pid, _flags) do
     %{role: "tool", tool_call_id: id, content: "Unknown tool."}
   end
 
@@ -155,6 +182,16 @@ defmodule Workbooks.Voice.Session do
 
   # Keep only the fields the chat API needs echoed back (mirrors Agent.strip/1).
   defp strip(assistant), do: Map.take(assistant, ["role", "content", "tool_calls"])
+
+  # Pin a specific OpenRouter provider for the brain (e.g. Groq) for low TTFT,
+  # via WB_VOICE_BRAIN_PROVIDER. Only affects the voice brain, not mercury-2.
+  defp brain_provider do
+    case System.get_env("WB_VOICE_BRAIN_PROVIDER") do
+      nil -> nil
+      "" -> nil
+      p -> %{order: [p], allow_fallbacks: false}
+    end
+  end
 
   # Pull every COMPLETE sentence out of the buffer and enqueue it for TTS, leaving
   # any trailing fragment for the next delta.

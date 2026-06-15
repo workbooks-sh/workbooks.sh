@@ -37,6 +37,11 @@ Client: `desktop/src/lib/live/inworld.svelte.ts` + `pcm.ts`.
 - `WB_VOICE_BRAIN_MODEL` (optional) — fast LLM for spoken replies; falls back to
   the default `Workbooks.Llm` model. The voice brain favors TTFT over smarts; the
   code lane stays on `mercury-2`.
+- `WB_VOICE_BRAIN_PROVIDER` (optional) — pin an OpenRouter provider for the brain
+  (e.g. `Groq`) to minimize TTFT. Measured: `meta-llama/llama-3.3-70b-instruct`
+  on `Groq` → ~1.0s first-audio chat, ~1.5s code lane (vs ~2.3s / ~5.8s on the
+  default model). Tools are offered only on the first turn so a fast brain
+  narrates after a code write instead of re-calling the tool.
 
 ## Status
 
