@@ -18,6 +18,7 @@
   import { setupSaveModelKey, setupCompleteFirstRun } from "$lib/bridge/setup.svelte";
   import { connections } from "$lib/bridge/connections.svelte";
   import { keys } from "$lib/bridge/keys.svelte";
+  import { engineRequest } from "$lib/engine-api/gen";
   import ModelPicker from "$lib/chat/ModelPicker.svelte";
   import { getLlmModel, setLlmModel } from "$lib/bridge/llmModel.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
@@ -116,6 +117,26 @@
         await connections.refresh();
         if (connections.forService("gemini")) gemConnected = true;
       } catch { /* offline — leave the input */ }
+      // Org-provisioned keys (wb-xiei.5): if the user's organization set the
+      // OpenRouter/Gemini keys for its members, apply them so onboarding needn't
+      // ask. Personal keys win — only fill what isn't already set. Graceful: no
+      // org / no keys / offline → the manual inputs stay.
+      if (!orConnected || !gemConnected) {
+        try {
+          const org = await engineRequest<{ keys?: Record<string, string> }>("/api/org-secrets");
+          const k = org?.keys ?? {};
+          if (!orConnected && k.OPENROUTER_API_KEY) {
+            await setupSaveModelKey({ name: "OpenRouter", provider: "openrouter", value: k.OPENROUTER_API_KEY });
+            orConnected = true;
+            orgProvisioned = true;
+          }
+          if (!gemConnected && k.GEMINI_API_KEY) {
+            await connections.connect({ service: "gemini", api_key: k.GEMINI_API_KEY });
+            gemConnected = true;
+            orgProvisioned = true;
+          }
+        } catch { /* no org keys / offline — manual entry */ }
+      }
     })();
     for (const t of DEMO_TOOLKITS)
       dock.register({ id: t.id, title: t.title, icon: t.icon, component: DemoToolkitPanel, props: { title: t.title } });
@@ -189,6 +210,8 @@
   let orBusy = $state(false);
   let orErr = $state<string | null>(null);
   let orConnected = $state(false);
+  // True when a key was applied from the org's provisioned secrets (wb-xiei.5).
+  let orgProvisioned = $state(false);
   async function saveOpenRouter() {
     const v = orKey.trim();
     if (!v || orBusy) return;
@@ -384,7 +407,7 @@
                 {#if orConnected}
                   <div class="kfilled">
                     <span class="kdots">••••••••••••••••</span>
-                    <span class="kadded"><CheckCircle size={13} weight="fill" /> Added</span>
+                    <span class="kadded"><CheckCircle size={13} weight="fill" /> {orgProvisioned ? "Provided by your org" : "Added"}</span>
                   </div>
                 {:else}
                   <form class="kform" onsubmit={(e) => { e.preventDefault(); void saveOpenRouter(); }}>
@@ -421,7 +444,7 @@
                 {#if gemConnected}
                   <div class="kfilled">
                     <span class="kdots">••••••••••••••••</span>
-                    <span class="kadded"><CheckCircle size={13} weight="fill" /> Added</span>
+                    <span class="kadded"><CheckCircle size={13} weight="fill" /> {orgProvisioned ? "Provided by your org" : "Added"}</span>
                   </div>
                 {:else}
                   <form class="kform" onsubmit={(e) => { e.preventDefault(); void saveGemini(); }}>
