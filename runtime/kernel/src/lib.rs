@@ -22,6 +22,10 @@ use orgize::rowan::ast::AstNode;
 use orgize::{Org, SyntaxKind, SyntaxNode};
 use std::collections::{BTreeMap, BTreeSet};
 
+// The Work format: generic Node tree + `.work` shorthand parser + work-* HTML
+// renderer (the replacement for the org front-end). See docs/WORK-FORMAT.md.
+pub mod work;
+
 // ── Public kernel API ─────────────────────────────────────────────────────
 // Pure string→string functions. The native build (e.g. the `wb` CLI) links
 // these as a normal rlib; the wasm Component below wraps the SAME functions.
