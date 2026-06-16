@@ -233,4 +233,50 @@ defmodule Workbooks.BundleIslandsTest do
       assert Islands.inline(src, %{}) == src
     end
   end
+
+  # ── P3: the lang= handler registry (source ↔ artifact dispatch) ────────────────
+  describe "P3 lang handler registry" do
+    test "handler_for resolves langs + aliases to the existing lanes; unknown → nil" do
+      assert %{ext: ".svelte", lane: :svelte} = Islands.handler_for("svelte")
+      assert %{ext: ".rs", lane: :rust} = Islands.handler_for("rust")
+      assert Islands.handler_for("rs").lane == :rust
+      assert Islands.handler_for("ts").lane == :js
+      assert Islands.handler_for("SVELTE").lane == :svelte
+      assert Islands.handler_for("cobol") == nil
+      assert Islands.handler_for(nil) == nil
+    end
+
+    test "a <work-component lang=…> island parses, round-trips, and builds a plan" do
+      html = """
+      <work-component id="card" lang="svelte" src="lib/Card.svelte"/>
+      <work-component id="md" lang="rust" src="lib/md.rs"/>
+      <work-component id="mystery" lang="cobol" src="lib/legacy.cob"/>
+      """
+
+      islands = Islands.parse(html)
+      assert length(Islands.component_islands(islands)) == 3
+
+      card = Enum.find(islands, &(&1.id == "card"))
+      assert card.kind == :component
+      assert card.attrs["lang"] == "svelte"
+      assert card.path == "lib/Card.svelte"
+
+      # manifest round-trip keeps the lang attribute (so bundle can dispatch later)
+      back = islands |> Islands.to_manifest() |> Islands.from_manifest()
+      assert Enum.find(back, &(&1.id == "card")).attrs["lang"] == "svelte"
+
+      # build_plan resolves the buildable ones and DROPS the unknown lang
+      plan = Islands.build_plan(islands)
+      assert length(plan) == 2
+      langs = Enum.map(plan, fn {i, h} -> {i.attrs["lang"], h.lane} end) |> Enum.sort()
+      assert langs == [{"rust", :rust}, {"svelte", :svelte}]
+      refute Enum.any?(plan, fn {i, _} -> i.id == "mystery" end)
+    end
+
+    test "component islands render as <work-component> (src-referenced)" do
+      i = %{kind: :component, id: "card", path: "lib/Card.svelte", attrs: %{"lang" => "svelte"}, body: nil}
+      frag = Islands.render([i])
+      assert frag =~ ~s(<work-component id="card" src="lib/Card.svelte" lang="svelte"/>)
+    end
+  end
 end

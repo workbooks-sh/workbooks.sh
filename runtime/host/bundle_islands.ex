@@ -35,7 +35,13 @@ defmodule Workbooks.Bundle.Islands do
 
   alias Workbooks.{AgentDef, Toolkits}
 
-  @kind_tag %{agent: "work-agent", toolkit: "work-toolkit", org: "work-org", vfs: "work-vfs"}
+  @kind_tag %{
+    agent: "work-agent",
+    toolkit: "work-toolkit",
+    org: "work-org",
+    vfs: "work-vfs",
+    component: "work-component"
+  }
   @tag_kind Map.new(@kind_tag, fn {k, v} -> {v, k} end)
 
   # A headline carrying the `:agent:` tag — the cheap pre-filter so we only invoke
@@ -321,6 +327,51 @@ defmodule Workbooks.Bundle.Islands do
   end
 
   def inline(i, _parts), do: i
+
+  # ── P3: the lang= handler registry (source ↔ artifact, reusing the built lanes) ──
+
+  # Each handler is {ext (the source file extension), lane (the existing build lane
+  # in Workbooks.Build/PackageManager / the tangle ext map)}. NO new compiler — this
+  # only DISPATCHES a `<work-component lang=…>` island's source to the lane that
+  # already exists. Aliases (rs→rust, js→javascript) fold to the canonical lane.
+  @handlers %{
+    "rust" => %{ext: ".rs", lane: :rust},
+    "rs" => %{ext: ".rs", lane: :rust},
+    "c" => %{ext: ".c", lane: :c},
+    "zig" => %{ext: ".zig", lane: :zig},
+    "svelte" => %{ext: ".svelte", lane: :svelte},
+    "javascript" => %{ext: ".js", lane: :js},
+    "js" => %{ext: ".js", lane: :js},
+    "typescript" => %{ext: ".ts", lane: :js},
+    "ts" => %{ext: ".ts", lane: :js},
+    "go" => %{ext: ".go", lane: :go}
+  }
+
+  @doc "The lang→handler registry (the source↔artifact dispatch table). See `@handlers`."
+  @spec handlers() :: %{optional(binary) => map}
+  def handlers, do: @handlers
+
+  @doc "Resolve a `lang` (or alias) to its handler `%{ext, lane}` — nil if unknown."
+  @spec handler_for(binary | nil) :: map | nil
+  def handler_for(lang) when is_binary(lang), do: Map.get(@handlers, String.downcase(lang))
+  def handler_for(_), do: nil
+
+  @doc "The `<work-component>` islands in a list (the lang'd, buildable nodes)."
+  @spec component_islands([map]) :: [map]
+  def component_islands(islands), do: Enum.filter(islands, &(&1.kind == :component))
+
+  @doc """
+  The build plan for a list of islands: each `<work-component lang=…>` paired with
+  its resolved handler — `[{island, handler}]`. This is what `bundle` dispatches to
+  the existing compile lanes; an unknown/absent lang drops out (not buildable here).
+  """
+  @spec build_plan([map]) :: [{map, map}]
+  def build_plan(islands) do
+    islands
+    |> component_islands()
+    |> Enum.map(fn i -> {i, handler_for(Map.get(i.attrs, "lang"))} end)
+    |> Enum.filter(fn {_i, h} -> h end)
+  end
 
   defp org?(path), do: String.ends_with?(path, ".org")
 
