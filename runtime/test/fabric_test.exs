@@ -6,6 +6,7 @@ defmodule Workbooks.FabricTest do
   intensive toolkit distributes the same way.
   """
   use ExUnit.Case, async: false
+  @moduletag :build
 
   alias Workbooks.{Fabric, CommandRegistry}
 

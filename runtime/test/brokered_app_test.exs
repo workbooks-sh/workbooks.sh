@@ -4,6 +4,7 @@ defmodule Workbooks.BrokeredAppTest do
   + isolated + grant-scoped. Proves the "deploy target" productization — define -> served + persisted + isolated.
   """
   use ExUnit.Case, async: false
+  @moduletag :build
   alias Workbooks.{BrokeredApp, Compilers}
 
   defp compile_reactor(body_c) do
