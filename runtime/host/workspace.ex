@@ -21,16 +21,16 @@ defmodule Workbooks.Workspace do
         :SCOPE: write
         :END:
 
-  Parsing reuses `Workbooks.OQL.parse_headlines/1` (one org parser, no second
+  Parsing reuses `Workbooks.Workbook.parse_headlines/1` (one org parser, no second
   hand-roll). Pure data — the Library layer composes these into an access graph.
   """
-  alias Workbooks.OQL
+  alias Workbooks.Workbook
 
   @doc "Parse a workspace.org → %{title, slug, members: [%{id, ref, scope}]}."
   def parse(org) when is_binary(org) do
     members =
       org
-      |> OQL.parse_headlines()
+      |> Workbook.parse_headlines()
       |> Enum.filter(&member?/1)
       |> Enum.map(&to_member/1)
 

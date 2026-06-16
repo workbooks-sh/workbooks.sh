@@ -36,11 +36,11 @@ defmodule Workbooks.Toolkits do
   path (Dock-gated). Host bash from skill files bypasses that and is therefore
   gated/capped/isolated above. See docs/TOOLKITS-V3.org for the full model.
   """
-  alias Workbooks.OQL
+  alias Workbooks.Workbook
 
   @doc "Every `:toolkit:` node in a Context Tree — the `(tags :toolkit:)` query."
   def discover(org) when is_binary(org) do
-    org |> OQL.parse_headlines() |> Enum.filter(&toolkit?/1) |> Enum.map(&view/1)
+    org |> Workbook.parse_headlines() |> Enum.filter(&toolkit?/1) |> Enum.map(&view/1)
   end
 
   @doc """
@@ -76,7 +76,7 @@ defmodule Workbooks.Toolkits do
   Discovery/closure ONLY — caps stay grant-gated (a dep edge never widens powers).
   """
   def resolve(org, agent_id) when is_binary(org) do
-    hs = OQL.parse_headlines(org)
+    hs = Workbook.parse_headlines(org)
     wanted = hs |> agent(agent_id) |> names()
     tks = hs |> Enum.filter(&toolkit?/1)
     by_id = Map.new(tks, &{&1["id"], view(&1)})

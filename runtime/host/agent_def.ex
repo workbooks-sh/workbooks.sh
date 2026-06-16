@@ -1,73 +1,70 @@
 defmodule Workbooks.AgentDef do
   @moduledoc """
-  Parse an Org `:agent:` node into a runnable agent (the brandnana-strategist
-  shape). The node's properties carry `:ID:` / `:MODEL:` / `:TOOLKITS:`; the
-  `** System prompt` subsection is the system prompt. `run/3` parses + runs the
-  agent (Workbooks.Agent) on a task. So an agent is authored as Org, discovered
-  like a toolkit, and run on the clean-room substrate — no bespoke format.
+  Parse a `<work-agent>` element into a runnable agent. The element's attributes
+  carry `id` / `model` / `toolkits` / `tagline`; a nested `<work-system>` element
+  (or, failing that, the agent's own text) is the system prompt. An agent is
+  authored as an HTML file using the `work-*` components, discovered like a
+  toolkit, and run on the clean-room substrate — no bespoke format, no parser.
   """
-  alias Workbooks.{OQL, Agent}
+  alias Workbooks.Agent
 
-  @doc "Parse the first `:agent:` node in an Org source → %{id, model, toolkits, system}."
-  def parse(org) when is_binary(org) do
-    node = OQL.parse_headlines(org) |> Enum.find(&("agent" in &1["tags"]))
+  @doc "Parse the first `<work-agent>` in a workbook's HTML → %{id, model, toolkits, tagline, system}."
+  def parse(html) when is_binary(html) do
+    agent = find_agent(html)
 
     %{
-      id: node && node["id"],
-      model: node && node["props"]["MODEL"],
-      toolkits: ((node && node["props"]["TOOLKITS"]) || "") |> String.split(),
-      tagline: node && node["props"]["TAGLINE"],
-      system: system_prompt(org)
+      id: agent && attr(agent, "id"),
+      model: agent && attr(agent, "model"),
+      toolkits: ((agent && attr(agent, "toolkits")) || "") |> String.split(),
+      tagline: agent && attr(agent, "tagline"),
+      system: agent && system_prompt(agent)
     }
   end
 
-  @doc "Parse an Org agent def and run it on `task`. opts override (e.g. :model, :max_steps, :vfs)."
-  def run(org, task, opts \\ []) do
-    def = parse(org)
+  @doc "Parse a `<work-agent>` and run it on `task`. opts override (e.g. :model, :max_steps, :vfs)."
+  def run(html, task, opts \\ []) do
+    def = parse(html)
 
-    # Toolkit auto-injection (TOOLKITS-V3 §P3): the agent's declared :TOOLKITS:
+    # Toolkit auto-injection (TOOLKITS-V3 §P3): the agent's declared toolkits
     # become a compact index appended to the system prompt — tier 1 of progressive
     # disclosure. Skill bodies stay on demand via the `wb` tool, never inlined.
     system =
       case Workbooks.Toolkits.injection_text(def.toolkits) do
         "" -> def.system
-        index -> def.system <> "\n\n" <> index
+        index -> "#{def.system}\n\n#{index}"
       end
 
     Agent.run(system, task, Keyword.put_new(opts, :model, def.model))
   end
 
-  # The system prompt is everything under the `** System prompt` heading, up to
-  # the next sibling heading (or end). Falls back to the whole body.
-  defp system_prompt(org) do
-    case Regex.split(~r/^\*+\s+System prompt\s*$/m, org, parts: 2) do
-      [_, rest] ->
-        rest |> next_section() |> String.trim()
-
-      _ ->
-        # No `** System prompt` heading: fall back to the body of the :agent:
-        # node (everything after its properties drawer) — an agent authored as
-        # a plain def shouldn't silently run prompt-less. (This bit bit.ml: the
-        # crew ran with EMPTY prompts and all imitated desk.)
-        agent_body(org)
+  # The first `<work-agent>` element as a Floki node, or nil.
+  defp find_agent(html) do
+    case Floki.parse_fragment(html) do
+      {:ok, tree} -> tree |> Floki.find("work-agent") |> List.first()
+      _ -> nil
     end
   end
 
-  # Everything after the first :agent: node's :END: drawer line, to the next
-  # top-level heading — used when there's no explicit `** System prompt`.
-  defp agent_body(org) do
-    case Regex.split(~r/^\s*:END:\s*$/m, org, parts: 2) do
-      [_, rest] -> rest |> String.trim()
-      _ -> ""
+  defp attr(node, name) do
+    case Floki.attribute([node], name) do
+      [v | _] -> v
+      _ -> nil
     end
   end
 
-  # End the system prompt at the next sibling/parent heading (level 1-2), so
-  # deeper `***` subsections (Command surface, Recipes, …) stay part of it.
-  defp next_section(text) do
-    case Regex.split(~r/^\*{1,2}\s+\S/m, text, parts: 2) do
-      [section | _] -> section
-      _ -> text
+  # The system prompt is the `<work-system>` child's text; failing that, the
+  # agent's own direct text. An agent must NEVER run prompt-less (the bit.ml
+  # footgun — agents authored without a prompt ran empty and imitated each other).
+  defp system_prompt(agent) do
+    case Floki.find([agent], "work-system") do
+      [sys | _] -> sys |> Floki.text() |> String.trim()
+      [] -> agent |> own_text() |> String.trim()
     end
   end
+
+  # Direct text of the agent element, excluding nested child elements' text.
+  defp own_text({_tag, _attrs, children}),
+    do: children |> Enum.filter(&is_binary/1) |> Enum.join()
+
+  defp own_text(_), do: ""
 end

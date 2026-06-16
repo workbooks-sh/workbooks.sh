@@ -16,6 +16,7 @@ mod local;
 mod mode;
 mod rcp;
 mod util;
+mod workbook;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

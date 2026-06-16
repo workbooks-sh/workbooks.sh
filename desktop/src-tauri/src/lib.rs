@@ -63,9 +63,10 @@ fn runtime_url() -> Runtime {
     }
 }
 
-/// The embedded OQL kernel, exposed LOCALLY (no runtime, no Docker). The
-/// workbook-native surface: render/tangle/validate/lint/outline a workbook
-/// fully in-process.
+/// Workbook structure ops, exposed LOCALLY (no runtime, no Docker). A workbook
+/// IS HTML built from `work-*` web components: render is passthrough (the browser
+/// + workponents Lit render it), while tangle/validate/lint/outline read the
+/// `work-*` element tree fully in-process.
 #[tauri::command]
 fn weave(org: String) -> Result<String, String> {
     kernel::call("render", &org)

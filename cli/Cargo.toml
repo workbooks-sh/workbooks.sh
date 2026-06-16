@@ -15,10 +15,6 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 serde_json = "1"
-# The OQL kernel as a pure rlib — local org ops, no running runtime needed.
-# default-features = false drops the wasm-Component glue so it links cleanly on
-# BOTH the CLI's native and wasm32-wasip1 targets (same crate, just the rlib).
-oql = { path = "../runtime/kernel", default-features = false }
 # .wbundle is a plain zip (workbook.html + vfs.sqlite + manifest.json) — match
 # the runtime's :zip exactly. Store+deflate only; no crypto/time/zstd bloat.
 zip = { version = "2", default-features = false, features = ["deflate"] }

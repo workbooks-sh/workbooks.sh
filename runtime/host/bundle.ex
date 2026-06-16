@@ -386,20 +386,20 @@ defmodule Workbooks.Bundle do
 
   defp seal_gated(parts, _none, _id), do: {parts, %{}}
 
-  # ── Tangle: org → native source (the compile step's input materialization) ──
+  # ── Tangle: workbook HTML → native source (the compile step's input) ──
   #
-  # The lifecycle's "tangle + compile" stage (docs/WORKBOOK-BUNDLE.md). The org
-  # file is the source-of-truth; its `:component:` code blocks are the native
-  # source. `tangle_files/1` is the org→native EMITTER alongside the kernel's
-  # plan-only `OQL.tangle_plan` — it REUSES that plan (no kernel rebuild) and
-  # writes each component's `src` body to its native file on disk, so the
-  # in-sandbox compiler lanes (Workbooks.Build → PackageManager/Compilers) can
-  # discover + compile them. One direction of the literate loop: org re-tangles
-  # to native on every rebuild, so editing the org (or re-tangled native) and
-  # re-bundling stays consistent — the bundle never carries stale tangled source.
+  # The lifecycle's "tangle + compile" stage (docs/WORKBOOK-BUNDLE.md). The
+  # workbook HTML is the source-of-truth; its `<work-component>` elements carry
+  # the native source (their text body) plus build wiring (lang/in/out/deps/dir
+  # attributes). `tangle_files/1` is the HTML→native EMITTER: it reads the build
+  # plan from the HTML (`Workbook.tangle_plan`, Floki — no kernel) and writes each
+  # component's body to its native file on disk, so the in-sandbox compiler lanes
+  # (Workbooks.Build → PackageManager/Compilers) can discover + compile them. One
+  # direction of the literate loop: the HTML re-tangles to native on every
+  # rebuild, so the bundle never carries stale tangled source.
 
-  # Map a component's org source language to its native file extension. Mirrors
-  # the lanes Workbooks.Build discovers (a lone `.rs`, a C/Zig leaf, a JS entry).
+  # Map a component's source language to its native file extension. Mirrors the
+  # lanes Workbooks.Build discovers (a lone `.rs`, a C/Zig leaf, a JS entry).
   @lang_ext %{
     "rust" => ".rs",
     "rs" => ".rs",
@@ -412,23 +412,23 @@ defmodule Workbooks.Bundle do
   }
 
   @doc ~S"""
-  Tangle the org source-of-truth in `parts` to native source files, returning the
-  parts map with each `:component:` block's body materialized at
-  `<dir>/<name><ext>` (the tangle direction org→native). REUSES `OQL.tangle_plan`
-  — the same WIT-world build plan the kernel already emits — rather than
-  reparsing org. A part already present at a tangled path is OVERWRITTEN (the org
-  is canonical; re-tangle wins) so the lifecycle's "edit source not compiled wasm"
-  invariant holds: the org round-trips, native is always derived.
+  Tangle the workbook HTML source-of-truth in `parts` to native source files,
+  returning the parts map with each `<work-component>` body materialized at
+  `<dir>/<name><ext>` (the tangle direction HTML→native). Reads the build plan
+  with `Workbook.tangle_plan` (Floki over the HTML — no kernel). A part already
+  present at a tangled path is OVERWRITTEN (the HTML is canonical; re-tangle wins)
+  so the lifecycle's "edit source not compiled wasm" invariant holds: the HTML
+  round-trips, native is always derived.
 
-  `org` defaults to `parts["source.org"] || parts["workbook.org"]` — the same org
-  lookup the `bundle` CLI verb renders from. With no org, parts pass through
+  `src` defaults to `parts["index.html"] || parts["workbook.html"]` — the workbook
+  HTML the `bundle` CLI verb renders from. With no HTML, parts pass through
   unchanged (a non-literate tree has nothing to tangle).
   """
-  def tangle_files(parts, org \\ nil) when is_map(parts) do
-    org = org || parts["source.work"] || parts["workbook.work"] || parts["source.org"] || parts["workbook.org"]
+  def tangle_files(parts, src \\ nil) when is_map(parts) do
+    src = src || parts["index.html"] || parts["workbook.html"] || parts["source.work"] || parts["workbook.work"]
 
-    if is_binary(org) and org != "" do
-      plan = Workbooks.OQL.tangle_plan(org)
+    if is_binary(src) and src != "" do
+      plan = Workbooks.Workbook.tangle_plan(src)
 
       plan
       |> plan_components()

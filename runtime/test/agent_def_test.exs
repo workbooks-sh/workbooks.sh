@@ -2,88 +2,62 @@ defmodule Workbooks.AgentDefTest do
   @moduledoc """
   Regression tests for the agent-def parser (the seam that gives an agent its
   system prompt + toolkits). Pins the known footgun: an agent must NEVER run
-  prompt-less. (The bit.ml incident — agents authored without a `** System
-  prompt` heading ran with EMPTY prompts and all imitated each other.) Runs
-  under the started app (OQL kernel parses headlines).
+  prompt-less. (The bit.ml incident — agents authored without a `<work-system>`
+  prompt ran with EMPTY prompts and all imitated each other.) An agent is an HTML
+  file built from `work-*` components; the parser reads it with Floki.
   """
   use ExUnit.Case, async: false
 
   alias Workbooks.AgentDef
 
-  defp def_with_heading do
+  defp def_with_system do
     """
-    * Waldo                                                          :agent:
-      :PROPERTIES:
-      :ID:        waldo
-      :MODEL:     anthropic/claude-haiku-4.5
-      :TOOLKITS:  workbooks-browser workbooks-cli
-      :TAGLINE:   Resident agent
-      :END:
+    <work-agent id="waldo" model="anthropic/claude-haiku-4.5"
+                toolkits="workbooks-browser workbooks-cli" tagline="Resident agent">
+      <work-system>
+        You are Waldo, the resident agent.
 
-    ** System prompt
-
-       You are Waldo, the resident agent.
-
-    *** Command surface
-
-       Use `wb app …` to drive the shell.
-
-    ** Notes
-
-       This must NOT be part of the prompt.
+        Command surface: use `wb app …` to drive the shell.
+      </work-system>
+      <work-note>This must NOT be part of the prompt.</work-note>
+    </work-agent>
     """
   end
 
   test "parses id, model, space-split toolkits, tagline" do
-    d = AgentDef.parse(def_with_heading())
+    d = AgentDef.parse(def_with_system())
     assert d.id == "waldo"
     assert d.model == "anthropic/claude-haiku-4.5"
     assert d.toolkits == ["workbooks-browser", "workbooks-cli"]
     assert d.tagline == "Resident agent"
   end
 
-  test "system prompt spans the heading + deeper *** subsections, stops at next sibling **" do
-    d = AgentDef.parse(def_with_heading())
+  test "system prompt is the <work-system> body; sibling elements are excluded" do
+    d = AgentDef.parse(def_with_system())
     assert d.system =~ "You are Waldo, the resident agent."
-    # a deeper *** subsection stays IN the prompt
-    assert d.system =~ "Use `wb app"
-    # a sibling ** heading ends the prompt — its body must be excluded
+    # content inside <work-system> stays in the prompt
+    assert d.system =~ "use `wb app"
+    # a sibling element's text must be excluded
     refute d.system =~ "This must NOT be part of the prompt."
   end
 
-  test "FOOTGUN: no `** System prompt` heading falls back to the node body, never empty" do
-    org = """
-    * Scout                                                          :agent:
-      :PROPERTIES:
-      :ID:        scout
-      :END:
+  test "FOOTGUN: no <work-system> falls back to the agent's own text, never empty" do
+    html = ~s(<work-agent id="scout">You scout the codebase and report findings concisely.</work-agent>)
 
-      You scout the codebase and report findings concisely.
-    """
-
-    d = AgentDef.parse(org)
+    d = AgentDef.parse(html)
     assert d.id == "scout"
     # MUST carry the body — a prompt-less agent is the bug we're guarding against
     refute d.system == ""
     assert d.system =~ "You scout the codebase"
   end
 
-  test "no toolkits prop → empty list (not a crash, not a [\"\"])" do
-    org = """
-    * Bare                                                           :agent:
-      :PROPERTIES:
-      :ID:        bare
-      :END:
-
-      Minimal agent.
-    """
-
-    d = AgentDef.parse(org)
+  test "no toolkits attr → empty list (not a crash, not a [\"\"])" do
+    d = AgentDef.parse(~s(<work-agent id="bare">Minimal agent.</work-agent>))
     assert d.toolkits == []
   end
 
-  test "no :agent: node → nil id, empty-ish def (graceful, no raise)" do
-    d = AgentDef.parse("* Just a heading\n\nSome prose, no agent tag.\n")
+  test "no <work-agent> → nil id, empty-ish def (graceful, no raise)" do
+    d = AgentDef.parse(~s(<work-doc title="Just a heading">Some prose, no agent.</work-doc>))
     assert d.id == nil
     assert d.toolkits == []
   end

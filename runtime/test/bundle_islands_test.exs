@@ -10,13 +10,6 @@ defmodule Workbooks.BundleIslandsTest do
   use ExUnit.Case, async: false
   alias Workbooks.Bundle.Islands
 
-  setup_all do
-    case Workbooks.OQL.start_link(nil) do
-      {:ok, _} -> :ok
-      {:error, {:already_started, _}} -> :ok
-    end
-  end
-
   @agent_org """
   * Analyst :agent:
   :PROPERTIES:

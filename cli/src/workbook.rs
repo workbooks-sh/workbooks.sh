@@ -1,13 +1,17 @@
-// HTML-native workbook structure, in-process. A workbook IS an HTML file built
-// from `work-*` web components; the desktop shell reads its structure with a
-// small standard HTML scanner — no embedded wasm, no Elixir, no Docker. The app
-// "renders its own format" because the format IS HTML: the browser + the
-// workponents Lit library render `work-*` elements directly.
-//
-// `call(export, arg)` mirrors the old kernel surface so the Tauri commands are
-// unchanged: `render` is passthrough (a workbook IS HTML), and
-// `parse-headlines` / `tangle-plan` / `validate` / `lint` read the `work-*`
-// element tree and return JSON.
+//! HTML-native workbook reader (CLI side, dep-free).
+//!
+//! A workbook IS an HTML file built from `work-*` web components. The CLI reads
+//! its STRUCTURE — the `work-*` element tree — with a small standard-shaped HTML
+//! scanner (no kernel, no wasm). It mirrors `Workbooks.Workbook` (Elixir/Floki):
+//!
+//!   * `parse_headlines` : the outline — every `work-*` element as a row.
+//!   * `tangle_plan`     : the build plan — `<work-flow>` worlds + `<work-component>`
+//!                         leaves (source = element body, wiring = attributes).
+//!   * `validate`        : diagnostics over the parsed component graph.
+//!   * `render`          : a workbook IS HTML; render is the HTML itself (passthrough).
+//!
+//! The scanner only needs to recognise `work-*` tags; everything else is opaque
+//! markup it descends through. Pure compute, identical on native + wasm targets.
 
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -17,28 +21,6 @@ const RESERVED: &[&str] = &[
     "dir", "due", "scheduled", "at", "start", "end", "cron", "repeat",
 ];
 
-/// Call a workbook structure op by name. Unknown export → an error string,
-/// matching the old typed-call surface.
-pub fn call(export: &str, arg: &str) -> Result<String, String> {
-    match export {
-        "render" => Ok(arg.to_string()),
-        "parse-headlines" => Ok(parse_headlines(arg)),
-        "tangle-plan" => Ok(tangle_plan(arg)),
-        "validate" => Ok(validate(arg)),
-        "lint" => Ok("[]".into()),
-        other => Err(format!("unknown workbook op: {other}")),
-    }
-}
-
-/// Weave a workbook → HTML, locally. A workbook IS HTML — weave is passthrough.
-/// Kept for API parity; the `weave` Tauri command goes through `call("render", _)`.
-#[allow(dead_code)]
-pub fn weave(src: &str) -> Result<String, String> {
-    Ok(src.to_string())
-}
-
-// ── work-* node tree ───────────────────────────────────────────────────────
-
 #[derive(Debug, Clone)]
 struct Node {
     tag: String,
@@ -47,17 +29,26 @@ struct Node {
     children: Vec<Node>,
 }
 
-fn parse_headlines(src: &str) -> String {
+// ── Public API (JSON strings out, mirroring the Elixir surface) ────────────
+
+pub fn parse_headlines(src: &str) -> String {
     let roots = parse_work_nodes(src);
     let mut rows = vec![];
     for n in &roots {
         flatten(n, 1, &mut rows);
     }
-    let arr: Vec<Value> = rows.iter().map(|(lvl, n)| node_row(*lvl, n)).collect();
+    let arr: Vec<Value> = rows.iter().map(|(level, n)| node_row(*level, n)).collect();
     serde_json::to_string(&arr).unwrap_or_else(|_| "[]".into())
 }
 
-fn tangle_plan(src: &str) -> String {
+// Diagnostics that aren't structural validation (currently none). The `lint`
+// verb uses `validate`; kept for API parity with the Elixir surface.
+#[allow(dead_code)]
+pub fn lint(_src: &str) -> String {
+    "[]".into()
+}
+
+pub fn tangle_plan(src: &str) -> String {
     let roots = parse_work_nodes(src);
     let worlds: Vec<Value> = match top_flows(&roots) {
         flows if !flows.is_empty() => flows.iter().map(|f| build_world(f)).collect(),
@@ -73,7 +64,7 @@ fn tangle_plan(src: &str) -> String {
     json!({ "worlds": worlds }).to_string()
 }
 
-fn validate(src: &str) -> String {
+pub fn validate(src: &str) -> String {
     let roots = parse_work_nodes(src);
     let flows: Vec<Node> = match top_flows(&roots) {
         flows if !flows.is_empty() => flows.into_iter().cloned().collect(),
@@ -86,6 +77,7 @@ fn validate(src: &str) -> String {
             }
         }
     };
+
     let mut diags = vec![];
     for flow in &flows {
         let comps = comps_of(flow);
@@ -109,7 +101,13 @@ fn validate(src: &str) -> String {
     serde_json::to_string(&diags).unwrap_or_else(|_| "[]".into())
 }
 
-// ── scanner ────────────────────────────────────────────────────────────────
+/// A workbook IS HTML — render returns the HTML itself (passthrough). The browser
+/// + the `work-*` Lit components do the visual render.
+pub fn render(src: &str) -> String {
+    src.to_string()
+}
+
+// ── HTML → work-* node tree (minimal scanner) ──────────────────────────────
 
 fn parse_work_nodes(src: &str) -> Vec<Node> {
     let toks = tokenize(src);
@@ -120,6 +118,7 @@ fn parse_work_nodes(src: &str) -> Vec<Node> {
             if node.tag.starts_with("work-") {
                 roots.push(node);
             } else {
+                // descend: a non-work element may wrap work-* children.
                 roots.extend(node.children);
             }
             pos = next;
@@ -132,7 +131,7 @@ fn parse_work_nodes(src: &str) -> Vec<Node> {
 
 #[derive(Debug, Clone)]
 enum Tok {
-    Open(String, BTreeMap<String, String>, bool),
+    Open(String, BTreeMap<String, String>, bool), // tag, attrs, self_closing
     Close(String),
     Text(String),
 }
@@ -142,11 +141,14 @@ fn tokenize(src: &str) -> Vec<Tok> {
     let mut i = 0;
     let mut out = vec![];
     let mut text = String::new();
+
     while i < bytes.len() {
         if bytes[i] == '<' {
+            // flush pending text
             if !text.is_empty() {
                 out.push(Tok::Text(std::mem::take(&mut text)));
             }
+            // find the matching '>'
             let start = i;
             let mut j = i + 1;
             let mut in_q: Option<char> = None;
@@ -162,6 +164,7 @@ fn tokenize(src: &str) -> Vec<Tok> {
                 j += 1;
             }
             if j >= bytes.len() {
+                // unterminated tag — treat the rest as text and stop.
                 text.extend(&bytes[start..]);
                 break;
             }
@@ -170,6 +173,7 @@ fn tokenize(src: &str) -> Vec<Tok> {
             if let Some(tok) = parse_tag(&raw) {
                 out.push(tok);
             }
+            // comments / doctype / processing instrs → dropped (parse_tag → None)
         } else {
             text.push(bytes[i]);
             i += 1;
@@ -191,11 +195,14 @@ fn parse_tag(raw: &str) -> Option<Tok> {
     }
     let self_closing = raw.ends_with('/');
     let body = raw.trim_end_matches('/').trim();
+
+    // tag name = up to first whitespace
     let (name, attr_str) = match body.find(|c: char| c.is_whitespace()) {
         Some(idx) => (&body[..idx], &body[idx..]),
         None => (body, ""),
     };
-    Some(Tok::Open(name.to_lowercase(), parse_attrs(attr_str), self_closing))
+    let attrs = parse_attrs(attr_str);
+    Some(Tok::Open(name.to_lowercase(), attrs, self_closing))
 }
 
 fn parse_attrs(s: &str) -> BTreeMap<String, String> {
@@ -209,6 +216,7 @@ fn parse_attrs(s: &str) -> BTreeMap<String, String> {
         if i >= chars.len() {
             break;
         }
+        // read name
         let nstart = i;
         while i < chars.len() && chars[i] != '=' && !chars[i].is_whitespace() {
             i += 1;
@@ -218,6 +226,7 @@ fn parse_attrs(s: &str) -> BTreeMap<String, String> {
             i += 1;
             continue;
         }
+        // optional = value
         while i < chars.len() && chars[i].is_whitespace() {
             i += 1;
         }
@@ -235,7 +244,7 @@ fn parse_attrs(s: &str) -> BTreeMap<String, String> {
                 }
                 let v: String = chars[vstart..i].iter().collect();
                 if i < chars.len() {
-                    i += 1;
+                    i += 1; // closing quote
                 }
                 v
             } else {
@@ -247,6 +256,7 @@ fn parse_attrs(s: &str) -> BTreeMap<String, String> {
             };
             attrs.insert(name, html_unescape(&val));
         } else {
+            // boolean attribute
             attrs.insert(name, String::new());
         }
     }
@@ -261,6 +271,7 @@ fn html_unescape(s: &str) -> String {
         .replace("&amp;", "&")
 }
 
+// Recursive-descent over the flat token stream → a Node (and the next index).
 fn parse_node(toks: &[Tok], pos: usize) -> Option<(Node, usize)> {
     match toks.get(pos)? {
         Tok::Open(tag, attrs, self_closing) => {
@@ -276,8 +287,13 @@ fn parse_node(toks: &[Tok], pos: usize) -> Option<(Node, usize)> {
             let mut i = pos + 1;
             while i < toks.len() {
                 match &toks[i] {
-                    Tok::Close(close) if close == tag => return Some((node, i + 1)),
-                    Tok::Close(_) => i += 1,
+                    Tok::Close(close) if close == tag => {
+                        return Some((node, i + 1));
+                    }
+                    Tok::Close(_) => {
+                        // stray/mismatched close — skip it.
+                        i += 1;
+                    }
                     Tok::Text(t) => {
                         node.body.push_str(t);
                         i += 1;
@@ -287,6 +303,8 @@ fn parse_node(toks: &[Tok], pos: usize) -> Option<(Node, usize)> {
                             if child.tag.starts_with("work-") {
                                 node.children.push(child);
                             } else {
+                                // flatten non-work descendants up so nested work-*
+                                // elements are still discovered.
                                 node.children.extend(child.children);
                             }
                             i = next;
@@ -296,6 +314,7 @@ fn parse_node(toks: &[Tok], pos: usize) -> Option<(Node, usize)> {
                     }
                 }
             }
+            // unterminated element — accept what we have.
             Some((node, i))
         }
         _ => None,
@@ -309,6 +328,8 @@ fn is_void(tag: &str) -> bool {
             | "param" | "source" | "track" | "wbr"
     )
 }
+
+// ── Row shape for parse_headlines ──────────────────────────────────────────
 
 fn flatten<'a>(n: &'a Node, level: usize, out: &mut Vec<(usize, &'a Node)>) {
     out.push((level, n));
@@ -330,6 +351,7 @@ fn node_row(level: usize, n: &Node) -> Value {
         .filter(|(k, _)| !RESERVED.contains(&k.as_str()))
         .map(|(k, v)| (k.to_uppercase(), v))
         .collect();
+
     json!({
         "level": level,
         "title": n.attrs.get("title").cloned().unwrap_or_default(),
@@ -346,6 +368,8 @@ fn node_row(level: usize, n: &Node) -> Value {
         "tagname": n.tag,
     })
 }
+
+// ── Components + build plan ─────────────────────────────────────────────────
 
 struct Comp {
     name: String,
@@ -467,6 +491,7 @@ fn sig_of(comps: &[Comp]) -> (Vec<String>, Vec<String>, Vec<(String, String)>) {
     let mut imports: Vec<String> = comps.iter().flat_map(|c| c.uses.clone()).collect();
     imports.sort();
     imports.dedup();
+
     let mut producer: BTreeMap<String, String> = BTreeMap::new();
     for c in comps {
         if let Some(o) = &c.out {
@@ -506,24 +531,91 @@ fn diag(level: &str, scope: &str, msg: &str) -> Value {
 
 #[cfg(test)]
 mod tests {
-    // A workbook IS HTML; weave is passthrough, and the structure ops read the
-    // work-* element tree with no embedded wasm and no Elixir.
+    use super::*;
+
+    const FLOW: &str = r#"
+<work-flow title="etl">
+  <work-component title="extract" lang="rust" out="raw"></work-component>
+  <work-component title="transform" lang="rust" in="raw" out="clean" uses="fetch"></work-component>
+  <work-component title="load" lang="rust" in="clean"></work-component>
+</work-flow>
+"#;
+
     #[test]
-    fn weave_is_passthrough() {
-        let html = r#"<work-doc title="Hello"><p>the workbook is HTML</p></work-doc>"#;
-        assert_eq!(super::weave(html).unwrap(), html);
+    fn parse_headlines_shape() {
+        let json: Value = serde_json::from_str(&parse_headlines(FLOW)).unwrap();
+        let rows = json.as_array().unwrap();
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[0]["level"], 1);
+        assert_eq!(rows[0]["title"], "etl");
+        assert_eq!(rows[1]["level"], 2);
+        assert_eq!(rows[1]["title"], "extract");
     }
 
     #[test]
-    fn outline_and_validate_return_json() {
-        let rows = super::call(
-            "parse-headlines",
-            r#"<work-doc title="One"><work-section title="Two"></work-section></work-doc>"#,
-        )
-        .expect("parse");
-        assert!(rows.trim_start().starts_with('['));
-        assert!(rows.contains("One") && rows.contains("Two"));
-        let diag = super::call("validate", r#"<work-doc title="x"></work-doc>"#).expect("validate");
-        assert_eq!(diag, "[]");
+    fn tangle_plan_world_and_edges() {
+        let plan: Value = serde_json::from_str(&tangle_plan(FLOW)).unwrap();
+        let worlds = plan["worlds"].as_array().unwrap();
+        assert_eq!(worlds.len(), 1);
+        let w = &worlds[0];
+        assert_eq!(w["name"], "etl");
+        assert_eq!(w["components"].as_array().unwrap().len(), 3);
+        assert_eq!(w["imports"], json!(["fetch"]));
+        let edges = w["edges"].as_array().unwrap();
+        assert!(edges
+            .iter()
+            .any(|e| e["from"] == "extract" && e["to"] == "transform"));
+    }
+
+    #[test]
+    fn validate_flags_dangling_and_langless() {
+        let src = r#"<work-flow title="b">
+          <work-component title="needs" lang="js" in="missing"></work-component>
+          <work-component title="nolang"></work-component>
+        </work-flow>"#;
+        let diags: Value = serde_json::from_str(&validate(src)).unwrap();
+        let msgs: Vec<String> = diags
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| d["message"].as_str().unwrap().to_string())
+            .collect();
+        assert!(msgs.iter().any(|m| m.contains("no upstream producer")));
+        assert!(msgs.iter().any(|m| m.contains("no source block")));
+    }
+
+    #[test]
+    fn validate_clean_is_empty() {
+        assert_eq!(
+            validate(r#"<work-doc title="t"><p>x</p></work-doc>"#),
+            "[]"
+        );
+    }
+
+    #[test]
+    fn render_is_passthrough() {
+        let html = r#"<work-doc title="Hi"><p>body</p></work-doc>"#;
+        assert_eq!(render(html), html);
+    }
+
+    #[test]
+    fn component_body_is_source() {
+        let src = r#"<work-flow title="f"><work-component title="add" lang="rust" out="sum" dir="crates/add">pub fn add() {}</work-component></work-flow>"#;
+        let plan: Value = serde_json::from_str(&tangle_plan(src)).unwrap();
+        let comp = &plan["worlds"][0]["components"][0];
+        assert_eq!(comp["name"], "add");
+        assert_eq!(comp["dir"], "crates/add");
+        assert!(comp["src"].as_str().unwrap().contains("pub fn add"));
+    }
+
+    #[test]
+    fn descends_through_non_work_wrappers() {
+        let json: Value =
+            serde_json::from_str(&parse_headlines(r#"<div><work-note title="Inner"></work-note></div>"#))
+                .unwrap();
+        let rows = json.as_array().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["title"], "Inner");
+        assert_eq!(rows[0]["level"], 1);
     }
 }

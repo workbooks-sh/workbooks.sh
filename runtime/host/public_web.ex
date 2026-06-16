@@ -328,7 +328,7 @@ defmodule Workbooks.PublicWeb do
     if complete_html?(org) do
       org
     else
-      static_doc(id, Workbooks.OQL.render(org))
+      static_doc(id, Workbooks.Workbook.render(org))
     end
   end
 
@@ -380,7 +380,7 @@ defmodule Workbooks.PublicWeb do
       <h1>#{escape(id)}</h1>
     </header>
     #{rendered}
-    <footer>Rendered by the Workbooks OQL kernel · <a href="https://github.com/workbooks-sh/workbooks.sh">workbooks-sh/workbooks.sh</a></footer>
+    <footer>Built with Workbooks · <a href="https://github.com/workbooks-sh/workbooks.sh">workbooks-sh/workbooks.sh</a></footer>
     </main>
     #{Workbooks.Bundle.loader_block()}
     </body></html>

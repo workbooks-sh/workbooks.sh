@@ -25,7 +25,9 @@ pub fn dev(src: &str, port: Option<u16>) -> Result<String> {
         use anyhow::Context;
         let org = std::fs::read_to_string(org_path)
             .with_context(|| format!("read {}", org_path.display()))?;
-        let body = oql::render(&org);
+        // A workbook IS HTML — render is passthrough; the browser + work-* Lit
+        // components do the visual render.
+        let body = crate::workbook::render(&org);
         let reload = format!(
             "<script>(()=>{{const v={bump};setInterval(async()=>{{try{{const r=await fetch('/__v');\
              if((await r.text()).trim()!==String(v))location.reload();}}catch(_){{}}}},500)}})()</script>"

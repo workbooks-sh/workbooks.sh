@@ -1,6 +1,6 @@
 # The Workbook Runtime engine image (wb-11ck.30). One Linux container:
 #   BEAM (the runtime) + wasmtime (run commands/components) + litestream
-#   (off-box VFS durability) + the baked wasm artifacts (oql kernel, jq, grep).
+#   (off-box VFS durability) + the baked wasm command artifacts (jq, grep).
 # Build:  docker build -t workbooks-engine .
 # Deploy: fly deploy   (the single credentialed step — needs Shane's Fly account)
 
@@ -16,7 +16,6 @@ COPY mix.exs mix.lock ./
 COPY vendor ./vendor
 RUN mix deps.get --only prod && mix deps.compile
 COPY . .
-# build/oql.wasm is embedded at compile time (@external_resource); it is COPY'd above.
 RUN mix compile && mix release
 
 # --- run: slim image with the release + the binaries it shells to ------------

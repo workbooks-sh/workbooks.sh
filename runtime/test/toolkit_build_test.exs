@@ -10,12 +10,6 @@ defmodule Workbooks.ToolkitBuildTest do
   alias Workbooks.{Toolkits, CommandRegistry}
 
   setup_all do
-    # discover_dir/parse_headlines route through the OQL kernel process.
-    case Workbooks.OQL.start_link(nil) do
-      {:ok, _} -> :ok
-      {:error, {:already_started, _}} -> :ok
-    end
-
     # Point discovery at the in-repo toolkits/ regardless of cwd.
     System.put_env("WB_TOOLKITS_ROOT", Path.expand("../toolkits", __DIR__))
     on_exit(fn -> System.delete_env("WB_TOOLKITS_ROOT") end)

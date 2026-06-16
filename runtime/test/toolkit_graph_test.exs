@@ -18,10 +18,6 @@ defmodule Workbooks.ToolkitGraphTest do
   alias Workbooks.Toolkits
 
   setup_all do
-    case Workbooks.OQL.start_link(nil) do
-      {:ok, _} -> :ok
-      {:error, {:already_started, _}} -> :ok
-    end
 
     :ok
   end

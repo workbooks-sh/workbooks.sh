@@ -214,7 +214,7 @@ defmodule Workbooks.Web do
   # Parse Org through the OQL kernel.
   post "/oql/parse" do
     {:ok, body, conn} = read_body(conn)
-    json = Jason.encode!(Workbooks.OQL.parse_headlines(body))
+    json = Jason.encode!(Workbooks.Workbook.parse_headlines(body))
     conn |> put_resp_content_type("application/json") |> send_resp(200, json)
   end
 
@@ -400,7 +400,7 @@ defmodule Workbooks.Web do
   get "/w/:id" do
     id = conn.params["id"]
     org = Workbooks.ControlPlane.get_workbook(id) || sample_workbook()
-    page = workbook_page(id, Workbooks.OQL.render(org))
+    page = workbook_page(id, Workbooks.Workbook.render(org))
     conn |> put_resp_content_type("text/html") |> send_resp(200, page)
   end
 
@@ -411,9 +411,9 @@ defmodule Workbooks.Web do
 
     result =
       case fun do
-        "parse" -> Workbooks.OQL.parse_headlines(org)
-        "tangle" -> Workbooks.OQL.tangle_plan(org)
-        "validate" -> Workbooks.OQL.validate(org)
+        "parse" -> Workbooks.Workbook.parse_headlines(org)
+        "tangle" -> Workbooks.Workbook.tangle_plan(org)
+        "validate" -> Workbooks.Workbook.validate(org)
         _ -> %{"error" => "unknown fn"}
       end
 
@@ -587,7 +587,7 @@ defmodule Workbooks.Web do
 
     case read_workspace_org(conn.assigns.tenant, conn.query_params["path"]) do
       {:ok, org} ->
-        headlines = Workbooks.OQL.parse_headlines(org)
+        headlines = Workbooks.Workbook.parse_headlines(org)
         conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{headlines: headlines, parse_warnings: []}))
 
       _ ->
@@ -629,7 +629,7 @@ defmodule Workbooks.Web do
 
     views =
       case read_workspace_org(conn.assigns.tenant, conn.query_params["path"]) do
-        {:ok, org} -> Workbooks.OQL.parse_headlines(org) |> Enum.map(&headline_to_view/1)
+        {:ok, org} -> Workbooks.Workbook.parse_headlines(org) |> Enum.map(&headline_to_view/1)
         _ -> []
       end
 
@@ -1127,7 +1127,7 @@ defmodule Workbooks.Web do
 
         html =
           parts["index.html"] || parts["workbook.html"] ||
-            Workbooks.OQL.render(parts["source.org"] || parts["workbook.org"] || "")
+            Workbooks.Workbook.render(parts["source.org"] || parts["workbook.org"] || "")
 
         html = html |> Workbooks.Bundle.embed(blob) |> Workbooks.Bundle.embed_loader()
         sign? = Plug.Conn.fetch_query_params(conn).query_params["sign"] == "1"
@@ -1571,7 +1571,7 @@ defmodule Workbooks.Web do
   get "/api/w/:id/html" do
     if Workbooks.ControlPlane.workbook_visible?(conn.params["id"], conn.assigns[:tenant]) do
       org = Workbooks.ControlPlane.get_workbook(conn.params["id"]) || ""
-      conn |> put_resp_content_type("text/html; charset=utf-8") |> send_resp(200, Workbooks.OQL.render(org))
+      conn |> put_resp_content_type("text/html; charset=utf-8") |> send_resp(200, Workbooks.Workbook.render(org))
     else
       conn |> put_resp_content_type("text/html; charset=utf-8") |> send_resp(404, "")
     end

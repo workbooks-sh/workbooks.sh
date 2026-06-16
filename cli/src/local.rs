@@ -1,8 +1,8 @@
 //! Local verbs — run entirely in the CLI, no runtime needed.
 //!
-//! - assembly: `bundle` renders the Work source via the embedded kernel and packs the
-//!   same `.wbundle` zip the runtime's `Workbooks.Bundle.ship/4` produces
-//!   (workbook.html + vfs.sqlite + manifest.json, format `wbundle/1`);
+//! - assembly: `bundle` takes the workbook HTML (passthrough — a workbook IS HTML)
+//!   and packs the same `.wbundle` zip the runtime's `Workbooks.Bundle.ship/4`
+//!   produces (workbook.html + vfs.sqlite + manifest.json, format `wbundle/1`);
 //!   `unbundle` is the inverse.
 //! - provenance: `sign`/`verify` — Ed25519 over canonical JSON with a did:key
 //!   issuer, byte-compatible with `Workbooks.Manifest` / `Workbooks.Git`.
@@ -12,6 +12,7 @@
 
 use crate::io::Io;
 use crate::util;
+use crate::workbook;
 use anyhow::{bail, Context, Result};
 use base64::Engine as _;
 use sha2::Digest;
@@ -19,26 +20,32 @@ use std::io::Write as _;
 
 // ─────────────────────────── assembly ───────────────────────────
 
-/// Resolve the Work source: a source file, or a dir containing `workbook.work`
-/// (else exactly one `.work` file).
+/// Resolve the workbook source: a source file, or a dir containing the workbook
+/// HTML (`index.html`/`workbook.html`, else exactly one `.html` file).
 pub(crate) fn find_org(src: &str) -> Result<std::path::PathBuf> {
     let p = std::path::Path::new(src);
     if p.is_file() {
         return Ok(p.to_path_buf());
     }
-    let wb = p.join("workbook.work");
-    if wb.is_file() {
-        return Ok(wb);
+    for name in ["index.html", "workbook.html"] {
+        let wb = p.join(name);
+        if wb.is_file() {
+            return Ok(wb);
+        }
     }
     let srcs: Vec<_> = std::fs::read_dir(p)
         .with_context(|| format!("read dir {src}"))?
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.extension().map(|e| e == "work").unwrap_or(false))
+        .filter(|p| {
+            p.extension()
+                .map(|e| e == "html" || e == "htm")
+                .unwrap_or(false)
+        })
         .collect();
     match srcs.as_slice() {
         [one] => Ok(one.clone()),
-        [] => bail!("no .work source in {src} (want workbook.work)"),
-        _ => bail!("multiple .work files in {src} — name one workbook.work or pass it explicitly"),
+        [] => bail!("no workbook HTML in {src} (want index.html)"),
+        _ => bail!("multiple .html files in {src} — name one index.html or pass it explicitly"),
     }
 }
 
@@ -46,10 +53,12 @@ pub fn bundle(io: &dyn Io, src: &str, out: Option<&str>) -> Result<String> {
     let src_path = find_org(src)?;
     let source = String::from_utf8(io.read(&src_path.to_string_lossy())?)?;
     let stem = src_path.file_stem().unwrap_or_default().to_string_lossy().to_string();
-    let html = oql::render(&source);
+    // A workbook IS HTML — render is passthrough (the browser + work-* Lit
+    // components do the visual render).
+    let html = workbook::render(&source);
 
     // diagnostics gate: refuse to assemble a workbook that doesn't lint clean
-    let diags = oql::validate(&source);
+    let diags = workbook::validate(&source);
     if diags != "[]" {
         bail!("source has diagnostics — fix them first (wb lint):\n{diags}");
     }
@@ -515,28 +524,34 @@ pub fn init(name: &str, template: &str) -> Result<String> {
         bail!("{name} already exists");
     }
     std::fs::create_dir_all(dir.join("data")).with_context(|| format!("create {name}/data"))?;
-    // The Work format: one mechanism — `work-*` elements + nesting + prose. The
-    // `.work` shorthand expands 1:1 into the shipped HTML. See docs/WORK-FORMAT.md.
+    // A workbook IS an HTML file built from `work-*` web components. Prose, data,
+    // and code live together as `work-*` elements; the browser + the workponents
+    // Lit library render it. A `<work-component>` body is buildable source.
     let src = format!(
-        "work-flow \"{name}\"\n  \
-         A new workbook. Prose, data, and code live together as work-* elements —\n  \
-         edit it, then preview with `wbx dev` and assemble with `wbx bundle`.\n  \
-         work-component \"main\" lang=javascript\n    \
-         // code blocks tangle into the workbook\n"
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  \
+         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  \
+         <title>{name}</title>\n</head>\n<body>\n  \
+         <work-flow title=\"{name}\">\n    \
+         <p>A new workbook. Prose, data, and code live together as work-* elements —\n    \
+         edit it, then preview with <code>wbx dev</code> and assemble with <code>wbx bundle</code>.</p>\n    \
+         <work-component title=\"main\" lang=\"javascript\">\n      \
+         // code blocks tangle into the workbook\n    \
+         </work-component>\n  \
+         </work-flow>\n</body>\n</html>\n"
     );
-    let src_path = dir.join("workbook.work");
+    let src_path = dir.join("index.html");
     std::fs::write(&src_path, &src).with_context(|| format!("write {}", src_path.display()))?;
 
     // the scaffold must satisfy its own toolchain — refuse to ship a template
     // that doesn't lint clean
-    let diags = oql::validate(&src);
+    let diags = workbook::validate(&src);
     if diags != "[]" {
         bail!("template bug: scaffold has diagnostics:\n{diags}");
     }
     Ok(format!(
         "{name}/
-  workbook.work  the source — prose + tasks + code as work-* elements
-  data/          files that travel with it
+  index.html  the workbook — prose + tasks + code as work-* elements
+  data/       files that travel with it
 
 next: cd {name} && wbx dev"
     ))

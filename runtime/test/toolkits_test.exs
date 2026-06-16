@@ -19,12 +19,6 @@ defmodule Workbooks.ToolkitsTest do
   @root Path.expand("../../toolkits", __DIR__)
 
   setup_all do
-    # discover_dir/parse_headlines route through the OQL kernel process.
-    case Workbooks.OQL.start_link(nil) do
-      {:ok, _} -> :ok
-      {:error, {:already_started, _}} -> :ok
-    end
-
     :ok
   end
 

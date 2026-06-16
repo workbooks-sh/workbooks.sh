@@ -63,7 +63,7 @@ defmodule Workbooks.PackageManager do
 
   @doc "Tangle a literate Workbook: build every component → [{name, lang, result}]."
   def tangle(org) when is_binary(org) do
-    Workbooks.OQL.tangle_plan(org)
+    Workbooks.Workbook.tangle_plan(org)
     |> Map.get("worlds", [])
     |> Enum.flat_map(&components/1)
     |> Enum.map(&build/1)
@@ -1223,7 +1223,7 @@ defmodule Workbooks.PackageManager do
   and needs WIT-declared components (jco / cargo-component). Returns name → output.
   """
   def run_dag(org, input) do
-    Workbooks.OQL.tangle_plan(org) |> Map.get("worlds") |> hd() |> run_world(input)
+    Workbooks.Workbook.tangle_plan(org) |> Map.get("worlds") |> hd() |> run_world(input)
   end
 
   @doc """
@@ -1390,7 +1390,7 @@ defmodule Workbooks.PackageManager do
   not Javy stdin/stdout. Multi-edge DAG folding is the next step.
   """
   def typed_compose(org) when is_binary(org) do
-    world = Workbooks.OQL.tangle_plan(org) |> Map.get("worlds") |> hd()
+    world = Workbooks.Workbook.tangle_plan(org) |> Map.get("worlds") |> hd()
     comps = Map.new(world["components"], &{&1["name"], &1})
 
     case world["edges"] do

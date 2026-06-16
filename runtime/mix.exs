@@ -1,8 +1,9 @@
 defmodule Workbooks.MixProject do
   use Mix.Project
 
-  # The whole system. Elixir host in host/, OQL kernel (Rust) in kernel/,
-  # compiled wasm in build/. No lib/, no priv/, no app-name nesting.
+  # The whole system. Elixir host in host/. A workbook is an HTML file built from
+  # `work-*` web components; the backend reads its structure with Floki, not a
+  # bespoke kernel. No lib/, no priv/, no app-name nesting.
   def project do
     [
       app: :workbooks,
@@ -44,6 +45,7 @@ defmodule Workbooks.MixProject do
       # source (force_build) — durable: no deps.get reversion, no env var, no external fork.
       {:wasmex, path: "vendor/wasmex"},
       {:exqlite, "~> 0.27"},
+      {:floki, "~> 0.36"},
       {:jason, "~> 1.4"},
       {:bandit, "~> 1.5"},
       {:plug, "~> 1.16"},

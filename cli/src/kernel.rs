@@ -1,13 +1,13 @@
-//! Local Work-format operations, backed by the kernel.
+//! Local workbook structure operations, read straight from HTML.
 //!
-//! The kernel is the same Rust crate (`runtime/kernel`, package `oql`) that
-//! compiles to the wasm Component the runtime + desktop embed. Here we link its
-//! native rlib, so these verbs run locally with no running runtime — identically
-//! on the CLI's native and wasm targets.
-//!
-//! Reading the source file goes through the Io seam (native fs / wasm Dock).
+//! A workbook IS an HTML file built from `work-*` web components; `crate::workbook`
+//! reads its structure with a small standard HTML scanner (no kernel, no wasm), so
+//! these verbs run locally with no running runtime — identically on the CLI's
+//! native and wasm targets. Reading the source file goes through the Io seam
+//! (native fs / wasm Dock).
 
 use crate::io::Io;
+use crate::workbook;
 use anyhow::Result;
 
 fn read_src(io: &dyn Io, file: &str) -> Result<String> {
@@ -20,17 +20,17 @@ fn read_src(io: &dyn Io, file: &str) -> Result<String> {
     Ok(String::from_utf8(io.read(file)?)?)
 }
 
-/// `wb query <file.work>` — structure → node rows (JSON).
+/// `wb query <workbook.html>` — the `work-*` structure → node rows (JSON).
 pub fn query(io: &dyn Io, file: &str) -> Result<String> {
-    Ok(oql::parse_headlines(&read_src(io, file)?))
+    Ok(workbook::parse_headlines(&read_src(io, file)?))
 }
 
-/// `wb tangle <file.work>` — the WIT-world-shaped build plan (JSON).
+/// `wb tangle <workbook.html>` — the build plan (worlds + components, JSON).
 pub fn tangle(io: &dyn Io, file: &str) -> Result<String> {
-    Ok(oql::tangle_plan(&read_src(io, file)?))
+    Ok(workbook::tangle_plan(&read_src(io, file)?))
 }
 
-/// `wb lint <file.work>` — diagnostics over the plan (JSON).
+/// `wb lint <workbook.html>` — diagnostics over the component graph (JSON).
 pub fn lint(io: &dyn Io, file: &str) -> Result<String> {
-    Ok(oql::validate(&read_src(io, file)?))
+    Ok(workbook::validate(&read_src(io, file)?))
 }

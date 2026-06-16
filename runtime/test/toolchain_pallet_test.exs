@@ -149,10 +149,7 @@ defmodule Workbooks.ToolchainPalletTest do
     end
   end
 
-  defp ensure_oql do
-    case Process.whereis(Workbooks.OQL) do
-      nil -> Workbooks.OQL.start_link(nil)
-      pid -> {:ok, pid}
-    end
-  end
+  # The workbook reader (Workbooks.Workbook) is a plain Floki module now — no
+  # kernel process to start. Kept as a {:ok, _} no-op so the call sites are intact.
+  defp ensure_oql, do: {:ok, :no_kernel}
 end

@@ -8,16 +8,16 @@ defmodule Workbooks.Workflow do
   run record with the schedule surfaced. Org owns the orchestration spec; the
   runtime just executes it — no DSL, no board model.
   """
-  alias Workbooks.{OQL, PackageManager}
+  alias Workbooks.{Workbook, PackageManager}
 
   @doc "Run the workflows declared in an Org source → nested run records."
   def run(org, input \\ "") when is_binary(org) do
-    OQL.tangle_plan(org)["worlds"] |> Enum.map(&run_world(&1, input))
+    Workbook.tangle_plan(org)["worlds"] |> Enum.map(&run_world(&1, input))
   end
 
   @doc "The workflows in an Org source, with their schedules (no execution)."
   def list(org) when is_binary(org) do
-    OQL.tangle_plan(org)["worlds"] |> Enum.map(&summary/1)
+    Workbook.tangle_plan(org)["worlds"] |> Enum.map(&summary/1)
   end
 
   defp run_world(world, input) do

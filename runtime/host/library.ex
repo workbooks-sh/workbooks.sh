@@ -262,7 +262,7 @@ defmodule Workbooks.Library do
   # CLI verb renders from — org is canonical, html is derived).
   defp page_html(parts) do
     parts["index.html"] || parts["workbook.html"] ||
-      Workbooks.OQL.render(parts["workspace.org"] || parts["source.org"] || parts["workbook.org"] || "")
+      Workbooks.Workbook.render(parts["workspace.org"] || parts["source.org"] || parts["workbook.org"] || "")
   end
 
   @doc """

@@ -27,7 +27,7 @@ ExUnit.start(
 # per-module `setup` (or `setup_all`) block, e.g.:
 #
 #     setup do
-#       {:ok, _pid} = Workbooks.OQL.start_link(nil)
+#       {:ok, _pid} = Workbooks.Domains.start_link(nil)
 #       :ok
 #     end
 #

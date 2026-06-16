@@ -1,28 +1,19 @@
 defmodule Workbooks.BundleTangleTest do
   @moduledoc """
   Pins the TANGLE/COMPILE wiring into the bundle lifecycle (docs/WORKBOOK-BUNDLE.md
-  "the workbook compiler"): org source-of-truth → tangled native source
-  (`Bundle.tangle_files` REUSING `OQL.tangle_plan`) → compile-shape
-  (`Bundle.compile_tree` REUSING `Workbooks.Build`/PackageManager) → packed +
-  embedded `.html` carrying org + native + (when built) `.wasm`.
+  "the workbook compiler"): workbook HTML source-of-truth → tangled native source
+  (`Bundle.tangle_files` reading the plan via `Workbook.tangle_plan`, Floki) →
+  compile-shape (`Bundle.compile_tree` REUSING `Workbooks.Build`/PackageManager) →
+  packed + embedded `.html` carrying the HTML + native + (when built) `.wasm`.
 
-  Hermetic: the org→tangle leg runs the REAL embedded OQL kernel (no network,
-  no LLM). The heavy compile leg is asserted at the WIRING level — `compile_tree`
-  detection + `build: false` skip — so the default run needs no wasm toolchain.
-  A real end-to-end compile lives behind the `:build` tag (excluded by default;
-  run with `mix test --include build` in a provisioned env).
+  Hermetic: the HTML→tangle leg is pure Floki (no network, no LLM, no kernel). The
+  heavy compile leg is asserted at the WIRING level — `compile_tree` detection +
+  `build: false` skip — so the default run needs no wasm toolchain. A real
+  end-to-end compile lives behind the `:build` tag (excluded by default; run with
+  `mix test --include build` in a provisioned env).
   """
   use ExUnit.Case, async: false
   alias Workbooks.{Bundle, CLI}
-
-  setup_all do
-    # The OQL kernel is a named GenServer over the embedded oql.wasm — hermetic
-    # (pure compute, no host/network). Tolerate it already being up.
-    case Workbooks.OQL.start_link(nil) do
-      {:ok, _} -> :ok
-      {:error, {:already_started, _}} -> :ok
-    end
-  end
 
   setup do
     base = Path.join(System.tmp_dir!(), "wb_bundle_tangle_#{System.unique_integer([:positive])}")
@@ -30,18 +21,20 @@ defmodule Workbooks.BundleTangleTest do
     {:ok, base: base}
   end
 
-  # A literate Workbook: one work-flow with one Rust work-component. This is the
-  # source-of-truth; the .rs is DERIVED by tangle, never authored directly. The
-  # component's body is its source; lang/out/dir are plain attributes.
+  # A literate workbook: HTML with one work-flow holding one Rust work-component.
+  # The HTML is the source-of-truth; the .rs is DERIVED by tangle, never authored
+  # directly. The component's text body is its source; lang/out/dir are attributes.
   @work """
-  work-flow "Adder"
-    work-component "add" lang=rust out=sum dir=crates/add
-      #[no_mangle]
-      pub extern "C" fn add(a: i32, b: i32) -> i32 { a + b }
+  <work-flow title="Adder">
+    <work-component title="add" lang="rust" out="sum" dir="crates/add">
+  #[no_mangle]
+  pub extern "C" fn add(a: i32, b: i32) -> i32 { a + b }
+    </work-component>
+  </work-flow>
   """
 
-  test "tangle_files materializes work-component bodies → native source (work→native)" do
-    parts = Bundle.tangle_files(%{"source.work" => @work})
+  test "tangle_files materializes work-component bodies → native source (html→native)" do
+    parts = Bundle.tangle_files(%{"index.html" => @work})
 
     # The Rust component tangles to <dir>/<name>.rs with its source-block body.
     assert Map.has_key?(parts, "crates/add/add.rs"),
@@ -51,13 +44,13 @@ defmodule Workbooks.BundleTangleTest do
     assert rs =~ "pub extern \"C\" fn add"
     assert rs =~ "a + b"
 
-    # The org source-of-truth survives — the bundle stays re-editable, re-tangles
+    # The HTML source-of-truth survives — the bundle stays re-editable, re-tangles
     # on each rebuild (the "edit source not compiled wasm" invariant).
-    assert parts["source.work"] == @work
+    assert parts["index.html"] == @work
   end
 
-  test "tangle is idempotent + the org wins over a stale tangled file (re-tangle)" do
-    base = %{"source.work" => @work, "crates/add/add.rs" => "STALE — should be overwritten\n"}
+  test "tangle is idempotent + the HTML wins over a stale tangled file (re-tangle)" do
+    base = %{"index.html" => @work, "crates/add/add.rs" => "STALE — should be overwritten\n"}
 
     once = Bundle.tangle_files(base)
     twice = Bundle.tangle_files(once)
@@ -67,13 +60,13 @@ defmodule Workbooks.BundleTangleTest do
     assert once["crates/add/add.rs"] =~ "pub extern"
   end
 
-  test "a non-literate tree (no org) passes through tangle unchanged" do
+  test "a non-literate tree (no work-components) passes through tangle unchanged" do
     parts = %{"index.html" => "<h1>hi</h1>", "data/x.bin" => <<1, 2, 3>>}
     assert Bundle.tangle_files(parts) == parts
   end
 
   test "compile_tree detects buildable native source but skips the heavy compile on build:false" do
-    parts = Bundle.tangle_files(%{"source.work" => @work})
+    parts = Bundle.tangle_files(%{"index.html" => @work})
 
     # build: false → compile is skipped; the tangled native source still ships
     # (source-only / archive projection). Hermetic: no lane spin-up.
@@ -84,52 +77,52 @@ defmodule Workbooks.BundleTangleTest do
   end
 
   test "compile_tree is a no-op for a tree with nothing to build" do
-    parts = %{"index.html" => "<h1>hi</h1>", "source.work" => "work-doc \"Doc\"\n  just prose\n"}
+    parts = %{"index.html" => "<work-doc title=\"Doc\">just prose</work-doc>"}
     assert Bundle.compile_tree(parts, build: true) == parts
   end
 
-  test "wb bundle (--no-build) tangles org→native then packs + embeds; round-trips", %{base: base} do
+  test "wb bundle (--no-build) tangles html→native then packs + embeds; round-trips", %{base: base} do
     src = Path.join(base, "src")
     out = Path.join(base, "page.html")
     dst = Path.join(base, "dst")
 
     File.mkdir_p!(src)
-    File.write!(Path.join(src, "source.work"), @work)
+    File.write!(Path.join(src, "index.html"), @work)
 
-    # --no-build: the heavy compile is skipped, but the org STILL tangles to native
-    # before pack — so the wiring (org→tangle→pack→embed) is exercised hermetically.
+    # --no-build: the heavy compile is skipped, but the HTML STILL tangles to native
+    # before pack — so the wiring (html→tangle→pack→embed) is exercised hermetically.
     msg = CLI.call(["bundle", src, out, "--no-build"], nil)
     assert msg =~ "bundled"
     assert File.exists?(out)
 
-    # The embedded bundle carries the org source-of-truth AND the tangled native.
+    # The embedded bundle carries the HTML source-of-truth AND the tangled native.
     blob = Bundle.extract(File.read!(out))
     assert is_binary(blob)
     parts = Bundle.unpack(blob)
-    assert parts["source.work"] == @work
+    assert parts["index.html"] == @work
     assert Map.has_key?(parts, "crates/add/add.rs")
     assert parts["crates/add/add.rs"] =~ "pub extern"
 
-    # unbundle reconstitutes both the org and the tangled native source on disk.
+    # unbundle reconstitutes both the HTML and the tangled native source on disk.
     CLI.call(["unbundle", out, dst], nil)
-    assert File.read!(Path.join(dst, "source.work")) == @work
+    assert File.read!(Path.join(dst, "index.html")) == @work
     assert File.read!(Path.join(dst, "crates/add/add.rs")) =~ "pub extern"
   end
 
   @tag :build
-  test "wb bundle (full compile) emits a runnable <name>.wasm part for the org component", %{base: base} do
+  test "wb bundle (full compile) emits a runnable <name>.wasm part for the component", %{base: base} do
     src = Path.join(base, "src")
     out = Path.join(base, "page.html")
 
     File.mkdir_p!(src)
-    File.write!(Path.join(src, "source.work"), @work)
+    File.write!(Path.join(src, "index.html"), @work)
 
     CLI.call(["bundle", src, out], nil)
 
     parts = out |> File.read!() |> Bundle.extract() |> Bundle.unpack()
-    # Source-of-truth org + tangled native + the compiled .wasm output all ship —
+    # Source-of-truth HTML + tangled native + the compiled .wasm output all ship —
     # the install/3 shape (CommandRegistry registers `.wasm` parts).
-    assert parts["source.work"] == @work
+    assert parts["index.html"] == @work
     assert Map.has_key?(parts, "crates/add/add.rs")
 
     wasm = Enum.filter(Map.keys(parts), &String.ends_with?(&1, ".wasm"))

@@ -14,13 +14,6 @@ defmodule Workbooks.BundleIslandsCliTest do
   alias Workbooks.CLI
   alias Workbooks.Bundle.Islands
 
-  setup_all do
-    case Workbooks.OQL.start_link(nil) do
-      {:ok, _} -> :ok
-      {:error, {:already_started, _}} -> :ok
-    end
-  end
-
   setup do
     base = Path.join(System.tmp_dir!(), "wb_islands_cli_#{System.unique_integer([:positive])}")
     on_exit(fn -> File.rm_rf!(base) end)
