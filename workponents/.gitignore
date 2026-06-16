@@ -1,2 +1,4 @@
 node_modules/
 dist/
+registry/*.json
+html-custom-data.json
