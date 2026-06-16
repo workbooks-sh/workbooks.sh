@@ -14,7 +14,9 @@ defmodule Workbooks.SandboxInvariantTest do
   # Every dependency, reviewed and classified in SANDBOX-INVARIANT.md. To add one: classify it
   # there first (pure-Elixir? trusted-infra NIF? does it run UNTRUSTED code? — only Wasmex may),
   # then add its name here.
-  @reviewed_deps ~w(wasmex exqlite jason bandit plug websock_adapter guardian jose postgrex)a
+  # floki: pure-Elixir HTML parser (the org→HTML migration reads workbook structure with it);
+  # parses markup only, runs no untrusted code.
+  @reviewed_deps ~w(wasmex exqlite jason bandit plug websock_adapter guardian jose postgrex floki)a
   # Opt-in ML stack (WB_CLIP=1): trusted-infra NIFs that process the runtime's own models, never user code.
   @reviewed_ml_deps ~w(ortex tokenizers nx stb_image)a
 
