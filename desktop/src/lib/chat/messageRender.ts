@@ -1,90 +1,66 @@
-// Waldo in-chat components — message render contract.
-//
-// One home for: "is this message org?" + "split an org message into
-// prose + inline component segments". See desktop/docs/waldo-inchat-
-// components.md. Prose is rendered by the EXISTING $lib/org-renderer
-// OQL-WASM pipeline; component segments are forwarded to the real
-// <work-gen-block> SDK element (via WorkGenBlock.svelte), which reads
-// structured props/body — we never {@html} raw LLM output.
-
-/** Leading marker line that opts a message into org rendering. */
-const ORG_MARKER = /^#\+RENDER:\s*org\s*$/im;
-
-export type RenderMode = "plain" | "org";
-
-/** Decide how an assistant message renders. Default is plain (today's
- *  behavior) — only the explicit marker switches to org, so nothing
- *  regresses. Stable from the first streamed line. */
-export function renderMode(text: string): RenderMode {
-  return ORG_MARKER.test(text.slice(0, 64)) ? "org" : "plain";
-}
-
-/** A component authored inline as `#+begin_src component :type … #+end_src`. */
+/**
+ * Split an assistant message into Markdown prose + inline `<work-*>` element
+ * segments, in order. Agents emit components as plain HTML
+ * (`<work-tag attr="v">body</work-tag>` or self-closing) — the chat renders the
+ * prose as Markdown and mounts each `<work-*>` as the REAL custom element
+ * (structured attrs + textContent, never `{@html}` of raw model output).
+ */
 export interface ComponentSegment {
   kind: "component";
-  type: string;
-  props: Record<string, string>;
+  tag: string;
+  attrs: Record<string, string>;
   body: string;
 }
 
-/** A run of plain org prose to hand to renderOrg(). */
-export interface OrgSegment {
-  kind: "org";
+export interface TextSegment {
+  kind: "text";
   source: string;
 }
 
-export type Segment = OrgSegment | ComponentSegment;
+export type Segment = TextSegment | ComponentSegment;
 
-// `#+begin_src component <header-args>` … `#+end_src`. Case-insensitive,
-// tolerant of indentation the LLM might add.
-const BLOCK_RE =
-  /^[ \t]*#\+begin_src[ \t]+component\b([^\n]*)\n([\s\S]*?)^[ \t]*#\+end_src[ \t]*$/gim;
+// An inline `<work-*>` element: paired (with a body) or self-closing.
+const EL_RE =
+  /<(work-[a-z][\w-]*)((?:\s+[a-zA-Z][\w-]*(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(?:\/>|>([\s\S]*?)<\/\1\s*>)/g;
 
-/** Split an org message into prose + component segments, in order.
- *  The org marker line is stripped from the first prose segment. */
-export function splitOrg(text: string): Segment[] {
-  const src = text.replace(ORG_MARKER, "").replace(/^\n+/, "");
+export function splitComponents(text: string): Segment[] {
   const segments: Segment[] = [];
   let last = 0;
-  for (const m of src.matchAll(BLOCK_RE)) {
+
+  for (const m of text.matchAll(EL_RE)) {
     const start = m.index ?? 0;
     if (start > last) {
-      const prose = src.slice(last, start);
-      if (prose.trim()) segments.push({ kind: "org", source: prose });
+      const prose = text.slice(last, start);
+      if (prose.trim()) segments.push({ kind: "text", source: prose });
     }
-    const { type, props } = parseHeaderArgs(m[1]);
     segments.push({
       kind: "component",
-      type: type || "callout",
-      props,
-      body: m[2].replace(/\n+$/, ""),
+      tag: m[1],
+      attrs: parseAttrs(m[2] ?? ""),
+      body: (m[3] ?? "").trim(),
     });
     last = start + m[0].length;
   }
-  if (last < src.length) {
-    const prose = src.slice(last);
-    if (prose.trim()) segments.push({ kind: "org", source: prose });
+
+  if (last < text.length) {
+    const prose = text.slice(last);
+    if (prose.trim()) segments.push({ kind: "text", source: prose });
   }
-  // A marker-only message with no body still renders as (empty) org.
-  if (segments.length === 0 && src.trim()) {
-    segments.push({ kind: "org", source: src });
+
+  if (segments.length === 0 && text.trim()) {
+    segments.push({ kind: "text", source: text });
   }
+
   return segments;
 }
 
-/** Parse Babel-style header args (`:type callout :tone info`). The
- *  first `:type` value is pulled out; the rest become props. Values
- *  run until the next ` :key` or end of line. */
-function parseHeaderArgs(header: string): {
-  type: string;
-  props: Record<string, string>;
-} {
-  const props: Record<string, string> = {};
-  const re = /:([a-zA-Z][\w-]*)[ \t]+([^:\n][^\n]*?)(?=[ \t]+:[a-zA-Z]|$)/g;
-  for (const m of header.matchAll(re)) {
-    props[m[1].toLowerCase()] = m[2].trim();
+/** Parse `attr="value"` pairs from a tag's attribute string. */
+function parseAttrs(s: string): Record<string, string> {
+  const attrs: Record<string, string> = {};
+  const re = /([a-zA-Z][\w-]*)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+  for (const m of s.matchAll(re)) {
+    if (!m[1]) continue;
+    attrs[m[1]] = m[2] ?? m[3] ?? m[4] ?? "";
   }
-  const type = props.type ?? "";
-  delete props.type;
-  return { type, props };
+  return attrs;
 }

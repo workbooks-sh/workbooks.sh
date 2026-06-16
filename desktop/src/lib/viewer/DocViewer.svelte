@@ -15,7 +15,6 @@
   import WaveletPlayer from "./WaveletPlayer.svelte";
   import CodeView from "./CodeView.svelte";
   import TextView from "./TextView.svelte";
-  import OrgEditor from "$lib/org-renderer/OrgEditor.svelte";
   import AgentTabView from "./AgentTabView.svelte";
   import WaldoPanel from "$lib/components/WaldoPanel.svelte";
 
@@ -56,7 +55,7 @@
     {:else if tab.kind === "wavelet"}
       <WaveletPlayer path={tab.path} />
     {:else if tab.kind === "org"}
-      <OrgEditor path={tab.path} tabId={tab.id} />
+      <CodeView path={tab.path} />
     {:else if tab.kind === "code"}
       <CodeView path={tab.path} />
     {:else}
