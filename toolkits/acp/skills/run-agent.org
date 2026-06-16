@@ -1,0 +1,64 @@
+#+TITLE: acp — run-agent
+
+* When to use this
+  :PROPERTIES:
+  :NETWORK:     yes
+  :DESTRUCTIVE: yes
+  :REQUIRES:    krunvm, WB_ACP_EXPERIMENTAL=1, a connected coding agent
+  :OS:          macOS
+  :COST:        runs against the user's own coding-agent subscription
+  :END:
+
+  Hand a task + a worktree to a connected coding agent (Codex / Claude Code) running
+  in an isolated local microVM. Use for autonomous, multi-step changes you want a
+  full external agent to make on a checkout.
+
+* The mental model
+  One command boots a throwaway microVM, mounts the worktree at =/work=, copies the
+  agent's auth in, runs the agent against the task, and tears the VM down. The
+  worktree edits persist on the host; nothing else is shared. The VM — not the
+  agent's inner sandbox — is the isolation boundary.
+
+* Workflow
+
+  #+CAPTION: 1. Confirm a coding agent is connected (else stop + tell the user)
+  #+begin_src bash :role pre
+  # The orchestrator refuses if nothing is connected. Don't proceed without one.
+  test "${WB_ACP_EXPERIMENTAL:-}" = "1" || { echo "acp is experimental — WB_ACP_EXPERIMENTAL=1 required"; exit 1; }
+  #+end_src
+
+  #+CAPTION: 2. Run the agent in a microVM against a worktree
+  #+begin_src bash
+  # acp-run.sh <codex|claude> <worktree-dir> <task...>
+  # Boots the VM, installs+authenticates the agent (codex from ~/.codex; claude via
+  # the macOS-Keychain bridge), runs it, prints the transcript. Worktree edits land
+  # on the host. Default sandbox is danger-full-access (the VM is the boundary).
+  WB_ACP_EXPERIMENTAL=1 runtime/acp-local/acp-run.sh codex "$WORKTREE" "$TASK"
+  #+end_src
+
+  #+CAPTION: 3. Inspect what the agent changed
+  #+begin_src bash :role post
+  git -C "$WORKTREE" status --short
+  git -C "$WORKTREE" diff
+  #+end_src
+
+* Common pitfalls
+  - **`refusing: set WB_ACP_EXPERIMENTAL=1`** — the gate; export it.
+  - **"no ~/.codex/auth.json" / "no Claude Code keychain credential"** — the agent
+    isn't signed in on the host. Tell the user to connect/sign in (desktop
+    Integrations) first; do not try to authenticate from inside the agent.
+  - **First run is slow (~1–2 min)** — the microVM installs the agent on first boot
+    (the bare node base). Subsequent design (prebuilt image) is faster; not a hang.
+  - **Don't pass secrets in the task** — the agent already has the user's auth via
+    the mounted copy; never echo keys into the prompt.
+  - **Worktree, not the whole repo** — point it at a scratch worktree, not your main
+    checkout, so the agent's edits are easy to review/revert.
+
+* Verification checklist
+  - [ ] A coding agent was connected before invoking.
+  - [ ] The task + worktree were explicit; the agent ran to completion.
+  - [ ] `git status`/`diff` in the worktree shows the expected edits and nothing stray.
+
+* See also
+  - =overview= — the isolation model + when to reach for this.
+  - =runtime/acp-local/README.md= — the host scaffold, auth ladder, and gotchas.

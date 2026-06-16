@@ -179,7 +179,23 @@ defmodule Workbooks.HarnessCreds do
          function_exported?(Workbooks.DesktopBridge, :call, 2) do
       apply(Workbooks.DesktopBridge, :call, [cmd, args])
     else
-      Logger.warning("HarnessCreds :desktop backend selected but no DesktopBridge — falling back to :file")
+      desktop_fallback(cmd, args)
+    end
+  end
+
+  # FIX (cloud-enable gap #7): the :desktop backend falling back to the co-located :file store re-introduces
+  # the shared store the multi-tenant guard forbids. In a MULTI-TENANT posture a missing DesktopBridge is a
+  # HARD FAILURE — never silently pool every tenant's subscription tokens into one file. On a single-user
+  # desktop (not multi-tenant) the :file fallback is the documented runtime-local store and is allowed.
+  defp desktop_fallback(cmd, args) do
+    if Workbooks.Tenancy.multi?() do
+      raise ArgumentError,
+            "HarnessCreds :desktop backend selected (WB_HARNESS_CREDS=desktop) but NO DesktopBridge is present " <>
+              "in a MULTI-TENANT posture. Refusing to fall back to the co-located :file store (it would pool " <>
+              "every tenant's subscription tokens). Configure the desktop/keychain bridge for a hosted runtime."
+    else
+      Logger.warning("HarnessCreds :desktop backend selected but no DesktopBridge — falling back to :file (single-tenant)")
+
       case cmd do
         "harness_creds_get" -> file_get(args.user, args.provider)
         "harness_creds_put" -> file_put(args.user, args.provider, args.blob)

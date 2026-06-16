@@ -9,10 +9,9 @@
 
   let name = $state('nova');
   let region = $state('sfo');
-  let plan = $state('Starter · 1 GB');
-  let est = $state(20);
-  let storageOn = $state(false);
-  let dbOn = $state(false);
+  let size = $state('1 GB');
+  let dbOn = $state(true); // a database comes with every nexus; toggle off if you don't want one
+  let deploying = $state(false);
 
   const REGIONS = [
     { id: 'sfo', label: '🌉 sfo' },
@@ -20,15 +19,14 @@
     { id: 'fra', label: '🇩🇪 fra' },
     { id: 'sin', label: '🇸🇬 sin' }
   ];
-  const PLANS = [
-    { id: 'Starter · 1 GB',   nm: 'Starter',   pr: 20,  ds: '1 GB · scale-to-zero · for one app or agent' },
-    { id: 'Pro · 2 GB',       nm: 'Pro',       pr: 45,  ds: '2 GB · always-warm option · more burst' },
-    { id: 'Dedicated · 4 GB', nm: 'Dedicated', pr: 120, ds: 'isolated host · strongest boundary' }
+  // A nexus is one isolated micro-VM; "size" is its compute (RAM). It draws from your
+  // plan's compute — bigger sizes use more of it. No per-nexus subscription here; your
+  // plan is the bill.
+  const SIZES = [
+    { id: '1 GB', nm: 'Small',  ds: '1 GB · a project or a few agents' },
+    { id: '2 GB', nm: 'Medium', ds: '2 GB · a busy app · more headroom' },
+    { id: '4 GB', nm: 'Large',  ds: '4 GB · heavy workloads · dedicated' }
   ];
-
-  function selectPlan(p) { plan = p.id; est = p.pr; }
-
-  let deploying = $state(false);
 
   async function deploy() {
     if (deploying) return;
@@ -38,7 +36,7 @@
     onclose?.();
     toast('Provisioning your nexus…');
     try {
-      const nx = await nexusStore.provision({ region: flyRegion, plan });
+      const nx = await nexusStore.provision({ name: name.trim(), region: flyRegion, plan: size, database: dbOn });
       toast(`${nx.name} is provisioning`);
       goto('/nexuses/' + nx.id);
     } catch {
@@ -53,7 +51,7 @@
   <div class="modal" onclick={(e) => { if (e.target === e.currentTarget) onclose?.(); }}>
     <div class="sheet">
       <h2>New nexus</h2>
-      <p class="sub">A hosted runtime that builds and runs your workbooks. Sleeps when idle.</p>
+      <p class="sub">A hosted runtime that builds and runs your workbooks.</p>
 
       <div class="lab">Name</div>
       <div class="field"><input bind:value={name} placeholder="my-nexus" /></div>
@@ -65,33 +63,28 @@
         {/each}
       </div>
 
-      <div class="lab">Plan</div>
+      <div class="lab">Size</div>
       <div class="plans">
-        {#each PLANS as p}
-          <div class="plan" class:sel={plan === p.id} onclick={() => selectPlan(p)}>
-            <div class="nm">{p.nm}</div>
-            <div class="pr">${p.pr}<small>/mo</small></div>
-            <div class="ds">{p.ds}</div>
+        {#each SIZES as s}
+          <div class="plan" class:sel={size === s.id} onclick={() => (size = s.id)}>
+            <div class="nm">{s.nm}</div>
+            <div class="pr">{s.id}</div>
+            <div class="ds">{s.ds}</div>
           </div>
         {/each}
       </div>
 
-      <div class="lab">Addons</div>
+      <div class="lab">Database</div>
       <div class="addon">
-        <div class="info"><b>Object storage</b><p>Zero-egress storage for images &amp; files</p></div>
-        <div class="pr">$0.015/GB</div>
-        <div class="tog" class:on={storageOn} onclick={() => (storageOn = !storageOn)}><i></i></div>
-      </div>
-      <div class="addon">
-        <div class="info"><b>Managed Postgres</b><p>Real backend, scales to zero with the nexus</p></div>
-        <div class="pr">+$10/mo</div>
+        <div class="info"><b>Postgres database</b><p>Comes with every nexus — turn it off if you don’t need one</p></div>
+        <div class="pr">included</div>
         <div class="tog" class:on={dbOn} onclick={() => (dbOn = !dbOn)}><i></i></div>
       </div>
 
-      <div class="note">Prices are illustrative placeholders — final numbers come from load-testing real tenant cost. You're billed on active compute, not idle time.</div>
+      <div class="note">Egress-free object storage and your database are included — storage comes from your plan. Unlimited users and workspaces. A nexus is its own isolated micro-VM.</div>
 
       <div class="foot">
-        <div class="est">Base <b>${est}/mo</b> + metered usage</div>
+        <div class="est">Included in your plan</div>
         <div style="display:flex;gap:8px">
           <button class="btn" onclick={() => onclose?.()}>Cancel</button>
           <button class="btn primary" onclick={deploy}>Deploy nexus</button>

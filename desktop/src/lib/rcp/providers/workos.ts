@@ -34,3 +34,22 @@ export function cloudClient(baseUrl: string, brokerUrl: string): RcpClient {
   const target: RcpTarget = { getBaseUrl: () => baseUrl, auth: workosAdapter(brokerUrl) };
   return new RcpClient(target);
 }
+
+/** A token source with NO renew — for BACKGROUND reads (the org list) that must never
+ *  pop an interactive sign-in. Returns null once the session is expired/absent; the
+ *  caller degrades gracefully (shows Personal only) instead of re-prompting. */
+function workosTokenSourceReadOnly(): OidcTokenSource {
+  const toTok = (s: { bearer: string; expires_at: number } | null) =>
+    s ? { bearer: s.bearer, expiresAt: s.expires_at } : null;
+  return { current: async () => toTok(await loadStoredSession()) };
+}
+
+/** Read-only cloud client — for polling `/api/platform/me` etc. without ever
+ *  triggering a sign-in dialog (e.g. when the nexus popover opens). */
+export function cloudClientReadOnly(baseUrl: string): RcpClient {
+  const target: RcpTarget = {
+    getBaseUrl: () => baseUrl,
+    auth: new OidcAdapter(workosTokenSourceReadOnly()),
+  };
+  return new RcpClient(target);
+}

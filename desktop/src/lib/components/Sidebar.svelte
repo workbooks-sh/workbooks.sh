@@ -482,7 +482,7 @@
   const accountRow = $derived.by(() => {
     if (auth.status === "signed-in")
       return { label: "Signed in", dot: "ok" as const };
-    if (auth.status === "sidecar-offline")
+    if (auth.sidecarOffline)
       return { label: "Unavailable", dot: "warn" as const };
     if (auth.status === "checking")
       return { label: "Checking…", dot: "pending" as const };
@@ -499,7 +499,7 @@
   const accountLabel = $derived.by(() => {
     if (auth.status === "signed-in")
       return auth.user?.displayName ?? auth.user?.email ?? "Account";
-    if (auth.status === "sidecar-offline") return "Engine offline";
+    if (auth.sidecarOffline) return "Engine offline";
     if (auth.status === "checking") return "Checking…";
     return "Sign in";
   });
@@ -585,12 +585,12 @@
   {/if}
 
   <div class="sb-body">
-  <!-- Workspace header. Hub: the icon-rail IS the switcher → plain label.
-       Map: the clickable switcher dropdown. Shelf: nothing here — the
-       selector lives in the titlebar (optimised for one / few workspaces). -->
+  <!-- Workspace switcher — ALWAYS at the top of the sidebar. Hub: the icon-rail IS
+       the switcher → plain label. Shelf + Map: the clickable switcher dropdown (the
+       titlebar no longer carries the workspace selector). -->
   {#if nav.layout === "hub"}
     <div class="ws-label-hub">{workspaceName || "Workspace"}</div>
-  {:else if nav.layout === "map"}
+  {:else}
   <button
     type="button"
     class="ws-header"
@@ -849,7 +849,7 @@
           {:else}
             <span class="account-avatar lg2">{accountInitial()}</span>
           {/if}
-        {:else if auth.status === "sidecar-offline"}
+        {:else if auth.sidecarOffline}
           <span class="account-anon lg2 offline">
             <ArrowsClockwise size={14} weight="fill" class={accountBusy ? "spinning" : ""} />
           </span>
@@ -1049,7 +1049,9 @@
 <style>
   .sidebar {
     flex-shrink: 0;
-    width: 232px;
+    /* Fill the resizable host (.sidebar-host owns the width); don't pin a fixed
+     * width here or the host resizes but the content doesn't follow. */
+    width: 100%;
     height: 100%;
     min-height: 100%;
     display: flex;
@@ -1076,7 +1078,7 @@
   }
 
   /* ── Hub — workspace icon-rail ───────────────────────────────────── */
-  .layout-hub { width: 288px; }
+  .layout-hub { width: 100%; }
   .ws-rail {
     flex: 0 0 52px;
     display: flex;

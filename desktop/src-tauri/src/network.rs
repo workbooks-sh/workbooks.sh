@@ -12,6 +12,7 @@ use std::path::PathBuf;
 
 const KC_SERVICE: &str = "sh.workbooks.identity";
 const KC_IDENTITY_SK: &str = "identity_sk";
+#[allow(dead_code)] // used only by release-build keychain storage (debug uses a file)
 const KC_WORKOS_SESSION: &str = "workos_session";
 
 fn identity_path() -> PathBuf {
@@ -226,8 +227,82 @@ fn pkce() -> (String, String) {
 /// Drive the loopback sign-in: open the browser to the broker's authorize URL
 /// (redirecting to our ephemeral localhost server), capture the `code`, then
 /// exchange it for a session bearer. The session is stashed in the keychain.
+// Session storage. RELEASE (signed) builds use the OS keychain — the secure store, and
+// signing means macOS never prompts. DEBUG builds use a local file instead: unsigned dev
+// rebuilds change the binary's signature every time, so the keychain would prompt on every
+// launch — intolerable for the dev loop. The file lives in the app data dir (dev only).
+fn session_file() -> PathBuf {
+    crate::paths::app_data_dir().join("session.json")
+}
+
+fn save_session(body: &str) -> Result<(), String> {
+    #[cfg(debug_assertions)]
+    {
+        return std::fs::write(session_file(), body).map_err(|e| e.to_string());
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
+            .map_err(|e| e.to_string())?
+            .set_password(body)
+            .map_err(|e| e.to_string())
+    }
+}
+
+fn read_session() -> Option<String> {
+    #[cfg(debug_assertions)]
+    {
+        return std::fs::read_to_string(session_file()).ok();
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Entry::new(KC_SERVICE, KC_WORKOS_SESSION).ok()?.get_password().ok()
+    }
+}
+
+fn clear_session() -> Result<(), String> {
+    #[cfg(debug_assertions)]
+    {
+        let _ = std::fs::remove_file(session_file());
+        return Ok(());
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        match Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
+            .map_err(|e| e.to_string())?
+            .delete_credential()
+        {
+            Ok(_) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+}
+
+// The branded page shown in the browser tab once the loopback catches the code — on
+// brand (paper, logo, pastel DNA edge) and self-closing, instead of a bare line of text.
+const SIGNED_IN_HTML: &str = r##"<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Signed in · Workbooks</title>
+<style>html,body{margin:0;height:100%}body{display:grid;place-items:center;background:#faf8f1;color:#121316;
+font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+.card{text-align:center;padding:40px;animation:rise .5s cubic-bezier(.22,1,.36,1) both}
+.mark{width:64px;height:64px;margin:0 auto 22px;border-radius:16px;box-shadow:0 1px 2px rgba(18,19,22,.06),0 14px 34px rgba(18,19,22,.16)}
+h1{font-size:1.6rem;font-weight:600;letter-spacing:-.02em;margin:0 0 8px}
+p{margin:0;color:rgba(18,19,22,.6);font-size:.95rem}
+.dna{position:fixed;left:0;right:0;bottom:0;height:12px;display:flex}.dna i{flex:1}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}</style></head>
+<body><div class="card"><svg class="mark" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+<rect width="320" height="320" rx="72" fill="#121316"/><path transform="translate(70 108) scale(1.586)" fill="#f7f6f1"
+d="M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z"/></svg>
+<h1>You're signed in</h1><p>You can close this tab and head back to Workbooks.</p></div>
+<div class="dna" aria-hidden="true"><i style="background:#f3c5a3"></i><i style="background:#aee5c2"></i><i style="background:#a8d4f0"></i><i style="background:#f2ddb0"></i><i style="background:#aee5c2"></i><i style="background:#a8d4f0"></i><i style="background:#f3c5a3"></i><i style="background:#d4c9f0"></i></div>
+<script>setTimeout(function(){window.close()},2000)</script></body></html>"##;
+
 #[tauri::command]
-pub fn workos_sign_in(broker_url: String) -> Result<StoredSession, String> {
+pub fn workos_sign_in(
+    app: tauri::AppHandle,
+    broker_url: String,
+    organization_id: Option<String>,
+) -> Result<StoredSession, String> {
     let server = tiny_http::Server::http("127.0.0.1:0").map_err(|e| e.to_string())?;
     let port = match server.server_addr() {
         tiny_http::ListenAddr::IP(addr) => addr.port(),
@@ -236,21 +311,28 @@ pub fn workos_sign_in(broker_url: String) -> Result<StoredSession, String> {
     let redirect = format!("http://127.0.0.1:{port}/cb");
     let (verifier, challenge) = pkce();
 
-    let authorize = format!(
+    let mut authorize = format!(
         "{}/v1/auth/authorize?response_type=code&redirect_uri={}&code_challenge={}&code_challenge_method=S256",
         broker_url.trim_end_matches('/'),
         urlencode(&redirect),
         challenge,
     );
+    // Scope the sign-in to a specific org (the org switcher); omitted for personal.
+    if let Some(org) = organization_id.as_deref().filter(|o| !o.is_empty()) {
+        authorize.push_str(&format!("&organization_id={}", urlencode(org)));
+    }
     open::that(&authorize).map_err(|e| e.to_string())?;
 
     // Block for the redirect carrying ?code=… (single request).
     let request = server.recv().map_err(|e| e.to_string())?;
     let url = request.url().to_string();
     let code = parse_query(&url, "code").ok_or("no authorization code in callback")?;
-    let _ = request.respond(tiny_http::Response::from_string(
-        "<html><body>You're signed in. You can close this tab.</body></html>",
-    ));
+    let _ = request.respond(
+        tiny_http::Response::from_string(SIGNED_IN_HTML).with_header(
+            tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..])
+                .unwrap(),
+        ),
+    );
 
     // Exchange the code for a session.
     let client = reqwest::blocking::Client::new();
@@ -272,19 +354,98 @@ pub fn workos_sign_in(broker_url: String) -> Result<StoredSession, String> {
     let session: StoredSession = resp.json().map_err(|e| e.to_string())?;
 
     let body = serde_json::to_string(&session).map_err(|e| e.to_string())?;
-    Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
-        .map_err(|e| e.to_string())?
-        .set_password(&body)
+    save_session(&body)?;
+
+    // Bring the app back to the front — the user just finished signing in the browser.
+    {
+        use tauri::Manager;
+        if let Some(w) = app.webview_windows().values().next() {
+            let _ = w.set_focus();
+        }
+    }
+    Ok(session)
+}
+
+/// Holds the pending PKCE verifier between `workos_sign_in_begin` (which opens the
+/// browser) and `workos_exchange` (which the deep-link callback triggers). One sign-in
+/// at a time; managed in lib.rs.
+#[derive(Default)]
+pub struct PkceState(pub std::sync::Mutex<Option<String>>);
+
+const APP_REDIRECT: &str = "workbooks://auth/callback";
+
+/// Deep-link sign-in, step 1: generate PKCE, stash the verifier, and open the system
+/// browser to the broker's authorize URL (which redirects back to our workbooks://
+/// scheme). The OS routes that deep link to us → JS calls `workos_exchange`.
+#[tauri::command]
+pub fn workos_sign_in_begin(
+    state: tauri::State<'_, PkceState>,
+    broker_url: String,
+    organization_id: Option<String>,
+) -> Result<(), String> {
+    let (verifier, challenge) = pkce();
+    *state.0.lock().map_err(|_| "pkce lock".to_string())? = Some(verifier);
+
+    let mut authorize = format!(
+        "{}/v1/auth/authorize?response_type=code&redirect_uri={}&code_challenge={}&code_challenge_method=S256",
+        broker_url.trim_end_matches('/'),
+        urlencode(APP_REDIRECT),
+        challenge,
+    );
+    if let Some(org) = organization_id.as_deref().filter(|o| !o.is_empty()) {
+        authorize.push_str(&format!("&organization_id={}", urlencode(org)));
+    }
+    open::that(&authorize).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Deep-link sign-in, step 2: the OS handed back `workbooks://auth/callback?code=…`.
+/// Exchange the code (with the stashed verifier) for the session, store it in the
+/// keychain, and bring the app to the front.
+#[tauri::command]
+pub fn workos_exchange(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, PkceState>,
+    broker_url: String,
+    code: String,
+) -> Result<StoredSession, String> {
+    let verifier = state
+        .0
+        .lock()
+        .map_err(|_| "pkce lock".to_string())?
+        .take()
+        .ok_or("no pending sign-in")?;
+
+    let client = reqwest::blocking::Client::new();
+    let resp = client
+        .post(format!("{}/v1/auth/exchange", broker_url.trim_end_matches('/')))
+        .json(&serde_json::json!({
+            "code": code,
+            "code_verifier": verifier,
+            "redirect_uri": APP_REDIRECT,
+        }))
+        .send()
         .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("broker exchange failed: {}", resp.status()));
+    }
+    let session: StoredSession = resp.json().map_err(|e| e.to_string())?;
+
+    let body = serde_json::to_string(&session).map_err(|e| e.to_string())?;
+    save_session(&body)?;
+
+    {
+        use tauri::Manager;
+        if let Some(w) = app.webview_windows().values().next() {
+            let _ = w.set_focus();
+        }
+    }
     Ok(session)
 }
 
 #[tauri::command]
 pub fn workos_load_session() -> Option<StoredSession> {
-    let body = Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
-        .ok()?
-        .get_password()
-        .ok()?;
+    let body = read_session()?;
     let session: StoredSession = serde_json::from_str(&body).ok()?;
     // Treat an expired session as signed-out.
     if session.expires_at != 0 && session.expires_at < crate::paths::now_ms() / 1000 {
@@ -295,13 +456,7 @@ pub fn workos_load_session() -> Option<StoredSession> {
 
 #[tauri::command]
 pub fn workos_clear_session() -> Result<(), String> {
-    match Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
-        .map_err(|e| e.to_string())?
-        .delete_credential()
-    {
-        Ok(_) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    clear_session()
 }
 
 // ── tiny URL helpers (avoid a url crate dep) ──────────────────────

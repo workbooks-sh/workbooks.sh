@@ -13,10 +13,13 @@
   import LiveBar from "$lib/components/LiveBar.svelte";
   import WorkgateModal from "$lib/workgate/WorkgateModal.svelte";
   import EnvRequestModal from "$lib/env_request/EnvRequestModal.svelte";
-  import SidecarOfflineOverlay from "$lib/auth/SidecarOfflineOverlay.svelte";
+  // No sidecar-offline overlay: engine reachability is surfaced in the
+  // titlebar engine chip / NexusPopover (down health dot), so a blocking
+  // full-page gate is redundant and conflicts with offline-first boot.
+  // Mandatory sign-in is the only hard gate (SignInGate, in +page).
   // SignInOverlay intentionally not imported — auth UI is flag-gated
   // (WB_FF_AUTH_UI, wb-aakl.3) and surfaces only via the GeneralSettings
-  // account card. The sidecar-offline overlay below is NOT auth.
+  // account card.
   // SetupWizard (in-app engine installer) is flag-gated (WB_FF_ONBOARDING,
   // wb-aakl.5) and lazily imported — the CLI owns runtime install now, so
   // a flags-off browser excludes the setup/ chunk entirely.
@@ -80,14 +83,6 @@
   <LiveBar />
 </div>
 
-<!-- Sidecar gate at the app root. Sign-in is OPTIONAL — the rail
-     avatar (and Settings → Account) are the entry points, and the
-     app stays usable in the anonymous default state. Only the
-     sidecar-unreachable overlay is a hard gate, because without
-     Workhorse we can't do anything network-adjacent. -->
-{#if auth.status === "sidecar-offline"}
-  <SidecarOfflineOverlay />
-{/if}
 
 <!-- wb-80q0.10 — Workgate approval modal. Always mounted; renders
      only when the workgate store has a pending request. Sits OUTSIDE

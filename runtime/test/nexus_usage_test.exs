@@ -66,7 +66,55 @@ defmodule Workbooks.NexusUsageTest do
     end
   end
 
+  describe "machine_load/1 (honest Fly-state load signal)" do
+    test "a stopped/scaled-down machine is genuinely 0% load" do
+      assert NexusUsage.machine_load(%{"state" => "stopped"}) == 0
+      assert NexusUsage.machine_load(%{"state" => "suspended"}) == 0
+    end
+
+    test "a started machine reports a real active load floor (> 0)" do
+      load = NexusUsage.machine_load(%{"state" => "started"})
+      assert is_integer(load) and load > 0
+    end
+
+    test "an unknown/empty machine is nil — no fabricated number" do
+      assert NexusUsage.machine_load(%{}) == nil
+      assert NexusUsage.machine_load(nil) == nil
+    end
+  end
+
   describe "rollup/2" do
+    test "idle org (stopped machine) ⇒ summary.load == 0", %{reg: reg, usage: usage} do
+      {:ok, _} =
+        NexusRegistry.register(
+          %{"id" => "nx-idle", "org_id" => "org-i", "fly_app" => "nexus-nx-idle", "fly_machine" => "m1", "state" => "running"},
+          reg
+        )
+
+      StubFly.machines(%{"nexus-nx-idle" => %{"state" => "stopped", "events" => []}})
+      r = NexusUsage.rollup("org-i", registry: reg, usage: usage, fly: StubFly)
+      assert r.summary.load == 0
+    end
+
+    test "active org (started machine) ⇒ summary.load > 0 and row carries load", %{reg: reg, usage: usage} do
+      {:ok, _} =
+        NexusRegistry.register(
+          %{"id" => "nx-hot", "org_id" => "org-h", "fly_app" => "nexus-nx-hot", "fly_machine" => "m1", "state" => "running"},
+          reg
+        )
+
+      StubFly.machines(%{"nexus-nx-hot" => %{"state" => "started", "events" => []}})
+      r = NexusUsage.rollup("org-h", registry: reg, usage: usage, fly: StubFly)
+      assert r.summary.load > 0
+      assert [%{name: "nx-hot", load: load}] = r.rows
+      assert load > 0
+    end
+
+    test "blank org → summary.load == 0", %{reg: reg, usage: usage} do
+      r = NexusUsage.rollup("", registry: reg, usage: usage, fly: StubFly)
+      assert r.summary.load == 0
+    end
+
     test "blank org → empty, all-zero rollup", %{reg: reg, usage: usage} do
       r = NexusUsage.rollup("", registry: reg, usage: usage, fly: StubFly)
       assert r.summary.nexusCount == 0

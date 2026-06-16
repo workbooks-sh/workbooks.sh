@@ -23,6 +23,8 @@
   import ToastStack from "$lib/components/ToastStack.svelte";
   import WorkspaceOnboarding from "$lib/workspace/WorkspaceOnboarding.svelte";
   import OnboardingFlow from "$lib/onboarding/OnboardingFlow.svelte";
+  import SignInGate from "$lib/auth/SignInGate.svelte";
+  import { auth } from "$lib/auth/store.svelte";
   import { setupStatus } from "$lib/bridge/setup.svelte";
   import WorkspaceSwitcher from "$lib/workspace/WorkspaceSwitcher.svelte";
   import EditNameModal from "$lib/workspace/EditNameModal.svelte";
@@ -539,10 +541,21 @@
     const forceOnboarding = new URLSearchParams(window.location.search).has(
       "onboarding",
     );
+    // A completed run is recorded BOTH durably (setup.json) and in localStorage.
+    // Honor either, so a slow/flaky durable write (common in unsigned dev builds)
+    // doesn't re-run the whole tour on every hot reload.
+    const lsDone = (() => {
+      try {
+        return !!JSON.parse(localStorage.getItem("wb.browser.prefs") || "{}").completedAt;
+      } catch {
+        return false;
+      }
+    })();
     if (forceOnboarding) firstRunDone = false;
+    else if (lsDone) firstRunDone = true;
     setupStatus()
       .then((s) => {
-        if (!forceOnboarding) firstRunDone = s.first_run_done;
+        if (!forceOnboarding) firstRunDone = s.first_run_done || lsDone;
       })
       .catch((e) => {
         // Fail-open: skip the personalization flow if the probe fails.
@@ -584,8 +597,16 @@
 
 <svelte:window onkeydown={onKey} />
 
-{#if !initialized}
+{#if !initialized || auth.status === "checking"}
+  <!-- Initial app + auth probe in flight — don't flash the sign-in
+       screen before we know whether a session already exists. -->
   <div class="loading"></div>
+{:else if auth.status !== "signed-in"}
+  <!-- Mandatory sign-in (wb-xiei.1): no workspace, no app until the
+       user has a Workbooks session. Sign-in is free; it secures their
+       data. A stored session counts even when the engine is offline
+       (offline-first), so signed-in users skip this regardless. -->
+  <SignInGate />
 {:else if needsWorkspace}
   <!-- Core file-system UX (wb-aakl.5): create the first workspace so
        packages have somewhere to live. Not a setup gate. -->
@@ -790,7 +811,7 @@
   y={createPackage.menuY}
 >
   <button class="ctx-item" onclick={() => createPackage.chooseCreate()}>
-    <PlusIcon size={13} weight="fill" /> Create new package
+    <PlusIcon size={13} weight="fill" /> New folder
   </button>
   <button class="ctx-item" onclick={() => void createPackage.chooseImport()}>
     <FolderOpen size={13} weight="fill" /> Import folder…

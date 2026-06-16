@@ -20,6 +20,7 @@
     "@workos-inc/node": "^10",
     "@workos-inc/widgets": "^1",
     "@workos/authkit-sveltekit": "^0.3.0",
+    "emoji-picker-element": "^1.29.1",
     "react": "^18",
     "react-dom": "^18"
   }

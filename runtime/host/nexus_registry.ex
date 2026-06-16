@@ -20,7 +20,7 @@ defmodule Workbooks.NexusRegistry do
   alias Workbooks.DB
 
   @table "nexuses"
-  @cols ~w(id org_id fly_app fly_machine region plan state addons neon_project_id created)
+  @cols ~w(id org_id name fly_app fly_machine region plan state addons neon_project_id created)
 
   @doc "Open the store and ensure the table exists (idempotent). Returns a DB handle."
   def open do
@@ -30,6 +30,7 @@ defmodule Workbooks.NexusRegistry do
     CREATE TABLE IF NOT EXISTS #{@table} (
       id TEXT PRIMARY KEY,
       org_id TEXT,
+      name TEXT,
       fly_app TEXT,
       fly_machine TEXT,
       region TEXT,
@@ -40,6 +41,15 @@ defmodule Workbooks.NexusRegistry do
       created INTEGER
     )
     """)
+
+    # Migration: a table created before `name` existed gets the column added.
+    try do
+      DB.execute(h, "ALTER TABLE #{@table} ADD COLUMN name TEXT")
+    rescue
+      _ -> :ok
+    catch
+      _, _ -> :ok
+    end
 
     h
   end
@@ -78,11 +88,12 @@ defmodule Workbooks.NexusRegistry do
           [] ->
             DB.query(
               h,
-              "INSERT INTO #{@table} (id, org_id, fly_app, fly_machine, region, plan, state, addons, neon_project_id, created) " <>
-                "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+              "INSERT INTO #{@table} (id, org_id, name, fly_app, fly_machine, region, plan, state, addons, neon_project_id, created) " <>
+                "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
               [
                 attrs["id"],
                 org,
+                attrs["name"] || attrs["id"],
                 attrs["fly_app"],
                 attrs["fly_machine"],
                 attrs["region"],
@@ -145,7 +156,7 @@ defmodule Workbooks.NexusRegistry do
     h = h || open()
 
     with {:ok, _current} <- get(id, org_id, h) do
-      attrs = normalize(attrs) |> Map.take(~w(fly_app fly_machine region plan state addons neon_project_id))
+      attrs = normalize(attrs) |> Map.take(~w(name fly_app fly_machine region plan state addons neon_project_id))
 
       if map_size(attrs) == 0 do
         get(id, org_id, h)

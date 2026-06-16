@@ -39,7 +39,7 @@ async function rt(path, { method = 'GET', body } = {}) {
  * @property {string} url       public hostname
  */
 
-const STATE_LABEL = { run: 'Running', sleep: 'Sleeping', build: 'Building', pause: 'Paused' };
+const STATE_LABEL = { run: 'Active', sleep: 'Idle', build: 'Starting', pause: 'Paused' };
 
 /** @type {Nexus[]} */
 const MOCK_NEXUSES = [
@@ -110,7 +110,7 @@ export async function getNexus(id) {
     const config = {
       region: nexus.region,
       plan: nexus.plan,
-      scaleToZero: 'on · 5 min idle',
+      status: nexus.state === 'run' ? 'Active' : nexus.state === 'sleep' ? 'Idle' : 'Starting',
       storage: row?.storage || '—',
       database: row?.database || 'none',
       created: '—'
@@ -131,11 +131,13 @@ export async function getNexus(id) {
 
 /**
  * Provision a REAL nexus (a Fly machine via the runtime provisioner).
- * @param {{region?: string, plan?: string}} opts
+ * `database` carries the "comes with a database" intent; full Postgres/Neon
+ * provisioning is a creds-gated follow-up (the runtime honours it when configured).
+ * @param {{region?: string, plan?: string, database?: boolean}} opts
  * @returns {Promise<Nexus>}
  */
 export async function createNexus(opts) {
-  return withSub(await plat('/nexuses', { method: 'POST', body: { region: opts.region, plan: opts.plan } }));
+  return withSub(await plat('/nexuses', { method: 'POST', body: { name: opts.name, region: opts.region, plan: opts.plan, database: opts.database } }));
 }
 
 export async function deleteNexus(id) {
@@ -149,7 +151,8 @@ export async function sleepNexus(id) {
 }
 
 const EMPTY_USAGE = {
-  summary: { monthToDate: '$0.00', compute: '$0.00', storage: '0 GB', database: '—', nexusCount: 0, activeHrs: '0.0' },
+  // `load` = % of compute capacity in use across the org's nexuses (idle ⇒ 0).
+  summary: { monthToDate: '$0.00', compute: '$0.00', storage: '0 GB', database: '—', nexusCount: 0, activeHrs: '0.0', load: 0 },
   period: 'current cycle · billed on the 1st',
   rows: []
 };
@@ -170,6 +173,34 @@ export async function listBuckets(opts = {}) {
   } catch {
     return { buckets: [], totalSize: '0 GB' };
   }
+}
+
+// ── Workspaces — FREE, named divisions within the org (Org → Nexus → Workspaces) ──
+
+/** @returns {Promise<Array<{id,name,nexus_id,created}>>} */
+export async function listWorkspaces(opts = {}) {
+  try {
+    return (await plat('/workspaces', { fetch: opts.fetch })).workspaces;
+  } catch {
+    return [];
+  }
+}
+
+export async function createWorkspace(name, opts = {}) {
+  return plat('/workspaces', { method: 'POST', body: { name, icon: opts.icon, nexus_id: opts.nexus_id } });
+}
+
+/** Patch a workspace — pass only the fields to change ({name} and/or {icon}). */
+export async function updateWorkspace(id, attrs) {
+  return plat(`/workspaces/${id}`, { method: 'PATCH', body: attrs });
+}
+
+export async function renameWorkspace(id, name) {
+  return updateWorkspace(id, { name });
+}
+
+export async function deleteWorkspace(id) {
+  return plat(`/workspaces/${id}`, { method: 'DELETE' });
 }
 
 // ── History + Restore ────────────────────────────────────────────────────────
@@ -218,13 +249,13 @@ const normChange = (c) => ({ id: c.id, when: c.when, authorType: c.author_type ?
 
 export async function nexusHistory(scope) {
   if (live()) return (await rt(`/api/history/${scope}`)).map(normChange);
-  return structuredClone(MOCK_HISTORY[scope] || []);
+  return []; // honest empty — per-nexus history streams from the tenant runtime (not yet wired)
 }
 
 /** @param {string} scope @param {string} changeId @returns {Promise<{before:string, after:string}>} */
 export async function changeDiff(scope, changeId) {
   if (live()) return rt(`/api/history/${scope}/${changeId}/diff`);
-  return structuredClone(MOCK_DIFF[changeId] || { before: '', after: '' });
+  return { before: '', after: '' };
 }
 
 /**
@@ -285,7 +316,7 @@ const MOCK_SHARED = {
 
 export async function sharedFolders() {
   if (live()) return rt('/api/shared-folders');
-  return structuredClone(MOCK_SHARED);
+  return { shareable: [], shared_by: [], shared_with: [] }; // honest empty
 }
 
 /** @param {{folder:string, recipient:string, mode?:'read'|'draft'}} opts */
@@ -333,7 +364,7 @@ const MOCK_DRAFTS = {
 
 export async function listDrafts(nexus) {
   if (live()) return rt(`/api/nexuses/${nexus}/drafts`);
-  return structuredClone(MOCK_DRAFTS[nexus] || []);
+  return []; // honest empty
 }
 
 export async function createDraft(nexus, name) {

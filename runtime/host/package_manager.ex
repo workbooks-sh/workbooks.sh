@@ -1099,6 +1099,88 @@ defmodule Workbooks.PackageManager do
     end
   end
 
+  @doc """
+  STREAMING wasm run (wb-b9xv.11) — drive the wasm CLI through an Erlang Port so the guest's stdout/stderr
+  arrive INCREMENTALLY (as the guest flushes them) instead of all-at-end. This is the host primitive a
+  long-lived `child_process.spawn()` consumes: the child stays alive, stdin is writable mid-run, exit
+  propagates.
+
+  Returns `{:ok, port, meta}` where `meta` carries the temp paths to clean up. The CALLER owns the port:
+    * receives `{port, {:data, chunk}}` messages as stdout arrives (line/byte granularity per the guest),
+    * may `Port.command(port, bytes)` to write to the guest's stdin (the Port's spawned process keeps
+      stdin open — wasmtime reads it as a pipe),
+    * receives `{port, {:exit_status, code}}` when the guest exits,
+    * may `Port.close(port)` to KILL the in-flight run (revocation / cap breach).
+
+  SECURITY: identical bounds to `run/5` — `-W timeout`/`-W fuel` DoS trap, argv/path discipline (no shell:
+  spawn_executable + an explicit argv list, NOT `sh -c`), content-addressed wasm verified by the caller
+  (CommandRegistry) before we ever spawn. NO native exec is introduced — the only executable spawned is
+  the trusted `wasmtime` binary running a REGISTERED, sha-pinned wasm guest.
+
+  HONEST GRANULARITY LIMIT: incrementality is bounded by the GUEST's flush behaviour. wasmtime does NOT
+  buffer the guest's fd_write — each WASI stdout write surfaces as a Port `{:data, _}` message as it
+  happens — but a guest that accumulates its whole answer and writes once at exit still arrives all-at-end.
+  The streaming PROTOCOL is real end-to-end; the per-chunk cadence is exactly the inner CLI's write cadence.
+  """
+  def run_streaming(wasm_path, argv, dirs \\ [], opts \\ []) when is_list(argv) do
+    cond do
+      argv_bytes(argv) > @max_argv_bytes -> {:error, {:argv_too_large, max: @max_argv_bytes}}
+      not File.regular?(wasm_path) -> {:error, {:no_wasm, wasm_path}}
+      true -> open_streaming_port(wasm_path, argv, dirs, opts)
+    end
+  end
+
+  defp open_streaming_port(wasm_path, argv, dirs, opts) do
+    timeout_ms = Keyword.get(opts, :timeout_ms, @default_run_timeout_ms)
+    fuel = Keyword.get(opts, :fuel, @default_fuel)
+    env = Keyword.get(opts, :env, [])
+
+    {argv, dirs, gosrc_dir} =
+      case go_artifact_source(wasm_path) do
+        {:ok, src} ->
+          d = Path.join(System.tmp_dir!(), "wb-gosrc-#{:erlang.unique_integer([:positive])}")
+          File.mkdir_p!(d)
+          File.write!(Path.join(d, "main.go"), src)
+          {["/gosrc/main.go" | argv], ["#{d}::/gosrc" | dirs], d}
+
+        :no ->
+          {argv, dirs, nil}
+      end
+
+    fuel_arg = if fuel in [:unlimited, 0], do: [], else: ["-W", "fuel=#{fuel}"]
+
+    wopts =
+      wasmtime_cache_args() ++
+        ["-W", "exceptions=y", "-W", "memory64=y", "-W", "timeout=#{timeout_ms}ms"] ++ fuel_arg
+
+    envs = Enum.flat_map(env, &["--env", &1])
+    parts = wopts ++ envs ++ Enum.flat_map(dirs, &["--dir", &1]) ++ [wasm_path | argv]
+
+    case System.find_executable("wasmtime") do
+      nil ->
+        if gosrc_dir, do: File.rm_rf(gosrc_dir)
+        {:error, :no_wasmtime}
+
+      bin ->
+        # spawn_executable → an explicit argv list, NO shell (no `sh -c`): no metacharacter interpretation,
+        # no injection. :stderr_to_stdout folds the guest's stderr into the stream. :exit_status delivers the
+        # guest's exit code. The port stays open with a writable stdin (Port.command) for the child's lifetime.
+        port =
+          Port.open({:spawn_executable, bin}, [
+            :binary,
+            :exit_status,
+            :stderr_to_stdout,
+            {:args, parts}
+          ])
+
+        {:ok, port, %{gosrc_dir: gosrc_dir}}
+    end
+  end
+
+  @doc "Clean up a streaming run's temp resources (call after the port closes)."
+  def cleanup_streaming(%{gosrc_dir: dir}) when is_binary(dir), do: File.rm_rf(dir)
+  def cleanup_streaming(_), do: :ok
+
   # The Go artifact's 16-byte trailer is <source length::big-64> ++ @go_magic ("WBGOSRC1",
   # defined with the build_go helpers above).
   #

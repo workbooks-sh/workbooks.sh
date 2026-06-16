@@ -109,14 +109,17 @@ defmodule Workbooks.HarnessSecurityFixesTest do
 
   # ── FIX 2: harness surface posture gate ─────────────────────────────────────────────────────────
 
-  describe "FIX 2 — harness surface is posture-gated (not always-on)" do
-    test "Harness.enabled? is FALSE under a multi-tenant posture even with WB_HARNESS=1" do
-      with_env(%{"WB_HARNESS" => "1", "WB_TENANCY_MODE" => "multi"}, fn ->
-        refute Harness.enabled?()
+  describe "FIX 2 — harness surface is posture-gated (relaxed: permitted in multi-tenant behind isolation)" do
+    # acp-cloud-enable: the blanket `not multi?` guard is DROPPED. The harness surface is now PERMITTED in a
+    # multi-tenant hosted posture because per-tenant isolation (HarnessPool cap + verified-tenant binding +
+    # TenantBudget) is the safety, not the on/off switch.
+    test "Harness.enabled? is TRUE under a multi-tenant posture (per-tenant isolation is the safety)" do
+      with_env(%{"WB_HARNESS" => nil, "WB_DESKTOP" => nil, "WB_TENANCY_MODE" => "multi"}, fn ->
+        assert Harness.enabled?()
       end)
     end
 
-    test "Harness.enabled? is FALSE when neither WB_DESKTOP nor WB_HARNESS is set (single-tenant)" do
+    test "Harness.enabled? is FALSE when neither WB_DESKTOP nor WB_HARNESS is set (bare single-tenant)" do
       with_env(%{"WB_HARNESS" => nil, "WB_DESKTOP" => nil, "WB_TENANCY_MODE" => "single"}, fn ->
         refute Harness.enabled?()
       end)
@@ -128,13 +131,17 @@ defmodule Workbooks.HarnessSecurityFixesTest do
       end)
     end
 
-    test "the application child list excludes ExecLoopback under a multi-tenant posture" do
-      with_env(%{"WB_HARNESS" => "1", "WB_TENANCY_MODE" => "multi"}, fn ->
-        refute Harness.enabled?()
+    test "the application starts ExecLoopback in BOTH single-desktop and multi-tenant, off in bare single" do
+      with_env(%{"WB_HARNESS" => nil, "WB_DESKTOP" => nil, "WB_TENANCY_MODE" => "multi"}, fn ->
+        assert Harness.enabled?()
       end)
 
       with_env(%{"WB_HARNESS" => "1", "WB_TENANCY_MODE" => "single"}, fn ->
         assert Harness.enabled?()
+      end)
+
+      with_env(%{"WB_HARNESS" => nil, "WB_DESKTOP" => nil, "WB_TENANCY_MODE" => "single"}, fn ->
+        refute Harness.enabled?()
       end)
     end
   end

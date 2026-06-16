@@ -43,7 +43,7 @@ defmodule Workbooks.HarnessSession do
   @idle_ms 5 * 60_000
   @default_timeout 30_000
 
-  defstruct [:wasm, :sm_pid, :session_id, :exec_token, :grant, last_active_ms: 0]
+  defstruct [:wasm, :sm_pid, :session_id, :exec_token, :grant, :workdir, last_active_ms: 0]
 
   # ── public API ───────────────────────────────────────────────────────────────────────────────
 
@@ -53,6 +53,10 @@ defmodule Workbooks.HarnessSession do
     * `:exec`       — exec/llm grant `[allow: true, commands: …, principal: …]`. Mints ONE long-lived
                       ExecLoopback token for the SESSION (revoked on terminate), so the resident harness can
                       make many tool calls + LLM fetches across the turn without re-minting per round-trip.
+    * `:fs`         — fs grant `[workdir: "/abs/dir", principal: …]`. Folds a confined `:workdir` into the
+                      SAME session token's grant so `require('node:fs')` / `'fs/promises'` work on the resident
+                      heap, routed over the pinned sentinel to `/__wb/fs`, confined to the workdir. The fs and
+                      exec/LLM caps ride ONE token (one mint, one revoke) for the whole session.
   Returns `{:ok, pid}`. The cold-start (instantiate the ~10MB SM component) is paid HERE, once.
   """
   def start_link(opts \\ []) do
@@ -125,10 +129,12 @@ defmodule Workbooks.HarnessSession do
   def init(opts) do
     session_id = Keyword.get(opts, :session_id, make_ref())
     exec_opts = Keyword.get(opts, :exec, nil)
+    fs_opts = Keyword.get(opts, :fs, nil)
+
+    {exec_token, grant, workdir} = maybe_mint(exec_opts, fs_opts)
 
     with {:ok, wasm} <- JsEngine.build_host(),
-         {:ok, sm_pid} <- instantiate(wasm) do
-      {exec_token, grant} = maybe_mint(exec_opts)
+         {:ok, sm_pid} <- instantiate(wasm, grant) do
 
       {:ok,
        %__MODULE__{
@@ -137,6 +143,7 @@ defmodule Workbooks.HarnessSession do
          session_id: session_id,
          exec_token: exec_token,
          grant: grant,
+         workdir: workdir,
          last_active_ms: now()
        }, @idle_ms}
     else
@@ -154,24 +161,38 @@ defmodule Workbooks.HarnessSession do
   def handle_call(:exec_token, _from, st), do: {:reply, st.exec_token, st, @idle_ms}
 
   def handle_call({:boot, harness_js, opts}, _from, st) do
-    # exec seam = the SESSION token (reused across every round-trip this session makes). The LLM endpoint
-    # shares the same pinned sentinel host + token gate, exposed to the harness as __wbHarness.{llmUrl,token}.
+    # KEYSTONE: the resident agent loop reaches the host over the SYNCHRONOUS host-import seam
+    # (`globalThis.__wbHostCall`, wired into this instance's grant at instantiate) — NOT the wasi:http loopback.
+    # The legacy ExecLoopback fetch seam (sentinel/llm URL + token) is still exposed for FALLBACK on a legacy
+    # eval-host, but it is now BEST-EFFORT: if the loopback listener isn't running (e.g. unit tests that don't
+    # supervise it), boot must NOT crash — the host-import carries the loop. So the seam URLs are nil when the
+    # listener is down, and the shims silently prefer __wbHostCall anyway.
+    # Always pass a seam MAP when the session carries a token — node_boot_payload's `{seam, _}` branch registers
+    # the child_process + fs shims off this (no NEW token mint). The `url` is best-effort: the loopback URL when
+    # the listener is up (legacy fetch fallback), else "" — the shims prefer __wbHostCall and never read the url
+    # under the host-import, so an empty url is harmless.
     exec_seam =
-      if st.exec_token, do: %{"url" => ExecLoopback.sentinel_url(), "token" => st.exec_token}, else: nil
+      if st.exec_token,
+        do: %{"url" => safe_sentinel_url() || "", "token" => st.exec_token},
+        else: nil
 
     boot_opts =
       [env: Keyword.get(opts, :env, %{}), argv: Keyword.get(opts, :argv, ["node", "harness"])]
       |> then(fn o -> if exec_seam, do: Keyword.put(o, :exec_seam, exec_seam), else: o end)
+      # the session's confined fs root rides the SAME grant; pass it so node_boot_payload registers the SM fs
+      # shim (require('node:fs')/'fs/promises') on this resident heap. nil => no fs shim, fs ops would 403.
+      |> then(fn o -> if st.workdir, do: Keyword.put(o, :fs, workdir: st.workdir), else: o end)
 
     case JsEngine.node_boot_payload(boot_opts) do
       {:ok, boot_js, _token} ->
         # 1) install the Node platform (require/process/Buffer/__wbExec) on the live heap;
-        # 2) expose the LLM seam the harness reads;
+        # 2) expose the (best-effort) LLM fallback seam the harness reads when no host-import is present;
         # 3) eval the harness JS (installs the resident harness object).
         llm_seam =
-          if st.exec_token,
-            do: Jason.encode!(%{"llmUrl" => ExecLoopback.llm_url(), "token" => st.exec_token}),
-            else: "null"
+          case st.exec_token && safe_llm_url() do
+            lurl when is_binary(lurl) -> Jason.encode!(%{"llmUrl" => lurl, "token" => st.exec_token})
+            _ -> "null"
+          end
 
         platform = boot_js <> "\nglobalThis.__wbHarness=" <> llm_seam <> ";\n'platform-ready'"
 
@@ -190,7 +211,7 @@ defmodule Workbooks.HarnessSession do
   def handle_call(:recycle, _from, st) do
     if Process.alive?(st.sm_pid), do: Process.exit(st.sm_pid, :normal)
 
-    case instantiate(st.wasm) do
+    case instantiate(st.wasm, st.grant) do
       {:ok, sm_pid} -> {:reply, :ok, %{st | sm_pid: sm_pid, last_active_ms: now()}, @idle_ms}
       {:error, reason} -> {:stop, {:recycle_failed, reason}, {:error, reason}, st}
     end
@@ -206,47 +227,66 @@ defmodule Workbooks.HarnessSession do
   def terminate(_reason, st) do
     if st.exec_token, do: ExecLoopback.revoke(st.exec_token)
     if st.sm_pid && Process.alive?(st.sm_pid), do: Process.exit(st.sm_pid, :normal)
+    # release the per-tenant resident-instance pool slot (gap #1) so an idle-evicted/crashed session frees its
+    # tenant's cap. The slot is keyed by the namespaced session id, which (under HarnessPool) IS st.session_id.
+    if is_binary(st.session_id) and Code.ensure_loaded?(Workbooks.HarnessPool),
+      do: Workbooks.HarnessPool.release(st.session_id)
+
     :ok
   end
 
   # ── internals ────────────────────────────────────────────────────────────────────────────────
 
-  # The whole point: NO `after Process.exit`. Keep the pid alive for the session's lifetime.
-  defp instantiate(wasm) do
+  # The whole point: NO `after Process.exit`. Keep the pid alive for the session's lifetime. The session GRANT
+  # is bound into the synchronous host-broker import (`wb:jseval/broker.host-call`) HOST-SIDE, so the resident
+  # agent loop's llm/fs/exec ops run through that sync import (host performs them in-call) rather than guest
+  # wasi:http — which is what lets run() be re-entered across many turns with NO recycle (the keystone fix).
+  defp instantiate(wasm, grant) do
     case Wasmex.Components.start_link(%{
            path: wasm,
-           wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}
+           wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true},
+           imports: JsEngine.host_broker_imports(grant)
          }) do
       {:ok, pid} -> {:ok, pid}
       {:error, reason} -> {:error, {:instantiate_failed, reason}}
     end
   end
 
-  defp maybe_mint(nil), do: {nil, nil}
+  # Mint ONE session token carrying BOTH the exec/LLM grant AND the (optional) confined fs workdir. Either
+  # cap alone is enough to mint (an fs-only session is valid: it can fetch the LLM seam + read/write its
+  # workdir without spawning). No grant at all => no token. Returns {token | nil, grant | nil, workdir | nil}.
+  defp maybe_mint(nil, nil), do: {nil, nil, nil}
 
-  defp maybe_mint(exec_opts) when is_list(exec_opts) do
+  defp maybe_mint(exec_opts, fs_opts) do
+    exec_opts = exec_opts || []
+    fs_opts = fs_opts || []
     allow = Keyword.get(exec_opts, :allow, false)
+    workdir = JsEngine.fs_workdir!(fs_opts)
+
+    # principal: an exec-capable grant MUST carry one (broker rate/concurrency/revoke handle); otherwise prefer
+    # whichever opt list supplies it (fs ops are principal-revocable too).
+    principal =
+      if allow,
+        do: require_principal!(true, exec_opts),
+        else: Keyword.get(exec_opts, :principal) || Keyword.get(fs_opts, :principal)
 
     grant = %{
       allow: allow,
       commands: Keyword.get(exec_opts, :commands, :all),
-      # FIX 1 (principal-OPTIONAL minting): an exec-capable session grant (`allow: true`) MUST carry a
-      # non-nil principal (the tenant/session id) — it is the broker's only handle for rate-limit /
-      # concurrency-cap / revocation. ExecLoopback.mint/1 enforces the same; required here too.
-      principal: require_principal!(allow, exec_opts),
+      principal: principal,
       depth: Keyword.get(exec_opts, :depth, 0),
       # SLICE 3: per-(user, provider) creds scope for dock.creds.{get,put}. The harness can only touch the
       # user+provider the host granted — one tenant's grant never reaches another's keychain blob.
-      creds_scope: Keyword.get(exec_opts, :creds_scope, nil)
+      creds_scope: Keyword.get(exec_opts, :creds_scope, nil),
+      # headless-JS path: the confined fs root. nil => every /__wb/fs op 403s (no fs reach).
+      workdir: workdir
     }
 
-    {ExecLoopback.mint(grant), grant}
+    {ExecLoopback.mint(grant), grant, workdir}
   end
 
   # An exec-capable session grant (`allow: true`) MUST carry a non-nil principal; refuse to mint one
-  # without it (see FIX 1). A non-exec grant keeps its principal unchanged.
-  defp require_principal!(false, exec_opts), do: Keyword.get(exec_opts, :principal)
-
+  # without it (see FIX 1) — it is the broker's only handle for rate-limit / concurrency-cap / revocation.
   defp require_principal!(true, exec_opts) do
     case Keyword.get(exec_opts, :principal) do
       p when is_binary(p) and p != "" ->
@@ -261,6 +301,21 @@ defmodule Workbooks.HarnessSession do
   defp normalize({:ok, _} = ok), do: ok
   defp normalize({:error, _} = err), do: err
   defp normalize(other), do: {:error, other}
+
+  # Best-effort loopback URLs for the LEGACY fetch fallback seam. nil when the ExecLoopback listener isn't
+  # running (unit tests, host-import-only deployments) — boot must not crash, since the resident loop reaches
+  # the host over the synchronous host-import, not these URLs.
+  defp safe_sentinel_url do
+    ExecLoopback.sentinel_url()
+  rescue
+    _ -> nil
+  end
+
+  defp safe_llm_url do
+    ExecLoopback.llm_url()
+  rescue
+    _ -> nil
+  end
 
   defp now, do: System.monotonic_time(:millisecond)
 end

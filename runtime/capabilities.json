@@ -258,12 +258,12 @@
           "failure_modes": []
         },
         {
-          "name": "ACP external-CLI orchestration (wb-d2nx.7)",
-          "status": "gated",
-          "tests": "—",
+          "name": "ACP / in-wasm harness surface (wb-b9xv) — EXPERIMENTAL (v2, NOT production)",
+          "status": "experimental",
+          "tests": "harness_session, host_broker_keystone_fixes, harness_multitenant_isolation, harness_streaming_loopback, harness_security_fixes",
           "units": 0,
-          "proof": "needs host-brokered external-exec broker",
-          "failure_modes": []
+          "proof": "SLICE 1/2/3 + keystone + multi-tenant isolation PROVEN in dev/test, but gated OFF in production: Workbooks.Harness.enabled? requires experimental?() (WB_ACP_EXPERIMENTAL=1; defaults OFF in MIX_ENV=prod). Retained behind the flag; not shipped, not published. Major security review still owed before any v2 go-live.",
+          "failure_modes": ["external-CLI orchestration (Claude Code/Codex) unverified", "subscription-auth brokering (HarnessCreds :desktop) deferred", "multi-tenant exposure pending a dedicated v2 security review"]
         }
       ]
     }

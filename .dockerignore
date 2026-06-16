@@ -7,7 +7,12 @@
 .git
 .beads
 desktop
-web
+# `web/*` (contents, not the bare `web` dir) so the one re-include below actually takes —
+# BuildKit can't un-prune a file from a fully-excluded directory (cf. jq.wasm below).
+web/*
+# …except the bundle loader, which host/bundle.ex inlines at compile time (the runtime
+# image build COPYs it to /web/wb-bundle-loader.js — see ci/Dockerfile.runtime).
+!web/wb-bundle-loader.js
 **/node_modules
 **/erl_crash.dump
 

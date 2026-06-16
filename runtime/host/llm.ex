@@ -50,28 +50,97 @@ defmodule Workbooks.Llm do
     retries = opts[:retries] || 2
     deadline = (retries + 1) * 120_000 + 15_000
     t0 = System.monotonic_time(:millisecond)
-    task = Task.async(fn -> if on_delta, do: post_stream(body, on_delta, retries), else: post(body, retries) end)
+    key = resolve_key(opts)
+    principal = opts[:principal]
 
-    result =
-      case Task.yield(task, deadline) || Task.shutdown(task, :brutal_kill) do
-        {:ok, r} -> r
-        {:exit, reason} -> {:error, {:llm_crash, reason}}
-        nil -> {:error, :llm_hard_timeout}
+    # PER-TENANT LLM BUDGET (cloud-enable gaps #4/#5): in a multi-tenant posture, refuse the turn UP FRONT if
+    # the tenant has already breached its rolling-window LLM-token ceiling (a tenant cannot run unbounded LLM
+    # spend on the platform key). No-op single-tenant / nil-principal. The actual tokens spent are metered
+    # AFTER the turn from the parsed usage, so the ceiling reflects real spend over the window.
+    if budget_pre_denied?(principal) do
+      Logger.info("Llm.complete: tenant LLM budget exceeded for principal #{inspect(principal)}")
+      {:error, :budget_exceeded}
+    else
+      task = Task.async(fn -> if on_delta, do: post_stream(body, on_delta, retries, key), else: post(body, retries, key) end)
+
+      result =
+        case Task.yield(task, deadline) || Task.shutdown(task, :brutal_kill) do
+          {:ok, r} -> r
+          {:exit, reason} -> {:error, {:llm_crash, reason}}
+          nil -> {:error, :llm_hard_timeout}
+        end
+
+      meter_usage(principal, result)
+      ms = System.monotonic_time(:millisecond) - t0
+
+      if ms > 30_000 or match?({:error, _}, result) do
+        Logger.info("Llm.complete: #{inspect(elem(result, 0))} after #{ms}ms")
       end
 
-    ms = System.monotonic_time(:millisecond) - t0
-
-    if ms > 30_000 or match?({:error, _}, result) do
-      Logger.info("Llm.complete: #{inspect(elem(result, 0))} after #{ms}ms")
+      result
     end
-
-    result
   end
 
-  defp post(body, retries) do
+  # Up-front budget check: deny the turn when the tenant's LLM-token window is already over the ceiling. The
+  # 0-cost probe never debits — it only reads whether the window total already exceeds the cap.
+  defp budget_pre_denied?(principal) when is_binary(principal) and principal != "" do
+    Workbooks.TenantBudget.spent(principal, :llm) > Workbooks.TenantBudget.llm_budget() and
+      Workbooks.Tenancy.multi?()
+  end
+
+  defp budget_pre_denied?(_), do: false
+
+  # Charge the tenant's LLM budget the REAL tokens this turn spent (prompt+completion), parsed from usage.
+  defp meter_usage(principal, {:ok, %{usage: usage}}) when is_binary(principal) and principal != "" do
+    tokens = total_tokens(usage)
+    if tokens > 0, do: Workbooks.TenantBudget.charge(principal, :llm, tokens)
+    :ok
+  end
+
+  defp meter_usage(_principal, _result), do: :ok
+
+  defp total_tokens(usage) when is_map(usage) do
+    get_n(usage, "total_tokens") ||
+      get_n(usage, "prompt_tokens", 0) + get_n(usage, "completion_tokens", 0)
+  end
+
+  defp total_tokens(_), do: 0
+
+  defp get_n(map, key, default \\ nil) do
+    case Map.get(map, key) do
+      n when is_integer(n) -> n
+      _ -> default
+    end
+  end
+
+  # Resolve the OpenRouter key for THIS call, host-side (never crosses the membrane):
+  #   1. an explicit `:api_key` opt (caller already resolved it), else
+  #   2. the TENANT's own key — a Vars secret `OPENROUTER_API_KEY` scoped to `:principal`
+  #      (the tenant/session id). Host-side raw read (`Vars.host_secret/2`), so every tenant
+  #      bills/authenticates as ITSELF rather than as the platform, else
+  #   3. the platform key (`Workbooks.Secrets`) — the intended fallback for single-tenant /
+  #      unconfigured tenants.
+  # Public for the per-tenant-key PoC (`HostBrokerKeystoneFixesTest`) to assert the REAL selection.
+  @doc false
+  def resolve_key(opts) do
+    cond do
+      is_binary(opts[:api_key]) and opts[:api_key] != "" -> opts[:api_key]
+      true -> tenant_key(opts[:principal]) || Workbooks.Secrets.get("OPENROUTER_API_KEY", "")
+    end
+  end
+
+  defp tenant_key(principal) when is_binary(principal) and principal != "" do
+    case Workbooks.Vars.host_secret(principal, "OPENROUTER_API_KEY") do
+      v when is_binary(v) and v != "" -> v
+      _ -> nil
+    end
+  end
+
+  defp tenant_key(_), do: nil
+
+  defp post(body, retries, key) do
     :inets.start()
     :ssl.start()
-    key = Workbooks.Secrets.get("OPENROUTER_API_KEY", "")
     headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}]
 
     case :httpc.request(:post, {@endpoint, headers, ~c"application/json", body}, [timeout: 120_000], body_format: :binary) do
@@ -80,14 +149,14 @@ defmodule Workbooks.Llm do
 
       {:ok, {{_, status, _}, _, _resp}} when status in [408, 429, 500, 502, 503] and retries > 0 ->
         Process.sleep(1000)
-        post(body, retries - 1)
+        post(body, retries - 1, key)
 
       {:ok, {{_, status, _}, _, resp}} ->
         {:error, {:http, status, String.slice(to_string(resp), 0, 200)}}
 
       {:error, _reason} when retries > 0 ->
         Process.sleep(1000)
-        post(body, retries - 1)
+        post(body, retries - 1, key)
 
       {:error, reason} ->
         {:error, reason}
@@ -99,21 +168,20 @@ defmodule Workbooks.Llm do
   # choices[0].delta carries incremental `content` (text tokens) and tool_call
   # fragments, terminated by `data: [DONE]`. We accumulate into the same result
   # shape as parse/1 and call on_delta with each text chunk as it lands.
-  defp post_stream(body, on_delta, retries) do
+  defp post_stream(body, on_delta, retries, key) do
     :inets.start()
     :ssl.start()
-    key = Workbooks.Secrets.get("OPENROUTER_API_KEY", "")
     headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}]
     http_opts = [timeout: 120_000]
     req_opts = [sync: false, stream: :self, body_format: :binary]
 
     case :httpc.request(:post, {@endpoint, headers, ~c"application/json", body}, http_opts, req_opts) do
       {:ok, request_id} ->
-        collect_stream(request_id, on_delta, %{content: "", tool_calls: %{}, finish: nil, usage: %{}}, "", retries, body)
+        collect_stream(request_id, on_delta, %{content: "", tool_calls: %{}, finish: nil, usage: %{}}, "", retries, body, key)
 
       {:error, _reason} when retries > 0 ->
         Process.sleep(1000)
-        post_stream(body, on_delta, retries - 1)
+        post_stream(body, on_delta, retries - 1, key)
 
       {:error, reason} ->
         {:error, reason}
@@ -122,14 +190,14 @@ defmodule Workbooks.Llm do
 
   # Receive loop over the async :httpc stream messages. `buf` holds a partial SSE
   # tail between chunks; `acc` is the running result.
-  defp collect_stream(req_id, on_delta, acc, buf, retries, body) do
+  defp collect_stream(req_id, on_delta, acc, buf, retries, body, key) do
     receive do
       {:http, {^req_id, :stream_start, _headers}} ->
-        collect_stream(req_id, on_delta, acc, buf, retries, body)
+        collect_stream(req_id, on_delta, acc, buf, retries, body, key)
 
       {:http, {^req_id, :stream, chunk}} ->
         {acc, buf} = consume_sse(buf <> chunk, on_delta, acc)
-        collect_stream(req_id, on_delta, acc, buf, retries, body)
+        collect_stream(req_id, on_delta, acc, buf, retries, body, key)
 
       {:http, {^req_id, :stream_end, _headers}} ->
         {:ok, finalize_stream(acc)}
@@ -137,14 +205,14 @@ defmodule Workbooks.Llm do
       # A non-200 arrives as a single non-streamed reply; retry transient codes.
       {:http, {^req_id, {{_, status, _}, _hdrs, _resp}}} when status in [408, 429, 500, 502, 503] and retries > 0 ->
         Process.sleep(1000)
-        post_stream(body, on_delta, retries - 1)
+        post_stream(body, on_delta, retries - 1, key)
 
       {:http, {^req_id, {{_, status, _}, _hdrs, resp}}} ->
         {:error, {:http, status, String.slice(to_string(resp), 0, 200)}}
 
       {:http, {^req_id, {:error, _reason}}} when retries > 0 ->
         Process.sleep(1000)
-        post_stream(body, on_delta, retries - 1)
+        post_stream(body, on_delta, retries - 1, key)
 
       {:http, {^req_id, {:error, reason}}} ->
         {:error, reason}

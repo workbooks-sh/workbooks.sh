@@ -41,11 +41,9 @@
   import { cubicOut } from "svelte/easing";
   import { invoke } from "@tauri-apps/api/core";
   import { chrome } from "$lib/ui/chrome.svelte";
-  import { nav } from "$lib/bridge/nav.svelte";
-  import { workspaces } from "$lib/bridge/workspaces.svelte";
-  import { DEMO_ACTIVE_WORKSPACE } from "$lib/onboarding/demo";
   import DockToolbar from "$lib/components/DockToolbar.svelte";
-  import NexusMark from "$lib/components/NexusMark.svelte";
+  import { nexus } from "$lib/bridge/nexus.svelte";
+  import { orgs } from "$lib/bridge/orgs.svelte";
   import { tip } from "$lib/ui/tip";
   import { commands } from "$lib/chrome/commands.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
@@ -71,10 +69,6 @@
     // The canvas renders dock.fullscreen regardless of chrome.mode, but
     // drop out of doc mode so a stray active tab doesn't shadow it.
   }
-
-  // Active workspace for the Shelf titlebar selector (demo during the tour).
-  const wsName = $derived(onboarding.active ? DEMO_ACTIVE_WORKSPACE.name : (workspaces.active?.name ?? "Workspace"));
-  const wsIcon = $derived(onboarding.active ? DEMO_ACTIVE_WORKSPACE.icon : (workspaces.active?.icon ?? ""));
 
   // Engine connection state, surfaced (offline-first: the app runs without it).
   const engine = $derived.by(() => {
@@ -307,21 +301,27 @@
     <SidebarSimple size={16} weight={chrome.sidebarOpen ? "fill" : "regular"} />
   </button>
 
-  <!-- Shelf moves the workspace selector up here (optimised for one / few
-       workspaces) — between the sidebar toggle and the ⌄ menu. -->
-  {#if nav.layout === "shelf"}
-    <button
-      type="button"
-      class="ws-pick"
-      data-tauri-drag-region="false"
-      title="Switch workspace ({wsName})"
-      aria-label="Switch workspace ({wsName})"
-      aria-haspopup="menu"
-      onclick={(e) => chrome.openWorkspace(e.currentTarget)}
-    >
-      <IconResolver value={wsIcon} name={wsName} size={15} />
-    </button>
-  {/if}
+  <!-- Nexus / organization switcher — the unit you're in (personal or an org
+       you've been added to). Lives on the LEFT in the titlebar for every layout;
+       the engine-state dot replaces the old green mark on the right. -->
+  <button
+    type="button"
+    class="nexus-chip"
+    data-tauri-drag-region="false"
+    use:tip={engine.title}
+    aria-label="Switch nexus ({orgs.activeEntry.name})"
+    aria-haspopup="menu"
+    aria-expanded={chrome.nexusOpen}
+    onclick={(e) => {
+      chrome.nexusAnchor = e.currentTarget as HTMLElement;
+      chrome.nexusOpen = !chrome.nexusOpen;
+    }}
+  >
+    <span class="nexus-ico">{orgs.activeEntry.icon}</span>
+    <ChevronDown size={12} weight="bold" />
+  </button>
+
+  <!-- (the workspace selector now lives in the sidebar top for every layout) -->
 
   <button
     type="button"
@@ -523,22 +523,8 @@
     <MagnifyingGlass size={15} weight="bold" />
   </button>
 
-  <button
-    type="button"
-    class="engine nexus-badge engine-{engine.cls}"
-    class:alive={engine.cls === "ok"}
-    data-tauri-drag-region="false"
-    use:tip={engine.title}
-    aria-label={engine.title}
-    onclick={(e) => {
-      // Open the nexus switcher (wb-aakl.9). The engine-install wizard is
-      // only reachable when onboarding is flagged on (CLI owns setup).
-      chrome.nexusAnchor = e.currentTarget as HTMLElement;
-      chrome.nexusOpen = !chrome.nexusOpen;
-    }}
-  >
-    <NexusMark size={15} />
-  </button>
+  <!-- (the green nexus mark used to live here; the nexus switcher now opens from
+       the org/nexus chip on the LEFT of the titlebar) -->
 
   <!-- The resident agent (Waldo) — its own badge, far right. Reveals at the
        onboarding agent step; always shown once onboarding is done. -->
@@ -679,28 +665,18 @@
     color: var(--color-fg);
   }
 
-  /* Shelf workspace selector — just the workspace logo in a square (it's a
-   * switch; no name, no caret). */
-  .ws-pick {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    align-self: center;
-    height: 26px;
-    width: 26px;
-    border-radius: 8px;
-    border: 1px solid var(--color-border);
-    background: var(--color-surface-soft);
-    color: var(--color-fg);
-    cursor: pointer;
-    flex-shrink: 0;
-    line-height: 0;
-    overflow: hidden;
+  /* Org / nexus switcher chip — left of the titlebar, all layouts. A single icon
+     represents the active nexus (Personal = local, orgs = cloud); no status color. */
+  .nexus-chip {
+    display: inline-flex; align-items: center; gap: 6px; align-self: center;
+    height: 26px; padding: 0 8px 0 7px; border-radius: 8px;
+    border: 1px solid var(--color-border); background: var(--color-surface-soft);
+    color: var(--color-fg); cursor: pointer; flex-shrink: 0; max-width: 200px;
     transition: border-color 0.15s, background 0.15s;
   }
-  .ws-pick:hover { border-color: var(--color-border-strong); }
-  .ws-pick :global(svg),
-  .ws-pick :global(img) { display: block; }
+  .nexus-chip:hover { border-color: var(--color-border-strong); }
+  .nexus-ico { font-size: 12px; line-height: 1; flex: none; }
+  .nexus-chip :global(svg) { color: var(--color-fg-subtle); flex: none; }
 
   .ctx-shortcut {
     margin-left: auto;

@@ -37,9 +37,7 @@
   let busy = $state(false);
   let error = $state<string | null>(null);
 
-  const title = $derived(
-    data.mode === "import" ? "Import folder as package" : "New package",
-  );
+  const title = $derived(data.mode === "import" ? "Import folder" : "New folder");
 
   async function submit() {
     const n = name.trim();
@@ -90,7 +88,7 @@
   <form onsubmit={(e) => { e.preventDefault(); void submit(); }}>
     <input
       type="text"
-      placeholder="my-package"
+      placeholder="my-folder"
       bind:value={name}
       autofocus
       disabled={busy}
