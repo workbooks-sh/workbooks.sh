@@ -148,6 +148,19 @@ defmodule Workbooks.Auth do
   defp bearer(conn) do
     case conn |> get_req_header("authorization") |> List.first() do
       "Bearer " <> token -> token
+      # WebSocket upgrades (and any browser-driven socket) can't set an
+      # Authorization header, so the Phoenix client carries the credential as a
+      # `?token=` query param (Socket params). Fall back to it and run the SAME
+      # verify ladder — without this, the desktop socket joins under `dev_fallback`
+      # instead of its real tenant, and `session:<id>` joins are silently denied,
+      # so agent telemetry never reaches the UI ("local nexus runs, agent silent").
+      _ -> token_param(conn)
+    end
+  end
+
+  defp token_param(conn) do
+    case Plug.Conn.fetch_query_params(conn).query_params["token"] do
+      t when is_binary(t) and t != "" -> t
       _ -> nil
     end
   end

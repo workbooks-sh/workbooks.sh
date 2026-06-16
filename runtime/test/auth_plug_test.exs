@@ -208,4 +208,41 @@ defmodule AuthPlugTest do
     refute conn.halted
     refute conn.assigns[:tenant] == "*"
   end
+
+  # `?token=` query param ladder (#4 regression). A WebSocket upgrade can't set an
+  # Authorization header, so the Phoenix client carries the bearer as a `?token=`
+  # Socket param. The plug MUST run that token through the SAME verify ladder as the
+  # header — otherwise the desktop socket joins under `dev_fallback` ("dev") while
+  # its runs are owned by its real tenant ("local"), the `session:<id>` tenant gate
+  # denies the join, and agent telemetry never streams ("local nexus runs, agent silent").
+  test "locked deploy: correct ?token= query param authenticates identically to the bearer header" do
+    System.put_env("WB_PUBLIC_BEARER", "supersecret-token-abc123")
+    System.delete_env("WB_TENANT")
+
+    conn = conn_for("/api/run?token=supersecret-token-abc123") |> call()
+
+    refute conn.halted
+    assert conn.assigns[:tenant] == "local"
+  end
+
+  test "locked deploy: wrong ?token= query param is rejected (same fail-closed as a bad header)" do
+    System.put_env("WB_PUBLIC_BEARER", "supersecret-token-abc123")
+
+    conn = conn_for("/api/run?token=wrongtoken") |> call()
+
+    assert conn.status == 401
+    assert conn.halted
+  end
+
+  test "an Authorization header takes precedence over a ?token= query param" do
+    System.put_env("WB_PUBLIC_BEARER", "supersecret-token-abc123")
+    System.delete_env("WB_TENANT")
+
+    conn =
+      conn_for("/api/run?token=junk", [{"authorization", "Bearer supersecret-token-abc123"}])
+      |> call()
+
+    refute conn.halted
+    assert conn.assigns[:tenant] == "local"
+  end
 end
