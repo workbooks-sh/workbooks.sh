@@ -92,8 +92,8 @@
     .s-foot { display:flex; align-items:center; justify-content:space-between; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
     .conf { font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); display:inline-flex; align-items:center; gap:7px; }
     .conf .lock { width:7px; height:7px; background:var(--trapped); border-radius:2px; }
-    .s-foot .wb { font-size:10.5px; color:var(--muted); }
-    .s-foot .wb code { background:#161c27; padding:1px 6px; border-radius:2px; font-size:10px; }
+    .s-foot .wbtag { font-size:10.5px; color:var(--muted); }
+    .s-foot .wbtag code { background:#161c27; padding:1px 6px; border-radius:2px; font-size:10px; }
 
     /* ---------- progress + controls ---------- */
     .progress { position:fixed; top:0; left:0; right:0; height:3px; background:transparent; z-index:30; }
@@ -239,7 +239,7 @@
     const fmtM = v => "$" + (Math.abs(v) >= 1000 ? (v/1000).toFixed(2)+"B" : v.toFixed(1)+"M");
     const FOOT = `<div class="s-foot">
         <span class="conf"><span class="lock"></span>Confidential — Board use only</span>
-        <span class="wb">Signal · Audit &amp; Finance Committee · <span class="num">2026-06-30</span></span>
+        <span class="wbtag">Signal · Audit &amp; Finance Committee · <span class="num">2026-06-30</span></span>
       </div>`;
 
     function head(kicker, no){
