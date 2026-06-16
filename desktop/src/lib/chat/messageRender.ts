@@ -3,9 +3,9 @@
 // One home for: "is this message org?" + "split an org message into
 // prose + inline component segments". See desktop/docs/waldo-inchat-
 // components.md. Prose is rendered by the EXISTING $lib/org-renderer
-// OQL-WASM pipeline; component segments are dispatched to
-// ChatComponent.svelte. We never {@html} raw LLM output — components
-// read structured props.
+// OQL-WASM pipeline; component segments are forwarded to the real
+// <work-gen-block> SDK element (via WorkGenBlock.svelte), which reads
+// structured props/body — we never {@html} raw LLM output.
 
 /** Leading marker line that opts a message into org rendering. */
 const ORG_MARKER = /^#\+RENDER:\s*org\s*$/im;
@@ -87,21 +87,4 @@ function parseHeaderArgs(header: string): {
   const type = props.type ?? "";
   delete props.type;
   return { type, props };
-}
-
-/** Parse a `kv` component body: one `key: value` per line. */
-export function parseKvBody(body: string): Array<[string, string]> {
-  return body
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const i = line.indexOf(":");
-      return i === -1
-        ? ([line, ""] as [string, string])
-        : ([line.slice(0, i).trim(), line.slice(i + 1).trim()] as [
-            string,
-            string,
-          ]);
-    });
 }

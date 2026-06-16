@@ -35,6 +35,39 @@ defmodule Workbooks.ToolkitInjectionTest do
     assert out =~ "overview"
   end
 
+  test "no component toolkit in scope → empty catalog (nothing injected)" do
+    assert Toolkits.component_catalog([]) == ""
+    # A non-component toolkit must NOT yield a catalog.
+    assert Toolkits.component_catalog(["workbooks-browser"]) == ""
+  end
+
+  test "subscribing to the component toolkit injects a work-* catalog discovered from the CEM" do
+    out = Toolkits.component_catalog(["workponents"])
+    assert out =~ "## Components"
+    # Emit syntax (the #+RENDER: org contract) stays unchanged.
+    assert out =~ "#+RENDER: org"
+    assert out =~ "#+begin_src component :type"
+    # Inline-card types the chat renders via <work-gen-block>.
+    assert out =~ ":type callout"
+    assert out =~ ":type kv"
+    # Standalone work-* tags DISCOVERED from custom-elements.json — proof the
+    # catalog is sourced from the CEM, not the old hardcoded five. work-chart /
+    # work-table are CEM tags that were never in the hardcoded list.
+    assert out =~ "work-chart"
+    assert out =~ "work-table"
+    # The CEM's attribute names ride along as the prop hint.
+    assert out =~ "props:"
+  end
+
+  test "the component catalog reaches the agent prompt via the resolved closure" do
+    # End-to-end of the wiring: an agent subscribed to the component toolkit
+    # gets the work-* catalog in its prompt. component_catalog/2 is what
+    # agent_system_prompt/1 appends, exercised here against the real toolkit.
+    out = Toolkits.component_catalog(["workbooks-browser", "workponents"])
+    assert out =~ "## Components"
+    assert out =~ "work-chart"
+  end
+
   test "an unknown toolkit is reported as not installed, not silently dropped" do
     out = Toolkits.injection_text(["ghost-does-not-exist"])
     assert out =~ "ghost-does-not-exist"

@@ -1,0 +1,52 @@
+#+TITLE: workponents toolkit
+#+TOOLKIT: workponents
+#+VERSION: 0.1.0
+#+KIND: render
+#+EXEC: component
+#+CEM: custom-elements.json
+#+STATUS: alpha
+#+TAGLINE: The Workbooks component SDK — render the real `work-*` custom elements inline in chat (cards, charts, tables, diffs) instead of plain prose.
+
+* workponents — the in-chat component SDK                          :toolkit:
+  :PROPERTIES:
+  :ID:        workponents
+  :VERSION:   0.1.0
+  :KIND:      render
+  :EXEC:      component
+  :STATUS:    alpha
+  :SKILL_DIR: skills/
+  :END:
+
+  workponents ships the platform's themed, framework-agnostic =work-*= custom
+  elements (Lit-based). When an agent subscribes to this toolkit, the chat can
+  render those elements *inline* — a rich reply renders as real interactive
+  cards instead of a wall of prose.
+
+  The agent does not import or build anything. It emits an Org component block
+  and the chat host (=AssistantMessageView= → =WorkGenBlock= → the real
+  =<work-gen-block>= element) renders it:
+
+  #+begin_example
+  #+RENDER: org
+
+  Done — created the workbook.
+
+  #+begin_src component :type callout :tone ok :title Created
+  Your sales workbook is live in the workspace.
+  #+end_src
+  #+end_example
+
+  The catalog of valid =:type= values is NOT hardcoded — the runtime discovers
+  it from this toolkit's *Custom Elements Manifest* (=custom-elements.json=, the
+  =#+CEM= keyword) and injects it into the agent's prompt as a Components
+  section. Add a tag to the SDK + regenerate the CEM and the agent can use it,
+  no prompt edit required.
+
+  NOT for: shipping a finished app (that's a workbook) or CLI automation (that's
+  a =command=/=posix= toolkit). Reach for workponents when a structured or
+  visual chat answer earns more than prose.
+
+** Skills
+
+   - =overview= — the contract: how to emit a component block, the inline-card
+     types, and the standalone =work-*= elements.

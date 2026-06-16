@@ -253,6 +253,153 @@ defmodule Workbooks.Toolkits do
     |> String.trim()
   end
 
+  # ── Discovered component catalog (P1, agent↔component contract) ───────────
+  # When an agent's resolved toolkit closure includes a `#+EXEC: component`
+  # toolkit (workponents/ctk), the chat can render the SDK's real `work-*`
+  # custom elements inline. The catalog of which tags exist + their props is
+  # NOT hardcoded — it is DISCOVERED from that toolkit's CEM (Custom Elements
+  # Manifest, the `#+CEM` keyword → `custom-elements.json`). Mirrors the
+  # `injection_text` Tier-1 pattern: a compact tag + prop-hint index, lazy on
+  # bodies. The emit syntax (`#+begin_src component :type <tag>`) is unchanged;
+  # only the CATALOG of valid `:type` values becomes dynamic.
+
+  # `work-gen-block` (the chat's inline-card element) multiplexes on its `type`
+  # attribute — the agent emits `:type <card>`; the chat forwards it to
+  # <work-gen-block type=…>. These are the card kinds gen-block renders today
+  # (an unknown type falls back to a labeled code block, so nothing vanishes).
+  @gen_block_cards ~w(callout kv button link share)
+
+  @doc """
+  The component catalog injected into an agent's prompt when its resolved
+  toolkit closure includes a `#+EXEC: component` toolkit. Returns "" when no
+  such toolkit is in scope (or its CEM is missing/unreadable) — the agent then
+  gets no component section and emits plain prose, exactly as before.
+
+  Sourced from the component toolkit's CEM (`#+CEM` → `custom-elements.json`):
+  one line per `work-*` tag (tag + attribute names), so the agent emits
+  `#+begin_src component :type <tag>` for ANY discovered tag, not a hardcoded
+  five.
+  """
+  def component_catalog(names, root \\ default_root())
+  def component_catalog([], _root), do: ""
+
+  def component_catalog(names, root) do
+    names = closure_disk(names, root)
+
+    tags =
+      names
+      |> Enum.flat_map(fn id ->
+        case tk_dir(id, root) do
+          nil -> []
+          dir -> cem_tags(parse_descriptor(File.read!(Path.join(dir, "manifest.org"))), dir, root)
+        end
+      end)
+      |> Enum.uniq_by(& &1.tag)
+
+    case tags do
+      [] -> ""
+      _ -> render_catalog(tags)
+    end
+  end
+
+  # Tags discovered from a toolkit's CEM — only for `#+EXEC: component` toolkits
+  # that declare a `#+CEM` path. The path resolves relative to the repo root
+  # (parent of the toolkits root) first, then the toolkit dir, then as-is.
+  defp cem_tags(%{exec: "component", cem: cem}, dir, root) when is_binary(cem) do
+    with path when is_binary(path) <- cem_path(cem, dir, root),
+         {:ok, raw} <- File.read(path),
+         {:ok, %{"modules" => mods}} <- Jason.decode(raw) do
+      for m <- mods,
+          d <- m["declarations"] || [],
+          d["customElement"],
+          tag = d["tagName"],
+          is_binary(tag) and String.starts_with?(tag, "work-") do
+        attrs = for a <- d["attributes"] || [], is_binary(a["name"]), do: a["name"]
+        %{tag: tag, attrs: attrs}
+      end
+    else
+      _ -> []
+    end
+  end
+
+  defp cem_tags(_desc, _dir, _root), do: []
+
+  defp cem_path(cem, dir, root) do
+    repo_root = Path.dirname(Path.expand(root))
+    [Path.join(repo_root, cem), Path.join(dir, cem), cem]
+    |> Enum.find(&File.regular?/1)
+  end
+
+  defp render_catalog(tags) do
+    by_tag = Map.new(tags, &{&1.tag, &1})
+
+    # The inline-card types the chat renders via <work-gen-block> today. Listed
+    # only when the CEM actually carries work-gen-block (the chat's element).
+    cards =
+      if Map.has_key?(by_tag, "work-gen-block"),
+        do: @gen_block_cards,
+        else: []
+
+    card_block =
+      cards
+      |> Enum.map(fn c -> "  :type #{c}" <> gen_block_hint(c) end)
+      |> Enum.join("\n")
+
+    # Every other discovered work-* tag (the standalone elements) + their props,
+    # so the agent can reach any tag the SDK ships, not a hardcoded set.
+    rest =
+      tags
+      |> Enum.map(& &1.tag)
+      |> Enum.reject(&(&1 == "work-gen-block"))
+      |> Enum.sort()
+
+    rest_block =
+      rest
+      |> Enum.map(fn tag ->
+        attrs = by_tag[tag].attrs
+        hint = if attrs == [], do: "", else: " — props: " <> Enum.join(Enum.take(attrs, 8), ", ")
+        "  #{tag}#{hint}"
+      end)
+      |> Enum.join("\n")
+
+    cards_section =
+      if card_block == "",
+        do: "",
+        else: "Inline cards (`:type` selects the card):\n#{card_block}\n\n"
+
+    rest_section =
+      if rest_block == "",
+        do: "",
+        else: "Other `work-*` elements (use the tag as `:type`):\n#{rest_block}\n"
+
+    """
+    ## Components
+
+    You have a component toolkit. The chat renders the SDK's real `work-*`
+    custom elements inline. To emit one, begin your message with `#+RENDER: org`
+    on its own first line, then write:
+
+      #+begin_src component :type <type> :<attr> <value> …
+      body text (or `key: value` lines)
+      #+end_src
+
+    The `:key value` header args map to the element's attributes; the block body
+    becomes its content. Reach for a component when a structured/visual answer
+    earns it (you confirmed an action, surfaced data, offered a next step);
+    otherwise reply in plain prose (it streams).
+
+    #{cards_section}#{rest_section}
+    """
+    |> String.trim()
+  end
+
+  defp gen_block_hint("callout"), do: " — info/warn/ok/error banner (:tone, :title)"
+  defp gen_block_hint("kv"), do: " — key/value table (:title; body = `key: value` lines)"
+  defp gen_block_hint("button"), do: " — action button (:label, :action; fires work-intent)"
+  defp gen_block_hint("link"), do: " — themed external link (:label, :href)"
+  defp gen_block_hint("share"), do: " — member chips + invite (:title; body = target/members/role)"
+  defp gen_block_hint(_), do: ""
+
   @doc "`wb toolkit show <id>` — the manifest front door + the skill index."
   def show_text(id, root \\ default_root()) do
     case tk_dir(id, root) do
@@ -595,6 +742,7 @@ defmodule Workbooks.Toolkits do
       preopen: kw(body, "PREOPEN"),
       author_did: kw(body, "AUTHOR_DID"),
       signature: kw(body, "SIGNATURE"),
+      cem: kw(body, "CEM"),
       requires: parse_requires(kw(body, "REQUIRES"))
     }
   end

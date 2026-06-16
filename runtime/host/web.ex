@@ -1869,16 +1869,11 @@ defmodule Workbooks.Web do
         "Only call a tool when you genuinely need to act (search, open a tab, run something); " <>
         "do NOT wrap a plain answer in a tool call. Your text streams to the user as you write it.\n\n" <>
         "RICH REPLIES (optional): when a structured or visual answer helps, begin your message with " <>
-        "`#+RENDER: org` on its own first line and write the body in Org. You may embed inline component " <>
-        "blocks the chat renders as interactive cards (like a tool-call result):\n" <>
-        "  #+begin_src component :type callout :tone ok :title Done\n  short body text\n  #+end_src\n" <>
-        "  #+begin_src component :type kv :title Stats\n  key: value\n  other: value\n  #+end_src\n" <>
-        "  #+begin_src component :type button :label Open it :action open\n  #+end_src\n" <>
-        "  #+begin_src component :type link :label Docs :href https://workbooks.sh\n  #+end_src\n" <>
-        "  #+begin_src component :type share :title Share with your org\n  target: this workbook\n  members: Ada, Grace\n  role: Editor\n  #+end_src\n" <>
-        "Emit a component when you took an action worth confirming (created a workbook → callout/kv), " <>
-        "or when offering the user a next step (share → share card, open → button). " <>
-        "Use plain prose for ordinary replies (it streams); reach for org only when the structure earns it.\n\n" <>
+        "`#+RENDER: org` on its own first line and write the body in Org. You may embed inline " <>
+        "`#+begin_src component …` blocks the chat renders as interactive cards (like a tool-call " <>
+        "result) — the available component types are listed in the Components section below, " <>
+        "discovered from your component toolkit. Emit one when you took an action worth confirming " <>
+        "or when offering the user a next step; use plain prose for ordinary replies (it streams).\n\n" <>
         "OPEN WHAT YOU BUILD: the moment you create or write a workbook or file, OPEN it for the user with `wb app open-tab <path>` (you have the workbooks-browser toolkit) so it appears live in their workspace — never leave a workbook created-but-unopened. Create the file, open it, then confirm."
 
     # Resolve the base prompt + the agent's declared toolkits. Waldo (the
@@ -1893,17 +1888,23 @@ defmodule Workbooks.Web do
            %{system: sys, toolkits: tks} when is_binary(sys) and sys != "" <- Workbooks.AgentDef.parse(org) do
         {sys, tks}
       else
-        _ -> {default, ["workbooks-browser", "workbooks-cli"]}
+        # Waldo also gets `workponents` (the #+EXEC: component toolkit) so the
+        # rich-reply path resolves a component catalog — the chat renders the
+        # SDK `work-*` elements inline.
+        _ -> {default, ["workbooks-browser", "workbooks-cli", "workponents"]}
       end
 
     # Tier-1 progressive disclosure: append the compact toolkit index (skill
     # names) so the agent knows what it can do; bodies stay on demand via `wb
-    # toolkit show`.
-    case Workbooks.Toolkits.injection_text(toolkits) do
-      "" -> base
-      index -> base <> "\n\n" <> index
-    end
+    # toolkit show`. When the closure includes a component-EXEC toolkit, append
+    # the catalog of `work-*` tags DISCOVERED from its CEM (not hardcoded).
+    base
+    |> append_section(Workbooks.Toolkits.injection_text(toolkits))
+    |> append_section(Workbooks.Toolkits.component_catalog(toolkits))
   end
+
+  defp append_section(text, ""), do: text
+  defp append_section(text, section), do: text <> "\n\n" <> section
 
   # The viewer SPA: the runtime renders Org→HTML server-side (orgize, in the
   # kernel); the page only fetches that HTML + colors code (highlight.js, BSD).
