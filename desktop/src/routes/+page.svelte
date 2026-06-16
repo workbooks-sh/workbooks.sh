@@ -800,7 +800,7 @@
   y={createPackage.menuY}
 >
   <button class="ctx-item" onclick={() => createPackage.chooseCreate()}>
-    <PlusIcon size={13} weight="fill" /> Create new package
+    <PlusIcon size={13} weight="fill" /> New folder
   </button>
   <button class="ctx-item" onclick={() => void createPackage.chooseImport()}>
     <FolderOpen size={13} weight="fill" /> Import folder…

@@ -318,7 +318,6 @@
     }}
   >
     <span class="nexus-ico">{orgs.activeEntry.icon}</span>
-    <span class="nexus-name">{orgs.activeEntry.name}</span>
     <ChevronDown size={12} weight="bold" />
   </button>
 
@@ -676,7 +675,6 @@
     transition: border-color 0.15s, background 0.15s;
   }
   .nexus-chip:hover { border-color: var(--color-border-strong); }
-  .nexus-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nexus-ico { font-size: 12px; line-height: 1; flex: none; }
   .nexus-chip :global(svg) { color: var(--color-fg-subtle); flex: none; }
 
