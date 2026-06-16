@@ -137,7 +137,7 @@
 
 <SettingsPanel
   title="MCP servers"
-  lede="Model Context Protocol servers expose external tools and resources to the agent. Configs persist to ~/.oql/desktop/mcp-servers.json."
+  lede="Model Context Protocol servers expose external tools and resources to the agent. Configs persist to ~/.workbooks/config/mcp-servers.json."
 >
   {#snippet actions()}
     <span class="chip chip-neutral">

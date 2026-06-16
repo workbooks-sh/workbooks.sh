@@ -1,5 +1,5 @@
 // Agent defaults — the model + agent-slug the oql-agent uses when no per-task
-// override is set. Persisted in ~/.oql/desktop/agent-settings.org as a flat
+// override is set. Persisted in ~/.workbooks/config/agent-settings.org as a flat
 // property drawer (:DEFAULT_MODEL: / :DEFAULT_AGENT_SLUG:). On set we
 // best-effort nudge a live daemon to re-read WB_AGENT_MODEL.
 
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 fn settings_path() -> PathBuf {
-    paths::oql_desktop_dir().join("agent-settings.org")
+    paths::config_dir().join("agent-settings.org")
 }
 
 #[derive(Serialize, Default)]

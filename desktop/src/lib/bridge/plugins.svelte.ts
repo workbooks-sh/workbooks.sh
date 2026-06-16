@@ -1,6 +1,6 @@
 // Phase B — Plugin registry store (native).
 //
-// Index persists in ~/.oql/desktop/plugins.json. Registry-only today;
+// Index persists in ~/.workbooks/config/plugins.json. Registry-only today;
 // agent-side plugin loading is OUT OF SCOPE for this phase.
 
 import { invoke } from "@tauri-apps/api/core";

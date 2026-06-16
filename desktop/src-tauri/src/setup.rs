@@ -14,7 +14,7 @@ const PROBE_SERVICE: &str = "sh.workbooks.setup";
 const PROBE_ACCOUNT: &str = "probe";
 
 fn setup_path() -> PathBuf {
-    paths::oql_desktop_dir().join("setup.json")
+    paths::config_dir().join("setup.json")
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]

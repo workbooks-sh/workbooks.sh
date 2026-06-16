@@ -1,45 +1,40 @@
-// Canonical on-disk locations the native shell owns. Centralised so every
-// module agrees on where config / descriptors / app-data live and so tests can
-// override the roots via env.
+// Canonical on-disk locations the native shell owns — ONE root, `~/.workbooks`
+// (override `WB_HOME`). Config, workspaces, and app-data all live under a single
+// directory instead of three scattered roots. Centralised so every module agrees
+// and tests can sandbox every write by pointing `WB_HOME` at a temp dir.
 //
-//   ~/.oql/desktop/            — local config: keys.json, env-vars.json,
-//                                themes, mcp-servers.json, plugins.json,
-//                                agent-settings.org, setup.json, connections.json
-//   ~/Workbooks/monorepo/workspaces/  — package descriptors (<name>.org) + state.json
-//   <app_data>/sh.workbooks/   — identity.json, packages/<ws>.html
-//
-// All overridable with WB_OQL_DIR / WB_MONOREPO_DIR / WB_DESKTOP_DIR so the
-// suite (and headless CI) can sandbox writes.
+//   ~/.workbooks/config/      — local config: keys.json, env-vars.json, themes,
+//                               mcp-servers.json, plugins.json, setup.json, …
+//   ~/.workbooks/workspaces/  — package descriptors + state.json
+//   ~/.workbooks/data/        — identity.json, packages/<ws>.html, session.json
 
 use std::path::PathBuf;
 
-/// `~/.oql/desktop` — the local-config root. Created on demand.
-pub fn oql_desktop_dir() -> PathBuf {
-    if let Ok(p) = std::env::var("WB_OQL_DIR") {
+/// The single Workbooks home: `~/.workbooks` (override `WB_HOME`). Everything the
+/// shell persists lives under here — one directory, not three.
+pub fn home() -> PathBuf {
+    if let Ok(p) = std::env::var("WB_HOME") {
         return PathBuf::from(p);
     }
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    home.join(".oql").join("desktop")
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".workbooks")
 }
 
-/// `~/Workbooks/monorepo/workspaces` — package descriptors + state.json.
+/// `~/.workbooks/config` — local config (keys, env-vars, themes, mcp, plugins,
+/// setup, connections). Created on demand.
+pub fn config_dir() -> PathBuf {
+    home().join("config")
+}
+
+/// `~/.workbooks/workspaces` — package descriptors + state.json.
 pub fn workspaces_dir() -> PathBuf {
-    if let Ok(p) = std::env::var("WB_MONOREPO_DIR") {
-        return PathBuf::from(p).join("workspaces");
-    }
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    home.join("Workbooks")
-        .join("monorepo")
-        .join("workspaces")
+    home().join("workspaces")
 }
 
-/// Application-support data root (`<app_data>/sh.workbooks`).
+/// `~/.workbooks/data` — identity, packages, session.
 pub fn app_data_dir() -> PathBuf {
-    if let Ok(p) = std::env::var("WB_APP_DATA_DIR") {
-        return PathBuf::from(p);
-    }
-    let base = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
-    base.join("sh.workbooks")
+    home().join("data")
 }
 
 /// Ensure a directory exists, returning it for chaining.

@@ -16,7 +16,7 @@
    *      Hidden in compiled view.
    *
    * `view_mode` is persisted per-workspace via `package_set_view_mode`
-   * → ~/.oql/desktop/workspaces/<name>.json. Switching the toggle just
+   * → ~/.workbooks/config/workspaces/<name>.json. Switching the toggle just
    * re-filters the in-memory tree; no re-walk.
    *
    * Empty states distinguish four cases:

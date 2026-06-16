@@ -1,5 +1,5 @@
 // Secrets live in a local owner-only (0600) file (secrets.json under
-// ~/.oql/desktop); only redacted metadata indices live alongside it (keys.json
+// ~/.workbooks/config); only redacted metadata indices live alongside it (keys.json
 // / env-vars.json / connections.json). The raw value crosses the IPC boundary
 // only on an explicit user reveal / copy. This module owns: API keys, scoped
 // env-vars, and third-party connections.
@@ -36,7 +36,7 @@ const SVC_CONN: &str = "sh.workbooks.conn";
 // in the file and are forwarded to the runtime without a single prompt).
 
 fn secrets_path() -> PathBuf {
-    paths::oql_desktop_dir().join("secrets.json")
+    paths::config_dir().join("secrets.json")
 }
 
 fn secrets_load() -> serde_json::Map<String, serde_json::Value> {
@@ -161,7 +161,7 @@ pub fn secrets_push() {
 // ── API keys ──────────────────────────────────────────────────────
 
 fn keys_path() -> PathBuf {
-    paths::oql_desktop_dir().join("keys.json")
+    paths::config_dir().join("keys.json")
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -327,7 +327,7 @@ pub fn keys_copy_to_clipboard(app: AppHandle, id: String) -> Result<(), String> 
 // ── Env vars ──────────────────────────────────────────────────────
 
 fn env_path() -> PathBuf {
-    paths::oql_desktop_dir().join("env-vars.json")
+    paths::config_dir().join("env-vars.json")
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -495,7 +495,7 @@ pub fn env_vars_bulk_import(req: BulkImportRequest) -> Result<BulkImportResult, 
 // ── Connections ───────────────────────────────────────────────────
 
 fn conn_path() -> PathBuf {
-    paths::oql_desktop_dir().join("connections.json")
+    paths::config_dir().join("connections.json")
 }
 
 #[derive(Serialize, Deserialize, Clone)]

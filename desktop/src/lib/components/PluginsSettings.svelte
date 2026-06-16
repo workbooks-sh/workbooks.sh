@@ -4,7 +4,7 @@
    *
    * Registry-only UI for v1 — agent-side plugin loading is OUT OF
    * SCOPE for this ticket. The JSON shape is fixed at
-   * `~/.oql/desktop/plugins.json` so a future runtime iteration can
+   * `~/.workbooks/config/plugins.json` so a future runtime iteration can
    * read it without schema churn.
    */
   import { onMount } from "svelte";
@@ -82,7 +82,7 @@
 
 <SettingsPanel
   title="Plugins"
-  lede="Extensions that add tools or behaviour to the agent. v1 is registry-only — entries persist to ~/.oql/desktop/plugins.json; runtime loading is a follow-up."
+  lede="Extensions that add tools or behaviour to the agent. v1 is registry-only — entries persist to ~/.workbooks/config/plugins.json; runtime loading is a follow-up."
 >
   {#snippet actions()}
     <span class="chip chip-neutral">

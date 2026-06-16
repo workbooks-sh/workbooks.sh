@@ -645,7 +645,7 @@ class WsBridgeStore {
    *  - Exact path match — `"/Users/me/Workbooks/monorepo/workspaces.org"`
    *  - Filename match — `"agent-settings.org"` (matches any file with
    *    that basename anywhere under the data root)
-   *  - Glob with `*` and `**` — `"** /.oql/agents/*.org"` (any
+   *  - Glob with `*` and `**` — `"** /.workbooks/agents/*.html"` (any
    *    workspace-scope agent definition; space added here just to
    *    sidestep this comment block)
    *

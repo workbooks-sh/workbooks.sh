@@ -230,7 +230,7 @@ DROP `network_` prefix (redundant). Secrets in OS keychain; only redacted metada
 | remove memory source | ws memory:control remove | DELETE /api/memory/sources | runtime | ({path})->RemoveWorkbookResult | pending |
 | config file watch | ws.onMonorepoChange(*.org) | config_watch_start | native | ()->() emits 'config-changed' | now (notify) |
 
-keys/env_vars secrets in OS keychain (keyring), index in ~/.oql/desktop/*.json. runtime secret.ex/vars.ex = egress-injection, NOT the offline store.
+keys/env_vars secrets in OS keychain (keyring), index in ~/.workbooks/config/*.json. runtime secret.ex/vars.ex = egress-injection, NOT the offline store.
 
 ## terminal — ALL native, ALL now (new terminal.rs, portable_pty)
 | cap | old | new name | place | signature | now/pending |
@@ -259,7 +259,7 @@ runtime shell.ex = WASM-sandboxed agent pipe shell, NOT this. Native pty is only
 | list wizards | GET /api/wizards | same | runtime | (surface?)->{wizards[]} | pending |
 | start wizard | POST /api/wizard/start | same | runtime | (args)->WizardStep | pending |
 | answer wizard | POST /api/wizard/:id/answer | POST /api/wizard/:session_id/answer | runtime | (id,answers)->WizardStep | pending |
-| setup flags store | implicit | ~/.oql/desktop/setup.json | local-store | SetupStore{first_run_done,keychain_initialized,model_key_set} | now |
+| setup flags store | implicit | ~/.workbooks/config/setup.json | local-store | SetupStore{first_run_done,keychain_initialized,model_key_set} | now |
 
 RECONCILE: lifecycle uses keychain_status/keychain_init; onboarding chart uses setup_status/setup_initialize_keychain. LOCKED: setup_* owns onboarding-flag surface (setup.json: first_run_done+keychain_initialized+model_key_set), and is the canonical name the UI gates on. keychain_status/keychain_init are NOT added separately — folded into setup_status/setup_initialize_keychain (one keychain probe, one init). Minimal flow: setup_status → setup_initialize_keychain → setup_save_model_key → setup_complete_first_run.
 

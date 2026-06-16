@@ -7,7 +7,7 @@
 //   setup_status → setup_initialize_keychain → setup_save_model_key
 //   → setup_complete_first_run
 //
-// All NATIVE / offline (setup.rs, ~/.oql/desktop/setup.json + OS keychain).
+// All NATIVE / offline (setup.rs, ~/.workbooks/config/setup.json + OS keychain).
 // Exported names stay stable for the splash; bodies invoke() the
 // canonical commands.
 

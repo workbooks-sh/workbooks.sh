@@ -1,6 +1,6 @@
 // Phase B — API key store (native, OS-keychain backed).
 //
-// Secrets in OS keychain; redacted index in `~/.oql/desktop/keys.json`.
+// Secrets in OS keychain; redacted index in `~/.workbooks/config/keys.json`.
 // The keys themselves never live in JS state — `refresh()` returns
 // redacted views (masked dots + length), and the raw secret is only
 // fetched on user-driven reveal via `reveal(id)`. This keeps a single

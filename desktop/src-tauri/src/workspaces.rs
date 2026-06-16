@@ -1,5 +1,5 @@
 // Top-level Workspaces — the outer tier of User → Workspace → Package. Stored
-// as a single JSON index (workspaces.json under ~/.oql/desktop) plus an
+// as a single JSON index (workspaces.json under ~/.workbooks/config) plus an
 // active-id pointer. A Workspace groups package names + an optional git-subtree.
 
 use crate::paths;
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 fn ws_path() -> PathBuf {
-    paths::oql_desktop_dir().join("workspaces.json")
+    paths::config_dir().join("workspaces.json")
 }
 
 #[derive(Serialize, Deserialize, Clone)]

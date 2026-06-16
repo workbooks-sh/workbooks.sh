@@ -753,8 +753,8 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
   end
 
-  # Agent picker catalog (wb-kbq5): project-scope (<workdir>/.oql/agents/*.org) →
-  # user-scope (WB_PROFILE_DIR/agents/*.org) → the builtin Waldo. The desktop's
+  # Agent picker catalog (wb-kbq5): project-scope (<workdir>/.workbooks/agents/*.html) →
+  # user-scope (WB_PROFILE_DIR/agents/*.html) → the builtin Waldo. The desktop's
   # agents.svelte refreshes this; without it the picker was empty (404).
   get "/api/agents/list" do
     conn = fetch_query_params(conn)
@@ -1940,7 +1940,7 @@ defmodule Workbooks.Web do
 
     project =
       if is_binary(workdir) and workdir != "",
-        do: catalog_dir(Path.join(workdir, ".oql/agents"), "project"),
+        do: catalog_dir(Path.join([workdir, ".workbooks", "agents"]), "project"),
         else: []
 
     user = catalog_dir(Path.join(System.get_env("WB_PROFILE_DIR") || "/opt/profile", "agents"), "user")
@@ -1958,7 +1958,7 @@ defmodule Workbooks.Web do
     case File.ls(dir) do
       {:ok, files} ->
         files
-        |> Enum.filter(&String.ends_with?(&1, ".org"))
+        |> Enum.filter(&String.ends_with?(&1, ".html"))
         |> Enum.map(fn f ->
           def = Workbooks.AgentDef.parse(File.read!(Path.join(dir, f)))
           slug = def.id || Path.rootname(f)

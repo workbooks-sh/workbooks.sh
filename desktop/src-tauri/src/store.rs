@@ -1,4 +1,4 @@
-// Plain-JSON registries the shell persists under ~/.oql/desktop: bookmarks,
+// Plain-JSON registries the shell persists under ~/.workbooks/config: bookmarks,
 // themes, MCP servers, plugins. No secrets here (those go through keychain.rs),
 // so a JSON index on disk is the whole story. Each registry follows the same
 // load → mutate → atomic-write shape via paths::{read_json,write_json}.
@@ -10,7 +10,7 @@ use std::path::PathBuf;
 // ── Bookmarks ─────────────────────────────────────────────────────
 
 fn bookmarks_path() -> PathBuf {
-    paths::oql_desktop_dir().join("bookmarks.json")
+    paths::config_dir().join("bookmarks.json")
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -120,10 +120,10 @@ pub fn bookmark_set_slot(req: BookmarkSetSlot) -> Result<(), String> {
 // ── Themes ────────────────────────────────────────────────────────
 
 fn themes_path() -> PathBuf {
-    paths::oql_desktop_dir().join("themes.json")
+    paths::config_dir().join("themes.json")
 }
 fn theme_active_path() -> PathBuf {
-    paths::oql_desktop_dir().join("theme-active.json")
+    paths::config_dir().join("theme-active.json")
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -270,7 +270,7 @@ pub fn theme_delete(id: String) -> Result<(), String> {
 // ── MCP servers ───────────────────────────────────────────────────
 
 fn mcp_path() -> PathBuf {
-    paths::oql_desktop_dir().join("mcp-servers.json")
+    paths::config_dir().join("mcp-servers.json")
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -369,7 +369,7 @@ pub fn mcp_delete(id: String) -> Result<(), String> {
 // ── Plugins ───────────────────────────────────────────────────────
 
 fn plugins_path() -> PathBuf {
-    paths::oql_desktop_dir().join("plugins.json")
+    paths::config_dir().join("plugins.json")
 }
 
 #[derive(Serialize, Deserialize, Clone)]

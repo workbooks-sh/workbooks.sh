@@ -1,7 +1,7 @@
 // Filesystem mutations + live watchers. Every mutation emits `fs-tree-changed`
 // so the tree refreshes without a manual reload; `fs_watch_start` installs a
 // recursive notify watcher per root that emits the same event on any change.
-// `config_watch_start` watches ~/.oql/desktop for config edits and emits
+// `config_watch_start` watches ~/.workbooks/config for config edits and emits
 // `config-changed`.
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
@@ -16,7 +16,7 @@ use tauri::{AppHandle, Emitter, State};
 #[derive(Default)]
 pub struct Watchers {
     inner: Mutex<HashMap<String, RecommendedWatcher>>,
-    /// The single config watcher (only one, on ~/.oql/desktop).
+    /// The single config watcher (only one, on ~/.workbooks/config).
     config: Mutex<Option<RecommendedWatcher>>,
 }
 
@@ -159,12 +159,12 @@ struct ConfigChanged {
     file: String,
 }
 
-/// Watch ~/.oql/desktop for config edits; emit `config-changed` with the
+/// Watch ~/.workbooks/config for config edits; emit `config-changed` with the
 /// changed file's basename. Replaces the WS-bridge `onMonorepoChange` for
 /// local config so settings stores live-refresh offline.
 #[tauri::command]
 pub fn config_watch_start(app: AppHandle, watchers: State<Watchers>) -> Result<(), String> {
-    let dir = crate::paths::oql_desktop_dir();
+    let dir = crate::paths::config_dir();
     let _ = std::fs::create_dir_all(&dir);
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         if let Ok(ev) = res {
