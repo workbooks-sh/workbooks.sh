@@ -8,6 +8,16 @@
 
 import { cloudClient } from "$lib/rcp/providers/workos";
 import { auth } from "$lib/auth/store.svelte";
+import { nexus } from "$lib/bridge/nexus.svelte";
+
+const CTX_KEY = "wb-active-context";
+function restoreContext(): string {
+  try {
+    return (typeof localStorage !== "undefined" && localStorage.getItem(CTX_KEY)) || "personal";
+  } catch {
+    return "personal";
+  }
+}
 
 const CP_URL =
   (typeof import.meta !== "undefined" &&
@@ -15,44 +25,67 @@ const CP_URL =
   "https://wb-nexus-cp.fly.dev";
 
 export type OrgNexus = { id: string; name: string; role: string };
-export type SwitcherEntry = OrgNexus & { personal: boolean };
+export type SwitcherEntry = OrgNexus & {
+  personal: boolean;
+  /** A single glyph/emoji representing the nexus (Personal gets a default). */
+  icon: string;
+  /** One-word context shown under the name: "local" (Personal) or "cloud". */
+  subtitle: string;
+};
 
 class Orgs {
   /** Orgs the user belongs to (each ≈ a nexus), from the control plane. */
   list = $state<OrgNexus[]>([]);
   user = $state<{ id: string; name: string } | null>(null);
-  /** The org of the current session token (the "active" one). */
-  activeOrg = $state<string | null>(null);
   loaded = $state(false);
 
-  /** Personal + every org you belong to (each ≈ a nexus). Personal is always first. */
+  /** Which nexus you're working in — "personal" (local) or an org id. Local UI state,
+   *  persisted; Personal is the default. Switching is a context change, NOT a re-login. */
+  activeContext = $state<string>(restoreContext());
+
+  /** Personal + every org you belong to (each ≈ a nexus). Personal is always first.
+   *  Personal = your local machine ("local"); orgs are hosted ("cloud"). */
   get switcher(): SwitcherEntry[] {
-    const personal: SwitcherEntry = { id: "personal", name: "Personal", role: "owner", personal: true };
-    return [personal, ...this.list.map((o) => ({ ...o, personal: false }))];
+    const personal: SwitcherEntry = {
+      id: "personal",
+      name: "Personal",
+      role: "owner",
+      personal: true,
+      icon: "💻",
+      subtitle: "local"
+    };
+    return [
+      personal,
+      ...this.list.map((o) => ({ ...o, personal: false, icon: "☁️", subtitle: "cloud" }))
+    ];
   }
 
-  /** True while a re-auth (org switch) is in flight. */
-  switching = $state(false);
+  /** The currently-active entry (Personal when no org is active). Drives the chip. */
+  get activeEntry(): SwitcherEntry {
+    const all = this.switcher;
+    return all.find((e) => this.isActive(e)) ?? all[0];
+  }
 
-  /** Whether `entry` is the currently-active context (Personal = no org scope). */
+  /** Whether `entry` is the nexus you're currently working in. */
   isActive(entry: SwitcherEntry): boolean {
-    return entry.personal ? !this.activeOrg : entry.id === this.activeOrg;
+    return entry.id === this.activeContext;
   }
 
   /**
-   * Switch the active org: re-authenticate scoped to it (Personal = no org scope),
-   * then refresh from the new token. WorkOS reuses the existing browser session, so
-   * this is usually a fast redirect, not a fresh credential prompt.
+   * Switch which nexus you're in. Personal = your local machine — free, offline, and
+   * NO sign-in (you already signed into your account once). Orgs are hosted nexuses you
+   * belong to. Switching is a context change, never a re-login.
    */
-  async switchTo(entry: SwitcherEntry): Promise<void> {
-    if (this.switching || this.isActive(entry)) return;
-    this.switching = true;
+  switchTo(entry: SwitcherEntry): void {
+    if (this.isActive(entry)) return;
+    this.activeContext = entry.id;
     try {
-      await auth.signIn(entry.personal ? undefined : entry.id);
-      await this.load(true);
-    } finally {
-      this.switching = false;
+      localStorage.setItem(CTX_KEY, entry.id);
+    } catch {
+      // ignore (SSR / private mode)
     }
+    if (entry.personal) nexus.select("local");
+    // Connecting to an org's hosted nexus is wired separately — no re-auth here.
   }
 
   /** Load from the cloud once (idempotent). Signed-out ⇒ Personal only. */
@@ -67,7 +100,6 @@ class Orgs {
         orgs: OrgNexus[];
       }>("/api/platform/me", { timeoutMs: 12_000 });
       this.user = me.user ?? null;
-      this.activeOrg = me.active_org ?? null;
       this.list = Array.isArray(me.orgs) ? me.orgs : [];
     } catch {
       this.list = []; // fail-soft — Personal still works offline

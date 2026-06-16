@@ -43,6 +43,7 @@
   import { chrome } from "$lib/ui/chrome.svelte";
   import DockToolbar from "$lib/components/DockToolbar.svelte";
   import { nexus } from "$lib/bridge/nexus.svelte";
+  import { orgs } from "$lib/bridge/orgs.svelte";
   import { tip } from "$lib/ui/tip";
   import { commands } from "$lib/chrome/commands.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
@@ -305,10 +306,10 @@
        the engine-state dot replaces the old green mark on the right. -->
   <button
     type="button"
-    class="nexus-chip engine-{engine.cls}"
+    class="nexus-chip"
     data-tauri-drag-region="false"
     use:tip={engine.title}
-    aria-label="Switch nexus ({nexus.active.name})"
+    aria-label="Switch nexus ({orgs.activeEntry.name})"
     aria-haspopup="menu"
     aria-expanded={chrome.nexusOpen}
     onclick={(e) => {
@@ -316,8 +317,8 @@
       chrome.nexusOpen = !chrome.nexusOpen;
     }}
   >
-    <span class="nexus-dot"></span>
-    <span class="nexus-name">{nexus.active.name}</span>
+    <span class="nexus-ico">{orgs.activeEntry.icon}</span>
+    <span class="nexus-name">{orgs.activeEntry.name}</span>
     <ChevronDown size={12} weight="bold" />
   </button>
 
@@ -665,20 +666,18 @@
     color: var(--color-fg);
   }
 
-  /* Org / nexus switcher chip — left of the titlebar, all layouts. The dot carries
-     the engine/connection state (replacing the old green mark on the right). */
+  /* Org / nexus switcher chip — left of the titlebar, all layouts. A single icon
+     represents the active nexus (Personal = local, orgs = cloud); no status color. */
   .nexus-chip {
     display: inline-flex; align-items: center; gap: 6px; align-self: center;
-    height: 26px; padding: 0 8px 0 9px; border-radius: 8px;
+    height: 26px; padding: 0 8px 0 7px; border-radius: 8px;
     border: 1px solid var(--color-border); background: var(--color-surface-soft);
     color: var(--color-fg); cursor: pointer; flex-shrink: 0; max-width: 200px;
     transition: border-color 0.15s, background 0.15s;
   }
   .nexus-chip:hover { border-color: var(--color-border-strong); }
   .nexus-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .nexus-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-fg-subtle); flex: none; }
-  .nexus-chip.engine-ok .nexus-dot { background: var(--color-ok); }
-  .nexus-chip.engine-pending .nexus-dot { background: var(--color-warn); animation: engine-pulse 1.4s ease-in-out infinite; }
+  .nexus-ico { font-size: 12px; line-height: 1; flex: none; }
   .nexus-chip :global(svg) { color: var(--color-fg-subtle); flex: none; }
 
   .ctx-shortcut {

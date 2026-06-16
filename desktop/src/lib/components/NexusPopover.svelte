@@ -63,13 +63,15 @@
     return h === "ok" ? "ok" : h === "checking" ? "checking" : h === "down" ? "down" : "unknown";
   }
 
-  // Below + right-aligned to the chip (chip sits top-right).
+  // Below + LEFT-aligned to the chip (the chip sits top-LEFT now), clamped so the
+  // popover never runs off the right edge of the window.
+  const POP_W = 264;
   let style = $derived.by(() => {
     if (!anchor) return "";
     const r = anchor.getBoundingClientRect();
     const top = Math.round(r.bottom + 6);
-    const right = Math.max(8, Math.round(window.innerWidth - r.right));
-    return `top: ${top}px; right: ${right}px;`;
+    const left = Math.round(Math.min(r.left, window.innerWidth - POP_W - 8));
+    return `top: ${top}px; left: ${Math.max(8, left)}px;`;
   });
 </script>
 
@@ -87,9 +89,8 @@
     </header>
 
     <div class="list">
-      <!-- Organizations — Personal + every org you've been added to (each ≈ a nexus),
-           with your role. Clicking re-authenticates scoped to that org (the switch). -->
-      <div class="grp-label">Organizations</div>
+      <!-- Personal (your local machine) + every org you've been added to (each a
+           hosted nexus), with role. Clicking re-authenticates scoped to that org. -->
       {#each orgs.switcher as o (o.id)}
         {@const active = orgs.isActive(o)}
         <button
@@ -97,38 +98,40 @@
           class="row org-row"
           class:active
           aria-current={active ? "true" : undefined}
-          disabled={orgs.switching}
           onclick={() => orgs.switchTo(o)}
         >
-          <span class="org-glyph">{o.personal ? "◦" : (o.name[0] || "O").toUpperCase()}</span>
+          <span class="org-ico">{o.icon}</span>
           <span class="row-text">
             <span class="name">{o.name}</span>
-            <span class="url">{o.role}{active ? " · active" : ""}</span>
+            <span class="url">{o.personal ? o.subtitle : `${o.subtitle} · ${o.role}`}</span>
           </span>
+          {#if active}<span class="badge">active</span>{/if}
         </button>
       {/each}
 
-      <div class="grp-label">Runtimes</div>
-      {#each nexus.endpoints as ep (ep.id)}
-        {@const h = nexus.healthOf(ep.id)}
-        <div class="row" class:active={ep.id === nexus.activeId}>
-          <button type="button" class="row-main" onclick={() => select(ep)}>
-            <span class="dot {dotClass(h)}" class:alive={h === "ok"}></span>
-            <span class="row-text">
-              <span class="name">{ep.name}</span>
-              <span class="url">
-                {ep.mode === "local" ? (nexus.activeUrl && ep.id === nexus.activeId ? nexus.activeUrl : "discovery") : ep.url}
+      {#if orgs.list.length === 0}
+        <p class="hint">Get added to an organization and its nexuses appear here.</p>
+      {/if}
+
+      {#if nexus.endpoints.some((e) => e.mode === "remote")}
+        <div class="grp-label">Connected runtimes</div>
+        {#each nexus.endpoints.filter((e) => e.mode === "remote") as ep (ep.id)}
+          {@const h = nexus.healthOf(ep.id)}
+          <div class="row" class:active={ep.id === nexus.activeId}>
+            <button type="button" class="row-main" onclick={() => select(ep)}>
+              <span class="dot {dotClass(h)}" class:alive={h === "ok"}></span>
+              <span class="row-text">
+                <span class="name">{ep.name}</span>
+                <span class="url">{ep.url}</span>
               </span>
-            </span>
-            {#if ep.id === nexus.activeId}<span class="badge">active</span>{/if}
-          </button>
-          {#if ep.mode === "remote"}
+              {#if ep.id === nexus.activeId}<span class="badge">active</span>{/if}
+            </button>
             <button type="button" class="icon-btn danger" title="Remove" onclick={() => nexus.remove(ep.id)}>
               <Trash2 weight="fill" size={11} />
             </button>
-          {/if}
-        </div>
-      {/each}
+          </div>
+        {/each}
+      {/if}
     </div>
 
     {#if adding}
@@ -201,12 +204,15 @@
   }
   .org-row:hover:not(:disabled) { background: color-mix(in srgb, var(--color-fg) 5%, transparent); }
   .org-row:disabled { cursor: default; opacity: 0.6; }
-  .org-glyph {
-    width: 20px; height: 20px; border-radius: 6px; flex: none; display: grid; place-items: center;
-    background: var(--color-surface-soft); border: 1px solid var(--color-border);
-    font-size: 11px; font-weight: 700; color: var(--color-fg);
+  .org-ico {
+    width: 24px; height: 24px; flex: none; display: grid; place-items: center;
+    font-size: 15px; line-height: 1;
   }
   .org-row.active { background: var(--color-brand-soft); }
+  .hint {
+    margin: 2px 8px 6px; font-size: 11px; line-height: 1.4;
+    color: var(--color-fg-subtle);
+  }
   .row {
     display: flex;
     align-items: center;
