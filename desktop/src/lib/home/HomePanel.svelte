@@ -293,10 +293,10 @@
           {:else if m.kind === "status"}
             <div class="status-line">{m.text}</div>
           {:else}
-            <div class="bubble {m.who}" class:tool={m.kind === "tool"} class:err={m.error}>
+            <div class="bubble {m.who}" class:tool={m.kind === "tool"} class:err={m.error} class:thinking={m.who === "waldo" && m.kind === "msg" && !m.text && m.pending}>
               {#if m.who === "waldo" && m.kind === "msg"}
                 <span class="tag">Waldo</span>
-                {#if m.text}<AssistantMessageView text={m.text} />{:else if m.pending}<span class="dim">…</span>{/if}
+                {#if m.text}<AssistantMessageView text={m.text} />{:else if m.pending}<span class="typing"><span></span><span></span><span></span></span>{/if}
               {:else}
                 <span class="text">{m.text}</span>
               {/if}
@@ -304,7 +304,7 @@
           {/if}
         {/each}
         {#if thinking}
-          <div class="bubble waldo">
+          <div class="bubble waldo thinking">
             <span class="tag">Waldo</span>
             <span class="typing"><span></span><span></span><span></span></span>
           </div>
@@ -473,15 +473,39 @@
   }
   .bubble.you {
     align-self: flex-end;
+    width: fit-content;
     background: var(--color-fg);
     color: var(--color-page);
   }
+  /* Waldo's prose/org/component bubble. align-self:flex-start in a flex
+     COLUMN sizes the bubble to its cross-axis content — async org and the
+     <work-gen-block> custom element resolve to ~zero intrinsic width before
+     upgrade, which collapsed the bubble into a tall narrow empty strip
+     (the project's known flex width-collapse). Pin a comfortable width so
+     prose, the thinking dots, and streamed tokens all render at normal
+     width regardless of when the inner content establishes its own size. */
   .bubble.waldo {
     align-self: flex-start;
+    width: 100%;
+    max-width: 88%;
     background: var(--color-surface-soft);
     color: var(--color-fg);
   }
+  /* Block-level rendered content must fill the bubble (not collapse it). */
+  .bubble.waldo :global(.agent-text),
+  .bubble.waldo :global(.agent-md),
+  .bubble.waldo :global(.agent-org),
+  .bubble.waldo :global(work-gen-block) {
+    width: 100%;
+  }
+  /* While only the typing indicator shows (no text yet), the bubble is a
+     small inline pill — not a full-width empty strip. */
+  .bubble.waldo.thinking {
+    width: fit-content;
+    min-width: 0;
+  }
   .bubble.tool {
+    width: fit-content;
     font-family: var(--font-mono);
     font-size: 0.76rem;
     color: var(--color-fg-muted);

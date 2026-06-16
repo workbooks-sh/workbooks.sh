@@ -26,6 +26,23 @@ export function mockMode(): boolean {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Stream a piece of content as `llm_delta` chunks (mirroring the real
+ *  OpenRouter SSE wire protocol the runtime forwards), so the chat render
+ *  path is exercised identically in mock + live. Chunks a few chars per
+ *  tick with a small delay; the authoritative full text still arrives at
+ *  the subsequent `llm_turn_stop`. */
+async function streamContent(
+  emit: (name: string, payload?: Record<string, unknown>) => void,
+  content: string,
+  chunk = 4,
+  delay = 18,
+): Promise<void> {
+  for (let i = 0; i < content.length; i += chunk) {
+    emit("llm_delta", { metadata: { content: content.slice(i, i + chunk) } });
+    await sleep(delay);
+  }
+}
+
 /** Stable artifact path derived from the user's prompt — so a follow-up
  *  referencing the same thing updates the same component (and tab) instead
  *  of spawning a new one. */
@@ -188,43 +205,37 @@ export async function runMockComponentAgent(
     emit("component_artifact", { path, title, kind: "workbook", action });
     await sleep(140);
 
+    const content =
+      action === "created"
+        ? `#+RENDER: org\nDone — I built *${title}* and opened it as a tab.\n\n` +
+          `#+begin_src component :type callout :tone ok :title Workbook created\n` +
+          `${title} is live in a new tab. Tell me what to change and I'll edit it in place.\n` +
+          `#+end_src\n\n` +
+          `#+begin_src component :type kv :title What I set up\n` +
+          `Name: ${title}\n` +
+          `Type: single-file workbook\n` +
+          `Status: open in a tab\n` +
+          `Next: say "share this" to invite your team\n` +
+          `#+end_src`
+        : `Updated *${title}* (revision ${rev}). The tab reflects the latest version — keep iterating.`;
+    await streamContent(emit, content);
     emit("llm_turn_stop", {
-      metadata: {
-        provider: "openrouter",
-        model: "waldo",
-        status: "ok",
-        content:
-          action === "created"
-            ? `#+RENDER: org\nDone — I built *${title}* and opened it as a tab.\n\n` +
-              `#+begin_src component :type callout :tone ok :title Workbook created\n` +
-              `${title} is live in a new tab. Tell me what to change and I'll edit it in place.\n` +
-              `#+end_src\n\n` +
-              `#+begin_src component :type kv :title What I set up\n` +
-              `Name: ${title}\n` +
-              `Type: single-file workbook\n` +
-              `Status: open in a tab\n` +
-              `Next: say "share this" to invite your team\n` +
-              `#+end_src`
-            : `Updated *${title}* (revision ${rev}). The tab reflects the latest version — keep iterating.`,
-      },
+      metadata: { provider: "openrouter", model: "waldo", status: "ok", content },
     });
   } else if (intent === "share") {
     // Offer a share action as an inline component (a clickable card/button).
     await sleep(300);
+    const content =
+      `#+RENDER: org\nYes — you can share this with anyone in your organization. ` +
+      `Pick who gets access and I'll send the invite.\n\n` +
+      `#+begin_src component :type share :title Share with your org\n` +
+      `target: this workbook\n` +
+      `members: Ada Lovelace, Grace Hopper, Alan Turing\n` +
+      `role: Editor\n` +
+      `#+end_src`;
+    await streamContent(emit, content);
     emit("llm_turn_stop", {
-      metadata: {
-        provider: "openrouter",
-        model: "waldo",
-        status: "ok",
-        content:
-          `#+RENDER: org\nYes — you can share this with anyone in your organization. ` +
-          `Pick who gets access and I'll send the invite.\n\n` +
-          `#+begin_src component :type share :title Share with your org\n` +
-          `target: this workbook\n` +
-          `members: Ada Lovelace, Grace Hopper, Alan Turing\n` +
-          `role: Editor\n` +
-          `#+end_src`,
-      },
+      metadata: { provider: "openrouter", model: "waldo", status: "ok", content },
     });
   } else if (intent === "agent") {
     // Stand up a new agent, confirm with an inline component + an open action.
@@ -237,38 +248,32 @@ export async function runMockComponentAgent(
       metadata: { tool_name: "agent_create", tool_call_id: "tc-agent", status: "ok", result_size: 1 },
     });
     await sleep(80);
+    const content =
+      `#+RENDER: org\nSet up. I created an agent and pinned it to your workspace.\n\n` +
+      `#+begin_src component :type callout :tone ok :title Agent ready\n` +
+      `Your new agent is configured and available to sessions. Open its tab to tweak the prompt or toolkits.\n` +
+      `#+end_src\n\n` +
+      `#+begin_src component :type kv :title Agent config\n` +
+      `Slug: summarizer\n` +
+      `Model: inherits your default\n` +
+      `Toolkits: workbooks-browser, library-search\n` +
+      `Human in the loop: off\n` +
+      `#+end_src`;
+    await streamContent(emit, content);
     emit("llm_turn_stop", {
-      metadata: {
-        provider: "openrouter",
-        model: "waldo",
-        status: "ok",
-        content:
-          `#+RENDER: org\nSet up. I created an agent and pinned it to your workspace.\n\n` +
-          `#+begin_src component :type callout :tone ok :title Agent ready\n` +
-          `Your new agent is configured and available to sessions. Open its tab to tweak the prompt or toolkits.\n` +
-          `#+end_src\n\n` +
-          `#+begin_src component :type kv :title Agent config\n` +
-          `Slug: summarizer\n` +
-          `Model: inherits your default\n` +
-          `Toolkits: workbooks-browser, library-search\n` +
-          `Human in the loop: off\n` +
-          `#+end_src`,
-      },
+      metadata: { provider: "openrouter", model: "waldo", status: "ok", content },
     });
   } else {
     // A plain, streaming prose answer (the common case) — as Waldo.
-    await sleep(280);
+    await sleep(160);
+    const content =
+      `I'm Waldo, your resident assistant in here. I can create workbooks, ` +
+      `share them to your org, set up agents, search your files, and open ` +
+      `things for you — by voice or text. Try "create a workbook for me" or ` +
+      `"set me up an agent that summarizes my notes."`;
+    await streamContent(emit, content);
     emit("llm_turn_stop", {
-      metadata: {
-        provider: "openrouter",
-        model: "waldo",
-        status: "ok",
-        content:
-          `I'm Waldo, your resident assistant in here. I can create workbooks, ` +
-          `share them to your org, set up agents, search your files, and open ` +
-          `things for you — by voice or text. Try "create a workbook for me" or ` +
-          `"set me up an agent that summarizes my notes."`,
-      },
+      metadata: { provider: "openrouter", model: "waldo", status: "ok", content },
     });
   }
 
