@@ -25,6 +25,8 @@
     "gate:all": "node tools/gate/run.js --strict",
     "gate:baseline": "node tools/gate/run.js --update-baseline",
     "test:gitviz": "node --test tools/gitviz/work-diff.test.mjs && node tools/gitviz/work-history-graph.test.mjs",
+    "new": "node tools/scaffold.mjs",
+    "test:scaffold": "node --test tools/scaffold.test.mjs",
     "registry": "node tools/registry.mjs"
   },
   "keywords": [
