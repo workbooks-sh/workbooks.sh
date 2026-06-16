@@ -64,17 +64,24 @@ defmodule Workbooks.WorkOS do
   the broker's own callback (must be a registered WorkOS redirect); `state` is the
   opaque flow id we look up on the way back.
   """
-  def authorize_url(redirect_uri, state) do
-    q =
-      URI.encode_query(%{
-        "client_id" => client_id(),
-        "redirect_uri" => redirect_uri,
-        "response_type" => "code",
-        "provider" => "authkit",
-        "state" => state
-      })
+  def authorize_url(redirect_uri, state, organization_id \\ nil) do
+    base = %{
+      "client_id" => client_id(),
+      "redirect_uri" => redirect_uri,
+      "response_type" => "code",
+      "provider" => "authkit",
+      "state" => state
+    }
 
-    @api <> "/user_management/authorize?" <> q
+    # Scope the sign-in to a specific org (the desktop org switcher) — omitted for a
+    # personal/no-org session.
+    params =
+      case organization_id do
+        org when is_binary(org) and org != "" -> Map.put(base, "organization_id", org)
+        _ -> base
+      end
+
+    @api <> "/user_management/authorize?" <> URI.encode_query(params)
   end
 
   @doc """

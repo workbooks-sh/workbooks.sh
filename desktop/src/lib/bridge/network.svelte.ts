@@ -147,8 +147,16 @@ export async function publish(args: PublishArgs): Promise<PublishResult> {
  *  stashed in the OS keychain by the Rust side. Resolves with the
  *  WorkOS user record once the user finishes signing in (and the
  *  browser tab self-closes via the "you're signed in" page). */
-export async function workosSignIn(brokerUrl: string): Promise<StoredSession> {
-  return invoke<StoredSession>("workos_sign_in", { brokerUrl });
+export async function workosSignIn(
+  brokerUrl: string,
+  organizationId?: string,
+): Promise<StoredSession> {
+  // organizationId scopes the sign-in to a specific org (the desktop org switcher);
+  // omitted/null is a personal session.
+  return invoke<StoredSession>("workos_sign_in", {
+    brokerUrl,
+    organizationId: organizationId ?? null,
+  });
 }
 
 /** Read a previously-stashed session from the OS keychain. Returns

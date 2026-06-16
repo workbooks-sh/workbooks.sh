@@ -133,9 +133,9 @@ class AuthStore {
    *  catch the loopback callback, exchange the code, stash bearer
    *  token in the OS keychain. On success the auth store transitions
    *  to "signed-in" using the user record from the same response. */
-  async signIn(): Promise<void> {
+  async signIn(organizationId?: string): Promise<void> {
     try {
-      const session = await workosSignIn(this.#brokerUrl);
+      const session = await workosSignIn(this.#brokerUrl, organizationId);
       this.#applySession(session);
       this.lastError = null;
     } catch (e) {

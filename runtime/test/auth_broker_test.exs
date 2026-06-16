@@ -44,6 +44,24 @@ defmodule Workbooks.AuthBrokerTest do
     assert url =~ "client_01TEST"
   end
 
+  test "scopes the authorize URL to an org when given a valid org id" do
+    assert {:ok, url} =
+             Workbooks.AuthBroker.begin_authorize(
+               "http://127.0.0.1:5000/cb",
+               @good_challenge,
+               "org_01ABC"
+             )
+
+    assert url =~ "organization_id=org_01ABC"
+  end
+
+  test "rejects a malformed org id (no injection into the authorize query)" do
+    for bad <- ["not-an-org", "org_ bad", "org_01;DROP", "../org"] do
+      assert {:error, :bad_org} =
+               Workbooks.AuthBroker.begin_authorize("http://127.0.0.1:5000/cb", @good_challenge, bad)
+    end
+  end
+
   test "exchange rejects an unknown / already-used code" do
     assert {:error, :unknown_code} = Workbooks.AuthBroker.exchange("nope", "verifier")
   end

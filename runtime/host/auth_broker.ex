@@ -30,13 +30,18 @@ defmodule Workbooks.AuthBroker do
 
   def start_link(_), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
 
-  @doc "Build the AuthKit authorize URL for a loopback sign-in. `{:ok, url}` | `{:error, _}`."
-  def begin_authorize(redirect_uri, code_challenge) do
+  @doc """
+  Build the AuthKit authorize URL for a loopback sign-in. `organization_id` scopes the
+  sign-in to a specific org (the desktop switcher); `nil`/"" is a personal session.
+  `{:ok, url}` | `{:error, _}`.
+  """
+  def begin_authorize(redirect_uri, code_challenge, organization_id \\ nil) do
     cond do
       not Workbooks.WorkOS.configured?() -> {:error, :not_configured}
       not loopback?(redirect_uri) -> {:error, :bad_redirect}
       not valid_challenge?(code_challenge) -> {:error, :bad_challenge}
-      true -> GenServer.call(__MODULE__, {:begin, redirect_uri, code_challenge})
+      not valid_org?(organization_id) -> {:error, :bad_org}
+      true -> GenServer.call(__MODULE__, {:begin, redirect_uri, code_challenge, organization_id})
     end
   end
 
@@ -61,10 +66,10 @@ defmodule Workbooks.AuthBroker do
   end
 
   @impl true
-  def handle_call({:begin, redirect_uri, challenge}, _from, s) do
+  def handle_call({:begin, redirect_uri, challenge, org}, _from, s) do
     state = token()
     flows = put(s.flows, state, %{redirect_uri: redirect_uri, challenge: challenge}, @state_ttl)
-    {:reply, {:ok, Workbooks.WorkOS.authorize_url(callback_url(), state)}, %{s | flows: flows}}
+    {:reply, {:ok, Workbooks.WorkOS.authorize_url(callback_url(), state, org)}, %{s | flows: flows}}
   end
 
   def handle_call({:callback, workos_code, state}, _from, s) do
@@ -159,6 +164,12 @@ defmodule Workbooks.AuthBroker do
   defp loopback?(_), do: false
 
   defp valid_challenge?(c), do: is_binary(c) and byte_size(c) in 16..256 and c =~ ~r/^[A-Za-z0-9_-]+$/
+
+  # A WorkOS org id (or absent, for a personal session). Constrained so it can't carry
+  # anything but an id into the upstream authorize query.
+  defp valid_org?(nil), do: true
+  defp valid_org?(""), do: true
+  defp valid_org?(o), do: is_binary(o) and byte_size(o) <= 80 and o =~ ~r/^org_[A-Za-z0-9]+$/
 
   defp pkce_ok?(verifier, challenge) do
     expected = :crypto.hash(:sha256, verifier) |> Base.url_encode64(padding: false)

@@ -88,16 +88,24 @@
 
     <div class="list">
       <!-- Organizations — Personal + every org you've been added to (each ≈ a nexus),
-           with your role. Switching orgs (re-auth to the org's token) is the next layer. -->
+           with your role. Clicking re-authenticates scoped to that org (the switch). -->
       <div class="grp-label">Organizations</div>
       {#each orgs.switcher as o (o.id)}
-        <div class="row org-row" class:active={o.id === orgs.activeOrg}>
+        {@const active = orgs.isActive(o)}
+        <button
+          type="button"
+          class="row org-row"
+          class:active
+          aria-current={active ? "true" : undefined}
+          disabled={orgs.switching}
+          onclick={() => orgs.switchTo(o)}
+        >
           <span class="org-glyph">{o.personal ? "◦" : (o.name[0] || "O").toUpperCase()}</span>
           <span class="row-text">
             <span class="name">{o.name}</span>
-            <span class="url">{o.role}{o.id === orgs.activeOrg ? " · active" : ""}</span>
+            <span class="url">{o.role}{active ? " · active" : ""}</span>
           </span>
-        </div>
+        </button>
       {/each}
 
       <div class="grp-label">Runtimes</div>
@@ -180,7 +188,19 @@
     color: var(--color-fg-subtle); padding: 8px 8px 3px;
   }
   .grp-label:first-child { padding-top: 2px; }
-  .org-row { padding: 6px 8px; gap: 8px; }
+  .org-row {
+    width: 100%;
+    padding: 6px 8px;
+    gap: 8px;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .org-row:hover:not(:disabled) { background: color-mix(in srgb, var(--color-fg) 5%, transparent); }
+  .org-row:disabled { cursor: default; opacity: 0.6; }
   .org-glyph {
     width: 20px; height: 20px; border-radius: 6px; flex: none; display: grid; place-items: center;
     background: var(--color-surface-soft); border: 1px solid var(--color-border);

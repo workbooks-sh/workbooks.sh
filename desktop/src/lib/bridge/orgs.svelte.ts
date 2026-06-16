@@ -31,6 +31,30 @@ class Orgs {
     return [personal, ...this.list.map((o) => ({ ...o, personal: false }))];
   }
 
+  /** True while a re-auth (org switch) is in flight. */
+  switching = $state(false);
+
+  /** Whether `entry` is the currently-active context (Personal = no org scope). */
+  isActive(entry: SwitcherEntry): boolean {
+    return entry.personal ? !this.activeOrg : entry.id === this.activeOrg;
+  }
+
+  /**
+   * Switch the active org: re-authenticate scoped to it (Personal = no org scope),
+   * then refresh from the new token. WorkOS reuses the existing browser session, so
+   * this is usually a fast redirect, not a fresh credential prompt.
+   */
+  async switchTo(entry: SwitcherEntry): Promise<void> {
+    if (this.switching || this.isActive(entry)) return;
+    this.switching = true;
+    try {
+      await auth.signIn(entry.personal ? undefined : entry.id);
+      await this.load(true);
+    } finally {
+      this.switching = false;
+    }
+  }
+
   /** Load from the cloud once (idempotent). Signed-out ⇒ Personal only. */
   async load(force = false): Promise<void> {
     if (this.loaded && !force) return;

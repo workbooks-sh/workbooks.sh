@@ -227,7 +227,10 @@ fn pkce() -> (String, String) {
 /// (redirecting to our ephemeral localhost server), capture the `code`, then
 /// exchange it for a session bearer. The session is stashed in the keychain.
 #[tauri::command]
-pub fn workos_sign_in(broker_url: String) -> Result<StoredSession, String> {
+pub fn workos_sign_in(
+    broker_url: String,
+    organization_id: Option<String>,
+) -> Result<StoredSession, String> {
     let server = tiny_http::Server::http("127.0.0.1:0").map_err(|e| e.to_string())?;
     let port = match server.server_addr() {
         tiny_http::ListenAddr::IP(addr) => addr.port(),
@@ -236,12 +239,16 @@ pub fn workos_sign_in(broker_url: String) -> Result<StoredSession, String> {
     let redirect = format!("http://127.0.0.1:{port}/cb");
     let (verifier, challenge) = pkce();
 
-    let authorize = format!(
+    let mut authorize = format!(
         "{}/v1/auth/authorize?response_type=code&redirect_uri={}&code_challenge={}&code_challenge_method=S256",
         broker_url.trim_end_matches('/'),
         urlencode(&redirect),
         challenge,
     );
+    // Scope the sign-in to a specific org (the org switcher); omitted for personal.
+    if let Some(org) = organization_id.as_deref().filter(|o| !o.is_empty()) {
+        authorize.push_str(&format!("&organization_id={}", urlencode(org)));
+    }
     open::that(&authorize).map_err(|e| e.to_string())?;
 
     // Block for the redirect carrying ?code=… (single request).

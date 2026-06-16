@@ -45,7 +45,8 @@ defmodule Workbooks.Web do
 
     case Workbooks.AuthBroker.begin_authorize(
            conn.query_params["redirect_uri"] || "",
-           conn.query_params["code_challenge"] || ""
+           conn.query_params["code_challenge"] || "",
+           conn.query_params["organization_id"]
          ) do
       {:ok, url} -> conn |> put_resp_header("location", url) |> send_resp(302, "")
       {:error, reason} -> send_resp(conn, 400, "sign-in unavailable (#{reason})")
