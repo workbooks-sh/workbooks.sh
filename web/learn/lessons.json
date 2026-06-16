@@ -298,7 +298,7 @@
        "audio": true,
        "status": "live",
        "added": "2026-06-12",
-       "dek": "Anything → toolkit: how wbx toolkit import sniffs nine source shapes (Claude skills, MCP configs, OpenAPI specs, npm/pip CLIs, cursor rules, AGENTS.md…), mechanically translates docs to org, and scaffolds a real manifest + skill tree — with carried scripts honestly flagged as untrusted."
+       "dek": "Anything → toolkit: how work toolkit import sniffs nine source shapes (Claude skills, MCP configs, OpenAPI specs, npm/pip CLIs, cursor rules, AGENTS.md…), mechanically translates docs to org, and scaffolds a real manifest + skill tree — with carried scripts honestly flagged as untrusted."
       },
       {
        "slug": "audits",
@@ -446,7 +446,7 @@
        "audio": true,
        "status": "live",
        "added": "2026-06-13",
-       "dek": "Inside OQL — one 550-line pure Rust crate (parse, tangle, validate, render on orgize) that ships as three surfaces from the same source: a native rlib in the wb CLI, a WIT-typed wasm Component in the runtime and desktop, and a raw ptr/len build running in this very website."
+       "dek": "Inside OQL — one 550-line pure Rust crate (parse, tangle, validate, render on orgize) that ships as three surfaces from the same source: a native rlib in the work CLI, a WIT-typed wasm Component in the runtime and desktop, and a raw ptr/len build running in this very website."
       },
       {
        "slug": "todos",
@@ -627,11 +627,11 @@
      ]
     },
     {
-     "slug": "wbx",
-     "title": "wbx",
+     "slug": "work",
+     "title": "work",
      "sub": "the command",
      "color": "#d9dbd3",
-     "icon": "icons/wbx.svg",
+     "icon": "icons/work.svg",
      "audio": true,
      "status": "live",
      "sublessons": [
@@ -640,7 +640,7 @@
        "title": "modes",
        "sub": "concept",
        "color": "#d9dbd3",
-       "icon": "icons/wbx.svg",
+       "icon": "icons/work.svg",
        "audio": true,
        "status": "live",
        "added": "2026-06-12",
@@ -651,7 +651,7 @@
        "title": "pipelines",
        "sub": "implementation",
        "color": "#d9dbd3",
-       "icon": "icons/wbx.svg",
+       "icon": "icons/work.svg",
        "audio": true,
        "status": "live",
        "added": "2026-06-12",
@@ -662,18 +662,18 @@
        "title": "doctor",
        "sub": "setup",
        "color": "#d9dbd3",
-       "icon": "icons/wbx.svg",
+       "icon": "icons/work.svg",
        "audio": true,
        "status": "live",
        "added": "2026-06-12",
-       "dek": "Wire wbx into your shell and let it check itself — doctor's report-not-judge contract (always exit 0, JSON for agents), the bare-wbx where-am-I landing, clap-generated completions, and upgrade's npm-aware self-update."
+       "dek": "Wire work into your shell and let it check itself — doctor's report-not-judge contract (always exit 0, JSON for agents), the bare-work where-am-I landing, clap-generated completions, and upgrade's npm-aware self-update."
       },
       {
        "slug": "deploy-kit",
        "title": "deploy kit",
        "sub": "setup",
        "color": "#d9dbd3",
-       "icon": "icons/wbx.svg",
+       "icon": "icons/work.svg",
        "status": "live",
        "dek": "Stand up an engine with the deploy-kit — scaffold deployment.org with init, validate, apply, and watch one verb set converge a local container or a cloud provider, with secrets declared by name and never written into the artifact.",
        "audio": true,
@@ -684,7 +684,7 @@
        "title": "the seam",
        "sub": "mechanics",
        "color": "#d9dbd3",
-       "icon": "icons/wbx.svg",
+       "icon": "icons/work.svg",
        "status": "planned",
        "dek": "Why the same crate compiles to your laptop and into the engine's sandbox — one Io trait (http/read/write/spawn) as the only place the two targets differ, native std/reqwest on one side, Dock-brokered host imports on the other, plus engine discovery via runtime.json."
       },
@@ -693,7 +693,7 @@
        "title": "recipes",
        "sub": "implementation",
        "color": "#d9dbd3",
-       "icon": "icons/wbx.svg",
+       "icon": "icons/work.svg",
        "audio": true,
        "status": "live",
        "added": "2026-06-12",
@@ -704,11 +704,11 @@
        "title": "distribution",
        "sub": "setup",
        "color": "#d9dbd3",
-       "icon": "icons/wbx.svg",
+       "icon": "icons/work.svg",
        "audio": true,
        "status": "live",
        "added": "2026-06-12",
-       "dek": "One static binary, three install lanes: a GitHub Release tagged wbx-v* feeds curl installs, an npm launcher whose postinstall downloads the matching platform asset (with PATH-shadow detection and loud failure banners), and wbx upgrade self-swaps the binary in place — plus a wb.wasm target published for in-sandbox agents."
+       "dek": "One static binary, three install lanes: a GitHub Release tagged work-v* feeds curl installs, an npm launcher whose postinstall downloads the matching platform asset (with PATH-shadow detection and loud failure banners), and work upgrade self-swaps the binary in place — plus a wb.wasm target published for in-sandbox agents."
       }
      ]
     },
@@ -957,7 +957,7 @@
      "promotion",
      "tangling",
      "claims",
-     "wbx",
+     "work",
      "modes",
      "pipelines",
      "doctor"

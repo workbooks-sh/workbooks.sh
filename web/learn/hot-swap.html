@@ -221,7 +221,7 @@ sequenceDiagram
   agent can write itself a sharper tool; it can't write itself a bigger
   blast radius.</p>
   <p>You can drive it by hand to feel it. Build a command from a file:</p>
-  <pre class="orgsample">$ wb toolkit build-inline slugify rust slugify.rs
+  <pre class="orgsample">$ work toolkit build-inline slugify rust slugify.rs
 
 built + registered command `slugify` (rust) → build/commands/9f2c…81d4.wasm
 run it via the Dock: run-command slugify</pre>
@@ -347,7 +347,7 @@ flowchart TD
     surprise.</li>
     <li><b>Provenance gates the swap-in.</b> A third-party toolkit with invalid
     provenance never builds — the engine refuses it outright and tells the author to
-    <code>wb toolkit sign</code> it first. And <a href="trust">trust posture</a>
+    <code>work toolkit sign</code> it first. And <a href="trust">trust posture</a>
     drives the isolation tier at run time: a third-party command is routed to a
     separate BEAM VM, with graceful fallback to local. You can swap in someone
     else's code, but only signed, and it runs further from the core than your
@@ -397,7 +397,7 @@ flowchart TD
     <tr><td>app <code>dist/</code></td><td class="y">on pull</td><td>deploy_app → site root</td></tr>
     <tr><td>app <code>src/</code> needing vite</td><td class="n">after CI / committed dist</td><td>the build seam — honest gap</td></tr>
     <tr><td>host engine (.ex)</td><td class="n">redeploy</td><td>CI runtime image, never hot</td></tr>
-    <tr><td>wbx itself</td><td class="n">next invocation</td><td><code>wbx upgrade</code> binary rename</td></tr>
+    <tr><td>work itself</td><td class="n">next invocation</td><td><code>work upgrade</code> binary rename</td></tr>
   </table>
   <p>Read the bottom four rows together — they're where a push <em>won't</em> just
   go live, and knowing them saves you the confusion of pushing the wrong kind of
@@ -415,7 +415,7 @@ flowchart TD
   source — swapping in new compiled bytes still takes an explicit build-and-register
   call or an agent action.</p>
   <p>For contrast, hold this up against the one thing nearby that <em>isn't</em> a
-  registry repoint: <code>wbx upgrade</code> swaps the CLI's own native binary by
+  registry repoint: <code>work upgrade</code> swaps the CLI's own native binary by
   downloading a new one and renaming it into place — a host-binary swap that takes
   effect on the next invocation, not a live repoint of a running map. Same word,
   different layer. The registry swap is live and in-flight-safe; the binary swap

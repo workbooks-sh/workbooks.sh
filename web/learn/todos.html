@@ -347,16 +347,16 @@ sequenceDiagram
   <p>Depth rung. The morning after a run, three verbs answer three questions —
   what ran, what broke, and whether anyone edited the story. Real output shapes,
   from the CLI:</p>
-  <pre class="orgsample">$ wb telemetry
+  <pre class="orgsample">$ work telemetry
 SLUG          STAGE  CALLS  ERRORS  MS
 wf-1842       done   41     1       183204
 wf-1791       done   12     0       60113
 
-$ wb telemetry wf-1842
+$ work telemetry wf-1842
 stage=done calls=41 errors=1 total_ms=183204
   ! step 17 bash: exit 1
 
-$ wb ledger wf-1842
+$ work ledger wf-1842
 tamper-evident=ok attributable=ok count=41 did=did:key:z6Mk…</pre>
   <p>The first command is <b>what ran</b> — a runs index, one line per run, with
   call counts, error counts, and total milliseconds. The second is <b>what
@@ -382,9 +382,9 @@ tamper-evident=ok attributable=ok count=41 did=did:key:z6Mk…</pre>
   selectable states, not skip-on-resume states.</p>
   <p><b>Two parsers disagree.</b> The Elixir workflow engine has its own
   self-contained parser with the full default keyword set and the
-  <code>#+TODO:</code> override. The kernel — <code>wb query &lt;file.org&gt;</code>
+  <code>#+TODO:</code> override. The kernel — <code>work query &lt;file.org&gt;</code>
   — uses orgize with its default config, whose todo keywords are exactly
-  <code>TODO</code> and <code>DONE</code>. So <code>wb query</code> reports
+  <code>TODO</code> and <code>DONE</code>. So <code>work query</code> reports
   <code>state</code> only for literal TODO/DONE; a <code>NEXT</code> or
   <code>DOING</code> keyword stays inside the title as far as the kernel is
   concerned. The two surfaces read the same file and see different states —
@@ -439,14 +439,14 @@ tamper-evident=ok attributable=ok count=41 did=did:key:z6Mk…</pre>
   </details>
   <details>
     <summary>Where do I look the morning after a run?</summary>
-    <p>Three verbs. <code>wb telemetry</code> for what ran,
-    <code>wb telemetry &lt;slug&gt;</code> for what broke,
-    <code>wb ledger &lt;slug&gt;</code> to prove nobody edited the history.
+    <p>Three verbs. <code>work telemetry</code> for what ran,
+    <code>work telemetry &lt;slug&gt;</code> for what broke,
+    <code>work ledger &lt;slug&gt;</code> to prove nobody edited the history.
     All three read files the run left in its workdir — no server required to ask
     the question.</p>
   </details>
   <details>
-    <summary>Why does <code>wb query</code> miss my NEXT tasks?</summary>
+    <summary>Why does <code>work query</code> miss my NEXT tasks?</summary>
     <p>Because it's the kernel parser, not the workflow engine. orgize's default
     config only knows TODO and DONE, so a NEXT or DOING keyword stays inside the
     title there. The Elixir runner knows the full set. Same file, two

@@ -83,7 +83,7 @@
   <h2>the second FILE</h2>
   <p>The <a href="workbook">parent lesson</a> made a one-file promise: the
   workbook is the app, the source, and the disk, in a single artifact. Then
-  you ran <code>wbx bundle</code> and a <em>second</em> file appeared, wearing
+  you ran <code>work bundle</code> and a <em>second</em> file appeared, wearing
   an extension you've never seen. Every instinct you've trained on twenty
   years of software says: here it comes. The custom container. The moat.</p>
   <p>Those instincts are earned. The history of "our format" is mostly a
@@ -114,7 +114,7 @@
   </div>
   <p>That defcard is not a summary of the spec. It <em>is</em> the spec.
   The runtime packs bundles with the zip library that ships in Erlang's
-  standard library; the <a href="wbx">CLI</a> packs them with a stock Rust
+  standard library; the <a href="work">CLI</a> packs them with a stock Rust
   zip crate using ordinary deflate. Two implementations, one deliberately
   boring container — the design's own words: because it's a plain zip,
   any tool can open it. Not a moat. A carton. The 1989 kind.</p>
@@ -125,7 +125,7 @@
   <p>Proof beats reassurance. Bundle a project, then crack the result open
   with the <code>unzip</code> that has shipped on every Unix since before
   some of your dependencies were born:</p>
-  <pre class="orgsample">$ wbx bundle shop/
+  <pre class="orgsample">$ work bundle shop/
 bundled shop/shop.org → shop.wbundle (412403 bytes, with vfs.sqlite)
 
 $ unzip -l shop.wbundle
@@ -159,9 +159,9 @@ Archive:  shop.wbundle
 
 <section id="roundtrip">
   <h2>bundle ⇄ UNBUNDLE</h2>
-  <p>The local round trip is two <a href="wbx">CLI</a> verbs, and both run
+  <p>The local round trip is two <a href="work">CLI</a> verbs, and both run
   entirely on your machine — no engine, no account, no network. First,
-  how <code>wbx bundle</code> decides what to pack. You can hand it a
+  how <code>work bundle</code> decides what to pack. You can hand it a
   <code>.org</code> file directly; or a directory, in which case it looks
   for <code>workbook.org</code> inside; or a directory with exactly one
   <code>.org</code> file, which it takes as the obvious choice. Two or more
@@ -169,8 +169,8 @@ Archive:  shop.wbundle
   explicitly</i> — guessing is not a feature in a packaging tool.</p>
   <p>Then the gate. The bundle verb will not assemble a workbook whose
   source doesn't lint clean:</p>
-  <pre class="orgsample">$ wbx bundle shop/
-error: source has diagnostics — fix them first (wb lint)</pre>
+  <pre class="orgsample">$ work bundle shop/
+error: source has diagnostics — fix them first (work lint)</pre>
   <p>That's a deliberate stance: a <code>.wbundle</code> is a thing you hand
   to other people, so the assembler refuses to carton up known-broken
   source. Fix the diagnostics, run again, and the pipeline is short:</p>
@@ -181,26 +181,26 @@ flowchart LR
   lint -- "clean" --> render["render<br/>org → workbook.html"]
   render --> pack["pack — plain zip<br/>+ manifest.json"]
   pack --> wb["shop.wbundle"]
-  wb --> un["wbx unbundle"]
+  wb --> un["work unbundle"]
   un --> dir["shop/ — the project back,<br/>ready to re-author"]
   style src fill:#f2ddb0,stroke:#121316
   style lint fill:#ffffff,stroke:#121316
   style stop fill:#f3c5a3,stroke:#121316
   style render fill:#ffffff,stroke:#121316
   style pack fill:#ffffff,stroke:#121316
-  style wb fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  style work fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
   style un fill:#ffffff,stroke:#121316
   style dir fill:#aee5c2,stroke:#121316
   </pre>
   <p>Defaults are unsurprising on purpose: output is named after the org
   file's stem — <code>&lt;stem&gt;.wbundle</code>, written where you ran
-  the command; <code>wbx unbundle</code> extracts
+  the command; <code>work unbundle</code> extracts
   into a directory named after the file's stem unless you say otherwise.
   The exact strings, because exactness is this page's whole register:</p>
-  <pre class="orgsample">$ wbx bundle shop/
+  <pre class="orgsample">$ work bundle shop/
 bundled shop/shop.org → shop.wbundle (412403 bytes, with vfs.sqlite)
 
-$ wbx unbundle shop.wbundle
+$ work unbundle shop.wbundle
 unbundled shop.wbundle → shop/ (4 files)</pre>
   <p>And the trip is lossless where it counts: the source rides inside, so
   <code>bundle → unbundle</code> gives the recipient the <em>project</em>
@@ -313,7 +313,7 @@ flowchart TD
   wb --- pub
   wb --- tk
   wb --- fr
-  style wb fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
+  style work fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
   style co fill:#fbfaf6,stroke:#121316
   style st fill:#fbfaf6,stroke:#121316
   style pub fill:#fbfaf6,stroke:#121316
@@ -329,7 +329,7 @@ flowchart TD
   design doc says it plainly — archiving is just writing the blob to cold
   storage. <b>Publish</b> accepts a <code>.wbundle</code> and pulls
   <code>workbook.html</code> out of it by name — and refuses raw org source
-  with <i>publish ships ASSEMBLED workbooks — run wb bundle first</i>.
+  with <i>publish ships ASSEMBLED workbooks — run work bundle first</i>.
   <b><a href="toolkit">Toolkit</a> install</b>: a built toolkit — compiled
   wasm and all — ships in the same container; the engine's own tests put it
   in writing: it's still just a .wbundle. And <b>the fractal pack</b>: a
@@ -355,7 +355,7 @@ flowchart TD
   all and the answer is equally blunt: <i>not a workbook bundle (zip)</i>.
   Fail closed, say why, write nothing.</p>
   <p>Sizes are bounded where bundles cross the network: checkin bodies cap
-  at 100 MB, toolkit installs at 50 MB. Local <code>wbx bundle</code> has
+  at 100 MB, toolkit installs at 50 MB. Local <code>work bundle</code> has
   no ceiling in code — the caps live at the engine's doors, where untrusted
   bytes arrive. Notice the symmetry with <a href="#ship-restore">the
   previous section</a>: the privacy strip guards the way <em>out</em>, the
@@ -405,7 +405,7 @@ flowchart TD
   Send someone a <code>.wbundle</code> and you've sent them the project as
   it stood; if you want two copies to converge again, that's the
   <a href="nexus">engine's</a> job, not the carton's.</p>
-  <p><b>Bundle is not build.</b> <code>wbx bundle</code> is local assembly —
+  <p><b>Bundle is not build.</b> <code>work bundle</code> is local assembly —
   lint, render, zip. Compiling components is a different, engine-backed
   verb. The lint gate will tell you the difference the moment your source
   needs more than assembly.</p>
@@ -491,8 +491,8 @@ flowchart TD
       <div>What is a workbook<small>the unit this carton ships</small></div><span class="go">→</span></a>
     <a href="vfs"><span class="sw" style="background:#a8d4f0"><img src="icons/vfs.svg" alt=""></span>
       <div>The VFS<small>the disk riding inside — and its volumes</small></div><span class="go">→</span></a>
-    <a href="wbx"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span>
-      <div>wbx, the CLI<small>where bundle and unbundle live</small></div><span class="go">→</span></a>
+    <a href="work"><span class="sw" style="background:#d9dbd3"><img src="icons/work.svg" alt=""></span>
+      <div>work, the CLI<small>where bundle and unbundle live</small></div><span class="go">→</span></a>
     <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
       <div>The Nexus<small>ship, restore, and every engine door</small></div><span class="go">→</span></a>
   </div>

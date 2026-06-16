@@ -44,7 +44,7 @@ Every brief independently named the same failure and the same fix:
 3. **Problem-centered, not content-centered.** Sequence around what the learner wants to *do* (delegate, review, ship, trust), not how the system is constructed.
 4. **The collaborator appears first.** The agent is the learner's hands. It shows up in Unit 1, structured as the Level 1→2→3 climb.
 5. **Show, don't tell.** Worked artifacts — a real prompt, the agent's real reply, the real result — over analogies. Editable starter-prompt cards ("Build me a `[tool]` that `[does X]` from `[my data]`") beat blank-canvas prose.
-6. **Concept first, mechanics optional.** Keep the conceptual strength, but re-anchor each concept lesson as *"so you can tell if the agent did it right."* Push deep mechanics (Org syntax, wbx, kernel, seam) to optional/reference back-half — expertise-reversal effect: deep mechanics help experts, hurt novices.
+6. **Concept first, mechanics optional.** Keep the conceptual strength, but re-anchor each concept lesson as *"so you can tell if the agent did it right."* Push deep mechanics (Org syntax, work, kernel, seam) to optional/reference back-half — expertise-reversal effect: deep mechanics help experts, hurt novices.
 7. **Honest arc with payoff.** End the core path on the aspirational self-improving system (brand-canon framed: "software built in workbooks," never "sites that run themselves"), then optional internals.
 
 ---
@@ -67,7 +67,7 @@ UNIT 8  Under the hood (optional)                (one ending, gated "for the cur
 - **Unit 1 is the activation unit** and the spine of the whole rebuild. It answers "why does this matter to me," then immediately puts the learner in the director's seat. Structured as the maturity ladder: *tell it what you want* (L1→2) → *the loop: prompt, look, redirect* (L2) → *reading what it did* (L2→3) → *your first workbook, end to end* (the worked narrative every analog front-loads, which we have zero of). This is the felt first win.
 - **Unit 2 fixes the frame inversion.** Now that the learner has *done* something, the ecosystem map lands as "here's what you were just standing on." The file is introduced as the core *unit you end up holding*, not the foundation. Folds `the-one-file` + `carries-its-story` + the language idea.
 - **Unit 3 fixes the backwards dependency and surfaces 40% of the thesis.** "Your agent runs in a safe sandbox you can trust" is a *motivation* (why you can hand it power), so it belongs before toolkits, framed as a benefit ("your secrets never touch the OS"), not a micro-VM mechanism tour. This is also the most *shareable* asset (counterintuitive, founder-original) and answers the audience's first objection: "is this safe for my company's data?"
-- **Unit 4 (toolkits) now sits after the engine that runs them.** Maturity-hedged (toolkits = least-mature prong). `wbx` demoted to a reference card — the *agent* runs wbx, not this user.
+- **Unit 4 (toolkits) now sits after the engine that runs them.** Maturity-hedged (toolkits = least-mature prong). `work` demoted to a reference card — the *agent* runs work, not this user.
 - **Unit 5** keeps the agent-depth lessons, re-anchored as "how the agent works when you're not watching, and how you keep it honest" — review like an untrusted colleague.
 - **Unit 6 is the climax.** Automation → the self-improving system. The autopoet moves OUT of `plans-that-run` (where it's a credibility risk — Phase-1-only + collides with "never pitch self-running") and becomes the honest Level-3 summit, framed per brand canon.
 - **Unit 7** merges the two thin single-lesson units (disk, browser) into trust/sharing — all the same idea: a copyable artifact that stays safe and useful when handed out.
@@ -80,7 +80,7 @@ UNIT 8  Under the hood (optional)                (one ending, gated "for the cur
 These over-claims are corrected as we reframe, not deferred:
 
 - `the-one-file` three false claims (no-server, history-in-file, one-HTML→bundle) — corrected in Unit 2; the file is the *unit* inside an ecosystem that *does* stand on a runtime.
-- `did-it-do-well` grounded in the real `wb toolkit eval` surface; cost/speed figure softened — Unit 1 (review) and Unit 5.
+- `did-it-do-well` grounded in the real `work toolkit eval` surface; cost/speed figure softened — Unit 1 (review) and Unit 5.
 - `going-live` public-history 401 claim fixed — Unit 3.
 - `plans-that-run` two-way kanban + self-running schedule softened; **autopoet doc-link cut** and relocated to the Unit 6 climax — the highest-risk over-claim.
 - `safe-powers` lowest-rung "no secrets" corrected — Unit 3.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deploy the brandnana production engine THROUGH the deploy-kit (fly provider) —
 # one deploy path, dogfooded. Equivalent CLI form:
-#   WB_FLY_APP=bn-engine-agents wb deploy --place fly up
+#   WB_FLY_APP=bn-engine-agents work deploy --place fly up
 #
 #   bash ci/deploy.sh                 # deploy the default app (bn-engine-agents)
 #   bash ci/deploy.sh bn-engine       # cut over a specific app

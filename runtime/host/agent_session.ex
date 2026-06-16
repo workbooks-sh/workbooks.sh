@@ -77,7 +77,7 @@ defmodule Workbooks.AgentSession do
           # the `run` bash hatch was deleted (wb-9ja).
           exec: Keyword.get(opts, :exec, false),
           # WB_RUN lets the agent address its OWN run for CTK reviews — build the
-          # ?run= connect URL + `wb ctk await $WB_RUN` (see toolkits/ctk).
+          # ?run= connect URL + `work ctk await $WB_RUN` (see toolkits/ctk).
           env: [{"WB_RUN", run_id} | Keyword.get(opts, :env, [])],
           on_step: fn ev -> send(parent, {:step, ev}) end,
           on_delta: fn chunk -> send(parent, {:delta, chunk}) end

@@ -90,7 +90,7 @@ test.describe(live ? "agent live (desktop ↔ real runtime)" : "agent live (skip
         "Overview and Timeline. Then open it for me.",
     );
     // What vite CAN prove end-to-end: the prompt reaches the real agent, it acts
-    // (vfs_write + `wb app open-tab` — confirmed in the runtime log), and confirms
+    // (vfs_write + `work app open-tab` — confirmed in the runtime log), and confirms
     // back in the transcript. Assert the agent's reply lands referencing the workbook.
     //
     // NOTE: the open-tab → actual desktop TAB requires the native Tauri shell (the

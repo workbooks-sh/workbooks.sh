@@ -43,7 +43,7 @@ sign-in, network social feed, publish, auto-update.
 | **Embedded OQL kernel** weave/tangle/validate/lint/outline, in-process via wasmtime | `kernel.rs` (oql.wasm 414KB compiled in, real component-model run); tests pass `kernel.rs:78-91` |
 | **Live workbook editor** — weave+validate+outline as you type (250ms debounce) | `WorkbookView.svelte:68-89`, `kernel.ts:14-46` → real `invoke()` |
 | **File open/save `.org`** — native dialog + Rust `std::fs` | `files.ts:12-33`, `lib.rs:78-84` |
-| **Daemon supervision** — `wb deploy local/status/down`, discovery file read | `daemon.rs`, `lib.rs:88-100` |
+| **Daemon supervision** — `work deploy local/status/down`, discovery file read | `daemon.rs`, `lib.rs:88-100` |
 | **Runtime discovery + Bearer token** — reads `{port,token}`, attaches `Authorization` | `runtime.rs`→`runtime_url`, `runtime.ts:21-35` |
 | **Sidecar health check** — real HTTP GET `/health` w/ token | `bindings.ts:525-533` (only command that actually calls `rt()`) |
 | **Offline gate** — reachability guard + real engine restart | `router.ts:23-25`, `OfflineView.svelte:17-25` |
@@ -136,6 +136,6 @@ WIRE-UP bucket as a side effect.
 ## Shippability blockers (separate from features)
 
 - No Apple signing cert (codesign/notarize) — `README` "Not yet shippable".
-- `wb` bundling undecided (escript needs Erlang → Burrito-wrap ERTS, or reimplement deploy
+- `work` bundling undecided (escript needs Erlang → Burrito-wrap ERTS, or reimplement deploy
   in Rust).
 - Runtime image `ghcr.io/workbooks-sh/runtime` must be public for anonymous pull.

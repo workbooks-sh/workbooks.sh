@@ -44,7 +44,7 @@
       <div class="kicker">learn / 01·6 — <b>under workbook · sharing</b></div>
       <h1><span class="ln">proof that</span><span class="ln bub">TRAVELS</span><span class="ln">with the file</span></h1>
       <p class="dek">The <a href="workbook">parent lesson</a> ended on a one-liner:
-      <code>wbx sign shop.html</code> — <i>provenance travels with the file</i>. This page
+      <code>work sign shop.html</code> — <i>provenance travels with the file</i>. This page
       is the how. One Ed25519 key per tenant, a <b>did:key that is the public key</b>,
       a manifest embedded in the HTML, and a verifier that runs in any browser —
       <b>no account on either end</b>, and honestly, what none of it promises.</p>
@@ -128,7 +128,7 @@
   <code>.workbooks/</code> keystore. The private half never enters version
   control: the same module that guards every egress — git, bundle, library —
   writes a <code>.gitignore</code> over the whole keystore automatically.
-  The <a href="wbx">CLI</a> mints its own local key in the identical
+  The <a href="work">CLI</a> mints its own local key in the identical
   on-disk format, <code>chmod 0600</code> on unix.</p>
   <p>The public half becomes a name — and this is the load-bearing move of
   the entire lesson. Take the 32-byte public key, prefix it with the
@@ -213,7 +213,7 @@ flowchart TD
   <p>Then the handoff itself:</p>
   <pre class="mermaid">
 sequenceDiagram
-  participant S as sender — wbx sign
+  participant S as sender — work sign
   participant F as shop.html — the file
   participant R as recipient — any verifier
   S->>F: embed the manifest block before the closing body tag
@@ -230,7 +230,7 @@ sequenceDiagram
   not a clock authority, not the sender. Two details worth keeping: signing
   is <b>idempotent</b> — re-signing strips any prior manifest first, so a
   file never accumulates stale claims — and both CLI lanes
-  (<code>wbx sign</code> / <code>wbx verify</code> on an engine, and the
+  (<code>work sign</code> / <code>work verify</code> on an engine, and the
   local Rust CLI) are byte-compatible: either can verify the other's
   output.</p>
 </section>
@@ -266,16 +266,16 @@ sequenceDiagram
   <p>The recipient's side is the page's load-bearing promise, so let's keep
   it literal. The round trip first, with real commands and real verdict
   shapes:</p>
-  <pre class="orgsample">$ wbx sign shop.html
+  <pre class="orgsample">$ work sign shop.html
 signed shop.html as did:key:z6MkpTHR8…dvktH → shop.html
 
-$ wbx verify shop.html
+$ work verify shop.html
 { "valid": true, "signature": true, "asset_integrity": true,
   "issuer_did": "did:key:z6MkpTHR8…dvktH",
   "issued_at": "2026-06-12T09:14:03.412Z", "assertions": […] }
 
 <i># the recipient — or anyone — edits one character of the page, then:</i>
-$ wbx verify shop.html
+$ work verify shop.html
 { "valid": false, "signature": true, "asset_integrity": false, … }</pre>
   <p>Read the failed verdict carefully, because the split is the
   diagnostic. <code>signature: true</code> with
@@ -310,7 +310,7 @@ $ wbx verify shop.html
   <h2>signed on every way OUT</h2>
   <p><span class="skip">depth rung · <b>skippable</b> — provenance as a property of leaving</span></p>
   <p>Here's the part that keeps signing from becoming one more step humans
-  forget: <b>you mostly don't run <code>wbx sign</code></b>. The engine
+  forget: <b>you mostly don't run <code>work sign</code></b>. The engine
   signs as part of leaving — every door out passes the artifact through
   the same signing seam:</p>
   <figure class="diag" aria-label="every egress signs">
@@ -338,7 +338,7 @@ flowchart TD
   repo[["the workbook repo — your work, with history"]]
   repo --> src["SOURCE rail — git push, plain"]
   repo --> art["ARTIFACT rail — pack + sign"]
-  src --> s1["github · gitlab · gitea<br/>any remote — wbx mirror"]
+  src --> s1["github · gitlab · gitea<br/>any remote — work mirror"]
   art --> a1["pages / self-host<br/>the signed .html"]
   art --> a2["an ATproto feed<br/>public, C2PA-verified"]
   style repo fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
@@ -349,7 +349,7 @@ flowchart TD
   style a2 fill:#ffffff,stroke:#121316
   </pre>
   <p>The <b>source rail</b> is deliberately boring: the unpacked repo, as
-  plain <a href="git">git</a>, to any host. <code>wbx mirror &lt;url&gt;</code>
+  plain <a href="git">git</a>, to any host. <code>work mirror &lt;url&gt;</code>
   pushes anywhere; pass <code>--forge github|gitlab|gitea</code> and the
   remote is auto-provisioned through the host's own CLI. No proprietary
   sync protocol, no blessed forge — history rides this rail, in the format

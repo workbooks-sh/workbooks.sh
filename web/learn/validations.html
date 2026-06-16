@@ -132,7 +132,7 @@
   <h2>rung 1 — validating the PLAN</h2>
   <p>The first rung runs before a single task executes. It lives in the
   <a href="org">OQL kernel</a> — the same pure string&rarr;string function that
-  ships both as a native library inside the <code>wbx</code> CLI and as the
+  ships both as a native library inside the <code>work</code> CLI and as the
   <code>workbooks:oql</code> WASM component. There is no &ldquo;wasm version&rdquo;
   of the logic and a separate native one; it is one function, run everywhere.</p>
   <p><code>validate</code> only looks at subtrees tagged <code>:workflow:</code>.
@@ -174,7 +174,7 @@ flowchart LR
 <section id="diagnostic">
   <h2>the shape of a FINDING</h2>
   <p>Here is the promise made literal. A broken plan — verified against the real
-  <code>wbx</code> binary — names a producer-less input and a component with no
+  <code>work</code> binary — names a producer-less input and a component with no
   source block:</p>
   <pre class="orgsample">* Broken workflow                                   :workflow:
 ** Summarize                                        :component:
@@ -182,7 +182,7 @@ flowchart LR
    export default (e) =&gt; e;
    #+end_src
 ** Orphan task                                      :component:</pre>
-  <pre class="orgsample">$ wbx lint broken.org
+  <pre class="orgsample">$ work lint broken.org
 [{"level":"error","message":"input `events:list` has no upstream producer","scope":"Summarize"},
  {"level":"error","message":"component has no source block / language","scope":"Orphan task"}]</pre>
   <p>Two errors, each with a <b>scope</b> — and the scope <em>is</em> the name.
@@ -195,16 +195,16 @@ flowchart LR
   <p>The same diagnostic shape surfaces through four doors:</p>
   <table class="cmp">
     <tr><th>surface</th><th>the verb</th></tr>
-    <tr><td><code>wbx lint &lt;file.org&gt;</code></td><td>runs <code>validate</code>, prints the JSON</td></tr>
-    <tr><td><code>wbx bundle</code></td><td><b>refuses to assemble</b> on any diagnostic</td></tr>
+    <tr><td><code>work lint &lt;file.org&gt;</code></td><td>runs <code>validate</code>, prints the JSON</td></tr>
+    <tr><td><code>work bundle</code></td><td><b>refuses to assemble</b> on any diagnostic</td></tr>
     <tr><td>runtime WebSocket <code>"validate"</code></td><td>same wasm, over a socket</td></tr>
     <tr><td><code>POST /w/:id/call</code> <code>fn=validate</code></td><td>same wasm, over HTTP</td></tr>
   </table>
   <p>That second row is a gate, not a courtesy. <a href="bundles">Bundling</a>
   is where the plan becomes a shippable workbook, and it will not assemble a
   source that doesn't lint clean — the error reads <code>source has diagnostics
-  &mdash; fix them first (wb lint)</code>, followed by the very JSON above.
-  <code>wbx init</code> even lints its own scaffold on the way out, so a template
+  &mdash; fix them first (work lint)</code>, followed by the very JSON above.
+  <code>work init</code> even lints its own scaffold on the way out, so a template
   bug fails the template, not you.</p>
 </section>
 
@@ -437,9 +437,9 @@ Workbooks.Conformance.engine?("build/oql.wasm")
   overclaim. Treat it as the contract the build <em>should</em> enforce, demoed
   end-to-end, with universal wiring still in front of it.</p>
   <p><b>One CLI's <code>lint</code> is a stub.</b> The Elixir CLI's
-  <code>wb lint</code> maps to a kernel <code>lint</code> that returns an empty
+  <code>work lint</code> maps to a kernel <code>lint</code> that returns an empty
   list today; the real checker is <code>validate</code>, reached by the Rust
-  <code>wbx lint</code>. Use <code>wbx lint</code> when you want the diagnostics
+  <code>work lint</code>. Use <code>work lint</code> when you want the diagnostics
   this page describes.</p>
 </section>
 
@@ -478,10 +478,10 @@ Workbooks.Conformance.engine?("build/oql.wasm")
     detector is a design answer, not a gap.</p>
   </details>
   <details>
-    <summary>Is <code>wbx bundle</code> failing on diagnostics a bug?</summary>
+    <summary>Is <code>work bundle</code> failing on diagnostics a bug?</summary>
     <p>No — it's the gate. Bundling refuses to assemble a workbook that doesn't
     lint clean; the error <code>source has diagnostics &mdash; fix them first</code>
-    is the feature working. Run <code>wbx lint</code>, read the named scopes, fix
+    is the feature working. Run <code>work lint</code>, read the named scopes, fix
     them, and the bundle proceeds.</p>
   </details>
   <details>

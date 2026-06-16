@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>deploy kit — one file brings the engine up — Workbooks</title>
-<meta name="description" content="The deploy kit is the bootstrap family inside wbx: one org file (deployment.org), one converge verb set (init/validate/apply/status/logs/down/doctor/secrets), and a provider seam that's a shell file, not a plugin SDK. A sub-lesson under wbx.">
+<meta name="description" content="The deploy kit is the bootstrap family inside work: one org file (deployment.org), one converge verb set (init/validate/apply/status/logs/down/doctor/secrets), and a provider seam that's a shell file, not a plugin SDK. A sub-lesson under work.">
 <link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="img/deploy-kit-hero.jpg" as="image" fetchpriority="high">
 <link rel="stylesheet" href="../fonts/fonts.css">
@@ -14,14 +14,14 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Workbooks">
 <meta property="og:title" content="deploy kit — one file brings the engine up">
-<meta property="og:description" content="One org file, one converge verb set, one provider seam — the bootstrap layer under `wbx deploy local`. Secrets by name, never in the artifact.">
+<meta property="og:description" content="One org file, one converge verb set, one provider seam — the bootstrap layer under `work deploy local`. Secrets by name, never in the artifact.">
 <meta property="og:url" content="https://workbooks.sh/learn/deploy-kit">
 <meta property="og:image" content="https://workbooks.sh/og/deploy-kit.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="deploy kit — one file brings the engine up">
-<meta name="twitter:description" content="The bootstrap verb under wbx — converge a local container or a cloud provider from one deployment.org.">
+<meta name="twitter:description" content="The bootstrap verb under work — converge a local container or a cloud provider from one deployment.org.">
 <meta name="twitter:image" content="https://workbooks.sh/og/deploy-kit.jpg">
 <meta name="twitter:image:src" content="https://workbooks.sh/og/deploy-kit.jpg">
 <link rel="stylesheet" href="learn.css?v=5">
@@ -46,9 +46,9 @@
 <header class="lhero">
   <div class="row">
     <div class="lcol">
-      <div class="kicker">learn / 07·4 — <b>under wbx · deploy kit</b></div>
+      <div class="kicker">learn / 07·4 — <b>under work · deploy kit</b></div>
     <h1><span class="ln">one file</span><span class="ln bub">BRINGS</span><span class="ln">the engine up</span></h1>
-    <p class="dek">The parent lesson ended <code>wbx deploy local</code> as one line of magic.
+    <p class="dek">The parent lesson ended <code>work deploy local</code> as one line of magic.
     The <b>deploy kit</b> is the layer under it: one org file declares the engine, one
     converge verb set stands it up, and where it runs — your laptop or a cloud account —
     is a <b>value in the file</b>, not a different tool. Secrets declared by name, never baked in.</p>
@@ -61,7 +61,7 @@
         <img fetchpriority="high" src="img/deploy-kit-hero.jpg" alt="A small engineer at a console pressing a single key as a colossal dormant engine ignites and rises on its mount, light pouring from its seams against a bright orange sky — 1970s sci-fi style">
         <div class="dnaMini" data-dna></div>
       </div>
-      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/wbx.svg" alt=""></div><span>deploy kit</span></div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/work.svg" alt=""></div><span>deploy kit</span></div>
     </figure>
   </div>
 </header>
@@ -87,9 +87,9 @@
 
 <section id="problem">
   <h2>the engine needs a MIDWIFE</h2>
-  <p>Every other <a href="wbx">wbx</a> engine verb assumes something is already
-  running — <code>wb rt status</code> talks to a <a href="nexus">Nexus</a>,
-  <code>wbx dock</code> needs one to dock into. Deploy is the one verb that has
+  <p>Every other <a href="work">work</a> engine verb assumes something is already
+  running — <code>work rt status</code> talks to a <a href="nexus">Nexus</a>,
+  <code>work dock</code> needs one to dock into. Deploy is the one verb that has
   no engine to call, because <b>its job is to make the engine exist</b>. It is the
   bootstrap verb: native-only — there is no wasm build of it, because a wasm verb
   needs a runtime to run inside, and at deploy time there isn't one yet.</p>
@@ -107,28 +107,28 @@
   <div class="defcard">
     <div class="head"><span class="hw">de·ploy kit</span> <span class="pr">/dɪˈplɔɪ ˌkɪt/</span> <span class="pos">noun</span></div>
     <div class="rule"></div>
-    <p><span class="num">1.</span> the <b>bootstrap family</b> inside wbx — one org
+    <p><span class="num">1.</span> the <b>bootstrap family</b> inside work — one org
     file (<code>deployment.org</code>), one converge verb set
     (<code>init · validate · apply · status · logs · down · doctor · secrets</code>),
     and one <b>provider seam</b> — that stands an engine up from nothing, local or cloud,
     from a single declaration.</p>
   </div>
-  <p>The kit is <b>compiled into the wbx binary</b> — it ships inside the same
+  <p>The kit is <b>compiled into the work binary</b> — it ships inside the same
   static executable as every other verb. The <code>cli/deploy-kit/</code> directory
   on disk holds only its assets: example deployments, provider recipes, and a
   <code>storage.env.example</code>. You don't install the kit; you already have it
-  the moment you have <code>wbx</code>.</p>
+  the moment you have <code>work</code>.</p>
 </section>
 
 <section id="file">
   <h2>the whole config, ANNOTATED</h2>
-  <p>This is the entire declaration. Running <code>wbx deploy init local</code>
+  <p>This is the entire declaration. Running <code>work deploy init local</code>
   scaffolds exactly this — five real lines and two comments, nothing hidden:</p>
   <pre class="orgsample">#+TITLE: Workbooks deployment
 #+DEPLOY_TARGET: local
 #+DEPLOY_APP: workbooks
 #+DEPLOY_PORT: 4000
-<i># Secret NAMES this deployment needs (values: `wbx deploy secrets set KEY=VAL`):</i>
+<i># Secret NAMES this deployment needs (values: `work deploy secrets set KEY=VAL`):</i>
 #+DEPLOY_SECRETS: OPENROUTER_API_KEY
 <i># DEPLOY_IMAGE defaults to ghcr.io/workbooks-sh/runtime:latest (env WB_IMAGE overrides).</i></pre>
   <p>The parser is deliberately dumb: it collects every <code>#+KEY: value</code>
@@ -137,7 +137,7 @@
   Each key has a fallback and a default:</p>
   <figure class="diag" aria-label="every deployment.org key">
     <div class="d-file">
-      <span class="ftag">deployment.org — every key the wbx verb reads</span>
+      <span class="ftag">deployment.org — every key the work verb reads</span>
       <div class="d-row"><span class="d-chip" style="background:#d9dbd3">DEPLOY_TARGET</span><span class="sub">where it runs — fallback <b>PLACE</b>, default <b>local</b>. This single value is the local/cloud switch.</span></div>
       <div class="d-row"><span class="d-chip" style="background:#cfe6d6">DEPLOY_APP</span><span class="sub">the engine's name — fallback <b>APP</b>, default <b>workbooks</b>. Names the container or the fly app.</span></div>
       <div class="d-row"><span class="d-chip" style="background:#cfe0ee">DEPLOY_REGION</span><span class="sub">cloud region — default <b>sjc</b>. Ignored locally; passed to the recipe in the cloud.</span></div>
@@ -156,7 +156,7 @@
 
 <section id="verbs">
   <h2>the converge LOOP</h2>
-  <p>The verb set is the same manners every wbx family uses — <code>init</code> to
+  <p>The verb set is the same manners every work family uses — <code>init</code> to
   scaffold, <code>validate</code> to check, <code>apply</code> to make it so, then
   <code>status / logs / down</code> to live with it. Three of them are worth a closer
   look because their behavior is the whole design:</p>
@@ -180,8 +180,8 @@
   <pre class="mermaid">
 flowchart TD
   f[["deployment.org — the one declaration"]]
-  f --> v["wbx deploy validate"]
-  v -->|"ok / warns on unset secrets"| a["wbx deploy apply"]
+  f --> v["work deploy validate"]
+  v -->|"ok / warns on unset secrets"| a["work deploy apply"]
   a -->|"target = local"| L["container seam<br/>docker · podman · krunvm"]
   a -->|"target = &lt;place&gt;"| R["recipe<br/>providers/&lt;place&gt;/bootstrap.sh"]
   L --> up["engine up"]
@@ -213,7 +213,7 @@ docker run -d --name workbooks -p 4000:4000 \
   -v ~/…/sh.workbooks/disco:/disco -v ~/…/sh.workbooks/data:/data \
   --env-file ~/…/sh.workbooks/secrets.env \
   ghcr.io/workbooks-sh/runtime:latest
-<i># → engine up — … discovery → …/disco/runtime.json · try `wb rt status`</i></pre>
+<i># → engine up — … discovery → …/disco/runtime.json · try `work rt status`</i></pre>
   <p>The <code>rm -f</code> before <code>run</code> is what makes re-apply
   idempotent — there's never a name conflict, because the kit removes the old
   container first. Two volumes mount the durable state: <code>/data</code> holds the
@@ -224,14 +224,14 @@ docker run -d --name workbooks -p 4000:4000 \
   local engine automatically:</p>
   <pre class="mermaid">
 sequenceDiagram
-  participant U as wbx deploy apply
+  participant U as work deploy apply
   participant D as docker
   participant C as the container
-  participant S as wb rt status
+  participant S as work rt status
   U->>D: pull · rm -f · run (mounts /disco + /data)
   D->>C: start engine (WB_WEB=1, secrets via --env-file)
   C->>C: write /disco/runtime.json (scheme · port · token)
-  U-->>U: print "engine up … try `wb rt status`"
+  U-->>U: print "engine up … try `work rt status`"
   S->>C: read runtime.json → connect — no URL to type
   </pre>
   <p>That handshake is why local needs no configuration to talk to: discovery is
@@ -248,13 +248,13 @@ sequenceDiagram
   The value lives in <code>&lt;app_dir&gt;/secrets.env</code>, written
   <code>chmod 0600</code>, and managed by <code>secrets set / list / unset / push</code>.
   Here is the full round trip with the real output shapes:</p>
-  <pre class="orgsample">$ wbx deploy secrets set OPENROUTER_API_KEY=sk-or-…
+  <pre class="orgsample">$ work deploy secrets set OPENROUTER_API_KEY=sk-or-…
 staged 1 secret(s) (~/Library/Application Support/sh.workbooks/secrets.env)
-  — applied on next `wbx deploy apply` (or `secrets push`)
+  — applied on next `work deploy apply` (or `secrets push`)
 
-$ wbx deploy apply        <i># with a name still missing:</i>
+$ work deploy apply        <i># with a name still missing:</i>
 error: declared secrets unset: OPENROUTER_API_KEY —
-  `wbx deploy secrets set KEY=VALUE` (or export them) first</pre>
+  `work deploy secrets set KEY=VALUE` (or export them) first</pre>
   <p>Two delivery paths, one declaration: locally the kit passes
   <code>--env-file secrets.env</code> to the container; in the cloud it stages each
   value through the provider's <code>set_secrets</code> hook. Either way, values
@@ -366,10 +366,10 @@ primary_region = "sjc"
 
 <section id="doctor">
   <h2>when it doesn't CONVERGE</h2>
-  <p><code>wbx deploy doctor</code> is the debugging entry point. It probes each
+  <p><code>work deploy doctor</code> is the debugging entry point. It probes each
   engine and provider, lists which recipes resolved and from where, and reports your
   secret state — a single screen that tells you why <code>apply</code> can't proceed:</p>
-  <pre class="orgsample">$ wbx deploy doctor
+  <pre class="orgsample">$ work deploy doctor
 engines:
   ✓ docker        27.3.1
   ✗ podman        not found
@@ -381,13 +381,13 @@ secrets:
   ✗ missing: OPENROUTER_API_KEY</pre>
   <p>Three failures are canonical, and each names its own fix. <b>No engine at
   all</b>: <code>no container engine (docker/podman/krunvm) — install one, or use
-  `wbx deploy init cloud`</code>. <b>Image pull fails</b>: the hint asks <i>is it
+  `work deploy init cloud`</code>. <b>Image pull fails</b>: the hint asks <i>is it
   published? override with WB_IMAGE</i> — because the default image is a published
   ghcr ref and a private build needs the override. <b>Missing secrets</b>: the exact
-  bail from apply, <code>declared secrets unset: … — `wbx deploy secrets set
-  KEY=VALUE` (or export them) first</code>. These tie back to the wbx
-  <a href="wbx">exit-code map</a>: a verb that can't reach the engine exits
-  <b>3</b>, and its hint names <code>wbx deploy local</code> — the loop closes back
+  bail from apply, <code>declared secrets unset: … — `work deploy secrets set
+  KEY=VALUE` (or export them) first</code>. These tie back to the work
+  <a href="work">exit-code map</a>: a verb that can't reach the engine exits
+  <b>3</b>, and its hint names <code>work deploy local</code> — the loop closes back
   here, at the verb that brings the engine up.</p>
 </section>
 
@@ -407,13 +407,13 @@ secrets:
     <li><b>Cloud needs flyctl and your own account.</b> The recipe exits with an
     install URL if <code>fly</code>/<code>flyctl</code> isn't on PATH, and the app
     lands under <em>your</em> Fly account, not ours.</li>
-    <li><b>The file is <code>./deployment.org</code>, in cwd.</b> The wbx verb reads
+    <li><b>The file is <code>./deployment.org</code>, in cwd.</b> The work verb reads
     exactly that path — it takes no file argument. The richer example files under
     <code>deploy-kit/deployments/</code> use a fuller axis set
     (<code>:TENANCY_MODE:</code>, <code>:STORAGE:</code>, <code>:AUTH:</code>) read by
     the engine-side backend, not by this verb. Those axes still ride to the engine —
     but as <em>environment</em> (see <code>storage.env.example</code>), not yet as
-    first-class wbx keys. Treat them as where this grows, not as today's input format.</li>
+    first-class work keys. Treat them as where this grows, not as today's input format.</li>
     <li><b>The bearer never rotates — and that's a feature.</b> Rotation would 401
     every live client; the kit chooses stability and stores the one token at 0600.</li>
   </ul>
@@ -425,7 +425,7 @@ secrets:
     <summary>Do I need Docker?</summary>
     <p>Any one of docker, podman, or krunvm covers local — the kit picks the first it
     finds. Or skip local entirely and go straight to cloud with
-    <code>wbx deploy init cloud</code>, which needs flyctl and a Fly account instead.</p>
+    <code>work deploy init cloud</code>, which needs flyctl and a Fly account instead.</p>
   </details>
   <details>
     <summary>Where exactly do my secrets live?</summary>
@@ -443,7 +443,7 @@ secrets:
     touch is the bearer token — re-applying never rotates it.</p>
   </details>
   <details>
-    <summary>How do I point wbx at the deployed engine?</summary>
+    <summary>How do I point work at the deployed engine?</summary>
     <p>Locally it's automatic — the container writes <code>runtime.json</code> into
     <code>/disco</code> and the CLI reads it. For a remote engine, set
     <code>WB_ENGINE_URL</code>, plus <code>WB_ENGINE_TOKEN</code> if it's a locked
@@ -458,7 +458,7 @@ secrets:
     <a href="recipes">recipes lesson</a>.</p>
   </details>
   <details>
-    <summary>Is `wb deploy` how Workbooks itself ships?</summary>
+    <summary>Is `work deploy` how Workbooks itself ships?</summary>
     <p>No — this is the users' tool, for standing up the runtime image for your own
     use. Workbooks' own platform releases (the runtime image, the compiler toolchain)
     ship through CI and a manual maintainer step, never through the deploy kit. The kit
@@ -468,11 +468,11 @@ secrets:
 
 <section id="next" class="lnext">
   <h2>keep GOING</h2>
-  <p>The deploy kit sits under wbx and stands up a Nexus — start with its parent, then
+  <p>The deploy kit sits under work and stands up a Nexus — start with its parent, then
   follow the engine it brings to life.</p>
   <div class="cards">
-    <a href="wbx"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span>
-      <div>wbx<small>the parent — verb manners, modes, exit codes</small></div><span class="go">→</span></a>
+    <a href="work"><span class="sw" style="background:#d9dbd3"><img src="icons/work.svg" alt=""></span>
+      <div>work<small>the parent — verb manners, modes, exit codes</small></div><span class="go">→</span></a>
     <a href="nexus"><span class="sw" style="background:#d9dbd3"><img src="../nexus-icon.svg" alt=""></span>
       <div>Nexus<small>what apply stands up</small></div><span class="go">→</span></a>
     <a href="toolkit"><span class="sw" style="background:#d9dbd3"><img src="icons/toolkit.svg" alt=""></span>
@@ -494,12 +494,12 @@ secrets:
 </footer>
 
 <script type="text/org" id="workbook-spec">
-* page  under wbx · deploy kit
+* page  under work · deploy kit
   :PROPERTIES:
   :SLUG:   deploy-kit
   :KIND:   learn
   :NN:     07.4
-  :KICKER: under wbx · deploy kit
+  :KICKER: under work · deploy kit
   :TITLE1: one file
   :TITLE2: BRINGS
   :TITLE3: the engine up

@@ -23,4 +23,4 @@ const token = r.headers.get("set-auth-token");
 
 ## Maturity
 
-Experimental. The turnkey provisioning (`wb forge app deploy`) and its bundled gateway were removed 2026-06-09 and are **not currently available** (restore-or-drop tracked in `wb-dtd0.1`); the skill gives the architecture + frontend wiring and points at the real provider tools (`cloudflare` / `railway` / `wrangler` toolkits + BetterAuth) to stand up the backend yourself.
+Experimental. The turnkey provisioning (`work forge app deploy`) and its bundled gateway were removed 2026-06-09 and are **not currently available** (restore-or-drop tracked in `wb-dtd0.1`); the skill gives the architecture + frontend wiring and points at the real provider tools (`cloudflare` / `railway` / `wrangler` toolkits + BetterAuth) to stand up the backend yourself.

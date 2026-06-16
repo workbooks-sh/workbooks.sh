@@ -1,0 +1,61 @@
+sku,title,category,price,original_price,in_stock,color,material,url
+TC-BT-0101,The Duke,boots,295,295,true,Bourbon,Bovine Leather,https://www.tecovas.com/products/the-duke
+TC-BT-0102,The Cartwright,boots,325,325,true,Cigar,Bovine Leather,https://www.tecovas.com/products/the-cartwright
+TC-BT-0103,The Earl,boots,375,375,true,Midnight,Lizard Print,https://www.tecovas.com/products/the-earl
+TC-BT-0104,The Doc,boots,295,295,true,Black Cherry,Bovine Leather,https://www.tecovas.com/products/the-doc
+TC-BT-0105,The Cole,boots,335,335,false,Slate,Roughout Suede,https://www.tecovas.com/products/the-cole
+TC-BT-0106,The Wyatt,boots,295,295,true,Honey,Bovine Leather,https://www.tecovas.com/products/the-wyatt
+TC-BT-0107,The Dillon,boots,345,345,true,Walnut,Calfskin,https://www.tecovas.com/products/the-dillon
+TC-BT-0108,The Jared,boots,395,395,true,Cognac,Caiman Print,https://www.tecovas.com/products/the-jared
+TC-BT-0109,The Knox,boots,295,295,true,Bone,Bovine Leather,https://www.tecovas.com/products/the-knox
+TC-BT-0110,The Marshall,boots,495,495,false,Chocolate,Bullhide,https://www.tecovas.com/products/the-marshall
+TC-BT-0201,The Annie,boots,245,245,true,Blanco,Bovine Leather,https://www.tecovas.com/products/the-annie
+TC-BT-0202,The Jamie,boots,265,265,true,Pecan,Bovine Leather,https://www.tecovas.com/products/the-jamie
+TC-BT-0203,The Daisy,boots,255,255,true,Sand,Suede,https://www.tecovas.com/products/the-daisy
+TC-BT-0204,The Penny,boots,275,275,true,Cordovan,Calfskin,https://www.tecovas.com/products/the-penny
+TC-BT-0205,The Nora,boots,295,295,false,Espresso,Bovine Leather,https://www.tecovas.com/products/the-nora
+TC-BT-0206,The Star,boots,295,295,true,Tan,Embroidered Leather,https://www.tecovas.com/products/the-star
+TC-BT-0207,The Bethany,boots,335,335,true,Pearl,Lizard Print,https://www.tecovas.com/products/the-bethany
+TC-BT-0208,The Vivian,boots,365,365,true,Wine,Suede,https://www.tecovas.com/products/the-vivian
+TC-BT-0209,The Shyanne,boots,245,245,true,Stone,Bovine Leather,https://www.tecovas.com/products/the-shyanne
+TC-BT-0210,The Maddie,boots,285,285,false,Saddle,Calfskin,https://www.tecovas.com/products/the-maddie
+TC-BO-0301,The Travis,boots,365,365,true,Whiskey,Bovine Leather,https://www.tecovas.com/products/the-travis
+TC-BO-0302,The Sadie Bootie,boots,235,235,true,Black,Suede,https://www.tecovas.com/products/the-sadie
+TC-BO-0303,The Daniel Chelsea,boots,255,255,true,Cigar,Bovine Leather,https://www.tecovas.com/products/the-daniel
+TC-BO-0304,The Roy Roper,boots,255,255,true,Cognac,Bovine Leather,https://www.tecovas.com/products/the-roy
+TC-BO-0305,The Hudson Lace-Up,boots,275,275,false,Brown,Roughout Suede,https://www.tecovas.com/products/the-hudson
+TC-AP-0401,The Western Snap Shirt,apparel,89,89,true,Faded Indigo,Cotton Twill,https://www.tecovas.com/products/western-snap-shirt
+TC-AP-0402,The Pearl Snap,apparel,79,79,true,Sage,Cotton,https://www.tecovas.com/products/pearl-snap
+TC-AP-0403,The Ranch Jacket,apparel,225,225,true,Tobacco,Waxed Canvas,https://www.tecovas.com/products/ranch-jacket
+TC-AP-0404,The Trucker Jacket,apparel,165,165,false,Stonewash,Denim,https://www.tecovas.com/products/trucker-jacket
+TC-AP-0405,The Flannel,apparel,95,95,true,Rust Plaid,Brushed Cotton,https://www.tecovas.com/products/flannel
+TC-AP-0406,The Henley,apparel,55,55,true,Heather Bone,Cotton Slub,https://www.tecovas.com/products/henley
+TC-AP-0407,The Pocket Tee,apparel,38,38,true,Washed Black,Pima Cotton,https://www.tecovas.com/products/pocket-tee
+TC-AP-0408,The Western Dress,apparel,135,165,true,Prairie Floral,Rayon,https://www.tecovas.com/products/western-dress
+TC-AP-0409,The Prairie Blouse,apparel,98,98,true,Cream,Cotton Voile,https://www.tecovas.com/products/prairie-blouse
+TC-AP-0410,The Ranch Vest,apparel,145,145,false,Olive,Quilted Nylon,https://www.tecovas.com/products/ranch-vest
+TC-AP-0411,The Jean Straight,apparel,98,98,true,Medium Wash,Denim,https://www.tecovas.com/products/jean-straight
+TC-AP-0412,The Boot-Cut Jean,apparel,98,98,true,Dark Wash,Denim,https://www.tecovas.com/products/boot-cut-jean
+TC-AC-0501,The Cartwright Belt,accessories,95,95,true,Cigar,Bovine Leather,https://www.tecovas.com/products/cartwright-belt
+TC-AC-0502,The Ranger Belt,accessories,110,110,true,Black,Bridle Leather,https://www.tecovas.com/products/ranger-belt
+TC-AC-0503,The Stockman Belt,accessories,125,125,false,Cognac,Harness Leather,https://www.tecovas.com/products/stockman-belt
+TC-AC-0504,The Felt Hat,accessories,195,195,true,Sand,Wool Felt,https://www.tecovas.com/products/felt-hat
+TC-AC-0505,The Straw Hat,accessories,125,125,true,Natural,Shantung Straw,https://www.tecovas.com/products/straw-hat
+TC-AC-0506,The Trucker Cap,accessories,32,32,true,Bone,Cotton/Mesh,https://www.tecovas.com/products/trucker-cap
+TC-AC-0507,The Bandana,accessories,24,24,true,Rust,Cotton,https://www.tecovas.com/products/bandana
+TC-AC-0508,The Wool Socks 3-Pack,accessories,35,35,true,Mixed,Merino Wool,https://www.tecovas.com/products/wool-socks
+TC-AC-0509,The Leather Wallet,accessories,75,75,true,Cigar,Bovine Leather,https://www.tecovas.com/products/leather-wallet
+TC-AC-0510,The Card Holder,accessories,45,45,false,Black,Bovine Leather,https://www.tecovas.com/products/card-holder
+TC-AC-0511,The Keychain,accessories,28,28,true,Cognac,Bovine Leather,https://www.tecovas.com/products/keychain
+TC-LG-0601,The Weekender Bag,leather-goods,395,395,true,Cigar,Full-Grain Leather,https://www.tecovas.com/products/weekender-bag
+TC-LG-0602,The Tote,leather-goods,295,295,true,Cognac,Full-Grain Leather,https://www.tecovas.com/products/tote
+TC-LG-0603,The Crossbody,leather-goods,225,225,true,Black,Pebbled Leather,https://www.tecovas.com/products/crossbody
+TC-LG-0604,The Dopp Kit,leather-goods,95,95,true,Cigar,Full-Grain Leather,https://www.tecovas.com/products/dopp-kit
+TC-LG-0605,The Briefcase,leather-goods,495,495,false,Walnut,Bridle Leather,https://www.tecovas.com/products/briefcase
+TC-LG-0606,The Laptop Sleeve,leather-goods,125,125,true,Cognac,Full-Grain Leather,https://www.tecovas.com/products/laptop-sleeve
+TC-LG-0607,The Belt Bag,leather-goods,135,135,true,Bone,Pebbled Leather,https://www.tecovas.com/products/belt-bag
+TC-LG-0608,The Valet Tray,leather-goods,65,65,true,Cigar,Full-Grain Leather,https://www.tecovas.com/products/valet-tray
+TC-CR-0701,The Leather Care Kit,accessories,45,45,true,Neutral,Conditioner/Brush,https://www.tecovas.com/products/leather-care-kit
+TC-CR-0702,The Boot Brush,accessories,18,18,true,Wood,Horsehair,https://www.tecovas.com/products/boot-brush
+TC-CR-0703,The Cedar Boot Trees,accessories,55,55,true,Cedar,Aromatic Cedar,https://www.tecovas.com/products/cedar-boot-trees
+TC-CR-0704,The Boot Jack,accessories,40,40,false,Walnut,Hardwood,https://www.tecovas.com/products/boot-jack

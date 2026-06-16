@@ -1,5 +1,6 @@
 defmodule Workbooks.RunCommandTelemetryTest do
   use ExUnit.Case, async: true
+  @moduletag :build
 
   alias Workbooks.Instance.Imports
   alias Workbooks.Workflow.Telemetry

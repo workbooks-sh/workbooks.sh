@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>modes — one binary, two audiences — Workbooks</title>
-<meta name="description" content="How one wbx binary serves humans, agents, and JSON consumers from a single code path — TTY detection, the --agent/--json switch, the {ok, verb, data, error} envelope, and a stable exit-code map a script can branch on without parsing prose. A sub-lesson under wbx.">
+<meta name="description" content="How one work binary serves humans, agents, and JSON consumers from a single code path — TTY detection, the --agent/--json switch, the {ok, verb, data, error} envelope, and a stable exit-code map a script can branch on without parsing prose. A sub-lesson under work.">
 <link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="img/modes-hero.jpg" as="image" fetchpriority="high">
 <link rel="stylesheet" href="../fonts/fonts.css">
@@ -14,14 +14,14 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Workbooks">
 <meta property="og:title" content="modes — one binary, two audiences">
-<meta property="og:description" content="One wbx, three manners — Human, Agent, Json. TTY detection, the envelope, and an exit-code contract that's tested, not just documented. A sub-lesson under wbx.">
+<meta property="og:description" content="One work, three manners — Human, Agent, Json. TTY detection, the envelope, and an exit-code contract that's tested, not just documented. A sub-lesson under work.">
 <meta property="og:url" content="https://workbooks.sh/learn/modes">
 <meta property="og:image" content="https://workbooks.sh/og/modes.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="modes — one binary, two audiences">
-<meta name="twitter:description" content="One wbx, three manners — Human, Agent, Json. TTY detection, the envelope, and an exit-code contract that's tested, not just documented.">
+<meta name="twitter:description" content="One work, three manners — Human, Agent, Json. TTY detection, the envelope, and an exit-code contract that's tested, not just documented.">
 <meta name="twitter:image" content="https://workbooks.sh/og/modes.jpg">
 <meta name="twitter:image:src" content="https://workbooks.sh/og/modes.jpg">
 <link rel="stylesheet" href="learn.css?v=5">
@@ -47,12 +47,12 @@
 <header class="lhero">
   <div class="row">
     <div class="lcol">
-      <div class="kicker">learn / 07·1 — <b>under wbx · modes</b></div>
+      <div class="kicker">learn / 07·1 — <b>under work · modes</b></div>
       <h1><span class="ln">one binary</span><span class="ln bub">KNOWS</span><span class="ln">who's listening</span></h1>
-      <p class="dek">The same <a href="wbx">wbx</a> command serves your terminal, your
+      <p class="dek">The same <a href="work">work</a> command serves your terminal, your
       CI script, and your <a href="agents">agents</a> — and it's not three tools, or
       even three code paths. It's one ~200-line module every verb flows through
-      <b>once</b>. <b>Mode</b> is the manner wbx adopts per audience: what it does
+      <b>once</b>. <b>Mode</b> is the manner work adopts per audience: what it does
       never changes, only how it speaks. This page is the exact rules — so you can
       write the retry loop today.</p>
       <div class="meta">
@@ -64,7 +64,7 @@
         <img fetchpriority="high" src="img/modes-hero.jpg" alt="A single monumental brass telephone switchboard rising into a bright sky, three glowing cables fanning out from one socket toward a person, a robot, and a printed punch-card — a tiny operator standing at its base pulling one lever — 1970s sci-fi style, warm and luminous">
         <div class="dnaMini" data-dna></div>
       </div>
-      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/wbx.svg" alt=""></div><span>modes</span></div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/work.svg" alt=""></div><span>modes</span></div>
     </figure>
   </div>
 </header>
@@ -105,9 +105,9 @@
   the laptop, in CI, and inside the engine</b> — can't take that fork. It
   needs the single command to be safe for an agent and pleasant for a person
   without becoming two programs that disagree.</p>
-  <p>wbx solves this with manners, not forks. The work is one code path; the
+  <p>work solves this with manners, not forks. The work is one code path; the
   audience is decided once, at the very end. The SPEC is candid about where
-  this started: before the mode model, wbx had zero interactivity — accidentally
+  this started: before the mode model, work had zero interactivity — accidentally
   agent-safe, deliberately human-poor; errors were plain strings with exit code
   <code>1</code> for everything; no <code>--json</code> anywhere; no color. The
   fix wasn't a rewrite. It was a seam.</p>
@@ -118,7 +118,7 @@
   <div class="defcard">
     <div class="head"><span class="hw">mode</span> <span class="pr">/moʊd/</span> <span class="pos">noun</span></div>
     <div class="rule"></div>
-    <p><span class="num">1.</span> the <b>manner</b> wbx adopts for its
+    <p><span class="num">1.</span> the <b>manner</b> work adopts for its
     audience — one of <b>Human</b>, <b>Agent</b>, or <b>Json</b> — chosen once
     per run. Three manners, one code path: the command does identical work and
     returns the same value; the mode decides only <b>how that value is
@@ -139,7 +139,7 @@
   the first match wins:</p>
   <pre class="mermaid">
 flowchart TB
-  start(["wbx verb runs"]) --> j{"--json passed?"}
+  start(["work verb runs"]) --> j{"--json passed?"}
   j -- yes --> J["Json — the envelope"]
   j -- no --> a{"--agent, or<br/>WBX_AGENT=1 ?"}
   a -- yes --> A["Agent — plain text, no prompts"]
@@ -155,7 +155,7 @@ flowchart TB
   <p>The precedence is <code>--json</code> first, then <code>--agent</code>
   or <code>WBX_AGENT=1</code>, then the terminal test, and if none of those
   fire — piped, redirected, no TTY — the fallback is <b>Agent</b>. That last
-  choice is the important one. When wbx can't tell who's listening, it does
+  choice is the important one. When work can't tell who's listening, it does
   <b>not</b> assume a human is there to answer a prompt. The safe failure for
   an unknown caller is silence and plain text, never a hang. A pipe is
   agent-by-default precisely because a pipe might be a CI runner with no
@@ -169,10 +169,10 @@ flowchart TB
   — the check is a literal <code>v == "1"</code>. Set it to <code>1</code> or
   don't set it.</p>
   <p>One verb, three manners, live:</p>
-  <pre class="orgsample">$ wbx status                <i># TTY → human: landing + a start-here verb menu</i>
-$ wbx status | cat          <i># piped → agent: structured body, no menu, no color</i>
-$ WBX_AGENT=1 wbx status    <i># agent manners ON a terminal</i>
-$ wbx --json status         <i># the envelope: {"ok":true,"verb":"status","data":{…}}</i></pre>
+  <pre class="orgsample">$ work status                <i># TTY → human: landing + a start-here verb menu</i>
+$ work status | cat          <i># piped → agent: structured body, no menu, no color</i>
+$ WBX_AGENT=1 work status    <i># agent manners ON a terminal</i>
+$ work --json status         <i># the envelope: {"ok":true,"verb":"status","data":{…}}</i></pre>
   <p>The agent landing has a small extra kindness: it splices the whole verb
   tree into the doctor body. One call, and an agent knows both the system's
   health and its entire surface.</p>
@@ -181,7 +181,7 @@ $ wbx --json status         <i># the envelope: {"ok":true,"verb":"status","data"
 <section id="one-channel">
   <h2>one channel, rendered ONCE</h2>
   <p>Detection is cheap because of a discipline upstream of it: every command
-  in wbx returns a single <code>String</code>, and <code>main</code> is the
+  in work returns a single <code>String</code>, and <code>main</code> is the
   only thing that renders. The shape of <code>main</code> is small enough to
   hold in your head:</p>
   <pre class="orgsample">let m = mode::detect(cli.json, cli.agent);
@@ -200,7 +200,7 @@ sequenceDiagram
   participant C as clap (parse + verb)
   participant R as run() — one verb
   participant M as mode::render
-  U->>C: wbx toolkit audit --json
+  U->>C: work toolkit audit --json
   C->>R: dispatch
   R-->>M: Ok(String)  /  Err(anyhow)
   Note over M: detect() chose the mode<br/>render_ok / render_err runs ONCE
@@ -234,10 +234,10 @@ sequenceDiagram
   <code>{ ok: true, verb, data }</code>; failure is <code>{ ok: false, verb,
   error: { code, message, hint, retryable } }</code>. Here is a real failure,
   no engine reachable:</p>
-  <pre class="orgsample">$ WBX_ENGINE_URL=http://127.0.0.1:1 wbx --json rt status
+  <pre class="orgsample">$ WBX_ENGINE_URL=http://127.0.0.1:1 work --json rt status
 {"ok":false,"verb":"rt status","error":{"code":3,
   "message":"…tcp connect error 127.0.0.1:1…",
-  "hint":"no engine reachable — start one with `wbx deploy local` or set WB_ENGINE_URL",
+  "hint":"no engine reachable — start one with `work deploy local` or set WB_ENGINE_URL",
   "retryable":true}}
 $ echo $?
 3</pre>
@@ -261,7 +261,7 @@ $ echo $?
   <p class="depthnote">A depth-rung — skippable on a first read, essential if
   you're writing the retry loop.</p>
   <p>The exit codes are a small, fixed set: <code>0</code> for ok; <code>2</code>
-  for a usage error (owned by clap, not by wbx — there's a test pinning that);
+  for a usage error (owned by clap, not by work — there's a test pinning that);
   and a handful of typed failures — <code>EXIT_ENGINE=3</code>,
   <code>EXIT_NOT_FOUND=4</code>, <code>EXIT_VERIFY=5</code>,
   <code>EXIT_CONFLICT=6</code>, <code>EXIT_AUTH=7</code>. Everything that doesn't
@@ -275,27 +275,27 @@ $ echo $?
   replaced; the code is the promise.</p>
   <table class="cmp">
     <tr><th>error text contains…</th><th>code</th><th>the hint it carries</th></tr>
-    <tr><td>connection refused · error sending request · runtime.json · no runtime · tcp connect</td><td class="y">3</td><td>no engine reachable — start one with <code>wbx deploy local</code> or set <code>WB_ENGINE_URL</code></td></tr>
-    <tr><td>404 · not found · no such file</td><td>4</td><td>names the list verbs — <code>wbx library</code>, <code>wbx toolkit list</code>, <code>wbx workbook list</code></td></tr>
-    <tr><td>signature · integrity · verif</td><td>5</td><td>re-sign with <code>wbx sign</code></td></tr>
+    <tr><td>connection refused · error sending request · runtime.json · no runtime · tcp connect</td><td class="y">3</td><td>no engine reachable — start one with <code>work deploy local</code> or set <code>WB_ENGINE_URL</code></td></tr>
+    <tr><td>404 · not found · no such file</td><td>4</td><td>names the list verbs — <code>work library</code>, <code>work toolkit list</code>, <code>work workbook list</code></td></tr>
+    <tr><td>signature · integrity · verif</td><td>5</td><td>re-sign with <code>work sign</code></td></tr>
     <tr><td>409 · conflict</td><td class="y">6</td><td>state moved underneath you — re-read and retry</td></tr>
-    <tr><td>401 · unauthorized · 403 · forbidden</td><td>7</td><td>set <code>WB_ENGINE_TOKEN</code>, or re-run <code>wbx deploy local</code></td></tr>
+    <tr><td>401 · unauthorized · 403 · forbidden</td><td>7</td><td>set <code>WB_ENGINE_TOKEN</code>, or re-run <code>work deploy local</code></td></tr>
   </table>
   <p>The verdict of that table: each failure class names the command that fixes
   it, and the two highlighted rows — 3 and 6 — are the ones <code>retryable</code>
   marks <code>true</code>. A 4 means enumerate what exists; a 5 means re-sign; a
   7 means fix your token and <b>never retry blindly</b>. This is different from
-  the broader what-a-script-should-do table on the <a href="wbx">parent page</a>
+  the broader what-a-script-should-do table on the <a href="work">parent page</a>
   — that one stays there; this one shows the seam underneath it.</p>
 </section>
 
 <section id="agent-vs-json">
   <h2>manners vs FORMAT</h2>
   <p>This is the page's sharpest distinction, and the one most people get
-  wrong. Piping wbx does <b>not</b> give you the JSON envelope. A pipe selects
+  wrong. Piping work does <b>not</b> give you the JSON envelope. A pipe selects
   <b>Agent</b> mode, which is <i>manners</i> — no prompts, no color, plain
   text. The envelope is a <i>format</i>, and you get it only by asking:
-  <code>--json</code>. Agent mode is how wbx behaves; Json mode is what it
+  <code>--json</code>. Agent mode is how work behaves; Json mode is what it
   emits. There is a contract test whose entire job is to prove that a piped
   command's output does <b>not</b> start with <code>{"ok"</code>.</p>
   <table class="cmp">
@@ -303,14 +303,14 @@ $ echo $?
     <tr><td>prompts?</td><td class="n">yes — pickers</td><td class="y">never</td><td class="y">never</td></tr>
     <tr><td>color / ANSI?</td><td>contract promises it</td><td class="y">none</td><td class="y">none</td></tr>
     <tr><td>success output</td><td>landing + verb menu</td><td>the plain string</td><td><code>{ok,verb,data}</code> envelope</td></tr>
-    <tr><td>failure output</td><td><code>wbx: {err}</code> + hint</td><td><code>wbx: {err}</code>, no hint</td><td><code>{ok:false,…,error}</code></td></tr>
+    <tr><td>failure output</td><td><code>work: {err}</code> + hint</td><td><code>work: {err}</code>, no hint</td><td><code>{ok:false,…,error}</code></td></tr>
     <tr><td>where's the hint?</td><td>stderr, under the error</td><td class="n">dropped</td><td>structural, in the envelope</td></tr>
     <tr><td>exit code</td><td>0–7</td><td>0–7</td><td>0–7</td></tr>
   </table>
   <p>The hint routing in that table is the subtle part. The hint is for whoever
   can act on it, in the channel they actually read. A human gets it on stderr,
   right under the error, where their eyes already are. An agent in plain mode
-  gets only <code>wbx: {err}</code> — no hint line, because plain agent output
+  gets only <code>work: {err}</code> — no hint line, because plain agent output
   is for piping, not advising. And Json mode carries the hint structurally, so
   the consumer that parses the envelope can act on it programmatically. Same
   hint, three deliveries — or none, when none would be noise.</p>
@@ -320,13 +320,13 @@ $ echo $?
   <h2>what only humans GET</h2>
   <p class="depthnote">A depth-rung — the two features that live entirely
   behind the mode gate.</p>
-  <p>Some things are luxuries a machine must never reach. wbx keeps two of them,
+  <p>Some things are luxuries a machine must never reach. work keeps two of them,
   and both are gated so hard that agent mode literally cannot trip over them.</p>
   <p>The first is <code>pick()</code> — a hand-rolled picker that prints its
   menu to <b>stderr</b> and reads one line from stdin. Its doc comment is a
   warning to future maintainers: <i>HUMAN mode only — callers must gate on mode;
   agent mode never reaches this</i>. It has exactly one real call site,
-  <code>wbx deploy init</code> run bare on a terminal, which asks where the
+  <code>work deploy init</code> run bare on a terminal, which asks where the
   engine should live:</p>
   <pre class="orgsample">? engine place — where does this run?
   › 1) local      a container on this machine — cloud-identical
@@ -334,14 +334,14 @@ $ echo $?
   [1]</pre>
   <p>Pipe that same command with stdin closed and there is no hang — it instantly
   takes the <code>local</code> default, writes <code>deployment.org</code>, and
-  answers: <code>wrote deployment.org (local) — edit it, then `wbx deploy
+  answers: <code>wrote deployment.org (local) — edit it, then `work deploy
   apply`</code>. The gate is enforced twice over: on a non-TTY the picker is never
   called, and the wasm32 build of <code>pick()</code> always returns the default
-  no matter what — the in-sandbox wbx physically cannot prompt.</p>
+  no matter what — the in-sandbox work physically cannot prompt.</p>
   <p>The second luxury is <code>next_hint()</code> — verb chaining, printed to
   stderr as <code>→ next: …</code>, human only. After a successful
   <code>deploy init</code> on a terminal, the output grows a tail an agent never
-  sees: <code>→ next: wbx deploy apply  (converge to what you declared)</code>.
+  sees: <code>→ next: work deploy apply  (converge to what you declared)</code>.
   The chains are short and real: build → bundle → sign → (verify or workbook
   deploy); deploy init → apply → status/logs; toolkit build → push; workbook
   deploy → list.</p>
@@ -353,7 +353,7 @@ flowchart LR
   style b fill:#aee5c2,stroke:#121316
   style di fill:#aee5c2,stroke:#121316
   </pre>
-  <p>Read that left to right as a human's guided path: finish a build and wbx
+  <p>Read that left to right as a human's guided path: finish a build and work
   whispers <i>now bundle</i>; bundle and it says <i>now sign</i>; sign and it
   offers two ways forward — verify it, or deploy the workbook. Init a deploy and
   the chain points you to apply, then to status and logs. An agent gets none of
@@ -373,20 +373,20 @@ flowchart LR
     <tr><td>deploy init with stdin closed never prompts; writes the file</td><td><code>agent_mode_deploy_init_never_prompts</code></td></tr>
     <tr><td><code>WBX_*</code> beats <code>WB_*</code> when both are set</td><td><code>wbx_env_aliases_win_over_wb</code></td></tr>
     <tr><td>open on a missing path → exit 4</td><td><code>status_is_the_landing_and_open_maps_not_found</code></td></tr>
-    <tr><td>bare wbx is a landing, not a usage error — exit 0</td><td><code>bare_wbx_is_a_landing_not_a_usage_error</code></td></tr>
+    <tr><td>bare work is a landing, not a usage error — exit 0</td><td><code>bare_wbx_is_a_landing_not_a_usage_error</code></td></tr>
     <tr><td>the classify table itself maps to the contract codes</td><td><code>classify_maps_the_contract_codes</code></td></tr>
   </table>
   <p>The verdict of that table: the most agent-hostile failure modes — a hang on
   a closed stdin, an envelope that disagrees with its own exit code, a pipe that
   vomits JSON you didn't ask for — are each a named, failing-if-broken test. The
-  never-prompts test is the strongest: it runs <code>wbx deploy init</code> with
+  never-prompts test is the strongest: it runs <code>work deploy init</code> with
   stdin set to <code>Stdio::null()</code>, asserts the command succeeds, and
   asserts <code>deployment.org</code> exists on disk afterward. Closed stdin, no
   hang, file written — proven, not promised.</p>
   <p>Two more worth naming because they shape everyday use. <code>doctor</code>
   always exits <code>0</code>, even with no engine reachable — a health check
   must not fail the shell, and a test enforces it. And the author verbs accept
-  <code>-</code> for stdin: <code>echo "* hello" | wbx lint -</code> returns
+  <code>-</code> for stdin: <code>echo "* hello" | work lint -</code> returns
   <code>[]</code>, which is the seam the sibling <span class="planned">pipelines</span>
   lesson is built on.</p>
 </section>
@@ -461,9 +461,9 @@ flowchart LR
   </details>
   <details>
     <summary>How does an agent learn the whole surface in one call?</summary>
-    <p>Bare <code>wbx</code> in agent mode returns the doctor body with the full
+    <p>Bare <code>work</code> in agent mode returns the doctor body with the full
     verb tree spliced in — health and surface in a single response. And
-    <code>wbx help --json</code> is a pre-clap intercept that emits the entire
+    <code>work help --json</code> is a pre-clap intercept that emits the entire
     verb tree as an envelope, group verbs and all. One call orients the agent.</p>
   </details>
 </section>
@@ -473,8 +473,8 @@ flowchart LR
   <p>Modes are the seam under the command line — start at the parent, then
   follow the seam outward to the things it makes safe.</p>
   <div class="cards">
-    <a href="wbx"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span>
-      <div>wbx<small>the command this is a seam inside</small></div><span class="go">→</span></a>
+    <a href="work"><span class="sw" style="background:#d9dbd3"><img src="icons/work.svg" alt=""></span>
+      <div>work<small>the command this is a seam inside</small></div><span class="go">→</span></a>
     <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
       <div>Agents<small>the consumers agent mode serves</small></div><span class="go">→</span></a>
     <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="icons/nexus.svg" alt=""></span>
@@ -496,12 +496,12 @@ flowchart LR
 </footer>
 
 <script type="text/org" id="workbook-spec">
-* page  under wbx · modes
+* page  under work · modes
   :PROPERTIES:
   :SLUG:   modes
   :KIND:   learn
   :NN:     07.1
-  :KICKER: under wbx · modes
+  :KICKER: under work · modes
   :TITLE1: one binary
   :TITLE2: KNOWS
   :TITLE3: who's listening
@@ -511,7 +511,7 @@ flowchart LR
   :HERO:   img/modes-hero.jpg
   :END:
 ** og
-- one wbx, three manners — Human, Agent, Json
+- one work, three manners — Human, Agent, Json
 - detection is one stdlib call; the work is one code path
 - a {ok, verb, data, error} envelope and an exit-code contract that's tested
 </script>

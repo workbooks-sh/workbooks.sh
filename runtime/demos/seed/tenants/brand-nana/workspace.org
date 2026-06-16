@@ -1,0 +1,102 @@
+#+TITLE: Brand Nana
+#+WORKSPACE: brand-nana
+#+OWNER: brand-nana
+#+DESCRIPTION: Brand research agency workspace — Brand Nana ingests a domain's catalog, social, and ads, then renders complete, traceable brand books, competitive intel, and client-ready decks. Six folders carry the practice from raw research to shipped deliverable.
+
+* Harvest Substrate Explorer               :member:
+  :PROPERTIES:
+  :PATH: workbooks/harvest-substrate-explorer.html
+  :SCOPE: write
+  :FOLDER: Research Queue
+  :END:
+
+  The raw harvest for tecovas.com — 1,358 catalog products, 4 social profiles,
+  22 ad creatives — browsable as the source substrate every claim traces back to.
+
+* Research Pipeline                         :member:
+  :PROPERTIES:
+  :PATH: workbooks/research-pipeline.html
+  :SCOPE: write
+  :FOLDER: Research Queue
+  :END:
+
+  Active briefs board — what's queued, harvesting, rendering, and ready for QA.
+
+* Tecovas — Brand Book                      :member:
+  :PROPERTIES:
+  :PATH: workbooks/tecovas-brand-book.html
+  :SCOPE: write
+  :FOLDER: Brand Books
+  :END:
+
+  The flagship deliverable: a complete, scroll-through brand book for Tecovas
+  (DTC western boots & apparel). Cover, logo system, color, type, voice,
+  imagery, and a 2026 motion + AI-comms section — every claim grounded in the
+  harvest.
+
+* Allbirds vs. Rothy's — Teardown           :member:
+  :PROPERTIES:
+  :PATH: workbooks/allbirds-vs-rothys.html
+  :SCOPE: write
+  :FOLDER: Competitive Intel
+  :END:
+
+  Side-by-side comparison teardown of two DTC sustainable-footwear brands.
+
+* Brand Health Dashboard                    :member:
+  :PROPERTIES:
+  :PATH: workbooks/brand-health-dashboard.html
+  :SCOPE: write
+  :FOLDER: Competitive Intel
+  :END:
+
+  Tecovas vs. the western-wear set — share of voice, sentiment, price band.
+
+* State of DTC Western Wear (Q2 2026)       :member:
+  :PROPERTIES:
+  :PATH: workbooks/western-wear-deck.html
+  :SCOPE: write
+  :FOLDER: Competitive Intel
+  :END:
+
+  Category landscape report on the DTC western-wear market.
+
+* Sales Battlecard — Tecovas                :member:
+  :PROPERTIES:
+  :PATH: workbooks/battlecard-tecovas.html
+  :SCOPE: write
+  :FOLDER: Client Decks
+  :END:
+
+  A one-screen competitive sales battlecard (Klue/Crayon format) for a client
+  selling against Tecovas — How they win / Where they're vulnerable / How to
+  position, with rep-ready talk tracks.
+
+* Creative Vault                            :member:
+  :PROPERTIES:
+  :PATH: workbooks/creative-vault.html
+  :SCOPE: write
+  :FOLDER: Client Decks
+  :END:
+
+  The reusable asset library — top-scoring ad creatives, palettes, and motion
+  references pulled into client-ready boards.
+
+* Client Roster & Engagements              :member:
+  :PROPERTIES:
+  :PATH: workbooks/client-roster.html
+  :SCOPE: write
+  :FOLDER: Account Ops
+  :END:
+
+  Every client, engagement type, status, renewal date, and MRR.
+
+* Brand Intel Academy                       :member:
+  :PROPERTIES:
+  :PATH: workbooks/brand-intel-academy.html
+  :SCOPE: write
+  :FOLDER: Knowledge Base
+  :END:
+
+  Onboarding course — how Brand Nana harvests, renders, and keeps every claim
+  traceable.

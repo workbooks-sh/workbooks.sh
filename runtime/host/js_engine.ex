@@ -41,7 +41,7 @@ defmodule Workbooks.JsEngine do
   @sm_shim_dir Path.join(@js_root, "shims-sm")
 
   # the fixed eval bootstrap — exports `run(input)` (the workbook world), eval's the JS, returns a string.
-  # ASYNC bootstrap (wb js-ecosystem async-eventloop): eval the src, and if it yields a thenable, AWAIT it.
+  # ASYNC bootstrap (work js-ecosystem async-eventloop): eval the src, and if it yields a thenable, AWAIT it.
   # StarlingMonkey drives its internal event loop until this async export settles — so Promises, async/await,
   # and (with clocks enabled) setTimeout/streams all complete before we return. Sync programs are unaffected.
   #

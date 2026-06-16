@@ -322,7 +322,7 @@ sequenceDiagram
         data-file-count="14" data-bundle-size="48210"&gt;H4sIAAAA…&lt;/script&gt;</pre>
   <p>Two markers, both with non-executable types, both ignored by the browser — the spec
   to identify the file, the source bundle so the file carries its own making. And the
-  <code>data-version="1"</code> attribute is not decoration: <code>wb unbundle</code>
+  <code>data-version="1"</code> attribute is not decoration: <code>work unbundle</code>
   hard-rejects any tag that lacks it. The war story is the reason it's there. An earlier
   pipeline omitted the version attribute, so <em>every shipped book failed to unbundle</em>
   — an audit caught it. The fix wasn't a patch at each call site; it was collapsing all

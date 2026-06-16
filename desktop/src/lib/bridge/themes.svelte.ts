@@ -85,7 +85,7 @@ class ThemesStore {
 
   async setActive(id: string | null): Promise<void> {
     // Ignore an UNKNOWN id (a stale/legacy value like "dark", or a bad arg from
-    // `wb app theme`) — fall back to the default rather than nuking every token
+    // `work app theme`) — fall back to the default rather than nuking every token
     // into a broken state where fg/page collapse together.
     const next = id === null || this.themes.some((t) => t.id === id) ? id : null;
     await invoke("theme_set_active", { id: next });

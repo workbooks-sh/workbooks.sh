@@ -59,7 +59,7 @@ defmodule Workbooks.IsolationTest do
     assert out =~ "#+TRUST"
   end
 
-  test "wb isolation surfaces the ladder to an agent via the CLI" do
+  test "work isolation surfaces the ladder to an agent via the CLI" do
     out = Workbooks.CLI.call(["isolation"], nil)
     assert out =~ "Isolation tiers"
     assert out =~ "instance"

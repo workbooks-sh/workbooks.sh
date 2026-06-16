@@ -7,7 +7,7 @@ generic browser MCP can offer. This is the agent-facing seam: the browser
 is an extensible desktop app an agent builds against.
 
 This doc is the locked architecture. The Rust server + stdio relay land in
-**wb-aakl.23**; the `wb desktop mcp` CLI entry point and this design ship
+**wb-aakl.23**; the `work desktop mcp` CLI entry point and this design ship
 with wb-aakl.11.
 
 ## Decision: in-house thin server (not vendoring tauri-plugin-mcp)
@@ -31,20 +31,20 @@ proves the shape. We **build our own thin server** rather than vendor:
   app start. No TCP/network listener, ever.
 - **Framing:** newline-delimited JSON-RPC 2.0 (one message per line).
 - **Lifecycle:** the listener starts from the Tauri `setup()` hook, gated by
-  `WB_MCP=1` (off by default so the plain app is unchanged; `wb desktop
+  `WB_MCP=1` (off by default so the plain app is unchanged; `work desktop
   mcp` sets it). One accept-loop thread; one worker thread per connection,
   each holding a cloned `AppHandle`.
 
 ### Bridging to `claude mcp add`
 
-Claude Code speaks MCP over **stdio**, not a UDS. `wb desktop mcp --stdio`
+Claude Code speaks MCP over **stdio**, not a UDS. `work desktop mcp --stdio`
 is a tiny relay: copy stdin → socket, socket → stdout. So:
 
 ```
-claude mcp add workbooks -- wb desktop mcp --stdio
+claude mcp add workbooks -- work desktop mcp --stdio
 ```
 
-`wb desktop mcp` (no args) prints exactly this line plus the socket path and
+`work desktop mcp` (no args) prints exactly this line plus the socket path and
 whether the browser is running. The relay connects to the live browser's
 socket; if the browser isn't running it exits with a clear message.
 
@@ -108,12 +108,12 @@ Waldo answers or acts. Wired once Waldo lands (wb-aakl.21).
 - The MCP surface is exactly what the user can already do in the UI (it
   reuses the same commands), so it grants no new capability — it just lets
   the user's agent drive their own browser.
-- Off by default (`WB_MCP=1` to enable); `wb desktop mcp` is the blessed
+- Off by default (`WB_MCP=1` to enable); `work desktop mcp` is the blessed
   on-ramp. A future setting can toggle it from the UI.
 
 ## Status
 
-- ✅ `wb desktop mcp` CLI entry (prints config + `claude mcp add` line).
+- ✅ `work desktop mcp` CLI entry (prints config + `claude mcp add` line).
 - ✅ Architecture + toolset locked (this doc).
 - ✅ Rust server (`src-tauri/src/mcp.rs`): UDS listener (`/tmp/workbooks-mcp.sock`,
   `WB_MCP_SOCK` override, `0600`), thread-per-conn, newline-delimited JSON-RPC 2.0
@@ -126,7 +126,7 @@ Waldo answers or acts. Wired once Waldo lands (wb-aakl.21).
   `hover` via Tauri 2.11 `WebviewWindow::eval_with_callback` — caller JS is
   wrapped in an async IIFE (top-level `await` supported), run on the main thread,
   and the worker blocks on a oneshot channel (15s timeout) for the JSON envelope.
-- ✅ stdio↔UDS relay: `wb desktop mcp --stdio` (Elixir, `runtime/host/cli/desktop.ex`)
+- ✅ stdio↔UDS relay: `work desktop mcp --stdio` (Elixir, `runtime/host/cli/desktop.ex`)
   connects via the `:local` address family and pumps stdin↔socket both ways.
 - ⏳ `screenshot`: pixel capture is the host/Linux capture tier (SCK on mac,
   x11grab/wf-recorder on Linux — see `docs/.plan/RECORDING-SYSTEM-FINDINGS.md`),

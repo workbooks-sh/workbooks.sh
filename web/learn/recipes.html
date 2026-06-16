@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>recipes — a cloud is a shell file — Workbooks</title>
-<meta name="description" content="In the deploy kit a cloud provider isn't code in the binary — it's a ~60-line bootstrap.sh that fills five named hooks. The tool's only job is to find that file and spawn it in a sealed environment. A sub-lesson under wbx.">
+<meta name="description" content="In the deploy kit a cloud provider isn't code in the binary — it's a ~60-line bootstrap.sh that fills five named hooks. The tool's only job is to find that file and spawn it in a sealed environment. A sub-lesson under work.">
 <link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="img/recipes-hero.jpg" as="image" fetchpriority="high">
 <link rel="stylesheet" href="../fonts/fonts.css">
@@ -45,7 +45,7 @@
 <header class="lhero">
   <div class="row">
     <div class="lcol">
-      <div class="kicker">learn / 07·6 — <b>under wbx · recipes</b></div>
+      <div class="kicker">learn / 07·6 — <b>under work · recipes</b></div>
       <h1><span class="ln">a cloud is</span><span class="ln bub">JUST</span><span class="ln">a shell file</span></h1>
       <p class="dek">Most deploy tools bake their cloud list into the binary — want a
       different vendor, fork and recompile. In the <a href="deploy-kit">deploy kit</a> a
@@ -234,7 +234,7 @@ flowchart TD
   wins.</p>
   <pre class="mermaid">
 flowchart TD
-  start["wbx needs providers/"]
+  start["work needs providers/"]
   start --> r1{"WB_PROVIDERS_DIR set?"}
   r1 -- yes --> use1["use it — rung 1, env wins"]
   r1 -- no --> r2{"walk up cwd —<br/>cli/deploy-kit/providers/_recipe.sh?"}
@@ -263,7 +263,7 @@ flowchart TD
   no repo and no env var still has a working fly recipe, because the binary
   is carrying a copy of it. A provider exists, to the CLI, if and only if
   <code>providers/&lt;place&gt;/bootstrap.sh</code> is a file. The check is
-  that literal — and <code>wbx deploy doctor</code> simply scans for
+  that literal — and <code>work deploy doctor</code> simply scans for
   <code>*/bootstrap.sh</code> and lists what it finds, so you can confirm a
   recipe is seen before you trust it.</p>
 </section>
@@ -280,7 +280,7 @@ flowchart TD
   decided to give it.</p>
   <pre class="mermaid">
 sequenceDiagram
-  participant U as wbx (your shell)
+  participant U as work (your shell)
   participant S as secrets.env (0600, app dir)
   participant B as bootstrap.sh (env -i)
   participant C as flyctl
@@ -310,7 +310,7 @@ sequenceDiagram
   purpose: it's how <code>flyctl</code> finds its own auth token — the recipe
   never sees your Fly credentials, the platform CLI does. And the secret
   store at rest is <code>secrets.env</code> under the app dir, written
-  <code>0600</code>; <code>wbx deploy secrets list</code> prints names, never
+  <code>0600</code>; <code>work deploy secrets list</code> prints names, never
   values. The kit's whole posture toward credentials is that they move by
   name until the last possible moment, and the last moment is sealed.</p>
 </section>
@@ -390,12 +390,12 @@ wb_recipe_run</pre>
   <code>validate</code> bails with the exact path it wanted; after you point
   the resolver at your directory, <code>doctor</code> lists it beside fly and
   <code>apply</code> deploys through it:</p>
-  <pre class="orgsample">$ wbx deploy validate
+  <pre class="orgsample">$ work deploy validate
 error: no provider recipe for `droplet` — expected providers/droplet/bootstrap.sh (WB_PROVIDERS_DIR, repo, or bundled)
 $ export WB_PROVIDERS_DIR=~/wb-providers        # copy _recipe.sh in beside it
-$ wbx deploy doctor
+$ work deploy doctor
   providers: droplet, fly (~/wb-providers)
-$ wbx deploy apply
+$ work deploy apply
 ==&gt; [droplet] deploying my-workbooks-engine (ghcr.io/workbooks-sh/runtime:latest)</pre>
   <p>One caveat the failure message names: <code>WB_PROVIDERS_DIR</code>
   <em>replaces</em> the search root — that's rung 1 of resolution — so your
@@ -413,7 +413,7 @@ $ wbx deploy apply
   callers, and that's the proof the seam is real rather than decorative.</p>
   <pre class="mermaid">
 flowchart TD
-  cli["the Rust CLI<br/>wbx deploy apply"]
+  cli["the Rust CLI<br/>work deploy apply"]
   bk["the runtime's Elixir backend<br/>System.cmd(bash, [boot])"]
   ci["our own CI<br/>ci/deploy.sh"]
   boot["providers/fly/bootstrap.sh<br/>one file"]
@@ -427,7 +427,7 @@ flowchart TD
   style ci fill:#d9dbd3,stroke:#121316
   </pre>
   <p>Three arrows converge on one file. The Rust CLI spawns it on
-  <code>wbx deploy apply</code>. The runtime's Elixir deploy backend spawns
+  <code>work deploy apply</code>. The runtime's Elixir deploy backend spawns
   it through <code>System.cmd("bash", [boot])</code> and honors its exit
   code, so the agent-experience exit contract reaches all the way down to the
   shell. And our own production CI, <code>ci/deploy.sh</code>, exports
@@ -523,8 +523,8 @@ flowchart TD
   <p>Recipes is the seam behind the deploy verbs — these are the lessons it
   sits between.</p>
   <div class="cards">
-    <a href="wbx"><span class="sw" style="background:#9fc4e8"><img src="icons/wbx.svg" alt=""></span>
-      <div>wbx<small>the engine verb family this deepens</small></div><span class="go">→</span></a>
+    <a href="work"><span class="sw" style="background:#9fc4e8"><img src="icons/work.svg" alt=""></span>
+      <div>work<small>the engine verb family this deepens</small></div><span class="go">→</span></a>
     <a href="deploy-kit"><span class="sw" style="background:#d9dbd3"><b>⌗</b></span>
       <div>The deploy kit<small>init, validate, apply — read first</small></div><span class="go">→</span></a>
     <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
@@ -546,12 +546,12 @@ flowchart TD
 </footer>
 
 <script type="text/org" id="workbook-spec">
-* page  under wbx · recipes
+* page  under work · recipes
   :PROPERTIES:
   :SLUG:   recipes
   :KIND:   learn
   :NN:     07.6
-  :KICKER: under wbx · recipes
+  :KICKER: under work · recipes
   :TITLE1: a cloud is
   :TITLE2: JUST
   :TITLE3: a shell file

@@ -112,7 +112,7 @@ defmodule Workbooks.PhoenixSocket do
 
   # Remember the join_ref per topic so future server-initiated pushes address the
   # right channel instance. (Inbound leaves drop it.) For desktop:control we also
-  # register in the DesktopControl registry — that's how an agent's `wb desktop`
+  # register in the DesktopControl registry — that's how an agent's `work desktop`
   # push finds this connected shell.
   defp maybe_track("phx_join", topic, join_ref, _payload, state) do
     state = track_topic(state, topic, join_ref)

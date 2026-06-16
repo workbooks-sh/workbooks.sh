@@ -21,7 +21,7 @@ defmodule Workbooks.QueueBroker do
 
   # State: %{q: %{{tenant, topic} => :queue}, c: %{tenant => total_msgs}}. The per-tenant running count `c`
   # makes the tenant-total quota check O(1) (incremented on publish, decremented on poll) — the earlier
-  # full-state scan was O(total topics) PER PUBLISH under the Agent lock, a self-inflicted DoS (wb self-audit).
+  # full-state scan was O(total topics) PER PUBLISH under the Agent lock, a self-inflicted DoS (work self-audit).
   def start_link(_ \\ []), do: Agent.start_link(fn -> %{q: %{}, c: %{}} end, name: __MODULE__)
 
   @doc "Enqueue `msg` on (`tenant`, `topic`). :ok | {:error, :revoked | :message_too_large | :rate_limited | :queue_full | :tenant_full}."

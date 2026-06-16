@@ -23,9 +23,11 @@ defmodule Workbooks.Bundle do
   # enforcing a hard PER-ENTRY and RUNNING-TOTAL cap on ACTUAL output bytes and
   # ABORTING the instant either cap is crossed — regardless of any declared size.
   # The JS loader (`web/wb-bundle-loader.js`) mirrors this (caps actual inflated
-  # output). Caps are configurable via app env (`:workbooks, :bundle_max_*`).
-  @default_max_total_bytes 512 * 1024 * 1024
-  @default_max_entry_bytes 256 * 1024 * 1024
+  # output). Caps are configurable via app env (`:workbooks, :bundle_max_*`) — the
+  # default is a conservative floor; raise it per-deployment for genuinely large
+  # workbooks rather than shipping a 512MB blast radius to every host.
+  @default_max_total_bytes 128 * 1024 * 1024
+  @default_max_entry_bytes 64 * 1024 * 1024
 
   @sig_eocd 0x06054B50
   @sig_cdh 0x02014B50
@@ -227,7 +229,7 @@ defmodule Workbooks.Bundle do
 
   # VCS internals and per-session private state never belong in a portable tree.
   # Consults the ONE public/private boundary (`Workbooks.Private`) so the raw-tree
-  # `wb bundle <dir>` egress strips secrets / agent-memory / session sidecars the
+  # `work bundle <dir>` egress strips secrets / agent-memory / session sidecars the
   # SAME way every other egress (Git, Library) does — a shared `.html` carries the
   # work, never the session that made it.
   defp strip_path?(abs) do
@@ -737,10 +739,19 @@ defmodule Workbooks.Bundle do
   (no `import` in the source) so it runs without `type=module` from `file://`.
   The served-page shell (`PublicWeb.static_doc`) injects this directly; offline
   CLI-built pages get it via `embed_loader/1`. ONE rendition of the loader.
+
+  Pass `nonce:` to stamp the `<script>` with a CSP nonce — the served plane
+  (`PublicWeb`) drops `'unsafe-inline'` from `script-src` and nonces its own
+  trusted scripts so a hostile bundle's injected inline `<script>` can't run with
+  the serving origin's privileges. Offline/`file://` pages omit it (no CSP there).
   """
-  def loader_block do
+  def loader_block(opts \\ []) do
     classic = String.replace(@loader_src, ~r/^export /m, "")
-    ~s(<script id="wb-bundle-loader">\n) <> classic <> "\n</script>"
+    nonce_attr = case opts[:nonce] do
+      n when is_binary(n) and n != "" -> ~s( nonce="#{n}")
+      _ -> ""
+    end
+    ~s(<script id="wb-bundle-loader"#{nonce_attr}>\n) <> classic <> "\n</script>"
   end
 
   @doc "Extract the embedded bundle blob from a workbook html, or nil if none."

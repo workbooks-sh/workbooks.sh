@@ -3,7 +3,7 @@ defmodule Workbooks.MemorySources do
   Workbook-as-memory loader (wb-kbq5.1): the desktop's memory panel loads a
   workbook file as a semantic-search source. Each load chunks the file, embeds
   the chunks (`Workbooks.Embed`), and upserts them into the vector store
-  (`Workbooks.Vector`) tagged by the source path — so `wb search` / retrieval
+  (`Workbooks.Vector`) tagged by the source path — so `work search` / retrieval
   surfaces them. A small JSON store tracks which paths are loaded (so GET can
   list them and DELETE can drop them).
   """

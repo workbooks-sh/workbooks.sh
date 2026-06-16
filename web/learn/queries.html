@@ -188,7 +188,7 @@ import vfs-query: func(sql: string) -&gt; string</pre>
   the Policy grants. A component that imports <code>vfs-query</code> without the
   grant doesn't get an error when it calls — it <b>fails to instantiate</b>,
   because the import it asks for isn't there to link against. The malformed case
-  is caught even earlier, at <code>wb build</code>, where conformance extracts
+  is caught even earlier, at <code>work build</code>, where conformance extracts
   the component's WIT and allows only the three engine-level imports
   (<code>session-info</code>, <code>vfs-query</code>, <code>run-command</code>).
   An unauthorized capability is a wire that was never run.</p>
@@ -371,7 +371,7 @@ flowchart TD
   from — then merge into one result. <code>press-kit</code> is HTML only, has no
   disk to query, and so it takes the one branch to the side and is reported in
   <code>skipped</code> — listed, never lost. The query is real, end to end:</p>
-  <pre class="orgsample">$ wbx library query "SELECT path FROM vfs
+  <pre class="orgsample">$ work library query "SELECT path FROM vfs
     WHERE volume='workspace' AND path LIKE '/reports/%'"
 
 {

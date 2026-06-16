@@ -12,7 +12,7 @@ defmodule Workbooks.WbRuntimeTest do
 
   @tag :build
   @tag timeout: 300_000
-  test "wb auto-provided — program just writes `use wb;`, no inlining (wb: true)" do
+  test "work auto-provided — program just writes `use wb;`, no inlining (wb: true)" do
     program = """
     use wb;
     fn main() {
@@ -31,7 +31,7 @@ defmodule Workbooks.WbRuntimeTest do
         assert String.trim(out) == "AUTO now_ok=true got=auto"
 
       {:error, reason} ->
-        IO.puts("\n[skip] wb auto-provide: #{inspect(reason) |> String.slice(0, 100)}")
+        IO.puts("\n[skip] work auto-provide: #{inspect(reason) |> String.slice(0, 100)}")
     end
   end
 
@@ -62,7 +62,7 @@ defmodule Workbooks.WbRuntimeTest do
         assert String.trim(out) == "WB now_ok=true stored=owned-by-beam"
 
       {:error, reason} ->
-        IO.puts("\n[skip] wb runtime: #{inspect(reason) |> String.slice(0, 100)}")
+        IO.puts("\n[skip] work runtime: #{inspect(reason) |> String.slice(0, 100)}")
     end
   end
 
@@ -94,7 +94,7 @@ defmodule Workbooks.WbRuntimeTest do
         assert String.trim(out) == "GET-MANY ok=3/3"
 
       {:error, reason} ->
-        IO.puts("\n[skip] wb get_many: #{inspect(reason) |> String.slice(0, 100)}")
+        IO.puts("\n[skip] work get_many: #{inspect(reason) |> String.slice(0, 100)}")
     end
   end
 end

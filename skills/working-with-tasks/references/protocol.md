@@ -30,9 +30,9 @@ Implement the least that satisfies the task. New ideas you spot become a **new
 
 Prove it at the cheapest tier that proves it; never await CI:
 
-- workbook/content artifact → `workbook check` / `wb content check`.
+- workbook/content artifact → `workbook check` / `work content check`.
 - runtime/engine → `mix compile` then `mix test` (targeted suite when possible).
-- toolkit → `wbx toolkit verify <id>` then `eval`.
+- toolkit → `work toolkit verify <id>` then `eval`.
 
 Re-read the change after.
 

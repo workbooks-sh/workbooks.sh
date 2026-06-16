@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# `wb forge web deploy --to cloudflare` runs this. Publishes a built workbook
+# `work forge web deploy --to cloudflare` runs this. Publishes a built workbook
 # (a single-file <slug>.html, or a directory of static assets) to Cloudflare
 # Pages on the USER'S OWN account. We stage the artifact into a clean deploy
 # dir (a lone .html becomes index.html so the project root serves it), then
 # hand off to `wrangler pages deploy`. The token is wrangler's own — never ours.
 #
-# Env contract (set by `wb forge web`):
+# Env contract (set by `work forge web`):
 #   WB_FORGE_ARTIFACT   path to the built .html OR a directory   (required)
 #   WB_FORGE_PROJECT    Cloudflare Pages project name (slug)     (required)
 #   WB_FORGE_BRANCH     deploy branch (default: main)
@@ -43,7 +43,7 @@ wb_cf_resolve_account() {
 [ "${WB_CF_SOURCE_ONLY:-0}" = "1" ] && return 0
 
 command -v wrangler >/dev/null 2>&1 || {
-  echo "wrangler not found — run: wb forge web doctor --to cloudflare --login" >&2
+  echo "wrangler not found — run: work forge web doctor --to cloudflare --login" >&2
   exit 1
 }
 # Auto-auth: if not signed in, open the browser sign-in right here so the

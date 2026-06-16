@@ -1,7 +1,7 @@
 defmodule Workbooks.WbToolTest do
   @moduledoc """
-  Pins the `wb` agent tool — the toolkit's core execution path, LIVE-PROVED this
-  session (Waldo ran `wb model get` and reported the model). The tool does
+  Pins the `work` agent tool — the toolkit's core execution path, LIVE-PROVED this
+  session (Waldo ran `work model get` and reported the model). The tool does
   OptionParser.split(args) → Workbooks.CLI.call(argv, tenant), so this pins the
   arg parse, the tenant threading, and the model get/set round-trip — all
   deterministic (Vars lookup, no LLM / network). Mirrors the live proof.
@@ -21,10 +21,10 @@ defmodule Workbooks.WbToolTest do
     :ok
   end
 
-  defp wb(args, tenant), do: Agent.__exec_one_for_test__(%{name: "wb", args: %{"args" => args}}, %{tenant: tenant})
-  defp wb(args, tenant, exec), do: Agent.__exec_one_for_test__(%{name: "wb", args: %{"args" => args}}, %{tenant: tenant, exec: exec})
+  defp wb(args, tenant), do: Agent.__exec_one_for_test__(%{name: "work", args: %{"args" => args}}, %{tenant: tenant})
+  defp wb(args, tenant, exec), do: Agent.__exec_one_for_test__(%{name: "work", args: %{"args" => args}}, %{tenant: tenant, exec: exec})
 
-  test "`wb deploy` is exec-gated: an exec-denied agent is refused (infra op, not tenant-scoped)" do
+  test "`work deploy` is exec-gated: an exec-denied agent is refused (infra op, not tenant-scoped)" do
     {out, _} = wb("deploy status", "wbtool-noexec", false)
     assert out =~ "not permitted"
   end
@@ -47,7 +47,7 @@ defmodule Workbooks.WbToolTest do
     end
   end
 
-  test "`wb deploy` with exec is NOT refused (the trusted desktop may deploy)" do
+  test "`work deploy` with exec is NOT refused (the trusted desktop may deploy)" do
     {out, _} = wb("deploy status", "wbtool-exec", true)
     refute out =~ "not permitted"
   end
@@ -58,13 +58,13 @@ defmodule Workbooks.WbToolTest do
     assert out =~ "mimo"
   end
 
-  test "`wb model get` for a fresh tenant returns the default model (matches the live proof)" do
+  test "`work model get` for a fresh tenant returns the default model (matches the live proof)" do
     {out, _st} = wb("model get", "wbtool-fresh-#{System.unique_integer([:positive])}")
     assert out =~ "mimo"
     assert out =~ "default"
   end
 
-  test "`wb model set` then `wb model get` round-trips per-tenant through the tool" do
+  test "`work model set` then `work model get` round-trips per-tenant through the tool" do
     tenant = "wbtool-rt-#{System.unique_integer([:positive])}"
     {_set, _} = wb("model set anthropic/claude-haiku-4-5", tenant)
     {out, _} = wb("model get", tenant)

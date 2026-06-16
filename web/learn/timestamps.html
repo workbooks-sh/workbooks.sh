@@ -216,7 +216,7 @@ flowchart TD
   in its plan, verified. A deadline is a fact you do arithmetic on — overdue
   is <code>now &gt; at</code> — not a clock that wakes anything up.</p>
   <table class="cmp">
-    <tr><th></th><th>shows in <code>wb query</code>?</th><th>in the tangle plan's <code>schedule</code>?</th><th>fires anything?</th></tr>
+    <tr><th></th><th>shows in <code>work query</code>?</th><th>in the tangle plan's <code>schedule</code>?</th><th>fires anything?</th></tr>
     <tr><td><b><code>SCHEDULED</code></b></td><td class="y">yes — as <code>scheduled</code></td><td class="y">yes — feeds <code>schedule_of</code></td><td class="y">it's the trigger</td></tr>
     <tr><td><b><code>DEADLINE</code></b></td><td class="y">yes — as <code>deadline</code></td><td class="n">no — always <code>null</code> from a deadline</td><td class="n">never — it's a fact, not a clock</td></tr>
   </table>
@@ -277,10 +277,10 @@ flowchart TD
   :PROPERTIES:
   :SCHEDULE: 0 6 * * *
   :END:</pre>
-  <p><code>wb query</code> still reports the timestamp in full —
+  <p><code>work query</code> still reports the timestamp in full —
   <code>"scheduled": {"at": "2026-07-01T09:00", "repeat": "++1w",
   "active": true}</code>, with the property visible as
-  <code>{"SCHEDULE": "0 6 * * *"}</code>. But <code>wb tangle</code>
+  <code>{"SCHEDULE": "0 6 * * *"}</code>. But <code>work tangle</code>
   resolves the world's <code>schedule</code> to
   <code>{"cron": "0 6 * * *"}</code> — the drawer overrode the timestamp,
   and the timestamp is still on record. One snippet teaches two things at
@@ -336,9 +336,9 @@ flowchart LR
   <h2>checking what it EXTRACTED</h2>
   <p><span class="skip">depth rung · <b>skippable</b> — the three ways to see the parse</span></p>
   <p>You never have to guess what the machine read off your line. Three
-  surfaces show it. <code>wb query &lt;file&gt;</code> shows the raw parse —
+  surfaces show it. <code>work query &lt;file&gt;</code> shows the raw parse —
   the <code>scheduled</code> and <code>deadline</code> objects per headline.
-  <code>wb tangle &lt;file&gt;</code> shows the resolved plan — the
+  <code>work tangle &lt;file&gt;</code> shows the resolved plan — the
   <code>schedule</code> on each world, after the drawer-vs-timestamp
   precedence runs. And <code>POST /api/workflow?plan=1</code> returns that
   same plan over HTTP without executing anything.</p>
@@ -346,15 +346,15 @@ flowchart LR
   <code>:workflow:</code> headline scheduled
   <code>&lt;2026-06-06 Sat 06:00 +1d&gt;</code> over a rust → js → go pipeline.
   Its two surfaces line up exactly:</p>
-  <pre class="orgsample"><i>wb query  →</i> "scheduled": { "active": true, "at": "2026-06-06T06:00", "repeat": "+1d" }
-<i>wb tangle →</i> "worlds"[0]["schedule"]: { "active": true, "at": "2026-06-06T06:00", "repeat": "+1d" }</pre>
+  <pre class="orgsample"><i>work query  →</i> "scheduled": { "active": true, "at": "2026-06-06T06:00", "repeat": "+1d" }
+<i>work tangle →</i> "worlds"[0]["schedule"]: { "active": true, "at": "2026-06-06T06:00", "repeat": "+1d" }</pre>
   <p>And the DEADLINE-only case, the one that catches everyone, settled in
   eight lines of real output:</p>
   <pre class="orgsample">* Deadline only                      :workflow:
   DEADLINE: &lt;2026-07-04 Sat&gt;
 
-<i>wb query  →</i> "deadline": { "at": "2026-07-04", "repeat": null, "active": true }
-<i>wb tangle →</i> "schedule": null</pre>
+<i>work query  →</i> "deadline": { "at": "2026-07-04", "repeat": null, "active": true }
+<i>work tangle →</i> "schedule": null</pre>
   <p>The deadline parsed perfectly — it's right there in the query — and the
   plan's schedule is still <code>null</code>, because a deadline was never a
   trigger. If you expected a fire and got silence, this is the check that
@@ -431,7 +431,7 @@ flowchart LR
     <p>The <code>:SCHEDULE:</code> drawer property wins.
     <code>schedule_of</code> checks the property first and only falls back to
     the timestamp if it's absent. The plan resolves to
-    <code>{"cron": …}</code> while <code>wb query</code> still shows the
+    <code>{"cron": …}</code> while <code>work query</code> still shows the
     timestamp — overridden, but not erased.</p>
   </details>
   <details>

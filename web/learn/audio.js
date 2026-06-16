@@ -123,7 +123,7 @@
     list:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6.5h16M4 12h16M4 17.5h9"/><circle cx="18.5" cy="17.5" r="1.4" fill="currentColor" stroke="none"/></svg>',
     down:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg>',
   };
-  var SW = { workbook: "#a8d4f0", nexus: "#aee5c2", toolkit: "#f3c5a3", org: "#f2ddb0", agents: "#9fc4e8", autopoet: "#aee5c2", wbx: "#d9dbd3" };
+  var SW = { workbook: "#a8d4f0", nexus: "#aee5c2", toolkit: "#f3c5a3", org: "#f2ddb0", agents: "#9fc4e8", autopoet: "#aee5c2", work: "#d9dbd3" };
 
   var style = document.createElement("style");
   style.textContent = css;

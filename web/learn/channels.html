@@ -203,7 +203,7 @@ flowchart TD
   characters, crypto-random, not a counter. It parks them in
   <code>pending</code> and replies, verbatim:</p>
   <pre class="orgsample">Workbooks pairing code: J5K2QA
-Approve with: wb channels approve telegram J5K2QA</pre>
+Approve with: work channels approve telegram J5K2QA</pre>
   <p>They message again. They get the <b>same</b> code — the check is idempotent:
   an already-pending peer keeps its existing code instead of minting a new one
   per message. Still nothing in the inbox. Now the operator runs the approve
@@ -224,7 +224,7 @@ sequenceDiagram
   B->>E: check_sender — already pending
   E-->>B: same code J5K2QA (idempotent)
   Note over E: still nothing in the inbox
-  O->>E: wb channels approve telegram J5K2QA
+  O->>E: work channels approve telegram J5K2QA
   E-->>O: ok — peer 5598821, code consumed
   S->>B: deploy status?
   B->>E: check_sender — allowed
@@ -318,19 +318,19 @@ flowchart TD
   the locked control plane and not on any public surface.</p>
   <table class="cmp">
     <tr><th>verb</th><th>route</th><th>success</th><th>failure</th></tr>
-    <tr><td><code>wb channels list</code></td><td><code>GET /api/channels</code></td><td class="y"><code>{"channels": [{"channel":"telegram","configured":true}]}</code></td><td>—</td></tr>
-    <tr><td><code>wb channels send</code></td><td><code>POST /api/channels/send</code></td><td class="y"><code>{"ok":true,"sent":{...}}</code></td><td class="n">unknown channel → 400 · not configured → unavailable</td></tr>
-    <tr><td><code>wb channels approve</code></td><td><code>POST /api/channels/approve</code></td><td class="y"><code>{"ok":true,"peer":...}</code></td><td class="n">no pending code → 404</td></tr>
+    <tr><td><code>work channels list</code></td><td><code>GET /api/channels</code></td><td class="y"><code>{"channels": [{"channel":"telegram","configured":true}]}</code></td><td>—</td></tr>
+    <tr><td><code>work channels send</code></td><td><code>POST /api/channels/send</code></td><td class="y"><code>{"ok":true,"sent":{...}}</code></td><td class="n">unknown channel → 400 · not configured → unavailable</td></tr>
+    <tr><td><code>work channels approve</code></td><td><code>POST /api/channels/approve</code></td><td class="y"><code>{"ok":true,"peer":...}</code></td><td class="n">no pending code → 404</td></tr>
   </table>
   <p>The CLI runs against the <i>connected</i> runtime over RCP — the same target
-  resolution as <code>wb rt</code>: <code>WB_RUNTIME_URL</code> +
+  resolution as <code>work rt</code>: <code>WB_RUNTIME_URL</code> +
   <code>WB_TOKEN</code> if set, otherwise the local discovery file. The creds and
   the inbound pollers live <b>there</b>, on the engine, not in the CLI. A real
   session looks like this:</p>
-  <pre class="orgsample">$ wb channels list
+  <pre class="orgsample">$ work channels list
 {"channels": [{"channel": "telegram", "configured": true}]}
 
-$ wb channels send telegram 5598821 build green — shipped
+$ work channels send telegram 5598821 build green — shipped
 {"ok": true, "sent": {"channel": "telegram", "peer": "5598821"}}</pre>
   <p>And the failure shapes are exactly as honest as you'd want. Send to a
   channel with no token and you get <code>channel not configured: telegram</code>;

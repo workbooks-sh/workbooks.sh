@@ -28,7 +28,7 @@ Optional, only when they carry real information (see `brandnana`):
 - `#+EXEC:` / `#+TRUST:` — the invocation shape + consent posture (V3). `command`
   is the default; a 3rd-party WASM component is `#+EXEC: component` +
   `#+TRUST: third-party`.
-- `#+BUILD_SRC:` — `crate:<name>` | `path:<dir>` for `wbx toolkit build` to
+- `#+BUILD_SRC:` — `crate:<name>` | `path:<dir>` for `work toolkit build` to
   auto-wrap and register the command.
 
 ## Body — one `:toolkit:` node + the skill index

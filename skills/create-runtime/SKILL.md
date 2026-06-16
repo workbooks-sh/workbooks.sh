@@ -1,6 +1,6 @@
 ---
 name: create-runtime
-description: Stand up or extend a Workbooks runtime — the single Elixir/BEAM engine that serves workbooks, hosts agents, and executes all compute as WebAssembly on wasmtime. ADVANCED. Enforces a STAGED process that elicits NEEDS before any implementation and refuses to vibe-code engine changes. Use only for runtime/host engine work, adding a new capability behind the Host/Dock surface, or deploying a runtime from scratch. Do NOT use for editing an existing module (use edit-runtime) or for app/toolkit work. NOTE: `wbx deploy` is the USER tool to run the image — never wire platform-release ops into it.
+description: Stand up or extend a Workbooks runtime — the single Elixir/BEAM engine that serves workbooks, hosts agents, and executes all compute as WebAssembly on wasmtime. ADVANCED. Enforces a STAGED process that elicits NEEDS before any implementation and refuses to vibe-code engine changes. Use only for runtime/host engine work, adding a new capability behind the Host/Dock surface, or deploying a runtime from scratch. Do NOT use for editing an existing module (use edit-runtime) or for app/toolkit work. NOTE: `work deploy` is the USER tool to run the image — never wire platform-release ops into it.
 ---
 
 # Create a runtime (staged — anti-vibe-code)
@@ -71,26 +71,26 @@ seam intact: agent and workflow are PEER engines, not toolkit EXEC shapes.
 
 ### Stage 4 — VERIFY (tightest tier first)
 - `mix test` (~58 files) — or a targeted suite for the module touched.
-- `wbx dev up` / `wbx dev test` — run it locally; never await CI to learn if it
+- `work dev up` / `work dev test` — run it locally; never await CI to learn if it
   works.
-- Inspect the live engine: `wbx rt status`, `wbx rt get <path>` (e.g. `/health`,
+- Inspect the live engine: `work rt status`, `work rt get <path>` (e.g. `/health`,
   `/api/workbooks`).
-- Prod-parity when needed: `wbx deploy local` (the SAME OCI image in a krunvm
+- Prod-parity when needed: `work deploy local` (the SAME OCI image in a krunvm
   container).
 
 ### Stage 5 — DEPLOY (users) / RELEASE (platform)
 **Do not conflate these.** See `references/release-three-layers.md`.
-- **Users** running the image for themselves: `wbx deploy init | validate |
+- **Users** running the image for themselves: `work deploy init | validate |
   apply | status | verify | logs | down`. Their registry, their machine.
 - **Platform release** is the THREE-layer model: compilers package = its own
   ghcr package, published **manually**; runtime image = built by **CI** on push
-  to main; **never** via `wbx deploy`. Live-confirm `/health` after.
+  to main; **never** via `work deploy`. Live-confirm `/health` after.
 
 ## References
 - `references/host-dock-seam.md` — the one-Host / Dock contract, providers,
   the invariants a runtime change must not break.
 - `references/release-three-layers.md` — compilers vs runtime image vs
-  `wbx deploy`; the rule of thumb that keeps them apart.
-- `references/deploykit.md` — the user-facing `wbx deploy` verbs and container
+  `work deploy`; the rule of thumb that keeps them apart.
+- `references/deploykit.md` — the user-facing `work deploy` verbs and container
   model.
 - `desktop/docs/platform-model.md` — full canon (read the source, not a copy).

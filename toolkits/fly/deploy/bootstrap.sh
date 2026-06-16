@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# `wb deploy apply` (ENGINE_PLACE=fly). Headless model: the engine runs the
+# `work deploy apply` (ENGINE_PLACE=fly). Headless model: the engine runs the
 # agent loop as a local subprocess on its own Fly machine (WB_VMM_BACKEND=
 # process); fly-machines is Fly's native machine-per-run sandbox backend.
 # Spine + hook contract: deploy-kit/recipe/common.sh + deploy-kit/README.org.
@@ -49,7 +49,7 @@ case "${WB_SANDBOX_RUN:-in-process}" in
     ;;
 esac
 
-# Declared profile ⇒ bake it. WB_PROFILE is exported by `wb deploy` (and
+# Declared profile ⇒ bake it. WB_PROFILE is exported by `work deploy` (and
 # required by wb_recipe_init); without this the source build defaults to
 # WITH_PROFILE=0 and ships a lean engine — empty /opt/profile + /opt/toolkits,
 # no wb/brandnana binaries — breaking every harvest verb and board agent
@@ -64,7 +64,7 @@ wb_append_forward_secrets "$FLY_FORWARD_EXTRA"
 provider_ensure_app() {
   if [ "$UPDATE" = 1 ]; then
     flyctl status --app "$WB_APP_NAME" >/dev/null 2>&1 || {
-      echo "    update: app '$WB_APP_NAME' does not exist — run \`wb deploy apply\` first" >&2
+      echo "    update: app '$WB_APP_NAME' does not exist — run \`work deploy apply\` first" >&2
       exit 1
     }
     echo "    update: converging existing app in place"

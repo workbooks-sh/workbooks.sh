@@ -6,16 +6,16 @@
   the file or surface has in the workspace (e.g. `README.org`,
   `notes/plan.org`). Three verbs:
 
-  : wb app open-tab  <path>    ;; open the path (or focus it if already open)
-  : wb app focus-tab <path>    ;; bring an already-open tab to the front
-  : wb app close-tab <path>    ;; close the tab for that path
+  : work app open-tab  <path>    ;; open the path (or focus it if already open)
+  : work app focus-tab <path>    ;; bring an already-open tab to the front
+  : work app close-tab <path>    ;; close the tab for that path
 
 # Recipes
 
   Open a file the user just asked about:
 
-  : wb app status               ;; confirm a shell is listening
-  : wb app open-tab docs/architecture.org
+  : work app status               ;; confirm a shell is listening
+  : work app open-tab docs/architecture.org
 
   Each command reports what it did and how many shells it reached:
 

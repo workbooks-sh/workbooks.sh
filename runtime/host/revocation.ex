@@ -8,7 +8,7 @@ defmodule Workbooks.Revocation do
   removes, `revoked?/1` checks. The "principal" is whatever identity a broker carries (StorageBroker →
   tenant; ServeBroker → serve_id).
 
-  SECURITY (wb self-audit): the table MUST be owned by a never-dying process. The old lazy pattern created it
+  SECURITY (work self-audit): the table MUST be owned by a never-dying process. The old lazy pattern created it
   from whatever (possibly TRANSIENT) process first touched it; a :named_table dies with its owner, so a
   transient creator's exit would WIPE EVERY REVOCATION — a revoked principal would silently regain access
   (fail-open). Owning it in BrokerTables makes revocation durable for the app lifetime.

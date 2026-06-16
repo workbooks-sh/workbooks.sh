@@ -49,7 +49,7 @@ The shape:
    invisible to you.
 3. **DO the smallest shippable unit.** New ideas → a new `** TODO`, never side
    notes.
-4. **SELF-VERIFY** at the tightest tier (`wb content check` / `mix compile` +
+4. **SELF-VERIFY** at the tightest tier (`work content check` / `mix compile` +
    `mix test` / build); re-read the change.
 5. **RECORD by moving state, not deleting**, in the same commit; clear
    `:AGENT:`; one dated log line; a typed, stranger-readable commit; `bd close

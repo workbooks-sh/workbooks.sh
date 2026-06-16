@@ -1,4 +1,4 @@
-# Deploy commands — `wbx deploy`
+# Deploy commands — `work deploy`
 
 Stand up the ONE runtime OCI image, local or cloud. One image, two places. Every
 verb is **non-interactive, idempotent, and exits non-zero on failure**; add
@@ -12,7 +12,7 @@ With no file they operate on the local daemon.
 TOC: init · validate · apply · local · doctor · status · verify · logs · down ·
 build · publish · the deployment.org spec
 
-## `wbx deploy init [local|cloud]`
+## `work deploy init [local|cloud]`
 
 - **Need:** start a reproducible deployment description.
 - **Action:** scaffolds `./deployment.org` from the `local` (default) or `cloud`
@@ -20,14 +20,14 @@ build · publish · the deployment.org spec
 - **Success:** `wrote deployment.org (local) — edit it, then validate → apply`.
 - **Failure:** `<file> already exists …`; `unknown preset '<x>' — try: local | cloud`.
 
-## `wbx deploy validate [file]`
+## `work deploy validate [file]`
 
 - **Need:** catch config errors before deploying (the write-then-submit gate).
 - **Action:** parses + coherence-checks the file. No deploy.
 - **Success:** `valid — <summary>`. **Failure:** `invalid deployment:` + a
-  bulleted issue list; `no deployment.org — run wbx deploy init`.
+  bulleted issue list; `no deployment.org — run work deploy init`.
 
-## `wbx deploy apply [file]`
+## `work deploy apply [file]`
 
 - **Need:** converge the environment to the config.
 - **Action:** validates, then dispatches on `ENGINE_PLACE`: `local` → a krunvm
@@ -38,51 +38,51 @@ build · publish · the deployment.org spec
 - **Failure:** invalid config; `ENGINE_PLACE must be local|cloud`; `cloud
   PROVIDER=<p> has no recipe …`.
 
-## `wbx deploy local`
+## `work deploy local`
 
 - **Need:** run the runtime locally right now, zero config (like `docker run`).
 - **Action:** doctor → create the microVM → direct-spawn it in the caller's GUI
   session (not launchd — libkrun fails under a background LaunchAgent) → await the
   discovery file.
-- **Success:** `local runtime up — http://… (survives app quit; wbx deploy down to
+- **Success:** `local runtime up — http://… (survives app quit; work deploy down to
   stop)`. If discovery doesn't land in time: `VM spawned … but no discovery yet`
   (still `:ok`; the image may be booting).
 
-## `wbx deploy doctor`
+## `work deploy doctor`
 
 - **Need:** check + self-heal local prerequisites. The first thing to run.
 - **Action:** preflight krunvm + the case-sensitive APFS volume; creates the
   volume if missing.
 - **Success:** `prereqs OK` (or `created the case-sensitive APFS volume…`).
 
-## `wbx deploy status [file]`
+## `work deploy status [file]`
 
 - **Need:** is it up? `local` by default; a cloud `deployment.org` reports the
   cloud deployment's state.
 - **Success (local):** `local runtime: microVM present; runtime up — http://… (pid …)`.
 
-## `wbx deploy verify [file]`
+## `work deploy verify [file]`
 
 - **Need:** prove the LIVE runtime answers.
 - **Action:** local — read discovery, `GET /health` with the token. Cloud — ask
   the provider for the URL, then `GET <url>/health`.
 - **Success:** `runtime healthy — …/health → 200`.
-- **Failure:** `no discovery file — is the daemon up? wbx deploy local`;
+- **Failure:** `no discovery file — is the daemon up? work deploy local`;
   `runtime reachable but unhealthy (HTTP …)`; `could not verify cloud runtime …`.
 
-## `wbx deploy logs [file]`
+## `work deploy logs [file]`
 
 - **Need:** find where logs are.
 - **Action (local):** prints a `tail -f` line pointing at the daemon's
   stdout/stderr logs under `~/Library/Application Support/sh.workbooks/logs`.
 
-## `wbx deploy down [file]`
+## `work deploy down [file]`
 
 - **Need:** tear it down.
 - **Action (local):** stops the runtime; **data + APFS volume are preserved**.
 - **Success:** `local runtime down (data + APFS volume preserved)`.
 
-## `wbx deploy build` / `wbx deploy publish`
+## `work deploy build` / `work deploy publish`
 
 - **Need:** build / push the one runtime image (the image artifact, not a user
   deployment).
@@ -91,7 +91,7 @@ build · publish · the deployment.org spec
 - **Failure:** `command not found (is docker/buildx installed?)`.
 - **Platform note:** publishing the *runtime image* is normally CI's job, and the
   separate *compilers* package is published manually outside this CLI — do not
-  conflate `wbx deploy` with platform-release ops.
+  conflate `work deploy` with platform-release ops.
 
 ## The deployment.org spec
 

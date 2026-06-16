@@ -363,15 +363,15 @@ flowchart LR
 <section id="mirror">
   <h2>any forge, or NONE</h2>
   <p>Depth rung. Your tenant is plain git, so it can be mirrored anywhere. The
-  <a href="wbx">wbx</a> CLI exposes this as two verbs, both calling the engine
+  <a href="work">work</a> CLI exposes this as two verbs, both calling the engine
   rather than your local <code>git</code> binary — the dependency audit even
   flags a local git as <em>convertible</em>: git exists engine-side, so call
   through the engine.</p>
   <table class="cmp">
     <tr><th>you run</th><th>what happens</th></tr>
-    <tr><td><code>wbx mirror git@…</code></td><td class="y">plain <code>git push</code> to any remote URL — host-agnostic</td></tr>
-    <tr><td><code>wbx mirror github</code></td><td class="y">a bare word is a forge — <code>gh</code> auto-provisions <code>wb-&lt;tenant&gt;</code>, private by default, and pushes</td></tr>
-    <tr><td><code>wbx federate</code></td><td class="y">Radicle — <code>rad init --public</code> mints a <code>rad:…</code> RID for P2P</td></tr>
+    <tr><td><code>work mirror git@…</code></td><td class="y">plain <code>git push</code> to any remote URL — host-agnostic</td></tr>
+    <tr><td><code>work mirror github</code></td><td class="y">a bare word is a forge — <code>gh</code> auto-provisions <code>wb-&lt;tenant&gt;</code>, private by default, and pushes</td></tr>
+    <tr><td><code>work federate</code></td><td class="y">Radicle — <code>rad init --public</code> mints a <code>rad:…</code> RID for P2P</td></tr>
   </table>
   <p>The forge lane picks whichever CLI is on PATH — <code>gh</code> for
   GitHub, <code>glab</code> for GitLab, <code>tea</code> for Gitea, in that
@@ -380,7 +380,7 @@ flowchart LR
   ceiling too — rad keys are per-device, and using the tenant keypair as a
   delegate needs a rad feature that doesn't exist yet; the limitation is
   documented rather than papered over. These same operations are reachable
-  from the engine CLI (<code>wb mirror</code>, <code>wb radicle</code>) and
+  from the engine CLI (<code>work mirror</code>, <code>work radicle</code>) and
   over RCP.</p>
 </section>
 
@@ -416,8 +416,8 @@ flowchart LR
   <details>
     <summary>Can I clone my tenant repo?</summary>
     <p>Yes — it's plain git. Mirror it to any remote you control with
-    <code>wbx mirror git@…</code>, or let a forge CLI provision one with
-    <code>wbx mirror github</code>, then clone it like any other repo. There's
+    <code>work mirror git@…</code>, or let a forge CLI provision one with
+    <code>work mirror github</code>, then clone it like any other repo. There's
     no proprietary format underneath; it's the same files the engine serves.</p>
   </details>
   <details>

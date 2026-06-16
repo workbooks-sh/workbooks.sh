@@ -23,4 +23,4 @@ icons get lobe:openai              # resolve any value → kind/source/url/fallb
 
 ## Maturity
 
-Experimental (v0.1.0). Builds in-sandbox via the QuickJS lane (`wb toolkit build icons`); the same file also runs under plain `node src/index.js` outside the runtime.
+Experimental (v0.1.0). Builds in-sandbox via the QuickJS lane (`work toolkit build icons`); the same file also runs under plain `node src/index.js` outside the runtime.

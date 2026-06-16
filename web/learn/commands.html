@@ -403,12 +403,12 @@ flowchart LR
 <section id="selfauthor">
   <h2>commands that write COMMANDS</h2>
   <p>The catalog isn't a fixed menu — agents extend it mid-session. With
-  <code>wb toolkit build-inline &lt;name&gt; &lt;lang&gt; &lt;file&gt;</code> an
+  <code>work toolkit build-inline &lt;name&gt; &lt;lang&gt; &lt;file&gt;</code> an
   agent writes source in <b>Rust, C, Zig, JS, TS, or Go</b>, and the result is a
   new registered command. The astonishing part is what does the compiling: the
   compiler is <em>itself wasm</em>. Write → build → content-address → register, all
   inside the sandbox — no native toolchain, no host escape.</p>
-  <pre class="orgsample">$ wb toolkit build-inline wfreq rust ./wfreq.rs
+  <pre class="orgsample">$ work toolkit build-inline wfreq rust ./wfreq.rs
 built + registered command `wfreq` (rust) → build/commands/&lt;sha&gt;.wasm
 run it via the Dock: run-command wfreq</pre>
   <p>And self-authoring never widens caps. The command <code>wfreq</code> holds

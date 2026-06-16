@@ -1,6 +1,6 @@
 defmodule Workbooks.Bundle.KeyWrap do
   @moduledoc """
-  Wrap a sealed-bundle CONTENT KEY to a recipient identity (wb sealed-bundle, part
+  Wrap a sealed-bundle CONTENT KEY to a recipient identity (work sealed-bundle, part
   a). Sealed-box style: an ephemeral X25519 keypair does ECDH against the
   recipient's X25519 public key; the shared secret derives a key-encryption-key
   (KEK) that AES-256-GCM-wraps the content key. Anyone holding the recipient's

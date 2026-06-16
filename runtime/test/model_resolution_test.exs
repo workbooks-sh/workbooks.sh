@@ -1,9 +1,9 @@
 defmodule Workbooks.ModelResolutionTest do
   @moduledoc """
-  `wb model get` must report a CONCRETE effective model id (resolving the
+  `work model get` must report a CONCRETE effective model id (resolving the
   built-in default), never an opaque "(default)" — an agent that can't read its
   own model can't reason about switching. (Surfaced by the multistep-model-switch
-  eval: the agent reached for web_search when `wb model get` returned "(default)".)
+  eval: the agent reached for web_search when `work model get` returned "(default)".)
   """
   use ExUnit.Case, async: false
 
@@ -22,7 +22,7 @@ defmodule Workbooks.ModelResolutionTest do
     assert Llm.effective_model() == Llm.default_model()
   end
 
-  test "wb model get reports the concrete default (marked), not the opaque '(default)'" do
+  test "work model get reports the concrete default (marked), not the opaque '(default)'" do
     out = CLI.call(["model", "get"], "dev")
     assert out == "#{Llm.default_model()} (default)"
     refute out == "(default)"
@@ -34,7 +34,7 @@ defmodule Workbooks.ModelResolutionTest do
     assert Llm.effective_model() == "anthropic/claude-haiku-4.5"
   end
 
-  test "wb model set is PER-TENANT — one tenant's choice doesn't leak to another (wb-g1yo)" do
+  test "work model set is PER-TENANT — one tenant's choice doesn't leak to another (wb-g1yo)" do
     a = "mr-alice-#{System.unique_integer([:positive])}"
     b = "mr-bob-#{System.unique_integer([:positive])}"
 

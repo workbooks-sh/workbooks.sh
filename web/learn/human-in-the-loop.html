@@ -35,7 +35,7 @@
       3. the session is a MAILBOX          — put_review (from the web), take_review (from the agent), FIFO between
 
     and because an agent here has exactly one tool — bash — "wait for a human"
-    collapses to one blocking command:  wb ctk await $WB_RUN
+    collapses to one blocking command:  work ctk await $WB_RUN
     no callback to register, no webhook the agent has to host. just a poll loop in a CLI verb.
     human = judgment. agent = labor. runtime = membrane.
 
@@ -300,8 +300,8 @@ sequenceDiagram
   <a href="toolkit">one tool — bash</a>. There's no callback to register, no
   webhook for the agent to host, no long-poll framework. So "wait for a human"
   has to collapse into a single blocking command:</p>
-  <pre class="orgsample">wb ctk await $WB_RUN          # blocks ≤ 600s until the human clicks Commit</pre>
-  <p>Under the hood, <code>wb ctk await &lt;run&gt; [timeout_s]</code> polls
+  <pre class="orgsample">work ctk await $WB_RUN          # blocks ≤ 600s until the human clicks Commit</pre>
+  <p>Under the hood, <code>work ctk await &lt;run&gt; [timeout_s]</code> polls
   <code>GET /api/ctk/review/&lt;run&gt;</code> every two seconds: a
   <code>204</code> means keep waiting, a <code>200</code> with a body means
   pretty-print the review and succeed, and when the deadline passes (default
@@ -312,7 +312,7 @@ sequenceDiagram
   back to the local discovery file.</p>
   <pre class="mermaid">
 sequenceDiagram
-  participant A as wb ctk await
+  participant A as work ctk await
   participant R as runtime
   A->>R: GET /api/ctk/review/run-4117
   R-->>A: 204 (nothing yet)
@@ -351,7 +351,7 @@ sequenceDiagram
   participant H as human
   A->>A: edit component → write the CTK story
   A->>H: print connect URL (?run=run-4117)
-  A->>R: wb ctk await run-4117  (blocks)
+  A->>R: work ctk await run-4117  (blocks)
   H->>K: open canvas, tune props + per-state values
   H->>K: Commit + feedback note
   K->>R: POST /api/ctk/commit?run=run-4117
@@ -368,7 +368,7 @@ sequenceDiagram
   the real recipe the agent runs — bash, the actual URL shape, the actual
   pitfall:</p>
   <pre class="orgsample">echo "Review: $WB_RUNTIME_URL/ctk/ctk.html?connect=$WB_RUNTIME_URL/api/ctk/commit?run=$WB_RUN"
-review=$(wb ctk await "$WB_RUN")          # blocks ≤600s until the human clicks Commit
+review=$(work ctk await "$WB_RUN")          # blocks ≤600s until the human clicks Commit
 echo "$review" | jq -r '.feedback'        # ghost variant border is too faint — bump to --line-strong
 echo "$review" | jq '.snapshot'           # approved props + per-state values
 # translate the approved STATE into source edits, then:
@@ -445,7 +445,7 @@ git add -A &amp;&amp; git commit -m "ui: $(echo "$review" | jq -r '.feedback // 
   <h2>questions people actually ASK</h2>
   <details>
     <summary>What if the human never clicks?</summary>
-    <p><code>wb ctk await</code> blocks up to 600 seconds, then exits
+    <p><code>work ctk await</code> blocks up to 600 seconds, then exits
     non-zero. The agent decides what that means — re-prompt with a fresh URL,
     or abort the run. The timeout is a deadline, not a hang.</p>
   </details>
@@ -531,7 +531,7 @@ git add -A &amp;&amp; git commit -m "ui: $(echo "$review" | jq -r '.feedback // 
 ** og
 - a checkpoint inside a live run: canvas + commit + mailbox
 - the verdict is data — approved state + a note, never remote control
-- wb ctk await blocks until a human commits; experimental end to end
+- work ctk await blocks until a human commits; experimental end to end
 </script>
 
 <script>

@@ -1,4 +1,4 @@
-# `wb` — Workbooks CLI (spec)
+# `work` — Workbooks CLI (spec)
 
 The single canonical command-line tool for Workbooks. **One Rust crate, two build
 targets.** Memory-safe, dependency-free, runs the same logic on a bare OS *and* inside
@@ -13,14 +13,14 @@ the runtime's wasm sandbox.
 The CLI must run in three places:
 
 1. **Outside the runtime** — a user's laptop / CI, possibly with no Erlang, no Node.
-2. **Inside the runtime** — agents call `wb` to author/build/run workbooks.
+2. **Inside the runtime** — agents call `work` to author/build/run workbooks.
 3. **Inside the wasm sandbox** — agents are sandboxed; the CLI must run there too.
 
 An Elixir escript fails (1) and (3): it drags the whole BEAM and can't run in wasm. A
 Rust crate gives **both targets from one source**:
 
 ```
-cargo build --release                      # → native `wb` (any OS, static, ~fast)
+cargo build --release                      # → native `work` (any OS, static, ~fast)
 cargo build --release --target wasm32-wasip1   # → wb.wasm (in-sandbox, agents)
 ```
 
@@ -76,7 +76,7 @@ which should stay out of this crate:
   `deploy/storage.env.example`, `Dockerfile.runtime` ("the ONE image the deploy-kit runs").
   These are consumed by the deploy-kit; they are infra/templates, not Rust source.
 
-So: **`cli/src/deploy/`** holds only the CLI-side `wb deploy` *command* (Rust — parse
+So: **`cli/src/deploy/`** holds only the CLI-side `work deploy` *command* (Rust — parse
 `deployment.org`, orchestrate the provider). The Dockerfiles/fly/configs remain in root
 `deploy/` (platform infra + deploy-kit assets). The deploy-kit *engine* logic currently in
 `runtime/host/deploy*.ex` is migrated into `cli/src/deploy/` over time (it's the bootstrap
@@ -98,14 +98,14 @@ One static binary → no Erlang, no Burrito:
 ```
 cli/
 ├── SPEC.md            # this file
-├── Cargo.toml         # crate `wb-cli`, bin `wb`
+├── Cargo.toml         # crate `wb-cli`, bin `work`
 └── src/
     ├── main.rs        # clap parse + dispatch
     ├── io.rs          # the capability seam (native + wasm impls)
     ├── kernel.rs      # embed the OQL kernel (local org ops)
     ├── rcp.rs         # thin runtime client (engine verbs)
     ├── commands.rs    # verb handlers (delegate)
-    └── deploy/        # the bootstrap `wb deploy` command (Rust)
+    └── deploy/        # the bootstrap `work deploy` command (Rust)
         └── mod.rs
 ```
 
@@ -124,7 +124,7 @@ can make for the user, it makes — and says what it chose, so trust builds
 instead of mystery. Defaults over questions; questions (pickers) only when a
 choice is genuinely the user's; never an error where a default + a note
 would do; every success teaches the next verb. Learning curve is a bug.
-Examples already in force: bare `wbx` = oriented landing, `deploy local` =
+Examples already in force: bare `work` = oriented landing, `deploy local` =
 scaffold-if-missing-then-apply, `upgrade` detects npm installs and redirects,
 `doctor` diagnoses without failing, hints chain build→bundle→sign→deploy.
 
@@ -142,12 +142,12 @@ auto      stdout is a TTY → human · piped/redirected → agent
 envelope `{ok, verb, data, error: {code, hint, retryable}}` under `--json`;
 documented exit-code map (0 ok · 2 usage · 3 engine unreachable · 4 not
 found · 5 verification failed · 6 conflict · 7 auth rejected); accepts `-` for stdin where a
-file is expected; `wbx help --json` emits the verb tree so agents can
+file is expected; `work help --json` emits the verb tree so agents can
 introspect the surface instead of parsing help prose.
 
 **Human mode (DX):** color + tables + progress; interactive pickers fill
-missing args (e.g. `wbx deploy init` asks place/database when run bare on a
-TTY — the same flow agents do with flags); bare `wbx` prints a friendly
+missing args (e.g. `work deploy init` asks place/database when run bare on a
+TTY — the same flow agents do with flags); bare `work` prints a friendly
 where-am-I landing (tenant, engine, current dir state, top verbs) instead of
 a usage dump; every success suggests the next verb.
 
@@ -158,20 +158,20 @@ single-channel design makes this a mechanical refactor, not a rewrite.
 ### Verb gaps (investigated, prioritized)
 
 P1 — the first ten minutes (launch-blocking):
-- `wbx init <name>`  scaffold a workbook source (org + data), `--template`
-- `wbx dev [src]`    watch → rebuild → serve preview
-- `wbx doctor`       top-level: PATH, version, engine reachability, disco
-- `wbx completions <shell>`  clap_complete
+- `work init <name>`  scaffold a workbook source (org + data), `--template`
+- `work dev [src]`    watch → rebuild → serve preview
+- `work doctor`       top-level: PATH, version, engine reachability, disco
+- `work completions <shell>`  clap_complete
 P2 — daily ergonomics:
-- `wbx open <file>`  open a workbook in the default browser
-- `wbx status`       one-screen where-am-I (also the bare-`wbx` landing)
-- `wbx upgrade`      self-update from releases (cli.sh logic)
+- `work open <file>`  open a workbook in the default browser
+- `work status`       one-screen where-am-I (also the bare-`work` landing)
+- `work upgrade`      self-update from releases (cli.sh logic)
 - `WBX_*` env names accepted alongside `WB_*` (docs say WBX_*)
 P3 — reach:
 - windows release matrix (install.js already expects the asset name)
 - stdin pipelines across author/trust verbs
 
-## Import: anything → toolkit (`wbx toolkit import`)
+## Import: anything → toolkit (`work toolkit import`)
 
 The ecosystem's intake ramp (relates epic wb-rhs): take any existing
 agent-capability construct and package it as a toolkit — automatically where
@@ -206,6 +206,6 @@ work, and leave a manual — never a shrug.
    needs redesign). Emit the report in the manifest; `--json` for agents.
 3. **Fix-up plan (the agent manual)** — everything not `ready` becomes org
    TODOs inside the scaffold, each with concrete instructions (which lane,
-   which recipe, what to rewrite). `wbx toolkit verify <id>` is the done
+   which recipe, what to rewrite). `work toolkit verify <id>` is the done
    test; auto-CONVERT (engine-backed builds via the compiler lanes) applies
    where the engine is reachable.

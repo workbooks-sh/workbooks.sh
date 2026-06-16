@@ -336,7 +336,7 @@
       (The lander spent 6h calling a missing search tool "env-gated" instead of
       filing it — that is the exact failure this prevents.)
     - `fetch` — HTTP GET a URL (use to confirm a change is live, read a source).
-    - `wb` — the wb CLI (e.g. `wb content check`).
+    - `work` — the work CLI (e.g. `work content check`).
     Do NOT reach for git/curl/cp/sed as commands — use the tools above.
 
    ### ORIENTATION BUDGET (hard rule)
@@ -396,7 +396,7 @@
     5. Self-review (ground rule 4) — including the DESIGN GATE (4a) for any
        designed/grown section.
     6. VALIDATE then DEPLOY (the page must stay consistent):
-       a. For grown partials, run `wb content check` — it validates the whole
+       a. For grown partials, run `work content check` — it validates the whole
           tree (every manifest row has a file, every file has a row, no
           duplicate orders, faq pinned last, each section has one
           `&lt;section class="grown"&gt;` + an `&lt;h2&gt;`). Fix everything it reports. A

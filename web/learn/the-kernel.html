@@ -220,7 +220,7 @@ export function run() { return fetch_prices() }
 #+begin_src python :in raw :out report :persist
 def run(raw): return summarize(raw)
 #+end_src</pre>
-  <p>Run <code>wbx tangle pipeline.org</code> and the kernel returns one world.
+  <p>Run <code>work tangle pipeline.org</code> and the kernel returns one world.
   The rules it applied, in order: the <code>:workflow:</code>-tagged headline
   becomes the world, named <b>pipeline</b>. Its <code>:component:</code> children
   become components. The <code>:SCHEDULE:</code> property — a cron string — wins
@@ -303,14 +303,14 @@ flowchart LR
 <section id="surface-native">
   <h2>surface one: linked into the CLI</h2>
   <p>The first surface is the plainest: the kernel as an ordinary Rust library.
-  The CLI crate — whose binary is named <code>wbx</code> — depends on it as
+  The CLI crate — whose binary is named <code>work</code> — depends on it as
   <code>oql = { path = "../runtime/kernel", default-features = false }</code>.
   No component glue, no WASI, no wrapper. With features off, the crate is just an
   rlib, and it links cleanly on native targets <em>and</em> on the CLI's own
   <code>wasm32-wasip1</code> target.</p>
-  <p>Three verbs map straight through: <code>wbx query</code> calls
-  <code>parse-headlines</code>, <code>wbx tangle</code> calls
-  <code>tangle-plan</code>, and <code>wbx lint</code> calls <code>validate</code>
+  <p>Three verbs map straight through: <code>work query</code> calls
+  <code>parse-headlines</code>, <code>work tangle</code> calls
+  <code>tangle-plan</code>, and <code>work lint</code> calls <code>validate</code>
   (the real diagnostics, not the stub). A bare <code>-</code> reads stdin, so org
   generated upstream never has to touch a temp file. The point worth holding:
   these verbs run with <b>no runtime server at all</b>. The kernel is compiled
@@ -348,7 +348,7 @@ sequenceDiagram
   instance returns HTML; the page ships. The same path drives more than rendering
   — the package manager calls <code>tangle-plan</code> to build a world, the
   socket dispatches parse, tangle, validate, and render over a websocket, and
-  <code>wb publish apply</code> renders a workbook to self-contained HTML with no
+  <code>work publish apply</code> renders a workbook to self-contained HTML with no
   server required at publish time, because the kernel is embedded in the runtime.</p>
   <p>The desktop does the same trick natively: <code>oql.wasm</code> is compiled
   into the Tauri shell with <code>include_bytes!</code> and run via wasmtime, and

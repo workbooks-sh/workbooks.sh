@@ -176,7 +176,7 @@
   // from inside the element's shadow root). Two dispositions:
   //   • `open` (carries a target path) → open the workbook chat-left /
   //     workbook-right deterministically — no round-trip needed (FIX 2, the
-  //     same split `wb app open-tab` drives).
+  //     same split `work app open-tab` drives).
   //   • everything else (e.g. a button :action, a share invite) → forward
   //     `{action, detail}` back into the SESSION as a follow-up user turn, so
   //     the agent re-enters the loop on a button press (was a dead-end before).

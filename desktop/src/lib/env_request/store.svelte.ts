@@ -1,4 +1,4 @@
-// Env request frontend store — wb env request's desktop surface.
+// Env request frontend store — work env request's desktop surface.
 //
 // Holds the queue of pending Workbooks.Engine.EnvBroker requests
 // pushed over the `engine:env_prompt` Phoenix channel. Same shape

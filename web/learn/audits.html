@@ -126,7 +126,7 @@
   an existing tool walks to become a toolkit. The spec calls them <em>three honest
   stages</em>, and the order matters:</p>
   <ul>
-    <li><b>Stage 1 — parse + scaffold.</b> <a href="imports"><code>wbx toolkit import</code></a>
+    <li><b>Stage 1 — parse + scaffold.</b> <a href="imports"><code>work toolkit import</code></a>
     is deliberately parse-only and local-only: it reads the source tool, writes a manifest,
     a skills overview, and the carried scripts — and leaves a piece of bait, a
     <code>** TODO dependency audit</code> heading, with a note saying the scripts are
@@ -159,7 +159,7 @@ flowchart LR
   src --> s1
   s1 -- "auto-runs at end of import" --> s23
   aud --> wm --> fp
-  reentry["wbx toolkit audit &lt;dir&gt;"] -. "re-run anytime; replaces the last" .-> s23
+  reentry["work toolkit audit &lt;dir&gt;"] -. "re-run anytime; replaces the last" .-> s23
   style s1 fill:#fbfaf6,stroke:#121316
   style s23 fill:#fbfaf6,stroke:#121316
   style sc fill:#f2ddb0,stroke:#121316
@@ -305,14 +305,14 @@ flowchart LR
   from above:</p>
   <pre class="orgsample">** TODO fix-up plan [0/3]
    The agent manual: work each item, check it off, then prove the whole
-   toolkit — done when =wbx toolkit push demo &lt;dir&gt;= · =wbx toolkit build demo=
-   · =wbx toolkit verify demo= all pass. With an engine reachable,
-   =wbx toolkit audit &lt;dir&gt; --fix= runs that push→build→verify for you.
+   toolkit — done when =work toolkit push demo &lt;dir&gt;= · =work toolkit build demo=
+   · =work toolkit verify demo= all pass. With an engine reachable,
+   =work toolkit audit &lt;dir&gt; --fix= runs that push→build→verify for you.
 *** TODO calc.py (blocked — python3)
     - [ ] rewrite in JS for the quickjs lane — keep the script's CLI contract (same args in, same stdout out) so callers don't change
     - [ ] or split the logic into org tasks the engine runs natively
     - [ ] =numpy= goes away with the python rewrite (see the interpreter item)
-    - [ ] re-run =wbx toolkit audit= — calc.py must classify ready</pre>
+    - [ ] re-run =work toolkit audit= — calc.py must classify ready</pre>
   <p>Two things are doing the real work here. The <code>[0/3]</code> cookie is a live
   progress meter — work items, check them, watch the fraction climb — and it's plain
   <a href="org">org</a> grammar, the same <a href="todos">TODO grammar</a> agents already
@@ -324,7 +324,7 @@ flowchart LR
   <em>route HTTP through the <a href="the-dock">Dock</a> — in JS use fetch (engine-shimmed); in
   shell, call the engine's http capability from a task</em>. An unknown interpreter gets
   <em>identify the language; if it's in a compile lane (c/zig/rust/go) declare a build recipe,
-  then wbx toolkit build produces the wasm</em>. Each verdict knows its own way across.</p>
+  then work toolkit build produces the wasm</em>. Each verdict knows its own way across.</p>
 </section>
 
 <section id="fix">
@@ -338,21 +338,21 @@ flowchart LR
   vocabulary the <a href="toolkit">parent lesson</a> used in its terminal story.</p>
   <pre class="mermaid">
 sequenceDiagram
-  participant wbx as wbx (your machine)
+  participant work as work (your machine)
   participant eng as engine (Nexus)
-  wbx-&gt;&gt;wbx: audit_static — scan · classify · write manifest
+  work-&gt;&gt;work: audit_static — scan · classify · write manifest
   alt --fix and an engine is reachable
-    wbx-&gt;&gt;eng: install(zip) — /rcp/toolkit/install
-    eng--&gt;&gt;wbx: pushed
-    wbx-&gt;&gt;eng: build — /rcp/toolkit/build
-    eng--&gt;&gt;wbx: built
-    wbx-&gt;&gt;eng: verify — /rcp/toolkit/verify
-    eng--&gt;&gt;wbx: verified ✓
-    Note over wbx: exit 0 · fix: pushed → built → verified
+    work-&gt;&gt;eng: install(zip) — /rcp/toolkit/install
+    eng--&gt;&gt;work: pushed
+    work-&gt;&gt;eng: build — /rcp/toolkit/build
+    eng--&gt;&gt;work: built
+    work-&gt;&gt;eng: verify — /rcp/toolkit/verify
+    eng--&gt;&gt;work: verified ✓
+    Note over work: exit 0 · fix: pushed → built → verified
   else --fix but no engine
-    wbx-&gt;&gt;eng: install …
+    work-&gt;&gt;eng: install …
     eng--xwbx: unreachable
-    Note over wbx: exit 3 — start one with wbx deploy local
+    Note over work: exit 3 — start one with work deploy local
   end
   </pre>
   <p>The output shapes match the two readers. For a human, the report prints, then a line:
@@ -362,8 +362,8 @@ sequenceDiagram
   without scraping prose.</p>
   <p>And the failure modes are stable, not ad-hoc. The bare audit on a broken setup still exits
   <b>0</b> — a diagnosis isn't a failure. But <code>--fix</code> with no engine reachable exits
-  <b>3</b>, with the hint <em>no engine reachable — start one with <code>wbx deploy local</code>
-  or set WB_ENGINE_URL</em>. That 3 is part of a fixed exit-code map every <a href="wbx">wbx</a>
+  <b>3</b>, with the hint <em>no engine reachable — start one with <code>work deploy local</code>
+  or set WB_ENGINE_URL</em>. That 3 is part of a fixed exit-code map every <a href="work">work</a>
   verb shares, so agents can branch on it:</p>
   <table class="cmp">
     <tr><th>exit</th><th>means</th><th>what an agent does</th></tr>

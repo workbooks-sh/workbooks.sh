@@ -10,7 +10,7 @@
 # PREREQUISITE: the runtime image pulls its in-sandbox compilers from the compilers layer
 # (`COPY --from=compilers`). CI can't build that layer (the wasm compilers are gitignored artifacts
 # from an hours-long provision chain), so a maintainer publishes it ONCE from a provisioned machine —
-# and again only when the compilers change — via `wb deploy publish-compilers`
+# and again only when the compilers change — via `work deploy publish-compilers`
 # (Workbooks.Deploy.Image.publish_compilers/1). It is public + multi-arch, so the per-arch FROM
 # ${COMPILERS_REF} pulls the matching variant.
 name: runtime-image

@@ -9,7 +9,7 @@ Reach for `mono` as the reference for what a kernel-shape toolkit *is*: a hot lo
 ## Example
 
 ```
-wb toolkit build mono            # clang.wasm compiles the C source → KernelRegistry
+work toolkit build mono            # clang.wasm compiles the C source → KernelRegistry
 # then loop it from the engine:
 Workbooks.Fabric.map_kernel(:mono, frames)
 # or one-shot:  POST /rcp/kernel/run

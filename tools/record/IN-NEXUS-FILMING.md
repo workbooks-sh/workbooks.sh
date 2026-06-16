@@ -105,7 +105,7 @@ at run end (or on `film my work`):
   3. (optional) narration line per step  →  narration.mp3   # host-brokered TTS
   4. wavelet film film/timeline.json -o demo.mp4 [--audio narration.mp3]
   5. wavelet-verify (or lib/verify-only.mjs) — require pass
-  6. wb publish / wrangler r2 put — share the URL
+  6. work publish / wrangler r2 put — share the URL
 ```
 
 The eval's `build-timeline.mjs` is the deterministic stand-in for step 1–2: it

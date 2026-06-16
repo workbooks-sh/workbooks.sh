@@ -145,13 +145,13 @@
     tools.</li>
   </ul>
   <p>The CLI is the same call wearing a friendlier face:
-  <code>wbx agent run "audit blog/ for dead links" --model openrouter/…</code>
+  <code>work agent run "audit blog/ for dead links" --model openrouter/…</code>
   posts to this endpoint and prints the id. There is no second code path — the
   CLI is a client of <code>/api/run</code>, exactly like your curl.</p>
   <figure class="diag" aria-label="POST /api/run returns 202 before the run starts">
   <pre class="mermaid">
 sequenceDiagram
-  participant C as caller (curl / wbx)
+  participant C as caller (curl / work)
   participant W as web.ex
   participant S as AgentSession.Sup<br/>(DynamicSupervisor)
   participant R as the session process
@@ -299,7 +299,7 @@ sequenceDiagram
   <p>That sounds small until you see what it enables: a run can build a URL that
   routes <em>back into its own mailbox</em>. A connect URL like
   <code>…/api/ctk/commit?run=$WB_RUN</code> lets the run hand a human a place to
-  send a decision, then call <code>wb ctk await $WB_RUN</code> and block until
+  send a decision, then call <code>work ctk await $WB_RUN</code> and block until
   it arrives. The review lands via <code>POST /api/ctk/commit?run=&lt;id&gt;</code>,
   gets pushed live to subscribers and queued FIFO, and the agent polls for it —
   a 204 when there's nothing yet. Reviews even persist to a per-run JSONL file,
@@ -345,7 +345,7 @@ sequenceDiagram
     <tr><th></th><th>ad-hoc run</th><th>standing agent</th></tr>
     <tr><td>spawner</td><td>DynamicSupervisor</td><td>static Supervisor (one per member)</td></tr>
     <tr><td>born</td><td class="y">on demand — a POST</td><td>at boot, staggered (i × 30s)</td></tr>
-    <tr><td>trigger</td><td><code>POST /api/run</code> / <code>wbx agent run</code></td><td>interval cadence from the manifest</td></tr>
+    <tr><td>trigger</td><td><code>POST /api/run</code> / <code>work agent run</code></td><td>interval cadence from the manifest</td></tr>
     <tr><td>concurrency</td><td>unbounded by design</td><td>Gate — max 2 at once</td></tr>
     <tr><td>per-run clock</td><td>max_steps + 150s/tool</td><td>15-minute wall clock per tick</td></tr>
     <tr><td>interior</td><td class="y" colspan="2">the same <code>Agent.run</code> loop, either way</td></tr>

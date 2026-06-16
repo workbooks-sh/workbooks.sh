@@ -8,6 +8,7 @@ defmodule WasmShellTest do
   compiler toolchain; tagged :wasm_e2e + skipped if the toolchain isn't present.
   """
   use ExUnit.Case, async: false
+  @moduletag :build
   @moduletag :wasm_e2e
   @moduletag timeout: 120_000
 

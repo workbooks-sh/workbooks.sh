@@ -1,10 +1,10 @@
-// Open-intent consumer (wb-aakl.10) — the browser side of `wb desktop
+// Open-intent consumer (wb-aakl.10) — the browser side of `work desktop
 // open <path|url>`.
 //
 // The CLI drops an open-intent file at <dataDir>/sh.workbooks/disco/
 // open-intent.json (mirroring daemon.rs discovery_path). This watcher reads
 // it on boot and on every window focus, opens the target as a tab, then
-// clears it. Focus coverage means a SECOND `wb desktop open <path>` against
+// clears it. Focus coverage means a SECOND `work desktop open <path>` against
 // the already-running browser lands too — a dependency-free deep link, no
 // URL scheme to register and no Tauri plugin.
 //

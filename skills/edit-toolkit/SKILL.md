@@ -1,6 +1,6 @@
 ---
 name: edit-toolkit
-description: Modify an existing Workbooks toolkit — edit a skill recipe, add a task, fix the manifest index, fix a broken see-also link — keeping the partition valid. Use when asked to change / fix / extend / update a toolkit or one of its skills. ALWAYS re-run `wbx toolkit verify` after, because the verify partition (every skill indexed once, see-also resolves, overview present, drawer matches keywords) is the toolkit's invariant and the smallest edit can break it.
+description: Modify an existing Workbooks toolkit — edit a skill recipe, add a task, fix the manifest index, fix a broken see-also link — keeping the partition valid. Use when asked to change / fix / extend / update a toolkit or one of its skills. ALWAYS re-run `work toolkit verify` after, because the verify partition (every skill indexed once, see-also resolves, overview present, drawer matches keywords) is the toolkit's invariant and the smallest edit can break it.
 ---
 
 # Edit a Workbooks toolkit
@@ -9,7 +9,7 @@ A toolkit is a `manifest.org` front-door + `skills/*.org` recipes read
 progressively. Editing one means making the **smallest change** while keeping the
 **partition** valid — every skill indexed exactly once, every see-also link
 resolving, `overview.org` present, the manifest drawer matching the `#+`
-keywords. The done-gate is `wbx toolkit verify <id>` passing, same as authoring.
+keywords. The done-gate is `work toolkit verify <id>` passing, same as authoring.
 
 Do the steps in order. Don't hand-edit and assume it's fine — verify, always.
 
@@ -18,10 +18,10 @@ Do the steps in order. Don't hand-edit and assume it's fine — verify, always.
 Find what's there before you touch it:
 
 ```
-wbx toolkit list                 # every toolkit: id · status · tagline
-wbx toolkit show <id>            # the manifest front door + skill index
-wbx toolkit show <id> <skill>    # one skill body (prefixed with a #+CAPTION TOC)
-wbx toolkit search <query>       # substring search across all skills
+work toolkit list                 # every toolkit: id · status · tagline
+work toolkit show <id>            # the manifest front door + skill index
+work toolkit show <id> <skill>    # one skill body (prefixed with a #+CAPTION TOC)
+work toolkit search <query>       # substring search across all skills
 ```
 
 Read the relevant skill before changing it — that's tier 2 of progressive
@@ -61,8 +61,8 @@ A new skill must carry the full header + the six mandatory sections; see
 Never await CI. Run at the tightest tier first:
 
 ```
-wbx toolkit verify <id>   # MUST pass: indexed-once, see-also resolves, overview present, drawer==keywords, #+EXEC satisfiable
-WB_TOOLKIT_EXEC=1 wbx toolkit eval <id>   # does it still behave? runs evals/*.org
+work toolkit verify <id>   # MUST pass: indexed-once, see-also resolves, overview present, drawer==keywords, #+EXEC satisfiable
+WB_TOOLKIT_EXEC=1 work toolkit eval <id>   # does it still behave? runs evals/*.org
 ```
 
 `verify` is the invariant gate — re-run it after every edit, even a one-line one.
@@ -74,14 +74,14 @@ For exactly what verify asserts and how eval tiers work, see
 If the edit touches the command or a task recipe, exercise it:
 
 ```
-wbx toolkit build <id>                 # re-wrap #+BUILD_SRC → register command
-wbx toolkit run <id> <task> -- <args>  # run the :role task block (needs WB_TOOLKIT_EXEC=1)
+work toolkit build <id>                 # re-wrap #+BUILD_SRC → register command
+work toolkit run <id> <task> -- <args>  # run the :role task block (needs WB_TOOLKIT_EXEC=1)
 ```
 
 ## 6. Sign + ship
 
 ```
-wbx toolkit sign <id>    # re-sign with the tenant did:key
+work toolkit sign <id>    # re-sign with the tenant did:key
 ```
 
 Live-confirm the change — don't trust the commit alone.
@@ -91,5 +91,5 @@ Live-confirm the change — don't trust the commit alone.
 - Smallest change applied; skill stays DEEP (not degraded to a flag dump).
 - Added skills: indexed exactly once by need (no trigger collision); full header +
   six sections; see-also links from/to siblings all resolve.
-- `wbx toolkit verify <id>` passes; eval still green where runnable.
+- `work toolkit verify <id>` passes; eval still green where runnable.
 - Command/task regression exercised if touched; re-signed; live-confirmed.

@@ -11,7 +11,7 @@ defmodule Workbooks.Agent do
   *VFS*. There is NO OS shell at all: the old `run` escape hatch (real native bash)
   was DELETED (wb-9ja). It is by construction IMPOSSIBLE for the agent to execute
   native code — the tool surface exposes only the in-WASM `shell`, the VFS, and a
-  handful of HOST-BROKERED capabilities (`git`, `publish`, `fetch`, `wb`) that
+  handful of HOST-BROKERED capabilities (`git`, `publish`, `fetch`, `work`) that
   trusted host Elixir performs on the agent's behalf. The agent never shells out.
   Every step is recorded in an HTML event log in the VFS (`events.html`, a
   `<work-log>` of `<work-event>` steps) — the run is fully observable and
@@ -113,8 +113,8 @@ defmodule Workbooks.Agent do
       parameters: %{type: "object", properties: %{query: %{type: "string"}}, required: ["query"]}
     }},
     %{type: "function", function: %{
-      name: "wb",
-      description: "Run the wb CLI. Args as one string. Subcommands: `var set/get/list/ref` (variable store; secrets ref-only); `toolkit list` · `toolkit show <id> [skill]` (READ a skill recipe before using a toolkit) · `toolkit search <q>` · `toolkit run <id> <task> -- <args>`. The workbook edit loop (host performs the zip IO, no shelling out): `unbundle <in.html> <dir>` extracts a workbook's embedded source tree to a dir, then after you edit the native source, `bundle <dir> <out.html>` re-packs the tree back into one self-contained .html (idempotent — replaces the old payload). e.g. args=\"toolkit show ffmpeg extract-audio\".",
+      name: "work",
+      description: "Run the work CLI. Args as one string. Subcommands: `var set/get/list/ref` (variable store; secrets ref-only); `toolkit list` · `toolkit show <id> [skill]` (READ a skill recipe before using a toolkit) · `toolkit search <q>` · `toolkit run <id> <task> -- <args>`. The workbook edit loop (host performs the zip IO, no shelling out): `unbundle <in.html> <dir>` extracts a workbook's embedded source tree to a dir, then after you edit the native source, `bundle <dir> <out.html>` re-packs the tree back into one self-contained .html (idempotent — replaces the old payload). e.g. args=\"toolkit show ffmpeg extract-audio\".",
       parameters: %{type: "object", properties: %{args: %{type: "string"}}, required: ["args"]}
     }},
     %{type: "function", function: %{
@@ -331,7 +331,7 @@ defmodule Workbooks.Agent do
   # network, a host-brokered git push — surfaces as a tool error the model can
   # react to, never a stalled run.
   defp exec_bounded(call, st) do
-    # A tool that RAISES (e.g. `wb model "get` → OptionParser.split unbalanced
+    # A tool that RAISES (e.g. `work model "get` → OptionParser.split unbalanced
     # quote) must become a clean tool-error the agent can react to — never crash
     # the whole run via the linked Task. Catch exceptions + non-local exits here.
     task =
@@ -565,10 +565,10 @@ defmodule Workbooks.Agent do
     {out, st, nil}
   end
 
-  defp exec_one(%{name: "wb", args: a}, st) do
+  defp exec_one(%{name: "work", args: a}, st) do
     argv = OptionParser.split(a["args"] || "")
 
-    # `wb deploy` reaches infra-modifying, non-tenant-scoped Deploy Kit ops, so it
+    # `work deploy` reaches infra-modifying, non-tenant-scoped Deploy Kit ops, so it
     # is gated by the exec capability like git/publish — the trusted desktop may
     # deploy; an exec-denied (cloud/shared) tenant's agent must not. The read +
     # tenant-scoped verbs (model/var/app/env/telemetry/ledger/…) stay ungated.
@@ -587,7 +587,7 @@ defmodule Workbooks.Agent do
   # File.read!/write! on caller-supplied paths and are NOT tenant-scoped). unbundle
   # is the edit-loop's first step (`.html` → working tree) and writes a whole tree
   # to a caller path, so it is gated like its `bundle` inverse. Reachable via the
-  # wb tool, they'd let an exec-denied (cloud/shared) tenant's agent read another
+  # work tool, they'd let an exec-denied (cloud/shared) tenant's agent read another
   # tenant's files or secrets / write anywhere — so they require exec, like
   # git/publish. The tenant-scoped verbs (model/var/app/env/telemetry/ledger/…)
   # stay open. (Confining these verbs' paths to the workdir even WITH exec — a

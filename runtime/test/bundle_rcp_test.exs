@@ -4,7 +4,7 @@ defmodule Workbooks.BundleRcpTest do
   uses: `POST /rcp/bundle` packs a raw parts map → self-contained .html, and
   `POST /rcp/unbundle` extracts it back to a parts map — byte-exact, binary-safe.
   The desktop owns NO bundler; this is `Workbooks.Bundle` on the engine, the same
-  home as `wb bundle`. Mirrors the checkout/checkin precedent (the engine runs in
+  home as `work bundle`. Mirrors the checkout/checkin precedent (the engine runs in
   a container, so trees move as bytes, never as engine-side paths).
 
   Deterministic (Plug.Test; x-tenant dev auth; the tree carries its own

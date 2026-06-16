@@ -38,7 +38,7 @@ After installing, open the **`getting-started`** skill before doing anything els
 | `create-workbook` | Create a new single-file HTML workbook systematically (framework, WASM deps, design canon, verify). |
 | `edit-workbook` | Edit an existing workbook safely via the unbundle → edit source → rebuild loop. |
 | `create-toolkit` | Author a new toolkit — `manifest.org` front-door + progressively-loaded `skills/*.org` recipes. |
-| `edit-toolkit` | Modify an existing toolkit while keeping the partition valid (`wbx toolkit verify`). |
+| `edit-toolkit` | Modify an existing toolkit while keeping the partition valid (`work toolkit verify`). |
 | `create-runtime` | Stand up or extend a Workbooks runtime — staged, anti-vibe-code gate (ADVANCED). |
 | `edit-runtime` | Modify the runtime/host engine — `mix compile` first gate, `mix test` suite (ADVANCED). |
 | `grow-a-premium-page` | Design + build a premium page/surface to a high bar — staged design canon, motion vocabulary, archetype catalog, component library, premium-bar gate. The design twin of `create-runtime`. |

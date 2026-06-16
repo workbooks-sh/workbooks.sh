@@ -267,11 +267,11 @@ flowchart LR
   <p>Verification recomputes the chain over the <em>current</em>
   <code>_steps.jsonl</code> and reports two booleans against the sealed file.
   There are two surfaces. From the CLI:</p>
-  <pre class="orgsample">$ wb ledger morning-links
+  <pre class="orgsample">$ work ledger morning-links
 tamper-evident=ok attributable=ok count=47 did=did:key:z6Mkp…</pre>
   <p>Now edit one byte of step twelve's output in <code>_steps.jsonl</code> and
   run it again:</p>
-  <pre class="orgsample">$ wb ledger morning-links
+  <pre class="orgsample">$ work ledger morning-links
 tamper-evident=FAIL attributable=FAIL count=47 did=did:key:z6Mkp…</pre>
   <p>Both fall together, and that's the design: <code>attributable</code> is
   <code>tamper_evident</code> <em>and</em> the signature — so the instant the
@@ -351,7 +351,7 @@ sequenceDiagram
   <p>The <code>did:key</code> that signs runs is not single-purpose. The very
   same key signs published <em>artifacts</em>: a manifest over the canonical
   JSON of a workbook, embedded in the published HTML, verifiable with
-  <code>wb verify &lt;file&gt;</code>. One identity, two rails — run provenance
+  <code>work verify &lt;file&gt;</code>. One identity, two rails — run provenance
   and artifact provenance — and a third power waiting in the wings.</p>
   <table class="cmp">
     <tr><th>rail</th><th>what gets signed</th><th>travels with the bytes?</th></tr>
@@ -360,7 +360,7 @@ sequenceDiagram
     <tr><td><b>x25519</b></td><td>(receives) wrapped content keys for sealed bundles</td><td class="y">the wrap travels; release is escrow-only</td></tr>
   </table>
   <p>The verdict of that table: the manifest rail is the portable one — a
-  signed workbook carries its proof inside itself and <code>wb verify</code>
+  signed workbook carries its proof inside itself and <code>work verify</code>
   checks it anywhere. The ledger rail is not yet portable; verifying a run
   still needs filesystem access to the workdir. And the same identity has a
   third power — mapped to an X25519 key so encrypted content keys can be
@@ -424,7 +424,7 @@ flowchart LR
     ledger as automatically witnessed off-host today.</li>
     <li><b>Verification needs the workdir.</b> Checking a run is a runtime or
     CLI operation against the files, not yet a portable offline artifact check.
-    Contrast <code>wb verify</code> on a signed workbook, which <em>is</em>
+    Contrast <code>work verify</code> on a signed workbook, which <em>is</em>
     portable — that gap is real.</li>
     <li><b>Provenance of actions, not a transcript.</b> The chained line
     carries only the first 200 characters of each tool's output. The ledger
@@ -488,8 +488,8 @@ flowchart LR
   <div class="cards">
     <a href="agents"><span class="sw" style="background:#9fc4e8"><img src="icons/agents.svg" alt=""></span>
       <div>Agents<small>the worker whose runs this makes verifiable</small></div><span class="go">→</span></a>
-    <a href="wbx"><span class="sw" style="background:#9fc4e8"><img src="icons/wbx.svg" alt=""></span>
-      <div>wbx<small>the CLI that runs ledger, sign, and verify</small></div><span class="go">→</span></a>
+    <a href="work"><span class="sw" style="background:#9fc4e8"><img src="icons/work.svg" alt=""></span>
+      <div>work<small>the CLI that runs ledger, sign, and verify</small></div><span class="go">→</span></a>
     <a href="autopoet"><span class="sw" style="background:#f2ddb0"><img src="icons/workflows.svg" alt=""></span>
       <div>The Autopoet<small>the standing agent you'd most want attributable</small></div><span class="go">→</span></a>
   </div>

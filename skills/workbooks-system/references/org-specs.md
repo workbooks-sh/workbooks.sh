@@ -19,13 +19,13 @@ system prompt.
 - `:MODEL:` — the LLM model id (honored by the run; overridable per call).
 - `:TOOLKITS:` — a whitespace-separated list of toolkit ids the agent may use.
   These are auto-injected into the system prompt as a compact index (progressive
-  disclosure tier 1); the skill bodies stay on demand via the `wbx` tool.
+  disclosure tier 1); the skill bodies stay on demand via the `work` tool.
 - `:TAGLINE:` — a short description.
 - **System prompt** — everything under `** System prompt`, up to the next level-1
   or -2 heading (so deeper `***` subsections like Recipes stay part of it).
 
 A running agent has one tool worldview: a WASM-sandboxed `shell` plus `search`,
-`wbx`, `fetch`, `vfs_read/write`, and `done`. Trusted agents also get a real-CLI
+`work`, `fetch`, `vfs_read/write`, and `done`. Trusted agents also get a real-CLI
 `run` escape hatch (granted by `exec`), being retired as CLIs become WASM commands.
 
 ## Workflow — component DAG (`:workflow:` node)
@@ -41,7 +41,7 @@ board model:
   sub-agents. Any other component is a WASM filter.
 
 Running a workflow executes it topologically, piping along edges, yielding nested
-run records with the schedule surfaced. `?plan=1` (or `wb tangle`) returns the
+run records with the schedule surfaced. `?plan=1` (or `work tangle`) returns the
 schedule without executing.
 
 ## Workflow TODO outline (native org states)
@@ -105,17 +105,17 @@ to the next waking run. Malformed entries (missing headings) are discarded.
 A toolkit directory's `manifest.org` carries a `:toolkit:`-tagged front-door node
 plus build keywords:
 
-- `#+TAGLINE:` — the one-line description shown by `wbx toolkit list`.
+- `#+TAGLINE:` — the one-line description shown by `work toolkit list`.
 - `CLI_BIN` / `CLI_*` — the command the toolkit wraps.
 - `#+EXEC:` — the exec shape: `command` | `posix` | `task` | `federation` |
   `kernel` (and `component`).
 - `#+BUILD_SRC:` — `crate:<name>` | `git+<url>` | `path:<dir>` | `wasm:<url>` |
-  `archive:<url>`. (`git+` is **not yet implemented** by `wbx toolkit build` — use
+  `archive:<url>`. (`git+` is **not yet implemented** by `work toolkit build` — use
   `crate:`/`path:`.)
 - `#+BUILD_LANG:` — `rust` | `go` | `js` | `py` | `c` | `zig` | `ts`.
 - `#+TRUST:` — e.g. `first-party`.
 - `skills/*.org` — the recipes, read on demand. A skill may carry `:role pre`
-  (verify-time setup), `:role task` (run-time, invoked by `wbx toolkit run`), and
+  (verify-time setup), `:role task` (run-time, invoked by `work toolkit run`), and
   `:role eval` blocks; `evals/*.org` cases use `:role eval` + `#+EXPECT:` (Tier
   1) or a `:TASK:` LLM judge (Tier 2). `#+CAPTION` lines form a skill's TOC.
 

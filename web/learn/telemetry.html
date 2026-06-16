@@ -223,8 +223,8 @@ flowchart TD
   altitudes. The same grammar answers different questions:</p>
   <table class="cmp">
     <tr><th>reader</th><th>question it answers</th><th>surface</th><th>liveness</th></tr>
-    <tr><td><code>summary/1</code></td><td>what happened in this one run?</td><td><code>wb telemetry &lt;slug&gt;</code> · <code>/api/telemetry/:slug</code></td><td class="y">live — works mid-flight, no db needed</td></tr>
-    <tr><td><code>index/2</code></td><td>what ran lately, across sessions?</td><td><code>wb telemetry</code> · <code>/api/telemetry</code></td><td class="y">live — a pure scan, no extra writes</td></tr>
+    <tr><td><code>summary/1</code></td><td>what happened in this one run?</td><td><code>work telemetry &lt;slug&gt;</code> · <code>/api/telemetry/:slug</code></td><td class="y">live — works mid-flight, no db needed</td></tr>
+    <tr><td><code>index/2</code></td><td>what ran lately, across sessions?</td><td><code>work telemetry</code> · <code>/api/telemetry</code></td><td class="y">live — a pure scan, no extra writes</td></tr>
     <tr><td><code>persist/3</code></td><td>the durable per-run query db</td><td><code>_telemetry.db</code> (SQLite)</td><td class="n">at run end — single writer, no contention</td></tr>
     <tr><td><code>/_activity</code></td><td>what is it doing right now? (public)</td><td>the public plane, anonymous read-only</td><td class="y">live — last 8 lines, slimmed</td></tr>
     <tr><td><code>AgentStream</code></td><td>watch this run unfold, step by step</td><td><code>/api/run/:id/stream</code> WebSocket</td><td class="y">live — per-step frames</td></tr>
@@ -239,17 +239,17 @@ flowchart TD
   its own to drift from.</p>
   <p>Here's the loop you'll actually live in. The index, then a single run,
   then the proof:</p>
-  <pre class="orgsample">$ wbx telemetry
+  <pre class="orgsample">$ work telemetry
 SLUG          STAGE    CALLS  ERRORS  MS
 wulu-refresh  done     42     0       183204
 brand-run     error    17     3       96110
 
-$ wbx telemetry brand-run
+$ work telemetry brand-run
 stage=error calls=17 errors=3 total_ms=96110
   ! step 9 shell: tool timeout
   ! step 11 fetch: exit 1 …
 
-$ wb ledger wulu-refresh
+$ work ledger wulu-refresh
 tamper-evident=ok attributable=ok count=42 did=did:key:z6Mk…</pre>
   <p>That second block is the morning answer to <em>what did my agent
   actually do</em> — the failing run named, the two bad steps quoted with
@@ -288,7 +288,7 @@ sequenceDiagram
   </pre>
   <p>The transformation is concrete. The full dream takes the last
   <b>25</b> steps and reformats each line to a terse move —
-  <code>shell wb toolkit verify rss (exit 0)</code> — then feeds that, the git
+  <code>shell work toolkit verify rss (exit 0)</code> — then feeds that, the git
   log, and the plan to a small model (<code>inception/mercury-2</code> by
   default). Out comes an entry like <code>rem/2026-06-12-0415.org</code> under
   five fixed headings: <code>* tale</code>, <code>* goals</code>,
@@ -327,7 +327,7 @@ flowchart LR
   Ed25519 <code>did:key</code>. Verification returns two facts —
   <b>tamper-evident</b> (no line was changed) and <b>attributable</b> (this
   agent, this key, signed it) — plus the count and head. It's the same
-  <code>wb ledger &lt;slug&gt;</code> line from the read stack above, sealed
+  <code>work ledger &lt;slug&gt;</code> line from the read stack above, sealed
   automatically at the end of a workflow run. The seal lives over the log, not
   beside it; the <a href="the-ledger">ledger</a> lesson owns the full
   story.</p>
@@ -346,7 +346,7 @@ flowchart LR
   wall["an agent hits a wall<br/>tried: the failing trace"] --> fi["file_issue"]
   fi --> bl["the autopoet backlog<br/>org files · SEEN dedup"]
   bl --> run["the autopoet works it<br/>agent: autopoet"]
-  run --> verify{"wb toolkit verify"}
+  run --> verify{"work toolkit verify"}
   verify -- ok --> done["DONE"]
   verify -- unverified --> open["downgrade to OPEN"]
   style wall fill:#f3c5a3,stroke:#121316
@@ -364,7 +364,7 @@ flowchart LR
   The system that extends the system is observable by the same telemetry it
   observes.</p>
   <p>One guard is non-negotiable. A self-reported DONE is
-  <b>independently re-verified</b> with <code>wb toolkit verify</code>; an
+  <b>independently re-verified</b> with <code>work toolkit verify</code>; an
   unverified DONE is downgraded back to OPEN. The agent's word is a claim, not
   a proof — and the same honesty that runs through the record runs through the
   fix. The full account is the <a href="autopoet">autopoet</a> lesson's; this
@@ -449,7 +449,7 @@ flowchart LR
   <h2>questions people actually ASK</h2>
   <details>
     <summary>Can I watch a run live?</summary>
-    <p>Yes, two ways. <code>wb telemetry &lt;slug&gt;</code> rolls up a run
+    <p>Yes, two ways. <code>work telemetry &lt;slug&gt;</code> rolls up a run
     even mid-flight, because the summary reads the file directly and needs no
     finished database. And <code>/api/run/:id/stream</code> is a WebSocket that
     pushes a frame per step as it happens — read this, ran that — then a done

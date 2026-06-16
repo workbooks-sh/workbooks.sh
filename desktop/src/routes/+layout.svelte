@@ -89,7 +89,7 @@
      the .shell flex so it overlays the whole viewport. -->
 <WorkgateModal />
 
-<!-- Env-request modal — desktop surface for `wb env request`.
+<!-- Env-request modal — desktop surface for `work env request`.
      Renders only when an agent / CLI asked for a credential. Same
      overlay treatment as WorkgateModal. -->
 <EnvRequestModal />

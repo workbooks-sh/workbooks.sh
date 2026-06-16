@@ -6,7 +6,7 @@ defmodule Workbooks.DesktopControl do
   The desktop already LISTENS on `desktop:control` and dispatches `tab_command`
   events (`%{action, path, session_id}`) to its tabs store; what was missing was
   anything on the runtime PUSHING those events. This is the keystone that lets
-  Waldo (a normal agent calling the `wb` tool) actually drive the app: open and
+  Waldo (a normal agent calling the `work` tool) actually drive the app: open and
   focus tabs, prompt for a key, retheme — by emitting a control event the
   connected shell acts on.
 
@@ -14,7 +14,7 @@ defmodule Workbooks.DesktopControl do
   `Registry`: every connected `Workbooks.PhoenixSocket` that joins
   `desktop:control` registers itself (value = its channel join_ref), and a push
   dispatches an Erlang message to each — the socket forwards it as a v2 channel
-  frame. Same node as the agent's `wb` call, so no distribution needed.
+  frame. Same node as the agent's `work` call, so no distribution needed.
   """
   @registry Workbooks.DesktopControl.Registry
   @topic "desktop:control"

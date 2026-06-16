@@ -86,7 +86,7 @@ There are **three**, and they must not be conflated:
 
 1. `compilers` — own ghcr package, published *manually*
 2. `runtime` — built by CI (`COPY --from` compilers)
-3. `wb deploy` — the user's tool, never platform-release
+3. `work deploy` — the user's tool, never platform-release
 
 #+begin_src component :type callout :tone warn :title One landmine
 Publishing the runtime before the compilers layer ships stale toolchains.

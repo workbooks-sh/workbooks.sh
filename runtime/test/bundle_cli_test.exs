@@ -1,6 +1,6 @@
 defmodule Workbooks.BundleCliTest do
   @moduledoc """
-  Pins the `wb bundle <dir> <out.html>` / `wb unbundle <in.html> <dir>` verbs over
+  Pins the `work bundle <dir> <out.html>` / `work unbundle <in.html> <dir>` verbs over
   the existing Bundle primitives: a dir tree round-trips dir → .html → dir
   byte-exact, the page survives, and the unbundle path-guard rejects escapes.
   Hermetic — no network, no LLM, no GenServer (the tree carries its own index.html
@@ -15,7 +15,7 @@ defmodule Workbooks.BundleCliTest do
     {:ok, base: base}
   end
 
-  test "wb bundle → wb unbundle round-trips a dir tree byte-exact", %{base: base} do
+  test "work bundle → work unbundle round-trips a dir tree byte-exact", %{base: base} do
     src = Path.join(base, "src")
     out = Path.join(base, "page.html")
     dst = Path.join(base, "dst")

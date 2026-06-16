@@ -47,10 +47,10 @@ Placement legend: **native** = Rust shell cmd (offline). **local-store** = clien
 | set dirty | tab_set_dirty | tab_set_dirty | native | (id,dirty)->() | EXISTS |
 | close/focus by path | client resolve | (no cmd) | native | (path)->bool | now (client) |
 | persist tabs | (none, TODO) | tabs.json local-store | local-store | TabsSnapshot<->json | now |
-| bundle dir->html | workbook_bundle | workbook_bundle | native | (dir,output)->{output,stdout,stderr} | PENDING (kernel bundle export / wb shim) |
+| bundle dir->html | workbook_bundle | workbook_bundle | native | (dir,output)->{output,stdout,stderr} | PENDING (kernel bundle export / work shim) |
 | unbundle html->dir | workbook_unbundle | workbook_unbundle | native | (htmlPath,outputDir)->{output_dir,files} | PENDING (port workbook.ex regex → flip now) |
 | read workbook-spec | Workbook.spec | workbook_spec_read | native | (htmlPath)->{spec\|null} | now |
-| portability check | workbook_check_portability | workbook_check_portability | native | (workdir)->{cells,workbook_tier,declared_tier} | PENDING (wb check --portability) |
+| portability check | workbook_check_portability | workbook_check_portability | native | (workdir)->{cells,workbook_tier,declared_tier} | PENDING (work check --portability) |
 | list packages | package_list | package_list | native | ()->string[] | now |
 | active package | package_get_active | package_get_active | native | ()->Package\|null | now |
 | load package | package_load | package_load | native | (name)->Package | now |

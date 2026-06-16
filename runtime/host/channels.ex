@@ -11,7 +11,7 @@ defmodule Workbooks.Channels do
   ## DM policy — pairing-code allowlist
 
   Unknown senders never reach the inbox: the adapter replies with a short
-  pairing code and parks them. `approve/2` (control plane / `wb channels
+  pairing code and parks them. `approve/2` (control plane / `work channels
   approve`) moves them onto the allowlist. State is two small JSON/JSONL files
   under `<WB_DATA>/channels/`:
 

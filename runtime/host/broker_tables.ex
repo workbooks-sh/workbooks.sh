@@ -1,6 +1,6 @@
 defmodule Workbooks.BrokerTables do
   @moduledoc """
-  wb self-audit: a LONG-LIVED owner for the broker ETS tables (rate-limiter, broker-audit counters + ring).
+  work self-audit: a LONG-LIVED owner for the broker ETS tables (rate-limiter, broker-audit counters + ring).
 
   THE BUG THIS CLOSES: those tables were created lazily by whatever process first touched them. Broker ops
   run inside TRANSIENT processes (e.g. ParallelBroker's `Task.async_stream`, the app-host's per-request

@@ -1,7 +1,7 @@
 defmodule Workbooks.DesktopControlTest do
   @moduledoc """
   DesktopControl pushes app/tab commands to connected desktop shells. It must be
-  tenant-scoped (wb-g1yo): a `wb app theme/tab/…` command drives only the caller's
+  tenant-scoped (wb-g1yo): a `work app theme/tab/…` command drives only the caller's
   own shell, not every desktop on a shared nexus. Mirrors the env/workgate broker
   scoping. The test process stands in for a shell.
   """

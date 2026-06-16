@@ -134,7 +134,7 @@
 <section id="rung-one">
   <h2>rung one — no manifest CEREMONY</h2>
   <p>One command turns a source file into a live, callable command:</p>
-  <pre class="orgsample">$ wbx toolkit build-inline slug js slug.js
+  <pre class="orgsample">$ work toolkit build-inline slug js slug.js
 built + registered command `slug` (js) &rarr; build/commands/9f2c&hellip;e1.wasm
 run it via the Dock: run-command slug</pre>
   <p>That output is verbatim from the engine; only the hash is illustrative. There is no
@@ -198,20 +198,20 @@ flowchart LR
   <h2>rung two — PROMOTE</h2>
   <p>The second command materializes the session command as a real, source-owned toolkit
   directory under the toolkits root:</p>
-  <pre class="orgsample">$ wbx toolkit promote slug js slug.js
+  <pre class="orgsample">$ work toolkit promote slug js slug.js
 promoted session command &rarr; workspace toolkit `slug` at toolkits/slug
-  build it: wb toolkit build slug
+  build it: work toolkit build slug
   then it packs into a workbook (Library.store) and installs elsewhere (Library.install)</pre>
   <p>Verbatim output again. Before it writes anything, <code>promote</code> runs the same
   guards in order: the name can't be a reserved built-in, it must match
   <code>^[A-Za-z0-9_.-]+$</code>, the language must be one of the six, and the source file must
   exist. Trip a guard and you get a clean refusal — the failure rail is honest:</p>
-  <pre class="orgsample">$ wbx toolkit promote grep js slug.js
+  <pre class="orgsample">$ work toolkit promote grep js slug.js
 cannot promote: "grep" is a reserved built-in command name</pre>
   <p>On success it doesn't compile anything. <b>Promote scaffolds; it does not build.</b> It
   writes your source at the per-language layout path, a generated <code>manifest.org</code>, and
   a <code>skills/overview.org</code> skill stub — then hands you the separate
-  <code>wb toolkit build slug</code> to do the deterministic rebuild. Here's the richest case,
+  <code>work toolkit build slug</code> to do the deterministic rebuild. Here's the richest case,
   rust, on disk after promote:</p>
   <pre class="orgsample">toolkits/slug/
 ├── manifest.org          &larr; generated spec
@@ -268,7 +268,7 @@ flowchart LR
   style same fill:#fbfaf6,stroke:#121316
   </pre>
   <p>Read that left to right as a story. The manifest declares the language, the build source
-  path, and the binary name. <code>wb toolkit build</code> reads those keys, assembles the build
+  path, and the binary name. <code>work toolkit build</code> reads those keys, assembles the build
   directory the compiler expects, compiles in the sandbox, and content-addresses the result.
   Because the source is byte-identical and the compiler is the same wasm compiler, the same
   source produces the same sha, which lands at the same path — the deterministic rebuild meets

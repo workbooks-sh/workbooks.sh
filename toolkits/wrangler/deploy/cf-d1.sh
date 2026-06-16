@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# `wb forge app deploy --backend cf-d1`: stands up the unified gateway (d1
+# `work forge app deploy --backend cf-d1`: stands up the unified gateway (d1
 # driver — D1 + Workers AI) on the USER'S OWN Cloudflare account, then injects
 # the PUBLIC descriptor into a COPY of the built workbook. Only a wrangler
 # login needed. Contracts: deploy-kit/app/gateway/README.org
 #
-# Env contract (set by `wb forge app`): WB_DEPLOY_KIT, WB_FORGE_ARTIFACT,
+# Env contract (set by `work forge app`): WB_DEPLOY_KIT, WB_FORGE_ARTIFACT,
 # WB_FORGE_APP_NAME, WB_FORGE_OUT, WB_APP_AUTH (better-auth|hmac-dev),
 # WB_APP_CORS, WB_APP_JWT_SECRET, WB_APP_BETTER_AUTH_SECRET,
 # CLOUDFLARE_ACCOUNT_ID (required when the login has >1 account),
@@ -16,7 +16,7 @@
 set -euo pipefail
 
 # shellcheck source=../../../deploy-kit/app/lib.sh
-source "${WB_DEPLOY_KIT:?wb forge sets WB_DEPLOY_KIT}/app/lib.sh"
+source "${WB_DEPLOY_KIT:?work forge sets WB_DEPLOY_KIT}/app/lib.sh"
 # Shared wrangler account resolver (source-only, don't run the pages deploy).
 # shellcheck source=./cloudflare.sh
 WB_CF_SOURCE_ONLY=1 source "$(dirname "${BASH_SOURCE[0]}")/cloudflare.sh"
@@ -26,7 +26,7 @@ WB_CF_SOURCE_ONLY=1 source "$(dirname "${BASH_SOURCE[0]}")/cloudflare.sh"
 [ -f "$WB_FORGE_ARTIFACT" ] || { echo "workbook not found: $WB_FORGE_ARTIFACT" >&2; exit 1; }
 
 command -v wrangler >/dev/null 2>&1 || {
-  echo "wrangler not found — run: wb forge web doctor --to cloudflare --login" >&2
+  echo "wrangler not found — run: work forge web doctor --to cloudflare --login" >&2
   exit 1
 }
 
@@ -130,6 +130,6 @@ echo "    backend: cf-d1 (D1 + Workers AI) @ $worker_url  ·  auth: $auth"
 if [ "$auth" = "better-auth" ]; then
   echo "    sign-in: POST $worker_url/api/auth/sign-up/email | /sign-in/email (bearer in set-auth-token)"
 else
-  echo "    mint a dev tenant token: wb forge app token --secret '<GATEWAY_JWT_SECRET>' --tenant <id>"
+  echo "    mint a dev tenant token: work forge app token --secret '<GATEWAY_JWT_SECRET>' --tenant <id>"
 fi
-echo "    deploy this .html with: wb forge web deploy '$staged' --to cloudflare"
+echo "    deploy this .html with: work forge web deploy '$staged' --to cloudflare"

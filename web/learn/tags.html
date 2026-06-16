@@ -194,7 +194,7 @@
   kind without any extra index. The kernel's <code>parse_headlines</code>
   emits one row per heading, and <code>"tags"</code> is a field on every row.
   Run the real verb against the real file:</p>
-  <pre class="orgsample">$ wbx query nightly-digest.org
+  <pre class="orgsample">$ work query nightly-digest.org
 
 { "level": 1, "title": "Nightly digest", "tags": [<b>"workflow"</b>],
   "scheduled": { "at": "2026-06-06T06:00", "repeat": "+1d", "active": true },
@@ -203,7 +203,7 @@
    <i>→ tags is a list — :a:b: would be two entries</i></pre>
   <p>So filtering by kind is filtering rows. From the shell, with
   <code>jq</code>, "give me every task in this workflow" is one line:</p>
-  <pre class="orgsample">$ wbx query digest.org | jq '.[] | select(.tags | index("component")) | .title'
+  <pre class="orgsample">$ work query digest.org | jq '.[] | select(.tags | index("component")) | .title'
    <i>→ "Fetch events"  "Summarize"  "Send"</i></pre>
   <p>The runtime does the same thing in Elixir, and this is the part worth
   sitting with: the entire toolkit-discovery "subsystem" is one filter over
@@ -237,7 +237,7 @@ flowchart LR
   composable s-expressions like <code>(and (tags :toolkit:) (property :ID:
   "wb"))</code> — as the design direction. That parser is not shipped as a
   kernel export today. What ships is exactly what you just saw:
-  <code>wbx query</code> returns all rows, and the tag filter lives one step
+  <code>work query</code> returns all rows, and the tag filter lives one step
   later — a <code>jq</code> selector at the shell, or one line of Elixir in
   the host. When this page writes <code>(tags :toolkit:)</code>, read it as
   "the filter over query output," not as a string the kernel parses.</p>
@@ -361,10 +361,10 @@ flowchart TD
     <code>(and (tags …))</code> s-expression syntax lives in the docs as the
     design intent. Today you filter rows.</li>
   </ul>
-  <pre class="orgsample">$ wbx tangle digest.org        # heading tagged :workflow:
+  <pre class="orgsample">$ work tangle digest.org        # heading tagged :workflow:
    <i>→ { "worlds": [ { … three tasks … } ] }</i>
 
-$ wbx tangle typo.org          # same file, :workflw: typo
+$ work tangle typo.org          # same file, :workflw: typo
    <i>→ { "worlds": [] }       no error. no diagnostics. just gone.</i></pre>
   <p>The lesson in that pair: with tags, the failure mode is never a stack
   trace. It's an empty result. The tree looks fine, the file parses, and the
@@ -414,7 +414,7 @@ $ wbx tangle typo.org          # same file, :workflw: typo
     heading tagged exactly <code>:workflow:</code>, and only treats a child as
     a task if it's tagged exactly <code>:component:</code>. A typo
     (<code>:workflw:</code>, <code>:Component:</code>) produces no error and no
-    diagnostics — just an empty plan. Run <code>wbx query</code> and read the
+    diagnostics — just an empty plan. Run <code>work query</code> and read the
     <code>tags</code> field on each row; what the kernel sees is what's
     actually there.</p>
   </details>
@@ -441,8 +441,8 @@ $ wbx tangle typo.org          # same file, :workflw: typo
       <div>Toolkits<small>the :toolkit: tag's consumer</small></div><span class="go">→</span></a>
     <a href="workflows"><span class="sw" style="background:#aee5c2"><img src="icons/workflows.svg" alt=""></span>
       <div>Workflows<small>what :workflow: compiles into</small></div><span class="go">→</span></a>
-    <a href="wbx"><span class="sw" style="background:#f2ddb0"><img src="icons/wbx.svg" alt=""></span>
-      <div>wbx<small>the query verb that exposes tags</small></div><span class="go">→</span></a>
+    <a href="work"><span class="sw" style="background:#f2ddb0"><img src="icons/work.svg" alt=""></span>
+      <div>work<small>the query verb that exposes tags</small></div><span class="go">→</span></a>
   </div>
 </section>
 

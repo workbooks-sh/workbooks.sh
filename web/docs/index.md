@@ -36,7 +36,7 @@ Now an agent or a workbook can call it.
 
 ```bash
 # write a tiny reverser in JS, build it in-sandbox, run it
-wb toolkit build-inline rev js ./reverse.js
+work toolkit build-inline rev js ./reverse.js
 run-command rev <<< "hello"     # → olleh
 ```
 

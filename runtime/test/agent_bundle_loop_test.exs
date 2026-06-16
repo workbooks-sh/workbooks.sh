@@ -1,12 +1,12 @@
 defmodule Workbooks.AgentBundleLoopTest do
   @moduledoc """
   Pins the AGENT's in-run workbook edit loop — unbundle → edit native source →
-  re-bundle — driven entirely through the agent's `wb` tool surface (the bash
+  re-bundle — driven entirely through the agent's `work` tool surface (the bash
   membrane), NOT a native unzip binary and NOT a second wasm zip lane.
 
   Per the MAP.sandbox decision: bundle/unbundle is pure byte manipulation the host
   already does in `Workbooks.Bundle` (Elixir `:zip` + base64 embed), so the guest
-  emits the INTENT (`wb unbundle …` / `wb bundle …` over its bash surface) and the
+  emits the INTENT (`work unbundle …` / `work bundle …` over its bash surface) and the
   host performs the IO — the same brokered-IO precedent as js_dock. One Bundle home,
   no native exec, no second zip implementation to drift.
 
@@ -20,7 +20,7 @@ defmodule Workbooks.AgentBundleLoopTest do
   alias Workbooks.{Agent, Bundle}
 
   defp wb(args, exec),
-    do: Agent.__exec_one_for_test__(%{name: "wb", args: %{"args" => args}}, %{tenant: nil, exec: exec})
+    do: Agent.__exec_one_for_test__(%{name: "work", args: %{"args" => args}}, %{tenant: nil, exec: exec})
 
   setup do
     base = Path.join(System.tmp_dir!(), "agent_bundle_loop_#{System.unique_integer([:positive])}")
@@ -28,7 +28,7 @@ defmodule Workbooks.AgentBundleLoopTest do
     {:ok, base: base}
   end
 
-  test "the edit loop runs over the agent's wb tool: unbundle → edit → re-bundle", %{base: base} do
+  test "the edit loop runs over the agent's work tool: unbundle → edit → re-bundle", %{base: base} do
     # A starting self-contained workbook .html (page + embedded source tree). Built
     # via the same Bundle primitive the host serves, so the fixture is honest.
     src_tree = %{

@@ -1,6 +1,6 @@
 ---
 name: workbooks-system
-description: The Workbooks platform, for any developer or agent building on it — what a workbook, the runtime, a toolkit, and a workflow are; the WebAssembly-only rules of engagement; bundling/unbundling; publishing; running your own runtime with Deploy Kit; authoring toolkits and agent skills. Use this skill whenever working with workbooks, the wbx CLI, a workbooks runtime/engine, toolkits, agents on the runtime, or anything involving "bundle", "unbundle", "publish", "deploy", "toolkit", or "WASM" in a Workbooks context — read it BEFORE inventing a mechanism, because the platform almost always already provides the mechanism.
+description: The Workbooks platform, for any developer or agent building on it — what a workbook, the runtime, a toolkit, and a workflow are; the WebAssembly-only rules of engagement; bundling/unbundling; publishing; running your own runtime with Deploy Kit; authoring toolkits and agent skills. Use this skill whenever working with workbooks, the work CLI, a workbooks runtime/engine, toolkits, agents on the runtime, or anything involving "bundle", "unbundle", "publish", "deploy", "toolkit", or "WASM" in a Workbooks context — read it BEFORE inventing a mechanism, because the platform almost always already provides the mechanism.
 ---
 
 # The Workbooks system
@@ -53,7 +53,7 @@ below is organized around them:
 - **Build inputs never ship in the runnable artifact** unless they are
   WebAssembly or a built bundle. Source lives on the source rail (git);
   the artifact carries outputs.
-- **Deploy through the platform** (`wbx` CLI / Deploy Kit / the control
+- **Deploy through the platform** (`work` CLI / Deploy Kit / the control
   plane), not by shelling into machines. → `references/deploykit.md`
 
 ## Where to go next
@@ -66,11 +66,11 @@ route, spec, env var — by what you're DOING):
 | author/bundle/unbundle/publish a workbook; the artifact | `references/workbooks.md` |
 | run/operate/extend your own runtime; deploy engines; env contract | `references/deploykit.md` |
 | build commands, toolkits, agent skills; convert anything to WASM | `references/toolkit.md` |
-| find a `wbx` command by purpose (the whole tree at a glance) | `references/cli/index.md` |
+| find a `work` command by purpose (the whole tree at a glance) | `references/cli/index.md` |
 | author/bundle/sign/publish/query a workbook (need→action→output) | `references/cli/workbook.md` |
-| stand up / inspect a runtime (`wbx deploy …`) | `references/cli/deploy.md` |
-| discover/build/run/eval toolkits + the compiler lane (`wbx toolkit …`) | `references/cli/toolkit.md` |
-| talk to a running engine, configure vars, dev loop (`wbx rt/dev/var/desktop`) | `references/cli/engine.md` |
+| stand up / inspect a runtime (`work deploy …`) | `references/cli/deploy.md` |
+| discover/build/run/eval toolkits + the compiler lane (`work toolkit …`) | `references/cli/toolkit.md` |
+| talk to a running engine, configure vars, dev loop (`work rt/dev/var/desktop`) | `references/cli/engine.md` |
 | the two HTTP planes' full route tables + auth ladder | `references/http.md` |
 | the org-file specs the runtime executes (agent/workflow/lifecycle/manifest) | `references/org-specs.md` |
 | every `WB_*` env var — purpose, default, subsystem | `references/env.md` |

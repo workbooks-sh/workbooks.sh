@@ -101,13 +101,13 @@ identity/vars/misc
 | `WB_CONTAINER_IMAGE` | — | the container image to run |
 | `WB_COMPILERS_IMAGE` | — | override the compilers-layer reference the image `COPY --from`s |
 | `WB_PLATFORMS` | `linux/amd64,linux/arm64` | buildx target platforms |
-| `WB_INSTALL_URL` | `https://workbooks.sh/install.sh` | the desktop installer URL (`wbx desktop install`) |
+| `WB_INSTALL_URL` | `https://workbooks.sh/install.sh` | the desktop installer URL (`work desktop install`) |
 
 ## Client target (CLI → running runtime)
 
 | Var | Default | Purpose |
 |---|---|---|
-| `WB_RUNTIME_URL` | unset | explicit runtime URL for `wbx rt`/`wbx ctk`/`wbx dev`; else the local discovery file |
+| `WB_RUNTIME_URL` | unset | explicit runtime URL for `work rt`/`work ctk`/`work dev`; else the local discovery file |
 | `WB_TOKEN` | `` (empty) | the bearer for `WB_RUNTIME_URL` |
 
 ## Identity / vars / misc
@@ -118,6 +118,6 @@ identity/vars/misc
 | `WB_VARS` | `:memory:` | the variable-store backend |
 | `WB_PM_DBG` | unset | package-manager debug logging |
 
-Model-key discovery for `wbx dev info` also recognizes these (not `WB_*`):
+Model-key discovery for `work dev info` also recognizes these (not `WB_*`):
 `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`,
 `GOOGLE_API_KEY`; publishing reads `CLOUDFLARE_ACCOUNT_ID`.

@@ -185,7 +185,7 @@ rollback come for free. They can also be published and fetched peer-to-peer over
 identified by the same keys above.
 
 **Deploy** — shipping it. One image runs the Runtime in a local container or on a cloud
-machine. `wb deploy` scaffolds the config and ships it.
+machine. `work deploy` scaffolds the config and ships it.
 
 ## Install the desktop app
 
@@ -194,7 +194,7 @@ curl -fsSL https://workbooks.sh/install.sh | sh
 ```
 
 Installs the latest [desktop release](https://github.com/workbooks-sh/workbooks.sh/releases)
-(macOS · Linux). Already have the `wb` CLI? `wb desktop install` does the same. Or grab a
+(macOS · Linux). Already have the `work` CLI? `work desktop install` does the same. Or grab a
 bundle straight from the releases page. On first launch the app's wizard connects an engine
 — a local microVM (via krunvm) or a cloud engine — but it's optional: Workbooks opens and
 weaves workbooks offline without one.
@@ -202,8 +202,8 @@ weaves workbooks offline without one.
 ## Try it
 
 ```bash
-wb run app.org      # run a workbook
-wb publish app.org  # ship it
+work run app.org      # run a workbook
+work publish app.org  # ship it
 ```
 
 That's the loop.
@@ -219,9 +219,9 @@ iex -S mix                 # dev
 MIX_ENV=prod mix release   # production build
 
 # Deploy: one OCI image, run it locally or on a cloud machine
-wb deploy init             # scaffold the config
-wb deploy local            # run it in a local Linux container
-wb deploy apply deploy.org # ship it to a cloud machine
+work deploy init             # scaffold the config
+work deploy local            # run it in a local Linux container
+work deploy apply deploy.org # ship it to a cloud machine
 ```
 
 The Runtime is one self-contained container: BEAM + wasmtime + the baked WASM artifacts.

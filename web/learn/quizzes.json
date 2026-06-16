@@ -800,7 +800,7 @@
     ],
     "the-one-command": [
       {
-        "q": "Who is the primary operator of wbx in your workflow?",
+        "q": "Who is the primary operator of work in your workflow?",
         "options": [
           "You, typing each verb yourself at the terminal",
           "A separate machine-only service you never see",
@@ -808,10 +808,10 @@
           "Your agent, which types the commands for you"
         ],
         "answer": 3,
-        "explain": "When you ask the agent to scaffold, wire, or ship, the agent is the one typing wbx commands."
+        "explain": "When you ask the agent to scaffold, wire, or ship, the agent is the one typing work commands."
       },
       {
-        "q": "What is the honest description of what wbx actually is?",
+        "q": "What is the honest description of what work actually is?",
         "options": [
           "A handle, not a brain, that hands heavy work to the engine",
           "A self-contained brain holding all the build intelligence",
@@ -822,7 +822,7 @@
         "explain": "It parses the request, does light local work, and hands everything heavy to the engine behind it."
       },
       {
-        "q": "How does wbx behave differently for machines versus people?",
+        "q": "How does work behave differently for machines versus people?",
         "options": [
           "It runs entirely different code paths for each kind of user",
           "It drops menus and colors for clean, predictable output",
@@ -833,7 +833,7 @@
         "explain": "For machines it drops friendliness for clean output and stable codes; the work underneath stays the same."
       },
       {
-        "q": "What is special about where wbx runs?",
+        "q": "What is special about where work runs?",
         "options": [
           "It exists only as a laptop install for three platforms",
           "It runs as a translated stand-in inside the engine",
@@ -841,7 +841,7 @@
           "It is recompiled into a different tool for the engine"
         ],
         "answer": 2,
-        "explain": "The same wbx a person installs runs inside the sandbox, so people and AI hold the identical tool."
+        "explain": "The same work a person installs runs inside the sandbox, so people and AI hold the identical tool."
       },
       {
         "q": "What is the job of the doctor verb?",
@@ -1925,7 +1925,7 @@
         "explain": "The plan is testable: empty components and dangling inputs are named errors caught before anything compiles."
       },
       {
-        "q": "What is wbx, and who usually drives it?",
+        "q": "What is work, and who usually drives it?",
         "options": [
           "An AI model that writes the code for you",
           "A configuration file the engine reads at startup",
@@ -1933,10 +1933,10 @@
           "A web dashboard the user logs into directly"
         ],
         "answer": 2,
-        "explain": "wbx is the one command-line handle that authors, builds, signs, ships, and runs; you direct and the agent operates it."
+        "explain": "work is the one command-line handle that authors, builds, signs, ships, and runs; you direct and the agent operates it."
       },
       {
-        "q": "How does wbx behave differently for people versus machines?",
+        "q": "How does work behave differently for people versus machines?",
         "options": [
           "Same work; warm menus for people, clean codes for machines",
           "It is two entirely separate programs underneath",
@@ -1951,7 +1951,7 @@
         "options": [
           "The engine that runs everything",
           "The sandbox the tools run inside",
-          "The wbx command-line tool",
+          "The work command-line tool",
           "Toolkits, whose parts bin is small"
         ],
         "answer": 3,

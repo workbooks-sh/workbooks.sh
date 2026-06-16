@@ -1,4 +1,4 @@
-/* wb svelte COMPILE-ONLY lane (wb-feto) — runs in qjs-run.wasm. Loads svelte/compiler from the
+/* work svelte COMPILE-ONLY lane (wb-feto) — runs in qjs-run.wasm. Loads svelte/compiler from the
  * supplied node_modules and compiles every .svelte source in the file-map to JS (in place), then
  * writes the transformed file-map back as JSON. The HOST then bundles that map with esbuild
  * (native-fast) — splitting the irreducible QuickJS COMPILE from the now-fast BUNDLE. This replaces

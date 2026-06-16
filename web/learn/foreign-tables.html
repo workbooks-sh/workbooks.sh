@@ -265,7 +265,7 @@ flowchart TD
 #+ROWS_PATH: data.items
 #+ENV_KEYS: SHOP_API_KEY</pre>
   <p>Run <code>Federation.discover()</code> and <code>shop-order</code> is now
-  a foreign table. Then <code>wbx library query "SELECT * FROM shop-order"</code>
+  a foreign table. Then <code>work library query "SELECT * FROM shop-order"</code>
   returns <code>%{federated: true, rows: [%{member: "federation", rows: […]}],
   skipped: []}</code> — while the same query against
   <code>FROM workspace_files</code> falls straight through to the local disk.
@@ -500,8 +500,8 @@ flowchart LR
   this repo — and their own manifests say so, admitting the impl is planned.
   The manifests are fixtures that <code>load_impl</code> skips today, on
   purpose.</p>
-  <p>And one naming collision to defuse: <code>wbx mirror</code> and
-  <code>wbx federate</code> in the CLI are about <b>git / Radicle repo
+  <p>And one naming collision to defuse: <code>work mirror</code> and
+  <code>work federate</code> in the CLI are about <b>git / Radicle repo
   federation</b> — a completely different construct that happens to share the
   words. Nothing on this page is that.</p>
 </section>
@@ -540,8 +540,8 @@ flowchart LR
     reads it with no special knowledge.</p>
   </details>
   <details>
-    <summary>Is this the <code>wbx federate</code> thing?</summary>
-    <p>No. <code>wbx mirror</code> / <code>wbx federate</code> are git and
+    <summary>Is this the <code>work federate</code> thing?</summary>
+    <p>No. <code>work mirror</code> / <code>work federate</code> are git and
     Radicle repository federation — sharing the word, nothing else. Foreign
     tables are about <code>FROM &lt;entity&gt;</code> resolving to a data
     source, live or mirrored.</p>

@@ -143,7 +143,7 @@ defmodule Workbooks.ServeBroker do
     end
   end
 
-  # public ETS channel owned by the long-lived Workbooks.BrokerTables process (wb self-audit: a transient
+  # public ETS channel owned by the long-lived Workbooks.BrokerTables process (work self-audit: a transient
   # caller that lazily creates a named table takes it down on exit, dropping serve state under concurrency).
   defp table, do: Workbooks.BrokerTables.ensure(@table, [:named_table, :public, :set])
 

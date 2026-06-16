@@ -1,0 +1,13 @@
+invoice_id,date,brand,content_type,base,hooks,usage_rights,total,status,due_date
+INV-1042,2026-06-09,Caraway,Bundle (4),2800,0,0,2800,paid,2026-06-16
+INV-1041,2026-06-08,Olipop,Reel,900,100,400,1400,paid,2026-06-15
+INV-1038,2026-06-05,Glossier,Ad-style,1450,100,100,1650,sent,2026-06-22
+INV-1035,2026-06-03,Ritual,Ad-style,1450,50,700,2200,sent,2026-06-20
+INV-1031,2026-05-28,AG1,Testimonial,900,0,0,900,paid,2026-06-04
+INV-1029,2026-05-22,Jones Road,Tutorial,1300,0,600,1900,paid,2026-05-29
+INV-1024,2026-05-14,Liquid Death,Skit,1000,100,0,1100,paid,2026-05-21
+INV-1019,2026-04-30,Topicals,Testimonial,1500,0,0,1500,overdue,2026-05-07
+INV-1015,2026-04-18,Caraway,Demo,800,0,240,1040,paid,2026-04-25
+INV-1011,2026-04-09,Olipop,Unboxing,300,0,0,300,paid,2026-04-16
+INV-1004,2026-03-27,Ritual,Testimonial,600,50,260,910,paid,2026-04-03
+INV-0998,2026-03-15,Glossier,Reel,450,100,220,770,paid,2026-03-22

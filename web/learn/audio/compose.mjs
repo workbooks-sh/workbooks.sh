@@ -62,7 +62,7 @@ const TURNS = {
   org: ["definition", "why-not", "faq"],
   agents: ["definition", "boundaries", "faq"],
   autopoet: ["definition", "does", "faq"],
-  wbx: ["definition", "first", "faq"],
+  work: ["definition", "first", "faq"],
   workflows: ["definition", "compile", "faq"],
   vfs: ["definition", "workspace", "faq"],
 };

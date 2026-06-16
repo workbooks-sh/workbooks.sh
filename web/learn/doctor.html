@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>doctor — the tool that checks itself — Workbooks</title>
-<meta name="description" content="wbx doctor reports environment and engine health without ever failing — a report, not a judge. It always exits 0, the same function is the bare-wbx landing, and agents get the whole picture as one JSON object. A sub-lesson under wbx.">
+<meta name="description" content="work doctor reports environment and engine health without ever failing — a report, not a judge. It always exits 0, the same function is the bare-work landing, and agents get the whole picture as one JSON object. A sub-lesson under work.">
 <link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="img/doctor-hero.jpg" as="image" fetchpriority="high">
 <link rel="stylesheet" href="../fonts/fonts.css">
@@ -14,14 +14,14 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Workbooks">
 <meta property="og:title" content="doctor — the tool that checks itself">
-<meta property="og:description" content="wbx doctor reports environment and engine health without ever failing — a report, not a judge. Always exit 0, the bare-wbx landing, one JSON object for agents.">
+<meta property="og:description" content="work doctor reports environment and engine health without ever failing — a report, not a judge. Always exit 0, the bare-work landing, one JSON object for agents.">
 <meta property="og:url" content="https://workbooks.sh/learn/doctor">
 <meta property="og:image" content="https://workbooks.sh/og/doctor.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="doctor — the tool that checks itself">
-<meta name="twitter:description" content="A report, not a judge — environment and engine health that never fails the script. A sub-lesson under wbx.">
+<meta name="twitter:description" content="A report, not a judge — environment and engine health that never fails the script. A sub-lesson under work.">
 <meta name="twitter:image" content="https://workbooks.sh/og/doctor.jpg">
 <meta name="twitter:image:src" content="https://workbooks.sh/og/doctor.jpg">
 <link rel="stylesheet" href="learn.css?v=5">
@@ -29,10 +29,10 @@
 <body>
 <!--
 
-    $ wbx doctor; echo $?
-    wbx 0.13.0
-    binary     /usr/local/bin/wbx
-    on PATH    /usr/local/bin/wbx
+    $ work doctor; echo $?
+    work 0.13.0
+    binary     /usr/local/bin/work
+    on PATH    /usr/local/bin/work
     engine     unreachable
     workspace  no org files here
     0                       <- reported, not judged
@@ -50,12 +50,12 @@
 <header class="lhero">
   <div class="row">
     <div class="lcol">
-      <div class="kicker">learn / 07·3 — <b>under wbx · doctor</b></div>
+      <div class="kicker">learn / 07·3 — <b>under work · doctor</b></div>
     <h1><span class="ln">a report,</span><span class="ln bub">NOT</span><span class="ln">a judge</span></h1>
-    <p class="dek"><b>wbx doctor</b> reports your environment and engine health — and
+    <p class="dek"><b>work doctor</b> reports your environment and engine health — and
     then refuses to fail you for it. It always exits <b>0</b>; a dead engine is a
     fact about your setup, not a fault in the tool reporting it. The same function is
-    bare <code>wbx</code>, so typing nothing gets you a health check plus your next
+    bare <code>work</code>, so typing nothing gets you a health check plus your next
     three moves — and agents get the whole picture as one JSON object.</p>
     <div class="meta">
     <span class="on">the checkup</span><span>10 min read</span>
@@ -66,7 +66,7 @@
         <img fetchpriority="high" src="img/doctor-hero.jpg" alt="A small technician standing before a colossal glowing diagnostic console that calmly reads out the state of a vast machine on amber dials and gauges — no red alarms, just steady lit readings — 1970s sci-fi style, bright and monumental">
         <div class="dnaMini" data-dna></div>
       </div>
-      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/wbx.svg" alt=""></div><span>doctor</span></div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/work.svg" alt=""></div><span>doctor</span></div>
     </figure>
   </div>
 </header>
@@ -78,7 +78,7 @@
   <a href="#definition">The definition</a>
   <a href="#probes">The four checks</a>
   <a href="#discovery">What "engine" actually means</a>
-  <a href="#landing">Bare wbx is doctor in a welcome mat</a>
+  <a href="#landing">Bare work is doctor in a welcome mat</a>
   <a href="#exit-zero">Exit zero, by contrast</a>
   <a href="#completions">The tree that can't drift</a>
   <a href="#upgrade">Self-update that knows who installed it</a>
@@ -118,10 +118,10 @@
     that always <b>exits 0</b>, rendered two ways: prose for you, one JSON
     object for an agent.</p>
   </div>
-  <p>It belongs to the <a href="wbx">everyday family</a> — the handful of
+  <p>It belongs to the <a href="work">everyday family</a> — the handful of
   verbs where the tool looks after itself and you. One sentence each:
   <code>doctor</code> diagnoses without failing; <code>status</code> and bare
-  <code>wbx</code> are the same checkup wearing a welcome mat;
+  <code>work</code> are the same checkup wearing a welcome mat;
   <code>open</code> launches a file in your OS opener; <code>upgrade</code>
   self-updates and first checks who installed it; <code>completions</code>
   prints shell completions from the same definition as <code>--help</code>.
@@ -135,10 +135,10 @@
   the fact is unwelcome:</p>
   <table class="cmp">
     <tr><th>check</th><th>how it's measured</th><th>healthy line</th><th>unhealthy line + coached fix</th></tr>
-    <tr><td><b>version</b></td><td>the compiled-in package version</td><td><code>wbx 0.13.0</code></td><td>— always present</td></tr>
-    <tr><td><b>binary + PATH</b></td><td><code>current_exe()</code> plus a hand-rolled PATH scan for <code>wbx</code></td><td><code>binary …</code> / <code>on PATH …</code></td><td><code>NOT on PATH — add the install dir</code></td></tr>
-    <tr><td><b>engine</b></td><td>one request to the runtime's well-known endpoint</td><td><code>engine reachable</code></td><td><code>unreachable</code> + detail + <code>→ wbx deploy local stands one up</code></td></tr>
-    <tr><td><b>workspace</b></td><td><code>is_file()</code> for <code>workbook.org</code> · <code>deployment.org</code> · <code>publish.org</code> in the current directory</td><td><code>workspace workbook.org · publish.org</code></td><td><code>no org files here (start: wbx init &lt;name&gt;)</code></td></tr>
+    <tr><td><b>version</b></td><td>the compiled-in package version</td><td><code>work 0.13.0</code></td><td>— always present</td></tr>
+    <tr><td><b>binary + PATH</b></td><td><code>current_exe()</code> plus a hand-rolled PATH scan for <code>work</code></td><td><code>binary …</code> / <code>on PATH …</code></td><td><code>NOT on PATH — add the install dir</code></td></tr>
+    <tr><td><b>engine</b></td><td>one request to the runtime's well-known endpoint</td><td><code>engine reachable</code></td><td><code>unreachable</code> + detail + <code>→ work deploy local stands one up</code></td></tr>
+    <tr><td><b>workspace</b></td><td><code>is_file()</code> for <code>workbook.org</code> · <code>deployment.org</code> · <code>publish.org</code> in the current directory</td><td><code>workspace workbook.org · publish.org</code></td><td><code>no org files here (start: work init &lt;name&gt;)</code></td></tr>
   </table>
   <p>Read that table as four independent questions, none of which can sink the
   ship. Version is the binary telling you which binary it is. Binary-plus-PATH
@@ -162,7 +162,7 @@
   every engine verb asks, and the resolution runs in a fixed order:</p>
   <pre class="mermaid">
 flowchart TD
-  start["wbx doctor — resolve the engine"]
+  start["work doctor — resolve the engine"]
   env{"WBX_ENGINE_URL<br/>or WB_ENGINE_URL set?"}
   envyes["use that URL<br/>+ optional _TOKEN"]
   disco{"runtime.json present?<br/>sh.workbooks/disco/runtime.json"}
@@ -197,7 +197,7 @@ flowchart TD
   scheme, a port, and a token, which point the call at
   <code>127.0.0.1</code> with a bearer token. If neither exists, the call has
   nowhere to go, and that missing-file error — <i>no runtime discovery at
-  &lt;path&gt; — is the runtime running? (try wbx deploy local)</i> — gets
+  &lt;path&gt; — is the runtime running? (try work deploy local)</i> — gets
   swallowed into <code>engine: unreachable</code> with the detail attached.
   Whatever the call returns, the result is classified into one of three
   states, never raised as an exception.</p>
@@ -210,9 +210,9 @@ flowchart TD
 </section>
 
 <section id="landing">
-  <h2>bare wbx is doctor in a WELCOME mat</h2>
+  <h2>bare work is doctor in a WELCOME mat</h2>
   <p>Here's where the report-not-judge posture pays its biggest dividend. Bare
-  <code>wbx</code> with no subcommand — and <code>wbx status</code>, the same
+  <code>work</code> with no subcommand — and <code>work status</code>, the same
   function — isn't a usage dump. It's the <b>where-am-I landing</b>: doctor's
   whole report, plus orientation.</p>
   <p><b>You</b> get the prose health check followed by a four-line footer of
@@ -224,9 +224,9 @@ flowchart TD
   <pre class="mermaid">
 sequenceDiagram
   participant A as a cold agent
-  participant W as wbx
+  participant W as work
   participant E as the engine
-  A->>W: wbx --json
+  A->>W: work --json
   Note over W: piped stdout → agent mode, automatically
   W->>E: GET /.well-known/workbooks-runtime
   E-->>W: reachable (or not — classified either way)
@@ -235,14 +235,14 @@ sequenceDiagram
   A->>W: now calls a real verb, no guessing at flags
   </pre>
   <p>Read that exchange as the orientation it is. The agent runs bare
-  <code>wbx --json</code>; because stdout is piped, the tool flips to its
+  <code>work --json</code>; because stdout is piped, the tool flips to its
   structured form on its own — no flag required to be machine-friendly when
-  no human is watching. wbx probes the engine, classifies whatever comes back,
+  no human is watching. work probes the engine, classifies whatever comes back,
   and answers with one object that bundles the health report and the full verb
   tree together. The agent reads it once and now knows both the state of the
   world and every move available in it — so its next call is a real verb with
   real flags, not a guess. There's a bare-tree form too:
-  <code>wbx help --json</code> returns just that tree, intercepted before the
+  <code>work help --json</code> returns just that tree, intercepted before the
   argument parser even runs. And because the tree is generated from one
   definition, that intercept, the landing's <code>verbs</code> key, and
   <code>--help</code> can never disagree.</p>
@@ -253,27 +253,27 @@ sequenceDiagram
   <p>Now the contract, stated as sharply as the code states it. Run the doctor
   against a dead engine and ask the shell what happened. Then run a verb that
   actually <em>needs</em> the engine, on the very same dead engine:</p>
-  <pre class="orgsample">$ wbx doctor
-wbx 0.13.0
-binary     /Users/ada/.local/bin/wbx
-on PATH    /Users/ada/.local/bin/wbx
+  <pre class="orgsample">$ work doctor
+work 0.13.0
+binary     /Users/ada/.local/bin/work
+on PATH    /Users/ada/.local/bin/work
 engine     unreachable
-           no runtime discovery at …/sh.workbooks/disco/runtime.json — is the runtime running? (try `wbx deploy local`)
-           → `wbx deploy local` stands one up
-workspace  no org files here (start: `wbx init &lt;name&gt;`)
+           no runtime discovery at …/sh.workbooks/disco/runtime.json — is the runtime running? (try `work deploy local`)
+           → `work deploy local` stands one up
+workspace  no org files here (start: `work init &lt;name&gt;`)
 $ echo $?
 0                       <i># reported, not judged</i>
 
-$ wbx library; echo $?  <i># an ENGINE verb on the same dead engine</i>
-wbx: …connection refused…
-     no engine reachable — start one with `wbx deploy local` or set WB_ENGINE_URL
+$ work library; echo $?  <i># an ENGINE verb on the same dead engine</i>
+work: …connection refused…
+     no engine reachable — start one with `work deploy local` or set WB_ENGINE_URL
 3                       <i># the verb that NEEDED the engine carries the code</i></pre>
   <p>Same dead engine, two different exit codes — and the difference is the
   whole idea:</p>
   <table class="cmp">
     <tr><th>command</th><th>exit</th><th>why</th></tr>
-    <tr><td><code>wbx doctor</code></td><td><b>0</b></td><td>the broken engine <em>is</em> doctor's subject — reporting it is success</td></tr>
-    <tr><td><code>wbx library</code></td><td><b>3</b></td><td>this verb needed the engine to do its job — its job genuinely failed</td></tr>
+    <tr><td><code>work doctor</code></td><td><b>0</b></td><td>the broken engine <em>is</em> doctor's subject — reporting it is success</td></tr>
+    <tr><td><code>work library</code></td><td><b>3</b></td><td>this verb needed the engine to do its job — its job genuinely failed</td></tr>
   </table>
   <p>That's the line the design draws. A diagnostic's job is to describe the
   state of the world, so any state it can describe is a job done — exit 0,
@@ -284,45 +284,45 @@ wbx: …connection refused…
   engine, 4 not found, 5 verify, 6 conflict, 7 auth, 1 other — and the
   one-envelope contract belong to the <a href="modes">modes deep dive</a>;
   this page only needs the contrast. One honest caveat: a genuine usage
-  mistake like <code>wbx doctor --bogus</code> still exits 2, because the
+  mistake like <code>work doctor --bogus</code> still exits 2, because the
   argument parser owns that code before doctor ever runs.</p>
 </section>
 
 <section id="completions">
   <h2>the tree that can't DRIFT</h2>
   <p><span class="skip">depth rung · <b>skippable</b> — why completions are always correct</span></p>
-  <p><code>wbx completions &lt;shell&gt;</code> prints shell-completion scripts
+  <p><code>work completions &lt;shell&gt;</code> prints shell-completion scripts
   for <b>bash, zsh, fish, elvish, and powershell</b> straight to stdout. The
   detail that matters: those completions are generated from the <em>same</em>
-  command definition as <code>--help</code> and <code>wbx help --json</code>.
+  command definition as <code>--help</code> and <code>work help --json</code>.
   One source of truth, three renderings. A verb can't appear in help and go
   missing from completions, because there's no second list to fall out of
   sync — they're the same tree, printed differently.</p>
   <p>To wire them up, source the output the way your shell expects.
   Conventionally:</p>
-  <pre class="orgsample">echo 'eval "$(wbx completions zsh)"' >> ~/.zshrc      <i># zsh</i>
-wbx completions bash > ~/.local/share/bash-completion/completions/wbx
-wbx completions fish > ~/.config/fish/completions/wbx.fish</pre>
+  <pre class="orgsample">echo 'eval "$(work completions zsh)"' >> ~/.zshrc      <i># zsh</i>
+work completions bash > ~/.local/share/bash-completion/completions/work
+work completions fish > ~/.config/fish/completions/work.fish</pre>
   <p>Those one-liners are the standard recipes for each shell, offered as
-  convention — wbx prints the script; where you source it from is your shell's
+  convention — work prints the script; where you source it from is your shell's
   business, not something the tool prescribes.</p>
 </section>
 
 <section id="upgrade">
   <h2>self-update that knows who INSTALLED it</h2>
-  <p><code>wbx upgrade</code> updates the binary in place — but its first move
+  <p><code>work upgrade</code> updates the binary in place — but its first move
   is to check how the binary got there, because the right way to upgrade
   depends on who owns the install. It's a three-way branch:</p>
   <pre class="mermaid">
 flowchart TD
-  up["wbx upgrade"]
+  up["work upgrade"]
   npm{"running from<br/>under node_modules?"}
   npmout["installed via npm — upgrade with:<br/>npm update -g @work.books/cli<br/>(returns Ok — a note, not an error)"]
-  fetch["GET github releases<br/>first tag matching wbx-v*"]
+  fetch["GET github releases<br/>first tag matching work-v*"]
   same{"latest == current?"}
-  current["already current: wbx 0.13.0"]
-  dl["download wbx-{os}-{arch}<br/>→ wbx.new → chmod 755"]
-  swap["atomic rename over the live binary<br/>upgraded: wbx 0.12.0 → 0.13.0"]
+  current["already current: work 0.13.0"]
+  dl["download work-{os}-{arch}<br/>→ work.new → chmod 755"]
+  swap["atomic rename over the live binary<br/>upgraded: work 0.12.0 → 0.13.0"]
   up --> npm
   npm -- yes --> npmout
   npm -- no --> fetch --> same
@@ -335,23 +335,23 @@ flowchart TD
   </pre>
   <p>Follow the three exits. First branch: if any component of the running
   executable's path is <code>node_modules</code>, the binary was installed by
-  the npm launcher — so wbx <b>returns Ok</b> (not an error) with the note
+  the npm launcher — so work <b>returns Ok</b> (not an error) with the note
   <i>installed via npm — upgrade with: npm update -g @work.books/cli</i>.
   Self-swapping under the npm package would desync it, so the right move is a
   note that hands you back to the package manager that owns the install —
   never an error where a note will do. Second exit: not under npm, so it
   fetches GitHub releases of <code>workbooks-sh/workbooks.sh</code>, takes the
-  first tag matching <code>wbx-v*</code> (the repo also carries
+  first tag matching <code>work-v*</code> (the repo also carries
   <code>desktop-v*</code> tags, hence the filter), and if that's your current
   version it says so and stops. Third exit: you're behind, so it downloads the
-  asset for your OS and arch, writes it to <code>wbx.new</code>, marks it
+  asset for your OS and arch, writes it to <code>work.new</code>, marks it
   executable, and atomically renames it over the running binary.</p>
 </section>
 
 <section id="small">
   <h2>the small VERBS</h2>
   <p><span class="skip">depth rung · <b>skippable</b> — the rest of the everyday family</span></p>
-  <p><code>wbx open &lt;file&gt;</code> rounds out the family. It bails if the
+  <p><code>work open &lt;file&gt;</code> rounds out the family. It bails if the
   path doesn't exist, canonicalizes it, and hands it to your OS opener —
   <code>open</code> on macOS, <code>cmd /C start</code> on Windows,
   <code>xdg-open</code> on Linux — then checks the opener's exit status so a
@@ -363,7 +363,7 @@ flowchart TD
   <code>upgrade</code> were priority two — daily ergonomics. They're all
   shipped now, and they share a single directive the spec names outright:
   human mode is dumb simple, the tool does the work, the learning curve is a
-  bug. Bare <code>wbx</code> orients you; <code>upgrade</code> detects npm and
+  bug. Bare <code>work</code> orients you; <code>upgrade</code> detects npm and
   redirects; <code>doctor</code> diagnoses without failing; every success
   teaches the next verb. The family is that sentence, implemented.</p>
 </section>
@@ -389,7 +389,7 @@ flowchart TD
     is unix-shaped; renaming over a running executable is a known sharp edge
     on Windows, where the file is locked, and the code carries no special case
     for it.</li>
-    <li><b>The wasm build bails honestly.</b> Compile wbx to WebAssembly and
+    <li><b>The wasm build bails honestly.</b> Compile work to WebAssembly and
     <code>upgrade</code>, <code>open</code>, and the PATH scan have nothing to
     act on — they say <i>needs the native binary</i> rather than pretend.
     Why a native tool can't fully be itself in the sandbox is
@@ -405,12 +405,12 @@ flowchart TD
     A diagnostic that reports a broken state did its job — exit 0. Failing the
     caller for diagnosing breaks scripts and panics agents, which is the exact
     problem doctor exists to avoid. The verb that genuinely needed the
-    engine — like <code>wbx library</code> — is the one that exits 3.</p>
+    engine — like <code>work library</code> — is the one that exits 3.</p>
   </details>
   <details>
     <summary>Doctor says unreachable — now what?</summary>
     <p>Two paths, both in the report. Stand one up locally with
-    <code>wbx deploy local</code> (doctor's prescribed fix, printed inline),
+    <code>work deploy local</code> (doctor's prescribed fix, printed inline),
     or point at an existing engine by setting <code>WBX_ENGINE_URL</code>
     (its <code>WB_</code> form works too). Re-run doctor and the engine line
     flips to reachable.</p>
@@ -438,13 +438,13 @@ flowchart TD
     <code>engine</code> (with <code>state</code>, <code>url</code>,
     <code>detail</code>), and <code>workspace</code>. Under <code>--json</code>
     it's wrapped in the standard <code>{ok, verb, data}</code> envelope, and
-    bare <code>wbx --json</code> adds the full <code>verbs</code> tree. Branch
+    bare <code>work --json</code> adds the full <code>verbs</code> tree. Branch
     on the fields, not on scraped prose.</p>
   </details>
   <details>
-    <summary>Is status different from bare wbx?</summary>
-    <p>No — <code>wbx status</code> is the same function as typing
-    <code>wbx</code> with no subcommand: the doctor report plus orientation.
+    <summary>Is status different from bare work?</summary>
+    <p>No — <code>work status</code> is the same function as typing
+    <code>work</code> with no subcommand: the doctor report plus orientation.
     It exists so the landing has a name you can write down in a runbook.</p>
   </details>
 </section>
@@ -454,12 +454,12 @@ flowchart TD
   <p>The checkup is the door into the rest of the command — and the engine it
   keeps asking about.</p>
   <div class="cards">
-    <a href="wbx"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span>
-      <div>wbx<small>the parent — every verb family</small></div><span class="go">→</span></a>
+    <a href="work"><span class="sw" style="background:#d9dbd3"><img src="icons/work.svg" alt=""></span>
+      <div>work<small>the parent — every verb family</small></div><span class="go">→</span></a>
     <a href="modes"><span class="sw" style="background:#a8d4f0"><b>&gt;_</b></span>
       <div>Modes &amp; the envelope<small>the full exit-code contract</small></div><span class="go">→</span></a>
     <a href="deploy-kit"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
-      <div>Deploy Kit<small>what wbx deploy local does</small></div><span class="go">→</span></a>
+      <div>Deploy Kit<small>what work deploy local does</small></div><span class="go">→</span></a>
     <a href="distribution"><span class="sw" style="background:#f2ddb0"><b>↧</b></span>
       <div>Distribution<small>the releases upgrade consumes</small></div><span class="go">→</span></a>
   </div>
@@ -477,12 +477,12 @@ flowchart TD
 </footer>
 
 <script type="text/org" id="workbook-spec">
-* page  under wbx · doctor
+* page  under work · doctor
   :PROPERTIES:
   :SLUG:   doctor
   :KIND:   learn
   :NN:     07.3
-  :KICKER: under wbx · doctor
+  :KICKER: under work · doctor
   :TITLE1: a report,
   :TITLE2: NOT
   :TITLE3: a judge
@@ -493,7 +493,7 @@ flowchart TD
   :END:
 ** og
 - environment + engine health, reported not judged
-- always exit 0 — bare wbx is the same checkup + next moves
+- always exit 0 — bare work is the same checkup + next moves
 - agents get health + the whole verb tree in one JSON object
 </script>
 

@@ -262,25 +262,37 @@ defmodule Workbooks.Keeper.Worker do
     acquire(cfg)
 
     try do
-      task = Task.async(fn -> run_def(cfg, File.read!(path), lifecycle_state) end)
-
-      case Task.yield(task, run_timeout_ms(cfg)) || Task.shutdown(task, :brutal_kill) do
-        {:ok, result} ->
-          out = result.result || ""
-          Logger.info("Keeper#{label(cfg)}: tick done — #{inspect(String.slice(out, 0, 120))}")
-
-          # wb-2ku.10: the agent signals "nothing my run-kind may do" by BEGINNING
-          # its done result with NO-WORK. The lifecycle collapses this state's
-          # remaining repeats instead of burning more slots on it.
-          if String.match?(out, ~r/\A\s*NO-WORK\b/i), do: :no_work, else: :done
-
-        {:exit, reason} ->
-          Logger.error("Keeper#{label(cfg)}: tick failed — #{inspect(reason)}")
+      # Read the watched def up front. If it's gone/unreadable (deleted mid-flight, or
+      # a not-yet-written path — common when a keeper outlives the workbook it watched),
+      # treat the tick as failed so the lifecycle backs off, but WITHOUT raising a
+      # misleading File.Error stacktrace through a spawned Task. (Also keeps a leaked
+      # test keeper from spamming the log after its temp def is cleaned up.)
+      case File.read(path) do
+        {:error, reason} ->
+          Logger.warning("Keeper#{label(cfg)}: tick skipped — def #{path} unreadable (#{inspect(reason)})")
           :failed
 
-        nil ->
-          Logger.error("Keeper#{label(cfg)}: tick killed — exceeded #{run_timeout_ms(cfg)}ms wall clock")
-          :killed
+        {:ok, def_src} ->
+          task = Task.async(fn -> run_def(cfg, def_src, lifecycle_state) end)
+
+          case Task.yield(task, run_timeout_ms(cfg)) || Task.shutdown(task, :brutal_kill) do
+            {:ok, result} ->
+              out = result.result || ""
+              Logger.info("Keeper#{label(cfg)}: tick done — #{inspect(String.slice(out, 0, 120))}")
+
+              # wb-2ku.10: the agent signals "nothing my run-kind may do" by BEGINNING
+              # its done result with NO-WORK. The lifecycle collapses this state's
+              # remaining repeats instead of burning more slots on it.
+              if String.match?(out, ~r/\A\s*NO-WORK\b/i), do: :no_work, else: :done
+
+            {:exit, reason} ->
+              Logger.error("Keeper#{label(cfg)}: tick failed — #{inspect(reason)}")
+              :failed
+
+            nil ->
+              Logger.error("Keeper#{label(cfg)}: tick killed — exceeded #{run_timeout_ms(cfg)}ms wall clock")
+              :killed
+          end
       end
     after
       release(cfg)

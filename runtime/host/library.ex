@@ -604,7 +604,7 @@ defmodule Workbooks.Library do
 
   @doc """
   Compile a workspace's components and return the build report (what became WASM,
-  what couldn't). The report behind `wb build` / `pack --build`. Builds a throwaway
+  what couldn't). The report behind `work build` / `pack --build`. Builds a throwaway
   copy of the parts so the tenant repo stays clean.
   """
   def build(tenant, workspace_slug) do

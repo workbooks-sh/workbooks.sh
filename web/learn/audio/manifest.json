@@ -3315,9 +3315,9 @@
    ]
   },
   {
-   "slug": "wbx",
-   "title": "wbx — the command",
-   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/wbx.mp3?v=663",
+   "slug": "work",
+   "title": "work — the command",
+   "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/work.mp3?v=663",
    "dur": 663,
    "chapters": [
     {
@@ -3384,7 +3384,7 @@
   },
   {
    "slug": "modes",
-   "title": "modes — under wbx",
+   "title": "modes — under work",
    "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/modes.mp3?v=1276",
    "dur": 1276,
    "chapters": [
@@ -3457,7 +3457,7 @@
   },
   {
    "slug": "pipelines",
-   "title": "pipelines — under wbx",
+   "title": "pipelines — under work",
    "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/pipelines.mp3?v=1109",
    "dur": 1109,
    "chapters": [
@@ -3530,7 +3530,7 @@
   },
   {
    "slug": "doctor",
-   "title": "doctor — under wbx",
+   "title": "doctor — under work",
    "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/doctor.mp3?v=968",
    "dur": 968,
    "chapters": [
@@ -3561,7 +3561,7 @@
     },
     {
      "id": "landing",
-     "title": "Bare wbx is doctor in a welcome mat",
+     "title": "Bare work is doctor in a welcome mat",
      "t": 342
     },
     {
@@ -3603,7 +3603,7 @@
   },
   {
    "slug": "deploy-kit",
-   "title": "deploy kit — under wbx",
+   "title": "deploy kit — under work",
    "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/deploy-kit.mp3?v=1120",
    "dur": 1120,
    "chapters": [
@@ -3664,14 +3664,14 @@
     },
     {
      "id": "outro",
-     "title": "Back up to wbx",
+     "title": "Back up to work",
      "t": 1072
     }
    ]
   },
   {
    "slug": "recipes",
-   "title": "recipes — under wbx",
+   "title": "recipes — under work",
    "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/recipes.mp3?v=1088",
    "dur": 1088,
    "chapters": [
@@ -3737,14 +3737,14 @@
     },
     {
      "id": "outro",
-     "title": "Back up to wbx",
+     "title": "Back up to work",
      "t": 1042
     }
    ]
   },
   {
    "slug": "distribution",
-   "title": "distribution — under wbx",
+   "title": "distribution — under work",
    "src": "https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/learn/audio/episodes/distribution.mp3?v=1204",
    "dur": 1204,
    "chapters": [

@@ -3,34 +3,34 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>wbx — the command line for living software — Workbooks</title>
-<meta name="description" content="wbx is the Workbooks command line: one compiled tool that authors, builds, signs, ships, and docks workbooks — the same binary on your laptop, in CI, and inside the engine.">
+<title>work — the command line for living software — Workbooks</title>
+<meta name="description" content="work is the Workbooks command line: one compiled tool that authors, builds, signs, ships, and docks workbooks — the same binary on your laptop, in CI, and inside the engine.">
 <link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="img/wbx-hero.jpg" as="image" fetchpriority="high">
+<link rel="preload" href="img/work-hero.jpg" as="image" fetchpriority="high">
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Workbooks">
-<meta property="og:title" content="wbx — the command line for living software">
+<meta property="og:title" content="work — the command line for living software">
 <meta property="og:description" content="One compiled tool that authors, builds, signs, ships, and docks workbooks — the same binary on your laptop, in CI, and inside the engine.">
-<meta property="og:url" content="https://workbooks.sh/learn/wbx">
-<meta property="og:image" content="https://workbooks.sh/og/wbx.jpg">
+<meta property="og:url" content="https://workbooks.sh/learn/work">
+<meta property="og:image" content="https://workbooks.sh/og/work.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="wbx — the command line for living software">
+<meta name="twitter:title" content="work — the command line for living software">
 <meta name="twitter:description" content="One compiled tool that authors, builds, signs, ships, and docks workbooks — the same binary everywhere.">
-<meta name="twitter:image" content="https://workbooks.sh/og/wbx.jpg">
-<meta name="twitter:image:src" content="https://workbooks.sh/og/wbx.jpg">
+<meta name="twitter:image" content="https://workbooks.sh/og/work.jpg">
+<meta name="twitter:image:src" content="https://workbooks.sh/og/work.jpg">
 <link rel="stylesheet" href="learn.css?v=5">
 </head>
 <body>
 <!--
 
-    $ wbx --version
-    wbx 0.13.0
+    $ work --version
+    work 0.13.0
 
     exit codes, for script writers and the curious:
       0 ok · 2 usage · 3 engine unreachable (retry) · 4 not found
@@ -49,7 +49,7 @@
     <div class="lcol">
       <div class="kicker">learn / 07 — <b>the command line</b></div>
     <h1><span class="ln">one command,</span><span class="ln bub">EVERY</span><span class="ln">verb</span></h1>
-    <p class="dek"><b>wbx</b> is the ecosystem's command line — one compiled tool that
+    <p class="dek"><b>work</b> is the ecosystem's command line — one compiled tool that
   authors, builds, signs, ships, and docks workbooks. The <b>same binary</b> runs on
   your laptop, in CI, and inside the engine, so you and your agents speak one language.</p>
     <div class="meta">
@@ -58,10 +58,10 @@
     </div>
     <figure class="heroart">
       <div class="plate">
-        <img fetchpriority="high" src="img/wbx-hero.jpg" alt="A colossal chrome multitool with its instruments fanned open, a tiny figure using the smallest blade — 1970s sci-fi style">
+        <img fetchpriority="high" src="img/work-hero.jpg" alt="A colossal chrome multitool with its instruments fanned open, a tiny figure using the smallest blade — 1970s sci-fi style">
         <div class="dnaMini" data-dna></div>
       </div>
-      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/wbx.svg" alt=""></div><span>wbx</span></div>
+      <div class="cap" aria-hidden="true"><div class="face"><img src="icons/work.svg" alt=""></div><span>work</span></div>
     </figure>
   </div>
 </header>
@@ -100,16 +100,16 @@
 <section id="definition">
   <h2>the DEFINITION</h2>
   <div class="defcard">
-    <div class="head"><span class="hw">wbx</span> <span class="pr">/ˌdʌb·əl·juː·biː·ˈeks/</span> <span class="pos">command</span></div>
+    <div class="head"><span class="hw">work</span> <span class="pr">/ˌdʌb·əl·juː·biː·ˈeks/</span> <span class="pos">command</span></div>
     <div class="rule"></div>
     <p><span class="num">1.</span> the Workbooks command line: one compiled
     tool that <b>authors, builds, signs, ships, and docks</b> workbooks —
     the same binary on your laptop, in CI, and inside the engine.</p>
   </div>
-  <p>It's deliberately thin. wbx owns almost no logic of its own: it parses
+  <p>It's deliberately thin. work owns almost no logic of its own: it parses
   what you asked, handles local org operations with the same kernel the rest
   of the ecosystem uses, and drives <a href="nexus">the engine</a> for
-  everything heavy. The intelligence lives in the system; wbx is the handle.</p>
+  everything heavy. The intelligence lives in the system; work is the handle.</p>
 </section>
 
 <section id="install">
@@ -117,26 +117,26 @@
   <p>Two honest paths today — the installer, or npm:</p>
   <pre class="orgsample">curl -fsSL https://workbooks.sh/cli.sh | sh    <i># detects your OS + arch</i>
 npm install -g @work.books/cli                 <i># same thing, npm-flavored</i>
-wbx --version                                  <i># → wbx 0.13.0</i></pre>
+work --version                                  <i># → work 0.13.0</i></pre>
   <p>macOS (Apple Silicon + Intel), Linux (x64 + arm64), and Windows (x64)
   binaries ship from
   <a href="https://github.com/workbooks-sh/workbooks.sh/releases">GitHub
   Releases</a> — the npm package is a thin launcher that fetches the right
-  one. (The bare npm name <code>wbx</code> belongs to someone else, so the
-  package lives at <code>@work.books/cli</code>; the command is wbx either
+  one. (The bare npm name <code>work</code> belongs to someone else, so the
+  package lives at <code>@work.books/cli</code>; the command is work either
   way.)</p>
   <p>Then let the tool check itself:</p>
-  <pre class="orgsample">wbx doctor      <i># env + engine health, what's wired and what isn't</i>
-wbx             <i># bare wbx = where am I — version, engine state, next moves</i></pre>
+  <pre class="orgsample">work doctor      <i># env + engine health, what's wired and what isn't</i>
+work             <i># bare work = where am I — version, engine state, next moves</i></pre>
 </section>
 
 <section id="families">
   <h2>the verb FAMILIES</h2>
   <p>Thirty-odd verbs, but they group into five families — learn the families
   and the help text carries you the rest of the way:</p>
-  <figure class="diag" aria-label="wbx verb families">
+  <figure class="diag" aria-label="work verb families">
     <div class="d-file">
-      <span class="ftag">wbx — one command, five families</span>
+      <span class="ftag">work — one command, five families</span>
       <div class="d-row"><span class="d-chip" style="background:#f2ddb0">author</span><span class="sub"><b>init · dev · query · tangle · lint</b> — scaffold, live-preview, and shape org; the literate-programming surface</span></div>
       <div class="d-row"><span class="d-chip" style="background:#a8d4f0">make</span><span class="sub"><b>build · bundle · unbundle · run</b> — compile code to wasm, tangle everything into one artifact</span></div>
       <div class="d-row"><span class="d-chip" style="background:#aee5c2">trust</span><span class="sub"><b>sign · verify · ledger</b> — did:key provenance that travels with the file</span></div>
@@ -156,7 +156,7 @@ wbx             <i># bare wbx = where am I — version, engine state, next moves
 
 <section id="modes">
   <h2>two AUDIENCES, one binary</h2>
-  <p>Here's the design decision that shapes everything else: wbx knows it has
+  <p>Here's the design decision that shapes everything else: work knows it has
   two kinds of users, and it changes its manners for each <b>without changing
   what it does</b>.</p>
   <p><b>You, at a terminal.</b> Human mode is deliberately dumb simple — the
@@ -164,14 +164,14 @@ wbx             <i># bare wbx = where am I — version, engine state, next moves
   default and tells you. Genuinely your call? A tiny picker. Every success
   ends with the next verb you probably want. You should never need the manual
   for the happy path.</p>
-  <p><b>An agent, in a pipe.</b> The moment stdout isn't a terminal, wbx
+  <p><b>An agent, in a pipe.</b> The moment stdout isn't a terminal, work
   switches: no prompts ever, no ANSI color, plain parseable output. Add
   <code>--json</code> and every outcome — success or failure — arrives as one
   envelope:</p>
   <pre class="orgsample">{ "ok": false, "verb": "toolkit push",
   "error": { "code": 3,
              "message": "engine unreachable at 127.0.0.1:4000",
-             "hint": "start one with `wbx deploy local` or set WB_ENGINE_URL",
+             "hint": "start one with `work deploy local` or set WB_ENGINE_URL",
              "retryable": true } }</pre>
   <p>Failures carry a <b>stable exit-code map</b>, so a script can branch
   without parsing prose:</p>
@@ -192,30 +192,30 @@ wbx             <i># bare wbx = where am I — version, engine state, next moves
 
 <section id="first">
   <h2>your first workbook, two MINUTES</h2>
-  <p>Step by step, nothing assumed. You need wbx installed — that's it, no
+  <p>Step by step, nothing assumed. You need work installed — that's it, no
   engine, no account.</p>
   <p><b>1 — scaffold.</b> One command, one folder:</p>
-  <pre class="orgsample">wbx init field-notes
+  <pre class="orgsample">work init field-notes
 <i>created field-notes/ — workbook.org + data/
-next: wbx dev field-notes</i></pre>
-  <p><b>2 — see it live.</b> <code>wbx dev</code> watches the org file,
+next: work dev field-notes</i></pre>
+  <p><b>2 — see it live.</b> <code>work dev</code> watches the org file,
   re-renders on every save, and serves a preview that reloads itself:</p>
-  <pre class="orgsample">wbx dev field-notes
-<i>wbx dev: http://127.0.0.1:4321 — watching field-notes/workbook.org</i></pre>
+  <pre class="orgsample">work dev field-notes
+<i>work dev: http://127.0.0.1:4321 — watching field-notes/workbook.org</i></pre>
   <p>Open the URL, then open <code>workbook.org</code> in any editor. Change a
   heading, save, watch the browser follow. That loop — org file on the left,
   living page on the right — is the whole authoring experience.</p>
   <p><b>3 — make it one file.</b> When it's worth keeping, tangle everything
   into a single self-contained artifact and put your name on it:</p>
-  <pre class="orgsample">wbx bundle field-notes      <i># tangles + packs source + data into one self-contained field-notes.html</i>
-wbx sign field-notes.html   <i># did:key provenance, embedded in the artifact</i></pre>
+  <pre class="orgsample">work bundle field-notes      <i># tangles + packs source + data into one self-contained field-notes.html</i>
+work sign field-notes.html   <i># did:key provenance, embedded in the artifact</i></pre>
   <p>The single <code>.html</code> ships anywhere — it opens
   in any browser, mails like an attachment, and carries its own filesystem and provenance
   (<a href="bundles">the bundles deep dive</a> opens one up byte by byte).
   No server was involved at any point — the engine only enters the story
   when you want the workbook to <em>keep living</em> after you close the
-  laptop, and that's <code>wbx deploy local</code> +
-  <code>wbx workbook deploy</code>, shown in the session below.</p>
+  laptop, and that's <code>work deploy local</code> +
+  <code>work workbook deploy</code>, shown in the session below.</p>
 </section>
 
 <section id="import">
@@ -223,7 +223,7 @@ wbx sign field-notes.html   <i># did:key provenance, embedded in the artifact</i
   <p>You probably already have capability lying around — Claude skills, MCP
   servers, an OpenAPI spec, a little npm CLI. The intake ramp packages any of
   it as a <a href="toolkit">toolkit</a>:</p>
-  <pre class="orgsample">wbx toolkit import ~/.claude/skills/my-skill
+  <pre class="orgsample">work toolkit import ~/.claude/skills/my-skill
 <i>imported claude-skill → my-skill-toolkit/
   manifest.org      the toolkit surface
   skills/           3 skills
@@ -232,7 +232,7 @@ audited 2 scripts — 1 ready · 1 convertible · 0 blocked</i></pre>
   out what the thing is (<code>--as</code> overrides):</p>
   <figure class="diag" aria-label="import source kinds">
     <div class="d-file">
-      <span class="ftag">wbx toolkit import — what it eats</span>
+      <span class="ftag">work toolkit import — what it eats</span>
       <div class="d-row"><span class="d-chip" style="background:#f2ddb0">claude-skill</span><span class="sub">SKILL.md + references + scripts → manifest + skill tree, docs translated to org</span></div>
       <div class="d-row"><span class="d-chip" style="background:#a8d4f0">mcp-server</span><span class="sub">.mcp.json → a skill per server; the launch command becomes the audited bin. Env vars carry over by <b>name only</b> — secret values never enter the artifact</span></div>
       <div class="d-row"><span class="d-chip" style="background:#aee5c2">openapi</span><span class="sub">a JSON spec → a skill per operation, HTTP routed through the engine</span></div>
@@ -242,7 +242,7 @@ audited 2 scripts — 1 ready · 1 convertible · 0 blocked</i></pre>
   </figure>
   <p>Import is three honest stages, and the second two run automatically:</p>
   <p><b>Stage 1 — parse + scaffold.</b> Detect the kind, translate the docs to
-  org, write a real <code>manifest.org</code> that <code>wbx toolkit push</code>
+  org, write a real <code>manifest.org</code> that <code>work toolkit push</code>
   will accept.</p>
   <p><b>Stage 2 — the wasm audit.</b> Every carried script gets classified
   against the sandbox lanes: <b>ready</b> (shell and JS run today),
@@ -258,18 +258,18 @@ audited 2 scripts — 1 ready · 1 convertible · 0 blocked</i></pre>
   <pre class="orgsample">** TODO fix-up plan [0/1]
 *** TODO scrape.py (blocked — python3)
     - [ ] rewrite in JS for the quickjs lane — keep the CLI contract
-    - [ ] re-run =wbx toolkit audit= — scrape.py must classify ready</pre>
-  <p>And when an engine is reachable, <code>wbx toolkit audit --fix</code>
+    - [ ] re-run =work toolkit audit= — scrape.py must classify ready</pre>
+  <p>And when an engine is reachable, <code>work toolkit audit --fix</code>
   runs the convert for you: push → build → verify, one shot.</p>
 </section>
 
 <section id="agents">
   <h2>wire in an AGENT</h2>
-  <p>If you're pointing a coding agent at wbx, three things make it fluent
+  <p>If you're pointing a coding agent at work, three things make it fluent
   immediately:</p>
   <p><b>1 — let it discover the surface.</b> The whole verb tree is
   machine-readable, so an agent never guesses at flags:</p>
-  <pre class="orgsample">wbx help --json     <i># every verb, sub-verb, arg, and flag as one JSON tree</i></pre>
+  <pre class="orgsample">work help --json     <i># every verb, sub-verb, arg, and flag as one JSON tree</i></pre>
   <p><b>2 — give it the envelope.</b> Tell the agent to call everything with
   <code>--json</code> and branch on <code>error.code</code> +
   <code>error.retryable</code> instead of scraping stderr. The hint field is
@@ -277,8 +277,8 @@ audited 2 scripts — 1 ready · 1 convertible · 0 blocked</i></pre>
   that fixes it.</p>
   <p><b>3 — pipe freely.</b> Author verbs accept <code>-</code> for stdin, so
   generated org never needs a temp file:</p>
-  <pre class="orgsample">cat generated.org | wbx lint -
-echo "* hello" | wbx query -</pre>
+  <pre class="orgsample">cat generated.org | work lint -
+echo "* hello" | work query -</pre>
   <p>That's the whole integration. No SDK, no API keys for the local surface —
   the same binary you use, spoken plainly. This is the contract the
   <a href="agents">runtime's own agents</a> use; nothing about it is
@@ -287,14 +287,14 @@ echo "* hello" | wbx query -</pre>
 
 <section id="everywhere">
   <h2>same binary EVERYWHERE</h2>
-  <p>The part that makes wbx more than a convenience: it's <b>one Rust
+  <p>The part that makes work more than a convenience: it's <b>one Rust
   crate with two build targets</b>. The native binary is what you install;
   the same source also compiles to WebAssembly, so it runs inside the
   engine's sandbox — which means the agents working in a runtime container
   reach for <b>the exact same tool you do</b>, with the same help text and
   the same manners.</p>
   <p>That's not an implementation detail; it's the trust model. When an
-  agent's session log says <code>wbx toolkit build</code>, you can run the
+  agent's session log says <code>work toolkit build</code>, you can run the
   identical command and see the identical thing. No translation layer
   between what your agents do and what you'd do — which is what "people and
   AI build together" has to mean at the tooling level.</p>
@@ -320,18 +320,18 @@ echo "* hello" | wbx query -</pre>
     <p>Not for the local families — author, make, and trust verbs work on
     plain files. The engine families (<code>deploy</code>, <code>rt</code>,
     <code>workbook</code>) need a Nexus to talk to, and
-    <code>wbx deploy local</code> is how you get one.</p>
+    <code>work deploy local</code> is how you get one.</p>
   </details>
   <details>
     <summary>Windows?</summary>
-    <p>Yes, as of 0.13.0 — <code>wbx-windows-x64.exe</code> ships in every
+    <p>Yes, as of 0.13.0 — <code>work-windows-x64.exe</code> ships in every
     release and the npm launcher picks it up. WSL still works if that's home
     for you.</p>
   </details>
   <details>
     <summary>Is this the same CLI my agents use?</summary>
     <p>Identical — that's the point. The runtime image carries the same
-    binary at <code>/usr/local/bin/wbx</code>, and the wasm build runs it
+    binary at <code>/usr/local/bin/work</code>, and the wasm build runs it
     in-sandbox. One tool, every hand that holds it.</p>
   </details>
   <details>
@@ -356,20 +356,20 @@ echo "* hello" | wbx query -</pre>
 <section id="deepdives" class="lnext">
   <h2>the deep DIVES</h2>
   <p>Go deeper into this area — the technical docs underneath it.</p>
-  <div class="cards"><a href="modes"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span><div>modes<small>concept</small></div><span class="go">→</span></a><a href="pipelines"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span><div>pipelines<small>implementation</small></div><span class="go">→</span></a><a href="doctor"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span><div>doctor<small>setup</small></div><span class="go">→</span></a><a href="deploy-kit"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span><div>deploy kit<small>setup</small></div><span class="go">→</span></a><a href="the-seam"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span><div>the seam<small>mechanics</small></div><span class="go">→</span></a><a href="recipes"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span><div>recipes<small>implementation</small></div><span class="go">→</span></a><a href="distribution"><span class="sw" style="background:#d9dbd3"><img src="icons/wbx.svg" alt=""></span><div>distribution<small>setup</small></div><span class="go">→</span></a></div>
+  <div class="cards"><a href="modes"><span class="sw" style="background:#d9dbd3"><img src="icons/work.svg" alt=""></span><div>modes<small>concept</small></div><span class="go">→</span></a><a href="pipelines"><span class="sw" style="background:#d9dbd3"><img src="icons/work.svg" alt=""></span><div>pipelines<small>implementation</small></div><span class="go">→</span></a><a href="doctor"><span class="sw" style="background:#d9dbd3"><img src="icons/work.svg" alt=""></span><div>doctor<small>setup</small></div><span class="go">→</span></a><a href="deploy-kit"><span class="sw" style="background:#d9dbd3"><img src="icons/work.svg" alt=""></span><div>deploy kit<small>setup</small></div><span class="go">→</span></a><a href="the-seam"><span class="sw" style="background:#d9dbd3"><img src="icons/work.svg" alt=""></span><div>the seam<small>mechanics</small></div><span class="go">→</span></a><a href="recipes"><span class="sw" style="background:#d9dbd3"><img src="icons/work.svg" alt=""></span><div>recipes<small>implementation</small></div><span class="go">→</span></a><a href="distribution"><span class="sw" style="background:#d9dbd3"><img src="icons/work.svg" alt=""></span><div>distribution<small>setup</small></div><span class="go">→</span></a></div>
 </section>
 <section id="next" class="lnext">
   <h2>keep GOING</h2>
   <p>The command is how you drive the rest — pick a destination.</p>
   <div class="cards">
     <a href="workbook"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span>
-      <div>What is a workbook<small>the artifact wbx makes</small></div><span class="go">→</span></a>
+      <div>What is a workbook<small>the artifact work makes</small></div><span class="go">→</span></a>
     <a href="nexus"><span class="sw" style="background:#aee5c2"><img src="../nexus-icon.svg" alt=""></span>
-      <div>What is the Nexus<small>what wbx deploy stands up</small></div><span class="go">→</span></a>
+      <div>What is the Nexus<small>what work deploy stands up</small></div><span class="go">→</span></a>
     <a href="toolkit"><span class="sw" style="background:#f3c5a3"><img src="../toolkit-icon.svg" alt=""></span>
-      <div>What is a toolkit<small>what wbx toolkit drives</small></div><span class="go">→</span></a>
+      <div>What is a toolkit<small>what work toolkit drives</small></div><span class="go">→</span></a>
     <a href="https://github.com/workbooks-sh/workbooks.sh/releases"><span class="sw" style="background:#d9dbd3"><b>&gt;_</b></span>
-      <div>Get wbx<small>npm @work.books/cli · releases</small></div><span class="go">→</span></a>
+      <div>Get work<small>npm @work.books/cli · releases</small></div><span class="go">→</span></a>
   </div>
 </section>
 
@@ -387,7 +387,7 @@ echo "* hello" | wbx query -</pre>
 <script type="text/org" id="workbook-spec">
 * page  the command line
   :PROPERTIES:
-  :SLUG:   wbx
+  :SLUG:   work
   :KIND:   learn
   :NN:     07
   :KICKER: the command line
@@ -397,7 +397,7 @@ echo "* hello" | wbx query -</pre>
   :CHIP:   the command
   :PC:     #d9dbd3
   :AC:     #13d943
-  :HERO:   img/wbx-hero.jpg
+  :HERO:   img/work-hero.jpg
   :END:
 ** og
 - author · make · trust · parts · engine · everyday
@@ -410,24 +410,24 @@ echo "* hello" | wbx query -</pre>
 window.LEARN = {
   mix: [["#aee5c2", .30], ["#a8d4f0", .26], ["#f2ddb0", .24], ["#f3c5a3", .20]],
   story: [
-    ["cmd", "wbx init field-notes"],
-    ["ok", "created — next: wbx dev field-notes"],
-    ["cmd", "wbx dev field-notes"],
+    ["cmd", "work init field-notes"],
+    ["ok", "created — next: work dev field-notes"],
+    ["cmd", "work dev field-notes"],
     ["out", "http://127.0.0.1:4321 — watching… (edit, save, it follows)"],
-    ["cmd", "wbx bundle field-notes"],
+    ["cmd", "work bundle field-notes"],
     ["out", "tangling + packing… source + data → embedded in the page"],
     ["ok", "field-notes.html — shippable, filesystem riding inside"],
-    ["cmd", "wbx sign field-notes.html"],
+    ["cmd", "work sign field-notes.html"],
     ["ok", "signed — did:key provenance embedded"],
-    ["cmd", "wbx deploy local"],
+    ["cmd", "work deploy local"],
     ["out", "scaffolding deployment.org… converging…"],
     ["ok", "runtime up — http://127.0.0.1:4000"],
-    ["cmd", "wbx workbook deploy notes field-notes.html"],
+    ["cmd", "work workbook deploy notes field-notes.html"],
     ["ok", "docked — living at /w/notes"],
-    ["cmd", "wbx toolkit import ~/.claude/skills/retrofuturism"],
+    ["cmd", "work toolkit import ~/.claude/skills/retrofuturism"],
     ["ok", "imported claude-skill → retrofuturism-toolkit/"],
     ["out", "audited 1 script — 1 ready · 0 convertible · 0 blocked"],
-    ["cmd", "wbx toolkit push retrofuturism retrofuturism-toolkit/"],
+    ["cmd", "work toolkit push retrofuturism retrofuturism-toolkit/"],
     ["ok", "shipped — your skill is on the agents' path now"],
     ["dim", "  one tool the whole way — and your agents"],
     ["dim", "  are holding the same one."]],

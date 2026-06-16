@@ -9,7 +9,7 @@
 #      mounts as a <work-gen-block>),
 #   2. CREATES a workbook (calls vfs_write with well-formed org source),
 #   3. EDITS a workbook (a follow-up write that preserves + extends the file),
-#   4. follows "OPEN WHAT YOU BUILD" (vfs_write + `wb app open-tab`).
+#   4. follows "OPEN WHAT YOU BUILD" (vfs_write + `work app open-tab`).
 #
 # The deterministic checks are the gate (objective: did the tool get called with the
 # right shape?). An LLM judge adds a quality score for the report. The component block
@@ -49,7 +49,7 @@ defmodule AgentCapabilities do
         "`#+RENDER: org` on its own first line and write the body in Org. You may embed inline " <>
         "`#+begin_src component …` blocks the chat renders as interactive cards — the available " <>
         "component types are listed in the Components section below.\n\n" <>
-        # NOTE: the production prompt also mandates `wb app open-tab` after every write
+        # NOTE: the production prompt also mandates `work app open-tab` after every write
         # ("OPEN WHAT YOU BUILD"). That tool only succeeds against a CONNECTED desktop, so
         # it's validated in the desktop e2e (e2e/agent-live.spec.ts), not here — including
         # it headless makes the agent loop retrying an open that can't land. This headless

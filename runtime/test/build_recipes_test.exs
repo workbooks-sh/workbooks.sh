@@ -11,6 +11,7 @@ defmodule Workbooks.BuildRecipesTest do
       @tag :build — needs the rust wasm toolchain + network for cargo install).
   """
   use ExUnit.Case, async: false
+  @moduletag :build
 
   alias Workbooks.{PackageManager, CommandRegistry}
 
