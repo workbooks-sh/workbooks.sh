@@ -1,19 +1,19 @@
 <!--
-  The `work` toolkit — the spine.
+  The `work` work-kit — the spine.
 
-  Everything is a toolkit. A toolkit is a PREFIX + the <prefix-*> elements it owns.
+  Everything is a work-kit. A work-kit is a PREFIX + the <prefix-*> elements it owns.
   `work` is the one that ships built-in: NOT a visual domain, but the irreducible
-  primitives every workbook and toolkit is built from. It passes the Primitive Test —
+  primitives every workbook and work-kit is built from. It passes the Primitive Test —
   irreducible · universal · system-run · mechanism-only.
 
-  There is no <work-toolkit> element: "what something is" is an EDGE (tagging = C).
-  This bundle declares ITSELF a toolkit with the work-ref below — a reified type edge,
+  There is no work-kit element: "what something is" is an EDGE (tagging = C).
+  This bundle declares ITSELF a work-kit with the work-ref below — a reified type edge,
   the same primitive used for every dependency, link, and binding. Reading the spine
   off the CEM is the machine source of truth; this manifest is the front door.
 -->
 
-<!-- the toolkit declares itself: a type edge into the registry (tagging = C) -->
-<work-ref rel="toolkit" name="work" prefix="work" version="0.1.0" status="stable"/>
+<!-- the work-kit declares itself: a type edge into the registry (tagging = C) -->
+<work-ref rel="kit" name="work" prefix="work" version="0.1.0" status="stable"/>
 
 <!-- ════ the spine — three elements, nothing else ════ -->
 
@@ -28,7 +28,8 @@
   work-ref — EVERY EDGE. One element; meaning by position + rel:
     <work-ref to="…">              a pointer (link / next-step), follows on activation
     <work-ref to="…" as="template"> a typed pointer (template | skill | cmd | doc)
-    <work-ref rel="toolkit|skill|agent"> a TYPE edge — asserts its container's type
+    <work-ref rel="kit|skill|agent">     a TYPE edge — asserts its container's type
+    <work-ref rel="call" to="…">         a CALL edge — invokes a host capability (Dock/RCP)
     <work-ref from="…">            a data-binding edge (invisible structure)
   Deps, links, bindings, and types all live in ONE graph the system already runs on.
 -->
@@ -44,13 +45,13 @@
 </work-flow>
 
 <!--
-  COMPOSITION. Pull another toolkit's namespace in with a dependency edge, then use its
+  COMPOSITION. Pull another work-kit's namespace in with a dependency edge, then use its
   <prefix-*> elements right here — provenance reads off every prefix:
 
     <work-ref rel="needs" to="cloudflare"/>
-    <chat-thread>…</chat-thread>          <!- borrowed from the chat toolkit ->
+    <chat-thread>…</chat-thread>          <!- borrowed from the chat work-kit ->
     <grid-table from="customers"></grid-table>
 
-  Authoring your own toolkit `byod` = owning <byod-*> + declaring it with
-  <work-ref rel="toolkit" name="byod" prefix="byod"/>. `work` is just the one named work.
+  Authoring your own work-kit `byod` = owning <byod-*> + declaring it with
+  <work-ref rel="kit" name="byod" prefix="byod"/>. `work` is just the one named work.
 -->

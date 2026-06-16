@@ -4,13 +4,15 @@
 //
 //   <work-ref to="setup/auth"/>            a pointer — follows to a target (link/next-step)
 //   <work-ref to="x" as="template"/>       a typed pointer (template | skill | cmd | doc)
-//   <work-ref rel="toolkit"/>              a TYPE edge — asserts its container IS a toolkit
-//                                          (rel=toolkit|skill|agent); this is "tagging = C"
+//   <work-ref rel="kit"/>                  a TYPE edge — asserts its container IS a work-kit
+//                                          (rel=kit|skill|agent); this is "tagging = C"
+//   <work-ref rel="call" to="deploy"/>     a CALL edge — invokes a host capability through
+//                                          the Dock (RPC surface; the transport is RCP)
 //   <work-ref from="customers"/>           a data-binding edge (invisible; the binding IS the edge)
 //
-// A pointer renders inline and emits `work-ref-follow { to, as }` on activation (the host
-// decides what following means). A type edge renders a small provenance badge. A pure
-// binding renders nothing — it's structure, not UI.
+// A pointer renders inline and emits `work-ref-follow { to, as }`. A call edge invokes
+// `this.host` and emits `work-ref-call { to, ok, result }`. A type edge renders a small
+// provenance badge. A pure binding renders nothing — it's structure, not UI.
 import { WbElement, html, css, define } from "../../core/element.js";
 
 export class WorkRef extends WbElement {
@@ -37,8 +39,32 @@ export class WorkRef extends WbElement {
     }));
   }
 
+  // call edge: invoke a host capability through the Dock (RPC over RCP).
+  async _call(e) {
+    e.preventDefault();
+    const to = this.attr("to");
+    let ok = false, result = null;
+    try {
+      let args = {};
+      try { args = JSON.parse(this.attr("args") || "{}"); } catch {}
+      const r = await this.host.request(`/call/${to}`, { body: args });
+      ok = !!(r && r.ok !== false); result = r;
+    } catch (err) {
+      result = "needs runtime: " + (err.message || err);
+    }
+    this.dispatchEvent(new CustomEvent("work-ref-call", {
+      bubbles: true, composed: true, detail: { to, ok, result },
+    }));
+  }
+
   render() {
     const to = this.attr("to"), rel = this.attr("rel"), as = this.attr("as");
+    // call edge: a followable capability invocation through the Dock.
+    if (rel === "call" && to) {
+      const label = (this.textContent || "").trim() || to;
+      return html`<a href="#" @click=${(e) => this._call(e)}
+        >${label}<span class="arrow">⚡</span><span class="kind">call</span></a>`;
+    }
     // type edge: assert the container's type — render as provenance.
     if (rel && !to) return html`<span class="badge" title="type edge">${rel}</span>`;
     // pure binding edge: invisible structure.
