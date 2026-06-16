@@ -21,8 +21,18 @@ const ALLOWLIST = (env.WB_ALLOWLIST || 'shane@shinyobjectz.com')
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
-// Routes reachable WITHOUT being a signed-in, allowlisted user.
-const PUBLIC = ['/login', '/logout', '/v1/auth/callback', '/denied'];
+// Routes reachable WITHOUT being a signed-in, allowlisted user. The desktop sign-in
+// broker (/v1/auth/{authorize,loopback,exchange}) ESTABLISHES auth, so it can't
+// require it — it enforces its own PKCE + loopback floors (see $lib/desktopBroker).
+const PUBLIC = [
+  '/login',
+  '/logout',
+  '/v1/auth/callback',
+  '/v1/auth/authorize',
+  '/v1/auth/loopback',
+  '/v1/auth/exchange',
+  '/denied'
+];
 const isPublic = (path) => PUBLIC.some((p) => path === p || path.startsWith(p + '/'));
 
 const gate = async ({ event, resolve }) => {
