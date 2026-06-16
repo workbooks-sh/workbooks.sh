@@ -6,6 +6,7 @@ defmodule Workbooks.DockComponentE2ETest do
   import work end to end in actual WASM, not just unit stubs.
   """
   use ExUnit.Case, async: false
+  @moduletag :build
   alias Workbooks.Instance
 
   @fixture "build/fixtures/engine-dock-probe.wasm"
