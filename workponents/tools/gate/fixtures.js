@@ -72,6 +72,41 @@ export const MAP_ROWS = JSON.stringify([
 export const EDITOR_DOC = `const greet = (name) => {\n  // say hello\n  return "hi " + name;\n};`;
 export const EDITOR_EDIT = `${EDITOR_DOC}\nconst n = 42;`;
 
+// work-doc · a representative document — the docs-domain substrate the composition
+// model centers on (preview ≡ source; the same bytes render). This exercises the
+// standalone renderer's full surface DETERMINISTICALLY (no engine round-trip, so
+// the visual baseline is stable offline): headings, prose, an org TODO pill, a
+// checkbox list, a markdown table, and a fenced code block. It is theme-agnostic
+// (no hardcoded color) so the token-flip gate measures real prose chrome. A live
+// compute cell (```chart / ```sql) is intentionally NOT in the baseline fixture —
+// cells round-trip an engine that is CDN-blocked offline, which would make the
+// shot nondeterministic; the live-cell path is proven by work-doc-cell + the
+// browser demo. This is the floor a docked Host upgrades through the OQL kernel.
+const DOC_SRC = `# Quarterly Review
+
+Revenue grew steadily across every region. The document **is** its source —
+the same bytes an agent or cursor edits are what you see rendered.
+
+## Action items
+
+- [x] Refresh the metrics table
+- [ ] Draft the outlook section
+
+TODO Follow up with the growth team on APAC
+
+## Regional revenue
+
+| Region | Revenue |
+| ------ | ------- |
+| NA     | 1200    |
+| EU     | 980     |
+| APAC   | 1430    |
+
+\`\`\`
+export const total = 1200 + 980 + 1430;
+\`\`\`
+`;
+
 export const FIXTURES = {
   "work-button": { html: "Click me", variants: [{ variant: "soft" }, { variant: "outline", tone: "err" }] },
   "work-diff": { attrs: { a: ORG_A, b: ORG_B, mode: "split" }, variants: [{ mode: "inline" }] },
@@ -91,6 +126,7 @@ export const FIXTURES = {
   "work-auth": { attrs: { mode: "password" } },
   "work-file": { attrs: { name: "report.org", size: "12 KB" } },
   "work-metric-card": {},
+  "work-doc": { html: DOC_SRC },
   // 3d · the gate runs OFFLINE (the model-viewer CDN ESM is unreachable / not
   // injected), so this deterministically renders the THEMED FLOOR placeholder —
   // the stable fixture the directive calls for. (The real <model-viewer> render is
