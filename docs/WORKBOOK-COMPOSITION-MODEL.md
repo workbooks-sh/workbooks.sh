@@ -185,20 +185,67 @@ The bundle compiler and its floors are **done and careful** — do not re-derive
   boundary;
 - the `#+REQUIRES` transitive closure resolver.
 
-## Roadmap
+## Roadmap — P0–P3 BUILT
 
-- **P0 — island reader.** A host-side reader (`Workbooks.Bundle.Islands`?) that, on
-  `unbundle`, surfaces `<work-org>`/`<work-agent>`/`<work-toolkit>`/`<work-vfs>` from
-  the tree+manifest; on `bundle`, collapses them back. Pure mapping over the existing
-  `Bundle` primitives — no new IO, no new zip lane.
-- **P1 — inline ⟷ src ⟷ packed.** Implement the three-residence swap + the islands
-  manifest; pin the byte-exact round-trip the same way the existing tests do.
-- **P2 — round-trip spike.** One hand-authored example: an agent HTML referencing a
-  toolkit referencing a toolkit, an `.org` file, and a `lang="svelte"` component.
-  Prove `bundle`→`unbundle`→`bundle` is byte-exact and the agent/toolkit DAG resolves
-  identically from both the bundled and exploded forms.
-- **P3 — `lang=` handler registry.** Generalize beyond the tangle leg's component
-  shapes (Svelte/Rust/JS already have lanes); register the source↔artifact handlers.
+The layer is implemented in `runtime/host/bundle_islands.ex` (`Workbooks.Bundle.Islands`),
+pinned by `runtime/test/bundle_islands_test.exs` (16 tests, hermetic — the agent leg
+runs the REAL embedded OQL kernel, no network/LLM). It adds **no new IO** and rewrites
+none of `Workbooks.Bundle`/`AgentDef`/`Toolkits`.
+
+- **P0 — island reader. DONE.** `index/1` classifies a workbook tree
+  (`%{"path" => bytes}`, the `Bundle.unpack` shape) into typed islands and `render/1`
+  emits them as `src=`-referenced `<work-*>` elements; `parse/1` pulls islands back out
+  of hand-authored HTML and `materialize/2` writes inline bodies to tree files. Pure
+  bijection over the tree (the tree is the truth; islands describe it). Kind mapping:
+  `<work-agent>`→`AgentDef.parse`, `<work-toolkit>`→`Toolkits.parse_descriptor`,
+  `<work-org>`→any other `.org`, `<work-vfs>`→SQLite volume. Non-structural files
+  (`.wasm`, assets, page html) are ignored.
+- **P1 — inline ⟷ src ⟷ packed. DONE.** The islands manifest (the node table) is
+  `to_manifest/2`/`from_manifest/1` (`work-islands/1` JSON: `kind, id, path, residence,
+  attrs, sha256 hash`), embedded into a page as an inert `<script id="work-islands">`
+  via `embed_manifest/2`/`extract_manifest/1` (idempotent, `</script>`-safe). The
+  residence swap is `externalize/2` (inline body → tree file) ⟷ `inline/2` (tree file
+  → element body), reversible. Round-trip pinned byte-stable.
+- **P2 — round-trip spike. DONE.** The nested-composition test proves the `#+REQUIRES`
+  toolkit DAG (agent → toolkit → toolkit) resolves identically from the exploded tree
+  and the rendered→parsed bundled islands — both feed the SAME `Toolkits.closure/3` via
+  `edges/1` + `toolkit_ids/1`. A bare CLI pre-flight (`git>=2.30`) correctly does NOT
+  become a graph edge.
+- **P3 — `lang=` handler registry. DONE.** `handlers/0` + `handler_for/1` map a
+  `<work-component lang=…>` to an existing build lane (`rust`/`rs`→`:rust`, `c`→`:c`,
+  `zig`→`:zig`, `svelte`→`:svelte`, `js`/`ts`/`typescript`→`:js`, `go`→`:go`); aliases
+  fold to the canonical lane, unknown → `nil`. `build_plan/1` pairs each buildable
+  `<work-component>` with its handler and drops unknown langs. NO new compiler — pure
+  dispatch to the lanes the bundle compiler already runs.
+
+### Public surface (`Workbooks.Bundle.Islands`)
+
+`index/1`, `render/1`, `parse/1`, `materialize/2`, `edges/1`, `toolkit_ids/1`,
+`to_manifest/2`, `from_manifest/1`, `embed_manifest/2`, `extract_manifest/1`,
+`externalize/2`, `inline/2`, `handlers/0`, `handler_for/1`, `component_islands/1`,
+`build_plan/1`. An island is `%{kind, id, path, attrs, body}` (body set only for
+inline islands).
+
+### CLI wiring — DONE
+
+The bijection is wired into the CLI (`runtime/host/cli.ex`):
+
+- **`wb bundle`** embeds the `work-islands` manifest into the page alongside the
+  `wb-bundle` zip — `Islands.embed_manifest(html, Islands.to_manifest(Islands.index(parts), parts))`.
+  The manifest `src`-references the packed files, so it's a loss-free projection, not a
+  second copy. Reports the island count.
+- **`wb unbundle`** restores the tree byte-exact (the `Workbooks.Bundle` guarantee,
+  unbroken) and reports the composition (`N agent/toolkit/org/vfs`) read from the
+  embedded manifest.
+- **`wb islands <in.html|dir>`** dumps the typed `<work-*>` structure — from a bundled
+  page's manifest, an inline-`<work-*>` fallback, or by classifying a working dir.
+
+Proven end-to-end by `runtime/test/bundle_islands_cli_test.exs` (a real
+agent→toolkit→toolkit+org+vfs tree, hermetic OQL kernel): bundle→unbundle byte-exact,
+both markers coexist, the embedded manifest equals the source-tree index, and the
+toolkit DAG resolves identically from the bundled manifest. Build-lane dispatch of
+`build_plan/1` at bundle time (compiling `<work-component lang=…>` sources) is the next
+increment; the plan is computed and available today.
 
 ## The anti-waffle rule (state in every agent/author prompt)
 

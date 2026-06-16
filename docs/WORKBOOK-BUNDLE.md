@@ -4,6 +4,12 @@
 > command was the last remnant; the compressed-fs-in-html core had been lost).
 > This is the canonical standard. Implementation lands incrementally against it.
 
+> **Declarative layer:** `docs/WORKBOOK-COMPOSITION-MODEL.md` specifies the typed
+> config-island surface (`<work-*>` custom elements) that rides this lifecycle —
+> `Workbooks.Bundle.Islands` is a bijection between a workbook's structure-as-DOM and
+> the org/tree this compiler already packs. It adds no new IO and does not re-derive
+> anything below; read this doc first.
+
 ## What a Workbook is
 
 A Workbook is **one `.html` file** that carries its **entire filesystem inside it**,

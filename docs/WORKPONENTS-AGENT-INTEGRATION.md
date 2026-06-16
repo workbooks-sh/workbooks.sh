@@ -24,6 +24,15 @@ layer). What's missing is the *system* that connects them. The genuinely new inv
 **a pptx→org emitter, a 3D domain, a 5-gate validation harness, and ~30–40 lines to make the toolkit
 dependency graph real.**
 
+> **Structure ⟷ org boundary.** The web-component-first stance here (components carry STRUCTURE/
+> hierarchy/wiring; org carries narrative + literate CONTENT) is specified end-to-end in
+> `docs/WORKBOOK-COMPOSITION-MODEL.md`. Its config-island layer — `Workbooks.Bundle.Islands`
+> (`<work-agent>`/`<work-toolkit>`/`<work-org>`/`<work-vfs>`/`<work-component>`) — is **BUILT**
+> (P0–P3, `runtime/test/bundle_islands_test.exs`, 16 tests) and resolves the same `#+REQUIRES`
+> toolkit DAG referenced below from both the bundled and exploded forms. The live `work-*` UI
+> elements (`work-table`/`work-chart`/…) are that doc's *live* island species; the inert config
+> islands are its declarative species. CLI wiring into `wb bundle`/`unbundle` is in progress.
+
 ---
 
 ## HAVE / DON'T-HAVE
@@ -80,7 +89,7 @@ dependency graph real.**
 - **Git-viz correctness** (critical finding: the backend emits **full-file `{before,after}`, NOT a semantic diff** — the semantic org-block diff lives **entirely in `work-diff`**, so it's pure-frontend unit-testable):
   - `work-history-graph`: frozen backend fixtures (`history.ex` shape: `{id,when,author_type,author_name,title}`, newest-first) → assert node order, **human/agent attribution 1:1**, no drop/coalesce, linear-when-input-linear (don't draw fictional merges).
   - `work-diff`: golden `(before,after,expected_ops)` table + **property/conservation invariants** (every block accounted for; `diff(x,x)`=all-eq; applying ops reconstructs `after`) — catches silent corruption. One live backend-parity smoke.
-- **Agent-use evals** — new pack `runtime/evals/components/`, reuses the wavelet spec/judge format. Adversarial one-liner cases (`"show me revenue by region"` → must emit `work-chart`, not a markdown table; `work-table` for records; `work-diff` for "what changed"; theme-honest; data-binding-not-fabricated). Judge rubric: component_selection / emit_correctness / data_binding / theme_compliance (delegates to Gate-a) / render_fidelity (vision) / restraint. **Voice parity** via the rehearsal harness (no key needed): same cases, assert text and voice reach the *same* component decision (`voice.component_parity`). **Standing CI gate**, cheap (no paid media), no `MAX_STEPS`.
+- **Agent-use evals** — pack `runtime/evals/components/`, run by `Workbooks.Evals.Components` (`runtime/host/evals/components.ex`), reuses the wavelet spec/judge format (no new runner: parse spec → run the agent → extract the emitted artifact → mount headless + screenshot light/dark → vision judge + deterministic checks). Adversarial one-liner cases (`"show me revenue by region"` → must emit `work-chart`, not a markdown table; `work-table` for records; `work-diff` for "what changed"; theme-honest; data-binding-not-fabricated) chosen from the CEM (`workponents/custom-elements.json`). Judge rubric: component_selection / emit_correctness / data_binding / theme_compliance (delegates to Gate-a) / render_fidelity (vision) / restraint. **Voice parity** via the rehearsal harness (no key needed): same cases, assert text and voice reach the *same* component decision (`voice.component_parity`). **Standing CI gate**, cheap (no paid media), no `MAX_STEPS`. The eval runs **emit-only** against a **capable default model** (`anthropic/claude-haiku-4.5`, `WB_EVAL_MODEL` override) — this eval measures COMPOSITION, so it skips the full tool-loop the cheap platform default thrashes on (trivial briefs → ~2.5min/step web-searches).
 - **Dogfooding loop:** mounting `work-*` in the desktop chat makes the product itself the canary; demos are the visual-baseline corpus; every observed failure converts into a new fixture (git-viz) or eval case (agent-use).
 
 ### 5. Self-editing real document formats
