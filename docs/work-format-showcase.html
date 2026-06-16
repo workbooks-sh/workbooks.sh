@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en" data-theme="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="darkreader-lock">
+<meta name="color-scheme" content="light">
+<title>Work Format — it's all HTML</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
+  :root{
+    --paper:#f7f6f1; --surface:#fbfaf3; --raised:#fffef9;
+    --ink:#121316; --ink-2:#4a4b50; --ink-3:#8a8b90;
+    --line:#e7e5db; --line-2:#d8d6ca;
+    --cream:#f2ddb0;
+    --sans:'Geist',system-ui,-apple-system,sans-serif;
+    --mono:'Geist Mono',ui-monospace,'SF Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font-family:var(--sans);color:var(--ink);background:var(--paper);
+    display:grid;grid-template-rows:auto 1fr;height:100vh;overflow:hidden}
+  header{display:flex;align-items:center;gap:14px;padding:0 18px;height:52px;
+    background:var(--surface);border-bottom:1px solid var(--line)}
+  .mark{width:22px;height:22px;flex:none}
+  header h1{font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0}
+  header .sub{font-size:12px;color:var(--ink-3);font-weight:450}
+  header .spacer{flex:1}
+  header .hint{font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
+  main{display:grid;grid-template-columns:248px 1fr 1fr;min-height:0}
+  @media(max-width:1100px){main{grid-template-columns:210px 1fr}.pane-preview{display:none}}
+
+  .tree{background:var(--surface);border-right:1px solid var(--line);overflow:auto;padding:10px 8px}
+  .tree-group{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);
+    font-weight:600;padding:12px 10px 5px}
+  .node{display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:8px;cursor:pointer;
+    font-size:12.5px;color:var(--ink-2);user-select:none;white-space:nowrap}
+  .node:hover{background:var(--raised)}
+  .node.active{background:var(--ink);color:var(--paper)}
+  .node.indent{padding-left:26px}
+  .ico{width:14px;height:14px;flex:none;opacity:.55}
+  .node .ext{margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--ink-3)}
+  .node.active .ext{color:var(--paper);opacity:.7}
+
+  .pane-editor{display:grid;grid-template-rows:auto 1fr auto;min-width:0;border-right:1px solid var(--line)}
+  .pane-head{display:flex;align-items:center;gap:10px;height:38px;padding:0 14px;
+    background:var(--surface);border-bottom:1px solid var(--line);font-size:12px;color:var(--ink-2)}
+  .pane-head .path{font-family:var(--mono);font-size:11.5px;color:var(--ink)}
+  .pane-head .tag{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:20px;
+    background:#e7f0e4;color:#2f6a47;font-weight:500}
+  .CodeMirror{height:100%;font-family:var(--mono);font-size:13px;line-height:1.65;
+    background:var(--paper);color:var(--ink-2)}
+  .CodeMirror-gutters{background:var(--paper);border-right:1px solid var(--line)}
+  .CodeMirror-linenumber{color:#c3c1b6}
+  .CodeMirror-cursor{border-left:1.5px solid var(--ink)}
+  .CodeMirror-selected{background:#e9e7db !important}
+  .cm-tag{color:#1f6f4f;font-weight:600}
+  .cm-attribute{color:#3a6ea5}
+  .cm-string{color:#9a5b2e}
+  .cm-comment{color:#9b9a8e;font-style:italic}
+  .cm-bracket{color:var(--ink-3)}
+  .shorthand{border-top:1px solid var(--line);background:var(--surface);padding:8px 14px;
+    font-size:11px;color:var(--ink-3);line-height:1.5}
+  .shorthand b{color:var(--ink-2);font-weight:600}
+  .shorthand code{font-family:var(--mono);color:#1f6f4f;background:var(--paper);
+    padding:1px 5px;border-radius:5px;font-size:10.5px}
+
+  .pane-preview{display:grid;grid-template-rows:auto 1fr;min-width:0}
+  .seg{margin-left:auto;display:inline-flex;background:var(--paper);border:1px solid var(--line-2);
+    border-radius:20px;padding:2px}
+  .seg button{border:0;background:none;font-family:var(--sans);font-size:11px;font-weight:500;
+    color:var(--ink-3);padding:3px 11px;border-radius:18px;cursor:pointer}
+  .seg button.on{background:var(--ink);color:var(--paper)}
+  iframe#preview{width:100%;height:100%;border:0;background:var(--paper)}
+  .shipped{overflow:auto;padding:18px 20px;background:var(--paper);
+    font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--ink-2);
+    white-space:pre;tab-size:2;display:none}
+  .shipped .c{color:#9b9a8e}.shipped .t{color:#1f6f4f}.shipped .a{color:#3a6ea5}.shipped .v{color:#9a5b2e}
+</style>
+</head>
+<body>
+<header>
+  <svg class="mark" viewBox="113.444 65.6002 100 100" aria-hidden="true">
+    <path d="M163.4 65.6c12 22 33 33 50 33-17 0-38 11-50 33-12-22-33-33-50-33 17 0 38-11 50-33z" fill="#121316"/>
+  </svg>
+  <h1>Work Format <span class="sub">· it's all HTML</span></h1>
+  <div class="spacer"></div>
+  <div class="hint">work-* are real custom elements — the browser renders the file directly</div>
+</header>
+
+<main>
+  <nav class="tree" id="tree"></nav>
+
+  <section class="pane-editor">
+    <div class="pane-head">
+      <span class="path" id="curPath"></span>
+      <span class="tag">.html · the file</span>
+    </div>
+    <textarea id="code"></textarea>
+    <div class="shorthand" id="shorthand"></div>
+  </section>
+
+  <section class="pane-preview">
+    <div class="pane-head">
+      <span>Rendered by the browser</span>
+      <div class="seg" id="seg">
+        <button data-v="preview" class="on">Preview</button>
+        <button data-v="shipped">Shipped .html</button>
+      </div>
+    </div>
+    <iframe id="preview"></iframe>
+    <div class="shipped" id="shipped"></div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script>
+/* ───────────────────────────────────────────────────────────────────────────
+   The examples ARE HTML. Each is the body of a workbook: real <work-*> custom
+   elements. The browser renders them directly — no build, no shorthand needed.
+   (HTML close tags inside strings are written <\/...> so this file doesn't
+   terminate its own script block.)
+   ─────────────────────────────────────────────────────────────────────────── */
+const FILES = {
+
+"single-file/sprint.html":
+{ shorthand: 'work-sprint "Q3 Parser Push" start=2026-06-15 → work-task "…" status=todo @kai',
+  html:
+`<!-- sprint.html — a project-management workbook. THIS is the file. -->
+<!-- work-* are custom elements, so a browser renders this HTML directly. -->
+<work-sprint title="Q3 Parser Push" start="2026-06-15" end="2026-06-29">
+
+  <!-- status= drives the pill colour; assignee renders as an @chip -->
+  <work-task status="done" assignee="kai" title="Ship the parser" estimate="3d">
+    Landed the indentation reader. <b>Blocks</b> nothing now.
+  </work-task>
+
+  <work-task status="doing" assignee="mara" title="Rewire the render path" due="2026-06-22">
+    Swap the old engine for the work renderer. Keep the exports stable.
+  </work-task>
+
+  <work-task status="todo" assignee="kai" title="Author the work-* vocabulary" due="2026-06-25"></work-task>
+
+  <!-- a milestone is the same shape — just a different element -->
+  <work-milestone title="Demo to the team" due="2026-06-29"></work-milestone>
+</work-sprint>`},
+
+"single-file/board.html":
+{ shorthand: 'work-board "Parser Push" → nested work-task lines with status=',
+  html:
+`<!-- board.html — the SAME tasks as a kanban board. -->
+<!-- work-board reads its work-task children and lays them out by status. -->
+<work-board title="Parser Push">
+  <work-task title="Ship the parser"        status="done"    assignee="kai"></work-task>
+  <work-task title="Rewire the render path" status="doing"   assignee="mara"></work-task>
+  <work-task title="work-* vocabulary"      status="todo"    assignee="kai"></work-task>
+  <work-task title="work-query element"     status="todo"    assignee="sol"></work-task>
+  <work-task title="Notarised desktop build" status="blocked" assignee="mara"></work-task>
+</work-board>`},
+
+"single-file/agents.html":
+{ shorthand: 'work-agent "Researcher" model=… → work-system / work-flow / work-loop cron=…',
+  html:
+`<!-- agents.html — agents, flows and loops are authored EXACTLY like tasks. -->
+<!-- "behaviour" is just structure + prose; there is no separate language. -->
+<work-agent title="Researcher" model="claude-opus-4-8">
+  <!-- a system prompt is just a nested element with prose inside it -->
+  <work-system>
+    You research a topic across the open web and return a cited brief.
+    Prefer primary sources. Never invent citations.
+  </work-system>
+</work-agent>
+
+<!-- in= / out= wire the data edges between steps (the build graph) -->
+<work-flow title="Nightly digest" in="topics" out="digest">
+  <work-task title="Gather sources" out="sources"></work-task>
+  <work-task title="Summarise + cite" in="sources" out="digest"></work-task>
+</work-flow>
+
+<!-- a loop is a flow on a schedule — cron is just an attribute -->
+<work-loop title="Weekday digest" cron="0 9 * * 1-5" status="active"></work-loop>`},
+
+"single-file/data.html":
+{ shorthand: 'work-query name=… sql="…"  →  work-table from=…  /  work-chart from=…',
+  html:
+`<!-- data.html — pull from SQLite OR Postgres right inside the page. -->
+<!-- work-query declares a named dataset; views bind to it with from=. -->
+<!-- The SAME tag works for either database — the host decides where it runs. -->
+<work-query name="big-orders" db="sales"
+  sql="select customer, total from orders where total > 100 order by total desc"></work-query>
+
+<!-- one source, many views. they just point at the named result. -->
+<work-table from="big-orders"></work-table>
+<work-chart from="big-orders" kind="bar" x="customer" y="total"></work-chart>`},
+
+"single-file/handbook.html":
+{ shorthand: 'work-doc "Team Handbook" → work-section "…" with prose',
+  html:
+`<!-- handbook.html — prose and structure in ONE plain HTML file. -->
+<!-- Components carry the structure; the text between tags is just HTML. -->
+<work-doc title="Team Handbook">
+  Welcome. This page is a workbook — it is literally an HTML file you can
+  double-click. The headings below are elements; the rest is ordinary prose.
+
+  <work-section title="How we work">
+    We ship in small, verifiable steps. Every change runs at the
+    <i>tightest</i> tier that proves it before it merges.
+  </work-section>
+
+  <work-section title="Where things live">
+    Design notes live next to the code. The artifact you ship is always
+    plain <b>HTML</b>.
+  </work-section>
+</work-doc>`},
+
+"bundle/workbook.html":
+{ shorthand: 'the full self-contained file the bundler produces',
+  html:
+`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Acme Ops</title>
+  <!-- registers the work-* custom elements -->
+  <script type="module" src="https://cdn.workbooks.sh/workponents.js"><\/script>
+  <!-- bundle marker: manifest + any embedded data live here -->
+  <script id="workbook-spec" type="application/json">
+    { "format": "wbundle-html/1", "title": "Acme Ops" }
+  <\/script>
+</head>
+<body>
+  <!-- multiple authored files weave into this ONE self-contained .html -->
+  <work-board title="Tasks">
+    <work-task status="doing" assignee="mara" title="Draft the Q3 plan"></work-task>
+    <work-task status="todo"  assignee="sol"  title="Renew the TLS cert" due="2026-07-01"></work-task>
+  </work-board>
+  <work-agent title="Research" model="claude-opus-4-8">
+    <work-system>Find primary sources, summarise, and always cite.</work-system>
+  </work-agent>
+</body>
+</html>`},
+};
+
+/* ───────────────────────────────────────────────────────────────────────────
+   The work-* custom elements, defined as real (vanilla) web components. This
+   exact registration script is injected into the preview iframe, so what you
+   see IS the browser rendering the HTML on the left — not a mock.
+   ─────────────────────────────────────────────────────────────────────────── */
+const ELEMENT_STYLE = `
+:host{display:block;font-family:'Geist',system-ui,sans-serif}
+.card{background:#fffef9;border:1px solid #e7e5db;border-radius:14px;padding:13px 15px;margin:0 0 11px}
+.head{display:flex;align-items:center;gap:9px;margin-bottom:2px}
+.title{font-weight:600;font-size:14px;letter-spacing:-.01em;color:#121316}
+.kind{font-size:9.5px;font-family:'Geist Mono',monospace;color:#8a8b90;text-transform:uppercase;letter-spacing:.06em}
+.meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.body{font-size:12.5px;color:#4a4b50;line-height:1.55;margin-top:6px}
+.pill{font-size:10.5px;font-weight:600;padding:2px 9px;border-radius:20px;color:#2c2c2c}
+.todo{background:#a8d4f0}.doing{background:#f3c5a3}.done{background:#c8e0b0}.blocked{background:#f0b0a8}.active{background:#aee5c2}.def{background:#f2ddb0}
+.chip{font-size:10.5px;padding:2px 8px;border-radius:20px;background:#f7f6f1;border:1px solid #d8d6ca;color:#4a4b50;font-weight:500}
+.who{background:#eef4ff;border-color:#d6e4fb;color:#3a6ea5}
+.mono{font-family:'Geist Mono',monospace;font-size:10px}
+.board{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:10px;align-items:start;margin-top:8px}
+.colh{font-size:10.5px;font-weight:600;color:#8a8b90;text-transform:uppercase;letter-spacing:.06em;padding:0 2px 6px}
+.sql{font-family:'Geist Mono',monospace;font-size:11px;color:#6b5a2a;background:#f2ddb0;padding:7px 10px;border-radius:8px;margin-top:7px;white-space:pre-wrap;word-break:break-word}
+.sys{font-family:'Geist Mono',monospace;font-size:11.5px;color:#4a4b50;background:#f7f6f1;border-left:3px solid #d8d6ca;padding:8px 12px;border-radius:0 8px 8px 0}
+.viz{display:flex;align-items:center;gap:10px;color:#4a4b50;font-size:12.5px}
+.glyph{font-size:18px}
+`;
+
+const REGISTER = `
+const STYLE = ${JSON.stringify(ELEMENT_STYLE)};
+const A = (el,n)=>el.getAttribute(n);
+function chips(el){
+  let h='';
+  if(A(el,'assignee')) h+='<span class="chip who">@'+A(el,'assignee')+'</span>';
+  if(A(el,'model'))    h+='<span class="chip mono">'+A(el,'model')+'</span>';
+  if(A(el,'due'))      h+='<span class="chip mono">due '+A(el,'due')+'</span>';
+  if(A(el,'estimate')) h+='<span class="chip mono">~'+A(el,'estimate')+'</span>';
+  if(A(el,'start'))    h+='<span class="chip mono">'+A(el,'start')+' → '+(A(el,'end')||'')+'</span>';
+  if(A(el,'in'))       h+='<span class="chip mono">in: '+A(el,'in')+'</span>';
+  if(A(el,'out'))      h+='<span class="chip mono">out: '+A(el,'out')+'</span>';
+  if(A(el,'cron'))     h+='<span class="chip mono">cron '+A(el,'cron')+'</span>';
+  return h;
+}
+const pill = el => { const s=A(el,'status'); return s?'<span class="pill '+(['todo','doing','done','blocked','active'].includes(s)?s:'def')+'">'+s+'</span>':''; };
+
+function define(tag, render, observed){
+  if(customElements.get(tag)) return;
+  customElements.define(tag, class extends HTMLElement{
+    static get observedAttributes(){ return observed||['title','status']; }
+    connectedCallback(){ if(!this.shadowRoot) this.attachShadow({mode:'open'}); this.r(); }
+    attributeChangedCallback(){ if(this.shadowRoot) this.r(); }
+    r(){ this.shadowRoot.innerHTML = '<style>'+STYLE+'</style>'+render(this); }
+  });
+}
+
+const container = (kindLabel) => (el)=>
+  '<div class="card"><div class="head"><span class="title">'+(A(el,'title')||kindLabel)+'</span>'+
+  '<span class="kind">'+kindLabel+'</span></div><div class="meta">'+chips(el)+'</div>'+
+  '<div class="body"><slot></slot></div></div>';
+
+define('work-task', el =>
+  '<div class="card"><div class="head">'+pill(el)+'<span class="title">'+(A(el,'title')||'')+'</span></div>'+
+  '<div class="meta">'+chips(el)+'</div><div class="body"><slot></slot></div></div>',
+  ['title','status','assignee','due','estimate']);
+
+define('work-milestone', el =>
+  '<div class="card"><div class="head"><span style="color:#9a5b2e">◆</span>'+
+  '<span class="title">'+(A(el,'title')||'')+'</span>'+
+  (A(el,'due')?'<span class="chip mono">due '+A(el,'due')+'</span>':'')+'</div></div>',
+  ['title','due']);
+
+define('work-loop', el =>
+  '<div class="card"><div class="head">'+pill(el)+'<span class="title">'+(A(el,'title')||'')+'</span>'+
+  '<span class="kind">loop</span></div><div class="meta">'+chips(el)+'</div></div>',
+  ['title','status','cron']);
+
+define('work-system', () =>
+  '<div class="card" style="padding:10px 12px"><div class="kind" style="margin-bottom:6px">system prompt</div>'+
+  '<div class="sys"><slot></slot></div></div>', []);
+
+define('work-query', el =>
+  '<div class="card"><div class="head"><span class="title">⛁ '+(A(el,'name')||'')+'</span>'+
+  '<span class="kind">query · '+(A(el,'db')||A(el,'src')||'')+'</span></div>'+
+  (A(el,'sql')?'<div class="sql">'+A(el,'sql')+'</div>':'')+'</div>',
+  ['name','db','sql']);
+
+const viz = (glyph,label) => (el)=>
+  '<div class="card"><div class="viz"><span class="glyph">'+glyph+'</span><span>'+label(el)+
+  ' bound to <span class="chip mono">from: '+(A(el,'from')||'?')+'</span></span></div></div>';
+define('work-table', viz('⊞', ()=>'table'), ['from']);
+define('work-chart', viz('▦', el=>(A(el,'kind')||'bar')+' chart'), ['from','kind']);
+
+define('work-board', null, ['title']);
+// board needs to route children into status columns, so override connectedCallback
+customElements.upgrade && 0;
+{
+  const cols=['todo','doing','done','blocked'];
+  class Board extends HTMLElement{
+    connectedCallback(){
+      if(!this.shadowRoot) this.attachShadow({mode:'open'});
+      [...this.querySelectorAll(':scope > work-task')].forEach(t=>{
+        const s=t.getAttribute('status')||'todo';
+        t.setAttribute('slot', cols.includes(s)?s:'todo');
+      });
+      const used = cols.filter(c=>[...this.querySelectorAll(':scope > work-task')].some(t=>(t.getAttribute('slot'))===c));
+      this.shadowRoot.innerHTML='<style>'+STYLE+'</style>'+
+        '<div class="card"><div class="head"><span class="title">'+(this.getAttribute('title')||'')+'</span>'+
+        '<span class="kind">board</span></div><div class="board" style="grid-auto-columns:repeat('+(used.length||1)+',1fr)">'+
+        used.map(c=>'<div><div class="colh">'+c+'</div><slot name="'+c+'"></slot></div>').join('')+'</div></div>';
+    }
+  }
+  if(!customElements.get('work-board-x')) customElements.define('work-board-x', Board);
+}
+
+// the plain containers
+['work-sprint:sprint','work-doc:doc','work-section:section','work-flow:flow','work-agent:agent','work-workbook:workbook']
+  .forEach(s=>{ const [tag,label]=s.split(':'); define(tag, container(label), ['title','model','in','out','start','end']); });
+`;
+
+// work-board can't be cleanly defined twice; register it directly in the iframe
+const BOARD_FIX = REGISTER.replace("define('work-board', null, ['title']);", "");
+
+/* ── app wiring ───────────────────────────────────────────── */
+const cm = CodeMirror.fromTextArea(document.getElementById('code'), {
+  lineNumbers:true, mode:'xml', lineWrapping:false, tabSize:2,
+});
+let current='single-file/sprint.html', view='preview';
+
+function buildTree(){
+  const tree=document.getElementById('tree'), groups={};
+  for(const path of Object.keys(FILES)){ const top=path.split('/')[0]; (groups[top]=groups[top]||[]).push(path); }
+  const labels={'single-file':'single file','bundle':'bundle'};
+  let html='';
+  for(const top of Object.keys(groups)){
+    html+='<div class="tree-group">'+(labels[top]||top)+'</div>';
+    for(const path of groups[top]){
+      const name=path.split('/').slice(1).join('/');
+      html+='<div class="node" data-path="'+path+'">'+
+        '<svg class="ico" viewBox="0 0 16 16"><path fill="currentColor" d="M2 2h12v12H2z" opacity=".15"/><path fill="none" stroke="currentColor" d="M5 6l-2 2 2 2M11 6l2 2-2 2"/></svg>'+
+        '<span>'+name+'</span><span class="ext">html</span></div>';
+    }
+  }
+  tree.innerHTML=html;
+  tree.querySelectorAll('.node').forEach(el=>el.onclick=()=>open(el.dataset.path));
+}
+
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function previewDoc(src){
+  // board needs its own class; use a tiny registration that routes the real board too
+  const reg = REGISTER.replace("define('work-board', null, ['title']);",
+    "if(!customElements.get('work-board')){customElements.define('work-board', (()=>{const cols=['todo','doing','done','blocked'];return class extends HTMLElement{connectedCallback(){if(!this.shadowRoot)this.attachShadow({mode:'open'});[...this.querySelectorAll(':scope > work-task')].forEach(t=>{const s=t.getAttribute('status')||'todo';t.setAttribute('slot',cols.includes(s)?s:'todo');});const used=cols.filter(c=>[...this.querySelectorAll(':scope > work-task')].some(t=>t.getAttribute('slot')===c));this.shadowRoot.innerHTML='<style>'+STYLE+'</style>'+'<div class=\\\"card\\\"><div class=\\\"head\\\"><span class=\\\"title\\\">'+(this.getAttribute('title')||'')+'</span><span class=\\\"kind\\\">board</span></div><div class=\\\"board\\\" style=\\\"grid-auto-columns:repeat('+(used.length||1)+',1fr)\\\">'+used.map(c=>'<div><div class=\\\"colh\\\">'+c+'</div><slot name=\\\"'+c+'\\\"></slot></div>').join('')+'</div></div>';}}})());}");
+  if(/<!doctype/i.test(src)){
+    return src.replace(/<\/head>/i,
+      '<style>@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono&display=swap");body{background:#f7f6f1;margin:0;padding:18px;font-family:Geist,sans-serif}</style>'+
+      '<scr'+'ipt>'+reg+'</scr'+'ipt></head>');
+  }
+  return '<!doctype html><meta charset=utf8>'+
+    '<style>@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono&display=swap");body{background:#f7f6f1;margin:0;padding:18px;font-family:Geist,sans-serif}</style>'+
+    '<scr'+'ipt>'+reg+'</scr'+'ipt><body>'+src+'</body>';
+}
+
+function shippedHtml(src){
+  if(/<!doctype/i.test(src)) return colour(src);
+  const body = src.split('\n').map(l=>'    '+l).join('\n');
+  const full =
+`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <!-- registers the work-* custom elements -->
+    <script type="module" src="https://cdn.workbooks.sh/workponents.js"><\/script>
+    <!-- bundle marker: manifest + embedded data -->
+    <script id="workbook-spec" type="application/json">{ "format": "wbundle-html/1" }<\/script>
+  </head>
+  <body>
+${body}
+  </body>
+</html>`;
+  return colour(full);
+}
+// light HTML colouring for the read-only "shipped" view
+function colour(src){
+  return esc(src)
+    .replace(/(&lt;!--[\s\S]*?--&gt;)/g,'<span class="c">$1</span>')
+    .replace(/(&lt;\/?)([a-z][\w-]*)/g,'$1<span class="t">$2</span>')
+    .replace(/([a-zA-Z-]+)=(&quot;[^&]*&quot;)/g,'<span class="a">$1</span>=<span class="v">$2</span>');
+}
+
+function render(){
+  const src=cm.getValue();
+  document.getElementById('preview').srcdoc = previewDoc(src);
+  document.getElementById('shipped').innerHTML = shippedHtml(src);
+}
+
+function open(path){
+  current=path;
+  cm.setValue(FILES[path].html);
+  document.getElementById('curPath').textContent=path;
+  document.getElementById('shorthand').innerHTML =
+    '<b>This is the file.</b> The same workbook in the optional <code>.work</code> shorthand: '+
+    '<code>'+esc(FILES[path].shorthand)+'</code>';
+  document.querySelectorAll('.node').forEach(n=>n.classList.toggle('active',n.dataset.path===path));
+  render();
+}
+
+document.getElementById('seg').onclick=e=>{
+  if(e.target.tagName!=='BUTTON') return;
+  view=e.target.dataset.v;
+  document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
+  document.getElementById('preview').style.display = view==='preview'?'':'none';
+  document.getElementById('shipped').style.display = view==='shipped'?'':'none';
+};
+
+cm.on('change', render);
+buildTree();
+open(current);
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 name = "oql"
 version = "0.1.0"
 edition = "2021"
-description = "OQL — the opinionated Org kernel. Narrow Org lens + tangle-plan emitter, compiled to WASM. Clean-room rewrite (OQL-KERNEL.org)."
+description = "The Work kernel — parser + renderer for the work-* format. Tangle-plan emitter + upgrade gate, compiled to WASM."
 
 # Standalone — not part of any parent workspace.
 [workspace]
@@ -24,7 +24,6 @@ browser = []
 
 [dependencies]
 serde_json = "1"
-orgize = "0.10.0-alpha.10"
 wit-bindgen-rt = { version = "0.41", features = ["bitflags"], optional = true }
 
 # cargo-component: build a WIT-typed Component from the workbooks:oql world.

@@ -425,7 +425,7 @@ defmodule Workbooks.Bundle do
   unchanged (a non-literate tree has nothing to tangle).
   """
   def tangle_files(parts, org \\ nil) when is_map(parts) do
-    org = org || parts["source.org"] || parts["workbook.org"]
+    org = org || parts["source.work"] || parts["workbook.work"] || parts["source.org"] || parts["workbook.org"]
 
     if is_binary(org) and org != "" do
       plan = Workbooks.OQL.tangle_plan(org)

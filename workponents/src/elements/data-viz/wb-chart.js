@@ -32,11 +32,16 @@
 // Usage (named source, default SELECT — x/y pick columns off the result):
 //   <work-chart type="line" src-name="daily" x="day" y="visits"></work-chart>
 //
+// Usage (bind to a <work-query> by name — the canonical data binding):
+//   <work-query name="daily" sql="SELECT day, visits FROM events"></work-query>
+//   <work-chart type="line" from="daily" x="day" y="visits"></work-chart>
+//
 // Usage (inline data, no engine round-trip beyond registration):
 //   <work-chart type="scatter" x="x" y="y" rows='[{"x":1,"y":3},{"x":2,"y":5}]'></work-chart>
 //
 // Attributes:
 //   type        bar | line | area | scatter | pie   (the chart variant)
+//   from        name of a <work-query> dataset to read (the canonical binding)
 //   src-name    name of a source registered via getEngine().register(...)
 //   query       full SQL to run (the aggregate/GROUP BY lives HERE, in the engine)
 //   rows        inline JSON array of row objects (registers an auto-named source)
@@ -83,7 +88,7 @@ export class WbChart extends WbElement {
   static variants = VARIANTS;
   static props = [
     ...variantAttrs(VARIANTS),
-    "src-name", "query", "rows", "csv",
+    "src-name", "from", "query", "rows", "csv",
     "x", "y", "series", "label", "legend", "format", "title",
     "engine",   // tier override: auto (default, prefer Plot) | plot | floor
   ];
@@ -167,8 +172,12 @@ export class WbChart extends WbElement {
     super.disconnectedCallback();
   }
 
+  // A named source: from="<work-query name>" is the canonical binding; src-name is
+  // the equivalent register()-side name. Either names a source the engine resolves.
+  _namedSource() { return this.attr("from") || this.attr("src-name"); }
+
   _captureSource() {
-    this._srcName = this.attr("src-name");
+    this._srcName = this._namedSource();
     if (!this._srcName) {
       const rowsAttr = this.attr("rows");
       const csvAttr = this.attr("csv");
@@ -187,7 +196,7 @@ export class WbChart extends WbElement {
   attributeChangedCallback(name, old, val) {
     super.attributeChangedCallback(name, old, val);
     if (!this._init) return;
-    if (name === "rows" || name === "csv" || name === "src-name" || name === "query") {
+    if (name === "rows" || name === "csv" || name === "src-name" || name === "from" || name === "query") {
       this._pendingSource = null;
       this._captureSource();
       this._load();
@@ -207,7 +216,7 @@ export class WbChart extends WbElement {
       this._busy = true; this._error = null; this.requestUpdate();
       try {
         if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
-        else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
+        else if (this._namedSource()) await this._engine.whenRegistered(this._srcName);
         await this._run();
       } catch (e) {
         this._error = String((e && e.message) || e);

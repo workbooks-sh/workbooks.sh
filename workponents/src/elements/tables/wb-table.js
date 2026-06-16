@@ -19,12 +19,17 @@
 //     <work-column field="rev" label="Revenue" align="right" format="usd"></work-column>
 //   </work-table>
 //
+// Usage (bind to a <work-query> by name — the canonical data binding):
+//   <work-query name="orders" sql="SELECT region, rev FROM sales"></work-query>
+//   <work-table from="orders" query="SELECT region, sum(rev) AS rev FROM orders GROUP BY region"></work-table>
+//
 // Usage (register elsewhere, query a named source):
 //   <work-table src-name="orders" query="SELECT region, sum(rev) AS rev FROM orders GROUP BY region"></work-table>
 //
 // Attributes:
 //   rows        inline JSON array of row objects (registers an auto-named source)
 //   csv         inline CSV text (header row)
+//   from        name of a <work-query> dataset to read (the canonical binding)
 //   src-name    name of a source registered via getEngine().register(...)
 //   query       full SQL to run (overrides the default SELECT * over src-name)
 //   page-size   rows rendered per virtual window (default 50)
@@ -50,7 +55,7 @@ let _autoId = 0;
 
 export class WbTable extends WbElement {
   static variants = VARIANTS;
-  static props = [...variantAttrs(VARIANTS), "rows", "csv", "src-name", "query", "page-size", "searchable"];
+  static props = [...variantAttrs(VARIANTS), "rows", "csv", "src-name", "from", "query", "page-size", "searchable"];
 
   static styles = css`
     :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
@@ -120,11 +125,16 @@ export class WbTable extends WbElement {
     this._load();
   }
 
+  // A named source: from="<work-query name>" is the canonical binding; src-name is
+  // the equivalent register()-side name. Either names a source the engine resolves.
+  _namedSource() { return this.attr("from") || this.attr("src-name"); }
+
   _captureSource() {
-    // src-name wins; else inline rows/csv become an auto-named source. The auto
-    // name is assigned ONCE per element — re-capture (e.g. an attr change) must
-    // not mint a new id, or the query would target a name we never registered.
-    this._srcName = this.attr("src-name");
+    // A named source (from=/src-name) wins; else inline rows/csv become an
+    // auto-named source. The auto name is assigned ONCE per element — re-capture
+    // (e.g. an attr change) must not mint a new id, or the query would target a
+    // name we never registered.
+    this._srcName = this._namedSource();
     if (!this._srcName) {
       const rowsAttr = this.attr("rows");
       const csvAttr = this.attr("csv");
@@ -151,7 +161,7 @@ export class WbTable extends WbElement {
   attributeChangedCallback(name, old, val) {
     super.attributeChangedCallback(name, old, val); // keep Lit's reactive props in sync
     if (!this._init) return;
-    if (name === "rows" || name === "csv" || name === "src-name" || name === "query") {
+    if (name === "rows" || name === "csv" || name === "src-name" || name === "from" || name === "query") {
       this._pendingSource = null;
       this._captureSource();
       this._load();
@@ -178,7 +188,7 @@ export class WbTable extends WbElement {
       this._busy = true; this._error = null; this.requestUpdate();
       try {
         if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
-        else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
+        else if (this._namedSource()) await this._engine.whenRegistered(this._srcName);
         await this._run();
       } catch (e) {
         this._error = String(e && e.message || e);

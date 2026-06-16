@@ -1,6 +1,6 @@
 //! Local verbs — run entirely in the CLI, no runtime needed.
 //!
-//! - assembly: `bundle` renders the org via the embedded kernel and packs the
+//! - assembly: `bundle` renders the Work source via the embedded kernel and packs the
 //!   same `.wbundle` zip the runtime's `Workbooks.Bundle.ship/4` produces
 //!   (workbook.html + vfs.sqlite + manifest.json, format `wbundle/1`);
 //!   `unbundle` is the inverse.
@@ -19,43 +19,43 @@ use std::io::Write as _;
 
 // ─────────────────────────── assembly ───────────────────────────
 
-/// Resolve the org source: a `.org` file, or a dir containing `workbook.org`
-/// (else exactly one `.org` file).
+/// Resolve the Work source: a source file, or a dir containing `workbook.work`
+/// (else exactly one `.work` file).
 pub(crate) fn find_org(src: &str) -> Result<std::path::PathBuf> {
     let p = std::path::Path::new(src);
     if p.is_file() {
         return Ok(p.to_path_buf());
     }
-    let wb = p.join("workbook.org");
+    let wb = p.join("workbook.work");
     if wb.is_file() {
         return Ok(wb);
     }
-    let orgs: Vec<_> = std::fs::read_dir(p)
+    let srcs: Vec<_> = std::fs::read_dir(p)
         .with_context(|| format!("read dir {src}"))?
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.extension().map(|e| e == "org").unwrap_or(false))
+        .filter(|p| p.extension().map(|e| e == "work").unwrap_or(false))
         .collect();
-    match orgs.as_slice() {
+    match srcs.as_slice() {
         [one] => Ok(one.clone()),
-        [] => bail!("no .org source in {src} (want workbook.org)"),
-        _ => bail!("multiple .org files in {src} — name one workbook.org or pass it explicitly"),
+        [] => bail!("no .work source in {src} (want workbook.work)"),
+        _ => bail!("multiple .work files in {src} — name one workbook.work or pass it explicitly"),
     }
 }
 
 pub fn bundle(io: &dyn Io, src: &str, out: Option<&str>) -> Result<String> {
-    let org_path = find_org(src)?;
-    let org = String::from_utf8(io.read(&org_path.to_string_lossy())?)?;
-    let stem = org_path.file_stem().unwrap_or_default().to_string_lossy().to_string();
-    let html = oql::render(&org);
+    let src_path = find_org(src)?;
+    let source = String::from_utf8(io.read(&src_path.to_string_lossy())?)?;
+    let stem = src_path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let html = oql::render(&source);
 
     // diagnostics gate: refuse to assemble a workbook that doesn't lint clean
-    let diags = oql::validate(&org);
+    let diags = oql::validate(&source);
     if diags != "[]" {
         bail!("source has diagnostics — fix them first (wb lint):\n{diags}");
     }
 
     // sibling vfs.sqlite travels with the workbook when present
-    let vfs = org_path.parent().map(|d| d.join("vfs.sqlite")).filter(|p| p.is_file());
+    let vfs = src_path.parent().map(|d| d.join("vfs.sqlite")).filter(|p| p.is_file());
 
     let manifest = serde_json::json!({
         "id": stem,
@@ -75,8 +75,8 @@ pub fn bundle(io: &dyn Io, src: &str, out: Option<&str>) -> Result<String> {
         z.start_file("workbook.html", o)?;
         z.write_all(html.as_bytes())?;
         // source travels with the artifact — recipients can unbundle + re-author
-        z.start_file("workbook.org", o)?;
-        z.write_all(org.as_bytes())?;
+        z.start_file("workbook.work", o)?;
+        z.write_all(source.as_bytes())?;
         if let Some(v) = &vfs {
             z.start_file("vfs.sqlite", o)?;
             z.write_all(&io.read(&v.to_string_lossy())?)?;
@@ -88,7 +88,7 @@ pub fn bundle(io: &dyn Io, src: &str, out: Option<&str>) -> Result<String> {
     io.write(&out_path, &buf)?;
     Ok(format!(
         "bundled {} → {out_path} ({} bytes{})",
-        org_path.display(),
+        src_path.display(),
         buf.len(),
         if vfs.is_some() { ", with vfs.sqlite" } else { "" }
     ))
@@ -367,7 +367,7 @@ fn publish_validate(io: &dyn Io) -> Result<(String, String)> {
 
 /// Extract the html to ship: a bare `.html`, or `workbook.html` out of a `.wbundle`.
 fn shippable_html(io: &dyn Io, workbook: &str) -> Result<Vec<u8>> {
-    if workbook.ends_with(".org") {
+    if workbook.ends_with(".work") {
         bail!("publish ships ASSEMBLED workbooks — run `wb bundle {workbook}` first");
     }
     let bytes = io.read(workbook)?;
@@ -515,38 +515,27 @@ pub fn init(name: &str, template: &str) -> Result<String> {
         bail!("{name} already exists");
     }
     std::fs::create_dir_all(dir.join("data")).with_context(|| format!("create {name}/data"))?;
-    let org = format!(
-        "#+TITLE: {name}
-
-         * {name}
-
-         A new workbook. Prose, data, and code live together in this file —
-         edit it, then preview with =wbx dev= and assemble with =wbx bundle=.
-
-         ** notes
-
-         - [ ] say what this workbook is for
-         - [ ] put source data in =data/=
-
-         ** code
-
-         #+begin_src javascript
-         // code blocks tangle into the workbook
-         #+end_src
-"
+    // The Work format: one mechanism — `work-*` elements + nesting + prose. The
+    // `.work` shorthand expands 1:1 into the shipped HTML. See docs/WORK-FORMAT.md.
+    let src = format!(
+        "work-flow \"{name}\"\n  \
+         A new workbook. Prose, data, and code live together as work-* elements —\n  \
+         edit it, then preview with `wbx dev` and assemble with `wbx bundle`.\n  \
+         work-component \"main\" lang=javascript\n    \
+         // code blocks tangle into the workbook\n"
     );
-    let org_path = dir.join("workbook.org");
-    std::fs::write(&org_path, &org).with_context(|| format!("write {}", org_path.display()))?;
+    let src_path = dir.join("workbook.work");
+    std::fs::write(&src_path, &src).with_context(|| format!("write {}", src_path.display()))?;
 
     // the scaffold must satisfy its own toolchain — refuse to ship a template
     // that doesn't lint clean
-    let diags = oql::validate(&org);
+    let diags = oql::validate(&src);
     if diags != "[]" {
         bail!("template bug: scaffold has diagnostics:\n{diags}");
     }
     Ok(format!(
         "{name}/
-  workbook.org   the source — prose + tasks + code
+  workbook.work  the source — prose + tasks + code as work-* elements
   data/          files that travel with it
 
 next: cd {name} && wbx dev"

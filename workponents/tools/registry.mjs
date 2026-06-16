@@ -59,6 +59,8 @@ const DOMAIN_TAGLINES = {
   git: "Version surfaces — diff, history graph, restore, undo.",
   live: "Realtime presence — room, presence, live value.",
   maps: "Geospatial — a map as a view over a spatial query.",
+  pm: "Project management — task, board, sprint, milestone.",
+  flow: "Agentic structure — flow (sequenced steps + build edges) and loop (cron jobs).",
   presentation: "Slide decks — deck and slide.",
   records: "Structured records — record, record-list, field-value.",
   search: "Search & command — search box, command palette, command item.",

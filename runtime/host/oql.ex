@@ -1,9 +1,11 @@
 defmodule Workbooks.OQL do
   @moduledoc """
-  The Org kernel. Loads `oql.wasm` — a WIT-typed Component (the `workbooks:oql`
-  world) — and reads Org structure: query (parse_headlines), the WIT-world build
-  plan (tangle_plan), validation, the upgrade gate, and render. One shared
-  kernel; the same component the browser viewer and Package Manager use.
+  The Work kernel. Loads `oql.wasm` — a WIT-typed Component (the `workbooks:oql`
+  world) — and reads `work-*` structure: query (parse_headlines), the WIT-world
+  build plan (tangle_plan), validation, the upgrade gate, and render. One shared
+  kernel; the same component the browser viewer and Package Manager use. The
+  export names are stable; the front-end is the Work format. See
+  docs/WORK-FORMAT.md.
 
   The kernel rides the Component Model it imposes on user code: every export is
   string→string, called through `Wasmex.Components` — no hand-rolled ptr/len
@@ -20,24 +22,24 @@ defmodule Workbooks.OQL do
 
   def start_link(_), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
 
-  @doc "Parse Org → list of headline maps (level, title, state, id, tags, props)."
-  def parse_headlines(org) when is_binary(org), do: call_json("parse-headlines", [org])
+  @doc "Parse Work → list of node maps (level, title, state, id, tags, props)."
+  def parse_headlines(src) when is_binary(src), do: call_json("parse-headlines", [src])
 
-  @doc "Lint Org → list of diagnostics."
-  def lint(org) when is_binary(org), do: call_json("lint", [org])
+  @doc "Lint Work → list of diagnostics."
+  def lint(src) when is_binary(src), do: call_json("lint", [src])
 
-  @doc "Emit the WIT-world-shaped build plan from a literate Workbook."
-  def tangle_plan(org) when is_binary(org), do: call_json("tangle-plan", [org])
+  @doc "Emit the WIT-world-shaped build plan from a Work workbook."
+  def tangle_plan(src) when is_binary(src), do: call_json("tangle-plan", [src])
 
-  @doc "Validate a literate Workbook → diagnostics (dangling inputs, missing language)."
-  def validate(org) when is_binary(org), do: call_json("validate", [org])
+  @doc "Validate a Work workbook → diagnostics (dangling inputs, missing language)."
+  def validate(src) when is_binary(src), do: call_json("validate", [src])
 
   @doc "Gate an upgrade: diff a deployed Workbook vs a new one, refuse breaking changes."
   def check_upgrade(old, new) when is_binary(old) and is_binary(new),
     do: call_json("check-upgrade", [old, new])
 
-  @doc "Render Org → rich HTML (orgize, inside the kernel). Returns a raw string."
-  def render(org) when is_binary(org), do: GenServer.call(__MODULE__, {:call, "render", [org]})
+  @doc "Render Work → `work-*` HTML (inside the kernel). Returns a raw string."
+  def render(src) when is_binary(src), do: GenServer.call(__MODULE__, {:call, "render", [src]})
 
   defp call_json(fun, args), do: GenServer.call(__MODULE__, {:call_json, fun, args})
 

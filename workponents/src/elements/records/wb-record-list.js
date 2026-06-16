@@ -14,7 +14,12 @@
 //     key="id" title-field="name" subtitle-field="tier"
 //     fields="mrr" formats="mrr:usd" searchable></work-record-list>
 //
+// Usage (bind to a <work-query> by name — the canonical data binding):
+//   <work-query name="customers" sql="SELECT * FROM crm_customers"></work-query>
+//   <work-record-list from="customers" key="id" title-field="name"></work-record-list>
+//
 // Attributes:
+//   from           name of a <work-query> dataset to read (the canonical binding)
 //   src-name       a source registered via getEngine().register(...)
 //   query          full SQL over the source (default SELECT * over src-name)
 //   key            the identifying column emitted on select (default "id")
@@ -45,7 +50,7 @@ export class WbRecordList extends WbElement {
   static variants = VARIANTS;
   static props = [
     ...variantAttrs(VARIANTS),
-    "src-name", "query", "key", "title-field", "subtitle-field", "fields",
+    "src-name", "from", "query", "key", "title-field", "subtitle-field", "fields",
     "formats", "searchable", "selected",
   ];
 
@@ -116,10 +121,14 @@ export class WbRecordList extends WbElement {
     this._load();
   }
 
+  // A named source: from="<work-query name>" is the canonical binding; src-name is
+  // the equivalent register()-side name. Either names a source the engine resolves.
+  _namedSource() { return this.attr("from") || this.attr("src-name"); }
+
   attributeChangedCallback(name, old, val) {
     super.attributeChangedCallback(name, old, val);
     if (!this._connected) return;
-    if (name === "src-name" || name === "query") { this._load(); }
+    if (name === "src-name" || name === "from" || name === "query") { this._load(); }
   }
 
   async _load() {
@@ -129,7 +138,7 @@ export class WbRecordList extends WbElement {
       this._loadAgain = false;
       this._busy = true; this._error = null; this.requestUpdate();
       try {
-        const sname = this.attr("src-name");
+        const sname = this._namedSource();
         if (sname) await this._engine.whenRegistered(sname);
         await this._run();
       } catch (e) {
@@ -156,7 +165,7 @@ export class WbRecordList extends WbElement {
 
   _buildSql() {
     const base = this.attr("query");
-    const name = this.attr("src-name");
+    const name = this._namedSource();
     const from = base ? `(${base.replace(/;$/, "")}) AS _q` : ident(name || "");
     let sql = `SELECT * FROM ${from}`;
     if (this._filter) {

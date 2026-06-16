@@ -9,8 +9,8 @@ fn wbx() -> Command {
 fn json_envelope_on_success() {
     let dir = std::env::temp_dir().join("wbx-mode-test");
     std::fs::create_dir_all(&dir).unwrap();
-    let f = dir.join("ok.org");
-    std::fs::write(&f, "* hello\n").unwrap();
+    let f = dir.join("ok.work");
+    std::fs::write(&f, "work-task \"hello\"\n").unwrap();
     let out = wbx().args(["--json", "query", f.to_str().unwrap()]).output().unwrap();
     assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("stdout is one JSON envelope");
@@ -33,8 +33,8 @@ fn json_envelope_and_code_on_not_found() {
 fn piped_default_is_plain_text_no_envelope() {
     let dir = std::env::temp_dir().join("wbx-mode-test");
     std::fs::create_dir_all(&dir).unwrap();
-    let f = dir.join("plain.org");
-    std::fs::write(&f, "* hello\n").unwrap();
+    let f = dir.join("plain.work");
+    std::fs::write(&f, "work-task \"hello\"\n").unwrap();
     // .output() pipes stdout → auto agent mode: plain text, not an envelope
     let out = wbx().args(["query", f.to_str().unwrap()]).output().unwrap();
     assert!(out.status.success());
@@ -56,7 +56,7 @@ fn init_scaffold_lints_and_bundles() {
     let name = dir.join("demo");
     let out = wbx().args(["init", name.to_str().unwrap()]).output().unwrap();
     assert!(out.status.success(), "init: {}", String::from_utf8_lossy(&out.stderr));
-    let org = name.join("workbook.org");
+    let org = name.join("workbook.work");
     assert!(org.is_file() && name.join("data").is_dir());
     // the scaffold must satisfy the rest of the toolchain
     let lint = wbx().args(["lint", org.to_str().unwrap()]).output().unwrap();

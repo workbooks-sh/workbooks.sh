@@ -13,8 +13,8 @@
     "validate"
   ],
   "totals": {
-    "components": 45,
-    "domains": 17
+    "components": 52,
+    "domains": 20
   },
   "domains": [
     {
@@ -226,6 +226,30 @@
       ]
     },
     {
+      "domain": "data",
+      "tagline": "",
+      "components": [
+        {
+          "name": "work-query",
+          "attributes": [
+            "name",
+            "db",
+            "sql",
+            "provider",
+            "debug"
+          ],
+          "events": [
+            "work-query-ready",
+            "work-query-error"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "data-viz",
       "tagline": "A chart is a live view over a query — chart, spark, metric.",
       "components": [
@@ -236,6 +260,7 @@
             "size",
             "variant",
             "src-name",
+            "from",
             "query",
             "rows",
             "csv",
@@ -425,6 +450,37 @@
           "events": [
             "work-file-open"
           ],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "flow",
+      "tagline": "Agentic structure — flow (sequenced steps + build edges) and loop (cron jobs).",
+      "components": [
+        {
+          "name": "work-flow",
+          "attributes": [
+            "title",
+            "in",
+            "out",
+            "deps"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "work-loop",
+          "attributes": [
+            "title",
+            "cron",
+            "status"
+          ],
+          "events": [],
           "registryDependencies": [
             "theme"
           ]
@@ -648,6 +704,62 @@
       ]
     },
     {
+      "domain": "pm",
+      "tagline": "Project management — task, board, sprint, milestone.",
+      "components": [
+        {
+          "name": "work-board",
+          "attributes": [
+            "title",
+            "columns"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "work-milestone",
+          "attributes": [
+            "title",
+            "due",
+            "done"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "work-sprint",
+          "attributes": [
+            "title",
+            "start",
+            "end"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "work-task",
+          "attributes": [
+            "status",
+            "title",
+            "assignee",
+            "due",
+            "estimate",
+            "priority"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "presentation",
       "tagline": "Slide decks — deck and slide.",
       "components": [
@@ -667,7 +779,9 @@
             "work-slide-change",
             "work-export-start",
             "work-export",
-            "work-export-error"
+            "work-deck-export",
+            "work-export-error",
+            "work-deck-import"
           ],
           "registryDependencies": [
             "theme"
@@ -741,6 +855,7 @@
             "layout",
             "variant",
             "src-name",
+            "from",
             "query",
             "key",
             "title-field",
@@ -863,6 +978,7 @@
             "rows",
             "csv",
             "src-name",
+            "from",
             "query",
             "page-size",
             "searchable"

@@ -124,7 +124,7 @@ defmodule Workbooks.CLI do
       # only (the '..' guard then keeps them from climbing out).
       Path.type(to_string(path)) == :absolute -> ~s({"error":"only relative paths allowed"})
       String.contains?(to_string(path), "..") -> ~s({"error":"bad path"})
-      Path.extname(abs) != ".org" -> ~s({"error":"only .org files can be read"})
+      Path.extname(abs) not in [".work", ".org"] -> ~s({"error":"only .work files can be read"})
       not File.regular?(abs) -> ~s({"error":"no such file"})
       true -> fun.(File.read!(abs))
     end
@@ -276,7 +276,7 @@ defmodule Workbooks.CLI do
       |> Bundle.compile_tree(build: build?)
 
     blob = Bundle.pack(parts)
-    html = parts["index.html"] || parts["workbook.html"] || OQL.render(parts["source.org"] || parts["workbook.org"] || "")
+    html = parts["index.html"] || parts["workbook.html"] || OQL.render(parts["source.work"] || parts["workbook.work"] || parts["source.org"] || parts["workbook.org"] || "")
 
     # The page carries BOTH the wb-bundle zip (the filesystem) AND the work-islands
     # manifest (the declarative STRUCTURE — the node table over the same tree, see

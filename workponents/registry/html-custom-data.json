@@ -26,6 +26,24 @@
       ]
     },
     {
+      "name": "work-board",
+      "description": "Copy-in of <work-board> and its transitive dependency set (core + tokens).\n\nDomain: pm. Install: copy-in via the workponents registry (work-board + theme).",
+      "attributes": [
+        {
+          "name": "title"
+        },
+        {
+          "name": "columns"
+        }
+      ],
+      "references": [
+        {
+          "name": "workponents",
+          "url": "https://workbooks.sh"
+        }
+      ]
+    },
+    {
       "name": "work-button",
       "description": "Copy-in of <work-button> and its transitive dependency set (core + tokens).\n\nDomain: core. Install: copy-in via the workponents registry (work-button + theme).",
       "attributes": [
@@ -64,6 +82,9 @@
         },
         {
           "name": "src-name"
+        },
+        {
+          "name": "from"
         },
         {
           "name": "query"
@@ -607,6 +628,30 @@
       ]
     },
     {
+      "name": "work-flow",
+      "description": "Copy-in of <work-flow> and its transitive dependency set (core + tokens).\n\nDomain: flow. Install: copy-in via the workponents registry (work-flow + theme).",
+      "attributes": [
+        {
+          "name": "title"
+        },
+        {
+          "name": "in"
+        },
+        {
+          "name": "out"
+        },
+        {
+          "name": "deps"
+        }
+      ],
+      "references": [
+        {
+          "name": "workponents",
+          "url": "https://workbooks.sh"
+        }
+      ]
+    },
+    {
       "name": "work-form",
       "description": "Copy-in of <work-form> and its transitive dependency set (core + validate + tokens).\n\nDomain: forms. Install: copy-in via the workponents registry (work-form + theme + validate).",
       "attributes": [
@@ -717,6 +762,27 @@
         },
         {
           "name": "value"
+        }
+      ],
+      "references": [
+        {
+          "name": "workponents",
+          "url": "https://workbooks.sh"
+        }
+      ]
+    },
+    {
+      "name": "work-loop",
+      "description": "Copy-in of <work-loop> and its transitive dependency set (core + tokens).\n\nDomain: flow. Install: copy-in via the workponents registry (work-loop + theme).",
+      "attributes": [
+        {
+          "name": "title"
+        },
+        {
+          "name": "cron"
+        },
+        {
+          "name": "status"
         }
       ],
       "references": [
@@ -856,6 +922,27 @@
       ]
     },
     {
+      "name": "work-milestone",
+      "description": "Copy-in of <work-milestone> and its transitive dependency set (core + tokens).\n\nDomain: pm. Install: copy-in via the workponents registry (work-milestone + theme).",
+      "attributes": [
+        {
+          "name": "title"
+        },
+        {
+          "name": "due"
+        },
+        {
+          "name": "done"
+        }
+      ],
+      "references": [
+        {
+          "name": "workponents",
+          "url": "https://workbooks.sh"
+        }
+      ]
+    },
+    {
       "name": "work-model",
       "description": "Copy-in of <work-model> and its transitive dependency set (core + tokens).\n\nDomain: 3d. Install: copy-in via the workponents registry (work-model + theme).",
       "attributes": [
@@ -949,6 +1036,33 @@
       ]
     },
     {
+      "name": "work-query",
+      "description": "Copy-in of <work-query> and its transitive dependency set (core + data + tokens).\n\nDomain: data. Install: copy-in via the workponents registry (work-query + theme + data).",
+      "attributes": [
+        {
+          "name": "name"
+        },
+        {
+          "name": "db"
+        },
+        {
+          "name": "sql"
+        },
+        {
+          "name": "provider"
+        },
+        {
+          "name": "debug"
+        }
+      ],
+      "references": [
+        {
+          "name": "workponents",
+          "url": "https://workbooks.sh"
+        }
+      ]
+    },
+    {
       "name": "work-record",
       "description": "Copy-in of <work-record> and its transitive dependency set (core + data + tokens).\n\nDomain: records. Install: copy-in via the workponents registry (work-record + theme + data).",
       "attributes": [
@@ -1011,6 +1125,9 @@
         },
         {
           "name": "src-name"
+        },
+        {
+          "name": "from"
         },
         {
           "name": "query"
@@ -1237,6 +1354,27 @@
       ]
     },
     {
+      "name": "work-sprint",
+      "description": "Copy-in of <work-sprint> and its transitive dependency set (core + tokens).\n\nDomain: pm. Install: copy-in via the workponents registry (work-sprint + theme).",
+      "attributes": [
+        {
+          "name": "title"
+        },
+        {
+          "name": "start"
+        },
+        {
+          "name": "end"
+        }
+      ],
+      "references": [
+        {
+          "name": "workponents",
+          "url": "https://workbooks.sh"
+        }
+      ]
+    },
+    {
       "name": "work-table",
       "description": "Copy-in of <work-table> and its transitive dependency set (core + data + tokens).\n\nDomain: tables. Install: copy-in via the workponents registry (work-table + theme + data).",
       "attributes": [
@@ -1256,6 +1394,9 @@
           "name": "src-name"
         },
         {
+          "name": "from"
+        },
+        {
           "name": "query"
         },
         {
@@ -1263,6 +1404,36 @@
         },
         {
           "name": "searchable"
+        }
+      ],
+      "references": [
+        {
+          "name": "workponents",
+          "url": "https://workbooks.sh"
+        }
+      ]
+    },
+    {
+      "name": "work-task",
+      "description": "Copy-in of <work-task> and its transitive dependency set (core + tokens).\n\nDomain: pm. Install: copy-in via the workponents registry (work-task + theme).",
+      "attributes": [
+        {
+          "name": "status"
+        },
+        {
+          "name": "title"
+        },
+        {
+          "name": "assignee"
+        },
+        {
+          "name": "due"
+        },
+        {
+          "name": "estimate"
+        },
+        {
+          "name": "priority"
         }
       ],
       "references": [

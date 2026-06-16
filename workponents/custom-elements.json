@@ -494,6 +494,9 @@
               "name": "src-name"
             },
             {
+              "name": "from"
+            },
+            {
               "name": "query"
             },
             {
@@ -673,6 +676,54 @@
           "declaration": {
             "name": "WbSpark",
             "module": "src/elements/data-viz/wb-spark.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elements/data/work-query.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-query",
+          "name": "WorkQuery",
+          "domain": "data",
+          "attributes": [
+            {
+              "name": "name"
+            },
+            {
+              "name": "db"
+            },
+            {
+              "name": "sql"
+            },
+            {
+              "name": "provider"
+            },
+            {
+              "name": "debug"
+            }
+          ],
+          "events": [
+            {
+              "name": "work-query-ready"
+            },
+            {
+              "name": "work-query-error"
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-query",
+          "declaration": {
+            "name": "WorkQuery",
+            "module": "src/elements/data/work-query.js"
           }
         }
       ]
@@ -992,6 +1043,79 @@
           "declaration": {
             "name": "WbFile",
             "module": "src/elements/files/wb-file.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elements/flow/work-flow.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-flow",
+          "name": "WorkFlow",
+          "domain": "flow",
+          "attributes": [
+            {
+              "name": "title"
+            },
+            {
+              "name": "in"
+            },
+            {
+              "name": "out"
+            },
+            {
+              "name": "deps"
+            }
+          ],
+          "events": []
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-flow",
+          "declaration": {
+            "name": "WorkFlow",
+            "module": "src/elements/flow/work-flow.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elements/flow/work-loop.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-loop",
+          "name": "WorkLoop",
+          "domain": "flow",
+          "attributes": [
+            {
+              "name": "title"
+            },
+            {
+              "name": "cron"
+            },
+            {
+              "name": "status"
+            }
+          ],
+          "events": []
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-loop",
+          "declaration": {
+            "name": "WorkLoop",
+            "module": "src/elements/flow/work-loop.js"
           }
         }
       ]
@@ -1539,6 +1663,152 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elements/pm/work-board.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-board",
+          "name": "WorkBoard",
+          "domain": "pm",
+          "attributes": [
+            {
+              "name": "title"
+            },
+            {
+              "name": "columns"
+            }
+          ],
+          "events": []
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-board",
+          "declaration": {
+            "name": "WorkBoard",
+            "module": "src/elements/pm/work-board.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elements/pm/work-milestone.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-milestone",
+          "name": "WorkMilestone",
+          "domain": "pm",
+          "attributes": [
+            {
+              "name": "title"
+            },
+            {
+              "name": "due"
+            },
+            {
+              "name": "done"
+            }
+          ],
+          "events": []
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-milestone",
+          "declaration": {
+            "name": "WorkMilestone",
+            "module": "src/elements/pm/work-milestone.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elements/pm/work-sprint.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-sprint",
+          "name": "WorkSprint",
+          "domain": "pm",
+          "attributes": [
+            {
+              "name": "title"
+            },
+            {
+              "name": "start"
+            },
+            {
+              "name": "end"
+            }
+          ],
+          "events": []
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-sprint",
+          "declaration": {
+            "name": "WorkSprint",
+            "module": "src/elements/pm/work-sprint.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elements/pm/work-task.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-task",
+          "name": "WorkTask",
+          "domain": "pm",
+          "attributes": [
+            {
+              "name": "status"
+            },
+            {
+              "name": "title"
+            },
+            {
+              "name": "assignee"
+            },
+            {
+              "name": "due"
+            },
+            {
+              "name": "estimate"
+            },
+            {
+              "name": "priority"
+            }
+          ],
+          "events": []
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-task",
+          "declaration": {
+            "name": "WorkTask",
+            "module": "src/elements/pm/work-task.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elements/presentation/work-deck.js",
       "declarations": [
         {
@@ -1713,6 +1983,9 @@
             },
             {
               "name": "src-name"
+            },
+            {
+              "name": "from"
             },
             {
               "name": "query"
@@ -2084,6 +2357,9 @@
             },
             {
               "name": "src-name"
+            },
+            {
+              "name": "from"
             },
             {
               "name": "query"

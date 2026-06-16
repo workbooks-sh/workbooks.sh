@@ -3,7 +3,7 @@ defmodule Workbooks.Bundle.Islands do
   The declarative config-island layer over the bundle compiler (see
   `docs/WORKBOOK-COMPOSITION-MODEL.md`). A workbook's STRUCTURE is expressed as
   typed `<work-*>` custom elements; this module is the **bijection** between those
-  islands and the org/tree the runtime already eats — it adds NO new IO and rewrites
+  islands and the file tree the runtime already eats — it adds NO new IO and rewrites
   none of `Workbooks.Bundle`/`AgentDef`/`Toolkits`.
 
   Two directions:
