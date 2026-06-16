@@ -1,9 +1,9 @@
-// <work-doc-import> — a token-only dropzone that imports a .docx into a sibling
-// <work-doc>. The docx → org/markdown conversion is the docx-io floor adapter;
+// <document-import> — a token-only dropzone that imports a .docx into a sibling
+// <document-view>. The docx → org/markdown conversion is the docx-io floor adapter;
 // this element is just the affordance (drop / pick a file) wired to the target
-// doc's importDocxBuffer(). Bind a target by `for="<work-doc id>"`.
+// doc's importDocxBuffer(). Bind a target by `for="<document-view id>"`.
 //
-// Emits `work-doc-import {ok, name, error?}` after each attempt. No color literals
+// Emits `document-import {ok, name, error?}` after each attempt. No color literals
 // — every surface reads from --work-* (gate-a/design-lint clean).
 import { WbElement, html, css, define } from "../../core/element.js";
 
@@ -34,16 +34,16 @@ export class WbDocImport extends WbElement {
   _target() {
     const id = this.attr("for");
     if (id) return (this.getRootNode().getElementById?.(id)) || document.getElementById(id);
-    // default: the next <work-doc> sibling
+    // default: the next <document-view> sibling
     let n = this.nextElementSibling;
-    while (n && n.tagName !== "WORK-DOC") n = n.nextElementSibling;
+    while (n && n.tagName !== "DOCUMENT-VIEW") n = n.nextElementSibling;
     return n;
   }
 
   async _ingest(file) {
     const doc = this._target();
     if (!doc || typeof doc.importDocxBuffer !== "function") {
-      this._fail(file?.name, "no target work-doc");
+      this._fail(file?.name, "no target document-view");
       return;
     }
     this._state = "busy"; this.requestUpdate();
@@ -52,7 +52,7 @@ export class WbDocImport extends WbElement {
       await doc.importDocxBuffer(buf);
       const ok = !doc._error;
       this._state = ok ? "idle" : "err"; this.requestUpdate();
-      this.dispatchEvent(new CustomEvent("work-doc-import", { bubbles: true, composed: true, detail: { ok, name: file.name, error: doc._error || undefined } }));
+      this.dispatchEvent(new CustomEvent("document-import", { bubbles: true, composed: true, detail: { ok, name: file.name, error: doc._error || undefined } }));
     } catch (e) {
       this._fail(file.name, String(e.message || e));
     }
@@ -60,7 +60,7 @@ export class WbDocImport extends WbElement {
 
   _fail(name, error) {
     this._state = "err"; this.requestUpdate();
-    this.dispatchEvent(new CustomEvent("work-doc-import", { bubbles: true, composed: true, detail: { ok: false, name, error } }));
+    this.dispatchEvent(new CustomEvent("document-import", { bubbles: true, composed: true, detail: { ok: false, name, error } }));
   }
 
   render() {
@@ -78,4 +78,4 @@ export class WbDocImport extends WbElement {
   }
 }
 
-define("work-doc-import", WbDocImport);
+define("document-import", WbDocImport);

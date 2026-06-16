@@ -82,7 +82,7 @@ function splitHeading(raw) {
   return { state, tags, text };
 }
 
-// The heading outline (used by work-doc-outline + work-doc cross-sync).
+// The heading outline (used by document-outline + document-view cross-sync).
 export function parseOutline(src) {
   const out = [];
   let inFence = false;
@@ -99,8 +99,8 @@ export function parseOutline(src) {
 }
 
 // The core: markdown/org source → HTML string. Fenced/src blocks whose lang is
-// a known compute language are handed to `onCell` so work-doc can mount a live
-// <work-doc-cell>; everything else renders as a <pre>.
+// a known compute language are handed to `onCell` so document-view can mount a live
+// <document-cell>; everything else renders as a <pre>.
 export function renderDoc(src, { onCell } = {}) {
   const lines = String(src).replace(/\r\n?/g, "\n").split("\n");
   const html = [];

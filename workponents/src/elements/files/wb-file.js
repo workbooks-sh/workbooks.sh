@@ -1,4 +1,4 @@
-// <work-file> — a single file card with an inline, type-aware preview.
+// <file-card> — a single file card with an inline, type-aware preview.
 //
 // The files reinvention: a file is a content-addressed RECORD, so previewing it
 // is a question of resolving its bytes and rendering them by `type` — image /
@@ -16,9 +16,9 @@
 //   • otherwise — a typed placeholder + metadata (degraded but complete)
 //
 // Usage:
-//   <work-file name="logo.svg" type="image/svg+xml" src="./logo.svg"></work-file>
-//   <work-file name="readme.md" type="text/markdown" text="# Hello"></work-file>
-//   <work-file name="clip.mp4" type="video/mp4" path="blobs/abc" size="91234"></work-file>
+//   <file-card name="logo.svg" type="image/svg+xml" src="./logo.svg"></file-card>
+//   <file-card name="readme.md" type="text/markdown" text="# Hello"></file-card>
+//   <file-card name="clip.mp4" type="video/mp4" path="blobs/abc" size="91234"></file-card>
 //
 // Attributes:
 //   name      file name (shown as the title)
@@ -274,4 +274,4 @@ export class WbFile extends WbElement {
   }
 }
 
-define("work-file", WbFile);
+define("file-card", WbFile);

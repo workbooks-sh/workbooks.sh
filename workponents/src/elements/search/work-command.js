@@ -1,11 +1,11 @@
-// <work-command> — the ⌘K command palette. THE killer element. A keyboard-driven,
+// <search-command> — the ⌘K command palette. THE killer element. A keyboard-driven,
 // grouped, themed overlay that ranks over TWO sources at once:
-//   1. a COMMAND SET (provided via the `.commands` property or <work-command-item>
+//   1. a COMMAND SET (provided via the `.commands` property or <search-command-item>
 //      slots) — fuzzy-ranked IN-WASM by ./rank.js (subsequence + bonuses). This is
 //      the in-memory ranking the engine's LIKE can't express (ordered relevance,
 //      highlight ranges). Commands map to Dock capabilities / app actions.
 //   2. DATA RESULTS from the shared engine (optional `src-name`/`query`/`fields`) —
-//      each keystroke runs a debounced engine query, exactly like <work-search>:
+//      each keystroke runs a debounced engine query, exactly like <search-box>:
 //      search IS a query. Reach compute ONLY through src/data (getEngine).
 //
 // Open with ⌘K / Ctrl-K (auto-bound while connected) or programmatically via
@@ -14,7 +14,7 @@
 //
 // Properties / attributes:
 //   .commands = [{ id, label, hint?, group?, keywords?, icon?, run?() }]   (property)
-//   <work-command-item id label hint group keywords>   declarative command slots
+//   <search-command-item id label hint group keywords>   declarative command slots
 //   src-name / query / fields / data-label   optional engine-backed data group
 //   data-limit       max data rows (default 6)
 //   placeholder      input placeholder
@@ -129,7 +129,7 @@ export class WorkCommand extends WbElement {
   get commands() { return this._commands; }
 
   _readSlotCommands() {
-    const items = [...this.querySelectorAll("work-command-item")];
+    const items = [...this.querySelectorAll("search-command-item")];
     if (!items.length) return;
     this._commands = items.map((el, i) => ({
       id: el.getAttribute("id") || `cmd_${i}`,
@@ -205,7 +205,7 @@ export class WorkCommand extends WbElement {
   }
 
   // Match tier for the DATA group (the command set is always rank.js): floor =
-  // engine LIKE, minisearch = the powered index. Same resolution as <work-search>.
+  // engine LIKE, minisearch = the powered index. Same resolution as <search-box>.
   _tierChoice() {
     const attr = this.attr("engine");
     if (attr === "floor" || attr === "minisearch") return attr;
@@ -245,7 +245,7 @@ export class WorkCommand extends WbElement {
           try {
             rows = await this._poweredData();
           } catch (e) {
-            if (choice === "minisearch") console.warn("work-command: MiniSearch tier failed, using floor LIKE", e);
+            if (choice === "minisearch") console.warn("search-command: MiniSearch tier failed, using floor LIKE", e);
             rows = null;
           }
         }
@@ -409,7 +409,7 @@ export class WorkCommand extends WbElement {
     if (!e) return;
     if (e.kind === "command") {
       this._emit("work-command-select", { kind: "command", item: e.item, index: i });
-      if (e.item.run) try { e.item.run(e.item); } catch (err) { console.error("[work-command] run failed", err); }
+      if (e.item.run) try { e.item.run(e.item); } catch (err) { console.error("[search-command] run failed", err); }
       if (e.item._el) e.item._el.dispatchEvent(new CustomEvent("select", { bubbles: true, composed: true, detail: { item: e.item } }));
     } else {
       const r = this._dataRows;
@@ -437,9 +437,9 @@ function highlightTerm(text, term) {
   return highlight(t, [[idx, idx + q.length]]);
 }
 
-// A lightweight declarative slot for command authoring (<work-command-item …>).
+// A lightweight declarative slot for command authoring (<search-command-item …>).
 class WorkCommandItem extends HTMLElement {
   connectedCallback() { this.style.display = "none"; }
 }
-define("work-command-item", WorkCommandItem);
-define("work-command", WorkCommand);
+define("search-command-item", WorkCommandItem);
+define("search-command", WorkCommand);

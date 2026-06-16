@@ -9,7 +9,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-model-source",
+          "tagName": "model-source",
           "name": "WorkModelSource",
           "domain": "3d",
           "attributes": [
@@ -32,7 +32,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-model-source",
+          "name": "model-source",
           "declaration": {
             "name": "WorkModelSource",
             "module": "src/elements/3d/work-model-source.js"
@@ -47,7 +47,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-model",
+          "tagName": "model-view",
           "name": "WorkModel",
           "domain": "3d",
           "attributes": [
@@ -98,7 +98,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-model",
+          "name": "model-view",
           "declaration": {
             "name": "WorkModel",
             "module": "src/elements/3d/work-model.js"
@@ -113,7 +113,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-composer",
+          "tagName": "chat-composer",
           "name": "WbComposer",
           "domain": "ai",
           "attributes": [
@@ -137,7 +137,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-composer",
+          "name": "chat-composer",
           "declaration": {
             "name": "WbComposer",
             "module": "src/elements/ai/wb-composer.js"
@@ -152,7 +152,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-gen-block",
+          "tagName": "chat-gen-block",
           "name": "WbGenBlock",
           "domain": "ai",
           "attributes": [
@@ -191,7 +191,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-gen-block",
+          "name": "chat-gen-block",
           "declaration": {
             "name": "WbGenBlock",
             "module": "src/elements/ai/wb-gen-block.js"
@@ -206,7 +206,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-message",
+          "tagName": "chat-message",
           "name": "WbMessage",
           "domain": "ai",
           "attributes": [
@@ -226,7 +226,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-message",
+          "name": "chat-message",
           "declaration": {
             "name": "WbMessage",
             "module": "src/elements/ai/wb-message.js"
@@ -241,7 +241,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-thread",
+          "tagName": "chat-thread",
           "name": "WbThread",
           "domain": "ai",
           "attributes": [
@@ -258,7 +258,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-thread",
+          "name": "chat-thread",
           "declaration": {
             "name": "WbThread",
             "module": "src/elements/ai/wb-thread.js"
@@ -273,7 +273,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-auth",
+          "tagName": "auth-panel",
           "name": "WorkAuth",
           "domain": "auth",
           "attributes": [
@@ -306,7 +306,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-auth",
+          "name": "auth-panel",
           "declaration": {
             "name": "WorkAuth",
             "module": "src/elements/auth/work-auth.js"
@@ -321,7 +321,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-gate",
+          "tagName": "auth-gate",
           "name": "WorkGate",
           "domain": "auth",
           "attributes": [
@@ -339,7 +339,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-gate",
+          "name": "auth-gate",
           "declaration": {
             "name": "WorkGate",
             "module": "src/elements/auth/work-gate.js"
@@ -354,7 +354,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-user",
+          "tagName": "auth-user",
           "name": "WorkUser",
           "domain": "auth",
           "attributes": [
@@ -375,7 +375,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-user",
+          "name": "auth-user",
           "declaration": {
             "name": "WorkUser",
             "module": "src/elements/auth/work-user.js"
@@ -390,7 +390,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-editor",
+          "tagName": "code-editor",
           "name": "WorkEditor",
           "domain": "code",
           "attributes": [
@@ -423,7 +423,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-editor",
+          "name": "code-editor",
           "declaration": {
             "name": "WorkEditor",
             "module": "src/elements/code/work-editor.js"
@@ -438,7 +438,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-repl",
+          "tagName": "code-repl",
           "name": "WorkRepl",
           "domain": "code",
           "attributes": [
@@ -462,7 +462,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-repl",
+          "name": "code-repl",
           "declaration": {
             "name": "WorkRepl",
             "module": "src/elements/code/work-repl.js"
@@ -477,7 +477,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-chart",
+          "tagName": "chart-view",
           "name": "WbChart",
           "domain": "data-viz",
           "attributes": [
@@ -549,7 +549,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-chart",
+          "name": "chart-view",
           "declaration": {
             "name": "WbChart",
             "module": "src/elements/data-viz/wb-chart.js"
@@ -564,7 +564,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-metric",
+          "tagName": "chart-metric",
           "name": "WbMetric",
           "domain": "data-viz",
           "attributes": [
@@ -615,7 +615,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-metric",
+          "name": "chart-metric",
           "declaration": {
             "name": "WbMetric",
             "module": "src/elements/data-viz/wb-metric.js"
@@ -630,7 +630,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-spark",
+          "tagName": "chart-spark",
           "name": "WbSpark",
           "domain": "data-viz",
           "attributes": [
@@ -672,7 +672,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-spark",
+          "name": "chart-spark",
           "declaration": {
             "name": "WbSpark",
             "module": "src/elements/data-viz/wb-spark.js"
@@ -687,7 +687,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-query",
+          "tagName": "data-query",
           "name": "WorkQuery",
           "domain": "data",
           "attributes": [
@@ -720,7 +720,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-query",
+          "name": "data-query",
           "declaration": {
             "name": "WorkQuery",
             "module": "src/elements/data/work-query.js"
@@ -735,7 +735,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-doc-cell",
+          "tagName": "document-cell",
           "name": "WbDocCell",
           "domain": "docs",
           "attributes": [
@@ -764,7 +764,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-doc-cell",
+          "name": "document-cell",
           "declaration": {
             "name": "WbDocCell",
             "module": "src/elements/docs/wb-doc-cell.js"
@@ -779,7 +779,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-doc-import",
+          "tagName": "document-import",
           "name": "WbDocImport",
           "domain": "docs",
           "attributes": [
@@ -792,7 +792,7 @@
           ],
           "events": [
             {
-              "name": "work-doc-import"
+              "name": "document-import"
             }
           ]
         }
@@ -800,7 +800,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-doc-import",
+          "name": "document-import",
           "declaration": {
             "name": "WbDocImport",
             "module": "src/elements/docs/wb-doc-import.js"
@@ -815,7 +815,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-doc-outline",
+          "tagName": "document-outline",
           "name": "WbDocOutline",
           "domain": "docs",
           "attributes": [
@@ -829,7 +829,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-doc-outline",
+          "name": "document-outline",
           "declaration": {
             "name": "WbDocOutline",
             "module": "src/elements/docs/wb-doc-outline.js"
@@ -844,7 +844,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-doc",
+          "tagName": "document-view",
           "name": "WbDoc",
           "domain": "docs",
           "attributes": [
@@ -865,7 +865,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-doc",
+          "name": "document-view",
           "declaration": {
             "name": "WbDoc",
             "module": "src/elements/docs/wb-doc.js"
@@ -880,7 +880,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-drive",
+          "tagName": "file-drive",
           "name": "WbDrive",
           "domain": "files",
           "attributes": [
@@ -940,7 +940,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-drive",
+          "name": "file-drive",
           "declaration": {
             "name": "WbDrive",
             "module": "src/elements/files/wb-drive.js"
@@ -955,7 +955,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-dropzone",
+          "tagName": "file-dropzone",
           "name": "WbDropzone",
           "domain": "files",
           "attributes": [
@@ -979,7 +979,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-dropzone",
+          "name": "file-dropzone",
           "declaration": {
             "name": "WbDropzone",
             "module": "src/elements/files/wb-dropzone.js"
@@ -994,7 +994,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-file",
+          "tagName": "file-card",
           "name": "WbFile",
           "domain": "files",
           "attributes": [
@@ -1039,7 +1039,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-file",
+          "name": "file-card",
           "declaration": {
             "name": "WbFile",
             "module": "src/elements/files/wb-file.js"
@@ -1127,7 +1127,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-field-group",
+          "tagName": "form-field-group",
           "name": "WbFieldGroup",
           "domain": "forms",
           "attributes": [
@@ -1144,7 +1144,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-field-group",
+          "name": "form-field-group",
           "declaration": {
             "name": "WbFieldGroup",
             "module": "src/elements/forms/wb-field-group.js"
@@ -1159,7 +1159,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-field",
+          "tagName": "form-field",
           "name": "WbField",
           "domain": "forms",
           "attributes": [
@@ -1219,7 +1219,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-field",
+          "name": "form-field",
           "declaration": {
             "name": "WbField",
             "module": "src/elements/forms/wb-field.js"
@@ -1234,7 +1234,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-form",
+          "tagName": "form-view",
           "name": "WbForm",
           "domain": "forms",
           "attributes": [
@@ -1267,7 +1267,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-form",
+          "name": "form-view",
           "declaration": {
             "name": "WbForm",
             "module": "src/elements/forms/wb-form.js"
@@ -1282,7 +1282,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-diff",
+          "tagName": "git-diff",
           "name": "WorkDiff",
           "domain": "git",
           "attributes": [
@@ -1305,7 +1305,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-diff",
+          "name": "git-diff",
           "declaration": {
             "name": "WorkDiff",
             "module": "src/elements/git/wb-diff.js"
@@ -1320,7 +1320,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-history-graph",
+          "tagName": "git-history-graph",
           "name": "WorkHistoryGraph",
           "domain": "git",
           "attributes": [
@@ -1341,7 +1341,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-history-graph",
+          "name": "git-history-graph",
           "declaration": {
             "name": "WorkHistoryGraph",
             "module": "src/elements/git/wb-history-graph.js"
@@ -1356,7 +1356,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-restore",
+          "tagName": "git-restore",
           "name": "WorkRestore",
           "domain": "git",
           "attributes": [
@@ -1389,7 +1389,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-restore",
+          "name": "git-restore",
           "declaration": {
             "name": "WorkRestore",
             "module": "src/elements/git/wb-restore.js"
@@ -1404,7 +1404,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-undo",
+          "tagName": "git-undo",
           "name": "WorkUndo",
           "domain": "git",
           "attributes": [
@@ -1434,7 +1434,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-undo",
+          "name": "git-undo",
           "declaration": {
             "name": "WorkUndo",
             "module": "src/elements/git/wb-undo.js"
@@ -1449,7 +1449,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-live-value",
+          "tagName": "live-value",
           "name": "WorkLiveValue",
           "domain": "live",
           "attributes": [
@@ -1479,7 +1479,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-live-value",
+          "name": "live-value",
           "declaration": {
             "name": "WorkLiveValue",
             "module": "src/elements/live/work-live-value.js"
@@ -1494,7 +1494,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-presence",
+          "tagName": "live-presence",
           "name": "WorkPresence",
           "domain": "live",
           "attributes": [
@@ -1521,7 +1521,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-presence",
+          "name": "live-presence",
           "declaration": {
             "name": "WorkPresence",
             "module": "src/elements/live/work-presence.js"
@@ -1536,7 +1536,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-room",
+          "tagName": "live-room",
           "name": "WorkRoom",
           "domain": "live",
           "attributes": [
@@ -1566,7 +1566,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-room",
+          "name": "live-room",
           "declaration": {
             "name": "WorkRoom",
             "module": "src/elements/live/work-room.js"
@@ -1581,7 +1581,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-map",
+          "tagName": "map-view",
           "name": "WbMap",
           "domain": "maps",
           "attributes": [
@@ -1653,7 +1653,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-map",
+          "name": "map-view",
           "declaration": {
             "name": "WbMap",
             "module": "src/elements/maps/wb-map.js"
@@ -1668,7 +1668,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-board",
+          "tagName": "board-view",
           "name": "WorkBoard",
           "domain": "pm",
           "attributes": [
@@ -1685,7 +1685,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-board",
+          "name": "board-view",
           "declaration": {
             "name": "WorkBoard",
             "module": "src/elements/pm/work-board.js"
@@ -1700,7 +1700,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-milestone",
+          "tagName": "board-milestone",
           "name": "WorkMilestone",
           "domain": "pm",
           "attributes": [
@@ -1720,7 +1720,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-milestone",
+          "name": "board-milestone",
           "declaration": {
             "name": "WorkMilestone",
             "module": "src/elements/pm/work-milestone.js"
@@ -1735,7 +1735,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-sprint",
+          "tagName": "board-sprint",
           "name": "WorkSprint",
           "domain": "pm",
           "attributes": [
@@ -1755,7 +1755,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-sprint",
+          "name": "board-sprint",
           "declaration": {
             "name": "WorkSprint",
             "module": "src/elements/pm/work-sprint.js"
@@ -1770,7 +1770,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-task",
+          "tagName": "board-task",
           "name": "WorkTask",
           "domain": "pm",
           "attributes": [
@@ -1799,7 +1799,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-task",
+          "name": "board-task",
           "declaration": {
             "name": "WorkTask",
             "module": "src/elements/pm/work-task.js"
@@ -1814,7 +1814,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-deck",
+          "tagName": "deck-view",
           "name": "WorkDeck",
           "domain": "presentation",
           "attributes": [
@@ -1868,7 +1868,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-deck",
+          "name": "deck-view",
           "declaration": {
             "name": "WorkDeck",
             "module": "src/elements/presentation/work-deck.js"
@@ -1883,7 +1883,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-slide",
+          "tagName": "deck-slide",
           "name": "WorkSlide",
           "domain": "presentation",
           "attributes": [
@@ -1915,7 +1915,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-slide",
+          "name": "deck-slide",
           "declaration": {
             "name": "WorkSlide",
             "module": "src/elements/presentation/work-slide.js"
@@ -1930,7 +1930,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-field-value",
+          "tagName": "record-field-value",
           "name": "WbFieldValue",
           "domain": "records",
           "attributes": [
@@ -1956,7 +1956,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-field-value",
+          "name": "record-field-value",
           "declaration": {
             "name": "WbFieldValue",
             "module": "src/elements/records/wb-field-value.js"
@@ -1971,7 +1971,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-record-list",
+          "tagName": "record-list",
           "name": "WbRecordList",
           "domain": "records",
           "attributes": [
@@ -2025,7 +2025,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-record-list",
+          "name": "record-list",
           "declaration": {
             "name": "WbRecordList",
             "module": "src/elements/records/wb-record-list.js"
@@ -2040,7 +2040,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-record",
+          "tagName": "record-view",
           "name": "WbRecord",
           "domain": "records",
           "attributes": [
@@ -2097,7 +2097,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-record",
+          "name": "record-view",
           "declaration": {
             "name": "WbRecord",
             "module": "src/elements/records/wb-record.js"
@@ -2112,7 +2112,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-command-item",
+          "tagName": "search-command-item",
           "name": "WorkCommandItem",
           "domain": "search",
           "attributes": [
@@ -2165,7 +2165,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-command",
+          "tagName": "search-command",
           "name": "WorkCommand",
           "domain": "search",
           "attributes": [
@@ -2219,7 +2219,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-command-item",
+          "name": "search-command-item",
           "declaration": {
             "name": "WorkCommandItem",
             "module": "src/elements/search/work-command.js"
@@ -2227,7 +2227,7 @@
         },
         {
           "kind": "custom-element-definition",
-          "name": "work-command",
+          "name": "search-command",
           "declaration": {
             "name": "WorkCommand",
             "module": "src/elements/search/work-command.js"
@@ -2242,7 +2242,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-search",
+          "tagName": "search-box",
           "name": "WorkSearch",
           "domain": "search",
           "attributes": [
@@ -2299,7 +2299,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-search",
+          "name": "search-box",
           "declaration": {
             "name": "WorkSearch",
             "module": "src/elements/search/work-search.js"
@@ -2314,7 +2314,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-column",
+          "tagName": "grid-column",
           "name": "WbColumn",
           "domain": "tables",
           "attributes": [],
@@ -2324,7 +2324,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-column",
+          "name": "grid-column",
           "declaration": {
             "name": "WbColumn",
             "module": "src/elements/tables/wb-column.js"
@@ -2339,7 +2339,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-table",
+          "tagName": "grid-table",
           "name": "WbTable",
           "domain": "tables",
           "attributes": [
@@ -2387,7 +2387,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-table",
+          "name": "grid-table",
           "declaration": {
             "name": "WbTable",
             "module": "src/elements/tables/wb-table.js"
@@ -2402,7 +2402,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-video-source",
+          "tagName": "video-source",
           "name": "WorkVideoSource",
           "domain": "video",
           "attributes": [
@@ -2422,7 +2422,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-video-source",
+          "name": "video-source",
           "declaration": {
             "name": "WorkVideoSource",
             "module": "src/elements/video/wb-video-source.js"
@@ -2437,7 +2437,7 @@
         {
           "kind": "class",
           "customElement": true,
-          "tagName": "work-video",
+          "tagName": "video-player",
           "name": "WorkVideo",
           "domain": "video",
           "attributes": [
@@ -2500,7 +2500,7 @@
       "exports": [
         {
           "kind": "custom-element-definition",
-          "name": "work-video",
+          "name": "video-player",
           "declaration": {
             "name": "WorkVideo",
             "module": "src/elements/video/wb-video.js"

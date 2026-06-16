@@ -1,9 +1,9 @@
-// <work-board> — a Kanban board. Composition-as-source: its slotted <work-task>
+// <board-view> — a Kanban board. Composition-as-source: its slotted <board-task>
 // children ARE the board; the board groups them into status columns by reading
 // each task's `status` attribute (no JSON model — the elements are the truth).
 //
 // Each column is a named slot (slot="status-<key>"); on connect and on any child
-// mutation the board assigns every <work-task> to the slot matching its status,
+// mutation the board assigns every <board-task> to the slot matching its status,
 // so authors just drop tasks in any order and the board lays them out. A column
 // header shows the status label + a live count.
 //
@@ -28,7 +28,7 @@ export class WorkBoard extends WbElement {
     .count { margin-left: auto; font-family: var(--work-font-mono); font-size: var(--work-text-2xs);
       color: var(--work-fg-subtle); background: var(--work-surface); border: 1px solid var(--work-border);
       border-radius: var(--work-radius-pill); padding: 0 var(--work-space-2); }
-    ::slotted(work-task) { margin-bottom: var(--work-space-2); }
+    ::slotted(board-task) { margin-bottom: var(--work-space-2); }
     .dot { width: 8px; height: 8px; border-radius: var(--work-radius-pill); flex: none; background: var(--work-fg-subtle); }
     .dot[data-tone="brand"] { background: var(--work-brand); }
     .dot[data-tone="ok"] { background: var(--work-ok); }
@@ -54,11 +54,11 @@ export class WorkBoard extends WbElement {
     return raw ? raw.split(",").map((c) => c.trim()).filter(Boolean) : STATUS_ORDER;
   }
 
-  /** Route each <work-task> into the slot for its status; recompute counts. */
+  /** Route each <board-task> into the slot for its status; recompute counts. */
   _assign() {
     const cols = this._columns();
     const counts = Object.fromEntries(cols.map((c) => [c, 0]));
-    for (const task of this.querySelectorAll(":scope > work-task")) {
+    for (const task of this.querySelectorAll(":scope > board-task")) {
       let status = task.getAttribute("status") || "todo";
       if (!cols.includes(status)) status = cols[0];
       task.setAttribute("slot", `status-${status}`);
@@ -89,4 +89,4 @@ export class WorkBoard extends WbElement {
   }
 }
 
-define("work-board", WorkBoard);
+define("board-view", WorkBoard);

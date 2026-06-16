@@ -1,4 +1,4 @@
-// <work-diff> — themed before/after diff, computed IN JS (no external dep).
+// <git-diff> — themed before/after diff, computed IN JS (no external dep).
 //
 // The reinvention: version control's diff without git's vocabulary. The element
 // is handed two SOURCES (`a`/`b` attrs, or two slotted <template>/text children)
@@ -255,4 +255,4 @@ export class WorkDiff extends WbElement {
   }
 }
 
-define("work-diff", WorkDiff);
+define("git-diff", WorkDiff);

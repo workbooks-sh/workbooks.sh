@@ -1,4 +1,4 @@
-// <work-auth> — the sign-in surface. Provider buttons (themed like work-button) +
+// <auth-panel> — the sign-in surface. Provider buttons (themed like work-button) +
 // an email form (password or magic-link), with loading/error states.
 //
 // It does NOT hardcode a provider. It reads the provider list + drives sign-in
@@ -16,7 +16,7 @@
 //   work-auth-changed { user, providers }   (on a resolved session)
 //   work-auth-error   { message }
 //
-// Usage:  <work-auth heading="Welcome back"></work-auth>
+// Usage:  <auth-panel heading="Welcome back"></auth-panel>
 import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getIdentity } from "./identity.js";
@@ -215,4 +215,4 @@ export class WorkAuth extends WbElement {
   }
 }
 
-define("work-auth", WorkAuth);
+define("auth-panel", WorkAuth);

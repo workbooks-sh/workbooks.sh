@@ -1,5 +1,5 @@
-// <work-sprint> — a time-boxed iteration: a titled interval (start=…end=…) that
-// contains its work. Composition-as-source: slotted <work-task> children ARE the
+// <board-sprint> — a time-boxed iteration: a titled interval (start=…end=…) that
+// contains its work. Composition-as-source: slotted <board-task> children ARE the
 // sprint backlog; the sprint renders its interval header + a done/total progress
 // bar computed from the children's `status`, then slots the tasks below.
 //
@@ -45,7 +45,7 @@ export class WorkSprint extends WbElement {
   disconnectedCallback() { super.disconnectedCallback(); this._mo?.disconnect(); }
 
   _tally() {
-    const tasks = Array.from(this.querySelectorAll(":scope > work-task"));
+    const tasks = Array.from(this.querySelectorAll(":scope > board-task"));
     this._total = tasks.length;
     this._done = tasks.filter((t) => t.getAttribute("status") === "done").length;
     this.requestUpdate();
@@ -71,4 +71,4 @@ export class WorkSprint extends WbElement {
   }
 }
 
-define("work-sprint", WorkSprint);
+define("board-sprint", WorkSprint);

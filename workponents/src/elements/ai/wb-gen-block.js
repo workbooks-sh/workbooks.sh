@@ -1,4 +1,4 @@
-// <work-gen-block> — an inline component block the agent emits inside a turn.
+// <chat-gen-block> — an inline component block the agent emits inside a turn.
 // Ported from desktop/src/lib/chat/ChatComponent.svelte. The agent authors
 // these as `#+begin_src component :type <t> …` blocks in the living document;
 // they render as themed cards reading STRUCTURED props/body — never raw LLM
@@ -11,7 +11,7 @@
 // Unknown types fall back to a labeled code block so nothing vanishes.
 //
 // Usage (props as attributes; body via textContent):
-//   <work-gen-block type="callout" tone="warn" title="Heads up">…body…</work-gen-block>
+//   <chat-gen-block type="callout" tone="warn" title="Heads up">…body…</chat-gen-block>
 //
 // Interactive blocks emit a `work-intent` CustomEvent (bubbles, composed) the
 // thread / host can observe — they never execute LLM-authored code.
@@ -191,4 +191,4 @@ export class WbGenBlock extends WbElement {
   }
 }
 
-define("work-gen-block", WbGenBlock);
+define("chat-gen-block", WbGenBlock);

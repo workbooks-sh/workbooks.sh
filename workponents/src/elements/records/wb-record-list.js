@@ -1,32 +1,32 @@
-// <work-record-list> — the master index of entities: a card / list view over a
+// <record-list> — the master index of entities: a card / list view over a
 // query (each row = one entity card), NOT a grid. This is the distinct records
-// surface — where wb-table is a dense tabular viewport, work-record-list is an
+// surface — where wb-table is a dense tabular viewport, record-list is an
 // entity browser (a title + a few summary fields per card), the master half of a
-// master-detail pair. Reuses the SAME shared engine as wb-table / work-record
+// master-detail pair. Reuses the SAME shared engine as wb-table / record-view
 // (getEngine) — never a second data store.
 //
 // Selecting a card emits `work-record-select` carrying the row's key/value + the
-// full row; wire it to a <work-record>'s value/where to drive a detail pane.
+// full row; wire it to a <record-view>'s value/where to drive a detail pane.
 //
 // Usage (named source, drive a detail record):
-//   <work-record-list src-name="customers"
+//   <record-list src-name="customers"
 //     query="SELECT id, name, tier, mrr FROM customers ORDER BY mrr DESC"
 //     key="id" title-field="name" subtitle-field="tier"
-//     fields="mrr" formats="mrr:usd" searchable></work-record-list>
+//     fields="mrr" formats="mrr:usd" searchable></record-list>
 //
-// Usage (bind to a <work-query> by name — the canonical data binding):
-//   <work-query name="customers" sql="SELECT * FROM crm_customers"></work-query>
-//   <work-record-list from="customers" key="id" title-field="name"></work-record-list>
+// Usage (bind to a <data-query> by name — the canonical data binding):
+//   <data-query name="customers" sql="SELECT * FROM crm_customers"></data-query>
+//   <record-list from="customers" key="id" title-field="name"></record-list>
 //
 // Attributes:
-//   from           name of a <work-query> dataset to read (the canonical binding)
+//   from           name of a <data-query> dataset to read (the canonical binding)
 //   src-name       a source registered via getEngine().register(...)
 //   query          full SQL over the source (default SELECT * over src-name)
 //   key            the identifying column emitted on select (default "id")
 //   title-field    column shown as the card title (default first column)
 //   subtitle-field column shown as a muted subtitle (optional)
 //   fields         comma list of summary columns shown as label:value chips
-//   formats        "col:usd,col2:pct" numeric format hints (work-field-value)
+//   formats        "col:usd,col2:pct" numeric format hints (record-field-value)
 //   searchable     show a filter box (filters IN the engine via WHERE … LIKE)
 //   layout         cards | rows   (variant)
 //   variant        card | bare    (visual shell)
@@ -121,7 +121,7 @@ export class WbRecordList extends WbElement {
     this._load();
   }
 
-  // A named source: from="<work-query name>" is the canonical binding; src-name is
+  // A named source: from="<data-query name>" is the canonical binding; src-name is
   // the equivalent register()-side name. Either names a source the engine resolves.
   _namedSource() { return this.attr("from") || this.attr("src-name"); }
 
@@ -238,8 +238,8 @@ export class WbRecordList extends WbElement {
       const chips = summary.map((c) => {
         const v = row[idx(c.field)];
         return html`<span class="chip"><span class="k">${c.label}</span>
-          <work-field-value type=${c.type} format=${c.format ?? ""} display=${c.display ?? ""}
-            value=${v ?? ""}></work-field-value></span>`;
+          <record-field-value type=${c.type} format=${c.format ?? ""} display=${c.display ?? ""}
+            value=${v ?? ""}></record-field-value></span>`;
       });
       return html`<button class="card" role="option" aria-selected=${String(isSel)}
         data-i=${i} data-key=${keyVal ?? ""} @click=${() => this._select(i)}>
@@ -282,4 +282,4 @@ export class WbRecordList extends WbElement {
 function ident(name) { return '"' + String(name).replace(/"/g, '""') + '"'; }
 function prettify(f) { return String(f).replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 
-define("work-record-list", WbRecordList);
+define("record-list", WbRecordList);

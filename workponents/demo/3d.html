@@ -17,7 +17,7 @@
       }
     }
   </script>
-  <!-- the 3d elements: native custom elements, ESM, NO build step. <work-model>
+  <!-- the 3d elements: native custom elements, ESM, NO build step. <model-view>
        lazy-loads Google's <model-viewer> (Apache-2.0) from a CDN on first connect. -->
   <script type="module" src="../src/elements/3d/index.js"></script>
   <style>
@@ -40,7 +40,7 @@
   <div class="wrap">
     <h1>workponents · 3d</h1>
     <p class="sub">
-      <code>&lt;work-model&gt;</code> is the themed wrapper over Google's
+      <code>&lt;model-view&gt;</code> is the themed wrapper over Google's
       <code>&lt;model-viewer&gt;</code> (Apache-2.0, three.js) for glTF / GLB / STL —
       lazy-loaded from a CDN on first connect (never bundled). The frame, progress bar,
       and AR button paint from the <code>--work-*</code> tokens; the model keeps its
@@ -61,17 +61,17 @@
       <p class="sub"><code>src</code> points at a GLB; drag to orbit, scroll to zoom.</p>
       <div class="grid">
         <!-- a real GLB from the model-viewer sample assets (CC-licensed) -->
-        <work-model
+        <model-view
           name="Astronaut"
           src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
           alt="An astronaut model"
           camera-controls
           auto-rotate
           tone="brand"
-        ></work-model>
+        ></model-view>
 
         <!-- a second model, soft frame + AR enabled -->
-        <work-model
+        <model-view
           variant="soft"
           name="Robot Expressive"
           src="https://modelviewer.dev/shared-assets/models/RobotExpressive.glb"
@@ -79,7 +79,7 @@
           camera-controls
           ar
           tone="neutral"
-        ></work-model>
+        ></model-view>
       </div>
     </section>
 
@@ -87,27 +87,27 @@
       <h2>floor placeholder — viewer blocked / disabled</h2>
       <p class="sub">
         Set <code>window.__WB_MODELVIEWER__ = false</code> (the engine is intentionally
-        disabled) — <code>&lt;work-model&gt;</code> degrades to a themed card with the
+        disabled) — <code>&lt;model-view&gt;</code> degrades to a themed card with the
         model name + a typed glyph. Never a blank box.
       </p>
       <div class="grid">
-        <work-model id="floor-disabled" name="Spaceship.glb" src="spaceship.glb" camera-controls></work-model>
+        <model-view id="floor-disabled" name="Spaceship.glb" src="spaceship.glb" camera-controls></model-view>
         <!-- no src at all → the "set a src" placeholder -->
-        <work-model variant="bare" size="sm"></work-model>
+        <model-view variant="bare" size="sm"></model-view>
       </div>
     </section>
 
     <section>
-      <h2>composition-as-source-for-3D · <code>&lt;work-model-source&gt;</code> (stubbed)</h2>
+      <h2>composition-as-source-for-3D · <code>&lt;model-source&gt;</code> (stubbed)</h2>
       <p class="sub">
-        The 3D analogue of <code>&lt;work-video-source&gt;</code>: a scene <em>source</em>
+        The 3D analogue of <code>&lt;video-source&gt;</code>: a scene <em>source</em>
         compiles to a GLB via <strong>Manifold</strong> wasm. The descriptor + parent
         wiring + lazy Manifold loader are real; the spec→mesh kernel binding is the one
         deferred piece, so the parent shows a clear status rather than a wrong model.
       </p>
-      <work-model name="manifold-scene" camera-controls>
-        <work-model-source code="cube(20); sphere(12);"></work-model-source>
-      </work-model>
+      <model-view name="manifold-scene" camera-controls>
+        <model-source code="cube(20); sphere(12);"></model-source>
+      </model-view>
     </section>
   </div>
 
@@ -119,7 +119,7 @@
     const slot = document.getElementById("floor-disabled");
     // Force the floor for this instance: re-create it with the engine disabled.
     window.__WB_MODELVIEWER__ = false;
-    const forced = document.createElement("work-model");
+    const forced = document.createElement("model-view");
     forced.setAttribute("name", "Spaceship.glb");
     forced.setAttribute("src", "spaceship.glb");
     forced.setAttribute("camera-controls", "");

@@ -1,7 +1,7 @@
 // workponents · docs domain — the document is its own org/markdown source,
 // rendered directly (preview ≡ source), with live computed cells as first-class.
-// Tags: <work-doc> · <work-doc-cell> · <work-doc-outline> · <work-doc-import>.
-// Self-editing formats: docx ↔ work-doc round-trips via the docx-io adapter
+// Tags: <document-view> · <document-cell> · <document-outline> · <document-import>.
+// Self-editing formats: docx ↔ document-view round-trips via the docx-io adapter
 // (mammoth+turndown read · docx write, floor; pandoc.wasm over the Dock for max
 // fidelity when docked).
 // Import this barrel to register the whole domain, or a single element file to

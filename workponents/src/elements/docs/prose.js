@@ -1,7 +1,7 @@
 // docs/prose.js — the shared themed-prose CSS for the docs domain.
 //
 // A Lit `css` CSSResult (composes into `static styles` via `${PROSE_CSS}`).
-// Token-only (every value var(--work-*)). Imported by work-doc + work-doc-cell so the
+// Token-only (every value var(--work-*)). Imported by document-view + document-cell so the
 // rendered document and its live cells read as one typeset surface. Mirrors the
 // visual contract of the desktop org-renderer (desktop/src/lib/org-renderer/
 // org.css) but expressed purely from the workponents token set.

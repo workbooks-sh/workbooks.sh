@@ -1,10 +1,10 @@
-// <work-field-group> — a themed fieldset/section that visually groups fields. Pure
-// layout + label; it does NOT own a schema (the owning <work-form> collects every
-// <work-field> beneath it, grouped or not). Styled entirely from --work-* tokens.
+// <form-field-group> — a themed fieldset/section that visually groups fields. Pure
+// layout + label; it does NOT own a schema (the owning <form-view> collects every
+// <form-field> beneath it, grouped or not). Styled entirely from --work-* tokens.
 // Usage:
-//   <work-field-group label="Account" help="How you sign in">
-//     <work-field ...></work-field>
-//   </work-field-group>
+//   <form-field-group label="Account" help="How you sign in">
+//     <form-field ...></form-field>
+//   </form-field-group>
 import { WbElement, html, css, define } from "../../core/element.js";
 
 export class WbFieldGroup extends WbElement {
@@ -32,4 +32,4 @@ export class WbFieldGroup extends WbElement {
   }
 }
 
-define("work-field-group", WbFieldGroup);
+define("form-field-group", WbFieldGroup);

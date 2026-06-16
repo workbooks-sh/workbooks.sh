@@ -1,6 +1,6 @@
-// docs/docx-io.js — the docx ↔ work-doc I/O adapter (Phase 4a, floor-first).
+// docs/docx-io.js — the docx ↔ document-view I/O adapter (Phase 4a, floor-first).
 //
-// work-doc's truth is its org/markdown SOURCE (preview ≡ source). docx is not a
+// document-view's truth is its org/markdown SOURCE (preview ≡ source). docx is not a
 // new document model — it is an I/O adapter on top: read a .docx INTO that source,
 // and emit the current source back out AS a .docx. The render path is untouched.
 //
@@ -9,17 +9,17 @@
 // tests / offline hosts via window globals:
 //   • read  — mammoth.js (docx → semantic HTML) → turndown (HTML → markdown).
 //             override: window.__WB_MAMMOTH__ / window.__WB_TURNDOWN__
-//   • write — docx (dolanmiu) builds an OOXML Document from work-doc's parsed
+//   • write — docx (dolanmiu) builds an OOXML Document from document-view's parsed
 //             block model (headings / paragraphs / lists / bold / italic / code).
 //             override: window.__WB_DOCX__
 //
 // HOST (max fidelity, documented — not required to wire here): when a runtime is
-// docked, work-doc routes doc.export through `this.host` → pandoc.wasm (already in
+// docked, document-view routes doc.export through `this.host` → pandoc.wasm (already in
 // runtime/host/pallet.ex). pandoc is GPL, so it is invoked AS A TOOL over the Dock,
 // never linked into this floor. The floor is the always-available default.
 //
 // Degradation: if the lib / CDN is unavailable, the import/export functions throw
-// a clear, catchable error so work-doc can surface a note instead of failing hard.
+// a clear, catchable error so document-view can surface a note instead of failing hard.
 
 const MAMMOTH_CDN  = "https://esm.sh/mammoth@1.8.0";
 const TURNDOWN_CDN = "https://esm.sh/turndown@7.2.0";
@@ -46,17 +46,17 @@ const loadTurndown = () => lazy("__WB_TURNDOWN__", TURNDOWN_CDN, "turndown");
 const loadDocx     = () => lazy("__WB_DOCX__",     DOCX_CDN,     "docx");
 
 /**
- * Import a .docx → org/markdown source string (the work-doc truth).
+ * Import a .docx → org/markdown source string (the document-view truth).
  * mammoth (docx → semantic HTML) → turndown (HTML → GitHub-flavored markdown).
  * @param {ArrayBuffer} arrayBuffer  the raw .docx bytes
- * @returns {Promise<string>} markdown source ready to feed work-doc
+ * @returns {Promise<string>} markdown source ready to feed document-view
  */
 export async function importDocx(arrayBuffer) {
   if (!arrayBuffer) throw new Error("docx-io: importDocx needs an ArrayBuffer");
   const [mammoth, Turndown] = await Promise.all([loadMammoth(), loadTurndown()]);
   const { value: htmlBody } = await mammoth.convertToHtml({ arrayBuffer });
   const td = new Turndown({
-    headingStyle: "atx",       // # H1 — matches work-doc's renderDoc heading grammar
+    headingStyle: "atx",       // # H1 — matches document-view's renderDoc heading grammar
     bulletListMarker: "-",
     codeBlockStyle: "fenced",
     emDelimiter: "*",          // *italic*  (renderDoc reads */_ for em)
@@ -66,7 +66,7 @@ export async function importDocx(arrayBuffer) {
 }
 
 /**
- * Export org/markdown source → a .docx Blob, from work-doc's parsed block model.
+ * Export org/markdown source → a .docx Blob, from document-view's parsed block model.
  * Pure floor: parses the source into blocks, maps each to a docx paragraph with
  * inline runs (bold / italic / code), and packs to a Blob (no native exec).
  * @param {string} orgSource  the document source (org or markdown)

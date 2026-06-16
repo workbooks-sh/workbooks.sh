@@ -1,28 +1,28 @@
-// <work-spark> — an inline sparkline. A trend IS a query: the element runs SQL on
+// <chart-spark> — an inline sparkline. A trend IS a query: the element runs SQL on
 // the shared engine and draws a tiny zero-dependency SVG line/area/bar from the
 // result's value column. No axes, no chrome — it sits inline in text, a table
-// cell, or a <work-metric>. Same data contract + same engine as <work-chart>;
+// cell, or a <chart-metric>. Same data contract + same engine as <chart-view>;
 // reach compute ONLY through src/data.
 //
 // FLOOR-ONLY by design — no powered (Observable Plot) tier. A sparkline is an
 // inline 96×24 glyph with no axes / legend / margins; Plot's figure model (margins,
 // scales, axis chrome) is overkill and would fight the inline box, while the floor
-// SVG is already minimal and optimal. <work-metric> is likewise a KPI scalar (it
+// SVG is already minimal and optimal. <chart-metric> is likewise a KPI scalar (it
 // only embeds a spark trend), so it stays floor too. The powered tier lives where
-// it pays off — the full <work-chart>.
+// it pays off — the full <chart-view>.
 //
 // Re-based onto Lit: render() returns a Lit template wrapping the string-built
 // SVG via unsafeSVG (the drawing code is ours). The _load single-flight + stable
 // inline auto-name + whenRegistered/register plumbing is unchanged.
 //
 // Usage:
-//   <work-spark src-name="daily" y="visits"></work-spark>
-//   <work-spark type="area" query="SELECT day, sum(rev) AS rev FROM orders GROUP BY day ORDER BY day" y="rev"></work-spark>
-//   <work-spark type="bar" rows='[{"v":3},{"v":7},{"v":4},{"v":9}]' y="v"></work-spark>
+//   <chart-spark src-name="daily" y="visits"></chart-spark>
+//   <chart-spark type="area" query="SELECT day, sum(rev) AS rev FROM orders GROUP BY day ORDER BY day" y="rev"></chart-spark>
+//   <chart-spark type="bar" rows='[{"v":3},{"v":7},{"v":4},{"v":9}]' y="v"></chart-spark>
 //
 // Attributes:
 //   type       line | area | bar     (default line)
-//   src-name / query / rows / csv    — same source story as <work-chart>
+//   src-name / query / rows / csv    — same source story as <chart-view>
 //   y          value column (default: first numeric column)
 //   tone       brand | ok | warn | err | neutral   (stroke color, a --work-* token)
 //   width      px hint for the inline box (default 96)
@@ -167,4 +167,4 @@ export class WbSpark extends WbElement {
 
 function ident(name) { return '"' + String(name).replace(/"/g, '""') + '"'; }
 
-define("work-spark", WbSpark);
+define("chart-spark", WbSpark);

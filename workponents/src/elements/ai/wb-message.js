@@ -1,15 +1,15 @@
-// <work-message> — one turn of a conversation. Ported from
+// <chat-message> — one turn of a conversation. Ported from
 // desktop/src/lib/chat/AssistantMessageView.svelte (+ the role bubble chrome).
 //
 // The body is the message's living source (markdown / org-with-components).
 // It renders SANITIZED markdown (bold/italic/lists/headings/code/links — see
 // ./markdown.js, HTML-escaped first) and weaves inline `#+begin_src component`
-// blocks into <work-gen-block> cards in document order. The agent edits this
+// blocks into <chat-gen-block> cards in document order. The agent edits this
 // source; the rendered turn is the view of it (preview ≡ source).
 //
 // Usage:
-//   <work-message role="user">What changed in the deploy?</work-message>
-//   <work-message role="assistant">**Done.** Here is the diff…</work-message>
+//   <chat-message role="user">What changed in the deploy?</chat-message>
+//   <chat-message role="assistant">**Done.** Here is the diff…</chat-message>
 //
 // `role` styles the turn (user | assistant | system | tool). The body can be
 // passed as light-DOM textContent or via the `text` attribute/property.
@@ -116,9 +116,9 @@ export class WbMessage extends WbElement {
     </div>`;
   }
 
-  /** Render a component segment as a <work-gen-block> with structured props. */
+  /** Render a component segment as a <chat-gen-block> with structured props. */
   _genBlock(seg) {
-    const el = document.createElement("work-gen-block");
+    const el = document.createElement("chat-gen-block");
     el.setAttribute("type", seg.type);
     for (const [k, v] of Object.entries(seg.props)) el.setAttribute(k, v);
     el.textContent = seg.body;
@@ -126,4 +126,4 @@ export class WbMessage extends WbElement {
   }
 }
 
-define("work-message", WbMessage);
+define("chat-message", WbMessage);

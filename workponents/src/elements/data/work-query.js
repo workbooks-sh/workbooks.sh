@@ -1,4 +1,4 @@
-// <work-query> — THE declarative data source: a named, queryable dataset written
+// <data-query> — THE declarative data source: a named, queryable dataset written
 // directly into the document. It declares intent (a name + the SQL) and routes
 // execution through the Host capability seam; the SAME tag answers over SQLite or
 // Postgres — the host decides WHERE the query actually runs (embedded sqlite-wasm
@@ -7,15 +7,15 @@
 // "SQL in HTML" section).
 //
 // One source element + a `from=` binding — no per-database tags. A view component
-// (work-table / work-chart / work-record-list) reads a result by name:
+// (grid-table / chart-view / record-list) reads a result by name:
 //
-//   <work-query name="big-orders" db="sales"
-//     sql="select * from orders where total > 100"></work-query>
-//   <work-table  from="big-orders"></work-table>
-//   <work-chart  from="big-orders" type="bar" x="region" y="total"></work-chart>
+//   <data-query name="big-orders" db="sales"
+//     sql="select * from orders where total > 100"></data-query>
+//   <grid-table  from="big-orders"></grid-table>
+//   <chart-view  from="big-orders" type="bar" x="region" y="total"></chart-view>
 //
 // HOW IT WIRES (no fabricated rows — real execution or an honest stub):
-//   work-query runs its `sql` through the shared data engine (../../data/engine.js)
+//   data-query runs its `sql` through the shared data engine (../../data/engine.js)
 //   — the ONE seam the whole library queries. The engine resolves the tier per
 //   context behind the Dock membrane: `runtime` routes SQL over the Dock to the
 //   tenant's native SQLite VFS (server-side exqlite) when a runtime/nexus is
@@ -28,16 +28,16 @@
 //   the in-JS floor and the element reports `engine="memory"` honestly.
 //
 // PROVIDER OVERRIDE (the documented host hookup point):
-//   The default resolver IS the shared engine. To route a named work-query through
+//   The default resolver IS the shared engine. To route a named data-query through
 //   a custom backend (e.g. a host-brokered Postgres connection the engine does not
 //   model), set a resolver — either imperatively on the element:
-//       document.querySelector('work-query').resolver =
+//       document.querySelector('data-query').resolver =
 //         async ({ sql, db, name }) => /* WbQueryResult | row-object[] */;
 //   or by name via `provider=`, looked up on a host-populated registry:
 //       window.__WB_QUERY_PROVIDERS__ = {
 //         warehouse: async ({ sql, db, name }) => /* … */,
 //       };
-//       <work-query name="orders" provider="warehouse" db="warehouse" sql="…">
+//       <data-query name="orders" provider="warehouse" db="warehouse" sql="…">
 //   A resolver returns either a WbQueryResult ({columns, rows[][], types}) or a
 //   plain array of row objects; both are normalized and registered under `name`.
 //   This is the ONE place a deployment hooks a non-engine datasource — the views
@@ -180,7 +180,7 @@ function shapeResolved(out, sql) {
     return { columns: out.columns, rows: out.rows, types, rowCount: out.rows.length, engine: out.engine || "provider", sql };
   }
   if (out && Array.isArray(out.rows)) return resultFromObjects(out.rows, out.columns, out.engine || "provider", sql);
-  throw new Error("work-query: provider must return a WbQueryResult or an array of row objects");
+  throw new Error("data-query: provider must return a WbQueryResult or an array of row objects");
 }
 
 // WbQueryResult (columns + rows[][]) → row objects, for engine.register({rows}).
@@ -194,4 +194,4 @@ function rowObjects(result) {
   });
 }
 
-define("work-query", WorkQuery);
+define("data-query", WorkQuery);

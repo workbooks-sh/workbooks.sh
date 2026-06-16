@@ -1,4 +1,4 @@
-// maps · the POWERED tier — MapLibre GL behind the <work-map> floor.
+// maps · the POWERED tier — MapLibre GL behind the <map-view> floor.
 //
 // The floor (wb-map.js `_renderPoints`/`_renderHeat`/`_renderBubbles`/
 // `_renderRegions`) is a zero-dependency SVG projection themed entirely from

@@ -1,4 +1,4 @@
-// <work-map> — THE maps reinvention: the map IS a SPATIAL VIEW OVER A QUERY, not a
+// <map-view> — THE maps reinvention: the map IS a SPATIAL VIEW OVER A QUERY, not a
 // hand-fed GeoJSON blob. Points / regions come from query ROWS — lat/lon (and an
 // optional value) are columns of a WbQueryResult. Spatial filtering and
 // aggregation belong IN the engine (SQL: GROUP BY region, WHERE lon BETWEEN …),
@@ -6,7 +6,7 @@
 //
 // Composition-as-source: the map carries its data + query as source. Reach
 // compute ONLY through the src/data layer (getEngine) — exactly the pattern
-// <work-table> uses, generalized to the shared DuckDB engine. One engine, three
+// <grid-table> uses, generalized to the shared DuckDB engine. One engine, three
 // surfaces: a table, a chart, and a map can all read the SAME registered source.
 //
 // Re-based onto Lit: render() returns the Lit shell (the stage + chrome + the
@@ -23,14 +23,14 @@
 // _tileLayerHint(); we never hard-depend on a tile CDN.
 //
 // Usage (inline points, declared lat/lon/value columns):
-//   <work-map rows='[{"city":"Oslo","lat":59.9,"lon":10.7,"pop":700}]'
-//           lat="lat" lon="lon" value="pop" mode="points"></work-map>
+//   <map-view rows='[{"city":"Oslo","lat":59.9,"lon":10.7,"pop":700}]'
+//           lat="lat" lon="lon" value="pop" mode="points"></map-view>
 //
 // Usage (register elsewhere, query a named source, aggregate in the engine):
-//   <work-map src-name="quakes"
+//   <map-view src-name="quakes"
 //           query="SELECT region, avg(lat) AS lat, avg(lon) AS lon, count(*) AS n
 //                   FROM quakes GROUP BY region"
-//           lat="lat" lon="lon" value="n" label="region" mode="choropleth"></work-map>
+//           lat="lat" lon="lon" value="n" label="region" mode="choropleth"></map-view>
 //
 // Attributes:
 //   rows        inline JSON array of row objects (auto-registers a source)
@@ -834,4 +834,4 @@ function geometryToRings(geom, proj) {
   return [];
 }
 
-define("work-map", WbMap);
+define("map-view", WbMap);

@@ -45,15 +45,15 @@
     </div>
     <p class="evlog" id="evlog">events appear here</p>
 
-    <h2>&lt;work-repl&gt; — JavaScript, run in a sandbox</h2>
+    <h2>&lt;code-repl&gt; — JavaScript, run in a sandbox</h2>
     <p class="sub">Press Run. The snippet executes in a Web Worker — no DOM, no page globals — and <code>console.log</code> + the returned value stream into the output pane.</p>
-    <work-repl id="js" language="js">const fib = n =&gt; n &lt; 2 ? n : fib(n - 1) + fib(n - 2);
+    <code-repl id="js" language="js">const fib = n =&gt; n &lt; 2 ? n : fib(n - 1) + fib(n - 2);
 const xs = Array.from({ length: 10 }, (_, i) =&gt; fib(i));
 console.log("fib(0..9):", xs.join(", "));
 // the returned value is shown too
-return { sum: xs.reduce((a, b) =&gt; a + b, 0), max: Math.max(...xs) };</work-repl>
+return { sum: xs.reduce((a, b) =&gt; a + b, 0), max: Math.max(...xs) };</code-repl>
 
-    <h2>&lt;work-editor&gt; — CodeMirror 6, themed from the token set</h2>
+    <h2>&lt;code-editor&gt; — CodeMirror 6, themed from the token set</h2>
     <p class="sub">The editing surface is swap-stable behind one public API (<code>value</code> / <code>language</code> / <code>work-code-change</code>). By default it lazy-loads <b>CodeMirror 6</b> from a CDN and themes it entirely from <code>--work-*</code> — flip the theme above and the editor re-themes with everything else. If CodeMirror can't load it falls back instantly to the zero-dep textarea+highlight floor. The tier in use shows on the right. Edit it — it emits <code>work-code-change</code>.</p>
     <div class="bar" role="group" aria-label="editor engine">
       <span style="font:700 10px var(--work-font-mono,monospace);letter-spacing:.18em;text-transform:uppercase;color:var(--work-fg-subtle)">engine</span>
@@ -61,25 +61,25 @@ return { sum: xs.reduce((a, b) =&gt; a + b, 0), max: Math.max(...xs) };</work-re
       <button data-engine="floor" aria-pressed="false">floor</button>
       <span id="tier" style="margin-left:auto;font:600 12px var(--work-font-mono,monospace);color:var(--work-brand)">resolving…</span>
     </div>
-    <work-editor id="ed" language="rust">// edit me — CodeMirror 6, themed from --work-* (flip the theme)
+    <code-editor id="ed" language="rust">// edit me — CodeMirror 6, themed from --work-* (flip the theme)
 fn main() {
     let greeting = "hello from workponents";
     let answer = 42;
     for i in 0..3 {
         println!("{} #{}", greeting, i + answer);
     }
-}</work-editor>
+}</code-editor>
 
-    <h2>&lt;work-repl&gt; — compiled language, standalone</h2>
+    <h2>&lt;code-repl&gt; — compiled language, standalone</h2>
     <p class="sub">No runtime connected, so C can't run here — the REPL says so plainly instead of faking output. Connect a runtime (<code>host.available("compile")</code>) and the same code compiles + runs in-sandbox via the compiler lane.</p>
-    <work-repl id="c" language="c">#include &lt;stdio.h&gt;
+    <code-repl id="c" language="c">#include &lt;stdio.h&gt;
 
 int main(void) {
     for (int i = 0; i &lt; 3; i++) {
         printf("compiled in-sandbox: %d\n", i * i);
     }
     return 0;
-}</work-repl>
+}</code-repl>
   </div>
 
   <script>
@@ -124,7 +124,7 @@ int main(void) {
       const val = ed.value;            // preserve the current text across the swap
       const eng = b.dataset.engine;
       // rebuild the element so the tier re-resolves (engine attr drives _mountSurface)
-      const fresh = document.createElement("work-editor");
+      const fresh = document.createElement("code-editor");
       fresh.id = "ed"; fresh.setAttribute("language", "rust");
       if (eng !== "auto") fresh.setAttribute("engine", eng);
       fresh.textContent = val;

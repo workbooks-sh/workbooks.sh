@@ -1,4 +1,4 @@
-// <work-dropzone> — drag (or pick) files to add them to the drive.
+// <file-dropzone> — drag (or pick) files to add them to the drive.
 //
 // Sharpens the files reinvention: adding a file = inserting a CONTENT-ADDRESSED
 // ROW. This element doesn't write — it normalizes a drop/pick into file records
@@ -9,7 +9,7 @@
 // the address the rest of the domain keys on.
 //
 // Usage:
-//   <work-dropzone accept="image/*,text/*" multiple></work-dropzone>
+//   <file-dropzone accept="image/*,text/*" multiple></file-dropzone>
 //   el.addEventListener("work-file-add", e => insertRows(e.detail.files));
 //
 // Attributes:
@@ -111,4 +111,4 @@ async function sha256(file) {
   return "sha256:" + hex;
 }
 
-define("work-dropzone", WbDropzone);
+define("file-dropzone", WbDropzone);

@@ -57,12 +57,12 @@
         <p class="sub">Identity is a <strong>host capability</strong>, not a per-provider widget. The
           elements bind to one identity seam over <code>this.host</code> — Clerk / Auth0 / WorkOS /
           BetterAuth are server-side wirings behind the Dock. This page runs the <strong>mock</strong>
-          identity (no backend): sign in to flip <code>&lt;work-gate&gt;</code> from anon→authed and reveal
-          <code>&lt;work-user&gt;</code>; sign out returns to anon. Toggle the theme; every element re-themes
+          identity (no backend): sign in to flip <code>&lt;auth-gate&gt;</code> from anon→authed and reveal
+          <code>&lt;auth-user&gt;</code>; sign out returns to anon. Toggle the theme; every element re-themes
           from the <code>--work-*</code> tokens.</p>
       </div>
       <!-- bound to the live session; hidden while anon, appears on sign-in -->
-      <div class="userbar"><work-user id="user"></work-user></div>
+      <div class="userbar"><auth-user id="user"></auth-user></div>
     </div>
 
     <div class="bar" role="group" aria-label="theme">
@@ -74,48 +74,48 @@
 
     <!-- THE GUARD: anon shows sign-in; authed shows the protected content + user -->
     <section>
-      <h2>work-gate · anon ⇄ authed (the declarative guard)</h2>
+      <h2>auth-gate · anon ⇄ authed (the declarative guard)</h2>
 
-      <work-gate when="anon">
+      <auth-gate when="anon">
         <div class="panel" style="display:flex;justify-content:center">
-          <work-auth id="auth" heading="Welcome back"></work-auth>
+          <auth-panel id="auth" heading="Welcome back"></auth-panel>
         </div>
-      </work-gate>
+      </auth-gate>
 
-      <work-gate when="authed">
+      <auth-gate when="authed">
         <div class="panel secret">
           <h3>You're in.</h3>
           <p style="color:var(--work-fg-muted);margin:0">This block is gated by
-            <code>&lt;work-gate when="authed"&gt;</code>. It was hidden a moment ago. Use the account menu
+            <code>&lt;auth-gate when="authed"&gt;</code>. It was hidden a moment ago. Use the account menu
             (top-right) to sign out — this disappears and the sign-in surface returns.</p>
         </div>
-      </work-gate>
+      </auth-gate>
 
       <p class="note">Both gates read the same identity seam and flip live the instant the session
-        changes — no host wiring. <code>&lt;work-auth&gt;</code> emits <code>work-auth-intent</code> on every
+        changes — no host wiring. <code>&lt;auth-panel&gt;</code> emits <code>work-auth-intent</code> on every
         action and <code>work-auth-changed</code> on a resolved session (logged below).</p>
       <div class="log" id="log">auth events appear here…</div>
     </section>
 
     <!-- role gate, to show the role: test -->
     <section>
-      <h2>work-gate · role-scoped content</h2>
+      <h2>auth-gate · role-scoped content</h2>
       <div class="panel">
-        <work-gate when="role:member">
+        <auth-gate when="role:member">
           <p style="margin:0">Visible to the <code>member</code> role (the mock seeds it on sign-in).</p>
           <p slot="fallback" style="margin:0;color:var(--work-fg-subtle)">Sign in to see member-only content.</p>
-        </work-gate>
+        </auth-gate>
       </div>
     </section>
 
     <!-- the surface on its own, magic-link mode -->
     <section>
-      <h2>work-auth · magic-link mode + compact user</h2>
+      <h2>auth-panel · magic-link mode + compact user</h2>
       <div class="panel" style="display:flex;gap:32px;align-items:flex-start;flex-wrap:wrap">
-        <work-auth mode="magic" heading="Sign in" providers="google,github"></work-auth>
+        <auth-panel mode="magic" heading="Sign in" providers="google,github"></auth-panel>
         <div>
-          <p class="note" style="margin-top:0">Compact <code>&lt;work-user&gt;</code> (avatar only) once authed:</p>
-          <work-user variant="compact"></work-user>
+          <p class="note" style="margin-top:0">Compact <code>&lt;auth-user&gt;</code> (avatar only) once authed:</p>
+          <auth-user variant="compact"></auth-user>
         </div>
       </div>
     </section>

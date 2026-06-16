@@ -1,4 +1,4 @@
-// <work-undo> — undo the last change (the "undo anything an agent did" promise).
+// <git-undo> — undo the last change (the "undo anything an agent did" promise).
 // git's reflog / jj op-log reinvented as one verb: undo the most recent Change
 // to a scope. Itself append-only at the ledger level (mirrors History.undo/2,
 // which rides the append-only Restore — see jj.ex for the op-log substrate).
@@ -59,4 +59,4 @@ export class WorkUndo extends WbElement {
   }
 }
 
-define("work-undo", WorkUndo);
+define("git-undo", WorkUndo);

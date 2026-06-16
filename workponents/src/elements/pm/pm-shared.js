@@ -1,7 +1,7 @@
 // pm-shared — the small DRY layer for the PM + flow structural elements.
 // Status tones, priority enum, the meta-row CSS, and the field/initials helpers
-// are authored ONCE here and reused by work-task / work-board / work-sprint /
-// work-milestone / work-flow / work-loop. Every component renders its own
+// are authored ONCE here and reused by board-task / board-view / board-sprint /
+// board-milestone / work-flow / work-loop. Every component renders its own
 // attributes (no post-hoc regex chrome); these just keep that rendering uniform
 // and token-only (var(--work-*) exclusively).
 import { html, css } from "../../core/element.js";

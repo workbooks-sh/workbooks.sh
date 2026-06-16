@@ -1,15 +1,15 @@
-// <work-user> — avatar + identity menu, bound to the current session.
+// <auth-user> — avatar + identity menu, bound to the current session.
 //
 // Reads the identity seam (over this.host): shows the signed-in user's avatar
 // (image or initials), and on click reveals a menu with name/email + sign-out.
 // Subscribes to the seam, so it updates live when the session changes elsewhere
-// (e.g. <work-auth> resolves a sign-in). Sign-out drives the seam and emits
-// `work-auth-changed` {user:null}. When anonymous it renders nothing (a <work-gate>
-// or <work-auth> handles the anon case).
+// (e.g. <auth-panel> resolves a sign-in). Sign-out drives the seam and emits
+// `work-auth-changed` {user:null}. When anonymous it renders nothing (a <auth-gate>
+// or <auth-panel> handles the anon case).
 //
 // Variants:  variant = "menu" | "compact"  (compact = avatar only, no name)
 // Events:  work-auth-changed { user, providers }  (on sign-out)
-// Usage:  <work-user></work-user>   ·   <work-user variant="compact"></work-user>
+// Usage:  <auth-user></auth-user>   ·   <auth-user variant="compact"></auth-user>
 import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getIdentity } from "./identity.js";
@@ -156,4 +156,4 @@ export class WorkUser extends WbElement {
   }
 }
 
-define("work-user", WorkUser);
+define("auth-user", WorkUser);

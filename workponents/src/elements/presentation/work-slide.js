@@ -1,12 +1,12 @@
-// <work-slide> — one slide of a <work-deck>. The reinvention (per the presentation
+// <deck-slide> — one slide of a <deck-view>. The reinvention (per the presentation
 // brief): a deck IS a wavelet timeline and each slide is a discrete KEYFRAME BAND
-// on it. A <work-slide> therefore carries, as source, the description of its band
+// on it. A <deck-slide> therefore carries, as source, the description of its band
 // (how long it holds, how it enters) — the same data the deck folds into a
 // <gm-doc> timeline when you export() to video. Preview ≡ render ≡ the band.
 //
 // Composition-as-source: the slotted content IS the slide. It stays in the LIGHT
-// DOM (default <slot>) so any other workponent placed inside — a <work-chart>, a
-// <work-video>, a <work-table> — upgrades and renders exactly as it would anywhere
+// DOM (default <slot>) so any other workponent placed inside — a <chart-view>, a
+// <video-player>, a <grid-table> — upgrades and renders exactly as it would anywhere
 // else. The shadow root only paints a themed frame from --work-* tokens; it never
 // re-renders or owns the author's content.
 //
@@ -15,14 +15,14 @@
 // is showing — the deck is the single source of the playhead.
 //
 // Usage:
-//   <work-deck>
-//     <work-slide band="title" transition="fade" hold="3s">
+//   <deck-view>
+//     <deck-slide band="title" transition="fade" hold="3s">
 //       <h1>Workponents</h1><p>One substrate, many domains.</p>
-//     </work-slide>
-//     <work-slide transition="rise">
-//       <work-chart type="bar" rows='[…]' x="region" y="rev"></work-chart>
-//     </work-slide>
-//   </work-deck>
+//     </deck-slide>
+//     <deck-slide transition="rise">
+//       <chart-view type="bar" rows='[…]' x="region" y="rev"></chart-view>
+//     </deck-slide>
+//   </deck-view>
 //
 // Attributes:
 //   band         a semantic label for the keyframe band (title|content|media|
@@ -130,4 +130,4 @@ export class WorkSlide extends WbElement {
   }
 }
 
-define("work-slide", WorkSlide);
+define("deck-slide", WorkSlide);

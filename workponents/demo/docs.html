@@ -45,20 +45,20 @@
       <button data-theme="dark" aria-pressed="false">dark</button>
       <button data-theme="signal" aria-pressed="false">signal</button>
       <span style="flex:1"></span>
-      <!-- docx ↔ work-doc: the document IS its source; .docx is just an I/O adapter
+      <!-- docx ↔ document-view: the document IS its source; .docx is just an I/O adapter
            on top (read via mammoth+turndown, write via docx — floor JS, lazy CDN). -->
       <button id="export-docx" title="export this document as .docx">export .docx ↓</button>
     </div>
 
     <!-- import affordance: drop or pick a .docx → it becomes the doc's org source -->
-    <work-doc-import for="report" style="margin: 0 0 24px"></work-doc-import>
+    <document-import for="report" style="margin: 0 0 24px"></document-import>
     <p id="io-note" style="font:600 11px var(--work-font-mono,monospace);color:var(--work-fg-subtle);min-height:16px;margin:-12px 0 24px"></p>
 
     <div class="layout">
       <div class="doc-pane">
-        <!-- The document is its own source. work-doc renders it directly; the
-             ```sql / ```polars fences below become live <work-doc-cell>s. -->
-        <work-doc id="report">
+        <!-- The document is its own source. document-view renders it directly; the
+             ```sql / ```polars fences below become live <document-cell>s. -->
+        <document-view id="report">
 # Q3 Revenue Review
 
 This document **is** its own source. There is no separate document model — the
@@ -111,12 +111,12 @@ A polars cell, same idea, different engine — resolved behind the one Dock seam
 df.filter(pl.col("quarter") == "Q3")
   .group_by("region")
   .agg(pl.col("revenue").sum())
-        </work-doc>
+        </document-view>
       </div>
 
       <aside>
         <!-- Auto-synced from the doc above, by id. -->
-        <work-doc-outline for="report"></work-doc-outline>
+        <document-outline for="report"></document-outline>
       </aside>
     </div>
   </div>
@@ -129,7 +129,7 @@ df.filter(pl.col("quarter") == "Q3")
     }));
 
     const note = document.getElementById("io-note");
-    // export: work-doc.export("docx") → a .docx Blob; download it (or, when docked,
+    // export: document-view.export("docx") → a .docx Blob; download it (or, when docked,
     // route through the Host → pandoc.wasm for max fidelity).
     document.getElementById("export-docx").addEventListener("click", async () => {
       const doc = document.getElementById("report");
@@ -146,7 +146,7 @@ df.filter(pl.col("quarter") == "Q3")
     // both adapters emit events — surface their verdict in the demo.
     document.addEventListener("work-doc-export", (e) =>
       note.textContent = e.detail.ok ? `exported .docx ✓ (${e.detail.format})` : `export failed: ${e.detail.error}`);
-    document.addEventListener("work-doc-import", (e) =>
+    document.addEventListener("document-import", (e) =>
       note.textContent = e.detail.ok ? `imported ${e.detail.name} ✓ — rendered as org` : `import failed: ${e.detail.error}`);
   </script>
 </body>

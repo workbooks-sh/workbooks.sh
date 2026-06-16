@@ -1,4 +1,4 @@
-// <work-composer> — the conversation input. Emits an intent rather than wiring
+// <chat-composer> — the conversation input. Emits an intent rather than wiring
 // to a transport itself: on submit it dispatches a `work-intent` CustomEvent
 // (bubbles, composed) carrying the typed text; the thread / host decides what
 // to do with it (append a turn, call inference over this.host, …). This keeps
@@ -10,7 +10,7 @@
 //   streaming — a reply is streaming in (animated indicator, input locked)
 //
 // Usage:
-//   <work-composer placeholder="Message the agent…"></work-composer>
+//   <chat-composer placeholder="Message the agent…"></chat-composer>
 //   composer.addEventListener("work-intent", (e) => { … e.detail.text … });
 //   composer.setAttribute("state", "thinking");  // host flips it while busy
 import { WbElement, html, css, define } from "../../core/element.js";
@@ -130,4 +130,4 @@ export class WbComposer extends WbElement {
   }
 }
 
-define("work-composer", WbComposer);
+define("chat-composer", WbComposer);

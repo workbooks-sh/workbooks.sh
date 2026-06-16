@@ -1,9 +1,9 @@
-// <work-chart> — THE data-viz reinvention: a chart IS a view over a query, not a
+// <chart-view> — THE data-viz reinvention: a chart IS a view over a query, not a
 // client-side data-wrangling widget. Aggregation / binning / grouping run IN the
 // shared engine (DuckDB on the runtime tier · browser duckdb-wasm · the in-JS
 // subset offline) — the element issues SQL and renders the result. Reach compute
 // ONLY through the src/data layer (getEngine), exactly like the sibling
-// <work-table>. Composition-as-source: the chart carries its data + query as source.
+// <grid-table>. Composition-as-source: the chart carries its data + query as source.
 //
 // TWO render tiers behind ONE public API (attrs / events / data path identical):
 //   • FLOOR — zero-dependency SVG, themed entirely from --work-* (axes, gridlines,
@@ -26,22 +26,22 @@
 // auto-name + whenRegistered/register plumbing is unchanged.
 //
 // Usage (register elsewhere, aggregate IN the engine):
-//   <work-chart type="bar" src-name="orders" x="region" y="revenue"
-//     query="SELECT region, sum(revenue) AS revenue FROM orders GROUP BY region"></work-chart>
+//   <chart-view type="bar" src-name="orders" x="region" y="revenue"
+//     query="SELECT region, sum(revenue) AS revenue FROM orders GROUP BY region"></chart-view>
 //
 // Usage (named source, default SELECT — x/y pick columns off the result):
-//   <work-chart type="line" src-name="daily" x="day" y="visits"></work-chart>
+//   <chart-view type="line" src-name="daily" x="day" y="visits"></chart-view>
 //
-// Usage (bind to a <work-query> by name — the canonical data binding):
-//   <work-query name="daily" sql="SELECT day, visits FROM events"></work-query>
-//   <work-chart type="line" from="daily" x="day" y="visits"></work-chart>
+// Usage (bind to a <data-query> by name — the canonical data binding):
+//   <data-query name="daily" sql="SELECT day, visits FROM events"></data-query>
+//   <chart-view type="line" from="daily" x="day" y="visits"></chart-view>
 //
 // Usage (inline data, no engine round-trip beyond registration):
-//   <work-chart type="scatter" x="x" y="y" rows='[{"x":1,"y":3},{"x":2,"y":5}]'></work-chart>
+//   <chart-view type="scatter" x="x" y="y" rows='[{"x":1,"y":3},{"x":2,"y":5}]'></chart-view>
 //
 // Attributes:
 //   type        bar | line | area | scatter | pie   (the chart variant)
-//   from        name of a <work-query> dataset to read (the canonical binding)
+//   from        name of a <data-query> dataset to read (the canonical binding)
 //   src-name    name of a source registered via getEngine().register(...)
 //   query       full SQL to run (the aggregate/GROUP BY lives HERE, in the engine)
 //   rows        inline JSON array of row objects (registers an auto-named source)
@@ -172,7 +172,7 @@ export class WbChart extends WbElement {
     super.disconnectedCallback();
   }
 
-  // A named source: from="<work-query name>" is the canonical binding; src-name is
+  // A named source: from="<data-query name>" is the canonical binding; src-name is
   // the equivalent register()-side name. Either names a source the engine resolves.
   _namedSource() { return this.attr("from") || this.attr("src-name"); }
 
@@ -431,7 +431,7 @@ export class WbChart extends WbElement {
         width: W, height: H, format: lay.fmt, legend: this.attr("legend", "auto"),
       });
     } catch (e) {
-      if (forced) console.warn("work-chart: Plot render failed, keeping floor", e);
+      if (forced) console.warn("chart-view: Plot render failed, keeping floor", e);
       return false;
     }
     powered.innerHTML = "";
@@ -738,4 +738,4 @@ function niceNum(range, round) {
   return nf * Math.pow(10, exp);
 }
 
-define("work-chart", WbChart);
+define("chart-view", WbChart);

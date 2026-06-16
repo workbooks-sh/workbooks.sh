@@ -1,4 +1,4 @@
-// code · the POWERED tier — CodeMirror 6 behind the <work-editor> floor.
+// code · the POWERED tier — CodeMirror 6 behind the <code-editor> floor.
 //
 // The floor (work-editor.js) is a zero-dependency editing surface: a transparent
 // <textarea> over a token-highlighted <pre> overlay, themed entirely from --work-*.
@@ -6,7 +6,7 @@
 // the element's SHADOW root, wired to the SAME public API — `getValue`/`setValue`,
 // the `value`/`language`/`readonly` props, and the `work-code-change` event. Only
 // the editing surface changes, never the contract; everything consuming
-// <work-editor> (incl. <work-repl>) inherits the upgrade unchanged.
+// <code-editor> (incl. <code-repl>) inherits the upgrade unchanged.
 //
 // Lazy-loaded from a CDN ESM at runtime (mirrors plot-tier / sqlite-wasm / wavelet):
 // nothing is bundled, no dep is installed. `loadCodeMirror()` is a single-flight
@@ -88,7 +88,7 @@ export function loadCodeMirror() {
   return _cmPromise;
 }
 
-// Map a normalized work-editor language → a single-flight CM language extension
+// Map a normalized code-editor language → a single-flight CM language extension
 // loader. Unknown / plain languages resolve to `null` (no language extension —
 // CM still edits text, just without grammar highlighting).
 function makeLangLoader() {
@@ -195,7 +195,7 @@ export function buildTheme(CM, tk) {
  * paints from `opts.tk`, and calls `opts.onChange(value)` on every doc edit.
  *
  * Returns { view, setDoc, setLanguage, setReadonly, setTheme, destroy } — the
- * imperative surface work-editor's getValue/setValue/_mountSurface drive. Language
+ * imperative surface code-editor's getValue/setValue/_mountSurface drive. Language
  * + readonly + theme each live in a Compartment so they reconfigure without losing
  * the doc/selection/history (theme re-applies on every host theme flip).
  *
@@ -258,7 +258,7 @@ export function createEditorView(CM, parent, opts) {
     setDoc(text) {
       const cur = view.state.doc.toString();
       if (cur === text) return;
-      // selection clamps automatically. work-editor decides whether to re-emit
+      // selection clamps automatically. code-editor decides whether to re-emit
       // work-code-change (its own `silent` flag) — the updateListener always fires.
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: text },

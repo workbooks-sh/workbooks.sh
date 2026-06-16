@@ -49,56 +49,56 @@
 
     <h2>0 · KPIs — a number IS a 1-row aggregate query</h2>
     <p class="note"><code>SELECT sum(revenue) … FROM orders</code> — the scalar is engine-computed, not
-      hand-rolled in JS. The third tile carries an inline <code>&lt;work-spark&gt;</code> trend (its own query).</p>
+      hand-rolled in JS. The third tile carries an inline <code>&lt;chart-spark&gt;</code> trend (its own query).</p>
     <div class="metrics">
-      <work-metric label="Total revenue" format="usd"
-        query="SELECT sum(revenue) AS total FROM orders"></work-metric>
-      <work-metric label="Orders" format="num"
-        query="SELECT count(*) AS n FROM orders"></work-metric>
-      <work-metric label="Daily revenue" format="usd" value-col="total"
+      <chart-metric label="Total revenue" format="usd"
+        query="SELECT sum(revenue) AS total FROM orders"></chart-metric>
+      <chart-metric label="Orders" format="num"
+        query="SELECT count(*) AS n FROM orders"></chart-metric>
+      <chart-metric label="Daily revenue" format="usd" value-col="total"
         query="SELECT sum(revenue) AS total FROM orders"
-        trend="SELECT day, sum(revenue) AS rev FROM orders GROUP BY day ORDER BY day" trend-y="rev"></work-metric>
+        trend="SELECT day, sum(revenue) AS rev FROM orders GROUP BY day ORDER BY day" trend-y="rev"></chart-metric>
     </div>
 
     <h2>1 · Bar — revenue per region (GROUP BY in the engine)</h2>
     <p class="note">The aggregate lives in the SQL: <code>SELECT region, sum(revenue) AS revenue FROM orders
       GROUP BY region</code>. The element just maps <code>x="region"</code> / <code>y="revenue"</code> off the
       result to bars. Hover a bar for the tooltip; click emits <code>work-point-select</code>.</p>
-    <work-chart type="bar" title="Revenue by region" src-name="orders" x="region" y="revenue" format="usd"
-      query="SELECT region, sum(revenue) AS revenue FROM orders GROUP BY region ORDER BY revenue DESC"></work-chart>
+    <chart-view type="bar" title="Revenue by region" src-name="orders" x="region" y="revenue" format="usd"
+      query="SELECT region, sum(revenue) AS revenue FROM orders GROUP BY region ORDER BY revenue DESC"></chart-view>
 
     <h2>2 · Line — revenue trend by day (GROUP BY day, engine-computed)</h2>
     <p class="note">Same source, a different query: <code>GROUP BY day</code> over the registered table. The
       line maps the ordered day buckets to points.</p>
-    <work-chart type="line" title="Revenue over time" src-name="orders" x="day" y="revenue" format="usd"
-      query="SELECT day, sum(revenue) AS revenue FROM orders GROUP BY day ORDER BY day"></work-chart>
+    <chart-view type="line" title="Revenue over time" src-name="orders" x="day" y="revenue" format="usd"
+      query="SELECT day, sum(revenue) AS revenue FROM orders GROUP BY day ORDER BY day"></chart-view>
 
     <div class="grid2">
       <div>
         <h2>3 · Area + multi-series — units &amp; revenue by region</h2>
         <p class="note">Two value columns from one aggregate → two series, one legend.</p>
-        <work-chart type="area" src-name="orders" x="region" y="units" size="sm" format="num"
-          query="SELECT region, sum(units) AS units FROM orders GROUP BY region ORDER BY region"></work-chart>
+        <chart-view type="area" src-name="orders" x="region" y="units" size="sm" format="num"
+          query="SELECT region, sum(units) AS units FROM orders GROUP BY region ORDER BY region"></chart-view>
       </div>
       <div>
         <h2>4 · Pie — share of revenue by product</h2>
         <p class="note"><code>GROUP BY product</code>; slices map to the value column, % computed from the result.</p>
-        <work-chart type="pie" src-name="orders" x="product" y="revenue" size="sm" format="usd"
-          query="SELECT product, sum(revenue) AS revenue FROM orders GROUP BY product"></work-chart>
+        <chart-view type="pie" src-name="orders" x="product" y="revenue" size="sm" format="usd"
+          query="SELECT product, sum(revenue) AS revenue FROM orders GROUP BY product"></chart-view>
       </div>
     </div>
 
     <h2>5 · Scatter — units vs revenue per order (raw rows, no aggregate)</h2>
     <p class="note">When the query returns raw rows the chart plots them directly; numeric x gets a numeric axis.</p>
-    <work-chart type="scatter" src-name="orders" x="units" y="revenue" size="sm" format="usd"
-      query="SELECT units, revenue FROM orders"></work-chart>
+    <chart-view type="scatter" src-name="orders" x="units" y="revenue" size="sm" format="usd"
+      query="SELECT units, revenue FROM orders"></chart-view>
 
     <h2>6 · Sparklines — a trend inline, each its own query</h2>
-    <p class="note">No axes, no chrome — <code>&lt;work-spark&gt;</code> sits inline.
-      Revenue/day <work-spark type="area" src-name="orders" y="rev"
-        query="SELECT day, sum(revenue) AS rev FROM orders GROUP BY day ORDER BY day" width="120"></work-spark>
-      &nbsp; orders/day <work-spark type="bar" tone="neutral" src-name="orders" y="n"
-        query="SELECT day, count(*) AS n FROM orders GROUP BY day ORDER BY day" width="120"></work-spark>
+    <p class="note">No axes, no chrome — <code>&lt;chart-spark&gt;</code> sits inline.
+      Revenue/day <chart-spark type="area" src-name="orders" y="rev"
+        query="SELECT day, sum(revenue) AS rev FROM orders GROUP BY day ORDER BY day" width="120"></chart-spark>
+      &nbsp; orders/day <chart-spark type="bar" tone="neutral" src-name="orders" y="n"
+        query="SELECT day, count(*) AS n FROM orders GROUP BY day ORDER BY day" width="120"></chart-spark>
     </p>
 
     <script type="module">
@@ -122,7 +122,7 @@
       await db.register("orders", { csv });
 
       // surface query + select events so the engine tier + interactions are visible
-      document.querySelectorAll("work-chart").forEach((c) => {
+      document.querySelectorAll("chart-view").forEach((c) => {
         c.addEventListener("work-chart-query", (e) => console.log("[work-chart-query]", e.detail));
         c.addEventListener("work-point-select", (e) => console.log("[work-point-select]", e.detail));
       });

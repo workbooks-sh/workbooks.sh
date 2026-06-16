@@ -1,22 +1,22 @@
-// <work-drive> — a file browser whose index IS a query over the workbook's store.
+// <file-drive> — a file browser whose index IS a query over the workbook's store.
 //
 // The files reinvention: a file is not a separate filesystem object, it's a ROW
 // in the workbook's SQLite — a content-addressed record (name, path/key, type,
 // size, modified, content-hash). So a "drive" is just a view over a query, the
-// same way <work-table> is a grid over a query and <work-record-list> is a card
+// same way <grid-table> is a grid over a query and <record-list> is a card
 // index. It reuses the SAME shared engine (getEngine) — never a second store —
 // but renders a file/icon browser surface (grid of typed tiles or a detail
 // list), NOT a tabular grid. Sorting/filtering push to SQL in the engine.
 //
 // Selecting a file emits `work-file-select` carrying the file's columns as a flat
-// object; wire it to a <work-file>'s attributes to drive an inline preview.
+// object; wire it to a <file-card>'s attributes to drive an inline preview.
 //
 // Usage (named source, drive a preview):
-//   <work-drive src-name="assets"
+//   <file-drive src-name="assets"
 //     query="SELECT name, path, type, size, modified, hash FROM assets"
 //     name-field="name" path-field="path" type-field="type"
 //     size-field="size" modified-field="modified" hash-field="hash"
-//     view="grid" sort="modified" dir="desc" searchable></work-drive>
+//     view="grid" sort="modified" dir="desc" searchable></file-drive>
 //
 // Attributes:
 //   src-name        a source registered via getEngine().register(...)
@@ -377,4 +377,4 @@ export class WbDrive extends WbElement {
 
 function ident(name) { return '"' + String(name).replace(/"/g, '""') + '"'; }
 
-define("work-drive", WbDrive);
+define("file-drive", WbDrive);

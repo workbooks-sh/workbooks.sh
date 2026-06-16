@@ -1,4 +1,4 @@
-// <work-live-value> — a single shared value that syncs across every client.
+// <live-value> — a single shared value that syncs across every client.
 //
 // The reinvention made concrete: shared state is just a published event on the
 // room's channel (no CRDT, no provisioned KV) — set it here and it lands on every
@@ -11,7 +11,7 @@
 // live. Three shapes cover the common cases: counter, toggle, text.
 //
 // Attributes:
-//   topic              bind directly (else inherits the nearest <work-room>)
+//   topic              bind directly (else inherits the nearest <live-room>)
 //   name               the value's key on the channel (default "value")
 //   variant = "counter" | "toggle" | "text"
 //   label              caption shown beside the control
@@ -163,4 +163,4 @@ export class WorkLiveValue extends WbElement {
   }
 }
 
-define("work-live-value", WorkLiveValue);
+define("live-value", WorkLiveValue);

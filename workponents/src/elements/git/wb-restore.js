@@ -1,4 +1,4 @@
-// <work-restore> — APPEND-ONLY restore (the "nothing is lost, restore anything"
+// <git-restore> — APPEND-ONLY restore (the "nothing is lost, restore anything"
 // promise). git's `checkout`/`reset` reinvented as one safe verb: restoring a
 // version never rewinds — it re-applies an old version AS A NEW version, so the
 // timeline stays fully intact (mirrors History.restore/3 in history.ex).
@@ -61,4 +61,4 @@ export class WorkRestore extends WbElement {
   }
 }
 
-define("work-restore", WorkRestore);
+define("git-restore", WorkRestore);

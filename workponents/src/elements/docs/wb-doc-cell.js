@@ -1,4 +1,4 @@
-// <work-doc-cell> — a live computed block inside a document. THE differentiator:
+// <document-cell> — a live computed block inside a document. THE differentiator:
 // the block that renders the data also computes it. A cell carries its query as
 // source (preview ≡ source); it reaches an engine through the Dock seam
 // (`this.host`) — DuckDB-wasm / Polars / the OQL kernel resolved local | runtime
@@ -6,8 +6,8 @@
 // to a "computed" preview with sample output (the same shape a real run returns),
 // so the document is never broken by an absent capability.
 //
-// Usage (standalone): <work-doc-cell lang="sql">SELECT region, sum(rev) ...</work-doc-cell>
-// Or, embedded by <work-doc> from a fenced ```sql block in the source.
+// Usage (standalone): <document-cell lang="sql">SELECT region, sum(rev) ...</document-cell>
+// Or, embedded by <document-view> from a fenced ```sql block in the source.
 import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 
@@ -174,4 +174,4 @@ export class WbDocCell extends WbElement {
   }
 }
 
-define("work-doc-cell", WbDocCell);
+define("document-cell", WbDocCell);

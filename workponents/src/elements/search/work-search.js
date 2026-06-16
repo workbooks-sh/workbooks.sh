@@ -1,16 +1,16 @@
-// <work-search> — THE search reinvention: search IS a query. An instant search box
+// <search-box> — THE search reinvention: search IS a query. An instant search box
 // over a registered source where EACH KEYSTROKE runs an engine query (debounced
 // WHERE … LIKE across the searchable fields) — never a JS .filter() over a
 // preloaded array. The result list is a thin, themed viewport over a
-// WbQueryResult, exactly like <work-table>. Reach compute ONLY through src/data
+// WbQueryResult, exactly like <grid-table>. Reach compute ONLY through src/data
 // (getEngine) — runtime DuckDB · browser duckdb-wasm · the in-JS offline floor.
 //
 // Usage (register elsewhere, search a named source):
-//   <work-search src-name="people" fields="name,role,city" label="Search people"
-//     title-field="name" subtitle-field="role"></work-search>
+//   <search-box src-name="people" fields="name,role,city" label="Search people"
+//     title-field="name" subtitle-field="role"></search-box>
 //
 // Usage (inline rows become an auto-named source):
-//   <work-search rows='[{"name":"Ada","role":"Eng"}]' fields="name,role"></work-search>
+//   <search-box rows='[{"name":"Ada","role":"Eng"}]' fields="name,role"></search-box>
 //
 // Attributes:
 //   src-name      name of a source registered via getEngine().register(...)
@@ -28,7 +28,7 @@
 //   variant       card | bare
 //   size          sm | md | lg
 //
-// Tier (floor → engine seam, mirrors <work-chart>):
+// Tier (floor → engine seam, mirrors <chart-view>):
 //   • FLOOR — the engine LIKE query (`… WHERE col LIKE '%term%'`). Zero-dep,
 //     always available, the guaranteed result path.
 //   • POWERED — MiniSearch (./minisearch-tier.js), lazy-loaded from a CDN ESM at
@@ -258,7 +258,7 @@ export class WorkSearch extends WbElement {
           try {
             result = await this._poweredQuery();
           } catch (e) {
-            if (choice === "minisearch") console.warn("work-search: MiniSearch tier failed, using floor LIKE", e);
+            if (choice === "minisearch") console.warn("search-box: MiniSearch tier failed, using floor LIKE", e);
             result = null;   // fall through to the floor below
           }
         }
@@ -419,4 +419,4 @@ function highlightTerm(text, term) {
   return highlight(t, [[idx, idx + q.length]]);
 }
 
-define("work-search", WorkSearch);
+define("search-box", WorkSearch);

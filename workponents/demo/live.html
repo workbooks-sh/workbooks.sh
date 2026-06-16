@@ -71,14 +71,14 @@
 
     <section>
       <h2>the room</h2>
-      <work-room id="room" topic="room:design-review" name="You">
+      <live-room id="room" topic="room:design-review" name="You">
         <div class="twocol">
           <div class="card">
             <h3>presence · avatars</h3>
-            <work-presence id="pres"></work-presence>
+            <live-presence id="pres"></live-presence>
             <div style="margin-top:14px">
               <h3>presence · count</h3>
-              <work-presence variant="count"></work-presence>
+              <live-presence variant="count"></live-presence>
             </div>
             <div class="controls">
               <wb-button id="pubHi" size="sm" variant="soft">Wave 👋</wb-button>
@@ -88,18 +88,18 @@
           </div>
           <div class="card">
             <h3>presence · list</h3>
-            <work-presence variant="list"></work-presence>
+            <live-presence variant="list"></live-presence>
           </div>
         </div>
-      </work-room>
+      </live-room>
     </section>
 
     <section>
       <h2>shared value (syncs across clients)</h2>
       <div class="row">
-        <work-live-value topic="room:design-review" name="votes" variant="counter" label="Votes"></work-live-value>
-        <work-live-value topic="room:design-review" name="locked" variant="toggle" label="Locked"></work-live-value>
-        <work-live-value topic="room:design-review" name="title" variant="text" label="Title"></work-live-value>
+        <live-value topic="room:design-review" name="votes" variant="counter" label="Votes"></live-value>
+        <live-value topic="room:design-review" name="locked" variant="toggle" label="Locked"></live-value>
+        <live-value topic="room:design-review" name="title" variant="text" label="Title"></live-value>
       </div>
       <p class="muted">Change any control here, or in a second tab — every client converges (last-write-wins on a
         logical clock). Simulated peers also nudge <code>votes</code> when they join.</p>

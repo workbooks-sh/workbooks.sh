@@ -1,4 +1,4 @@
-// <work-video> — the themed wrapper over the SHIPPED wavelet player.
+// <video-player> — the themed wrapper over the SHIPPED wavelet player.
 //
 // Wavelet's reinvention: COMPOSITION-AS-SOURCE video. The composition (a
 // <gm-doc> tree of <gm-timeline>/<gm-track>/<gm-clip>/<gm-scene>/… data
@@ -17,7 +17,7 @@
 // Source resolution (composition-as-source first):
 //   • `composition` attr / a slotted <gm-doc> / inner gm-* markup — inlined
 //     directly; the player IS the renderer (no fetch, no iframe). Preferred.
-//   • `src="…html"` (or a <work-video-source>) — fetched, then inlined the same
+//   • `src="…html"` (or a <video-source>) — fetched, then inlined the same
 //     way, so preview still equals render.
 //
 // Theming: chrome is suppressed on the embedded gm-doc (`data-embedded`); we
@@ -26,10 +26,10 @@
 // content — mirroring the desktop WaveletPlayer.
 //
 // Usage:
-//   <work-video controls poster="…">
+//   <video-player controls poster="…">
 //     <gm-doc fps="30" resolution="1280x720" duration="2.0s"> … </gm-doc>
-//   </work-video>
-//   <work-video src="reel.html" controls autoplay></work-video>
+//   </video-player>
+//   <video-player src="reel.html" controls autoplay></video-player>
 //   el.play(); el.pause(); await el.export();
 
 import { WbElement, html, css, define } from "../../core/element.js";
@@ -42,7 +42,7 @@ const DEFAULT_RUNTIME =
   (typeof window !== "undefined" && window.__WB_WAVELET_RUNTIME__) ||
   "/wavelet/wavelet-runtime.js";
 
-// One in-flight import per URL, shared across every <work-video> on the page.
+// One in-flight import per URL, shared across every <video-player> on the page.
 const _runtimeLoads = new Map();
 function loadWaveletRuntime(rawSrc) {
   if (typeof customElements !== "undefined" && customElements.get("gm-doc")) {
@@ -266,13 +266,13 @@ export class WorkVideo extends WbElement {
   _inlineSource() {
     const attr = this.attr("composition");
     if (attr && attr.trim()) return attr;
-    // A <work-video-source composition="…"> child (declarative form).
-    const srcEl = this.querySelector("work-video-source[composition]");
+    // A <video-source composition="…"> child (declarative form).
+    const srcEl = this.querySelector("video-source[composition]");
     if (srcEl) {
       const c = srcEl.getAttribute("composition");
       if (c && c.trim()) return c;
     }
-    // A slotted/child <gm-doc> authored directly inside <work-video>; move it
+    // A slotted/child <gm-doc> authored directly inside <video-player>; move it
     // into the shadow stage.
     const child = this.querySelector("gm-doc");
     if (child) return child.outerHTML;
@@ -283,7 +283,7 @@ export class WorkVideo extends WbElement {
   _srcUrl() {
     const direct = this.attr("src");
     if (direct) return direct;
-    const srcEl = this.querySelector("work-video-source[src]");
+    const srcEl = this.querySelector("video-source[src]");
     return srcEl ? srcEl.getAttribute("src") : null;
   }
 
@@ -575,4 +575,4 @@ function fmt(frame, fps) {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
-define("work-video", WorkVideo);
+define("video-player", WorkVideo);

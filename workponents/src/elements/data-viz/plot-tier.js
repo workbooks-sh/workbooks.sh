@@ -1,4 +1,4 @@
-// data-viz · the POWERED tier — Observable Plot behind the <work-chart> floor.
+// data-viz · the POWERED tier — Observable Plot behind the <chart-view> floor.
 //
 // The floor (wb-chart.js `_drawXY`/`_drawPie`) is a zero-dependency SVG renderer
 // themed entirely from --work-*. This module is the powered alternative: it draws

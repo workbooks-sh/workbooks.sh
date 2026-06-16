@@ -1,18 +1,18 @@
-// <work-editor> — a themed code editor. The editing surface is the zero-dep FLOOR:
+// <code-editor> — a themed code editor. The editing surface is the zero-dep FLOOR:
 // a transparent <textarea> over a token-highlighted <pre> overlay, with a line-
 // number gutter. Composition-as-source: the code IS the artifact's source, edited
 // in place — emits `work-code-change {value}` on every edit.
 //
 // THE EDITOR-SWAP SEAM (now wired to CodeMirror 6):
 //   The public API — the `value` property/attr, the `language`/`readonly` attrs, the
-//   `work-code-change` event, and the `<work-editor>` tag — is the contract. The
+//   `work-code-change` event, and the `<code-editor>` tag — is the contract. The
 //   editing surface itself is built by `_mountSurface()` / read+written via
 //   `getValue()` / `setValue()`. The POWERED build (./codemirror-tier.js) overrides
 //   ONLY those internals (mount a CodeMirror EditorView in the shadow root, read/
-//   write its doc) behind the same public API; nothing that consumes <work-editor>
-//   — including <work-repl> — changes. The floor is the lower rung of one ladder.
+//   write its doc) behind the same public API; nothing that consumes <code-editor>
+//   — including <code-repl> — changes. The floor is the lower rung of one ladder.
 //
-//   Tier resolution (mirrors work-chart): `engine="codemirror"|"floor"` attr or
+//   Tier resolution (mirrors chart-view): `engine="codemirror"|"floor"` attr or
 //   `window.__WB_EDITOR_ENGINE__` force it; default "auto" prefers CodeMirror and
 //   falls back to the floor INSTANTLY if the lazy CDN import fails (offline /
 //   network-blocked / the gate's wasm proof). NO build step, pure ESM; CM is
@@ -157,7 +157,7 @@ export class WorkEditor extends WbElement {
     if (!silent) this._emitChange();
   }
 
-  // ---- tier resolution (mirrors work-chart's _tierChoice) --------------------
+  // ---- tier resolution (mirrors chart-view's _tierChoice) --------------------
   //   - attribute engine="floor" | "codemirror" forces it (the gate drives this)
   //   - window.__WB_EDITOR_ENGINE__ = "floor" | "codemirror" is the host opt-out
   //   - default "auto": prefer CodeMirror, fall back to the floor if it can't load.
@@ -200,7 +200,7 @@ export class WorkEditor extends WbElement {
       this._tier = "codemirror";
       this.setAttribute("data-tier", "codemirror");
     }).catch((e) => {
-      if (forced) console.warn("work-editor: CodeMirror failed to load, keeping floor", e);
+      if (forced) console.warn("code-editor: CodeMirror failed to load, keeping floor", e);
       // floor remains; nothing to do.
     });
   }
@@ -314,4 +314,4 @@ export class WorkEditor extends WbElement {
   }
 }
 
-define("work-editor", WorkEditor);
+define("code-editor", WorkEditor);

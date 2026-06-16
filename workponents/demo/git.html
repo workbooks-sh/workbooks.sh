@@ -49,12 +49,12 @@
     <section>
       <h2>history + diff — select a version</h2>
       <div class="grid">
-        <work-history-graph id="hg"></work-history-graph>
+        <git-history-graph id="hg"></git-history-graph>
         <div>
-          <work-diff id="diff" mode="split"></work-diff>
+          <git-diff id="diff" mode="split"></git-diff>
           <div class="row" style="margin-top:14px">
-            <work-restore id="restore" scope="demo-workbook"></work-restore>
-            <work-undo id="undo" scope="demo-workbook"></work-undo>
+            <git-restore id="restore" scope="demo-workbook"></git-restore>
+            <git-undo id="undo" scope="demo-workbook"></git-undo>
           </div>
           <div class="log" id="log" style="margin-top:12px">No action yet. (standalone — no runtime; buttons emit events)</div>
         </div>
@@ -63,7 +63,7 @@
 
     <section>
       <h2>diff — line fallback (plain text), inline mode</h2>
-      <work-diff mode="inline" diff="lines"
+      <git-diff mode="inline" diff="lines"
         a="the quick brown fox
 jumps over the lazy dog
 a line that stays
@@ -71,7 +71,7 @@ remove me"
         b="the quick red fox
 jumps over the lazy dog
 a line that stays
-a brand new line"></work-diff>
+a brand new line"></git-diff>
     </section>
   </div>
 
@@ -139,7 +139,7 @@ a brand new line"></work-diff>
 
     // preselect the newest version so the diff shows on load (wait for the
     // custom elements to upgrade + connect, then drive a selection)
-    customElements.whenDefined("work-history-graph").then(() =>
+    customElements.whenDefined("git-history-graph").then(() =>
       requestAnimationFrame(() => hg.shadowRoot?.querySelector('li[data-id="f1a2b3c4"]')?.click()));
 
     // theme toggle

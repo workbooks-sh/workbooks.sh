@@ -95,22 +95,22 @@
     <h2>auth <span class="count">3</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;auth&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-auth&gt;</code></p>
-      <p class="purpose">the sign-in surface. Provider buttons (themed like work-button) +</p>
-      <p class="attrs"><span>mode</span><span>state</span><span>providers</span><span>heading</span></p>
-      <pre class="usage"><code>&lt;auth mode=&quot;…&quot; state=&quot;…&quot; providers=&quot;…&quot;&gt;&lt;/auth&gt;</code></pre>
-    </article>
-    <article class="card built">
       <header><code class="tag">&lt;auth-gate&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-gate&gt;</code></p>
+      
       <p class="purpose">the declarative auth guard. Conditionally renders its slotted</p>
       <p class="attrs"><span>when</span></p>
       <pre class="usage"><code>&lt;auth-gate when=&quot;…&quot;&gt;&lt;/auth-gate&gt;</code></pre>
     </article>
     <article class="card built">
+      <header><code class="tag">&lt;auth-panel&gt;</code><span class="badge built">toolkit</span></header>
+      
+      <p class="purpose">the sign-in surface. Provider buttons (themed like work-button) +</p>
+      <p class="attrs"><span>mode</span><span>state</span><span>providers</span><span>heading</span></p>
+      <pre class="usage"><code>&lt;auth-panel mode=&quot;…&quot; state=&quot;…&quot; providers=&quot;…&quot;&gt;&lt;/auth-panel&gt;</code></pre>
+    </article>
+    <article class="card built">
       <header><code class="tag">&lt;auth-user&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-user&gt;</code></p>
+      
       <p class="purpose">avatar + identity menu, bound to the current session.</p>
       <p class="attrs"><span>variant</span><span>open</span></p>
       <pre class="usage"><code>&lt;auth-user variant=&quot;…&quot; open=&quot;…&quot;&gt;&lt;/auth-user&gt;</code></pre>
@@ -120,57 +120,57 @@
     <h2>board <span class="count">4</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;board&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-board&gt;</code></p>
-      <p class="purpose">a Kanban board. Composition-as-source: its slotted &lt;work-task&gt;</p>
-      <p class="attrs"><span>title</span><span>columns</span></p>
-      <pre class="usage"><code>&lt;board title=&quot;…&quot; columns=&quot;…&quot;&gt;&lt;/board&gt;</code></pre>
-    </article>
-    <article class="card built">
       <header><code class="tag">&lt;board-milestone&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-milestone&gt;</code></p>
+      
       <p class="purpose">a dated marker: a goal due on an instant, either reached</p>
       <p class="attrs"><span>title</span><span>due</span><span>done</span></p>
       <pre class="usage"><code>&lt;board-milestone title=&quot;…&quot; due=&quot;…&quot; done=&quot;…&quot;&gt;&lt;/board-milestone&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;board-sprint&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-sprint&gt;</code></p>
+      
       <p class="purpose">a time-boxed iteration: a titled interval (start=…end=…) that</p>
       <p class="attrs"><span>title</span><span>start</span><span>end</span></p>
       <pre class="usage"><code>&lt;board-sprint title=&quot;…&quot; start=&quot;…&quot; end=&quot;…&quot;&gt;&lt;/board-sprint&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;board-task&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-task&gt;</code></p>
+      
       <p class="purpose">the PM leaf: a single unit of work as a themed card that renders</p>
       <p class="attrs"><span>status</span><span>title</span><span>assignee</span><span>due</span><span>estimate</span><span>priority</span></p>
       <pre class="usage"><code>&lt;board-task status=&quot;…&quot; title=&quot;…&quot; assignee=&quot;…&quot;&gt;&lt;/board-task&gt;</code></pre>
+    </article>
+    <article class="card built">
+      <header><code class="tag">&lt;board-view&gt;</code><span class="badge built">toolkit</span></header>
+      
+      <p class="purpose">a Kanban board. Composition-as-source: its slotted &lt;board-task&gt;</p>
+      <p class="attrs"><span>title</span><span>columns</span></p>
+      <pre class="usage"><code>&lt;board-view title=&quot;…&quot; columns=&quot;…&quot;&gt;&lt;/board-view&gt;</code></pre>
     </article></div>
   </section>
   <section id="chart">
     <h2>chart <span class="count">3</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;chart&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-chart&gt;</code></p>
-      <p class="purpose">THE data-viz reinvention: a chart IS a view over a query, not a</p>
-      <p class="attrs"><span>type</span><span>size</span><span>variant</span><span>src-name</span><span>from</span><span>query</span><span>rows</span><span>csv</span><span>x</span><span>y</span><span>series</span><span>label</span><span>legend</span><span>format</span><span>title</span><span>engine</span></p>
-      <pre class="usage"><code>&lt;chart type=&quot;…&quot; size=&quot;…&quot; variant=&quot;…&quot;&gt;&lt;/chart&gt;</code></pre>
-    </article>
-    <article class="card built">
       <header><code class="tag">&lt;chart-metric&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-metric&gt;</code></p>
+      
       <p class="purpose">a single KPI, computed in the engine. The number IS a query: the</p>
       <p class="attrs"><span>size</span><span>variant</span><span>query</span><span>src-name</span><span>rows</span><span>csv</span><span>value-col</span><span>delta-col</span><span>label</span><span>format</span><span>trend</span><span>trend-y</span></p>
       <pre class="usage"><code>&lt;chart-metric size=&quot;…&quot; variant=&quot;…&quot; query=&quot;…&quot;&gt;&lt;/chart-metric&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;chart-spark&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-spark&gt;</code></p>
+      
       <p class="purpose">an inline sparkline. A trend IS a query: the element runs SQL on</p>
       <p class="attrs"><span>type</span><span>tone</span><span>src-name</span><span>query</span><span>rows</span><span>csv</span><span>y</span><span>width</span><span>height</span></p>
       <pre class="usage"><code>&lt;chart-spark type=&quot;…&quot; tone=&quot;…&quot; src-name=&quot;…&quot;&gt;&lt;/chart-spark&gt;</code></pre>
+    </article>
+    <article class="card built">
+      <header><code class="tag">&lt;chart-view&gt;</code><span class="badge built">toolkit</span></header>
+      
+      <p class="purpose">THE data-viz reinvention: a chart IS a view over a query, not a</p>
+      <p class="attrs"><span>type</span><span>size</span><span>variant</span><span>src-name</span><span>from</span><span>query</span><span>rows</span><span>csv</span><span>x</span><span>y</span><span>series</span><span>label</span><span>legend</span><span>format</span><span>title</span><span>engine</span></p>
+      <pre class="usage"><code>&lt;chart-view type=&quot;…&quot; size=&quot;…&quot; variant=&quot;…&quot;&gt;&lt;/chart-view&gt;</code></pre>
     </article></div>
   </section>
   <section id="chat">
@@ -178,28 +178,28 @@
     <div class="grid">
     <article class="card built">
       <header><code class="tag">&lt;chat-composer&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-composer&gt;</code></p>
+      
       <p class="purpose">the conversation input. Emits an intent rather than wiring</p>
       <p class="attrs"><span>state</span><span>placeholder</span><span>disabled</span></p>
       <pre class="usage"><code>&lt;chat-composer state=&quot;…&quot; placeholder=&quot;…&quot; disabled=&quot;…&quot;&gt;&lt;/chat-composer&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;chat-gen-block&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-gen-block&gt;</code></p>
+      
       <p class="purpose">an inline component block the agent emits inside a turn.</p>
       <p class="attrs"><span>type</span><span>tone</span><span>title</span><span>label</span><span>href</span><span>action</span><span>target</span><span>done</span></p>
       <pre class="usage"><code>&lt;chat-gen-block type=&quot;…&quot; tone=&quot;…&quot; title=&quot;…&quot;&gt;&lt;/chat-gen-block&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;chat-message&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-message&gt;</code></p>
+      
       <p class="purpose">one turn of a conversation. Ported from</p>
       <p class="attrs"><span>role</span><span>text</span><span>name</span></p>
       <pre class="usage"><code>&lt;chat-message role=&quot;…&quot; text=&quot;…&quot; name=&quot;…&quot;&gt;&lt;/chat-message&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;chat-thread&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-thread&gt;</code></p>
+      
       <p class="purpose">renders a whole conversation. The DOC IS THE TRANSCRIPT:</p>
       <p class="attrs"><span>title</span><span>max-width</span></p>
       <pre class="usage"><code>&lt;chat-thread title=&quot;…&quot; max-width=&quot;…&quot;&gt;&lt;/chat-thread&gt;</code></pre>
@@ -210,15 +210,15 @@
     <div class="grid">
     <article class="card built">
       <header><code class="tag">&lt;code-editor&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-editor&gt;</code></p>
+      
       <p class="purpose">a themed code editor. The editing surface is the zero-dep FLOOR:</p>
       <p class="attrs"><span>variant</span><span>language</span><span>readonly</span><span>gutter</span><span>placeholder</span><span>engine</span></p>
       <pre class="usage"><code>&lt;code-editor variant=&quot;…&quot; language=&quot;…&quot; readonly=&quot;…&quot;&gt;&lt;/code-editor&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;code-repl&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-repl&gt;</code></p>
-      <p class="purpose">a &lt;work-editor&gt; + a Run affordance + an output pane. Real in-sandbox</p>
+      
+      <p class="purpose">a &lt;code-editor&gt; + a Run affordance + an output pane. Real in-sandbox</p>
       <p class="attrs"><span>variant</span><span>language</span><span>gutter</span></p>
       <pre class="usage"><code>&lt;code-repl variant=&quot;…&quot; language=&quot;…&quot; gutter=&quot;…&quot;&gt;&lt;/code-repl&gt;</code></pre>
     </article></div>
@@ -228,7 +228,7 @@
     <div class="grid">
     <article class="card built">
       <header><code class="tag">&lt;data-query&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-query&gt;</code></p>
+      
       <p class="purpose">THE declarative data source: a named, queryable dataset written</p>
       <p class="attrs"><span>name</span><span>db</span><span>sql</span><span>provider</span><span>debug</span></p>
       <pre class="usage"><code>&lt;data-query name=&quot;…&quot; db=&quot;…&quot; sql=&quot;…&quot;&gt;&lt;/data-query&gt;</code></pre>
@@ -238,72 +238,72 @@
     <h2>deck <span class="count">2</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;deck&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-deck&gt;</code></p>
-      <p class="purpose">THE presentation reinvention: a deck IS a wavelet timeline, and the</p>
-      <p class="attrs"><span>variant</span><span>index</span><span>aspect</span><span>controls</span><span>loop</span><span>hold</span><span>transition</span><span>resolution</span></p>
-      <pre class="usage"><code>&lt;deck variant=&quot;…&quot; index=&quot;…&quot; aspect=&quot;…&quot;&gt;&lt;/deck&gt;</code></pre>
-    </article>
-    <article class="card built">
       <header><code class="tag">&lt;deck-slide&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-slide&gt;</code></p>
-      <p class="purpose">one slide of a &lt;work-deck&gt;. The reinvention (per the presentation</p>
+      
+      <p class="purpose">one slide of a &lt;deck-view&gt;. The reinvention (per the presentation</p>
       <p class="attrs"><span>band</span><span>transition</span><span>align</span><span>active</span><span>prev</span><span>next</span><span>hold</span></p>
       <pre class="usage"><code>&lt;deck-slide band=&quot;…&quot; transition=&quot;…&quot; align=&quot;…&quot;&gt;&lt;/deck-slide&gt;</code></pre>
+    </article>
+    <article class="card built">
+      <header><code class="tag">&lt;deck-view&gt;</code><span class="badge built">toolkit</span></header>
+      
+      <p class="purpose">THE presentation reinvention: a deck IS a wavelet timeline, and the</p>
+      <p class="attrs"><span>variant</span><span>index</span><span>aspect</span><span>controls</span><span>loop</span><span>hold</span><span>transition</span><span>resolution</span></p>
+      <pre class="usage"><code>&lt;deck-view variant=&quot;…&quot; index=&quot;…&quot; aspect=&quot;…&quot;&gt;&lt;/deck-view&gt;</code></pre>
     </article></div>
   </section>
   <section id="document">
     <h2>document <span class="count">4</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;document&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-doc&gt;</code></p>
-      <p class="purpose">renders an org/markdown document directly from its source. The</p>
-      <p class="attrs"><span>src</span><span>format</span></p>
-      <pre class="usage"><code>&lt;document src=&quot;…&quot; format=&quot;…&quot;&gt;&lt;/document&gt;</code></pre>
-    </article>
-    <article class="card built">
       <header><code class="tag">&lt;document-cell&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-doc-cell&gt;</code></p>
+      
       <p class="purpose">a live computed block inside a document. THE differentiator:</p>
       <p class="attrs"><span>display</span><span>variant</span><span>lang</span><span>src</span><span>title</span><span>state</span></p>
       <pre class="usage"><code>&lt;document-cell display=&quot;…&quot; variant=&quot;…&quot; lang=&quot;…&quot;&gt;&lt;/document-cell&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;document-import&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-doc-import&gt;</code></p>
+      
       <p class="purpose">a token-only dropzone that imports a .docx into a sibling</p>
       <p class="attrs"><span>for</span><span>label</span></p>
       <pre class="usage"><code>&lt;document-import for=&quot;…&quot; label=&quot;…&quot;&gt;&lt;/document-import&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;document-outline&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-doc-outline&gt;</code></p>
+      
       <p class="purpose">a clickable heading tree for a document, auto-synced.</p>
       <p class="attrs"><span>for</span></p>
       <pre class="usage"><code>&lt;document-outline for=&quot;…&quot;&gt;&lt;/document-outline&gt;</code></pre>
+    </article>
+    <article class="card built">
+      <header><code class="tag">&lt;document-view&gt;</code><span class="badge built">toolkit</span></header>
+      
+      <p class="purpose">renders an org/markdown document directly from its source. The</p>
+      <p class="attrs"><span>src</span><span>format</span></p>
+      <pre class="usage"><code>&lt;document-view src=&quot;…&quot; format=&quot;…&quot;&gt;&lt;/document-view&gt;</code></pre>
     </article></div>
   </section>
   <section id="file">
     <h2>file <span class="count">3</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;file&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-file&gt;</code></p>
+      <header><code class="tag">&lt;file-card&gt;</code><span class="badge built">toolkit</span></header>
+      
       <p class="purpose">a single file card with an inline, type-aware preview.</p>
       <p class="attrs"><span>variant</span><span>density</span><span>name</span><span>type</span><span>src</span><span>text</span><span>path</span><span>hash</span><span>size</span><span>modified</span></p>
-      <pre class="usage"><code>&lt;file variant=&quot;…&quot; density=&quot;…&quot; name=&quot;…&quot;&gt;&lt;/file&gt;</code></pre>
+      <pre class="usage"><code>&lt;file-card variant=&quot;…&quot; density=&quot;…&quot; name=&quot;…&quot;&gt;&lt;/file-card&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;file-drive&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-drive&gt;</code></p>
+      
       <p class="purpose">a file browser whose index IS a query over the workbook's store.</p>
       <p class="attrs"><span>view</span><span>variant</span><span>src-name</span><span>query</span><span>name-field</span><span>path-field</span><span>type-field</span><span>size-field</span><span>modified-field</span><span>hash-field</span><span>sort</span><span>dir</span><span>searchable</span><span>selected</span></p>
       <pre class="usage"><code>&lt;file-drive view=&quot;…&quot; variant=&quot;…&quot; src-name=&quot;…&quot;&gt;&lt;/file-drive&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;file-dropzone&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-dropzone&gt;</code></p>
+      
       <p class="purpose">drag (or pick) files to add them to the drive.</p>
       <p class="attrs"><span>variant</span><span>accept</span><span>multiple</span></p>
       <pre class="usage"><code>&lt;file-dropzone variant=&quot;…&quot; accept=&quot;…&quot; multiple=&quot;…&quot;&gt;&lt;/file-dropzone&gt;</code></pre>
@@ -331,25 +331,25 @@
     <h2>form <span class="count">3</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;form&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-form&gt;</code></p>
-      <p class="purpose">the form surface. THE reinvention: a form IS its schema. The form</p>
-      <p class="attrs"><span>schema</span><span>submit-label</span><span>novalidate</span><span>live</span></p>
-      <pre class="usage"><code>&lt;form schema=&quot;…&quot; submit-label=&quot;…&quot; novalidate=&quot;…&quot;&gt;&lt;/form&gt;</code></pre>
-    </article>
-    <article class="card built">
       <header><code class="tag">&lt;form-field&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-field&gt;</code></p>
+      
       <p class="purpose">one control bound to its rule. The form IS its schema: a field</p>
       <p class="attrs"><span>variant</span><span>size</span><span>name</span><span>type</span><span>label</span><span>help</span><span>placeholder</span><span>value</span><span>required</span><span>min</span><span>max</span><span>pattern</span><span>options</span><span>disabled</span><span>error</span></p>
       <pre class="usage"><code>&lt;form-field variant=&quot;…&quot; size=&quot;…&quot; name=&quot;…&quot;&gt;&lt;/form-field&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;form-field-group&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-field-group&gt;</code></p>
+      
       <p class="purpose">a themed fieldset/section that visually groups fields. Pure</p>
       <p class="attrs"><span>label</span><span>help</span></p>
       <pre class="usage"><code>&lt;form-field-group label=&quot;…&quot; help=&quot;…&quot;&gt;&lt;/form-field-group&gt;</code></pre>
+    </article>
+    <article class="card built">
+      <header><code class="tag">&lt;form-view&gt;</code><span class="badge built">toolkit</span></header>
+      
+      <p class="purpose">the form surface. THE reinvention: a form IS its schema. The form</p>
+      <p class="attrs"><span>schema</span><span>submit-label</span><span>novalidate</span><span>live</span></p>
+      <pre class="usage"><code>&lt;form-view schema=&quot;…&quot; submit-label=&quot;…&quot; novalidate=&quot;…&quot;&gt;&lt;/form-view&gt;</code></pre>
     </article></div>
   </section>
   <section id="git">
@@ -357,28 +357,28 @@
     <div class="grid">
     <article class="card built">
       <header><code class="tag">&lt;git-diff&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-diff&gt;</code></p>
+      
       <p class="purpose">themed before/after diff, computed IN JS (no external dep).</p>
       <p class="attrs"><span>mode</span><span>diff</span><span>a</span><span>b</span></p>
       <pre class="usage"><code>&lt;git-diff mode=&quot;…&quot; diff=&quot;…&quot; a=&quot;…&quot;&gt;&lt;/git-diff&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;git-history-graph&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-history-graph&gt;</code></p>
+      
       <p class="purpose">the user-facing History timeline.</p>
       <p class="attrs"><span>items</span><span>selected</span></p>
       <pre class="usage"><code>&lt;git-history-graph items=&quot;…&quot; selected=&quot;…&quot;&gt;&lt;/git-history-graph&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;git-restore&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-restore&gt;</code></p>
+      
       <p class="purpose">APPEND-ONLY restore (the &quot;nothing is lost, restore anything&quot;</p>
       <p class="attrs"><span>scope</span><span>to</span><span>label</span><span>disabled</span><span>busy</span></p>
       <pre class="usage"><code>&lt;git-restore scope=&quot;…&quot; to=&quot;…&quot; label=&quot;…&quot;&gt;&lt;/git-restore&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;git-undo&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-undo&gt;</code></p>
+      
       <p class="purpose">undo the last change (the &quot;undo anything an agent did&quot; promise).</p>
       <p class="attrs"><span>scope</span><span>label</span><span>disabled</span><span>busy</span></p>
       <pre class="usage"><code>&lt;git-undo scope=&quot;…&quot; label=&quot;…&quot; disabled=&quot;…&quot;&gt;&lt;/git-undo&gt;</code></pre>
@@ -389,14 +389,14 @@
     <div class="grid">
     <article class="card built">
       <header><code class="tag">&lt;grid-column&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-column&gt;</code></p>
-      <p class="purpose">declarative column config for &lt;work-table&gt;. Light-DOM only; it</p>
+      
+      <p class="purpose">declarative column config for &lt;grid-table&gt;. Light-DOM only; it</p>
       
       <pre class="usage"><code>&lt;grid-column&gt;&lt;/grid-column&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;grid-table&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-table&gt;</code></p>
+      
       <p class="purpose">THE tables reinvention: the grid IS a view over a query, not a</p>
       <p class="attrs"><span>variant</span><span>density</span><span>rows</span><span>csv</span><span>src-name</span><span>from</span><span>query</span><span>page-size</span><span>searchable</span></p>
       <pre class="usage"><code>&lt;grid-table variant=&quot;…&quot; density=&quot;…&quot; rows=&quot;…&quot;&gt;&lt;/grid-table&gt;</code></pre>
@@ -407,21 +407,21 @@
     <div class="grid">
     <article class="card built">
       <header><code class="tag">&lt;live-presence&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-presence&gt;</code></p>
+      
       <p class="purpose">who's here, live. Renders the channel's presence set.</p>
       <p class="attrs"><span>variant</span><span>topic</span><span>max</span><span>self</span></p>
       <pre class="usage"><code>&lt;live-presence variant=&quot;…&quot; topic=&quot;…&quot; max=&quot;…&quot;&gt;&lt;/live-presence&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;live-room&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-room&gt;</code></p>
+      
       <p class="purpose">the realtime container. Joins a topic and slots its content.</p>
       <p class="attrs"><span>topic</span><span>name</span><span>color</span><span>state</span></p>
       <pre class="usage"><code>&lt;live-room topic=&quot;…&quot; name=&quot;…&quot; color=&quot;…&quot;&gt;&lt;/live-room&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;live-value&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-live-value&gt;</code></p>
+      
       <p class="purpose">a single shared value that syncs across every client.</p>
       <p class="attrs"><span>variant</span><span>topic</span><span>name</span><span>label</span><span>value</span></p>
       <pre class="usage"><code>&lt;live-value variant=&quot;…&quot; topic=&quot;…&quot; name=&quot;…&quot;&gt;&lt;/live-value&gt;</code></pre>
@@ -431,76 +431,76 @@
     <h2>map <span class="count">1</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;map&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-map&gt;</code></p>
+      <header><code class="tag">&lt;map-view&gt;</code><span class="badge built">toolkit</span></header>
+      
       <p class="purpose">THE maps reinvention: the map IS a SPATIAL VIEW OVER A QUERY, not a</p>
       <p class="attrs"><span>mode</span><span>variant</span><span>projection</span><span>rows</span><span>csv</span><span>src-name</span><span>query</span><span>lat</span><span>lon</span><span>value</span><span>label</span><span>key</span><span>geo-key</span><span>geojson</span><span>tiles</span><span>engine</span></p>
-      <pre class="usage"><code>&lt;map mode=&quot;…&quot; variant=&quot;…&quot; projection=&quot;…&quot;&gt;&lt;/map&gt;</code></pre>
+      <pre class="usage"><code>&lt;map-view mode=&quot;…&quot; variant=&quot;…&quot; projection=&quot;…&quot;&gt;&lt;/map-view&gt;</code></pre>
     </article></div>
   </section>
   <section id="model">
     <h2>model <span class="count">2</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;model&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-model&gt;</code></p>
-      <p class="purpose">the themed wrapper over Google's &lt;model-viewer&gt;.</p>
-      <p class="attrs"><span>variant</span><span>size</span><span>tone</span><span>src</span><span>poster</span><span>alt</span><span>ar</span><span>auto-rotate</span><span>camera-controls</span><span>name</span><span>viewer-src</span></p>
-      <pre class="usage"><code>&lt;model variant=&quot;…&quot; size=&quot;…&quot; tone=&quot;…&quot;&gt;&lt;/model&gt;</code></pre>
-    </article>
-    <article class="card built">
       <header><code class="tag">&lt;model-source&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-model-source&gt;</code></p>
+      
       <p class="purpose">the composition-as-source-for-3D descriptor for</p>
       <p class="attrs"><span>src</span><span>code</span><span>manifold-src</span><span>type</span></p>
       <pre class="usage"><code>&lt;model-source src=&quot;…&quot; code=&quot;…&quot; manifold-src=&quot;…&quot;&gt;&lt;/model-source&gt;</code></pre>
+    </article>
+    <article class="card built">
+      <header><code class="tag">&lt;model-view&gt;</code><span class="badge built">toolkit</span></header>
+      
+      <p class="purpose">the themed wrapper over Google's &lt;model-viewer&gt;.</p>
+      <p class="attrs"><span>variant</span><span>size</span><span>tone</span><span>src</span><span>poster</span><span>alt</span><span>ar</span><span>auto-rotate</span><span>camera-controls</span><span>name</span><span>viewer-src</span></p>
+      <pre class="usage"><code>&lt;model-view variant=&quot;…&quot; size=&quot;…&quot; tone=&quot;…&quot;&gt;&lt;/model-view&gt;</code></pre>
     </article></div>
   </section>
   <section id="record">
     <h2>record <span class="count">3</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;record&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-record&gt;</code></p>
-      <p class="purpose">THE records reinvention: the detail view of ONE entity. A record</p>
-      <p class="attrs"><span>layout</span><span>variant</span><span>src-name</span><span>query</span><span>where</span><span>key</span><span>value</span><span>id</span><span>fields</span><span>formats</span><span>editable</span><span>table</span><span>title-field</span></p>
-      <pre class="usage"><code>&lt;record layout=&quot;…&quot; variant=&quot;…&quot; src-name=&quot;…&quot;&gt;&lt;/record&gt;</code></pre>
-    </article>
-    <article class="card built">
       <header><code class="tag">&lt;record-field-value&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-field-value&gt;</code></p>
+      
       <p class="purpose">a typed single-value display, the atom of the records</p>
       <p class="attrs"><span>display</span><span>value</span><span>type</span><span>format</span><span>empty</span></p>
       <pre class="usage"><code>&lt;record-field-value display=&quot;…&quot; value=&quot;…&quot; type=&quot;…&quot;&gt;&lt;/record-field-value&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;record-list&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-record-list&gt;</code></p>
+      
       <p class="purpose">the master index of entities: a card / list view over a</p>
       <p class="attrs"><span>layout</span><span>variant</span><span>src-name</span><span>from</span><span>query</span><span>key</span><span>title-field</span><span>subtitle-field</span><span>fields</span><span>formats</span><span>searchable</span><span>selected</span></p>
       <pre class="usage"><code>&lt;record-list layout=&quot;…&quot; variant=&quot;…&quot; src-name=&quot;…&quot;&gt;&lt;/record-list&gt;</code></pre>
+    </article>
+    <article class="card built">
+      <header><code class="tag">&lt;record-view&gt;</code><span class="badge built">toolkit</span></header>
+      
+      <p class="purpose">THE records reinvention: the detail view of ONE entity. A record</p>
+      <p class="attrs"><span>layout</span><span>variant</span><span>src-name</span><span>query</span><span>where</span><span>key</span><span>value</span><span>id</span><span>fields</span><span>formats</span><span>editable</span><span>table</span><span>title-field</span></p>
+      <pre class="usage"><code>&lt;record-view layout=&quot;…&quot; variant=&quot;…&quot; src-name=&quot;…&quot;&gt;&lt;/record-view&gt;</code></pre>
     </article></div>
   </section>
   <section id="search">
     <h2>search <span class="count">3</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;search&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-search&gt;</code></p>
+      <header><code class="tag">&lt;search-box&gt;</code><span class="badge built">toolkit</span></header>
+      
       <p class="purpose">THE search reinvention: search IS a query. An instant search box</p>
       <p class="attrs"><span>variant</span><span>size</span><span>rows</span><span>csv</span><span>src-name</span><span>query</span><span>fields</span><span>placeholder</span><span>limit</span><span>open-on-focus</span><span>engine</span><span>value</span></p>
-      <pre class="usage"><code>&lt;search variant=&quot;…&quot; size=&quot;…&quot; rows=&quot;…&quot;&gt;&lt;/search&gt;</code></pre>
+      <pre class="usage"><code>&lt;search-box variant=&quot;…&quot; size=&quot;…&quot; rows=&quot;…&quot;&gt;&lt;/search-box&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;search-command&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-command&gt;</code></p>
+      
       <p class="purpose">the ⌘K command palette. THE killer element. A keyboard-driven,</p>
       <p class="attrs"><span>variant</span><span>src-name</span><span>query</span><span>fields</span><span>data-label</span><span>data-limit</span><span>placeholder</span><span>open</span><span>engine</span></p>
       <pre class="usage"><code>&lt;search-command variant=&quot;…&quot; src-name=&quot;…&quot; query=&quot;…&quot;&gt;&lt;/search-command&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;search-command-item&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-command-item&gt;</code></p>
+      
       <p class="purpose">the ⌘K command palette. THE killer element. A keyboard-driven,</p>
       <p class="attrs"><span>variant</span><span>src-name</span><span>query</span><span>fields</span><span>data-label</span><span>data-limit</span><span>placeholder</span><span>open</span><span>engine</span></p>
       <pre class="usage"><code>&lt;search-command-item variant=&quot;…&quot; src-name=&quot;…&quot; query=&quot;…&quot;&gt;&lt;/search-command-item&gt;</code></pre>
@@ -510,16 +510,16 @@
     <h2>video <span class="count">2</span></h2>
     <div class="grid">
     <article class="card built">
-      <header><code class="tag">&lt;video&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-video&gt;</code></p>
+      <header><code class="tag">&lt;video-player&gt;</code><span class="badge built">toolkit</span></header>
+      
       <p class="purpose">the themed wrapper over the SHIPPED wavelet player.</p>
       <p class="attrs"><span>variant</span><span>size</span><span>tone</span><span>fit</span><span>src</span><span>composition</span><span>poster</span><span>controls</span><span>autoplay</span><span>loop</span><span>runtime-src</span></p>
-      <pre class="usage"><code>&lt;video variant=&quot;…&quot; size=&quot;…&quot; tone=&quot;…&quot;&gt;&lt;/video&gt;</code></pre>
+      <pre class="usage"><code>&lt;video-player variant=&quot;…&quot; size=&quot;…&quot; tone=&quot;…&quot;&gt;&lt;/video-player&gt;</code></pre>
     </article>
     <article class="card built">
       <header><code class="tag">&lt;video-source&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-video-source&gt;</code></p>
-      <p class="purpose">a declarative source descriptor for &lt;work-video&gt;, the</p>
+      
+      <p class="purpose">a declarative source descriptor for &lt;video-player&gt;, the</p>
       <p class="attrs"><span>src</span><span>composition</span><span>type</span></p>
       <pre class="usage"><code>&lt;video-source src=&quot;…&quot; composition=&quot;…&quot; type=&quot;…&quot;&gt;&lt;/video-source&gt;</code></pre>
     </article></div>

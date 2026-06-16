@@ -1,9 +1,9 @@
-// <work-gate> — the declarative auth guard. Conditionally renders its slotted
+// <auth-gate> — the declarative auth guard. Conditionally renders its slotted
 // content by auth state, reading the identity seam (over this.host).
 //
-//   <work-gate when="authed">      …shown only when signed in…
+//   <auth-gate when="authed">      …shown only when signed in…
 //     <p slot="fallback">Please sign in.</p>   <!-- shown when the test fails -->
-//   </work-gate>
+//   </auth-gate>
 //
 // `when` values:
 //   authed      — a user session exists
@@ -11,7 +11,7 @@
 //   role:<name> — a session whose user.roles includes <name>
 //
 // It subscribes to the seam, so it flips live the moment the session changes
-// (e.g. <work-auth> resolves, or <work-user> signs out) — no host wiring needed.
+// (e.g. <auth-panel> resolves, or <auth-user> signs out) — no host wiring needed.
 // Light-DOM content is projected; the default slot is the protected content,
 // slot="fallback" is shown otherwise. Emits `work-gate-change` {passed, when}.
 import { WbElement, html, css, define } from "../../core/element.js";
@@ -94,4 +94,4 @@ export class WorkGate extends WbElement {
   }
 }
 
-define("work-gate", WorkGate);
+define("auth-gate", WorkGate);

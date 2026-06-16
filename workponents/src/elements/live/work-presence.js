@@ -1,6 +1,6 @@
-// <work-presence> — who's here, live. Renders the channel's presence set.
+// <live-presence> — who's here, live. Renders the channel's presence set.
 //
-// Binds to the room's Channel (own `topic` attr, else the nearest <work-room>) and
+// Binds to the room's Channel (own `topic` attr, else the nearest <live-room>) and
 // re-renders on every presence diff — joins/leaves/metadata updates flow straight
 // off Phoenix Presence (real) or the BroadcastChannel mock (standalone), same
 // shape either way. Themed entirely from --work-*; the per-client color is the only
@@ -13,7 +13,7 @@
 //   self="hide"        omit this client from the rendered set
 // Events:
 //   work-presence-change { list, count, joins, leaves }   — on every presence diff
-// Usage:  <work-presence></work-presence>  ·  <work-presence variant="list"></work-presence>
+// Usage:  <live-presence></live-presence>  ·  <live-presence variant="list"></live-presence>
 import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { clientId, colorFor } from "./channel.js";
@@ -134,4 +134,4 @@ export class WorkPresence extends WbElement {
   }
 }
 
-define("work-presence", WorkPresence);
+define("live-presence", WorkPresence);

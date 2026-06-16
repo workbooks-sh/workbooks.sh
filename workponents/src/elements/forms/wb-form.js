@@ -1,6 +1,6 @@
-// <work-form> — the form surface. THE reinvention: a form IS its schema. The form
+// <form-view> — the form surface. THE reinvention: a form IS its schema. The form
 // owns one declarative schema (inline JSON `schema` attr/property, OR built from
-// its child <work-field> rules), runs `src/validate` against the live values on
+// its child <form-field> rules), runs `src/validate` against the live values on
 // input + on submit, blocks submit while invalid, and writes errors back down to
 // each field — validation is never hand-wired per control. Themed entirely from
 // --work-* tokens.
@@ -16,11 +16,11 @@
 // can decide, the Host only adds what it alone knows (uniqueness, cross-record).
 //
 // Usage:
-//   <work-form>
-//     <work-field name="email" type="email" label="Email" required></work-field>
-//     <work-field name="pw" type="password" label="Password" required min="8"></work-field>
+//   <form-view>
+//     <form-field name="email" type="email" label="Email" required></form-field>
+//     <form-field name="pw" type="password" label="Password" required min="8"></form-field>
 //     <wb-button type="submit" slot="actions">Create</wb-button>
-//   </work-form>
+//   </form-view>
 import { WbElement, html, css, define } from "../../core/element.js";
 import { validateRecord, validateRecordAsync, parseSchema } from "../../validate/index.js";
 
@@ -47,7 +47,7 @@ export class WbForm extends WbElement {
   `;
 
   /** The form's schema — explicit property/attr wins; otherwise built from the
-   *  child <work-field> rules (the form IS its schema). */
+   *  child <form-field> rules (the form IS its schema). */
   get schema() {
     if (this._schema) return this._schema;
     const attr = this.attr("schema");
@@ -57,7 +57,7 @@ export class WbForm extends WbElement {
   set schema(v) { this._schema = v; }
 
   _fields() {
-    return Array.from(this.querySelectorAll("work-field"));
+    return Array.from(this.querySelectorAll("form-field"));
   }
 
   _schemaFromFields() {
@@ -71,8 +71,8 @@ export class WbForm extends WbElement {
 
   /** The native <form> the fields actually participate in. A Form-Associated
    *  Custom Element associates with the nearest ANCESTOR <form> in its own tree —
-   *  the <work-field>s live in this element's light DOM, so that is the <form>
-   *  the author wraps <work-form> in (`<form><work-form>…`). The inner shadow
+   *  the <form-field>s live in this element's light DOM, so that is the <form>
+   *  the author wraps <form-view> in (`<form><form-view>…`). The inner shadow
    *  <form> is layout/submit-affordance only and is NOT where slotted fields
    *  associate, so we read the owning light-DOM form for native participation. */
   get _ownerForm() {
@@ -82,7 +82,7 @@ export class WbForm extends WbElement {
   /** The owning form's native FormData — the fields' submitted values (FACE).
    *  Proves native participation: each field appears here under its `name`
    *  because it called setFormValue, with NO manual DOM harvesting. Empty when
-   *  <work-form> is not wrapped in a real <form> (standalone usage). */
+   *  <form-view> is not wrapped in a real <form> (standalone usage). */
   formData() {
     const form = this._ownerForm;
     return form && typeof FormData === "function" ? new FormData(form) : new FormData();
@@ -143,8 +143,8 @@ export class WbForm extends WbElement {
       }
     });
 
-    // Native form participation: when the author wraps <work-form> in a real
-    // <form>, the child <work-field>s are Form-Associated to THAT form. Run the
+    // Native form participation: when the author wraps <form-view> in a real
+    // <form>, the child <form-field>s are Form-Associated to THAT form. Run the
     // schema floor on the owning form's native submit so the floor's errors flow
     // into each field's native validity (setValidity via setError) and the
     // browser blocks the submit on any invalid field — the floor and native
@@ -258,4 +258,4 @@ export class WbForm extends WbElement {
   }
 }
 
-define("work-form", WbForm);
+define("form-view", WbForm);

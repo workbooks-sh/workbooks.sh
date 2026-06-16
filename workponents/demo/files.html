@@ -56,36 +56,36 @@
     <h2>The drive drives the preview</h2>
     <p class="note">The drive on the left is a <code>query</code> over a registered <code>assets</code>
       source (each row = one file). Pick a file; its <code>work-file-select</code> event carries the row,
-      and the page maps those columns onto the <code>&lt;work-file&gt;</code> on the right — which previews
+      and the page maps those columns onto the <code>&lt;file-card&gt;</code> on the right — which previews
       by <code>type</code>: a text file inline, an image by URL, and a typed placeholder for content that
       lives in the nexus (standalone, no Host → it shows the degraded card). Switch grid/list, sort, filter.</p>
     <div class="md">
-      <work-drive id="drive" src-name="assets"
+      <file-drive id="drive" src-name="assets"
         query="SELECT name, path, type, size, modified, hash FROM assets"
         name-field="name" path-field="path" type-field="type"
         size-field="size" modified-field="modified" hash-field="hash"
-        view="grid" sort="modified" dir="desc" searchable></work-drive>
+        view="grid" sort="modified" dir="desc" searchable></file-drive>
 
-      <work-file id="preview" density="md"></work-file>
+      <file-card id="preview" density="md"></file-card>
     </div>
 
     <h2>Previews, standalone — text inline · image by URL · typed placeholder</h2>
-    <p class="note">Three <code>&lt;work-file&gt;</code> cards used on their own. Text and image-by-URL render
+    <p class="note">Three <code>&lt;file-card&gt;</code> cards used on their own. Text and image-by-URL render
       with zero Host; the video card has only a <code>path</code> — its content lives in the nexus, so
       standalone it shows the typed placeholder + the &ldquo;dock to transcode&rdquo; note.</p>
     <div class="md" style="grid-template-columns:1fr 1fr 1fr">
-      <work-file name="notes.md" type="text/markdown"
-        text="# Release notes&#10;&#10;- files = content-addressed rows&#10;- preview rides the wavelet path&#10;- the index IS a query&#10;&#10;Everything themes from --work-* tokens."></work-file>
-      <work-file id="img-by-url" name="petal.svg" type="image/svg+xml" size="612"></work-file>
-      <work-file name="trailer.mp4" type="video/mp4" path="blobs/9f2a…c1" size="18452211"
-        hash="sha256:9f2a7b1c4d8e0f3a6b5c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1c"></work-file>
+      <file-card name="notes.md" type="text/markdown"
+        text="# Release notes&#10;&#10;- files = content-addressed rows&#10;- preview rides the wavelet path&#10;- the index IS a query&#10;&#10;Everything themes from --work-* tokens."></file-card>
+      <file-card id="img-by-url" name="petal.svg" type="image/svg+xml" size="612"></file-card>
+      <file-card name="trailer.mp4" type="video/mp4" path="blobs/9f2a…c1" size="18452211"
+        hash="sha256:9f2a7b1c4d8e0f3a6b5c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1c"></file-card>
     </div>
 
     <h2>Add files — a drop is an insert</h2>
-    <p class="note">Drag a file (or click) — <code>&lt;work-dropzone&gt;</code> normalizes it into a
+    <p class="note">Drag a file (or click) — <code>&lt;file-dropzone&gt;</code> normalizes it into a
       content-addressed record (sha256 over the bytes) and emits <code>work-file-add</code>; here we
       <code>register()</code> the new row straight into the engine, and the drive above re-queries.</p>
-    <work-dropzone id="drop" multiple></work-dropzone>
+    <file-dropzone id="drop" multiple></file-dropzone>
 
     <script type="module">
       import { getEngine } from "../src/data/index.js";

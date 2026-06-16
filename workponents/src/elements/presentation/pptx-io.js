@@ -1,8 +1,8 @@
-// presentation/pptx-io.js — the pptx ↔ work-deck I/O adapter (Phase 4b, floor-first).
+// presentation/pptx-io.js — the pptx ↔ deck-view I/O adapter (Phase 4b, floor-first).
 //
-// A <work-deck>'s truth is its ordered <work-slide> children (composition-as-source);
+// A <deck-view>'s truth is its ordered <deck-slide> children (composition-as-source);
 // pptx is not a new deck model — it is an I/O adapter on top: emit the deck's slides
-// AS a .pptx, and read a .pptx INTO deck source (a <work-deck>…<work-slide> string the
+// AS a .pptx, and read a .pptx INTO deck source (a <deck-view>…<deck-slide> string the
 // normal render path consumes). The deck/slide render + the wavelet export path are
 // untouched.
 //
@@ -12,7 +12,7 @@
 //   • write — PptxGenJS builds a real .pptx from the deck's slides (title + body
 //             text + bullets per slide). override: window.__WB_PPTXGEN__
 //   • read  — fflate unzips the OOXML container; we parse ppt/slides/slideN.xml
-//             ourselves into structured slides, then EMIT <work-deck> source.
+//             ourselves into structured slides, then EMIT <deck-view> source.
 //             override: window.__WB_FFLATE__
 //
 // THE NOVEL PIECE — importPptx: there is no off-the-shelf pptx→deck/org reader
@@ -30,7 +30,7 @@
 // pptx export/import through a host verb; the floor is the always-available default.
 //
 // Degradation: if a lib / CDN is unavailable, the functions throw a clear, catchable
-// error so work-deck can surface a note instead of failing hard.
+// error so deck-view can surface a note instead of failing hard.
 
 const PPTXGEN_CDN = "https://esm.sh/pptxgenjs@3.12.0";
 const FFLATE_CDN   = "https://esm.sh/fflate@0.8.2";
@@ -51,12 +51,12 @@ const loadPptxGen = () => lazy("__WB_PPTXGEN__", PPTXGEN_CDN, "pptxgenjs");
 const loadFflate   = () => lazy("__WB_FFLATE__",  FFLATE_CDN,  "fflate");
 
 // ── EXPORT — deck → .pptx Blob ────────────────────────────────────────────────
-// Floor-JS, straightforward: map each <work-slide> band → a pptx slide. We pull
+// Floor-JS, straightforward: map each <deck-slide> band → a pptx slide. We pull
 // the slide's structured text (title / body / bullets) with the SAME extractor the
 // import side emits, so a round-trip is stable. PptxGenJS writes a real OOXML .pptx.
 /**
- * Export a <work-deck> → a .pptx Blob.
- * @param {Element} deck  a <work-deck> element (or anything exposing the slides)
+ * Export a <deck-view> → a .pptx Blob.
+ * @param {Element} deck  a <deck-view> element (or anything exposing the slides)
  * @returns {Promise<Blob>} an application/vnd.openxmlformats-…presentationml Blob
  */
 export async function exportPptx(deck) {
@@ -89,14 +89,14 @@ export async function exportPptx(deck) {
   return out instanceof Blob ? out : new Blob([out], { type: PPTX_MIME });
 }
 
-// ── IMPORT (the novel piece) — .pptx ArrayBuffer → <work-deck> source ──────────
+// ── IMPORT (the novel piece) — .pptx ArrayBuffer → <deck-view> source ──────────
 /**
- * Import a .pptx → a <work-deck>…<work-slide> source string (the deck truth).
+ * Import a .pptx → a <deck-view>…<deck-slide> source string (the deck truth).
  * Unzips the OOXML container (fflate), reads slide order, parses each slide's
  * DrawingML into {title, body[]}, and emits deck source. Text-first; see header
  * for what's dropped (a note is embedded as an HTML comment in the output).
  * @param {ArrayBuffer|Uint8Array} arrayBuffer  the raw .pptx bytes
- * @returns {Promise<string>} <work-deck> source ready to render
+ * @returns {Promise<string>} <deck-view> source ready to render
  */
 export async function importPptx(arrayBuffer) {
   if (!arrayBuffer) throw new Error("pptx-io: importPptx needs an ArrayBuffer");
@@ -128,9 +128,9 @@ export const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presenta
 function deckSlides(deck) {
   if (!deck) return [];
   if (typeof deck.querySelectorAll === "function") {
-    const found = Array.from(deck.querySelectorAll(":scope > work-slide"));
+    const found = Array.from(deck.querySelectorAll(":scope > deck-slide"));
     if (found.length) return found;
-    return Array.from(deck.querySelectorAll("work-slide"));
+    return Array.from(deck.querySelectorAll("deck-slide"));
   }
   return Array.isArray(deck) ? deck : [];
 }
@@ -273,9 +273,9 @@ function decodeXml(s) {
     .replace(/&amp;/g, "&");
 }
 
-// ── emit <work-deck> source from parsed slides ─────────────────────────────────
+// ── emit <deck-view> source from parsed slides ─────────────────────────────────
 // Heading band for slides whose only content is a title; content/split otherwise.
-// Bullets nest via real <ul> depth so the deck/work-slide typography applies and a
+// Bullets nest via real <ul> depth so the deck/deck-slide typography applies and a
 // re-export round-trips the levels. The drop-list lives as an HTML comment header.
 function emitDeckSource(slides) {
   const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -287,9 +287,9 @@ function emitDeckSource(slides) {
     const parts = [];
     if (s.title) parts.push(`    <${band === "title" ? "h1" : "h2"}>${esc(s.title)}</${band === "title" ? "h1" : "h2"}>`);
     if (hasBody) parts.push(renderBody(s.body, esc));
-    return `  <work-slide band="${band}" align="${align}">\n${parts.filter(Boolean).join("\n")}\n  </work-slide>`;
+    return `  <deck-slide band="${band}" align="${align}">\n${parts.filter(Boolean).join("\n")}\n  </deck-slide>`;
   });
-  return `${note}\n<work-deck controls aspect="16:9" hold="4s" transition="rise">\n${slideEls.join("\n")}\n</work-deck>\n`;
+  return `${note}\n<deck-view controls aspect="16:9" hold="4s" transition="rise">\n${slideEls.join("\n")}\n</deck-view>\n`;
 }
 
 // Render a flat body model (with bullet levels) into <p> + nested <ul> markup.

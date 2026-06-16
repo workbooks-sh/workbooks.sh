@@ -1,5 +1,5 @@
 // <work-flow> — an agentic flow / pipeline: a titled sequence of steps, where each
-// step is a slotted <work-task> (or any child). Composition-as-source: the ordered
+// step is a slotted <board-task> (or any child). Composition-as-source: the ordered
 // children ARE the flow. The flow surfaces each step's build edges — `in=` / `out=`
 // (the data it consumes / produces) and `deps=` (steps it waits on) — as visible
 // chips, the same edges the org `#+begin_src` header args once carried, now plain

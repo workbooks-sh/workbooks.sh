@@ -51,7 +51,7 @@
     <h1>workponents · ai</h1>
     <p class="sub">Conversation-as-source. The agent edits a living markdown/org document; the
       thread renders it (turns are its diff stream), and generated UI is authored inline as
-      <code>#+begin_src component</code> blocks — rendered as themed <code>&lt;work-gen-block&gt;</code>
+      <code>#+begin_src component</code> blocks — rendered as themed <code>&lt;chat-gen-block&gt;</code>
       cards, never a JSON IR. Markdown renders sanitized (escaped first). Toggle the theme; every
       element re-themes from the <code>--work-*</code> tokens.</p>
 
@@ -64,9 +64,9 @@
 
     <!-- THREAD built from a transcript source (the document IS the conversation) -->
     <section>
-      <h2>work-thread · the transcript is the source</h2>
+      <h2>chat-thread · the transcript is the source</h2>
       <div class="panel">
-        <work-thread id="thread" title="deploy review" max-width="none"></work-thread>
+        <chat-thread id="thread" title="deploy review" max-width="none"></chat-thread>
       </div>
       <p class="note">Built from an org-style transcript string (<code>* user</code> / <code>* assistant</code>
         headings) set on <code>thread.turns</code>. The Waldo reply weaves a markdown paragraph, a
@@ -76,11 +76,11 @@
 
     <!-- Declarative thread: author turns directly in HTML -->
     <section>
-      <h2>work-message · declarative turns + gen-blocks</h2>
+      <h2>chat-message · declarative turns + gen-blocks</h2>
       <div class="panel">
-        <work-thread max-width="none">
-          <work-message role="user">Can you summarize the **release layers** and flag anything risky?</work-message>
-          <work-message role="assistant" name="waldo">## Release layers
+        <chat-thread max-width="none">
+          <chat-message role="user">Can you summarize the **release layers** and flag anything risky?</chat-message>
+          <chat-message role="assistant" name="waldo">## Release layers
 
 There are **three**, and they must not be conflated:
 
@@ -94,38 +94,38 @@ Publishing the runtime before the compilers layer ships stale toolchains.
 
 #+begin_src component :type button :label Open release runbook :action open
 target: /workbooks/Release.org
-#+end_src</work-message>
-          <work-message role="tool">tool · read_file(Release.org) → 412 lines</work-message>
-        </work-thread>
+#+end_src</chat-message>
+          <chat-message role="tool">tool · read_file(Release.org) → 412 lines</chat-message>
+        </chat-thread>
       </div>
-      <p class="note">Authored as plain HTML — light-DOM <code>&lt;work-message&gt;</code> children. The
+      <p class="note">Authored as plain HTML — light-DOM <code>&lt;chat-message&gt;</code> children. The
         assistant body carries inline component blocks; the message weaves them into cards in document
         order. Click the button → fires a <code>work-intent</code> event (logged below).</p>
     </section>
 
     <!-- gen-block gallery: every type -->
     <section>
-      <h2>work-gen-block · every type</h2>
+      <h2>chat-gen-block · every type</h2>
       <div class="panel" style="display:flex;flex-direction:column;gap:16px;align-items:flex-start">
-        <work-gen-block type="callout" tone="info" title="Heads up">A neutral informational note.</work-gen-block>
-        <work-gen-block type="callout" tone="ok" title="Deployed">All checks green.</work-gen-block>
-        <work-gen-block type="callout" tone="err" title="Build failed">mrustc: missing libstd target.</work-gen-block>
-        <work-gen-block type="kv" title="run summary">duration: 8.4s
+        <chat-gen-block type="callout" tone="info" title="Heads up">A neutral informational note.</chat-gen-block>
+        <chat-gen-block type="callout" tone="ok" title="Deployed">All checks green.</chat-gen-block>
+        <chat-gen-block type="callout" tone="err" title="Build failed">mrustc: missing libstd target.</chat-gen-block>
+        <chat-gen-block type="kv" title="run summary">duration: 8.4s
 tools: read_file, edit, bash
-verdict: live</work-gen-block>
-        <work-gen-block type="link" label="Open the capabilities dashboard" href="https://workbooks.sh"></work-gen-block>
-        <work-gen-block type="button" label="Promote to production" action="promote">target: /workbooks/Promote.org</work-gen-block>
-        <work-gen-block type="share" title="Share with your org">target: /workbooks/Release.org
+verdict: live</chat-gen-block>
+        <chat-gen-block type="link" label="Open the capabilities dashboard" href="https://workbooks.sh"></chat-gen-block>
+        <chat-gen-block type="button" label="Promote to production" action="promote">target: /workbooks/Promote.org</chat-gen-block>
+        <chat-gen-block type="share" title="Share with your org">target: /workbooks/Release.org
 members: Shane O, Ada L, Grace H
-role: Editor</work-gen-block>
+role: Editor</chat-gen-block>
       </div>
     </section>
 
     <!-- composer with state toggle -->
     <section>
-      <h2>work-composer · intent + thinking/streaming state</h2>
+      <h2>chat-composer · intent + thinking/streaming state</h2>
       <div class="panel">
-        <work-composer id="composer" placeholder="Message the agent — Enter to send, Shift+Enter for newline…"></work-composer>
+        <chat-composer id="composer" placeholder="Message the agent — Enter to send, Shift+Enter for newline…"></chat-composer>
         <div class="row">
           <wb-button id="s-idle" size="sm" variant="soft" tone="neutral">idle</wb-button>
           <wb-button id="s-think" size="sm" variant="soft">thinking</wb-button>

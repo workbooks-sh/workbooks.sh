@@ -10,9 +10,9 @@
 // All three elements style only from --work-* tokens, extend WbElement, register
 // via define(), and reach identity through the seam (over this.host).
 //
-//   <work-auth>  — the sign-in surface (provider buttons + email/password|magic).
-//   <work-user>  — avatar + identity menu, bound to the current session.
-//   <work-gate>  — declarative auth guard (when="authed|anon|role:<x>" + fallback).
+//   <auth-panel>  — the sign-in surface (provider buttons + email/password|magic).
+//   <auth-user>  — avatar + identity menu, bound to the current session.
+//   <auth-gate>  — declarative auth guard (when="authed|anon|role:<x>" + fallback).
 //
 // Import this barrel for the whole auth set, or a single element file.
 export { WorkAuth } from "./work-auth.js";

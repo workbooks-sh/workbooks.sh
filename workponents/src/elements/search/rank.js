@@ -4,7 +4,7 @@
 // a command palette wants ORDERED RELEVANCE over a small, in-memory command set —
 // a subsequence/prefix fuzzy match with a score, not a substring filter. That
 // ranking is pure data (no DOM, no CSS), so it lives here in the domain dir and is
-// shared by <work-command> (command set) and <work-search> (client-side re-rank of the
+// shared by <search-command> (command set) and <search-box> (client-side re-rank of the
 // engine's candidate rows). Deliberately tiny — no Fuse.js, no deps.
 //
 // Algorithm: a forgiving subsequence matcher (every query char must appear in

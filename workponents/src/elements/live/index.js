@@ -11,9 +11,9 @@
 // All elements style only from --work-* tokens, extend WbElement (Lit base), register
 // via define(), and reach the channel through the seam (over this.host).
 //
-//   <work-room>        — the realtime container; joins a topic, slots content.
-//   <work-presence>    — who's here (avatars/list/count), live.
-//   <work-live-value>  — a shared value (counter/toggle/text) that syncs across clients.
+//   <live-room>        — the realtime container; joins a topic, slots content.
+//   <live-presence>    — who's here (avatars/list/count), live.
+//   <live-value>  — a shared value (counter/toggle/text) that syncs across clients.
 //
 // Import this barrel for the whole live set, or a single element file.
 export { WorkRoom } from "./work-room.js";

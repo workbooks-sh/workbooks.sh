@@ -4,7 +4,7 @@
 // domain, or a single element file to stay lean. Standalone (zero deps): the
 // editor is a themed textarea + token highlight; the REPL runs JS in a sandboxed
 // worker and shows a graceful "needs runtime" state for compiled languages. The
-// editing surface is swap-stable — a CodeMirror 6 engine backs <work-editor>
+// editing surface is swap-stable — a CodeMirror 6 engine backs <code-editor>
 // (./codemirror-tier.js), lazy-loaded from a CDN behind the same public API; the
 // zero-dep textarea+highlight floor is the guaranteed fallback. Lit-based;
 // buildless ESM.

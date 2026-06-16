@@ -1,23 +1,23 @@
-// <work-model-source> — the composition-as-source-for-3D descriptor for
-// <work-model>. The 3D analogue of <work-video-source> / <source>: a typed slot
-// of metadata the parent <work-model> reads to resolve what to render. Renders
+// <model-source> — the composition-as-source-for-3D descriptor for
+// <model-view>. The 3D analogue of <video-source> / <source>: a typed slot
+// of metadata the parent <model-view> reads to resolve what to render. Renders
 // nothing itself.
 //
-//   <work-model><work-model-source src="model.glb"></work-model-source></work-model>
+//   <model-view><model-source src="model.glb"></model-source></model-view>
 //
 // THE COMPOSITION-AS-SOURCE MOMENT (text → geometry): the `code` form carries a
 // scene SOURCE (an OpenSCAD-like / minimal CSG scene spec) that compiles to a GLB
 // in-browser via **Manifold** wasm (manifold-3d, lazy CDN ESM) and feeds the
-// resulting blob URL to the parent — exactly the way <work-video-source> inlines a
+// resulting blob URL to the parent — exactly the way <video-source> inlines a
 // wavelet composition. The source IS the model: edit the text, recompile, the
 // viewer updates; the GLB never has to be shipped.
 //
-//   <work-model camera-controls>
-//     <work-model-source code="cube(20); sphere(12);"></work-model-source>
-//   </work-model>
+//   <model-view camera-controls>
+//     <model-source code="cube(20); sphere(12);"></model-source>
+//   </model-view>
 //
 // STATUS — STUBBED (directive: "if Manifold is heavy, scope the viewer solid first
-// and STUB work-model-source with a clear note"). The descriptor contract + the
+// and STUB model-source with a clear note"). The descriptor contract + the
 // parent wiring + the lazy single-flight Manifold loader (overridable via
 // window.__WB_MANIFOLD__) are REAL and shipped. The scene-spec → Manifold-mesh
 // COMPILER (`_compileScene`) is the only deferred piece: today it parses the spec
@@ -56,7 +56,7 @@ export class WorkModelSource extends WbElement {
   // metadata only — no visible rendering.
   static styles = css`:host { display: none; }`;
 
-  /** The source descriptor the parent <work-model> reads. */
+  /** The source descriptor the parent <model-view> reads. */
   get descriptor() {
     return {
       src: this.attr("src"),
@@ -66,7 +66,7 @@ export class WorkModelSource extends WbElement {
   }
 
   /**
-   * Compile this source to something <work-model> can render.
+   * Compile this source to something <model-view> can render.
    *  • `src` form  → returns { url } directly (a GLB/STL URL, no compile).
    *  • `code` form → compiles the scene spec to a GLB blob URL via Manifold.
    *
@@ -92,14 +92,14 @@ export class WorkModelSource extends WbElement {
     return {
       pending: true,
       ops: parsed,
-      note: `work-model-source: parsed ${parsed.length} op(s); Manifold spec→GLB compile is stubbed (kernel binding pending). Use src= for a ready model.`,
+      note: `model-source: parsed ${parsed.length} op(s); Manifold spec→GLB compile is stubbed (kernel binding pending). Use src= for a ready model.`,
     };
   }
 
   attributeChangedCallback(name, oldV, newV) {
     super.attributeChangedCallback?.(name, oldV, newV);
     if (this.isConnected && oldV !== newV) {
-      this.closest("work-model")?._resolveSource?.();
+      this.closest("model-view")?._resolveSource?.();
     }
   }
 
@@ -118,4 +118,4 @@ function parseScene(code) {
   return ops;
 }
 
-define("work-model-source", WorkModelSource);
+define("model-source", WorkModelSource);

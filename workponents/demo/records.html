@@ -58,31 +58,31 @@
       with no runtime Host reachable it degrades to read-only (see the footer note) — a write goes through
       <code>this.host → /data/update</code>, never the read-only engine.</p>
     <div class="md">
-      <work-record-list id="people" src-name="customers"
+      <record-list id="people" src-name="customers"
         query="SELECT id, name, tier, mrr, signed, active, site FROM customers ORDER BY mrr DESC"
         key="id" title-field="name" subtitle-field="tier"
-        fields="mrr,active" formats="mrr:usd" searchable></work-record-list>
+        fields="mrr,active" formats="mrr:usd" searchable></record-list>
 
-      <work-record id="detail" src-name="customers"
+      <record-view id="detail" src-name="customers"
         query="SELECT id, name, tier, mrr, seats, signed, active, site, owner FROM customers"
         key="id" title-field="name" layout="stacked"
-        formats="mrr:usd,signed:date,site:link" editable></work-record>
+        formats="mrr:usd,signed:date,site:link" editable></record-view>
     </div>
 
     <h2>Inline layout + a standalone typed field value</h2>
     <p class="note">The same record in <code>layout="inline"</code> (label/value rows), and a bare
-      <code>&lt;work-field-value&gt;</code> used on its own — the atom records and tables share.</p>
+      <code>&lt;record-field-value&gt;</code> used on its own — the atom records and tables share.</p>
     <div class="md">
-      <work-record src-name="customers"
+      <record-view src-name="customers"
         query="SELECT name, tier, mrr, seats, signed, active, site FROM customers"
-        key="name" value="Atlas Data Co" layout="inline" formats="mrr:usd,signed:date,site:link"></work-record>
+        key="name" value="Atlas Data Co" layout="inline" formats="mrr:usd,signed:date,site:link"></record-view>
       <div style="display:flex;flex-direction:column;gap:14px">
-        <div><span class="note">usd&nbsp;</span> <work-field-value type="number" format="usd" value="124900.5"></work-field-value></div>
-        <div><span class="note">pct&nbsp;</span> <work-field-value type="number" format="pct" value="0.732"></work-field-value></div>
-        <div><span class="note">date&nbsp;</span> <work-field-value type="date" value="2024-11-03"></work-field-value></div>
-        <div><span class="note">bool&nbsp;</span> <work-field-value type="boolean" value="true"></work-field-value> &nbsp; <work-field-value type="boolean" value="false"></work-field-value></div>
-        <div><span class="note">link&nbsp;</span> <work-field-value type="string" value="https://workbooks.sh/customers"></work-field-value></div>
-        <div><span class="note">badge</span> <work-field-value type="string" display="badge" value="Enterprise"></work-field-value></div>
+        <div><span class="note">usd&nbsp;</span> <record-field-value type="number" format="usd" value="124900.5"></record-field-value></div>
+        <div><span class="note">pct&nbsp;</span> <record-field-value type="number" format="pct" value="0.732"></record-field-value></div>
+        <div><span class="note">date&nbsp;</span> <record-field-value type="date" value="2024-11-03"></record-field-value></div>
+        <div><span class="note">bool&nbsp;</span> <record-field-value type="boolean" value="true"></record-field-value> &nbsp; <record-field-value type="boolean" value="false"></record-field-value></div>
+        <div><span class="note">link&nbsp;</span> <record-field-value type="string" value="https://workbooks.sh/customers"></record-field-value></div>
+        <div><span class="note">badge</span> <record-field-value type="string" display="badge" value="Enterprise"></record-field-value></div>
       </div>
     </div>
 

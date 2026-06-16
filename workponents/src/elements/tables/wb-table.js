@@ -1,4 +1,4 @@
-// <work-table> — THE tables reinvention: the grid IS a view over a query, not a
+// <grid-table> — THE tables reinvention: the grid IS a view over a query, not a
 // static table. Sort / filter / aggregate run IN the engine (DuckDB on the
 // runtime tier · browser duckdb-wasm · the in-JS subset offline) — never in the
 // element. The element is a thin, virtualized viewport over a WbQueryResult.
@@ -14,22 +14,22 @@
 // whenRegistered/register — is unchanged; only the RENDER moved to Lit.
 //
 // Usage (inline data, declared columns):
-//   <work-table rows='[{"region":"North","rev":120}]' searchable>
-//     <work-column field="region" label="Region"></work-column>
-//     <work-column field="rev" label="Revenue" align="right" format="usd"></work-column>
-//   </work-table>
+//   <grid-table rows='[{"region":"North","rev":120}]' searchable>
+//     <grid-column field="region" label="Region"></grid-column>
+//     <grid-column field="rev" label="Revenue" align="right" format="usd"></grid-column>
+//   </grid-table>
 //
-// Usage (bind to a <work-query> by name — the canonical data binding):
-//   <work-query name="orders" sql="SELECT region, rev FROM sales"></work-query>
-//   <work-table from="orders" query="SELECT region, sum(rev) AS rev FROM orders GROUP BY region"></work-table>
+// Usage (bind to a <data-query> by name — the canonical data binding):
+//   <data-query name="orders" sql="SELECT region, rev FROM sales"></data-query>
+//   <grid-table from="orders" query="SELECT region, sum(rev) AS rev FROM orders GROUP BY region"></grid-table>
 //
 // Usage (register elsewhere, query a named source):
-//   <work-table src-name="orders" query="SELECT region, sum(rev) AS rev FROM orders GROUP BY region"></work-table>
+//   <grid-table src-name="orders" query="SELECT region, sum(rev) AS rev FROM orders GROUP BY region"></grid-table>
 //
 // Attributes:
 //   rows        inline JSON array of row objects (registers an auto-named source)
 //   csv         inline CSV text (header row)
-//   from        name of a <work-query> dataset to read (the canonical binding)
+//   from        name of a <data-query> dataset to read (the canonical binding)
 //   src-name    name of a source registered via getEngine().register(...)
 //   query       full SQL to run (overrides the default SELECT * over src-name)
 //   page-size   rows rendered per virtual window (default 50)
@@ -125,7 +125,7 @@ export class WbTable extends WbElement {
     this._load();
   }
 
-  // A named source: from="<work-query name>" is the canonical binding; src-name is
+  // A named source: from="<data-query name>" is the canonical binding; src-name is
   // the equivalent register()-side name. Either names a source the engine resolves.
   _namedSource() { return this.attr("from") || this.attr("src-name"); }
 
@@ -152,7 +152,7 @@ export class WbTable extends WbElement {
   }
 
   _readColumns() {
-    const cols = [...this.querySelectorAll("work-column")].map((c) => c.config);
+    const cols = [...this.querySelectorAll("grid-column")].map((c) => c.config);
     this._declaredColumns = cols.length ? cols : null;
   }
 
@@ -170,7 +170,7 @@ export class WbTable extends WbElement {
     }
   }
 
-  /** Called by <work-column> when its attrs change. */
+  /** Called by <grid-column> when its attrs change. */
   _columnsChanged() {
     if (!this._init) return;
     this._readColumns();
@@ -300,7 +300,7 @@ export class WbTable extends WbElement {
     return `<div class="scroll"><table><thead><tr>${ths}</tr></thead></table></div>`;
   }
 
-  /** Merge declared <work-column> config with the result's actual columns. */
+  /** Merge declared <grid-column> config with the result's actual columns. */
   _resolvedColumns(r) {
     if (this._declaredColumns) {
       return this._declaredColumns.filter((c) => !c.hidden && r.columns.includes(c.field));
@@ -406,4 +406,4 @@ function fmt(v, format) {
   return v;
 }
 
-define("work-table", WbTable);
+define("grid-table", WbTable);

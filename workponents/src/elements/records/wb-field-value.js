@@ -1,9 +1,9 @@
-// <work-field-value> — a typed single-value display, the atom of the records
+// <record-field-value> — a typed single-value display, the atom of the records
 // domain. Given a value + its WbColType (the `types[j]` off a WbQueryResult), it
 // renders the value the way that type should READ: currency / number / percent
 // for numerics, a localized date for dates, a check/✕ pill for booleans, an
 // anchor for links, a soft chip badge for short categorical strings. Reused
-// inside <work-record> for every field; usable on its own anywhere a single typed
+// inside <record-view> for every field; usable on its own anywhere a single typed
 // cell needs to render the same way the table/record do.
 //
 // Token-only styling; zero deps. The mapping mirrors wb-table's fmt() helper but
@@ -12,10 +12,10 @@
 // detail view rather than a dense grid cell.
 //
 // Usage:
-//   <work-field-value type="number" format="usd" value="1240.5"></work-field-value>
-//   <work-field-value type="boolean" value="true"></work-field-value>
-//   <work-field-value type="string" display="badge" value="EMEA"></work-field-value>
-//   <work-field-value type="string" display="link" value="https://x.y"></work-field-value>
+//   <record-field-value type="number" format="usd" value="1240.5"></record-field-value>
+//   <record-field-value type="boolean" value="true"></record-field-value>
+//   <record-field-value type="string" display="badge" value="EMEA"></record-field-value>
+//   <record-field-value type="string" display="link" value="https://x.y"></record-field-value>
 //
 // Attributes:
 //   value     the raw value (string form; numbers/bools coerced by type)
@@ -137,4 +137,4 @@ function fmtJson(v) {
   try { return JSON.stringify(v, null, 2); } catch { return String(v); }
 }
 
-define("work-field-value", WbFieldValue);
+define("record-field-value", WbFieldValue);

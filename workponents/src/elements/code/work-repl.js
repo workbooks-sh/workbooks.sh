@@ -1,10 +1,10 @@
-// <work-repl> — a <work-editor> + a Run affordance + an output pane. Real in-sandbox
+// <code-repl> — a <code-editor> + a Run affordance + an output pane. Real in-sandbox
 // eval: composition-as-source code, run where it can actually run.
 //
 //   • host.available("compile") → route ANY language through the Host compiler
 //     lane (clang/rustc/zig/go/StarlingMonkey → wasm), in-sandbox. Endpoint
 //     contract: POST /run { language, source } → { ok, output }. Mirrors how
-//     <work-doc-cell> routes compute through `this.host` and degrades cleanly.
+//     <document-cell> routes compute through `this.host` and degrades cleanly.
 //   • STANDALONE (no runtime) → JS evals in a sandboxed Worker (never eval in the
 //     page; see sandbox.js). Compiled languages show a clear, themed
 //     "runtime needed for C/Rust/Zig/Go" state instead of pretending.
@@ -138,7 +138,7 @@ export class WorkRepl extends WbElement {
   }
 
   _editorValue() {
-    const ed = this.shadowRoot.querySelector("work-editor");
+    const ed = this.shadowRoot.querySelector("code-editor");
     return ed ? ed.value : this._source;
   }
 
@@ -194,11 +194,11 @@ export class WorkRepl extends WbElement {
             <span class="tri"></span>${this._busy ? "running" : "Run"}
           </button>
         </div>
-        <work-editor language=${language} gutter=${gutter ?? ""} variant="inline"
-          @work-code-change=${(e) => this._onCodeChange(e)}>${this._source || ""}</work-editor>
+        <code-editor language=${language} gutter=${gutter ?? ""} variant="inline"
+          @work-code-change=${(e) => this._onCodeChange(e)}>${this._source || ""}</code-editor>
         ${this._renderOut()}
       </div>`;
   }
 }
 
-define("work-repl", WorkRepl);
+define("code-repl", WorkRepl);

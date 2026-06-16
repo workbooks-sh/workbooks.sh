@@ -1,7 +1,7 @@
-// search · the POWERED tier — MiniSearch behind the <work-search> / <work-command>
+// search · the POWERED tier — MiniSearch behind the <search-box> / <search-command>
 // data floor.
 //
-// The floor (`work-search._buildSql` / `work-command._runData`) answers "which
+// The floor (`search-box._buildSql` / `search-command._runData`) answers "which
 // rows match" with the engine: `… WHERE col LIKE '%term%'` over getEngine() —
 // a case-insensitive SUBSTRING filter, plus (for the command set) the in-WASM
 // fuzzy `rank.js`. That floor is zero-dependency and always available.

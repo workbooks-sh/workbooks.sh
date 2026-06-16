@@ -67,15 +67,15 @@
     <!-- ── data-viz: the number IS an aggregate query over customers ── -->
     <h2 class="sec">Pulse · data-viz</h2>
     <div class="kpis">
-      <work-metric class="panel" label="Monthly recurring" format="usd" value-col="total"
-        src-name="customers" query="SELECT sum(mrr) AS total FROM customers"></work-metric>
-      <work-metric class="panel" label="Customers" format="num" value-col="total"
-        src-name="customers" query="SELECT count(*) AS total FROM customers"></work-metric>
-      <work-metric class="panel" label="Seats sold" format="num" value-col="total"
-        src-name="customers" query="SELECT sum(seats) AS total FROM customers"></work-metric>
+      <chart-metric class="panel" label="Monthly recurring" format="usd" value-col="total"
+        src-name="customers" query="SELECT sum(mrr) AS total FROM customers"></chart-metric>
+      <chart-metric class="panel" label="Customers" format="num" value-col="total"
+        src-name="customers" query="SELECT count(*) AS total FROM customers"></chart-metric>
+      <chart-metric class="panel" label="Seats sold" format="num" value-col="total"
+        src-name="customers" query="SELECT sum(seats) AS total FROM customers"></chart-metric>
       <div class="panel" style="display:flex;flex-direction:column;gap:4px;justify-content:center;min-width:200px">
         <span class="cap" style="margin:0">New MRR / week</span>
-        <work-spark type="area" src-name="growth" y="mrr" query="SELECT week, mrr FROM growth ORDER BY week"></work-spark>
+        <chart-spark type="area" src-name="growth" y="mrr" query="SELECT week, mrr FROM growth ORDER BY week"></chart-spark>
       </div>
     </div>
 
@@ -83,46 +83,46 @@
     <h2 class="sec">Accounts · records</h2>
     <p class="cap">Pick a customer — its <code>work-record-select</code> re-queries that <b>one row</b> as the detail.</p>
     <div class="md">
-      <work-record-list class="panel" id="people" src-name="customers"
+      <record-list class="panel" id="people" src-name="customers"
         query="SELECT id, name, tier, mrr, signed, active, site FROM customers ORDER BY mrr DESC"
-        fields="mrr,active" formats="mrr:usd" searchable></work-record-list>
-      <work-record class="panel" id="detail" src-name="customers"
+        fields="mrr,active" formats="mrr:usd" searchable></record-list>
+      <record-view class="panel" id="detail" src-name="customers"
         query="SELECT id, name, tier, mrr, seats, signed, active, site, owner FROM customers"
-        key="id" value="C-1001" formats="mrr:usd,signed:date,site:link"></work-record>
+        key="id" value="C-1001" formats="mrr:usd,signed:date,site:link"></record-view>
     </div>
 
     <!-- ── tables + ai: the same source as a grid, beside an agent thread ── -->
     <div class="two" style="margin-top:8px">
       <div>
         <h2 class="sec">Ledger · tables</h2>
-        <work-table class="panel" src-name="customers"
+        <grid-table class="panel" src-name="customers"
           query="SELECT name, tier, mrr, seats, active FROM customers ORDER BY mrr DESC">
-          <work-column field="name" label="Account"></work-column>
-          <work-column field="tier" label="Tier"></work-column>
-          <work-column field="mrr" label="MRR" align="right" format="usd"></work-column>
-          <work-column field="seats" label="Seats" align="right" format="num"></work-column>
-          <work-column field="active" label="Active"></work-column>
-        </work-table>
+          <grid-column field="name" label="Account"></grid-column>
+          <grid-column field="tier" label="Tier"></grid-column>
+          <grid-column field="mrr" label="MRR" align="right" format="usd"></grid-column>
+          <grid-column field="seats" label="Seats" align="right" format="num"></grid-column>
+          <grid-column field="active" label="Active"></grid-column>
+        </grid-table>
       </div>
       <div>
         <h2 class="sec">Review · ai</h2>
-        <work-thread class="panel" max-width="none">
-          <work-message role="user">Which **Growth**-tier accounts are at risk this quarter?</work-message>
-          <work-message role="assistant" name="atlas">Three Growth accounts show **inactive** status with MRR above $8k:
+        <chat-thread class="panel" max-width="none">
+          <chat-message role="user">Which **Growth**-tier accounts are at risk this quarter?</chat-message>
+          <chat-message role="assistant" name="atlas">Three Growth accounts show **inactive** status with MRR above $8k:
 
 - **Ion Telecom** — $8.1k, inactive
 - **Drift Mobility** — flagged last week
 - **Granite Bank** — renewal in 12 days
 
-Want me to draft outreach for the owner of each?</work-message>
-          <work-message role="tool">tool · query(customers WHERE tier='Growth' AND active=false) → 3 rows</work-message>
-        </work-thread>
+Want me to draft outreach for the owner of each?</chat-message>
+          <chat-message role="tool">tool · query(customers WHERE tier='Growth' AND active=false) → 3 rows</chat-message>
+        </chat-thread>
       </div>
     </div>
 
     <!-- ── docs: a note that lives with the data ── -->
     <h2 class="sec">Playbook · docs</h2>
-    <work-doc class="panel" id="note">## Renewal playbook
+    <document-view class="panel" id="note">## Renewal playbook
 
 A **record is a row**; this note is just prose in the same workbook. When an account
 goes inactive with MRR > $8k, the owner gets a 12-day outreach window.
@@ -130,7 +130,7 @@ goes inactive with MRR > $8k, the owner gets a 12-day outreach window.
 1. Pull the account in **Accounts** above.
 2. Check **New MRR / week** for the trend.
 3. Draft outreach in **Review** and assign the owner.
-</work-doc>
+</document-view>
   </div>
 
   <script type="module">

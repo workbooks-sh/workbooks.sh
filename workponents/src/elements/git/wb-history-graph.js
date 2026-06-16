@@ -1,10 +1,10 @@
-// <work-history-graph> — the user-facing History timeline.
+// <git-history-graph> — the user-facing History timeline.
 //
 // The reinvention: version control's log without git's vocabulary. Nodes are
 // VERSIONS (never "commits"), each with an author/agent badge and a title; the
 // rail draws a Sapling-smartlog-legible spine with branch lanes. Selecting a
 // version emits a `selected` CustomEvent {detail:{id, version}} — the host wires
-// that to <work-diff>/<work-restore>. Data via `items` (JSON array) attr or property.
+// that to <git-diff>/<git-restore>. Data via `items` (JSON array) attr or property.
 //
 // Each version mirrors the History backend Change shape (history.ex):
 //   { id, when, author_type: "human"|"agent", author_name, title, parents? }
@@ -105,4 +105,4 @@ export class WorkHistoryGraph extends WbElement {
   }
 }
 
-define("work-history-graph", WorkHistoryGraph);
+define("git-history-graph", WorkHistoryGraph);

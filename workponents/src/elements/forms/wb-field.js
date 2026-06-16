@@ -1,16 +1,16 @@
-// <work-field> — one control bound to its rule. The form IS its schema: a field
+// <form-field> — one control bound to its rule. The form IS its schema: a field
 // carries its own declarative rule (inline JSON `rule` attr/property, or built
 // from the validation attrs name/type/required/min/max/pattern), and reflects
-// its own validity — it is not hand-wired per field. The owning <work-form>
+// its own validity — it is not hand-wired per field. The owning <form-view>
 // collects fields, runs `src/validate`, and writes errors back down.
 //
 // Form-Associated Custom Element (FACE) — rides the platform standard: with
 // `static formAssociated = true` + ElementInternals (attachInternals), a
-// <work-field> participates in a native <form> exactly like a built-in input —
+// <form-field> participates in a native <form> exactly like a built-in input —
 // its value is submitted (setFormValue, named by `name`), its validity surfaces
 // through native constraint validation (setValidity, fed by the EXISTING
 // src/validate layer), and its state is exposed as CustomStateSet entries
-// (:state(invalid|required|disabled)). The owning <work-form> no longer hand-
+// (:state(invalid|required|disabled)). The owning <form-view> no longer hand-
 // harvests DOM values; it reads native form participation. Degrades cleanly when
 // attachInternals / CustomStateSet are unavailable (older engines) — the reflected
 // attributes ([invalid]/[required]/[disabled]) remain a styling fallback.
@@ -18,8 +18,8 @@
 // Renders the right control by `type` (text/number/email/select/checkbox/
 // textarea/date). Label + help + error are themed entirely from --work-* tokens.
 // Usage:
-//   <work-field name="email" type="email" label="Email" required></work-field>
-//   <work-field name="role" type="select" label="Role" options="eng,design,ops"></work-field>
+//   <form-field name="email" type="email" label="Email" required></form-field>
+//   <form-field name="role" type="select" label="Role" options="eng,design,ops"></form-field>
 import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 
@@ -177,7 +177,7 @@ export class WbField extends WbElement {
     this._syncFormValue();
   }
 
-  /** Show / clear the field's error (called by <work-form>); reflects validity.
+  /** Show / clear the field's error (called by <form-view>); reflects validity.
    *  The `error` attr drives the Lit `.error` binding; we also write the node's
    *  text synchronously so a read right after setError (before Lit's async flush)
    *  already reflects it. The src/validate result feeds NATIVE constraint
@@ -228,12 +228,12 @@ export class WbField extends WbElement {
     });
   }
 
-  // Bubble a normalized input/change/blur event up to the owning <work-form> so it
+  // Bubble a normalized input/change/blur event up to the owning <form-view> so it
   // can re-validate live. Dispatched on the host (this) so the form's delegated
   // listener catches it; .control's native event handlers route here.
   _fire(kind) {
     // Native form participation: every value change updates what the <form>
-    // submits, so the owning <work-form> / a real <form> never harvests the DOM.
+    // submits, so the owning <form-view> / a real <form> never harvests the DOM.
     if (kind === "input") this._syncFormValue();
     this.dispatchEvent(new CustomEvent("work-field-" + kind, {
       bubbles: true, composed: true, detail: { name: this.name, value: this.value },
@@ -322,4 +322,4 @@ export class WbField extends WbElement {
   }
 }
 
-define("work-field", WbField);
+define("form-field", WbField);

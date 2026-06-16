@@ -1,4 +1,4 @@
-// <work-milestone> — a dated marker: a goal due on an instant, either reached
+// <board-milestone> — a dated marker: a goal due on an instant, either reached
 // (done) or pending. Renders its own attributes as a compact marker row with a
 // check/target glyph, the title, a due chip and a status pill.
 //
@@ -49,4 +49,4 @@ export class WorkMilestone extends WbElement {
   }
 }
 
-define("work-milestone", WorkMilestone);
+define("board-milestone", WorkMilestone);

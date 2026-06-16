@@ -1,4 +1,4 @@
-// <work-task> — the PM leaf: a single unit of work as a themed card that renders
+// <board-task> — the PM leaf: a single unit of work as a themed card that renders
 // its own org-derived attributes (status pill, assignee, due, estimate, priority)
 // and its prose body. The HTML element IS the source — no JSON IR, no regex chrome
 // injected after the fact (the old org `:PROPERTIES:` drawer collapses into plain
@@ -83,4 +83,4 @@ export class WorkTask extends WbElement {
   }
 }
 
-define("work-task", WorkTask);
+define("board-task", WorkTask);

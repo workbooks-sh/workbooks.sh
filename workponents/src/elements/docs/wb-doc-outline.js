@@ -1,8 +1,8 @@
-// <work-doc-outline> — a clickable heading tree for a document, auto-synced.
+// <document-outline> — a clickable heading tree for a document, auto-synced.
 //
-// Binds to a <work-doc> by id (`for="my-doc"`) or, with no `for`, to the nearest
-// preceding/containing <work-doc>. It reads that doc's `.outline` and re-syncs on
-// the doc's `work-doc:rendered` event — so editing the source (composition-as-
+// Binds to a <document-view> by id (`for="my-doc"`) or, with no `for`, to the nearest
+// preceding/containing <document-view>. It reads that doc's `.outline` and re-syncs on
+// the doc's `document-view:rendered` event — so editing the source (composition-as-
 // source) keeps the outline live with no manual wiring. Clicking a heading
 // scrolls it into view inside the doc's shadow root.
 import { WbElement, html, css, define } from "../../core/element.js";
@@ -36,7 +36,7 @@ export class WbDocOutline extends WbElement {
   }
 
   disconnectedCallback() {
-    if (this._doc && this._onRender) this._doc.removeEventListener("work-doc:rendered", this._onRender);
+    if (this._doc && this._onRender) this._doc.removeEventListener("document-view:rendered", this._onRender);
     super.disconnectedCallback();
   }
 
@@ -46,10 +46,10 @@ export class WbDocOutline extends WbElement {
       const root = this.getRootNode();
       return (root.getElementById && root.getElementById(ref)) || document.getElementById(ref);
     }
-    // nearest work-doc: a previous sibling, or anywhere in the document
+    // nearest document-view: a previous sibling, or anywhere in the document
     let n = this.previousElementSibling;
-    while (n) { if (n.tagName === "WORK-DOC") return n; n = n.previousElementSibling; }
-    return document.querySelector("work-doc");
+    while (n) { if (n.tagName === "DOCUMENT-VIEW") return n; n = n.previousElementSibling; }
+    return document.querySelector("document-view");
   }
 
   _bind() {
@@ -57,7 +57,7 @@ export class WbDocOutline extends WbElement {
     if (!doc) { this._outline = []; this.requestUpdate(); return; }
     this._doc = doc;
     this._onRender = (e) => { this._outline = (e.detail && e.detail.outline) || doc.outline; this.requestUpdate(); };
-    doc.addEventListener("work-doc:rendered", this._onRender);
+    doc.addEventListener("document-view:rendered", this._onRender);
     // doc may have already rendered before we bound — read it now if so
     if (doc.outline && doc.outline.length) { this._outline = doc.outline; this.requestUpdate(); }
     else if (doc._source == null) { /* will fire on load */ }
@@ -83,4 +83,4 @@ export class WbDocOutline extends WbElement {
   }
 }
 
-define("work-doc-outline", WbDocOutline);
+define("document-outline", WbDocOutline);

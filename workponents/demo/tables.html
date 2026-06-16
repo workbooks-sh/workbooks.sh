@@ -48,34 +48,34 @@
       filter (engine-side <code>WHERE … LIKE</code>). The data IS the source — an inline CSV the element
       registers on connect.</p>
     <!-- inline CSV becomes a registered source named "orders" the trio can query -->
-    <work-table src-name="orders"
+    <grid-table src-name="orders"
       query="SELECT order_id, region, rep, product, units, revenue FROM orders"
       searchable page-size="50">
-      <work-column field="order_id" label="Order"></work-column>
-      <work-column field="region" label="Region"></work-column>
-      <work-column field="rep" label="Rep"></work-column>
-      <work-column field="product" label="Product"></work-column>
-      <work-column field="units" label="Units" align="right" format="num"></work-column>
-      <work-column field="revenue" label="Revenue" align="right" format="usd"></work-column>
-    </work-table>
+      <grid-column field="order_id" label="Order"></grid-column>
+      <grid-column field="region" label="Region"></grid-column>
+      <grid-column field="rep" label="Rep"></grid-column>
+      <grid-column field="product" label="Product"></grid-column>
+      <grid-column field="units" label="Units" align="right" format="num"></grid-column>
+      <grid-column field="revenue" label="Revenue" align="right" format="usd"></grid-column>
+    </grid-table>
 
     <h2>2 · Aggregate — the same engine, GROUP BY revenue per region</h2>
     <p class="note">A different view over the <em>same registered source</em> — the aggregate is computed in
       the engine (<code>SELECT region, count(*) , sum(revenue) … GROUP BY region</code>). Sorting still
       pushes to SQL.</p>
-    <work-table src-name="orders"
+    <grid-table src-name="orders"
       query="SELECT region, count(*) AS orders, sum(units) AS units, sum(revenue) AS revenue, avg(revenue) AS avg_order FROM orders GROUP BY region">
-      <work-column field="region" label="Region"></work-column>
-      <work-column field="orders" label="Orders" align="right" format="num"></work-column>
-      <work-column field="units" label="Units" align="right" format="num"></work-column>
-      <work-column field="revenue" label="Revenue" align="right" format="usd"></work-column>
-      <work-column field="avg_order" label="Avg / order" align="right" format="usd"></work-column>
-    </work-table>
+      <grid-column field="region" label="Region"></grid-column>
+      <grid-column field="orders" label="Orders" align="right" format="num"></grid-column>
+      <grid-column field="units" label="Units" align="right" format="num"></grid-column>
+      <grid-column field="revenue" label="Revenue" align="right" format="usd"></grid-column>
+      <grid-column field="avg_order" label="Avg / order" align="right" format="usd"></grid-column>
+    </grid-table>
 
     <h2>3 · Inline JSON — compact density, no declared columns</h2>
     <p class="note">A second source from inline JSON rows; columns inferred from the result, types drive
       alignment, large set is virtualized.</p>
-    <work-table id="big" density="compact" searchable page-size="40"></work-table>
+    <grid-table id="big" density="compact" searchable page-size="40"></grid-table>
 
     <script type="module">
       import { getEngine } from "../src/data/index.js";
@@ -107,7 +107,7 @@
       big.setAttribute("rows", JSON.stringify(rows));
 
       // surface a query event in the console so the engine tier is visible
-      document.querySelectorAll("work-table").forEach((t) =>
+      document.querySelectorAll("grid-table").forEach((t) =>
         t.addEventListener("work-table-query", (e) => console.log("[work-table-query]", e.detail)));
 
       // theme toggle

@@ -1,16 +1,16 @@
-// <work-deck> — THE presentation reinvention: a deck IS a wavelet timeline, and the
+// <deck-view> — THE presentation reinvention: a deck IS a wavelet timeline, and the
 // slides ARE its discrete keyframe bands. Because of that single idea the domain
 // shares the wavelet render-core with `video` and "export to video" is free — the
-// deck just folds its <work-slide> children into a <gm-doc> timeline (one
+// deck just folds its <deck-slide> children into a <gm-doc> timeline (one
 // <gm-scene> per band, each band's `hold` = its duration) and hands it to the
-// SAME path <work-video> uses (in-guest encode when the Host has `wavelet`,
+// SAME path <video-player> uses (in-guest encode when the Host has `wavelet`,
 // degrading to a portable self-contained .html otherwise). The deck never
 // reimplements rendering or encoding.
 //
-// Composition-as-source: the ordered set of slotted <work-slide> children IS the
+// Composition-as-source: the ordered set of slotted <deck-slide> children IS the
 // deck. The deck owns the playhead (which band is live) and nothing else — slides
 // keep their own content in the light DOM, so a live workponent on a slide (a
-// <work-chart>, a <work-video>) is a first-class citizen, not a screenshot.
+// <chart-view>, a <video-player>) is a first-class citizen, not a screenshot.
 //
 // Live navigation:
 //   ← / PageUp / k        previous slide
@@ -39,7 +39,7 @@
 //                                 portable .html · "pptx" → a .pptx Blob (PptxGenJS).
 //                                 slides→video is the differentiator no Office tool has.
 //   .import(arrayBuffer|src)      a .pptx → importPptx → render its slides as
-//                                 <work-slide> children (composition-as-source).
+//                                 <deck-slide> children (composition-as-source).
 //
 // Events (all bubbling):
 //   work-slide-change { index, total, slide }   on every band change
@@ -57,7 +57,7 @@ const VARIANTS = defineVariants({
   variant: { options: ["framed", "bare"], default: "framed" },
 });
 
-// Default location of the shipped wavelet runtime (mirrors <work-video>). Used only
+// Default location of the shipped wavelet runtime (mirrors <video-player>). Used only
 // to inline the runtime into a portable export when no Host encode is available.
 const DEFAULT_RUNTIME =
   (typeof window !== "undefined" && window.__WB_WAVELET_RUNTIME__) ||
@@ -93,7 +93,7 @@ export class WorkDeck extends WbElement {
     :host([variant="bare"]) .shell { background: transparent; border-color: transparent; box-shadow: none; border-radius: 0; }
     :host(:fullscreen) .shell, :host(.is-fs) .shell { height: 100vh; border: none; border-radius: 0; }
 
-    /* the stage holds exactly one absolutely-positioned <work-slide> at a time */
+    /* the stage holds exactly one absolutely-positioned <deck-slide> at a time */
     .stage {
       position: relative;
       aspect-ratio: var(--_aspect, 16 / 9);
@@ -103,7 +103,7 @@ export class WorkDeck extends WbElement {
     :host(.is-fs) .stage { flex: 1 1 auto; aspect-ratio: auto; }
 
     /* the slotted slides live here; only [active] paints (slide owns that) */
-    ::slotted(work-slide) { position: absolute; inset: 0; }
+    ::slotted(deck-slide) { position: absolute; inset: 0; }
 
     /* edge click zones for click-to-advance */
     .zone { position: absolute; top: 0; bottom: 0; width: 22%; z-index: 4; cursor: pointer; }
@@ -214,7 +214,7 @@ export class WorkDeck extends WbElement {
 
   _collect() {
     const prev = this._slides.length;
-    this._slides = Array.from(this.querySelectorAll(":scope > work-slide"));
+    this._slides = Array.from(this.querySelectorAll(":scope > deck-slide"));
     // honor a per-deck default transition on slides that didn't declare one
     const tDefault = this.attr("transition");
     if (tDefault) for (const s of this._slides) {
@@ -357,7 +357,7 @@ ${scenes}
     }
   }
 
-  /** The pptx lane — map the deck's <work-slide> bands → a .pptx Blob. */
+  /** The pptx lane — map the deck's <deck-slide> bands → a .pptx Blob. */
   async _exportPptx() {
     this._exporting = true;
     this.dispatchEvent(new CustomEvent("work-export-start", { bubbles: true, detail: { format: "pptx" } }));
@@ -375,7 +375,7 @@ ${scenes}
     }
   }
 
-  /** Import a .pptx → render its slides as <work-slide> children (composition-as-
+  /** Import a .pptx → render its slides as <deck-slide> children (composition-as-
    *  source). Accepts an ArrayBuffer/Uint8Array, or a URL string to fetch. Replaces
    *  the deck's current slides with the parsed ones. Emits `work-deck-import`. */
   async import(input) {
@@ -388,14 +388,14 @@ ${scenes}
       }
       const { importPptx } = await import("./pptx-io.js");
       const source = await importPptx(buf);
-      // the emitted source is a full <work-deck>…</work-deck>; adopt only its slides
+      // the emitted source is a full <deck-view>…</deck-view>; adopt only its slides
       // (this deck stays the host, keeping its own controls/aspect/theme).
       const tpl = document.createElement("template");
       tpl.innerHTML = source.replace(/^<!--[\s\S]*?-->\s*/, "");
-      const imported = tpl.content.querySelector("work-deck");
-      const slides = imported ? Array.from(imported.querySelectorAll(":scope > work-slide")) : [];
+      const imported = tpl.content.querySelector("deck-view");
+      const slides = imported ? Array.from(imported.querySelectorAll(":scope > deck-slide")) : [];
       // swap children
-      for (const s of Array.from(this.querySelectorAll(":scope > work-slide"))) s.remove();
+      for (const s of Array.from(this.querySelectorAll(":scope > deck-slide"))) s.remove();
       for (const s of slides) this.appendChild(document.importNode(s, true));
       this._index = 0;
       this._collect();
@@ -467,7 +467,7 @@ ${scenes}
           ${n ? html`
             <div class="zone prev" aria-hidden="true" @click=${() => this.prev()}></div>
             <div class="zone next" aria-hidden="true" @click=${() => this.next()}></div>
-          ` : html`<div class="empty">No &lt;work-slide&gt; children.</div>`}
+          ` : html`<div class="empty">No &lt;deck-slide&gt; children.</div>`}
           <div class="notes" part="notes">${this._notesHtml()}</div>
         </div>
         <div class="progress" part="progress"><i style=${`--_pct:${pct}`}></i></div>
@@ -551,4 +551,4 @@ function captureSlide(slide, res, i) {
   <div class="deck-band-${i}" data-band="${band}">${parts}</div>`;
 }
 
-define("work-deck", WorkDeck);
+define("deck-view", WorkDeck);

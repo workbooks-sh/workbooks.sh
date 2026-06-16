@@ -214,7 +214,7 @@ function parseWhere(str, out) {
   const parts = str.split(/\s+(and|or)\s+/i);
   for (let i = 0; i < parts.length; i++) {
     if (i % 2 === 1) { out.push({ bool: parts[i].toLowerCase() }); continue; }
-    // accept the floor's `CAST(col AS TYPE)` coercion (used by work-search/-command
+    // accept the floor's `CAST(col AS TYPE)` coercion (used by search-box/-command
     // so non-string columns LIKE-match) — the memory tier is the floor's own offline
     // engine, so it must run the floor's own query. Reduce the cast to the column;
     // the JS comparison is type-agnostic (String() coerces), so the cast is a no-op.

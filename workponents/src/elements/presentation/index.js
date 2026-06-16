@@ -2,10 +2,10 @@
 // timeline and the slides ARE its discrete keyframe bands. Because of that one
 // idea the domain shares the wavelet render-core with `video`, so "export to
 // video" is free (the deck folds its slides into a <gm-doc> and hands it to the
-// SAME encode path <work-video> uses), and live workponents (a <work-chart>, a
-// <work-video>) live ON slides as first-class citizens — not screenshots.
+// SAME encode path <video-player> uses), and live workponents (a <chart-view>, a
+// <video-player>) live ON slides as first-class citizens — not screenshots.
 //
-// Composition-as-source: the ordered <work-slide> children ARE the deck. Importing
+// Composition-as-source: the ordered <deck-slide> children ARE the deck. Importing
 // this barrel registers the elements (idempotent via define()) + re-exports the
 // classes. The wavelet runtime is only needed for export (lazily, via the Host or
 // a portable bundle) — never for viewing. Lit-based; buildless ESM.

@@ -1,12 +1,12 @@
-// <work-record> — THE records reinvention: the detail view of ONE entity. A record
+// <record-view> — THE records reinvention: the detail view of ONE entity. A record
 // IS a row. A source (src-name / query) + a selector (where / id, or key+value)
 // resolves to exactly one row of a WbQueryResult; the element renders it as a
-// typed field layout — label + a <work-field-value> per column, type-aware off the
+// typed field layout — label + a <record-field-value> per column, type-aware off the
 // result's `types[]`. Same shared engine as wb-table (getEngine) — never a second
 // data store; a record is just a query that returns one row.
 //
 // Selection is master→detail friendly: set `where`/`id`/`value` from a
-// <work-record-list>'s work-record-select event to drive a detail pane off the same
+// <record-list>'s work-record-select event to drive a detail pane off the same
 // source. Composition-as-source: the record carries its source + selector.
 //
 // Editable mode (optional) writes back through the Host/Dock seam
@@ -14,12 +14,12 @@
 // no reachable Host it degrades to read-only and shows a note.
 //
 // Usage (named source, select by id):
-//   <work-record src-name="customers" key="id" value="C-1004"></work-record>
+//   <record-view src-name="customers" key="id" value="C-1004"></record-view>
 //
 // Usage (full query + WHERE selector, grid layout, editable):
-//   <work-record src-name="customers"
+//   <record-view src-name="customers"
 //     query="SELECT id, name, tier, mrr, signed, active FROM customers"
-//     where="id = 'C-1004'" layout="grid" editable></work-record>
+//     where="id = 'C-1004'" layout="grid" editable></record-view>
 //
 // Attributes:
 //   src-name    a source registered via getEngine().register(...)
@@ -266,8 +266,8 @@ export class WbRecord extends WbElement {
       const inner = editing
         ? html`<input type="text" .value=${String(this._edits[c.field] ?? (v ?? ""))}
             @input=${(e) => { this._edits[c.field] = e.target.value; }} />`
-        : html`<work-field-value type=${c.type} format=${c.format ?? ""} display=${c.display ?? ""}
-            value=${v ?? ""}></work-field-value>`;
+        : html`<record-field-value type=${c.type} format=${c.format ?? ""} display=${c.display ?? ""}
+            value=${v ?? ""}></record-field-value>`;
       return html`<div class="field"><span class="label">${c.label}</span><span class="val">${inner}</span></div>`;
     });
     return html`<div class="fields">${fields}</div>`;
@@ -330,7 +330,7 @@ function sqlLiteral(v) {
 }
 function prettify(f) { return String(f).replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 // A per-column display hint (the author's lens) → either a numeric `format` or a
-// `display` mode for <work-field-value>. Lets a DATE that DuckDB returns as an
+// `display` mode for <record-field-value>. Lets a DATE that DuckDB returns as an
 // epoch-int still read as a date, without touching the read-only engine.
 export const NUMERIC_FORMATS = ["usd", "num", "pct"];
 export function hintFor(map, field) {
@@ -351,4 +351,4 @@ function coerceToType(v, type) {
   return v;
 }
 
-define("work-record", WbRecord);
+define("record-view", WbRecord);

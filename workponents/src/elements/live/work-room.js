@@ -1,9 +1,9 @@
-// <work-room> — the realtime container. Joins a topic and slots its content.
+// <live-room> — the realtime container. Joins a topic and slots its content.
 //
 // The reinvention: a room is a ROUTING CONFIG, not a backend. Set `topic` and the
 // room opens a presence/pubsub channel over the Host seam (the BEAM over RCP when
 // a runtime is reachable, a BroadcastChannel mock standalone) — no service to
-// provision. Child live elements (<work-presence>, <work-cursors>, <work-live-value>)
+// provision. Child live elements (<live-presence>, <work-cursors>, <live-value>)
 // find their channel through the room, so one connection backs the whole subtree.
 //
 // Attributes:
@@ -124,4 +124,4 @@ export class WorkRoom extends WbElement {
   }
 }
 
-define("work-room", WorkRoom);
+define("live-room", WorkRoom);

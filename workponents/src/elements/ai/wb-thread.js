@@ -1,18 +1,18 @@
-// <work-thread> — renders a whole conversation. The DOC IS THE TRANSCRIPT:
+// <chat-thread> — renders a whole conversation. The DOC IS THE TRANSCRIPT:
 // conversation-as-source. The agent edits a living org/markdown artifact; the
 // thread is the rendered view of it (the turns are its diff stream).
 //
 // Two source modes (the same document, two encodings):
-//   1. Light-DOM <work-message> children — author the transcript declaratively
-//      in HTML; <work-thread> just lays them out (the children render themselves).
+//   1. Light-DOM <chat-message> children — author the transcript declaratively
+//      in HTML; <chat-thread> just lays them out (the children render themselves).
 //   2. The `turns` property — an array of {role, name, text} OR an org/markdown
-//      string with `* role` headings. Setting it (re)builds <work-message>s.
+//      string with `* role` headings. Setting it (re)builds <chat-message>s.
 //
 // Usage:
-//   <work-thread>
-//     <work-message role="user">…</work-message>
-//     <work-message role="assistant">…</work-message>
-//   </work-thread>
+//   <chat-thread>
+//     <chat-message role="user">…</chat-message>
+//     <chat-message role="assistant">…</chat-message>
+//   </chat-thread>
 //
 //   el.turns = [{ role: "user", text: "hi" }, { role: "assistant", text: "**hey**" }];
 import { WbElement, html, css, define } from "../../core/element.js";
@@ -33,7 +33,7 @@ export class WbThread extends WbElement {
     }
     .title { font: 700 11px var(--work-font-mono); letter-spacing: .18em;
       text-transform: uppercase; color: var(--work-fg-subtle); margin-bottom: var(--work-space-2); }
-    ::slotted(work-message) { display: block; }
+    ::slotted(chat-message) { display: block; }
     .built { display: contents; }
   `;
 
@@ -75,20 +75,20 @@ export class WbThread extends WbElement {
     const head = title ? html`<div class="title">${title}</div>` : "";
     const style = mw ? `--_mw:${mw}` : "";
 
-    // Built mode: render the turns array into <work-message>s.
+    // Built mode: render the turns array into <chat-message>s.
     if (this._turns) {
       return html`<div class="thread" style=${style}>${head}<div class="built">${this._turns.map(
         (t) => this._message(t),
       )}</div></div>`;
     }
 
-    // Declarative mode: lay out light-DOM <work-message> children via slot.
+    // Declarative mode: lay out light-DOM <chat-message> children via slot.
     return html`<div class="thread" style=${style}>${head}<slot></slot></div>`;
   }
 
-  /** Build a <work-message> element, passing text via the property (no escaping). */
+  /** Build a <chat-message> element, passing text via the property (no escaping). */
   _message(t) {
-    const el = document.createElement("work-message");
+    const el = document.createElement("chat-message");
     el.setAttribute("role", t.role || "assistant");
     if (t.name) el.setAttribute("name", t.name);
     el.text = t.text || "";
@@ -96,4 +96,4 @@ export class WbThread extends WbElement {
   }
 }
 
-define("work-thread", WbThread);
+define("chat-thread", WbThread);

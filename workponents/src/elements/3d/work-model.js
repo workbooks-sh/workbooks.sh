@@ -1,6 +1,6 @@
-// <work-model> — the themed wrapper over Google's <model-viewer>.
+// <model-view> — the themed wrapper over Google's <model-viewer>.
 //
-// 3D's analogue of <work-video>: the floor VIEWER for glTF/GLB/STL. model-viewer
+// 3D's analogue of <video-player>: the floor VIEWER for glTF/GLB/STL. model-viewer
 // (Apache-2.0) is itself a custom element built on three.js; we do NOT reimplement
 // any of it. We wrap it in a token-themed shell — frame chrome, our own loading /
 // error / placeholder states, and model-viewer's OWN CSS custom properties driven
@@ -25,8 +25,8 @@
 // element's shadow root; its styles never land in document.head.
 //
 // Usage:
-//   <work-model src="astronaut.glb" camera-controls auto-rotate></work-model>
-//   <work-model src="model.glb" ar poster="poster.webp"></work-model>
+//   <model-view src="astronaut.glb" camera-controls auto-rotate></model-view>
+//   <model-view src="model.glb" ar poster="poster.webp"></model-view>
 //   el.addEventListener("work-model-load", …); // / "work-model-error"
 //
 // Generation (text/image → 3D) is HOST-BROKERED — see `generate()` below: the seam
@@ -42,7 +42,7 @@ import { defineVariants, variantAttrs } from "../../core/variants.js";
 // force the floor placeholder without a network hit.
 const DEFAULT_VIEWER_SRC = "https://esm.sh/@google/model-viewer@4.0.0";
 
-// One in-flight import shared across every <work-model> on the page. Resolves once
+// One in-flight import shared across every <model-view> on the page. Resolves once
 // <model-viewer> is registered. Rejects (→ floor placeholder) when the chunk can't
 // load. An explicit window.__WB_MODELVIEWER__ override short-circuits the import:
 //   • a truthy value → treat as "already provided" (e.g. a host that pre-bundled it),
@@ -73,7 +73,7 @@ function loadModelViewer(rawSrc) {
 }
 
 const VARIANTS = defineVariants({
-  // visual weight of the viewer frame (matches work-video's transport vocabulary)
+  // visual weight of the viewer frame (matches video-player's transport vocabulary)
   variant: { options: ["solid", "soft", "bare"], default: "solid" },
   size: { options: ["sm", "md", "lg"], default: "md" },
   // accent the chrome (progress bar, AR button) paints with
@@ -200,13 +200,13 @@ export class WorkModel extends WbElement {
     this._resolveSource();
   }
 
-  /** Resolve a child <work-model-source> (composition-as-source) into `src`. A
+  /** Resolve a child <model-source> (composition-as-source) into `src`. A
    *  direct `src` attr always wins; otherwise a source child's compile() result
    *  drives the viewer (a `src` form sets it directly; a stubbed `code` form
    *  surfaces a clear status instead of a wrong model). */
   async _resolveSource() {
     if (this.attr("src")) return; // explicit src wins
-    const srcEl = this.querySelector("work-model-source");
+    const srcEl = this.querySelector("model-source");
     if (!srcEl?.compile) return;
     try {
       const out = await srcEl.compile();
@@ -352,4 +352,4 @@ export class WorkModel extends WbElement {
   }
 }
 
-define("work-model", WorkModel);
+define("model-view", WorkModel);

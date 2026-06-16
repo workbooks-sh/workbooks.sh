@@ -32,33 +32,33 @@ To install a component, a consumer (or a CLI/agent) resolves it recursively:
    theme-contract + `applyTheme`/`registerTheme`; `data`/`validate` as needed).
 3. `npm install` the union of `dependencies`; optionally the
    `peerDependencies` to enable the heavy tier.
-4. Import the element file (registers the tag) and drop `<work-model …>` in markup.
+4. Import the element file (registers the tag) and drop `<model-source …>` in markup.
 
 Every component pulls **theme**, so a copy-in always lands with the design
 contract — no element ships an orphaned token.
 
 ## Components (52 tags · 20 domains)
 
-- **3d** —  (`work-model`, `work-model-source`)
-- **ai** — Conversational surfaces — thread, message, generative block, composer. (`work-composer`, `work-gen-block`, `work-message`, `work-thread`)
-- **auth** — Identity & access — sign-in, the current user, capability gates. (`work-auth`, `work-gate`, `work-user`)
-- **code** — Code surfaces — a themed editor and a sandboxed REPL. (`work-editor`, `work-repl`)
+- **3d** —  (`model-source`, `model-view`)
+- **ai** — Conversational surfaces — thread, message, generative block, composer. (`chat-composer`, `chat-gen-block`, `chat-message`, `chat-thread`)
+- **auth** — Identity & access — sign-in, the current user, capability gates. (`auth-gate`, `auth-panel`, `auth-user`)
+- **code** — Code surfaces — a themed editor and a sandboxed REPL. (`code-editor`, `code-repl`)
 - **core** — The base element + variant contract + the reference work-button. (`work-button`)
-- **data** —  (`work-query`)
-- **data-viz** — A chart is a live view over a query — chart, spark, metric. (`work-chart`, `work-metric`, `work-spark`)
-- **docs** — Prose & document structure — doc, doc-cell, outline. (`work-doc`, `work-doc-cell`, `work-doc-import`, `work-doc-outline`)
-- **files** — File surfaces — a drive, a file card, a dropzone. (`work-drive`, `work-dropzone`, `work-file`)
+- **data** —  (`data-query`)
+- **data-viz** — A chart is a live view over a query — chart, spark, metric. (`chart-metric`, `chart-spark`, `chart-view`)
+- **docs** — Prose & document structure — doc, doc-cell, outline. (`document-cell`, `document-import`, `document-outline`, `document-view`)
+- **files** — File surfaces — a drive, a file card, a dropzone. (`file-card`, `file-drive`, `file-dropzone`)
 - **flow** — Agentic structure — flow (sequenced steps + build edges) and loop (cron jobs). (`work-flow`, `work-loop`)
-- **forms** — Schema-driven forms — form, field, field-group (over src/validate). (`work-field`, `work-field-group`, `work-form`)
-- **git** — Version surfaces — diff, history graph, restore, undo. (`work-diff`, `work-history-graph`, `work-restore`, `work-undo`)
-- **live** — Realtime presence — room, presence, live value. (`work-live-value`, `work-presence`, `work-room`)
-- **maps** — Geospatial — a map as a view over a spatial query. (`work-map`)
-- **pm** — Project management — task, board, sprint, milestone. (`work-board`, `work-milestone`, `work-sprint`, `work-task`)
-- **presentation** — Slide decks — deck and slide. (`work-deck`, `work-slide`)
-- **records** — Structured records — record, record-list, field-value. (`work-field-value`, `work-record`, `work-record-list`)
-- **search** — Search & command — search box, command palette, command item. (`work-command`, `work-command-item`, `work-search`)
-- **tables** — Tabular data over the shared engine — table and column. (`work-column`, `work-table`)
-- **video** — Video surfaces — video and video-source. (`work-video`, `work-video-source`)
+- **forms** — Schema-driven forms — form, field, field-group (over src/validate). (`form-field`, `form-field-group`, `form-view`)
+- **git** — Version surfaces — diff, history graph, restore, undo. (`git-diff`, `git-history-graph`, `git-restore`, `git-undo`)
+- **live** — Realtime presence — room, presence, live value. (`live-presence`, `live-room`, `live-value`)
+- **maps** — Geospatial — a map as a view over a spatial query. (`map-view`)
+- **pm** — Project management — task, board, sprint, milestone. (`board-milestone`, `board-sprint`, `board-task`, `board-view`)
+- **presentation** — Slide decks — deck and slide. (`deck-slide`, `deck-view`)
+- **records** — Structured records — record, record-list, field-value. (`record-field-value`, `record-list`, `record-view`)
+- **search** — Search & command — search box, command palette, command item. (`search-box`, `search-command`, `search-command-item`)
+- **tables** — Tabular data over the shared engine — table and column. (`grid-column`, `grid-table`)
+- **video** — Video surfaces — video and video-source. (`video-player`, `video-source`)
 
 Library items: `data`, `validate` · style item: `theme`.
 

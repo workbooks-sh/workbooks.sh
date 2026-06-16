@@ -1,31 +1,31 @@
-// <work-metric> — a single KPI, computed in the engine. The number IS a query: the
+// <chart-metric> — a single KPI, computed in the engine. The number IS a query: the
 // element runs a 1-row aggregate on the shared engine and renders one value (+
-// optional label, delta, and inline <work-spark> trend). The whole point of the
+// optional label, delta, and inline <chart-spark> trend). The whole point of the
 // reinvention: there is no "metric value" prop you hand-compute in JS — you hand
 // it SQL and the engine returns the scalar. Same data contract + engine as
-// <work-chart>; reach compute ONLY through src/data.
+// <chart-view>; reach compute ONLY through src/data.
 //
 // Re-based onto Lit: render() returns a Lit template wrapping the string-built
-// shell via unsafeHTML (the embedded <work-spark> is a sibling custom element).
+// shell via unsafeHTML (the embedded <chart-spark> is a sibling custom element).
 // The _load single-flight + whenRegistered/register plumbing is unchanged.
 //
 // Usage (the aggregate runs in the engine, returns one row):
-//   <work-metric label="Total revenue" format="usd"
-//     query="SELECT sum(revenue) AS total FROM orders"></work-metric>
+//   <chart-metric label="Total revenue" format="usd"
+//     query="SELECT sum(revenue) AS total FROM orders"></chart-metric>
 //
-//   <work-metric label="Avg order" format="usd" value-col="avg_order" delta-col="wow"
-//     query="SELECT avg(revenue) AS avg_order, 0.082 AS wow FROM orders"></work-metric>
+//   <chart-metric label="Avg order" format="usd" value-col="avg_order" delta-col="wow"
+//     query="SELECT avg(revenue) AS avg_order, 0.082 AS wow FROM orders"></chart-metric>
 //
 // Attributes:
 //   query        SQL returning ONE row (the scalar lives here, engine-computed)
-//   src-name / rows / csv   — register a source inline (same story as work-chart)
+//   src-name / rows / csv   — register a source inline (same story as chart-view)
 //   value-col    which result column is the value (default: first)
 //   delta-col    optional column holding a fraction delta (e.g. 0.082 = +8.2%)
 //   label        the metric caption
 //   format       usd | num | pct | none
 //   size         sm | md | lg
 //   variant      card | bare
-//   trend        optional SQL for an inline sparkline; renders <work-spark>
+//   trend        optional SQL for an inline sparkline; renders <chart-spark>
 //   trend-y      value column for the trend query
 //
 // Events: work-metric-ready { detail: { value, delta, engine } }
@@ -110,7 +110,7 @@ export class WbMetric extends WbElement {
         if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
         else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
         const sql = this.attr("query") || (this._srcName ? `SELECT * FROM ${ident(this._srcName)} LIMIT 1` : null);
-        if (!sql) throw new Error("work-metric needs a query or a source");
+        if (!sql) throw new Error("chart-metric needs a query or a source");
         const res = await this._engine.query(sql);
         this._tier = res.engine || this._engine.provider();
         const vCol = this.attr("value-col");
@@ -146,7 +146,7 @@ export class WbMetric extends WbElement {
     }
     const trend = this.attr("trend");
     const spark = trend
-      ? `<div class="spark"><work-spark query="${esc(trend)}" ${this.attr("trend-y") ? `y="${esc(this.attr("trend-y"))}"` : ""} type="area" width="140" height="28"></work-spark></div>`
+      ? `<div class="spark"><chart-spark query="${esc(trend)}" ${this.attr("trend-y") ? `y="${esc(this.attr("trend-y"))}"` : ""} type="area" width="140" height="28"></chart-spark></div>`
       : "";
     return `<div class="shell">
       ${label ? `<div class="label">${esc(label)}</div>` : ""}
@@ -175,4 +175,4 @@ function abbrev(n) {
   return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-define("work-metric", WbMetric);
+define("chart-metric", WbMetric);
