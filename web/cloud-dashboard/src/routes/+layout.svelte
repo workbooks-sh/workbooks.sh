@@ -63,8 +63,13 @@
     cancelEdit();
   }
 
-  // /welcome + /denied render full-bleed, without the app chrome.
-  const bare = $derived(page.url.pathname === '/welcome' || page.url.pathname === '/denied');
+  // /welcome + /denied + /authorize render full-bleed, without the app chrome
+  // (/authorize is the desktop device-consent takeover — centered, no sidebar).
+  const bare = $derived(
+    page.url.pathname === '/welcome' ||
+      page.url.pathname === '/denied' ||
+      page.url.pathname === '/authorize'
+  );
 
   // each section gets its own pastel "little touch" (progress bars, accents) via --section
   const sectionAccent = $derived.by(() => {
