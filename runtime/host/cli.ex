@@ -467,6 +467,9 @@ defmodule Workbooks.CLI do
   # `wb toolkit eval <id> <case>` — run ONE eval whose filename contains <case>.
   def call(["toolkit", "eval", id, filter], _t),
     do: Toolkits.eval_text(id, Toolkits.default_root(), filter)
+  # `wb eval components [case]` — the component-emit eval pack (text + voice parity).
+  def call(["eval", "components"], _t), do: Workbooks.Evals.Components.run()
+  def call(["eval", "components", filter], _t), do: Workbooks.Evals.Components.run(filter)
   def call(["toolkit", "sign", id], t), do: Toolkits.sign_text(id, t)
   def call(["toolkit", "versions", id], _t), do: Toolkits.versions_text(id)
   def call(["toolkit", "live"], _t), do: Toolkits.live_text()

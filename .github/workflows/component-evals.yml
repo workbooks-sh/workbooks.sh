@@ -1,0 +1,105 @@
+# Component-emit eval pack — the standing assurance gate that the agent (text
+# AND voice) reaches for the right `work-*` component on the fly.
+#
+# Phase 2 (assurance) of WORKPONENTS-AGENT-INTEGRATION.md. Reuses the wavelet
+# eval machinery shape (spec + checks + vision-judge rubric); the runner lives
+# in the BEAM (Workbooks.Evals.Components). Each spec is an adversarial one-liner
+# — the agent must DISCOVER the right element from the CEM catalog. The emitted
+# component block is mounted headless, screenshotted light + dark, and the frames
+# feed the vision judge. Voice parity asserts the rehearsed voice path picks the
+# same element.
+#
+# CHEAP by design — no paid media (no image/video gen), so it runs per-PR.
+# NO MAX_STEPS: we measure the agent's trajectory and gate on artifact + rubric,
+# never on an iteration cap (standing project rule).
+name: component-evals
+
+on:
+  pull_request:
+    paths:
+      - "workponents/**"
+      - "runtime/evals/components/**"
+      - "runtime/host/evals/components.ex"
+      - "runtime/host/browse/headless.ex"
+      - "runtime/host/web.ex" # the agent_system_prompt component contract
+      - "**/agents/*.org" # agent defs
+      - "**/skills/**" # skills that shape component choice
+      - ".github/workflows/component-evals.yml"
+  workflow_dispatch:
+    inputs:
+      case:
+        description: "Run one case (substring of the spec filename), or blank for all"
+        required: false
+        default: ""
+
+concurrency:
+  group: component-evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: runtime
+    env:
+      # The default workbench eval model (cheap; ~10x under gemini-flash).
+      WB_EVAL_MODEL: ${{ vars.WB_EVAL_MODEL || 'xiaomi/mimo-v2.5' }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      # The CI runner can't init Chrome's process sandbox (no userns) — accept the
+      # weaker isolation for the eval mount (we only ever load our own file:// page).
+      WB_CHROME_NO_SANDBOX: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install headless Chrome (for the mount-and-screenshot path)
+        uses: browser-actions/setup-chrome@v1
+        id: chrome
+        with:
+          chrome-version: stable
+
+      - name: Point the runtime at the installed Chrome
+        run: echo "WB_CHROME_BIN=${{ steps.chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28"
+          elixir-version: "1.17"
+
+      - name: Cache deps + build
+        uses: actions/cache@v4
+        with:
+          path: |
+            runtime/deps
+            runtime/_build
+          key: ${{ runner.os }}-mix-${{ hashFiles('runtime/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+
+      - name: mix deps.get + compile
+        run: |
+          mix deps.get
+          mix compile
+
+      - name: Run the component-emit eval pack
+        run: |
+          if [ -n "${{ github.event.inputs.case }}" ]; then
+            ./evals/components/bin/eval-run "${{ github.event.inputs.case }}" | tee eval-out.txt
+          else
+            ./evals/components/bin/eval-run | tee eval-out.txt
+          fi
+          # Gate: fail the job if any non-skipped case failed. The summary line is
+          # `components evals: P/N passed (S skipped)` — require P == N.
+          line=$(grep -E '^components evals:' eval-out.txt | tail -1)
+          echo "$line"
+          pn=$(echo "$line" | sed -E 's/.*: ([0-9]+)\/([0-9]+) .*/\1 \2/')
+          pass=$(echo "$pn" | cut -d' ' -f1); total=$(echo "$pn" | cut -d' ' -f2)
+          if [ "$pass" != "$total" ]; then echo "::error::component evals failed ($pass/$total)"; exit 1; fi
+
+      - name: Upload run artifacts (emitted blocks + mount frames + verdicts)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: component-eval-runs
+          path: runtime/evals/components/runs/**
+          if-no-files-found: ignore
+          retention-days: 14

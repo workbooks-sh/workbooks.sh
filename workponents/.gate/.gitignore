@@ -1,0 +1,4 @@
+# Run artifacts — regenerated every `npm run gate`. Not committed.
+*.json
+# The visual baselines ARE committed (the perceptual oracle the gate diffs against).
+!baseline/

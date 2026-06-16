@@ -21,7 +21,7 @@ const VARIANTS = defineVariants({
 // Classic dynamic-programming longest-common-subsequence over arrays of lines.
 // Returns a flat op list: {type: "eq"|"del"|"add", text, an, bn} with the
 // originating line numbers (an = a-side, bn = b-side; null when not present).
-function lcsDiff(aLines, bLines) {
+export function lcsDiff(aLines, bLines) {
   const n = aLines.length, m = bLines.length;
   // dp[i][j] = LCS length of a[i..], b[j..]
   const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
@@ -52,7 +52,7 @@ function lcsDiff(aLines, bLines) {
 // #+begin_…/#+end_… pair is one atomic block; a :PROPERTIES:…:END: drawer is one
 // block; blank-line-separated runs are paragraph blocks. Each block keeps a kind
 // + a stable key (heading text / first line) so the block-level diff is semantic.
-function orgBlocks(src) {
+export function orgBlocks(src) {
   const lines = src.split("\n");
   const blocks = [];
   let buf = [], kind = "para";
@@ -98,7 +98,7 @@ function looksOrg(s) {
 
 // Diff org sources at the block level (LCS over block keys), then within each
 // changed block fall back to a line diff so edits inside a section still show.
-function semanticDiff(aSrc, bSrc) {
+export function semanticDiff(aSrc, bSrc) {
   const A = orgBlocks(aSrc), B = orgBlocks(bSrc);
   const aKeys = A.map((b) => b.kind + " " + b.text);
   const bKeys = B.map((b) => b.kind + " " + b.text);

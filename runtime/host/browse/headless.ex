@@ -40,6 +40,65 @@ defmodule Workbooks.Browse.Headless do
     end
   end
 
+  @doc """
+  Screenshot a local file:// page → {:ok, png_path} | {:error, reason}.
+
+  Used by the component-emit eval pack to capture a mounted `work-*` artifact.
+  Same chrome binary / sandbox / timeout discipline as `render/2`; the SSRF
+  NetGuard gate is skipped ONLY for `file://` paths under a caller-owned temp
+  dir (the eval mount HTML the harness itself wrote) — never a remote URL.
+  """
+  def screenshot(url, out_png, opts \\ [])
+  def screenshot(url, _out, _opts) when not is_binary(url) or url == "", do: {:error, :no_url}
+
+  def screenshot(url, out_png, opts) do
+    timeout = opts[:timeout] || 15_000
+    local? = String.starts_with?(url, "file://")
+
+    cond do
+      not local? and not Workbooks.NetGuard.allowed?(url) ->
+        {:error, :blocked}
+
+      true ->
+        case chrome_bin() do
+          nil -> {:error, :no_browser}
+          bin -> run_shot(bin, url, out_png, opts[:window] || "900,640", timeout)
+        end
+    end
+  end
+
+  defp run_shot(bin, url, out_png, window, timeout) do
+    base = [
+      "--headless",
+      "--disable-gpu",
+      "--hide-scrollbars",
+      "--force-device-scale-factor=2",
+      "--window-size=#{window}",
+      "--timeout=#{timeout}",
+      "--virtual-time-budget=#{timeout}",
+      "--screenshot=#{out_png}",
+      url
+    ]
+
+    args = if System.get_env("WB_CHROME_NO_SANDBOX") == "1", do: ["--no-sandbox" | base], else: base
+    task = Task.async(fn -> System.cmd(bin, args, stderr_to_stdout: true) end)
+
+    case Task.yield(task, timeout + 5_000) || Task.shutdown(task, :brutal_kill) do
+      {:ok, {_out, 0}} ->
+        if File.exists?(out_png) and File.stat!(out_png).size > 0,
+          do: {:ok, out_png},
+          else: {:error, :empty_screenshot}
+
+      {:ok, {out, code}} ->
+        {:error, {:exit, code, String.slice(out, 0, 400)}}
+
+      _ ->
+        {:error, :timeout}
+    end
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
   @doc "Is a local headless browser available on this host?"
   def available?, do: chrome_bin() != nil
 

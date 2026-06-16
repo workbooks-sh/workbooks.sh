@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en" data-work-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- offline import map: lit + every directive specifier → the one shared bundle -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "/__lit/all.js",
+        "lit/directives/unsafe-html.js": "/__lit/all.js",
+        "lit/directives/unsafe-svg.js": "/__lit/all.js",
+        "lit/directives/ref.js": "/__lit/all.js"
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/src/theme/tokens.css" />
+  <style>
+    html, body { margin: 0; }
+    body { background: var(--work-bg); color: var(--work-fg); font-family: var(--work-font, system-ui); padding: 24px; }
+    #stage { display: block; }
+  </style>
+  <!-- register every element (idempotent); the harness mounts by tag name.
+       A throw mid-barrel (a floor element with a Lit dev-mode warning that
+       escalates) must NOT strand the harness — load the whole barrel first
+       (gets most), then expose a per-module loader so the harness can import any
+       still-unregistered element by its OWN module path with isolated try/catch.
+       Each module's failure is recorded, never fatal. -->
+  <script type="module">
+    window.__loadErrors = [];
+    try { await import("/src/index.js"); }
+    catch (e) { window.__loadErrors.push("index.js: " + String(e)); }
+    // Per-module loader: import one element file in isolation. Returns true if the
+    // tag is registered afterwards. Used by the harness to recover elements that a
+    // barrel-level throw skipped (a bad sibling module can't strand a good one).
+    window.__loadModule = async (path) => {
+      try { await import("/" + path.replace(/^\/+/, "")); return true; }
+      catch (e) { window.__loadErrors.push(path + ": " + String(e)); return false; }
+    };
+    window.__workponentsLoaded = true;
+  </script>
+</head>
+<body>
+  <div id="stage"></div>
+  <script>
+    // ── harness API (driven from Playwright via page.evaluate) ────────────────
+    // The gate calls window.__gate.* — kept tiny + synchronous-friendly.
+    window.__gate = {
+      setTheme(theme) {
+        document.documentElement.setAttribute("data-work-theme", theme);
+      },
+      // Mount one element. spec = { tag, attrs:{}, html:"", into:"#stage" }.
+      // Returns once the element has upgraded + completed its first Lit update.
+      async mount(spec) {
+        const stage = document.querySelector(spec.into || "#stage");
+        stage.innerHTML = "";
+        const el = document.createElement(spec.tag);
+        for (const [k, v] of Object.entries(spec.attrs || {})) {
+          if (v === true) el.setAttribute(k, "");
+          else if (v != null) el.setAttribute(k, String(v));
+        }
+        if (spec.html) el.innerHTML = spec.html;
+        stage.appendChild(el);
+        await customElements.whenDefined(spec.tag);
+        // wait for Lit's first render to settle
+        if (el.updateComplete) { try { await el.updateComplete; } catch {} }
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        return true;
+      },
+      // Sweep the shadow tree's paint-relevant computed styles. Returns a list of
+      // { sel, prop, value } for every shadow node + the host.
+      sweepStyles(tag, props) {
+        const el = document.querySelector("#stage " + tag) || document.querySelector(tag);
+        if (!el) return { error: "no element" };
+        const PAINT = props || [
+          "color", "background-color", "border-top-color", "border-bottom-color",
+          "border-left-color", "border-right-color", "outline-color", "fill", "stroke",
+          "box-shadow",
+        ];
+        const out = [];
+        const visit = (node, path) => {
+          if (node.nodeType !== 1) return;
+          const cs = getComputedStyle(node);
+          const rec = { sel: path };
+          for (const p of PAINT) rec[p] = cs.getPropertyValue(p).trim();
+          out.push(rec);
+          // descend into light children + shadow root
+          const kids = [...node.children];
+          kids.forEach((c, i) => visit(c, path + ">" + c.tagName.toLowerCase() + ":" + i));
+          if (node.shadowRoot) {
+            [...node.shadowRoot.children].forEach((c, i) =>
+              visit(c, path + "::shadow>" + c.tagName.toLowerCase() + ":" + i));
+          }
+        };
+        visit(el, tag);
+        return { records: out };
+      },
+      // Count nodes in document.head that the element mounting may have injected.
+      headRuleSignature() {
+        const styles = [...document.head.querySelectorAll("style")];
+        return {
+          styleCount: styles.length,
+          // serialize each <style> so a before/after diff catches global injection
+          text: styles.map((s) => s.textContent || "").join("\n---\n"),
+        };
+      },
+    };
+  </script>
+</body>
+</html>

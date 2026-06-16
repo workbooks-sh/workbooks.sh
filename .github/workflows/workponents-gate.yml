@@ -1,0 +1,71 @@
+name: workponents gate
+
+# The 5-gate headless validation harness + git-viz correctness tests.
+# Runs on any PR (or push to main) that touches workponents/. Fails the check
+# if any element's verdict is pass:false (gate:all --strict) or a git-viz test
+# regresses. This is the standing assurance gate for the component library.
+
+on:
+  pull_request:
+    paths:
+      - "workponents/**"
+      - ".github/workflows/workponents-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "workponents/**"
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workponents
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # The harness deps are tiny: playwright (drives its own headless Chromium —
+      # never the shared chrome-devtools MCP) + sharp (perceptual PNG diff) + lit
+      # (the floor element engine, resolved offline by the gate server). CI has no
+      # shared node_modules, so install them here into workponents/.
+      - name: Install harness deps
+        run: npm install --no-save playwright@1.61.0 sharp lit esbuild
+
+      - name: Install Chromium (cached in ~/.cache/ms-playwright)
+        run: npx playwright install --with-deps chromium
+
+      # Rebuild the offline lit bundle the gate page imports (kept in the repo,
+      # but regenerate so CI never drifts from the installed lit).
+      - name: Rebuild offline lit bundle
+        run: |
+          cat > tools/gate/vendor/_entry.mjs <<'EOF'
+          export * from "lit";
+          export { unsafeHTML } from "lit/directives/unsafe-html.js";
+          export { unsafeSVG } from "lit/directives/unsafe-svg.js";
+          export { ref, createRef } from "lit/directives/ref.js";
+          EOF
+          npx esbuild tools/gate/vendor/_entry.mjs --bundle --format=esm --platform=browser --outfile=tools/gate/vendor/lit-all.js
+          rm -f tools/gate/vendor/_entry.mjs
+
+      - name: git-viz correctness tests
+        run: npm run test:gitviz
+
+      # gate:all runs --strict: exits non-zero if ANY element verdict is pass:false.
+      # The committed baselines are the visual oracle; a render change must land a
+      # baseline update (npm run gate:baseline) in the same PR or this fails.
+      - name: 5-gate validation (strict)
+        run: npm run gate:all
+
+      - name: Upload verdicts + failing screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workponents-gate-verdicts
+          path: |
+            workponents/.gate/*.json
+            workponents/.gate/baseline/*.png
+          retention-days: 14
