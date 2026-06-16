@@ -12,7 +12,6 @@
   import SettingsContainer from "$lib/components/settings/SettingsContainer.svelte";
   import HomePanel from "$lib/home/HomePanel.svelte";
   import PackageTreeDrawer from "$lib/components/PackageTreeDrawer.svelte";
-  import BoardPanel from "$lib/board/BoardPanel.svelte";
   import { FolderOpen, Plus as PlusIcon } from "phosphor-svelte";
   import CreatePackageModal from "$lib/home/CreatePackageModal.svelte";
   import ShareOrgModal from "$lib/network/components/ShareOrgModal.svelte";
@@ -95,7 +94,6 @@
   function sectionFor(id: string) {
     switch (id) {
       case "home": return HomePanel;
-      case "kanban": return BoardPanel;
       case "settings": return SettingsContainer;
       case "network": return features.network ? NetworkPanel : null;
       default: return null;
@@ -105,7 +103,6 @@
     home: "Create",
     network: "Network",
     settings: "Settings",
-    kanban: "Kanban",
   };
 
   let active = $state("home");
