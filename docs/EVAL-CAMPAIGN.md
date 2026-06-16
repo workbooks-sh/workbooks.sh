@@ -113,14 +113,14 @@ For each surface with a passing happy-path, add the break-it test: cross-tenant,
 - DID Ed25519 signing / verify · `mix test test/did_x25519_test.exs` · GREEN(claimed)
 
 ### Agent intelligence / tools
-- Loop robustness (dead-stop/runaway/unknown-tool/parallel; the empty-turn nudge fix) · `mix test test/agent_loop_test.exs` · GREEN(claimed)
-- Streaming carries tool_calls (multi-step chains; wb-0lw8 root fix) · `mix test test/agent_socket_bridge_test.exs` + capability eval · GREEN
-- System-prompt composition · `mix test test/agent_prompt_test.exs` · GREEN(claimed)
-- vfs_write/read workdir confinement · `mix test test/vfs_write_confinement_test.exs` · GREEN(claimed)
+- Loop robustness (dead-stop/runaway/unknown-tool/parallel; the empty-turn nudge fix) · `mix test test/agent_loop_test.exs` · GREEN(verified 31/0 cluster)
+- Streaming carries tool_calls (multi-step chains; wb-0lw8 root fix) · `mix test test/agent_socket_bridge_test.exs` + capability eval · GREEN(verified)
+- System-prompt composition · `mix test test/agent_prompt_test.exs` · GREEN(verified)
+- vfs_write/read workdir confinement · `mix test test/vfs_write_confinement_test.exs` · GREEN(verified)
 - Agent quality (reasoning/honesty/format, 9 adversarial) · `mix run bench/agent_evals.exs` · GREEN (9/9 minimax-m3) — needs key
 - Agent capability (component-emit, workbook create/edit, tool-use honesty) · `mix run bench/agent_capabilities.exs` · GREEN (4/4) — needs key
-- Recall + embeddings-down fallback · `mix test test/library_search_fallback_test.exs` · GREEN(claimed)
-- AI-over-files (no fabrication) · `mix test test/library_ask_test.exs` · GREEN(claimed)
+- Recall + embeddings-down fallback · `mix test test/library_search_fallback_test.exs` · GREEN(verified)
+- AI-over-files (no fabrication) · `mix test test/library_ask_test.exs` · GREEN(verified)
 - web_search provider rotation + cite-able · `mix test test/web_search_format_test.exs test/search_provider_test.exs` · GREEN(claimed); Perplexity provider · BUILD
 - Headless browse (JS-rendered, SSRF-floored) · `mix test test/browse_headless_test.exs` · GREEN(claimed); SPA async-XHR (wb-70mi) · BUILD
 - OQL kernel render/parse/validate/tangle · `mix test test/oql_render_test.exs` · GREEN(claimed)
@@ -178,6 +178,7 @@ For each surface with a passing happy-path, add the break-it test: cross-tenant,
 
 ## Status Log (append-only — newest first; the loop's memory)
 
+- **Agent INTELLIGENCE cluster VERIFIED 31/0** (Phase 1): in isolation (dodges wb-94qn suite-load flakiness) `agent_loop` + `agent_socket_bridge` + `agent_prompt` + `vfs_write_confinement` + `library_search_fallback` + `library_ask` = **31/0**. Confirms claimed-green: loop robustness (dead-stop/runaway/unknown-tool/parallel + empty-turn nudge), streaming carries tool_calls (multi-step chains) + WS `?token=` socket auth, system-prompt composition, vfs_write/read workdir confinement, recall + embeddings-down fallback, AI-over-files no-fabrication. Keyless logic suites (the LLM-dependent quality/capability evals were already 9/9 + 4/4). Guardrail 1/0, no product code changed. Commit: <pending>.
 - **Phase 0.2 COMPLETE — web-component authoring gates GREEN**: `cd workponents && node tools/design-lint.mjs` → **PASS, 78 element decls / 3 themes, 0 design-system violations** (would go red on any literal color in a `work-*` decl); `node --test tools/scaffold.test.mjs` → **4/4** (derive name/domain→tag+class+import, rejects bad names/unknown domains, scaffolded element is token-only + well-formed extends WbElement + registers its tag). Keyless can-fail gates — `work component new` produces a gate-passing token-only element, and the 78 shipped elements carry zero hardcoded colors. With agent_evals 9/9 + agent_capabilities 4/4 + guardrail 1/0 (prior fires), 0.2 is fully recorded. Component-emit (vision) stays deferred — its dist bundle is unbuilt. Guardrail 1/0. Commit: <pending>.
 - **Sync runtime PUSH validated 3/0** (wb-9s6v): new `monorepo_watcher_test.exs` drives the watcher — a NEW file under scope → `file_changed:created` push to subscribers, delete → `removed`, and (adversarial) NO push when nothing changed (no sidebar refresh storms). The agent-file→sidebar SYNC chain is now real-tested on 2/3 links + the fix: runtime push (3/0) → desktop subscribes+refresh (fixed) → desktop scan lists it (2/0). Only the live GUI render remains (Tauri-app e2e). Guardrail 1/0, compile clean. Commit: <pending>.
 - **Sidebar DATA LAYER validated + desktop Rust backend 32/0** (wb-9s6v progress): refactored `package_workbooks` → pure `scan_workbooks(folders)` + 2 real isolated tests (spec-marked .html IS listed → agent/bundle workbook appears; marker-less/.txt NOT; empty/missing folder → [] no panic). Full `cargo test --lib` = 32/0 — the native layer behind sidebar/file/tab. NOTE: only .html/.htm with the workbook-spec marker list (the one-file format); a bare .org would NOT appear (legacy/deprecating). FULL GUI e2e (built Tauri app asserts file VISUALLY in sidebar + opens) still owed → wb-9s6v. Guardrail 1/0. Commit: <pending>.
