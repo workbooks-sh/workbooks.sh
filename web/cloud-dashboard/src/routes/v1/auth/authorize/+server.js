@@ -2,7 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import {
   authKv,
-  isLoopback,
+  isValidRedirect,
   validChallenge,
   validOrg,
   randomToken,
@@ -24,7 +24,7 @@ export async function GET({ url, platform }) {
   const challenge = url.searchParams.get('code_challenge') || '';
   const org = url.searchParams.get('organization_id') || '';
 
-  if (!isLoopback(redirectUri)) return new Response('sign-in unavailable (bad redirect)', { status: 400 });
+  if (!isValidRedirect(redirectUri)) return new Response('sign-in unavailable (bad redirect)', { status: 400 });
   if (!validChallenge(challenge)) return new Response('sign-in unavailable (bad challenge)', { status: 400 });
   if (!validOrg(org)) return new Response('sign-in unavailable (bad org)', { status: 400 });
 

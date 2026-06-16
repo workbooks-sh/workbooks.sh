@@ -25,11 +25,17 @@ export function randomToken() {
   return b64url(a);
 }
 
-// Only a loopback redirect — the broker must never bounce a code to an arbitrary host.
-export function isLoopback(uri) {
+// The broker must never bounce a code to an arbitrary host. Only two redirect shapes
+// are allowed, both owned by the desktop app (RFC 8252): a loopback http address, or
+// the app's private-use URL scheme (deep link). Everything else is rejected.
+const APP_SCHEME = 'workbooks:';
+export function isValidRedirect(uri) {
   try {
     const u = new URL(uri);
-    return u.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(u.hostname);
+    if (u.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(u.hostname)) {
+      return true; // loopback (RFC 8252 §7.3)
+    }
+    return u.protocol === APP_SCHEME; // private-use scheme deep link (RFC 8252 §7.2)
   } catch {
     return false;
   }

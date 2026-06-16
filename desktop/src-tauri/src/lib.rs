@@ -106,9 +106,11 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_deep_link::init())
         .manage(tabs::TabManager::default())
         .manage(fs_ops::Watchers::default())
         .manage(terminal::PtyManager::default())
+        .manage(network::PkceState::default())
         .invoke_handler(tauri::generate_handler![
             // Kernel + runtime discovery.
             weave,
@@ -243,6 +245,8 @@ pub fn run() {
             network::identity_set_workos,
             network::workspace_package,
             network::workos_sign_in,
+            network::workos_sign_in_begin,
+            network::workos_exchange,
             network::workos_load_session,
             network::workos_clear_session,
             // Terminal.
@@ -259,6 +263,14 @@ pub fn run() {
         .setup(|app| {
             build_tray(app.handle())?;
             enable_webview_media(app.handle());
+
+            // Register the workbooks:// scheme so the OS routes the sign-in deep link
+            // back to us (runtime register is needed in dev; prod uses Info.plist).
+            #[cfg(desktop)]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let _ = app.deep_link().register("workbooks");
+            }
 
             // Workbook-native: do NOT auto-start the heavy runtime on launch.
             // CONNECT to a running one if its discovery file is present and

@@ -317,6 +317,86 @@ pub fn workos_sign_in(
     Ok(session)
 }
 
+/// Holds the pending PKCE verifier between `workos_sign_in_begin` (which opens the
+/// browser) and `workos_exchange` (which the deep-link callback triggers). One sign-in
+/// at a time; managed in lib.rs.
+#[derive(Default)]
+pub struct PkceState(pub std::sync::Mutex<Option<String>>);
+
+const APP_REDIRECT: &str = "workbooks://auth/callback";
+
+/// Deep-link sign-in, step 1: generate PKCE, stash the verifier, and open the system
+/// browser to the broker's authorize URL (which redirects back to our workbooks://
+/// scheme). The OS routes that deep link to us → JS calls `workos_exchange`.
+#[tauri::command]
+pub fn workos_sign_in_begin(
+    state: tauri::State<'_, PkceState>,
+    broker_url: String,
+    organization_id: Option<String>,
+) -> Result<(), String> {
+    let (verifier, challenge) = pkce();
+    *state.0.lock().map_err(|_| "pkce lock".to_string())? = Some(verifier);
+
+    let mut authorize = format!(
+        "{}/v1/auth/authorize?response_type=code&redirect_uri={}&code_challenge={}&code_challenge_method=S256",
+        broker_url.trim_end_matches('/'),
+        urlencode(APP_REDIRECT),
+        challenge,
+    );
+    if let Some(org) = organization_id.as_deref().filter(|o| !o.is_empty()) {
+        authorize.push_str(&format!("&organization_id={}", urlencode(org)));
+    }
+    open::that(&authorize).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Deep-link sign-in, step 2: the OS handed back `workbooks://auth/callback?code=…`.
+/// Exchange the code (with the stashed verifier) for the session, store it in the
+/// keychain, and bring the app to the front.
+#[tauri::command]
+pub fn workos_exchange(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, PkceState>,
+    broker_url: String,
+    code: String,
+) -> Result<StoredSession, String> {
+    let verifier = state
+        .0
+        .lock()
+        .map_err(|_| "pkce lock".to_string())?
+        .take()
+        .ok_or("no pending sign-in")?;
+
+    let client = reqwest::blocking::Client::new();
+    let resp = client
+        .post(format!("{}/v1/auth/exchange", broker_url.trim_end_matches('/')))
+        .json(&serde_json::json!({
+            "code": code,
+            "code_verifier": verifier,
+            "redirect_uri": APP_REDIRECT,
+        }))
+        .send()
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("broker exchange failed: {}", resp.status()));
+    }
+    let session: StoredSession = resp.json().map_err(|e| e.to_string())?;
+
+    let body = serde_json::to_string(&session).map_err(|e| e.to_string())?;
+    Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
+        .map_err(|e| e.to_string())?
+        .set_password(&body)
+        .map_err(|e| e.to_string())?;
+
+    {
+        use tauri::Manager;
+        if let Some(w) = app.webview_windows().values().next() {
+            let _ = w.set_focus();
+        }
+    }
+    Ok(session)
+}
+
 #[tauri::command]
 pub fn workos_load_session() -> Option<StoredSession> {
     let body = Entry::new(KC_SERVICE, KC_WORKOS_SESSION)

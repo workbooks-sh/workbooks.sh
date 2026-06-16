@@ -15,6 +15,7 @@
     "core:tray:default",
     "core:menu:default",
     "core:event:default",
+    "deep-link:default",
     "dialog:default",
     "updater:default",
     "process:default",
