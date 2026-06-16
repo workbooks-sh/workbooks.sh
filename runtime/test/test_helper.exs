@@ -20,6 +20,18 @@ ExUnit.start(
   max_cases: 1
 )
 
+# Secrets-file hygiene (wb-94qn): several tests `Secrets.put(...)` FAKE platform/tenant
+# keys (e.g. "sk-PLATFORM", tenantA/B) into the node-global file at
+# `Workbooks.Secrets.path()` (a fixed $TMPDIR path) and never clean up. That file
+# PERSISTS across runs, so a later `mix run` (e.g. the agent capability eval) reads the
+# fake "sk-PLATFORM" key BEFORE the real env key → 401. Delete it after the suite so test
+# fixtures never leak into a real LLM-calling run. (Prod refreshes this file from the
+# control plane; deleting it in the test harness is harmless.)
+ExUnit.after_suite(fn _ ->
+  _ = File.rm(Workbooks.Secrets.path())
+  :ok
+end)
+
 # NOTE: We deliberately do NOT start the full OTP application here.
 # `Workbooks.Application` binds network ports (Bandit/control-plane), which
 # would make `mix test` flaky and refuse to run in parallel / CI.
