@@ -49,7 +49,7 @@ defmodule Workbooks.Acp do
   @doc """
   Agent-toolkit-index row(s) for `acp` — connection-aware. `[]` unless the surface is
   available here (so the toolkit is absent from the index in plain dev/test and in
-  production). Appended by `Workbooks.Toolkits.injection_text/2`.
+  production). Appended by `Workbooks.WorkKits.injection_text/2`.
   """
   def injection_rows do
     if available?() do

@@ -6,7 +6,7 @@ defmodule Workbooks.ToolkitVerifyCapsTest do
   """
   use ExUnit.Case, async: false
 
-  alias Workbooks.Toolkits
+  alias Workbooks.WorkKits
 
   defp tmp_root do
     d = Path.join(System.tmp_dir!(), "wb-vcaps-#{System.unique_integer([:positive])}")
@@ -33,7 +33,7 @@ defmodule Workbooks.ToolkitVerifyCapsTest do
     name = "vc_#{System.unique_integer([:positive])}"
     write_toolkit(root, name, "vfs commands")
 
-    out = Toolkits.verify_text(name, root)
+    out = WorkKits.verify_text(name, root)
     assert out =~ "all grantable: vfs commands"
     assert out =~ "granted by profile"
     refute out =~ "NOT grantable"
@@ -44,7 +44,7 @@ defmodule Workbooks.ToolkitVerifyCapsTest do
     name = "vc_#{System.unique_integer([:positive])}"
     write_toolkit(root, name, "vfs telepathy")
 
-    out = Toolkits.verify_text(name, root)
+    out = WorkKits.verify_text(name, root)
     assert out =~ "✗"
     assert out =~ "NOT grantable by any profile: telepathy"
   end
@@ -57,7 +57,7 @@ defmodule Workbooks.ToolkitVerifyCapsTest do
     # combination that IS grantable to assert the positive path names posix.
     write_toolkit(root, name, "parallel browse posix")
 
-    out = Toolkits.verify_text(name, root)
+    out = WorkKits.verify_text(name, root)
     assert out =~ "granted by profile(s): posix"
   end
 end

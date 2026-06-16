@@ -8,3 +8,9 @@ build/tools/wasm-tools.wasm
 
 # component-eval run artifacts (frames/verdicts)
 evals/components/runs/
+
+# generated runtime artifacts (never track)
+/.campaign/
+/autopoet/issues/
+/.demo-workspace/
+/_tmp_jsb_*/

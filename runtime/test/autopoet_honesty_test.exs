@@ -55,8 +55,8 @@ defmodule Workbooks.AutopoetHonestyTest do
     clean_toolkit("good")
     hollow_toolkit("bad")
 
-    good = Workbooks.Toolkits.verify_text("good", @root)
-    bad = Workbooks.Toolkits.verify_text("bad", @root)
+    good = Workbooks.WorkKits.verify_text("good", @root)
+    bad = Workbooks.WorkKits.verify_text("bad", @root)
 
     assert cleanish?(good), "clean toolkit should verify clean:\n#{good}"
     refute cleanish?(bad), "hollow toolkit must NOT verify clean:\n#{bad}"

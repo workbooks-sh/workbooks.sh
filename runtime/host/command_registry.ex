@@ -701,7 +701,7 @@ defmodule Workbooks.CommandRegistry do
   (host provisioning), exactly like those siblings. It is NOT reachable from the
   in-sandbox agent: the only agent-facing caller (`work toolkit build` with a
   `script:` #+BUILD_SRC from an untrusted toolkit dir) is DISABLED in
-  Workbooks.Toolkits. The ban is on the AGENT running native code / the runtime
+  Workbooks.WorkKits. The ban is on the AGENT running native code / the runtime
   native-compiling UNTRUSTED source — not on the host provisioning its own trusted
   compiler wasms from in-repo scripts. Callers must only pass first-party scripts.
   """

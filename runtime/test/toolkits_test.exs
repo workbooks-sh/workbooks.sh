@@ -2,7 +2,7 @@ defmodule Workbooks.ToolkitsTest do
   @moduledoc """
   The `work toolkit` surface (wb-4bj.2) — discovery + rendering over the on-disk
   org toolkits. Exercises default_root, list_text/show_text/show_skill_text/
-  search_text/verify_text against the real ../toolkits tree, thin vs thick
+  search_text/verify_text against the real ../workkits tree, thin vs thick
   skill resolution, extract_role_blocks, and #+CAPTION TOC extraction.
 
   ADVERSARIAL: toolkit ids and skill slugs are agent/LLM-supplied. A slug
@@ -11,12 +11,12 @@ defmodule Workbooks.ToolkitsTest do
   """
   use ExUnit.Case, async: false
 
-  alias Workbooks.Toolkits
+  alias Workbooks.WorkKits
 
   # The rich on-disk tree: git/ ffmpeg/ 3w/ linear/ … (sibling of runtime/, i.e.
   # workbooks-finish/toolkits). __DIR__ is runtime/test, so it is two levels up —
   # NOT runtime/toolkits, which holds only the huniq/text WASM build fixtures.
-  @root Path.expand("../../toolkits", __DIR__)
+  @root Path.expand("../../workkits", __DIR__)
 
   setup_all do
     :ok
@@ -66,31 +66,31 @@ defmodule Workbooks.ToolkitsTest do
   # ── default_root/0 ────────────────────────────────────────────────────────
 
   describe "default_root/0" do
-    test "honors $WB_TOOLKITS_ROOT when set" do
-      System.put_env("WB_TOOLKITS_ROOT", @root)
-      on_exit(fn -> System.delete_env("WB_TOOLKITS_ROOT") end)
-      assert Toolkits.default_root() == @root
+    test "honors $WB_WORKKITS_ROOT when set" do
+      System.put_env("WB_WORKKITS_ROOT", @root)
+      on_exit(fn -> System.delete_env("WB_WORKKITS_ROOT") end)
+      assert WorkKits.default_root() == @root
     end
 
-    # SECURITY REGRESSION (finding #6): a blank/invalid WB_TOOLKITS_ROOT must NOT
+    # SECURITY REGRESSION (finding #6): a blank/invalid WB_WORKKITS_ROOT must NOT
     # repoint the surface. It is now honored ONLY if it names an existing dir;
     # otherwise we fall back to the in-tree default.
     test "an empty-string env var is ignored (falls back to default)" do
-      System.put_env("WB_TOOLKITS_ROOT", "")
-      on_exit(fn -> System.delete_env("WB_TOOLKITS_ROOT") end)
-      refute Toolkits.default_root() == ""
+      System.put_env("WB_WORKKITS_ROOT", "")
+      on_exit(fn -> System.delete_env("WB_WORKKITS_ROOT") end)
+      refute WorkKits.default_root() == ""
     end
 
     test "a non-existent-dir env var is ignored (falls back to default)" do
-      System.put_env("WB_TOOLKITS_ROOT", "/no/such/dir/wb-#{System.unique_integer([:positive])}")
-      on_exit(fn -> System.delete_env("WB_TOOLKITS_ROOT") end)
-      refute String.starts_with?(Toolkits.default_root(), "/no/such/dir")
+      System.put_env("WB_WORKKITS_ROOT", "/no/such/dir/wb-#{System.unique_integer([:positive])}")
+      on_exit(fn -> System.delete_env("WB_WORKKITS_ROOT") end)
+      refute String.starts_with?(WorkKits.default_root(), "/no/such/dir")
     end
 
     test "falls back to a real dir when env is unset" do
-      System.delete_env("WB_TOOLKITS_ROOT")
+      System.delete_env("WB_WORKKITS_ROOT")
       # We can't guarantee cwd, but the function must return a string and never raise.
-      assert is_binary(Toolkits.default_root())
+      assert is_binary(WorkKits.default_root())
     end
   end
 
@@ -98,7 +98,7 @@ defmodule Workbooks.ToolkitsTest do
 
   describe "list_text/1" do
     test "lists known toolkits, one per line, with id + status + tagline" do
-      out = Toolkits.list_text(@root)
+      out = WorkKits.list_text(@root)
       assert out =~ "git"
       assert out =~ "ffmpeg"
       assert out =~ "stable"
@@ -110,7 +110,7 @@ defmodule Workbooks.ToolkitsTest do
 
     test "sorted by id" do
       ids =
-        Toolkits.list_text(@root)
+        WorkKits.list_text(@root)
         |> String.split("\n")
         |> Enum.map(&(String.split(&1, ~r/\s/, parts: 2) |> hd()))
 
@@ -121,10 +121,10 @@ defmodule Workbooks.ToolkitsTest do
       empty = Path.join(System.tmp_dir!(), "wb_empty_#{:erlang.unique_integer([:positive])}")
       File.mkdir_p!(empty)
       on_exit(fn -> File.rm_rf!(empty) end)
-      assert Toolkits.list_text(empty) == "(no toolkits under #{empty})"
+      assert WorkKits.list_text(empty) == "(no toolkits under #{empty})"
 
       missing = "/nonexistent/path/#{:erlang.unique_integer([:positive])}"
-      assert Toolkits.list_text(missing) == "(no toolkits under #{missing})"
+      assert WorkKits.list_text(missing) == "(no toolkits under #{missing})"
     end
   end
 
@@ -132,7 +132,7 @@ defmodule Workbooks.ToolkitsTest do
 
   describe "show_text/2" do
     test "shows the manifest body + a skill index" do
-      out = Toolkits.show_text("git", @root)
+      out = WorkKits.show_text("git", @root)
       assert out =~ ~s(<work-toolkit)
       assert out =~ ~s(id="git")
       assert out =~ "Skills (read with `work toolkit show git <skill>`)"
@@ -141,22 +141,22 @@ defmodule Workbooks.ToolkitsTest do
     end
 
     test "unknown toolkit id → 'no such toolkit'" do
-      assert Toolkits.show_text("does-not-exist", @root) == "no such toolkit: does-not-exist"
+      assert WorkKits.show_text("does-not-exist", @root) == "no such toolkit: does-not-exist"
     end
 
     test "ADVERSARIAL: id with ../ does not resolve to a parent dir" do
       # tk_dir matches on the *discovered* id field, never builds a path from id,
       # so traversal ids simply fail to match → 'no such toolkit'.
-      out = Toolkits.show_text("../git", @root)
+      out = WorkKits.show_text("../git", @root)
       assert out == "no such toolkit: ../git"
     end
 
     test "ADVERSARIAL: absolute-path id does not resolve" do
-      assert Toolkits.show_text("/etc/passwd", @root) == "no such toolkit: /etc/passwd"
+      assert WorkKits.show_text("/etc/passwd", @root) == "no such toolkit: /etc/passwd"
     end
 
     test "ADVERSARIAL: null byte in id does not crash, does not resolve" do
-      assert Toolkits.show_text("git\0", @root) == "no such toolkit: git\0"
+      assert WorkKits.show_text("git\0", @root) == "no such toolkit: git\0"
     end
   end
 
@@ -167,7 +167,7 @@ defmodule Workbooks.ToolkitsTest do
     # `#+CAPTION` → `##` in the work-* model). git/overview.md carries `##`
     # headings, so the TOC header is emitted and the body renders.
     test "renders a thin skill body with a heading TOC header" do
-      out = Toolkits.show_skill_text("git", "overview", @root)
+      out = WorkKits.show_skill_text("git", "overview", @root)
       # body always renders:
       assert out =~ "confirm git is installed"
       assert out =~ "# git — overview"
@@ -183,19 +183,19 @@ defmodule Workbooks.ToolkitsTest do
       for slug <- ~w(overview bisect cherry-pick partial-staging
                      rebase-without-losing-work recover-from-detached-head
                      undo-a-commit-safely worktree-management submodule-flows) do
-        out = Toolkits.show_skill_text("git", slug, @root)
+        out = WorkKits.show_skill_text("git", slug, @root)
         assert out =~ ~r/^##\s/m, "#{slug} should contain `##` headings"
         assert out =~ "TOC (CAPTIONs):", "#{slug} should render a TOC"
       end
     end
 
     test "unknown skill slug → 'no such skill'" do
-      assert Toolkits.show_skill_text("git", "no-such-skill", @root) ==
+      assert WorkKits.show_skill_text("git", "no-such-skill", @root) ==
                "no such skill: git/no-such-skill"
     end
 
     test "unknown toolkit → 'no such skill' (dir resolves nil)" do
-      assert Toolkits.show_skill_text("nope", "overview", @root) ==
+      assert WorkKits.show_skill_text("nope", "overview", @root) ==
                "no such skill: nope/overview"
     end
   end
@@ -204,14 +204,14 @@ defmodule Workbooks.ToolkitsTest do
     setup [:scratch_toolkit]
 
     test "thin skill: skills/<slug>.md resolves", %{root: root} do
-      out = Toolkits.show_skill_text("demo", "overview", root)
+      out = WorkKits.show_skill_text("demo", "overview", root)
       assert out =~ "body of the thin overview skill"
       assert out =~ "TOC (CAPTIONs):"
       assert out =~ "only caption in the thin skill"
     end
 
     test "thick skill: skills/<slug>/SKILL.md resolves", %{root: root} do
-      out = Toolkits.show_skill_text("demo", "deep", root)
+      out = WorkKits.show_skill_text("demo", "deep", root)
       assert out =~ "THICK_SKILL_MARKER"
     end
 
@@ -219,7 +219,7 @@ defmodule Workbooks.ToolkitsTest do
       # Plant a thick form alongside the thin one; thin must take precedence.
       File.mkdir_p!(Path.join([tk, "skills", "overview"]))
       File.write!(Path.join([tk, "skills", "overview", "SKILL.md"]), "THICK_OVERVIEW\n")
-      out = Toolkits.show_skill_text("demo", "overview", root)
+      out = WorkKits.show_skill_text("demo", "overview", root)
       assert out =~ "body of the thin overview skill"
       refute out =~ "THICK_OVERVIEW"
     end
@@ -232,13 +232,13 @@ defmodule Workbooks.ToolkitsTest do
       assert File.exists?(secret)
       # SECURITY REGRESSION (finding #5): a slug that, joined+`.org`, reaches the
       # REAL secret (skills/../../../SECRET.org = base/SECRET.org) must be refused.
-      out = Toolkits.show_skill_text("demo", "../../../SECRET", root)
+      out = WorkKits.show_skill_text("demo", "../../../SECRET", root)
       refute out =~ "TOP_SECRET"
       assert out == "no such skill: demo/../../../SECRET"
     end
 
     test "deeper traversal toward /etc/passwd is not read", %{root: root} do
-      out = Toolkits.show_skill_text("demo", "../../../../../../../../etc/passwd", root)
+      out = WorkKits.show_skill_text("demo", "../../../../../../../../etc/passwd", root)
       refute out =~ "root:"
       assert out =~ "no such skill:"
     end
@@ -246,13 +246,13 @@ defmodule Workbooks.ToolkitsTest do
     test "absolute-path slug is not read", %{root: root} do
       # Path.join([dir,"skills","/etc/passwd.org"]) — an absolute middle segment
       # would, under a naive join, reset to /etc/passwd.org. Must not read.
-      out = Toolkits.show_skill_text("demo", "/etc/passwd", root)
+      out = WorkKits.show_skill_text("demo", "/etc/passwd", root)
       refute out =~ "root:"
       assert out =~ "no such skill:"
     end
 
     test "null byte in slug does not crash and does not read", %{root: root} do
-      out = Toolkits.show_skill_text("demo", "overview\0", root)
+      out = WorkKits.show_skill_text("demo", "overview\0", root)
       # File.exists? returns false for a NUL-containing path (no raise).
       assert out =~ "no such skill:"
     end
@@ -262,25 +262,25 @@ defmodule Workbooks.ToolkitsTest do
 
   describe "search_text/2" do
     test "finds a substring across skills, formatted path:line: text" do
-      out = Toolkits.search_text("rebase", @root)
+      out = WorkKits.search_text("rebase", @root)
       refute out == "(no matches for \"rebase\")"
       # each hit line is "<rel-path>:<n>: <trimmed text>"
       assert out =~ ~r{git/skills/[^:]+\.md:\d+: }
     end
 
     test "is case-insensitive" do
-      a = Toolkits.search_text("REBASE", @root)
-      b = Toolkits.search_text("rebase", @root)
+      a = WorkKits.search_text("REBASE", @root)
+      b = WorkKits.search_text("rebase", @root)
       assert a == b
     end
 
     test "no match → friendly inspect-quoted message" do
-      assert Toolkits.search_text("zzz_no_such_token_zzz_#{:erlang.unique_integer()}", @root) =~
+      assert WorkKits.search_text("zzz_no_such_token_zzz_#{:erlang.unique_integer()}", @root) =~
                "(no matches for "
     end
 
     test "empty query matches every line (empty string is a substring of all)" do
-      out = Toolkits.search_text("", @root)
+      out = WorkKits.search_text("", @root)
       # "" is contained in every line → many hits, definitely not the no-match msg
       refute out =~ "(no matches"
       assert String.contains?(out, ":1:")
@@ -290,14 +290,14 @@ defmodule Workbooks.ToolkitsTest do
       # the CAPTION bullets/arrows aren't in skills, but ffmpeg/3w use →/em-dash.
       # Use a token we control: search for the em dash that appears in taglines'
       # cousin lines inside skills. Fall back to ascii if absent — assert no crash.
-      out = Toolkits.search_text("→", @root)
+      out = WorkKits.search_text("→", @root)
       assert is_binary(out)
     end
 
     test "ADVERSARIAL: regex metacharacters in query are treated literally" do
       # query is lowercased and passed to String.contains?/2 (NOT a regex), so
       # ".*" must match only the literal ".*", not act as a wildcard.
-      out = Toolkits.search_text(".*", @root)
+      out = WorkKits.search_text(".*", @root)
       # If it were a regex wildcard it'd match nearly everything; literal ".*"
       # is rare. Either way it must not raise and must be a string.
       assert is_binary(out)
@@ -305,7 +305,7 @@ defmodule Workbooks.ToolkitsTest do
 
     test "huge query does not crash" do
       big = String.duplicate("x", 100_000)
-      assert Toolkits.search_text(big, @root) =~ "(no matches for "
+      assert WorkKits.search_text(big, @root) =~ "(no matches for "
     end
   end
 
@@ -313,7 +313,7 @@ defmodule Workbooks.ToolkitsTest do
 
   describe "verify_text/2" do
     test "git: structural checks pass (manifest + overview present)" do
-      out = Toolkits.verify_text("git", @root)
+      out = WorkKits.verify_text("git", @root)
       assert out =~ "✓ manifest.html present"
       assert out =~ "skills/overview.md present"
       # exec mode is reported (git declares none → discovery-only).
@@ -327,17 +327,17 @@ defmodule Workbooks.ToolkitsTest do
     test "git: no native :role pre lane even with WB_TOOLKIT_EXEC=1 (native exec banned)" do
       System.put_env("WB_TOOLKIT_EXEC", "1")
       on_exit(fn -> System.delete_env("WB_TOOLKIT_EXEC") end)
-      out = Toolkits.verify_text("git", @root)
+      out = WorkKits.verify_text("git", @root)
       # The opt-in flag no longer re-enables native bash; pre never runs.
       refute out =~ ~r/(✓|✗) pre skills/
     end
 
     test "unknown toolkit → 'no such toolkit'" do
-      assert Toolkits.verify_text("nope", @root) == "no such toolkit: nope"
+      assert WorkKits.verify_text("nope", @root) == "no such toolkit: nope"
     end
 
     test "ADVERSARIAL: traversal id does not resolve" do
-      assert Toolkits.verify_text("../git", @root) == "no such toolkit: ../git"
+      assert WorkKits.verify_text("../git", @root) == "no such toolkit: ../git"
     end
 
     test "scratch toolkit with no pre blocks still reports structural checks" do
@@ -354,7 +354,7 @@ defmodule Workbooks.ToolkitsTest do
       """)
 
       File.write!(Path.join([tk, "skills", "overview.md"]), "no role blocks here\n")
-      out = Toolkits.verify_text("quiet", root)
+      out = WorkKits.verify_text("quiet", root)
       assert out =~ "✓ manifest.html present"
       assert out =~ "✓ skills/overview.md present"
     end
@@ -373,7 +373,7 @@ defmodule Workbooks.ToolkitsTest do
       tail
       """
 
-      assert [body] = Toolkits.extract_role_blocks(content, "pre")
+      assert [body] = WorkKits.extract_role_blocks(content, "pre")
       assert body =~ "echo hi"
       assert body =~ "exit 0"
       refute body =~ "preamble"
@@ -390,7 +390,7 @@ defmodule Workbooks.ToolkitsTest do
       #+end_src
       """
 
-      assert [a, b] = Toolkits.extract_role_blocks(content, "pre")
+      assert [a, b] = WorkKits.extract_role_blocks(content, "pre")
       assert a =~ "one"
       assert b =~ "two"
     end
@@ -408,27 +408,27 @@ defmodule Workbooks.ToolkitsTest do
       #+end_src
       """
 
-      assert [pre] = Toolkits.extract_role_blocks(content, "pre")
+      assert [pre] = WorkKits.extract_role_blocks(content, "pre")
       assert pre =~ "P"
-      assert [post] = Toolkits.extract_role_blocks(content, "post")
+      assert [post] = WorkKits.extract_role_blocks(content, "post")
       assert post =~ "Q"
-      assert [task] = Toolkits.extract_role_blocks(content, "task")
+      assert [task] = WorkKits.extract_role_blocks(content, "task")
       assert task =~ "R"
     end
 
     test "no matching role → []" do
       content = "#+begin_src bash :role pre\nx\n#+end_src\n"
-      assert Toolkits.extract_role_blocks(content, "task") == []
+      assert WorkKits.extract_role_blocks(content, "task") == []
     end
 
     test "empty content → []" do
-      assert Toolkits.extract_role_blocks("", "pre") == []
+      assert WorkKits.extract_role_blocks("", "pre") == []
     end
 
     test "role word-boundary: ':role pre' does not match ':role preflight'" do
       content = "#+begin_src bash :role preflight\nx\n#+end_src\n"
-      assert Toolkits.extract_role_blocks(content, "pre") == []
-      assert [b] = Toolkits.extract_role_blocks(content, "preflight")
+      assert WorkKits.extract_role_blocks(content, "pre") == []
+      assert [b] = WorkKits.extract_role_blocks(content, "preflight")
       assert b =~ "x"
     end
 
@@ -436,7 +436,7 @@ defmodule Workbooks.ToolkitsTest do
       content =
         "#+begin_src bash :results output :role pre :dir /tmp\nbody-line\n  #+end_src\n"
 
-      assert [b] = Toolkits.extract_role_blocks(content, "pre")
+      assert [b] = WorkKits.extract_role_blocks(content, "pre")
       assert b =~ "body-line"
     end
 
@@ -445,25 +445,25 @@ defmodule Workbooks.ToolkitsTest do
       # should not raise (it just won't match the literal block). Documents the
       # current contract — callers pass literal "pre"/"post"/"task".
       content = "#+begin_src bash :role pre\nx\n#+end_src\n"
-      assert Toolkits.extract_role_blocks(content, "pre") != []
+      assert WorkKits.extract_role_blocks(content, "pre") != []
       # A metachar role compiles into the regex unescaped: "p.e" therefore
       # matches "pre" (`.` matches the literal 'r'). This is a leaky contract —
       # callers MUST pass literal role names ("pre"/"post"/"task"); a role like
       # "p.e" silently aliases real blocks rather than failing. Documented, not
       # a crash. A role with an *unbalanced* metachar would raise at compile.
-      assert Toolkits.extract_role_blocks(content, "p.e") == ["x"]
+      assert WorkKits.extract_role_blocks(content, "p.e") == ["x"]
     end
 
     test "huge content with one block still extracts" do
       filler = String.duplicate("noise line\n", 50_000)
       content = filler <> "#+begin_src bash :role pre\nNEEDLE\n#+end_src\n" <> filler
-      assert [b] = Toolkits.extract_role_blocks(content, "pre")
+      assert [b] = WorkKits.extract_role_blocks(content, "pre")
       assert b =~ "NEEDLE"
     end
 
     test "unicode inside a block body is preserved" do
       content = "#+begin_src bash :role pre\necho 'café → 日本語 🎬'\n#+end_src\n"
-      assert [b] = Toolkits.extract_role_blocks(content, "pre")
+      assert [b] = WorkKits.extract_role_blocks(content, "pre")
       assert b =~ "café → 日本語 🎬"
     end
   end
@@ -495,7 +495,7 @@ defmodule Workbooks.ToolkitsTest do
 
       on_exit(fn -> File.rm(sentinel) end)
 
-      out = Toolkits.run_task_text("demo", "echoer", ["alpha", "beta"], root)
+      out = WorkKits.run_task_text("demo", "echoer", ["alpha", "beta"], root)
       # Honest refusal, and CRUCIALLY: nothing executed (no sentinel, no echo output).
       assert out =~ "native :role bash execution removed (wb-9ja)"
       refute out =~ "arg1=alpha"
@@ -519,7 +519,7 @@ defmodule Workbooks.ToolkitsTest do
 
       on_exit(fn -> File.rm(evil); File.rm(sentinel) end)
 
-      out = Toolkits.run_task_text("demo", "../../evil", [], root)
+      out = WorkKits.run_task_text("demo", "../../evil", [], root)
       refute out =~ "PWNED"
       refute File.exists?(sentinel)
       assert out =~ "native :role bash execution removed (wb-9ja)"
@@ -537,7 +537,7 @@ defmodule Workbooks.ToolkitsTest do
       ```
       """)
 
-      out = Toolkits.run_task_text("demo", "danger", [], root)
+      out = WorkKits.run_task_text("demo", "danger", [], root)
       assert out =~ "refusing to run"
       refute File.exists?(sentinel)
     end

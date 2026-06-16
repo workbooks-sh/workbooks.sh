@@ -58,8 +58,8 @@ defmodule AgentCapabilities do
 
     [
       base,
-      Workbooks.Toolkits.injection_text(@toolkits),
-      Workbooks.Toolkits.component_catalog(@toolkits)
+      Workbooks.WorkKits.injection_text(@toolkits),
+      Workbooks.WorkKits.component_catalog(@toolkits)
     ]
     |> Enum.reject(&(&1 in [nil, ""]))
     |> Enum.join("\n\n")

@@ -9,14 +9,14 @@ defmodule Workbooks.AgentPromptTest do
   use ExUnit.Case, async: false
   import Plug.Test
 
-  # Pin the default in-tree toolkit root (wb-q2qg): WB_TOOLKITS_ROOT is global env
+  # Pin the default in-tree toolkit root (wb-q2qg): WB_WORKKITS_ROOT is global env
   # and several other tests point it at temp fixture dirs (lacking the real skills).
   # A leaked/overlapping value made this test flake — the index would compose from
   # a fixture root missing variables/library-search. Force the real root here.
   setup do
-    prev = System.get_env("WB_TOOLKITS_ROOT")
-    System.delete_env("WB_TOOLKITS_ROOT")
-    on_exit(fn -> if prev, do: System.put_env("WB_TOOLKITS_ROOT", prev), else: System.delete_env("WB_TOOLKITS_ROOT") end)
+    prev = System.get_env("WB_WORKKITS_ROOT")
+    System.delete_env("WB_WORKKITS_ROOT")
+    on_exit(fn -> if prev, do: System.put_env("WB_WORKKITS_ROOT", prev), else: System.delete_env("WB_WORKKITS_ROOT") end)
     :ok
   end
 

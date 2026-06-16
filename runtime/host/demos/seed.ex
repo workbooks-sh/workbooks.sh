@@ -17,7 +17,7 @@ defmodule Workbooks.Demos.Seed do
     * installs a DETERMINISTIC Ed25519 keypair from the member's fixed seed so
       its `did:key` is stable across every re-materialization,
     * copies the tenant's fixture files in (workspace.org, workbooks, agents),
-    * copies the custom toolkits into `$WB_TOOLKITS_ROOT` (and the author's repo),
+    * copies the custom toolkits into `$WB_WORKKITS_ROOT` (and the author's repo),
     * SIGNS the third-party toolkits as their owning tenant,
     * BUILDS the build-targeted workbooks at seed time (real run records — no
       faked outputs),
@@ -75,7 +75,7 @@ defmodule Workbooks.Demos.Seed do
       "WB_DEMO" => "1",
       "WB_DEMO_REPLAY" => "1",
       "WB_DEMO_NOW" => m.frozen_at,
-      "WB_TOOLKITS_ROOT" => tk_root,
+      "WB_WORKKITS_ROOT" => tk_root,
       "WB_DATA" => data_root
     }
 
@@ -207,7 +207,7 @@ defmodule Workbooks.Demos.Seed do
       copy_tree(Path.join(@seed_dir, "toolkits/#{tk}"), dest)
       # Sign as the owning tenant so `work toolkit verify` is green on a
       # #+TRUST: third-party manifest.
-      signed = Workbooks.Toolkits.sign_text(tk, m.toolkits_owner, tk_root)
+      signed = Workbooks.WorkKits.sign_text(tk, m.toolkits_owner, tk_root)
       %{toolkit: tk, root: dest, signed: signed}
     end
   end
@@ -277,7 +277,7 @@ defmodule Workbooks.Demos.Seed do
   end
 
   defp toolkits_root do
-    System.get_env("WB_TOOLKITS_ROOT") ||
+    System.get_env("WB_WORKKITS_ROOT") ||
       Path.join(System.get_env("WB_DATA", "tmp/data"), "toolkits")
   end
 

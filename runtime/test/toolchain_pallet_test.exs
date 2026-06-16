@@ -7,9 +7,9 @@ defmodule Workbooks.ToolchainPalletTest do
   """
   use ExUnit.Case, async: false
 
-  alias Workbooks.{Toolkits, CommandRegistry}
+  alias Workbooks.{WorkKits, CommandRegistry}
 
-  @root "../toolkits"
+  @root "../workkits"
   @qjs_url "https://github.com/quickjs-ng/quickjs/releases/download/v0.15.1/qjs-wasi.wasm"
   @qjs_sha "b4071ef2fbb2bb693c0bbcfc07cb9d28639fd9cea2fd986824a57aeac929817b"
 
@@ -22,7 +22,7 @@ defmodule Workbooks.ToolchainPalletTest do
       </work-toolkit>
       """
 
-      d = Toolkits.parse_descriptor(body)
+      d = WorkKits.parse_descriptor(body)
       assert d.build_src == {:wasm, @qjs_url}
       assert d.sha256 == @qjs_sha
       assert d.arg_mode == :argv
@@ -60,7 +60,7 @@ defmodule Workbooks.ToolchainPalletTest do
     @tag :build
     test "work toolkit build palette qjs (one runtime from the set) fetches, verifies, registers, runs JS" do
       {:ok, _} = ensure_ready()
-      out = Toolkits.build_text("palette", "qjs", @root)
+      out = WorkKits.build_text("palette", "qjs", @root)
       assert out =~ "registered command \"qjs\""
       assert "qjs" in CommandRegistry.list()
 
@@ -75,7 +75,7 @@ defmodule Workbooks.ToolchainPalletTest do
     @tag :build
     test "work toolkit build palette python (archive runtime: wasm + stdlib) runs a .py" do
       {:ok, _} = ensure_ready()
-      out = Toolkits.build_text("palette", "python", @root)
+      out = WorkKits.build_text("palette", "python", @root)
       assert out =~ "registered command \"python\""
 
       tmp = Path.join(System.tmp_dir!(), "wbpy-#{System.unique_integer([:positive])}")
@@ -88,7 +88,7 @@ defmodule Workbooks.ToolchainPalletTest do
     @tag :build
     test "work toolkit build palette go (gobuild yaegi → wasip1) runs .go source" do
       {:ok, _} = ensure_ready()
-      out = Toolkits.build_text("palette", "go", @root)
+      out = WorkKits.build_text("palette", "go", @root)
       assert out =~ "registered command \"go\""
 
       tmp = Path.join(System.tmp_dir!(), "wbgo-#{System.unique_integer([:positive])}")
@@ -102,7 +102,7 @@ defmodule Workbooks.ToolchainPalletTest do
     @tag timeout: 300_000
     test "work toolkit build palette lua (wasi-sdk sjlj build) runs .lua incl. pcall/longjmp" do
       {:ok, _} = ensure_ready()
-      out = Toolkits.build_text("palette", "lua", @root)
+      out = WorkKits.build_text("palette", "lua", @root)
       assert out =~ "registered command \"lua\""
 
       tmp = Path.join(System.tmp_dir!(), "wbl-#{System.unique_integer([:positive])}")
@@ -141,7 +141,7 @@ defmodule Workbooks.ToolchainPalletTest do
     @tag timeout: 180_000
     test "work toolkit build palette zig (native zig → wasm command) runs a Zig-authored command" do
       {:ok, _} = ensure_ready()
-      out = Toolkits.build_text("palette", "zig", @root)
+      out = WorkKits.build_text("palette", "zig", @root)
       assert out =~ "registered command \"zigdemo\""
       {:ok, z} = CommandRegistry.run("zigdemo", "", [], [])
       assert z =~ "55"

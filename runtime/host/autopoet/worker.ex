@@ -21,7 +21,7 @@ defmodule Workbooks.Autopoet.Worker do
     * `WB_AUTOPOET_DEF`         — path to the autopoet agent def (HTML `<work-agent>`)
     * `WB_AUTOPOET_WORKDIR`     — the workspace (default `<WB_DATA>/autopoet/workspace`);
                                   the workspace itself IS the toolkits root — the
-                                  worker pins WB_TOOLKITS_ROOT to it at init so the
+                                  worker pins WB_WORKKITS_ROOT to it at init so the
                                   autopoet authors and verifies in the same tree
     * `WB_AUTOPOET_INTERVAL_MS` — poll cadence (default 180_000 = 3 min)
     * `WB_AUTOPOET_RUN_TIMEOUT_MS` — per-issue wall clock (default 900_000 = 15 min)
@@ -77,14 +77,14 @@ defmodule Workbooks.Autopoet.Worker do
   end
 
   # The workspace IS the toolkits root (the def's contract: "your working
-  # directory IS the toolkits tree"). Pin WB_TOOLKITS_ROOT to it so the autopoet's
+  # directory IS the toolkits tree"). Pin WB_WORKKITS_ROOT to it so the autopoet's
   # OWN `work toolkit verify`/`list` resolve to exactly where it authors — otherwise
   # it cannot verify its own work and falls back to claiming DONE on a shell
   # smoke-test (the iter-9 false-DONE root cause). Idempotent — safe to call from
   # both the GenServer init and an on-demand `drain_one/0`.
   defp ensure_workspace do
     File.mkdir_p!(workdir())
-    System.put_env("WB_TOOLKITS_ROOT", workdir())
+    System.put_env("WB_WORKKITS_ROOT", workdir())
   end
 
   defp reset_orphans do
@@ -237,7 +237,7 @@ defmodule Workbooks.Autopoet.Worker do
     root = workdir()
     fresh = toolkit_names() -- before
 
-    reports = Enum.map(fresh, fn n -> {n, Workbooks.Toolkits.verify_text(n, root)} end)
+    reports = Enum.map(fresh, fn n -> {n, Workbooks.WorkKits.verify_text(n, root)} end)
     clean = for {n, r} <- reports, not String.contains?(r, "✗"), not String.contains?(r, "no such toolkit"), do: n
 
     cond do

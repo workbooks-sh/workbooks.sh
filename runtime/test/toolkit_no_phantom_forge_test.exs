@@ -16,8 +16,8 @@ defmodule Workbooks.ToolkitNoPhantomForgeTest do
   @root Path.expand("../..", __DIR__)
 
   defp doc_files do
-    Path.wildcard(Path.join(@root, "toolkits/**/*.org")) ++
-      Path.wildcard(Path.join(@root, "toolkits/**/*.md")) ++
+    Path.wildcard(Path.join(@root, "workkits/**/*.org")) ++
+      Path.wildcard(Path.join(@root, "workkits/**/*.md")) ++
       Path.wildcard(Path.join(@root, "web/toolkits/content/*.md"))
   end
 

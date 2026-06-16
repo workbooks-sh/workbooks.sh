@@ -179,27 +179,27 @@ defmodule Workbooks.Demos.Platform do
   @doc "Toolkit-discovery demo (wb-11ck.46): `(tags :toolkit:)` + resolve an agent's :TOOLKITS:."
   def demo_toolkits do
     %{
-      discovered: Workbooks.Toolkits.discover(@context_tree) |> Enum.map(& &1.id),
-      workhorse_resolves: Workbooks.Toolkits.resolve(@context_tree, "workhorse") |> Enum.map(&{&1.id, &1.cli})
+      discovered: Workbooks.WorkKits.discover(@context_tree) |> Enum.map(& &1.id),
+      workhorse_resolves: Workbooks.WorkKits.resolve(@context_tree, "workhorse") |> Enum.map(&{&1.id, &1.cli})
     }
   end
 
   @doc "Toolkit→command vertical: resolve the `text` toolkit and run its CLI (`upper`) as a WASM command."
   def demo_toolkit_run do
-    {:ok, out} = Workbooks.Toolkits.run(@context_tree, "text", "hello from a toolkit")
+    {:ok, out} = Workbooks.WorkKits.run(@context_tree, "text", "hello from a toolkit")
     %{toolkit: "text", cli: "upper", output: out}
   end
 
   @doc "On-disk toolkit demo: discover toolkits/text/ (manifest.org + skills/) from disk."
   def demo_toolkit_disk do
-    tks = Workbooks.Toolkits.discover_dir("toolkits")
+    tks = Workbooks.WorkKits.discover_dir("toolkits")
     text = Enum.find(tks, &(&1.id == "text"))
 
     %{
       discovered: Enum.map(tks, & &1.id),
       text_cli: text && text.cli,
       text_dir: text && text.dir,
-      skills_on_disk: text && Workbooks.Toolkits.skills(text.dir)
+      skills_on_disk: text && Workbooks.WorkKits.skills(text.dir)
     }
   end
 

@@ -1,4 +1,4 @@
-defmodule Workbooks.Toolkits do
+defmodule Workbooks.WorkKits do
   @moduledoc """
   Toolkit discovery (L4, wb-11ck.46) — the agent extensibility surface. A toolkit
   makes an agent competent with a CLI it has never seen: a single `<work-toolkit>`
@@ -17,13 +17,13 @@ defmodule Workbooks.Toolkits do
 
   ## TRUST BOUNDARY (wb-sec)
 
-  The discovery root ($WB_TOOLKITS_ROOT or ./toolkits) is an UNAUTHENTICATED,
+  The discovery root ($WB_WORKKITS_ROOT or ./toolkits) is an UNAUTHENTICATED,
   writable directory. A toolkit dropped there is UNTRUSTED supply-chain input —
   NOT "first-party" by virtue of its location. Accordingly:
 
     * READ-ONLY surfaces (list / show / search) are open, but slugs/roots are
       path-contained (no `..`/separator traversal; files must resolve inside the
-      toolkit) and $WB_TOOLKITS_ROOT is honored only if it is an existing dir.
+      toolkit) and $WB_WORKKITS_ROOT is honored only if it is an existing dir.
     * EXECUTION surfaces (`verify` pre blocks, `run` task blocks) are DISABLED
       (wb-9ja). A :role bash block is arbitrary NATIVE bash; native execution is
       banned, so this lane never shells out — `exec_allowed?` is always false and
@@ -188,21 +188,21 @@ defmodule Workbooks.Toolkits do
   # Discovery rides discover_dir/1; these add the human/agent-facing rendering.
 
   @doc """
-  Default discovery root: $WB_TOOLKITS_ROOT (validated), else first of
+  Default discovery root: $WB_WORKKITS_ROOT (validated), else first of
   toolkits/ | ../toolkits that exists.
 
-  SECURITY (wb-sec, finding #6): $WB_TOOLKITS_ROOT is honored ONLY if it names an
+  SECURITY (wb-sec, finding #6): $WB_WORKKITS_ROOT is honored ONLY if it names an
   existing directory. An unset/blank/non-dir value falls back to the in-tree
   defaults rather than letting a bogus value repoint the whole surface. Note the
   trust-boundary caveat in the moduledoc: the discovery root is read-only/search
   by default; EXECUTION (verify/run/build) is separately gated — see TOOLKITS-V3.
   """
   def default_root do
-    env = System.get_env("WB_TOOLKITS_ROOT")
+    env = System.get_env("WB_WORKKITS_ROOT")
 
     cond do
       is_binary(env) and env != "" and File.dir?(env) -> env
-      true -> Enum.find(["toolkits", "../toolkits", Path.expand("../toolkits", File.cwd!())], &File.dir?/1) || "toolkits"
+      true -> Enum.find(["workkits", "../workkits", Path.expand("../workkits", File.cwd!())], &File.dir?/1) || "workkits"
     end
   end
 
@@ -1232,8 +1232,8 @@ defmodule Workbooks.Toolkits do
         # CLI_BIN: work means the toolkit's "binary" IS the built-in wb — its skills
         # document `work <verb>` commands (vs a compiled command-toolkit like huniq
         # whose CLI_BIN is its own binary).
-        if d.cli_bin == "wb" do
-          suggested = String.trim("wb #{task} " <> Enum.join(List.wrap(args), " "))
+        if d.cli_bin == "work" do
+          suggested = String.trim("work #{task} " <> Enum.join(List.wrap(args), " "))
 
           "#{id} is a direct-verb toolkit — its skills document built-in `work` verbs, " <>
             "not a runnable command. Run it DIRECTLY through your `work` tool: `#{suggested}` " <>

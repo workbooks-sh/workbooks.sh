@@ -6,7 +6,7 @@ defmodule Workbooks.KernelDispatchTest do
   """
   use ExUnit.Case, async: false
 
-  alias Workbooks.{Toolkits, KernelRegistry, Kernel}
+  alias Workbooks.{WorkKits, KernelRegistry, Kernel}
 
   @kernel_c File.read!(Path.join(__DIR__, "fixtures/kernel/reverse.c"))
 
@@ -43,11 +43,11 @@ defmodule Workbooks.KernelDispatchTest do
     name = "kr#{System.unique_integer([:positive])}"
     write_kernel_toolkit(root, name)
 
-    prev = System.get_env("WB_TOOLKITS_ROOT")
-    System.put_env("WB_TOOLKITS_ROOT", root)
+    prev = System.get_env("WB_WORKKITS_ROOT")
+    System.put_env("WB_WORKKITS_ROOT", root)
 
     try do
-      out = Toolkits.build_text(name)
+      out = WorkKits.build_text(name)
       assert out =~ "registered kernel"
       assert name in KernelRegistry.list()
 
@@ -57,7 +57,7 @@ defmodule Workbooks.KernelDispatchTest do
       assert {:ok, "olleh"} = Kernel.call(k, "hello")
       Kernel.close(k)
     after
-      if prev, do: System.put_env("WB_TOOLKITS_ROOT", prev), else: System.delete_env("WB_TOOLKITS_ROOT")
+      if prev, do: System.put_env("WB_WORKKITS_ROOT", prev), else: System.delete_env("WB_WORKKITS_ROOT")
     end
   end
 

@@ -102,10 +102,10 @@ defmodule Workbooks.CLI.Dev do
     if set == [], do: "none set (agent runs need one)", else: Enum.join(set, ", ") <> " set"
   end
 
-  # Same resolution as Workbooks.Toolkits.default_root/0, inlined so `dev` stays
+  # Same resolution as Workbooks.WorkKits.default_root/0, inlined so `dev` stays
   # host-side (no app/NIF load from the escript).
   defp toolkits_root do
-    env = System.get_env("WB_TOOLKITS_ROOT")
+    env = System.get_env("WB_WORKKITS_ROOT")
 
     cond do
       is_binary(env) and env != "" and File.dir?(env) -> env

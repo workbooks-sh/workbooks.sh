@@ -5,7 +5,7 @@ defmodule Workbooks.CLI do
   modules the Runtime uses. `call/2` returns output as a string (so an agent can
   run `work` in-process as a tool); `main/1` prints it.
   """
-  alias Workbooks.{Workbook, Bundle, Vars, Toolkits}
+  alias Workbooks.{Workbook, Bundle, Vars, WorkKits}
 
   @version "0.1.0"
 
@@ -46,10 +46,10 @@ defmodule Workbooks.CLI do
 
       # Release/version verbs are HOST-side & LOCAL (read toolkits/releases.json +
       # .live.json from the repo) — no runtime needed, so handle before the RCP branch.
-      ["toolkit", "versions", id] -> IO.puts(Workbooks.Toolkits.versions_text(id))
-      ["toolkit", "live"] -> IO.puts(Workbooks.Toolkits.live_text())
-      ["toolkit", "live", id] -> IO.puts(Workbooks.Toolkits.live_text(id, Workbooks.Toolkits.default_root()))
-      ["toolkit", "rollback", id, version] -> IO.puts(Workbooks.Toolkits.rollback_text(id, version))
+      ["toolkit", "versions", id] -> IO.puts(Workbooks.WorkKits.versions_text(id))
+      ["toolkit", "live"] -> IO.puts(Workbooks.WorkKits.live_text())
+      ["toolkit", "live", id] -> IO.puts(Workbooks.WorkKits.live_text(id, Workbooks.WorkKits.default_root()))
+      ["toolkit", "rollback", id, version] -> IO.puts(Workbooks.WorkKits.rollback_text(id, version))
 
       # `work toolkit …` — toolkit surface over RCP (server-side; the escript can't
       # load the NIFs). HOST-side HTTP client → /rcp/toolkit/*. In-process callers
@@ -483,34 +483,34 @@ defmodule Workbooks.CLI do
       else: Enum.map_join(hits, "\n", fn h -> "#{h.workbook}/#{h.path} :: #{h.headline}\n  #{String.slice(h.text, 0, 80) |> String.replace("\n", " ")}" end)
   end
 
-  # Toolkits (wb-4bj.2) — the agent's extensibility surface: discover toolkits and
+  # WorkKits (wb-4bj.2) — the agent's extensibility surface: discover toolkits and
   # read their progressive-disclosure skill recipes on demand (the CLI help-wrapper).
-  def call(["toolkit"], _t), do: Toolkits.list_text()
-  def call(["toolkit", "list"], _t), do: Toolkits.list_text()
-  def call(["toolkit", "show", id], _t), do: Toolkits.show_text(id)
-  def call(["toolkit", "show", id, skill], _t), do: Toolkits.show_skill_text(id, skill)
-  def call(["toolkit", "search" | q], _t), do: Toolkits.search_text(Enum.join(q, " "))
-  def call(["toolkit", "verify", id], _t), do: Toolkits.verify_text(id)
-  def call(["toolkit", "eval", id], _t), do: Toolkits.eval_text(id)
+  def call(["toolkit"], _t), do: WorkKits.list_text()
+  def call(["toolkit", "list"], _t), do: WorkKits.list_text()
+  def call(["toolkit", "show", id], _t), do: WorkKits.show_text(id)
+  def call(["toolkit", "show", id, skill], _t), do: WorkKits.show_skill_text(id, skill)
+  def call(["toolkit", "search" | q], _t), do: WorkKits.search_text(Enum.join(q, " "))
+  def call(["toolkit", "verify", id], _t), do: WorkKits.verify_text(id)
+  def call(["toolkit", "eval", id], _t), do: WorkKits.eval_text(id)
   # `work toolkit eval <id> <case>` — run ONE eval whose filename contains <case>.
   def call(["toolkit", "eval", id, filter], _t),
-    do: Toolkits.eval_text(id, Toolkits.default_root(), filter)
+    do: WorkKits.eval_text(id, WorkKits.default_root(), filter)
   # `work eval components [case]` — the component-emit eval pack (text + voice parity).
   def call(["eval", "components"], _t), do: Workbooks.Evals.Components.run()
   def call(["eval", "components", filter], _t), do: Workbooks.Evals.Components.run(filter)
-  def call(["toolkit", "sign", id], t), do: Toolkits.sign_text(id, t)
-  def call(["toolkit", "versions", id], _t), do: Toolkits.versions_text(id)
-  def call(["toolkit", "live"], _t), do: Toolkits.live_text()
-  def call(["toolkit", "live", id], _t), do: Toolkits.live_text(id, Toolkits.default_root())
-  def call(["toolkit", "rollback", id, version], _t), do: Toolkits.rollback_text(id, version)
-  def call(["toolkit", "build", id], _t), do: Toolkits.build_text(id)
-  def call(["toolkit", "build", id, which], _t), do: Toolkits.build_text(id, which, Toolkits.default_root())
-  def call(["toolkit", "build-inline", name, lang, file], _t), do: Toolkits.build_inline_text(name, lang, file)
-  def call(["toolkit", "promote", name, lang, file], _t), do: Toolkits.promote_text(name, lang, file)
+  def call(["toolkit", "sign", id], t), do: WorkKits.sign_text(id, t)
+  def call(["toolkit", "versions", id], _t), do: WorkKits.versions_text(id)
+  def call(["toolkit", "live"], _t), do: WorkKits.live_text()
+  def call(["toolkit", "live", id], _t), do: WorkKits.live_text(id, WorkKits.default_root())
+  def call(["toolkit", "rollback", id, version], _t), do: WorkKits.rollback_text(id, version)
+  def call(["toolkit", "build", id], _t), do: WorkKits.build_text(id)
+  def call(["toolkit", "build", id, which], _t), do: WorkKits.build_text(id, which, WorkKits.default_root())
+  def call(["toolkit", "build-inline", name, lang, file], _t), do: WorkKits.build_inline_text(name, lang, file)
+  def call(["toolkit", "promote", name, lang, file], _t), do: WorkKits.promote_text(name, lang, file)
   def call(["isolation"], _t), do: Workbooks.Isolation.describe()
 
   def call(["toolkit", "run", id, task | rest], _t),
-    do: Toolkits.run_task_text(id, task, Enum.drop_while(rest, &(&1 == "--")))
+    do: WorkKits.run_task_text(id, task, Enum.drop_while(rest, &(&1 == "--")))
 
   # Autopoet (wb-9ae / wb-pow) — the central self-improvement agent as an ON-DEMAND
   # surface. The backlog is bursty + small, so a triggered drain (any scheduler:

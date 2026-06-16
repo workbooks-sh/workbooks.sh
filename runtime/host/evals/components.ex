@@ -554,7 +554,7 @@ defmodule Workbooks.Evals.Components do
     # agent context. Falls back to the eval-local catalog if the toolkit isn't on
     # disk (keeps the eval runnable in a bare checkout).
     catalog =
-      case Workbooks.Toolkits.component_catalog(["workponents"]) do
+      case Workbooks.WorkKits.component_catalog(["workponents"]) do
         "" -> catalog_injection()
         real -> real
       end

@@ -1123,31 +1123,31 @@ defmodule Workbooks.Web do
   end
 
   # ── `work toolkit` — the agent-extensibility surface over RCP ─────────────────
-  # Mirrors the escript verbs (Toolkits.*_text) so a REMOTE/containerized engine
+  # Mirrors the escript verbs (WorkKits.*_text) so a REMOTE/containerized engine
   # is reachable from the thin CLI. Text in/out — these are help-surface +
   # build/run verbs, not data APIs. Task execution stays server-side gated
-  # (WB_TOOLKIT_EXEC=1 default-deny + Sandbox, see Workbooks.Toolkits).
+  # (WB_TOOLKIT_EXEC=1 default-deny + Sandbox, see Workbooks.WorkKits).
 
   get "/rcp/toolkit" do
-    send_resp(conn, 200, Workbooks.Toolkits.list_text())
+    send_resp(conn, 200, Workbooks.WorkKits.list_text())
   end
 
   get "/rcp/toolkit/show" do
     out =
       case conn.params["skill"] do
-        s when s in [nil, ""] -> Workbooks.Toolkits.show_text(conn.params["id"])
-        skill -> Workbooks.Toolkits.show_skill_text(conn.params["id"], skill)
+        s when s in [nil, ""] -> Workbooks.WorkKits.show_text(conn.params["id"])
+        skill -> Workbooks.WorkKits.show_skill_text(conn.params["id"], skill)
       end
 
     send_resp(conn, 200, out)
   end
 
   get "/rcp/toolkit/search" do
-    send_resp(conn, 200, Workbooks.Toolkits.search_text(conn.params["q"] || ""))
+    send_resp(conn, 200, Workbooks.WorkKits.search_text(conn.params["q"] || ""))
   end
 
   post "/rcp/toolkit/verify" do
-    send_resp(conn, 200, Workbooks.Toolkits.verify_text(conn.params["id"]))
+    send_resp(conn, 200, Workbooks.WorkKits.verify_text(conn.params["id"]))
   end
 
   # Run a toolkit's eval suite server-side (NIFs + LLM available here; bash/agent
@@ -1156,41 +1156,41 @@ defmodule Workbooks.Web do
     conn = fetch_query_params(conn)
     # ?case=<substring> runs just ONE eval case; ?model=<id> overrides WB_EVAL_MODEL
     # for that run (the "re-run a failing eval with a stronger model" triage step).
-    out = Workbooks.Toolkits.eval_text(conn.query_params["id"], Workbooks.Toolkits.default_root(), conn.query_params["case"], conn.query_params["model"])
+    out = Workbooks.WorkKits.eval_text(conn.query_params["id"], Workbooks.WorkKits.default_root(), conn.query_params["case"], conn.query_params["model"])
     send_resp(conn, 200, out)
   end
 
   post "/rcp/toolkit/build" do
     out =
       case conn.params["which"] do
-        w when w in [nil, ""] -> Workbooks.Toolkits.build_text(conn.params["id"])
-        which -> Workbooks.Toolkits.build_text(conn.params["id"], which, Workbooks.Toolkits.default_root())
+        w when w in [nil, ""] -> Workbooks.WorkKits.build_text(conn.params["id"])
+        which -> Workbooks.WorkKits.build_text(conn.params["id"], which, Workbooks.WorkKits.default_root())
       end
 
     send_resp(conn, 200, out)
   end
 
   post "/rcp/toolkit/sign" do
-    send_resp(conn, 200, Workbooks.Toolkits.sign_text(conn.params["id"], conn.assigns.tenant))
+    send_resp(conn, 200, Workbooks.WorkKits.sign_text(conn.params["id"], conn.assigns.tenant))
   end
 
   # Versioned releases (work-verbs): list versions, show the live pin, roll back.
   get "/rcp/toolkit/versions" do
-    send_resp(conn, 200, Workbooks.Toolkits.versions_text(conn.params["id"]))
+    send_resp(conn, 200, Workbooks.WorkKits.versions_text(conn.params["id"]))
   end
 
   get "/rcp/toolkit/live" do
     out =
       case conn.params["id"] do
-        id when id in [nil, ""] -> Workbooks.Toolkits.live_text()
-        id -> Workbooks.Toolkits.live_text(id, Workbooks.Toolkits.default_root())
+        id when id in [nil, ""] -> Workbooks.WorkKits.live_text()
+        id -> Workbooks.WorkKits.live_text(id, Workbooks.WorkKits.default_root())
       end
 
     send_resp(conn, 200, out)
   end
 
   post "/rcp/toolkit/rollback" do
-    send_resp(conn, 200, Workbooks.Toolkits.rollback_text(conn.params["id"], conn.params["version"]))
+    send_resp(conn, 200, Workbooks.WorkKits.rollback_text(conn.params["id"], conn.params["version"]))
   end
 
   # Run a registered KERNEL (bytes → bytes) over RCP — the seam that makes
@@ -1238,7 +1238,7 @@ defmodule Workbooks.Web do
         true ->
           try do
             %{"b64" => b64} = Jason.decode!(body)
-            root = Path.expand(Workbooks.Toolkits.default_root())
+            root = Path.expand(Workbooks.WorkKits.default_root())
             dest = Path.join(root, id)
             File.mkdir_p!(dest)
 
@@ -1251,7 +1251,7 @@ defmodule Workbooks.Web do
               end
             end
 
-            "installed toolkit #{id} → #{dest} (#{length(Workbooks.Toolkits.skills(dest))} skills)"
+            "installed toolkit #{id} → #{dest} (#{length(Workbooks.WorkKits.skills(dest))} skills)"
           rescue
             e -> "install failed: " <> Exception.message(e)
           end
@@ -1269,7 +1269,7 @@ defmodule Workbooks.Web do
         b -> Jason.decode!(b)["args"] || []
       end
 
-    send_resp(conn, 200, Workbooks.Toolkits.run_task_text(conn.params["id"], conn.params["task"], args))
+    send_resp(conn, 200, Workbooks.WorkKits.run_task_text(conn.params["id"], conn.params["task"], args))
   end
 
   # lander-live (wb-5vm): the page's PUBLIC change feed — the tenant repo's real
@@ -2014,8 +2014,8 @@ defmodule Workbooks.Web do
     # toolkit show`. When the closure includes a component-EXEC toolkit, append
     # the catalog of `work-*` tags DISCOVERED from its CEM (not hardcoded).
     base
-    |> append_section(Workbooks.Toolkits.injection_text(toolkits))
-    |> append_section(Workbooks.Toolkits.component_catalog(toolkits))
+    |> append_section(Workbooks.WorkKits.injection_text(toolkits))
+    |> append_section(Workbooks.WorkKits.component_catalog(toolkits))
   end
 
   defp append_section(text, ""), do: text
@@ -2097,7 +2097,7 @@ defmodule Workbooks.Web do
   # terminates TLS upstream) so the DID id matches the URL clients actually used.
   # Serve a file from <toolkits_root>/<toolkit>/<rel>, path-contained (no escape).
   defp serve_toolkit_file(conn, toolkit, rel) do
-    base = Path.expand(Path.join(Workbooks.Toolkits.default_root(), toolkit))
+    base = Path.expand(Path.join(Workbooks.WorkKits.default_root(), toolkit))
     path = Path.expand(Path.join(base, rel))
 
     cond do

@@ -7,7 +7,7 @@ defmodule Workbooks.ToolkitPromoteTest do
   """
   use ExUnit.Case, async: false
 
-  alias Workbooks.{Toolkits, CommandRegistry}
+  alias Workbooks.{WorkKits, CommandRegistry}
 
   defp uniq(p), do: "#{p}_#{System.unique_integer([:positive])}"
 
@@ -25,7 +25,7 @@ defmodule Workbooks.ToolkitPromoteTest do
     src = Path.join(System.tmp_dir!(), "#{name}.js")
     File.write!(src, @rev_src)
 
-    out = Toolkits.promote_text(name, "js", src, root: root)
+    out = WorkKits.promote_text(name, "js", src, root: root)
     assert out =~ "promoted session command"
 
     dir = Path.join(root, name)
@@ -41,7 +41,7 @@ defmodule Workbooks.ToolkitPromoteTest do
     assert manifest =~ ~s(build-src="path:src")
 
     # Discoverable as a toolkit by the same query agents use.
-    discovered = Toolkits.discover(manifest)
+    discovered = WorkKits.discover(manifest)
     assert Enum.any?(discovered, &(&1[:id] == name or &1["id"] == name))
   end
 
@@ -50,10 +50,10 @@ defmodule Workbooks.ToolkitPromoteTest do
     src = Path.join(System.tmp_dir!(), "x.js")
     File.write!(src, "x")
 
-    assert Toolkits.promote_text("jq", "js", src, root: root) =~ "reserved"
-    assert Toolkits.promote_text("bad name", "js", src, root: root) =~ "invalid"
-    assert Toolkits.promote_text(uniq("t"), "brainfuck", src, root: root) =~ "unsupported"
-    assert Toolkits.promote_text(uniq("t"), "js", "/no/such/file.js", root: root) =~ "no such source"
+    assert WorkKits.promote_text("jq", "js", src, root: root) =~ "reserved"
+    assert WorkKits.promote_text("bad name", "js", src, root: root) =~ "invalid"
+    assert WorkKits.promote_text(uniq("t"), "brainfuck", src, root: root) =~ "unsupported"
+    assert WorkKits.promote_text(uniq("t"), "js", "/no/such/file.js", root: root) =~ "no such source"
     # Nothing was created for the bad cases.
     assert File.ls!(root) == []
   end
@@ -67,17 +67,17 @@ defmodule Workbooks.ToolkitPromoteTest do
 
     # do_build_clause resolves the build dir via default_root(); point it at our
     # temp workspace so the promoted toolkit builds in isolation.
-    prev = System.get_env("WB_TOOLKITS_ROOT")
-    System.put_env("WB_TOOLKITS_ROOT", root)
+    prev = System.get_env("WB_WORKKITS_ROOT")
+    System.put_env("WB_WORKKITS_ROOT", root)
 
     try do
-      assert Toolkits.promote_text(name, "js", src, root: root) =~ "promoted"
+      assert WorkKits.promote_text(name, "js", src, root: root) =~ "promoted"
       # The promoted toolkit builds + registers its command via the normal path.
-      assert Toolkits.build_text(name) =~ "registered command"
+      assert WorkKits.build_text(name) =~ "registered command"
       assert name in CommandRegistry.list()
       assert {:ok, "cba"} = CommandRegistry.run(name, "abc")
     after
-      if prev, do: System.put_env("WB_TOOLKITS_ROOT", prev), else: System.delete_env("WB_TOOLKITS_ROOT")
+      if prev, do: System.put_env("WB_WORKKITS_ROOT", prev), else: System.delete_env("WB_WORKKITS_ROOT")
     end
   end
 end

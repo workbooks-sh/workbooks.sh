@@ -7,12 +7,12 @@ defmodule Workbooks.ToolkitBuildTest do
   """
   use ExUnit.Case, async: false
 
-  alias Workbooks.{Toolkits, CommandRegistry}
+  alias Workbooks.{WorkKits, CommandRegistry}
 
   setup_all do
     # Point discovery at the in-repo toolkits/ regardless of cwd.
-    System.put_env("WB_TOOLKITS_ROOT", Path.expand("../toolkits", __DIR__))
-    on_exit(fn -> System.delete_env("WB_TOOLKITS_ROOT") end)
+    System.put_env("WB_WORKKITS_ROOT", Path.expand("../workkits", __DIR__))
+    on_exit(fn -> System.delete_env("WB_WORKKITS_ROOT") end)
     :ok
   end
 
@@ -24,7 +24,7 @@ defmodule Workbooks.ToolkitBuildTest do
     </work-toolkit>
     """
 
-    d = Toolkits.parse_descriptor(body)
+    d = WorkKits.parse_descriptor(body)
     assert d.exec == "command"
     assert d.build_src == {:crate, "huniq"}
     assert d.build_lang == "rust"
@@ -34,28 +34,28 @@ defmodule Workbooks.ToolkitBuildTest do
   end
 
   test "parse_descriptor: empty/absent attribute is nil, not a crash" do
-    d = Toolkits.parse_descriptor(~s(<work-toolkit id="x" caps=""></work-toolkit>))
+    d = WorkKits.parse_descriptor(~s(<work-toolkit id="x" caps=""></work-toolkit>))
     assert d.caps == []
     assert d.exec == nil
   end
 
   test "parse_descriptor recognizes git+ and path: build sources" do
-    assert Toolkits.parse_descriptor(~s(<work-toolkit id="x" build-src="git+https://x/y"></work-toolkit>)).build_src ==
+    assert WorkKits.parse_descriptor(~s(<work-toolkit id="x" build-src="git+https://x/y"></work-toolkit>)).build_src ==
              {:git, "https://x/y"}
 
-    assert Toolkits.parse_descriptor(~s(<work-toolkit id="x" build-src="path:./cli"></work-toolkit>)).build_src ==
+    assert WorkKits.parse_descriptor(~s(<work-toolkit id="x" build-src="path:./cli"></work-toolkit>)).build_src ==
              {:path, "./cli"}
   end
 
   test "descriptor/1 reads the huniq fixture manifest" do
-    assert {:ok, d} = Toolkits.descriptor("huniq")
+    assert {:ok, d} = WorkKits.descriptor("huniq")
     assert d.exec == "command"
     assert d.build_src == {:crate, "huniq"}
     assert d.cli_bin == "huniq"
   end
 
   test "verify reports the #+EXEC: command is satisfiable via the build descriptor" do
-    out = Toolkits.verify_text("huniq")
+    out = WorkKits.verify_text("huniq")
     assert out =~ "exec: command"
     assert out =~ "huniq"
   end
@@ -77,7 +77,7 @@ defmodule Workbooks.ToolkitBuildTest do
     </work-toolkit>
     """)
 
-    out = Toolkits.build_text("evil", root)
+    out = WorkKits.build_text("evil", root)
     assert out =~ "reserved built-in command name"
     # jq is unchanged: still the real jq built-in.
     assert {:wasm, "build/commands/jq.wasm", :stdin1} = CommandRegistry.registry()["jq"]
@@ -86,7 +86,7 @@ defmodule Workbooks.ToolkitBuildTest do
   @tag :build
   @tag timeout: 420_000
   test "work toolkit build huniq compiles the crate, registers it, and it runs" do
-    out = Toolkits.build_text("huniq")
+    out = WorkKits.build_text("huniq")
     assert out =~ "registered command \"huniq\"", "build output: #{out}"
     assert "huniq" in CommandRegistry.list()
 

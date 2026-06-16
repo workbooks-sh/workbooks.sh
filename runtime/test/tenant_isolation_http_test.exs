@@ -27,17 +27,17 @@ defmodule Workbooks.TenantIsolationHttpTest do
     # SessionLedger writes silently fail → this test sees no sessions. Use a fresh
     # temp dir. Also pin the toolkit root to the in-tree default.
     prev_data = System.get_env("WB_DATA")
-    prev_tk = System.get_env("WB_TOOLKITS_ROOT")
+    prev_tk = System.get_env("WB_WORKKITS_ROOT")
     data = Path.join(System.tmp_dir!(), "wb-tenant-http-#{System.unique_integer([:positive])}")
     File.mkdir_p!(data)
     System.put_env("WB_DATA", data)
-    System.delete_env("WB_TOOLKITS_ROOT")
+    System.delete_env("WB_WORKKITS_ROOT")
 
     on_exit(fn ->
       for {k, v} <- saved, do: if(v, do: System.put_env(k, v), else: System.delete_env(k))
       reset_guardian()
       if prev_data, do: System.put_env("WB_DATA", prev_data), else: System.delete_env("WB_DATA")
-      if prev_tk, do: System.put_env("WB_TOOLKITS_ROOT", prev_tk), else: System.delete_env("WB_TOOLKITS_ROOT")
+      if prev_tk, do: System.put_env("WB_WORKKITS_ROOT", prev_tk), else: System.delete_env("WB_WORKKITS_ROOT")
       File.rm_rf(data)
     end)
 

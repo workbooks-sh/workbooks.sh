@@ -15,7 +15,7 @@ defmodule Workbooks.ToolkitGraphTest do
   """
   use ExUnit.Case, async: false
 
-  alias Workbooks.Toolkits
+  alias Workbooks.WorkKits
 
   setup_all do
 
@@ -64,7 +64,7 @@ defmodule Workbooks.ToolkitGraphTest do
         ])
 
       # Declaring only "ui" must close over icons + glyphs.
-      closed = Toolkits.closure_disk(["ui"], root)
+      closed = WorkKits.closure_disk(["ui"], root)
       assert "ui" in closed
       assert "icons" in closed
       assert "glyphs" in closed
@@ -74,7 +74,7 @@ defmodule Workbooks.ToolkitGraphTest do
 
       # The prompt index that an agent declaring only :TOOLKITS: ui receives names
       # all three (this is the "subscribe to A, get B's skills" behavior).
-      idx = Toolkits.injection_text(["ui"], root)
+      idx = WorkKits.injection_text(["ui"], root)
       assert idx =~ "ui"
       assert idx =~ "icons"
       assert idx =~ "glyphs"
@@ -89,10 +89,10 @@ defmodule Workbooks.ToolkitGraphTest do
           {"forge", "git>=2.30 node>=20 cargo"}
         ])
 
-      closed = Toolkits.closure_disk(["forge"], root)
+      closed = WorkKits.closure_disk(["forge"], root)
       assert closed == ["forge"]
 
-      idx = Toolkits.injection_text(["forge"], root)
+      idx = WorkKits.injection_text(["forge"], root)
       assert idx =~ "forge"
       refute idx =~ "git>=2.30"
       refute idx =~ "node"
@@ -102,7 +102,7 @@ defmodule Workbooks.ToolkitGraphTest do
       # `git` with no version is a :dep candidate, but no `git` toolkit is installed
       # in this scratch root → it falls back to a pre-flight, no edge, no crash.
       root = scratch_root([{"forge", "git"}])
-      assert Toolkits.closure_disk(["forge"], root) == ["forge"]
+      assert WorkKits.closure_disk(["forge"], root) == ["forge"]
     end
 
     test "(c) a dependency cycle errors (the REQUIRES graph is a DAG)" do
@@ -114,7 +114,7 @@ defmodule Workbooks.ToolkitGraphTest do
         ])
 
       assert_raise ArgumentError, ~r/cycle/, fn ->
-        Toolkits.closure_disk(["a"], root)
+        WorkKits.closure_disk(["a"], root)
       end
     end
 
@@ -127,7 +127,7 @@ defmodule Workbooks.ToolkitGraphTest do
           {"d", nil}
         ])
 
-      closed = Toolkits.closure_disk(["a"], root)
+      closed = WorkKits.closure_disk(["a"], root)
       assert Enum.count(closed, &(&1 == "d")) == 1
       assert Enum.sort(closed) == ["a", "b", "c", "d"]
     end
@@ -136,7 +136,7 @@ defmodule Workbooks.ToolkitGraphTest do
   describe "parse_descriptor/1 — #+REQUIRES typing" do
     test "version-operator tokens are :cli; bare/@semver names are :dep candidates" do
       d =
-        Toolkits.parse_descriptor("""
+        WorkKits.parse_descriptor("""
         <work-toolkit id="x" requires="git>=2.30, glyphs, icons@0.2.0 cargo (build only)">
           <work-doc title="x"></work-doc>
         </work-toolkit>
@@ -154,12 +154,12 @@ defmodule Workbooks.ToolkitGraphTest do
     end
 
     test "no requires attr → empty requires (no crash)" do
-      assert Toolkits.parse_descriptor(~s(<work-toolkit id="x"></work-toolkit>)).requires == []
+      assert WorkKits.parse_descriptor(~s(<work-toolkit id="x"></work-toolkit>)).requires == []
     end
   end
 
   describe "the shipped manifests stay edge-free (no regression)" do
-    @root Path.expand("../../toolkits", __DIR__)
+    @root Path.expand("../../workkits", __DIR__)
 
     test "every shipped #+REQUIRES classifies as native CLI (zero toolkit-id edges)" do
       # The 10 manifests with #+REQUIRES name native CLIs (git>=2.30, node>=20,
@@ -170,7 +170,7 @@ defmodule Workbooks.ToolkitGraphTest do
         |> Enum.map(&(Path.dirname(&1) |> Path.basename()))
 
       for manifest <- Path.wildcard(Path.join(@root, "*/manifest.html")) do
-        d = Toolkits.parse_descriptor(File.read!(manifest))
+        d = WorkKits.parse_descriptor(File.read!(manifest))
 
         for t <- d.requires do
           case t do

@@ -6,13 +6,13 @@ defmodule Workbooks.SandboxToolkitTest do
   # discover_dir for ALL agents), the skills must exist, and the agents we activated it on must still
   # list it.
 
-  @toolkits Path.expand("../../toolkits", __DIR__)
+  @toolkits Path.expand("../../workkits", __DIR__)
 
   test "the sandbox manifest discovers as exactly one valid <work-toolkit> node" do
     manifest = Path.join(@toolkits, "sandbox/manifest.html")
     assert File.regular?(manifest)
 
-    nodes = Workbooks.Toolkits.discover(File.read!(manifest))
+    nodes = Workbooks.WorkKits.discover(File.read!(manifest))
     assert [node] = nodes
     assert node.id == "sandbox"
     assert node.skill_dir == "skills/"

@@ -29,7 +29,7 @@ defmodule Workbooks.AgentDef do
     # become a compact index appended to the system prompt — tier 1 of progressive
     # disclosure. Skill bodies stay on demand via the `work` tool, never inlined.
     system =
-      case Workbooks.Toolkits.injection_text(def.toolkits) do
+      case Workbooks.WorkKits.injection_text(def.toolkits) do
         "" -> def.system
         index -> "#{def.system}\n\n#{index}"
       end

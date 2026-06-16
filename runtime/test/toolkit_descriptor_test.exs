@@ -8,7 +8,7 @@ defmodule Workbooks.ToolkitDescriptorTest do
   """
   use ExUnit.Case, async: true
 
-  alias Workbooks.Toolkits
+  alias Workbooks.WorkKits
 
   test "a full command-toolkit descriptor decodes every field" do
     body = """
@@ -18,7 +18,7 @@ defmodule Workbooks.ToolkitDescriptorTest do
     </work-toolkit>
     """
 
-    d = Toolkits.parse_descriptor(body)
+    d = WorkKits.parse_descriptor(body)
     assert d.exec == "command"
     assert d.trust == "first-party"
     assert d.build_src == {:crate, "huniq"}
@@ -29,7 +29,7 @@ defmodule Workbooks.ToolkitDescriptorTest do
   end
 
   test "defaults: trust → first-party, arg_mode → :argv, caps → [] when absent" do
-    d = Toolkits.parse_descriptor(~s(<work-toolkit id="x" exec="component"></work-toolkit>))
+    d = WorkKits.parse_descriptor(~s(<work-toolkit id="x" exec="component"></work-toolkit>))
     assert d.exec == "component"
     assert d.trust == "first-party"
     assert d.arg_mode == :argv
@@ -51,7 +51,7 @@ defmodule Workbooks.ToolkitDescriptorTest do
     ]
 
     for {spec, expected} <- schemes do
-      d = Toolkits.parse_descriptor(~s(<work-toolkit id="x" build-src="#{spec}"></work-toolkit>))
+      d = WorkKits.parse_descriptor(~s(<work-toolkit id="x" build-src="#{spec}"></work-toolkit>))
       assert d.build_src == expected, "build-src #{spec} → #{inspect(d.build_src)}"
     end
   end

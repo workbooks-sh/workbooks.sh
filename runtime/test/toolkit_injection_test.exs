@@ -8,24 +8,24 @@ defmodule Workbooks.ToolkitInjectionTest do
   """
   use ExUnit.Case, async: false
 
-  alias Workbooks.Toolkits
+  alias Workbooks.WorkKits
 
   setup do
-    # Pin to the default in-tree toolkit root (wb-q2qg): a leaked WB_TOOLKITS_ROOT
+    # Pin to the default in-tree toolkit root (wb-q2qg): a leaked WB_WORKKITS_ROOT
     # from an earlier serial test would otherwise point discovery at a fixture/
     # empty dir, so the real workbooks-browser toolkit wouldn't be found.
-    prev = System.get_env("WB_TOOLKITS_ROOT")
-    System.delete_env("WB_TOOLKITS_ROOT")
-    on_exit(fn -> if prev, do: System.put_env("WB_TOOLKITS_ROOT", prev), else: System.delete_env("WB_TOOLKITS_ROOT") end)
+    prev = System.get_env("WB_WORKKITS_ROOT")
+    System.delete_env("WB_WORKKITS_ROOT")
+    on_exit(fn -> if prev, do: System.put_env("WB_WORKKITS_ROOT", prev), else: System.delete_env("WB_WORKKITS_ROOT") end)
     :ok
   end
 
   test "no toolkits → empty string (nothing injected)" do
-    assert Toolkits.injection_text([]) == ""
+    assert WorkKits.injection_text([]) == ""
   end
 
   test "a real toolkit injects a ## Toolkits block with its id + skill index" do
-    out = Toolkits.injection_text(["workbooks-browser"])
+    out = WorkKits.injection_text(["workbooks-browser"])
     assert out =~ "## Toolkits"
     # Teaches the progressive-disclosure call so the agent reads a skill on demand.
     assert out =~ "toolkit show"
@@ -36,13 +36,13 @@ defmodule Workbooks.ToolkitInjectionTest do
   end
 
   test "no component toolkit in scope → empty catalog (nothing injected)" do
-    assert Toolkits.component_catalog([]) == ""
+    assert WorkKits.component_catalog([]) == ""
     # A non-component toolkit must NOT yield a catalog.
-    assert Toolkits.component_catalog(["workbooks-browser"]) == ""
+    assert WorkKits.component_catalog(["workbooks-browser"]) == ""
   end
 
   test "subscribing to the component toolkit injects a work-* catalog discovered from the CEM" do
-    out = Toolkits.component_catalog(["workponents"])
+    out = WorkKits.component_catalog(["workponents"])
     assert out =~ "## Components"
     # Emit syntax is inline `<work-*>` HTML (no org source blocks).
     assert out =~ "write them as HTML"
@@ -63,19 +63,19 @@ defmodule Workbooks.ToolkitInjectionTest do
     # End-to-end of the wiring: an agent subscribed to the component toolkit
     # gets the work-* catalog in its prompt. component_catalog/2 is what
     # agent_system_prompt/1 appends, exercised here against the real toolkit.
-    out = Toolkits.component_catalog(["workbooks-browser", "workponents"])
+    out = WorkKits.component_catalog(["workbooks-browser", "workponents"])
     assert out =~ "## Components"
     assert out =~ "work-chart"
   end
 
   test "an unknown toolkit is reported as not installed, not silently dropped" do
-    out = Toolkits.injection_text(["ghost-does-not-exist"])
+    out = WorkKits.injection_text(["ghost-does-not-exist"])
     assert out =~ "ghost-does-not-exist"
     assert out =~ "(not installed)"
   end
 
   test "mixed known + unknown — each is accounted for on its own line" do
-    out = Toolkits.injection_text(["workbooks-browser", "ghost-zzz"])
+    out = WorkKits.injection_text(["workbooks-browser", "ghost-zzz"])
     assert out =~ "workbooks-browser"
     assert out =~ "ghost-zzz: (not installed)"
   end
@@ -84,7 +84,7 @@ defmodule Workbooks.ToolkitInjectionTest do
     # Guards the drift just fixed (the `models` skill existed but was missing from
     # the workbooks-browser manifest's Live-now table). Every skills/*.md must be
     # mentioned in manifest.html so the doc can't silently fall behind the files.
-    root = Toolkits.default_root()
+    root = WorkKits.default_root()
 
     # Discover EVERY installed toolkit (not a hardcoded pair) so a new toolkit or
     # skill can't dodge the guard.
@@ -98,7 +98,7 @@ defmodule Workbooks.ToolkitInjectionTest do
     for tk <- toolkits do
       manifest = File.read!(Path.join([root, tk, "manifest.html"]))
 
-      for skill <- Toolkits.skills(Path.join(root, tk)) do
+      for skill <- WorkKits.skills(Path.join(root, tk)) do
         assert manifest =~ skill, "#{tk}: skill '#{skill}' missing from manifest.html"
       end
     end
@@ -108,24 +108,24 @@ defmodule Workbooks.ToolkitInjectionTest do
     # The real eval-failure root cause: agents tried `work toolkit run workbooks-cli
     # deploy status` (refused) instead of `work deploy status`. The refusal now names
     # the exact direct command so the agent self-corrects at the point of error.
-    cli = Toolkits.run_task_text("workbooks-cli", "deploy", ["status"])
+    cli = WorkKits.run_task_text("workbooks-cli", "deploy", ["status"])
     assert cli =~ "direct-verb"
     assert cli =~ "work deploy status"
     assert cli =~ "don't use `work toolkit run`"
 
-    browser = Toolkits.run_task_text("workbooks-browser", "app", ["status"])
+    browser = WorkKits.run_task_text("workbooks-browser", "app", ["status"])
     assert browser =~ "work app status"
   end
 
   test "toolkit run on an unknown toolkit says so, not a crash" do
-    assert Toolkits.run_task_text("ghost-zzz", "x", []) =~ "no such toolkit"
+    assert WorkKits.run_task_text("ghost-zzz", "x", []) =~ "no such toolkit"
   end
 
   test "eval_text case-filter: a non-matching filter selects no case (no LLM run)" do
     # The filter narrows to one eval by filename substring — cheap iteration vs
     # the full suite. A bogus filter must short-circuit to a clear message rather
     # than running (and billing) anything.
-    out = Toolkits.eval_text("workbooks-cli", Toolkits.default_root(), "no-such-eval-zzz")
+    out = WorkKits.eval_text("workbooks-cli", WorkKits.default_root(), "no-such-eval-zzz")
     assert out == ~s(workbooks-cli: no eval matches "no-such-eval-zzz")
   end
 end

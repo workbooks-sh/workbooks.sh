@@ -21,7 +21,7 @@ defmodule Workbooks.Federation do
   Discover + register data-source plugins under `root` (default the toolkits dir).
   Idempotent. Returns the list of {entity, module} registered.
   """
-  def discover(root \\ Workbooks.Toolkits.default_root()) do
+  def discover(root \\ Workbooks.WorkKits.default_root()) do
     Path.wildcard(Path.join(root, "*/plugin/manifest.org"))
     |> Enum.flat_map(fn manifest ->
       d = parse_plugin(File.read!(manifest))
