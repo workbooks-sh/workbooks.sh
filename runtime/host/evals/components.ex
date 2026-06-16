@@ -30,6 +30,10 @@ defmodule Workbooks.Evals.Components do
   # eval measures COMPOSITION, so it pins a fast capable model and runs emit-only.
   # Override with WB_EVAL_MODEL.
   @eval_model "anthropic/claude-haiku-4.5"
+  # Chart variants the model emits as `:type` (bar/line/…) — all resolve to work-chart,
+  # the variant kept as the element's `type` attr. (Defined here, before first use —
+  # module attributes read in source order.)
+  @chart_variants ~w(bar line area scatter column donut pie)
 
   # ── public surface ─────────────────────────────────────────────────────────
 
@@ -639,7 +643,23 @@ defmodule Workbooks.Evals.Components do
         # type is a single token — guard against any value over-capture (e.g. a
         # `:type doc` block whose prose has no `:`-prefixed lines).
         type = props["type"] && (props["type"] |> String.split() |> List.first())
-        %{tag: type_to_tag(type), props: Map.delete(props, "type"), body: body, raw: block}
+        tag = type_to_tag(type)
+
+        # For work-chart the `type` value is the chart VARIANT (bar/line/area) the
+        # element reads to render — keep it as an attribute; for every other tag
+        # `type` was just the selector, so drop it.
+        props =
+          if tag == "work-chart" and type in @chart_variants,
+            do: Map.put(props, "type", type),
+            else: Map.delete(props, "type")
+
+        # Normalize the model's data-emit variance onto the element's real attrs
+        # (work-chart/table/spark all accept rows | csv): `:data` → rows, and a
+        # CSV body → the `csv` attr. Without this, data emitted as CSV-in-body or
+        # `:data` never reaches the element → "engine error" → blank chart.
+        {props, body} = normalize_data(props, body)
+
+        %{tag: tag, props: props, body: body, raw: block}
 
       m = Regex.run(~r/<(work-[a-z-]+)\b([^>]*)>(.*?)<\/\1>/ms, text) ->
         [raw, tag, attrs, body] = m
@@ -672,6 +692,9 @@ defmodule Workbooks.Evals.Components do
       "diff" -> "work-diff"
       "history" -> "work-history-graph"
       "history-graph" -> "work-history-graph"
+      # chart VARIANTS the model emits as `:type` (instead of `:type chart :variant
+      # bar`) all resolve to work-chart — the variant is kept as the `type` attr below.
+      v when v in ~w(bar line area scatter column donut pie) -> "work-chart"
       other -> if String.starts_with?(other, "work-"), do: other, else: "work-" <> other
     end
   end
@@ -681,14 +704,51 @@ defmodule Workbooks.Evals.Components do
   # captures its value up to the NEXT line-leading `:key` (or block end), so a
   # multi-line JSON value (`:rows [\n…\n]`) is one prop. The non-prop remainder is
   # the body (e.g. a `:type doc` block's markdown), so data → attribute, prose → text.
+  # Map the model's varied data shapes onto the element's real attributes. `:data`
+  # (array) aliases to `rows`; a CSV body (header + comma rows) becomes the `csv`
+  # attr (work-chart/table/spark all parse `rows` | `csv`). No-op for prose bodies.
+  defp normalize_data(props, body) do
+    props =
+      if is_nil(props["rows"]) and is_binary(props["data"]),
+        do: props |> Map.put("rows", props["data"]) |> Map.delete("data"),
+        else: props
+
+    if is_nil(props["rows"]) and is_nil(props["csv"]) and csv_like?(body) do
+      {Map.put(props, "csv", String.trim(body)), ""}
+    else
+      {props, body}
+    end
+  end
+
+  defp csv_like?(body) when is_binary(body) do
+    lines = body |> String.trim() |> String.split("\n", trim: true)
+    length(lines) >= 2 and Enum.all?(lines, &String.contains?(&1, ",")) and not String.contains?(body, "{")
+  end
+
+  defp csv_like?(_), do: false
+
+  # Two passes, so trailing non-prop content (a CSV/prose body) is NOT swallowed into
+  # the last prop's value:
+  #   1. the HEADER line's INLINE props (`:type chart :x region :y rev`) — each value
+  #      runs to the next ` :key ` or end-of-line.
+  #   2. LINE-LEADING props in the remaining lines (`:rows [\n…\n]`) — value runs to
+  #      the next line-leading `:key` or end (so multi-line JSON is one prop).
+  # Lines in the remainder that don't start with `:` are the BODY (CSV/markdown).
+  @inline_prop ~r/:([a-z_-]+)[ \t]*(.*?)(?=[ \t]+:[a-z_-]+[ \t]|\z)/s
+  @lead_prop ~r/(?:\A|\n)[ \t]*:([a-z_-]+)[ \t]*(.*?)(?=\n[ \t]*:[a-z_-]+|\z)/s
+
   defp parse_block(block) do
-    # `:key` + optional value, captured up to the next LINE-LEADING `:key` (or end)
-    # — so a multi-line JSON value is one prop, a valueless boolean prop (`:searchable`)
-    # captures "", and the next prop doesn't bleed into the prior value.
-    re = ~r/:([a-z_-]+)[ \t]*(.*?)(?=\n[ \t]*:[a-z_-]+|\z)/s
-    props = Regex.scan(re, block) |> Map.new(fn [_, k, v] -> {k, String.trim(v)} end)
-    body = re |> Regex.replace(block, "") |> String.trim()
-    {props, body}
+    {header, rest} =
+      case String.split(String.trim_leading(block), "\n", parts: 2) do
+        [h, r] -> {h, r}
+        [h] -> {h, ""}
+      end
+
+    inline = Regex.scan(@inline_prop, header) |> Map.new(fn [_, k, v] -> {k, String.trim(v)} end)
+    lead = Regex.scan(@lead_prop, rest) |> Map.new(fn [_, k, v] -> {k, String.trim(v)} end)
+    body = @lead_prop |> Regex.replace(rest, "") |> String.trim()
+
+    {Map.merge(lead, inline), body}
   end
 
   defp parse_attrs(a) do
