@@ -19,6 +19,28 @@ same element runs in the **desktop app**, **any workbook** (plain HTML, no build
 No build step. Theme by setting `data-work-theme="light|dark|signal"` (or your own) on an
 ancestor — every element re-themes from the tokens. See `demo/index.html` for the specimen.
 
+### Or load ONE built file (`dist/`)
+
+`npm run build` (esbuild, resolved from the shared workspace `node_modules` — no extra
+runtime dep) emits a self-contained, **unminified** ESM that registers all 45 `<work-*>`
+elements from a single import:
+
+```html
+<link rel="stylesheet" href="workponents/dist/theme.css" />
+<script type="module" src="workponents/dist/workponents.js"></script>   <!-- real components, not stubs -->
+```
+
+- **Lit is bundled in** — the file is fully self-contained; no import map, no peer install.
+  (The `src/` entry keeps Lit a bare `"lit"` specifier for the buildless import-map path; the
+  dist trades that for a single drop-in file. Pick whichever fits the host.)
+- **The powered engine tiers stay LAZY** — Observable Plot / MapLibre / CodeMirror / MiniSearch /
+  model-viewer / mammoth / docx / pptxgen / Manifold are dynamic `import()`s of their CDN
+  specifiers, **never** bundled. The floor renders with the CDN blocked; the powered tier resolves
+  only on demand. (Proven: load `dist/workponents.js` with all CDNs route-aborted → 45/45 register,
+  `work-chart` paints real SVG marks, `work-table` real rows.)
+- Consumers (a workbook, the agent-eval `render_fidelity` harness) point at `@work.books/workponents/dist`
+  (the `exports["./dist"]` map) or the raw file — one import, real elements.
+
 ## How it's built (the conventions every element follows)
 
 - **Token-only styling.** Elements style *only* from `--work-*` CSS custom properties

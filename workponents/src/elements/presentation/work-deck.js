@@ -35,13 +35,20 @@
 //   .index .count .current        playhead state
 //   .next() .prev() .go(i) .first() .last()
 //   .toComposition()              the <gm-doc> timeline markup (deck → wavelet)
-//   .export({format})             in-guest encode via Host, else portable .html
+//   .export(format|{format})      "video"/"mp4"/"webm" → wavelet encode (Host) or
+//                                 portable .html · "pptx" → a .pptx Blob (PptxGenJS).
+//                                 slides→video is the differentiator no Office tool has.
+//   .import(arrayBuffer|src)      a .pptx → importPptx → render its slides as
+//                                 <work-slide> children (composition-as-source).
 //
 // Events (all bubbling):
 //   work-slide-change { index, total, slide }   on every band change
-//   work-export-start                            export began
-//   work-export      { format, … }               export finished
+//   work-export-start { format }                 export began
+//   work-export      { format, … }               export finished (video path detail)
 //   work-export-error { error }                  export failed
+//   work-deck-export { format, ok }              export terminal (video + pptx) — the
+//                                                format-agnostic signal the directive asks for
+//   work-deck-import { ok, slides?, error? }     a .pptx import completed
 
 import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
@@ -308,30 +315,96 @@ ${scenes}
 </gm-doc>`;
   }
 
-  /** Export the deck. In-guest wavelet encode via the Dock when the Host has the
-   *  `wavelet` capability; otherwise a portable, self-contained .html (the deck
-   *  as a wavelet composition — the SAME source the render-core consumes). */
-  async export({ format = "mp4", fps = 30 } = {}) {
+  /** Export the deck. Routes by format:
+   *   "video" | "mp4" | "webm"  → the wavelet path (the slides→video differentiator):
+   *       in-guest encode via the Dock when the Host has `wavelet`, else a portable,
+   *       self-contained .html (the deck AS the wavelet composition the render-core
+   *       consumes). This is the existing free win — no Office tool does it.
+   *   "pptx"                    → a real .pptx Blob (PptxGenJS, floor-JS, lazy CDN).
+   *  Accepts a format string or an options object. Emits `work-deck-export {format, ok}`
+   *  for both lanes; the video lane also emits the richer work-export(-start/-error). */
+  async export(opts = {}) {
+    const o = typeof opts === "string" ? { format: opts } : opts;
+    const format = o.format || "mp4";
     if (this._exporting || !this._slides.length) return;
+    if (format === "pptx") return this._exportPptx();
+    return this._exportVideo({ format, fps: o.fps || 30 });
+  }
+
+  /** The wavelet video lane (the original export() — slides folded into a timeline). */
+  async _exportVideo({ format = "mp4", fps = 30 } = {}) {
     this._exporting = true;
-    this.dispatchEvent(new CustomEvent("work-export-start", { bubbles: true }));
+    this.dispatchEvent(new CustomEvent("work-export-start", { bubbles: true, detail: { format } }));
     const composition = this.toComposition({ fps });
     try {
+      let out;
       if (this.host.available("wavelet")) {
-        const out = await this.host.request("/wavelet/encode", {
-          body: { composition, format, fps },
-        });
+        out = await this.host.request("/wavelet/encode", { body: { composition, format, fps } });
         this.dispatchEvent(new CustomEvent("work-export", { bubbles: true, detail: { ...out, format } }));
-        return out;
+      } else {
+        const file = await this._downloadPortable(composition);
+        out = { file, format: "html" };
+        this.dispatchEvent(new CustomEvent("work-export", { bubbles: true, detail: out }));
       }
-      const file = await this._downloadPortable(composition);
-      this.dispatchEvent(new CustomEvent("work-export", { bubbles: true, detail: { file, format: "html" } }));
-      return { file, format: "html" };
+      this.dispatchEvent(new CustomEvent("work-deck-export", { bubbles: true, composed: true, detail: { format, ok: true } }));
+      return out;
     } catch (e) {
       this.dispatchEvent(new CustomEvent("work-export-error", { bubbles: true, detail: { error: String(e) } }));
+      this.dispatchEvent(new CustomEvent("work-deck-export", { bubbles: true, composed: true, detail: { format, ok: false, error: String(e.message || e) } }));
       throw e;
     } finally {
       this._exporting = false;
+    }
+  }
+
+  /** The pptx lane — map the deck's <work-slide> bands → a .pptx Blob. */
+  async _exportPptx() {
+    this._exporting = true;
+    this.dispatchEvent(new CustomEvent("work-export-start", { bubbles: true, detail: { format: "pptx" } }));
+    try {
+      const { exportPptx } = await import("./pptx-io.js");
+      const blob = await exportPptx(this);
+      this.dispatchEvent(new CustomEvent("work-deck-export", { bubbles: true, composed: true, detail: { format: "pptx", ok: true } }));
+      return blob;
+    } catch (e) {
+      this.dispatchEvent(new CustomEvent("work-deck-export", { bubbles: true, composed: true, detail: { format: "pptx", ok: false, error: String(e.message || e) } }));
+      this.dispatchEvent(new CustomEvent("work-export-error", { bubbles: true, detail: { error: String(e) } }));
+      return null;
+    } finally {
+      this._exporting = false;
+    }
+  }
+
+  /** Import a .pptx → render its slides as <work-slide> children (composition-as-
+   *  source). Accepts an ArrayBuffer/Uint8Array, or a URL string to fetch. Replaces
+   *  the deck's current slides with the parsed ones. Emits `work-deck-import`. */
+  async import(input) {
+    try {
+      let buf = input;
+      if (typeof input === "string") {
+        const res = await fetch(input);
+        if (!res.ok) throw new Error(`${res.status} ${input}`);
+        buf = await res.arrayBuffer();
+      }
+      const { importPptx } = await import("./pptx-io.js");
+      const source = await importPptx(buf);
+      // the emitted source is a full <work-deck>…</work-deck>; adopt only its slides
+      // (this deck stays the host, keeping its own controls/aspect/theme).
+      const tpl = document.createElement("template");
+      tpl.innerHTML = source.replace(/^<!--[\s\S]*?-->\s*/, "");
+      const imported = tpl.content.querySelector("work-deck");
+      const slides = imported ? Array.from(imported.querySelectorAll(":scope > work-slide")) : [];
+      // swap children
+      for (const s of Array.from(this.querySelectorAll(":scope > work-slide"))) s.remove();
+      for (const s of slides) this.appendChild(document.importNode(s, true));
+      this._index = 0;
+      this._collect();
+      this._reflectSlides(false);
+      this.dispatchEvent(new CustomEvent("work-deck-import", { bubbles: true, composed: true, detail: { ok: true, slides: slides.length } }));
+      return slides.length;
+    } catch (e) {
+      this.dispatchEvent(new CustomEvent("work-deck-import", { bubbles: true, composed: true, detail: { ok: false, error: String(e.message || e) } }));
+      return 0;
     }
   }
 

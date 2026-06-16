@@ -190,6 +190,147 @@
         }
         window.__WB_MINISEARCH__ = MiniSearchShim;
       },
+      // Install a faithful offline MapLibre GL shim as window.__WB_MAPLIBRE__ so the
+      // <work-map> powered tier's BINDING path runs without a CDN/WebGL. The parity
+      // gate reads the GeoJSON the tier hands the `wb-data` source — so the shim is a
+      // no-canvas Map that RECORDS every source's data onto window.__WB_MAP_BOUND__
+      // and fires `load` synchronously (so addDataLayers + the binding run). Real
+      // MapLibre rendering is proven in the browser demo step; here we verify only
+      // that the tier binds the SAME features the floor projected.
+      installMaplibreShim() {
+        if (window.__WB_MAPLIBRE__) return;
+        window.__WB_MAP_BOUND__ = null;
+        class MapShim {
+          constructor(opts) {
+            this._opts = opts || {};
+            this._sources = {};
+            this._layers = {};
+            this._handlers = {};
+            this._loaded = false;
+            // a minimal canvas stand-in for cursor styling + size reads
+            this._canvas = document.createElement("canvas");
+            if (opts && opts.container) opts.container.appendChild(this._canvas);
+            // fire `load` on the next microtask, mirroring MapLibre's async style load
+            queueMicrotask(() => { this._loaded = true; this._fire("load"); });
+          }
+          _fire(ev, arg) { for (const h of (this._handlers[ev] || [])) h(arg); }
+          on(ev, layerOrCb, cb) {
+            const fn = cb || layerOrCb;
+            (this._handlers[ev] = this._handlers[ev] || []).push(fn);
+            return this;
+          }
+          once(ev, cb) {
+            const wrap = (a) => { cb(a); this._handlers[ev] = (this._handlers[ev] || []).filter((h) => h !== wrap); };
+            return this.on(ev, wrap);
+          }
+          loaded() { return this._loaded; }
+          isStyleLoaded() { return this._loaded; }
+          resize() {}
+          getCanvas() { return this._canvas; }
+          addSource(id, src) {
+            this._sources[id] = src;
+            if (id === "wb-data") window.__WB_MAP_BOUND__ = src.data; // the bound GeoJSON
+          }
+          getSource(id) {
+            const self = this;
+            return this._sources[id]
+              ? { setData(data) { self._sources[id].data = data; if (id === "wb-data") window.__WB_MAP_BOUND__ = data; } }
+              : null;
+          }
+          addLayer(layer) { this._layers[layer.id] = layer; }
+          removeLayer(id) { delete this._layers[id]; }
+          getLayer(id) { return this._layers[id]; }
+          setPaintProperty() {}
+          setStyle() { queueMicrotask(() => this._fire("styledata")); }
+          fitBounds() {}
+          remove() { try { this._canvas.remove(); } catch {} }
+        }
+        window.__WB_MAPLIBRE__ = { Map: MapShim };
+      },
+      // Install a faithful offline CodeMirror 6 shim as window.__WB_CODEMIRROR__ so the
+      // <work-editor> powered tier's mount/getValue/setValue/change path runs without a
+      // CDN. The shim is shaped EXACTLY like the namespace codemirror-tier.js consumes
+      // (createEditorView): an EditorView holding a doc string, a dispatch that applies
+      // `changes` + fires the updateListener (so work-code-change emits), Compartments
+      // that no-op-reconfigure, and the theme/highlight/state helpers as inert stubs.
+      // The parity gate proves the powered tier exposes the SAME value contract the
+      // floor does (initial value, edited value, work-code-change.detail.value). Real
+      // CM editing/highlighting is proven in the browser demo step.
+      installCodeMirrorShim() {
+        if (window.__WB_CODEMIRROR__) return;
+        const ext = (kind, payload) => ({ __cmExt: kind, payload });
+        class Compartment {
+          of(e) { return ext("compartment", e); }
+          reconfigure(e) { return ext("reconfigure", e); }
+        }
+        // a Text-like doc: toString() + length, built from a string.
+        const mkDoc = (s) => ({ _s: String(s == null ? "" : s), toString() { return this._s; }, get length() { return this._s.length; } });
+        const EditorState = {
+          create(cfg) { return { doc: mkDoc(cfg && cfg.doc), _ext: (cfg && cfg.extensions) || [] }; },
+          tabSize: { of: (n) => ext("tabSize", n) },
+          readOnly: { of: (b) => ext("readOnly", b) },
+        };
+        function collectListeners(extensions) {
+          const out = [];
+          const walk = (e) => {
+            if (!e) return;
+            if (Array.isArray(e)) { e.forEach(walk); return; }
+            if (e.__cmListener) out.push(e.__cmListener);
+            if (e.__cmExt && e.payload) walk(e.payload);
+          };
+          walk(extensions);
+          return out;
+        }
+        class EditorView {
+          constructor(cfg) {
+            const state = cfg.state || { doc: mkDoc(""), _ext: [] };
+            this._doc = state.doc._s;
+            this._listeners = collectListeners(state._ext);
+            this.dom = document.createElement("div");
+            this.dom.className = "cm-editor";
+            if (cfg.parent) cfg.parent.appendChild(this.dom);
+            this.dom.textContent = this._doc;
+            // expose a minimal `state.doc` read used by getDoc()/setDoc()
+            const self = this;
+            this.state = { get doc() { return mkDoc(self._doc); } };
+          }
+          dispatch(tr) {
+            if (tr && tr.changes && typeof tr.changes.insert === "string") {
+              this._doc = tr.changes.insert;        // full-range replace (work-editor setDoc)
+              this.dom.textContent = this._doc;
+              const self = this;
+              for (const ln of this._listeners)
+                ln({ docChanged: true, state: { doc: mkDoc(self._doc) } });
+            }
+            // effects (compartment reconfigure: lang/readonly/theme) — inert in the shim
+          }
+          destroy() { try { this.dom.remove(); } catch {} }
+        }
+        EditorView.updateListener = { of: (fn) => ({ __cmListener: fn }) };
+        EditorView.theme = () => ext("theme");
+        EditorView.editable = { of: (b) => ext("editable", b) };
+        EditorView.lineWrapping = ext("lineWrapping");
+        // CM.tags.* — each tag is an opaque token; tags.function()/special() are
+        // callables returning a token. A single callable object satisfies both shapes.
+        const tagToken = () => ({});
+        const tagsProxy = new Proxy(tagToken, { get: () => tagToken });
+        window.__WB_CODEMIRROR__ = {
+          EditorView,
+          EditorState,
+          Compartment,
+          keymap: { of: (k) => ext("keymap", k) },
+          lineNumbers: () => ext("lineNumbers"),
+          history: () => ext("history"),
+          historyKeymap: [],
+          defaultKeymap: [],
+          indentWithTab: ext("indentWithTab"),
+          HighlightStyle: { define: () => ext("highlightStyle") },
+          syntaxHighlighting: () => ext("syntaxHighlighting"),
+          indentUnit: { of: (s) => ext("indentUnit", s) },
+          tags: tagsProxy,
+          langFor: () => Promise.resolve(null),
+        };
+      },
       // Count nodes in document.head that the element mounting may have injected.
       headRuleSignature() {
         const styles = [...document.head.querySelectorAll("style")];

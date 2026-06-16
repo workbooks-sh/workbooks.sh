@@ -1584,7 +1584,13 @@
               "name": "work-export"
             },
             {
+              "name": "work-deck-export"
+            },
+            {
               "name": "work-export-error"
+            },
+            {
+              "name": "work-deck-import"
             }
           ]
         }

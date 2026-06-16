@@ -15,3 +15,8 @@
 
 export { WorkDeck } from "./work-deck.js";
 export { WorkSlide } from "./work-slide.js";
+
+// pptx ↔ deck I/O adapter (Phase 4b): export a deck → .pptx, import a .pptx → deck
+// source. Floor-JS, lazy CDN (PptxGenJS write / fflate+OOXML read). Slides→video
+// stays the deck's own export("video") path — pptx is the Office-format sibling.
+export { exportPptx, importPptx, looksLikePptx, PPTX_MIME } from "./pptx-io.js";

@@ -6,11 +6,14 @@
   "license": "Apache-2.0",
   "exports": {
     ".": "./src/index.js",
+    "./dist": "./dist/workponents.js",
+    "./dist/theme.css": "./dist/theme.css",
     "./theme.css": "./src/theme/tokens.css",
     "./elements/*": "./src/elements/*.js"
   },
   "files": [
     "src",
+    "dist",
     "registry"
   ],
   "scripts": {

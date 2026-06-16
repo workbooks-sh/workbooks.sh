@@ -41,6 +41,7 @@
     .bar .lbl { font: 700 10px var(--work-font-mono, monospace); letter-spacing: .18em; text-transform: uppercase; color: var(--work-fg-subtle); margin-right: 4px; }
     .bar button { font: 600 12px var(--work-font-mono, monospace); padding: 7px 12px; border-radius: var(--work-radius-sm); border: 1.5px solid var(--work-border-strong); background: var(--work-surface); color: var(--work-fg); cursor: pointer; }
     .bar button[aria-pressed="true"] { background: var(--work-fg); color: var(--work-surface); }
+    .bar .filebtn { font: 600 12px var(--work-font-mono, monospace); padding: 7px 12px; border-radius: var(--work-radius-sm); border: 1.5px dashed var(--work-border-strong); background: var(--work-surface); color: var(--work-fg); cursor: pointer; }
     .hint { font: 500 11px var(--work-font-mono, monospace); color: var(--work-fg-subtle); margin-top: 16px; }
     .hint code { color: var(--work-fg-muted); }
     .lead { color: var(--work-fg-muted); }
@@ -64,6 +65,19 @@
       <button data-theme="dark" aria-pressed="true">dark</button>
       <button data-theme="signal" aria-pressed="false">signal</button>
     </div>
+
+    <!-- Phase 4b · the deck is a real document format AND a video. Three lanes:
+         export → .pptx (PptxGenJS) · export → video (the wavelet path no Office tool
+         has) · import a .pptx → it RE-RENDERS as <work-slide> children (the novel
+         OOXML→deck reader). All floor-JS, lazy CDN — nothing bundled. -->
+    <div class="bar" role="group" aria-label="formats">
+      <span class="lbl">formats</span>
+      <button id="export-pptx" title="export this deck as a .pptx">export .pptx ↓</button>
+      <button id="export-video" title="render the whole deck to video via the wavelet path">export video (wavelet) ↓</button>
+      <label for="import-pptx" class="filebtn" title="import a .pptx — it re-renders as work-slides">import .pptx ↑</label>
+      <input id="import-pptx" type="file" accept=".pptx" hidden />
+    </div>
+    <p id="note" class="hint">Round-trip a .pptx, or render the slides to video — same deck, same source.</p>
 
     <work-deck controls aspect="16:9" hold="4s" transition="rise">
       <!-- 1 · title band -->
@@ -143,9 +157,45 @@
       buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     }));
     // surface the playhead event in the console for the spec proof
-    document.querySelector("work-deck")?.addEventListener("work-slide-change", (e) => {
+    const deck = document.querySelector("work-deck");
+    deck?.addEventListener("work-slide-change", (e) => {
       console.log("work-slide-change", e.detail.index, "/", e.detail.total);
     });
+
+    const note = document.getElementById("note");
+    const download = (blob, name) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+
+    // export → .pptx (PptxGenJS, floor-JS lazy from CDN)
+    document.getElementById("export-pptx").addEventListener("click", async () => {
+      note.textContent = "building .pptx…";
+      const blob = await deck.export("pptx");
+      if (blob) download(blob, "deck.pptx");
+    });
+
+    // export → video (the wavelet path — in-guest encode when docked, else portable .html)
+    document.getElementById("export-video").addEventListener("click", async () => {
+      note.textContent = "rendering deck → video…";
+      await deck.export("video").catch((e) => (note.textContent = "video export failed: " + e));
+    });
+
+    // import a .pptx → it re-renders as <work-slide> children (the novel OOXML reader)
+    document.getElementById("import-pptx").addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      note.textContent = `importing ${file.name}…`;
+      await deck.import(await file.arrayBuffer());
+    });
+
+    // one event surface for both lanes (format-agnostic)
+    document.addEventListener("work-deck-export", (e) =>
+      note.textContent = e.detail.ok ? `exported ${e.detail.format} ✓` : `export failed (${e.detail.format}): ${e.detail.error}`);
+    document.addEventListener("work-deck-import", (e) =>
+      note.textContent = e.detail.ok ? `imported ✓ — ${e.detail.slides} slides re-rendered as work-slides` : `import failed: ${e.detail.error}`);
   </script>
 </body>
 </html>

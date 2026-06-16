@@ -51,6 +51,27 @@ export const SEARCH_CORPUS = JSON.stringify([
 ]);
 export const SEARCH_QUERY = "re";
 
+// work-map · a frozen golden point set. The parity gate's oracle is the FLOOR's
+// projected feature model (`_features`: kind/i/lat/lon/v); the candidate is the
+// feature set MapLibre BOUND (the GeoJSON the powered tier handed the map's
+// `wb-data` source). MapLibre must receive the SAME features — same count, same
+// per-feature index→coord→value mapping — proving the powered tier binds the
+// identical engine result, not the same pixels. Token-only (no color).
+export const MAP_ROWS = JSON.stringify([
+  { city: "Oslo", lat: 59.91, lon: 10.75, pop: 700 },
+  { city: "Tokyo", lat: 35.68, lon: 139.69, pop: 1400 },
+  { city: "Lima", lat: -12.05, lon: -77.04, pop: 950 },
+  { city: "Cairo", lat: 30.04, lon: 31.24, pop: 1100 },
+]);
+
+// work-editor · a frozen golden doc + language. The parity gate's oracle is the
+// FLOOR's value/change-contract (the textarea value + the `work-code-change`
+// detail.value on edit); the candidate is the CodeMirror doc + its change event
+// for the SAME edit. The powered tier must expose the IDENTICAL value contract
+// (getValue/setValue/work-code-change), not the same pixels. Token-only.
+export const EDITOR_DOC = `const greet = (name) => {\n  // say hello\n  return "hi " + name;\n};`;
+export const EDITOR_EDIT = `${EDITOR_DOC}\nconst n = 42;`;
+
 export const FIXTURES = {
   "work-button": { html: "Click me", variants: [{ variant: "soft" }, { variant: "outline", tone: "err" }] },
   "work-diff": { attrs: { a: ORG_A, b: ORG_B, mode: "split" }, variants: [{ mode: "inline" }] },
@@ -64,6 +85,8 @@ export const FIXTURES = {
   "work-gen-block": { attrs: { type: "action", label: "Run", action: "run" } },
   "work-field": { attrs: { label: "Email", placeholder: "you@co" } },
   "work-search": { attrs: { placeholder: "Search…", rows: SEARCH_CORPUS, fields: "name,team", value: SEARCH_QUERY, "open-on-focus": true } },
+  "work-map": { attrs: { rows: MAP_ROWS, lat: "lat", lon: "lon", value: "pop", label: "city", mode: "points" } },
+  "work-editor": { attrs: { language: "js", value: EDITOR_DOC } },
   "work-user": { attrs: { name: "Shane", variant: "compact" } },
   "work-auth": { attrs: { mode: "password" } },
   "work-file": { attrs: { name: "report.org", size: "12 KB" } },
@@ -75,6 +98,11 @@ export const FIXTURES = {
   // placeholder a label to paint; `src` proves the floor still shows when the
   // engine can't load (graceful degrade), exercising the same gate-c posture.
   "work-model": { attrs: { name: "Astronaut", src: "astronaut.glb", "camera-controls": true }, variants: [{ variant: "soft" }] },
+  // presentation · a deck IS a wavelet timeline; mount one with a title + a content
+  // slide so the token/visual gates measure real chrome (the controls + a band). The
+  // slide is a child element, so it gets its own bare fixture entry for completeness.
+  "work-deck": { attrs: { controls: true, aspect: "16:9" }, html: '<work-slide band="title"><h1>Deck</h1><p>One substrate, many domains.</p></work-slide><work-slide band="content" align="start"><h2>Highlights</h2><ul><li>Live charts on slides</li><li>Export to video</li></ul></work-slide>' },
+  "work-slide": { attrs: { band: "title", active: true }, html: "<h1>Slide</h1><p>A keyframe band.</p>" },
 };
 
 /** Build the mount spec for a tag, merging CEM attrs with the fixture. */

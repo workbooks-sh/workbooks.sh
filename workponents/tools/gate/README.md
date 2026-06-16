@@ -35,34 +35,47 @@ barrel-load errors.
 | **tokens** | styles only from `--work-*` | static design-lint (reuses `tools/design-lint.mjs`'s `src/validate/design-lint.js`) **+** a runtime computed-style sweep across light/dark/signal **+** a theme-flip-delta (an element that paints identically light-vs-dark ignores the tokens → fail; pure-layout/slot elements with no paint are exempt) |
 | **scope** | shadow DOM isolates it | mount under a hostile host-page stylesheet (`button{}`, `div{}`, `table{}`, `.frame{}`, …) and assert shadow-descendant paint is unchanged; assert no unscoped `<style>` was injected into `document.head`. (Inherited `color`/`font` cascade through the shadow boundary by spec, so the host node itself and a `*!important` color override are deliberately not weaponized.) |
 | **wasm** | no native dep, floor-loadable | static import-graph scan (no `node:*` built-in, no load-time CDN import) + for powered seams, the floor must still render with the engine chunk network-blocked (Playwright `route.abort`) |
-| **functional** | engine output == floor output | the parity framework (oracle = floor). No-op until P3 registers an engine — see below |
+| **functional** | engine output == floor output | the parity framework (oracle = floor). LIVE for the four powered domains — `work-chart` (Plot), `work-search` (MiniSearch), `work-map` (MaplibreGL), `work-editor` (CodeMirror); structural pass for pure-floor elements — see below |
 | **visual** | render matches the baseline | element × {light,dark,signal} × key variants → PNG; perceptual diff (sharp, ≤6% pixels) vs the committed `.gate/baseline/` |
 
-## Plugging a powered engine into the parity gate at P3
+## Plugging a powered engine into the parity gate
 
-When P3 swaps a powered engine behind a `work-*` element:
+Four powered domains are wired LIVE — `work-chart` (Observable Plot), `work-search`
+(MiniSearch), `work-map` (MapLibre GL), `work-editor` (CodeMirror 6). Each follows the
+same three-part pattern; to add a fifth:
 
 1. Register the **load seam** in `gates.js → POWERED_SEAMS`:
    ```js
-   "work-map": { enginePattern: /maplibre/i, floorMustRender: ".frame" }
+   "work-map": { enginePattern: /maplibre-gl/i, floorMustRender: ".pt",
+                 shim: "installMaplibreShim", engine: "maplibre" }
    ```
-   The `wasm` gate then route-aborts `enginePattern` and asserts `floorMustRender`
-   still appears (the floor degrades gracefully with the engine offline).
+   The `wasm` gate route-aborts `enginePattern` and asserts `floorMustRender` still
+   appears (the floor degrades gracefully with the engine offline). `engine` is the
+   value the parity gate forces on the candidate mount (`engine="maplibre"`); `shim`
+   names the `page.html` installer that injects the offline engine override.
 
 2. Register the **parity fixture** in `gates.js → PARITY_FIXTURES`:
    ```js
-   "work-chart": {
+   "work-map": {
      oracle:    (page) => page.evaluate(() => /* canonical model off the FLOOR render */),
-     candidate: (page) => page.evaluate(() => /* SAME model off the powered render */),
+     candidate: (page) => page.evaluate(() => /* SAME model off the powered binding */),
      compare:   (a, b) => ({ equal: deepEqual(a, b), notes: "" }),
    }
    ```
-   The model is the *logical* output — series/rows/domain/labels — NOT pixels
-   (pixels are the visual gate). The floor is the oracle: same data in, same data
-   out, regardless of which engine drew it.
+   The model is the *logical* output — series/rows/domain/labels (chart), recall set
+   (search), feature coords/values (map), value+change-contract (editor) — NOT pixels
+   (pixels are the visual gate). The floor is the oracle: same data in, same data out,
+   regardless of which engine drew it.
 
-Until a fixture is registered, `functional` is a documented structural pass
-("no powered engine — floor is the only impl").
+3. Add the **offline engine shim** in `page.html` (`window.__gate.install<Engine>Shim`)
+   shaped like the namespace the element's tier consumes (overrides `window.__WB_<ENGINE>__`).
+   It runs the BINDING path without shipping the real engine/CDN; the shim records what
+   the tier bound (map: the `wb-data` GeoJSON onto `window.__WB_MAP_BOUND__`; editor: a
+   CM-shaped EditorView holding the doc + firing the updateListener on dispatch).
+
+Until a seam+fixture is registered, `functional` is a documented structural pass
+("no powered engine — floor is the only impl"). Real engine pixels are proven in the
+browser demo step; the gate proves the powered tier binds the SAME logical model.
 
 ## Disk / Playwright setup (worktree-safe)
 
