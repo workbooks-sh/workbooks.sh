@@ -541,10 +541,21 @@
     const forceOnboarding = new URLSearchParams(window.location.search).has(
       "onboarding",
     );
+    // A completed run is recorded BOTH durably (setup.json) and in localStorage.
+    // Honor either, so a slow/flaky durable write (common in unsigned dev builds)
+    // doesn't re-run the whole tour on every hot reload.
+    const lsDone = (() => {
+      try {
+        return !!JSON.parse(localStorage.getItem("wb.browser.prefs") || "{}").completedAt;
+      } catch {
+        return false;
+      }
+    })();
     if (forceOnboarding) firstRunDone = false;
+    else if (lsDone) firstRunDone = true;
     setupStatus()
       .then((s) => {
-        if (!forceOnboarding) firstRunDone = s.first_run_done;
+        if (!forceOnboarding) firstRunDone = s.first_run_done || lsDone;
       })
       .catch((e) => {
         // Fail-open: skip the personalization flow if the probe fails.
