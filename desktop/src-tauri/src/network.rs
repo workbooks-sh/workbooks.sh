@@ -12,6 +12,7 @@ use std::path::PathBuf;
 
 const KC_SERVICE: &str = "sh.workbooks.identity";
 const KC_IDENTITY_SK: &str = "identity_sk";
+#[allow(dead_code)] // used only by release-build keychain storage (debug uses a file)
 const KC_WORKOS_SESSION: &str = "workos_session";
 
 fn identity_path() -> PathBuf {
@@ -226,6 +227,57 @@ fn pkce() -> (String, String) {
 /// Drive the loopback sign-in: open the browser to the broker's authorize URL
 /// (redirecting to our ephemeral localhost server), capture the `code`, then
 /// exchange it for a session bearer. The session is stashed in the keychain.
+// Session storage. RELEASE (signed) builds use the OS keychain — the secure store, and
+// signing means macOS never prompts. DEBUG builds use a local file instead: unsigned dev
+// rebuilds change the binary's signature every time, so the keychain would prompt on every
+// launch — intolerable for the dev loop. The file lives in the app data dir (dev only).
+fn session_file() -> PathBuf {
+    crate::paths::app_data_dir().join("session.json")
+}
+
+fn save_session(body: &str) -> Result<(), String> {
+    #[cfg(debug_assertions)]
+    {
+        return std::fs::write(session_file(), body).map_err(|e| e.to_string());
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
+            .map_err(|e| e.to_string())?
+            .set_password(body)
+            .map_err(|e| e.to_string())
+    }
+}
+
+fn read_session() -> Option<String> {
+    #[cfg(debug_assertions)]
+    {
+        return std::fs::read_to_string(session_file()).ok();
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        Entry::new(KC_SERVICE, KC_WORKOS_SESSION).ok()?.get_password().ok()
+    }
+}
+
+fn clear_session() -> Result<(), String> {
+    #[cfg(debug_assertions)]
+    {
+        let _ = std::fs::remove_file(session_file());
+        return Ok(());
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        match Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
+            .map_err(|e| e.to_string())?
+            .delete_credential()
+        {
+            Ok(_) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+}
+
 // The branded page shown in the browser tab once the loopback catches the code — on
 // brand (paper, logo, pastel DNA edge) and self-closing, instead of a bare line of text.
 const SIGNED_IN_HTML: &str = r##"<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -302,10 +354,7 @@ pub fn workos_sign_in(
     let session: StoredSession = resp.json().map_err(|e| e.to_string())?;
 
     let body = serde_json::to_string(&session).map_err(|e| e.to_string())?;
-    Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
-        .map_err(|e| e.to_string())?
-        .set_password(&body)
-        .map_err(|e| e.to_string())?;
+    save_session(&body)?;
 
     // Bring the app back to the front — the user just finished signing in the browser.
     {
@@ -383,10 +432,7 @@ pub fn workos_exchange(
     let session: StoredSession = resp.json().map_err(|e| e.to_string())?;
 
     let body = serde_json::to_string(&session).map_err(|e| e.to_string())?;
-    Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
-        .map_err(|e| e.to_string())?
-        .set_password(&body)
-        .map_err(|e| e.to_string())?;
+    save_session(&body)?;
 
     {
         use tauri::Manager;
@@ -399,10 +445,7 @@ pub fn workos_exchange(
 
 #[tauri::command]
 pub fn workos_load_session() -> Option<StoredSession> {
-    let body = Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
-        .ok()?
-        .get_password()
-        .ok()?;
+    let body = read_session()?;
     let session: StoredSession = serde_json::from_str(&body).ok()?;
     // Treat an expired session as signed-out.
     if session.expires_at != 0 && session.expires_at < crate::paths::now_ms() / 1000 {
@@ -413,13 +456,7 @@ pub fn workos_load_session() -> Option<StoredSession> {
 
 #[tauri::command]
 pub fn workos_clear_session() -> Result<(), String> {
-    match Entry::new(KC_SERVICE, KC_WORKOS_SESSION)
-        .map_err(|e| e.to_string())?
-        .delete_credential()
-    {
-        Ok(_) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    clear_session()
 }
 
 // ── tiny URL helpers (avoid a url crate dep) ──────────────────────
