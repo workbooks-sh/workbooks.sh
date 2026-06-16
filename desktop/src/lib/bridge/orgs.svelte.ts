@@ -6,7 +6,7 @@
 // Fail-soft: no session / offline / no WorkOS key on the control plane ⇒ just Personal.
 // The control-plane URL is overridable via PUBLIC_NEXUS_CP_URL.
 
-import { cloudClient } from "$lib/rcp/providers/workos";
+import { cloudClientReadOnly } from "$lib/rcp/providers/workos";
 import { auth } from "$lib/auth/store.svelte";
 import { nexus } from "$lib/bridge/nexus.svelte";
 
@@ -94,7 +94,7 @@ class Orgs {
     this.loaded = true;
     if (!auth.user) return; // not signed in → Personal only, no cloud call
     try {
-      const me = await cloudClient(CP_URL, auth.brokerUrl).request<{
+      const me = await cloudClientReadOnly(CP_URL).request<{
         user: { id: string; name: string } | null;
         active_org: string | null;
         orgs: OrgNexus[];
