@@ -10,7 +10,7 @@
 
 import { WorkOS } from '@workos-inc/node';
 
-export const STATE_TTL = 600;
+export const STATE_TTL = 1800; // generous — a new user may sign up + onboard mid-flow
 export const CODE_TTL = 300;
 
 const b64url = (buf) =>
@@ -77,6 +77,17 @@ export function storedSession({ user, organizationId, accessToken }) {
     display_name: name || null,
     picture_url: user.profilePictureUrl || null
   };
+}
+
+// Build StoredSession from an AuthKit server session (the CONSENT path — the user is
+// already signed into the dashboard, so we mint from that session with no WorkOS
+// round-trip). `auth` is event.locals.auth ({ user, accessToken, organizationId }).
+export function storedSessionFromAuth(auth) {
+  return storedSession({
+    user: auth?.user || {},
+    organizationId: auth?.organizationId || null,
+    accessToken: auth?.accessToken || ''
+  });
 }
 
 // KV is required (stateless Functions). Throws a clear error if the binding is missing
