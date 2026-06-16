@@ -214,7 +214,12 @@ function parseWhere(str, out) {
   const parts = str.split(/\s+(and|or)\s+/i);
   for (let i = 0; i < parts.length; i++) {
     if (i % 2 === 1) { out.push({ bool: parts[i].toLowerCase() }); continue; }
-    const m = /^\s*([\w."]+)\s*(<=|>=|<>|!=|=|<|>|like)\s*(.+?)\s*$/i.exec(parts[i]);
+    // accept the floor's `CAST(col AS TYPE)` coercion (used by work-search/-command
+    // so non-string columns LIKE-match) — the memory tier is the floor's own offline
+    // engine, so it must run the floor's own query. Reduce the cast to the column;
+    // the JS comparison is type-agnostic (String() coerces), so the cast is a no-op.
+    const cast = /^\s*CAST\s*\(\s*([\w."]+)\s+AS\s+\w+\s*\)\s*(<=|>=|<>|!=|=|<|>|like)\s*(.+?)\s*$/i.exec(parts[i]);
+    const m = cast || /^\s*([\w."]+)\s*(<=|>=|<>|!=|=|<|>|like)\s*(.+?)\s*$/i.exec(parts[i]);
     if (!m) throw new Error(`wb-data(memory): bad WHERE clause "${parts[i]}"`);
     const col = unquote(m[1]), op = m[2].toLowerCase();
     let value = m[3].trim(), param = false;

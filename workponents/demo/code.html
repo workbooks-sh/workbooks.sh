@@ -53,9 +53,15 @@ console.log("fib(0..9):", xs.join(", "));
 // the returned value is shown too
 return { sum: xs.reduce((a, b) =&gt; a + b, 0), max: Math.max(...xs) };</work-repl>
 
-    <h2>&lt;work-editor&gt; — highlight + line numbers</h2>
-    <p class="sub">A themed editor: transparent textarea over a token-highlighted overlay, gutter line numbers, <code>language</code> attr. Edit it — it emits <code>work-code-change</code> (watch the events line above). The editing surface is swap-stable: a CodeMirror engine backs it later behind this same API.</p>
-    <work-editor id="ed" language="rust">// edit me — keywords, strings, numbers, comments highlight
+    <h2>&lt;work-editor&gt; — CodeMirror 6, themed from the token set</h2>
+    <p class="sub">The editing surface is swap-stable behind one public API (<code>value</code> / <code>language</code> / <code>work-code-change</code>). By default it lazy-loads <b>CodeMirror 6</b> from a CDN and themes it entirely from <code>--work-*</code> — flip the theme above and the editor re-themes with everything else. If CodeMirror can't load it falls back instantly to the zero-dep textarea+highlight floor. The tier in use shows on the right. Edit it — it emits <code>work-code-change</code>.</p>
+    <div class="bar" role="group" aria-label="editor engine">
+      <span style="font:700 10px var(--work-font-mono,monospace);letter-spacing:.18em;text-transform:uppercase;color:var(--work-fg-subtle)">engine</span>
+      <button data-engine="auto" aria-pressed="true">auto (CodeMirror)</button>
+      <button data-engine="floor" aria-pressed="false">floor</button>
+      <span id="tier" style="margin-left:auto;font:600 12px var(--work-font-mono,monospace);color:var(--work-brand)">resolving…</span>
+    </div>
+    <work-editor id="ed" language="rust">// edit me — CodeMirror 6, themed from --work-* (flip the theme)
 fn main() {
     let greeting = "hello from workponents";
     let answer = 42;
@@ -100,6 +106,40 @@ int main(void) {
       const d = e.detail;
       log.innerHTML = `<b>work-run</b> · ${d.language} · ${d.ok ? "ok" : "error"} · ${(d.output || "").split("\n").length} line(s)`;
     });
+
+    // editor engine toggle + tier readout. The editor resolves its tier
+    // asynchronously (CodeMirror lazy-loads from a CDN); poll _tier for the badge.
+    const ed = document.getElementById("ed");
+    const tierEl = document.getElementById("tier");
+    const showTier = () => {
+      const t = ed._tier === "codemirror" ? "CodeMirror 6" : "floor (textarea)";
+      tierEl.textContent = t;
+      tierEl.style.color = ed._tier === "codemirror" ? "var(--work-brand)" : "var(--work-warn)";
+    };
+    const pollTier = () => { showTier(); if (ed._tier !== "codemirror") setTimeout(pollTier, 200); };
+    pollTier();
+    const engBtns = document.querySelectorAll('[data-engine]');
+    engBtns.forEach((b) => b.addEventListener("click", () => {
+      engBtns.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      const val = ed.value;            // preserve the current text across the swap
+      const eng = b.dataset.engine;
+      // rebuild the element so the tier re-resolves (engine attr drives _mountSurface)
+      const fresh = document.createElement("work-editor");
+      fresh.id = "ed"; fresh.setAttribute("language", "rust");
+      if (eng !== "auto") fresh.setAttribute("engine", eng);
+      fresh.textContent = val;
+      ed.replaceWith(fresh);
+      // re-bind references + poller to the new element
+      window.__ed = fresh;
+      const tierEl2 = document.getElementById("tier");
+      const poll2 = () => {
+        const t = fresh._tier === "codemirror" ? "CodeMirror 6" : "floor (textarea)";
+        tierEl2.textContent = t;
+        tierEl2.style.color = fresh._tier === "codemirror" ? "var(--work-brand)" : "var(--work-warn)";
+        if (eng === "auto" && fresh._tier !== "codemirror") setTimeout(poll2, 200);
+      };
+      setTimeout(poll2, 60);
+    }));
   </script>
 </body>
 </html>

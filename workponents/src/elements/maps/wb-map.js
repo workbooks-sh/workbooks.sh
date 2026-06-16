@@ -48,6 +48,19 @@
 //   mode        points | heat | choropleth    (the spatial-view variant)
 //   variant     card | bare    (visual shell)
 //   tiles       a tile-layer id reached via Host (e.g. "osm"); standalone if unset
+//   engine      auto | maplibre | floor   (render tier — see below)
+//
+// TWO render tiers behind ONE public API (attrs / events / data path identical):
+//   • FLOOR — the zero-dependency SVG projection above (points/heat/choropleth),
+//     themed entirely from --work-*. The guaranteed render; never blocks on a net.
+//   • POWERED — MapLibre GL (./maplibre-tier.js), lazy-loaded from a CDN ESM at
+//     runtime (overridable via window.__WB_MAPLIBRE__). Renders the SAME features
+//     from the SAME engine query — only the drawing/basemap changes. Real tiles
+//     route through the Host (`this.host`, "tiles" cap); with no Host it draws a
+//     token-themed blank/vector style (NO hardcoded CDN tile URL).
+//   The tier resolves per-load: `engine="maplibre"|"floor"` attr or
+//   window.__WB_MAP_ENGINE__ force it; default "auto" prefers MapLibre and falls
+//   back to the floor instantly if the lazy import fails (offline / blocked).
 //
 // Events:
 //   work-map-ready    { detail: { columns, types, engine, mode } }
@@ -57,7 +70,11 @@ import { WbElement, html, css, define } from "../../core/element.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
-import { project, bounds } from "./projection.js";
+import { project, unproject, bounds } from "./projection.js";
+import {
+  loadMaplibre, loadMaplibreCss, readTokens, buildStyle,
+  featuresToGeoJSON, addDataLayers,
+} from "./maplibre-tier.js";
 
 const VARIANTS = defineVariants({
   mode: { options: ["points", "heat", "choropleth"], default: "points" },
@@ -73,6 +90,7 @@ export class WbMap extends WbElement {
     ...variantAttrs(VARIANTS),
     "rows", "csv", "src-name", "query",
     "lat", "lon", "value", "label", "key", "geo-key", "geojson", "tiles",
+    "engine",   // tier override: auto (default, prefer MapLibre) | maplibre | floor
   ];
 
   static styles = css`
@@ -88,6 +106,13 @@ export class WbMap extends WbElement {
         radial-gradient(120% 120% at 50% -10%, var(--work-surface) 0%, var(--work-surface-soft) 100%); }
     .stage.dragging { cursor: grabbing; }
     svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; }
+
+    /* the POWERED tier host (MapLibre GL canvas). When it carries a child the
+       floor SVG is declaratively hidden — no imperative show/hide race. */
+    .gl { position: absolute; inset: 0; }
+    .gl:empty { display: none; }
+    .stage:has(.gl > *) > svg { visibility: hidden; }
+    .gl .maplibregl-map { width: 100%; height: 100%; }
 
     /* the abstract themed basemap */
     .graticule { stroke: var(--work-border); stroke-width: var(--work-map-grid-w, 1); fill: none; opacity: .55; }
@@ -165,6 +190,20 @@ export class WbMap extends WbElement {
     }
     super.connectedCallback();
     this._load();
+    // The FLOOR re-themes automatically (token-driven CSS). The POWERED tier paints
+    // onto a WebGL canvas where CSS tokens don't reach, so a theme flip must re-read
+    // tokens + rebuild MapLibre's paint. Observe the documentElement theme attr and
+    // redraw the powered tier when it changes (no-op when on the floor).
+    if (typeof MutationObserver !== "undefined" && !this._themeObs) {
+      this._themeObs = new MutationObserver(() => { if (this._map) { this._teardownPowered(); this._drawPowered(); } });
+      this._themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-work-theme", "class"] });
+    }
+  }
+
+  disconnectedCallback() {
+    this._teardownPowered();
+    if (this._themeObs) { this._themeObs.disconnect(); this._themeObs = null; }
+    super.disconnectedCallback();
   }
 
   _captureSource() {
@@ -405,6 +444,7 @@ export class WbMap extends WbElement {
           ${layer}
         </g>
       </svg>
+      <div class="gl" part="gl"></div>
     </div>`;
   }
 
@@ -512,6 +552,137 @@ export class WbMap extends WbElement {
     return id;
   }
 
+  // ── tier resolution (mirrors wb-chart's _tierChoice) ──────────────────────────
+  // floor (zero-dep SVG projection) vs maplibre (MapLibre GL).
+  //   - attribute engine="floor" | "maplibre" forces it (the gate drives this)
+  //   - window.__WB_MAP_ENGINE__ = "floor" | "maplibre" is the host opt-out
+  //   - default "auto": prefer MapLibre when it loads, fall back to the floor.
+  _tierChoice() {
+    const attr = this.attr("engine");
+    if (attr === "floor" || attr === "maplibre") return attr;
+    const host = typeof window !== "undefined" && window.__WB_MAP_ENGINE__;
+    if (host === "floor" || host === "maplibre") return host;
+    return "auto";
+  }
+
+  /**
+   * Resolve a MapLibre tile source spec through the Host (a keyed exception). With
+   * no Host "tiles" capability we return null → MapLibre renders the token-themed
+   * blank style (NO hardcoded CDN tile URL — keeps the offline/wasm gate green).
+   */
+  _resolveTileSource() {
+    const id = this.attr("tiles");
+    if (!id || !this.host?.available?.("tiles")) return null;
+    try { return this.host.tileSource?.(id) || null; } catch { return null; }
+  }
+
+  // The POWERED tier — MapLibre GL, lazy-loaded. On success it draws the SAME
+  // features into the .gl host (the floor SVG is hidden declaratively by CSS). On
+  // failure (network-blocked / load error) it leaves the floor in place — forced
+  // engine="maplibre" still degrades gracefully; the floor IS the guaranteed
+  // render (the wasm/floor gate proves this).
+  async _drawPowered() {
+    const gl = this.shadowRoot && this.shadowRoot.querySelector(".gl");
+    if (!gl || !this._features.length) return;
+    const token = (this._glToken = (this._glToken || 0) + 1);
+    let ml;
+    try { ml = await loadMaplibre(); }
+    catch { return; /* floor already drawn — graceful degrade */ }
+    if (token !== this._glToken || !this.isConnected) return;
+    this._ML = ml;
+
+    // gate-b: adopt MapLibre's stylesheet into the SHADOW root (constructable
+    // sheet), never document.head. Best-effort.
+    try {
+      if (!this._mlSheet) {
+        const cssText = await loadMaplibreCss();
+        if (cssText) {
+          this._mlSheet = new CSSStyleSheet();
+          this._mlSheet.replaceSync(cssText);
+          this.shadowRoot.adoptedStyleSheets = [...this.shadowRoot.adoptedStyleSheets, this._mlSheet];
+        }
+      }
+    } catch {}
+    if (token !== this._glToken) return;
+
+    const tk = readTokens(this);
+    const projKind = this.variant("projection");
+    const geojson = featuresToGeoJSON(this._features, unproject, projKind);
+    const tileSource = this._resolveTileSource();
+
+    if (!this._map) {
+      try {
+        this._map = new ml.Map({
+          container: gl,
+          style: buildStyle(tk, tileSource),
+          attributionControl: false,
+          interactive: true,
+        });
+      } catch (e) { this._map = null; return; }
+      const onReady = () => {
+        if (token !== this._glToken) { try { this._map.remove(); } catch {} this._map = null; return; }
+        // the .gl container only gets its real box after shadow layout — resize so
+        // MapLibre's canvas matches the stage before we fit the data bounds.
+        try { this._map.resize(); } catch {}
+        addDataLayers(this._map, this.variant("mode"), geojson, this._features, tk);
+        this._fitMapLibre(geojson, projKind);
+        this._wireMapLibreSelect();
+        this._emit("work-map-engine", { engine: "maplibre" });
+      };
+      if (this._map.loaded && this._map.loaded()) onReady();
+      else this._map.on("load", onReady);
+    } else {
+      this._map.setStyle(buildStyle(tk, tileSource));
+      const reAdd = () => {
+        addDataLayers(this._map, this.variant("mode"), geojson, this._features, tk);
+        this._wireMapLibreSelect();
+      };
+      if (this._map.isStyleLoaded && this._map.isStyleLoaded()) reAdd();
+      else this._map.once("styledata", reAdd);
+    }
+  }
+
+  // Fit the MapLibre viewport to the data's lon/lat bbox (mirrors floor _fit).
+  _fitMapLibre(geojson, projKind) {
+    let minLon = 180, minLat = 90, maxLon = -180, maxLat = -90, any = false;
+    const eat = (lon, lat) => { any = true;
+      if (lon < minLon) minLon = lon; if (lon > maxLon) maxLon = lon;
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat; };
+    for (const f of geojson.features) {
+      if (f.geometry.type === "Point") eat(...f.geometry.coordinates);
+      else if (f.geometry.type === "Polygon") for (const ring of f.geometry.coordinates) for (const [lo, la] of ring) eat(lo, la);
+    }
+    if (!any) return;
+    try { this._map.fitBounds([[minLon, minLat], [maxLon, maxLat]], { padding: 36, duration: 0, maxZoom: 6 }); } catch {}
+  }
+
+  // Forward MapLibre feature clicks to the SAME work-feature-select contract.
+  _wireMapLibreSelect() {
+    if (!this._map || this._mlWired) return;
+    this._mlWired = true;
+    for (const layer of ["wb-points", "wb-regions"]) {
+      this._map.on("click", layer, (e) => {
+        const feat = e.features && e.features[0];
+        if (!feat) return;
+        const fi = feat.properties?._fi;
+        const ff = this._features.find((x) => x.i === fi);
+        this._sel = fi;
+        if (ff) this._emit("work-feature-select", { feature: ff.row, index: fi });
+      });
+      this._map.on("mouseenter", layer, () => { this._map.getCanvas().style.cursor = "pointer"; });
+      this._map.on("mouseleave", layer, () => { this._map.getCanvas().style.cursor = ""; });
+    }
+  }
+
+  // Tear the MapLibre map down (engine flip to floor, or disconnect).
+  _teardownPowered() {
+    this._glToken = (this._glToken || 0) + 1; // invalidate any in-flight draw
+    if (this._map) { try { this._map.remove(); } catch {} this._map = null; }
+    this._mlWired = false;
+    const gl = this.shadowRoot && this.shadowRoot.querySelector(".gl");
+    if (gl) gl.innerHTML = "";
+  }
+
   // Lit lifecycle: the shell just (re)rendered — (re)wire pan/zoom/select. Old
   // listeners die with the replaced nodes (unsafeHTML rebuilds the markup).
   updated() {
@@ -520,6 +691,18 @@ export class WbMap extends WbElement {
     const svg = root.querySelector("svg");
     const tip = root.querySelector("#tip");
     if (!svg) return;
+
+    // tier dispatch: the floor SVG is ALWAYS wired below (the guaranteed render +
+    // instant fallback). When MapLibre is chosen we additionally draw it into the
+    // .gl host (CSS hides the floor svg once it has a child). unsafeHTML rebuilt
+    // the .gl node each render, so re-mount the powered tier here.
+    const choice = this._tierChoice();
+    if (choice === "floor") {
+      this._teardownPowered();
+    } else if (this._features.length) {
+      this._teardownPowered();   // fresh .gl node → drop old map, redraw into new
+      this._drawPowered();
+    }
 
     // pan (drag)
     let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;

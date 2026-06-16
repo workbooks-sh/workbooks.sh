@@ -31,6 +31,7 @@ import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 import { fuzzyScore, highlight } from "./rank.js";
+import { loadMiniSearch, buildIndex, searchIndex } from "./minisearch-tier.js";
 import { ref, createRef } from "lit/directives/ref.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
@@ -40,7 +41,7 @@ const VARIANTS = defineVariants({
 
 export class WorkCommand extends WbElement {
   static variants = VARIANTS;
-  static props = [...variantAttrs(VARIANTS), "src-name", "query", "fields", "data-label", "data-limit", "placeholder", "open"];
+  static props = [...variantAttrs(VARIANTS), "src-name", "query", "fields", "data-label", "data-limit", "placeholder", "open", "engine"];
 
   static styles = css`
     :host { position: fixed; inset: 0; z-index: 1000; display: none; font-family: var(--work-font); color: var(--work-fg); }
@@ -203,6 +204,30 @@ export class WorkCommand extends WbElement {
     return base ? `(${base.replace(/;$/, "")}) AS _q` : ident(this.attr("src-name"));
   }
 
+  // Match tier for the DATA group (the command set is always rank.js): floor =
+  // engine LIKE, minisearch = the powered index. Same resolution as <work-search>.
+  _tierChoice() {
+    const attr = this.attr("engine");
+    if (attr === "floor" || attr === "minisearch") return attr;
+    const host = typeof window !== "undefined" && window.__WB_SEARCH_ENGINE__;
+    if (host === "floor" || host === "minisearch") return host;
+    return "auto";
+  }
+
+  /** POWERED data tier — MiniSearch over the source rows. Throws → floor LIKE. */
+  async _poweredData() {
+    const MiniSearch = await loadMiniSearch();
+    const from = this._dataFrom();
+    const key = from + "|" + this._dataFields.join(",");
+    if (!this._msCache || this._msCache.key !== key) {
+      const source = await this._engine.query(`SELECT * FROM ${from}`);
+      const built = buildIndex(MiniSearch, source.rows, source.columns, this._dataFields);
+      this._msCache = { key, source, built };
+    }
+    const limit = parseInt(this.attr("data-limit", "6"), 10) || 6;
+    return searchIndex(this._msCache.built, this._msCache.source, this._value, limit);
+  }
+
   async _runData() {
     if (!this._hasData() || !this._value) { this._dataRows = null; this.requestUpdate(); return; }
     // Single-flight, last-wins across debounced keystrokes.
@@ -214,17 +239,30 @@ export class WorkCommand extends WbElement {
       try {
         if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this.attr("src-name"));
         await this._resolveDataFields();
-        const limit = parseInt(this.attr("data-limit", "6"), 10) || 6;
-        const term = this._value.replace(/'/g, "''");
-        // SQLite LIKE is case-insensitive for ASCII on every tier — no provider fork.
-        let sql = `SELECT * FROM ${this._dataFrom()}`;
-        if (this._dataFields.length) {
-          const ors = this._dataFields.map((c) => `CAST(${ident(c)} AS VARCHAR) LIKE '%${term}%'`);
-          sql += ` WHERE ${ors.join(" OR ")}`;
+        const choice = this._tierChoice();
+        let sql = null, rows = null;
+        if (choice !== "floor") {
+          try {
+            rows = await this._poweredData();
+          } catch (e) {
+            if (choice === "minisearch") console.warn("work-command: MiniSearch tier failed, using floor LIKE", e);
+            rows = null;
+          }
         }
-        sql += ` LIMIT ${limit}`;
-        this._dataRows = await this._engine.query(sql);
-        this._tier = this._dataRows.engine || this._engine.provider();
+        if (!rows) {
+          const limit = parseInt(this.attr("data-limit", "6"), 10) || 6;
+          const term = this._value.replace(/'/g, "''");
+          // SQLite LIKE is case-insensitive for ASCII on every tier — no provider fork.
+          sql = `SELECT * FROM ${this._dataFrom()}`;
+          if (this._dataFields.length) {
+            const ors = this._dataFields.map((c) => `CAST(${ident(c)} AS VARCHAR) LIKE '%${term}%'`);
+            sql += ` WHERE ${ors.join(" OR ")}`;
+          }
+          sql += ` LIMIT ${limit}`;
+          rows = await this._engine.query(sql);
+        }
+        this._dataRows = rows;
+        this._tier = rows.engine || this._engine.provider();
         this._emit("work-command-query", { sql, rowCount: this._dataRows.rowCount, engine: this._tier, value: this._value });
       } catch (e) {
         this._error = String((e && e.message) || e);
@@ -284,6 +322,7 @@ export class WorkCommand extends WbElement {
     const groups = this._build();
     const ph = this.attr("placeholder", "Type a command or search…");
     const tierText = this._error ? "engine error" :
+      this._tier === "minisearch" ? "MiniSearch" :
       this._tier === "runtime" ? "runtime" : this._tier === "duckdb-wasm" ? "duckdb-wasm" : "in-JS";
     let flatI = 0;
     const body = groups.length

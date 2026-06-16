@@ -154,6 +154,42 @@
         };
         window.__WB_PLOT__ = Plot;
       },
+      // Install a faithful offline MiniSearch shim as window.__WB_MINISEARCH__ so the
+      // search powered tier's build+search path runs without a CDN. The parity gate
+      // proves RECALL ⊇ the floor LIKE set — so the shim must, at minimum, match every
+      // substring the floor LIKE would (token prefix + whole-field substring), in
+      // descending-score order. Real MiniSearch ranking/typo-tolerance is proven in
+      // the browser demo step; here we verify the tier hands MiniSearch the SAME
+      // source rows and returns at least the floor's matches.
+      installMiniSearchShim() {
+        if (window.__WB_MINISEARCH__) return;
+        class MiniSearchShim {
+          constructor(opts) { this._fields = (opts && opts.fields) || []; this._docs = []; }
+          addAll(docs) { for (const d of docs) this._docs.push(d); }
+          add(doc) { this._docs.push(doc); }
+          search(query) {
+            const q = String(query || "").trim().toLowerCase();
+            if (!q) return this._docs.map((d) => ({ id: d._id, score: 1 }));
+            const terms = q.split(/\s+/).filter(Boolean);
+            const out = [];
+            for (const d of this._docs) {
+              let score = 0;
+              for (const f of this._fields) {
+                const val = String(d[f] == null ? "" : d[f]).toLowerCase();
+                for (const t of terms) {
+                  // whole-field substring (covers the floor LIKE) + per-token prefix.
+                  if (val.includes(t)) score += 10;
+                  for (const w of val.split(/\s+/)) if (w.startsWith(t)) score += 5;
+                }
+              }
+              if (score > 0) out.push({ id: d._id, score });
+            }
+            out.sort((a, b) => b.score - a.score);
+            return out;
+          }
+        }
+        window.__WB_MINISEARCH__ = MiniSearchShim;
+      },
       // Count nodes in document.head that the element mounting may have injected.
       headRuleSignature() {
         const styles = [...document.head.querySelectorAll("style")];

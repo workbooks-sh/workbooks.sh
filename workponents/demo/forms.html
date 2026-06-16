@@ -50,6 +50,10 @@
     </div>
 
     <h2>create account</h2>
+    <!-- A real <form>: the <work-field>s are Form-Associated Custom Elements, so
+         they participate natively — their values are in new FormData(form) and
+         invalid fields block native submit. <work-form> still owns the schema. -->
+    <form id="native">
     <work-form id="signup" submit-label="Create account">
       <work-field-group label="Account" help="How you sign in.">
         <work-field name="name" type="text" label="Full name" placeholder="Ada Lovelace" required></work-field>
@@ -75,6 +79,7 @@
       <wb-button slot="actions" type="submit" variant="solid" tone="brand">Create account</wb-button>
       <wb-button slot="actions" id="reset" variant="ghost" tone="neutral">Reset</wb-button>
     </work-form>
+    </form>
 
     <div class="log" id="log">— submit the form to see the result —</div>
   </div>
@@ -100,9 +105,15 @@
       custom: (v, ctx) => (ctx.record && v === ctx.record.pw) ? true : "Passwords must match.",
     };
 
+    const nativeForm = document.getElementById("native");
+
     form.addEventListener("work-submit", (e) => {
-      log.innerHTML = "<b>✓ work-submit</b> — valid. values:\n" + JSON.stringify(e.detail.values, null, 2);
-      console.log("work-submit", e.detail.values);
+      // Proof of native participation: the fields' values are in the real form's
+      // FormData with zero manual harvesting (each field called setFormValue).
+      const fd = Object.fromEntries(new FormData(nativeForm).entries());
+      log.innerHTML = "<b>✓ work-submit</b> — valid. values:\n" + JSON.stringify(e.detail.values, null, 2) +
+        "\n\n<b>new FormData(form)</b> (native FACE participation):\n" + JSON.stringify(fd, null, 2);
+      console.log("work-submit", e.detail.values, "FormData:", fd);
     });
     form.addEventListener("work-invalid", (e) => {
       log.innerHTML = "<b>✗ work-invalid</b> — submit blocked. errors:\n" +

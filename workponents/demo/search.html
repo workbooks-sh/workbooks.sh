@@ -52,7 +52,16 @@
       <button data-theme="light" aria-pressed="true">light</button>
       <button data-theme="dark" aria-pressed="false">dark</button>
       <button data-theme="signal" aria-pressed="false">signal</button>
+      <span style="flex:1"></span>
+      <span style="font:700 10px var(--work-font-mono,monospace);letter-spacing:.18em;text-transform:uppercase;color:var(--work-fg-subtle)">match tier</span>
+      <button data-engine="auto" aria-pressed="true">auto</button>
+      <button data-engine="minisearch" aria-pressed="false">minisearch</button>
+      <button data-engine="floor" aria-pressed="false">floor · LIKE</button>
     </div>
+    <p class="note">The <strong>match tier</strong> swaps the ranking engine behind the SAME data path / API.
+      <code>floor</code> = the engine <code>LIKE</code> substring filter. <code>minisearch</code> = a client-side
+      MiniSearch index (lazy-loaded from a CDN) for <em>ranked · prefix · typo-tolerant</em> search. Try
+      <code>anlytics</code> (typo) or <code>eng</code> (prefix) on each tier and watch the footer tag.</p>
 
     <h2>1 · Instant search — each keystroke is an engine query</h2>
     <p class="note">Searches a registered source named <code>people</code>. Typing runs
@@ -88,7 +97,7 @@
       // ── sample dataset: register inline rows as "people" (the data IS the source) ──
       const FIRST = ["Ada","Bram","Chen","Dara","Esme","Faro","Gita","Hugo","Imani","Juno","Kato","Lina","Mira","Niko","Omar","Pia","Quinn","Rosa","Sami","Tara","Umi","Vera","Wes","Xan","Yara","Zed"];
       const LAST = ["Okafor","Vega","Rossi","Dahl","Mensah","Ahn","Sole","Park","Reyes","Nair","Holt","Cruz","Ito","Bauer","Flores","Kim"];
-      const ROLES = ["Engineer","Designer","Product Manager","Data Scientist","Researcher","Support Lead","Sales Rep","Marketer"];
+      const ROLES = ["Engineer","Designer","Product Manager","Data Scientist","Researcher","Support Lead","Sales Rep","Marketer","Analytics Lead"];
       const CITIES = ["Lisbon","Nairobi","Berlin","Osaka","Bogotá","Toronto","Austin","Oslo","Cairo","Seoul"];
       const TEAMS = ["Atlas","Beacon","Cinder","Drift","Ember","Forge"];
       let seed = 11;
@@ -135,8 +144,22 @@
         { console.log("[work-command-select]", e.detail); if (e.detail.kind === "data") log(`palette → ${e.detail.row.name} (${e.detail.row.role})`); });
 
       // ── theme toggle ──
-      const buttons = [...document.querySelectorAll(".bar button")];
+      const buttons = [...document.querySelectorAll(".bar button[data-theme]")];
       buttons.forEach((b) => b.addEventListener("click", () => setTheme(b.dataset.theme)));
+
+      // ── match-tier toggle (floor → engine seam): set the `engine` attr on both
+      // search surfaces. minisearch = ranked/typo/prefix; floor = engine LIKE. ──
+      const search = document.querySelector("work-search");
+      const engineBtns = [...document.querySelectorAll(".bar button[data-engine]")];
+      const setEngine = (e) => {
+        window.__WB_SEARCH_ENGINE__ = e === "auto" ? undefined : e;
+        for (const el of [search, palette]) {
+          if (e === "auto") el.removeAttribute("engine"); else el.setAttribute("engine", e);
+        }
+        engineBtns.forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.engine === e)));
+        log(`match tier → ${e}`);
+      };
+      engineBtns.forEach((b) => b.addEventListener("click", () => setEngine(b.dataset.engine)));
     </script>
   </div>
 </body>

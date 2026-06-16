@@ -304,6 +304,9 @@
             },
             {
               "name": "placeholder"
+            },
+            {
+              "name": "engine"
             }
           ],
           "events": [
@@ -1358,6 +1361,9 @@
             },
             {
               "name": "tiles"
+            },
+            {
+              "name": "engine"
             }
           ],
           "events": [
@@ -1366,6 +1372,9 @@
             },
             {
               "name": "work-map-query"
+            },
+            {
+              "name": "work-map-engine"
             },
             {
               "name": "work-feature-select"
@@ -1707,6 +1716,9 @@
             },
             {
               "name": "open"
+            },
+            {
+              "name": "engine"
             }
           ],
           "events": [
@@ -1757,6 +1769,9 @@
             },
             {
               "name": "open"
+            },
+            {
+              "name": "engine"
             }
           ],
           "events": [
@@ -1837,6 +1852,12 @@
             },
             {
               "name": "open-on-focus"
+            },
+            {
+              "name": "engine"
+            },
+            {
+              "name": "value"
             }
           ],
           "events": [

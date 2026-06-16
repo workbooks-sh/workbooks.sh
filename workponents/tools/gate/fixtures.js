@@ -36,6 +36,21 @@ const ROWS = JSON.stringify([
   { region: "APAC", revenue: 1430 },
 ]);
 
+// work-search · a frozen golden corpus + query. The parity gate's oracle is the
+// FLOOR LIKE result set over this exact corpus+query; the candidate is the
+// MiniSearch result set. Recall must NOT regress (MiniSearch ⊇ floor LIKE). The
+// query "re" is a substring the floor LIKE finds in several titles; MiniSearch
+// (prefix + OR) must surface at least the same rows. Token-only (no color).
+export const SEARCH_CORPUS = JSON.stringify([
+  { name: "Revenue report", team: "Finance" },
+  { name: "Restore snapshot", team: "Platform" },
+  { name: "Region rollout", team: "Growth" },
+  { name: "Analytics dashboard", team: "Data" },
+  { name: "Release notes", team: "Docs" },
+  { name: "Onboarding flow", team: "Product" },
+]);
+export const SEARCH_QUERY = "re";
+
 export const FIXTURES = {
   "work-button": { html: "Click me", variants: [{ variant: "soft" }, { variant: "outline", tone: "err" }] },
   "work-diff": { attrs: { a: ORG_A, b: ORG_B, mode: "split" }, variants: [{ mode: "inline" }] },
@@ -48,7 +63,7 @@ export const FIXTURES = {
   "work-composer": { attrs: { placeholder: "Ask anything…" } },
   "work-gen-block": { attrs: { type: "action", label: "Run", action: "run" } },
   "work-field": { attrs: { label: "Email", placeholder: "you@co" } },
-  "work-search": { attrs: { placeholder: "Search…" } },
+  "work-search": { attrs: { placeholder: "Search…", rows: SEARCH_CORPUS, fields: "name,team", value: SEARCH_QUERY, "open-on-focus": true } },
   "work-user": { attrs: { name: "Shane", variant: "compact" } },
   "work-auth": { attrs: { mode: "password" } },
   "work-file": { attrs: { name: "report.org", size: "12 KB" } },

@@ -4,6 +4,17 @@
 // its own validity — it is not hand-wired per field. The owning <work-form>
 // collects fields, runs `src/validate`, and writes errors back down.
 //
+// Form-Associated Custom Element (FACE) — rides the platform standard: with
+// `static formAssociated = true` + ElementInternals (attachInternals), a
+// <work-field> participates in a native <form> exactly like a built-in input —
+// its value is submitted (setFormValue, named by `name`), its validity surfaces
+// through native constraint validation (setValidity, fed by the EXISTING
+// src/validate layer), and its state is exposed as CustomStateSet entries
+// (:state(invalid|required|disabled)). The owning <work-form> no longer hand-
+// harvests DOM values; it reads native form participation. Degrades cleanly when
+// attachInternals / CustomStateSet are unavailable (older engines) — the reflected
+// attributes ([invalid]/[required]/[disabled]) remain a styling fallback.
+//
 // Renders the right control by `type` (text/number/email/select/checkbox/
 // textarea/date). Label + help + error are themed entirely from --work-* tokens.
 // Usage:
@@ -20,12 +31,50 @@ const VARIANTS = defineVariants({
 const TYPES = ["text", "number", "email", "url", "password", "select", "checkbox", "textarea", "date", "tel"];
 
 export class WbField extends WbElement {
+  // Form-Associated Custom Element: opt into native <form> participation so the
+  // browser submits this element's value and runs its validity like a built-in.
+  static formAssociated = true;
+
   static variants = VARIANTS;
   static props = [
     ...variantAttrs(VARIANTS),
     "name", "type", "label", "help", "placeholder", "value",
     "required", "min", "max", "pattern", "options", "disabled", "error",
   ];
+
+  constructor() {
+    super();
+    // attachInternals gives us the FACE surface (setFormValue/setValidity/states).
+    // Guarded — older engines (and some test stubs) lack it; the element then
+    // degrades to the reflected-attribute styling path with no behavior loss.
+    this._internals = typeof this.attachInternals === "function" ? this.attachInternals() : null;
+  }
+
+  /** The CustomStateSet (this._internals.states) when supported, else null.
+   *  Used to expose :state(invalid|required|disabled) without reflecting attrs. */
+  get _states() {
+    const s = this._internals && this._internals.states;
+    // Some engines expose `states` but not the Set API; feature-detect `add`.
+    return s && typeof s.add === "function" ? s : null;
+  }
+
+  /** Mirror a boolean condition into the CustomStateSet (modern :state() styling).
+   *  The attribute fallback is left to the caller — `invalid` is owned by this
+   *  element (setError sets the attr too), while `required`/`disabled` are
+   *  author-set attributes we only MIRROR into states. */
+  _setState(name, on) {
+    const states = this._states;
+    if (!states) return;
+    if (on) states.add(name); else states.delete(name);
+  }
+
+  /** Sync the author-set required/disabled attributes into :state() so
+   *  :host(:state(required|disabled)) matches alongside the [required]/[disabled]
+   *  fallback selectors. Runs on connect + on attribute change. */
+  _syncAuthorStates() {
+    this._setState("required", this.boolAttr("required"));
+    this._setState("disabled", this.boolAttr("disabled"));
+  }
 
   static styles = css`
     :host { display: block; margin: 0 0 var(--work-space-4); font-family: var(--work-font); }
@@ -62,13 +111,22 @@ export class WbField extends WbElement {
     .error { margin: var(--work-space-2) 0 0; font-size: var(--work-text-sm); color: var(--work-err);
       font-weight: 500; line-height: 1.45; display: none; }
 
-    /* invalid state — purely from tokens */
+    /* invalid state — purely from tokens. Drive off the CustomStateSet
+       (:state(invalid)) when the engine supports it; keep the reflected
+       [invalid] attribute selector as the fallback for engines without
+       ElementInternals/CustomStateSet. */
+    :host(:state(invalid)) .control,
     :host([invalid]) .control { border-color: var(--work-err); }
+    :host(:state(invalid)) .control:focus,
     :host([invalid]) .control:focus { box-shadow: 0 0 0 var(--work-space-3px) var(--work-err-glow); }
+    :host(:state(invalid)) .error,
     :host([invalid]) .error { display: block; }
+    :host(:state(invalid)) .help,
     :host([invalid]) .help { display: none; }
 
+    :host(:state(disabled)),
     :host([disabled]) { opacity: 0.55; }
+    :host(:state(disabled)) .control, :host(:state(disabled)) .check,
     :host([disabled]) .control, :host([disabled]) .check { pointer-events: none; }
   `;
 
@@ -116,19 +174,51 @@ export class WbField extends WbElement {
     this.setAttribute("value", v == null ? "" : String(v));
     const ctl = this._controlEl();
     if (ctl) { const type = (this.attr("type", "text") || "text").toLowerCase(); if (type === "checkbox") ctl.checked = !!v; else ctl.value = v; }
+    this._syncFormValue();
   }
 
   /** Show / clear the field's error (called by <work-form>); reflects validity.
    *  The `error` attr drives the Lit `.error` binding; we also write the node's
    *  text synchronously so a read right after setError (before Lit's async flush)
-   *  already reflects it. */
+   *  already reflects it. The src/validate result feeds NATIVE constraint
+   *  validation here: a message → setValidity({customError:true}, msg, anchorEl)
+   *  so the field blocks native <form> submit and reports the same human message
+   *  the floor produced; no message → setValidity({}) (valid). The CustomStateSet
+   *  + [invalid] attribute both carry the styling. */
   setError(message) {
     if (message) { this.setAttribute("invalid", ""); this.setAttribute("error", message); }
     else { this.removeAttribute("invalid"); this.removeAttribute("error"); }
+    this._setState("invalid", !!message);
+    if (this._internals && typeof this._internals.setValidity === "function") {
+      if (message) this._internals.setValidity({ customError: true }, message, this._controlEl() || undefined);
+      else this._internals.setValidity({});
+    }
     const el = this.shadowRoot && this.shadowRoot.querySelector(".error");
     if (el) el.textContent = message || "";
   }
   clearError() { this.setError(null); }
+
+  /** Native constraint-validation surface, delegated to ElementInternals so the
+   *  field behaves like a built-in input in script and in a real <form>. */
+  checkValidity() { return this._internals ? this._internals.checkValidity() : !this.hasAttribute("invalid"); }
+  reportValidity() { return this._internals ? this._internals.reportValidity() : !this.hasAttribute("invalid"); }
+  get validity() { return this._internals ? this._internals.validity : undefined; }
+  get validationMessage() { return this._internals ? this._internals.validationMessage : (this.attr("error") || ""); }
+  /** The <form> this field participates in (FACE), when associated. */
+  get form() { return this._internals ? this._internals.form : null; }
+
+  /** Push the field's current value into native form submission. Called after
+   *  every render and on programmatic value set so `new FormData(form)` carries
+   *  this field's value under its `name` with zero manual harvesting. */
+  _syncFormValue() {
+    if (!this._internals || typeof this._internals.setFormValue !== "function") return;
+    const type = (this.attr("type", "text") || "text").toLowerCase();
+    const v = this.value;
+    // A checkbox submits its value (or "on") only when checked — match the
+    // platform: unchecked contributes nothing to the form data.
+    if (type === "checkbox") { this._internals.setFormValue(v ? (this.attr("value") || "on") : null); return; }
+    this._internals.setFormValue(v == null ? "" : String(v));
+  }
 
   _optionList() {
     const raw = this.attr("options", "") || "";
@@ -142,6 +232,9 @@ export class WbField extends WbElement {
   // can re-validate live. Dispatched on the host (this) so the form's delegated
   // listener catches it; .control's native event handlers route here.
   _fire(kind) {
+    // Native form participation: every value change updates what the <form>
+    // submits, so the owning <work-form> / a real <form> never harvests the DOM.
+    if (kind === "input") this._syncFormValue();
     this.dispatchEvent(new CustomEvent("work-field-" + kind, {
       bubbles: true, composed: true, detail: { name: this.name, value: this.value },
     }));
@@ -198,6 +291,34 @@ export class WbField extends WbElement {
       ${help ? html`<p class="help">${help}</p>` : null}
       <p class="error">${error || ""}</p>
     `;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._syncAuthorStates();
+    this._setState("invalid", this.hasAttribute("invalid"));
+  }
+
+  // After Lit paints the control, publish the field's value to native form
+  // submission (the control element now exists / has its bound value).
+  updated(changed) {
+    super.updated?.(changed);
+    this._syncFormValue();
+    // Author may have changed required/disabled between renders — keep states synced.
+    this._syncAuthorStates();
+  }
+
+  // The browser calls this when an ancestor <fieldset disabled> / form-disabled
+  // state toggles — mirror it into our own disabled styling + states.
+  formDisabledCallback(disabled) {
+    if (disabled) this.setAttribute("disabled", ""); else this.removeAttribute("disabled");
+    this._setState("disabled", disabled);
+  }
+
+  // Native form reset — clear value + error like a built-in control.
+  formResetCallback() {
+    this.value = "";
+    this.clearError();
   }
 }
 

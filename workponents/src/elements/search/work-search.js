@@ -24,8 +24,20 @@
 //   placeholder   input placeholder
 //   label         a11y label for the box
 //   open-on-focus show the result panel as soon as the box is focused (default: only when typing)
+//   engine        auto | minisearch | floor   — match tier (see below)
 //   variant       card | bare
 //   size          sm | md | lg
+//
+// Tier (floor → engine seam, mirrors <work-chart>):
+//   • FLOOR — the engine LIKE query (`… WHERE col LIKE '%term%'`). Zero-dep,
+//     always available, the guaranteed result path.
+//   • POWERED — MiniSearch (./minisearch-tier.js), lazy-loaded from a CDN ESM at
+//     runtime (overridable via window.__WB_MINISEARCH__). A client-side index over
+//     the SAME source rows gives ranked / typo-tolerant / prefix search LIKE can't.
+//   Resolves per query: engine="minisearch"|"floor" attr, or
+//   window.__WB_SEARCH_ENGINE__, else "auto" (prefer MiniSearch, fall back to the
+//   floor LIKE query instantly if the lazy import fails). Same data source, same
+//   public API/events — only the match engine swaps.
 //
 // Events:
 //   work-search-input   { detail: { value } }                       on every (debounced) query
@@ -35,6 +47,7 @@ import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 import { highlight } from "./rank.js";
+import { loadMiniSearch, buildIndex, searchIndex } from "./minisearch-tier.js";
 import { ref, createRef } from "lit/directives/ref.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
@@ -47,7 +60,7 @@ let _autoId = 0;
 
 export class WorkSearch extends WbElement {
   static variants = VARIANTS;
-  static props = [...variantAttrs(VARIANTS), "rows", "csv", "src-name", "query", "fields", "placeholder", "limit", "open-on-focus"];
+  static props = [...variantAttrs(VARIANTS), "rows", "csv", "src-name", "query", "fields", "placeholder", "limit", "open-on-focus", "engine", "value"];
 
   static styles = css`
     :host { display: block; font-family: var(--work-font); color: var(--work-fg); position: relative; }
@@ -112,6 +125,11 @@ export class WorkSearch extends WbElement {
     super.connectedCallback();
     // Pre-register inline source so the first query can run.
     if (this._pendingSource) this._engine.register(this._srcName, this._pendingSource).catch(() => {});
+    // A `value` attr seeds an initial (controlled) query — opens the panel and
+    // runs the first query without a keystroke. Used by hosts that drive the box
+    // programmatically (and by the gate's floor-degrade proof).
+    const seed = this.attr("value");
+    if (seed && !this._value) { this._value = seed; this._open = true; this._runQuery(); }
   }
 
   _captureSource() {
@@ -134,8 +152,10 @@ export class WorkSearch extends WbElement {
   attributeChangedCallback(name, old, val) {
     super.attributeChangedCallback?.(name, old, val);
     if (!this._connected) return;
-    if (name === "rows" || name === "csv" || name === "src-name" || name === "query") {
+    if (name === "rows" || name === "csv" || name === "src-name" || name === "query" || name === "fields") {
       this._pendingSource = null;
+      this._searchFields = null;   // re-resolve against the new source
+      this._msCache = null;        // drop the stale MiniSearch index
       this._captureSource();
       if (this._pendingSource) this._engine.register(this._srcName, this._pendingSource).catch(() => {});
       if (this._value) this._runQuery();
@@ -182,6 +202,44 @@ export class WorkSearch extends WbElement {
     }
   }
 
+  // Which match tier should answer? floor (engine LIKE) vs minisearch (powered).
+  //   - attribute engine="floor" | "minisearch" forces it (the gate drives this)
+  //   - window.__WB_SEARCH_ENGINE__ = "floor" | "minisearch" is the host opt-out
+  //   - default "auto": prefer MiniSearch when it loads, fall back to the floor.
+  // Returns "floor" | "minisearch". A non-floor verdict still degrades to the floor
+  // LIKE query whenever the MiniSearch lazy import / index build fails.
+  _tierChoice() {
+    const attr = this.attr("engine");
+    if (attr === "floor" || attr === "minisearch") return attr;
+    const host = typeof window !== "undefined" && window.__WB_SEARCH_ENGINE__;
+    if (host === "floor" || host === "minisearch") return host;
+    return "auto";
+  }
+
+  /**
+   * The POWERED tier — MiniSearch over the SOURCE rows. Fetches the source the SAME
+   * way the floor does (getEngine, `SELECT * FROM <from>`), builds/reuses a
+   * MiniSearch index keyed to that source result, and returns a WbQueryResult-shaped
+   * ranked subset. Throws to let `_runQuery` fall back to the floor LIKE query when
+   * MiniSearch can't load or the index can't build (network-blocked / forced gate).
+   */
+  async _poweredQuery() {
+    const MiniSearch = await loadMiniSearch();   // throws → caller falls back
+    const base = this.attr("query");
+    const from = base ? `(${base.replace(/;$/, "")}) AS _q` : ident(this._srcName);
+    // Pull the full source once and cache the index against (from + fields). The
+    // engine round-trip IS the data path — search ranks over rows the engine owns,
+    // never a parallel store.
+    const key = from + "|" + this._searchFields.join(",");
+    if (!this._msCache || this._msCache.key !== key) {
+      const source = await this._engine.query(`SELECT * FROM ${from}`);
+      const built = buildIndex(MiniSearch, source.rows, source.columns, this._searchFields);
+      this._msCache = { key, source, built };
+    }
+    const limit = parseInt(this.attr("limit", "8"), 10) || 8;
+    return searchIndex(this._msCache.built, this._msCache.source, this._value, limit);
+  }
+
   async _runQuery() {
     // Single-flight, last-wins: a newer keystroke query supersedes an in-flight
     // one (and never races a register()'s DROP/CREATE on the same table).
@@ -194,9 +252,22 @@ export class WorkSearch extends WbElement {
         if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
         else if (this._pendingSource) await this._engine.whenRegistered(this._srcName);
         await this._resolveFields();
-        const sql = this._buildSql();
-        this._result = await this._engine.query(sql);
-        this._tier = this._result.engine || this._engine.provider();
+        const choice = this._tierChoice();
+        let sql = null, result = null;
+        if (choice !== "floor") {
+          try {
+            result = await this._poweredQuery();
+          } catch (e) {
+            if (choice === "minisearch") console.warn("work-search: MiniSearch tier failed, using floor LIKE", e);
+            result = null;   // fall through to the floor below
+          }
+        }
+        if (!result) {
+          sql = this._buildSql();
+          result = await this._engine.query(sql);
+        }
+        this._result = result;
+        this._tier = result.engine || this._engine.provider();
         this._active = 0;
         this._emit("work-search-query", { sql, rowCount: this._result.rowCount, engine: this._tier, value: this._value });
       } catch (e) {
@@ -235,6 +306,7 @@ export class WorkSearch extends WbElement {
   _renderPanel() {
     const r = this._result;
     const tierText = this._error ? "engine error" :
+      this._tier === "minisearch" ? "MiniSearch" :
       this._tier === "runtime" ? "runtime DuckDB" :
       this._tier === "duckdb-wasm" ? "DuckDB-wasm" : "in-JS engine";
     let body;

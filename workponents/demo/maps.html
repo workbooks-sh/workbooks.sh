@@ -46,6 +46,16 @@
       <button data-theme="signal" aria-pressed="false">signal</button>
     </div>
 
+    <div class="bar" role="group" aria-label="engine">
+      <span style="font:700 10px var(--work-font-mono,monospace);letter-spacing:.18em;text-transform:uppercase;color:var(--work-fg-subtle)">engine</span>
+      <button data-engine="auto" aria-pressed="true">auto (MapLibre)</button>
+      <button data-engine="maplibre" aria-pressed="false">maplibre</button>
+      <button data-engine="floor" aria-pressed="false">floor (SVG)</button>
+    </div>
+    <p class="note">The POWERED tier is MapLibre GL, lazy-loaded from a CDN ESM at runtime (never bundled).
+      With no Host tile broker it draws a token-themed blank/vector style — the SAME features from the SAME
+      engine query. Force <code>floor</code> (or block the CDN) and the zero-dep SVG projection still renders.</p>
+
     <h2>1 · Points — one marker per query row (size = population)</h2>
     <p class="note">An inline-JSON source registered as <code>cities</code>; the map runs
       <code>SELECT * FROM cities</code>, reads the <code>lat</code>/<code>lon</code>/<code>pop</code> columns,
@@ -137,10 +147,23 @@
         m.addEventListener("work-map-ready", (e) => console.log("[work-map-ready]", e.detail)));
 
       // theme toggle — everything re-themes from --work-*
-      const buttons = [...document.querySelectorAll(".bar button")];
-      buttons.forEach((b) => b.addEventListener("click", () => {
+      const themeBtns = [...document.querySelectorAll('.bar[aria-label="theme"] button')];
+      themeBtns.forEach((b) => b.addEventListener("click", () => {
         document.documentElement.setAttribute("data-work-theme", b.dataset.theme);
-        buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+        themeBtns.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      }));
+
+      // engine toggle — flip every map's render tier (floor SVG ↔ MapLibre GL)
+      const engineBtns = [...document.querySelectorAll('.bar[aria-label="engine"] button')];
+      engineBtns.forEach((b) => b.addEventListener("click", () => {
+        engineBtns.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+        const e = b.dataset.engine;
+        window.__WB_MAP_ENGINE__ = e === "auto" ? undefined : e;
+        document.querySelectorAll("work-map").forEach((m) => {
+          if (e === "auto") m.removeAttribute("engine"); else m.setAttribute("engine", e);
+          // nudge a re-render
+          m.requestUpdate && m.requestUpdate();
+        });
       }));
     </script>
   </div>

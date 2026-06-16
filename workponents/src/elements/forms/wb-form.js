@@ -69,7 +69,31 @@ export class WbForm extends WbElement {
     return s;
   }
 
-  /** Current { name: value } record across all child fields. */
+  /** The native <form> the fields actually participate in. A Form-Associated
+   *  Custom Element associates with the nearest ANCESTOR <form> in its own tree —
+   *  the <work-field>s live in this element's light DOM, so that is the <form>
+   *  the author wraps <work-form> in (`<form><work-form>…`). The inner shadow
+   *  <form> is layout/submit-affordance only and is NOT where slotted fields
+   *  associate, so we read the owning light-DOM form for native participation. */
+  get _ownerForm() {
+    return this.closest("form");
+  }
+
+  /** The owning form's native FormData — the fields' submitted values (FACE).
+   *  Proves native participation: each field appears here under its `name`
+   *  because it called setFormValue, with NO manual DOM harvesting. Empty when
+   *  <work-form> is not wrapped in a real <form> (standalone usage). */
+  formData() {
+    const form = this._ownerForm;
+    return form && typeof FormData === "function" ? new FormData(form) : new FormData();
+  }
+
+  /** Current { name: typed-value } record for the schema floor. The validate
+   *  layer needs TYPED values (number→number, checkbox→boolean) and the presence
+   *  of empty fields to fire `required`; native FormData yields only strings and
+   *  drops unchecked checkboxes, so the typed record is read from each field's
+   *  `value` (the same value the field published to the form via setFormValue).
+   *  `formData()` exposes the raw native submission separately. */
   get values() {
     const out = {};
     for (const f of this._fields()) {
@@ -118,6 +142,24 @@ export class WbForm extends WbElement {
         e.preventDefault(); this.submit();
       }
     });
+
+    // Native form participation: when the author wraps <work-form> in a real
+    // <form>, the child <work-field>s are Form-Associated to THAT form. Run the
+    // schema floor on the owning form's native submit so the floor's errors flow
+    // into each field's native validity (setValidity via setError) and the
+    // browser blocks the submit on any invalid field — the floor and native
+    // constraint validation are one path, not two. The work-submit/work-invalid
+    // events fire exactly as before (via submit()).
+    const owner = this._ownerForm;
+    if (owner && !owner.__workFormBound) {
+      owner.__workFormBound = true;
+      owner.addEventListener("submit", (e) => {
+        // submit() seeds field validity from the floor; if anything is invalid the
+        // native submit must not proceed.
+        this.submit();
+        if (this._fields().some((f) => f.hasAttribute("invalid"))) e.preventDefault();
+      });
+    }
   }
 
   // Native submit from a slotted real <button type=submit> or the default.

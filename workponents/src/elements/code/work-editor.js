@@ -3,14 +3,20 @@
 // number gutter. Composition-as-source: the code IS the artifact's source, edited
 // in place — emits `work-code-change {value}` on every edit.
 //
-// THE EDITOR-SWAP SEAM (for CodeMirror later):
-//   The public API — the `value` property/attr, the `language` attr, the
+// THE EDITOR-SWAP SEAM (now wired to CodeMirror 6):
+//   The public API — the `value` property/attr, the `language`/`readonly` attrs, the
 //   `work-code-change` event, and the `<work-editor>` tag — is the contract. The
 //   editing surface itself is built by `_mountSurface()` / read+written via
-//   `getValue()` / `setValue()`. A powered build overrides ONLY those three
-//   internals (mount a CodeMirror EditorView, read/write its doc) behind the same
-//   public API; nothing that consumes <work-editor> changes. The floor is a refusal
-//   of nothing — it is the lower rung of one ladder. NO build step, pure ESM.
+//   `getValue()` / `setValue()`. The POWERED build (./codemirror-tier.js) overrides
+//   ONLY those internals (mount a CodeMirror EditorView in the shadow root, read/
+//   write its doc) behind the same public API; nothing that consumes <work-editor>
+//   — including <work-repl> — changes. The floor is the lower rung of one ladder.
+//
+//   Tier resolution (mirrors work-chart): `engine="codemirror"|"floor"` attr or
+//   `window.__WB_EDITOR_ENGINE__` force it; default "auto" prefers CodeMirror and
+//   falls back to the floor INSTANTLY if the lazy CDN import fails (offline /
+//   network-blocked / the gate's wasm proof). NO build step, pure ESM; CM is
+//   lazy-loaded from a CDN (overridable via window.__WB_CODEMIRROR__), never bundled.
 //
 // Lit base: the surface chrome (gutter/overlay/textarea) is a Lit template. The
 // highlighted overlay is trusted, already-escaped HTML (see highlight.js), bound
@@ -23,6 +29,7 @@ import { ref, createRef } from "lit/directives/ref.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { highlight, normalizeLang } from "./highlight.js";
+import { loadCodeMirror, readEditorTokens, createEditorView } from "./codemirror-tier.js";
 
 const VARIANTS = defineVariants({
   variant: { options: ["card", "inline"], default: "card" },
@@ -31,13 +38,16 @@ const VARIANTS = defineVariants({
 export class WorkEditor extends WbElement {
   static variants = VARIANTS;
   // language + readonly reflected so :host([...]) + re-render react; gutter toggles linenos.
-  static props = [...variantAttrs(VARIANTS), "language", "readonly", "gutter", "placeholder"];
+  // `engine` = tier override (auto | codemirror | floor).
+  static props = [...variantAttrs(VARIANTS), "language", "readonly", "gutter", "placeholder", "engine"];
 
   static properties = {
     ...WbElement.properties,
     // the highlighted overlay markup + the gutter line list — reactive state
     _highlighted: { state: true },
     _lines: { state: true },
+    // which tier rendered: "floor" | "codemirror" — toggles the floor wrap vs CM host
+    _tier: { state: true },
   };
 
   static styles = css`
@@ -82,14 +92,34 @@ export class WorkEditor extends WbElement {
     textarea:focus-visible ~ .overlay,
     .wrap:focus-within { box-shadow: none; }
     .wrap:focus-within { border-color: var(--work-brand); box-shadow: 0 0 0 3px var(--work-ring); }
+
+    /* the POWERED surface: a CodeMirror EditorView mounts INTO .cm-host. The
+       chrome (border/radius/bg/focus-ring) is the floor's — CM only owns the inner
+       content/gutter, themed from --work-* via the tier's EditorView.theme. */
+    .cm-host { display: none; }
+    :host([data-tier="codemirror"]) .cm-host {
+      display: block;
+      border: 1px solid var(--work-border); border-radius: var(--work-radius);
+      background: var(--work-bg); box-shadow: var(--work-shadow-sm); overflow: hidden;
+    }
+    :host([variant="inline"][data-tier="codemirror"]) .cm-host {
+      border: none; box-shadow: none; background: var(--work-surface-soft);
+    }
+    .cm-host:focus-within { border-color: var(--work-brand); box-shadow: 0 0 0 3px var(--work-ring); }
+    /* when CM owns the surface, the floor wrap is removed from the box entirely */
+    :host([data-tier="codemirror"]) .wrap { display: none; }
+    .cm-host .cm-editor { min-height: var(--_minh, 8.6em); }
   `;
 
   constructor() {
     super();
     this._taRef = createRef();
     this._ovRef = createRef();
+    this._cmRef = createRef();
     this._highlighted = "";
     this._lines = "";
+    this._tier = "floor";   // until the CM lazy-load resolves (or auto picks floor)
+    this._cm = null;        // the codemirror-tier handle when mounted
   }
 
   // ---- public API (the swap-stable contract) ---------------------------------
@@ -102,14 +132,23 @@ export class WorkEditor extends WbElement {
 
   // ---- editing-surface seam (floor impl; CodeMirror overrides these) ---------
 
-  /** Read the current text. (Floor: from the textarea.) */
+  /** Read the current text. CM tier: from the EditorView doc. Floor: the textarea. */
   getValue() {
+    if (this._cm) return this._cm.getDoc();
     const ta = this._taRef.value;
     return ta ? ta.value : (this._pending != null ? this._pending : "");
   }
 
-  /** Write text + re-highlight + emit change. (Floor: into the textarea.) */
+  /** Write text + emit change. CM tier: into the EditorView doc. Floor: the textarea. */
   setValue(v, { silent = false } = {}) {
+    if (this._cm) {
+      if (this._cm.getDoc() === v) return;
+      this._suppressEmit = silent;          // the CM updateListener fires; gate emit
+      this._cm.setDoc(v);
+      this._suppressEmit = false;
+      if (!silent) { /* updateListener already emitted */ }
+      return;
+    }
     const ta = this._taRef.value;
     if (!ta) { this._pending = v; return; }
     if (ta.value === v) return;
@@ -118,9 +157,55 @@ export class WorkEditor extends WbElement {
     if (!silent) this._emitChange();
   }
 
-  /** Build the editing surface. Floor = textarea+overlay wired here once the Lit
-   *  template has rendered (firstUpdated). CodeMirror overrides this hook. */
+  // ---- tier resolution (mirrors work-chart's _tierChoice) --------------------
+  //   - attribute engine="floor" | "codemirror" forces it (the gate drives this)
+  //   - window.__WB_EDITOR_ENGINE__ = "floor" | "codemirror" is the host opt-out
+  //   - default "auto": prefer CodeMirror, fall back to the floor if it can't load.
+  _tierChoice() {
+    const attr = this.attr("engine");
+    if (attr === "floor" || attr === "codemirror") return attr;
+    const host = typeof window !== "undefined" && window.__WB_EDITOR_ENGINE__;
+    if (host === "floor" || host === "codemirror") return host;
+    return "auto";
+  }
+
+  /** Build the editing surface. Resolves the tier: the FLOOR is wired immediately
+   *  (it never blocks on a CDN and is the guaranteed render); when the tier is
+   *  codemirror/auto, the CM EditorView is lazy-loaded and, on success, takes over
+   *  the surface behind the same getValue/setValue/event contract. */
   _mountSurface() {
+    this._mountFloor();
+    const choice = this._tierChoice();
+    if (choice !== "floor") this._mountCodeMirror(choice === "codemirror");
+  }
+
+  // The POWERED tier — CodeMirror 6, lazy-loaded from a CDN. On success it mounts an
+  // EditorView in .cm-host (shadow-scoped styles), seeds it with the floor's current
+  // value, and flips _tier → "codemirror" (CSS hides the floor wrap). On failure
+  // (network-blocked / load error) the floor stays — forced "codemirror" still
+  // degrades gracefully; the floor IS the guaranteed render (the wasm gate proves it).
+  _mountCodeMirror(forced) {
+    loadCodeMirror().then((CM) => {
+      const host = this._cmRef.value;
+      if (!host || this._cm) return;
+      const tk = readEditorTokens(this);
+      this._cm = createEditorView(CM, host, {
+        doc: this.getValue(),
+        language: this.language,
+        readonly: this.boolAttr("readonly"),
+        tk,
+        root: this.shadowRoot,
+        onChange: () => { if (!this._suppressEmit) this._emitChange(); },
+      });
+      this._tier = "codemirror";
+      this.setAttribute("data-tier", "codemirror");
+    }).catch((e) => {
+      if (forced) console.warn("work-editor: CodeMirror failed to load, keeping floor", e);
+      // floor remains; nothing to do.
+    });
+  }
+
+  _mountFloor() {
     const ta = this._taRef.value;
     if (!ta) return;
     const sync = () => { this._paint(); this._emitChange(); };
@@ -176,11 +261,40 @@ export class WorkEditor extends WbElement {
       this._initial = this._initial.replace(/^\n/, "").replace(/\s+$/, "");
     }
     super.connectedCallback();
+    // Re-theme the powered CM surface when the host flips data-work-theme — CM holds
+    // computed token VALUES (not var()), so a flip must re-read + reconfigure. The
+    // floor re-themes via the CSS cascade automatically; only CM needs the nudge.
+    if (typeof MutationObserver !== "undefined") {
+      this._themeObs = new MutationObserver(() => this._retheme());
+      this._themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-work-theme"] });
+    }
+  }
+
+  disconnectedCallback() {
+    if (this._themeObs) { this._themeObs.disconnect(); this._themeObs = null; }
+    if (this._cm) { this._cm.destroy(); this._cm = null; }
+    super.disconnectedCallback();
+  }
+
+  _retheme() {
+    if (this._cm) this._cm.setTheme(readEditorTokens(this));
   }
 
   // Lit lifecycle: wire the surface once the template + textarea exist.
   firstUpdated() {
     this._mountSurface();
+  }
+
+  // Propagate language/readonly to the CM tier on every (re)render. CM reconfigure
+  // is idempotent — re-applying the same grammar/readonly is a no-op — so we sync
+  // unconditionally rather than diffing the reactive-property map (language is a
+  // prototype getter, so it never lands in Lit's `changed` set). The floor reads
+  // these straight off attributes in _paint()/render() and needs no propagation.
+  updated() {
+    if (!this._cm) return;
+    if (this._cmLang !== this.language) { this._cmLang = this.language; this._cm.setLanguage(this.language); }
+    const ro = this.boolAttr("readonly");
+    if (this._cmRo !== ro) { this._cmRo = ro; this._cm.setReadonly(ro); }
   }
 
   render() {
@@ -195,7 +309,8 @@ export class WorkEditor extends WbElement {
             placeholder=${ph}></textarea>
           <pre class="overlay" aria-hidden="true" ${ref(this._ovRef)}>${unsafeHTML(this._highlighted)}</pre>
         </div>
-      </div>`;
+      </div>
+      <div class="cm-host" ${ref(this._cmRef)}></div>`;
   }
 }
 

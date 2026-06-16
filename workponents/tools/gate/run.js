@@ -283,24 +283,34 @@ async function gateElement(page, el, update) {
   let wasmNote = seam ? "powered seam — floor-with-engine-blocked verified" : "pure-floor — static scan only";
   let wasmPass = importLeaks.length === 0;
   if (seam) {
-    // route-abort the engine chunk, assert the floor still renders
+    // route-abort the engine chunk, assert the floor still renders. A data-bound
+    // floor (work-search) resolves its query async after the lazy import rejects, so
+    // poll the floor-render selector for a short budget rather than reading once.
     await page.route(seam.enginePattern, (r) => r.abort());
     await mount();
-    const rendered = await page.$(`#stage ${tag} >> css=${seam.floorMustRender}`).catch(() => null);
+    const sel = `#stage ${tag} >> css=${seam.floorMustRender}`;
+    let rendered = null;
+    for (let i = 0; i < 40 && !rendered; i++) {
+      rendered = await page.$(sel).catch(() => null);
+      if (!rendered) await page.waitForTimeout(25);
+    }
     await page.unroute(seam.enginePattern);
     if (!rendered) { wasmPass = false; leaks.push({ gate: "wasm", rule: "floor-degrade", message: `floor did not render with ${seam.enginePattern} blocked` }); }
   }
 
   // (d) functional-parity-vs-floor. The oracle mounts the FLOOR (engine="floor");
-  // the candidate installs the offline Plot shim + mounts the POWERED tier
-  // (engine="plot") so Plot's data-binding path runs without a CDN, then reads what
-  // Plot bound. For a pure-floor element both are no-ops (structural pass).
+  // the candidate installs the seam's offline engine shim + mounts the POWERED tier
+  // (engine=<seam.engine>) so the powered path runs without a CDN, then reads its
+  // output. For a pure-floor element both are no-ops (structural pass). Each powered
+  // seam declares its shim installer + engine token (defaults to the Plot seam).
+  const poweredEngine = (seam && seam.engine) || "plot";
+  const shimFn = (seam && seam.shim) || "installPlotShim";
   const mountFloor = () => page.evaluate((s) => window.__gate.mount(s),
     { tag, attrs: { ...baseSpec.attrs, engine: "floor" }, html: baseSpec.html });
   const mountEngine = async () => {
-    await page.evaluate(() => window.__gate.installPlotShim && window.__gate.installPlotShim());
+    await page.evaluate((fn) => window.__gate[fn] && window.__gate[fn](), shimFn);
     return page.evaluate((s) => window.__gate.mount(s),
-      { tag, attrs: { ...baseSpec.attrs, engine: "plot" }, html: baseSpec.html });
+      { tag, attrs: { ...baseSpec.attrs, engine: poweredEngine }, html: baseSpec.html });
   };
   const parity = await functionalParity(tag, page, mountFloor, mountEngine);
   if (!parity.pass) leaks.push({ gate: "functional", rule: "parity", message: parity.note });

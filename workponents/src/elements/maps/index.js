@@ -14,3 +14,4 @@
 // wb-map.js directly to stay lean.
 export { WbMap } from "./wb-map.js";
 export { project, unproject, bounds } from "./projection.js";
+export { loadMaplibre, readTokens, buildStyle, featuresToGeoJSON, addDataLayers } from "./maplibre-tier.js";
