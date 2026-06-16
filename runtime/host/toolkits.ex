@@ -368,10 +368,10 @@ defmodule Workbooks.Toolkits do
 
     card_block =
       cards
-      |> Enum.map(fn c -> "  :type #{c}" <> gen_block_hint(c) end)
+      |> Enum.map(fn c -> ~s(  <work-gen-block type="#{c}" …>) <> gen_block_hint(c) end)
       |> Enum.join("\n")
 
-    # Every other discovered work-* tag (the standalone elements) + their props,
+    # Every other discovered work-* tag (the standalone elements) + their attrs,
     # so the agent can reach any tag the SDK ships, not a hardcoded set.
     rest =
       tags
@@ -383,55 +383,50 @@ defmodule Workbooks.Toolkits do
       rest
       |> Enum.map(fn tag ->
         attrs = by_tag[tag].attrs
-        hint = if attrs == [], do: "", else: " — props: " <> Enum.join(Enum.take(attrs, 8), ", ")
-        "  #{tag}#{hint}"
+        hint = if attrs == [], do: "", else: " — attrs: " <> Enum.join(Enum.take(attrs, 8), ", ")
+        "  <#{tag}>#{hint}"
       end)
       |> Enum.join("\n")
 
     cards_section =
       if card_block == "",
         do: "",
-        else: "Inline cards (`:type` selects the card):\n#{card_block}\n\n"
+        else: "Inline cards (the `type` attribute selects the card):\n#{card_block}\n\n"
 
     rest_section =
       if rest_block == "",
         do: "",
-        else: "Other `work-*` elements (use the tag as `:type`):\n#{rest_block}\n"
+        else: "Other `work-*` elements:\n#{rest_block}\n"
 
     """
     ## Components
 
-    You have a component toolkit. The chat renders the SDK's real `work-*`
-    custom elements inline. To emit one, begin your message with `#+RENDER: org`
-    on its own first line, then write:
+    You have a component toolkit. The chat renders the SDK's real `work-*` custom
+    elements inline — just write them as HTML anywhere in your reply:
 
-      #+begin_src component :type <type> :<attr> <value> …
-      body text (or `key: value` lines)
-      #+end_src
+      <work-<tag> attr="value" …>content</work-<tag>>
 
-    The `:key value` header args map to the element's attributes; the block body
-    becomes its content. Reach for a component when a structured/visual answer
-    earns it (you confirmed an action, surfaced data, offered a next step);
-    otherwise reply in plain prose (it streams).
+    The attributes are the element's attributes; the content goes between the tags.
+    Reach for a component when a structured/visual answer earns it (you confirmed an
+    action, surfaced data, offered a next step); otherwise reply in plain prose.
 
-    DATA BINDING: data elements (chart, table, spark) take their data inline via
-    `:rows` — a JSON array of row OBJECTS, e.g.
-    `:rows [{"region":"NA","revenue":1200},{"region":"EU","revenue":980}]` — or
-    `:csv` (CSV text with a header row). For a chart, `:x`/`:y` name the columns and
-    `:type` is the shape (bar/line/area); a scalar uses `:value`/`:label`/`:delta`.
-    Use `:src-name`/`:query` ONLY when a named data source already exists; otherwise
-    put the data inline with `:rows` or `:csv`.
+    DATA BINDING: data elements (chart, table, spark) take their data inline via a
+    `rows` attribute — a JSON array of row OBJECTS, e.g.
+    `<work-chart type="bar" x="region" y="revenue" rows='[{"region":"NA","revenue":1200}]'>`
+    — or `csv` (CSV text with a header row). For a chart, `x`/`y` name the columns and
+    `type` is the shape (bar/line/area); a scalar uses `value`/`label`/`delta`. Use
+    `from="<name>"` ONLY when a named data source already exists.
 
     #{cards_section}#{rest_section}
     """
     |> String.trim()
   end
 
-  defp gen_block_hint("callout"), do: " — info/warn/ok/error banner (:tone, :title)"
-  defp gen_block_hint("kv"), do: " — key/value table (:title; body = `key: value` lines)"
-  defp gen_block_hint("button"), do: " — action button (:label, :action; fires work-intent)"
-  defp gen_block_hint("link"), do: " — themed external link (:label, :href)"
-  defp gen_block_hint("share"), do: " — member chips + invite (:title; body = target/members/role)"
+  defp gen_block_hint("callout"), do: " — info/warn/ok/error banner (tone, title)"
+  defp gen_block_hint("kv"), do: " — key/value table (title; content = `key: value` lines)"
+  defp gen_block_hint("button"), do: " — action button (label, action; fires work-intent)"
+  defp gen_block_hint("link"), do: " — themed external link (label, href)"
+  defp gen_block_hint("share"), do: " — member chips + invite (title; content = target/members/role)"
   defp gen_block_hint(_), do: ""
 
   @doc "`wb toolkit show <id>` — the manifest front door + the skill index."

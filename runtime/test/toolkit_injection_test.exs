@@ -44,19 +44,19 @@ defmodule Workbooks.ToolkitInjectionTest do
   test "subscribing to the component toolkit injects a work-* catalog discovered from the CEM" do
     out = Toolkits.component_catalog(["workponents"])
     assert out =~ "## Components"
-    # Emit syntax (the #+RENDER: org contract) stays unchanged.
-    assert out =~ "#+RENDER: org"
-    assert out =~ "#+begin_src component :type"
-    # Inline-card types the chat renders via <work-gen-block>.
-    assert out =~ ":type callout"
-    assert out =~ ":type kv"
+    # Emit syntax is inline `<work-*>` HTML (no org source blocks).
+    assert out =~ "write them as HTML"
+    assert out =~ "<work-<tag>"
+    # Inline-card types the chat renders via <work-gen-block type="…">.
+    assert out =~ ~s(<work-gen-block type="callout")
+    assert out =~ ~s(<work-gen-block type="kv")
     # Standalone work-* tags DISCOVERED from custom-elements.json — proof the
     # catalog is sourced from the CEM, not the old hardcoded five. work-chart /
     # work-table are CEM tags that were never in the hardcoded list.
     assert out =~ "work-chart"
     assert out =~ "work-table"
-    # The CEM's attribute names ride along as the prop hint.
-    assert out =~ "props:"
+    # The CEM's attribute names ride along as the attr hint.
+    assert out =~ "attrs:"
   end
 
   test "the component catalog reaches the agent prompt via the resolved closure" do
