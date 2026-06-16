@@ -36,47 +36,9 @@ defmodule Workbooks.Web do
     send_resp(conn, 200, "ok")
   end
 
-  # ── Desktop sign-in broker (public — see Workbooks.Auth @public) ──────────────
-  # The native app runs a loopback+PKCE flow against these three; this server holds
-  # the WorkOS secret and drives hosted AuthKit. See Workbooks.AuthBroker.
-
-  get "/v1/auth/authorize" do
-    conn = fetch_query_params(conn)
-
-    case Workbooks.AuthBroker.begin_authorize(
-           conn.query_params["redirect_uri"] || "",
-           conn.query_params["code_challenge"] || "",
-           conn.query_params["organization_id"]
-         ) do
-      {:ok, url} -> conn |> put_resp_header("location", url) |> send_resp(302, "")
-      {:error, reason} -> send_resp(conn, 400, "sign-in unavailable (#{reason})")
-    end
-  end
-
-  get "/v1/auth/callback" do
-    conn = fetch_query_params(conn)
-
-    case Workbooks.AuthBroker.complete_callback(
-           conn.query_params["code"] || "",
-           conn.query_params["state"] || ""
-         ) do
-      {:ok, redirect} -> conn |> put_resp_header("location", redirect) |> send_resp(302, "")
-      {:error, _} -> send_resp(conn, 400, "sign-in failed — please try again")
-    end
-  end
-
-  post "/v1/auth/exchange" do
-    {:ok, body, conn} = read_body(conn)
-    params = case Jason.decode(body) do
-      {:ok, m} when is_map(m) -> m
-      _ -> %{}
-    end
-
-    case Workbooks.AuthBroker.exchange(params["code"] || "", params["code_verifier"] || "") do
-      {:ok, session} -> j(conn, 200, session)
-      {:error, _} -> j(conn, 400, %{error: "exchange failed"})
-    end
-  end
+  # NOTE: the desktop sign-in broker (/v1/auth/{authorize,callback,exchange}) moved to
+  # the cloud dashboard (app.workbooks.sh) — ONE auth front door for web + desktop.
+  # See web/cloud-dashboard $lib/desktopBroker. The control plane no longer brokers auth.
 
   # Live capability dashboard (dev). `capabilities.json` is an agent-maintained
   # ledger (the DSL: capabilities, their tests/units, proof, failure modes);

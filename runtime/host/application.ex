@@ -45,7 +45,6 @@ defmodule Workbooks.Application do
         Workbooks.OQL,
         Workbooks.ControlPlane,
         Workbooks.Vars,
-        Workbooks.AuthBroker,
         Workbooks.Instance.Supervisor,
         Workbooks.Domains,
         {DynamicSupervisor, strategy: :one_for_one, name: Workbooks.AgentSession.Sup}

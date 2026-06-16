@@ -37,9 +37,6 @@ defmodule Workbooks.Auth do
       # the ElevenLabs webhook HMAC) and fails closed when unconfigured —
       # see Workbooks.Groundskeeper.Router.
       String.starts_with?(conn.request_path, "/gk/") -> dev_fallback(conn)
-      # The desktop sign-in broker establishes the bearer, so it can't require one
-      # (it enforces its own PKCE + loopback floors — see Workbooks.AuthBroker).
-      String.starts_with?(conn.request_path, "/v1/auth/") -> dev_fallback(conn)
       true ->
         case bearer(conn) do
           nil -> no_bearer(conn)
