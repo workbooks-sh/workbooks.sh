@@ -35,21 +35,51 @@ test.describe(live ? "agent live (desktop ↔ real runtime)" : "agent live (skip
     await composer.press("ControlOrMeta+Enter");
   }
 
-  test("renders an inline component the agent emits (work-gen-block)", async ({ page }) => {
+  test("renders an inline component the agent emits — VISUALLY, not just mounted", async ({ page }) => {
     await page.goto("/");
     await send(
       page,
       "I just finished wiring up the Apollo project. Confirm it back to me with a small inline " +
         "component (not a markdown table) summarizing: Name = Apollo, Status = Ready.",
     );
-    // The real agent streams a #+begin_src component block → messageRender mounts the
-    // real SDK element. Assert it upgraded (shadow root + a type attribute), not raw text.
     const block = page.locator("work-gen-block").first();
     await expect(block).toBeVisible({ timeout: 60_000 });
-    const upgraded = await block.evaluate(
-      (el) => !!(el as HTMLElement & { shadowRoot: ShadowRoot | null }).shadowRoot && el.getAttribute("type") != null,
-    );
-    expect(upgraded).toBe(true);
+
+    // Deep render validation — the full chain emit → parse → mount → RENDER, not just
+    // "the tag upgraded". Catches the real UI failures: mounted-but-collapsed (zero box),
+    // empty shadow (rendered nothing), unstyled (theme tokens never applied), and
+    // data-not-bound (the agent's values never reached the rendered output).
+    const r = await block.evaluate((el) => {
+      const e = el as HTMLElement & { shadowRoot: ShadowRoot | null };
+      const root = e.shadowRoot;
+      const box = e.getBoundingClientRect();
+      const card = root?.firstElementChild as HTMLElement | null;
+      const cs = card ? getComputedStyle(card) : null;
+      const text = (root?.textContent || "").replace(/\s+/g, " ").trim();
+      return {
+        upgraded: !!root && el.getAttribute("type") != null,
+        painted: box.width > 4 && box.height > 4,
+        childCount: root?.querySelectorAll("*").length ?? 0,
+        // the agent's DATA rendered visibly (not lost between emit and paint)
+        dataBound: /apollo/i.test(text) && /ready/i.test(text),
+        // theme tokens actually applied — a real card has bg OR border OR padding,
+        // never a bare unstyled box
+        themed:
+          !!cs &&
+          (cs.backgroundColor !== "rgba(0, 0, 0, 0)" ||
+            parseFloat(cs.borderTopWidth) > 0 ||
+            parseFloat(cs.paddingTop) > 0),
+      };
+    });
+
+    // Artifact for eyeballing the actual render.
+    await block.screenshot({ path: "test-results/agent-live-component.png" }).catch(() => {});
+
+    expect(r.upgraded, "custom element upgraded").toBe(true);
+    expect(r.painted, "component actually painted (non-collapsed box)").toBe(true);
+    expect(r.childCount, "shadow DOM rendered real content").toBeGreaterThan(0);
+    expect(r.dataBound, "the agent's data (Apollo/Ready) rendered visibly").toBe(true);
+    expect(r.themed, "theme tokens applied (bg/border/padding), not unstyled").toBe(true);
   });
 
   test("creates a workbook end-to-end (agent acts + confirms in the transcript)", async ({ page }) => {
