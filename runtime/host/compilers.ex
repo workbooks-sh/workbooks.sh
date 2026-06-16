@@ -23,9 +23,9 @@ defmodule Workbooks.Compilers do
       "compilers"
   end
 
-  @doc "Languages with a compilers/<lang>/manifest.org."
+  @doc "Languages with a compilers/<lang>/manifest.html."
   def list(root \\ default_root()) do
-    Path.wildcard(Path.join([root, "*", "manifest.org"]))
+    Path.wildcard(Path.join([root, "*", "manifest.html"]))
     |> Enum.map(&Path.basename(Path.dirname(&1)))
     |> Enum.sort()
   end
@@ -36,7 +36,7 @@ defmodule Workbooks.Compilers do
   """
   def build(lang, root \\ default_root()) do
     dir = Path.join(root, lang)
-    manifest = Path.join(dir, "manifest.org")
+    manifest = Path.join(dir, "manifest.html")
     cli = kw(manifest, "CLI_BIN")
     script = Path.join(dir, kw(manifest, "BUILD") || "build.sh")
     mode = if kw(manifest, "ARG_MODE") == "stdin1", do: :stdin1, else: :argv
@@ -58,7 +58,7 @@ defmodule Workbooks.Compilers do
   preopen (untrusted source can't reach the host). Returns {:ok, output} | {:error, _}.
   """
   def compile_run(lang, source_path, argv \\ [], root \\ default_root()) do
-    cli = kw(Path.join([root, lang, "manifest.org"]), "CLI_BIN")
+    cli = kw(Path.join([root, lang, "manifest.html"]), "CLI_BIN")
     src = Path.expand(source_path)
     dir = Path.dirname(src)
     CommandRegistry.run(cli, "", argv ++ ["/src/#{Path.basename(src)}"], ["#{dir}::/src"])
@@ -75,7 +75,7 @@ defmodule Workbooks.Compilers do
   is removed after — nothing of the untrusted compile persists in the tree.
   """
   def compile(lang, source_path, opts \\ [], root \\ default_root()) do
-    m = Path.join([root, lang, "manifest.org"])
+    m = Path.join([root, lang, "manifest.html"])
     cli = kw(m, "CLI_BIN")
     base = Path.expand(Path.join([root, lang, kw(m, "LIB_ROOT") || "zig-root"]))
     zlib = kw(m, "ZIG_LIB") || "lib"
@@ -269,7 +269,7 @@ defmodule Workbooks.Compilers do
   end
 
   def compile_c(source_path, opts \\ [], root \\ default_root()) do
-    m = Path.join([root, "clang", "manifest.org"])
+    m = Path.join([root, "clang", "manifest.html"])
     cli = kw(m, "CLI_BIN") || "clang"
     sysroot = Path.expand(Path.join([root, "clang", kw(m, "SYSROOT") || "clang-root/sysroot"]))
     target = Keyword.get(opts, :target, kw(m, "TARGET") || "wasm32-wasip1")
@@ -504,7 +504,7 @@ defmodule Workbooks.Compilers do
         #define __builtin_extract_return_addr(x) (x)
         """
         File.write!(cfile, prelude <> c_source)
-        zm = Path.join([root, "zig", "manifest.org"])
+        zm = Path.join([root, "zig", "manifest.html"])
         zigdir = Path.join(root, "zig")
         ziglib = Path.expand(Path.join([zigdir, kw(zm, "LIB_ROOT") || "zig-root", kw(zm, "ZIG_LIB") || "lib"]))
         shim = Path.expand(Path.join(zigdir, "wasi_shim.c"))
@@ -2227,12 +2227,21 @@ defmodule Workbooks.Compilers do
     end
   end
 
+  # Read a value off the compiler's `<work-toolkit>` HTML manifest (Floki). The
+  # old org `#+CLI_BIN:` keyword is the `cli` attribute; every other keyword the
+  # converter preserved as a `data-*` attribute (e.g. `#+ARG_MODE` → `data-arg-mode`).
   defp kw(file, key) do
+    attr = manifest_attr(key)
+
     with {:ok, body} <- File.read(file),
-         [_, v] <- Regex.run(~r/^#\+#{key}:\s*(.+)$/m, body) do
+         {:ok, tree} <- Floki.parse_fragment(body),
+         [v | _] <- Floki.attribute(tree, "work-toolkit", attr) do
       String.trim(v)
     else
       _ -> nil
     end
   end
+
+  defp manifest_attr("CLI_BIN"), do: "cli"
+  defp manifest_attr(key), do: "data-" <> (key |> String.downcase() |> String.replace("_", "-"))
 end
