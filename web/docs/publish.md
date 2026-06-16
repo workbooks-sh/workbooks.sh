@@ -1,0 +1,8 @@
+# publish
+
+- **PUBLISH_TARGET:** cloudflare-pages
+- **PUBLISH_PROJECT:** workbooks-docs
+- **PUBLISH_DOMAIN:** docs.workbooks.sh
+- **PUBLISH_TITLE:** Workbooks — Documentation
+- **PUBLISH_OUTPUT:** .publish_out/index.html
+

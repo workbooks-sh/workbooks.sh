@@ -1,5 +1,0 @@
-#+RUNTIME: go
-#+CLI_BIN: go
-#+EXEC: command
-#+BUILD_SRC: gobuild:github.com/traefik/yaegi/cmd/yaegi@v0.16.1
-#+ARG_MODE: argv

@@ -155,7 +155,7 @@
     return '<a href="' + root + href + '"><span class="sw" style="background:' + sw[0] + '">' + sw[1] + '</span> ' + name + ' <small>' + small + '</small></a>';
   }
 
-  // Docs — the real Diátaxis tree from web/docs/site.org, rendered as a
+  // Docs — the real Diátaxis tree from web/docs/site.md, rendered as a
   // multi-column panel pointing at docs.workbooks.sh/<path>. Each column is one
   // top-level section; the rows are the key pages under it.
   var REPO = 'https://github.com/workbooks-sh/workbooks.sh';

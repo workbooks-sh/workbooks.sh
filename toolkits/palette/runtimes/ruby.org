@@ -1,8 +1,0 @@
-#+RUNTIME: ruby
-#+CLI_BIN: ruby
-#+EXEC: command
-#+BUILD_SRC: archive:https://github.com/ruby/ruby.wasm/releases/download/2.9.4/ruby-3.3-wasm32-unknown-wasip1-full.tar.gz
-#+SHA256: 0a56d987a5d830558f797ded3b751332199f413dc9afdf8b272bd29b4a986f86
-#+WASM_PATH: ruby-3.3-wasm32-unknown-wasip1-full/usr/local/bin/ruby
-#+PREOPEN: ruby-3.3-wasm32-unknown-wasip1-full::/
-#+ARG_MODE: argv

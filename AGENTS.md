@@ -50,11 +50,18 @@ Never stop before pushing; never say "ready to push when you are" — you push.
 One frontend, many targets. The UI talks to a **single Host capability surface**
 (the `invoke` seam, generalized — the Dock membrane). Behind it a router
 fulfills each capability from a **provider**: `local` (OS via Tauri, or
-browser-native), `runtime` (a shared server over RCP / HTTP+WS), or `kernel`
-(`oql.wasm`). A *target* (desktop/web/mobile) is just a **routing config** +
-runtime endpoint — not a code fork. Do NOT reintroduce a second "runtime
-contract" the UI manages, and do NOT try to compile the Tauri/OS layer to WASM;
-swap providers behind the one Host instead.
+browser-native) or `runtime` (a shared server over RCP / HTTP+WS). A *target*
+(desktop/web/mobile) is just a **routing config** + runtime endpoint — not a
+code fork. Do NOT reintroduce a second "runtime contract" the UI manages, and do
+NOT try to compile the Tauri/OS layer to WASM; swap providers behind the one
+Host instead.
+
+A **workbook is an HTML file** built from the `work-*` Lit web-component library
+(`workponents/`); the browser renders it. There is no org-mode, no OQL kernel,
+and no bespoke format — where the backend must read a workbook's structure (the
+compiler finding `<work-component>` source; validation; an outline) it parses
+the HTML with a standard parser (`Workbooks.Workbook` over Floki). Authoring is
+HTML-only; internal tooling JSON is fine.
 
 - **Canon doc:** `desktop/docs/platform-model.md` · **epic:** `wb-lk6` · **runtime connect:** RCP `wb-uxn`.
 - **Desktop state of truth:** `desktop/ASSESSMENT.md` (the runtime is canonical; the desktop frontend is the most out-of-date code — re-point it onto `runtime/host`, never the reverse).

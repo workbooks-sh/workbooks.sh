@@ -1,7 +1,0 @@
-#+TITLE: text — agent knows the toolkit is for string transforms (Tier 2)
-
-* the agent identifies the text toolkit's purpose                   :eval:
-  :PROPERTIES:
-  :TASK:    Answer in words only — do not run anything. In one sentence, what is the `text` toolkit for?
-  :RUBRIC:  The answer says the text toolkit performs STRING / TEXT TRANSFORMS — e.g. changing case or normalizing text — as a sandboxed command.
-  :END:
