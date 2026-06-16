@@ -211,13 +211,6 @@ defmodule Workbooks.Web do
     end
   end
 
-  # Parse Org through the OQL kernel.
-  post "/oql/parse" do
-    {:ok, body, conn} = read_body(conn)
-    json = Jason.encode!(Workbooks.Workbook.parse_headlines(body))
-    conn |> put_resp_content_type("application/json") |> send_resp(200, json)
-  end
-
   # Run a workflow declared in Org — the runtime parses the :workflow: DAG and
   # executes it (topological waves; agent + WASM components; recursive).
   #   {"org": "...", "input": "..."}  → run records
@@ -577,63 +570,6 @@ defmodule Workbooks.Web do
     }
 
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(about))
-  end
-
-  # Kanban board READ (wb-kbq5). path is an absolute workspace org file (desktop,
-  # trusted). /api/oql/query parses its headlines; /api/oql/board-views maps each
-  # headline of a views file to a BoardView. Mutation (PATCH) is separate.
-  get "/api/oql/query" do
-    conn = fetch_query_params(conn)
-
-    case read_workspace_org(conn.assigns.tenant, conn.query_params["path"]) do
-      {:ok, org} ->
-        headlines = Workbooks.Workbook.parse_headlines(org)
-        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{headlines: headlines, parse_warnings: []}))
-
-      _ ->
-        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{headlines: [], parse_warnings: []}))
-    end
-  end
-
-  # Kanban card mutation (wb-kbq5): PATCH a headline by ID in its org file. Body
-  # {path, op, ...args}; op ∈ transition_todo | set_property | append_logbook.
-  patch "/api/oql/headline/:id" do
-    {:ok, body, conn} = read_body(conn)
-    params = Jason.decode!(body)
-    id = conn.params["id"]
-    path = params["path"]
-    op = params["op"]
-    args = Map.drop(params, ["path", "op"])
-
-    # Resolve the confined abs path ONCE and use it for both read AND write — an
-    # unconfined File.write(Path.expand(path)) was the arbitrary cross-tenant .org
-    # WRITE vector (wb-u6su).
-    result =
-      with {:ok, abs} <- confine_workspace_org(Workbooks.Desktop.enabled?(), conn.assigns.tenant, path),
-           true <- File.regular?(abs) || {:error, :enoent},
-           {:ok, org} <- File.read(abs),
-           {:ok, new_org} <- Workbooks.OrgEdit.patch(org, id, op, args),
-           :ok <- File.write(abs, new_org) do
-        {200, %{ok: true}}
-      else
-        {:error, reason} -> {422, %{error: inspect(reason)}}
-        false -> {422, %{error: "enoent"}}
-      end
-
-    {status, payload} = result
-    conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
-  end
-
-  get "/api/oql/board-views" do
-    conn = fetch_query_params(conn)
-
-    views =
-      case read_workspace_org(conn.assigns.tenant, conn.query_params["path"]) do
-        {:ok, org} -> Workbooks.Workbook.parse_headlines(org) |> Enum.map(&headline_to_view/1)
-        _ -> []
-      end
-
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(views))
   end
 
   # Voice/agent command exec (wb-kbq5): the Gemini voice agent's bash tool POSTs
@@ -1987,43 +1923,6 @@ defmodule Workbooks.Web do
     send_resp(conn, 404, "not found")
   end
 
-  # Read an absolute workspace org file for the trusted desktop. Guards: must be
-  # an absolute path to an existing regular file (no traversal games — it's an
-  # absolute path the desktop already resolved from its own workspace folder).
-  defp read_workspace_org(tenant, path) do
-    with {:ok, abs} <- confine_workspace_org(Workbooks.Desktop.enabled?(), tenant, path) do
-      if File.regular?(abs), do: File.read(abs), else: {:error, :enoent}
-    end
-  end
-
-  @doc false
-  # Resolve a workspace .org path for `tenant` to a confined absolute path (wb-u6su).
-  # Desktop = trusted single-user machine: an absolute local path the desktop already
-  # resolved from its own workspace folder (`..` text still rejected). Cloud/shared =
-  # confined UNDER the tenant's workspace root (`<WB_DATA>/wb-runs/<tenant>`) via the
-  # shared WorkdirConfine spine — a leading "/" is stripped, `..` and symlink-escape
-  # are refused — so an authenticated tenant can never read OR patch another tenant's
-  # (or an arbitrary host) .org file by absolute path. Pure (testable): takes desktop?
-  # as an arg, same shape as confined_workdir/4.
-  def confine_workspace_org(desktop?, tenant, path) when is_binary(path) and path != "" do
-    cond do
-      Path.extname(path) != ".org" ->
-        {:error, :badpath}
-
-      desktop? ->
-        if String.contains?(path, ".."), do: {:error, :badpath}, else: {:ok, Path.expand(path)}
-
-      true ->
-        base = System.get_env("WB_DATA") || System.tmp_dir!()
-        root = Path.expand(Path.join([base, "wb-runs", safe_segment(tenant, "anon")]))
-        Workbooks.WorkdirConfine.confine(root, path)
-    end
-  rescue
-    _ -> {:error, :badpath}
-  end
-
-  def confine_workspace_org(_desktop?, _tenant, _path), do: {:error, :nopath}
-
   defp send_json(conn, status, payload) do
     conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
   end
@@ -2032,21 +1931,6 @@ defmodule Workbooks.Web do
   # GET /api/org-secrets can never exfiltrate arbitrary tenant vars and POST can't
   # write outside this set.
   defp org_secret_keys, do: ~w(OPENROUTER_API_KEY GEMINI_API_KEY)
-
-  # Map a parsed headline (a board-views file entry) to a desktop BoardView.
-  defp headline_to_view(h) do
-    props = h["props"] || %{}
-
-    %{
-      id: h["id"] || h["title"],
-      name: props["NAME"] || h["title"],
-      path: props["PATH"] || "",
-      query: props["QUERY"] || "",
-      icon: props["ICON"],
-      tagline: props["DESCRIPTION"],
-      action_label: props["ACTION_LABEL"]
-    }
-  end
 
   # Build the agent catalog the desktop picker reads. Project agents (if a
   # workdir is given) override user agents override the builtin. Every entry is

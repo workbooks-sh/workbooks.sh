@@ -110,22 +110,4 @@ defmodule Workbooks.TenantIsolationHttpTest do
     assert "wb-isol" in alice_ids
     refute "wb-isol" in Jason.decode!(req(:get, "/api/workbooks", "isol-bob").resp_body)
   end
-
-  test "GET /api/oql/query confines to .org — no arbitrary host-file read" do
-    File.write!("/tmp/wb-it-leak.txt", "* LEAK :secret:\n")
-    File.write!("/tmp/wb-it-leak.org", "* LEAK :secret:\n")
-    on_exit(fn -> File.rm("/tmp/wb-it-leak.txt"); File.rm("/tmp/wb-it-leak.org") end)
-
-    # non-.org with org content → blocked (not read) → empty headlines
-    txt = req(:get, "/api/oql/query?path=/tmp/wb-it-leak.txt", "isol-alice")
-    assert Jason.decode!(txt.resp_body)["headlines"] == []
-
-    # control: identical content as .org IS parsed → proves the gate, not a parse quirk
-    org = req(:get, "/api/oql/query?path=/tmp/wb-it-leak.org", "isol-alice")
-    assert length(Jason.decode!(org.resp_body)["headlines"]) == 1
-
-    # traversal also blocked
-    trav = req(:get, "/api/oql/query?path=../../../../etc/passwd", "isol-alice")
-    assert Jason.decode!(trav.resp_body)["headlines"] == []
-  end
 end
