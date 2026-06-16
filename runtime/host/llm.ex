@@ -289,21 +289,38 @@ defmodule Workbooks.Llm do
   end
 
   defp finalize_stream(acc) do
+    sorted = acc.tool_calls |> Enum.sort_by(fn {idx, _} -> idx end) |> Enum.map(fn {_idx, tc} -> tc end)
+
     tool_calls =
-      acc.tool_calls
-      |> Enum.sort_by(fn {idx, _} -> idx end)
-      |> Enum.map(fn {_idx, tc} ->
-        %{id: tc["id"], name: tc["name"], args: decode_args(tc["arguments"])}
-      end)
+      Enum.map(sorted, fn tc -> %{id: tc["id"], name: tc["name"], args: decode_args(tc["arguments"])} end)
 
     content = if acc.content == "", do: nil, else: acc.content
+
+    # The assistant message threaded back to the model on the NEXT turn MUST carry the
+    # tool_calls it made (in OpenAI API shape) — otherwise the following `tool` result
+    # messages are orphaned, and strict models (minimax) reject the broken conversation
+    # and return an empty turn, so multi-step tool chains (read -> write) silently stall
+    # (wb-0lw8). The non-streaming parse/1 keeps the raw message intact; the streaming
+    # path dropped tool_calls and only carried content — this reconstructs them.
+    raw_tool_calls =
+      Enum.map(sorted, fn tc ->
+        %{
+          "id" => tc["id"],
+          "type" => "function",
+          "function" => %{"name" => tc["name"], "arguments" => tc["arguments"] || "{}"}
+        }
+      end)
+
+    raw_message =
+      %{"role" => "assistant", "content" => content}
+      |> then(&if(raw_tool_calls == [], do: &1, else: Map.put(&1, "tool_calls", raw_tool_calls)))
 
     %{
       content: content,
       tool_calls: tool_calls,
       finish: acc.finish || "stop",
       usage: acc.usage,
-      raw_message: %{"role" => "assistant", "content" => content}
+      raw_message: raw_message
     }
   end
 
