@@ -9,12 +9,14 @@
    *
    * Per docs/canonical-model.md.
    */
-  import { Check, Plus } from "phosphor-svelte";
+  import { Check, Plus, DotsThree, PencilSimple, UsersThree, SignOut } from "phosphor-svelte";
   import { workspaces, type Workspace } from "$lib/bridge/workspaces.svelte";
   import { onboarding } from "$lib/onboarding/onboarding.svelte";
   import { DEMO_WORKSPACES, DEMO_ACTIVE_WORKSPACE } from "$lib/onboarding/demo";
   import IconPickerMenu from "./IconPickerMenu.svelte";
   import { iconAccent, accentFill, isImageIcon } from "$lib/ui/iconAccent.svelte";
+  import { orgs } from "$lib/bridge/orgs.svelte";
+  import ShareOrgModal from "$lib/network/components/ShareOrgModal.svelte";
 
   // During the tour the store is empty — show the demo workspaces so the
   // dropdown is populated like the rest of the demo content.
@@ -36,9 +38,43 @@
   let mode = $state<"list" | "create">("list");
   let newName = $state("");
   let newIcon = $state("✨");
+  let editId = $state<string | null>(null); // set when the create-form is reused to rename
   let busy = $state(false);
   let error = $state<string | null>(null);
   let popoverEl: HTMLDivElement | undefined = $state();
+
+  // Per-row "⋯" actions menu (Edit / Share / Leave). Permissions aren't modelled yet
+  // (workspaces are local), so all show; Share is offered only in a cloud nexus.
+  let rowMenuId = $state<string | null>(null);
+  let shareWs = $state<{ id: string; name: string } | null>(null);
+  const canShare = $derived(!orgs.activeEntry.personal);
+
+  function toggleRowMenu(e: MouseEvent, id: string) {
+    e.stopPropagation();
+    rowMenuId = rowMenuId === id ? null : id;
+  }
+  // The ⋯ menu is hidden during onboarding, so these only ever receive real
+  // workspaces — accept the minimal shape both Workspace + DemoWorkspace share.
+  function startEdit(w: { id: string; name: string; icon: string }) {
+    rowMenuId = null;
+    editId = w.id;
+    newName = w.name;
+    newIcon = w.icon || "✨";
+    mode = "create"; // the create-form doubles as the rename form
+  }
+  function shareWorkspace(w: { id: string; name: string }) {
+    rowMenuId = null;
+    shareWs = { id: w.id, name: w.name };
+  }
+  async function leaveWorkspace(w: { id: string; name: string }) {
+    rowMenuId = null;
+    if (!confirm(`Remove "${w.name}" from your workspaces? Its folders stay on disk.`)) return;
+    try {
+      await workspaces.delete(w.id);
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
 
   function initials(name: string): string {
     const words = name.trim().split(/[\s\-_]+/).filter(Boolean);
@@ -65,8 +101,14 @@
     busy = true;
     error = null;
     try {
-      const w = await workspaces.create(n, newIcon);
-      await workspaces.setActive(w.id);
+      if (editId) {
+        await workspaces.rename(editId, n);
+        await workspaces.setIcon(editId, newIcon);
+      } else {
+        const w = await workspaces.create(n, newIcon);
+        await workspaces.setActive(w.id);
+      }
+      editId = null;
       newName = "";
       newIcon = "✨";
       mode = "list";
@@ -123,36 +165,63 @@
         {#each wsItems as w (w.id)}
           {@const isActive = activeWsId === w.id}
           {@const ac = iconAccent(w.icon)}
-          <button
-            type="button"
-            class="row"
-            class:active={isActive}
-            onclick={() => pick(w)}
-          >
-            <span
-              class="row-icon"
-              class:has-image={w.icon.startsWith("data:image/")}
-              class:has-accent={!!ac && !isImageIcon(w.icon)}
-              style={ac && !isImageIcon(w.icon)
-                ? `border-color: ${ac}; background: ${accentFill(ac, 0.12)};`
-                : ""}
+          <div class="row-wrap" class:menu-open={rowMenuId === w.id}>
+            <button
+              type="button"
+              class="row"
+              class:active={isActive}
+              onclick={() => pick(w)}
             >
-              {#if w.icon.startsWith("data:image/")}
-                <img src={w.icon} alt="" />
-              {:else if w.icon}
-                {w.icon}
-              {:else}
-                {initials(w.name)}
-              {/if}
-            </span>
-            <span class="row-name">{w.name}</span>
-            {#if isActive}<Check weight="bold" size={12} />{/if}
-          </button>
+              <span
+                class="row-icon"
+                class:has-image={w.icon.startsWith("data:image/")}
+                class:has-accent={!!ac && !isImageIcon(w.icon)}
+                style={ac && !isImageIcon(w.icon)
+                  ? `border-color: ${ac}; background: ${accentFill(ac, 0.12)};`
+                  : ""}
+              >
+                {#if w.icon.startsWith("data:image/")}
+                  <img src={w.icon} alt="" />
+                {:else if w.icon}
+                  {w.icon}
+                {:else}
+                  {initials(w.name)}
+                {/if}
+              </span>
+              <span class="row-name">{w.name}</span>
+              {#if isActive}<Check weight="bold" size={12} />{/if}
+            </button>
+            {#if !onboarding.active}
+              <button
+                type="button"
+                class="more"
+                aria-label="Workspace actions"
+                onclick={(e) => toggleRowMenu(e, w.id)}
+              >
+                <DotsThree weight="bold" size={16} />
+              </button>
+            {/if}
+            {#if rowMenuId === w.id}
+              <div class="row-menu" role="menu">
+                <button type="button" class="mi" onclick={() => startEdit(w)}>
+                  <PencilSimple size={13} weight="fill" /> Edit
+                </button>
+                {#if canShare}
+                  <button type="button" class="mi" onclick={() => shareWorkspace(w)}>
+                    <UsersThree size={13} weight="fill" /> Share
+                  </button>
+                {/if}
+                <button type="button" class="mi danger" onclick={() => leaveWorkspace(w)}>
+                  <SignOut size={13} weight="fill" /> Leave
+                </button>
+              </div>
+            {/if}
+          </div>
         {/each}
         <button
           type="button"
           class="row create"
-          onclick={() => (mode = "create")}
+          onclick={() => { editId = null; newName = ""; newIcon = "✨"; mode = "create"; }}
         >
           <span class="row-icon plus"><Plus weight="bold" size={14} /></span>
           <span class="row-name">New workspace</span>
@@ -175,7 +244,7 @@
             <button
               type="button"
               class="btn ghost"
-              onclick={() => (mode = "list")}
+              onclick={() => { mode = "list"; editId = null; }}
               disabled={busy}
             >
               Back
@@ -185,7 +254,7 @@
               class="btn primary"
               disabled={busy || !newName.trim()}
             >
-              Create
+              {editId ? "Save" : "Create"}
             </button>
           </div>
         </form>
@@ -193,6 +262,14 @@
       </div>
     {/if}
   </div>
+{/if}
+
+{#if shareWs}
+  <ShareOrgModal
+    resourceId={`workspace:${shareWs.id}`}
+    resourceTitle={shareWs.name}
+    onclose={() => (shareWs = null)}
+  />
 {/if}
 
 <style>
@@ -275,6 +352,62 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* Per-row "⋯" actions (Edit / Share / Leave) */
+  .row-wrap { position: relative; display: flex; align-items: center; }
+  .row-wrap .row { flex: 1 1 auto; min-width: 0; }
+  .more {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-right: 2px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-fg-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s, background 0.12s, color 0.12s;
+  }
+  .row-wrap:hover .more,
+  .row-wrap.menu-open .more { opacity: 1; }
+  .more:hover { background: var(--color-surface-soft); color: var(--color-fg); }
+  .row-menu {
+    position: absolute;
+    top: 100%;
+    right: 4px;
+    z-index: 10;
+    min-width: 132px;
+    margin-top: 2px;
+    padding: 3px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-pop);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .mi {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--color-fg);
+    font-size: 0.82rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+  }
+  .mi:hover { background: var(--color-surface-soft); }
+  .mi.danger { color: var(--color-err); }
 
   .create-form {
     display: flex;
