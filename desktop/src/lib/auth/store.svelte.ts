@@ -52,7 +52,10 @@ export interface AuthUser {
   picture: string | null;
 }
 
-const DEFAULT_BROKER_URL = "https://auth.workbooks.sh";
+// The desktop sign-in broker — the control plane runs the loopback+PKCE flow
+// (/v1/auth/{authorize,callback,exchange}) since it holds the WorkOS secret. Points
+// at the always-on control plane directly; auth.workbooks.sh can CNAME here later.
+const DEFAULT_BROKER_URL = "https://wb-nexus-cp.fly.dev";
 
 function envOverride(key: string): string | undefined {
   return (import.meta.env as Record<string, string | undefined>)?.[key];
