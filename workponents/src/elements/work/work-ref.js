@@ -20,7 +20,7 @@ export class WorkRef extends WbElement {
 
   static styles = css`
     :host { display: contents; font-family: var(--work-font); }
-    a { display: inline-flex; align-items: baseline; gap: 4px; cursor: pointer;
+    a { display: inline-flex; align-items: baseline; gap: var(--work-space-1); cursor: pointer;
       color: var(--work-brand-ink); text-decoration: none;
       border-bottom: 1px solid var(--work-brand-soft); }
     a:hover { border-bottom-color: var(--work-brand); }
@@ -28,7 +28,7 @@ export class WorkRef extends WbElement {
     a .kind { font: 600 var(--work-text-sm) var(--work-font-mono); color: var(--work-fg-subtle); }
     .badge { display: inline-block; font: 600 var(--work-text-sm) var(--work-font-mono);
       text-transform: uppercase; letter-spacing: .06em; color: var(--work-fg-subtle);
-      border: 1px solid var(--work-border); border-radius: var(--work-radius-pill); padding: 0 8px; }
+      border: 1px solid var(--work-border); border-radius: var(--work-radius-pill); padding: 0 var(--work-space-2); }
   `;
 
   _follow(e) {

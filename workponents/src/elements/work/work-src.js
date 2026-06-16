@@ -34,11 +34,11 @@ export class WorkSrc extends WbElement {
       background: var(--work-surface-soft); }
     .lang { font-family: var(--work-font-mono); font-weight: 700; font-size: var(--work-text-sm);
       text-transform: uppercase; letter-spacing: .06em; color: var(--work-brand-ink);
-      background: var(--work-brand-soft); padding: 2px 8px; border-radius: var(--work-radius-pill); }
+      background: var(--work-brand-soft); padding: var(--work-space-2px) var(--work-space-2); border-radius: var(--work-radius-pill); }
     .name { font-family: var(--work-font-mono); font-size: var(--work-text-sm); color: var(--work-fg-muted); }
     .grow { flex: 1; }
     button { font: 700 var(--work-text-sm) var(--work-font-mono); cursor: pointer;
-      padding: 4px 12px; border-radius: var(--work-radius-sm); border: 1.5px solid var(--work-border-strong);
+      padding: var(--work-space-1) var(--work-space-3); border-radius: var(--work-radius-sm); border: 1.5px solid var(--work-border-strong);
       background: var(--work-fg); color: var(--work-surface); }
     button:disabled { opacity: .5; cursor: default; }
     pre { margin: 0; padding: var(--work-space-3); overflow: auto;
@@ -47,7 +47,7 @@ export class WorkSrc extends WbElement {
       font: var(--work-text-sm)/1.6 var(--work-font-mono); white-space: pre-wrap; }
     .out.err { color: var(--work-err); }
     .out .badge { display: inline-block; font-size: var(--work-text-sm); color: var(--work-fg-subtle);
-      border: 1px solid var(--work-border); border-radius: var(--work-radius-pill); padding: 0 8px; }
+      border: 1px solid var(--work-border); border-radius: var(--work-radius-pill); padding: 0 var(--work-space-2); }
   `;
 
   constructor() {
