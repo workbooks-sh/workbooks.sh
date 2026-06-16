@@ -1,8 +1,9 @@
 # Exclude the heavy / external-resource tags by DEFAULT so plain `mix test`
 # (and `work dev test`) is a fast, deterministic gate that never hangs. These
-# tags need a wasm toolchain (:build, :pallet, :serde, :simd, :rayon, :threads,
-# :node) or live network (:netdeps) — without that environment they stall or
-# fail. Run them explicitly: `mix test --include build` (or several --include
+# tags need a wasm toolchain (:build, :wavelet, :pallet, :serde, :simd, :rayon,
+# :threads, :node) or live network (:netdeps) — without that environment they stall
+# or fail (e.g. :wavelet compiles/encodes via ffmpeg.wasm → clang_not_built without
+# the toolchain). Run them explicitly: `mix test --include build` (or several --include
 # flags) in a provisioned env. (:skip is the manual one-off opt-out.)
 # Run SERIAL (max_cases: 1). Several modules run heavy wasm/network work (the OQL
 # kernel, ffmpeg.wasm, presign, brokers) on shared resources (fixed TCP ports, the
@@ -15,7 +16,7 @@
 # (serial 68s vs 78s+ contended). PROVEN: `mix test --trace --seed 259781` (which
 # forces serial) → 831 tests, 0 failures.
 ExUnit.start(
-  exclude: [:skip, :build, :netdeps, :pallet, :node, :threads, :serde, :simd, :rayon],
+  exclude: [:skip, :build, :wavelet, :netdeps, :pallet, :node, :threads, :serde, :simd, :rayon],
   max_cases: 1
 )
 
