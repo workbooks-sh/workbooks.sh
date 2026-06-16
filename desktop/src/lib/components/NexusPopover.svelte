@@ -10,6 +10,7 @@
    */
   import { Planet, Plus, Trash as Trash2, X, ArrowClockwise } from "phosphor-svelte";
   import { nexus, type NexusEndpoint, type NexusHealth } from "$lib/bridge/nexus.svelte";
+  import { orgs } from "$lib/bridge/orgs.svelte";
 
   let {
     anchor,
@@ -25,9 +26,12 @@
   let fUrl = $state("");
   let fToken = $state("");
 
-  // Probe remotes whenever the popover opens.
+  // Probe remotes + load the user's orgs (personal + the orgs they're in) on open.
   $effect(() => {
-    if (open) nexus.probeAll();
+    if (open) {
+      nexus.probeAll();
+      void orgs.load();
+    }
   });
 
   function select(ep: NexusEndpoint) {
@@ -83,6 +87,20 @@
     </header>
 
     <div class="list">
+      <!-- Organizations — Personal + every org you've been added to (each ≈ a nexus),
+           with your role. Switching orgs (re-auth to the org's token) is the next layer. -->
+      <div class="grp-label">Organizations</div>
+      {#each orgs.switcher as o (o.id)}
+        <div class="row org-row" class:active={o.id === orgs.activeOrg}>
+          <span class="org-glyph">{o.personal ? "◦" : (o.name[0] || "O").toUpperCase()}</span>
+          <span class="row-text">
+            <span class="name">{o.name}</span>
+            <span class="url">{o.role}{o.id === orgs.activeOrg ? " · active" : ""}</span>
+          </span>
+        </div>
+      {/each}
+
+      <div class="grp-label">Runtimes</div>
       {#each nexus.endpoints as ep (ep.id)}
         {@const h = nexus.healthOf(ep.id)}
         <div class="row" class:active={ep.id === nexus.activeId}>
@@ -157,6 +175,18 @@
   }
   .spacer { flex: 1; }
   .list { display: flex; flex-direction: column; gap: 2px; }
+  .grp-label {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--color-fg-subtle); padding: 8px 8px 3px;
+  }
+  .grp-label:first-child { padding-top: 2px; }
+  .org-row { padding: 6px 8px; gap: 8px; }
+  .org-glyph {
+    width: 20px; height: 20px; border-radius: 6px; flex: none; display: grid; place-items: center;
+    background: var(--color-surface-soft); border: 1px solid var(--color-border);
+    font-size: 11px; font-weight: 700; color: var(--color-fg);
+  }
+  .org-row.active { background: var(--color-brand-soft); }
   .row {
     display: flex;
     align-items: center;
