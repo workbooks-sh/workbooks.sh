@@ -459,7 +459,7 @@ defmodule Workbooks.Web do
     system =
       case params["skills"] do
         skills when is_list(skills) and skills != [] ->
-          agent_system_prompt(slug) <> "\n\nAttached skills (read with `work toolkit show`): " <> Enum.join(skills, ", ")
+          agent_system_prompt(slug) <> "\n\nAttached skills (read with `work kit show`): " <> Enum.join(skills, ", ")
 
         _ ->
           agent_system_prompt(slug)
@@ -1122,7 +1122,7 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
-  # ── `work toolkit` — the agent-extensibility surface over RCP ─────────────────
+  # ── `work kit` — the agent-extensibility surface over RCP ─────────────────
   # Mirrors the escript verbs (WorkKits.*_text) so a REMOTE/containerized engine
   # is reachable from the thin CLI. Text in/out — these are help-surface +
   # build/run verbs, not data APIs. Task execution stays server-side gated
@@ -1223,7 +1223,7 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
-  # `work toolkit push` — install a toolkit DIRECTORY onto this engine (zip b64).
+  # `work kit push` — install a toolkit DIRECTORY onto this engine (zip b64).
   # The deploy-the-toolkit verb: deployment.org declares it, deploy applies it.
   # Guards: id charset, zip-slip containment under the toolkits root.
   post "/rcp/toolkit/install" do

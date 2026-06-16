@@ -49,7 +49,7 @@ collisions.
 - `versions` — every released version (newest the runtime cares about; grows as
   releases are cut). The runtime reads `releases(root)[id]["versions"]` in
   `runtime/host/toolkits.ex` (`available_versions/3`) to answer
-  `work toolkit versions <id>`.
+  `work kit versions <id>`.
 - `updated`  — the manifest's last git-commit date (file mtime fallback).
 
 It is **derived from the manifests** — never hand-edit it. Regenerate with the
@@ -88,10 +88,10 @@ Runtime verbs (`runtime/host/toolkits.ex`, surfaced through the `work` CLI):
 
 | Verb                              | What it does                                            |
 |-----------------------------------|---------------------------------------------------------|
-| `work toolkit version <id>`        | Show the live version of one toolkit.                   |
-| `work toolkit live`                | Show the live version of every toolkit.                 |
-| `work toolkit versions <id>`       | List all available versions (releases.json ∪ manifest). |
-| `work toolkit rollback <id> <ver>` | Pin the live version to a prior released `<ver>`.        |
+| `work kit version <id>`        | Show the live version of one toolkit.                   |
+| `work kit live`                | Show the live version of every toolkit.                 |
+| `work kit versions <id>`       | List all available versions (releases.json ∪ manifest). |
+| `work kit rollback <id> <ver>` | Pin the live version to a prior released `<ver>`.        |
 
 **Rollback** pins `<id> -> <ver>` in `.live.json` (the version must appear in
 that toolkit's `versions`). To return to the tip, remove the pin (or

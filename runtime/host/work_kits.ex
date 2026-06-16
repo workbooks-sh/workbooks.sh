@@ -182,7 +182,7 @@ defmodule Workbooks.WorkKits do
     end
   end
 
-  # ── The `work toolkit` surface (wb-4bj.2) ──────────────────────────────────
+  # ── The `work kit` surface (wb-4bj.2) ──────────────────────────────────
   # The CLI help-wrapper that teaches an agent the underlying CLI from our skill
   # files. Thin reads over the on-disk org toolkits + the :role block executor.
   # Discovery rides discover_dir/1; these add the human/agent-facing rendering.
@@ -206,7 +206,7 @@ defmodule Workbooks.WorkKits do
     end
   end
 
-  @doc "`work toolkit list` — every toolkit under the root, keyed by id, with status + tagline."
+  @doc "`work kit list` — every toolkit under the root, keyed by id, with status + tagline."
   def list_text(root \\ default_root()) do
     case discover_dir(root) do
       [] ->
@@ -226,7 +226,7 @@ defmodule Workbooks.WorkKits do
   (V3 §P3) — progressive disclosure tier 1. One short entry per declared toolkit
   (tagline + skill slugs), plus the ONE query pattern for going deeper. Deliberately
   minimal: the index tells the agent WHAT exists and HOW to read more; the skill
-  bodies stay on demand (`work toolkit show <id> <skill>`), never in the prompt.
+  bodies stay on demand (`work kit show <id> <skill>`), never in the prompt.
 
   The declared list is first expanded over the `#+REQUIRES` dependency graph
   (`closure_disk/2`) so a toolkit's required toolkits land in the index too —
@@ -429,7 +429,7 @@ defmodule Workbooks.WorkKits do
   defp gen_block_hint("share"), do: " — member chips + invite (title; content = target/members/role)"
   defp gen_block_hint(_), do: ""
 
-  @doc "`work toolkit show <id>` — the manifest front door + the skill index."
+  @doc "`work kit show <id>` — the manifest front door + the skill index."
   def show_text(id, root \\ default_root()) do
     case tk_dir(id, root) do
       nil ->
@@ -437,12 +437,12 @@ defmodule Workbooks.WorkKits do
 
       dir ->
         File.read!(Path.join(dir, @manifest)) <>
-          "\n\nSkills (read with `work toolkit show #{id} <skill>`):\n" <>
+          "\n\nSkills (read with `work kit show #{id} <skill>`):\n" <>
           Enum.map_join(skills(dir), "\n", &("  " <> &1))
     end
   end
 
-  @doc "`work toolkit show <id> <skill>` — a skill body, with a #+CAPTION TOC header."
+  @doc "`work kit show <id> <skill>` — a skill body, with a #+CAPTION TOC header."
   def show_skill_text(id, slug, root \\ default_root()) do
     with dir when not is_nil(dir) <- tk_dir(id, root),
          path when not is_nil(path) <- skill_path(dir, slug) do
@@ -455,7 +455,7 @@ defmodule Workbooks.WorkKits do
     end
   end
 
-  @doc "`work toolkit search <q>` — substring match across all skills (path:line: text)."
+  @doc "`work kit search <q>` — substring match across all skills (path:line: text)."
   def search_text(query, root \\ default_root()) do
     q = String.downcase(query)
 
@@ -480,7 +480,7 @@ defmodule Workbooks.WorkKits do
     if hits == [], do: "(no matches for #{inspect(query)})", else: Enum.join(hits, "\n")
   end
 
-  @doc "`work toolkit verify <id>` — structural checks + run every :role pre block in the toolkit's skills."
+  @doc "`work kit verify <id>` — structural checks + run every :role pre block in the toolkit's skills."
   def verify_text(id, root \\ default_root()) do
     case tk_dir(id, root) do
       nil ->
@@ -506,7 +506,7 @@ defmodule Workbooks.WorkKits do
   end
 
   @doc """
-  `work toolkit eval <id>` — run the toolkit's bundled eval suite (Tier 1,
+  `work kit eval <id>` — run the toolkit's bundled eval suite (Tier 1,
   deterministic): each `evals/*.md` case's eval-role block runs under the
   same sandbox as verify (only with WB_TOOLKIT_EXEC=1), and PASSES on exit 0 +
   stdout containing the case's `EXPECT` substring (when set). See EVALS.md.
@@ -733,7 +733,7 @@ defmodule Workbooks.WorkKits do
   defp trust_checks(dir, %{trust: "third-party"}) do
     case manifest_provenance(dir) do
       {:ok, did} -> [{true, "third-party signature valid (#{did})"}]
-      {:error, why} -> [{false, "third-party provenance: #{why} (sign with `work toolkit sign <id>`)"}]
+      {:error, why} -> [{false, "third-party provenance: #{why} (sign with `work kit sign <id>`)"}]
     end
   end
 
@@ -753,7 +753,7 @@ defmodule Workbooks.WorkKits do
   Parse a toolkit's build descriptor from its `manifest.html`. Returns a map with
   `:exec`, `:build_src` (a `{:crate|:git|:path, value}` tuple or nil), `:build_lang`,
   `:caps` (list), `:cli_bin`, and `:arg_mode`. Missing keys are nil/[]. The
-  descriptor is what `work toolkit build`/`verify` act on.
+  descriptor is what `work kit build`/`verify` act on.
   """
   def descriptor(id, root \\ default_root()) do
     case tk_dir(id, root) do
@@ -861,7 +861,7 @@ defmodule Workbooks.WorkKits do
   defp blank_to_nil(s), do: s
 
   @doc """
-  `work toolkit build <id>` — the declarative auto-wrap. Read the toolkit's build
+  `work kit build <id>` — the declarative auto-wrap. Read the toolkit's build
   descriptor and materialize its CLI as a runnable command:
     - #+EXEC: command + #+BUILD_SRC crate:<name> → CommandRegistry.build_and_register_crate
     - #+EXEC: command + #+BUILD_SRC path:<dir>   → PackageManager.build_dir + register
@@ -873,7 +873,7 @@ defmodule Workbooks.WorkKits do
   @doc """
   Build a toolkit. A toolkit may hold a SET of build entries in `runtimes/*.html`
   (e.g. the `palette` toolkit = many language runtimes, one cohesive set) — then
-  `work toolkit build <id>` builds them all and `work toolkit build <id> <name>` builds
+  `work kit build <id>` builds them all and `work kit build <id> <name>` builds
   one. A plain single-CLI toolkit (no runtimes/) builds from its own manifest.
   """
   def build_text(id, which, root) do
@@ -889,7 +889,7 @@ defmodule Workbooks.WorkKits do
           # Supply-chain gate: an unsigned/tampered third-party toolkit never builds.
           d.trust == "third-party" and not match?({:ok, _}, manifest_provenance(dir)) ->
             {:error, why} = manifest_provenance(dir)
-            "#{id}: REFUSED — third-party toolkit with invalid provenance (#{why}); author must `work toolkit sign #{id}`"
+            "#{id}: REFUSED — third-party toolkit with invalid provenance (#{why}); author must `work kit sign #{id}`"
 
           entries == [] ->
             do_build(id, d)
@@ -914,7 +914,7 @@ defmodule Workbooks.WorkKits do
 
   @doc """
   Inline self-authoring (wb-rhs.4): build a command directly from a SOURCE FILE an
-  agent just wrote — no manifest ceremony. `work toolkit build-inline <name> <lang>
+  agent just wrote — no manifest ceremony. `work kit build-inline <name> <lang>
   <file>`. The agent writes the file in its workdir, then registers it as a
   runnable command in one step: write → build-in-sandbox → content-address →
   register. The built command is capped by the Instance's Policy profile like any
@@ -941,7 +941,7 @@ defmodule Workbooks.WorkKits do
   Instance dies) and materializes a real, source-owned toolkit dir under the
   toolkits root: manifest.org (#+EXEC: command, #+TRUST: first-party) + the source
   in the per-language layout build_dir expects + a skill stub. The result is a
-  normal toolkit — `work toolkit build` rebuilds it deterministically, it's
+  normal toolkit — `work kit build` rebuilds it deterministically, it's
   discoverable by `(tags :toolkit:)`, and it packs into a workbook for the
   registry (Library.store) and install elsewhere (Library.install).
 
@@ -983,7 +983,7 @@ defmodule Workbooks.WorkKits do
         File.write!(Path.join(dir, @manifest), promote_manifest(name, lang, build_src, tagline))
 
         "promoted session command → workspace toolkit `#{name}` at #{dir}\n" <>
-          "  build it: work toolkit build #{name}\n" <>
+          "  build it: work kit build #{name}\n" <>
           "  then it packs into a workbook (Library.store) and installs elsewhere (Library.install)"
     end
   end
@@ -1038,7 +1038,7 @@ defmodule Workbooks.WorkKits do
     Run it through the Dock: `run-command #{name}` (argv + stdin → stdout).
 
     ## Verification checklist
-    - [ ] `work toolkit build #{name}` registers the command
+    - [ ] `work kit build #{name}` registers the command
     - [ ] `run-command #{name}` produces expected output
     """
   end
@@ -1202,7 +1202,7 @@ defmodule Workbooks.WorkKits do
     do: "#{id}: no #+BUILD_SRC declared — nothing to build (declare crate:<name> | path:<dir> | wasm:<url> | archive:<url>)"
 
   defp do_build_clause(id, %{build_src: {:git, url}}),
-    do: "#{id}: #+BUILD_SRC git+#{url} not yet supported by `work toolkit build` (use crate: or path:)"
+    do: "#{id}: #+BUILD_SRC git+#{url} not yet supported by `work kit build` (use crate: or path:)"
 
   defp do_build_clause(id, %{build_src: {:unknown, spec}}),
     do: "#{id}: unrecognized #+BUILD_SRC #{inspect(spec)} (expected crate:<name> | git+<url> | path:<dir>)"
@@ -1211,7 +1211,7 @@ defmodule Workbooks.WorkKits do
   defp error_text(reason), do: inspect(reason)
 
   @doc """
-  `work toolkit run <id> <task> -- <args...>` — DISABLED (wb-9ja). A `:role task`
+  `work kit run <id> <task> -- <args...>` — DISABLED (wb-9ja). A `:role task`
   block is arbitrary NATIVE bash; native execution is banned, and this surface is
   reachable by the in-sandbox agent (its `work` tool), so it must never run native
   code. The toolkit's CLI is meant to ship as a WASM command (the Dock-gated
@@ -1237,7 +1237,7 @@ defmodule Workbooks.WorkKits do
 
           "#{id} is a direct-verb toolkit — its skills document built-in `work` verbs, " <>
             "not a runnable command. Run it DIRECTLY through your `work` tool: `#{suggested}` " <>
-            "(don't use `work toolkit run` for #{id})."
+            "(don't use `work kit run` for #{id})."
         else
           "refusing to run #{id}/#{task}: native :role bash execution removed (wb-9ja). " <>
             "Ship the toolkit CLI as a WASM command and run it via the Dock-gated run-command path."
@@ -1254,7 +1254,7 @@ defmodule Workbooks.WorkKits do
 
   # Is the declared #+EXEC mode satisfiable right now?
   #   command  → CLI_BIN already a registered command, OR a #+BUILD_SRC that can
-  #              produce it (so `work toolkit build` would satisfy it).
+  #              produce it (so `work kit build` would satisfy it).
   #   posix    → CLI_BIN resolves on PATH.
   #   task     → at least one skill carries a :role task block.
   #   federation → a plugin/ data-source face exists.
@@ -1293,7 +1293,7 @@ defmodule Workbooks.WorkKits do
     cond do
       is_nil(bin) -> [{false, "exec: command but no CLI_BIN declared"}]
       registered? -> [{true, "exec: command — #{bin} registered"}]
-      buildable? -> [{true, "exec: command — #{bin} not yet registered, build descriptor present (run `work toolkit build`)"}]
+      buildable? -> [{true, "exec: command — #{bin} not yet registered, build descriptor present (run `work kit build`)"}]
       true -> [{false, "exec: command — #{bin} not registered and no buildable #+BUILD_SRC"}]
     end
   end
@@ -1306,13 +1306,13 @@ defmodule Workbooks.WorkKits do
     end
   end
 
-  defp exec_checks(%{exec: "task"}), do: [{true, "exec: task (recipes run via `work toolkit run`)"}]
+  defp exec_checks(%{exec: "task"}), do: [{true, "exec: task (recipes run via `work kit run`)"}]
   defp exec_checks(%{exec: "federation"}), do: [{true, "exec: federation (data-source/sync faces)"}]
 
   defp exec_checks(%{exec: "kernel", cli_bin: bin}) do
     if is_binary(bin) and bin in Workbooks.KernelRegistry.list(),
       do: [{true, "exec: kernel — #{bin} registered (open via Workbooks.Kernel / Fabric.map_kernel)"}],
-      else: [{true, "exec: kernel — #{bin} not yet built (run `work toolkit build`)"}]
+      else: [{true, "exec: kernel — #{bin} not yet built (run `work kit build`)"}]
   end
 
   defp exec_checks(%{exec: "component"}),
@@ -1417,7 +1417,7 @@ defmodule Workbooks.WorkKits do
   #
   # A :role bash block from a discovered toolkit dir is arbitrary NATIVE bash. The
   # no-native-exec canon makes it IMPOSSIBLE for the in-sandbox agent (and the
-  # toolkit verify/eval/run surfaces it reaches via `work toolkit run`) to execute
+  # toolkit verify/eval/run surfaces it reaches via `work kit run`) to execute
   # native code. So this lane no longer shells out at all — `Workbooks.Sandbox`
   # (the old bwrap/seatbelt native isolator) was DELETED, and `run_bash` returns an
   # honest "disabled" result instead of forking bash.
@@ -1439,7 +1439,7 @@ defmodule Workbooks.WorkKits do
   # rewrites that pin. Pure-Elixir, no network — these are plain file reads/writes
   # over the toolkits root, mirroring discovery (a toolkit is a directory).
 
-  @doc "`work toolkit versions <id>` — available versions/tags for a toolkit (releases.json ∪ manifest VERSION)."
+  @doc "`work kit versions <id>` — available versions/tags for a toolkit (releases.json ∪ manifest VERSION)."
   def versions_text(id, root \\ default_root()) do
     case tk_dir(id, root) do
       nil ->
@@ -1461,7 +1461,7 @@ defmodule Workbooks.WorkKits do
   end
 
   @doc """
-  `work toolkit live [<id>]` — the currently-live version. With an id, that one
+  `work kit live [<id>]` — the currently-live version. With an id, that one
   toolkit; without, every toolkit's live pin (the manifest VERSION when unpinned).
   """
   def live_text(id_or_root \\ nil, root \\ default_root())
@@ -1491,7 +1491,7 @@ defmodule Workbooks.WorkKits do
   end
 
   @doc """
-  `work toolkit rollback <id> <version>` — set the live version back to an older
+  `work kit rollback <id> <version>` — set the live version back to an older
   release. Validates the version exists for the toolkit, then writes the pin into
   `toolkits/.live.json` (created/merged in place). Idempotent.
   """
@@ -1505,7 +1505,7 @@ defmodule Workbooks.WorkKits do
 
         cond do
           version in [nil, ""] ->
-            "rollback #{id}: no version given (try `work toolkit versions #{id}`)"
+            "rollback #{id}: no version given (try `work kit versions #{id}`)"
 
           version not in vs ->
             "rollback #{id}: no such version #{inspect(version)} (have: #{Enum.join(vs, ", ")})"

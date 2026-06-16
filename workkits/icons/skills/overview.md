@@ -52,5 +52,5 @@
 
 # Verification checklist
   - [ ] `node test/icons.test.mjs` — all checks green
-  - [ ] `work toolkit verify icons` — structural checks pass
-  - [ ] `work toolkit build icons` — registers the `icons` command (provisioned runtime)
+  - [ ] `work kit verify icons` — structural checks pass
+  - [ ] `work kit build icons` — registers the `icons` command (provisioned runtime)

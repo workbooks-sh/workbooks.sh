@@ -4,8 +4,8 @@
 
   Everything here is a BUILT-IN `work` verb — run it DIRECTLY through your `work` tool
   (args="deploy status", args="publish apply x.org"). These are NOT compiled
-  command-toolkits: do NOT wrap them in `work toolkit run …` (that path is refused
-  for deploy/publish). `work toolkit show …` is only for READING these skills.
+  command-toolkits: do NOT wrap them in `work kit run …` (that path is refused
+  for deploy/publish). `work kit show …` is only for READING these skills.
 
 # What this toolkit is
 
@@ -60,4 +60,4 @@
     (don't invent a URL, status, or any result you didn't observe).
   - Prefer `validate` before `apply`; prefer `--json` when you need to branch on
     the outcome. Read a skill for detail:
-    `work toolkit show workbooks-cli <skill>` (deploy, publish).
+    `work kit show workbooks-cli <skill>` (deploy, publish).

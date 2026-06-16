@@ -38,7 +38,7 @@ defmodule Workbooks.CLI.Runtime do
   def ctk(_, _), do: {ctk_usage(), true}
 
   @doc """
-  `work toolkit …` over RCP — the shipped escript can't load the wasmex/sqlite NIFs
+  `work kit …` over RCP — the shipped escript can't load the wasmex/sqlite NIFs
   from its archive, so toolkit verbs run SERVER-SIDE in the connected runtime
   (where they work) via /rcp/toolkit/*. Same target + transport as the rest.
   """
@@ -86,7 +86,7 @@ defmodule Workbooks.CLI.Runtime do
 
   defp toolkit_usage do
     """
-    work toolkit list | show <id> [skill] | search <q> | verify <id> | eval <id> | build <id> [which] | sign <id>
+    work kit list | show <id> [skill] | search <q> | verify <id> | eval <id> | build <id> [which] | sign <id>
                 | versions <id> | live [<id>] | rollback <id> <version>
 
     Runs against the connected runtime (toolkit verbs execute server-side; the

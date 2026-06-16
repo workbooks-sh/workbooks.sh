@@ -24,7 +24,7 @@ COST: free
 
 ## Build the kernel in-sandbox and register it
 ```bash
-     work toolkit build mono
+     work kit build mono
 ```
 
   2. Loop it engine-side (the hot path):
@@ -54,10 +54,10 @@ COST: free
 
 # Verification checklist
 
-  - [ ] `work toolkit build mono` reports "registered kernel"
+  - [ ] `work kit build mono` reports "registered kernel"
   - [ ] a 4-byte input `[10,20,30,255]` returns `[20,20,20,255]`
 
 # See also
 
-  - `work toolkit show mono` — the manifest + ABI summary
+  - `work kit show mono` — the manifest + ABI summary
   - runtime/host/kernel.ex — the host side of the ABI (authoritative)

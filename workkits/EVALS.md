@@ -12,7 +12,7 @@ bundled IN the toolkit, so
 - a CONSUMER can run those evals against their own runtime/data to validate it
   before trusting it (or extend them).
 
-It is the behavioral complement to `work toolkit verify`: **verify** asks "does it
+It is the behavioral complement to `work kit verify`: **verify** asks "does it
 load / is the contract satisfiable" (structural + `:role pre`); **eval** asks
 "does it DO the right thing." Both run under the same default-deny sandbox.
 
@@ -21,7 +21,7 @@ One case per file under `toolkits/<name>/evals/*`. A case is an
 `eval`-tagged node + a header declaring the expectation. Two tiers; an
 author ships whichever fits (a toolkit may ship both).
 
-### Tier 1 — deterministic (BUILT: `work toolkit eval <id>`)
+### Tier 1 — deterministic (BUILT: `work kit eval <id>`)
 A `:role eval` bash block + an `EXPECT:` substring. The block runs under
 `Workbooks.Sandbox` (network-denied, fs-confined, wall-clock-capped) — the
 SAME executor as verify's `:role pre` — and ONLY when `WB_TOOLKIT_EXEC=1`.
@@ -58,7 +58,7 @@ with `WB_EVAL_MODEL`, both with `WB_LLM_MODEL`). Needs an LLM key
 The judge's verdict is its first line (`PASS`/`FAIL`) + one line of reasoning.
 
 ## Running
-- `work toolkit eval <id>`      — run a toolkit's eval suite (Tier 1 + Tier 2).
+- `work kit eval <id>`      — run a toolkit's eval suite (Tier 1 + Tier 2).
 - `work dev eval [toolkit]`     — dev-service entry: list eval suites / run them.
 - Gating: Tier-1 bash runs only with `WB_TOOLKIT_EXEC=1` (else reported SKIPPED,
   like verify). Tier-2 needs a runtime + an LLM key.
@@ -69,7 +69,7 @@ The judge's verdict is its first line (`PASS`/`FAIL`) + one line of reasoning.
 - [ ] Deterministic cases are hermetic (no network; the sandbox denies it).
 - [ ] Tier-2 cases carry `TASK` + `RUBRIC` and name the toolkit verbs the
       agent should reach for.
-- [ ] `work toolkit eval <id>` passes locally (with `WB_TOOLKIT_EXEC=1`).
+- [ ] `work kit eval <id>` passes locally (with `WB_TOOLKIT_EXEC=1`).
 
 ## See also
 - AUTHORING.md — the manifest + skill standard (verify, :role pre/post).

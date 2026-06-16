@@ -17,11 +17,11 @@ read its skill, run its command.
 # Discover and read (progressive disclosure)
 
 ```bash
-work toolkit list                 # every installed toolkit: id · status · tagline
-work toolkit search <query>       # substring search across all skills
-work toolkit show <id>            # the toolkit's manifest front door + skill index
-work toolkit show <id> <skill>    # ONE skill body, loaded only when you reach it
-work toolkit run <id> <task> -- <args…>   # run a skill's :role task block
+work kit list                 # every installed toolkit: id · status · tagline
+work kit search <query>       # substring search across all skills
+work kit show <id>            # the toolkit's manifest front door + skill index
+work kit show <id> <skill>    # ONE skill body, loaded only when you reach it
+work kit run <id> <task> -- <args…>   # run a skill's :role task block
 ```
 
 Discipline: read `show <id>` (tier 1) to confirm you're in the right place,
@@ -46,8 +46,8 @@ lanes themselves run in the sandbox):
 ```bash
 work compiler list                       # installed compilers
 work compiler run <lang> <file> [argv…]  # compile + run a source file in-sandbox
-work toolkit build-inline <name> <lang> <file>   # one source file → a session command
-work toolkit promote <name> <lang> <file>        # session command → durable toolkit
+work kit build-inline <name> <lang> <file>   # one source file → a session command
+work kit promote <name> <lang> <file>        # session command → durable toolkit
 ```
 
 Lanes: C / Zig (clang/zig to `wasm32-wasi`), Rust (full-std, in-sandbox
@@ -71,7 +71,7 @@ dir under the toolkits root with a `manifest.org` (`#+EXEC: command`,
 packable. Verify before relying on it:
 
 ```bash
-work toolkit verify <id>          # structural + #+EXEC satisfiability + :role pre
+work kit verify <id>          # structural + #+EXEC satisfiability + :role pre
 ```
 
 Treat an unbuilt or unverifiable command as *not shipped*. Write the skill
@@ -81,6 +81,6 @@ real failure modes — no project history, no internal references.
 # Done-when
 
 The capability task is done when the command runs and returns what the skill
-promised, `work toolkit verify` passes for anything you authored, and you
+promised, `work kit verify` passes for anything you authored, and you
 stayed inside the stated budget. If a capability truly needs native OS
 exec, stop and report it as host-brokered work, not a thing you can install.

@@ -2,7 +2,7 @@ defmodule Workbooks.ToolkitBuildTest do
   @moduledoc """
   P4 — declarative auto-wrap from the manifest. Proves the full vertical:
   parse #+EXEC/#+BUILD_SRC/#+CAPS from a real toolkit manifest, then
-  `work toolkit build` compiles a third-party crate (huniq) to wasm32-wasip1 and
+  `work kit build` compiles a third-party crate (huniq) to wasm32-wasip1 and
   registers it as a command runnable through CommandRegistry.
   """
   use ExUnit.Case, async: false
@@ -62,8 +62,8 @@ defmodule Workbooks.ToolkitBuildTest do
 
   # SECURITY REGRESSION (finding #12): a toolkit declaring `#+CLI_BIN: jq` +
   # `#+BUILD_SRC: crate:<anything>` must NOT be able to shadow the jq built-in.
-  # `work toolkit build` refuses with a clear error BEFORE any compile runs.
-  test "work toolkit build refuses a reserved CLI_BIN (no shadowing of jq)" do
+  # `work kit build` refuses with a clear error BEFORE any compile runs.
+  test "work kit build refuses a reserved CLI_BIN (no shadowing of jq)" do
     base = Path.join(System.tmp_dir!(), "wb_tk_resv_#{System.unique_integer([:positive])}")
     root = Path.join(base, "root")
     tk = Path.join(root, "evil")
@@ -85,7 +85,7 @@ defmodule Workbooks.ToolkitBuildTest do
 
   @tag :build
   @tag timeout: 420_000
-  test "work toolkit build huniq compiles the crate, registers it, and it runs" do
+  test "work kit build huniq compiles the crate, registers it, and it runs" do
     out = WorkKits.build_text("huniq")
     assert out =~ "registered command \"huniq\"", "build output: #{out}"
     assert "huniq" in CommandRegistry.list()

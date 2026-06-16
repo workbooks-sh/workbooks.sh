@@ -8,4 +8,4 @@
 
 A Tier-2 case: an agent answers the TASK, a judge scores the result against the
 RUBRIC. Non-exec (pure reasoning) so it needs only an LLM key, not
-WB_TOOLKIT_EXEC. Run with `work toolkit eval git`.
+WB_TOOLKIT_EXEC. Run with `work kit eval git`.

@@ -44,17 +44,21 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
-      # Release/version verbs are HOST-side & LOCAL (read toolkits/releases.json +
-      # .live.json from the repo) — no runtime needed, so handle before the RCP branch.
-      ["toolkit", "versions", id] -> IO.puts(Workbooks.WorkKits.versions_text(id))
-      ["toolkit", "live"] -> IO.puts(Workbooks.WorkKits.live_text())
-      ["toolkit", "live", id] -> IO.puts(Workbooks.WorkKits.live_text(id, Workbooks.WorkKits.default_root()))
-      ["toolkit", "rollback", id, version] -> IO.puts(Workbooks.WorkKits.rollback_text(id, version))
+      # `work toolkit …` stays a transparent alias for `work kit …` (the Rust thin
+      # client still emits `toolkit` until its own rename; old muscle memory too).
+      ["toolkit" | rest] -> main(["kit" | rest])
 
-      # `work toolkit …` — toolkit surface over RCP (server-side; the escript can't
+      # Release/version verbs are HOST-side & LOCAL (read workkits/releases.json +
+      # .live.json from the repo) — no runtime needed, so handle before the RCP branch.
+      ["kit", "versions", id] -> IO.puts(Workbooks.WorkKits.versions_text(id))
+      ["kit", "live"] -> IO.puts(Workbooks.WorkKits.live_text())
+      ["kit", "live", id] -> IO.puts(Workbooks.WorkKits.live_text(id, Workbooks.WorkKits.default_root()))
+      ["kit", "rollback", id, version] -> IO.puts(Workbooks.WorkKits.rollback_text(id, version))
+
+      # `work kit …` — toolkit surface over RCP (server-side; the escript can't
       # load the NIFs). HOST-side HTTP client → /rcp/toolkit/*. In-process callers
       # (an agent running work as a tool) still use `call/2` directly.
-      ["toolkit" | rest] ->
+      ["kit" | rest] ->
         {out, failed?} = Workbooks.CLI.Runtime.toolkit(rest)
         IO.puts(out)
         if failed?, do: System.halt(1)
@@ -485,31 +489,32 @@ defmodule Workbooks.CLI do
 
   # WorkKits (wb-4bj.2) — the agent's extensibility surface: discover toolkits and
   # read their progressive-disclosure skill recipes on demand (the CLI help-wrapper).
-  def call(["toolkit"], _t), do: WorkKits.list_text()
-  def call(["toolkit", "list"], _t), do: WorkKits.list_text()
-  def call(["toolkit", "show", id], _t), do: WorkKits.show_text(id)
-  def call(["toolkit", "show", id, skill], _t), do: WorkKits.show_skill_text(id, skill)
-  def call(["toolkit", "search" | q], _t), do: WorkKits.search_text(Enum.join(q, " "))
-  def call(["toolkit", "verify", id], _t), do: WorkKits.verify_text(id)
-  def call(["toolkit", "eval", id], _t), do: WorkKits.eval_text(id)
-  # `work toolkit eval <id> <case>` — run ONE eval whose filename contains <case>.
-  def call(["toolkit", "eval", id, filter], _t),
+  def call(["toolkit" | rest], t), do: call(["kit" | rest], t)
+  def call(["kit"], _t), do: WorkKits.list_text()
+  def call(["kit", "list"], _t), do: WorkKits.list_text()
+  def call(["kit", "show", id], _t), do: WorkKits.show_text(id)
+  def call(["kit", "show", id, skill], _t), do: WorkKits.show_skill_text(id, skill)
+  def call(["kit", "search" | q], _t), do: WorkKits.search_text(Enum.join(q, " "))
+  def call(["kit", "verify", id], _t), do: WorkKits.verify_text(id)
+  def call(["kit", "eval", id], _t), do: WorkKits.eval_text(id)
+  # `work kit eval <id> <case>` — run ONE eval whose filename contains <case>.
+  def call(["kit", "eval", id, filter], _t),
     do: WorkKits.eval_text(id, WorkKits.default_root(), filter)
   # `work eval components [case]` — the component-emit eval pack (text + voice parity).
   def call(["eval", "components"], _t), do: Workbooks.Evals.Components.run()
   def call(["eval", "components", filter], _t), do: Workbooks.Evals.Components.run(filter)
-  def call(["toolkit", "sign", id], t), do: WorkKits.sign_text(id, t)
-  def call(["toolkit", "versions", id], _t), do: WorkKits.versions_text(id)
-  def call(["toolkit", "live"], _t), do: WorkKits.live_text()
-  def call(["toolkit", "live", id], _t), do: WorkKits.live_text(id, WorkKits.default_root())
-  def call(["toolkit", "rollback", id, version], _t), do: WorkKits.rollback_text(id, version)
-  def call(["toolkit", "build", id], _t), do: WorkKits.build_text(id)
-  def call(["toolkit", "build", id, which], _t), do: WorkKits.build_text(id, which, WorkKits.default_root())
-  def call(["toolkit", "build-inline", name, lang, file], _t), do: WorkKits.build_inline_text(name, lang, file)
-  def call(["toolkit", "promote", name, lang, file], _t), do: WorkKits.promote_text(name, lang, file)
+  def call(["kit", "sign", id], t), do: WorkKits.sign_text(id, t)
+  def call(["kit", "versions", id], _t), do: WorkKits.versions_text(id)
+  def call(["kit", "live"], _t), do: WorkKits.live_text()
+  def call(["kit", "live", id], _t), do: WorkKits.live_text(id, WorkKits.default_root())
+  def call(["kit", "rollback", id, version], _t), do: WorkKits.rollback_text(id, version)
+  def call(["kit", "build", id], _t), do: WorkKits.build_text(id)
+  def call(["kit", "build", id, which], _t), do: WorkKits.build_text(id, which, WorkKits.default_root())
+  def call(["kit", "build-inline", name, lang, file], _t), do: WorkKits.build_inline_text(name, lang, file)
+  def call(["kit", "promote", name, lang, file], _t), do: WorkKits.promote_text(name, lang, file)
   def call(["isolation"], _t), do: Workbooks.Isolation.describe()
 
-  def call(["toolkit", "run", id, task | rest], _t),
+  def call(["kit", "run", id, task | rest], _t),
     do: WorkKits.run_task_text(id, task, Enum.drop_while(rest, &(&1 == "--")))
 
   # Autopoet (wb-9ae / wb-pow) — the central self-improvement agent as an ON-DEMAND
@@ -763,18 +768,18 @@ defmodule Workbooks.CLI do
       work mirror [--forge github|gitlab|gitea] [--repo n] [--public]   auto-provision + push
       work radicle                           federate the tenant repo over Radicle (P2P)
       work unpack <bundle> <dest>            disassemble a parent workbook → flat tree
-      work toolkit [list]                    list discoverable toolkits (id · status · tagline)
-      work toolkit show <id> [<skill>]       manifest + skill index, or one skill (with CAPTION TOC)
-      work toolkit search <query>            substring search across all skills
-      work toolkit verify <id>               structural checks + #+EXEC satisfiable + run :role pre blocks
-      work toolkit versions <id>             list available versions/tags (releases.json ∪ manifest VERSION)
-      work toolkit live [<id>]               show the currently-live version (all toolkits, or one)
-      work toolkit rollback <id> <version>   pin the live version back to an older release
-      work toolkit build <id>                declarative auto-wrap: build #+BUILD_SRC → register the command
-      work toolkit build-inline <name> <lang> <file>  self-author: build a source file → register a command (rust/c/zig/js/ts/go)
-      work toolkit promote <name> <lang> <file>       promote a session command → durable workspace toolkit (source-owned, packable)
+      work kit [list]                    list discoverable toolkits (id · status · tagline)
+      work kit show <id> [<skill>]       manifest + skill index, or one skill (with CAPTION TOC)
+      work kit search <query>            substring search across all skills
+      work kit verify <id>               structural checks + #+EXEC satisfiable + run :role pre blocks
+      work kit versions <id>             list available versions/tags (releases.json ∪ manifest VERSION)
+      work kit live [<id>]               show the currently-live version (all toolkits, or one)
+      work kit rollback <id> <version>   pin the live version back to an older release
+      work kit build <id>                declarative auto-wrap: build #+BUILD_SRC → register the command
+      work kit build-inline <name> <lang> <file>  self-author: build a source file → register a command (rust/c/zig/js/ts/go)
+      work kit promote <name> <lang> <file>       promote a session command → durable workspace toolkit (source-owned, packable)
       work isolation                                  show the isolation-tier ladder (the (width,tier) depth knob)
-      work toolkit run <id> <task> -- <args> run a skill's :role task block with positional args
+      work kit run <id> <task> -- <args> run a skill's :role task block with positional args
       work publish init                          scaffold ./publish.html
       work publish validate                      coherence-check it
       work publish apply <file.html>             render + deploy → live URL

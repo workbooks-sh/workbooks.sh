@@ -3,9 +3,9 @@
 # How to invoke (read this first)
 
   Every command below is a BUILT-IN `work` verb — run it DIRECTLY through your `work`
-  tool (args="app status", args="model get"). Do NOT wrap them in `work toolkit
+  tool (args="app status", args="model get"). Do NOT wrap them in `work kit
   run …` (that's only for compiled command-toolkits, and is refused here).
-  `work toolkit show …` just READS these skills.
+  `work kit show …` just READS these skills.
 
 # What this toolkit is
 
@@ -65,5 +65,5 @@
 
   Only promise what's listed above. Theme AUTHORING and workspace SWITCHING are
   not wired yet — say so rather than inventing a command. Read a skill for detail:
-  `work toolkit show workbooks-browser <skill>` (tab-control, app-control,
+  `work kit show workbooks-browser <skill>` (tab-control, app-control,
   key-prompt, models).

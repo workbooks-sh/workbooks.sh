@@ -1,6 +1,6 @@
 defmodule Workbooks.ToolkitVerifyCapsTest do
   @moduledoc """
-  wb-pkh.6 — `work toolkit verify` cross-checks declared #+CAPS against Policy: every
+  wb-pkh.6 — `work kit verify` cross-checks declared #+CAPS against Policy: every
   cap must be grantable, and some profile must grant the whole set, else the
   toolkit could never instantiate (it would import a cap no profile provides).
   """

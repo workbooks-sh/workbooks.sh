@@ -40,7 +40,7 @@ defmodule Workbooks.CLI.Dev do
   end
 
   # work dev eval — list toolkits that ship an eval suite (evals/*.md); run one
-  # with `work dev eval <id>` (= work toolkit eval, sandboxed; set WB_TOOLKIT_EXEC=1).
+  # with `work dev eval <id>` (= work kit eval, sandboxed; set WB_TOOLKIT_EXEC=1).
   defp eval_list do
     root = toolkits_root()
 

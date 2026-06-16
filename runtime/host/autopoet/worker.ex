@@ -78,7 +78,7 @@ defmodule Workbooks.Autopoet.Worker do
 
   # The workspace IS the toolkits root (the def's contract: "your working
   # directory IS the toolkits tree"). Pin WB_WORKKITS_ROOT to it so the autopoet's
-  # OWN `work toolkit verify`/`list` resolve to exactly where it authors — otherwise
+  # OWN `work kit verify`/`list` resolve to exactly where it authors — otherwise
   # it cannot verify its own work and falls back to claiming DONE on a shell
   # smoke-test (the iter-9 false-DONE root cause). Idempotent — safe to call from
   # both the GenServer init and an on-demand `drain_one/0`.
@@ -183,7 +183,7 @@ defmodule Workbooks.Autopoet.Worker do
   # HONESTY GATE: a self-reported DONE is the agent grading its own homework —
   # and it over-claims (it once returned "DONE … registration blocked by host
   # gap" on a stub toolkit that fails verify). So the worker does NOT trust the
-  # word DONE: it INDEPENDENTLY runs `work toolkit verify` on whatever toolkit this
+  # word DONE: it INDEPENDENTLY runs `work kit verify` on whatever toolkit this
   # run newly authored. DONE is honored only if a fresh toolkit verifies clean;
   # otherwise the issue stays OPEN with the verify output as evidence. Same trust
   # boundary as the confinement guard — enforce host-side, don't trust the agent.
@@ -224,7 +224,7 @@ defmodule Workbooks.Autopoet.Worker do
     do: {:done, note <> " ✔ worker-verified: #{Enum.join(names, ", ")}"}
 
   def decide(_note, {:fail, report}),
-    do: {:open, "DONE claimed but the worker's `work toolkit verify` FAILED — an unverified capability is not shipped:\n#{report}"}
+    do: {:open, "DONE claimed but the worker's `work kit verify` FAILED — an unverified capability is not shipped:\n#{report}"}
 
   def decide(_note, :none),
     do: {:open, "DONE claimed but this run authored no verifiable toolkit (worker check). If you edited an existing artifact, say which and re-run; nothing was registered to verify."}
@@ -301,7 +301,7 @@ defmodule Workbooks.Autopoet.Worker do
     `mkdir`, will not create parent dirs, and its cwd is not stable between
     commands — shell redirection is for running commands, not writing files.
     Follow the autopoiesis laws in your system prompt: edit the declarative layer
-    only, never native code; TEST before you register (`work toolkit verify <id>`);
+    only, never native code; TEST before you register (`work kit verify <id>`);
     a gap that needs a NEW host primitive is not yours to build — end with
     `HOST: <what primitive>`.
 

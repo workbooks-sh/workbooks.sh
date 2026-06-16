@@ -63,7 +63,7 @@ defmodule Workbooks.CommandRegistry do
 
   # SECURITY (wb-sec): built-in names are RESERVED. A dynamic registration must
   # never shadow jq/grep/upper — otherwise any caller that can reach register/3
-  # (or a data-driven `work toolkit build`) silently hijacks a trusted command for
+  # (or a data-driven `work kit build`) silently hijacks a trusted command for
   # every Instance (semantic supply-chain attack). registry/0 also merges with
   # @builtins LAST so even a stale/poisoned dynamic key cannot win at lookup.
   @reserved Map.keys(@builtins)
@@ -699,7 +699,7 @@ defmodule Workbooks.CommandRegistry do
   / `wasm-tools build.sh`: it builds the trusted TOOLS (the wasm compilers), never
   untrusted USER source. So it runs the script via plain `System.cmd("bash", …)`
   (host provisioning), exactly like those siblings. It is NOT reachable from the
-  in-sandbox agent: the only agent-facing caller (`work toolkit build` with a
+  in-sandbox agent: the only agent-facing caller (`work kit build` with a
   `script:` #+BUILD_SRC from an untrusted toolkit dir) is DISABLED in
   Workbooks.WorkKits. The ban is on the AGENT running native code / the runtime
   native-compiling UNTRUSTED source — not on the host provisioning its own trusted

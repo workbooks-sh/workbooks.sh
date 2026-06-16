@@ -12,12 +12,12 @@ DESTRUCTIVE: no
 
 ## build + register every runtime in the set
 ```bash
-  work toolkit build palette
+  work kit build palette
 ```
 
 ## or just one
 ```bash
-  work toolkit build palette python
+  work kit build palette python
 ```
 
 # Run source in the sandbox

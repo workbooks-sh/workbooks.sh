@@ -3,7 +3,7 @@
 # How to invoke (read this first)
 
   These are BUILT-IN `work` verbs. Run them DIRECTLY through your `work` tool —
-  e.g. args="deploy status". Do NOT wrap them in `work toolkit run …` (that path is
+  e.g. args="deploy status". Do NOT wrap them in `work kit run …` (that path is
   for compiled command-toolkits and will be refused for deploy). The command is
   literally `work deploy <verb>`, nothing more.
 

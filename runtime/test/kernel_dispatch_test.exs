@@ -1,6 +1,6 @@
 defmodule Workbooks.KernelDispatchTest do
   @moduledoc """
-  wb-pkh.11 — a toolkit declares #+EXEC: kernel and `work toolkit build` produces a
+  wb-pkh.11 — a toolkit declares #+EXEC: kernel and `work kit build` produces a
   bytes→bytes reactor, registered in KernelRegistry and opened by name (the
   manifest-declaration convenience over the wb-pkh.1 source→kernel recipe).
   """
@@ -37,7 +37,7 @@ defmodule Workbooks.KernelDispatchTest do
   end
 
   @tag :build
-  test "work toolkit build of an #+EXEC: kernel toolkit → registered kernel → open by name → run" do
+  test "work kit build of an #+EXEC: kernel toolkit → registered kernel → open by name → run" do
     root = Path.join(System.tmp_dir!(), "wb-kdisp-#{System.unique_integer([:positive])}")
     File.mkdir_p!(root)
     name = "kr#{System.unique_integer([:positive])}"

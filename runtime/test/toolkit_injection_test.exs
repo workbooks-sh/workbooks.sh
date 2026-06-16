@@ -105,13 +105,13 @@ defmodule Workbooks.ToolkitInjectionTest do
   end
 
   test "toolkit run on a direct-verb toolkit guides to the DIRECT work command (self-correction)" do
-    # The real eval-failure root cause: agents tried `work toolkit run workbooks-cli
+    # The real eval-failure root cause: agents tried `work kit run workbooks-cli
     # deploy status` (refused) instead of `work deploy status`. The refusal now names
     # the exact direct command so the agent self-corrects at the point of error.
     cli = WorkKits.run_task_text("workbooks-cli", "deploy", ["status"])
     assert cli =~ "direct-verb"
     assert cli =~ "work deploy status"
-    assert cli =~ "don't use `work toolkit run`"
+    assert cli =~ "don't use `work kit run`"
 
     browser = WorkKits.run_task_text("workbooks-browser", "app", ["status"])
     assert browser =~ "work app status"

@@ -205,7 +205,7 @@ defmodule Workbooks.Demos.Seed do
       dest = Path.join(tk_root, tk)
       File.rm_rf!(dest)
       copy_tree(Path.join(@seed_dir, "toolkits/#{tk}"), dest)
-      # Sign as the owning tenant so `work toolkit verify` is green on a
+      # Sign as the owning tenant so `work kit verify` is green on a
       # #+TRUST: third-party manifest.
       signed = Workbooks.WorkKits.sign_text(tk, m.toolkits_owner, tk_root)
       %{toolkit: tk, root: dest, signed: signed}
