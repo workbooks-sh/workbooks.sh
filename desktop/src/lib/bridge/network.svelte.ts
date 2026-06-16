@@ -152,6 +152,16 @@ export async function workosSignIn(
   brokerUrl: string,
   organizationId?: string,
 ): Promise<StoredSession> {
+  // Unsigned DEV builds can't reliably register the workbooks:// URL scheme on macOS
+  // (LaunchServices only trusts a signed, Info.plist-declared handler), so dev uses the
+  // loopback flow. Signed RELEASE builds use the native deep link below.
+  if (import.meta.env.DEV) {
+    return invoke<StoredSession>("workos_sign_in", {
+      brokerUrl,
+      organizationId: organizationId ?? null,
+    });
+  }
+
   // Deep-link flow (the idiomatic Tauri pattern): arm a one-shot listener for the
   // workbooks://auth/callback?code=… deep link, THEN open the browser. The OS routes
   // the callback straight back to the app — no loopback server, no tab to close.

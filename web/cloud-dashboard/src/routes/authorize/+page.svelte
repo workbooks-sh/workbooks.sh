@@ -8,7 +8,7 @@
 
 <svelte:head><title>Authorize Workbooks</title></svelte:head>
 
-<div class="wrap">
+<div class="authwrap">
   <div class="aurora" aria-hidden="true"></div>
 
   <form
@@ -54,7 +54,7 @@
 </div>
 
 <style>
-  .wrap {
+  .authwrap {
     position: fixed;
     inset: 0;
     display: grid;
