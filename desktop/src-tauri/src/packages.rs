@@ -307,8 +307,17 @@ pub struct WorkbookEntry {
 #[tauri::command]
 pub fn package_workbooks(name: String) -> Result<Vec<WorkbookEntry>, String> {
     let pkg = load_package(&name)?;
+    Ok(scan_workbooks(&pkg.folders))
+}
+
+/// Walk the given folders for *.html/*.htm files carrying the workbook-spec
+/// marker; title from the spec (or the filename). Pure over its folder list so
+/// the sidebar's "does a workbook file actually show up" data layer is testable
+/// without the real monorepo. (The agent/bundle produces these one-file `.html`
+/// workbooks; a bare non-marker file is correctly NOT listed.)
+pub(crate) fn scan_workbooks(folders: &[String]) -> Vec<WorkbookEntry> {
     let mut html: Vec<String> = Vec::new();
-    for folder in &pkg.folders {
+    for folder in folders {
         for entry in walkdir::WalkDir::new(folder).into_iter().flatten() {
             let ext = entry
                 .path()
@@ -341,7 +350,49 @@ pub fn package_workbooks(name: String) -> Result<Vec<WorkbookEntry>, String> {
         })
         .collect();
     entries.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
-    Ok(entries)
+    entries
+}
+
+#[cfg(test)]
+mod scan_workbooks_tests {
+    use super::scan_workbooks;
+
+    // The sidebar's data layer: a spec-marked .html in a package folder IS listed
+    // (so an agent/bundle-written workbook appears); a marker-less .html and a
+    // non-html file are NOT. Real, isolated, can-fail.
+    #[test]
+    fn lists_only_spec_marked_html_workbooks() {
+        let dir =
+            std::env::temp_dir().join(format!("wb_scan_{}_{}", std::process::id(), line!()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("book.html"),
+            r#"<!doctype html><script id="workbook-spec">{"title":"Launch Plan"}</script><body>x</body>"#,
+        )
+        .unwrap();
+        std::fs::write(dir.join("plain.html"), "<html>no spec marker</html>").unwrap();
+        std::fs::write(dir.join("notes.txt"), "not even html").unwrap();
+
+        let found = scan_workbooks(&[dir.to_string_lossy().to_string()]);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(found.len(), 1, "only the spec-marked .html counts as a workbook");
+        assert_eq!(found[0].title, "Launch Plan", "title parsed from the spec");
+    }
+
+    #[test]
+    fn empty_or_missing_folder_lists_nothing_and_does_not_panic() {
+        let dir =
+            std::env::temp_dir().join(format!("wb_scan_empty_{}_{}", std::process::id(), line!()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let found = scan_workbooks(&[dir.to_string_lossy().to_string()]);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(found.is_empty());
+        // a non-existent folder is tolerated (walkdir flatten skips errors)
+        assert!(scan_workbooks(&["/no/such/path/xyzzy".to_string()]).is_empty());
+    }
 }
 
 /// First workbook reachable from the package's folders — the file an
