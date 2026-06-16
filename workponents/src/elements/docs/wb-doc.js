@@ -8,7 +8,7 @@
 // (./render.js) — headings, lists, code, emphasis, links, tables, blockquotes,
 // rules, checkboxes, and org TODO pills + tags. For FULL org fidelity (property
 // drawers, footnotes, citations, #+EXEC component blocks, exact orgize parity)
-// a wired Host routes rendering through the OQL kernel (oql.wasm) — the same
+// a wired Host routes rendering through the runtime — the same
 // pipeline desktop/src/lib/org-renderer uses; this element reaches it via
 // `this.host` when the `kernel` capability is available, and falls back to the
 // standalone renderer otherwise.

@@ -182,11 +182,11 @@
           ]
         },
         {
-          "name": "OQL kernel surface — render (Org→HTML), parse outline, validate",
+          "name": "Workbook structure surface — read work-* HTML (parse outline, build plan, validate)",
           "status": "done",
-          "tests": "oql_render_test",
+          "tests": "bundle_tangle_test",
           "units": 4,
-          "proof": "Workbooks.OQL.render/parse_headlines/validate (the oql.wasm kernel) — the product's core: GET /w/:id viewer + publish render, the /w/:id/call surface (parse/tangle/validate). PROVEN live: render → HTML (<h1>/<pre><code>) ~1ms; parse → correct outline (level+title); validate → [] for well-formed org; tangle → worlds plan. Deterministic tests (oql_render_test, 4).",
+          "proof": "Workbooks.Workbook (Floki) reads a workbook's work-* HTML — the product's core: GET /w/:id viewer + publish render serve the HTML directly (browser + work-* components render it); parse_headlines → outline rows; tangle_plan → the <work-component> build plan; validate → diagnostics. No kernel/wasm: pure HTML parsing.",
           "failure_modes": []
         }
       ]

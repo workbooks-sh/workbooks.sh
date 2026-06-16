@@ -2,7 +2,7 @@
 //
 // A workponent never hardcodes where a capability runs. It asks the Host, which
 // resolves `local` (in-WASM / browser-native), `runtime` (a Workbooks runtime
-// over RCP), or `kernel` (oql.wasm) per the platform-model — so the SAME element
+// over RCP) per the platform-model — so the SAME element
 // (e.g. <wb-table>) runs in-WASM locally or on the runtime tier for huge data,
 // no code fork. Capability elements declare what they need; the Host provisions
 // it (the same grant model toolkits use) and reports availability so the element

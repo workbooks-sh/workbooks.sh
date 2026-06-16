@@ -6,7 +6,7 @@
 // code, emphasis, links, tables, rules, blockquotes, checkboxes, org TODO
 // pills + tags. It is deliberately a SUBSET — for full org fidelity (property
 // drawers, #+EXEC cells, citations, footnotes) an element reaches the OQL
-// kernel (oql.wasm) through `this.host` (see the note in work-doc.js). The
+// the runtime through `this.host` (see the note in work-doc.js). The
 // visual contract is kept aligned with the desktop org-renderer
 // (desktop/src/lib/org-renderer/*).
 
