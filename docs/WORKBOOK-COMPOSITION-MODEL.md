@@ -9,6 +9,63 @@
 > one-shot model — while every node still rides the existing tangle → compile → pack
 > → embed lifecycle and inherits its losslessness + security floors verbatim.
 
+## Thesis: web-component-first STRUCTURE, org-as-CONTENT
+
+This is a layering, **not a 50/50 split** and **not org-vs-components**. One is the
+container; the other is a content-type inside it.
+
+| Layer | Owner | Rationale |
+|---|---|---|
+| Structure, hierarchy, composition, references, config, wiring, UI (apps, containers, agents, toolkits, data bindings, workflow *declaration*) | **Web components** | Typed/attributed/nested referencing nodes + CEM schema + heavy training-data familiarity + machine-validatable. The layer that eclipses org. |
+| Narrative prose + literate code (code woven into explanation) | **Org**, inside `<work-org>`/`<work-doc>` nodes | Best literate-document format; HTML prose is worse; don't reinvent literate programming in HTML. |
+| Plain source (`.rs`/`.svelte`/`.js`) | `src=`-referenced files in the bundle | Most code isn't literate; a file ref + the existing compile lane beats tangling. |
+
+Components are the skeleton; **org is the body text of document/literate nodes**. Org
+is no longer the top-level organizer — it's a vital *leaf* content format. The mix is
+set by the workbook's *nature* (app/container → almost all components, org sparse;
+report/notebook/literate-toolkit → `<work-org>` dominates), never chosen per project.
+The layering is always the same.
+
+### Composing org inside HTML — the rule
+
+Raw org text contains `<` (e.g. `if (x < 3)`, literal HTML) → the HTML parser mis-reads
+it as tags. So:
+
+- **Preferred:** `<work-org src="./report.org">` — org as a bundle file. No escaping;
+  `[[links]]`/references resolve against sibling node ids.
+- **Inline-only-when-tiny:** a `<script type="text/org">…</script>` raw-text child
+  (script content is not HTML-parsed — the `<template>` trick).
+- **Never:** raw org as direct element children.
+
+Direction is **components-outer, org-inner**. (Org's `#+begin_export html` embeds a
+component as an opaque blob — fine for an embed, wrong as the primary structure.)
+
+### Tangle / untangle — keep, but demote
+
+Literate programming stays valuable, so don't remove tangle and don't move it to
+components. In this model most code lives as `src=` files (no tangle); **tangle becomes
+one residence among {inline element, src file, packed entry, tangled-from-org}, scoped
+to literate-org nodes only** — a posture change, not a rewrite (the bundle compiler
+already does both).
+
+### Workflows — declaration → components, engine → host
+
+A workflow *declaration* is structure + references + gates (the component sweet spot,
+schema-backed): migrate it to a `<work-workflow>`/`<work-step>` shape. Its *control
+flow* is code and stays in the engine — declarative DOM is bad at loops/conditionals
+(the same reason the Workflow tool is a script, not config).
+
+### Why this is the bet, not a coin flip
+
+1. **Training data** — models know HTML/custom-elements; org is rare. Improves one-shot
+   authorability directly.
+2. **Schema** — the CEM makes structure validatable/completable; org structure isn't.
+3. **The runtime is never rewritten** — the island reader (P0) is a **bijection**:
+   `<work-agent>` ⟷ agent-def.org, `<work-toolkit>` ⟷ manifest.org, `<work-org>` ⟷
+   `.org` file. The hardened runtime keeps eating org/trees; the authoring front-door
+   becomes components; the layer translates. This is an **authoring-surface migration,
+   not a runtime amputation.**
+
 ## The problem this fixes
 
 Authoring kept treating "one HTML file" vs. "a tree of files" as a **style choice
