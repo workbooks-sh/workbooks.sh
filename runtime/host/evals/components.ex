@@ -499,6 +499,10 @@ defmodule Workbooks.Evals.Components do
 
     """
     <!doctype html><html data-work-theme="#{theme}"><head><meta charset="utf-8">
+    <!-- Block external scripts/connections so the powered tiers' CDN import() FAILS
+         FAST (no network hang) → the element floor renders deterministically before
+         the screenshot. 'unsafe-inline' keeps the inlined bundle + styles working. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-inline' data: blob:; connect-src 'none'">
     <style>#{tokens}
     html,body{margin:0;background:var(--work-bg);color:var(--work-fg);font-family:var(--work-font);}
     .mount{padding:24px;min-height:100vh;box-sizing:border-box;}
