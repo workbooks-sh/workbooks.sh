@@ -75,6 +75,19 @@ class CreatePackageController {
   closeModal() {
     this.modal = null;
   }
+
+  /** Set when a freshly-created folder wants the optional "add people" step.
+   *  The route watches this, mounts ShareOrgModal, and clears it on close.
+   *  Only ever set for CLOUD nexuses (gated at the call site — local has no peers). */
+  shareRequest = $state<{ resourceId: string; title: string } | null>(null);
+
+  requestShare(resourceId: string, title: string) {
+    this.shareRequest = { resourceId, title };
+  }
+
+  clearShare() {
+    this.shareRequest = null;
+  }
 }
 
 export const createPackage = new CreatePackageController();
@@ -83,4 +96,10 @@ export const createPackage = new CreatePackageController();
 export function basenameFromPath(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
   return parts[parts.length - 1] ?? "";
+}
+
+/** Stable, opaque resource id for sharing a package/folder. The host treats it
+ *  as a map key; the format only needs to be unique + stable. */
+export function packageResourceId(workspaceId: string, packageName: string): string {
+  return `package:${workspaceId}/${packageName}`;
 }

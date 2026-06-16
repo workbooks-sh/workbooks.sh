@@ -15,6 +15,7 @@
   import BoardPanel from "$lib/board/BoardPanel.svelte";
   import { FolderOpen, Plus as PlusIcon } from "phosphor-svelte";
   import CreatePackageModal from "$lib/home/CreatePackageModal.svelte";
+  import ShareOrgModal from "$lib/network/components/ShareOrgModal.svelte";
   import PaletteModal from "$lib/palette/PaletteModal.svelte";
   import { createPackage } from "$lib/home/createPackage.svelte";
   import TerminalDrawer from "$lib/components/TerminalDrawer.svelte";
@@ -822,6 +823,14 @@
   <CreatePackageModal
     data={createPackage.modal}
     onclose={() => createPackage.closeModal()}
+  />
+{/if}
+
+{#if createPackage.shareRequest}
+  <ShareOrgModal
+    resourceId={createPackage.shareRequest.resourceId}
+    resourceTitle={createPackage.shareRequest.title}
+    onclose={() => createPackage.clearShare()}
   />
 {/if}
 

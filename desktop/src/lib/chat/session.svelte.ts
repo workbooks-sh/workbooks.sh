@@ -204,6 +204,19 @@ class ChatSessionStore {
         prompt: t,
         attachments: opts.attachments ?? [],
       };
+      // Watchdog: if the run stays pending with ZERO events, the live telemetry
+      // socket likely never connected (the run POST succeeded but session:<id>
+      // never joined). Surface it instead of an indefinite typing indicator.
+      setTimeout(() => {
+        if (
+          this.session?.id === id &&
+          this.session.status === "pending" &&
+          this.blocks.length === 0
+        ) {
+          this.sendError =
+            "No response from the nexus — the live connection may not be established. Check that the runtime is reachable.";
+        }
+      }, 12_000);
       // Record into the per-agent history (localStorage-backed).
       // Pin the slug at send time — switching agents mid-conversation
       // shouldn't retroactively re-tag prior sessions.

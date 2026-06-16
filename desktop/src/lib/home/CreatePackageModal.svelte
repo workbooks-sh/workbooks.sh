@@ -14,13 +14,16 @@
    * UX is identical apart from a "Source folder" line under the title
    * when importing.
    */
-  import { Check } from "phosphor-svelte";
+  import { Check, UsersThree } from "phosphor-svelte";
   import IconPickerMenu from "$lib/workspace/IconPickerMenu.svelte";
   import { workspaces } from "$lib/bridge/workspaces.svelte";
   import { packageStore } from "$lib/bridge/package.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
+  import { orgs } from "$lib/bridge/orgs.svelte";
   import {
     basenameFromPath,
+    createPackage,
+    packageResourceId,
     type CreatePackageModalState,
   } from "./createPackage.svelte";
 
@@ -38,6 +41,11 @@
   let error = $state<string | null>(null);
 
   const title = $derived(data.mode === "import" ? "Import folder" : "New folder");
+
+  // "Add people" is offered ONLY in a cloud nexus (orgs have members/peers);
+  // Personal/local has no peers, so never show it there.
+  const canShare = $derived(data.mode === "create" && !orgs.activeEntry.personal);
+  let addPeople = $state(false);
 
   async function submit() {
     const n = name.trim();
@@ -57,6 +65,10 @@
       }
       await packageStore.setActive(n);
       await workspaces.addPackage(wsActive.id, n);
+      if (canShare && addPeople) {
+        // The folder now exists with a stable id — hand off to the share modal.
+        createPackage.requestShare(packageResourceId(wsActive.id, n), n);
+      }
       chrome.openFiles();
       onclose();
     } catch (e) {
@@ -93,6 +105,13 @@
       autofocus
       disabled={busy}
     />
+    {#if canShare}
+      <label class="add-people">
+        <input type="checkbox" bind:checked={addPeople} disabled={busy} />
+        <UsersThree weight="fill" size={15} />
+        <span>Add people after creating…</span>
+      </label>
+    {/if}
     <div class="actions">
       <button
         type="button"
@@ -106,7 +125,7 @@
         disabled={busy || !name.trim()}
       >
         <Check weight="bold" size={14} />
-        {data.mode === "import" ? "Import" : "Create"}
+        {data.mode === "import" ? "Import" : canShare && addPeople ? "Create & add people" : "Create"}
       </button>
     </div>
   </form>
@@ -198,6 +217,17 @@
     text-align: center;
   }
   input:focus { border-color: var(--color-border-strong); }
+  .add-people {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.8rem;
+    color: var(--color-fg-muted);
+    cursor: pointer;
+    user-select: none;
+    padding: 0.1rem 0;
+  }
+  .add-people input { width: auto; margin: 0; cursor: pointer; }
   .actions {
     display: flex;
     gap: 0.5rem;
