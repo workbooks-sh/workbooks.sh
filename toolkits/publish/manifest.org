@@ -1,7 +1,7 @@
 #+TITLE: publish toolkit
 #+TOOLKIT: publish
 #+VERSION: 0.1.0
-#+CLI_BIN: wb-publish
+#+CLI_BIN: work-publish
 #+CLI_VERSION_RANGE: >=0.1.0
 #+STATUS: stable
 #+TAGLINE: AT Protocol publishing + Workbooks Network identity — bind a Bluesky account, publish signed workbooks, watch the verified feed.
@@ -11,7 +11,7 @@
   :PROPERTIES:
   :ID:        publish
   :VERSION:        0.1.0
-  :CLI_BIN:   wb-publish
+  :CLI_BIN:   work-publish
   :STATUS:    stable
   :SKILL_DIR: skills/
   :END:

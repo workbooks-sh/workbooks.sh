@@ -1,7 +1,7 @@
 #+TITLE: workbooks-browser toolkit
 #+TOOLKIT: workbooks-browser
 #+VERSION: 0.1.0
-#+CLI_BIN: wb
+#+CLI_BIN: work
 #+STATUS: alpha
 #+TAGLINE: Drive the Workbooks desktop shell — tabs, themes, bookmarks, workspaces, and key prompts.
 
@@ -9,7 +9,7 @@
   :PROPERTIES:
   :ID:        workbooks-browser
   :VERSION:        0.1.0
-  :CLI_BIN:   wb
+  :CLI_BIN:   work
   :STATUS:    alpha
   :SKILL_DIR: skills/
   :END:

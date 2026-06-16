@@ -1,7 +1,7 @@
 #+TITLE: byod toolkit
 #+TOOLKIT: byod
 #+VERSION: 0.1.0
-#+CLI_BIN: wb
+#+CLI_BIN: work
 #+CLI_VERSION_RANGE: >=0.1
 #+STATUS: experimental
 #+TAGLINE: Turn a forged workbook into a real, multi-tenant app — live DB + auth, no engine.
@@ -12,7 +12,7 @@
   :PROPERTIES:
   :ID:        byod
   :VERSION:        0.1.0
-  :CLI_BIN:   wb
+  :CLI_BIN:   work
   :STATUS:    experimental
   :SKILL_DIR: skills/
   :END:

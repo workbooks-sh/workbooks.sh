@@ -1223,11 +1223,12 @@ defmodule Workbooks.Toolkits do
       dir ->
         d = parse_descriptor(File.read!(Path.join(dir, "manifest.org")))
 
-        # CLI_BIN: work means the toolkit's "binary" IS the built-in wb — its skills
-        # document `work <verb>` commands (vs a compiled command-toolkit like huniq
-        # whose CLI_BIN is its own binary).
-        if d.cli_bin == "wb" do
-          suggested = String.trim("wb #{task} " <> Enum.join(List.wrap(args), " "))
+        # CLI_BIN: work means the toolkit's "binary" IS the built-in CLI (`work`) — its
+        # skills document `work <verb>` commands (vs a compiled command-toolkit like huniq
+        # whose CLI_BIN is its own binary). Accept the legacy "wb" sentinel too so a
+        # not-yet-migrated manifest still resolves to the direct-verb path.
+        if d.cli_bin in ["work", "wb"] do
+          suggested = String.trim("work #{task} " <> Enum.join(List.wrap(args), " "))
 
           "#{id} is a direct-verb toolkit — its skills document built-in `work` verbs, " <>
             "not a runnable command. Run it DIRECTLY through your `work` tool: `#{suggested}` " <>

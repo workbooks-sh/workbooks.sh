@@ -32,8 +32,13 @@ defmodule CliNameTest do
   # Bare standalone `wbx` anywhere (the in-flight rename's prose). `wbx` is not a bead
   # prefix, so this is safe; bare `wb` is NOT checked (it would hit `wb-…` bead IDs).
   @bare_wbx_re ~r/\bwbx\b/
+  # The `CLI_BIN: wb` toolkit sentinel — a bare `wb` the @cmd_re/@bare_wbx_re can't catch
+  # (no following verb, not `wbx`). It means "this toolkit's binary IS the built-in CLI",
+  # which is now `work`. A stale one ships the agent a dead command suggestion (the bug
+  # this gate now prevents — toolkit_injection direct-verb).
+  @cli_bin_re ~r/CLI_BIN:\s*wbx?\b/i
 
-  @patterns [@cmd_re, @backtick_re, @escript_re, @tool_re, @usage_re, @bare_wbx_re]
+  @patterns [@cmd_re, @backtick_re, @escript_re, @tool_re, @usage_re, @bare_wbx_re, @cli_bin_re]
 
   test "no stale `wb`/`wbx` CLI references survive (the CLI is `work`)" do
     offenders =

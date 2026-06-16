@@ -2,7 +2,7 @@
 #+TOOLKIT: workbooks-system
 #+VERSION: 0.1.0
 #+KIND: toolkit
-#+CLI_BIN: wb
+#+CLI_BIN: work
 # `work` is HOST-PROVIDED: every workbooks engine fulfills it in-process
 # (agents' work tool -> Workbooks.CLI.call, tenant-scoped). This toolkit
 # bundles no binary and must not — nothing native executes in the sandbox.

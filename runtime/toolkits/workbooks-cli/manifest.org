@@ -1,7 +1,7 @@
 #+TITLE: workbooks-cli toolkit
 #+TOOLKIT: workbooks-cli
 #+VERSION: 0.1.0
-#+CLI_BIN: wb
+#+CLI_BIN: work
 #+STATUS: alpha
 #+TAGLINE: Deploy + publish from the CLI — stand up a runtime (local or cloud) and ship a workbook to a live URL, declaratively.
 
@@ -9,7 +9,7 @@
   :PROPERTIES:
   :ID:        workbooks-cli
   :VERSION:   0.1.0
-  :CLI_BIN:   wb
+  :CLI_BIN:   work
   :STATUS:    alpha
   :SKILL_DIR: skills/
   :END:
