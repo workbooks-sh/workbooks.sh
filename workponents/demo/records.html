@@ -8,7 +8,16 @@
   <title>workponents · records — specimen</title>
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
-  <!-- the records domain: native custom elements, ESM, NO build step -->
+  <!-- Lit, buildless: the bare "lit" specifier resolves to a pinned CDN ESM. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://esm.sh/lit@3.2.1",
+        "lit/": "https://esm.sh/lit@3.2.1/"
+      }
+    }
+  </script>
+  <!-- the records domain: Lit-base custom elements, ESM, NO build step -->
   <script type="module" src="../src/elements/records/index.js"></script>
   <style>
     body { margin: 0; background: var(--wb-bg); color: var(--wb-fg); font-family: var(--wb-font, system-ui); transition: background .2s, color .2s; }
@@ -44,36 +53,36 @@
 
     <h2>Master-detail — the list drives the record</h2>
     <p class="note">Pick a customer on the left (a card index over a <code>query</code>); its
-      <code>wb-record-select</code> event sets the detail record's <code>value</code>, which re-queries the
+      <code>work-record-select</code> event sets the detail record's <code>value</code>, which re-queries the
       SAME source for that one row and lays it out as typed fields. <code>editable</code> shows an Edit affordance;
       with no runtime Host reachable it degrades to read-only (see the footer note) — a write goes through
       <code>this.host → /data/update</code>, never the read-only engine.</p>
     <div class="md">
-      <wb-record-list id="people" src-name="customers"
+      <work-record-list id="people" src-name="customers"
         query="SELECT id, name, tier, mrr, signed, active, site FROM customers ORDER BY mrr DESC"
         key="id" title-field="name" subtitle-field="tier"
-        fields="mrr,active" formats="mrr:usd" searchable></wb-record-list>
+        fields="mrr,active" formats="mrr:usd" searchable></work-record-list>
 
-      <wb-record id="detail" src-name="customers"
+      <work-record id="detail" src-name="customers"
         query="SELECT id, name, tier, mrr, seats, signed, active, site, owner FROM customers"
         key="id" title-field="name" layout="stacked"
-        formats="mrr:usd,signed:date,site:link" editable></wb-record>
+        formats="mrr:usd,signed:date,site:link" editable></work-record>
     </div>
 
     <h2>Inline layout + a standalone typed field value</h2>
     <p class="note">The same record in <code>layout="inline"</code> (label/value rows), and a bare
-      <code>&lt;wb-field-value&gt;</code> used on its own — the atom records and tables share.</p>
+      <code>&lt;work-field-value&gt;</code> used on its own — the atom records and tables share.</p>
     <div class="md">
-      <wb-record src-name="customers"
+      <work-record src-name="customers"
         query="SELECT name, tier, mrr, seats, signed, active, site FROM customers"
-        key="name" value="Atlas Data Co" layout="inline" formats="mrr:usd,signed:date,site:link"></wb-record>
+        key="name" value="Atlas Data Co" layout="inline" formats="mrr:usd,signed:date,site:link"></work-record>
       <div style="display:flex;flex-direction:column;gap:14px">
-        <div><span class="note">usd&nbsp;</span> <wb-field-value type="number" format="usd" value="124900.5"></wb-field-value></div>
-        <div><span class="note">pct&nbsp;</span> <wb-field-value type="number" format="pct" value="0.732"></wb-field-value></div>
-        <div><span class="note">date&nbsp;</span> <wb-field-value type="date" value="2024-11-03"></wb-field-value></div>
-        <div><span class="note">bool&nbsp;</span> <wb-field-value type="boolean" value="true"></wb-field-value> &nbsp; <wb-field-value type="boolean" value="false"></wb-field-value></div>
-        <div><span class="note">link&nbsp;</span> <wb-field-value type="string" value="https://workbooks.sh/customers"></wb-field-value></div>
-        <div><span class="note">badge</span> <wb-field-value type="string" display="badge" value="Enterprise"></wb-field-value></div>
+        <div><span class="note">usd&nbsp;</span> <work-field-value type="number" format="usd" value="124900.5"></work-field-value></div>
+        <div><span class="note">pct&nbsp;</span> <work-field-value type="number" format="pct" value="0.732"></work-field-value></div>
+        <div><span class="note">date&nbsp;</span> <work-field-value type="date" value="2024-11-03"></work-field-value></div>
+        <div><span class="note">bool&nbsp;</span> <work-field-value type="boolean" value="true"></work-field-value> &nbsp; <work-field-value type="boolean" value="false"></work-field-value></div>
+        <div><span class="note">link&nbsp;</span> <work-field-value type="string" value="https://workbooks.sh/customers"></work-field-value></div>
+        <div><span class="note">badge</span> <work-field-value type="string" display="badge" value="Enterprise"></work-field-value></div>
       </div>
     </div>
 
@@ -108,16 +117,16 @@
       // ── master-detail wiring: list selection drives the detail record ──
       const list = document.getElementById("people");
       const detail = document.getElementById("detail");
-      list.addEventListener("wb-record-select", (e) => {
+      list.addEventListener("work-record-select", (e) => {
         detail.setAttribute("value", e.detail.value);   // a record IS a row → re-query that one row
-        console.log("[wb-record-select]", e.detail);
+        console.log("[work-record-select]", e.detail);
       });
       // preselect the top customer so the detail isn't empty on load
-      list.addEventListener("wb-record-list-ready", (e) => {
-        console.log("[wb-record-list-ready]", e.detail);
+      list.addEventListener("work-record-list-ready", (e) => {
+        console.log("[work-record-list-ready]", e.detail);
         if (rows.length) { detail.setAttribute("value", rows[0].id); list.setAttribute("selected", rows[0].id); }
       }, { once: true });
-      detail.addEventListener("wb-record-ready", (e) => console.log("[wb-record-ready]", e.detail));
+      detail.addEventListener("work-record-ready", (e) => console.log("[work-record-ready]", e.detail));
 
       // theme toggle
       const buttons = [...document.querySelectorAll(".bar button")];

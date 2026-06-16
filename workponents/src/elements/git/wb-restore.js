@@ -1,4 +1,4 @@
-// <wb-restore> — APPEND-ONLY restore (the "nothing is lost, restore anything"
+// <work-restore> — APPEND-ONLY restore (the "nothing is lost, restore anything"
 // promise). git's `checkout`/`reset` reinvented as one safe verb: restoring a
 // version never rewinds — it re-applies an old version AS A NEW version, so the
 // timeline stays fully intact (mirrors History.restore/3 in history.ex).
@@ -7,14 +7,12 @@
 // `this.host`: when a runtime is configured it POSTs the restore; standalone it
 // just emits `restore` {detail:{scope, to}} for the host page to handle. Always
 // emits `restore` after a successful call so either wiring drives the UI.
-import { WbElement, define } from "../../core/element.js";
+import { WbElement, html, css, define } from "../../core/element.js";
 
-const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-
-export class WbRestore extends WbElement {
+export class WorkRestore extends WbElement {
   static props = ["scope", "to", "label", "disabled", "busy"];
 
-  static styles = `
+  static styles = css`
     :host { display: inline-block; font-family: var(--wb-font); }
     button {
       display: inline-flex; align-items: center; gap: var(--wb-space-2);
@@ -33,11 +31,6 @@ export class WbRestore extends WbElement {
     :host([busy]) svg { animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
   `;
-
-  connectedCallback() {
-    super.connectedCallback();
-    this.addEventListener("click", () => this.restore());
-  }
 
   async restore() {
     if (this.boolAttr("disabled") || this.boolAttr("busy")) return;
@@ -59,13 +52,13 @@ export class WbRestore extends WbElement {
 
   render() {
     const label = this.attr("label", "Restore this version");
-    return `<button part="button" aria-label="${esc(label)}">
+    return html`<button part="button" aria-label=${label} @click=${() => this.restore()}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>
       </svg>
-      <span>${esc(label)}</span>
+      <span>${label}</span>
     </button>`;
   }
 }
 
-define("wb-restore", WbRestore);
+define("work-restore", WorkRestore);

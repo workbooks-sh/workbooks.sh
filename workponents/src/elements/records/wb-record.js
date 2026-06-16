@@ -1,12 +1,12 @@
-// <wb-record> — THE records reinvention: the detail view of ONE entity. A record
+// <work-record> — THE records reinvention: the detail view of ONE entity. A record
 // IS a row. A source (src-name / query) + a selector (where / id, or key+value)
 // resolves to exactly one row of a WbQueryResult; the element renders it as a
-// typed field layout — label + a <wb-field-value> per column, type-aware off the
+// typed field layout — label + a <work-field-value> per column, type-aware off the
 // result's `types[]`. Same shared engine as wb-table (getEngine) — never a second
 // data store; a record is just a query that returns one row.
 //
 // Selection is master→detail friendly: set `where`/`id`/`value` from a
-// <wb-record-list>'s wb-record-select event to drive a detail pane off the same
+// <work-record-list>'s work-record-select event to drive a detail pane off the same
 // source. Composition-as-source: the record carries its source + selector.
 //
 // Editable mode (optional) writes back through the Host/Dock seam
@@ -14,12 +14,12 @@
 // no reachable Host it degrades to read-only and shows a note.
 //
 // Usage (named source, select by id):
-//   <wb-record src-name="customers" key="id" value="C-1004"></wb-record>
+//   <work-record src-name="customers" key="id" value="C-1004"></work-record>
 //
 // Usage (full query + WHERE selector, grid layout, editable):
-//   <wb-record src-name="customers"
+//   <work-record src-name="customers"
 //     query="SELECT id, name, tier, mrr, signed, active FROM customers"
-//     where="id = 'C-1004'" layout="grid" editable></wb-record>
+//     where="id = 'C-1004'" layout="grid" editable></work-record>
 //
 // Attributes:
 //   src-name    a source registered via getEngine().register(...)
@@ -39,9 +39,9 @@
 //   title-field column whose value labels the record header (default first col)
 //
 // Events:
-//   wb-record-ready  { detail: { row, columns, types, engine, found } }
-//   wb-record-save   { detail: { changes, ok, error } }   after an edit write-back
-import { WbElement, define } from "../../core/element.js";
+//   work-record-ready  { detail: { row, columns, types, engine, found } }
+//   work-record-save   { detail: { changes, ok, error } }   after an edit write-back
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 import "./wb-field-value.js";
@@ -59,7 +59,7 @@ export class WbRecord extends WbElement {
     "editable", "table", "title-field",
   ];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .shell { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
       background: var(--wb-surface); overflow: hidden; box-shadow: var(--wb-shadow-sm); }
@@ -125,14 +125,13 @@ export class WbRecord extends WbElement {
   }
 
   // Reload when the source / selector changes (master-detail selection drives
-  // where/value/id). Layout/variant only re-render (base handles those).
-  attributeChangedCallback(name) {
+  // where/value/id). Layout/variant only re-render (Lit handles those reactively).
+  attributeChangedCallback(name, old, val) {
+    super.attributeChangedCallback(name, old, val);
     if (!this._connected) return;
     if (["src-name", "query", "where", "key", "value", "id"].includes(name)) {
       this._editing = false; this._edits = {}; this._saveNote = null;
       this._load();
-    } else {
-      this.update();
     }
   }
 
@@ -142,7 +141,7 @@ export class WbRecord extends WbElement {
     this._loading = true;
     do {
       this._loadAgain = false;
-      this._busy = true; this._error = null; this.update();
+      this._busy = true; this._error = null; this.requestUpdate();
       try {
         const name = this.attr("src-name");
         if (name) await this._engine.whenRegistered(name);
@@ -156,8 +155,8 @@ export class WbRecord extends WbElement {
         this._row = null;
       }
       this._busy = false;
-      this.update();
-      this._emit("wb-record-ready", {
+      this.requestUpdate();
+      this._emit("work-record-ready", {
         row: this._rowObject(),
         columns: this._result?.columns || [],
         types: this._result?.types || [],
@@ -231,30 +230,30 @@ export class WbRecord extends WbElement {
     const hostOk = this._hostWritable();
 
     let body;
-    if (this._busy && !this._result) body = `<div class="empty">Loading…</div>`;
-    else if (this._error) body = `<div class="empty">Could not load record — ${esc(this._error)}</div>`;
-    else if (!this._row) body = `<div class="empty">No matching record.</div>`;
+    if (this._busy && !this._result) body = html`<div class="empty">Loading…</div>`;
+    else if (this._error) body = html`<div class="empty">Could not load record — ${this._error}</div>`;
+    else if (!this._row) body = html`<div class="empty">No matching record.</div>`;
     else body = this._renderFields();
 
     const actions = (this._row && canEdit) ? (
       this._editing
-        ? `<button class="btn primary" data-act="save"${hostOk ? "" : " disabled"}>Save</button>
-           <button class="btn" data-act="cancel">Cancel</button>`
-        : `<button class="btn" data-act="edit">Edit</button>`
-    ) : "";
+        ? html`<button class="btn primary" ?disabled=${!hostOk} @click=${() => this._onAction("save")}>Save</button>
+               <button class="btn" @click=${() => this._onAction("cancel")}>Cancel</button>`
+        : html`<button class="btn" @click=${() => this._onAction("edit")}>Edit</button>`
+    ) : null;
 
     const head = this._row
-      ? `<div class="head"><span class="title">${esc(this._titleText())}</span><span class="actions">${actions}</span></div>`
-      : "";
+      ? html`<div class="head"><span class="title">${this._titleText()}</span><span class="actions">${actions}</span></div>`
+      : null;
 
     const editNote = (canEdit && !hostOk)
-      ? `<span class="note"> — read-only (no Host write seam)</span>` : "";
-    const saveNote = this._saveNote ? `<span class="note"> — ${esc(this._saveNote)}</span>` : "";
+      ? html`<span class="note"> — read-only (no Host write seam)</span>` : null;
+    const saveNote = this._saveNote ? html`<span class="note"> — ${this._saveNote}</span>` : null;
 
-    return `<div class="shell">${head}${body}
+    return html`<div class="shell">${head}${body}
       <div class="foot">
-        <span class="engine" data-tier="${this._error ? "error" : this._tier}"><span class="dot"></span></span>
-        <span class="note">${esc(tierText)}</span>${editNote}${saveNote}
+        <span class="engine" data-tier=${this._error ? "error" : this._tier}><span class="dot"></span></span>
+        <span class="note">${tierText}</span>${editNote}${saveNote}
         <span class="grow"></span>
       </div></div>`;
   }
@@ -265,26 +264,19 @@ export class WbRecord extends WbElement {
     const fields = this._displayColumns().map((c) => {
       const v = o[c.field];
       const inner = editing
-        ? `<input data-field="${esc(c.field)}" type="text" value="${esc(this._edits[c.field] ?? (v ?? ""))}" />`
-        : `<wb-field-value type="${esc(c.type)}"${c.format ? ` format="${esc(c.format)}"` : ""}${c.display ? ` display="${esc(c.display)}"` : ""} value="${esc(v ?? "")}"></wb-field-value>`;
-      return `<div class="field"><span class="label">${esc(c.label)}</span><span class="val">${inner}</span></div>`;
-    }).join("");
-    return `<div class="fields">${fields}</div>`;
+        ? html`<input type="text" .value=${String(this._edits[c.field] ?? (v ?? ""))}
+            @input=${(e) => { this._edits[c.field] = e.target.value; }} />`
+        : html`<work-field-value type=${c.type} format=${c.format ?? ""} display=${c.display ?? ""}
+            value=${v ?? ""}></work-field-value>`;
+      return html`<div class="field"><span class="label">${c.label}</span><span class="val">${inner}</span></div>`;
+    });
+    return html`<div class="fields">${fields}</div>`;
   }
 
   // ── interaction ───────────────────────────────────────────────────────────
-  update() {
-    super.update();
-    const root = this.shadowRoot;
-    root.querySelectorAll("[data-act]").forEach((b) =>
-      b.addEventListener("click", () => this._onAction(b.getAttribute("data-act"))));
-    root.querySelectorAll("input[data-field]").forEach((inp) =>
-      inp.addEventListener("input", (e) => { this._edits[inp.getAttribute("data-field")] = e.target.value; }));
-  }
-
   _onAction(act) {
-    if (act === "edit") { this._editing = true; this._edits = {}; this._saveNote = null; this.update(); }
-    else if (act === "cancel") { this._editing = false; this._edits = {}; this.update(); }
+    if (act === "edit") { this._editing = true; this._edits = {}; this._saveNote = null; this.requestUpdate(); }
+    else if (act === "cancel") { this._editing = false; this._edits = {}; this.requestUpdate(); }
     else if (act === "save") this._save();
   }
 
@@ -301,7 +293,7 @@ export class WbRecord extends WbElement {
       const orig = this._rowObject()?.[k];
       if (String(v) !== String(orig ?? "")) changes[k] = v;
     }
-    if (!Object.keys(changes).length) { this._editing = false; this.update(); return; }
+    if (!Object.keys(changes).length) { this._editing = false; this.requestUpdate(); return; }
     const table = this.attr("table") || this.attr("src-name");
     const where = this._selector();
     try {
@@ -314,12 +306,12 @@ export class WbRecord extends WbElement {
         if (j >= 0) this._row[j] = coerceToType(v, r.types[j]);
       }
       this._editing = false; this._edits = {}; this._saveNote = "saved";
-      this.update();
-      this._emit("wb-record-save", { changes, ok: true });
+      this.requestUpdate();
+      this._emit("work-record-save", { changes, ok: true });
     } catch (e) {
       this._saveNote = "save failed: " + String((e && e.message) || e);
-      this.update();
-      this._emit("wb-record-save", { changes, ok: false, error: String((e && e.message) || e) });
+      this.requestUpdate();
+      this._emit("work-record-save", { changes, ok: false, error: String((e && e.message) || e) });
     }
   }
 
@@ -336,12 +328,9 @@ function sqlLiteral(v) {
   if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
   return "'" + String(v).replace(/'/g, "''") + "'";
 }
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
 function prettify(f) { return String(f).replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 // A per-column display hint (the author's lens) → either a numeric `format` or a
-// `display` mode for <wb-field-value>. Lets a DATE that DuckDB returns as an
+// `display` mode for <work-field-value>. Lets a DATE that DuckDB returns as an
 // epoch-int still read as a date, without touching the read-only engine.
 export const NUMERIC_FORMATS = ["usd", "num", "pct"];
 export function hintFor(map, field) {
@@ -362,4 +351,4 @@ function coerceToType(v, type) {
   return v;
 }
 
-define("wb-record", WbRecord);
+define("work-record", WbRecord);

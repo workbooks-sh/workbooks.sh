@@ -1,12 +1,12 @@
-// <wb-slide> — one slide of a <wb-deck>. The reinvention (per the presentation
+// <work-slide> — one slide of a <work-deck>. The reinvention (per the presentation
 // brief): a deck IS a wavelet timeline and each slide is a discrete KEYFRAME BAND
-// on it. A <wb-slide> therefore carries, as source, the description of its band
+// on it. A <work-slide> therefore carries, as source, the description of its band
 // (how long it holds, how it enters) — the same data the deck folds into a
 // <gm-doc> timeline when you export() to video. Preview ≡ render ≡ the band.
 //
 // Composition-as-source: the slotted content IS the slide. It stays in the LIGHT
-// DOM (default <slot>) so any other workponent placed inside — a <wb-chart>, a
-// <wb-video>, a <wb-table> — upgrades and renders exactly as it would anywhere
+// DOM (default <slot>) so any other workponent placed inside — a <work-chart>, a
+// <work-video>, a <work-table> — upgrades and renders exactly as it would anywhere
 // else. The shadow root only paints a themed frame from --wb-* tokens; it never
 // re-renders or owns the author's content.
 //
@@ -15,14 +15,14 @@
 // is showing — the deck is the single source of the playhead.
 //
 // Usage:
-//   <wb-deck>
-//     <wb-slide band="title" transition="fade" hold="3s">
+//   <work-deck>
+//     <work-slide band="title" transition="fade" hold="3s">
 //       <h1>Workponents</h1><p>One substrate, many domains.</p>
-//     </wb-slide>
-//     <wb-slide transition="rise">
-//       <wb-chart type="bar" rows='[…]' x="region" y="rev"></wb-chart>
-//     </wb-slide>
-//   </wb-deck>
+//     </work-slide>
+//     <work-slide transition="rise">
+//       <work-chart type="bar" rows='[…]' x="region" y="rev"></work-chart>
+//     </work-slide>
+//   </work-deck>
 //
 // Attributes:
 //   band         a semantic label for the keyframe band (title|content|media|
@@ -34,10 +34,10 @@
 //   active       (set by the deck) this slide is the current playhead band.
 //   prev / next  (set by the deck) adjacency hints for peek/transition direction.
 //
-// Events: none of its own — the deck owns wb-slide-change. A slide exposes
+// Events: none of its own — the deck owns work-slide-change. A slide exposes
 // `band` / `transition` / `hold` as properties for the deck's export folder.
 
-import { WbElement, define } from "../../core/element.js";
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs, resolveVariant } from "../../core/variants.js";
 
 const VARIANTS = defineVariants({
@@ -49,11 +49,11 @@ const VARIANTS = defineVariants({
   align: { options: ["center", "start", "end"], default: "center" },
 });
 
-export class WbSlide extends WbElement {
+export class WorkSlide extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "active", "prev", "next", "hold"];
 
-  static styles = `
+  static styles = css`
     :host {
       display: none;                /* deck shows exactly one band at a time */
       position: absolute; inset: 0;
@@ -124,10 +124,10 @@ export class WbSlide extends WbElement {
     // band="split" exposes two regions; otherwise one default slot. Either way
     // the author's content stays in the light DOM and renders as itself.
     if (resolveVariant(this, VARIANTS, "band") === "split") {
-      return `<div class="band"><div class="region"><slot name="a"></slot></div><div class="region"><slot name="b"></slot></div></div>`;
+      return html`<div class="band"><div class="region"><slot name="a"></slot></div><div class="region"><slot name="b"></slot></div></div>`;
     }
-    return `<div class="band"><slot></slot></div>`;
+    return html`<div class="band"><slot></slot></div>`;
   }
 }
 
-define("wb-slide", WbSlide);
+define("work-slide", WorkSlide);

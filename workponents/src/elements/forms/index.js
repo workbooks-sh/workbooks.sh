@@ -1,5 +1,5 @@
-// workponents · forms domain — the form IS its schema. A <wb-form> owns one
-// declarative schema (inline JSON or built from its <wb-field> rules) and runs
+// workponents · forms domain — the form IS its schema. A <work-form> owns one
+// declarative schema (inline JSON or built from its <work-field> rules) and runs
 // the shared `src/validate` layer against the live values — validation is not
 // hand-wired per control. Import this barrel to register the whole domain, or a
 // single element file to stay lean. Zero-dep sync validation by default; server/

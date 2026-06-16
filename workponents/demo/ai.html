@@ -8,6 +8,16 @@
   <title>workponents — ai specimen</title>
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
+  <!-- Lit, buildless: the bare "lit" specifier resolves to a pinned CDN ESM.
+       The whole library (WbElement base) loads through this. No bundler. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://esm.sh/lit@3.2.1",
+        "lit/": "https://esm.sh/lit@3.2.1/"
+      }
+    }
+  </script>
   <!-- the ai elements: native custom elements, ESM, NO build step -->
   <script type="module" src="../src/elements/ai/index.js"></script>
   <style>
@@ -41,7 +51,7 @@
     <h1>workponents · ai</h1>
     <p class="sub">Conversation-as-source. The agent edits a living markdown/org document; the
       thread renders it (turns are its diff stream), and generated UI is authored inline as
-      <code>#+begin_src component</code> blocks — rendered as themed <code>&lt;wb-gen-block&gt;</code>
+      <code>#+begin_src component</code> blocks — rendered as themed <code>&lt;work-gen-block&gt;</code>
       cards, never a JSON IR. Markdown renders sanitized (escaped first). Toggle the theme; every
       element re-themes from the <code>--wb-*</code> tokens.</p>
 
@@ -54,9 +64,9 @@
 
     <!-- THREAD built from a transcript source (the document IS the conversation) -->
     <section>
-      <h2>wb-thread · the transcript is the source</h2>
+      <h2>work-thread · the transcript is the source</h2>
       <div class="panel">
-        <wb-thread id="thread" title="deploy review" max-width="none"></wb-thread>
+        <work-thread id="thread" title="deploy review" max-width="none"></work-thread>
       </div>
       <p class="note">Built from an org-style transcript string (<code>* user</code> / <code>* assistant</code>
         headings) set on <code>thread.turns</code>. The Waldo reply weaves a markdown paragraph, a
@@ -66,11 +76,11 @@
 
     <!-- Declarative thread: author turns directly in HTML -->
     <section>
-      <h2>wb-message · declarative turns + gen-blocks</h2>
+      <h2>work-message · declarative turns + gen-blocks</h2>
       <div class="panel">
-        <wb-thread max-width="none">
-          <wb-message role="user">Can you summarize the **release layers** and flag anything risky?</wb-message>
-          <wb-message role="assistant" name="waldo">## Release layers
+        <work-thread max-width="none">
+          <work-message role="user">Can you summarize the **release layers** and flag anything risky?</work-message>
+          <work-message role="assistant" name="waldo">## Release layers
 
 There are **three**, and they must not be conflated:
 
@@ -84,46 +94,46 @@ Publishing the runtime before the compilers layer ships stale toolchains.
 
 #+begin_src component :type button :label Open release runbook :action open
 target: /workbooks/Release.org
-#+end_src</wb-message>
-          <wb-message role="tool">tool · read_file(Release.org) → 412 lines</wb-message>
-        </wb-thread>
+#+end_src</work-message>
+          <work-message role="tool">tool · read_file(Release.org) → 412 lines</work-message>
+        </work-thread>
       </div>
-      <p class="note">Authored as plain HTML — light-DOM <code>&lt;wb-message&gt;</code> children. The
+      <p class="note">Authored as plain HTML — light-DOM <code>&lt;work-message&gt;</code> children. The
         assistant body carries inline component blocks; the message weaves them into cards in document
-        order. Click the button → fires a <code>wb-intent</code> event (logged below).</p>
+        order. Click the button → fires a <code>work-intent</code> event (logged below).</p>
     </section>
 
     <!-- gen-block gallery: every type -->
     <section>
-      <h2>wb-gen-block · every type</h2>
+      <h2>work-gen-block · every type</h2>
       <div class="panel" style="display:flex;flex-direction:column;gap:16px;align-items:flex-start">
-        <wb-gen-block type="callout" tone="info" title="Heads up">A neutral informational note.</wb-gen-block>
-        <wb-gen-block type="callout" tone="ok" title="Deployed">All checks green.</wb-gen-block>
-        <wb-gen-block type="callout" tone="err" title="Build failed">mrustc: missing libstd target.</wb-gen-block>
-        <wb-gen-block type="kv" title="run summary">duration: 8.4s
+        <work-gen-block type="callout" tone="info" title="Heads up">A neutral informational note.</work-gen-block>
+        <work-gen-block type="callout" tone="ok" title="Deployed">All checks green.</work-gen-block>
+        <work-gen-block type="callout" tone="err" title="Build failed">mrustc: missing libstd target.</work-gen-block>
+        <work-gen-block type="kv" title="run summary">duration: 8.4s
 tools: read_file, edit, bash
-verdict: live</wb-gen-block>
-        <wb-gen-block type="link" label="Open the capabilities dashboard" href="https://workbooks.sh"></wb-gen-block>
-        <wb-gen-block type="button" label="Promote to production" action="promote">target: /workbooks/Promote.org</wb-gen-block>
-        <wb-gen-block type="share" title="Share with your org">target: /workbooks/Release.org
+verdict: live</work-gen-block>
+        <work-gen-block type="link" label="Open the capabilities dashboard" href="https://workbooks.sh"></work-gen-block>
+        <work-gen-block type="button" label="Promote to production" action="promote">target: /workbooks/Promote.org</work-gen-block>
+        <work-gen-block type="share" title="Share with your org">target: /workbooks/Release.org
 members: Shane O, Ada L, Grace H
-role: Editor</wb-gen-block>
+role: Editor</work-gen-block>
       </div>
     </section>
 
     <!-- composer with state toggle -->
     <section>
-      <h2>wb-composer · intent + thinking/streaming state</h2>
+      <h2>work-composer · intent + thinking/streaming state</h2>
       <div class="panel">
-        <wb-composer id="composer" placeholder="Message the agent — Enter to send, Shift+Enter for newline…"></wb-composer>
+        <work-composer id="composer" placeholder="Message the agent — Enter to send, Shift+Enter for newline…"></work-composer>
         <div class="row">
           <wb-button id="s-idle" size="sm" variant="soft" tone="neutral">idle</wb-button>
           <wb-button id="s-think" size="sm" variant="soft">thinking</wb-button>
           <wb-button id="s-stream" size="sm" variant="soft">streaming</wb-button>
         </div>
-        <div class="log" id="log">wb-intent events appear here…</div>
+        <div class="log" id="log">work-intent events appear here…</div>
       </div>
-      <p class="note">The composer emits a <code>wb-intent</code> CustomEvent on submit — it does NOT
+      <p class="note">The composer emits a <code>work-intent</code> CustomEvent on submit — it does NOT
         call inference itself. A host listens and routes the intent through <code>this.host</code>
         (the Dock seam) to <code>local</code> / <code>runtime</code> / <code>kernel</code>. Real
         inference is the runtime-wired part; this specimen logs the intent instead.</p>
@@ -174,16 +184,16 @@ target: /workbooks/Promote.org
 #+end_src`;
     document.getElementById("thread").turns = transcript;
 
-    // Composer: log wb-intent, drive state from the controls.
+    // Composer: log work-intent, drive state from the controls.
     const composer = document.getElementById("composer");
     const log = document.getElementById("log");
     function logIntent(e) {
       const { action, text, ...rest } = e.detail;
       const extra = Object.keys(rest).length ? " " + JSON.stringify(rest) : "";
-      log.textContent = `wb-intent · ${action}${text ? ` "${text}"` : ""}${extra}`;
+      log.textContent = `work-intent · ${action}${text ? ` "${text}"` : ""}${extra}`;
     }
     // Listen at the document so EVERY element's intent bubbles up here.
-    document.addEventListener("wb-intent", logIntent);
+    document.addEventListener("work-intent", logIntent);
 
     document.getElementById("s-idle").addEventListener("click", () => composer.setAttribute("state", "idle"));
     document.getElementById("s-think").addEventListener("click", () => composer.setAttribute("state", "thinking"));

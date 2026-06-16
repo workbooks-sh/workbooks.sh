@@ -1,16 +1,14 @@
-// <wb-history-graph> — the user-facing History timeline.
+// <work-history-graph> — the user-facing History timeline.
 //
 // The reinvention: version control's log without git's vocabulary. Nodes are
 // VERSIONS (never "commits"), each with an author/agent badge and a title; the
 // rail draws a Sapling-smartlog-legible spine with branch lanes. Selecting a
 // version emits a `selected` CustomEvent {detail:{id, version}} — the host wires
-// that to <wb-diff>/<wb-restore>. Data via `items` (JSON array) attr or property.
+// that to <work-diff>/<work-restore>. Data via `items` (JSON array) attr or property.
 //
 // Each version mirrors the History backend Change shape (history.ex):
 //   { id, when, author_type: "human"|"agent", author_name, title, parents? }
-import { WbElement, define } from "../../core/element.js";
-
-const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+import { WbElement, html, css, define } from "../../core/element.js";
 
 function fmtWhen(w) {
   if (w == null) return "";
@@ -24,10 +22,10 @@ function fmtWhen(w) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export class WbHistoryGraph extends WbElement {
+export class WorkHistoryGraph extends WbElement {
   static props = ["items", "selected"];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); font-size: var(--wb-text); color: var(--wb-fg); }
     .frame { border: 1px solid var(--wb-border); border-radius: var(--wb-radius); background: var(--wb-surface); box-shadow: var(--wb-shadow-sm); overflow: hidden; }
     .head { padding: var(--wb-space-2) var(--wb-space-3); border-bottom: 1px solid var(--wb-border); background: var(--wb-surface-soft); font: 700 10px var(--wb-font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--wb-fg-subtle); }
@@ -64,26 +62,12 @@ export class WbHistoryGraph extends WbElement {
   `;
 
   // items can be a JSON attribute or an assigned property.
-  set items(v) { this._items = Array.isArray(v) ? v : null; this.update(); }
+  set items(v) { this._items = Array.isArray(v) ? v : null; this.requestUpdate(); }
   get items() {
     if (this._items) return this._items;
     const raw = this.attr("items");
     if (!raw) return [];
     try { return JSON.parse(raw); } catch { return []; }
-  }
-
-  connectedCallback() {
-    super.connectedCallback();
-    // Listen on the shadow root: clicks inside shadow DOM are retargeted to the
-    // host as they bubble out, so a host listener can't resolve the inner <li>.
-    this.shadowRoot.addEventListener("click", (e) => {
-      const li = e.target.closest("li[data-id]");
-      if (li) this._select(li.dataset.id);
-    });
-    this.shadowRoot.addEventListener("keydown", (e) => {
-      const li = e.target.closest("li[data-id]");
-      if (li && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); this._select(li.dataset.id); }
-    });
   }
 
   _select(id) {
@@ -92,28 +76,33 @@ export class WbHistoryGraph extends WbElement {
     this.dispatchEvent(new CustomEvent("selected", { bubbles: true, composed: true, detail: { id, version } }));
   }
 
+  _onKeydown(e, id) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._select(id); }
+  }
+
   render() {
     const items = this.items;
     const sel = this.attr("selected");
-    if (!items.length) return `<div class="frame"><div class="head">history</div><div class="empty">No versions yet.</div></div>`;
-    const rows = items.map((v) => {
+    if (!items.length) return html`<div class="frame"><div class="head">history</div><div class="empty">No versions yet.</div></div>`;
+    return html`<div class="frame"><div class="head">history</div><ul part="list">${items.map((v) => {
       const at = v.author_type === "agent" ? "agent" : "human";
       const isSel = sel != null && String(v.id) === String(sel);
-      return `
-        <li tabindex="0" role="button" data-id="${esc(v.id)}" data-author="${at}" class="${isSel ? "sel" : ""}" aria-pressed="${isSel}">
+      const id = v.id;
+      return html`
+        <li tabindex="0" role="button" data-id=${id} data-author=${at} class=${isSel ? "sel" : ""} aria-pressed=${String(isSel)}
+            @click=${() => this._select(id)} @keydown=${(e) => this._onKeydown(e, id)}>
           <div class="rail"><span class="node"></span></div>
           <div class="body">
-            <div class="title">${esc(v.title || "(untitled version)")}</div>
+            <div class="title">${v.title || "(untitled version)"}</div>
             <div class="meta">
-              <span class="badge ${at}"><span class="dot"></span>${esc(v.author_name || at)}</span>
-              <span class="when">${esc(fmtWhen(v.when))}</span>
-              <span class="id">${esc(String(v.id).slice(0, 8))}</span>
+              <span class="badge ${at}"><span class="dot"></span>${v.author_name || at}</span>
+              <span class="when">${fmtWhen(v.when)}</span>
+              <span class="id">${String(v.id).slice(0, 8)}</span>
             </div>
           </div>
         </li>`;
-    }).join("");
-    return `<div class="frame"><div class="head">history</div><ul part="list">${rows}</ul></div>`;
+    })}</ul></div>`;
   }
 }
 
-define("wb-history-graph", WbHistoryGraph);
+define("work-history-graph", WorkHistoryGraph);

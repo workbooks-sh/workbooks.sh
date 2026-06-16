@@ -1,11 +1,11 @@
-// <wb-column> — declarative column config for <wb-table>. Light-DOM only; it
-// renders nothing itself. The parent <wb-table> reads these to label, align,
+// <work-column> — declarative column config for <work-table>. Light-DOM only; it
+// renders nothing itself. The parent <work-table> reads these to label, align,
 // format, and order columns. Composition-as-source: the columns ARE markup.
 //
-//   <wb-table src-name="orders">
-//     <wb-column field="region" label="Region"></wb-column>
-//     <wb-column field="rev" label="Revenue" align="right" format="usd"></wb-column>
-//   </wb-table>
+//   <work-table src-name="orders">
+//     <work-column field="region" label="Region"></work-column>
+//     <work-column field="rev" label="Revenue" align="right" format="usd"></work-column>
+//   </work-table>
 //
 // Attrs: field (required) · label · align(left|right|center) · format(usd|num|pct|raw) · hidden
 import { define } from "../../core/element.js";
@@ -16,10 +16,10 @@ export class WbColumn extends HTMLElement {
   connectedCallback() { this._notify(); }
   attributeChangedCallback() { this._notify(); }
   _notify() {
-    const t = this.closest("wb-table");
+    const t = this.closest("work-table");
     if (t && typeof t._columnsChanged === "function") t._columnsChanged();
   }
-  /** The config object <wb-table> consumes. */
+  /** The config object <work-table> consumes. */
   get config() {
     return {
       field: this.getAttribute("field"),
@@ -31,4 +31,4 @@ export class WbColumn extends HTMLElement {
   }
 }
 
-define("wb-column", WbColumn);
+define("work-column", WbColumn);

@@ -8,6 +8,15 @@
   <title>workponents · search — specimen</title>
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
+  <!-- Lit, buildless: the bare "lit" specifier resolves to a pinned CDN ESM. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://esm.sh/lit@3.2.1",
+        "lit/": "https://esm.sh/lit@3.2.1/"
+      }
+    }
+  </script>
   <!-- the search domain: native custom elements, ESM, NO build step -->
   <script type="module" src="../src/elements/search/index.js"></script>
   <style>
@@ -48,12 +57,12 @@
     <h2>1 · Instant search — each keystroke is an engine query</h2>
     <p class="note">Searches a registered source named <code>people</code>. Typing runs
       <code>SELECT * FROM people WHERE name LIKE … OR role LIKE … OR city LIKE … LIMIT 8</code> in the engine —
-      watch the <code>rowCount</code> change in the log + console (<code>wb-search-query</code>).</p>
-    <wb-search src-name="people"
+      watch the <code>rowCount</code> change in the log + console (<code>work-search-query</code>).</p>
+    <work-search src-name="people"
       fields="name,role,city,team"
       title-field="name" subtitle-field="role"
       placeholder="Search 600 people…" label="Search people"
-      open-on-focus limit="8"></wb-search>
+      open-on-focus limit="8"></work-search>
 
     <h2>2 · ⌘K command palette — fuzzy commands + live data, ranked</h2>
     <p class="note">Press <code>⌘K</code> / <code>Ctrl-K</code> (or click the trigger). Commands are fuzzy-ranked
@@ -68,10 +77,10 @@
     <div id="log"></div>
 
     <!-- the palette: commands via property below + a live data group over `people` -->
-    <wb-command id="palette"
+    <work-command id="palette"
       src-name="people" fields="name,role,city" data-label="People"
       data-limit="6" trigger="#open-palette" hotkey="mod+k"
-      placeholder="Type a command or search people…"></wb-command>
+      placeholder="Type a command or search people…"></work-command>
 
     <script type="module">
       import { getEngine } from "../src/data/index.js";
@@ -117,13 +126,13 @@
       // ── surface events (the elements emit; the app/agent listens) ──
       const logEl = document.getElementById("log");
       function log(msg) { logEl.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`; }
-      document.querySelector("wb-search").addEventListener("wb-search-query", (e) =>
-        { console.log("[wb-search-query]", e.detail); log(`search "${e.detail.value}" → ${e.detail.rowCount} rows · engine: ${e.detail.engine} · ${e.detail.sql}`); });
-      document.querySelector("wb-search").addEventListener("wb-search-select", (e) =>
-        { console.log("[wb-search-select]", e.detail); log(`selected: ${e.detail.row.name} — ${e.detail.row.role} (${e.detail.row.city})`); });
-      palette.addEventListener("wb-command-query", (e) => console.log("[wb-command-query]", e.detail));
-      palette.addEventListener("wb-command-select", (e) =>
-        { console.log("[wb-command-select]", e.detail); if (e.detail.kind === "data") log(`palette → ${e.detail.row.name} (${e.detail.row.role})`); });
+      document.querySelector("work-search").addEventListener("work-search-query", (e) =>
+        { console.log("[work-search-query]", e.detail); log(`search "${e.detail.value}" → ${e.detail.rowCount} rows · engine: ${e.detail.engine} · ${e.detail.sql}`); });
+      document.querySelector("work-search").addEventListener("work-search-select", (e) =>
+        { console.log("[work-search-select]", e.detail); log(`selected: ${e.detail.row.name} — ${e.detail.row.role} (${e.detail.row.city})`); });
+      palette.addEventListener("work-command-query", (e) => console.log("[work-command-query]", e.detail));
+      palette.addEventListener("work-command-select", (e) =>
+        { console.log("[work-command-select]", e.detail); if (e.detail.kind === "data") log(`palette → ${e.detail.row.name} (${e.detail.row.role})`); });
 
       // ── theme toggle ──
       const buttons = [...document.querySelectorAll(".bar button")];

@@ -1,4 +1,4 @@
-// <wb-undo> — undo the last change (the "undo anything an agent did" promise).
+// <work-undo> — undo the last change (the "undo anything an agent did" promise).
 // git's reflog / jj op-log reinvented as one verb: undo the most recent Change
 // to a scope. Itself append-only at the ledger level (mirrors History.undo/2,
 // which rides the append-only Restore — see jj.ex for the op-log substrate).
@@ -6,14 +6,12 @@
 // Attrs: `scope` (workbook id), `label`. Capability via `this.host`: POSTs the
 // undo when a runtime is configured; standalone it emits `undo` {detail:{scope}}
 // for the host page. Always emits `undo` on success.
-import { WbElement, define } from "../../core/element.js";
+import { WbElement, html, css, define } from "../../core/element.js";
 
-const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-
-export class WbUndo extends WbElement {
+export class WorkUndo extends WbElement {
   static props = ["scope", "label", "disabled", "busy"];
 
-  static styles = `
+  static styles = css`
     :host { display: inline-block; font-family: var(--wb-font); }
     button {
       display: inline-flex; align-items: center; gap: var(--wb-space-2);
@@ -32,11 +30,6 @@ export class WbUndo extends WbElement {
     :host([busy]) svg { animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
   `;
-
-  connectedCallback() {
-    super.connectedCallback();
-    this.addEventListener("click", () => this.undo());
-  }
 
   async undo() {
     if (this.boolAttr("disabled") || this.boolAttr("busy")) return;
@@ -57,13 +50,13 @@ export class WbUndo extends WbElement {
 
   render() {
     const label = this.attr("label", "Undo last change");
-    return `<button part="button" aria-label="${esc(label)}">
+    return html`<button part="button" aria-label=${label} @click=${() => this.undo()}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M9 14 4 9l5-5"/><path d="M4 9h11a6 6 0 0 1 0 12h-3"/>
       </svg>
-      <span>${esc(label)}</span>
+      <span>${label}</span>
     </button>`;
   }
 }
 
-define("wb-undo", WbUndo);
+define("work-undo", WorkUndo);

@@ -1,4 +1,4 @@
-// <wb-file> — a single file card with an inline, type-aware preview.
+// <work-file> — a single file card with an inline, type-aware preview.
 //
 // The files reinvention: a file is a content-addressed RECORD, so previewing it
 // is a question of resolving its bytes and rendering them by `type` — image /
@@ -16,9 +16,9 @@
 //   • otherwise — a typed placeholder + metadata (degraded but complete)
 //
 // Usage:
-//   <wb-file name="logo.svg" type="image/svg+xml" src="./logo.svg"></wb-file>
-//   <wb-file name="readme.md" type="text/markdown" text="# Hello"></wb-file>
-//   <wb-file name="clip.mp4" type="video/mp4" path="blobs/abc" size="91234"></wb-file>
+//   <work-file name="logo.svg" type="image/svg+xml" src="./logo.svg"></work-file>
+//   <work-file name="readme.md" type="text/markdown" text="# Hello"></work-file>
+//   <work-file name="clip.mp4" type="video/mp4" path="blobs/abc" size="91234"></work-file>
 //
 // Attributes:
 //   name      file name (shown as the title)
@@ -30,11 +30,11 @@
 //   size      byte size (shown in metadata)
 //   modified  modified timestamp (shown in metadata)
 //   variant   card | bare      (visual shell)
-//   size-v    sm | md | lg      (preview height)  [reflected attr "density"]
+//   density   sm | md | lg      (preview height)
 //
 // Events:
-//   wb-file-open  { detail: { file } }   fired when the preview/title is opened
-import { WbElement, define } from "../../core/element.js";
+//   work-file-open  { detail: { file } }   fired when the preview/title is opened
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { fileKind, kindGlyph, fmtBytes, fmtWhen, shortHash, extOf } from "./file-types.js";
 
@@ -50,7 +50,12 @@ export class WbFile extends WbElement {
     "name", "type", "src", "text", "path", "hash", "size", "modified",
   ];
 
-  static styles = `
+  // The element reads its state via this.attr() in render() and drives its own
+  // repaints (requestUpdate / _resolveContent) from attributeChangedCallback —
+  // so it must observe every prop attribute itself.
+  static get observedAttributes() { return this.props; }
+
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .card { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
       background: var(--wb-surface); overflow: hidden; box-shadow: var(--wb-shadow-sm);
@@ -129,14 +134,18 @@ export class WbFile extends WbElement {
     }
     super.connectedCallback();
     this._resolveContent();
+    this._connected = true;
   }
 
-  disconnectedCallback() { this._revoke(); }
+  disconnectedCallback() { super.disconnectedCallback(); this._revoke(); }
 
-  attributeChangedCallback(name) {
+  attributeChangedCallback(name, old, val) {
+    // NB: this element reads state via this.attr() in render() and drives its own
+    // repaints, so it does NOT delegate to Lit's attributeChangedCallback (whose
+    // property machinery is unused here) — that path would throw.
     if (!this._connected) return;
     if (["src", "text", "path", "type"].includes(name)) this._resolveContent();
-    else this.update();
+    else this.requestUpdate(); // name/hash/size/modified change the card copy → repaint
   }
 
   _revoke() { if (this._objUrl) { try { URL.revokeObjectURL(this._objUrl); } catch {} this._objUrl = null; } }
@@ -150,12 +159,12 @@ export class WbFile extends WbElement {
     this._resolved = null;
     this._error = null;
     // Direct URL / inline text — no resolution needed.
-    if (this.attr("src") || this.attr("text") != null) { this.update(); return; }
+    if (this.attr("src") || this.attr("text") != null) { this.requestUpdate(); return; }
     const path = this.attr("path");
-    if (!path) { this.update(); return; }       // metadata-only → typed placeholder
-    if (!this.host.available("files")) { this.update(); return; } // standalone, no Host
+    if (!path) { this.requestUpdate(); return; }       // metadata-only → typed placeholder
+    if (!this.host.available("files")) { this.requestUpdate(); return; } // standalone, no Host
     // Docked: ask the Host for the content-addressed blob.
-    this._busy = true; this.update();
+    this._busy = true; this.requestUpdate();
     try {
       const out = await this.host.request("/files/get", { body: { path, hash: this.attr("hash") } });
       if (out && out.url) this._resolved = { url: out.url };
@@ -165,7 +174,7 @@ export class WbFile extends WbElement {
       this._error = String((e && e.message) || e);
     }
     this._busy = false;
-    this.update();
+    this.requestUpdate();
   }
 
   /** The URL to render media from (direct src or a Host-resolved blob). */
@@ -182,12 +191,12 @@ export class WbFile extends WbElement {
     const type = this.attr("type") || "";
     const kind = this._kind;
     const ext = extOf(name) || extOf(type);
-    return `<div class="card">
+    return html`<div class="card">
       <div class="head">
-        <span class="badge" data-kind="${kind}">${kindGlyph(kind)}</span>
-        <span class="title" title="${esc(name)}">${esc(name)}</span>
+        <span class="badge" data-kind=${kind}>${kindGlyph(kind)}</span>
+        <span class="title" title=${name} @click=${this._open}>${name}</span>
         <span class="grow"></span>
-        <span class="typetag">${esc(type || ext || kind)}</span>
+        <span class="typetag">${type || ext || kind}</span>
       </div>
       <div class="stage">${this._renderPreview(kind)}</div>
       ${this._renderMeta()}
@@ -195,20 +204,20 @@ export class WbFile extends WbElement {
   }
 
   _renderPreview(kind) {
-    if (this._busy) return `<div class="status">Resolving content…</div>`;
-    if (this._error) return `<div class="status err">Could not load — ${esc(this._error)}</div>`;
+    if (this._busy) return html`<div class="status">Resolving content…</div>`;
+    if (this._error) return html`<div class="status err">Could not load — ${this._error}</div>`;
     const url = this._mediaUrl();
     const text = this._textContent();
 
-    if (kind === "image" && url) return `<img src="${esc(url)}" alt="${esc(this.attr("name") || "")}" />`;
-    if (kind === "video" && url) return `<video src="${esc(url)}" controls preload="metadata"></video>`;
+    if (kind === "image" && url) return html`<img src=${url} alt=${this.attr("name") || ""} @click=${this._open} />`;
+    if (kind === "video" && url) return html`<video src=${url} controls preload="metadata"></video>`;
     if (kind === "audio" && url) {
-      return `<div class="audio-wrap"><span class="audio-glyph">${kindGlyph("audio")}</span>
-        <audio src="${esc(url)}" controls></audio></div>`;
+      return html`<div class="audio-wrap"><span class="audio-glyph">${kindGlyph("audio")}</span>
+        <audio src=${url} controls></audio></div>`;
     }
     if ((kind === "text" || kind === "code") && text != null) {
       const clipped = text.length > 8000 ? text.slice(0, 8000) + "\n…" : text;
-      return `<pre class="textview">${esc(clipped)}</pre>`;
+      return html`<pre class="textview">${clipped}</pre>`;
     }
     // text/code with a URL but no inline content, and no Host text → placeholder
     return this._renderPlaceholder(kind);
@@ -222,10 +231,10 @@ export class WbFile extends WbElement {
       : (kind === "video"
           ? "Preview / transcode via the wavelet path when docked."
           : "No preview — metadata only.");
-    return `<div class="placeholder">
-      <span class="ph-glyph" data-kind="${kind}">${kindGlyph(kind)}</span>
-      ${ext ? `<span class="ph-ext">.${esc(ext)}</span>` : ""}
-      <span class="ph-note">${esc(note)}</span>
+    return html`<div class="placeholder">
+      <span class="ph-glyph" data-kind=${kind}>${kindGlyph(kind)}</span>
+      ${ext ? html`<span class="ph-ext">.${ext}</span>` : null}
+      <span class="ph-note">${note}</span>
     </div>`;
   }
 
@@ -236,28 +245,25 @@ export class WbFile extends WbElement {
     const modified = this.attr("modified");
     const hash = this.attr("hash");
     const path = this.attr("path");
-    if (type) items.push(["Type", esc(type), false]);
-    if (size != null && size !== "") items.push(["Size", esc(fmtBytes(size)), true]);
-    if (modified) items.push(["Modified", esc(fmtWhen(modified)), false]);
-    if (hash) items.push(["Content hash", esc(shortHash(hash)), true]);
-    if (path) items.push(["Path", esc(path), true]);
-    if (!items.length) return "";
+    if (type) items.push(["Type", type, false]);
+    if (size != null && size !== "") items.push(["Size", fmtBytes(size), true]);
+    if (modified) items.push(["Modified", fmtWhen(modified), false]);
+    if (hash) items.push(["Content hash", shortHash(hash), true]);
+    if (path) items.push(["Path", path, true]);
+    if (!items.length) return null;
     const docked = path
-      ? `<span class="docked" style="color:var(${this.host.available("files") ? "--wb-ok" : "--wb-fg-subtle"})">${this.host.available("files") ? "● docked" : "○ standalone"}</span>`
-      : "";
-    return `<div class="meta">${items.map(([k, v, mono]) =>
-      `<span class="m"><span class="k">${k}</span><span class="v${mono ? " mono" : ""}" title="${v}">${v}</span></span>`).join("")}
-      ${docked ? `<span class="m"><span class="k">Source</span><span class="v">${docked}</span></span>` : ""}
+      ? html`<span class="m"><span class="k">Source</span><span class="v">
+          <span class="docked" style=${`color:var(${this.host.available("files") ? "--wb-ok" : "--wb-fg-subtle"})`}>${this.host.available("files") ? "● docked" : "○ standalone"}</span>
+        </span></span>`
+      : null;
+    return html`<div class="meta">${items.map(([k, v, mono]) =>
+      html`<span class="m"><span class="k">${k}</span><span class="v ${mono ? "mono" : ""}" title=${v}>${v}</span></span>`)}
+      ${docked}
     </div>`;
   }
 
-  update() {
-    super.update();
-    const open = () => this.dispatchEvent(new CustomEvent("wb-file-open", {
-      detail: { file: this._file() }, bubbles: true, composed: true }));
-    this.shadowRoot.querySelector(".title")?.addEventListener("click", open);
-    this.shadowRoot.querySelector("img")?.addEventListener("click", open);
-  }
+  _open = () => this.dispatchEvent(new CustomEvent("work-file-open", {
+    detail: { file: this._file() }, bubbles: true, composed: true }));
 
   _file() {
     const o = {};
@@ -268,8 +274,4 @@ export class WbFile extends WbElement {
   }
 }
 
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
-
-define("wb-file", WbFile);
+define("work-file", WbFile);

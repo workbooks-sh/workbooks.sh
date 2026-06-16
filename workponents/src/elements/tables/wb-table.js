@@ -1,4 +1,4 @@
-// <wb-table> — THE tables reinvention: the grid IS a view over a query, not a
+// <work-table> — THE tables reinvention: the grid IS a view over a query, not a
 // static table. Sort / filter / aggregate run IN the engine (DuckDB on the
 // runtime tier · browser duckdb-wasm · the in-JS subset offline) — never in the
 // element. The element is a thin, virtualized viewport over a WbQueryResult.
@@ -7,14 +7,20 @@
 // compute ONLY through the src/data layer (getEngine) — exactly the cell pattern
 // in docs/wb-doc-cell.js, generalized to the shared DuckDB engine.
 //
+// Re-based onto Lit (the FLOOR's engine): render() returns a Lit template; the
+// table/header markup is string-built and dropped in via unsafeHTML (the drawing
+// code is ours, not untrusted), and post-render event wiring lives in updated().
+// The data-layer plumbing — _load single-flight, stable inline auto-name,
+// whenRegistered/register — is unchanged; only the RENDER moved to Lit.
+//
 // Usage (inline data, declared columns):
-//   <wb-table rows='[{"region":"North","rev":120}]' searchable>
-//     <wb-column field="region" label="Region"></wb-column>
-//     <wb-column field="rev" label="Revenue" align="right" format="usd"></wb-column>
-//   </wb-table>
+//   <work-table rows='[{"region":"North","rev":120}]' searchable>
+//     <work-column field="region" label="Region"></work-column>
+//     <work-column field="rev" label="Revenue" align="right" format="usd"></work-column>
+//   </work-table>
 //
 // Usage (register elsewhere, query a named source):
-//   <wb-table src-name="orders" query="SELECT region, sum(rev) AS rev FROM orders GROUP BY region"></wb-table>
+//   <work-table src-name="orders" query="SELECT region, sum(rev) AS rev FROM orders GROUP BY region"></work-table>
 //
 // Attributes:
 //   rows        inline JSON array of row objects (registers an auto-named source)
@@ -27,10 +33,11 @@
 //   density     comfortable | compact
 //
 // Events:
-//   wb-table-ready   { detail: { columns, types, engine } }
-//   wb-table-query   { detail: { sql, rowCount, engine } }   on every (re)query
-//   wb-row-click     { detail: { row: {…}, index } }
-import { WbElement, define } from "../../core/element.js";
+//   work-table-ready   { detail: { columns, types, engine } }
+//   work-table-query   { detail: { sql, rowCount, engine } }   on every (re)query
+//   work-row-click     { detail: { row: {…}, index } }
+import { WbElement, html, css, define } from "../../core/element.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 
@@ -45,7 +52,7 @@ export class WbTable extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "rows", "csv", "src-name", "query", "page-size", "searchable"];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .shell { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
       background: var(--wb-surface); overflow: hidden; box-shadow: var(--wb-shadow-sm); }
@@ -95,7 +102,7 @@ export class WbTable extends WbElement {
   `;
 
   connectedCallback() {
-    // Capture source + columns ONCE before the base wipes anything.
+    // Capture source + columns ONCE before the base wires anything.
     if (this._init == null) {
       this._init = true;
       this._engine = getEngine();
@@ -121,7 +128,7 @@ export class WbTable extends WbElement {
     if (!this._srcName) {
       const rowsAttr = this.attr("rows");
       const csvAttr = this.attr("csv");
-      if (!this._autoName) this._autoName = `wb_inline_${++_autoId}`;
+      if (!this._autoName) this._autoName = `work_inline_${++_autoId}`;
       this._srcName = this._autoName;
       if (rowsAttr) this._pendingSource = { json: rowsAttr };
       else if (csvAttr) this._pendingSource = { csv: csvAttr };
@@ -135,28 +142,29 @@ export class WbTable extends WbElement {
   }
 
   _readColumns() {
-    const cols = [...this.querySelectorAll("wb-column")].map((c) => c.config);
+    const cols = [...this.querySelectorAll("work-column")].map((c) => c.config);
     this._declaredColumns = cols.length ? cols : null;
   }
 
   // Reload when the data source / query changes (e.g. rows set after connect);
   // variant/density/page-size/searchable only re-render (base handles those).
-  attributeChangedCallback(name) {
-    if (!this._connected) return;
+  attributeChangedCallback(name, old, val) {
+    super.attributeChangedCallback(name, old, val); // keep Lit's reactive props in sync
+    if (!this._init) return;
     if (name === "rows" || name === "csv" || name === "src-name" || name === "query") {
       this._pendingSource = null;
       this._captureSource();
       this._load();
     } else {
-      this.update();
+      this.requestUpdate();
     }
   }
 
-  /** Called by <wb-column> when its attrs change. */
+  /** Called by <work-column> when its attrs change. */
   _columnsChanged() {
     if (!this._init) return;
     this._readColumns();
-    this.update();
+    this.requestUpdate();
   }
 
   async _load() {
@@ -167,7 +175,7 @@ export class WbTable extends WbElement {
     this._loading = true;
     do {
       this._loadAgain = false;
-      this._busy = true; this._error = null; this.update();
+      this._busy = true; this._error = null; this.requestUpdate();
       try {
         if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
         else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
@@ -177,8 +185,8 @@ export class WbTable extends WbElement {
         this._tier = "error";
       }
       this._busy = false;
-      this.update();
-      this._emit("wb-table-ready", { columns: this._result?.columns || [], types: this._result?.types || [], engine: this._tier });
+      this.requestUpdate();
+      this._emit("work-table-ready", { columns: this._result?.columns || [], types: this._result?.types || [], engine: this._tier });
     } while (this._loadAgain);
     this._loading = false;
   }
@@ -189,7 +197,7 @@ export class WbTable extends WbElement {
     this._result = await this._engine.query(sql);
     this._tier = this._result.engine || this._engine.provider();
     this._page = 0;
-    this._emit("wb-table-query", { sql, rowCount: this._result.rowCount, engine: this._tier });
+    this._emit("work-table-query", { sql, rowCount: this._result.rowCount, engine: this._tier });
   }
 
   _buildSql() {
@@ -231,7 +239,8 @@ export class WbTable extends WbElement {
         <span class="engine" data-tier="${this._error ? "error" : this._tier}"><span class="dot"></span></span>
         <span class="meta">${this._result ? this._result.rowCount.toLocaleString() + " rows" : ""}</span>
       </div>`;
-    return `<div class="shell">${head}${this._renderBody()}<div class="foot"><span class="note">${esc(tierText)}</span>${this._error ? `<span class="note"> — ${esc(this._error)}</span>` : ""}</div></div>`;
+    const shell = `<div class="shell">${head}${this._renderBody()}<div class="foot"><span class="note">${esc(tierText)}</span>${this._error ? `<span class="note"> — ${esc(this._error)}</span>` : ""}</div></div>`;
+    return html`${unsafeHTML(shell)}`;
   }
 
   _renderBody() {
@@ -281,7 +290,7 @@ export class WbTable extends WbElement {
     return `<div class="scroll"><table><thead><tr>${ths}</tr></thead></table></div>`;
   }
 
-  /** Merge declared <wb-column> config with the result's actual columns. */
+  /** Merge declared <work-column> config with the result's actual columns. */
   _resolvedColumns(r) {
     if (this._declaredColumns) {
       return this._declaredColumns.filter((c) => !c.hidden && r.columns.includes(c.field));
@@ -289,8 +298,10 @@ export class WbTable extends WbElement {
     return r.columns.map((f) => ({ field: f, label: prettify(f), align: null, format: null }));
   }
 
-  update() {
-    super.update();
+  // Lit lifecycle: wire imperative listeners after every render (the markup is
+  // re-emitted as a string via unsafeHTML, so we (re)bind handlers here — the
+  // same post-render wiring the string base did, now on the Lit hook).
+  updated() {
     const root = this.shadowRoot;
     // header sort
     root.querySelectorAll("thead th[data-col]").forEach((th) => {
@@ -312,7 +323,7 @@ export class WbTable extends WbElement {
         clearTimeout(this._t);
         this._t = setTimeout(() => {
           this._filter = value;
-          this._run().then(() => this.update());
+          this._run().then(() => this.requestUpdate());
         }, 140);
       });
     }
@@ -333,7 +344,7 @@ export class WbTable extends WbElement {
         const r = this._result;
         const obj = {};
         r.columns.forEach((c, j) => (obj[c] = r.rows[i][j]));
-        this._emit("wb-row-click", { row: obj, index: i });
+        this._emit("work-row-click", { row: obj, index: i });
       });
     });
   }
@@ -342,9 +353,11 @@ export class WbTable extends WbElement {
     // Re-render preserving scroll position (virtual window moved).
     const scroll = this.shadowRoot.querySelector(".scroll");
     const top = scroll ? scroll.scrollTop : 0;
-    this.update();
-    const s2 = this.shadowRoot.querySelector(".scroll");
-    if (s2) s2.scrollTop = top;
+    this.requestUpdate();
+    this.updateComplete.then(() => {
+      const s2 = this.shadowRoot.querySelector(".scroll");
+      if (s2) s2.scrollTop = top;
+    });
   }
 
   _toggleSort(col) {
@@ -353,7 +366,7 @@ export class WbTable extends WbElement {
     } else {
       this._sort = { col, dir: "asc" };
     }
-    this._run().then(() => this.update());
+    this._run().then(() => this.requestUpdate());
   }
 
   _emit(name, detail) {
@@ -383,4 +396,4 @@ function fmt(v, format) {
   return v;
 }
 
-define("wb-table", WbTable);
+define("work-table", WbTable);

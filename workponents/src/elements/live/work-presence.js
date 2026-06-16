@@ -1,6 +1,6 @@
-// <wb-presence> — who's here, live. Renders the channel's presence set.
+// <work-presence> — who's here, live. Renders the channel's presence set.
 //
-// Binds to the room's Channel (own `topic` attr, else the nearest <wb-room>) and
+// Binds to the room's Channel (own `topic` attr, else the nearest <work-room>) and
 // re-renders on every presence diff — joins/leaves/metadata updates flow straight
 // off Phoenix Presence (real) or the BroadcastChannel mock (standalone), same
 // shape either way. Themed entirely from --wb-*; the per-client color is the only
@@ -12,9 +12,9 @@
 //   max                avatars: max shown before "+N" (default 5)
 //   self="hide"        omit this client from the rendered set
 // Events:
-//   wb-presence-change { list, count, joins, leaves }   — on every presence diff
-// Usage:  <wb-presence></wb-presence>  ·  <wb-presence variant="list"></wb-presence>
-import { WbElement, define } from "../../core/element.js";
+//   work-presence-change { list, count, joins, leaves }   — on every presence diff
+// Usage:  <work-presence></work-presence>  ·  <work-presence variant="list"></work-presence>
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { clientId, colorFor } from "./channel.js";
 import { resolveChannel } from "./resolve.js";
@@ -23,11 +23,11 @@ const VARIANTS = defineVariants({
   variant: { options: ["avatars", "list", "count"], default: "avatars" },
 });
 
-export class WbPresence extends WbElement {
+export class WorkPresence extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "topic", "max", "self"];
 
-  static styles = `
+  static styles = css`
     :host { display: inline-block; font-family: var(--wb-font); color: var(--wb-fg); }
     .stack { display: inline-flex; align-items: center; }
     .ava {
@@ -65,29 +65,29 @@ export class WbPresence extends WbElement {
     this._me = clientId();
     this._bind();
   }
-  disconnectedCallback() { this._unsub?.(); }
+  disconnectedCallback() { super.disconnectedCallback(); this._unsub?.(); }
 
   _bind() {
     this._ch = resolveChannel(this);
     if (!this._ch) {
       // room may not have opened its channel yet; retry next frame, then on state
-      requestAnimationFrame(() => { if (!this._ch) { this._bind(); this.update(); } });
+      requestAnimationFrame(() => { if (!this._ch) { this._bind(); this.requestUpdate(); } });
       this.addEventListener("__wb_retry__", () => this._bind(), { once: true });
       return;
     }
     this._unsub?.();
     this._unsub = this._ch.on("presence", (detail) => this._onPresence(detail));
-    this.update();
+    this.requestUpdate();
     if (this._ch.state === "joined") this._emit({ list: this._ch.presence(), joins: [], leaves: [] });
   }
 
   _onPresence(detail) {
-    this.update();
+    this.requestUpdate();
     this._emit(detail);
   }
 
   _emit({ list, joins, leaves }) {
-    this.dispatchEvent(new CustomEvent("wb-presence-change", {
+    this.dispatchEvent(new CustomEvent("work-presence-change", {
       bubbles: true, composed: true,
       detail: { list, count: list.length, joins: joins || [], leaves: leaves || [] },
     }));
@@ -100,36 +100,38 @@ export class WbPresence extends WbElement {
     return m.sort((a, b) => (a.id === this._me ? -1 : b.id === this._me ? 1 : (a.online_at || 0) - (b.online_at || 0)));
   }
 
+  _nameOf(p) { return p.meta?.name || ("Guest " + p.id.slice(-4).toUpperCase()); }
+
   _avatar(p, extraClass = "") {
-    const name = p.meta?.name || ("Guest " + p.id.slice(-4).toUpperCase());
+    const name = this._nameOf(p);
     const color = p.meta?.color || colorFor(p.id);
-    const me = p.id === this._me ? " me" : "";
+    const isMe = p.id === this._me;
     const init = name.split(/[\s._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || name[0]?.toUpperCase() || "?";
-    const img = p.meta?.avatar ? `<img src="${p.meta.avatar}" alt="" />` : init;
-    return `<span class="ava${me} ${extraClass}" style="background:${color}" title="${name}${p.id === this._me ? " (you)" : ""}">${img}</span>`;
+    const inner = p.meta?.avatar ? html`<img src=${p.meta.avatar} alt="" />` : init;
+    return html`<span class=${"ava" + (isMe ? " me" : "") + (extraClass ? " " + extraClass : "")}
+      style=${`background:${color}`} title=${name + (isMe ? " (you)" : "")}>${inner}</span>`;
   }
 
   render() {
     const v = this.attr("variant", "avatars");
     const members = this._members();
     if (v === "count") {
-      return `<span class="count"><span class="pip"></span><b>${members.length}</b> here</span>`;
+      return html`<span class="count"><span class="pip"></span><b>${members.length}</b> here</span>`;
     }
     if (v === "list") {
-      if (!members.length) return `<div class="list"><span class="empty">No one here yet.</span></div>`;
-      return `<div class="list">${members.map((p) => {
-        const name = p.meta?.name || ("Guest " + p.id.slice(-4).toUpperCase());
-        return `<div class="row">${this._avatar(p)}<span class="nm">${name}</span>${p.id === this._me ? `<span class="tag">you</span>` : ""}</div>`;
-      }).join("")}</div>`;
+      if (!members.length) return html`<div class="list"><span class="empty">No one here yet.</span></div>`;
+      return html`<div class="list">${members.map((p) => html`
+        <div class="row">${this._avatar(p)}<span class="nm">${this._nameOf(p)}</span>${
+          p.id === this._me ? html`<span class="tag">you</span>` : ""}</div>`)}</div>`;
     }
     // avatars (default)
     const max = parseInt(this.attr("max", "5"), 10);
     const shown = members.slice(0, max);
     const extra = members.length - shown.length;
-    return `<span class="stack">${shown.map((p) => this._avatar(p)).join("")}${
-      extra > 0 ? `<span class="ava more" title="${extra} more">+${extra}</span>` : ""
+    return html`<span class="stack">${shown.map((p) => this._avatar(p))}${
+      extra > 0 ? html`<span class="ava more" title=${extra + " more"}>+${extra}</span>` : ""
     }</span>`;
   }
 }
 
-define("wb-presence", WbPresence);
+define("work-presence", WorkPresence);

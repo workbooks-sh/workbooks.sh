@@ -1,16 +1,16 @@
-// <wb-user> — avatar + identity menu, bound to the current session.
+// <work-user> — avatar + identity menu, bound to the current session.
 //
 // Reads the identity seam (over this.host): shows the signed-in user's avatar
 // (image or initials), and on click reveals a menu with name/email + sign-out.
 // Subscribes to the seam, so it updates live when the session changes elsewhere
-// (e.g. <wb-auth> resolves a sign-in). Sign-out drives the seam and emits
-// `wb-auth-changed` {user:null}. When anonymous it renders nothing (a <wb-gate>
-// or <wb-auth> handles the anon case).
+// (e.g. <work-auth> resolves a sign-in). Sign-out drives the seam and emits
+// `work-auth-changed` {user:null}. When anonymous it renders nothing (a <work-gate>
+// or <work-auth> handles the anon case).
 //
 // Variants:  variant = "menu" | "compact"  (compact = avatar only, no name)
-// Events:  wb-auth-changed { user, providers }  (on sign-out)
-// Usage:  <wb-user></wb-user>   ·   <wb-user variant="compact"></wb-user>
-import { WbElement, define } from "../../core/element.js";
+// Events:  work-auth-changed { user, providers }  (on sign-out)
+// Usage:  <work-user></work-user>   ·   <work-user variant="compact"></work-user>
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getIdentity } from "./identity.js";
 
@@ -18,11 +18,11 @@ const VARIANTS = defineVariants({
   variant: { options: ["menu", "compact"], default: "menu" },
 });
 
-export class WbUser extends WbElement {
+export class WorkUser extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "open"];
 
-  static styles = `
+  static styles = css`
     :host { display: inline-block; font-family: var(--wb-font); color: var(--wb-fg); position: relative; }
     :host([hidden]) { display: none; }
     .trigger {
@@ -83,11 +83,11 @@ export class WbUser extends WbElement {
     this._unsub?.();
     this._identity = cap;
     this._listen();
-    if (this._connected) this.update();
+    if (this._connected) this.requestUpdate();
   }
 
   _listen() {
-    this._unsub = this.identity.subscribe(() => this.update());
+    this._unsub = this.identity.subscribe(() => this.requestUpdate());
   }
 
   _initials(name, email) {
@@ -101,23 +101,17 @@ export class WbUser extends WbElement {
     if (!this._wired) {
       this._wired = true;
       this._listen();
-      this.shadowRoot.addEventListener("click", (e) => {
-        if (e.target.closest(".item.signout")) { this._signOut(); return; }
-        if (e.target.closest(".trigger")) {
-          this.toggleAttribute("open");
-          return;
-        }
-      });
       // close on outside click
       this._onDoc = (e) => { if (!this.contains(e.target)) this.removeAttribute("open"); };
       document.addEventListener("click", this._onDoc);
     }
     // resolve a possibly-async real session
     await this.identity.session();
-    this.update();
+    this.requestUpdate();
   }
 
   disconnectedCallback() {
+    super.disconnectedCallback();
     this._unsub?.();
     document.removeEventListener("click", this._onDoc);
   }
@@ -125,32 +119,36 @@ export class WbUser extends WbElement {
   async _signOut() {
     this.removeAttribute("open");
     const snap = await this.identity.signOut();
-    this.dispatchEvent(new CustomEvent("wb-auth-changed", { bubbles: true, composed: true, detail: snap }));
+    this.dispatchEvent(new CustomEvent("work-auth-changed", { bubbles: true, composed: true, detail: snap }));
+  }
+
+  _avatar(user) {
+    return user.avatar
+      ? html`<span class="avatar"><img src=${user.avatar} alt="" /></span>`
+      : html`<span class="avatar">${this._initials(user.name, user.email)}</span>`;
   }
 
   render() {
     const { user } = this.identity.peek();
     if (!user) { this.setAttribute("hidden", ""); return ""; }
     this.removeAttribute("hidden");
-    const avatar = user.avatar
-      ? `<span class="avatar"><img src="${user.avatar}" alt="" /></span>`
-      : `<span class="avatar">${this._initials(user.name, user.email)}</span>`;
-    return `
-      <button class="trigger" part="trigger" aria-haspopup="menu" aria-label="Account">
-        ${avatar}
+    return html`
+      <button class="trigger" part="trigger" aria-haspopup="menu" aria-label="Account"
+        @click=${() => this.toggleAttribute("open")}>
+        ${this._avatar(user)}
         <span class="name">${user.name || user.email || "Account"}</span>
         <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </button>
       <div class="menu" part="menu" role="menu">
         <div class="who">
-          ${avatar}
+          ${this._avatar(user)}
           <div class="meta">
             <div class="n">${user.name || "—"}</div>
             <div class="e">${user.email || ""}</div>
           </div>
         </div>
         <div class="sep"></div>
-        <button class="item signout danger" role="menuitem" part="signout">
+        <button class="item signout danger" role="menuitem" part="signout" @click=${() => this._signOut()}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
           Sign out
         </button>
@@ -158,4 +156,4 @@ export class WbUser extends WbElement {
   }
 }
 
-define("wb-user", WbUser);
+define("work-user", WorkUser);

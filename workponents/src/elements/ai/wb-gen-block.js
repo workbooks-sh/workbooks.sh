@@ -1,4 +1,4 @@
-// <wb-gen-block> — an inline component block the agent emits inside a turn.
+// <work-gen-block> — an inline component block the agent emits inside a turn.
 // Ported from desktop/src/lib/chat/ChatComponent.svelte. The agent authors
 // these as `#+begin_src component :type <t> …` blocks in the living document;
 // they render as themed cards reading STRUCTURED props/body — never raw LLM
@@ -6,17 +6,18 @@
 // the block IS the source.
 //
 // Types: callout (info/warn/ok/error banner) · kv (key/value table) ·
-//        button (action; fires wb-intent) · link (themed external link) ·
-//        share (member chips + invite button; fires wb-intent).
+//        button (action; fires work-intent) · link (themed external link) ·
+//        share (member chips + invite button; fires work-intent).
 // Unknown types fall back to a labeled code block so nothing vanishes.
 //
 // Usage (props as attributes; body via textContent):
-//   <wb-gen-block type="callout" tone="warn" title="Heads up">…body…</wb-gen-block>
+//   <work-gen-block type="callout" tone="warn" title="Heads up">…body…</work-gen-block>
 //
-// Interactive blocks emit a `wb-intent` CustomEvent (bubbles, composed) the
+// Interactive blocks emit a `work-intent` CustomEvent (bubbles, composed) the
 // thread / host can observe — they never execute LLM-authored code.
-import { WbElement, define } from "../../core/element.js";
-import { esc, parseKvBody } from "./markdown.js";
+import { WbElement, html, css, define } from "../../core/element.js";
+import { svg as litSvg } from "lit";
+import { parseKvBody } from "./markdown.js";
 
 const ICONS = {
   info: "M12 17v-5m0-4h.01M12 22a10 10 0 100-20 10 10 0 000 20z",
@@ -28,14 +29,14 @@ const ICONS = {
   users: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8m14 10v-2a4 4 0 00-3-3.87M16 3.13A4 4 0 0116 11",
 };
 
-function svg(d) {
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+function icon(d, cls = "icon") {
+  return litSvg`<svg class=${cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d=${d}></path></svg>`;
 }
 
 export class WbGenBlock extends WbElement {
   static props = ["type", "tone", "title", "label", "href", "action", "target", "done"];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .card {
       border-radius: var(--wb-radius);
@@ -124,7 +125,7 @@ export class WbGenBlock extends WbElement {
   _fire(action, detail = {}) {
     this.setAttribute("done", "");
     this.dispatchEvent(
-      new CustomEvent("wb-intent", {
+      new CustomEvent("work-intent", {
         bubbles: true,
         composed: true,
         detail: { action, ...detail },
@@ -132,28 +133,15 @@ export class WbGenBlock extends WbElement {
     );
   }
 
-  connectedCallback() {
-    super.connectedCallback();
-    if (!this._wired) {
-      this._wired = true;
-      this.shadowRoot.addEventListener("click", (e) => {
-        const btn = e.target.closest("[data-fire]");
-        if (!btn) return;
-        const t = this.attr("type", "callout");
-        const target = parseKvBody(this.body).find(([k]) => k === "target")?.[1] || this.attr("target", "");
-        if (t === "share") {
-          const f = Object.fromEntries(parseKvBody(this.body));
-          const members = (f.members || "").split(",").map((m) => m.trim()).filter(Boolean);
-          this._fire("share", { target: f.target, members, role: f.role });
-        } else {
-          this._fire(this.attr("action", "button"), {
-            label: this.attr("label", this.body),
-            target,
-          });
-        }
-        this.update();
-      });
-    }
+  _onButton() {
+    const target = parseKvBody(this.body).find(([k]) => k === "target")?.[1] || this.attr("target", "");
+    this._fire(this.attr("action", "button"), { label: this.attr("label", this.body), target });
+  }
+
+  _onShare() {
+    const f = Object.fromEntries(parseKvBody(this.body));
+    const members = (f.members || "").split(",").map((m) => m.trim()).filter(Boolean);
+    this._fire("share", { target: f.target, members, role: f.role });
   }
 
   render() {
@@ -164,47 +152,43 @@ export class WbGenBlock extends WbElement {
     const done = this.boolAttr("done");
 
     if (type === "kv") {
-      const rows = parseKvBody(body)
-        .map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`)
-        .join("");
-      return `<div class="card kv">${title ? `<div class="kvtitle">${esc(title)}</div>` : ""}<table><tbody>${rows}</tbody></table></div>`;
+      const rows = parseKvBody(body);
+      return html`<div class="card kv">${title ? html`<div class="kvtitle">${title}</div>` : ""}<table><tbody>${rows.map(
+        ([k, v]) => html`<tr><th>${k}</th><td>${v}</td></tr>`,
+      )}</tbody></table></div>`;
     }
 
     if (type === "button") {
       const label = done ? this.attr("doneLabel", "Done") : this.attr("label", body || "Run");
-      return `<button class="card btn" data-fire ${done ? "data-done" : ""}>${svg(done ? ICONS.ok : ICONS.send)}<span>${esc(label)}</span></button>`;
+      return html`<button class="card btn" ?data-done=${done} @click=${this._onButton}>${icon(done ? ICONS.ok : ICONS.send)}<span>${label}</span></button>`;
     }
 
     if (type === "link") {
       const href = this.attr("href", "#");
       const safe = /^(https?:\/\/|mailto:|\/)/i.test(href) ? href : "#";
-      return `<a class="card link" href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${svg(ICONS.out)}<span>${esc(this.attr("label", body || href))}</span></a>`;
+      return html`<a class="card link" href=${safe} target="_blank" rel="noopener noreferrer">${icon(ICONS.out)}<span>${this.attr("label", body || href)}</span></a>`;
     }
 
     if (type === "share") {
       const f = Object.fromEntries(parseKvBody(body));
       const members = (f.members || "").split(",").map((m) => m.trim()).filter(Boolean);
-      const chips = members
-        .map((m) => `<span class="member" title="${esc(m)}">${esc(m.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase())}</span>`)
-        .join("");
-      const count = members.length
-        ? `<span class="mcount">${members.length} people · ${esc(f.role || "Editor")}</span>`
-        : "";
-      return `<div class="card share">
-        <div class="shead">${svg(ICONS.users)}<span>${esc(title || "Share with your org")}</span></div>
-        ${f.target ? `<div class="starget">${esc(f.target)}</div>` : ""}
-        ${members.length ? `<div class="members">${chips}${count}</div>` : ""}
-        <button class="btn" data-fire ${done ? "data-done" : ""}>${svg(done ? ICONS.ok : ICONS.send)}<span>${done ? "Invited" : "Send invite"}</span></button>
+      return html`<div class="card share">
+        <div class="shead">${icon(ICONS.users)}<span>${title || "Share with your org"}</span></div>
+        ${f.target ? html`<div class="starget">${f.target}</div>` : ""}
+        ${members.length ? html`<div class="members">${members.map(
+          (m) => html`<span class="member" title=${m}>${m.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}</span>`,
+        )}<span class="mcount">${members.length} people · ${f.role || "Editor"}</span></div>` : ""}
+        <button class="btn" ?data-done=${done} @click=${this._onShare}>${icon(done ? ICONS.ok : ICONS.send)}<span>${done ? "Invited" : "Send invite"}</span></button>
       </div>`;
     }
 
     if (type === "callout") {
       const ic = tone === "warn" ? ICONS.warn : tone === "ok" ? ICONS.ok : (tone === "error" || tone === "err") ? ICONS.err : ICONS.info;
-      return `<div class="card callout"><span class="icon">${svg(ic)}</span><div>${title ? `<div class="ctitle">${esc(title)}</div>` : ""}<div class="ctext">${esc(body)}</div></div></div>`;
+      return html`<div class="card callout"><span class="icon">${icon(ic, "")}</span><div>${title ? html`<div class="ctitle">${title}</div>` : ""}<div class="ctext">${body}</div></div></div>`;
     }
 
-    return `<div class="card unknown"><div class="ulabel">component: ${esc(type)}</div><pre>${esc(body)}</pre></div>`;
+    return html`<div class="card unknown"><div class="ulabel">component: ${type}</div><pre>${body}</pre></div>`;
   }
 }
 
-define("wb-gen-block", WbGenBlock);
+define("work-gen-block", WbGenBlock);

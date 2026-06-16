@@ -3,11 +3,11 @@
 // Themed wrappers over the SHIPPED wavelet player (composition-as-source video:
 // the player IS the renderer, preview ≡ render, in-guest encode). Importing
 // this file registers the elements (idempotent via define()) and re-exports the
-// classes. The wavelet runtime itself is imported lazily by <wb-video> on first
+// classes. The wavelet runtime itself is imported lazily by <work-video> on first
 // play, from `runtime-src` (default /wavelet/wavelet-runtime.js) — never bundled.
 //
 //   import "workponents/src/elements/video/index.js";   // register + use tags
-//   import { WbVideo } from ".../video/index.js";        // the class
+//   import { WorkVideo } from ".../video/index.js";      // the class
 
-export { WbVideo } from "./wb-video.js";
-export { WbVideoSource } from "./wb-video-source.js";
+export { WorkVideo } from "./wb-video.js";
+export { WorkVideoSource } from "./wb-video-source.js";

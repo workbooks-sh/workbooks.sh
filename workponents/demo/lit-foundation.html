@@ -4,15 +4,28 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="darkreader-lock" />
-  <title>workponents — specimen</title>
-  <!-- Lit (the base) resolved buildless via an import map — no bundler. -->
-  <script type="importmap">
-    { "imports": { "lit": "https://esm.sh/lit@3.2.1", "lit/": "https://esm.sh/lit@3.2.1/" } }
-  </script>
+  <link rel="icon" href="data:," />
+  <title>workponents — Lit foundation</title>
+
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
-  <!-- the elements: native custom elements, ESM, NO build step -->
-  <script type="module" src="../src/index.js"></script>
+
+  <!-- Lit, buildless: the bare "lit" specifier resolves to a pinned CDN ESM.
+       This is THE loading convention every demo + SDK consumer uses (peer dep).
+       No bundler, no `bun install`. Keep the version pinned. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://esm.sh/lit@3.2.1",
+        "lit/": "https://esm.sh/lit@3.2.1/"
+      }
+    }
+  </script>
+
+  <!-- the foundation proof: ONLY the core + the reference element are Lit yet.
+       (The other 12 domains still return strings; they convert in the fan-out.) -->
+  <script type="module" src="../src/elements/work-button.js"></script>
+
   <style>
     body { margin: 0; background: var(--wb-bg); color: var(--wb-fg); font-family: var(--wb-font, system-ui); transition: background .2s, color .2s; }
     .wrap { max-width: 920px; margin: 0 auto; padding: 48px 24px 96px; }
@@ -24,12 +37,14 @@
     section { margin: 28px 0; }
     h2 { font: 700 11px var(--wb-font-mono, monospace); letter-spacing: .18em; text-transform: uppercase; color: var(--wb-fg-subtle); }
     .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .note { font: 500 12px var(--wb-font-mono, monospace); color: var(--wb-fg-subtle); }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>workponents</h1>
-    <p class="sub">Native custom elements. One token set themes them. No build — this page imports the source directly and drops the tags in plain HTML. Toggle the theme; every element re-themes from the tokens.</p>
+    <h1>workponents — Lit foundation</h1>
+    <p class="sub">The reference element on the Lit base. Same buildless drop-in (import map for the bare <code>lit</code> specifier), same tokens, same variant contract — surgical Lit updates underneath. Toggle the theme; the button re-themes from the tokens.</p>
+    <p class="note">core + wb-button only. The other 12 domains convert in the fan-out.</p>
 
     <div class="bar" role="group" aria-label="theme">
       <span style="font:700 10px var(--wb-font-mono,monospace);letter-spacing:.18em;text-transform:uppercase;color:var(--wb-fg-subtle)">theme</span>
@@ -41,31 +56,31 @@
     <section>
       <h2>variant</h2>
       <div class="row">
-        <work-button variant="solid">Solid</work-button>
-        <work-button variant="soft">Soft</work-button>
-        <work-button variant="outline">Outline</work-button>
-        <work-button variant="ghost">Ghost</work-button>
+        <wb-button variant="solid">Solid</wb-button>
+        <wb-button variant="soft">Soft</wb-button>
+        <wb-button variant="outline">Outline</wb-button>
+        <wb-button variant="ghost">Ghost</wb-button>
       </div>
     </section>
 
     <section>
       <h2>tone</h2>
       <div class="row">
-        <work-button tone="brand">Brand</work-button>
-        <work-button tone="neutral">Neutral</work-button>
-        <work-button tone="ok">OK</work-button>
-        <work-button tone="warn">Warn</work-button>
-        <work-button tone="err">Error</work-button>
+        <wb-button tone="brand">Brand</wb-button>
+        <wb-button tone="neutral">Neutral</wb-button>
+        <wb-button tone="ok">OK</wb-button>
+        <wb-button tone="warn">Warn</wb-button>
+        <wb-button tone="err">Error</wb-button>
       </div>
     </section>
 
     <section>
       <h2>size</h2>
       <div class="row">
-        <work-button size="sm">Small</work-button>
-        <work-button size="md">Medium</work-button>
-        <work-button size="lg">Large</work-button>
-        <work-button disabled>Disabled</work-button>
+        <wb-button size="sm">Small</wb-button>
+        <wb-button size="md">Medium</wb-button>
+        <wb-button size="lg">Large</wb-button>
+        <wb-button disabled>Disabled</wb-button>
       </div>
     </section>
   </div>

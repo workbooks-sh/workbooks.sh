@@ -8,6 +8,10 @@
   <title>workponents · tables — specimen</title>
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
+  <!-- Lit (the FLOOR's engine) — buildless via import map, no bundler -->
+  <script type="importmap">
+    { "imports": { "lit": "https://esm.sh/lit@3.2.1", "lit/": "https://esm.sh/lit@3.2.1/" } }
+  </script>
   <!-- the tables domain: native custom elements, ESM, NO build step -->
   <script type="module" src="../src/elements/tables/index.js"></script>
   <style>
@@ -44,34 +48,34 @@
       filter (engine-side <code>WHERE … LIKE</code>). The data IS the source — an inline CSV the element
       registers on connect.</p>
     <!-- inline CSV becomes a registered source named "orders" the trio can query -->
-    <wb-table src-name="orders"
+    <work-table src-name="orders"
       query="SELECT order_id, region, rep, product, units, revenue FROM orders"
       searchable page-size="50">
-      <wb-column field="order_id" label="Order"></wb-column>
-      <wb-column field="region" label="Region"></wb-column>
-      <wb-column field="rep" label="Rep"></wb-column>
-      <wb-column field="product" label="Product"></wb-column>
-      <wb-column field="units" label="Units" align="right" format="num"></wb-column>
-      <wb-column field="revenue" label="Revenue" align="right" format="usd"></wb-column>
-    </wb-table>
+      <work-column field="order_id" label="Order"></work-column>
+      <work-column field="region" label="Region"></work-column>
+      <work-column field="rep" label="Rep"></work-column>
+      <work-column field="product" label="Product"></work-column>
+      <work-column field="units" label="Units" align="right" format="num"></work-column>
+      <work-column field="revenue" label="Revenue" align="right" format="usd"></work-column>
+    </work-table>
 
     <h2>2 · Aggregate — the same engine, GROUP BY revenue per region</h2>
     <p class="note">A different view over the <em>same registered source</em> — the aggregate is computed in
       the engine (<code>SELECT region, count(*) , sum(revenue) … GROUP BY region</code>). Sorting still
       pushes to SQL.</p>
-    <wb-table src-name="orders"
+    <work-table src-name="orders"
       query="SELECT region, count(*) AS orders, sum(units) AS units, sum(revenue) AS revenue, avg(revenue) AS avg_order FROM orders GROUP BY region">
-      <wb-column field="region" label="Region"></wb-column>
-      <wb-column field="orders" label="Orders" align="right" format="num"></wb-column>
-      <wb-column field="units" label="Units" align="right" format="num"></wb-column>
-      <wb-column field="revenue" label="Revenue" align="right" format="usd"></wb-column>
-      <wb-column field="avg_order" label="Avg / order" align="right" format="usd"></wb-column>
-    </wb-table>
+      <work-column field="region" label="Region"></work-column>
+      <work-column field="orders" label="Orders" align="right" format="num"></work-column>
+      <work-column field="units" label="Units" align="right" format="num"></work-column>
+      <work-column field="revenue" label="Revenue" align="right" format="usd"></work-column>
+      <work-column field="avg_order" label="Avg / order" align="right" format="usd"></work-column>
+    </work-table>
 
     <h2>3 · Inline JSON — compact density, no declared columns</h2>
     <p class="note">A second source from inline JSON rows; columns inferred from the result, types drive
       alignment, large set is virtualized.</p>
-    <wb-table id="big" density="compact" searchable page-size="40"></wb-table>
+    <work-table id="big" density="compact" searchable page-size="40"></work-table>
 
     <script type="module">
       import { getEngine } from "../src/data/index.js";
@@ -103,8 +107,8 @@
       big.setAttribute("rows", JSON.stringify(rows));
 
       // surface a query event in the console so the engine tier is visible
-      document.querySelectorAll("wb-table").forEach((t) =>
-        t.addEventListener("wb-table-query", (e) => console.log("[wb-table-query]", e.detail)));
+      document.querySelectorAll("work-table").forEach((t) =>
+        t.addEventListener("work-table-query", (e) => console.log("[work-table-query]", e.detail)));
 
       // theme toggle
       const buttons = [...document.querySelectorAll(".bar button")];

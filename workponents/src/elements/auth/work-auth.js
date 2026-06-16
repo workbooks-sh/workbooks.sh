@@ -1,25 +1,26 @@
-// <wb-auth> — the sign-in surface. Provider buttons (themed like wb-button) +
+// <work-auth> — the sign-in surface. Provider buttons (themed like work-button) +
 // an email form (password or magic-link), with loading/error states.
 //
 // It does NOT hardcode a provider. It reads the provider list + drives sign-in
 // through the identity seam (over this.host), which is provider-agnostic —
 // Clerk/Auth0/WorkOS/BetterAuth are server-side wirings behind it. On every
-// user action it emits `wb-auth-intent` {method, provider, email?}; when the
-// seam resolves a session it emits `wb-auth-changed` {user, providers}.
+// user action it emits `work-auth-intent` {method, provider, email?}; when the
+// seam resolves a session it emits `work-auth-changed` {user, providers}.
 //
 // Attributes:
 //   mode      = "password" | "magic"   (email form style; default password)
 //   providers = "google,github,workos" (override the seam's provider ids)
 //   heading   = surface title          (default "Sign in")
 // Events (bubbles, composed):
-//   wb-auth-intent  { method:"oauth"|"password"|"magic", provider?, email? }
-//   wb-auth-changed { user, providers }   (on a resolved session)
-//   wb-auth-error   { message }
+//   work-auth-intent  { method:"oauth"|"password"|"magic", provider?, email? }
+//   work-auth-changed { user, providers }   (on a resolved session)
+//   work-auth-error   { message }
 //
-// Usage:  <wb-auth heading="Welcome back"></wb-auth>
-import { WbElement, define } from "../../core/element.js";
+// Usage:  <work-auth heading="Welcome back"></work-auth>
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getIdentity } from "./identity.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
 const VARIANTS = defineVariants({
   mode: { options: ["password", "magic"], default: "password" },
@@ -34,11 +35,11 @@ const GLYPHS = {
 };
 const fallbackGlyph = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>`;
 
-export class WbAuth extends WbElement {
+export class WorkAuth extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "providers", "heading"];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .card {
       max-width: 360px; box-sizing: border-box;
@@ -109,8 +110,8 @@ export class WbAuth extends WbElement {
     :host([state="loading"]) input { opacity: .6; }
     .spin { width: 14px; height: 14px; border-radius: 50%; flex: none;
       border: 2px solid currentColor; border-right-color: transparent;
-      animation: wb-spin .7s linear infinite; }
-    @keyframes wb-spin { to { transform: rotate(360deg); } }
+      animation: work-spin .7s linear infinite; }
+    @keyframes work-spin { to { transform: rotate(360deg); } }
   `;
 
   get identity() {
@@ -118,7 +119,7 @@ export class WbAuth extends WbElement {
   }
   set identity(cap) {
     this._identity = cap;
-    if (this._connected) this.update();
+    if (this._connected) this.requestUpdate();
   }
 
   _providers() {
@@ -134,7 +135,7 @@ export class WbAuth extends WbElement {
   }
 
   _emitIntent(detail) {
-    this.dispatchEvent(new CustomEvent("wb-auth-intent", { bubbles: true, composed: true, detail }));
+    this.dispatchEvent(new CustomEvent("work-auth-intent", { bubbles: true, composed: true, detail }));
   }
 
   async _run(intent) {
@@ -148,7 +149,7 @@ export class WbAuth extends WbElement {
       // A resolved user session → announce it. (Magic-link on a real host may be
       // pending; the seam's mock resolves it directly.)
       if (snap?.user) {
-        this.dispatchEvent(new CustomEvent("wb-auth-changed", { bubbles: true, composed: true, detail: snap }));
+        this.dispatchEvent(new CustomEvent("work-auth-changed", { bubbles: true, composed: true, detail: snap }));
       }
     } catch (err) {
       this._error(err?.message || "Sign-in failed");
@@ -158,69 +159,60 @@ export class WbAuth extends WbElement {
   _error(message) {
     this._errMsg = message;
     this.setAttribute("state", "error");
-    this.dispatchEvent(new CustomEvent("wb-auth-error", { bubbles: true, composed: true, detail: { message } }));
-    const el = this.shadowRoot.querySelector(".err");
-    if (el) el.textContent = message;
+    this.requestUpdate();
+    this.dispatchEvent(new CustomEvent("work-auth-error", { bubbles: true, composed: true, detail: { message } }));
   }
 
-  connectedCallback() {
-    super.connectedCallback();
-    if (this._wired) return;
-    this._wired = true;
-    this.shadowRoot.addEventListener("click", (e) => {
-      const prov = e.target.closest(".provider");
-      if (prov) { this._run({ method: "oauth", provider: prov.dataset.provider }); return; }
-      const alt = e.target.closest(".alt button");
-      if (alt) {
-        this.setAttribute("mode", this.attr("mode", "password") === "magic" ? "password" : "magic");
-      }
-    });
-    this.shadowRoot.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const email = this.shadowRoot.querySelector("input[name=email]")?.value.trim();
-      const password = this.shadowRoot.querySelector("input[name=password]")?.value;
-      if (!email) return this._error("Enter your email.");
-      const mode = this.attr("mode", "password");
-      if (mode === "magic") this._run({ method: "magic", email });
-      else this._run({ method: "password", email, password });
-    });
-  }
+  _onClick = (e) => {
+    const prov = e.target.closest(".provider");
+    if (prov) { this._run({ method: "oauth", provider: prov.dataset.provider }); return; }
+    const alt = e.target.closest(".alt button");
+    if (alt) {
+      this.setAttribute("mode", this.attr("mode", "password") === "magic" ? "password" : "magic");
+    }
+  };
+
+  _onSubmit = (e) => {
+    e.preventDefault();
+    const email = this.shadowRoot.querySelector("input[name=email]")?.value.trim();
+    const password = this.shadowRoot.querySelector("input[name=password]")?.value;
+    if (!email) return this._error("Enter your email.");
+    const mode = this.attr("mode", "password");
+    if (mode === "magic") this._run({ method: "magic", email });
+    else this._run({ method: "password", email, password });
+  };
 
   render() {
     const heading = this.attr("heading", "Sign in");
     const mode = this.attr("mode", "password");
     const loading = this.attr("state") === "loading";
-    const provs = this._providers()
-      .map((p) => `<button class="provider" type="button" data-provider="${p.id}">
-        ${GLYPHS[p.id] || fallbackGlyph}<span>Continue with ${p.name}</span></button>`)
-      .join("");
-    const submitInner = loading
-      ? `<span class="spin"></span>`
-      : mode === "magic" ? "Email me a magic link" : "Sign in";
-    return `
-      <div class="card" part="card">
+    return html`
+      <div class="card" part="card" @click=${this._onClick} @submit=${this._onSubmit}>
         <h3>${heading}</h3>
         <p class="sub">Identity is a host capability — same surface, any provider behind the Dock.</p>
-        <div class="providers">${provs}</div>
+        <div class="providers">${this._providers().map((p) => html`
+          <button class="provider" type="button" data-provider=${p.id}>
+            ${unsafeHTML(GLYPHS[p.id] || fallbackGlyph)}<span>Continue with ${p.name}</span>
+          </button>`)}</div>
         <div class="div">or</div>
         <form>
           <div class="field">
             <label for="email">Email</label>
             <input id="email" name="email" type="email" placeholder="you@company.com" autocomplete="email" />
           </div>
-          ${mode === "password" ? `
+          ${mode === "password" ? html`
           <div class="field">
             <label for="password">Password</label>
             <input id="password" name="password" type="password" placeholder="••••••••" autocomplete="current-password" />
           </div>` : ""}
           <p class="err">${this._errMsg || ""}</p>
-          <button class="submit" type="submit" part="submit">${submitInner}</button>
+          <button class="submit" type="submit" part="submit">${loading ? html`<span class="spin"></span>` : mode === "magic" ? "Email me a magic link" : "Sign in"}</button>
         </form>
         <p class="alt">${mode === "magic"
-          ? `Prefer a password? <button type="button">Use password</button>`
-          : `No password? <button type="button">Email a magic link</button>`}</p>
+          ? html`Prefer a password? <button type="button">Use password</button>`
+          : html`No password? <button type="button">Email a magic link</button>`}</p>
       </div>`;
   }
 }
 
-define("wb-auth", WbAuth);
+define("work-auth", WorkAuth);

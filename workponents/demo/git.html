@@ -7,6 +7,15 @@
   <meta name="color-scheme" content="dark light" />
   <title>workponents · git — specimen</title>
   <link rel="stylesheet" href="../src/theme/tokens.css" />
+  <!-- Lit via the import map (buildless ESM, no bun install) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://esm.sh/lit@3.2.1",
+        "lit/": "https://esm.sh/lit@3.2.1/"
+      }
+    }
+  </script>
   <!-- the git domain elements: native custom elements, ESM, NO build step -->
   <script type="module" src="../src/elements/git/index.js"></script>
   <style>
@@ -40,12 +49,12 @@
     <section>
       <h2>history + diff — select a version</h2>
       <div class="grid">
-        <wb-history-graph id="hg"></wb-history-graph>
+        <work-history-graph id="hg"></work-history-graph>
         <div>
-          <wb-diff id="diff" mode="split"></wb-diff>
+          <work-diff id="diff" mode="split"></work-diff>
           <div class="row" style="margin-top:14px">
-            <wb-restore id="restore" scope="demo-workbook"></wb-restore>
-            <wb-undo id="undo" scope="demo-workbook"></wb-undo>
+            <work-restore id="restore" scope="demo-workbook"></work-restore>
+            <work-undo id="undo" scope="demo-workbook"></work-undo>
           </div>
           <div class="log" id="log" style="margin-top:12px">No action yet. (standalone — no runtime; buttons emit events)</div>
         </div>
@@ -54,7 +63,7 @@
 
     <section>
       <h2>diff — line fallback (plain text), inline mode</h2>
-      <wb-diff mode="inline" diff="lines"
+      <work-diff mode="inline" diff="lines"
         a="the quick brown fox
 jumps over the lazy dog
 a line that stays
@@ -62,7 +71,7 @@ remove me"
         b="the quick red fox
 jumps over the lazy dog
 a line that stays
-a brand new line"></wb-diff>
+a brand new line"></work-diff>
     </section>
   </div>
 
@@ -130,7 +139,7 @@ a brand new line"></wb-diff>
 
     // preselect the newest version so the diff shows on load (wait for the
     // custom elements to upgrade + connect, then drive a selection)
-    customElements.whenDefined("wb-history-graph").then(() =>
+    customElements.whenDefined("work-history-graph").then(() =>
       requestAnimationFrame(() => hg.shadowRoot?.querySelector('li[data-id="f1a2b3c4"]')?.click()));
 
     // theme toggle

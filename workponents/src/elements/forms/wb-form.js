@@ -1,14 +1,14 @@
-// <wb-form> — the form surface. THE reinvention: a form IS its schema. The form
+// <work-form> — the form surface. THE reinvention: a form IS its schema. The form
 // owns one declarative schema (inline JSON `schema` attr/property, OR built from
-// its child <wb-field> rules), runs `src/validate` against the live values on
+// its child <work-field> rules), runs `src/validate` against the live values on
 // input + on submit, blocks submit while invalid, and writes errors back down to
 // each field — validation is never hand-wired per control. Themed entirely from
 // --wb-* tokens.
 //
 // Events:
-//   wb-submit  { detail: { values } }  — fired only when the record is valid
-//   wb-invalid { detail: { errors } }  — fired when a submit is blocked
-//   wb-change  { detail: { values, valid } } — on every field input (live)
+//   work-submit  { detail: { values } }  — fired only when the record is valid
+//   work-invalid { detail: { errors } }  — fired when a submit is blocked
+//   work-change  { detail: { values, valid } } — on every field input (live)
 //
 // Standalone (sync floor) by default; when a Host with a /validate route is
 // reachable (this.host.available("validate")) it merges server/derived errors
@@ -16,18 +16,18 @@
 // can decide, the Host only adds what it alone knows (uniqueness, cross-record).
 //
 // Usage:
-//   <wb-form>
-//     <wb-field name="email" type="email" label="Email" required></wb-field>
-//     <wb-field name="pw" type="password" label="Password" required min="8"></wb-field>
+//   <work-form>
+//     <work-field name="email" type="email" label="Email" required></work-field>
+//     <work-field name="pw" type="password" label="Password" required min="8"></work-field>
 //     <wb-button type="submit" slot="actions">Create</wb-button>
-//   </wb-form>
-import { WbElement, define } from "../../core/element.js";
+//   </work-form>
+import { WbElement, html, css, define } from "../../core/element.js";
 import { validateRecord, validateRecordAsync, parseSchema } from "../../validate/index.js";
 
 export class WbForm extends WbElement {
   static props = ["schema", "submit-label", "novalidate", "live"];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     form { display: block; }
     .fields { display: block; }
@@ -47,7 +47,7 @@ export class WbForm extends WbElement {
   `;
 
   /** The form's schema — explicit property/attr wins; otherwise built from the
-   *  child <wb-field> rules (the form IS its schema). */
+   *  child <work-field> rules (the form IS its schema). */
   get schema() {
     if (this._schema) return this._schema;
     const attr = this.attr("schema");
@@ -57,7 +57,7 @@ export class WbForm extends WbElement {
   set schema(v) { this._schema = v; }
 
   _fields() {
-    return Array.from(this.querySelectorAll("wb-field"));
+    return Array.from(this.querySelectorAll("work-field"));
   }
 
   _schemaFromFields() {
@@ -81,8 +81,8 @@ export class WbForm extends WbElement {
 
   render() {
     const label = this.attr("submit-label", "Submit");
-    return `
-      <form novalidate>
+    return html`
+      <form novalidate @submit=${this._onSubmit}>
         <p class="summary" role="alert"></p>
         <div class="fields"><slot></slot></div>
         <div class="actions">
@@ -93,11 +93,10 @@ export class WbForm extends WbElement {
 
   connectedCallback() {
     super.connectedCallback();
-    const form = this.shadowRoot.querySelector("form");
 
-    // Live validation: any field input bubbles wb-field-input / wb-field-blur.
-    this.addEventListener("wb-field-input", (e) => {
-      this.dispatchEvent(new CustomEvent("wb-change", {
+    // Live validation: any field input bubbles work-field-input / work-field-blur.
+    this.addEventListener("work-field-input", (e) => {
+      this.dispatchEvent(new CustomEvent("work-change", {
         bubbles: true, composed: true,
         detail: { values: this.values, valid: validateRecord(this.values, this.schema).valid },
       }));
@@ -106,12 +105,10 @@ export class WbForm extends WbElement {
       const touched = e.detail && e.detail.name;
       if (this.boolAttr("live") || this._submitted || this._fieldInvalid(touched)) this._revalidateField(touched);
     });
-    this.addEventListener("wb-field-blur", (e) => {
+    this.addEventListener("work-field-blur", (e) => {
       if (this._submitted || this.boolAttr("live")) this._revalidateField(e.detail && e.detail.name);
     });
 
-    // Submit (native submit from a slotted <wb-button type=submit> or the default).
-    form.addEventListener("submit", (e) => { e.preventDefault(); this.submit(); });
     // A slotted action button might be a <wb-button> not a real submit; catch clicks.
     this.addEventListener("click", (e) => {
       const t = e.target;
@@ -122,6 +119,9 @@ export class WbForm extends WbElement {
       }
     });
   }
+
+  // Native submit from a slotted real <button type=submit> or the default.
+  _onSubmit(e) { e.preventDefault(); this.submit(); }
 
   _fieldByName(name) {
     return this._fields().find((f) => f.getAttribute("name") === name);
@@ -156,7 +156,7 @@ export class WbForm extends WbElement {
   }
 
   _refreshSummary(errors) {
-    const sum = this.shadowRoot.querySelector(".summary");
+    const sum = this.shadowRoot && this.shadowRoot.querySelector(".summary");
     if (!sum) return;
     const list = errors || this._fields()
       .filter((f) => f.hasAttribute("invalid"))
@@ -172,32 +172,32 @@ export class WbForm extends WbElement {
     }
   }
 
-  /** Run validation; on valid → wb-submit, on invalid → wb-invalid + mark fields. */
+  /** Run validation; on valid → work-submit, on invalid → work-invalid + mark fields. */
   async submit() {
     this._submitted = true;
     const values = this.values;
     const schema = this.schema;
     if (this.boolAttr("novalidate")) {
-      this.dispatchEvent(new CustomEvent("wb-submit", { bubbles: true, composed: true, detail: { values } }));
+      this.dispatchEvent(new CustomEvent("work-submit", { bubbles: true, composed: true, detail: { values } }));
       return { valid: true, values };
     }
     // Sync floor first (instant), then optional Host merge.
     let result = validateRecord(values, schema);
     this._applyErrors(result.errors);
     if (!result.valid) {
-      this.dispatchEvent(new CustomEvent("wb-invalid", { bubbles: true, composed: true, detail: { errors: result.errors } }));
+      this.dispatchEvent(new CustomEvent("work-invalid", { bubbles: true, composed: true, detail: { errors: result.errors } }));
       return result;
     }
     // Floor passed — consult the Host for server/derived errors when reachable.
     const merged = await validateRecordAsync(values, schema, this.host);
     if (!merged.valid) {
       this._applyErrors(merged.errors);
-      this.dispatchEvent(new CustomEvent("wb-invalid", { bubbles: true, composed: true, detail: { errors: merged.errors } }));
+      this.dispatchEvent(new CustomEvent("work-invalid", { bubbles: true, composed: true, detail: { errors: merged.errors } }));
       return merged;
     }
     this.removeAttribute("invalid");
     this._refreshSummary([]);
-    this.dispatchEvent(new CustomEvent("wb-submit", { bubbles: true, composed: true, detail: { values } }));
+    this.dispatchEvent(new CustomEvent("work-submit", { bubbles: true, composed: true, detail: { values } }));
     return { valid: true, values };
   }
 
@@ -216,4 +216,4 @@ export class WbForm extends WbElement {
   }
 }
 
-define("wb-form", WbForm);
+define("work-form", WbForm);

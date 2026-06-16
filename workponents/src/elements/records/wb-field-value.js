@@ -1,9 +1,9 @@
-// <wb-field-value> — a typed single-value display, the atom of the records
+// <work-field-value> — a typed single-value display, the atom of the records
 // domain. Given a value + its WbColType (the `types[j]` off a WbQueryResult), it
 // renders the value the way that type should READ: currency / number / percent
 // for numerics, a localized date for dates, a check/✕ pill for booleans, an
 // anchor for links, a soft chip badge for short categorical strings. Reused
-// inside <wb-record> for every field; usable on its own anywhere a single typed
+// inside <work-record> for every field; usable on its own anywhere a single typed
 // cell needs to render the same way the table/record do.
 //
 // Token-only styling; zero deps. The mapping mirrors wb-table's fmt() helper but
@@ -12,10 +12,10 @@
 // detail view rather than a dense grid cell.
 //
 // Usage:
-//   <wb-field-value type="number" format="usd" value="1240.5"></wb-field-value>
-//   <wb-field-value type="boolean" value="true"></wb-field-value>
-//   <wb-field-value type="string" display="badge" value="EMEA"></wb-field-value>
-//   <wb-field-value type="string" display="link" value="https://x.y"></wb-field-value>
+//   <work-field-value type="number" format="usd" value="1240.5"></work-field-value>
+//   <work-field-value type="boolean" value="true"></work-field-value>
+//   <work-field-value type="string" display="badge" value="EMEA"></work-field-value>
+//   <work-field-value type="string" display="link" value="https://x.y"></work-field-value>
 //
 // Attributes:
 //   value     the raw value (string form; numbers/bools coerced by type)
@@ -23,7 +23,7 @@
 //   format    numeric format hint: usd|num|pct (only when type is numeric)
 //   display   override the chosen renderer: text|badge|link|bool|date|money|json
 //   empty     placeholder shown when value is null/empty (default "—")
-import { WbElement, define } from "../../core/element.js";
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 
 const VARIANTS = defineVariants({
@@ -35,7 +35,7 @@ export class WbFieldValue extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "value", "type", "format", "empty"];
 
-  static styles = `
+  static styles = css`
     :host { display: inline; font-family: var(--wb-font); color: var(--wb-fg); font-size: var(--wb-text); }
     .empty { color: var(--wb-fg-subtle); }
     .num { font-variant-numeric: tabular-nums; }
@@ -57,34 +57,32 @@ export class WbFieldValue extends WbElement {
   render() {
     const raw = this.attr("value");
     const empty = this.attr("empty", "—");
-    if (raw == null || raw === "") return `<span class="empty">${esc(empty)}</span>`;
+    if (raw == null || raw === "") return html`<span class="empty">${empty}</span>`;
 
     const type = this.attr("type", "string");
     const mode = this._mode(raw, type);
 
     switch (mode) {
       case "money":
-      case "num": {
-        const cls = "num";
-        return `<span class="${cls}">${esc(fmtNumber(raw, this.attr("format")))}</span>`;
-      }
+      case "num":
+        return html`<span class="num">${fmtNumber(raw, this.attr("format"))}</span>`;
       case "date":
-        return `<span>${esc(fmtDate(raw))}</span>`;
+        return html`<span>${fmtDate(raw)}</span>`;
       case "bool": {
         const t = isTrue(raw);
-        return `<span class="bool ${t ? "t" : "f"}"><span class="dot"></span>${t ? "Yes" : "No"}</span>`;
+        return html`<span class="bool ${t ? "t" : "f"}"><span class="dot"></span>${t ? "Yes" : "No"}</span>`;
       }
       case "link": {
         const href = String(raw);
         const label = href.replace(/^https?:\/\//, "").replace(/\/$/, "");
-        return `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(label)}</a>`;
+        return html`<a href=${href} target="_blank" rel="noopener">${label}</a>`;
       }
       case "badge":
-        return `<span class="badge">${esc(raw)}</span>`;
+        return html`<span class="badge">${raw}</span>`;
       case "json":
-        return `<span class="json">${esc(fmtJson(raw))}</span>`;
+        return html`<span class="json">${fmtJson(raw)}</span>`;
       default:
-        return `<span>${esc(raw)}</span>`;
+        return html`<span>${raw}</span>`;
     }
   }
 
@@ -105,9 +103,6 @@ export class WbFieldValue extends WbElement {
 }
 
 // ── helpers (token-unaware) ───────────────────────────────────────────────────
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
 function isTrue(v) {
   if (typeof v === "boolean") return v;
   const s = String(v).trim().toLowerCase();
@@ -142,4 +137,4 @@ function fmtJson(v) {
   try { return JSON.stringify(v, null, 2); } catch { return String(v); }
 }
 
-define("wb-field-value", WbFieldValue);
+define("work-field-value", WbFieldValue);

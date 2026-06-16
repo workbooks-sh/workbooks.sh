@@ -3,7 +3,8 @@
 // browser duckdb-wasm · the in-JS subset offline); the element issues SQL and
 // renders the result as zero-dependency, token-themed SVG. The chart-vs-data gap
 // dissolves — it is a live query you can talk to. Reach compute only through
-// ../../data (one engine, three surfaces: tables / data-viz / maps).
+// ../../data (one engine, three surfaces: tables / data-viz / maps). Re-based onto
+// the Lit FLOOR.
 //
 // Import this barrel to register the domain, or a single element file to stay
 // lean. Standalone (zero deps, no build) by default; the runtime DuckDB tier

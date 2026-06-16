@@ -8,6 +8,15 @@
   <title>workponents — presentation specimen</title>
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
+  <!-- Lit, buildless: the bare "lit" specifier resolves to a pinned CDN ESM. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://esm.sh/lit@3.2.1",
+        "lit/": "https://esm.sh/lit@3.2.1/"
+      }
+    }
+  </script>
   <!-- export needs the wavelet runtime; viewing never does. Point it at the
        runtime served beside this page (same as the video specimen). -->
   <script>window.__WB_WAVELET_RUNTIME__ = "./wavelet/wavelet-runtime.js";</script>
@@ -15,6 +24,14 @@
   <script type="module" src="../src/elements/presentation/index.js"></script>
   <script type="module" src="../src/elements/data-viz/index.js"></script>
   <script type="module" src="../src/elements/video/index.js"></script>
+  <!-- the embedded data-viz/video domains still register as <work-chart>/<work-video>
+       (not part of this conversion pass) — alias them to the work- tag names so
+       the slides can use the renamed tags while those domains upgrade as usual. -->
+  <script type="module">
+    await Promise.all([customElements.whenDefined("wb-chart"), customElements.whenDefined("wb-video")]);
+    if (!customElements.get("work-chart")) customElements.define("work-chart", class extends customElements.get("wb-chart") {});
+    if (!customElements.get("work-video")) customElements.define("work-video", class extends customElements.get("wb-video") {});
+  </script>
   <style>
     body { margin: 0; background: var(--wb-bg); color: var(--wb-fg); font-family: var(--wb-font, system-ui); transition: background .2s, color .2s; }
     .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px 96px; }
@@ -33,11 +50,11 @@
   <div class="wrap">
     <h1 class="page">workponents · presentation</h1>
     <p class="sub">
-      A <code>&lt;wb-deck&gt;</code> owns its ordered <code>&lt;wb-slide&gt;</code> children — the slides
+      A <code>&lt;work-deck&gt;</code> owns its ordered <code>&lt;work-slide&gt;</code> children — the slides
       <em>are</em> the deck. The reinvention: a deck <strong>is a wavelet timeline</strong> and each slide
-      is a keyframe band, so it shares the render-core with <code>&lt;wb-video&gt;</code> and
-      <strong>Export → video</strong> is free. Live workponents (the <code>&lt;wb-chart&gt;</code> and
-      <code>&lt;wb-video&gt;</code> below) render <em>on</em> slides, not as screenshots. Themed entirely
+      is a keyframe band, so it shares the render-core with <code>&lt;work-video&gt;</code> and
+      <strong>Export → video</strong> is free. Live workponents (the <code>&lt;work-chart&gt;</code> and
+      <code>&lt;work-video&gt;</code> below) render <em>on</em> slides, not as screenshots. Themed entirely
       from <code>--wb-*</code> — toggle below.
     </p>
 
@@ -48,35 +65,35 @@
       <button data-theme="signal" aria-pressed="false">signal</button>
     </div>
 
-    <wb-deck controls aspect="16:9" hold="4s" transition="rise">
+    <work-deck controls aspect="16:9" hold="4s" transition="rise">
       <!-- 1 · title band -->
-      <wb-slide band="title" transition="fade" align="center" hold="3s">
+      <work-slide band="title" transition="fade" align="center" hold="3s">
         <h1>Build the deck.<br>Ship the video.</h1>
         <p>One substrate, many domains — a presentation that is a wavelet timeline.</p>
         <div slot="notes">Open on the thesis: the deck and the video share the same render-core. Press <b>p</b> to hide these notes.</div>
-      </wb-slide>
+      </work-slide>
 
       <!-- 2 · a live workponent ON a slide (split band) -->
-      <wb-slide band="split" transition="rise" align="start">
+      <work-slide band="split" transition="rise" align="start">
         <div slot="a">
           <h2>A live chart, on a slide</h2>
-          <p class="lead">This isn't an image — it's a real <code style="font-family:var(--wb-font-mono)">&lt;wb-chart&gt;</code>
+          <p class="lead">This isn't an image — it's a real <code style="font-family:var(--wb-font-mono)">&lt;work-chart&gt;</code>
             querying its inline data through the shared engine. Export folds it into the timeline.</p>
         </div>
         <div slot="b">
-          <wb-chart
+          <work-chart
             type="bar"
             x="quarter" y="revenue"
             format="usd" legend="off"
             rows='[{"quarter":"Q1","revenue":42000},{"quarter":"Q2","revenue":58000},{"quarter":"Q3","revenue":71000},{"quarter":"Q4","revenue":96000}]'
-          ></wb-chart>
+          ></work-chart>
         </div>
         <div slot="notes">Stress that the chart is queryable and themable — same element you'd drop in a dashboard.</div>
-      </wb-slide>
+      </work-slide>
 
       <!-- 3 · media band: a wavelet composition embedded as the slide -->
-      <wb-slide band="media" transition="scale" align="center">
-        <wb-video variant="bare" tone="brand" autoplay loop>
+      <work-slide band="media" transition="scale" align="center">
+        <work-video variant="bare" tone="brand" autoplay loop>
           <gm-doc fps="30" resolution="1280x720" aspect="16:9">
             <gm-timeline id="tl" duration="3.0s">
               <gm-track id="bg" z="0">
@@ -101,17 +118,17 @@
               </gm-track>
             </gm-timeline>
           </gm-doc>
-        </wb-video>
+        </work-video>
         <div slot="notes">The media band is itself a wavelet composition — the player IS the renderer.</div>
-      </wb-slide>
+      </work-slide>
 
       <!-- 4 · closing band -->
-      <wb-slide band="closing" transition="slide" align="center" hold="5s">
+      <work-slide band="closing" transition="slide" align="center" hold="5s">
         <h2>Press <b>Export ↓</b> to render the whole deck to video.</h2>
         <p>In-guest encode when the Host has <code>wavelet</code>; a portable self-contained <code>.html</code> otherwise.</p>
         <div slot="notes">Close by hitting Export to prove the shared-engine payoff.</div>
-      </wb-slide>
-    </wb-deck>
+      </work-slide>
+    </work-deck>
 
     <p class="hint">
       Navigate: <code>← →</code> · <code>Space</code> · <code>Home/End</code> · click the stage edges ·
@@ -126,8 +143,8 @@
       buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     }));
     // surface the playhead event in the console for the spec proof
-    document.querySelector("wb-deck")?.addEventListener("wb-slide-change", (e) => {
-      console.log("wb-slide-change", e.detail.index, "/", e.detail.total);
+    document.querySelector("work-deck")?.addEventListener("work-slide-change", (e) => {
+      console.log("work-slide-change", e.detail.index, "/", e.detail.total);
     });
   </script>
 </body>

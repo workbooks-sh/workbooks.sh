@@ -1,4 +1,4 @@
-// <wb-video> — the themed wrapper over the SHIPPED wavelet player.
+// <work-video> — the themed wrapper over the SHIPPED wavelet player.
 //
 // Wavelet's reinvention: COMPOSITION-AS-SOURCE video. The composition (a
 // <gm-doc> tree of <gm-timeline>/<gm-track>/<gm-clip>/<gm-scene>/… data
@@ -17,7 +17,7 @@
 // Source resolution (composition-as-source first):
 //   • `composition` attr / a slotted <gm-doc> / inner gm-* markup — inlined
 //     directly; the player IS the renderer (no fetch, no iframe). Preferred.
-//   • `src="…html"` (or a <wb-video-source>) — fetched, then inlined the same
+//   • `src="…html"` (or a <work-video-source>) — fetched, then inlined the same
 //     way, so preview still equals render.
 //
 // Theming: chrome is suppressed on the embedded gm-doc (`data-embedded`); we
@@ -26,13 +26,14 @@
 // content — mirroring the desktop WaveletPlayer.
 //
 // Usage:
-//   <wb-video controls poster="…">
+//   <work-video controls poster="…">
 //     <gm-doc fps="30" resolution="1280x720" duration="2.0s"> … </gm-doc>
-//   </wb-video>
-//   <wb-video src="reel.html" controls autoplay></wb-video>
+//   </work-video>
+//   <work-video src="reel.html" controls autoplay></work-video>
 //   el.play(); el.pause(); await el.export();
 
-import { WbElement, define } from "../../core/element.js";
+import { WbElement, html, css, define } from "../../core/element.js";
+import { ref, createRef } from "lit/directives/ref.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 
 // Default location of the shipped wavelet runtime. Override per-element with
@@ -41,7 +42,7 @@ const DEFAULT_RUNTIME =
   (typeof window !== "undefined" && window.__WB_WAVELET_RUNTIME__) ||
   "/wavelet/wavelet-runtime.js";
 
-// One in-flight import per URL, shared across every <wb-video> on the page.
+// One in-flight import per URL, shared across every <work-video> on the page.
 const _runtimeLoads = new Map();
 function loadWaveletRuntime(rawSrc) {
   if (typeof customElements !== "undefined" && customElements.get("gm-doc")) {
@@ -79,7 +80,7 @@ const VARIANTS = defineVariants({
   fit: { options: ["contain", "cover"], default: "contain" },
 });
 
-export class WbVideo extends WbElement {
+export class WorkVideo extends WbElement {
   static variants = VARIANTS;
   static props = [
     ...variantAttrs(VARIANTS),
@@ -92,7 +93,7 @@ export class WbVideo extends WbElement {
     "runtime-src",
   ];
 
-  static styles = `
+  static styles = css`
     :host { display: block; color: var(--wb-fg); font-family: var(--wb-font); }
 
     .frame {
@@ -214,7 +215,12 @@ export class WbVideo extends WbElement {
     this._raf = 0;
     this._status = null; // {kind:'load'|'error', msg}
     this._exporting = false;
-    this._onToggle = () => this.toggle();
+    // refs to the live transport widgets (set by Lit after each render)
+    this._stageRef = createRef();
+    this._scrubRef = createRef();
+    this._timeRef = createRef();
+    this._framesRef = createRef();
+    this._playRef = createRef();
   }
 
   connectedCallback() {
@@ -223,17 +229,33 @@ export class WbVideo extends WbElement {
   }
 
   disconnectedCallback() {
+    super.disconnectedCallback();
     cancelAnimationFrame(this._raf);
     this._raf = 0;
     try { this._doc?.pause?.(); } catch {}
   }
 
-  // Only re-boot on source/runtime changes; cosmetic attrs just re-render.
+  // Only re-boot on source/runtime changes; cosmetic attrs just re-render. Lit
+  // already re-renders on any reactive-property change; here we additionally
+  // re-boot when the SOURCE changes.
   attributeChangedCallback(name, oldV, newV) {
     super.attributeChangedCallback(name, oldV, newV);
-    if (!this._connected) return;
+    if (!this.isConnected) return;
     if (["src", "composition", "runtime-src"].includes(name) && oldV !== newV) {
       this._boot();
+    }
+  }
+
+  // After every Lit render: re-attach the cached gm-doc into the (new) stage
+  // node and re-sync transport. update() rewrites the shadow tree, so the doc
+  // must be re-homed — but the gm-doc element itself is preserved (never torn
+  // down), so the player keeps running across theme/variant changes.
+  updated() {
+    if (this._doc) {
+      const stage = this._stageRef.value;
+      if (stage && this._doc.parentNode !== stage) stage.appendChild(this._doc);
+      this._scaleStage();
+      this._syncTransport();
     }
   }
 
@@ -244,13 +266,13 @@ export class WbVideo extends WbElement {
   _inlineSource() {
     const attr = this.attr("composition");
     if (attr && attr.trim()) return attr;
-    // A <wb-video-source composition="…"> child (declarative form).
-    const srcEl = this.querySelector("wb-video-source[composition]");
+    // A <work-video-source composition="…"> child (declarative form).
+    const srcEl = this.querySelector("work-video-source[composition]");
     if (srcEl) {
       const c = srcEl.getAttribute("composition");
       if (c && c.trim()) return c;
     }
-    // A slotted/child <gm-doc> authored directly inside <wb-video>; move it
+    // A slotted/child <gm-doc> authored directly inside <work-video>; move it
     // into the shadow stage.
     const child = this.querySelector("gm-doc");
     if (child) return child.outerHTML;
@@ -261,7 +283,7 @@ export class WbVideo extends WbElement {
   _srcUrl() {
     const direct = this.attr("src");
     if (direct) return direct;
-    const srcEl = this.querySelector("wb-video-source[src]");
+    const srcEl = this.querySelector("work-video-source[src]");
     return srcEl ? srcEl.getAttribute("src") : null;
   }
 
@@ -271,7 +293,7 @@ export class WbVideo extends WbElement {
     this._playing = false;
     this._doc = null;
     this._status = { kind: "load", msg: "Loading composition…" };
-    this.update();
+    this.requestUpdate();
 
     let markup = this._inlineSource();
     try {
@@ -280,7 +302,7 @@ export class WbVideo extends WbElement {
         if (!url) {
           // Nothing to play — themed placeholder (clean, on-brand).
           this._status = null;
-          this.update();
+          this.requestUpdate();
           return;
         }
         const res = await fetch(url);
@@ -293,31 +315,33 @@ export class WbVideo extends WbElement {
       if (needsRuntime) await loadWaveletRuntime(runtimeSrc);
 
       this._status = null;
-      this._mount(markup);
+      await this._mount(markup);
     } catch (e) {
       this._status = { kind: "error", msg: `wavelet: ${e?.message || e}` };
-      this.update();
+      this.requestUpdate();
     }
   }
 
   /** Place the composition into the shadow stage and wire transport to the
    *  gm-doc API. The composition is the renderer; we never re-render frames. */
-  _mount(markup) {
-    this.update(); // ensure .stage exists
-    const stage = this.shadowRoot.querySelector(".stage");
+  async _mount(markup) {
+    // Ensure the .stage node exists before we mount into it.
+    this.requestUpdate();
+    await this.updateComplete;
+    const stage = this._stageRef.value;
     if (!stage) return;
 
     // If the markup is a full <gm-doc …>…</gm-doc>, instantiate it directly.
     // If it's bare gm-* fragments, wrap in a gm-doc carrying our attrs.
-    let html = markup.trim();
-    if (!/^<gm-doc[\s>]/i.test(html)) {
-      html = `<gm-doc data-embedded>${html}</gm-doc>`;
+    let frag = markup.trim();
+    if (!/^<gm-doc[\s>]/i.test(frag)) {
+      frag = `<gm-doc data-embedded>${frag}</gm-doc>`;
     }
-    stage.innerHTML = html;
+    stage.innerHTML = frag;
     const doc = stage.querySelector("gm-doc");
     if (!doc) {
       this._status = { kind: "error", msg: "no <gm-doc> in composition" };
-      this.update();
+      this.requestUpdate();
       return;
     }
     // Suppress wavelet's own chrome — we paint the themed transport.
@@ -330,7 +354,7 @@ export class WbVideo extends WbElement {
       this._ready = true;
       this._applyAspect();
       this._scaleStage();
-      this.update();
+      this.requestUpdate();
       if (this.boolAttr("autoplay")) this.play();
     });
   }
@@ -346,8 +370,8 @@ export class WbVideo extends WbElement {
   /** Letterbox-scale the native-pixel stage to fit its box (preview ≡ render —
    *  scale the box, not the content). Mirrors WaveletPlayer.recomputeScale. */
   _scaleStage() {
-    const wrap = this.shadowRoot.querySelector(".stage-wrap");
-    const stage = this.shadowRoot.querySelector(".stage");
+    const stage = this._stageRef.value;
+    const wrap = stage?.parentElement;
     const w = this._doc?.resolved?.resolution?.width;
     const h = this._doc?.resolved?.resolution?.height;
     if (!wrap || !stage || !w || !h) return;
@@ -367,8 +391,8 @@ export class WbVideo extends WbElement {
     this._doc.play();
     this._playing = true;
     this._tickLoop();
-    this.update();
-    this.dispatchEvent(new CustomEvent("wb-play", { bubbles: true }));
+    this.requestUpdate();
+    this.dispatchEvent(new CustomEvent("work-play", { bubbles: true }));
   }
 
   pause() {
@@ -376,8 +400,8 @@ export class WbVideo extends WbElement {
     this._doc.pause();
     this._playing = false;
     cancelAnimationFrame(this._raf);
-    this.update();
-    this.dispatchEvent(new CustomEvent("wb-pause", { bubbles: true }));
+    this.requestUpdate();
+    this.dispatchEvent(new CustomEvent("work-pause", { bubbles: true }));
   }
 
   toggle() {
@@ -408,8 +432,8 @@ export class WbVideo extends WbElement {
     const markup = this._currentMarkup();
     if (!markup) return;
     this._exporting = true;
-    this.update();
-    this.dispatchEvent(new CustomEvent("wb-export-start", { bubbles: true }));
+    this.requestUpdate();
+    this.dispatchEvent(new CustomEvent("work-export-start", { bubbles: true }));
     try {
       if (this.host.available("wavelet")) {
         // In-guest encode brokered through the Dock (render_seq.wasm + the
@@ -418,24 +442,24 @@ export class WbVideo extends WbElement {
           body: { composition: markup, format, fps: this.fps },
         });
         this.dispatchEvent(
-          new CustomEvent("wb-export", { bubbles: true, detail: { ...out, format } }),
+          new CustomEvent("work-export", { bubbles: true, detail: { ...out, format } }),
         );
         return out;
       }
       // Degrade: portable HTML download (self-contained composition).
       const file = await this._downloadPortable(markup);
       this.dispatchEvent(
-        new CustomEvent("wb-export", { bubbles: true, detail: { file, format: "html" } }),
+        new CustomEvent("work-export", { bubbles: true, detail: { file, format: "html" } }),
       );
       return { file, format: "html" };
     } catch (e) {
       this.dispatchEvent(
-        new CustomEvent("wb-export-error", { bubbles: true, detail: { error: String(e) } }),
+        new CustomEvent("work-export-error", { bubbles: true, detail: { error: String(e) } }),
       );
       throw e;
     } finally {
       this._exporting = false;
-      this.update();
+      this.requestUpdate();
     }
   }
 
@@ -486,7 +510,7 @@ export class WbVideo extends WbElement {
         } else {
           this._playing = false;
           this._syncTransport();
-          this.dispatchEvent(new CustomEvent("wb-ended", { bubbles: true }));
+          this.dispatchEvent(new CustomEvent("work-ended", { bubbles: true }));
           return;
         }
       }
@@ -498,12 +522,11 @@ export class WbVideo extends WbElement {
 
   /** Update only the transport widgets without re-mounting the composition. */
   _syncTransport() {
-    const sr = this.shadowRoot;
-    const scrub = sr.querySelector(".scrub");
-    const time = sr.querySelector(".time");
-    const frames = sr.querySelector(".frames");
-    const play = sr.querySelector(".play");
     if (!this._doc) return;
+    const scrub = this._scrubRef.value;
+    const time = this._timeRef.value;
+    const frames = this._framesRef.value;
+    const play = this._playRef.value;
     const cur = this._doc.currentFrame, total = this._doc.totalFrames, fps = this._doc.fps;
     if (scrub) { scrub.max = String(Math.max(0, total - 1)); scrub.value = String(cur); }
     if (time) time.textContent = `${fmt(cur, fps)} / ${fmt(total, fps)}`;
@@ -513,65 +536,35 @@ export class WbVideo extends WbElement {
 
   // ---- render -------------------------------------------------------------
 
-  // NOTE: update() rewrites shadow innerHTML, which would destroy a mounted
-  // gm-doc. We override update() to re-mount the cached _doc node so theme/
-  // variant changes don't tear down the player.
-  update() {
-    if (!this.shadowRoot) return;
-    this.shadowRoot.innerHTML = this.render();
-    if (this._doc) {
-      const stage = this.shadowRoot.querySelector(".stage");
-      if (stage && this._doc.parentNode !== stage) stage.appendChild(this._doc);
-      this._scaleStage();
-      this._syncTransport();
-    }
-    this._wire();
-  }
-
-  _wire() {
-    const sr = this.shadowRoot;
-    sr.querySelector(".play")?.addEventListener("click", this._onToggle);
-    sr.querySelector(".bigplay")?.addEventListener("click", this._onToggle);
-    sr.querySelector(".poster")?.addEventListener("click", this._onToggle);
-    sr.querySelector(".scrub")?.addEventListener("input", (e) => {
-      this.seek(Number(e.target.value));
-    });
-    sr.querySelector(".step-back")?.addEventListener("click", () => this.seek(this.currentFrame - 1));
-    sr.querySelector(".step-fwd")?.addEventListener("click", () => this.seek(this.currentFrame + 1));
-    sr.querySelector(".export")?.addEventListener("click", () => { void this.export(); });
-  }
-
   render() {
     const controls = this.boolAttr("controls");
     const poster = this.attr("poster");
     const showPoster = poster && !this._playing && !this._doc;
     const status = this._status;
 
-    const stage = `<div class="stage-wrap"><div class="stage"></div>${
-      showPoster
-        ? `<img class="poster" src="${escapeAttr(poster)}" alt="" /><button class="bigplay" aria-label="Play">▶</button>`
-        : ""
-    }${
-      status
-        ? `<div class="status ${status.kind === "error" ? "err" : ""}">${escapeText(status.msg)}</div>`
+    const overlay = showPoster
+      ? html`<img class="poster" src=${poster} alt="" @click=${() => this.toggle()} /><button class="bigplay" aria-label="Play" @click=${() => this.toggle()}>▶</button>`
+      : status
+        ? html`<div class="status ${status.kind === "error" ? "err" : ""}">${status.msg}</div>`
         : !this._doc && !showPoster
-          ? `<div class="status">No composition. Set <code>composition</code>, <code>src</code>, or slot a &lt;gm-doc&gt;.</div>`
-          : ""
-    }</div>`;
+          ? html`<div class="status">No composition. Set <code>composition</code>, <code>src</code>, or slot a &lt;gm-doc&gt;.</div>`
+          : "";
+
+    const stage = html`<div class="stage-wrap"><div class="stage" ${ref(this._stageRef)}></div>${overlay}</div>`;
 
     const transport = controls
-      ? `<div class="transport">
-           <button class="play" aria-label="Play/Pause">${this._playing ? "❚❚" : "▶"}</button>
-           <button class="step-back" aria-label="Previous frame" title="Previous frame">⟨</button>
-           <button class="step-fwd" aria-label="Next frame" title="Next frame">⟩</button>
-           <input class="scrub" type="range" min="0" max="0" step="1" value="0" aria-label="Scrub timeline" />
-           <span class="time">0:00 / 0:00</span>
-           <span class="frames">f 0/0</span>
-           <button class="export ${this._exporting ? "busy" : ""}" title="Export (in-guest encode, or portable .html)">${this._exporting ? "…" : "Export ↓"}</button>
+      ? html`<div class="transport">
+           <button class="play" aria-label="Play/Pause" @click=${() => this.toggle()} ${ref(this._playRef)}>${this._playing ? "❚❚" : "▶"}</button>
+           <button class="step-back" aria-label="Previous frame" title="Previous frame" @click=${() => this.seek(this.currentFrame - 1)}>⟨</button>
+           <button class="step-fwd" aria-label="Next frame" title="Next frame" @click=${() => this.seek(this.currentFrame + 1)}>⟩</button>
+           <input class="scrub" type="range" min="0" max="0" step="1" value="0" aria-label="Scrub timeline" @input=${(e) => this.seek(Number(e.target.value))} ${ref(this._scrubRef)} />
+           <span class="time" ${ref(this._timeRef)}>0:00 / 0:00</span>
+           <span class="frames" ${ref(this._framesRef)}>f 0/0</span>
+           <button class="export ${this._exporting ? "busy" : ""}" title="Export (in-guest encode, or portable .html)" @click=${() => { void this.export(); }}>${this._exporting ? "…" : "Export ↓"}</button>
          </div>`
       : "";
 
-    return `<div class="frame">${stage}${transport}</div>`;
+    return html`<div class="frame">${stage}${transport}</div>`;
   }
 }
 
@@ -581,7 +574,5 @@ function fmt(frame, fps) {
   const sec = Math.floor(s % 60);
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
-function escapeAttr(s) { return String(s).replace(/"/g, "&quot;"); }
-function escapeText(s) { return String(s).replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
-define("wb-video", WbVideo);
+define("work-video", WorkVideo);

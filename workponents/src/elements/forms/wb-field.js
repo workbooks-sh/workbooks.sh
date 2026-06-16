@@ -1,15 +1,15 @@
-// <wb-field> — one control bound to its rule. The form IS its schema: a field
+// <work-field> — one control bound to its rule. The form IS its schema: a field
 // carries its own declarative rule (inline JSON `rule` attr/property, or built
 // from the validation attrs name/type/required/min/max/pattern), and reflects
-// its own validity — it is not hand-wired per field. The owning <wb-form>
+// its own validity — it is not hand-wired per field. The owning <work-form>
 // collects fields, runs `src/validate`, and writes errors back down.
 //
 // Renders the right control by `type` (text/number/email/select/checkbox/
 // textarea/date). Label + help + error are themed entirely from --wb-* tokens.
 // Usage:
-//   <wb-field name="email" type="email" label="Email" required></wb-field>
-//   <wb-field name="role" type="select" label="Role" options="eng,design,ops"></wb-field>
-import { WbElement, define } from "../../core/element.js";
+//   <work-field name="email" type="email" label="Email" required></work-field>
+//   <work-field name="role" type="select" label="Role" options="eng,design,ops"></work-field>
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 
 const VARIANTS = defineVariants({
@@ -19,11 +19,6 @@ const VARIANTS = defineVariants({
 
 const TYPES = ["text", "number", "email", "url", "password", "select", "checkbox", "textarea", "date", "tel"];
 
-function esc(s) {
-  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
 export class WbField extends WbElement {
   static variants = VARIANTS;
   static props = [
@@ -32,7 +27,7 @@ export class WbField extends WbElement {
     "required", "min", "max", "pattern", "options", "disabled", "error",
   ];
 
-  static styles = `
+  static styles = css`
     :host { display: block; margin: 0 0 var(--wb-space-4); font-family: var(--wb-font); }
     .label { display: block; font-size: var(--wb-text-sm); font-weight: 600; color: var(--wb-fg);
       margin-bottom: var(--wb-space-2); }
@@ -92,7 +87,7 @@ export class WbField extends WbElement {
     if (this.hasAttribute("options")) r.enum = this._optionList().map((o) => o.value);
     return r;
   }
-  set rule(v) { this._rule = v; if (this._connected) this.update(); }
+  set rule(v) { this._rule = v; this.requestUpdate(); }
 
   _ruleType(type) {
     if (type === "number") return "number";
@@ -105,9 +100,13 @@ export class WbField extends WbElement {
 
   get name() { return this.attr("name", ""); }
 
+  _controlEl() {
+    return this.shadowRoot && this.shadowRoot.querySelector(".control");
+  }
+
   /** Current control value (typed). */
   get value() {
-    const ctl = this.shadowRoot && this.shadowRoot.querySelector(".control");
+    const ctl = this._controlEl();
     const type = (this.attr("type", "text") || "text").toLowerCase();
     if (!ctl) return this.attr("value", type === "checkbox" ? false : "");
     if (type === "checkbox") return ctl.checked;
@@ -115,11 +114,14 @@ export class WbField extends WbElement {
   }
   set value(v) {
     this.setAttribute("value", v == null ? "" : String(v));
-    const ctl = this.shadowRoot && this.shadowRoot.querySelector(".control");
+    const ctl = this._controlEl();
     if (ctl) { const type = (this.attr("type", "text") || "text").toLowerCase(); if (type === "checkbox") ctl.checked = !!v; else ctl.value = v; }
   }
 
-  /** Show / clear the field's error (called by <wb-form>); reflects validity. */
+  /** Show / clear the field's error (called by <work-form>); reflects validity.
+   *  The `error` attr drives the Lit `.error` binding; we also write the node's
+   *  text synchronously so a read right after setError (before Lit's async flush)
+   *  already reflects it. */
   setError(message) {
     if (message) { this.setAttribute("invalid", ""); this.setAttribute("error", message); }
     else { this.removeAttribute("invalid"); this.removeAttribute("error"); }
@@ -136,32 +138,49 @@ export class WbField extends WbElement {
     });
   }
 
+  // Bubble a normalized input/change/blur event up to the owning <work-form> so it
+  // can re-validate live. Dispatched on the host (this) so the form's delegated
+  // listener catches it; .control's native event handlers route here.
+  _fire(kind) {
+    this.dispatchEvent(new CustomEvent("work-field-" + kind, {
+      bubbles: true, composed: true, detail: { name: this.name, value: this.value },
+    }));
+  }
+
   _control() {
     const type = (this.attr("type", "text") || "text").toLowerCase();
     const t = TYPES.includes(type) ? type : "text";
-    const name = esc(this.name);
-    const ph = this.attr("placeholder") ? ` placeholder="${esc(this.attr("placeholder"))}"` : "";
+    const name = this.name;
+    const ph = this.attr("placeholder");
     const val = this.attr("value");
-    const disabled = this.boolAttr("disabled") ? " disabled" : "";
+    const disabled = this.boolAttr("disabled");
+    const onInput = () => this._fire("input");
+    const onBlur = () => this._fire("blur");
 
     if (t === "checkbox") {
-      return `<label class="check"><input class="control" type="checkbox" name="${name}"${val === "true" ? " checked" : ""}${disabled} />` +
-        `<span>${esc(this.attr("label", ""))}</span></label>`;
+      return html`<label class="check"><input class="control" type="checkbox" name=${name}
+          ?checked=${val === "true"} ?disabled=${disabled}
+          @input=${onInput} @change=${onInput} @blur=${onBlur} />
+        <span>${this.attr("label", "")}</span></label>`;
     }
     if (t === "textarea") {
-      return `<textarea class="control" name="${name}"${ph}${disabled}>${esc(val || "")}</textarea>`;
+      return html`<textarea class="control" name=${name} placeholder=${ph ?? ""}
+        ?disabled=${disabled} @input=${onInput} @change=${onInput} @blur=${onBlur}
+        .value=${val || ""}></textarea>`;
     }
     if (t === "select") {
       const opts = this._optionList();
-      const ph2 = this.attr("placeholder") ? `<option value="" ${val ? "" : "selected"} disabled hidden>${esc(this.attr("placeholder"))}</option>` : "";
-      return `<select class="control" name="${name}"${disabled}>${ph2}` +
-        opts.map((o) => `<option value="${esc(o.value)}"${val === o.value ? " selected" : ""}>${esc(o.label)}</option>`).join("") +
-        `</select>`;
+      return html`<select class="control" name=${name} ?disabled=${disabled}
+        @input=${onInput} @change=${onInput} @blur=${onBlur} .value=${val ?? ""}>
+        ${ph ? html`<option value="" ?selected=${!val} disabled hidden>${ph}</option>` : null}
+        ${opts.map((o) => html`<option value=${o.value} ?selected=${val === o.value}>${o.label}</option>`)}
+      </select>`;
     }
-    const valAttr = val != null ? ` value="${esc(val)}"` : "";
-    const min = this.hasAttribute("min") ? ` min="${esc(this.getAttribute("min"))}"` : "";
-    const max = this.hasAttribute("max") ? ` max="${esc(this.getAttribute("max"))}"` : "";
-    return `<input class="control" type="${t}" name="${name}"${ph}${valAttr}${min}${max}${disabled} />`;
+    return html`<input class="control" type=${t} name=${name}
+      placeholder=${ph ?? ""} .value=${val ?? ""}
+      min=${this.hasAttribute("min") ? this.getAttribute("min") : ""}
+      max=${this.hasAttribute("max") ? this.getAttribute("max") : ""}
+      ?disabled=${disabled} @input=${onInput} @change=${onInput} @blur=${onBlur} />`;
   }
 
   render() {
@@ -172,31 +191,14 @@ export class WbField extends WbElement {
     const req = this.boolAttr("required");
     // checkbox renders its own inline label inside .check
     const labelHtml = label && type !== "checkbox"
-      ? `<label class="label">${esc(label)}${req ? '<span class="req">*</span>' : ""}</label>` : "";
-    return `
+      ? html`<label class="label">${label}${req ? html`<span class="req">*</span>` : null}</label>` : null;
+    return html`
       ${labelHtml}
       ${this._control()}
-      ${help ? `<p class="help">${esc(help)}</p>` : ""}
-      <p class="error">${esc(error || "")}</p>
+      ${help ? html`<p class="help">${help}</p>` : null}
+      <p class="error">${error || ""}</p>
     `;
-  }
-
-  update() {
-    super.update();
-    // Bubble a normalized input/change event up to the owning <wb-form> so it can
-    // re-validate live. We dispatch on the host (this) so the form's delegated
-    // listener catches it.
-    const ctl = this.shadowRoot.querySelector(".control");
-    if (ctl && !ctl._wbBound) {
-      ctl._wbBound = true;
-      const fire = (kind) => this.dispatchEvent(new CustomEvent("wb-field-" + kind, {
-        bubbles: true, composed: true, detail: { name: this.name, value: this.value },
-      }));
-      ctl.addEventListener("input", () => fire("input"));
-      ctl.addEventListener("change", () => fire("input"));
-      ctl.addEventListener("blur", () => fire("blur"));
-    }
   }
 }
 
-define("wb-field", WbField);
+define("work-field", WbField);

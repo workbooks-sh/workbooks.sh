@@ -1,17 +1,26 @@
-// <wb-editor> — a themed code editor. The editing surface is the zero-dep FLOOR:
+// <work-editor> — a themed code editor. The editing surface is the zero-dep FLOOR:
 // a transparent <textarea> over a token-highlighted <pre> overlay, with a line-
 // number gutter. Composition-as-source: the code IS the artifact's source, edited
-// in place — emits `wb-code-change {value}` on every edit.
+// in place — emits `work-code-change {value}` on every edit.
 //
 // THE EDITOR-SWAP SEAM (for CodeMirror later):
 //   The public API — the `value` property/attr, the `language` attr, the
-//   `wb-code-change` event, and the `<wb-editor>` tag — is the contract. The
+//   `work-code-change` event, and the `<work-editor>` tag — is the contract. The
 //   editing surface itself is built by `_mountSurface()` / read+written via
 //   `getValue()` / `setValue()`. A powered build overrides ONLY those three
 //   internals (mount a CodeMirror EditorView, read/write its doc) behind the same
-//   public API; nothing that consumes <wb-editor> changes. The floor is a refusal
+//   public API; nothing that consumes <work-editor> changes. The floor is a refusal
 //   of nothing — it is the lower rung of one ladder. NO build step, pure ESM.
-import { WbElement, define } from "../../core/element.js";
+//
+// Lit base: the surface chrome (gutter/overlay/textarea) is a Lit template. The
+// highlighted overlay is trusted, already-escaped HTML (see highlight.js), bound
+// with Lit's `unsafeHTML` directive — the escaping lives in the tokenizer, not the
+// markup author. The textarea value is managed imperatively (a `ref`) so a re-render
+// never disturbs the caret; Lit only re-renders the overlay/gutter via reactive
+// state.
+import { WbElement, html, css, define } from "../../core/element.js";
+import { ref, createRef } from "lit/directives/ref.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { highlight, normalizeLang } from "./highlight.js";
 
@@ -19,12 +28,19 @@ const VARIANTS = defineVariants({
   variant: { options: ["card", "inline"], default: "card" },
 });
 
-export class WbEditor extends WbElement {
+export class WorkEditor extends WbElement {
   static variants = VARIANTS;
   // language + readonly reflected so :host([...]) + re-render react; gutter toggles linenos.
   static props = [...variantAttrs(VARIANTS), "language", "readonly", "gutter", "placeholder"];
 
-  static styles = `
+  static properties = {
+    ...WbElement.properties,
+    // the highlighted overlay markup + the gutter line list — reactive state
+    _highlighted: { state: true },
+    _lines: { state: true },
+  };
+
+  static styles = css`
     :host { display: block; font-family: var(--wb-font-mono); }
     .wrap { position: relative; display: flex;
       border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
@@ -68,6 +84,14 @@ export class WbEditor extends WbElement {
     .wrap:focus-within { border-color: var(--wb-brand); box-shadow: 0 0 0 3px var(--wb-ring); }
   `;
 
+  constructor() {
+    super();
+    this._taRef = createRef();
+    this._ovRef = createRef();
+    this._highlighted = "";
+    this._lines = "";
+  }
+
   // ---- public API (the swap-stable contract) ---------------------------------
 
   get value() { return this.getValue(); }
@@ -80,13 +104,13 @@ export class WbEditor extends WbElement {
 
   /** Read the current text. (Floor: from the textarea.) */
   getValue() {
-    const ta = this.shadowRoot && this.shadowRoot.querySelector("textarea");
+    const ta = this._taRef.value;
     return ta ? ta.value : (this._pending != null ? this._pending : "");
   }
 
   /** Write text + re-highlight + emit change. (Floor: into the textarea.) */
   setValue(v, { silent = false } = {}) {
-    const ta = this.shadowRoot && this.shadowRoot.querySelector("textarea");
+    const ta = this._taRef.value;
     if (!ta) { this._pending = v; return; }
     if (ta.value === v) return;
     ta.value = v;
@@ -94,14 +118,15 @@ export class WbEditor extends WbElement {
     if (!silent) this._emitChange();
   }
 
-  /** Build the editing surface into the shadow root. Floor = textarea+overlay. */
+  /** Build the editing surface. Floor = textarea+overlay wired here once the Lit
+   *  template has rendered (firstUpdated). CodeMirror overrides this hook. */
   _mountSurface() {
-    const ta = this.shadowRoot.querySelector("textarea");
+    const ta = this._taRef.value;
     if (!ta) return;
     const sync = () => { this._paint(); this._emitChange(); };
     ta.addEventListener("input", sync);
     ta.addEventListener("scroll", () => {
-      const ov = this.shadowRoot.querySelector(".overlay");
+      const ov = this._ovRef.value;
       if (ov) { ov.scrollTop = ta.scrollTop; ov.scrollLeft = ta.scrollLeft; }
     });
     // soft tab on Tab (floor nicety; CM handles this natively later)
@@ -114,31 +139,31 @@ export class WbEditor extends WbElement {
         sync();
       }
     });
+    // seed the textarea with the captured initial source, then paint the overlay
+    if (ta.value === "" && this._initial) ta.value = this._initial;
     this._paint();
   }
 
   // ---- internals -------------------------------------------------------------
 
+  // Recompute the highlight overlay + gutter into reactive state; Lit binds them
+  // (overlay via unsafeHTML — the highlight HTML is escaped at the source).
   _paint() {
-    const ta = this.shadowRoot.querySelector("textarea");
-    const ov = this.shadowRoot.querySelector(".overlay");
-    const gut = this.shadowRoot.querySelector(".gutter");
-    if (!ta || !ov) return;
+    const ta = this._taRef.value;
+    if (!ta) return;
     const code = ta.value;
     // trailing newline keeps the overlay tall enough to match the textarea
-    ov.innerHTML = highlight(code, this.language) + "\n";
-    if (gut) {
-      const n = code.split("\n").length;
-      let g = "";
-      for (let k = 1; k <= n; k++) g += k + "\n";
-      gut.textContent = g;
-    }
+    this._highlighted = highlight(code, this.language) + "\n";
+    const n = code.split("\n").length;
+    let g = "";
+    for (let k = 1; k <= n; k++) g += k + "\n";
+    this._lines = g;
   }
 
   _emitChange() {
     const value = this.getValue();
     this._pending = value;
-    this.dispatchEvent(new CustomEvent("wb-code-change", {
+    this.dispatchEvent(new CustomEvent("work-code-change", {
       detail: { value }, bubbles: true, composed: true,
     }));
   }
@@ -151,30 +176,27 @@ export class WbEditor extends WbElement {
       this._initial = this._initial.replace(/^\n/, "").replace(/\s+$/, "");
     }
     super.connectedCallback();
+  }
+
+  // Lit lifecycle: wire the surface once the template + textarea exist.
+  firstUpdated() {
     this._mountSurface();
   }
 
   render() {
-    const ro = this.boolAttr("readonly") ? "readonly" : "";
+    const ro = this.boolAttr("readonly");
     const ph = this.attr("placeholder", "");
-    const initial = this._pending != null ? this._pending : (this._initial || "");
-    const esc = initial.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    return `
+    return html`
       <div class="wrap">
-        <pre class="gutter" aria-hidden="true"></pre>
+        <pre class="gutter" aria-hidden="true">${this._lines}</pre>
         <div class="surface">
-          <textarea spellcheck="false" autocomplete="off" autocapitalize="off"
-            wrap="off" ${ro} placeholder="${ph.replace(/"/g, "&quot;")}">${esc}</textarea>
-          <pre class="overlay" aria-hidden="true"></pre>
+          <textarea ${ref(this._taRef)} spellcheck="false" autocomplete="off"
+            autocapitalize="off" wrap="off" ?readonly=${ro}
+            placeholder=${ph}></textarea>
+          <pre class="overlay" aria-hidden="true" ${ref(this._ovRef)}>${unsafeHTML(this._highlighted)}</pre>
         </div>
       </div>`;
   }
-
-  // The base re-renders on attr changes; re-mount the surface + repaint each time.
-  update() {
-    super.update();
-    this._mountSurface();
-  }
 }
 
-define("wb-editor", WbEditor);
+define("work-editor", WorkEditor);

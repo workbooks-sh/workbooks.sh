@@ -1,32 +1,37 @@
-// <wb-metric> — a single KPI, computed in the engine. The number IS a query: the
+// <work-metric> — a single KPI, computed in the engine. The number IS a query: the
 // element runs a 1-row aggregate on the shared engine and renders one value (+
-// optional label, delta, and inline <wb-spark> trend). The whole point of the
+// optional label, delta, and inline <work-spark> trend). The whole point of the
 // reinvention: there is no "metric value" prop you hand-compute in JS — you hand
 // it SQL and the engine returns the scalar. Same data contract + engine as
-// <wb-chart>; reach compute ONLY through src/data.
+// <work-chart>; reach compute ONLY through src/data.
+//
+// Re-based onto Lit: render() returns a Lit template wrapping the string-built
+// shell via unsafeHTML (the embedded <work-spark> is a sibling custom element).
+// The _load single-flight + whenRegistered/register plumbing is unchanged.
 //
 // Usage (the aggregate runs in the engine, returns one row):
-//   <wb-metric label="Total revenue" format="usd"
-//     query="SELECT sum(revenue) AS total FROM orders"></wb-metric>
+//   <work-metric label="Total revenue" format="usd"
+//     query="SELECT sum(revenue) AS total FROM orders"></work-metric>
 //
-//   <wb-metric label="Avg order" format="usd" value-col="avg_order" delta-col="wow"
-//     query="SELECT avg(revenue) AS avg_order, 0.082 AS wow FROM orders"></wb-metric>
+//   <work-metric label="Avg order" format="usd" value-col="avg_order" delta-col="wow"
+//     query="SELECT avg(revenue) AS avg_order, 0.082 AS wow FROM orders"></work-metric>
 //
 // Attributes:
 //   query        SQL returning ONE row (the scalar lives here, engine-computed)
-//   src-name / rows / csv   — register a source inline (same story as wb-chart)
+//   src-name / rows / csv   — register a source inline (same story as work-chart)
 //   value-col    which result column is the value (default: first)
 //   delta-col    optional column holding a fraction delta (e.g. 0.082 = +8.2%)
 //   label        the metric caption
 //   format       usd | num | pct | none
 //   size         sm | md | lg
 //   variant      card | bare
-//   trend        optional SQL for an inline sparkline; renders <wb-spark>
+//   trend        optional SQL for an inline sparkline; renders <work-spark>
 //   trend-y      value column for the trend query
 //
-// Events: wb-metric-ready { detail: { value, delta, engine } }
-import { WbElement, define } from "../../core/element.js";
-import { defineVariants, variantAttrs, resolveVariant } from "../../core/variants.js";
+// Events: work-metric-ready { detail: { value, delta, engine } }
+import { WbElement, html, css, define } from "../../core/element.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 import "./wb-spark.js";
 
@@ -42,7 +47,7 @@ export class WbMetric extends WbElement {
   static props = [...variantAttrs(VARIANTS), "query", "src-name", "rows", "csv",
     "value-col", "delta-col", "label", "format", "trend", "trend-y"];
 
-  static styles = `
+  static styles = css`
     :host { display: inline-block; font-family: var(--wb-font); color: var(--wb-fg); }
     .shell { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
       background: var(--wb-surface); box-shadow: var(--wb-shadow-sm);
@@ -79,19 +84,20 @@ export class WbMetric extends WbElement {
     if (!this._srcName) {
       const rowsAttr = this.attr("rows"), csvAttr = this.attr("csv");
       if (rowsAttr || csvAttr) {
-        if (!this._autoName) this._autoName = `wb_metric_${++_autoId}`;
+        if (!this._autoName) this._autoName = `work_metric_${++_autoId}`;
         this._srcName = this._autoName;
         this._pendingSource = rowsAttr ? { json: rowsAttr } : { csv: csvAttr };
       }
     }
   }
 
-  attributeChangedCallback(name) {
-    if (!this._connected) return;
+  attributeChangedCallback(name, old, val) {
+    super.attributeChangedCallback(name, old, val);
+    if (!this._init) return;
     if (name === "query" || name === "src-name" || name === "rows" || name === "csv" ||
         name === "value-col" || name === "delta-col") {
       this._pendingSource = null; this._captureSource(); this._load();
-    } else { this.update(); }
+    } else { this.requestUpdate(); }
   }
 
   async _load() {
@@ -104,7 +110,7 @@ export class WbMetric extends WbElement {
         if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
         else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
         const sql = this.attr("query") || (this._srcName ? `SELECT * FROM ${ident(this._srcName)} LIMIT 1` : null);
-        if (!sql) throw new Error("wb-metric needs a query or a source");
+        if (!sql) throw new Error("work-metric needs a query or a source");
         const res = await this._engine.query(sql);
         this._tier = res.engine || this._engine.provider();
         const vCol = this.attr("value-col");
@@ -117,13 +123,17 @@ export class WbMetric extends WbElement {
       } catch (e) {
         this._error = String((e && e.message) || e);
       }
-      this.update();
-      this._emit("wb-metric-ready", { value: this._value, delta: this._delta, engine: this._tier });
+      this.requestUpdate();
+      this._emit("work-metric-ready", { value: this._value, delta: this._delta, engine: this._tier });
     } while (this._loadAgain);
     this._loading = false;
   }
 
   render() {
+    return html`${unsafeHTML(this._html())}`;
+  }
+
+  _html() {
     const label = this.attr("label");
     const fmt = this.attr("format");
     if (this._error) return `<div class="shell">${label ? `<div class="label">${esc(label)}</div>` : ""}<div class="err">${esc(this._error)}</div></div>`;
@@ -136,7 +146,7 @@ export class WbMetric extends WbElement {
     }
     const trend = this.attr("trend");
     const spark = trend
-      ? `<div class="spark"><wb-spark query="${esc(trend)}" ${this.attr("trend-y") ? `y="${esc(this.attr("trend-y"))}"` : ""} type="area" width="140" height="28"></wb-spark></div>`
+      ? `<div class="spark"><work-spark query="${esc(trend)}" ${this.attr("trend-y") ? `y="${esc(this.attr("trend-y"))}"` : ""} type="area" width="140" height="28"></work-spark></div>`
       : "";
     return `<div class="shell">
       ${label ? `<div class="label">${esc(label)}</div>` : ""}
@@ -165,4 +175,4 @@ function abbrev(n) {
   return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-define("wb-metric", WbMetric);
+define("work-metric", WbMetric);

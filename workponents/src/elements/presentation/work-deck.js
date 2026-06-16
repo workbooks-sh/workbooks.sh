@@ -1,16 +1,16 @@
-// <wb-deck> — THE presentation reinvention: a deck IS a wavelet timeline, and the
+// <work-deck> — THE presentation reinvention: a deck IS a wavelet timeline, and the
 // slides ARE its discrete keyframe bands. Because of that single idea the domain
 // shares the wavelet render-core with `video` and "export to video" is free — the
-// deck just folds its <wb-slide> children into a <gm-doc> timeline (one
+// deck just folds its <work-slide> children into a <gm-doc> timeline (one
 // <gm-scene> per band, each band's `hold` = its duration) and hands it to the
-// SAME path <wb-video> uses (in-guest encode when the Host has `wavelet`,
+// SAME path <work-video> uses (in-guest encode when the Host has `wavelet`,
 // degrading to a portable self-contained .html otherwise). The deck never
 // reimplements rendering or encoding.
 //
-// Composition-as-source: the ordered set of slotted <wb-slide> children IS the
+// Composition-as-source: the ordered set of slotted <work-slide> children IS the
 // deck. The deck owns the playhead (which band is live) and nothing else — slides
 // keep their own content in the light DOM, so a live workponent on a slide (a
-// <wb-chart>, a <wb-video>) is a first-class citizen, not a screenshot.
+// <work-chart>, a <work-video>) is a first-class citizen, not a screenshot.
 //
 // Live navigation:
 //   ← / PageUp / k        previous slide
@@ -38,29 +38,36 @@
 //   .export({format})             in-guest encode via Host, else portable .html
 //
 // Events (all bubbling):
-//   wb-slide-change { index, total, slide }   on every band change
-//   wb-export-start                            export began
-//   wb-export      { format, … }               export finished
-//   wb-export-error { error }                  export failed
+//   work-slide-change { index, total, slide }   on every band change
+//   work-export-start                            export began
+//   work-export      { format, … }               export finished
+//   work-export-error { error }                  export failed
 
-import { WbElement, define } from "../../core/element.js";
-import { defineVariants, variantAttrs, resolveVariant } from "../../core/variants.js";
+import { WbElement, html, css, define } from "../../core/element.js";
+import { defineVariants, variantAttrs } from "../../core/variants.js";
 
 const VARIANTS = defineVariants({
   variant: { options: ["framed", "bare"], default: "framed" },
 });
 
-// Default location of the shipped wavelet runtime (mirrors <wb-video>). Used only
+// Default location of the shipped wavelet runtime (mirrors <work-video>). Used only
 // to inline the runtime into a portable export when no Host encode is available.
 const DEFAULT_RUNTIME =
   (typeof window !== "undefined" && window.__WB_WAVELET_RUNTIME__) ||
   "/wavelet/wavelet-runtime.js";
 
-export class WbDeck extends WbElement {
+export class WorkDeck extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "index", "aspect", "controls", "loop", "hold", "transition", "resolution"];
 
-  static styles = `
+  static properties = {
+    ...WbElement.properties,
+    // internal reactive state that drives the Lit template
+    _count: { state: true },
+    _exporting: { state: true },
+  };
+
+  static styles = css`
     :host {
       display: block;
       color: var(--wb-fg);
@@ -79,7 +86,7 @@ export class WbDeck extends WbElement {
     :host([variant="bare"]) .shell { background: transparent; border-color: transparent; box-shadow: none; border-radius: 0; }
     :host(:fullscreen) .shell, :host(.is-fs) .shell { height: 100vh; border: none; border-radius: 0; }
 
-    /* the stage holds exactly one absolutely-positioned <wb-slide> at a time */
+    /* the stage holds exactly one absolutely-positioned <work-slide> at a time */
     .stage {
       position: relative;
       aspect-ratio: var(--_aspect, 16 / 9);
@@ -89,7 +96,7 @@ export class WbDeck extends WbElement {
     :host(.is-fs) .stage { flex: 1 1 auto; aspect-ratio: auto; }
 
     /* the slotted slides live here; only [active] paints (slide owns that) */
-    ::slotted(wb-slide) { position: absolute; inset: 0; }
+    ::slotted(work-slide) { position: absolute; inset: 0; }
 
     /* edge click zones for click-to-advance */
     .zone { position: absolute; top: 0; bottom: 0; width: 22%; z-index: 4; cursor: pointer; }
@@ -160,6 +167,7 @@ export class WbDeck extends WbElement {
     super();
     this._slides = [];
     this._index = 0;
+    this._count = 0;
     this._exporting = false;
     this._onKey = this._onKey.bind(this);
     this._onFsChange = () => this._syncFs();
@@ -176,39 +184,39 @@ export class WbDeck extends WbElement {
     document.addEventListener("fullscreenchange", this._onFsChange);
     this._applyAspect();
     this._index = clampIndex(this._intAttr("index", 0), this._slides.length);
-    this._sync(false);
+    this._reflectSlides(false);
   }
 
   disconnectedCallback() {
+    super.disconnectedCallback();
     this._mo?.disconnect();
     this.removeEventListener("keydown", this._onKey);
     document.removeEventListener("fullscreenchange", this._onFsChange);
   }
 
-  attributeChangedCallback(name, oldV, newV) {
-    super.attributeChangedCallback(name, oldV, newV);
-    if (!this._connected) return;
-    if (name === "index" && oldV !== newV) {
+  // Lit-reactive: when `index`/`aspect` change as attributes, react.
+  updated(changed) {
+    if (changed.has("index")) {
       const i = clampIndex(this._intAttr("index", 0), this._slides.length);
-      if (i !== this._index) { this._index = i; this._sync(true); }
-    } else if (name === "aspect") {
-      this._applyAspect();
+      if (i !== this._index) { this._index = i; this._reflectSlides(true); }
     }
+    if (changed.has("aspect")) this._applyAspect();
   }
 
   // ---- slides + playhead --------------------------------------------------
 
   _collect() {
-    const prev = this._slides;
-    this._slides = Array.from(this.querySelectorAll(":scope > wb-slide"));
+    const prev = this._slides.length;
+    this._slides = Array.from(this.querySelectorAll(":scope > work-slide"));
     // honor a per-deck default transition on slides that didn't declare one
     const tDefault = this.attr("transition");
     if (tDefault) for (const s of this._slides) {
       if (!s.hasAttribute("transition")) s.setAttribute("transition", tDefault);
     }
     this._index = clampIndex(this._index, this._slides.length);
-    if (prev.length !== this._slides.length) this._sync(false);
-    else this._paintControls();
+    this._count = this._slides.length;       // drives the Lit template (dots/chrome)
+    this._reflectSlides(prev !== this._slides.length ? false : false);
+    this.requestUpdate();
   }
 
   get count() { return this._slides.length; }
@@ -224,24 +232,24 @@ export class WbDeck extends WbElement {
     else next = Math.max(0, Math.min(n - 1, i));
     if (next === this._index) return;
     this._index = next;
-    this._sync(true);
+    this._reflectSlides(true);
   }
   next() { this.go(this._index + 1); }
   prev() { this.go(this._index - 1); }
   first() { this.go(0); }
   last() { this.go(this._slides.length - 1); }
 
-  /** Reflect playhead onto slides + chrome; emit wb-slide-change when moved. */
-  _sync(emit) {
+  /** Reflect playhead onto slides + request a Lit re-render; emit on move. */
+  _reflectSlides(emit) {
     this.setAttribute("index", String(this._index));
     this._slides.forEach((s, i) => {
       s.toggleAttribute("active", i === this._index);
       s.toggleAttribute("prev", i === this._index - 1);
       s.toggleAttribute("next", i === this._index + 1);
     });
-    this.update();
+    this.requestUpdate();
     if (emit) {
-      this.dispatchEvent(new CustomEvent("wb-slide-change", {
+      this.dispatchEvent(new CustomEvent("work-slide-change", {
         bubbles: true,
         detail: { index: this._index, total: this._slides.length, slide: this.current },
       }));
@@ -258,7 +266,7 @@ export class WbDeck extends WbElement {
       case "Home": this.first(); break;
       case "End":  this.last();  break;
       case "f": this.toggleFullscreen(); break;
-      case "p": this.classList.toggle("show-notes"); this._paintNotes(); break;
+      case "p": this.classList.toggle("show-notes"); this.requestUpdate(); break;
       case "Escape": if (document.fullscreenElement) document.exitFullscreen(); return;
       default: return;
     }
@@ -306,26 +314,24 @@ ${scenes}
   async export({ format = "mp4", fps = 30 } = {}) {
     if (this._exporting || !this._slides.length) return;
     this._exporting = true;
-    this._paintControls();
-    this.dispatchEvent(new CustomEvent("wb-export-start", { bubbles: true }));
+    this.dispatchEvent(new CustomEvent("work-export-start", { bubbles: true }));
     const composition = this.toComposition({ fps });
     try {
       if (this.host.available("wavelet")) {
         const out = await this.host.request("/wavelet/encode", {
           body: { composition, format, fps },
         });
-        this.dispatchEvent(new CustomEvent("wb-export", { bubbles: true, detail: { ...out, format } }));
+        this.dispatchEvent(new CustomEvent("work-export", { bubbles: true, detail: { ...out, format } }));
         return out;
       }
       const file = await this._downloadPortable(composition);
-      this.dispatchEvent(new CustomEvent("wb-export", { bubbles: true, detail: { file, format: "html" } }));
+      this.dispatchEvent(new CustomEvent("work-export", { bubbles: true, detail: { file, format: "html" } }));
       return { file, format: "html" };
     } catch (e) {
-      this.dispatchEvent(new CustomEvent("wb-export-error", { bubbles: true, detail: { error: String(e) } }));
+      this.dispatchEvent(new CustomEvent("work-export-error", { bubbles: true, detail: { error: String(e) } }));
       throw e;
     } finally {
       this._exporting = false;
-      this._paintControls();
     }
   }
 
@@ -359,71 +365,54 @@ ${scenes}
   }
   _intAttr(name, d) { const v = parseInt(this.attr(name, ""), 10); return Number.isFinite(v) ? v : d; }
 
-  update() {
-    if (!this.shadowRoot) return;
-    this.shadowRoot.innerHTML = this.render();
-    this._wire();
-    this._paintControls();
-    this._paintNotes();
-  }
-
-  _wire() {
-    const sr = this.shadowRoot;
-    sr.querySelector(".zone.prev")?.addEventListener("click", () => this.prev());
-    sr.querySelector(".zone.next")?.addEventListener("click", () => this.next());
-    sr.querySelector(".btn-prev")?.addEventListener("click", () => this.prev());
-    sr.querySelector(".btn-next")?.addEventListener("click", () => this.next());
-    sr.querySelector(".btn-fs")?.addEventListener("click", () => this.toggleFullscreen());
-    sr.querySelector(".export")?.addEventListener("click", () => { void this.export(); });
-    sr.querySelectorAll(".dot").forEach((d) =>
-      d.addEventListener("click", () => this.go(Number(d.dataset.i))));
-  }
-
-  _paintControls() {
-    const sr = this.shadowRoot; if (!sr) return;
-    const n = this._slides.length, i = this._index;
-    const fill = sr.querySelector(".progress > i");
-    if (fill) fill.style.setProperty("--_pct", n > 1 ? `${(i / (n - 1)) * 100}%` : (n ? "100%" : "0%"));
-    const counter = sr.querySelector(".counter");
-    if (counter) counter.textContent = n ? `${i + 1} / ${n}` : "0 / 0";
-    sr.querySelector(".btn-prev")?.toggleAttribute("disabled", !this.boolAttr("loop") && i <= 0);
-    sr.querySelector(".btn-next")?.toggleAttribute("disabled", !this.boolAttr("loop") && i >= n - 1);
-    sr.querySelectorAll(".dot").forEach((d) =>
-      d.setAttribute("aria-current", String(Number(d.dataset.i) === i)));
-    const ex = sr.querySelector(".export");
-    if (ex) { ex.classList.toggle("busy", this._exporting); ex.textContent = this._exporting ? "…" : "Export ↓"; }
-  }
-
-  _paintNotes() {
-    const sr = this.shadowRoot; if (!sr) return;
-    const box = sr.querySelector(".notes"); if (!box) return;
+  _notesHtml() {
     const slide = this.current;
     const note = slide ? slide.querySelector('[slot="notes"]') : null;
-    box.innerHTML = note
-      ? `<b>Notes · ${this._index + 1}/${this._slides.length}</b><br>${note.innerHTML}`
-      : `<b>Notes · ${this._index + 1}/${this._slides.length}</b><br><span style="opacity:.6">no notes for this slide</span>`;
+    const head = `Notes · ${this._index + 1}/${this._slides.length}`;
+    return note
+      ? html`<b>${head}</b><br>${unsafeNotes(note.innerHTML)}`
+      : html`<b>${head}</b><br><span style="opacity:.6">no notes for this slide</span>`;
   }
 
   render() {
     const controls = this.boolAttr("controls");
-    const n = this._slides.length;
-    const dots = Array.from({ length: n }, (_, i) =>
-      `<button class="dot" part="dot" data-i="${i}" aria-label="Go to slide ${i + 1}"></button>`).join("");
-    const stage = `<div class="stage" part="stage">
-      <slot></slot>
-      ${n ? `<div class="zone prev" aria-hidden="true"></div><div class="zone next" aria-hidden="true"></div>` : `<div class="empty">No &lt;wb-slide&gt; children.</div>`}
-      <div class="notes" part="notes"></div>
-    </div>`;
-    const progress = `<div class="progress" part="progress"><i></i></div>`;
-    const chrome = controls ? `<div class="chrome" part="chrome">
-      <button class="btn-prev" aria-label="Previous slide">‹</button>
-      <span class="counter">0 / 0</span>
-      <div class="dots" part="dots">${dots}</div>
-      <button class="btn-next" aria-label="Next slide">›</button>
-      <button class="btn-fs" aria-label="Fullscreen" title="Fullscreen (f)">⤢</button>
-      <button class="export" title="Export to video (in-guest encode, or portable .html)">Export ↓</button>
-    </div>` : "";
-    return `<div class="shell">${stage}${progress}${chrome}</div>`;
+    const n = this._count;
+    const i = this._index;
+    const loop = this.boolAttr("loop");
+    const pct = n > 1 ? `${(i / (n - 1)) * 100}%` : (n ? "100%" : "0%");
+    const counter = n ? `${i + 1} / ${n}` : "0 / 0";
+    const dots = Array.from({ length: n }, (_, k) => html`
+      <button class="dot" part="dot" data-i=${k}
+        aria-label=${`Go to slide ${k + 1}`}
+        aria-current=${String(k === i)}
+        @click=${() => this.go(k)}></button>`);
+
+    return html`
+      <div class="shell">
+        <div class="stage" part="stage">
+          <slot></slot>
+          ${n ? html`
+            <div class="zone prev" aria-hidden="true" @click=${() => this.prev()}></div>
+            <div class="zone next" aria-hidden="true" @click=${() => this.next()}></div>
+          ` : html`<div class="empty">No &lt;work-slide&gt; children.</div>`}
+          <div class="notes" part="notes">${this._notesHtml()}</div>
+        </div>
+        <div class="progress" part="progress"><i style=${`--_pct:${pct}`}></i></div>
+        ${controls ? html`
+          <div class="chrome" part="chrome">
+            <button class="btn-prev" aria-label="Previous slide"
+              ?disabled=${!loop && i <= 0} @click=${() => this.prev()}>‹</button>
+            <span class="counter">${counter}</span>
+            <div class="dots" part="dots">${dots}</div>
+            <button class="btn-next" aria-label="Next slide"
+              ?disabled=${!loop && i >= n - 1} @click=${() => this.next()}>›</button>
+            <button class="btn-fs" aria-label="Fullscreen" title="Fullscreen (f)"
+              @click=${() => this.toggleFullscreen()}>⤢</button>
+            <button class=${"export" + (this._exporting ? " busy" : "")}
+              title="Export to video (in-guest encode, or portable .html)"
+              @click=${() => { void this.export(); }}>${this._exporting ? "…" : "Export ↓"}</button>
+          </div>` : ""}
+      </div>`;
   }
 }
 
@@ -440,6 +429,15 @@ function durToSeconds(raw, fps) {
   if (v.endsWith("f")) { const f = parseInt(v.slice(0, -1), 10); return Number.isFinite(f) ? f / fps : 0; }
   if (v.endsWith("s")) { const s = parseFloat(v.slice(0, -1)); return Number.isFinite(s) ? s : 0; }
   const n = parseFloat(v); return Number.isFinite(n) ? n : 0;
+}
+
+// Presenter notes are AUTHOR-supplied light-DOM markup we want to render as-is in
+// the overlay. Lazily import Lit's unsafeHTML so the no-build module graph stays
+// flat; until it resolves we fall back to the escaped text.
+let _unsafeHTML = null;
+import("lit/directives/unsafe-html.js").then((m) => { _unsafeHTML = m.unsafeHTML; });
+function unsafeNotes(htmlStr) {
+  return _unsafeHTML ? _unsafeHTML(htmlStr) : htmlStr;
 }
 
 // Capture a slide's rendered band as a self-contained scene for the wavelet
@@ -480,4 +478,4 @@ function captureSlide(slide, res, i) {
   <div class="deck-band-${i}" data-band="${band}">${parts}</div>`;
 }
 
-define("wb-deck", WbDeck);
+define("work-deck", WorkDeck);

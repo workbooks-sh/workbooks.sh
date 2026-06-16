@@ -1,22 +1,22 @@
-// <wb-drive> — a file browser whose index IS a query over the workbook's store.
+// <work-drive> — a file browser whose index IS a query over the workbook's store.
 //
 // The files reinvention: a file is not a separate filesystem object, it's a ROW
 // in the workbook's SQLite — a content-addressed record (name, path/key, type,
 // size, modified, content-hash). So a "drive" is just a view over a query, the
-// same way <wb-table> is a grid over a query and <wb-record-list> is a card
+// same way <work-table> is a grid over a query and <work-record-list> is a card
 // index. It reuses the SAME shared engine (getEngine) — never a second store —
 // but renders a file/icon browser surface (grid of typed tiles or a detail
 // list), NOT a tabular grid. Sorting/filtering push to SQL in the engine.
 //
-// Selecting a file emits `wb-file-select` carrying the file's columns as a flat
-// object; wire it to a <wb-file>'s attributes to drive an inline preview.
+// Selecting a file emits `work-file-select` carrying the file's columns as a flat
+// object; wire it to a <work-file>'s attributes to drive an inline preview.
 //
 // Usage (named source, drive a preview):
-//   <wb-drive src-name="assets"
+//   <work-drive src-name="assets"
 //     query="SELECT name, path, type, size, modified, hash FROM assets"
 //     name-field="name" path-field="path" type-field="type"
 //     size-field="size" modified-field="modified" hash-field="hash"
-//     view="grid" sort="modified" dir="desc" searchable></wb-drive>
+//     view="grid" sort="modified" dir="desc" searchable></work-drive>
 //
 // Attributes:
 //   src-name        a source registered via getEngine().register(...)
@@ -35,9 +35,9 @@
 //   variant         framed | bare                        (visual shell)
 //
 // Events:
-//   wb-drive-ready  { detail: { rowCount, columns, types, engine } }
-//   wb-file-select  { detail: { file, index } }   file = flat {col:value}
-import { WbElement, define } from "../../core/element.js";
+//   work-drive-ready  { detail: { rowCount, columns, types, engine } }
+//   work-file-select  { detail: { file, index } }   file = flat {col:value}
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 import { fileKind, kindGlyph, fmtBytes, fmtWhen, extOf } from "./file-types.js";
@@ -56,7 +56,12 @@ export class WbDrive extends WbElement {
     "searchable", "selected",
   ];
 
-  static styles = `
+  // The element reads its state via this.attr() in render() and drives its own
+  // repaints (requestUpdate / _load) from attributeChangedCallback — so it must
+  // observe every prop attribute itself.
+  static get observedAttributes() { return this.props; }
+
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .shell { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
       background: var(--wb-surface); overflow: hidden; box-shadow: var(--wb-shadow-sm); }
@@ -149,17 +154,18 @@ export class WbDrive extends WbElement {
       this._tier = "memory";
       this._error = null;
       this._busy = true;
-      this._searchFocused = false;
     }
     super.connectedCallback();
     this._load();
+    this._connected = true;
   }
 
-  attributeChangedCallback(name) {
+  attributeChangedCallback(name, old, val) {
+    // Reads state via this.attr() in render() and drives its own repaints — does
+    // NOT delegate to Lit's attributeChangedCallback (unused property machinery).
     if (!this._connected) return;
     if (name === "src-name" || name === "query" || name === "sort" || name === "dir") this._load();
-    else if (name === "selected") this._reflectSelection();
-    else this.update();
+    else this.requestUpdate(); // view (grid/list markup), selected (aria), variant → repaint
   }
 
   // ── field resolution ────────────────────────────────────────────────────────
@@ -182,7 +188,7 @@ export class WbDrive extends WbElement {
     this._loading = true;
     do {
       this._loadAgain = false;
-      this._busy = true; this._error = null; this.update();
+      this._busy = true; this._error = null; this.requestUpdate();
       try {
         const sname = this.attr("src-name");
         if (sname) await this._engine.whenRegistered(sname);
@@ -192,8 +198,8 @@ export class WbDrive extends WbElement {
         this._tier = "error";
       }
       this._busy = false;
-      this.update();
-      this._emit("wb-drive-ready", {
+      this.requestUpdate();
+      this._emit("work-drive-ready", {
         rowCount: this._result?.rowCount || 0,
         columns: this._result?.columns || [],
         types: this._result?.types || [],
@@ -236,21 +242,24 @@ export class WbDrive extends WbElement {
       this._tier === "runtime" ? "engine: runtime SQLite (VFS)" :
       this._tier === "sqlite-wasm" ? "engine: sqlite-wasm (in-page)" :
       "engine: in-JS (offline)";
-    const head = `
+    return html`<div class="shell">
       <div class="toolbar">
-        ${searchable ? `<input class="search" type="search" placeholder="Filter files…" value="${esc(this._filter)}" />` : ""}
+        ${searchable ? html`<input class="search" type="search" placeholder="Filter files…"
+          aria-label="Filter files" .value=${this._filter} @input=${this._onSearch} />` : null}
         ${this._renderSort()}
         <span class="grow"></span>
         <div class="vbtn" role="group" aria-label="view">
-          <button class="vg" aria-pressed="${this.attr("view") !== "list"}" title="Grid view">▦</button>
-          <button class="vl" aria-pressed="${this.attr("view") === "list"}" title="List view">☰</button>
+          <button class="vg" aria-pressed=${String(this.attr("view") !== "list")}
+            title="Grid view" @click=${() => this.setAttribute("view", "grid")}>▦</button>
+          <button class="vl" aria-pressed=${String(this.attr("view") === "list")}
+            title="List view" @click=${() => this.setAttribute("view", "list")}>☰</button>
         </div>
         <span class="meta">${this._result ? this._result.rowCount.toLocaleString() + " files" : ""}</span>
-      </div>`;
-    return `<div class="shell">${head}${this._renderBody()}
+      </div>
+      ${this._renderBody()}
       <div class="foot">
-        <span class="engine" data-tier="${this._error ? "error" : this._tier}"><span class="dot"></span></span>
-        <span>${esc(tierText)}</span><span class="grow"></span>
+        <span class="engine" data-tier=${this._error ? "error" : this._tier}><span class="dot"></span></span>
+        <span>${tierText}</span><span class="grow"></span>
         <span class="meta">content-addressed index · files = rows</span>
       </div></div>`;
   }
@@ -261,9 +270,13 @@ export class WbDrive extends WbElement {
       ["size", "Size"], ["modified", "Modified"],
     ].filter(([v]) => !v || this._fieldFor(v));
     const cur = this.attr("sort") || "";
-    return `<select class="sort" title="Sort by">${
-      opts.map(([v, l]) => `<option value="${v}"${v === cur ? " selected" : ""}>${l}</option>`).join("")
-    }</select>`;
+    return html`<select class="sort" title="Sort by" aria-label="Sort by" @change=${this._onSort}>
+      ${opts.map(([v, l]) => html`<option value=${v} ?selected=${v === cur}>${l}</option>`)}
+    </select>`;
+  }
+  _onSort(e) {
+    const v = e.target.value;
+    if (v) { this.setAttribute("sort", v); } else { this.removeAttribute("sort"); this._load(); }
   }
   // map a logical sort key to the configured column (default = same name)
   _fieldFor(key) {
@@ -274,10 +287,10 @@ export class WbDrive extends WbElement {
   }
 
   _renderBody() {
-    if (this._busy && !this._result) return `<div class="empty">Loading…</div>`;
-    if (this._error) return `<div class="empty">Could not load — ${esc(this._error)}</div>`;
+    if (this._busy && !this._result) return html`<div class="empty">Loading…</div>`;
+    if (this._error) return html`<div class="empty">Could not load — ${this._error}</div>`;
     const r = this._result;
-    if (!r || !r.rows.length) return `<div class="empty">${this._filter ? "No matching files." : "No files."}</div>`;
+    if (!r || !r.rows.length) return html`<div class="empty">${this._filter ? "No matching files." : "No files."}</div>`;
     return this.attr("view") === "list" ? this._renderList() : this._renderGrid();
   }
 
@@ -305,75 +318,56 @@ export class WbDrive extends WbElement {
     const tiles = this._files().map((f) => {
       const sel = selected != null && String(f.path) === String(selected);
       const ext = extOf(f.name) || extOf(f.type);
-      return `<button class="tile" role="option" aria-selected="${sel}" data-i="${f.i}" data-path="${esc(f.path)}">
-        <span class="icon" data-kind="${f.kind}">${kindGlyph(f.kind)}${ext ? `<span class="ext">${esc(ext)}</span>` : ""}</span>
-        <span class="name" title="${esc(f.name)}">${esc(f.name || "—")}</span>
-        <span class="sub">${f.size != null ? esc(fmtBytes(f.size)) : esc(f.kind)}</span>
+      return html`<button class="tile" role="option" aria-selected=${String(sel)}
+        data-i=${f.i} data-path=${f.path}
+        @click=${() => this._select(f.i)} @keydown=${(e) => this._onKey(e, f.i)}>
+        <span class="icon" data-kind=${f.kind}>${kindGlyph(f.kind)}${ext ? html`<span class="ext">${ext}</span>` : null}</span>
+        <span class="name" title=${f.name}>${f.name || "—"}</span>
+        <span class="sub">${f.size != null ? fmtBytes(f.size) : f.kind}</span>
       </button>`;
-    }).join("");
-    return `<div class="grid" role="listbox">${tiles}</div>`;
+    });
+    return html`<div class="grid" role="listbox">${tiles}</div>`;
   }
 
   _renderList() {
     const selected = this.attr("selected");
     const rows = this._files().map((f) => {
       const sel = selected != null && String(f.path) === String(selected);
-      return `<div class="row" role="option" tabindex="0" aria-selected="${sel}" data-i="${f.i}" data-path="${esc(f.path)}">
+      return html`<div class="row" role="option" tabindex="0" aria-selected=${String(sel)}
+        data-i=${f.i} data-path=${f.path}
+        @click=${() => this._select(f.i)} @keydown=${(e) => this._onKey(e, f.i)}>
         <span class="cell-name">
-          <span class="ricon" data-kind="${f.kind}">${kindGlyph(f.kind)}</span>
-          <span class="rname" title="${esc(f.name)}">${esc(f.name || "—")}</span>
+          <span class="ricon" data-kind=${f.kind}>${kindGlyph(f.kind)}</span>
+          <span class="rname" title=${f.name}>${f.name || "—"}</span>
         </span>
-        <span class="num">${esc(f.type || f.kind)}</span>
-        <span class="num">${f.size != null ? esc(fmtBytes(f.size)) : "—"}</span>
-        <span class="num">${f.modified != null ? esc(fmtWhen(f.modified)) : "—"}</span>
+        <span class="num">${f.type || f.kind}</span>
+        <span class="num">${f.size != null ? fmtBytes(f.size) : "—"}</span>
+        <span class="num">${f.modified != null ? fmtWhen(f.modified) : "—"}</span>
       </div>`;
-    }).join("");
-    return `<div class="rows" role="listbox">
+    });
+    return html`<div class="rows" role="listbox">
       <div class="head"><span>Name</span><span>Type</span><span>Size</span><span>Modified</span></div>
       ${rows}</div>`;
   }
 
   // ── interaction ─────────────────────────────────────────────────────────────
-  update() {
-    super.update();
-    const root = this.shadowRoot;
-    root.querySelectorAll("[data-i]").forEach((el) => {
-      el.addEventListener("click", () => this._select(+el.getAttribute("data-i")));
-      el.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._select(+el.getAttribute("data-i")); }
-      });
-    });
-    root.querySelector(".vg")?.addEventListener("click", () => this.setAttribute("view", "grid"));
-    root.querySelector(".vl")?.addEventListener("click", () => this.setAttribute("view", "list"));
-    root.querySelector(".sort")?.addEventListener("change", (e) => {
-      const v = e.target.value;
-      if (v) { this.setAttribute("sort", v); } else { this.removeAttribute("sort"); this._load(); }
-    });
-    const search = root.querySelector(".search");
-    if (search) {
-      if (this._searchFocused) { search.focus(); const n = search.value.length; search.setSelectionRange(n, n); }
-      search.addEventListener("focus", () => { this._searchFocused = true; });
-      search.addEventListener("blur", () => { this._searchFocused = false; });
-      search.addEventListener("input", (e) => {
-        const value = e.target.value;
-        clearTimeout(this._t);
-        this._t = setTimeout(() => { this._filter = value; this._run().then(() => this.update()); }, 140);
-      });
-    }
+  // Debounced search: filters IN the engine, then re-renders. Lit's surgical
+  // update keeps the live <input> (and its focus/caret) intact across re-renders.
+  _onSearch(e) {
+    const value = e.target.value;
+    clearTimeout(this._t);
+    this._t = setTimeout(() => { this._filter = value; this._run().then(() => this.requestUpdate()); }, 140);
   }
 
-  _reflectSelection() {
-    const selected = this.attr("selected");
-    this.shadowRoot.querySelectorAll("[data-path]").forEach((el) => {
-      el.setAttribute("aria-selected", String(String(el.getAttribute("data-path")) === String(selected)));
-    });
+  _onKey(e, i) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._select(i); }
   }
 
   _select(i) {
     const f = this._files().find((x) => x.i === i);
     if (!f) return;
     this.setAttribute("selected", f.path == null ? "" : String(f.path));
-    this._emit("wb-file-select", { file: f.file, index: i });
+    this._emit("work-file-select", { file: f.file, index: i });
   }
 
   _emit(name, detail) {
@@ -382,8 +376,5 @@ export class WbDrive extends WbElement {
 }
 
 function ident(name) { return '"' + String(name).replace(/"/g, '""') + '"'; }
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
 
-define("wb-drive", WbDrive);
+define("work-drive", WbDrive);

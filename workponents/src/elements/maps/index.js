@@ -10,6 +10,7 @@
 // tile provider and NO network. Real basemap PIXELS are a keyed exception reached
 // through the Host seam (this.host) when configured — never a hard CDN dependency.
 //
-// Import this barrel to register the domain, or wb-map.js directly to stay lean.
+// Re-based onto the Lit FLOOR. Import this barrel to register the domain, or
+// wb-map.js directly to stay lean.
 export { WbMap } from "./wb-map.js";
 export { project, unproject, bounds } from "./projection.js";

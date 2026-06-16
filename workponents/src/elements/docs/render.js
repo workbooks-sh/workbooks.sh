@@ -6,7 +6,7 @@
 // code, emphasis, links, tables, rules, blockquotes, checkboxes, org TODO
 // pills + tags. It is deliberately a SUBSET — for full org fidelity (property
 // drawers, #+EXEC cells, citations, footnotes) an element reaches the OQL
-// kernel (oql.wasm) through `this.host` (see the note in wb-doc.js). The
+// kernel (oql.wasm) through `this.host` (see the note in work-doc.js). The
 // visual contract is kept aligned with the desktop org-renderer
 // (desktop/src/lib/org-renderer/*).
 
@@ -82,7 +82,7 @@ function splitHeading(raw) {
   return { state, tags, text };
 }
 
-// The heading outline (used by wb-doc-outline + wb-doc cross-sync).
+// The heading outline (used by work-doc-outline + work-doc cross-sync).
 export function parseOutline(src) {
   const out = [];
   let inFence = false;
@@ -99,8 +99,8 @@ export function parseOutline(src) {
 }
 
 // The core: markdown/org source → HTML string. Fenced/src blocks whose lang is
-// a known compute language are handed to `onCell` so wb-doc can mount a live
-// <wb-doc-cell>; everything else renders as a <pre>.
+// a known compute language are handed to `onCell` so work-doc can mount a live
+// <work-doc-cell>; everything else renders as a <pre>.
 export function renderDoc(src, { onCell } = {}) {
   const lines = String(src).replace(/\r\n?/g, "\n").split("\n");
   const html = [];

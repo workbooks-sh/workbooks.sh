@@ -8,7 +8,16 @@
   <title>workponents · code — specimen</title>
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
-  <!-- the code domain: native custom elements, ESM, NO build step -->
+  <!-- Lit, buildless: the bare "lit" specifier resolves to a pinned CDN ESM. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://esm.sh/lit@3.2.1",
+        "lit/": "https://esm.sh/lit@3.2.1/"
+      }
+    }
+  </script>
+  <!-- the code domain: Lit-based custom elements, ESM, NO build step -->
   <script type="module" src="../src/elements/code/index.js"></script>
   <style>
     body { margin: 0; background: var(--wb-bg); color: var(--wb-fg); font-family: var(--wb-font, system-ui); transition: background .2s, color .2s; }
@@ -36,35 +45,35 @@
     </div>
     <p class="evlog" id="evlog">events appear here</p>
 
-    <h2>&lt;wb-repl&gt; — JavaScript, run in a sandbox</h2>
+    <h2>&lt;work-repl&gt; — JavaScript, run in a sandbox</h2>
     <p class="sub">Press Run. The snippet executes in a Web Worker — no DOM, no page globals — and <code>console.log</code> + the returned value stream into the output pane.</p>
-    <wb-repl id="js" language="js">const fib = n =&gt; n &lt; 2 ? n : fib(n - 1) + fib(n - 2);
+    <work-repl id="js" language="js">const fib = n =&gt; n &lt; 2 ? n : fib(n - 1) + fib(n - 2);
 const xs = Array.from({ length: 10 }, (_, i) =&gt; fib(i));
 console.log("fib(0..9):", xs.join(", "));
 // the returned value is shown too
-return { sum: xs.reduce((a, b) =&gt; a + b, 0), max: Math.max(...xs) };</wb-repl>
+return { sum: xs.reduce((a, b) =&gt; a + b, 0), max: Math.max(...xs) };</work-repl>
 
-    <h2>&lt;wb-editor&gt; — highlight + line numbers</h2>
-    <p class="sub">A themed editor: transparent textarea over a token-highlighted overlay, gutter line numbers, <code>language</code> attr. Edit it — it emits <code>wb-code-change</code> (watch the events line above). The editing surface is swap-stable: a CodeMirror engine backs it later behind this same API.</p>
-    <wb-editor id="ed" language="rust">// edit me — keywords, strings, numbers, comments highlight
+    <h2>&lt;work-editor&gt; — highlight + line numbers</h2>
+    <p class="sub">A themed editor: transparent textarea over a token-highlighted overlay, gutter line numbers, <code>language</code> attr. Edit it — it emits <code>work-code-change</code> (watch the events line above). The editing surface is swap-stable: a CodeMirror engine backs it later behind this same API.</p>
+    <work-editor id="ed" language="rust">// edit me — keywords, strings, numbers, comments highlight
 fn main() {
     let greeting = "hello from workponents";
     let answer = 42;
     for i in 0..3 {
         println!("{} #{}", greeting, i + answer);
     }
-}</wb-editor>
+}</work-editor>
 
-    <h2>&lt;wb-repl&gt; — compiled language, standalone</h2>
+    <h2>&lt;work-repl&gt; — compiled language, standalone</h2>
     <p class="sub">No runtime connected, so C can't run here — the REPL says so plainly instead of faking output. Connect a runtime (<code>host.available("compile")</code>) and the same code compiles + runs in-sandbox via the compiler lane.</p>
-    <wb-repl id="c" language="c">#include &lt;stdio.h&gt;
+    <work-repl id="c" language="c">#include &lt;stdio.h&gt;
 
 int main(void) {
     for (int i = 0; i &lt; 3; i++) {
         printf("compiled in-sandbox: %d\n", i * i);
     }
     return 0;
-}</wb-repl>
+}</work-repl>
   </div>
 
   <script>
@@ -83,13 +92,13 @@ int main(void) {
     }));
 
     const log = document.getElementById("evlog");
-    document.addEventListener("wb-code-change", (e) => {
+    document.addEventListener("work-code-change", (e) => {
       const v = e.detail.value || "";
-      log.innerHTML = `<b>wb-code-change</b> · ${v.length} chars`;
+      log.innerHTML = `<b>work-code-change</b> · ${v.length} chars`;
     });
-    document.addEventListener("wb-run", (e) => {
+    document.addEventListener("work-run", (e) => {
       const d = e.detail;
-      log.innerHTML = `<b>wb-run</b> · ${d.language} · ${d.ok ? "ok" : "error"} · ${(d.output || "").split("\n").length} line(s)`;
+      log.innerHTML = `<b>work-run</b> · ${d.language} · ${d.ok ? "ok" : "error"} · ${(d.output || "").split("\n").length} line(s)`;
     });
   </script>
 </body>

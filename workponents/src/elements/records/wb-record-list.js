@@ -1,18 +1,18 @@
-// <wb-record-list> — the master index of entities: a card / list view over a
+// <work-record-list> — the master index of entities: a card / list view over a
 // query (each row = one entity card), NOT a grid. This is the distinct records
-// surface — where wb-table is a dense tabular viewport, wb-record-list is an
+// surface — where wb-table is a dense tabular viewport, work-record-list is an
 // entity browser (a title + a few summary fields per card), the master half of a
-// master-detail pair. Reuses the SAME shared engine as wb-table / wb-record
+// master-detail pair. Reuses the SAME shared engine as wb-table / work-record
 // (getEngine) — never a second data store.
 //
-// Selecting a card emits `wb-record-select` carrying the row's key/value + the
-// full row; wire it to a <wb-record>'s value/where to drive a detail pane.
+// Selecting a card emits `work-record-select` carrying the row's key/value + the
+// full row; wire it to a <work-record>'s value/where to drive a detail pane.
 //
 // Usage (named source, drive a detail record):
-//   <wb-record-list src-name="customers"
+//   <work-record-list src-name="customers"
 //     query="SELECT id, name, tier, mrr FROM customers ORDER BY mrr DESC"
 //     key="id" title-field="name" subtitle-field="tier"
-//     fields="mrr" formats="mrr:usd" searchable></wb-record-list>
+//     fields="mrr" formats="mrr:usd" searchable></work-record-list>
 //
 // Attributes:
 //   src-name       a source registered via getEngine().register(...)
@@ -21,16 +21,16 @@
 //   title-field    column shown as the card title (default first column)
 //   subtitle-field column shown as a muted subtitle (optional)
 //   fields         comma list of summary columns shown as label:value chips
-//   formats        "col:usd,col2:pct" numeric format hints (wb-field-value)
+//   formats        "col:usd,col2:pct" numeric format hints (work-field-value)
 //   searchable     show a filter box (filters IN the engine via WHERE … LIKE)
 //   layout         cards | rows   (variant)
 //   variant        card | bare    (visual shell)
 //   selected       the key value of the currently active card (reflected)
 //
 // Events:
-//   wb-record-list-ready  { detail: { rowCount, columns, types, engine } }
-//   wb-record-select      { detail: { key, value, row, index } }
-import { WbElement, define } from "../../core/element.js";
+//   work-record-list-ready  { detail: { rowCount, columns, types, engine } }
+//   work-record-select      { detail: { key, value, row, index } }
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 import { hintFor, splitHint } from "./wb-record.js";
@@ -49,7 +49,7 @@ export class WbRecordList extends WbElement {
     "formats", "searchable", "selected",
   ];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .shell { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
       background: var(--wb-surface); overflow: hidden; box-shadow: var(--wb-shadow-sm); }
@@ -111,17 +111,15 @@ export class WbRecordList extends WbElement {
       this._tier = "memory";
       this._error = null;
       this._busy = true;
-      this._searchFocused = false;
     }
     super.connectedCallback();
     this._load();
   }
 
-  attributeChangedCallback(name) {
+  attributeChangedCallback(name, old, val) {
+    super.attributeChangedCallback(name, old, val);
     if (!this._connected) return;
     if (name === "src-name" || name === "query") { this._load(); }
-    else if (name === "selected") { this._reflectSelection(); }
-    else { this.update(); }
   }
 
   async _load() {
@@ -129,7 +127,7 @@ export class WbRecordList extends WbElement {
     this._loading = true;
     do {
       this._loadAgain = false;
-      this._busy = true; this._error = null; this.update();
+      this._busy = true; this._error = null; this.requestUpdate();
       try {
         const sname = this.attr("src-name");
         if (sname) await this._engine.whenRegistered(sname);
@@ -139,8 +137,8 @@ export class WbRecordList extends WbElement {
         this._tier = "error";
       }
       this._busy = false;
-      this.update();
-      this._emit("wb-record-list-ready", {
+      this.requestUpdate();
+      this._emit("work-record-list-ready", {
         rowCount: this._result?.rowCount || 0,
         columns: this._result?.columns || [],
         types: this._result?.types || [],
@@ -197,24 +195,25 @@ export class WbRecordList extends WbElement {
       this._tier === "runtime" ? "engine: runtime DuckDB" :
       this._tier === "duckdb-wasm" ? "engine: DuckDB-wasm (in-browser)" :
       "engine: in-JS (offline)";
-    const head = `
+    const head = html`
       <div class="toolbar">
-        ${searchable ? `<input class="search" type="search" placeholder="Filter…" value="${esc(this._filter)}" />` : ""}
+        ${searchable ? html`<input class="search" type="search" placeholder="Filter…"
+          .value=${this._filter} @input=${this._onSearch} />` : null}
         <span class="grow"></span>
         <span class="meta">${this._result ? this._result.rowCount.toLocaleString() + " items" : ""}</span>
       </div>`;
-    return `<div class="shell">${head}${this._renderBody()}
+    return html`<div class="shell">${head}${this._renderBody()}
       <div class="foot">
-        <span class="engine" data-tier="${this._error ? "error" : this._tier}"><span class="dot"></span></span>
-        <span class="note">${esc(tierText)}</span><span class="grow"></span>
+        <span class="engine" data-tier=${this._error ? "error" : this._tier}><span class="dot"></span></span>
+        <span class="note">${tierText}</span><span class="grow"></span>
       </div></div>`;
   }
 
   _renderBody() {
-    if (this._busy && !this._result) return `<div class="empty">Loading…</div>`;
-    if (this._error) return `<div class="empty">Could not load — ${esc(this._error)}</div>`;
+    if (this._busy && !this._result) return html`<div class="empty">Loading…</div>`;
+    if (this._error) return html`<div class="empty">Could not load — ${this._error}</div>`;
     const r = this._result;
-    if (!r || !r.rows.length) return `<div class="empty">${this._filter ? "No matching records." : "No records."}</div>`;
+    if (!r || !r.rows.length) return html`<div class="empty">${this._filter ? "No matching records." : "No records."}</div>`;
 
     const keyCol = this._keyCol(), titleCol = this._titleCol();
     const subCol = this.attr("subtitle-field");
@@ -229,45 +228,28 @@ export class WbRecordList extends WbElement {
       const isSel = selected != null && String(keyVal) === String(selected);
       const chips = summary.map((c) => {
         const v = row[idx(c.field)];
-        return `<span class="chip"><span class="k">${esc(c.label)}</span>
-          <wb-field-value type="${esc(c.type)}"${c.format ? ` format="${esc(c.format)}"` : ""}${c.display ? ` display="${esc(c.display)}"` : ""} value="${esc(v ?? "")}"></wb-field-value></span>`;
-      }).join("");
-      return `<button class="card" role="option" aria-selected="${isSel}" data-i="${i}" data-key="${esc(keyVal ?? "")}">
-        <span class="title">${esc(title ?? "—")}</span>
-        ${sub != null && sub !== "" ? `<span class="subtitle">${esc(sub)}</span>` : ""}
-        ${chips ? `<span class="chips">${chips}</span>` : ""}
+        return html`<span class="chip"><span class="k">${c.label}</span>
+          <work-field-value type=${c.type} format=${c.format ?? ""} display=${c.display ?? ""}
+            value=${v ?? ""}></work-field-value></span>`;
+      });
+      return html`<button class="card" role="option" aria-selected=${String(isSel)}
+        data-i=${i} data-key=${keyVal ?? ""} @click=${() => this._select(i)}>
+        <span class="title">${title ?? "—"}</span>
+        ${sub != null && sub !== "" ? html`<span class="subtitle">${sub}</span>` : null}
+        ${chips.length ? html`<span class="chips">${chips}</span>` : null}
       </button>`;
-    }).join("");
+    });
 
-    return `<div class="list" role="listbox">${cards}</div>`;
+    return html`<div class="list" role="listbox">${cards}</div>`;
   }
 
   // ── interaction ───────────────────────────────────────────────────────────
-  update() {
-    super.update();
-    const root = this.shadowRoot;
-    root.querySelectorAll(".card").forEach((card) => {
-      card.addEventListener("click", () => this._select(+card.getAttribute("data-i")));
-    });
-    const search = root.querySelector(".search");
-    if (search) {
-      if (this._searchFocused) { search.focus(); const e = search.value.length; search.setSelectionRange(e, e); }
-      search.addEventListener("focus", () => { this._searchFocused = true; });
-      search.addEventListener("blur", () => { this._searchFocused = false; });
-      search.addEventListener("input", (e) => {
-        const value = e.target.value;
-        clearTimeout(this._t);
-        this._t = setTimeout(() => { this._filter = value; this._run().then(() => this.update()); }, 140);
-      });
-    }
-  }
-
-  _reflectSelection() {
-    // Cheap selection update without a re-query: just toggle aria-selected.
-    const selected = this.attr("selected");
-    this.shadowRoot.querySelectorAll(".card").forEach((card) => {
-      card.setAttribute("aria-selected", String(String(card.getAttribute("data-key")) === String(selected)));
-    });
+  // Debounced search: filters IN the engine, then re-renders. Lit's surgical
+  // update keeps the live <input> (and its focus/caret) intact across re-renders.
+  _onSearch(e) {
+    const value = e.target.value;
+    clearTimeout(this._t);
+    this._t = setTimeout(() => { this._filter = value; this._run().then(() => this.requestUpdate()); }, 140);
   }
 
   _select(i) {
@@ -279,7 +261,7 @@ export class WbRecordList extends WbElement {
     r.columns.forEach((c, j) => (obj[c] = row[j]));
     const value = row[r.columns.indexOf(keyCol)];
     this.setAttribute("selected", value == null ? "" : String(value));
-    this._emit("wb-record-select", { key: keyCol, value, row: obj, index: i });
+    this._emit("work-record-select", { key: keyCol, value, row: obj, index: i });
   }
 
   _emit(name, detail) {
@@ -289,9 +271,6 @@ export class WbRecordList extends WbElement {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function ident(name) { return '"' + String(name).replace(/"/g, '""') + '"'; }
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
 function prettify(f) { return String(f).replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 
-define("wb-record-list", WbRecordList);
+define("work-record-list", WbRecordList);

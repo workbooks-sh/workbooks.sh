@@ -1,5 +1,5 @@
-// <wb-composer> — the conversation input. Emits an intent rather than wiring
-// to a transport itself: on submit it dispatches a `wb-intent` CustomEvent
+// <work-composer> — the conversation input. Emits an intent rather than wiring
+// to a transport itself: on submit it dispatches a `work-intent` CustomEvent
 // (bubbles, composed) carrying the typed text; the thread / host decides what
 // to do with it (append a turn, call inference over this.host, …). This keeps
 // the element transport-agnostic — same element, any provider behind the Dock.
@@ -10,10 +10,11 @@
 //   streaming — a reply is streaming in (animated indicator, input locked)
 //
 // Usage:
-//   <wb-composer placeholder="Message the agent…"></wb-composer>
-//   composer.addEventListener("wb-intent", (e) => { … e.detail.text … });
+//   <work-composer placeholder="Message the agent…"></work-composer>
+//   composer.addEventListener("work-intent", (e) => { … e.detail.text … });
 //   composer.setAttribute("state", "thinking");  // host flips it while busy
-import { WbElement, define } from "../../core/element.js";
+import { WbElement, html, css, define } from "../../core/element.js";
+import { ref, createRef } from "lit/directives/ref.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 
 const VARIANTS = defineVariants({
@@ -24,7 +25,9 @@ export class WbComposer extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "placeholder", "disabled"];
 
-  static styles = `
+  _ta = createRef();
+
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .composer {
       display: flex; align-items: flex-end; gap: var(--wb-space-2);
@@ -76,11 +79,10 @@ export class WbComposer extends WbElement {
 
   /** Programmatic value. */
   get value() {
-    return this.shadowRoot.querySelector("textarea")?.value || "";
+    return this._ta.value?.value || "";
   }
   set value(v) {
-    const ta = this.shadowRoot.querySelector("textarea");
-    if (ta) ta.value = v;
+    if (this._ta.value) this._ta.value.value = v;
   }
 
   get busy() {
@@ -89,11 +91,11 @@ export class WbComposer extends WbElement {
 
   _submit() {
     if (this.busy) return;
-    const ta = this.shadowRoot.querySelector("textarea");
+    const ta = this._ta.value;
     const text = (ta?.value || "").trim();
     if (!text) return;
     this.dispatchEvent(
-      new CustomEvent("wb-intent", {
+      new CustomEvent("work-intent", {
         bubbles: true,
         composed: true,
         detail: { action: "send", text },
@@ -102,37 +104,30 @@ export class WbComposer extends WbElement {
     if (ta) ta.value = "";
   }
 
-  connectedCallback() {
-    super.connectedCallback();
-    if (this._wired) return;
-    this._wired = true;
-    this.shadowRoot.addEventListener("click", (e) => {
-      if (e.target.closest(".send")) this._submit();
-    });
-    this.shadowRoot.addEventListener("keydown", (e) => {
-      // Enter submits; Shift+Enter inserts a newline.
-      if (e.key === "Enter" && !e.shiftKey && e.target.tagName === "TEXTAREA") {
-        e.preventDefault();
-        this._submit();
-      }
-    });
+  _onKeydown(e) {
+    // Enter submits; Shift+Enter inserts a newline.
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      this._submit();
+    }
   }
 
   render() {
     const ph = this.attr("placeholder", "Message the agent…");
     const state = this.attr("state", "idle");
     const label = state === "thinking" ? "Thinking" : state === "streaming" ? "Streaming" : "";
-    const dots = `<span class="dots"><i></i><i></i><i></i></span>`;
+    const dots = html`<span class="dots"><i></i><i></i><i></i></span>`;
     const sendIcon = this.busy
       ? dots
-      : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>`;
-    return `
+      : html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>`;
+    return html`
       <div class="status">${label}${label ? dots : ""}</div>
       <div class="composer">
-        <textarea part="input" rows="1" placeholder="${ph.replace(/"/g, "&quot;")}" ${this.busy ? "tabindex=-1" : ""}></textarea>
-        <button class="send" part="send" aria-label="Send" ${this.busy ? "disabled" : ""}>${sendIcon}</button>
+        <textarea ${ref(this._ta)} part="input" rows="1" placeholder=${ph}
+          tabindex=${this.busy ? "-1" : "0"} @keydown=${this._onKeydown}></textarea>
+        <button class="send" part="send" aria-label="Send" ?disabled=${this.busy} @click=${this._submit}>${sendIcon}</button>
       </div>`;
   }
 }
 
-define("wb-composer", WbComposer);
+define("work-composer", WbComposer);

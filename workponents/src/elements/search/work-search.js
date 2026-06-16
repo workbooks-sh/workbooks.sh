@@ -1,16 +1,16 @@
-// <wb-search> — THE search reinvention: search IS a query. An instant search box
+// <work-search> — THE search reinvention: search IS a query. An instant search box
 // over a registered source where EACH KEYSTROKE runs an engine query (debounced
 // WHERE … LIKE across the searchable fields) — never a JS .filter() over a
 // preloaded array. The result list is a thin, themed viewport over a
-// WbQueryResult, exactly like <wb-table>. Reach compute ONLY through src/data
+// WbQueryResult, exactly like <work-table>. Reach compute ONLY through src/data
 // (getEngine) — runtime DuckDB · browser duckdb-wasm · the in-JS offline floor.
 //
 // Usage (register elsewhere, search a named source):
-//   <wb-search src-name="people" fields="name,role,city" label="Search people"
-//     title-field="name" subtitle-field="role"></wb-search>
+//   <work-search src-name="people" fields="name,role,city" label="Search people"
+//     title-field="name" subtitle-field="role"></work-search>
 //
 // Usage (inline rows become an auto-named source):
-//   <wb-search rows='[{"name":"Ada","role":"Eng"}]' fields="name,role"></wb-search>
+//   <work-search rows='[{"name":"Ada","role":"Eng"}]' fields="name,role"></work-search>
 //
 // Attributes:
 //   src-name      name of a source registered via getEngine().register(...)
@@ -28,13 +28,15 @@
 //   size          sm | md | lg
 //
 // Events:
-//   wb-search-input   { detail: { value } }                       on every (debounced) query
-//   wb-search-query   { detail: { sql, rowCount, engine, value } } on every (re)query
-//   wb-search-select  { detail: { row, index } }                  Enter / click a result
-import { WbElement, define } from "../../core/element.js";
+//   work-search-input   { detail: { value } }                       on every (debounced) query
+//   work-search-query   { detail: { sql, rowCount, engine, value } } on every (re)query
+//   work-search-select  { detail: { row, index } }                  Enter / click a result
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 import { highlight } from "./rank.js";
+import { ref, createRef } from "lit/directives/ref.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
 const VARIANTS = defineVariants({
   variant: { options: ["card", "bare"], default: "card" },
@@ -43,11 +45,11 @@ const VARIANTS = defineVariants({
 
 let _autoId = 0;
 
-export class WbSearch extends WbElement {
+export class WorkSearch extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "rows", "csv", "src-name", "query", "fields", "placeholder", "limit", "open-on-focus"];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); position: relative; }
     .box { position: relative; }
     .field { display: flex; align-items: center; gap: var(--wb-space-2);
@@ -92,6 +94,8 @@ export class WbSearch extends WbElement {
     .grow { flex: 1; }
   `;
 
+  _inputRef = createRef();
+
   connectedCallback() {
     if (this._init == null) {
       this._init = true;
@@ -113,7 +117,7 @@ export class WbSearch extends WbElement {
   _captureSource() {
     this._srcName = this.attr("src-name");
     if (!this._srcName) {
-      if (!this._autoName) this._autoName = `wb_search_${++_autoId}`;
+      if (!this._autoName) this._autoName = `work_search_${++_autoId}`;
       this._srcName = this._autoName;
       const rowsAttr = this.attr("rows");
       const csvAttr = this.attr("csv");
@@ -127,15 +131,14 @@ export class WbSearch extends WbElement {
     }
   }
 
-  attributeChangedCallback(name) {
+  attributeChangedCallback(name, old, val) {
+    super.attributeChangedCallback?.(name, old, val);
     if (!this._connected) return;
     if (name === "rows" || name === "csv" || name === "src-name" || name === "query") {
       this._pendingSource = null;
       this._captureSource();
       if (this._pendingSource) this._engine.register(this._srcName, this._pendingSource).catch(() => {});
       if (this._value) this._runQuery();
-    } else {
-      this.update();
     }
   }
 
@@ -186,7 +189,7 @@ export class WbSearch extends WbElement {
     this._loading = true;
     do {
       this._loadAgain = false;
-      this._busy = true; this._error = null; this.update();
+      this._busy = true; this._error = null; this.requestUpdate();
       try {
         if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
         else if (this._pendingSource) await this._engine.whenRegistered(this._srcName);
@@ -195,14 +198,14 @@ export class WbSearch extends WbElement {
         this._result = await this._engine.query(sql);
         this._tier = this._result.engine || this._engine.provider();
         this._active = 0;
-        this._emit("wb-search-query", { sql, rowCount: this._result.rowCount, engine: this._tier, value: this._value });
+        this._emit("work-search-query", { sql, rowCount: this._result.rowCount, engine: this._tier, value: this._value });
       } catch (e) {
         this._error = String((e && e.message) || e);
         this._tier = "error";
         this._result = null;
       }
       this._busy = false;
-      this.update();
+      this.requestUpdate();
     } while (this._loadAgain);
     this._loading = false;
   }
@@ -212,19 +215,20 @@ export class WbSearch extends WbElement {
     const ph = this.attr("placeholder", "Search…");
     const label = this.attr("label", "Search");
     const showClear = this._value.length > 0;
-    const panel = this._open ? this._renderPanel() : "";
-    return `
+    return html`
       <div class="box">
         <div class="field" part="field">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
             <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input type="text" role="combobox" aria-expanded="${this._open}" aria-label="${esc(label)}"
-            placeholder="${esc(ph)}" value="${esc(this._value)}" autocomplete="off" spellcheck="false" />
-          ${this._busy ? `<span class="spin" aria-hidden="true"></span>` : ""}
-          ${showClear ? `<button class="clear" type="button" aria-label="Clear" tabindex="-1">✕</button>` : ""}
+          <input ${ref(this._inputRef)} type="text" role="combobox" aria-expanded=${String(this._open)} aria-label=${label}
+            placeholder=${ph} .value=${this._value} autocomplete="off" spellcheck="false"
+            @focus=${this._onFocus} @blur=${this._onBlur} @input=${this._onInput} @keydown=${this._onKey} />
+          ${this._busy ? html`<span class="spin" aria-hidden="true"></span>` : ""}
+          ${showClear ? html`<button class="clear" type="button" aria-label="Clear" tabindex="-1"
+            @mousedown=${this._onClear}>✕</button>` : ""}
         </div>
-        ${panel}
+        ${this._open ? this._renderPanel() : ""}
       </div>`;
   }
 
@@ -234,13 +238,13 @@ export class WbSearch extends WbElement {
       this._tier === "runtime" ? "runtime DuckDB" :
       this._tier === "duckdb-wasm" ? "DuckDB-wasm" : "in-JS engine";
     let body;
-    if (this._error) body = `<div class="state">${esc(this._error)}</div>`;
-    else if (this._busy && !r) body = `<div class="state">Searching…</div>`;
-    else if (!this._value) body = `<div class="state">Type to search.</div>`;
-    else if (!r || !r.rows.length) body = `<div class="state">No matches for “${esc(this._value)}”.</div>`;
+    if (this._error) body = html`<div class="state">${this._error}</div>`;
+    else if (this._busy && !r) body = html`<div class="state">Searching…</div>`;
+    else if (!this._value) body = html`<div class="state">Type to search.</div>`;
+    else if (!r || !r.rows.length) body = html`<div class="state">No matches for “${this._value}”.</div>`;
     else body = this._renderResults(r);
-    return `<div class="panel" part="panel">${body}
-      <div class="foot" data-tier="${this._error ? "error" : this._tier}"><span class="dot"></span><span>${esc(tierText)}</span><span class="grow"></span><span>${r ? r.rowCount : 0} ${r && r.rowCount === 1 ? "result" : "results"}</span></div></div>`;
+    return html`<div class="panel" part="panel">${body}
+      <div class="foot" data-tier=${this._error ? "error" : this._tier}><span class="dot"></span><span>${tierText}</span><span class="grow"></span><span>${r ? r.rowCount : 0} ${r && r.rowCount === 1 ? "result" : "results"}</span></div></div>`;
   }
 
   _renderResults(r) {
@@ -249,62 +253,59 @@ export class WbSearch extends WbElement {
     const subField = this.attr("subtitle-field");
     const ti = r.columns.indexOf(titleField);
     const si = subField ? r.columns.indexOf(subField) : -1;
-    const items = r.rows.map((row, i) => {
+    return html`<ul class="results" role="listbox">${r.rows.map((row, i) => {
       const title = ti >= 0 ? row[ti] : row[0];
       const sub = si >= 0 ? row[si] : null;
-      return `<li class="row" role="option" aria-selected="${i === this._active}" data-i="${i}">
-        <span class="title">${highlightTerm(title, this._value)}</span>
-        ${sub != null && sub !== "" ? `<span class="sub">${highlightTerm(sub, this._value)}</span>` : ""}
+      return html`<li class="row" role="option" aria-selected=${String(i === this._active)} data-i=${i}
+        @mousedown=${(e) => { e.preventDefault(); this._select(i); }}
+        @mousemove=${() => { if (i !== this._active) { this._active = i; this._syncActive(); } }}>
+        <span class="title">${unsafeHTML(highlightTerm(title, this._value))}</span>
+        ${sub != null && sub !== "" ? html`<span class="sub">${unsafeHTML(highlightTerm(sub, this._value))}</span>` : ""}
       </li>`;
-    }).join("");
-    return `<ul class="results" role="listbox">${items}</ul>`;
+    })}</ul>`;
   }
 
-  update() {
-    super.update();
-    const root = this.shadowRoot;
-    const input = root.querySelector("input");
-    if (!input) return;
-    if (this._inputFocused) { input.focus(); const e = input.value.length; input.setSelectionRange(e, e); }
-
-    input.addEventListener("focus", () => {
-      this._inputFocused = true;
-      if (this.boolAttr("open-on-focus") || this._value) { this._open = true; this.update(); }
-    });
-    input.addEventListener("blur", () => {
-      this._inputFocused = false;
-      // Delay close so a result click registers first.
-      setTimeout(() => { if (!this._inputFocused) { this._open = false; this.update(); } }, 120);
-    });
-    input.addEventListener("input", (e) => {
-      const value = e.target.value;
-      this._value = value;
-      this._open = true;
-      this._emit("wb-search-input", { value });
-      clearTimeout(this._t);
-      this._t = setTimeout(() => this._runQuery(), 140);
-      this.update();
-    });
-    input.addEventListener("keydown", (e) => this._onKey(e));
-
-    root.querySelector(".clear")?.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      this._value = ""; this._result = null; this._open = false;
-      this._emit("wb-search-input", { value: "" });
-      this.update();
-    });
-    root.querySelectorAll(".row[data-i]").forEach((li) => {
-      li.addEventListener("mousedown", (e) => { e.preventDefault(); this._select(+li.getAttribute("data-i")); });
-      li.addEventListener("mousemove", () => { const i = +li.getAttribute("data-i"); if (i !== this._active) { this._active = i; this._syncActive(); } });
-    });
+  // Restore focus + caret after a surgical re-render while the input is focused.
+  updated() {
+    const input = this._inputRef.value;
+    if (input && this._inputFocused && this.shadowRoot.activeElement !== input) {
+      input.focus();
+      const e = input.value.length;
+      input.setSelectionRange(e, e);
+    }
   }
+
+  _onFocus = () => {
+    this._inputFocused = true;
+    if (this.boolAttr("open-on-focus") || this._value) { this._open = true; this.requestUpdate(); }
+  };
+  _onBlur = () => {
+    this._inputFocused = false;
+    // Delay close so a result click registers first.
+    setTimeout(() => { if (!this._inputFocused) { this._open = false; this.requestUpdate(); } }, 120);
+  };
+  _onInput = (e) => {
+    const value = e.target.value;
+    this._value = value;
+    this._open = true;
+    this._emit("work-search-input", { value });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this._runQuery(), 140);
+    this.requestUpdate();
+  };
+  _onClear = (e) => {
+    e.preventDefault();
+    this._value = ""; this._result = null; this._open = false;
+    this._emit("work-search-input", { value: "" });
+    this.requestUpdate();
+  };
 
   _onKey(e) {
     const n = this._result ? this._result.rows.length : 0;
     if (e.key === "ArrowDown") { e.preventDefault(); if (n) { this._active = (this._active + 1) % n; this._syncActive(); } }
     else if (e.key === "ArrowUp") { e.preventDefault(); if (n) { this._active = (this._active - 1 + n) % n; this._syncActive(); } }
     else if (e.key === "Enter") { if (n) { e.preventDefault(); this._select(this._active); } }
-    else if (e.key === "Escape") { this._open = false; this.update(); }
+    else if (e.key === "Escape") { this._open = false; this.requestUpdate(); }
   }
 
   /** Cheap selection move without a full re-query/re-render. */
@@ -322,9 +323,9 @@ export class WbSearch extends WbElement {
     if (!r || !r.rows[i]) return;
     const obj = {};
     r.columns.forEach((c, j) => (obj[c] = r.rows[i][j]));
-    this._emit("wb-search-select", { row: obj, index: i });
+    this._emit("work-search-select", { row: obj, index: i });
     this._open = false;
-    this.update();
+    this.requestUpdate();
   }
 
   _emit(name, detail) {
@@ -346,4 +347,4 @@ function highlightTerm(text, term) {
   return highlight(t, [[idx, idx + q.length]]);
 }
 
-define("wb-search", WbSearch);
+define("work-search", WorkSearch);

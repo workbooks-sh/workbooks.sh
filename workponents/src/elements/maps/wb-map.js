@@ -1,4 +1,4 @@
-// <wb-map> — THE maps reinvention: the map IS a SPATIAL VIEW OVER A QUERY, not a
+// <work-map> — THE maps reinvention: the map IS a SPATIAL VIEW OVER A QUERY, not a
 // hand-fed GeoJSON blob. Points / regions come from query ROWS — lat/lon (and an
 // optional value) are columns of a WbQueryResult. Spatial filtering and
 // aggregation belong IN the engine (SQL: GROUP BY region, WHERE lon BETWEEN …),
@@ -6,8 +6,14 @@
 //
 // Composition-as-source: the map carries its data + query as source. Reach
 // compute ONLY through the src/data layer (getEngine) — exactly the pattern
-// <wb-table> uses, generalized to the shared DuckDB engine. One engine, three
+// <work-table> uses, generalized to the shared DuckDB engine. One engine, three
 // surfaces: a table, a chart, and a map can all read the SAME registered source.
+//
+// Re-based onto Lit: render() returns the Lit shell (the stage + chrome + the
+// pre-built SVG markup, dropped in via unsafeHTML — the drawing/projection code is
+// ours); pan/zoom/select wiring lives in Lit's updated() hook. The _load
+// single-flight + stable inline auto-name + whenRegistered/register plumbing is
+// unchanged.
 //
 // Base layer (zero-dep, framework-agnostic): standalone, the map draws an
 // ABSTRACT themed projection — points/regions projected to SVG with a chosen
@@ -17,14 +23,14 @@
 // _tileLayerHint(); we never hard-depend on a tile CDN.
 //
 // Usage (inline points, declared lat/lon/value columns):
-//   <wb-map rows='[{"city":"Oslo","lat":59.9,"lon":10.7,"pop":700}]'
-//           lat="lat" lon="lon" value="pop" mode="points"></wb-map>
+//   <work-map rows='[{"city":"Oslo","lat":59.9,"lon":10.7,"pop":700}]'
+//           lat="lat" lon="lon" value="pop" mode="points"></work-map>
 //
 // Usage (register elsewhere, query a named source, aggregate in the engine):
-//   <wb-map src-name="quakes"
+//   <work-map src-name="quakes"
 //           query="SELECT region, avg(lat) AS lat, avg(lon) AS lon, count(*) AS n
 //                   FROM quakes GROUP BY region"
-//           lat="lat" lon="lon" value="n" label="region" mode="choropleth"></wb-map>
+//           lat="lat" lon="lon" value="n" label="region" mode="choropleth"></work-map>
 //
 // Attributes:
 //   rows        inline JSON array of row objects (auto-registers a source)
@@ -44,10 +50,11 @@
 //   tiles       a tile-layer id reached via Host (e.g. "osm"); standalone if unset
 //
 // Events:
-//   wb-map-ready    { detail: { columns, types, engine, mode } }
-//   wb-map-query    { detail: { sql, rowCount, engine } }   on every (re)query
-//   wb-feature-select { detail: { feature, index } }        feature = row object
-import { WbElement, define } from "../../core/element.js";
+//   work-map-ready    { detail: { columns, types, engine, mode } }
+//   work-map-query    { detail: { sql, rowCount, engine } }   on every (re)query
+//   work-feature-select { detail: { feature, index } }        feature = row object
+import { WbElement, html, css, define } from "../../core/element.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 import { project, bounds } from "./projection.js";
@@ -68,7 +75,7 @@ export class WbMap extends WbElement {
     "lat", "lon", "value", "label", "key", "geo-key", "geojson", "tiles",
   ];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .shell { position: relative; border: 1px solid var(--wb-border);
       border-radius: var(--wb-radius); background: var(--wb-surface);
@@ -138,6 +145,7 @@ export class WbMap extends WbElement {
       padding: var(--wb-space-2) var(--wb-space-3); border-top: 1px solid var(--wb-border);
       font-size: var(--wb-text-sm); color: var(--wb-fg-subtle); }
     .note { color: var(--wb-fg-subtle); }
+    .grow { flex: 1; }
     .empty { padding: var(--wb-space-5); text-align: center; color: var(--wb-fg-muted); font-size: var(--wb-text-sm); }
   `;
 
@@ -164,7 +172,7 @@ export class WbMap extends WbElement {
     if (!this._srcName) {
       const rowsAttr = this.attr("rows");
       const csvAttr = this.attr("csv");
-      if (!this._autoName) this._autoName = `wb_geo_${++_autoId}`;
+      if (!this._autoName) this._autoName = `work_geo_${++_autoId}`;
       this._srcName = this._autoName;
       if (rowsAttr) this._pendingSource = { json: rowsAttr };
       else if (csvAttr) this._pendingSource = { csv: csvAttr };
@@ -184,8 +192,9 @@ export class WbMap extends WbElement {
     this._geojson = slot ? safeJson(slot.textContent) : null;
   }
 
-  attributeChangedCallback(name) {
-    if (!this._connected) return;
+  attributeChangedCallback(name, old, val) {
+    super.attributeChangedCallback(name, old, val);
+    if (!this._init) return;
     if (name === "rows" || name === "csv" || name === "src-name" || name === "query") {
       this._pendingSource = null;
       this._captureSource();
@@ -193,11 +202,11 @@ export class WbMap extends WbElement {
     } else if (name === "geojson") {
       this._captureGeojson();
       this._rebuild();
-      this.update();
+      this.requestUpdate();
     } else {
       // lat/lon/value/label/key/mode/projection/variant — re-derive features
       this._rebuild();
-      this.update();
+      this.requestUpdate();
     }
   }
 
@@ -206,7 +215,7 @@ export class WbMap extends WbElement {
     this._loading = true;
     do {
       this._loadAgain = false;
-      this._busy = true; this._error = null; this.update();
+      this._busy = true; this._error = null; this.requestUpdate();
       try {
         if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
         else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
@@ -218,8 +227,8 @@ export class WbMap extends WbElement {
       this._busy = false;
       this._rebuild();
       if (!this._fitted && this._features.length) { this._fit(); this._fitted = true; }
-      this.update();
-      this._emit("wb-map-ready", {
+      this.requestUpdate();
+      this._emit("work-map-ready", {
         columns: this._result?.columns || [], types: this._result?.types || [],
         engine: this._tier, mode: this.variant("mode"),
       });
@@ -231,7 +240,7 @@ export class WbMap extends WbElement {
     const sql = this._buildSql();
     this._result = await this._engine.query(sql);
     this._tier = this._result.engine || this._engine.provider();
-    this._emit("wb-map-query", { sql, rowCount: this._result.rowCount, engine: this._tier });
+    this._emit("work-map-query", { sql, rowCount: this._result.rowCount, engine: this._tier });
   }
 
   /** Spatial filtering/aggregation lives in SQL — we just pick the source/query. */
@@ -354,7 +363,7 @@ export class WbMap extends WbElement {
     else if (!this._features.length) body = `<div class="stage"><div class="empty">No spatial rows.</div></div>`;
     else body = this._renderStage(mode);
 
-    return `<div class="shell">
+    const shell = `<div class="shell">
       ${body}
       <div class="foot">
         <span class="note">${esc(tierText)}</span>
@@ -362,6 +371,7 @@ export class WbMap extends WbElement {
         ${this._result ? `<span class="grow"></span><span class="note">${this._features.length.toLocaleString()} features</span>` : ""}
       </div>
     </div>`;
+    return html`${unsafeHTML(shell)}`;
   }
 
   _renderStage(mode) {
@@ -502,8 +512,9 @@ export class WbMap extends WbElement {
     return id;
   }
 
-  update() {
-    super.update();
+  // Lit lifecycle: the shell just (re)rendered — (re)wire pan/zoom/select. Old
+  // listeners die with the replaced nodes (unsafeHTML rebuilds the markup).
+  updated() {
     const root = this.shadowRoot;
     const stage = root.querySelector(".stage");
     const svg = root.querySelector("svg");
@@ -521,7 +532,6 @@ export class WbMap extends WbElement {
     svg.addEventListener("pointermove", (e) => {
       if (!dragging) return;
       const rect = svg.getBoundingClientRect();
-      const sc = (rect.width || 1) / VB; // px per viewBox unit
       this._view.x = ox + (e.clientX - sx) / (rect.width || 1);
       this._view.y = oy + (e.clientY - sy) / (rect.height || 1) * (rect.height / rect.width);
       this._applyTransform();
@@ -562,7 +572,7 @@ export class WbMap extends WbElement {
     this._view.k = k1;
     this._view.x = 0.5 - cx * k1;
     this._view.y = 0.5 - cy * k1;
-    this.update(); // re-render so marker radii rescale crisply
+    this.requestUpdate(); // re-render so marker radii rescale crisply
   }
 
   _zoomAt(factor, e, svg) {
@@ -574,14 +584,14 @@ export class WbMap extends WbElement {
     this._view.k = k1;
     this._view.x = fx - px * k1;
     this._view.y = fy - py * k1;
-    this.update();
+    this.requestUpdate();
   }
 
   _select(i) {
     this._sel = i;
     const f = i == null ? null : this._features.find((ft) => ft.i === i);
     this._applySelectionAttrs();
-    if (f) this._emit("wb-feature-select", { feature: f.row, index: i });
+    if (f) this._emit("work-feature-select", { feature: f.row, index: i });
   }
 
   _applySelectionAttrs() {
@@ -641,4 +651,4 @@ function geometryToRings(geom, proj) {
   return [];
 }
 
-define("wb-map", WbMap);
+define("work-map", WbMap);

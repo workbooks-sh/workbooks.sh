@@ -1,11 +1,14 @@
-// docs/prose.js — the shared themed-prose CSS string for the docs domain.
+// docs/prose.js — the shared themed-prose CSS for the docs domain.
 //
-// Token-only (every value var(--wb-*)). Imported by wb-doc + wb-doc-cell so the
+// A Lit `css` CSSResult (composes into `static styles` via `${PROSE_CSS}`).
+// Token-only (every value var(--wb-*)). Imported by work-doc + work-doc-cell so the
 // rendered document and its live cells read as one typeset surface. Mirrors the
 // visual contract of the desktop org-renderer (desktop/src/lib/org-renderer/
 // org.css) but expressed purely from the workponents token set.
 
-export const PROSE_CSS = `
+import { css } from "../../core/element.js";
+
+export const PROSE_CSS = css`
   .prose {
     font-family: var(--wb-font);
     font-size: var(--wb-text);

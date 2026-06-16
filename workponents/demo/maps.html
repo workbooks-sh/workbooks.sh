@@ -8,6 +8,10 @@
   <title>workponents · maps — specimen</title>
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
+  <!-- Lit (the FLOOR's engine) — buildless via import map, no bundler -->
+  <script type="importmap">
+    { "imports": { "lit": "https://esm.sh/lit@3.2.1", "lit/": "https://esm.sh/lit@3.2.1/" } }
+  </script>
   <!-- the maps domain: native custom elements, ESM, NO build step -->
   <script type="module" src="../src/elements/maps/index.js"></script>
   <style>
@@ -46,31 +50,31 @@
     <p class="note">An inline-JSON source registered as <code>cities</code>; the map runs
       <code>SELECT * FROM cities</code>, reads the <code>lat</code>/<code>lon</code>/<code>pop</code> columns,
       and projects each row. Pan (drag), zoom (wheel / + −), click a point to select.</p>
-    <wb-map id="m-points" src-name="cities"
+    <work-map id="m-points" src-name="cities"
       query="SELECT city, region, lat, lon, pop FROM cities"
-      lat="lat" lon="lon" value="pop" label="city" mode="points"></wb-map>
+      lat="lat" lon="lon" value="pop" label="city" mode="points"></work-map>
     <div class="sel" id="sel-points">click a marker…</div>
 
     <h2>2 · Heat — the same rows as graduated density blooms</h2>
     <p class="note">Same registered source, <code>mode="heat"</code>; intensity scales with the
       engine-supplied <code>pop</code> value. No shader, no dependency.</p>
-    <wb-map id="m-heat" src-name="cities"
+    <work-map id="m-heat" src-name="cities"
       query="SELECT city, lat, lon, pop FROM cities"
-      lat="lat" lon="lon" value="pop" mode="heat"></wb-map>
+      lat="lat" lon="lon" value="pop" mode="heat"></work-map>
 
     <h2>3 · Choropleth — aggregated BY REGION in the engine</h2>
     <p class="note">The map runs <code>SELECT region, avg(lat), avg(lon), sum(pop), count(*) … GROUP BY
       region</code> — the aggregation happens <strong>in SQL</strong>, the element just binds the result.
       With no GeoJSON the standalone floor draws graduated proportional bubbles at each region's centroid.</p>
-    <wb-map id="m-bubbles" src-name="cities"
+    <work-map id="m-bubbles" src-name="cities"
       query="SELECT region, avg(lat) AS lat, avg(lon) AS lon, sum(pop) AS pop, count(*) AS cities FROM cities GROUP BY region"
-      lat="lat" lon="lon" value="pop" label="region" mode="choropleth"></wb-map>
+      lat="lat" lon="lon" value="pop" label="region" mode="choropleth"></work-map>
 
     <h2>4 · Choropleth — region polygons bound to the aggregate</h2>
     <p class="note">Same engine aggregate, now bound to an <strong>inline GeoJSON</strong> of macro-regions by
       <code>key="region"</code> → fill scales with <code>sum(pop)</code> (token-only via
       <code>color-mix</code>). The GeoJSON gives shape; the <em>data</em> still comes from the query.</p>
-    <wb-map id="m-choro" src-name="cities"
+    <work-map id="m-choro" src-name="cities"
       query="SELECT region, sum(pop) AS pop, count(*) AS cities FROM cities GROUP BY region"
       key="region" value="pop" label="region" mode="choropleth">
       <script type="application/geo+json">
@@ -85,7 +89,7 @@
         ]
       }
       </script>
-    </wb-map>
+    </work-map>
     <div class="sel" id="sel-choro">click a region…</div>
 
     <script type="module">
@@ -117,20 +121,20 @@
       await db.register("cities", { rows });
       // Declarative maps upgrade before this script runs; re-trigger their load now
       // that "cities" is registered on the shared engine (re-setting query reloads).
-      document.querySelectorAll("wb-map").forEach((m) => m.setAttribute("query", m.getAttribute("query")));
+      document.querySelectorAll("work-map").forEach((m) => m.setAttribute("query", m.getAttribute("query")));
 
       // ── selection / query telemetry (proves the engine tier is real) ──
       const selPoints = document.getElementById("sel-points");
-      document.getElementById("m-points").addEventListener("wb-feature-select",
+      document.getElementById("m-points").addEventListener("work-feature-select",
         (e) => selPoints.textContent = `selected → ${e.detail.feature.city} (${e.detail.feature.region}) · pop ${e.detail.feature.pop.toLocaleString()}k`);
       const selChoro = document.getElementById("sel-choro");
-      document.getElementById("m-choro").addEventListener("wb-feature-select",
+      document.getElementById("m-choro").addEventListener("work-feature-select",
         (e) => selChoro.textContent = `region → ${e.detail.feature.region} · Σpop ${Number(e.detail.feature.pop).toLocaleString()}k · ${e.detail.feature.cities} cities`);
 
-      document.querySelectorAll("wb-map").forEach((m) =>
-        m.addEventListener("wb-map-query", (e) => console.log("[wb-map-query]", e.detail)));
-      document.querySelectorAll("wb-map").forEach((m) =>
-        m.addEventListener("wb-map-ready", (e) => console.log("[wb-map-ready]", e.detail)));
+      document.querySelectorAll("work-map").forEach((m) =>
+        m.addEventListener("work-map-query", (e) => console.log("[work-map-query]", e.detail)));
+      document.querySelectorAll("work-map").forEach((m) =>
+        m.addEventListener("work-map-ready", (e) => console.log("[work-map-ready]", e.detail)));
 
       // theme toggle — everything re-themes from --wb-*
       const buttons = [...document.querySelectorAll(".bar button")];

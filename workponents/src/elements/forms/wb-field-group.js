@@ -1,21 +1,16 @@
-// <wb-field-group> — a themed fieldset/section that visually groups fields. Pure
-// layout + label; it does NOT own a schema (the owning <wb-form> collects every
-// <wb-field> beneath it, grouped or not). Styled entirely from --wb-* tokens.
+// <work-field-group> — a themed fieldset/section that visually groups fields. Pure
+// layout + label; it does NOT own a schema (the owning <work-form> collects every
+// <work-field> beneath it, grouped or not). Styled entirely from --wb-* tokens.
 // Usage:
-//   <wb-field-group label="Account" help="How you sign in">
-//     <wb-field ...></wb-field>
-//   </wb-field-group>
-import { WbElement, define } from "../../core/element.js";
-
-function esc(s) {
-  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
+//   <work-field-group label="Account" help="How you sign in">
+//     <work-field ...></work-field>
+//   </work-field-group>
+import { WbElement, html, css, define } from "../../core/element.js";
 
 export class WbFieldGroup extends WbElement {
   static props = ["label", "help"];
 
-  static styles = `
+  static styles = css`
     :host { display: block; margin: 0 0 var(--wb-space-5); }
     .group { border: 1px solid var(--wb-border); border-radius: var(--wb-radius-lg);
       background: var(--wb-surface); padding: var(--wb-space-5); }
@@ -28,13 +23,13 @@ export class WbFieldGroup extends WbElement {
   render() {
     const label = this.attr("label");
     const help = this.attr("help");
-    return `
+    return html`
       <div class="group">
-        ${label ? `<div class="legend">${esc(label)}</div>` : ""}
-        ${help ? `<p class="help">${esc(help)}</p>` : ""}
+        ${label ? html`<div class="legend">${label}</div>` : null}
+        ${help ? html`<p class="help">${help}</p>` : null}
         <slot></slot>
       </div>`;
   }
 }
 
-define("wb-field-group", WbFieldGroup);
+define("work-field-group", WbFieldGroup);

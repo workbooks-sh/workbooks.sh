@@ -1,24 +1,29 @@
-// <wb-spark> — an inline sparkline. A trend IS a query: the element runs SQL on
+// <work-spark> — an inline sparkline. A trend IS a query: the element runs SQL on
 // the shared engine and draws a tiny zero-dependency SVG line/area/bar from the
 // result's value column. No axes, no chrome — it sits inline in text, a table
-// cell, or a <wb-metric>. Same data contract + same engine as <wb-chart>; reach
-// compute ONLY through src/data.
+// cell, or a <work-metric>. Same data contract + same engine as <work-chart>;
+// reach compute ONLY through src/data.
+//
+// Re-based onto Lit: render() returns a Lit template wrapping the string-built
+// SVG via unsafeSVG (the drawing code is ours). The _load single-flight + stable
+// inline auto-name + whenRegistered/register plumbing is unchanged.
 //
 // Usage:
-//   <wb-spark src-name="daily" y="visits"></wb-spark>
-//   <wb-spark type="area" query="SELECT day, sum(rev) AS rev FROM orders GROUP BY day ORDER BY day" y="rev"></wb-spark>
-//   <wb-spark type="bar" rows='[{"v":3},{"v":7},{"v":4},{"v":9}]' y="v"></wb-spark>
+//   <work-spark src-name="daily" y="visits"></work-spark>
+//   <work-spark type="area" query="SELECT day, sum(rev) AS rev FROM orders GROUP BY day ORDER BY day" y="rev"></work-spark>
+//   <work-spark type="bar" rows='[{"v":3},{"v":7},{"v":4},{"v":9}]' y="v"></work-spark>
 //
 // Attributes:
 //   type       line | area | bar     (default line)
-//   src-name / query / rows / csv    — same source story as <wb-chart>
+//   src-name / query / rows / csv    — same source story as <work-chart>
 //   y          value column (default: first numeric column)
 //   tone       brand | ok | warn | err | neutral   (stroke color, a --wb-* token)
 //   width      px hint for the inline box (default 96)
 //   height     px hint (default 24)
 //
-// Events: wb-spark-ready { detail: { points, min, max, last, engine } }
-import { WbElement, define } from "../../core/element.js";
+// Events: work-spark-ready { detail: { points, min, max, last, engine } }
+import { WbElement, html, css, define } from "../../core/element.js";
+import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 import { defineVariants, variantAttrs, resolveVariant } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 
@@ -34,7 +39,7 @@ export class WbSpark extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "src-name", "query", "rows", "csv", "y", "width", "height"];
 
-  static styles = `
+  static styles = css`
     :host { display: inline-block; vertical-align: middle; line-height: 0; }
     svg { display: block; overflow: visible; }
     .line { fill: none; stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
@@ -59,20 +64,21 @@ export class WbSpark extends WbElement {
     this._srcName = this.attr("src-name");
     if (!this._srcName) {
       const rowsAttr = this.attr("rows"), csvAttr = this.attr("csv");
-      if (!this._autoName) this._autoName = `wb_spark_${++_autoId}`;
+      if (!this._autoName) this._autoName = `work_spark_${++_autoId}`;
       this._srcName = this._autoName;
       if (rowsAttr) this._pendingSource = { json: rowsAttr };
       else if (csvAttr) this._pendingSource = { csv: csvAttr };
     }
   }
 
-  attributeChangedCallback(name) {
-    if (!this._connected) return;
+  attributeChangedCallback(name, old, val) {
+    super.attributeChangedCallback(name, old, val);
+    if (!this._init) return;
     if (name === "rows" || name === "csv" || name === "src-name" || name === "query" || name === "y") {
       this._pendingSource = null;
       this._captureSource();
       this._load();
-    } else { this.update(); }
+    } else { this.requestUpdate(); }
   }
 
   async _load() {
@@ -94,9 +100,9 @@ export class WbSpark extends WbElement {
       } catch (e) {
         this._values = null;
       }
-      this.update();
+      this.requestUpdate();
       const vs = (this._values || []).filter((v) => v != null);
-      this._emit("wb-spark-ready", {
+      this._emit("work-spark-ready", {
         points: this._values?.length || 0,
         min: vs.length ? Math.min(...vs) : null,
         max: vs.length ? Math.max(...vs) : null,
@@ -108,6 +114,10 @@ export class WbSpark extends WbElement {
   }
 
   render() {
+    return html`${unsafeSVG(this._svg())}`;
+  }
+
+  _svg() {
     const W = +this.attr("width", "96"), H = +this.attr("height", "24");
     const vs = this._values;
     if (!vs || !vs.length) return `<svg width="${W}" height="${H}"></svg>`;
@@ -150,4 +160,4 @@ export class WbSpark extends WbElement {
 
 function ident(name) { return '"' + String(name).replace(/"/g, '""') + '"'; }
 
-define("wb-spark", WbSpark);
+define("work-spark", WbSpark);

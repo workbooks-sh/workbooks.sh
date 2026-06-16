@@ -2,7 +2,7 @@
 // viewport over a WbQueryResult; sort / filter / aggregate run IN the shared
 // DuckDB engine (runtime tier · browser duckdb-wasm · in-JS offline floor),
 // never in the element. Reach compute only through ../../data (one engine, three
-// surfaces: tables / data-viz / maps).
+// surfaces: tables / data-viz / maps). Re-based onto the Lit FLOOR.
 //
 // Import this barrel to register the domain, or a single element file to stay
 // lean. Standalone (zero deps, no build) by default; the runtime DuckDB tier

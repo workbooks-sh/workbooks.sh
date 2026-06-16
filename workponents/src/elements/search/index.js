@@ -6,7 +6,8 @@
 // command set the SQL LIKE can't express. Reach compute only through ../../data.
 //
 // Import this barrel to register the domain, or a single element file to stay
-// lean. Zero-dep, no build; the runtime DuckDB tier lights up via `this.host`.
-export { WbSearch } from "./wb-search.js";
-export { WbCommand } from "./wb-command.js";
+// lean. Zero-dep authoring contract; Lit is a buildless peer dep (import map in
+// demos). The runtime DuckDB tier lights up via `this.host`.
+export { WorkSearch } from "./work-search.js";
+export { WorkCommand } from "./work-command.js";
 export { fuzzyScore, rank, highlight } from "./rank.js";

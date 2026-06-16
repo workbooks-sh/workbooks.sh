@@ -1,24 +1,29 @@
-// <wb-chart> — THE data-viz reinvention: a chart IS a view over a query, not a
+// <work-chart> — THE data-viz reinvention: a chart IS a view over a query, not a
 // client-side data-wrangling widget. Aggregation / binning / grouping run IN the
 // shared engine (DuckDB on the runtime tier · browser duckdb-wasm · the in-JS
 // subset offline) — the element issues SQL and renders the result. Reach compute
 // ONLY through the src/data layer (getEngine), exactly like the sibling
-// <wb-table>. Composition-as-source: the chart carries its data + query as source.
+// <work-table>. Composition-as-source: the chart carries its data + query as source.
 //
 // Renders zero-dependency SVG themed entirely from --wb-* (axes, gridlines, marks,
 // legend, tooltip). Responsive (re-renders on resize). The element does NO data
 // wrangling: it maps a WbQueryResult { columns, rows[i][j], types } to marks by
 // the x / y / series column attributes, and nothing more.
 //
+// Re-based onto Lit: render() returns the Lit shell (wrapping the string-built
+// chrome via unsafeHTML); the SVG itself is drawn imperatively in _draw(), invoked
+// from Lit's updated() hook and on resize. The _load single-flight + stable inline
+// auto-name + whenRegistered/register plumbing is unchanged.
+//
 // Usage (register elsewhere, aggregate IN the engine):
-//   <wb-chart type="bar" src-name="orders" x="region" y="revenue"
-//     query="SELECT region, sum(revenue) AS revenue FROM orders GROUP BY region"></wb-chart>
+//   <work-chart type="bar" src-name="orders" x="region" y="revenue"
+//     query="SELECT region, sum(revenue) AS revenue FROM orders GROUP BY region"></work-chart>
 //
 // Usage (named source, default SELECT — x/y pick columns off the result):
-//   <wb-chart type="line" src-name="daily" x="day" y="visits"></wb-chart>
+//   <work-chart type="line" src-name="daily" x="day" y="visits"></work-chart>
 //
 // Usage (inline data, no engine round-trip beyond registration):
-//   <wb-chart type="scatter" x="x" y="y" rows='[{"x":1,"y":3},{"x":2,"y":5}]'></wb-chart>
+//   <work-chart type="scatter" x="x" y="y" rows='[{"x":1,"y":3},{"x":2,"y":5}]'></work-chart>
 //
 // Attributes:
 //   type        bar | line | area | scatter | pie   (the chart variant)
@@ -38,10 +43,11 @@
 //   title       optional heading rendered in the shell
 //
 // Events:
-//   wb-chart-ready   { detail: { type, columns, types, engine, series, rowCount } }
-//   wb-chart-query   { detail: { sql, rowCount, engine } }      on every (re)query
-//   wb-point-select  { detail: { series, x, y, row, index } }   on hover/click a mark
-import { WbElement, define } from "../../core/element.js";
+//   work-chart-ready   { detail: { type, columns, types, engine, series, rowCount } }
+//   work-chart-query   { detail: { sql, rowCount, engine } }      on every (re)query
+//   work-point-select  { detail: { series, x, y, row, index } }   on hover/click a mark
+import { WbElement, html, css, define } from "../../core/element.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { defineVariants, variantAttrs, resolveVariant } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 
@@ -69,7 +75,7 @@ export class WbChart extends WbElement {
     "x", "y", "series", "label", "legend", "format", "title",
   ];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .shell { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
       background: var(--wb-surface); overflow: hidden; box-shadow: var(--wb-shadow-sm); }
@@ -139,6 +145,7 @@ export class WbChart extends WbElement {
 
   disconnectedCallback() {
     if (this._ro) this._ro.disconnect();
+    super.disconnectedCallback();
   }
 
   _captureSource() {
@@ -146,7 +153,7 @@ export class WbChart extends WbElement {
     if (!this._srcName) {
       const rowsAttr = this.attr("rows");
       const csvAttr = this.attr("csv");
-      if (!this._autoName) this._autoName = `wb_chart_${++_autoId}`;
+      if (!this._autoName) this._autoName = `work_chart_${++_autoId}`;
       this._srcName = this._autoName;
       if (rowsAttr) this._pendingSource = { json: rowsAttr };
       else if (csvAttr) this._pendingSource = { csv: csvAttr };
@@ -158,20 +165,16 @@ export class WbChart extends WbElement {
     }
   }
 
-  attributeChangedCallback(name) {
-    if (!this._connected) return;
+  attributeChangedCallback(name, old, val) {
+    super.attributeChangedCallback(name, old, val);
+    if (!this._init) return;
     if (name === "rows" || name === "csv" || name === "src-name" || name === "query") {
       this._pendingSource = null;
       this._captureSource();
       this._load();
-    } else if (name === "type" || name === "x" || name === "y" || name === "series" ||
-               name === "label" || name === "legend" || name === "format") {
-      // re-layout from the cached result; no re-query needed
-      this.update();
-      this._draw();
     } else {
-      this.update();
-      this._draw();
+      // re-layout / re-render from the cached result; no re-query needed
+      this.requestUpdate();
     }
   }
 
@@ -182,7 +185,7 @@ export class WbChart extends WbElement {
     this._loading = true;
     do {
       this._loadAgain = false;
-      this._busy = true; this._error = null; this.update();
+      this._busy = true; this._error = null; this.requestUpdate();
       try {
         if (this._pendingSource) await this._engine.register(this._srcName, this._pendingSource);
         else if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this._srcName);
@@ -192,9 +195,8 @@ export class WbChart extends WbElement {
         this._tier = "error";
       }
       this._busy = false;
-      this.update();
-      this._draw();
-      this._emit("wb-chart-ready", {
+      this.requestUpdate();
+      this._emit("work-chart-ready", {
         type: this.variant("type"),
         columns: this._result?.columns || [],
         types: this._result?.types || [],
@@ -213,7 +215,7 @@ export class WbChart extends WbElement {
     const sql = this.attr("query") || `SELECT * FROM ${ident(this._srcName)}`;
     this._result = await this._engine.query(sql);
     this._tier = this._result.engine || this._engine.provider();
-    this._emit("wb-chart-query", { sql, rowCount: this._result.rowCount, engine: this._tier });
+    this._emit("work-chart-query", { sql, rowCount: this._result.rowCount, engine: this._tier });
   }
 
   variant(name) { return resolveVariant(this, VARIANTS, name); }
@@ -225,18 +227,26 @@ export class WbChart extends WbElement {
       this._error ? "engine error" :
       this._tier === "runtime" ? "runtime DuckDB" :
       this._tier === "duckdb-wasm" ? "DuckDB-wasm" : "in-JS (offline)";
-    const head = (title || true) ? `
+    const head = `
       <div class="head">
         ${title ? `<span class="title">${esc(title)}</span>` : ""}
         <span class="grow"></span>
         <span class="engine" data-tier="${this._error ? "error" : this._tier}"><span class="dot"></span>${esc(tierText)}</span>
-      </div>` : "";
-    return `<div class="shell">
+      </div>`;
+    const shell = `<div class="shell">
       ${head}
       <div class="plot"><div class="tip"></div><svg part="svg"></svg></div>
       <div class="legend"></div>
       <div class="foot">${this._error ? `<span class="err">${esc(this._error)}</span>` : ""}</div>
     </div>`;
+    return html`${unsafeHTML(shell)}`;
+  }
+
+  // Lit lifecycle: the shell just (re)rendered — draw the SVG against the cached
+  // result (base used to do this in an update() override; Lit's hook is updated()).
+  updated() {
+    if (this._result && !this._busy) this._draw();
+    else this._draw(); // clears / shows empty as needed
   }
 
   // ── layout: map the WbQueryResult { columns, rows[][], types } to marks ───────
@@ -297,6 +307,7 @@ export class WbChart extends WbElement {
     const xNumeric = type === "scatter" && (r.types[xj] === "number" || r.types[xj] === "integer");
     const xVals = categories.map((c) => (xNumeric ? toNum(c) : c));
 
+    this._series = series;
     return { type, fmt, xName, categories, xVals, xNumeric, series, rows: r.rows, xj };
   }
 
@@ -308,7 +319,7 @@ export class WbChart extends WbElement {
     if (!lay) {
       svg.innerHTML = "";
       svg.removeAttribute("viewBox");
-      legendEl.innerHTML = "";
+      if (legendEl) legendEl.innerHTML = "";
       if (!this._busy && !this._error) {
         const plot = this.shadowRoot.querySelector(".plot");
         if (plot && !plot.querySelector(".empty")) {
@@ -323,7 +334,6 @@ export class WbChart extends WbElement {
     const oldEmpty = plot && plot.querySelector(".empty");
     if (oldEmpty) oldEmpty.remove();
 
-    const W = Math.max(220, this.clientWidth - 0); // CSS controls outer width
     const H = HEIGHTS[this.variant("size")] || HEIGHTS.md;
     // viewBox-driven so the SVG scales fluidly; width:100% in CSS.
     const vbW = Math.max(320, this.getBoundingClientRect().width || 640);
@@ -518,13 +528,13 @@ export class WbChart extends WbElement {
     marks.forEach((mark) => {
       mark.addEventListener("mousemove", (ev) => show(mark, ev));
       mark.addEventListener("mouseleave", hide);
-      mark.addEventListener("click", (ev) => {
+      mark.addEventListener("click", () => {
         const si = +mark.getAttribute("data-s");
         const i = +mark.getAttribute("data-i");
         const rowObj = {};
         if (r) r.columns.forEach((c, j) => (rowObj[c] = r.rows[i] ? r.rows[i][j] : null));
         const s = lay.series[si];
-        this._emit("wb-point-select", {
+        this._emit("work-point-select", {
           series: lay.type === "pie" ? lay._slices[i].label : s.key,
           x: lay.categories[i],
           y: lay.type === "pie" ? lay._slices[i].value : s.values[i],
@@ -532,12 +542,6 @@ export class WbChart extends WbElement {
         });
       });
     });
-  }
-
-  update() {
-    super.update();
-    // base wipes the shadow DOM; redraw the SVG against the cached result.
-    if (this._result && !this._busy) this._draw();
   }
 
   _emit(name, detail) {
@@ -588,4 +592,4 @@ function niceNum(range, round) {
   return nf * Math.pow(10, exp);
 }
 
-define("wb-chart", WbChart);
+define("work-chart", WbChart);

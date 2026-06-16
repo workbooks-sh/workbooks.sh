@@ -1,21 +1,22 @@
-// <wb-message> — one turn of a conversation. Ported from
+// <work-message> — one turn of a conversation. Ported from
 // desktop/src/lib/chat/AssistantMessageView.svelte (+ the role bubble chrome).
 //
 // The body is the message's living source (markdown / org-with-components).
 // It renders SANITIZED markdown (bold/italic/lists/headings/code/links — see
 // ./markdown.js, HTML-escaped first) and weaves inline `#+begin_src component`
-// blocks into <wb-gen-block> cards in document order. The agent edits this
+// blocks into <work-gen-block> cards in document order. The agent edits this
 // source; the rendered turn is the view of it (preview ≡ source).
 //
 // Usage:
-//   <wb-message role="user">What changed in the deploy?</wb-message>
-//   <wb-message role="assistant">**Done.** Here is the diff…</wb-message>
+//   <work-message role="user">What changed in the deploy?</work-message>
+//   <work-message role="assistant">**Done.** Here is the diff…</work-message>
 //
 // `role` styles the turn (user | assistant | system | tool). The body can be
 // passed as light-DOM textContent or via the `text` attribute/property.
-import { WbElement, define } from "../../core/element.js";
+import { WbElement, html, css, define } from "../../core/element.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
-import { renderMarkdown, splitComponents, esc } from "./markdown.js";
+import { renderMarkdown, splitComponents } from "./markdown.js";
 import "./wb-gen-block.js";
 
 const VARIANTS = defineVariants({
@@ -26,7 +27,7 @@ export class WbMessage extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "text", "name"];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .turn { display: flex; flex-direction: column; gap: var(--wb-space-1); }
     .meta { display: flex; align-items: center; gap: var(--wb-space-2);
@@ -89,13 +90,14 @@ export class WbMessage extends WbElement {
   }
   set text(v) {
     this._text = v;
-    if (this._connected) this.update();
+    if (this._connected) this.requestUpdate();
   }
 
   connectedCallback() {
-    // Capture light-DOM text BEFORE the base wipes nothing (shadow render
-    // leaves light DOM intact, but read it once for the textContent path).
+    // Capture light-DOM text once for the textContent path (shadow render
+    // leaves light DOM intact).
     if (this._initialText == null) this._initialText = this.textContent || "";
+    this._connected = true;
     super.connectedCallback();
   }
 
@@ -104,27 +106,24 @@ export class WbMessage extends WbElement {
     const name = this.attr("name") || role;
     const segments = splitComponents(this.source);
 
-    const bodyParts = segments
-      .map((seg) =>
+    return html`<div class="turn">
+      <div class="meta"><span class="dot"></span><span>${name}</span></div>
+      <div class="body">${segments.map((seg) =>
         seg.kind === "prose"
-          ? `<div class="md">${renderMarkdown(seg.source)}</div>`
+          ? html`<div class="md">${unsafeHTML(renderMarkdown(seg.source))}</div>`
           : this._genBlock(seg),
-      )
-      .join("");
-
-    return `<div class="turn">
-      <div class="meta"><span class="dot"></span><span>${esc(name)}</span></div>
-      <div class="body">${bodyParts}</div>
+      )}</div>
     </div>`;
   }
 
-  /** Render a component segment as a <wb-gen-block> with structured attrs. */
+  /** Render a component segment as a <work-gen-block> with structured props. */
   _genBlock(seg) {
-    const attrs = Object.entries(seg.props)
-      .map(([k, v]) => `${esc(k)}="${esc(v)}"`)
-      .join(" ");
-    return `<wb-gen-block type="${esc(seg.type)}" ${attrs}>${esc(seg.body)}</wb-gen-block>`;
+    const el = document.createElement("work-gen-block");
+    el.setAttribute("type", seg.type);
+    for (const [k, v] of Object.entries(seg.props)) el.setAttribute(k, v);
+    el.textContent = seg.body;
+    return el;
   }
 }
 
-define("wb-message", WbMessage);
+define("work-message", WbMessage);

@@ -1,8 +1,9 @@
-// <wb-button> — the reference element. Proves the conventions: token-only styling,
-// the variant contract (variant/size/tone as reflected attrs targeted in CSS),
-// shadow-DOM isolation, and the WbElement base. Every other element follows this
-// shape. Usage: <wb-button variant="solid" tone="brand" size="md">Save</wb-button>
-import { WbElement, define } from "../core/element.js";
+// <work-button> — the reference element. Proves the conventions on the Lit base:
+// token-only styling, the variant contract (variant/size/tone as reflected attrs
+// targeted in CSS), shadow-DOM isolation, the WbElement base, and define().
+// Every other element follows this shape.
+// Usage: <work-button variant="solid" tone="brand" size="md">Save</work-button>
+import { WbElement, html, css, define } from "../core/element.js";
 import { defineVariants, variantAttrs } from "../core/variants.js";
 
 const VARIANTS = defineVariants({
@@ -15,7 +16,7 @@ export class WbButton extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "disabled"];
 
-  static styles = `
+  static styles = css`
     :host { display: inline-block; }
     button {
       font-family: var(--wb-font);
@@ -60,8 +61,8 @@ export class WbButton extends WbElement {
   `;
 
   render() {
-    return `<button part="button"><slot></slot></button>`;
+    return html`<button part="button"><slot></slot></button>`;
   }
 }
 
-define("wb-button", WbButton);
+define("work-button", WbButton);

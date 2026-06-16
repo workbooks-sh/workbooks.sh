@@ -1,4 +1,4 @@
-// <wb-doc> — renders an org/markdown document directly from its source. The
+// <work-doc> — renders an org/markdown document directly from its source. The
 // reinvention: the document IS its source (preview ≡ source) — there is no
 // separate document model, so the same bytes an agent or cursor edits are what
 // renders. Source comes from a `src` attr (a URL or inline) or the element's
@@ -14,12 +14,13 @@
 // standalone renderer otherwise.
 //
 // Live cells: fenced ```sql / ```polars / ```py / ```js / ```chart blocks (and
-// the org #+begin_src equivalents) become <wb-doc-cell> elements — first-class
+// the org #+begin_src equivalents) become <work-doc-cell> elements — first-class
 // computed blocks, the docs-domain differentiator.
 //
-// Cross-element: emits `wb-doc:rendered` with the parsed outline, so a sibling
-// <wb-doc-outline for="…"> stays auto-synced.
-import { WbElement, define } from "../../core/element.js";
+// Cross-element: emits `work-doc:rendered` with the parsed outline, so a sibling
+// <work-doc-outline for="…"> stays auto-synced.
+import { WbElement, html, css, define } from "../../core/element.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { renderDoc, parseOutline } from "./render.js";
 import { PROSE_CSS } from "./prose.js";
 import "./wb-doc-cell.js";
@@ -29,7 +30,7 @@ let _cellSeq = 0;
 export class WbDoc extends WbElement {
   static props = ["src", "format"];
 
-  static styles = `
+  static styles = css`
     :host { display: block; }
     .doc { max-width: 76ch; margin: 0 auto; }
     .loading, .error { color: var(--wb-fg-muted); font-family: var(--wb-font); padding: var(--wb-space-4); }
@@ -48,55 +49,55 @@ export class WbDoc extends WbElement {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`${res.status} ${url}`);
       this._source = await res.text();
-      this.update();
+      this.requestUpdate();
     } catch (e) {
       this._error = String(e.message || e);
-      this.update();
+      this.requestUpdate();
     }
   }
 
   /** The document source string (the artifact's truth). */
   get source() { return this._source || ""; }
-  set source(v) { this._source = v; this._error = null; this.update(); }
+  set source(v) { this._source = v; this._error = null; this.requestUpdate(); }
 
-  /** The heading outline — consumed by <wb-doc-outline>. */
+  /** The heading outline — consumed by <work-doc-outline>. */
   get outline() { return parseOutline(this.source); }
 
   render() {
-    if (this._error) return `<div class="error">Could not load document: ${this._error}</div>`;
-    if (this._source == null) return `<div class="loading">Loading…</div>`;
+    if (this._error) return html`<div class="error">Could not load document: ${this._error}</div>`;
+    if (this._source == null) return html`<div class="loading">Loading…</div>`;
 
     // Pull live-cell blocks out into placeholders, render prose, then re-insert
-    // real <wb-doc-cell> elements after innerHTML is set (so their own shadow
+    // real <work-doc-cell> elements after the DOM is updated (so their own shadow
     // DOM mounts and computes).
     this._pendingCells = [];
     const body = renderDoc(this._source, {
       onCell: ({ lang, code }) => {
-        const id = `wbcell-${++_cellSeq}`;
+        const id = `workcell-${++_cellSeq}`;
         this._pendingCells.push({ id, lang, code });
         return `<div data-cell="${id}"></div>`;
       },
     });
-    return `<article class="doc prose">${body}</article>`;
+    // body is trusted output of OUR renderer (escaped at the source — see render.js).
+    return html`<article class="doc prose">${unsafeHTML(body)}</article>`;
   }
 
-  update() {
-    super.update();
+  updated() {
     // mount the deferred live cells
     for (const c of this._pendingCells || []) {
       const slot = this.shadowRoot.querySelector(`[data-cell="${c.id}"]`);
       if (!slot) continue;
-      const cell = document.createElement("wb-doc-cell");
+      const cell = document.createElement("work-doc-cell");
       cell.setAttribute("lang", c.lang);
       cell.textContent = c.code;
       slot.replaceWith(cell);
     }
     this._pendingCells = [];
-    // announce the outline for siblings (e.g. <wb-doc-outline>)
-    this.dispatchEvent(new CustomEvent("wb-doc:rendered", {
+    // announce the outline for siblings (e.g. <work-doc-outline>)
+    this.dispatchEvent(new CustomEvent("work-doc:rendered", {
       bubbles: true, composed: true, detail: { outline: this.outline, id: this.id },
     }));
   }
 }
 
-define("wb-doc", WbDoc);
+define("work-doc", WbDoc);

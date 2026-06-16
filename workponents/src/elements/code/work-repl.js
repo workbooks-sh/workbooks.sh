@@ -1,20 +1,20 @@
-// <wb-repl> — a <wb-editor> + a Run affordance + an output pane. Real in-sandbox
+// <work-repl> — a <work-editor> + a Run affordance + an output pane. Real in-sandbox
 // eval: composition-as-source code, run where it can actually run.
 //
 //   • host.available("compile") → route ANY language through the Host compiler
 //     lane (clang/rustc/zig/go/StarlingMonkey → wasm), in-sandbox. Endpoint
 //     contract: POST /run { language, source } → { ok, output }. Mirrors how
-//     <wb-doc-cell> routes compute through `this.host` and degrades cleanly.
+//     <work-doc-cell> routes compute through `this.host` and degrades cleanly.
 //   • STANDALONE (no runtime) → JS evals in a sandboxed Worker (never eval in the
 //     page; see sandbox.js). Compiled languages show a clear, themed
 //     "runtime needed for C/Rust/Zig/Go" state instead of pretending.
 //
-// Emits `wb-run {language, ok, output}` after every run.
-import { WbElement, define } from "../../core/element.js";
+// Emits `work-run {language, ok, output}` after every run.
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
-import { normalizeLang, escapeHtml } from "./highlight.js";
+import { normalizeLang } from "./highlight.js";
 import { runJs } from "./sandbox.js";
-import "./wb-editor.js";
+import "./work-editor.js";
 
 const VARIANTS = defineVariants({
   variant: { options: ["card", "inline"], default: "card" },
@@ -24,11 +24,18 @@ const VARIANTS = defineVariants({
 const STANDALONE_RUNNABLE = new Set(["js"]);
 const COMPILED = { c: "C", cpp: "C", rust: "Rust", zig: "Zig", go: "Go" };
 
-export class WbRepl extends WbElement {
+export class WorkRepl extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "language", "gutter"];
 
-  static styles = `
+  static properties = {
+    ...WbElement.properties,
+    _busy: { state: true },
+    _result: { state: true },
+    _live: { state: true },
+  };
+
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); }
     .shell { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
       background: var(--wb-surface); overflow: hidden; box-shadow: var(--wb-shadow-sm); }
@@ -80,6 +87,13 @@ export class WbRepl extends WbElement {
       padding: 1px 5px; border-radius: var(--wb-radius-sm); }
   `;
 
+  constructor() {
+    super();
+    this._busy = false;
+    this._result = null;
+    this._live = false;
+  }
+
   get language() { return normalizeLang(this.attr("language", "js")); }
 
   connectedCallback() {
@@ -88,7 +102,6 @@ export class WbRepl extends WbElement {
         : (this.textContent || "").replace(/^\n/, "").replace(/\s+$/, "");
     }
     super.connectedCallback();
-    this._wire();
   }
 
   // can this language run AT ALL in the current context?
@@ -102,7 +115,6 @@ export class WbRepl extends WbElement {
     const language = this.language;
     const source = this._editorValue();
     this._busy = true;
-    this.update();
     let res;
     try {
       if (this.host.available("compile")) {
@@ -119,24 +131,18 @@ export class WbRepl extends WbElement {
     }
     this._busy = false;
     this._result = res;
-    this.update();
-    this.dispatchEvent(new CustomEvent("wb-run", {
+    this.dispatchEvent(new CustomEvent("work-run", {
       detail: { language, ok: res.ok, output: res.output },
       bubbles: true, composed: true,
     }));
   }
 
   _editorValue() {
-    const ed = this.shadowRoot.querySelector("wb-editor");
+    const ed = this.shadowRoot.querySelector("work-editor");
     return ed ? ed.value : this._source;
   }
 
-  _wire() {
-    const ed = this.shadowRoot.querySelector("wb-editor");
-    if (ed) ed.addEventListener("wb-code-change", (e) => { this._source = e.detail.value; });
-    const btn = this.shadowRoot.querySelector(".run");
-    if (btn) btn.addEventListener("click", () => this._run());
-  }
+  _onCodeChange(e) { this._source = e.detail.value; }
 
   _renderOut() {
     const language = this.language;
@@ -145,12 +151,12 @@ export class WbRepl extends WbElement {
 
     // graceful "needs runtime" state for compiled languages standalone
     if (!canRun && compiled) {
-      return `
+      return html`
         <div class="note">
           <span class="ic">!</span>
           <div class="body">
-            <b>${escapeHtml(compiled)} needs the runtime.</b> Standalone, this editor runs
-            JavaScript in a sandbox. Compiling and running ${escapeHtml(compiled)} (and Rust /
+            <b>${compiled} needs the runtime.</b> Standalone, this editor runs
+            JavaScript in a sandbox. Compiling and running ${compiled} (and Rust /
             Zig / Go) routes through the Workbooks compiler lane — connect a runtime
             (<code>host.available("compile")</code>) and the same code runs in-sandbox, no setup.
           </div>
@@ -159,14 +165,14 @@ export class WbRepl extends WbElement {
 
     const r = this._result;
     const badge = this._busy ? "" : r
-      ? `<span class="badge ${r.ok ? "ok" : "err"}">${r.ok ? "ok" : "error"}</span>`
+      ? html`<span class="badge ${r.ok ? "ok" : "err"}">${r.ok ? "ok" : "error"}</span>`
       : "";
     let body;
-    if (this._busy) body = `<pre class="console"><span class="empty">running…</span></pre>`;
-    else if (!r) body = `<pre class="console"><span class="empty">output appears here — press Run</span></pre>`;
-    else body = `<pre class="console${r.ok ? "" : " err"}">${r.output ? escapeHtml(r.output) : '<span class="empty">(no output)</span>'}</pre>`;
+    if (this._busy) body = html`<pre class="console"><span class="empty">running…</span></pre>`;
+    else if (!r) body = html`<pre class="console"><span class="empty">output appears here — press Run</span></pre>`;
+    else body = html`<pre class="console${r.ok ? "" : " err"}">${r.output ? r.output : html`<span class="empty">(no output)</span>`}</pre>`;
 
-    return `
+    return html`
       <div class="out">
         <div class="out-head"><span>output</span>${badge}</div>
         ${body}
@@ -179,24 +185,20 @@ export class WbRepl extends WbElement {
     const live = this.host.available("compile");
     const where = live ? "compiler lane" : (canRun ? "sandbox (worker)" : "needs runtime");
     const gutter = this.attr("gutter");
-    return `
+    return html`
       <div class="shell">
         <div class="bar">
-          <span class="lang">${escapeHtml(language)}</span>
-          <span class="where" data-live="${live ? 1 : 0}"><span class="dot"></span>${where}</span>
-          <button class="run" type="button" ${canRun ? "" : "disabled"}>
+          <span class="lang">${language}</span>
+          <span class="where" data-live=${live ? 1 : 0}><span class="dot"></span>${where}</span>
+          <button class="run" type="button" ?disabled=${!canRun} @click=${() => this._run()}>
             <span class="tri"></span>${this._busy ? "running" : "Run"}
           </button>
         </div>
-        <wb-editor language="${language}" ${gutter ? `gutter="${escapeHtml(gutter)}"` : ""} variant="inline">${escapeHtml(this._source || "")}</wb-editor>
+        <work-editor language=${language} gutter=${gutter ?? ""} variant="inline"
+          @work-code-change=${(e) => this._onCodeChange(e)}>${this._source || ""}</work-editor>
         ${this._renderOut()}
       </div>`;
   }
-
-  update() {
-    super.update();
-    this._wire();
-  }
 }
 
-define("wb-repl", WbRepl);
+define("work-repl", WorkRepl);

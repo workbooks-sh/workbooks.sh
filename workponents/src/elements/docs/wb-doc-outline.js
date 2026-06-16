@@ -1,17 +1,16 @@
-// <wb-doc-outline> — a clickable heading tree for a document, auto-synced.
+// <work-doc-outline> — a clickable heading tree for a document, auto-synced.
 //
-// Binds to a <wb-doc> by id (`for="my-doc"`) or, with no `for`, to the nearest
-// preceding/containing <wb-doc>. It reads that doc's `.outline` and re-syncs on
-// the doc's `wb-doc:rendered` event — so editing the source (composition-as-
+// Binds to a <work-doc> by id (`for="my-doc"`) or, with no `for`, to the nearest
+// preceding/containing <work-doc>. It reads that doc's `.outline` and re-syncs on
+// the doc's `work-doc:rendered` event — so editing the source (composition-as-
 // source) keeps the outline live with no manual wiring. Clicking a heading
 // scrolls it into view inside the doc's shadow root.
-import { WbElement, define } from "../../core/element.js";
-import { escapeHtml } from "./render.js";
+import { WbElement, html, css, define } from "../../core/element.js";
 
 export class WbDocOutline extends WbElement {
   static props = ["for"];
 
-  static styles = `
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); }
     nav { border-left: 2px solid var(--wb-border); padding-left: var(--wb-space-3); }
     .label { font-family: var(--wb-font-mono); font-size: 0.62rem; font-weight: 700;
@@ -37,7 +36,8 @@ export class WbDocOutline extends WbElement {
   }
 
   disconnectedCallback() {
-    if (this._doc && this._onRender) this._doc.removeEventListener("wb-doc:rendered", this._onRender);
+    if (this._doc && this._onRender) this._doc.removeEventListener("work-doc:rendered", this._onRender);
+    super.disconnectedCallback();
   }
 
   _findDoc() {
@@ -46,22 +46,22 @@ export class WbDocOutline extends WbElement {
       const root = this.getRootNode();
       return (root.getElementById && root.getElementById(ref)) || document.getElementById(ref);
     }
-    // nearest wb-doc: a previous sibling, or anywhere in the document
+    // nearest work-doc: a previous sibling, or anywhere in the document
     let n = this.previousElementSibling;
-    while (n) { if (n.tagName === "WB-DOC") return n; n = n.previousElementSibling; }
-    return document.querySelector("wb-doc");
+    while (n) { if (n.tagName === "WORK-DOC") return n; n = n.previousElementSibling; }
+    return document.querySelector("work-doc");
   }
 
   _bind() {
     const doc = this._findDoc();
-    if (!doc) { this._outline = []; this.update(); return; }
+    if (!doc) { this._outline = []; this.requestUpdate(); return; }
     this._doc = doc;
-    this._onRender = (e) => { this._outline = (e.detail && e.detail.outline) || doc.outline; this.update(); };
-    doc.addEventListener("wb-doc:rendered", this._onRender);
+    this._onRender = (e) => { this._outline = (e.detail && e.detail.outline) || doc.outline; this.requestUpdate(); };
+    doc.addEventListener("work-doc:rendered", this._onRender);
     // doc may have already rendered before we bound — read it now if so
-    if (doc.outline && doc.outline.length) { this._outline = doc.outline; this.update(); }
+    if (doc.outline && doc.outline.length) { this._outline = doc.outline; this.requestUpdate(); }
     else if (doc._source == null) { /* will fire on load */ }
-    else { this._outline = doc.outline || []; this.update(); }
+    else { this._outline = doc.outline || []; this.requestUpdate(); }
   }
 
   _scrollTo(id) {
@@ -74,18 +74,13 @@ export class WbDocOutline extends WbElement {
 
   render() {
     const items = this._outline || [];
-    if (!items.length) return `<nav><p class="label">Outline</p><p class="empty">No headings yet.</p></nav>`;
-    return `<nav>
+    if (!items.length) return html`<nav><p class="label">Outline</p><p class="empty">No headings yet.</p></nav>`;
+    return html`<nav>
       <p class="label">Outline</p>
-      <ol>${items.map((h) => `<li><a class="l${h.level}" data-id="${h.id}" href="#${h.id}">${escapeHtml(h.text)}</a></li>`).join("")}</ol>
+      <ol>${items.map((h) => html`<li><a class="l${h.level}" data-id=${h.id} href="#${h.id}"
+        @click=${(e) => { e.preventDefault(); this._scrollTo(h.id); }}>${h.text}</a></li>`)}</ol>
     </nav>`;
-  }
-
-  update() {
-    super.update();
-    this.shadowRoot.querySelectorAll("a").forEach((a) =>
-      a.addEventListener("click", (e) => { e.preventDefault(); this._scrollTo(a.dataset.id); }));
   }
 }
 
-define("wb-doc-outline", WbDocOutline);
+define("work-doc-outline", WbDocOutline);

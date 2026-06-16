@@ -8,10 +8,19 @@
   <title>workponents — video specimen</title>
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
-  <!-- point <wb-video> at the wavelet runtime served beside this page (the
+  <!-- point <work-video> at the wavelet runtime served beside this page (the
        shipped runtime, copied into demo/wavelet/). In the desktop app / a
        workbook this is /wavelet/wavelet-runtime.js. -->
   <script>window.__WB_WAVELET_RUNTIME__ = "./wavelet/wavelet-runtime.js";</script>
+  <!-- Lit via the import map (buildless ESM, no bun install) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://esm.sh/lit@3.2.1",
+        "lit/": "https://esm.sh/lit@3.2.1/"
+      }
+    }
+  </script>
   <!-- the video elements: native custom elements, ESM, NO build step -->
   <script type="module" src="../src/elements/video/index.js"></script>
   <style>
@@ -33,7 +42,7 @@
   <div class="wrap">
     <h1>workponents · video</h1>
     <p class="sub">
-      <code>&lt;wb-video&gt;</code> is the themed wrapper over the shipped wavelet player —
+      <code>&lt;work-video&gt;</code> is the themed wrapper over the shipped wavelet player —
       <strong>composition-as-source</strong> video where the player <em>is</em> the renderer
       (preview ≡ render), and export is an in-guest encode. The composition below is a
       self-contained <code>&lt;gm-doc&gt;</code> scene (CSS&nbsp;@keyframes, no external assets), so it
@@ -50,9 +59,9 @@
 
     <section>
       <h2>composition-as-source · solid + controls</h2>
-      <!-- The <gm-doc> tree IS the source. wb-video suppresses wavelet's own
+      <!-- The <gm-doc> tree IS the source. work-video suppresses wavelet's own
            chrome and paints a themed transport (play/scrub/export). -->
-      <wb-video controls tone="brand">
+      <work-video controls tone="brand">
         <gm-doc fps="30" resolution="1280x720" aspect="16:9">
           <gm-timeline id="tl" duration="3.0s">
             <gm-track id="bg" z="0">
@@ -81,14 +90,14 @@
             </gm-track>
           </gm-timeline>
         </gm-doc>
-      </wb-video>
+      </work-video>
     </section>
 
     <section>
       <h2>variants · soft frame · poster · bare</h2>
       <div class="grid">
         <!-- soft frame + neutral tone, no controls (autoplay loop) -->
-        <wb-video variant="soft" tone="neutral" autoplay loop>
+        <work-video variant="soft" tone="neutral" autoplay loop>
           <gm-doc fps="24" resolution="800x800" aspect="1:1">
             <gm-timeline id="tl2" duration="2.0s">
               <gm-track id="t" z="0">
@@ -112,18 +121,18 @@
               </gm-track>
             </gm-timeline>
           </gm-doc>
-        </wb-video>
+        </work-video>
 
-        <!-- declarative source via <wb-video-source>, controls -->
-        <wb-video variant="bare" controls size="sm">
-          <wb-video-source composition='<gm-doc fps="30" resolution="900x600" aspect="3:2"><gm-timeline id="d" duration="2.5s"><gm-track id="t" z="0"><gm-scene id="s" start="0s" duration="2.5s"><template><style>.s{position:absolute;inset:0;background:#10151f;display:grid;place-items:center}.r{width:160px;height:160px;border:6px solid #1c232f;border-top-color:#3da9fc;border-radius:50%;animation:sp 1.1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}</style><div class="s"><div class="r"></div></div></template></gm-scene></gm-track></gm-timeline></gm-doc>'></wb-video-source>
-        </wb-video>
+        <!-- declarative source via <work-video-source>, controls -->
+        <work-video variant="bare" controls size="sm">
+          <work-video-source composition='<gm-doc fps="30" resolution="900x600" aspect="3:2"><gm-timeline id="d" duration="2.5s"><gm-track id="t" z="0"><gm-scene id="s" start="0s" duration="2.5s"><template><style>.s{position:absolute;inset:0;background:#10151f;display:grid;place-items:center}.r{width:160px;height:160px;border:6px solid #1c232f;border-top-color:#3da9fc;border-radius:50%;animation:sp 1.1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}</style><div class="s"><div class="r"></div></div></template></gm-scene></gm-track></gm-timeline></gm-doc>'></work-video-source>
+        </work-video>
       </div>
     </section>
 
     <section>
       <h2>empty state (no source) — clean themed placeholder</h2>
-      <wb-video controls></wb-video>
+      <work-video controls></work-video>
     </section>
   </div>
 

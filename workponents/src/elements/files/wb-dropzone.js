@@ -1,4 +1,4 @@
-// <wb-dropzone> — drag (or pick) files to add them to the drive.
+// <work-dropzone> — drag (or pick) files to add them to the drive.
 //
 // Sharpens the files reinvention: adding a file = inserting a CONTENT-ADDRESSED
 // ROW. This element doesn't write — it normalizes a drop/pick into file records
@@ -9,8 +9,8 @@
 // the address the rest of the domain keys on.
 //
 // Usage:
-//   <wb-dropzone accept="image/*,text/*" multiple></wb-dropzone>
-//   el.addEventListener("wb-file-add", e => insertRows(e.detail.files));
+//   <work-dropzone accept="image/*,text/*" multiple></work-dropzone>
+//   el.addEventListener("work-file-add", e => insertRows(e.detail.files));
 //
 // Attributes:
 //   accept    a standard accept list passed to the file input
@@ -19,8 +19,9 @@
 //   variant   framed | bare
 //
 // Events:
-//   wb-file-add  { detail: { files: [{ name, type, size, modified, hash?, file }] } }
-import { WbElement, define } from "../../core/element.js";
+//   work-file-add  { detail: { files: [{ name, type, size, modified, hash?, file }] } }
+import { WbElement, html, css, define } from "../../core/element.js";
+import { ref, createRef } from "lit/directives/ref.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 
 const VARIANTS = defineVariants({
@@ -31,7 +32,14 @@ export class WbDropzone extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "accept", "multiple"];
 
-  static styles = `
+  static get observedAttributes() { return this.props; }
+
+  attributeChangedCallback(name, old, val) {
+    // Reads accept/multiple via this.attr() in render(); drives its own repaint.
+    if (this._init) this.requestUpdate();
+  }
+
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .zone { display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: var(--wb-space-2); padding: var(--wb-space-5); text-align: center; cursor: pointer;
@@ -48,31 +56,34 @@ export class WbDropzone extends WbElement {
     input { display: none; }
   `;
 
+  connectedCallback() {
+    if (this._init == null) {
+      this._init = true;
+      this._over = false;
+      this._inputRef = createRef();
+    }
+    super.connectedCallback();
+  }
+
   render() {
     const acc = this.attr("accept");
-    return `<div class="zone" tabindex="0" role="button" aria-label="Add files">
+    return html`<div class="zone ${this._over ? "over" : ""}" tabindex="0" role="button" aria-label="Add files"
+      @click=${this._pick} @keydown=${this._onKey}
+      @dragover=${this._onDragover} @dragleave=${this._onDragleave} @drop=${this._onDrop}>
       <span class="glyph">⤓</span>
       <span class="label"><slot>Drop files, or click to add</slot></span>
-      <span class="hint">${acc ? esc(acc) : "any type"} · added as content-addressed rows</span>
-      <input type="file" ${this.boolAttr("multiple") ? "multiple" : ""}${acc ? ` accept="${esc(acc)}"` : ""} />
+      <span class="hint">${acc || "any type"} · added as content-addressed rows</span>
+      <input ${ref(this._inputRef)} type="file" name="files" aria-label="Choose files"
+        ?multiple=${this.boolAttr("multiple")} accept=${acc ?? ""} @change=${this._onChange} />
     </div>`;
   }
 
-  update() {
-    super.update();
-    const zone = this.shadowRoot.querySelector(".zone");
-    const input = this.shadowRoot.querySelector("input");
-    if (!zone || !input) return;
-    zone.addEventListener("click", () => input.click());
-    zone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } });
-    input.addEventListener("change", () => { this._ingest(input.files); input.value = ""; });
-    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("over"); });
-    zone.addEventListener("dragleave", () => zone.classList.remove("over"));
-    zone.addEventListener("drop", (e) => {
-      e.preventDefault(); zone.classList.remove("over");
-      this._ingest(e.dataTransfer?.files);
-    });
-  }
+  _pick() { this._inputRef.value?.click(); }
+  _onKey(e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._pick(); } }
+  _onChange(e) { const input = e.target; this._ingest(input.files); input.value = ""; }
+  _onDragover(e) { e.preventDefault(); this._over = true; this.requestUpdate(); }
+  _onDragleave() { this._over = false; this.requestUpdate(); }
+  _onDrop(e) { e.preventDefault(); this._over = false; this.requestUpdate(); this._ingest(e.dataTransfer?.files); }
 
   async _ingest(fileList) {
     const arr = [...(fileList || [])];
@@ -86,7 +97,7 @@ export class WbDropzone extends WbElement {
       if (wantHash) { try { rec.hash = await sha256(f); } catch {} }
       return rec;
     }));
-    this.dispatchEvent(new CustomEvent("wb-file-add", { detail: { files }, bubbles: true, composed: true }));
+    this.dispatchEvent(new CustomEvent("work-file-add", { detail: { files }, bubbles: true, composed: true }));
   }
 }
 
@@ -100,8 +111,4 @@ async function sha256(file) {
   return "sha256:" + hex;
 }
 
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
-
-define("wb-dropzone", WbDropzone);
+define("work-dropzone", WbDropzone);

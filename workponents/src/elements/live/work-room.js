@@ -1,9 +1,9 @@
-// <wb-room> — the realtime container. Joins a topic and slots its content.
+// <work-room> — the realtime container. Joins a topic and slots its content.
 //
 // The reinvention: a room is a ROUTING CONFIG, not a backend. Set `topic` and the
 // room opens a presence/pubsub channel over the Host seam (the BEAM over RCP when
 // a runtime is reachable, a BroadcastChannel mock standalone) — no service to
-// provision. Child live elements (<wb-presence>, <wb-cursors>, <wb-live-value>)
+// provision. Child live elements (<work-presence>, <work-cursors>, <work-live-value>)
 // find their channel through the room, so one connection backs the whole subtree.
 //
 // Attributes:
@@ -13,15 +13,21 @@
 //   manual              don't auto-join on connect (call .join())
 // Reflected state attr:  state = "idle|joining|joined|error|closed"
 // Events:
-//   wb-room-state  { state, topic, mock }   — on every connection-state change
+//   work-room-state  { state, topic, mock }   — on every connection-state change
 // Property:  el.channel  → the live Channel (for child elements / scripting)
-import { WbElement, define } from "../../core/element.js";
+import { WbElement, html, css, define } from "../../core/element.js";
 import { openChannel, clientId, colorFor } from "./channel.js";
 
-export class WbRoom extends WbElement {
+export class WorkRoom extends WbElement {
   static props = ["topic", "name", "color", "state"];
 
-  static styles = `
+  static properties = {
+    ...WbElement.properties,
+    _conn: { state: true },   // connection label, drives the Lit template
+    _mock: { state: true },   // mock | rcp badge
+  };
+
+  static styles = css`
     :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
     .room {
       border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
@@ -51,6 +57,12 @@ export class WbRoom extends WbElement {
     ::slotted([slot="head"]) { display: contents; }
   `;
 
+  constructor() {
+    super();
+    this._conn = "offline";
+    this._mock = true;
+  }
+
   get channel() { return this._ch || null; }
 
   /** Open the channel + announce presence. Idempotent. */
@@ -67,16 +79,18 @@ export class WbRoom extends WbElement {
     this._reflect(this._ch.state);
     this._ch.join();
     // make the channel discoverable by descendants synchronously
-    this.dispatchEvent(new CustomEvent("wb-room-ready", { bubbles: false, detail: { channel: this._ch } }));
+    this.dispatchEvent(new CustomEvent("work-room-ready", { bubbles: false, detail: { channel: this._ch } }));
   }
 
   _reflect(state) {
     this.setAttribute("state", state);
-    this.dispatchEvent(new CustomEvent("wb-room-state", {
+    this.dispatchEvent(new CustomEvent("work-room-state", {
       bubbles: true, composed: true,
       detail: { state, topic: this.attr("topic"), mock: !!this._ch?.isMock },
     }));
-    this._renderHead();
+    const label = { idle: "offline", joining: "connecting", joined: "live", error: "offline", closed: "left" }[state] || state;
+    this._conn = label;
+    this._mock = !!this._ch?.isMock;
   }
 
   _defaultName() {
@@ -90,38 +104,24 @@ export class WbRoom extends WbElement {
   }
 
   disconnectedCallback() {
+    super.disconnectedCallback();
     this._unsub?.();
     // pooled channel is shared; don't close it here (other rooms/tabs may use it)
   }
 
-  _renderHead() {
-    const c = this.shadowRoot.querySelector(".conn");
-    if (!c) return;
-    const st = this.attr("state", "idle");
-    const label = { idle: "offline", joining: "connecting", joined: "live", error: "offline", closed: "left" }[st] || st;
-    c.querySelector(".txt").textContent = label;
-    const badge = this.shadowRoot.querySelector(".badge");
-    if (badge) badge.textContent = this._ch?.isMock ? "mock" : "rcp";
-  }
-
   render() {
-    return `
+    return html`
       <div class="room" part="room">
         <div class="head" part="head">
           <span class="topic">${this.attr("topic") || "—"}</span>
           <slot name="head"></slot>
           <span class="spacer"></span>
-          <span class="badge"></span>
-          <span class="conn"><span class="dot"></span><span class="txt">offline</span></span>
+          <span class="badge">${this._mock ? "mock" : "rcp"}</span>
+          <span class="conn"><span class="dot"></span><span class="txt">${this._conn}</span></span>
         </div>
         <div class="body" part="body"><slot></slot></div>
       </div>`;
   }
-
-  update() {
-    super.update();
-    this._renderHead();
-  }
 }
 
-define("wb-room", WbRoom);
+define("work-room", WorkRoom);

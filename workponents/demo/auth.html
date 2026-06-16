@@ -8,6 +8,15 @@
   <title>workponents — auth specimen</title>
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
+  <!-- Lit, buildless: the bare "lit" specifier resolves to a pinned CDN ESM. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://esm.sh/lit@3.2.1",
+        "lit/": "https://esm.sh/lit@3.2.1/"
+      }
+    }
+  </script>
   <!-- the auth elements: native custom elements, ESM, NO build step -->
   <script type="module" src="../src/elements/auth/index.js"></script>
   <style>
@@ -48,12 +57,12 @@
         <p class="sub">Identity is a <strong>host capability</strong>, not a per-provider widget. The
           elements bind to one identity seam over <code>this.host</code> — Clerk / Auth0 / WorkOS /
           BetterAuth are server-side wirings behind the Dock. This page runs the <strong>mock</strong>
-          identity (no backend): sign in to flip <code>&lt;wb-gate&gt;</code> from anon→authed and reveal
-          <code>&lt;wb-user&gt;</code>; sign out returns to anon. Toggle the theme; every element re-themes
+          identity (no backend): sign in to flip <code>&lt;work-gate&gt;</code> from anon→authed and reveal
+          <code>&lt;work-user&gt;</code>; sign out returns to anon. Toggle the theme; every element re-themes
           from the <code>--wb-*</code> tokens.</p>
       </div>
       <!-- bound to the live session; hidden while anon, appears on sign-in -->
-      <div class="userbar"><wb-user id="user"></wb-user></div>
+      <div class="userbar"><work-user id="user"></work-user></div>
     </div>
 
     <div class="bar" role="group" aria-label="theme">
@@ -65,48 +74,48 @@
 
     <!-- THE GUARD: anon shows sign-in; authed shows the protected content + user -->
     <section>
-      <h2>wb-gate · anon ⇄ authed (the declarative guard)</h2>
+      <h2>work-gate · anon ⇄ authed (the declarative guard)</h2>
 
-      <wb-gate when="anon">
+      <work-gate when="anon">
         <div class="panel" style="display:flex;justify-content:center">
-          <wb-auth id="auth" heading="Welcome back"></wb-auth>
+          <work-auth id="auth" heading="Welcome back"></work-auth>
         </div>
-      </wb-gate>
+      </work-gate>
 
-      <wb-gate when="authed">
+      <work-gate when="authed">
         <div class="panel secret">
           <h3>You're in.</h3>
           <p style="color:var(--wb-fg-muted);margin:0">This block is gated by
-            <code>&lt;wb-gate when="authed"&gt;</code>. It was hidden a moment ago. Use the account menu
+            <code>&lt;work-gate when="authed"&gt;</code>. It was hidden a moment ago. Use the account menu
             (top-right) to sign out — this disappears and the sign-in surface returns.</p>
         </div>
-      </wb-gate>
+      </work-gate>
 
       <p class="note">Both gates read the same identity seam and flip live the instant the session
-        changes — no host wiring. <code>&lt;wb-auth&gt;</code> emits <code>wb-auth-intent</code> on every
-        action and <code>wb-auth-changed</code> on a resolved session (logged below).</p>
+        changes — no host wiring. <code>&lt;work-auth&gt;</code> emits <code>work-auth-intent</code> on every
+        action and <code>work-auth-changed</code> on a resolved session (logged below).</p>
       <div class="log" id="log">auth events appear here…</div>
     </section>
 
     <!-- role gate, to show the role: test -->
     <section>
-      <h2>wb-gate · role-scoped content</h2>
+      <h2>work-gate · role-scoped content</h2>
       <div class="panel">
-        <wb-gate when="role:member">
+        <work-gate when="role:member">
           <p style="margin:0">Visible to the <code>member</code> role (the mock seeds it on sign-in).</p>
           <p slot="fallback" style="margin:0;color:var(--wb-fg-subtle)">Sign in to see member-only content.</p>
-        </wb-gate>
+        </work-gate>
       </div>
     </section>
 
     <!-- the surface on its own, magic-link mode -->
     <section>
-      <h2>wb-auth · magic-link mode + compact user</h2>
+      <h2>work-auth · magic-link mode + compact user</h2>
       <div class="panel" style="display:flex;gap:32px;align-items:flex-start;flex-wrap:wrap">
-        <wb-auth mode="magic" heading="Sign in" providers="google,github"></wb-auth>
+        <work-auth mode="magic" heading="Sign in" providers="google,github"></work-auth>
         <div>
-          <p class="note" style="margin-top:0">Compact <code>&lt;wb-user&gt;</code> (avatar only) once authed:</p>
-          <wb-user variant="compact"></wb-user>
+          <p class="note" style="margin-top:0">Compact <code>&lt;work-user&gt;</code> (avatar only) once authed:</p>
+          <work-user variant="compact"></work-user>
         </div>
       </div>
     </section>
@@ -127,13 +136,13 @@
     function show(tag, detail) {
       log.textContent = `${tag} · ${JSON.stringify(detail)}`;
     }
-    document.addEventListener("wb-auth-intent", (e) => show("wb-auth-intent", e.detail));
-    document.addEventListener("wb-auth-changed", (e) =>
-      show("wb-auth-changed", { user: e.detail.user ? e.detail.user.name : null }));
-    document.addEventListener("wb-gate-change", (e) => {
+    document.addEventListener("work-auth-intent", (e) => show("work-auth-intent", e.detail));
+    document.addEventListener("work-auth-changed", (e) =>
+      show("work-auth-changed", { user: e.detail.user ? e.detail.user.name : null }));
+    document.addEventListener("work-gate-change", (e) => {
       // append a compact note without clobbering the last auth event
       const prev = log.textContent;
-      log.textContent = `${prev}\nwb-gate-change · ${JSON.stringify(e.detail)}`;
+      log.textContent = `${prev}\nwork-gate-change · ${JSON.stringify(e.detail)}`;
     });
   </script>
 </body>

@@ -8,6 +8,16 @@
   <title>workponents · docs — specimen</title>
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
+  <!-- Lit, buildless: the bare "lit" specifier resolves to a pinned CDN ESM.
+       The whole library (WbElement base) loads through this. No bundler. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://esm.sh/lit@3.2.1",
+        "lit/": "https://esm.sh/lit@3.2.1/"
+      }
+    }
+  </script>
   <!-- the docs domain: native custom elements, ESM, NO build step -->
   <script type="module" src="../src/elements/docs/index.js"></script>
   <style>
@@ -38,9 +48,9 @@
 
     <div class="layout">
       <div class="doc-pane">
-        <!-- The document is its own source. wb-doc renders it directly; the
-             ```sql / ```polars fences below become live <wb-doc-cell>s. -->
-        <wb-doc id="report">
+        <!-- The document is its own source. work-doc renders it directly; the
+             ```sql / ```polars fences below become live <work-doc-cell>s. -->
+        <work-doc id="report">
 # Q3 Revenue Review
 
 This document **is** its own source. There is no separate document model — the
@@ -93,12 +103,12 @@ A polars cell, same idea, different engine — resolved behind the one Dock seam
 df.filter(pl.col("quarter") == "Q3")
   .group_by("region")
   .agg(pl.col("revenue").sum())
-        </wb-doc>
+        </work-doc>
       </div>
 
       <aside>
         <!-- Auto-synced from the doc above, by id. -->
-        <wb-doc-outline for="report"></wb-doc-outline>
+        <work-doc-outline for="report"></work-doc-outline>
       </aside>
     </div>
   </div>

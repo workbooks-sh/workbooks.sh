@@ -10,7 +10,7 @@
 // elements demo live — multiple tabs (or peers in one page) — with no backend.
 //
 // The elements never know which transport is live. That is the whole point: a
-// `<wb-room>` written against this seam works on a static page today and lights
+// `<work-room>` written against this seam works on a static page today and lights
 // up against the runtime tomorrow with zero element changes — realtime as config.
 //
 // ────────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 // workponents · records domain — a record IS a row. The detail view of one
-// entity (wb-record), a master card index over a query (wb-record-list), and the
-// typed single-value atom both reuse (wb-field-value). Built on the SAME shared
+// entity (work-record), a master card index over a query (work-record-list), and the
+// typed single-value atom both reuse (work-field-value). Built on the SAME shared
 // in-WASM data layer as tables / data-viz / maps (../../data: runtime DuckDB ·
 // browser duckdb-wasm · in-JS offline floor) — never a second data store; a
 // record view is just a query over the one engine. Editing writes back through

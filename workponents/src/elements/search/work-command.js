@@ -1,11 +1,11 @@
-// <wb-command> — the ⌘K command palette. THE killer element. A keyboard-driven,
+// <work-command> — the ⌘K command palette. THE killer element. A keyboard-driven,
 // grouped, themed overlay that ranks over TWO sources at once:
-//   1. a COMMAND SET (provided via the `.commands` property or <wb-command-item>
+//   1. a COMMAND SET (provided via the `.commands` property or <work-command-item>
 //      slots) — fuzzy-ranked IN-WASM by ./rank.js (subsequence + bonuses). This is
 //      the in-memory ranking the engine's LIKE can't express (ordered relevance,
 //      highlight ranges). Commands map to Dock capabilities / app actions.
 //   2. DATA RESULTS from the shared engine (optional `src-name`/`query`/`fields`) —
-//      each keystroke runs a debounced engine query, exactly like <wb-search>:
+//      each keystroke runs a debounced engine query, exactly like <work-search>:
 //      search IS a query. Reach compute ONLY through src/data (getEngine).
 //
 // Open with ⌘K / Ctrl-K (auto-bound while connected) or programmatically via
@@ -14,7 +14,7 @@
 //
 // Properties / attributes:
 //   .commands = [{ id, label, hint?, group?, keywords?, icon?, run?() }]   (property)
-//   <wb-command-item id label hint group keywords>   declarative command slots
+//   <work-command-item id label hint group keywords>   declarative command slots
 //   src-name / query / fields / data-label   optional engine-backed data group
 //   data-limit       max data rows (default 6)
 //   placeholder      input placeholder
@@ -23,24 +23,26 @@
 //   variant          center | top
 //
 // Events:
-//   wb-command-open    {}
-//   wb-command-close   {}
-//   wb-command-query   { detail: { sql, rowCount, engine, value } }
-//   wb-command-select  { detail: { kind:"command"|"data", item, row?, index } }
-import { WbElement, define } from "../../core/element.js";
+//   work-command-open    {}
+//   work-command-close   {}
+//   work-command-query   { detail: { sql, rowCount, engine, value } }
+//   work-command-select  { detail: { kind:"command"|"data", item, row?, index } }
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
 import { fuzzyScore, highlight } from "./rank.js";
+import { ref, createRef } from "lit/directives/ref.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
 const VARIANTS = defineVariants({
   variant: { options: ["center", "top"], default: "center" },
 });
 
-export class WbCommand extends WbElement {
+export class WorkCommand extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "src-name", "query", "fields", "data-label", "data-limit", "placeholder", "open"];
 
-  static styles = `
+  static styles = css`
     :host { position: fixed; inset: 0; z-index: 1000; display: none; font-family: var(--wb-font); color: var(--wb-fg); }
     :host([open]) { display: block; }
     .backdrop { position: absolute; inset: 0; background: rgba(8,10,14,0.5); backdrop-filter: blur(2px);
@@ -88,6 +90,8 @@ export class WbCommand extends WbElement {
     .grow { flex: 1; }
   `;
 
+  _inputRef = createRef();
+
   connectedCallback() {
     if (this._init == null) {
       this._init = true;
@@ -108,6 +112,7 @@ export class WbCommand extends WbElement {
   }
 
   disconnectedCallback() {
+    super.disconnectedCallback();
     if (this._hk) window.removeEventListener("keydown", this._hk, true);
   }
 
@@ -118,12 +123,12 @@ export class WbCommand extends WbElement {
       hint: c.hint ?? "", group: c.group ?? "Commands", icon: c.icon ?? "",
       keywords: c.keywords ?? "", run: typeof c.run === "function" ? c.run : null,
     }));
-    if (this._connected) this.update();
+    if (this._connected) this.requestUpdate();
   }
   get commands() { return this._commands; }
 
   _readSlotCommands() {
-    const items = [...this.querySelectorAll("wb-command-item")];
+    const items = [...this.querySelectorAll("work-command-item")];
     if (!items.length) return;
     this._commands = items.map((el, i) => ({
       id: el.getAttribute("id") || `cmd_${i}`,
@@ -143,14 +148,14 @@ export class WbCommand extends WbElement {
     this._value = "";
     this._dataRows = null;
     this._active = 0;
-    this._emit("wb-command-open", {});
-    this.update();
-    requestAnimationFrame(() => this.shadowRoot.querySelector("input")?.focus());
+    this._emit("work-command-open", {});
+    this.requestUpdate();
+    requestAnimationFrame(() => this._inputRef.value?.focus());
   }
   close() {
     this.removeAttribute("open");
-    this._emit("wb-command-close", {});
-    this.update();
+    this._emit("work-command-close", {});
+    this.requestUpdate();
   }
   toggle() { (this.hasAttribute("open") ? this.close() : this.open()); }
 
@@ -199,13 +204,13 @@ export class WbCommand extends WbElement {
   }
 
   async _runData() {
-    if (!this._hasData() || !this._value) { this._dataRows = null; this.update(); return; }
+    if (!this._hasData() || !this._value) { this._dataRows = null; this.requestUpdate(); return; }
     // Single-flight, last-wins across debounced keystrokes.
     if (this._loading) { this._loadAgain = true; return; }
     this._loading = true;
     do {
       this._loadAgain = false;
-      this._busy = true; this._error = null; this.update();
+      this._busy = true; this._error = null; this.requestUpdate();
       try {
         if (this.hasAttribute("src-name")) await this._engine.whenRegistered(this.attr("src-name"));
         await this._resolveDataFields();
@@ -220,13 +225,13 @@ export class WbCommand extends WbElement {
         sql += ` LIMIT ${limit}`;
         this._dataRows = await this._engine.query(sql);
         this._tier = this._dataRows.engine || this._engine.provider();
-        this._emit("wb-command-query", { sql, rowCount: this._dataRows.rowCount, engine: this._tier, value: this._value });
+        this._emit("work-command-query", { sql, rowCount: this._dataRows.rowCount, engine: this._tier, value: this._value });
       } catch (e) {
         this._error = String((e && e.message) || e);
         this._dataRows = null;
       }
       this._busy = false;
-      this.update();
+      this.requestUpdate();
     } while (this._loadAgain);
     this._loading = false;
   }
@@ -289,61 +294,59 @@ export class WbCommand extends WbElement {
               ? highlight(e.label, e.ranges)
               : highlightTerm(e.label, this._value);
             const ic = e.kind === "command" ? (e.item.icon || "") : "›";
-            return `<li class="item" role="option" aria-selected="${i === this._active}" data-i="${i}">
-              <span class="ic">${esc(ic)}</span>
-              <span class="label">${labelHtml}</span>
-              ${e.hint || (e.item && e.item.hint) ? `<span class="hint">${esc(e.hint || e.item.hint)}</span>` : ""}
+            return html`<li class="item" role="option" aria-selected=${String(i === this._active)} data-i=${i}
+              @mousedown=${(ev) => { ev.preventDefault(); this._run(i); }}
+              @mousemove=${() => { if (i !== this._active) { this._active = i; this._syncActive(); } }}>
+              <span class="ic">${ic}</span>
+              <span class="label">${unsafeHTML(labelHtml)}</span>
+              ${e.hint || (e.item && e.item.hint) ? html`<span class="hint">${e.hint || e.item.hint}</span>` : ""}
             </li>`;
-          }).join("");
-          return `<li class="group">${esc(g.name)}</li>${items}`;
-        }).join("")
-      : `<li class="empty">${this._error ? esc(this._error) : this._value ? `No results for “${esc(this._value)}”.` : "Type to search commands and data."}</li>`;
+          });
+          return html`<li class="group">${g.name}</li>${items}`;
+        })
+      : html`<li class="empty">${this._error ? this._error : this._value ? html`No results for “${this._value}”.` : "Type to search commands and data."}</li>`;
 
-    return `
-      <div class="backdrop" part="backdrop"></div>
+    return html`
+      <div class="backdrop" part="backdrop" @mousedown=${() => this.close()}></div>
       <div class="dialog" role="dialog" aria-modal="true" aria-label="Command palette">
         <div class="field">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
             <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input type="text" role="combobox" aria-expanded="true" aria-label="Command palette"
-            placeholder="${esc(ph)}" value="${esc(this._value)}" autocomplete="off" spellcheck="false" />
-          ${this._busy ? `<span class="spin" aria-hidden="true"></span>` : `<span class="kbd">esc</span>`}
+          <input ${ref(this._inputRef)} type="text" role="combobox" aria-expanded="true" aria-label="Command palette"
+            placeholder=${ph} .value=${this._value} autocomplete="off" spellcheck="false"
+            @focus=${() => { this._inputFocused = true; }} @blur=${() => { this._inputFocused = false; }}
+            @input=${this._onInput} @keydown=${this._onKey} />
+          ${this._busy ? html`<span class="spin" aria-hidden="true"></span>` : html`<span class="kbd">esc</span>`}
         </div>
         <ul class="list" role="listbox">${body}</ul>
-        <div class="foot" data-tier="${this._error ? "error" : this._tier}">
+        <div class="foot" data-tier=${this._error ? "error" : this._tier}>
           <span class="k">↑↓</span><span>navigate</span>
           <span class="k">↵</span><span>select</span>
           <span class="grow"></span>
-          ${this._hasData() ? `<span class="dot"></span><span>engine: ${esc(tierText)}</span>` : ""}
+          ${this._hasData() ? html`<span class="dot"></span><span>engine: ${tierText}</span>` : ""}
         </div>
       </div>`;
   }
 
-  update() {
-    super.update();
+  // Restore focus + caret after a surgical re-render while open + focused.
+  updated() {
     if (!this.hasAttribute("open")) return;
-    const root = this.shadowRoot;
-    const input = root.querySelector("input");
-    if (input) {
-      if (this._inputFocused) { input.focus(); const e = input.value.length; input.setSelectionRange(e, e); }
-      input.addEventListener("focus", () => { this._inputFocused = true; });
-      input.addEventListener("blur", () => { this._inputFocused = false; });
-      input.addEventListener("input", (e) => {
-        this._value = e.target.value;
-        this._active = 0;
-        clearTimeout(this._t);
-        this._t = setTimeout(() => this._runData(), 140);
-        this.update();   // commands re-rank instantly; data follows when the query resolves
-      });
-      input.addEventListener("keydown", (e) => this._onKey(e));
+    const input = this._inputRef.value;
+    if (input && this._inputFocused && this.shadowRoot.activeElement !== input) {
+      input.focus();
+      const e = input.value.length;
+      input.setSelectionRange(e, e);
     }
-    root.querySelector(".backdrop")?.addEventListener("mousedown", () => this.close());
-    root.querySelectorAll(".item[data-i]").forEach((li) => {
-      li.addEventListener("mousedown", (e) => { e.preventDefault(); this._run(+li.getAttribute("data-i")); });
-      li.addEventListener("mousemove", () => { const i = +li.getAttribute("data-i"); if (i !== this._active) { this._active = i; this._syncActive(); } });
-    });
   }
+
+  _onInput = (e) => {
+    this._value = e.target.value;
+    this._active = 0;
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this._runData(), 140);
+    this.requestUpdate();   // commands re-rank instantly; data follows when the query resolves
+  };
 
   _onKey(e) {
     const n = this._flat.length;
@@ -366,14 +369,14 @@ export class WbCommand extends WbElement {
     const e = this._flat[i];
     if (!e) return;
     if (e.kind === "command") {
-      this._emit("wb-command-select", { kind: "command", item: e.item, index: i });
-      if (e.item.run) try { e.item.run(e.item); } catch (err) { console.error("[wb-command] run failed", err); }
+      this._emit("work-command-select", { kind: "command", item: e.item, index: i });
+      if (e.item.run) try { e.item.run(e.item); } catch (err) { console.error("[work-command] run failed", err); }
       if (e.item._el) e.item._el.dispatchEvent(new CustomEvent("select", { bubbles: true, composed: true, detail: { item: e.item } }));
     } else {
       const r = this._dataRows;
       const obj = {};
       r.columns.forEach((c, j) => (obj[c] = r.rows[e.index][j]));
-      this._emit("wb-command-select", { kind: "data", row: obj, index: e.index, item: obj });
+      this._emit("work-command-select", { kind: "data", row: obj, index: e.index, item: obj });
     }
     this.close();
   }
@@ -395,9 +398,9 @@ function highlightTerm(text, term) {
   return highlight(t, [[idx, idx + q.length]]);
 }
 
-// A lightweight declarative slot for command authoring (<wb-command-item …>).
-class WbCommandItem extends HTMLElement {
+// A lightweight declarative slot for command authoring (<work-command-item …>).
+class WorkCommandItem extends HTMLElement {
   connectedCallback() { this.style.display = "none"; }
 }
-define("wb-command-item", WbCommandItem);
-define("wb-command", WbCommand);
+define("work-command-item", WorkCommandItem);
+define("work-command", WorkCommand);

@@ -8,7 +8,16 @@
   <title>workponents · files — specimen</title>
   <!-- the design contract: one token set themes everything -->
   <link rel="stylesheet" href="../src/theme/tokens.css" />
-  <!-- the files domain: native custom elements, ESM, NO build step -->
+  <!-- Lit as a bare specifier — buildless, no bundler, no install -->
+  <script type="importmap">
+    {
+      "imports": {
+        "lit": "https://esm.sh/lit@3.2.1",
+        "lit/": "https://esm.sh/lit@3.2.1/"
+      }
+    }
+  </script>
+  <!-- the files domain: Lit-base custom elements, ESM, NO build step -->
   <script type="module" src="../src/elements/files/index.js"></script>
   <style>
     body { margin: 0; background: var(--wb-bg); color: var(--wb-fg); font-family: var(--wb-font, system-ui); transition: background .2s, color .2s; }
@@ -46,37 +55,37 @@
 
     <h2>The drive drives the preview</h2>
     <p class="note">The drive on the left is a <code>query</code> over a registered <code>assets</code>
-      source (each row = one file). Pick a file; its <code>wb-file-select</code> event carries the row,
-      and the page maps those columns onto the <code>&lt;wb-file&gt;</code> on the right — which previews
+      source (each row = one file). Pick a file; its <code>work-file-select</code> event carries the row,
+      and the page maps those columns onto the <code>&lt;work-file&gt;</code> on the right — which previews
       by <code>type</code>: a text file inline, an image by URL, and a typed placeholder for content that
       lives in the nexus (standalone, no Host → it shows the degraded card). Switch grid/list, sort, filter.</p>
     <div class="md">
-      <wb-drive id="drive" src-name="assets"
+      <work-drive id="drive" src-name="assets"
         query="SELECT name, path, type, size, modified, hash FROM assets"
         name-field="name" path-field="path" type-field="type"
         size-field="size" modified-field="modified" hash-field="hash"
-        view="grid" sort="modified" dir="desc" searchable></wb-drive>
+        view="grid" sort="modified" dir="desc" searchable></work-drive>
 
-      <wb-file id="preview" density="md"></wb-file>
+      <work-file id="preview" density="md"></work-file>
     </div>
 
     <h2>Previews, standalone — text inline · image by URL · typed placeholder</h2>
-    <p class="note">Three <code>&lt;wb-file&gt;</code> cards used on their own. Text and image-by-URL render
+    <p class="note">Three <code>&lt;work-file&gt;</code> cards used on their own. Text and image-by-URL render
       with zero Host; the video card has only a <code>path</code> — its content lives in the nexus, so
       standalone it shows the typed placeholder + the &ldquo;dock to transcode&rdquo; note.</p>
     <div class="md" style="grid-template-columns:1fr 1fr 1fr">
-      <wb-file name="notes.md" type="text/markdown"
-        text="# Release notes&#10;&#10;- files = content-addressed rows&#10;- preview rides the wavelet path&#10;- the index IS a query&#10;&#10;Everything themes from --wb-* tokens."></wb-file>
-      <wb-file id="img-by-url" name="petal.svg" type="image/svg+xml" size="612"></wb-file>
-      <wb-file name="trailer.mp4" type="video/mp4" path="blobs/9f2a…c1" size="18452211"
-        hash="sha256:9f2a7b1c4d8e0f3a6b5c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1c"></wb-file>
+      <work-file name="notes.md" type="text/markdown"
+        text="# Release notes&#10;&#10;- files = content-addressed rows&#10;- preview rides the wavelet path&#10;- the index IS a query&#10;&#10;Everything themes from --wb-* tokens."></work-file>
+      <work-file id="img-by-url" name="petal.svg" type="image/svg+xml" size="612"></work-file>
+      <work-file name="trailer.mp4" type="video/mp4" path="blobs/9f2a…c1" size="18452211"
+        hash="sha256:9f2a7b1c4d8e0f3a6b5c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1c"></work-file>
     </div>
 
     <h2>Add files — a drop is an insert</h2>
-    <p class="note">Drag a file (or click) — <code>&lt;wb-dropzone&gt;</code> normalizes it into a
-      content-addressed record (sha256 over the bytes) and emits <code>wb-file-add</code>; here we
+    <p class="note">Drag a file (or click) — <code>&lt;work-dropzone&gt;</code> normalizes it into a
+      content-addressed record (sha256 over the bytes) and emits <code>work-file-add</code>; here we
       <code>register()</code> the new row straight into the engine, and the drive above re-queries.</p>
-    <wb-dropzone id="drop" multiple></wb-dropzone>
+    <work-dropzone id="drop" multiple></work-dropzone>
 
     <script type="module">
       import { getEngine } from "../src/data/index.js";
@@ -136,19 +145,19 @@
         else if (c && c.text != null) preview.setAttribute("text", c.text);
       }
 
-      drive.addEventListener("wb-file-select", (e) => { showFile(e.detail.file); console.log("[wb-file-select]", e.detail); });
-      drive.addEventListener("wb-drive-ready", (e) => {
-        console.log("[wb-drive-ready]", e.detail);
+      drive.addEventListener("work-file-select", (e) => { showFile(e.detail.file); console.log("[work-file-select]", e.detail); });
+      drive.addEventListener("work-drive-ready", (e) => {
+        console.log("[work-drive-ready]", e.detail);
         if (rows.length) { const f = rows[0]; showFile(f); drive.setAttribute("selected", f.path); }
       }, { once: true });
-      preview.addEventListener("wb-file-open", (e) => console.log("[wb-file-open]", e.detail));
+      preview.addEventListener("work-file-open", (e) => console.log("[work-file-open]", e.detail));
 
       // the standalone image-by-URL card
       document.getElementById("img-by-url").setAttribute("src", PETAL);
 
       // dropzone → register the new row, re-query the drive
-      document.getElementById("drop").addEventListener("wb-file-add", async (e) => {
-        console.log("[wb-file-add]", e.detail);
+      document.getElementById("drop").addEventListener("work-file-add", async (e) => {
+        console.log("[work-file-add]", e.detail);
         for (const f of e.detail.files) {
           const url = URL.createObjectURL(f.file);
           const idx = { name: f.name, path: "uploads/" + f.name, type: f.type, size: f.size, modified: f.modified, hash: f.hash || "" };

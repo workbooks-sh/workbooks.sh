@@ -1,4 +1,4 @@
-// <wb-doc-cell> — a live computed block inside a document. THE differentiator:
+// <work-doc-cell> — a live computed block inside a document. THE differentiator:
 // the block that renders the data also computes it. A cell carries its query as
 // source (preview ≡ source); it reaches an engine through the Dock seam
 // (`this.host`) — DuckDB-wasm / Polars / the OQL kernel resolved local | runtime
@@ -6,11 +6,10 @@
 // to a "computed" preview with sample output (the same shape a real run returns),
 // so the document is never broken by an absent capability.
 //
-// Usage (standalone): <wb-doc-cell lang="sql">SELECT region, sum(rev) ...</wb-doc-cell>
-// Or, embedded by <wb-doc> from a fenced ```sql block in the source.
-import { WbElement, define } from "../../core/element.js";
+// Usage (standalone): <work-doc-cell lang="sql">SELECT region, sum(rev) ...</work-doc-cell>
+// Or, embedded by <work-doc> from a fenced ```sql block in the source.
+import { WbElement, html, css, define } from "../../core/element.js";
 import { defineVariants, variantAttrs } from "../../core/variants.js";
-import { escapeHtml } from "./render.js";
 
 const VARIANTS = defineVariants({
   // how the result renders
@@ -51,7 +50,7 @@ export class WbDocCell extends WbElement {
   static variants = VARIANTS;
   static props = [...variantAttrs(VARIANTS), "lang", "src", "title", "state"];
 
-  static styles = `
+  static styles = css`
     :host { display: block; margin: 1.1em 0; }
     .cell { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
       background: var(--wb-surface); overflow: hidden; box-shadow: var(--wb-shadow-sm); }
@@ -96,6 +95,7 @@ export class WbDocCell extends WbElement {
     .recompute { cursor: pointer; color: var(--wb-brand); border: none; background: none; font: inherit;
       font-family: var(--wb-font-mono); padding: 0; }
     .recompute:hover { text-decoration: underline; }
+    pre.raw { margin: 0; font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); }
   `;
 
   connectedCallback() {
@@ -114,6 +114,7 @@ export class WbDocCell extends WbElement {
     const cap = LANG_CAP[lang] || "kernel";
     this._busy = true;
     this._error = null;
+    this.requestUpdate();
     try {
       if (this.host.available(cap)) {
         // Live path: ask the runtime/kernel to run the cell. The seam exists; a
@@ -131,24 +132,23 @@ export class WbDocCell extends WbElement {
       this._live = false;
     }
     this._busy = false;
-    this.update();
+    this.requestUpdate();
   }
 
   _renderResult() {
     const r = this._result || {};
     const display = this.attr("display") || (r.kind === "metric" ? "metric" : "table");
     if (display === "raw") {
-      return `<pre style="margin:0;font-family:var(--wb-font-mono);font-size:var(--wb-text-sm)">${escapeHtml(JSON.stringify(r, null, 2))}</pre>`;
+      return html`<pre class="raw">${JSON.stringify(r, null, 2)}</pre>`;
     }
     if (r.kind === "metric" || display === "metric") {
-      return `<div class="metric"><span class="v">${escapeHtml(r.value ?? "—")}</span>` +
-        `<span class="l">${escapeHtml(r.label ?? "")}</span>` +
-        (r.delta ? `<span class="d">${escapeHtml(r.delta)}</span>` : "") + `</div>`;
+      return html`<div class="metric"><span class="v">${r.value ?? "—"}</span><span class="l">${r.label ?? ""}</span>${r.delta ? html`<span class="d">${r.delta}</span>` : ""}</div>`;
     }
     const cols = r.columns || [];
     const rows = r.rows || [];
-    return `<table><thead><tr>${cols.map((c) => `<th>${escapeHtml(c)}</th>`).join("")}</tr></thead>` +
-      `<tbody>${rows.map((row) => `<tr>${row.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    return html`<table><thead><tr>${cols.map((c) => html`<th>${c}</th>`)}</tr></thead><tbody>${rows.map(
+      (row) => html`<tr>${row.map((c) => html`<td>${c}</td>`)}</tr>`,
+    )}</tbody></table>`;
   }
 
   render() {
@@ -156,28 +156,22 @@ export class WbDocCell extends WbElement {
     const title = this.attr("title");
     const state = this._error ? "error" : this._live ? "live" : "stub";
     const stateText = this._busy ? "computing…" : this._error ? "compute error" : this._live ? "computed live" : "computed (sample)";
-    return `
+    return html`
       <div class="cell">
         <div class="head">
-          <span class="lang">${escapeHtml(lang)}</span>
-          ${title ? `<span class="title">${escapeHtml(title)}</span>` : ""}
-          <span class="status" data-state="${state}"><span class="dot"></span>${stateText}</span>
+          <span class="lang">${lang}</span>
+          ${title ? html`<span class="title">${title}</span>` : ""}
+          <span class="status" data-state=${state}><span class="dot"></span>${stateText}</span>
         </div>
-        ${this._source ? `<pre class="query">${escapeHtml(this._source)}</pre>` : ""}
-        <div class="out">${this._busy ? '<span style="color:var(--wb-fg-muted)">running…</span>' : this._renderResult()}</div>
+        ${this._source ? html`<pre class="query">${this._source}</pre>` : ""}
+        <div class="out">${this._busy ? html`<span style="color:var(--wb-fg-muted)">running…</span>` : this._renderResult()}</div>
         <div class="foot">
-          <button class="recompute" type="button">recompute</button>
+          <button class="recompute" type="button" @click=${this._compute}>recompute</button>
           <span>·</span>
           <span>${this._live ? "engine: " + (LANG_CAP[lang] || "kernel") : "no engine reached — sample shape shown"}</span>
         </div>
       </div>`;
   }
-
-  update() {
-    super.update();
-    const btn = this.shadowRoot.querySelector(".recompute");
-    if (btn) btn.addEventListener("click", () => this._compute());
-  }
 }
 
-define("wb-doc-cell", WbDocCell);
+define("work-doc-cell", WbDocCell);
