@@ -9,15 +9,19 @@
    * old `{text}` literal which showed raw `**bold**` / `- bullets`.
    *
    * Org prose is rendered by the EXISTING $lib/org-renderer OQL-WASM
-   * pipeline (renderOrg) — no second parser. Component blocks are
-   * dispatched to ChatComponent.
+   * pipeline (renderOrg) — no second parser. Component blocks mount the REAL
+   * <work-gen-block> SDK element (workponents ai domain) via WorkGenBlock —
+   * the Svelte twin (ChatComponent.svelte) is retired. Same syntax, same
+   * structured-prop safety; one shipped implementation, themed via the
+   * --work-* bridge. Interactive blocks fire `work-intent` (bubbles+composed)
+   * which the chat container forwards back into the session.
    *
    * See desktop/docs/waldo-inchat-components.md.
    */
   import { renderMode, splitOrg, type Segment } from "./messageRender";
   import { renderMarkdown } from "./markdown";
   import { renderOrg } from "$lib/org-renderer/render";
-  import ChatComponent from "./ChatComponent.svelte";
+  import WorkGenBlock from "./WorkGenBlock.svelte";
   import "$lib/org-renderer/org.css";
 
   let { text }: { text: string } = $props();
@@ -51,7 +55,7 @@
           <div class="org-doc"><div class="org-content">{@html html}</div></div>
         {/await}
       {:else}
-        <ChatComponent type={seg.type} props={seg.props} body={seg.body} />
+        <WorkGenBlock type={seg.type} props={seg.props} body={seg.body} />
       {/if}
     {/each}
   </div>

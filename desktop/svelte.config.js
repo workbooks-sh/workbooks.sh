@@ -18,6 +18,12 @@ const config = {
       precompress: false,
       strict: true,
     }),
+    // workponents is the sibling SDK package (the real <work-*> Lit
+    // elements). The desktop imports it as `$workponents/...` so the chat
+    // surface renders the SAME elements we ship, not Svelte twins.
+    alias: {
+      $workponents: "../workponents/src",
+    },
   },
 };
 

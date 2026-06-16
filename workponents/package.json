@@ -1,7 +1,7 @@
 {
   "name": "@work.books/workponents",
   "version": "0.0.0",
-  "description": "Workbooks web-component SDK — themed, framework-agnostic <wb-*> custom elements. One substrate, many domains. Runs in the desktop app, any workbook (plain HTML), and as a public dev-kit.",
+  "description": "Workbooks web-component SDK — themed, framework-agnostic <work-*> custom elements. One substrate, many domains. Runs in the desktop app, any workbook (plain HTML), and as a public dev-kit.",
   "type": "module",
   "license": "Apache-2.0",
   "exports": {
@@ -12,7 +12,9 @@
   "files": ["src", "registry"],
   "scripts": {
     "demo": "python3 -m http.server 5340",
-    "build": "node tools/build.js"
+    "build": "node tools/build.js",
+    "cem": "node tools/cem.mjs",
+    "lint:design": "node tools/design-lint.mjs"
   },
   "keywords": ["web-components", "custom-elements", "workbooks", "design-system", "agnostic"]
 }

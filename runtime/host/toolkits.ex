@@ -65,14 +65,89 @@ defmodule Workbooks.Toolkits do
   end
 
   @doc """
-  Resolve an `:agent:` node's `:TOOLKITS:` list → the toolkit nodes it may use,
-  in declared order. Unknown names are dropped (a missing toolkit is not a crash).
+  Resolve an `:agent:` node's `:TOOLKITS:` list → the toolkit nodes it may use.
+  Computes the **transitive closure** over toolkit→toolkit `:REQUIRES:` edges
+  BEFORE flattening: subscribing to a toolkit that REQUIRES another pulls the
+  dependency in once (dedup, declared-first order). A `:REQUIRES:` token is a
+  graph edge only when it names a known toolkit id (optionally `id@semver`);
+  native-CLI pre-flights (`git>=2.30`) are not edges. The DAG is cycle-checked —
+  a back-edge raises. Unknown names are dropped (a missing toolkit is not a crash).
+
+  Discovery/closure ONLY — caps stay grant-gated (a dep edge never widens powers).
   """
   def resolve(org, agent_id) when is_binary(org) do
     hs = OQL.parse_headlines(org)
     wanted = hs |> agent(agent_id) |> names()
-    by_id = hs |> Enum.filter(&toolkit?/1) |> Map.new(&{&1["id"], view(&1)})
-    wanted |> Enum.map(&by_id[&1]) |> Enum.reject(&is_nil/1)
+    tks = hs |> Enum.filter(&toolkit?/1)
+    by_id = Map.new(tks, &{&1["id"], view(&1)})
+    # Edges sourced from each in-org toolkit node's :REQUIRES: drawer property.
+    edges = Map.new(tks, &{&1["id"], parse_requires((&1["props"] || %{})["REQUIRES"])})
+    closure(wanted, edges, Map.keys(by_id))
+    |> Enum.map(&by_id[&1])
+    |> Enum.reject(&is_nil/1)
+  end
+
+  @doc """
+  Transitive closure of `roots` over toolkit-id `:REQUIRES:` edges.
+
+  `edges` maps a toolkit id → its parsed `#+REQUIRES` tokens (the `parse_requires`
+  shape). `known` is the set of installed toolkit ids — a `{:dep, name, _}` token
+  is followed ONLY when `name ∈ known` (otherwise it's a native-CLI pre-flight, not
+  a graph edge). Returns ids in declared-first, dependency-after order, deduped.
+  Cycle-detects: a back-edge (a node re-entered while still on the active path)
+  raises `ArgumentError` — the dependency graph is a DAG.
+  """
+  def closure(roots, edges, known) do
+    known = MapSet.new(known)
+
+    {acc, _seen} =
+      Enum.reduce(roots, {[], MapSet.new()}, fn id, {acc, seen} ->
+        visit(id, edges, known, acc, seen, MapSet.new())
+      end)
+
+    Enum.reverse(acc)
+  end
+
+  # DFS post-order with an active-path set for cycle detection. `acc` accumulates
+  # ids reversed (a dep is appended before its dependent, so reverse yields
+  # declared-first/dep-after); `seen` dedups across the whole walk.
+  defp visit(id, edges, known, acc, seen, path) do
+    cond do
+      MapSet.member?(path, id) ->
+        raise ArgumentError, "toolkit dependency cycle through #{id} (the REQUIRES graph must be a DAG)"
+
+      MapSet.member?(seen, id) ->
+        {acc, seen}
+
+      true ->
+        dep_ids =
+          for {:dep, name, _raw} <- Map.get(edges, id, []), MapSet.member?(known, name), do: name
+
+        {acc, seen} =
+          Enum.reduce(dep_ids, {acc, seen}, fn dep, {acc, seen} ->
+            visit(dep, edges, known, acc, seen, MapSet.put(path, id))
+          end)
+
+        {[id | acc], MapSet.put(seen, id)}
+    end
+  end
+
+  @doc """
+  Expand a flat list of declared toolkit ids into the transitive closure over
+  on-disk `#+REQUIRES` toolkit-id edges — the disk-backed counterpart of the
+  in-org `closure/3`, used by `injection_text/2`. Reads each toolkit's manifest
+  descriptor for its edges; unknown/uninstalled ids pass through unfollowed.
+  """
+  def closure_disk(ids, root \\ default_root()) do
+    descs = discover_dir(root)
+    known = Enum.map(descs, & &1.id)
+
+    edges =
+      Map.new(descs, fn t ->
+        {t.id, parse_descriptor(File.read!(Path.join(t.dir, "manifest.org"))).requires}
+      end)
+
+    closure(ids, edges, known)
   end
 
   @doc """
@@ -134,12 +209,17 @@ defmodule Workbooks.Toolkits do
   (tagline + skill slugs), plus the ONE query pattern for going deeper. Deliberately
   minimal: the index tells the agent WHAT exists and HOW to read more; the skill
   bodies stay on demand (`wb toolkit show <id> <skill>`), never in the prompt.
+
+  The declared list is first expanded over the `#+REQUIRES` dependency graph
+  (`closure_disk/2`) so a toolkit's required toolkits land in the index too —
+  subscribe to A that REQUIRES B and B's entry/skills appear once.
   """
   def injection_text(names, root \\ default_root())
   def injection_text([], _root), do: ""
 
   def injection_text(names, root) do
     tks = discover_dir(root) |> Map.new(&{&1.id, &1})
+    names = closure_disk(names, root)
 
     rows =
       names
@@ -514,8 +594,48 @@ defmodule Workbooks.Toolkits do
       wasm_path: kw(body, "WASM_PATH"),
       preopen: kw(body, "PREOPEN"),
       author_did: kw(body, "AUTHOR_DID"),
-      signature: kw(body, "SIGNATURE")
+      signature: kw(body, "SIGNATURE"),
+      requires: parse_requires(kw(body, "REQUIRES"))
     }
+  end
+
+  # `#+REQUIRES` is a mixed list: some entries are toolkit→toolkit dependency
+  # edges, others are native-CLI pre-flights the skills assume. Parse the raw
+  # line into typed tokens WITHOUT yet knowing the toolkit id set — classification
+  # against known ids happens in closure/2. Two syntaxes disambiguate intent:
+  #
+  #   * `git>=2.30`, `node>=20`, `cargo`, `xcode`, `wb` → :cli pre-flight. A token
+  #     carrying a version OPERATOR (>= > <= < = ~ ^) is always a native CLI (the
+  #     existing TOOLKIT-MANIFEST prose form — keeps the shipped manifests as
+  #     pre-flights, zero graph edges).
+  #   * `glyphs`, `icons@0.2.0` → :dep candidate (bare id, optionally npm-style
+  #     `@semver`). Becomes a real edge only if the bare name matches a known
+  #     `:toolkit:` id; otherwise it falls back to a :cli pre-flight in closure/2.
+  #
+  # Parenthetical prose (e.g. "(to deploy the gateway)") is stripped as comment.
+  defp parse_requires(nil), do: []
+
+  defp parse_requires(line) do
+    line
+    |> String.replace(~r/\([^)]*\)/, " ")
+    |> String.split([",", " "], trim: true)
+    |> Enum.map(&classify_requirement/1)
+  end
+
+  @req_op ~r/(>=|<=|>|<|=|~|\^)/
+
+  defp classify_requirement(tok) do
+    cond do
+      Regex.match?(@req_op, tok) ->
+        {:cli, tok}
+
+      String.contains?(tok, "@") ->
+        [name | _] = String.split(tok, "@", parts: 2)
+        {:dep, name, tok}
+
+      true ->
+        {:dep, tok, tok}
+    end
   end
 
   # crate:<name> | git+<url> | path:<dir> | wasm:<url> | archive:<url> → tagged tuple.

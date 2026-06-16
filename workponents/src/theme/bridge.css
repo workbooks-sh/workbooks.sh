@@ -1,0 +1,85 @@
+/* workponents · theme bridge — derive `--work-*` from the desktop `--color-*`.
+ *
+ * ONE DIRECTION ONLY: the desktop app's existing `--color-*` registry (app.css
+ * @theme + themes.svelte.ts runtime overrides) is the source; `--work-*` is the
+ * alias. Include this stylesheet in the desktop (or any host that already speaks
+ * `--color-*`) and every `<work-*>` element inherits the host theme through the
+ * shadow boundary with ZERO desktop churn — no token rename, no per-element edit.
+ *
+ * Why a separate file (not folded into tokens.css): tokens.css is the canonical
+ * standalone contract for no-host artifacts (a bare workbook .html themes itself
+ * from tokens.css + registry.js). bridge.css is opt-in glue you load ONLY inside
+ * a `--color-*` host. The two never load together.
+ *
+ * `--color-*` names are read from desktop/src/app.css. Tokens the host registry
+ * has no equivalent for (on-brand, radius/space scale, type scale, display font)
+ * fall back to the same literals tokens.css uses — so a `work-*` element under
+ * the bridge is fully themed, never half-tokened. Where a `--color-*` exists it
+ * wins via var() with the literal as the fallback arm. */
+
+:root {
+  /* surfaces — direct host equivalents */
+  --work-bg: var(--color-page, #f7f6f1);
+  --work-surface: var(--color-surface, #ffffff);
+  --work-surface-soft: var(--color-surface-soft, #efede6);
+  --work-border: var(--color-border, rgba(18, 19, 22, 0.13));
+  --work-border-strong: var(--color-border-strong, rgba(18, 19, 22, 0.28));
+
+  /* foreground — direct host equivalents */
+  --work-fg: var(--color-fg, #121316);
+  --work-fg-muted: var(--color-fg-muted, rgba(18, 19, 22, 0.6));
+  --work-fg-subtle: var(--color-fg-subtle, rgba(18, 19, 22, 0.38));
+
+  /* brand + state — host has brand/brand-soft/brand-ink/ring/ok/warn/err.
+   * NOTE the host's --color-accent is the INK button fill (paper canon), NOT
+   * the bloom brand, so --work-brand maps to --color-brand (the bloom), not
+   * accent. --work-on-brand has no host token (host pairs brand with ink text
+   * elsewhere) → literal fallback. */
+  --work-brand: var(--color-brand, #13d943);
+  --work-brand-soft: var(--color-brand-soft, rgba(19, 217, 67, 0.13));
+  --work-brand-ink: var(--color-brand-ink, #0a2413);
+  --work-on-brand: #07210f;
+  --work-ring: var(--color-ring, rgba(19, 217, 67, 0.5));
+  --work-ok: var(--color-ok, #0fae38);
+  --work-warn: var(--color-warn, #b8861b);
+  --work-err: var(--color-err, #c92f2f);
+  /* state ink + tints — no host equivalent; tokens.css literals. */
+  --work-on-state: #ffffff;
+  --work-on-warn: #1c1304;
+  --work-ok-soft: rgba(15, 174, 56, 0.14);
+  --work-warn-soft: rgba(184, 134, 27, 0.14);
+  --work-err-soft: rgba(201, 47, 47, 0.14);
+
+  /* pastel chips — direct host equivalents */
+  --work-chip-blue: var(--color-chip-blue, #aecbf2);
+  --work-chip-green: var(--color-chip-green, #b6e2bd);
+  --work-chip-peach: var(--color-chip-peach, #f3cfae);
+  --work-chip-lavender: var(--color-chip-lavender, #d4c9f0);
+
+  /* shape — host has --radius-lg (8px) only; map --work-radius* around it. */
+  --work-radius: var(--radius-lg, 12px);
+  --work-radius-sm: 8px;
+  --work-radius-lg: 18px;
+  --work-radius-pill: 999px;
+
+  /* spacing — no host scale; tokens.css literals. */
+  --work-space-1: 4px;
+  --work-space-2: 8px;
+  --work-space-3: 12px;
+  --work-space-4: 16px;
+  --work-space-5: 24px;
+
+  /* type — host has --font-sans / --font-mono; no display or text scale. */
+  --work-font: var(--font-sans, "Geist", system-ui, -apple-system, sans-serif);
+  --work-font-mono: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  --work-font-display: var(--font-sans, "Franie", "Geist", sans-serif);
+  --work-text-sm: 12.5px;
+  --work-text: 14px;
+  --work-text-lg: 16px;
+
+  /* depth + motion — host has --shadow-pop; no -sm/ease/dur. */
+  --work-shadow: var(--shadow-pop, 0 1px 2px rgba(18, 19, 22, 0.06), 0 8px 24px rgba(18, 19, 22, 0.08));
+  --work-shadow-sm: 0 1px 2px rgba(18, 19, 22, 0.08);
+  --work-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --work-dur: 0.14s;
+}

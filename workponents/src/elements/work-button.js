@@ -40,9 +40,9 @@ export class WbButton extends WbElement {
 
     /* tone sets the accent the variants paint with */
     :host([tone="neutral"]) button { --_a: var(--work-fg); --_ink: var(--work-surface); --_soft: var(--work-surface-soft); }
-    :host([tone="ok"])      button { --_a: var(--work-ok);  --_ink: #fff; --_soft: var(--work-brand-soft); }
-    :host([tone="warn"])    button { --_a: var(--work-warn);--_ink: #1c1304; --_soft: rgba(184,134,27,0.14); }
-    :host([tone="err"])     button { --_a: var(--work-err); --_ink: #fff; --_soft: rgba(201,47,47,0.14); }
+    :host([tone="ok"])      button { --_a: var(--work-ok);  --_ink: var(--work-on-state); --_soft: var(--work-ok-soft); }
+    :host([tone="warn"])    button { --_a: var(--work-warn);--_ink: var(--work-on-warn); --_soft: var(--work-warn-soft); }
+    :host([tone="err"])     button { --_a: var(--work-err); --_ink: var(--work-on-state); --_soft: var(--work-err-soft); }
     button { --_a: var(--work-brand); --_ink: var(--work-on-brand); --_soft: var(--work-brand-soft); }
 
     /* variant decides how the tone is applied */

@@ -58,7 +58,9 @@ export default defineConfig({
       ]
         .filter(Boolean)
         .flatMap((v) => (v as string).split(":"));
-      return extra.length ? { allow: [".", ...extra] } : undefined;
+      // The sibling workponents package ($workponents alias) lives outside
+      // the desktop root; allow Vite to serve its source.
+      return { allow: [".", "../workponents", ...extra] };
     })(),
   },
 });

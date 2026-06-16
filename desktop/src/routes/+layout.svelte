@@ -4,6 +4,11 @@
   import "$lib/platform/webHost";
   import { onMount } from "svelte";
   import "../app.css";
+  // Theme bridge — derives the workponents --work-* contract from the
+  // desktop's own --color-* registry, so the SDK's <work-*> elements (e.g.
+  // the in-chat <work-gen-block>) inherit the app's light/dark theme with
+  // zero per-element wiring. Must load after app.css.
+  import "$workponents/theme/bridge.css";
   import Titlebar from "$lib/components/Titlebar.svelte";
   import LiveBar from "$lib/components/LiveBar.svelte";
   import WorkgateModal from "$lib/workgate/WorkgateModal.svelte";

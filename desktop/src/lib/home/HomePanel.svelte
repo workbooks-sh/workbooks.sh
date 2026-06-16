@@ -169,26 +169,62 @@
     }
   }
 
-  // An `:action open` button in an agent reply (or any chat-action with a
-  // target path) opens the workbook chat-left / workbook-right (FIX 2) — the
-  // same split the agent's `wb app open-tab` drives, but user-clickable and
-  // deterministic. Other actions are ignored here.
-  function onChatAction(e: Event) {
-    const detail = (e as CustomEvent).detail as { action?: string; target?: string } | null;
-    if (!detail || detail.action !== "open") return;
-    const target = (detail.target ?? "").trim();
-    if (!target) return;
-    void import("$lib/tabs/agentOpen").then((m) => m.openFromAgent(target));
+  // Close the work-intent loop. A <work-gen-block> button/share fires a
+  // `work-intent` CustomEvent (bubbles + composed, so it reaches window even
+  // from inside the element's shadow root). Two dispositions:
+  //   • `open` (carries a target path) → open the workbook chat-left /
+  //     workbook-right deterministically — no round-trip needed (FIX 2, the
+  //     same split `wb app open-tab` drives).
+  //   • everything else (e.g. a button :action, a share invite) → forward
+  //     `{action, detail}` back into the SESSION as a follow-up user turn, so
+  //     the agent re-enters the loop on a button press (was a dead-end before).
+  function describeIntent(d: Record<string, unknown>): string {
+    const action = String(d.action ?? "button");
+    if (action === "share") {
+      const members = Array.isArray(d.members) ? (d.members as string[]).join(", ") : "";
+      const role = d.role ? ` as ${d.role}` : "";
+      const target = d.target ? ` to ${d.target}` : "";
+      return `Send the invite${target}${members ? ` for ${members}` : ""}${role}.`;
+    }
+    const label = d.label ? ` "${d.label}"` : "";
+    const target = d.target ? ` (${d.target})` : "";
+    return `I clicked the${label} action${target}. Please continue.`;
+  }
+
+  async function onWorkIntent(e: Event) {
+    const detail = (e as CustomEvent).detail as
+      | { action?: string; target?: string; [k: string]: unknown }
+      | null;
+    if (!detail) return;
+    if (detail.action === "open") {
+      const target = (detail.target ?? "").trim();
+      if (!target) return;
+      void import("$lib/tabs/agentOpen").then((m) => m.openFromAgent(target));
+      return;
+    }
+    // Re-enter the agent loop: echo a follow-up turn and send it, mirroring
+    // submit() (the composer's own send path).
+    if (sending || sidecar.status.state !== "ready") return;
+    const followUp = describeIntent(detail);
+    sending = true;
+    chatSession.pushEcho(followUp);
+    try {
+      await chatSession.send(followUp, { agentSlug: WALDO_SLUG });
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    } finally {
+      sending = false;
+    }
   }
 
   onMount(() => {
     chatSession.init();
     void keys.init().catch(() => {});
-    window.addEventListener("wb-chat-action", onChatAction);
+    window.addEventListener("work-intent", onWorkIntent);
     queueMicrotask(() => textareaEl?.focus());
   });
   onDestroy(() => {
-    window.removeEventListener("wb-chat-action", onChatAction);
+    window.removeEventListener("work-intent", onWorkIntent);
     // Leaving the create surface must not strand the inverted backdrop.
     chatBackdrop.active = false;
   });
