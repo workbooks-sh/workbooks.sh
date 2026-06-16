@@ -1,0 +1,45 @@
+# brandnana — brand identity
+
+# When to use this
+
+Pull a brand's core identity — the consolidated record, or one facet (logo,
+fonts, palette, a product page). First move for almost any brand task.
+
+# Common verbs
+
+```bash
+brandnana brand fetch <domain>            # consolidated identity record
+brandnana brand fetch <domain> --no-save  # don't write local .brandnana/ sqlite
+brandnana brand logo <domain>             # logo only, via the cascade
+brandnana brand fonts <domain>            # typography (has a WAF-bypass fallback)
+brandnana brand palette <domain>          # colour tokens
+brandnana brand product <domain> <url>    # parse one product page
+```
+
+Add `--json` to any verb for structured output. `--base-url <url>` overrides the
+API endpoint (rarely needed). `brand fetch` persists to `.brandnana/brandnana.sqlite`
+by default — pass `--no-save` for a read-only probe.
+
+# What "good" looks like
+
+- `fetch` returns logo + fonts + palette + products in one shot — prefer it over
+  calling each facet separately unless you only need one.
+- `logo` returns ranked candidates with a `recommended` index + per-candidate
+  `confidence`, `source`, and `format`. Trust `recommended`; report its `url`.
+  The cascade probes the brand's homepage, Wikipedia Commons SVGs, logo.dev
+  (only when `LOGO_DEV_TOKEN` is set), and simpleicons.org, rejecting
+  favicon-shaped app-icons. Quality depends on which sources hit: a
+  low-confidence (≤0.4) top candidate means the homepage + official logo.dev
+  sources were unavailable and you're seeing a community/last-resort fallback.
+
+# Common pitfalls
+
+- Reporting a logo URL without checking `recommended` / `confidence`.
+- Re-fetching facets one-by-one when `brand fetch` already returned them.
+- Echoing `$BRANDNANA_API_KEY` — never.
+
+# See also
+
+- `overview` — the full verb map + cost discipline.
+- `resolve` — canonicalize a fuzzy brand reference before `fetch`.
+- `design` — structured design tokens (deeper than `palette`).

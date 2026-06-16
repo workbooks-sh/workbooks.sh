@@ -23,8 +23,9 @@ defmodule Workbooks.ToolkitGraphTest do
   end
 
   # Build a scratch toolkit root we fully control. `tks` is a list of
-  # {id, requires_line | nil} — each becomes <root>/<id>/manifest.org with a
-  # skills/overview.org so injection_text has a skill to list.
+  # {id, requires_line | nil} — each becomes <root>/<id>/manifest.html (a single
+  # `<work-toolkit>` element) with a skills/overview.md so injection_text has a
+  # skill to list.
   defp scratch_root(tks) do
     base = Path.join(System.tmp_dir!(), "wb_graph_#{:erlang.unique_integer([:positive])}")
     root = Path.join(base, "root")
@@ -32,24 +33,17 @@ defmodule Workbooks.ToolkitGraphTest do
     for {id, requires} <- tks do
       dir = Path.join(root, id)
       File.mkdir_p!(Path.join(dir, "skills"))
-      req_line = if requires, do: "#+REQUIRES: #{requires}\n", else: ""
+      req_attr = if requires, do: ~s( requires="#{requires}"), else: ""
 
-      File.write!(Path.join(dir, "manifest.org"), """
-      #+TITLE: #{id} toolkit
-      #+STATUS: stable
-      #+TAGLINE: tagline for #{id}
-      #{req_line}
-      * #{id} — scratch                                            :toolkit:
-        :PROPERTIES:
-        :ID:        #{id}
-        :STATUS:    stable
-        :SKILL_DIR: skills/
-      #{if requires, do: "  :REQUIRES:  #{requires}\n", else: ""}  :END:
+      File.write!(Path.join(dir, "manifest.html"), """
+      <work-toolkit id="#{id}" status="stable" tagline="tagline for #{id}" skill-dir="skills/"#{req_attr}>
+        <work-doc title="#{id} — scratch"></work-doc>
+      </work-toolkit>
       """)
 
-      File.write!(Path.join([dir, "skills", "overview.org"]), """
-      #+TITLE: #{id} overview
-      #+CAPTION: #{id} cap
+      File.write!(Path.join([dir, "skills", "overview.md"]), """
+      # #{id} overview
+      ## #{id} cap
       the #{id} skill body
       """)
     end
@@ -143,8 +137,9 @@ defmodule Workbooks.ToolkitGraphTest do
     test "version-operator tokens are :cli; bare/@semver names are :dep candidates" do
       d =
         Toolkits.parse_descriptor("""
-        #+TITLE: x
-        #+REQUIRES: git>=2.30, glyphs, icons@0.2.0 cargo (build only)
+        <work-toolkit id="x" requires="git>=2.30, glyphs, icons@0.2.0 cargo (build only)">
+          <work-doc title="x"></work-doc>
+        </work-toolkit>
         """)
 
       # version-pinned → always a native CLI pre-flight, never an edge
@@ -158,8 +153,8 @@ defmodule Workbooks.ToolkitGraphTest do
       refute Enum.any?(d.requires, fn t -> match?({_, "build"}, t) or match?({_, "build", _}, t) end)
     end
 
-    test "no #+REQUIRES → empty requires (no crash)" do
-      assert Toolkits.parse_descriptor("#+TITLE: x\n").requires == []
+    test "no requires attr → empty requires (no crash)" do
+      assert Toolkits.parse_descriptor(~s(<work-toolkit id="x"></work-toolkit>)).requires == []
     end
   end
 
@@ -171,10 +166,10 @@ defmodule Workbooks.ToolkitGraphTest do
       # cargo, xcode, wb, …) — none must become a graph edge against the real id
       # set, or the closure would silently widen a long-stable agent's index.
       known =
-        Path.wildcard(Path.join(@root, "*/manifest.org"))
+        Path.wildcard(Path.join(@root, "*/manifest.html"))
         |> Enum.map(&(Path.dirname(&1) |> Path.basename()))
 
-      for manifest <- Path.wildcard(Path.join(@root, "*/manifest.org")) do
+      for manifest <- Path.wildcard(Path.join(@root, "*/manifest.html")) do
         d = Toolkits.parse_descriptor(File.read!(manifest))
 
         for t <- d.requires do

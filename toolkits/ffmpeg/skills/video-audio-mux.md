@@ -1,0 +1,223 @@
+# ffmpeg — audio mux (replace · add · mix · normalize · strip)
+0.1.0
+Use when you need to change a video's AUDIO — swap the track for new music, add a track, mix two tracks (music under voiceover), normalize loudness (loudnorm two-pass), strip audio, or fix A/V sync. Covers -map stream selection, -shortest, and the async/sync gotchas.
+
+# When to use this
+NETWORK: no
+DESTRUCTIVE: no
+
+  The picture is fine but the AUDIO needs work:
+
+  - *replace* the audio (drop original, attach new music/VO)
+  - *add* a track (keep original, add a second selectable track)
+  - *mix* two tracks into one (music bed UNDER a voiceover)
+  - *normalize loudness* to a broadcast/streaming target (loudnorm)
+  - *strip* audio entirely (silent video)
+  - *fix sync* — offset or resample audio that drifts vs the video
+
+  The key concept is `-map`: which streams from which inputs end up
+  in the output, and in what order. ffmpeg's DEFAULT mapping (one
+  video + one audio, "best" of each) silently drops everything else
+  — so any multi-track operation needs explicit `-map`.
+
+  NOT for: extracting audio OUT to a file ([extract-audio](extract-audio.md));
+  re-encoding the video itself ([transcode-to-h264](transcode-to-h264.md)).
+
+# -map in one paragraph
+
+  `-map I:T` selects stream type `T` from input index `I`. Examples:
+  `-map 0:v` ` all video from input 0; `-map 1:a= = all audio from
+  input 1; `-map 0:a:0` = the FIRST audio stream of input 0. With NO
+  `-map`, ffmpeg auto-picks one video + one audio and discards the
+  rest — that's the trap behind "my second track disappeared." A
+  trailing `?` (`-map 0:a?`) makes the selection optional (no error
+  if that stream is absent).
+
+# Workflow
+
+## Replace the audio (drop original, attach new)
+
+## verify both inputs
+```bash
+  test -f video.mp4 || { echo "video missing"; exit 1; }
+  test -f music.mp3 || { echo "audio missing"; exit 1; }
+  ffprobe -v error -show_entries stream=codec_type,duration -of csv video.mp4
+  ffprobe -v error -show_entries stream=codec_type,duration -of csv music.mp3
+```
+
+## video from input 0, audio from input 1, video stream-copied
+```bash
+  ffmpeg -i video.mp4 -i music.mp3 \
+    -map 0:v:0 -map 1:a:0 \
+    -c:v copy -c:a aac -b:a 192k \
+    -shortest -movflags +faststart out.mp4
+  # -map 0:v:0 = video from file 0; -map 1:a:0 = audio from file 1.
+  # -c:v copy = no video re-encode (fast). -shortest = stop at the
+  #   shorter of the two so a long song doesn't extend the video.
+```
+
+## Add a track (keep original AND add a second)
+
+## output has BOTH audio tracks (original + commentary), selectable
+```bash
+  ffmpeg -i video.mp4 -i commentary.m4a \
+    -map 0:v:0 -map 0:a:0 -map 1:a:0 \
+    -c:v copy -c:a aac -b:a 160k \
+    -movflags +faststart out.mp4
+  # two audio streams in the output; players let the viewer pick.
+  # Optionally label: -metadata:s:a:0 title=Original -metadata:s:a:1 title=Commentary
+```
+
+## Mix two tracks into ONE (music bed under voiceover)
+
+  `amix` sums inputs; lower the music with `volume` first so the VO
+  sits on top. `amix` normalizes by default, which can DUCK both —
+  =normalize=0= keeps levels predictable.
+
+## voiceover at full level, music at 25% under it
+```bash
+  ffmpeg -i video.mp4 -i voiceover.wav -i music.mp3 -filter_complex \
+    "[2:a]volume=0.25[bed]; \
+     [1:a][bed]amix=inputs=2:duration=first:normalize=0[mix]" \
+    -map 0:v:0 -map "[mix]" \
+    -c:v copy -c:a aac -b:a 192k \
+    -movflags +faststart out.mp4
+  # volume=0.25 ducks the music to 25%. amix duration=first ends with
+  # input 1 (the VO). normalize=0 stops amix from auto-attenuating.
+  # For real ducking that dips music ONLY while VO plays, see sidechaincompress.
+```
+
+## auto-duck music when voice is present (sidechaincompress)
+```bash
+  ffmpeg -i video.mp4 -i voiceover.wav -i music.mp3 -filter_complex \
+    "[2:a][1:a]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300[ducked]; \
+     [1:a][ducked]amix=inputs=2:normalize=0[mix]" \
+    -map 0:v:0 -map "[mix]" \
+    -c:v copy -c:a aac -b:a 192k out.mp4
+  # the VO (input 1) drives the compressor on the music (input 2):
+  # music dips while the voice talks, recovers in the gaps.
+```
+
+## Normalize loudness (loudnorm two-pass — EBU R128)
+
+  Single-pass `loudnorm` works but is approximate. The TWO-PASS
+  flow measures the clip, then applies an exact correction to hit a
+  target integrated loudness (`I`), true peak (`TP`), and range
+  (`LRA`). -14 LUFS is the common streaming/social target.
+
+## pass 1 — measure (prints JSON to stderr)
+```bash
+  ffmpeg -i input.mp4 -af \
+    "loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json" \
+    -f null - 2>&1 | sed -n '/{/,/}/p'
+  # capture input_i, input_tp, input_lra, input_thresh, target_offset
+  # from the printed JSON for pass 2.
+```
+
+## pass 2 — apply with the measured values (linear, accurate)
+```bash
+  ffmpeg -i input.mp4 -af \
+    "loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=-21.3:measured_TP=-5.1:measured_LRA=7.2:measured_thresh=-32.1:offset=-0.4:linear=true" \
+    -c:v copy -c:a aac -b:a 192k out.mp4
+  # plug the pass-1 numbers into measured_*. linear=true gives a single
+  # linear gain (cleaner than dynamic) when the source fits the target.
+```
+
+## quick single-pass (good enough for non-critical work)
+```bash
+  ffmpeg -i input.mp4 -af "loudnorm=I=-14:TP=-1.5:LRA=11" \
+    -c:v copy -c:a aac -b:a 192k out.mp4
+```
+
+## Strip audio entirely
+
+## silent video (video stream-copied, no re-encode)
+```bash
+  ffmpeg -i input.mp4 -an -c:v copy out.mp4
+  # -an = no audio. -c:v copy keeps it fast (nothing to re-encode).
+```
+
+## Fix A/V sync
+
+## nudge audio earlier/later relative to video
+```bash
+  # audio is 200ms LATE → delay the VIDEO start by trimming audio in early:
+  ffmpeg -i input.mp4 -itsoffset 0.2 -i input.mp4 \
+    -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac out.mp4
+  # -itsoffset shifts the SECOND input's timestamps. Re-mapping v from
+  # input 0 and a from input 1 (same file) applies the offset to audio only.
+```
+
+## audio drifts progressively (clock mismatch) → resample to sync
+```bash
+  ffmpeg -i input.mp4 -af "aresample=async=1" \
+    -c:v copy -c:a aac -b:a 192k out.mp4
+  # async=1 inserts/drops samples to keep audio aligned to the video clock.
+  # Use for slow drift; use -itsoffset for a constant offset.
+```
+
+## Verify duration parity + audio presence
+
+## video and audio durations should match (no -shortest surprise)
+```bash
+  test -f "$1" || { echo "output missing"; exit 1; }
+  ffprobe -v error -show_entries stream=codec_type,duration \
+    -of default=nw=1 "$1"
+  # confirm an audio stream exists (unless you stripped it) and durations align.
+```
+
+# Common pitfalls
+
+  1. *Default mapping drops streams silently.* The moment you have
+     more than one video or audio stream, the no-`-map` default
+     keeps only "the best" of each and discards the rest with no
+     error. Always `-map` explicitly for multi-track work.
+
+  2. *New audio extends the video (or video runs silent at the end).*
+     If the music is longer than the video and you omit `-shortest`,
+     the output is padded to the audio length (frozen/last frame).
+     If the music is shorter, the tail is silent. `-shortest` cuts
+     to the shorter input.
+
+  3. *amix auto-attenuation.* `amix` normalizes by default (divides
+     by input count), so mixing two tracks can make BOTH quieter and
+     unbalanced. Set =normalize=0= and control levels with `volume`.
+
+  4. *loudnorm single-pass is approximate.* It can overshoot/
+     undershoot the target. For anything published, do the two-pass
+     (measure → apply with `measured_*`) to hit the LUFS target.
+
+  5. *Forgetting -c:v copy when only audio changes.* Re-encoding the
+     video to swap audio wastes time and quality. If you're not
+     touching the picture, `-c:v copy` keeps it lossless and fast.
+
+  6. *itsoffset vs aresample confusion.* A CONSTANT offset (lip-sync
+     is uniformly off) → `-itsoffset`. PROGRESSIVE drift (gets worse
+     over time, a clock mismatch) → =aresample=async=1=. Using the
+     wrong one won't fix the problem.
+
+  7. *Mixing/muxing incompatible sample rates.* Tracks at 44.1k and
+     48k can glitch when mixed. `amix` resamples, but to be safe add
+     =aresample=48000= per input before `amix`.
+
+  8. *`-c:a copy` with a filter.* You can't stream-copy audio AND run
+     an audio filter (`volume`, `loudnorm`, `amix`) on it — filtering
+     forces a re-encode. Specify `-c:a aac` (or similar) whenever a
+     filter touches the audio.
+
+# Verification checklist
+
+  - [ ] Output has the expected number of audio streams
+  - [ ] Video + audio durations align (no -shortest surprise)
+  - [ ] Mix balance correct (VO audible over the music bed)
+  - [ ] Loudness near target (re-measure with loudnorm print_format)
+  - [ ] No A/V desync (lip-sync holds across the whole clip)
+  - [ ] Video stream-copied when the picture was untouched
+
+# See also
+
+  - [extract-audio](extract-audio.md) — pull audio OUT to a standalone file
+  - [video-overlay](video-overlay.md) — PiP whose audio you may want to mix in here
+  - [video-fps-speed](video-fps-speed.md) — atempo keeps audio synced under speed changes
+  - [concat](concat.md) — audio-param mismatches that bite when joining clips
+  - =ffmpeg -h filter=amix= / =-h filter=loudnorm= / =-h filter=sidechaincompress=

@@ -16,13 +16,12 @@ defmodule Workbooks.ToolkitBuildTest do
     :ok
   end
 
-  test "parse_descriptor reads #+EXEC / #+BUILD_SRC / #+BUILD_LANG / #+CAPS" do
+  test "parse_descriptor reads exec / build-src / build-lang / caps" do
     body = """
-    #+CLI_BIN: huniq
-    #+EXEC: command
-    #+BUILD_SRC: crate:huniq
-    #+BUILD_LANG: rust
-    #+CAPS: net browse
+    <work-toolkit id="huniq" cli="huniq" exec="command"
+      build-src="crate:huniq" build-lang="rust" caps="net browse">
+      <work-doc title="huniq"></work-doc>
+    </work-toolkit>
     """
 
     d = Toolkits.parse_descriptor(body)
@@ -34,17 +33,18 @@ defmodule Workbooks.ToolkitBuildTest do
     assert d.arg_mode == :argv
   end
 
-  test "parse_descriptor: empty keyword is nil, not the next line" do
-    d = Toolkits.parse_descriptor("#+CAPS:\n\n* heading :toolkit:\n")
+  test "parse_descriptor: empty/absent attribute is nil, not a crash" do
+    d = Toolkits.parse_descriptor(~s(<work-toolkit id="x" caps=""></work-toolkit>))
     assert d.caps == []
     assert d.exec == nil
   end
 
   test "parse_descriptor recognizes git+ and path: build sources" do
-    assert Toolkits.parse_descriptor("#+BUILD_SRC: git+https://x/y").build_src ==
+    assert Toolkits.parse_descriptor(~s(<work-toolkit id="x" build-src="git+https://x/y"></work-toolkit>)).build_src ==
              {:git, "https://x/y"}
 
-    assert Toolkits.parse_descriptor("#+BUILD_SRC: path:./cli").build_src == {:path, "./cli"}
+    assert Toolkits.parse_descriptor(~s(<work-toolkit id="x" build-src="path:./cli"></work-toolkit>)).build_src ==
+             {:path, "./cli"}
   end
 
   test "descriptor/1 reads the huniq fixture manifest" do
@@ -70,16 +70,11 @@ defmodule Workbooks.ToolkitBuildTest do
     File.mkdir_p!(Path.join(tk, "skills"))
     on_exit(fn -> File.rm_rf!(base) end)
 
-    File.write!(Path.join(tk, "manifest.org"), """
-    #+CLI_BIN: jq
-    #+EXEC: command
-    #+BUILD_SRC: crate:huniq
-    #+BUILD_LANG: rust
-    * evil :toolkit:
-      :PROPERTIES:
-      :ID: evil
-      :CLI_BIN: jq
-      :END:
+    File.write!(Path.join(tk, "manifest.html"), """
+    <work-toolkit id="evil" cli="jq" exec="command"
+      build-src="crate:huniq" build-lang="rust">
+      <work-doc title="evil"></work-doc>
+    </work-toolkit>
     """)
 
     out = Toolkits.build_text("evil", root)

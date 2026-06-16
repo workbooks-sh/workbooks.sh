@@ -1,0 +1,46 @@
+<work-toolkit
+  id="workbooks-system"
+  cli="wb"
+  version="0.1.0"
+  status="experimental"
+  tagline="System knowledge for an agent running INSIDE a Workbooks runtime — what a workbook/runtime/toolkit/workflow is, the WASM-only rules of engagement, authoring + publishing from the agent&#x27;s seat, and the product facts to get right when writing about Workbooks."
+  skill-dir="skills/"
+  data-kind="toolkit"
+  data-flow="read overview → branch to the one skill your task needs (concepts for &quot;what is X&quot;, authoring for editing/publishing content, toolkits for using a capability, workflows for board/lifecycle work, writing for prose ABOUT Workbooks). cat a skill only when you reach its step.">
+  <work-doc title="workbooks-system — in-runtime platform knowledge">
+    A *knowledge* toolkit for an agent that is itself running inside a
+    Workbooks runtime. It carries no new CLI binary of its own — =wb= is
+    already on PATH in the runtime — only the org skill files that teach the
+    agent the platform it lives in: what the pieces are, the invariants it
+    must not break, and how to author, publish, and reason about workbooks
+    from the inside.
+
+    The agent&#x27;s reality this toolkit is written FOR:
+
+    - One tool surface — a WASM-sandboxed shell. Capabilities arrive as
+      commands on PATH, never as new tool-registry entries.
+    - WASM commands only — no node / python / cargo / native binaries. Need a
+      capability that isn&#x27;t there? It goes through a compiler lane, not an
+      install.
+    - Files via =vfs_read= / =vfs_write=; the workdir is a tenant git repo.
+    - =wb= available as a command (in-process; same modules the runtime uses).
+    - Network only when granted, via curl-like =fetch=; every action is
+      wall-clock bounded; your commits are public.
+
+    Host-level operations — provisioning machines, building/pushing the
+    runtime image, =wb deploy=, editing host engine code, =fly=/cloud
+    lifecycle — belong to operators OUTSIDE the runtime. They are out of scope
+    for an in-runtime agent; this toolkit names them only to draw the line.
+
+    Skill index (read on demand):
+
+    | Skill        | Use when                                                       |
+    |--------------+----------------------------------------------------------------|
+    | =overview=   | First contact — the three layers, the invariants, which skill next |
+    | =concepts=   | You need &quot;what IS a workbook / runtime / toolkit / workflow / Dock&quot; |
+    | =authoring=  | You&#x27;re creating or editing workbook content + publishing it     |
+    | =toolkits=   | You need a capability — discover + use a toolkit as an agent     |
+    | =workflows=  | You&#x27;re driving an org TODO board / workflow / lifecycle spec     |
+    | =writing=    | You&#x27;re WRITING prose ABOUT Workbooks (product facts + framings)  |
+  </work-doc>
+</work-toolkit>

@@ -256,7 +256,7 @@ defmodule Workbooks.Autopoet.Worker do
     case File.ls(root) do
       {:ok, names} ->
         names
-        |> Enum.filter(&File.exists?(Path.join([root, &1, "manifest.org"])))
+        |> Enum.filter(&File.exists?(Path.join([root, &1, "manifest.html"])))
         |> Enum.sort()
 
       _ ->

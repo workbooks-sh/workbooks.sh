@@ -14,13 +14,12 @@ defmodule Workbooks.ToolchainPalletTest do
   @qjs_sha "b4071ef2fbb2bb693c0bbcfc07cb9d28639fd9cea2fd986824a57aeac929817b"
 
   describe "manifest parsing (no network)" do
-    test "wasm:<url> + #+SHA256 parse into the descriptor" do
+    test "wasm:<url> + sha256 parse into the descriptor" do
       body = """
-      #+CLI_BIN: qjs
-      #+EXEC: command
-      #+BUILD_SRC: wasm:#{@qjs_url}
-      #+SHA256: #{@qjs_sha}
-      #+ARG_MODE: argv
+      <work-toolkit id="qjs" cli="qjs" exec="command"
+        build-src="wasm:#{@qjs_url}" sha256="#{@qjs_sha}" arg-mode="argv">
+        <work-doc title="qjs"></work-doc>
+      </work-toolkit>
       """
 
       d = Toolkits.parse_descriptor(body)

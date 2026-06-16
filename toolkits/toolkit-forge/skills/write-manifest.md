@@ -1,0 +1,123 @@
+# toolkit-forge — write-manifest (the index that routes by need)
+0.1.0
+Use when all skills are written — author the manifest.org with the canonical frontmatter, the :toolkit:-tagged node, and the skill-index table that lists every skill once, keyed by need.
+
+# When to use this
+NETWORK: no
+DESTRUCTIVE: no
+
+  Phase 4 of the forge, after the skills exist. The manifest is the
+  toolkit's front door — what the SessionRunner reads to build the
+  auto-injected TOOLKITS index, and what an agent reads to decide if
+  this toolkit is the right one. Write it LAST so the index matches the
+  skills on disk.
+
+  NOT for: writing skills ([author-deep-skill](author-deep-skill.md)); the final checks
+  ([verify-toolkit](verify-toolkit.md)). Full spec: [AUTHORING.org §"manifest.org"](../../AUTHORING.md).
+
+# The mental model: the index, not the manual
+
+  The manifest indexes skills by NEED; it never duplicates a skill's
+  body. The "Use when" column is the router — an agent matches its
+  intent to a row and =cat=s that one skill. So the triggers must
+  PARTITION the surface (every common need owned once).
+
+  Two invariants the verify phase enforces:
+  - The skill table lists every `skills/*.org` exactly once.
+  - The `:PROPERTIES:` drawer's `:ID:/:CLI_BIN:/:STATUS:` equal the
+    matching `#+` keywords.
+
+# Workflow
+
+## Frontmatter (canonical order, match ffmpeg)
+
+## the manifest header
+```org
+  ,#+TITLE: <name> toolkit
+  ,#+TOOLKIT: <slug>            # whitespace-free; == dir name == :ID:
+  ,#+VERSION: 0.1.0             # the WRAPPER version, not the CLI's
+  ,#+CLI_BIN: <bin>
+  ,#+CLI_VERSION_RANGE: <range, e.g. >=6.0>
+  ,#+STATUS: stable | experimental | deprecated
+  ,#+TAGLINE: <one sentence — when to reach for this toolkit>
+  ,#+REQUIRES: <extra CLIs>     # omit if none
+```
+
+  Optional richer keys (only if they carry real info): `#+KIND:`,
+  `#+ENV_KEYS:` + `#+ENV_NOTE:` (creds), `#+FLOW:` (the happy-path
+  pipeline). See `../brandnana/manifest.org` for a worked example.
+
+## The :toolkit:-tagged node + skill-index table
+
+## the toolkit headline with the runtime-honored drawer + index
+```org
+  ,* <name> — <what it is>                                       :toolkit:
+    :PROPERTIES:
+    :ID:        <slug>         # == #+TOOLKIT
+    :CLI_BIN:   <bin>          # == #+CLI_BIN
+    :STATUS:    <status>       # == #+STATUS
+    :SKILL_DIR: skills/
+    :END:
+
+    <2-5 sentences: what it wraps, the WHY (what an agent gets wrong
+    from priors / from skimming --help), where NOT to use it.>
+
+    Skill index (read on demand):
+
+    | Skill        | Use when                                  |
+    |--------------+-------------------------------------------|
+    | =overview=   | First contact — what this toolkit covers  |
+    | =<slug>=     | <the NEED that routes here, one line>     |
+```
+
+  Group with `*— GROUP —*` rows only when the surface splits cleanly
+  and there are ≥6 skills.
+
+## Confirm the index matches disk
+
+## pre — the skills must exist before you index them
+```bash
+  ls toolkits/NAME/skills/*.org >/dev/null 2>&1 || { echo "no skills to index"; exit 1; }
+```
+
+## post — every skill file appears in the table exactly once
+```bash
+  cd "$1"
+  for f in skills/*.org; do
+    s=$(basename "$f" .org)
+    n=$(grep -c "=$s=" manifest.org)
+    [ "$n" -ge 1 ] || { echo "MISSING from index: $s"; exit 1; }
+  done
+  echo "index covers every skill"
+```
+
+# Common pitfalls
+
+  1. *Drawer drifts from keywords.* `:ID:` ≠ `#+TOOLKIT`, or `:STATUS:`
+     ≠ `#+STATUS`. They MUST match; verify greps for it.
+  2. *A skill not in the table* (or in twice). The table must be a 1:1
+     index of `skills/*.org`. The post-check above catches it.
+  3. *Duplicating skill bodies.* The manifest is an index — one
+     need-line per skill, never the recipe.
+  4. *use_when restates the slug.* "trim a video" for `trim` helps
+     nobody. Phrase it as the agent's trigger.
+  5. *VERSION ` the CLI's version.* `#+VERSION= is the WRAPPER's semver
+     (start `0.1.0`); the CLI's range goes in `#+CLI_VERSION_RANGE`.
+  6. *Inventing groups for a small toolkit.* <6 skills ⇒ no group rows.
+
+# Verification checklist
+
+  - [ ] Frontmatter complete + in canonical order
+  - [ ] `:ID:/:CLI_BIN:/:STATUS:` drawer =` the `#+= keywords
+  - [ ] Body has the WHY + where-not-to-use
+  - [ ] Table lists every `skills/*.org` exactly once, keyed by need
+  - [ ] `overview` row present
+  - [ ] Groups only if ≥6 skills + clean split
+  - [ ] `#+begin_src/#+end_src` balanced (the org snippets too)
+
+# See also
+
+  - [author-deep-skill](author-deep-skill.md) — write the skills this indexes
+  - [verify-toolkit](verify-toolkit.md) — next: the whole-toolkit done-bar
+  - [toolkits/AUTHORING.org](../../AUTHORING.md) — the manifest spec
+  - `../ffmpeg/manifest.org` — the exemplar index (with groups)

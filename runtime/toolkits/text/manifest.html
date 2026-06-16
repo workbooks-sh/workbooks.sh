@@ -1,0 +1,22 @@
+<work-toolkit
+  id="text"
+  cli="upper"
+  cli-range="&gt;=0.1"
+  version="0.1.0"
+  status="stable"
+  tagline="String transforms — case/normalize text as a sandboxed WASM command."
+  skill-dir="skills/">
+  <work-doc title="text — string transforms">
+    Transform text the agent tends to get wrong from training priors. The wrapped
+    CLI =upper= runs as a *sandboxed WASM command* (CommandRegistry / =run-command=)
+    — not a native PATH binary — but the manifest + skill shape is the canonical
+    toolkit format (manifest indexes skills by NEED; skills hold the recipes).
+
+    Skill index (read on demand):
+
+    | Skill      | Use when                              |
+    |------------+---------------------------------------|
+    | =overview= | First contact — what this toolkit does|
+    | =uppercase=| Shout / normalize a string to caps    |
+  </work-doc>
+</work-toolkit>

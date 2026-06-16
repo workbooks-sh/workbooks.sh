@@ -19,40 +19,33 @@ defmodule Workbooks.AutopoetHonestyTest do
     :ok
   end
 
-  # A toolkit is discovered by an org HEADLINE tagged :toolkit: with a
-  # :PROPERTIES: drawer (the real format — see toolkits/glyphs/manifest.org), NOT
-  # #+TYPE: frontmatter. A knowledge toolkit with no EXEC/caps passes verify once
-  # skills/overview.org exists.
+  # A toolkit is discovered by a single `<work-toolkit>` element (see
+  # toolkits/glyphs/manifest.html). A knowledge toolkit with no exec/caps passes
+  # verify once skills/overview.md exists.
   defp manifest(name) do
     """
-    #+TITLE: #{name} toolkit
-    #+TOOLKIT: #{name}
-
-    * #{name} — honesty-gate fixture                                   :toolkit:
-      :PROPERTIES:
-      :ID:        #{name}
-      :KIND:      knowledge
-      :SKILL_DIR: skills/
-      :END:
-
-      A minimal knowledge toolkit fixture.
+    <work-toolkit id="#{name}" kind="knowledge" skill-dir="skills/">
+      <work-doc title="#{name} — honesty-gate fixture">
+        A minimal knowledge toolkit fixture.
+      </work-doc>
+    </work-toolkit>
     """
   end
 
   defp clean_toolkit(name) do
     dir = Path.join(@root, name)
     File.mkdir_p!(Path.join(dir, "skills"))
-    File.write!(Path.join(dir, "manifest.org"), manifest(name))
-    File.write!(Path.join([dir, "skills", "overview.org"]), "#+TITLE: overview\n\n* overview\n  what this toolkit does.\n")
+    File.write!(Path.join(dir, "manifest.html"), manifest(name))
+    File.write!(Path.join([dir, "skills", "overview.md"]), "# overview\n\n## overview\nwhat this toolkit does.\n")
   end
 
   defp hollow_toolkit(name) do
-    # mirrors the iter-9 rss toolkit: a discoverable :toolkit: headline + a
-    # non-overview skill, but NO skills/overview.org → verify must NOT be clean.
+    # mirrors the iter-9 rss toolkit: a discoverable toolkit + a non-overview
+    # skill, but NO skills/overview.md → verify must NOT be clean.
     dir = Path.join(@root, name)
     File.mkdir_p!(Path.join(dir, "skills"))
-    File.write!(Path.join(dir, "manifest.org"), manifest(name))
-    File.write!(Path.join([dir, "skills", "parse.org"]), "#+TITLE: parse\n\n* parse\n  parse a feed.\n")
+    File.write!(Path.join(dir, "manifest.html"), manifest(name))
+    File.write!(Path.join([dir, "skills", "parse.md"]), "# parse\n\n## parse\nparse a feed.\n")
   end
 
   # exactly the predicate verify_new/1 uses to decide a toolkit "verified clean"
@@ -90,9 +83,9 @@ defmodule Workbooks.AutopoetHonestyTest do
     assert {:done, note} = Worker.decide("DONE: built x", {:ok, ["x"]})
     assert note =~ "worker-verified: x"
 
-    assert {:open, why} = Worker.decide("DONE: built x", {:fail, "x:\n✗ skills/overview.org present"})
+    assert {:open, why} = Worker.decide("DONE: built x", {:fail, "x:\n✗ skills/overview.md present"})
     assert why =~ "verify` FAILED"
-    assert why =~ "overview.org"
+    assert why =~ "overview.md"
 
     assert {:open, why2} = Worker.decide("DONE: edited a skill", :none)
     assert why2 =~ "no verifiable toolkit"

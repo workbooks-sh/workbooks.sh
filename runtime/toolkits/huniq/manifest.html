@@ -1,0 +1,33 @@
+<work-toolkit
+  id="huniq"
+  cli="huniq"
+  version="0.1.0"
+  status="stable"
+  tagline="Remove duplicate lines (order-preserving) — a WASI-clean Rust CLI auto-wrapped to a WASM command."
+  skill-dir="skills/"
+  exec="command"
+  build-src="crate:huniq"
+  build-lang="rust"
+  arg-mode="argv">
+  <work-doc title="huniq — dedupe lines">
+    Deduplicate lines from stdin while preserving first-seen order — unlike
+    =sort -u=, which reorders. The wrapped CLI =huniq= is a third-party Rust crate
+    we did NOT write; it compiles CLEAN to =wasm32-wasip1= (pure compute + stdio),
+    so the declarative auto-wrap applies with ZERO glue:
+
+    : #+EXEC: command          run as a registered WASM run-command
+    : #+BUILD_SRC: crate:huniq  cargo install huniq --target wasm32-wasip1
+    : #+BUILD_LANG: rust
+    : #+ARG_MODE: argv          args reach the CLI as real wasmtime argv
+
+    Build it with =wb toolkit build huniq= → CommandRegistry registers =huniq= →
+    any agent can =run-command(&quot;huniq&quot;, stdin)=.
+
+    Skill index (read on demand):
+
+    | Skill      | Use when                              |
+    |------------+---------------------------------------|
+    | =overview= | First contact — what this toolkit does|
+    | =dedupe=   | Drop duplicate lines, keep first order|
+  </work-doc>
+</work-toolkit>

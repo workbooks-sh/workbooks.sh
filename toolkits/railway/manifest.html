@@ -1,0 +1,30 @@
+<work-toolkit
+  id="railway"
+  cli="railway"
+  cli-range="&gt;=3.0"
+  version="0.1.0"
+  status="experimental"
+  tagline="Railway&#x27;s CLI — deploy a forged workbook as a static site on the user&#x27;s own account."
+  requires="railway&gt;=3.0"
+  skill-dir="skills/">
+  <work-doc title="railway — Railway PaaS CLI">
+    Wrapper around the standard =railway= binary. The Workbooks use case:
+    publish a built workbook (=dist/&lt;slug&gt;.html=) as a static site on the
+    *user&#x27;s own* Railway account. Stage the artifact behind a small Caddy image
+    (binds Railway&#x27;s =$PORT=) and run ~railway up~. (There is no =wb forge web=
+    command — that wrapper and its =deploy-kit/web/railway.sh= recipe were removed
+    with the Rust =wb=, 2026-06-09; the skill gives the raw =railway= flow.)
+
+    Auth is railway&#x27;s own browser login (=railway login=) — the token lives in
+    =~/.railway=, never anything Workbooks stores.
+
+    =railway --help= and the docs at https://docs.railway.com/guides/cli are
+    authoritative for per-command detail.
+
+    Skill index (read on demand):
+
+    | Skill                          | Use when                                   |
+    |--------------------------------+--------------------------------------------|
+    | =deploy-a-workbook-to-railway= | Publish a built =dist/&lt;slug&gt;.html= as a static site on the user&#x27;s Railway account |
+  </work-doc>
+</work-toolkit>

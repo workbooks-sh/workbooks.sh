@@ -1,0 +1,129 @@
+# toolkit-forge — research-target (resolve + fetch npm / GitHub / semantic need)
+0.1.0
+Use when starting a forge — detect which of the 3 target kinds you have and fetch its source into a scratch dir so a later phase can study the real surface.
+
+# When to use this
+NETWORK: yes
+DESTRUCTIVE: no
+REQUIRES: git node
+
+  Phase 1 of the forge. You have a target and need its actual source
+  on disk to study. The target is one of three kinds — detect which,
+  then fetch into a stable scratch dir `/tmp/forge-<slug>`.
+
+  NOT for: mapping the surface (that's [study-surface](study-surface.md), after the source
+  is fetched); deciding the skill set ([design-skills](design-skills.md)).
+
+# The mental model: three kinds, one scratch dir
+
+  | Target shape                          | Kind     | Fetch                          |
+  |---------------------------------------|----------|--------------------------------|
+  | contains `github.com` / `git@`        | github   | shallow clone                  |
+  | bare name or `@scope/name`            | npm      | `npm view` repo → clone, else `npm pack` |
+  | a sentence ("I need PDF manipulation")| semantic | research → pick tool → fetch as above |
+
+  Derive a stable slug from the target (lowercase, non-alnum → `-`) and
+  use `/tmp/forge-<slug>` for everything. Stable so re-runs are
+  idempotent.
+
+# Workflow
+
+## Pick the slug + scratch dir
+
+## derive a stable scratch dir from the target
+```bash
+  TARGET="$1"
+  SLUG=$(printf '%s' "$TARGET" | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's#^https?://##; s#[^a-z0-9]+#-#g; s#^-+|-+$##g' | cut -c1-40)
+  SCRATCH="/tmp/forge-$SLUG"
+  rm -rf "$SCRATCH"; mkdir -p "$SCRATCH"
+  echo "scratch: $SCRATCH"
+```
+
+## GitHub URL → shallow clone
+
+## clone a github target (depth 1 — we only need to read it)
+```bash
+  git clone --depth 1 "https://github.com/OWNER/REPO" "$SCRATCH"
+```
+
+  `--depth 1` is enough: you read the README + source, you don't need
+  history. Works for any git host (gitlab, codeberg) — just use the URL.
+
+## npm name → metadata, then repo or tarball
+
+## read package metadata + the repo URL
+```bash
+  npm view PKG repository.url version bin description
+```
+
+## prefer cloning the repo (richer than the tarball)
+```bash
+  REPO_URL=$(npm view PKG repository.url | sed -E 's#^git\+##; s#\.git$##; s#^git://#https://#')
+  git clone --depth 1 "$REPO_URL" "$SCRATCH"
+```
+
+## fallback — no repo field: pack + extract the published tarball
+```bash
+  ( cd "$SCRATCH" && npm pack PKG && tar -xzf ./*.tgz --strip-components=1 )
+```
+
+  The repo has tests + docs + the real entrypoint; the tarball has only
+  what was published (often built/minified). Clone first, pack only as
+  fallback.
+
+## Semantic need → research, pick, then fetch
+
+  When the target is a capability ("I need PDF manipulation"), you must
+  CHOOSE the tool first. Research (web search, the language's package
+  registry, "best CLI for X"), pick ONE well-maintained tool, STATE why,
+  then fetch it via the github/npm path above.
+
+## example — chose `pdftk`/`qpdf`/`pikepdf` for PDF manip; record the choice
+```bash
+  echo "semantic need: PDF manipulation"
+  echo "chose: qpdf (mature, scriptable CLI, no JVM) over pdftk (java) — fetch its repo"
+  git clone --depth 1 "https://github.com/qpdf/qpdf" "$SCRATCH"
+```
+
+## Confirm + probe installability
+
+## confirm the source landed + whether the CLI can be installed here
+```bash
+  test -d "$1" && ls "$1" | head || { echo "scratch empty"; exit 1; }
+  # is the bin installable for empirical verification later?
+  command -v BIN >/dev/null && echo "BIN already on PATH" \
+    || echo "BIN absent — note it; skills it can't run get #+STATUS: experimental"
+```
+
+# Common pitfalls
+
+  1. *Treating a scoped npm name as a URL.* `@scope/name` is an npm
+     name, not a path — route it to the npm branch, not `git clone`.
+  2. *Cloning full history.* Omitting `--depth 1` drags huge repos. You
+     only read the tree; shallow is always enough.
+  3. *Trusting the npm tarball as the surface.* Published tarballs are
+     often built artifacts (minified, no tests/docs). Clone the repo for
+     the real source; pack only when there's no repo field.
+  4. *Not recording the semantic choice.* For a semantic need, the
+     downstream phases must know WHICH tool you picked and why — write
+     it down, don't leave it implicit.
+  5. *Reusing a dirty scratch dir.* `rm -rf "$SCRATCH"` before fetch so
+     a stale half-clone doesn't pollute the study phase.
+  6. *No network / private repo.* If the clone fails (offline, auth),
+     say so explicitly and stop — don't fabricate the surface from
+     memory.
+
+# Verification checklist
+
+  - [ ] Target kind correctly detected (npm / github / semantic)
+  - [ ] Source present under `/tmp/forge-<slug>` (`ls` shows a real tree)
+  - [ ] For semantic: the chosen tool + rationale recorded
+  - [ ] CLI bin name identified + installability probed
+  - [ ] Fetch failures (if any) reported, not papered over
+
+# See also
+
+  - [study-surface](study-surface.md) — next: map the real commands + gotchas + needs
+  - [design-skills](design-skills.md) — turn the surface into a skill map
+  - [overview](overview.md) — the full forge loop

@@ -17,22 +17,12 @@ defmodule Workbooks.ToolkitVerifyCapsTest do
   defp write_toolkit(root, name, caps) do
     dir = Path.join(root, name)
     File.mkdir_p!(Path.join(dir, "skills"))
-    File.write!(Path.join(dir, "skills/overview.org"), "#+TITLE: #{name}\n* When to use this\nx\n")
+    File.write!(Path.join(dir, "skills/overview.md"), "# #{name}\n## When to use this\nx\n")
 
-    File.write!(Path.join(dir, "manifest.org"), """
-    #+TITLE: #{name}
-    #+TOOLKIT: #{name}
-    #+VERSION: 0.1.0
-    #+EXEC: command
-    #+CLI_BIN: #{name}
-    #+CAPS: #{caps}
-
-    * #{name} :toolkit:
-    :PROPERTIES:
-    :ID: #{name}
-    :CLI_BIN: #{name}
-    :END:
-    body
+    File.write!(Path.join(dir, "manifest.html"), """
+    <work-toolkit id="#{name}" cli="#{name}" version="0.1.0" exec="command" caps="#{caps}">
+      <work-doc title="#{name}">body</work-doc>
+    </work-toolkit>
     """)
 
     dir

@@ -1,0 +1,12 @@
+<work-toolkit
+  id="rust"
+  cli="mrustc"
+  data-kind="compile-to-c-then-wasm"
+  data-build="build.sh"
+  data-arg-mode="argv"
+  data-lib-root="mrustc-root"
+  data-target="wasm32-wasip1"
+  data-source="mrustc (thepowersgang/mrustc @ be69c747) — a C++ Rust→C compiler. Built to wasm32-wasi (build.sh) so it runs in-sandbox; its C output is compiled to wasm by the clang lane. STATUS: WORKING — untrusted no_std Rust compiles AND runs entirely in-sandbox (e2e.sh proves &#x27;RUST IN WASM SANDBOX: 55&#x27;, zero native exec). Enhancements pending: full std, a clean wasm32 target spec, runtime API wiring (PORT-LOG.org).">
+  <work-doc>
+  </work-doc>
+</work-toolkit>

@@ -24,8 +24,9 @@ defmodule Workbooks.BundleIslandsCliTest do
     "index.html" => "<!doctype html><html><body><h1>workbook</h1></body></html>",
     "agents/analyst.org" =>
       "* Analyst :agent:\n:PROPERTIES:\n:ID: analyst\n:MODEL: test/model\n:TOOLKITS: crm\n:END:\n** System prompt\nResolve CRM questions.\n",
-    "toolkits/crm/manifest.org" => "#+EXEC: command\n#+REQUIRES: browser, git>=2.30\n",
-    "toolkits/browser/manifest.org" => "#+EXEC: command\n",
+    "toolkits/crm/manifest.html" =>
+      ~s(<work-toolkit id="crm" exec="command" requires="browser, git>=2.30"></work-toolkit>),
+    "toolkits/browser/manifest.html" => ~s(<work-toolkit id="browser" exec="command"></work-toolkit>),
     "report.org" => "* Q3\nRevenue is up.\n",
     "data.sqlite" => "SQLite format 3\0demo"
   }

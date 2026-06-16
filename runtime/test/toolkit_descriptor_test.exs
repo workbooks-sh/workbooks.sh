@@ -1,10 +1,10 @@
 defmodule Workbooks.ToolkitDescriptorTest do
   @moduledoc """
-  Pins parse_descriptor/1 — the pure decode of a toolkit manifest's EXEC-shape
-  contract (how a toolkit declares it builds + runs). A regression here silently
-  misroutes the build (e.g. a `crate:` source falling through to :unknown → the
-  whole autobuild lane breaks) without any eval/injection test noticing.
-  Deterministic: pure string → map, no kernel/LLM.
+  Pins parse_descriptor/1 — the pure decode of a `<work-toolkit>` manifest's
+  EXEC-shape contract (how a toolkit declares it builds + runs). A regression here
+  silently misroutes the build (e.g. a `crate:` source falling through to :unknown
+  → the whole autobuild lane breaks) without any eval/injection test noticing.
+  Deterministic: pure HTML string → map, no kernel/LLM.
   """
   use ExUnit.Case, async: true
 
@@ -12,14 +12,10 @@ defmodule Workbooks.ToolkitDescriptorTest do
 
   test "a full command-toolkit descriptor decodes every field" do
     body = """
-    #+TITLE: Huniq
-    #+EXEC: command
-    #+TRUST: first-party
-    #+BUILD_SRC: crate:huniq
-    #+BUILD_LANG: rust
-    #+CAPS: stdio fs
-    #+CLI_BIN: huniq
-    #+ARG_MODE: stdin1
+    <work-toolkit id="huniq" cli="huniq" exec="command" trust="first-party"
+      build-src="crate:huniq" build-lang="rust" caps="stdio fs" arg-mode="stdin1">
+      <work-doc title="Huniq"></work-doc>
+    </work-toolkit>
     """
 
     d = Toolkits.parse_descriptor(body)
@@ -33,7 +29,7 @@ defmodule Workbooks.ToolkitDescriptorTest do
   end
 
   test "defaults: trust → first-party, arg_mode → :argv, caps → [] when absent" do
-    d = Toolkits.parse_descriptor("#+EXEC: component\n")
+    d = Toolkits.parse_descriptor(~s(<work-toolkit id="x" exec="component"></work-toolkit>))
     assert d.exec == "component"
     assert d.trust == "first-party"
     assert d.arg_mode == :argv
@@ -41,7 +37,7 @@ defmodule Workbooks.ToolkitDescriptorTest do
     assert d.build_src == nil
   end
 
-  test "every BUILD_SRC scheme decodes to its tagged tuple (and an unknown is tagged, not dropped)" do
+  test "every build-src scheme decodes to its tagged tuple (and an unknown is tagged, not dropped)" do
     schemes = [
       {"crate:serde", {:crate, "serde"}},
       {"git+https://x/y.git", {:git, "https://x/y.git"}},
@@ -55,8 +51,8 @@ defmodule Workbooks.ToolkitDescriptorTest do
     ]
 
     for {spec, expected} <- schemes do
-      d = Toolkits.parse_descriptor("#+BUILD_SRC: #{spec}\n")
-      assert d.build_src == expected, "BUILD_SRC #{spec} → #{inspect(d.build_src)}"
+      d = Toolkits.parse_descriptor(~s(<work-toolkit id="x" build-src="#{spec}"></work-toolkit>))
+      assert d.build_src == expected, "build-src #{spec} → #{inspect(d.build_src)}"
     end
   end
 end

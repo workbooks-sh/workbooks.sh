@@ -1,0 +1,71 @@
+<work-toolkit
+  id="brandnana"
+  cli="brandnana"
+  version="0.1.0"
+  status="experimental"
+  tagline="Ad + brand intelligence substrate — brand identity, ads, social, catalog, design tokens, brief + brand-book composition against api.brandnana.net."
+  skill-dir="skills/"
+  data-kind="toolkit"
+  data-flow="pre-read (spawn brand-scout per slice) → author analysis/*.org → `brandnana analysis check .` (gate to PASS) → vision-batch creatives (`creative analyze --file`) → compose + `book publish-rendered` → `book render-slides` + vision review. cat a skill only when you reach its step."
+  data-env-keys="BRANDNANA_API_KEY"
+  data-env-note="BRANDNANA_API_KEY is the toolkit&#x27;s only required cred. The `logo` command ADDITIONALLY reads two optional keys from the dev&#x27;s OWN environment, if present: LOGO_DEV_TOKEN (acquires the official logo.dev source) and GROQ_API_KEY (enables Groq-vision usage tags on raster candidates). Both are optional — the cascade degrades gracefully without them.">
+  <work-doc title="brandnana — brand-intelligence CLI">
+    A *base* toolkit (BACKEND-PATTERN.org §KIND ladder): a CLI on PATH plus
+    the skill files an agent reads to drive it. The =brandnana= binary is a
+    self-contained =bun build --compile= executable that fronts
+    =api.brandnana.net= — the agent never speaks HTTP directly, it shells
+    out to verbs and gets text or =--json=.
+
+    Credentials: =BRANDNANA_API_KEY= (declared in =#+ENV_KEYS:=) — the
+    bearer for =api.brandnana.net=. The CLI reads it from the environment;
+    the toolkit holds NO creds (the same toolkit serves an agent and a
+    deploy recipe in different trust contexts). In the cloud engine the key
+    is a Fly secret, injected into the agent&#x27;s =env_clear=&#x27;d guest shell via
+    the =WB_FORWARD_SECRETS= allowlist.
+
+    Optional logo keys: the =logo= command additionally reads =LOGO_DEV_TOKEN=
+    (acquires the official logo.dev source) and =GROQ_API_KEY= (Groq-vision
+    usage tags on raster candidates) from the *dev&#x27;s own* environment if set.
+    Both are optional — the cascade degrades gracefully without them.
+
+    Verb groups (=brandnana &lt;group&gt; --help= for flags):
+
+    | Group         | Covers                                                   |
+    |---------------+----------------------------------------------------------|
+    | =brand=       | Identity: fetch / logo / fonts / palette / product       |
+    | =logo=        | Logo cascade (homepage → Wikipedia SVG → logo.dev → simpleicons) |
+    | =ads=         | Meta / Google / TikTok ad search (via ScrapeCreators)    |
+    | =social=      | IG / TikTok / LinkedIn profiles, posts, transcripts      |
+    | =catalog=     | Product-catalog crawl                                    |
+    | =design=      | Design tokens — palette, type scale, spacing             |
+    | =brief=       | Creative-brief generation                                |
+    | =book=        | Brand-book compose / query / install                     |
+    | =resolve=     | Canonicalize a fuzzy brand/domain reference              |
+    | =audit-trace= | Surface the per-session verb trace + cost ledger         |
+    | =usage=       | Account usage + cost reporting                           |
+    | =simulate=    | Dry-run a pipeline without spending                      |
+    | =mcp=         | Run as an MCP stdio server (Claude / Codex / Cursor)     |
+    | =auth/login=  | Authenticate the CLI against api.brandnana.net           |
+    | =admin=       | Account administration (privileged)                      |
+
+    Skill index (read on demand):
+
+    | Skill      | Use when                                                       |
+    |------------+----------------------------------------------------------------|
+    | =overview= | First contact — what the toolkit covers + the logo cascade     |
+    | =resolve=  | Input is a fuzzy brand name — canonicalize to a domain first   |
+    | =brand=    | You need a brand&#x27;s identity (logo, fonts, palette, a product)  |
+    | =ads=      | You need live ad creatives (Meta / Google / TikTok) as voice   |
+    | =social=   | You need organic social (profiles, posts, transcripts)         |
+    | =catalog=  | You need the product catalog (PDP images, prices, titles)      |
+    | =creative-analysis= | Vision-batch analyze gathered creatives (=creative analyze --file=) |
+    | =design=   | You need structured design tokens to theme a deliverable       |
+    | =brief=    | You&#x27;re turning gathered signal into a creative brief           |
+    | =book=     | You&#x27;re composing / querying / installing a brand-book workbook |
+
+    The brand-book PIPELINE skills (research → strategize → compose-deck →
+    make-image → publish-workbook) are the *strategist agent&#x27;s* workflow and
+    live with that agent&#x27;s profile (=substrates/brandnana/profile/skills/=),
+    not here — this toolkit is the CLI reference they call into.
+  </work-doc>
+</work-toolkit>

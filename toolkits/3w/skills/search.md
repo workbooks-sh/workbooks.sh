@@ -1,0 +1,96 @@
+# 3w — web search (keyless, multi-engine, no Google)
+0.1.0
+Use when you need to find pages on the open web by query. Native ddg+bing+brave+mojeek merged by cross-engine consensus; no API key; Google excluded by design.
+
+# When to use this
+NETWORK: yes
+DESTRUCTIVE: no
+COST: free
+
+  Use as the *on-ramp* to any web task where you don't already have the exact
+  URL: "find reviews of X", "who writes about Y", "where is the docs page for
+  Z". `3w search "<query>"` returns merged, de-duplicated, consensus-ranked
+  hits with title, URL, and snippet — then feed the URLs you want to
+  [read-extract](read-extract.md).
+  NOT for: reading a page you already have the URL of (that's
+  [read-extract](read-extract.md)); interactive click-through (a later
+  `3w browse` verb).
+
+# The mental model
+
+  Four independent indexes are queried in parallel and merged. A result's
+  *score* is the sum of `1/position` across the engines that returned it, so a
+  page surfaced near the top by several engines outranks a single-engine hit.
+  Read the `[engines]` tag on each line — `[bing,brave,mojeek]` means three
+  indexes agreed, which is a strong relevance + not-spam signal.
+
+  | Engine     | Character                                              |
+  |------------|--------------------------------------------------------|
+  | duckduckgo | broad; ad rows auto-filtered                            |
+  | bing       | richest snippets, dated results                        |
+  | brave      | independent index, strong on forums/Reddit             |
+  | mojeek     | fully independent crawler, least commercial            |
+
+  *Google is not in the pool.* Its wall is JS/behavioral and cannot be
+  scraped cheaply — don't ask for it. If coverage feels thin, widen with
+  `--engines` or rephrase; do not try to route to Google.
+
+# Workflow
+
+## pre — the 3w binary is available
+```bash
+  command -v 3w >/dev/null || { echo "3w not on PATH (bake it into the sandbox image)"; exit 1; }
+```
+
+## basic search — human-readable
+```bash
+  3w search "caraway cookware honest review" --n 8
+```
+
+## structured output for programmatic use (pick URLs to read next)
+```bash
+  3w search "caraway cookware honest review" --n 8 --json
+  # → [{title,url,snippet,engines:[...],score}, ...] sorted by score desc
+```
+
+## narrow or widen the engine pool
+```bash
+  3w search "niche topic" --engines mojeek,brave   # independent indexes only
+  3w search "mainstream topic"                      # default: all four
+```
+
+## post — results came back parseable
+```bash
+  3w search "example domain" --json | python3 -c 'import sys,json; d=json.load(sys.stdin); assert isinstance(d,list); print(f"{len(d)} results")'
+```
+
+# Common pitfalls
+
+  1. *Asking for Google / expecting Google-quality coverage.* → It's excluded
+     on purpose (unscrapeable cheaply). → Widen `--engines`, rephrase the
+     query, or escalate to a paid SERP backend at deploy time — never fight
+     the Google wall in-band.
+  2. *Treating a single-engine hit as authoritative.* → Spam and SEO farms
+     show up on one index. → Prefer results with 2+ engines in the `[engines]`
+     tag; cross-check before trusting.
+  3. *Over-long queries.* → Engines tokenize; a 20-word natural-language
+     question dilutes. → Use the 3-6 keywords that matter.
+  4. *Reading every result.* → Costs time + tokens. → Triage by title +
+     snippet + score; read only the 2-3 that matter via
+     [read-extract](read-extract.md).
+  5. *Empty results read as "nothing exists".* → It usually means a transient
+     wall on one engine or too-narrow a query. → See
+     [troubleshoot](troubleshoot.md).
+
+# Verification checklist
+
+  - [ ] `3w search "<q>" --json` returns a non-empty JSON array
+  - [ ] Top results carry `score` and an `engines` list
+  - [ ] At least one result is corroborated by ≥2 engines for a common query
+  - [ ] No `duckduckgo.com/y.js` ad URLs leak into results
+
+# See also
+
+  - [read-extract](read-extract.md) — turn a result URL into clean markdown
+  - [overview](overview.md) — the full verb map + cost model
+  - [troubleshoot](troubleshoot.md) — empty / walled / CAPTCHA'd results

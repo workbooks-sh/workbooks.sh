@@ -1,0 +1,29 @@
+# brandnana — design tokens
+
+# When to use this
+
+Get a brand's design tokens — palette, type scale, spacing — as structured data
+to theme a workbook so the deliverable looks on-brand, not generic.
+
+# Common verbs
+
+```bash
+brandnana design tokens <domain>          # structured design tokens
+brandnana design tokens <domain> --json   # machine-readable for theming
+```
+
+# What "good" looks like
+
+- Drive a workbook's CSS variables from the returned tokens — colours, fonts, and
+  spacing — instead of eyeballing the homepage.
+- `design tokens` is richer than `brand palette`: prefer it when you're theming a
+  deliverable, not just naming the primary colour.
+
+# Common pitfalls
+
+- Hardcoding hex values from a screenshot when the token set is available.
+- Ignoring the type scale / spacing and only taking colours.
+
+# See also
+
+- `overview`, `brand` (`palette`/`fonts` facets), `catalog` (imagery).

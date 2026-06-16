@@ -1,0 +1,38 @@
+# brandnana — social
+
+# When to use this
+
+Pull a brand's organic social presence — profiles, posts, comments, video
+transcripts, reel search — across Instagram, TikTok, and LinkedIn. Evidence for
+voice, audience, and content strategy.
+
+# Common verbs
+
+```bash
+brandnana social instagram profile <handle>
+brandnana social instagram post <url>
+brandnana social instagram comments <url>
+brandnana social instagram transcript <url>     # speech-to-text of a reel/video
+brandnana social instagram reels-search <query>
+brandnana social tiktok profile <handle>
+brandnana social tiktok videos <handle>
+```
+
+(LinkedIn lookups follow the same `social linkedin <verb>` shape — check
+`brandnana social --help`.) Add `--json` for structured output.
+
+# What "good" looks like
+
+- Default the handle to the brand's second-level domain when unknown, then
+  correct from the profile result.
+- `transcript` turns a reel into quotable copy — strong evidence for tone claims.
+- Pair a `profile` (positioning) with a few `post`/`videos` samples (proof).
+
+# Common pitfalls
+
+- Guessing handles instead of resolving them; verify via `profile` first.
+- Pulling dozens of posts when 3-5 representative ones make the point.
+
+# See also
+
+- `overview`, `ads` (paid voice), `brief`.

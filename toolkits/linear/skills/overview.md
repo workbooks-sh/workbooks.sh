@@ -1,0 +1,68 @@
+# Linear connector — overview
+0.1.0
+Federate a Linear project into org :task: nodes the Board can drive; query via OQL; gated write-back.
+
+# When to use this
+  First contact with the Linear connector. Reach for it when you want a
+  Linear project's issues to appear as Workbooks `:task:` nodes the
+  orchestrator Board can drive, or when an agent needs to query/update
+  Linear. To set up the live mirror, read `sync-a-project`.
+
+# What this connector does
+  Linear is a task tracker. This toolkit federates Linear into the
+  Workbooks runtime: it mirrors a Linear project's issues into org
+  `:task:` nodes the orchestrator Board can drive, and (when write-back
+  is enabled) pushes Board changes back to Linear.
+
+  The mirror is one-directional by default (`:pull`, read-only). Pull is
+  always safe: it only writes `:task:` headlines on disk. Write-back is
+  opt-in and DESTRUCTIVE deletes are gated through a Workgate permit.
+
+# Common verbs
+  - *Read via OQL* — once the data-source plugin is registered you can
+    query Linear issues directly:
+
+```sql
+      SELECT title, state, assignee FROM linear-issue WHERE state = 'in_progress'
+```
+
+  - *Mirror into a Board* — the sync daemon (`sync.org`) pulls on an
+    interval into a federation board. See `sync-a-project`.
+
+  - *Write back* — Board task changes push to Linear when write-back is
+    enabled; destructive deletes go through a Workgate permit (fail-closed).
+
+# Credentials
+  Set `LINEAR_API_KEY` in the engine's env / `wb env` keychain. The
+  connector reads it through `WorkbooksRuntime.Plugin.Auth`; it is never
+  stored in this toolkit.
+
+# What the org :task: node looks like
+  A pulled issue becomes a `:task:`-tagged headline whose drawer carries
+  the universal field set plus the identity drawer:
+
+```org
+  ** Fix the login redirect                                       :task:
+     :PROPERTIES:
+     :ID:        linear-LIN-123
+     :STATE:     in_progress
+     :SOURCE:    linear
+     :REMOTE_ID: LIN-123
+     :UPDATED:   2026-06-03T12:00:00Z
+     :ASSIGNED_TO: alice
+     :END:
+     Issue body becomes the task description.
+```
+
+  `Loader.Org` loads this as an ordinary Board task — the airgap proof.
+
+# Common pitfalls
+  - The mirror is `:pull` (read-only) by DEFAULT — write-back is opt-in.
+  - There is NO `linear` CLI: this is a SaaS federation connector
+    (`plugin/` + `sync.org`), NOT a CLI-wrapper toolkit — so the manifest
+    declares no `#+CLI_BIN:`.
+  - Deletes fail closed: a denied or absent Workgate permit blocks the op.
+
+# See also
+  - `sync-a-project` — set up the interval mirror into a Board.
+  - `runtime/docs/BACKEND-PATTERN.org` — the #+KIND ladder + the org-`:task:` airgap.

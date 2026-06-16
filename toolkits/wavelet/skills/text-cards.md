@@ -1,0 +1,71 @@
+# wavelet — text cards (titles, lower-thirds, end cards)
+
+# When to use this
+NETWORK: no
+DESTRUCTIVE: no
+
+  The composition needs styled text shown for a slice of the clip —
+  an opening title, a lower-third name strap, a kicker, an end card.
+  In wavelet this is just HTML elements positioned with CSS and timed
+  with CSS `@keyframes` (there is no scene graph and no JS runtime —
+  the renderer seeks the CSS-animation clock to `t ` frame / fps=).
+
+# Timing a card to a window
+
+  Use `animation-delay` to set the in-point and a finite animation
+  (with `forwards`/`both` fill) to hold the end state. To make a card
+  LEAVE, give it a second keyframe animation with its own delay.
+
+## an opening title that enters at 0.2s and exits at 2.5s
+```bash
+  cat > title.html <<'HTML'
+  <!doctype html>
+  <html><head><style>
+    html,body{margin:0;height:100%;background:#0b1020;overflow:hidden;font-family:sans-serif}
+    #title{
+      position:absolute; left:80px; top:300px; margin:0;
+      font-size:104px; font-weight:800; color:#fff; letter-spacing:-.03em;
+      /* enter (0.2s..1.0s) then exit (2.5s..3.0s), both holding their end */
+      animation: enter .8s .2s ease-out both, exit .5s 2.5s ease-in forwards;
+    }
+    @keyframes enter { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes exit  { from{opacity:1} to{opacity:0} }
+  </style></head>
+  <body><h1 id="title">Built in the nexus</h1></body></html>
+  HTML
+  wavelet render title.html -o title.mp4 --duration 3 --fps 30
+```
+
+# Lower-third strap
+
+  A lower-third is the same idea pinned to the bottom-left with a
+  backing bar:
+
+```
+  #strap { position:absolute; left:60px; bottom:90px; padding:14px 22px;
+           background:rgba(20,145,87,.9); color:#fff; font-size:34px;
+           animation: wipe .5s .4s ease-out both; }
+  @keyframes wipe { from{opacity:0;transform:translateX(-30px)} to{opacity:1;transform:translateX(0)} }
+```
+
+# Verify
+
+## confirm the card rendered
+```bash
+  head -c 8 "$1" | tail -c 4 | grep -q ftyp || { echo "render failed"; exit 1; }
+  echo "✓ text card rendered"
+```
+
+# Gotchas
+
+  - No web-font fetch in the render lane — use `sans-serif` / `serif`
+    / `monospace`, or a font installed in the render core.
+  - Hard cuts read better than fades between separate clips; keep
+    fades INSIDE one composition (opacity keyframes), per brand canon.
+  - Times in `animation-delay` are absolute clip time — keep them
+    inside `--duration` or the card never appears.
+
+# See also
+
+  - [transitions](transitions.md) — moving between sections in one composition
+  - [render](render.md) — produce the mp4

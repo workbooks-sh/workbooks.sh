@@ -70,7 +70,7 @@ defmodule Workbooks.Bundle.Islands do
       org?(path) and is_binary(bytes) and Regex.match?(@agent_tag, bytes) ->
         [agent_island(path, bytes)]
 
-      Path.basename(path) == "manifest.org" and is_binary(bytes) ->
+      Path.basename(path) == "manifest.html" and is_binary(bytes) ->
         [toolkit_island(path, bytes)]
 
       org?(path) ->
@@ -209,7 +209,7 @@ defmodule Workbooks.Bundle.Islands do
 
   # An inline island with no explicit src gets a conventional path by kind+id.
   defp derive_path(%{kind: :agent, id: id}), do: "agents/#{slug(id)}.org"
-  defp derive_path(%{kind: :toolkit, id: id}), do: "toolkits/#{slug(id)}/manifest.org"
+  defp derive_path(%{kind: :toolkit, id: id}), do: "toolkits/#{slug(id)}/manifest.html"
   defp derive_path(%{kind: :org, id: id}), do: "#{slug(id) || "doc"}.org"
   defp derive_path(%{kind: :vfs, id: id}), do: "#{slug(id) || "vfs"}.sqlite"
 

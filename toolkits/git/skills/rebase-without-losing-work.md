@@ -1,0 +1,75 @@
+# git — rebase a branch onto updated main without losing work
+
+# When to use this
+NETWORK: yes
+DESTRUCTIVE: yes
+
+  You're on a feature branch that has commits behind main has
+  moved forward. You want your feature commits to sit on top of
+  the latest main rather than off the older base they were
+  written against.
+
+  *Destructive: yes* — rebase rewrites commit SHAs on your
+  branch. If the branch is already pushed AND others have based
+  work on it, rebasing breaks their setup. Prefer `git merge`
+  for shared branches.
+
+# The pre-flight check
+
+  Refuse to rebase if:
+  1. Working tree has uncommitted changes (lose them on conflict)
+  2. Branch is shared and others have commits on it
+
+## 1. confirm work tree is clean
+```bash
+  git status --porcelain | grep -q . && { echo "uncommitted changes — stash or commit first"; exit 1; }
+  echo "clean ✓"
+```
+
+## 2. see how far behind main you are + what you'll be rebasing
+```bash
+  git fetch origin
+  git log --oneline HEAD..origin/main | head -10    # what main has that you don't
+  git log --oneline origin/main..HEAD | head -10    # your commits that will move
+```
+
+# Workflow
+
+## 1. backup branch in case rebase goes wrong
+```bash
+  git branch backup/$(git branch --show-current)-$(date +%Y%m%d-%H%M)
+```
+
+## 2. rebase onto main
+```bash
+  git rebase origin/main
+  # On conflict: edit, `git add <files>`, `git rebase --continue`
+  # To bail at any point: `git rebase --abort`
+```
+
+## 3. force-push with lease (safer than --force)
+```bash
+  # --force-with-lease refuses if remote has commits you didn't see
+  git push --force-with-lease
+```
+
+## confirm history makes sense + tests pass
+```bash
+  git log --oneline -5
+  # then run whatever test command is canonical for this repo
+```
+
+# Gotchas
+
+  - `--force-with-lease` is safer than plain `--force` — it
+    refuses if the remote moved while you were rebasing. Always
+    use it.
+  - If conflicts get nasty, `git rebase --abort` returns you to
+    pre-rebase state. The backup branch from step 1 is also
+    there.
+  - If you've already merged your branch upstream, do NOT rebase
+    + force-push — that creates confusing duplicate history.
+
+# See also
+
+  - [undo-a-commit-safely](undo-a-commit-safely.md) — if the rebase produced a bad commit

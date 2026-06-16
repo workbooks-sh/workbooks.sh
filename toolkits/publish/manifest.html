@@ -1,0 +1,51 @@
+<work-toolkit
+  id="publish"
+  cli="wb-publish"
+  cli-range="&gt;=0.1.0"
+  version="0.1.0"
+  status="stable"
+  tagline="AT Protocol publishing + Workbooks Network identity — bind a Bluesky account, publish signed workbooks, watch the verified feed."
+  requires="wb-publish&gt;=0.1.0"
+  skill-dir="skills/">
+  <work-doc title="publish — federation + identity for workbooks">
+    The publish/identity stack, lifted out of the `wb` core
+    (M5-publish-to-toolkit — provider/integration logic lives in
+    toolkits). The toolkit OWNS the `wb-publish` binary: its source
+    is this directory&#x27;s =bin/= crate, and `wb identity …` /
+    `wb atproto …` exec it when it&#x27;s on PATH.
+
+    Build / install:
+
+      cargo install --path toolkits/publish/bin
+
+    Two verb groups, same surface they had inside `wb`:
+
+    - =wb-publish identity= — the Workbooks Network identity.
+      Export/import the did:key + Ed25519 keypair across machines,
+      bind a Bluesky account (app-password or the OAuth 2.0
+      PKCE + PAR + DPoP flow, `--standalone` needs no engine),
+      mint/inspect the X.509 cert for C2PA signing, generate a CSR.
+
+    - =wb-publish atproto= — AT Protocol operations against any PDS,
+      signed with the bound session. Publish/delete
+      =sh.workbooks.workbook= records, advertise substrate endpoints,
+      read follow graphs, stream the firehose, and run the verified
+      (C2PA-checked) feed.
+
+    Engine contract: the engine-bind verbs (`bluesky-login`, oauth
+    login without `--standalone`, `bluesky-logout`) POST to the
+    Workhorse daemon discovered via =~/Workbooks/Engine/listen.json=
+    (or WB_DAEMON_URL / WB_ENGINE_URL env). Everything else reads and
+    writes the on-disk identity sidecar at
+    =&lt;data_root&gt;/Engine/network/identity/= directly — no engine.
+
+    =wb-publish --help= and =wb-publish &lt;group&gt; &lt;verb&gt; --help= are
+    authoritative for flags. Skills are end-to-end recipes.
+
+    Skill index (read on demand):
+
+    | Skill      | Use when                                              |
+    |------------+-------------------------------------------------------|
+    | =overview= | First contact — bind an identity, publish a workbook |
+  </work-doc>
+</work-toolkit>

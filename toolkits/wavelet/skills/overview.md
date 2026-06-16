@@ -1,0 +1,86 @@
+# wavelet — overview
+
+# When to use this
+NETWORK: no
+DESTRUCTIVE: no
+
+  Request involves producing a short motion-graphics video from
+  declarative source: an animated title card, a kinetic-type reel,
+  an explainer beat, a logo sting. You author a *plain HTML + CSS*
+  file and wavelet renders it to an mp4 — entirely in-nexus, no
+  external tooling.
+
+  Don't reach for wavelet for:
+  - Extracting frames / audio from an existing video.
+  - Authoring static documents → use the `wb` toolkit.
+
+# The surface: render · film · image · gif · audio · present
+
+  Every one of these renders an HTML composition (or a timeline of
+  snapshots) ENTIRELY IN-NEXUS — Blitz/Stylo render + the in-guest
+  `wb_encode` (libx264 / native AAC) — with no host browser and no
+  native exec. Pick the verb by the artifact you want:
+
+```bash
+  # mp4 from one animated HTML composition (the workhorse)
+  wavelet render <composition.html> -o <out.mp4> \
+    [--w 1280] [--h 720] [--fps 30] [--duration 4] [--crf 18] [--audio track.mp3]
+
+  # mp4 from a TIMELINE of edit-state snapshots (each a STATE, captioned, crossfaded)
+  # — this is how an in-nexus agent films its own workbook edits.
+  wavelet film <timeline.json> -o <out.mp4> \
+    [--w 1280] [--h 720] [--fps 30] [--crossfade 0.4] [--audio narration.mp3]
+
+  # single still — render one frame of a composition to an image (render_one core)
+  # gif — an animated GIF instead of mp4 (render-core media lane)
+
+  # audio-only — transcode/extract to a clean AAC .m4a, no video, fully in-guest
+  wavelet audio <in.{mp3,aac,wav,m4a}> -o <out.m4a> [--bitrate 128]
+
+  # slides — render a composition to a .pptx deck (one slide per frame)
+  wavelet present <composition.html> -o <out.pptx> \
+    [--w 1280] [--h 720] [--frame 0] [--fps 30]
+```
+
+  - `render` / `film` / `present` take HTML/timeline → mp4 / mp4 / pptx.
+  - `audio` is the only verb with no frames: an in-guest AAC transcode.
+  - `image` (one still) and `gif` (animated GIF) are render-core
+    capabilities (`render_one` / the media lane) — same sandboxed
+    pipeline, a different container at the end.
+  - `--audio` on `render`/`film` muxes an mp3/aac/wav narration track as
+    AAC (NOT m4a — the ISO-BMFF container isn't decodable in-guest).
+
+  There is no `init`, `preview`, `trim`, `concat`. Author the HTML (or
+  the snapshot timeline), then render the artifact you want.
+
+# How it renders (so your CSS behaves)
+
+  The renderer is Blitz (HTML/CSS) + Stylo's CSS-animation timeline +
+  a CPU rasterizer. For each output frame it seeks the animation clock
+  to `t ` frame / fps= and re-rasterizes. So:
+
+  - Animate with CSS `@keyframes` + the `animation` property. Use
+    `forwards` / `both` fill modes for one-shot intros; the clock is
+    absolute time, scrub-safe by construction.
+  - There is NO JavaScript runtime. No `<script>`, no GSAP, no DOM
+    timers — pure declarative CSS animation only.
+  - No GPU effects, no filters that need WebGL. Stick to layout,
+    transforms, opacity, color, gradients, `<img>`.
+  - Relative asset paths (e.g. `<img src`"assets/logo.png">=) resolve
+    against the composition file's directory — keep assets beside it.
+
+# Verify the command is wired
+
+## wavelet render is in-nexus — no install, no node, no PATH check
+```bash
+  echo "wavelet render is a built-in command (like jq/grep) — nothing to install"
+```
+
+# See also
+
+  - [scaffold-a-composition](scaffold-a-composition.md) — empty dir → a renderable HTML file
+  - [render](render.md) — run the render, flags, verify the mp4
+  - [film](film.md) — film a TIMELINE of edit-state snapshots (an agent filming its workbook edits)
+  - [text-cards](text-cards.md) — title / lower-third / end-card overlays
+  - [transitions](transitions.md) — section hand-offs with CSS keyframes
+  - [audio-sync](audio-sync.md) — mux an mp3 + time visuals to it

@@ -1,17 +1,16 @@
 defmodule Workbooks.Toolkits do
   @moduledoc """
   Toolkit discovery (L4, wb-11ck.46) — the agent extensibility surface. A toolkit
-  makes an agent competent with a CLI it has never seen: a `:toolkit:`-tagged Org
-  node (the manifest front-door) names the CLI it wraps and indexes deep skill
-  recipes the agent reads on demand. This module is the *discovery* half — the
-  canonical concept, recreated on the kernel's existing tag/property extraction,
-  not a port of the mainline layout.
+  makes an agent competent with a CLI it has never seen: a single `<work-toolkit>`
+  HTML element (the `manifest.html` front-door) names the CLI it wraps and indexes
+  deep skill recipes (Markdown) the agent reads on demand. This module is the
+  *discovery* half — plain HTML parsing (Floki), no kernel.
 
-  Discovery is one query — `(tags :toolkit:)` over the Context Tree. An `:agent:`
-  node's `:TOOLKITS:` property lists the toolkits it may use; each name resolves
-  to a `:toolkit:` node. No tool-search subsystem: org + the kernel. The skill
-  bodies are read lazily (the agent `cat`s the skill file when a task routes to
-  it); the runtime only resolves *which* toolkit, never inlines the manual.
+  Discovery is one query — every `<work-toolkit>` element under the root. A
+  `<work-agent toolkits="…">` element lists the toolkits it may use; each name
+  resolves to a `<work-toolkit id=…>`. No tool-search subsystem. The skill bodies
+  are read lazily (the agent reads the `.md` file when a task routes to it); the
+  runtime only resolves *which* toolkit, never inlines the manual.
 
   In the clean-room a toolkit's CLI is a WASM command (`run-command`,
   wb-11ck.21), not a native PATH binary — but the discovery contract is identical.
@@ -36,21 +35,27 @@ defmodule Workbooks.Toolkits do
   path (Dock-gated). Host bash from skill files bypasses that and is therefore
   gated/capped/isolated above. See docs/TOOLKITS-V3.org for the full model.
   """
-  alias Workbooks.Workbook
+  # The toolkit manifest is a single `<work-toolkit>` HTML element (work-* model;
+  # org fully retired — see docs/WORK-FORMAT.md). Skills are Markdown recipes.
+  @manifest "manifest.html"
+  @skill_ext ".md"
 
-  @doc "Every `:toolkit:` node in a Context Tree — the `(tags :toolkit:)` query."
-  def discover(org) when is_binary(org) do
-    org |> Workbook.parse_headlines() |> Enum.filter(&toolkit?/1) |> Enum.map(&view/1)
+  @doc """
+  Every `<work-toolkit>` element in a workbook's HTML — the discovery query, now
+  HTML-native (a `<work-toolkit>` element replaces the old `:toolkit:` org node).
+  Returns the same view shape (`%{id, title, version, cli, status, skill_dir}`).
+  """
+  def discover(html) when is_binary(html) do
+    html |> work_toolkit_nodes() |> Enum.map(&view/1)
   end
 
   @doc """
-  Discover toolkits on disk: read every `<root>/<name>/manifest.org`, run the same
-  `(tags :toolkit:)` query over each, and tag the view with its directory so the
-  agent can `cat` a skill on demand. This is the canonical filesystem-native
-  shape — a toolkit is a directory; discovery is org + the kernel, no new infra.
+  Discover toolkits on disk: read every `<root>/<name>/manifest.html`, parse its
+  `<work-toolkit>` element, and tag the view with its directory so the agent can
+  read a skill on demand. A toolkit is a directory; discovery is plain HTML parsing.
   """
   def discover_dir(root) do
-    Path.wildcard(Path.join(root, "*/manifest.org"))
+    Path.wildcard(Path.join(root, "*/#{@manifest}"))
     |> Enum.flat_map(fn manifest ->
       dir = Path.dirname(manifest)
       manifest |> File.read!() |> discover() |> Enum.map(&Map.put(&1, :dir, dir))
@@ -59,8 +64,8 @@ defmodule Workbooks.Toolkits do
 
   @doc "Skill names available in a toolkit dir (read the body on demand — progressive disclosure)."
   def skills(toolkit_dir) do
-    Path.wildcard(Path.join([toolkit_dir, "skills", "*.org"]))
-    |> Enum.map(&Path.basename(&1, ".org"))
+    Path.wildcard(Path.join([toolkit_dir, "skills", "*#{@skill_ext}"]))
+    |> Enum.map(&Path.basename(&1, @skill_ext))
     |> Enum.sort()
   end
 
@@ -75,16 +80,29 @@ defmodule Workbooks.Toolkits do
 
   Discovery/closure ONLY — caps stay grant-gated (a dep edge never widens powers).
   """
-  def resolve(org, agent_id) when is_binary(org) do
-    hs = Workbook.parse_headlines(org)
-    wanted = hs |> agent(agent_id) |> names()
-    tks = hs |> Enum.filter(&toolkit?/1)
-    by_id = Map.new(tks, &{&1["id"], view(&1)})
-    # Edges sourced from each in-org toolkit node's :REQUIRES: drawer property.
-    edges = Map.new(tks, &{&1["id"], parse_requires((&1["props"] || %{})["REQUIRES"])})
+  def resolve(html, agent_id) when is_binary(html) do
+    wanted = html |> agent_toolkits(agent_id)
+    tks = work_toolkit_nodes(html)
+    by_id = Map.new(tks, &{&1.attrs["id"], view(&1)})
+    # Edges sourced from each `<work-toolkit requires="…">` attribute.
+    edges = Map.new(tks, &{&1.attrs["id"], parse_requires(&1.attrs["requires"])})
     closure(wanted, edges, Map.keys(by_id))
     |> Enum.map(&by_id[&1])
     |> Enum.reject(&is_nil/1)
+  end
+
+  # The `toolkits` list declared on a `<work-agent id=…>` element, or [].
+  defp agent_toolkits(html, agent_id) do
+    case Floki.parse_fragment(html) do
+      {:ok, tree} ->
+        case Floki.find(tree, "work-agent[id=\"#{agent_id}\"]") do
+          [node | _] -> Floki.attribute([node], "toolkits") |> List.first() |> to_string() |> String.split()
+          [] -> []
+        end
+
+      {:error, _} ->
+        []
+    end
   end
 
   @doc """
@@ -144,7 +162,7 @@ defmodule Workbooks.Toolkits do
 
     edges =
       Map.new(descs, fn t ->
-        {t.id, parse_descriptor(File.read!(Path.join(t.dir, "manifest.org"))).requires}
+        {t.id, parse_descriptor(File.read!(Path.join(t.dir, @manifest))).requires}
       end)
 
     closure(ids, edges, known)
@@ -299,7 +317,7 @@ defmodule Workbooks.Toolkits do
       |> Enum.flat_map(fn id ->
         case tk_dir(id, root) do
           nil -> []
-          dir -> cem_tags(parse_descriptor(File.read!(Path.join(dir, "manifest.org"))), dir, root)
+          dir -> cem_tags(parse_descriptor(File.read!(Path.join(dir, @manifest))), dir, root)
         end
       end)
       |> Enum.uniq_by(& &1.tag)
@@ -423,7 +441,7 @@ defmodule Workbooks.Toolkits do
         "no such toolkit: #{id}"
 
       dir ->
-        File.read!(Path.join(dir, "manifest.org")) <>
+        File.read!(Path.join(dir, @manifest)) <>
           "\n\nSkills (read with `wb toolkit show #{id} <skill>`):\n" <>
           Enum.map_join(skills(dir), "\n", &("  " <> &1))
     end
@@ -449,7 +467,7 @@ defmodule Workbooks.Toolkits do
     base = Path.expand(root)
 
     hits =
-      Path.wildcard(Path.join(root, "*/skills/**/*.org"))
+      Path.wildcard(Path.join(root, "*/skills/**/*#{@skill_ext}"))
       # SECURITY (wb-sec, finding #6): only emit content for files that truly live
       # under the resolved root — a symlinked entry that escapes is skipped.
       |> Enum.filter(&contained?(&1, base))
@@ -474,12 +492,12 @@ defmodule Workbooks.Toolkits do
         "no such toolkit: #{id}"
 
       dir ->
-        d = parse_descriptor(File.read!(Path.join(dir, "manifest.org")))
+        d = parse_descriptor(File.read!(Path.join(dir, @manifest)))
 
         struct =
           [
-            {File.exists?(Path.join(dir, "manifest.org")), "manifest.org present"},
-            {File.exists?(Path.join([dir, "skills", "overview.org"])), "skills/overview.org present"}
+            {File.exists?(Path.join(dir, @manifest)), "#{@manifest} present"},
+            {File.exists?(Path.join([dir, "skills", "overview#{@skill_ext}"])), "skills/overview#{@skill_ext} present"}
           ] ++ exec_checks(d) ++ cap_checks(d) ++ trust_checks(dir, d)
 
         # :role pre blocks are arbitrary NATIVE bash. Native execution is banned
@@ -574,7 +592,7 @@ defmodule Workbooks.Toolkits do
 
       true ->
         overview =
-          case File.read(Path.join([dir, "skills", "overview.org"])) do
+          case File.read(Path.join([dir, "skills", "overview#{@skill_ext}"])) do
             {:ok, o} -> "\n\n#{id} toolkit overview:\n" <> o
             _ -> ""
           end
@@ -668,7 +686,7 @@ defmodule Workbooks.Toolkits do
         "no such toolkit: #{id}"
 
       dir ->
-        path = Path.join(dir, "manifest.org")
+        path = Path.join(dir, @manifest)
         did = Workbooks.Git.did(tenant)
 
         body =
@@ -685,7 +703,7 @@ defmodule Workbooks.Toolkits do
 
   @doc "Verify a manifest's provenance: {:ok, did} | {:error, reason}."
   def manifest_provenance(dir) do
-    body = File.read!(Path.join(dir, "manifest.org"))
+    body = File.read!(Path.join(dir, @manifest))
     d = parse_descriptor(body)
 
     cond do
@@ -731,7 +749,7 @@ defmodule Workbooks.Toolkits do
   # :PROPERTIES: drawer (CLI_BIN) or the #+CLI_BIN keyword, same as discovery.
 
   @doc """
-  Parse a toolkit's build descriptor from its `manifest.org`. Returns a map with
+  Parse a toolkit's build descriptor from its `manifest.html`. Returns a map with
   `:exec`, `:build_src` (a `{:crate|:git|:path, value}` tuple or nil), `:build_lang`,
   `:caps` (list), `:cli_bin`, and `:arg_mode`. Missing keys are nil/[]. The
   descriptor is what `wb toolkit build`/`verify` act on.
@@ -739,27 +757,34 @@ defmodule Workbooks.Toolkits do
   def descriptor(id, root \\ default_root()) do
     case tk_dir(id, root) do
       nil -> {:error, {:no_toolkit, id}}
-      dir -> {:ok, parse_descriptor(File.read!(Path.join(dir, "manifest.org")))}
+      dir -> {:ok, parse_descriptor(File.read!(Path.join(dir, @manifest)))}
     end
   end
 
   @doc false
+  # Parse a manifest body (`<work-toolkit>` HTML) into the build descriptor. Each
+  # field reads the same-named attribute (`build-src` etc. dash-cased per HTML).
   def parse_descriptor(body) do
+    a = case work_toolkit(body) do
+          %{attrs: attrs} -> attrs
+          nil -> %{}
+        end
+
     %{
-      exec: kw(body, "EXEC"),
-      trust: kw(body, "TRUST") || "first-party",
-      build_src: parse_build_src(kw(body, "BUILD_SRC")),
-      build_lang: kw(body, "BUILD_LANG"),
-      caps: (kw(body, "CAPS") || "") |> String.split() ,
-      cli_bin: kw(body, "CLI_BIN") || drawer(body, "CLI_BIN"),
-      arg_mode: arg_mode(kw(body, "ARG_MODE")),
-      sha256: kw(body, "SHA256"),
-      wasm_path: kw(body, "WASM_PATH"),
-      preopen: kw(body, "PREOPEN"),
-      author_did: kw(body, "AUTHOR_DID"),
-      signature: kw(body, "SIGNATURE"),
-      cem: kw(body, "CEM"),
-      requires: parse_requires(kw(body, "REQUIRES"))
+      exec: blank_to_nil(a["exec"]),
+      trust: blank_to_nil(a["trust"]) || "first-party",
+      build_src: parse_build_src(blank_to_nil(a["build-src"])),
+      build_lang: blank_to_nil(a["build-lang"]),
+      caps: (a["caps"] || "") |> String.split(),
+      cli_bin: blank_to_nil(a["cli"]),
+      arg_mode: arg_mode(a["arg-mode"]),
+      sha256: blank_to_nil(a["sha256"]),
+      wasm_path: blank_to_nil(a["wasm-path"]),
+      preopen: blank_to_nil(a["preopen"]),
+      author_did: blank_to_nil(a["author-did"]),
+      signature: blank_to_nil(a["signature"]),
+      cem: blank_to_nil(a["cem"]),
+      requires: parse_requires(a["requires"])
     }
   end
 
@@ -831,24 +856,7 @@ defmodule Workbooks.Toolkits do
   defp arg_mode("argv"), do: :argv
   defp arg_mode(_), do: :argv
 
-  # `#+KEY: value` keyword (file-level). nil if absent or empty. The value capture
-  # is restricted to the SAME line ([^\n]) — `\s*` would otherwise cross blank
-  # lines and grab the next non-empty line.
-  defp kw(body, key) do
-    case Regex.run(~r/^#\+#{key}:[^\S\n]*([^\n]*)$/m, body) do
-      [_, v] -> blank_to_nil(String.trim(v))
-      _ -> nil
-    end
-  end
-
-  # `:KEY: value` from a :PROPERTIES: drawer. nil if absent or empty.
-  defp drawer(body, key) do
-    case Regex.run(~r/^[^\S\n]*:#{key}:[^\S\n]*([^\n]*)$/m, body) do
-      [_, v] -> blank_to_nil(String.trim(v))
-      _ -> nil
-    end
-  end
-
+  defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(s), do: s
 
@@ -875,7 +883,7 @@ defmodule Workbooks.Toolkits do
 
       dir ->
         entries = runtime_entries(dir)
-        d = parse_descriptor(File.read!(Path.join(dir, "manifest.org")))
+        d = parse_descriptor(File.read!(Path.join(dir, @manifest)))
 
         cond do
           # Supply-chain gate: an unsigned/tampered third-party toolkit never builds.
@@ -971,8 +979,8 @@ defmodule Workbooks.Toolkits do
         end
 
         File.mkdir_p!(Path.join(dir, "skills"))
-        File.write!(Path.join(dir, "skills/overview.org"), promote_skill(name))
-        File.write!(Path.join(dir, "manifest.org"), promote_manifest(name, lang, build_src, tagline))
+        File.write!(Path.join(dir, "skills/overview#{@skill_ext}"), promote_skill(name))
+        File.write!(Path.join(dir, @manifest), promote_manifest(name, lang, build_src, tagline))
 
         "promoted session command → workspace toolkit `#{name}` at #{dir}\n" <>
           "  build it: wb toolkit build #{name}\n" <>
@@ -996,45 +1004,42 @@ defmodule Workbooks.Toolkits do
 
   defp promote_manifest(name, lang, build_src, tagline) do
     """
-    #+TITLE: #{name} toolkit
-    #+TOOLKIT: #{name}
-    #+VERSION: 0.1.0
-    #+STATUS: experimental
-    #+TAGLINE: #{tagline}
-    #+EXEC: command
-    #+TRUST: first-party
-    #+CLI_BIN: #{name}
-    #+BUILD_LANG: #{lang}
-    #+BUILD_SRC: path:#{build_src}
-    #+ARG_MODE: argv
+    <work-toolkit
+      id="#{name}"
+      cli="#{name}"
+      version="0.1.0"
+      status="experimental"
+      tagline="#{tagline}"
+      exec="command"
+      trust="first-party"
+      build-lang="#{lang}"
+      build-src="path:#{build_src}"
+      arg-mode="argv">
+      <work-doc title="#{name} toolkit">
+        Promoted from a session command (wb-rhs.6). Source-owned + rebuildable.
 
-    * #{name} :toolkit:
-    :PROPERTIES:
-    :ID: #{name}
-    :CLI_BIN: #{name}
-    :END:
-    Promoted from a session command (wb-rhs.6). Source-owned + rebuildable.
-
-    | need   | skill    |
-    |--------+----------|
-    | use it | overview |
+        | need   | skill    |
+        |--------|----------|
+        | use it | overview |
+      </work-doc>
+    </work-toolkit>
     """
   end
 
   defp promote_skill(name) do
     """
-    #+TITLE: #{name} — overview
+    # #{name} — overview
 
-    * When to use this
+    ## When to use this
     A command promoted from a session. NOT for anything else yet — extend the
     skill as the toolkit grows.
 
-    * Workflow
-    Run it through the Dock: =run-command #{name}= (argv + stdin → stdout).
+    ## Workflow
+    Run it through the Dock: `run-command #{name}` (argv + stdin → stdout).
 
-    * Verification checklist
-    - [ ] =wb toolkit build #{name}= registers the command
-    - [ ] =run-command #{name}= produces expected output
+    ## Verification checklist
+    - [ ] `wb toolkit build #{name}` registers the command
+    - [ ] `run-command #{name}` produces expected output
     """
   end
 
@@ -1046,7 +1051,7 @@ defmodule Workbooks.Toolkits do
       |> Enum.map(fn f -> {Path.basename(f, ".org"), f} end)
 
     sub =
-      Path.wildcard(Path.join([dir, "runtimes", "*", "manifest.org"]))
+      Path.wildcard(Path.join([dir, "runtimes", "*", "manifest.html"]))
       |> Enum.map(fn f -> {Path.basename(Path.dirname(f)), f} end)
 
     flat ++ sub
@@ -1221,7 +1226,7 @@ defmodule Workbooks.Toolkits do
         "no such toolkit: #{id}"
 
       dir ->
-        d = parse_descriptor(File.read!(Path.join(dir, "manifest.org")))
+        d = parse_descriptor(File.read!(Path.join(dir, @manifest)))
 
         # CLI_BIN: wb means the toolkit's "binary" IS the built-in wb — its skills
         # document `wb <verb>` commands (vs a compiled command-toolkit like huniq
@@ -1241,7 +1246,7 @@ defmodule Workbooks.Toolkits do
 
   # Count :role pre blocks across a toolkit's skills (for the verify SKIPPED note).
   defp pre_block_count(dir) do
-    Path.wildcard(Path.join([dir, "skills", "**", "*.org"]))
+    Path.wildcard(Path.join([dir, "skills", "**", "*#{@skill_ext}"]))
     |> Enum.filter(&contained?(&1, Path.expand(dir)))
     |> Enum.reduce(0, fn path, acc -> acc + length(extract_role_blocks(File.read!(path), "pre")) end)
   end
@@ -1322,14 +1327,17 @@ defmodule Workbooks.Toolkits do
   end
 
   # Lightweight toolkit lister for the release/version verbs: pure filesystem +
-  # text regex (kw/drawer), NO OQL NIF — so it runs from the host escript without
-  # a live runtime. id = manifest TOOLKIT/ID keyword/drawer, else the dir name.
+  # Floki over the manifest's `<work-toolkit id=…>`, no live runtime needed. id =
+  # the manifest's `id` attribute, else the dir name.
   defp tk_dirs_lite(root) do
-    Path.wildcard(Path.join(root, "*/manifest.org"))
+    Path.wildcard(Path.join(root, "*/#{@manifest}"))
     |> Enum.map(fn manifest ->
       dir = Path.dirname(manifest)
-      body = File.read!(manifest)
-      id = kw(body, "TOOLKIT") || kw(body, "ID") || drawer(body, "ID") || Path.basename(dir)
+      id = case work_toolkit(File.read!(manifest)) do
+             %{attrs: %{"id" => id}} when is_binary(id) and id != "" -> id
+             _ -> Path.basename(dir)
+           end
+
       %{id: id, dir: dir}
     end)
   end
@@ -1346,12 +1354,12 @@ defmodule Workbooks.Toolkits do
   defp safe_slug?(slug),
     do: is_binary(slug) and Regex.match?(@slug_re, slug) and slug not in [".", ".."]
 
-  # thin skill: skills/<slug>.org ; thick skill: skills/<slug>/SKILL.org
+  # thin skill: skills/<slug>.md ; thick skill: skills/<slug>/SKILL.md
   defp skill_path(dir, slug) do
     if safe_slug?(slug) do
       skills = Path.join(dir, "skills")
-      thin = Path.join([dir, "skills", "#{slug}.org"])
-      thick = Path.join([dir, "skills", slug, "SKILL.org"])
+      thin = Path.join([dir, "skills", "#{slug}#{@skill_ext}"])
+      thick = Path.join([dir, "skills", slug, "SKILL#{@skill_ext}"])
 
       cond do
         File.exists?(thin) and contained?(thin, skills) -> thin
@@ -1371,17 +1379,25 @@ defmodule Workbooks.Toolkits do
     abs == base or String.starts_with?(abs, base <> "/")
   end
 
+  # Read a `<work-toolkit>` attribute (dash-cased lowercase) from a toolkit's
+  # manifest. `key` is the legacy UPPER_SNAKE name (TAGLINE/VERSION/…); it maps to
+  # the HTML attribute (tagline/version/…), with CLI_BIN → cli.
   defp manifest_kw(dir, key) do
-    with {:ok, body} <- File.read(Path.join(dir, "manifest.org")),
-         [_, v] <- Regex.run(~r/^#\+#{key}:\s*(.+)$/m, body) do
-      String.trim(v)
+    with {:ok, body} <- File.read(Path.join(dir, @manifest)),
+         %{attrs: attrs} <- work_toolkit(body) do
+      blank_to_nil(attrs[attr_name(key)])
     else
       _ -> nil
     end
   end
 
+  defp attr_name("CLI_BIN"), do: "cli"
+  defp attr_name(key), do: key |> String.downcase() |> String.replace("_", "-")
+
+  # The skill TOC: a Markdown skill's `##` section headings (org `#+CAPTION` →
+  # `##` in the work-* model). Each heading becomes a "  • <heading>" TOC bullet.
   defp captions(body),
-    do: Regex.scan(~r/^[ \t]*#\+CAPTION:\s*(.+)$/m, body) |> Enum.map(fn [_, c] -> String.trim(c) end)
+    do: Regex.scan(~r/^[ \t]*##[ \t]+(.+?)[ \t]*$/m, body) |> Enum.map(fn [_, c] -> String.trim(c) end)
 
   @doc false
   # Extract the body of every `#+begin_src bash :role <role> …` block.
@@ -1529,10 +1545,7 @@ defmodule Workbooks.Toolkits do
 
   defp pinned?(id, root), do: Map.has_key?(live_pins(root), id)
 
-  defp manifest_version(dir) do
-    body = File.read!(Path.join(dir, "manifest.org"))
-    kw(body, "VERSION") || drawer(body, "VERSION")
-  end
+  defp manifest_version(dir), do: manifest_kw(dir, "VERSION")
 
   # toolkits/releases.json — the release index (id → versions). Absent/corrupt → %{}.
   defp releases(root) do
@@ -1559,21 +1572,40 @@ defmodule Workbooks.Toolkits do
     File.write!(path, Jason.encode!(pins, pretty: true) <> "\n")
   end
 
-  defp agent(hs, id), do: Enum.find(hs, &("agent" in &1["tags"] and &1["id"] == id))
+  # ── <work-toolkit> HTML reader (Floki) ────────────────────────────────────
+  # The manifest is a single `<work-toolkit>` element. Its attributes carry what
+  # the org keywords used to (id/cli/version/status/tagline/requires/exec/…); the
+  # nested `<work-doc>` body is the front-door prose. One parser, attribute-named.
 
-  defp names(nil), do: []
-  defp names(agent), do: (agent["props"]["TOOLKITS"] || "") |> String.split()
+  # Parse a manifest's HTML → the `<work-toolkit>` element nodes (attrs map + body).
+  defp work_toolkit_nodes(html) do
+    case Floki.parse_fragment(html) do
+      {:ok, tree} -> Floki.find(tree, "work-toolkit") |> Enum.map(&node_of/1)
+      {:error, _} -> []
+    end
+  end
 
-  defp toolkit?(h), do: "toolkit" in h["tags"]
+  defp node_of({"work-toolkit", attrs, children}) do
+    %{attrs: Map.new(attrs), doc: Floki.find(children, "work-doc") |> Floki.text() |> String.trim()}
+  end
 
-  defp view(h) do
+  # The first `<work-toolkit>` in a manifest body, or nil. Cached read shape used
+  # by the keyword/descriptor accessors below.
+  defp work_toolkit(body) do
+    case work_toolkit_nodes(body) do
+      [n | _] -> n
+      [] -> nil
+    end
+  end
+
+  defp view(%{attrs: a}) do
     %{
-      id: h["id"],
-      title: h["title"],
-      version: h["props"]["VERSION"],
-      cli: h["props"]["CLI_BIN"],
-      status: h["props"]["STATUS"],
-      skill_dir: h["props"]["SKILL_DIR"]
+      id: a["id"],
+      title: a["title"],
+      version: a["version"],
+      cli: a["cli"],
+      status: a["status"],
+      skill_dir: a["skill-dir"]
     }
   end
 end

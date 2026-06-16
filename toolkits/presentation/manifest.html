@@ -1,0 +1,40 @@
+<work-toolkit
+  id="presentation"
+  version="0.1.0"
+  status="stable"
+  tagline="Ask for a presentation, get reveal.js — slide nav, fullscreen, per-slide URLs. The capability is &quot;presentation&quot;; the impl is reveal.js, swappable."
+  skill-dir="skills/"
+  data-impl="reveal.js">
+  <work-doc title="presentation — slide decks">
+    When the user asks for a *presentation*, *deck*, or *slides*, reach for this —
+    do NOT hand-roll a scroll page. A presentation is reveal.js: a real
+    navigable deck (arrow keys, =f= fullscreen, =o= overview, per-slide URLs via
+    the hash), not a long document.
+
+    The brand is incidental. The agent calls the *capability* (&quot;make a
+    presentation&quot;); this toolkit resolves it to the reveal.js impl. Swap the impl
+    here without touching any agent that asks for &quot;presentation&quot;.
+
+    Two ways in, by where the content lives:
+
+    - *From a brandnana deck spec* (slides authored as JSON) — =brandnana book
+      assemble &lt;spec&gt; --out deck.html= already emits reveal.js (the 1280×720
+      slide design wrapped in =.reveal&gt;.slides&gt;section.slide=, scaled to the
+      viewport). Then =brandnana book publish= it. See =skills/deck.org=.
+
+    - *From an Org workbook* — render the workbook&#x27;s =:slide:= / =:section:= nodes
+      as reveal sections. The workbook renderer (org→HTML) takes a presentation
+      mode that wraps each top-level heading as a =&lt;section&gt;= under
+      =.reveal&gt;.slides=. See =skills/org-to-reveal.org=.
+
+    Either path: hard cuts (=transition:none=), no fade/wipe; the deck stays a
+    single self-contained =.html= (reveal from CDN, content inline).
+
+    Skill index (read on demand):
+
+    | Skill             | Use when                                              |
+    |-------------------+-------------------------------------------------------|
+    | =deck=            | Author/assemble a slide deck (brandnana book → reveal)|
+    | =org-to-reveal=   | Turn an existing Org workbook into a reveal deck      |
+  </work-doc>
+</work-toolkit>

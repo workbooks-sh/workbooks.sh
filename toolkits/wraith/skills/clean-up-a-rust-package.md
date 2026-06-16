@@ -1,0 +1,81 @@
+# wraith — clean up a Rust package
+
+# When to use this
+NETWORK: no
+DESTRUCTIVE: maybe
+
+  About to finalize a PR or hand off a Rust package. Want a
+  quick checklist of what's stale, unused, over-complex, or
+  AI-slop-flavored.
+
+# Workflow
+
+  Run from the package root (or workspace root).
+
+## 1. dead code — pub items nothing references
+```bash
+  wraith dead-code
+```
+
+## 2. unused dependencies in Cargo.toml
+```bash
+  wraith unused-deps
+```
+
+## 3. over-complex functions (cyclo>15 or cog>25)
+```bash
+  wraith health
+```
+
+## 4. AI-slop signatures (glob imports, lint-escapes, placeholder prose)
+```bash
+  wraith slop
+```
+
+## 5. near-duplicate fn bodies
+```bash
+  wraith dupes
+```
+
+# The shortcut: `wraith audit`
+
+  Runs dead-code + unused-deps but ONLY on files changed in
+  your current git branch. Good for a fast "what did this PR
+  introduce" check.
+
+```bash
+  wraith audit
+```
+
+# Auto-fix (with care)
+
+  `wraith fix` can remove dead pub items + unused deps. Dry-run
+  by default — preview the diff first.
+
+## preview what fix would change
+```bash
+  wraith fix --dry-run
+```
+
+## actually apply (after reviewing diff)
+```bash
+  wraith fix --write
+  # then: cargo build && cargo test
+```
+
+# Gotchas
+
+  - `dead-code` flags PUB items with no in-workspace refs — does
+    NOT flag pub items consumed by /downstream/ crates. If your
+    package is a library, dead-code in the public surface may be
+    legitimate API.
+  - `health` thresholds (cyclo/cog) are conservative defaults;
+    override in `.wraithrc.json` if your codebase has a higher
+    natural floor.
+  - `slop` flags `use super::*` which is idiomatic in `#[cfg(test)]`
+    modules — ignore those hits.
+
+# See also
+
+  - [reduce-complexity](reduce-complexity.md) — for the cases `health` flagged
+  - `wraith hooks install` — auto-run on git pre-commit

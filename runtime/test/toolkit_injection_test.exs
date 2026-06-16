@@ -82,8 +82,8 @@ defmodule Workbooks.ToolkitInjectionTest do
 
   test "no manifest drift: every skill file is documented in its toolkit manifest" do
     # Guards the drift just fixed (the `models` skill existed but was missing from
-    # the workbooks-browser manifest's Live-now table). Every skills/*.org must be
-    # mentioned in manifest.org so the doc can't silently fall behind the files.
+    # the workbooks-browser manifest's Live-now table). Every skills/*.md must be
+    # mentioned in manifest.html so the doc can't silently fall behind the files.
     root = Toolkits.default_root()
 
     # Discover EVERY installed toolkit (not a hardcoded pair) so a new toolkit or
@@ -91,15 +91,15 @@ defmodule Workbooks.ToolkitInjectionTest do
     toolkits =
       root
       |> File.ls!()
-      |> Enum.filter(&File.exists?(Path.join([root, &1, "manifest.org"])))
+      |> Enum.filter(&File.exists?(Path.join([root, &1, "manifest.html"])))
 
     assert toolkits != [], "no toolkits discovered under #{root}"
 
     for tk <- toolkits do
-      manifest = File.read!(Path.join([root, tk, "manifest.org"]))
+      manifest = File.read!(Path.join([root, tk, "manifest.html"]))
 
       for skill <- Toolkits.skills(Path.join(root, tk)) do
-        assert manifest =~ skill, "#{tk}: skill '#{skill}' missing from manifest.org"
+        assert manifest =~ skill, "#{tk}: skill '#{skill}' missing from manifest.html"
       end
     end
   end

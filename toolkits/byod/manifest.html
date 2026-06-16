@@ -1,0 +1,33 @@
+<work-toolkit
+  id="byod"
+  cli="wb"
+  cli-range="&gt;=0.1"
+  version="0.1.0"
+  status="experimental"
+  tagline="Turn a forged workbook into a real, multi-tenant app — live DB + auth, no engine."
+  requires="wb, node&gt;=20, railway&gt;=3 (to deploy the gateway)"
+  skill-dir="skills/">
+  <work-doc title="byod — workbook → app with a live backend + auth">
+    Connect a forged workbook to a live database (Postgres, or Cloudflare D1)
+    through a secure data backend, with the developer&#x27;s OWN auth (BetterAuth) for
+    sign-in, sessions, organizations (multi-tenant), and API keys. No agent engine
+    required.
+
+    STATUS: the turnkey provisioning (=wb forge app deploy=) + its unified gateway
+    (=deploy-kit/app/gateway=) were removed 2026-06-09 and are NOT currently
+    available (restore-or-drop tracked in =wb-dtd0.1=). Do NOT invoke =wb forge
+    app=. The skill still gives the (real, current) architecture + frontend wiring,
+    and points at the live provider tools to stand up the backend yourself
+    (=cloudflare= / =railway= / =wrangler= toolkits + BetterAuth).
+
+    The workbook .html is the frontend; the backend + auth deploy SEPARATELY and
+    are pointed at via a PUBLIC connection descriptor injected into the .html —
+    never DB credentials or server code.
+
+    Skill index (read on demand):
+
+    | Skill                              | Use when                            |
+    |------------------------------------+-------------------------------------|
+    | =connect-a-workbook-to-a-database= | Give a forged workbook a live Postgres + the developer&#x27;s own auth (sessions, orgs, API keys), no engine |
+  </work-doc>
+</work-toolkit>

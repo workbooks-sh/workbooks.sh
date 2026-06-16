@@ -81,7 +81,7 @@ defmodule Workbooks.CLI.Dev do
       end
 
     root = toolkits_root()
-    n = root |> Path.join("*/manifest.org") |> Path.wildcard() |> length()
+    n = root |> Path.join("*/manifest.html") |> Path.wildcard() |> length()
 
     """
     Workbooks dev environment

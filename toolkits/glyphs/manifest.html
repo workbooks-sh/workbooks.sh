@@ -1,0 +1,107 @@
+<work-toolkit
+  id="glyphs"
+  version="0.1.0"
+  status="experimental"
+  tagline="One API resolves any visual mark — brand logo, tech icon, seeded avatar, social avatar — to an SVG (or an &lt;img&gt;). Curated-local-first, CDN fallback for the long tail. glyph(ref) is sync (curated-only, offline, returns null on a miss); glyphAsync(ref) hits the CDN for the long tail. ref is &quot;&lt;kind&gt;:&lt;id&gt;&quot; — brand:google, icon:elixir, avatar:open-peeps/wren, social:github/octocat."
+  skill-dir="skills/"
+  data-kind="knowledge+assets"
+  data-flow="read this front door → pick the one skill your task needs (resolve to use it, curate to add/refresh curated marks, integrate to plug it into a site/wasm). cat a skill only when you reach its step. The resolver lives in dist/glyphs.js + dist/glyphs.css; the proof page is dist/specimen.html; curated packs in packs/*.json; licenses + the trademark note in LICENSES.md."
+  data-sources="curated-local (inlined SVGs) → svgl (full-color brands) · simple-icons (currentColor tech/brand) · lobehub (AI/LLM brands) · unavatar (social avatars) · open-avatars (this repo, seeded avatars). Marks are trademarks; nominative/identification use only — see LICENSES.md."
+  data-assets="dist/glyphs.js, dist/glyphs.css, dist/specimen.html, packs/curated-brands.json, packs/curated-icons.json, packs/svgl-index.json, packs/open-avatars/*, LICENSES.md">
+  <work-doc title="glyphs — one mark resolver for any site">
+    A *knowledge + assets* toolkit: a tiny, zero-dependency resolver that turns a
+    string ref into a visual mark. One function, four kinds, curated-local-first.
+    Parts that ship together —
+
+    - =dist/glyphs.js= — the resolver. One self-contained file, *zero
+      dependencies*. Pure data-in → string-out: =glyph(ref, opts)= (sync) and
+      =glyphAsync(ref, opts)= (CDN). Runs in a browser =&lt;script&gt;= (=window.Glyphs=),
+      as an ES module, in Node, and in the runtime&#x27;s QuickJS wasm JS lane. The CDN
+      path uses the global =fetch=; where =fetch= is absent the curated-only sync
+      path still works and =glyphAsync= degrades to the curated result (or null).
+    - =dist/glyphs.css= — minimal: =.glyph= inline-flex, baseline-aligned, 1em
+      box (inline-with-text scale); =.glyph--mono= grayscale filter. Recoloring is
+      handled inline by the resolver — the CSS only owns layout + the mono stance.
+    - =packs/= — the curated maps (committed JSON, SVGs inlined):
+      - =curated-brands.json= — name → full-color brand SVG (svgl, simple-icons
+        fallback). The marks bit.ml + the lander use.
+      - =curated-icons.json= — name → currentColor tech-icon SVG (simple-icons).
+      - =svgl-index.json= — svgl&#x27;s name→route map (URLs, no art) so a *long-tail*
+        =brand:= is ONE runtime fetch of the svg, not an index round-trip.
+      - =open-avatars/= — this repo&#x27;s open-avatars renderer + the open-peeps bundle,
+        vendored so =avatar:= resolves with no network.
+    - =scripts/build-curated.mjs= — regenerates the three curated JSONs from the
+      live sources (so the curated set can be refreshed).
+    - =LICENSES.md= — per-source attribution + the *trademark note* (brand logos
+      are trademarks; nominative / identification use only, never implying
+      endorsement).
+    - =skills/= — how to use it: the ref grammar + resolve order (=resolve=), how
+      to add/refresh curated marks (=curate=), and how to plug it into a site or
+      the wasm lane (=integrate=).
+
+    *The ref grammar.* Every mark is =\&quot;&lt;kind&gt;:&lt;id&gt;\&quot;=. The id keeps everything
+    after the first colon (so it may contain =/=):
+
+    | Kind      | id form              | Resolves to                        | Network |
+    |-----------+----------------------+------------------------------------+---------|
+    | =brand=   | =&lt;name&gt;=             | full-color logo (svg)              | sync curated → async svgl/lobehub/simple-icons |
+    | =icon=    | =&lt;name&gt;=             | currentColor tech/UI icon (svg)    | sync curated → async simple-icons/lobehub |
+    | =avatar=  | =&lt;pack&gt;/&lt;seed&gt;=      | seeded avatar (svg/img), delegated | sync, local (open-avatars) |
+    | =social=  | =&lt;provider&gt;/&lt;user&gt;=  | real avatar =&lt;img src=unavatar&gt;=   | the browser fetches the pixels |
+
+    *Resolve order per kind* (first hit wins; a total miss → =null=):
+    - =brand:= → (1) curated local inline → (2) svgl (via the bundled index route,
+      full color) → (3) lobehub → (4) simple-icons.
+    - =icon:=  → (1) curated local → (2) simple-icons → (3) lobehub.
+    - =avatar:= → open-avatars =avatar(packBundle, seed, opts)=. Deterministic by
+      seed (FNV pick), preserved.
+    - =social:= → =https://unavatar.io/&lt;provider&gt;/&lt;user&gt;= as an =&lt;img&gt;=.
+
+    *The sync / async split is the whole design.* =glyph()= is *sync* and
+    *curated-only* for =brand:=/=icon:= — instant, offline, returns =null= if the
+    mark isn&#x27;t in the curated packs (the caller renders nothing). =glyphAsync()=
+    is the same but falls through to the CDN for the long tail (returns a
+    =Promise&lt;string|null&gt;=). =avatar:= and =social:= resolve sync either way
+    (avatar is local + pure; social is just an =&lt;img&gt;= tag the browser loads). A
+    miss — no curated entry and (async) a CDN 404 — returns =null=: honest, never
+    a broken-image box.
+
+    *opts* — ={ size, color, title, class, mono }=. =size= defaults to =&#x27;1em&#x27;=
+    (inline-with-text scale; a number → px). =color= recolors currentColor marks
+    (simple-icons/lobehub are monochrome and inherit it). =mono: true= forces
+    grayscale on a full-color brand (the B&amp;W contexts). =title= sets =&lt;title&gt;= +
+    =aria-label=; =class= is appended to the =.glyph= class list.
+
+    *Wiring.* The core is pure: it holds no fs / no JSON imports. The host injects
+    the packs once via =configure({ brands, icons, svglIndex, avatarPacks,
+    avatarFn })= — then =glyph()= / =glyphAsync()= work. The specimen inlines the
+    packs; the Node test loads them from =packs/=. See =skills/integrate=.
+
+    *The wasm / node fetch caveat.* The CDN path requires a global =fetch=. In some
+    Node and wasm contexts =fetch= is absent — there, =glyph()= (curated-only) is
+    fully functional and =glyphAsync()= returns the curated hit or =null= for the
+    long tail (it never throws). Prerender the long tail at build time (Node 18+
+    has =fetch=) if the deploy target has none. See =skills/integrate=.
+
+    Quick proof: open =dist/specimen.html= — one self-contained page (resolver +
+    open-avatars engine + the curated packs + the open-peeps bundle, all inlined)
+    with a grid of curated brands, a grid of tech icons, a mono demo, delegated
+    avatars across seeds, social =&lt;img&gt;= examples, an *inline-in-headline* demo
+    (logos at text scale in running text — the bit.ml use), and a live input that
+    resolves =brand:stripe= and the like from the CDN. Rebuild it with
+    =node test/build-specimen.mjs=. Tests: =node test/glyph.test.mjs= (55 checks,
+    CDN path mocked).
+
+    *Trademark.* Brand logos + icons are the trademarks of their owners, provided
+    for nominative / identification use only — never implying endorsement or
+    affiliation. See =LICENSES.md=.
+
+    Skill index (read on demand):
+
+    | Skill        | Use when                                                            |
+    |--------------+---------------------------------------------------------------------|
+    | =resolve=    | Calling glyph()/glyphAsync() — the ref grammar, resolve orders, opts, sync/async |
+    | =curate=     | Adding a mark to the curated set or refreshing the curated JSON     |
+    | =integrate=  | Plugging the resolver into a site (browser / Node build-time / wasm / framework) |
+  </work-doc>
+</work-toolkit>

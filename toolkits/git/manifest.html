@@ -1,0 +1,39 @@
+<work-toolkit
+  id="git"
+  cli="git"
+  cli-range="&gt;=2.30"
+  version="0.1.0"
+  status="stable"
+  tagline="Distributed version control — recovery, rebase, undo recipes the agent can lift verbatim."
+  requires="git&gt;=2.30"
+  skill-dir="skills/">
+  <work-doc title="git — distributed version control">
+    Wrapper around the standard =git= binary. Skills cover the
+    workflows agents commonly need but tend to get wrong if they
+    rely on training-data priors alone:
+
+    - rebasing without losing work
+    - recovering from a detached HEAD
+    - undoing a commit (different recipes depending on whether
+      it was pushed)
+    - inspecting + resolving merge conflicts
+
+    =git --help= and =git &lt;verb&gt; --help= remain authoritative for
+    per-flag details. The skills are end-to-end recipes for common
+    /tasks/, not man-page substitutes.
+
+    Skill index (read on demand):
+
+    | Skill                                | Use when                                       |
+    |--------------------------------------+------------------------------------------------|
+    | =overview=                           | First contact, what this toolkit covers        |
+    | =recover-from-detached-head=         | git status says &quot;HEAD detached at SHA&quot;         |
+    | =rebase-without-losing-work=         | Branch needs to be moved onto updated main     |
+    | =undo-a-commit-safely=               | A commit shouldn&#x27;t have happened               |
+    | =bisect=                             | Binary-search the commit that broke a test     |
+    | =cherry-pick=                        | Apply one commit (or range) from another branch|
+    | =partial-staging=                    | =git add -p= to split a file into commits      |
+    | =worktree-management=                | Two branches checked out at once               |
+    | =submodule-flows=                    | Repo has submodules; init / bump / remove      |
+  </work-doc>
+</work-toolkit>

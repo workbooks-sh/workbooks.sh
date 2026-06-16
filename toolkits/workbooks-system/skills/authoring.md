@@ -1,0 +1,86 @@
+# workbooks-system — authoring
+
+# When to use this
+
+Read this when your task is to create or edit workbook content from inside
+the runtime and ship it: scaffold, build, unbundle an existing artifact,
+validate, and publish. For the conceptual model of bundle⇄unbundle and the
+three projections, read `concepts` first.
+
+# Source-vs-artifact discipline (the one rule)
+
+Edit *source*, never the runnable artifact. A workbook ships as one `.html`
+that carries its whole filesystem packed inside it — a base64
+`<script id`"wb-bundle">= deflate-zip holding the org source, the compiled
+`.wasm`, and the assets; that file is an output. If you receive a workbook as
+a file and must change it: unbundle it to source, edit the source, rebuild.
+Never patch the compiled HTML, and never let raw build inputs (un-compiled
+sources) leak into the shipped artifact — only WASM or built bundles belong in it.
+
+# The authoring loop (commands available to you)
+
+`wb` is on PATH in the runtime. The canonical verbs (use `--help` for flags
+rather than memorizing them — the verbs are the stable contract):
+
+```bash
+wb build <workspace>            # compile components → WASM; reports built/unbuilt
+wb bundle <dir> <out.html>      # tangle + compile + pack the tree into one self-contained .html
+wb unbundle <in.html> <dir>     # extract the wb-bundle block back into an editable filesystem tree
+wb query | tangle | lint <file.org>   # headlines / build plan / diagnostics
+wb sign <file.html>             # embed a did:key provenance manifest
+wb verify <file.html>           # check signature + asset integrity
+```
+
+An `unbuilt` component is a to-do, not an error to suppress — it names the
+missing toolchain. If the toolchain is a missing language, that capability
+goes through a compiler lane (see `toolkits`), not an install — you cannot
+install native toolchains in the runtime.
+
+# Files: vfs, not raw OS
+
+Read and write source through `vfs_read` / `vfs_write` against the workdir,
+which is a tenant git repo. Treat it as the source rail: the git tree is the
+truth, and the artifact must be reproducible from it.
+
+# Publishing (the control plane)
+
+Deploying a workbook stores it under an id and serves it on the *public*
+plane (anonymous, GET-only). The write itself goes through the *control*
+plane (bearer-authed) — you never write to the public plane.
+
+```bash
+wb publish init | validate | apply | site   # render a workbook → a live URL
+# or, to a runtime registry:
+wb workbook deploy <id> <artifact>           # control-plane PUT /w/<id>, authed
+```
+
+- A complete-HTML artifact is served verbatim; org sources are rendered by
+  the runtime.
+- When a workbook is multi-page or carries assets, publish the built output
+  *tree* to the site directory (it takes precedence over the registry). When
+  it is truly one file, the registry path is simplest.
+
+# The git rail — your commits are the public changelog
+
+*Every publish/deploy is one git commit* in the tenant repo, surfaced on the
+public plane's `/_changes` feed. This is the public, inspectable history of
+the app. Therefore:
+
+- Write commit messages for strangers — no internal shorthand, no secrets.
+- Don't stuff credentials or tokens into source; secrets live in ENV /
+  the platform variable store, referenced not embedded.
+- Assume every commit is read. The git rail IS the changelog, not a private
+  scratchpad.
+
+# Done-when
+
+A workbook authoring task is done when: source is edited (not the artifact),
+`wb build` reports no unexpected `unbuilt` components, `wb verify` passes on
+the signed artifact, and the publish commit landed on `/_changes`. Verify
+with the cheapest verb; don't re-publish to check.
+
+# Out of scope
+
+Standing up or rolling the *runtime itself* (`wb deploy …`, image builds,
+cloud lifecycle) is an operator action outside the runtime — not part of
+authoring a workbook from in here.

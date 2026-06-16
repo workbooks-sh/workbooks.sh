@@ -1,0 +1,37 @@
+<work-toolkit
+  id="3w"
+  cli="3w"
+  cli-range="&gt;=0.1"
+  version="0.1.0"
+  status="experimental"
+  tagline="Local-first deep-research browser — keyless web search, clean reads, and (soon) crawl/harvest into a workbook context repository."
+  skill-dir="skills/"
+  data-kind="toolkit"
+  data-env-keys="WB_WEB_PROXY SERP_API_KEY"
+  data-env-note="All optional. Zero keys = fully working (native search + readability + lightpanda render). WB_WEB_PROXY routes fetches/renders through a rotation proxy (HTTP/HTTPS). SERP_API_KEY only if you ever need Google-grade coverage (the native pool deliberately excludes Google)."
+  data-flow="3w search → pick URLs → 3w read --render where needed → (later) 3w crawl/harvest → 3w repo build">
+  <work-doc title="3w — keyless web research from inside the sandbox">
+    =3w= (WWW) gives an agent the open web with no API keys and no per-call
+    cost. It is NOT a generic browser wrapper: =search= is native multi-engine
+    (ddg+bing+brave+mojeek merged by cross-engine consensus), =read= is a
+    Chrome-impersonating fetch that falls back to a real JS render only when a
+    page needs it. The defining goal — turning a research run into a portable
+    *workbook context repository* — lands as the crawl/harvest/repo verbs come
+    online (tracked in bd wb-ebwt).
+
+    What an agent gets wrong from priors: reaching for =curl= (bot-walled,
+    no JS) or assuming it must know a domain before reading it. =3w search=
+    is the on-ramp — search first, then read the URLs it returns. Google is
+    *intentionally absent* from the native pool (its wall is JS/behavioral and
+    unrecoverable cheaply); don&#x27;t try to force it — widen engines instead.
+
+    Skill index (read on demand):
+
+    | Skill          | Use when                                                   |
+    |----------------+------------------------------------------------------------|
+    | =overview=     | First contact — the verbs, the cost model, what&#x27;s live yet |
+    | =search=       | Find pages on the open web by query (no key, no Google)     |
+    | =read-extract= | Pull a URL&#x27;s content as clean markdown (JS-aware)          |
+    | =troubleshoot= | A search/read came back empty, walled, or CAPTCHA&#x27;d        |
+  </work-doc>
+</work-toolkit>

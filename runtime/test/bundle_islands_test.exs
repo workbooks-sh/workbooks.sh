@@ -21,17 +21,16 @@ defmodule Workbooks.BundleIslandsTest do
   You are an analyst.
   """
 
-  @manifest_org """
-  #+TITLE: CRM
-  #+EXEC: command
-  #+CAPS: net
-  #+REQUIRES: glyphs, git>=2.30
+  @manifest_html """
+  <work-toolkit id="crm" exec="command" caps="net" requires="glyphs, git>=2.30">
+    <work-doc title="CRM"></work-doc>
+  </work-toolkit>
   """
 
   defp tree do
     %{
       "agents/analyst.org" => @agent_org,
-      "toolkits/crm/manifest.org" => @manifest_org,
+      "toolkits/crm/manifest.html" => @manifest_html,
       "report.org" => "* Q3 report\nRevenue is up.\n",
       "data.sqlite" => "SQLite format 3\0binary",
       "build/out.wasm" => <<0, 97, 115, 109>>
@@ -84,7 +83,7 @@ defmodule Workbooks.BundleIslandsTest do
     # self-closing, src-referenced elements only
     frag = Islands.render(idx)
     assert frag =~ ~s(<work-agent id="analyst" src="agents/analyst.org")
-    assert frag =~ ~s(<work-toolkit id="crm" src="toolkits/crm/manifest.org")
+    assert frag =~ ~s(<work-toolkit id="crm" src="toolkits/crm/manifest.html")
     refute frag =~ "</work-"
   end
 
@@ -129,14 +128,14 @@ defmodule Workbooks.BundleIslandsTest do
     ** System prompt
     Resolve CRM questions.
     """
-    @crm "#+EXEC: command\n#+REQUIRES: browser, git>=2.30\n"
-    @browser "#+EXEC: command\n#+REQUIRES: net>=1\n"
+    @crm ~s(<work-toolkit id="crm" exec="command" requires="browser, git>=2.30"></work-toolkit>)
+    @browser ~s(<work-toolkit id="browser" exec="command" requires="net>=1"></work-toolkit>)
 
     defp nested_tree do
       %{
         "agents/analyst.org" => @analyst,
-        "toolkits/crm/manifest.org" => @crm,
-        "toolkits/browser/manifest.org" => @browser,
+        "toolkits/crm/manifest.html" => @crm,
+        "toolkits/browser/manifest.html" => @browser,
         "report.org" => "* Findings\nDone.\n"
       }
     end

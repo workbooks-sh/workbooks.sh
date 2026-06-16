@@ -30,15 +30,15 @@ defmodule Workbooks.ToolkitPromoteTest do
 
     dir = Path.join(root, name)
     # The durable, source-owned scaffold.
-    assert File.regular?(Path.join(dir, "manifest.org"))
+    assert File.regular?(Path.join(dir, "manifest.html"))
     assert File.regular?(Path.join(dir, "src/index.js"))
-    assert File.regular?(Path.join(dir, "skills/overview.org"))
+    assert File.regular?(Path.join(dir, "skills/overview.md"))
 
-    manifest = File.read!(Path.join(dir, "manifest.org"))
-    assert manifest =~ "#+EXEC: command"
-    assert manifest =~ "#+TRUST: first-party"
-    assert manifest =~ "#+BUILD_LANG: js"
-    assert manifest =~ "#+BUILD_SRC: path:src"
+    manifest = File.read!(Path.join(dir, "manifest.html"))
+    assert manifest =~ ~s(exec="command")
+    assert manifest =~ ~s(trust="first-party")
+    assert manifest =~ ~s(build-lang="js")
+    assert manifest =~ ~s(build-src="path:src")
 
     # Discoverable as a toolkit by the same query agents use.
     discovered = Toolkits.discover(manifest)

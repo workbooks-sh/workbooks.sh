@@ -1,0 +1,94 @@
+# ctk — overview: the standard component canvas
+0.1.0
+Use when first deciding whether CTK fits. What the shell is, the story contract, and when to reach for it vs a workbook or CLI toolkit.
+
+# When to use this
+NETWORK: no
+DESTRUCTIVE: no
+OS: macos linux
+COST: free
+
+  Reach for CTK when you need to *render one component/page in isolation and
+  tune it* — to review an agent's UI work, iterate "vibes," or hand a human a
+  checkpoint in the loop. It is Storybook-shaped, but Org-tangle-native and
+  itself a toolkit.
+
+  NOT for: shipping a finished, self-contained app — that's a workbook (one
+  `.html`). NOT for CLI automation — that's a `command`/`posix` toolkit. CTK is
+  the *bench*, not the product.
+
+# The mental model — three kinds of control, never blurred
+
+  The shell never changes; you never design a layout. There are THREE distinct
+  kinds of control, and keeping them separate is the whole point:
+
+```
+  ┌ Story ▾                                          View: Zoom · Background ┐
+  ├──────────────────┬────────────────────────────────────────────────────────┤
+  │ CONTROLS (props) │                                                          │
+  │  label  variant… │   STATE MATRIX — every state rendered side-by-side       │
+  │ ─────────────────│   [ default ]    [ disabled ]    [ loading ]            │
+  │ STATES (manager) │                                                          │
+  │  disabled→opacity│                                                          │
+  └──────────────────┴────────────────────────────────────────────────────────┘
+```
+
+  - *VIEW* (top bar) — the lens: zoom / background. NEVER changes the component.
+  - *PROPS* (panel, top) — the component's shared authored inputs (label,
+    variant, color, size). Apply to every state. The free-tune surface.
+  - *STATES* (panel "manager" + the stage) — the conditions the component can be
+    in (default / disabled / loading / …). They render *side-by-side* on the
+    stage, not flipped via a picker. Each state may carry its OWN per-state
+    controls (e.g. the disabled state's `opacity`); the panel lists a group per
+    state with those controls, or "no state-specific controls." View them all at
+    once (default) or page through them via *Layout → Tabs* (better for larger
+    components with many states).
+
+  The line that resolves the common confusion: a *value you author* is a PROP
+  (`label`, `variant`); a *condition the component can be in* is a STATE
+  (`disabled`, `loading`). A per-state control tunes one state's cell only.
+
+  You supply only:
+  1. *A component* exposing `render(el, props)` (any language → a module with render).
+  2. *An Org spec* — a `Controls` table (shared props), a `States` section
+     (states with optional per-state controls), and the source in a `:tangle`
+     block. The shell imports that block to render (tangle + polyglot).
+
+  Prop control types: `text`, `color`, `range` (`min..max` or `min..max:step`),
+  `toggle`, `select` (`a|b|c`).
+
+# Workflow — see it now
+
+## open the reference artifact (self-contained; no build, no runtime)
+```bash
+  open toolkits/ctk/ctk.html      # macOS; or xdg-open / a browser
+```
+
+  The FolderIcon story renders in the stage; the left panel (icon/color/size/
+  badge) drives it live; the top bar switches size, vibe, and focus/gallery.
+
+# Common pitfalls
+
+  1. *Treating CTK as the deliverable.* It's the bench. The artifact you tune is
+     a component; the shipped thing is a workbook or a desktop surface. → Keep
+     stories thin; don't grow app logic in the shell.
+  2. *Designing a panel.* The panel is generated from the control table — if you
+     find yourself hand-building inputs, you're off-standard. → Add a table row.
+  3. *Forgetting the render contract.* The stage calls `render(el, props)`; a
+     component that mounts itself elsewhere won't show. → Expose `render`.
+  4. *Drift between controls and source.* The controls table and the `:tangle`
+     props must agree (a control with no matching prop does nothing). → Name them
+     identically; the spec is one source of truth.
+
+# Verification checklist
+
+  - [ ] `open ctk.html` shows the shell (top bar + panel + stage).
+  - [ ] Moving a control re-renders the component live.
+  - [ ] Size + vibe + focus/gallery in the top bar all respond.
+  - [ ] The component came from the `:tangle` block (edit it → output changes).
+
+# See also
+
+  - [authoring-a-story](authoring-a-story.md) — add your own component + control-spec.
+  - `../ctk.html` — the reference shell + FolderIcon story.
+  - `../../AUTHORING.org` — the toolkit depth/breadth standard.

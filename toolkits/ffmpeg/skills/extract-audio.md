@@ -1,0 +1,61 @@
+# ffmpeg — extract audio from a video
+
+# When to use this
+NETWORK: no
+DESTRUCTIVE: no
+
+  Source is a video file; you want just the audio as a
+  standalone `.mp3` / `.wav` / `.m4a`. Common cases: transcripts,
+  podcast clips, music extraction.
+
+# Workflow
+
+## 1. confirm input has an audio stream
+```bash
+  test -f "$1" || { echo "input $1 not found"; exit 1; }
+  ffprobe -v error -show_streams -select_streams a:0 "$1" \
+    | grep -E "codec_name|sample_rate|channels" || { echo "no audio stream"; exit 1; }
+```
+
+## 2a. copy audio without re-encoding (preserves quality, fast)
+```bash
+  # extension depends on source codec — use ffprobe to check
+  ffmpeg -i input.mp4 -vn -c:a copy output.m4a
+  # -vn      = no video
+  # -c:a copy = stream copy, no re-encode
+```
+
+## 2b. transcode to mp3 (universal compatibility)
+```bash
+  ffmpeg -i input.mp4 -vn -c:a libmp3lame -q:a 2 output.mp3
+  # -q:a 2  = high quality VBR (0=highest, 9=lowest)
+```
+
+## 2c. transcode to wav (uncompressed, for further processing)
+```bash
+  ffmpeg -i input.mp4 -vn -c:a pcm_s16le -ar 16000 -ac 1 output.wav
+  # -ar 16000 = 16kHz sample rate (good for speech-to-text)
+  # -ac 1     = mono
+```
+
+## confirm output is valid audio + non-zero duration
+```bash
+  test -f "$1" || { echo "output missing"; exit 1; }
+  ffprobe -v error -show_entries format=duration -of csv=p=0 "$1" \
+    | awk '$1 + 0 > 0 { print "✓", $1, "seconds"; exit } END { print "✗ zero-duration"; exit 1 }'
+```
+
+# Gotchas
+
+  - `-c:a copy` only works if the container (e.g. .m4a, .mka)
+    supports the source codec. If you get "Could not write
+    header", transcode instead.
+  - For speech-to-text inputs (Whisper, etc.), use 16kHz mono
+    WAV (2c above) — most STT models expect this format.
+  - `-vn` is critical; without it the output container may
+    still try to include the video stream.
+
+# See also
+
+  - [extract-thumbnail](extract-thumbnail.md) — visual still
+  - [transcode-to-h264](transcode-to-h264.md) — keep video, re-encode

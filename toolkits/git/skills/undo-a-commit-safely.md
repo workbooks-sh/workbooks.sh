@@ -1,0 +1,79 @@
+# git — undo a commit safely (the right recipe by case)
+
+# When to use this
+NETWORK: maybe
+DESTRUCTIVE: maybe
+
+  A commit happened that shouldn't have, or shouldn't have looked
+  like that. The right recipe depends on TWO orthogonal questions:
+
+  1. Has the commit been *pushed* to a shared remote?
+  2. Do you want to *keep the working changes* or revert them?
+
+# Decision matrix
+
+  | Pushed? | Keep changes? | Recipe                            |
+  |---------|---------------|-----------------------------------|
+  | No      | Yes           | `git reset --soft HEAD~1`         |
+  | No      | No            | `git reset --hard HEAD~1`         |
+  | Yes     | Yes           | `git revert HEAD` (new commit)    |
+  | Yes     | No            | `git revert HEAD` (new commit)    |
+  | No      | Edit msg only | `git commit --amend`              |
+
+  Pushed + Yes/No (keep changes) collapses to revert because
+  rewriting pushed history is unsafe for anyone else who pulled
+  the commit.
+
+# Workflow A — unpushed, keep changes (most common)
+
+## undo the commit but keep the file changes staged
+```bash
+  git reset --soft HEAD~1
+  # files are still modified + staged; you can re-commit differently
+  git status
+```
+
+# Workflow B — unpushed, discard changes
+
+## blow away the commit AND the working changes
+```bash
+  git stash list | head -5
+  echo "if you need any of the discarded changes, stash first"
+```
+
+```bash
+  git reset --hard HEAD~1
+  # the commit is gone; working tree matches the previous commit
+```
+
+# Workflow C — pushed (revert is the only safe path)
+
+## undo by creating a NEW commit that inverts the changes
+```bash
+  git revert HEAD
+  # opens editor for the revert commit message; save + close
+  git push
+```
+
+  Revert leaves history intact (everyone who pulled the bad
+  commit gets a clean revert commit on top — no rewrite).
+
+# Workflow D — wrong message only, unpushed
+
+## edit the commit message
+```bash
+  git commit --amend
+  # edits the message; if files are staged, they're added to the commit too
+```
+
+# Gotchas
+
+  - `git reset --hard` without first stashing loses uncommitted
+    changes. Stash first if any doubt.
+  - `git revert <SHA>` for a MERGE commit needs `-m 1`. The
+    failure message will say so explicitly.
+  - Never amend a pushed commit — same problem as rewriting any
+    pushed history. Use revert.
+  - `git reflog` can recover from almost any local mistake within
+    ~30 days. Try =git reflog --pretty=fuller= and =git reset
+    --hard HEAD@{N}= for "go back N reflog entries".

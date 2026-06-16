@@ -32,39 +32,31 @@ defmodule Workbooks.ToolkitsTest do
     tk = Path.join(root, "demo")
     File.mkdir_p!(Path.join(tk, "skills"))
 
-    # manifest with a toolkit node (id "demo")
-    File.write!(Path.join(tk, "manifest.org"), """
-    #+TITLE: demo toolkit
-    #+CLI_BIN: demo
-    #+STATUS: stable
-    #+TAGLINE: scratch fixture for path-escape tests
-
-    * demo — scratch                                             :toolkit:
-      :PROPERTIES:
-      :ID:        demo
-      :CLI_BIN:   demo
-      :STATUS:    stable
-      :SKILL_DIR: skills/
-      :END:
+    # manifest with a <work-toolkit> node (id "demo")
+    File.write!(Path.join(tk, "manifest.html"), """
+    <work-toolkit id="demo" cli="demo" status="stable"
+      tagline="scratch fixture for path-escape tests" skill-dir="skills/">
+      <work-doc title="demo — scratch"></work-doc>
+    </work-toolkit>
     """)
 
-    # thin skill: skills/overview.org   (verify_text wants overview.org present)
-    File.write!(Path.join([tk, "skills", "overview.org"]), """
-    #+TITLE: demo overview
-    #+CAPTION: only caption in the thin skill
+    # thin skill: skills/overview.md   (verify_text wants overview.md present)
+    File.write!(Path.join([tk, "skills", "overview.md"]), """
+    # demo overview
+    ## only caption in the thin skill
     body of the thin overview skill
     """)
 
-    # thick skill: skills/deep/SKILL.org
+    # thick skill: skills/deep/SKILL.md
     File.mkdir_p!(Path.join([tk, "skills", "deep"]))
 
-    File.write!(Path.join([tk, "skills", "deep", "SKILL.org"]), """
-    #+TITLE: deep thick skill
+    File.write!(Path.join([tk, "skills", "deep", "SKILL.md"]), """
+    # deep thick skill
     THICK_SKILL_MARKER
     """)
 
     # A secret OUTSIDE the toolkit dir, reachable only via traversal.
-    secret = Path.join(base, "SECRET.org")
+    secret = Path.join(base, "SECRET.md")
     File.write!(secret, "TOP_SECRET_SHOULD_NEVER_BE_READ\n")
 
     on_exit(fn -> File.rm_rf!(base) end)
@@ -141,7 +133,8 @@ defmodule Workbooks.ToolkitsTest do
   describe "show_text/2" do
     test "shows the manifest body + a skill index" do
       out = Toolkits.show_text("git", @root)
-      assert out =~ "#+TITLE: git toolkit"
+      assert out =~ ~s(<work-toolkit)
+      assert out =~ ~s(id="git")
       assert out =~ "Skills (read with `wb toolkit show git <skill>`)"
       assert out =~ "overview"
       assert out =~ "bisect"
@@ -170,38 +163,28 @@ defmodule Workbooks.ToolkitsTest do
   # ── show_skill_text/3 — thin vs thick, CAPTION TOC ────────────────────────
 
   describe "show_skill_text/3 against the real tree" do
-    # FAILING — REAL BUG (do not "fix" by relaxing the assertion).
-    # git/skills/overview.org carries two `#+CAPTION:` lines, but they are
-    # INDENTED under the `* Verify` heading ("  #+CAPTION: …"), as org body
-    # content conventionally is. `Toolkits.captions/1` uses
-    #   ~r/^#\+CAPTION:\s*(.+)$/m
-    # which anchors at column 0 and rejects leading whitespace, so it finds
-    # ZERO captions here and the TOC header is never emitted. Contrast
-    # extract_role_blocks/2, which (correctly) does NOT anchor and so handles
-    # the same indentation. The fix is to allow leading whitespace in the
-    # caption regex (e.g. ~r/^[^\S\n]*#\+CAPTION:[^\S\n]*(.+)$/m), matching how
-    # kw/drawer already tolerate indentation. Left failing to flag the bug.
-    test "renders a thin skill body with a CAPTION TOC header" do
+    # Skills are Markdown now; their `##` section headings drive the TOC (org
+    # `#+CAPTION` → `##` in the work-* model). git/overview.md carries `##`
+    # headings, so the TOC header is emitted and the body renders.
+    test "renders a thin skill body with a heading TOC header" do
       out = Toolkits.show_skill_text("git", "overview", @root)
       # body always renders:
       assert out =~ "confirm git is installed"
-      assert out =~ "#+TITLE: git — overview"
-      # BUG: indented captions are not detected → no TOC header. This assertion
-      # SHOULD pass once captions/1 tolerates leading whitespace.
+      assert out =~ "# git — overview"
+      # `##` headings are detected → TOC header.
       assert out =~ "TOC (CAPTIONs):"
-      # caption bullets use "  • "
+      # TOC bullets use "  • "
       assert out =~ ~r/^\s+•\s/m
     end
 
-    test "every git skill has captions AND renders a TOC (indented captions detected)" do
-      # All 9 git skills carry indented #+CAPTION lines; captions/1 now tolerates
-      # leading whitespace, so each produces a TOC header (regression guard for the
-      # column-0-anchor bug).
+    test "every git skill has `##` headings AND renders a TOC" do
+      # All 9 git skills carry `##` section headings; captions/1 reads them, so
+      # each produces a TOC header.
       for slug <- ~w(overview bisect cherry-pick partial-staging
                      rebase-without-losing-work recover-from-detached-head
                      undo-a-commit-safely worktree-management submodule-flows) do
         out = Toolkits.show_skill_text("git", slug, @root)
-        assert out =~ "#+CAPTION:", "#{slug} should contain caption lines"
+        assert out =~ ~r/^##\s/m, "#{slug} should contain `##` headings"
         assert out =~ "TOC (CAPTIONs):", "#{slug} should render a TOC"
       end
     end
@@ -220,14 +203,14 @@ defmodule Workbooks.ToolkitsTest do
   describe "show_skill_text/3 thin vs thick (scratch fixture)" do
     setup [:scratch_toolkit]
 
-    test "thin skill: skills/<slug>.org resolves", %{root: root} do
+    test "thin skill: skills/<slug>.md resolves", %{root: root} do
       out = Toolkits.show_skill_text("demo", "overview", root)
       assert out =~ "body of the thin overview skill"
       assert out =~ "TOC (CAPTIONs):"
       assert out =~ "only caption in the thin skill"
     end
 
-    test "thick skill: skills/<slug>/SKILL.org resolves", %{root: root} do
+    test "thick skill: skills/<slug>/SKILL.md resolves", %{root: root} do
       out = Toolkits.show_skill_text("demo", "deep", root)
       assert out =~ "THICK_SKILL_MARKER"
     end
@@ -235,7 +218,7 @@ defmodule Workbooks.ToolkitsTest do
     test "thin wins when both could exist (overview is thin)", %{root: root, tk: tk} do
       # Plant a thick form alongside the thin one; thin must take precedence.
       File.mkdir_p!(Path.join([tk, "skills", "overview"]))
-      File.write!(Path.join([tk, "skills", "overview", "SKILL.org"]), "THICK_OVERVIEW\n")
+      File.write!(Path.join([tk, "skills", "overview", "SKILL.md"]), "THICK_OVERVIEW\n")
       out = Toolkits.show_skill_text("demo", "overview", root)
       assert out =~ "body of the thin overview skill"
       refute out =~ "THICK_OVERVIEW"
@@ -282,7 +265,7 @@ defmodule Workbooks.ToolkitsTest do
       out = Toolkits.search_text("rebase", @root)
       refute out == "(no matches for \"rebase\")"
       # each hit line is "<rel-path>:<n>: <trimmed text>"
-      assert out =~ ~r{git/skills/[^:]+\.org:\d+: }
+      assert out =~ ~r{git/skills/[^:]+\.md:\d+: }
     end
 
     test "is case-insensitive" do
@@ -329,23 +312,23 @@ defmodule Workbooks.ToolkitsTest do
   # ── verify_text/2 ─────────────────────────────────────────────────────────
 
   describe "verify_text/2" do
-    test "git: structural checks pass; pre blocks SKIPPED by default (default-deny)" do
+    test "git: structural checks pass (manifest + overview present)" do
       out = Toolkits.verify_text("git", @root)
-      assert out =~ "✓ manifest.org present"
-      assert out =~ "skills/overview.org present"
-      # git exec mode is posix; CLI_BIN=git is on PATH on this machine.
+      assert out =~ "✓ manifest.html present"
+      assert out =~ "skills/overview.md present"
+      # exec mode is reported (git declares none → discovery-only).
       assert out =~ "exec:"
-      # NO NATIVE EXEC (wb-9ja): pre blocks are NEVER executed — native :role bash
-      # is removed entirely. verify reports them DISABLED (structural checks stand).
-      assert out =~ "pre checks DISABLED"
+      # NO NATIVE EXEC (wb-9ja): Markdown skills carry no org `:role` bash blocks,
+      # so there is nothing to disable — the structural checks are the gate.
+      refute out =~ "pre checks DISABLED"
+      refute out =~ ~r/(✓|✗) pre skills/
     end
 
-    test "git: pre blocks stay DISABLED even with WB_TOOLKIT_EXEC=1 (native exec banned)" do
+    test "git: no native :role pre lane even with WB_TOOLKIT_EXEC=1 (native exec banned)" do
       System.put_env("WB_TOOLKIT_EXEC", "1")
       on_exit(fn -> System.delete_env("WB_TOOLKIT_EXEC") end)
       out = Toolkits.verify_text("git", @root)
       # The opt-in flag no longer re-enables native bash; pre never runs.
-      assert out =~ "pre checks DISABLED"
       refute out =~ ~r/(✓|✗) pre skills/
     end
 
@@ -364,19 +347,16 @@ defmodule Workbooks.ToolkitsTest do
       File.mkdir_p!(Path.join(tk, "skills"))
       on_exit(fn -> File.rm_rf!(base) end)
 
-      File.write!(Path.join(tk, "manifest.org"), """
-      #+CLI_BIN: quiet
-      * quiet :toolkit:
-        :PROPERTIES:
-        :ID: quiet
-        :CLI_BIN: quiet
-        :END:
+      File.write!(Path.join(tk, "manifest.html"), """
+      <work-toolkit id="quiet" cli="quiet">
+        <work-doc title="quiet"></work-doc>
+      </work-toolkit>
       """)
 
-      File.write!(Path.join([tk, "skills", "overview.org"]), "no role blocks here\n")
+      File.write!(Path.join([tk, "skills", "overview.md"]), "no role blocks here\n")
       out = Toolkits.verify_text("quiet", root)
-      assert out =~ "✓ manifest.org present"
-      assert out =~ "✓ skills/overview.org present"
+      assert out =~ "✓ manifest.html present"
+      assert out =~ "✓ skills/overview.md present"
     end
   end
 
@@ -506,11 +486,11 @@ defmodule Workbooks.ToolkitsTest do
     test "refuses to run a :role task block — native exec removed", %{root: root, tk: tk} do
       sentinel = Path.join(System.tmp_dir!(), "wb_ran_#{System.unique_integer([:positive])}")
 
-      File.write!(Path.join([tk, "skills", "echoer.org"]), """
-      #+begin_src bash :role task
+      File.write!(Path.join([tk, "skills", "echoer.md"]), """
+      ```bash :role task
       touch #{sentinel}
       echo "arg1=$1 arg2=$2"
-      #+end_src
+      ```
       """)
 
       on_exit(fn -> File.rm(sentinel) end)
@@ -528,13 +508,13 @@ defmodule Workbooks.ToolkitsTest do
     test "ADVERSARIAL: traversal task slug never executes a planted .org",
          %{root: root, tk: tk} do
       sentinel = Path.join(System.tmp_dir!(), "wb_pwned_#{System.unique_integer([:positive])}")
-      evil = Path.join(Path.dirname(Path.dirname(tk)), "evil.org")
+      evil = Path.join(Path.dirname(Path.dirname(tk)), "evil.md")
 
       File.write!(evil, """
-      #+begin_src bash :role task
+      ```bash :role task
       touch #{sentinel}
       echo PWNED
-      #+end_src
+      ```
       """)
 
       on_exit(fn -> File.rm(evil); File.rm(sentinel) end)
@@ -551,10 +531,10 @@ defmodule Workbooks.ToolkitsTest do
       sentinel = Path.join(System.tmp_dir!(), "wb_noexec_#{System.unique_integer([:positive])}")
       on_exit(fn -> File.rm(sentinel) end)
 
-      File.write!(Path.join([tk, "skills", "danger.org"]), """
-      #+begin_src bash :role task
+      File.write!(Path.join([tk, "skills", "danger.md"]), """
+      ```bash :role task
       touch #{sentinel}
-      #+end_src
+      ```
       """)
 
       out = Toolkits.run_task_text("demo", "danger", [], root)

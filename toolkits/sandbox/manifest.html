@@ -1,0 +1,54 @@
+<work-toolkit
+  id="sandbox"
+  version="0.1.0"
+  status="stable"
+  tagline="The in-sandbox command set — scripting languages, JS engines, crypto, fonts &amp; text-shaping, image, XML, regex, linear algebra, document conversion, data formats — 30+ real tools compiled to WASI and run under wasmtime, no native execution."
+  skill-dir="skills/"
+  data-kind="commands">
+  <work-doc title="sandbox — in-sandbox WASI commands">
+    Real upstream CLIs/runtimes compiled to =wasm32-wasi= and run under wasmtime in the sandbox via the
+    =run-command= Dock import (host: =Workbooks.CommandRegistry.run/3-5=). ZERO native execution — each
+    command IS a sandboxed wasm module, stdin → stdout, argv passed through. FIVE lanes in
+    =Workbooks.Pallet= provide them: prebuilt-WASI artifacts (=@catalog=), C/C++-from-source (=@csource=,
+    built in-sandbox via =clang.wasm= — handles amalgams via =:include_only=/=:compile_only=, config
+    substitution, and multi-tarball =:deps=), Rust crates (=@rust= via =mrustc=→clang), pure-Python
+    (=@python_tools= on CPython.wasm), and npm/JS (=@js_tools= — an npm package bundled in-sandbox via
+    esbuild and run on Javy/QuickJS). All are seeded at boot, then persisted + reloaded (no rebuild).
+
+    Unlike git/ffmpeg/etc., this toolkit is not ONE wrapped CLI — it is the INDEX of the command set the
+    agent can reach. Invoke any of them by name; pass file access with a WASI =--dir= preopen.
+
+    | Command(s)                       | Category      | What                                              |
+    |----------------------------------+---------------+---------------------------------------------------|
+    | =python= =ruby= =php=            | languages     | full interpreters + huge stdlibs                  |
+    | =lua= =wren= =mujs= =zforth=     | languages     | small embeddable scripting / Forth                |
+    | =qjs= =duk=                      | JS engines    | qjs = full ES2023; duk = ES5/ES2015               |
+    | =agda=                           | proof         | dependently-typed language / proof assistant      |
+    | =gz= =lz4= =zstd= =br= =wuffs=   | compression   | gzip/lz4/zstd/brotli (+ =-d=); wuffs CRC32         |
+    | =b2= =b3= =argon2=               | hashing       | BLAKE2b-512 / BLAKE3-256 / Argon2                 |
+    | =sodium= =mbedtls= =openssl=     | crypto        | NaCl crypto / mbedTLS SHA / full OpenSSL CLI      |
+    | =sqlite3=                        | database      | SQL on stdin → stdout                             |
+    | =jq=                             | JSON          | filter / transform                                |
+    | =md= =pandoc=                    | documents     | markdown→HTML; pandoc = any↔any doc convert       |
+    | =freetype= =harfbuzz=            | text/fonts    | FreeType font engine / HarfBuzz text shaping      |
+    | =jpeg= =png=                     | image         | JPEG (cjpeg/djpeg) / PNG (libpng+zlib)            |
+    | =expat= =xml2=                   | XML           | expat SAX parse; xml2 = libxml2 XPath/DOM         |
+    | =onig= =rgx= =wfreq=             | text/regex    | Oniguruma / Rust-regex grep; word frequency       |
+    | =eigen=                          | math          | linear algebra (matrices / decompositions)        |
+    | =qr=                             | encoding      | text → ASCII QR code                              |
+    | =tar=                            | archive       | tar create / extract                              |
+    | =yaml= =tmpl=                    | config/tmpl   | YAML→JSON; Jinja2 render (Lane D Python)          |
+    | =arrow= =protobuf=               | data formats  | Apache Arrow tables; protobuf .proto parse (JS)   |
+    | =glimmer= =enhance= =pdf=        | web/render    | Glimmer precompile; @enhance SSR; text→PDF (JS)   |
+    | =coreutils=                      | unix utils    | ~100 applets (=coreutils &lt;applet&gt; …=)             |
+    | =wat2wasm= =wasm2wat= …          | wasm tooling  | WABT (12 tools)                                   |
+    | =prolog= =wasm3=                 | misc          | Trealla Prolog / Wasm3 interpreter                |
+
+    Skill index (read on demand):
+
+    | Skill      | Use when                                                     |
+    |------------+--------------------------------------------------------------|
+    | =overview= | First contact — what&#x27;s here + the invocation convention      |
+    | =commands= | Per-command usage, args, stdin/stdout, + how to add a tool    |
+  </work-doc>
+</work-toolkit>

@@ -1,0 +1,121 @@
+# git — stage partial changes (hunks within a file)
+0.1.0
+Use when one file has multiple unrelated changes and you want each in its own commit. `git add -p` / `git restore -p` / `git reset -p` walk the hunks interactively.
+
+# When to use this
+NETWORK: no
+DESTRUCTIVE: no
+
+  You've been working on a file and the diff now includes two
+  (or more) logically separate changes — a feature edit + an
+  unrelated refactor, a bug fix + a comment tweak. You want
+  each in its own commit so the history reads cleanly.
+
+  Also when you want to UNSTAGE only part of what you accidentally
+  `git add .`'d.
+
+# The three -p modes
+
+  | Verb              | Direction           | Use when                           |
+  |-------------------|---------------------|------------------------------------|
+  | `git add -p`      | unstaged → staged   | Pick which hunks to commit         |
+  | `git reset -p`    | staged → unstaged   | Un-stage a hunk you regret         |
+  | `git restore -p`  | unstaged → discard  | Throw away a hunk (DESTRUCTIVE)    |
+  | `git stash -p`    | unstaged → stash    | Set aside hunks without committing |
+
+# Workflow: split unrelated edits into two commits
+
+## 1. survey what's changed
+```bash
+  git status
+  git diff --stat
+```
+
+## 2. interactively stage hunk-by-hunk for the FIRST commit
+```bash
+  git add -p
+  # for each hunk, git asks: Stage this hunk [y,n,q,a,d,s,e,?]
+  #   y = stage this hunk
+  #   n = skip
+  #   s = split into smaller hunks (when possible)
+  #   e = edit the hunk by hand (advanced — modify the diff text)
+  #   q = quit
+```
+
+## 3. confirm what's staged vs what's left
+```bash
+  echo "=== staged ==="
+  git diff --cached --stat
+  echo "=== still unstaged ==="
+  git diff --stat
+```
+
+## 4. commit the first slice
+```bash
+  git commit -m "first-thing: <description of just the staged hunks>"
+```
+
+## 5. repeat for the second slice (or just commit the rest)
+```bash
+  git add -p   # OR git add . if everything remaining is one logical change
+  git commit -m "second-thing: <description>"
+```
+
+# Workflow: unstage a hunk you regret
+
+## walk the staged hunks; unstage selectively
+```bash
+  git reset -p
+  # asks Unstage this hunk [y,n,...] per hunk
+```
+
+# Workflow: discard a hunk without staging it
+
+## throw away unstaged hunks WITHOUT committing — DESTRUCTIVE
+```bash
+  git restore -p
+  # asks Discard this hunk from working tree [y,n,...] per hunk
+  # there is no undo; stash first if any doubt
+```
+
+# The `e` edit-hunk option
+
+  When `s` can't split far enough (two changes in adjacent lines),
+  `e` opens the hunk in `$EDITOR`. Rules of the road:
+
+  - Delete a line with `-` prefix to UN-do that removal.
+  - Delete a line with `+` prefix to UN-do that addition.
+  - Convert `+` to ` ` (space) to keep the line as context but
+    not commit the change.
+  - DON'T add new lines (they're not in either side of the diff).
+
+  Save + quit; git re-applies your edited hunk.
+
+# Common pitfalls
+
+  1. *Editor confusion with `e`.* Easy to break the hunk by
+     forgetting the prefix rules. If it fails, git rejects the
+     edit and re-prompts; nothing's lost.
+
+  2. *Forgot to add the rest before committing the rest.* =git
+     commit= without `-a` only commits what's staged. =git add
+     .= or `git add -u` picks up the rest of the file.
+
+  3. *`git restore -p` is destructive.* Unlike `git reset -p`
+     (which keeps changes), restore THROWS AWAY unstaged hunks.
+     Stash first if unsure.
+
+  4. *Whitespace-only hunks split awkwardly.* If a file has a
+     mix of whitespace + real changes, `git diff --ignore-all-space`
+     helps surface the real ones first.
+
+# Verification checklist
+
+  - [ ] Each commit's `git show` contains only the intended hunks
+  - [ ] `git status` is clean (or shows ONLY what you deliberately left)
+  - [ ] No stash leaked from a half-completed restore -p (`git stash list`)
+
+# See also
+
+  - [undo-a-commit-safely](undo-a-commit-safely.md) — when -p splitting went wrong
+  - [overview](overview.md) — git toolkit basics

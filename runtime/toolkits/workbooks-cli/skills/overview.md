@@ -1,0 +1,63 @@
+# workbooks-cli — overview
+
+# How to invoke (read this first)
+
+  Everything here is a BUILT-IN `wb` verb — run it DIRECTLY through your `wb` tool
+  (args="deploy status", args="publish apply x.org"). These are NOT compiled
+  command-toolkits: do NOT wrap them in `wb toolkit run …` (that path is refused
+  for deploy/publish). `wb toolkit show …` is only for READING these skills.
+
+# What this toolkit is
+
+  Two outward-facing `wb` surfaces the user runs themselves:
+  - `wb deploy`  — stand up + operate THE runtime image (the "nexus"), local or cloud.
+  - `wb publish` — render a Workbook (.org) to HTML and ship it to a live URL.
+
+  Both are NON-INTERACTIVE and accept `--json` (exit 0 ` ok, non-zero ` fail), so
+  you can run them and read the result honestly.
+
+# The golden rule: it's declarative — scaffold, edit, validate, apply
+
+  Don't improvise flags. Each surface has ONE source-of-truth file you scaffold,
+  let the user edit, then reconcile:
+  - deploy  → `./deployment.org`
+  - publish → `./publish.org`
+
+# Deploy — the runtime (a nexus)
+
+  : wb deploy local              ;; zero-config local run (no file — like `docker run`)
+  : wb deploy doctor             ;; check the host can deploy (krunvm/docker, creds)
+  : wb deploy init [preset]      ;; scaffold ./deployment.org (local | fly)
+  : wb deploy validate           ;; coherence-check deployment.org (no apply)
+  : wb deploy apply              ;; reconcile → bring the runtime to the declared state
+  : wb deploy status             ;; is it up? (./deployment.org if present, else local daemon)
+  : wb deploy verify             ;; health-check the deployed runtime
+  : wb deploy logs               ;; tail its logs
+  : wb deploy down               ;; tear it down
+  : wb deploy ci [github|gitlab|generic]  ;; scaffold CI that applies deployment.org on push
+
+  (`build` / `publish` build + push the one OCI image to a registry the USER
+  controls — only when explicitly asked.)
+
+# Publish — a workbook → live URL
+
+  : wb publish init             ;; scaffold ./publish.org
+  : wb publish validate         ;; coherence-check it (no render, no deploy)
+  : wb publish apply <file.org> ;; render + ship → prints the live URL
+  : wb publish site [<dir>]     ;; render a multi-page site from site.org → deploy
+
+  publish.org declares: PUBLISH_TARGET (cloudflare-pages | gh-pages | self-hosted),
+  PUBLISH_PROJECT, optional PUBLISH_DOMAIN / PUBLISH_TITLE.
+
+# Honesty
+
+  - This is the USER's tool — it deploys runtimes + sites the user controls.
+    It is NOT how the platform ships the compilers package or the platform
+    runtime image (maintainer-only). Never conflate them.
+  - NEVER fabricate a command's output. `wb publish apply` prints the real live
+    URL; `wb deploy status` prints the real state — quote ONLY what the command
+    actually printed. If you have NOT run it, say the value comes from running it
+    (don't invent a URL, status, or any result you didn't observe).
+  - Prefer `validate` before `apply`; prefer `--json` when you need to branch on
+    the outcome. Read a skill for detail:
+    `wb toolkit show workbooks-cli <skill>` (deploy, publish).

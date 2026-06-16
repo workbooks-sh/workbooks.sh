@@ -2,13 +2,14 @@ defmodule Workbooks.SandboxToolkitTest do
   use ExUnit.Case, async: false
 
   # The sandbox toolkit is the agent-discovery surface for the in-sandbox command set. This guards it:
-  # the manifest must parse to exactly one :toolkit: node (a malformed one would break discover_dir for
-  # ALL agents), the skills must exist, and the agents we activated it on must still list it.
+  # the manifest must parse to exactly one `<work-toolkit>` node (a malformed one would break
+  # discover_dir for ALL agents), the skills must exist, and the agents we activated it on must still
+  # list it.
 
   @toolkits Path.expand("../../toolkits", __DIR__)
 
-  test "the sandbox manifest discovers as exactly one valid :toolkit: node" do
-    manifest = Path.join(@toolkits, "sandbox/manifest.org")
+  test "the sandbox manifest discovers as exactly one valid <work-toolkit> node" do
+    manifest = Path.join(@toolkits, "sandbox/manifest.html")
     assert File.regular?(manifest)
 
     nodes = Workbooks.Toolkits.discover(File.read!(manifest))
@@ -19,7 +20,7 @@ defmodule Workbooks.SandboxToolkitTest do
 
   test "the sandbox toolkit ships its skills" do
     for s <- ~w(overview commands) do
-      assert File.regular?(Path.join(@toolkits, "sandbox/skills/#{s}.org")),
+      assert File.regular?(Path.join(@toolkits, "sandbox/skills/#{s}.md")),
              "sandbox skill '#{s}' should exist"
     end
   end
