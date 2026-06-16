@@ -148,6 +148,7 @@ defmodule Workbooks.CommandRegistryTest do
   # ---------------------------------------------------------------------------
 
   describe "run/2 (stdin only)" do
+    @tag :build
     test "upper uppercases stdin (source-built Javy, :argv mode, no argv)" do
       assert {:ok, "HI THERE"} = CommandRegistry.run("upper", "hi there")
     end
@@ -183,11 +184,13 @@ defmodule Workbooks.CommandRegistryTest do
       assert out == "foo\nzoo"
     end
 
+    @tag :build
     test ":argv builtin (upper) ignores argv it does not read, returns uppercased stdin" do
       # upper is :argv mode but the JS never reads argv; argv passes harmlessly.
       assert {:ok, "ABC"} = CommandRegistry.run("upper", "abc", ["whatever", "args"])
     end
 
+    @tag :build
     test "empty argv is a no-op for either mode" do
       assert {:ok, "HI"} = CommandRegistry.run("upper", "hi", [])
       assert {:ok, "42"} = CommandRegistry.run("jq", ".x\n{\"x\":42}", [])
@@ -201,6 +204,7 @@ defmodule Workbooks.CommandRegistryTest do
       end
     end
 
+    @tag :build
     test "run/4 accepts a dirs list (empty dirs is the default and works)" do
       assert {:ok, "HI"} = CommandRegistry.run("upper", "hi", [], [])
     end
@@ -431,6 +435,7 @@ defmodule Workbooks.CommandRegistryTest do
       {:ok, sentinels: sentinels}
     end
 
+    @tag :build
     test "injection-shaped argv on an :argv command is never executed on the host",
          %{sentinels: [s1, s2]} do
       # Build "$" <> "(...)" / backticks at runtime so the Elixir parser itself
@@ -503,14 +508,17 @@ defmodule Workbooks.CommandRegistryTest do
   # ---------------------------------------------------------------------------
 
   describe "boundary and unicode inputs" do
+    @tag :build
     test "empty stdin to upper yields empty output" do
       assert {:ok, ""} = CommandRegistry.run("upper", "")
     end
 
+    @tag :build
     test "whitespace-only stdin to upper trims to empty (run_builtin String.trim/1)" do
       assert {:ok, ""} = CommandRegistry.run("upper", "   \n\t  ")
     end
 
+    @tag :build
     test "unicode stdin: upper does Unicode-aware uppercasing" do
       # JS String.toUpperCase handles non-ASCII; ß has no single uppercase so it
       # becomes SS — assert the actual JS behavior, not an ASCII assumption.
@@ -518,6 +526,7 @@ defmodule Workbooks.CommandRegistryTest do
       assert out == "CAFÉ ΑΒΓ STRASSE"
     end
 
+    @tag :build
     test "emoji / astral plane stdin passes through upper without corruption" do
       assert {:ok, out} = CommandRegistry.run("upper", "hi 🚀🧪 end")
       assert out == "HI 🚀🧪 END"
@@ -539,6 +548,7 @@ defmodule Workbooks.CommandRegistryTest do
     # a list of chunks until readSync returns 0), NOT in this test. Leaving the
     # assertion as the CORRECT expectation so the bug stays visible.
     @tag :known_bug
+    @tag :build
     test "very-long stdin (256 KiB) round-trips through upper" do
       big = String.duplicate("ab", 128 * 1024)
       assert {:ok, out} = CommandRegistry.run("upper", big)
@@ -560,6 +570,7 @@ defmodule Workbooks.CommandRegistryTest do
       assert {:ok, _} = CommandRegistry.run("jq", ".x\nthis is not json")
     end
 
+    @tag :build
     test "embedded NULs and control bytes in stdin do not crash the run path" do
       input = "a\0b\x01c\x1f"
       assert {:ok, _} = CommandRegistry.run("upper", input)
