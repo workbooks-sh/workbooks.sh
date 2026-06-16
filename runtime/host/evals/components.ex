@@ -480,10 +480,13 @@ defmodule Workbooks.Evals.Components do
 
     loader =
       if has_dist do
-        "<script type=\"module\">\n" <>
-          "try { await import(\"file://#{dist}\"); }\n" <>
-          "catch (e) { document.body.dataset.elementsError = String(e); }\n" <>
-          "</script>"
+        # INLINE the bundle source — both `import("file://…")` and
+        # `<script src="file://…">` are CORS-blocked from a file:// page (origin
+        # null), so the only offline path is inlining the module text. `</script`
+        # is neutralized so the bundle can't close its own tag. Lit is bundled in;
+        # the lazy CDN engine tiers stay dynamic imports (fail offline → floor).
+        bundle = File.read!(dist) |> String.replace("</script", "<\\/script")
+        "<script type=\"module\">\n#{bundle}\n</script>"
       else
         # stub: a token-themed card showing the chosen tag + payload so the
         # frame is non-blank and theme-honest WITHOUT the built bundle.
