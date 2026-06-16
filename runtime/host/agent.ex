@@ -236,7 +236,12 @@ defmodule Workbooks.Agent do
     # condensed into a rolling summary.
     {messages, st} = maybe_compact(messages, st)
 
-    case st.complete_fn.(messages, model: st.model, tools: tools(st), on_delta: st.on_delta) do
+    case st.complete_fn.(messages,
+           model: st.model,
+           tools: tools(st),
+           principal: st.tenant,
+           on_delta: st.on_delta
+         ) do
       {:ok, %{tool_calls: [], content: content} = turn} ->
         st = account(st, turn)
         cond do

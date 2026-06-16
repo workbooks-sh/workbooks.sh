@@ -4,3 +4,8 @@ dist/
 *.log
 build/
 .svelte-kit/
+
+# Playwright
+test-results/
+playwright-report/
+.playwright/

@@ -30,6 +30,7 @@
   import ArtifactCard from "$lib/chat/ArtifactCard.svelte";
   import { chatBackdrop } from "./chatBackdrop.svelte";
   import { onDestroy } from "svelte";
+  import { openChatTab } from "$lib/tabs/chatTab";
 
   const WALDO_SLUG = "waldo";
 
@@ -63,7 +64,8 @@
   // read the user's echoes + the agent blocks straight off the shared
   // chatSession store (the same store WaldoPanel uses), so opening the
   // dock panel later shows the identical conversation.
-  const inConversation = $derived(chatSession.userEchoes.length > 0 || sending);
+  // Home is a launcher — the conversation lives in its chat:// tab, never inline.
+  const inConversation = $derived(false);
 
   // Invert the background vignette while the page is a thread (FIX 3):
   // clear centre behind the conversation, faint grid only at the edges.
@@ -249,11 +251,14 @@
     sending = true;
     error = null;
     priorPrompt = null;
-    // Foreground text chat: render the conversation HERE (TASK 2). Echo the
-    // user's message into the shared store and clear the composer — the page
-    // becomes the thread; we do NOT open the Waldo side panel for text.
+    // The home composer is a LAUNCHER: the first message opens a returnable chat
+    // tab bound to the live session (the tab + this page share the chatSession
+    // singleton), and the composer stays a fresh launcher. (Same pattern as
+    // WaldoPanel.) Revisit past chats from the chat tab's "Chats" view.
+    const firstMessage = chatSession.userEchoes.length === 0;
     chatSession.pushEcho(t);
     prompt = "";
+    if (firstMessage) void openChatTab(WALDO_SLUG);
     try {
       await chatSession.send(t, { agentSlug: WALDO_SLUG });
     } catch (e) {
