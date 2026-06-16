@@ -2545,6 +2545,87 @@
           }
         }
       ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elements/work/work-ref.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-ref",
+          "name": "WorkRef",
+          "domain": "work",
+          "attributes": [
+            {
+              "name": "to"
+            },
+            {
+              "name": "rel"
+            },
+            {
+              "name": "from"
+            },
+            {
+              "name": "as"
+            }
+          ],
+          "events": [
+            {
+              "name": "work-ref-follow"
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-ref",
+          "declaration": {
+            "name": "WorkRef",
+            "module": "src/elements/work/work-ref.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elements/work/work-src.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-src",
+          "name": "WorkSrc",
+          "domain": "work",
+          "attributes": [
+            {
+              "name": "lang"
+            },
+            {
+              "name": "name"
+            },
+            {
+              "name": "display"
+            }
+          ],
+          "events": [
+            {
+              "name": "work-run"
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-src",
+          "declaration": {
+            "name": "WorkSrc",
+            "module": "src/elements/work/work-src.js"
+          }
+        }
+      ]
     }
   ]
 }

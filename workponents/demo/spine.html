@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en" data-work-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="darkreader-lock" /><meta name="color-scheme" content="light dark" />
+  <title>the spine — work-src · work-ref · work-flow</title>
+  <link rel="stylesheet" href="../src/theme/tokens.css" />
+  <script type="importmap">
+    { "imports": { "lit": "https://esm.sh/lit@3.2.1", "lit/": "https://esm.sh/lit@3.2.1/" } }
+  </script>
+  <script type="module" src="../src/elements/work/index.js"></script>
+  <script type="module" src="../src/elements/flow/index.js"></script>
+  <style>
+    body { margin:0; background:var(--work-bg); color:var(--work-fg);
+           font:15px/1.6 "Geist", ui-sans-serif, system-ui, sans-serif; }
+    .wrap { max-width:760px; margin:0 auto; padding:48px 24px 100px; }
+    h1 { font-size:24px; letter-spacing:-.02em; margin:0 0 4px; }
+    p.sub { color:var(--work-fg-muted); margin:0 0 36px; }
+    h2 { font:12px/1 "Geist Mono",monospace; text-transform:uppercase; letter-spacing:.12em;
+         color:var(--work-fg-subtle); margin:40px 0 14px; }
+    .note { color:var(--work-fg-muted); font-size:13.5px; margin:0 0 12px; }
+    code { font-family:"Geist Mono",monospace; background:var(--work-surface-soft); padding:1px 5px; border-radius:4px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>The spine</h1>
+    <p class="sub">Three elements the whole framework runs on — compute, edges, the DAG.</p>
+
+    <h2>work-src · compute → WASM</h2>
+    <p class="note">The source IS the element's text. <code>js</code> runs in a sandboxed Worker;
+      compiled langs route through the Dock. Press <strong>run</strong>.</p>
+    <work-src lang="js" name="greet">const who = "workbooks";
+return `hello, ${who} — ${2 + 40} blocks compiled`;</work-src>
+
+    <br>
+    <work-src lang="rust" name="connect">pub fn connect(dsn: &str) -> Conn { Conn::open(dsn) }</work-src>
+
+    <h2>work-ref · every edge</h2>
+    <p class="note">One element for a pointer, a type, or a binding — meaning by position + <code>rel</code>.</p>
+    <p>A pointer: see <work-ref to="setup/auth">authentication</work-ref>, then
+       scaffold from <work-ref to="starter" as="template"/>.</p>
+    <p>A type edge (tagging = C): this section is
+       <work-ref rel="toolkit"/> · a step is <work-ref rel="skill"/>.</p>
+    <p>A binding edge is invisible structure → <work-ref from="customers"/>(nothing renders).</p>
+
+    <h2>work-flow · the DAG</h2>
+    <p class="note">The runnable graph — tasks + dependencies. (Existing spine element.)</p>
+    <work-flow title="ship" out="site">
+      <board-task in="repo" out="bundle">Build</board-task>
+      <board-task deps="Build" out="site">Deploy</board-task>
+    </work-flow>
+  </div>
+  <script type="module">
+    import "../src/elements/pm/index.js"; // board-task used inside the flow
+    for (const el of document.querySelectorAll("work-src,work-ref")) {
+      el.addEventListener("work-run", (e) => console.log("[work-run]", e.detail));
+      el.addEventListener("work-ref-follow", (e) => console.log("[work-ref-follow]", e.detail));
+    }
+  </script>
+</body>
+</html>

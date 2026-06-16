@@ -30,6 +30,7 @@ export * from "./elements/3d/index.js";        // model-view, model-source
 export * from "./elements/pm/index.js";        // board-task, board-view, board-sprint, board-milestone
 export * from "./elements/flow/index.js";      // work-flow, work-loop
 export * from "./elements/data/index.js";      // data-query (named source; views bind via from=)
+export * from "./elements/work/index.js";      // work-src, work-ref (the spine)
 
 // shared SQLite data layer (runtime VFS / in-page sqlite-wasm / memory floor,
 // behind the Host seam) — the one engine the data surfaces query.
