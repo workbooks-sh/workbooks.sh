@@ -803,10 +803,9 @@ defmodule Workbooks.Toolkits do
   #
   # Parenthetical prose (e.g. "(to deploy the gateway)") is stripped as comment.
   @doc """
-  Parse a raw `#+REQUIRES` line into typed `{:cli, tok} | {:dep, name, raw}` tokens
-  (nil → []). Public so the composition-island layer (`Workbooks.Bundle.Islands`)
-  can interpret a `<work-toolkit requires="…">` attribute back into the same edge
-  shape `closure/3` consumes — one parser, both surfaces.
+  Parse a raw `requires` value into typed `{:cli, tok} | {:dep, name, raw}` tokens
+  (nil → []). Reads a `<work-toolkit requires="…">` attribute into the edge shape
+  `closure/3` consumes.
   """
   def parse_requires(nil), do: []
 

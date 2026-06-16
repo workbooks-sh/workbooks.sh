@@ -278,19 +278,12 @@ defmodule Workbooks.CLI do
     blob = Bundle.pack(parts)
     html = parts["index.html"] || parts["workbook.html"] || Workbook.render(parts["source.work"] || parts["workbook.work"] || "")
 
-    # The page carries BOTH the wb-bundle zip (the filesystem) AND the work-islands
-    # manifest (the declarative STRUCTURE — the node table over the same tree, see
-    # docs/WORKBOOK-COMPOSITION-MODEL.md). The manifest src-references the packed
-    # files, so it's a loss-free projection, not a second copy.
-    islands = Workbooks.Bundle.Islands.index(parts)
-
-    page =
-      html
-      |> Bundle.embed(blob)
-      |> Workbooks.Bundle.Islands.embed_manifest(Workbooks.Bundle.Islands.to_manifest(islands, parts))
+    # The page carries the wb-bundle zip (the filesystem). The STRUCTURE is the
+    # work-* HTML itself — no separate manifest. A workbook IS HTML.
+    page = Bundle.embed(html, blob)
 
     File.write!(out, page)
-    "bundled #{map_size(parts)} files → #{out} (#{byte_size(blob)} bytes embedded, #{length(islands)} islands)"
+    "bundled #{map_size(parts)} files → #{out} (#{byte_size(blob)} bytes embedded)"
   end
 
   def call(["unbundle", in_html, dir], _t) do
@@ -305,38 +298,27 @@ defmodule Workbooks.CLI do
       end
 
     n = Bundle.write_tree(Bundle.unpack(blob), dir)
-
-    summary =
-      case Workbooks.Bundle.Islands.extract_manifest(input) do
-        [] -> ""
-        islands -> " · " <> (islands |> Enum.frequencies_by(& &1.kind) |> Enum.map_join(", ", fn {k, c} -> "#{c} #{k}" end))
-      end
-
-    "unbundled #{n} files → #{dir}#{summary}"
+    "unbundled #{n} files → #{dir}"
   end
 
-  # Dump a workbook's declarative STRUCTURE — the typed `<work-*>` islands. Reads the
-  # work-islands manifest from a bundled `.html` (falling back to inline `<work-*>`
-  # elements in the page), or classifies a working-tree dir. The legible projection
-  # over the bundle (docs/WORKBOOK-COMPOSITION-MODEL.md).
-  def call(["islands", src], _t) do
-    islands =
+  # Dump a workbook's STRUCTURE — its `<work-*>` elements. A workbook IS HTML, so
+  # this just reads the page (or a dir's index.html) with Floki — no manifest.
+  def call(["structure", src], _t) do
+    html =
       if File.dir?(src) do
-        Workbooks.Bundle.Islands.index(Bundle.read_tree(src))
+        parts = Bundle.read_tree(src)
+        parts["index.html"] || parts["workbook.html"] || ""
       else
-        input = File.read!(src)
-
-        case Workbooks.Bundle.Islands.extract_manifest(input) do
-          [] -> Workbooks.Bundle.Islands.parse(input)
-          manifest -> manifest
-        end
+        File.read!(src)
       end
 
-    if islands == [] do
-      "no islands in #{src}"
-    else
-      listing = Enum.map_join(islands, "\n", fn i -> "  #{i.kind}\t#{i.id || "-"}\t#{i.path || "(inline)"}" end)
-      "#{length(islands)} islands in #{src}:\n#{listing}"
+    case Workbook.parse_headlines(html) do
+      [] ->
+        "no work-* elements in #{src}"
+
+      rows ->
+        listing = Enum.map_join(rows, "\n", fn r -> "  #{r["tagname"]}\t#{r["id"] || r["title"] || "-"}" end)
+        "#{length(rows)} elements in #{src}:\n#{listing}"
     end
   end
 
