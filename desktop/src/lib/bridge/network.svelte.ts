@@ -20,6 +20,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { engineRequest, EngineApiError } from "$lib/engine-api/gen";
 
 // ── Types — mirror src-tauri network structs ──────────────────────
@@ -151,12 +152,46 @@ export async function workosSignIn(
   brokerUrl: string,
   organizationId?: string,
 ): Promise<StoredSession> {
-  // organizationId scopes the sign-in to a specific org (the desktop org switcher);
-  // omitted/null is a personal session.
-  return invoke<StoredSession>("workos_sign_in", {
-    brokerUrl,
-    organizationId: organizationId ?? null,
+  // Deep-link flow (the idiomatic Tauri pattern): arm a one-shot listener for the
+  // workbooks://auth/callback?code=… deep link, THEN open the browser. The OS routes
+  // the callback straight back to the app — no loopback server, no tab to close.
+  // organizationId scopes the sign-in to a specific org (the switcher).
+  const code = await new Promise<string>((resolve, reject) => {
+    let unlisten: (() => void) | undefined;
+    const finish = (fn: () => void) => {
+      clearTimeout(timer);
+      unlisten?.();
+      fn();
+    };
+    const timer = setTimeout(
+      () => finish(() => reject(new Error("Sign-in timed out — please try again."))),
+      300_000,
+    );
+
+    onOpenUrl((urls) => {
+      const hit = urls.find((u) => u.startsWith("workbooks://"));
+      if (!hit) return;
+      let c: string | null = null;
+      let err: string | null = null;
+      try {
+        const u = new URL(hit);
+        c = u.searchParams.get("code");
+        err = u.searchParams.get("error");
+      } catch {
+        // malformed — fall through to the rejection below
+      }
+      if (c) finish(() => resolve(c));
+      else finish(() => reject(new Error(err === "access_denied" ? "Sign-in cancelled." : "No code in callback.")));
+    })
+      .then((fn) => {
+        unlisten = fn;
+        // Arm-then-open: only launch the browser once the listener is live.
+        return invoke("workos_sign_in_begin", { brokerUrl, organizationId: organizationId ?? null });
+      })
+      .catch((e) => finish(() => reject(e instanceof Error ? e : new Error(String(e)))));
   });
+
+  return invoke<StoredSession>("workos_exchange", { brokerUrl, code });
 }
 
 /** Read a previously-stashed session from the OS keychain. Returns
