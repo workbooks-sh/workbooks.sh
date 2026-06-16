@@ -11,10 +11,11 @@
 //     offline (see pushScopeToAgent). The push happens (a) whenever Rust
 //     emits `workspace-scope-change` and (b) once on bridge re-connect.
 //
-// Mutations refresh directly (no ws.onMonorepoChange watchers — the
-// package store is native/local-store; we re-read after every mutation).
-// The native `fs-tree-changed` watcher event still drives a re-scan so
-// folders created out-of-band (agent `mkdir`, external tools) appear.
+// Mutations refresh directly; the native `fs-tree-changed` watcher re-scans for
+// out-of-band local writes (agent `mkdir`, external tools). We ALSO subscribe to
+// the runtime's `monorepo:watch` push (ws.onMonorepoChange) so an agent-written
+// file syncs to the sidebar even when the native OS watcher misses it or isn't
+// running (e.g. a non-Tauri shell, or a debounced/scoped local watcher).
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -87,7 +88,19 @@ class PackageStore {
 
   #unlisten: UnlistenFn | null = null;
   #unsubFsTree: UnlistenFn | null = null;
+  #unsubMonorepo: (() => void) | null = null;
+  #refreshTimer: ReturnType<typeof setTimeout> | null = null;
   #initStarted = false;
+
+  // Coalesced re-scan — agents can write many files in a burst; one refresh
+  // per quiet window, not per event.
+  #scheduleRefresh() {
+    if (this.#refreshTimer) clearTimeout(this.#refreshTimer);
+    this.#refreshTimer = setTimeout(() => {
+      this.#refreshTimer = null;
+      void this.refresh();
+    }, 400);
+  }
 
   async init() {
     if (this.#initStarted) return;
@@ -150,14 +163,25 @@ class PackageStore {
       },
     );
 
+    // Also re-scan on RUNTIME-pushed file changes (monorepo:watch). The native
+    // fs-tree-changed watcher above is local-only and can miss a write (or not run
+    // in every host — e.g. a vite/web shell, or a write the OS watcher debounced
+    // away). The runtime KNOWS when an agent wrote a file, so this is the reliable
+    // signal that an agent-generated workbook lands in the sidebar. Coalesced.
+    this.#unsubMonorepo = ws.onMonorepoChange("**/*", () => this.#scheduleRefresh());
+
     await this.refresh();
   }
 
   destroy() {
     this.#unlisten?.();
     this.#unsubFsTree?.();
+    this.#unsubMonorepo?.();
+    if (this.#refreshTimer) clearTimeout(this.#refreshTimer);
     this.#unlisten = null;
     this.#unsubFsTree = null;
+    this.#unsubMonorepo = null;
+    this.#refreshTimer = null;
     this.#initStarted = false;
   }
 
