@@ -25,6 +25,11 @@ defmodule Workbooks.Evals.Components do
   alias Workbooks.Browse.Headless
 
   @root Path.expand("../../evals/components", __DIR__)
+  # A capable default for the emit eval. The cheap platform default (mimo) + the
+  # full agent tool-loop thrashes (web-searches trivial briefs ~2.5min/step); this
+  # eval measures COMPOSITION, so it pins a fast capable model and runs emit-only.
+  # Override with WB_EVAL_MODEL.
+  @eval_model "anthropic/claude-haiku-4.5"
 
   # ── public surface ─────────────────────────────────────────────────────────
 
@@ -521,18 +526,24 @@ defmodule Workbooks.Evals.Components do
 
   # ── agent emit ──────────────────────────────────────────────────────────────
 
-  # Run the agent on one prompt and return its final message text (the emit).
+  # Emit one component for a prompt and return the message text. EMIT-ONLY: a direct
+  # LLM completion with NO search/shell tool loop — this eval measures the agent's
+  # COMPOSITION (does it reach for + correctly author the right element), not its
+  # tool-using behavior. (The full agent loop web-searches trivial briefs and
+  # thrashes; that's a separate integration concern.) Model: opts → WB_EVAL_MODEL →
+  # the capable @eval_model default (never the cheap platform default here).
   defp agent_emit(system, prompt, opts) do
-    model = opts[:model] || System.get_env("WB_EVAL_MODEL")
+    model = opts[:model] || System.get_env("WB_EVAL_MODEL") || @eval_model
 
-    run =
-      Workbooks.Agent.run(system <> "\n\n" <> catalog_injection(), prompt,
-        model: model,
-        max_steps: 40,
-        tenant: "eval"
-      )
+    messages = [
+      %{role: "system", content: system <> "\n\n" <> catalog_injection()},
+      %{role: "user", content: prompt}
+    ]
 
-    run.result || ""
+    case Workbooks.Llm.complete(messages, model: model) do
+      {:ok, %{content: content}} -> content || ""
+      {:error, reason} -> "(llm error: #{inspect(reason)})"
+    end
   rescue
     e -> "(agent error: #{Exception.message(e)})"
   end
@@ -544,8 +555,9 @@ defmodule Workbooks.Evals.Components do
       "on its own first line and emit a component block:\n" <>
       "  #+begin_src component :type <type> :<prop> <value>\n  <payload>\n  #+end_src\n" <>
       "Choose the component TYPE that fits the data shape (see the catalog). " <>
-      "Bind real data into the block; never fabricate numbers when data is supplied. " <>
-      "Theme only from --work-* tokens — never hardcode colors. " <>
+      "When data is supplied, bind it faithfully; when NONE is supplied, populate the " <>
+      "component with clearly-illustrative sample data rather than asking for data — " <>
+      "emit the artifact. Theme only from --work-* tokens — never hardcode colors. " <>
       "Reach for exactly one component; keep prose minimal."
   end
 
@@ -560,8 +572,6 @@ defmodule Workbooks.Evals.Components do
 
   # The discovered catalog: the `:type` choices map onto work-* tags from the CEM.
   defp catalog_injection do
-    tags = known_tags()
-
     "COMPONENT CATALOG (choose the right element for the data shape):\n" <>
       "- numeric series over a category → :type chart   (work-chart)\n" <>
       "- a list of records / rows with fields → :type table   (work-table)\n" <>
@@ -569,9 +579,41 @@ defmodule Workbooks.Evals.Components do
       "- what changed (before/after) → :type diff   (work-diff)\n" <>
       "- a revision / version history → :type history   (work-history-graph)\n" <>
       "- a short status note → :type callout ; key/value facts → :type kv\n" <>
-      "Full element catalog (CEM tags): #{Enum.join(tags, ", ")}\n" <>
+      "Full element catalog with ATTRIBUTES (use these exact prop names — e.g. " <>
+      "work-metric uses `delta` not `change`, work-chart uses `rows` not `data`):\n" <>
+      catalog_with_attrs() <>
       "Map your :type to the matching work-* element; do NOT answer a numeric " <>
       "series with a markdown table, a scalar with a full chart, or a diff with raw text."
+  end
+
+  # Per-tag attribute lines from the CEM, so the model emits REAL prop names (the
+  # tag-names-only catalog made it invent `:change`/`:data`). `tag(attr, attr, …)`.
+  defp catalog_with_attrs do
+    tag_attrs()
+    |> Enum.sort_by(fn {tag, _} -> tag end)
+    |> Enum.map_join("\n", fn
+      {tag, []} -> "  #{tag}"
+      {tag, attrs} -> "  #{tag}(#{Enum.join(attrs, ", ")})"
+    end)
+    |> Kernel.<>("\n")
+  end
+
+  # tagName → [attribute names] from the CEM (empty list if none / unreadable).
+  defp tag_attrs do
+    cem = Path.expand("../../../workponents/custom-elements.json", __DIR__)
+
+    with {:ok, json} <- File.read(cem),
+         {:ok, %{"modules" => mods}} <- Jason.decode(json) do
+      mods
+      |> Enum.flat_map(fn m -> m["declarations"] || [] end)
+      |> Enum.filter(&is_binary(&1["tagName"]))
+      |> Map.new(fn d ->
+        attrs = (d["attributes"] || []) |> Enum.map(& &1["name"]) |> Enum.filter(&is_binary/1)
+        {d["tagName"], attrs}
+      end)
+    else
+      _ -> Map.new(default_tags(), &{&1, []})
+    end
   end
 
   # ── artifact extraction ──────────────────────────────────────────────────────
