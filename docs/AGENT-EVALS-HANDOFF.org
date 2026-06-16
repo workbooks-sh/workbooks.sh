@@ -78,8 +78,9 @@ mix run --no-halt -e 'IO.puts(Workbooks.Evals.Components.run("chart-not-table"))
    frames; threshold = every dimension ≥2 AND sum ≥14/18.
 
 ** Model + catalog
-- =@eval_model = "anthropic/claude-haiku-4.5"= (override =WB_EVAL_MODEL=). Do
-  NOT use the cheap platform default — it tool-thrashes (~2.5 min/step).
+- =@eval_model = "minimax/minimax-m3"= — the product model (override =WB_EVAL_MODEL=).
+  Minimax M3 is the model we evaluate across ALL eval suites; do NOT use Claude Haiku
+  or the cheap platform default (it tool-thrashes ~2.5 min/step).
 - The eval injects the REAL production catalog
   (=Workbooks.Toolkits.component_catalog(["workponents"])=) — the same surface
   Waldo sees — not an eval-local copy.

@@ -13,6 +13,8 @@
 
 defmodule AgentEvals do
   @judge_model System.get_env("WB_EVAL_JUDGE") || "google/gemini-2.5-flash"
+  # The product/eval model under test — Minimax M3 (override WB_EVAL_MODEL / WB_LLM_MODEL).
+  @model System.get_env("WB_EVAL_MODEL") || System.get_env("WB_LLM_MODEL") || "minimax/minimax-m3"
   # Floor catches REGRESSIONS. Baseline finding (2026-06-16): the cheap default model
   # xiaomi/mimo-v2.5 scores ~7/9 (~78%) — it over-tools trivial tasks (extraction,
   # false-premise) instead of answering directly, hitting max_steps. A capable model
@@ -85,7 +87,7 @@ defmodule AgentEvals do
     id = "eval-#{:erlang.unique_integer([:positive])}"
     # Bound steps tightly: these are single-turn capability probes, not research runs.
     # (The default 40 lets a model loop on tool-call attempts → minutes per case.)
-    {:ok, _} = Workbooks.AgentSession.start(id, c.system, c.task, max_steps: 3)
+    {:ok, _} = Workbooks.AgentSession.start(id, c.system, c.task, max_steps: 3, model: @model)
     Workbooks.AgentSession.subscribe(id)
     collect("")
   end
@@ -136,7 +138,7 @@ defmodule AgentEvals do
   end
 
   def main do
-    IO.puts("agent=#{Workbooks.Llm.effective_model()}  judge=#{@judge_model}  floor=#{@floor}\n")
+    IO.puts("agent=#{@model}  judge=#{@judge_model}  floor=#{@floor}\n")
 
     results =
       Enum.map(@cases, fn c ->

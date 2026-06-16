@@ -25,11 +25,11 @@ defmodule Workbooks.Evals.Components do
   alias Workbooks.Browse.Headless
 
   @root Path.expand("../../evals/components", __DIR__)
-  # A capable default for the emit eval. The cheap platform default (mimo) + the
-  # full agent tool-loop thrashes (web-searches trivial briefs ~2.5min/step); this
-  # eval measures COMPOSITION, so it pins a fast capable model and runs emit-only.
-  # Override with WB_EVAL_MODEL.
-  @eval_model "anthropic/claude-haiku-4.5"
+  # The product/eval model: Minimax M3 (override WB_EVAL_MODEL). The cheap platform
+  # default (mimo) + the full agent tool-loop thrashes (web-searches trivial briefs
+  # ~2.5min/step); this eval measures COMPOSITION, so it pins the product model and
+  # runs emit-only.
+  @eval_model "minimax/minimax-m3"
   # Chart variants the model emits as `:type` (bar/line/…) — all resolve to work-chart,
   # the variant kept as the element's `type` attr. (Defined here, before first use —
   # module attributes read in source order.)
