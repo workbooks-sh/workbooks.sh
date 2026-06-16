@@ -47,6 +47,28 @@ defmodule AgentSocketBridgeTest do
     assert stop_payload["metadata"]["status"] == "ok"
   end
 
+  test "agent_step → tool_call_start + tool_call_stop carrying tool name + status" do
+    ev = %{step: 1, tool: "bash", args: %{"cmd" => "echo hi"}, error: nil, output: "hi\n"}
+    frames = pushed(PS.handle_info({:agent_step, ev}, state()))
+    assert Enum.map(frames, &elem(&1, 0)) == ["tool_call_start", "tool_call_stop"]
+
+    {_ev, start} = hd(frames)
+    assert start["metadata"]["tool_name"] == "bash"
+    assert start["metadata"]["tool_call_id"] == "s1"
+
+    {_ev, stop} = List.last(frames)
+    assert stop["metadata"]["status"] == "ok"
+    assert stop["metadata"]["result_size"] == byte_size("hi\n")
+  end
+
+  test "agent_step with an error reports status=error" do
+    ev = %{step: 2, tool: "bash", args: %{}, error: "boom", output: nil}
+    frames = pushed(PS.handle_info({:agent_step, ev}, state()))
+    {_ev, stop} = List.last(frames)
+    assert stop["metadata"]["status"] == "error"
+    assert stop["metadata"]["result_size"] == 0
+  end
+
   test "bridge_session_started → a session_started frame" do
     frames = pushed(PS.handle_info({:bridge_session_started, "session:run-x", "1"}, state()))
     assert Enum.map(frames, &elem(&1, 0)) == ["session_started"]
