@@ -549,8 +549,18 @@ defmodule Workbooks.Evals.Components do
   defp agent_emit(system, prompt, opts) do
     model = opts[:model] || System.get_env("WB_EVAL_MODEL") || @eval_model
 
+    # Use the REAL production catalog Waldo sees (the discovered work-* surface +
+    # the data-binding contract), not an eval-local copy — so we audit the actual
+    # agent context. Falls back to the eval-local catalog if the toolkit isn't on
+    # disk (keeps the eval runnable in a bare checkout).
+    catalog =
+      case Workbooks.Toolkits.component_catalog(["workponents"]) do
+        "" -> catalog_injection()
+        real -> real
+      end
+
     messages = [
-      %{role: "system", content: system <> "\n\n" <> catalog_injection()},
+      %{role: "system", content: system <> "\n\n" <> catalog},
       %{role: "user", content: prompt}
     ]
 

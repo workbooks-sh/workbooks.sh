@@ -396,6 +396,14 @@ defmodule Workbooks.Toolkits do
     earns it (you confirmed an action, surfaced data, offered a next step);
     otherwise reply in plain prose (it streams).
 
+    DATA BINDING: data elements (chart, table, spark) take their data inline via
+    `:rows` — a JSON array of row OBJECTS, e.g.
+    `:rows [{"region":"NA","revenue":1200},{"region":"EU","revenue":980}]` — or
+    `:csv` (CSV text with a header row). For a chart, `:x`/`:y` name the columns and
+    `:type` is the shape (bar/line/area); a scalar uses `:value`/`:label`/`:delta`.
+    Use `:src-name`/`:query` ONLY when a named data source already exists; otherwise
+    put the data inline with `:rows` or `:csv`.
+
     #{cards_section}#{rest_section}
     """
     |> String.trim()
