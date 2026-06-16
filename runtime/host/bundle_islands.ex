@@ -105,6 +105,23 @@ defmodule Workbooks.Bundle.Islands do
   defp require_token({:cli, tok}), do: tok
   defp require_token({:dep, _name, raw}), do: raw
 
+  @doc """
+  Build the `closure/3` edge map from a list of islands — toolkit id → its parsed
+  `#+REQUIRES` tokens, read back from each `<work-toolkit requires="…">` attr via
+  the SAME `Toolkits.parse_requires/1`. So the toolkit DAG resolves identically
+  whether the edges come from the exploded manifest files or the bundled islands.
+  """
+  @spec edges([map]) :: %{optional(binary) => list}
+  def edges(islands) do
+    islands
+    |> Enum.filter(&(&1.kind == :toolkit))
+    |> Map.new(fn i -> {i.id, Toolkits.parse_requires(Map.get(i.attrs, "requires"))} end)
+  end
+
+  @doc "Toolkit ids present in an island list (the `known` set for `closure/3`)."
+  @spec toolkit_ids([map]) :: [binary]
+  def toolkit_ids(islands), do: for(%{kind: :toolkit, id: id} <- islands, do: id)
+
   defp vfs_id(path), do: Path.basename(path) |> String.replace(@sqlite_ext, "")
 
   @doc """

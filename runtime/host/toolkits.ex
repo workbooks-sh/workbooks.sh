@@ -761,9 +761,15 @@ defmodule Workbooks.Toolkits do
   #     `:toolkit:` id; otherwise it falls back to a :cli pre-flight in closure/2.
   #
   # Parenthetical prose (e.g. "(to deploy the gateway)") is stripped as comment.
-  defp parse_requires(nil), do: []
+  @doc """
+  Parse a raw `#+REQUIRES` line into typed `{:cli, tok} | {:dep, name, raw}` tokens
+  (nil → []). Public so the composition-island layer (`Workbooks.Bundle.Islands`)
+  can interpret a `<work-toolkit requires="…">` attribute back into the same edge
+  shape `closure/3` consumes — one parser, both surfaces.
+  """
+  def parse_requires(nil), do: []
 
-  defp parse_requires(line) do
+  def parse_requires(line) do
     line
     |> String.replace(~r/\([^)]*\)/, " ")
     |> String.split([",", " "], trim: true)

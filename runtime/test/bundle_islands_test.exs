@@ -117,4 +117,57 @@ defmodule Workbooks.BundleIslandsTest do
     [island] = Islands.parse("<work-org id=\"snip\">if (x &lt; 3) { y }</work-org>")
     assert island.body == "if (x < 3) { y }"
   end
+
+  # ── P2: round-trip spike — agent → toolkit → toolkit + org, DAG identical ──────
+  describe "P2 round-trip spike (nested composition)" do
+    # analyst (agent) → crm (toolkit) → browser (toolkit); crm also pulls a bare
+    # CLI pre-flight (git>=2.30) which must NOT become a graph edge.
+    @analyst """
+    * Analyst :agent:
+    :PROPERTIES:
+    :ID: analyst
+    :MODEL: test/model
+    :TOOLKITS: crm
+    :END:
+    ** System prompt
+    Resolve CRM questions.
+    """
+    @crm "#+EXEC: command\n#+REQUIRES: browser, git>=2.30\n"
+    @browser "#+EXEC: command\n#+REQUIRES: net>=1\n"
+
+    defp nested_tree do
+      %{
+        "agents/analyst.org" => @analyst,
+        "toolkits/crm/manifest.org" => @crm,
+        "toolkits/browser/manifest.org" => @browser,
+        "report.org" => "* Findings\nDone.\n"
+      }
+    end
+
+    test "the #+REQUIRES DAG resolves identically from the exploded tree and the bundled islands" do
+      idx = Islands.index(nested_tree())
+      known = Islands.toolkit_ids(idx)
+
+      # Exploded form: edges straight from the island index (built off the manifest files).
+      exploded = Workbooks.Toolkits.closure(["crm"], Islands.edges(idx), known)
+
+      # Bundled form: render → parse → rebuild edges from the <work-toolkit requires> attrs.
+      bundled_islands = idx |> Islands.render() |> Islands.parse()
+      bundled = Workbooks.Toolkits.closure(["crm"], Islands.edges(bundled_islands), Islands.toolkit_ids(bundled_islands))
+
+      assert exploded == bundled
+      assert MapSet.new(exploded) == MapSet.new(["crm", "browser"])
+      # git>=2.30 is a CLI pre-flight, not a toolkit → never an edge.
+      refute "git" in exploded
+    end
+
+    test "the agent island carries its declared toolkit, linking into the DAG" do
+      idx = Islands.index(nested_tree())
+      agent = Enum.find(idx, &(&1.kind == :agent))
+      assert agent.id == "analyst"
+      assert agent.attrs["toolkits"] == "crm"
+      # the agent's declared toolkit is a real node in the resolved graph
+      assert "crm" in Islands.toolkit_ids(idx)
+    end
+  end
 end
