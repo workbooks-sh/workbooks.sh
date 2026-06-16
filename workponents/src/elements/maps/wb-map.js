@@ -76,77 +76,77 @@ export class WbMap extends WbElement {
   ];
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
-    .shell { position: relative; border: 1px solid var(--wb-border);
-      border-radius: var(--wb-radius); background: var(--wb-surface);
-      overflow: hidden; box-shadow: var(--wb-shadow-sm); }
+    :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
+    .shell { position: relative; border: 1px solid var(--work-border);
+      border-radius: var(--work-radius); background: var(--work-surface);
+      overflow: hidden; box-shadow: var(--work-shadow-sm); }
     :host([variant="bare"]) .shell { border: none; box-shadow: none; background: transparent; }
 
     .stage { position: relative; width: 100%;
-      height: var(--wb-map-h, 460px); cursor: grab;
+      height: var(--work-map-h, 460px); cursor: grab;
       background:
-        radial-gradient(120% 120% at 50% -10%, var(--wb-surface) 0%, var(--wb-surface-soft) 100%); }
+        radial-gradient(120% 120% at 50% -10%, var(--work-surface) 0%, var(--work-surface-soft) 100%); }
     .stage.dragging { cursor: grabbing; }
     svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; }
 
     /* the abstract themed basemap */
-    .graticule { stroke: var(--wb-border); stroke-width: var(--wb-map-grid-w, 1); fill: none; opacity: .55; }
-    .frame { stroke: var(--wb-border-strong); stroke-width: 1; fill: none; opacity: .7; }
-    .land { fill: var(--wb-surface-soft); stroke: var(--wb-border-strong); stroke-width: 1; opacity: .9; }
+    .graticule { stroke: var(--work-border); stroke-width: var(--work-map-grid-w, 1); fill: none; opacity: .55; }
+    .frame { stroke: var(--work-border-strong); stroke-width: 1; fill: none; opacity: .7; }
+    .land { fill: var(--work-surface-soft); stroke: var(--work-border-strong); stroke-width: 1; opacity: .9; }
 
     /* choropleth regions (bound to query rows) */
-    .region { stroke: var(--wb-surface); stroke-width: 1; cursor: pointer;
-      transition: filter var(--wb-dur, .14s) var(--wb-ease, ease); }
+    .region { stroke: var(--work-surface); stroke-width: 1; cursor: pointer;
+      transition: filter var(--work-dur, .14s) var(--work-ease, ease); }
     .region:hover { filter: brightness(1.08); }
-    .region[aria-selected="true"] { stroke: var(--wb-fg); stroke-width: 2; }
+    .region[aria-selected="true"] { stroke: var(--work-fg); stroke-width: 2; }
 
     /* points / heat */
-    .pt { fill: var(--wb-brand); fill-opacity: .82; stroke: var(--wb-surface); stroke-width: 1.2;
-      cursor: pointer; transition: fill-opacity var(--wb-dur,.14s) var(--wb-ease,ease); }
+    .pt { fill: var(--work-brand); fill-opacity: .82; stroke: var(--work-surface); stroke-width: 1.2;
+      cursor: pointer; transition: fill-opacity var(--work-dur,.14s) var(--work-ease,ease); }
     .pt:hover { fill-opacity: 1; }
-    .pt[aria-selected="true"] { stroke: var(--wb-fg); stroke-width: 2; }
-    .heat { fill: var(--wb-brand); }
+    .pt[aria-selected="true"] { stroke: var(--work-fg); stroke-width: 2; }
+    .heat { fill: var(--work-brand); }
 
     /* chrome */
-    .toolbar { position: absolute; top: var(--wb-space-2); left: var(--wb-space-2);
-      display: flex; align-items: center; gap: var(--wb-space-2); z-index: 2; }
-    .badge { display: inline-flex; align-items: center; gap: var(--wb-space-1);
-      font: 600 10px var(--wb-font-mono); letter-spacing: .12em; text-transform: uppercase;
-      color: var(--wb-fg-muted); background: var(--wb-surface); border: 1px solid var(--wb-border);
-      border-radius: var(--wb-radius-pill); padding: 3px 9px; box-shadow: var(--wb-shadow-sm); }
-    .engine .dot { width: 7px; height: 7px; border-radius: var(--wb-radius-pill); background: var(--wb-brand);
-      box-shadow: 0 0 0 3px var(--wb-brand-soft); }
-    .engine[data-tier="memory"] .dot { background: var(--wb-warn); box-shadow: 0 0 0 3px rgba(184,134,27,.18); }
-    .engine[data-tier="error"] .dot { background: var(--wb-err); box-shadow: none; }
+    .toolbar { position: absolute; top: var(--work-space-2); left: var(--work-space-2);
+      display: flex; align-items: center; gap: var(--work-space-2); z-index: 2; }
+    .badge { display: inline-flex; align-items: center; gap: var(--work-space-1);
+      font: 600 10px var(--work-font-mono); letter-spacing: .12em; text-transform: uppercase;
+      color: var(--work-fg-muted); background: var(--work-surface); border: 1px solid var(--work-border);
+      border-radius: var(--work-radius-pill); padding: 3px 9px; box-shadow: var(--work-shadow-sm); }
+    .engine .dot { width: 7px; height: 7px; border-radius: var(--work-radius-pill); background: var(--work-brand);
+      box-shadow: 0 0 0 3px var(--work-brand-soft); }
+    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,.18); }
+    .engine[data-tier="error"] .dot { background: var(--work-err); box-shadow: none; }
 
-    .zoom { position: absolute; top: var(--wb-space-2); right: var(--wb-space-2);
-      display: flex; flex-direction: column; z-index: 2; box-shadow: var(--wb-shadow-sm);
-      border-radius: var(--wb-radius-sm); overflow: hidden; border: 1px solid var(--wb-border); }
-    .zoom button { font: 600 15px var(--wb-font-mono); width: 30px; height: 30px; line-height: 1;
-      border: none; background: var(--wb-surface); color: var(--wb-fg); cursor: pointer; }
-    .zoom button + button { border-top: 1px solid var(--wb-border); }
-    .zoom button:hover { background: var(--wb-surface-soft); }
+    .zoom { position: absolute; top: var(--work-space-2); right: var(--work-space-2);
+      display: flex; flex-direction: column; z-index: 2; box-shadow: var(--work-shadow-sm);
+      border-radius: var(--work-radius-sm); overflow: hidden; border: 1px solid var(--work-border); }
+    .zoom button { font: 600 15px var(--work-font-mono); width: 30px; height: 30px; line-height: 1;
+      border: none; background: var(--work-surface); color: var(--work-fg); cursor: pointer; }
+    .zoom button + button { border-top: 1px solid var(--work-border); }
+    .zoom button:hover { background: var(--work-surface-soft); }
 
-    .legend { position: absolute; bottom: var(--wb-space-2); left: var(--wb-space-2); z-index: 2;
-      display: flex; align-items: center; gap: var(--wb-space-2);
-      font: 500 11px var(--wb-font-mono); color: var(--wb-fg-muted);
-      background: var(--wb-surface); border: 1px solid var(--wb-border);
-      border-radius: var(--wb-radius-sm); padding: var(--wb-space-1) var(--wb-space-2); box-shadow: var(--wb-shadow-sm); }
-    .ramp { width: 96px; height: 8px; border-radius: var(--wb-radius-pill);
-      background: linear-gradient(90deg, var(--wb-brand-soft), var(--wb-brand)); }
+    .legend { position: absolute; bottom: var(--work-space-2); left: var(--work-space-2); z-index: 2;
+      display: flex; align-items: center; gap: var(--work-space-2);
+      font: 500 11px var(--work-font-mono); color: var(--work-fg-muted);
+      background: var(--work-surface); border: 1px solid var(--work-border);
+      border-radius: var(--work-radius-sm); padding: var(--work-space-1) var(--work-space-2); box-shadow: var(--work-shadow-sm); }
+    .ramp { width: 96px; height: 8px; border-radius: var(--work-radius-pill);
+      background: linear-gradient(90deg, var(--work-brand-soft), var(--work-brand)); }
 
     .tip { position: absolute; z-index: 3; pointer-events: none; transform: translate(-50%, -120%);
-      background: var(--wb-fg); color: var(--wb-surface); font: 600 11px var(--wb-font-mono);
-      padding: 4px 8px; border-radius: var(--wb-radius-sm); white-space: nowrap;
-      box-shadow: var(--wb-shadow); opacity: 0; transition: opacity var(--wb-dur,.14s); }
+      background: var(--work-fg); color: var(--work-surface); font: 600 11px var(--work-font-mono);
+      padding: 4px 8px; border-radius: var(--work-radius-sm); white-space: nowrap;
+      box-shadow: var(--work-shadow); opacity: 0; transition: opacity var(--work-dur,.14s); }
     .tip.show { opacity: 1; }
 
-    .foot { display: flex; align-items: center; gap: var(--wb-space-2);
-      padding: var(--wb-space-2) var(--wb-space-3); border-top: 1px solid var(--wb-border);
-      font-size: var(--wb-text-sm); color: var(--wb-fg-subtle); }
-    .note { color: var(--wb-fg-subtle); }
+    .foot { display: flex; align-items: center; gap: var(--work-space-2);
+      padding: var(--work-space-2) var(--work-space-3); border-top: 1px solid var(--work-border);
+      font-size: var(--work-text-sm); color: var(--work-fg-subtle); }
+    .note { color: var(--work-fg-subtle); }
     .grow { flex: 1; }
-    .empty { padding: var(--wb-space-5); text-align: center; color: var(--wb-fg-muted); font-size: var(--wb-text-sm); }
+    .empty { padding: var(--work-space-5); text-align: center; color: var(--work-fg-muted); font-size: var(--work-text-sm); }
   `;
 
   connectedCallback() {
@@ -479,7 +479,7 @@ export class WbMap extends WbElement {
   _renderRegions(VB) {
     return this._features.map((f) => {
       const d = f.rings.map((rg) => "M" + rg.map(([px, py]) => `${(px * VB).toFixed(1)} ${(py * VB).toFixed(1)}`).join("L") + "Z").join("");
-      const fill = f.v == null ? "var(--wb-surface-soft)" : this._fillFor(f.v);
+      const fill = f.v == null ? "var(--work-surface-soft)" : this._fillFor(f.v);
       return `<path class="region" data-i="${f.i}" d="${d}" style="fill:${fill}"
         ${this._sel === f.i ? 'aria-selected="true"' : ""} />`;
     }).join("");
@@ -493,11 +493,11 @@ export class WbMap extends WbElement {
     return Math.sqrt((+v - lo) / (hi - lo)); // sqrt -> area-fair point sizing
   }
 
-  /** Token-only choropleth fill: blend toward --wb-brand by value (via opacity). */
+  /** Token-only choropleth fill: blend toward --work-brand by value (via opacity). */
   _fillFor(v) {
     const t = this._scale(v);
     // color-mix keeps everything token-driven; falls back to brand if unsupported.
-    return `color-mix(in srgb, var(--wb-brand) ${Math.round(15 + t * 85)}%, var(--wb-surface-soft))`;
+    return `color-mix(in srgb, var(--work-brand) ${Math.round(15 + t * 85)}%, var(--work-surface-soft))`;
   }
 
   /** Documented Host path for real basemap PIXELS (a keyed exception). */

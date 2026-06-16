@@ -8,9 +8,9 @@
 // `bun install`.
 //
 // Conventions (unchanged — the whole library follows these):
-//   • Shadow DOM (open) for style isolation; --wb-* tokens inherit through it.
+//   • Shadow DOM (open) for style isolation; --work-* tokens inherit through it.
 //   • `static styles` = the component CSS as a Lit `css``` CSSResult (was a
-//     string). Use ONLY var(--wb-*). Variants targeted via :host([name="value"]).
+//     string). Use ONLY var(--work-*). Variants targeted via :host([name="value"]).
 //   • `render()` returns a Lit `html``` TemplateResult (was a string) — surgical
 //     updates, no innerHTML rewrite.
 //   • `static props` = reflected attributes that re-render on change (variants,
@@ -31,7 +31,7 @@ import { getHost } from "./host.js";
 export { html, css };
 
 export class WbElement extends LitElement {
-  /** @type {import("lit").CSSResult} component CSS — override with css``; use only var(--wb-*) */
+  /** @type {import("lit").CSSResult} component CSS — override with css``; use only var(--work-*) */
   static styles = css``;
 
   /** @type {string[]} reflected attributes that trigger a re-render */

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-wb-theme="light">
+<html lang="en" data-work-theme="light">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -23,27 +23,27 @@
     import "../src/elements/forms/index.js";
   </script>
   <style>
-    body { margin: 0; background: var(--wb-bg); color: var(--wb-fg); font-family: var(--wb-font, system-ui); transition: background .2s, color .2s; }
+    body { margin: 0; background: var(--work-bg); color: var(--work-fg); font-family: var(--work-font, system-ui); transition: background .2s, color .2s; }
     .wrap { max-width: 720px; margin: 0 auto; padding: 48px 24px 96px; }
-    h1 { font-family: var(--wb-font-display, sans-serif); font-weight: 600; letter-spacing: -.01em; }
-    p.sub { color: var(--wb-fg-muted); max-width: 60ch; }
+    h1 { font-family: var(--work-font-display, sans-serif); font-weight: 600; letter-spacing: -.01em; }
+    p.sub { color: var(--work-fg-muted); max-width: 60ch; }
     .bar { display: flex; gap: 8px; align-items: center; margin: 20px 0 36px; }
-    .bar button { font: 600 12px var(--wb-font-mono, monospace); padding: 7px 12px; border-radius: var(--wb-radius-sm); border: 1.5px solid var(--wb-border-strong); background: var(--wb-surface); color: var(--wb-fg); cursor: pointer; }
-    .bar button[aria-pressed="true"] { background: var(--wb-fg); color: var(--wb-surface); }
-    h2 { font: 700 11px var(--wb-font-mono, monospace); letter-spacing: .18em; text-transform: uppercase; color: var(--wb-fg-subtle); margin: 40px 0 16px; }
-    .log { margin-top: 20px; padding: 14px 16px; border-radius: var(--wb-radius); background: var(--wb-surface-soft);
-      border: 1px solid var(--wb-border); font: 12.5px/1.5 var(--wb-font-mono, monospace); color: var(--wb-fg-muted);
+    .bar button { font: 600 12px var(--work-font-mono, monospace); padding: 7px 12px; border-radius: var(--work-radius-sm); border: 1.5px solid var(--work-border-strong); background: var(--work-surface); color: var(--work-fg); cursor: pointer; }
+    .bar button[aria-pressed="true"] { background: var(--work-fg); color: var(--work-surface); }
+    h2 { font: 700 11px var(--work-font-mono, monospace); letter-spacing: .18em; text-transform: uppercase; color: var(--work-fg-subtle); margin: 40px 0 16px; }
+    .log { margin-top: 20px; padding: 14px 16px; border-radius: var(--work-radius); background: var(--work-surface-soft);
+      border: 1px solid var(--work-border); font: 12.5px/1.5 var(--work-font-mono, monospace); color: var(--work-fg-muted);
       white-space: pre-wrap; min-height: 1.5em; }
-    .log b { color: var(--wb-brand); }
+    .log b { color: var(--work-brand); }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>workponents · forms</h1>
-    <p class="sub">A form <em>is</em> its schema. Each <code>&lt;work-field&gt;</code> carries its rule; <code>&lt;work-form&gt;</code> runs the shared <code>src/validate</code> layer live and on submit, blocks invalid submits, and themes every state from <code>--wb-*</code> tokens. Toggle the theme — everything re-themes from the contract.</p>
+    <p class="sub">A form <em>is</em> its schema. Each <code>&lt;work-field&gt;</code> carries its rule; <code>&lt;work-form&gt;</code> runs the shared <code>src/validate</code> layer live and on submit, blocks invalid submits, and themes every state from <code>--work-*</code> tokens. Toggle the theme — everything re-themes from the contract.</p>
 
     <div class="bar" role="group" aria-label="theme">
-      <span style="font:700 10px var(--wb-font-mono,monospace);letter-spacing:.18em;text-transform:uppercase;color:var(--wb-fg-subtle)">theme</span>
+      <span style="font:700 10px var(--work-font-mono,monospace);letter-spacing:.18em;text-transform:uppercase;color:var(--work-fg-subtle)">theme</span>
       <button data-theme="light" aria-pressed="true">light</button>
       <button data-theme="dark" aria-pressed="false">dark</button>
       <button data-theme="signal" aria-pressed="false">signal</button>
@@ -84,7 +84,7 @@
     const root = document.documentElement;
     for (const b of document.querySelectorAll(".bar button")) {
       b.addEventListener("click", () => {
-        root.setAttribute("data-wb-theme", b.dataset.theme);
+        root.setAttribute("data-work-theme", b.dataset.theme);
         for (const x of document.querySelectorAll(".bar button")) x.setAttribute("aria-pressed", String(x === b));
       });
     }

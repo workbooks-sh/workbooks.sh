@@ -40,19 +40,19 @@ export class WbDropzone extends WbElement {
   }
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
+    :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
     .zone { display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: var(--wb-space-2); padding: var(--wb-space-5); text-align: center; cursor: pointer;
-      border: 1.5px dashed var(--wb-border-strong); border-radius: var(--wb-radius);
-      background: var(--wb-surface); color: var(--wb-fg-muted);
-      transition: border-color var(--wb-dur) var(--wb-ease), background var(--wb-dur) var(--wb-ease); }
+      gap: var(--work-space-2); padding: var(--work-space-5); text-align: center; cursor: pointer;
+      border: 1.5px dashed var(--work-border-strong); border-radius: var(--work-radius);
+      background: var(--work-surface); color: var(--work-fg-muted);
+      transition: border-color var(--work-dur) var(--work-ease), background var(--work-dur) var(--work-ease); }
     :host([variant="bare"]) .zone { background: transparent; }
-    .zone:hover { border-color: var(--wb-brand); }
-    .zone.over { border-color: var(--wb-brand); background: var(--wb-brand-soft); color: var(--wb-brand); }
-    .zone:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); }
+    .zone:hover { border-color: var(--work-brand); }
+    .zone.over { border-color: var(--work-brand); background: var(--work-brand-soft); color: var(--work-brand); }
+    .zone:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
     .glyph { font-size: 26px; }
-    .label { font-size: var(--wb-text-sm); font-weight: 600; color: var(--wb-fg); }
-    .hint { font-family: var(--wb-font-mono); font-size: 11px; color: var(--wb-fg-subtle); }
+    .label { font-size: var(--work-text-sm); font-weight: 600; color: var(--work-fg); }
+    .hint { font-family: var(--work-font-mono); font-size: 11px; color: var(--work-fg-subtle); }
     input { display: none; }
   `;
 

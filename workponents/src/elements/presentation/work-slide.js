@@ -7,7 +7,7 @@
 // Composition-as-source: the slotted content IS the slide. It stays in the LIGHT
 // DOM (default <slot>) so any other workponent placed inside — a <work-chart>, a
 // <work-video>, a <work-table> — upgrades and renders exactly as it would anywhere
-// else. The shadow root only paints a themed frame from --wb-* tokens; it never
+// else. The shadow root only paints a themed frame from --work-* tokens; it never
 // re-renders or owns the author's content.
 //
 // The deck drives visibility: it sets/removes the boolean `active` attribute (and
@@ -58,15 +58,15 @@ export class WorkSlide extends WbElement {
       display: none;                /* deck shows exactly one band at a time */
       position: absolute; inset: 0;
       box-sizing: border-box;
-      color: var(--wb-fg);
-      font-family: var(--wb-font);
+      color: var(--work-fg);
+      font-family: var(--work-font);
     }
     :host([active]) { display: block; }
 
     .band {
       position: absolute; inset: 0;
       display: flex; flex-direction: column;
-      gap: var(--wb-space-4);
+      gap: var(--work-space-4);
       padding: clamp(28px, 6vw, 80px);
       overflow: auto;
     }
@@ -76,29 +76,29 @@ export class WorkSlide extends WbElement {
     :host([align="end"])    .band { align-items: flex-end; justify-content: flex-end; text-align: right; }
 
     /* band presets — typographic scale for the slotted content, tokens only */
-    ::slotted(h1) { font-family: var(--wb-font-display, var(--wb-font)); font-weight: 600; letter-spacing: -.02em; margin: 0; line-height: 1.04; }
-    ::slotted(h2) { font-family: var(--wb-font-display, var(--wb-font)); font-weight: 600; letter-spacing: -.01em; margin: 0; line-height: 1.1; }
-    ::slotted(p)  { color: var(--wb-fg-muted); margin: 0; max-width: 64ch; line-height: 1.5; }
-    ::slotted(ul), ::slotted(ol) { color: var(--wb-fg); margin: 0; line-height: 1.7; max-width: 60ch; }
+    ::slotted(h1) { font-family: var(--work-font-display, var(--work-font)); font-weight: 600; letter-spacing: -.02em; margin: 0; line-height: 1.04; }
+    ::slotted(h2) { font-family: var(--work-font-display, var(--work-font)); font-weight: 600; letter-spacing: -.01em; margin: 0; line-height: 1.1; }
+    ::slotted(p)  { color: var(--work-fg-muted); margin: 0; max-width: 64ch; line-height: 1.5; }
+    ::slotted(ul), ::slotted(ol) { color: var(--work-fg); margin: 0; line-height: 1.7; max-width: 60ch; }
 
     :host([band="title"]) ::slotted(h1) { font-size: clamp(40px, 8vw, 92px); }
-    :host([band="title"]) ::slotted(p)  { font-size: var(--wb-text-lg); color: var(--wb-fg-muted); }
+    :host([band="title"]) ::slotted(p)  { font-size: var(--work-text-lg); color: var(--work-fg-muted); }
     :host([band="content"]) ::slotted(h2) { font-size: clamp(26px, 4.5vw, 48px); }
     :host([band="quote"]) ::slotted(blockquote) {
-      font-family: var(--wb-font-display, var(--wb-font));
+      font-family: var(--work-font-display, var(--work-font));
       font-size: clamp(24px, 4vw, 44px); line-height: 1.3; margin: 0; max-width: 22ch;
-      color: var(--wb-fg); border: none; padding: 0;
+      color: var(--work-fg); border: none; padding: 0;
     }
     :host([band="media"]) .band { padding: clamp(16px, 3vw, 36px); }
     :host([band="media"]) ::slotted(*) { width: 100%; max-width: min(100%, 1100px); }
 
     /* split: two stacked/side-by-side regions via the named slots */
-    :host([band="split"]) .band { display: grid; gap: var(--wb-space-5);
+    :host([band="split"]) .band { display: grid; gap: var(--work-space-5);
       grid-template-columns: 1fr 1fr; align-content: center; text-align: left; }
     @media (max-width: 680px) { :host([band="split"]) .band { grid-template-columns: 1fr; } }
 
     /* enter transitions — only run when the band becomes active */
-    :host([active]) .band { animation: fade-in var(--wb-deck-enter, .42s) var(--wb-ease) both; }
+    :host([active]) .band { animation: fade-in var(--work-deck-enter, .42s) var(--work-ease) both; }
     :host([active][transition="none"]) .band { animation: none; }
     :host([active][transition="fade"])  .band { animation-name: fade-in; }
     :host([active][transition="rise"])  .band { animation-name: rise-in; }

@@ -27,14 +27,14 @@
   - *In-nexus compute* — the element that renders the data also runs it (the
     workbook's SQLite VFS / wavelet render-core / the OQL kernel), brokered through
     the Dock; the same element runs in-page (sqlite-wasm) or on the runtime tier.
-  - *One token set* — every element styles only from `--wb-*` CSS custom
+  - *One token set* — every element styles only from `--work-*` CSS custom
     properties, so one theme governs all domains AND the workbook artifacts.
   - *One Dock seam* — capabilities resolve `local` / `runtime` (RCP) / `kernel`
     behind the Host; the same element swaps providers per target.
 
   Parts that ship together —
-  - =src/theme/tokens.css= — the design contract: the `--wb-*` token set + the
-    `[data-wb-theme]` light/dark/brand presets. The single source of cohesion.
+  - =src/theme/tokens.css= — the design contract: the `--work-*` token set + the
+    `[data-work-theme]` light/dark/brand presets. The single source of cohesion.
   - =src/core/element.js= — `WbElement`, the thin base class (shadow DOM, reactive
     attributes, token-aware styling, the render seam). Zero dependencies.
   - =src/core/variants.js= — the variant contract (cva-style: variant/size/tone as

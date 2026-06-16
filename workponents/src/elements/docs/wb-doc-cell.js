@@ -52,50 +52,50 @@ export class WbDocCell extends WbElement {
 
   static styles = css`
     :host { display: block; margin: 1.1em 0; }
-    .cell { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
-      background: var(--wb-surface); overflow: hidden; box-shadow: var(--wb-shadow-sm); }
+    .cell { border: 1px solid var(--work-border); border-radius: var(--work-radius);
+      background: var(--work-surface); overflow: hidden; box-shadow: var(--work-shadow-sm); }
     :host([variant="inline"]) .cell { border: none; box-shadow: none; background: transparent; }
 
-    .head { display: flex; align-items: center; gap: var(--wb-space-2);
-      padding: var(--wb-space-2) var(--wb-space-3); border-bottom: 1px solid var(--wb-border);
-      background: var(--wb-surface-soft); font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); }
+    .head { display: flex; align-items: center; gap: var(--work-space-2);
+      padding: var(--work-space-2) var(--work-space-3); border-bottom: 1px solid var(--work-border);
+      background: var(--work-surface-soft); font-family: var(--work-font-mono); font-size: var(--work-text-sm); }
     :host([variant="inline"]) .head { background: transparent; padding-left: 0; padding-right: 0; }
-    .lang { font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--wb-brand); }
-    .title { color: var(--wb-fg); font-family: var(--wb-font); font-weight: 600; }
-    .status { margin-left: auto; display: inline-flex; align-items: center; gap: var(--wb-space-1);
-      font-size: 0.85em; color: var(--wb-fg-muted); }
-    .dot { width: 7px; height: 7px; border-radius: var(--wb-radius-pill); background: var(--wb-brand);
-      box-shadow: 0 0 0 3px var(--wb-brand-soft); }
-    .status[data-state="stub"] .dot { background: var(--wb-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
-    .status[data-state="error"] .dot { background: var(--wb-err); box-shadow: none; }
+    .lang { font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--work-brand); }
+    .title { color: var(--work-fg); font-family: var(--work-font); font-weight: 600; }
+    .status { margin-left: auto; display: inline-flex; align-items: center; gap: var(--work-space-1);
+      font-size: 0.85em; color: var(--work-fg-muted); }
+    .dot { width: 7px; height: 7px; border-radius: var(--work-radius-pill); background: var(--work-brand);
+      box-shadow: 0 0 0 3px var(--work-brand-soft); }
+    .status[data-state="stub"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
+    .status[data-state="error"] .dot { background: var(--work-err); box-shadow: none; }
 
-    .query { margin: 0; padding: var(--wb-space-3); font-family: var(--wb-font-mono);
-      font-size: var(--wb-text-sm); line-height: 1.55; color: var(--wb-fg-muted);
-      background: var(--wb-bg); border-bottom: 1px solid var(--wb-border); white-space: pre-wrap; word-break: break-word; }
-    :host([variant="inline"]) .query { background: var(--wb-surface-soft); border-radius: var(--wb-radius-sm); border: none; }
+    .query { margin: 0; padding: var(--work-space-3); font-family: var(--work-font-mono);
+      font-size: var(--work-text-sm); line-height: 1.55; color: var(--work-fg-muted);
+      background: var(--work-bg); border-bottom: 1px solid var(--work-border); white-space: pre-wrap; word-break: break-word; }
+    :host([variant="inline"]) .query { background: var(--work-surface-soft); border-radius: var(--work-radius-sm); border: none; }
 
-    .out { padding: var(--wb-space-3); font-family: var(--wb-font); }
+    .out { padding: var(--work-space-3); font-family: var(--work-font); }
 
-    table { width: 100%; border-collapse: collapse; font-size: var(--wb-text-sm); }
-    th, td { text-align: left; padding: var(--wb-space-2) var(--wb-space-3); border-bottom: 1px solid var(--wb-border); }
-    th { font-weight: 600; color: var(--wb-fg-muted); font-family: var(--wb-font-mono); font-size: 0.85em;
+    table { width: 100%; border-collapse: collapse; font-size: var(--work-text-sm); }
+    th, td { text-align: left; padding: var(--work-space-2) var(--work-space-3); border-bottom: 1px solid var(--work-border); }
+    th { font-weight: 600; color: var(--work-fg-muted); font-family: var(--work-font-mono); font-size: 0.85em;
       text-transform: uppercase; letter-spacing: 0.04em; }
     tbody tr:last-child td { border-bottom: none; }
-    tbody tr:hover { background: var(--wb-surface-soft); }
+    tbody tr:hover { background: var(--work-surface-soft); }
     td:not(:first-child) { font-variant-numeric: tabular-nums; }
 
-    .metric { display: flex; align-items: baseline; gap: var(--wb-space-3); }
-    .metric .v { font-family: var(--wb-font-display, var(--wb-font)); font-size: 2.4em; font-weight: 600;
-      letter-spacing: -0.02em; color: var(--wb-fg); line-height: 1; }
-    .metric .l { color: var(--wb-fg-muted); font-size: var(--wb-text-sm); }
-    .metric .d { margin-left: auto; color: var(--wb-ok); font-weight: 600; font-size: var(--wb-text-sm); }
+    .metric { display: flex; align-items: baseline; gap: var(--work-space-3); }
+    .metric .v { font-family: var(--work-font-display, var(--work-font)); font-size: 2.4em; font-weight: 600;
+      letter-spacing: -0.02em; color: var(--work-fg); line-height: 1; }
+    .metric .l { color: var(--work-fg-muted); font-size: var(--work-text-sm); }
+    .metric .d { margin-left: auto; color: var(--work-ok); font-weight: 600; font-size: var(--work-text-sm); }
 
-    .foot { padding: var(--wb-space-2) var(--wb-space-3); border-top: 1px solid var(--wb-border);
-      font-size: var(--wb-text-sm); color: var(--wb-fg-subtle); display: flex; gap: var(--wb-space-2); align-items: center; }
-    .recompute { cursor: pointer; color: var(--wb-brand); border: none; background: none; font: inherit;
-      font-family: var(--wb-font-mono); padding: 0; }
+    .foot { padding: var(--work-space-2) var(--work-space-3); border-top: 1px solid var(--work-border);
+      font-size: var(--work-text-sm); color: var(--work-fg-subtle); display: flex; gap: var(--work-space-2); align-items: center; }
+    .recompute { cursor: pointer; color: var(--work-brand); border: none; background: none; font: inherit;
+      font-family: var(--work-font-mono); padding: 0; }
     .recompute:hover { text-decoration: underline; }
-    pre.raw { margin: 0; font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); }
+    pre.raw { margin: 0; font-family: var(--work-font-mono); font-size: var(--work-text-sm); }
   `;
 
   connectedCallback() {
@@ -164,7 +164,7 @@ export class WbDocCell extends WbElement {
           <span class="status" data-state=${state}><span class="dot"></span>${stateText}</span>
         </div>
         ${this._source ? html`<pre class="query">${this._source}</pre>` : ""}
-        <div class="out">${this._busy ? html`<span style="color:var(--wb-fg-muted)">running…</span>` : this._renderResult()}</div>
+        <div class="out">${this._busy ? html`<span style="color:var(--work-fg-muted)">running…</span>` : this._renderResult()}</div>
         <div class="foot">
           <button class="recompute" type="button" @click=${this._compute}>recompute</button>
           <span>·</span>

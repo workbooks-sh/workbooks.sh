@@ -7,7 +7,7 @@
 // identity so the elements render + demo a full sign-in → authed → sign-out cycle
 // with no backend.
 //
-// All three elements style only from --wb-* tokens, extend WbElement, register
+// All three elements style only from --work-* tokens, extend WbElement, register
 // via define(), and reach identity through the seam (over this.host).
 //
 //   <work-auth>  — the sign-in surface (provider buttons + email/password|magic).

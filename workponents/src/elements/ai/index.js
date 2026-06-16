@@ -4,7 +4,7 @@
 // edits; the thread renders that source (turns = its diff stream), and the UI
 // the agent generates is authored INLINE as `#+begin_src component` blocks
 // (rendered to <work-gen-block> cards) — NOT a JSON IR. All four elements style
-// only from --wb-* tokens, extend WbElement, register via define(), and reach
+// only from --work-* tokens, extend WbElement, register via define(), and reach
 // capability (real inference) through this.host (the Dock seam).
 //
 // Tags: <work-message> · <work-thread> · <work-gen-block> · <work-composer>.

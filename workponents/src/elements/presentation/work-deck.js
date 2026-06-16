@@ -70,18 +70,18 @@ export class WorkDeck extends WbElement {
   static styles = css`
     :host {
       display: block;
-      color: var(--wb-fg);
-      font-family: var(--wb-font);
-      --wb-deck-enter: .42s;
+      color: var(--work-fg);
+      font-family: var(--work-font);
+      --work-deck-enter: .42s;
     }
 
     .shell {
       display: flex; flex-direction: column;
-      background: var(--wb-surface);
-      border: 1.5px solid var(--wb-border);
-      border-radius: var(--wb-radius-lg);
+      background: var(--work-surface);
+      border: 1.5px solid var(--work-border);
+      border-radius: var(--work-radius-lg);
       overflow: hidden;
-      box-shadow: var(--wb-shadow);
+      box-shadow: var(--work-shadow);
     }
     :host([variant="bare"]) .shell { background: transparent; border-color: transparent; box-shadow: none; border-radius: 0; }
     :host(:fullscreen) .shell, :host(.is-fs) .shell { height: 100vh; border: none; border-radius: 0; }
@@ -90,7 +90,7 @@ export class WorkDeck extends WbElement {
     .stage {
       position: relative;
       aspect-ratio: var(--_aspect, 16 / 9);
-      background: var(--wb-bg);
+      background: var(--work-bg);
       overflow: hidden;
     }
     :host(.is-fs) .stage { flex: 1 1 auto; aspect-ratio: auto; }
@@ -103,64 +103,64 @@ export class WorkDeck extends WbElement {
     .zone.prev { left: 0; }
     .zone.next { right: 0; cursor: pointer; }
     .zone:hover { background: linear-gradient(to var(--_dir, right),
-      color-mix(in srgb, var(--wb-fg) 6%, transparent), transparent); }
+      color-mix(in srgb, var(--work-fg) 6%, transparent), transparent); }
     .zone.prev { --_dir: left; }
 
     /* presenter notes overlay */
     .notes {
       position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
       max-height: 38%; overflow: auto;
-      padding: var(--wb-space-3) var(--wb-space-4);
-      background: color-mix(in srgb, var(--wb-surface) 86%, transparent);
+      padding: var(--work-space-3) var(--work-space-4);
+      background: color-mix(in srgb, var(--work-surface) 86%, transparent);
       backdrop-filter: blur(8px);
-      border-top: 1.5px solid var(--wb-border);
-      color: var(--wb-fg-muted); font-size: var(--wb-text-sm); line-height: 1.5;
+      border-top: 1.5px solid var(--work-border);
+      color: var(--work-fg-muted); font-size: var(--work-text-sm); line-height: 1.5;
       display: none;
     }
     :host(.show-notes) .notes { display: block; }
-    .notes b { color: var(--wb-fg); font-weight: 600; }
+    .notes b { color: var(--work-fg); font-weight: 600; }
 
     /* progress hairline */
-    .progress { position: relative; height: 3px; background: var(--wb-surface-soft); z-index: 5; }
-    .progress > i { position: absolute; inset: 0 auto 0 0; background: var(--wb-brand);
-      width: var(--_pct, 0%); transition: width var(--wb-dur) var(--wb-ease); }
+    .progress { position: relative; height: 3px; background: var(--work-surface-soft); z-index: 5; }
+    .progress > i { position: absolute; inset: 0 auto 0 0; background: var(--work-brand);
+      width: var(--_pct, 0%); transition: width var(--work-dur) var(--work-ease); }
 
     /* bottom chrome — tokens only */
     .chrome {
-      display: flex; align-items: center; gap: var(--wb-space-2);
-      padding: var(--wb-space-2) var(--wb-space-3);
-      border-top: 1.5px solid var(--wb-border);
-      background: var(--wb-surface);
+      display: flex; align-items: center; gap: var(--work-space-2);
+      padding: var(--work-space-2) var(--work-space-3);
+      border-top: 1.5px solid var(--work-border);
+      background: var(--work-surface);
     }
     :host([variant="bare"]) .chrome { background: transparent; }
     .chrome button {
       appearance: none; cursor: pointer;
-      height: 30px; min-width: 30px; padding: 0 var(--wb-space-2);
-      display: inline-flex; align-items: center; justify-content: center; gap: var(--wb-space-1);
-      border: 1.5px solid var(--wb-border-strong);
-      border-radius: var(--wb-radius-sm);
-      background: var(--wb-surface); color: var(--wb-fg);
-      font-family: var(--wb-font); font-size: var(--wb-text-sm); font-weight: 600; line-height: 1;
-      transition: border-color var(--wb-dur) var(--wb-ease), background var(--wb-dur) var(--wb-ease);
+      height: 30px; min-width: 30px; padding: 0 var(--work-space-2);
+      display: inline-flex; align-items: center; justify-content: center; gap: var(--work-space-1);
+      border: 1.5px solid var(--work-border-strong);
+      border-radius: var(--work-radius-sm);
+      background: var(--work-surface); color: var(--work-fg);
+      font-family: var(--work-font); font-size: var(--work-text-sm); font-weight: 600; line-height: 1;
+      transition: border-color var(--work-dur) var(--work-ease), background var(--work-dur) var(--work-ease);
     }
-    .chrome button:hover:not(:disabled) { border-color: var(--wb-brand); background: var(--wb-brand-soft); }
-    .chrome button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); }
+    .chrome button:hover:not(:disabled) { border-color: var(--work-brand); background: var(--work-brand-soft); }
+    .chrome button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
     .chrome button:disabled { opacity: .45; cursor: default; }
-    .counter { font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); color: var(--wb-fg-muted); white-space: nowrap; }
+    .counter { font-family: var(--work-font-mono); font-size: var(--work-text-sm); color: var(--work-fg-muted); white-space: nowrap; }
 
     /* dot rail — one dot per band, the wavelet "keyframe markers" */
     .dots { display: flex; gap: 6px; flex: 1 1 auto; align-items: center; justify-content: center; flex-wrap: wrap; }
-    .dot { width: 8px; height: 8px; border-radius: var(--wb-radius-pill);
-      background: var(--wb-border-strong); border: none; padding: 0; cursor: pointer;
-      transition: background var(--wb-dur) var(--wb-ease), transform var(--wb-dur) var(--wb-ease); }
+    .dot { width: 8px; height: 8px; border-radius: var(--work-radius-pill);
+      background: var(--work-border-strong); border: none; padding: 0; cursor: pointer;
+      transition: background var(--work-dur) var(--work-ease), transform var(--work-dur) var(--work-ease); }
     .dot:hover { transform: scale(1.25); }
-    .dot[aria-current="true"] { background: var(--wb-brand); width: 20px; }
+    .dot[aria-current="true"] { background: var(--work-brand); width: 20px; }
     .spacer { flex: 1 1 auto; }
     .export { margin-left: auto; }
     .export.busy { opacity: .6; pointer-events: none; }
 
     .empty { position: absolute; inset: 0; display: grid; place-items: center;
-      color: var(--wb-fg-muted); font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); }
+      color: var(--work-fg-muted); font-family: var(--work-font-mono); font-size: var(--work-text-sm); }
   `;
 
   constructor() {
@@ -457,9 +457,9 @@ function captureSlide(slide, res, i) {
   // on-screen theme (the scene renders in a bare <gm-doc>, outside our cascade).
   const cs = getComputedStyle(slide);
   const tok = (name, fb) => (cs.getPropertyValue(name) || fb).trim();
-  const bg = tok("--wb-bg", "#0a0d13");
-  const fg = tok("--wb-fg", "#e9edf4");
-  const font = tok("--wb-font", "system-ui, sans-serif");
+  const bg = tok("--work-bg", "#0a0d13");
+  const fg = tok("--work-fg", "#e9edf4");
+  const font = tok("--work-font", "system-ui, sans-serif");
   const justify = align === "start" ? "center" : align === "end" ? "flex-end" : "center";
   const items = align === "start" ? "flex-start" : align === "end" ? "flex-end" : "center";
   const text = align === "center" ? "center" : align === "end" ? "right" : "left";

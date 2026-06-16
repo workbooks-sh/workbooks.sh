@@ -5,7 +5,7 @@
 // ONLY through the src/data layer (getEngine), exactly like the sibling
 // <work-table>. Composition-as-source: the chart carries its data + query as source.
 //
-// Renders zero-dependency SVG themed entirely from --wb-* (axes, gridlines, marks,
+// Renders zero-dependency SVG themed entirely from --work-* (axes, gridlines, marks,
 // legend, tooltip). Responsive (re-renders on resize). The element does NO data
 // wrangling: it maps a WbQueryResult { columns, rows[i][j], types } to marks by
 // the x / y / series column attributes, and nothing more.
@@ -60,9 +60,9 @@ const VARIANTS = defineVariants({
 const HEIGHTS = { sm: 180, md: 300, lg: 440 };
 // Categorical palette — pastel chips first, then brand/state tokens. Pure tokens.
 const PALETTE = [
-  "var(--wb-brand)", "var(--wb-chip-blue)", "var(--wb-chip-peach)",
-  "var(--wb-chip-lavender)", "var(--wb-chip-green)", "var(--wb-warn)",
-  "var(--wb-ok)", "var(--wb-err)",
+  "var(--work-brand)", "var(--work-chip-blue)", "var(--work-chip-peach)",
+  "var(--work-chip-lavender)", "var(--work-chip-green)", "var(--work-warn)",
+  "var(--work-ok)", "var(--work-err)",
 ];
 
 let _autoId = 0;
@@ -76,54 +76,54 @@ export class WbChart extends WbElement {
   ];
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
-    .shell { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
-      background: var(--wb-surface); overflow: hidden; box-shadow: var(--wb-shadow-sm); }
+    :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
+    .shell { border: 1px solid var(--work-border); border-radius: var(--work-radius);
+      background: var(--work-surface); overflow: hidden; box-shadow: var(--work-shadow-sm); }
     :host([variant="bare"]) .shell { border: none; box-shadow: none; background: transparent; }
 
-    .head { display: flex; align-items: center; gap: var(--wb-space-2);
-      padding: var(--wb-space-3) var(--wb-space-4) 0; }
-    .title { font-family: var(--wb-font-display, var(--wb-font)); font-weight: 600;
-      font-size: var(--wb-text-lg); letter-spacing: -0.01em; }
+    .head { display: flex; align-items: center; gap: var(--work-space-2);
+      padding: var(--work-space-3) var(--work-space-4) 0; }
+    .title { font-family: var(--work-font-display, var(--work-font)); font-weight: 600;
+      font-size: var(--work-text-lg); letter-spacing: -0.01em; }
     .grow { flex: 1; }
-    .engine { display: inline-flex; align-items: center; gap: var(--wb-space-1);
-      font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); color: var(--wb-fg-subtle); }
-    .dot { width: 7px; height: 7px; border-radius: var(--wb-radius-pill); background: var(--wb-brand);
-      box-shadow: 0 0 0 3px var(--wb-brand-soft); }
-    .engine[data-tier="memory"] .dot { background: var(--wb-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
-    .engine[data-tier="error"] .dot { background: var(--wb-err); box-shadow: none; }
+    .engine { display: inline-flex; align-items: center; gap: var(--work-space-1);
+      font-family: var(--work-font-mono); font-size: var(--work-text-sm); color: var(--work-fg-subtle); }
+    .dot { width: 7px; height: 7px; border-radius: var(--work-radius-pill); background: var(--work-brand);
+      box-shadow: 0 0 0 3px var(--work-brand-soft); }
+    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
+    .engine[data-tier="error"] .dot { background: var(--work-err); box-shadow: none; }
 
-    .plot { padding: var(--wb-space-3) var(--wb-space-4) var(--wb-space-4); position: relative; }
+    .plot { padding: var(--work-space-3) var(--work-space-4) var(--work-space-4); position: relative; }
     svg { display: block; width: 100%; height: auto; overflow: visible; }
-    text { font-family: var(--wb-font); fill: var(--wb-fg-muted); }
-    .axis-label { fill: var(--wb-fg-muted); font-size: 11px; }
-    .axis-line { stroke: var(--wb-border-strong); stroke-width: 1; }
-    .grid { stroke: var(--wb-border); stroke-width: 1; }
-    .mark { transition: opacity var(--wb-dur) var(--wb-ease); cursor: pointer; }
+    text { font-family: var(--work-font); fill: var(--work-fg-muted); }
+    .axis-label { fill: var(--work-fg-muted); font-size: 11px; }
+    .axis-line { stroke: var(--work-border-strong); stroke-width: 1; }
+    .grid { stroke: var(--work-border); stroke-width: 1; }
+    .mark { transition: opacity var(--work-dur) var(--work-ease); cursor: pointer; }
     .plot[data-hover] .mark:not([data-active]) { opacity: 0.32; }
     .bar-rect { rx: 3; }
     .line-path { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
     .area-fill { opacity: 0.16; }
-    .dot-mark { stroke: var(--wb-surface); stroke-width: 1.5; }
+    .dot-mark { stroke: var(--work-surface); stroke-width: 1.5; }
 
-    .legend { display: flex; flex-wrap: wrap; gap: var(--wb-space-3);
-      padding: 0 var(--wb-space-4) var(--wb-space-3); font-size: var(--wb-text-sm); color: var(--wb-fg-muted); }
-    .legend .key { display: inline-flex; align-items: center; gap: var(--wb-space-1); cursor: default; }
+    .legend { display: flex; flex-wrap: wrap; gap: var(--work-space-3);
+      padding: 0 var(--work-space-4) var(--work-space-3); font-size: var(--work-text-sm); color: var(--work-fg-muted); }
+    .legend .key { display: inline-flex; align-items: center; gap: var(--work-space-1); cursor: default; }
     .legend .swatch { width: 11px; height: 11px; border-radius: 3px; }
 
     .tip { position: absolute; pointer-events: none; z-index: 3; opacity: 0;
       transform: translate(-50%, calc(-100% - 10px));
-      background: var(--wb-fg); color: var(--wb-surface);
-      font-family: var(--wb-font-mono); font-size: var(--wb-text-sm);
-      padding: var(--wb-space-1) var(--wb-space-2); border-radius: var(--wb-radius-sm);
-      white-space: nowrap; box-shadow: var(--wb-shadow); transition: opacity var(--wb-dur) var(--wb-ease); }
+      background: var(--work-fg); color: var(--work-surface);
+      font-family: var(--work-font-mono); font-size: var(--work-text-sm);
+      padding: var(--work-space-1) var(--work-space-2); border-radius: var(--work-radius-sm);
+      white-space: nowrap; box-shadow: var(--work-shadow); transition: opacity var(--work-dur) var(--work-ease); }
     .tip[data-show] { opacity: 1; }
-    .tip .tk { color: var(--wb-surface-soft); }
+    .tip .tk { color: var(--work-surface-soft); }
 
-    .empty { padding: var(--wb-space-5); text-align: center; color: var(--wb-fg-muted); font-size: var(--wb-text-sm); }
-    .foot { padding: 0 var(--wb-space-4) var(--wb-space-3); font-size: var(--wb-text-sm); color: var(--wb-fg-subtle);
-      font-family: var(--wb-font-mono); }
-    .foot .err { color: var(--wb-err); }
+    .empty { padding: var(--work-space-5); text-align: center; color: var(--work-fg-muted); font-size: var(--work-text-sm); }
+    .foot { padding: 0 var(--work-space-4) var(--work-space-3); font-size: var(--work-text-sm); color: var(--work-fg-subtle);
+      font-family: var(--work-font-mono); }
+    .foot .err { color: var(--work-err); }
   `;
 
   connectedCallback() {
@@ -475,8 +475,8 @@ export class WbChart extends WbElement {
       a0 = a1;
     });
     // center total
-    parts.push(`<text x="${cx}" y="${cy - 2}" text-anchor="middle" style="fill:var(--wb-fg);font-weight:600;font-size:18px">${esc(fmtVal(total, fmt))}</text>`);
-    parts.push(`<text x="${cx}" y="${cy + 16}" text-anchor="middle" class="axis-label" style="font-family:var(--wb-font-mono)">total</text>`);
+    parts.push(`<text x="${cx}" y="${cy - 2}" text-anchor="middle" style="fill:var(--work-fg);font-weight:600;font-size:18px">${esc(fmtVal(total, fmt))}</text>`);
+    parts.push(`<text x="${cx}" y="${cy + 16}" text-anchor="middle" class="axis-label" style="font-family:var(--work-font-mono)">total</text>`);
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.innerHTML = parts.join("");
     lay._slices = slices;   // for legend + hover

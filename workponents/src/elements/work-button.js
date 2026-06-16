@@ -19,31 +19,31 @@ export class WbButton extends WbElement {
   static styles = css`
     :host { display: inline-block; }
     button {
-      font-family: var(--wb-font);
+      font-family: var(--work-font);
       font-weight: 600;
-      font-size: var(--wb-text);
+      font-size: var(--work-text);
       line-height: 1;
-      display: inline-flex; align-items: center; gap: var(--wb-space-2);
-      padding: var(--wb-space-3) var(--wb-space-4);
-      border-radius: var(--wb-radius);
+      display: inline-flex; align-items: center; gap: var(--work-space-2);
+      padding: var(--work-space-3) var(--work-space-4);
+      border-radius: var(--work-radius);
       border: 1.5px solid transparent;
-      background: var(--wb-brand); color: var(--wb-on-brand);
+      background: var(--work-brand); color: var(--work-on-brand);
       cursor: pointer;
-      transition: transform var(--wb-dur) var(--wb-ease),
-                  background var(--wb-dur) var(--wb-ease),
-                  border-color var(--wb-dur) var(--wb-ease),
-                  box-shadow var(--wb-dur) var(--wb-ease);
+      transition: transform var(--work-dur) var(--work-ease),
+                  background var(--work-dur) var(--work-ease),
+                  border-color var(--work-dur) var(--work-ease),
+                  box-shadow var(--work-dur) var(--work-ease);
     }
     button:hover { transform: translateY(-1px); }
     button:active { transform: translateY(0); }
-    button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); }
+    button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
 
     /* tone sets the accent the variants paint with */
-    :host([tone="neutral"]) button { --_a: var(--wb-fg); --_ink: var(--wb-surface); --_soft: var(--wb-surface-soft); }
-    :host([tone="ok"])      button { --_a: var(--wb-ok);  --_ink: #fff; --_soft: var(--wb-brand-soft); }
-    :host([tone="warn"])    button { --_a: var(--wb-warn);--_ink: #1c1304; --_soft: rgba(184,134,27,0.14); }
-    :host([tone="err"])     button { --_a: var(--wb-err); --_ink: #fff; --_soft: rgba(201,47,47,0.14); }
-    button { --_a: var(--wb-brand); --_ink: var(--wb-on-brand); --_soft: var(--wb-brand-soft); }
+    :host([tone="neutral"]) button { --_a: var(--work-fg); --_ink: var(--work-surface); --_soft: var(--work-surface-soft); }
+    :host([tone="ok"])      button { --_a: var(--work-ok);  --_ink: #fff; --_soft: var(--work-brand-soft); }
+    :host([tone="warn"])    button { --_a: var(--work-warn);--_ink: #1c1304; --_soft: rgba(184,134,27,0.14); }
+    :host([tone="err"])     button { --_a: var(--work-err); --_ink: #fff; --_soft: rgba(201,47,47,0.14); }
+    button { --_a: var(--work-brand); --_ink: var(--work-on-brand); --_soft: var(--work-brand-soft); }
 
     /* variant decides how the tone is applied */
     :host([variant="solid"])   button { background: var(--_a); color: var(--_ink); }
@@ -54,8 +54,8 @@ export class WbButton extends WbElement {
     :host([variant="outline"]) button:hover { background: var(--_soft); }
 
     /* size */
-    :host([size="sm"]) button { font-size: var(--wb-text-sm); padding: var(--wb-space-2) var(--wb-space-3); border-radius: var(--wb-radius-sm); }
-    :host([size="lg"]) button { font-size: var(--wb-text-lg); padding: var(--wb-space-4) var(--wb-space-5); border-radius: var(--wb-radius-lg); }
+    :host([size="sm"]) button { font-size: var(--work-text-sm); padding: var(--work-space-2) var(--work-space-3); border-radius: var(--work-radius-sm); }
+    :host([size="lg"]) button { font-size: var(--work-text-lg); padding: var(--work-space-4) var(--work-space-5); border-radius: var(--work-radius-lg); }
 
     :host([disabled]) button { opacity: 0.5; pointer-events: none; }
   `;

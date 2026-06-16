@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-wb-theme="dark">
+<html lang="en" data-work-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -33,17 +33,17 @@
     if (!customElements.get("work-video")) customElements.define("work-video", class extends customElements.get("wb-video") {});
   </script>
   <style>
-    body { margin: 0; background: var(--wb-bg); color: var(--wb-fg); font-family: var(--wb-font, system-ui); transition: background .2s, color .2s; }
+    body { margin: 0; background: var(--work-bg); color: var(--work-fg); font-family: var(--work-font, system-ui); transition: background .2s, color .2s; }
     .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px 96px; }
-    h1.page { font-family: var(--wb-font-display, sans-serif); font-weight: 600; letter-spacing: -.01em; margin: 0 0 6px; }
-    p.sub { color: var(--wb-fg-muted); max-width: 70ch; margin: 0 0 22px; }
+    h1.page { font-family: var(--work-font-display, sans-serif); font-weight: 600; letter-spacing: -.01em; margin: 0 0 6px; }
+    p.sub { color: var(--work-fg-muted); max-width: 70ch; margin: 0 0 22px; }
     .bar { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; flex-wrap: wrap; }
-    .bar .lbl { font: 700 10px var(--wb-font-mono, monospace); letter-spacing: .18em; text-transform: uppercase; color: var(--wb-fg-subtle); margin-right: 4px; }
-    .bar button { font: 600 12px var(--wb-font-mono, monospace); padding: 7px 12px; border-radius: var(--wb-radius-sm); border: 1.5px solid var(--wb-border-strong); background: var(--wb-surface); color: var(--wb-fg); cursor: pointer; }
-    .bar button[aria-pressed="true"] { background: var(--wb-fg); color: var(--wb-surface); }
-    .hint { font: 500 11px var(--wb-font-mono, monospace); color: var(--wb-fg-subtle); margin-top: 16px; }
-    .hint code { color: var(--wb-fg-muted); }
-    .lead { color: var(--wb-fg-muted); }
+    .bar .lbl { font: 700 10px var(--work-font-mono, monospace); letter-spacing: .18em; text-transform: uppercase; color: var(--work-fg-subtle); margin-right: 4px; }
+    .bar button { font: 600 12px var(--work-font-mono, monospace); padding: 7px 12px; border-radius: var(--work-radius-sm); border: 1.5px solid var(--work-border-strong); background: var(--work-surface); color: var(--work-fg); cursor: pointer; }
+    .bar button[aria-pressed="true"] { background: var(--work-fg); color: var(--work-surface); }
+    .hint { font: 500 11px var(--work-font-mono, monospace); color: var(--work-fg-subtle); margin-top: 16px; }
+    .hint code { color: var(--work-fg-muted); }
+    .lead { color: var(--work-fg-muted); }
   </style>
 </head>
 <body>
@@ -55,7 +55,7 @@
       is a keyframe band, so it shares the render-core with <code>&lt;work-video&gt;</code> and
       <strong>Export → video</strong> is free. Live workponents (the <code>&lt;work-chart&gt;</code> and
       <code>&lt;work-video&gt;</code> below) render <em>on</em> slides, not as screenshots. Themed entirely
-      from <code>--wb-*</code> — toggle below.
+      from <code>--work-*</code> — toggle below.
     </p>
 
     <div class="bar" role="group" aria-label="theme">
@@ -77,7 +77,7 @@
       <work-slide band="split" transition="rise" align="start">
         <div slot="a">
           <h2>A live chart, on a slide</h2>
-          <p class="lead">This isn't an image — it's a real <code style="font-family:var(--wb-font-mono)">&lt;work-chart&gt;</code>
+          <p class="lead">This isn't an image — it's a real <code style="font-family:var(--work-font-mono)">&lt;work-chart&gt;</code>
             querying its inline data through the shared engine. Export folds it into the timeline.</p>
         </div>
         <div slot="b">
@@ -139,7 +139,7 @@
   <script>
     const buttons = document.querySelectorAll(".bar button");
     buttons.forEach((b) => b.addEventListener("click", () => {
-      document.documentElement.setAttribute("data-wb-theme", b.dataset.theme);
+      document.documentElement.setAttribute("data-work-theme", b.dataset.theme);
       buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     }));
     // surface the playhead event in the console for the spec proof

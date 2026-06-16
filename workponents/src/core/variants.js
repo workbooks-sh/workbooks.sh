@@ -7,8 +7,8 @@
 // default when unset or invalid. The actual styling lives in the component CSS:
 //
 //   static styles = `
-//     :host([variant="solid"]) button { background: var(--wb-brand); }
-//     :host([size="sm"])      button { padding: var(--wb-space-1) var(--wb-space-2); }
+//     :host([variant="solid"]) button { background: var(--work-brand); }
+//     :host([size="sm"])      button { padding: var(--work-space-1) var(--work-space-2); }
 //   `;
 //
 // Usage in an element:

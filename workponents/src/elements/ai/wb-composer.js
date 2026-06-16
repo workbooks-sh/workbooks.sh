@@ -28,30 +28,30 @@ export class WbComposer extends WbElement {
   _ta = createRef();
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
+    :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
     .composer {
-      display: flex; align-items: flex-end; gap: var(--wb-space-2);
-      border: 1.5px solid var(--wb-border-strong);
-      border-radius: var(--wb-radius-lg);
-      background: var(--wb-surface);
-      padding: var(--wb-space-2) var(--wb-space-2) var(--wb-space-2) var(--wb-space-4);
-      transition: border-color var(--wb-dur) var(--wb-ease), box-shadow var(--wb-dur) var(--wb-ease);
+      display: flex; align-items: flex-end; gap: var(--work-space-2);
+      border: 1.5px solid var(--work-border-strong);
+      border-radius: var(--work-radius-lg);
+      background: var(--work-surface);
+      padding: var(--work-space-2) var(--work-space-2) var(--work-space-2) var(--work-space-4);
+      transition: border-color var(--work-dur) var(--work-ease), box-shadow var(--work-dur) var(--work-ease);
     }
-    .composer:focus-within { border-color: var(--wb-brand); box-shadow: 0 0 0 3px var(--wb-ring); }
+    .composer:focus-within { border-color: var(--work-brand); box-shadow: 0 0 0 3px var(--work-ring); }
     textarea {
       flex: 1; resize: none; border: 0; outline: 0; background: none;
-      font: var(--wb-text)/1.5 var(--wb-font); color: var(--wb-fg);
-      padding: var(--wb-space-2) 0; max-height: 180px;
+      font: var(--work-text)/1.5 var(--work-font); color: var(--work-fg);
+      padding: var(--work-space-2) 0; max-height: 180px;
     }
-    textarea::placeholder { color: var(--wb-fg-subtle); }
+    textarea::placeholder { color: var(--work-fg-subtle); }
     .send {
       display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none;
-      border: 0; border-radius: var(--wb-radius); cursor: pointer;
-      background: var(--wb-brand); color: var(--wb-on-brand);
-      transition: filter var(--wb-dur) var(--wb-ease), opacity var(--wb-dur) var(--wb-ease);
+      border: 0; border-radius: var(--work-radius); cursor: pointer;
+      background: var(--work-brand); color: var(--work-on-brand);
+      transition: filter var(--work-dur) var(--work-ease), opacity var(--work-dur) var(--work-ease);
     }
     .send:hover { filter: brightness(1.06); }
-    .send:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); }
+    .send:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
     .send svg { width: 16px; height: 16px; }
 
     /* busy states: lock input, show a live indicator in place of the icon */
@@ -59,22 +59,22 @@ export class WbComposer extends WbElement {
     :host([state="streaming"]) textarea,
     :host([disabled]) textarea { pointer-events: none; opacity: .6; }
     :host([state="thinking"]) .composer,
-    :host([state="streaming"]) .composer { border-color: var(--wb-brand); }
+    :host([state="streaming"]) .composer { border-color: var(--work-brand); }
 
     .dots { display: inline-flex; gap: 3px; }
     .dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor;
-      animation: wb-pulse 1s var(--wb-ease) infinite; }
+      animation: wb-pulse 1s var(--work-ease) infinite; }
     .dots i:nth-child(2) { animation-delay: .15s; }
     .dots i:nth-child(3) { animation-delay: .3s; }
     @keyframes wb-pulse { 0%,80%,100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
 
-    .status { font: 600 11px var(--wb-font-mono); letter-spacing: .06em;
-      text-transform: uppercase; color: var(--wb-fg-muted);
-      padding: 0 var(--wb-space-2) var(--wb-space-1); height: 0; overflow: hidden;
-      transition: height var(--wb-dur); }
+    .status { font: 600 11px var(--work-font-mono); letter-spacing: .06em;
+      text-transform: uppercase; color: var(--work-fg-muted);
+      padding: 0 var(--work-space-2) var(--work-space-1); height: 0; overflow: hidden;
+      transition: height var(--work-dur); }
     :host([state="thinking"]) .status,
     :host([state="streaming"]) .status { height: 18px; }
-    .status .dots { color: var(--wb-brand); vertical-align: middle; margin-left: var(--wb-space-1); }
+    .status .dots { color: var(--work-brand); vertical-align: middle; margin-left: var(--work-space-1); }
   `;
 
   /** Programmatic value. */

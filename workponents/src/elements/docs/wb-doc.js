@@ -33,8 +33,8 @@ export class WbDoc extends WbElement {
   static styles = css`
     :host { display: block; }
     .doc { max-width: 76ch; margin: 0 auto; }
-    .loading, .error { color: var(--wb-fg-muted); font-family: var(--wb-font); padding: var(--wb-space-4); }
-    .error { color: var(--wb-err); }
+    .loading, .error { color: var(--work-fg-muted); font-family: var(--work-font); padding: var(--work-space-4); }
+    .error { color: var(--work-err); }
     ${PROSE_CSS}
   `;
 

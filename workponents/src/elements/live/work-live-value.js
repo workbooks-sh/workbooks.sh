@@ -39,38 +39,38 @@ export class WorkLiveValue extends WbElement {
   };
 
   static styles = css`
-    :host { display: inline-block; font-family: var(--wb-font); color: var(--wb-fg); }
-    .box { display: inline-flex; align-items: center; gap: var(--wb-space-3);
-      border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
-      background: var(--wb-surface); padding: var(--wb-space-2) var(--wb-space-3); }
-    .label { font: 600 var(--wb-text-sm) var(--wb-font); color: var(--wb-fg-muted); }
-    .val { font: 700 var(--wb-text-lg) var(--wb-font-mono); color: var(--wb-fg);
+    :host { display: inline-block; font-family: var(--work-font); color: var(--work-fg); }
+    .box { display: inline-flex; align-items: center; gap: var(--work-space-3);
+      border: 1px solid var(--work-border); border-radius: var(--work-radius);
+      background: var(--work-surface); padding: var(--work-space-2) var(--work-space-3); }
+    .label { font: 600 var(--work-text-sm) var(--work-font); color: var(--work-fg-muted); }
+    .val { font: 700 var(--work-text-lg) var(--work-font-mono); color: var(--work-fg);
       min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums;
-      transition: color var(--wb-dur) var(--wb-ease); }
-    .flash { animation: flash .5s var(--wb-ease); }
-    @keyframes flash { from { color: var(--wb-brand) } to { color: var(--wb-fg) } }
+      transition: color var(--work-dur) var(--work-ease); }
+    .flash { animation: flash .5s var(--work-ease); }
+    @keyframes flash { from { color: var(--work-brand) } to { color: var(--work-fg) } }
     button.step {
-      width: 28px; height: 28px; flex: none; border-radius: var(--wb-radius-sm);
-      border: 1.5px solid var(--wb-border-strong); background: var(--wb-surface); color: var(--wb-fg);
-      font: 700 16px var(--wb-font-mono); line-height: 1; cursor: pointer;
-      transition: background var(--wb-dur) var(--wb-ease), transform var(--wb-dur) var(--wb-ease); }
-    button.step:hover { background: var(--wb-surface-soft); }
+      width: 28px; height: 28px; flex: none; border-radius: var(--work-radius-sm);
+      border: 1.5px solid var(--work-border-strong); background: var(--work-surface); color: var(--work-fg);
+      font: 700 16px var(--work-font-mono); line-height: 1; cursor: pointer;
+      transition: background var(--work-dur) var(--work-ease), transform var(--work-dur) var(--work-ease); }
+    button.step:hover { background: var(--work-surface-soft); }
     button.step:active { transform: scale(.92); }
 
     .switch { position: relative; width: 44px; height: 26px; flex: none;
-      border-radius: var(--wb-radius-pill); background: var(--wb-surface-soft);
-      border: 1.5px solid var(--wb-border-strong); cursor: pointer; padding: 0;
-      transition: background var(--wb-dur) var(--wb-ease); }
-    .switch[aria-checked="true"] { background: var(--wb-brand); border-color: var(--wb-brand); }
+      border-radius: var(--work-radius-pill); background: var(--work-surface-soft);
+      border: 1.5px solid var(--work-border-strong); cursor: pointer; padding: 0;
+      transition: background var(--work-dur) var(--work-ease); }
+    .switch[aria-checked="true"] { background: var(--work-brand); border-color: var(--work-brand); }
     .switch .knob { position: absolute; top: 1px; left: 1px; width: 20px; height: 20px;
-      border-radius: 50%; background: var(--wb-surface); box-shadow: var(--wb-shadow-sm);
-      transition: transform var(--wb-dur) var(--wb-ease); }
+      border-radius: 50%; background: var(--work-surface); box-shadow: var(--work-shadow-sm);
+      transition: transform var(--work-dur) var(--work-ease); }
     .switch[aria-checked="true"] .knob { transform: translateX(18px); }
 
-    input.text { font: var(--wb-text) var(--wb-font); color: var(--wb-fg);
-      background: var(--wb-bg); border: 1.5px solid var(--wb-border); border-radius: var(--wb-radius-sm);
-      padding: var(--wb-space-2) var(--wb-space-3); min-width: 16ch; }
-    input.text:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); border-color: var(--wb-brand); }
+    input.text { font: var(--work-text) var(--work-font); color: var(--work-fg);
+      background: var(--work-bg); border: 1.5px solid var(--work-border); border-radius: var(--work-radius-sm);
+      padding: var(--work-space-2) var(--work-space-3); min-width: 16ch; }
+    input.text:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); border-color: var(--work-brand); }
   `;
 
   constructor() {

@@ -41,47 +41,47 @@ export class WorkEditor extends WbElement {
   };
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font-mono); }
+    :host { display: block; font-family: var(--work-font-mono); }
     .wrap { position: relative; display: flex;
-      border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
-      background: var(--wb-bg); box-shadow: var(--wb-shadow-sm); overflow: hidden; }
-    :host([variant="inline"]) .wrap { border: none; box-shadow: none; background: var(--wb-surface-soft); }
+      border: 1px solid var(--work-border); border-radius: var(--work-radius);
+      background: var(--work-bg); box-shadow: var(--work-shadow-sm); overflow: hidden; }
+    :host([variant="inline"]) .wrap { border: none; box-shadow: none; background: var(--work-surface-soft); }
 
-    .gutter { flex: none; padding: var(--wb-space-3) var(--wb-space-2);
-      text-align: right; user-select: none; color: var(--wb-fg-subtle);
-      font-size: var(--wb-text-sm); line-height: 1.6;
-      background: var(--wb-surface-soft); border-right: 1px solid var(--wb-border);
+    .gutter { flex: none; padding: var(--work-space-3) var(--work-space-2);
+      text-align: right; user-select: none; color: var(--work-fg-subtle);
+      font-size: var(--work-text-sm); line-height: 1.6;
+      background: var(--work-surface-soft); border-right: 1px solid var(--work-border);
       font-variant-numeric: tabular-nums; min-width: 2.2em; }
     :host([gutter="off"]) .gutter { display: none; }
 
     /* the surface: textarea and overlay are layered, pixel-identical metrics */
     .surface { position: relative; flex: 1 1 auto; min-width: 0; }
     .overlay, textarea {
-      margin: 0; padding: var(--wb-space-3);
-      font-family: var(--wb-font-mono); font-size: var(--wb-text-sm);
+      margin: 0; padding: var(--work-space-3);
+      font-family: var(--work-font-mono); font-size: var(--work-text-sm);
       line-height: 1.6; tab-size: 2; white-space: pre; overflow-wrap: normal;
       letter-spacing: 0; word-spacing: 0; border: 0; box-sizing: border-box;
     }
-    .overlay { position: absolute; inset: 0; pointer-events: none; color: var(--wb-fg);
+    .overlay { position: absolute; inset: 0; pointer-events: none; color: var(--work-fg);
       overflow: auto; }
     textarea {
       position: relative; width: 100%; height: 100%; min-height: var(--_minh, 8.6em);
       display: block; resize: vertical; background: transparent;
-      color: transparent; caret-color: var(--wb-fg);
+      color: transparent; caret-color: var(--work-fg);
       outline: none; overflow: auto; }
-    textarea::selection { background: var(--wb-brand-soft); color: var(--wb-fg); }
-    textarea::placeholder { color: var(--wb-fg-subtle); }
+    textarea::selection { background: var(--work-brand-soft); color: var(--work-fg); }
+    textarea::placeholder { color: var(--work-fg-subtle); }
     :host([readonly]) textarea { caret-color: transparent; }
 
-    /* token classes — styled ONLY from --wb-* */
-    .tok-kw { color: var(--wb-brand); font-weight: 600; }
-    .tok-str { color: var(--wb-ok); }
-    .tok-num { color: var(--wb-warn); }
-    .tok-comment { color: var(--wb-fg-subtle); font-style: italic; }
+    /* token classes — styled ONLY from --work-* */
+    .tok-kw { color: var(--work-brand); font-weight: 600; }
+    .tok-str { color: var(--work-ok); }
+    .tok-num { color: var(--work-warn); }
+    .tok-comment { color: var(--work-fg-subtle); font-style: italic; }
 
     textarea:focus-visible ~ .overlay,
     .wrap:focus-within { box-shadow: none; }
-    .wrap:focus-within { border-color: var(--wb-brand); box-shadow: 0 0 0 3px var(--wb-ring); }
+    .wrap:focus-within { border-color: var(--work-brand); box-shadow: 0 0 0 3px var(--work-ring); }
   `;
 
   constructor() {

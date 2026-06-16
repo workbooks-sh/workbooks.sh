@@ -26,13 +26,13 @@ export class WbThread extends WbElement {
   static props = ["title", "max-width"];
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
+    :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
     .thread {
-      display: flex; flex-direction: column; gap: var(--wb-space-5);
+      display: flex; flex-direction: column; gap: var(--work-space-5);
       max-width: var(--_mw, 760px); margin: 0 auto;
     }
-    .title { font: 700 11px var(--wb-font-mono); letter-spacing: .18em;
-      text-transform: uppercase; color: var(--wb-fg-subtle); margin-bottom: var(--wb-space-2); }
+    .title { font: 700 11px var(--work-font-mono); letter-spacing: .18em;
+      text-transform: uppercase; color: var(--work-fg-subtle); margin-bottom: var(--work-space-2); }
     ::slotted(work-message) { display: block; }
     .built { display: contents; }
   `;

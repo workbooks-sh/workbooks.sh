@@ -1,95 +1,95 @@
 /* workponents — the design contract.
  * Every <wb-*> element styles ONLY from these custom properties. CSS custom
- * properties inherit through the shadow boundary, so setting --wb-* on :root (or
- * any ancestor / [data-wb-theme] scope) themes every element beneath it. One set
+ * properties inherit through the shadow boundary, so setting --work-* on :root (or
+ * any ancestor / [data-work-theme] scope) themes every element beneath it. One set
  * governs all domains AND the workbook artifacts. Authors theme by overriding
  * tokens — never by reaching into a component. Per-workspace brands = a scope
  * with its own token overrides (the demo brands are this pattern). */
 
 :root,
-[data-wb-theme="light"] {
+[data-work-theme="light"] {
   /* surfaces */
-  --wb-bg: #f7f6f1;
-  --wb-surface: #ffffff;
-  --wb-surface-soft: #efede6;
-  --wb-border: rgba(18, 19, 22, 0.13);
-  --wb-border-strong: rgba(18, 19, 22, 0.28);
+  --work-bg: #f7f6f1;
+  --work-surface: #ffffff;
+  --work-surface-soft: #efede6;
+  --work-border: rgba(18, 19, 22, 0.13);
+  --work-border-strong: rgba(18, 19, 22, 0.28);
   /* foreground */
-  --wb-fg: #121316;
-  --wb-fg-muted: rgba(18, 19, 22, 0.6);
-  --wb-fg-subtle: rgba(18, 19, 22, 0.38);
+  --work-fg: #121316;
+  --work-fg-muted: rgba(18, 19, 22, 0.6);
+  --work-fg-subtle: rgba(18, 19, 22, 0.38);
   /* brand + state */
-  --wb-brand: #13d943;
-  --wb-brand-soft: rgba(19, 217, 67, 0.13);
-  --wb-brand-ink: #0a2413;
-  --wb-on-brand: #07210f;
-  --wb-ring: rgba(19, 217, 67, 0.5);
-  --wb-ok: #0fae38;
-  --wb-warn: #b8861b;
-  --wb-err: #c92f2f;
+  --work-brand: #13d943;
+  --work-brand-soft: rgba(19, 217, 67, 0.13);
+  --work-brand-ink: #0a2413;
+  --work-on-brand: #07210f;
+  --work-ring: rgba(19, 217, 67, 0.5);
+  --work-ok: #0fae38;
+  --work-warn: #b8861b;
+  --work-err: #c92f2f;
   /* pastel chips (per-tone accents) */
-  --wb-chip-blue: #aecbf2;
-  --wb-chip-green: #b6e2bd;
-  --wb-chip-peach: #f3cfae;
-  --wb-chip-lavender: #d4c9f0;
+  --work-chip-blue: #aecbf2;
+  --work-chip-green: #b6e2bd;
+  --work-chip-peach: #f3cfae;
+  --work-chip-lavender: #d4c9f0;
 
   /* shape */
-  --wb-radius: 12px;
-  --wb-radius-sm: 8px;
-  --wb-radius-lg: 18px;
-  --wb-radius-pill: 999px;
+  --work-radius: 12px;
+  --work-radius-sm: 8px;
+  --work-radius-lg: 18px;
+  --work-radius-pill: 999px;
   /* spacing scale */
-  --wb-space-1: 4px;
-  --wb-space-2: 8px;
-  --wb-space-3: 12px;
-  --wb-space-4: 16px;
-  --wb-space-5: 24px;
+  --work-space-1: 4px;
+  --work-space-2: 8px;
+  --work-space-3: 12px;
+  --work-space-4: 16px;
+  --work-space-5: 24px;
   /* type */
-  --wb-font: "Geist", system-ui, -apple-system, sans-serif;
-  --wb-font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
-  --wb-font-display: "Franie", "Geist", sans-serif;
-  --wb-text-sm: 12.5px;
-  --wb-text: 14px;
-  --wb-text-lg: 16px;
+  --work-font: "Geist", system-ui, -apple-system, sans-serif;
+  --work-font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+  --work-font-display: "Franie", "Geist", sans-serif;
+  --work-text-sm: 12.5px;
+  --work-text: 14px;
+  --work-text-lg: 16px;
   /* depth + motion */
-  --wb-shadow: 0 1px 2px rgba(18, 19, 22, 0.06), 0 8px 24px rgba(18, 19, 22, 0.08);
-  --wb-shadow-sm: 0 1px 2px rgba(18, 19, 22, 0.08);
-  --wb-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --wb-dur: 0.14s;
+  --work-shadow: 0 1px 2px rgba(18, 19, 22, 0.06), 0 8px 24px rgba(18, 19, 22, 0.08);
+  --work-shadow-sm: 0 1px 2px rgba(18, 19, 22, 0.08);
+  --work-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --work-dur: 0.14s;
 }
 
-[data-wb-theme="dark"] {
-  --wb-bg: #0a0d13;
-  --wb-surface: #10151f;
-  --wb-surface-soft: #161c27;
-  --wb-border: #23262c;
-  --wb-border-strong: #353a44;
-  --wb-fg: #e9edf4;
-  --wb-fg-muted: #9aa0a6;
-  --wb-fg-subtle: #6b727c;
+[data-work-theme="dark"] {
+  --work-bg: #0a0d13;
+  --work-surface: #10151f;
+  --work-surface-soft: #161c27;
+  --work-border: #23262c;
+  --work-border-strong: #353a44;
+  --work-fg: #e9edf4;
+  --work-fg-muted: #9aa0a6;
+  --work-fg-subtle: #6b727c;
   /* live-green primary on dark (per brand canon) */
-  --wb-brand: #3fe081;
-  --wb-brand-soft: rgba(63, 224, 129, 0.14);
-  --wb-brand-ink: #d7ffe6;
-  --wb-on-brand: #07210f;
-  --wb-ring: rgba(63, 224, 129, 0.5);
-  --wb-ok: #4f9d6b;
-  --wb-warn: #f5a524;
-  --wb-err: #ef5350;
-  --wb-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.45);
-  --wb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --work-brand: #3fe081;
+  --work-brand-soft: rgba(63, 224, 129, 0.14);
+  --work-brand-ink: #d7ffe6;
+  --work-on-brand: #07210f;
+  --work-ring: rgba(63, 224, 129, 0.5);
+  --work-ok: #4f9d6b;
+  --work-warn: #f5a524;
+  --work-err: #ef5350;
+  --work-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.45);
+  --work-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* A preset shows the per-workspace-brand pattern: a scope with its own overrides
  * (here: Signal — dark institutional terminal, sharp corners, mono). */
-[data-wb-theme="signal"] {
-  --wb-bg: #0a0d13; --wb-surface: #10151f; --wb-surface-soft: #161c27;
-  --wb-border: #1c232f; --wb-border-strong: #2a3340;
-  --wb-fg: #e9edf4; --wb-fg-muted: #8893a6; --wb-fg-subtle: #5b6573;
-  --wb-brand: #3da9fc; --wb-brand-soft: rgba(61,169,252,0.14); --wb-on-brand: #04121f;
-  --wb-ring: rgba(61,169,252,0.5);
-  --wb-radius: 2px; --wb-radius-sm: 2px; --wb-radius-lg: 3px; --wb-radius-pill: 3px;
-  --wb-font: "Space Grotesk", system-ui, sans-serif;
-  --wb-font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --wb-font-display: "Space Grotesk", sans-serif;
+[data-work-theme="signal"] {
+  --work-bg: #0a0d13; --work-surface: #10151f; --work-surface-soft: #161c27;
+  --work-border: #1c232f; --work-border-strong: #2a3340;
+  --work-fg: #e9edf4; --work-fg-muted: #8893a6; --work-fg-subtle: #5b6573;
+  --work-brand: #3da9fc; --work-brand-soft: rgba(61,169,252,0.14); --work-on-brand: #04121f;
+  --work-ring: rgba(61,169,252,0.5);
+  --work-radius: 2px; --work-radius-sm: 2px; --work-radius-lg: 3px; --work-radius-pill: 3px;
+  --work-font: "Space Grotesk", system-ui, sans-serif;
+  --work-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --work-font-display: "Space Grotesk", sans-serif;
 }

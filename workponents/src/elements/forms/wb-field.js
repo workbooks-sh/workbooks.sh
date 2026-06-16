@@ -5,7 +5,7 @@
 // collects fields, runs `src/validate`, and writes errors back down.
 //
 // Renders the right control by `type` (text/number/email/select/checkbox/
-// textarea/date). Label + help + error are themed entirely from --wb-* tokens.
+// textarea/date). Label + help + error are themed entirely from --work-* tokens.
 // Usage:
 //   <work-field name="email" type="email" label="Email" required></work-field>
 //   <work-field name="role" type="select" label="Role" options="eng,design,ops"></work-field>
@@ -28,42 +28,42 @@ export class WbField extends WbElement {
   ];
 
   static styles = css`
-    :host { display: block; margin: 0 0 var(--wb-space-4); font-family: var(--wb-font); }
-    .label { display: block; font-size: var(--wb-text-sm); font-weight: 600; color: var(--wb-fg);
-      margin-bottom: var(--wb-space-2); }
-    .req { color: var(--wb-err); margin-left: 2px; }
+    :host { display: block; margin: 0 0 var(--work-space-4); font-family: var(--work-font); }
+    .label { display: block; font-size: var(--work-text-sm); font-weight: 600; color: var(--work-fg);
+      margin-bottom: var(--work-space-2); }
+    .req { color: var(--work-err); margin-left: 2px; }
 
-    .control { font: inherit; font-size: var(--wb-text); color: var(--wb-fg);
+    .control { font: inherit; font-size: var(--work-text); color: var(--work-fg);
       width: 100%; box-sizing: border-box;
-      padding: var(--wb-space-3) var(--wb-space-3);
-      border-radius: var(--wb-radius); border: 1.5px solid var(--wb-border-strong);
-      background: var(--wb-surface);
-      transition: border-color var(--wb-dur) var(--wb-ease), box-shadow var(--wb-dur) var(--wb-ease),
-                  background var(--wb-dur) var(--wb-ease); }
-    .control::placeholder { color: var(--wb-fg-subtle); }
-    .control:focus { outline: none; border-color: var(--wb-brand); box-shadow: 0 0 0 3px var(--wb-ring); }
+      padding: var(--work-space-3) var(--work-space-3);
+      border-radius: var(--work-radius); border: 1.5px solid var(--work-border-strong);
+      background: var(--work-surface);
+      transition: border-color var(--work-dur) var(--work-ease), box-shadow var(--work-dur) var(--work-ease),
+                  background var(--work-dur) var(--work-ease); }
+    .control::placeholder { color: var(--work-fg-subtle); }
+    .control:focus { outline: none; border-color: var(--work-brand); box-shadow: 0 0 0 3px var(--work-ring); }
     textarea.control { min-height: 88px; resize: vertical; line-height: 1.5; }
     select.control { appearance: none; cursor: pointer;
-      background-image: linear-gradient(45deg, transparent 50%, var(--wb-fg-muted) 50%),
-                        linear-gradient(135deg, var(--wb-fg-muted) 50%, transparent 50%);
+      background-image: linear-gradient(45deg, transparent 50%, var(--work-fg-muted) 50%),
+                        linear-gradient(135deg, var(--work-fg-muted) 50%, transparent 50%);
       background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 13px) calc(50% - 2px);
-      background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: var(--wb-space-5); }
+      background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: var(--work-space-5); }
 
-    :host([variant="soft"]) .control { background: var(--wb-surface-soft); border-color: transparent; }
-    :host([variant="ghost"]) .control { background: transparent; border-color: transparent; border-bottom: 1.5px solid var(--wb-border-strong); border-radius: 0; padding-left: 0; padding-right: 0; }
+    :host([variant="soft"]) .control { background: var(--work-surface-soft); border-color: transparent; }
+    :host([variant="ghost"]) .control { background: transparent; border-color: transparent; border-bottom: 1.5px solid var(--work-border-strong); border-radius: 0; padding-left: 0; padding-right: 0; }
 
-    :host([size="sm"]) .control { font-size: var(--wb-text-sm); padding: var(--wb-space-2) var(--wb-space-3); border-radius: var(--wb-radius-sm); }
-    :host([size="lg"]) .control { font-size: var(--wb-text-lg); padding: var(--wb-space-4); border-radius: var(--wb-radius-lg); }
+    :host([size="sm"]) .control { font-size: var(--work-text-sm); padding: var(--work-space-2) var(--work-space-3); border-radius: var(--work-radius-sm); }
+    :host([size="lg"]) .control { font-size: var(--work-text-lg); padding: var(--work-space-4); border-radius: var(--work-radius-lg); }
 
-    .check { display: inline-flex; align-items: center; gap: var(--wb-space-2); cursor: pointer; font-size: var(--wb-text); }
-    .check input { width: 18px; height: 18px; accent-color: var(--wb-brand); cursor: pointer; }
+    .check { display: inline-flex; align-items: center; gap: var(--work-space-2); cursor: pointer; font-size: var(--work-text); }
+    .check input { width: 18px; height: 18px; accent-color: var(--work-brand); cursor: pointer; }
 
-    .help { margin: var(--wb-space-2) 0 0; font-size: var(--wb-text-sm); color: var(--wb-fg-muted); line-height: 1.45; }
-    .error { margin: var(--wb-space-2) 0 0; font-size: var(--wb-text-sm); color: var(--wb-err);
+    .help { margin: var(--work-space-2) 0 0; font-size: var(--work-text-sm); color: var(--work-fg-muted); line-height: 1.45; }
+    .error { margin: var(--work-space-2) 0 0; font-size: var(--work-text-sm); color: var(--work-err);
       font-weight: 500; line-height: 1.45; display: none; }
 
     /* invalid state — purely from tokens */
-    :host([invalid]) .control { border-color: var(--wb-err); }
+    :host([invalid]) .control { border-color: var(--work-err); }
     :host([invalid]) .control:focus { box-shadow: 0 0 0 3px rgba(201,47,47,0.28); }
     :host([invalid]) .error { display: block; }
     :host([invalid]) .help { display: none; }

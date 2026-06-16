@@ -37,83 +37,83 @@ export class WbGenBlock extends WbElement {
   static props = ["type", "tone", "title", "label", "href", "action", "target", "done"];
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
+    :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
     .card {
-      border-radius: var(--wb-radius);
-      font-size: var(--wb-text);
+      border-radius: var(--work-radius);
+      font-size: var(--work-text);
       line-height: 1.5;
       max-width: 720px;
     }
     .icon { width: 15px; height: 15px; flex: none; }
 
     /* callout */
-    .callout { display: flex; gap: var(--wb-space-2); padding: var(--wb-space-3) var(--wb-space-4);
-      border: 1px solid var(--wb-border); background: var(--wb-surface); }
-    .callout .icon { margin-top: 2px; color: var(--wb-fg-muted); }
+    .callout { display: flex; gap: var(--work-space-2); padding: var(--work-space-3) var(--work-space-4);
+      border: 1px solid var(--work-border); background: var(--work-surface); }
+    .callout .icon { margin-top: 2px; color: var(--work-fg-muted); }
     .ctitle { font-weight: 600; margin-bottom: 2px; }
     .ctext { white-space: pre-wrap; word-break: break-word; }
-    :host([tone="warn"]) .callout { border-color: color-mix(in srgb, var(--wb-warn) 40%, transparent); background: color-mix(in srgb, var(--wb-warn) 7%, var(--wb-surface)); }
-    :host([tone="warn"]) .callout .icon { color: var(--wb-warn); }
-    :host([tone="ok"]) .callout   { border-color: color-mix(in srgb, var(--wb-ok) 40%, transparent); background: color-mix(in srgb, var(--wb-ok) 7%, var(--wb-surface)); }
-    :host([tone="ok"]) .callout .icon { color: var(--wb-ok); }
+    :host([tone="warn"]) .callout { border-color: color-mix(in srgb, var(--work-warn) 40%, transparent); background: color-mix(in srgb, var(--work-warn) 7%, var(--work-surface)); }
+    :host([tone="warn"]) .callout .icon { color: var(--work-warn); }
+    :host([tone="ok"]) .callout   { border-color: color-mix(in srgb, var(--work-ok) 40%, transparent); background: color-mix(in srgb, var(--work-ok) 7%, var(--work-surface)); }
+    :host([tone="ok"]) .callout .icon { color: var(--work-ok); }
     :host([tone="error"]) .callout,
-    :host([tone="err"]) .callout  { border-color: color-mix(in srgb, var(--wb-err) 40%, transparent); background: color-mix(in srgb, var(--wb-err) 7%, var(--wb-surface)); }
+    :host([tone="err"]) .callout  { border-color: color-mix(in srgb, var(--work-err) 40%, transparent); background: color-mix(in srgb, var(--work-err) 7%, var(--work-surface)); }
     :host([tone="error"]) .callout .icon,
-    :host([tone="err"]) .callout .icon { color: var(--wb-err); }
+    :host([tone="err"]) .callout .icon { color: var(--work-err); }
 
     /* kv table */
-    .kv { border: 1px solid var(--wb-border); background: var(--wb-surface); overflow: hidden; }
-    .kvtitle { padding: var(--wb-space-2) var(--wb-space-3); font-weight: 600;
-      border-bottom: 1px solid var(--wb-border); background: var(--wb-surface-soft); }
+    .kv { border: 1px solid var(--work-border); background: var(--work-surface); overflow: hidden; }
+    .kvtitle { padding: var(--work-space-2) var(--work-space-3); font-weight: 600;
+      border-bottom: 1px solid var(--work-border); background: var(--work-surface-soft); }
     table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: var(--wb-space-2) var(--wb-space-3);
-      border-bottom: 1px solid var(--wb-border); vertical-align: top; }
+    th, td { text-align: left; padding: var(--work-space-2) var(--work-space-3);
+      border-bottom: 1px solid var(--work-border); vertical-align: top; }
     tr:last-child th, tr:last-child td { border-bottom: 0; }
-    th { width: 38%; color: var(--wb-fg-muted); font-weight: 500;
-      font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); }
+    th { width: 38%; color: var(--work-fg-muted); font-weight: 500;
+      font-family: var(--work-font-mono); font-size: var(--work-text-sm); }
 
     /* button / link / share — interactive */
     .btn {
-      display: inline-flex; align-items: center; gap: var(--wb-space-2);
-      padding: var(--wb-space-2) var(--wb-space-4);
-      border: 0; border-radius: var(--wb-radius-sm);
-      background: var(--wb-brand); color: var(--wb-on-brand);
-      font: 600 var(--wb-text) var(--wb-font); cursor: pointer;
-      transition: filter var(--wb-dur) var(--wb-ease), background var(--wb-dur) var(--wb-ease);
+      display: inline-flex; align-items: center; gap: var(--work-space-2);
+      padding: var(--work-space-2) var(--work-space-4);
+      border: 0; border-radius: var(--work-radius-sm);
+      background: var(--work-brand); color: var(--work-on-brand);
+      font: 600 var(--work-text) var(--work-font); cursor: pointer;
+      transition: filter var(--work-dur) var(--work-ease), background var(--work-dur) var(--work-ease);
     }
     .btn:hover { filter: brightness(1.06); }
-    .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); }
-    .btn[data-done] { background: var(--wb-brand-soft); color: var(--wb-fg); cursor: default; }
+    .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
+    .btn[data-done] { background: var(--work-brand-soft); color: var(--work-fg); cursor: default; }
     .btn .icon { width: 14px; height: 14px; }
 
     .link {
-      display: inline-flex; align-items: center; gap: var(--wb-space-2);
-      padding: var(--wb-space-2) var(--wb-space-3);
-      border: 1px solid var(--wb-border); border-radius: var(--wb-radius-sm);
-      background: var(--wb-surface); color: var(--wb-brand);
-      font: 500 var(--wb-text) var(--wb-font); text-decoration: none; width: fit-content;
+      display: inline-flex; align-items: center; gap: var(--work-space-2);
+      padding: var(--work-space-2) var(--work-space-3);
+      border: 1px solid var(--work-border); border-radius: var(--work-radius-sm);
+      background: var(--work-surface); color: var(--work-brand);
+      font: 500 var(--work-text) var(--work-font); text-decoration: none; width: fit-content;
     }
-    .link:hover { border-color: var(--wb-border-strong); }
+    .link:hover { border-color: var(--work-border-strong); }
     .link .icon { width: 13px; height: 13px; }
 
-    .share { display: flex; flex-direction: column; gap: var(--wb-space-3);
-      padding: var(--wb-space-3) var(--wb-space-4);
-      border: 1px solid var(--wb-border); border-radius: var(--wb-radius); background: var(--wb-surface); }
-    .shead { display: inline-flex; align-items: center; gap: var(--wb-space-2); font-weight: 600; }
-    .shead .icon { color: var(--wb-fg-muted); }
-    .starget { font-size: var(--wb-text-sm); color: var(--wb-fg-muted); }
-    .members { display: flex; align-items: center; gap: var(--wb-space-1); flex-wrap: wrap; }
+    .share { display: flex; flex-direction: column; gap: var(--work-space-3);
+      padding: var(--work-space-3) var(--work-space-4);
+      border: 1px solid var(--work-border); border-radius: var(--work-radius); background: var(--work-surface); }
+    .shead { display: inline-flex; align-items: center; gap: var(--work-space-2); font-weight: 600; }
+    .shead .icon { color: var(--work-fg-muted); }
+    .starget { font-size: var(--work-text-sm); color: var(--work-fg-muted); }
+    .members { display: flex; align-items: center; gap: var(--work-space-1); flex-wrap: wrap; }
     .member { display: inline-grid; place-items: center; width: 26px; height: 26px;
-      border-radius: 50%; background: var(--wb-brand-soft); color: var(--wb-fg);
-      font-size: 10px; font-weight: 700; border: 1px solid var(--wb-border); }
-    .mcount { margin-left: var(--wb-space-1); font-size: var(--wb-text-sm); color: var(--wb-fg-muted); }
+      border-radius: 50%; background: var(--work-brand-soft); color: var(--work-fg);
+      font-size: 10px; font-weight: 700; border: 1px solid var(--work-border); }
+    .mcount { margin-left: var(--work-space-1); font-size: var(--work-text-sm); color: var(--work-fg-muted); }
 
     /* unknown fallback */
-    .unknown { border: 1px dashed var(--wb-border-strong); background: var(--wb-surface-soft);
-      padding: var(--wb-space-3) var(--wb-space-3); }
+    .unknown { border: 1px dashed var(--work-border-strong); background: var(--work-surface-soft);
+      padding: var(--work-space-3) var(--work-space-3); }
     .ulabel { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
-      color: var(--wb-fg-subtle); margin-bottom: var(--wb-space-1); }
-    pre { margin: 0; white-space: pre-wrap; font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); }
+      color: var(--work-fg-subtle); margin-bottom: var(--work-space-1); }
+    pre { margin: 0; white-space: pre-wrap; font-family: var(--work-font-mono); font-size: var(--work-text-sm); }
   `;
 
   /** The raw block body (light-DOM textContent). */

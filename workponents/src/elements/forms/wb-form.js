@@ -3,7 +3,7 @@
 // its child <work-field> rules), runs `src/validate` against the live values on
 // input + on submit, blocks submit while invalid, and writes errors back down to
 // each field — validation is never hand-wired per control. Themed entirely from
-// --wb-* tokens.
+// --work-* tokens.
 //
 // Events:
 //   work-submit  { detail: { values } }  — fired only when the record is valid
@@ -28,21 +28,21 @@ export class WbForm extends WbElement {
   static props = ["schema", "submit-label", "novalidate", "live"];
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
+    :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
     form { display: block; }
     .fields { display: block; }
-    .actions { display: flex; gap: var(--wb-space-3); align-items: center; margin-top: var(--wb-space-4); }
-    .summary { margin: 0 0 var(--wb-space-4); padding: var(--wb-space-3) var(--wb-space-4);
-      border-radius: var(--wb-radius); background: rgba(201,47,47,0.10);
-      border: 1px solid var(--wb-err); color: var(--wb-err); font-size: var(--wb-text-sm);
+    .actions { display: flex; gap: var(--work-space-3); align-items: center; margin-top: var(--work-space-4); }
+    .summary { margin: 0 0 var(--work-space-4); padding: var(--work-space-3) var(--work-space-4);
+      border-radius: var(--work-radius); background: rgba(201,47,47,0.10);
+      border: 1px solid var(--work-err); color: var(--work-err); font-size: var(--work-text-sm);
       font-weight: 500; line-height: 1.5; display: none; }
     :host([invalid]) .summary[data-has] { display: block; }
-    .submit { font: 600 var(--wb-text) var(--wb-font); padding: var(--wb-space-3) var(--wb-space-5);
-      border-radius: var(--wb-radius); border: 1.5px solid transparent;
-      background: var(--wb-brand); color: var(--wb-on-brand); cursor: pointer;
-      transition: transform var(--wb-dur) var(--wb-ease), box-shadow var(--wb-dur) var(--wb-ease); }
+    .submit { font: 600 var(--work-text) var(--work-font); padding: var(--work-space-3) var(--work-space-5);
+      border-radius: var(--work-radius); border: 1.5px solid transparent;
+      background: var(--work-brand); color: var(--work-on-brand); cursor: pointer;
+      transition: transform var(--work-dur) var(--work-ease), box-shadow var(--work-dur) var(--work-ease); }
     .submit:hover { transform: translateY(-1px); }
-    .submit:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); }
+    .submit:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
     .submit[disabled] { opacity: 0.5; pointer-events: none; }
   `;
 

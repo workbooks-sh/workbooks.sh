@@ -28,27 +28,27 @@ export class WbMessage extends WbElement {
   static props = [...variantAttrs(VARIANTS), "text", "name"];
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
-    .turn { display: flex; flex-direction: column; gap: var(--wb-space-1); }
-    .meta { display: flex; align-items: center; gap: var(--wb-space-2);
-      font: 600 11px var(--wb-font-mono); letter-spacing: .08em; text-transform: uppercase;
-      color: var(--wb-fg-subtle); }
-    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--wb-fg-subtle); }
+    :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
+    .turn { display: flex; flex-direction: column; gap: var(--work-space-1); }
+    .meta { display: flex; align-items: center; gap: var(--work-space-2);
+      font: 600 11px var(--work-font-mono); letter-spacing: .08em; text-transform: uppercase;
+      color: var(--work-fg-subtle); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--work-fg-subtle); }
     .body {
-      font-size: var(--wb-text); line-height: 1.55;
-      display: flex; flex-direction: column; gap: var(--wb-space-3);
+      font-size: var(--work-text); line-height: 1.55;
+      display: flex; flex-direction: column; gap: var(--work-space-3);
     }
 
     /* user turn: a brand-tinted bubble, right-shouldered */
     :host([role="user"]) .turn { align-items: flex-end; }
     :host([role="user"]) .body {
-      background: var(--wb-brand-soft); color: var(--wb-fg);
-      border: 1px solid color-mix(in srgb, var(--wb-brand) 24%, transparent);
-      border-radius: var(--wb-radius-lg);
-      padding: var(--wb-space-3) var(--wb-space-4);
+      background: var(--work-brand-soft); color: var(--work-fg);
+      border: 1px solid color-mix(in srgb, var(--work-brand) 24%, transparent);
+      border-radius: var(--work-radius-lg);
+      padding: var(--work-space-3) var(--work-space-4);
       max-width: 80%;
     }
-    :host([role="user"]) .dot { background: var(--wb-brand); }
+    :host([role="user"]) .dot { background: var(--work-brand); }
 
     /* assistant turn: flat on the surface */
     :host([role="assistant"]) .body { max-width: 100%; }
@@ -56,10 +56,10 @@ export class WbMessage extends WbElement {
     /* system / tool: muted monospace card */
     :host([role="system"]) .body,
     :host([role="tool"]) .body {
-      font-family: var(--wb-font-mono); font-size: var(--wb-text-sm);
-      color: var(--wb-fg-muted); background: var(--wb-surface-soft);
-      border: 1px solid var(--wb-border); border-radius: var(--wb-radius-sm);
-      padding: var(--wb-space-2) var(--wb-space-3);
+      font-family: var(--work-font-mono); font-size: var(--work-text-sm);
+      color: var(--work-fg-muted); background: var(--work-surface-soft);
+      border: 1px solid var(--work-border); border-radius: var(--work-radius-sm);
+      padding: var(--work-space-2) var(--work-space-3);
     }
 
     /* rendered markdown rhythm */
@@ -72,14 +72,14 @@ export class WbMessage extends WbElement {
     .md h1 { font-size: 1.18em; } .md h2 { font-size: 1.1em; } .md h3 { font-size: 1.02em; }
     .md ul, .md ol { margin: .25em 0 .5em; padding-left: 1.35em; }
     .md li { margin: .15em 0; }
-    .md li::marker { color: var(--wb-fg-muted); }
-    .md code { font-family: var(--wb-font-mono); font-size: .88em;
-      background: var(--wb-surface-soft); border: 1px solid var(--wb-border);
+    .md li::marker { color: var(--work-fg-muted); }
+    .md code { font-family: var(--work-font-mono); font-size: .88em;
+      background: var(--work-surface-soft); border: 1px solid var(--work-border);
       border-radius: 4px; padding: .05em .3em; }
-    .md pre { margin: .4em 0 .55em; padding: .6em .75em; background: var(--wb-surface-soft);
-      border: 1px solid var(--wb-border); border-radius: 7px; overflow-x: auto; }
+    .md pre { margin: .4em 0 .55em; padding: .6em .75em; background: var(--work-surface-soft);
+      border: 1px solid var(--work-border); border-radius: 7px; overflow-x: auto; }
     .md pre code { background: none; border: 0; padding: 0; font-size: .85em; }
-    .md a { color: var(--wb-brand); text-decoration: underline; text-underline-offset: 2px; }
+    .md a { color: var(--work-brand); text-decoration: underline; text-underline-offset: 2px; }
   `;
 
   /** Source: explicit `text` prop/attr, else light-DOM textContent. */

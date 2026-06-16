@@ -8,7 +8,7 @@
 // contract either way, so the elements demo live with no backend and light up
 // against the runtime with zero changes. Realtime is config, not infrastructure.
 //
-// All elements style only from --wb-* tokens, extend WbElement (Lit base), register
+// All elements style only from --work-* tokens, extend WbElement (Lit base), register
 // via define(), and reach the channel through the seam (over this.host).
 //
 //   <work-room>        — the realtime container; joins a topic, slots content.

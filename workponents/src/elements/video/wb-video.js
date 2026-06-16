@@ -21,7 +21,7 @@
 //     way, so preview still equals render.
 //
 // Theming: chrome is suppressed on the embedded gm-doc (`data-embedded`); we
-// paint our own controls from --wb-* tokens only. The composition stage keeps
+// paint our own controls from --work-* tokens only. The composition stage keeps
 // its native pixels (preview ≡ render); we letterbox-scale the box, never the
 // content — mirroring the desktop WaveletPlayer.
 //
@@ -94,19 +94,19 @@ export class WorkVideo extends WbElement {
   ];
 
   static styles = css`
-    :host { display: block; color: var(--wb-fg); font-family: var(--wb-font); }
+    :host { display: block; color: var(--work-fg); font-family: var(--work-font); }
 
     .frame {
       position: relative;
       display: flex; flex-direction: column;
-      background: var(--wb-surface);
-      border: 1.5px solid var(--wb-border);
-      border-radius: var(--wb-radius-lg);
+      background: var(--work-surface);
+      border: 1.5px solid var(--work-border);
+      border-radius: var(--work-radius-lg);
       overflow: hidden;
-      box-shadow: var(--wb-shadow);
+      box-shadow: var(--work-shadow);
     }
-    :host([variant="soft"]) .frame { background: var(--wb-surface-soft); box-shadow: var(--wb-shadow-sm); }
-    :host([variant="bare"]) .frame { background: transparent; border-color: transparent; box-shadow: none; border-radius: var(--wb-radius); }
+    :host([variant="soft"]) .frame { background: var(--work-surface-soft); box-shadow: var(--work-shadow-sm); }
+    :host([variant="bare"]) .frame { background: transparent; border-color: transparent; box-shadow: none; border-radius: var(--work-radius); }
 
     /* stage: native composition pixels, letterbox-scaled to fit. Checkerboard
        behind transparent compositions, like the desktop player. */
@@ -117,9 +117,9 @@ export class WorkVideo extends WbElement {
       aspect-ratio: var(--_aspect, 16 / 9);
       background:
         repeating-conic-gradient(
-          color-mix(in srgb, var(--wb-fg) 5%, transparent) 0% 25%,
+          color-mix(in srgb, var(--work-fg) 5%, transparent) 0% 25%,
           transparent 0% 50%) 50% / 22px 22px,
-        var(--wb-bg);
+        var(--work-bg);
       overflow: hidden;
     }
     .stage {
@@ -141,65 +141,65 @@ export class WorkVideo extends WbElement {
       position: absolute; inset: 0; margin: auto;
       width: 64px; height: 64px;
       display: grid; place-items: center;
-      border: none; border-radius: var(--wb-radius-pill);
-      background: color-mix(in srgb, var(--wb-brand) 88%, transparent);
-      color: var(--wb-on-brand);
+      border: none; border-radius: var(--work-radius-pill);
+      background: color-mix(in srgb, var(--work-brand) 88%, transparent);
+      color: var(--work-on-brand);
       font-size: 24px; cursor: pointer;
-      box-shadow: var(--wb-shadow);
-      transition: transform var(--wb-dur) var(--wb-ease);
+      box-shadow: var(--work-shadow);
+      transition: transform var(--work-dur) var(--work-ease);
     }
     .bigplay:hover { transform: scale(1.06); }
 
     .status {
       position: absolute; inset: 0;
-      display: grid; place-items: center; padding: var(--wb-space-4);
+      display: grid; place-items: center; padding: var(--work-space-4);
       text-align: center;
-      color: var(--wb-fg-muted); font-size: var(--wb-text-sm);
-      font-family: var(--wb-font-mono);
+      color: var(--work-fg-muted); font-size: var(--work-text-sm);
+      font-family: var(--work-font-mono);
     }
-    .status.err { color: var(--wb-err); white-space: pre-wrap; }
+    .status.err { color: var(--work-err); white-space: pre-wrap; }
 
     /* transport — tokens only */
     .transport {
       flex: 0 0 auto;
-      display: flex; align-items: center; gap: var(--wb-space-2);
-      padding: var(--wb-space-2) var(--wb-space-3);
-      border-top: 1.5px solid var(--wb-border);
-      background: var(--wb-surface);
-      --_a: var(--wb-brand); --_ink: var(--wb-on-brand);
+      display: flex; align-items: center; gap: var(--work-space-2);
+      padding: var(--work-space-2) var(--work-space-3);
+      border-top: 1.5px solid var(--work-border);
+      background: var(--work-surface);
+      --_a: var(--work-brand); --_ink: var(--work-on-brand);
     }
-    :host([tone="neutral"]) .transport { --_a: var(--wb-fg); --_ink: var(--wb-surface); }
-    :host([variant="soft"]) .transport { background: var(--wb-surface-soft); }
-    :host([variant="bare"]) .transport { background: transparent; border-top-color: var(--wb-border); }
+    :host([tone="neutral"]) .transport { --_a: var(--work-fg); --_ink: var(--work-surface); }
+    :host([variant="soft"]) .transport { background: var(--work-surface-soft); }
+    :host([variant="bare"]) .transport { background: transparent; border-top-color: var(--work-border); }
 
     .transport button {
       appearance: none; cursor: pointer;
-      height: 30px; min-width: 30px; padding: 0 var(--wb-space-2);
+      height: 30px; min-width: 30px; padding: 0 var(--work-space-2);
       display: inline-flex; align-items: center; justify-content: center;
-      border: 1.5px solid var(--wb-border-strong);
-      border-radius: var(--wb-radius-sm);
-      background: var(--wb-surface); color: var(--wb-fg);
-      font-family: var(--wb-font); font-size: var(--wb-text-sm); font-weight: 600;
+      border: 1.5px solid var(--work-border-strong);
+      border-radius: var(--work-radius-sm);
+      background: var(--work-surface); color: var(--work-fg);
+      font-family: var(--work-font); font-size: var(--work-text-sm); font-weight: 600;
       line-height: 1;
-      transition: border-color var(--wb-dur) var(--wb-ease), background var(--wb-dur) var(--wb-ease);
+      transition: border-color var(--work-dur) var(--work-ease), background var(--work-dur) var(--work-ease);
     }
-    .transport button:hover:not(:disabled) { border-color: var(--_a); background: var(--wb-brand-soft); }
-    .transport button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); }
+    .transport button:hover:not(:disabled) { border-color: var(--_a); background: var(--work-brand-soft); }
+    .transport button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
     .transport button:disabled { opacity: 0.45; cursor: default; }
     .play { color: var(--_a); font-weight: 700; }
 
-    :host([size="sm"]) .transport { padding: var(--wb-space-1) var(--wb-space-2); }
+    :host([size="sm"]) .transport { padding: var(--work-space-1) var(--work-space-2); }
     :host([size="sm"]) .transport button { height: 26px; min-width: 26px; }
-    :host([size="lg"]) .transport { padding: var(--wb-space-3) var(--wb-space-4); }
-    :host([size="lg"]) .transport button { height: 34px; min-width: 34px; font-size: var(--wb-text); }
+    :host([size="lg"]) .transport { padding: var(--work-space-3) var(--work-space-4); }
+    :host([size="lg"]) .transport button { height: 34px; min-width: 34px; font-size: var(--work-text); }
 
     .scrub {
       flex: 1 1 auto; min-width: 40px;
       accent-color: var(--_a); cursor: pointer;
     }
     .time, .frames {
-      font-family: var(--wb-font-mono); font-size: var(--wb-text-sm);
-      color: var(--wb-fg-muted); white-space: nowrap;
+      font-family: var(--work-font-mono); font-size: var(--work-text-sm);
+      color: var(--work-fg-muted); white-space: nowrap;
     }
     .export { margin-left: auto; }
     .export.busy { opacity: 0.6; pointer-events: none; }

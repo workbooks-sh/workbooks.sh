@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-wb-theme="light">
+<html lang="en" data-work-theme="light">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -20,30 +20,30 @@
   <script type="module" src="../src/elements/live/index.js"></script>
   <script type="module" src="../src/elements/work-button.js"></script>
   <style>
-    body { margin: 0; background: var(--wb-bg); color: var(--wb-fg); font-family: var(--wb-font, system-ui); transition: background .2s, color .2s; }
+    body { margin: 0; background: var(--work-bg); color: var(--work-fg); font-family: var(--work-font, system-ui); transition: background .2s, color .2s; }
     .wrap { max-width: 980px; margin: 0 auto; padding: 48px 24px 96px; }
-    h1 { font-family: var(--wb-font-display, sans-serif); font-weight: 600; letter-spacing: -.01em; margin: 0 0 6px; }
-    p.sub { color: var(--wb-fg-muted); max-width: 64ch; margin-top: 0; }
+    h1 { font-family: var(--work-font-display, sans-serif); font-weight: 600; letter-spacing: -.01em; margin: 0 0 6px; }
+    p.sub { color: var(--work-fg-muted); max-width: 64ch; margin-top: 0; }
     .bar { display: flex; gap: 8px; align-items: center; margin: 20px 0 36px; }
-    .bar button { font: 600 12px var(--wb-font-mono, monospace); padding: 7px 12px; border-radius: var(--wb-radius-sm); border: 1.5px solid var(--wb-border-strong); background: var(--wb-surface); color: var(--wb-fg); cursor: pointer; }
-    .bar button[aria-pressed="true"] { background: var(--wb-fg); color: var(--wb-surface); }
+    .bar button { font: 600 12px var(--work-font-mono, monospace); padding: 7px 12px; border-radius: var(--work-radius-sm); border: 1.5px solid var(--work-border-strong); background: var(--work-surface); color: var(--work-fg); cursor: pointer; }
+    .bar button[aria-pressed="true"] { background: var(--work-fg); color: var(--work-surface); }
     .bar .grp { display:inline-flex; gap:8px; align-items:center; }
-    .bar .cap { font:700 10px var(--wb-font-mono,monospace); letter-spacing:.18em; text-transform:uppercase; color:var(--wb-fg-subtle); }
+    .bar .cap { font:700 10px var(--work-font-mono,monospace); letter-spacing:.18em; text-transform:uppercase; color:var(--work-fg-subtle); }
     section { margin: 28px 0; }
-    h2 { font: 700 11px var(--wb-font-mono, monospace); letter-spacing: .18em; text-transform: uppercase; color: var(--wb-fg-subtle); }
+    h2 { font: 700 11px var(--work-font-mono, monospace); letter-spacing: .18em; text-transform: uppercase; color: var(--work-fg-subtle); }
     .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
     .controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:14px; }
-    .log { margin-top:14px; border:1px solid var(--wb-border); border-radius:var(--wb-radius); background:var(--wb-bg);
+    .log { margin-top:14px; border:1px solid var(--work-border); border-radius:var(--work-radius); background:var(--work-bg);
       max-height:220px; overflow:auto; padding:10px 12px; }
-    .log .ln { font:12px/1.6 var(--wb-font-mono); color:var(--wb-fg-muted); white-space:pre-wrap; }
-    .log .ln b { color: var(--wb-fg); }
-    .log .ln .ev { color: var(--wb-brand); }
-    .log:empty::before { content:"published events appear here…"; color:var(--wb-fg-subtle); font:12px var(--wb-font-mono); }
+    .log .ln { font:12px/1.6 var(--work-font-mono); color:var(--work-fg-muted); white-space:pre-wrap; }
+    .log .ln b { color: var(--work-fg); }
+    .log .ln .ev { color: var(--work-brand); }
+    .log:empty::before { content:"published events appear here…"; color:var(--work-fg-subtle); font:12px var(--work-font-mono); }
     .twocol { display:grid; grid-template-columns: 1fr; gap: 16px; }
     @media (min-width: 760px) { .twocol { grid-template-columns: 1.3fr 1fr; } }
-    .card { border:1px solid var(--wb-border); border-radius:var(--wb-radius); background:var(--wb-surface); padding:16px; }
-    .card h3 { margin:0 0 8px; font:700 11px var(--wb-font-mono); letter-spacing:.14em; text-transform:uppercase; color:var(--wb-fg-subtle); }
-    .muted { color: var(--wb-fg-muted); font-size: var(--wb-text-sm); }
+    .card { border:1px solid var(--work-border); border-radius:var(--work-radius); background:var(--work-surface); padding:16px; }
+    .card h3 { margin:0 0 8px; font:700 11px var(--work-font-mono); letter-spacing:.14em; text-transform:uppercase; color:var(--work-fg-subtle); }
+    .muted { color: var(--work-fg-muted); font-size: var(--work-text-sm); }
   </style>
 </head>
 <body>
@@ -110,7 +110,7 @@
     // ── theme toggle ──────────────────────────────────────────────────────────
     const buttons = document.querySelectorAll(".bar [data-theme]");
     buttons.forEach((b) => b.addEventListener("click", () => {
-      document.documentElement.setAttribute("data-wb-theme", b.dataset.theme);
+      document.documentElement.setAttribute("data-work-theme", b.dataset.theme);
       buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     }));
   </script>

@@ -17,7 +17,7 @@
 //   type       line | area | bar     (default line)
 //   src-name / query / rows / csv    — same source story as <work-chart>
 //   y          value column (default: first numeric column)
-//   tone       brand | ok | warn | err | neutral   (stroke color, a --wb-* token)
+//   tone       brand | ok | warn | err | neutral   (stroke color, a --work-* token)
 //   width      px hint for the inline box (default 96)
 //   height     px hint (default 24)
 //
@@ -31,7 +31,7 @@ const VARIANTS = defineVariants({
   type: { options: ["line", "area", "bar"], default: "line" },
   tone: { options: ["brand", "ok", "warn", "err", "neutral"], default: "brand" },
 });
-const TONE = { brand: "var(--wb-brand)", ok: "var(--wb-ok)", warn: "var(--wb-warn)", err: "var(--wb-err)", neutral: "var(--wb-fg-muted)" };
+const TONE = { brand: "var(--work-brand)", ok: "var(--work-ok)", warn: "var(--work-warn)", err: "var(--work-err)", neutral: "var(--work-fg-muted)" };
 
 let _autoId = 0;
 
@@ -45,7 +45,7 @@ export class WbSpark extends WbElement {
     .line { fill: none; stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
     .area { opacity: 0.18; }
     .bar { rx: 0.8; }
-    .last { stroke: var(--wb-surface); stroke-width: 1; }
+    .last { stroke: var(--work-surface); stroke-width: 1; }
   `;
 
   connectedCallback() {

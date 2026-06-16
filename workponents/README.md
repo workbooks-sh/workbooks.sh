@@ -16,12 +16,12 @@ same element runs in the **desktop app**, **any workbook** (plain HTML, no build
 <wb-button variant="solid" tone="brand" size="md">Save</wb-button>
 ```
 
-No build step. Theme by setting `data-wb-theme="light|dark|signal"` (or your own) on an
+No build step. Theme by setting `data-work-theme="light|dark|signal"` (or your own) on an
 ancestor — every element re-themes from the tokens. See `demo/index.html` for the specimen.
 
 ## How it's built (the conventions every element follows)
 
-- **Token-only styling.** Elements style *only* from `--wb-*` CSS custom properties
+- **Token-only styling.** Elements style *only* from `--work-*` CSS custom properties
   (`src/theme/tokens.css`). Custom properties inherit through the shadow boundary, so one token
   set themes all domains *and* the workbook artifacts. Per-workspace brands = a token scope.
 - **Variants as reflected attributes.** `variant` / `size` / `tone` are attributes the component

@@ -2,7 +2,7 @@
 //
 // Deliberately minimal: a lightweight tokenizer that wraps comments, strings,
 // numbers, and a per-language keyword set in <span class="tok-*"> spans styled
-// from --wb-* tokens. It is NOT a parser and makes no correctness claims — it is
+// from --work-* tokens. It is NOT a parser and makes no correctness claims — it is
 // the readable floor. The powered tier swaps in CodeMirror behind the same
 // <wb-editor> public API (see editor seam in wb-editor.js); this module is then
 // simply not used. Output is HTML-escaped first, so it is safe to set as innerHTML.

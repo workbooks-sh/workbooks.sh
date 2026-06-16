@@ -28,32 +28,32 @@ export class WorkRoom extends WbElement {
   };
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
+    :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
     .room {
-      border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
-      background: var(--wb-surface); box-shadow: var(--wb-shadow-sm); overflow: hidden;
+      border: 1px solid var(--work-border); border-radius: var(--work-radius);
+      background: var(--work-surface); box-shadow: var(--work-shadow-sm); overflow: hidden;
     }
     .head {
-      display: flex; align-items: center; gap: var(--wb-space-3);
-      padding: var(--wb-space-3) var(--wb-space-4);
-      border-bottom: 1px solid var(--wb-border); background: var(--wb-surface-soft);
+      display: flex; align-items: center; gap: var(--work-space-3);
+      padding: var(--work-space-3) var(--work-space-4);
+      border-bottom: 1px solid var(--work-border); background: var(--work-surface-soft);
     }
-    .topic { font: 600 var(--wb-text-sm) var(--wb-font-mono); color: var(--wb-fg);
+    .topic { font: 600 var(--work-text-sm) var(--work-font-mono); color: var(--work-fg);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .spacer { flex: 1; }
-    .conn { display: inline-flex; align-items: center; gap: var(--wb-space-2);
-      font: 600 11px var(--wb-font-mono); letter-spacing: .04em; text-transform: uppercase;
-      color: var(--wb-fg-muted); }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--wb-fg-subtle); flex: none; }
-    :host([state="joined"]) .dot { background: var(--wb-ok); box-shadow: 0 0 0 3px var(--wb-brand-soft); }
-    :host([state="joining"]) .dot { background: var(--wb-warn); animation: pulse 1s var(--wb-ease) infinite; }
+    .conn { display: inline-flex; align-items: center; gap: var(--work-space-2);
+      font: 600 11px var(--work-font-mono); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--work-fg-muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--work-fg-subtle); flex: none; }
+    :host([state="joined"]) .dot { background: var(--work-ok); box-shadow: 0 0 0 3px var(--work-brand-soft); }
+    :host([state="joining"]) .dot { background: var(--work-warn); animation: pulse 1s var(--work-ease) infinite; }
     :host([state="error"]) .dot,
-    :host([state="closed"]) .dot { background: var(--wb-err); }
+    :host([state="closed"]) .dot { background: var(--work-err); }
     @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
-    .badge { font: 600 10px var(--wb-font-mono); letter-spacing: .08em; text-transform: uppercase;
-      padding: 2px 7px; border-radius: var(--wb-radius-pill); border: 1px solid var(--wb-border);
-      color: var(--wb-fg-subtle); background: var(--wb-bg); }
-    .body { padding: var(--wb-space-4); position: relative; }
+    .badge { font: 600 10px var(--work-font-mono); letter-spacing: .08em; text-transform: uppercase;
+      padding: 2px 7px; border-radius: var(--work-radius-pill); border: 1px solid var(--work-border);
+      color: var(--work-fg-subtle); background: var(--work-bg); }
+    .body { padding: var(--work-space-4); position: relative; }
     ::slotted([slot="head"]) { display: contents; }
   `;
 

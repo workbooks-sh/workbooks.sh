@@ -3,7 +3,7 @@
 // Binds to the room's Channel (own `topic` attr, else the nearest <work-room>) and
 // re-renders on every presence diff — joins/leaves/metadata updates flow straight
 // off Phoenix Presence (real) or the BroadcastChannel mock (standalone), same
-// shape either way. Themed entirely from --wb-*; the per-client color is the only
+// shape either way. Themed entirely from --work-*; the per-client color is the only
 // non-token value and it comes from presence metadata.
 //
 // Attributes:
@@ -28,36 +28,36 @@ export class WorkPresence extends WbElement {
   static props = [...variantAttrs(VARIANTS), "topic", "max", "self"];
 
   static styles = css`
-    :host { display: inline-block; font-family: var(--wb-font); color: var(--wb-fg); }
+    :host { display: inline-block; font-family: var(--work-font); color: var(--work-fg); }
     .stack { display: inline-flex; align-items: center; }
     .ava {
       width: 30px; height: 30px; border-radius: 50%; flex: none;
       display: inline-grid; place-items: center; overflow: hidden;
-      font: 700 11px var(--wb-font-mono); color: #fff;
-      border: 2px solid var(--wb-surface); margin-left: -8px;
-      box-shadow: var(--wb-shadow-sm); transition: transform var(--wb-dur) var(--wb-ease);
+      font: 700 11px var(--work-font-mono); color: #fff;
+      border: 2px solid var(--work-surface); margin-left: -8px;
+      box-shadow: var(--work-shadow-sm); transition: transform var(--work-dur) var(--work-ease);
     }
     .ava:first-child { margin-left: 0; }
     .ava:hover { transform: translateY(-2px); z-index: 2; }
     .ava img { width: 100%; height: 100%; object-fit: cover; }
-    .ava.more { background: var(--wb-surface-soft); color: var(--wb-fg-muted); }
-    .ava.me { box-shadow: 0 0 0 2px var(--wb-ring), var(--wb-shadow-sm); }
+    .ava.more { background: var(--work-surface-soft); color: var(--work-fg-muted); }
+    .ava.me { box-shadow: 0 0 0 2px var(--work-ring), var(--work-shadow-sm); }
 
-    .count { display: inline-flex; align-items: center; gap: var(--wb-space-2);
-      font: 600 var(--wb-text-sm) var(--wb-font); color: var(--wb-fg-muted); }
-    .count .pip { width: 8px; height: 8px; border-radius: 50%; background: var(--wb-ok);
-      box-shadow: 0 0 0 3px var(--wb-brand-soft); flex: none; }
-    .count b { color: var(--wb-fg); font-variant-numeric: tabular-nums; }
+    .count { display: inline-flex; align-items: center; gap: var(--work-space-2);
+      font: 600 var(--work-text-sm) var(--work-font); color: var(--work-fg-muted); }
+    .count .pip { width: 8px; height: 8px; border-radius: 50%; background: var(--work-ok);
+      box-shadow: 0 0 0 3px var(--work-brand-soft); flex: none; }
+    .count b { color: var(--work-fg); font-variant-numeric: tabular-nums; }
 
-    .list { display: flex; flex-direction: column; gap: var(--wb-space-1); }
-    .row { display: flex; align-items: center; gap: var(--wb-space-3);
-      padding: var(--wb-space-2) var(--wb-space-2); border-radius: var(--wb-radius-sm); }
-    .row:hover { background: var(--wb-surface-soft); }
+    .list { display: flex; flex-direction: column; gap: var(--work-space-1); }
+    .row { display: flex; align-items: center; gap: var(--work-space-3);
+      padding: var(--work-space-2) var(--work-space-2); border-radius: var(--work-radius-sm); }
+    .row:hover { background: var(--work-surface-soft); }
     .row .ava { margin: 0; width: 26px; height: 26px; }
-    .row .nm { font-size: var(--wb-text-sm); font-weight: 600; }
-    .row .tag { margin-left: auto; font: 600 10px var(--wb-font-mono); letter-spacing: .08em;
-      text-transform: uppercase; color: var(--wb-fg-subtle); }
-    .empty { font-size: var(--wb-text-sm); color: var(--wb-fg-subtle); }
+    .row .nm { font-size: var(--work-text-sm); font-weight: 600; }
+    .row .tag { margin-left: auto; font: 600 10px var(--work-font-mono); letter-spacing: .08em;
+      text-transform: uppercase; color: var(--work-fg-subtle); }
+    .empty { font-size: var(--work-text-sm); color: var(--work-fg-subtle); }
   `;
 
   connectedCallback() {

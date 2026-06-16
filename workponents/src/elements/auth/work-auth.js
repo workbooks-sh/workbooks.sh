@@ -40,69 +40,69 @@ export class WorkAuth extends WbElement {
   static props = [...variantAttrs(VARIANTS), "providers", "heading"];
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
+    :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
     .card {
       max-width: 360px; box-sizing: border-box;
-      border: 1px solid var(--wb-border); border-radius: var(--wb-radius-lg);
-      background: var(--wb-surface); padding: var(--wb-space-5);
-      box-shadow: var(--wb-shadow);
+      border: 1px solid var(--work-border); border-radius: var(--work-radius-lg);
+      background: var(--work-surface); padding: var(--work-space-5);
+      box-shadow: var(--work-shadow);
     }
-    h3 { margin: 0 0 var(--wb-space-1); font-family: var(--wb-font-display);
-      font-size: var(--wb-text-lg); font-weight: 600; letter-spacing: -.01em; }
-    .sub { margin: 0 0 var(--wb-space-4); color: var(--wb-fg-muted); font-size: var(--wb-text-sm); }
+    h3 { margin: 0 0 var(--work-space-1); font-family: var(--work-font-display);
+      font-size: var(--work-text-lg); font-weight: 600; letter-spacing: -.01em; }
+    .sub { margin: 0 0 var(--work-space-4); color: var(--work-fg-muted); font-size: var(--work-text-sm); }
 
-    .providers { display: flex; flex-direction: column; gap: var(--wb-space-2); }
+    .providers { display: flex; flex-direction: column; gap: var(--work-space-2); }
     .provider {
-      font-family: var(--wb-font); font-weight: 600; font-size: var(--wb-text);
-      display: inline-flex; align-items: center; justify-content: center; gap: var(--wb-space-2);
+      font-family: var(--work-font); font-weight: 600; font-size: var(--work-text);
+      display: inline-flex; align-items: center; justify-content: center; gap: var(--work-space-2);
       width: 100%; box-sizing: border-box;
-      padding: var(--wb-space-3) var(--wb-space-4);
-      border-radius: var(--wb-radius); border: 1.5px solid var(--wb-border-strong);
-      background: var(--wb-surface); color: var(--wb-fg); cursor: pointer;
-      transition: transform var(--wb-dur) var(--wb-ease), background var(--wb-dur) var(--wb-ease),
-                  border-color var(--wb-dur) var(--wb-ease), box-shadow var(--wb-dur) var(--wb-ease);
+      padding: var(--work-space-3) var(--work-space-4);
+      border-radius: var(--work-radius); border: 1.5px solid var(--work-border-strong);
+      background: var(--work-surface); color: var(--work-fg); cursor: pointer;
+      transition: transform var(--work-dur) var(--work-ease), background var(--work-dur) var(--work-ease),
+                  border-color var(--work-dur) var(--work-ease), box-shadow var(--work-dur) var(--work-ease);
     }
-    .provider:hover { transform: translateY(-1px); background: var(--wb-surface-soft); }
+    .provider:hover { transform: translateY(-1px); background: var(--work-surface-soft); }
     .provider:active { transform: translateY(0); }
-    .provider:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); }
+    .provider:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
     .provider svg { flex: none; }
 
-    .div { display: flex; align-items: center; gap: var(--wb-space-3);
-      margin: var(--wb-space-4) 0; color: var(--wb-fg-subtle);
-      font: 600 10px var(--wb-font-mono); letter-spacing: .14em; text-transform: uppercase; }
-    .div::before, .div::after { content: ""; flex: 1; height: 1px; background: var(--wb-border); }
+    .div { display: flex; align-items: center; gap: var(--work-space-3);
+      margin: var(--work-space-4) 0; color: var(--work-fg-subtle);
+      font: 600 10px var(--work-font-mono); letter-spacing: .14em; text-transform: uppercase; }
+    .div::before, .div::after { content: ""; flex: 1; height: 1px; background: var(--work-border); }
 
-    form { display: flex; flex-direction: column; gap: var(--wb-space-3); }
-    label { font: 600 11px var(--wb-font-mono); letter-spacing: .06em;
-      text-transform: uppercase; color: var(--wb-fg-muted); }
-    .field { display: flex; flex-direction: column; gap: var(--wb-space-1); }
+    form { display: flex; flex-direction: column; gap: var(--work-space-3); }
+    label { font: 600 11px var(--work-font-mono); letter-spacing: .06em;
+      text-transform: uppercase; color: var(--work-fg-muted); }
+    .field { display: flex; flex-direction: column; gap: var(--work-space-1); }
     input {
-      font: var(--wb-text)/1.4 var(--wb-font); color: var(--wb-fg);
-      padding: var(--wb-space-3); border-radius: var(--wb-radius);
-      border: 1.5px solid var(--wb-border-strong); background: var(--wb-bg);
-      transition: border-color var(--wb-dur) var(--wb-ease), box-shadow var(--wb-dur) var(--wb-ease);
+      font: var(--work-text)/1.4 var(--work-font); color: var(--work-fg);
+      padding: var(--work-space-3); border-radius: var(--work-radius);
+      border: 1.5px solid var(--work-border-strong); background: var(--work-bg);
+      transition: border-color var(--work-dur) var(--work-ease), box-shadow var(--work-dur) var(--work-ease);
     }
-    input::placeholder { color: var(--wb-fg-subtle); }
-    input:focus-visible { outline: none; border-color: var(--wb-brand); box-shadow: 0 0 0 3px var(--wb-ring); }
+    input::placeholder { color: var(--work-fg-subtle); }
+    input:focus-visible { outline: none; border-color: var(--work-brand); box-shadow: 0 0 0 3px var(--work-ring); }
 
     .submit {
-      font-family: var(--wb-font); font-weight: 600; font-size: var(--wb-text);
-      display: inline-flex; align-items: center; justify-content: center; gap: var(--wb-space-2);
-      width: 100%; box-sizing: border-box; margin-top: var(--wb-space-1);
-      padding: var(--wb-space-3) var(--wb-space-4);
-      border: 1.5px solid transparent; border-radius: var(--wb-radius);
-      background: var(--wb-brand); color: var(--wb-on-brand); cursor: pointer;
-      transition: filter var(--wb-dur) var(--wb-ease), opacity var(--wb-dur) var(--wb-ease);
+      font-family: var(--work-font); font-weight: 600; font-size: var(--work-text);
+      display: inline-flex; align-items: center; justify-content: center; gap: var(--work-space-2);
+      width: 100%; box-sizing: border-box; margin-top: var(--work-space-1);
+      padding: var(--work-space-3) var(--work-space-4);
+      border: 1.5px solid transparent; border-radius: var(--work-radius);
+      background: var(--work-brand); color: var(--work-on-brand); cursor: pointer;
+      transition: filter var(--work-dur) var(--work-ease), opacity var(--work-dur) var(--work-ease);
     }
     .submit:hover { filter: brightness(1.06); }
-    .submit:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); }
+    .submit:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
 
-    .err { display: none; color: var(--wb-err); font-size: var(--wb-text-sm); }
+    .err { display: none; color: var(--work-err); font-size: var(--work-text-sm); }
     :host([state="error"]) .err { display: block; }
 
-    .alt { margin-top: var(--wb-space-3); text-align: center; font-size: var(--wb-text-sm);
-      color: var(--wb-fg-muted); }
-    .alt button { background: none; border: 0; color: var(--wb-brand); cursor: pointer;
+    .alt { margin-top: var(--work-space-3); text-align: center; font-size: var(--work-text-sm);
+      color: var(--work-fg-muted); }
+    .alt button { background: none; border: 0; color: var(--work-brand); cursor: pointer;
       font: inherit; font-weight: 600; padding: 0; }
 
     /* loading: lock the surface, spinner on the active control */

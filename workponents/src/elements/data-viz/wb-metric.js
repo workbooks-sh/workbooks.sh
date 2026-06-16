@@ -48,24 +48,24 @@ export class WbMetric extends WbElement {
     "value-col", "delta-col", "label", "format", "trend", "trend-y"];
 
   static styles = css`
-    :host { display: inline-block; font-family: var(--wb-font); color: var(--wb-fg); }
-    .shell { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
-      background: var(--wb-surface); box-shadow: var(--wb-shadow-sm);
-      padding: var(--wb-space-3) var(--wb-space-4); min-width: 160px; }
+    :host { display: inline-block; font-family: var(--work-font); color: var(--work-fg); }
+    .shell { border: 1px solid var(--work-border); border-radius: var(--work-radius);
+      background: var(--work-surface); box-shadow: var(--work-shadow-sm);
+      padding: var(--work-space-3) var(--work-space-4); min-width: 160px; }
     :host([variant="bare"]) .shell { border: none; box-shadow: none; background: transparent; padding: 0; }
-    .label { font-family: var(--wb-font-mono); font-size: var(--wb-text-sm);
-      letter-spacing: 0.04em; text-transform: uppercase; color: var(--wb-fg-muted); }
-    .row { display: flex; align-items: baseline; gap: var(--wb-space-2); margin-top: var(--wb-space-1); }
-    .value { font-family: var(--wb-font-display, var(--wb-font)); font-weight: 600;
+    .label { font-family: var(--work-font-mono); font-size: var(--work-text-sm);
+      letter-spacing: 0.04em; text-transform: uppercase; color: var(--work-fg-muted); }
+    .row { display: flex; align-items: baseline; gap: var(--work-space-2); margin-top: var(--work-space-1); }
+    .value { font-family: var(--work-font-display, var(--work-font)); font-weight: 600;
       letter-spacing: -0.02em; font-size: 30px; line-height: 1.05; font-variant-numeric: tabular-nums; }
     :host([size="sm"]) .value { font-size: 22px; }
     :host([size="lg"]) .value { font-size: 42px; }
-    .delta { font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); font-weight: 600;
-      padding: 1px 6px; border-radius: var(--wb-radius-pill); }
-    .delta.up { color: var(--wb-ok); background: var(--wb-brand-soft); }
-    .delta.down { color: var(--wb-err); background: rgba(201,47,47,0.12); }
-    .spark { margin-top: var(--wb-space-2); }
-    .err { color: var(--wb-err); font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); }
+    .delta { font-family: var(--work-font-mono); font-size: var(--work-text-sm); font-weight: 600;
+      padding: 1px 6px; border-radius: var(--work-radius-pill); }
+    .delta.up { color: var(--work-ok); background: var(--work-brand-soft); }
+    .delta.down { color: var(--work-err); background: rgba(201,47,47,0.12); }
+    .spark { margin-top: var(--work-space-2); }
+    .err { color: var(--work-err); font-family: var(--work-font-mono); font-size: var(--work-text-sm); }
   `;
 
   connectedCallback() {

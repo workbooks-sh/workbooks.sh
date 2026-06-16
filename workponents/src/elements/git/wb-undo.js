@@ -12,19 +12,19 @@ export class WorkUndo extends WbElement {
   static props = ["scope", "label", "disabled", "busy"];
 
   static styles = css`
-    :host { display: inline-block; font-family: var(--wb-font); }
+    :host { display: inline-block; font-family: var(--work-font); }
     button {
-      display: inline-flex; align-items: center; gap: var(--wb-space-2);
-      font: 600 var(--wb-text) var(--wb-font); line-height: 1;
-      padding: var(--wb-space-2) var(--wb-space-4);
-      border-radius: var(--wb-radius); cursor: pointer;
-      background: var(--wb-surface-soft); color: var(--wb-fg);
-      border: 1.5px solid var(--wb-border);
-      transition: background var(--wb-dur) var(--wb-ease), transform var(--wb-dur) var(--wb-ease);
+      display: inline-flex; align-items: center; gap: var(--work-space-2);
+      font: 600 var(--work-text) var(--work-font); line-height: 1;
+      padding: var(--work-space-2) var(--work-space-4);
+      border-radius: var(--work-radius); cursor: pointer;
+      background: var(--work-surface-soft); color: var(--work-fg);
+      border: 1.5px solid var(--work-border);
+      transition: background var(--work-dur) var(--work-ease), transform var(--work-dur) var(--work-ease);
     }
-    button:hover { background: var(--wb-surface); border-color: var(--wb-border-strong); transform: translateY(-1px); }
+    button:hover { background: var(--work-surface); border-color: var(--work-border-strong); transform: translateY(-1px); }
     button:active { transform: translateY(0); }
-    button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--wb-ring); }
+    button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
     svg { width: 15px; height: 15px; }
     :host([disabled]) button, :host([busy]) button { opacity: .5; pointer-events: none; }
     :host([busy]) svg { animation: spin .8s linear infinite; }

@@ -56,33 +56,33 @@ export class WbFile extends WbElement {
   static get observedAttributes() { return this.props; }
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); color: var(--wb-fg); }
-    .card { border: 1px solid var(--wb-border); border-radius: var(--wb-radius);
-      background: var(--wb-surface); overflow: hidden; box-shadow: var(--wb-shadow-sm);
+    :host { display: block; font-family: var(--work-font); color: var(--work-fg); }
+    .card { border: 1px solid var(--work-border); border-radius: var(--work-radius);
+      background: var(--work-surface); overflow: hidden; box-shadow: var(--work-shadow-sm);
       display: flex; flex-direction: column; }
     :host([variant="bare"]) .card { border: none; box-shadow: none; background: transparent; }
 
-    .head { display: flex; align-items: center; gap: var(--wb-space-2);
-      padding: var(--wb-space-2) var(--wb-space-3); border-bottom: 1px solid var(--wb-border);
-      background: var(--wb-surface-soft); }
+    .head { display: flex; align-items: center; gap: var(--work-space-2);
+      padding: var(--work-space-2) var(--work-space-3); border-bottom: 1px solid var(--work-border);
+      background: var(--work-surface-soft); }
     .badge { width: 26px; height: 26px; flex: none; display: grid; place-items: center;
-      border-radius: var(--wb-radius-sm); font-size: 14px; background: var(--wb-surface); color: var(--wb-fg-muted); }
-    .badge[data-kind="image"] { background: var(--wb-chip-lavender); color: var(--wb-brand-ink); }
-    .badge[data-kind="video"] { background: var(--wb-chip-peach);    color: var(--wb-brand-ink); }
-    .badge[data-kind="audio"] { background: var(--wb-chip-green);    color: var(--wb-brand-ink); }
-    .badge[data-kind="text"]  { background: var(--wb-chip-blue);     color: var(--wb-brand-ink); }
-    .title { font-weight: 600; font-size: var(--wb-text); letter-spacing: -.005em;
+      border-radius: var(--work-radius-sm); font-size: 14px; background: var(--work-surface); color: var(--work-fg-muted); }
+    .badge[data-kind="image"] { background: var(--work-chip-lavender); color: var(--work-brand-ink); }
+    .badge[data-kind="video"] { background: var(--work-chip-peach);    color: var(--work-brand-ink); }
+    .badge[data-kind="audio"] { background: var(--work-chip-green);    color: var(--work-brand-ink); }
+    .badge[data-kind="text"]  { background: var(--work-chip-blue);     color: var(--work-brand-ink); }
+    .title { font-weight: 600; font-size: var(--work-text); letter-spacing: -.005em;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-    .title:hover { color: var(--wb-brand); }
+    .title:hover { color: var(--work-brand); }
     .grow { flex: 1; }
-    .typetag { font-family: var(--wb-font-mono); font-size: 10px; text-transform: uppercase;
-      letter-spacing: .04em; color: var(--wb-fg-subtle); }
+    .typetag { font-family: var(--work-font-mono); font-size: 10px; text-transform: uppercase;
+      letter-spacing: .04em; color: var(--work-fg-subtle); }
 
     /* preview stage */
     .stage { position: relative; display: flex; align-items: center; justify-content: center;
       background:
-        repeating-conic-gradient(color-mix(in srgb, var(--wb-fg) 4%, transparent) 0% 25%, transparent 0% 50%) 50% / 20px 20px,
-        var(--wb-bg);
+        repeating-conic-gradient(color-mix(in srgb, var(--work-fg) 4%, transparent) 0% 25%, transparent 0% 50%) 50% / 20px 20px,
+        var(--work-bg);
       min-height: var(--_h, 220px); max-height: var(--_h, 220px); overflow: hidden; }
     :host([density="sm"]) .stage { --_h: 140px; }
     :host([density="lg"]) .stage { --_h: 340px; }
@@ -90,38 +90,38 @@ export class WbFile extends WbElement {
     .stage img { max-width: 100%; max-height: var(--_h, 220px); object-fit: contain; display: block; }
     .stage video { max-width: 100%; max-height: var(--_h, 220px); background: #000; }
     .stage audio { width: 90%; }
-    .audio-wrap { display: flex; flex-direction: column; align-items: center; gap: var(--wb-space-3); width: 100%; padding: var(--wb-space-4); }
-    .audio-glyph { font-size: 38px; color: var(--wb-brand); }
+    .audio-wrap { display: flex; flex-direction: column; align-items: center; gap: var(--work-space-3); width: 100%; padding: var(--work-space-4); }
+    .audio-glyph { font-size: 38px; color: var(--work-brand); }
 
     .textview { width: 100%; height: var(--_h, 220px); margin: 0; overflow: auto;
-      padding: var(--wb-space-3); box-sizing: border-box;
-      font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); line-height: 1.5;
-      color: var(--wb-fg); background: var(--wb-surface); white-space: pre-wrap; word-break: break-word; text-align: left; }
+      padding: var(--work-space-3); box-sizing: border-box;
+      font-family: var(--work-font-mono); font-size: var(--work-text-sm); line-height: 1.5;
+      color: var(--work-fg); background: var(--work-surface); white-space: pre-wrap; word-break: break-word; text-align: left; }
 
-    .placeholder { display: flex; flex-direction: column; align-items: center; gap: var(--wb-space-2);
-      color: var(--wb-fg-muted); padding: var(--wb-space-5); text-align: center; }
+    .placeholder { display: flex; flex-direction: column; align-items: center; gap: var(--work-space-2);
+      color: var(--work-fg-muted); padding: var(--work-space-5); text-align: center; }
     .ph-glyph { width: 64px; height: 64px; display: grid; place-items: center; font-size: 30px;
-      border-radius: var(--wb-radius); background: var(--wb-surface); color: var(--wb-fg-muted);
-      border: 1px solid var(--wb-border); }
-    .ph-glyph[data-kind="image"] { background: var(--wb-chip-lavender); color: var(--wb-brand-ink); }
-    .ph-glyph[data-kind="video"] { background: var(--wb-chip-peach);    color: var(--wb-brand-ink); }
-    .ph-glyph[data-kind="audio"] { background: var(--wb-chip-green);    color: var(--wb-brand-ink); }
-    .ph-glyph[data-kind="text"]  { background: var(--wb-chip-blue);     color: var(--wb-brand-ink); }
-    .ph-ext { font-family: var(--wb-font-mono); font-size: 11px; }
-    .ph-note { font-size: var(--wb-text-sm); }
-    .status { color: var(--wb-fg-muted); font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); padding: var(--wb-space-4); }
-    .status.err { color: var(--wb-err); white-space: pre-wrap; }
+      border-radius: var(--work-radius); background: var(--work-surface); color: var(--work-fg-muted);
+      border: 1px solid var(--work-border); }
+    .ph-glyph[data-kind="image"] { background: var(--work-chip-lavender); color: var(--work-brand-ink); }
+    .ph-glyph[data-kind="video"] { background: var(--work-chip-peach);    color: var(--work-brand-ink); }
+    .ph-glyph[data-kind="audio"] { background: var(--work-chip-green);    color: var(--work-brand-ink); }
+    .ph-glyph[data-kind="text"]  { background: var(--work-chip-blue);     color: var(--work-brand-ink); }
+    .ph-ext { font-family: var(--work-font-mono); font-size: 11px; }
+    .ph-note { font-size: var(--work-text-sm); }
+    .status { color: var(--work-fg-muted); font-family: var(--work-font-mono); font-size: var(--work-text-sm); padding: var(--work-space-4); }
+    .status.err { color: var(--work-err); white-space: pre-wrap; }
 
     /* metadata footer */
     .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: var(--wb-space-1) var(--wb-space-4); padding: var(--wb-space-2) var(--wb-space-3);
-      border-top: 1px solid var(--wb-border); }
+      gap: var(--work-space-1) var(--work-space-4); padding: var(--work-space-2) var(--work-space-3);
+      border-top: 1px solid var(--work-border); }
     .m { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-    .m .k { font-family: var(--wb-font-mono); font-size: 9px; text-transform: uppercase;
-      letter-spacing: .05em; color: var(--wb-fg-subtle); }
-    .m .v { font-size: var(--wb-text-sm); color: var(--wb-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .m .v.mono { font-family: var(--wb-font-mono); font-size: 11px; color: var(--wb-fg-muted); }
-    .docked { font-family: var(--wb-font-mono); font-size: 9px; }
+    .m .k { font-family: var(--work-font-mono); font-size: 9px; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--work-fg-subtle); }
+    .m .v { font-size: var(--work-text-sm); color: var(--work-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .m .v.mono { font-family: var(--work-font-mono); font-size: 11px; color: var(--work-fg-muted); }
+    .docked { font-family: var(--work-font-mono); font-size: 9px; }
   `;
 
   connectedCallback() {
@@ -253,7 +253,7 @@ export class WbFile extends WbElement {
     if (!items.length) return null;
     const docked = path
       ? html`<span class="m"><span class="k">Source</span><span class="v">
-          <span class="docked" style=${`color:var(${this.host.available("files") ? "--wb-ok" : "--wb-fg-subtle"})`}>${this.host.available("files") ? "● docked" : "○ standalone"}</span>
+          <span class="docked" style=${`color:var(${this.host.available("files") ? "--work-ok" : "--work-fg-subtle"})`}>${this.host.available("files") ? "● docked" : "○ standalone"}</span>
         </span></span>`
       : null;
     return html`<div class="meta">${items.map(([k, v, mono]) =>

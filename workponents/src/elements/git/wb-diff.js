@@ -2,7 +2,7 @@
 //
 // The reinvention: version control's diff without git's vocabulary. The element
 // is handed two SOURCES (`a`/`b` attrs, or two slotted <template>/text children)
-// and renders a diff2html-grade view, themed entirely from --wb-*. Two engines:
+// and renders a diff2html-grade view, themed entirely from --work-*. Two engines:
 //   • SEMANTIC org-block diff (the goal) — splits org-mode source into blocks
 //     (headings, :PROPERTIES: drawers, src/example blocks, paragraphs) and diffs
 //     at the block level, so a moved/edited section reads as one semantic change.
@@ -130,37 +130,37 @@ export class WorkDiff extends WbElement {
   static props = [...variantAttrs(VARIANTS), "a", "b"];
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); color: var(--wb-fg); }
-    .frame { border: 1px solid var(--wb-border); border-radius: var(--wb-radius); overflow: hidden; background: var(--wb-surface); box-shadow: var(--wb-shadow-sm); }
-    .head { display: flex; align-items: center; gap: var(--wb-space-2); padding: var(--wb-space-2) var(--wb-space-3); border-bottom: 1px solid var(--wb-border); background: var(--wb-surface-soft); font: 700 10px var(--wb-font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--wb-fg-subtle); }
+    :host { display: block; font-family: var(--work-font-mono); font-size: var(--work-text-sm); color: var(--work-fg); }
+    .frame { border: 1px solid var(--work-border); border-radius: var(--work-radius); overflow: hidden; background: var(--work-surface); box-shadow: var(--work-shadow-sm); }
+    .head { display: flex; align-items: center; gap: var(--work-space-2); padding: var(--work-space-2) var(--work-space-3); border-bottom: 1px solid var(--work-border); background: var(--work-surface-soft); font: 700 10px var(--work-font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--work-fg-subtle); }
     .head .grow { flex: 1; }
     .stat { font-weight: 700; letter-spacing: .04em; }
-    .stat .add { color: var(--wb-diff-add-ink, var(--wb-ok)); }
-    .stat .del { color: var(--wb-diff-del-ink, var(--wb-err)); }
+    .stat .add { color: var(--work-diff-add-ink, var(--work-ok)); }
+    .stat .del { color: var(--work-diff-del-ink, var(--work-err)); }
 
     table { width: 100%; border-collapse: collapse; }
-    td { padding: 1px var(--wb-space-3); vertical-align: top; white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
-    td.gut { width: 1%; text-align: right; color: var(--wb-fg-subtle); user-select: none; background: var(--wb-surface-soft); border-right: 1px solid var(--wb-border); font-variant-numeric: tabular-nums; padding-right: var(--wb-space-2); }
-    td.sign { width: 1%; text-align: center; user-select: none; color: var(--wb-fg-subtle); padding: 1px 0; }
+    td { padding: 1px var(--work-space-3); vertical-align: top; white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
+    td.gut { width: 1%; text-align: right; color: var(--work-fg-subtle); user-select: none; background: var(--work-surface-soft); border-right: 1px solid var(--work-border); font-variant-numeric: tabular-nums; padding-right: var(--work-space-2); }
+    td.sign { width: 1%; text-align: center; user-select: none; color: var(--work-fg-subtle); padding: 1px 0; }
 
-    tr.add td.code { background: var(--wb-diff-add-bg, rgba(16,174,56,0.13)); }
-    tr.del td.code { background: var(--wb-diff-del-bg, rgba(201,47,47,0.13)); }
-    tr.add td.sign { color: var(--wb-diff-add-ink, var(--wb-ok)); }
-    tr.del td.sign { color: var(--wb-diff-del-ink, var(--wb-err)); }
-    tr.empty td { background: var(--wb-diff-empty-bg, var(--wb-surface-soft)); }
+    tr.add td.code { background: var(--work-diff-add-bg, rgba(16,174,56,0.13)); }
+    tr.del td.code { background: var(--work-diff-del-bg, rgba(201,47,47,0.13)); }
+    tr.add td.sign { color: var(--work-diff-add-ink, var(--work-ok)); }
+    tr.del td.sign { color: var(--work-diff-del-ink, var(--work-err)); }
+    tr.empty td { background: var(--work-diff-empty-bg, var(--work-surface-soft)); }
 
     /* semantic block markers */
-    .blockhdr { padding: var(--wb-space-2) var(--wb-space-3); font: 700 10px var(--wb-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--wb-fg-muted); background: var(--wb-surface-soft); border-top: 1px solid var(--wb-border); display: flex; gap: var(--wb-space-2); align-items: center; }
-    .pill { padding: 1px 7px; border-radius: var(--wb-radius-pill); font-size: 9px; letter-spacing: .08em; }
-    .pill.add { background: var(--wb-diff-add-bg, rgba(16,174,56,0.16)); color: var(--wb-diff-add-ink, var(--wb-ok)); }
-    .pill.del { background: var(--wb-diff-del-bg, rgba(201,47,47,0.16)); color: var(--wb-diff-del-ink, var(--wb-err)); }
-    .pill.chg { background: var(--wb-brand-soft); color: var(--wb-brand-ink, var(--wb-brand)); }
-    .pill.kind { background: var(--wb-surface); border: 1px solid var(--wb-border); color: var(--wb-fg-subtle); }
-    .key { color: var(--wb-fg); font-weight: 600; text-transform: none; letter-spacing: 0; }
+    .blockhdr { padding: var(--work-space-2) var(--work-space-3); font: 700 10px var(--work-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--work-fg-muted); background: var(--work-surface-soft); border-top: 1px solid var(--work-border); display: flex; gap: var(--work-space-2); align-items: center; }
+    .pill { padding: 1px 7px; border-radius: var(--work-radius-pill); font-size: 9px; letter-spacing: .08em; }
+    .pill.add { background: var(--work-diff-add-bg, rgba(16,174,56,0.16)); color: var(--work-diff-add-ink, var(--work-ok)); }
+    .pill.del { background: var(--work-diff-del-bg, rgba(201,47,47,0.16)); color: var(--work-diff-del-ink, var(--work-err)); }
+    .pill.chg { background: var(--work-brand-soft); color: var(--work-brand-ink, var(--work-brand)); }
+    .pill.kind { background: var(--work-surface); border: 1px solid var(--work-border); color: var(--work-fg-subtle); }
+    .key { color: var(--work-fg); font-weight: 600; text-transform: none; letter-spacing: 0; }
 
     /* split layout: two synced columns */
     .split { display: grid; grid-template-columns: 1fr 1fr; }
-    .split .col { border-right: 1px solid var(--wb-border); }
+    .split .col { border-right: 1px solid var(--work-border); }
     .split .col:last-child { border-right: 0; }
   `;
 

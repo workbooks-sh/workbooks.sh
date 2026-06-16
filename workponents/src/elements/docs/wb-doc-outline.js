@@ -11,23 +11,23 @@ export class WbDocOutline extends WbElement {
   static props = ["for"];
 
   static styles = css`
-    :host { display: block; font-family: var(--wb-font); }
-    nav { border-left: 2px solid var(--wb-border); padding-left: var(--wb-space-3); }
-    .label { font-family: var(--wb-font-mono); font-size: 0.62rem; font-weight: 700;
-      letter-spacing: 0.18em; text-transform: uppercase; color: var(--wb-fg-subtle);
-      margin: 0 0 var(--wb-space-2); }
+    :host { display: block; font-family: var(--work-font); }
+    nav { border-left: 2px solid var(--work-border); padding-left: var(--work-space-3); }
+    .label { font-family: var(--work-font-mono); font-size: 0.62rem; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--work-fg-subtle);
+      margin: 0 0 var(--work-space-2); }
     ol { list-style: none; margin: 0; padding: 0; }
     li { margin: 1px 0; }
-    a { display: block; text-decoration: none; color: var(--wb-fg-muted);
-      font-size: var(--wb-text-sm); line-height: 1.5; padding: 3px var(--wb-space-2);
-      border-radius: var(--wb-radius-sm); cursor: pointer;
-      transition: color var(--wb-dur) var(--wb-ease), background var(--wb-dur) var(--wb-ease); }
-    a:hover { color: var(--wb-fg); background: var(--wb-surface-soft); }
-    a.active { color: var(--wb-brand); background: var(--wb-brand-soft); font-weight: 600; }
-    .l2 { padding-left: var(--wb-space-3); }
-    .l3 { padding-left: var(--wb-space-5); font-size: 0.95em; }
-    .l4, .l5, .l6 { padding-left: calc(var(--wb-space-5) + var(--wb-space-3)); font-size: 0.9em; }
-    .empty { color: var(--wb-fg-subtle); font-size: var(--wb-text-sm); }
+    a { display: block; text-decoration: none; color: var(--work-fg-muted);
+      font-size: var(--work-text-sm); line-height: 1.5; padding: 3px var(--work-space-2);
+      border-radius: var(--work-radius-sm); cursor: pointer;
+      transition: color var(--work-dur) var(--work-ease), background var(--work-dur) var(--work-ease); }
+    a:hover { color: var(--work-fg); background: var(--work-surface-soft); }
+    a.active { color: var(--work-brand); background: var(--work-brand-soft); font-weight: 600; }
+    .l2 { padding-left: var(--work-space-3); }
+    .l3 { padding-left: var(--work-space-5); font-size: 0.95em; }
+    .l4, .l5, .l6 { padding-left: calc(var(--work-space-5) + var(--work-space-3)); font-size: 0.9em; }
+    .empty { color: var(--work-fg-subtle); font-size: var(--work-text-sm); }
   `;
 
   connectedCallback() {

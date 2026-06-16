@@ -36,21 +36,21 @@ export class WbFieldValue extends WbElement {
   static props = [...variantAttrs(VARIANTS), "value", "type", "format", "empty"];
 
   static styles = css`
-    :host { display: inline; font-family: var(--wb-font); color: var(--wb-fg); font-size: var(--wb-text); }
-    .empty { color: var(--wb-fg-subtle); }
+    :host { display: inline; font-family: var(--work-font); color: var(--work-fg); font-size: var(--work-text); }
+    .empty { color: var(--work-fg-subtle); }
     .num { font-variant-numeric: tabular-nums; }
-    a { color: var(--wb-brand); text-decoration: none; border-bottom: 1px solid var(--wb-brand-soft); }
-    a:hover { border-bottom-color: var(--wb-brand); }
-    .badge { display: inline-flex; align-items: center; padding: 2px var(--wb-space-2);
-      border-radius: var(--wb-radius-pill); background: var(--wb-surface-soft);
-      border: 1px solid var(--wb-border); font-size: var(--wb-text-sm);
-      font-family: var(--wb-font-mono); color: var(--wb-fg-muted); line-height: 1.5; }
-    .bool { display: inline-flex; align-items: center; gap: var(--wb-space-1);
-      font-size: var(--wb-text-sm); font-weight: 600; }
-    .bool .dot { width: 8px; height: 8px; border-radius: var(--wb-radius-pill); }
-    .bool.t { color: var(--wb-ok); } .bool.t .dot { background: var(--wb-ok); box-shadow: 0 0 0 3px var(--wb-brand-soft); }
-    .bool.f { color: var(--wb-fg-subtle); } .bool.f .dot { background: var(--wb-fg-subtle); }
-    .json { font-family: var(--wb-font-mono); font-size: var(--wb-text-sm); color: var(--wb-fg-muted);
+    a { color: var(--work-brand); text-decoration: none; border-bottom: 1px solid var(--work-brand-soft); }
+    a:hover { border-bottom-color: var(--work-brand); }
+    .badge { display: inline-flex; align-items: center; padding: 2px var(--work-space-2);
+      border-radius: var(--work-radius-pill); background: var(--work-surface-soft);
+      border: 1px solid var(--work-border); font-size: var(--work-text-sm);
+      font-family: var(--work-font-mono); color: var(--work-fg-muted); line-height: 1.5; }
+    .bool { display: inline-flex; align-items: center; gap: var(--work-space-1);
+      font-size: var(--work-text-sm); font-weight: 600; }
+    .bool .dot { width: 8px; height: 8px; border-radius: var(--work-radius-pill); }
+    .bool.t { color: var(--work-ok); } .bool.t .dot { background: var(--work-ok); box-shadow: 0 0 0 3px var(--work-brand-soft); }
+    .bool.f { color: var(--work-fg-subtle); } .bool.f .dot { background: var(--work-fg-subtle); }
+    .json { font-family: var(--work-font-mono); font-size: var(--work-text-sm); color: var(--work-fg-muted);
       white-space: pre-wrap; word-break: break-word; }
   `;
 
