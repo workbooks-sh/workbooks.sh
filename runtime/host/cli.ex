@@ -514,6 +514,13 @@ defmodule Workbooks.CLI do
   # `work eval components [case]` — the component-emit eval pack (text + voice parity).
   def call(["eval", "components"], _t), do: Workbooks.Evals.Components.run()
   def call(["eval", "components", filter], _t), do: Workbooks.Evals.Components.run(filter)
+
+  # `work component new <name> [domain]` — scaffold a gate-passing work-* web component
+  # (web-component supremacy: a capability is a themed custom element, not a CLI binary).
+  # Delegates to the workponents node scaffolder; works from anywhere inside the repo.
+  def call(["component", "new", name | rest], _t), do: scaffold_component(name, rest)
+  def call(["component" | _], _t), do: "usage: work component new <name> [domain]"
+
   def call(["toolkit", "sign", id], t), do: Toolkits.sign_text(id, t)
   def call(["toolkit", "versions", id], _t), do: Toolkits.versions_text(id)
   def call(["toolkit", "live"], _t), do: Toolkits.live_text()
@@ -805,6 +812,44 @@ defmodule Workbooks.CLI do
         Enum.each(problems, &IO.puts("  - #{&1}"))
         System.halt(1)
     end
+  end
+
+  # Scaffold a work-* web component via the workponents node tool. Located by walking
+  # up from cwd to the repo's workponents/ — a repo/dev operation, so it degrades to a
+  # clear instruction when run outside the tree or without node.
+  defp scaffold_component(name, rest) do
+    hint = "cd workponents && npm run new -- #{Enum.join([name | rest], " ")}"
+
+    case workponents_dir() do
+      nil ->
+        "can't find workponents/ from here — run it in the repo:  #{hint}"
+
+      dir ->
+        case System.find_executable("node") do
+          nil ->
+            "node not found — install Node, then:  #{hint}"
+
+          node ->
+            {out, _code} =
+              System.cmd(node, ["tools/scaffold.mjs", name | rest], cd: dir, stderr_to_stdout: true)
+
+            out
+        end
+    end
+  end
+
+  defp workponents_dir do
+    File.cwd!()
+    |> Stream.iterate(&Path.dirname/1)
+    |> Stream.take(40)
+    |> Enum.find_value(fn d ->
+      cand = Path.join(d, "workponents")
+      cond do
+        File.exists?(Path.join(cand, "package.json")) -> cand
+        File.exists?(Path.join(d, "tools/scaffold.mjs")) -> d
+        true -> nil
+      end
+    end)
   end
 
 end
