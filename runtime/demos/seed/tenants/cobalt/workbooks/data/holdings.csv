@@ -1,0 +1,8 @@
+instrument,issuer,type,par_usd,yield_pct,wam_days,rating,maturity
+Brex Treasury Govt MMF,Brex Treasury / Morgan Stanley,Govt MMF,87300000,4.71,33,AAAm,Daily (T+0)
+HSBC USD Liquidity Fund,HSBC Global Asset Mgmt,Prime MMF,48600000,4.58,37,AAAm,Daily (T+0)
+Fidelity Govt MMF (FGXX),Fidelity Investments,Govt MMF,45000000,4.66,18,AAAm,Daily (T+0)
+US Treasury Bill,US Treasury,T-Bill,40000000,4.69,62,AAA,2026-08-14
+Goldman Sachs FS Govt MMF,Goldman Sachs Asset Mgmt,Govt MMF,20100000,4.63,14,AAAm,Daily (T+0)
+JPMorgan Chase CP,JPMorgan Chase & Co.,Commercial Paper,15000000,4.83,45,A-1,2026-07-28
+Bank of America CD,"Bank of America, N.A.",Bank CD,15000000,4.55,90,A-1,2026-09-11
