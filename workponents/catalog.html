@@ -34,12 +34,12 @@
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(400px,1fr)); gap:22px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px;
           box-shadow:0 1px 0 rgba(18,19,22,.03), 0 8px 22px -16px rgba(18,19,22,.25); }
-  .card.planned { border-style:dashed; }
+  .card.core { border-style:dashed; }
   .card header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
   .tag { font-size:14px; font-weight:600; }
   .badge { font-size:10px; text-transform:uppercase; letter-spacing:.06em; padding:2px 7px; border-radius:20px; }
   .badge.built { background:var(--mint); color:#0c3a22; }
-  .badge.planned { background:var(--peach); color:#5a2c10; }
+  .badge.core { background:var(--peach); color:#5a2c10; }
   .was { margin:0 0 7px; font:11px/1 "Geist Mono",monospace; color:var(--mut); }
   .was code { background:#0000000a; padding:1px 5px; border-radius:5px; }
   .purpose { margin:0 0 13px; font-size:14px; line-height:1.55; color:#2a2b2f; }
@@ -55,13 +55,13 @@
 <div class="wrap">
   <nav>
     <h1><b>work-*</b> catalog</h1>
-    <a href="#core-the-spine">core · the spine <em>3</em></a><a href="#auth">auth <em>3</em></a><a href="#board">board <em>4</em></a><a href="#chart">chart <em>3</em></a><a href="#chat">chat <em>4</em></a><a href="#code">code <em>2</em></a><a href="#data">data <em>1</em></a><a href="#deck">deck <em>2</em></a><a href="#document">document <em>4</em></a><a href="#file">file <em>3</em></a><a href="#flow">flow <em>2</em></a><a href="#form">form <em>3</em></a><a href="#git">git <em>4</em></a><a href="#grid">grid <em>2</em></a><a href="#live">live <em>3</em></a><a href="#map">map <em>1</em></a><a href="#model">model <em>2</em></a><a href="#record">record <em>3</em></a><a href="#search">search <em>3</em></a><a href="#video">video <em>2</em></a><a href="#work">work <em>1</em></a>
+    <a href="#core-the-spine">core · the spine <em>3</em></a><a href="#auth">auth <em>3</em></a><a href="#board">board <em>4</em></a><a href="#chart">chart <em>3</em></a><a href="#chat">chat <em>4</em></a><a href="#code">code <em>2</em></a><a href="#data">data <em>1</em></a><a href="#deck">deck <em>2</em></a><a href="#document">document <em>4</em></a><a href="#file">file <em>3</em></a><a href="#form">form <em>3</em></a><a href="#git">git <em>4</em></a><a href="#grid">grid <em>2</em></a><a href="#live">live <em>3</em></a><a href="#map">map <em>1</em></a><a href="#model">model <em>2</em></a><a href="#record">record <em>3</em></a><a href="#search">search <em>3</em></a><a href="#video">video <em>2</em></a>
   </nav>
   <main>
-    <p class="lead"><b>The spine is 3 elements</b> — <code>work-src</code>
+    <p class="lead"><b>The spine is 3 real elements</b> — <code>work-src</code>
     (compute), <code>work-ref</code> (every edge, incl. type via <code>rel=</code>),
-    <code>work-flow</code> (the DAG). Everything else is a <b>toolkit</b>: 52
-    built elements regrouped into <b>20 visual toolkits</b>, each owning its
+    <code>work-flow</code> (the DAG). Everything else is a <b>toolkit</b>: 49
+    built elements regrouped into <b>18 visual toolkits</b>, each owning its
     own <code>&lt;prefix-*&gt;</code> (work-table → <code>grid-table</code>). "What something
     is" is an edge, not an element — there's no <code>&lt;work-toolkit&gt;</code>. Generated
     from the CEM — <code>node tools/catalog.js</code>.</p>
@@ -69,22 +69,22 @@
   <section id="core-the-spine">
     <h2>core · the spine <span class="count">3</span></h2>
     <div class="grid">
-    <article class="card planned">
-      <header><code class="tag">&lt;work-flow&gt;</code><span class="badge planned">core</span></header>
+    <article class="card core">
+      <header><code class="tag">&lt;work-flow&gt;</code><span class="badge core">core</span></header>
       
       <p class="purpose">ORCHESTRATION. The runnable DAG the runtime schedules and runs — tasks + dependencies. A board/list/skill is just an authored VIEW or ordering over a flow. every=/at= schedule it.</p>
       <p class="attrs"><span>name</span><span>every</span><span>at</span></p>
       <pre class="usage"><code>&lt;work-flow name=&quot;…&quot; every=&quot;…&quot; at=&quot;…&quot;&gt;&lt;/work-flow&gt;</code></pre>
     </article>
-    <article class="card planned">
-      <header><code class="tag">&lt;work-ref&gt;</code><span class="badge planned">core</span></header>
+    <article class="card core">
+      <header><code class="tag">&lt;work-ref&gt;</code><span class="badge core">core</span></header>
       
       <p class="purpose">EVERY EDGE. Dependency, link, binding — AND type. rel= turns it into a reified type-assertion (rel=toolkit|skill|agent), so 'what something is' lives in the same graph as deps. Meaning comes from where it sits + rel.</p>
       <p class="attrs"><span>to</span><span>rel</span><span>from</span><span>as</span></p>
       <pre class="usage"><code>&lt;work-ref to=&quot;…&quot; rel=&quot;…&quot; from=&quot;…&quot;&gt;&lt;/work-ref&gt;</code></pre>
     </article>
-    <article class="card planned">
-      <header><code class="tag">&lt;work-src&gt;</code><span class="badge planned">core</span></header>
+    <article class="card core">
+      <header><code class="tag">&lt;work-src&gt;</code><span class="badge core">core</span></header>
       
       <p class="purpose">COMPUTE. Inline code in some lang, compiled by the Dock to a sandboxed WASM module. lang=rust|c|zig → native; lang=js|py → interpreted; lang=sql → data engine. name= exports a callable; display= runs &amp; renders.</p>
       <p class="attrs"><span>lang</span><span>name</span><span>display</span></p>
@@ -309,24 +309,6 @@
       <pre class="usage"><code>&lt;file-dropzone variant=&quot;…&quot; accept=&quot;…&quot; multiple=&quot;…&quot;&gt;&lt;/file-dropzone&gt;</code></pre>
     </article></div>
   </section>
-  <section id="flow">
-    <h2>flow <span class="count">2</span></h2>
-    <div class="grid">
-    <article class="card built">
-      <header><code class="tag">&lt;flow&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-flow&gt;</code></p>
-      <p class="purpose">an agentic flow / pipeline: a titled sequence of steps, where each</p>
-      <p class="attrs"><span>title</span><span>in</span><span>out</span><span>deps</span></p>
-      <pre class="usage"><code>&lt;flow title=&quot;…&quot; in=&quot;…&quot; out=&quot;…&quot;&gt;&lt;/flow&gt;</code></pre>
-    </article>
-    <article class="card built">
-      <header><code class="tag">&lt;flow-loop&gt;</code><span class="badge built">toolkit</span></header>
-      <p class="was">was <code>&lt;work-loop&gt;</code></p>
-      <p class="purpose">a recurring job: a named task on a cron cadence with a run status.</p>
-      <p class="attrs"><span>title</span><span>cron</span><span>status</span></p>
-      <pre class="usage"><code>&lt;flow-loop title=&quot;…&quot; cron=&quot;…&quot; status=&quot;…&quot;&gt;&lt;/flow-loop&gt;</code></pre>
-    </article></div>
-  </section>
   <section id="form">
     <h2>form <span class="count">3</span></h2>
     <div class="grid">
@@ -522,17 +504,6 @@
       <p class="purpose">a declarative source descriptor for &lt;video-player&gt;, the</p>
       <p class="attrs"><span>src</span><span>composition</span><span>type</span></p>
       <pre class="usage"><code>&lt;video-source src=&quot;…&quot; composition=&quot;…&quot; type=&quot;…&quot;&gt;&lt;/video-source&gt;</code></pre>
-    </article></div>
-  </section>
-  <section id="work">
-    <h2>work <span class="count">1</span></h2>
-    <div class="grid">
-    <article class="card built">
-      <header><code class="tag">&lt;work-button&gt;</code><span class="badge built">toolkit</span></header>
-      
-      <p class="purpose">the reference element. Proves the conventions on the Lit base:</p>
-      <p class="attrs"><span>variant</span><span>size</span><span>tone</span><span>disabled</span></p>
-      <pre class="usage"><code>&lt;work-button variant=&quot;…&quot; size=&quot;…&quot; tone=&quot;…&quot;&gt;&lt;/work-button&gt;</code></pre>
     </article></div>
   </section>
   </main>

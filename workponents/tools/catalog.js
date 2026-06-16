@@ -50,7 +50,10 @@ const planned = [
   { tag: "work-ref", purpose: "EVERY EDGE. Dependency, link, binding — AND type. rel= turns it into a reified type-assertion (rel=toolkit|skill|agent), so 'what something is' lives in the same graph as deps. Meaning comes from where it sits + rel.", attrs: ["to", "rel", "from", "as"] },
   { tag: "work-flow", purpose: "ORCHESTRATION. The runnable DAG the runtime schedules and runs — tasks + dependencies. A board/list/skill is just an authored VIEW or ordering over a flow. every=/at= schedule it.", attrs: ["name", "every", "at"] },
 ];
-for (const p of planned) { p.domain = "core · the spine"; p.status = "planned"; }
+// work-src + work-ref are REAL elements now (in the CEM); work-flow too. Mark the spine
+// "core" (built) and dedupe it from the toolkit groups below.
+const SPINE = new Set(["work-src", "work-ref", "work-flow", "work-loop", "work-button"]);
+for (const p of planned) { p.domain = "core · the spine"; p.status = "core"; }
 
 // ── domain → visual-toolkit prefix (the re-prefix plan). Each domain becomes its own
 //    toolkit owning <prefix-*> elements; work- retracts to the spine above. ──
@@ -61,7 +64,8 @@ const TOOLKIT = {
   git: "git", live: "live", search: "search", auth: "auth", "3d": "model",
   flow: "flow", data: "data", core: "work",
 };
-for (const e of built) {
+const builtToolkits = built.filter((e) => !SPINE.has(e.tag));   // spine shown in its own group
+for (const e of builtToolkits) {
   const tk = TOOLKIT[e.domain] || e.domain;
   e.current = e.tag;                                   // keep the old name for reference
   let base = e.tag.replace(/^work-/, "").replace(/^(doc|model)-/, "");
@@ -71,7 +75,7 @@ for (const e of built) {
 }
 
 // ── group by domain; authoring first (it's the spine), then the rest A→Z. ──────
-const all = [...planned, ...built];
+const all = [...planned, ...builtToolkits];
 const groups = {};
 for (const e of all) (groups[e.domain] ||= []).push(e);
 const order = ["core · the spine", ...Object.keys(groups).filter((d) => d !== "core · the spine").sort()];
@@ -84,7 +88,7 @@ const usage = (e) =>
 
 const card = (e) => `
     <article class="card ${e.status}">
-      <header><code class="tag">&lt;${esc(e.tag)}&gt;</code><span class="badge ${e.status}">${e.status === "planned" ? "core" : "toolkit"}</span></header>
+      <header><code class="tag">&lt;${esc(e.tag)}&gt;</code><span class="badge ${e.status}">${e.status === "core" ? "core" : "toolkit"}</span></header>
       ${e.current && e.current !== e.tag ? `<p class="was">was <code>&lt;${esc(e.current)}&gt;</code></p>` : ""}
       <p class="purpose">${esc(e.purpose)}</p>
       ${e.attrs.length ? `<p class="attrs">${e.attrs.map((a) => `<span>${esc(a)}</span>`).join("")}</p>` : ""}
@@ -137,12 +141,12 @@ const html = `<!doctype html>
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(400px,1fr)); gap:22px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px;
           box-shadow:0 1px 0 rgba(18,19,22,.03), 0 8px 22px -16px rgba(18,19,22,.25); }
-  .card.planned { border-style:dashed; }
+  .card.core { border-style:dashed; }
   .card header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
   .tag { font-size:14px; font-weight:600; }
   .badge { font-size:10px; text-transform:uppercase; letter-spacing:.06em; padding:2px 7px; border-radius:20px; }
   .badge.built { background:var(--mint); color:#0c3a22; }
-  .badge.planned { background:var(--peach); color:#5a2c10; }
+  .badge.core { background:var(--peach); color:#5a2c10; }
   .was { margin:0 0 7px; font:11px/1 "Geist Mono",monospace; color:var(--mut); }
   .was code { background:#0000000a; padding:1px 5px; border-radius:5px; }
   .purpose { margin:0 0 13px; font-size:14px; line-height:1.55; color:#2a2b2f; }
@@ -161,9 +165,9 @@ const html = `<!doctype html>
     ${nav}
   </nav>
   <main>
-    <p class="lead"><b>The spine is ${planned.length} elements</b> — <code>work-src</code>
+    <p class="lead"><b>The spine is ${planned.length} real elements</b> — <code>work-src</code>
     (compute), <code>work-ref</code> (every edge, incl. type via <code>rel=</code>),
-    <code>work-flow</code> (the DAG). Everything else is a <b>toolkit</b>: ${built.length}
+    <code>work-flow</code> (the DAG). Everything else is a <b>toolkit</b>: ${builtToolkits.length}
     built elements regrouped into <b>${order.length - 1} visual toolkits</b>, each owning its
     own <code>&lt;prefix-*&gt;</code> (work-table → <code>grid-table</code>). "What something
     is" is an edge, not an element — there's no <code>&lt;work-toolkit&gt;</code>. Generated
@@ -175,4 +179,4 @@ const html = `<!doctype html>
 </html>`;
 
 writeFileSync(join(ROOT, "catalog.html"), html);
-console.log(`catalog.html — ${all.length} elements (${planned.length} planned, ${built.length} built) in ${order.length} groups`);
+console.log(`catalog.html — ${all.length} elements (${planned.length} core spine, ${builtToolkits.length} toolkit) in ${order.length} groups`);
