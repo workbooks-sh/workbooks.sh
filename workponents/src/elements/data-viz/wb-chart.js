@@ -115,8 +115,10 @@ export class WbChart extends WbElement {
     .powered:empty { display: none; }
     /* when the powered tier (Observable Plot) has rendered into .powered, the floor
        SVG is declaratively hidden — no imperative show/hide race against Lit's
-       shell re-render or the ResizeObserver. */
-    .plot:has(.powered > *) svg { display: none; }
+       shell re-render or the ResizeObserver. CHILD combinator (> svg): hide ONLY the
+       floor svg (a direct child of .plot), never Plot's own svg nested in .powered —
+       a descendant selector hid both, collapsing the chart to 0×0. */
+    .plot:has(.powered > *) > svg { display: none; }
     .powered > * { width: 100%; }
     svg { display: block; width: 100%; height: auto; overflow: visible; }
     text { font-family: var(--work-font); fill: var(--work-fg-muted); }
