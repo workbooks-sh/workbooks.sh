@@ -28,6 +28,6 @@ defmodule Workbooks.SandboxToolkitTest do
   test "the activated agents list the sandbox toolkit" do
     # analyst.html lives at runtime/examples/agents/ (__DIR__ is runtime/test)
     analyst = Path.expand("../examples/agents/analyst.html", __DIR__)
-    assert File.read!(analyst) =~ ~r/toolkits="[^"]*\bsandbox\b/
+    assert File.read!(analyst) =~ ~r/kits="[^"]*\bsandbox\b/
   end
 end

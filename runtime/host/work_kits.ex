@@ -96,7 +96,7 @@ defmodule Workbooks.WorkKits do
     case Floki.parse_fragment(html) do
       {:ok, tree} ->
         case Floki.find(tree, "work-agent[id=\"#{agent_id}\"]") do
-          [node | _] -> Floki.attribute([node], "toolkits") |> List.first() |> to_string() |> String.split()
+          [node | _] -> Floki.attribute([node], "kits") |> List.first() |> to_string() |> String.split()
           [] -> []
         end
 
@@ -268,7 +268,7 @@ defmodule Workbooks.WorkKits do
       ""
     else
       """
-      ## Toolkits
+      ## Work-kits
 
       You have these toolkits. Before using one, read the relevant skill — call the
       `work` tool: `toolkit show <id> <skill>` (or `toolkit search <query>` to find one).

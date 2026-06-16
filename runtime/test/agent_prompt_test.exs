@@ -38,7 +38,7 @@ defmodule Workbooks.AgentPromptTest do
 
   test "Waldo's prompt composes the toolkit index with BOTH default toolkits" do
     p = prompt("waldo")
-    assert p =~ "## Toolkits"
+    assert p =~ "## Work-kits"
     assert p =~ "workbooks-browser"
     assert p =~ "workbooks-cli"
     # the progressive-disclosure instruction (read a skill on demand)
@@ -51,6 +51,6 @@ defmodule Workbooks.AgentPromptTest do
   test "an unknown slug still gets the safe default prompt (voice/chat works out of the box)" do
     p = prompt("some-unprovisioned-agent")
     assert p =~ "Waldo"
-    assert p =~ "## Toolkits"
+    assert p =~ "## Work-kits"
   end
 end

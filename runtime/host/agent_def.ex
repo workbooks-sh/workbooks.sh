@@ -15,7 +15,7 @@ defmodule Workbooks.AgentDef do
     %{
       id: agent && attr(agent, "id"),
       model: agent && attr(agent, "model"),
-      toolkits: ((agent && attr(agent, "toolkits")) || "") |> String.split(),
+      toolkits: ((agent && attr(agent, "kits")) || "") |> String.split(),
       tagline: agent && attr(agent, "tagline"),
       system: agent && system_prompt(agent)
     }

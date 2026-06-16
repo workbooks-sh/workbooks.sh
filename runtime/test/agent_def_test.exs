@@ -13,7 +13,7 @@ defmodule Workbooks.AgentDefTest do
   defp def_with_system do
     """
     <work-agent id="waldo" model="anthropic/claude-haiku-4.5"
-                toolkits="workbooks-browser workbooks-cli" tagline="Resident agent">
+                kits="workbooks-browser workbooks-cli" tagline="Resident agent">
       <work-system>
         You are Waldo, the resident agent.
 
