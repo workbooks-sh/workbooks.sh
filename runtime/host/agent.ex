@@ -249,17 +249,21 @@ defmodule Workbooks.Agent do
             finish(st, content)
 
           # Silent dead-stop: the model returned empty content with no tool call
-          # (common on cheap models — whether after tool use, or even a first-turn
-          # hiccup). Nudge ONCE for a real answer so the user (and the eval judge)
-          # never gets "(no result)" when a reply was recoverable. The summarized
-          # flag guards against re-nudging forever.
+          # (a common between-steps hiccup, or a first-turn stall). Nudge ONCE to make
+          # progress — but DON'T forbid tools. Forbidding them strands a model that
+          # stalled mid-task (it read a file and still needs to write it back), which is
+          # exactly how multi-step edits got cut off (wb-0lw8): narrate-then-act models
+          # emit an empty turn between the read and the write, and "don't call tools"
+          # killed the write. Tell it to CONTINUE the task OR finish, so a recoverable
+          # run never dead-ends at "(no result)". The summarized flag bounds this to one nudge.
           not st.summarized ->
             nudge = %{
               role: "user",
               content:
-                "Please give your answer to my request now, in plain language" <>
-                  if(st.step > 0, do: " using what your tools returned", else: "") <>
-                  ". Don't call any more tools."
+                "You returned an empty turn. If your task is not finished, CONTINUE — call the " <>
+                  "next tool you need" <>
+                  if(st.step > 0, do: " (for example, write back the file you just read)", else: "") <>
+                  ". If you are finished, give your final answer now in plain language."
             }
 
             loop(messages ++ [nudge], %{st | summarized: true, step: st.step + 1})

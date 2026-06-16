@@ -120,9 +120,15 @@ defmodule AgentCapabilities do
   # ---- run one case through the full agent loop, capturing streamed prose ----
   def run_case(c) do
     {:ok, vfs} = Workbooks.VFS.open(":memory:")
-    # Pre-seed an existing file when the case tests EDITING (vs creating).
+    # Exec agents (the production Waldo posture) target an OS WORKDIR, not the
+    # in-memory VFS (agent.ex:520-522). So a fresh per-case workdir is the agent's
+    # filesystem — and EDIT cases seed the existing file THERE (not in the VFS, which
+    # the exec agent never reads).
+    workdir = Path.join(System.tmp_dir!(), "cap-eval-#{:erlang.unique_integer([:positive])}")
+    File.mkdir_p!(workdir)
+
     case c[:seed] do
-      {path, content} -> Workbooks.VFS.put(vfs, path, content)
+      {path, content} -> File.write!(Path.join(workdir, path), content)
       _ -> :ok
     end
 
@@ -131,6 +137,7 @@ defmodule AgentCapabilities do
     run =
       Workbooks.Agent.run(system_prompt(), c.task,
         vfs: vfs,
+        workdir: workdir,
         exec: true,
         tenant: "eval",
         model: @model,
@@ -140,6 +147,7 @@ defmodule AgentCapabilities do
 
     streamed = Agent.get(buf, & &1)
     Agent.stop(buf)
+    File.rm_rf(workdir)
     %{run: run, streamed: streamed}
   end
 
@@ -182,10 +190,18 @@ defmodule AgentCapabilities do
   # instead of fabricating from nothing. (Honesty of the phrasing is semantic — the
   # LLM judge scores that; gating it on a keyword regex is a harness false-negative.)
   def check(%{name: "tool-use-honesty"}, %{run: run}) do
-    read? = Enum.any?(run.events, fn e -> e.tool == "vfs_read" and arg_text(e) =~ "roadmap" end)
-    if read?,
-      do: {true, "checked with vfs_read before answering (judge scores honesty of the reply)"},
-      else: {false, "answered without calling vfs_read on roadmap.org (guessed instead of checking)"}
+    # "Checked before answering" = inspected the filesystem with a read tool — vfs_read
+    # OR a shell listing/cat (both are valid ways to verify the file). Answering with no
+    # filesystem tool at all = guessed.
+    checked? =
+      Enum.any?(run.events, fn e ->
+        (e.tool == "vfs_read" and arg_text(e) =~ "roadmap") or
+          (e.tool == "shell" and arg_text(e) =~ ~r/roadmap|ls |find |cat |stat /i)
+      end)
+
+    if checked?,
+      do: {true, "checked the filesystem before answering (judge scores honesty of the reply)"},
+      else: {false, "answered without inspecting the filesystem (guessed instead of checking)"}
   end
 
   # ---- LLM judge (quality score for the report; deterministic check is the gate) ----
