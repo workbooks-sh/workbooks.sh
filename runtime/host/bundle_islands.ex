@@ -43,6 +43,10 @@ defmodule Workbooks.Bundle.Islands do
     component: "work-component"
   }
   @tag_kind Map.new(@kind_tag, fn {k, v} -> {v, k} end)
+  # The known kind atoms keyed by their string name — the allowlist that keeps a
+  # tampered manifest's `kind` away from `String.to_existing_atom` (which raises on
+  # an unknown string). Only these five kinds ever reify.
+  @tag_kind_by_name Map.new(@kind_tag, fn {k, _v} -> {Atom.to_string(k), k} end)
 
   # A headline carrying the `:agent:` tag — the cheap pre-filter so we only invoke
   # the (kernel-backed) AgentDef.parse on files that are actually agent defs.
@@ -245,25 +249,54 @@ defmodule Workbooks.Bundle.Islands do
     |> Jason.encode!()
   end
 
-  @doc "Parse a manifest JSON back into islands (the inverse of `to_manifest/2`)."
+  @doc """
+  Parse a manifest JSON back into islands (the inverse of `to_manifest/2`).
+
+  Fail-safe by construction: malformed/truncated JSON, the wrong top-level shape,
+  a non-list `islands`, or an entry whose `kind` isn't one of the known island
+  kinds is **skipped**, never crashed on. (A `kind` we don't recognize MUST NOT
+  reach `String.to_existing_atom` — an unknown/never-loaded atom string raises, so
+  this would otherwise be a trivial DoS / corruption vector on tampered manifests.)
+  Non-string `id`/`path` and a non-map `attrs` are coerced to `nil`/`%{}`.
+  """
   @spec from_manifest(binary) :: [map]
   def from_manifest(json) when is_binary(json) do
     case Jason.decode(json) do
-      {:ok, %{"islands" => list}} ->
-        Enum.map(list, fn m ->
-          %{
-            kind: String.to_existing_atom(m["kind"]),
-            id: m["id"],
-            path: m["path"],
-            attrs: m["attrs"] || %{},
-            body: nil
-          }
-        end)
+      {:ok, %{"islands" => list}} when is_list(list) ->
+        Enum.flat_map(list, &manifest_entry/1)
 
       _ ->
         []
     end
   end
+
+  # A valid entry resolves to a known kind; anything else (unknown/non-string kind,
+  # non-map entry) is dropped rather than crashing the whole parse.
+  defp manifest_entry(%{"kind" => kind} = m) when is_binary(kind) do
+    case Map.get(@tag_kind_by_name, kind) do
+      nil ->
+        []
+
+      atom ->
+        [
+          %{
+            kind: atom,
+            id: string_or_nil(m["id"]),
+            path: string_or_nil(m["path"]),
+            attrs: map_or_empty(m["attrs"]),
+            body: nil
+          }
+        ]
+    end
+  end
+
+  defp manifest_entry(_), do: []
+
+  defp string_or_nil(v) when is_binary(v), do: v
+  defp string_or_nil(_), do: nil
+
+  defp map_or_empty(v) when is_map(v), do: v
+  defp map_or_empty(_), do: %{}
 
   defp residence(%{body: b}) when is_binary(b), do: "inline"
   defp residence(_), do: "src"
