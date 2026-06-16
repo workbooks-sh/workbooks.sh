@@ -4,6 +4,13 @@
 // cell, or a <work-metric>. Same data contract + same engine as <work-chart>;
 // reach compute ONLY through src/data.
 //
+// FLOOR-ONLY by design — no powered (Observable Plot) tier. A sparkline is an
+// inline 96×24 glyph with no axes / legend / margins; Plot's figure model (margins,
+// scales, axis chrome) is overkill and would fight the inline box, while the floor
+// SVG is already minimal and optimal. <work-metric> is likewise a KPI scalar (it
+// only embeds a spark trend), so it stays floor too. The powered tier lives where
+// it pays off — the full <work-chart>.
+//
 // Re-based onto Lit: render() returns a Lit template wrapping the string-built
 // SVG via unsafeSVG (the drawing code is ours). The _load single-flight + stable
 // inline auto-name + whenRegistered/register plumbing is unchanged.

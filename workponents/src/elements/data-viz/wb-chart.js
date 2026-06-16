@@ -5,6 +5,16 @@
 // ONLY through the src/data layer (getEngine), exactly like the sibling
 // <work-table>. Composition-as-source: the chart carries its data + query as source.
 //
+// TWO render tiers behind ONE public API (attrs / events / data path identical):
+//   • FLOOR — zero-dependency SVG, themed entirely from --work-* (axes, gridlines,
+//     marks, legend, tooltip). The guaranteed render; never blocks on a network.
+//   • POWERED — Observable Plot (./plot-tier.js), lazy-loaded from a CDN ESM at
+//     runtime (overridable via window.__WB_PLOT__). Draws the SAME logical chart
+//     (same _layout() model) with Plot, themed from the SAME --work-* tokens.
+//   The tier resolves per-draw: `engine="plot"|"floor"` attr or
+//   window.__WB_CHART_ENGINE__ force it; default "auto" prefers Plot and falls
+//   back to the floor instantly if the lazy import fails (offline / blocked).
+//
 // Renders zero-dependency SVG themed entirely from --work-* (axes, gridlines, marks,
 // legend, tooltip). Responsive (re-renders on resize). The element does NO data
 // wrangling: it maps a WbQueryResult { columns, rows[i][j], types } to marks by
@@ -38,6 +48,7 @@
 //   label       pie: slice-label column (default = x); value = y
 //   size        sm | md | lg     (chart height preset)
 //   variant     card | bare      (visual shell)
+//   engine      auto | plot | floor   (render tier — see below)
 //   legend      auto | off       (default auto: shown when >1 series)
 //   format      usd | num | pct | none   (value formatting in axis + tooltip)
 //   title       optional heading rendered in the shell
@@ -50,6 +61,7 @@ import { WbElement, html, css, define } from "../../core/element.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { defineVariants, variantAttrs, resolveVariant } from "../../core/variants.js";
 import { getEngine } from "../../data/index.js";
+import { loadPlot, readTokens, renderPlot } from "./plot-tier.js";
 
 const VARIANTS = defineVariants({
   type: { options: ["bar", "line", "area", "scatter", "pie"], default: "bar" },
@@ -73,6 +85,7 @@ export class WbChart extends WbElement {
     ...variantAttrs(VARIANTS),
     "src-name", "query", "rows", "csv",
     "x", "y", "series", "label", "legend", "format", "title",
+    "engine",   // tier override: auto (default, prefer Plot) | plot | floor
   ];
 
   static styles = css`
@@ -90,13 +103,19 @@ export class WbChart extends WbElement {
       font-family: var(--work-font-mono); font-size: var(--work-text-sm); color: var(--work-fg-subtle); }
     .dot { width: 7px; height: 7px; border-radius: var(--work-radius-pill); background: var(--work-brand);
       box-shadow: 0 0 0 3px var(--work-brand-soft); }
-    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
+    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px var(--work-warn-soft); }
     .engine[data-tier="error"] .dot { background: var(--work-err); box-shadow: none; }
 
     .plot { padding: var(--work-space-3) var(--work-space-4) var(--work-space-4); position: relative; }
+    .powered:empty { display: none; }
+    /* when the powered tier (Observable Plot) has rendered into .powered, the floor
+       SVG is declaratively hidden — no imperative show/hide race against Lit's
+       shell re-render or the ResizeObserver. */
+    .plot:has(.powered > *) svg { display: none; }
+    .powered > * { width: 100%; }
     svg { display: block; width: 100%; height: auto; overflow: visible; }
     text { font-family: var(--work-font); fill: var(--work-fg-muted); }
-    .axis-label { fill: var(--work-fg-muted); font-size: 11px; }
+    .axis-label { fill: var(--work-fg-muted); font-size: var(--work-text-xs); }
     .axis-line { stroke: var(--work-border-strong); stroke-width: 1; }
     .grid { stroke: var(--work-border); stroke-width: 1; }
     .mark { transition: opacity var(--work-dur) var(--work-ease); cursor: pointer; }
@@ -109,7 +128,7 @@ export class WbChart extends WbElement {
     .legend { display: flex; flex-wrap: wrap; gap: var(--work-space-3);
       padding: 0 var(--work-space-4) var(--work-space-3); font-size: var(--work-text-sm); color: var(--work-fg-muted); }
     .legend .key { display: inline-flex; align-items: center; gap: var(--work-space-1); cursor: default; }
-    .legend .swatch { width: 11px; height: 11px; border-radius: 3px; }
+    .legend .swatch { width: 11px; height: 11px; border-radius: var(--work-radius-xs); }
 
     .tip { position: absolute; pointer-events: none; z-index: 3; opacity: 0;
       transform: translate(-50%, calc(-100% - 10px));
@@ -220,6 +239,31 @@ export class WbChart extends WbElement {
 
   variant(name) { return resolveVariant(this, VARIANTS, name); }
 
+  // The canonical LOGICAL model of the chart — series, data-point count, domain,
+  // category labels — independent of which tier drew it. The parity gate uses this
+  // off the FLOOR render as the oracle (the floor maps the engine result directly,
+  // so it IS the ground truth for "what the data says"). Pure read of _layout().
+  _logicalModel() {
+    const lay = this._layout();
+    if (!lay) return { seriesCount: 0, pointCount: 0, yMin: null, yMax: null, categories: [], seriesLabels: [] };
+    let yMin = Infinity, yMax = -Infinity, pointCount = 0;
+    for (const s of lay.series) for (const v of s.values) {
+      if (v == null) continue;
+      pointCount++;
+      if (v < yMin) yMin = v;
+      if (v > yMax) yMax = v;
+    }
+    return {
+      type: lay.type,
+      seriesCount: lay.series.length,
+      pointCount,
+      yMin: isFinite(yMin) ? yMin : null,
+      yMax: isFinite(yMax) ? yMax : null,
+      categories: lay.categories.map((c) => String(c)),
+      seriesLabels: lay.series.map((s) => String(s.label)),
+    };
+  }
+
   // ── render (shell only; the SVG is drawn imperatively in _draw) ───────────────
   render() {
     const title = this.attr("title");
@@ -235,7 +279,7 @@ export class WbChart extends WbElement {
       </div>`;
     const shell = `<div class="shell">
       ${head}
-      <div class="plot"><div class="tip"></div><svg part="svg"></svg></div>
+      <div class="plot"><div class="tip"></div><div class="powered" part="powered"></div><svg part="svg"></svg></div>
       <div class="legend"></div>
       <div class="foot">${this._error ? `<span class="err">${esc(this._error)}</span>` : ""}</div>
     </div>`;
@@ -311,14 +355,30 @@ export class WbChart extends WbElement {
     return { type, fmt, xName, categories, xVals, xNumeric, series, rows: r.rows, xj };
   }
 
+  // Which tier should draw? floor (zero-dep SVG) vs plot (Observable Plot).
+  //   - attribute engine="floor" | "plot" forces it (the gate drives this)
+  //   - window.__WB_CHART_ENGINE__ = "floor" | "plot" is the host opt-out
+  //   - default "auto": prefer Plot when it loads, fall back to the floor.
+  // Returns "floor" | "plot". A non-floor verdict still falls back to the floor
+  // synchronously if Plot has not resolved yet (the floor never blocks on a CDN).
+  _tierChoice() {
+    const attr = this.attr("engine");
+    if (attr === "floor" || attr === "plot") return attr;
+    const host = typeof window !== "undefined" && window.__WB_CHART_ENGINE__;
+    if (host === "floor" || host === "plot") return host;
+    return "auto";
+  }
+
   _draw() {
     const svg = this.shadowRoot && this.shadowRoot.querySelector("svg");
+    const powered = this.shadowRoot && this.shadowRoot.querySelector(".powered");
     if (!svg) return;
     const lay = this._layout();
     const legendEl = this.shadowRoot.querySelector(".legend");
     if (!lay) {
       svg.innerHTML = "";
       svg.removeAttribute("viewBox");
+      if (powered) powered.innerHTML = "";
       if (legendEl) legendEl.innerHTML = "";
       if (!this._busy && !this._error) {
         const plot = this.shadowRoot.querySelector(".plot");
@@ -334,16 +394,93 @@ export class WbChart extends WbElement {
     const oldEmpty = plot && plot.querySelector(".empty");
     if (oldEmpty) oldEmpty.remove();
 
+    const choice = this._tierChoice();
+    if (choice === "floor") return this._drawFloor(svg, powered, lay, legendEl);
+
+    // powered path. If Plot has already resolved (cached on the instance), render
+    // it SYNCHRONOUSLY this frame — no floor flash, no svg un-hide race on resize.
+    // Otherwise draw the floor instantly (never a blank chart) and upgrade to Plot
+    // once the lazy import lands.
+    if (this._Plot && powered) {
+      const ok = this._renderPoweredSync(svg, powered, lay, legendEl, this._Plot, choice === "plot");
+      if (ok) return;
+    }
+    this._drawFloor(svg, powered, lay, legendEl);
+    this._drawPowered(svg, powered, lay, legendEl, choice === "plot");
+  }
+
+  // Render the Plot figure into the powered host with an already-loaded Plot ns.
+  // Returns true on success (svg hidden, figure shown); false to fall to floor.
+  _renderPoweredSync(svg, powered, lay, legendEl, Plot, forced) {
+    if (!this._result) return false;
+    const tk = readTokens(this);
+    const W = Math.max(320, this.getBoundingClientRect().width || 640);
+    const H = HEIGHTS[this.variant("size")] || HEIGHTS.md;
+    let fig;
+    try {
+      fig = renderPlot(Plot, lay, tk, {
+        width: W, height: H, format: lay.fmt, legend: this.attr("legend", "auto"),
+      });
+    } catch (e) {
+      if (forced) console.warn("work-chart: Plot render failed, keeping floor", e);
+      return false;
+    }
+    powered.innerHTML = "";
+    powered.appendChild(fig);
+    // the floor SVG is hidden declaratively by CSS (.plot:has(.powered > *) svg);
+    // clear its marks so it carries no stale render behind the figure.
+    svg.innerHTML = "";
+    svg.removeAttribute("viewBox");
+    if (legendEl) legendEl.innerHTML = "";
+    this._engineTier = "plot";
+    this._wirePlotSelect(fig, lay);
+    return true;
+  }
+
+  // The zero-dependency SVG floor (the original renderer). Hides the powered host.
+  _drawFloor(svg, powered, lay, legendEl) {
+    if (powered) powered.innerHTML = "";   // empty .powered → CSS shows the floor svg
     const H = HEIGHTS[this.variant("size")] || HEIGHTS.md;
     // viewBox-driven so the SVG scales fluidly; width:100% in CSS.
     const vbW = Math.max(320, this.getBoundingClientRect().width || 640);
     const vbH = H;
-
     if (lay.type === "pie") this._drawPie(svg, lay, vbW, vbH);
     else this._drawXY(svg, lay, vbW, vbH);
-
     this._drawLegend(legendEl, lay);
     this._wireHover(svg, lay);
+    this._engineTier = "floor";
+  }
+
+  // The POWERED tier — Observable Plot, lazy-loaded. On success it replaces the
+  // floor SVG with a Plot <figure> rendered from the SAME `lay` model, themed from
+  // the live --work-* tokens. On failure (network-blocked / load error) it leaves
+  // the floor in place (forced="plot" still degrades gracefully — the floor IS the
+  // guaranteed render; the gate proves this).
+  async _drawPowered(svg, powered, lay, legendEl, forced) {
+    if (!powered) return;
+    const token = (this._drawToken = (this._drawToken || 0) + 1);
+    let Plot;
+    try { Plot = await loadPlot(); }
+    catch { return; /* floor already drawn — graceful degrade */ }
+    if (token !== this._drawToken) return;      // a newer draw superseded this one
+    this._Plot = Plot;                          // cache so later draws go sync
+    const ok = this._renderPoweredSync(svg, powered, lay, legendEl, Plot, forced);
+    if (ok) this._emit("work-chart-engine", { engine: "plot" });
+  }
+
+  // Forward Plot mark clicks to the SAME work-point-select contract as the floor.
+  _wirePlotSelect(fig, lay) {
+    const r = this._result;
+    fig.querySelectorAll("[fill]").forEach((mark) => {
+      mark.style.cursor = "pointer";
+      mark.addEventListener("click", () => {
+        // Plot bars/dots carry their datum index in document order; map back to
+        // the layout. We approximate by reading the mark's __data__ when present.
+        const d = mark.__data__;
+        if (d == null) return;
+        this._emit("work-point-select", { series: d.series, x: d.x, y: d.y, row: d, index: -1 });
+      });
+    });
   }
 
   _drawXY(svg, lay, W, H) {

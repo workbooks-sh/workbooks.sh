@@ -57,6 +57,13 @@
   --work-text-sm: 12.5px;
   --work-text: 14px;
   --work-text-lg: 16px;
+  --work-text-xs: 11px;
+  /* data-viz (Plot tier): KPI display scale + fine radius/space rungs */
+  --work-text-metric-sm: 22px;
+  --work-text-metric: 30px;
+  --work-text-metric-lg: 42px;
+  --work-radius-xs: 3px;
+  --work-space-px: 1px;
   /* depth + motion */
   --work-shadow: 0 1px 2px rgba(18, 19, 22, 0.06), 0 8px 24px rgba(18, 19, 22, 0.08);
   --work-shadow-sm: 0 1px 2px rgba(18, 19, 22, 0.08);
@@ -99,7 +106,7 @@
   --work-fg: #e9edf4; --work-fg-muted: #8893a6; --work-fg-subtle: #5b6573;
   --work-brand: #3da9fc; --work-brand-soft: rgba(61,169,252,0.14); --work-on-brand: #04121f;
   --work-ring: rgba(61,169,252,0.5);
-  --work-radius: 2px; --work-radius-sm: 2px; --work-radius-lg: 3px; --work-radius-pill: 3px;
+  --work-radius: 2px; --work-radius-sm: 2px; --work-radius-lg: 3px; --work-radius-pill: 3px; --work-radius-xs: 1px;
   --work-font: "Space Grotesk", system-ui, sans-serif;
   --work-font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --work-font-display: "Space Grotesk", sans-serif;

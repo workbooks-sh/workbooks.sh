@@ -30,6 +30,17 @@
     window.__loadErrors = [];
     try { await import("/src/index.js"); }
     catch (e) { window.__loadErrors.push("index.js: " + String(e)); }
+    // The harness runs OFFLINE (no CDN). Pin the shared data engine to the zero-dep
+    // in-JS memory provider so data-bound elements (work-chart/table/metric) never
+    // hang awaiting the sqlite-wasm CDN boot — they resolve their queries instantly
+    // against the in-page subset, exactly as the offline-floor contract intends.
+    try {
+      const { getEngine } = await import("/src/data/index.js");
+      const eng = getEngine();
+      eng._provider = "memory";
+      eng._initPromise = Promise.resolve();
+      eng._ensureProvider = async () => "memory";
+    } catch (e) { window.__loadErrors.push("data-engine pin: " + String(e)); }
     // Per-module loader: import one element file in isolation. Returns true if the
     // tag is registered afterwards. Used by the harness to recover elements that a
     // barrel-level throw skipped (a bad sibling module can't strand a good one).
@@ -94,6 +105,54 @@
         };
         visit(el, tag);
         return { records: out };
+      },
+      // Install a faithful offline Observable Plot shim as window.__WB_PLOT__ so
+      // the powered tier's BINDING path runs without a CDN (the parity gate reads
+      // the datum Plot binds onto each mark). Real Plot rendering is proven in the
+      // browser demo step — here we verify only that the tier hands Plot the SAME
+      // logical model the floor computed (same series/points/domain/labels).
+      installPlotShim() {
+        if (window.__WB_PLOT__) return;
+        const NS = "http://www.w3.org/2000/svg";
+        const dataMark = (data, tag) => ({ __mark: true, data, tag });
+        const Plot = {
+          frame: () => ({ __mark: true, data: [], tag: "rect", frame: true }),
+          gridY: () => ({ __mark: true, data: [], tag: "line", grid: true }),
+          ruleY: () => ({ __mark: true, data: [], tag: "line", rule: true }),
+          barY: (data) => dataMark(data, "rect"),
+          line: (data) => dataMark(data, "path"),
+          areaY: (data) => dataMark(data, "path"),
+          dot: (data) => dataMark(data, "circle"),
+          text: () => ({ __mark: true, data: [], tag: "text" }),
+          plot(spec) {
+            const W = spec.width || 320, H = spec.height || 300;
+            const fig = document.createElement("figure");
+            fig.style.margin = "0";
+            // Plot writes a scoped <style> INSIDE the figure — mirror that so the
+            // scope gate sees the same shape (no document.head pollution).
+            const st = document.createElement("style");
+            st.textContent = ".plot-shim{}"; // inert, scoped within the figure subtree
+            fig.appendChild(st);
+            const svg = document.createElementNS(NS, "svg");
+            svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+            svg.setAttribute("width", "100%");
+            for (const m of (spec.marks || [])) {
+              if (!m || !m.__mark) continue;
+              // a line/area mark binds ONE datum per series point — explode it so the
+              // bound-datum count matches the floor's point count.
+              for (const d of (m.data || [])) {
+                const node = document.createElementNS(NS, m.tag === "path" ? "circle" : m.tag);
+                node.setAttribute("data-mark", "");
+                node.setAttribute("fill", "currentColor");
+                node.__data__ = d; // the bound datum the parity gate reads
+                svg.appendChild(node);
+              }
+            }
+            fig.appendChild(svg);
+            return fig;
+          },
+        };
+        window.__WB_PLOT__ = Plot;
       },
       // Count nodes in document.head that the element mounting may have injected.
       headRuleSignature() {

@@ -2,111 +2,556 @@
   "$comment": "workponents theme contract — the single machine-readable source of truth for the --work-* token namespace, the allowed variant enums, and the registered theme ids. design-lint AND agents read THIS file (not the elements) to know what is in-system. Generated/maintained alongside src/theme/tokens.css + src/theme/registry.js; keep in sync when a token or variant is added.",
   "namespace": "--work-",
   "tokens": {
-    "work-bg": { "role": "page background", "type": "color" },
-    "work-surface": { "role": "raised surface / card background", "type": "color" },
-    "work-surface-soft": { "role": "recessed / muted surface", "type": "color" },
-    "work-border": { "role": "hairline border", "type": "color" },
-    "work-border-strong": { "role": "emphasized border", "type": "color" },
-    "work-fg": { "role": "primary foreground / text", "type": "color" },
-    "work-fg-muted": { "role": "secondary text", "type": "color" },
-    "work-fg-subtle": { "role": "tertiary / placeholder text", "type": "color" },
-    "work-brand": { "role": "brand accent", "type": "color" },
-    "work-brand-soft": { "role": "brand tint (soft fills, selection)", "type": "color" },
-    "work-brand-ink": { "role": "text on brand-soft tint", "type": "color" },
-    "work-on-brand": { "role": "text/icon on solid brand fill", "type": "color" },
-    "work-ring": { "role": "focus ring", "type": "color" },
-    "work-ok": { "role": "success state", "type": "color" },
-    "work-warn": { "role": "warning state", "type": "color" },
-    "work-err": { "role": "error state", "type": "color" },
-    "work-on-state": { "role": "text/icon on a solid ok/err state fill", "type": "color" },
-    "work-on-warn": { "role": "text/icon on a solid warn fill", "type": "color" },
-    "work-ok-soft": { "role": "success tint", "type": "color" },
-    "work-warn-soft": { "role": "warning tint", "type": "color" },
-    "work-err-soft": { "role": "error tint", "type": "color" },
-    "work-chip-blue": { "role": "pastel chip — blue", "type": "color" },
-    "work-chip-green": { "role": "pastel chip — green", "type": "color" },
-    "work-chip-peach": { "role": "pastel chip — peach", "type": "color" },
-    "work-chip-lavender": { "role": "pastel chip — lavender", "type": "color" },
-    "work-radius": { "role": "default corner radius", "type": "radius" },
-    "work-radius-sm": { "role": "small corner radius", "type": "radius" },
-    "work-radius-lg": { "role": "large corner radius", "type": "radius" },
-    "work-radius-pill": { "role": "pill / full radius", "type": "radius" },
-    "work-space-1": { "role": "space scale — 1", "type": "space" },
-    "work-space-2": { "role": "space scale — 2", "type": "space" },
-    "work-space-3": { "role": "space scale — 3", "type": "space" },
-    "work-space-4": { "role": "space scale — 4", "type": "space" },
-    "work-space-5": { "role": "space scale — 5", "type": "space" },
-    "work-font": { "role": "body sans font stack", "type": "font" },
-    "work-font-mono": { "role": "monospace font stack", "type": "font" },
-    "work-font-display": { "role": "display font stack", "type": "font" },
-    "work-text-sm": { "role": "small text size", "type": "font" },
-    "work-text": { "role": "base text size", "type": "font" },
-    "work-text-lg": { "role": "large text size", "type": "font" },
-    "work-shadow": { "role": "elevation shadow", "type": "shadow" },
-    "work-shadow-sm": { "role": "small shadow", "type": "shadow" },
-    "work-ease": { "role": "motion easing curve", "type": "motion" },
-    "work-dur": { "role": "motion duration", "type": "motion" }
+    "work-bg": {
+      "role": "page background",
+      "type": "color"
+    },
+    "work-surface": {
+      "role": "raised surface / card background",
+      "type": "color"
+    },
+    "work-surface-soft": {
+      "role": "recessed / muted surface",
+      "type": "color"
+    },
+    "work-border": {
+      "role": "hairline border",
+      "type": "color"
+    },
+    "work-border-strong": {
+      "role": "emphasized border",
+      "type": "color"
+    },
+    "work-fg": {
+      "role": "primary foreground / text",
+      "type": "color"
+    },
+    "work-fg-muted": {
+      "role": "secondary text",
+      "type": "color"
+    },
+    "work-fg-subtle": {
+      "role": "tertiary / placeholder text",
+      "type": "color"
+    },
+    "work-brand": {
+      "role": "brand accent",
+      "type": "color"
+    },
+    "work-brand-soft": {
+      "role": "brand tint (soft fills, selection)",
+      "type": "color"
+    },
+    "work-brand-ink": {
+      "role": "text on brand-soft tint",
+      "type": "color"
+    },
+    "work-on-brand": {
+      "role": "text/icon on solid brand fill",
+      "type": "color"
+    },
+    "work-ring": {
+      "role": "focus ring",
+      "type": "color"
+    },
+    "work-ok": {
+      "role": "success state",
+      "type": "color"
+    },
+    "work-warn": {
+      "role": "warning state",
+      "type": "color"
+    },
+    "work-err": {
+      "role": "error state",
+      "type": "color"
+    },
+    "work-on-state": {
+      "role": "text/icon on a solid ok/err state fill",
+      "type": "color"
+    },
+    "work-on-warn": {
+      "role": "text/icon on a solid warn fill",
+      "type": "color"
+    },
+    "work-ok-soft": {
+      "role": "success tint",
+      "type": "color"
+    },
+    "work-warn-soft": {
+      "role": "warning tint",
+      "type": "color"
+    },
+    "work-err-soft": {
+      "role": "error tint",
+      "type": "color"
+    },
+    "work-chip-blue": {
+      "role": "pastel chip — blue",
+      "type": "color"
+    },
+    "work-chip-green": {
+      "role": "pastel chip — green",
+      "type": "color"
+    },
+    "work-chip-peach": {
+      "role": "pastel chip — peach",
+      "type": "color"
+    },
+    "work-chip-lavender": {
+      "role": "pastel chip — lavender",
+      "type": "color"
+    },
+    "work-radius": {
+      "role": "default corner radius",
+      "type": "radius"
+    },
+    "work-radius-sm": {
+      "role": "small corner radius",
+      "type": "radius"
+    },
+    "work-radius-lg": {
+      "role": "large corner radius",
+      "type": "radius"
+    },
+    "work-radius-pill": {
+      "role": "pill / full radius",
+      "type": "radius"
+    },
+    "work-space-1": {
+      "role": "space scale — 1",
+      "type": "space"
+    },
+    "work-space-2": {
+      "role": "space scale — 2",
+      "type": "space"
+    },
+    "work-space-3": {
+      "role": "space scale — 3",
+      "type": "space"
+    },
+    "work-space-4": {
+      "role": "space scale — 4",
+      "type": "space"
+    },
+    "work-space-5": {
+      "role": "space scale — 5",
+      "type": "space"
+    },
+    "work-font": {
+      "role": "body sans font stack",
+      "type": "font"
+    },
+    "work-font-mono": {
+      "role": "monospace font stack",
+      "type": "font"
+    },
+    "work-font-display": {
+      "role": "display font stack",
+      "type": "font"
+    },
+    "work-text-sm": {
+      "role": "small text size",
+      "type": "font"
+    },
+    "work-text": {
+      "role": "base text size",
+      "type": "font"
+    },
+    "work-text-lg": {
+      "role": "large text size",
+      "type": "font"
+    },
+    "work-shadow": {
+      "role": "elevation shadow",
+      "type": "shadow"
+    },
+    "work-shadow-sm": {
+      "role": "small shadow",
+      "type": "shadow"
+    },
+    "work-ease": {
+      "role": "motion easing curve",
+      "type": "motion"
+    },
+    "work-dur": {
+      "role": "motion duration",
+      "type": "motion"
+    },
+    "work-text-xs": {
+      "role": "caption text size",
+      "type": "font"
+    },
+    "work-text-metric-sm": {
+      "role": "small KPI display size",
+      "type": "font"
+    },
+    "work-text-metric": {
+      "role": "KPI display size",
+      "type": "font"
+    },
+    "work-text-metric-lg": {
+      "role": "large KPI display size",
+      "type": "font"
+    },
+    "work-radius-xs": {
+      "role": "fine corner radius",
+      "type": "font"
+    },
+    "work-space-px": {
+      "role": "hairline spacing",
+      "type": "font"
+    }
   },
-  "allowedLiterals": ["transparent", "currentColor", "inherit", "none", "unset", "initial"],
+  "allowedLiterals": [
+    "transparent",
+    "currentColor",
+    "inherit",
+    "none",
+    "unset",
+    "initial"
+  ],
   "variants": {
     "work-button": {
-      "variant": ["solid", "soft", "outline", "ghost"],
-      "size": ["sm", "md", "lg"],
-      "tone": ["brand", "neutral", "ok", "warn", "err"]
+      "variant": [
+        "solid",
+        "soft",
+        "outline",
+        "ghost"
+      ],
+      "size": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "tone": [
+        "brand",
+        "neutral",
+        "ok",
+        "warn",
+        "err"
+      ]
     },
-    "work-table": { "variant": ["card", "bare"], "density": ["comfortable", "compact"] },
+    "work-table": {
+      "variant": [
+        "card",
+        "bare"
+      ],
+      "density": [
+        "comfortable",
+        "compact"
+      ]
+    },
     "work-map": {
-      "mode": ["points", "heat", "choropleth"],
-      "variant": ["card", "bare"],
-      "projection": ["mercator", "equirectangular"]
+      "mode": [
+        "points",
+        "heat",
+        "choropleth"
+      ],
+      "variant": [
+        "card",
+        "bare"
+      ],
+      "projection": [
+        "mercator",
+        "equirectangular"
+      ]
     },
     "work-video": {
-      "variant": ["solid", "soft", "bare"],
-      "size": ["sm", "md", "lg"],
-      "tone": ["brand", "neutral"]
+      "variant": [
+        "solid",
+        "soft",
+        "bare"
+      ],
+      "size": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "tone": [
+        "brand",
+        "neutral"
+      ]
     },
-    "work-record-list": { "layout": ["cards", "rows"], "variant": ["card", "bare"] },
-    "work-field-value": { "display": ["auto", "text", "badge", "link", "bool", "date", "money", "json"] },
-    "work-field": { "variant": ["outline", "soft", "ghost"], "size": ["sm", "md", "lg"] },
-    "work-auth": { "mode": ["password", "magic"], "state": ["idle", "loading", "error"] },
-    "work-record": { "layout": ["stacked", "grid", "inline"], "variant": ["card", "bare"] },
-    "work-user": { "variant": ["menu", "compact"] },
-    "work-editor": { "variant": ["card", "inline"] },
-    "work-repl": { "variant": ["card", "inline"] },
-    "work-doc-cell": { "display": ["table", "metric", "raw"], "variant": ["card", "inline"] },
-    "work-search": { "variant": ["card", "bare"], "size": ["sm", "md", "lg"] },
-    "work-command": { "variant": ["center", "top"] },
-    "work-message": { "role": ["user", "assistant", "system", "tool"] },
-    "work-presence": { "variant": ["avatars", "list", "count"] },
-    "work-live-value": { "variant": ["counter", "toggle", "text"] },
-    "work-composer": { "state": ["idle", "thinking", "streaming"] },
-    "work-spark": { "type": ["line", "area", "bar"], "tone": ["brand", "ok", "warn", "err", "neutral"] },
-    "work-file": { "variant": ["card", "bare"], "density": ["sm", "md", "lg"] },
-    "work-metric": { "size": ["sm", "md", "lg"], "variant": ["card", "bare"] },
+    "work-record-list": {
+      "layout": [
+        "cards",
+        "rows"
+      ],
+      "variant": [
+        "card",
+        "bare"
+      ]
+    },
+    "work-field-value": {
+      "display": [
+        "auto",
+        "text",
+        "badge",
+        "link",
+        "bool",
+        "date",
+        "money",
+        "json"
+      ]
+    },
+    "work-field": {
+      "variant": [
+        "outline",
+        "soft",
+        "ghost"
+      ],
+      "size": [
+        "sm",
+        "md",
+        "lg"
+      ]
+    },
+    "work-auth": {
+      "mode": [
+        "password",
+        "magic"
+      ],
+      "state": [
+        "idle",
+        "loading",
+        "error"
+      ]
+    },
+    "work-record": {
+      "layout": [
+        "stacked",
+        "grid",
+        "inline"
+      ],
+      "variant": [
+        "card",
+        "bare"
+      ]
+    },
+    "work-user": {
+      "variant": [
+        "menu",
+        "compact"
+      ]
+    },
+    "work-editor": {
+      "variant": [
+        "card",
+        "inline"
+      ]
+    },
+    "work-repl": {
+      "variant": [
+        "card",
+        "inline"
+      ]
+    },
+    "work-doc-cell": {
+      "display": [
+        "table",
+        "metric",
+        "raw"
+      ],
+      "variant": [
+        "card",
+        "inline"
+      ]
+    },
+    "work-search": {
+      "variant": [
+        "card",
+        "bare"
+      ],
+      "size": [
+        "sm",
+        "md",
+        "lg"
+      ]
+    },
+    "work-command": {
+      "variant": [
+        "center",
+        "top"
+      ]
+    },
+    "work-message": {
+      "role": [
+        "user",
+        "assistant",
+        "system",
+        "tool"
+      ]
+    },
+    "work-presence": {
+      "variant": [
+        "avatars",
+        "list",
+        "count"
+      ]
+    },
+    "work-live-value": {
+      "variant": [
+        "counter",
+        "toggle",
+        "text"
+      ]
+    },
+    "work-composer": {
+      "state": [
+        "idle",
+        "thinking",
+        "streaming"
+      ]
+    },
+    "work-spark": {
+      "type": [
+        "line",
+        "area",
+        "bar"
+      ],
+      "tone": [
+        "brand",
+        "ok",
+        "warn",
+        "err",
+        "neutral"
+      ]
+    },
+    "work-file": {
+      "variant": [
+        "card",
+        "bare"
+      ],
+      "density": [
+        "sm",
+        "md",
+        "lg"
+      ]
+    },
+    "work-metric": {
+      "size": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "variant": [
+        "card",
+        "bare"
+      ]
+    },
     "work-chart": {
-      "type": ["bar", "line", "area", "scatter", "pie"],
-      "size": ["sm", "md", "lg"],
-      "variant": ["card", "bare"]
+      "type": [
+        "bar",
+        "line",
+        "area",
+        "scatter",
+        "pie"
+      ],
+      "size": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "variant": [
+        "card",
+        "bare"
+      ]
     },
-    "work-drive": { "view": ["grid", "list"], "variant": ["framed", "bare"] },
-    "work-dropzone": { "variant": ["framed", "bare"] },
+    "work-drive": {
+      "view": [
+        "grid",
+        "list"
+      ],
+      "variant": [
+        "framed",
+        "bare"
+      ]
+    },
+    "work-dropzone": {
+      "variant": [
+        "framed",
+        "bare"
+      ]
+    },
     "work-slide": {
-      "band": ["title", "content", "media", "split", "quote", "closing"],
-      "transition": ["fade", "rise", "slide", "scale", "none"],
-      "align": ["center", "start", "end"]
+      "band": [
+        "title",
+        "content",
+        "media",
+        "split",
+        "quote",
+        "closing"
+      ],
+      "transition": [
+        "fade",
+        "rise",
+        "slide",
+        "scale",
+        "none"
+      ],
+      "align": [
+        "center",
+        "start",
+        "end"
+      ]
     },
-    "work-deck": { "variant": ["framed", "bare"] },
-    "work-diff": { "mode": ["split", "inline"], "diff": ["semantic", "lines", "auto"] }
+    "work-deck": {
+      "variant": [
+        "framed",
+        "bare"
+      ]
+    },
+    "work-diff": {
+      "mode": [
+        "split",
+        "inline"
+      ],
+      "diff": [
+        "semantic",
+        "lines",
+        "auto"
+      ]
+    }
   },
-  "themes": ["light", "dark", "signal"],
+  "themes": [
+    "light",
+    "dark",
+    "signal"
+  ],
   "contrastTargets": {
     "$comment": "WCAG minimums the design-lint enforces per registered theme. text = 4.5:1, ui = 3:1.",
     "pairs": [
-      { "fg": "work-fg", "bg": "work-bg", "min": 4.5, "kind": "text" },
-      { "fg": "work-fg", "bg": "work-surface", "min": 4.5, "kind": "text" },
-      { "fg": "work-on-brand", "bg": "work-brand", "min": 4.5, "kind": "text" },
-      { "fg": "work-brand-ink", "bg": "work-brand-soft", "min": 4.5, "kind": "text" },
-      { "fg": "work-fg-muted", "bg": "work-surface", "min": 3.0, "kind": "ui" }
+      {
+        "fg": "work-fg",
+        "bg": "work-bg",
+        "min": 4.5,
+        "kind": "text"
+      },
+      {
+        "fg": "work-fg",
+        "bg": "work-surface",
+        "min": 4.5,
+        "kind": "text"
+      },
+      {
+        "fg": "work-on-brand",
+        "bg": "work-brand",
+        "min": 4.5,
+        "kind": "text"
+      },
+      {
+        "fg": "work-brand-ink",
+        "bg": "work-brand-soft",
+        "min": 4.5,
+        "kind": "text"
+      },
+      {
+        "fg": "work-fg-muted",
+        "bg": "work-surface",
+        "min": 3,
+        "kind": "ui"
+      }
     ]
   }
 }

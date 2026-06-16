@@ -157,9 +157,34 @@ async function visualBaseline(page, tag, baseSpec, update) {
   for (const theme of THEMES) {
     await page.evaluate((t) => window.__gate.setTheme(t), theme);
     for (let vi = 0; vi < variants.length; vi++) {
-      const spec = { tag, attrs: { ...(baseSpec.attrs || {}), ...variants[vi] }, html: baseSpec.html };
+      // The offline harness has no real powered engine (CDN-blocked), and the
+      // parity gate may have left a binding-only shim installed — so the visual
+      // baseline is captured from the deterministic FLOOR. Powered-tier pixels are
+      // intentionally NOT a baseline (they require the real CDN engine; verified in
+      // the browser demo). A floor-forcing attr keeps every element's shot stable.
+      const floorAttr = POWERED_SEAMS[tag] ? { engine: "floor" } : {};
+      const spec = { tag, attrs: { ...(baseSpec.attrs || {}), ...variants[vi], ...floorAttr }, html: baseSpec.html };
       await page.evaluate((s) => window.__gate.mount(s), spec);
-      await page.waitForTimeout(60);
+      // data-bound elements (chart/table/metric/spark) resolve their query async,
+      // after the first Lit update the mount awaited — give the engine round-trip
+      // (in-memory, fast) time to draw its marks before the shot, so the baseline
+      // captures the rendered chart, not the pre-data shell.
+      await page.waitForTimeout(120);
+      // poll until the element has painted real content (axis/marks) or a short
+      // budget elapses — robust to the async engine round-trip without a blanket
+      // long sleep on every shot.
+      await page.evaluate((t) => {
+        return new Promise((res) => {
+          const el = document.querySelector("#stage " + t);
+          const ready = () => el && el.shadowRoot &&
+            (el.shadowRoot.querySelector("svg rect, svg path, svg circle, .powered > *") ||
+             el.shadowRoot.childElementCount > 0);
+          let n = 0;
+          const tick = () => { if (ready() || n++ > 30) res(); else setTimeout(tick, 16); };
+          tick();
+        });
+      }, spec.tag).catch(() => {});
+      await page.waitForTimeout(40);
       const el = await page.$(`#stage ${tag}`);
       const name = `${tag}-${theme}-v${vi}.png`;
       const file = join(BASELINE_DIR, name);
@@ -266,9 +291,21 @@ async function gateElement(page, el, update) {
     if (!rendered) { wasmPass = false; leaks.push({ gate: "wasm", rule: "floor-degrade", message: `floor did not render with ${seam.enginePattern} blocked` }); }
   }
 
-  // (d) functional-parity-vs-floor (framework; no-op until P3)
-  const parity = await functionalParity(tag, page, mount, mount);
+  // (d) functional-parity-vs-floor. The oracle mounts the FLOOR (engine="floor");
+  // the candidate installs the offline Plot shim + mounts the POWERED tier
+  // (engine="plot") so Plot's data-binding path runs without a CDN, then reads what
+  // Plot bound. For a pure-floor element both are no-ops (structural pass).
+  const mountFloor = () => page.evaluate((s) => window.__gate.mount(s),
+    { tag, attrs: { ...baseSpec.attrs, engine: "floor" }, html: baseSpec.html });
+  const mountEngine = async () => {
+    await page.evaluate(() => window.__gate.installPlotShim && window.__gate.installPlotShim());
+    return page.evaluate((s) => window.__gate.mount(s),
+      { tag, attrs: { ...baseSpec.attrs, engine: "plot" }, html: baseSpec.html });
+  };
+  const parity = await functionalParity(tag, page, mountFloor, mountEngine);
   if (!parity.pass) leaks.push({ gate: "functional", rule: "parity", message: parity.note });
+  // restore the default (engine-less) mount so the visual gate measures the floor
+  await mount();
 
   // (e) visual baseline
   const visual = await visualBaseline(page, tag, baseSpec, update);

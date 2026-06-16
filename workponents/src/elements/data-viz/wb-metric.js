@@ -57,13 +57,13 @@ export class WbMetric extends WbElement {
       letter-spacing: 0.04em; text-transform: uppercase; color: var(--work-fg-muted); }
     .row { display: flex; align-items: baseline; gap: var(--work-space-2); margin-top: var(--work-space-1); }
     .value { font-family: var(--work-font-display, var(--work-font)); font-weight: 600;
-      letter-spacing: -0.02em; font-size: 30px; line-height: 1.05; font-variant-numeric: tabular-nums; }
-    :host([size="sm"]) .value { font-size: 22px; }
-    :host([size="lg"]) .value { font-size: 42px; }
+      letter-spacing: -0.02em; font-size: var(--work-text-metric); line-height: 1.05; font-variant-numeric: tabular-nums; }
+    :host([size="sm"]) .value { font-size: var(--work-text-metric-sm); }
+    :host([size="lg"]) .value { font-size: var(--work-text-metric-lg); }
     .delta { font-family: var(--work-font-mono); font-size: var(--work-text-sm); font-weight: 600;
-      padding: 1px 6px; border-radius: var(--work-radius-pill); }
+      padding: var(--work-space-px) var(--work-space-2); border-radius: var(--work-radius-pill); }
     .delta.up { color: var(--work-ok); background: var(--work-brand-soft); }
-    .delta.down { color: var(--work-err); background: rgba(201,47,47,0.12); }
+    .delta.down { color: var(--work-err); background: var(--work-err-soft); }
     .spark { margin-top: var(--work-space-2); }
     .err { color: var(--work-err); font-family: var(--work-font-mono); font-size: var(--work-text-sm); }
   `;

@@ -415,6 +415,9 @@
             },
             {
               "name": "title"
+            },
+            {
+              "name": "engine"
             }
           ],
           "events": [
@@ -423,6 +426,9 @@
             },
             {
               "name": "work-chart-query"
+            },
+            {
+              "name": "work-chart-engine"
             },
             {
               "name": "work-point-select"
