@@ -1,0 +1,210 @@
+#+TITLE: Component / Workponents Agent-Eval Handoff
+#+AUTHOR: composition-model work
+#+DATE: 2026-06-16
+#+OPTIONS: toc:2
+
+* Purpose
+
+A handoff for the agent-evaluation work: what we built (workponents SDK,
+composition islands, the component-emit eval pack), how the component eval
+harness works, the *non-obvious pitfalls we already solved* (so you don't
+re-hit them), the confident-gate philosophy, and the open items to fold into a
+larger agent-evaluation framework.
+
+Everything below is on =main= (canon). Nothing here is speculative — the file
+references are live.
+
+* What we built (the substrate under test)
+
+** workponents — the =work-*= web-component SDK
+- 45 custom elements across 17 domains, Lit-based, themed only via =--work-*=
+  CSS tokens. The agent composes these as the UI/structured-output surface.
+- Authoritative registry: =workponents/custom-elements.json= (the CEM). It
+  carries tag + attribute *names* per element (NO types/descriptions yet — see
+  [[*Open items]]).
+- 5-gate Playwright harness (=workponents/tools/gate/=): token-leak, scope,
+  loadability, parity-vs-floor, visual baseline. =node tools/gate/run.js
+  --strict= → 45/45, 0 leaks. =node tools/design-lint.mjs= → 0.
+- Self-contained build: =workponents/dist/workponents.js= (=npm run build=,
+  esbuild). Lit bundled IN; lazy CDN engine tiers (Plot/MapLibre/CodeMirror/
+  MiniSearch) stay dynamic imports. =dist/= is gitignored — build before use.
+
+** Composition islands (runtime) — =Workbooks.Bundle.Islands=
+- =runtime/host/bundle_islands.ex= — typed config islands
+  (=<work-agent>/<work-toolkit>/<work-org>/<work-vfs>/<work-component>=) as a
+  bijection onto the org/tree the runtime already eats. Wired into
+  =wb bundle= / =wb unbundle= / =wb islands=.
+- Tests: =runtime/test/bundle_islands_test.exs= (P0–P3),
+  =bundle_islands_adversarial_test.exs= (28 hostile-input),
+  =bundle_islands_cli_test.exs= (e2e). All green.
+- Directive: =docs/WORKBOOK-COMPOSITION-MODEL.md=. Thesis: web-component-first
+  STRUCTURE, org-as-CONTENT.
+- NOTE: islands are an *authoring/runtime* concept. =work-agent=/=work-toolkit=
+  are NOT in the workponents CEM, so the chat agent (Waldo) cannot discover
+  them — see [[*Open items]].
+
+** The component-emit eval pack
+- Runner: =Workbooks.Evals.Components= (=runtime/host/evals/components.ex=).
+- Specs: =runtime/evals/components/specs/*.eval.md= (11 cases). YAML frontmatter
+  (=name/agent/turns[].prompt/checks[]/rubric=) + adversarial prose.
+- Run artifacts: =runtime/evals/components/runs/<case>-<ts>/= (emit.org,
+  mount.{light,dark}.html/png, verdict.md) — gitignored.
+
+* How the component eval harness works
+
+** Run it
+#+begin_src sh
+cd runtime
+# whole pack
+mix run --no-halt -e 'IO.puts(Workbooks.Evals.Components.run()); System.halt(0)'
+# one case (substring match)
+mix run --no-halt -e 'IO.puts(Workbooks.Evals.Components.run("chart-not-table")); System.halt(0)'
+#+end_src
+- Requires =OPENROUTER_API_KEY= in env (the LLM + the vision judge).
+- Requires =workponents/dist/workponents.js= built (the mount inlines it).
+- Headless Chrome for the frames (auto-detected; macOS Chrome.app works).
+- The whole pack with the vision judge is slow (~minutes); long single =run()=
+  invocations can get killed — prefer batches of 1–3 cases.
+
+** The pipeline per case (components.ex)
+1. =agent_emit/3= — EMIT-ONLY: a direct =Workbooks.Llm.complete= (NO search/
+   shell tool loop). Measures COMPOSITION, not tool behavior.
+2. =extract_component/1= — parse the emitted =#+begin_src component= block (or a
+   raw =<work-*>= element) → ={tag, props, body, raw}=.
+3. Deterministic checks (=component.emits_tag=, =binds_data=,
+   =themes_from_tokens=, =voice.component_parity=).
+4. =mount_and_shoot/2= — mount the element headless, screenshot light + dark.
+5. =rubric.passes= — a vision judge (gemini-3-pro) scores the rubric against the
+   frames; threshold = every dimension ≥2 AND sum ≥14/18.
+
+** Model + catalog
+- =@eval_model = "anthropic/claude-haiku-4.5"= (override =WB_EVAL_MODEL=). Do
+  NOT use the cheap platform default — it tool-thrashes (~2.5 min/step).
+- The eval injects the REAL production catalog
+  (=Workbooks.Toolkits.component_catalog(["workponents"])=) — the same surface
+  Waldo sees — not an eval-local copy.
+
+* Waldo's actual system context (so evals test the real thing)
+
+Built in =runtime/host/web.ex= (=agent_system_prompt=, ~line 2095). Three layers:
+1. Base prompt — warm assistant; reply in prose; tools only to act; RICH REPLIES
+   via =#+RENDER: org= + =#+begin_src component=; "open what you build".
+2. =Workbooks.Toolkits.injection_text(toolkits)= — tier-1 skill index for
+   =workbooks-browser=, =workbooks-cli=, =workponents=.
+3. =Workbooks.Toolkits.component_catalog(toolkits)= — the =## Components= section:
+   the emit contract, the data-binding contract (rows = JSON array of objects |
+   csv; x/y name columns; src-name/query only when a source exists), inline cards
+   (callout/kv/button/link/share), and every =work-*= tag + attribute names.
+
+The emit-only eval feeds (base reply contract) + (this real catalog). It does NOT
+run the tool loop, so prompt references to tools are inert in the eval.
+
+* The hard-won pitfalls (DON'T re-discover these)
+
+These were the layers between "0/11" and a trustworthy gate. Each is fixed in
+=components.ex= / =toolkits.ex=; keep them when extending.
+
+1. *Cheap model + full tool loop = thrash.* The platform default + the agent
+   tool loop web-searches trivial briefs (~2.5 min/step, up to max_steps). Use
+   emit-only + a capable model.
+2. *file:// CORS blocks ES modules.* =import("file://…")= AND
+   =<script src="file://…">= are both CORS-blocked from a file:// page
+   (origin null). The mount must INLINE the bundle source into
+   =<script type="module">= (=</script= neutralized).
+3. *Powered tiers hang on the CDN offline.* =work-chart= (Plot), =work-map=,
+   =work-editor= =await= a CDN =import()= that hangs under headless virtual-time
+   before falling to the floor → the floor paints AFTER the screenshot → blank.
+   FIX: a CSP meta on the mount
+   (=default-src 'unsafe-inline' data: blob:; connect-src 'none'=) fast-fails the
+   external import → the floor renders deterministically. (Data-only elements
+   like =work-table= have no CDN step and were always reliable.)
+4. *The model emits data three ways.* =:rows= JSON, =:data=, and CSV-in-body —
+   plus inline single-line vs multi-line vs valueless boolean props.
+   =parse_block/1= is two-pass (header-line inline props + line-leading
+   multi-line props; non-=:= lines = body); =normalize_data/2= maps =:data= →
+   rows and a CSV body → the =csv= attr. =type_to_tag= maps chart variants
+   (bar/line/area) → work-chart, keeping the variant as the =type= attr.
+5. *Test the REAL catalog.* The eval previously fed a simplified eval-local
+   prompt. It now injects the production =component_catalog= — otherwise you're
+   auditing a context the agent never sees.
+
+* Confident-gate philosophy (the point of all this)
+
+Once harness false-negatives are removed, *green = real success, red = real
+signal.* Concretely:
+- The *deterministic checks* (emits_tag / binds_data / themes_from_tokens /
+  voice_parity) are the trustworthy, reproducible gate — use these as the
+  primary signal for adversarial pushes.
+- The *vision rubric* is a real quality signal, but it depends on the frame
+  rendering (the pitfalls above) AND a non-deterministic LLM judge. A red here
+  now means a real render/quality issue, not harness noise.
+- *No gaming.* Improve the agent's GENUINE surface (the real catalog/contract,
+  test data infra) — never add eval-case-specific examples or "don't do X"
+  rules. We verified this works: teaching the real data-binding contract flipped
+  =data-binding= to PASS because the model emitted valid JSON ON ITS OWN.
+
+* Current baseline (2026-06-16, haiku, 11 cases)
+
+~3/11 pass cleanly (chart-not-table, table-not-chart, theme-honest). The reds are
+now categorized REAL signal, not harness bugs:
+- *Real composition misses* (adversarial briefs working): =composition-agent-
+  toolkit= (emits work-kv — but see below), =diff-render= (emits nothing),
+  =literate-doc= (emits a chart, not a doc+chart).
+- *Model non-determinism*: =metric-vs-chart= sometimes punts to prose.
+- *Needs test data*: =sql-bound-table= — the model CORRECTLY chooses a
+  =src-name/query= binding (the brief implies a "customers table"), but the eval
+  has no backing data source → loading state → can't render.
+
+* Open items (for the larger eval framework)
+
+1. *Sample data source for query bindings.* =work-table/chart/spark= resolve
+   =src-name= via =getEngine().register(name, rows)=
+   (=workponents/src/data/engine.js=; =whenRegistered= handles the
+   element-queries-before-seed race). Seed a few sample tables (customers,
+   orders, …) in the eval mount AFTER the bundle loads so query-bound emits
+   render. This tests a real capability (the model still must choose the binding
+   + write correct SQL). The memory floor (=src/data/memory-sql.js=) supports a
+   SELECT/WHERE/GROUP/ORDER/LIMIT subset. Open question: exposing =getEngine()=
+   to the mount (it's a module export; either expose on =globalThis= from the
+   dist build, or append a seed inside the inlined bundle module where the
+   binding is in scope).
+2. *Composition-island discoverability.* =work-agent=/=work-toolkit= aren't in
+   the workponents CEM, so Waldo can't discover them. Either (a) the
+   =composition-agent-toolkit= case is mis-scoped for the chat agent (Waldo
+   emits UI in chat, not config islands) and should move to a
+   bundle/authoring-level eval, or (b) make the islands discoverable in a catalog
+   the authoring agent sees.
+3. *Model non-determinism.* The agent emit AND the vision judge are
+   non-deterministic. For a stable signal, run each case N times and report a
+   pass-rate, or majority-vote the judge — rather than a single boolean.
+4. *CEM enrichment.* The CEM has attribute NAMES only. Annotating the element
+   sources (types + one-line descriptions) would let =component_catalog= surface
+   real prop types — strengthening discovery for both production and evals
+   (legitimately, not gaming).
+5. *Judge calibration.* The vision rubric threshold (every dim ≥2, sum ≥14/18)
+   is strict. Worth characterizing its variance on known-good frames before
+   trusting per-case pass/fail as a hard gate.
+
+* File map
+
+| Area | Path |
+|------+------|
+| Eval runner | =runtime/host/evals/components.ex= |
+| Eval specs | =runtime/evals/components/specs/*.eval.md= |
+| Waldo system prompt | =runtime/host/web.ex= (=agent_system_prompt=, ~2095) |
+| Production catalog | =runtime/host/toolkits.ex= (=component_catalog/2=, =render_catalog=) |
+| Agent run | =runtime/host/agent.ex= (=Agent.run/3=), =agent_def.ex= |
+| LLM seam | =runtime/host/llm.ex= (=WB_LLM_MODEL=/=WB_EVAL_MODEL=, OPENROUTER_API_KEY) |
+| Headless | =runtime/host/browse/headless.ex= |
+| workponents SDK | =workponents/src/=, CEM =workponents/custom-elements.json= |
+| workponents gate | =workponents/tools/gate/= |
+| dist build | =workponents/tools/build.js= → =workponents/dist/workponents.js= |
+| Composition islands | =runtime/host/bundle_islands.ex= + =bundle_islands*_test.exs= |
+| Composition directive | =docs/WORKBOOK-COMPOSITION-MODEL.md= |
+| Bundle compiler | =docs/WORKBOOK-BUNDLE.md= |
+
+* Contact points / canon
+
+- Capability ledger: =runtime/capabilities.json= (drives the live
+  =/capabilities= dashboard). Keep eval/component rows honest.
+- Bead epic: =wb-vtfa= (composition model) + the eval render-timing follow-up.
