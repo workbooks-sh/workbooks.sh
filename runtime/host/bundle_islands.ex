@@ -206,6 +206,122 @@ defmodule Workbooks.Bundle.Islands do
   defp slug(nil), do: nil
   defp slug(s), do: s |> String.downcase() |> String.replace(~r/[^a-z0-9]+/, "-") |> String.trim("-")
 
+  # ── P1: the islands manifest (node table) + the inline ⟷ src residence swap ──
+
+  @manifest_version "work-islands/1"
+  @manifest_re ~r/<script[^>]*id="work-islands"[^>]*>(.*?)<\/script>/s
+
+  @doc """
+  Serialize islands as the **node table** — the loss-free manifest that lets
+  `unbundle` rebuild the exact element/file for each node. Each entry records
+  `kind, id, path, residence (inline|src), attrs` and a `hash` (sha256 of the
+  node's bytes — the body for inline, the tree file for src) for integrity.
+  `parts` supplies the bytes for the src hash; pass `%{}` when unavailable.
+  """
+  @spec to_manifest([map], %{optional(binary) => binary}) :: binary
+  def to_manifest(islands, parts \\ %{}) do
+    %{
+      "v" => @manifest_version,
+      "islands" =>
+        Enum.map(islands, fn i ->
+          %{
+            "kind" => Atom.to_string(i.kind),
+            "id" => i.id,
+            "path" => i.path,
+            "residence" => residence(i),
+            "attrs" => i.attrs,
+            "hash" => content_hash(i, parts)
+          }
+          |> Enum.reject(fn {_k, v} -> v in [nil, %{}] end)
+          |> Map.new()
+        end)
+    }
+    |> Jason.encode!()
+  end
+
+  @doc "Parse a manifest JSON back into islands (the inverse of `to_manifest/2`)."
+  @spec from_manifest(binary) :: [map]
+  def from_manifest(json) when is_binary(json) do
+    case Jason.decode(json) do
+      {:ok, %{"islands" => list}} ->
+        Enum.map(list, fn m ->
+          %{
+            kind: String.to_existing_atom(m["kind"]),
+            id: m["id"],
+            path: m["path"],
+            attrs: m["attrs"] || %{},
+            body: nil
+          }
+        end)
+
+      _ ->
+        []
+    end
+  end
+
+  defp residence(%{body: b}) when is_binary(b), do: "inline"
+  defp residence(_), do: "src"
+
+  defp content_hash(%{body: b}, _parts) when is_binary(b), do: sha(b)
+  defp content_hash(%{path: p}, parts) when is_binary(p), do: parts |> Map.get(p) |> sha()
+  defp content_hash(_, _), do: nil
+  defp sha(nil), do: nil
+  defp sha(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+
+  @doc """
+  Embed the islands manifest into a page as an inert `<script id="work-islands">`
+  block (idempotent — replaces any prior one). JSON `</` is escaped so the payload
+  cannot break out of the script tag (same posture as the other markers).
+  """
+  @spec embed_manifest(binary, binary) :: binary
+  def embed_manifest(html, manifest_json) do
+    safe = String.replace(manifest_json, "</", "<\\/")
+    block = ~s(<script type="application/json" id="work-islands">#{safe}</script>)
+
+    cond do
+      Regex.match?(@manifest_re, html) -> Regex.replace(@manifest_re, html, block)
+      String.contains?(html, "</body>") -> String.replace(html, "</body>", block <> "\n</body>", global: false)
+      true -> html <> "\n" <> block
+    end
+  end
+
+  @doc "Extract islands from a page's `work-islands` manifest block (`[]` if none)."
+  @spec extract_manifest(binary) :: [map]
+  def extract_manifest(html) when is_binary(html) do
+    case Regex.run(@manifest_re, html) do
+      [_, json] -> json |> String.replace("<\\/", "</") |> from_manifest()
+      _ -> []
+    end
+  end
+
+  @doc """
+  Externalize an INLINE island: write its body to a tree file (its `path` or a
+  derived one) and return the now-`src`-referenced island + updated `parts`. A
+  src island is returned unchanged. The reverse of `inline/2`.
+  """
+  @spec externalize(map, %{optional(binary) => binary}) :: {map, %{optional(binary) => binary}}
+  def externalize(%{body: body} = i, parts) when is_binary(body) do
+    path = i.path || derive_path(i)
+    {%{i | path: path, body: nil}, Map.put(parts, path, body)}
+  end
+
+  def externalize(i, parts), do: {i, parts}
+
+  @doc """
+  Inline a SRC island: pull its file content from `parts` into the element body
+  and return the now-inline island. A node with no resolvable file is returned
+  unchanged. The reverse of `externalize/2`.
+  """
+  @spec inline(map, %{optional(binary) => binary}) :: map
+  def inline(%{path: path} = i, parts) when is_binary(path) do
+    case Map.fetch(parts, path) do
+      {:ok, body} -> %{i | body: body}
+      :error -> i
+    end
+  end
+
+  def inline(i, _parts), do: i
+
   defp org?(path), do: String.ends_with?(path, ".org")
 
   defp put_attr(map, _k, nil), do: map

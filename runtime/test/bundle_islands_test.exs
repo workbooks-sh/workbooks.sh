@@ -170,4 +170,67 @@ defmodule Workbooks.BundleIslandsTest do
       assert "crm" in Islands.toolkit_ids(idx)
     end
   end
+
+  # ── P1: the islands manifest (node table) + inline ⟷ src residence swap ────────
+  describe "P1 manifest + residence swap" do
+    defp norm(list) do
+      list |> Enum.map(&Map.take(&1, [:kind, :id, :path, :attrs])) |> Enum.sort_by(&{&1.kind, &1.path})
+    end
+
+    test "manifest round-trips the node table loss-free" do
+      idx = Islands.index(tree())
+      round = idx |> Islands.to_manifest(tree()) |> Islands.from_manifest()
+      assert norm(round) == norm(idx)
+    end
+
+    test "manifest carries a content hash per node (integrity)" do
+      idx = Islands.index(tree())
+      json = Islands.to_manifest(idx, tree())
+      assert {:ok, %{"v" => "work-islands/1", "islands" => entries}} = Jason.decode(json)
+      assert Enum.all?(entries, &(byte_size(&1["hash"]) == 64))
+      assert Enum.all?(entries, &(&1["residence"] == "src"))
+    end
+
+    test "embed → extract round-trips through a page (idempotent, </script>-safe)" do
+      idx = Islands.index(tree())
+      json = Islands.to_manifest(idx, tree())
+
+      html = "<html><body><h1>wb</h1></body></html>"
+      page = Islands.embed_manifest(html, json)
+      assert page =~ ~s(id="work-islands")
+      # idempotent: embedding again replaces, doesn't duplicate
+      page2 = Islands.embed_manifest(page, json)
+      assert length(Regex.scan(~r/id="work-islands"/, page2)) == 1
+
+      assert norm(Islands.extract_manifest(page2)) == norm(idx)
+    end
+
+    test "a manifest value containing </script> cannot break out of the tag" do
+      island = %{kind: :org, id: "x", path: "x.org", attrs: %{"note" => "see </script> here"}, body: nil}
+      page = Islands.embed_manifest("<body></body>", Islands.to_manifest([island]))
+      # the literal closing tag is neutralized in the payload
+      refute page =~ "see </script> here"
+      assert [back] = Islands.extract_manifest(page)
+      assert back.attrs["note"] == "see </script> here"
+    end
+
+    test "externalize ⟷ inline is a reversible residence swap" do
+      inline = %{kind: :org, id: "snip", path: nil, attrs: %{}, body: "if (x < 3) { y }"}
+
+      {ext, parts} = Islands.externalize(inline, %{})
+      assert ext.body == nil
+      assert ext.path == "snip.org"
+      assert parts["snip.org"] == "if (x < 3) { y }"
+
+      back = Islands.inline(ext, parts)
+      assert back.body == "if (x < 3) { y }"
+      assert back.path == "snip.org"
+    end
+
+    test "externalize is identity on an already-src island; inline is identity with no file" do
+      src = %{kind: :org, id: "r", path: "report.org", attrs: %{}, body: nil}
+      assert {^src, %{}} = Islands.externalize(src, %{})
+      assert Islands.inline(src, %{}) == src
+    end
+  end
 end
