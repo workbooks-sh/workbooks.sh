@@ -2,7 +2,7 @@
 #+STATUS: SUPERSEDED — the full C2PA/X.509 path below is NOT what we shipped.
 #+STATUS: Built instead: Workbooks.Manifest — a pure-Elixir embedded Ed25519
 #+STATUS: did:key manifest (the scheme the archive proved across 3 impls), no
-#+STATUS: COSE/X.509, no c2patool, no Rust signer. `wb sign` / `wb verify`.
+#+STATUS: COSE/X.509, no c2patool, no Rust signer. `work sign` / `work verify`.
 #+STATUS: Keep this doc for the c2patool findings if a TRUSTED-issuer C2PA badge
 #+STATUS: (Content Credentials UI) is ever required — that DOES need the X.509
 #+STATUS: chain below. Provenance binding does not.

@@ -1,6 +1,6 @@
 defmodule Workbooks.ToolkitsTest do
   @moduledoc """
-  The `wb toolkit` surface (wb-4bj.2) — discovery + rendering over the on-disk
+  The `work toolkit` surface (wb-4bj.2) — discovery + rendering over the on-disk
   org toolkits. Exercises default_root, list_text/show_text/show_skill_text/
   search_text/verify_text against the real ../toolkits tree, thin vs thick
   skill resolution, extract_role_blocks, and #+CAPTION TOC extraction.
@@ -148,7 +148,7 @@ defmodule Workbooks.ToolkitsTest do
     test "shows the manifest body + a skill index" do
       out = Toolkits.show_text("git", @root)
       assert out =~ "#+TITLE: git toolkit"
-      assert out =~ "Skills (read with `wb toolkit show git <skill>`)"
+      assert out =~ "Skills (read with `work toolkit show git <skill>`)"
       assert out =~ "overview"
       assert out =~ "bisect"
     end
@@ -496,7 +496,7 @@ defmodule Workbooks.ToolkitsTest do
 
   # ── run_task_text/4 — DISABLED (no native exec, wb-9ja) ───────────────────
   # The `:role task` lane ran NATIVE bash; native execution is banned and this
-  # surface is agent-reachable (the `wb` tool), so run_task_text now ALWAYS refuses
+  # surface is agent-reachable (the `work` tool), so run_task_text now ALWAYS refuses
   # without executing anything. These tests pin that contract.
 
   describe "run_task_text/4 (scratch fixture)" do

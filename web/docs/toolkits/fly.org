@@ -5,7 +5,7 @@
   :PROPERTIES:
   :MATURITY: partial
   :EVIDENCE: toolkits/fly/deploy/bootstrap.sh:1
-  :CAVEAT: This is a `wb deploy` recipe (USER tool), not a registry toolkit you `wbx toolkit add`. It deploys the engine to a Fly machine via flyctl; it is not a general Fly API surface for arbitrary apps. See deploy/cloud.org for the full deploy flow.
+  :CAVEAT: This is a `work deploy` recipe (USER tool), not a registry toolkit you `work toolkit add`. It deploys the engine to a Fly machine via flyctl; it is not a general Fly API surface for arbitrary apps. See deploy/cloud.org for the full deploy flow.
   :END:
 
 Connecting Fly.io lets you stand the Workbooks *engine* (or an app forged from a
@@ -52,21 +52,21 @@ See [[../reference/caps.org][Dock capabilities]].
    :PROPERTIES:
    :MATURITY: partial
    :EVIDENCE: toolkits/fly/deploy/bootstrap.sh:8
-   :CAVEAT: This runs through `wb deploy`, the consumer Deploy Kit — not `wbx toolkit add`. Do not confuse it with platform-release ops (the compilers package and runtime image ship separately).
+   :CAVEAT: This runs through `work deploy`, the consumer Deploy Kit — not `work toolkit add`. Do not confuse it with platform-release ops (the compilers package and runtime image ship separately).
    :END:
 
 1. Install =flyctl= (=bootstrap.sh:8= bails with the install URL if it's missing)
    and run =flyctl auth login=.
 2. Configure the deploy target:
    #+begin_src text
-   wb deploy init --place fly
+   work deploy init --place fly
    #+end_src
 3. Apply it:
    #+begin_src text
-   wb deploy apply
+   work deploy apply
    #+end_src
 
-#+CAUTION: =wb deploy= is the *user's* tool to run the runtime image on their own
+#+CAUTION: =work deploy= is the *user's* tool to run the runtime image on their own
 account — it is not how the platform publishes the compilers package or the
 runtime image (those are a separate, manual/CI path). The Fly token is flyctl's
 own; Workbooks never reads or proxies it.
@@ -77,11 +77,11 @@ Deploy a fresh engine to Fly in the =iad= region, then update it after a change:
 
 #+begin_src text
 flyctl auth login
-wb deploy init --place fly --region iad
-wb deploy apply          # provisions the machine, boots the headless engine
+work deploy init --place fly --region iad
+work deploy apply          # provisions the machine, boots the headless engine
 # ... change config ...
-UPDATE=1 wb deploy apply  # re-applies against the existing app
-wb deploy status         # confirm the machine is live
+UPDATE=1 work deploy apply  # re-applies against the existing app
+work deploy status         # confirm the machine is live
 #+end_src
 
 The engine comes up on its own Fly machine running the agent loop as a local
@@ -97,7 +97,7 @@ subprocess; you get a runtime endpoint your workbooks can connect to over RCP.
 ** Maturity
 
 =partial=. The Fly deploy recipe ships and works (=toolkits/fly/deploy/=), but it
-is a Deploy-Kit *recipe* invoked through =wb deploy=, not a registry toolkit and
+is a Deploy-Kit *recipe* invoked through =work deploy=, not a registry toolkit and
 not a general Fly API surface. It deploys the engine headless to a single Fly
 machine; broader Fly operations are not in scope. Keep it distinct from the
 three platform-release layers.

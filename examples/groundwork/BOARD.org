@@ -19,7 +19,7 @@
    :ID: wb-5fl
 ** TODO Svelte lane perf wall: 17+ CPU-min per probe — precompile svelte/compiler to a cached WASM command (javy) + payload diet
    :ID: wb-2ku.7
-** TODO wb CLI deploy-to-remote-runtime path: make 'wb workbook deploy' work from a laptop against a fly engine
+** TODO work CLI deploy-to-remote-runtime path: make 'work workbook deploy' work from a laptop against a fly engine
    :ID: wb-ziv.5
 ** TODO REM (Mercury Dreams) — inter-session dream journal that steers the agent :epic:
    :ID: wb-2ku
@@ -31,7 +31,7 @@
    :ID: wb-d13
 ** TODO deploy-kit P1: size fly machine for the runtime by default (>=1GB, rec 2GB) + #+DEPLOY_MEMORY knob + post-apply /health poll surfacing OOM — first cloud apply crash-loops on default 512MB. Found by lander-live.
    :ID: wb-c4w
-** TODO SECURITY: deployed engine control plane open (x-tenant dev fallback) — wb deploy cloud should require a persisted bearer (WB_PUBLIC_BEARER) when not dev; /api/run + /rcp/* + PUT /w are spend/abuse surfaces. Found by lander-live eval.
+** TODO SECURITY: deployed engine control plane open (x-tenant dev fallback) — work deploy cloud should require a persisted bearer (WB_PUBLIC_BEARER) when not dev; /api/run + /rcp/* + PUT /w are spend/abuse surfaces. Found by lander-live eval.
    :ID: wb-oom
 ** TODO host-brokered command exec — the WASM shell calls a Dock import to run CommandRegistry commands (flat-forest nesting); no fork/exec in-wasm
    :ID: wb-9ja.2
@@ -41,7 +41,7 @@
    :ID: wb-9ja
 ** TODO [epic] lander-live — self-maintaining lander as system proof: runtime-hosted page + hourly keeper agent + observable loop
    :ID: wb-5vm
-** TODO [epic] CTK + eval SDK + wb dev — PRODUCT-complete (A) :epic:
+** TODO [epic] CTK + eval SDK + work dev — PRODUCT-complete (A) :epic:
    :ID: wb-3gm
 ** TODO RCP runtime-connection config — generalize local discovery to endpoint+token+pluggable auth (coord wb-uxn)
    :ID: wb-lk6.5
@@ -67,7 +67,7 @@
    :ID: wb-dsb
 ** TODO Harden untrusted in-sandbox execution: memory/fuel caps + directive allowlist (security)
    :ID: wb-77k
-** TODO wb deploy local: krunvm exits 78 (EX_CONFIG) under launchd — runtime never boots via tray
+** TODO work deploy local: krunvm exits 78 (EX_CONFIG) under launchd — runtime never boots via tray
    :ID: wb-u6r
 ** TODO RCP: Runtime Connect Protocol — workbook→app + pluggable-IDP auth :epic:
    :ID: wb-uxn
@@ -77,13 +77,13 @@
    :ID: wb-jay.5
 ** TODO Rust crates.io enablement — compile arbitrary(ish) Rust packages in-sandbox :epic:
    :ID: wb-3s8
-** TODO docs: wb publish site mode (directory → multi-page HTML)
+** TODO docs: work publish site mode (directory → multi-page HTML)
    :ID: wb-d2h
 ** TODO docs: write all documentation content from source (20 pages)
    :ID: wb-lse
 ** TODO docs: multi-page documentation site for workbooks.sh
    :ID: wb-x8p
-** TODO P2: live wb deploy local end-to-end — boot the real runtime in krunvm, discovery written
+** TODO P2: live work deploy local end-to-end — boot the real runtime in krunvm, discovery written
    :ID: wb-and
 ** TODO P4: tauri dev integration — launch shell, daemon up, window loads frontend on runtime, sidecar-state flows
    :ID: wb-xyc
@@ -149,7 +149,7 @@
    :ID: wb-2ku.8
 ** TODO Framework lane taxonomy — which UI frameworks get in-sandbox hooks (Vue, Solid) vs config (Preact/JSX) vs dev-machine-only (Astro/Next/SvelteKit)
    :ID: wb-2ku.6
-** TODO wb CLI polish: usage text omits real commands; publish desktop-app target undocumented; toolkit eval only reachable over RCP
+** TODO work CLI polish: usage text omits real commands; publish desktop-app target undocumented; toolkit eval only reachable over RCP
    :ID: wb-0bw
 ** TODO Svelte lane IN-SANDBOX: sveltejob.js compiles .svelte under qjs-run.wasm, then bundlejob — zero native exec
    :ID: wb-2ku.5
@@ -191,9 +191,9 @@
    :ID: wb-u48.1
 ** TODO ergonomics(investigate): faster engine inner-loop — dev image that MOUNTS host code vs baking it, so an engine change is testable in a real container without a full multi-arch CI build
    :ID: wb-ziv.4
-** TODO ergonomics: clean 'wb publish' for built workbooks/static sites to a running engine — retire the fly-proxy + github-raw hacks; works against internal-plane deploys
+** TODO ergonomics: clean 'work publish' for built workbooks/static sites to a running engine — retire the fly-proxy + github-raw hacks; works against internal-plane deploys
    :ID: wb-ziv.3
-** TODO ergonomics: wb deploy VERIFIES — post-apply /health poll + running-image-digest check + control-plane lock probe; fail loud instead of 'success while OOM-looping/stale/open'
+** TODO ergonomics: work deploy VERIFIES — post-apply /health poll + running-image-digest check + control-plane lock probe; fail loud instead of 'success while OOM-looping/stale/open'
    :ID: wb-ziv.2
 ** TODO ergonomics: engine changes local-first — doc + tooling so runtime/host edits are validated against a local runtime (iex/mix) and CI image is cut ONCE when proven, not per-discovery (biggest lander-live time sink)
    :ID: wb-ziv.1
@@ -215,13 +215,13 @@
    :ID: wb-5vm.3
 ** TODO lander-live: fly demo engine via deploy-kit — deployment.org + secrets (OPENROUTER_API_KEY, POSTHOG_API_KEY), cheap model default (xiaomi/mimo-v2.5)
    :ID: wb-5vm.2
-** TODO lander-live: serve the lander at runtime root — map / to stored workbook (PublicWeb), publish via wb publish self-hosted
+** TODO lander-live: serve the lander at runtime root — map / to stored workbook (PublicWeb), publish via work publish self-hosted
    :ID: wb-5vm.1
-** TODO wb dev: eval + ctk verbs (development-service follow-ons)
+** TODO work dev: eval + ctk verbs (development-service follow-ons)
    :ID: wb-xx6
 ** TODO [epic] CTK — Component ToolKit (human-in-the-loop component canvas) :epic:
    :ID: wb-3xz
-** TODO wb bundle: port single-file HTML-app bundling (Vite multi-file JS apps → one .html, the old npm workbook-build lane) into the canonical Rust wb or runtime; web/lander-wb still builds via its project-local legacy devDependency
+** TODO work bundle: port single-file HTML-app bundling (Vite multi-file JS apps → one .html, the old npm workbook-build lane) into the canonical Rust work or runtime; web/lander-wb still builds via its project-local legacy devDependency
    :ID: wb-1y6
 ** TODO Routing config + target presets (desktop / web / mobile)
    :ID: wb-lk6.4
@@ -229,7 +229,7 @@
    :ID: wb-jay.24
 ** TODO Wire installer into desktop publish CI/CD
    :ID: wb-qyk
-** TODO Add 'wb desktop' CLI subcommand (install/launch)
+** TODO Add 'work desktop' CLI subcommand (install/launch)
    :ID: wb-jnw
 ** TODO Author install.sh curl installer served at workbooks.sh
    :ID: wb-pdd
@@ -335,7 +335,7 @@
    :ID: wb-4k8
 ** TODO SHIP: make ghcr.io/workbooks-sh/runtime image public for anonymous pull
    :ID: wb-jay.23
-** TODO SHIP: decide wb bundling (Burrito-wrap ERTS vs reimplement deploy in Rust)
+** TODO SHIP: decide work bundling (Burrito-wrap ERTS vs reimplement deploy in Rust)
    :ID: wb-jay.22
 ** TODO SHIP: Apple signing cert (codesign + notarize)
    :ID: wb-jay.21

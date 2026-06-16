@@ -23,4 +23,4 @@ npx cap open ios           # open in Xcode → Archive → Distribute → TestFl
 
 ## Maturity
 
-Experimental. Requires full Xcode.app (CommandLineTools can't archive or sign), Node 18+, and Capacitor 8+. There is no `wb forge mobile` command — the toolkit is grounded on `npx cap` + Xcode directly. Some Apple setup is genuinely one-time and manual — the `ship-a-workbook-to-ios` skill walks through all of it.
+Experimental. Requires full Xcode.app (CommandLineTools can't archive or sign), Node 18+, and Capacitor 8+. There is no `work forge mobile` command — the toolkit is grounded on `npx cap` + Xcode directly. Some Apple setup is genuinely one-time and manual — the `ship-a-workbook-to-ios` skill walks through all of it.

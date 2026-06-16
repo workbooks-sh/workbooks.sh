@@ -35,12 +35,12 @@ treat each edit as load-bearing: smallest unit, compile immediately, fail loud.
    wasmtime (`references/host-dock-seam.md`).
 4. **Compile gate.** `mix compile` IMMEDIATELY after the edit — this is the
    first gate, every time, before anything else.
-5. **Test.** `mix test` (or a targeted suite for the module); `wbx dev test`.
+5. **Test.** `mix test` (or a targeted suite for the module); `work dev test`.
    Re-read your change. Fail loud — don't swallow errors to make a test pass.
 6. **Record + push.** `bd close <id>`; a typed, stranger-readable commit;
    `git pull --rebase && git push`. CI rebuilds the runtime image from main
    (`references/release-three-layers.md`). **Live-confirm** `/health` /
-   `wbx rt status` — trust the served engine, not the commit.
+   `work rt status` — trust the served engine, not the commit.
 
 ## Invariants (do not violate while editing)
 
@@ -49,9 +49,9 @@ treat each edit as load-bearing: smallest unit, compile immediately, fail loud.
   workflow specs, boards) hot-swap on a live engine.
 - Two HTTP planes never blend — public is anonymous + GET-only; every write is
   on the bearer-authed control plane.
-- Don't wire platform-release ops into `wbx deploy` — that's the USER tool.
+- Don't wire platform-release ops into `work deploy` — that's the USER tool.
 
 ## References
 - `references/host-dock-seam.md` — the Host/Dock contract + invariants.
 - `references/release-three-layers.md` — what CI rebuilds vs what's manual vs
-  what `wbx deploy` is (so a push doesn't get mistaken for a release).
+  what `work deploy` is (so a push doesn't get mistaken for a release).

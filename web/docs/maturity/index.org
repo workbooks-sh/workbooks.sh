@@ -156,7 +156,7 @@ The most-cited over-claim. The =.html= is the *view*; the shareable *unit* is
 (Audit correction to =the-one-file=. Canon: the runtime is "the main component to
 stand on.")
 
-* wbx CLI
+* work CLI
   :PROPERTIES:
   :OWNER: cli
   :END:
@@ -182,7 +182,7 @@ Elixir escript; =reference/cli.org= is auto-tangled from clap.
    :PROPERTIES:
    :MATURITY: partial
    :EVIDENCE: cli/src/io.rs:163
-   :CAVEAT: In-sandbox engine verbs bail (io.rs:163) until the Dock HTTP broker lands. Full in-sandbox wbx parity is not yet real. (Audit correction to the-one-command.)
+   :CAVEAT: In-sandbox engine verbs bail (io.rs:163) until the Dock HTTP broker lands. Full in-sandbox work parity is not yet real. (Audit correction to the-one-command.)
    :END:
 
 ** dev split-pane "source on one side, living page on the other"
@@ -221,7 +221,7 @@ JS npm lane (resolve/fetch/bundle + Node shims) with host-brokered fs+net.
    :PROPERTIES:
    :MATURITY: partial
    :EVIDENCE: runtime/host/toolkits.ex:258
-   :CAVEAT: Real but toolkit-scoped — `wb toolkit eval <id>` runs a bundled suite (toolkits.ex:253,258). There is no standalone evals primitive, and the "couple of minutes / fraction of a cent" cost/speed figures are unbenchmarked. (Audit correction to did-it-do-well.)
+   :CAVEAT: Real but toolkit-scoped — `work toolkit eval <id>` runs a bundled suite (toolkits.ex:253,258). There is no standalone evals primitive, and the "couple of minutes / fraction of a cent" cost/speed figures are unbenchmarked. (Audit correction to did-it-do-well.)
    :END:
 
 * Automation & the living system

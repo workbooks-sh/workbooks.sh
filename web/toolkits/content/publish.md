@@ -1,6 +1,6 @@
 # publish
 
-AT Protocol publishing plus Workbooks Network identity: bind a Bluesky account, publish signed workbooks, and watch the verified (C2PA-checked) feed. The toolkit owns the `wb-publish` binary — the publish/identity stack lifted out of the `wb` core so provider logic lives in a toolkit.
+AT Protocol publishing plus Workbooks Network identity: bind a Bluesky account, publish signed workbooks, and watch the verified (C2PA-checked) feed. The toolkit owns the `wb-publish` binary — the publish/identity stack lifted out of the `work` core so provider logic lives in a toolkit.
 
 ## When to reach for it
 

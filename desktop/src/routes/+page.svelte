@@ -111,7 +111,7 @@
   let active = $state("home");
   let lastRail = $state("home");
 
-  // CLI owns setup (wb-aakl.5): the browser is installed by `wb desktop
+  // CLI owns setup (wb-aakl.5): the browser is installed by `work desktop
   // install` with the runtime already present, so there is no in-app
   // engine-install or keychain first-run wizard. The engine/keychain
   // setup gates are gone; engine state shows in the titlebar chip
@@ -513,7 +513,7 @@
     themes.init();
     // Apply persisted personalization (theme mode — wb-aakl.20).
     applyBootPrefs();
-    // `wb desktop open <path>` deep link — read the intent on boot + focus.
+    // `work desktop open <path>` deep link — read the intent on boot + focus.
     openIntent.watch();
     // Composable search (wb-aakl.19): register the built-in providers
     // (files/workbooks, bookmarks, tabs, nexus web). Toolkits add more.

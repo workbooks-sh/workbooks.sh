@@ -27,12 +27,12 @@ sources) leak into the shipped artifact — only WASM or built bundles belong in
 rather than memorizing them — the verbs are the stable contract):
 
 #+begin_src bash
-wb build <workspace>            # compile components → WASM; reports built/unbuilt
-wb bundle <dir> <out.html>      # tangle + compile + pack the tree into one self-contained .html
-wb unbundle <in.html> <dir>     # extract the wb-bundle block back into an editable filesystem tree
-wb query | tangle | lint <file.org>   # headlines / build plan / diagnostics
-wb sign <file.html>             # embed a did:key provenance manifest
-wb verify <file.html>           # check signature + asset integrity
+work build <workspace>            # compile components → WASM; reports built/unbuilt
+work bundle <dir> <out.html>      # tangle + compile + pack the tree into one self-contained .html
+work unbundle <in.html> <dir>     # extract the wb-bundle block back into an editable filesystem tree
+work query | tangle | lint <file.org>   # headlines / build plan / diagnostics
+work sign <file.html>             # embed a did:key provenance manifest
+work verify <file.html>           # check signature + asset integrity
 #+end_src
 
 An =unbuilt= component is a to-do, not an error to suppress — it names the
@@ -53,9 +53,9 @@ plane (anonymous, GET-only). The write itself goes through the *control*
 plane (bearer-authed) — you never write to the public plane.
 
 #+begin_src bash
-wb publish init | validate | apply | site   # render a workbook → a live URL
+work publish init | validate | apply | site   # render a workbook → a live URL
 # or, to a runtime registry:
-wb workbook deploy <id> <artifact>           # control-plane PUT /w/<id>, authed
+work workbook deploy <id> <artifact>           # control-plane PUT /w/<id>, authed
 #+end_src
 
 - A complete-HTML artifact is served verbatim; org sources are rendered by
@@ -79,12 +79,12 @@ the app. Therefore:
 * Done-when
 
 A workbook authoring task is done when: source is edited (not the artifact),
-=wb build= reports no unexpected =unbuilt= components, =wb verify= passes on
+=work build= reports no unexpected =unbuilt= components, =work verify= passes on
 the signed artifact, and the publish commit landed on =/_changes=. Verify
 with the cheapest verb; don't re-publish to check.
 
 * Out of scope
 
-Standing up or rolling the *runtime itself* (=wb deploy …=, image builds,
+Standing up or rolling the *runtime itself* (=work deploy …=, image builds,
 cloud lifecycle) is an operator action outside the runtime — not part of
 authoring a workbook from in here.

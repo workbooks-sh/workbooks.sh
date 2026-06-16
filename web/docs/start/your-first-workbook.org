@@ -9,11 +9,11 @@ this tutorial you'll stand up a local runtime, *tell an agent what you want in
 plain English*, watch it author the workbook for you, and deploy it to a URL.
 
 One happy path, start to finish, about ten minutes. You need a terminal and the
-=wbx= CLI — nothing else on your machine. The compilers, the model, and the
+=work= CLI — nothing else on your machine. The compilers, the model, and the
 sandbox all live *inside* the runtime.
 
 #+begin_quote
-The CLI is =wbx=. Every command below is real and pinned to where it lives in the
+The CLI is =work=. Every command below is real and pinned to where it lives in the
 code. Engine-backed commands (build, agent, deploy) talk to a runtime you start in
 step 2 — they don't need anything else installed.
 :SRC: cli/src/main.rs:24
@@ -26,15 +26,15 @@ step 2 — they don't need anything else installed.
 :SRC:      desktop/scripts/install.sh:4
 :END:
 
-One line installs the =wbx= binary. The toolchains it needs are *not* installed
+One line installs the =work= binary. The toolchains it needs are *not* installed
 here — they live in the runtime as WASM and provision on first use.
 
 #+begin_src bash
 curl -fsSL https://workbooks.sh/install.sh | sh
-wbx --help
+work --help
 #+end_src
 
-If =wbx --help= prints the verb list, you're ready.
+If =work --help= prints the verb list, you're ready.
 
 ** 2 · Start a runtime
 :PROPERTIES:
@@ -43,16 +43,16 @@ If =wbx --help= prints the verb list, you're ready.
 :SRC:      cli/src/deploy/mod.rs#DeployVerb
 :END:
 
-The agent thinks, compiles, and runs inside a *runtime engine*. =wbx deploy local=
+The agent thinks, compiles, and runs inside a *runtime engine*. =work deploy local=
 scaffolds a local config if there isn't one, then converges to a running container
 on your machine — one command.
 
 #+begin_src bash
-wbx deploy local
-wbx deploy status     # confirm it's up
+work deploy local
+work deploy status     # confirm it's up
 #+end_src
 
-=wbx deploy local= is the shorthand: it writes a =deployment.org= if absent, then
+=work deploy local= is the shorthand: it writes a =deployment.org= if absent, then
 applies it (a docker / podman container, or a krunvm microVM on macOS).
 :SRC: cli/src/deploy/mod.rs:48
 
@@ -68,11 +68,11 @@ You set it as a deployment secret — it lives host-side and the agent never see
 it.
 
 #+begin_src bash
-wbx deploy secrets set OPENROUTER_API_KEY=sk-or-...
-wbx deploy apply        # re-converge so the runtime picks it up
+work deploy secrets set OPENROUTER_API_KEY=sk-or-...
+work deploy apply        # re-converge so the runtime picks it up
 #+end_src
 
-The key is stored under the name =OPENROUTER_API_KEY=; =wbx deploy secrets list=
+The key is stored under the name =OPENROUTER_API_KEY=; =work deploy secrets list=
 shows the names (never the values).
 :SRC: cli/src/deploy/mod.rs:60
 
@@ -80,17 +80,17 @@ shows the names (never the values).
 :PROPERTIES:
 :MATURITY: partial
 :EVIDENCE: cli/src/main.rs:190
-:CAVEAT:   `wbx agent run` ships and reaches the model today; the agent writing a
+:CAVEAT:   `work agent run` ships and reaches the model today; the agent writing a
 :CAVEAT:   complete, deploy-ready workbook end-to-end from one sentence depends on
 :CAVEAT:   the task and may need a follow-up instruction or two. Treat the result
 :CAVEAT:   as a draft you direct, not a one-shot guarantee.
 :END:
 
-Describe the workbook in plain English. =wbx agent run= starts a long-horizon run
+Describe the workbook in plain English. =work agent run= starts a long-horizon run
 on the runtime and returns an *id* you poll — the agent works in the background.
 
 #+begin_src bash
-wbx agent run "Make a workbook that shows the current weather \
+work agent run "Make a workbook that shows the current weather \
 for three cities I name, with a small chart."
 # → returns a run id, e.g. run_a1b2c3
 #+end_src
@@ -110,11 +110,11 @@ Poll the run with its id. Repeat until the status shows it's done; the result
 includes the workbook the agent authored.
 
 #+begin_src bash
-wbx agent status run_a1b2c3
+work agent status run_a1b2c3
 #+end_src
 
 If the draft isn't quite right, tell the agent again in the same plain-English
-way with another =wbx agent run= — directing it is the loop. When you're happy,
+way with another =work agent run= — directing it is the loop. When you're happy,
 save the workbook the agent produced as a file, e.g. =weather.org=.
 
 ** 5 · Deploy it to a URL
@@ -128,12 +128,12 @@ Give the workbook an id and deploy its source to the runtime. It's now live and
 listed.
 
 #+begin_src bash
-wbx workbook deploy weather weather.org
+work workbook deploy weather weather.org
 # → deployed weather.org → /w/weather
-wbx workbook list                         # see it among your deployed workbooks
+work workbook list                         # see it among your deployed workbooks
 #+end_src
 
-=wbx workbook deploy <id> <file>= reads the org source and =PUT=s it to =/w/<id>=
+=work workbook deploy <id> <file>= reads the org source and =PUT=s it to =/w/<id>=
 on the engine — that path is your live workbook.
 :SRC: cli/src/commands.rs:120
 
@@ -145,7 +145,7 @@ writing the workbook by hand and without a compiler on your machine.
 
 From here:
 
-- *Author one yourself* — scaffold a blank workbook with =wbx init= and edit the
+- *Author one yourself* — scaffold a blank workbook with =work init= and edit the
   =.org= directly. See [[file:first-toolkit.org][Your first toolkit]] for the build-and-run loop.
 - *Understand what a workbook is* → [[file:../concepts/two-surfaces.org][Workbooks & toolkits]].
 - *Ship it further* → [[file:../workbooks/publish.org][Publish]] to the open web.

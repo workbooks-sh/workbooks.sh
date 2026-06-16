@@ -3,10 +3,10 @@
 #+VERSION: 0.1.0
 #+KIND: knowledge+pipeline
 #+STATUS: partial
-#+CLI_BIN: wbx
+#+CLI_BIN: work
 #+CLI_VERSION_RANGE: >=0.1.0
 #+TAGLINE: A reusable, drift-checked documentation pipeline for any Workbooks tenant — Diátaxis-shaped org source, reference auto-tangled from your own code, a forced honesty/maturity gate, and agent/SEO output. Point it at your repo, get docs.workbooks.sh's exact machinery for free.
-#+FLOW: read this front door → author with the docs-authoring skill (.claude/skills/docs-authoring) → run the wbx docs verb family below. Reference renderer = toolkits/orgitorial; publish target/identity = toolkits/publish + runtime/host/publish/site.ex; source-derivation = wbx tangle/lint.
+#+FLOW: read this front door → author with the docs-authoring skill (.claude/skills/docs-authoring) → run the work docs verb family below. Reference renderer = toolkits/orgitorial; publish target/identity = toolkits/publish + runtime/host/publish/site.ex; source-derivation = work tangle/lint.
 
 * docs — the documentation pipeline, as a toolkit                 :toolkit:
   :PROPERTIES:
@@ -14,9 +14,9 @@
   :VERSION:        0.1.0
   :KIND:      knowledge+pipeline
   :STATUS:    partial
-  :CLI_BIN:   wbx
+  :CLI_BIN:   work
   :SKILL_DIR: skills/
-  :REUSES:    toolkits/orgitorial, toolkits/publish, runtime/host/publish/site.ex, wbx tangle, wbx lint
+  :REUSES:    toolkits/orgitorial, toolkits/publish, runtime/host/publish/site.ex, work tangle, work lint
   :END:
 
   This toolkit packages the system that builds =docs.workbooks.sh= so any
@@ -35,10 +35,10 @@
     :SRC: runtime/host/publish/site.ex:30 (=def build(site_dir)=) · :209 (=wrangler= seam) · :217 (=pages deploy=).
   - *Identity / federation for published artifacts* — =toolkits/publish=.
     :SRC: toolkits/publish/manifest.org:10.
-  - *Source derivation discipline* — =wbx tangle= (org → typed build plan)
-    and =wbx lint= (diagnostics over a source), the read-only model the
+  - *Source derivation discipline* — =work tangle= (org → typed build plan)
+    and =work lint= (diagnostics over a source), the read-only model the
     drift gate copies.
-    :SRC: cli/src/main.rs:58 (=wbx tangle=) · :60 (=wbx lint=).
+    :SRC: cli/src/main.rs:58 (=work tangle=) · :60 (=work lint=).
 
   Authoritative architecture: =docs/.plan/DOCS-ARCHITECTURE.md=.
   Authoring conventions: the =docs-authoring= skill (read on demand).
@@ -49,7 +49,7 @@
   |-------------------+-------------------------------------------------------------|
   | =docs-authoring=  | Write or maintain a doc page the honest, drift-checked way   |
 
-* The =wbx docs= verb family
+* The =work docs= verb family
 
   The intended command surface. Today it is *not yet wired into the clap
   surface* — there is no =Docs= variant in =cli/src/main.rs#Cmd= (verified:
@@ -58,7 +58,7 @@
   as shipping.
   :SRC: docs/.plan/DOCS-ARCHITECTURE.md:201-209 (spec) · cli/src/main.rs:37-132 (no Docs variant).
 
-** wbx docs new <section>/<slug>
+** work docs new <section>/<slug>
    :PROPERTIES:
    :MATURITY: north-star
    :CAVEAT:   No =Docs= subcommand exists in the binary yet; scaffolding is
@@ -73,7 +73,7 @@
    tutorial, =build|run|distribute|deploy/= → how-to, =reference/= → tangled
    table, =concepts/= → thin stub linking =/learn/*.html=).
 
-** wbx docs build
+** work docs build
    :PROPERTIES:
    :MATURITY: partial
    :EVIDENCE: runtime/host/publish/site.ex:30
@@ -81,7 +81,7 @@
               =Workbooks.Publish.Site.build/1= (org→HTML via the templates it
               embeds, then wrangler deploy). The drift-verify front of the
               pipeline and the =.md=/=llms*.txt=/=sitemap.xml=/schema/pagefind
-              emitters are north-star — not yet a single =wbx docs build=
+              emitters are north-star — not yet a single =work docs build=
               command. No =Docs= variant in clap today.
    :SRC:      runtime/host/publish/site.ex:30 · docs/.plan/DOCS-ARCHITECTURE.md:191,203
    :END:
@@ -91,7 +91,7 @@
    =sitemap.xml= / schema.org → build the Pagefind index. Today, the render +
    deploy step is reachable via =Site.build/1=; the rest is designed.
 
-** wbx docs drift
+** work docs drift
    :PROPERTIES:
    :MATURITY: north-star
    :CAVEAT:   The KEYSTONE CI gate is designed, not built. It re-extracts every
@@ -107,14 +107,14 @@
    a =:SRC:= path which no longer exists also fails. This makes reference
    drift a mechanical red build, not a review judgement.
 
-** wbx docs lint
+** work docs lint
    :PROPERTIES:
    :MATURITY: partial
    :EVIDENCE: cli/src/main.rs:60
-   :CAVEAT:   =wbx lint= ships and runs diagnostics over a single org source,
+   :CAVEAT:   =work lint= ships and runs diagnostics over a single org source,
               but the DOCS-specific lints (required-field-by-maturity-tier,
               broken =:EVIDENCE:= / =:SRC:= path, dead internal links,
-              schema.org validity) are north-star — not yet a =wbx docs lint=
+              schema.org validity) are north-star — not yet a =work docs lint=
               variant. Until then, the =docs-authoring= skill's checklist is
               the gate.
    :SRC:      cli/src/main.rs:60 · docs/.plan/DOCS-ARCHITECTURE.md:132-144,205
@@ -126,7 +126,7 @@
    not exist in the tree, on dead internal links, and on invalid schema.org.
    An unkept claim cannot silently ship.
 
-** wbx docs untangle
+** work docs untangle
    :PROPERTIES:
    :MATURITY: north-star
    :CAVEAT:   The reverse, write-back direction is designed, not built. It
@@ -139,7 +139,7 @@
    The literate round-trip for the editable half only. Keeps the =.org= the
    working surface for inlined examples without forking code.
 
-** wbx docs serve
+** work docs serve
    :PROPERTIES:
    :MATURITY: north-star
    :CAVEAT:   No serve verb today. Local preview is currently: build via
@@ -152,14 +152,14 @@
    Local preview server. Renders with orgitorial in the QuickJS-wasm lane so a
    tenant previews docs in-sandbox, no node required.
 
-** wbx docs publish
+** work docs publish
    :PROPERTIES:
    :MATURITY: partial
    :EVIDENCE: runtime/host/publish/site.ex:209
    :CAVEAT:   Publishing WORKS today through =Site.build/1=, which reads the
               =#+PUBLISH_*= props and runs =wrangler pages deploy <dist>
               --project-name <project>=. It is just not yet fronted by a
-              =wbx docs publish= verb; that wrapper is north-star.
+              =work docs publish= verb; that wrapper is north-star.
    :SRC:      runtime/host/publish/site.ex:209,217 · web/docs/publish.org:1 · web/docs/site.org:2-5
    :END:
 
@@ -171,10 +171,10 @@
 
   | Reused (ships today)                                  | New (this toolkit / plan)                                 |
   |------------------------------------------------------+-----------------------------------------------------------|
-  | =web/docs/= org tree + =site.org= nav manifest        | =wbx docs drift= / =untangle= / =build= verbs (north-star) |
+  | =web/docs/= org tree + =site.org= nav manifest        | =work docs drift= / =untangle= / =build= verbs (north-star) |
   | =toolkits/orgitorial= renderer + editorial CSS        | =# docs:name:start/end= source anchor convention          |
   | =Workbooks.Publish.Site.build/1= (org→HTML + wrangler) | =:SRC:= / =:SRC_HASH:= / =:MATURITY:= drawer schema        |
-  | =wbx tangle= / =wbx lint= derivation model             | =docs/.tangle.lock= + =maturity.json= emitter + =/maturity= |
+  | =work tangle= / =work lint= derivation model             | =docs/.tangle.lock= + =maturity.json= emitter + =/maturity= |
   | =publish.org= / =site.org= =#+PUBLISH_*= CF props      | =.md= / =llms*.txt= / =sitemap.xml= / schema / pagefind     |
   :SRC: docs/.plan/DOCS-ARCHITECTURE.md:215-218.
 

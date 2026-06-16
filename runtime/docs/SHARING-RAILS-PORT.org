@@ -41,7 +41,7 @@ key with no second store (rule 4 — the drift to avoid).
       caches the session. Non-interactive after that.
    4. [ ] =Workbooks.Atproto.publish(tenant, file, opts)= — thin shell to
       =wb-publish atproto publish <file> --sign --json=. Returns the at:// uri.
-   5. [ ] =POST /api/publish/atproto= + =wb publish atproto <file>= CLI verb.
+   5. [ ] =POST /api/publish/atproto= + =work publish atproto <file>= CLI verb.
    6. [ ] Emit a =c2pa.action.published.atproto= assertion (already in the
       manifest vocab) into the signed manifest so the artifact records WHERE it
       went. did:key (sign) ↔ did:plc (carrier) bound via the manifest, per
@@ -69,7 +69,7 @@ key with no second store (rule 4 — the drift to avoid).
    1. [ ] Ensure =gh= on PATH in the image (+ =GH_TOKEN= secret).
    2. [ ] =Workbooks.GitHub.push/2= (create-or-push) + =Workbooks.Git.publish/1=
       already federates via Radicle — GitHub is the SECOND mirror, same repo.
-   3. [ ] =wb push github= CLI verb + =POST /api/publish/github=.
+   3. [ ] =work push github= CLI verb + =POST /api/publish/github=.
 ** Credential gate: =gh auth login= (or a =GH_TOKEN= secret on the app).
 
 * Throughline

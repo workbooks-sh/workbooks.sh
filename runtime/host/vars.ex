@@ -3,7 +3,7 @@ defmodule Workbooks.Vars do
   The runtime variable store + ref, per tenant. Variables are key→value; some are
   *secrets* — ref-only, never returned to a guest, only injected on egress (the
   secrets-by-reference rule, docs/SECRETS.org). `ref/2` substitutes `{{var:KEY}}`
-  and `{{secret:KEY}}` host-side; `get/2` redacts secret values. The `wb var` CLI
+  and `{{secret:KEY}}` host-side; `get/2` redacts secret values. The `work var` CLI
   manages them and an agent references a secret without ever holding its bytes.
   """
   use GenServer

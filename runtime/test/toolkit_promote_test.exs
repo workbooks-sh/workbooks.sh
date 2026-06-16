@@ -59,7 +59,7 @@ defmodule Workbooks.ToolkitPromoteTest do
   end
 
   @tag :build
-  test "FULL ladder: promote → wb toolkit build → registered → run" do
+  test "FULL ladder: promote → work toolkit build → registered → run" do
     root = tmp_root()
     name = uniq("rev")
     src = Path.join(System.tmp_dir!(), "#{name}.js")

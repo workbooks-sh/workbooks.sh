@@ -47,7 +47,7 @@ Out of ~150 audited claims, the overwhelming majority verify TRUE. Below are the
 | plans-that-run | "A schedule self-runs from the bare file." | Requires a running keeper/scheduler process. |
 | the-disk-grows | "Background worker materializes outside data to disk for agents." | Primitives exist (keeper.ex, host egress) but no shipped single-feature path; composed pattern. |
 | a-disk-that-travels | "Single .html carries the disk." | Egress is a `.wbundle` zip (HTML + separate SQLite). |
-| did-it-do-well | "Standing bench, couple of minutes, fraction of a cent." | Real but THIN/toolkit-scoped (`wb toolkit eval`, toolkits.ex:307-378); no standalone evals primitive; cost/speed unbenchmarked. |
+| did-it-do-well | "Standing bench, couple of minutes, fraction of a cent." | Real but THIN/toolkit-scoped (`work toolkit eval`, toolkits.ex:307-378); no standalone evals primitive; cost/speed unbenchmarked. |
 | plans-that-run (doc) | **autopoet** taught beside shipped primitives. | autopoet.ex = Phase-1 issue backlog only; collides with brand canon (never pitch self-running). **Highest-risk over-claim.** |
 | the-browser | "The app is itself made of workbooks / no privileged frozen core." | Conventional Svelte app; "UI becomes a workbook" is the documented **north star**, not current state. |
 
@@ -64,13 +64,13 @@ Out of ~150 audited claims, the overwhelming majority verify TRUE. Below are the
 | 3 | the-one-language | Found. | **Reframe/Move** | Soften "models already know org"; promote to its own early language unit. |
 | 4 | giving-it-abilities | Making | **Keep** | Cut app-store boast; add maturity hedge (toolkits = least-mature prong); place AFTER the engine. |
 | 5 | code-in-the-document | Making | **Keep** | Gate behind file/language lessons; optionally split out the upgrade-gate beat. |
-| 6 | the-one-command (wbx) | Making | **Reframe→reference** | The agent runs wbx, not this user. Demote to a reference card; fix 3 embellishments. |
+| 6 | the-one-command (work) | Making | **Reframe→reference** | The agent runs work, not this user. Demote to a reference card; fix 3 embellishments. |
 | 7 | coming-alive | Engine | **Keep** | Soften "thousands = resting state"; reconcile Nexus/Dock vocabulary. |
 | 8 | safe-powers | Engine | **Keep** | Fix "no secrets" lowest-rung; promote isolation into a headline. |
 | 9 | going-live | Engine | **Keep** | Fix public-history 401 claim; forward-point the one-word claim. |
 | 10 | what-an-agent-is | Agents | **Keep + Move up** | Move to lesson 2-3; it's the spine for this audience. Note host-brokered tools. |
 | 11 | agents-that-persist | Agents | **Keep** | Light reframe + trim ~15% lyrical filler; orient the non-technical reader. |
-| 12 | did-it-do-well | Agents | **Keep** | Ground evals in real `wb toolkit eval` surface; soften cost/speed figure. |
+| 12 | did-it-do-well | Agents | **Keep** | Ground evals in real `work toolkit eval` surface; soften cost/speed figure. |
 | 13 | plans-that-run | Automation | **Keep** | Fix two-way kanban + self-running schedule; **cut autopoet doc-link**. |
 | 14 | compiled-plans | Automation | **Keep / Optional** | Strong; for this audience demote to optional back half. |
 | 15 | a-disk-that-travels | The disk | **Keep / Merge** | Reconcile single-HTML; **merge unit into Trust & sharing**. |
@@ -93,7 +93,7 @@ Out of ~150 audited claims, the overwhelming majority verify TRUE. Below are the
 1. **The whole thing** — the ecosystem map (artifact + runtime + Org + toolkits + living layer). Introduce the file here as the core *unit*. Fold `the-one-file` + `carries-its-story`.
 2. **The one language** — Org / literate programming / tangling (`the-one-language` + `code-in-the-document`). Everything downstream is written in it.
 3. **The engine & the sandbox** — the runtime as load-bearing pillar, with **isolation as its own headline** (BEAM-node isolation, Wasmtime-in-NIF, why-not-micro-VMs, the threat model, capabilities/safe-powers). **Before toolkits.**
-4. **Toolkits — giving it abilities** (`giving-it-abilities` + wbx-as-reference) — now correctly after the engine that runs them.
+4. **Toolkits — giving it abilities** (`giving-it-abilities` + work-as-reference) — now correctly after the engine that runs them.
 5. **Agents** — unchanged content, but the agent appears far earlier overall.
 6. **Automation, plans & the living system** — Automation + a **new autopoet/self-editing climax** (honestly framed, brand-canon-aligned).
 7. **Trust, sharing & the disk** — merge the disk unit into trust/sharing (both = a copyable artifact staying safe/useful when handed out). Fold `the-browser` as the closing lesson; merge its "all the same idea" beat with `under-the-hood` so there is **one** climax.
@@ -122,7 +122,7 @@ The biggest gap: **not one lesson teaches the audience's actual job.** Add:
 **P0 — credibility / canon risk (do first, cheap):**
 1. **Demote/reframe autopoet** out of `plans-that-run` (Phase-1-only + collides with "never pitch self-running"). Move to the honest vision climax or cut.
 2. **Fix `the-one-file`'s three false claims** (no-server, history-in-file, one-HTML→bundle) — they force every later unit to walk them back.
-3. **Ground `did-it-do-well`** in the real `wb toolkit eval` surface; soften cost/speed.
+3. **Ground `did-it-do-well`** in the real `work toolkit eval` surface; soften cost/speed.
 4. **Fix `going-live`** public-history claim (401 on locked/multi-tenant).
 5. **Fix `plans-that-run`** two-way kanban + self-running schedule.
 
@@ -133,7 +133,7 @@ The biggest gap: **not one lesson teaches the audience's actual job.** Add:
 9. Dissolve the disk + browser units; merge the two endings.
 
 **P2 — audience reframes:**
-10. Demote `wbx` to a reference card; move `the-one-language` format mechanics later for novices.
+10. Demote `work` to a reference card; move `the-one-language` format mechanics later for novices.
 11. Reframe `the-browser` "made of workbooks"→"extended via toolkits"; downgrade agent-arranges-desktop to "can".
 12. Add a standalone **isolation/threat-model** lesson and the **autopoet climax**.
 

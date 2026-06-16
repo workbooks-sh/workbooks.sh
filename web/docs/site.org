@@ -52,7 +52,7 @@
 
 * Reference
   Exhaustive, tangled from code. No narrative.
-  - [[reference/cli.org][wbx CLI]]
+  - [[reference/cli.org][work CLI]]
   - [[reference/runtime.org][Runtime RCP API]]
   - [[reference/engine.org][Engine internals]]
   - [[reference/browser.org][Browser / desktop Host]]

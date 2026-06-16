@@ -12,7 +12,7 @@
    *   - ready + declared_mismatch   → red chip + offending cells
    *   - ready + no mismatch         → green/amber/red summary chip
    *
-   * Read-only by design: this is a *display* of `wb check` output,
+   * Read-only by design: this is a *display* of `work check` output,
    * never a mutation of the workbook source.
    */
   import {
@@ -70,7 +70,7 @@
   {:else if portability.phase === "unavailable"}
     <p class="status">
       Classification unavailable —
-      <code>wb check --portability</code> hasn't shipped yet.
+      <code>work check --portability</code> hasn't shipped yet.
     </p>
   {:else if portability.phase === "error"}
     <p class="status err">

@@ -34,7 +34,7 @@
 
     * TODO try this line yourself                                  :you:reader:
       :PROPERTIES:
-      :HOW: save it and run  wbx query you.org
+      :HOW: save it and run  work query you.org
       :END:
 
     everything a human can read in a comment, the machine reads too —
@@ -145,8 +145,8 @@
   <p>Here's the method for the whole page, and the method you'll keep after it.
   Pipe org text into the kernel through the CLI and read the rows it returns:</p>
   <pre class="orgsample">printf '* TODO water the plants  :home:\n' > task.org
-wbx query task.org</pre>
-  <p>Point <code>wbx query</code> at any <code>.org</code> file and it calls the
+work query task.org</pre>
+  <p>Point <code>work query</code> at any <code>.org</code> file and it calls the
   kernel's <code>parse_headlines</code> and prints the JSON array. There's no
   project, no config, no setup — the kernel is a pure function from text to rows.
   The same text, the same row, every time, on any of the kernel's surfaces. The
@@ -168,7 +168,7 @@ flowchart LR
   eight headline fields, source blocks, the workflow tags — and lets everything
   else fall through as prose. Every example below this line is real output from
   that function. Nothing is illustrative; each cell was machine-verified. You can
-  reproduce any of them by saving the org and running <code>wbx query</code> on it.</p>
+  reproduce any of them by saving the org and running <code>work query</code> on it.</p>
 </section>
 
 <section id="headline">
@@ -304,7 +304,7 @@ flowchart LR
    #+begin_src python :deps pandas :in prices.json :out report.html :persist
    build_report()
    #+end_src</pre>
-  <p>Run that through <code>wbx tangle</code> and the kernel computes — nobody
+  <p>Run that through <code>work tangle</code> and the kernel computes — nobody
   draws — this:</p>
   <pre class="mermaid">
 flowchart LR
@@ -330,7 +330,7 @@ flowchart LR
   <code>"persist":true</code>, and the <code>:SCHEDULE:</code> property surfaces
   as <code>{"cron":"0 6 * * *"}</code>. Two tagged headlines, and you have a
   scheduled, capability-aware build graph.</p>
-  <p>Now delete <code>fetch</code> and run <code>wbx lint</code>:</p>
+  <p>Now delete <code>fetch</code> and run <code>work lint</code>:</p>
   <pre class="orgsample">[{"level":"error","scope":"report",
   "message":"input `prices.json` has no upstream producer"}]</pre>
   <p>The validator flags exactly two kinds of error — a component with no source
@@ -383,7 +383,7 @@ flowchart LR
   the drawers section, proving itself on a comment nobody was supposed to find.
   The lesson inside the lesson: org lives anywhere plain text lives. View-source
   on the parent is itself the drill — paste that comment into
-  <code>wbx query</code> and you'll get exactly the row above. (This page hides
+  <code>work query</code> and you'll get exactly the row above. (This page hides
   one too. Go look.)</p>
 </section>
 
@@ -399,7 +399,7 @@ flowchart LR
     <tr><td>time ranges <code>09:00-10:30</code></td><td class="n">pass through raw into <code>at</code> as a single string — not split</td></tr>
     <tr><td>split planning line</td><td class="n">only the first stamp parses, and it kills the drawer below — the one-line rule is load-bearing</td></tr>
     <tr><td>a second source block in one section</td><td class="n">ignored — only the first is captured</td></tr>
-    <tr><td><code>lint</code> (the kernel export)</td><td class="n">a stub returning <code>[]</code>. The CLI's <code>wbx lint</code> actually calls <code>validate</code> — different function, real output</td></tr>
+    <tr><td><code>lint</code> (the kernel export)</td><td class="n">a stub returning <code>[]</code>. The CLI's <code>work lint</code> actually calls <code>validate</code> — different function, real output</td></tr>
     <tr><td>agenda, links, footnotes, tables-as-data, clock tables…</td><td class="n">rendered as HTML by <code>render()</code>, never surfaced as structure</td></tr>
   </table>
   <p>That last row is the honest summary of the whole page. Most of org-mode's
@@ -438,7 +438,7 @@ flowchart LR
   </details>
   <details>
     <summary>How do I check my own file?</summary>
-    <p>Run it through the kernel: <code>wbx query plan.org</code>. You'll get the
+    <p>Run it through the kernel: <code>work query plan.org</code>. You'll get the
     JSON rows back. If a
     field is missing or a drawer came back empty, you've found a syntax issue —
     most often the one-line planning rule. The parser is the spec.</p>
@@ -451,16 +451,16 @@ flowchart LR
     for exactly this kind of in-page drill. An earlier in-page notebook shipped
     and was then retired the same day, so today this page prints
     machine-verified static output rather than running the wasm in your tab.
-    Every JSON snippet here is real <code>wbx</code> output; the live in-page
+    Every JSON snippet here is real <code>work</code> output; the live in-page
     version is a wiring decision, not a missing capability.</p>
   </details>
   <details>
-    <summary>Why is wbx lint not the same as the kernel's lint?</summary>
+    <summary>Why is work lint not the same as the kernel's lint?</summary>
     <p>A fun honest wrinkle. The kernel exports a <code>lint</code> function that
     is currently a stub — it returns <code>[]</code>. The CLI's
-    <code>wbx lint</code> doesn't call it; it calls the kernel's
+    <code>work lint</code> doesn't call it; it calls the kernel's
     <code>validate</code>, which is real and flags missing producers and
-    source-less components. So <code>wbx lint</code> works — it just routes
+    source-less components. So <code>work lint</code> works — it just routes
     around the stub.</p>
   </details>
 </section>

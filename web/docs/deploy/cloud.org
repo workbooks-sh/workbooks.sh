@@ -14,9 +14,9 @@ script, no recompile. Fly is the recipe we bundle (a default, not a privilege);
 it runs under *your own* account.
 
 #+begin_src bash
-wbx deploy init cloud   # scaffold deployment.org for the cloud preset
-wbx deploy secrets set KEY=VALUE
-wbx deploy apply        # converge via the provider recipe
+work deploy init cloud   # scaffold deployment.org for the cloud preset
+work deploy secrets set KEY=VALUE
+work deploy apply        # converge via the provider recipe
 #+end_src
 
 ** Where recipes resolve from
@@ -27,7 +27,7 @@ wbx deploy apply        # converge via the provider recipe
   :END:
 
 =$WB_PROVIDERS_DIR= → =./cli/deploy-kit/providers= (repo dev) → recipes embedded in
-the =wbx= binary, materialized under the app dir (standalone installs).
+the =work= binary, materialized under the app dir (standalone installs).
 
 ** Secrets
   :PROPERTIES:
@@ -36,7 +36,7 @@ the =wbx= binary, materialized under the app dir (standalone installs).
   :END:
 
 Secrets are declared by NAME in =deployment.org= (=#+DEPLOY_SECRETS:=), set via
-=wbx deploy secrets=, and delivered per provider — staged through the recipe's
+=work deploy secrets=, and delivered per provider — staged through the recipe's
 =provider_set_secrets= hook in the cloud. Values never enter =deployment.org= or
 images.
 

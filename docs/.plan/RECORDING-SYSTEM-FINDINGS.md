@@ -34,16 +34,16 @@ Models are the *fallback* and the *verifier*, not the steering wheel.
         │ drive              │ capture               │ verify
         ▼                    ▼                       ▼
   Embedded MCP          ScreenCaptureKit        Gemini 3 Flash → 3.1 Pro
-  (wb desktop mcp)      → VideoToolbox H.264     (video proof gate)
+  (work desktop mcp)      → VideoToolbox H.264     (video proof gate)
   click/type/eval_js    → ffmpeg stills          MiniMax M3 tiebreak
         │                + gifski GIF
         ▼
-  Real Tauri window (WKWebView), seeded demo env (wb demo seed)
+  Real Tauri window (WKWebView), seeded demo env (work demo seed)
 ```
 
 - **Capture:** ScreenCaptureKit (window-scoped, GPU zero-copy) → VideoToolbox H.264 MP4 + ffmpeg
   stills + gifski GIFs.
-- **Drive:** the **embedded MCP** (`wb desktop mcp --stdio`) for the real app; **Playwright +
+- **Drive:** the **embedded MCP** (`work desktop mcp --stdio`) for the real app; **Playwright +
   ghost-cursor + Stagehand** when the artifact is a polished *web* walkthrough (dev frontend or
   arbitrary web), where animated cursor/typing matters and Chromium is fair game.
 - **AI:** drive ~$0 (deterministic MCP scripts); fallback to **Claude Opus 4.8 computer-use** for
@@ -103,7 +103,7 @@ not research.
 
 | Role | Model | id | $/M (in/out) | Note |
 |---|---|---|---|---|
-| Primary driver | *none — MCP scripts* | `wb desktop mcp` | $0 | deterministic, reproducible |
+| Primary driver | *none — MCP scripts* | `work desktop mcp` | $0 | deterministic, reproducible |
 | Driver fallback (pixels) | **Claude Opus 4.8** | `claude-opus-4-8` | 5 / 25 | 83.4% OSWorld, the real CU leader; use sparingly |
 | Driver fallback (MCP, cheap) | DeepSeek V4 Flash | `deepseek-v4-flash` | 0.14 / 0.28 | tool-calls only, **NOT pixels** |
 | Verify — triage | **Gemini 3 Flash** | `gemini-3-flash` | 0.50 / 3.00 | 1fps sample, finds error frames+timestamps |
@@ -161,7 +161,7 @@ controlled, dependency-free).
   time** so the Browser shows real run records.
 - **Custom toolkits** — 1–2 demo toolkits as `:toolkit:` Org nodes under `$WB_TOOLKITS_ROOT`
   (point at `runtime/demos/seed/toolkits`), each with skills + a signed manifest
-  (`Workbooks.Toolkits.sign_text/3`) so `wb toolkit list/verify` is green on camera. Reuse the
+  (`Workbooks.Toolkits.sign_text/3`) so `work toolkit list/verify` is green on camera. Reuse the
   `huniq` autobuild shape.
 - **Set-up agents** — `:agent:` Org nodes with mandatory `** System prompt`, `:MODEL:`,
   `:TOOLKITS:`. Pin `MODEL: xiaomi/mimo-v2.5`; for recordings prefer **replayed transcripts**.
@@ -176,14 +176,14 @@ controlled, dependency-free).
 3. **Stable IDs** — replace `System.unique_integer`/`Tenant.ephemeral` in the demo path with seeded
    ids so DIDs/run-ids/filenames don't churn.
 
-**Plug-in:** a `wb demo seed --fresh --tenancy multi` escript verb wraps a new
+**Plug-in:** a `work demo seed --fresh --tenancy multi` escript verb wraps a new
 `Workbooks.Demos.Seed.materialize/1` (peer to `Demos.Build`) → clean `$WB_DATA`+`$WB_TOOLKITS_ROOT`
 +dock preset → boots `WB_WEB=1` runtime + Tauri app with `WB_DEMO=1`. The harness shells this before
 every take; the check-model asserts seeded state rendered (tiles present, runs green) before publish.
 
 **Ready today:** Org workspaces/agents/toolkits, git seeding, build/workflow demos, toolkit signing.
 **Small build (~1–2 days):** `Demos.Seed.materialize/1`, per-tenant key seeds, `WB_DEMO`/replay/
-clock gates, `demo-dock.json`+loader, `wb demo seed`. **Riskiest knob:** multi-tenancy (mint short-
+clock gates, `demo-dock.json`+loader, `work demo seed`. **Riskiest knob:** multi-tenancy (mint short-
 lived demo JWTs at seed time; never seed into the shared `"default"` partition — it fails-isolated).
 
 ---
@@ -234,7 +234,7 @@ single dependency shared by app-tier recording (D2), testing reuse (D6), and the
 VideoToolbox transcode + ffmpeg stills + gifski). Grant TCC permission once. Output: real MP4s of
 the app today, even before the MCP bridge (drive manually/Opus while .23 lands).
 
-**Phase 2 — Demo seed.** `wb demo seed` + `Demos.Seed.materialize/1` + deterministic key/clock/
+**Phase 2 — Demo seed.** `work demo seed` + `Demos.Seed.materialize/1` + deterministic key/clock/
 replay gates + `demo-dock.json`. Now every take runs against identical rich state.
 
 **Phase 3 — Proof loop.** Wire Gemini 3 Flash → 3.1 Pro → MiniMax M3 cascade behind a
@@ -339,7 +339,7 @@ Read `runtime/host/browse.ex` + `runtime/host/browse/provider.ex` +
   public verbs are `fetch/2`, `crawl/2`, `search/2`. No `navigate/click/type/
   screenshot/eval_js` anywhere in `runtime/host/`.
 - `grep -rn ':drive\|Browse.Drive'` over `runtime/host/` → **0 hits.** The only
-  MCP reference is `cli/desktop.ex` (`wb desktop mcp --stdio`), a stdio↔UDS
+  MCP reference is `cli/desktop.ex` (`work desktop mcp --stdio`), a stdio↔UDS
   **relay for Claude Code → the live browser**, whose own comment says the
   in-browser MCP **server** is "impl wb-aakl.23" — i.e. not shipped.
 

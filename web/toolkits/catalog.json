@@ -149,10 +149,10 @@
     "category": "Pipeline",
     "logo": "/toolkits/logos/docs.svg",
     "tint": "#f3c5a3",
-    "cli_bin": "wbx",
+    "cli_bin": "work",
     "env_keys": [],
     "requires": null,
-    "flow": "read this front door \u2192 author with the docs-authoring skill (.claude/skills/docs-authoring) \u2192 run the wbx docs verb family below. Reference renderer = toolkits/orgitorial; publish target/identity = toolkits/publish + runtime/host/publish/site.ex; source-derivation = wbx tangle/lint.",
+    "flow": "read this front door \u2192 author with the docs-authoring skill (.claude/skills/docs-authoring) \u2192 run the work docs verb family below. Reference renderer = toolkits/orgitorial; publish target/identity = toolkits/publish + runtime/host/publish/site.ex; source-derivation = work tangle/lint.",
     "env_note": null,
     "description": "This toolkit packages the system that builds docs.workbooks.sh so any tenant can point it at their own code and inherit the same skeleton: Di\u00e1taxis IA + reference *tangled from code* + a fail-closed honesty gate",
     "updated": "2026-06-13"
@@ -441,7 +441,7 @@
     "requires": "wb-publish>=0.1.0",
     "flow": null,
     "env_note": null,
-    "description": "The publish/identity stack, lifted out of the `wb` core (M5-publish-to-toolkit \u2014 provider/integration logic lives in toolkits). The toolkit OWNS the `wb-publish` binary: its source",
+    "description": "The publish/identity stack, lifted out of the `work` core (M5-publish-to-toolkit \u2014 provider/integration logic lives in toolkits). The toolkit OWNS the `wb-publish` binary: its source",
     "updated": "2026-06-07"
   },
   {
@@ -630,7 +630,7 @@
     "requires": null,
     "flow": "read overview \u2192 branch to the one skill your task needs (concepts for \"what is X\", authoring for editing/publishing content, toolkits for using a capability, workflows for board/lifecycle work, writing for prose ABOUT Workbooks). cat a skill only when you reach its step.",
     "env_note": null,
-    "description": "# `wb` is HOST-PROVIDED: every workbooks engine fulfills it in-process # (agents' wb tool -> Workbooks.CLI.call, tenant-scoped). This toolkit # bundles no binary and must not \u2014 nothing native executes in the sandbox.",
+    "description": "# `work` is HOST-PROVIDED: every workbooks engine fulfills it in-process # (agents' work tool -> Workbooks.CLI.call, tenant-scoped). This toolkit # bundles no binary and must not \u2014 nothing native executes in the sandbox.",
     "updated": "2026-06-10"
   },
   {

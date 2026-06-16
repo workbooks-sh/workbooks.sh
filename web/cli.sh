@@ -1,9 +1,9 @@
 #!/bin/sh
-# wbx installer — the Workbooks CLI.
+# work installer — the Workbooks CLI.
 #
 #   curl -fsSL https://workbooks.sh/cli.sh | sh
 #
-# Downloads the latest wbx binary from GitHub Releases (tags `wbx-v*`) and
+# Downloads the latest work binary from GitHub Releases (tags `work-v*`) and
 # installs it. Prefer npm? `npm install -g @work.books/cli` does the same.
 #
 # Env overrides:
@@ -28,14 +28,14 @@ case "$arch" in
   x86_64|amd64)  arch=x64 ;;
   *) die "unsupported arch: $arch" ;;
 esac
-ASSET="wbx-${os}-${arch}"
+ASSET="work-${os}-${arch}"
 
 if [ -n "${WBX_VERSION:-}" ]; then
-  TAG="wbx-v${WBX_VERSION}"
+  TAG="work-v${WBX_VERSION}"
 else
   TAG="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=30" \
-    | grep -o '"tag_name": *"wbx-v[^"]*"' | head -1 | sed 's/.*"\(wbx-v[^"]*\)"/\1/')"
-  [ -n "$TAG" ] || die "no wbx-v* release found on ${REPO}"
+    | grep -o '"tag_name": *"work-v[^"]*"' | head -1 | sed 's/.*"\(work-v[^"]*\)"/\1/')"
+  [ -n "$TAG" ] || die "no work-v* release found on ${REPO}"
 fi
 
 DIR="${WBX_INSTALL_DIR:-}"
@@ -49,12 +49,12 @@ say "downloading ${ASSET} (${TAG})…"
 TMP="$(mktemp)"
 curl -fsSL "$URL" -o "$TMP" || die "download failed: $URL"
 chmod +x "$TMP"
-mv "$TMP" "$DIR/wbx"
-say "installed → $DIR/wbx"
+mv "$TMP" "$DIR/work"
+say "installed → $DIR/work"
 
 case ":$PATH:" in
   *":$DIR:"*) ;;
   *) say "note: $DIR is not on your PATH — add: export PATH=\"$DIR:\$PATH\"" ;;
 esac
-"$DIR/wbx" --version >&2 || true
-say "done. start with: wbx --help"
+"$DIR/work" --version >&2 || true
+say "done. start with: work --help"

@@ -62,7 +62,7 @@ and emits a sibling `.gif`. Flow grammar is documented in `flows/example-app.flo
 
 ### Terminal tutorials
 ```sh
-tools/record/record term rec demo.cast -- "wb demo seed --fresh"
+tools/record/record term rec demo.cast -- "work demo seed --fresh"
 tools/record/record term mp4 demo.cast demo.mp4       # cast → agg GIF → MP4
 ```
 
@@ -127,7 +127,7 @@ GIF/stills/terminal artifacts.
 
 ## Where this sits in the larger plan
 This is **Phase 1** of `RECORDING-SYSTEM-FINDINGS.md` (native/Linux capture rig).
-Downstream phases — demo seed (`wb demo seed`), the Gemini-video proof loop, the
+Downstream phases — demo seed (`work demo seed`), the Gemini-video proof loop, the
 web-walkthrough Playwright lane, regression-assert mode, and the Nexus
 `Workbooks.Browse` CDP-over-broker provider — consume this rig's MP4/PNG outputs
 and the same intent seam. The keystone shared dependency for *driving the shipped

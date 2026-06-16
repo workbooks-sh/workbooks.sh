@@ -9,7 +9,7 @@ its own sandbox. No native toolchain, no host escape.
 
 #+begin_src bash
 # the agent writes source, then:
-wb toolkit build-inline mytool zig ./mytool.zig    # compile in-sandbox → register
+work toolkit build-inline mytool zig ./mytool.zig    # compile in-sandbox → register
 run-command mytool < input                          # use it immediately
 #+end_src
 
@@ -25,7 +25,7 @@ When a session tool proves its worth, *promote* it to a durable, source-owned
 workspace toolkit that survives the session and can be packaged:
 
 #+begin_src bash
-wb toolkit promote mytool zig ./mytool.zig
+work toolkit promote mytool zig ./mytool.zig
 #+end_src
 
 - Make it durable + shippable: [[../distribute/package.org][Package & sign]]

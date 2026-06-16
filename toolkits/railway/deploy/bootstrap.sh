@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# `wb deploy apply` (ENGINE_PLACE=railway). Railway sells long-lived containers
+# `work deploy apply` (ENGINE_PLACE=railway). Railway sells long-lived containers
 # (no machine-per-run API), so sandboxes are in-process only — the CLI coherence
 # matrix rejects anything else before this runs. Spine + hook contract:
 # deploy-kit/recipe/common.sh + deploy-kit/README.org.

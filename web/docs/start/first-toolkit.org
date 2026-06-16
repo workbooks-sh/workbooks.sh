@@ -25,7 +25,7 @@ Javy.IO.writeSync(1, new TextEncoder().encode([...all].reverse().join("")));
 ** 2 · Build it — in the sandbox
 
 #+begin_src bash
-wb toolkit build-inline rev js ./reverse.js
+work toolkit build-inline rev js ./reverse.js
 #+end_src
 
 The runtime compiled your source to WASM *without a toolchain on your machine* —
@@ -50,7 +50,7 @@ and replaces the old binding *with no restart* — calls already in flight finis
 the old bytes, new calls hit the new ones.
 
 #+begin_src bash
-wb toolkit build-inline rev js ./reverse.js   # hot-swapped in place
+work toolkit build-inline rev js ./reverse.js   # hot-swapped in place
 #+end_src
 
 ** 5 · Make it durable
@@ -60,7 +60,7 @@ manifest plus your source — so it survives, rebuilds deterministically, and ca
 packaged:
 
 #+begin_src bash
-wb toolkit promote rev js ./reverse.js
+work toolkit promote rev js ./reverse.js
 # → workspace toolkit `rev`: manifest.org + src + skills, source-owned
 #+end_src
 
@@ -70,9 +70,9 @@ A toolkit *is* a workbook. Pack it, and anyone can install it by hash — the ha
 is the supply-chain gate, so a tampered bundle is rejected before anything runs.
 
 #+begin_src bash
-wb pack rev rev.wbundle           # one portable .wbundle (HTML + the wasm)
+work pack rev rev.wbundle           # one portable .wbundle (HTML + the wasm)
 # on another machine:
-wb install rev.wbundle            # verifies + registers; now `run-command rev` works
+work install rev.wbundle            # verifies + registers; now `run-command rev` works
 #+end_src
 
 ** What you just did

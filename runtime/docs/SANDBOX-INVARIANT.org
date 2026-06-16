@@ -47,7 +47,7 @@
    resolution, fetch, parsing, orchestration — is in-BEAM Elixir.
 
 ** Host TOOLING via ports (NOT untrusted code, NOT in the exec path)
-   `wb publish` / dev workflows shell out to git, gh, rad, tea, jj, glab, brandnana, litestream.
+   `work publish` / dev workflows shell out to git, gh, rad, tea, jj, glab, brandnana, litestream.
    These are isolated OS processes operating on the operator's OWN repo/data — they never compile or
    execute untrusted workbook code, and they are not in the compile path. Outside the invariant.
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// Thin launcher: exec the native `wb` binary fetched by install.js.
+// Thin launcher: exec the native `work` binary fetched by install.js.
 const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const bin = path.join(__dirname, process.platform === "win32" ? "wbx.exe" : "wbx");
+const bin = path.join(__dirname, process.platform === "win32" ? "work.exe" : "work");
 
 function fatal(reason) {
   process.stderr.write(
     "\n" +
     "╔══════════════════════════════════════════════════════════════╗\n" +
-    "║  wb is not installed correctly                               ║\n" +
+    "║  work is not installed correctly                               ║\n" +
     "╚══════════════════════════════════════════════════════════════╝\n" +
     `  ${reason}\n\n` +
     "  Fix options:\n" +

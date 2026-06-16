@@ -53,7 +53,7 @@
           "title": "signing and verifying",
           "kind": "implementation",
           "dek": "Make provenance travel with the bytes: sign a workbook with a self-certifying did:key (Ed25519 over canonical JSON, embedded in the file) and verify both the signature and that the artifact hasn't been touched since.",
-          "evidence": "runtime/host/manifest.ex (embedded <script type=\"application/workbooks-c2pa+json\"> manifest, two-check verify: signature + asset sha256, canonical-JSON contract); cli/src/local.rs sign/verify ('byte-compatible with Workbooks.Manifest'); runtime/host/bundle.ex ship() signing on egress; the wbx sign/verify story in web/learn/workbook.html's terminal block"
+          "evidence": "runtime/host/manifest.ex (embedded <script type=\"application/workbooks-c2pa+json\"> manifest, two-check verify: signature + asset sha256, canonical-JSON contract); cli/src/local.rs sign/verify ('byte-compatible with Workbooks.Manifest'); runtime/host/bundle.ex ship() signing on egress; the work sign/verify story in web/learn/workbook.html's terminal block"
         }
       ]
     },
@@ -125,7 +125,7 @@
           "slug": "the-import-ramp",
           "title": "the import ramp",
           "kind": "implementation",
-          "dek": "Anything → toolkit: how wbx toolkit import sniffs nine source shapes (Claude skills, MCP configs, OpenAPI specs, npm/pip CLIs, cursor rules, AGENTS.md…), mechanically translates docs to org, and scaffolds a real manifest + skill tree — with carried scripts honestly flagged as untrusted.",
+          "dek": "Anything → toolkit: how work toolkit import sniffs nine source shapes (Claude skills, MCP configs, OpenAPI specs, npm/pip CLIs, cursor rules, AGENTS.md…), mechanically translates docs to org, and scaffolds a real manifest + skill tree — with carried scripts honestly flagged as untrusted.",
           "evidence": "cli/src/import.rs (Kind enum with 9 detected shapes, detect() shape-sniffing, md_to_org() the 'honest 90%' translator, write_scaffold(), per-kind parsers incl. import_mcp_server synthesizing launch scripts so the audit can judge them, import_openapi making a skill per operation); stage 2 auto-runs via crate::audit::audit_static at the end of import()"
         },
         {
@@ -201,20 +201,20 @@
           "title": "tangling",
           "kind": "concept",
           "dek": "Literate programming, weaponized: how source blocks plus six header args (:deps :uses :in :out :persist :dir) compile a document into a WIT-world-shaped build plan — components, capability imports, and a DAG of :out→:in edges.",
-          "evidence": "runtime/kernel/src/lib.rs tangle_plan/build_world/parse_args (the six header args, including Motoko-style :persist and :dir for real project dirs); sig_of() derives imports/exports/edges from header args alone; cli/src/kernel.rs `wb tangle` runs it locally with no runtime; cli/SPEC.md lists tangle as a kernel-local verb; runtime/examples/wb/nightly-digest.org is a three-language tangled workflow."
+          "evidence": "runtime/kernel/src/lib.rs tangle_plan/build_world/parse_args (the six header args, including Motoko-style :persist and :dir for real project dirs); sig_of() derives imports/exports/edges from header args alone; cli/src/kernel.rs `work tangle` runs it locally with no runtime; cli/SPEC.md lists tangle as a kernel-local verb; runtime/examples/wb/nightly-digest.org is a three-language tangled workflow."
         },
         {
           "slug": "your-first-workflow",
           "title": "your first workflow",
           "kind": "implementation",
           "dek": "Write a multi-language workflow from a blank file — headline by headline, component by component — then tangle it, lint it, fix the diagnostics, and run the DAG.",
-          "evidence": "runtime/examples/wb/nightly-digest.org (rust→js→go, :uses workbook:vfs/query, llm/complete, net/email) is the template; cli/src/kernel.rs gives the loop verbs (`wb query` / `wb tangle` / `wb lint`); runtime/kernel/src/lib.rs validate() produces the teachable failure modes (component with no source block, input with no upstream producer); runtime/host/workflow.ex executes the plan topologically, piping along edges."
+          "evidence": "runtime/examples/wb/nightly-digest.org (rust→js→go, :uses workbook:vfs/query, llm/complete, net/email) is the template; cli/src/kernel.rs gives the loop verbs (`work query` / `work tangle` / `work lint`); runtime/kernel/src/lib.rs validate() produces the teachable failure modes (component with no source block, input with no upstream producer); runtime/host/workflow.ex executes the plan topologically, piping along edges."
         },
         {
           "slug": "the-kernel",
           "title": "the kernel",
           "kind": "mechanics",
-          "dek": "Inside OQL — one 550-line pure Rust crate (parse, tangle, validate, render on orgize) that ships as three surfaces from the same source: a native rlib in the wb CLI, a WIT-typed wasm Component in the runtime and desktop, and a raw ptr/len build running in this very website.",
+          "dek": "Inside OQL — one 550-line pure Rust crate (parse, tangle, validate, render on orgize) that ships as three surfaces from the same source: a native rlib in the work CLI, a WIT-typed wasm Component in the runtime and desktop, and a raw ptr/len build running in this very website.",
           "evidence": "runtime/kernel/src/lib.rs (pure string→string API, no host calls, no unsafe in the component path); runtime/kernel/wit/world.wit (the workbooks:oql world — six exports); runtime/kernel/src/browser_abi.rs (packed-u64 ABI for in-browser instantiation); runtime/kernel/Cargo.toml documents the cdylib+rlib split; consumers: cli/src/kernel.rs (native), runtime/host/oql.ex (wasm component), runtime/host/publish.ex + public_web.ex (render to HTML)."
         },
         {
@@ -276,7 +276,7 @@
           "title": "human in the loop",
           "kind": "implementation",
           "dek": "Insert a real human checkpoint into a live run — a review canvas the agent opens, a commit the human makes, and a FIFO the agent polls mid-loop to pick the verdict up.",
-          "evidence": "toolkits/ctk/manifest.org (CTK — 'a human-in-the-loop canvas', render EXEC shape) + skills/agent-review-loop.org, commit-connector.org, runtime-driving.org; runtime/host/agent_session.ex put_review/take_review (FIFO reviews, append-only review_log, durable per-run JSONL, live push to subscribers), WB_RUN + `wb ctk await $WB_RUN`."
+          "evidence": "toolkits/ctk/manifest.org (CTK — 'a human-in-the-loop canvas', render EXEC shape) + skills/agent-review-loop.org, commit-connector.org, runtime-driving.org; runtime/host/agent_session.ex put_review/take_review (FIFO reviews, append-only review_log, durable per-run JSONL, live push to subscribers), WB_RUN + `work ctk await $WB_RUN`."
         },
         {
           "slug": "dreaming",
@@ -288,7 +288,7 @@
       ]
     },
     {
-      "cat": "wbx",
+      "cat": "work",
       "subs": [
         {
           "slug": "mode-model",
@@ -308,14 +308,14 @@
           "slug": "doctor-and-friends",
           "title": "doctor, status, completions",
           "kind": "setup",
-          "dek": "Wire wbx into your shell and let it check itself — doctor's report-not-judge contract (always exit 0, JSON for agents), the bare-wbx where-am-I landing, clap-generated completions, and upgrade's npm-aware self-update.",
-          "evidence": "cli/src/commands.rs:207 (doctor — 'reported not judged', exit 0); cli/src/main.rs (Doctor/Status/Open/Upgrade/Completions verbs, bare wbx routes through doctor at main.rs:258, completions via clap_complete); cli/src/local.rs upgrade(); spec rationale in cli/SPEC.md § 'The prime DX directive'."
+          "dek": "Wire work into your shell and let it check itself — doctor's report-not-judge contract (always exit 0, JSON for agents), the bare-work where-am-I landing, clap-generated completions, and upgrade's npm-aware self-update.",
+          "evidence": "cli/src/commands.rs:207 (doctor — 'reported not judged', exit 0); cli/src/main.rs (Doctor/Status/Open/Upgrade/Completions verbs, bare work routes through doctor at main.rs:258, completions via clap_complete); cli/src/local.rs upgrade(); spec rationale in cli/SPEC.md § 'The prime DX directive'."
         },
         {
           "slug": "intake-ramp",
           "title": "the intake ramp",
           "kind": "implementation",
-          "dek": "A full walkthrough of wbx toolkit import — nine source kinds detected by shape, the wasm-lane audit that classifies every script ready/convertible/blocked, and the fix-up plan written as org TODOs an agent can execute.",
+          "dek": "A full walkthrough of work toolkit import — nine source kinds detected by shape, the wasm-lane audit that classifies every script ready/convertible/blocked, and the fix-up plan written as org TODOs an agent can execute.",
           "evidence": "cli/src/import.rs (Kind enum: claude-skill/markdown/folder/mcp-server/openapi/npm-cli/pip-cli/cursor-rules/agents-md; detect() by shape, --as override); cli/src/audit.rs (Class Ready/Convertible/Blocked, classify_interpreter — sh/js ready, python blocked, classify_binary — curl→engine-brokered HTTP; findings written into manifest.org); taxonomy table in cli/SPEC.md § 'Import: anything → toolkit'. Parent covers the three stages in prose; this walks the actual detection and classification rules."
         },
         {
@@ -329,7 +329,7 @@
           "slug": "inside-the-bundle",
           "title": "inside the bundle",
           "kind": "mechanics",
-          "dek": "What wbx bundle actually writes — the wbundle/1 zip (workbook.html + workbook.org + vfs.sqlite + manifest.json), the lint gate that refuses to assemble a dirty source, and the Ed25519 did:key signature that makes verify mean something.",
+          "dek": "What work bundle actually writes — the wbundle/1 zip (workbook.html + workbook.org + vfs.sqlite + manifest.json), the lint gate that refuses to assemble a dirty source, and the Ed25519 did:key signature that makes verify mean something.",
           "evidence": "cli/src/local.rs (bundle() — oql::render, diagnostics gate 'source has diagnostics — fix them first', sibling vfs.sqlite travels, manifest format 'wbundle/1', source ships in the artifact so recipients can unbundle + re-author; sign/verify — Ed25519 over canonical JSON, byte-compatible with the runtime's Workbooks.Manifest); parent lesson only says 'org + data + wasm → one artifact'."
         },
         {
@@ -356,7 +356,7 @@
           "title": "validations",
           "kind": "concept",
           "dek": "DONE is a claim until a check proves it — the three-rung ladder of plan validation (dangling inputs, missing langs), task acceptance (:done-when: and :check blocks run fail-closed in the WASM shell), and build conformance, which together turn drift from a shrug into a named diagnostic.",
-          "evidence": "runtime/kernel/src/lib.rs validate() (dangling :in, component without source block); runtime/host/workflow/todo.ex validate/sh_ok ('unit tests for org mode', fail-closed via Workbooks.Shell, never native sh); runtime/host/conformance.ex (engine-world conformance at wb build); runtime/host/demos/kernel.ex demo_validate. Parent's #honest section promises 'drift detectable, with a name and a line number' — this lesson is that promise, mechanized. User-named topic."
+          "evidence": "runtime/kernel/src/lib.rs validate() (dangling :in, component without source block); runtime/host/workflow/todo.ex validate/sh_ok ('unit tests for org mode', fail-closed via Workbooks.Shell, never native sh); runtime/host/conformance.ex (engine-world conformance at work build); runtime/host/demos/kernel.ex demo_validate. Parent's #honest section promises 'drift detectable, with a name and a line number' — this lesson is that promise, mechanized. User-named topic."
         },
         {
           "slug": "boards-as-renderings",
@@ -438,7 +438,7 @@
           "title": "unbundling",
           "kind": "implementation",
           "dek": "Getting everything back out: the .wbundle is a plain zip any tool can open — workbook.html, vfs.sqlite, the org source, a manifest — and one CLI verb unpacks the whole disk to ordinary files on your real disk, zip-slip-guarded, with re-authoring possible because the source travels.",
-          "evidence": "runtime/host/bundle.ex (pack/unpack/ship/restore, format wbundle/1 — 'a plain zip, any tool can open it'); cli/src/local.rs (wb bundle / wb unbundle local verbs, unzip_bytes_to with unsafe-path refusal, workbook.org included so 'recipients can unbundle + re-author')"
+          "evidence": "runtime/host/bundle.ex (pack/unpack/ship/restore, format wbundle/1 — 'a plain zip, any tool can open it'); cli/src/local.rs (work bundle / work unbundle local verbs, unzip_bytes_to with unsafe-path refusal, workbook.org included so 'recipients can unbundle + re-author')"
         },
         {
           "slug": "sealed-sections",

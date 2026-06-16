@@ -1,11 +1,11 @@
 defmodule Workbooks.Demos.Agent do
-  @moduledoc "Demos for the agent layer: the LLM loop, the wb CLI, and the variable store/ref."
+  @moduledoc "Demos for the agent layer: the LLM loop, the work CLI, and the variable store/ref."
 
   @doc """
   Variable store + ref demo (wb-11ck): set a plain var + a secret, then `ref` a
-  template two ways. GUEST (what an agent / `wb var ref` sees) resolves the plain
+  template two ways. GUEST (what an agent / `work var ref` sees) resolves the plain
   var but leaves the secret an opaque placeholder; HOST (egress only) resolves it.
-  And `wb var get` redacts a secret. Deterministic — no LLM.
+  And `work var get` redacts a secret. Deterministic — no LLM.
   """
   def demo_vars do
     t = "vars-#{System.unique_integer([:positive])}"
@@ -22,7 +22,7 @@ defmodule Workbooks.Demos.Agent do
   end
 
   # A workflow that fans out two sub-agents (both `agent`-lang, no edge → same
-  # wave → run in parallel). brandnana's `wb agent spawn` fan-out, as a workflow.
+  # wave → run in parallel). brandnana's `work agent spawn` fan-out, as a workflow.
   @subagents """
   * Research fan-out                                  :workflow:
   ** Fact                                             :component:
@@ -57,7 +57,7 @@ defmodule Workbooks.Demos.Agent do
   Authored-agent demo (wb-11ck, the brandnana-strategist shape): parse a real Org
   `:agent:` node (examples/agents/analyst.org — MODEL, TOOLKITS, system prompt)
   and run it on a multi-step task: total a JSON dataset with shell `jq`, persist
-  the finding with `wb memory`, finish. Proves agents are authored as Org and run
+  the finding with `work memory`, finish. Proves agents are authored as Org and run
   end to end on the substrate. Gated on OPENROUTER_API_KEY.
   """
   def demo_agent_def do
@@ -71,7 +71,7 @@ defmodule Workbooks.Demos.Agent do
       task =
         "From {\"sales\":[{\"region\":\"us\",\"amt\":100},{\"region\":\"eu\",\"amt\":150}," <>
           "{\"region\":\"us\",\"amt\":50}]} use the shell jq command to total all amt values. " <>
-          "Remember the total with wb memory (key total_sales). done with the total."
+          "Remember the total with work memory (key total_sales). done with the total."
 
       r = Workbooks.AgentDef.run(org, task, vfs: vfs, tenant: "analyst", max_steps: 8)
 
@@ -87,9 +87,9 @@ defmodule Workbooks.Demos.Agent do
   end
 
   @doc """
-  Agent memory demo (wb-11ck): the `wb memory` store — remember findings, recall
+  Agent memory demo (wb-11ck): the `work memory` store — remember findings, recall
   them, search. Persists across agent runs (the second time an agent works a
-  topic it has the prior run's research). Deterministic via the wb CLI.
+  topic it has the prior run's research). Deterministic via the work CLI.
   """
   def demo_memory do
     t = "mem-#{System.unique_integer([:positive])}"
@@ -125,7 +125,7 @@ defmodule Workbooks.Demos.Agent do
 
   @doc """
   Agent demo (the brandnana model on the clean-room substrate): a real LLM loop
-  whose tools are the sandboxed in-WASM shell (jq) + the wb CLI (variable store) +
+  whose tools are the sandboxed in-WASM shell (jq) + the work CLI (variable store) +
   the VFS — long-horizon, observable (events.org in the VFS). Runs for real when
   OPENROUTER_API_KEY is set; cleanly :unavailable otherwise so the suite stays
   green. Task: store a brand via wb, count JSON items via jq, finish.
@@ -135,7 +135,7 @@ defmodule Workbooks.Demos.Agent do
       %{agent: :unavailable, reason: "no OPENROUTER_API_KEY"}
     else
       system =
-        "You are a runtime agent. Tools: shell (jq/grep/upper over `input`), wb (the wb CLI: " <>
+        "You are a runtime agent. Tools: shell (jq/grep/upper over `input`), wb (the work CLI: " <>
           "args=\"var set <k> <v>\" / \"var get <k>\"), vfs_write, done. Take real actions via tools; " <>
           "finish with done and a one-line summary."
 

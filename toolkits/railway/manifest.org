@@ -20,7 +20,7 @@
   Wrapper around the standard =railway= binary. The Workbooks use case:
   publish a built workbook (=dist/<slug>.html=) as a static site on the
   *user's own* Railway account. Stage the artifact behind a small Caddy image
-  (binds Railway's =$PORT=) and run ~railway up~. (There is no =wb forge web=
+  (binds Railway's =$PORT=) and run ~railway up~. (There is no =work forge web=
   command — that wrapper and its =deploy-kit/web/railway.sh= recipe were removed
   with the Rust =wb=, 2026-06-09; the skill gives the raw =railway= flow.)
 

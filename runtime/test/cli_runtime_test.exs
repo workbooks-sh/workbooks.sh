@@ -1,5 +1,5 @@
 defmodule CliRuntimeTest do
-  @moduledoc "wb-82g: the `wb rt` CLI as an RCP HTTP client — target resolution, dispatch, exit codes."
+  @moduledoc "wb-82g: the `work rt` CLI as an RCP HTTP client — target resolution, dispatch, exit codes."
   use ExUnit.Case, async: false
 
   alias Workbooks.CLI.Runtime
@@ -88,7 +88,7 @@ defmodule CliRuntimeTest do
     test "unknown subcommand → usage + failing exit" do
       {out, failed?} = Runtime.run(["wat"], faker(200, %{}))
       assert failed?
-      assert out =~ "wb rt"
+      assert out =~ "work rt"
     end
   end
 end

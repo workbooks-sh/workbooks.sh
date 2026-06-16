@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the in-sandbox JS toolchain (wb-fm0.4): QuickJS-ng compiled to wasm objects via
-# clang.wasm + the wb harness (Javy.IO + console + TextEncoder/Decoder). These objects are the
+# clang.wasm + the work harness (Javy.IO + console + TextEncoder/Decoder). These objects are the
 # "libquickjs" the per-program JS lane links against (Workbooks.Compilers.js_compile_to_wasm):
 # JS source -> js_src.c (embedded) -> clang.wasm -> wasm-ld(harness + js_src + libquickjs).
 # Untrusted JS thus compiles AND runs ENTIRELY in the sandbox (QuickJS interpreter, no JIT, no

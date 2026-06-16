@@ -139,7 +139,7 @@
 
 <section id="first-apply">
   <h2>the ONCE machine</h2>
-  <p>The cloud bearer is born on your first <code>wbx deploy apply</code> to any
+  <p>The cloud bearer is born on your first <code>work deploy apply</code> to any
   non-local target — before the provider recipe ever runs <code>up</code>. The
   function is <code>ensure_cloud_bearer</code>, and the word <em>ensure</em> is
   load-bearing: it doesn't generate, it <b>guarantees one exists</b>. Run it a
@@ -152,7 +152,7 @@
   loops back to reuse and says nothing:</p>
   <pre class="mermaid">
 flowchart TD
-  apply["wbx deploy apply<br/>(non-local target)"] --> check{"WB_PUBLIC_BEARER<br/>already in secrets.env?"}
+  apply["work deploy apply<br/>(non-local target)"] --> check{"WB_PUBLIC_BEARER<br/>already in secrets.env?"}
   check -- "yes" --> reuse["return empty string<br/>— reuse, say nothing"]
   check -- "no" --> mint["OsRng → 32 bytes → 64 hex chars"]
   mint --> save["secrets_save → secrets.env<br/>chmod 0600"]
@@ -168,12 +168,12 @@ flowchart TD
   system entropy, the same source you'd seed a private key from. There's no
   structure to it: no header, no claims, no expiry baked in. It's a pure shared
   secret, and that simplicity is deliberate — we'll come back to why hex beats a
-  JWT here. The file it lands in lives in the <code>wbx</code> app dir, not your
+  JWT here. The file it lands in lives in the <code>work</code> app dir, not your
   project dir, and it's chmod'd <code>0600</code> the moment it's written.</p>
   <p>The notice text is the only time you'll ever see the token printed, and the
   writer of that text was careful to make a promise in it. Here's the first
   apply, and then the same command run again:</p>
-  <pre class="orgsample">$ wbx deploy apply
+  <pre class="orgsample">$ work deploy apply
 ==&gt; [fly] deploying my-workbooks-engine (ghcr.io/workbooks-sh/runtime:latest)
 url: https://my-workbooks-engine.fly.dev
 
@@ -182,7 +182,7 @@ To talk to your engine locally, set:
   export WB_ENGINE_TOKEN=9f2c61a8…e4b7   <i>← 64 hex chars, 256 bits, OsRng</i>
 (stored in ~/…/secrets.env — will NOT be regenerated on future applies)
 
-$ wbx deploy apply        <i># run it again</i>
+$ work deploy apply        <i># run it again</i>
 ==&gt; [fly] deploying my-workbooks-engine (…)
 url: https://my-workbooks-engine.fly.dev
                           <i># no notice. same token. idempotent.</i></pre>
@@ -263,7 +263,7 @@ $ curl -H "Authorization: Bearer $WB_ENGINE_TOKEN" …/api/library
   token:</p>
   <pre class="mermaid">
 sequenceDiagram
-  participant C as wbx (client)
+  participant C as work (client)
   participant E as engine (locked)
   Note over C: WB_ENGINE_URL + WB_ENGINE_TOKEN set
   C->>E: GET /api/library  (no Authorization)
@@ -275,7 +275,7 @@ sequenceDiagram
   </pre>
   <p>When the token is wrong or missing, the CLI doesn't bury the failure. It
   exits with a dedicated auth code whose message tells you the two ways out:
-  <i>the engine rejected your credentials — set WB_ENGINE_TOKEN, or re-run wbx
+  <i>the engine rejected your credentials — set WB_ENGINE_TOKEN, or re-run work
   deploy local to refresh discovery</i>. If you got a <code>401</code> wiring a
   script into CI, that's the sentence to read — either the token's stale, or
   you're pointed at a cloud engine without exporting it.</p>
@@ -375,8 +375,8 @@ flowchart TD
   identity holds across every redeploy after:</p>
   <pre class="orgsample">$ elixir -e 'IO.puts(Base.encode64(:crypto.strong_rand_bytes(32)))'
 nq3K…0Yw=
-$ wbx deploy secrets set WB_SIGNING_KEY=nq3K…0Yw=
-staged 1 secret(s) — applied on next `wbx deploy apply`
+$ work deploy secrets set WB_SIGNING_KEY=nq3K…0Yw=
+staged 1 secret(s) — applied on next `work deploy apply`
 $ curl https://my-workbooks-engine.fly.dev/.well-known/did.json
 { "id":"did:web:my-workbooks-engine.fly.dev",
   "verificationMethod":[{"type":"Ed25519VerificationKey2020","publicKeyMultibase":"z6Mk…"}],
@@ -397,8 +397,8 @@ $ curl https://my-workbooks-engine.fly.dev/.well-known/did.json
   blast radius the system is protecting you from:</p>
   <table class="cmp">
     <tr><th></th><th>bearer rotation (possible, manual)</th><th>signing-key &ldquo;rotation&rdquo; (don't)</th></tr>
-    <tr><td>step 1</td><td><code>wbx deploy secrets unset WB_PUBLIC_BEARER</code></td><td class="n">there is no step — you don't rotate a name</td></tr>
-    <tr><td>step 2</td><td><code>wbx deploy apply</code> → ensure_cloud_bearer mints a new one</td><td class="n">a new seed is a new engine, identity-wise</td></tr>
+    <tr><td>step 1</td><td><code>work deploy secrets unset WB_PUBLIC_BEARER</code></td><td class="n">there is no step — you don't rotate a name</td></tr>
+    <tr><td>step 2</td><td><code>work deploy apply</code> → ensure_cloud_bearer mints a new one</td><td class="n">a new seed is a new engine, identity-wise</td></tr>
     <tr><td>step 3</td><td>redistribute <code>WB_ENGINE_TOKEN</code> to every client</td><td class="n">every prior ledger goes un-attributable</td></tr>
     <tr><td>cost</td><td class="n">every client 401s until updated — no overlap window</td><td class="n">you don't become secure, you become someone else</td></tr>
   </table>
@@ -440,9 +440,9 @@ $ curl https://my-workbooks-engine.fly.dev/.well-known/did.json
   <h2>questions people actually ASK</h2>
   <details>
     <summary>Where's my token? I lost the first-apply notice.</summary>
-    <p>It's in <code>secrets.env</code>, in the <code>wbx</code> app dir — the
+    <p>It's in <code>secrets.env</code>, in the <code>work</code> app dir — the
     notice prints the path. The file is plain <code>KEY=VALUE</code> lines.
-    <code>wbx deploy secrets list</code> shows key <em>names</em> only, never
+    <code>work deploy secrets list</code> shows key <em>names</em> only, never
     values, so to read the actual token you open the file (it's yours, mode
     0600). The notice is one-time; the file is forever.</p>
   </details>
@@ -463,8 +463,8 @@ $ curl https://my-workbooks-engine.fly.dev/.well-known/did.json
   </details>
   <details>
     <summary>What if secrets.env leaks?</summary>
-    <p>Rotate, manually: <code>wbx deploy secrets unset WB_PUBLIC_BEARER</code>,
-    then <code>wbx deploy apply</code> to mint a new one, then push the new
+    <p>Rotate, manually: <code>work deploy secrets unset WB_PUBLIC_BEARER</code>,
+    then <code>work deploy apply</code> to mint a new one, then push the new
     <code>WB_ENGINE_TOKEN</code> to every client. There's no overlap window, so
     line up the redistribution first. If the signing seed leaked, that's a harder
     conversation — you can't rotate a name without orphaning history.</p>

@@ -28,7 +28,7 @@
   : #+BUILD_LANG: rust
   : #+ARG_MODE: argv          args reach the CLI as real wasmtime argv
 
-  Build it with =wb toolkit build huniq= → CommandRegistry registers =huniq= →
+  Build it with =work toolkit build huniq= → CommandRegistry registers =huniq= →
   any agent can =run-command("huniq", stdin)=.
 
   Skill index (read on demand):

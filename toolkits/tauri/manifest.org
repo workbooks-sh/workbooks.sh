@@ -22,7 +22,7 @@
   prebuilt single-file workbook (=dist/<slug>.html=) — no engine, no Node at
   runtime, no IPC commands. Scaffold a Tauri project whose =frontendDist= points
   at the workbook (as =index.html=), then =cargo tauri build=. (There is no
-  =wb forge desktop= command — that wrapper and its =deploy-kit/desktop/= recipes
+  =work forge desktop= command — that wrapper and its =deploy-kit/desktop/= recipes
   were removed with the Rust =wb=, 2026-06-09; build with the real Tauri CLI.)
 
   Skills here cover the part agents get wrong: *code signing + notarization*,

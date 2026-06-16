@@ -98,7 +98,7 @@ class ChatSessionStore {
   /** Start a live Waldo voice session wired to THIS store's voice transcript.
    *  The single home for "start voice" so every entry point (the home
    *  composer's "+" menu, the Waldo panel) drives the same conversation that
-   *  the panel renders — voice lives in the panel (wb demo TASK 3). Idempotent
+   *  the panel renders — voice lives in the panel (work demo TASK 3). Idempotent
    *  when a session is already present. */
   async startVoice(): Promise<void> {
     const { inworldLive } = await import("$lib/live/inworld.svelte");

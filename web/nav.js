@@ -195,7 +195,7 @@
     ]) +
     '<div class="col">' +
       dcol('Reference', [
-        dlink('reference/cli', 'wbx CLI'),
+        dlink('reference/cli', 'work CLI'),
         dlink('reference/runtime', 'Runtime API'),
         dlink('reference/manifest', 'Manifest fields'),
         dlink('reference/caps', 'Dock capabilities'),

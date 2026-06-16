@@ -1,7 +1,7 @@
-#+TITLE: wbx deploy & the OCI image
-#+DESCRIPTION: Reference for the Deploy Kit — `wbx deploy` verbs, deployment.org, the ONE runtime image, local vs cloud, and the OQL kernel WIT world.
+#+TITLE: work deploy & the OCI image
+#+DESCRIPTION: Reference for the Deploy Kit — `work deploy` verbs, deployment.org, the ONE runtime image, local vs cloud, and the OQL kernel WIT world.
 
-* wbx deploy & the OCI image :reference:
+* work deploy & the OCI image :reference:
   :PROPERTIES:
   :OWNER:     deploy-kit
   :MATURITY:  ships-today
@@ -19,7 +19,7 @@ recipe. Native-only.
 #+begin_quote
 The three release layers must not be conflated. Deploy Kit is layer 3 (users
 only). The compilers package (layer 1, published manually) and the runtime image
-(layer 2, built by CI) are NOT =wbx deploy=. See [[*Release layers (do not conflate)][Release layers]].
+(layer 2, built by CI) are NOT =work deploy=. See [[*Release layers (do not conflate)][Release layers]].
 #+end_quote
 
 ** Verbs
@@ -33,19 +33,19 @@ The =DeployVerb= enum (clap subcommands) — =cli/src/deploy/mod.rs:31=.
 
 | verb                    | does                                                                | src                              |
 |-------------------------+---------------------------------------------------------------------+----------------------------------|
-| =wbx deploy init [preset]= | scaffold =./deployment.org=; preset =local= \vert =cloud= (TTY picks)  | =cli/src/deploy/mod.rs:34,161=   |
-| =wbx deploy validate=   | coherence check on =deployment.org= incl. declared secrets          | =cli/src/deploy/mod.rs:40,152=   |
-| =wbx deploy apply=      | converge to declared state (local container or provider recipe)     | =cli/src/deploy/mod.rs:42,363=   |
-| =wbx deploy status=     | inspect the live deployment                                         | =cli/src/deploy/mod.rs:44,98=    |
-| =wbx deploy logs=       | tail the live deployment's logs                                    | =cli/src/deploy/mod.rs:46,99=    |
-| =wbx deploy down=       | tear it down                                                        | =cli/src/deploy/mod.rs:48,100=   |
-| =wbx deploy local=      | shorthand: scaffold local config if absent, then apply              | =cli/src/deploy/mod.rs:50,101=   |
-| =wbx deploy doctor=     | engines, recipes, declared secrets — present vs missing             | =cli/src/deploy/mod.rs:52,527=   |
-| =wbx deploy secrets …=  | manage kit-abstracted, provider-delivered secrets (subcommands)     | =cli/src/deploy/mod.rs:54,223=   |
+| =work deploy init [preset]= | scaffold =./deployment.org=; preset =local= \vert =cloud= (TTY picks)  | =cli/src/deploy/mod.rs:34,161=   |
+| =work deploy validate=   | coherence check on =deployment.org= incl. declared secrets          | =cli/src/deploy/mod.rs:40,152=   |
+| =work deploy apply=      | converge to declared state (local container or provider recipe)     | =cli/src/deploy/mod.rs:42,363=   |
+| =work deploy status=     | inspect the live deployment                                         | =cli/src/deploy/mod.rs:44,98=    |
+| =work deploy logs=       | tail the live deployment's logs                                    | =cli/src/deploy/mod.rs:46,99=    |
+| =work deploy down=       | tear it down                                                        | =cli/src/deploy/mod.rs:48,100=   |
+| =work deploy local=      | shorthand: scaffold local config if absent, then apply              | =cli/src/deploy/mod.rs:50,101=   |
+| =work deploy doctor=     | engines, recipes, declared secrets — present vs missing             | =cli/src/deploy/mod.rs:52,527=   |
+| =work deploy secrets …=  | manage kit-abstracted, provider-delivered secrets (subcommands)     | =cli/src/deploy/mod.rs:54,223=   |
 
-Note: the binary is invoked =wbx= (=cli/src/main.rs:24=, =name = "wbx"=). Older
-docs and source moduledoc comments still say =wb deploy=; the shipped command is
-=wbx deploy=.
+Note: the binary is invoked =work= (=cli/src/main.rs:24=, =name = "work"=). Older
+docs and source moduledoc comments still say =work deploy=; the shipped command is
+=work deploy=.
 
 *** deploy secrets subcommands
     :PROPERTIES:
@@ -56,10 +56,10 @@ docs and source moduledoc comments still say =wb deploy=; the shipped command is
 
 | verb                                       | does                                                          | src                            |
 |--------------------------------------------+--------------------------------------------------------------+--------------------------------|
-| =wbx deploy secrets set KEY=VALUE …=       | stage KEY=VALUE pairs (or =--from-env <file>=)               | =cli/src/deploy/mod.rs:61,225= |
-| =wbx deploy secrets list=                  | list secret NAMES (never values)                             | =cli/src/deploy/mod.rs:65,251= |
-| =wbx deploy secrets unset KEY=             | remove a secret by name                                      | =cli/src/deploy/mod.rs:67,258= |
-| =wbx deploy secrets push=                  | push staged secrets to the provider without a deploy         | =cli/src/deploy/mod.rs:71,266= |
+| =work deploy secrets set KEY=VALUE …=       | stage KEY=VALUE pairs (or =--from-env <file>=)               | =cli/src/deploy/mod.rs:61,225= |
+| =work deploy secrets list=                  | list secret NAMES (never values)                             | =cli/src/deploy/mod.rs:65,251= |
+| =work deploy secrets unset KEY=             | remove a secret by name                                      | =cli/src/deploy/mod.rs:67,258= |
+| =work deploy secrets push=                  | push staged secrets to the provider without a deploy         | =cli/src/deploy/mod.rs:71,266= |
 
 Secrets are declared by NAME in =deployment.org= (=#+DEPLOY_SECRETS: KEY …=),
 values staged via =secrets set=, stored =0600= at =<app-dir>/secrets.env=
@@ -74,7 +74,7 @@ enter =deployment.org= or images (=cli/src/deploy/mod.rs:18-21=).
    :SRC:       cli/src/deploy/mod.rs#Config
    :END:
 
-The shipped =wbx deploy= parses =deployment.org= as flat =#+KEYWORD:= lines
+The shipped =work deploy= parses =deployment.org= as flat =#+KEYWORD:= lines
 (=org_keywords=, =cli/src/deploy/mod.rs:149=). Recognized keys:
 
 | keyword              | default                              | meaning                                       | src                          |
@@ -144,7 +144,7 @@ engine is auto-detected in this preference order: =docker=, =podman=, =krunvm=
 Mounted volumes + env on the container (=cli/src/deploy/mod.rs:436-454=):
 =<app-dir>/disco → /disco= (discovery, =WB_DESKTOP_DIR=), =<app-dir>/data →
 /data= (=WB_DATA=); env =WB_WEB=1=, =WB_DESKTOP=1=, =PORT=<port>=. After apply,
-talk to it with =wb rt status= (=cli/src/deploy/mod.rs:464=).
+talk to it with =work rt status= (=cli/src/deploy/mod.rs:464=).
 
 #+begin_quote
 *krunvm limitation:* =krunvm= cannot deliver the kit's secrets env-file yet —
@@ -276,9 +276,9 @@ Three distinct layers — Deploy Kit is only layer 3.
 |----------------------+-------------------------------------------+--------------------------------------------------------+----------------------------------|
 | 1 compilers package  | =ghcr.io/workbooks-sh/compilers:{latest,sha}= | MANUAL, =publish_compilers/1=; CI cannot build it     | =runtime/host/deploy/image.ex:97= |
 | 2 runtime image      | =ghcr.io/workbooks-sh/runtime:{latest,sha}=   | CI (=runtime-image.yml=); =COPY --from= compilers     | =runtime/host/deploy/image.ex:53= |
-| 3 =wbx deploy=       | runs the runtime image (user's registry/host) | USERS only — init/validate/apply/…                    | =cli/src/deploy/mod.rs:82=       |
+| 3 =work deploy=       | runs the runtime image (user's registry/host) | USERS only — init/validate/apply/…                    | =cli/src/deploy/mod.rs:82=       |
 
-Layer-1/2 maintainer functions (NOT CLI verbs; not =wbx deploy=):
+Layer-1/2 maintainer functions (NOT CLI verbs; not =work deploy=):
 =Workbooks.Deploy.Image.build/1= (local single-arch, =image.ex:31=),
 =publish/1= (multi-arch push, =image.ex:53=), =build_compilers/1= (=image.ex:80=),
 =publish_compilers/1= (=image.ex:97=).
@@ -288,7 +288,7 @@ Layer-1/2 maintainer functions (NOT CLI verbs; not =wbx deploy=):
    :MATURITY:  partial
    :EVIDENCE:  runtime/host/deploy/config.ex:1-13
    :SRC:       runtime/host/deploy/config.ex#Config
-   :CAVEAT:    Richer deployment.org schema (`:PROPERTIES:` drawer, ENGINE_PLACE/TENANCY_MODE/STORAGE/DATABASE/AUTH, BYOD + multi-tenant validation) lives in the Elixir runtime backend and the deploy-kit example descriptors — NOT in the shipped Rust `wbx deploy`, which parses only flat `#+DEPLOY_*` keywords. The two schemas diverge; the SPEC notes the Elixir logic is migrating into `cli/src/deploy/` over time.
+   :CAVEAT:    Richer deployment.org schema (`:PROPERTIES:` drawer, ENGINE_PLACE/TENANCY_MODE/STORAGE/DATABASE/AUTH, BYOD + multi-tenant validation) lives in the Elixir runtime backend and the deploy-kit example descriptors — NOT in the shipped Rust `work deploy`, which parses only flat `#+DEPLOY_*` keywords. The two schemas diverge; the SPEC notes the Elixir logic is migrating into `cli/src/deploy/` over time.
    :WALL:      none
    :END:
 
@@ -316,4 +316,4 @@ needs =WB_DATABASE_URL= env. Secrets stay in the deploy ENV, never the file
 
 - How-to: =deploy/= guides (goal-titled tasks).
 - Concepts: [[../concepts/the-dock.org][the Dock & capabilities]] · isolation tiers.
-- Reference: [[./cli.org][wbx CLI]] · [[./caps.org][Dock capabilities]].
+- Reference: [[./cli.org][work CLI]] · [[./caps.org][Dock capabilities]].

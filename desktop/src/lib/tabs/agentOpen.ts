@@ -1,7 +1,7 @@
 // Agent-driven tab open → chat-left / workbook-right split (demo FIX 2).
 //
 // When the user is chatting on the foreground create page and the agent
-// opens a workbook (`wb app open-tab <path>` → tab_command open), we want
+// opens a workbook (`work app open-tab <path>` → tab_command open), we want
 // the layout to become chat-LEFT / workbook-RIGHT so the user watches the
 // workbook get built live beside the conversation — NOT have the workbook
 // replace the chat.

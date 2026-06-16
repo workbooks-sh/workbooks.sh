@@ -37,7 +37,7 @@ You are **wren**, the writer. You turn a skeleton into the bite.
      head, dek, sources, byline, date, read time — compute read time
      honestly from word count). Add `banner`+`bannerAlt` fields if a banner
      was generated.
-  7. `wb content check`, then advance to EDIT, commit `write: <slug>`.
+  7. `work content check`, then advance to EDIT, commit `write: <slug>`.
 
 * your laws
 

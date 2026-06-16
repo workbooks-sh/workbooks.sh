@@ -55,14 +55,14 @@
   | 40+ authored toolkits       | DONE*    | toolkits/<name>/{manifest,skills}  |
   | Discovery (tags :toolkit:)  | DONE     | runtime/host/toolkits.ex (88 LOC)  |
   | CLI = WASM command          | PARTIAL  | command_registry.ex (3: upper/jq/grep) |
-  | `wb toolkit` learn-surface  | MISSING  | (was Rust toolkit.rs in archive)   |
+  | `work toolkit` learn-surface  | MISSING  | (was Rust toolkit.rs in archive)   |
   | Manifest auto-injection     | MISSING  | (no SessionRunner index inject)    |
   | run-command telemetry hook  | MISSING  | instance/imports.ex (no workdir ctx) |
   | command caps (vfs/net/secret)| STUB    | policy.ex net/llm declared, stubbed |
   | Design docs                 | RESTORED | this commit                        |
 
   (*) The 40 toolkits were authored against the OLD mainline: they assume native
-  PATH binaries and the old `wb toolkit` Rust runner. Their *skill docs* are
+  PATH binaries and the old `work toolkit` Rust runner. Their *skill docs* are
   good; their *execution contract* needs re-pointing at the clean-room.
 
 * The core decisions
@@ -74,7 +74,7 @@
    #+BEGIN_SRC org
    #+EXEC: command       # argv+stdin→stdout WASM run-command (jq, grep) — default, most portable
    #+EXEC: posix         # native PATH binary, run under the `posix` Policy profile inside the deploy container (ffmpeg-class)
-   #+EXEC: task          # no single CLI; the toolkit ships :role task bash recipes run via `wb toolkit run`
+   #+EXEC: task          # no single CLI; the toolkit ships :role task bash recipes run via `work toolkit run`
    #+EXEC: federation    # no CLI; a data-source plugin + sync daemon (see §Federation)
    #+EXEC: component     # WIT-typed component on engine.wit; typed I/O, in-process call (absorbs the old "extension")
    #+EXEC: kernel        # bytes→bytes hot loop, instantiate-once-call-many; the fabric/media-render class (wb-rhs.5)
@@ -92,7 +92,7 @@
    isolation — local now (instead of seatbelt), same image in cloud. It is not
    per-component and not a Firecracker/libkrun microVM. That single deploy
    container is the OS-isolation boundary, so `posix` native binaries are safe
-   there; `command` (WASM) is the tighter, portable default. `wb toolkit verify`
+   there; `command` (WASM) is the tighter, portable default. `work toolkit verify`
    checks the declared EXEC mode is satisfiable (command registered / binary on PATH).
 
 ** Progressive disclosure is the whole point (carried forward, unchanged)
@@ -134,7 +134,7 @@
    #+BUILD_LANG: rust               # rust | go | js | py — picks the build recipe
    #+CAPS:       net                # WASI worlds / Dock imports the wasm may use; deployer grants
    #+END_SRC
-   `wb toolkit build <name>` → PackageManager picks the lang recipe → compiles
+   `work toolkit build <name>` → PackageManager picks the lang recipe → compiles
    under Sandbox (network-denied) → content-addresses → registers the artifact in
    CommandRegistry under CLI_BIN. One single .wasm per toolkit CLI. (Bundling the
    .wasm + org into a distributable .html Workbook is OPTIONAL — a distribution
@@ -302,7 +302,7 @@
      from the one cargo line above), per ARCHITECTURE.org "WASM owns the artifact,
      Org owns the spec."
 
-* The headline build: the `wb toolkit` surface
+* The headline build: the `work toolkit` surface
 
   Reimplement the archive's Rust toolkit.rs (2278 LOC) as Elixir subcommands in
   runtime/host/cli.ex. THIS is the "CLI help-wrapper that teaches the agent the
@@ -311,12 +311,12 @@
 
   | Subcommand                          | Does                                                   |
   |-------------------------------------+--------------------------------------------------------|
-  | =wb toolkit list=                   | scan discovery root, print manifest summaries          |
-  | =wb toolkit show <tk>=              | manifest body + skill index table                      |
-  | =wb toolkit show <tk> <skill>=      | skill body + a #+CAPTION-derived TOC header            |
-  | =wb toolkit search <q>=             | substring (or `(...)` ⇒ OQL) over skills               |
-  | =wb toolkit verify <tk>=            | run :role pre blocks; check EXEC mode satisfiable      |
-  | =wb toolkit run <tk> <task> -- …=   | extract the :role task block, run via run_bash_snippet |
+  | =work toolkit list=                   | scan discovery root, print manifest summaries          |
+  | =work toolkit show <tk>=              | manifest body + skill index table                      |
+  | =work toolkit show <tk> <skill>=      | skill body + a #+CAPTION-derived TOC header            |
+  | =work toolkit search <q>=             | substring (or `(...)` ⇒ OQL) over skills               |
+  | =work toolkit verify <tk>=            | run :role pre blocks; check EXEC mode satisfiable      |
+  | =work toolkit run <tk> <task> -- …=   | extract the :role task block, run via run_bash_snippet |
 
   Port these helpers from toolkit.rs: `extract_role_blocks(content, role)`,
   `run_bash_snippet(body)`, CAPTION-TOC extraction, the thin/thick skill
@@ -370,14 +370,14 @@
 * Phased plan (the epic wb-tk3)
 
   - P0 — Restore + reconcile docs. (this commit)
-  - P1 — `wb toolkit` surface in cli.ex (list/show/show-skill/search/verify/run
+  - P1 — `work toolkit` surface in cli.ex (list/show/show-skill/search/verify/run
     + role-block executor + CAPTION-TOC). The headline deliverable.
   - P2 — Command context + telemetry: workdir/tenant into run-command, emit a
     step per call, honor :NETWORK:/:DESTRUCTIVE:.
   - P3 — Manifest auto-injection: SessionRunner builds the compact TOOLKITS index
     (need table only, ~200 tok/toolkit) from the agent's :TOOLKITS: list.
   - P4 — EXEC-mode + build descriptor parsing: parse #+EXEC / #+BUILD_SRC /
-    #+BUILD_LANG / #+CAPS; `wb toolkit build <name>` drives PackageManager per
+    #+BUILD_LANG / #+CAPS; `work toolkit build <name>` drives PackageManager per
     lang; posix mode resolves a native binary. Zero-glue auto-wrap.
   - P5 — CLI→WASM build recipes: extend PackageManager.build_dir for the lang
     matrix (rust/go/js/py); content-address + register under CLI_BIN; optional

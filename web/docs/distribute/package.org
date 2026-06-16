@@ -7,7 +7,7 @@ A toolkit *is* a workbook, so distribution is the document. Pack it into one
 portable =.wbundle= — a zip carrying the HTML, the compiled WASM, and a manifest.
 
 #+begin_src bash
-wb pack my-tool my-tool.wbundle
+work pack my-tool my-tool.wbundle
 #+end_src
 
 The bundle is content-addressed: its hash is the supply-chain gate. For

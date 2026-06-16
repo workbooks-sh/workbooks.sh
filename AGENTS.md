@@ -60,20 +60,20 @@ swap providers behind the one Host instead.
 - **Desktop state of truth:** `desktop/ASSESSMENT.md` (the runtime is canonical; the desktop frontend is the most out-of-date code — re-point it onto `runtime/host`, never the reverse).
 - Browser preview: `cd desktop && bun run dev` (port 5178) — runs the real frontend with `$lib/platform/webHost` mocking the providers; no runtime needed.
 
-## Local development & verification — `wb dev`
+## Local development & verification — `work dev`
 
 Never await a CI → production build to verify a change; run it locally at the
 tightest tier that proves it. The methodology is a shipped CLI surface so
 DeployKit users get the same path. **Canon doc:** `docs/DEVELOPMENT.md`.
 
-- **`wb dev info`** — demo-env dashboard (runtime target + `/health`, model key,
-  toolkits root, CTK URL). `wb dev up` / `wb dev test` (= `mix test`).
+- **`work dev info`** — demo-env dashboard (runtime target + `/health`, model key,
+  toolkits root, CTK URL). `work dev up` / `work dev test` (= `mix test`).
 - **Runtime:** `WB_WEB=1 iex -S mix` (control plane `:4000`); `mix compile` is the
   first gate for any runtime edit; `mix test` (~58 files) the suite.
 - **Desktop:** `cd desktop && bun run dev` (`:5178`, real frontend + webHost mock
   providers, full-reload on every edit).
-- **Toolkits/CTK:** `cd toolkits/ctk && python3 -m http.server 5180`; `wb toolkit verify <id>`.
-- **Prod-parity:** `wb deploy local` (same OCI image, krunvm container).
+- **Toolkits/CTK:** `cd toolkits/ctk && python3 -m http.server 5180`; `work toolkit verify <id>`.
+- **Prod-parity:** `work deploy local` (same OCI image, krunvm container).
 
 ## Release / publishing — THREE separate layers. DO NOT CONFLATE THEM.
 
@@ -88,15 +88,15 @@ This tripped up a session badly once. Keep these distinct:
   ```
   Needs `docker login ghcr.io` + the `wb-multi` buildx builder (multi-arch amd64+arm64).
 - **Staging allowlist:** `runtime/scripts/stage-tools.sh` decides what goes in the layer (explicit `take` lines → `compilers-dist/`). **Add a `take` for any new compiler asset** or it silently won't ship (this is exactly how the whole npm lane went missing once).
-- This is **NOT** `wb deploy`.
+- This is **NOT** `work deploy`.
 
 ### 2. Runtime image — `ghcr.io/workbooks-sh/runtime:{latest,<sha>}`
 - **What:** the BEAM runtime + wasmtime + litestream + the release. Contains `runtime/host/**` (the engine code).
 - **How:** built by **CI/CD** — `.github/workflows/runtime-image.yml` on push to main. It `COPY --from`s the **compilers package (layer 1)**.
 - **So:** runtime code change → push to main, CI builds it (nothing manual). Compilers change → publish **layer 1 first** (manual, above), THEN CI rebuilds the runtime image on top.
 
-### 3. `wb deploy` (Deploy Kit) — USERS ONLY
+### 3. `work deploy` (Deploy Kit) — USERS ONLY
 - **What:** the tool for **consumers with our CLI** to deploy the runtime image for **their own use** — locally (krunvm) or cloud (Fly), to **their** registry via `WB_IMAGE`. Verbs: `init / validate / apply / update / verify / status / logs / down` (+ internal `build`/`publish` pushing to a registry the user controls).
-- **NOT** how *we* publish the compilers package or platform runtime image. **Never wire platform-release ops into `wb deploy`.**
+- **NOT** how *we* publish the compilers package or platform runtime image. **Never wire platform-release ops into `work deploy`.**
 
-**Rule of thumb:** *compilers* ship as their own ghcr package, published **manually**. The *runtime* ships via **CI**. **`wb deploy` is the user's tool to run the runtime** — not a platform-release mechanism.
+**Rule of thumb:** *compilers* ship as their own ghcr package, published **manually**. The *runtime* ships via **CI**. **`work deploy` is the user's tool to run the runtime** — not a platform-release mechanism.

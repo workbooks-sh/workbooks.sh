@@ -33,7 +33,7 @@ result, zero native execution.
 | =zig=    | Zig            | zig1.wasm (→C) → clang lane → wasm                   | compile-to-c→wasm   | ships-today |
 | =rust=   | Rust (no_std)  | mrustc.wasm (→C) → clang lane → wasm                 | compile-to-c→wasm   | partial     |
 | =go=     | Go (stdlib)    | yaegi-run.wasm interpreter (untrusted Go at runtime) | interpret-in-sandbox| partial     |
-| =js=     | JavaScript     | QuickJS-ng → wasm objects + wb harness               | compile-to-wasm     | ships-today |
+| =js=     | JavaScript     | QuickJS-ng → wasm objects + work harness               | compile-to-wasm     | ships-today |
 | =esbuild=| JS/TS/JSX/TSX  | esbuild (Go) → wasip1, JIT'd by wasmtime             | bundle/transform    | ships-today |
 | =svelte= | Svelte 4 comp. | svelte/compiler in QuickJS → esbuild/bundlejob       | bundle              | partial     |
 
@@ -236,7 +236,7 @@ self-contained wasm.
 
 * JavaScript lane (=js=)
 
-QuickJS-ng (v0.10.0) compiled to wasm objects via the clang lane + the wb harness
+QuickJS-ng (v0.10.0) compiled to wasm objects via the clang lane + the work harness
 (=harness.c=: Javy.IO + console + TextEncoder/Decoder). Untrusted JS embeds into
 =js_src.c= and links against these objects → a standalone wasm. Zero native
 execution; no native javy. The Javy.IO contract is preserved (reverse/uppercase

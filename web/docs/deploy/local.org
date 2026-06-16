@@ -8,12 +8,12 @@
   :OWNER:    cli
   :END:
 
-=wbx deploy= is the *user* tool for running the runtime image for your own use —
+=work deploy= is the *user* tool for running the runtime image for your own use —
 not a platform-release mechanism. Locally it converges =deployment.org= against a
 container-engine seam: =docker=, =podman=, or =krunvm= (whichever is on PATH).
 
 #+begin_src bash
-wbx deploy local        # scaffold ./deployment.org if absent, then apply
+work deploy local        # scaffold ./deployment.org if absent, then apply
 #+end_src
 
 ** Step by step
@@ -23,15 +23,15 @@ wbx deploy local        # scaffold ./deployment.org if absent, then apply
   :SRC:      cli/src/deploy/mod.rs#DeployVerb
   :END:
 
-1. =wbx deploy init local= — scaffold =deployment.org=.
-2. =wbx deploy secrets set KEY=VALUE= — store declared secrets (0600, under the app
+1. =work deploy init local= — scaffold =deployment.org=.
+2. =work deploy secrets set KEY=VALUE= — store declared secrets (0600, under the app
    dir; never written into =deployment.org= or any image).
-3. =wbx deploy validate= — coherence check, including declared-but-unset secrets.
-4. =wbx deploy apply= — converge to the declared state.
-5. =wbx deploy status= / =wbx deploy logs= — inspect / tail.
-6. =wbx deploy down= — tear it down.
+3. =work deploy validate= — coherence check, including declared-but-unset secrets.
+4. =work deploy apply= — converge to the declared state.
+5. =work deploy status= / =work deploy logs= — inspect / tail.
+6. =work deploy down= — tear it down.
 
-=wbx deploy doctor= reports which engines, recipes, and secrets are present.
+=work deploy doctor= reports which engines, recipes, and secrets are present.
 
 ** krunvm caveat
   :PROPERTIES:

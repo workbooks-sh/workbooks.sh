@@ -36,7 +36,7 @@ defmodule Workbooks.Autopoet.Worker do
   @max_steps 80
 
   # The autopoet is a SYSTEM def, not tenant data — it must be present on every
-  # runtime box so `WB_AUTOPOET=1` (or an on-demand `wb autopoet tick`) just works,
+  # runtime box so `WB_AUTOPOET=1` (or an on-demand `work autopoet tick`) just works,
   # with no manual file placement (the CI image ships only the release, not the
   # repo's examples/). Embed the canonical def at COMPILE time so it is part of the
   # BEAM and cannot be missing in prod; `WB_AUTOPOET_DEF` still overrides it (the
@@ -78,7 +78,7 @@ defmodule Workbooks.Autopoet.Worker do
 
   # The workspace IS the toolkits root (the def's contract: "your working
   # directory IS the toolkits tree"). Pin WB_TOOLKITS_ROOT to it so the autopoet's
-  # OWN `wb toolkit verify`/`list` resolve to exactly where it authors — otherwise
+  # OWN `work toolkit verify`/`list` resolve to exactly where it authors — otherwise
   # it cannot verify its own work and falls back to claiming DONE on a shell
   # smoke-test (the iter-9 false-DONE root cause). Idempotent — safe to call from
   # both the GenServer init and an on-demand `drain_one/0`.
@@ -95,7 +95,7 @@ defmodule Workbooks.Autopoet.Worker do
 
   @doc """
   Drain ONE issue on demand — the unit of autopoet work, callable WITHOUT the
-  GenServer (e.g. `wb autopoet tick` on a triggered job). The backlog is bursty
+  GenServer (e.g. `work autopoet tick` on a triggered job). The backlog is bursty
   and small, so a triggered drain is the efficient shape — no always-on poller
   idling on an empty backlog. Returns:
     * `{:worked, id, verdict}` — ran an issue (verdict ∈ :done | :host | :open)
@@ -183,7 +183,7 @@ defmodule Workbooks.Autopoet.Worker do
   # HONESTY GATE: a self-reported DONE is the agent grading its own homework —
   # and it over-claims (it once returned "DONE … registration blocked by host
   # gap" on a stub toolkit that fails verify). So the worker does NOT trust the
-  # word DONE: it INDEPENDENTLY runs `wb toolkit verify` on whatever toolkit this
+  # word DONE: it INDEPENDENTLY runs `work toolkit verify` on whatever toolkit this
   # run newly authored. DONE is honored only if a fresh toolkit verifies clean;
   # otherwise the issue stays OPEN with the verify output as evidence. Same trust
   # boundary as the confinement guard — enforce host-side, don't trust the agent.
@@ -224,7 +224,7 @@ defmodule Workbooks.Autopoet.Worker do
     do: {:done, note <> " ✔ worker-verified: #{Enum.join(names, ", ")}"}
 
   def decide(_note, {:fail, report}),
-    do: {:open, "DONE claimed but the worker's `wb toolkit verify` FAILED — an unverified capability is not shipped:\n#{report}"}
+    do: {:open, "DONE claimed but the worker's `work toolkit verify` FAILED — an unverified capability is not shipped:\n#{report}"}
 
   def decide(_note, :none),
     do: {:open, "DONE claimed but this run authored no verifiable toolkit (worker check). If you edited an existing artifact, say which and re-run; nothing was registered to verify."}
@@ -301,7 +301,7 @@ defmodule Workbooks.Autopoet.Worker do
     `mkdir`, will not create parent dirs, and its cwd is not stable between
     commands — shell redirection is for running commands, not writing files.
     Follow the autopoiesis laws in your system prompt: edit the declarative layer
-    only, never native code; TEST before you register (`wb toolkit verify <id>`);
+    only, never native code; TEST before you register (`work toolkit verify <id>`);
     a gap that needs a NEW host primitive is not yours to build — end with
     `HOST: <what primitive>`.
 

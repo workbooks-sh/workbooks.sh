@@ -39,9 +39,9 @@ List every dependency the workbook needs, then classify each against
 `references/wasm-deps.md`:
 
 - **Interpreted** (qjs / python / ruby / lua / yaegi) → already in-sandbox.
-  `wbx toolkit build palette [<runtime>]`, invoke directly.
+  `work toolkit build palette [<runtime>]`, invoke directly.
 - **Compiled** (C / Zig / Rust) → the compiler itself runs in WASM.
-  `wb-rt compiler build <lang>` then `wb-rt compiler run`. Recipes:
+  `work compiler build <lang>` then `work compiler run`. Recipes:
   `runtime/compilers/<lang>/`.
 - **npm / crate** → resolve → bundle → WASM via the PackageManager lane.
 
@@ -64,7 +64,7 @@ Apply the canon (full tokens + the glyphs wiring snippet in
 ## 5. Scaffold
 
 Use the standalone artifact CLI (the `workbooks-authoring` skill owns
-`workbook`, a **separate** tool from `wbx`):
+`workbook`, a **separate** tool from `work`):
 
 ```sh
 workbook init
@@ -79,7 +79,7 @@ Wire the glyphs resolver if marks are needed: alias `$glyphs` →
 ```sh
 workbook dev          # run locally
 workbook build        # bundle
-workbook check        # or: wb content check [dir]
+workbook check        # or: work content check [dir]
 ```
 
 Re-read the changed file. Confirm the runnable contains **no raw inputs** and
@@ -91,4 +91,4 @@ tightest tier that demonstrates the change.
 - `references/frameworks.md` — framework choice guidance.
 - `references/wasm-deps.md` — the dependency-conversion decision table.
 - `references/design-canon.md` — tokens + the glyphs wiring snippet.
-- `references/cli.md` — the `workbook` vs `wbx` split.
+- `references/cli.md` — the `workbook` vs `work` split.

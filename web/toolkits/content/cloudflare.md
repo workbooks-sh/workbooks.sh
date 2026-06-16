@@ -23,4 +23,4 @@ wrangler deploy                         # your Worker (D1 + [ai] binding + Bette
 
 ## Maturity
 
-Experimental. The turnkey one-command deploy (`wb forge app deploy --backend cf-d1`) and its bundled gateway Worker were removed 2026-06-09 and are **not currently available** (restore-or-drop tracked in `wb-dtd0.1`); the skill gives the raw primitives to build it today. Uses wrangler's own token in `~/.wrangler` — Workbooks never reads, stores, or proxies it. Requires wrangler 3+.
+Experimental. The turnkey one-command deploy (`work forge app deploy --backend cf-d1`) and its bundled gateway Worker were removed 2026-06-09 and are **not currently available** (restore-or-drop tracked in `wb-dtd0.1`); the skill gives the raw primitives to build it today. Uses wrangler's own token in `~/.wrangler` — Workbooks never reads, stores, or proxies it. Requires wrangler 3+.

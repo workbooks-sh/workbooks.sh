@@ -1,6 +1,6 @@
 defmodule Workbooks.Deploy.ConfigTest do
   @moduledoc """
-  Pins Workbooks.Deploy.Config.validate/1 — the secure-by-default gate `wb deploy
+  Pins Workbooks.Deploy.Config.validate/1 — the secure-by-default gate `work deploy
   validate`/`apply` runs before standing up a runtime. The headline invariant
   (wb-oom): a CLOUD deploy must never be left OPEN. `cloud` + `trusted` auth +
   no WB_PUBLIC_BEARER is an unauthenticated control plane (anyone can drive

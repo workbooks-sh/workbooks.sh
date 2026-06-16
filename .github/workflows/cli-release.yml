@@ -1,13 +1,13 @@
 name: cli-release
 
-# Build + ship the canonical `wbx` CLI (cli/). One Rust source → native binaries
+# Build + ship the canonical `work` CLI (cli/). One Rust source → native binaries
 # (per platform) + a wasm32-wasip1 module. Distributed three ways from one run:
 #   - GitHub Release assets        (the curl path: workbooks.sh/cli.sh)
 #   - npmjs  @work.books/cli        (public; NPM_TOKEN)
 #   - GitHub Packages @workbooks-sh/cli  (shows as "cli" in the repo's Packages)
 on:
   push:
-    tags: ["wbx-v*"]
+    tags: ["work-v*"]
   workflow_dispatch:
     inputs:
       version:
@@ -29,7 +29,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "v=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
           else
-            echo "v=${GITHUB_REF_NAME#wbx-v}" >> "$GITHUB_OUTPUT"
+            echo "v=${GITHUB_REF_NAME#work-v}" >> "$GITHUB_OUTPUT"
           fi
 
   build:
@@ -37,13 +37,13 @@ jobs:
     strategy:
       matrix:
         include:
-          - { os: macos-14, target: aarch64-apple-darwin, asset: wbx-darwin-arm64 }
+          - { os: macos-14, target: aarch64-apple-darwin, asset: work-darwin-arm64 }
           # Intel mac is CROSS-compiled from the arm64 runner — macos-13 (Intel)
           # runners are being retired and can queue indefinitely.
-          - { os: macos-14, target: x86_64-apple-darwin, asset: wbx-darwin-x64 }
-          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, asset: wbx-linux-x64 }
-          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, asset: wbx-linux-arm64 }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, asset: wbx-windows-x64.exe }
+          - { os: macos-14, target: x86_64-apple-darwin, asset: work-darwin-x64 }
+          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, asset: work-linux-x64 }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, asset: work-linux-arm64 }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, asset: work-windows-x64.exe }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
           targets: ${{ matrix.target }}
       - run: cargo build --release --target ${{ matrix.target }} --manifest-path cli/Cargo.toml
       - shell: bash
-        run: cp cli/target/${{ matrix.target }}/release/wbx${{ contains(matrix.target, 'windows') && '.exe' || '' }} ${{ matrix.asset }}
+        run: cp cli/target/${{ matrix.target }}/release/work${{ contains(matrix.target, 'windows') && '.exe' || '' }} ${{ matrix.asset }}
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
@@ -66,11 +66,11 @@ jobs:
         with:
           targets: wasm32-wasip1
       - run: cargo build --release --target wasm32-wasip1 --manifest-path cli/Cargo.toml
-      - run: cp cli/target/wasm32-wasip1/release/wbx.wasm wbx.wasm
+      - run: cp cli/target/wasm32-wasip1/release/work.wasm work.wasm
       - uses: actions/upload-artifact@v4
         with:
           name: wb-wasm
-          path: wbx.wasm
+          path: work.wasm
 
   release:
     needs: [version, build, wasm]
@@ -86,8 +86,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           V: ${{ needs.version.outputs.v }}
         run: |
-          gh release create "wbx-v$V" dist/* --title "wbx v$V" --notes "Workbooks CLI v$V" \
-            || gh release upload "wbx-v$V" dist/* --clobber
+          gh release create "work-v$V" dist/* --title "work v$V" --notes "Workbooks CLI v$V" \
+            || gh release upload "work-v$V" dist/* --clobber
 
   npm:
     needs: [version, release]
@@ -122,7 +122,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd cli/npm
-          MSG="legacy — replaced by the Rust wb CLI (npm i -g @work.books/cli, or curl -fsSL workbooks.sh/cli.sh | sh)"
+          MSG="legacy — replaced by the Rust work CLI (npm i -g @work.books/cli, or curl -fsSL workbooks.sh/cli.sh | sh)"
           npm deprecate "@work.books/cli@<=0.10.0" "$MSG" || true
           npm deprecate "@work.books/runtime" "$MSG" || true
           npm deprecate "@work.books/runtime-wasm" "$MSG" || true

@@ -1,7 +1,7 @@
 defmodule Workbooks.BundleIslandsCliTest do
   @moduledoc """
-  End-to-end: the composition-island layer wired into `wb bundle`/`wb unbundle`/
-  `wb islands` (docs/WORKBOOK-COMPOSITION-MODEL.md). A real workbook tree
+  End-to-end: the composition-island layer wired into `work bundle`/`work unbundle`/
+  `work islands` (docs/WORKBOOK-COMPOSITION-MODEL.md). A real workbook tree
   (agent → toolkit → toolkit + org + vfs) round-trips dir → .html → dir byte-exact
   (the existing Bundle guarantee), the bundled page carries BOTH the wb-bundle zip
   AND the work-islands manifest, and the manifest is a loss-free projection whose
@@ -45,7 +45,7 @@ defmodule Workbooks.BundleIslandsCliTest do
     end
   end
 
-  test "wb bundle embeds the islands manifest; unbundle restores byte-exact + reports the structure", %{base: base} do
+  test "work bundle embeds the islands manifest; unbundle restores byte-exact + reports the structure", %{base: base} do
     src = Path.join(base, "src")
     out = Path.join(base, "wb.html")
     dst = Path.join(base, "dst")
@@ -101,7 +101,7 @@ defmodule Workbooks.BundleIslandsCliTest do
     assert MapSet.new(closure) == MapSet.new(["crm", "browser"])
   end
 
-  test "wb islands dumps the structure from both a bundled .html and a working dir", %{base: base} do
+  test "work islands dumps the structure from both a bundled .html and a working dir", %{base: base} do
     src = Path.join(base, "src")
     out = Path.join(base, "wb.html")
     write_tree(src)

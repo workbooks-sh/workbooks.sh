@@ -73,7 +73,7 @@ for a DEEP CLI) · `federation` · `posix` · `kernel` (bytes→bytes hot loop).
 **deep** CLI (`#+FLOW` chains ≥3 verbs, ≥6 verb groups, or a verb nests ≥2 levels)
 ship ≥1 **task recipe** per common need — a `:role task` bash block taking the
 user's NOUN, surfaced in a Task index ABOVE the leaf index. A `:role task` block
-is run via `wbx toolkit run <id> <task> -- <args>`. Shallow CLI ⇒ the leaf IS the
+is run via `work toolkit run <id> <task> -- <args>`. Shallow CLI ⇒ the leaf IS the
 task.
 
 ## 6. Verify the partition
@@ -81,11 +81,11 @@ task.
 Never await CI. Run, at the tightest tier first:
 
 ```
-wbx toolkit verify <id>   # partition: skills indexed once, see-also resolves, overview present, drawer==keywords
-wbx toolkit eval <id>     # does it behave? runs evals/*.org (needs WB_TOOLKIT_EXEC=1)
-wbx toolkit build <id>    # declarative auto-wrap of #+BUILD_SRC → register command
-wbx toolkit run <id> <task> -- <args>   # exercise a :role task recipe
-wbx toolkit sign <id>     # sign with the tenant did:key to ship
+work toolkit verify <id>   # partition: skills indexed once, see-also resolves, overview present, drawer==keywords
+work toolkit eval <id>     # does it behave? runs evals/*.org (needs WB_TOOLKIT_EXEC=1)
+work toolkit build <id>    # declarative auto-wrap of #+BUILD_SRC → register command
+work toolkit run <id> <task> -- <args>   # exercise a :role task recipe
+work toolkit sign <id>     # sign with the tenant did:key to ship
 ```
 
 Re-read the files you wrote; confirm `verify` passes (this is the done-gate). For
@@ -99,5 +99,5 @@ the assertions verify makes and how eval tiers work, see `references/verify-eval
 - Every skill has the six sections, is DEEP (mental model + 4+ pitfalls +
   checklist), not a flag dump.
 - All see-also links resolve; org parses; every file < 800 LOC.
-- `wbx toolkit verify <id>` passes; recipes verified where the CLI is runnable
+- `work toolkit verify <id>` passes; recipes verified where the CLI is runnable
   (un-verifiable ones flagged `#+STATUS: experimental` and logged).

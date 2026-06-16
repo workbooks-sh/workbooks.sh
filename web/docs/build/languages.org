@@ -19,7 +19,7 @@ For a self-authored command you point =build-inline= at a source file; for a
 durable toolkit the manifest's =#+BUILD_LANG= and =#+BUILD_SRC= drive the build.
 
 #+begin_src bash
-wb toolkit build-inline rev rust ./reverse.rs
+work toolkit build-inline rev rust ./reverse.rs
 #+end_src
 
 - Build + register + run in one step: [[self-authoring.org][Self-authoring & hot-swap]]

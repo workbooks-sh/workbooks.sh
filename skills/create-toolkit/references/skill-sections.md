@@ -65,7 +65,7 @@ where the tool is runnable. Not a man-page paraphrase, not a flag dump. Target
 
    Every code block gets a `#+CAPTION:` (it is the surfaced TOC). `:role pre` runs
    before the agent suggests the recipe; `:role post` validates after; `:role
-   task` is a runnable multi-verb recipe invoked by `wbx toolkit run`. `$1` in a
+   task` is a runnable multi-verb recipe invoked by `work toolkit run`. `$1` in a
    role block is the path the runtime passes. **Security:** `:role` blocks are
    arbitrary host bash — they run ONLY when `WB_TOOLKIT_EXEC=1`, under the sandbox
    (network-denied, fs-confined, ulimit-capped); unset ⇒ reported SKIPPED.

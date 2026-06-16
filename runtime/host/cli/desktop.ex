@@ -1,17 +1,17 @@
 defmodule Workbooks.CLI.Desktop do
   @moduledoc """
-  `wb desktop` — install + launch the Workbooks DESKTOP app from the CLI. The
+  `work desktop` — install + launch the Workbooks DESKTOP app from the CLI. The
   desktop app is the GUI shell whose first-run wizard connects an engine (a local
   microVM via krunvm, or a cloud engine). This is the terminal on-ramp to the
   same artifact you'd download from GitHub Releases.
 
-  HOST-side (shells out, no app/runtime boot — like `wb deploy`). `install`
+  HOST-side (shells out, no app/runtime boot — like `work deploy`). `install`
   dogfoods the SAME `install.sh` served at workbooks.sh, so there is ONE source
   of install truth: the CLI is a thin wrapper, not a second implementation.
   """
   @default_url "https://workbooks.sh/install.sh"
 
-  @doc "Dispatch a `wb desktop` verb → {output, failed?}."
+  @doc "Dispatch a `work desktop` verb → {output, failed?}."
   def run(rest) do
     case rest do
       [] -> {usage(), false}
@@ -19,7 +19,7 @@ defmodule Workbooks.CLI.Desktop do
       ["install" | opts] -> install(opts)
       [v | rest2] when v in ["open", "launch", "run"] -> open(rest2)
       ["mcp" | opts] -> mcp(opts)
-      other -> {"unknown verb: wb desktop #{Enum.join(other, " ")}\n\n#{usage()}", true}
+      other -> {"unknown verb: work desktop #{Enum.join(other, " ")}\n\n#{usage()}", true}
     end
   end
 
@@ -32,7 +32,7 @@ defmodule Workbooks.CLI.Desktop do
 
     case sh(cmd, env) do
       {out, 0} ->
-        # `wb desktop install --open` chains install → launch in one motion,
+        # `work desktop install --open` chains install → launch in one motion,
         # so Claude Code (or the user) lands in the running browser.
         if "--open" in opts do
           {launch_out, failed?} = open([])
@@ -46,7 +46,7 @@ defmodule Workbooks.CLI.Desktop do
     end
   end
 
-  # `wb desktop open [<path|url>]`. With no target, just launches/focuses the
+  # `work desktop open [<path|url>]`. With no target, just launches/focuses the
   # app. With a target, drops an open-intent file the running (or next-booting)
   # browser picks up and opens as a tab — a dependency-free deep link: no URL
   # scheme to register, no Tauri plugin, works for both a cold start and a
@@ -65,7 +65,7 @@ defmodule Workbooks.CLI.Desktop do
     end
   end
 
-  # `wb desktop mcp` — the MCP on-ramp (wb-aakl.11; server impl wb-aakl.23).
+  # `work desktop mcp` — the MCP on-ramp (wb-aakl.11; server impl wb-aakl.23).
   # No args: print the connection config + the one-line `claude mcp add`.
   # `--stdio`: act as the stdio↔UDS relay Claude Code runs (impl wb-aakl.23).
   @mcp_default_sock "/tmp/workbooks-mcp.sock"
@@ -89,7 +89,7 @@ defmodule Workbooks.CLI.Desktop do
 
       Add it to Claude Code (one line):
 
-        claude mcp add workbooks -- wb desktop mcp --stdio
+        claude mcp add workbooks -- work desktop mcp --stdio
 
       The browser exposes workbooks-native tools (tabs, bookmarks, the
       workspace tree, open_workbook, weave/validate via oql.wasm) plus
@@ -108,7 +108,7 @@ defmodule Workbooks.CLI.Desktop do
   # process drains stdin to the socket. Either EOF/close tears the relay down.
   defp stdio_relay(sock) do
     unless File.exists?(sock) do
-      throw_relay("browser not running (no socket at #{sock}). Start it with WB_MCP=1, e.g. `WB_MCP=1 wb desktop open`.")
+      throw_relay("browser not running (no socket at #{sock}). Start it with WB_MCP=1, e.g. `WB_MCP=1 work desktop open`.")
     end
 
     case :gen_tcp.connect({:local, to_charlist(sock)}, 0, [:binary, active: false, packet: 0]) do
@@ -125,7 +125,7 @@ defmodule Workbooks.CLI.Desktop do
         {"", false}
 
       {:error, reason} ->
-        {"wb desktop mcp --stdio: could not connect to #{sock}: #{inspect(reason)}", true}
+        {"work desktop mcp --stdio: could not connect to #{sock}: #{inspect(reason)}", true}
     end
   catch
     {:relay_error, msg} -> {msg, true}
@@ -210,17 +210,17 @@ defmodule Workbooks.CLI.Desktop do
       {:unix, :darwin} ->
         case sh("open -a Workbooks", []) do
           {_out, 0} -> {"launched Workbooks", false}
-          {out, _} -> {"could not launch Workbooks — install it first with `wb desktop install`.\n#{out}", true}
+          {out, _} -> {"could not launch Workbooks — install it first with `work desktop install`.\n#{out}", true}
         end
 
       {:unix, _} ->
         case sh("workbooks >/dev/null 2>&1 &", []) do
           {_out, 0} -> {"launched workbooks", false}
-          {out, _} -> {"could not launch — is it on PATH? Install with `wb desktop install`.\n#{out}", true}
+          {out, _} -> {"could not launch — is it on PATH? Install with `work desktop install`.\n#{out}", true}
         end
 
       _ ->
-        {"`wb desktop open` isn't supported on this OS — launch the app from your applications menu.", true}
+        {"`work desktop open` isn't supported on this OS — launch the app from your applications menu.", true}
     end
   end
 
@@ -240,14 +240,14 @@ defmodule Workbooks.CLI.Desktop do
 
   defp usage do
     """
-    wb desktop — install + launch the Workbooks browser.
+    work desktop — install + launch the Workbooks browser.
 
-      wb desktop install                install the latest release (curl | sh)
-      wb desktop install --version=X    pin a release (tag desktop-vX)
-      wb desktop install --open         install, then launch
-      wb desktop open                   launch the installed browser
-      wb desktop open <path|url>        open a workbook/page in the browser
-      wb desktop mcp                    print the MCP config + claude mcp add line
+      work desktop install                install the latest release (curl | sh)
+      work desktop install --version=X    pin a release (tag desktop-vX)
+      work desktop install --open         install, then launch
+      work desktop open                   launch the installed browser
+      work desktop open <path|url>        open a workbook/page in the browser
+      work desktop mcp                    print the MCP config + claude mcp add line
 
     The installer downloads the browser from GitHub Releases. The runtime is
     installed separately by the CLI; `open <path>` drops an open-intent the

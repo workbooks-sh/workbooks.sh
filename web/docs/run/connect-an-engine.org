@@ -1,11 +1,11 @@
 #+TITLE: Connect the CLI to a runtime engine
-#+DESCRIPTION: Point wbx at a running runtime — local discovery by default, or a remote engine via one env var.
+#+DESCRIPTION: Point work at a running runtime — local discovery by default, or a remote engine via one env var.
 
 * Connect the CLI to a runtime engine
 
 Engine-backed verbs (=compile=, =workflow=, =agent=, =toolkit push=, =telemetry=, …)
 talk to a running runtime over RCP — a small JSON-over-HTTP+WS connect/auth/transport
-floor. The goal here: get =wbx= pointed at the right engine.
+floor. The goal here: get =work= pointed at the right engine.
 
 There are two paths. Local discovery is automatic; a remote engine is one env var.
 
@@ -21,14 +21,14 @@ anything — stand the engine up and engine-backed verbs just work.
 :SRC:       cli/src/io.rs#http
 :END:
 
-1. *Stand up / converge the engine.* =wbx deploy local= brings a runtime up in a
+1. *Stand up / converge the engine.* =work deploy local= brings a runtime up in a
    container (docker | podman | krunvm). See [[../../deploy/ship-to-the-internet.org][Deploy a runtime]].
    :PROPERTIES:
    :MATURITY:  ships-today
    :EVIDENCE:  cli/src/deploy/mod.rs:48
    :END:
 
-2. *Verify the connection.* Bare =wbx= (or =wbx info=) prints an environment +
+2. *Verify the connection.* Bare =work= (or =work info=) prints an environment +
    engine health report — state, URL, workspace. Agents get JSON with =--json=.
    :PROPERTIES:
    :MATURITY:  ships-today
@@ -44,7 +44,7 @@ only knows about local engines. Add =WBX_ENGINE_TOKEN= for the bearer credential
 #+begin_src sh
 export WBX_ENGINE_URL=https://engine.example.com
 export WBX_ENGINE_TOKEN=…              # optional bearer
-wbx info                               # confirm it points at the remote
+work info                               # confirm it points at the remote
 #+end_src
 
 :PROPERTIES:
@@ -55,8 +55,8 @@ wbx info                               # confirm it points at the remote
 
 ** Talk to it directly
 
-For ad-hoc RCP calls there's a raw escape hatch: =wbx rt status=, =wbx rt get <path>=,
-=wbx rt post <path> [body]=. Useful for poking the runtime without an engine-backed
+For ad-hoc RCP calls there's a raw escape hatch: =work rt status=, =work rt get <path>=,
+=work rt post <path> [body]=. Useful for poking the runtime without an engine-backed
 verb in front of it.
 
 :PROPERTIES:

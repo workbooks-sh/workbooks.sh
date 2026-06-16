@@ -64,7 +64,7 @@ Everything is organized around three layers. Learn the words once:
 
 * Out of scope for you (operator territory)
 
-Provisioning machines, building/pushing the runtime OCI image, =wb deploy=,
+Provisioning machines, building/pushing the runtime OCI image, =work deploy=,
 =fly= and other cloud lifecycle, and editing host engine code are
 *host-level* operations done by operators OUTSIDE the runtime. You cannot do
 them from in here and should not try; if a task seems to need one, it

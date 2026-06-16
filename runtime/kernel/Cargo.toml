@@ -8,13 +8,13 @@ description = "OQL — the opinionated Org kernel. Narrow Org lens + tangle-plan
 [workspace]
 
 # cdylib → the wasm Component (cargo-component); rlib → the native kernel API
-# linked by the `wb` CLI. Same source, two consumers.
+# linked by the `work` CLI. Same source, two consumers.
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [features]
 # `component` builds the WIT-typed wasm Component (cargo-component uses it via
-# default features). Consumers that only want the pure rlib (the `wb` CLI, on
+# default features). Consumers that only want the pure rlib (the `work` CLI, on
 # native AND wasm) depend with default-features = false → no component glue.
 default = ["component"]
 component = ["dep:wit-bindgen-rt"]

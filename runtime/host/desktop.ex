@@ -71,7 +71,7 @@ defmodule Workbooks.Desktop do
 
   @doc """
   How this runtime is managed, written into the discovery file so the tray knows
-  whether it may restart us. `container` = the tray booted us via `wb deploy local`
+  whether it may restart us. `container` = the tray booted us via `work deploy local`
   (krunvm sets `WB_DESKTOP_DIR=/disco`) and so owns our lifecycle. `raw` = we were
   launched by hand (`WB_DESKTOP=1 iex -S mix` in dev); the tray must NOT kill us.
   """

@@ -19,8 +19,8 @@
   granted preopen.
 
   Build them:
-    - =wb toolkit build palette=         → build/register every runtime in the set
-    - =wb toolkit build palette <name>=  → just one (e.g. =python=)
+    - =work toolkit build palette=         → build/register every runtime in the set
+    - =work toolkit build palette <name>=  → just one (e.g. =python=)
 
   Runtimes (each = runtimes/<name>.org, a pinned spec):
 

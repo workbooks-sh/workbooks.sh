@@ -1,14 +1,14 @@
 <p class="lead">You've spent this unit learning how your agent gets real tools to work with. Here's the thing that ties them together — and the first surprise is that it isn't yours to operate. It's a reference card for a tool your <em>agent</em> drives, so you can recognize it when it shows up in a session log and know what it's doing.</p>
 
-    <p>Most of what you do here, you do by talking. You describe what you want; the agent does the work. But underneath the conversation, the agent isn't waving a magic wand — it's running a real command-line tool, over and over, the way a builder reaches for the same trusted handle a hundred times a day. That tool is called <code>wbx</code>, and this lesson is the short version of what it is and why you'll see its name go by.</p>
+    <p>Most of what you do here, you do by talking. You describe what you want; the agent does the work. But underneath the conversation, the agent isn't waving a magic wand — it's running a real command-line tool, over and over, the way a builder reaches for the same trusted handle a hundred times a day. That tool is called <code>work</code>, and this lesson is the short version of what it is and why you'll see its name go by.</p>
 
     <h2>One handle, mostly held by the agent</h2>
 
-    <p>The honest way to describe <code>wbx</code> is that it's a handle, not a brain. It's a single program that authors, builds, signs, ships, and runs workbooks — but it owns almost none of the cleverness itself. It parses what it was asked for, does the light local work directly, and hands everything heavy to the engine behind it. The intelligence lives in the system; the command is the grip you hold it by.</p>
+    <p>The honest way to describe <code>work</code> is that it's a handle, not a brain. It's a single program that authors, builds, signs, ships, and runs workbooks — but it owns almost none of the cleverness itself. It parses what it was asked for, does the light local work directly, and hands everything heavy to the engine behind it. The intelligence lives in the system; the command is the grip you hold it by.</p>
 
-    <p>And in your case, you mostly <em>don't</em> hold it. When you ask your agent to scaffold a workbook, wire in a toolkit, or ship the thing, the agent is the one typing <code>wbx</code> commands. You'll see them scroll past in the session — <code>wbx init</code>, <code>wbx toolkit push</code>, <code>wbx bundle</code> — like a worker's hands moving across a bench. You're directing; it's operating.</p>
+    <p>And in your case, you mostly <em>don't</em> hold it. When you ask your agent to scaffold a workbook, wire in a toolkit, or ship the thing, the agent is the one typing <code>work</code> commands. You'll see them scroll past in the session — <code>work init</code>, <code>work toolkit push</code>, <code>work bundle</code> — like a worker's hands moving across a bench. You're directing; it's operating.</p>
 
-    <div class="aside">This is the correction worth keeping from the older version of this page: it used to read like a getting-started tutorial — "you install the tool, you run two minutes of commands, you get your first workbook." For a builder who works by talking to an agent, that's the wrong picture. You don't have to install <code>wbx</code> or memorize a single verb. Your agent does the driving. This page exists so the driving isn't a black box.</div>
+    <div class="aside">This is the correction worth keeping from the older version of this page: it used to read like a getting-started tutorial — "you install the tool, you run two minutes of commands, you get your first workbook." For a builder who works by talking to an agent, that's the wrong picture. You don't have to install <code>work</code> or memorize a single verb. Your agent does the driving. This page exists so the driving isn't a black box.</div>
 
     <h2>Why you'd want to recognize it anyway</h2>
 
@@ -28,15 +28,15 @@
 
     <h2>It speaks to people and to machines, on purpose</h2>
 
-    <p>Here's the design choice that makes <code>wbx</code> safe for an agent to drive. The tool knows it has two kinds of users, and it changes its manners for each <em>without</em> changing what it does.</p>
+    <p>Here's the design choice that makes <code>work</code> safe for an agent to drive. The tool knows it has two kinds of users, and it changes its manners for each <em>without</em> changing what it does.</p>
 
     <p>When a person is at a terminal, it's warm: it picks sensible defaults, offers a small menu when the choice is genuinely yours, and ends each success by suggesting the next step. The moment its output is being read by a program instead of a person — piped into a script, or driven by an agent — it drops the friendliness. No menus to hang on, no colors a log can't read, just clean, predictable output a machine can trust, and a stable code for every outcome so the agent can tell success from "the engine isn't running" from "that wasn't found." Same work underneath; only the manners change.</p>
 
-    <p>This matters more than it sounds. The usual industry answer is two separate things — a tool for humans and an interface for machines — and they always drift apart until they quietly disagree about what the software even does. <code>wbx</code> refuses that fork: one program with good manners, not two programs that fall out of sync.</p>
+    <p>This matters more than it sounds. The usual industry answer is two separate things — a tool for humans and an interface for machines — and they always drift apart until they quietly disagree about what the software even does. <code>work</code> refuses that fork: one program with good manners, not two programs that fall out of sync.</p>
 
     <h2>The same tool, inside the engine</h2>
 
-    <p>And it goes one step further than most people expect. The very same tool runs <em>inside</em> the system, in the sandbox where the engine's own agents do their work. So when an agent's log says it ran a particular command, that's not a stand-in or a translation — it's literally <code>wbx</code>, the same one a person would install on a laptop.</p>
+    <p>And it goes one step further than most people expect. The very same tool runs <em>inside</em> the system, in the sandbox where the engine's own agents do their work. So when an agent's log says it ran a particular command, that's not a stand-in or a translation — it's literally <code>work</code>, the same one a person would install on a laptop.</p>
 
     <p>That's what makes "people and AI build together" more than a slogan. It has to be true at the level of the tool itself, or it isn't true anywhere. When you and the agent are reaching for the exact same handle, with the same words and the same behavior, you're genuinely working in the same place — not watching a machine operate controls you can never touch.</p>
 
@@ -44,9 +44,9 @@
 
     <h2>Where this is today, and where it's going</h2>
 
-    <p>What's real today: <code>wbx</code> ships as one compiled tool for Mac, Linux, and Windows, and the same source also runs inside the engine's sandbox — so the claim that you and the agents hold the identical tool is literally true, not a metaphor. The verb families, the human-versus-machine manners, the stable outcome codes, and the never-fail health check are all built and tested.</p>
+    <p>What's real today: <code>work</code> ships as one compiled tool for Mac, Linux, and Windows, and the same source also runs inside the engine's sandbox — so the claim that you and the agents hold the identical tool is literally true, not a metaphor. The verb families, the human-versus-machine manners, the stable outcome codes, and the never-fail health check are all built and tested.</p>
 
-    <p>The honest edge: this page is a reference, not a tutorial. We've deliberately not walked you through running commands yourself, because for a builder who works by directing an agent, that's not the job. If you ever want to drive <code>wbx</code> by hand — and plenty of people do, once they're curious — the deeper pages are where to go, and the tool is built to teach its own shape as you use it.</p>
+    <p>The honest edge: this page is a reference, not a tutorial. We've deliberately not walked you through running commands yourself, because for a builder who works by directing an agent, that's not the job. If you ever want to drive <code>work</code> by hand — and plenty of people do, once they're curious — the deeper pages are where to go, and the tool is built to teach its own shape as you use it.</p>
 
     <hr>
 

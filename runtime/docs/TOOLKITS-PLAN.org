@@ -12,9 +12,9 @@ authoritative current shape. Deltas:
     escape hatch (manifest declares its EXEC mode; not a global rule).
   - Old monorepo paths (engine/lib/..., ~/Workbooks/Workbox/...) → this
     repo's runtime/host/* + the discovery root scanned by Toolkits.discover_dir/1.
-  - The `wb toolkit` runner described here was Rust (cli/wb/.../toolkit.rs);
+  - The `work toolkit` runner described here was Rust (cli/wb/.../toolkit.rs);
     in the clean-room it is reimplemented as Elixir subcommands in
-    runtime/host/cli.ex (see TOOLKITS-V3.org §"wb toolkit surface").
+    runtime/host/cli.ex (see TOOLKITS-V3.org §"work toolkit surface").
   - "No ToolRegistry / catalog-in-prompt" — STILL TRUE, carried forward.
 #+END_COMMENT
 
@@ -141,9 +141,9 @@ authoritative current shape. Deltas:
 
    #+begin_src org
    ,* Workflow
-     ,#+CAPTION: verify wb is installed at the right version
+     ,#+CAPTION: verify work is installed at the right version
      ,#+begin_src bash :role pre
-     wb --version | grep -E '^wb 0\.[0-9]+\.' || { echo "wb missing"; exit 1; }
+     wb --version | grep -E '^wb 0\.[0-9]+\.' || { echo "work missing"; exit 1; }
      ,#+end_src
 
      [...the actual recipe...]
@@ -154,7 +154,7 @@ authoritative current shape. Deltas:
      ,#+end_src
    #+end_src
 
-   The agent (or the eval runner, or =wb toolkit check=) runs
+   The agent (or the eval runner, or =work toolkit check=) runs
    =:role pre= before suggesting the recipe, =:role post= after
    to validate. A skill that always returns "pre failed" warns
    the user instead of running.
@@ -174,7 +174,7 @@ authoritative current shape. Deltas:
    | =:COST:= free\vert paid     | Eval suite uses to gate live-API skills                |
    | =:OS:= macos linux   | Skipped on mismatched OS                                |
 
-   These are first-class. The =wb toolkit check= linter validates
+   These are first-class. The =work toolkit check= linter validates
    them; the runtime honors them at session start.
 
    /Markdown frontmatter can carry the same keys, but nothing
@@ -183,10 +183,10 @@ authoritative current shape. Deltas:
 ** 3. OQL-queryable structure
 
    The skills tree is just org files; OQL queries it natively.
-   The =wb toolkit search= helper is literally:
+   The =work toolkit search= helper is literally:
 
    #+begin_src bash
-   wb query '(and (tags video) (not (todo deprecated)))' \
+   work query '(and (tags video) (not (todo deprecated)))' \
      --root ~/Workbooks/Workbox/toolkits/
    #+end_src
 
@@ -209,7 +209,7 @@ authoritative current shape. Deltas:
    #+end_src
 
    The agent navigates skill-to-skill by intent, not by
-   grepping. =wb toolkit show <toolkit>= can render the link
+   grepping. =work toolkit show <toolkit>= can render the link
    graph (or omit it if the agent prefers raw).
 
    /Markdown links are strings; org links resolve./
@@ -226,12 +226,12 @@ authoritative current shape. Deltas:
    #+begin_src org
    ,#+CAPTION: scaffold a document workbook
    ,#+begin_src bash
-   wb init "$1" --template=document --no-install
+   work init "$1" --template=document --no-install
    ,#+end_src
 
    ,#+CAPTION: install deps + first build
    ,#+begin_src bash
-   cd "$1" && npm install --no-audit --no-fund && wb build
+   cd "$1" && npm install --no-audit --no-fund && work build
    ,#+end_src
    #+end_src
 
@@ -245,7 +245,7 @@ authoritative current shape. Deltas:
 
    For each of the above to pay rent, the runtime needs to:
 
-   - Parse :role pre/post blocks and expose them to =wb toolkit
+   - Parse :role pre/post blocks and expose them to =work toolkit
      check= + the eval framework
    - Honor =:DESTRUCTIVE:= / =:NETWORK:= / =:STATUS:= /
      =:REQUIRES:= / =:OS:= at toolkit-load + skill-render time
@@ -276,22 +276,22 @@ authoritative current shape. Deltas:
 
    The shape is the source of truth. No build step, no compile.
 
-** Helper commands (=wb toolkit ...=) — phase 1
+** Helper commands (=work toolkit ...=) — phase 1
 
-   - =wb toolkit list= — walk =~/Workbooks/Workbox/toolkits/=, print
+   - =work toolkit list= — walk =~/Workbooks/Workbox/toolkits/=, print
      a table of installed toolkits + tagline + skill count
-   - =wb toolkit show <name>= — print the manifest + skill index
+   - =work toolkit show <name>= — print the manifest + skill index
      for one toolkit (=ls= of the skills dir with their TITLEs)
-   - =wb toolkit new <name> [--cli <bin>]= — scaffold a new
+   - =work toolkit new <name> [--cli <bin>]= — scaffold a new
      toolkit dir with a template =manifest.org= + =skills/overview.org=
-   - =wb toolkit check <name>= — lint: manifest has required
+   - =work toolkit check <name>= — lint: manifest has required
      frontmatter, =CLI_BIN= resolves on PATH, each skill has
      =#+TITLE: + #+TOOLKIT: + #+SKILL:=, no broken cross-refs
-   - =wb toolkit search <query>= — grep across all installed
+   - =work toolkit search <query>= — grep across all installed
      toolkits' skill TITLEs + frontmatter tags, return hits
 
    All of these are thin wrappers over the filesystem
-   convention. =wb toolkit list= is essentially =ls + cat
+   convention. =work toolkit list= is essentially =ls + cat
    manifest.org= with formatting. The CLI helpers exist to make
    authoring + discovery ergonomic, not because the convention
    needs them.
@@ -304,13 +304,13 @@ authoritative current shape. Deltas:
    the toolkits dir installs it.
 
    #+begin_src bash
-   wb toolkit install https://github.com/alice/wb-toolkit-fly
+   work toolkit install https://github.com/alice/wb-toolkit-fly
    # = shallow clone into ~/Workbooks/Workbox/toolkits/fly/
    #+end_src
 
    - Auth: relies on git's existing auth (SSH keys, etc.)
-   - Updates: =wb toolkit update fly= = =git pull= in the dir
-   - Uninstall: =wb toolkit remove fly= = =rm -rf=
+   - Updates: =work toolkit update fly= = =git pull= in the dir
+   - Uninstall: =work toolkit remove fly= = =rm -rf=
 
 ** Tier 2 — npm packages (ship soon)
 
@@ -332,7 +332,7 @@ authoritative current shape. Deltas:
 ** Tier 3 — Radicle / federation (ship when federation is live)
 
    Toolkits as workbook .html artifacts published via the Broker.
-   =wb toolkit install rad://<rid>= pulls via radicle-node. Lets
+   =work toolkit install rad://<rid>= pulls via radicle-node. Lets
    toolkit authors federate without depending on npm or GitHub.
 
    No work needed today; the directory format will already work
@@ -373,10 +373,10 @@ authoritative current shape. Deltas:
    That's it. No new tool, no special API. The agent already has
    bash; the file is on disk; =cat= prints it.
 
-** When the agent doesn't know which skill it needs: =wb toolkit search=
+** When the agent doesn't know which skill it needs: =work toolkit search=
 
    #+begin_src bash
-   wb toolkit search "share workbook with password"
+   work toolkit search "share workbook with password"
    # → fly/skills/...   (no hit)
    # → wb/skills/share-a-workbook.org  (match: "Live URL with password")
    #+end_src
@@ -394,13 +394,13 @@ authoritative current shape. Deltas:
 
   Initial skills:
     - =overview.org= — what is a workbook, when to use wb
-    - =scaffold-a-workbook.org= — wb init + npm install + wb build
+    - =scaffold-a-workbook.org= — work init + npm install + work build
     - =edit-and-rebuild.org= — unbundle, edit, rebuild
-    - =share-a-workbook.org= — wb publish + Live URL pattern
+    - =share-a-workbook.org= — work publish + Live URL pattern
     - =seal-and-encrypt.org= — seal / unseal / encrypt for distribution
-    - =query-across-workbooks.org= — =wb workbooks= cross-workbook OQL
+    - =query-across-workbooks.org= — =work workbooks= cross-workbook OQL
 
-  The wb toolkit is also the first thing the agent sees in any
+  The work toolkit is also the first thing the agent sees in any
   Workbooks environment.  Validating wb's discovery loop validates
   the whole convention.
 
@@ -411,7 +411,7 @@ authoritative current shape. Deltas:
 
 ** Phase 1 — convention + reference toolkit (wb-tlkt.1 .. .5)
 
-   1. =wb-tlkt.1= — Author the 6 wb skill files at =cli/wb/toolkit/=
+   1. =wb-tlkt.1= — Author the 6 work skill files at =cli/wb/toolkit/=
       + manifest.org
    2. =wb-tlkt.2= — Install script: copy =cli/wb/toolkit/= →
       =~/Workbooks/Workbox/toolkits/wb/= as part of =wb='s install
@@ -419,23 +419,23 @@ authoritative current shape. Deltas:
       =~/Workbooks/Workbox/toolkits/*/manifest.org= → assemble
       TOOLKITS index → inject into system prompt
    4. =wb-tlkt.4= — Eval: agent given vague workbook task,
-      discovers wb via index, reads scaffold skill, executes
+      discovers work via index, reads scaffold skill, executes
       end-to-end; passes
    5. =wb-tlkt.5= — Eval: agent given task that DOES NOT match
       any toolkit; agent recognizes + reports honestly
 
 ** Phase 2 — authoring helpers (wb-tlkt.6 .. .9)
 
-   1. =wb-tlkt.6= — =wb toolkit list= command
-   2. =wb-tlkt.7= — =wb toolkit show <name>= command
-   3. =wb-tlkt.8= — =wb toolkit new <name> [--cli <bin>]= scaffold
-   4. =wb-tlkt.9= — =wb toolkit check <name>= linter
+   1. =wb-tlkt.6= — =work toolkit list= command
+   2. =wb-tlkt.7= — =work toolkit show <name>= command
+   3. =wb-tlkt.8= — =work toolkit new <name> [--cli <bin>]= scaffold
+   4. =wb-tlkt.9= — =work toolkit check <name>= linter
 
 ** Phase 3 — distribution (wb-tlkt.10 .. .12)
 
-   1. =wb-tlkt.10= — =wb toolkit install <git-url>= (Tier 1)
-   2. =wb-tlkt.11= — =wb toolkit search= cross-toolkit grep
-   3. =wb-tlkt.12= — =wb toolkit install @workbooks-toolkit/<name>=
+   1. =wb-tlkt.10= — =work toolkit install <git-url>= (Tier 1)
+   2. =wb-tlkt.11= — =work toolkit search= cross-toolkit grep
+   3. =wb-tlkt.12= — =work toolkit install @workbooks-toolkit/<name>=
       via npm (Tier 2)
 
 ** Phase 4 — second + third reference toolkit (wb-tlkt.13 .. .14)
@@ -495,7 +495,7 @@ authoritative current shape. Deltas:
   shareable workbook with a password"/, accomplishes it by:
 
     1. Reading the TOOLKITS index in its prompt → sees =wb=
-    2. =cat=ing =wb/skills/overview.org= → confirms wb is the right
+    2. =cat=ing =wb/skills/overview.org= → confirms work is the right
        toolkit
     3. =cat=ing =wb/skills/share-a-workbook.org= → learns the publish
        flow

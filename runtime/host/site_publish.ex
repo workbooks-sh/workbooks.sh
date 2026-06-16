@@ -60,7 +60,7 @@ defmodule Workbooks.SitePublish do
   renamed bundle leaves nothing behind. Returns `{:ok, count}` (0 when no dist).
 
   Called on GitOps reconcile (a pulled `dist` goes live) and invocable as
-  `wb deploy app` — so "commit a built dist" ⇒ "live", the same commit-⇒-live
+  `work deploy app` — so "commit a built dist" ⇒ "live", the same commit-⇒-live
   invariant content already has.
   """
   def deploy_app(workdir, tenant) when is_binary(workdir) do

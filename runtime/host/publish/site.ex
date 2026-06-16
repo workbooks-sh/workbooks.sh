@@ -1,6 +1,6 @@
 defmodule Workbooks.Publish.Site do
   @moduledoc """
-  Multi-page site mode for wb publish. Reads a site.org manifest, renders
+  Multi-page site mode for work publish. Reads a site.org manifest, renders
   each linked org file with a shared sidebar, outputs a flat dist/.
 
   site.org format:
@@ -254,7 +254,7 @@ defmodule Workbooks.Publish.Site do
                                        "https://github.com/#{repo}.git", tmp], stderr_to_stdout: true),
          :ok <- copy_dir(dist, tmp),
          {_, 0} <- System.cmd("git", ["-C", tmp, "add", "."], stderr_to_stdout: true),
-         {_, 0} <- System.cmd("git", ["-C", tmp, "commit", "-m", "wb publish site: update docs"],
+         {_, 0} <- System.cmd("git", ["-C", tmp, "commit", "-m", "work publish site: update docs"],
                                stderr_to_stdout: true),
          {_, 0} <- System.cmd("git", ["-C", tmp, "push"], stderr_to_stdout: true) do
       File.rm_rf!(tmp)

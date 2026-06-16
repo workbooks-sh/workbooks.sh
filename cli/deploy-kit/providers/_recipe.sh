@@ -26,7 +26,7 @@ wb_recipe_init() {
 # from deployment.org `#+DEPLOY_SECRETS:` via the kit) extends the forwarded set
 # — the kit abstracts secrets; providers just receive the pairs. NOTE: generated
 # secrets (WB_SIGNING_KEY / WB_PUBLIC_BEARER) are NOT generated here — they must
-# be PERSISTED by the operator (via `wb deploy secrets set`), not rotated on each
+# be PERSISTED by the operator (via `work deploy secrets set`), not rotated on each
 # apply (rotation 401s live clients and breaks the tenant DID). The deploy-kit
 # auto-generates WB_PUBLIC_BEARER ONCE on first cloud apply and persists it in
 # secrets.env; subsequent applies reuse the stored value forwarded here.

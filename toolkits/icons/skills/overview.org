@@ -52,5 +52,5 @@
 
 * Verification checklist
   - [ ] =node test/icons.test.mjs= — all checks green
-  - [ ] =wb toolkit verify icons= — structural checks pass
-  - [ ] =wb toolkit build icons= — registers the =icons= command (provisioned runtime)
+  - [ ] =work toolkit verify icons= — structural checks pass
+  - [ ] =work toolkit build icons= — registers the =icons= command (provisioned runtime)

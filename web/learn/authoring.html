@@ -129,16 +129,16 @@
   :ID:        analyst
   :MODEL:     xiaomi/mimo-v2.5
   :TAGLINE:   Processes JSON data via in-WASM commands and persists findings.
-  :TOOLKITS:  shell wb sandbox
+  :TOOLKITS:  shell work sandbox
   :END:
 
 ** System prompt
 
 You are *analyst*, a clean-room runtime agent. You have tools: shell
-(run jq/grep pipelines over input), wb (the wb CLI), vfs_write, and done.
+(run jq/grep pipelines over input), wb (the work CLI), vfs_write, and done.
 
 - Use the shell <code>jq</code> command to extract and aggregate JSON.
-- Persist any durable finding with <code>wb memory remember &lt;key&gt; &lt;text&gt;</code>.
+- Persist any durable finding with <code>work memory remember &lt;key&gt; &lt;text&gt;</code>.
 - When the task is complete, call done with a one-line summary.</pre>
   <p>Roughly twenty-five lines, and there is nothing else — no surrounding harness,
   no entry point to register. Point the runtime at this file and it has a worker.</p>
@@ -182,7 +182,7 @@ flowchart LR
     <li><b>The four properties</b> come straight off the <code>:PROPERTIES:</code>
     drawer: <code>:ID:</code> becomes the node's id, <code>:MODEL:</code> the model
     string, <code>:TAGLINE:</code> a one-liner, and <code>:TOOLKITS:</code> a
-    whitespace-split list — so <code>shell wb sandbox</code> parses to three names.</li>
+    whitespace-split list — so <code>shell work sandbox</code> parses to three names.</li>
     <li><b>A missing <code>:TOOLKITS:</code> is not an error</b> — it defaults to
     the empty list. A name that isn't installed isn't an error either; you'll see
     in a moment exactly how it surfaces.</li>
@@ -260,7 +260,7 @@ flowchart LR
   disc["discover toolkits in<br/>$WB_TOOLKITS_ROOT"]
   idx["## Toolkits block<br/>tagline + first 8 skills + (+N more)"]
   app["appended LAST:<br/>system + idx"]
-  pull["skill body fetched at run time<br/>wb toolkit show &lt;id&gt; &lt;skill&gt;"]
+  pull["skill body fetched at run time<br/>work toolkit show &lt;id&gt; &lt;skill&gt;"]
   decl --> disc --> idx --> app
   app -.->|"on demand"| pull
   style decl fill:#ffffff,stroke:#121316
@@ -282,7 +282,7 @@ flowchart LR
   <pre class="orgsample">## Toolkits
 
 You have these toolkits. Before using one, read the relevant skill — call the
-`wb` tool: `toolkit show &lt;id&gt; &lt;skill&gt;` (or `toolkit search &lt;query&gt;` to find one).
+`work` tool: `toolkit show &lt;id&gt; &lt;skill&gt;` (or `toolkit search &lt;query&gt;` to find one).
 
 - git: Host-brokered commit + push for agent workdirs.
   skills: overview, publish-flow
@@ -320,7 +320,7 @@ You have these toolkits. Before using one, read the relevant skill — call the
     <tr><th>tool</th><th>what it does</th><th>who gets it</th></tr>
     <tr><td><code>shell</code></td><td>the in-WASM shell — <code>cat jq grep sort uniq tr</code>… with pipes and vars, no OS process</td><td>every agent</td></tr>
     <tr><td><code>search</code></td><td>semantic recall over the workdir — the files are the memory</td><td>every agent</td></tr>
-    <tr><td><code>wb</code></td><td>the wb CLI, including <code>toolkit show/search</code></td><td>every agent</td></tr>
+    <tr><td><code>wb</code></td><td>the work CLI, including <code>toolkit show/search</code></td><td>every agent</td></tr>
     <tr><td><code>fetch</code> · <code>web_search</code></td><td>a GET (HTML-stripped) and a host-brokered keyless search</td><td>every agent</td></tr>
     <tr><td><code>file_issue</code></td><td>the metacognitive seam — files into the <a href="autopoet">autopoet</a> backlog</td><td>every agent</td></tr>
     <tr><td><code>vfs_read</code> · <code>vfs_write</code> · <code>done</code></td><td>read/write the workspace; end the run</td><td>every agent</td></tr>

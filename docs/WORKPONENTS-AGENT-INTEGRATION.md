@@ -31,7 +31,7 @@ dependency graph real.**
 > (P0–P3, `runtime/test/bundle_islands_test.exs`, 16 tests) and resolves the same `#+REQUIRES`
 > toolkit DAG referenced below from both the bundled and exploded forms. The live `work-*` UI
 > elements (`work-table`/`work-chart`/…) are that doc's *live* island species; the inert config
-> islands are its declarative species. CLI wiring into `wb bundle`/`unbundle` is in progress.
+> islands are its declarative species. CLI wiring into `work bundle`/`unbundle` is in progress.
 
 ---
 

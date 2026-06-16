@@ -417,7 +417,7 @@ flowchart TD
   <pre class="mermaid">
 flowchart LR
   m["#+CAPS: vfs commands net"]
-  v["wb toolkit verify"]
+  v["work toolkit verify"]
   ok["caps declared, all grantable<br/>granted by profile(s): network, posix"]
   bad["no single profile grants the set<br/>— can never instantiate"]
   m --> v
@@ -432,9 +432,9 @@ flowchart LR
   answer <b>what can it reach</b>; the isolation tier ladder answers
   <b>where does it run</b> — first-party trust runs in-instance,
   third-party at <code>:node</code> tier in a separate VM, surfaced by
-  <code>wb isolation</code>. Two orthogonal dials. Don't conflate them —
+  <code>work isolation</code>. Two orthogonal dials. Don't conflate them —
   the <a href="sandboxes">sandboxes lesson</a> owns the second one. And if
-  you want to poke the walls yourself, <a href="wbx#install">run an
+  you want to poke the walls yourself, <a href="work#install">run an
   engine</a> and call <code>Instance.info</code> — the answer comes back
   as the shape you saw in the definition section.</p>
 </section>

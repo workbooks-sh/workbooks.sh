@@ -683,7 +683,7 @@ defmodule Workbooks.Compilers do
 
         {pm_servers, pm_externs} = build_pm_servers(o, cl, extern_args0)
 
-        # wb-asw: auto-provide the `wb` BEAM-runtime crate so programs can `use wb;` (opt-in).
+        # wb-asw: auto-provide the `work` BEAM-runtime crate so programs can `use wb;` (opt-in).
         {wb_extern, wb_obj} =
           if Keyword.get(opts, :wb, false), do: wb_runtime(o, mr, cl, clang_flags), else: {[], []}
 
@@ -1464,7 +1464,7 @@ defmodule Workbooks.Compilers do
     end
   end
 
-  # wb-asw: auto-provide the `wb` runtime crate (compilers/rust/wb/lib.rs) so in-sandbox programs can
+  # wb-asw: auto-provide the `work` runtime crate (compilers/rust/wb/lib.rs) so in-sandbox programs can
   # just `use wb;` for BEAM-backed I/O instead of declaring the host externs by hand. Compiled fresh
   # each build (tiny) with the SAME clang flags as the user (so the exception mode matches), into
   # output-wasi-174/. Returns {extern_args, link_objs}. The host_* symbols stay undefined (the caller
@@ -1683,7 +1683,7 @@ defmodule Workbooks.Compilers do
 
   # ── JS full lane (wb-fm0.4) ────────────────────────────────────────────────
   # Untrusted JS compiles AND runs entirely in the sandbox via QuickJS-ng built to wasm by
-  # clang.wasm (no JIT, no native javy). The wb harness (compilers/js/harness.c) supplies the
+  # clang.wasm (no JIT, no native javy). The work harness (compilers/js/harness.c) supplies the
   # same contract the native-javy lane did — Javy.IO.readSync/writeSync + console — plus a
   # TextEncoder/Decoder polyfill. Recipe: compilers/js/build.sh.
   @js_qobjs ~w(quickjs cutils libregexp libunicode xsum)

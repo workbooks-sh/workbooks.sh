@@ -173,7 +173,7 @@ flowchart LR
   </figure>
   <p>And that one function is reachable through three doors that are the same
   code compiled three ways. It's a pure string-to-string Rust crate, so it
-  ships as a native library inside the <a href="wbx">wbx</a> CLI (<code>wbx
+  ships as a native library inside the <a href="work">work</a> CLI (<code>work
   query</code> reads a drawer directly), as the <code>oql.wasm</code> Component
   embedded in the runtime at compile time (the engine calls the identical
   function), and as a WebAssembly build running in your browser tab right now.
@@ -275,7 +275,7 @@ sequenceDiagram
   F->>K: :PROPERTIES: drawer
   K->>A: props map · MODEL · TOOLKITS · TAGLINE
   Note over A: id + model read straight off the map
-  A->>T: :TOOLKITS: shell wb sandbox
+  A->>T: :TOOLKITS: shell work sandbox
   T->>A: skill index appended to the system prompt
   Note over A: system prompt comes from the<br/>** System prompt heading — NOT the drawer
   A->>R: %{id, model, toolkits, system}
@@ -311,7 +311,7 @@ sequenceDiagram
   :END:</pre>
   <p>Nobody types that. It's emitted by the runtime, one headline per call,
   which means an agent's entire run is a parseable org file you can later query
-  with the same <code>wbx query</code> that reads a hand-written manifest. The
+  with the same <code>work query</code> that reads a hand-written manifest. The
   run is <b>fully observable</b> because it was recorded in the one grammar
   everything else speaks. The same is true of the task ledger a keeper renders —
   a <code>TASKS.org</code> with <code>:ID:</code>, <code>:FILE:</code>,
@@ -429,7 +429,7 @@ flowchart TD
   </details>
   <details>
     <summary>How do I see the record a drawer produces?</summary>
-    <p>Run <code>wbx query</code> over the file. It calls the same kernel the
+    <p>Run <code>work query</code> over the file. It calls the same kernel the
     runtime uses and prints the JSON map — uppercased keys, trimmed values,
     <code>:ID:</code> promoted, keys alphabetically sorted. It's the fastest way
     to confirm a drawer parses the way you think it does, especially when

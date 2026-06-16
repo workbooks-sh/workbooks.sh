@@ -55,6 +55,6 @@
     runaway processes — the architecture forbids them.
 
 * Honest limits
-  - 1.74 ceiling still applies to YOUR source (the wb crate is thin and fine).
+  - 1.74 ceiling still applies to YOUR source (the work crate is thin and fine).
   - Not transparent tokio/std::net replacement — same capabilities, different (small) API.
   - In-program async/await needs a future slice (an executor); system concurrency covers most needs.

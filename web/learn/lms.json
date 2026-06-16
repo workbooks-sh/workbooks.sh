@@ -55,7 +55,7 @@
      "slug": "reading-what-it-did",
      "title": "Reading what your agent did",
      "status": "live",
-     "teaches": "Level 2->3: review AI work like an untrusted colleague — the sniff-check, spotting drift and failure modes, and the unfakeable ledger as your trustable record. A builder-facing, de-jargoned version of did-it-do-well grounded in the real wb toolkit eval surface.",
+     "teaches": "Level 2->3: review AI work like an untrusted colleague — the sniff-check, spotting drift and failure modes, and the unfakeable ledger as your trustable record. A builder-facing, de-jargoned version of did-it-do-well grounded in the real work toolkit eval surface.",
      "docs": [
       "the-ledger",
       "evals"
@@ -224,9 +224,9 @@
      "slug": "the-one-command",
      "title": "The one command (reference)",
      "status": "live",
-     "teaches": "Demoted to a reference card: the AGENT runs wbx, not this non-technical user. Fix the three embellishments (next-hint on only 7 verbs, in-sandbox parity bails until the Dock broker, no source split-pane).",
+     "teaches": "Demoted to a reference card: the AGENT runs work, not this non-technical user. Fix the three embellishments (next-hint on only 7 verbs, in-sandbox parity bails until the Dock broker, no source split-pane).",
      "docs": [
-      "wbx",
+      "work",
       "modes",
       "doctor"
      ],
@@ -273,7 +273,7 @@
      "slug": "did-it-do-well",
      "title": "Knowing whether the agent did well",
      "status": "live",
-     "teaches": "The deeper review craft: measuring a good job, catching drift, and the record you can't fake. Ground in the real wb toolkit eval surface; soften the cost/speed figure. Complements the Unit 1 builder-facing review lesson with the mechanism.",
+     "teaches": "The deeper review craft: measuring a good job, catching drift, and the record you can't fake. Ground in the real work toolkit eval surface; soften the cost/speed figure. Complements the Unit 1 builder-facing review lesson with the mechanism.",
      "docs": [
       "evals",
       "the-ledger"

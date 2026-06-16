@@ -24,7 +24,7 @@ engine/lib/* map to runtime/host/*. See TOOLKITS-V3.org.
   * Workhorse                                                  :agent:
     :PROPERTIES:
     :ID:        workhorse
-    :TOOLKITS:  wb git wavelet brandnana
+    :TOOLKITS:  work git wavelet brandnana
     :END:
   #+END_SRC
 
@@ -49,15 +49,15 @@ engine/lib/* map to runtime/host/*. See TOOLKITS-V3.org.
     links OQL crates as a library for query/memory.
 
     ** Recipes
-       - Query memory:           =wb memory recall "<text>"=
-       - Spawn a sub-agent:      =wb agent spawn workhorse "<task>"=
-       - Show session:           =wb session show <id>=
+       - Query memory:           =work memory recall "<text>"=
+       - Spawn a sub-agent:      =work agent spawn workhorse "<task>"=
+       - Show session:           =work session show <id>=
   #+END_SRC
 
 * Why a node, not a registry
 
   Pre-Context Tree, Workbooks had no formal toolkit schema.  The
-  agent prompt declared =:TOOLKITS: wb git= (with bash sometimes
+  agent prompt declared =:TOOLKITS: work git= (with bash sometimes
   also listed by mistake) but there was no authoritative source
   for what each name *meant*.  Three rules
   break apart cleanly under Context Tree:

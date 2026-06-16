@@ -33,7 +33,7 @@ references are live.
 - =runtime/host/bundle_islands.ex= — typed config islands
   (=<work-agent>/<work-toolkit>/<work-org>/<work-vfs>/<work-component>=) as a
   bijection onto the org/tree the runtime already eats. Wired into
-  =wb bundle= / =wb unbundle= / =wb islands=.
+  =work bundle= / =work unbundle= / =work islands=.
 - Tests: =runtime/test/bundle_islands_test.exs= (P0–P3),
   =bundle_islands_adversarial_test.exs= (28 hostile-input),
   =bundle_islands_cli_test.exs= (e2e). All green.

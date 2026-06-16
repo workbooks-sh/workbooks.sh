@@ -1,9 +1,9 @@
 defmodule Workbooks.CLI do
   @moduledoc """
-  The `wbx` CLI — folded into the runtime mix project. One binary owns query,
+  The `work` CLI — folded into the runtime mix project. One binary owns query,
   tangle, bundle, serve, and the variable store, calling straight into the same
   modules the Runtime uses. `call/2` returns output as a string (so an agent can
-  run `wbx` in-process as a tool); `main/1` prints it.
+  run `work` in-process as a tool); `main/1` prints it.
   """
   alias Workbooks.{OQL, Bundle, Vars, Toolkits}
 
@@ -24,21 +24,21 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
-      # `wb content check [dir]` validates a tenant CMS content tree (manifests
+      # `work content check [dir]` validates a tenant CMS content tree (manifests
       # vs files, dup orders, faq-last, partial shape) — pure file reads, no app
       # boot. The agent's pre-publish gate so a broken page can't ship silently.
       ["content", "check"] -> content_check(".")
       ["content", "check", dir] -> content_check(dir)
 
-      # `wbx rt …` drives a RUNNING runtime over HTTP (RCP client) — no app boot
+      # `work rt …` drives a RUNNING runtime over HTTP (RCP client) — no app boot
       # (no NIF), just :httpc against the discovered/configured target.
       ["rt" | rest] ->
         {out, failed?} = Workbooks.CLI.Runtime.run(rest)
         IO.puts(out)
         if failed?, do: System.halt(1)
 
-      # `wbx ctk …` — CTK human-in-the-loop helpers over the runtime HTTP (no app
-      # boot). `wbx ctk await <run>` blocks until a review lands, then prints it.
+      # `work ctk …` — CTK human-in-the-loop helpers over the runtime HTTP (no app
+      # boot). `work ctk await <run>` blocks until a review lands, then prints it.
       ["ctk" | rest] ->
         {out, failed?} = Workbooks.CLI.Runtime.ctk(rest)
         IO.puts(out)
@@ -51,36 +51,36 @@ defmodule Workbooks.CLI do
       ["toolkit", "live", id] -> IO.puts(Workbooks.Toolkits.live_text(id, Workbooks.Toolkits.default_root()))
       ["toolkit", "rollback", id, version] -> IO.puts(Workbooks.Toolkits.rollback_text(id, version))
 
-      # `wbx toolkit …` — toolkit surface over RCP (server-side; the escript can't
+      # `work toolkit …` — toolkit surface over RCP (server-side; the escript can't
       # load the NIFs). HOST-side HTTP client → /rcp/toolkit/*. In-process callers
-      # (an agent running wb as a tool) still use `call/2` directly.
+      # (an agent running work as a tool) still use `call/2` directly.
       ["toolkit" | rest] ->
         {out, failed?} = Workbooks.CLI.Runtime.toolkit(rest)
         IO.puts(out)
         if failed?, do: System.halt(1)
 
-      # `wb channels …` — messaging channels over RCP (list / send / approve
+      # `work channels …` — messaging channels over RCP (list / send / approve
       # against the connected runtime's control plane; creds stay runtime-side).
       ["channels" | rest] ->
         {out, failed?} = Workbooks.CLI.Runtime.channels(rest)
         IO.puts(out)
         if failed?, do: System.halt(1)
 
-      # `wbx dev …` — the development service: inspect the demo env + drive the
+      # `work dev …` — the development service: inspect the demo env + drive the
       # local verify loop (info / up / test). HOST-side, no app boot.
       ["dev" | rest] ->
         {out, failed?} = Workbooks.CLI.Dev.run(rest)
         IO.puts(out)
         if failed?, do: System.halt(1)
 
-      # `wbx desktop …` installs/launches the GUI app — HOST-side (shells out to
+      # `work desktop …` installs/launches the GUI app — HOST-side (shells out to
       # the curl|sh installer), no app boot.
       ["desktop" | rest] ->
         {out, failed?} = Workbooks.CLI.Desktop.run(rest)
         IO.puts(out)
         if failed?, do: System.halt(1)
 
-      # `wb demo seed …` — materialize the reproducible demo environment from the
+      # `work demo seed …` — materialize the reproducible demo environment from the
       # git-backed Org fixture tree (recording-system findings §3). --dry-run
       # describes the plan with NO disk writes + NO app boot; a real run needs the
       # app (the build lane uses the wasmex NIF), so it boots first.
@@ -95,7 +95,7 @@ defmodule Workbooks.CLI do
     end
   end
 
-  @doc "Run a wb subcommand, returning its output. `tenant` scopes the variable store."
+  @doc "Run a work subcommand, returning its output. `tenant` scopes the variable store."
   def call(argv, tenant \\ "dev")
 
   def call(["content", "check"], tenant) do
@@ -112,7 +112,7 @@ defmodule Workbooks.CLI do
   def call(["lint", f], _t), do: with_org_file(f, &(&1 |> OQL.lint() |> json()))
 
   # Read an Org file for the parse/plan/lint verbs, confined to .org + no traversal
-  # (wb-g1yo): the agent's `wb query <path>` otherwise read ANY host file (the CLI
+  # (wb-g1yo): the agent's `work query <path>` otherwise read ANY host file (the CLI
   # sibling of the HTTP read_workspace_org confinement). The only legit input is an
   # Org workbook, so this blocks /etc/* + secrets while keeping the real use intact.
   defp with_org_file(path, fun) do
@@ -154,9 +154,9 @@ defmodule Workbooks.CLI do
 
   def call(["var", "ref" | rest], t), do: Vars.ref(t, Enum.join(rest, " "))
 
-  # `wb app …` — IN-PROCESS app control (wb-d2nx.1): an agent (Waldo) drives the
+  # `work app …` — IN-PROCESS app control (wb-d2nx.1): an agent (Waldo) drives the
   # connected desktop shell by pushing `desktop:control` events the shell already
-  # acts on. Distinct from the host-side `wb desktop` installer verb in main/1.
+  # acts on. Distinct from the host-side `work desktop` installer verb in main/1.
   # No shell connected → reports "(no desktop shell connected)" rather than failing.
   def call(["app", "status"], _t) do
     case Workbooks.DesktopControl.listeners() do
@@ -187,7 +187,7 @@ defmodule Workbooks.CLI do
   end
 
   def call(["app" | _], _t),
-    do: "usage: wb app <status | open-tab PATH | close-tab PATH | focus-tab PATH | theme ID | bookmark PATH [title] | workspace NAME [icon]>"
+    do: "usage: work app <status | open-tab PATH | close-tab PATH | focus-tab PATH | theme ID | bookmark PATH [title] | workspace NAME [icon]>"
 
   defp app_command(action, args, ok_msg, tenant \\ nil) do
     case Workbooks.DesktopControl.command(action, args, tenant) do
@@ -196,7 +196,7 @@ defmodule Workbooks.CLI do
     end
   end
 
-  # `wb env request NAME [reason…]` — ask the connected desktop to prompt the
+  # `work env request NAME [reason…]` — ask the connected desktop to prompt the
   # user for a key/value (wb-kbq5.2). Blocks until they answer. On success the
   # value is stored in the runtime secret store (by reference) and the agent gets
   # a confirmation — never the raw value (secrets-by-reference).
@@ -214,12 +214,12 @@ defmodule Workbooks.CLI do
     end
   end
 
-  def call(["env" | _], _t), do: "usage: wb env request NAME [reason]"
+  def call(["env" | _], _t), do: "usage: work env request NAME [reason]"
 
-  # `wb models list [query]` — discover OpenRouter models (wb-d2nx.5). `wb model
+  # `work models list [query]` — discover OpenRouter models (wb-d2nx.5). `work model
   # set ID` switches the model the agent runs on for the rest of the session.
   def call(["models", "list" | rest], _t), do: Workbooks.Models.list(Enum.join(rest, " "))
-  def call(["models" | _], _t), do: "usage: wb models list [query]"
+  def call(["models" | _], _t), do: "usage: work models list [query]"
 
   def call(["model", "set", id], t) do
     # PER-TENANT (wb-g1yo): store in the tenant's Vars, not a process-global env
@@ -236,9 +236,9 @@ defmodule Workbooks.CLI do
       _ -> System.get_env("WB_LLM_MODEL") || "#{Workbooks.Llm.default_model()} (default)"
     end
   end
-  def call(["model" | _], _t), do: "usage: wb model <get | set ID>"
+  def call(["model" | _], _t), do: "usage: work model <get | set ID>"
 
-  # `wb workgate request CAP [reason…]` — ask the user to Allow/Deny an OS
+  # `work workgate request CAP [reason…]` — ask the user to Allow/Deny an OS
   # capability (wb-kbq5.3). Blocks. Returns the decision.
   def call(["workgate", "request", cap | rest], t) do
     reason = if rest == [], do: nil, else: Enum.join(rest, " ")
@@ -251,15 +251,15 @@ defmodule Workbooks.CLI do
     end
   end
 
-  def call(["workgate" | _], _t), do: "usage: wb workgate request CAPABILITY [reason]"
+  def call(["workgate" | _], _t), do: "usage: work workgate request CAPABILITY [reason]"
 
   # "Memory" is removed by design: the org/code files ARE the context. Recall =
-  # `wb search` (semantic) / `wbx library query` (literal); "remember" = write an
+  # `work search` (semantic) / `work library query` (literal); "remember" = write an
   # org file. No separate store to drift. See docs/VECTOR-QUERY.org.
 
   # Single tree → one self-contained .html: pack the dir, embed the zip into the
   # page html. The page is the tree's own index/workbook, or rendered from its
-  # source.org. (`wbx pack/unpack` is the workspace-level, multi-member sibling.)
+  # source.org. (`work pack/unpack` is the workspace-level, multi-member sibling.)
   def call(["bundle", dir, out | flags], _t) do
     # The workbook compiler (docs/WORKBOOK-BUNDLE.md "lifecycle"): tangle the org
     # source-of-truth → native source, COMPILE native → .wasm via the in-sandbox
@@ -344,7 +344,7 @@ defmodule Workbooks.CLI do
   # feedback loop over the always-on _steps.jsonl any run writes.
   def call(["telemetry"], t) do
     # Tenant-scoped (wb-g1yo): the CLI sibling of GET /api/telemetry — an agent's
-    # `wb telemetry` must only see its own tenant's runs, not every run on a nexus.
+    # `work telemetry` must only see its own tenant's runs, not every run on a nexus.
     runs = Workbooks.Workflow.Telemetry.index(t)
     if runs == [] do
       "(no runs)"
@@ -508,10 +508,10 @@ defmodule Workbooks.CLI do
   def call(["toolkit", "search" | q], _t), do: Toolkits.search_text(Enum.join(q, " "))
   def call(["toolkit", "verify", id], _t), do: Toolkits.verify_text(id)
   def call(["toolkit", "eval", id], _t), do: Toolkits.eval_text(id)
-  # `wb toolkit eval <id> <case>` — run ONE eval whose filename contains <case>.
+  # `work toolkit eval <id> <case>` — run ONE eval whose filename contains <case>.
   def call(["toolkit", "eval", id, filter], _t),
     do: Toolkits.eval_text(id, Toolkits.default_root(), filter)
-  # `wb eval components [case]` — the component-emit eval pack (text + voice parity).
+  # `work eval components [case]` — the component-emit eval pack (text + voice parity).
   def call(["eval", "components"], _t), do: Workbooks.Evals.Components.run()
   def call(["eval", "components", filter], _t), do: Workbooks.Evals.Components.run(filter)
   def call(["toolkit", "sign", id], t), do: Toolkits.sign_text(id, t)
@@ -574,7 +574,7 @@ defmodule Workbooks.CLI do
   # main/1). Every verb is non-interactive, idempotent, and supports `--json`.
   def call(["deploy" | rest], _t), do: elem(deploy_run(rest), 0)
 
-  def call(["version"], _t), do: "wb-rt #{@version} (engine plumbing — the user CLI is wbx)"
+  def call(["version"], _t), do: "work #{@version} (engine plumbing — the user CLI is work)"
   def call(_, _t), do: usage()
 
   # Dispatch a deploy verb → {rendered_output, failed?}. `--json` anywhere in args
@@ -605,7 +605,7 @@ defmodule Workbooks.CLI do
         # The one image artifact.
         ["build" | _] -> deploy_norm(Workbooks.Deploy.Image.build(into_krunvm: true))
         ["publish" | _] -> deploy_norm(Workbooks.Deploy.Image.publish())
-        other -> {:error, "unknown verb: wbx deploy #{Enum.join(other, " ")}", %{}}
+        other -> {:error, "unknown verb: work deploy #{Enum.join(other, " ")}", %{}}
       end
 
     {Workbooks.Deploy.render(result, json?), Workbooks.Deploy.failed?(result)}
@@ -643,7 +643,7 @@ defmodule Workbooks.CLI do
             {:error, msg, _data} -> {:error, msg, %{}}
           end
         other ->
-          {:error, "unknown verb: wbx publish #{Enum.join(other, " ")}", %{}}
+          {:error, "unknown verb: work publish #{Enum.join(other, " ")}", %{}}
       end
 
     {pub.render_result(result, json?), pub.failed?(result)}
@@ -651,14 +651,14 @@ defmodule Workbooks.CLI do
 
   defp publish_usage do
     """
-    wbx publish — render a Workbook (.org) → self-contained HTML → live URL.
+    work publish — render a Workbook (.org) → self-contained HTML → live URL.
     Non-interactive; add --json for machine output (exit 0 ok / non-zero fail).
 
     THE FLOW:
-      wbx publish init                scaffold ./publish.org
-      wbx publish validate            coherence-check it (no render, no deploy)
-      wbx publish apply <file.org>    render + ship → prints the live URL
-      wbx publish site [<dir>]        render multi-page site from site.org → deploy
+      work publish init                scaffold ./publish.org
+      work publish validate            coherence-check it (no render, no deploy)
+      work publish apply <file.org>    render + ship → prints the live URL
+      work publish site [<dir>]        render multi-page site from site.org → deploy
     (config defaults to ./publish.org; workbook defaults to ./workbook.org)
 
     A publish.org describes:
@@ -696,28 +696,28 @@ defmodule Workbooks.CLI do
 
   defp deploy_usage do
     """
-    wbx deploy — stand up the Workbooks runtime, local or cloud. Non-interactive,
+    work deploy — stand up the Workbooks runtime, local or cloud. Non-interactive,
     idempotent; add --json to any verb for machine output (exit 0 ok / non-zero fail).
 
     THE FLOW (declarative — reproducible):
-      wbx deploy init [local|cloud]   scaffold ./deployment.org
-      wbx deploy ci [github|gitlab|generic]   scaffold CI that reconciles it on push
-      wbx deploy validate             coherence-check it (no deploy)
-      wbx deploy apply                deploy it — local microVM OR the cloud provider
-      wbx deploy status|verify|logs   inspect / prove-live / tail   (reads ./deployment.org)
-      wbx deploy down                 tear it down
+      work deploy init [local|cloud]   scaffold ./deployment.org
+      work deploy ci [github|gitlab|generic]   scaffold CI that reconciles it on push
+      work deploy validate             coherence-check it (no deploy)
+      work deploy apply                deploy it — local microVM OR the cloud provider
+      work deploy status|verify|logs   inspect / prove-live / tail   (reads ./deployment.org)
+      work deploy down                 tear it down
     (commands default to ./deployment.org; pass a path to use another)
 
     QUICK (no config, like `docker run`):
-      wbx deploy local                run the runtime locally right now
-      wbx deploy doctor               check + self-heal local prerequisites
+      work deploy local                run the runtime locally right now
+      work deploy doctor               check + self-heal local prerequisites
 
     A deployment.org describes:
       ENGINE_PLACE local|cloud · TENANCY_MODE single|multi · STORAGE local-fs|s3
       DATABASE sqlite|postgres · AUTH trusted|clerk|… · PROFILE · (cloud: PROVIDER, APP)
     Secrets (S3 keys, DB DSN) come from your ENV, never the file.
 
-    IMAGE:  wbx deploy build | publish   (build / push the one runtime image to ghcr)
+    IMAGE:  work deploy build | publish   (build / push the one runtime image to ghcr)
     """
   end
 
@@ -751,47 +751,47 @@ defmodule Workbooks.CLI do
   defp usage do
     """
     wb — Workbook CLI (#{@version})
-      wb query|tangle|lint <file.org>      Org → headlines / build plan / diagnostics
-      wbx var set <key> <value> [--secret]  set a variable (secrets are ref-only)
-      wbx var get <key>                     read a variable (secrets redacted)
-      wbx var list                          list variables
-      wbx var ref <template>                inject {{var:KEY}} / {{secret:KEY}}
-      wb bundle <dir> <out.html> [--no-build]  compile a dir tree → one self-contained .html
+      work query|tangle|lint <file.org>      Org → headlines / build plan / diagnostics
+      work var set <key> <value> [--secret]  set a variable (secrets are ref-only)
+      work var get <key>                     read a variable (secrets redacted)
+      work var list                          list variables
+      work var ref <template>                inject {{var:KEY}} / {{secret:KEY}}
+      work bundle <dir> <out.html> [--no-build]  compile a dir tree → one self-contained .html
                                            (tangle org→native, compile native→wasm, then pack+embed;
                                             --no-build packs source-only, still tangling the org)
-      wb unbundle <in.html> <dir>          extract an embedded bundle → dir tree
-      wb telemetry [<slug>]                runs index, or one run's summary + errors
-      wb ledger <slug>                     verify a run's signed ledger (tamper/attribution)
-      wbx sign <file.html> [--out <f>]      embed a did:key provenance manifest
-      wbx verify <file.html>                check an artifact's signature + integrity
-      wbx library                           list the tenant's workspaces + members
-      wbx library query <sql>               cross-workbook query across members' VFS
-      wb checkout <member> <workdir>       borrow a member into a working dir
-      wb checkin <member> <workdir>        pack + sign a member back into the library
-      wb pack <workspace> <out> [--build]  compose members → one workbook (--build = compile to WASM)
-      wbx build <workspace>                 compile components → WASM; report built/unbuilt
-      wb mirror <remote-url>               mirror the tenant repo to any git host (push)
-      wb mirror [--forge github|gitlab|gitea] [--repo n] [--public]   auto-provision + push
-      wb radicle                           federate the tenant repo over Radicle (P2P)
-      wbx unpack <bundle> <dest>            disassemble a parent workbook → flat tree
-      wbx toolkit [list]                    list discoverable toolkits (id · status · tagline)
-      wbx toolkit show <id> [<skill>]       manifest + skill index, or one skill (with CAPTION TOC)
-      wbx toolkit search <query>            substring search across all skills
-      wbx toolkit verify <id>               structural checks + #+EXEC satisfiable + run :role pre blocks
-      wbx toolkit versions <id>             list available versions/tags (releases.json ∪ manifest VERSION)
-      wbx toolkit live [<id>]               show the currently-live version (all toolkits, or one)
-      wbx toolkit rollback <id> <version>   pin the live version back to an older release
-      wbx toolkit build <id>                declarative auto-wrap: build #+BUILD_SRC → register the command
-      wbx toolkit build-inline <name> <lang> <file>  self-author: build a source file → register a command (rust/c/zig/js/ts/go)
-      wbx toolkit promote <name> <lang> <file>       promote a session command → durable workspace toolkit (source-owned, packable)
-      wb isolation                                  show the isolation-tier ladder (the (width,tier) depth knob)
-      wbx toolkit run <id> <task> -- <args> run a skill's :role task block with positional args
-      wbx publish init                          scaffold ./publish.org
-      wbx publish validate                      coherence-check it
-      wbx publish apply <file.org>              render + deploy → live URL
-      wbx desktop install [--version=X]         install the desktop app (curl | sh)
-      wbx desktop open                          launch the installed desktop app
-      wbx version
+      work unbundle <in.html> <dir>          extract an embedded bundle → dir tree
+      work telemetry [<slug>]                runs index, or one run's summary + errors
+      work ledger <slug>                     verify a run's signed ledger (tamper/attribution)
+      work sign <file.html> [--out <f>]      embed a did:key provenance manifest
+      work verify <file.html>                check an artifact's signature + integrity
+      work library                           list the tenant's workspaces + members
+      work library query <sql>               cross-workbook query across members' VFS
+      work checkout <member> <workdir>       borrow a member into a working dir
+      work checkin <member> <workdir>        pack + sign a member back into the library
+      work pack <workspace> <out> [--build]  compose members → one workbook (--build = compile to WASM)
+      work build <workspace>                 compile components → WASM; report built/unbuilt
+      work mirror <remote-url>               mirror the tenant repo to any git host (push)
+      work mirror [--forge github|gitlab|gitea] [--repo n] [--public]   auto-provision + push
+      work radicle                           federate the tenant repo over Radicle (P2P)
+      work unpack <bundle> <dest>            disassemble a parent workbook → flat tree
+      work toolkit [list]                    list discoverable toolkits (id · status · tagline)
+      work toolkit show <id> [<skill>]       manifest + skill index, or one skill (with CAPTION TOC)
+      work toolkit search <query>            substring search across all skills
+      work toolkit verify <id>               structural checks + #+EXEC satisfiable + run :role pre blocks
+      work toolkit versions <id>             list available versions/tags (releases.json ∪ manifest VERSION)
+      work toolkit live [<id>]               show the currently-live version (all toolkits, or one)
+      work toolkit rollback <id> <version>   pin the live version back to an older release
+      work toolkit build <id>                declarative auto-wrap: build #+BUILD_SRC → register the command
+      work toolkit build-inline <name> <lang> <file>  self-author: build a source file → register a command (rust/c/zig/js/ts/go)
+      work toolkit promote <name> <lang> <file>       promote a session command → durable workspace toolkit (source-owned, packable)
+      work isolation                                  show the isolation-tier ladder (the (width,tier) depth knob)
+      work toolkit run <id> <task> -- <args> run a skill's :role task block with positional args
+      work publish init                          scaffold ./publish.org
+      work publish validate                      coherence-check it
+      work publish apply <file.org>              render + deploy → live URL
+      work desktop install [--version=X]         install the desktop app (curl | sh)
+      work desktop open                          launch the installed desktop app
+      work version
     """
   end
 

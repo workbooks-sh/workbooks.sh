@@ -113,7 +113,7 @@ defmodule Workbooks.Channels.Telegram do
         })
 
       {:pairing, code} ->
-        send_message(peer, "Workbooks pairing code: #{code}\nApprove with: wb channels approve telegram #{code}", opts)
+        send_message(peer, "Workbooks pairing code: #{code}\nApprove with: work channels approve telegram #{code}", opts)
         :ok
     end
   end

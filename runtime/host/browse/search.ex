@@ -91,7 +91,7 @@ defmodule Workbooks.Browse.Search do
   end
 
   # Per-tenant provider choice from the variable store (what Settings writes:
-  # `wb var set wb.search.provider exa`). Plain (non-secret) var.
+  # `work var set wb.search.provider exa`). Plain (non-secret) var.
   defp tenant_provider(nil), do: nil
 
   defp tenant_provider(tenant) do

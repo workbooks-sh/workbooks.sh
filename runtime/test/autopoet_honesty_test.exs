@@ -4,7 +4,7 @@ defmodule Workbooks.AutopoetHonestyTest do
   # The autopoet honesty gate (wb-wxye): the worker must NOT trust a self-reported
   # DONE — it over-claims (iter-9 returned "DONE … registration blocked by host
   # gap" on a stub toolkit that fails verify). The worker independently runs
-  # `wb toolkit verify` on what the run authored; DONE survives only if a fresh
+  # `work toolkit verify` on what the run authored; DONE survives only if a fresh
   # toolkit verifies clean. This proves (1) verify discriminates clean vs hollow,
   # and (2) the decision logic downgrades a hollow DONE to OPEN.
 

@@ -227,7 +227,7 @@ defmodule Workbooks.Bundle do
 
   # VCS internals and per-session private state never belong in a portable tree.
   # Consults the ONE public/private boundary (`Workbooks.Private`) so the raw-tree
-  # `wb bundle <dir>` egress strips secrets / agent-memory / session sidecars the
+  # `work bundle <dir>` egress strips secrets / agent-memory / session sidecars the
   # SAME way every other egress (Git, Library) does — a shared `.html` carries the
   # work, never the session that made it.
   defp strip_path?(abs) do

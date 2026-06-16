@@ -10,7 +10,7 @@
   :PROPERTIES:
   :NETWORK:     yes
   :DESTRUCTIVE: no
-  :REQUIRES:    wb curl jq
+  :REQUIRES:    work curl jq
   :COST:        free
   :END:
 
@@ -28,7 +28,7 @@
   #+begin_example
   agent renders change as a CTK story
      → serves CTK to the human with  ?connect=<rt>/api/ctk/commit?run=$WB_RUN
-     → `wb ctk await $WB_RUN`         (blocks until the human clicks Commit)
+     → `work ctk await $WB_RUN`         (blocks until the human clicks Commit)
      → applies the approved snapshot + feedback → git commit
   #+end_example
 
@@ -39,9 +39,9 @@
 
 * Workflow
 
-  #+CAPTION: 0. preconditions — wb on PATH, your run id, the runtime target
+  #+CAPTION: 0. preconditions — work on PATH, your run id, the runtime target
   #+begin_src bash :role pre
-  command -v wb >/dev/null || { echo "wb not on PATH"; exit 1; }
+  command -v wb >/dev/null || { echo "work not on PATH"; exit 1; }
   : "${WB_RUN:?run id not injected}"            # the runtime sets this for your run
   : "${WB_RUNTIME_URL:?}" ; : "${WB_TOKEN:?}"   # or the local discovery file
   #+end_src
@@ -56,7 +56,7 @@
   #+CAPTION: 2. hand the human a CTK URL wired to THIS run, then block on it
   #+begin_src bash
   echo "Review: $WB_RUNTIME_URL/ctk/ctk.html?connect=$WB_RUNTIME_URL/api/ctk/commit?run=$WB_RUN"
-  review=$(wb ctk await "$WB_RUN")              # blocks until the human clicks Commit
+  review=$(work ctk await "$WB_RUN")              # blocks until the human clicks Commit
   #+end_src
 
   #+CAPTION: 3. apply the approved snapshot + feedback, then commit
@@ -75,11 +75,11 @@
 * Common pitfalls
 
   1. *Missing =?run=$WB_RUN= on the connect URL* — without it the commit can't be
-     routed to your run, and =wb ctk await= blocks forever. Always wire the run id.
+     routed to your run, and =work ctk await= blocks forever. Always wire the run id.
   2. *Treating the snapshot as the source* — the snapshot is the approved *state*
      (prop values), not your component's code. You still edit the real file; the
      snapshot tells you WHICH values the human approved.
-  3. *No timeout handling* — =wb ctk await <run> [timeout_s]= defaults to 600s
+  3. *No timeout handling* — =work ctk await <run> [timeout_s]= defaults to 600s
      then returns non-zero. Decide whether to re-prompt or abort; don't assume
      it blocks indefinitely.
   4. *Not knowing your run id* — =$WB_RUN= must be injected by the runtime when it
@@ -88,7 +88,7 @@
 * Verification checklist
 
   - [ ] The connect URL carries =?run=$WB_RUN=.
-  - [ ] =wb ctk await "$WB_RUN"= returns a JSON =ctk.commit= event after the human commits.
+  - [ ] =work ctk await "$WB_RUN"= returns a JSON =ctk.commit= event after the human commits.
   - [ ] =jq '.snapshot'= shows the props/states you expected.
   - [ ] A commit lands carrying the human's feedback.
 

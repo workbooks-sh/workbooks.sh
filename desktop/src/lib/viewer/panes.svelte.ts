@@ -13,7 +13,7 @@ import { tabs } from "$lib/tabs/store.svelte";
 export type SplitSide = "left" | "right";
 /** How the panes tile. `row` = side-by-side resizable columns (the 2-up
  *  default). `grid` = a real 2-column grid that quadrants 4-up (2×2) and
- *  lays 3-up out sensibly — never N skinny columns (wb demo TASK 5). */
+ *  lays 3-up out sensibly — never N skinny columns (work demo TASK 5). */
 export type PaneLayout = "row" | "grid";
 
 export interface Pane {

@@ -6,8 +6,8 @@
 Installing a toolkit is installing a workbook. The hash is the gate.
 
 #+begin_src bash
-wb install my-tool.wbundle                 # verify the hash, register the commands
-wb install my-tool.wbundle --sha <hash>    # pin: reject anything that doesn't match
+work install my-tool.wbundle                 # verify the hash, register the commands
+work install my-tool.wbundle --sha <hash>    # pin: reject anything that doesn't match
 #+end_src
 
 A tampered bundle is rejected *before* anything is registered. For a signed

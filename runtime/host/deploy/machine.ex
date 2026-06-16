@@ -20,7 +20,7 @@ defmodule Workbooks.Deploy.Machine do
   @label "sh.workbooks.runtime"
   # Start the app with NO TTY console (release `start` blocks on a TTY under
   # krunvm), then park the node alive so the VM stays up; halt non-zero on failure
-  # so it surfaces in `wb deploy logs` instead of hanging.
+  # so it surfaces in `work deploy logs` instead of hanging.
   @boot_expr ~S|case Application.ensure_all_started(:workbooks) do {:ok, _} -> Process.sleep(:infinity); err -> IO.inspect(err); System.halt(1) end|
 
   @doc "Backend availability + the one-time prerequisite (the case-sensitive volume)."
@@ -154,7 +154,7 @@ defmodule Workbooks.Deploy.Machine do
   Spawn the microVM DIRECTLY in the CALLER's session (detached), instead of via a
   launchd LaunchAgent. macOS virtualization (libkrun) needs the user's GUI/Aqua
   session — a background LaunchAgent fails with EX_CONFIG (exit 78). The desktop
-  app lives in the Aqua session and shells out to `wb deploy local`, so the krunvm
+  app lives in the Aqua session and shells out to `work deploy local`, so the krunvm
   we background here inherits that session and boots cleanly. It survives the app
   quitting (reparented, not a child of the app); a full logout ends it — use
   `install_agent/1` for start-on-login. Writes the pid to a pidfile for `down`.

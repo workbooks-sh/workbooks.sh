@@ -2,8 +2,8 @@ defmodule Workbooks.Deploy.Config do
   @moduledoc """
   A `deployment.org` — the ONE declarative description of a deployment. Two places
   (`ENGINE_PLACE: local|cloud`), two tenancy modes (`TENANCY_MODE: single|multi`),
-  and BYOD backends (`STORAGE`, `DATABASE`) + the agent `PROFILE`. `wb deploy
-  validate` checks coherence; `wb deploy apply` converges to it. File-based by
+  and BYOD backends (`STORAGE`, `DATABASE`) + the agent `PROFILE`. `work deploy
+  validate` checks coherence; `work deploy apply` converges to it. File-based by
   design (no prompts); SECRETS (S3 keys, the Postgres DSN) come from the deploy
   ENV, never the file.
 

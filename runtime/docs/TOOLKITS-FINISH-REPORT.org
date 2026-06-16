@@ -32,7 +32,7 @@
 ** P4 — Declarative EXEC / build descriptor — DONE
    =Workbooks.Toolkits.parse_descriptor/1= + =descriptor/1= parse
    =#+EXEC / #+BUILD_SRC / #+BUILD_LANG / #+CAPS= from a toolkit manifest;
-   =wb toolkit build= drives the build per declared lang and refuses a CLI_BIN
+   =work toolkit build= drives the build per declared lang and refuses a CLI_BIN
    that collides with a reserved built-in.
    Proof (all in test/toolkit_build_test.exs, 0 failures):
    - "parse_descriptor reads #+EXEC / #+BUILD_SRC / #+BUILD_LANG / #+CAPS"
@@ -40,8 +40,8 @@
      real org-parse footgun — a blank =#+EXEC:= must NOT swallow the next line)
    - "parse_descriptor recognizes git+ and path: build sources"
    - "verify reports the #+EXEC: command is satisfiable via the build descriptor"
-   - "wb toolkit build refuses a reserved CLI_BIN (no shadowing of jq)"
-   - "wb toolkit build huniq compiles the crate, registers it, and it runs"
+   - "work toolkit build refuses a reserved CLI_BIN (no shadowing of jq)"
+   - "work toolkit build huniq compiles the crate, registers it, and it runs"
      (@tag :build — real =cargo install huniq --target wasm32-wasip1=, end-to-end
      through CommandRegistry; verified under =mix test --only build=).
 
@@ -131,7 +131,7 @@
 
   Assessment: neither failure regresses a finish-branch feature; both are
   pre-existing defects in unrelated demo/helper code, deliberately surfaced.
-  Recommend a one-line fix for each before shipping the =wb toolkit show= TOC and
+  Recommend a one-line fix for each before shipping the =work toolkit show= TOC and
   before promoting =upper= beyond a demo. Not silently patched here to respect
   the "do not hide a failing test exposing a real bug" rule.
 

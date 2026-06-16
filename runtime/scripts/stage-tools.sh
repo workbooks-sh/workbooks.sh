@@ -36,7 +36,7 @@ mkdir -p "$DST"
 # is, in this lean slice) — so this registers, it never rebuilds. Without build.sh: {:unknown_command}.
 for lane in rust clang zig go js c; do take "$lane/build.sh"; done
 
-# --- rust: the 3 mrustc wasm + 1.74 libstd link objects + the wb runtime crate + std shims --------
+# --- rust: the 3 mrustc wasm + 1.74 libstd link objects + the work runtime crate + std shims --------
 take rust/mrustc-root/mrustc_std.wasm
 take rust/mrustc-root/mrustc_pm.wasm
 take rust/mrustc-root/mrustc.wasm
@@ -51,7 +51,7 @@ take clang/clang-root/llvm.core.wasm
 take clang/clang-root/sysroot
 # C++ EXCEPTIONS archives (new-EH libc++abi + libunwind) — gitignored build artifacts produced by
 # clang/build.sh, staged INTO the sysroot. `take sysroot` above already copies them, but name them
-# explicitly so a partial/manual stage still ships them (this is how artifacts ship — wb release canon).
+# explicitly so a partial/manual stage still ships them (this is how artifacts ship — work release canon).
 take clang/clang-root/sysroot/lib/wasm32-wasip1/libc++abi-eh.a
 take clang/clang-root/sysroot/lib/wasm32-wasip1/libunwind-eh.a
 take clang/manifest.org

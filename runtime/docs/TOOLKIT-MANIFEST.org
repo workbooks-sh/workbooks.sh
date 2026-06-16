@@ -64,7 +64,7 @@
   |-------------+----------------------------------+-------------------+------+--------+----------|
   | =command=   | argv + stdin → stdout + exit     | agent, workflow   | no   | yes    | ✅ built  |
   | =posix=     | native PATH binary in container  | agent, workflow   | no   | no     | ✅ built  |
-  | =task=      | :role bash recipe (wb toolkit run)| agent            | no   | no     | ✅ built  |
+  | =task=      | :role bash recipe (work toolkit run)| agent            | no   | no     | ✅ built  |
   | =federation=| OQL data-source + sync daemon    | host, OQL         | no   | mixed  | ✅ functional |
   | =component= | WIT-typed, in-process call       | component, workflow| yes | yes    | ◐ substrate exists |
   | =kernel=    | bytes→bytes, instantiate-once-loop| the fabric       | yes  | yes    | ⏳ wb-rhs.5 |
@@ -82,7 +82,7 @@
    safe. Not portable to desktop/browser tiers; declare honestly.
 
 ** task — recipe-only, no single CLI
-   Ships =:role task= bash blocks run via `wb toolkit run <tk> <task> -- …`.
+   Ships =:role task= bash blocks run via `work toolkit run <tk> <task> -- …`.
    Default-deny execution (WB_TOOLKIT_EXEC=1, sandboxed, ulimit + wall-clock).
    For multi-verb NEEDs the toolkit owns but does not compile.
 
@@ -162,7 +162,7 @@
   #+begin_src text
   AUTHOR    src/ (Dock SDK + #+BUILD_LANG) + skills/*.org + manifest.org
      │
-  BUILD     wb toolkit build <name>
+  BUILD     work toolkit build <name>
      │      → PackageManager picks #+BUILD_LANG recipe
      │      → compiles ENTIRELY in the wasm sandbox (compiler-in-wasm)
      │      → content-addresses (sha256 = filename)

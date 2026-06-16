@@ -53,9 +53,9 @@ did + atproto libs; reimplement nothing we can call).
 *A workbook RUNS WebAssembly, not source.* So pack has a compile stage, and the
 same workbook projects three ways depending on where it's going:
 
-- *source* (=wb pack=) — the build INPUTS (=.rs=, =Cargo.toml=, readable assets).
+- *source* (=work pack=) — the build INPUTS (=.rs=, =Cargo.toml=, readable assets).
   What syncs to GitHub + what a human diffs. No build outputs.
-- *runnable* (=wb pack --build=) — compile each component to =.wasm=, ship the
+- *runnable* (=work pack --build=) — compile each component to =.wasm=, ship the
   OUTPUTS, DROP the source inputs. "Build files don't enter the runnable artifact
   unless they're WebAssembly." Non-source assets (docs, html) stay.
 - *archive* (=purpose: :archive=) — everything (source + outputs + session).
@@ -254,13 +254,13 @@ broker) — with the signed agent ledger proving every step.
   - Native exec path (System.cmd, not WASM) → the Elixir =:opentelemetry= SDK,
     fed by the =exec_tools= instrumentation (exit code/error/duration). Emits OTel
     directly since wasi-otel can't cover non-WASM.
-  Everything → OTel → a *CLI feedback loop, NOT a dashboard*: a =wb telemetry=
+  Everything → OTel → a *CLI feedback loop, NOT a dashboard*: a =work telemetry=
   command reads the spans (local collector / sqlite exporter) → timeline of tool
   calls / exit codes / errors / cost per run + aggregates. Self-authored surface
   = the wasi-otel host bridge + the exec→OTel emit + the CLI. SPIKE FIRST:
   verify wasi-otel ↔ Wasmex/Wasmtime wiring before committing.
   0a verify live =_telemetry.db= [DONE] ; 0b chokepoint instrumentation
-  (exec_one + Llm.complete → step/tool/error/cost) ; 0c the =wb telemetry= CLI +
+  (exec_one + Llm.complete → step/tool/error/cost) ; 0c the =work telemetry= CLI +
   OTel spans ; 0d per-session db + cross-session index ; 0e wire into brandnana
   agent runs too.
 - *Phase 1 — Auth profile* : deploy-kit =auth= knob (workos/clerk/native/bluesky),

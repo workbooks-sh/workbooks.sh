@@ -1,8 +1,8 @@
 defmodule Workbooks.Deploy.Image do
   @moduledoc """
   The runtime IMAGE recipe — building + publishing the ONE OCI image, owned by the
-  deploy-kit (not a bespoke CI pipeline). `wb deploy build` makes a local
-  single-arch image; `wb deploy publish` pushes multi-arch to the registry. CI and
+  deploy-kit (not a bespoke CI pipeline). `work deploy build` makes a local
+  single-arch image; `work deploy publish` pushes multi-arch to the registry. CI and
   the desktop app call these same verbs — one source of deploy truth, dogfooded.
 
   Shells to `docker buildx` (as the local backend shells to krunvm). The Dockerfile,
@@ -25,7 +25,7 @@ defmodule Workbooks.Deploy.Image do
 
   @doc """
   Build the runtime image for ONE platform and load it into the local docker (and,
-  if `into_krunvm: true`, copy it into krunvm's buildah store so `wb deploy local`
+  if `into_krunvm: true`, copy it into krunvm's buildah store so `work deploy local`
   can run it offline). Default platform = the host arch.
   """
   def build(opts \\ []) do

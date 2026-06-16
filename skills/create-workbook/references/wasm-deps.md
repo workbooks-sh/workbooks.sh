@@ -8,8 +8,8 @@ becomes a capability-gated WASM command. Never install a native toolchain
 
 | Dep kind | Lane | Commands | Notes |
 |---|---|---|---|
-| Interpreted (qjs, python, ruby, lua, yaegi) | already in-sandbox | `wbx toolkit build palette [<runtime>]`, then invoke | no compile step |
-| Compiled (C, Zig, Rust) | compiler-in-WASM | `wb-rt compiler build <lang>` → `wb-rt compiler run` | recipes in `runtime/compilers/<lang>/` |
+| Interpreted (qjs, python, ruby, lua, yaegi) | already in-sandbox | `work toolkit build palette [<runtime>]`, then invoke | no compile step |
+| Compiled (C, Zig, Rust) | compiler-in-WASM | `work compiler build <lang>` → `work compiler run` | recipes in `runtime/compilers/<lang>/` |
 | npm package | PackageManager | resolve → fetch → bundle → WASM | Node shims provided |
 | Rust crate | PackageManager | resolve → build via the Rust lane | crates.io enablement is active frontier |
 

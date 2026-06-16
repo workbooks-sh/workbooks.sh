@@ -1,6 +1,6 @@
 defmodule Workbooks.CLIDispatchTest do
   @moduledoc """
-  The `wb` CLI is the agent's primary tool surface (Agent.exec_one routes the
+  The `work` CLI is the agent's primary tool surface (Agent.exec_one routes the
   'wb' tool → CLI.call/2). These pin the GRACEFUL-FALLBACK contract: an unknown
   or incomplete verb returns a usage string, never a crash — so a probing agent
   always gets actionable text back instead of an error.
@@ -22,11 +22,11 @@ defmodule Workbooks.CLIDispatchTest do
   end
 
   test "incomplete subcommands return their own usage line" do
-    assert CLI.call(["app"], "dev") =~ "usage: wb app"
-    assert CLI.call(["env"], "dev") =~ "usage: wb env request"
-    assert CLI.call(["models"], "dev") =~ "usage: wb models list"
-    assert CLI.call(["model"], "dev") =~ "usage: wb model"
-    assert CLI.call(["workgate"], "dev") =~ "usage: wb workgate request"
+    assert CLI.call(["app"], "dev") =~ "usage: work app"
+    assert CLI.call(["env"], "dev") =~ "usage: work env request"
+    assert CLI.call(["models"], "dev") =~ "usage: work models list"
+    assert CLI.call(["model"], "dev") =~ "usage: work model"
+    assert CLI.call(["workgate"], "dev") =~ "usage: work workgate request"
   end
 
   test "model get returns a concrete id (regression: not the opaque '(default)')" do

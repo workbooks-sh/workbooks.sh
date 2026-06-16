@@ -35,7 +35,7 @@ multi-agent workflow board where several agents work the pipeline at once:
 - Runtime: one engine, multiple keeper agents (or one keeper orchestrating a
   crew via the workflow board) — decide during build against wb-2ku learnings.
 - Content: runtime CMS manifests (stories.json + HTML partials), validated by
-  `wb content check` conventions.
+  `work content check` conventions.
 - Presence: /_activity gains agent identity per step; the frontend's state
   machine (on-page / portal / thinking) runs per-agent.
 - Models: deliberately undecided (Mercury/diffusion is a candidate for the

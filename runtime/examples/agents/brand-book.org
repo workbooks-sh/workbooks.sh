@@ -6,7 +6,7 @@
   :TYPE:      ai
   :MODEL:     deepseek/deepseek-v3.2-exp
   :TAGLINE:   Researches a brand, forms a thesis, ships a brand-book workbook.
-  :TOOLKITS:  fetch shell wb vfs
+  :TOOLKITS:  fetch shell work vfs
   :END:
 
 ** System prompt

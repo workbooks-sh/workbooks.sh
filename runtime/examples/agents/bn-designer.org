@@ -8,12 +8,12 @@
   :MODEL:        minimax/minimax-m3
   :ICON:         lucide:LayoutTemplate
   :TAGLINE:      Stage-3 — turns the GATED analysis into the deck-v2 brand book, publishes it, and visually self-reviews every slide.
-  :TOOLKITS:     bash wb brandnana ffmpeg
+  :TOOLKITS:     bash work brandnana ffmpeg
   :ALLOW_SPAWN:  t
   :SPAWN_DEPTH:  1
   :MAX_CHILDREN: 8
   :MAX_TURNS:    90
-  :CAN_GRANT:    bash wb brandnana
+  :CAN_GRANT:    bash work brandnana
   :DONE_CHECK:     command:bash /opt/profile/skills/deck-gate.sh .
   :DONE_CHECK_MAX: 6
   :END:
@@ -82,8 +82,8 @@ brand-book (deck-v2), publish it, and SEE every slide before you finish.
    SLUG="$(cat session-id 2>/dev/null || echo "$DOMAIN" | sed 's/^www\.//; s/\..*$//')"
    mkdir -p spec   # then write spec/deck.json + spec/01-*.json + spec/02-*.json … one per slide
    brandnana book assemble spec --out deck.html   # reads spec/deck.json + spec/NN-*.json — NO python
-   wb embed-source deck.html .                      # inject the VALID source bundle (never hand-roll it)
-   wb unbundle deck.html /tmp/_chk >/dev/null && echo "bundle round-trips ✓"   # must pass
+   work embed-source deck.html .                      # inject the VALID source bundle (never hand-roll it)
+   work unbundle deck.html /tmp/_chk >/dev/null && echo "bundle round-trips ✓"   # must pass
    brandnana book publish "$SLUG" deck.html        # the ONLY publish verb (takes the composed .html)
    echo "https://api.brandnana.net/books/$SLUG.html" > published-url   # deck-gate reads this
    #+end_src

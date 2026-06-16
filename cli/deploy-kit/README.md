@@ -1,10 +1,10 @@
-# deploy-kit — assets behind `wb deploy` (for users/devs of the kit)
+# deploy-kit — assets behind `work deploy` (for users/devs of the kit)
 
-The deploy kit itself is compiled into the `wb` binary (`cli/src/deploy/`). This
+The deploy kit itself is compiled into the `work` binary (`cli/src/deploy/`). This
 folder holds its on-disk assets:
 
 - `deployments/` — example `deployment.org` declarations (`local.org`,
-  `cloud-saas.org`). `wb deploy init [local|cloud]` scaffolds equivalents.
+  `cloud-saas.org`). `work deploy init [local|cloud]` scaffolds equivalents.
 - `providers/` — cloud-provider recipes: `_recipe.sh` is the neutral spine; each
   `<place>/bootstrap.sh` (e.g. `fly/`) fills its hooks. Read by the Elixir
   deploy backend (`runtime/host/deploy/backend.ex`) and our `ci/deploy.sh`.

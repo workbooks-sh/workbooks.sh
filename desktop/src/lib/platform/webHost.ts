@@ -260,7 +260,7 @@ WITH the user; you never run off on your own.
   :MODEL:        google/gemini-3.5-flash
   :ICON:         lucide:Telescope
   :TAGLINE:      Fans out web searches, verifies claims, writes a cited report.
-  :TOOLKITS:     bash wb git
+  :TOOLKITS:     bash work git
   :HUMAN_IN_LOOP: true
   :END:
 ** System prompt

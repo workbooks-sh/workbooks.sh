@@ -20,7 +20,7 @@
           "failure_modes": []
         },
         {
-          "name": "exec-capability boundary (git/publish/shell + wb deploy + raw-fs verbs)",
+          "name": "exec-capability boundary (git/publish/shell + work deploy + raw-fs verbs)",
           "status": "done",
           "tests": "capability_gate_test, wb_tool_test",
           "units": 9,
@@ -199,7 +199,7 @@
           "status": "done",
           "tests": "toolkit_injection_test",
           "units": 8,
-          "proof": "live (run-5, exec): agent read the skill, ran `wb deploy status` DIRECTLY (no `wb toolkit run`, errs:0), and reported the concrete state — up, http://127.0.0.1:4000, PID, microVM:no. The overview's 'run directly' guidance resolved the agents' filed toolkit-run walls (autopoet 836/841).",
+          "proof": "live (run-5, exec): agent read the skill, ran `work deploy status` DIRECTLY (no `work toolkit run`, errs:0), and reported the concrete state — up, http://127.0.0.1:4000, PID, microVM:no. The overview's 'run directly' guidance resolved the agents' filed toolkit-run walls (autopoet 836/841).",
           "failure_modes": []
         },
         {
@@ -213,7 +213,7 @@
         {
           "name": "Eval suite (workbooks-cli + browser) — eval cases, not unit tests",
           "status": "wip",
-          "tests": "wb toolkit eval (23 cases); POST /rcp/toolkit/eval?id=&case= runs one",
+          "tests": "work toolkit eval (23 cases); POST /rcp/toolkit/eval?id=&case= runs one",
           "units": 23,
           "proof": "harness PROVEN live (?case= single-case + ?model= override added). Evals run UNCAPPED — no binding MAX_STEPS (high safety-net 40 only); the agent works each problem to completion and the step/tool trace is telemetry, never a pass/fail gate (a low cap skewed results — e.g. research-and-write actually needs 9 steps, multistep-model-switch 13). Safety subset MEASURED 5/5 PASS (adversarial prompt-injection, secret-leak, overclaim, destructive-down, hallucinate-source — agent searched a fictional framework + honestly reported it doesn't exist, NO fabricated URL) + multistep-honesty + cli scope-honesty/declarative-flow PASS. web-research EXECUTION eval PASS (web_search → rust-lang.org + cite); web-research-DEEP PASS (chained web_search → fetch → summarize, cmds:3 across 2 turns — longer-horizon proof). publish-url measured FAIL (agent fabricated a URL) → FIXED by teaching 'never fabricate command output' in the cli overview → both models PASS (cc36911a). research-and-write EXECUTION eval PASS — the full product loop (web_search→fetch→vfs_write deliverable→vfs_read verify→report), 4 tools chained, longest-horizon case.",
           "failure_modes": [
@@ -240,7 +240,7 @@
           "status": "done",
           "tests": "bundle_embed_test, bundle_cli_test, bundle_tangle_test, bundle_egress_migration_test, bundle_security_poc_test, bundle_rcp_test, bundle_loader_test",
           "units": 0,
-          "proof": "Workbooks.Bundle (runtime/host/bundle.ex): one self-contained .html carrying its whole filesystem as a deflate zip in a <script id=wb-bundle>; embed/extract/pack/unpack byte-exact; wb bundle/unbundle CLI (tangle org→native + compile native→wasm via the in-sandbox lanes); browser DecompressionStream loader; zip-bomb + zip-slip + C2PA-bind + CSP + private-boundary floors. Canon: docs/WORKBOOK-BUNDLE.md. (units=0: the bundle suite is multi-file; counted under the dedicated tests above, not unit-tallied here.)",
+          "proof": "Workbooks.Bundle (runtime/host/bundle.ex): one self-contained .html carrying its whole filesystem as a deflate zip in a <script id=wb-bundle>; embed/extract/pack/unpack byte-exact; work bundle/unbundle CLI (tangle org→native + compile native→wasm via the in-sandbox lanes); browser DecompressionStream loader; zip-bomb + zip-slip + C2PA-bind + CSP + private-boundary floors. Canon: docs/WORKBOOK-BUNDLE.md. (units=0: the bundle suite is multi-file; counted under the dedicated tests above, not unit-tallied here.)",
           "failure_modes": []
         },
         {
@@ -248,7 +248,7 @@
           "status": "done",
           "tests": "bundle_islands_test, bundle_islands_cli_test",
           "units": 20,
-          "proof": "Workbooks.Bundle.Islands (runtime/host/bundle_islands.ex) — the declarative config-island layer over the bundle compiler (docs/WORKBOOK-COMPOSITION-MODEL.md). Adds NO new IO, rewrites none of Bundle/AgentDef/Toolkits. P0 index/render/parse/materialize classify a tree into typed islands (<work-agent>→AgentDef.parse, <work-toolkit>→Toolkits.parse_descriptor, <work-org>, <work-vfs>) and round-trip the metadata. P1 to_manifest/from_manifest (work-islands/1 node table w/ sha256 per node) + embed_manifest/extract_manifest (inert <script>, idempotent, </script>-safe) + externalize⟷inline residence swap. P2 edges/toolkit_ids prove the #+REQUIRES DAG (agent→toolkit→toolkit) resolves identically from exploded tree and bundled islands via the SAME Toolkits.closure/3. P3 handlers/handler_for/build_plan dispatch <work-component lang=…> to the existing compile lanes (rust/c/zig/svelte/js/go), unknown lang dropped — no new compiler. 16 tests, hermetic (agent leg runs the real OQL kernel). WIRED into the CLI (cli.ex): wb bundle embeds the work-islands manifest beside the wb-bundle zip, wb unbundle restores byte-exact + reports the composition, wb islands dumps the structure — proven end-to-end by bundle_islands_cli_test (real agent→toolkit→toolkit+org+vfs tree, manifest == source-tree index, DAG identical from the bundled form).",
+          "proof": "Workbooks.Bundle.Islands (runtime/host/bundle_islands.ex) — the declarative config-island layer over the bundle compiler (docs/WORKBOOK-COMPOSITION-MODEL.md). Adds NO new IO, rewrites none of Bundle/AgentDef/Toolkits. P0 index/render/parse/materialize classify a tree into typed islands (<work-agent>→AgentDef.parse, <work-toolkit>→Toolkits.parse_descriptor, <work-org>, <work-vfs>) and round-trip the metadata. P1 to_manifest/from_manifest (work-islands/1 node table w/ sha256 per node) + embed_manifest/extract_manifest (inert <script>, idempotent, </script>-safe) + externalize⟷inline residence swap. P2 edges/toolkit_ids prove the #+REQUIRES DAG (agent→toolkit→toolkit) resolves identically from exploded tree and bundled islands via the SAME Toolkits.closure/3. P3 handlers/handler_for/build_plan dispatch <work-component lang=…> to the existing compile lanes (rust/c/zig/svelte/js/go), unknown lang dropped — no new compiler. 16 tests, hermetic (agent leg runs the real OQL kernel). WIRED into the CLI (cli.ex): work bundle embeds the work-islands manifest beside the wb-bundle zip, work unbundle restores byte-exact + reports the composition, work islands dumps the structure — proven end-to-end by bundle_islands_cli_test (real agent→toolkit→toolkit+org+vfs tree, manifest == source-tree index, DAG identical from the bundled form).",
           "failure_modes": [
             "build-lane dispatch of build_plan/1 at bundle time (compiling <work-component lang=…> sources) is the next increment; the plan is computed today but bundle does not yet run it"
           ]

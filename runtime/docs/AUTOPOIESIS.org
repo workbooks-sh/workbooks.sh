@@ -7,7 +7,7 @@
   The loop runs end to end. PROVEN: a filed issue ("no SEO toolkit") was picked
   up by the autopoet worker, which read AUTHORING.org + example toolkits and
   authored a real `seo` toolkit (manifest + two skills) that PASSES
-  =wb toolkit verify= — all confined to its workspace, no native code. Shipped:
+  =work toolkit verify= — all confined to its workspace, no native code. Shipped:
   the file_issue seam (P1), the autopoet def (P2), the supervised worker (P3),
   and the proof (P5). P4 (the declarative tool registry) remains optional — the
   autopoet already extends the system via toolkits, the native extension path.
@@ -126,7 +126,7 @@
     layer (org, toolkits, skills, defs, registry, config). The host
     interpreter is not yours to touch.
   - A change must be TESTED before it is registered (the artifact's own test /
-    specimen / `wb content check` / a smoke run). An unverified capability is
+    specimen / `work content check` / a smoke run). An unverified capability is
     not shipped.
   - A gap you cannot fill in config is a HOST issue you FILE — never a hack
     around the boundary, never a native escape.

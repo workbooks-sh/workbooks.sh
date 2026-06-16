@@ -186,7 +186,7 @@ flowchart LR
 :PUBLISH_PROJECT: acme-pricing
 :PUBLISH_ACCESS:  gated-data
 :END:</pre>
-  <p><code>wb publish validate</code> fails with the error, verbatim from
+  <p><code>work publish validate</code> fails with the error, verbatim from
   the source:</p>
   <pre class="orgsample">PUBLISH_ACCESS: gated-data cannot publish to cloudflare-pages — a public static
 host ships the whole workbook to anyone (client-side gating is theater).
@@ -208,7 +208,7 @@ Use self-hosted (the runtime gates per-request) or desktop-app (local shell).</p
   copied to a web host.</p>
   <pre class="mermaid">
 flowchart TD
-  v["wb publish validate — target × posture"] --> t{"target?"}
+  v["work publish validate — target × posture"] --> t{"target?"}
   t -- "cloudflare-pages · gh-pages" --> s{"posture?"}
   s -- "public" --> ok["ship — static artifact, the whole workbook"]
   s -- "gated-*" --> rej["REJECTED — build error,<br/>the leaking file is never produced"]

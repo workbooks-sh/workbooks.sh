@@ -5,7 +5,7 @@ wrong one corrupts the other's assumptions. They are never crossed.
 
 ## Ledger A — bd / beads (platform / engine dev)
 
-For work on the **platform itself**: the runtime/host engine, the `wbx` CLI,
+For work on the **platform itself**: the runtime/host engine, the `work` CLI,
 toolkits, the desktop app — anything that outlives a single tenant repo or
 spans many files.
 

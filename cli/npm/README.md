@@ -1,6 +1,6 @@
 # @work.books/cli
 
-The Workbooks CLI — `wb`. Build apps you actually own: author, build, bundle, run,
+The Workbooks CLI — `work`. Build apps you actually own: author, build, bundle, run,
 publish, deploy. One small static binary (built from Rust); this package downloads
 the one matching your platform from the GitHub Release on install.
 

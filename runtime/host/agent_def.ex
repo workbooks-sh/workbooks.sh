@@ -27,7 +27,7 @@ defmodule Workbooks.AgentDef do
 
     # Toolkit auto-injection (TOOLKITS-V3 §P3): the agent's declared :TOOLKITS:
     # become a compact index appended to the system prompt — tier 1 of progressive
-    # disclosure. Skill bodies stay on demand via the `wb` tool, never inlined.
+    # disclosure. Skill bodies stay on demand via the `work` tool, never inlined.
     system =
       case Workbooks.Toolkits.injection_text(def.toolkits) do
         "" -> def.system

@@ -7,7 +7,7 @@ CLEAN-ROOM RECONCILIATION (restored 2026-06-07 from workbooks-archive).
 The DEPTH BAR and skill structure here are carried forward UNCHANGED — this is
 the authoritative source for "what a skill must contain" (the 6 mandatory
 sections, thin-vs-thick + references/, :role pre/post, #+CAPTION TOC). What
-changed is only the RUNTIME that honors them: the "wb toolkit verify / search"
+changed is only the RUNTIME that honors them: the "work toolkit verify / search"
 that lit up these features was Rust; it is reimplemented in Elixir per
 TOOLKITS-V3.org. The org-mode features this doc says "don't pay rent yet"
 (properties-drawer prompt injection, CAPTION surfacing, OQL search) are the
@@ -126,7 +126,7 @@ explicit P1/P2 deliverables in the V3 plan.
   | "Common Pitfalls" mandatory section | yes                 | informal                      |
   | "Verification Checklist"            | yes                 | NO                            |
   | Per-skill VERSION                   | yes                 | toolkit-level only            |
-  | Validator (size limits, structure)  | yes                 | =wb toolkit check= (light)    |
+  | Validator (size limits, structure)  | yes                 | =work toolkit check= (light)    |
   | BM25 ranked search                  | yes                 | substring grep                |
   | Tool-catalog deferral               | yes (3-tool bridge) | n/a — one tool                |
   | Skill index injection at session    | n/a (Hermes loads)  | yes (TOOLKITS block)          |
@@ -143,7 +143,7 @@ explicit P1/P2 deliverables in the V3 plan.
 
   | Org-mode feature              | Status                                                |
   |-------------------------------+-------------------------------------------------------|
-  | =:role pre/post= blocks       | ✅ USED by =wb toolkit verify=                        |
+  | =:role pre/post= blocks       | ✅ USED by =work toolkit verify=                        |
   | =:PROPERTIES:= drawer keys    | ⚠ PARTIAL — only enforced by =verify=, not injected into agent prompt |
   | OQL queryability              | ❌ DECLARED, no consumer (substring grep used instead) |
   | Cross-skill =[[file:]]= links | ⚠ PARTIAL — agent can follow with =cat=, no surfacing |
@@ -163,7 +163,7 @@ explicit P1/P2 deliverables in the V3 plan.
       destructive skills:
 
       #+BEGIN_EXAMPLE
-      ## wb (`wb` v0.1.0, stable)
+      ## wb (`work` v0.1.0, stable)
         Scaffold, build, share, and query single-file workbook .html documents.
         Skills (read via `cat …/<name>.org`):
           - overview
@@ -177,28 +177,28 @@ explicit P1/P2 deliverables in the V3 plan.
    2. *Surface =#+CAPTION= as a skill TOC.* When the agent
       =cat=s a skill file, the runtime can either insert a
       generated header listing every CAPTION'd block in the
-      file, or =wb toolkit show <skill>= can render captions
+      file, or =work toolkit show <skill>= can render captions
       as a TOC.
 
       Today: agent reads prose to find the right code block.
       With CAPTION as TOC: agent scans the TOC and jumps to
       the block by name.
 
-   3. *OQL-driven =wb toolkit search=.* Replace the substring
-      grep with =wb query=:
+   3. *OQL-driven =work toolkit search=.* Replace the substring
+      grep with =work query=:
 
       #+BEGIN_SRC bash
-      wb toolkit search "video thumbnail"
+      work toolkit search "video thumbnail"
       # internally:
-      wb query '(or (tags video) (tags thumbnail))' --root ~/Workbooks/Workbox/toolkits/
+      work query '(or (tags video) (tags thumbnail))' --root ~/Workbooks/Workbox/toolkits/
       #+END_SRC
 
-      Composable. =wb toolkit search "(and (tags video) (not (todo experimental)))"=
+      Composable. =work toolkit search "(and (tags video) (not (todo experimental)))"=
       becomes possible.
 
    4. *Babel blocks in lua / python / sql.* Authors ship recipes
       in the right language. The runtime executes them via OQL
-      plugins. A wb skill that wants to demonstrate "transform
+      plugins. A work skill that wants to demonstrate "transform
       a CSV into JSON" ships a python source block, not a
       bash-+-python-c invocation.
 
@@ -266,27 +266,27 @@ explicit P1/P2 deliverables in the V3 plan.
               in the TOOLKITS prompt index — annotate per-skill
               lines with the relevant markers.
 
-   wb-skv2.2  Surface =#+CAPTION= TOC: =wb toolkit show <toolkit>
+   wb-skv2.2  Surface =#+CAPTION= TOC: =work toolkit show <toolkit>
               <skill>= prints CAPTIONs as a navigable index above
               the body. Inject same TOC at top of any =cat=-style
               skill render.
 
-   wb-skv2.3  =wb toolkit search= rewritten on top of OQL.
+   wb-skv2.3  =work toolkit search= rewritten on top of OQL.
               Falls back to substring if OQL query parse fails.
 
-   wb-skv2.4  =wb toolkit check= enforces new mandatory sections
+   wb-skv2.4  =work toolkit check= enforces new mandatory sections
               (When to Use / Workflow / Common Pitfalls /
               Verification Checklist) + #+VERSION + #+DESCRIPTION.
               Existing skills that don't conform get warnings,
               not errors, until we backfill.
 
-   wb-skv2.5  =wb toolkit new= scaffold updated to include the
+   wb-skv2.5  =work toolkit new= scaffold updated to include the
               mandatory sections + reference-subdir option.
 
 ** Phase 2 — adopt =references/= subdir pattern
 
    wb-skv2.6  Skill resolver supports both =<slug>.org= AND
-              =<slug>/SKILL.org=. =wb toolkit show <toolkit>
+              =<slug>/SKILL.org=. =work toolkit show <toolkit>
               <slug>= prints the SKILL + lists =references/=
               files for follow-up.
 
@@ -316,7 +316,7 @@ explicit P1/P2 deliverables in the V3 plan.
    wb-skv2.13  BM25 index built from TITLE + TAGS + body of every
                skill. Cached at =~/Workbooks/Workbox/toolkits/.search-index=.
                Rebuilt when any toolkit dir mtime changes.
-               =wb toolkit search= returns ranked hits with
+               =work toolkit search= returns ranked hits with
                relevance scores.
 
                Defer until corpus > ~50 skills. At today's scale
@@ -354,7 +354,7 @@ explicit P1/P2 deliverables in the V3 plan.
     proving the deep-dive pattern works.
   - The TOOLKITS prompt block tells the agent which skills are
     destructive / paid / network-dependent before it picks one.
-  - =wb toolkit search "<intent>"= returns a ranked, OQL-filterable
+  - =work toolkit search "<intent>"= returns a ranked, OQL-filterable
     hit list (no substring brittleness).
   - A new developer reading TOOLKIT-SKILLS-V2.org understands
     what we have, what's missing, and which phase to pick up.

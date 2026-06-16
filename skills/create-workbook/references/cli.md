@@ -1,4 +1,4 @@
-# `workbook` vs `wbx` — the split
+# `workbook` vs `work` — the split
 
 Two CLIs, two scopes. Use the right one.
 
@@ -16,20 +16,20 @@ workbook project.
 | `workbook check` | validate the artifact |
 | `workbook publish` | publish → prints a URL |
 
-## `wbx` — the platform CLI
+## `work` — the platform CLI
 
 The Elixir escript. Operates on the runtime, toolkits, deploy, dev loop.
 Relevant during authoring:
 
 | Command | Does |
 |---|---|
-| `wb content check [dir]` | content validation (alternative to `workbook check`) |
-| `wb-rt compiler build <lang>` / `wb-rt compiler run` | the compiled-dep WASM lane |
-| `wbx toolkit build palette [<runtime>]` | interpreted-runtime palette |
-| `wbx publish apply` | platform publish path |
-| `wbx sign` / `wbx verify` | sign / verify an artifact |
+| `work content check [dir]` | content validation (alternative to `workbook check`) |
+| `work compiler build <lang>` / `work compiler run` | the compiled-dep WASM lane |
+| `work toolkit build palette [<runtime>]` | interpreted-runtime palette |
+| `work publish apply` | platform publish path |
+| `work sign` / `work verify` | sign / verify an artifact |
 
 ## Rule of thumb
 
 The single-file artifact loop is `workbook …`. Anything touching the runtime,
-toolkits, compilers, or deploy is `wb …`. Never assume one binary does both.
+toolkits, compilers, or deploy is `work …`. Never assume one binary does both.

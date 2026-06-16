@@ -41,12 +41,12 @@
   let phase = $state<"loading" | "ready" | "error">("loading");
   let error = $state<string | null>(null);
   // Portability sidebar visibility — off by default; toggled from the
-  // toolbar. The sidebar drives its own `wb check --portability` call
+  // toolbar. The sidebar drives its own `work check --portability` call
   // off the file's parent directory when shown.
   let showPortability = $state<boolean>(false);
 
   // The workdir for the portability check is the file's parent dir —
-  // `wb check` walks a directory tree, not a single file.
+  // `work check` walks a directory tree, not a single file.
   const workdir = $derived.by<string | null>(() => {
     if (!showPortability) return null;
     const idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));

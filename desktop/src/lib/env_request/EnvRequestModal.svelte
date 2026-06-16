@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Env-request modal — the desktop surface for `wb env request`.
+   * Env-request modal — the desktop surface for `work env request`.
    *
    * Deliberately minimal: a logo of the source (resolved from the var name via
    * the icon library), one plain sentence, the field, and two buttons. The

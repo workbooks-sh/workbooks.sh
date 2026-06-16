@@ -28,11 +28,11 @@
   Mac that has Xcode.
 
   NOTE — drift correction (wb-2qy2): earlier versions documented a
-  =wb forge mobile <cmd>= command surface backed by =cli/deploy-kit/mobile/=
+  =work forge mobile <cmd>= command surface backed by =cli/deploy-kit/mobile/=
   recipes. That lane was removed with the Rust =wb= (2026-06-09) and the recipes
   no longer exist. This toolkit is now grounded on the *real, present* tools:
   =npx cap= for the project + sync, and Xcode / standard Apple tooling for sign +
-  upload. Do NOT invoke =wb forge mobile= — it is not a command.
+  upload. Do NOT invoke =work forge mobile= — it is not a command.
 
   Command surface (the real tools — ~npx cap --help~ is authoritative):
   - =npx cap add ios=        — scaffold the native iOS project (once).

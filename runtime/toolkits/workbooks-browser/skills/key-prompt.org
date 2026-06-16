@@ -3,17 +3,17 @@
 * Ask the user for an API key (a modal)
 
   When you need a key/secret you don't have — to call a service, say — ask the
-  user for it. =wb env request= pops a clean modal in the shell and BLOCKS until
+  user for it. =work env request= pops a clean modal in the shell and BLOCKS until
   they answer:
 
-  : wb env request <NAME> [reason…]
+  : work env request <NAME> [reason…]
 
   On "Save key" the value is stored in the runtime secret store BY REFERENCE —
   you get a confirmation, never the raw value (the secrets-by-reference rule).
 
 * Recipe
 
-  : wb env request OPENAI_API_KEY to call the OpenAI image API
+  : work env request OPENAI_API_KEY to call the OpenAI image API
   ;; user sees: "Enter your OpenAI key" + your reason → Save key
   ;; → "provided — OPENAI_API_KEY is now set (51 bytes), usable by reference"
 

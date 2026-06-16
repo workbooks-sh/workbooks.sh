@@ -1,4 +1,4 @@
-/* wb in-sandbox JS bundler (wb-spy.T1.4). Runs inside qjs-run.wasm — same IO contract as
+/* work in-sandbox JS bundler (wb-spy.T1.4). Runs inside qjs-run.wasm — same IO contract as
  * ts/tsjob.js (Javy.IO stdin→stdout), ZERO native execution, no esbuild/rollup/node.
  *
  * stdin  : JSON {"entry": "<relpath>", "files": {"<relpath>": "<source>", ...}}

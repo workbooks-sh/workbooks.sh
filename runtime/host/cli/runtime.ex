@@ -1,13 +1,13 @@
 defmodule Workbooks.CLI.Runtime do
   @moduledoc """
-  `wb rt …` — drive a RUNNING runtime over HTTP as a first-class RCP client
+  `work rt …` — drive a RUNNING runtime over HTTP as a first-class RCP client
   (wb-82g; RUNTIME-CONNECT-PROTOCOL.org). The CLI is just another client: it
   resolves a target + credential, then speaks the same HTTP contract the desktop
   and web clients do.
 
-      wb rt status                 # the /.well-known capabilities handshake + health
-      wb rt get  <path>            # GET  <path>
-      wb rt post <path> [<json>]   # POST <path> with an optional JSON body
+      work rt status                 # the /.well-known capabilities handshake + health
+      work rt get  <path>            # GET  <path>
+      work rt post <path> [<json>]   # POST <path> with an optional JSON body
 
   Target resolution (first wins):
     * WB_RUNTIME_URL + WB_TOKEN          — explicit (a remote/cloud runtime, or CI)
@@ -17,7 +17,7 @@ defmodule Workbooks.CLI.Runtime do
   """
   @well_known "/.well-known/workbooks-runtime"
 
-  @doc "Entry point for `wb rt …`. Returns {output, failed?}. `req` is injectable for tests."
+  @doc "Entry point for `work rt …`. Returns {output, failed?}. `req` is injectable for tests."
   def run(args, req \\ &http_request/4)
 
   def run(["status"], req), do: status(req)
@@ -27,9 +27,9 @@ defmodule Workbooks.CLI.Runtime do
   def run(_, _), do: {usage(), true}
 
   @doc """
-  `wb ctk await <run> [timeout_s]` — block until a CTK review (a human clicking
+  `work ctk await <run> [timeout_s]` — block until a CTK review (a human clicking
   Commit in the CTK shell, which POSTs /api/ctk/commit?run=<run>) lands, then
-  print it. Same target + transport as `wb rt`. The agent's open→await→commit
+  print it. Same target + transport as `work rt`. The agent's open→await→commit
   primitive (it has only bash; this wraps the poll loop).
   """
   def ctk(args, req \\ &http_request/4)
@@ -38,7 +38,7 @@ defmodule Workbooks.CLI.Runtime do
   def ctk(_, _), do: {ctk_usage(), true}
 
   @doc """
-  `wb toolkit …` over RCP — the shipped escript can't load the wasmex/sqlite NIFs
+  `work toolkit …` over RCP — the shipped escript can't load the wasmex/sqlite NIFs
   from its archive, so toolkit verbs run SERVER-SIDE in the connected runtime
   (where they work) via /rcp/toolkit/*. Same target + transport as the rest.
   """
@@ -59,7 +59,7 @@ defmodule Workbooks.CLI.Runtime do
   def toolkit(_, _), do: {toolkit_usage(), true}
 
   @doc """
-  `wb channels …` over RCP — messaging channels live runtime-side (creds + the
+  `work channels …` over RCP — messaging channels live runtime-side (creds + the
   pollers run in the engine); the CLI just drives the control-plane routes.
   """
   def channels(args, req \\ &http_request/4)
@@ -75,7 +75,7 @@ defmodule Workbooks.CLI.Runtime do
 
   defp channels_usage do
     """
-    wb channels list | send <channel> <peer> <text…> | approve <channel> <code>
+    work channels list | send <channel> <peer> <text…> | approve <channel> <code>
 
     Runs against the connected runtime (creds + inbound pollers live there).
     Target: WB_RUNTIME_URL (+ WB_TOKEN) or the local discovery file.
@@ -86,7 +86,7 @@ defmodule Workbooks.CLI.Runtime do
 
   defp toolkit_usage do
     """
-    wb toolkit list | show <id> [skill] | search <q> | verify <id> | eval <id> | build <id> [which] | sign <id>
+    work toolkit list | show <id> [skill] | search <q> | verify <id> | eval <id> | build <id> [which] | sign <id>
                 | versions <id> | live [<id>] | rollback <id> <version>
 
     Runs against the connected runtime (toolkit verbs execute server-side; the
@@ -127,7 +127,7 @@ defmodule Workbooks.CLI.Runtime do
 
   defp ctk_usage do
     """
-    wb ctk await <run> [timeout_s]   block until a CTK review for <run> arrives, then print it
+    work ctk await <run> [timeout_s]   block until a CTK review for <run> arrives, then print it
 
     The human clicks Commit in the CTK shell (POSTs /api/ctk/commit?run=<run>);
     this polls GET /api/ctk/review/<run> until it lands. Target: WB_RUNTIME_URL
@@ -157,7 +157,7 @@ defmodule Workbooks.CLI.Runtime do
       scheme = Map.get(d, "scheme", "http")
       {:ok, %{url: "#{scheme}://127.0.0.1:#{port}", token: Map.get(d, "token", ""), source: "discovery"}}
     else
-      _ -> {:error, "no runtime: start one (`wb deploy local`) or set WB_RUNTIME_URL (+ WB_TOKEN)"}
+      _ -> {:error, "no runtime: start one (`work deploy local`) or set WB_RUNTIME_URL (+ WB_TOKEN)"}
     end
   end
 
@@ -235,11 +235,11 @@ defmodule Workbooks.CLI.Runtime do
 
   defp usage do
     """
-    wb rt — talk to a running runtime over HTTP (RCP client).
+    work rt — talk to a running runtime over HTTP (RCP client).
 
-      wb rt status                 the capabilities handshake + target
-      wb rt get  <path>            GET  <path>   (e.g. /api/workbooks)
-      wb rt post <path> [<json>]   POST <path> with an optional JSON body
+      work rt status                 the capabilities handshake + target
+      work rt get  <path>            GET  <path>   (e.g. /api/workbooks)
+      work rt post <path> [<json>]   POST <path> with an optional JSON body
 
     Target: WB_RUNTIME_URL (+ WB_TOKEN), else the local discovery file.
     """

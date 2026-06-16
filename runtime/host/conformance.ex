@@ -4,7 +4,7 @@ defmodule Workbooks.Conformance do
   the `workbooks:engine` world it must dock into? A Workbook component has to
   export `run` and may only import the engine Dock funcs (session-info / vfs-query
   / run-command) plus WASI. We extract the component's WIT with `wasm-tools` and
-  verify it — so a malformed Workbook is caught at `wb build`, not at instantiate.
+  verify it — so a malformed Workbook is caught at `work build`, not at instantiate.
   """
 
   # The world-level func imports the engine Dock provides. WASI interface imports

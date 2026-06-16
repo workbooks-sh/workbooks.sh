@@ -23,7 +23,7 @@ COMPONENTS=(kernel escript image app)
 # The runtime image ref the local container boots (override with WB_IMAGE).
 IMAGE_REF="${WB_IMAGE:-ghcr.io/workbooks-sh/runtime:latest}"
 # The freshly-built escript the app shell + deploy-kit shell out to.
-export WB_BIN="$ROOT/runtime/wb"
+export WB_BIN="$ROOT/runtime/work"
 
 c_red=$'\e[31m'; c_grn=$'\e[32m'; c_ylw=$'\e[33m'; c_dim=$'\e[2m'; c_cyn=$'\e[36m'; c_rst=$'\e[0m'
 say()  { printf '%s\n' "$*" >&2; }
@@ -56,7 +56,7 @@ src_hash() {
 art_path() {
   case "$1" in
     kernel)  echo "$ROOT/desktop/src-tauri/oql.wasm" ;;
-    escript) echo "$ROOT/runtime/wb" ;;
+    escript) echo "$ROOT/runtime/work" ;;
     image)   echo "" ;;  # docker image, not a file — handled specially
     app)     ls -d "$ROOT"/desktop/src-tauri/target/release/bundle/macos/*.app 2>/dev/null | head -1 ;;
   esac
@@ -104,9 +104,9 @@ build_kernel() {
   say "    oql.wasm -> runtime/build/ + desktop/src-tauri/ ($(wc -c <"$out" | tr -d ' ') bytes)"
 }
 build_escript() {
-  hdr "escript: mix escript.build (wb)"
+  hdr "escript: mix escript.build (work)"
   ( cd "$ROOT/runtime" && mix escript.build >/dev/null )
-  [ -x "$ROOT/runtime/wb" ] || die "escript build produced no runtime/wb"
+  [ -x "$ROOT/runtime/work" ] || die "escript build produced no runtime/work"
 }
 build_image() {
   hdr "image: wb deploy build (OCI runtime -> krunvm store)"

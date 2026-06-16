@@ -34,8 +34,8 @@ authed tenant into the socket so per-session/per-push gates can use it.
   =GET /api/run/:id= (live + persisted transcript) gated. Transcripts persist
   tenant-stamped so a past chat survives restart, still gated.
 - *Telemetry / ledger* — run dirs stamped with a =.tenant= marker;
-  =/api/telemetry[/:slug]=, =/api/ledger/:slug=, and the CLI =wb telemetry= /
-  =wb ledger= filter/gate via =Telemetry.run_visible?=.
+  =/api/telemetry[/:slug]=, =/api/ledger/:slug=, and the CLI =work telemetry= /
+  =work ledger= filter/gate via =Telemetry.run_visible?=.
 - *Instances / workbooks* — =ControlPlane.list/1= + =workbook_visible?/2= scope
   =/instances=, =/api/workbooks=, =/api/w/:id/{org,html}=. (PUBLISHED workbooks are
   served by the separate, unauthenticated =PublicWeb= plane — not these.)
@@ -43,13 +43,13 @@ authed tenant into the socket so per-session/per-push gates can use it.
   =/api/mirror/:tenant= (repo push), =/api/radicle/:tenant/publish= require
   caller == path (=path_tenant_ok?=) — no IDOR by URL.
 - *WS pushes* — session join/cancel gated by ownership; the env / workgate /
-  desktop-control pushes (=wb env request=, =wb app theme/tab/…=) fan out only to
+  desktop-control pushes (=work env request=, =work app theme/tab/…=) fan out only to
   the requesting tenant's connected shell.
-- *Config* — =wb model set= is per-tenant (the =Vars= store, key =wb.model=), not a
+- *Config* — =work model set= is per-tenant (the =Vars= store, key =wb.model=), not a
   process-global env.
 - *Agent workdir* — confined per-tenant on cloud (=WB_DATA/wb-runs/<tenant>/<run>=);
   the trusted desktop keeps its local workbook path (=confined_workdir/4=).
-- *Arbitrary-file read* — =/api/oql/query?path== and =wb query/tangle/lint= confined
+- *Arbitrary-file read* — =/api/oql/query?path== and =work query/tangle/lint= confined
   to =.org= + no traversal.
 
 * Brokers (stateful) vs visibility

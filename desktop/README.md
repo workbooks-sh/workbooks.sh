@@ -10,7 +10,7 @@ connected to only when you want those features.
 | Tier | What | Needs |
 |------|------|-------|
 | **The app (default)** | Tauri (Rust) + the OQL kernel (`oql.wasm`, embedded) + the Svelte frontend. Open / edit / weave / validate / outline workbooks. | **Nothing else** — offline, instant. |
-| **The runtime (optional)** | Agents, multi-tenant, HTTP/WS control plane, vectors, cloud sync. The Elixir BEAM in a container, via the deploy-kit (`wb deploy`). | A running runtime (local krunvm *or* cloud). |
+| **The runtime (optional)** | Agents, multi-tenant, HTTP/WS control plane, vectors, cloud sync. The Elixir BEAM in a container, via the deploy-kit (`work deploy`). | A running runtime (local krunvm *or* cloud). |
 
 The app **never** requires the runtime to open a workbook. Starting it is explicit
 (tray "Start / restart engine", or opening an agent feature).
@@ -22,8 +22,8 @@ The app **never** requires the runtime to open a workbook. Starting it is explic
     loads) and runs it via `wasmtime` + `wasmtime-wasi`. Exposes `weave`, `tangle`,
     `validate`, `lint`, `outline` as Tauri commands — **fully in-process**.
   - `daemon.rs` + `machine.rs` — the engine bridge. Boots the runtime the same way
-    `wb deploy local` does (a libkrun microVM via `krunvm`) but **natively from Rust**,
-    so a fresh install needs only the krunvm backend — no Erlang, no `wb` escript.
+    `work deploy local` does (a libkrun microVM via `krunvm`) but **natively from Rust**,
+    so a fresh install needs only the krunvm backend — no Erlang, no `work` escript.
     Reads the runtime discovery file (`{host, port, token}`); the install wizard
     (`src/lib/setup/`) drives the `engine_*` commands (detect / install-backend /
     boot-local / connect-cloud).
@@ -40,7 +40,7 @@ The app **never** requires the runtime to open a workbook. Starting it is explic
 ## Develop
 
 ```bash
-bash scripts/dev.sh        # builds the wb escript + `tauri dev` with WB_BIN set
+bash scripts/dev.sh        # builds the work escript + `tauri dev` with WB_BIN set
 # or:
 bun run build              # frontend → dist/
 cargo test --manifest-path src-tauri/Cargo.toml   # kernel weaves Org → HTML, in-process
@@ -56,7 +56,7 @@ bun run tauri build        # → unsigned .dmg
 ```
 
 Not yet shippable: needs (1) an Apple signing cert (codesign/notarize), and (2) a
-decision on bundling `wb` — the deploy-kit escript needs Erlang, so either Burrito-
+decision on bundling `work` — the deploy-kit escript needs Erlang, so either Burrito-
 wrap it (bundle ERTS) or reimplement deploy natively in Rust. The image the runtime
 tier pulls is `ghcr.io/workbooks-sh/runtime` (must be public for anonymous pull).
 

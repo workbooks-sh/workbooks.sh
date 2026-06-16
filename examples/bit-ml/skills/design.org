@@ -81,7 +81,7 @@ blocks, whitespace, badges. Build questions → DESIGN.md. Writing questions →
   - SELF-CONTAINED: inline styles, inline script. No external build.
     Module scripts may import wasm — keep payload lean.
   - :width wide is the default for interactive. :width full for hero-scale only.
-  - After writing: run =wb content check= and do a render sanity read-back.
+  - After writing: run =work content check= and do a render sanity read-back.
     A story with a broken block does not advance.
 
 * whitespace & length discipline

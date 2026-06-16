@@ -2,8 +2,8 @@
 
 > The **declarative composition layer** over the already-built bundle compiler.
 > Read `docs/WORKBOOK-BUNDLE.md` first — that is the canonical, byte-exact,
-> security-hardened `bundle`/`unbundle` compiler (`Workbooks.Bundle`, `wb bundle`/
-> `wb unbundle`). This document does **not** re-derive any of it. It specifies a
+> security-hardened `bundle`/`unbundle` compiler (`Workbooks.Bundle`, `work bundle`/
+> `work unbundle`). This document does **not** re-derive any of it. It specifies a
 > thin layer: expressing a workbook's structure as **typed config-island custom
 > elements** so composition is legible *as HTML/DOM* and authorable by hand or by a
 > one-shot model — while every node still rides the existing tangle → compile → pack
@@ -80,7 +80,7 @@ judgment call.
   editable form, and a **context-management tool** (work one node-file at a time when
   the whole bundle won't fit a context window; re-bundle to ship).
 
-`wb bundle` ⟷ `wb unbundle` already move between them losslessly. This layer adds a
+`work bundle` ⟷ `work unbundle` already move between them losslessly. This layer adds a
 **third, legible residence** for a node — an inline DOM element — and the mapping
 between all three.
 
@@ -137,10 +137,10 @@ All three are the same node. The compiler swaps between them mechanically — ex
 how the web inlines/externalizes `<script src>` ⟷ `<script>`, `<link>` ⟷ `<style>`,
 `<img src>` ⟷ `data:`. **inline ⟷ src ⟷ packed** is the whole trick.
 
-- `wb bundle`: external/inline source → tangle → compile → **pack into `wb-bundle`**;
+- `work bundle`: external/inline source → tangle → compile → **pack into `wb-bundle`**;
   islands collapse to their packed entries (or stay inline for small text nodes), with
   origin recorded so explode is exact.
-- `wb unbundle`: `wb-bundle` → unpack → write tree → **surface islands** as elements
+- `work unbundle`: `wb-bundle` → unpack → write tree → **surface islands** as elements
   (or `src`-referenced files) from the manifest.
 
 ## Polyglot: bundle = link **+** compile-in-sandbox (already built)
@@ -180,7 +180,7 @@ The bundle compiler and its floors are **done and careful** — do not re-derive
 
 - the `wb-bundle` zip+base64 format, `embed`/`extract`, the browser
   `DecompressionStream` loader;
-- `wb bundle`/`wb unbundle`, the tangle (org→native) + compile (native→wasm) legs;
+- `work bundle`/`work unbundle`, the tangle (org→native) + compile (native→wasm) legs;
 - zip-bomb guard, zip-slip denylist, C2PA signing bound to payload, CSP, private
   boundary;
 - the `#+REQUIRES` transitive closure resolver.
@@ -230,14 +230,14 @@ inline islands).
 
 The bijection is wired into the CLI (`runtime/host/cli.ex`):
 
-- **`wb bundle`** embeds the `work-islands` manifest into the page alongside the
+- **`work bundle`** embeds the `work-islands` manifest into the page alongside the
   `wb-bundle` zip — `Islands.embed_manifest(html, Islands.to_manifest(Islands.index(parts), parts))`.
   The manifest `src`-references the packed files, so it's a loss-free projection, not a
   second copy. Reports the island count.
-- **`wb unbundle`** restores the tree byte-exact (the `Workbooks.Bundle` guarantee,
+- **`work unbundle`** restores the tree byte-exact (the `Workbooks.Bundle` guarantee,
   unbroken) and reports the composition (`N agent/toolkit/org/vfs`) read from the
   embedded manifest.
-- **`wb islands <in.html|dir>`** dumps the typed `<work-*>` structure — from a bundled
+- **`work islands <in.html|dir>`** dumps the typed `<work-*>` structure — from a bundled
   page's manifest, an inline-`<work-*>` fallback, or by classifying a working dir.
 
 Proven end-to-end by `runtime/test/bundle_islands_cli_test.exs` (a real
@@ -249,8 +249,8 @@ increment; the plan is computed and available today.
 
 ## The anti-waffle rule (state in every agent/author prompt)
 
-> The single `.html` is an **output of `wb bundle`**, never an authoring decision.
+> The single `.html` is an **output of `work bundle`**, never an authoring decision.
 > You edit a typed node graph (inline islands, `src`-referenced files, or a working
-> tree — all equivalent). `wb bundle` / `wb unbundle` are deterministic, lossless,
+> tree — all equivalent). `work bundle` / `work unbundle` are deterministic, lossless,
 > reversible compiler passes over it. Never hand-assemble one HTML "to keep it
 > tidy"; run the bundler.

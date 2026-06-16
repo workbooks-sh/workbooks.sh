@@ -96,11 +96,11 @@ Every response carries `x-served-by: workbooks-runtime`. Non-GET falls through t
 |---|---|---|
 | GET | `/api/library/:tenant` | the tenant's access graph — workspaces + members |
 | POST | `/api/library/:tenant/query` | cross-workbook OQL query across members |
-| POST | `/rcp/build` | `wbx build` — compile a workspace's components → WASM |
+| POST | `/rcp/build` | `work build` — compile a workspace's components → WASM |
 | POST | `/rcp/library/checkout` | borrow a member out (zip back to the caller) |
 | POST | `/rcp/library/checkin` | accept a zip and write a member back |
-| GET / POST | `/rcp/store` | `wb stored` (list keys) / `wbx store` (archive a workspace) |
-| GET | `/rcp/fetch` | `wb fetch` — restore stored bytes (base64) |
+| GET / POST | `/rcp/store` | `work stored` (list keys) / `work store` (archive a workspace) |
+| GET | `/rcp/fetch` | `work fetch` — restore stored bytes (base64) |
 
 ### RCP toolkit / kernel
 
@@ -113,7 +113,7 @@ Every response carries `x-served-by: workbooks-runtime`. Non-GET falls through t
 | POST | `/rcp/toolkit/eval` | run the toolkit's eval suite server-side (NIFs+LLM here) |
 | POST | `/rcp/toolkit/build` | build `#+BUILD_SRC` → register (`?id=`, `&which=`) |
 | POST | `/rcp/toolkit/sign` | sign a toolkit with the tenant's did:key |
-| POST | `/rcp/toolkit/install` | `wbx toolkit push` — install a toolkit directory (zip b64, zip-slip-guarded) |
+| POST | `/rcp/toolkit/install` | `work toolkit push` — install a toolkit directory (zip b64, zip-slip-guarded) |
 | POST | `/rcp/toolkit/run` | run a skill's `:role task` block |
 | POST | `/rcp/kernel/run` | one-shot open/call/close of a kernel-shape toolkit |
 | GET | `/rcp/changes` | the tenant repo's public git log, newest first |

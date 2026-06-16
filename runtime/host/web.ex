@@ -466,7 +466,7 @@ defmodule Workbooks.Web do
     system =
       case params["skills"] do
         skills when is_list(skills) and skills != [] ->
-          agent_system_prompt(slug) <> "\n\nAttached skills (read with `wb toolkit show`): " <> Enum.join(skills, ", ")
+          agent_system_prompt(slug) <> "\n\nAttached skills (read with `work toolkit show`): " <> Enum.join(skills, ", ")
 
         _ ->
           agent_system_prompt(slug)
@@ -476,7 +476,7 @@ defmodule Workbooks.Web do
     exec? = Workbooks.Desktop.enabled?() or System.get_env("WB_AGENT_EXEC") == "1"
 
     # The tenant's own model choice (wb-g1yo / wb-d2nx.5), if they set one via
-    # `wb model set` — per-tenant, not the process-global default.
+    # `work model set` — per-tenant, not the process-global default.
     tenant_model =
       case Workbooks.Vars.get(conn.assigns.tenant, "wb.model") do
         {:ok, m} -> m
@@ -637,8 +637,8 @@ defmodule Workbooks.Web do
   end
 
   # Voice/agent command exec (wb-kbq5): the Gemini voice agent's bash tool POSTs
-  # {command} here. NO native bash (wb-9ja) — a `wb …` command runs the real CLI
-  # (incl. `wb app …` desktop control), anything else runs in the safe in-WASM
+  # {command} here. NO native bash (wb-9ja) — a `work …` command runs the real CLI
+  # (incl. `work app …` desktop control), anything else runs in the safe in-WASM
   # shell (cat/grep/jq/pipes). Returns {output} | {error}.
   post "/api/agents/:slug/exec" do
     {:ok, body, conn} = read_body(conn)
@@ -1048,11 +1048,11 @@ defmodule Workbooks.Web do
     end
   end
 
-  # ── RCP engine verbs for the `wb` CLI (token → tenant; see cli/TAXONOMY.md) ──
+  # ── RCP engine verbs for the `work` CLI (token → tenant; see cli/TAXONOMY.md) ──
   # These mirror the escript's local Library.* calls, but token-authed so the thin
   # Rust CLI can drive a running engine. Tenant comes from the credential, not a path.
 
-  # `wb build` — compile a workspace's components → WASM.
+  # `work build` — compile a workspace's components → WASM.
   post "/rcp/build" do
     t = conn.assigns.tenant
     slug = conn.params["src"] || conn.params["slug"] || "."
@@ -1062,7 +1062,7 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
-  # `wb checkout` / `wb checkin` — borrow a library member / pack it back.
+  # `work checkout` / `work checkin` — borrow a library member / pack it back.
   # BYTES over RCP: the CLI may be on a different machine than the engine (the
   # engine usually runs in a container), so working trees can't be engine-side
   # paths. checkout zips the member's tree back to the caller; checkin accepts a
@@ -1104,7 +1104,7 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(json_safe(result)))
   end
 
-  # `wb bundle` over RCP — the engine-side home of the format for callers (the
+  # `work bundle` over RCP — the engine-side home of the format for callers (the
   # desktop, a remote CLI) whose working tree isn't on the engine's filesystem.
   # BYTES in, BYTES out, same as checkout/checkin: the caller packs its dir tree
   # into the SAME :zip parts map (Workbooks.Bundle.pack) and ships it b64; the
@@ -1140,7 +1140,7 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
-  # `wb unbundle` over RCP — inverse of the above. The caller ships the .html
+  # `work unbundle` over RCP — inverse of the above. The caller ships the .html
   # bytes b64; the engine extracts + unpacks the embedded bundle and returns the
   # raw parts map (`files: %{"rel/path" => base64-bytes}`) so the desktop shell
   # only writes bytes to disk — no engine-side path, no Rust unzip.
@@ -1167,7 +1167,7 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
-  # `wb store` / `wb store --list` — archive a workspace / list stored keys.
+  # `work store` / `work store --list` — archive a workspace / list stored keys.
   get "/rcp/store" do
     t = conn.assigns.tenant
     result = try do %{stored: Workbooks.Library.stored(t)} rescue e -> %{error: Exception.message(e)} end
@@ -1186,7 +1186,7 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
-  # ── `wb toolkit` — the agent-extensibility surface over RCP ─────────────────
+  # ── `work toolkit` — the agent-extensibility surface over RCP ─────────────────
   # Mirrors the escript verbs (Toolkits.*_text) so a REMOTE/containerized engine
   # is reachable from the thin CLI. Text in/out — these are help-surface +
   # build/run verbs, not data APIs. Task execution stays server-side gated
@@ -1238,7 +1238,7 @@ defmodule Workbooks.Web do
     send_resp(conn, 200, Workbooks.Toolkits.sign_text(conn.params["id"], conn.assigns.tenant))
   end
 
-  # Versioned releases (wbx-verbs): list versions, show the live pin, roll back.
+  # Versioned releases (work-verbs): list versions, show the live pin, roll back.
   get "/rcp/toolkit/versions" do
     send_resp(conn, 200, Workbooks.Toolkits.versions_text(conn.params["id"]))
   end
@@ -1287,7 +1287,7 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(result))
   end
 
-  # `wb toolkit push` — install a toolkit DIRECTORY onto this engine (zip b64).
+  # `work toolkit push` — install a toolkit DIRECTORY onto this engine (zip b64).
   # The deploy-the-toolkit verb: deployment.org declares it, deploy applies it.
   # Guards: id charset, zip-slip containment under the toolkits root.
   post "/rcp/toolkit/install" do
@@ -1353,7 +1353,7 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{changes: entries}))
   end
 
-  # `wb fetch` — restore stored bytes (base64-wrapped; zips aren't JSON-safe raw).
+  # `work fetch` — restore stored bytes (base64-wrapped; zips aren't JSON-safe raw).
   get "/rcp/fetch" do
     t = conn.assigns.tenant
     result = try do
@@ -2105,11 +2105,11 @@ defmodule Workbooks.Web do
         "result) — the available component types are listed in the Components section below, " <>
         "discovered from your component toolkit. Emit one when you took an action worth confirming " <>
         "or when offering the user a next step; use plain prose for ordinary replies (it streams).\n\n" <>
-        "OPEN WHAT YOU BUILD: the moment you create or write a workbook or file, OPEN it for the user with `wb app open-tab <path>` (you have the workbooks-browser toolkit) so it appears live in their workspace — never leave a workbook created-but-unopened. Create the file, open it, then confirm."
+        "OPEN WHAT YOU BUILD: the moment you create or write a workbook or file, OPEN it for the user with `work app open-tab <path>` (you have the workbooks-browser toolkit) so it appears live in their workspace — never leave a workbook created-but-unopened. Create the file, open it, then confirm."
 
     # Resolve the base prompt + the agent's declared toolkits. Waldo (the
-    # default) ALWAYS gets workbooks-browser (drive the app: wb app …, wb env
-    # request …) AND workbooks-cli (deploy + publish: wb deploy …, wb publish …).
+    # default) ALWAYS gets workbooks-browser (drive the app: work app …, work env
+    # request …) AND workbooks-cli (deploy + publish: work deploy …, work publish …).
     # A provisioned <slug>.org overrides.
     {base, toolkits} =
       with true <- is_binary(slug) and Regex.match?(~r/^[a-z0-9][a-z0-9_-]*$/i, slug),
@@ -2126,7 +2126,7 @@ defmodule Workbooks.Web do
       end
 
     # Tier-1 progressive disclosure: append the compact toolkit index (skill
-    # names) so the agent knows what it can do; bodies stay on demand via `wb
+    # names) so the agent knows what it can do; bodies stay on demand via `work
     # toolkit show`. When the closure includes a component-EXEC toolkit, append
     # the catalog of `work-*` tags DISCOVERED from its CEM (not hardcoded).
     base

@@ -120,15 +120,15 @@ one* (the capability doesn't exist yet).
 ** Link an existing toolkit
    :PROPERTIES:
    :MATURITY: north-star
-   :CAVEAT: The `wbx toolkit add <id>` install-from-registry verb is the intended ergonomics; a published registry is not live yet. Today you reference an in-repo toolkit by id and the runtime resolves it from toolkits/<id>/. The CLI surface here describes the target, not a shipped flag.
+   :CAVEAT: The `work toolkit add <id>` install-from-registry verb is the intended ergonomics; a published registry is not live yet. Today you reference an in-repo toolkit by id and the runtime resolves it from toolkits/<id>/. The CLI surface here describes the target, not a shipped flag.
    :END:
 
 The intended one-liner — pull a toolkit from the library into the current
 workbook by id:
 
 #+begin_src text
-wbx toolkit add fly          # resolve from the library, grant its #+CAPS
-wbx toolkit list             # what this workbook can reach
+work toolkit add fly          # resolve from the library, grant its #+CAPS
+work toolkit list             # what this workbook can reach
 #+end_src
 
 Until the registry ships, you reference a toolkit by its id and the runtime
@@ -166,11 +166,11 @@ lives in =toolkits/AUTHORING.org=.
    :END:
 
 The intended flow — sign your toolkit and publish it to the shared library so
-others can =wbx toolkit add= it:
+others can =work toolkit add= it:
 
 #+begin_src text
-wbx toolkit sign my-tool      # third-party signature (planned)
-wbx toolkit publish my-tool   # push to the library (planned)
+work toolkit sign my-tool      # third-party signature (planned)
+work toolkit publish my-tool   # push to the library (planned)
 #+end_src
 
 * Related

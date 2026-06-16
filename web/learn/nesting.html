@@ -130,8 +130,8 @@ flowchart LR
   g["company.org<br/>* Company notes<br/>** Some prose section<br/>*** Pipeline  :workflow:"]
   w[["one world JSON<br/>byte-identical either way"]]
   p -. "demote two levels, paste the subtree" .-> g
-  p -- "wb tangle" --> w
-  g -- "wb tangle" --> w
+  p -- "work tangle" --> w
+  g -- "work tangle" --> w
   style p fill:#ffffff,stroke:#121316
   style g fill:#ffffff,stroke:#121316
   style w fill:#13d943,stroke:#121316,stroke-width:2.5px
@@ -146,7 +146,7 @@ flowchart LR
   mechanism; the grammar's levels being relative <em>is</em> the import
   mechanism.</p>
   <p>And notice what the move is made of. There is no graft verb in the CLI —
-  no <code>wb merge</code>, no manifest to update, no registry round-trip.
+  no <code>work merge</code>, no manifest to update, no registry round-trip.
   Grafting is a text edit: cut the subtree, fix the levels, paste,
   re-tangle. Which means an agent can do it with the one tool agents
   actually have, and you can review it the way you review any edit — as a
@@ -179,7 +179,7 @@ flowchart LR
   compiler, <code>build_world()</code>, is literally recursive: walking the
   children, a <code>:component:</code> child becomes a leaf; a
   <code>:workflow:</code> child triggers the same function on the subtree,
-  then skips past it. <code>wb tangle pipeline.org</code> emits one plan
+  then skips past it. <code>work tangle pipeline.org</code> emits one plan
   (trimmed, real output):</p>
   <pre class="orgsample">{"worlds":[{"name":"Pipeline","exports":[],"imports":[],
   "edges":[{"from":"Ingest","to":"Publish"}],
@@ -213,8 +213,8 @@ flowchart TD
   <p>The org tree and the execution DAG are the same object at different
   zoom levels — zoom out and it's an outline a person edits; zoom in and
   it's a typed plan an engine runs. And you can run this yourself, right
-  now, with nothing docked: <code>wb tangle</code>, <code>wb query</code>,
-  and <code>wb lint</code> are local kernel verbs — the same ~550-line pure
+  now, with nothing docked: <code>work tangle</code>, <code>work query</code>,
+  and <code>work lint</code> are local kernel verbs — the same ~550-line pure
   Rust kernel, built into the CLI, also served over HTTP and
   WebSocket. One kernel, every surface, no runtime required to see your own
   plan.</p>

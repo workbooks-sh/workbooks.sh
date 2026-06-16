@@ -1,7 +1,7 @@
 defmodule Workbooks.Publish.Config do
   @moduledoc """
   A `publish.org` — the declarative description of where a workbook gets deployed.
-  One file per workbook site; `wb publish validate` checks it; `wb publish apply`
+  One file per workbook site; `work publish validate` checks it; `work publish apply`
   renders + ships it. Mirrors the shape of `Deploy.Config` (same `:PROPERTIES:`
   parser, same validate/to_env pattern) so both feel like one system.
 

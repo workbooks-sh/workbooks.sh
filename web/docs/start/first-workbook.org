@@ -34,7 +34,7 @@ Save it as =hello.org=. See [[../workbooks/anatomy.org][Anatomy of a workbook]] 
 ** 2 · Run it
 
 #+begin_src bash
-wb run hello.org
+work run hello.org
 #+end_src
 
 The runtime parses the Org, compiles each source block to WASM *inside its own
@@ -43,7 +43,7 @@ sandbox* — no toolchain on your machine — and runs it.
 ** 3 · Publish it
 
 #+begin_src bash
-wb publish hello.org
+work publish hello.org
 #+end_src
 
 The output is one =.html=: prose, compiled WASM, and the source it tangles from,
@@ -56,4 +56,4 @@ See [[../workbooks/publish.org][Publish a workbook]] for providers and options, 
 
 - Give your workbook a new capability: [[first-toolkit.org][Your first toolkit]].
 - Understand the two surfaces: [[../concepts/two-surfaces.org][Workbooks & toolkits]].
-- The exact CLI verbs: [[../reference/cli.org][Reference → wbx CLI]].
+- The exact CLI verbs: [[../reference/cli.org][Reference → work CLI]].

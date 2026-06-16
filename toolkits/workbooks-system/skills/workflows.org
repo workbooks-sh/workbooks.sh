@@ -68,7 +68,7 @@ When the spec is a =:workflow:=-tagged DAG rather than a TODO outline:
 =:workflow:= headings are sub-workflows, and a =#+begin_src agent= component
 runs an agent loop (its source block is the system prompt, the piped input
 is the task). Running executes topologically, piping along edges. To see the
-schedule WITHOUT executing: =wb tangle <file.org>= (or =?plan=1=).
+schedule WITHOUT executing: =work tangle <file.org>= (or =?plan=1=).
 
 * Lifecycle state machines
 

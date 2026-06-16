@@ -51,18 +51,18 @@ See [[../reference/caps.org][Dock capabilities]].
 ** How to add it
    :PROPERTIES:
    :MATURITY: north-star
-   :CAVEAT: `wbx toolkit add slack` and the slack command surface are the intended ergonomics. The toolkit is not published; only the brokered net+secrets primitives it would use exist today.
+   :CAVEAT: `work toolkit add slack` and the slack command surface are the intended ergonomics. The toolkit is not published; only the brokered net+secrets primitives it would use exist today.
    :END:
 
 The intended flow:
 
 1. Create a Slack incoming webhook (or a bot token) and store it as a host secret:
    #+begin_src text
-   wbx secret set SLACK_WEBHOOK_URL <url>
+   work secret set SLACK_WEBHOOK_URL <url>
    #+end_src
 2. Add the toolkit:
    #+begin_src text
-   wbx toolkit add slack
+   work toolkit add slack
    #+end_src
 
 #+CAUTION: The host holds the webhook/token and owns egress. The toolkit asks for
@@ -74,7 +74,7 @@ opens its own connection.
 The intended end state — an agent posts to =#deploys= when a deploy lands:
 
 #+begin_src text
-wbx slack post --channel '#deploys' --text 'engine deployed to fly · iad'   # planned
+work slack post --channel '#deploys' --text 'engine deployed to fly · iad'   # planned
 #+end_src
 
 The host resolves =SLACK_WEBHOOK_URL= from its secret store, POSTs the message,

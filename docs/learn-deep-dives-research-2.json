@@ -73,7 +73,7 @@
       "parent": "nexus",
       "kind": "concept",
       "dek": "Secrets-by-reference: variables marked secret are ref-only — agents substitute {{secret:KEY}} placeholders, the host injects real values only at egress, and the deploy kit stages declared secret names per deployment and delivers values through provider hooks without ever baking them into images or config.",
-      "evidence": "runtime/host/vars.ex (ref-only model, :guest vs :host resolution, docs/SECRETS.org rule); cli/src/local.rs:445-504 (wbx var set --secret, {{var:}}/{{secret:}} refs, masked list); cli/src/deploy/mod.rs:17-21,185-274 (#+DEPLOY_SECRETS declared names, staged 0600 secrets.env, secrets set/list/unset/push); cli/deploy-kit/providers/_recipe.sh:25-46 (WB_SECRET_KEYS forwarding); cli/deploy-kit/providers/fly/bootstrap.sh:39-42 (provider_set_secrets hook)"
+      "evidence": "runtime/host/vars.ex (ref-only model, :guest vs :host resolution, docs/SECRETS.org rule); cli/src/local.rs:445-504 (work var set --secret, {{var:}}/{{secret:}} refs, masked list); cli/src/deploy/mod.rs:17-21,185-274 (#+DEPLOY_SECRETS declared names, staged 0600 secrets.env, secrets set/list/unset/push); cli/deploy-kit/providers/_recipe.sh:25-46 (WB_SECRET_KEYS forwarding); cli/deploy-kit/providers/fly/bootstrap.sh:39-42 (provider_set_secrets hook)"
     },
     {
       "slug": "publishing",
@@ -86,7 +86,7 @@
     {
       "slug": "recipes",
       "title": "Recipes",
-      "parent": "wbx",
+      "parent": "work",
       "kind": "implementation",
       "dek": "Bring-your-own-cloud without a recompile: a provider is a bootstrap.sh that sources the neutral recipe spine and fills five hooks (ensure_app, set_secrets, attach_volume, deploy_image, public_url) plus the lifecycle trio; recipes resolve from WB_PROVIDERS_DIR, the repo, or copies embedded in the binary — fly is just the bundled one.",
       "evidence": "cli/deploy-kit/providers/_recipe.sh (hook spine, wb_recipe_run dispatch, WB_ENGINE_ENV assembly); cli/deploy-kit/providers/fly/bootstrap.sh (full hook implementation, prebuilt vs app-build image strategies, synthesized fly.toml); cli/src/deploy/mod.rs:78-80,276-354 (include_str! embedded recipes, resolve_providers_dir chain, env -i hermetic spawn)"
@@ -94,10 +94,10 @@
     {
       "slug": "distribution",
       "title": "Distribution",
-      "parent": "wbx",
+      "parent": "work",
       "kind": "setup",
-      "dek": "One static binary, three install lanes: a GitHub Release tagged wbx-v* feeds curl installs, an npm launcher whose postinstall downloads the matching platform asset (with PATH-shadow detection and loud failure banners), and wbx upgrade self-swaps the binary in place — plus a wb.wasm target published for in-sandbox agents.",
-      "evidence": "cli/npm/install.js (asset resolution, redirect-following download, findShadow PATH check, non-fatal failure banner); cli/src/local.rs:585-634 (upgrade: release discovery, npm-install detection, atomic binary swap); cli/SPEC.md Distribution section (curl + npm optionalDependencies + wasm lanes); cli/npm/bin/wbx.js"
+      "dek": "One static binary, three install lanes: a GitHub Release tagged work-v* feeds curl installs, an npm launcher whose postinstall downloads the matching platform asset (with PATH-shadow detection and loud failure banners), and work upgrade self-swaps the binary in place — plus a wb.wasm target published for in-sandbox agents.",
+      "evidence": "cli/npm/install.js (asset resolution, redirect-following download, findShadow PATH check, non-fatal failure banner); cli/src/local.rs:585-634 (upgrade: release discovery, npm-install detection, atomic binary swap); cli/SPEC.md Distribution section (curl + npm optionalDependencies + wasm lanes); cli/npm/bin/work.js"
     },
     {
       "slug": "backends",

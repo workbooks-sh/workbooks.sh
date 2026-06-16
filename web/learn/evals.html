@@ -295,7 +295,7 @@ flowchart LR
     c["commands"]
     e["evals/*.org — the author's proof"]
   end
-  tk -- "wb toolkit eval &lt;id&gt;" --> run["run the author's cases<br/>on YOUR runtime"]
+  tk -- "work toolkit eval &lt;id&gt;" --> run["run the author's cases<br/>on YOUR runtime"]
   run --> v{"same verdicts?"}
   v -- "yes" --> trust["trust the artifact"]
   v -- "no" --> hold["it doesn't do what it claims here"]
@@ -303,14 +303,14 @@ flowchart LR
   style trust fill:#13d943,stroke:#121316
   </pre>
   <p>Walk it: you import a toolkit; it carries its manual, its commands, and its
-  evals. You run <code>wb toolkit eval &lt;id&gt;</code> and the author's own
+  evals. You run <code>work toolkit eval &lt;id&gt;</code> and the author's own
   cases execute — on <em>your</em> runtime, with <em>your</em> models. If the
   verdicts match the author's, you've reproduced their proof and you can trust
   the thing. If they don't, the artifact doesn't do what it claims in your
   environment, and you found out before you depended on it.</p>
-  <p>The run can happen server-side. <code>wb toolkit eval git</code> goes over
+  <p>The run can happen server-side. <code>work toolkit eval git</code> goes over
   the engine's remote protocol — the eval executes on the runtime, not your
-  laptop, because Tier 2 needs the real agent loop. And <code>wb dev eval</code>
+  laptop, because Tier 2 needs the real agent loop. And <code>work dev eval</code>
   lists every suite the engine is carrying — <em>each toolkit, with its case
   count</em> — so you can see at a glance what proofs are on the shelf and run any
   one of them.</p>

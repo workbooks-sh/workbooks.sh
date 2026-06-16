@@ -2,20 +2,20 @@
 
 * Render a Workbook → a live URL
 
-  `wb publish` turns a Workbook (`.org`) into self-contained HTML and ships it.
+  `work publish` turns a Workbook (`.org`) into self-contained HTML and ships it.
   Non-interactive; add `--json` for machine output (exit 0 ok / non-zero fail).
 
 * The flow
 
-  : wb publish init               ;; scaffold ./publish.org
+  : work publish init               ;; scaffold ./publish.org
   ;; → user edits publish.org (target, project, optional domain/title)
-  : wb publish validate           ;; coherence-check it — no render, no deploy
-  : wb publish apply <file.org>   ;; render + ship → prints the live URL
+  : work publish validate           ;; coherence-check it — no render, no deploy
+  : work publish apply <file.org>   ;; render + ship → prints the live URL
   ;; (workbook defaults to ./workbook.org; config defaults to ./publish.org)
 
 * Multi-page sites
 
-  : wb publish site [<dir>]       ;; render a multi-page site from site.org → deploy
+  : work publish site [<dir>]       ;; render a multi-page site from site.org → deploy
 
 * What publish.org declares
 
@@ -33,5 +33,5 @@
     first and report it.
   - The printed URL is the real, live result — quote it back; don't fabricate one.
   - If the target needs a credential the user hasn't provided, say which one and
-    stop (you can request it with `wb env request <NAME>` if the browser toolkit
+    stop (you can request it with `work env request <NAME>` if the browser toolkit
     is also available).

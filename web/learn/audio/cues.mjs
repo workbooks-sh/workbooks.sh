@@ -25,7 +25,7 @@ const TEMPER = {
   org: "spare and focused, elegant minimalism",
   agents: "patient gentle pulse, quietly determined",
   autopoet: "organic and tender, growing warmth",
-  wbx: "precise and crisp, quietly confident",
+  work: "precise and crisp, quietly confident",
   bundles: "tidy packing-room temperament, light and satisfying, things clicking into place",
   nesting: "branching garden temperament, gentle recursive motifs, patient growth",
 
@@ -87,7 +87,7 @@ const TEMPER = {
   fleets: "many-workers-one-manifest, staggered boots in concert, organized warmth",
   rehearsals: "dress-rehearsal brightness, real persona scripted through, lively proof",
 
-  // wbx subs
+  // work subs
   modes: "two-audiences-one-binary poise, switching cleanly, adaptable confidence",
   pipelines: "stdin-flowing-through temperament, verbs composing briskly, fluid craft",
   doctor: "self-checkup reassurance, reporting never judging, gentle and steady",

@@ -402,7 +402,7 @@ Perform one keeper run per your loop. …</pre>
   opposite of that. <code>exec</code> is a <b>trust grant</b> — it adds a fixed
   set of <em>host-brokered</em> tools and nothing native. Here is the keeper's
   actual run call, with a def whose head declares
-  <code>:MODEL: xiaomi/mimo-v2.5</code> and <code>:TOOLKITS: shell wb sandbox</code>:</p>
+  <code>:MODEL: xiaomi/mimo-v2.5</code> and <code>:TOOLKITS: shell work sandbox</code>:</p>
   <pre class="orgsample">Workbooks.AgentDef.run(org,
   "MODE: plan\nPerform one keeper run per your loop. …",
   exec: true, workdir: repo, tenant: "local", agent: "wren", max_steps: 60)</pre>

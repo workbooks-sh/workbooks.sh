@@ -1,5 +1,5 @@
 #+TITLE: Install
-#+DESCRIPTION: Get the wb CLI and the runtime.
+#+DESCRIPTION: Get the work CLI and the runtime.
 
 * Install
 

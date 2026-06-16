@@ -1,6 +1,6 @@
 ---
 name: getting-started
-description: Onboard an agent or developer to a Workbooks project from zero. Read FIRST in any repo that contains a `skills/` folder or a `wbx` CLI. Covers the non-interactive first-run setup — installing the wbx CLI, pointing at a runtime, and loading the rest of the Workbooks skills. Use when you land in an unfamiliar Workbooks repo, when asked to "set up" / "get started" / "onboard", or before invoking create-workbook / create-toolkit.
+description: Onboard an agent or developer to a Workbooks project from zero. Read FIRST in any repo that contains a `skills/` folder or a `work` CLI. Covers the non-interactive first-run setup — installing the work CLI, pointing at a runtime, and loading the rest of the Workbooks skills. Use when you land in an unfamiliar Workbooks repo, when asked to "set up" / "get started" / "onboard", or before invoking create-workbook / create-toolkit.
 ---
 
 # Getting started on a Workbooks project
@@ -32,9 +32,9 @@ command -v wb && wb --version || echo "install needed"
 The classification decides which task ledger you use (step 5) and which sibling
 skill you hand off to (step 6).
 
-## 2. Install the `wbx` CLI — non-interactively
+## 2. Install the `work` CLI — non-interactively
 
-If `wbx` is absent, build the canonical escript from this repo's runtime, or use
+If `work` is absent, build the canonical escript from this repo's runtime, or use
 a published path. **Always pass non-interactive flags** (`-y`,
 `BatchMode=yes`, `HOMEBREW_NO_AUTO_UPDATE=1`) — an aliased `-i` prompt will hang
 an agent shell forever.
@@ -45,7 +45,7 @@ cd runtime && mix escript.build      # canonical: runtime/host/cli.ex → ./wb
 
 Full build + install paths (and the `workbook` standalone-artifact CLI, which is
 a separate tool) are in `references/cli-bootstrap.md`. There is exactly **one**
-canonical `wbx` — the Elixir escript from this repo. Ignore any legacy Rust `wbx`
+canonical `work` — the Elixir escript from this repo. Ignore any legacy Rust `work`
 or npm `@work.books/cli`; both are dead.
 
 ## 3. Load the sibling skills
@@ -65,10 +65,10 @@ usually already provides one.
 ## 4. Locate a runtime — only if the task needs compute
 
 ```sh
-wbx dev info       # demo dashboard: runtime target + /health, model key, toolkits root
+work dev info       # demo dashboard: runtime target + /health, model key, toolkits root
 ```
 
-If there's no runtime and the task genuinely needs one, `wbx deploy local` stands
+If there's no runtime and the task genuinely needs one, `work deploy local` stands
 one up (krunvm, same OCI image as prod — **users only**, never a platform-release
 path). If the task is just viewing or authoring an artifact, skip this entirely.
 
@@ -96,5 +96,5 @@ State which skill to invoke next based on intent:
 
 ## References
 
-- `references/cli-bootstrap.md` — escript build + install paths, `wbx` vs `workbook`.
+- `references/cli-bootstrap.md` — escript build + install paths, `work` vs `workbook`.
 - `references/repo-shapes.md` — consumer vs platform vs tenant detection table.

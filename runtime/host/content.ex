@@ -1,7 +1,7 @@
 defmodule Workbooks.Content do
   @moduledoc """
   Validation for a tenant's runtime-CMS content tree — the host-side check an
-  agent runs via `wb content check` before publishing. No JS, no node: the
+  agent runs via `work content check` before publishing. No JS, no node: the
   runtime already reads the tenant repo, so the validator is pure Elixir over
   files. It exists to catch the authoring mistakes that otherwise ship a broken
   page silently — a manifest row with no file, a file with no row (so it never

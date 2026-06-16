@@ -17,7 +17,7 @@ way, and a hotlink rots. Fetch, sanity-check, inline.
   - Broad coverage / simple monochrome fallback → SIMPLE-ICONS:
     https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/<slug>.svg
     slug = lowercase, no spaces/dots (react, svelte, nextdotjs, x).
-  - Arbitrary company by domain (no entry above) → `wb` brand fetch if the
+  - Arbitrary company by domain (no entry above) → `work` brand fetch if the
     toolkit offers it; else a clean text label is fine — never invent a mark.
 
 * recipe (run via the run tool)

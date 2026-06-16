@@ -108,7 +108,7 @@
    benchmark — "ask models org mode from memory" — is a real, cheap eval to
    actually run.)
 
-** KEPT toolkits = org skill-trees wrapping CLIs compiled to WASM, run via wb toolkit
+** KEPT toolkits = org skill-trees wrapping CLIs compiled to WASM, run via work toolkit
    Quote: "package up a CLI system by using a WebAssembly compiler… wrap them
    in the same skill structure."
    Evidence: six EXEC shapes audited; huniq autobuild proof; AUTHORING.org;
@@ -122,7 +122,7 @@
 ** CLAIMED org mode beats Markdown because drift is TESTABLE ("I can't write a test suite for Markdown")
    This is the single sharpest differentiating argument in the whole
    recording. Verify we actually HAVE the thing it implies: a drift
-   linter/validator for org artifacts (=wb content check= exists — how much
+   linter/validator for org artifacts (=work content check= exists — how much
    does it cover?). If we make this fully true, it's the headline.
 
 * Prong 4 — the autopoet (the future state)

@@ -35,7 +35,7 @@
    "sub": "Lesson · Build by talking to your agent",
    "kind": "learn",
    "url": "/learn/reading-what-it-did",
-   "text": "Level 2->3: review AI work like an untrusted colleague — the sniff-check, spotting drift and failure modes, and the unfakeable ledger as your trustable record. A builder-facing, de-jargoned version of did-it-do-well grounded in the real wb toolkit eval surface."
+   "text": "Level 2->3: review AI work like an untrusted colleague — the sniff-check, spotting drift and failure modes, and the unfakeable ledger as your trustable record. A builder-facing, de-jargoned version of did-it-do-well grounded in the real work toolkit eval surface."
   },
   {
    "title": "Your first workbook, start to finish",
@@ -112,7 +112,7 @@
    "sub": "Lesson · Giving it abilities",
    "kind": "learn",
    "url": "/learn/the-one-command",
-   "text": "Demoted to a reference card: the AGENT runs wbx, not this non-technical user. Fix the three embellishments (next-hint on only 7 verbs, in-sandbox parity bails until the Dock broker, no source split-pane)."
+   "text": "Demoted to a reference card: the AGENT runs work, not this non-technical user. Fix the three embellishments (next-hint on only 7 verbs, in-sandbox parity bails until the Dock broker, no source split-pane)."
   },
   {
    "title": "What an agent really is",
@@ -133,7 +133,7 @@
    "sub": "Lesson · Agents that work on their own",
    "kind": "learn",
    "url": "/learn/did-it-do-well",
-   "text": "The deeper review craft: measuring a good job, catching drift, and the record you can't fake. Ground in the real wb toolkit eval surface; soften the cost/speed figure. Complements the Unit 1 builder-facing review lesson with the mechanism."
+   "text": "The deeper review craft: measuring a good job, catching drift, and the record you can't fake. Ground in the real work toolkit eval surface; soften the cost/speed figure. Complements the Unit 1 builder-facing review lesson with the mechanism."
   },
   {
    "title": "Plans that run themselves",
@@ -402,7 +402,7 @@
    "text": ""
   },
   {
-   "title": "wbx CLI",
+   "title": "work CLI",
    "sub": "Docs · Reference",
    "kind": "docs",
    "url": "https://docs.workbooks.sh/docs/reference/cli",

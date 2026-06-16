@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>imports — convert, don't rewrite — Workbooks</title>
-<meta name="description" content="wbx toolkit import is the ecosystem's intake ramp: it sniffs a source's shape across nine formats, mechanically translates its docs to org, scaffolds a real toolkit, and writes the conversion plan it can't finish for you. Parse what's parseable — never a shrug.">
+<meta name="description" content="work toolkit import is the ecosystem's intake ramp: it sniffs a source's shape across nine formats, mechanically translates its docs to org, scaffolds a real toolkit, and writes the conversion plan it can't finish for you. Parse what's parseable — never a shrug.">
 <link rel="preload" href="../fonts/GroothanMixed-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../fonts/fonts.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -243,12 +243,12 @@ flowchart LR
   from <code>description</code> (truncated to 220 chars), the body becomes the main
   skill, and <code>references/extra.md</code> becomes a <code>reference-extra</code>
   skill. The human-mode output:</p>
-  <pre class="orgsample">$ wbx toolkit import my-skill
+  <pre class="orgsample">$ work toolkit import my-skill
 imported claude-skill → demo-skill-toolkit/
   manifest.org      the toolkit surface
   skills/           2 skills
   scripts/          1 carried (unaudited — see the TODO)
-next: review manifest.org, then `wbx toolkit verify demo-skill`
+next: review manifest.org, then `work toolkit verify demo-skill`
 
 audited 1 script — 1 ready · 0 convertible · 0 blocked
   run.sh                   ready        (sh)
@@ -349,10 +349,10 @@ out  →  scripts/gh.sh
     <code>owner/repo</code>, an <code>http</code> URL — none import directly. Instead
     of half-trying, the error teaches the fix: <i>Remote refs (skills.sh, owner-repo)
     aren't wired yet — clone it locally and import the folder: git clone … &amp;&amp;
-    wbx toolkit import &lt;dir&gt;.</i> Clone first.</li>
+    work toolkit import &lt;dir&gt;.</i> Clone first.</li>
     <li><b>YAML OpenAPI isn't parsed.</b> Only JSON specs parse today, and a YAML
     spec doesn't get a half-parse — it gets a recipe: <i>convert YAML first: yq
-    -o=json spec.yaml &gt; spec.json &amp;&amp; wbx toolkit import spec.json.</i></li>
+    -o=json spec.yaml &gt; spec.json &amp;&amp; work toolkit import spec.json.</i></li>
     <li><b>MCP tools are runtime-enumerated.</b> The config has the launcher, not
     the tool catalog, so the import documents the launcher and tells you to
     enumerate the rest after first run.</li>
@@ -374,14 +374,14 @@ out  →  scripts/gh.sh
 
 ** TODO fix-up plan [0/1]
    The agent manual: work each item, check it off, then prove the whole
-   toolkit — done when =wbx toolkit push pycli <dir>= · =wbx toolkit build pycli=
-   · =wbx toolkit verify pycli= all pass. With an engine reachable,
-   =wbx toolkit audit <dir> --fix= runs that push→build→verify for you.
+   toolkit — done when =work toolkit push pycli <dir>= · =work toolkit build pycli=
+   · =work toolkit verify pycli= all pass. With an engine reachable,
+   =work toolkit audit <dir> --fix= runs that push→build→verify for you.
 *** TODO pycli.py (blocked — python3)
     - [ ] rewrite in JS for the quickjs lane — keep the script's CLI contract
           (same args in, same stdout out) so callers don't change
     - [ ] or split the logic into org tasks the engine runs natively
-    - [ ] re-run =wbx toolkit audit= — pycli.py must classify ready</pre>
+    - [ ] re-run =work toolkit audit= — pycli.py must classify ready</pre>
   <p>The import didn't fail. It produced the instructions — in the same org grammar
   agents already execute. The sibling lesson <a href="audits">audits</a> owns the
   depth of how <em>ready</em>, <em>convertible</em>, and <em>blocked</em> get
@@ -401,7 +401,7 @@ out  →  scripts/gh.sh
     <summary>My import says blocked — did it fail?</summary>
     <p>No — the plan is the product. A blocked script means import couldn't make it
     sandbox-ready by itself, so it wrote the rewrite recipe instead. An agent works
-    the org checklist, and <code>wbx toolkit audit &lt;dir&gt; --fix</code> proves
+    the org checklist, and <code>work toolkit audit &lt;dir&gt; --fix</code> proves
     the result by running push → build → verify. Blocked is a starting line, not a
     dead end.</p>
   </details>

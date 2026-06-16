@@ -1,9 +1,9 @@
 # wb-publish — the publish/identity toolkit binary (toolkits/publish/).
 #
 # Standalone home of the AT Protocol + Workbooks Network identity stack
-# moved out of `wb` (M5-publish-to-toolkit, plans/minimal-platform.org:
-# provider/integration logic lives in toolkits). `wb identity …` /
-# `wb atproto …` pass through to this binary when it's on PATH.
+# moved out of `work` (M5-publish-to-toolkit, plans/minimal-platform.org:
+# provider/integration logic lives in toolkits). `work identity …` /
+# `work atproto …` pass through to this binary when it's on PATH.
 #
 # Install: cargo install --path toolkits/publish/bin
 

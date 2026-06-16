@@ -7,7 +7,7 @@ license = "Apache-2.0"
 repository = "https://github.com/workbooks-sh/workbooks.sh"
 
 [[bin]]
-name = "wbx"
+name = "work"
 path = "src/main.rs"
 
 [dependencies]

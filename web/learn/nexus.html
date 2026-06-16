@@ -353,8 +353,8 @@
       <div>What is a toolkit<small>the parts</small></div><span class="go">→</span></a>
     <a href="workbook"><span class="sw" style="background:#a8d4f0"><img src="../wb-file-icon.svg" alt=""></span>
       <div>What is a workbook<small>the unit</small></div><span class="go">→</span></a>
-    <a href="wbx#install"><span class="sw" style="background:#d9dbd3"><b>&gt;_</b></span>
-      <div>Run your own<small>wbx deploy local — engine in one command</small></div><span class="go">→</span></a>
+    <a href="work#install"><span class="sw" style="background:#d9dbd3"><b>&gt;_</b></span>
+      <div>Run your own<small>work deploy local — engine in one command</small></div><span class="go">→</span></a>
     <a href="https://github.com/workbooks-sh/workbooks.sh"><span class="sw" style="background:#9fc4e8"><img src="../nexus-icon.svg" alt=""></span>
       <div>Read the source<small>open source, FSL — github</small></div><span class="go">→</span></a>
   </div>
@@ -397,7 +397,7 @@
 window.LEARN = {
   mix: [["#a8d4f0", .34], ["#f3c5a3", .26], ["#9fc4e8", .22], ["#f2ddb0", .18]],
   story: [
-    ["cmd", "wbx deploy init"],
+    ["cmd", "work deploy init"],
     ["q",  "? engine place — where does this run?"],
     ["out", "  <span class=hi>› local</span>     a microVM on this mac — cloud-identical"],
     ["out", "    cloud     fly.io, under your own account"],
@@ -407,12 +407,12 @@ window.LEARN = {
     ["ok", "wrote deployment.org (local) — declarative, reproducible"],
     ["dim", "  engine place · tenancy · storage · database · auth —"],
     ["dim", "  one org file describes the whole deployment."],
-    ["cmd", "wbx deploy validate"],
+    ["cmd", "work deploy validate"],
     ["ok", "valid — local · single-tenant · storage=local-fs · db=sqlite"],
-    ["cmd", "wbx deploy apply"],
+    ["cmd", "work deploy apply"],
     ["out", "pulling engine… booting microVM…"],
     ["ok", "runtime up — http://127.0.0.1:4000"],
-    ["cmd", "wbx deploy status"],
+    ["cmd", "work deploy status"],
     ["out", "local runtime: microVM up — http://127.0.0.1:4000 <span class=dim>(pid 210)</span>"],
     ["dim", "  cloud later? flip ENGINE_PLACE to fly — same file,"],
     ["dim", "  same engine, dev → prod."]],

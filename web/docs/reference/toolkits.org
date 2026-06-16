@@ -1,5 +1,5 @@
 #+TITLE: Toolkits
-#+DESCRIPTION: The toolkit authoring surface — manifest schema, EXEC shapes, capability grants, build lanes, and the wbx toolkit CLI. Tangled from code.
+#+DESCRIPTION: The toolkit authoring surface — manifest schema, EXEC shapes, capability grants, build lanes, and the work toolkit CLI. Tangled from code.
 
 # REFERENCE — exhaustive, flat, zero narrative. Each fact carries a :SRC: anchor
 # (where truth lives in code) and a :MATURITY: tier. The conceptual "why" lives in
@@ -158,7 +158,7 @@ binary under the =posix= Policy profile inside the one deploy container. Verify:
 
 *** task — recipe-only, no single CLI
 
-Ships =:role task= bash blocks run via =wbx toolkit run <tk> <task> -- …=. Verify
+Ships =:role task= bash blocks run via =work toolkit run <tk> <task> -- …=. Verify
 always passes structurally (=toolkits.ex:972=). HOWEVER: native =:role= bash
 execution is BANNED (wb-9ja). =exec_allowed?= is hardcoded =false=; =run_bash= is a
 no-op (=toolkits.ex:1062=). So a task block does not execute today — ship the CLI
@@ -328,7 +328,7 @@ shared-frame arena for kernels) is *proposed*, not in the Policy set today.
   :MATURITY: partial
   :EVIDENCE: runtime/host/toolkits.ex:507-521
   :SRC:      runtime/host/toolkits.ex#parse_build_src
-  :CAVEAT:   crate:/path:/wasm:/archive: build through `wbx toolkit build`; git+ is parsed but NOT yet supported by build (returns an error, toolkits.ex:891); gobuild:/script:/zigbuild: are parsed but script: is removed (wb-9ja).
+  :CAVEAT:   crate:/path:/wasm:/archive: build through `work toolkit build`; git+ is parsed but NOT yet supported by build (returns an error, toolkits.ex:891); gobuild:/script:/zigbuild: are parsed but script: is removed (wb-9ja).
   :END:
 
 | Prefix       | Tuple             | Build support                                              | :SRC: (toolkits.ex) |
@@ -381,7 +381,7 @@ TRUSTED components — not on untrusted source (=package_manager.ex:6-31=).
   :WALL:     forge
   :END:
 
-** The =wbx toolkit= CLI
+** The =work toolkit= CLI
 
 The learn/build/run surface. Verbs (=ToolkitVerb=, =cli/src/main.rs:145-172=);
 dispatch at =main.rs:326-336=.
@@ -394,16 +394,16 @@ dispatch at =main.rs:326-336=.
 
 | Command                                  | Does                                                        | :SRC: (main.rs) |
 |------------------------------------------+-------------------------------------------------------------+-----------------|
-| =wbx toolkit list=                       | list discoverable toolkits (id · status · tagline)          | l.327           |
-| =wbx toolkit show <id> [skill]=          | manifest + skill index, or one skill's recipe               | l.328           |
-| =wbx toolkit search <q>=                 | substring match across toolkits + skills                    | l.329           |
-| =wbx toolkit verify <id>=                | structural + cap + trust + exec contract checks             | l.330           |
-| =wbx toolkit sign <id>=                  | sign a manifest (=did:key= provenance; req. third-party)    | l.331           |
-| =wbx toolkit build <id> [which]=         | in-sandbox compile + register the declared artifact         | l.332           |
-| =wbx toolkit push <id> <dir>=            | ship a toolkit dir onto the engine (deploy-the-toolkit)     | l.333           |
-| =wbx toolkit import <source> [--as] [-o]=| package a Claude skill / markdown / folder as a toolkit      | l.334           |
-| =wbx toolkit audit <dir> [--fix]=        | re-run the wasm-compatibility audit on an imported dir       | l.335           |
-| =wbx toolkit run <id> <task> -- <args>=  | run a =:role task= recipe (gated: =WB_TOOLKIT_EXEC=1=)       | l.336           |
+| =work toolkit list=                       | list discoverable toolkits (id · status · tagline)          | l.327           |
+| =work toolkit show <id> [skill]=          | manifest + skill index, or one skill's recipe               | l.328           |
+| =work toolkit search <q>=                 | substring match across toolkits + skills                    | l.329           |
+| =work toolkit verify <id>=                | structural + cap + trust + exec contract checks             | l.330           |
+| =work toolkit sign <id>=                  | sign a manifest (=did:key= provenance; req. third-party)    | l.331           |
+| =work toolkit build <id> [which]=         | in-sandbox compile + register the declared artifact         | l.332           |
+| =work toolkit push <id> <dir>=            | ship a toolkit dir onto the engine (deploy-the-toolkit)     | l.333           |
+| =work toolkit import <source> [--as] [-o]=| package a Claude skill / markdown / folder as a toolkit      | l.334           |
+| =work toolkit audit <dir> [--fix]=        | re-run the wasm-compatibility audit on an imported dir       | l.335           |
+| =work toolkit run <id> <task> -- <args>=  | run a =:role task= recipe (gated: =WB_TOOLKIT_EXEC=1=)       | l.336           |
 
   :PROPERTIES:
   :MATURITY: partial
@@ -459,7 +459,7 @@ EXECUTION (verify pre / run / build) is separately gated (=toolkits.ex:19-37=).
 The manifest is the INDEX; skills are read on demand. The auto-injected agent
 prompt carries one line per declared toolkit + up to 8 skill names
 (=injection_text/2=, =toolkits.ex:138-175=). The agent then reads a skill body via
-=wbx toolkit show <id> <skill>=. The runtime resolves *which* toolkit; it never
+=work toolkit show <id> <skill>=. The runtime resolves *which* toolkit; it never
 inlines the manual.
 
   :PROPERTIES:

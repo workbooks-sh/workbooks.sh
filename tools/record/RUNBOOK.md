@@ -1,6 +1,6 @@
 # Recording System — RUNBOOK
 
-The operator's guide to `wb record` — the single, Claude-Code-runnable pipeline
+The operator's guide to `work record` — the single, Claude-Code-runnable pipeline
 that produces verified demo/tutorial content (MP4 + stills + GIF) of the
 **Workbooks Browser** and Workbooks generally, for the landing page, blog, LMS,
 and docs. The same harness doubles as UI/UX regression testing.
@@ -48,7 +48,7 @@ Output: `<out>/pipeline.json` (publishable flag, verdict, artifact paths) +
 | `tools/record/lib/voiceover.mjs` | Adds a narrated track to a recorded MP4 (ElevenLabs v3; `XI_API_KEY`). TTS per line → paced across the video's real duration → muxed AAC. CLI: `node lib/voiceover.mjs --video f.mp4 --script narration.json`. Wired into `pipeline` via `--voiceover <script.json|recipe>` / `WB_REC_VOICEOVER`; a recipe `"voiceover":{"lines":[…]}` block is the zero-arg path. |
 | `tools/record/lib/verify.mjs` | The proof cascade (Gemini 3.5 Flash → 3.1 Pro → MiniMax M3). |
 | `tools/record/lib/verify-only.mjs` | Run that cascade against an **already-captured** MP4 (the orchestrator gates the *real* capture, not a still-strip). |
-| `runtime/demos/seed/` + `wb demo seed` | The reproducible demo environment every take plays against. |
+| `runtime/demos/seed/` + `work demo seed` | The reproducible demo environment every take plays against. |
 | `tools/record/trigger-from-mac.sh` | Mac → Linux trigger (krunvm/podman/docker/ssh seam). |
 
 **Two targets, one seam.** A recipe's `"target"` decides the lane:
@@ -135,10 +135,10 @@ Cloud notes:
 | `WB_MCP_SOCK` | the Browser's MCP UDS | `/tmp/workbooks-mcp.sock` |
 | `WB_REC_DRIVER` | `mcp` / `playwright` / `auto` | `auto` |
 | `WB_REC_RETRIES` / `WB_REC_TIMEOUT_MS` | re-takes / wall-clock budget (no turn cap, per canon) | `1` / `900000` |
-| `WB_REC_SEED_ARGS` | args for `wb demo seed` | `--no-build` |
+| `WB_REC_SEED_ARGS` | args for `work demo seed` | `--no-build` |
 | `WB_REC_APP` | app launch cmd (alt to `--app`) | — |
 | `WB_REC_DISPLAY/_W/_H/_FPS/_CRF/_CURSOR` | capture knobs (`lib/common.sh`) | `:99` / `1440` / `900` / `30` / `20` / `1` |
-| seed gates | `WB_TENANCY_MODE=multi`, `WB_DEMO=1`, `WB_DEMO_REPLAY=1`, `WB_DEMO_NOW`, `WB_DATA`, `WB_TOOLKITS_ROOT` (exported by `wb demo seed`) | — |
+| seed gates | `WB_TENANCY_MODE=multi`, `WB_DEMO=1`, `WB_DEMO_REPLAY=1`, `WB_DEMO_NOW`, `WB_DATA`, `WB_TOOLKITS_ROOT` (exported by `work demo seed`) | — |
 
 ---
 
@@ -153,7 +153,7 @@ Cloud notes:
   so the app/MCP tier works in a minimal Linux container.
 - The Linux capture rig (`record selftest`) produces a real synthetic MP4/PNG/GIF
   where Xvfb+ffmpeg exist (per the capture-rig phase).
-- `wb demo seed --dry-run` (stable DIDs, no writes) and the seed module.
+- `work demo seed --dry-run` (stable DIDs, no writes) and the seed module.
 - The verify cascade + `verify-only` load and call OpenRouter when a key is set.
 
 **Env-gated (needs the real substrate / inputs — flagged honestly, not faked):**
@@ -207,7 +207,7 @@ exec** — BEDROCK-resolved-by-broker, the same pattern as HTTP/exec/net.
    intent-emission + verification logic are guest-eligible). Reuse the MCP
    transport: the provider speaks the same JSON-RPC the Browser MCP already does.
 3. Expose it to the guest as a toolkit EXEC-shape (`3w browse drive …` / a
-   `wb record` shape over RCP) so a wasm tenant emits intents across the Dock
+   `work record` shape over RCP) so a wasm tenant emits intents across the Dock
    membrane and gets back screenshots/DOM — never touching a display.
 4. The proof loop (`verify.mjs`) and demo seed are unchanged: they already live
    host-side and gate any take regardless of who emitted the intents.

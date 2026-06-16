@@ -26,7 +26,7 @@ defmodule Workbooks.AgentDefTest do
 
     *** Command surface
 
-       Use `wb app …` to drive the shell.
+       Use `work app …` to drive the shell.
 
     ** Notes
 
@@ -46,7 +46,7 @@ defmodule Workbooks.AgentDefTest do
     d = AgentDef.parse(def_with_heading())
     assert d.system =~ "You are Waldo, the resident agent."
     # a deeper *** subsection stays IN the prompt
-    assert d.system =~ "Use `wb app"
+    assert d.system =~ "Use `work app"
     # a sibling ** heading ends the prompt — its body must be excluded
     refute d.system =~ "This must NOT be part of the prompt."
   end

@@ -109,7 +109,7 @@ const MEMORY_CONTROL_TOPIC = "memory:control";
 // the agent. Outbound: permit messages with the user's Allow/Deny.
 const WORKGATE_CONTROL_TOPIC = "workgate:control";
 // Bidirectional control channel for env-var provisioning requests
-// from `wb env request`. Inbound: env_prompt with name + workspace
+// from `work env request`. Inbound: env_prompt with name + workspace
 // + reason + hint. Outbound: env:fulfill with the value the user
 // typed (writes to the workspace keychain) or env:cancel.
 const ENV_PROMPT_TOPIC = "engine:env_prompt";
@@ -506,7 +506,7 @@ class WsBridgeStore {
       // os.* capability request from the agent reaches the SvelteKit
       // approval modal immediately on first connect.
       this.#join(WORKGATE_CONTROL_TOPIC);
-      // Auto-join the env-prompt channel so `wb env request` from
+      // Auto-join the env-prompt channel so `work env request` from
       // any terminal reaches the SvelteKit modal. The engine counts
       // joins here to decide whether desktop mode is reachable
       // (see EnvBroker.desktop_subscribed?/0).
@@ -589,7 +589,7 @@ class WsBridgeStore {
         this.#dispatchTabCommand(payload);
       });
       // wb-d2nx.2 — non-tab app capabilities (theme / bookmark / workspace) the
-      // agent drives via `wb app …`. Generic action dispatch to the local stores.
+      // agent drives via `work app …`. Generic action dispatch to the local stores.
       ch.on("app_command", (payload: Record<string, unknown>) => {
         void this.#dispatchAppCommand(payload);
       });

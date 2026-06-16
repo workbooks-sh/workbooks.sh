@@ -12,7 +12,7 @@ The Nexus exposes its capabilities over HTTP/WebSocket. There are *two
 separate listeners* — two *planes* — never merged: the authenticated
 *control plane* (=Workbooks.Web=) and the anonymous, GET-only *content
 plane* (=Workbooks.PublicWeb=). RCP (the Runtime-Connect Protocol) is the
-token-authed verb subset of the control plane the thin =wbx= CLI drives
+token-authed verb subset of the control plane the thin =work= CLI drives
 against a running engine.
 
 Every fact below is anchored at =:SRC:= a real =file:line=. Routes are
@@ -183,7 +183,7 @@ ONLY for the trusted local case (single-tenant/desktop) or explicit
 | GET  | =/api/telemetry/:slug= | —           | per-run telemetry summary (states, tool calls, time, errors) | =web.ex:416= |
 | GET  | =/api/telemetry=       | —           | cross-run rollup index                         | =web.ex:730= |
 
-** RCP engine verbs for the =wbx= CLI (control plane, token-authed)
+** RCP engine verbs for the =work= CLI (control plane, token-authed)
    :PROPERTIES:
    :MATURITY: ships-today
    :EVIDENCE: runtime/host/web.ex:435-665
@@ -197,14 +197,14 @@ bytes cross the wire base64'd in the =:zip= =Workbooks.Bundle= format
 because the engine usually runs in a container on another machine
 (=web.ex:449-454=).
 
-| method | path | wbx verb | does | :SRC: |
+| method | path | work verb | does | :SRC: |
 |--------+------+----------+------+-------|
-| POST | =/rcp/build=             | =wbx build=     | compile a workspace's components → WASM      | =web.ex:440= |
-| POST | =/rcp/library/checkout=  | =wbx checkout=  | borrow a library member (zip back to caller) | =web.ex:455= |
-| POST | =/rcp/library/checkin=   | =wbx checkin=   | pack a working tree back (zip in)            | =web.ex:473= |
-| GET  | =/rcp/store=             | =wbx store --list= | list stored archive keys                  | =web.ex:492= |
-| POST | =/rcp/store=             | =wbx store=     | archive a workspace                          | =web.ex:498= |
-| GET  | =/rcp/fetch=             | =wbx fetch=     | restore stored bytes (base64)                | =web.ex:656= |
+| POST | =/rcp/build=             | =work build=     | compile a workspace's components → WASM      | =web.ex:440= |
+| POST | =/rcp/library/checkout=  | =work checkout=  | borrow a library member (zip back to caller) | =web.ex:455= |
+| POST | =/rcp/library/checkin=   | =work checkin=   | pack a working tree back (zip in)            | =web.ex:473= |
+| GET  | =/rcp/store=             | =work store --list= | list stored archive keys                  | =web.ex:492= |
+| POST | =/rcp/store=             | =work store=     | archive a workspace                          | =web.ex:498= |
+| GET  | =/rcp/fetch=             | =work fetch=     | restore stored bytes (base64)                | =web.ex:656= |
 | GET  | =/rcp/changes=          | —               | the tenant repo's git log (newest first, 30) | =web.ex:641= |
 | POST | =/rcp/key/:key_id=       | —               | sealed-bundle key release (access-gated, fail-closed) | =web.ex:122= |
 
@@ -338,5 +338,5 @@ public plane today is static content + read-only =/_changes= and
 
 - [[../concepts/the-dock.org][The Dock & capabilities]] — the membrane the runtime brokers.
 - [[./caps.org][Dock capabilities reference]] — the capability grants.
-- [[./cli.org][wbx CLI reference]] — the verbs that drive the RCP surface.
+- [[./cli.org][work CLI reference]] — the verbs that drive the RCP surface.
 - =runtime/docs/RUNTIME-CONNECT-PROTOCOL.org= — the RCP handshake spec (=:SRC:= for =/.well-known/workbooks-runtime=).

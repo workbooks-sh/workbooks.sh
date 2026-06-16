@@ -33,12 +33,12 @@ Desktop app  ──HTTP──>  Runtime (OCI image)  running INSIDE a VM   ─�
 - **`desktop/src-tauri/src/daemon.rs`** — the engine bridge, already working:
   - `status() -> DaemonStatus` — reads the runtime's discovery file + probes `/health`; returns
     running / stopped / unhealthy + a `chip` label for the titlebar. Short timeout, never stalls.
-  - `daemon_up()` — if nothing live, runs `wb deploy local --json`, waits for the discovery file.
-  - `daemon_down()` — `wb deploy down --json`.
-  - `wb(args)` — shells to the `wb` escript, resolved from `WB_BIN` env or PATH.
+  - `daemon_up()` — if nothing live, runs `work deploy local --json`, waits for the discovery file.
+  - `daemon_down()` — `work deploy down --json`.
+  - `wb(args)` — shells to the `work` escript, resolved from `WB_BIN` env or PATH.
   - Discovery file: written by the runtime inside the VM, read by the desktop → gives the URL
     (`http://localhost:<port>`).
-- **Deploy-kit verbs** (`runtime/host/deploy.ex`): `wb deploy init local|cloud`, `wb deploy local`
+- **Deploy-kit verbs** (`runtime/host/deploy.ex`): `work deploy init local|cloud`, `work deploy local`
   (boot the microVM), `status`, `down`, `url`. `Machine` (`runtime/host/deploy/machine.ex`) is the
   mac backend: ensure case-sensitive APFS volume → `krunvm create <image>` → `krunvm start` (launchd).
 - **Runtime image**: `ghcr.io/workbooks-sh/runtime:latest` — PUBLIC, multi-arch (amd64+arm64),
@@ -60,7 +60,7 @@ skippable (offline-first). State machine:
    b. **If missing → guide install.** Offer the one concrete install action for the platform
       (mac: `brew install krunvm` or the documented libkrun install; surface a button that runs it
       via a Tauri command, with a copy-paste fallback). Show progress + errors plainly.
-   c. **Boot the engine** — call the existing `daemon_up()` path (which runs `wb deploy local` →
+   c. **Boot the engine** — call the existing `daemon_up()` path (which runs `work deploy local` →
       `Machine` → pulls `runtime:latest`, boots the microVM). Stream status; first pull is slow
       (show a spinner + "downloading engine image, one time").
    d. **Connect** — poll `status()` until running; on `/health` 200, close the wizard, titlebar chip
@@ -68,19 +68,19 @@ skippable (offline-first). State machine:
 4. **Failure surfaces** — every step shows the actual error + a retry, never a silent `let _ = wb(...)`.
 
 ## The one open implementation decision (pick + document your choice)
-`daemon.rs` currently boots via the **`wb` escript** (`wb deploy local`), which needs the `wb` binary
+`daemon.rs` currently boots via the **`work` escript** (`work deploy local`), which needs the `work` binary
 (an Elixir escript → needs Erlang) on the host. On a fresh machine neither is present. Three ways to
 resolve, in order of recommendation:
 
-- **(A, recommended) Bundle the `wb` escript as a Tauri sidecar + have the wizard install only the VM
+- **(A, recommended) Bundle the `work` escript as a Tauri sidecar + have the wizard install only the VM
   backend.** Set `WB_BIN` to the bundled escript. Still needs Erlang on the host for the escript —
   so either bundle a minimal ERTS with it, or fold "install Erlang" into the wizard's prereq step.
-- **(B) Skip `wb` entirely — boot the image directly from Rust.** The runtime image is self-contained
+- **(B) Skip `work` entirely — boot the image directly from Rust.** The runtime image is self-contained
   (Erlang + compilers inside), so `krunvm create ghcr.io/workbooks-sh/runtime:latest` + `krunvm start`
   (port-map 4000, the APFS volume, the discovery bind-mount) is all you need — port the small
   `Machine` create/start/discovery logic to Rust in `daemon.rs`. No host Erlang at all. More Rust,
   but the lightest host footprint. **Strongly consider this** — it matches "user needs only the VM."
-- **(C) Wizard installs `wb` + Erlang + krunvm as prereqs.** Simplest code, heaviest install.
+- **(C) Wizard installs `work` + Erlang + krunvm as prereqs.** Simplest code, heaviest install.
 
 Decide A vs B early; it shapes the local path. (B keeps the host to just the VM backend, which best
 fits the settled design.)
@@ -111,7 +111,7 @@ cloud for now" message** in the wizard — do not block those builds. The deploy
 ## Status — IMPLEMENTED (route B)
 
 The wizard is built. **Decision: route B** — boot the image directly from Rust;
-the host needs ONLY the krunvm backend (no Erlang, no `wb` escript). The `wb`
+the host needs ONLY the krunvm backend (no Erlang, no `work` escript). The `work`
 escript dependency was removed from the engine bridge entirely.
 
 What landed:
@@ -121,7 +121,7 @@ What landed:
   cloud config (`write_cloud`/`clear_cloud`/`parse_url`). Host port pinned to the
   guest port 4000 (the guest writes the guest port into discovery).
 - `desktop/src-tauri/src/daemon.rs` — `daemon_up`/`down`/`restart` + tray now
-  drive `machine::*` instead of `wb deploy`. `Discovery` gained an optional
+  drive `machine::*` instead of `work deploy`. `Discovery` gained an optional
   `host` (cloud) and a `cloud` manager mode (never torn down locally). New
   wizard commands: `engine_detect`, `engine_install_backend`, `engine_boot_local`
   (patient poll through the first image pull), `engine_probe`,

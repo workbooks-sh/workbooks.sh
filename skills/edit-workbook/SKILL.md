@@ -12,7 +12,7 @@ first-class — lean on it.
 ## 1. Unbundle
 
 ```sh
-workbook unbundle <file.html>     # or: wbx unpack
+workbook unbundle <file.html>     # or: work unpack
 ```
 
 Recovers the editable source tree. **Never** open the runnable `.html` to
@@ -49,8 +49,8 @@ and the bundle round-trips losslessly.
 ## 6. Ship
 
 ```sh
-workbook publish        # or: wbx publish apply  → prints a URL
-wbx sign / wbx verify     # if signing
+workbook publish        # or: work publish apply  → prints a URL
+work sign / work verify     # if signing
 ```
 
 **Live-confirm:** fetch the served artifact and check it. Don't trust the commit
@@ -58,5 +58,5 @@ wbx sign / wbx verify     # if signing
 
 ## References
 
-- `references/cli.md` — `workbook` vs `wbx` (shared with create-workbook).
+- `references/cli.md` — `workbook` vs `work` (shared with create-workbook).
 - `references/wasm-deps.md` — dependency-conversion table (shared with create-workbook).

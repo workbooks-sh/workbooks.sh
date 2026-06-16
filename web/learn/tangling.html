@@ -225,11 +225,11 @@ flowchart LR
   org <code>SCHEDULED:</code> timestamp becomes <code>{at, repeat, active}</code>,
   with repeat cookies like <code>+1d</code> parsed and a bracketed timestamp
   read as inactive.</p>
-  <p>You can run this locally with no server at all. <code>wb tangle</code>
+  <p>You can run this locally with no server at all. <code>work tangle</code>
   links the kernel natively in the Rust CLI; it reads a file or
   <code>-</code> for stdin. Here is the genuine output of
   <code>wb&nbsp;tangle&nbsp;nightly-digest.org</code>, trimmed:</p>
-  <pre class="orgsample">$ wb tangle nightly-digest.org
+  <pre class="orgsample">$ work tangle nightly-digest.org
 { "worlds": [{
     "name": "Nightly digest",
     "schedule": { "at": "2026-06-06T06:00", "repeat": "+1d", "active": true },
@@ -331,7 +331,7 @@ sequenceDiagram
 <section id="lint-gate">
   <h2>the plan you can REFUSE</h2>
   <p>Before anything builds, the plan can be validated — and the validation
-  runs with no server, the same native kernel as <code>wb tangle</code>.
+  runs with no server, the same native kernel as <code>work tangle</code>.
   <code>validate</code> makes exactly two checks per workflow:</p>
   <table class="cmp">
     <tr><th>check</th><th>level</th><th>message</th></tr>
@@ -340,7 +340,7 @@ sequenceDiagram
   </table>
   <p>Here is the second one, live. The broken workflow is a single component
   that consumes <code>events:list</code> with nothing producing it:</p>
-  <pre class="orgsample">$ wb lint broken.org
+  <pre class="orgsample">$ work lint broken.org
 [{"level":"error","scope":"Summarize","message":"input `events:list` has no upstream producer"}]</pre>
   <p>That is a test suite running against a <em>document</em>. The
   <a href="org">org lesson</a> made a claim — you can't write a test suite
@@ -398,7 +398,7 @@ sequenceDiagram
   <details>
     <summary>Do I write this JSON by hand?</summary>
     <p>Never. The plan is <b>derived</b>, not configured. You write org with
-    source blocks and header args; <code>wb tangle</code> is a read-only
+    source blocks and header args; <code>work tangle</code> is a read-only
     derivation that emits the JSON. There's no plan file to keep in sync —
     that's the whole point.</p>
   </details>

@@ -16,7 +16,7 @@ your role def adds only your territory and hand-offs.
 
   - `vfs_read` / `vfs_write` — files in your workdir. Surgical writes.
   - `shell` — the in-WASM shell (echo/cat/grep/jq/sd pipelines). Real, fast.
-  - `wb` — the engine CLI. `wb content check` validates manifests/partials.
+  - `work` — the engine CLI. `work content check` validates manifests/partials.
   - `web_search` — keyless web search by query → top results (title·url·snippet).
     Your SERP/research tool: search a topic, find the real primaries, then fetch.
     - `file_issue` — when you hit a WALL (a capability/tool you NEED that does
@@ -73,7 +73,7 @@ your role def adds only your territory and hand-offs.
 
 * validation gates (before any publish)
 
-  `wb content check` must pass. A story partial renders from its org via
+  `work content check` must pass. A story partial renders from its org via
   orgitorial — if your change breaks rendering (malformed org), fix before
   advancing. The site never ships a broken manifest.
 

@@ -45,7 +45,7 @@ stop being the exception.
   stream/future + Javy/jco emitting 0.3. Kernel-as-Component is the on-ramp.
 - *Bump user components preview1 -> WASI 0.2 proper* (drop the preview1 adapter
   shim). Low urgency.
-- *Spin/Fermyon (Akamai) as an edge deploy target* — possible =wb deploy
+- *Spin/Fermyon (Akamai) as an edge deploy target* — possible =work deploy
   --edge=; framework lock-in, so not now.
 
 ** No — and why

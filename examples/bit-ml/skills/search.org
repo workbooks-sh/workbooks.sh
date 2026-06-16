@@ -20,7 +20,7 @@ only the recipes change, not your method.
   Run via the run-less world: use `fetch`? No — DataForSEO is POST-only;
   use the shell tool's curl? There is no curl in the wasm shell. The
   sanctioned path is `fetch` for GETs and the dataforseo POST via the
-  engine: `wb rt post` is host-side. SO: DataForSEO calls are made with
+  engine: `work rt post` is host-side. SO: DataForSEO calls are made with
   the `fetch` tool ONLY if a GET endpoint exists — otherwise file the gap.
 
   CURRENT TRUTH: use the `web_search` tool — keyless, host-brokered SERP

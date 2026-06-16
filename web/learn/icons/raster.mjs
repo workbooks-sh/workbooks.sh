@@ -34,7 +34,7 @@ const ICONS = {
   org:       "a thick rounded six-lobed asterisk, the seed of branching structure.",
   agents:    "a small friendly robot head in profile: rounded helmet dome, one negative-space eye, a thick antenna nub.",
   autopoet:  "a garden watering can in profile: chunky body, thick curved spout, big rounded handle as a negative-space hole.",
-  wbx:       "a bold terminal prompt: one massive right-pointing chevron with a low fat underscore block to its right.",
+  work:       "a bold terminal prompt: one massive right-pointing chevron with a low fat underscore block to its right.",
   workflows: "three fat rounded cards in a diagonal cascade, separated by thick white channels, a board in motion.",
   vfs:       "a chunky document page with a folded corner, carved by three thick horizontal drawer slots.",
 };

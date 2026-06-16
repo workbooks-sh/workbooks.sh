@@ -65,7 +65,7 @@ defmodule Workbooks.AutopoetTest do
 
   describe "the worker's verdict classification (pure)" do
     test "DONE on the first line closes" do
-      assert {:done, _} = Worker.classify("DONE: authored the seo toolkit, wb toolkit verify passed")
+      assert {:done, _} = Worker.classify("DONE: authored the seo toolkit, work toolkit verify passed")
     end
 
     test "HOST routes to the human lane" do

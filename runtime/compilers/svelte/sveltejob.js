@@ -1,4 +1,4 @@
-/* wb in-sandbox Svelte lane (wb-2ku.5). Runs inside qjs-run.wasm — same Javy.IO stdin→stdout
+/* work in-sandbox Svelte lane (wb-2ku.5). Runs inside qjs-run.wasm — same Javy.IO stdin→stdout
  * contract as bundle/bundlejob.js and ts/tsjob.js. ZERO native execution: no node/bun/vite/rollup.
  *
  * This file is CONCATENATED BEFORE bundlejob.js by Workbooks.Compilers.svelte_bundle_dir. It does

@@ -76,7 +76,7 @@ defmodule Workbooks.BrokerAudit do
     end
   end
 
-  # owned by the long-lived Workbooks.BrokerTables process (wb self-audit: a transient caller that creates a
+  # owned by the long-lived Workbooks.BrokerTables process (work self-audit: a transient caller that creates a
   # named table takes it down on exit, crashing later broker calls).
   defp ring, do: Workbooks.BrokerTables.ensure(@ring, [:named_table, :public, :ordered_set])
 

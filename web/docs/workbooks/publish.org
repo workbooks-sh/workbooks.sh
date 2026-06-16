@@ -7,7 +7,7 @@ Publishing compiles a workbook to a single self-contained =.html= and pushes it 
 a provider.
 
 #+begin_src bash
-wb publish my-workbook.org
+work publish my-workbook.org
 #+end_src
 
 The output is one file: prose, compiled WASM, and the source it tangles from, all

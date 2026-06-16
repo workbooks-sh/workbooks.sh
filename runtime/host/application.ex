@@ -21,7 +21,7 @@ defmodule Workbooks.Application do
     children =
       [
         # long-lived owner of the broker ETS tables (rate-limiter, audit) — must outlive transient broker
-        # tasks, else a named table dies with its transient creator (wb self-audit).
+        # tasks, else a named table dies with its transient creator (work self-audit).
         Workbooks.BrokerTables,
         {Registry, keys: :unique, name: Workbooks.Instance.Registry},
         {Registry, keys: :unique, name: Workbooks.AgentSession.Registry},
@@ -29,7 +29,7 @@ defmodule Workbooks.Application do
         # per session id, held across tool round-trips. Registry keys sessions by id for the via-tuple name.
         {Registry, keys: :unique, name: Workbooks.HarnessSession.Registry},
         # Runtime → desktop control bus: connected shells register here so an
-        # agent's `wb desktop …` call can push tab/theme/key events to them.
+        # agent's `work desktop …` call can push tab/theme/key events to them.
         Workbooks.DesktopControl,
         # Agent→user env-var/key prompts over engine:env_prompt (two registries).
         Supervisor.child_spec({Registry, keys: :duplicate, name: Workbooks.EnvBroker.Sockets}, id: :env_broker_sockets),
@@ -265,7 +265,7 @@ defmodule Workbooks.Application do
     if Workbooks.Harness.enabled?(), do: [Workbooks.ExecLoopback], else: []
   end
 
-  # Channels (wb messaging adapters, official-API tier): each inbound poller is
+  # Channels (work messaging adapters, official-API tier): each inbound poller is
   # opt-in by CREDENTIAL — the Telegram long-poller joins the tree only when
   # TELEGRAM_BOT_TOKEN is set (same pattern as keeper(): unset → excluded).
   defp channels do

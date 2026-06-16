@@ -15,7 +15,7 @@ Apple account; device/TestFlight builds need an Apple Developer Program
 membership and an App Store Connect API key. Lead the user through that setup
 (below) — most of it is one-time.
 
-NOTE: there is no =wb forge mobile= command (the Rust =wb= that provided it was
+NOTE: there is no =work forge mobile= command (the Rust =wb= that provided it was
 removed 2026-06-09). Use =npx cap= + Xcode directly, as below. ~npx cap --help~
 is authoritative for Capacitor; Xcode's Organizer drives archive/distribute.
 
@@ -23,7 +23,7 @@ is authoritative for Capacitor; Xcode's Organizer drives archive/distribute.
 
 #+begin_src bash
 # 1. build the workbook if you haven't (emits dist/<slug>.html)
-wb build
+work build
 
 # 2. one-time: create a Capacitor app next to the workbook, point its web dir at
 #    a staged www/, and add the iOS platform.

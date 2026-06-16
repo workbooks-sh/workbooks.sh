@@ -17,11 +17,11 @@
   This toolkit lets an agent operate the two outward-facing =wb= surfaces
   the user runs themselves:
 
-  - =wb deploy= — stand up THE runtime image (the "nexus") for the user,
+  - =work deploy= — stand up THE runtime image (the "nexus") for the user,
     locally (a krunvm container) or in the cloud (Fly), from a declarative
     =deployment.org=. The flow is git-like: scaffold → edit → validate →
     apply, with =status/verify/logs/down= to operate it after.
-  - =wb publish= — render a Workbook (=.org=) to self-contained HTML and
+  - =work publish= — render a Workbook (=.org=) to self-contained HTML and
     ship it to a live URL (Cloudflare Pages / gh-pages / self-hosted),
     from a declarative =publish.org=.
 
@@ -42,4 +42,4 @@
   *Not in scope (do not promise)*
 
   - Platform-release ops (publishing the compilers package / platform runtime
-    image) — those are maintainer-only, never =wb deploy=.
+    image) — those are maintainer-only, never =work deploy=.

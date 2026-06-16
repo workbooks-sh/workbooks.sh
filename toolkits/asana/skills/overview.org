@@ -38,7 +38,7 @@
 
 * Credentials
   Set =ASANA_PAT= (an Asana personal access token) in the engine's env /
-  =wb env= keychain. The connector reads it through
+  =work env= keychain. The connector reads it through
   =WorkbooksRuntime.Plugin.Auth=; it is never stored in this toolkit. The
   REST API authenticates with a =Bearer= token.
 

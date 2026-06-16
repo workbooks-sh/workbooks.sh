@@ -1,7 +1,7 @@
-#+TITLE: wbx CLI
-#+DESCRIPTION: Every wbx verb, flag, mode, env var, and exit code — tangled from the clap surface.
+#+TITLE: work CLI
+#+DESCRIPTION: Every work verb, flag, mode, env var, and exit code — tangled from the clap surface.
 
-* wbx CLI
+* work CLI
 :PROPERTIES:
 :MATURITY: ships-today
 :EVIDENCE: cli/src/main.rs:24
@@ -10,19 +10,19 @@
 :END:
 
 The canonical Workbooks command-line tool. **One Rust crate, two build targets**
-(native + =wasm32-wasip1=): the binary is named =wbx= (crate =wb-cli=).
+(native + =wasm32-wasip1=): the binary is named =work= (crate =wb-cli=).
 
 #+begin_quote
-The binary is =wbx=, not =wb=. The legacy Elixir escript (=runtime/host/cli.ex=)
+The binary is =work=, not =wb=. The legacy Elixir escript (=runtime/host/cli.ex=)
 and the dead npm =@work.books/cli= are superseded; this crate is canonical.
-:SRC: cli/Cargo.toml#bin (=name = "wbx"=, line 10) · cli/SPEC.md:6
+:SRC: cli/Cargo.toml#bin (=name = "work"=, line 10) · cli/SPEC.md:6
 #+end_quote
 
 Two execution classes (see each verb's *Where it runs* column):
 - *LOCAL* — kernel ops, assembly, provenance, orchestration; needs no runtime.
 - *ENGINE* — a thin RCP call into a running runtime (it owns the compilers,
   wasmtime, the tenant library). Engine verbs fail with exit 3 + a "no runtime —
-  try =wbx deploy local=" hint when none is reachable.
+  try =work deploy local=" hint when none is reachable.
 :SRC: cli/src/main.rs:3 · cli/src/mode.rs:67
 
 ** Global flags & the mode model
@@ -47,9 +47,9 @@ verb already emitted JSON it is embedded structurally, else wrapped as
 ={"text": …}=. Error: ={ "ok": false, "verb", "error": {code, message, hint, retryable} }=.
 :SRC: cli/src/mode.rs#render_ok (:92-107) · #render_err (:110-135).
 
-*Verb introspection* — =wbx help --json= (either order) prints the whole verb
+*Verb introspection* — =work help --json= (either order) prints the whole verb
 tree as JSON so agents introspect the surface instead of scraping help. Agent-mode
-bare =wbx= also folds the tree into the health payload.
+bare =work= also folds the tree into the health payload.
 :SRC: cli/src/main.rs#verb_tree (:212) · main intercept :233 · landing :257-266.
 
 ** Exit-code map
@@ -95,8 +95,8 @@ prefer =WBX_*=). :SRC: cli/src/util.rs#env_var (:84-88).
 | =WB_ENGINE_TOKEN=   | bearer for the remote engine                                   | cli/src/io.rs:115         |
 | =WB_DESKTOP_DIR=    | discovery dir holding =runtime.json= (else app-data =disco/=)   | cli/src/io.rs:60-64       |
 | =WB_IMAGE=          | override the deploy runtime image (default below)               | cli/src/deploy/mod.rs:127 |
-| =WB_PROVIDERS_DIR=  | where =wbx deploy= resolves provider recipes                   | cli/src/deploy/mod.rs:280 |
-| =WB_TOOLKIT_EXEC=1= | server-side gate required for =wbx toolkit run=                 | cli/src/main.rs:169       |
+| =WB_PROVIDERS_DIR=  | where =work deploy= resolves provider recipes                   | cli/src/deploy/mod.rs:280 |
+| =WB_TOOLKIT_EXEC=1= | server-side gate required for =work toolkit run=                 | cli/src/main.rs:169       |
 | =WB_PUBLIC_BEARER=  | (deploy-managed) control-plane token, generated once on cloud apply | cli/src/deploy/mod.rs:406 |
 
 Engine discovery: with no =WB_ENGINE_URL=, the local engine is located via its
@@ -120,14 +120,14 @@ Defaults and flags are exactly as declared in clap.
 
 | verb                        | args / flags                          | does                                                          | Run   | src (main.rs) |
 |-----------------------------+---------------------------------------+--------------------------------------------------------------+-------+---------------|
-| =wbx= (bare)                | —                                     | where-am-I landing (doctor + start hints; agents get verb tree) | LOCAL | :283, :257    |
-| =wbx init=                  | =name= [=--template= minimal]         | scaffold a new workbook source (=workbook.org= + =data/=)     | LOCAL | :40, :289     |
-| =wbx dev=                   | [=src= .] [=--port=]                   | watch + rebuild + serve a live preview (interactive)         | LOCAL | :42, :290     |
-| =wbx doctor=                | —                                     | env + engine health report (always exits 0; =--json= for agents) | LOCAL | :44, :291     |
-| =wbx status=                | —                                     | same landing as bare =wbx=                                    | LOCAL | :46, :292     |
-| =wbx open=                  | =file=                                | open a workbook (or any file) in the default browser         | LOCAL | :48, :293     |
-| =wbx upgrade=               | —                                     | replace this binary with the latest release (npm → use npm)  | LOCAL | :50, :294     |
-| =wbx completions=           | =shell= (bash\vbar zsh\vbar fish\vbar elvish\vbar powershell) | shell completions to stdout                                  | LOCAL | :52, :295     |
+| =work= (bare)                | —                                     | where-am-I landing (doctor + start hints; agents get verb tree) | LOCAL | :283, :257    |
+| =work init=                  | =name= [=--template= minimal]         | scaffold a new workbook source (=workbook.org= + =data/=)     | LOCAL | :40, :289     |
+| =work dev=                   | [=src= .] [=--port=]                   | watch + rebuild + serve a live preview (interactive)         | LOCAL | :42, :290     |
+| =work doctor=                | —                                     | env + engine health report (always exits 0; =--json= for agents) | LOCAL | :44, :291     |
+| =work status=                | —                                     | same landing as bare =work=                                    | LOCAL | :46, :292     |
+| =work open=                  | =file=                                | open a workbook (or any file) in the default browser         | LOCAL | :48, :293     |
+| =work upgrade=               | —                                     | replace this binary with the latest release (npm → use npm)  | LOCAL | :50, :294     |
+| =work completions=           | =shell= (bash\vbar zsh\vbar fish\vbar elvish\vbar powershell) | shell completions to stdout                                  | LOCAL | :52, :295     |
 
 ** Source inspection (local, kernel)
 :PROPERTIES:
@@ -139,9 +139,9 @@ Defaults and flags are exactly as declared in clap.
 
 | verb         | args   | does                                          | Run   | src (main.rs) |
 |--------------+--------+-----------------------------------------------+-------+---------------|
-| =wbx query=  | =file= | org → headline / structure rows               | LOCAL | :56, :302     |
-| =wbx tangle= | =file= | org → WIT-world-shaped build plan (literate)  | LOCAL | :58, :303     |
-| =wbx lint=   | =file= | diagnostics over a workbook source            | LOCAL | :60, :304     |
+| =work query=  | =file= | org → headline / structure rows               | LOCAL | :56, :302     |
+| =work tangle= | =file= | org → WIT-world-shaped build plan (literate)  | LOCAL | :58, :303     |
+| =work lint=   | =file= | diagnostics over a workbook source            | LOCAL | :60, :304     |
 
 =tangle= is the org-mode term of art and stays (not renamed to =plan=).
 :SRC: cli/TAXONOMY.md:142 (decision LOCKED 2026-06-09).
@@ -158,13 +158,13 @@ Defaults and flags are exactly as declared in clap.
 
 | verb               | args / flags                  | does                                                  | Run    | src (main.rs) |
 |--------------------+-------------------------------+-------------------------------------------------------+--------+---------------|
-| =wbx build=        | [=src= .]                     | compile the source's code components → WASM           | ENGINE | :63, :306     |
-| =wbx bundle=       | [=src= .] [=-o/--out=]        | assemble org (+ data) → one workbook =.wbundle=       | LOCAL  | :65, :307     |
-| =wbx unbundle=     | =file= [=dest=]               | workbook → source tree                                | LOCAL  | :67, :308     |
-| =wbx run=          | =file= [=input…= trailing]    | execute a workbook's workflow DAG on the engine       | ENGINE | :69, :309     |
-| =wbx publish init= | —                             | scaffold =./publish.org=                              | LOCAL  | :136, :311    |
-| =wbx publish validate= | —                         | coherence-check =publish.org=                         | LOCAL  | :138, :312    |
-| =wbx publish apply=| [=workbook= workbook.html]    | ship the assembled workbook to the configured surface | LOCAL¹ | :140, :313    |
+| =work build=        | [=src= .]                     | compile the source's code components → WASM           | ENGINE | :63, :306     |
+| =work bundle=       | [=src= .] [=-o/--out=]        | assemble org (+ data) → one workbook =.wbundle=       | LOCAL  | :65, :307     |
+| =work unbundle=     | =file= [=dest=]               | workbook → source tree                                | LOCAL  | :67, :308     |
+| =work run=          | =file= [=input…= trailing]    | execute a workbook's workflow DAG on the engine       | ENGINE | :69, :309     |
+| =work publish init= | —                             | scaffold =./publish.org=                              | LOCAL  | :136, :311    |
+| =work publish validate= | —                         | coherence-check =publish.org=                         | LOCAL  | :138, :312    |
+| =work publish apply=| [=workbook= workbook.html]    | ship the assembled workbook to the configured surface | LOCAL¹ | :140, :313    |
 
 ¹ =publish= is *local orchestration* — it spawns =wrangler=/=git= to ship to a
 surface (CF Pages / gh-pages / host); no runtime, but external tools.
@@ -182,12 +182,12 @@ build/run delegation rationale: :SRC: cli/TAXONOMY.md:142 (decision 2).
 
 | verb           | args / flags                                  | does                                              | Run    | src (main.rs) |
 |----------------+-----------------------------------------------+---------------------------------------------------+--------+---------------|
-| =wbx library=  | —                                             | list the tenant's workspaces + members            | ENGINE | :75, :316     |
-| =wbx checkout= | =member= =dir=                                | borrow a library member into a working dir         | ENGINE | :77, :317     |
-| =wbx checkin=  | =member= =dir=                                | pack + sign a member back into the library         | ENGINE | :79, :318     |
-| =wbx store=    | [=slug=] [=--list=] [=--build=]               | archive a workspace to durable storage (=--build= compiles first) | ENGINE | :81, :319     |
-| =wbx fetch=    | =key= [=out= ./]                              | restore from durable storage                       | ENGINE | :88, :320     |
-| =wbx search=   | =query= [=--semantic= \vbar =--literal= \vbar =--sql=] | cross-workbook search (default: =hybrid=)   | ENGINE | :90, :321     |
+| =work library=  | —                                             | list the tenant's workspaces + members            | ENGINE | :75, :316     |
+| =work checkout= | =member= =dir=                                | borrow a library member into a working dir         | ENGINE | :77, :317     |
+| =work checkin=  | =member= =dir=                                | pack + sign a member back into the library         | ENGINE | :79, :318     |
+| =work store=    | [=slug=] [=--list=] [=--build=]               | archive a workspace to durable storage (=--build= compiles first) | ENGINE | :81, :319     |
+| =work fetch=    | =key= [=out= ./]                              | restore from durable storage                       | ENGINE | :88, :320     |
+| =work search=   | =query= [=--semantic= \vbar =--literal= \vbar =--sql=] | cross-workbook search (default: =hybrid=)   | ENGINE | :90, :321     |
 
 =search= mode resolves to =semantic= / =literal= / =sql= if the flag is set,
 else =hybrid=. :SRC: cli/src/main.rs:322.
@@ -203,16 +203,16 @@ else =hybrid=. :SRC: cli/src/main.rs:322.
 
 | verb                   | args / flags                                       | does                                                          | Run    | src (main.rs) |
 |------------------------+----------------------------------------------------+--------------------------------------------------------------+--------+---------------|
-| =wbx toolkit list=     | —                                                  | list discoverable toolkits (id · status · tagline)           | ENGINE | :146, :327    |
-| =wbx toolkit show=     | =id= [=skill=]                                     | a toolkit's manifest + skill index (or one skill's recipe)   | ENGINE | :148, :328    |
-| =wbx toolkit search=   | =q…=                                               | search toolkits + skills                                     | ENGINE | :150, :329    |
-| =wbx toolkit verify=   | =id=                                               | check a toolkit's invocation contract (bin/artifact present) | ENGINE | :152, :330    |
-| =wbx toolkit sign=     | =id=                                               | sign a toolkit manifest (did:key; required for third-party)  | LOCAL  | :154, :331    |
-| =wbx toolkit build=    | =id= [=which=]                                     | build a toolkit's declared artifact (in-sandbox compile + register) | ENGINE | :156, :332 |
-| =wbx toolkit push=     | =id= =dir=                                         | ship a toolkit directory onto the engine                     | ENGINE | :158, :333    |
-| =wbx toolkit import=   | =source= [=--as=] [=--out=]                        | package an existing construct (skill / md / folder) as a toolkit | LOCAL | :160, :334    |
-| =wbx toolkit run=      | =id= =task= [=args…=]                              | run a toolkit task recipe (gated on =WB_TOOLKIT_EXEC=1=)      | ENGINE | :169, :336    |
-| =wbx toolkit audit=    | [=dir= .] [=--fix=]                                | re-run the wasm-compat audit on an imported dir (=--fix= auto-converts) | LOCAL/ENGINE | :171, :335 |
+| =work toolkit list=     | —                                                  | list discoverable toolkits (id · status · tagline)           | ENGINE | :146, :327    |
+| =work toolkit show=     | =id= [=skill=]                                     | a toolkit's manifest + skill index (or one skill's recipe)   | ENGINE | :148, :328    |
+| =work toolkit search=   | =q…=                                               | search toolkits + skills                                     | ENGINE | :150, :329    |
+| =work toolkit verify=   | =id=                                               | check a toolkit's invocation contract (bin/artifact present) | ENGINE | :152, :330    |
+| =work toolkit sign=     | =id=                                               | sign a toolkit manifest (did:key; required for third-party)  | LOCAL  | :154, :331    |
+| =work toolkit build=    | =id= [=which=]                                     | build a toolkit's declared artifact (in-sandbox compile + register) | ENGINE | :156, :332 |
+| =work toolkit push=     | =id= =dir=                                         | ship a toolkit directory onto the engine                     | ENGINE | :158, :333    |
+| =work toolkit import=   | =source= [=--as=] [=--out=]                        | package an existing construct (skill / md / folder) as a toolkit | LOCAL | :160, :334    |
+| =work toolkit run=      | =id= =task= [=args…=]                              | run a toolkit task recipe (gated on =WB_TOOLKIT_EXEC=1=)      | ENGINE | :169, :336    |
+| =work toolkit audit=    | [=dir= .] [=--fix=]                                | re-run the wasm-compat audit on an imported dir (=--fix= auto-converts) | LOCAL/ENGINE | :171, :335 |
 
 *=--as= override kinds* (else detected by shape): =claude-skill= · =markdown= ·
 =folder=. Detected source taxonomy (SKILL.md, single .md, dir, .mcp.json,
@@ -233,15 +233,15 @@ else =hybrid=. :SRC: cli/src/main.rs:322.
 
 | verb                   | args / flags                                                  | does                                       | Run    | src (main.rs) |
 |------------------------+--------------------------------------------------------------+--------------------------------------------+--------+---------------|
-| =wbx workflow run=     | =file= [=input= ""]                                          | execute the workflow DAG                    | ENGINE | :181, :340    |
-| =wbx workflow plan=    | =file=                                                       | show the schedule/plan without executing    | ENGINE | :183, :341    |
-| =wbx agent run=        | =task…= [=--system= "…"] [=--model=]                         | start a long-horizon run (returns an id)    | ENGINE | :189, :344    |
-| =wbx agent status=     | =id=                                                        | poll a run's status + result                | ENGINE | :196, :345    |
-| =wbx workbook list=    | —                                                           | list deployed workbooks                     | ENGINE | :201, :348    |
-| =wbx workbook show=    | =id=                                                        | show a deployed workbook's org source       | ENGINE | :203, :349    |
-| =wbx workbook deploy=  | =id= =file=                                                 | deploy an org source under an id            | ENGINE | :205, :350    |
-| =wbx telemetry=        | [=slug=]                                                    | run index, or one run's summary             | ENGINE | :109, :352    |
-| =wbx ledger=           | =slug=                                                      | verify a run's signed ledger                | ENGINE | :111, :353    |
+| =work workflow run=     | =file= [=input= ""]                                          | execute the workflow DAG                    | ENGINE | :181, :340    |
+| =work workflow plan=    | =file=                                                       | show the schedule/plan without executing    | ENGINE | :183, :341    |
+| =work agent run=        | =task…= [=--system= "…"] [=--model=]                         | start a long-horizon run (returns an id)    | ENGINE | :189, :344    |
+| =work agent status=     | =id=                                                        | poll a run's status + result                | ENGINE | :196, :345    |
+| =work workbook list=    | —                                                           | list deployed workbooks                     | ENGINE | :201, :348    |
+| =work workbook show=    | =id=                                                        | show a deployed workbook's org source       | ENGINE | :203, :349    |
+| =work workbook deploy=  | =id= =file=                                                 | deploy an org source under an id            | ENGINE | :205, :350    |
+| =work telemetry=        | [=slug=]                                                    | run index, or one run's summary             | ENGINE | :109, :352    |
+| =work ledger=           | =slug=                                                      | verify a run's signed ledger                | ENGINE | :111, :353    |
 
 =agent run= default system prompt: ="You are a careful, capable agent."=
 :SRC: cli/src/main.rs:192.
@@ -257,10 +257,10 @@ else =hybrid=. :SRC: cli/src/main.rs:322.
 
 | verb           | args / flags          | does                                                 | Run   | src (main.rs) |
 |----------------+-----------------------+------------------------------------------------------+-------+---------------|
-| =wbx sign=     | =file= [=-o/--out=]   | embed a did:key provenance manifest                  | LOCAL | :115, :355    |
-| =wbx verify=   | =file=                | check an artifact's signature + integrity            | LOCAL | :117, :356    |
-| =wbx mirror=   | =target=              | mirror the tenant repo to a git host (url or forge)  | LOCAL¹| :119, :357    |
-| =wbx federate= | —                     | federate the tenant repo over Radicle (P2P)          | ENGINE| :121, :358    |
+| =work sign=     | =file= [=-o/--out=]   | embed a did:key provenance manifest                  | LOCAL | :115, :355    |
+| =work verify=   | =file=                | check an artifact's signature + integrity            | LOCAL | :117, :356    |
+| =work mirror=   | =target=              | mirror the tenant repo to a git host (url or forge)  | LOCAL¹| :119, :357    |
+| =work federate= | —                     | federate the tenant repo over Radicle (P2P)          | ENGINE| :121, :358    |
 
 ¹ orchestration: spawns git. :SRC: cli/TAXONOMY.md:136.
 
@@ -276,18 +276,18 @@ else =hybrid=. :SRC: cli/src/main.rs:322.
 
 | verb                       | args / flags                  | does                                                         | src (mod.rs) |
 |----------------------------+-------------------------------+-------------------------------------------------------------+--------------|
-| =wbx deploy init=          | [=preset= local\vbar cloud]   | scaffold =./deployment.org= (TTY picks if omitted)          | :34, :84     |
-| =wbx deploy validate=      | —                             | coherence check (incl. declared secrets present)            | :36, :85     |
-| =wbx deploy apply=         | —                             | converge to the declared state                              | :38, :97     |
-| =wbx deploy status=        | —                             | inspect the live deployment                                 | :40, :98     |
-| =wbx deploy logs=          | —                             | tail the live deployment's logs                            | :42, :99     |
-| =wbx deploy down=          | —                             | tear it down                                                | :44, :100    |
-| =wbx deploy local=         | —                             | shorthand: scaffold local config if absent, then apply      | :46, :101    |
-| =wbx deploy doctor=        | —                             | engines, recipes, and declared secrets — present/missing    | :50, :107    |
-| =wbx deploy secrets set=   | =pairs…= [=--from-env=]       | stage KEY=VALUE secrets (0600 under app-dir)                | :62, :225    |
-| =wbx deploy secrets list=  | —                             | list secret NAMES (never values)                            | :66, :251    |
-| =wbx deploy secrets unset= | =key=                         | remove a secret by name                                     | :68, :258    |
-| =wbx deploy secrets push=  | —                             | push staged secrets to the provider without a deploy        | :70, :266    |
+| =work deploy init=          | [=preset= local\vbar cloud]   | scaffold =./deployment.org= (TTY picks if omitted)          | :34, :84     |
+| =work deploy validate=      | —                             | coherence check (incl. declared secrets present)            | :36, :85     |
+| =work deploy apply=         | —                             | converge to the declared state                              | :38, :97     |
+| =work deploy status=        | —                             | inspect the live deployment                                 | :40, :98     |
+| =work deploy logs=          | —                             | tail the live deployment's logs                            | :42, :99     |
+| =work deploy down=          | —                             | tear it down                                                | :44, :100    |
+| =work deploy local=         | —                             | shorthand: scaffold local config if absent, then apply      | :46, :101    |
+| =work deploy doctor=        | —                             | engines, recipes, and declared secrets — present/missing    | :50, :107    |
+| =work deploy secrets set=   | =pairs…= [=--from-env=]       | stage KEY=VALUE secrets (0600 under app-dir)                | :62, :225    |
+| =work deploy secrets list=  | —                             | list secret NAMES (never values)                            | :66, :251    |
+| =work deploy secrets unset= | =key=                         | remove a secret by name                                     | :68, :258    |
+| =work deploy secrets push=  | —                             | push staged secrets to the provider without a deploy        | :70, :266    |
 
 *Provider model:* =local= uses a container-engine seam (=docker= → =podman= →
 =krunvm=, first found wins); any other =DEPLOY_TARGET= is a recipe at
@@ -309,7 +309,7 @@ live clients). Call your engine with =export WB_ENGINE_TOKEN=<token>=.
 :SRC: cli/src/deploy/mod.rs#ensure_cloud_bearer (:406-422).
 
 #+begin_quote
-=wbx deploy= is the *user's* tool to run the runtime image for their own use. It
+=work deploy= is the *user's* tool to run the runtime image for their own use. It
 is *not* how the platform publishes the compilers package or the runtime image —
 do not conflate the three release layers.
 :SRC: CLAUDE.md "Release / publishing — THREE separate layers" · cli/TAXONOMY.md:122.
@@ -324,13 +324,13 @@ do not conflate the three release layers.
 
 | verb       | args / flags              | does                                          | Run    | src (main.rs) |
 |------------+---------------------------+-----------------------------------------------+--------+---------------|
-| =wbx rt=   | =args…= (status\vbar get \pth\vbar post \pth [body]) | raw RCP escape hatch              | ENGINE | :127, :361    |
-| =wbx var=  | =args…= (set\vbar get\vbar list\vbar ref) | local variables / secrets (ref-only)          | LOCAL  | :131, :363    |
+| =work rt=   | =args…= (status\vbar get \pth\vbar post \pth [body]) | raw RCP escape hatch              | ENGINE | :127, :361    |
+| =work var=  | =args…= (set\vbar get\vbar list\vbar ref) | local variables / secrets (ref-only)          | LOCAL  | :131, :363    |
 
-* Not-yet-built: =wbx docs *=
+* Not-yet-built: =work docs *=
 :PROPERTIES:
 :MATURITY: north-star
-:CAVEAT:   The =wbx docs= verb family (new/build/drift/lint/untangle/serve/publish)
+:CAVEAT:   The =work docs= verb family (new/build/drift/lint/untangle/serve/publish)
            that powers this very docs site is DESIGNED but NOT in the clap surface
            today — there is no =Docs= variant in cli/src/main.rs#Cmd. Planned as
            Phase P1/P5 of the docs architecture. Do not document it as shipping.
@@ -338,16 +338,16 @@ do not conflate the three release layers.
 :END:
 
 Planned verbs (per the architecture plan, *not present in the binary*):
-=wbx docs new= · =build= · =drift= (keystone CI gate) · =lint= · =untangle= ·
-=serve= · =publish=, plus =wbx schema --json=. Verified absent: =grep Docs
+=work docs new= · =build= · =drift= (keystone CI gate) · =lint= · =untangle= ·
+=serve= · =publish=, plus =work schema --json=. Verified absent: =grep Docs
 cli/src/main.rs= matches nothing.
 
 * Legacy: the Elixir escript
 :PROPERTIES:
 :MATURITY: partial
-:CAVEAT:   runtime/host/cli.ex is the pre-wbx escript (~29 verbs / 67 forms,
+:CAVEAT:   runtime/host/cli.ex is the pre-work escript (~29 verbs / 67 forms,
            audited in TAXONOMY.md). It keeps working until each verb is migrated
-           to this crate, but =wbx= (Rust) is the canonical home going forward.
+           to this crate, but =work= (Rust) is the canonical home going forward.
            Don't author new verbs there.
 :SRC:      runtime/host/cli.ex · cli/SPEC.md:7-9 · cli/TAXONOMY.md:4
 :END:

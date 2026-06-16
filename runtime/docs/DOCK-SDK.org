@@ -37,7 +37,7 @@
     this: the macro expands in the caller's crate, whose features differ from
     dock's, so a feature on the dock dependency was invisible — wb-pkh.2/.12.)
   - The enabled feature set MUST match the component's declared WIT subset world
-    and the toolkit manifest's =#+CAPS=. =wb toolkit verify= cross-checks the
+    and the toolkit manifest's =#+CAPS=. =work toolkit verify= cross-checks the
     declared #+CAPS ⊆ granted profile (the cap list must match the WIT world).
 
   Corollary (resolves an apparent "drift"): the base =engine.wit= world stays a
@@ -95,7 +95,7 @@
   - This spec.
   Deferred to follow-ups: the JS package build, the feature↔WIT-subset codegen
   glue (today the author declares the WIT subset by hand + enables matching
-  features; =wb toolkit verify= checks agreement), and dogfooding the SDK back
+  features; =work toolkit verify= checks agreement), and dogfooding the SDK back
   into the engine-*-probe example fixtures.
 
 * See also

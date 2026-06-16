@@ -9,8 +9,8 @@ Reach for `palette` when a workbook or agent needs to run code in a specific lan
 ## Example
 
 ```
-wb toolkit build palette            # build/register every runtime
-wb toolkit build palette python     # or just one
+work toolkit build palette            # build/register every runtime
+work toolkit build palette python     # or just one
 python script.py                     # then run untrusted source through it
 ```
 

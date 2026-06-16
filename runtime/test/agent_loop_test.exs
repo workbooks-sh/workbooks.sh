@@ -24,10 +24,10 @@ defmodule Workbooks.AgentLoopTest do
 
   test "dead-stop after a tool call → nudged → produces a real final answer (not '(no result)')" do
     responses = [
-      # 1) a tool call (advances step past 0) — `wb model get` is cheap + offline
+      # 1) a tool call (advances step past 0) — `work model get` is cheap + offline
       {:ok,
        %{
-         tool_calls: [%{name: "wb", args: %{"args" => "model get"}, id: "c1"}],
+         tool_calls: [%{name: "work", args: %{"args" => "model get"}, id: "c1"}],
          raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
        }},
       # 2) SILENT DEAD-STOP: empty content, no tool call → loop should nudge once
@@ -63,7 +63,7 @@ defmodule Workbooks.AgentLoopTest do
     always_tool = fn _m, _o ->
       {:ok,
        %{
-         tool_calls: [%{name: "wb", args: %{"args" => "model get"}, id: "x"}],
+         tool_calls: [%{name: "work", args: %{"args" => "model get"}, id: "x"}],
          raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
        }}
     end
@@ -104,14 +104,14 @@ defmodule Workbooks.AgentLoopTest do
   end
 
   test "a tool that RAISES becomes a clean error — the run survives and recovers" do
-    # `wb model "get` makes OptionParser.split raise inside exec_one; the run must
+    # `work model "get` makes OptionParser.split raise inside exec_one; the run must
     # NOT crash via the linked Task — it gets a tool-error and the agent answers.
     r =
       run(
         scripted([
           {:ok,
            %{
-             tool_calls: [%{name: "wb", args: %{"args" => ~s(model "get)}, id: "raise1"}],
+             tool_calls: [%{name: "work", args: %{"args" => ~s(model "get)}, id: "raise1"}],
              raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
            }},
           {:ok, %{tool_calls: [], content: "handled the broken command"}}
@@ -130,8 +130,8 @@ defmodule Workbooks.AgentLoopTest do
           {:ok,
            %{
              tool_calls: [
-               %{name: "wb", args: %{"args" => "model get"}, id: "p1"},
-               %{name: "wb", args: %{"args" => "model get"}, id: "p2"}
+               %{name: "work", args: %{"args" => "model get"}, id: "p1"},
+               %{name: "work", args: %{"args" => "model get"}, id: "p2"}
              ],
              raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
            }},
@@ -149,7 +149,7 @@ defmodule Workbooks.AgentLoopTest do
           {:ok,
            %{
              tool_calls: [
-               %{name: "wb", args: %{"args" => "model get"}, id: "q1"},
+               %{name: "work", args: %{"args" => "model get"}, id: "q1"},
                %{name: "done", args: %{"result" => "finished via done"}, id: "q2"}
              ],
              raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
@@ -164,7 +164,7 @@ defmodule Workbooks.AgentLoopTest do
     responses = [
       {:ok,
        %{
-         tool_calls: [%{name: "wb", args: %{"args" => "model get"}, id: "c1"}],
+         tool_calls: [%{name: "work", args: %{"args" => "model get"}, id: "c1"}],
          raw_message: %{"role" => "assistant", "content" => nil, "tool_calls" => []}
        }},
       {:ok, %{tool_calls: [], content: nil}},

@@ -72,7 +72,7 @@ summarized in TOOLKITS-V3.org §"Federation".
   #+SLOT: data-source                 # NEW SLOT
   #+ENTITIES: github-repo github-issue github-pr github-user
   #+AUTH: pat                         # pat | oauth2 | service_account
-  #+ENV_KEYS: GITHUB_TOKEN            # secrets DeployKit + wb env must inject
+  #+ENV_KEYS: GITHUB_TOKEN            # secrets DeployKit + work env must inject
   #+CAPABILITIES: read write          # what the plugin actually supports
   #+SCOPE: tenant                     # tenant | workspace | global
   #+IMPL: WorkbooksRuntime.Plugin.Github
@@ -133,7 +133,7 @@ summarized in TOOLKITS-V3.org §"Federation".
 
   | Context              | Source                                    |
   |---------------------+--------------------------------------------|
-  | Local dev           | process env, then `wb env` keychain        |
+  | Local dev           | process env, then `work env` keychain        |
   | DeployKit tenant    | tenant's bound secret store                |
   | Cloud cell          | broker-issued per-tenant token             |
 
@@ -175,7 +175,7 @@ summarized in TOOLKITS-V3.org §"Federation".
 
 * DeployKit integration
 
-  When a developer runs =wb deploy= on their workbooks app:
+  When a developer runs =work deploy= on their workbooks app:
 
   1. DeployKit walks installed plugins (=runtime/engine/priv/plugins/
      <id>/manifest.org=).
@@ -210,7 +210,7 @@ summarized in TOOLKITS-V3.org §"Federation".
 
   Agents reach mutations via a small =plugin= toolkit (not
   agent-callable as direct tools per CLAUDE.md rule 13; via the
-  =bash= → =wb plugin <id> <verb> <args>= CLI path).
+  =bash= → =work plugin <id> <verb> <args>= CLI path).
 
 * What we DON'T do
 
@@ -226,7 +226,7 @@ summarized in TOOLKITS-V3.org §"Federation".
   - No SQL surface for SaaS. Users never write SQL against SaaS
     sources. They write OQL: =(notion-page (property "Status" "Done"))=.
 
-  - No `wb` "plugin install" verb that downloads binaries.  Plugins
+  - No `work` "plugin install" verb that downloads binaries.  Plugins
     are Elixir modules + org manifests shipped with the engine (or
     via Hex packages for community plugins).  No runtime fetch.
 
@@ -239,7 +239,7 @@ summarized in TOOLKITS-V3.org §"Federation".
      =priv/plugins/= + dynamically-registered plugins; entity →
      module lookup. ~80 LOC.
   4. *Auth shim* (=WorkbooksRuntime.Plugin.Auth=) — three-context
-     fetch (env / wb env keychain / broker). ~60 LOC.
+     fetch (env / work env keychain / broker). ~60 LOC.
   5. *Oql.Query dispatch update* — recognize plugin entity verbs and
      route to =Plugin.Registry.lookup_by_entity=. ~30 LOC.
   6. *First plugin: GitHub* — manifest + Elixir module + tests.

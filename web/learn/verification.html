@@ -28,7 +28,7 @@
 <body>
 <!--
 
-    $ wbx toolkit verify this-page
+    $ work toolkit verify this-page
     ✓ manifest.org present
     ✓ skills/overview.org present
     ✓ exec: none declared (discovery-only toolkit)
@@ -126,16 +126,16 @@
     them.</p>
   </div>
   <p>Quality is two different questions, so there are two commands.
-  <code>wbx toolkit verify</code> asks <em>is the contract satisfiable</em> —
-  does it load. <code>wbx toolkit eval</code> asks <em>does it do the right
+  <code>work toolkit verify</code> asks <em>is the contract satisfiable</em> —
+  does it load. <code>work toolkit eval</code> asks <em>does it do the right
   thing</em>. The split is canon: eval is the third leg beside the skills and
   the CLI — the author proves the toolkit does what its skills claim, and a
   consumer reruns those same proofs against their own runtime before trusting
   it.</p>
   <table class="cmp">
     <tr><th></th><th>question asked</th><th>command</th><th>what runs</th><th>what can fail</th></tr>
-    <tr><td><b>verify</b></td><td>is the contract satisfiable?</td><td><code>wbx toolkit verify &lt;id&gt;</code></td><td>a ✓/✗ board, one line per check — no agent, no model</td><td>missing files · unbuildable exec · ungrantable caps · bad signature</td></tr>
-    <tr><td><b>eval</b></td><td>does it do the right thing?</td><td><code>wbx toolkit eval &lt;id&gt;</code></td><td>one case per <code>evals/*.org</code> — an agent runs, a judge scores</td><td>no LLM key · wrong result · misleading manual · no task and no eval block</td></tr>
+    <tr><td><b>verify</b></td><td>is the contract satisfiable?</td><td><code>work toolkit verify &lt;id&gt;</code></td><td>a ✓/✗ board, one line per check — no agent, no model</td><td>missing files · unbuildable exec · ungrantable caps · bad signature</td></tr>
+    <tr><td><b>eval</b></td><td>does it do the right thing?</td><td><code>work toolkit eval &lt;id&gt;</code></td><td>one case per <code>evals/*.org</code> — an agent runs, a judge scores</td><td>no LLM key · wrong result · misleading manual · no task and no eval block</td></tr>
   </table>
 </section>
 
@@ -146,10 +146,10 @@
   check against it: files present, the exec mode, the declared capabilities,
   and — for third-party toolkits — the signature. The output is a literal
   board, one ✓ or ✗ per line. Here's a real one:</p>
-  <pre class="orgsample">$ wbx toolkit verify glyphs
+  <pre class="orgsample">$ work toolkit verify glyphs
 ✓ manifest.org present
 ✓ skills/overview.org present
-✓ exec: command — glyphs not yet registered, build descriptor present (run `wb toolkit build`)
+✓ exec: command — glyphs not yet registered, build descriptor present (run `work toolkit build`)
 ✓ caps declared, all grantable: vfs net
 ✓ granted by profile(s): network, posix
 ✓ pre checks DISABLED (2 block(s); native :role bash execution removed — wb-9ja)</pre>
@@ -198,12 +198,12 @@ flowchart TD
   its <code>CLI_BIN</code> is already in the command registry, <em>or</em> if
   it isn't yet but its <code>#+BUILD_SRC</code> is buildable (a crate or a
   path the build lane can compile) — in which case the line tells you the
-  fix: <code>run `wb toolkit build`</code>. A <b>posix</b> toolkit just
+  fix: <code>run `work toolkit build`</code>. A <b>posix</b> toolkit just
   checks the binary is on PATH. The failures are verbatim and self-correcting:</p>
   <pre class="orgsample">✗ exec: command — &lt;bin&gt; not registered and no buildable #+BUILD_SRC
 ✗ caps NOT grantable by any profile: …
 ✗ no single Policy profile grants all declared caps (…)
-✗ third-party provenance: no_signature (sign with `wb toolkit sign &lt;id&gt;`)</pre>
+✗ third-party provenance: no_signature (sign with `work toolkit sign &lt;id&gt;`)</pre>
   <p>The last board line is the honest one, and it gets its own section
   later: <code>pre checks DISABLED</code>. A toolkit may carry <code>:role
   pre</code> setup blocks; verify <em>counts</em> them but never runs them,
@@ -265,11 +265,11 @@ sequenceDiagram
   participant A as author
   participant T as the toolkit dir
   participant C as consumer
-  A->>T: wb toolkit sign — appends AUTHOR_DID + SIGNATURE
+  A->>T: work toolkit sign — appends AUTHOR_DID + SIGNATURE
   Note over T: manifest now carries Ed25519 over its own body
-  C->>T: wbx toolkit verify — recompute canonical body, check sig
+  C->>T: work toolkit verify — recompute canonical body, check sig
   alt signature valid
-    C->>T: wb toolkit build — proceeds
+    C->>T: work toolkit build — proceeds
   else missing / tampered
     C--xT: REFUSED — invalid provenance
   end
@@ -448,7 +448,7 @@ AGENT RESULT:
   docs that still describe Tier 1 as live.</p>
   <p>So a full run today looks like this — one tier skipped by design, one
   tier doing the real work:</p>
-  <pre class="orgsample">$ wbx toolkit eval git
+  <pre class="orgsample">$ work toolkit eval git
 git evals: 1/1 passed (1 skipped)
   · evals/version.org: DISABLED (native :role bash eval removed — wb-9ja)
   ✓ evals/explain.org [steps:1 tools:done errs:0] — PASS — names staged/unstaged and untracked state.</pre>
@@ -469,8 +469,8 @@ git evals: 1/1 passed (1 skipped)
   <h2>questions people actually ASK</h2>
   <details>
     <summary>Do evals run automatically when I install a toolkit?</summary>
-    <p>No — they're a command you run, <code>wbx toolkit eval &lt;id&gt;</code>
-    (or <code>wb dev eval</code>). That's deliberate: the eval is yours to
+    <p>No — they're a command you run, <code>work toolkit eval &lt;id&gt;</code>
+    (or <code>work dev eval</code>). That's deliberate: the eval is yours to
     rerun against your own runtime, on your own key, when you're deciding
     whether to trust the toolkit. The author proved it; you re-administer the
     same files.</p>

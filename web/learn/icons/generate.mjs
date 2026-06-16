@@ -28,7 +28,7 @@ const ICONS = {
   "org":      "A thick rounded asterisk-star whose six lobes are carved apart by thick white channels, like a seed of branching structure.",
   "agents":   "A chunky four-pointed compass spark: one heavy rounded star form split by thick white channels into facets, suggesting a crew moving with purpose.",
   "autopoet": "One fat rounded watering can in profile, a single recognizable garden watering can: chunky body, thick curved spout, big rounded handle as a negative-space hole.",
-  "wbx":      "A single bold right-pointing chevron symbol, like a giant play prompt, made of two thick rounded bars meeting at a point, with one clean white channel separating them.",
+  "work":      "A single bold right-pointing chevron symbol, like a giant play prompt, made of two thick rounded bars meeting at a point, with one clean white channel separating them.",
   // future tier-2 lessons
   "workflows": "Three fat rounded squares arranged in a diagonal staircase, overlapping at the corners where thick white channels separate them, a board in motion.",
   "vfs":      "One chunky rounded document page shape with a folded corner, carved by three thick white horizontal slots like drawers inside the page.",

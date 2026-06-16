@@ -67,7 +67,7 @@ See [[../reference/caps.org][Dock capabilities]] for the exhaustive cap list.
    "Set the `<ENV_VAR>` host secret.">
 2. Add the toolkit:
    #+begin_src text
-   wbx toolkit add <slug>
+   work toolkit add <slug>
    #+end_src
 3. <GRANT step — what cap/credential the host needs, and how it's supplied.>
 

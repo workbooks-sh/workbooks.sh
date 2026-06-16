@@ -53,18 +53,18 @@ See [[../reference/caps.org][Dock capabilities]].
 ** How to add it
    :PROPERTIES:
    :MATURITY: north-star
-   :CAVEAT: `wbx toolkit add github` and the host-held GitHub token are the intended ergonomics. Today you use the in-repo `git` toolkit for local operations; the GitHub-API path is not shipped.
+   :CAVEAT: `work toolkit add github` and the host-held GitHub token are the intended ergonomics. Today you use the in-repo `git` toolkit for local operations; the GitHub-API path is not shipped.
    :END:
 
 The intended flow:
 
 1. Set the GitHub token as a host secret (the toolkit never sees it):
    #+begin_src text
-   wbx secret set GITHUB_TOKEN <token>
+   work secret set GITHUB_TOKEN <token>
    #+end_src
 2. Add the toolkit:
    #+begin_src text
-   wbx toolkit add github
+   work toolkit add github
    #+end_src
 
 Today, for local repo work, reference the =git= toolkit and read its skills on
@@ -89,7 +89,7 @@ git push --force-with-lease
 Planned — once the GitHub integration ships, the same agent would then open a PR:
 
 #+begin_src text
-wbx github pr open --base main --title "..."   # planned
+work github pr open --base main --title "..."   # planned
 #+end_src
 
 ** Related toolkits

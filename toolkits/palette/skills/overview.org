@@ -18,12 +18,12 @@
 
   #+CAPTION: build + register every runtime in the set
   #+begin_src bash
-  wb toolkit build palette
+  work toolkit build palette
   #+end_src
 
   #+CAPTION: or just one
   #+begin_src bash
-  wb toolkit build palette python
+  work toolkit build palette python
   #+end_src
 
 * Run source in the sandbox

@@ -18,7 +18,7 @@ database. Frame + name accordingly: it's `Query`, not `Memory`.
   OQL — done), SEMANTIC (vector, pluggable embeddings — building), GRAPH
   (relationships / a GraphQL-style traversal over members + links — future). A
   caller picks the modality; new ones drop in without touching callers.
-- *Consumers are anything*: exposed over the CLI (`wb search`/`wb query`), the
+- *Consumers are anything*: exposed over the CLI (`work search`/`work query`), the
   HTTP API (`/api/search`), and in-workbook scripts — an agent is just one
   caller among scripts + services. No modality or surface assumes an LLM.
 - *Cross-workbook by DID*: a workbook can query ANOTHER workbook's data by its
@@ -84,7 +84,7 @@ same "compute at author time, bake the result" conclusion.)
    stable for pgvector/sqlite-vec.
 3. Index at store-time: =Library.store= chunks + embeds + upserts vectors.
 4. =Library.search(tenant, query, scope)= — semantic, then hybrid with OQL
-   literal. Exposed as a CONSUMER-AGNOSTIC surface: =wb search= / =wb query= +
+   literal. Exposed as a CONSUMER-AGNOSTIC surface: =work search= / =work query= +
    =/api/search= (any script/service/agent calls it). No LLM assumed.
 4b. Cross-workbook by DID: a member referenced by DID is resolved
    (=Workbooks.Did=) and included in the search scope — federated query against

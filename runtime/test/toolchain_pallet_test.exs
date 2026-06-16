@@ -59,7 +59,7 @@ defmodule Workbooks.ToolchainPalletTest do
     end
 
     @tag :build
-    test "wb toolkit build palette qjs (one runtime from the set) fetches, verifies, registers, runs JS" do
+    test "work toolkit build palette qjs (one runtime from the set) fetches, verifies, registers, runs JS" do
       {:ok, _} = ensure_oql()
       out = Toolkits.build_text("palette", "qjs", @root)
       assert out =~ "registered command \"qjs\""
@@ -74,7 +74,7 @@ defmodule Workbooks.ToolchainPalletTest do
     end
 
     @tag :build
-    test "wb toolkit build palette python (archive runtime: wasm + stdlib) runs a .py" do
+    test "work toolkit build palette python (archive runtime: wasm + stdlib) runs a .py" do
       {:ok, _} = ensure_oql()
       out = Toolkits.build_text("palette", "python", @root)
       assert out =~ "registered command \"python\""
@@ -87,7 +87,7 @@ defmodule Workbooks.ToolchainPalletTest do
     end
 
     @tag :build
-    test "wb toolkit build palette go (gobuild yaegi → wasip1) runs .go source" do
+    test "work toolkit build palette go (gobuild yaegi → wasip1) runs .go source" do
       {:ok, _} = ensure_oql()
       out = Toolkits.build_text("palette", "go", @root)
       assert out =~ "registered command \"go\""
@@ -101,7 +101,7 @@ defmodule Workbooks.ToolchainPalletTest do
 
     @tag :build
     @tag timeout: 300_000
-    test "wb toolkit build palette lua (wasi-sdk sjlj build) runs .lua incl. pcall/longjmp" do
+    test "work toolkit build palette lua (wasi-sdk sjlj build) runs .lua incl. pcall/longjmp" do
       {:ok, _} = ensure_oql()
       out = Toolkits.build_text("palette", "lua", @root)
       assert out =~ "registered command \"lua\""
@@ -140,7 +140,7 @@ defmodule Workbooks.ToolchainPalletTest do
 
     @tag :build
     @tag timeout: 180_000
-    test "wb toolkit build palette zig (native zig → wasm command) runs a Zig-authored command" do
+    test "work toolkit build palette zig (native zig → wasm command) runs a Zig-authored command" do
       {:ok, _} = ensure_oql()
       out = Toolkits.build_text("palette", "zig", @root)
       assert out =~ "registered command \"zigdemo\""

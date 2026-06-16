@@ -47,7 +47,7 @@
       <div class="kicker">learn / 01·3 — <b>under workbook · signatures</b></div>
       <h1><span class="ln">provenance that</span><span class="ln bub">TRAVELS</span><span class="ln">with the bytes</span></h1>
       <p class="dek">A <b>signature</b> is an embedded Ed25519 manifest, signed by a
-      self-certifying <a href="wbx">did:key</a> and read by <b>two independent checks</b> —
+      self-certifying <a href="work">did:key</a> and read by <b>two independent checks</b> —
       who signed, and whether the bytes changed. No certificate authority, no registry,
       no network. The proof rides <em>inside</em> the file it attests, and verifying it
       needs nothing but the file.</p>
@@ -161,7 +161,7 @@ flowchart LR
   red.</p>
   <pre class="mermaid">
 flowchart TD
-  V["wbx verify file.html"] --> S{"check 1 — signature<br/>Ed25519 over the manifest,<br/>key decoded from the did:key"}
+  V["work verify file.html"] --> S{"check 1 — signature<br/>Ed25519 over the manifest,<br/>key decoded from the did:key"}
   V --> I{"check 2 — asset integrity<br/>sha256 of the page with<br/>every manifest stripped"}
   S -->|true| AND(("AND"))
   I -->|true| AND
@@ -314,7 +314,7 @@ sequenceDiagram
     <tr><th></th><th>CLI key</th><th>runtime tenant key</th></tr>
     <tr><td>path</td><td><code>sh.workbooks/keys/local.ed25519</code></td><td><code>.workbooks/</code> in the tenant repo</td></tr>
     <tr><td>format</td><td>hex seed + <code>.pub</code></td><td>hex seed + <code>.pub</code></td></tr>
-    <tr><td>minted</td><td>first <code>wbx sign</code>, via OsRng</td><td>per tenant, via <code>:crypto.generate_key</code></td></tr>
+    <tr><td>minted</td><td>first <code>work sign</code>, via OsRng</td><td>per tenant, via <code>:crypto.generate_key</code></td></tr>
     <tr><td>protected</td><td>private half chmod <code>0600</code></td><td>gitignored — never committed</td></tr>
     <tr><td>persisted</td><td>lives in the app dir</td><td><code>WB_SIGNING_KEY</code> (primary tenant only)</td></tr>
   </table>
@@ -337,8 +337,8 @@ sequenceDiagram
 
 <section id="flows">
   <h2>where signing fires for YOU</h2>
-  <p>You can always sign by hand — <code>wbx sign &lt;file&gt;</code> on the
-  CLI, <code>wb sign</code> on the runtime escript, both fully local, no
+  <p>You can always sign by hand — <code>work sign &lt;file&gt;</code> on the
+  CLI, <code>work sign</code> on the runtime escript, both fully local, no
   engine required. But signing also fires automatically at the moments where
   provenance matters most. Here's the artifact lifecycle with the checkpoints
   marked:</p>
@@ -370,7 +370,7 @@ flowchart TD
   by default for first-party local installs — it's the posture you reach for
   when installing something you didn't make.</p>
   <p>Toolkit manifests get the same crypto in a different envelope:
-  <code>wbx toolkit sign/verify</code> signs the manifest body with
+  <code>work toolkit sign/verify</code> signs the manifest body with
   <code>#+SIGNATURE:</code> and <code>#+AUTHOR_DID:</code> org lines, required
   for <code>#+TRUST: third-party</code> toolkits — see the
   <a href="toolkit">toolkit</a> lesson. Pure-local CLI <code>bundle</code>
@@ -442,7 +442,7 @@ flowchart TD
   </details>
   <details>
     <summary>Do I need the runtime to verify?</summary>
-    <p>No. <code>wbx verify &lt;file&gt;</code> is fully local — it decodes the
+    <p>No. <code>work verify &lt;file&gt;</code> is fully local — it decodes the
     public key out of the <code>did:key</code>, strips the manifest, re-hashes,
     and checks the Ed25519 signature, all without a network or an account.
     Self-certifying identity is exactly what makes offline verification
@@ -476,19 +476,19 @@ flowchart TD
       <div>Workbook, the unit<small>the file this page unpacks the seal of</small></div><span class="go">→</span></a>
     <a href="bundles"><span class="sw" style="background:#a8d4f0"><img src="icons/bundles.svg" alt=""></span>
       <div>Bundles<small>the egress moment where signing fires</small></div><span class="go">→</span></a>
-    <a href="wbx"><span class="sw" style="background:#9fc4e8"><img src="icons/wbx.svg" alt=""></span>
-      <div>wbx, the CLI<small>sign and verify as local verbs</small></div><span class="go">→</span></a>
+    <a href="work"><span class="sw" style="background:#9fc4e8"><img src="icons/work.svg" alt=""></span>
+      <div>work, the CLI<small>sign and verify as local verbs</small></div><span class="go">→</span></a>
     <a href="toolkit"><span class="sw" style="background:#f3c5a3"><img src="icons/toolkit.svg" alt=""></span>
       <div>Toolkit<small>the third-party trust gate</small></div><span class="go">→</span></a>
     <a href="nexus"><span class="sw" style="background:#f2ddb0"><img src="icons/nexus.svg" alt=""></span>
       <div>Nexus, the engine<small>the runtime keystore and tenant DID</small></div><span class="go">→</span></a>
   </div>
-  <pre class="orgsample">$ wbx sign shop.html
+  <pre class="orgsample">$ work sign shop.html
 signed shop.html as did:key:z6MksgYVoXUjHkzUNrNHXDgr1bE7p4TJo7DfgSy78UxfYN1C → shop.html
-$ wbx verify shop.html
+$ work verify shop.html
 { "signature": true, "asset_integrity": true, "valid": true, … }
 # edit one character in the body, then:
-$ wbx verify shop.html
+$ work verify shop.html
 { "signature": true, "asset_integrity": false, "valid": false, … }</pre>
 </section>
 

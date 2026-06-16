@@ -35,8 +35,8 @@
   const AGENTS: AgentTarget[] = [
     { id: "claude-code", name: "Claude Code", icon: "lobe:claude-color", binary: "claude", service: "claude_code", where: "~/.claude", command: "npx skills add workbooks-sh/workbooks.sh" },
     { id: "codex", name: "Codex", icon: "lobe:openai", binary: "codex", service: "codex", where: "~/.codex", command: "npx skills add workbooks-sh/workbooks.sh" },
-    { id: "cursor", name: "Cursor", icon: "lobe:cursor", binary: "cursor", service: "cursor", where: "~/.cursor", command: "cursor: add MCP — wb desktop mcp" },
-    { id: "claude-desktop", name: "Claude Desktop", icon: "lobe:claude-color", binary: null, service: "claude_desktop", where: "app", command: "claude mcp add workbooks -- wb desktop mcp" },
+    { id: "cursor", name: "Cursor", icon: "lobe:cursor", binary: "cursor", service: "cursor", where: "~/.cursor", command: "cursor: add MCP — work desktop mcp" },
+    { id: "claude-desktop", name: "Claude Desktop", icon: "lobe:claude-color", binary: null, service: "claude_desktop", where: "app", command: "claude mcp add workbooks -- work desktop mcp" },
   ];
 
   interface Probe { found: boolean; path: string | null; version: string | null; error: string | null }

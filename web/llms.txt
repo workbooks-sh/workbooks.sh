@@ -8,7 +8,7 @@
 > isolated, stateful, and agentic. Toolkits are real programs compiled to
 > WebAssembly wrapped in readable manuals that teach people and agents alike.
 
-The CLI is `wbx` (installed via https://workbooks.sh/install.sh). With a coding
+The CLI is `work` (installed via https://workbooks.sh/install.sh). With a coding
 agent, install the skills: `npx skills add workbooks-sh/workbooks.sh`.
 
 ## Learn
@@ -26,11 +26,11 @@ technical background needed. Full index: https://workbooks.sh/learn/llms.txt
 ## Docs
 Reference and guides at https://docs.workbooks.sh — full index:
 https://docs.workbooks.sh/llms.txt
-- [install](https://docs.workbooks.sh/start/install): Install the wbx CLI and the engine
+- [install](https://docs.workbooks.sh/start/install): Install the work CLI and the engine
 - [your-first-workbook](https://docs.workbooks.sh/start/your-first-workbook): Direct an agent to build your first workbook
 - [what-is-a-toolkit](https://docs.workbooks.sh/concepts/what-is-a-toolkit): What a toolkit is — wasm program + readable manual
 - [the-dock](https://docs.workbooks.sh/concepts/the-dock): The Dock & capabilities — the host membrane
-- [cli](https://docs.workbooks.sh/reference/cli): wbx CLI — every verb, mode, and flag
+- [cli](https://docs.workbooks.sh/reference/cli): work CLI — every verb, mode, and flag
 - [cloud](https://docs.workbooks.sh/deploy/cloud): Deploy a workbook to the cloud
 - [maturity](https://docs.workbooks.sh/maturity): Capability matrix — the honest 'what works?' answer
 

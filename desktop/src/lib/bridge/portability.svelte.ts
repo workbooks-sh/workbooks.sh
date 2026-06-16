@@ -1,7 +1,7 @@
 // files domain — portability bridge (Phase B, native/offline).
 //
 // Invokes the native Rust `workbook_check_portability` Tauri command
-// (which runs `wb check --portability <workdir> --json`). The CLI emits
+// (which runs `work check --portability <workdir> --json`). The CLI emits
 // the per-cell classification + the workbook's computed tier; we hold the
 // last result in a reactive store and re-fetch on demand. No runtime /
 // control-plane involvement — fully local.
@@ -13,7 +13,7 @@
 // panel rather than blocking the editor.
 //
 // Read-only by design. The store NEVER mutates a workbook's source;
-// it only displays what `wb check` reports.
+// it only displays what `work check` reports.
 
 import { invoke } from "@tauri-apps/api/core";
 
@@ -86,7 +86,7 @@ function asTier(v: unknown, fallback: Tier = "browser"): Tier {
 }
 
 /** Parse the raw Rust response into our typed shape. The Rust side
- *  passes `cells` through as untyped JSON so the wb CLI can evolve its
+ *  passes `cells` through as untyped JSON so the work CLI can evolve its
  *  schema without breaking us; we coerce here.  */
 function parseReport(raw: unknown): PortabilityReport {
   const obj = (raw ?? {}) as Record<string, unknown>;
@@ -168,7 +168,7 @@ class PortabilityStore {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       // The Rust side prefixes "classification_unavailable:" when the
-      // wb CLI is missing the verb or the binary isn't on PATH — both
+      // work CLI is missing the verb or the binary isn't on PATH — both
       // are non-fatal at this stage of the rollout.
       if (msg.includes("classification_unavailable")) {
         this.report = null;

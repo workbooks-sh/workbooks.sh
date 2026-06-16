@@ -1,9 +1,9 @@
 #+TITLE: Deploy a runtime to the internet
-#+DESCRIPTION: Bring a runtime up — locally in a container or on a cloud provider — with wbx deploy, the bootstrap verb.
+#+DESCRIPTION: Bring a runtime up — locally in a container or on a cloud provider — with work deploy, the bootstrap verb.
 
 * Deploy a runtime to the internet
 
-The goal: stand a runtime up somewhere it can serve. =wbx deploy= is the *bootstrap*
+The goal: stand a runtime up somewhere it can serve. =work deploy= is the *bootstrap*
 verb — special because it runs with no runtime up; it's what brings the runtime up.
 It reads a =deployment.org= file and converges to that declared state.
 
@@ -19,7 +19,7 @@ publishes the compilers package or the runtime image; do not conflate those.
 
 ** Steps
 
-1. *Scaffold the config.* =wbx deploy init [local|cloud]= writes a =deployment.org=.
+1. *Scaffold the config.* =work deploy init [local|cloud]= writes a =deployment.org=.
    On a TTY, omit the preset to pick interactively. Edit it, then apply.
    :PROPERTIES:
    :MATURITY:  ships-today
@@ -28,30 +28,30 @@ publishes the compilers package or the runtime image; do not conflate those.
 
 2. *Stage any secrets.* Secrets are declared by NAME in =deployment.org=
    (=#+DEPLOY_SECRETS: KEY …=); values are managed out-of-band and never enter the
-   file or the image. Use =wbx deploy secrets set KEY=VALUE …= (or =--from-env <file>=).
+   file or the image. Use =work deploy secrets set KEY=VALUE …= (or =--from-env <file>=).
    :PROPERTIES:
    :MATURITY:  ships-today
    :EVIDENCE:  cli/src/deploy/mod.rs:60
    :CAVEAT:    values stored 0600 under the app dir; delivered per provider (env-file locally, recipe hook in the cloud).
    :END:
 
-3. *Validate.* =wbx deploy validate= runs a coherence check on =deployment.org=,
+3. *Validate.* =work deploy validate= runs a coherence check on =deployment.org=,
    including that every declared secret is set.
    :PROPERTIES:
    :MATURITY:  ships-today
    :EVIDENCE:  cli/src/deploy/mod.rs:38
    :END:
 
-4. *Apply.* =wbx deploy apply= converges to the declared state — a local container
-   or a provider recipe. The shorthand =wbx deploy local= scaffolds local config if
+4. *Apply.* =work deploy apply= converges to the declared state — a local container
+   or a provider recipe. The shorthand =work deploy local= scaffolds local config if
    absent, then applies.
    :PROPERTIES:
    :MATURITY:  ships-today
    :EVIDENCE:  cli/src/deploy/mod.rs:41
    :END:
 
-5. *Operate.* =wbx deploy status= inspects the live deployment, =wbx deploy logs=
-   tails its logs, =wbx deploy down= tears it down. =wbx deploy doctor= reports which
+5. *Operate.* =work deploy status= inspects the live deployment, =work deploy logs=
+   tails its logs, =work deploy down= tears it down. =work deploy doctor= reports which
    engines, recipes, and declared secrets are present vs missing.
    :PROPERTIES:
    :MATURITY:  ships-today
@@ -82,7 +82,7 @@ ships code:
 
 - The compilers package — its own ghcr package, published manually.
 - The runtime image — built by CI on push to main.
-- =wbx deploy= — consumers running the runtime image for their own use. ←  *this page.*
+- =work deploy= — consumers running the runtime image for their own use. ←  *this page.*
 
 :PROPERTIES:
 :MATURITY:  ships-today

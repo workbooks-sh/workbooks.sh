@@ -245,7 +245,7 @@ defp pub_of_did("did:key:z" &lt;&gt; b58),
   defeats a real forgery.</p>
   <pre class="mermaid">
 sequenceDiagram
-  participant A as author · wbx toolkit sign
+  participant A as author · work toolkit sign
   participant M as manifest.org
   participant C as consumer · manifest_provenance
   A->>M: read manifest body
@@ -299,15 +299,15 @@ flowchart TD
   the right: its provenance must verify, and the three enforcement points are
   these.</p>
   <ul>
-    <li><b>Verify</b> — <code>wbx toolkit verify</code> appends one line to its
+    <li><b>Verify</b> — <code>work toolkit verify</code> appends one line to its
     report: <code>✓ third-party signature valid (did:key:…)</code> or
-    <code>✗ third-party provenance: &lt;why&gt; (sign with wb toolkit sign &lt;id&gt;)</code>.
+    <code>✗ third-party provenance: &lt;why&gt; (sign with work toolkit sign &lt;id&gt;)</code>.
     First-party toolkits get no such line — there's nothing to check. This is the
     advisory point; it tells you, but doesn't stop you.</li>
     <li><b>Build</b> — the hard gate. A third-party toolkit whose provenance
     doesn't verify is refused with an exact string:
     <code>&lt;id&gt;: REFUSED — third-party toolkit with invalid provenance
-    (&lt;why&gt;); author must wb toolkit sign &lt;id&gt;</code>. The source comment:
+    (&lt;why&gt;); author must work toolkit sign &lt;id&gt;</code>. The source comment:
     <i>"an unsigned/tampered third-party toolkit never builds."</i> Nothing
     downstream happens — the bytes never compile.</li>
     <li><b>Run</b> — even after a clean build, posture follows the toolkit into
@@ -326,9 +326,9 @@ flowchart TD
   exactly which rung of verification fell through and how to fix it:</p>
   <table class="cmp">
     <tr><th>atom</th><th>what it means</th><th>the fix</th></tr>
-    <tr><td><code>:no_author_did</code></td><td>no <code>#+AUTHOR_DID</code> line — the manifest was never signed at all</td><td><code>wb toolkit sign &lt;id&gt;</code></td></tr>
-    <tr><td><code>:no_signature</code></td><td>an author DID is present but no <code>#+SIGNATURE</code> line</td><td><code>wb toolkit sign &lt;id&gt;</code></td></tr>
-    <tr><td><code>:bad_signature_encoding</code></td><td>the signature line isn't valid Base64 — corrupted or hand-edited</td><td>re-sign (<code>wb toolkit sign</code>) to overwrite it cleanly</td></tr>
+    <tr><td><code>:no_author_did</code></td><td>no <code>#+AUTHOR_DID</code> line — the manifest was never signed at all</td><td><code>work toolkit sign &lt;id&gt;</code></td></tr>
+    <tr><td><code>:no_signature</code></td><td>an author DID is present but no <code>#+SIGNATURE</code> line</td><td><code>work toolkit sign &lt;id&gt;</code></td></tr>
+    <tr><td><code>:bad_signature_encoding</code></td><td>the signature line isn't valid Base64 — corrupted or hand-edited</td><td>re-sign (<code>work toolkit sign</code>) to overwrite it cleanly</td></tr>
     <tr><td><code>:bad_signature</code></td><td>decodes fine, but doesn't verify against the body — the manifest was <b>changed after signing</b></td><td>re-sign — and ask <em>who</em> changed which line</td></tr>
   </table>
   <p>The verdict of that table: the first two atoms mean <em>never signed</em>,
@@ -340,13 +340,13 @@ flowchart TD
   <p>Put it all together as one real round trip. You sign a toolkit; an attacker
   edits a single line — say flipping an empty <code>#+CAPS:</code> to
   <code>#+CAPS: net-fetch</code>; the build refuses:</p>
-  <pre class="orgsample">$ wbx toolkit sign huniq
+  <pre class="orgsample">$ work toolkit sign huniq
 signed huniq as did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH
 
 <i># attacker edits one line:  #+CAPS:  →  #+CAPS: net-fetch</i>
 
-$ wbx toolkit build huniq
-huniq: REFUSED — third-party toolkit with invalid provenance (bad_signature); author must `wb toolkit sign huniq`</pre>
+$ work toolkit build huniq
+huniq: REFUSED — third-party toolkit with invalid provenance (bad_signature); author must `work toolkit sign huniq`</pre>
   <p>The edit could have been any manifest byte — <code>EXEC</code>,
   <code>BUILD_SRC</code>, the <code>SHA256</code> pin, even the
   <code>AUTHOR_DID</code> itself. Every one of them lands you at
@@ -364,8 +364,8 @@ flowchart TD
   k --> r1["toolkit manifests<br/>Toolkits.sign_text"]
   k --> r2["published workbook HTML<br/>embedded c2pa-style manifest<br/>+ asset_sha256"]
   k --> r3["agent run ledgers<br/>the attributable signed half"]
-  r1 --> v1["build gate · wb toolkit verify"]
-  r2 --> v2["install gate · require_signature: true<br/>wbx verify &lt;file.html&gt;"]
+  r1 --> v1["build gate · work toolkit verify"]
+  r2 --> v2["install gate · require_signature: true<br/>work verify &lt;file.html&gt;"]
   r3 --> v3["ledger verification"]
   style k fill:#13d943,stroke:#121316,stroke-width:2.5px
   style r2 fill:#f3c5a3,stroke:#121316
@@ -379,7 +379,7 @@ flowchart TD
   a tampered bundle fails <code>{:error, {:bad_signature, _}}</code>, an unsigned
   one <code>{:error, {:unverifiable, _}}</code>. A test proves it the honest way —
   append a comment <em>after</em> signing and the integrity check catches it. On
-  the CLI, <code>wbx verify &lt;file.html&gt;</code> is pure-read, no key needed,
+  the CLI, <code>work verify &lt;file.html&gt;</code> is pure-read, no key needed,
   and prints <code>valid=… signature=… asset_integrity=… issuer=did:key:…</code>.</p>
   <p>The deliberate part: the manifest module states it outright —
   <i>"no C2PA/X.509 stack, no Rust signer binary."</i> The did:key supersedes the

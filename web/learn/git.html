@@ -132,12 +132,12 @@
     <tr><th>layer</th><th>form</th><th><code>git diff</code> verdict</th><th>the move when it doesn't</th></tr>
     <tr><td>the <a href="org">org spec</a></td><td>plain text, in a <code>script type=text/org</code> block</td><td class="y">clean line diffs — the designed diff surface</td><td>—</td></tr>
     <tr><td>the <code>.html</code> artifact</td><td>text, end to end</td><td>diffable in principle — it's text, not a blob</td><td>read the org source for the legible diff</td></tr>
-    <tr><td>the <a href="vfs">vfs.sqlite</a> disk</td><td>binary database file</td><td class="n">stored, but git can't line-diff it</td><td><code>wbx unbundle</code> recovers a source tree; the legible-SQL projection is design intent (see honesty)</td></tr>
+    <tr><td>the <a href="vfs">vfs.sqlite</a> disk</td><td>binary database file</td><td class="n">stored, but git can't line-diff it</td><td><code>work unbundle</code> recovers a source tree; the legible-SQL projection is design intent (see honesty)</td></tr>
   </table>
   <p>Two things follow. First, the source is never trapped: a workbook ships as
   one <code>.html</code> that carries a plain zip inside it, holding
   <code>workbook.org</code> right beside the rendered page, on purpose, so a recipient can
-  <code>wbx unbundle</code> it back into a diffable tree and re-author. The
+  <code>work unbundle</code> it back into a diffable tree and re-author. The
   comment in the bundler says it outright: <i>source travels with the artifact —
   recipients can unbundle and re-author.</i> Second, the one binary layer —
   SQLite — is the one place to be careful, and we come back to it honestly
@@ -150,7 +150,7 @@
   in one breath: it writes the fast SQLite index your app reads from, <em>and</em>
   it commits your <code>.org</code> source into the tenant repo. One deploy, one
   commit, with a real message and a real author.</p>
-  <pre class="orgsample">$ wbx workbook deploy lander ./lander.org
+  <pre class="orgsample">$ work workbook deploy lander ./lander.org
 
    <i>→ runtime runs Workbooks.deploy("lander", org, "dev")</i>
    <i>→ writes the SQLite index  +  Git.save commits &lt;name&gt;.org</i>
@@ -161,7 +161,7 @@
   that remembers — and a short sha comes back to you as the receipt:</p>
   <pre class="mermaid">
 sequenceDiagram
-  participant U as you (wbx)
+  participant U as you (work)
   participant R as runtime (Workbooks.deploy)
   participant I as SQLite index
   participant G as git repo
@@ -324,17 +324,17 @@ flowchart LR
   style repo fill:#a8d4f0,stroke:#121316,stroke-width:2.5px
   </pre>
   <p>The common case is one line:</p>
-  <pre class="orgsample">$ wbx mirror github
+  <pre class="orgsample">$ work mirror github
    <i>→ POST /api/mirror/dev {"forge":"github"}</i>
    <i>→ no origin yet, so: gh repo create wb-dev --source . --private --push --remote origin</i>
    <i>→ {"ok":true, "url":"https://github.com/you/wb-dev.git"}</i></pre>
   <p>If you already have the remote, skip the forge CLI entirely — hand
   <code>mirror</code> a URL (anything containing <code>://</code> or starting
   <code>git@</code>) and it's a bare <code>git push</code>, zero tooling
-  required: <code>wbx mirror git@github.com:you/site.git</code>. And when nothing
+  required: <code>work mirror git@github.com:you/site.git</code>. And when nothing
   is installed, the engine doesn't fail quietly — it tells you the truth:
   <code>"no forge CLI (gh/glab/tea) on PATH — create the remote yourself and use
-  mirror/3."</code> For the peer-to-peer crowd, <code>wbx federate</code> runs
+  mirror/3."</code> For the peer-to-peer crowd, <code>work federate</code> runs
   <code>rad init --public</code> and hands back a Radicle RID
   (<code>rad:…</code>), with delegates addressed by DID — the same
   <code>did:key</code> from the author section, doing real work.</p>
@@ -407,7 +407,7 @@ flowchart LR
   </details>
   <details>
     <summary>Is my history locked inside the runtime?</summary>
-    <p>No. It's plain git. <code>wbx mirror &lt;url&gt;</code> pushes the whole
+    <p>No. It's plain git. <code>work mirror &lt;url&gt;</code> pushes the whole
     history to your forge with a bare <code>git push</code> — no platform CLI
     required when you bring the URL. Clone it anywhere and it's yours.</p>
   </details>
@@ -428,12 +428,12 @@ flowchart LR
   <details>
     <summary>Does this replace GitHub?</summary>
     <p>No — it pushes <em>to</em> it. The runtime hosts a git repo; GitHub (or
-    GitLab, or Gitea, or your own server) stays your forge. <code>wbx mirror
+    GitLab, or Gitea, or your own server) stays your forge. <code>work mirror
     github</code> wires them together; you keep your existing workflow.</p>
   </details>
   <details>
     <summary>How do I get a diffable tree out of a workbook someone sent me?</summary>
-    <p><code>wbx unbundle &lt;file&gt;</code>. A workbook <code>.html</code> carries
+    <p><code>work unbundle &lt;file&gt;</code>. A workbook <code>.html</code> carries
     <code>workbook.org</code> in the filesystem embedded inside it (and a legacy
     <code>.wbundle</code> carries it the same way), so you can extract the source
     and re-author it. The source travels with the artifact.</p>

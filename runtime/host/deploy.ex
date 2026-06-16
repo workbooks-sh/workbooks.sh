@@ -13,7 +13,7 @@ defmodule Workbooks.Deploy do
   returns a tagged `{:ok | :error, map}` (rendered human OR `--json`), and exits
   non-zero on failure. `doctor` self-heals prereqs; `verify` proves the LIVE
   runtime answers. Backends sit behind a seam (`Machine` today; podman/docker/WSL2
-  later). Reached via `wb deploy <verb> [--json]`.
+  later). Reached via `work deploy <verb> [--json]`.
   """
   alias Workbooks.Deploy.{Machine, Image, Backend, Config}
 
@@ -21,7 +21,7 @@ defmodule Workbooks.Deploy do
 
   @template_local """
   # A Workbooks deployment — single-tenant, all-local (runs in a krunvm microVM,
-  # cloud-identical isolation). Edit, then:  wb deploy validate  →  wb deploy apply
+  # cloud-identical isolation). Edit, then:  work deploy validate  →  work deploy apply
   * deployment :deployment:
     :PROPERTIES:
     :ENGINE_PLACE: local
@@ -36,7 +36,7 @@ defmodule Workbooks.Deploy do
   @template_cloud """
   # A Workbooks deployment — multi-tenant SaaS in the cloud. Fill the <...>.
   # SECRETS live in your ENV, never here:  WB_S3_KEY  WB_S3_SECRET  WB_DATABASE_URL
-  # Then:  wb deploy validate  →  wb deploy apply
+  # Then:  work deploy validate  →  work deploy apply
   * deployment :deployment:
     :PROPERTIES:
     :ENGINE_PLACE:     cloud
@@ -56,12 +56,12 @@ defmodule Workbooks.Deploy do
   """
 
   # ── CI scaffolds (wb-6ttc) ──────────────────────────────────────────────────
-  # `wb deploy ci <provider>` writes one of these so DeployKit is git-workflow-
+  # `work deploy ci <provider>` writes one of these so DeployKit is git-workflow-
   # native: validate on PRs, apply+verify on main, all from deployment.org.
   # Secrets stay in the CI provider's secret store, never in the file.
 
   @ci_github """
-  # .github/workflows/deploy.yml — scaffolded by `wb deploy ci github`.
+  # .github/workflows/deploy.yml — scaffolded by `work deploy ci github`.
   # Reconciles your nexus/runtime from deployment.org: validate on PRs,
   # apply + verify on push to main. Put secrets in repo Settings → Secrets and
   # variables → Actions (never in deployment.org).
@@ -78,10 +78,10 @@ defmodule Workbooks.Deploy do
       runs-on: ubuntu-latest
       steps:
         - uses: actions/checkout@v4
-        - name: Install the wb CLI
+        - name: Install the work CLI
           run: curl -fsSL https://workbooks.sh/cli.sh | sh
         - name: Validate deployment.org
-          run: wb deploy validate
+          run: work deploy validate
         - name: Apply + verify (main only)
           if: github.ref == 'refs/heads/main'
           env:
@@ -91,12 +91,12 @@ defmodule Workbooks.Deploy do
             WB_S3_SECRET: ${{ secrets.WB_S3_SECRET }}
             WB_DATABASE_URL: ${{ secrets.WB_DATABASE_URL }}
           run: |
-            wb deploy apply
-            wb deploy verify
+            work deploy apply
+            work deploy verify
   """
 
   @ci_gitlab """
-  # .gitlab-ci.yml — scaffolded by `wb deploy ci gitlab`.
+  # .gitlab-ci.yml — scaffolded by `work deploy ci gitlab`.
   # Secrets live in GitLab → Settings → CI/CD → Variables (never in deployment.org).
   stages: [validate, deploy]
   default:
@@ -106,28 +106,28 @@ defmodule Workbooks.Deploy do
   validate:
     stage: validate
     script:
-      - wb deploy validate
+      - work deploy validate
   deploy:
     stage: deploy
     rules:
       - if: $CI_COMMIT_BRANCH == "main"
     script:
-      - wb deploy apply
-      - wb deploy verify
+      - work deploy apply
+      - work deploy verify
   """
 
   @ci_generic """
   #!/usr/bin/env sh
-  # deploy-ci.sh — scaffolded by `wb deploy ci generic`. Portable across any CI.
+  # deploy-ci.sh — scaffolded by `work deploy ci generic`. Portable across any CI.
   # Validates always; applies + verifies on the main branch. Secrets come from
   # the CI's environment (the same vars your deployment.org references).
   set -eu
   command -v wb >/dev/null 2>&1 || curl -fsSL https://workbooks.sh/cli.sh | sh
-  wb deploy validate
+  work deploy validate
   BRANCH="${CI_COMMIT_BRANCH:-${GITHUB_REF_NAME:-${BRANCH_NAME:-}}}"
   if [ "$BRANCH" = "main" ]; then
-    wb deploy apply
-    wb deploy verify
+    work deploy apply
+    work deploy verify
   fi
   """
 
@@ -145,14 +145,14 @@ defmodule Workbooks.Deploy do
 
       {path, body} ->
         if File.exists?(path) and not force? do
-          err("#{path} already exists — edit it, or `wb deploy ci #{provider} --force` to replace it", %{file: path})
+          err("#{path} already exists — edit it, or `work deploy ci #{provider} --force` to replace it", %{file: path})
         else
           File.mkdir_p!(Path.dirname(path))
           File.write!(path, body)
           if provider == "generic", do: File.chmod(path, 0o755)
 
           ok(
-            "wrote #{path} — commit it. CI now runs `wb deploy validate` on PRs and `apply`+`verify` on main. Set the secrets your deployment.org references in your CI provider.",
+            "wrote #{path} — commit it. CI now runs `work deploy validate` on PRs and `apply`+`verify` on main. Set the secrets your deployment.org references in your CI provider.",
             %{file: path, provider: provider}
           )
         end
@@ -174,11 +174,11 @@ defmodule Workbooks.Deploy do
         err("unknown preset '#{preset}' — try: local | cloud", %{presets: ["local", "cloud"]})
 
       File.exists?(file) and not force? ->
-        err("#{file} already exists — edit it, or `wb deploy init #{preset} --force` to replace it", %{file: file})
+        err("#{file} already exists — edit it, or `work deploy init #{preset} --force` to replace it", %{file: file})
 
       true ->
         File.write!(file, template(preset))
-        ok("wrote #{file} (#{preset}) — edit it, then `wb deploy validate` → `wb deploy apply`", %{file: file, preset: preset})
+        ok("wrote #{file} (#{preset}) — edit it, then `work deploy validate` → `work deploy apply`", %{file: file, preset: preset})
     end
   end
 
@@ -201,7 +201,7 @@ defmodule Workbooks.Deploy do
   end
 
   defp exists(file) do
-    if File.exists?(file), do: :ok, else: {:error, "no #{file} — run `wb deploy init` to scaffold one"}
+    if File.exists?(file), do: :ok, else: {:error, "no #{file} — run `work deploy init` to scaffold one"}
   end
 
   @doc """
@@ -279,11 +279,11 @@ defmodule Workbooks.Deploy do
 
       case await_discovery(20_000) do
         {:ok, disc} ->
-          ok("local runtime up — #{info.url} (survives app quit; `wb deploy down` to stop)",
+          ok("local runtime up — #{info.url} (survives app quit; `work deploy down` to stop)",
              Map.merge(base, %{state: "up", token_preview: String.slice(disc["token"] || "", 0, 8)}))
 
         {:error, :timeout} ->
-          ok("VM spawned (#{info.url}) but no discovery yet — `wb deploy logs`/`verify`. Image may still be booting.",
+          ok("VM spawned (#{info.url}) but no discovery yet — `work deploy logs`/`verify`. Image may still be booting.",
              Map.merge(base, %{state: "starting"}))
       end
     else
@@ -324,7 +324,7 @@ defmodule Workbooks.Deploy do
         do: ok("runtime healthy — http://127.0.0.1:#{port}/health → 200", %{state: "healthy", port: port}),
         else: err("runtime reachable but unhealthy (HTTP #{status})", %{state: "unhealthy", port: port, http: status})
     else
-      {:error, :no_discovery} -> err("no discovery file — is the daemon up? `wb deploy local`", %{state: "down"})
+      {:error, :no_discovery} -> err("no discovery file — is the daemon up? `work deploy local`", %{state: "down"})
       {:error, reason} -> err("runtime not reachable: #{inspect(reason)}", %{state: "unreachable"})
       _ -> err("runtime not reachable", %{state: "unreachable"})
     end
@@ -395,7 +395,7 @@ defmodule Workbooks.Deploy do
         else: err("cloud runtime reachable but unhealthy at #{url}", %{state: "unhealthy", url: url})
     else
       {:ok, status, _} -> err("cloud runtime returned HTTP #{status}", %{state: "unhealthy", http: status})
-      _ -> err("could not verify cloud runtime (provider #{provider}) — is it deployed? `wb deploy apply`", %{state: "unreachable"})
+      _ -> err("could not verify cloud runtime (provider #{provider}) — is it deployed? `work deploy apply`", %{state: "unreachable"})
     end
   end
 
