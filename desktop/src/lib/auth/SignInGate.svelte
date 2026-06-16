@@ -1,15 +1,15 @@
 <script lang="ts">
   /**
-   * Mandatory sign-in gate. Rendered full-screen before the workspace
-   * or app is reachable — the user cannot proceed until they have a
-   * Workbooks session (free, but required so their data is secured).
+   * Mandatory sign-in gate — full-screen before the app is reachable. A grand,
+   * on-brand welcome: paper field, a soft pastel aurora, one big "Get started", and
+   * the signature multi-pastel DNA strip along the bottom edge.
    *
-   * Copy never names the underlying auth provider — to the user this is
-   * simply "sign in to Workbooks." Reuses the SignInOverlay button logic
-   * and the EmptyState illustration so it matches the rest of the app.
+   * Copy reflects the model: the app is FREE and local-first; signing in syncs your
+   * account and unlocks the cloud. It never names the underlying auth provider — to
+   * the user this is simply "sign in to Workbooks" (one front door, app.workbooks.sh).
    */
   import { SignIn as LogIn } from "phosphor-svelte";
-  import EmptyState from "$lib/network/components/EmptyState.svelte";
+  import DnaStrip from "$lib/components/DnaStrip.svelte";
   import { auth } from "./store.svelte";
 
   let signingIn = $state(false);
@@ -30,82 +30,175 @@
 </script>
 
 <div class="gate">
-  <EmptyState
-    title="Welcome to Workbooks"
-    blurb="Sign in to get started. Sign-in opens in a browser window — come back when it's done."
-    glyph="✦"
-    hue={190}
-  >
-    {#snippet cta()}
-      <div class="cta-stack">
-        <button type="button" class="btn primary" onclick={signIn} disabled={signingIn}>
-          <LogIn weight="fill" size={13} />
-          {signingIn ? "Opening sign-in…" : "Sign in to Workbooks"}
-        </button>
-        <p class="rationale">Free — signing in secures your data.</p>
-        {#if signInError ?? auth.lastError}
-          <p class="err">{signInError ?? auth.lastError}</p>
-        {/if}
-      </div>
-    {/snippet}
-  </EmptyState>
+  <div class="aurora" aria-hidden="true"></div>
+
+  <div class="card">
+    <div class="mark" aria-hidden="true"><span>✦</span></div>
+
+    <h1>Welcome to Workbooks</h1>
+    <p class="lede">
+      Your workbooks live on your machine — free. Sign in to sync across devices,
+      manage your account, and spin up the cloud whenever you're ready.
+    </p>
+
+    <button type="button" class="cta" onclick={signIn} disabled={signingIn}>
+      <LogIn weight="fill" size={16} />
+      {signingIn ? "Opening sign-in…" : "Get started"}
+    </button>
+
+    <p class="fine">Free, local-first. Sign-in opens in your browser — come back when it's done.</p>
+
+    {#if signInError ?? auth.lastError}
+      <p class="err">{signInError ?? auth.lastError}</p>
+    {/if}
+  </div>
+
+  <div class="dna-edge"><DnaStrip height={14} /></div>
 </div>
 
 <style>
   .gate {
     position: fixed;
     inset: 0;
-    background: var(--color-page);
     z-index: 1000;
+    background: var(--color-page);
     display: grid;
     place-items: center;
+    overflow: hidden;
   }
-  .cta-stack {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
+
+  /* Soft pastel aurora — the brand glow, top-weighted so the card floats on it. */
+  .aurora {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.85;
+    background:
+      radial-gradient(42rem 28rem at 50% -10%, color-mix(in srgb, var(--color-chip-blue) 42%, transparent), transparent 70%),
+      radial-gradient(32rem 24rem at 14% 4%, color-mix(in srgb, var(--color-chip-peach) 38%, transparent), transparent 72%),
+      radial-gradient(32rem 24rem at 86% 2%, color-mix(in srgb, var(--color-chip-green) 34%, transparent), transparent 72%),
+      radial-gradient(30rem 22rem at 78% 96%, color-mix(in srgb, var(--color-chip-lavender) 30%, transparent), transparent 74%);
   }
-  .btn {
+
+  .card {
+    position: relative;
+    z-index: 1;
+    width: min(92vw, 460px);
+    padding: 44px 44px 40px;
+    text-align: center;
+    background: color-mix(in srgb, var(--color-surface, var(--color-page)) 88%, var(--color-page));
+    border: 1px solid color-mix(in srgb, var(--color-fg) 8%, transparent);
+    border-radius: 22px;
+    box-shadow: var(--shadow-pop);
+    animation: rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .mark {
+    width: 66px;
+    height: 66px;
+    margin: 0 auto 24px;
+    border-radius: 19px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(
+      135deg,
+      var(--color-chip-peach),
+      var(--color-chip-blue) 48%,
+      var(--color-chip-lavender)
+    );
+    box-shadow: var(--shadow-pop);
+  }
+  .mark span {
+    font-size: 30px;
+    line-height: 1;
+    color: var(--color-fg);
+  }
+
+  h1 {
+    margin: 0 0 12px;
+    font-family: var(--font-sans);
+    font-size: 2.05rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--color-fg);
+  }
+
+  .lede {
+    margin: 0 auto 28px;
+    max-width: 34ch;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: color-mix(in srgb, var(--color-fg) 68%, transparent);
+  }
+
+  .cta {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 9px 18px;
-    border-radius: 8px;
-    font-size: 0.86rem;
-    font-weight: 600;
-    cursor: pointer;
+    gap: 9px;
+    padding: 13px 30px;
+    border-radius: 12px;
     border: 1px solid var(--color-fg);
     background: var(--color-fg);
     color: var(--color-page);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
     transition:
-      transform 180ms cubic-bezier(0.22, 1.2, 0.36, 1),
-      box-shadow 200ms ease;
+      transform 200ms cubic-bezier(0.22, 1.2, 0.36, 1),
+      box-shadow 220ms ease;
   }
-  .btn:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(15, 15, 15, 0.12);
+  .cta:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(18, 19, 22, 0.2);
   }
-  .btn:disabled {
+  .cta:active:not(:disabled) {
+    transform: translateY(0);
+  }
+  .cta:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
-  .rationale {
-    margin: 0;
+
+  .fine {
+    margin: 18px 0 0;
     font-size: 0.78rem;
-    color: var(--color-fg-muted, var(--color-fg));
-    opacity: 0.7;
+    color: color-mix(in srgb, var(--color-fg) 52%, transparent);
   }
+
   .err {
-    margin: 0;
-    padding: 7px 11px;
-    border-radius: 6px;
+    margin: 16px auto 0;
+    padding: 8px 12px;
+    max-width: 36ch;
+    border-radius: 9px;
     background: rgba(220, 60, 60, 0.08);
     border: 1px solid rgba(220, 60, 60, 0.22);
     color: rgb(180, 50, 50);
     font-size: 0.78rem;
     font-weight: 500;
-    max-width: 36ch;
-    text-align: center;
+  }
+
+  .dna-edge {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card {
+      animation: none;
+    }
   }
 </style>
