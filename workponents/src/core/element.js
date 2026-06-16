@@ -48,7 +48,15 @@ export class WbElement extends LitElement {
     super.finalize();
     const variants = this.variants || {};
     for (const name of this.props || []) {
-      this.createProperty(this._propKey(name), {
+      const key = this._propKey(name);
+      // Skip names that already exist on the prototype as a method/getter (e.g. a
+      // `variant(name)` helper, an `open()` method). Creating a reactive accessor
+      // there THROWS in Lit dev mode ("declared as a reactive property but it's
+      // actually declared as a value on the prototype"). The attribute is still
+      // OBSERVED via observedAttributes below, so attribute changes still fire
+      // attributeChangedCallback → the element's reload/requestUpdate runs.
+      if (key in this.prototype) continue;
+      this.createProperty(key, {
         type: String,
         attribute: name,
         reflect: Object.prototype.hasOwnProperty.call(variants, name),
