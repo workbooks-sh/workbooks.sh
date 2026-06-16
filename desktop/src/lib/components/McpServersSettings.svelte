@@ -2,7 +2,7 @@
   /**
    * MCP server registry (wb-i38o.6 §2).
    *
-   * UI-only persistence — the oql-agent doesn't read mcp-servers.json
+   * UI-only persistence — the agent doesn't read mcp-servers.json
    * today. The JSON shape is fixed so a future agent-side consumer can
    * pick the file up without rework.
    *

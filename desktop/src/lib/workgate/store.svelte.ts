@@ -30,7 +30,7 @@ export interface WorkgatePushSink {
 
 /** Wire shape pushed by Workbooks.Engine.Web.WorkgateChannel under event name
  *  `workgate_request`. Mirrors the BEAM-side Permit/Request structs in
- *  packages/oql/elixir/oql-agent/lib/oql_agent/workgate/. */
+ *  runtime/host */
 export interface WorkgateRequest {
   id: string;
   workspace: string | null;

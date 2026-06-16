@@ -14,7 +14,7 @@
    * — same UX shape, scoped to what the desktop already has.
    *
    * Value is the raw OpenRouter model id (e.g.
-   * "anthropic/claude-sonnet-4-6"). When the oql-agent eventually
+   * "anthropic/claude-sonnet-4-6"). When the agent eventually
    * routes to a non-OpenRouter provider directly, that consumer
    * will read the same string and route appropriately.
    */

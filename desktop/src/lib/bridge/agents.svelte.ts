@@ -3,7 +3,7 @@
 // Catalog (RUNTIME cap, graceful-offline): fetched from the runtime
 // control-plane GET /api/agents, which walks project-scope →
 // user-scope → bundled priv/agents and returns parsed metadata per
-// the :agent: entity binding (see packages/oql/plugins/agent/
+// the work-agent binding (see runtime/host
 // manifest.org). When the daemon is offline (or the route is still
 // pending) the catalog degrades to empty — the picker renders its
 // empty state, never an error.
@@ -57,7 +57,7 @@ export interface AgentCatalogEntry {
   allow_spawn?: boolean;
   spawn_depth?: number;
   can_grant?: string[];
-  /** Visual identity per the :agent: entity binding's :ICON: property.
+  /** Visual identity per the work-agent binding's :ICON: property.
    *  Formats: "emoji:<glyph>", "lucide:<IconName>", "hidden" (suppresses
    *  the agent from the picker), or null/absent (UI falls back to
    *  initials). */

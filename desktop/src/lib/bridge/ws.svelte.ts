@@ -4,8 +4,8 @@
 // boots on localhost. Lifecycle is driven off `daemon.status`: connect
 // once it lands `ready` (native `running`), disconnect when it stops.
 // The per-boot bearer token from discovery is attached to the socket and
-// to the run POST. The agent's WS shape today (per packages/oql/elixir/
-// oql-agent/lib/oql_agent/web/{user_socket,session_channel,runtime_channel}.ex):
+// to the run POST. The agent's WS shape today (per runtime/host
+// agent/lib/agent/web/{user_socket,session_channel,runtime_channel}.ex):
 //
 //   socket "/socket" → topic `session:<session_id>` (per-session telemetry)
 //                    → topic `runtime:telemetry`  (global fan-out, wb-i38o.18)
@@ -617,21 +617,6 @@ class WsBridgeStore {
         this.#emit({ name: "bridge:error", payload: resp, topic });
       });
     this.#channels.set(topic, ch);
-  }
-
-  /** wb-i38o.33.3 — subscribe to the per-document live-update channel.
-   *  Returns a teardown that leaves the channel. Calling joinDocument
-   *  twice for the same path is a no-op (the underlying #join is
-   *  idempotent). */
-  joinDocument(path: string): () => void {
-    const topic = `oql:document:${path}`;
-    this.#join(topic);
-    return () => {
-      const ch = this.#channels.get(topic);
-      if (!ch) return;
-      ch.leave();
-      this.#channels.delete(topic);
-    };
   }
 
   /** Path-pattern router for the single-firehose live-update channel.

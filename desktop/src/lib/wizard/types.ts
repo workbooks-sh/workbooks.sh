@@ -1,6 +1,6 @@
 // wb-ne0o / wb-tx6h — Planning Wizard wire types.
 //
-// Mirrors the JSON the oql-agent's WizardController emits. Single
+// Mirrors the JSON the agent's WizardController emits. Single
 // source of truth on the client side.
 
 export type QuestionType =

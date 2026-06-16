@@ -331,7 +331,7 @@
           .replaceAll("{brief_path}", step.brief_path)
           .replaceAll("{wizard_id}", wid)
           .replaceAll("{wizard_title}", wtitle)
-      : `I just finished the **${wtitle}** planning wizard. The brief is at:\n\n  ${step.brief_path}\n\nRead it, then execute the plan it describes. Use your oql tools (read, write, set_property, add_child, transition_todo) to make the changes — the brief carries the specification in its \`* Spec\` / \`* Configuration\` section. Report when done.`;
+      : `I just finished the **${wtitle}** planning wizard. The brief is at:\n\n  ${step.brief_path}\n\nRead it, then execute the plan it describes — the brief carries the specification. Report when done.`;
 
     await chatSession.send(prompt, {
       agentSlug: step.agent_slug ?? null,

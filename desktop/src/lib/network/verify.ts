@@ -10,7 +10,7 @@
  * manifest schema changes, this file MUST change in lockstep. See
  * the `CROSS-IMPL CONTRACT` notes in:
  *   packages/workbooks-manifest/src/embed.rs
- *   packages/oql/elixir/oql-agent/lib/oql_agent/network/manifest.ex
+ *   runtime/host
  *
  * Three checks (any fail → FAIL):
  *   1. Ed25519 signature over canonical_json(manifest) matches the
@@ -102,7 +102,7 @@ export interface VerifyFail {
 
 // CROSS-IMPL CONTRACT: this tag MUST stay byte-for-byte identical to
 // packages/workbooks-manifest/src/embed.rs::MANIFEST_TAG_OPEN AND
-// packages/oql/elixir/oql-agent/lib/oql_agent/network/manifest.ex::@tag_open
+// runtime/host::@tag_open
 const TAG_OPEN =
   '<script type="application/workbooks-c2pa+json" id="wb-c2pa-manifest">';
 const TAG_CLOSE = "</script>";

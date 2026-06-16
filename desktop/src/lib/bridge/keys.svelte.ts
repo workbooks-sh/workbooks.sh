@@ -6,7 +6,7 @@
 // fetched on user-driven reveal via `reveal(id)`. This keeps a single
 // devtools `console.log(store)` from leaking secrets.
 //
-// Daemon coupling: the Elixir oql-agent reads provider env vars at
+// Daemon coupling: the Elixir agent reads provider env vars at
 // boot (`OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, etc.). Changing
 // keys may require a daemon restart — the UI surfaces a warning chip
 // after a mutation and exposes `restartSidecar()` (now wired to the

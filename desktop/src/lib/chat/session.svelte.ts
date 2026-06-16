@@ -252,7 +252,7 @@ class ChatSessionStore {
   }
 
   /** Walk the captured raw entries and rebuild the block list. This
-   *  is O(events) per ingest which is fine for v1 (oql sessions emit
+   *  is O(events) per ingest which is fine for v1 (agent sessions emit
    *  on the order of dozens of events). When that breaks down,
    *  switch to incremental append + a tool-call index. */
   #reproject() {

@@ -3,7 +3,7 @@
 // Three flavors of session live in the drawer:
 //
 //   1. `daemon`  — pinned, read-only "logs" view. Streams stdout/stderr
-//      from the oql daemon via the `daemon-log` Tauri event (emitted by
+//      from the the runtime via the `daemon-log` Tauri event (emitted by
 //      the long-lived daemon.rs capture). Not a pty; just lines piped
 //      into xterm. Always present.
 //   2. `shell`   — interactive shell (zsh/bash/cmd) backed by a real

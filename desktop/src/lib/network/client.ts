@@ -153,7 +153,7 @@ export interface ForkUpstreamStatusResponse {
  *  Sourced from Workhorse's local ForkWatcher (per-machine state, not
  *  Broker — forks live in the user's local workspace and don't
  *  cross-sync). The HTTP path /v1/network/forks/upstream-status hits
- *  the oql-agent internal API rather than the Broker.
+ *  the agent internal API rather than the Broker.
  *
  *  Demo mode: throws DemoModeError; caller falls back to fixture data. */
 export async function listForkAdvances(): Promise<ForkUpstreamStatusResponse> {

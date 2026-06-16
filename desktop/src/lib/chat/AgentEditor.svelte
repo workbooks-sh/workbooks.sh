@@ -317,7 +317,7 @@
         });
       } else {
         // Existing agent — parser-backed property mutations via
-        // oql-parse's Document::set_property; title + body via
+        // the runtime's Document::set_property; title + body via
         // string splices over the parser-serialized output (until
         // wb-shtl.6 lands set_section_body / set_title). NO regex
         // over the raw file.

@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * EngineOnboarding — full-viewport splash shown on first launch
-   * BEFORE the keychain step, when the launchd-managed oql-agent
+   * BEFORE the keychain step, when the launchd-managed agent
    * daemon hasn't been installed yet. Triggers `engine_install` on
    * click, then polls `engine_status` until the daemon comes up.
    *

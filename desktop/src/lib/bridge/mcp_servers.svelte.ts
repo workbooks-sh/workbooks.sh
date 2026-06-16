@@ -1,7 +1,7 @@
 // Phase B — MCP server registry store (native).
 //
 // Index persists in ~/.workbooks/config/mcp-servers.json. UI-only consumption
-// today; the oql-agent doesn't read it yet — file a follow-up bd if
+// today; the agent doesn't read it yet — file a follow-up bd if
 // agent-side consumption requires runtime changes.
 
 import { invoke } from "@tauri-apps/api/core";
