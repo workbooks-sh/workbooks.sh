@@ -34,7 +34,7 @@ This is the single worklist an autonomous loop (a 2-minute cron) works through. 
    - **Fix** (test red): diagnose, fix the REAL product code, re-run. Green → record. Still red after a bounded effort (≈1 fire) → record the real blocker, leave RED, move on. Never thrash one item across many fires; if stuck twice, file a bd issue and skip.
 5. Run the guardrail + a quick compile to ensure no regression: `cd runtime && mix compile` and `mix test test/cli_name_test.exs`.
 6. Update the item's status + append a one-line entry to the **Status Log** with evidence (command + result + commit sha).
-7. `git add -A` (excluding local dev-config: desktop/bun.lock, desktop/package.json, desktop/vite.config.ts, desktop/src-tauri/Cargo.lock — stash those first), commit with a clear message, `git push origin <branch>:main`. Restore stash.
+7. Commit with **targeted** `git add <only the files you changed for this item>` — NEVER `git add -A` (the runtime generates uncommitted artifacts: `runtime/build/`, `runtime/deps`, `runtime/keeper-last-run`, `examples/groundwork/BOARD.org`, and the local dev-config `desktop/{bun.lock,package.json,vite.config.ts}` + `desktop/src-tauri/Cargo.lock` — do NOT commit any of these). Clear message. `git push origin <branch>:main` (no `| tail`).
 8. Stop. One item per fire.
 
 Operating constraints: model for agent evals = `minimax/minimax-m3` (the product model); judges stay gemini. Never commit `.beads`. Don't `| tail` a git push (it masks the exit code).
