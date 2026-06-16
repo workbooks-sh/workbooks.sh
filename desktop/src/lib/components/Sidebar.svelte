@@ -1049,7 +1049,9 @@
 <style>
   .sidebar {
     flex-shrink: 0;
-    width: 232px;
+    /* Fill the resizable host (.sidebar-host owns the width); don't pin a fixed
+     * width here or the host resizes but the content doesn't follow. */
+    width: 100%;
     height: 100%;
     min-height: 100%;
     display: flex;
@@ -1076,7 +1078,7 @@
   }
 
   /* ── Hub — workspace icon-rail ───────────────────────────────────── */
-  .layout-hub { width: 288px; }
+  .layout-hub { width: 100%; }
   .ws-rail {
     flex: 0 0 52px;
     display: flex;
