@@ -461,8 +461,13 @@ defmodule Workbooks.Evals.Components do
   # isn't built — the frame still proves the headless path + the agent's choice.
   defp mount_html(art, theme) do
     tokens = token_sheet()
-    elements_dir = Path.expand("../../../workponents/src/elements", __DIR__)
-    has_src = File.dir?(elements_dir)
+    # Prefer the self-contained dist bundle: Lit is bundled IN, so it imports from
+    # file:// offline (the lazy CDN engine tiers stay lazy → the element FLOOR
+    # renders — real chrome, not a stub card). The src/elements path uses a bare
+    # `import "lit"` that can't resolve from file:// offline, so it's not a usable
+    # fallback here; build dist first (`cd workponents && npm run build`).
+    dist = Path.expand("../../../workponents/dist/workponents.js", __DIR__)
+    has_dist = File.exists?(dist)
 
     mount_body =
       if String.starts_with?(art.raw || "", "<") and String.contains?(art.raw, "work-") do
@@ -474,11 +479,9 @@ defmodule Workbooks.Evals.Components do
       end
 
     loader =
-      if has_src do
-        import_url = "file://#{elements_dir}/index.js"
-
+      if has_dist do
         "<script type=\"module\">\n" <>
-          "try { await import(\"#{import_url}\"); }\n" <>
+          "try { await import(\"file://#{dist}\"); }\n" <>
           "catch (e) { document.body.dataset.elementsError = String(e); }\n" <>
           "</script>"
       else
@@ -623,11 +626,17 @@ defmodule Workbooks.Evals.Components do
   # Handles BOTH the `#+begin_src component :type …` block and raw `<work-*>` HTML.
   def extract_component(text) when is_binary(text) do
     cond do
-      m = Regex.run(~r/#\+begin_src component\s+([^\n]*)\n(.*?)\n\s*#\+end_src/ms, text) ->
-        [_, header, body] = m
-        props = parse_header(header)
-        type = props["type"]
-        %{tag: type_to_tag(type), props: Map.delete(props, "type"), body: String.trim(body || ""), raw: "#{header}\n#{body}"}
+      m = Regex.run(~r/#\+begin_src component[ \t]*(.*?)\n[ \t]*#\+end_src/ms, text) ->
+        [_, block] = m
+        # Parse the WHOLE block (not just the first line) so multi-line data props
+        # like `:rows [ … ]` / `:columns [ … ]` land in PROPS (→ the element's
+        # attribute) instead of leaking into the body as raw text — the bug that
+        # made <work-table> mount empty with the JSON shown as source.
+        {props, body} = parse_block(block)
+        # type is a single token — guard against any value over-capture (e.g. a
+        # `:type doc` block whose prose has no `:`-prefixed lines).
+        type = props["type"] && (props["type"] |> String.split() |> List.first())
+        %{tag: type_to_tag(type), props: Map.delete(props, "type"), body: body, raw: block}
 
       m = Regex.run(~r/<(work-[a-z-]+)\b([^>]*)>(.*?)<\/\1>/ms, text) ->
         [raw, tag, attrs, body] = m
@@ -665,9 +674,18 @@ defmodule Workbooks.Evals.Components do
   end
 
   # `:type chart :tone info` → %{"type" => "chart", "tone" => "info"}
-  defp parse_header(h) do
-    Regex.scan(~r/:([a-z_-]+)\s+([^:]+?)(?=\s+:|$)/, String.trim(h))
-    |> Map.new(fn [_, k, v] -> {k, String.trim(v)} end)
+  # Parse a `#+begin_src component` block into {props, body}. Each `:key value`
+  # captures its value up to the NEXT line-leading `:key` (or block end), so a
+  # multi-line JSON value (`:rows [\n…\n]`) is one prop. The non-prop remainder is
+  # the body (e.g. a `:type doc` block's markdown), so data → attribute, prose → text.
+  defp parse_block(block) do
+    # `:key` + optional value, captured up to the next LINE-LEADING `:key` (or end)
+    # — so a multi-line JSON value is one prop, a valueless boolean prop (`:searchable`)
+    # captures "", and the next prop doesn't bleed into the prior value.
+    re = ~r/:([a-z_-]+)[ \t]*(.*?)(?=\n[ \t]*:[a-z_-]+|\z)/s
+    props = Regex.scan(re, block) |> Map.new(fn [_, k, v] -> {k, String.trim(v)} end)
+    body = re |> Regex.replace(block, "") |> String.trim()
+    {props, body}
   end
 
   defp parse_attrs(a) do

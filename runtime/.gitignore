@@ -5,3 +5,6 @@ build/tools/wasm-tools.wasm
 
 # lean tool bundle assembled by scripts/stage-tools.sh (regenerated, not committed)
 /compilers-dist/
+
+# component-eval run artifacts (frames/verdicts)
+evals/components/runs/
