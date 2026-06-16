@@ -1,5 +1,0 @@
-#+RUNTIME: lua
-#+CLI_BIN: lua
-#+EXEC: command
-#+BUILD_SRC: script:build.sh
-#+ARG_MODE: argv
