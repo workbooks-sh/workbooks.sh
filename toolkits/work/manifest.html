@@ -1,0 +1,72 @@
+<!--
+  The `work` toolkit — the standard library.
+
+  Everything is a toolkit. A toolkit is a PREFIX + the <prefix-*> elements it owns
+  (a Lit component library) + skills + templates. `work` is the one that ships
+  built-in and bootstraps the rest: it defines the very elements used to author
+  toolkits — work-toolkit, work-skill, work-step, work-ref, work-src — INCLUDING
+  this manifest's own tags. Self-hosting. Reading this file teaches the model.
+
+  The prefix is provenance: `work-` means "from the work toolkit", exactly symmetric
+  with `byod-` or `cloudflare-`. It is never dead weight — it names the owner.
+
+  Element BEHAVIOUR lives in Lit source (workponents/src) and is generated into the
+  CEM = the machine source of truth. This manifest is the human/agent front door:
+  the index + the skills. (CI keeps the element index below in sync with the CEM —
+  do not hand-drift it.)
+-->
+<work-toolkit id="work" prefix="work" version="0.1.0" status="stable">
+  <work-purpose>
+    The standard library every workbook and toolkit is built from — and the toolkit
+    that defines what a toolkit IS. Author in plain HTML; the tree is the spec.
+  </work-purpose>
+
+  <!-- ════ the vocabulary this toolkit owns (index; behaviour + docs from the CEM) ════ -->
+
+  <!-- containers -->
+  <work-element name="work-toolkit">A namespaced element library: a prefix (its id) + the elements it owns + skills + templates. The unit of composition.</work-element>
+  <work-element name="work-skill">A unit of agent/author guidance. Its ordered children ARE the procedure (composition-as-source).</work-element>
+  <work-element name="work-template">A reusable artifact the toolkit ships, instantiated by id.</work-element>
+  <work-element name="work-doc">A prose/reference unit (a document or a section of one).</work-element>
+
+  <!-- clause nouns (short, read as grammar inside their parent) -->
+  <work-element name="work-purpose">One-line statement of what a toolkit is for.</work-element>
+  <work-element name="work-step">One step of a skill. Ordered; may carry state; the same primitive used anywhere there is enumeration.</work-element>
+  <work-element name="work-needs">A dependency edge — imports another toolkit's prefix into scope. <work-needs ref="cloudflare"/></work-element>
+
+  <!-- cross-cutting universals (singular + work- prefixed BECAUSE they appear everywhere;
+       meaning is supplied by position, not by minting a new tag per context) -->
+  <work-element name="work-ref">The one reference/link/pointer. Meaning comes from where it sits: next-step inside a work-step, dependency under work-needs. <work-ref to="…" as="template|skill|cmd"/></work-element>
+  <work-element name="work-src">The source/exec block. Inline code in some <code>lang</code>, compiled by the Dock to a sandboxed WASM module. <code>lang=rust|c|zig</code> → native compilers; <code>lang=js|py</code> → interpreters; <code>lang=sql</code> → data engine. <code>name=</code> exports a callable; <code>display=</code> runs &amp; renders inline; neither = just run.</work-element>
+
+  <!-- ════ skills — read the tree, you know what to do ════ -->
+
+  <work-skill name="what-is-a-toolkit">
+    <work-purpose>The mental model, in one read.</work-purpose>
+    <work-step>A toolkit owns a prefix (= its id) and the <work-ref to="work-element"/> elements under it.</work-step>
+    <work-step>Compose toolkits by nesting their elements as siblings/parents — never conflicting, because each owns its tag.</work-step>
+    <work-step>Pull another toolkit in with <work-ref to="work-needs" as="cmd"/>; then use its <code>&lt;prefix-*&gt;</code> elements right here.</work-step>
+    <work-step>`work` is just the toolkit that ships built-in. Your own toolkit works the same way.</work-step>
+  </work-skill>
+
+  <work-skill name="author-a-toolkit">
+    <work-purpose>Make your own namespaced element library.</work-purpose>
+    <work-step>Pick an id — it becomes your prefix. A `byod` toolkit owns <code>&lt;byod-*&gt;</code>.</work-step>
+    <work-step>Write the elements in Lit source; their behaviour generates into the CEM.</work-step>
+    <work-step>Implement logic as <work-ref to="work-src"/> — inline code the Dock compiles to WASM.</work-step>
+    <work-step>Document with <work-ref to="work-skill"/>s whose steps point where they go. Ship <work-ref to="work-template" as="template"/>s for the common starts.</work-step>
+    <work-step>Declare what you build on with <work-ref to="work-needs" as="cmd"/>.</work-step>
+  </work-skill>
+
+  <!-- ════ a worked example of composition (provenance reads off the prefixes) ════ -->
+  <work-template id="compose-example">
+    <work-toolkit id="my-deploy">
+      <work-needs ref="cloudflare"/>
+      <work-src lang="rust" name="build"> /* … compiled to WASM by the Dock … */ </work-src>
+      <work-skill name="ship">
+        <work-step>Build      <work-ref to="build" as="cmd"/></work-step>
+        <work-step>Deploy it  <cloudflare-deploy project="site"/></work-step>
+      </work-skill>
+    </work-toolkit>
+  </work-template>
+</work-toolkit>
