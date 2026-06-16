@@ -75,9 +75,9 @@ export class WbMessage extends WbElement {
     .md li::marker { color: var(--work-fg-muted); }
     .md code { font-family: var(--work-font-mono); font-size: .88em;
       background: var(--work-surface-soft); border: 1px solid var(--work-border);
-      border-radius: 4px; padding: .05em .3em; }
+      border-radius: var(--work-radius-4px); padding: .05em .3em; }
     .md pre { margin: .4em 0 .55em; padding: .6em .75em; background: var(--work-surface-soft);
-      border: 1px solid var(--work-border); border-radius: 7px; overflow-x: auto; }
+      border: 1px solid var(--work-border); border-radius: var(--work-radius-7px); overflow-x: auto; }
     .md pre code { background: none; border: 0; padding: 0; font-size: .85em; }
     .md a { color: var(--work-brand); text-decoration: underline; text-underline-offset: 2px; }
   `;

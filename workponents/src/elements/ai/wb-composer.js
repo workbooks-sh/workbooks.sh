@@ -61,7 +61,7 @@ export class WbComposer extends WbElement {
     :host([state="thinking"]) .composer,
     :host([state="streaming"]) .composer { border-color: var(--work-brand); }
 
-    .dots { display: inline-flex; gap: 3px; }
+    .dots { display: inline-flex; gap: var(--work-space-3px); }
     .dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor;
       animation: wb-pulse 1s var(--work-ease) infinite; }
     .dots i:nth-child(2) { animation-delay: .15s; }

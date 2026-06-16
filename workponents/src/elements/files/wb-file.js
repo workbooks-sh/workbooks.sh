@@ -66,7 +66,7 @@ export class WbFile extends WbElement {
       padding: var(--work-space-2) var(--work-space-3); border-bottom: 1px solid var(--work-border);
       background: var(--work-surface-soft); }
     .badge { width: 26px; height: 26px; flex: none; display: grid; place-items: center;
-      border-radius: var(--work-radius-sm); font-size: 14px; background: var(--work-surface); color: var(--work-fg-muted); }
+      border-radius: var(--work-radius-sm); font-size: var(--work-text); background: var(--work-surface); color: var(--work-fg-muted); }
     .badge[data-kind="image"] { background: var(--work-chip-lavender); color: var(--work-brand-ink); }
     .badge[data-kind="video"] { background: var(--work-chip-peach);    color: var(--work-brand-ink); }
     .badge[data-kind="audio"] { background: var(--work-chip-green);    color: var(--work-brand-ink); }
@@ -75,7 +75,7 @@ export class WbFile extends WbElement {
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
     .title:hover { color: var(--work-brand); }
     .grow { flex: 1; }
-    .typetag { font-family: var(--work-font-mono); font-size: 10px; text-transform: uppercase;
+    .typetag { font-family: var(--work-font-mono); font-size: var(--work-text-2xs); text-transform: uppercase;
       letter-spacing: .04em; color: var(--work-fg-subtle); }
 
     /* preview stage */
@@ -88,10 +88,10 @@ export class WbFile extends WbElement {
     :host([density="lg"]) .stage { --_h: 340px; }
 
     .stage img { max-width: 100%; max-height: var(--_h, 220px); object-fit: contain; display: block; }
-    .stage video { max-width: 100%; max-height: var(--_h, 220px); background: #000; }
+    .stage video { max-width: 100%; max-height: var(--_h, 220px); background: var(--work-scrim); }
     .stage audio { width: 90%; }
     .audio-wrap { display: flex; flex-direction: column; align-items: center; gap: var(--work-space-3); width: 100%; padding: var(--work-space-4); }
-    .audio-glyph { font-size: 38px; color: var(--work-brand); }
+    .audio-glyph { font-size: var(--work-glyph-lg); color: var(--work-brand); }
 
     .textview { width: 100%; height: var(--_h, 220px); margin: 0; overflow: auto;
       padding: var(--work-space-3); box-sizing: border-box;
@@ -100,14 +100,14 @@ export class WbFile extends WbElement {
 
     .placeholder { display: flex; flex-direction: column; align-items: center; gap: var(--work-space-2);
       color: var(--work-fg-muted); padding: var(--work-space-5); text-align: center; }
-    .ph-glyph { width: 64px; height: 64px; display: grid; place-items: center; font-size: 30px;
+    .ph-glyph { width: 64px; height: 64px; display: grid; place-items: center; font-size: var(--work-text-metric);
       border-radius: var(--work-radius); background: var(--work-surface); color: var(--work-fg-muted);
       border: 1px solid var(--work-border); }
     .ph-glyph[data-kind="image"] { background: var(--work-chip-lavender); color: var(--work-brand-ink); }
     .ph-glyph[data-kind="video"] { background: var(--work-chip-peach);    color: var(--work-brand-ink); }
     .ph-glyph[data-kind="audio"] { background: var(--work-chip-green);    color: var(--work-brand-ink); }
     .ph-glyph[data-kind="text"]  { background: var(--work-chip-blue);     color: var(--work-brand-ink); }
-    .ph-ext { font-family: var(--work-font-mono); font-size: 11px; }
+    .ph-ext { font-family: var(--work-font-mono); font-size: var(--work-text-xs); }
     .ph-note { font-size: var(--work-text-sm); }
     .status { color: var(--work-fg-muted); font-family: var(--work-font-mono); font-size: var(--work-text-sm); padding: var(--work-space-4); }
     .status.err { color: var(--work-err); white-space: pre-wrap; }
@@ -116,12 +116,12 @@ export class WbFile extends WbElement {
     .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
       gap: var(--work-space-1) var(--work-space-4); padding: var(--work-space-2) var(--work-space-3);
       border-top: 1px solid var(--work-border); }
-    .m { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-    .m .k { font-family: var(--work-font-mono); font-size: 9px; text-transform: uppercase;
+    .m { display: flex; flex-direction: column; gap: var(--work-space-px); min-width: 0; }
+    .m .k { font-family: var(--work-font-mono); font-size: var(--work-text-3xs); text-transform: uppercase;
       letter-spacing: .05em; color: var(--work-fg-subtle); }
     .m .v { font-size: var(--work-text-sm); color: var(--work-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .m .v.mono { font-family: var(--work-font-mono); font-size: 11px; color: var(--work-fg-muted); }
-    .docked { font-family: var(--work-font-mono); font-size: 9px; }
+    .m .v.mono { font-family: var(--work-font-mono); font-size: var(--work-text-xs); color: var(--work-fg-muted); }
+    .docked { font-family: var(--work-font-mono); font-size: var(--work-text-3xs); }
   `;
 
   connectedCallback() {

@@ -141,19 +141,19 @@ export class WorkDiff extends WbElement {
     table { width: 100%; border-collapse: collapse; }
     td { padding: 1px var(--work-space-3); vertical-align: top; white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
     td.gut { width: 1%; text-align: right; color: var(--work-fg-subtle); user-select: none; background: var(--work-surface-soft); border-right: 1px solid var(--work-border); font-variant-numeric: tabular-nums; padding-right: var(--work-space-2); }
-    td.sign { width: 1%; text-align: center; user-select: none; color: var(--work-fg-subtle); padding: 1px 0; }
+    td.sign { width: 1%; text-align: center; user-select: none; color: var(--work-fg-subtle); padding: var(--work-space-px) 0; }
 
-    tr.add td.code { background: var(--work-diff-add-bg, rgba(16,174,56,0.13)); }
-    tr.del td.code { background: var(--work-diff-del-bg, rgba(201,47,47,0.13)); }
+    tr.add td.code { background: var(--work-diff-add-bg, var(--work-diff-add)); }
+    tr.del td.code { background: var(--work-diff-del-bg, var(--work-diff-del)); }
     tr.add td.sign { color: var(--work-diff-add-ink, var(--work-ok)); }
     tr.del td.sign { color: var(--work-diff-del-ink, var(--work-err)); }
     tr.empty td { background: var(--work-diff-empty-bg, var(--work-surface-soft)); }
 
     /* semantic block markers */
     .blockhdr { padding: var(--work-space-2) var(--work-space-3); font: 700 10px var(--work-font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--work-fg-muted); background: var(--work-surface-soft); border-top: 1px solid var(--work-border); display: flex; gap: var(--work-space-2); align-items: center; }
-    .pill { padding: 1px 7px; border-radius: var(--work-radius-pill); font-size: 9px; letter-spacing: .08em; }
-    .pill.add { background: var(--work-diff-add-bg, rgba(16,174,56,0.16)); color: var(--work-diff-add-ink, var(--work-ok)); }
-    .pill.del { background: var(--work-diff-del-bg, rgba(201,47,47,0.16)); color: var(--work-diff-del-ink, var(--work-err)); }
+    .pill { padding: var(--work-space-px) var(--work-space-7px); border-radius: var(--work-radius-pill); font-size: var(--work-text-3xs); letter-spacing: .08em; }
+    .pill.add { background: var(--work-diff-add-bg, var(--work-diff-add-strong)); color: var(--work-diff-add-ink, var(--work-ok)); }
+    .pill.del { background: var(--work-diff-del-bg, var(--work-diff-del-strong)); color: var(--work-diff-del-ink, var(--work-err)); }
     .pill.chg { background: var(--work-brand-soft); color: var(--work-brand-ink, var(--work-brand)); }
     .pill.kind { background: var(--work-surface); border: 1px solid var(--work-border); color: var(--work-fg-subtle); }
     .key { color: var(--work-fg); font-weight: 600; text-transform: none; letter-spacing: 0; }

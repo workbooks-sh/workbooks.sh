@@ -33,7 +33,7 @@ export class WorkPresence extends WbElement {
     .ava {
       width: 30px; height: 30px; border-radius: 50%; flex: none;
       display: inline-grid; place-items: center; overflow: hidden;
-      font: 700 11px var(--work-font-mono); color: #fff;
+      font: 700 11px var(--work-font-mono); color: var(--work-on-scrim);
       border: 2px solid var(--work-surface); margin-left: -8px;
       box-shadow: var(--work-shadow-sm); transition: transform var(--work-dur) var(--work-ease);
     }

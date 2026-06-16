@@ -49,9 +49,9 @@ export class WorkHistoryGraph extends WbElement {
     .title { font-weight: 600; line-height: 1.3; }
     .meta { display: flex; align-items: center; gap: var(--work-space-2); margin-top: 3px; font-size: var(--work-text-sm); color: var(--work-fg-muted); }
     .when { font-variant-numeric: tabular-nums; }
-    .id { font-family: var(--work-font-mono); font-size: 11px; color: var(--work-fg-subtle); }
+    .id { font-family: var(--work-font-mono); font-size: var(--work-text-xs); color: var(--work-fg-subtle); }
 
-    .badge { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: var(--work-radius-pill); font-size: 11px; font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: var(--work-space-5px); padding: var(--work-space-px) var(--work-space-2); border-radius: var(--work-radius-pill); font-size: var(--work-text-xs); font-weight: 600; }
     .badge .dot { width: 6px; height: 6px; border-radius: var(--work-radius-pill); }
     .badge.human { background: var(--work-surface-soft); color: var(--work-fg-muted); }
     .badge.human .dot { background: var(--work-fg-subtle); }

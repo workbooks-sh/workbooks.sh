@@ -66,7 +66,7 @@ export class WbDocCell extends WbElement {
       font-size: 0.85em; color: var(--work-fg-muted); }
     .dot { width: 7px; height: 7px; border-radius: var(--work-radius-pill); background: var(--work-brand);
       box-shadow: 0 0 0 3px var(--work-brand-soft); }
-    .status[data-state="stub"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
+    .status[data-state="stub"] .dot { background: var(--work-warn); box-shadow: 0 0 0 var(--work-space-3px) var(--work-warn-glow); }
     .status[data-state="error"] .dot { background: var(--work-err); box-shadow: none; }
 
     .query { margin: 0; padding: var(--work-space-3); font-family: var(--work-font-mono);

@@ -149,7 +149,7 @@ export class WorkDeck extends WbElement {
     .counter { font-family: var(--work-font-mono); font-size: var(--work-text-sm); color: var(--work-fg-muted); white-space: nowrap; }
 
     /* dot rail — one dot per band, the wavelet "keyframe markers" */
-    .dots { display: flex; gap: 6px; flex: 1 1 auto; align-items: center; justify-content: center; flex-wrap: wrap; }
+    .dots { display: flex; gap: var(--work-space-6px); flex: 1 1 auto; align-items: center; justify-content: center; flex-wrap: wrap; }
     .dot { width: 8px; height: 8px; border-radius: var(--work-radius-pill);
       background: var(--work-border-strong); border: none; padding: 0; cursor: pointer;
       transition: background var(--work-dur) var(--work-ease), transform var(--work-dur) var(--work-ease); }

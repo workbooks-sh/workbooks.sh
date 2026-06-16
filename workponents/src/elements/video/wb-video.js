@@ -125,7 +125,7 @@ export class WorkVideo extends WbElement {
     .stage {
       flex: 0 0 auto;
       transform-origin: center center;
-      background: #000;
+      background: var(--work-scrim);
     }
     :host([fit="cover"]) .stage-wrap { /* cover lets the scaler overflow-crop */ }
 
@@ -144,7 +144,7 @@ export class WorkVideo extends WbElement {
       border: none; border-radius: var(--work-radius-pill);
       background: color-mix(in srgb, var(--work-brand) 88%, transparent);
       color: var(--work-on-brand);
-      font-size: 24px; cursor: pointer;
+      font-size: var(--work-glyph-sm); cursor: pointer;
       box-shadow: var(--work-shadow);
       transition: transform var(--work-dur) var(--work-ease);
     }

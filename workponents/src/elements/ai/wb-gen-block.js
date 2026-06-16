@@ -105,13 +105,13 @@ export class WbGenBlock extends WbElement {
     .members { display: flex; align-items: center; gap: var(--work-space-1); flex-wrap: wrap; }
     .member { display: inline-grid; place-items: center; width: 26px; height: 26px;
       border-radius: 50%; background: var(--work-brand-soft); color: var(--work-fg);
-      font-size: 10px; font-weight: 700; border: 1px solid var(--work-border); }
+      font-size: var(--work-text-2xs); font-weight: 700; border: 1px solid var(--work-border); }
     .mcount { margin-left: var(--work-space-1); font-size: var(--work-text-sm); color: var(--work-fg-muted); }
 
     /* unknown fallback */
     .unknown { border: 1px dashed var(--work-border-strong); background: var(--work-surface-soft);
       padding: var(--work-space-3) var(--work-space-3); }
-    .ulabel { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
+    .ulabel { font-size: var(--work-text-label); text-transform: uppercase; letter-spacing: .06em;
       color: var(--work-fg-subtle); margin-bottom: var(--work-space-1); }
     pre { margin: 0; white-space: pre-wrap; font-family: var(--work-font-mono); font-size: var(--work-text-sm); }
   `;

@@ -49,6 +49,18 @@
   --work-ok-soft: rgba(15, 174, 56, 0.14);
   --work-warn-soft: rgba(184, 134, 27, 0.14);
   --work-err-soft: rgba(201, 47, 47, 0.14);
+  /* state glows + fills, diff backgrounds, scrim — no host equivalent. */
+  --work-warn-glow: rgba(184, 134, 27, 0.18);
+  --work-warn-fill: rgba(184, 134, 27, 0.16);
+  --work-err-glow: rgba(201, 47, 47, 0.28);
+  --work-err-faint: rgba(201, 47, 47, 0.10);
+  --work-diff-add: rgba(16, 174, 56, 0.13);
+  --work-diff-del: rgba(201, 47, 47, 0.13);
+  --work-diff-add-strong: rgba(16, 174, 56, 0.16);
+  --work-diff-del-strong: rgba(201, 47, 47, 0.16);
+  --work-scrim: #000000;
+  --work-scrim-soft: rgba(8, 10, 14, 0.5);
+  --work-on-scrim: #ffffff;
 
   /* pastel chips — direct host equivalents */
   --work-chip-blue: var(--color-chip-blue, #aecbf2);
@@ -61,8 +73,18 @@
   --work-radius-sm: 8px;
   --work-radius-lg: 18px;
   --work-radius-pill: 999px;
+  --work-radius-xs: 3px;
+  --work-radius-4px: 4px;
+  --work-radius-7px: 7px;
 
   /* spacing — no host scale; tokens.css literals. */
+  --work-space-px: 1px;
+  --work-space-2px: 2px;
+  --work-space-3px: 3px;
+  --work-space-5px: 5px;
+  --work-space-6px: 6px;
+  --work-space-7px: 7px;
+  --work-space-9px: 9px;
   --work-space-1: 4px;
   --work-space-2: 8px;
   --work-space-3: 12px;
@@ -73,9 +95,18 @@
   --work-font: var(--font-sans, "Geist", system-ui, -apple-system, sans-serif);
   --work-font-mono: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
   --work-font-display: var(--font-sans, "Franie", "Geist", sans-serif);
+  --work-text-xs: 11px;
   --work-text-sm: 12.5px;
   --work-text: 14px;
   --work-text-lg: 16px;
+  --work-text-3xs: 9px;
+  --work-text-2xs: 10px;
+  --work-text-label: 10.5px;
+  --work-text-md: 13px;
+  --work-text-icon: 15px;
+  --work-glyph-sm: 24px;
+  --work-glyph: 26px;
+  --work-glyph-lg: 38px;
 
   /* depth + motion — host has --shadow-pop; no -sm/ease/dur. */
   --work-shadow: var(--shadow-pop, 0 1px 2px rgba(18, 19, 22, 0.06), 0 8px 24px rgba(18, 19, 22, 0.08));

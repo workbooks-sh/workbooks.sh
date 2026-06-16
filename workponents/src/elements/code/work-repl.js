@@ -49,7 +49,7 @@ export class WorkRepl extends WbElement {
     .where { font-family: var(--work-font-mono); font-size: var(--work-text-sm); color: var(--work-fg-subtle);
       display: inline-flex; align-items: center; gap: var(--work-space-1); }
     .where .dot { width: 7px; height: 7px; border-radius: var(--work-radius-pill);
-      background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
+      background: var(--work-warn); box-shadow: 0 0 0 var(--work-space-3px) var(--work-warn-glow); }
     .where[data-live="1"] .dot { background: var(--work-brand); box-shadow: 0 0 0 3px var(--work-brand-soft); }
     .run { margin-left: auto; font-family: var(--work-font); font-weight: 600; font-size: var(--work-text-sm);
       display: inline-flex; align-items: center; gap: var(--work-space-2);
@@ -79,12 +79,12 @@ export class WorkRepl extends WbElement {
     .note { padding: var(--work-space-3); display: flex; gap: var(--work-space-3); align-items: flex-start;
       background: var(--work-surface-soft); }
     .note .ic { flex: none; width: 22px; height: 22px; border-radius: var(--work-radius-pill);
-      background: rgba(184,134,27,0.16); color: var(--work-warn); display: grid; place-items: center;
+      background: var(--work-warn-fill); color: var(--work-warn); display: grid; place-items: center;
       font-weight: 700; font-family: var(--work-font-mono); }
     .note .body { font-size: var(--work-text-sm); line-height: 1.5; color: var(--work-fg-muted); }
     .note .body b { color: var(--work-fg); }
     .note code { font-family: var(--work-font-mono); color: var(--work-fg); background: var(--work-bg);
-      padding: 1px 5px; border-radius: var(--work-radius-sm); }
+      padding: var(--work-space-px) var(--work-space-5px); border-radius: var(--work-radius-sm); }
   `;
 
   constructor() {

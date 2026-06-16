@@ -64,7 +64,7 @@ export class WbField extends WbElement {
 
     /* invalid state — purely from tokens */
     :host([invalid]) .control { border-color: var(--work-err); }
-    :host([invalid]) .control:focus { box-shadow: 0 0 0 3px rgba(201,47,47,0.28); }
+    :host([invalid]) .control:focus { box-shadow: 0 0 0 var(--work-space-3px) var(--work-err-glow); }
     :host([invalid]) .error { display: block; }
     :host([invalid]) .help { display: none; }
 

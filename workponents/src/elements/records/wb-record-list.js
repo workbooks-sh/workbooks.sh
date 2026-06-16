@@ -86,8 +86,8 @@ export class WbRecordList extends WbElement {
     .subtitle { font-size: var(--work-text-sm); color: var(--work-fg-muted); }
     .chips { display: flex; flex-wrap: wrap; gap: var(--work-space-1) var(--work-space-3); margin-top: var(--work-space-1); }
     :host([layout="rows"]) .chips { margin-top: 0; }
-    .chip { display: inline-flex; flex-direction: column; gap: 1px; }
-    .chip .k { font-family: var(--work-font-mono); font-size: 10px; text-transform: uppercase;
+    .chip { display: inline-flex; flex-direction: column; gap: var(--work-space-px); }
+    .chip .k { font-family: var(--work-font-mono); font-size: var(--work-text-2xs); text-transform: uppercase;
       letter-spacing: .05em; color: var(--work-fg-subtle); }
 
     .foot { display: flex; align-items: center; gap: var(--work-space-2);
@@ -96,7 +96,7 @@ export class WbRecordList extends WbElement {
     .engine { display: inline-flex; align-items: center; gap: var(--work-space-1); }
     .dot { width: 7px; height: 7px; border-radius: var(--work-radius-pill); background: var(--work-brand);
       box-shadow: 0 0 0 3px var(--work-brand-soft); }
-    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
+    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 var(--work-space-3px) var(--work-warn-glow); }
     .engine[data-tier="error"] .dot { background: var(--work-err); box-shadow: none; }
     .note { color: var(--work-fg-subtle); } .grow { flex: 1; }
     .empty { padding: var(--work-space-5); text-align: center; color: var(--work-fg-muted); font-size: var(--work-text-sm); }

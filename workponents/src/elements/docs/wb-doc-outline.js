@@ -17,7 +17,7 @@ export class WbDocOutline extends WbElement {
       letter-spacing: 0.18em; text-transform: uppercase; color: var(--work-fg-subtle);
       margin: 0 0 var(--work-space-2); }
     ol { list-style: none; margin: 0; padding: 0; }
-    li { margin: 1px 0; }
+    li { margin: var(--work-space-px) 0; }
     a { display: block; text-decoration: none; color: var(--work-fg-muted);
       font-size: var(--work-text-sm); line-height: 1.5; padding: 3px var(--work-space-2);
       border-radius: var(--work-radius-sm); cursor: pointer;

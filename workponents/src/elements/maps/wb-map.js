@@ -113,10 +113,10 @@ export class WbMap extends WbElement {
     .badge { display: inline-flex; align-items: center; gap: var(--work-space-1);
       font: 600 10px var(--work-font-mono); letter-spacing: .12em; text-transform: uppercase;
       color: var(--work-fg-muted); background: var(--work-surface); border: 1px solid var(--work-border);
-      border-radius: var(--work-radius-pill); padding: 3px 9px; box-shadow: var(--work-shadow-sm); }
+      border-radius: var(--work-radius-pill); padding: var(--work-space-3px) var(--work-space-9px); box-shadow: var(--work-shadow-sm); }
     .engine .dot { width: 7px; height: 7px; border-radius: var(--work-radius-pill); background: var(--work-brand);
       box-shadow: 0 0 0 3px var(--work-brand-soft); }
-    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,.18); }
+    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 var(--work-space-3px) var(--work-warn-glow); }
     .engine[data-tier="error"] .dot { background: var(--work-err); box-shadow: none; }
 
     .zoom { position: absolute; top: var(--work-space-2); right: var(--work-space-2);
@@ -137,7 +137,7 @@ export class WbMap extends WbElement {
 
     .tip { position: absolute; z-index: 3; pointer-events: none; transform: translate(-50%, -120%);
       background: var(--work-fg); color: var(--work-surface); font: 600 11px var(--work-font-mono);
-      padding: 4px 8px; border-radius: var(--work-radius-sm); white-space: nowrap;
+      padding: var(--work-space-1) var(--work-space-2); border-radius: var(--work-radius-sm); white-space: nowrap;
       box-shadow: var(--work-shadow); opacity: 0; transition: opacity var(--work-dur,.14s); }
     .tip.show { opacity: 1; }
 

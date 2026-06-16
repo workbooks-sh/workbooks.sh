@@ -59,7 +59,7 @@ export class WorkUser extends WbElement {
     :host([open]) .menu { display: block; }
     .who { display: flex; align-items: center; gap: var(--work-space-3);
       padding: var(--work-space-2) var(--work-space-2) var(--work-space-3); }
-    .who .avatar { width: 36px; height: 36px; font-size: 13px; }
+    .who .avatar { width: 36px; height: 36px; font-size: var(--work-text-md); }
     .who .meta { min-width: 0; }
     .who .meta .n { font-weight: 600; font-size: var(--work-text); }
     .who .meta .e { color: var(--work-fg-muted); font-size: var(--work-text-sm);

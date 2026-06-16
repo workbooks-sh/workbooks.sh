@@ -201,6 +201,114 @@
     "work-space-px": {
       "role": "hairline spacing",
       "type": "font"
+    },
+    "work-warn-glow": {
+      "role": "warning glow ring",
+      "type": "color"
+    },
+    "work-warn-fill": {
+      "role": "warning chip fill",
+      "type": "color"
+    },
+    "work-err-glow": {
+      "role": "error focus-ring glow",
+      "type": "color"
+    },
+    "work-err-faint": {
+      "role": "error banner background",
+      "type": "color"
+    },
+    "work-diff-add": {
+      "role": "diff added-line background",
+      "type": "color"
+    },
+    "work-diff-del": {
+      "role": "diff removed-line background",
+      "type": "color"
+    },
+    "work-diff-add-strong": {
+      "role": "diff added pill background",
+      "type": "color"
+    },
+    "work-diff-del-strong": {
+      "role": "diff removed pill background",
+      "type": "color"
+    },
+    "work-scrim": {
+      "role": "opaque media letterbox / scrim",
+      "type": "color"
+    },
+    "work-scrim-soft": {
+      "role": "translucent modal backdrop",
+      "type": "color"
+    },
+    "work-on-scrim": {
+      "role": "text/icon on a dark or colored fill",
+      "type": "color"
+    },
+    "work-radius-4px": {
+      "role": "4px corner radius rung",
+      "type": "radius"
+    },
+    "work-radius-7px": {
+      "role": "7px corner radius rung",
+      "type": "radius"
+    },
+    "work-space-2px": {
+      "role": "space rung — 2px",
+      "type": "space"
+    },
+    "work-space-3px": {
+      "role": "space rung — 3px",
+      "type": "space"
+    },
+    "work-space-5px": {
+      "role": "space rung — 5px",
+      "type": "space"
+    },
+    "work-space-6px": {
+      "role": "space rung — 6px",
+      "type": "space"
+    },
+    "work-space-7px": {
+      "role": "space rung — 7px",
+      "type": "space"
+    },
+    "work-space-9px": {
+      "role": "space rung — 9px",
+      "type": "space"
+    },
+    "work-text-3xs": {
+      "role": "nano label text size",
+      "type": "font"
+    },
+    "work-text-2xs": {
+      "role": "micro label text size",
+      "type": "font"
+    },
+    "work-text-label": {
+      "role": "uppercase pill label size",
+      "type": "font"
+    },
+    "work-text-md": {
+      "role": "compact text size",
+      "type": "font"
+    },
+    "work-text-icon": {
+      "role": "inline icon glyph size",
+      "type": "font"
+    },
+    "work-glyph-sm": {
+      "role": "small display glyph size",
+      "type": "font"
+    },
+    "work-glyph": {
+      "role": "display glyph size",
+      "type": "font"
+    },
+    "work-glyph-lg": {
+      "role": "large display glyph size",
+      "type": "font"
     }
   },
   "allowedLiterals": [

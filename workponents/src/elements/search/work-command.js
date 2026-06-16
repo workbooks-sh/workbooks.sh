@@ -45,7 +45,7 @@ export class WorkCommand extends WbElement {
   static styles = css`
     :host { position: fixed; inset: 0; z-index: 1000; display: none; font-family: var(--work-font); color: var(--work-fg); }
     :host([open]) { display: block; }
-    .backdrop { position: absolute; inset: 0; background: rgba(8,10,14,0.5); backdrop-filter: blur(2px);
+    .backdrop { position: absolute; inset: 0; background: var(--work-scrim-soft); backdrop-filter: blur(2px);
       animation: fade var(--work-dur) var(--work-ease); }
     @keyframes fade { from { opacity: 0; } }
     .dialog { position: absolute; left: 50%; transform: translateX(-50%); width: min(620px, 92vw);
@@ -62,31 +62,31 @@ export class WorkCommand extends WbElement {
       background: transparent; border: none; outline: none; }
     input::placeholder { color: var(--work-fg-subtle); }
     .kbd { font-family: var(--work-font-mono); font-size: var(--work-text-sm); color: var(--work-fg-subtle);
-      border: 1px solid var(--work-border); border-radius: var(--work-radius-sm); padding: 1px 6px; flex: none; }
+      border: 1px solid var(--work-border); border-radius: var(--work-radius-sm); padding: var(--work-space-px) var(--work-space-6px); flex: none; }
     .spin { width: 14px; height: 14px; border-radius: var(--work-radius-pill); flex: none;
       border: 2px solid var(--work-border-strong); border-top-color: var(--work-brand); animation: spin .7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .list { list-style: none; margin: 0; padding: var(--work-space-2); max-height: 52vh; overflow: auto; }
-    .group { font-family: var(--work-font-mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+    .group { font-family: var(--work-font-mono); font-size: var(--work-text-2xs); letter-spacing: .16em; text-transform: uppercase;
       color: var(--work-fg-subtle); padding: var(--work-space-3) var(--work-space-3) var(--work-space-1); }
     .item { display: flex; align-items: center; gap: var(--work-space-3); padding: var(--work-space-2) var(--work-space-3);
       border-radius: var(--work-radius-sm); cursor: pointer; }
     .item[aria-selected="true"] { background: var(--work-brand-soft); }
-    .item .ic { width: 18px; text-align: center; color: var(--work-fg-muted); flex: none; font-size: 15px; }
+    .item .ic { width: 18px; text-align: center; color: var(--work-fg-muted); flex: none; font-size: var(--work-text-icon); }
     .item .label { flex: 1; min-width: 0; font-size: var(--work-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .item .hint { font-size: var(--work-text-sm); color: var(--work-fg-subtle); white-space: nowrap; flex: none; }
     .item[aria-selected="true"] .hint { color: var(--work-fg-muted); }
-    mark { background: var(--work-brand-soft); color: var(--work-brand-ink, var(--work-fg)); border-radius: 3px; padding: 0 1px; }
+    mark { background: var(--work-brand-soft); color: var(--work-brand-ink, var(--work-fg)); border-radius: var(--work-radius-xs); padding: 0 var(--work-space-px); }
     [data-work-theme="dark"] mark, [data-work-theme="signal"] mark { color: var(--work-brand); }
 
     .empty { padding: var(--work-space-5) var(--work-space-4); text-align: center; color: var(--work-fg-muted); font-size: var(--work-text-sm); }
     .foot { display: flex; align-items: center; gap: var(--work-space-3); padding: var(--work-space-2) var(--work-space-4);
       border-top: 1px solid var(--work-border); background: var(--work-surface-soft);
       font-family: var(--work-font-mono); font-size: var(--work-text-sm); color: var(--work-fg-subtle); }
-    .foot .k { border: 1px solid var(--work-border); border-radius: 4px; padding: 0 5px; color: var(--work-fg-muted); }
+    .foot .k { border: 1px solid var(--work-border); border-radius: var(--work-radius-4px); padding: 0 var(--work-space-5px); color: var(--work-fg-muted); }
     .foot .dot { width: 6px; height: 6px; border-radius: var(--work-radius-pill); background: var(--work-brand); box-shadow: 0 0 0 3px var(--work-brand-soft); }
-    .foot[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
+    .foot[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 var(--work-space-3px) var(--work-warn-glow); }
     .grow { flex: 1; }
   `;
 

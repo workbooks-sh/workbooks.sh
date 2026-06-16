@@ -50,9 +50,9 @@ export class WbDropzone extends WbElement {
     .zone:hover { border-color: var(--work-brand); }
     .zone.over { border-color: var(--work-brand); background: var(--work-brand-soft); color: var(--work-brand); }
     .zone:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
-    .glyph { font-size: 26px; }
+    .glyph { font-size: var(--work-glyph); }
     .label { font-size: var(--work-text-sm); font-weight: 600; color: var(--work-fg); }
-    .hint { font-family: var(--work-font-mono); font-size: 11px; color: var(--work-fg-subtle); }
+    .hint { font-family: var(--work-font-mono); font-size: var(--work-text-xs); color: var(--work-fg-subtle); }
     input { display: none; }
   `;
 

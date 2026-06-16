@@ -33,6 +33,20 @@
   --work-ok-soft: rgba(15, 174, 56, 0.14);
   --work-warn-soft: rgba(184, 134, 27, 0.14);
   --work-err-soft: rgba(201, 47, 47, 0.14);
+  /* state glow rings + chip fills (stronger than the -soft tints) */
+  --work-warn-glow: rgba(184, 134, 27, 0.18);
+  --work-warn-fill: rgba(184, 134, 27, 0.16);
+  --work-err-glow: rgba(201, 47, 47, 0.28);
+  --work-err-faint: rgba(201, 47, 47, 0.10);
+  /* diff add/del backgrounds (theme-agnostic — readable on any surface) */
+  --work-diff-add: rgba(16, 174, 56, 0.13);
+  --work-diff-del: rgba(201, 47, 47, 0.13);
+  --work-diff-add-strong: rgba(16, 174, 56, 0.16);
+  --work-diff-del-strong: rgba(201, 47, 47, 0.16);
+  /* scrim + ink on scrim (media letterbox, modal backdrop, ink on a fill) */
+  --work-scrim: #000000;
+  --work-scrim-soft: rgba(8, 10, 14, 0.5);
+  --work-on-scrim: #ffffff;
   /* pastel chips (per-tone accents) */
   --work-chip-blue: #aecbf2;
   --work-chip-green: #b6e2bd;
@@ -63,7 +77,25 @@
   --work-text-metric: 30px;
   --work-text-metric-lg: 42px;
   --work-radius-xs: 3px;
+  --work-radius-4px: 4px;
+  --work-radius-7px: 7px;
   --work-space-px: 1px;
+  /* fine spacing rungs (tight chrome: chips, pills, badges, dense rows) */
+  --work-space-2px: 2px;
+  --work-space-3px: 3px;
+  --work-space-5px: 5px;
+  --work-space-6px: 6px;
+  --work-space-7px: 7px;
+  --work-space-9px: 9px;
+  /* fine + glyph type rungs (mono labels, icons, large display glyphs) */
+  --work-text-3xs: 9px;
+  --work-text-2xs: 10px;
+  --work-text-label: 10.5px;
+  --work-text-md: 13px;
+  --work-text-icon: 15px;
+  --work-glyph-sm: 24px;
+  --work-glyph: 26px;
+  --work-glyph-lg: 38px;
   /* depth + motion */
   --work-shadow: 0 1px 2px rgba(18, 19, 22, 0.06), 0 8px 24px rgba(18, 19, 22, 0.08);
   --work-shadow-sm: 0 1px 2px rgba(18, 19, 22, 0.08);
@@ -94,6 +126,10 @@
   --work-ok-soft: rgba(79, 157, 107, 0.18);
   --work-warn-soft: rgba(245, 165, 36, 0.18);
   --work-err-soft: rgba(239, 83, 80, 0.18);
+  --work-warn-glow: rgba(245, 165, 36, 0.18);
+  --work-warn-fill: rgba(245, 165, 36, 0.16);
+  --work-err-glow: rgba(239, 83, 80, 0.28);
+  --work-err-faint: rgba(239, 83, 80, 0.10);
   --work-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.45);
   --work-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
@@ -107,6 +143,7 @@
   --work-brand: #3da9fc; --work-brand-soft: rgba(61,169,252,0.14); --work-on-brand: #04121f;
   --work-ring: rgba(61,169,252,0.5);
   --work-radius: 2px; --work-radius-sm: 2px; --work-radius-lg: 3px; --work-radius-pill: 3px; --work-radius-xs: 1px;
+  --work-radius-4px: 2px; --work-radius-7px: 3px;
   --work-font: "Space Grotesk", system-ui, sans-serif;
   --work-font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --work-font-display: "Space Grotesk", sans-serif;

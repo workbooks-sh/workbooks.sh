@@ -69,27 +69,27 @@ export class WorkSearch extends WbElement {
     .spin { width: 13px; height: 13px; border-radius: var(--work-radius-pill); flex: none;
       border: 2px solid var(--work-border-strong); border-top-color: var(--work-brand); animation: spin .7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .clear { cursor: pointer; color: var(--work-fg-subtle); font-size: 14px; line-height: 1; padding: 2px; border: none; background: none; }
+    .clear { cursor: pointer; color: var(--work-fg-subtle); font-size: var(--work-text); line-height: 1; padding: var(--work-space-2px); border: none; background: none; }
     .clear:hover { color: var(--work-fg); }
 
     .panel { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30;
       background: var(--work-surface); border: 1px solid var(--work-border); border-radius: var(--work-radius);
       box-shadow: var(--work-shadow); overflow: hidden; }
     .results { list-style: none; margin: 0; padding: var(--work-space-1); max-height: 320px; overflow: auto; }
-    .row { display: flex; flex-direction: column; gap: 1px; padding: var(--work-space-2) var(--work-space-3);
+    .row { display: flex; flex-direction: column; gap: var(--work-space-px); padding: var(--work-space-2) var(--work-space-3);
       border-radius: var(--work-radius-sm); cursor: pointer; }
     .row[aria-selected="true"] { background: var(--work-brand-soft); }
     .row:hover { background: var(--work-surface-soft); }
     .row .title { font-size: var(--work-text); color: var(--work-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .row .sub { font-size: var(--work-text-sm); color: var(--work-fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    mark { background: var(--work-brand-soft); color: var(--work-brand-ink, var(--work-fg)); border-radius: 3px; padding: 0 1px; }
+    mark { background: var(--work-brand-soft); color: var(--work-brand-ink, var(--work-fg)); border-radius: var(--work-radius-xs); padding: 0 var(--work-space-px); }
     [data-work-theme="dark"] mark, [data-work-theme="signal"] mark { color: var(--work-brand); }
 
     .state { padding: var(--work-space-4) var(--work-space-3); text-align: center; color: var(--work-fg-muted); font-size: var(--work-text-sm); }
     .foot { display: flex; align-items: center; gap: var(--work-space-2); padding: var(--work-space-1) var(--work-space-3);
       border-top: 1px solid var(--work-border); font-family: var(--work-font-mono); font-size: var(--work-text-sm); color: var(--work-fg-subtle); }
     .dot { width: 6px; height: 6px; border-radius: var(--work-radius-pill); background: var(--work-brand); box-shadow: 0 0 0 3px var(--work-brand-soft); }
-    .foot[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
+    .foot[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 var(--work-space-3px) var(--work-warn-glow); }
     .foot[data-tier="error"] .dot { background: var(--work-err); box-shadow: none; }
     .grow { flex: 1; }
   `;

@@ -33,7 +33,7 @@ export class WbForm extends WbElement {
     .fields { display: block; }
     .actions { display: flex; gap: var(--work-space-3); align-items: center; margin-top: var(--work-space-4); }
     .summary { margin: 0 0 var(--work-space-4); padding: var(--work-space-3) var(--work-space-4);
-      border-radius: var(--work-radius); background: rgba(201,47,47,0.10);
+      border-radius: var(--work-radius); background: var(--work-err-faint);
       border: 1px solid var(--work-err); color: var(--work-err); font-size: var(--work-text-sm);
       font-weight: 500; line-height: 1.5; display: none; }
     :host([invalid]) .summary[data-has] { display: block; }

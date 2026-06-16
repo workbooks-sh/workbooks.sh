@@ -78,7 +78,7 @@ export class WbDrive extends WbElement {
     .sort { font: inherit; font-size: var(--work-text-sm); color: var(--work-fg);
       background: var(--work-surface); border: 1px solid var(--work-border); border-radius: var(--work-radius-sm);
       padding: var(--work-space-1) var(--work-space-2); cursor: pointer; }
-    .vbtn { display: inline-flex; gap: 1px; border: 1px solid var(--work-border); border-radius: var(--work-radius-sm); overflow: hidden; }
+    .vbtn { display: inline-flex; gap: var(--work-space-px); border: 1px solid var(--work-border); border-radius: var(--work-radius-sm); overflow: hidden; }
     .vbtn button { appearance: none; cursor: pointer; border: none; background: var(--work-surface);
       color: var(--work-fg-muted); font: 600 var(--work-text-sm)/1 var(--work-font); padding: var(--work-space-1) var(--work-space-2); }
     .vbtn button[aria-pressed="true"] { background: var(--work-brand-soft); color: var(--work-brand); }
@@ -99,17 +99,17 @@ export class WbDrive extends WbElement {
     .tile:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }
 
     .icon { width: 48px; height: 48px; display: grid; place-items: center;
-      border-radius: var(--work-radius-sm); font-size: 22px; line-height: 1;
+      border-radius: var(--work-radius-sm); font-size: var(--work-text-metric-sm); line-height: 1;
       background: var(--work-surface-soft); color: var(--work-fg-muted); }
     .icon[data-kind="image"]  { background: var(--work-chip-lavender); color: var(--work-brand-ink); }
     .icon[data-kind="video"]  { background: var(--work-chip-peach);    color: var(--work-brand-ink); }
     .icon[data-kind="audio"]  { background: var(--work-chip-green);    color: var(--work-brand-ink); }
     .icon[data-kind="text"]   { background: var(--work-chip-blue);     color: var(--work-brand-ink); }
-    .ext { font-family: var(--work-font-mono); font-size: 9px; letter-spacing: .04em;
+    .ext { font-family: var(--work-font-mono); font-size: var(--work-text-3xs); letter-spacing: .04em;
       text-transform: uppercase; opacity: .8; margin-top: 2px; }
     .name { font-size: var(--work-text-sm); font-weight: 600; max-width: 100%;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sub { font-family: var(--work-font-mono); font-size: 10px; color: var(--work-fg-subtle); }
+    .sub { font-family: var(--work-font-mono); font-size: var(--work-text-2xs); color: var(--work-fg-subtle); }
 
     /* list / detail rows */
     .rows { max-height: var(--work-drive-max-h, 460px); overflow: auto; }
@@ -118,7 +118,7 @@ export class WbDrive extends WbElement {
       gap: var(--work-space-3); padding: var(--work-space-2) var(--work-space-3); }
     .head { position: sticky; top: 0; background: var(--work-surface-soft);
       border-bottom: 1px solid var(--work-border); font-family: var(--work-font-mono);
-      font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--work-fg-subtle); }
+      font-size: var(--work-text-2xs); text-transform: uppercase; letter-spacing: .05em; color: var(--work-fg-subtle); }
     .row { cursor: pointer; border-bottom: 1px solid var(--work-border);
       transition: background var(--work-dur) var(--work-ease); }
     .row:hover { background: var(--work-surface-soft); }
@@ -126,7 +126,7 @@ export class WbDrive extends WbElement {
     .row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--work-ring); }
     .cell-name { display: flex; align-items: center; gap: var(--work-space-2); min-width: 0; }
     .ricon { width: 26px; height: 26px; flex: none; display: grid; place-items: center;
-      border-radius: var(--work-radius-sm); font-size: 14px; background: var(--work-surface-soft); color: var(--work-fg-muted); }
+      border-radius: var(--work-radius-sm); font-size: var(--work-text); background: var(--work-surface-soft); color: var(--work-fg-muted); }
     .ricon[data-kind="image"]  { background: var(--work-chip-lavender); color: var(--work-brand-ink); }
     .ricon[data-kind="video"]  { background: var(--work-chip-peach);    color: var(--work-brand-ink); }
     .ricon[data-kind="audio"]  { background: var(--work-chip-green);    color: var(--work-brand-ink); }
@@ -140,7 +140,7 @@ export class WbDrive extends WbElement {
     .engine { display: inline-flex; align-items: center; gap: var(--work-space-1); }
     .dot { width: 7px; height: 7px; border-radius: var(--work-radius-pill); background: var(--work-brand);
       box-shadow: 0 0 0 3px var(--work-brand-soft); }
-    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
+    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 var(--work-space-3px) var(--work-warn-glow); }
     .engine[data-tier="error"] .dot { background: var(--work-err); box-shadow: none; }
     .empty { padding: var(--work-space-5); text-align: center; color: var(--work-fg-muted); font-size: var(--work-text-sm); }
   `;

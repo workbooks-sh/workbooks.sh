@@ -101,7 +101,7 @@ export class WbRecord extends WbElement {
     .engine { display: inline-flex; align-items: center; gap: var(--work-space-1); }
     .dot { width: 7px; height: 7px; border-radius: var(--work-radius-pill); background: var(--work-brand);
       box-shadow: 0 0 0 3px var(--work-brand-soft); }
-    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 3px rgba(184,134,27,0.18); }
+    .engine[data-tier="memory"] .dot { background: var(--work-warn); box-shadow: 0 0 0 var(--work-space-3px) var(--work-warn-glow); }
     .engine[data-tier="error"] .dot { background: var(--work-err); box-shadow: none; }
     .note { color: var(--work-fg-subtle); } .grow { flex: 1; }
     .empty { padding: var(--work-space-5); text-align: center; color: var(--work-fg-muted); font-size: var(--work-text-sm); }

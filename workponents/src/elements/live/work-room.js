@@ -51,7 +51,7 @@ export class WorkRoom extends WbElement {
     :host([state="closed"]) .dot { background: var(--work-err); }
     @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
     .badge { font: 600 10px var(--work-font-mono); letter-spacing: .08em; text-transform: uppercase;
-      padding: 2px 7px; border-radius: var(--work-radius-pill); border: 1px solid var(--work-border);
+      padding: var(--work-space-2px) var(--work-space-7px); border-radius: var(--work-radius-pill); border: 1px solid var(--work-border);
       color: var(--work-fg-subtle); background: var(--work-bg); }
     .body { padding: var(--work-space-4); position: relative; }
     ::slotted([slot="head"]) { display: contents; }
