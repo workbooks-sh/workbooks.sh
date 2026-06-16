@@ -24,7 +24,7 @@ COST: free
 
 ## Build the kernel in-sandbox and register it
 ```bash
-     wb toolkit build mono
+     work toolkit build mono
 ```
 
   2. Loop it engine-side (the hot path):
@@ -40,7 +40,7 @@ COST: free
 
 ## One frame over RCP (base64 in/out)
 ```bash
-     wb rt post "/rcp/kernel/run?name=mono" '{"b64":"<base64 RGBA>"}'
+     work rt post "/rcp/kernel/run?name=mono" '{"b64":"<base64 RGBA>"}'
 ```
 
 # Common pitfalls
@@ -54,10 +54,10 @@ COST: free
 
 # Verification checklist
 
-  - [ ] `wb toolkit build mono` reports "registered kernel"
+  - [ ] `work toolkit build mono` reports "registered kernel"
   - [ ] a 4-byte input `[10,20,30,255]` returns `[20,20,20,255]`
 
 # See also
 
-  - `wb toolkit show mono` — the manifest + ABI summary
+  - `work toolkit show mono` — the manifest + ABI summary
   - runtime/host/kernel.ex — the host side of the ABI (authoritative)

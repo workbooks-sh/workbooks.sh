@@ -6,7 +6,7 @@ Related: ../runtime/docs/TOOLKITS-V3.md (authoritative, clean-room), ../runtime/
 
 > NOTE (2026-06-07): the three RELATED design docs were restored from the archive
 > this day (each carries a clean-room reconciliation banner). For the AUTHORITATIVE
-> clean-room shape — per-toolkit EXEC mode, the `wb toolkit` surface, telemetry/
+> clean-room shape — per-toolkit EXEC mode, the `work toolkit` surface, telemetry/
 > VFS integration — read ../runtime/docs/TOOLKITS-V3.md first. This file remains
 > the operational "exactly what to write" standard; V3 owns the runtime contract.
 
@@ -205,7 +205,7 @@ re-composes their bash. So a task ships as a runnable recipe, chosen by OWNERSHI
   UPSTREAM CLI VERB (`brandnana harvest social <domain>`) wrapping the internal
   sequence server-side. Most robust — one noun in, zero agent jq/python/fan-out.
 - **CLI we don't own**: ship the recipe as a `:role task`-tagged ```` ```bash ````
-  block (positional `$1 $2` args) and run it with `wb toolkit run <toolkit> <task>
+  block (positional `$1 $2` args) and run it with `work toolkit run <toolkit> <task>
   -- <args>` (extracts + runs the block via the existing `extract_role_blocks` /
   `run_bash_snippet`). The executed bytes ARE the documented block — no doc/script
   drift, no on-PATH `.sh` dump, no emacs in the image.

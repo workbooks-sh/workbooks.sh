@@ -12,11 +12,11 @@
     standing entirely on the user&#x27;s OWN Cloudflare account, with just a
     =wrangler= login — no second provider, no DB to provision elsewhere.
 
-    STATUS: the turnkey one-command deploy (=wb forge app deploy --backend cf-d1=)
-    is NOT currently available — the =wb forge= verb and the unified gateway Worker
+    STATUS: the turnkey one-command deploy (=work forge app deploy --backend cf-d1=)
+    is NOT currently available — the =work forge= verb and the unified gateway Worker
     (=deploy-kit/app/gateway=) were removed 2026-06-09 (restore-or-drop tracked in
     =wb-dtd0.1=). The skill gives the real raw-=wrangler= primitives to build it
-    today; do NOT invoke =wb forge app=.
+    today; do NOT invoke =work forge app=.
 
     - DATA + AI: a Cloudflare Worker over D1 (SQLite, tenant-scoped data) + Workers
       AI. Built with =wrangler d1 create= / =wrangler d1 execute= / =wrangler deploy=.

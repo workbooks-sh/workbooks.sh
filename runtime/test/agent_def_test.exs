@@ -17,7 +17,7 @@ defmodule Workbooks.AgentDefTest do
       <work-system>
         You are Waldo, the resident agent.
 
-        Command surface: use `wb app …` to drive the shell.
+        Command surface: use `work app …` to drive the shell.
       </work-system>
       <work-note>This must NOT be part of the prompt.</work-note>
     </work-agent>
@@ -36,7 +36,7 @@ defmodule Workbooks.AgentDefTest do
     d = AgentDef.parse(def_with_system())
     assert d.system =~ "You are Waldo, the resident agent."
     # content inside <work-system> stays in the prompt
-    assert d.system =~ "use `wb app"
+    assert d.system =~ "use `work app"
     # a sibling element's text must be excluded
     refute d.system =~ "This must NOT be part of the prompt."
   end

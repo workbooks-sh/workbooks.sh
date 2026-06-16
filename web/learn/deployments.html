@@ -249,13 +249,13 @@ flowchart TD
   seam; podman, docker, and WSL2 slot in behind the same
   ensure→create→run→status→down contract.</p>
   <p>The bring-up, command by command, is shorter than the explanation:</p>
-  <pre class="orgsample">$ wbx deploy doctor
+  <pre class="orgsample">$ work deploy doctor
 created the case-sensitive APFS volume; prereqs OK now
 
-$ wbx deploy apply
-local runtime up — http://127.0.0.1:55123 (survives app quit; `wbx deploy down` to stop)
+$ work deploy apply
+local runtime up — http://127.0.0.1:55123 (survives app quit; `work deploy down` to stop)
 
-$ wbx deploy verify
+$ work deploy verify
 runtime healthy — http://127.0.0.1:55123/health → 200</pre>
   <p>Under that calm output is a sequence with two real macOS war stories
   baked into it. First the one-time prereq: krunvm's OCI store needs a
@@ -276,10 +276,10 @@ runtime healthy — http://127.0.0.1:55123/health → 200</pre>
   silent, no discovery, nothing. So the boot is
   <code>/app/bin/workbooks eval '…ensure_all_started… Process.sleep(:infinity)'</code>
   — boot the app, then park forever; on failure <code>System.halt(1)</code>
-  so it surfaces in <code>wbx deploy logs</code> instead of hanging.</p>
+  so it surfaces in <code>work deploy logs</code> instead of hanging.</p>
   <pre class="mermaid">
 sequenceDiagram
-  participant U as wbx (your session)
+  participant U as work (your session)
   participant K as krunvm
   participant V as the microVM (the runtime image)
   participant D as /disco (bind mount)
@@ -331,7 +331,7 @@ provider_public_url      <i>← print  url: https://…</i>
   host failure is a failed command.</p>
   <pre class="mermaid">
 flowchart TD
-  apply["wbx deploy apply"] --> place{"ENGINE_PLACE?"}
+  apply["work deploy apply"] --> place{"ENGINE_PLACE?"}
   place -- local --> machine["built-in Machine<br/>(krunvm microVM)"]
   place -- cloud --> recipe["resolve providers/&lt;place&gt;/bootstrap.sh"]
   recipe --> up["WB_RECIPE_ACTION=up"]
@@ -405,7 +405,7 @@ primary_region = "sjc"
   refusing a half-edit. Try to go to <code>multi</code> tenancy while still
   on <code>sqlite</code> and <code>trusted</code>, with <code>s3</code> but
   no credentials, and validate stops you cold:</p>
-  <pre class="orgsample">$ wbx deploy validate cloud-saas.html
+  <pre class="orgsample">$ work deploy validate cloud-saas.html
 invalid deployment:
   - TENANCY_MODE: multi on DATABASE: sqlite serializes every tenant
     through one writer — set DATABASE: postgres
@@ -446,7 +446,7 @@ invalid deployment:
   without ever echoing them.</p>
   <p>The richer flow, in the Rust kit: you declare secrets <em>by name</em>
   in the file with <code>#+DEPLOY_SECRETS: KEY …</code>, set values with
-  <code>wbx deploy secrets set KEY=VALUE</code> (stored mode-0600 in
+  <code>work deploy secrets set KEY=VALUE</code> (stored mode-0600 in
   <code>secrets.env</code> under the app dir), and list them by name only —
   <code>secrets list</code> never prints a value. Locally they're delivered
   as <code>--env-file</code>; in the cloud they're staged through the
@@ -486,9 +486,9 @@ flowchart LR
   <p>The verbs are built for agents as much as humans: every one is
   non-interactive, idempotent, takes <code>--json</code>, and exits non-zero
   on failure. The arc is <code>init → validate → apply → status|verify|logs
-  → down</code>, with two shortcuts: <code>wbx deploy local</code> for the
+  → down</code>, with two shortcuts: <code>work deploy local</code> for the
   zero-config bring-up (think <code>docker run</code>) and
-  <code>wbx deploy doctor</code> to check and self-heal prereqs.</p>
+  <code>work deploy doctor</code> to check and self-heal prereqs.</p>
   <table class="cmp">
     <tr><th>verb</th><th>what it does</th><th>what it reads</th><th>proves success by</th></tr>
     <tr><td><code>init [local|cloud]</code></td><td>writes a starter <code>deployment.org</code></td><td>a template (won't clobber without <code>--force</code>)</td><td>file exists, validates</td></tr>
@@ -542,7 +542,7 @@ flowchart LR
   <details>
     <summary>Do I need Docker?</summary>
     <p>On a mac, no — local runs in a krunvm microVM, prereqs installed by
-    <code>wbx deploy doctor</code>. The Rust kit also speaks docker and
+    <code>work deploy doctor</code>. The Rust kit also speaks docker and
     podman if you'd rather, picked in automation-friendliness order. Cloud
     needs nothing local but the provider's CLI.</p>
   </details>
@@ -594,8 +594,8 @@ flowchart LR
       <div>Nexus<small>the why — dev is prod, position not kind</small></div><span class="go">→</span></a>
     <a href="org"><span class="sw" style="background:#f2ddb0"><img src="icons/org.svg" alt=""></span>
       <div>Org<small>the format that stays inert here</small></div><span class="go">→</span></a>
-    <a href="wbx"><span class="sw" style="background:#9fc4e8"><img src="icons/wbx.svg" alt=""></span>
-      <div>wbx<small>the CLI carrying the verbs</small></div><span class="go">→</span></a>
+    <a href="work"><span class="sw" style="background:#9fc4e8"><img src="icons/work.svg" alt=""></span>
+      <div>work<small>the CLI carrying the verbs</small></div><span class="go">→</span></a>
     <a href="bundles"><span class="sw" style="background:#f3c5a3"><b>⊟</b></span>
       <div>Bundles<small>nothing proprietary in the container</small></div><span class="go">→</span></a>
   </div>

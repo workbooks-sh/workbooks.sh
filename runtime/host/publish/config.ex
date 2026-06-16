@@ -1,7 +1,7 @@
 defmodule Workbooks.Publish.Config do
   @moduledoc """
   A `publish.html` — the declarative description of where a workbook gets
-  deployed. One file per workbook site; `wb publish validate` checks it; `wb
+  deployed. One file per workbook site; `work publish validate` checks it; `work
   publish apply` renders + ships it. Mirrors the shape of `Deploy.Config` (same
   `Workbooks.Config.HTML` reader, same validate/to_env pattern) so both feel like
   one system.

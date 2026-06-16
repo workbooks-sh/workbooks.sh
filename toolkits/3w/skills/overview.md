@@ -30,7 +30,7 @@ COST: free
   | `3w crawl`      | soon   | frontier crawl + page-template extraction               |
   | `3w harvest`    | soon   | media/SVG/font + component catalog                      |
   | `3w har`        | soon   | capture network session → mine hidden JSON endpoints    |
-  | `3w repo`       | soon   | assemble the workbook context repository (`wb build`)   |
+  | `3w repo`       | soon   | assemble the workbook context repository (`work build`)   |
   | `3w doctor`     | soon   | run the troubleshooting checks                          |
 
 # The rules that keep it free + unblocked

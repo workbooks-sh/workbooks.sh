@@ -3,13 +3,13 @@
 
 # Status — read first
 
-The *turnkey* one-command path (`wb forge app deploy --backend cf-d1`) is NOT
-currently available. It was driven by the Rust `wb`'s forge lane + a unified
+The *turnkey* one-command path (`work forge app deploy --backend cf-d1`) is NOT
+currently available. It was driven by the Rust `work`'s forge lane + a unified
 gateway Worker under `deploy-kit/app/gateway/` — both removed 2026-06-09. There
-is no `wb forge` verb in the current Elixir `wb`, and the gateway code
+is no `work forge` verb in the current Elixir `work`, and the gateway code
 (`core.mjs` / `auth.mjs` / `d1-driver.js` / `schema.sql`) is gone, so
 `toolkits/wrangler/deploy/cf-d1.sh` cannot run (it sources a missing lib). Do
-NOT run `wb forge app …` — it is not a command. Restore-or-drop is tracked in
+NOT run `work forge app …` — it is not a command. Restore-or-drop is tracked in
 `wb-dtd0.1`.
 
 What DOES work today: the *raw Cloudflare primitives* below (`wrangler d1`,

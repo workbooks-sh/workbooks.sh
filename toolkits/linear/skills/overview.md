@@ -33,7 +33,7 @@ Federate a Linear project into org :task: nodes the Board can drive; query via O
     enabled; destructive deletes go through a Workgate permit (fail-closed).
 
 # Credentials
-  Set `LINEAR_API_KEY` in the engine's env / `wb env` keychain. The
+  Set `LINEAR_API_KEY` in the engine's env / `work env` keychain. The
   connector reads it through `WorkbooksRuntime.Plugin.Auth`; it is never
   stored in this toolkit.
 

@@ -11,10 +11,10 @@
     is looking at. Every verb pushes a =desktop:control= event the shell
     already acts on — there is no separate API for the agent to manage.
 
-    The bridge is one in-process command surface, =wb app …=, fulfilled
+    The bridge is one in-process command surface, =work app …=, fulfilled
     by the runtime → desktop control bus (epic =wb-d2nx=, keystone
     =wb-d2nx.1=). If no shell is connected the verbs are safe no-ops that
-    say so, so an agent can always probe with =wb app status= first.
+    say so, so an agent can always probe with =work app status= first.
 
     *Live now*
 
@@ -23,10 +23,10 @@
     | =overview=     | First contact — what this toolkit can drive           |
     | =tab-control=  | Open / focus / close a tab by path in the shell       |
     | =app-control=  | Switch theme, add a bookmark, create a workspace      |
-    | =key-prompt=   | Ask the user for an API key (modal) via =wb env request= |
-    | =models=       | Inspect/switch your model + discover the live catalog via =wb model/models= |
-    | =variables=    | Store config + secrets (per-tenant, secrets by reference) via =wb var= |
-    | =library-search= | Find content across the user&#x27;s workbooks via =wb search= / =wb library= |
+    | =key-prompt=   | Ask the user for an API key (modal) via =work env request= |
+    | =models=       | Inspect/switch your model + discover the live catalog via =work model/models= |
+    | =variables=    | Store config + secrets (per-tenant, secrets by reference) via =work var= |
+    | =library-search= | Find content across the user&#x27;s workbooks via =work search= / =work library= |
 
     *Planned (epic wb-d2nx — not yet wired, do not promise these)*
 

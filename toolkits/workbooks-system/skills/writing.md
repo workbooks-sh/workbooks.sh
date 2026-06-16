@@ -26,7 +26,7 @@ Frame Workbooks as an *ecosystem* with two doors, not as a single trick.
 Two products, one open-source codebase (Apache-2.0):
 
 - *The repository* — the ecosystem for builders: the runtime engine, the
-  `wb` CLI, the compiler lanes (C/Zig/Rust/JS-TS-npm → WASM), the toolkits,
+  `work` CLI, the compiler lanes (C/Zig/Rust/JS-TS-npm → WASM), the toolkits,
   and the desktop app's own source. Everything is inspectable.
 - *The desktop app* — the front door for everyone else: a signed,
   cross-platform (macOS / Windows / Linux; Tauri) application that puts the

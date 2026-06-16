@@ -75,8 +75,8 @@ Never stop before pushing; never say "ready to push when you are" — you push.
 
 The canonical CLI binary is **`work`** (the Elixir escript folded into the runtime
 mix project; the same modules the runtime uses). An agent can run `work` verbs
-in-process as a tool. Earlier names (`wb`, `wbx`) are retired — a guardrail test
-fails if a stale `wb`/`wbx` command reference reappears.
+in-process as a tool. Earlier names (`work`, `work`) are retired — a guardrail test
+fails if a stale `work`/`work` command reference reappears.
 
 ## Architecture canon — desktop / web / mobile
 

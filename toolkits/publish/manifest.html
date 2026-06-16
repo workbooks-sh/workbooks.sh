@@ -8,17 +8,17 @@
   requires="wb-publish&gt;=0.1.0"
   skill-dir="skills/">
   <work-doc title="publish — federation + identity for workbooks">
-    The publish/identity stack, lifted out of the `wb` core
+    The publish/identity stack, lifted out of the `work` core
     (M5-publish-to-toolkit — provider/integration logic lives in
     toolkits). The toolkit OWNS the `wb-publish` binary: its source
-    is this directory&#x27;s =bin/= crate, and `wb identity …` /
-    `wb atproto …` exec it when it&#x27;s on PATH.
+    is this directory&#x27;s =bin/= crate, and `work identity …` /
+    `work atproto …` exec it when it&#x27;s on PATH.
 
     Build / install:
 
       cargo install --path toolkits/publish/bin
 
-    Two verb groups, same surface they had inside `wb`:
+    Two verb groups, same surface they had inside `work`:
 
     - =wb-publish identity= — the Workbooks Network identity.
       Export/import the did:key + Ed25519 keypair across machines,

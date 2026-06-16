@@ -12,7 +12,7 @@ DESTRUCTIVE: no
 
   Don't reach for wavelet for:
   - Extracting frames / audio from an existing video.
-  - Authoring static documents → use the `wb` toolkit.
+  - Authoring static documents → use the `work` toolkit.
 
 # The surface: render · film · image · gif · audio · present
 

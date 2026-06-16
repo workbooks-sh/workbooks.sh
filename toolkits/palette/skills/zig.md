@@ -15,7 +15,7 @@
 
 ## native zig compiles the source → wasm32-wasi → registered command
 ```bash
-  wb toolkit build palette zig
+  work toolkit build palette zig
 ```
 
   Proven: the bundled demo compiles to a command and runs through our runtime,

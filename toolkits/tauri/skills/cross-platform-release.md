@@ -9,7 +9,7 @@ operating systems, or an automated release pipeline that produces signed
 installers on a tag. Use this alongside `tauri code-signing` (signing is the
 gate; this is the distribution shape).
 
-NOTE: there is no `wb forge desktop` command (removed with the Rust `wb`,
+NOTE: there is no `work forge desktop` command (removed with the Rust `work`,
 2026-06-09). Build with the real Tauri CLI — `cargo tauri build` — and release
 via the canonical GitHub Action, `tauri-apps/tauri-action`.
 

@@ -3,12 +3,12 @@
 
 # Status — read first
 
-The *turnkey* provisioning path (=wb forge app deploy --backend cf-d1 |
-postgres-gateway=) is NOT currently available. It was driven by the Rust `wb`'s
+The *turnkey* provisioning path (=work forge app deploy --backend cf-d1 |
+postgres-gateway=) is NOT currently available. It was driven by the Rust `work`'s
 forge lane + a unified gateway (`deploy-kit/app/gateway/` — core/auth/d1+pg
-drivers/schema), all removed 2026-06-09. There is no `wb forge` verb in the
-current Elixir `wb`, and the gateway code + provision recipes are gone. Do NOT
-run `wb forge app …` — it is not a command. Restore-or-drop is tracked in
+drivers/schema), all removed 2026-06-09. There is no `work forge` verb in the
+current Elixir `work`, and the gateway code + provision recipes are gone. Do NOT
+run `work forge app …` — it is not a command. Restore-or-drop is tracked in
 `wb-dtd0.1`.
 
 What's still true + useful: the ARCHITECTURE and the FRONTEND WIRING below — they

@@ -9,8 +9,8 @@ DESTRUCTIVE: no
   Reach for this toolkit when the user wants to publish a built
   workbook to their Bluesky/AT Protocol account, verify what's
   bound, watch the verified workbook feed, or move their Workbooks
-  identity (did:key) to another machine. `wb identity …` and
-  `wb atproto …` pass through here, so either spelling works.
+  identity (did:key) to another machine. `work identity …` and
+  `work atproto …` pass through here, so either spelling works.
 
 # Workflow
 
@@ -49,7 +49,7 @@ DESTRUCTIVE: no
   2. `bluesky-login` (app password) and oauth login WITHOUT
      `--standalone` need a running engine; use `--standalone` when
      only public publishing is wanted.
-  3. `atproto publish --sign` is reserved — pre-sign with `wb seal`
+  3. `atproto publish --sign` is reserved — pre-sign with `work seal`
      instead.
 
 # Verification checklist

@@ -3,7 +3,7 @@ defmodule Workbooks.Deploy.Config do
   A `deployment.html` — the ONE declarative description of a deployment. Two
   places (`engine-place="local|cloud"`), two tenancy modes
   (`tenancy-mode="single|multi"`), and BYOD backends (`storage`, `database`) +
-  the agent `profile`. `wb deploy validate` checks coherence; `wb deploy apply`
+  the agent `profile`. `work deploy validate` checks coherence; `work deploy apply`
   converges to it. File-based by design (no prompts); SECRETS (S3 keys, the
   Postgres DSN) come from the deploy ENV, never the file.
 

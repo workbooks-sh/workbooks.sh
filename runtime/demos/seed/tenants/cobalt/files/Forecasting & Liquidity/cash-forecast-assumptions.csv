@@ -1,7 +1,0 @@
-driver,category,basis,weekly_amount_usd,confidence,notes
-Customer receipts,inflow,AR aging + DSO,14200000,high,Top-50 accounts modeled individually
-Payroll,outflow,Bi-weekly run,-6800000,high,Frozen headcount
-Vendor AP,outflow,AP terms net-30/45,-9100000,medium,Batch-approved Thursdays
-Tax reserve,outflow,Estimated quarterly,-3400000,high,Q2 estimate due 2026-06-15
-Revolver draw,financing,Liquidity floor $25M,0,low,Standby only
-Interest income,inflow,MMF yield 4.6%,520000,high,Swept daily

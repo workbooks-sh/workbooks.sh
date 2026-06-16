@@ -11,14 +11,14 @@ to live alongside a backend they run there.
 # Workflow
 
 Use the real `railway` CLI directly (you, the agent, run it via bash). There is
-no `wb forge web` command — that wrapper (and its `deploy-kit/web/railway.sh`
-recipe) was removed with the Rust `wb` (2026-06-09). Railway routes to `$PORT`,
+no `work forge web` command — that wrapper (and its `deploy-kit/web/railway.sh`
+recipe) was removed with the Rust `work` (2026-06-09). Railway routes to `$PORT`,
 so a static file needs a tiny server in front of it; the standard pattern is a
 small Caddy image.
 
 ```bash
 # build the workbook if needed (emits dist/<slug>.html)
-wb build
+work build
 
 # one-time per machine: browser OAuth into the USER'S Railway account
 railway login                       # check with: railway whoami

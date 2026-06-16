@@ -1,15 +1,15 @@
 defmodule Workbooks.CLI.Demo do
   @moduledoc """
-  `wb demo …` — the demo-environment seed CLI (recording-system findings §3).
+  `work demo …` — the demo-environment seed CLI (recording-system findings §3).
 
   Materializes a reproducible, fully-seeded Workbooks demo workspace from the
   git-backed Org fixture tree at `runtime/demos/seed/` via
   `Workbooks.Demos.Seed.materialize/1`.
 
-      wb demo seed              materialize (fresh) the whole demo env
-      wb demo seed --dry-run    print the plan; touch nothing, no app boot
-      wb demo seed --no-build   skip the slow tangle+build lanes (smoke seed)
-      wb demo seed --keep       don't wipe existing tenant repos first
+      work demo seed              materialize (fresh) the whole demo env
+      work demo seed --dry-run    print the plan; touch nothing, no app boot
+      work demo seed --no-build   skip the slow tangle+build lanes (smoke seed)
+      work demo seed --keep       don't wipe existing tenant repos first
 
   A real run boots the app (the build lane needs the wasmex NIF); `--dry-run`
   does not, so an agent can validate the plan cheaply.
@@ -17,7 +17,7 @@ defmodule Workbooks.CLI.Demo do
 
   alias Workbooks.Demos.Seed
 
-  @doc "Entry for `wb demo …`. Returns {output, failed?}."
+  @doc "Entry for `work demo …`. Returns {output, failed?}."
   def run([]), do: {usage(), false}
   def run(["help"]), do: {usage(), false}
 
@@ -101,13 +101,13 @@ defmodule Workbooks.CLI.Demo do
 
   defp usage do
     """
-    wb demo — the reproducible demo-environment seed
+    work demo — the reproducible demo-environment seed
 
-      wb demo seed              materialize (fresh) the whole demo env from the
+      work demo seed              materialize (fresh) the whole demo env from the
                                 git-backed Org fixture tree (runtime/demos/seed)
-      wb demo seed --dry-run    print the plan; touch nothing, no app boot
-      wb demo seed --no-build   skip the tangle+build lanes (fast smoke seed)
-      wb demo seed --keep       keep existing tenant repos (no wipe)
+      work demo seed --dry-run    print the plan; touch nothing, no app boot
+      work demo seed --no-build   skip the tangle+build lanes (fast smoke seed)
+      work demo seed --keep       keep existing tenant repos (no wipe)
 
     Seeds: 4 team members (ada/grace/alan/demo-bot) with STABLE DIDs, 3 real
     workspaces, built workbooks (real run records), 2 signed custom toolkits, a

@@ -5,6 +5,6 @@
   Pipe newline-delimited text to `huniq` on stdin; deduped lines come back on
   stdout in original order.
 
-  As a registered command (after `wb toolkit build huniq`):
+  As a registered command (after `work toolkit build huniq`):
 
   : run-command("huniq", "a\nb\na\nc\n")  → "a\nb\nc"

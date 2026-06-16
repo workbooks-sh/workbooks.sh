@@ -22,7 +22,7 @@ EX=(--exclude _build --exclude deps --exclude .git --exclude '*.beam'
 rsync -a "${EX[@]}" "$WT/" "$CTX/runtime/"                          # the clean-room app
 rsync -a "${EX[@]}" "$ROOT/projects/brandnana/" "$CTX/projects/brandnana/"  # brandnana CLI source
 rsync -a "${EX[@]}" "$ROOT/substrates/brandnana/" "$CTX/substrates/brandnana/"  # profile + boards
-rsync -a "${EX[@]}" "$ROOT/cli/" "$CTX/cli/"                        # wb meta-CLI
+rsync -a "${EX[@]}" "$ROOT/cli/" "$CTX/cli/"                        # work meta-CLI
 cp "$WT/Dockerfile.brandnana" "$CTX/Dockerfile.brandnana"
 du -sh "$CTX" | awk '{print "context size: "$1}'
 

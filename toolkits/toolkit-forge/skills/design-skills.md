@@ -61,7 +61,7 @@ DESTRUCTIVE: no
   Make it runnable by OWNERSHIP (AUTHORING.md §How a task is made
   runnable): a CLI we own → an UPSTREAM task-verb; a CLI we don't own →
   a `:role task`-tagged bash source block run via
-  `wb toolkit run <toolkit> <task> -- <args>`. The manifest indexes
+  `work toolkit run <toolkit> <task> -- <args>`. The manifest indexes
   TASKS above leaves; the agent reaches for the task by default. A
   SHALLOW CLI skips this — there the leaf IS the task.
 

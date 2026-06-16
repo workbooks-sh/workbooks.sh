@@ -27,7 +27,7 @@ defmodule Workbooks.Demos.Seed do
   Determinism levers (the no-flaky requirement): frozen clock (`WB_DEMO_NOW`),
   replay transcripts (`WB_DEMO_REPLAY`), and the fixed per-tenant key seeds.
 
-  Drive it from the CLI: `wb demo seed [--fresh] [--dry-run] [--no-build]`.
+  Drive it from the CLI: `work demo seed [--fresh] [--dry-run] [--no-build]`.
   """
 
   @seed_dir Path.expand("../../demos/seed", __DIR__)
@@ -205,7 +205,7 @@ defmodule Workbooks.Demos.Seed do
       dest = Path.join(tk_root, tk)
       File.rm_rf!(dest)
       copy_tree(Path.join(@seed_dir, "toolkits/#{tk}"), dest)
-      # Sign as the owning tenant so `wb toolkit verify` is green on a
+      # Sign as the owning tenant so `work toolkit verify` is green on a
       # #+TRUST: third-party manifest.
       signed = Workbooks.Toolkits.sign_text(tk, m.toolkits_owner, tk_root)
       %{toolkit: tk, root: dest, signed: signed}

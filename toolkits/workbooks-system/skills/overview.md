@@ -3,7 +3,7 @@
 # When to use this
 
 Read this when you are an agent running inside a Workbooks runtime and the
-task touches the platform itself — a workbook, `wb`, a toolkit, a workflow,
+task touches the platform itself — a workbook, `work`, a toolkit, a workflow,
 or anything saying "bundle", "unbundle", "publish", "toolkit", or "WASM".
 Read it BEFORE inventing a mechanism: the platform almost always already
 provides one.
@@ -60,7 +60,7 @@ Everything is organized around three layers. Learn the words once:
 
 # Out of scope for you (operator territory)
 
-Provisioning machines, building/pushing the runtime OCI image, `wb deploy`,
+Provisioning machines, building/pushing the runtime OCI image, `work deploy`,
 `fly` and other cloud lifecycle, and editing host engine code are
 *host-level* operations done by operators OUTSIDE the runtime. You cannot do
 them from in here and should not try; if a task seems to need one, it

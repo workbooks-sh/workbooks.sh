@@ -5,19 +5,19 @@
 
 The user wants their workbook live on the web at a real URL, hosted on *their
 own* Cloudflare account (not our broker / Live URL). One static file, no
-server. Preferred over `wb publish` when they want to own the hosting + the
+server. Preferred over `work publish` when they want to own the hosting + the
 bill and keep the artifact entirely on their infrastructure.
 
 # Workflow
 
 Use the real `wrangler` CLI directly (you, the agent, run it via bash). There is
-no `wb forge web` command — that wrapper was removed with the Rust `wb`
+no `work forge web` command — that wrapper was removed with the Rust `work`
 (2026-06-09); `wrangler` is the tool. If the user isn't signed in, =wrangler
 login= opens the browser; they just authenticate there.
 
 ```bash
 # build the workbook if you haven't (emits dist/<slug>.html)
-wb build
+work build
 
 # one-time per machine: browser OAuth into the USER'S Cloudflare account
 wrangler login                       # check with: wrangler whoami

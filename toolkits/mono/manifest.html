@@ -19,7 +19,7 @@
     : #+BUILD_SRC: path:src     C source → Compilers.c_compile_to_kernel
     : process(in_len)→out_len   the kernel ABI; in_ptr()/out_ptr() locate the arena
 
-    Build with =wb toolkit build mono= → KernelRegistry registers =mono= → loop it
+    Build with =work toolkit build mono= → KernelRegistry registers =mono= → loop it
     with =Workbooks.Fabric.map_kernel= (engine) or one-shot via =POST /rcp/kernel/run=.
 
     Skill index (read on demand):

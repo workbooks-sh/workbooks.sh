@@ -47,7 +47,7 @@
        artifact directly.
      - a capability that exists as a host PRIMITIVE but is not exposed as a
        tool → add it to the capability registry (config), do not edit the host.
-  3. TEST before you register. The artifact's own test / specimen / `wb content
+  3. TEST before you register. The artifact's own test / specimen / `work content
      check` / a smoke run must pass. An unverified capability is not shipped —
      a broken toolkit is worse than a missing one.
   4. Register it (make it reachable), close the issue with a one-line
@@ -87,7 +87,7 @@
 
   A toolkit is DISCOVERED by a `&lt;work-toolkit&gt;` element with `id` / `kind` /
   `skill-dir` attributes. The toolkit MUST contain `skills/overview.md`. Minimal
-  valid shape (copy it, then read `wb toolkit show glyphs` for a fuller real
+  valid shape (copy it, then read `work toolkit show glyphs` for a fuller real
   example):
 
     &lt;!-- rss/manifest.html --&gt;
@@ -99,15 +99,15 @@
     # overview
     how to use this toolkit, with a worked example.
 
-  TEST before you claim DONE: run `wb toolkit verify &lt;name&gt;` and READ its output
-  — every line must be ✓, none ✗ — and `wb toolkit list` must show it. The worker
+  TEST before you claim DONE: run `work toolkit verify &lt;name&gt;` and READ its output
+  — every line must be ✓, none ✗ — and `work toolkit list` must show it. The worker
   INDEPENDENTLY re-runs verify on what you authored: if it is not clean your DONE
   is REJECTED and the issue stays open, so "DONE" without a passing verify only
   wastes a round. A toolkit that verifies clean is reachable by every tenant
-  agent via `wb toolkit run &lt;name&gt;` — that is how the capability ships.
+  agent via `work toolkit run &lt;name&gt;` — that is how the capability ships.
 
   END EVERY RUN WITH EXACTLY ONE VERDICT LINE (the worker reads it):
-    DONE: &lt;what you built + that `wb toolkit verify &lt;name&gt;` passed clean (all ✓)&gt;
+    DONE: &lt;what you built + that `work toolkit verify &lt;name&gt;` passed clean (all ✓)&gt;
     HOST: &lt;the new host primitive this needs — you cannot build it; a human will&gt;
     BLOCKED: &lt;why you could not finish, for a human to read&gt;
   </work-system>

@@ -8,9 +8,9 @@ defmodule Workbooks.Publish do
     * `self-hosted`      — POST the HTML blob to a running runtime's /publish API
 
   THE FLOW (declarative — mirrors deploy-kit):
-    wb publish init                scaffold ./publish.html
-    wb publish validate            coherence-check it (no render, no deploy)
-    wb publish apply <file.html>   render + ship → prints the live URL
+    work publish init                scaffold ./publish.html
+    work publish validate            coherence-check it (no render, no deploy)
+    work publish apply <file.html>   render + ship → prints the live URL
   (workbook defaults to ./workbook.html; config defaults to ./publish.html)
 
   Rendering reuses `PublicWeb.static_page/2`: a workbook IS HTML, so a complete
@@ -24,7 +24,7 @@ defmodule Workbooks.Publish do
 
   @template """
   <!-- Publish configuration — one declarative description of where this workbook lives.
-       Edit, then:  wb publish validate  →  wb publish apply <workbook.html>
+       Edit, then:  work publish validate  →  work publish apply <workbook.html>
        Secrets (API keys, tokens, account IDs) do NOT go here. Use env vars
        (CLOUDFLARE_ACCOUNT_ID, etc.). -->
   <work-publish
@@ -41,11 +41,11 @@ defmodule Workbooks.Publish do
 
     cond do
       File.exists?(file) and not force? ->
-        err("#{file} already exists — edit it, or `wb publish init --force` to replace it", %{file: file})
+        err("#{file} already exists — edit it, or `work publish init --force` to replace it", %{file: file})
 
       true ->
         File.write!(file, @template)
-        ok("wrote #{file} — edit it, then `wb publish validate` → `wb publish apply <workbook.html>`", %{file: file})
+        ok("wrote #{file} — edit it, then `work publish validate` → `work publish apply <workbook.html>`", %{file: file})
     end
   end
 
@@ -155,7 +155,7 @@ defmodule Workbooks.Publish do
                                        "https://github.com/#{repo}.git", tmp], stderr_to_stdout: true),
          :ok <- File.cp(html_path, Path.join(tmp, "index.html")),
          {_, 0} <- System.cmd("git", ["-C", tmp, "add", "index.html"], stderr_to_stdout: true),
-         {_, 0} <- System.cmd("git", ["-C", tmp, "commit", "-m", "wb publish: update workbook"],
+         {_, 0} <- System.cmd("git", ["-C", tmp, "commit", "-m", "work publish: update workbook"],
                                stderr_to_stdout: true),
          {_, 0} <- System.cmd("git", ["-C", tmp, "push"], stderr_to_stdout: true) do
       url = if domain, do: "https://#{domain}", else: "https://#{String.replace(repo, "/", ".github.io/", global: false)}"

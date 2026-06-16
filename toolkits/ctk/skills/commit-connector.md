@@ -88,8 +88,8 @@ COST: free
   echo "$review"   # {type:ctk.commit, feedback, snapshot:{props,states}} → apply + git commit
 ```
 
-  BUILT: `wb ctk await <run> [timeout_s]` wraps exactly this poll (host-side over
-  the runtime HTTP, same target resolution as `wb rt`) and prints the review when
+  BUILT: `work ctk await <run> [timeout_s]` wraps exactly this poll (host-side over
+  the runtime HTTP, same target resolution as `work rt`) and prints the review when
   it lands. NEXT: a toolkit skill teaching the agent the open→await→commit shape.
 
 # Verification checklist
@@ -107,7 +107,7 @@ COST: free
   SHIPPED: the CTK side (Commit button, modal, `ctk.commit` event, both
   transports, `window.CTK.commit`) AND the runtime routes (`POST /api/ctk/commit`
   + `GET /api/ctk/review/:id`, delivering into `Workbooks.AgentSession`) AND the
-  `wb ctk await <run>` CLI poll helper (`mix compile` clean). NEXT: a toolkit
+  `work ctk await <run>` CLI poll helper (`mix compile` clean). NEXT: a toolkit
   skill teaching the agent's open→await→commit loop, persisting the approved
   snapshot with the run, and a live round-trip test. Mark `stable` once a real
   run commits an approved change.

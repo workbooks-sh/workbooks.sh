@@ -17,7 +17,7 @@ DESTRUCTIVE: no
 
   - git internals (plumbing commands, refs, object model)
   - GitHub-specific verbs — use the `gh` toolkit
-  - Workbooks federation via Radicle — see `wb`
+  - Workbooks federation via Radicle — see `work`
 
 # Verify
 

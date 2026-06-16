@@ -81,7 +81,7 @@ defmodule Workbooks.BundleTangleTest do
     assert Bundle.compile_tree(parts, build: true) == parts
   end
 
-  test "wb bundle (--no-build) tangles html→native then packs + embeds; round-trips", %{base: base} do
+  test "work bundle (--no-build) tangles html→native then packs + embeds; round-trips", %{base: base} do
     src = Path.join(base, "src")
     out = Path.join(base, "page.html")
     dst = Path.join(base, "dst")
@@ -110,7 +110,7 @@ defmodule Workbooks.BundleTangleTest do
   end
 
   @tag :build
-  test "wb bundle (full compile) emits a runnable <name>.wasm part for the component", %{base: base} do
+  test "work bundle (full compile) emits a runnable <name>.wasm part for the component", %{base: base} do
     src = Path.join(base, "src")
     out = Path.join(base, "page.html")
 

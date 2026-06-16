@@ -10,14 +10,14 @@
 <work-agent
   id="designer"
   model="minimax/minimax-m3"
-  toolkits="bash wb brandnana ffmpeg"
+  toolkits="bash work brandnana ffmpeg"
   tagline="Stage-3 — turns the GATED analysis into the deck-v2 brand book, publishes it, and visually self-reviews every slide."
   icon="lucide:LayoutTemplate"
   allow-spawn="t"
   spawn-depth="1"
   max-children="8"
   max-turns="90"
-  can-grant="bash wb brandnana"
+  can-grant="bash work brandnana"
   done-check="command:bash /opt/profile/skills/deck-gate.sh ."
   done-check-max="6">
   <work-system>
@@ -83,8 +83,8 @@ brand-book (deck-v2), publish it, and SEE every slide before you finish.
    SLUG="$(cat session-id 2&gt;/dev/null || echo "$DOMAIN" | sed 's/^www\.//; s/\..*$//')"
    mkdir -p spec   # then write spec/deck.json + spec/01-*.json + spec/02-*.json … one per slide
    brandnana book assemble spec --out deck.html   # reads spec/deck.json + spec/NN-*.json — NO python
-   wb embed-source deck.html .                      # inject the VALID source bundle (never hand-roll it)
-   wb unbundle deck.html /tmp/_chk &gt;/dev/null &amp;&amp; echo "bundle round-trips ✓"   # must pass
+   work embed-source deck.html .                      # inject the VALID source bundle (never hand-roll it)
+   work unbundle deck.html /tmp/_chk &gt;/dev/null &amp;&amp; echo "bundle round-trips ✓"   # must pass
    brandnana book publish "$SLUG" deck.html        # the ONLY publish verb (takes the composed .html)
    echo "https://api.brandnana.net/books/$SLUG.html" &gt; published-url   # deck-gate reads this
    ```

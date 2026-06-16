@@ -40,11 +40,16 @@ defmodule CliNameTest do
 
   @patterns [@cmd_re, @backtick_re, @escript_re, @tool_re, @usage_re, @bare_wbx_re, @cli_bin_re]
 
+  # Whole-repo line-by-line scan over every tracked source file — inherently slow,
+  # well past the 60s ExUnit default.
+  @tag timeout: 600_000
   test "no stale `wb`/`wbx` CLI references survive (the CLI is `work`)" do
     offenders =
-      walk(@repo)
-      |> Enum.filter(&File.regular?/1)
+      tracked_files()
+      |> Enum.filter(&(Path.extname(&1) in @exts))
       |> Enum.reject(&(Path.basename(&1) in @skip_names))
+      |> Enum.map(&Path.join(@repo, &1))
+      |> Enum.filter(&File.regular?/1)
       |> Enum.flat_map(&scan_file/1)
 
     if offenders != [] do
@@ -56,22 +61,14 @@ defmodule CliNameTest do
     end
   end
 
-  defp walk(dir) do
-    case File.ls(dir) do
-      {:ok, entries} ->
-        Enum.flat_map(entries, fn e ->
-          p = Path.join(dir, e)
-          cond do
-            e in ~w(_build deps node_modules .git .beads dist .gate) -> []
-            File.dir?(p) -> walk(p)
-            Path.extname(p) in @exts -> [p]
-            true -> []
-          end
-        end)
-
-      _ ->
-        []
-    end
+  # SOURCE = git-tracked files only. Untracked local artifacts (gitignored build
+  # output like generated audio scripts, scratch files) are NOT a source CLI surface
+  # and must not gate the rename — they aren't shipped and aren't reviewed. This also
+  # keeps the scan bounded to what's actually in the repo, not whatever happens to be
+  # in a contributor's working tree.
+  defp tracked_files do
+    {out, 0} = System.cmd("git", ["ls-files", "-z"], cd: @repo)
+    out |> String.split("\0", trim: true)
   end
 
   defp scan_file(path) do
@@ -90,6 +87,12 @@ defmodule CliNameTest do
     else
       lines
       |> Enum.with_index(1)
+      # Skip minified/bundled blobs (generated pack.bundle.json, dist specimens):
+      # a real `wb <verb>` CLI reference lives on a normal source line, never a
+      # multi-megabyte minified one — and the lookbehind patterns backtrack
+      # catastrophically on them (Regex.safe_run timeout). 8 KB is far above any
+      # hand-written source line.
+      |> Enum.reject(fn {line, _} -> byte_size(line) > 8_192 end)
       |> Enum.flat_map(fn {line, n} ->
         if Enum.any?(@patterns, &Regex.match?(&1, line)),
           do: ["  #{rel}:#{n}: #{String.trim(line) |> String.slice(0, 100)}"],
