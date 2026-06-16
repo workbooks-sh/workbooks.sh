@@ -48,12 +48,89 @@ export class WbDoc extends WbElement {
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`${res.status} ${url}`);
-      this._source = await res.text();
+      // docx is an I/O adapter on top of the org/markdown source: a .docx src is
+      // imported to that source, then rendered by the normal path. Detect by the
+      // URL extension OR the ZIP container magic (PK…) so a docx served without a
+      // .docx suffix still routes correctly.
+      const buf = await res.arrayBuffer();
+      const isDocx = /\.docx(\?|#|$)/i.test(url) || (await this._isDocxBuf(buf));
+      this._source = isDocx ? await this._importDocx(buf) : new TextDecoder().decode(buf);
       this.requestUpdate();
     } catch (e) {
       this._error = String(e.message || e);
       this.requestUpdate();
     }
+  }
+
+  async _isDocxBuf(buf) {
+    const { looksLikeDocx } = await import("./docx-io.js");
+    return looksLikeDocx(buf);
+  }
+
+  async _importDocx(buf) {
+    const { importDocx } = await import("./docx-io.js");
+    return importDocx(buf);
+  }
+
+  /**
+   * Set the document from a .docx ArrayBuffer (import adapter). Renders the result
+   * as org/markdown through the normal path. Emits `work-doc-export` on completion
+   * is NOT this path — see export() — but a failed import surfaces a clear error.
+   * @param {ArrayBuffer} buf
+   */
+  async importDocxBuffer(buf) {
+    try {
+      this._source = await this._importDocx(buf);
+      this._error = null;
+    } catch (e) {
+      this._error = String(e.message || e);
+    }
+    this.requestUpdate();
+    return this._source;
+  }
+
+  /**
+   * Export the current document. format "docx": when a runtime is docked, route
+   * through the Host (pandoc.wasm, max fidelity); otherwise the floor `exportDocx`
+   * builds the .docx Blob in-browser. Emits `work-doc-export {format, ok}`. Returns
+   * the Blob (or null on failure).
+   * @param {"docx"} [format]
+   * @returns {Promise<Blob|null>}
+   */
+  async export(format = "docx") {
+    if (format !== "docx") {
+      this.dispatchEvent(new CustomEvent("work-doc-export", { bubbles: true, composed: true, detail: { format, ok: false, error: `unsupported format ${format}` } }));
+      return null;
+    }
+    try {
+      let blob;
+      // Host tier (pandoc over the Dock) when docked — kept optional; the floor is
+      // the always-available default and the only path required to wire here.
+      if (this.host && this.host.available("runtime") && this.host.runtimeUrl) {
+        blob = await this._exportViaHost(this.source);
+      }
+      if (!blob) {
+        const { exportDocx } = await import("./docx-io.js");
+        blob = await exportDocx(this.source);
+      }
+      this.dispatchEvent(new CustomEvent("work-doc-export", { bubbles: true, composed: true, detail: { format, ok: true } }));
+      return blob;
+    } catch (e) {
+      this.dispatchEvent(new CustomEvent("work-doc-export", { bubbles: true, composed: true, detail: { format, ok: false, error: String(e.message || e) } }));
+      return null;
+    }
+  }
+
+  async _exportViaHost(source) {
+    try {
+      const r = await this.host.request("/api/doc/export", { body: { format: "docx", source } });
+      if (r && r.blobBase64) {
+        const bin = atob(r.blobBase64);
+        const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+        return new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+      }
+    } catch { /* fall through to the floor */ }
+    return null;
   }
 
   /** The document source string (the artifact's truth). */

@@ -4,6 +4,110 @@
   "modules": [
     {
       "kind": "javascript-module",
+      "path": "src/elements/3d/work-model-source.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-model-source",
+          "name": "WorkModelSource",
+          "domain": "3d",
+          "attributes": [
+            {
+              "name": "src"
+            },
+            {
+              "name": "code"
+            },
+            {
+              "name": "manifold-src"
+            },
+            {
+              "name": "type"
+            }
+          ],
+          "events": []
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-model-source",
+          "declaration": {
+            "name": "WorkModelSource",
+            "module": "src/elements/3d/work-model-source.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/elements/3d/work-model.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-model",
+          "name": "WorkModel",
+          "domain": "3d",
+          "attributes": [
+            {
+              "name": "variant"
+            },
+            {
+              "name": "size"
+            },
+            {
+              "name": "tone"
+            },
+            {
+              "name": "src"
+            },
+            {
+              "name": "poster"
+            },
+            {
+              "name": "alt"
+            },
+            {
+              "name": "ar"
+            },
+            {
+              "name": "auto-rotate"
+            },
+            {
+              "name": "camera-controls"
+            },
+            {
+              "name": "name"
+            },
+            {
+              "name": "viewer-src"
+            }
+          ],
+          "events": [
+            {
+              "name": "work-model-load"
+            },
+            {
+              "name": "work-model-error"
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-model",
+          "declaration": {
+            "name": "WorkModel",
+            "module": "src/elements/3d/work-model.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elements/ai/wb-composer.js",
       "declarations": [
         {
@@ -619,6 +723,42 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/elements/docs/wb-doc-import.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "customElement": true,
+          "tagName": "work-doc-import",
+          "name": "WbDocImport",
+          "domain": "docs",
+          "attributes": [
+            {
+              "name": "for"
+            },
+            {
+              "name": "label"
+            }
+          ],
+          "events": [
+            {
+              "name": "work-doc-import"
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "work-doc-import",
+          "declaration": {
+            "name": "WbDocImport",
+            "module": "src/elements/docs/wb-doc-import.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/elements/docs/wb-doc-outline.js",
       "declarations": [
         {
@@ -664,7 +804,11 @@
               "name": "format"
             }
           ],
-          "events": []
+          "events": [
+            {
+              "name": "work-doc-export"
+            }
+          ]
         }
       ],
       "exports": [

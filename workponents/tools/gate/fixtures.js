@@ -68,6 +68,13 @@ export const FIXTURES = {
   "work-auth": { attrs: { mode: "password" } },
   "work-file": { attrs: { name: "report.org", size: "12 KB" } },
   "work-metric-card": {},
+  // 3d · the gate runs OFFLINE (the model-viewer CDN ESM is unreachable / not
+  // injected), so this deterministically renders the THEMED FLOOR placeholder —
+  // the stable fixture the directive calls for. (The real <model-viewer> render is
+  // proven in the browser demo with __WB_MODELVIEWER__ false.) A `name` gives the
+  // placeholder a label to paint; `src` proves the floor still shows when the
+  // engine can't load (graceful degrade), exercising the same gate-c posture.
+  "work-model": { attrs: { name: "Astronaut", src: "astronaut.glb", "camera-controls": true }, variants: [{ variant: "soft" }] },
 };
 
 /** Build the mount spec for a tag, merging CEM attrs with the fixture. */

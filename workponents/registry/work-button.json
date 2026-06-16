@@ -1,0 +1,111 @@
+{
+  "$schema": "https://workbooks.sh/schema/registry-item.json",
+  "name": "work-button",
+  "type": "registry:element",
+  "domain": "core",
+  "className": "WbButton",
+  "module": "src/elements/work-button.js",
+  "description": "Copy-in of <work-button> and its transitive dependency set (core + tokens).",
+  "dependencies": {
+    "lit": "*"
+  },
+  "peerDependencies": {},
+  "registryDependencies": [
+    "theme"
+  ],
+  "cssVars": [
+    "--work-brand",
+    "--work-brand-soft",
+    "--work-dur",
+    "--work-ease",
+    "--work-err",
+    "--work-err-soft",
+    "--work-fg",
+    "--work-font",
+    "--work-ok",
+    "--work-ok-soft",
+    "--work-on-brand",
+    "--work-on-state",
+    "--work-on-warn",
+    "--work-radius",
+    "--work-radius-lg",
+    "--work-radius-sm",
+    "--work-ring",
+    "--work-space-1",
+    "--work-space-2",
+    "--work-space-3",
+    "--work-space-4",
+    "--work-space-5",
+    "--work-surface",
+    "--work-surface-soft",
+    "--work-text",
+    "--work-text-lg",
+    "--work-text-sm",
+    "--work-warn",
+    "--work-warn-soft"
+  ],
+  "tokens": [
+    "--work-brand",
+    "--work-brand-soft",
+    "--work-dur",
+    "--work-ease",
+    "--work-err",
+    "--work-err-soft",
+    "--work-fg",
+    "--work-font",
+    "--work-ok",
+    "--work-ok-soft",
+    "--work-on-brand",
+    "--work-on-state",
+    "--work-on-warn",
+    "--work-radius",
+    "--work-radius-lg",
+    "--work-radius-sm",
+    "--work-ring",
+    "--work-space-1",
+    "--work-space-2",
+    "--work-space-3",
+    "--work-space-4",
+    "--work-space-5",
+    "--work-surface",
+    "--work-surface-soft",
+    "--work-text",
+    "--work-text-lg",
+    "--work-text-sm",
+    "--work-warn",
+    "--work-warn-soft"
+  ],
+  "attributes": [
+    "variant",
+    "size",
+    "tone",
+    "disabled"
+  ],
+  "events": [],
+  "files": [
+    {
+      "path": "src/elements/work-button.js",
+      "type": "registry:element",
+      "target": "workponents/elements/work-button.js",
+      "content": "// <work-button> — the reference element. Proves the conventions on the Lit base:\n// token-only styling, the variant contract (variant/size/tone as reflected attrs\n// targeted in CSS), shadow-DOM isolation, the WbElement base, and define().\n// Every other element follows this shape.\n// Usage: <work-button variant=\"solid\" tone=\"brand\" size=\"md\">Save</work-button>\nimport { WbElement, html, css, define } from \"../core/element.js\";\nimport { defineVariants, variantAttrs } from \"../core/variants.js\";\n\nconst VARIANTS = defineVariants({\n  variant: { options: [\"solid\", \"soft\", \"outline\", \"ghost\"], default: \"solid\" },\n  size: { options: [\"sm\", \"md\", \"lg\"], default: \"md\" },\n  tone: { options: [\"brand\", \"neutral\", \"ok\", \"warn\", \"err\"], default: \"brand\" },\n});\n\nexport class WbButton extends WbElement {\n  static variants = VARIANTS;\n  static props = [...variantAttrs(VARIANTS), \"disabled\"];\n\n  static styles = css`\n    :host { display: inline-block; }\n    button {\n      font-family: var(--work-font);\n      font-weight: 600;\n      font-size: var(--work-text);\n      line-height: 1;\n      display: inline-flex; align-items: center; gap: var(--work-space-2);\n      padding: var(--work-space-3) var(--work-space-4);\n      border-radius: var(--work-radius);\n      border: 1.5px solid transparent;\n      background: var(--work-brand); color: var(--work-on-brand);\n      cursor: pointer;\n      transition: transform var(--work-dur) var(--work-ease),\n                  background var(--work-dur) var(--work-ease),\n                  border-color var(--work-dur) var(--work-ease),\n                  box-shadow var(--work-dur) var(--work-ease);\n    }\n    button:hover { transform: translateY(-1px); }\n    button:active { transform: translateY(0); }\n    button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--work-ring); }\n\n    /* tone sets the accent the variants paint with */\n    :host([tone=\"neutral\"]) button { --_a: var(--work-fg); --_ink: var(--work-surface); --_soft: var(--work-surface-soft); }\n    :host([tone=\"ok\"])      button { --_a: var(--work-ok);  --_ink: var(--work-on-state); --_soft: var(--work-ok-soft); }\n    :host([tone=\"warn\"])    button { --_a: var(--work-warn);--_ink: var(--work-on-warn); --_soft: var(--work-warn-soft); }\n    :host([tone=\"err\"])     button { --_a: var(--work-err); --_ink: var(--work-on-state); --_soft: var(--work-err-soft); }\n    button { --_a: var(--work-brand); --_ink: var(--work-on-brand); --_soft: var(--work-brand-soft); }\n\n    /* variant decides how the tone is applied */\n    :host([variant=\"solid\"])   button { background: var(--_a); color: var(--_ink); }\n    :host([variant=\"soft\"])    button { background: var(--_soft); color: var(--_a); }\n    :host([variant=\"outline\"]) button { background: transparent; color: var(--_a); border-color: var(--_a); }\n    :host([variant=\"ghost\"])   button { background: transparent; color: var(--_a); }\n    :host([variant=\"ghost\"])   button:hover,\n    :host([variant=\"outline\"]) button:hover { background: var(--_soft); }\n\n    /* size */\n    :host([size=\"sm\"]) button { font-size: var(--work-text-sm); padding: var(--work-space-2) var(--work-space-3); border-radius: var(--work-radius-sm); }\n    :host([size=\"lg\"]) button { font-size: var(--work-text-lg); padding: var(--work-space-4) var(--work-space-5); border-radius: var(--work-radius-lg); }\n\n    :host([disabled]) button { opacity: 0.5; pointer-events: none; }\n  `;\n\n  render() {\n    return html`<button part=\"button\"><slot></slot></button>`;\n  }\n}\n\ndefine(\"work-button\", WbButton);\n"
+    },
+    {
+      "path": "src/core/element.js",
+      "type": "registry:lib",
+      "target": "workponents/core/element.js",
+      "content": "// WbElement — the base for every <wb-*> element, re-based onto Lit.\n//\n// Lit is the FLOOR's engine now (the approved adoption pass): surgical template\n// updates instead of an innerHTML nuke, while every workponents convention is\n// preserved so the rest of the library migrates mechanically. Lit is loaded as a\n// bare specifier (\"lit\") — buildless via an import map in the demos, a peer dep\n// for SDK consumers (see README / demo/lit-foundation.html). No bundler, no\n// `bun install`.\n//\n// Conventions (unchanged — the whole library follows these):\n//   • Shadow DOM (open) for style isolation; --work-* tokens inherit through it.\n//   • `static styles` = the component CSS as a Lit `css``` CSSResult (was a\n//     string). Use ONLY var(--work-*). Variants targeted via :host([name=\"value\"]).\n//   • `render()` returns a Lit `html``` TemplateResult (was a string) — surgical\n//     updates, no innerHTML rewrite.\n//   • `static props` = reflected attributes that re-render on change (variants,\n//     state). They are mapped to Lit reactive properties automatically.\n//   • `static variants` defaults are reflected on connect (before first paint) so\n//     :host([name=\"value\"]) selectors always match.\n//   • Capability is reached through `this.host` (the Dock seam), never hardcoded.\n//   • Register with `define()` (idempotent — safe to load twice).\n//\n// `attr()` / `boolAttr()` helpers are preserved for elements that read attributes\n// directly in render(). Re-exports `html` + `css` so domain files import the whole\n// authoring surface from one place:\n//   import { WbElement, html, css, define } from \"../core/element.js\";\n\nimport { LitElement, html, css } from \"lit\";\nimport { getHost } from \"./host.js\";\n\nexport { html, css };\n\nexport class WbElement extends LitElement {\n  /** @type {import(\"lit\").CSSResult} component CSS — override with css``; use only var(--work-*) */\n  static styles = css``;\n\n  /** @type {string[]} reflected attributes that trigger a re-render */\n  static props = [];\n\n  // Register each subclass's `static props` as Lit reactive properties so an\n  // attribute change fires attributeChangedCallback + re-renders (the old\n  // observedAttributes contract). NOTE: a base-class `static get properties()` is\n  // NOT honored — Lit's finalize() only reads each class's OWN `properties`. So we\n  // hook finalize() and createProperty() per subclass instead. Reflect ONLY the\n  // short variant enums (so el.variant = \"soft\" still matches :host([variant]));\n  // never reflect data attributes like `rows`/`csv`/`query` (can be huge strings).\n  static finalize() {\n    super.finalize();\n    const variants = this.variants || {};\n    for (const name of this.props || []) {\n      const key = this._propKey(name);\n      // Skip names that already exist on the prototype as a method/getter (e.g. a\n      // `variant(name)` helper, an `open()` method). Creating a reactive accessor\n      // there THROWS in Lit dev mode (\"declared as a reactive property but it's\n      // actually declared as a value on the prototype\"). The attribute is still\n      // OBSERVED via observedAttributes below, so attribute changes still fire\n      // attributeChangedCallback → the element's reload/requestUpdate runs.\n      if (key in this.prototype) continue;\n      this.createProperty(key, {\n        type: String,\n        attribute: name,\n        reflect: Object.prototype.hasOwnProperty.call(variants, name),\n      });\n    }\n  }\n\n  // Guarantee every `static props` attribute is OBSERVED (the browser reads this\n  // at customElements.define() time). This is the bulletproof half: even if Lit's\n  // reactive-property finalize timing misses one, attribute changes still fire\n  // attributeChangedCallback → the element's reload/requestUpdate handler runs.\n  static get observedAttributes() {\n    const base = super.observedAttributes || [];\n    return Array.from(new Set([...base, ...(this.props || [])]));\n  }\n\n  // Attribute names may contain dashes; reactive-property keys must be identifiers.\n  static _propKey(name) {\n    return name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());\n  }\n\n  /** The Dock/Host capability seam — local | runtime (RCP) | kernel. */\n  get host() {\n    return getHost();\n  }\n\n  /** Read an attribute with a default. */\n  attr(name, fallback = null) {\n    return this.hasAttribute(name) ? this.getAttribute(name) : fallback;\n  }\n\n  /** Read a boolean attribute (present = true). */\n  boolAttr(name) {\n    return this.hasAttribute(name);\n  }\n\n  /** Override: return the template (Lit `html```). */\n  render() {\n    return html`<slot></slot>`;\n  }\n\n  connectedCallback() {\n    // Reflect default variants BEFORE Lit's first render so :host([name=\"value\"])\n    // selectors match the very first paint, even when the author sets only some\n    // (e.g. tone without variant).\n    const v = this.constructor.variants;\n    if (v) {\n      for (const [name, def] of Object.entries(v)) {\n        if (!this.hasAttribute(name)) this.setAttribute(name, def.default);\n      }\n    }\n    super.connectedCallback();\n  }\n}\n\n/** Idempotent custom-element registration (safe across double-loads). */\nexport function define(name, ctor) {\n  if (!customElements.get(name)) customElements.define(name, ctor);\n  return ctor;\n}\n"
+    },
+    {
+      "path": "src/core/host.js",
+      "type": "registry:lib",
+      "target": "workponents/core/host.js",
+      "content": "// The Host/Dock seam — one capability surface for every element.\n//\n// A workponent never hardcodes where a capability runs. It asks the Host, which\n// resolves `local` (in-WASM / browser-native), `runtime` (a Workbooks runtime\n// over RCP), or `kernel` (oql.wasm) per the platform-model — so the SAME element\n// (e.g. <wb-table>) runs in-WASM locally or on the runtime tier for huge data,\n// no code fork. Capability elements declare what they need; the Host provisions\n// it (the same grant model toolkits use) and reports availability so the element\n// degrades cleanly when a capability is absent (e.g. voice without a key).\n//\n// Phase 0: a minimal, portable seam (no Tauri/Svelte). When a runtime URL is\n// configured it routes over fetch/WebSocket (mirroring desktop/src/lib/rcp);\n// otherwise it serves local capabilities and reports the rest unavailable.\n\nlet _host = null;\n\nexport class WbHost {\n  /** @param {{ runtimeUrl?: string|null, tenant?: string }} [opts] */\n  constructor(opts = {}) {\n    this.runtimeUrl = opts.runtimeUrl || null;\n    this.tenant = opts.tenant || \"local\";\n    this._caps = new Set([\"local\"]); // in-WASM/browser caps are always present\n  }\n\n  /** Is a capability reachable here? (elements gate UI on this) */\n  available(cap) {\n    return this._caps.has(cap) || (this.runtimeUrl != null && cap !== \"voice\");\n  }\n\n  /** Unary capability call — routed to the runtime when present. */\n  async request(path, { method = \"POST\", body } = {}) {\n    if (!this.runtimeUrl) throw new Error(`wb-host: no runtime for ${path}`);\n    const res = await fetch(this.runtimeUrl.replace(/\\/$/, \"\") + path, {\n      method,\n      headers: { \"content-type\": \"application/json\", \"x-tenant\": this.tenant },\n      body: body != null ? JSON.stringify(body) : undefined,\n    });\n    if (!res.ok) throw new Error(`wb-host ${res.status} ${path}`);\n    return res.json();\n  }\n\n  /** Streaming capability — a WebSocket to the runtime. */\n  socket(path, { onMessage } = {}) {\n    if (!this.runtimeUrl) throw new Error(`wb-host: no runtime for ${path}`);\n    const url = this.runtimeUrl.replace(/^http/, \"ws\").replace(/\\/$/, \"\") + path;\n    const ws = new WebSocket(url);\n    if (onMessage) ws.addEventListener(\"message\", (e) => onMessage(e.data));\n    return ws;\n  }\n}\n\n/** Configure the shared Host (call once at app/workbook boot). */\nexport function configureHost(opts) {\n  _host = new WbHost(opts);\n  return _host;\n}\n\n/** The shared Host singleton (a local-only Host by default). */\nexport function getHost() {\n  if (!_host) {\n    // Honor a global hint (a workbook/desktop can set window.__WB_RUNTIME_URL__).\n    const url = typeof window !== \"undefined\" ? window.__WB_RUNTIME_URL__ : null;\n    _host = new WbHost({ runtimeUrl: url || null });\n  }\n  return _host;\n}\n"
+    },
+    {
+      "path": "src/core/variants.js",
+      "type": "registry:lib",
+      "target": "workponents/core/variants.js",
+      "content": "// Variants — the cva-style contract for web components.\n//\n// Variants are REFLECTED ATTRIBUTES the component CSS targets via :host([...]).\n// This util doesn't generate classes; it (1) declares the allowed values +\n// defaults for an element (so authoring is typed/validated and the design-lint\n// can check conformance), and (2) normalizes the live attribute, applying the\n// default when unset or invalid. The actual styling lives in the component CSS:\n//\n//   static styles = `\n//     :host([variant=\"solid\"]) button { background: var(--work-brand); }\n//     :host([size=\"sm\"])      button { padding: var(--work-space-1) var(--work-space-2); }\n//   `;\n//\n// Usage in an element:\n//   static variants = defineVariants({\n//     variant: { options: [\"solid\", \"soft\", \"ghost\"], default: \"solid\" },\n//     size:    { options: [\"sm\", \"md\", \"lg\"],        default: \"md\" },\n//     tone:    { options: [\"brand\", \"neutral\", \"ok\", \"warn\", \"err\"], default: \"brand\" },\n//   });\n//   // in render(): this.variant(\"variant\") -> the resolved value\n\nexport function defineVariants(spec) {\n  return spec;\n}\n\n/** Resolve a variant attribute on `el` to a valid value (default on miss). */\nexport function resolveVariant(el, spec, name) {\n  const def = spec[name];\n  if (!def) return el.getAttribute(name);\n  const v = el.getAttribute(name);\n  return def.options.includes(v) ? v : def.default;\n}\n\n/** Every variant attribute name an element declares (for observedAttributes). */\nexport function variantAttrs(spec) {\n  return Object.keys(spec || {});\n}\n\n/** Design-lint helper: report any variant attr set to a non-allowed value. */\nexport function lintVariants(el, spec) {\n  const bad = [];\n  for (const [name, def] of Object.entries(spec || {})) {\n    const v = el.getAttribute(name);\n    if (v != null && !def.options.includes(v)) bad.push({ name, value: v, allowed: def.options });\n  }\n  return bad;\n}\n"
+    }
+  ]
+}

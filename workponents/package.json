@@ -9,7 +9,10 @@
     "./theme.css": "./src/theme/tokens.css",
     "./elements/*": "./src/elements/*.js"
   },
-  "files": ["src", "registry"],
+  "files": [
+    "src",
+    "registry"
+  ],
   "scripts": {
     "demo": "python3 -m http.server 5340",
     "build": "node tools/build.js",
@@ -18,7 +21,14 @@
     "gate": "node tools/gate/run.js",
     "gate:all": "node tools/gate/run.js --strict",
     "gate:baseline": "node tools/gate/run.js --update-baseline",
-    "test:gitviz": "node --test tools/gitviz/work-diff.test.mjs && node tools/gitviz/work-history-graph.test.mjs"
+    "test:gitviz": "node --test tools/gitviz/work-diff.test.mjs && node tools/gitviz/work-history-graph.test.mjs",
+    "registry": "node tools/registry.mjs"
   },
-  "keywords": ["web-components", "custom-elements", "workbooks", "design-system", "agnostic"]
+  "keywords": [
+    "web-components",
+    "custom-elements",
+    "workbooks",
+    "design-system",
+    "agnostic"
+  ]
 }

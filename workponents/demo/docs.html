@@ -44,7 +44,15 @@
       <button data-theme="light" aria-pressed="true">light</button>
       <button data-theme="dark" aria-pressed="false">dark</button>
       <button data-theme="signal" aria-pressed="false">signal</button>
+      <span style="flex:1"></span>
+      <!-- docx ↔ work-doc: the document IS its source; .docx is just an I/O adapter
+           on top (read via mammoth+turndown, write via docx — floor JS, lazy CDN). -->
+      <button id="export-docx" title="export this document as .docx">export .docx ↓</button>
     </div>
+
+    <!-- import affordance: drop or pick a .docx → it becomes the doc's org source -->
+    <work-doc-import for="report" style="margin: 0 0 24px"></work-doc-import>
+    <p id="io-note" style="font:600 11px var(--work-font-mono,monospace);color:var(--work-fg-subtle);min-height:16px;margin:-12px 0 24px"></p>
 
     <div class="layout">
       <div class="doc-pane">
@@ -114,11 +122,32 @@ df.filter(pl.col("quarter") == "Q3")
   </div>
 
   <script>
-    const buttons = document.querySelectorAll(".bar button");
+    const buttons = document.querySelectorAll(".bar button[data-theme]");
     buttons.forEach((b) => b.addEventListener("click", () => {
       document.documentElement.setAttribute("data-work-theme", b.dataset.theme);
       buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     }));
+
+    const note = document.getElementById("io-note");
+    // export: work-doc.export("docx") → a .docx Blob; download it (or, when docked,
+    // route through the Host → pandoc.wasm for max fidelity).
+    document.getElementById("export-docx").addEventListener("click", async () => {
+      const doc = document.getElementById("report");
+      note.textContent = "building .docx…";
+      const blob = await doc.export("docx");
+      if (!blob) return; // the work-doc-export event note below reports the failure
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "report.docx";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    // both adapters emit events — surface their verdict in the demo.
+    document.addEventListener("work-doc-export", (e) =>
+      note.textContent = e.detail.ok ? `exported .docx ✓ (${e.detail.format})` : `export failed: ${e.detail.error}`);
+    document.addEventListener("work-doc-import", (e) =>
+      note.textContent = e.detail.ok ? `imported ${e.detail.name} ✓ — rendered as org` : `import failed: ${e.detail.error}`);
   </script>
 </body>
 </html>

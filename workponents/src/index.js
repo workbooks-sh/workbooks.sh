@@ -26,6 +26,7 @@ export * from "./elements/presentation/index.js"; // work-deck, work-slide
 export * from "./elements/code/index.js";     // work-editor, work-repl
 export * from "./elements/files/index.js";    // work-drive, work-file, work-dropzone
 export * from "./elements/live/index.js";     // work-room, work-presence, work-live-value
+export * from "./elements/3d/index.js";        // work-model, work-model-source
 
 // shared SQLite data layer (runtime VFS / in-page sqlite-wasm / memory floor,
 // behind the Host seam) — the one engine the data surfaces query.
