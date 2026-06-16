@@ -17,54 +17,50 @@ defmodule Workbooks.Deploy do
   """
   alias Workbooks.Deploy.{Machine, Image, Backend, Config}
 
-  @default_file "deployment.org"
+  @default_file "deployment.html"
 
   @template_local """
-  # A Workbooks deployment — single-tenant, all-local (runs in a krunvm microVM,
-  # cloud-identical isolation). Edit, then:  wb deploy validate  →  wb deploy apply
-  * deployment :deployment:
-    :PROPERTIES:
-    :ENGINE_PLACE: local
-    :TENANCY_MODE: single
-    :STORAGE:      local-fs
-    :DATABASE:     sqlite
-    :AUTH:         trusted
-    # :PROFILE:    path/to/your/agent/profile
-    :END:
+  <!-- A Workbooks deployment — single-tenant, all-local (runs in a krunvm microVM,
+       cloud-identical isolation). Edit, then:  wb deploy validate → wb deploy apply -->
+  <work-deploy
+    engine-place="local"
+    tenancy-mode="single"
+    storage="local-fs"
+    database="sqlite"
+    auth="trusted"></work-deploy>
+  <!-- optional: profile="path/to/your/agent/profile" -->
   """
 
   @template_cloud """
-  # A Workbooks deployment — multi-tenant SaaS in the cloud. Fill the <...>.
-  # SECRETS live in your ENV, never here:  WB_S3_KEY  WB_S3_SECRET  WB_DATABASE_URL
-  # Then:  wb deploy validate  →  wb deploy apply
-  * deployment :deployment:
-    :PROPERTIES:
-    :ENGINE_PLACE:     cloud
-    :PROVIDER:         fly
-    :APP:              <your-app-name>
-    :REGION:           sjc
-    :TENANCY_MODE:     multi
-    :STORAGE:          s3
-    :STORAGE_ENDPOINT: https://s3.us-east-1.amazonaws.com
-    :STORAGE_BUCKET:   <your-bucket>
-    :STORAGE_REGION:   us-east-1
-    :DATABASE:         postgres
-    :AUTH:             clerk
-    :ISSUER:           https://<your-clerk-domain>
-    # :PROFILE:        path/to/your/agent/profile
-    :END:
+  <!-- A Workbooks deployment — multi-tenant SaaS in the cloud. Fill the <...>.
+       SECRETS live in your ENV, never here:  WB_S3_KEY  WB_S3_SECRET  WB_DATABASE_URL
+       Then:  wb deploy validate  →  wb deploy apply -->
+  <work-deploy
+    engine-place="cloud"
+    provider="fly"
+    app="<your-app-name>"
+    region="sjc"
+    tenancy-mode="multi"
+    storage="s3"
+    storage-endpoint="https://s3.us-east-1.amazonaws.com"
+    storage-bucket="<your-bucket>"
+    storage-region="us-east-1"
+    database="postgres"
+    auth="clerk"
+    issuer="https://<your-clerk-domain>"></work-deploy>
+  <!-- optional: profile="path/to/your/agent/profile" -->
   """
 
   # ── CI scaffolds (wb-6ttc) ──────────────────────────────────────────────────
   # `wb deploy ci <provider>` writes one of these so DeployKit is git-workflow-
-  # native: validate on PRs, apply+verify on main, all from deployment.org.
+  # native: validate on PRs, apply+verify on main, all from deployment.html.
   # Secrets stay in the CI provider's secret store, never in the file.
 
   @ci_github """
   # .github/workflows/deploy.yml — scaffolded by `wb deploy ci github`.
-  # Reconciles your nexus/runtime from deployment.org: validate on PRs,
+  # Reconciles your nexus/runtime from deployment.html: validate on PRs,
   # apply + verify on push to main. Put secrets in repo Settings → Secrets and
-  # variables → Actions (never in deployment.org).
+  # variables → Actions (never in deployment.html).
   name: deploy
   on:
     push:
@@ -80,12 +76,12 @@ defmodule Workbooks.Deploy do
         - uses: actions/checkout@v4
         - name: Install the wb CLI
           run: curl -fsSL https://workbooks.sh/cli.sh | sh
-        - name: Validate deployment.org
+        - name: Validate deployment.html
           run: wb deploy validate
         - name: Apply + verify (main only)
           if: github.ref == 'refs/heads/main'
           env:
-            # Map the secrets your deployment.org references, from GitHub secrets:
+            # Map the secrets your deployment.html references, from GitHub secrets:
             WB_IMAGE: ${{ secrets.WB_IMAGE }}
             WB_S3_KEY: ${{ secrets.WB_S3_KEY }}
             WB_S3_SECRET: ${{ secrets.WB_S3_SECRET }}
@@ -97,7 +93,7 @@ defmodule Workbooks.Deploy do
 
   @ci_gitlab """
   # .gitlab-ci.yml — scaffolded by `wb deploy ci gitlab`.
-  # Secrets live in GitLab → Settings → CI/CD → Variables (never in deployment.org).
+  # Secrets live in GitLab → Settings → CI/CD → Variables (never in deployment.html).
   stages: [validate, deploy]
   default:
     image: ubuntu:24.04
@@ -120,7 +116,7 @@ defmodule Workbooks.Deploy do
   #!/usr/bin/env sh
   # deploy-ci.sh — scaffolded by `wb deploy ci generic`. Portable across any CI.
   # Validates always; applies + verifies on the main branch. Secrets come from
-  # the CI's environment (the same vars your deployment.org references).
+  # the CI's environment (the same vars your deployment.html references).
   set -eu
   command -v wb >/dev/null 2>&1 || curl -fsSL https://workbooks.sh/cli.sh | sh
   wb deploy validate
@@ -132,7 +128,7 @@ defmodule Workbooks.Deploy do
   """
 
   @doc """
-  Scaffold CI that reconciles deployment.org on push — `github` | `gitlab` |
+  Scaffold CI that reconciles deployment.html on push — `github` | `gitlab` |
   `generic`. The DeployKit analogue of a git workflow: commit the file and every
   push validates (PRs) and applies+verifies (main) your nexus/runtime.
   """
@@ -152,7 +148,7 @@ defmodule Workbooks.Deploy do
           if provider == "generic", do: File.chmod(path, 0o755)
 
           ok(
-            "wrote #{path} — commit it. CI now runs `wb deploy validate` on PRs and `apply`+`verify` on main. Set the secrets your deployment.org references in your CI provider.",
+            "wrote #{path} — commit it. CI now runs `wb deploy validate` on PRs and `apply`+`verify` on main. Set the secrets your deployment.html references in your CI provider.",
             %{file: path, provider: provider}
           )
         end
@@ -164,7 +160,7 @@ defmodule Workbooks.Deploy do
   defp ci_spec("generic"), do: {"deploy-ci.sh", @ci_generic}
   defp ci_spec(_), do: nil
 
-  @doc "Scaffold a deployment.org from a preset (`local` | `cloud`). The starting point."
+  @doc "Scaffold a deployment.html from a preset (`local` | `cloud`). The starting point."
   def init(preset \\ "local", opts \\ []) do
     file = Keyword.get(opts, :file, @default_file)
     force? = Keyword.get(opts, :force, false)
@@ -187,7 +183,7 @@ defmodule Workbooks.Deploy do
   defp template("cloud-saas"), do: @template_cloud
   defp template(_), do: nil
 
-  @doc "Coherence-check a deployment.org without deploying (the write-then-submit gate)."
+  @doc "Coherence-check a deployment.html without deploying (the write-then-submit gate)."
   def validate(file) do
     with :ok <- exists(file),
          {:ok, p} <- Config.parse(file) do
@@ -205,7 +201,7 @@ defmodule Workbooks.Deploy do
   end
 
   @doc """
-  Apply a `deployment.org`: validate, then converge to it. ENGINE_PLACE picks the
+  Apply a `deployment.html`: validate, then converge to it. ENGINE_PLACE picks the
   target (local krunvm vs the cloud provider); TENANCY_MODE + the BYOD STORAGE/
   DATABASE axes + PROFILE flow to the engine as env. Idempotent.
   """

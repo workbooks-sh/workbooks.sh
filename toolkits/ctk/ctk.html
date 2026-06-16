@@ -16,8 +16,8 @@
            is a state manager (shared controls + a group per state). A state with
            no controls just shows on the stage with nothing to tune.
 
-  Stories live as separate files under stories/<id>.org — an Org spec that
-  declares Controls + States and carries the component source in a :tangle block.
+  Stories live as separate files under stories/<id>.md — a Markdown spec that
+  declares Controls + States and carries the component source in a ```js block.
   The harness imports that block to render. Machine-drivable via window.CTK +
   postMessage. Serve over http (fetch needs it): `python3 -m http.server 5180`.
 -->
@@ -136,7 +136,7 @@
       <p class="src-note">Three kinds of control: <em>View</em> (top — the lens),
         <em>Props</em> (shared inputs), <em>States</em> (conditions, side-by-side;
         each may have its own per-state controls). Source comes from the spec's
-        <code>:tangle</code> block. Drive it via <code>window.CTK</code>.</p>
+        <code>```js</code> block. Drive it via <code>window.CTK</code>.</p>
     </aside>
     <div class="stage-col">
       <div class="state-tabs" id="state-tabs" style="display:none"></div>
@@ -173,7 +173,8 @@
   function parseControls(src) {
     const rows = src.split("\n").map((l) => l.trim()).filter((l) => l.startsWith("|") && !l.includes("---"));
     if (!rows.length) return [];
-    const cells = (r) => r.split("|").slice(1, -1).map((c) => c.trim());
+    // split on UNescaped pipes, then unescape `\|` inside a cell (MD table syntax)
+    const cells = (r) => r.split(/(?<!\\)\|/).slice(1, -1).map((c) => c.trim().replace(/\\\|/g, "|"));
     const head = cells(rows[0]).map((h) => h.toLowerCase());
     return rows.slice(1).map((r) => { const c = cells(r); const o = {}; head.forEach((h, i) => (o[h] = c[i])); return o; });
   }
@@ -185,12 +186,12 @@
     });
     return o;
   }
-  // States: each `*** name` block carries an optional :OVERRIDE: line + an
+  // States: each `### name` block carries an optional `Override:` line + an
   // optional controls table (its per-state controls).
   function parseStates(src) {
-    return src.split(/^\*\*\* /m).slice(1).map((b) => {
+    return src.split(/^### /m).slice(1).map((b) => {
       const state = b.split("\n")[0].trim();
-      const ov = (b.match(/:OVERRIDE:\s*(.+)/) || [])[1];
+      const ov = (b.match(/Override:\s*(.+)/i) || [])[1];
       return { state, overrides: ov ? parseKV(ov) : {}, controls: parseControls(b) };
     });
   }
@@ -226,16 +227,17 @@
 
   // ── load a story ──
   async function loadStory(id) {
-    currentOrg = await (await fetch(`stories/${id}.org`)).text();
+    currentOrg = await (await fetch(`stories/${id}.md`)).text();
     currentId = id;
-    const name = (currentOrg.match(/:NAME:\s*(.+)/) || [])[1]?.trim() || id;
+    const name = (currentOrg.match(/^Name:\s*(.+)/m) || [])[1]?.trim() || id;
     $("panel-sub").textContent = `${name} — shared props`;
 
-    defs = parseControls((currentOrg.split(/^\*\* Controls/m)[1] || "").split(/^\*\* /m)[0]);
-    stateDefs = parseStates((currentOrg.split(/^\*\* States/m)[1] || "").split(/^\*\* /m)[0]);
+    // Section by `## H2`; bound a section at the next `## ` (States keeps its `###` substates).
+    defs = parseControls((currentOrg.split(/^## Controls/m)[1] || "").split(/^## /m)[0]);
+    stateDefs = parseStates((currentOrg.split(/^## States/m)[1] || "").split(/^## /m)[0]);
 
-    const src = (currentOrg.match(/:tangle component\.js\s*\n([\s\S]*?)#\+end_src/) || [])[1] || "";
-    render = (await import(URL.createObjectURL(new Blob([src.replace(/^\s{2}/gm, "")], { type: "text/javascript" })))).render;
+    const src = (currentOrg.match(/```js\s*\n([\s\S]*?)```/) || [])[1] || "";
+    render = (await import(URL.createObjectURL(new Blob([src], { type: "text/javascript" })))).render;
 
     props = {};
     defs.forEach((d) => (props[d.prop] = coerce(d.type, d.default)));

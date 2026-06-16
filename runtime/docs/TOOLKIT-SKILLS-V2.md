@@ -1,0 +1,358 @@
+# Toolkit skills v2 — depth, discovery, and what org-mode actually buys us
+
+*2026-06-03*
+
+> CLEAN-ROOM RECONCILIATION (restored 2026-06-07 from workbooks-archive).
+> The DEPTH BAR and skill structure here are carried forward UNCHANGED — this is
+> the authoritative source for "what a skill must contain" (the 6 mandatory
+> sections, thin-vs-thick + references/, :role pre/post, #+CAPTION TOC). What
+> changed is only the RUNTIME that honors them: the "wb toolkit verify / search"
+> that lit up these features was Rust; it is reimplemented in Elixir per
+> TOOLKITS-V3.md. The org-mode features this doc says "don't pay rent yet"
+> (properties-drawer prompt injection, CAPTION surfacing, OQL search) are the
+> explicit P1/P2 deliverables in the V3 plan.
+
+# Why this doc
+
+  `wb-lyeq` shipped the toolkit _format_. The format works:
+  agent discovers via auto-injected index → `cat` individual
+  skills → executes. Five toolkits installed, 20 skill files,
+  end-to-end eval passes.
+
+  But the skill files are _thin_. 80-100 lines each. Hermes —
+  the closest comparable — runs its peers at 150-340 lines plus
+  `references/` sub-dirs with 4-7 deep-dive files. The user's
+  read after the audit: "we kind of talked about VSL is bad,
+  but … what is the net positive implementations that org-mode
+  delivers for us? as well as the toolkit CLI wrapper concept
+  for being able to explore and do progressive disclosure?"
+
+  Translation: format is fine. Skills are thin. Org-mode
+  features we declared but never lit up. Let's plan v2.
+
+# What Hermes does (the comparison)
+
+## Skill anatomy
+
+   Hermes pattern for a non-trivial CLI wrapper:
+
+```text
+   optional-skills/<category>/<skill-name>/
+   ├── SKILL.md                         # entry point, 150-340 lines
+   │   ├── frontmatter (YAML)
+   │   │   ├── name, description (≤1024 chars, "Use when ...")
+   │   │   ├── version, author, license, platforms
+   │   │   └── metadata.hermes.{tags, related_skills}
+   │   ├── # Title
+   │   ├── ## Overview         (1-2 paragraphs)
+   │   ├── ## When to Use      (bulleted triggers + "Don't use for")
+   │   ├── ## Workflow         (numbered steps with concrete commands)
+   │   ├── ## Topic sections   (quick-reference tables, recipes)
+   │   ├── ## Common Pitfalls  (numbered: mistake → fix)
+   │   └── ## Verification Checklist
+   └── references/                      # deep-dive subfiles
+       ├── cli-reference.md             # full verb table
+       ├── authentication.md            # detail flows
+       ├── app-discovery.md             # search/filter patterns
+       └── running-apps.md              # invocation idioms
+```
+
+   SKILL.md is the _front door_: when-to-use, the canonical
+   workflow, common gotchas. `references/*` are deep-dives the
+   SKILL explicitly points at by file path: /"For complete
+   intake patterns and per-style question banks, see
+   `references/intake.md`."/
+
+   The agent reads SKILL first; follows references on demand.
+   This is progressive disclosure _within_ a skill, on top of
+   progressive disclosure _between_ skills.
+
+## Sizes
+
+   - Skill `name`: ≤ 64 chars (validated)
+   - Skill `description`: ≤ 1024 chars (validated)
+   - Full SKILL.md: ≤ 100k chars (validated), peers sit 8-15k
+   - `references/` files: 50-200 lines each, several per skill
+
+   Our current toolkit skills are 2-3k chars. Hermes peers are
+   3-5× larger _before_ the references/ tree is counted.
+
+## Tool discovery (the "tool_search" pattern)
+
+   When Hermes's deferrable-tool catalog would consume >10% of
+   the model's context window, it replaces those tools in the
+   model-visible array with THREE bridge tools:
+
+   - `tool_search <query>` — BM25-ranked hit list
+   - `tool_describe <name>` — full schema for one tool
+   - `tool_call <name> <args>` — routes to the real tool
+
+   The agent now has to _ask_ for tools, getting just-in-time
+   schemas. The catalog is stateless across turns (rebuilt every
+   assembly — they learned this the hard way after a regression
+   where a session-keyed catalog drifted out of sync).
+
+   **We don't have this problem.** Our agent has ONE tool (bash),
+   no catalog to defer. But the semantic is still useful at the
+   SKILL layer:
+
+   - our TOOLKITS index   ≈ what `tool_search` returns post-query
+   - `cat <skill-path>`    ≈ `tool_describe`
+   - bash + the CLI        ≈ `tool_call`
+
+   So the equivalent pattern is already in place — we just do it
+   filesystem-native via cat/grep instead of via reserved tool
+   names. The user's bash IS the bridge.
+
+## Cross-references
+
+   `metadata.hermes.related_skills` in the frontmatter unions
+   in-repo and user-local skill trees at load time. The list
+   forms an explicit skill graph the runtime can walk.
+
+   We have body-level `[other.md](other.md)` links. Equivalent
+   navigation, but no _load-time_ enforcement and no graph.
+
+# What we have vs don't have
+
+| Capability | Hermes | Us (today) |
+| --- | --- | --- |
+| Skill file with rich structure | yes (150-340 lines) | yes-but-thin (80-100 lines) |
+| `references/` deep dives | yes (heavy use) | NO |
+| Frontmatter (name/desc/version/tags) | yes (YAML) | partial (org keywords) |
+| `related_skills` as a graph | yes (frontmatter) | links in body only |
+| "Common Pitfalls" mandatory section | yes | informal |
+| "Verification Checklist" | yes | NO |
+| Per-skill VERSION | yes | toolkit-level only |
+| Validator (size limits, structure) | yes | `wb toolkit check` (light) |
+| BM25 ranked search | yes | substring grep |
+| Tool-catalog deferral | yes (3-tool bridge) | n/a — one tool |
+| Skill index injection at session | n/a (Hermes loads) | yes (TOOLKITS block) |
+| Pre/post executable verification | manual | yes (`:role pre/post` blocks) |
+| `:DESTRUCTIVE:` / `:NETWORK:` flags | yes (tags) | declared but only enforced by `verify` |
+| OQL-queryability of corpus | n/a | declared, no consumer |
+| Babel blocks in non-bash langs | n/a | declared, no skill uses them |
+| `#+CAPTION` as TOC | n/a | declared, not surfaced |
+
+# What org-mode actually buys us (and what we haven't used yet)
+
+  `wb-lyeq` shipped with five "what makes org > markdown"
+  claims. Auditing how many actually pay rent:
+
+| Org-mode feature | Status |
+| --- | --- |
+| `:role pre/post` blocks | ✅ USED by `wb toolkit verify` |
+| `:PROPERTIES:` drawer keys | ⚠ PARTIAL — only enforced by `verify`, not injected into agent prompt |
+| OQL queryability | ❌ DECLARED, no consumer (substring grep used instead) |
+| Cross-skill `[]()` links | ⚠ PARTIAL — agent can follow with `cat`, no surfacing |
+| `#+CAPTION` block annotation | ❌ DECLARED, never surfaced (block bodies look the same to agent) |
+| Babel blocks (python/sql/lua) | ❌ DECLARED, no skill ships any |
+| Org-table formulas | ❌ N/A — no skill uses computed tables yet |
+
+  Two out of seven actually pay rent. The rest are decoration
+  the runtime doesn't act on. That's the heart of what makes
+  the skills feel thin: structurally they ARE thin in org-mode
+  terms, because we're using ~10% of what the format offers.
+
+## What "lighting these up" looks like
+
+   1. **Honor `:DESTRUCTIVE:` at injection time.** When rendering
+      the TOOLKITS index into the agent's prompt, annotate
+      destructive skills:
+
+```text
+      ## wb (`wb` v0.1.0, stable)
+        Scaffold, build, share, and query single-file workbook .html documents.
+        Skills (read via `cat …/<name>.org`):
+          - overview
+          - scaffold-a-workbook
+          - share-a-workbook        [⚠ network, paid]
+          - seal-and-encrypt        [⚠ network]
+```
+
+      Agent sees the gating BEFORE the user asks "is this safe?"
+
+   2. **Surface `#+CAPTION` as a skill TOC.** When the agent
+      =cat=s a skill file, the runtime can either insert a
+      generated header listing every CAPTION'd block in the
+      file, or `wb toolkit show <skill>` can render captions
+      as a TOC.
+
+      Today: agent reads prose to find the right code block.
+      With CAPTION as TOC: agent scans the TOC and jumps to
+      the block by name.
+
+   3. **OQL-driven `wb toolkit search`.** Replace the substring
+      grep with `wb query`:
+
+```bash
+      wb toolkit search "video thumbnail"
+      # internally:
+      wb query '(or (tags video) (tags thumbnail))' --root ~/Workbooks/Workbox/toolkits/
+```
+
+      Composable. `wb toolkit search "(and (tags video) (not (todo experimental)))"`
+      becomes possible.
+
+   4. **Babel blocks in lua / python / sql.** Authors ship recipes
+      in the right language. The runtime executes them via OQL
+      plugins. A wb skill that wants to demonstrate "transform
+      a CSV into JSON" ships a python source block, not a
+      bash-+-python-c invocation.
+
+# What the skill trees should look like
+
+  Pattern, applied per toolkit:
+
+```text
+  toolkits/<name>/
+  ├── manifest.org
+  └── skills/
+      ├── <slug>.org                  # for thin skills (1-page recipe, <150 lines)
+      └── <slug>/                     # for thick skills (multi-doc with deep dives)
+          ├── SKILL.org               # the entry point
+          └── references/
+              ├── <topic-1>.org
+              ├── <topic-2>.org
+              └── <topic-N>.org
+```
+
+  Decision criteria for thin-vs-thick:
+
+  - Thin (single file): one-verb recipe, no branch points
+    beyond gotchas. Examples: `extract-thumbnail.org`.
+  - Thick (dir with references): multi-step workflow, many
+    sub-cases, or covers a large CLI surface. Examples:
+    `scaffold-a-workbook/` (build flow + dev mode + template
+    catalog + troubleshooting + …).
+
+  Each skill — thin or thick — follows the same mandatory
+  shape (lifted from Hermes peers):
+
+```text
+  #+TITLE: <toolkit> — <task>
+  #+TOOLKIT: <toolkit>
+  #+SKILL: <slug>
+  #+VERSION: <skill semver, independent of toolkit version>
+  #+TAGS: <space-separated>
+  #+STATUS: stable | experimental | deprecated
+  #+RELATED: <other-skill> <another-skill>
+  #+DESCRIPTION: Use when <trigger>. <one-line behavior>.
+
+  * When to use this                  :MANDATORY:
+    Properties drawer with :DESTRUCTIVE: / :NETWORK: / :REQUIRES: / :OS:
+    Then 1-paragraph trigger conditions.
+
+  * Workflow                          :MANDATORY:
+    Numbered steps with CAPTION'd src blocks.
+
+  * Common pitfalls                   :MANDATORY:
+    Numbered: mistake → fix.
+
+  * Verification checklist            :MANDATORY:
+    Checkbox list of post-action verifications.
+
+  * See also                          :MANDATORY:
+    Cross-skill links.
+```
+
+# Implementation phases (the wb-skv2 epic)
+
+## Phase 1 — runtime support for the format (small)
+
+   wb-skv2.1  Honor `:DESTRUCTIVE:` / `:NETWORK:` / `:STATUS:`
+              in the TOOLKITS prompt index — annotate per-skill
+              lines with the relevant markers.
+
+   wb-skv2.2  Surface `#+CAPTION` TOC: =wb toolkit show <toolkit>
+              <skill>= prints CAPTIONs as a navigable index above
+              the body. Inject same TOC at top of any `cat`-style
+              skill render.
+
+   wb-skv2.3  `wb toolkit search` rewritten on top of OQL.
+              Falls back to substring if OQL query parse fails.
+
+   wb-skv2.4  `wb toolkit check` enforces new mandatory sections
+              (When to Use / Workflow / Common Pitfalls /
+              Verification Checklist) + #+VERSION + #+DESCRIPTION.
+              Existing skills that don't conform get warnings,
+              not errors, until we backfill.
+
+   wb-skv2.5  `wb toolkit new` scaffold updated to include the
+              mandatory sections + reference-subdir option.
+
+## Phase 2 — adopt `references/` subdir pattern
+
+   wb-skv2.6  Skill resolver supports both `<slug>.org` AND
+              `<slug>/SKILL.org`. =wb toolkit show <toolkit>
+              <slug>= prints the SKILL + lists `references/`
+              files for follow-up.
+
+   wb-skv2.7  Updated TOOLKITS prompt index points at SKILL.org
+              for thick skills, includes "(N reference docs)"
+              annotation.
+
+## Phase 3 — flesh out skill trees (real content work)
+
+   Per toolkit, bring skills up to Hermes peer length. Add
+   references/ where the surface is large. Specific targets:
+
+   wb-skv2.8   `wb`:    error-recovery, advanced-oql-queries,
+                        live-url-management, scaffold-a-workbook/
+                        with references/ for each template
+   wb-skv2.9   `git`:   bisect, cherry-pick, partial-staging,
+                        worktree-management, submodule-flows
+   wb-skv2.10  `ffmpeg`: trim/concat/subtitle-burn,
+                         hardware-acceleration, lossy-tradeoffs
+   wb-skv2.11  `wavelet`: text-cards, transitions, audio-sync,
+                          template-catalog
+   wb-skv2.12  `wraith`: boundary-enforcement, fix-write workflow,
+                         refactor-extract-fn, slop-suppression-policy
+
+## Phase 4 — BM25 ranked search (optional, ship when corpus is big)
+
+   wb-skv2.13  BM25 index built from TITLE + TAGS + body of every
+               skill. Cached at `~/Workbooks/Workbox/toolkits/.search-index`.
+               Rebuilt when any toolkit dir mtime changes.
+               `wb toolkit search` returns ranked hits with
+               relevance scores.
+
+               Defer until corpus > ~50 skills. At today's scale
+               (20) substring + OQL is sufficient.
+
+## Phase 5 — babel-language skills (when the demand shows up)
+
+   wb-skv2.14  Document the supported babel languages (`bash`,
+               `python`, `sql` via OQL plugins; `lua` via
+               `substrates/oql`). Author one reference skill per
+               toolkit that demonstrates a non-bash block — e.g.
+               `wb/skills/advanced-oql-queries/SKILL.org` with
+               python blocks generating sample data.
+
+# What this doc deliberately doesn't do
+
+  - **Doesn't add a tool-bridge.** Bash IS the bridge in our model.
+    The Hermes 3-tool pattern doesn't transplant.
+  - **Doesn't propose a separate skill validator binary.** =wb
+    toolkit check= grows to cover the new mandatory sections;
+    no second tool needed.
+  - **Doesn't lock down the file format.** `references/` is
+    _additive_ to the current single-file convention; existing
+    skills don't have to migrate.
+  - **Doesn't change the install/discovery pipeline.** The TOOLKITS
+    auto-injection + the install/sync surfaces are working;
+    Phase 1 changes are inside the existing render path.
+
+# Success looks like
+
+  - Each toolkit's primary skills sit at 150-300 lines (vs
+    today's 80-100), with a Common Pitfalls section that catches
+    the agent before it stumbles.
+  - At least one `<slug>_SKILL.org + references_` per toolkit,
+    proving the deep-dive pattern works.
+  - The TOOLKITS prompt block tells the agent which skills are
+    destructive / paid / network-dependent before it picks one.
+  - `wb toolkit search "<intent>"` returns a ranked, OQL-filterable
+    hit list (no substring brittleness).
+  - A new developer reading TOOLKIT-SKILLS-V2.md understands
+    what we have, what's missing, and which phase to pick up.

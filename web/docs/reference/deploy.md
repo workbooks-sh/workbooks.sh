@@ -290,8 +290,8 @@ Coherence rules it enforces (`config.ex:56-83`): `multi` tenancy on `sqlite` is
 rejected (one writer serializes tenants); `multi` needs real `AUTH`; `s3` needs
 `STORAGE_BUCKET` + `STORAGE_ENDPOINT` + `WB_S3_KEY=/=WB_S3_SECRET` env; `postgres`
 needs `WB_DATABASE_URL` env. Secrets stay in the deploy ENV, never the file
-(`config.ex:6-9`). See examples `cli/deploy-kit/deployments/local.org` and
-`cloud-saas.org`.
+(`config.ex:6-9`). See examples `cli/deploy-kit/deployments/local.html` and
+`cloud-saas.html`.
 
 ## See also
 

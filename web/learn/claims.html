@@ -217,7 +217,7 @@ flowchart LR
     v["verbatim.txt<br/>8,578 words"]
     w["words.json<br/>per-word timing + logprobs"]
   end
-  src --> audit["audits/spoken-thesis.org<br/>claims, evidence-checked"]
+  src --> audit["audits/spoken-thesis.md<br/>claims, evidence-checked"]
   audit --> back["backlog<br/>every UNKEPT / PARTIAL"]
   audit -. "#+SOURCE: points back" .-> src
   style src fill:#fbfaf6,stroke:#121316
@@ -286,9 +286,9 @@ sequenceDiagram
   <p>Depth rung — skippable. Because every status is a headline keyword in a
   plain text file, the health of your pitch is one shell command away. You do
   not need a dashboard; you need <code>grep</code>:</p>
-  <pre class="orgsample">$ grep -c '^\*\* UNKEPT'  audits/spoken-thesis.org   <i># 1  — said, not built</i>
-$ grep -c '^\*\* CLAIMED' audits/spoken-thesis.org   <i># 6  — still unchecked</i>
-$ grep '^\*\* ' audits/spoken-thesis.org | awk '{print $2}' | sort | uniq -c
+  <pre class="orgsample">$ grep -c '^\*\* UNKEPT'  audits/spoken-thesis.md   <i># 1  — said, not built</i>
+$ grep -c '^\*\* CLAIMED' audits/spoken-thesis.md   <i># 6  — still unchecked</i>
+$ grep '^\*\* ' audits/spoken-thesis.md | awk '{print $2}' | sort | uniq -c
    <i># KEPT 7  ·  PARTIAL 3  ·  CLAIMED 6  ·  UNKEPT 1  ·  FUTURE 1</i></pre>
   <p>Those are the real counts from the one live ledger. They tell you
   something the prose can't: this audit is <b>ahead of its own data</b>. The

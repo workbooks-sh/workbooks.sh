@@ -2,7 +2,7 @@ defmodule Workbooks.Groundskeeper.Tasks do
   @moduledoc """
   The groundskeeper's task ledger — the list of background workflows the voice
   agent has dispatched, visible two ways: this GenServer (the API the /gk
-  routes read) and a rendered `TASKS.org` in the groundskeeper home (the
+  routes read) and a rendered `TASKS.md` in the groundskeeper home (the
   git-visible, human/Claude-readable view; regenerated on every change, never
   hand-edited).
 
@@ -38,17 +38,15 @@ defmodule Workbooks.Groundskeeper.Tasks do
   end
 
   # The autopoet lesson (wb-3ojf.7): the ledger is in-memory, so a restart
-  # orphans any TODO/DOING entry in the rendered TASKS.org — un-pickable and
+  # orphans any TODO/DOING entry in the rendered TASKS.md — un-pickable and
   # lying about liveness. On boot, rewrite stale active states to BLOCKED in
   # place (we own the generated file; this is a render correction, not sync).
   defp reset_orphans do
-    path = Path.join(Workbooks.Groundskeeper.home(), "TASKS.org")
+    path = Path.join(Workbooks.Groundskeeper.home(), "TASKS.md")
 
     with {:ok, content} <- File.read(path) do
-      fixed = Regex.replace(~r/^\* (DOING|TODO) /m, content, "* BLOCKED ")
-
-      if fixed != content,
-        do: File.write!(path, String.replace(fixed, "#+TODO:", "# orphaned actives marked BLOCKED on boot\n#+TODO:", global: false))
+      fixed = Regex.replace(~r/^### (DOING|TODO) /m, content, "### BLOCKED ")
+      if fixed != content, do: File.write!(path, fixed)
     end
 
     :ok
@@ -167,7 +165,7 @@ defmodule Workbooks.Groundskeeper.Tasks do
     end
   end
 
-  # TASKS.org: generated FROM this ledger, never hand-edited (no two-way sync).
+  # TASKS.md: generated FROM this ledger, never hand-edited (no two-way sync).
   defp render(s) do
     state_kw = %{"queued" => "TODO", "doing" => "DOING", "done" => "DONE", "blocked" => "BLOCKED"}
 
@@ -177,19 +175,18 @@ defmodule Workbooks.Groundskeeper.Tasks do
       |> Enum.sort_by(& &1.started, :desc)
       |> Enum.map(fn t ->
         """
-        * #{state_kw[t.status] || "TODO"} #{t.goal}
-          :PROPERTIES:
-          :ID: #{t.id}
-          :FILE: #{t.file}
-          :STARTED: [#{t.started}]#{if t.finished, do: "\n  :FINISHED: [#{t.finished}]", else: ""}
-          :END:#{if t.result, do: "\n  #{t.result}", else: ""}
+        ### #{state_kw[t.status] || "TODO"} #{t.goal}
+
+        - id: #{t.id}
+        - file: #{t.file}
+        - started: #{t.started}#{if t.finished, do: "\n- finished: #{t.finished}", else: ""}#{if t.result, do: "\n\n#{t.result}", else: ""}
         """
       end)
       |> Enum.join("\n")
 
     home = Workbooks.Groundskeeper.home()
     File.mkdir_p!(home)
-    File.write!(Path.join(home, "TASKS.org"), "#+TITLE: groundskeeper — dispatched tasks\n#+TODO: TODO DOING BLOCKED | DONE\n\n" <> body)
+    File.write!(Path.join(home, "TASKS.md"), "# groundskeeper — dispatched tasks\n\nStates: TODO · DOING · BLOCKED | DONE\n\n" <> body)
   rescue
     _ -> :ok
   end

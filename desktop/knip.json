@@ -1,4 +1,4 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "ignore": ["build/**", "dist/**", ".svelte-kit/**", "src/lib/oql-wasm/**", "**/*.test.ts"]
+  "ignore": ["build/**", "dist/**", ".svelte-kit/**", "**/*.test.ts"]
 }

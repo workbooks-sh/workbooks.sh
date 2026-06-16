@@ -1,6 +1,6 @@
 defmodule RcpCapabilitiesTest do
   @moduledoc """
-  RCP-1 (RUNTIME-CONNECT-PROTOCOL.org): the capabilities handshake is public and
+  RCP-1 (RUNTIME-CONNECT-PROTOCOL.md): the capabilities handshake is public and
   truthful, and the auth gate emits the uniform error envelope.
   """
   use ExUnit.Case, async: false
@@ -24,7 +24,7 @@ defmodule RcpCapabilitiesTest do
       assert doc["tenancy"] in ["single", "multi"]
       assert doc["auth"]["rung"] in ["trusted", "oidc-jwt"]
       assert doc["transports"]["http"] == true
-      assert is_list(doc["capabilities"]) and "oql" in doc["capabilities"]
+      assert is_list(doc["capabilities"]) and "workbook" in doc["capabilities"]
     end
 
     test "single-tenant advertises the trusted rung" do

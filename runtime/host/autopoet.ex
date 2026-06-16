@@ -1,15 +1,17 @@
 defmodule Workbooks.Autopoet do
   @moduledoc """
   The metacognitive issue backlog — phase 1 of autopoiesis (wb-9ae, see
-  docs/AUTOPOIESIS.org). When a tenant agent hits a capability wall ("I need X
+  docs/AUTOPOIESIS.md). When a tenant agent hits a capability wall ("I need X
   and it does not exist"), it FILES an issue here instead of stalling or faking.
   The autopoet (a central system agent, later phases) works this backlog down,
   implementing each by editing the declarative config layer (toolkits / skills /
   defs / the capability registry) — never native code.
 
-  Issues are ORG FILES (declarative + diffable, like everything the autopoet
-  edits) under `WB_DATA/autopoet/issues/<id>.org`. This module is the host
-  PRIMITIVE that writes/reads them; it is NOT the autopoet (that is an agent).
+  Issues are Markdown files (declarative + diffable) under
+  `WB_DATA/autopoet/issues/<id>.md` — a YAML-ish `key: value` header block + free
+  prose body. This module is the host PRIMITIVE that writes/reads them; it is NOT
+  the autopoet (that is an agent). The storage extension/path lives here only
+  (`issue_path/1`, `read_body/1`) so callers never hardcode it.
 
   An issue is one of two KINDs:
     * `:capability` — "I need a tool/skill/capability the config layer can
@@ -21,6 +23,12 @@ defmodule Workbooks.Autopoet do
 
   @doc "Directory holding the backlog (system-level, not a tenant repo)."
   def dir, do: Path.join([System.get_env("WB_DATA") || File.cwd!(), "autopoet", "issues"])
+
+  @doc "Absolute path of an issue's Markdown file."
+  def issue_path(id), do: Path.join(dir(), "#{id}.md")
+
+  @doc "Raw Markdown body of an issue (header + prose), or `{:error, …}`."
+  def read_body(id), do: File.read(issue_path(id))
 
   @doc """
   File a metacognitive issue. `attrs`:
@@ -46,7 +54,7 @@ defmodule Workbooks.Autopoet do
 
         nil ->
           id = new_id()
-          File.write!(Path.join(dir(), "#{id}.org"), render(id, attrs))
+          File.write!(issue_path(id), render(id, attrs))
           {:ok, id}
       end
     end
@@ -59,7 +67,7 @@ defmodule Workbooks.Autopoet do
     case File.ls(dir()) do
       {:ok, names} ->
         names
-        |> Enum.filter(&String.ends_with?(&1, ".org"))
+        |> Enum.filter(&String.ends_with?(&1, ".md"))
         |> Enum.map(&parse(Path.join(dir(), &1)))
         |> Enum.reject(&is_nil/1)
         |> Enum.filter(fn i -> filter == :all or i.status == filter end)
@@ -72,7 +80,7 @@ defmodule Workbooks.Autopoet do
 
   @doc "Mark an issue claimed/closed. `status` ∈ :open | :doing | :done | :wontfix."
   def set_status(id, status, note \\ nil) do
-    path = Path.join(dir(), "#{id}.org")
+    path = issue_path(id)
 
     with {:ok, body} <- File.read(path) do
       body =
@@ -87,7 +95,7 @@ defmodule Workbooks.Autopoet do
 
   @doc "Reclassify an issue as :host (needs a new host primitive — the human lane)."
   def rekind_host(id) do
-    path = Path.join(dir(), "#{id}.org")
+    path = issue_path(id)
 
     with {:ok, body} <- File.read(path) do
       File.write!(path, bump_field(body, "KIND", "host"))
@@ -95,26 +103,26 @@ defmodule Workbooks.Autopoet do
     end
   end
 
-  # ── rendering / parsing (org, so issues are diffable like every other surface) ──
+  # ── rendering / parsing (Markdown, so issues are diffable + human-readable) ──
 
   defp render(id, a) do
     kind = a[:kind] || a["kind"] || :capability
 
     """
-    #+TITLE: #{a[:title] || a["title"]}
-    #+ID: #{id}
-    #+KIND: #{kind}
-    #+STATUS: open
-    #+TENANT: #{a[:tenant] || a["tenant"] || "?"}
-    #+SEEN: 1
+    TITLE: #{a[:title] || a["title"]}
+    ID: #{id}
+    KIND: #{kind}
+    STATUS: open
+    TENANT: #{a[:tenant] || a["tenant"] || "?"}
+    SEEN: 1
 
-    * need
+    ## need
     #{indent(a[:need] || a["need"] || a[:title] || a["title"])}
 
-    * tried (evidence)
+    ## tried (evidence)
     #{indent(a[:tried] || a["tried"] || "(not given)")}
 
-    * log
+    ## log
     - filed
     """
   end
@@ -140,7 +148,7 @@ defmodule Workbooks.Autopoet do
     list(:open)
     |> Enum.find_value(fn i ->
       if i.title == to_string(title) and to_string(i.tenant) == to_string(tenant || "?"),
-        do: {i.id, Path.join(dir(), "#{i.id}.org")},
+        do: {i.id, issue_path(i.id)},
         else: nil
     end)
   end
@@ -153,13 +161,13 @@ defmodule Workbooks.Autopoet do
   end
 
   defp field(body, key) do
-    case Regex.run(~r/^#\+#{key}:\s*(.+)$/m, body) do
+    case Regex.run(~r/^#{key}:\s*(.+)$/m, body) do
       [_, v] -> String.trim(v)
       _ -> nil
     end
   end
 
-  defp bump_field(body, key, val), do: Regex.replace(~r/^#\+#{key}:.*$/m, body, "#+#{key}: #{val}")
+  defp bump_field(body, key, val), do: Regex.replace(~r/^#{key}:.*$/m, body, "#{key}: #{val}")
 
   defp maybe_log(body, _status, nil), do: body
   defp maybe_log(body, status, note), do: body <> "\n- #{status}: #{note}"

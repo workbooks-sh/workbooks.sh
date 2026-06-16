@@ -1,0 +1,6 @@
+# workbooks-browser — EXECUTION: research → write a deliverable (3-tool chain)
+
+## the agent researches a topic, then produces a file deliverable
+
+- **TASK:** Research what the Elixir programming language is — use web_search to find a source and fetch to actually read it — then write a concise 3-bullet summary (grounded in what you read) to a file named elixir-summary.md.
+- **RUBRIC:** Longer-horizon EXECUTION eval (research → deliverable, the product's core loop). PASS only if the telemetry shows the agent used web_search AND fetch AND vfs_write (commands_run >= 3; all three tools present in the trace), and the result indicates a 3-bullet Elixir summary was written to elixir-summary.md reflecting REAL content (a dynamic/functional language, the Erlang/BEAM VM, concurrency/fault-tolerance/scalability). Skipping the file write, or writing without researching (no web_search+fetch), FAILS.

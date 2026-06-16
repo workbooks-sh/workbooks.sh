@@ -1,7 +1,7 @@
 defmodule Workbooks.CLI.Runtime do
   @moduledoc """
   `wb rt …` — drive a RUNNING runtime over HTTP as a first-class RCP client
-  (wb-82g; RUNTIME-CONNECT-PROTOCOL.org). The CLI is just another client: it
+  (wb-82g; RUNTIME-CONNECT-PROTOCOL.md). The CLI is just another client: it
   resolves a target + credential, then speaks the same HTTP contract the desktop
   and web clients do.
 

@@ -16,7 +16,7 @@ defmodule Workbooks.Embed do
 
   Adapter specs: `local` (Model2Vec, text) · `hash` (lexical text) · `openrouter`
   (OpenAI-compatible text) · `http:<url>` (any endpoint, any modality). Embed at
-  STORE time, not query time (docs/VECTOR-QUERY.org, MULTIMODAL-EMBED-SPIKE.org).
+  STORE time, not query time (docs/VECTOR-QUERY.md, MULTIMODAL-EMBED-SPIKE.md).
   """
   @callback embed(inputs :: [term]) :: {:ok, [[float]]} | {:error, term}
   @callback dim() :: pos_integer()

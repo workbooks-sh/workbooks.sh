@@ -13,8 +13,9 @@ defmodule Workbooks.Agent do
   native code — the tool surface exposes only the in-WASM `shell`, the VFS, and a
   handful of HOST-BROKERED capabilities (`git`, `publish`, `fetch`, `wb`) that
   trusted host Elixir performs on the agent's behalf. The agent never shells out.
-  Every step is appended to an org-mode event log in the VFS (`events.org`) — the
-  run is fully observable and OQL-queryable, like brandnana's events.org.
+  Every step is recorded in an HTML event log in the VFS (`events.html`, a
+  `<work-log>` of `<work-event>` steps) — the run is fully observable and
+  parseable with Floki like any workbook.
   """
   require Logger
   alias Workbooks.{Shell, VFS}
@@ -885,25 +886,30 @@ defmodule Workbooks.Agent do
 
   defp finish(st, result) do
     log = event_log(st.events, result)
-    VFS.put(st.vfs, "/events.org", log)
+    VFS.put(st.vfs, "/events.html", log)
     %{result: result, steps: st.step, events: st.events, log: log,
       usage: st.usage_total, compactions: st.compactions}
   end
 
-  # Org-mode event log — fully observable, OQL-queryable (like brandnana's events.org).
+  # HTML event log (work-* elements) — fully observable, parseable with Floki like
+  # any workbook. One `<work-log>` per run, a `<work-event>` per tool step.
   defp event_log(events, result) do
     steps =
       Enum.map_join(events, "\n", fn ev ->
-        """
-        ** step #{ev.step}: #{ev.tool}                                  :tool_call:
-           :PROPERTIES:
-           :ARGS: #{Jason.encode!(ev.args)}
-           :END:
-           #{String.slice(ev.output, 0, 300) |> String.replace("\n", " ")}
-        """
+        out = ev.output |> String.slice(0, 300) |> String.replace("\n", " ") |> esc()
+
+        ~s(  <work-event step="#{ev.step}" tool="#{esc(ev.tool)}" args=#{inspect(Jason.encode!(ev.args))}>#{out}</work-event>)
       end)
 
-    "* Agent run                                                  :session:\n" <>
-      steps <> "\n* Result\n  " <> String.replace(result, "\n", "\n  ") <> "\n"
+    "<work-log title=\"Agent run\">\n" <> steps <>
+      "\n  <work-result>" <> esc(result) <> "</work-result>\n</work-log>\n"
+  end
+
+  defp esc(s) do
+    s
+    |> to_string()
+    |> String.replace("&", "&amp;")
+    |> String.replace("<", "&lt;")
+    |> String.replace(">", "&gt;")
   end
 end

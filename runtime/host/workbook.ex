@@ -5,8 +5,8 @@ defmodule Workbooks.Workbook do
   needs a bespoke format or kernel to understand it — it parses the HTML with a
   standard parser (Floki) and reads the `work-*` element tree.
 
-  This replaces the old `oql.wasm` kernel. The jobs the kernel did map onto plain
-  HTML parsing:
+  This replaces the old wasm kernel. The jobs the kernel did map onto plain HTML
+  parsing:
 
     * `parse_headlines/1` — the structure/outline: every `work-*` element flattened
       to `{level, title, status, tags, props, lang, ...}` rows.
@@ -275,6 +275,7 @@ defmodule Workbooks.Workbook do
 
     %{
       "name" => flow.attrs["title"] || "",
+      "schedule" => flow.attrs["cron"] || flow.attrs["scheduled"] || flow.attrs["at"],
       "imports" => imports,
       "exports" => exports,
       "components" => Enum.map(comps, &comp_json/1),

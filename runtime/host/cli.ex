@@ -11,7 +11,7 @@ defmodule Workbooks.CLI do
 
   def main(argv) do
     # Deploy + publish verbs are HOST-side (shell out + file config) — they need no
-    # runtime, so they don't boot the app (which would load the OQL/wasmex NIF that
+    # runtime, so they don't boot the app (which would load the wasmex NIF that
     # can't load from an escript archive). They carry exit codes + --json for agents.
     case argv do
       ["deploy" | rest] ->
@@ -107,24 +107,25 @@ defmodule Workbooks.CLI do
     end
   end
 
-  def call(["query", f], _t), do: with_org_file(f, &(&1 |> Workbook.parse_headlines() |> json()))
-  def call(["tangle", f], _t), do: with_org_file(f, &(&1 |> Workbook.tangle_plan() |> json()))
-  def call(["lint", f], _t), do: with_org_file(f, &(&1 |> Workbook.lint() |> json()))
+  def call(["query", f], _t), do: with_workbook_file(f, &(&1 |> Workbook.parse_headlines() |> json()))
+  def call(["tangle", f], _t), do: with_workbook_file(f, &(&1 |> Workbook.tangle_plan() |> json()))
+  def call(["lint", f], _t), do: with_workbook_file(f, &(&1 |> Workbook.lint() |> json()))
 
-  # Read an Org file for the parse/plan/lint verbs, confined to .org + no traversal
-  # (wb-g1yo): the agent's `wb query <path>` otherwise read ANY host file (the CLI
-  # sibling of the HTTP read_workspace_org confinement). The only legit input is an
-  # Org workbook, so this blocks /etc/* + secrets while keeping the real use intact.
-  defp with_org_file(path, fun) do
+  # Read a workbook HTML file for the parse/plan/lint verbs, confined to .html + no
+  # traversal (wb-g1yo): the agent's `wb query <path>` otherwise read ANY host file
+  # (the CLI sibling of the HTTP read_workspace confinement). The only legit input
+  # is an HTML workbook, so this blocks /etc/* + secrets while keeping the real use
+  # intact.
+  defp with_workbook_file(path, fun) do
     abs = Path.expand(to_string(path))
 
     cond do
-      # An ABSOLUTE path could read any .org on the host — including another
+      # An ABSOLUTE path could read any file on the host — including another
       # tenant's data under WB_DATA. query/tangle/lint operate on relative paths
       # only (the '..' guard then keeps them from climbing out).
       Path.type(to_string(path)) == :absolute -> ~s({"error":"only relative paths allowed"})
       String.contains?(to_string(path), "..") -> ~s({"error":"bad path"})
-      Path.extname(abs) not in [".html", ".htm", ".work", ".org"] -> ~s({"error":"only workbook .html files can be read"})
+      Path.extname(abs) not in [".html", ".htm"] -> ~s({"error":"only workbook .html files can be read"})
       not File.regular?(abs) -> ~s({"error":"no such file"})
       true -> fun.(File.read!(abs))
     end
@@ -253,20 +254,21 @@ defmodule Workbooks.CLI do
 
   def call(["workgate" | _], _t), do: "usage: wb workgate request CAPABILITY [reason]"
 
-  # "Memory" is removed by design: the org/code files ARE the context. Recall =
+  # "Memory" is removed by design: the HTML/code files ARE the context. Recall =
   # `wb search` (semantic) / `wbx library query` (literal); "remember" = write an
-  # org file. No separate store to drift. See docs/VECTOR-QUERY.org.
+  # HTML workbook file. No separate store to drift. See docs/VECTOR-QUERY.md.
 
   # Single tree → one self-contained .html: pack the dir, embed the zip into the
-  # page html. The page is the tree's own index/workbook, or rendered from its
-  # source.org. (`wbx pack/unpack` is the workspace-level, multi-member sibling.)
+  # page html. The page is the tree's own index/workbook .html.
+  # (`wbx pack/unpack` is the workspace-level, multi-member sibling.)
   def call(["bundle", dir, out | flags], _t) do
-    # The workbook compiler (docs/WORKBOOK-BUNDLE.md "lifecycle"): tangle the org
-    # source-of-truth → native source, COMPILE native → .wasm via the in-sandbox
-    # lanes (Workbooks.Build → PackageManager/Compilers), then pack the tree
-    # INCLUDING the compiled .wasm so the bundled .html carries org (re-editable),
-    # native (tangled), and .wasm (runnable). `--no-build` packs source-only (the
-    # tangle still runs — native source stays in sync with the org).
+    # The workbook compiler (docs/WORKBOOK-BUNDLE.md "lifecycle"): tangle the
+    # <work-component> source out of the workbook HTML → native source, COMPILE
+    # native → .wasm via the in-sandbox lanes (Workbooks.Build →
+    # PackageManager/Compilers), then pack the tree INCLUDING the compiled .wasm so
+    # the bundled .html carries the workbook HTML (re-editable), native (tangled),
+    # and .wasm (runnable). `--no-build` packs source-only (the tangle still runs —
+    # native source stays in sync with the workbook HTML).
     build? = "--no-build" not in flags
 
     parts =
@@ -526,7 +528,7 @@ defmodule Workbooks.CLI do
   end
 
   def call(["autopoet", "show", id], _t) do
-    case File.read(Path.join(Workbooks.Autopoet.dir(), "#{id}.org")) do
+    case Workbooks.Autopoet.read_body(id) do
       {:ok, body} -> body
       _ -> "no such issue: #{id}"
     end
@@ -570,16 +572,16 @@ defmodule Workbooks.CLI do
         [] -> {:ok, deploy_usage(), %{}}
         ["help" | _] -> {:ok, deploy_usage(), %{}}
         # The declarative model: scaffold → edit → validate → apply. The file
-        # defaults to ./deployment.org, so most commands take no argument.
+        # defaults to ./deployment.html, so most commands take no argument.
         ["init" | rest] -> Workbooks.Deploy.init(preset_arg(rest), force: "--force" in rest)
-        # Scaffold CI that reconciles deployment.org on push (github|gitlab|generic).
+        # Scaffold CI that reconciles deployment.html on push (github|gitlab|generic).
         ["ci" | rest] -> Workbooks.Deploy.ci(ci_provider_arg(rest), force: "--force" in rest)
         ["validate" | rest] -> Workbooks.Deploy.validate(file_arg(rest))
         ["apply" | rest] -> Workbooks.Deploy.apply(file_arg(rest))
         # Quick zero-config local run (no file — like `docker run`).
         ["local" | _] -> Workbooks.Deploy.local()
         ["doctor"] -> Workbooks.Deploy.doctor()
-        # ./deployment.org if present (local OR cloud), else the local daemon.
+        # ./deployment.html if present (local OR cloud), else the local daemon.
         ["status" | rest] -> Workbooks.Deploy.status(file_opt(rest))
         ["verify" | rest] -> Workbooks.Deploy.verify(file_opt(rest))
         ["down" | rest] -> Workbooks.Deploy.down(file_opt(rest))
@@ -613,9 +615,9 @@ defmodule Workbooks.CLI do
         ["validate" | rest] ->
           pub.validate(pub_config_arg(rest))
         ["apply" | rest] ->
-          org = pub_org_arg(rest)
+          workbook = pub_workbook_arg(rest)
           cfg = pub_config_arg(rest)
-          pub.apply(org, cfg)
+          pub.apply(workbook, cfg)
         ["site" | rest] ->
           dir = Enum.find(rest, ".", fn a -> not String.starts_with?(a, "-") end)
           site = Workbooks.Publish.Site
@@ -633,45 +635,50 @@ defmodule Workbooks.CLI do
 
   defp publish_usage do
     """
-    wbx publish — render a Workbook (.org) → self-contained HTML → live URL.
+    wbx publish — render a Workbook (.html) → self-contained HTML → live URL.
     Non-interactive; add --json for machine output (exit 0 ok / non-zero fail).
 
     THE FLOW:
-      wbx publish init                scaffold ./publish.org
+      wbx publish init                scaffold ./publish.html
       wbx publish validate            coherence-check it (no render, no deploy)
-      wbx publish apply <file.org>    render + ship → prints the live URL
-      wbx publish site [<dir>]        render multi-page site from site.org → deploy
-    (config defaults to ./publish.org; workbook defaults to ./workbook.org)
+      wbx publish apply <file.html>   render + ship → prints the live URL
+      wbx publish site [<dir>]        render multi-page site → deploy
+    (config defaults to ./publish.html; workbook defaults to ./workbook.html)
 
-    A publish.org describes:
-      PUBLISH_TARGET  cloudflare-pages | gh-pages | self-hosted
-      PUBLISH_PROJECT the CF Pages project name, GitHub repo (org/name), or runtime URL
-      PUBLISH_DOMAIN  optional custom domain (for the printed URL)
-      PUBLISH_TITLE   page <title> (falls back to PUBLISH_PROJECT)
-      PUBLISH_OUTPUT  where to write the rendered HTML (default: .publish_out/index.html)
+    A publish.html is a <work-publish …> element whose attributes describe:
+      publish-target   cloudflare-pages | gh-pages | self-hosted
+      publish-project  the CF Pages project name, GitHub repo (org/name), or runtime URL
+      publish-domain   optional custom domain (for the printed URL)
+      publish-title    page <title> (falls back to publish-project)
+      publish-output   where to write the rendered HTML (default: .publish_out/index.html)
     """
   end
 
-  defp pub_org_arg(rest) do
+  # The workbook arg is the HTML file to render; the config arg is the publish.html.
+  # Both default via Workbooks.Publish; the only positional that names a workbook is
+  # the one matching the workbook default's extension (.html).
+  defp pub_workbook_arg(rest) do
     Enum.find(rest, Workbooks.Publish.default_workbook(), fn a ->
-      not String.starts_with?(a, "-") and String.ends_with?(a, ".org")
+      not String.starts_with?(a, "-") and a != Workbooks.Publish.default_config() and
+        String.ends_with?(a, ".html")
     end)
   end
 
   defp pub_config_arg(rest) do
     Enum.find(rest, Workbooks.Publish.default_config(), fn a ->
-      not String.starts_with?(a, "-") and not String.ends_with?(a, ".org")
+      not String.starts_with?(a, "-") and
+        (a == Workbooks.Publish.default_config() or String.contains?(a, "publish"))
     end)
   end
 
-  # File arg helpers — the deployment.org defaults to ./deployment.org.
+  # File arg helpers — the deployment config defaults to ./deployment.html.
   defp preset_arg(rest), do: Enum.find(rest, "local", &(not String.starts_with?(&1, "-")))
   defp ci_provider_arg(rest), do: Enum.find(rest, "github", &(not String.starts_with?(&1, "-")))
-  defp file_arg(rest), do: Enum.find(rest, "deployment.org", &(not String.starts_with?(&1, "-")))
+  defp file_arg(rest), do: Enum.find(rest, "deployment.html", &(not String.starts_with?(&1, "-")))
 
   defp file_opt(rest) do
     case Enum.find(rest, &(not String.starts_with?(&1, "-"))) do
-      nil -> if File.exists?("deployment.org"), do: "deployment.org", else: nil
+      nil -> if File.exists?("deployment.html"), do: "deployment.html", else: nil
       f -> f
     end
   end
@@ -682,21 +689,21 @@ defmodule Workbooks.CLI do
     idempotent; add --json to any verb for machine output (exit 0 ok / non-zero fail).
 
     THE FLOW (declarative — reproducible):
-      wbx deploy init [local|cloud]   scaffold ./deployment.org
+      wbx deploy init [local|cloud]   scaffold ./deployment.html
       wbx deploy ci [github|gitlab|generic]   scaffold CI that reconciles it on push
       wbx deploy validate             coherence-check it (no deploy)
       wbx deploy apply                deploy it — local microVM OR the cloud provider
-      wbx deploy status|verify|logs   inspect / prove-live / tail   (reads ./deployment.org)
+      wbx deploy status|verify|logs   inspect / prove-live / tail   (reads ./deployment.html)
       wbx deploy down                 tear it down
-    (commands default to ./deployment.org; pass a path to use another)
+    (commands default to ./deployment.html; pass a path to use another)
 
     QUICK (no config, like `docker run`):
       wbx deploy local                run the runtime locally right now
       wbx deploy doctor               check + self-heal local prerequisites
 
-    A deployment.org describes:
-      ENGINE_PLACE local|cloud · TENANCY_MODE single|multi · STORAGE local-fs|s3
-      DATABASE sqlite|postgres · AUTH trusted|clerk|… · PROFILE · (cloud: PROVIDER, APP)
+    A deployment.html is a <work-deploy …> element whose attributes describe:
+      engine-place local|cloud · tenancy-mode single|multi · storage local-fs|s3
+      database sqlite|postgres · auth trusted|clerk|… · profile · (cloud: provider, app)
     Secrets (S3 keys, DB DSN) come from your ENV, never the file.
 
     IMAGE:  wbx deploy build | publish   (build / push the one runtime image to ghcr)
@@ -733,7 +740,7 @@ defmodule Workbooks.CLI do
   defp usage do
     """
     wb — Workbook CLI (#{@version})
-      wb query|tangle|lint <file.org>      Org → headlines / build plan / diagnostics
+      wb query|tangle|lint <file.html>     workbook HTML → headlines / build plan / diagnostics
       wbx var set <key> <value> [--secret]  set a variable (secrets are ref-only)
       wbx var get <key>                     read a variable (secrets redacted)
       wbx var list                          list variables
@@ -768,9 +775,9 @@ defmodule Workbooks.CLI do
       wbx toolkit promote <name> <lang> <file>       promote a session command → durable workspace toolkit (source-owned, packable)
       wb isolation                                  show the isolation-tier ladder (the (width,tier) depth knob)
       wbx toolkit run <id> <task> -- <args> run a skill's :role task block with positional args
-      wbx publish init                          scaffold ./publish.org
+      wbx publish init                          scaffold ./publish.html
       wbx publish validate                      coherence-check it
-      wbx publish apply <file.org>              render + deploy → live URL
+      wbx publish apply <file.html>             render + deploy → live URL
       wbx desktop install [--version=X]         install the desktop app (curl | sh)
       wbx desktop open                          launch the installed desktop app
       wbx version

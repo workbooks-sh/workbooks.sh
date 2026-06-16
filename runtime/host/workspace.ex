@@ -4,7 +4,7 @@ defmodule Workbooks.Workspace do
   MEMBERS (workbooks/containers) by DID or path, plus the access scope each
   grants. The structure lives in config, decoupled from the file tree: a member
   is referenced (resolved on demand) or embedded, and reorganizing = editing the
-  manifest, not moving files (see docs/IDENTITY-GIT-MONOREPO.org).
+  manifest, not moving files (see docs/IDENTITY-GIT-MONOREPO.md).
 
   A member is any heading tagged `:member:` (or carrying a `:DID:`/`:PATH:` prop):
 

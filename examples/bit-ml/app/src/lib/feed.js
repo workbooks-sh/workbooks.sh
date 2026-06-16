@@ -11,7 +11,7 @@
 //       { name:'wren', role:'writer', doing:'drafting: deepmind weather',
 //         live:true, avatarSeed:'wren' }
 //     ],
-//     wire: [ { time:'14:01', who:'wren', msg:'draft: deepmind-weather.org' } ],
+//     wire: [ { time:'14:01', who:'wren', msg:'draft: deepmind-weather.md' } ],
 //     pipeline: { assigned:2, research:1, writing:1, edit:0 }
 //   }
 //
@@ -22,7 +22,7 @@
 // `avatarSeed` (defaults to name) drives the OpenPeeps avatar (LOCAL pack now —
 // see DESIGN.md §4.8a). `desk` is the assignment lead.
 
-// ── crew bios — one honest sentence each, from agents/*.org role descriptions.
+// ── crew bios — one honest sentence each, from agents/*.html role descriptions.
 // No fabrication: these describe what the agent literally does in the newsroom.
 export const BIOS = {
   desk: 'Decides what bit.ml covers — scans the wire and assigns each story with an angle and real, found leads. Never writes.',
@@ -43,7 +43,7 @@ export function crewFeed() {
       { name: 'hale', role: 'editor',     doing: 'next pass in 4m',             live: false, avatarSeed: 'hale' },
     ],
     wire: [
-      { time: '14:01', who: 'wren', msg: 'draft: deepmind-weather.org' },
+      { time: '14:01', who: 'wren', msg: 'draft: deepmind-weather.md' },
       { time: '13:58', who: 'moss', msg: 'research note: 6 sources attached' },
       { time: '13:51', who: 'desk', msg: 'assigned: deepmind weather model' },
     ],
@@ -57,7 +57,7 @@ export function changesFeed() {
   return {
     specimen: true,
     commits: [
-      { sha: 'a1b2c3d', author: 'wren', msg: 'write: deepmind-weather.org — ten-day forecast on one TPU', ts: tsAgo(120) },
+      { sha: 'a1b2c3d', author: 'wren', msg: 'write: deepmind-weather.md — ten-day forecast on one TPU', ts: tsAgo(120) },
       { sha: '9f3e21a', author: 'moss', msg: 'research: deepmind-weather — 6 facts, 6 sources, gaps: contract names', ts: tsAgo(540) },
       { sha: 'c7d4e90', author: 'hale', msg: 'edit: tsmc-arizona — cut two overclaims, dek tightened', ts: tsAgo(900) },
       { sha: '4a8b1f2', author: 'desk', msg: 'desk: assigned deepmind weather model — angle: the supercomputer it replaced', ts: tsAgo(1320) },

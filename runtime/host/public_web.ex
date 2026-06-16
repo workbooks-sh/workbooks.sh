@@ -1,6 +1,6 @@
 defmodule Workbooks.PublicWeb do
   @moduledoc """
-  The PUBLIC content plane (wb-1x1, PUBLIC-WEB-PLAN.org) — a SECOND, separate HTTP
+  The PUBLIC content plane (wb-1x1, PUBLIC-WEB-PLAN.md) — a SECOND, separate HTTP
   surface from `Workbooks.Web` (the authed control plane). This router is anonymous
   by design and serves ONE thing: the static, self-contained bytes of a published
   app, resolved by HOST.

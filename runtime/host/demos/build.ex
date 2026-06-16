@@ -3,14 +3,14 @@ defmodule Workbooks.Demos.Build do
 
   # A JS component in Javy I/O form (reads stdin, writes stdout).
   @build_demo """
-  * Build demo                                        :workflow:
-  ** Uppercase                                        :component:
-     #+begin_src js
-     const buf = new Uint8Array(4096); let n, t = 0;
-     while ((n = Javy.IO.readSync(0, buf.subarray(t))) > 0) t += n;
-     const s = new TextDecoder().decode(buf.subarray(0, t)).trim();
-     Javy.IO.writeSync(1, new TextEncoder().encode(JSON.stringify({upper: s.toUpperCase()})));
-     #+end_src
+  <work-flow title="Build demo">
+    <work-component title="Uppercase" lang="js">
+  const buf = new Uint8Array(4096); let n, t = 0;
+  while ((n = Javy.IO.readSync(0, buf.subarray(t))) > 0) t += n;
+  const s = new TextDecoder().decode(buf.subarray(0, t)).trim();
+  Javy.IO.writeSync(1, new TextEncoder().encode(JSON.stringify({upper: s.toUpperCase()})));
+    </work-component>
+  </work-flow>
   """
 
   @doc "Tangle→build→run demo: a JS component compiled to real WASM and executed."
@@ -27,21 +27,20 @@ defmodule Workbooks.Demos.Build do
     end
   end
 
-  # Two JS filters wired by the OQL edge u:json — Upper's output feeds Count.
+  # Two JS filters wired by the work-component edge u:json — Upper's output feeds Count.
   @chain """
-  * Chain                                             :workflow:
-  ** Upper                                            :component:
-     #+begin_src js :out u:json
-     const b=new Uint8Array(4096);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
-     const s=new TextDecoder().decode(b.subarray(0,t)).trim();
-     Javy.IO.writeSync(1,new TextEncoder().encode(JSON.stringify({upper:s.toUpperCase()})));
-     #+end_src
-  ** Count                                            :component:
-     #+begin_src js :in u:json
-     const b=new Uint8Array(4096);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
-     const d=JSON.parse(new TextDecoder().decode(b.subarray(0,t)).trim());
-     Javy.IO.writeSync(1,new TextEncoder().encode(JSON.stringify({len:d.upper.length})));
-     #+end_src
+  <work-flow title="Chain">
+    <work-component title="Upper" lang="js" out="u:json">
+  const b=new Uint8Array(4096);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
+  const s=new TextDecoder().decode(b.subarray(0,t)).trim();
+  Javy.IO.writeSync(1,new TextEncoder().encode(JSON.stringify({upper:s.toUpperCase()})));
+    </work-component>
+    <work-component title="Count" lang="js" in="u:json">
+  const b=new Uint8Array(4096);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
+  const d=JSON.parse(new TextDecoder().decode(b.subarray(0,t)).trim());
+  Javy.IO.writeSync(1,new TextEncoder().encode(JSON.stringify({len:d.upper.length})));
+    </work-component>
+  </work-flow>
   """
 
   @doc "DAG demo: Upper → Count; the runtime pipes A's output into B's input along the edge."
@@ -49,18 +48,17 @@ defmodule Workbooks.Demos.Build do
 
   # One workbook, two languages: Rust (reverse) + TypeScript (length).
   @polyglot """
-  * Polyglot                                          :workflow:
-  ** Reverse                                          :component:
-     #+begin_src rust
-     use std::io::{Read,Write};
-     fn main(){let mut s=String::new();std::io::stdin().read_to_string(&mut s).unwrap();let r:String=s.trim().chars().rev().collect();std::io::stdout().write_all(r.as_bytes()).unwrap();}
-     #+end_src
-  ** Measure                                          :component:
-     #+begin_src ts
-     const b=new Uint8Array(4096);let n,t=0;while((n=(globalThis as any).Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
-     const s: string = new TextDecoder().decode(b.subarray(0,t)).trim();
-     (globalThis as any).Javy.IO.writeSync(1,new TextEncoder().encode(JSON.stringify({len:s.length})));
-     #+end_src
+  <work-flow title="Polyglot">
+    <work-component title="Reverse" lang="rust">
+  use std::io::{Read,Write};
+  fn main(){let mut s=String::new();std::io::stdin().read_to_string(&mut s).unwrap();let r:String=s.trim().chars().rev().collect();std::io::stdout().write_all(r.as_bytes()).unwrap();}
+    </work-component>
+    <work-component title="Measure" lang="ts">
+  const b=new Uint8Array(4096);let n,t=0;while((n=(globalThis as any).Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
+  const s: string = new TextDecoder().decode(b.subarray(0,t)).trim();
+  (globalThis as any).Javy.IO.writeSync(1,new TextEncoder().encode(JSON.stringify({len:s.length})));
+    </work-component>
+  </work-flow>
   """
 
   @doc "Polyglot build demo: a Rust + a TypeScript component, each compiled to real WASM and run."
@@ -77,10 +75,9 @@ defmodule Workbooks.Demos.Build do
 
   # Mode 2: a component that references a REAL project dir.
   @dir_workbook """
-  * Real project                                      :workflow:
-  ** Reverser                                         :component:
-     #+begin_src rust :dir examples/reverser
-     #+end_src
+  <work-flow title="Real project">
+    <work-component title="Reverser" lang="rust" dir="examples/reverser"></work-component>
+  </work-flow>
   """
 
   @doc "Referenced-dir demo: build a real on-disk Rust crate (with a cargo dep) → WASM → run."
@@ -98,13 +95,13 @@ defmodule Workbooks.Demos.Build do
 
   # A Go component (TinyGo → wasm, WASI stdio): reverse stdin.
   @go_workbook """
-  * Go demo                                           :workflow:
-  ** Reverse                                          :component:
-     #+begin_src go
-     package main
-     import ("bufio";"os")
-     func main(){ b,_ := bufio.NewReader(os.Stdin).ReadString(0); r := []rune(b); for i,j:=0,len(r)-1;i<j;i,j=i+1,j-1 {r[i],r[j]=r[j],r[i]}; os.Stdout.WriteString(string(r)) }
-     #+end_src
+  <work-flow title="Go demo">
+    <work-component title="Reverse" lang="go">
+  package main
+  import ("bufio";"os")
+  func main(){ b,_ := bufio.NewReader(os.Stdin).ReadString(0); r := []rune(b); for i,j:=0,len(r)-1;i<j;i,j=i+1,j-1 {r[i],r[j]=r[j],r[i]}; os.Stdout.WriteString(string(r)) }
+    </work-component>
+  </work-flow>
   """
 
   @doc "Go build demo: a Go component compiled to real WASM by TinyGo and run."
@@ -122,33 +119,31 @@ defmodule Workbooks.Demos.Build do
 
   # A workflow IS the DAG: tasks (components) + edges + nested sub-workflows.
   @workflow_demo """
-  * Pipeline                                          :workflow:
-    SCHEDULED: <2026-06-07 Sun 06:00 +1d>
-  ** Upper                                            :component:
-     #+begin_src js :out up:json
-     const b=new Uint8Array(4096);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
-     const s=new TextDecoder().decode(b.subarray(0,t)).trim();
-     Javy.IO.writeSync(1,new TextEncoder().encode(JSON.stringify({upper:s.toUpperCase()})));
-     #+end_src
-  ** Count                                            :component:
-     #+begin_src js :in up:json
-     const b=new Uint8Array(4096);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
-     const d=JSON.parse(new TextDecoder().decode(b.subarray(0,t)).trim());
-     Javy.IO.writeSync(1,new TextEncoder().encode(JSON.stringify({len:d.upper.length})));
-     #+end_src
-  ** Audit                                            :workflow:
-  *** Echo                                            :component:
-      #+begin_src js
-      const b=new Uint8Array(4096);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
-      const s=new TextDecoder().decode(b.subarray(0,t)).trim();
-      Javy.IO.writeSync(1,new TextEncoder().encode("audited:"+s));
-      #+end_src
+  <work-flow title="Pipeline" scheduled="2026-06-07 06:00 +1d">
+    <work-component title="Upper" lang="js" out="up:json">
+  const b=new Uint8Array(4096);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
+  const s=new TextDecoder().decode(b.subarray(0,t)).trim();
+  Javy.IO.writeSync(1,new TextEncoder().encode(JSON.stringify({upper:s.toUpperCase()})));
+    </work-component>
+    <work-component title="Count" lang="js" in="up:json">
+  const b=new Uint8Array(4096);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
+  const d=JSON.parse(new TextDecoder().decode(b.subarray(0,t)).trim());
+  Javy.IO.writeSync(1,new TextEncoder().encode(JSON.stringify({len:d.upper.length})));
+    </work-component>
+    <work-flow title="Audit">
+      <work-component title="Echo" lang="js">
+  const b=new Uint8Array(4096);let n,t=0;while((n=Javy.IO.readSync(0,b.subarray(t)))>0)t+=n;
+  const s=new TextDecoder().decode(b.subarray(0,t)).trim();
+  Javy.IO.writeSync(1,new TextEncoder().encode("audited:"+s));
+      </work-component>
+    </work-flow>
+  </work-flow>
   """
 
   @doc """
   Workflow demo (wb-11ck.47): a workflow IS the DAG — no separate board. Run
   Pipeline (Upper→Count piped) + its nested Audit sub-workflow → a run record
-  (each task's output + the schedule), executed natively from the Org.
+  (each task's output + the schedule), executed natively from the workbook HTML.
   """
   def demo_workflow do
     [pipeline] = Workbooks.Workflow.run(@workflow_demo, "hello world")
@@ -189,13 +184,13 @@ defmodule Workbooks.Demos.Build do
 
   # A C component (zig cc → wasm32-wasi, WASI stdio): uppercase stdin.
   @c_workbook """
-  * C demo                                            :workflow:
-  ** Upper                                            :component:
-     #+begin_src c
-     #include <stdio.h>
-     #include <ctype.h>
-     int main(void){int c;while((c=getchar())!=EOF)putchar(toupper(c));return 0;}
-     #+end_src
+  <work-flow title="C demo">
+    <work-component title="Upper" lang="c">
+  #include <stdio.h>
+  #include <ctype.h>
+  int main(void){int c;while((c=getchar())!=EOF)putchar(toupper(c));return 0;}
+    </work-component>
+  </work-flow>
   """
 
   @doc "C build demo (wb-11ck.42): a C component compiled to real WASM by zig cc and run."
@@ -260,21 +255,20 @@ defmodule Workbooks.Demos.Build do
 
   # Two JS components componentized + composed into one (structural bundle).
   @compose_demo """
-  * Compose demo                                      :workflow:
-  ** Uppercase                                        :component:
-     #+begin_src js
-     const buf = new Uint8Array(4096); let n, t = 0;
-     while ((n = Javy.IO.readSync(0, buf.subarray(t))) > 0) t += n;
-     const s = new TextDecoder().decode(buf.subarray(0, t)).trim();
-     Javy.IO.writeSync(1, new TextEncoder().encode(JSON.stringify({upper: s.toUpperCase()})));
-     #+end_src
-  ** Length                                           :component:
-     #+begin_src js
-     const buf = new Uint8Array(4096); let n, t = 0;
-     while ((n = Javy.IO.readSync(0, buf.subarray(t))) > 0) t += n;
-     const s = new TextDecoder().decode(buf.subarray(0, t)).trim();
-     Javy.IO.writeSync(1, new TextEncoder().encode(JSON.stringify({len: s.length})));
-     #+end_src
+  <work-flow title="Compose demo">
+    <work-component title="Uppercase" lang="js">
+  const buf = new Uint8Array(4096); let n, t = 0;
+  while ((n = Javy.IO.readSync(0, buf.subarray(t))) > 0) t += n;
+  const s = new TextDecoder().decode(buf.subarray(0, t)).trim();
+  Javy.IO.writeSync(1, new TextEncoder().encode(JSON.stringify({upper: s.toUpperCase()})));
+    </work-component>
+    <work-component title="Length" lang="js">
+  const buf = new Uint8Array(4096); let n, t = 0;
+  while ((n = Javy.IO.readSync(0, buf.subarray(t))) > 0) t += n;
+  const s = new TextDecoder().decode(buf.subarray(0, t)).trim();
+  Javy.IO.writeSync(1, new TextEncoder().encode(JSON.stringify({len: s.length})));
+    </work-component>
+  </work-flow>
   """
 
   @doc "Compose demo: componentize TWO Javy core modules, then `wac compose` into one component."
@@ -293,19 +287,18 @@ defmodule Workbooks.Demos.Build do
 
   # Two JS components for the TYPED contract: A exports `stage`, B imports `stage.apply`.
   @typed_compose_demo """
-  * Typed compose demo                                :workflow:
-  ** Upper                                            :component:
-     #+begin_src js :out t:string
-     export const stage = { apply(input) { return input.toUpperCase(); } };
-     #+end_src
-  ** Label                                            :component:
-     #+begin_src js :in t:string
-     import { apply } from 'wb:pipe/stage';
-     export function run(input) { const u = apply(input); return u + " (len=" + u.length + ")"; }
-     #+end_src
+  <work-flow title="Typed compose demo">
+    <work-component title="Upper" lang="js" out="t:string">
+  export const stage = { apply(input) { return input.toUpperCase(); } };
+    </work-component>
+    <work-component title="Label" lang="js" in="t:string">
+  import { apply } from 'wb:pipe/stage';
+  export function run(input) { const u = apply(input); return u + " (len=" + u.length + ")"; }
+    </work-component>
+  </work-flow>
   """
 
-  @doc "Typed-compose demo: lower the OQL edge into WIT, componentize via jco, `wac plug` A→B into one typed component."
+  @doc "Typed-compose demo: lower the work-component edge into WIT, componentize via jco, `wac plug` A→B into one typed component."
   def demo_typed_compose do
     pm = Workbooks.PackageManager
     {:ok, composed, how} = pm.typed_compose(@typed_compose_demo)

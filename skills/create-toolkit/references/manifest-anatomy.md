@@ -3,7 +3,7 @@
 The toolkit's **front door**: the index the runtime reads to build the
 auto-injected TOOLKITS catalog, and the first thing an author/agent reads to
 decide if this is the right toolkit. It indexes skills **by need**; it never
-duplicates a skill's body. Source of truth: `toolkits/AUTHORING.org §"The two
+duplicates a skill's body. Source of truth: `toolkits/AUTHORING.md §"The two
 artifacts"`. Exemplar: `toolkits/ffmpeg/manifest.org`.
 
 ## Frontmatter (order matters — match ffmpeg)

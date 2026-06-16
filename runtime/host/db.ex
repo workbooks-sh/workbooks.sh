@@ -5,7 +5,7 @@ defmodule Workbooks.DB do
   deploy); Postgres the moment `WB_DATABASE_URL` is set — and ANY Postgres
   provider works because it's just a connection URL: CrunchyData, Fly PG, Railway,
   Neon, Supabase are indistinguishable to the runtime. One code path, no
-  per-provider branches. See docs/DEPLOY-KIT-STORAGE.org.
+  per-provider branches. See docs/DEPLOY-KIT-STORAGE.md.
 
   A store opens a handle and runs portable SQL with `?1/?2` placeholders;
   `Workbooks.DB` translates them to `$1/$2` for Postgres. Rows come back as lists

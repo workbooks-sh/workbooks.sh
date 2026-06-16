@@ -1,0 +1,6 @@
+# workbooks-browser — model discovery (Tier 2)
+
+## the agent finds + switches to a vision model
+
+- **TASK:** Documentation question — do not call any tool. You need to analyze an IMAGE but your current model is text-only. Which two commands let you (a) find a model that can see images and (b) switch to it?
+- **RUBRIC:** The answer uses `wb models list` (e.g. `wb models list image` or `wb models list vision`) to discover a multimodal model, then `wb model set <id>` to switch. It must NOT claim it can't see images without trying these.

@@ -1,0 +1,136 @@
+
+# Goal
+
+Find across a workbook / workspace / library by MEANING as well as by literal
+match. OQL already makes a workbook queryable via SQL; this adds the semantic
+half so "find the bit about retry backoff" works without the exact words — over
+org content AND code. Rides the BYO-storage layer (storage is the precondition).
+
+# The construct: a QUERYABLE WORKBOOK — agent-agnostic, not "AI memory"
+
+This is general data infrastructure, NOT an AI feature. "Vector search" is one
+QUERY MODALITY, not the point; "agent memory" is one CONSUMER, not the definition.
+A workbook is a queryable data object — any script, service, or agent run out of a
+workbook can query it (and other workbooks), the same way it would query a
+database. Frame + name accordingly: it's `Query`, not `Memory`.
+
+- **Modalities are slots** (like the storage/embed providers): LITERAL (SQL via
+  OQL — done), SEMANTIC (vector, pluggable embeddings — building), GRAPH
+  (relationships / a GraphQL-style traversal over members + links — future). A
+  caller picks the modality; new ones drop in without touching callers.
+- **Consumers are anything**: exposed over the CLI (`wb search`/`wb query`), the
+  HTTP API (`/api/search`), and in-workbook scripts — an agent is just one
+  caller among scripts + services. No modality or surface assumes an LLM.
+- **Cross-workbook by DID**: a workbook can query ANOTHER workbook's data by its
+  DID (resolve via `Workbooks.Did`, then query the resolved members) — federated
+  query against the identity, not just the local library. This is the same DID
+  rail the composition layer uses; querying is one more thing you do "against the
+  DID."
+- **Embeddings are pluggable + not required**: literal + graph queries need no model
+  at all; semantic uses the `Workbooks.Embed` slot (hash baseline → external →
+  in-BEAM). The construct degrades cleanly to pure data querying with zero ML.
+- Agent memory, RAG, etc. are then trivial CONSUMERS of this — they call the same
+  query surface every other script does. We build the construct; the AI use is
+  downstream, not the foundation.
+
+# Three seams (each a provider slot, like Storage/Browse/auth)
+
+## 1. Embedding — `Workbooks.Embed` (`embed(texts) -> vectors`)
+
+The "is it multi-tenant?" question decided here:
+- `local` (the multi answer): ONE small text model resident in the BEAM
+  (EmbeddingGemma-300M or all-MiniLM-L6-v2 — both commercially licensed), serving
+  every tenant from one load. No per-query external call → free, private, multi.
+  Heavy dep (Bumblebee/Nx, or the lighter ortex/ONNX), so PLUGGABLE not mandatory.
+- `openrouter` (lean default to start): reuse the existing LLM key, real semantic
+  search with ZERO new dependency; per-query cost. Swap to `local` when we want to
+  shed the external dependency.
+- Selected by =WB_EMBED=local|openrouter=; the model id is config.
+
+## 2. Vector store — `Workbooks.Vector` (tenant-scoped, on the storage layer)
+
+- Postgres backend (`Workbooks.DB` = postgres) → **pgvector** (Crunchy/Neon/
+  Supabase ship it) — a real vector column + ANN index.
+- SQLite default → brute-force cosine (fine for one library); **sqlite-vec** as the
+  ANN upgrade. Same interface either way: `upsert(tenant, id, vector, meta)` /
+  `search(tenant, query_vector, k, scope)`.
+
+## 3. Query — hybrid, over the access graph
+
+- LITERAL: OQL / `Library.query` (SQL over members' VFS) — already built.
+- SEMANTIC: embed the query → ANN over the scope's vectors → ranked chunks.
+- HYBRID: combine (e.g. reciprocal-rank-fusion) — the strongest. Scope =
+  workbook | workspace | library, resolved through `Workbooks.Library`.
+
+# The load-bearing principle: embed at STORE time, not query time
+
+When a workbook is packed/stored (`Library.store`), chunk + embed it ONCE and
+upsert the vectors. Queries are then pure lookups — cheap, and the embedder is hit
+on writes (rare) not reads (hot). This is what makes BOTH the local model and an
+external API affordable. (The archive's mobile-embeddings research reached the
+same "compute at author time, bake the result" conclusion.)
+
+# Chunking
+
+- Org: by headline / section / src block (reuse `OQL.parse_headlines`).
+- Code: by function / top-level item (language-aware later; lines now).
+- Each chunk carries {workbook, path, headline, span} so a hit points back.
+
+# Multi-tenant + security
+
+- Vectors are tenant-scoped exactly like blobs/rows (tenant is the first arg).
+- The `local` model is shared compute, not shared DATA — every tenant's vectors
+  stay in their scope; the model just turns text into numbers.
+- Embedding provider creds (if external) live in secrets; never in the image.
+
+# Build order (the loop)
+
+1. `Workbooks.Embed` seam + `openrouter` adapter (reuse the LLM key) + `local`
+   stub (honest "not wired"); `WB_EMBED` select.
+2. `Workbooks.Vector` — brute-force cosine on SQLite (default) first; interface
+   stable for pgvector/sqlite-vec.
+3. Index at store-time: `Library.store` chunks + embeds + upserts vectors.
+4. `Library.search(tenant, query, scope)` — semantic, then hybrid with OQL
+   literal. Exposed as a CONSUMER-AGNOSTIC surface: `wb search` / `wb query` +
+   `/api/search` (any script/service/agent calls it). No LLM assumed.
+4b. Cross-workbook by DID: a member referenced by DID is resolved
+   (`Workbooks.Did`) and included in the search scope — federated query against
+   the identity.
+5. pgvector adapter for the Postgres backend; sqlite-vec upgrade.
+6. `local` embedder — DONE, via *Model2Vec/potion (static embeddings), PURE
+   ELIXIR*. Chosen over ORT-Web because static embeddings skip the model runtime
+   entirely (tokenize → matrix lookup → mean-pool), so it's the smallest to ship
+   (~30 MB matrix, no runtime), multi-tenant (one resident matrix), and satisfies
+   "WASM or Elixir, no native NIF" via the Elixir path. `Workbooks.Embed.Model2Vec`
+   (WordPiece tokenizer + safetensors binary matrix) + `Workbooks.Embed.Local`;
+   =WB_EMBED=local= downloads potion-base-8M once to the storage volume. Verified
+   REAL semantic similarity (dog↔puppy 0.70, synonym/paraphrase matching the
+   lexical hash baseline can't). `WB_EMBED_MODEL` overrides the potion variant.
+   (The ORT-Web/WASM path below is retained as an option for higher raw quality
+   or a browser-native story, but is NOT what we shipped.)
+
+   OLD PLAN (superseded): run IN WebAssembly, NOT a native NIF (user constraint;
+   Bumblebee's fast path is the EXLA/Torchx NIF, ortex is a NIF — both excluded).
+   Plan: a small ONNX model (all-MiniLM-L6-v2, 384-d, Apache-2.0) via tract OR
+   ONNX-Runtime-Web compiled to wasm32-wasip1, registered as the `embed` command
+   in `CommandRegistry` and run in the EXISTING Wasmex sandbox (like jq/grep/oql)
+   — invoked by `Workbooks.Embed.Local`. Embed at store-time so wasm speed is moot
+   (all-MiniLM is ~8–12 ms via ONNX-Runtime-Web; tens of ms via tract); the SAME
+   artifact runs in the browser viewer. Note: Wasmex is itself a Rust NIF (the
+   wasm runtime) — the rule means no SEPARATE ML NIF, model-in-sandbox instead.
+   Fallback if we ever need near-native speed: WASI-NN (host ort backend) — but
+   that reintroduces a host-native lib. WasmEdge/LlamaEdge is the alternative
+   whole-runtime (OpenAI `/embeddings` over WASI-NN+ggml) if we want its server
+   wholesale — a 2nd runtime alongside Wasmex.
+7. GRAPH modality (future) — relationships/links across members as a GraphQL-style
+   traversal; another modality slot, no embeddings needed.
+   Decide dep weight when we get here; the seam means it drops in without churn.
+
+# Resolved: ortex (ONNX) over Bumblebee/EXLA
+
+ortex (ONNX Runtime via Rustler) vs Bumblebee/Nx/EXLA: DECIDED for ortex. The image
+embedder (`Workbooks.Embed.OrtexClip`, CLIP, WB_CLIP=1) ships on it — ~170 MB vs
+EXLA's ~900 MB (300 MB XLA + 605 MB model + ~24 s JIT), and ~250 ms warm vs ~24 s.
+The no-NIF constraint is lifted for OPT-IN builds; the lean default still carries no
+native ML. Same call holds for any heavier text embedder (all-MiniLM/EmbeddingGemma)
+when we want one — ortex behind the same `Workbooks.Embed` seam.

@@ -17,7 +17,6 @@ FROM ${COMPILERS_REF} AS compilers
 # the SAME CLI users do; the escript is wb-rt engine plumbing, not shipped) ---
 FROM rust:1-slim-bookworm AS wbxcli
 WORKDIR /repo/cli
-COPY runtime/kernel /repo/runtime/kernel
 COPY cli/Cargo.toml cli/Cargo.lock ./
 COPY cli/src ./src
 COPY cli/deploy-kit ./deploy-kit
@@ -29,7 +28,7 @@ ENV MIX_ENV=prod LANG=C.UTF-8
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git curl \
     && rm -rf /var/lib/apt/lists/*
-# Rust toolchain for any rustler NIF (oql.wasm itself is pre-built + committed).
+# Rust toolchain for any rustler NIF.
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable --profile minimal
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN mix local.hex --force && mix local.rebar --force

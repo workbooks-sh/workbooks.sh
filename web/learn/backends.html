@@ -347,7 +347,7 @@ sequenceDiagram
   thousand vectors — the engine logs a one-time warning telling the operator
   exactly what to do:</p>
   <pre class="orgsample">[warning] Vector: brute-force search over 31204 vectors on SQLite (O(n) per query).
-For sub-linear ANN at scale, set WB_DATABASE_URL → pgvector. See docs/VECTOR-QUERY.org.</pre>
+For sub-linear ANN at scale, set WB_DATABASE_URL → pgvector. See docs/VECTOR-QUERY.md.</pre>
   <p>A work pool would only buy a constant factor — the number of cores — so
   the real fix at scale is sub-linear ANN, and the warning says so. Then the
   flip itself is anticlimactic: the same <code>Vector.search(tenant, query, k: 5)</code>

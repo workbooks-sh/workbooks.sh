@@ -42,7 +42,7 @@ defmodule Workbooks.Keeper.Lifecycle do
 
   `:MIN-INTERVAL: 45m` on a state is a time gate — work is skipped (a no-op tick,
   position held) until that long has passed since the state last ran. See
-  `runtime/examples/lifecycle.org` for the canonical spec.
+  `runtime/examples/lifecycle.md` for the canonical spec.
 
   ## Position (survives restarts)
 

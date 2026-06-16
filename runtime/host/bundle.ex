@@ -239,7 +239,7 @@ defmodule Workbooks.Bundle do
 
   @doc ~S"""
   Write an unpacked parts map to `dir`, path-confined: any entry that is absolute
-  or escapes `dir` via `..` is rejected (mirrors the CLI `with_org_file` guard) so
+  or escapes `dir` via `..` is rejected (mirrors the CLI `with_workbook_file` guard) so
   a hostile bundle can't write outside its target tree. Returns the count written.
   """
   def write_tree(parts, dir) when is_map(parts) and is_binary(dir) do

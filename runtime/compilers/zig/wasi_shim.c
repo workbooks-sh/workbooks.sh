@@ -1,5 +1,5 @@
 /* auto-generated: zig's C-backend wasi bare names -> wasi-libc __wasi_ imports.
-   Generated from <wasi/wasip1.h> (see compilers/zig/README.org). */
+   Generated from <wasi/wasip1.h> (see compilers/zig/README.md). */
 #include <wasi/wasip1.h>
 __wasi_errno_t args_get(uint8_t **argv, uint8_t *argv_buf) { return __wasi_args_get(argv, argv_buf); }
 __wasi_errno_t args_sizes_get(__wasi_size_t *retptr0, __wasi_size_t *retptr1) { return __wasi_args_sizes_get(retptr0, retptr1); }

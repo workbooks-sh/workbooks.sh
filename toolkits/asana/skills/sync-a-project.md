@@ -13,7 +13,7 @@ NETWORK: yes
   The sync is NOT something an agent starts. It is a config-gated
   `:beam` GenServer under the engine supervisor — the deployment turns
   it on, never the agent (SERVICEHOST-PLAN.org trust floor). The
-  `sync.org` node in this toolkit DECLARES the daemon; the DeployKit
+  `sync.md` node in this toolkit DECLARES the daemon; the DeployKit
   federation walk registers it when the connector is installed.
 
   The deploy env contract (set by the operator / DeployKit, NOT by you):
@@ -29,7 +29,7 @@ NETWORK: yes
 ```
 
   `scope` is the LIST scope (the Asana project gid to mirror); `ownership`
-  is the daemon tenancy `session/tenant/engine` (from =sync.org
+  is the daemon tenancy `session/tenant/engine` (from =sync.md
   :OWNERSHIP:=). DeployKit emits this from the deployment's
   `:CONNECTOR_*:` props + toolkit manifests; you set nothing.
 

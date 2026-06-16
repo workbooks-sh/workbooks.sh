@@ -17,13 +17,13 @@ defmodule Workbooks.Keeper.Crew do
       #+TITLE: crew
       * wren
       :PROPERTIES:
-      :DEF: /data/agents/writer.org          (required — the agent Org def to run)
+      :DEF: /data/agents/writer.html         (required — the agent def to run)
       :LIFECYCLE: /data/lifecycles/writer.org (optional — absent → interval ticks)
       :INTERVAL: 10m                          (fallback cadence; default 1h)
       :END:
       * moss
       :PROPERTIES:
-      :DEF: /data/agents/editor.org
+      :DEF: /data/agents/editor.html
       :END:
 
   Headings are AGENT NAMES; the `:PROPERTIES:` drawer carries each agent's config

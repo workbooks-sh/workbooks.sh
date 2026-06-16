@@ -8,9 +8,9 @@ defmodule Workbooks.Groundskeeper.ElevenLabs do
   rule as `Workbooks.Llm`. The agent is THIN by design: persona prompt + five
   webhook tools pointing at the /gk bridge; all state stays in the runtime.
 
-  Persona source of truth: <gk_home>/agent/groundskeeper.org (the def file,
-  read under its `** System prompt` heading) — provisioning is a dev-box op
-  where the repo exists.
+  Persona source of truth: <gk_home>/agent/groundskeeper.html (the def file,
+  read from its `<work-system>` element) — provisioning is a dev-box op where
+  the repo exists.
   """
   require Logger
 
@@ -154,15 +154,14 @@ defmodule Workbooks.Groundskeeper.ElevenLabs do
 
   # ── persona ─────────────────────────────────────────────────────────────────
 
-  # The def file's `** System prompt` section (the AgentDef convention — the
-  # prompt MUST live under that heading or the agent runs empty).
+  # The def file's `<work-system>` element (the AgentDef convention — the prompt
+  # MUST live in that element or the agent runs empty).
   defp persona! do
-    path = Path.join([Workbooks.Groundskeeper.home(), "agent", "groundskeeper.org"])
-    org = File.read!(path)
+    path = Path.join([Workbooks.Groundskeeper.home(), "agent", "groundskeeper.html"])
 
-    case Regex.run(~r/^\*\* System prompt\n(.*?)(?=^\* |\z)/ms, org) do
-      [_, prompt] -> String.trim(prompt)
-      _ -> raise "no `** System prompt` heading in #{path}"
+    case Workbooks.AgentDef.parse(File.read!(path)).system do
+      prompt when is_binary(prompt) and prompt != "" -> prompt
+      _ -> raise "no `<work-system>` prompt in #{path}"
     end
   end
 

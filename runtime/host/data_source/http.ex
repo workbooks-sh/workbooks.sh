@@ -1,19 +1,22 @@
 defmodule Workbooks.DataSource.Http do
   @moduledoc """
   Generic JSON-API data source (wb-39j.3) — makes ANY JSON HTTP endpoint a
-  federation data source. A plugin manifest declares:
+  federation data source. A plugin manifest declares a `<work-toolkit>` with a
+  data-source slot, e.g.:
 
-      #+SLOT: data-source
-      #+ENTITIES: <entity>
-      #+IMPL: Workbooks.DataSource.Http
-      #+URL: https://api.example.com/items
-      #+ROWS_PATH: data.items        # dotted path to the array in the response (optional)
-      #+ENV_KEYS: EXAMPLE_API_KEY     # bearer credential, via Plugin.Auth (optional)
+      <work-toolkit
+        slot="data-source"
+        entities="<entity>"
+        impl="Workbooks.DataSource.Http"
+        url="https://api.example.com/items"
+        rows-path="data.items"      <!-- dotted path to the array in the response (optional) -->
+        env-keys="EXAMPLE_API_KEY">  <!-- bearer credential, via Plugin.Auth (optional) -->
 
   `SELECT … FROM <entity>` → GET the URL (Bearer auth resolved through
   Plugin.Auth — the plugin never holds the raw key) → extract the row array. This
-  is the pattern Linear/Asana specialize (their own query/3 translating OQL → their
-  GraphQL); this generic one covers plain REST/JSON sources with zero code.
+  is the pattern Linear/Asana specialize (their own query/3 translating the SQL
+  query → their GraphQL); this generic one covers plain REST/JSON sources with zero
+  code.
   """
   @behaviour Workbooks.DataSource
 

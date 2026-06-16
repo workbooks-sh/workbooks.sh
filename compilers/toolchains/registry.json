@@ -55,7 +55,7 @@
       "name": "rustc",
       "kind": "compile-to-wasm",
       "status": "blocked",
-      "blocker": "runtime/compilers/rust/README.org",
+      "blocker": "runtime/compilers/rust/README.md",
       "summary": "rustc->wasm32-wasi is an open upstream frontier (rust-lang/rust#62202, internals#16198): rustc embeds LLVM as a library, forks a proc-macro server + linker (impossible under WASI), needs realpath/threads. No prebuilt rustc.wasm exists. cg_clif emits native (no wasm output). mrustc (Rust->C) has no wasm build + only Rust ~1.54.",
       "unblock_when": "an upstream/community wasm32-wasi rustc ships (a la YoWASP clang), OR LLVM-for-wasi (RFC #79073) matures + in-process proc-macro/linker + WASI realpath/threads."
     }

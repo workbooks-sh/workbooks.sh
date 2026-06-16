@@ -35,17 +35,17 @@ defmodule Workbooks.CLIDispatchTest do
     assert out =~ "/"
   end
 
-  test "query/tangle/lint reject absolute + .. paths (no cross-tenant .org read)" do
-    # An absolute path could read another tenant's .org under WB_DATA; a '..'
+  test "query/tangle/lint reject absolute + .. paths (no cross-tenant workbook read)" do
+    # An absolute path could read another tenant's workbook under WB_DATA; a '..'
     # could climb out. Both must be refused before any File.read!.
     for verb <- ["query", "tangle", "lint"] do
-      assert CLI.call([verb, "/etc/anything.org"], "dev") =~ "only relative paths",
+      assert CLI.call([verb, "/etc/anything.html"], "dev") =~ "only relative paths",
              "#{verb} should reject an absolute path"
-      assert CLI.call([verb, "../../secret.org"], "dev") =~ "bad path",
+      assert CLI.call([verb, "../../secret.html"], "dev") =~ "bad path",
              "#{verb} should reject a .. traversal"
     end
 
     # a clean relative path passes the guards (then fails only on absence)
-    assert CLI.call(["query", "nope-#{System.unique_integer([:positive])}.org"], "dev") =~ "no such file"
+    assert CLI.call(["query", "nope-#{System.unique_integer([:positive])}.html"], "dev") =~ "no such file"
   end
 end

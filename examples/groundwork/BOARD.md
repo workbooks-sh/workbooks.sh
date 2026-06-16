@@ -1,0 +1,680 @@
+# BOARD — the repo, as bd sees it
+
+> [2026-06-16 18:18 UTC] by Workbooks.Groundskeeper.Board — NEVER hand-edit (regenerated from bd; bd stays out of git)
+
+TODO states: TODO DOING DEFERRED · DONE
+
+
+## P1 (77)
+- **TODO** Suite is order/state-dependent: 3-20 failures across seeds (contamination)
+  - id: wb-94qn
+- **TODO** Custom/unknown component rendering resilience (eval gap)
+  - id: wb-pvjw
+- **TODO** Promise-coverage eval expansion — validate the full capability ledger (epic)
+  - id: wb-wz98
+- **TODO** D1 [HIGH] /rcp/bundle skips the Private/public_only strip — VFS leak path
+  - id: wb-kfwa
+- **TODO** Cloud dashboard: org-provisioned API keys UI (admin-only)
+  - id: wb-xiei.4
+- **TODO** EPIC: de-mock dashboard — wire platform HTTP API + real Fly metering (epic)
+  - id: wb-4suu
+- **TODO** Desktop onboarding: mandatory sign-in + org auth/keys/per-seat billing (epic)
+  - id: wb-xiei
+- **TODO** [epic] ACP external-agent orchestration: Waldo drives Claude Code/Codex/Cursor (host-brokered) (epic)
+  - id: wb-b9xv
+- **TODO** ACP branch is INSECURE — do NOT merge until real OS-level sandbox enforcement is added
+  - id: wb-b9xv.6
+- **TODO** Hermetic broker tests (fake ACP agent): allowlist, capability fail-closed, happy path, sandbox-invariant holds
+  - id: wb-b9xv.5
+- **TODO** LOADED toolkits/acp/ manifest + delegate skill (no phantom commands)
+  - id: wb-b9xv.4
+- **TODO** Expose exec-gated 'delegate' tool in agent.ex + telemetry adapter (ACP events -> Workflow.Telemetry)
+  - id: wb-b9xv.3
+- **TODO** HOST broker runtime/host/external_agent.ex (Policy-gated, allowlist, ACP stdio relay, capability grant)
+  - id: wb-b9xv.2
+- **TODO** Design+security canon doc runtime/docs/acp.md (ACP wire, broker contract, trust model, telemetry, plan)
+  - id: wb-b9xv.1
+- **TODO** cf-d1 / BYOD gateway is GONE: deploy-kit/app + gateway/*.mjs purged → cloudflare+byod backend-deploy non-functional. Restore or drop?
+  - id: wb-dtd0.1
+- **TODO** OpenRouter web-browsing as default web search when OpenRouter is the model
+  - id: wb-e4jl
+- **TODO** Onboarding/search UX: right-bar = AI search over FILES; web only if enabled
+  - id: wb-ndlz
+- **TODO** WorkOS authentication in onboarding (cloud-service login)
+  - id: wb-wejt
+- **TODO** Tauri native auto-update from GitHub releases (prod update dialog; CLI vs installer)
+  - id: wb-gjrh
+- **TODO** Session model: multi-tenant isolation + roles/sharing + session-as-tab UX (epic)
+  - id: wb-g1yo
+- **TODO** rename CLI: wb → wbx (escript, docs, skills, scripts)
+  - id: wb-t21n
+- **TODO** Release: bundle + codesign vfkit binary (com.apple.security.virtualization entitlement) into the .app Resources/engine so a fresh mac has vfkit_bin(); kernel/initrd/disk already fetch from ghcr at runtime. Needs a signed desktop-v* tag to verify.
+  - id: wb-2s09.17
+- **TODO** Waldo agentic toolkit — full app/CLI/browser control (epic)
+  - id: wb-d2nx
+- **TODO** CORS fix — runtime now answers webview preflights (204 + Access-Control-*). The real blocker for voice (system_prompt fetch preflight 404'd) + all desktop engine fetches. PROVEN on :4000.
+  - id: wb-hdos
+- **TODO** Model picker w/ recommendations (MiniMax M3 #1, Gemini 3.5 #2, multimodal) in onboarding+settings; persists WB_LLM_MODEL → runtime. DONE.
+  - id: wb-3kuk
+- **TODO** DeployKit CI/CD scripting — native, git-workflow-like. wb CLI scaffolds + manages CI so users set up DeployKit across their codebase and operate their nexus/runtimes (emit CI workflows that run wb deploy verbs; declarative deployment.org as source of truth) (epic)
+  - id: wb-6ttc
+- **TODO** Stage wasm32-wasi-threads sysroot -> enable wasm threads in PackageManager.run
+  - id: wb-i982
+- **TODO** Waldo runtime brain: agent def + autopoet file_issue + voice + MCP tools
+  - id: wb-aakl.25
+- **TODO** Implement the embedded MCP Rust server + stdio relay + JS bridge
+  - id: wb-aakl.23
+- **TODO** Workbooks Browser — strip desktop to browser core, ship via CLI (epic)
+  - id: wb-aakl
+- **TODO** Cold-context Claude Code eval harness
+  - id: wb-aakl.12
+- **TODO** wb-gnzy: edge worker→fly origin subrequest 404s (empty body, via fly.io) while direct requests 200 — site currently rides the pages-fallback plane; diagnose Host/SNI handling on the CF→fly path so x-wb-origin:fly becomes real
+  - id: wb-eioq
+- **TODO** content: /learn/claude — building workbooks with your coding agent
+  - id: wb-jedm
+- **TODO** content: /learn/start — the 5-minute quickstart (skill → prompt → workbook → wbx)
+  - id: wb-504d
+- **TODO** Lander deploy spine: make code-push a git-pull with structural code/data separation (no manual flatten, no clobber risk)
+  - id: wb-642i
+- **TODO** Svelte lane perf wall: 17+ CPU-min per probe — precompile svelte/compiler to a cached WASM command (javy) + payload diet
+  - id: wb-2ku.7
+- **TODO** esbuild-wasm keystone: one fast wasm JS engine for the frontend lanes (likely retires the svelte perf wall)
+  - id: wb-feto
+- **TODO** desktop release: ship new W-glyph icon set + cut desktop release so lander download serves new logo
+  - id: wb-4bev
+- **TODO** groundskeeper → declarative: dissolve host code into agent def + toolkit + bridge spec (the P4 tool registry made real) (epic)
+  - id: wb-mest
+- **TODO** Lander efficiency: validate grok ships cleanly + tune cadence/cost
+  - id: wb-atg
+- **TODO** desktop onboarding flow: runtime setup + OpenRouter key + optional sign-in (web-aware) (epic)
+  - id: wb-hhf
+- **TODO** Shell drag-and-drop: splits, pins, previews (epic)
+  - id: wb-5fl
+- **TODO** wb CLI deploy-to-remote-runtime path: make 'wb workbook deploy' work from a laptop against a fly engine
+  - id: wb-ziv.5
+- **TODO** [epic] keeper as growth/content agent — blog + browser-research + SEO/landing mandate (beyond page-maintenance)
+  - id: wb-u48
+- **TODO** [epic] deploy/dev-loop ergonomics — local-first engine loop, verify-don't-trust apply, clean publish; the lander-live takeaways
+  - id: wb-ziv
+- **TODO** deploy-kit BLOCKER: single-machine deploy exposes only the authed control plane (:4000); the anonymous PublicWeb content plane (:4001, WB_PUBLIC=1) is neither started nor fronted. Need two-plane routing (rec: 2 fly services, public exposed + control internal + runtime-native keeper scheduler). Blocks serving any public page. Found by lander-live.
+  - id: wb-d13
+- **TODO** deploy-kit P1: size fly machine for the runtime by default (>=1GB, rec 2GB) + #+DEPLOY_MEMORY knob + post-apply /health poll surfacing OOM — first cloud apply crash-loops on default 512MB. Found by lander-live.
+  - id: wb-c4w
+- **TODO** host-brokered command exec — the WASM shell calls a Dock import to run CommandRegistry commands (flat-forest nesting); no fork/exec in-wasm
+  - id: wb-9ja.2
+- **TODO** bash-in-WASM shell — busybox/dash → wasm32-wasi (wasmtime) as the default shell tool (replaces jq/grep/upper pipeline)
+  - id: wb-9ja.1
+- **TODO** [epic] No bash outside WASM — every command is a WASM command; retire raw run (epic)
+  - id: wb-9ja
+- **TODO** [epic] lander-live — self-maintaining lander as system proof: runtime-hosted page + hourly keeper agent + observable loop
+  - id: wb-5vm
+- **TODO** RCP runtime-connection config — generalize local discovery to endpoint+token+pluggable auth (coord wb-uxn)
+  - id: wb-lk6.5
+- **TODO** Route runtime calls through the Host — collapse engine-api/gen + ws dual path into one contract
+  - id: wb-lk6.3
+- **TODO** WebHost provider — browser-native local caps (stores->IndexedDB, fs->File System Access, secrets->WebCrypto/runtime)
+  - id: wb-lk6.2
+- **TODO** Formalize the Host capability surface (typed interface over the invoke seam)
+  - id: wb-lk6.1
+- **TODO** [epic] Platform model: one Host + provider routing (desktop/web/mobile from one build) (epic)
+  - id: wb-lk6
+- **TODO** Define workspaces vs packages vs apps-within-apps model
+  - id: wb-jay.25
+- **TODO** SPINE-3: route runtime data commands through rt() instead of mocks
+  - id: wb-jay.3
+- **TODO** SPINE-4: chat backend — chatSession.send + agent-message stream into AgentPanel
+  - id: wb-jay.4
+- **TODO** Desktop app: deliver on its promises — validate agent works end-to-end (epic)
+  - id: wb-jay
+- **DOING** SPINE-2: WorkOS authentication — real sign-in (browser+loopback+keychain)
+  - id: wb-jay.2
+- **TODO** Sealed workbook bundle ('rzip'): seal + did-wrap + posture routing + edge broker
+  - id: wb-dsb
+- **TODO** Harden untrusted in-sandbox execution: memory/fuel caps + directive allowlist (security)
+  - id: wb-77k
+- **TODO** wb deploy local: krunvm exits 78 (EX_CONFIG) under launchd — runtime never boots via tray
+  - id: wb-u6r
+- **TODO** RCP: Runtime Connect Protocol — workbook→app + pluggable-IDP auth (epic)
+  - id: wb-uxn
+- **TODO** TRACKER: the 3 big rocks (ceiling-raise + proc-macros + unicode + BEAM caps) (epic)
+  - id: wb-kgo
+- **TODO** SPINE-5: agent can open tabs in the interface (real tab manager + agent tabOpen)
+  - id: wb-jay.5
+- **TODO** Rust crates.io enablement — compile arbitrary(ish) Rust packages in-sandbox (epic)
+  - id: wb-3s8
+- **TODO** docs: wb publish site mode (directory → multi-page HTML)
+  - id: wb-d2h
+- **TODO** docs: write all documentation content from source (20 pages)
+  - id: wb-lse
+- **TODO** docs: multi-page documentation site for workbooks.sh
+  - id: wb-x8p
+- **TODO** P2: live wb deploy local end-to-end — boot the real runtime in krunvm, discovery written
+  - id: wb-and
+- **TODO** P4: tauri dev integration — launch shell, daemon up, window loads frontend on runtime, sidecar-state flows
+  - id: wb-xyc
+- **TODO** P3: lean Tauri shell — daemon.rs (ensure+discover) + tray.rs + window hide + keychain
+  - id: wb-006
+- **TODO** P1: launchd LaunchAgent — plist template + install/uninstall/start/stop/status (mac)
+  - id: wb-5yt
+- **TODO** P2: packaging — bundle mix release tree as Tauri resource + first-run extract to App Support
+  - id: wb-ans
+- **TODO** P0: runtime daemon mode — discovery file (port+token) + ephemeral bind + WB_DESKTOP boot path
+  - id: wb-23t
+
+
+## P2 (203)
+- **TODO** FEATURE+eval: agent creates a NEW toolkit end-to-end
+  - id: wb-fy24
+- **TODO** Migrate authored content org→Work: agent defs + toolkit manifests
+  - id: wb-2gtr.6
+- **TODO** Work Format: HTML/work-* authoring, org retired (epic)
+  - id: wb-2gtr
+- **TODO** Nexus deploy apply/teardown + dev-server push — agent eval
+  - id: wb-zkys
+- **TODO** Ether: CPU scale-to-zero inference (BitNet + FP-Q4 tracks) (epic)
+  - id: wb-ecx9
+- **TODO** OQL confinement test stale: /tmp/.org control returns 0 headlines
+  - id: wb-4d4v
+- **TODO** OQL confinement test stale: /tmp/.org control returns 0 headlines
+  - id: wb-8ib9
+- **TODO** Eval rubric render-timing: headless shoots before work-* async data engine paints
+  - id: wb-umby
+- **TODO** Component eval rubric: headless shoots before work-* async data engine paints → blank frame
+  - id: wb-vtfa.1
+- **DOING** Workbook composition model — declarative config-island layer (epic)
+  - id: wb-vtfa
+- **TODO** Wire nexus database provisioning (Neon-gated, honor disable toggle)
+  - id: wb-qt97
+- **TODO** D2 [LOW] VFS.public_only fails OPEN on SQLite error
+  - id: wb-gsml
+- **TODO** Retire legacy .wbundle zip as a concept (drift)
+  - id: wb-twy0
+- **TODO** Land cloud-prod runtime commits on main so CI rebuilds runtime:latest with workspace API
+  - id: wb-dha3
+- **TODO** Validate live nexus provisioning flow end-to-end in browser
+  - id: wb-icg1
+- **TODO** Validate live nexus provisioning flow end-to-end (browser)
+  - id: wb-5b2w
+- **TODO** Local microVM ACP orchestrator (experimental, local-only)
+  - id: wb-xiei.8
+- **TODO** Wire onboarding profile → dashboard seed (de-mock the first-run flow)
+  - id: wb-xcxh
+- **TODO** Cloud dashboard: per-seat billing (Polar)
+  - id: wb-xiei.6
+- **TODO** Cloud dashboard: org creation + de-hardcode WORKOS_DEMO_ORG
+  - id: wb-xiei.3
+- **TODO** in-wasm keystone: a RE-ENTERABLE wasi:http component (the ~30% remaining for a FULLY-resident headless JS agent)
+  - id: wb-b9xv.14
+- **TODO** Bundle hardening (track, not merge-blocking): served-workbook CSP carrier-page + 512MB host cap + compile_tree trust boundary
+  - id: wb-mv3d
+- **TODO** DRIFT: deploy skills' no-arg 'wb build' (emits dist/<slug>.html) does not exist as a verb
+  - id: wb-hiwj
+- **TODO** DRIFT: toolkit skills use no-arg 'wb build' (emits dist/<slug>.html) but cli.ex 'wb build <slug>' builds a NAMED library workspace -> JSON report
+  - id: wb-zknm
+- **TODO** Host-side URL-liveness gate: a fact whose source 404s cannot leave RESEARCH
+  - id: wb-wc0.7
+- **TODO** Keyless SERP scrape stale: DDG IP-challenges, Brave/Bing parsers miss nested-markup anchors
+  - id: wb-46yi
+- **TODO** Platform-admin access into customer nexus deployments (deliberate design)
+  - id: wb-ehor
+- **TODO** Agent headless browser tier — load + interact with JS-rendered pages (the real web capability) (epic)
+  - id: wb-70mi
+- **TODO** Headless browse: per-tenant Chrome process cap before enabling for cloud (exec-off) agents
+  - id: wb-myrw
+- **TODO** Audit remaining CLI.call verbs for exec-gating completeness
+  - id: wb-oyhh
+- **TODO** UX: server-sourced session log — desktop reads GET /api/sessions (currently UNUSED; browses only localStorage, 60 cap) so history survives across devices; + RESUME a past session (today the Chats view is read-only)
+  - id: wb-g1yo.8
+- **TODO** UX: open a chat/session as a TAB (not just the right dock panel). Needs a session:// tab type (tabs/store.svelte.ts), per-tab session isolation (chatSession is a global singleton), render WaldoPanel content in the main tab area
+  - id: wb-g1yo.7
+- **TODO** Explicit session sharing: session_shares table + POST/DELETE /api/sessions/:id/share; WS join honors shares (invite another user to observe/steer a session)
+  - id: wb-g1yo.6
+- **TODO** Admin role: parse role from JWT identity (auth.ex:104 identity has no role); admin can view all sessions/telemetry across tenants. No RBAC exists today
+  - id: wb-g1yo.5
+- **TODO** Workspace switcher dropdown occluded by titlebar — open below it (hub layout)
+  - id: wb-3c2z
+- **TODO** OpenRouter icon: white on dark / dark on light (currently always black, invisible in dark)
+  - id: wb-5pfv
+- **TODO** Phoenix /socket DONE — runtime serves it (phx_join+heartbeat→ok proven); desktop bridge connects cleanly, no reconnect spam. (workspace-sync /api/workspaces/sync still 404 but handled gracefully)
+  - id: wb-kw2f
+- **TODO** Runtime: implement /socket (Phoenix-Channels-compatible WS) + /api/workspaces/sync — the desktop expects them for telemetry/kanban realtime, agent tab-control, env-approval, workspace sync. Currently 404 (handled gracefully, but features unavailable).
+  - id: wb-e95f
+- **TODO** FINAL rename: runtime -> nexus (codebase-wide, last step after stabilization). Mechanical + canonical-vocabulary; touches docs/CLI/code/image names
+  - id: wb-4f7g
+- **TODO** Secrets: encrypt secrets.json at rest with a NON-PROMPTING key (machine-derived via IOPlatformUUID/Secure Enclave, or the local did:key; consider libkrun-held key). Plaintext 0600 is the interim.
+  - id: wb-2s09.20
+- **TODO** Stage EH-enabled libc++/libc++abi/libunwind sysroot -> full C++ exceptions in compile_cpp
+  - id: wb-i9nc
+- **TODO** Package real Python net tools as :pynet commands (httpie/yt-dlp-metadata/datasette-client live flips)
+  - id: wb-5p9e
+- **TODO** python-lane: network tools blocked on CPython-wasip1 lacking outbound sockets (sock_connect)
+  - id: wb-wb0c
+- **TODO** Visual-verify browser surfaces once devtools MCP returns
+  - id: wb-aakl.22
+- **TODO** Composable search follow-ups: SERP provider behaviour + 3rd-party SDK providers
+  - id: wb-aakl.24
+- **TODO** EPIC: build-lane frontier — reclaim the 262 build-blocked items (post-networking campaign) (epic)
+  - id: wb-lcsj
+- **TODO** policy(decision): should :minimal drop secrets + raw-socket caps? (least-privilege naming)
+  - id: wb-ltum
+- **TODO** broker(audit/storage/policy/exec/sockets): 10 medium+low audit findings (allow-list, caps, byte-quotas, NAT64, UDP source, rate atomicity)
+  - id: wb-8w8x
+- **TODO** lesson-factory B37: vfs/escrow
+  - id: wb-szcq
+- **TODO** lesson-factory B35: vfs/sealed-sections + vfs/foreign-tables
+  - id: wb-7okq
+- **TODO** lesson-factory B36: vfs/vectors + vfs/backends
+  - id: wb-pulh
+- **TODO** lesson-factory B34: vfs/sync + vfs/privacy
+  - id: wb-2p4j
+- **TODO** lesson-factory B33: vfs/queries + vfs/volumes
+  - id: wb-yubj
+- **TODO** lesson-factory B32: workflows/upgrades + workflows/dispatch
+  - id: wb-bgk5
+- **TODO** lesson-factory B31: workflows/waves + workflows/worlds
+  - id: wb-ex9w
+- **TODO** lesson-factory B30: workflows/schedules + workflows/boards
+  - id: wb-3u43
+- **TODO** lesson-factory B29: wbx/distribution + workflows/validations
+  - id: wb-bez7
+- **TODO** lesson-factory B27: wbx/doctor + wbx/deploy-kit
+  - id: wb-3fo8
+- **TODO** lesson-factory B28: wbx/the-seam + wbx/recipes
+  - id: wb-7fdr
+- **TODO** lesson-factory B26: wbx/modes + wbx/pipelines
+  - id: wb-4yvq
+- **TODO** lesson-factory B25: agents/fleets + agents/rehearsals
+  - id: wb-j3qc
+- **TODO** lesson-factory B24: agents/evals + agents/the-ledger
+  - id: wb-44xl
+- **TODO** lesson-factory B23: agents/runtime-config + agents/dreaming
+  - id: wb-gfg0
+- **TODO** lesson-factory B22: agents/orchestration + agents/human-in-the-loop
+  - id: wb-5xgt
+- **TODO** lesson-factory B21: agents/context-repo + agents/spawning
+  - id: wb-ggjm
+- **TODO** lesson-factory B20: agents/loops + agents/authoring
+  - id: wb-aitc
+- **TODO** lesson-factory B19: org/tags + org/claims
+  - id: wb-r5rs
+- **TODO** lesson-factory B18: org/the-kernel + org/todos
+  - id: wb-j5ki
+- **TODO** lesson-factory B17: org/drawers + org/timestamps
+  - id: wb-b06g
+- **TODO** lesson-factory B16: org/syntax + org/tangling
+  - id: wb-77gf
+- **TODO** lesson-factory B15: toolkit/verification + toolkit/commands
+  - id: wb-bdsv
+- **TODO** lesson-factory B14: toolkit/promotion + toolkit/trust
+  - id: wb-w2z2
+- **TODO** lesson-factory B13: toolkit/audits + toolkit/lanes
+  - id: wb-knsz
+- **TODO** lesson-factory B11: nexus/browsing + nexus/tokens
+  - id: wb-8al7
+- **TODO** lesson-factory B12: nexus/changelogs + toolkit/imports
+  - id: wb-nlgd
+- **TODO** lesson-factory B10: nexus/channels + nexus/secrets
+  - id: wb-a4p9
+- **TODO** lesson-factory B09: nexus/hot-swap + nexus/networking
+  - id: wb-8txn
+- **TODO** lesson-factory B08: nexus/telemetry + nexus/gitops
+  - id: wb-j2fg
+- **TODO** lesson-factory B07: nexus/planes + nexus/deployments
+  - id: wb-yg4n
+- **TODO** lesson-factory B06: nexus/sandboxes + nexus/keepers
+  - id: wb-afd6
+- **TODO** lesson-factory B05: nexus/the-dock + nexus/capabilities
+  - id: wb-cuew
+- **TODO** lesson-factory B04: workbook/postures + workbook/publishing
+  - id: wb-y5lq
+- **TODO** lesson-factory B03: workbook/git + workbook/sharing
+  - id: wb-o1fm
+- **TODO** lesson-factory B02: workbook/signatures + workbook/specs
+  - id: wb-vj40
+- **TODO** broker(net): streaming bodies — chunked response/request (downloads, SSE, large uploads)
+  - id: wb-t3sq
+- **TODO** Lesson Center M3: nav rework — lesson hover reveals sub-lessons; 'view all in Lesson Center' footer entry; mobile-manageable
+  - id: wb-vrv6
+- **TODO** Lesson Center M3: first sub-lessons — tangling (under org), the dock (under nexus): same format, parent color, own icon + episode; retire nb-kernel into the tangling sub-lesson where the runnable cells earn their place
+  - id: wb-rk8q
+- **TODO** Lesson Center M4: audio player rework for the two-tier catalog — desktop + mobile explore-first, not one big list
+  - id: wb-93jt
+- **TODO** Lesson Center M4: Lesson Center page — the learning sub-app: explore + search every lesson/sub-lesson, categories, audio integrated
+  - id: wb-grnc
+- **TODO** broker(net): verify standard wasi-sockets raw-TCP is unblocked by spawn_blocking + SSRF-filtered. BLOCKED on guest-build: componentize-js node:net traps 'unreachable' (StarlingMonkey has no raw sockets); rust lane=core modules; cargo-component out-of-lane. Needs a hand-built wasi:sockets component. Would reclaim ~37 db-client/netcat tools.
+  - id: wb-us76
+- **TODO** runtime: dock-component nested command path times out (:cpu_timeout) — test/dock_component_e2e_test.exs:13 (component -> dock::command::run -> upper builtin). PRE-EXISTING (fails identically with spawn and spawn_blocking; unrelated to wb-0beq). The non-nested component path works (rcp_capabilities, net_probe). Likely the nested-run-from-within-a-component-call path or the timeout/epoch enforcement.
+  - id: wb-avwy
+- **TODO** broker(net): remaining red-team items need a server/internet env to validate — DoS-body-streaming-cap (entangled w/ redirect-follow + host_http_get's body-only ABI; :httpc streaming doesn't expose status for 3xx detection), DNS-rebinding-pin (needs connect-to-pinned-IP with SNI=hostname, which :httpc doesn't expose), allow-REACHABILITY e2e (allowed host actually connecting)
+  - id: wb-k2im
+- **TODO** docs hub refresh under wbx (web/docs regen + real CLI reference)
+  - id: wb-a94y
+- **TODO** content: field notes — blog spine as CMS records
+  - id: wb-hegp
+- **TODO** content: examples gallery — workbooks in the wild
+  - id: wb-g97b
+- **TODO** Disk pressure (96% full) blocks the resolution campaign — parallel waves ENOSPC
+  - id: wb-8jmr
+- **DOING** In-sandbox C lane: support multi-file projects with local headers/include dirs (Lane B blocker)
+  - id: wb-yi7q
+- **TODO** Campaign: validate + promote feasibility-matrix lanes (wire-up → effort → research) to LIVE (epic)
+  - id: wb-9d74
+- **TODO** [bug] JS bundle lane: ESM->CJS drops named 'export const/function' (bundlejob.js:130 replacement self-mangles)
+  - id: wb-w60c
+- **TODO** elevenlabs provisioning as config: agent def + tool registry render the upsert payload; host keeps only the authed HTTP call
+  - id: wb-mest.4
+- **TODO** migrate the dispatch lane to an org workflow (author->validate->persist->run) so the autopoet can tune the author prompt without a deploy
+  - id: wb-mest.3
+- **TODO** migrate gk tools to a toolkit: repo-state / capture / file-issue / dispatch as skills+CLIs the bridge (and any agent) invokes
+  - id: wb-mest.2
+- **TODO** P4 host primitive: declarative inbound tool-bridge — org spec declares routes (name, auth mode, schema) -> named capability (toolkit CLI / workflow / agent)
+  - id: wb-mest.1
+- **TODO** End-to-end thesis eval: both runtimes + autopoet loop, correct AND efficient
+  - id: wb-8oa
+- **TODO** [host] runnable RSS/XML parse primitive — jq can't parse XML; autopoet filed 1781161903-5
+  - id: wb-cnqh
+- **TODO** autopoet efficiency: ~75% of steps wasted on web_search/fetch that return nothing from the box (datacenter-IP block)
+  - id: wb-2974
+- **TODO** load benchmark for concurrent agents
+  - id: wb-pdi2
+- **TODO** groundskeeper v2: workbook-native mobile client
+  - id: wb-3ojf.5
+- **TODO** groundskeeper — voice chief-of-staff over the repo (design: examples/groundwork/design/voice-agent.md) (epic)
+  - id: wb-3ojf
+- **TODO** groundwork: derive positioning artifacts from audited thesis
+  - id: wb-5m2.4
+- **TODO** groundwork: 'ideate' toolkit — audio in, claims ledger out
+  - id: wb-5m2.3
+- **TODO** groundwork: run the org-mode model-knowledge benchmark
+  - id: wb-5m2.2
+- **TODO** groundwork: evidence pass — verify every CLAIMED item in audits/spoken-thesis.md against repo
+  - id: wb-5m2.1
+- **TODO** self-contained .app: bundle vfkit + OCI→ext4 disk boot (no brew, no admin, fast first boot)
+  - id: wb-hhf.2
+- **TODO** Autopoiesis — the autopoet: the runtime self-maintains by editing its own declarative config layer (epic)
+  - id: wb-9ae
+- **TODO** channels CLI toolkit — agent-facing send/receive surface
+  - id: wb-07r
+- **TODO** Tunneled app delivery — agent ships a workbook link to your phone
+  - id: wb-6hn
+- **TODO** channels: Telegram adapter (official Bot API, pure Elixir)
+  - id: wb-8pm
+- **TODO** Channels: runtime messaging adapters (OpenClaw-parity, official-API tier first) (epic)
+  - id: wb-aiw
+- **TODO** bit.ml search capability: news research via DataForSEO SERP + fetch (no new keys)
+  - id: wb-wc0.3
+- **TODO** runtime credential brokerage via Workbooks auth: fetch cloud/org runtime creds, share across org
+  - id: wb-hhf.1
+- **TODO** Quarantined X reader — inbound mentions/replies without prompt-injection risk
+  - id: wb-2ku.9
+- **TODO** Live edit streaming: agent tool-call deltas over SSE → token-level typing/diff animation in follow mode
+  - id: wb-2ku.8
+- **TODO** Framework lane taxonomy — which UI frameworks get in-sandbox hooks (Vue, Solid) vs config (Preact/JSX) vs dev-machine-only (Astro/Next/SvelteKit)
+  - id: wb-2ku.6
+- **TODO** wb CLI polish: usage text omits real commands; publish desktop-app target undocumented; toolkit eval only reachable over RCP
+  - id: wb-0bw
+- **TODO** Svelte lane IN-SANDBOX: sveltejob.js compiles .svelte under qjs-run.wasm, then bundlejob — zero native exec
+  - id: wb-2ku.5
+- **TODO** Lander A/B testing — whole-page variants instead of section-at-a-time growth
+  - id: wb-u48.6
+- **TODO** REM: Mercury diffusion live view — stream denoising passes to /rem while dreaming
+  - id: wb-2ku.4
+- **TODO** REM v3: semantic embedding mind-map over dream history — directions, variables, connections
+  - id: wb-2ku.2
+- **TODO** REM v2: multi-frame dreaming — N fast Mercury snapshots per cycle, compiled into the single entry
+  - id: wb-2ku.1
+- **TODO** curation format: showcase-not-replace — creator links, attribution, daily manifest
+  - id: wb-0st.8
+- **TODO** poster thumbnails via image model — no baked text, HTML overlays only
+  - id: wb-0st.7
+- **TODO** editorial-room workflow def — ideate from today's news → pick → curate → publish
+  - id: wb-0st.6
+- **TODO** wire Workbooks.Browse as the editorial room's research tool
+  - id: wb-0st.5
+- **TODO** Exa agentic search integration (key from founder)
+  - id: wb-0st.4
+- **TODO** YouTube Data API integration (search channels/videos; key from founder)
+  - id: wb-0st.3
+- **TODO** WULU tenant on the runtime — second app/host via Domains registry, same scale-to-zero pattern
+  - id: wb-0st.2
+- **TODO** WULU brand + poster design system (textless CSS/image posters, HTML text overlays)
+  - id: wb-0st.1
+- **TODO** blog/SEO: sitemap.xml + meta/OG/JSON-LD on lander+blog served by the runtime (or CF), so the agent's SEO work is real
+  - id: wb-u48.5
+- **TODO** keeper: research→draft→verify loop for content — gather sources (browser), draft (cite, never fabricate), self-check claims, commit; same plan/edit mode + ground rules
+  - id: wb-u48.4
+- **TODO** keeper: expand mandate beyond the lander — SEO (titles/meta/structure), SaaS landing copy, docs, and blog posts; the loop picks the highest-leverage growth task
+  - id: wb-u48.3
+- **TODO** keeper: browser/research capability — wire Workbooks.Browse into the keeper's tool surface (gated) so it can look things up, gather sources, check facts before writing
+  - id: wb-u48.2
+- **TODO** blog: a /blog on the runtime — posts ARE workbooks (one file each), served by PublicWeb; index + post routes; keeper authors/edits them
+  - id: wb-u48.1
+- **TODO** ergonomics(investigate): faster engine inner-loop — dev image that MOUNTS host code vs baking it, so an engine change is testable in a real container without a full multi-arch CI build
+  - id: wb-ziv.4
+- **TODO** ergonomics: clean 'wb publish' for built workbooks/static sites to a running engine — retire the fly-proxy + github-raw hacks; works against internal-plane deploys
+  - id: wb-ziv.3
+- **TODO** ergonomics: wb deploy VERIFIES — post-apply /health poll + running-image-digest check + control-plane lock probe; fail loud instead of 'success while OOM-looping/stale/open'
+  - id: wb-ziv.2
+- **TODO** ergonomics: engine changes local-first — doc + tooling so runtime/host edits are validated against a local runtime (iex/mix) and CI image is cut ONCE when proven, not per-discovery (biggest lander-live time sink)
+  - id: wb-ziv.1
+- **TODO** deploy-kit: pin engine image by sha (not float :latest) + verify running digest post-apply — fly served a stale pre-fix :latest, masking the auth-lock regression. Found by lander-live.
+  - id: wb-0d6
+- **TODO** toolkits: run :role pre/task blocks with cwd = toolkit dir (sandbox-confined) or export WB_TOOLKIT_DIR — relative self-probes currently fail; found by living-lander native eval
+  - id: wb-apd
+- **TODO** DIST: npm postinstall soft-fail is silent under npm's script-output suppression — print loud summary / fail hard when platform asset definitively absent
+  - id: wb-fwz
+- **TODO** retire the real-bash run tool — remove the exec escape hatch once the WASM shell + brokered exec + CLI coverage land
+  - id: wb-9ja.4
+- **TODO** CLI→WASM coverage — audit every shipped toolkit CLI is wb-toolkit-build-able to a WASM command; native posix toolkits run under the Policy profile, never raw exec
+  - id: wb-9ja.3
+- **TODO** lander-live: analytics in — PostHog snippet on page + keeper skill querying PostHog REST (secret-gated), decisions cited in commit messages
+  - id: wb-5vm.5
+- **TODO** lander-live: live-update channel v1 — WS/poll notify on /w/:id change → client soft reload (Yjs deferred to v2 if live cursors wanted)
+  - id: wb-5vm.4
+- **TODO** lander-live: keeper agent — org :agent: def w/ ground rules + hourly trigger (BEAM interval or fly cron → POST /api/run) + weekly plan org
+  - id: wb-5vm.3
+- **TODO** lander-live: fly demo engine via deploy-kit — deployment.org + secrets (OPENROUTER_API_KEY, POSTHOG_API_KEY), cheap model default (xiaomi/mimo-v2.5)
+  - id: wb-5vm.2
+- **TODO** lander-live: serve the lander at runtime root — map / to stored workbook (PublicWeb), publish via wb publish self-hosted
+  - id: wb-5vm.1
+- **TODO** wb dev: eval + ctk verbs (development-service follow-ons)
+  - id: wb-xx6
+- **TODO** wb bundle: port single-file HTML-app bundling (Vite multi-file JS apps → one .html, the old npm workbook-build lane) into the canonical Rust wb or runtime; web/lander-wb still builds via its project-local legacy devDependency
+  - id: wb-1y6
+- **TODO** Routing config + target presets (desktop / web / mobile)
+  - id: wb-lk6.4
+- **TODO** Green the desktop typecheck — 6 svelte-check errors
+  - id: wb-jay.24
+- **TODO** Wire installer into desktop publish CI/CD
+  - id: wb-qyk
+- **TODO** Add 'wb desktop' CLI subcommand (install/launch)
+  - id: wb-jnw
+- **TODO** Author install.sh curl installer served at workbooks.sh
+  - id: wb-pdd
+- **TODO** Confirm desktop-release.yml builds the app WITH the wizard
+  - id: wb-y01
+- **TODO** Smoke-test wizard happy path locally
+  - id: wb-rj7
+- **TODO** Ship desktop engine install wizard (release + CLI installer + CI/CD) (epic)
+  - id: wb-kyb
+- **TODO** Proc-macros in wasm (watt-style) + mrustc bridge
+  - id: wb-zq4
+- **TODO** Agent secret brokering: no secrets in the container; runtime brokers capabilities
+  - id: wb-qdx
+- **TODO** Gap 2 smoke test: proc-macro server wasm round-trips a TokenStream over stdin-stdout
+  - id: wb-phq
+- **TODO** Verify WorkOS sign-in end-to-end in the production .app
+  - id: wb-1bo
+- **TODO** serde_derive compile: target_os spoof unblocks syn parse_macro_input (gap #1)
+  - id: wb-ag8
+- **TODO** WIRE-UP: skills / plugins / MCP servers real list+install+toggle+persist
+  - id: wb-jay.11
+- **TODO** WIRE-UP: agent settings persistence (default agent/model + catalog)
+  - id: wb-jay.10
+- **TODO** BUILD: voice / Gemini-Live realtime brainstorm (needs runtime support first)
+  - id: wb-jay.17
+- **TODO** Runtime: duplex audio transport over the authed WS (frames up, audio+transcript+events down)
+  - id: wb-hhc.3
+- **TODO** SPIKE: can BEAM hold a Gemini Live WS and relay audio frames at acceptable latency?
+  - id: wb-hhc.1
+- **TODO** Runtime: realtime session lifecycle in the agent framework (open/stream/barge-in/close)
+  - id: wb-hhc.2
+- **TODO** Runtime: realtime (voice-to-voice) agents — runtime-brokered Gemini Live (epic)
+  - id: wb-hhc
+- **TODO** BUILD: network feed / identity (DID) / publish / fork — real backend
+  - id: wb-jay.20
+- **TODO** BUILD: terminal drawer — xterm.js + pty sessions
+  - id: wb-jay.19
+- **TODO** BUILD: command palette actions execute (not just write-back to composer)
+  - id: wb-jay.18
+- **TODO** WIRE-UP: engine status real probe
+  - id: wb-jay.14
+- **TODO** WIRE-UP: integrations/connections (OAuth + local CLI detection + keychain)
+  - id: wb-jay.12
+- **TODO** SPINE-6: GUI verification — drive full loop via tauri-gui-testing
+  - id: wb-jay.6
+- **TODO** resolve_via_index ignores exact pin for httparse (1.3.0 -> 1.9.3)
+  - id: wb-4jo
+- **TODO** build.rs: compile + run build scripts in-sandbox (codegen path)
+  - id: wb-iht
+- **TODO** In-sandbox JS bundler (npm-dep resolution) — the real Bun gap
+  - id: wb-mam
+- **TODO** P6: bundle + codesign/notarize the .dmg (mac aarch64); honest stub if no certs
+  - id: wb-7b3
+- **TODO** P4: wire frontend to real backend — replace bindings.ts mocks (HTTP/WS to localhost + Tauri IPC for native)
+  - id: wb-naa
+- **TODO** P5: bundle + codesign/notarize .dmg (mac aarch64+x86_64); stub signing if no certs
+  - id: wb-u2s
+- **TODO** Toolchain pallet: pin runtimes by manifest+sha, fetch-not-commit the .wasm
+  - id: wb-4bj.13
+- **TODO** Node.js runtime for the palette via ComponentizeJS/StarlingMonkey (wasmtime-native Node-package compat)
+  - id: wb-4bj.15
+- **TODO** Backfill 2 adversarial test files the audit workflow wrote but never committed (dock_run_command, package_manager_run)
+  - id: wb-4bj.14
+- **TODO** Compiler-in-WASM (option B): build runs inside the sandbox, no OS process — SPIKED, works
+  - id: wb-4bj.12
+- **DEFERRED** Deploy: workbooks.sh → Fly runtime serving the lander via PublicWeb; provider-agnostic DNS (CF for this domain) + optional CF orange-cloud for DDoS; verify e2e + x-served-by marker
+  - id: wb-1x1.8
+- **TODO** Public Web — serve apps publicly from the runtime (all-Elixir, one node) (epic)
+  - id: wb-1x1
+- **TODO** P6: hardening — rate limits, strict Host validation, isolation review; fold in palette-audit findings before internet-live
+  - id: wb-1x1.7
+- **TODO** P3: attach flow (control plane) — attach/verify/mark_live + DNS instructions + SSRF-guarded verification
+  - id: wb-1x1.4
+- **TODO** P2: Workbooks.Acme GenServer — HTTP-01 issuance + /.well-known/acme-challenge route + persistence + renewal tick
+  - id: wb-1x1.3
+- **TODO** P9: host-side bash interpreter (&&/||/;/redirects/vars/globs/subst over command leaves) + coreutils-as-wasm-commands; current Shell is pipe-only over 3 commands
+  - id: wb-4bj.10
+- **TODO** P7: re-author workbooks toolkits + federation 3-face for SaaS + deprecate publish/
+  - id: wb-4bj.8
+- **TODO** P3: manifest auto-injection (SessionRunner compact TOOLKITS index from agent :TOOLKITS:)
+  - id: wb-4bj.4
+
+
+## P3 (34)
+- **TODO** D3 [advisory] VFS strip uses VACUUM, not secure erasure
+  - id: wb-fxdg
+- **TODO** DEFER (hard/capability): streaming multiplexed child_process protocol over the Dock + readline/tty/PTY (interactive CLI) + cloud device-code auth
+  - id: wb-b9xv.11
+- **TODO** Image-gen workflows/skills in the waldo toolkit
+  - id: wb-d2nx.6
+- **TODO** Waldo under/over-executes the multi-step model-switch task (multistep-model-switch eval fails on BOTH cheap + strong models)
+  - id: wb-wl4v
+- **TODO** Browse path hardening: crawl handler hard-matches {:ok,pages}; Fetch.get re-resolves (DNS-rebind TOCTOU)
+  - id: wb-pbw4
+- **TODO** web_search: expose source signal so query() distinguishes empty from backend-failure
+  - id: wb-qc03
+- **TODO** exec-deploy-status eval: mimo doesn't converge (runs wb deploy status, never reports+done)
+  - id: wb-3hdb
+- **TODO** Harden fetch SSRF guard against DNS rebinding (TOCTOU)
+  - id: wb-ntx6
+- **TODO** ACP external-CLI orchestration (Claude Code/Codex/Cursor) host-brokered tool
+  - id: wb-d2nx.7
+- **TODO** /api/run/:id JSON: events_org field intermittently has raw control chars (strict parsers reject)
+  - id: wb-p2we
+- **TODO** NetGuard.request: streaming response cap (bound PEAK receive memory, not just stored bytes)
+  - id: wb-4had
+- **TODO** Palette command-registry merge
+  - id: wb-aakl.26
+- **TODO** Lesson: 'browser' deep-dive concept
+  - id: wb-aakl.18
+- **TODO** Rename runtime → nexus (codebase-wide)
+  - id: wb-2phu
+- **TODO** broker(js): js_dock host_tcp/host_udp imports not yet JS-callable (need Javy harness bindings)
+  - id: wb-q2mo
+- **TODO** broker(net): host_http_get transient body-read unbounded (low priority)
+  - id: wb-p90a
+- **TODO** File libkrun upstream issues with wb-ryw repro data
+  - id: wb-z4x
+- **TODO** Built-command cache should layer WB_DATA over the image dir — deploys wipe /app/build/cache so the first shell call per deploy rebuilds wbox (~17s)
+  - id: wb-59o
+- **TODO** center-drop INTO running workbook app (Dock file-drop event, app opt-in)
+  - id: wb-5fl.6
+- **TODO** folder-row drop = move file into package (needs backend move cmd + spring-load)
+  - id: wb-5fl.5
+- **TODO** keeper: inject real date into the run task (agent dated its Log entry 2025, today is 2026 — model's internal date is stale). keeper.ex run_def should pass Date.utc_today() in the task line.
+  - id: wb-2gy
+- **TODO** deploy-kit: support OPTIONAL declared secrets (#+DEPLOY_SECRETS_OPTIONAL or name? suffix) — currently all declared secrets are mandatory; found by lander-live deploy
+  - id: wb-24t
+- **TODO** lander-live: OPTIONAL open-tab live poll — page re-fetches /rcp/changes every ~30s so a tab already open ticks when the keeper commits (next-load is already instant via live render). Additive; skip-able. Yjs not needed (poll suffices).
+  - id: wb-96o
+- **TODO** Consolidate desktop storage dirs — retire ~/.oql/desktop for a Workbooks-branded root
+  - id: wb-jay.26
+- **DEFERRED** BEAM-offload: mediated concurrency host fn (MEDIATE: BEAM processes as parallelism)
+  - id: wb-y72
+- **TODO** unicode EDGE: full-default regex tables + unicode-normalization on 1.74
+  - id: wb-4k8
+- **TODO** SHIP: make ghcr.io/workbooks-sh/runtime image public for anonymous pull
+  - id: wb-jay.23
+- **TODO** SHIP: decide wb bundling (Burrito-wrap ERTS vs reimplement deploy in Rust)
+  - id: wb-jay.22
+- **TODO** SHIP: Apple signing cert (codesign + notarize)
+  - id: wb-jay.21
+- **TODO** -sys crates: compile vendored C deps via clang.wasm
+  - id: wb-zir
+- **TODO** Language-version ceiling: mrustc ~1.54 vs modern Rust (GATs/let-else/edition2024)
+  - id: wb-1ec
+- **TODO** P5: :public Policy profile + content-plane sandboxed component invocation (no secrets/net/build)
+  - id: wb-1x1.6
+- **TODO** P4: agent automation — create DNS records via DNS toolkits when creds exist; DNS-01 for wildcard/apex
+  - id: wb-1x1.5
+- **TODO** P8: extensions (untrusted WASM artifacts) per EXTENSIONS-ORB.org — gated on Orb/Rust-component maturity
+  - id: wb-4bj.9
+
+
+## P4 (1)
+- **TODO** ChatGPT-subscription as LLM backbone (parked/experimental)
+  - id: wb-xiei.7
+
+
+## recently closed
+- **DONE** Time: pure host-injected date/duration/cron library
+  - id: wb-2gtr.5
+- **DONE** Data: work-query + from= bindings over SQLite/Postgres seam
+  - id: wb-2gtr.4
+- **DONE** Workponents: PM + agentic structural vocabulary
+  - id: wb-2gtr.3
+- **DONE** Kernel: rewire tangle/validate/upgrade onto Node; drop orgize + transforms.ts
+  - id: wb-2gtr.2
+- **DONE** groundwork example — zero-to-one ideation system on workbooks (epic)
+  - id: wb-5m2
+- **DONE** Toolkits V3 — clean-room toolkit system (epic)
+  - id: wb-4bj
+- **DONE** Desktop: Waldo+home redesign, real key connections, voice (epic)
+  - id: wb-2s09
+- **DONE** REM (Mercury Dreams) — inter-session dream journal that steers the agent (epic)
+  - id: wb-2ku
+- **DONE** bit.ml — agent-run editorial service (Linear×NYT): multi-agent newsroom pipeline, per-agent live presence, redesigned inspect panel (epic)
+  - id: wb-wc0
+- **DONE** WULU — agent-curated AI/tech showcase site (Netflix × NYT) (epic)
+  - id: wb-0st
+- **DONE** groundwork example — zero-to-one ideation system on workbooks (epic)
+  - id: wb-0qh
+- **DONE** Streaming Waldo chat + in-chat component system (epic)
+  - id: wb-18ae
+- **DONE** [epic] CTK + eval SDK + wb dev — PRODUCT-complete (A) (epic)
+  - id: wb-3gm
+- **DONE** [epic] CTK — Component ToolKit (human-in-the-loop component canvas) (epic)
+  - id: wb-3xz
+- **DONE** Desktop home + Waldo redesign, real key connections, voice (epic)
+  - id: wb-l894

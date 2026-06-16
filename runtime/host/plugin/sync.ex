@@ -6,7 +6,7 @@ defmodule Workbooks.Plugin.Sync do
   plugin), this gives a resident, queryable local mirror, airgapped from the agent —
   it only ever writes to the VFS; the agent reads the mirror like any other workbook.
 
-  Driven from a `sync.org` face (`:daemon:` node: `#+ENTITY`, `#+INTERVAL`). The pull
+  Driven from a `sync.md` face (`:daemon:` node: `#+ENTITY`, `#+INTERVAL`). The pull
   logic is `pull_once/2` (pure, testable); the GenServer just calls it on a timer.
   """
   use GenServer

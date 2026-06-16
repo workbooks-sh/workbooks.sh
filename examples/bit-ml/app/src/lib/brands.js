@@ -1,5 +1,5 @@
 // Brand registry (DESIGN.md §"inline brand logos"). Curated, INLINED full-color
-// SVG marks for the brands the seed content names. Sourced per skills/icons.org:
+// SVG marks for the brands the seed content names. Sourced per skills/icons.md:
 //   svgl (full color) → lobehub *-color → simple-icons (monochrome, brand hex).
 // Each mark is normalized to a 24-viewBox, sized by the wrapper to ~1em (so it
 // scales with its heading), and carries its OWN color (monochrome marks get the

@@ -1,0 +1,81 @@
+# Secrets — reference without sight (the Dock secret model)
+
+*2026-06-06*
+
+The goal Shane named: a Workbook container (and the agents inside it) can **use** a
+server-held secret without ever being able to **see** it. The WASM sandbox makes
+this enforceable in a way a normal process can't — a secret the host never writes
+into the guest's linear memory is a secret the guest physically cannot read.
+
+This sits in the onion as: an L1 contract (the Org schema of **what** secrets a
+Workbook needs) + an L2 backend (where values actually live) + a Dock rule
+(values cross into the guest only as **effects**, never as **data**).
+
+# Varlock — the reference (investigated 2026-06-06)
+
+  Varlock (`dmno-dev/varlock`, TypeScript) is "AI-safe .env": a committed
+  `.env.schema` declares variable **names, types, validation, descriptions** —
+  **no values** — and resolves real values at runtime from external managers
+  (1Password, AWS Secrets Manager, Azure Key Vault) via plugins. It masks
+  secrets in CLI output, redacts them from logs (`console` patched), and scans
+  for leaks. The schema is safe to commit and gives an agent full config context
+  **without** the secret values. https://varlock.dev , https://github.com/dmno-dev/varlock
+
+  What we borrow: the **schema/values split** and **redaction**. What we add that
+  Varlock can't: **sandbox enforcement** — Varlock redacts what a process could
+  still read; our guest never receives the bytes at all.
+
+# The model — three pieces
+
+## 1. The schema lives in Org (L1). AI-safe by construction.
+
+   A Workbook declares the secrets it needs as named, typed requirements — the
+   `.env.schema` analog, authored in Org (fits "Org owns the spec"). E.g. a
+   `:secrets:` drawer or header arg: `:needs STRIPE_KEY:secret OPENAI_KEY:secret`.
+   This is what an agent sees: names + types + descriptions, never values. The
+   tangle plan surfaces it; `wb build` can validate that every referenced secret
+   is declared (the way it validates dangling inputs today).
+
+## 2. The values live host-side (L2). A SecretBackend behaviour.
+
+   Same shape as the storage `Backend`: one behaviour, many impls, chosen per
+   deploy cell.
+   - `Secret.Env` — local/dev, from the host environment.
+   - `Secret.OnePassword` / `Secret.AWS` / `Secret.Vault` — prod, over their APIs.
+   - `Secret.Varlock` — shell out to the varlock CLI / read its resolved set,
+     getting Varlock's resolution + redaction for free.
+   Values are loaded into the **engine**, never into a Workbook's VFS or bundle.
+
+## 3. The Dock rule: secrets cross as effects, never as data.
+
+   The guest references a secret by **name**; the host resolves it only **inside** a
+   host-side operation and returns the result, not the secret. Concretely, extend
+   the `workbooks:engine` world:
+   - `net-fetch` already runs host-side. A guest passes a header template
+     `authorization: Bearer {{secret:STRIPE_KEY}}`; the host substitutes the
+     value **after** leaving the sandbox and before the socket. The guest sees the
+     response, never the key.
+   - `llm-complete` already holds the model key host-side — the existing proof of
+     this pattern. Same rule, generalized.
+   - `secret-present?(name) -> bool` — the **only** secret-shaped value a guest may
+     read: existence, never content. Lets a Workbook branch on config without
+     exposure.
+   There is deliberately **no** `secret-get(name) -> string` import. Adding one
+   would defeat the whole model; its absence is the guarantee.
+
+# Why the sandbox makes this real
+
+  In a normal process, "don't log the secret" is a discipline (what Varlock
+  automates). Here it's physics: the host writes the secret into the *outbound
+  request buffer* on the host side of the Wasmtime boundary. It is never `alloc`'d
+  into the guest's linear memory, so no guest instruction — intended, buggy, or
+  hostile — can address it. Capability-by-construction, the same way an ungranted
+  Dock import simply isn't linked.
+
+# Status / next
+
+  Design only today. The existing `llm-complete` host-held-key path is the
+  working seed. Implementation order when picked up: SecretBackend behaviour +
+  `Secret.Env` → the Org `:needs` schema in the tangle plan + `wb build`
+  validation → `net-fetch` secret-template substitution + `secret-present?` Dock
+  import → `Secret.Varlock` / 1Password as deploy-cell swaps. Tracked in bd.

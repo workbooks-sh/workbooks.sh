@@ -13,7 +13,7 @@
 //! - **Cap wrappers** (`dock::llm::ask`, `dock::vfs::query`, …): materialized by
 //!   the [`bind!`] macro over the author's wit-bindgen-generated `bindings`
 //!   module, gated by Cargo feature so only granted caps are linked. See the
-//!   crate README / DOCK-SDK.org for the cap-scoping rule.
+//!   crate README / DOCK-SDK.md for the cap-scoping rule.
 //!
 //! ```ignore
 //! mod bindings;            // wit-bindgen output for your WIT subset world

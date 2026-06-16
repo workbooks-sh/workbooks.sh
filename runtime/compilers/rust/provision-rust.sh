@@ -2,7 +2,7 @@
 # ONE idempotent entrypoint that rebuilds the entire Rust-in-WASM lane from the committed
 # recipe. Run this in any fresh checkout (or after the gitignored artifacts are cleaned) and
 # it brings the lane back to "untrusted Rust+std compiles in the sandbox". Fast-skips every
-# stage whose output already exists, so it's cheap to re-run as a status check. See BUILD-STATE.org.
+# stage whose output already exists, so it's cheap to re-run as a status check. See BUILD-STATE.md.
 set -euo pipefail
 SD="$(cd "$(dirname "$0")" && pwd)"          # compilers/rust
 COMPILERS="$(cd "$SD/.." && pwd)"

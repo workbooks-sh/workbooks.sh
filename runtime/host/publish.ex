@@ -1,6 +1,6 @@
 defmodule Workbooks.Publish do
   @moduledoc """
-  The publish-kit — render a Workbook (.org) to a self-contained HTML page and
+  The publish-kit — render a Workbook (.html) to a self-contained HTML page and
   ship it to a provider. One workbook = one URL.
 
     * `cloudflare-pages` — wrangler pages deploy (already used by the lander)
@@ -8,36 +8,33 @@ defmodule Workbooks.Publish do
     * `self-hosted`      — POST the HTML blob to a running runtime's /publish API
 
   THE FLOW (declarative — mirrors deploy-kit):
-    wb publish init                scaffold ./publish.org
+    wb publish init                scaffold ./publish.html
     wb publish validate            coherence-check it (no render, no deploy)
-    wb publish apply <file.org>    render + ship → prints the live URL
-  (workbook defaults to ./workbook.org; config defaults to ./publish.org)
+    wb publish apply <file.html>   render + ship → prints the live URL
+  (workbook defaults to ./workbook.html; config defaults to ./publish.html)
 
-  Rendering reuses `PublicWeb.static_page/2`: OQL.render(org) → rich HTML shell.
-  No server required at publish time — the OQL kernel is embedded in the runtime
-  binary (same as the desktop app).
+  Rendering reuses `PublicWeb.static_page/2`: a workbook IS HTML, so a complete
+  document is served verbatim and a fragment is wrapped in the doc shell. No
+  server required at publish time.
   """
   alias Workbooks.Publish.Config
 
-  @default_config "publish.org"
-  @default_workbook "workbook.org"
+  @default_config "publish.html"
+  @default_workbook "workbook.html"
 
   @template """
-  # Publish configuration — one declarative description of where this workbook lives.
-  # Edit, then:  wb publish validate  →  wb publish apply <workbook.org>
-  #
-  # Secrets (API keys, tokens, account IDs) do NOT go here.
-  # Use env vars: CLOUDFLARE_ACCOUNT_ID, etc.
-  * publish :publish:
-    :PROPERTIES:
-    :PUBLISH_TARGET:  cloudflare-pages
-    :PUBLISH_PROJECT: <your-pages-project-name>
-    :PUBLISH_DOMAIN:  <your-domain-or-pages.dev-url>
-    :PUBLISH_TITLE:   <page title>
-    :END:
+  <!-- Publish configuration — one declarative description of where this workbook lives.
+       Edit, then:  wb publish validate  →  wb publish apply <workbook.html>
+       Secrets (API keys, tokens, account IDs) do NOT go here. Use env vars
+       (CLOUDFLARE_ACCOUNT_ID, etc.). -->
+  <work-publish
+    publish-target="cloudflare-pages"
+    publish-project="<your-pages-project-name>"
+    publish-domain="<your-domain-or-pages.dev-url>"
+    publish-title="<page title>"></work-publish>
   """
 
-  @doc "Scaffold a publish.org. Starting point."
+  @doc "Scaffold a publish.html. Starting point."
   def init(opts \\ []) do
     file = Keyword.get(opts, :file, @default_config)
     force? = Keyword.get(opts, :force, false)
@@ -48,11 +45,11 @@ defmodule Workbooks.Publish do
 
       true ->
         File.write!(file, @template)
-        ok("wrote #{file} — edit it, then `wb publish validate` → `wb publish apply <workbook.org>`", %{file: file})
+        ok("wrote #{file} — edit it, then `wb publish validate` → `wb publish apply <workbook.html>`", %{file: file})
     end
   end
 
-  @doc "Coherence-check a publish.org without rendering or deploying."
+  @doc "Coherence-check a publish.html without rendering or deploying."
   def validate(config_file) do
     with :ok <- exists(config_file),
          {:ok, p} <- Config.parse(config_file) do
@@ -67,15 +64,16 @@ defmodule Workbooks.Publish do
   end
 
   @doc """
-  Render `org_file` → HTML, then ship to the configured provider.
-  `config_file` defaults to ./publish.org; `org_file` defaults to ./workbook.org.
+  Render `workbook_file` → HTML, then ship to the configured provider.
+  `config_file` defaults to ./publish.html; `workbook_file` defaults to
+  ./workbook.html.
   """
-  def apply(org_file, config_file) do
+  def apply(workbook_file, config_file) do
     with :ok <- exists(config_file),
-         :ok <- exists(org_file),
+         :ok <- exists(workbook_file),
          {:ok, p} <- Config.parse(config_file),
          :ok <- coherent(p),
-         {:ok, out_path} <- render(org_file, p) do
+         {:ok, out_path} <- render(workbook_file, p) do
       ship(out_path, p)
     else
       {:error, issues} when is_list(issues) ->
@@ -85,11 +83,12 @@ defmodule Workbooks.Publish do
     end
   end
 
-  # Render .org → self-contained .html using the embedded OQL kernel.
-  # Reuses PublicWeb.static_page/2 — same render path the runtime's public plane uses.
-  defp render(org_file, p) do
-    org = File.read!(org_file)
-    html = Workbooks.PublicWeb.static_page(Config.title(p), org)
+  # Render the workbook HTML → a self-contained page. Reuses PublicWeb.static_page/2
+  # (a complete document serves verbatim; a fragment gets the doc shell) — the same
+  # render path the runtime's public plane uses.
+  defp render(workbook_file, p) do
+    src = File.read!(workbook_file)
+    html = Workbooks.PublicWeb.static_page(Config.title(p), src)
     out = p["PUBLISH_OUTPUT"] || ".publish_out/index.html"
     File.mkdir_p!(Path.dirname(out))
     File.write!(out, html)

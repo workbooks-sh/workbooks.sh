@@ -1,0 +1,141 @@
+
+# The question
+
+Can we embed images + video for semantic search, like we do text? Can it run
+in-BEAM? Is there a Gemma multimodal model? How big, and does it need another server?
+
+# Key finding: text is static (pure Elixir); image/video need neural inference — 3 ways to run it
+
+Text embeds in pure Elixir ONLY because Model2Vec is STATIC (tokenize → matrix
+lookup → mean — no neural net). Image/video models are ViTs/CNNs needing actual
+neural inference. That inference can run THREE ways, all behind `Workbooks.Embed`:
+  1. **IN-BEAM (ONNX via Ortex)** — the small in-process path, SHIPPED. CLIP runs
+     inside the BEAM through onnxruntime (Ortex), two q8 towers in one 512-d space.
+     OPT-IN at build: =WB_CLIP=1= pulls {ortex, tokenizers, nx, stb_image} AND
+     compiles `host_ml/embed_ortex_clip.ex` — default builds pull NONE of it (lean).
+     Runtime route: =WB_EMBED=clip=. ~170 MB total (onnxruntime ~20 MB + q8 model
+     ~147 MB), no XLA, no JIT. PROVEN here (see "Tested" below).
+     [Rejected: an EXLA/Bumblebee version — it worked but carried a 300 MB XLA
+     runtime + 605 MB model + a ~24 s first-call JIT (~900 MB). ONNX is ~5× smaller
+     and warms in ~250 ms; not worth the weight.]
+  2. **WASM / browser** — transformers.js (onnxruntime-web) runs CLIP/SigLIP client-
+     side, same place `verify.mjs/embed.mjs` run. Sovereign, no server inference.
+  3. **External API** — a hosted multimodal embedder. Connect via
+     =WB_EMBED_IMAGE=http:<url>=.
+All slot into `Workbooks.Embed` (the provider behaviour). `Workbooks.Vector` is
+already modality-agnostic (any dim) — only the EMBEDDER changes per modality; index
++ search + storage are unchanged.
+
+# The models (2026)
+
+- **Gemini Embedding 2** (Google, public preview Mar 2026) — first natively
+  MULTIMODAL embedder: text + image + video + audio + PDF in ONE 3072-d space
+  (cross-modal: a text query matches images/video directly). Top MTEB 68.32. But
+  HOSTED API — external, per-query, on Google's servers. The "covers all bases"
+  option, not sovereign.
+- **EmbeddingGemma** (308M, open, on-device) — TEXT-ONLY (the one we already cite).
+- **SigLIP 2** (Google, Feb 2025, Apache-2.0) — open image-text encoder, several
+  sizes; base ~375 MB. The sovereign image workhorse.
+- **TinyCLIP** (MIT, ~24 MB) — small image-text model, runs in WASM/browser.
+- **Video** = sample keyframes → embed each as an image → pool/store (recent
+  methods need ~1.4% of frames). NO separate video model — reuse the image
+  embedder; "search a video" = search its keyframe vectors.
+
+# Recommendation — two options, both fit the slot
+
+| option | covers | runs where | tradeoff |
+| --- | --- | --- | --- |
+| Gemini Embedding 2 (API) | text+image+video+audio, 1 space | Google servers | zero infra, top quality; external + per-query + not sovereign |
+| WASM SigLIP/TinyCLIP + frames | text↔image (video via frames) | our Wasmex sandbox + browser | sovereign, multi-tenant; bigger model, no audio |
+
+Keep the modality-slot design (it accommodates both). Text ships now (pure
+Elixir, tiny). Add image/video as a SECOND `Embed` adapter when needed — WASM
+SigLIP/TinyCLIP for sovereign, or Gemini Embedding 2 as the all-in-one convenience
+adapter (same shape as the `openrouter` text adapter). The only new work is the
+embedder; everything downstream is reused. Multimodal vectors live in the SAME
+Vector store, so cross-modal search (text query → image/video hits) is automatic
+once both land in one space (native with Gemini Embedding 2; with SigLIP the
+image-text space is shared by construction).
+
+# Tested: CLIP cross-modal works (image embeddings are real)
+
+Ran `Xenova/clip-vit-base-patch32` (transformers.js): a dog photo scored
+`a photo of a dog` 0.977 vs `a sports car` 0.021, `cat` 0.001 — cross-modal text↔
+image by meaning, inference 115 ms (native; 605 MB fp32 / q8 ≈ 150 MB). CLIP runs
+in WASM in any browser (transformers.js = onnxruntime-web) → a workbook can do
+sovereign image search CLIENT-SIDE, the same place verify.mjs/embed.mjs run.
+
+Then proven IN-BEAM via ONNX (=WB_CLIP=1=, Ortex/onnxruntime, =Xenova/clip-vit-base-
+patch32= q8 towers, 512-d joint space), BOTH directions cross-modal correct:
+  dog-image ↔ dog-text 0.273 > car-text 0.214
+  car-image ↔ car-text 0.278 > dog-text 0.210
+First text embed ~250 ms (no JIT). Adapter (`host_ml/embed_ortex_clip.ex`): the
+HF tokenizer pads to ctx 77 → text tower; image resize-shortest-224 + center-crop +
+CLIP-mean/std normalize (HWC→CHW) → vision tower; first ONNX output is the projected
+embedding, L2-normed. Ortex outputs live on `Ortex.Backend` → `Nx.backend_transfer`
+before any Nx math.
+
+# VLM2Vec-V2.0 — the preferred multimodal model (user pick), but GPU-only
+
+- Base = **Qwen2-VL-7B-Instruct** (7B params, bf16 ≈ ~15 GB on disk). Embeds text +
+  image + VIDEO + visual documents into ONE space — SOTA on MMEB-V2. No ONNX /
+  quantized export published.
+- **Cannot run in WASM or the BEAM** — a 7B VLM needs a GPU (~18–24 GB VRAM bf16,
+  ~8–12 GB quantized). It is a GPU INFERENCE SERVICE, not in-process — the "run
+  on another server" reality.
+- **Fits the Embed slot anyway**: an EXTERNAL/sidecar adapter (`Workbooks.Embed.VLM2Vec`)
+  POSTs text/image/video to a GPU endpoint, returns vectors into the SAME Vector
+  store → cross-modal search automatic. Same shape as the `openrouter` text adapter.
+- **Deploy options to actually run it**: Modal / Replicate / Fly GPU / HF Inference
+  Endpoint (dedicated GPU). Can't run 7B locally to demo on our data; wire the
+  adapter, point it at the GPU endpoint, validate there.
+
+# Defaults by deployment: cloud = CLIP, local-capable = bigger multimodal
+
+The right default depends on WHERE the runtime runs — and the open provider
+registry (`Workbooks.Embed`) makes it a config choice, not a fork:
+- **Cloud / Fly (CPU, multi-tenant)** → CLIP-class is the recommended default: one
+  model for image+TEXT in ONE space (cross-modal), small enough (~150 MB q8) to
+  ride in the runtime. A 7B VLM can't run multi-tenant on a CPU Fly machine.
+  Text can stay Model2Vec (pure Elixir) where pure-text quality matters; image (+
+  cross-modal) via CLIP.
+- **Local / single machine with an accelerator** (a dev's Mac MPS, a workstation
+  GPU) → since it's ONE computer, not multi-tenant, the runtime can serve a
+  HEAVIER multimodal model locally as the default (VLM2Vec, etc.), geared to that
+  machine's accelerator. The runtime can ASSESS capability (cores/RAM/OS/GPU) and,
+  if the box can run it, default to the bigger local model; else fall back to CLIP
+  / Model2Vec. "Fit the system it's on."
+- Both are just `WB_EMBED*` config today (local adapter / `http:<sidecar>` /
+  `WB_EMBED_MULTIMODAL`). The remaining BUILD is the actual local model RUNNER
+  (CLIP via a WASM `embed` command or an onnxruntime/torch sidecar) + a small
+  capability probe to pick the default — the registry already routes to it.
+
+# The modality spectrum (all one Vector store, pick per need)
+
+| modality | model | where it runs |
+| --- | --- | --- |
+| text | Model2Vec/potion (DONE) | pure Elixir, in-BEAM, tiny |
+| image (sovereign/client, light) | CLIP/SigLIP/TinyCLIP | WASM (browser/sandbox) — CLIP proven |
+| text+image+video+docs (SOTA) | VLM2Vec-V2 (Qwen2-VL-7B) | GPU service (Modal/Replicate/Fly GPU) |
+| text+image+video+audio (all-in) | Gemini Embedding 2 | hosted API (Google) |
+
+# Wiring the heavy local multimodal (VLM2Vec) — operator step, accelerator-gated
+
+The capability probe (`Workbooks.Embed.Capability`) recommends `:big_multimodal`
+ONLY when the machine has an accelerator (CUDA / Apple-Silicon MPS) + enough RAM.
+On such a machine the operator runs a LOCAL GPU/MPS sidecar (a Python service with
+VLM2Vec/Qwen2-VL-7B, or any multimodal embedder) exposing the same
+`POST /embed {inputs,modality} -> {vectors}` contract, and points the runtime at
+it: =WB_EMBED_MULTIMODAL=http:http://localhost:<port>=. Then ALL modalities
+(text+image+video) go through it in one space — same registry path as the CLIP
+sidecar, just a bigger model on real hardware. NOT runnable here (no GPU) and NOT
+on a multi-tenant CPU Fly box — honest stub: the connection + routing + probe are
+built; the GPU sidecar is the operator's to stand up on a capable machine. The
+shape mirrors `host_ml/embed_ortex_clip.ex` (swap CLIP q8 for the VLM, or run it as
+an external endpoint via =WB_EMBED_IMAGE=http:<url>=).
+
+# Worth prototyping when the need lands
+
+A WASM image-embed command (onnxruntime-web + TinyCLIP) registered like the text
+embedder — proves sovereign image search end-to-end, runs in the browser viewer
+too. Until then: text is done; image/video is a documented drop-in.

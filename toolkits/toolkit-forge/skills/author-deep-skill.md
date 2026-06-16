@@ -13,7 +13,7 @@ DESTRUCTIVE: no
 
   NOT for: the manifest index ([write-manifest](write-manifest.md)); deciding the skill
   set ([design-skills](design-skills.md)). For the full format spec read
-  [AUTHORING.org §"skills/<slug>.org"](../../AUTHORING.md); this is the operational how-to.
+  [AUTHORING.md §"skills/<slug>.org"](../../AUTHORING.md); this is the operational how-to.
 
 # The mental model: depth is the bar
 
@@ -130,5 +130,5 @@ DESTRUCTIVE: no
   - [design-skills](design-skills.md) — where this skill's slug + need came from
   - [write-manifest](write-manifest.md) — index this skill after writing
   - [verify-toolkit](verify-toolkit.md) — the final balance/link/recipe checks
-  - [toolkits/AUTHORING.org](../../AUTHORING.md) — the full format spec
+  - [toolkits/AUTHORING.md](../../AUTHORING.md) — the full format spec
   - `../ffmpeg/skills/image-resize.org` — the exemplar to match

@@ -11,7 +11,7 @@ defmodule Workbooks.Manifest do
   full COSE/X.509 C2PA claim. We adopt the scheme, drop the machinery: the
   did:key is self-certifying (the verifier decodes the pubkey straight from the
   DID), so the heavy cert chain the C2PA spike planned isn't needed. That spike's
-  X.509 path is SUPERSEDED by this — see docs/C2PA-DIDKEY-SPIKE.org.
+  X.509 path is SUPERSEDED by this — see docs/C2PA-DIDKEY-SPIKE.md.
 
   A signed `.html` carries `<script type="application/workbooks-c2pa+json">` with
   the manifest + signature. `verify/1` checks two things (either fail ⇒ invalid):

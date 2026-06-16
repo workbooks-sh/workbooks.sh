@@ -13,7 +13,7 @@ defmodule Workbooks.JJ do
       op-log corroborate each other (tamper-evident from two directions);
     * it's the substrate for concurrent sub-agents — each works on its own JJ
       change, JJ auto-rebases the TEXT, and the org-mode validations arbitrate
-      the MEANING (docs/IDENTITY-GIT-MONOREPO.org "Validation-gated merges").
+      the MEANING (docs/IDENTITY-GIT-MONOREPO.md "Validation-gated merges").
 
   Thin by design: we shell to `jj`, we don't reimplement it. Colocation means
   nothing else has to change — `Workbooks.Git` keeps committing as it does; JJ

@@ -33,7 +33,7 @@ defmodule Workbooks.Toolkits do
 
   The intended sandboxed surface for a toolkit's CLI is the WASM `run-command`
   path (Dock-gated). Host bash from skill files bypasses that and is therefore
-  gated/capped/isolated above. See docs/TOOLKITS-V3.org for the full model.
+  gated/capped/isolated above. See docs/TOOLKITS-V3.md for the full model.
   """
   # The toolkit manifest is a single `<work-toolkit>` HTML element (work-* model;
   # org fully retired — see docs/WORK-FORMAT.md). Skills are Markdown recipes.
@@ -507,9 +507,9 @@ defmodule Workbooks.Toolkits do
 
   @doc """
   `wb toolkit eval <id>` — run the toolkit's bundled eval suite (Tier 1,
-  deterministic): each `evals/*.org` case's `:role eval` block runs under the
+  deterministic): each `evals/*.md` case's eval-role block runs under the
   same sandbox as verify (only with WB_TOOLKIT_EXEC=1), and PASSES on exit 0 +
-  stdout containing the case's `#+EXPECT:` substring (when set). See EVALS.org.
+  stdout containing the case's `EXPECT` substring (when set). See EVALS.md.
   """
   def eval_text(id, root \\ default_root(), filter \\ nil, model \\ nil) do
     case tk_dir(id, root) do
@@ -518,7 +518,7 @@ defmodule Workbooks.Toolkits do
 
       dir ->
         cases =
-          Path.wildcard(Path.join([dir, "evals", "*.org"]))
+          Path.wildcard(Path.join([dir, "evals", "*.md"]))
           |> Enum.filter(&contained?(&1, Path.expand(dir)))
           # `filter` (a substring of the eval filename) runs just ONE case — cheap
           # iteration on a single eval rather than the whole LLM-driven suite.
@@ -528,7 +528,7 @@ defmodule Workbooks.Toolkits do
         if cases == [] do
           if filter,
             do: "#{id}: no eval matches #{inspect(filter)}",
-            else: "#{id}: no eval suite (add evals/*.org — see toolkits/EVALS.org)"
+            else: "#{id}: no eval suite (add evals/*.md — see toolkits/EVALS.md)"
         else
           results = Enum.map(cases, &run_eval_case(&1, dir, id, model))
           pass = Enum.count(results, &(elem(&1, 0) == :pass))
@@ -544,8 +544,8 @@ defmodule Workbooks.Toolkits do
     end
   end
 
-  # Each evals/*.org is one case: Tier 2 (agent + judge) if it declares :TASK:,
-  # else Tier 1 (deterministic :role eval + #+EXPECT:). Returns {:pass|:fail|:skip, label}.
+  # Each evals/*.md is one case: Tier 2 (agent + judge) if it declares TASK,
+  # else Tier 1 (deterministic eval-role block + EXPECT). Returns {:pass|:fail|:skip, label}.
   defp run_eval_case(path, dir, id, model \\ nil) do
     text = File.read!(path)
     name = Path.relative_to(path, dir)
@@ -553,7 +553,7 @@ defmodule Workbooks.Toolkits do
     cond do
       prop(text, "TASK") != nil -> agent_judge_case(text, name, dir, id, model)
       extract_role_blocks(text, "eval") != [] -> deterministic_case(text, name, dir)
-      true -> {:fail, "#{name}: no :role eval block and no :TASK:"}
+      true -> {:fail, "#{name}: no eval-role block and no TASK"}
     end
   end
 
@@ -653,8 +653,14 @@ defmodule Workbooks.Toolkits do
   end
 
   # Read a `:KEY: value` property line (PROPERTIES drawer); nil if absent.
+  # Read an eval/manifest property `key`. Eval suites are Markdown: a property is a
+  # list item `- **KEY:** value` (or `- KEY: value`). Toolkit manifests still carry
+  # `#+KEY:`/`:KEY:` lines, so accept both forms.
   defp prop(text, key) do
-    case Regex.run(~r/^\s*:#{key}:\s*(.+?)\s*$/m, text) do
+    md = ~r/^\s*-\s+(?:\*\*#{key}:\*\*|#{key}:)\s*(.+?)\s*$/m
+    org = ~r/^\s*:#{key}:\s*(.+?)\s*$/m
+
+    case Regex.run(md, text) || Regex.run(org, text) do
       [_, v] -> String.trim(v)
       _ -> nil
     end
@@ -865,7 +871,7 @@ defmodule Workbooks.Toolkits do
   def build_text(id, root \\ default_root()), do: build_text(id, nil, root)
 
   @doc """
-  Build a toolkit. A toolkit may hold a SET of build entries in `runtimes/*.org`
+  Build a toolkit. A toolkit may hold a SET of build entries in `runtimes/*.html`
   (e.g. the `palette` toolkit = many language runtimes, one cohesive set) — then
   `wb toolkit build <id>` builds them all and `wb toolkit build <id> <name>` builds
   one. A plain single-CLI toolkit (no runtimes/) builds from its own manifest.
@@ -1037,12 +1043,13 @@ defmodule Workbooks.Toolkits do
     """
   end
 
-  # A runtime entry is either runtimes/<name>.org (a flat pinned spec) or
-  # runtimes/<name>/manifest.org (a dir carrying a build script + assets).
+  # A runtime entry is either runtimes/<name>.html (a flat pinned spec, a single
+  # <work-toolkit> island) or runtimes/<name>/manifest.html (a dir carrying a
+  # build script + assets).
   defp runtime_entries(dir) do
     flat =
-      Path.wildcard(Path.join([dir, "runtimes", "*.org"]))
-      |> Enum.map(fn f -> {Path.basename(f, ".org"), f} end)
+      Path.wildcard(Path.join([dir, "runtimes", "*.html"]))
+      |> Enum.map(fn f -> {Path.basename(f, ".html"), f} end)
 
     sub =
       Path.wildcard(Path.join([dir, "runtimes", "*", "manifest.html"]))
@@ -1396,8 +1403,13 @@ defmodule Workbooks.Toolkits do
   @doc false
   # Extract the body of every `#+begin_src bash :role <role> …` block.
   def extract_role_blocks(content, role) do
-    ~r/#\+begin_src\s+[^\n]*:role\s+#{role}\b[^\n]*\n(.*?)\n\s*#\+end_src/s
-    |> Regex.scan(content)
+    # Markdown eval/skill suites tag a fenced block's role with an HTML comment on
+    # the line just above it: `<!-- role: eval -->` then a ```lang … ``` block.
+    md = ~r/<!--\s*role:\s*#{role}\b[^>]*-->\s*\n```[^\n]*\n(.*?)\n\s*```/s
+    # Legacy org manifests: `#+begin_src lang :role eval … #+end_src`.
+    org = ~r/#\+begin_src\s+[^\n]*:role\s+#{role}\b[^\n]*\n(.*?)\n\s*#\+end_src/s
+
+    (Regex.scan(md, content) ++ Regex.scan(org, content))
     |> Enum.map(fn [_, body] -> body end)
   end
 

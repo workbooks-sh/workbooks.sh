@@ -13,7 +13,7 @@ DESTRUCTIVE: no
   skills on disk.
 
   NOT for: writing skills ([author-deep-skill](author-deep-skill.md)); the final checks
-  ([verify-toolkit](verify-toolkit.md)). Full spec: [AUTHORING.org §"manifest.org"](../../AUTHORING.md).
+  ([verify-toolkit](verify-toolkit.md)). Full spec: [AUTHORING.md §"manifest.org"](../../AUTHORING.md).
 
 # The mental model: the index, not the manual
 
@@ -119,5 +119,5 @@ DESTRUCTIVE: no
 
   - [author-deep-skill](author-deep-skill.md) — write the skills this indexes
   - [verify-toolkit](verify-toolkit.md) — next: the whole-toolkit done-bar
-  - [toolkits/AUTHORING.org](../../AUTHORING.md) — the manifest spec
+  - [toolkits/AUTHORING.md](../../AUTHORING.md) — the manifest spec
   - `../ffmpeg/manifest.org` — the exemplar index (with groups)

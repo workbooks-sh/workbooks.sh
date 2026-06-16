@@ -1,0 +1,40 @@
+# fixture: desk landscape brief — raw notes, 3 items
+
+These are unprocessed notes from the wire. desk must triage them into
+board assignments (or not). No angles are pre-supplied — that is desk's job.
+
+## raw item 1
+
+source: Financial Times, 2026-06-09
+notes: TSMC reported Arizona fab N3 yield figures in a private briefing
+to Apple and Nvidia. Yield is reportedly 55–60%, below the 65% threshold
+for cost-parity with Taiwan. The briefing cited moisture control as the
+primary variable. TSMC Q2 earnings call is scheduled for July 17.
+links:
+- https://www.ft.com/content/tsmc-arizona-yield-briefing (paywalled)
+- https://asia.nikkei.com/tsmc-arizona-n3-yields
+
+## raw item 2
+
+source: arxiv preprint, 2026-06-08
+notes: DeepMind posted "WeatherMind-3: sub-kilometer global forecasting
+at 1-hour resolution." The model runs on 8 TPU v5e chips; claims to beat
+ECMWF HRES on 10-day RMSE by 12%. No peer review yet. A Nature reviewer
+(anonymous) is quoted by Ars Technica calling the benchmark setup
+"cherry-picked."
+links:
+- https://arxiv.org/abs/2606.01234
+- https://arstechnica.com/science/weathermind-3-deepmind
+
+## raw item 3
+
+source: EU Official Journal, 2026-06-07
+notes: The EU AI Act implementing regulation published thresholds for
+"general-purpose AI with systemic risk." Threshold is 10^25 FLOPs
+cumulative training compute. This covers GPT-4 class models and above.
+Compliance deadline: 12 months from publication. No US or UK equivalent
+yet. Legal commentary from Linklaters says enforcement mechanism is
+"administratively untested."
+links:
+- https://eur-lex.europa.eu/ai-act-implementing-reg-2026
+- https://www.linklaters.com/eu-ai-act-systemic-risk-threshold

@@ -1,6 +1,6 @@
 # toolkit-forge
 
-The self-hosting toolkit: it teaches an agent how to BUILD another toolkit. Given a target — an npm package name, a GitHub URL, or a semantic need ("I need PDF manipulation") — the skills walk the agent through resolving and fetching the target, studying its *real* CLI/API surface (never training priors), designing the progressive-disclosure skill map, authoring deep empirically-verified skills, and verifying the result, to the `toolkits/AUTHORING.org` standard.
+The self-hosting toolkit: it teaches an agent how to BUILD another toolkit. Given a target — an npm package name, a GitHub URL, or a semantic need ("I need PDF manipulation") — the skills walk the agent through resolving and fetching the target, studying its *real* CLI/API surface (never training priors), designing the progressive-disclosure skill map, authoring deep empirically-verified skills, and verifying the result, to the `toolkits/AUTHORING.md` standard.
 
 ## When to reach for it
 

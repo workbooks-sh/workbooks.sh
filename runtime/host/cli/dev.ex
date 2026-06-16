@@ -8,7 +8,7 @@ defmodule Workbooks.CLI.Dev do
   a CI/CD → production build to see if something works. Two modes:
 
     * source checkout — the dev runtime boots from source (`mix`); the escript
-      can't host the OQL/wasmex NIF, so `up`/`test` shell out to mix.
+      can't host the wasmex NIF, so `up`/`test` shell out to mix.
     * deployed runtime — your runtime is the container; `dev` is a client/harness
       against it over HTTP (reuses `wb rt` target resolution).
   """
@@ -39,20 +39,20 @@ defmodule Workbooks.CLI.Dev do
     end
   end
 
-  # wb dev eval — list toolkits that ship an eval suite (evals/*.org); run one
+  # wb dev eval — list toolkits that ship an eval suite (evals/*.md); run one
   # with `wb dev eval <id>` (= wb toolkit eval, sandboxed; set WB_TOOLKIT_EXEC=1).
   defp eval_list do
     root = toolkits_root()
 
     suites =
       root
-      |> Path.join("*/evals/*.org")
+      |> Path.join("*/evals/*.md")
       |> Path.wildcard()
       |> Enum.group_by(&Path.basename(Path.dirname(Path.dirname(&1))))
       |> Enum.sort()
 
     if suites == [] do
-      "no toolkit eval suites under #{root} (add evals/*.org — see toolkits/EVALS.org)"
+      "no toolkit eval suites under #{root} (add evals/*.md — see toolkits/EVALS.md)"
     else
       body =
         Enum.map_join(suites, "\n", fn {tk, files} ->

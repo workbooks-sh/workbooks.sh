@@ -1,6 +1,6 @@
 defmodule Workbooks.Backend do
   @moduledoc """
-  BYOD — the storage seam (L2 in ARCHITECTURE.org). One behaviour, many impls,
+  BYOD — the storage seam (L2 in ARCHITECTURE.md). One behaviour, many impls,
   chosen at deploy time per cell. The runtime depends only on this behaviour;
   a cell swaps `Backend.SQLite` (local/dev) for `Backend.Postgres` (cloud,
   indexed/shared) without touching core. Org files stay the source of truth;
@@ -23,7 +23,7 @@ defmodule Workbooks.Backend do
   @doc """
   The deploy-cell backend table: logical name → {impl, opts}. A cell sets
   `config :workbooks, :backends, [...]`; the default is one in-memory SQLite.
-  This is the only place a deploy chooses its storage — see ARCHITECTURE.org §L2.
+  This is the only place a deploy chooses its storage — see ARCHITECTURE.md §L2.
   """
   def table, do: Application.get_env(:workbooks, :backends, [{:default, Workbooks.Backend.SQLite, [path: ":memory:"]}])
 

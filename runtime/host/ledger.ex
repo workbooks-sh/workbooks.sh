@@ -19,7 +19,7 @@ defmodule Workbooks.Ledger do
       workdir. `anchor/2` does the git half; the sharing phase adds the rest.
 
   Same file the telemetry already writes — the ledger is a seal OVER it, not a
-  second log. See docs/IDENTITY-GIT-MONOREPO.org "The signed agent ledger".
+  second log. See docs/IDENTITY-GIT-MONOREPO.md "The signed agent ledger".
   """
   alias Workbooks.Git
 

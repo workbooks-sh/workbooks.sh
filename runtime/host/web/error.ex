@@ -1,6 +1,6 @@
 defmodule Workbooks.Web.Error do
   @moduledoc """
-  The ONE error envelope every RCP client parses (RUNTIME-CONNECT-PROTOCOL.org §4):
+  The ONE error envelope every RCP client parses (RUNTIME-CONNECT-PROTOCOL.md §4):
 
       { "error": { "code": "...", "message": "...", "retryable": true|false } }
 

@@ -1,0 +1,68 @@
+# Porting the brandnana brand book onto the clean-room runtime
+
+*2026-06-07*
+
+Make the clean-room WASM runtime (`:workbooks`) host the real brandnana 42-part
+brand book, deployed as its own engine — **without** disturbing the live `bn-engine`.
+
+# What's the same vs different
+
+  - The brandnana CLI (`harvest-all`, `analysis check`, `book insight-slides`,
+    `book publish`) is a native bun binary toolkit. It STAYS native — it is not
+    compiled to wasm. The agents invoke it via the clean-room `run` exec tool.
+  - The clean-room provides: the agent loop (`Workbooks.Agent`, the `run` tool),
+    the orchestration (`Workbooks.BrandBook` — 3 stages over a shared workdir),
+    OQL (the kernel), the VFS, HTTP. It REPLACES the mainline `WorkbooksRuntime`
+    engine, not the brandnana CLI.
+
+# Done
+
+  - `run` exec tool (`opts[:exec]`, workdir/env) — agents run real CLIs. Verified
+    `brandnana --version`.
+  - Real agent defs ported: `examples/agents/bn-strategist.html` (deepseek-v4-pro),
+    `bn-designer.html` (minimax-m3). `AgentDef` parses the full prompts.
+  - `Workbooks.BrandBook.run(domain)` — harvest → Strategist → Designer over one
+    workdir. Compiles. Needs a deployed engine (the harvest keys) to fully run.
+
+# The brandnana CLI — build from SOURCE (the local v0.1.0 lacks harvest-all)
+
+  Source: `examples/brandnana/apps/cli/` (bun + TS; `src/commands/harvest-all.ts`).
+  Build (mirror `deploy-kit/cloud/Dockerfile.engine-profile` lines 88-94):
+```dockerfile
+  FROM oven/bun:1 AS brandnana-cli
+  WORKDIR /src/brandnana
+  COPY examples/brandnana/package.json examples/brandnana/bun.lock ./
+  COPY examples/brandnana/packages ./packages
+  COPY examples/brandnana/apps/cli ./apps/cli
+  RUN bun install --ignore-scripts && bash apps/cli/scripts/build-binary.sh linux-x64
+  # -> apps/cli/dist/brandnana-linux-x64
+```
+
+  Final stage copies it to `/usr/local/bin/brandnana`; the profile + boards:
+  `substrates/brandnana/profile -> /opt/profile`, =substrates/brandnana/boards
+  -> /opt/profile/boards=. `wb` (Rust, `cli/wb`) also on PATH for OQL.
+
+# The clean-room engine image (extend runtime/Dockerfile)
+
+  Add a `brandnana-cli` bun stage (above) + a `wb` build, and in the final image:
+  copy the clean-room `:workbooks` release + `/usr/local/bin/brandnana` + `wb` +
+  `/opt/profile` + the runtime-read wasm (oql/jq/grep) + wasmtime + litestream.
+  NOTE: the build context must be the MONOREPO ROOT (=/Users/shinyobjectz/apps/
+  workbooks=), since brandnana CLI + profile live there, not in the worktree —
+  so the Dockerfile + a build script that runs `docker build` from the root,
+  COPYing both the clean-room runtime and examples/brandnana + substrates/brandnana.
+
+# Deploy target — a NEW app, never touch live bn-engine
+
+  `fly apps create bn-engine-clean` (or reuse the pending `bn-engine-agents`).
+  Secrets to copy from live bn-engine: OPENROUTER_API_KEY, FIRECRAWL_API_KEY,
+  BRANDNANA_API_KEY, GEMINI_API_KEY, THE_COMPANIES_API_KEY, GROQ_API_KEY, +
+  a fresh WB_PUBLIC_BEARER. Read each off the running bn-engine via
+  `fly ssh console --app bn-engine -C "printenv <KEY>"` and set on the new app.
+
+# Run it
+
+  Expose `POST /api/run-brand-book {domain}` (or reuse `/api/run`) that calls
+  `Workbooks.BrandBook.run(domain)` and returns the deck. Fire on tecovas.com;
+  compare to the live bn-engine deck. The deck = a published workbook .html under
+  the run workdir (`brandnana book publish` output).

@@ -3,7 +3,7 @@ defmodule Workbooks.Secret.Env do
   Local/dev secret backend: values from a configured map
   (`config :workbooks, :secrets, %{"NAME" => "value"}`) and then the OS
   environment. The prod cells swap this for 1Password/AWS/Vault/Varlock — same
-  `Workbooks.Secret` behaviour, no core change (docs/SECRETS.org).
+  `Workbooks.Secret` behaviour, no core change (docs/SECRETS.md).
   """
   @behaviour Workbooks.Secret
 

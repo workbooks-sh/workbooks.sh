@@ -109,12 +109,11 @@ defmodule Workbooks.Groundskeeper.Rehearsal do
   end
 
   defp persona! do
-    path = Path.join([Groundskeeper.home(), "agent", "groundskeeper.org"])
-    org = File.read!(path)
+    path = Path.join([Groundskeeper.home(), "agent", "groundskeeper.html"])
 
-    case Regex.run(~r/^\*\* System prompt\n(.*?)(?=^\* |\z)/ms, org) do
-      [_, prompt] -> String.trim(prompt)
-      _ -> raise "no `** System prompt` heading in #{path}"
+    case Workbooks.AgentDef.parse(File.read!(path)).system do
+      prompt when is_binary(prompt) and prompt != "" -> prompt
+      _ -> raise "no `<work-system>` prompt in #{path}"
     end
   end
 

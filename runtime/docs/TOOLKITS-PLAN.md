@@ -1,0 +1,508 @@
+# Toolkits — agent-discoverable wrappers for any CLI
+
+*2026-06-03*
+
+> CLEAN-ROOM RECONCILIATION (restored 2026-06-07 from workbooks-archive).
+> This is the original mainline design, kept for provenance. It assumes a few
+> things the clean-room runtime CHANGES — read TOOLKITS-V3.md for the
+> authoritative current shape. Deltas:
+> - "CLI on $PATH" → a toolkit's CLI_BIN is a WASM `run-command`
+> (CommandRegistry), with `posix`-profile native PATH as a per-toolkit
+> escape hatch (manifest declares its EXEC mode; not a global rule).
+> - Old monorepo paths (engine/lib/..., ~/Workbooks/Workbox/...) → this
+> repo's runtime/host/* + the discovery root scanned by Toolkits.discover_dir/1.
+> - The `wb toolkit` runner described here was Rust (cli/wb/.../toolkit.rs);
+> in the clean-room it is reimplemented as Elixir subcommands in
+> runtime/host/cli.ex (see TOOLKITS-V3.md §"wb toolkit surface").
+> - "No ToolRegistry / catalog-in-prompt" — STILL TRUE, carried forward.
+
+# Why this doc
+
+  A Workbooks Runtime agent has exactly one tool: `bash` (per
+  CLAUDE.md rule 13). Through bash it invokes CLIs — `wb`, `git`,
+  `node`, `ffmpeg`, `jq`, anything on PATH. That part is decided.
+
+  Open question: how does an agent _learn_ a CLI it hasn't seen
+  before? Today the answer is "system prompt has hardcoded skill
+  text" — which doesn't scale past a handful of toolkits, doesn't
+  let third parties extend the agent's capability, and doesn't
+  let an agent progressively discover what it needs.
+
+  This doc defines **toolkits** — a portable, agent-discoverable
+  wrapper around any CLI that ships:
+
+    1. The CLI binary (the underlying tool, e.g. `git`, `wb`, `fly`),
+    2. `skills/*.org` — progressive-disclosure recipes the agent
+       reads on demand,
+    3. `manifest.org` — name, version, the CLI it wraps, when to
+       reach for it.
+
+  A toolkit is just a **directory** matching a known shape, dropped
+  at a well-known location. No new runtime tool, no new API; the
+  agent uses `cat` + `ls` via bash to discover and read.
+
+  Goal: any developer can author a toolkit for any CLI in the
+  world (`git`, `vercel`, `ffmpeg`, `supabase`, …) and ship it so
+  an agent in a Workbooks Runtime environment can pick it up and
+  use it competently within one session.
+
+# The shape
+
+  Filesystem-native; no new infra required to read.
+
+```text
+  ~/Workbooks/Workbox/toolkits/
+  ├── wb/                          # our reference toolkit
+  │   ├── manifest.org
+  │   └── skills/
+  │       ├── overview.org
+  │       ├── scaffold-a-workbook.org
+  │       ├── edit-and-rebuild.org
+  │       ├── share-a-workbook.org
+  │       ├── seal-and-encrypt.org
+  │       └── query-across-workbooks.org
+  ├── git/                         # third-party — wraps an existing CLI
+  │   ├── manifest.org
+  │   └── skills/
+  │       ├── overview.org
+  │       ├── recover-from-detached-head.org
+  │       └── rebase-without-losing-work.org
+  └── ffmpeg/
+      ├── manifest.org
+      └── skills/
+          ├── overview.org
+          ├── transcode-to-h264.org
+          └── extract-thumbnail.org
+```
+
+## manifest.org
+
+```org
+   ,#+TITLE: <toolkit-name>
+   ,#+TOOLKIT: <slug>
+   ,#+VERSION: <semver of THIS wrapper, not the underlying CLI>
+   ,#+CLI_BIN: <name of the CLI on PATH, e.g. "git", "wb", "ffmpeg">
+   ,#+CLI_VERSION_RANGE: <semver range the skills are tested against>
+   ,#+TAGLINE: <one short sentence — when to reach for this toolkit>
+   ,#+REQUIRES: <space-separated CLIs this toolkit also expects, e.g. "node>=20 npm">
+
+   ,* <name> — <tagline>                                          :toolkit:
+     <body: the long-form what/why. Optional sections describing
+     subcommand groups, common confusions, where to NOT use it.>
+```
+
+## skills/<slug>.org
+
+   Each skill file is a self-contained recipe for one task or
+   verb. Frontmatter + 1-page body.
+
+```org
+   ,#+TITLE: <toolkit> — <slug>
+   ,#+TOOLKIT: <toolkit>
+   ,#+SKILL: <slug>
+   ,#+TAGS: <space-separated lookup tags>
+
+   ,* When to use this
+     One-paragraph trigger condition. The agent reads this first
+     to decide if the skill is what it needs.
+
+   ,* Workflow
+     Numbered steps. Each step a concrete bash command.
+
+   ,* Examples
+     One or two complete invocations with expected output.
+
+   ,* Gotchas
+     Things that look right but aren't. Mistakes the agent will
+     make if it skims =--help=.
+```
+
+   Keep each skill under ~500 words. Progressive disclosure means
+   the agent reads ONE skill per task, not the whole manual.
+
+# What makes org-mode skills _more than_ markdown
+
+  A markdown file is text the agent reads. An org-mode skill can
+  be more: a structured, queryable, partially-executable artifact
+  that encodes its own preconditions, postconditions, and
+  relationships to other skills.
+
+  Five org-mode features earn their keep — but ONLY because the
+  runtime actively uses what they declare. Without runtime
+  uptake, they're decoration.
+
+## 1. Pre/post-condition source blocks
+
+   A skill declares blocks the agent can run _as part of_ the
+   skill, not just _from_ the skill. Each block has a `:role`
+   header arg the runtime recognizes:
+
+```org
+   ,* Workflow
+     ,#+CAPTION: verify wb is installed at the right version
+     ,#+begin_src bash :role pre
+     wb --version | grep -E '^wb 0\.[0-9]+\.' || { echo "wb missing"; exit 1; }
+     ,#+end_src
+
+     [...the actual recipe...]
+
+     ,#+CAPTION: confirm the built artifact is a valid workbook
+     ,#+begin_src bash :role post :path dist/mywb.html
+     grep -q 'id="workbook-spec"' "$1" || { echo "not a workbook"; exit 1; }
+     ,#+end_src
+```
+
+   The agent (or the eval runner, or `wb toolkit check`) runs
+   `:role pre` before suggesting the recipe, `:role post` after
+   to validate. A skill that always returns "pre failed" warns
+   the user instead of running.
+
+   _Markdown can't do this without out-of-band convention._
+
+## 2. Property-drawer declarations the runtime acts on
+
+   Drawer keys with structured meaning:
+
+| Key | Effect |
+| --- | --- |
+| `:DESTRUCTIVE:` yes | Agent must confirm before running; eval-scoring penalty if it skips |
+| `:NETWORK:` yes | Skipped under offline mode; declares the cost |
+| `:REQUIRES:` <CLIs> | Pre-flight check at toolkit-load time |
+| `:STATUS:` stable\vert experimental\vert deprecated | Filter; deprecated skills warn |
+| `:COST:` free\vert paid | Eval suite uses to gate live-API skills |
+| `:OS:` macos linux | Skipped on mismatched OS |
+
+   These are first-class. The `wb toolkit check` linter validates
+   them; the runtime honors them at session start.
+
+   /Markdown frontmatter can carry the same keys, but nothing
+   structurally enforces them — they become decoration./
+
+## 3. OQL-queryable structure
+
+   The skills tree is just org files; OQL queries it natively.
+   The `wb toolkit search` helper is literally:
+
+```bash
+   wb query '(and (tags video) (not (todo deprecated)))' \
+     --root ~/Workbooks/Workbox/toolkits/
+```
+
+   Plus composability — "all destructive skills across every
+   toolkit" is one query. Cross-cutting filters become trivial.
+
+   /A markdown-skill corpus needs a separate index. The org
+   corpus IS its own index./
+
+## 4. Cross-skill links
+
+   Org-mode `[share-a-workbook.md](share-a-workbook.md)` links are first-class
+   navigation. A skill ends with a "See also" section:
+
+```org
+   ,* See also
+     - [[file:edit-and-rebuild.org][Edit an existing workbook]] — when you start
+       from someone else's .html
+     - [[file:seal-and-encrypt.org][Sealing for distribution]] — adds signing + age encryption
+```
+
+   The agent navigates skill-to-skill by intent, not by
+   grepping. `wb toolkit show <toolkit>` can render the link
+   graph (or omit it if the agent prefers raw).
+
+   _Markdown links are strings; org links resolve._
+
+## 5. Org-babel blocks the agent runs directly
+
+   Each `#+begin_src <lang> ...` block is an executable recipe.
+   Languages supported via the OQL plugin layer: `bash` (always),
+   `python`, `sql` (when the relevant plugins are installed).
+
+   The `:CAPTION:` annotation tells the agent _what_ the block
+   does so it can pick the right one without re-reading prose:
+
+```org
+   ,#+CAPTION: scaffold a document workbook
+   ,#+begin_src bash
+   wb init "$1" --template=document --no-install
+   ,#+end_src
+
+   ,#+CAPTION: install deps + first build
+   ,#+begin_src bash
+   cd "$1" && npm install --no-audit --no-fund && wb build
+   ,#+end_src
+```
+
+   The agent reads CAPTIONs, picks the matching block, runs it.
+   The skill stays human-editable but is also machine-pickable.
+
+   /Markdown code fences carry only the language hint, not
+   intent./
+
+## What the runtime owes
+
+   For each of the above to pay rent, the runtime needs to:
+
+   - Parse :role pre/post blocks and expose them to =wb toolkit
+     check= + the eval framework
+   - Honor `:DESTRUCTIVE:` / `:NETWORK:` / `:STATUS:` /
+     `:REQUIRES:` / `:OS:` at toolkit-load + skill-render time
+   - Render skill files through the existing OQL parser (already
+     done — OQL parses anything org)
+   - Render cross-skill links into prompt context so the agent
+     sees them as actionable
+   - Surface CAPTIONs as the skill's "table of contents" when
+     the agent =cat=s the file
+
+   None of this requires net-new infra; it's the OQL substrate
+   doing what it already does, with conventions the runtime
+   honors.
+
+# Authoring workflow (developer ergonomics)
+
+  Goal: writing a toolkit for some CLI should take 30 minutes,
+  not 30 hours.
+
+## Local dev (today, no tooling required)
+
+```bash
+   mkdir -p ~/Workbooks/Workbox/toolkits/mycli/skills
+   $EDITOR ~/Workbooks/Workbox/toolkits/mycli/manifest.org
+   $EDITOR ~/Workbooks/Workbox/toolkits/mycli/skills/overview.org
+   # next agent session sees it
+```
+
+   The shape is the source of truth. No build step, no compile.
+
+## Helper commands (`wb toolkit ...`) — phase 1
+
+   - `wb toolkit list` — walk `~/Workbooks/Workbox/toolkits/`, print
+     a table of installed toolkits + tagline + skill count
+   - `wb toolkit show <name>` — print the manifest + skill index
+     for one toolkit (`ls` of the skills dir with their TITLEs)
+   - `wb toolkit new <name> [--cli <bin>]` — scaffold a new
+     toolkit dir with a template `manifest.org` + `skills/overview.org`
+   - `wb toolkit check <name>` — lint: manifest has required
+     frontmatter, `CLI_BIN` resolves on PATH, each skill has
+     `#+TITLE: + #+TOOLKIT: + #+SKILL:`, no broken cross-refs
+   - `wb toolkit search <query>` — grep across all installed
+     toolkits' skill TITLEs + frontmatter tags, return hits
+
+   All of these are thin wrappers over the filesystem
+   convention. `wb toolkit list` is essentially =ls + cat
+   manifest.org= with formatting. The CLI helpers exist to make
+   authoring + discovery ergonomic, not because the convention
+   needs them.
+
+# Distribution (using other people's toolkits)
+
+## Tier 1 — git URL (ship today)
+
+   Simplest path. A toolkit is a directory; cloning a repo into
+   the toolkits dir installs it.
+
+```bash
+   wb toolkit install https://github.com/alice/wb-toolkit-fly
+   # = shallow clone into ~/Workbooks/Workbox/toolkits/fly/
+```
+
+   - Auth: relies on git's existing auth (SSH keys, etc.)
+   - Updates: `wb toolkit update fly` = `git pull` in the dir
+   - Uninstall: `wb toolkit remove fly` = `rm -rf`
+
+## Tier 2 — npm packages (ship soon)
+
+   For toolkit authors who want a real registry + semver +
+   discovery. Package layout: top-level `manifest.org` + `skills/`
+   + a `package.json` with `postinstall` that copies the dir into
+   `~/Workbooks/Workbox/toolkits/<name>/`.
+
+   Authors publish under `@workbooks-toolkit/<name>`.
+
+```bash
+   npm i -g @workbooks-toolkit/git
+   # postinstall populates ~/Workbooks/Workbox/toolkits/git/
+```
+
+   Same shape, different install channel. The agent doesn't
+   notice the difference.
+
+## Tier 3 — Radicle / federation (ship when federation is live)
+
+   Toolkits as workbook .html artifacts published via the Broker.
+   `wb toolkit install rad://<rid>` pulls via radicle-node. Lets
+   toolkit authors federate without depending on npm or GitHub.
+
+   No work needed today; the directory format will already work
+   when the Radicle pipeline lands.
+
+# Discovery — how the agent finds + reads toolkits at runtime
+
+## At session start: TOOLKITS.org auto-index
+
+   The SessionRunner walks `~/Workbooks/Workbox/toolkits/*/manifest.org`
+   and assembles a compact index (NOT the full skill contents).
+   Shape:
+
+```text
+   ,* Available toolkits (read skills on demand via =cat=)
+
+   ,** wb       =wb= — Workbooks meta-CLI: scaffold, build, share, query workbooks.
+      Skills: ~/Workbooks/Workbox/toolkits/wb/skills/
+        overview, scaffold-a-workbook, edit-and-rebuild,
+        share-a-workbook, seal-and-encrypt, query-across-workbooks
+
+   ,** git      =git= — Distributed VCS.  Recovery + rebase recipes.
+      Skills: ~/Workbooks/Workbox/toolkits/git/skills/
+        overview, recover-from-detached-head, rebase-without-losing-work
+```
+
+   This index is rendered into the agent's system prompt at
+   session start. Costs ~200 tokens per toolkit (one summary
+   line per skill). Agents with 5 toolkits installed pay ~1k
+   tokens, get full progressive discovery.
+
+## When the agent needs a skill: `cat` the file
+
+```bash
+   cat ~/Workbooks/Workbox/toolkits/wb/skills/scaffold-a-workbook.org
+```
+
+   That's it. No new tool, no special API. The agent already has
+   bash; the file is on disk; `cat` prints it.
+
+## When the agent doesn't know which skill it needs: `wb toolkit search`
+
+```bash
+   wb toolkit search "share workbook with password"
+   # → fly/skills/...   (no hit)
+   # → wb/skills/share-a-workbook.org  (match: "Live URL with password")
+```
+
+   Light grep across TITLEs + tags + first paragraph. Helps when
+   the agent has a verb in mind but doesn't know which toolkit
+   owns it.
+
+# Reference implementation: `wb`
+
+  `wb` itself ships as the canonical toolkit. The source dir is
+  `cli/wb/toolkit/` in the monorepo; the install step (npm i -g
+  `@work.books/cli` or `cargo install wb`) drops it to
+  `~/Workbooks/Workbox/toolkits/wb/`.
+
+  Initial skills:
+    - `overview.org` — what is a workbook, when to use wb
+    - `scaffold-a-workbook.org` — wb init + npm install + wb build
+    - `edit-and-rebuild.org` — unbundle, edit, rebuild
+    - `share-a-workbook.org` — wb publish + Live URL pattern
+    - `seal-and-encrypt.org` — seal / unseal / encrypt for distribution
+    - `query-across-workbooks.org` — `wb workbooks` cross-workbook OQL
+
+  The wb toolkit is also the first thing the agent sees in any
+  Workbooks environment.  Validating wb's discovery loop validates
+  the whole convention.
+
+# Implementation phases
+
+  Each phase ships independently. Don't gate later phases on
+  earlier ones beyond the obvious deps.
+
+## Phase 1 — convention + reference toolkit (wb-tlkt.1 .. .5)
+
+   1. `wb-tlkt.1` — Author the 6 wb skill files at `cli/wb/toolkit/`
+      + manifest.org
+   2. `wb-tlkt.2` — Install script: copy `cli/wb/toolkit/` →
+      `~/Workbooks/Workbox/toolkits/wb/` as part of `wb`'s install
+   3. `wb-tlkt.3` — SessionRunner: at session start, walk
+      `~/Workbooks/Workbox/toolkits/*/manifest.org` → assemble
+      TOOLKITS index → inject into system prompt
+   4. `wb-tlkt.4` — Eval: agent given vague workbook task,
+      discovers wb via index, reads scaffold skill, executes
+      end-to-end; passes
+   5. `wb-tlkt.5` — Eval: agent given task that DOES NOT match
+      any toolkit; agent recognizes + reports honestly
+
+## Phase 2 — authoring helpers (wb-tlkt.6 .. .9)
+
+   1. `wb-tlkt.6` — `wb toolkit list` command
+   2. `wb-tlkt.7` — `wb toolkit show <name>` command
+   3. `wb-tlkt.8` — `wb toolkit new <name> [--cli <bin>]` scaffold
+   4. `wb-tlkt.9` — `wb toolkit check <name>` linter
+
+## Phase 3 — distribution (wb-tlkt.10 .. .12)
+
+   1. `wb-tlkt.10` — `wb toolkit install <git-url>` (Tier 1)
+   2. `wb-tlkt.11` — `wb toolkit search` cross-toolkit grep
+   3. `wb-tlkt.12` — `wb toolkit install @workbooks-toolkit/<name>`
+      via npm (Tier 2)
+
+## Phase 4 — second + third reference toolkit (wb-tlkt.13 .. .14)
+
+   Prove generality.  Wrap two CLIs we don't own:
+
+   1. `wb-tlkt.13` — author a `git` toolkit (3-5 skills): rebase,
+      recover-detached-head, undo-mistake, bisect
+   2. `wb-tlkt.14` — author a `ffmpeg` or `fly` toolkit (whichever
+      we use more day-to-day), 3-5 skills
+
+   Validates the format isn't wb-specific.
+
+## Phase 5 — federation (wb-tlkt.15+, deferred)
+
+   Toolkits via Radicle.  Not in scope until federation is live;
+   the directory format already works when that pipeline lands.
+
+# What's out of scope (for now)
+
+  - **Versioning / signed toolkits.** Tier 1 (git URL) trusts you to
+    clone responsibly.  Signed toolkits via age recipient keys is
+    a Tier 4 concern.
+  - **Per-user vs project-scope toolkits.** Phase 1 has one
+    location: `~/Workbooks/Workbox/toolkits/`. Per-project
+    toolkit overrides at `<package>/.workbooks/toolkits/` are
+    forwards-compatible but not Phase 1.
+  - **Live skill registration via CLI subcommand** (`git skills`).
+    Won't push toolkit authors to modify their CLI. The
+    convention is filesystem-native; CLIs stay unchanged.
+  - **MCP integration.** Toolkits are NOT MCP servers. They're
+    just CLI wrappers with org docs. MCP is a different lane.
+  - **Auto-skill-authoring by the agent.** "Agent encounters
+    unknown CLI → drafts a skill → user reviews" is the Hermes
+    self-improvement loop. Worth doing, not Phase 1.
+
+# Open questions
+
+  - **Where exactly does the prompt injection happen?** In
+    `Prompt.render_with_memory` or a sibling
+    `Prompt.render_with_toolkits`? Either way, deserves its own
+    section in the rendered prompt.
+  - **Format of the TOOLKITS index:** org headlines (this doc's
+    sketch) or markdown table? Probably org, since the rest of
+    the system is org.
+  - **Skill rendering:** should the agent see all installed
+    toolkits' indices, or only those it has a hint about? Phase
+    1: show all.  If the index grows too big, add a filter knob.
+  - **Conflict resolution:** what if two installed toolkits both
+    claim the slug `git`? Phase 1: last-installed wins, log a
+    warning.  Phase 2: namespace.
+
+# Success looks like
+
+  An agent in a fresh Workbooks Runtime environment, given a
+  realistic-but-vague task like /"package this directory as a
+  shareable workbook with a password"/, accomplishes it by:
+
+    1. Reading the TOOLKITS index in its prompt → sees `wb`
+    2. =cat=ing `wb/skills/overview.org` → confirms wb is the right
+       toolkit
+    3. =cat=ing `wb/skills/share-a-workbook.org` → learns the publish
+       flow
+    4. Running the commands in order → produces the artifact
+
+  No skill content was pre-loaded into the prompt. The agent
+  discovered everything via the filesystem convention at runtime.
+
+  A second proof: a developer who has never seen Workbooks
+  authors a working toolkit for some CLI (`ffmpeg`, `gh`, `fly`)
+  in under an hour and an agent in their environment uses it
+  competently in the next session.

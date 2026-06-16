@@ -1,7 +1,7 @@
 # The clean-room WASM runtime engine + the brandnana brand-book toolkit.
 # Same BEAM+wasmtime+litestream base as Dockerfile, PLUS the brandnana CLI
-# (built from source — the local v0.1.0 lacks harvest-all), the `wb` meta-CLI
-# (OQL over the substrate), and the brandnana profile/boards baked at /opt/profile.
+# (built from source — the local v0.1.0 lacks harvest-all), the `wb` meta-CLI,
+# and the brandnana profile/boards baked at /opt/profile.
 #
 # Build CONTEXT = the MONOREPO ROOT (brandnana CLI + profile live there, not in
 # the worktree). Use scripts/build-brandnana-engine.sh, which runs:
@@ -22,12 +22,12 @@ COPY projects/brandnana/apps/cli ./apps/cli
 RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
     bun install --ignore-scripts && bash apps/cli/scripts/build-binary.sh linux-x64
 
-# --- wb meta-CLI (Rust; own workspace; OQL path-deps from substrates/oql) -----
+# --- wb meta-CLI (Rust; own workspace) ---------------------------------------
 FROM rust:1-bookworm AS wb-cli
-WORKDIR /build
-COPY substrates/oql ./substrates/oql
-COPY cli/wb ./cli/wb
-WORKDIR /build/cli/wb
+WORKDIR /build/cli
+COPY cli/Cargo.toml cli/Cargo.lock ./
+COPY cli/src ./src
+COPY cli/deploy-kit ./deploy-kit
 RUN cargo build --release -p wb-cli
 
 # --- clean-room engine (Elixir release) --------------------------------------
@@ -41,7 +41,6 @@ RUN mix local.hex --force && mix local.rebar --force
 COPY ${WORKTREE}/mix.exs ${WORKTREE}/mix.lock ./
 RUN mix deps.get --only prod && mix deps.compile
 COPY ${WORKTREE}/ .
-# build/oql.wasm is embedded at compile time (@external_resource), COPY'd above.
 RUN mix compile && mix release
 
 # --- run: slim image with the release + the toolkit binaries -----------------
@@ -62,7 +61,7 @@ RUN curl -fsSL https://wasmtime.dev/install.sh | bash \
 
 # The brandnana brand-book toolkit: CLI + wb + the profile (agents + skills) + boards.
 COPY --from=brandnana-cli /src/brandnana/apps/cli/dist/brandnana-linux-x64 /usr/local/bin/brandnana
-COPY --from=wb-cli /build/cli/wb/target/release/wb /usr/local/bin/wb
+COPY --from=wb-cli /build/cli/target/release/wbx /usr/local/bin/wb
 COPY substrates/brandnana/profile /opt/profile
 COPY substrates/brandnana/boards /opt/profile/boards
 

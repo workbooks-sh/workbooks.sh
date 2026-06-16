@@ -1,44 +1,24 @@
 defmodule Workbooks.Publish.Config do
   @moduledoc """
-  A `publish.org` — the declarative description of where a workbook gets deployed.
-  One file per workbook site; `wb publish validate` checks it; `wb publish apply`
-  renders + ships it. Mirrors the shape of `Deploy.Config` (same `:PROPERTIES:`
-  parser, same validate/to_env pattern) so both feel like one system.
+  A `publish.html` — the declarative description of where a workbook gets
+  deployed. One file per workbook site; `wb publish validate` checks it; `wb
+  publish apply` renders + ships it. Mirrors the shape of `Deploy.Config` (same
+  `Workbooks.Config.HTML` reader, same validate/to_env pattern) so both feel like
+  one system.
 
-  Parsed with a hand-rolled `:PROPERTIES:` scan — NOT the OQL/org parser — so a
-  publish file is inert config.
+  The config is a single `<work-publish …>` element whose attributes carry the
+  axes (`publish-target`, `publish-project`, …). Parsed with Floki — NOT an org
+  parser — so a publish file is inert config.
   """
 
   @targets ~w(cloudflare-pages gh-pages self-hosted desktop-app)
 
-  @doc "Parse a publish.org → the property map (string keys)."
+  @doc "Parse a publish.html → the property map (string keys, UPPER_SNAKE)."
   def parse(path) do
     case File.read(path) do
-      {:ok, body} -> {:ok, parse_props(body)}
+      {:ok, body} -> {:ok, Workbooks.Config.HTML.props(body, "work-publish")}
       {:error, e} -> {:error, "cannot read #{path}: #{:file.format_error(e)}"}
     end
-  end
-
-  defp parse_props(body) do
-    body
-    |> String.split("\n")
-    |> Enum.reduce({false, %{}}, fn line, {in?, acc} ->
-      t = String.trim(line)
-
-      cond do
-        String.upcase(t) == ":PROPERTIES:" -> {true, acc}
-        String.upcase(t) == ":END:" -> {false, acc}
-        in? ->
-          case Regex.run(~r/^:([A-Za-z_]+):\s+(.*\S)\s*$/, t) do
-            [_, k, v] -> {true, Map.put(acc, String.upcase(k), String.trim(v))}
-            _ -> {true, acc}
-          end
-
-        true ->
-          {in?, acc}
-      end
-    end)
-    |> elem(1)
   end
 
   @doc "Coherence-check a parsed config → `:ok` or `{:error, [issues]}`."
@@ -81,7 +61,7 @@ defmodule Workbooks.Publish.Config do
     Enum.flat_map(p, fn {k, v} ->
       cond do
         secret_key?.(k) ->
-          ["#{k} looks like a secret — use an env var instead of storing it in publish.org"]
+          ["#{k} looks like a secret — use an env var instead of storing it in publish.html"]
         hex_id?.(v) ->
           ["#{k}: value looks like a hex ID or token — use an env var if it is sensitive"]
         true ->

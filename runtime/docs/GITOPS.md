@@ -1,0 +1,94 @@
+
+# the idea
+
+  A running runtime tenant IS a git repo (see `host/git.ex` + GIT.org). Today the
+  loop is one-directional — the agent commits and the host PUSHES to GitHub
+  (`commit_and_push/3`). GitOps closes the loop: an authorized human (or CI) PUSHES
+  an update to the tenant's GitHub repo, and the live runtime PULLS it in and
+  applies it — **tracked, versioned, and without clobbering the agent's data**.
+
+  "Anyone with a connection can update the running system, and it's all versioned"
+  = a git push to the tenant's origin + the runtime reconciling it. The GitHub
+  account is the hub; access to the repo IS the authorization.
+
+# why it can't clobber (the whole point)
+
+  The manual deploy that prompted this OVERWROTE files (tar over ssh) — which is
+  exactly how you clobber an agent's in-flight work. `Workbooks.Git.pull/1` does a
+  `git merge` instead, which INTEGRATES:
+
+  - CODE paths and DATA paths are different files.
+  - A human edits CODE; the agent commits DATA.
+  - Different files ⇒ the merge replays cleanly ⇒ both survive.
+  - A genuine SAME-FILE divergence is REPORTED and rolled back (`merge --abort`),
+    left for a human — never silently overwritten.
+
+  Proven: `test/git_reconcile_test.exs` — upstream code push + local agent data
+  commit → pull integrates both, neither lost.
+
+# the code / data split (the convention that makes it safe)
+
+| lane | examples | who writes | pushable by humans |
+| --- | --- | --- | --- |
+| CODE | app `src/`, the agent def, `design.org`, `design-gate.md`, `skills/`, archetypes | the team / CI | YES — this is the GitOps surface |
+| DATA | `content/`, `blog/`, the board (`plan.org`), `strategy/`, `rem/` (dreams), history | the agent | NO — the agent owns it; reconcile never touches it |
+
+  Keep them in DISJOINT paths and a code push can never collide with agent data.
+  (Open: the lander def lives at `/data/agent.org`, OUTSIDE the repo — move it INTO
+  the repo so it is GitOps-managed too.)
+
+# the reconcile trigger
+
+  - NOW: the keeper pulls at the TOP of each tick (opt-in =WB_GITOPS=1=), before the
+    agent runs — so a push lands live within one cycle. Best-effort; a failure is
+    logged, never blocks the run. See `keeper/worker.ex` `maybe_reconcile/1`.
+  - NEXT: a dedicated reconcile controller (poll origin every N s, or a webhook /
+    RCP `POST /reconcile` an authorized client hits right after pushing) so GitOps
+    works for tenants with no keeper, and crews don't each pull the same repo.
+
+# the build seam (the honest gap)
+
+  `pull` integrates the repo, but the served artifact may need a BUILD the runtime
+  can't do (the Svelte app needs `vite build`; there is no bun on the BEAM box).
+  So today GitOps is LIVE for the build-free surface — the agent def, `design.org`,
+  `skills/`, and `content/` (republished on merge). For the app `src/`, either
+  (a) commit the built `dist/` into the repo (pull = serve, no build), or
+  (b) CI builds on push and the runtime pulls the built output. Pick one; until
+  then app changes still ride the team build. Config/def/content are the 90%.
+
+# step 3 — the GOAL: in-sandbox build on pull (retire CI)
+
+  "Just send it" (Convex-style) for the WHOLE app: a push compiles + serves with
+  no CI round-trip. The runtime already has the lane (`compilers/js/qjs-run.wasm`
+  QuickJS + `compilers/svelte/sveltejob.js`) — but it hits the PERF WALL (wb-2ku.7):
+  QuickJS has no JIT, so it re-parses+interprets the multi-MB `svelte/compiler` on
+  EVERY build → ~17 CPU-min. The reconcile would just call it on pull; the wall is
+  the only blocker.
+
+  Fixes, leverage-ordered (the heavy ones need the PROVISIONED compilers env —
+  clang.wasm + harness + quickjs-ng — not a laptop):
+  1. PRECOMPILE svelte/compiler to QuickJS BYTECODE (qjsc) / a cached wasm command
+     so the parse cost is paid ONCE per svelte version, not per build. (wb-2ku.7
+     fix 1; needs provisioned env.)
+  2. WARM-INSTANCE (likely host-only, tractable WITHOUT re-provisioning): keep ONE
+     long-lived Wasmex instance with svelte/compiler already loaded and feed it
+     components, instead of spinning a fresh QuickJS (re-parsing the compiler) per
+     build. Amortizes the load over many compiles. Worth trying first — it's
+     Elixir orchestration (build.ex / JsDock), not toolchain work.
+  3. OUTPUT CACHE: content-address (component source → compiled JS); a push usually
+     changes 1–2 components, so only those recompile.
+  4. payload diet (ship only compiler/index + needed internals) + linearize the
+     ESM→CJS pass (also fix the named-export bug wb-w60c found en route).
+
+  Until one lands, step 2 (the CI bridge) carries app builds — by design.
+
+# status
+
+  - [X] `Workbooks.Git.pull/1` — fetch + merge, data-safe, conflict-reporting
+  - [X] keeper reconcile hook (=WB_GITOPS=1=) + LIVE-proven (external GitHub push pulled live)
+  - [X] no-clobber proof (`test/git_reconcile_test.exs`, 3 tests)
+  - [X] move the lander def into the repo (`/data/wb-lander-live/agent.org`, WB_KEEPER_DEF repointed)
+  - [X] step 2 — `SitePublish.deploy_app/2` ships pulled `dist` live + CI `build-app.yml` bridge
+  - [ ] step 3 — in-sandbox build (above); start with the WARM-INSTANCE fix (host-only)
+  - [ ] dedicated reconcile controller + RCP `POST /reconcile` (anyone-triggers)
+  - [ ] align monorepo source layout with the deploy layout (kill the flatten)

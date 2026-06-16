@@ -95,7 +95,7 @@ Each `*` headline is a **cue**:
 
 ```sh
 # org lane (frame-accurate) — voiceover by cue frame, then verify:
-./pipeline recipes/desktop-search-drawer.org --voiceover recipe
+./pipeline recipes/desktop-search-drawer.md --voiceover recipe
 
 # JSON recipes still work unchanged (even-spread voiceover, afterMs dwell).
 ./pipeline recipes/app-demo.example.json
@@ -108,7 +108,7 @@ voices by cue frame (passing `--timing <take>.timing.json --fps`), and verifies.
 
 ```sh
 node lib/timecode.mjs   # round-trips every timecode form at fps 24/30/60
-node lib/dsl.mjs recipes/desktop-search-drawer.org   # prints parsed timeline
+node lib/dsl.mjs recipes/desktop-search-drawer.md   # prints parsed timeline
 ```
 
 ## Frame-accuracy caveat (honest)

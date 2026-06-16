@@ -103,4 +103,4 @@ COST: free
 
   - [overview](overview.md) — what CTK is and the shell.
   - [authoring-a-story](authoring-a-story.md) — the component + control-spec contract.
-  - `../../../runtime/docs/TOOLKITS-V3.org` — the render/component EXEC contract.
+  - `../../../runtime/docs/TOOLKITS-V3.md` — the render/component EXEC contract.

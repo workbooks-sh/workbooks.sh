@@ -1,0 +1,11 @@
+# git toolkit — agent explains git status (Tier 2: agent + judge)
+
+## the agent explains what git status shows
+
+- **TASK:** In one sentence, explain what the command `git status` shows.
+- **RUBRIC:** The answer says git status reports the state of the working tree — mentioning at least staged/unstaged changes and/or untracked files.
+- **MAX_STEPS:** 2
+
+A Tier-2 case: an agent answers the TASK, a judge scores the result against the
+RUBRIC. Non-exec (pure reasoning) so it needs only an LLM key, not
+WB_TOOLKIT_EXEC. Run with `wb toolkit eval git`.

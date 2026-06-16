@@ -5,8 +5,7 @@
 #   runtime/            -> the BEAM engine (mix release)
 #   projects/brandnana  -> the brandnana CLI (bun --compile) + profile + boards
 #
-# No `wb` / substrates/oql: the engine owns OQL (kernel/ -> build/oql.wasm), and
-# the agents query the substrate via brandnana + the engine's OQL, not a CLI.
+# No `wb` CLI baked in: the agents query the substrate via brandnana, not a CLI.
 
 # --- brandnana CLI: self-contained bun binary ---------------------------------
 FROM oven/bun:1 AS brandnana-cli
@@ -23,7 +22,7 @@ ENV MIX_ENV=prod LANG=C.UTF-8
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git curl \
     && rm -rf /var/lib/apt/lists/*
-# Rust toolchain for any rustler NIF (oql.wasm itself is pre-built + committed).
+# Rust toolchain for any rustler NIF.
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable --profile minimal
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN mix local.hex --force && mix local.rebar --force

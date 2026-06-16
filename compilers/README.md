@@ -15,7 +15,7 @@ This is the standalone packaging of the compiler-in-WASM work: a [spec](SPEC.md)
 | **C** (subset) | ✅ | `c4` — no-LLVM compiler+interpreter in one wasm process |
 | **C** (full)   | ✅ | `clang`+`lld` (LLVM built for wasm32-wasi) → wasm |
 | **Zig**        | ✅ | `zig1.wasm` (.zig→C) → `clang` (C→wasm) → run |
-| **Rust**       | 🧱 blocked | rustc-in-wasm is an open upstream frontier — see the [blocker](../runtime/compilers/rust/README.org) |
+| **Rust**       | 🧱 blocked | rustc-in-wasm is an open upstream frontier — see the [blocker](../runtime/compilers/rust/README.md) |
 
 Every entry is **working with a proof** or a **committed blocker note** naming the precise
 upstream wall — no stubs.

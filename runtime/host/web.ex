@@ -1,7 +1,7 @@
 defmodule Workbooks.Web do
   @moduledoc """
-  The HTTP/WS surface. Authenticate, then create/resume Instances and run OQL.
-  Bandit serves this Plug router (opt-in via WB_WEB=1).
+  The HTTP/WS surface. Authenticate, then create/resume Instances and run SQL
+  queries over a workbook's data. Bandit serves this Plug router (opt-in via WB_WEB=1).
   """
   use Plug.Router
 
@@ -171,7 +171,7 @@ defmodule Workbooks.Web do
   # The groundskeeper voice-agent bridge (wb-3ojf) — own credential, see router.
   forward("/gk", to: Workbooks.Groundskeeper.Router)
 
-  # RCP handshake (RUNTIME-CONNECT-PROTOCOL.org §1): unauthenticated capabilities
+  # RCP handshake (RUNTIME-CONNECT-PROTOCOL.md §1): unauthenticated capabilities
   # doc so any client learns the required auth rung + feature surface before
   # presenting a credential. Public (see Workbooks.Auth @public).
   get "/.well-known/workbooks-runtime" do
@@ -769,7 +769,7 @@ defmodule Workbooks.Web do
     |> halt()
   end
 
-  # Poll an agent run's status + result + observable events.org.
+  # Poll an agent run's status + result + observable events.html.
   get "/api/run/:id" do
     id = conn.params["id"]
     t = conn.assigns[:tenant]
@@ -971,7 +971,7 @@ defmodule Workbooks.Web do
     end
   end
 
-  # Cross-workbook OQL query-through across a Library's members. {"sql": "..."}
+  # Cross-workbook SQL query-through across a Library's members. {"sql": "..."}
   post "/api/library/:tenant/query" do
     {:ok, body, conn} = read_body(conn)
 

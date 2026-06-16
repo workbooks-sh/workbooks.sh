@@ -100,9 +100,9 @@ defmodule GroundskeeperTest do
     assert Enum.any?(feedback, &(&1.task == id and &1.status == "done"))
     assert Tasks.drain_feedback() == []
 
-    # TASKS.org is the rendered, git-visible view
-    tasks_org = File.read!(Path.join(home, "TASKS.org"))
-    assert tasks_org =~ "* DONE investigate widget pricing"
+    # TASKS.md is the rendered, git-visible view
+    tasks_md = File.read!(Path.join(home, "TASKS.md"))
+    assert tasks_md =~ "### DONE investigate widget pricing"
   end
 
   test "an invalid outline from the author is rejected, not run" do
@@ -173,12 +173,12 @@ defmodule GroundskeeperTest do
 
   test "boot marks orphaned active ledger entries BLOCKED", %{home: home} do
     stop_supervised!(Tasks)
-    File.write!(Path.join(home, "TASKS.org"), "#+TODO: TODO DOING BLOCKED | DONE\n\n* DOING orphaned run\n* DONE finished run\n")
+    File.write!(Path.join(home, "TASKS.md"), "States: TODO DOING BLOCKED | DONE\n\n### DOING orphaned run\n### DONE finished run\n")
     start_supervised!(Tasks)
 
-    content = File.read!(Path.join(home, "TASKS.org"))
-    assert content =~ "* BLOCKED orphaned run"
-    assert content =~ "* DONE finished run"
+    content = File.read!(Path.join(home, "TASKS.md"))
+    assert content =~ "### BLOCKED orphaned run"
+    assert content =~ "### DONE finished run"
   end
 
   # ── the app password gate ───────────────────────────────────────────────────
@@ -234,7 +234,7 @@ defmodule GroundskeeperTest do
 
   # ── the board ───────────────────────────────────────────────────────────────
 
-  test "board sync renders BOARD.org from bd json (stubbed bd)", %{home: home} do
+  test "board sync renders BOARD.md from bd json (stubbed bd)", %{home: home} do
     bin = Path.join(home, "bin")
     File.mkdir_p!(bin)
 
@@ -253,9 +253,9 @@ defmodule GroundskeeperTest do
 
     assert {:ok, path} = Workbooks.Groundskeeper.Board.sync()
     board = File.read!(path)
-    assert board =~ "** TODO open thing"
-    assert board =~ "** DOING doing thing :epic:"
-    assert board =~ "** DONE done thing"
+    assert board =~ "- **TODO** open thing"
+    assert board =~ "- **DOING** doing thing (epic)"
+    assert board =~ "- **DONE** done thing"
     assert board =~ "NEVER hand-edit"
   end
 

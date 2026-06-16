@@ -19,7 +19,7 @@ defmodule Workbooks.Telemetry.WasmBridge do
   ADOPT, don't author: the guest emits these calls via the Dylibso Observe SDK's
   wasm-to-wasm transform (mature, language-agnostic) or the wasi:otel proposal
   once it + Wasmtime/Wasmex stabilize. This module is only the host sink — see
-  docs/WASI-OTEL-SPIKE.org. Wiring it into a real component is blocked on that
+  docs/WASI-OTEL-SPIKE.md. Wiring it into a real component is blocked on that
   guest-side transform tooling (honest TODO there); the bridge itself is complete
   and unit-tested in isolation.
   """

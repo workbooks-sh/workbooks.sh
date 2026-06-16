@@ -6,7 +6,7 @@
 // Env: OPENROUTER_API_KEY  (required)
 //
 // For each stage:
-//   1. Build prompt = shared.org + role-def + fixture + task instruction
+//   1. Build prompt = shared.md + role-def + fixture + task instruction
 //   2. Call OpenRouter (model: xiaomi/mimo-v2.5) → agent output
 //   3. Call judge (same model) with rubric + output → JSON {pass, reasons[]}
 //   4. Print table; exit 1 if any stage fails
@@ -44,6 +44,19 @@ function read(rel) {
 
 function readAbs(rel) {
   return readFileSync(join(ROOT, rel), "utf8");
+}
+
+// A role def is a <work-agent> HTML file; its prompt body is the <work-system>
+// element's (entity-decoded) text. The eval system prompt is shared.md laws +
+// the role body.
+function roleDef(rel) {
+  const html = readAbs(rel);
+  const m = html.match(/<work-system>([\s\S]*?)<\/work-system>/i);
+  const body = m ? m[1] : html;
+  return body
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&")
+    .trim();
 }
 
 async function chat(messages, label, maxTokens = AGENT_MAX_TOKENS) {
@@ -118,13 +131,13 @@ const STAGES = [
   {
     name: "desk",
     buildPrompt() {
-      const shared = readAbs("agents/shared.org");
-      const roleDef = readAbs("agents/desk.org");
-      const fixture = read("fixtures/desk-landscape.org");
+      const shared = readAbs("agents/shared.md");
+      const roleDefText = roleDef("agents/desk.html");
+      const fixture = read("fixtures/desk-landscape.md");
       return [
         {
           role: "system",
-          content: `${shared}\n\n---\n\n${roleDef}`,
+          content: `${shared}\n\n---\n\n${roleDefText}`,
         },
         {
           role: "user",
@@ -150,13 +163,13 @@ const STAGES = [
     // emits — a dead/invented citation hard-fails regardless of the judge.
     name: "desk-fabrication",
     buildPrompt() {
-      const shared = readAbs("agents/shared.org");
-      const roleDef = readAbs("agents/desk.org");
-      const fixture = read("fixtures/desk-fabrication-trap.org");
+      const shared = readAbs("agents/shared.md");
+      const roleDefText = roleDef("agents/desk.html");
+      const fixture = read("fixtures/desk-fabrication-trap.md");
       return [
         {
           role: "system",
-          content: `${shared}\n\n---\n\n${roleDef}`,
+          content: `${shared}\n\n---\n\n${roleDefText}`,
         },
         {
           role: "user",
@@ -188,13 +201,13 @@ const STAGES = [
   {
     name: "moss",
     buildPrompt() {
-      const shared = readAbs("agents/shared.org");
-      const roleDef = readAbs("agents/researcher.org");
-      const fixture = read("fixtures/moss-assignment.org");
+      const shared = readAbs("agents/shared.md");
+      const roleDefText = roleDef("agents/researcher.html");
+      const fixture = read("fixtures/moss-assignment.md");
       return [
         {
           role: "system",
-          content: `${shared}\n\n---\n\n${roleDef}`,
+          content: `${shared}\n\n---\n\n${roleDefText}`,
         },
         {
           role: "user",
@@ -215,13 +228,13 @@ const STAGES = [
   {
     name: "wren",
     buildPrompt() {
-      const shared = readAbs("agents/shared.org");
-      const roleDef = readAbs("agents/writer.org");
-      const fixture = read("fixtures/wren-skeleton.org");
+      const shared = readAbs("agents/shared.md");
+      const roleDefText = roleDef("agents/writer.html");
+      const fixture = read("fixtures/wren-skeleton.md");
       return [
         {
           role: "system",
-          content: `${shared}\n\n---\n\n${roleDef}`,
+          content: `${shared}\n\n---\n\n${roleDefText}`,
         },
         {
           role: "user",
@@ -243,14 +256,14 @@ const STAGES = [
   {
     name: "hale",
     buildPrompt() {
-      const shared = readAbs("agents/shared.org");
-      const roleDef = readAbs("agents/editor.org");
-      const skeleton = read("fixtures/wren-skeleton.org");
-      const draft = read("fixtures/hale-draft.org");
+      const shared = readAbs("agents/shared.md");
+      const roleDefText = roleDef("agents/editor.html");
+      const skeleton = read("fixtures/wren-skeleton.md");
+      const draft = read("fixtures/hale-draft.md");
       return [
         {
           role: "system",
-          content: `${shared}\n\n---\n\n${roleDef}`,
+          content: `${shared}\n\n---\n\n${roleDefText}`,
         },
         {
           role: "user",

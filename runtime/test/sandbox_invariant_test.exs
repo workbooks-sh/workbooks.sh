@@ -1,6 +1,6 @@
 defmodule Workbooks.SandboxInvariantTest do
   @moduledoc """
-  Enforces the runtime execution invariant (docs/SANDBOX-INVARIANT.org, wb-ova):
+  Enforces the runtime execution invariant (docs/SANDBOX-INVARIANT.md, wb-ova):
 
     Untrusted/arbitrary code executes ONLY inside the wasmtime sandbox; Wasmex is the only NIF that
     runs it; everything else is pure Elixir/Erlang or wasm. No untrusted code ever runs as a native
@@ -11,7 +11,7 @@ defmodule Workbooks.SandboxInvariantTest do
   """
   use ExUnit.Case, async: true
 
-  # Every dependency, reviewed and classified in SANDBOX-INVARIANT.org. To add one: classify it
+  # Every dependency, reviewed and classified in SANDBOX-INVARIANT.md. To add one: classify it
   # there first (pure-Elixir? trusted-infra NIF? does it run UNTRUSTED code? — only Wasmex may),
   # then add its name here.
   @reviewed_deps ~w(wasmex exqlite jason bandit plug websock_adapter guardian jose postgrex)a
@@ -26,7 +26,7 @@ defmodule Workbooks.SandboxInvariantTest do
     assert unexpected == [],
            """
            Unreviewed dependency: #{inspect(unexpected)}.
-           Classify it in docs/SANDBOX-INVARIANT.org — is it pure Elixir, a trusted-infra NIF, or does
+           Classify it in docs/SANDBOX-INVARIANT.md — is it pure Elixir, a trusted-infra NIF, or does
            it run UNTRUSTED code? (Only Wasmex may run untrusted code.) Then add it to @reviewed_deps.
            """
   end

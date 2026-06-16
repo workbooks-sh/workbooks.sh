@@ -14,7 +14,7 @@
     1. *base* — this =manifest.org= + =skills/= (how an agent uses it).
     2. *data-source* — =plugin/manifest.org= (=#+SLOT: data-source=): the
        OQL read face, so =SELECT ... FROM asana-task= routes here.
-    3. *sync daemon* — =sync.org= (a =:daemon:= node, =:RUNTIME: beam=,
+    3. *sync daemon* — =sync.md= (a =:daemon:= node, =:RUNTIME: beam=,
        =:OWNERSHIP: tenant=): the engine runs the connector&#x27;s pull on an
        interval as a supervised GenServer (no VMM), mirroring Asana
        tasks into =:task:= org nodes.

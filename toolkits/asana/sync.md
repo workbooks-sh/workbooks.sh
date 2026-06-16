@@ -1,0 +1,37 @@
+# asana — sync daemon spec
+
+Status: experimental
+
+## About
+
+Face 3 of 3 of the `asana` federation toolkit: the sync daemon
+declaration. The DeployKit federation provision walk reads this node
+to register the connector's interval pull when the toolkit is
+installed on a deployment that can host a `beam` daemon.
+
+`RUNTIME: beam` + `OWNERSHIP: tenant`: a first-party, signed-into-the-
+image connector runs IN the engine as a supervised GenServer
+(`WorkbooksRuntime.Plugin.TaskSync`) — no VMM, no sandbox, no separate
+process. The trust floor (SERVICEHOST-PLAN) permits `beam` ONLY
+for deployment-manifest / first-party daemons; an agent could never
+start this.
+
+## asana-sync (daemon)
+
+- **ID:** asana-sync
+- **RUNTIME:** beam
+- **OWNERSHIP:** tenant
+- **DIRECTION:** pull
+- **INTERVAL_MS:** 60000
+- **IMPL:** WorkbooksRuntime.Plugin.TaskSync
+- **ADAPTER:** WorkbooksRuntime.Plugin.Asana
+- **ENV_KEYS:** ASANA_PAT
+- **CAPABILITY:** connector.task.sync
+- **NETWORK:** yes
+
+Interval pull: list Asana tasks changed since the last cursor →
+project onto the universal `task` map → upsert `task` nodes
+matched on `(SOURCE, REMOTE_ID)`. `DIRECTION: pull` is the safe
+read-only default; write-back (create/update/delete) is a synchronous
+call, with DESTRUCTIVE deletes gated through a Workgate permit
+(`connector.task.delete`).

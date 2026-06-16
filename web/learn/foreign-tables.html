@@ -445,7 +445,7 @@ flowchart LR
   side of the bridge but text someone else already fetched.</p>
   <p>The structure is what makes that hold. The daemon is a <em>supervised</em>
   <code>Plugin.Sync</code> GenServer, driven from a <code>:daemon:</code> node in
-  a <code>sync.org</code> face — not something an agent inside the workbook
+  a <code>sync.md</code> face — not something an agent inside the workbook
   spawns or steers. And the direction is one-way by construction: the generic
   <code>pull_once</code> only ever <em>reads</em> the source and <em>writes</em>
   the VFS — there is no write-back path in this core at all. The toolkit that

@@ -1,12 +1,12 @@
 defmodule Workbooks.DataSource do
   @moduledoc """
-  Federation data-source plugin contract (wb-39j.1). A `#+SLOT: data-source` plugin
+  Federation data-source plugin contract (wb-39j.1). A `data-source` plugin
   registers an entity name; a query `SELECT … FROM <entity>` then routes to its
-  `query/3` instead of the local VFS — the OQL read face of a federation toolkit.
+  `query/3` instead of the local VFS — the SQL read face of a federation toolkit.
 
   A plugin module implements this behaviour; Workbooks.Federation discovers it from
-  the plugin manifest (`#+ENTITIES` → `#+IMPL`) and registers it here. Routing is
-  by entity name, in :persistent_term (rare write, fast read), like CommandRegistry.
+  the plugin manifest (entities → impl) and registers it here. Routing is by entity
+  name, in :persistent_term (rare write, fast read), like CommandRegistry.
   """
 
   @doc """

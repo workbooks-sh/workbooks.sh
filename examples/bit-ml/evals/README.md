@@ -95,10 +95,10 @@ published unchanged.
 evals/
   run.mjs              # harness — build prompt → call agent → call judge → table
   fixtures/
-    desk-landscape.org   # 3 raw news items
-    moss-assignment.org  # assignment + 2 inline source docs (with injected trap)
-    wren-skeleton.org    # finished research skeleton (9 facts, gaps)
-    hale-draft.org       # draft with 2 planted overclaims
+    desk-landscape.md    # 3 raw news items
+    moss-assignment.md   # assignment + 2 inline source docs (with injected trap)
+    wren-skeleton.md     # finished research skeleton (9 facts, gaps)
+    hale-draft.md        # draft with 2 planted overclaims
   rubrics/
     desk.md              # judge prompt for desk
     moss.md              # judge prompt for moss (quarantine law)

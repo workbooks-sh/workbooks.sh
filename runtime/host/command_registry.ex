@@ -6,7 +6,7 @@ defmodule Workbooks.CommandRegistry do
   in-WASM shell, wb-11ck.20). The in-WASM equivalent of a CLI on $PATH, except
   the CLI is itself sandboxed WASM. Think jq, ripgrep, grep.
 
-  Relationship to toolkits (L4, ARCHITECTURE.org): a *toolkit* is our version of
+  Relationship to toolkits (L4, ARCHITECTURE.md): a *toolkit* is our version of
   Claude Code skills — a progressive-disclosure skill doc bundled with the whole
   CLI it documents. That CLI is converted to commands (here); the skill tells the
   agent which commands exist and how to call them. So a command is the runnable
@@ -16,8 +16,7 @@ defmodule Workbooks.CommandRegistry do
 
   Built-ins are either source compiled on first use (`upper`, Javy) or prebuilt
   wasm artifacts: `jq` (a jaq-interpret wrapper) and `grep` (a regex wrapper),
-  both real CLIs compiled to wasm. `oql` is the kernel (a Component), reachable
-  directly, not as a stdio command.
+  both real CLIs compiled to wasm.
   """
 
   # Built-in shapes (each carries an ARG MODE — the last element):

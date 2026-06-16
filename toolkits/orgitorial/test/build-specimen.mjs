@@ -1,5 +1,5 @@
 // Regenerate dist/specimen.html from dist/{orgitorial.js,orgitorial.css} +
-// examples/kitchen-sink.org.  Self-contained, zero deps.  run:
+// examples/kitchen-sink.md.  Self-contained, zero deps.  run:
 //   node test/build-specimen.mjs
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -8,7 +8,7 @@ import path from "node:path";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 
-const org = read("examples/kitchen-sink.org");
+const org = read("examples/kitchen-sink.md");
 const css = read("dist/orgitorial.css");
 // inline (non-module) script: drop the ES `export` statements (SyntaxError in a
 // plain <script>); window.Orgitorial is still set, module.exports is guarded.

@@ -3,7 +3,7 @@ defmodule Workbooks.AgentStream do
   Live agent telemetry over a WebSocket (`GET /api/run/:id/stream`) — brandnana's
   per-step event stream. On connect it subscribes to the AgentSession; each tool
   step the agent takes is pushed as a JSON frame the moment it happens, then a
-  final `done` frame. The same observable trace is also durable in events.org.
+  final `done` frame. The same observable trace is also durable in events.html.
   """
   @behaviour WebSock
 

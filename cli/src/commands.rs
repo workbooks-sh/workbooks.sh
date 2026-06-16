@@ -82,7 +82,7 @@ pub fn fetch(io: &dyn Io, key: &str, out: &str) -> Result<String> {
 }
 
 pub fn search(io: &dyn Io, query: &str, mode: &str) -> Result<String> {
-    // --sql is the cross-workbook OQL query-through — a DIFFERENT engine surface
+    // --sql is the cross-workbook SQL query-through — a DIFFERENT engine surface
     // than ranked search (Library.search only knows hybrid/semantic/literal).
     if mode == "sql" {
         let body = serde_json::json!({ "sql": query });

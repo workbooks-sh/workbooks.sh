@@ -4,7 +4,7 @@ defmodule Workbooks.Compilers do
   (a build recipe + source/stubs). `build/1` compiles it to a wasm command; source is
   then compiled+run ENTIRELY in the sandbox — zero native execution — making untrusted
   compiled-language source as safe as running an interpreter (unlike a NATIVE compile
-  under bwrap, which is not an untrusted-source boundary). See docs/COMPILER-IN-WASM.org.
+  under bwrap, which is not an untrusted-source boundary). See docs/COMPILER-IN-WASM.md.
 
   Reuses the command path (CommandRegistry + PackageManager.run, which enables
   -W exceptions + memory64). Three compiler KINDs:
@@ -545,7 +545,7 @@ defmodule Workbooks.Compilers do
   end
 
   # ── Rust full-std lane (wb-fm0.3) ──────────────────────────────────────────
-  # Recipe + walls: compilers/rust/{PORT-LOG.org,BUILD-STATE.org,std/std-e2e.sh}.
+  # Recipe + walls: compilers/rust/{PORT-LOG.md,BUILD-STATE.md,std/std-e2e.sh}.
   @rust_clang_flags ~w(--target=wasm32-wasip1 --sysroot=/usr -O1 -fno-strict-aliasing -w
                        -fwasm-exceptions -mllvm -wasm-enable-sjlj -mllvm -wasm-use-legacy-eh=false
                        -Xclang -disable-llvm-verifier)

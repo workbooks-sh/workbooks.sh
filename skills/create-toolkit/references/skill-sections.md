@@ -4,7 +4,7 @@ One file per task/verb. **Depth is the bar** — a skill is the recipe + the
 GOTCHAS + the WHY + a verification checklist + see-also, empirically verified
 where the tool is runnable. Not a man-page paraphrase, not a flag dump. Target
 150–300 body lines; below ~120, ask whether you went deep. Source:
-`toolkits/AUTHORING.org §"=skills/<slug>.org="`. Exemplars:
+`toolkits/AUTHORING.md §"=skills/<slug>.org="`. Exemplars:
 `toolkits/ffmpeg/skills/image-resize.org`, `.../lossy-tradeoffs.org`.
 
 ## Header (every key load-bearing)

@@ -13,12 +13,12 @@
 #   ./desktop/scripts/app unlock <comp|all> # thaw: allow rebuilds again
 #   ./desktop/scripts/app rebuild <comp...> # force rebuild even if unchanged (ignores lock)
 #
-# Components:  kernel  escript  image  app
+# Components:  escript  image  app
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOCK="$ROOT/desktop/scripts/.build-lock.tsv"
-COMPONENTS=(kernel escript image app)
+COMPONENTS=(escript image app)
 
 # The runtime image ref the local container boots (override with WB_IMAGE).
 IMAGE_REF="${WB_IMAGE:-ghcr.io/workbooks-sh/runtime:latest}"
@@ -33,10 +33,9 @@ die()  { printf '%sERROR:%s %s\n' "$c_red" "$c_rst" "$*" >&2; exit 1; }
 # ---- source globs: what feeds each artifact (a change here => stale) ----------
 src_paths() {
   case "$1" in
-    kernel)  echo "runtime/kernel/src runtime/kernel/wit runtime/kernel/Cargo.toml runtime/kernel/Cargo.lock" ;;
     escript) echo "runtime/host runtime/mix.exs runtime/mix.lock" ;;
     image)   echo "runtime/host ci/Dockerfile.runtime .dockerignore runtime/scripts/stage-tools.sh runtime/mix.exs runtime/mix.lock" ;;
-    app)     echo "desktop/src desktop/src-tauri/src desktop/src-tauri/Cargo.toml desktop/src-tauri/Cargo.lock desktop/src-tauri/tauri.conf.json desktop/package.json desktop/src-tauri/oql.wasm" ;;
+    app)     echo "desktop/src desktop/src-tauri/src desktop/src-tauri/Cargo.toml desktop/src-tauri/Cargo.lock desktop/src-tauri/tauri.conf.json desktop/package.json" ;;
   esac
 }
 
@@ -55,7 +54,6 @@ src_hash() {
 # Artifact path (file or dir) + an identity string for the built output.
 art_path() {
   case "$1" in
-    kernel)  echo "$ROOT/desktop/src-tauri/oql.wasm" ;;
     escript) echo "$ROOT/runtime/wb" ;;
     image)   echo "" ;;  # docker image, not a file — handled specially
     app)     ls -d "$ROOT"/desktop/src-tauri/target/release/bundle/macos/*.app 2>/dev/null | head -1 ;;
@@ -93,16 +91,6 @@ set_locked() { # component 0|1
 }
 
 # ---- per-component builders ---------------------------------------------------
-build_kernel() {
-  hdr "kernel: cargo component build --release"
-  ( cd "$ROOT/runtime/kernel" && cargo component build --release )
-  local out
-  out="$(ls -t "$ROOT"/runtime/kernel/target/wasm32-*/release/oql.wasm 2>/dev/null | head -1)"
-  [ -n "$out" ] || die "kernel build produced no oql.wasm"
-  cp "$out" "$ROOT/runtime/build/oql.wasm"
-  cp "$out" "$ROOT/desktop/src-tauri/oql.wasm"
-  say "    oql.wasm -> runtime/build/ + desktop/src-tauri/ ($(wc -c <"$out" | tr -d ' ') bytes)"
-}
 build_escript() {
   hdr "escript: mix escript.build (wb)"
   ( cd "$ROOT/runtime" && mix escript.build >/dev/null )

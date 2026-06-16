@@ -9,7 +9,7 @@ defmodule Workbooks.Embed.Model2Vec do
   serves every tenant), satisfying "WASM or Elixir, no native NIF" via the Elixir
   path — nothing to compile, nothing to download at runtime but the matrix itself.
   Chosen over ORT-Web because it skips the runtime entirely (~3–5× smaller total).
-  See docs/VECTOR-QUERY.org step 6.
+  See docs/VECTOR-QUERY.md step 6.
 
   Loaded once into :persistent_term. `model` is %{vocab, unk, matrix, dim, normalize}.
   """

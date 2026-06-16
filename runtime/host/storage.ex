@@ -9,7 +9,7 @@ defmodule Workbooks.Storage do
   Tenant-scoped BY CONSTRUCTION: `tenant` is the first argument of every call, so
   isolation lives ABOVE the backend — swapping a Fly volume for R2 can't widen
   access. Auth (BetterAuth→Guardian) decides WHO the tenant is; this just stores
-  their bytes under that scope. See docs/DEPLOY-KIT-STORAGE.org.
+  their bytes under that scope. See docs/DEPLOY-KIT-STORAGE.md.
   """
   @callback put(tenant :: String.t(), key :: String.t(), bytes :: binary) :: :ok | {:error, term}
   @callback get(tenant :: String.t(), key :: String.t()) :: {:ok, binary} | :error

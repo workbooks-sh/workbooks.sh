@@ -1,7 +1,8 @@
 defmodule Workbooks.PackageManager do
   @moduledoc """
-  Tangle: take the OQL build plan from a literate Workbook and compile each
-  component's source block to a WASM command/component, content-addressed in build/cache.
+  Tangle: take the build plan from a Workbook (the `<work-component>` graph, via
+  Workbooks.Workbook.tangle_plan) and compile each component's source block to a
+  WASM command/component, content-addressed in build/cache.
 
   ── The canon (wb-fm0): untrusted source NEVER compiles or runs natively ──────
   Every language lane compiles + runs untrusted user source ENTIRELY in the wasm
@@ -1217,7 +1218,7 @@ defmodule Workbooks.PackageManager do
 
   @doc """
   Execute a Workbook's DAG: build each component, run them in topological order,
-  and pipe each one's stdout into its consumer's stdin along the OQL `:out`→`:in`
+  and pipe each one's stdout into its consumer's stdin along the work-component `out`→`in`
   edges. Host-orchestrated dataflow — composes stdin/stdout filters (stock Javy,
   any language) without WIT. Typed in-WASM composition (wac plug) is the upgrade,
   and needs WIT-declared components (jco / cargo-component). Returns name → output.
@@ -1378,7 +1379,7 @@ defmodule Workbooks.PackageManager do
 
   @doc """
   Typed composition — real in-WASM dataflow, the upgrade over `compose/1`'s
-  structural bundle. Lowers an OQL `:out`→`:in` edge into a WIT `stage`
+  structural bundle. Lowers a work-component `out`→`in` edge into a WIT `stage`
   interface, componentizes each component's JS against the generated WIT world
   via *jco* (NOT Javy — Javy declares no WIT, so `wac plug` finds nothing to
   wire), then `wac plug`s producer.export(stage) → consumer.import(stage) into
@@ -1411,7 +1412,7 @@ defmodule Workbooks.PackageManager do
     end
   end
 
-  # OQL field "label:type" → WIT type. Generic types we don't model become bytes.
+  # Workbook field "label:type" → WIT type. Generic types we don't model become bytes.
   defp wit_type(nil), do: "string"
 
   defp wit_type(field) do

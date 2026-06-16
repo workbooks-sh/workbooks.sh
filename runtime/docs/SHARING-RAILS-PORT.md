@@ -1,0 +1,88 @@
+# Sharing rails port plan — ATproto (2d) + GitHub (2a/2b)
+
+Both remaining sharing rails are credential-gated, so they wait on the user. But
+neither is a from-scratch build — the archive already has the hard parts, and the
+toolkit model (agents have bash; capabilities = CLIs on PATH) means we WIRE, not
+re-author. Golden rules applied throughout: don't re-implement crypto/OAuth
+(rule 1/2), both rails are one CLI shared across consumers (rule 3), one identity
+key with no second store (rule 4 — the drift to avoid).
+
+# 2d — ATproto / Bluesky publish (the PUBLIC artifact rail)
+
+## Reuse, don't rewrite: `toolkits/publish` (`wb-publish`)
+
+   The archive's `toolkits/publish/bin` is a COMPLETE standalone Rust CLI:
+   - Bluesky OAuth, DPoP-bound (`cmd/bluesky_oauth/{client,dpop,discover}.rs`)
+   - atproto publish / delete / status / feed / firehose (`cmd/atproto/`)
+   - identity export/import/show (`cmd/identity.rs`)
+   - "No engine required" for any of sign-in / publish / delete.
+   - `wb-publish atproto publish <file> --sign` already pairs publishing with the
+     manifest signer.
+   This IS rail 2d. It's a CLI toolkit → it drops onto PATH the same way
+   `jj`_`c2patool`_`gh` do. Port = build it into the engine image, not port code.
+
+## The ONE real design issue — identity drift (rule 4)
+
+   The toolkit keeps its identity at `~/.config/workbooks/` (`binding.json` +
+   `key.b64`, raw 32-byte Ed25519 priv, mode 0600). The runtime keeps the SAME
+   kind of key at `.workbooks/<tenant>.ed25519` (hex 32-byte Ed25519 priv,
+   `Workbooks.Git`). Same key TYPE, two stores → drift.
+   Fix (no new key): the runtime materializes the toolkit's sidecar FROM its
+   existing keypair — write `key.b64` = `Base64(decode_hex(.workbooks/<tenant>.ed25519))`
+   and a `binding.json` carrying `Git.did(tenant)` + the bound handle. One key,
+   two encodings, written once at bind time. The toolkit's `identity import`
+   already accepts exactly this envelope, so likely zero toolkit changes.
+
+## Work items
+
+   1. [ ] Add `wb-publish` to `deploy/Dockerfile` (cargo build the toolkit;
+      copy the binary to PATH). ~Rust build stage.
+   2. [ ] `Workbooks.Atproto.materialize_identity(tenant, handle)` — write the
+      toolkit sidecar from `.workbooks/<tenant>.ed25519` (reconcile, rule 4).
+   3. [ ] ONE interactive bind (user-gated): =wb-publish identity
+      bluesky-oauth-login --handle <user>.bsky.social=. Browser loopback DPoP;
+      caches the session. Non-interactive after that.
+   4. [ ] `Workbooks.Atproto.publish(tenant, file, opts)` — thin shell to
+      `wb-publish atproto publish <file> --sign --json`. Returns the at:// uri.
+   5. [ ] `POST /api/publish/atproto` + `wb publish atproto <file>` CLI verb.
+   6. [ ] Emit a `c2pa.action.published.atproto` assertion (already in the
+      manifest vocab) into the signed manifest so the artifact records WHERE it
+      went. did:key (sign) ↔ did:plc (carrier) bound via the manifest, per
+      IDENTITY-GIT-MONOREPO.md — NOT merged.
+## Credential gate: the user's Bluesky handle + one OAuth login. Nothing else.
+
+# 2a/2b — GitHub (the SOURCE rail)
+
+## Leanest path: lean on `gh` (rule 2/3), don't build a GitHub App yet
+
+   The source rail = push a tenant's git repo (the `Workbooks.Git` repo) to
+   GitHub + open/track PRs. The minimal-code way is the `gh` CLI on PATH — the
+   exact toolkit pattern already used elsewhere. No app registration, no
+   installation-token dance, no Octokit.
+   - `Workbooks.GitHub.push(tenant, remote)` → shell =gh repo create --source
+     <repo> --private --push= (idempotent: create-or-push).
+   - PR/status verbs → `gh pr create` / `gh pr view --json`.
+   The archive's `services/broker/.../githubWebhook.ts` is the INBOUND half
+   (receiving webhooks in a Cloudflare worker) — a separate concern; ignore for
+   the outbound source rail.
+## When a full GitHub App IS justified — defer until then
+
+   Only if we need PER-TENANT installation tokens (many end-users each granting
+   the app access to THEIR repos) does a GitHub App earn its complexity. For
+   "self-host for now / we host our own," `gh` with one account is enough. Note
+   the fork so we don't over-build (rule 2).
+## Work items (gh path)
+
+   1. [ ] Ensure `gh` on PATH in the image (+ `GH_TOKEN` secret).
+   2. [ ] `Workbooks.GitHub.push/2` (create-or-push) + `Workbooks.Git.publish/1`
+      already federates via Radicle — GitHub is the SECOND mirror, same repo.
+   3. [ ] `wb push github` CLI verb + `POST /api/publish/github`.
+## Credential gate: `gh auth login` (or a `GH_TOKEN` secret on the app).
+
+# Throughline
+
+  source rail = GitHub (`gh`) + Radicle (already wired in `git.ex`); artifact rail
+  = signed manifest (done) + ATproto (`wb-publish`). Every external capability is
+  a CLI on PATH; the host modules are thin shells; the ONE Ed25519 key per tenant
+  backs ledger + manifest + did:web + did:key + atproto. No second identity, no
+  re-authored crypto. Build when creds land.

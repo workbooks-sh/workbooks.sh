@@ -525,7 +525,7 @@
   {
     "slug": "toolkit-forge",
     "title": "toolkit-forge",
-    "tagline": "Forge a new toolkit from a target \u2014 npm name / GitHub URL / semantic need \u2014 by research \u2192 study real surface \u2192 author deep skills + manifest to the toolkits/AUTHORING.org standard.",
+    "tagline": "Forge a new toolkit from a target \u2014 npm name / GitHub URL / semantic need \u2014 by research \u2192 study real surface \u2192 author deep skills + manifest to the toolkits/AUTHORING.md standard.",
     "version": "0.1.0",
     "kind": "toolkit",
     "status": "experimental",

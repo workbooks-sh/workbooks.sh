@@ -4,18 +4,19 @@ defmodule Workbooks.BrandBook do
   this as a Scout→Strategist→Designer board; here it's a three-stage pipeline over
   one shared OS workdir, driven by the clean-room agent loop:
 
-    1. HARVEST  — `brandnana harvest-all <domain>` (deterministic sweep → an
-       OQL-queryable org substrate in the workdir). Needs the cloud keys, so it
-       only fully runs on a deployed engine.
+    1. HARVEST  — `brandnana harvest-all <domain>` (deterministic sweep → a
+       queryable substrate in the workdir). Needs the cloud keys, so it only fully
+       runs on a deployed engine.
     2. STRATEGIST — the real brandnana-strategist agent (exec + workdir) reads the
-       substrate, writes gated `analysis/*.org`.
+       substrate, writes gated analysis files.
     3. DESIGNER — the real designer agent composes + publishes the deck-v2 HTML.
 
-  The agents are the canonical profile `:agent:` defs baked at WB_PROFILE_DIR
-  (/opt/profile/agents) — the exact files the production engine uses — parsed by
-  `Workbooks.AgentDef`; their bash/brandnana toolkits are the clean-room `run`
-  exec tool. The engine env (the brandnana keys) is inherited by every `run`.
-  Stage status is written to `<workdir>/_status.json` for observability.
+  The agents are the canonical profile `<work-agent>` HTML defs baked at
+  WB_PROFILE_DIR (/opt/profile/agents) — the exact files the production engine uses
+  — parsed by `Workbooks.AgentDef`; their bash/brandnana toolkits are the
+  clean-room `run` exec tool. The engine env (the brandnana keys) is inherited by
+  every `run`. Stage status is written to `<workdir>/_status.json` for
+  observability.
   """
   alias Workbooks.AgentDef
 
@@ -63,9 +64,9 @@ defmodule Workbooks.BrandBook do
 
   # Stages 2 & 3 — a real brandnana agent, exec-enabled, rooted in the workdir.
   # on_step appends each tool step to a trace file so a long-horizon run is
-  # observable from outside (the in-VFS events.org is only written at finish).
-  defp stage(agent_org_path, task, workdir, steps) do
-    role = Path.basename(agent_org_path, ".org")
+  # observable from outside (the in-VFS events.html is only written at finish).
+  defp stage(agent_def_path, task, workdir, steps) do
+    role = Path.basename(agent_def_path, ".html")
     trace = Path.join(workdir, "_trace-#{role}.jsonl")
     on_step = fn ev ->
       line = Jason.encode!(%{step: ev.step, tool: ev.tool, out: String.slice(ev.output || "", 0, 160)})
@@ -73,7 +74,7 @@ defmodule Workbooks.BrandBook do
     end
 
     t = Task.async(fn ->
-      AgentDef.run(File.read!(agent_org_path), task, exec: true, workdir: workdir, max_steps: steps, on_step: on_step)
+      AgentDef.run(File.read!(agent_def_path), task, exec: true, workdir: workdir, max_steps: steps, on_step: on_step)
     end)
 
     case Task.yield(t, @stage_timeout_ms) || Task.shutdown(t, :brutal_kill) do
@@ -117,8 +118,8 @@ defmodule Workbooks.BrandBook do
 
   # Agent defs: the canonical profile agents (baked at WB_PROFILE_DIR), with a
   # local examples/ fallback for dev.
-  defp strategist_path, do: first_existing(["#{profile_dir()}/agents/brandnana-strategist.org", local("bn-strategist.org")])
-  defp designer_path, do: first_existing(["#{profile_dir()}/agents/designer.org", local("bn-designer.org")])
+  defp strategist_path, do: first_existing(["#{profile_dir()}/agents/brandnana-strategist.html", local("bn-strategist.html")])
+  defp designer_path, do: first_existing(["#{profile_dir()}/agents/designer.html", local("bn-designer.html")])
   defp profile_dir, do: System.get_env("WB_PROFILE_DIR") || "/opt/profile"
   defp local(name), do: Path.expand(Path.join([__DIR__, "..", "examples", "agents", name]))
   defp first_existing(paths), do: Enum.find(paths, &File.exists?/1) || hd(paths)

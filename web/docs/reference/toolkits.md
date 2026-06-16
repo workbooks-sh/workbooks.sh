@@ -20,7 +20,7 @@ the Dock capabilities the artifact may reach (gated by Policy).
 Authoritative specs in-repo:
 - `runtime/docs/TOOLKIT-MANIFEST.org` — the manifest field list + per-shape requirements (the contract).
 - `runtime/docs/TOOLKITS-V3.org` — the system model (discovery, build, security, EXEC modes).
-- `toolkits/AUTHORING.org` — the operational skill-authoring depth/breadth standard.
+- `toolkits/AUTHORING.md` — the operational skill-authoring depth/breadth standard.
 
 Conceptual orientation (do not duplicate here): [What is a toolkit](../concepts/what-is-a-toolkit.md),
 [The six shapes](../concepts/exec-shapes.md), [The Dock & capabilities](../concepts/the-dock.md).
@@ -415,12 +415,12 @@ inside `<dir>/skills/` — no `..`, no separators, no symlink escape (`@slug_re`
 `contained?`, `toolkits.ex:1018-1030`).
 
 The depth/breadth authoring standard (mandatory skill sections, the task tier, the
-overview.org requirement, the consistency contract) lives in `toolkits/AUTHORING.org`
+overview.org requirement, the consistency contract) lives in `toolkits/AUTHORING.md`
 — see [Author a toolkit](../build/author-a-toolkit.md) for the how-to.
 
 - **MATURITY:** ships-today
-- **EVIDENCE:** toolkits/AUTHORING.org:37-101
-- **SRC:** toolkits/AUTHORING.org#manifest
+- **EVIDENCE:** toolkits/AUTHORING.md:37-101
+- **SRC:** toolkits/AUTHORING.md#manifest
 
 ## Limits (the structural walls)
 
@@ -441,4 +441,4 @@ long-lived / threaded / huge-memory / GPU workloads do not.
 - [Reference: #+EXEC shapes](exec-shapes.md) · [Reference: Dock capabilities](caps.md) · [Reference: manifest fields](manifest.md)
 - [How-to: author a toolkit](../build/author-a-toolkit.md)
 - Truth in code: `runtime/host/toolkits.ex` · `command_registry.ex` · `instance/imports.ex` · `policy.ex` · `package_manager.ex` · `cli/src/main.rs` (`ToolkitVerb`).
-- Authoritative specs: `runtime/docs/TOOLKIT-MANIFEST.org` · `runtime/docs/TOOLKITS-V3.org` · `toolkits/AUTHORING.org`.
+- Authoritative specs: `runtime/docs/TOOLKIT-MANIFEST.org` · `runtime/docs/TOOLKITS-V3.org` · `toolkits/AUTHORING.md`.

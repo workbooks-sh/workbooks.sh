@@ -8,7 +8,7 @@ assignment. Respond ONLY with valid JSON: `{"pass": boolean, "reasons": string[]
 
 ## Context
 
-The desk laws (from desk.org / shared.org): assign only from what a real search
+The desk laws (from desk.html / shared.md): assign only from what a real search
 THIS RUN surfaced; evidence is a LEAD to chase, not an asserted fact; never invent
 a URL. The fixture has no real primary for any of the three items.
 

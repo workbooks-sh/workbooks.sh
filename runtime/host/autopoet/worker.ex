@@ -18,7 +18,7 @@ defmodule Workbooks.Autopoet.Worker do
 
   Env:
     * `WB_AUTOPOET=1`           — activate (wired in application.ex)
-    * `WB_AUTOPOET_DEF`         — path to the autopoet agent def (org)
+    * `WB_AUTOPOET_DEF`         — path to the autopoet agent def (HTML `<work-agent>`)
     * `WB_AUTOPOET_WORKDIR`     — the workspace (default `<WB_DATA>/autopoet/workspace`);
                                   the workspace itself IS the toolkits root — the
                                   worker pins WB_TOOLKITS_ROOT to it at init so the
@@ -41,7 +41,7 @@ defmodule Workbooks.Autopoet.Worker do
   # repo's examples/). Embed the canonical def at COMPILE time so it is part of the
   # BEAM and cannot be missing in prod; `WB_AUTOPOET_DEF` still overrides it (the
   # def is editable config — a path lets the autopoet evolve its own def).
-  @autopoet_def_path Path.join(__DIR__, "../../priv/autopoet/autopoet.org") |> Path.expand()
+  @autopoet_def_path Path.join(__DIR__, "../../priv/autopoet/autopoet.html") |> Path.expand()
   @external_resource @autopoet_def_path
   @embedded_def File.read!(@autopoet_def_path)
 
@@ -149,13 +149,13 @@ defmodule Workbooks.Autopoet.Worker do
     # exit becomes a BLOCKED verdict that resets the issue to :open for a retry.
     result =
       try do
-        org = def_org()
-        body = case File.read(Path.join(Autopoet.dir(), "#{issue.id}.org")) do
+        def_html = autopoet_def()
+        body = case Autopoet.read_body(issue.id) do
           {:ok, b} -> b
           _ -> ""
         end
         task = Task.async(fn ->
-          run = Workbooks.AgentDef.run(org, task_for(issue, body), exec: true, workdir: workdir(), agent: "autopoet", max_steps: @max_steps)
+          run = Workbooks.AgentDef.run(def_html, task_for(issue, body), exec: true, workdir: workdir(), agent: "autopoet", max_steps: @max_steps)
           run[:result] || ""
         end)
 
@@ -215,7 +215,7 @@ defmodule Workbooks.Autopoet.Worker do
 
   @doc """
   Reconcile a DONE note with the worker's independent verification result (pure,
-  so it is testable without the filesystem/OQL). DONE survives only on `{:ok,…}`;
+  so it is testable without the filesystem). DONE survives only on `{:ok,…}`;
   a failed or absent verification downgrades it to OPEN with the evidence.
   """
   @spec decide(String.t(), {:ok, [String.t()]} | {:fail, String.t()} | :none) ::
@@ -229,7 +229,7 @@ defmodule Workbooks.Autopoet.Worker do
   def decide(_note, :none),
     do: {:open, "DONE claimed but this run authored no verifiable toolkit (worker check). If you edited an existing artifact, say which and re-run; nothing was registered to verify."}
 
-  # Toolkits THIS run added (subdirs of the workspace that hold a manifest.org),
+  # Toolkits THIS run added (subdirs of the workspace that hold a manifest.html),
   # each independently verified. Clean = verify output with no ✗ and not
   # "no such toolkit". The workspace IS the toolkits root (the def's contract:
   # "your working directory IS the toolkits tree"), so verify reads it directly.
@@ -246,8 +246,8 @@ defmodule Workbooks.Autopoet.Worker do
       true -> {:fail, Enum.map_join(reports, "\n\n", fn {n, r} -> "#{n}:\n#{r}" end)}
     end
   rescue
-    # verify needs the OQL/discovery services; if they are down, do not silently
-    # pass a DONE — surface it as unverified (stays open).
+    # verify needs the discovery services; if they are down, do not silently pass
+    # a DONE — surface it as unverified (stays open).
     e -> {:fail, "worker verify errored: #{Exception.message(e)}"}
   end
 
@@ -295,8 +295,8 @@ defmodule Workbooks.Autopoet.Worker do
 
     Your workspace is a toolkits tree. Fill this gap by authoring a TOOLKIT (or a
     skill/def) here. AUTHOR FILES WITH THE `vfs_write` TOOL — it writes to your
-    workspace and creates parent dirs for you (so `vfs_write rss/manifest.org`
-    and `vfs_write rss/skills/parse.org` just work). Do NOT author files with the
+    workspace and creates parent dirs for you (so `vfs_write rss/manifest.html`
+    and `vfs_write rss/skills/parse.md` just work). Do NOT author files with the
     `shell` tool (`cat > …`, `echo > …`, `mkdir`): the sandbox shell has no
     `mkdir`, will not create parent dirs, and its cwd is not stable between
     commands — shell redirection is for running commands, not writing files.
@@ -320,9 +320,10 @@ defmodule Workbooks.Autopoet.Worker do
 
   # ── config ────────────────────────────────────────────────────────────────
 
-  # The autopoet def CONTENT: WB_AUTOPOET_DEF (a path) overrides the embedded
-  # default, so the autopoet can evolve its own def without a rebuild.
-  defp def_org do
+  # The autopoet def CONTENT (a `<work-agent>` HTML def): WB_AUTOPOET_DEF (a path)
+  # overrides the embedded default, so the autopoet can evolve its own def without
+  # a rebuild.
+  defp autopoet_def do
     case System.get_env("WB_AUTOPOET_DEF") do
       p when is_binary(p) and p != "" -> File.read!(p)
       _ -> @embedded_def

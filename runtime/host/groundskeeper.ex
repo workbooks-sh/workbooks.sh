@@ -1,7 +1,7 @@
 defmodule Workbooks.Groundskeeper do
   @moduledoc """
   The groundskeeper — the founder's voice chief-of-staff over the repo
-  (examples/groundwork/design/voice-agent.org, epic wb-3ojf).
+  (examples/groundwork/design/voice-agent.md, epic wb-3ojf).
 
   This module is the TOOL IMPLEMENTATIONS the voice agent (ElevenLabs) calls
   through `Workbooks.Groundskeeper.Router`. The agent holds no state; all
@@ -30,7 +30,7 @@ defmodule Workbooks.Groundskeeper do
 
   On the dev box bd is the ledger. On a deployed host (fly) there is no bd —
   the answers degrade to the git checkout (cloned from WB_GK_REPO_URL on
-  demand) and its committed BOARD.org, which the dev box regenerates from bd.
+  demand) and its committed BOARD.md, which the dev box regenerates from bd.
   """
   def repo_state(query \\ "summary") do
     case query do
@@ -191,7 +191,7 @@ defmodule Workbooks.Groundskeeper do
 
   # ── plumbing ────────────────────────────────────────────────────────────────
 
-  @doc "The groundskeeper's home — where captures, workflows, runs, TASKS.org live."
+  @doc "The groundskeeper's home — where captures, workflows, runs, TASKS.md live."
   def home do
     System.get_env("WB_GK_HOME") ||
       (case git(~w(rev-parse --show-toplevel)) do
@@ -209,14 +209,14 @@ defmodule Workbooks.Groundskeeper do
     _ -> "bd unavailable on this host"
   end
 
-  # bd when present; otherwise the committed BOARD.org from the checkout —
+  # bd when present; otherwise the committed BOARD.md from the checkout —
   # the dev box generates it FROM bd, so a deployed host still answers with
   # real (if slightly stale) board state.
   defp bd_or_board(args) do
     case bd(args) do
       "bd unavailable" <> _ ->
-        case repo_root() && File.read(Path.join(repo_root(), "examples/groundwork/BOARD.org")) do
-          {:ok, board} -> "from committed BOARD.org (bd lives on the dev box):\n" <> String.slice(board, 0, 4000)
+        case repo_root() && File.read(Path.join(repo_root(), "examples/groundwork/BOARD.md")) do
+          {:ok, board} -> "from committed BOARD.md (bd lives on the dev box):\n" <> String.slice(board, 0, 4000)
           _ -> "no board available on this host"
         end
 

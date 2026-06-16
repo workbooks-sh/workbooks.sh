@@ -2,7 +2,7 @@ defmodule Workbooks.Publish.DesktopApp do
   @moduledoc """
   The `desktop-app` publish target (RCP-4 / wb-dl2): compile a workbook into a
   buildable desktop-app project whose frontend is the rendered workbook wired to a
-  runtime via the Runtime Connect Protocol (RUNTIME-CONNECT-PROTOCOL.org).
+  runtime via the Runtime Connect Protocol (RUNTIME-CONNECT-PROTOCOL.md).
 
   The author writes ZERO connection code. We emit:
 
@@ -159,7 +159,7 @@ defmodule Workbooks.Publish.DesktopApp do
   defp rcp_js do
     """
     // rcp.js — portable Runtime Connect Protocol client (generated).
-    // Same standard as desktop/src/lib/rcp; spec: RUNTIME-CONNECT-PROTOCOL.org.
+    // Same standard as desktop/src/lib/rcp; spec: RUNTIME-CONNECT-PROTOCOL.md.
     export class RcpError extends Error {
       constructor(code, message, opts = {}) {
         super(message);

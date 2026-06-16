@@ -1,0 +1,68 @@
+# skill: icons — real brand/tech logos at bit.ml
+
+When a story names a company, model, or tool that has a recognised mark, use
+its REAL logo. Never approximate in CSS. INLINE the SVG — hotlinks rot and
+a missing icon on load is worse than none.
+
+## where icons belong at bit.ml
+
+- Inline, next to a company's or product's FIRST MENTION in a story,
+  when it aids scanning (AI labs, chip makers, exchanges, major platforms).
+- Size: 16px inline, vertically aligned to the text baseline.
+- After the first mention: text only — never repeat the icon.
+- NEVER in heads or deks — those are pure typography.
+- NEVER decorative spray — one icon per entity, one placement per story.
+- If in doubt whether a logo aids scanning: omit it.
+
+## which source (try in this order)
+
+1. AI / LLM / dev-tool brands → LOBEHUB
+   Best quality, monochrome `currentColor` → themes with the page.
+
+   ```
+   https://raw.githubusercontent.com/lobehub/lobe-icons/master/packages/static-svg/icons/<slug>.svg
+   ```
+
+   Known slugs: openai, claude, gemini, cursor, vercel, ollama, huggingface,
+   anthropic, deepmind, mistral, cohere, stability, midjourney, perplexity…
+
+2. General brand, full color matters → SVGL
+
+   ```
+   GET https://api.svgl.app?search=<brand>
+   ```
+
+   Response is JSON; take the `.route` field, then fetch that URL.
+   Full-color marks keep their brand color — don't recolor them.
+
+3. Broad coverage, simple monochrome fallback → SIMPLE-ICONS
+
+   ```
+   https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/<slug>.svg
+   ```
+
+   Slug: lowercase, no spaces/dots (nvidia, tsmc, amd, intel, react, meta).
+
+4. Miss everywhere → styled text label. A wrong or blurry logo is worse
+   than none. Never invent a mark.
+
+## fetch & sanity check
+
+```sh
+S=$(fetch "https://raw.githubusercontent.com/lobehub/lobe-icons/master/packages/static-svg/icons/openai.svg")
+# pass only if it starts with <svg or <?xml
+```
+
+Only inline output starting with `<svg` or `<?xml`. On a miss, fall to
+next source.
+
+## inlining rules
+
+- Strip tracking attributes and comments; keep `viewBox`.
+- Size with the wrapper span (`width`/`height` on `<span>`), NOT by editing
+  the SVG `width`/`height` attributes.
+- Lobehub / simple-icons are monochrome → set `color` on the wrapper,
+  the SVG inherits via `currentColor`. For bit.ml body copy: `color: var(--ink)`.
+- SVGL full-color: give it a neutral wrapper, don't override color.
+- Respect trademarks: showing a mark to identify or compare is fine.
+  Never imply endorsement.

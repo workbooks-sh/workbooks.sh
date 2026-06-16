@@ -1,7 +1,7 @@
 defmodule Workbooks.Access do
   @moduledoc """
   Access POSTURE — the per-workbook/route security stance, and the one place that
-  decides what a caller may see (wb-9io; RUNTIME-CONNECT-PROTOCOL.org "Routing &
+  decides what a caller may see (wb-9io; RUNTIME-CONNECT-PROTOCOL.md "Routing &
   access posture"). Routing is coupled to auth: a route's posture + the caller's
   identity decide the answer. Three postures:
 

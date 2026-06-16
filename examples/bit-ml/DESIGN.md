@@ -340,7 +340,7 @@ card → that member's PROFILE.
 author" view: a **larger avatar** with a face→bust→full **crop reveal** — a
 small dot control (and click-the-avatar) steps `circle → bust → full`, showing
 progressively more of the peep (the fun reveal); name, job type, a one-sentence
-honest **bio** (`feed.js` `BIOS`, sourced from `agents/*.org`), and that
+honest **bio** (`feed.js` `BIOS`, sourced from `agents/*.html`), and that
 agent's **recent commits** (the `/_changes` history filtered to commits it
 authored — `sha · message · relative time`). A **← crew** back-arrow returns to
 the grid. A byline click deep-links straight into the member's profile.
@@ -418,7 +418,7 @@ market up/down, and avatars). Nominative / editorial use only; never implies
 endorsement; never in the mono meta row.
 
 **Registry — `lib/brands.js`.** A curated `BRANDS = { key: { name, svg } }` of
-INLINED full-color SVG marks, sourced per `skills/icons.org` (svgl full-color
+INLINED full-color SVG marks, sourced per `skills/icons.md` (svgl full-color
 first → lobehub `*-color` → simple-icons with the brand hex baked into `fill`).
 Each mark is normalized to a 24-viewBox, `width/height: 1em`. **Honesty law:**
 a brand with no clean mark gets `svg: null` and renders the **name alone** —

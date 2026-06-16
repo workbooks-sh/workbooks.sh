@@ -138,12 +138,21 @@ defmodule Workbooks.Llm do
 
   defp tenant_key(_), do: nil
 
+  # The chat/completions endpoint. WB_LLM_BASE_URL points it at a self-hosted
+  # OpenAI-compatible server (e.g. llama-server) for evals; else the OpenRouter default.
+  defp endpoint do
+    case System.get_env("WB_LLM_BASE_URL") do
+      url when is_binary(url) and url != "" -> String.to_charlist(url)
+      _ -> @endpoint
+    end
+  end
+
   defp post(body, retries, key) do
     :inets.start()
     :ssl.start()
     headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}]
 
-    case :httpc.request(:post, {@endpoint, headers, ~c"application/json", body}, [timeout: 120_000], body_format: :binary) do
+    case :httpc.request(:post, {endpoint(), headers, ~c"application/json", body}, [timeout: 120_000], body_format: :binary) do
       {:ok, {{_, 200, _}, _, resp}} ->
         {:ok, parse(Jason.decode!(resp))}
 
@@ -175,7 +184,7 @@ defmodule Workbooks.Llm do
     http_opts = [timeout: 120_000]
     req_opts = [sync: false, stream: :self, body_format: :binary]
 
-    case :httpc.request(:post, {@endpoint, headers, ~c"application/json", body}, http_opts, req_opts) do
+    case :httpc.request(:post, {endpoint(), headers, ~c"application/json", body}, http_opts, req_opts) do
       {:ok, request_id} ->
         collect_stream(request_id, on_delta, %{content: "", tool_calls: %{}, finish: nil, usage: %{}}, "", retries, body, key)
 
@@ -315,6 +324,8 @@ defmodule Workbooks.Llm do
       %{"role" => "assistant", "content" => content}
       |> then(&if(raw_tool_calls == [], do: &1, else: Map.put(&1, "tool_calls", raw_tool_calls)))
 
+    {tool_calls, content, raw_message} = maybe_recover(tool_calls, content, raw_message)
+
     %{
       content: content,
       tool_calls: tool_calls,
@@ -336,12 +347,14 @@ defmodule Workbooks.Llm do
   end
 
   defp parse(%{"choices" => [%{"message" => msg, "finish_reason" => finish} | _]} = resp) do
+    {tool_calls, content, raw} = maybe_recover(parse_tool_calls(msg["tool_calls"]), msg["content"], msg)
+
     %{
-      content: msg["content"],
-      tool_calls: parse_tool_calls(msg["tool_calls"]),
+      content: content,
+      tool_calls: tool_calls,
       finish: finish,
       usage: resp["usage"] || %{},
-      raw_message: msg
+      raw_message: raw
     }
   end
 
@@ -358,6 +371,43 @@ defmodule Workbooks.Llm do
       }
     end)
   end
+
+  # Self-hosted servers (e.g. llama-server + Qwen3-Coder) sometimes fail to parse the model's
+  # native XML tool-call dialect and leak it as plain content. When that happens, structured
+  # tool_calls are empty but the content carries `<function=NAME><parameter=K>V</parameter>…`.
+  # Recover those so the agent loop sees a real tool call instead of a "finished" text turn.
+  defp recover_xml_tool_calls(content) when is_binary(content) do
+    Regex.scan(~r/<function=([^>\s]+)>(.*?)<\/function>/s, content)
+    |> Enum.with_index()
+    |> Enum.map(fn {[_, name, body], i} ->
+      args =
+        Regex.scan(~r/<parameter=([^>\s]+)>\s*(.*?)\s*<\/parameter>/s, body)
+        |> Map.new(fn [_, k, v] -> {String.trim(k), String.trim(v)} end)
+
+      %{id: "call_xml_#{i}", name: String.trim(name), args: args}
+    end)
+  end
+
+  defp recover_xml_tool_calls(_), do: []
+
+  # Only kicks in when the server gave us NO structured tool calls but the text holds one.
+  defp maybe_recover([], content, raw) when is_binary(content) do
+    case recover_xml_tool_calls(content) do
+      [] ->
+        {[], content, raw}
+
+      recovered ->
+        raw_tcs =
+          Enum.map(recovered, fn tc ->
+            %{"id" => tc.id, "type" => "function",
+              "function" => %{"name" => tc.name, "arguments" => Jason.encode!(tc.args)}}
+          end)
+
+        {recovered, nil, raw |> Map.put("tool_calls", raw_tcs) |> Map.put("content", nil)}
+    end
+  end
+
+  defp maybe_recover(tcs, content, raw), do: {tcs, content, raw}
 
   defp maybe_put(map, _k, nil), do: map
   defp maybe_put(map, k, v), do: Map.put(map, k, v)

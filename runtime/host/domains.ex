@@ -1,6 +1,6 @@
 defmodule Workbooks.Domains do
   @moduledoc """
-  The public-plane domain registry (wb-1x1 P1, PUBLIC-WEB-PLAN.org). Maps a public
+  The public-plane domain registry (wb-1x1 P1, PUBLIC-WEB-PLAN.md). Maps a public
   HOST → the app it serves, and holds the per-host TLS cert used by `sni/1`.
 
   Design:

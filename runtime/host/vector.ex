@@ -12,7 +12,7 @@ defmodule Workbooks.Vector do
 
   Tenant-scoped: `tenant` is the first arg of every call; one tenant's vectors are
   never visible to another. Each row carries source metadata {workbook, path,
-  headline, text} so a hit points back. See VECTOR-QUERY.org.
+  headline, text} so a hit points back. See VECTOR-QUERY.md.
   """
   alias Workbooks.{DB, Embed}
 
@@ -96,7 +96,7 @@ defmodule Workbooks.Vector do
       require Logger
       Logger.warning(
         "Vector: brute-force search over #{n} vectors on SQLite (O(n) per query). " <>
-          "For sub-linear ANN at scale, set WB_DATABASE_URL → pgvector. See docs/VECTOR-QUERY.org."
+          "For sub-linear ANN at scale, set WB_DATABASE_URL → pgvector. See docs/VECTOR-QUERY.md."
       )
 
       :persistent_term.put({__MODULE__, :warned}, true)

@@ -26,7 +26,7 @@ Federate an Asana project into org :task: nodes the Board can drive; query via O
       SELECT title, state, assignee FROM asana-task WHERE state = 'done'
 ```
 
-  - *Mirror into a Board* — the sync daemon (`sync.org`) pulls on an
+  - *Mirror into a Board* — the sync daemon (`sync.md`) pulls on an
     interval into a federation board. See `sync-a-project`.
 
   - *Write back* — Board task changes push to Asana when write-back is
@@ -63,7 +63,7 @@ Federate an Asana project into org :task: nodes the Board can drive; query via O
     survive the round-trip — Asana doesn't carry them at the task level.
   - The mirror is `:pull` (read-only) by DEFAULT — write-back is opt-in.
   - There is NO `asana` CLI: this is a SaaS federation connector
-    (`plugin/` + `sync.org`), NOT a CLI-wrapper toolkit — so the manifest
+    (`plugin/` + `sync.md`), NOT a CLI-wrapper toolkit — so the manifest
     declares no `#+CLI_BIN:`.
   - Deletes fail closed: a denied or absent Workgate permit blocks the op.
 

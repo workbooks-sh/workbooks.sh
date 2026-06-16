@@ -4,8 +4,8 @@ A toolkit is a capability an agent (or a developer) can pull in: commands plus
 org **skills** (progressive-disclosure docs), authored to one standard. Each
 folder has a `manifest.org` (the front door — `:toolkit:` node, skill index)
 and a `skills/` tree; asset/engine toolkits also ship `dist/`, a `specimen`,
-and a `test`. The format and depth bar live in **[AUTHORING.org](AUTHORING.org)**
-(runtime contract: `../runtime/docs/TOOLKITS-V3.org`).
+and a `test`. The format and depth bar live in **[AUTHORING.md](AUTHORING.md)**
+(runtime contract: `../runtime/docs/TOOLKITS-V3.md`).
 
 Two audiences, one format: a markdown twin under `skills/workbooks-system/`
 (repo root) addresses OS-capable harnesses; these org toolkits address an agent

@@ -1,0 +1,6 @@
+# workbooks-browser — EXECUTION: web research (search → cite)
+
+## the agent searches the live web and cites a real source
+
+- **TASK:** What is the official website of the Rust programming language? Don't answer from memory — use web_search to look it up now, then reply with the URL and one factual sentence about Rust, citing the source URL you used.
+- **RUBRIC:** EXECUTION eval (pins that web_search actually works end-to-end, not from memory). PASS only if the telemetry shows the agent RAN web_search (commands_run >= 1, tool includes web_search), the answer names the official site (rust-lang.org), gives one factual sentence about Rust, AND cites a source URL. Answering purely from memory with NO web_search call FAILS even if the URL is correct.

@@ -1,0 +1,18 @@
+# libstd prebuild for wasm32-wasi (wb-zyl.8, in progress)
+
+The trusted libstd, built once (native mrustc+minicargo cross-compiling to wasm) so the
+UNTRUSTED user .rs compiles in-sandbox against it. Pieces here:
+
+- `mrustc-arch-wasm32.patch` — adds ARCH_WASM32 to mrustc (target_arch=wasm32, wasm32 ABI).
+- `build_dlmalloc.txt` — empty script-override (wasi pulls dlmalloc; its build.rs emits nothing).
+- `cc-wrapper.template.sh` — wasm32-wasi-gcc → wasi-sdk clang, so mrustc's cc step cross-
+  compiles libstd C → wasm objects.
+
+Build (native): apply patch, rebuild mrustc, then
+
+```sh
+PATH=ccbin:$PATH MRUSTC_TARGET_VER=1.54 make -f minicargo.mk RUSTC_VERSION=1.54.0 \
+  MRUSTC_TARGET=<abs wasm32-wasi.spec> OUTDIR=output-wasi/ LIBS
+```
+
+See [../PORT-LOG](../PORT-LOG.md) for the live state + current wall.

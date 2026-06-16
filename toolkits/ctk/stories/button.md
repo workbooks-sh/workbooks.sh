@@ -1,0 +1,71 @@
+# Component
+
+Name: Button
+
+## Controls
+
+| prop    | type   | default  | range/options          |
+|---------|--------|----------|------------------------|
+| label   | text   | Download |                        |
+| variant | select | primary  | primary\|ghost\|danger  |
+| accent  | color  | #2f6fe0  |                        |
+| size    | range  | 14       | 11..20                 |
+
+## States
+
+States render side-by-side on the stage. A state = a base OVERRIDE (what makes
+it that state) + optional per-state controls (what you can tune for THAT state
+only). `default` has neither; `disabled` exposes its own opacity; `loading`
+just overrides a prop with nothing to tune.
+
+### default
+
+### disabled
+
+Override: disabled:true
+
+| prop    | type  | default | range/options |
+|---------|-------|---------|---------------|
+| opacity | range | 0.55    | 0..1:0.05     |
+
+### loading
+
+Override: loading:true
+
+## Source
+
+```js
+// render(el, props). `disabled`/`loading` arrive via state OVERRIDEs; `opacity`
+// arrives from the disabled state's per-state control. The component just reads
+// props — CTK decides which are shared controls, which are states, and which
+// are per-state controls.
+export function render(el, props) {
+  const { label = "Button", variant = "primary", accent = "#2f6fe0",
+          size = 14, disabled = false, loading = false, opacity } = props;
+  const off = disabled || loading;
+  const op = opacity != null ? opacity : (off ? 0.55 : 1);
+  const pad = `${Math.round(size * 0.7)}px ${Math.round(size * 1.3)}px`;
+  const radius = `${Math.round(size * 0.7)}px`;
+  let bg, fg, border, shadow;
+  if (variant === "ghost") { bg = "transparent"; fg = accent; border = `1px solid ${accent}`; shadow = "none"; }
+  else if (variant === "danger") { bg = "#e5484d"; fg = "#fff"; border = "1px solid #e5484d"; shadow = "0 1px 2px rgba(0,0,0,.18)"; }
+  else { bg = accent; fg = "#fff"; border = `1px solid ${accent}`; shadow = "0 1px 2px rgba(0,0,0,.18)"; }
+  const content = loading
+    ? `<span style="display:inline-block;animation:ctkspin 0.8s linear infinite">◠</span>&nbsp;${escapeHtml(label)}`
+    : escapeHtml(label);
+  el.innerHTML = `
+    <style>@keyframes ctkspin{to{transform:rotate(360deg)}}</style>
+    <button ${off ? "disabled" : ""} style="
+      font: 600 ${size}px/1 -apple-system,'Geist',system-ui,sans-serif;
+      padding:${pad}; border-radius:${radius}; border:${border};
+      background:${bg}; color:${fg}; box-shadow:${off ? "none" : shadow};
+      cursor:${off ? "not-allowed" : "pointer"}; opacity:${op};
+      transition:transform .06s; ">${content}</button>`;
+  const b = el.querySelector("button");
+  if (!off) {
+    b.onmousedown = () => (b.style.transform = "scale(0.97)");
+    b.onmouseup = b.onmouseleave = () => (b.style.transform = "none");
+  }
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+```

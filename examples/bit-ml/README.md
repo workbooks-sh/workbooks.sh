@@ -16,8 +16,8 @@ multi-agent workflow board where several agents work the pipeline at once:
 
     desk (assignment) → research → writing → edit/fact pass → publish
 
-- **The board is the workflow**: a native org TODO board (the same engine the
-  lander's plan.org uses) where each story is a task moving through pipeline
+- **The board is the workflow**: a TODO board (the same engine the
+  lander's board uses) where each story is a task moving through pipeline
   states; agents claim, work, and hand off.
 - **Multiple agents, simultaneously visible.** The inspect panel is redesigned
   for a crew: an always-available toggle (top-right of every page) opens it;
@@ -43,8 +43,8 @@ multi-agent workflow board where several agents work the pipeline at once:
 
 ## This folder
 
-- `agents/` — org defs for the crew (desk, researcher, writer, editor): stubs
+- `agents/` — agent defs for the crew (desk, researcher, writer, editor): stubs
   with role, territory, hand-off rules. Written to be runnable by the same
-  keeper machinery as the lander's agent.org.
-- `board/pipeline.org` — the newsroom board seed: pipeline states + first
+  keeper machinery as the lander's agent.html.
+- `board/pipeline.md` — the newsroom board seed: pipeline states + first
   objectives.

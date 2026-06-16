@@ -2,7 +2,7 @@
 
 A full redesign of the command surface so it's clear and communicable. Audited from
 the live code: `runtime/host/cli.ex` (~29 verbs / 67 forms), `package_manager.ex`,
-the 33 runtime routes in `web.ex`/`public_web.ex`, and `RUNTIME-CONNECT-PROTOCOL.org`.
+the 33 runtime routes in `web.ex`/`public_web.ex`, and `RUNTIME-CONNECT-PROTOCOL.md`.
 
 ## 1. Principles
 

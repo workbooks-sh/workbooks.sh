@@ -1,6 +1,6 @@
 defmodule Workbooks.Secret do
   @moduledoc """
-  Secrets-by-reference (L2, docs/SECRETS.org). A Workbook references a secret by
+  Secrets-by-reference (L2, docs/SECRETS.md). A Workbook references a secret by
   *name*; the host resolves the *value* only inside a host-side operation and
   never returns it to the guest. This module is the resolver + the injection
   primitive `net-fetch` (and any egress Dock import) uses.

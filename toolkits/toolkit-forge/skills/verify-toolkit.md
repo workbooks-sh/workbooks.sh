@@ -12,7 +12,7 @@ DESTRUCTIVE: no
   install to run recipes).
 
   NOT for: writing content ([author-deep-skill](author-deep-skill.md) / [write-manifest](write-manifest.md)). This
-  is the gate, mirroring [AUTHORING.org §"Authoring checklist"](../../AUTHORING.md).
+  is the gate, mirroring [AUTHORING.md §"Authoring checklist"](../../AUTHORING.md).
 
 # The mental model: cheap structural checks catch silent failures
 
@@ -51,7 +51,7 @@ DESTRUCTIVE: no
   TK="toolkits/NAME"
   grep -rhoE '\[\[file:[^]]+\.org' "$TK"/skills | sed -E 's#\[\[file:##' | sort -u \
   | while read -r rel; do
-      # resolve relative to skills/ (handles ../ to AUTHORING.org etc.)
+      # resolve relative to skills/ (handles ../ to AUTHORING.md etc.)
       ( cd "$TK/skills" && test -e "$rel" ) || echo "DANGLING LINK: $rel"
     done
   echo "link check done"
@@ -99,7 +99,7 @@ DESTRUCTIVE: no
      `,#+begin_src` is an ESCAPED example, not a real directive. Count
      only `^#+begin_src` / `^#+end_src` so the balance check isn't false.
   2. *Resolving links from the wrong dir.* `[file:...](file:...)` is relative to
-     the skill file (`skills/`). `../AUTHORING.org` resolves to the
+     the skill file (`skills/`). `../AUTHORING.md` resolves to the
      toolkit root; `../../` to `toolkits/`. Resolve from `skills/`.
   3. *Declaring stable without running recipes.* If `BIN` wasn't
      installable, the toolkit is `experimental` and you say so — don't
@@ -127,4 +127,4 @@ DESTRUCTIVE: no
   - [write-manifest](write-manifest.md) — previous: the index this checks
   - [author-deep-skill](author-deep-skill.md) — fix depth/format issues this surfaces
   - [overview](overview.md) — the full forge loop
-  - [toolkits/AUTHORING.org](../../AUTHORING.md) — the authoring checklist this mirrors
+  - [toolkits/AUTHORING.md](../../AUTHORING.md) — the authoring checklist this mirrors

@@ -17,7 +17,7 @@ DESTRUCTIVE: no
 
 # The mental model: one need with its own gotchas = one skill
 
-  From [AUTHORING.org §"Progressive disclosure"](../../AUTHORING.md): the manifest is the
+  From [AUTHORING.md §"Progressive disclosure"](../../AUTHORING.md): the manifest is the
   INDEX, skills are read on demand. The skill set must PARTITION the
   surface — every common need owned by exactly one skill, no two skills
   claiming the same need.
@@ -50,7 +50,7 @@ DESTRUCTIVE: no
 ## Deep CLI? Partition the TASKS first (the task tier)
 
   Before the leaf skills, decide if the CLI is DEEP (see the depth
-  heuristic in `toolkits/AUTHORING.org`: `#+FLOW` chains >=3 verbs, OR
+  heuristic in `toolkits/AUTHORING.md`: `#+FLOW` chains >=3 verbs, OR
   >=6 verb groups, OR a verb nests >=2 levels like =social <platform>
   <kind>=). If so, the toolkit MUST ship a TASK tier ABOVE the leaves —
   "wrap the SEQUENCE, not the verb". From the surface's
@@ -58,7 +58,7 @@ DESTRUCTIVE: no
   brand's social presence", "publish + verify a deck") author ONE
   runnable recipe whose input is the user's NOUN (`<domain>`), not a
   verb chain — it OWNS the dirty work (discovery, fan-out, lane writes).
-  Make it runnable by OWNERSHIP (AUTHORING.org §How a task is made
+  Make it runnable by OWNERSHIP (AUTHORING.md §How a task is made
   runnable): a CLI we own → an UPSTREAM task-verb; a CLI we don't own →
   a `:role task`-tagged bash source block run via
   `wb toolkit run <toolkit> <task> -- <args>`. The manifest indexes
@@ -129,4 +129,4 @@ DESTRUCTIVE: no
   - [study-surface](study-surface.md) — previous: the needs list this consumes
   - [author-deep-skill](author-deep-skill.md) — next: realize each skill in the map
   - [write-manifest](write-manifest.md) — build the index from this map
-  - [toolkits/AUTHORING.org](../../AUTHORING.md) — the partition + disclosure rules
+  - [toolkits/AUTHORING.md](../../AUTHORING.md) — the partition + disclosure rules

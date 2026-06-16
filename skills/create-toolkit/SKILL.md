@@ -18,10 +18,10 @@ a thin, flag-dump skill is a bug, not a shortcut.
 
 Do not author from priors. Two docs govern:
 
-- `toolkits/AUTHORING.org` — the operational "exactly what to write" standard:
+- `toolkits/AUTHORING.md` — the operational "exactly what to write" standard:
   the two artifacts, the mandatory skill sections, the task-tier vs leaf-tier
   decision, the depth/breadth bar, the authoring checklist.
-- `runtime/docs/TOOLKITS-V3.org` — the runtime contract: the three nouns
+- `runtime/docs/TOOLKITS-V3.md` — the runtime contract: the three nouns
   (capability / command / toolkit), the `#+EXEC` shapes, `#+TRUST`, discovery via
   `(tags :toolkit:)`, the security model (the toolkits root is an **untrusted,
   writable** dir — reads open, execution default-deny + sandboxed).

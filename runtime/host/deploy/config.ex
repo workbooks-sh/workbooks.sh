@@ -1,15 +1,18 @@
 defmodule Workbooks.Deploy.Config do
   @moduledoc """
-  A `deployment.org` — the ONE declarative description of a deployment. Two places
-  (`ENGINE_PLACE: local|cloud`), two tenancy modes (`TENANCY_MODE: single|multi`),
-  and BYOD backends (`STORAGE`, `DATABASE`) + the agent `PROFILE`. `wb deploy
-  validate` checks coherence; `wb deploy apply` converges to it. File-based by
-  design (no prompts); SECRETS (S3 keys, the Postgres DSN) come from the deploy
-  ENV, never the file.
+  A `deployment.html` — the ONE declarative description of a deployment. Two
+  places (`engine-place="local|cloud"`), two tenancy modes
+  (`tenancy-mode="single|multi"`), and BYOD backends (`storage`, `database`) +
+  the agent `profile`. `wb deploy validate` checks coherence; `wb deploy apply`
+  converges to it. File-based by design (no prompts); SECRETS (S3 keys, the
+  Postgres DSN) come from the deploy ENV, never the file.
 
-  Parsed with a hand-rolled `:PROPERTIES:` scan — NOT the OQL/org parser, never
-  executed — so a deployment file is inert config, exactly as the descriptors
-  in cli/deploy-kit/deployments/ document.
+  The deployment is a single `<work-deploy …>` element whose attributes carry the
+  axes. Parsed with Floki (the HTML-native reader), never executed — so a
+  deployment file is inert config, exactly as the descriptors in
+  cli/deploy-kit/deployments/ document. Attribute names map to the legacy
+  uppercase property keys (`engine-place` → `ENGINE_PLACE`) so the validate/to_env
+  logic is untouched.
   """
 
   @places ~w(local cloud)
@@ -18,34 +21,12 @@ defmodule Workbooks.Deploy.Config do
   @database ~w(sqlite postgres)
   @auth ~w(trusted betterauth clerk oidc)
 
-  @doc "Parse a deployment.org → the property map (string keys)."
+  @doc "Parse a deployment.html → the property map (string keys, UPPER_SNAKE)."
   def parse(path) do
     case File.read(path) do
-      {:ok, body} -> {:ok, parse_props(body)}
+      {:ok, body} -> {:ok, Workbooks.Config.HTML.props(body, "work-deploy")}
       {:error, e} -> {:error, "cannot read #{path}: #{:file.format_error(e)}"}
     end
-  end
-
-  defp parse_props(body) do
-    body
-    |> String.split("\n")
-    |> Enum.reduce({false, %{}}, fn line, {in?, acc} ->
-      t = String.trim(line)
-
-      cond do
-        String.upcase(t) == ":PROPERTIES:" -> {true, acc}
-        String.upcase(t) == ":END:" -> {false, acc}
-        in? ->
-          case Regex.run(~r/^:([A-Za-z_]+):\s+(.*\S)\s*$/, t) do
-            [_, k, v] -> {true, Map.put(acc, String.upcase(k), String.trim(v))}
-            _ -> {true, acc}
-          end
-
-        true ->
-          {in?, acc}
-      end
-    end)
-    |> elem(1)
   end
 
   @doc """

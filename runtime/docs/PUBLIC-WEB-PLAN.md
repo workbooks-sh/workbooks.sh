@@ -1,0 +1,237 @@
+# Public Web — serve apps publicly from the runtime, all-Elixir, one node
+
+*2026-06-07*
+
+# Provider neutrality (do NOT overbuild for any one vendor)
+
+  The runtime hosts + terminates TLS itself (`sni_fun`), so it has NO hard
+  dependency on any DNS host or edge/CDN. The domain may live at Cloudflare,
+  GoDaddy, Namecheap, Route 53, or self-hosted DNS — design for all of them:
+  - **DNS automation** is a pluggable ADAPTER layer = our toolkits (cloudflare,
+    + future godaddy/namecheap/route53, and RFC 2136 for standards DNS). When a
+    provider adapter + creds exist, the agent writes records automatically; when
+    not, we emit exact manual instructions and verify them. One user flow, many
+    adapters (the capability matrix). Never hardcode one provider's API.
+  - **Edge / DDoS** is OPTIONAL defense-in-depth, not a requirement. Cloudflare's
+    proxy (orange-cloud) is the RECOMMENDED option because its free tier genuinely
+    absorbs volumetric DDoS, hides the origin IP, and adds WAF/CDN — but it is one
+    choice among many (Fastly, Bunny, AWS Shield, …). The honest constraint: a
+    single BEAM VM cannot self-defend against volumetric floods (no edge
+    bandwidth), so SOME edge is advisable for a hot public site — but the runtime
+    works with NONE (direct, with origin rate-limiting) and with ANY (origin behind
+    the edge). Recommend Cloudflare; depend on nothing.
+  - **Origin-side** defense (always available, vendor-free): PlugAttack/Hammer rate
+    limiting + Bandit/ThousandIsland connection caps on the content listener.
+    Stops app-layer abuse; not a substitute for an edge against true floods.
+
+# Goal
+
+  Host a public app on a real domain (apex or custom), served by the SAME Elixir
+  runtime that runs Workbooks — without dragging the privileged runtime (build /
+  commands / agents / secrets) into the public blast radius. One BEAM node, one
+  container, no second machine, no Caddy/nginx sidecar. The isolation we need is
+  LOGICAL (planes + capability sandbox + per-app origins), not physical.
+
+# What already exists (grounding)
+
+  - `host/web.ex` — a `Plug.Router` on Bandit, opt-in via =WB_WEB=1=. `plug(Workbooks.Auth)`
+    gates the WHOLE router today. `GET _w_:id` already returns workbook `text/html`;
+    `_w_:id/call` is a Dock call; `_w_:id/ws` a socket.
+  - `host/auth.ex` (Guardian/JWKS), `host/policy.ex` (capability profiles),
+    `host/secret*.ex` (the broker), `host/vfs.ex` (per-instance SQLite),
+    `host/bundle.ex` / `library.ex` (published artifacts), `host/did:web` authority
+    handling (already reads a proxy's forwarded host).
+  - Toolkits for DNS providers already exist: `toolkits/{cloudflare,wrangler,fly,railway}`.
+
+  So "serve a page" is half-built. The work is: a PUBLIC plane, TLS for arbitrary
+  domains in-process, a domain registry, and the attach flow.
+
+# The core decision: two planes, one node
+
+  Today one auth plug protects everything. Public traffic must NOT be able to reach
+  the palette (`/api/workflow`, `_w_:id/call`, `/api/run`, build, commands) or secrets.
+  Split the HTTP surface into two planes, each its own Bandit listener + router:
+
+| Plane | Listener | Router | Auth | Serves |
+| --- | --- | --- | --- | --- |
+| **Control** | existing (authed) | `Workbooks.Web` | Guardian | _api_*, _w_:id/call, build, commands, agents |
+| **Content** | NEW :80/:443 | `Workbooks.PublicWeb` | NONE | GET published artifact bytes only |
+
+  Rules for the content plane (`PublicWeb`):
+  - NO `Workbooks.Auth` plug. It is anonymous by design.
+  - GET only. No Dock, no command/build/agent routes, no secret access — not even
+    reachable from this router's code paths.
+  - Serves an immutable, already-published artifact resolved by HOST (not by a
+    tenant-supplied id). Host → app → bytes.
+  - Lives on a DIFFERENT hostname than the control plane, so a hosted app's JS can
+    never ride the control-plane cookie/session.
+
+  One node is fine; this split is what makes it safe. (See §One node vs many.)
+
+# All-Elixir TLS for arbitrary domains (no Caddy)
+
+  The instinct to avoid a second process is correct. Erlang's `:ssl` supports
+  per-connection certificate selection via **`sni_fun`** (Bandit/ThousandIstand pass
+  it through transport options). That is the whole multi-domain primitive:
+
+```elixir
+  # Bandit content listener, :443
+  Bandit, scheme: :https, port: 443, plug: Workbooks.PublicWeb,
+    thousand_island_options: [transport_options: [
+      sni_fun: &Workbooks.Domains.sni/1   # SNI host → {:ok, [cert: ..., key: ...]} | :undefined
+    ]]
+```
+
+  `Domains.sni(host)` looks up the domain in the registry and returns its stored
+  cert+key. Unknown/unattached host ⇒ `:undefined` ⇒ handshake refused. That is the
+  enforcement point.
+
+## Issue-on-attach, not on-handshake
+
+   Caddy's "on-demand TLS" issues a cert DURING the TLS handshake. We do NOT need
+   that and should not: ACME issuance takes seconds — far too long to stall a
+   handshake. Instead we ISSUE WHEN A DOMAIN IS ATTACHED + VERIFIED (the attach
+   flow below), store the cert, and `sni_fun` just serves it. Benefits: no handshake
+   stalls, and no "cert mill" risk (issuance is gated by the attach flow, not by
+   whoever points a domain at our IP — the #1 multi-tenant-TLS footgun).
+
+## ACME in-process (`Workbooks.Acme` GenServer)
+
+   A GenServer owns issuance + renewal. Two challenge types:
+   - **HTTP-01** (default, no DNS creds needed): on order, store the token→keyauth in
+     the registry; `PublicWeb` serves `GET /.well-known/acme-challenge/:token` from
+     it on :80; finalize; store cert+key. Works for any domain already CNAME'd/
+     A-record'd to us.
+   - **DNS-01** (wildcards, or when :80 is closed): create the `_acme-challenge` TXT
+     via the tenant's DNS toolkit (`cloudflare` etc. — our toolkits ARE the libdns
+     adapter layer), poll, finalize.
+   Renewal: a periodic tick re-orders certs nearing expiry. Persist cert+key+order
+   state in the registry's backing store (Postgres/SQLite — Backend behaviour), so
+   a restart doesn't re-issue (Let's Encrypt rate limits).
+
+   Build vs buy: `site_encrypt` (Elixir ACME for Plug/Bandit) is the buy option, but
+   it is built around a CONFIGURED domain set; for a fully dynamic multi-tenant set a
+   thin custom ACME GenServer + `sni_fun` is cleaner. Reuse `site_encrypt`'s ACME
+   internals if convenient; do not adopt its fixed-domain model wholesale.
+
+# The domain registry (`Workbooks.Domains`)
+
+  A GenServer over an ETS cache + a durable Backend table (org/DB is source of truth).
+  One row per attached host:
+
+```
+  host            TEXT PRIMARY KEY   -- app.acme.com (custom) | slug.apps.ours (subdomain)
+  tenant          TEXT
+  app             TEXT               -- which published artifact (bundle/library member)
+  status          TEXT               -- pending_dns | verifying | issuing | live | error
+  cert_pem        BLOB               -- nil until issued
+  key_pem         BLOB               -- nil until issued (private — never leaves the host)
+  acme_order      JSON               -- in-flight order state
+  challenge_token TEXT               -- HTTP-01 token while issuing
+  expires_at      INTEGER
+```
+
+  Public-facing functions: `sni/1` (cert for SNI), `resolve/1` (host → {tenant, app}
+  for `PublicWeb`), `acme_challenge/1` (token → keyauth). Mutating functions
+  (`attach/3`, `verify/1`, `mark_live/2`) live behind the control plane only.
+
+# Custom-domain attach flow (agent-assisted)
+
+  1. **attach** — control-plane call: tenant picks `app.theirs.com` for a published app.
+     Registry row → `pending_dns`. Return the required record(s):
+     - subdomain of theirs → CNAME `app.theirs.com → apps.ours.com`
+     - apex → A/AAAA to our IP (or ALIAS where supported)
+  2. **create records** — if the tenant has DNS-provider creds, the AGENT creates the
+     record via the matching DNS toolkit (cloudflare/…). Else the user adds it
+     manually. (Capability matrix = which toolkit/creds exist; no hardcoded flow.)
+  3. **verify** — poll DNS until the record resolves to us. `verifying`.
+  4. **issue** — `Acme` orders the cert (HTTP-01 once the CNAME resolves, or DNS-01 via
+     the DNS toolkit). Store cert+key. `issuing` → `live`.
+  5. **serve** — `sni_fun` now answers for that host; `PublicWeb` serves the app.
+  Renewal is automatic thereafter; near-zero further user action.
+
+  SSRF guard: verification checks DNS resolution to OUR address; it must NOT fetch
+  attacker-controlled URLs or probe internal hosts.
+
+# Per-app isolation + server-side compute
+
+  - **Origin isolation**: every app gets its OWN host (`slug.apps.ours` or the custom
+    domain). NEVER many tenants on one origin/path (browser same-origin is the only
+    thing keeping their cookies/storage/XSS apart). Control plane on a DISTINCT apex.
+  - **Static by default**: the published artifact is self-contained HTML (WASM-in-HTML).
+    The content plane just returns bytes. No server compute, no secrets.
+  - **If a public app needs server compute**: it runs as a WASM component under a NEW
+    `:public` Policy profile — the most restrictive: no secrets, no build, no
+    run-command, no net unless explicitly granted; tight memory + CPU + wall-clock.
+    This is where our model pays off: public compute is deny-by-default by
+    construction (the capability-gate invariant), not bolted-on. The content plane invokes a
+    component the same way the control plane does, but with the `:public` profile and
+    NO access to the tenant's secret broker.
+
+# Security must-haves (the checklist)
+
+  - [ ] Plane split: `PublicWeb` has no Auth plug AND no code path to Dock/secrets/build.
+  - [ ] Separate hostnames: hosted apps vs control plane (cookie isolation).
+  - [ ] One origin per app/tenant (no shared-origin multi-tenancy).
+  - [ ] `sni_fun` refuses unknown hosts (`:undefined`).
+  - [ ] Certs issued only on a verified attach (no handshake-time issuance → no cert mill).
+  - [ ] Private keys persist host-side only; never in a public response or an artifact.
+  - [ ] SSRF guard on domain verification.
+  - [ ] Strict Host routing; reject unknown/malformed Host.
+  - [ ] `:public` Policy profile for any public server compute (no secrets/net/build).
+  - [ ] Rate-limit the content plane; keep its process pool separate from control.
+  - [ ] ACME order/cert state persisted (survive restart; respect LE rate limits).
+
+# One node vs many (answering the question directly)
+
+  One BEAM node serving both planes is the right DEFAULT and is genuinely simpler:
+  fewer moving parts, no inter-machine auth, no extra deploy. The security you need
+  comes from the LOGICAL split + the capability sandbox, not from separate boxes.
+
+  The ONE honest downside of a single node: shared blast radius — a BEAM
+  crash/compromise touches both planes. The plane split + `:public` sandbox shrink
+  that a lot, but only physical separation fully isolates. So: ship one node now;
+  keep `PublicWeb` / `Domains` / `Acme` cleanly separable (their own modules + a
+  Backend-backed registry) so that IF you ever want defense-in-depth, you can run
+  the content plane as its own node/cell later with ZERO redesign — it already talks
+  to the registry, not to control-plane internals. Don't pay for that now.
+
+# Architecture summary (new modules, all in host/)
+
+| Module | Kind | Owns |
+| --- | --- | --- |
+| `Workbooks.PublicWeb` | Plug | anonymous GET content plane + ACME HTTP-01 route |
+| `Workbooks.Domains` | GenServer | host→app registry, sni_fun, durable cert store |
+| `Workbooks.Acme` | GenServer | ACME issuance + renewal (HTTP-01 / DNS-01) |
+| `:public` profile | Policy | most-restrictive caps for public server compute |
+| (Application) | sup tree | a SECOND Bandit listener (:80/:443) for PublicWeb |
+
+  No new machine. No Caddy. `sni_fun` + an ACME GenServer is the whole TLS story.
+
+# Phased plan (epic wb-pweb)
+
+  - P0 — Plane split: `PublicWeb` router (GET-only, no Auth), second Bandit listener,
+    serve a published artifact by Host from the library/bundle store. HTTP only.
+  - P1 — `Domains` registry (Backend-backed) + `sni_fun` wired to the :443 listener;
+    serve a manually-installed cert for one test host end-to-end.
+  - P2 — `Acme` GenServer: HTTP-01 issuance + the `/.well-known/acme-challenge` route +
+    persistence + renewal tick. Issue a real cert for a test domain.
+  - P3 — Attach flow (control-plane): `attach/verify/mark_live`, DNS instructions,
+    SSRF-guarded verification.
+  - P4 — Agent automation: create DNS records via the DNS toolkits when creds exist;
+    DNS-01 path for wildcards/apex.
+  - P5 — `:public` Policy profile + content-plane component invocation (sandboxed
+    public server compute, no secrets).
+  - P6 — Hardening: rate limits, Host validation, isolation review (fold in the
+    findings from the palette audit before going internet-live).
+
+# Open questions
+
+  1. Apex domains: A/AAAA to a stable IP, or require a CNAME-able subdomain only?
+     (Apex needs a static ingress IP or ALIAS-capable DNS.)
+  2. Do we want wildcard certs (`*.apps.ours`) for our own subdomains (one cert,
+     DNS-01) plus per-domain certs for custom domains? (Recommended: yes.)
+  3. Where do cert private keys live — Postgres (encrypted), the VFS, or the secret
+     broker? (Lean: the secret broker / encrypted-at-rest, never an artifact.)
+  4. Should the content plane be a separate OTP release/cell option from day one, or
+     just kept separable? (Lean: separable now, separate later only if needed.)

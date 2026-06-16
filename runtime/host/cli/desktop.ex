@@ -92,7 +92,7 @@ defmodule Workbooks.CLI.Desktop do
         claude mcp add workbooks -- wb desktop mcp --stdio
 
       The browser exposes workbooks-native tools (tabs, bookmarks, the
-      workspace tree, open_workbook, weave/validate via oql.wasm) plus
+      workspace tree, open_workbook, weave/validate over the workbook HTML) plus
       generic webview tools (screenshot, dom_read, eval_js, click/type) and
       the Waldo agent bridge. Local Unix socket only — no network listener.
       See desktop/docs/mcp.md.

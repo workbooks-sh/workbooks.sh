@@ -15,7 +15,7 @@ defmodule Workbooks.Library do
     * backup/sync      ← projecting workspaces to git is the MONOREPO, separate
     * provenance       ← every member is did:key/C2PA-linked (`Workbooks.Manifest`)
 
-  See docs/IDENTITY-GIT-MONOREPO.org "The Library".
+  See docs/IDENTITY-GIT-MONOREPO.md "The Library".
   """
   alias Workbooks.{Git, Workspace}
 
@@ -116,7 +116,7 @@ defmodule Workbooks.Library do
   end
 
   @doc """
-  Cross-workbook OQL query-through — run one SQL across EVERY member that carries
+  Cross-workbook SQL query-through — run one SQL across EVERY member that carries
   a queryable SQLite VFS (a `.wbundle`), returning rows tagged by member. The
   Library reads as one queryable surface without merging the workbooks. Members
   with no VFS (html-only, unresolved DID) are reported in `skipped`, never
@@ -522,7 +522,7 @@ defmodule Workbooks.Library do
     parts = Workbooks.Bundle.unpack(Workbooks.Bundle.read_any(input))
 
     # Path-confined write (zip-slip guard): any entry that is absolute or escapes
-    # `dest` via `..` is rejected by `write_tree` (mirrors `with_org_file`), so a
+    # `dest` via `..` is rejected by `write_tree` (mirrors `with_workbook_file`), so a
     # hostile bundle can't write outside the target tree. Returns names written.
     Workbooks.Bundle.write_tree(parts, dest)
     Map.keys(parts)

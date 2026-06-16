@@ -671,41 +671,41 @@ ol.org-list > li::marker { font-family: var(--org-mono); color: var(--org-faint)
 
 <!-- the source document, verbatim -->
 <script type="text/plain" id="org-source">
-#+TITLE: Writing for the Web in Org-mode
-#+AUTHOR: The Orgitorial Team
-#+DATE: 2031-11-22
-#+keywords: org-mode, writing, publishing, plain-text
+# Writing for the Web
 
-Plain text outlives every CMS. This post is itself an =.org= file, rendered
-to the page you're reading by *orgitorial* — a single zero-dependency
+Author: The Orgitorial Team
+Date: 2031-11-22
+Keywords: writing, publishing, plain-text
+
+Plain text outlives every CMS. This post is itself a plain-text file, rendered
+to the page you're reading by **orgitorial** — a single zero-dependency
 renderer. It doubles as a kitchen sink: every construct below is live proof
 that the toolkit handles it. If you can write a blog post, you already know
-enough org-mode to ship.
+enough to ship.
 
-* Why org-mode :rationale:
+## Why plain text
 
-Org-mode is a /plain-text/ outline format. It started as an Emacs mode for
-notes and to-do lists, but the markup is small, legible, and *durable* —
-which is exactly what you want for content you'll keep for a decade. You get
-structure (~headlines~), rich text, lists, tables, and code, with none of the
-lock-in of a database-backed editor.
+Plain text is a *legible* outline format. The markup is small, legible, and
+**durable** — which is exactly what you want for content you'll keep for a
+decade. You get structure (`headlines`), rich text, lists, tables, and code,
+with none of the lock-in of a database-backed editor.
 
-The pitch in one line: write once in =.org=, render anywhere with one file.
+The pitch in one line: write once in plain text, render anywhere with one file.
 
-** Emphasis you'll actually use
+### Emphasis you'll actually use
 
-You can make text *bold*, /italic/, _underlined_, or +struck through+.
-Inline code comes in two flavors: =verbatim= (literal) and ~code~ (a token).
-Links are first-class: [[https://orgmode.org][the org-mode home page]], or a
-bare URL like https://workbooks.sh that auto-links. Footnotes[fn:1] keep your
+You can make text **bold**, *italic*, _underlined_, or ~~struck through~~.
+Inline code comes in two flavors: `verbatim` (literal) and `code` (a token).
+Links are first-class: [the home page](https://orgmode.org), or a
+bare URL like https://workbooks.sh that auto-links. Footnotes[^1] keep your
 prose clean while still citing your sources.
 
-** Timestamps and tags
+### Timestamps and tags
 
-Org has native dates. This post was filed <2031-11-22 Sat>, and headlines can
-carry =:tags:= (see the heading above) for lightweight categorization.
+Dates are native. This post was filed 2031-11-22 (Sat), and headlines can
+carry tags for lightweight categorization.
 
-* Lists, the workhorse :lists:
+## Lists, the workhorse
 
 Unordered lists use a dash:
 
@@ -717,97 +717,90 @@ Unordered lists use a dash:
 
 Ordered lists count for you:
 
-1. Write your post in =.org=
-2. Run it through ~render()~
+1. Write your post in plain text
+2. Run it through `render()`
 3. Drop in the stylesheet
 4. Ship
 
 And checkboxes track real state:
 
-- [X] Renderer ships as one file
-- [X] CSS themed entirely via variables
+- [x] Renderer ships as one file
+- [x] CSS themed entirely via variables
 - [-] Syntax highlighting (the class hook is there; bring your own)
 - [ ] Your next post
 
-An image link renders as an =<img>= — point it at any =.png/.jpg/.svg=:
+An image link renders as an `<img>` — point it at any `.png/.jpg/.svg`:
 
-[[data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='200'%3E%3Crect width='720' height='200' fill='%23b3411f'/%3E%3Ctext x='50%25' y='50%25' fill='%23fbf9f4' font-family='monospace' font-size='28' text-anchor='middle' dominant-baseline='middle'%3Eorgitorial%3C/text%3E%3C/svg%3E.svg][orgitorial banner]]
+![orgitorial banner](data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='720'%20height='200'%3E%3Crect%20width='720'%20height='200'%20fill='%23b3411f'/%3E%3Ctext%20x='50%25'%20y='50%25'%20fill='%23fbf9f4'%20font-family='monospace'%20font-size='28'%20text-anchor='middle'%20dominant-baseline='middle'%3Eorgitorial%3C/text%3E%3C/svg%3E.svg)
 
-* Tables without the pain :tables:
+## Tables without the pain
 
-A header row is separated by a rule line (=|---|=):
+A header row is separated by a rule line:
 
-| Construct   | Org syntax        | HTML class      |
-|-------------+-------------------+-----------------|
-| Headline    | =* Title=         | =h2.org-h=      |
-| Source      | =#+begin_src=     | =pre.org-src=   |
-| Quote       | =#+begin_quote=   | =blockquote=    |
-| Checkbox    | =- [ ] item=      | =li.org-check=  |
+| Construct   | Syntax            | HTML class      |
+|-------------|-------------------|-----------------|
+| Headline    | `# Title`         | `h2.org-h`      |
+| Source      | ```` ``` ````     | `pre.org-src`   |
+| Quote       | `> ...`           | `blockquote`    |
+| Checkbox    | `- [ ] item`      | `li.org-check`  |
 
-* Code, quoted and highlighted :code:
+## Code, quoted and highlighted
 
 Source blocks preserve whitespace, escape your HTML, and label the language:
 
-#+begin_src javascript
+```javascript
 import { render } from "./orgitorial.js";
 
-const html = render(orgText);          // string in, string out
+const html = render(text);             // string in, string out
 document.querySelector("#post").innerHTML = html;
-#+end_src
+```
 
 A plain example block (no language bar) is for literal output:
 
-#+begin_example
-$ node -e "import('./dist/orgitorial.js').then(m => console.log(m.render('* hi')))"
+```
+$ node -e "import('./dist/orgitorial.js').then(m => console.log(m.render('# hi')))"
 <article class="org-doc"><h2 class="org-h">hi</h2></article>
-#+end_example
+```
 
 And a quote, for when someone said it better:
 
-#+begin_quote
-The best format is the one you can still read in twenty years.
-#+end_quote
+> The best format is the one you can still read in twenty years.
 
-A verse block keeps your line breaks — handy for a pull-stanza or a snippet of
-poetry:
+A verse, keeping line breaks — handy for a pull-stanza or a snippet of poetry:
 
-#+begin_verse
-Plain text in,
-clean HTML out —
-one file does it,
-no build to doubt.
-#+end_verse
+> Plain text in,
+> clean HTML out —
+> one file does it,
+> no build to doubt.
 
-* Living blocks: diagrams and mini-apps :living:
+## Living blocks: diagrams and mini-apps
 
 An article can also be a workbook. Three block types turn a static post into a
 living document — and none of them inner-scroll or sit in a cramped iframe.
 
-A *Mermaid diagram* beats a paragraph when you're describing a flow. Write it as
-=#+begin_src mermaid=; the host page's =Orgitorial.activate(document)= call
+A **Mermaid diagram** beats a paragraph when you're describing a flow. Write it
+as a `mermaid` code block; the host page's `Orgitorial.activate(document)` call
 renders it (lazy-loading mermaid from a CDN only if a diagram is present):
 
-#+begin_src mermaid
+```mermaid
 flowchart LR
-  A[".org file"] --> B["render()"]
+  A["source file"] --> B["render()"]
   B --> C["static HTML"]
   C --> D["activate()"]
   D --> E["mermaid + live apps"]
-#+end_src
+```
 
-A *wide quote* can break out of the editorial column with =:width wide= — past
-the measure, but never the whole viewport:
+A **wide quote** can break out of the editorial column — past the measure, but
+never the whole viewport:
 
-#+begin_quote :width wide
-The best interface for a document is the document itself — readable as plain
-text, alive when you open it in a browser, and the same one file either way.
-#+end_quote
+> The best interface for a document is the document itself — readable as plain
+> text, alive when you open it in a browser, and the same one file either way.
 
-And a *full-bleed mini-app*: a self-contained =#+begin_src html :app= block with
-inline styles and an inline script that runs on =activate()=. Here's a 20-line
+And a **full-bleed mini-app**: a self-contained `html :app` block with inline
+styles and an inline script that runs on `activate()`. Here's a 20-line
 compounding estimator, edge to edge:
 
-#+begin_src html :app :width full
+```html
 <div style="font-family:system-ui,sans-serif;max-width:46rem;margin:0 auto;padding:1.5rem 1.25rem;text-align:center">
   <label style="display:block;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;color:#888;margin-bottom:.6rem">
     Monthly deposit
@@ -834,44 +827,41 @@ compounding estimator, edge to edge:
     })();
   <\/script>
 </div>
-#+end_src
+```
 
-* Drawers for metadata :advanced:
+## Drawers for metadata
 
 Property drawers fold away the machinery so the prose stays clean. They render
 collapsed by default — click to expand:
 
-:PROPERTIES:
-:ID:       writing-for-the-web
-:CATEGORY: tutorial
-:READTIME: 4 min
-:END:
+- ID: writing-for-the-web
+- Category: tutorial
+- Readtime: 4 min
 
-* Roadmap, as headline state :roadmap:
+## Roadmap, as headline state
 
-Headlines can carry TODO/DONE keywords — org's native way to track work.
+Headlines can carry TODO/DONE keywords — a native way to track work.
 orgitorial renders the keyword as a colored state chip:
 
-** DONE One-file renderer
-** DONE Editorial CSS, themed by variables
-** TODO Pluggable syntax highlighting
-** TODO Your contribution
+- **DONE** One-file renderer
+- **DONE** Editorial CSS, themed by variables
+- **TODO** Pluggable syntax highlighting
+- **TODO** Your contribution
 
-* Where it goes :ship:
+## Where it goes
 
 orgitorial is built to plug into anything: a static site, the workbooks
 living-lander blog, a bit.ml story. The renderer is pure string→string, so it
-runs in a browser tag, in Node at build time, and in the runtime's QuickJS
-wasm lane. Re-theme it by setting a few CSS variables; the class contract is
-the whole API.
+runs in a browser tag, in Node at build time, and in the runtime's JS wasm lane.
+Re-theme it by setting a few CSS variables; the class contract is the whole API.
 
------
+---
 
 That's the kitchen sink. Everything above this rule is a supported construct,
 rendered by the same one file you'd ship.
 
-[fn:1] A footnote is reference-and-definition: drop =[fn:1]= inline, define it
-later with =[fn:1] the text=. orgitorial collects them into a Footnotes
+[^1]: A footnote is reference-and-definition: drop `[^1]` inline, define it
+later with `[^1]: the text`. orgitorial collects them into a Footnotes
 section at the end, with backlinks.
 
 </script>

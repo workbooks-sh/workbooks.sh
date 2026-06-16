@@ -91,4 +91,4 @@ COST: free
 
   - [authoring-a-story](authoring-a-story.md) — add your own component + control-spec.
   - `../ctk.html` — the reference shell + FolderIcon story.
-  - `../../AUTHORING.org` — the toolkit depth/breadth standard.
+  - `../../AUTHORING.md` — the toolkit depth/breadth standard.

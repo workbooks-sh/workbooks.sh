@@ -15,7 +15,7 @@ DESTRUCTIVE: no
 
   NOT for: a one-off shell command (just run it); editing an existing
   toolkit's prose (edit the `.org` files). For the depth/format rules
-  themselves, read [toolkits/AUTHORING.org](../../AUTHORING.md) — this toolkit OPERATES that
+  themselves, read [toolkits/AUTHORING.md](../../AUTHORING.md) — this toolkit OPERATES that
   standard, it doesn't restate it.
 
 # The mental model: the substrate is the catalog
@@ -28,7 +28,7 @@ DESTRUCTIVE: no
   TOOLKITS index and uses it.
 
   Two things make a forged toolkit good (both enforced by
-  [AUTHORING.org](../../AUTHORING.md)):
+  [AUTHORING.md](../../AUTHORING.md)):
   - *Depth* — each skill is recipe + the GOTCHAS + the WHY + a verify
     checklist + see-also, empirically verified. A flag dump is a
     failure.
@@ -55,7 +55,7 @@ DESTRUCTIVE: no
 ```bash
   command -v git >/dev/null || { echo "git missing"; exit 1; }
   command -v node >/dev/null || echo "warn: node absent — npm-name targets degrade"
-  test -f toolkits/AUTHORING.org || echo "warn: run from the monorepo root (AUTHORING.org not found)"
+  test -f toolkits/AUTHORING.md || echo "warn: run from the monorepo root (AUTHORING.md not found)"
 ```
 
 # The automated path vs the by-hand path
@@ -88,13 +88,13 @@ DESTRUCTIVE: no
 # Verification checklist
 
   - [ ] You know which of the 3 target kinds you have
-  - [ ] You've read [AUTHORING.org](../../AUTHORING.md) before authoring
+  - [ ] You've read [AUTHORING.md](../../AUTHORING.md) before authoring
   - [ ] You'll run the phases in order (research → … → verify)
   - [ ] Output lands at `toolkits/<name>/` with manifest + skills
 
 # See also
 
-  - [toolkits/AUTHORING.org](../../AUTHORING.md) — the depth/breadth standard this operates
+  - [toolkits/AUTHORING.md](../../AUTHORING.md) — the depth/breadth standard this operates
   - [research-target](research-target.md) — phase 1, fetch the target
   - [verify-toolkit](verify-toolkit.md) — phase 5, the done-bar
   - `../ffmpeg/` — the gold-standard exemplar toolkit

@@ -54,17 +54,17 @@ defmodule Workbooks.Demos.Agent do
   end
 
   @doc """
-  Authored-agent demo (wb-11ck, the brandnana-strategist shape): parse a real Org
-  `:agent:` node (examples/agents/analyst.org — MODEL, TOOLKITS, system prompt)
-  and run it on a multi-step task: total a JSON dataset with shell `jq`, persist
-  the finding with `wb memory`, finish. Proves agents are authored as Org and run
-  end to end on the substrate. Gated on OPENROUTER_API_KEY.
+  Authored-agent demo (wb-11ck, the brandnana-strategist shape): parse a real
+  `<work-agent>` element (examples/agents/analyst.html — model, toolkits, system
+  prompt) and run it on a multi-step task: total a JSON dataset with shell `jq`,
+  persist the finding with `wb memory`, finish. Proves agents are authored as HTML
+  and run end to end on the substrate. Gated on OPENROUTER_API_KEY.
   """
   def demo_agent_def do
     if System.get_env("OPENROUTER_API_KEY") in [nil, ""] do
       %{authored_agent: :unavailable}
     else
-      org = File.read!("examples/agents/analyst.org")
+      org = File.read!("examples/agents/analyst.html")
       d = Workbooks.AgentDef.parse(org)
       {:ok, vfs} = Workbooks.VFS.open(":memory:")
 
@@ -126,7 +126,7 @@ defmodule Workbooks.Demos.Agent do
   @doc """
   Agent demo (the brandnana model on the clean-room substrate): a real LLM loop
   whose tools are the sandboxed in-WASM shell (jq) + the wb CLI (variable store) +
-  the VFS — long-horizon, observable (events.org in the VFS). Runs for real when
+  the VFS — long-horizon, observable (events.html in the VFS). Runs for real when
   OPENROUTER_API_KEY is set; cleanly :unavailable otherwise so the suite stays
   green. Task: store a brand via wb, count JSON items via jq, finish.
   """
@@ -151,7 +151,7 @@ defmodule Workbooks.Demos.Agent do
         steps: r.steps,
         result: String.slice(r.result, 0, 200),
         tools_used: Enum.map(r.events, & &1.tool) |> Enum.uniq(),
-        events_org_in_vfs: match?({:ok, _}, Workbooks.VFS.get(vfs, "/events.org"))
+        events_log_in_vfs: match?({:ok, _}, Workbooks.VFS.get(vfs, "/events.html"))
       }
     end
   end

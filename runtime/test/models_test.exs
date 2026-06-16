@@ -3,7 +3,7 @@ defmodule Workbooks.ModelsTest do
   Unit tests for the OpenRouter model-discovery RENDERER (wb-d2nx.5). The pure
   `render/2` path is tested with a fixture catalog so there's no network flake —
   the live `fetch/1` (with its UA header + retry) is exercised by the toolkit
-  eval suite (evals/exec-models.org), not here.
+  eval suite (evals/exec-models.md), not here.
   """
   use ExUnit.Case, async: true
 

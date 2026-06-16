@@ -12,7 +12,7 @@ defmodule Workbooks.Storage.S3 do
     WB_S3_REGION    us-east-1 (S3) | auto (R2, default)
 
   Tenant isolation is the key prefix (`<tenant>/blobs/<key>`) — identical scoping
-  to the Local adapter, enforced above the backend. See docs/DEPLOY-KIT-STORAGE.org.
+  to the Local adapter, enforced above the backend. See docs/DEPLOY-KIT-STORAGE.md.
   """
   @behaviour Workbooks.Storage
 

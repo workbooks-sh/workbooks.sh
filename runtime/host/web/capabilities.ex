@@ -1,6 +1,6 @@
 defmodule Workbooks.Web.Capabilities do
   @moduledoc """
-  The RCP handshake document (RUNTIME-CONNECT-PROTOCOL.org §1). Served
+  The RCP handshake document (RUNTIME-CONNECT-PROTOCOL.md §1). Served
   unauthenticated at `GET /.well-known/workbooks-runtime` so any client learns,
   BEFORE presenting a credential, (a) which auth rung this runtime requires and
   (b) what feature surface it exposes.
@@ -13,7 +13,7 @@ defmodule Workbooks.Web.Capabilities do
                   "issuer": "<oidc issuer or null>",
                   "jwks_url": "<url or null>" },
         "transports": { "http": true, "ws": true },
-        "capabilities": ["oql", "workflow", ...]
+        "capabilities": ["workbook", "workflow", ...]
       }
 
   The auth RUNG is derived from tenancy: single-tenant accepts the `trusted`
@@ -40,7 +40,7 @@ defmodule Workbooks.Web.Capabilities do
         jwks_url: jwks
       },
       transports: %{http: true, ws: true},
-      capabilities: ~w(oql workflow instances workbook agent library search publish browse telemetry)
+      capabilities: ~w(workbook workflow instances agent library search publish browse telemetry)
     }
   end
 

@@ -129,8 +129,8 @@ workbook.
 ## Author a new toolkit
 
 - **MATURITY:** ships-today
-- **EVIDENCE:** toolkits/AUTHORING.org:1
-- **SRC:** toolkits/AUTHORING.org
+- **EVIDENCE:** toolkits/AUTHORING.md:1
+- **SRC:** toolkits/AUTHORING.md
 
 When the capability doesn't exist, write one. The full guide is
 [Pick a shape](../build/pick-a-shape.md) → [The Dock SDK](../build/dock-sdk.md); the manifest minimum is:
@@ -146,7 +146,7 @@ When the capability doesn't exist, write one. The full guide is
 
 The runtime compiles your source to WASM **inside its own sandbox** — no toolchain
 to install, and untrusted source never touches a native compiler. Authoring canon
-lives in `toolkits/AUTHORING.org`.
+lives in `toolkits/AUTHORING.md`.
 
 ## Submit it to the library
 

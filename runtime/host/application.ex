@@ -151,7 +151,7 @@ defmodule Workbooks.Application do
   end
 
   # The HTTP surfaces are opt-in so the demo boots without binding a port.
-  # Two SEPARATE listeners / planes (PUBLIC-WEB-PLAN.org):
+  # Two SEPARATE listeners / planes (PUBLIC-WEB-PLAN.md):
   #   WB_WEB=1     → control plane (authed): Workbooks.Web on PORT (default 4000)
   #   WB_PUBLIC=1  → content plane (anonymous, GET-only): Workbooks.PublicWeb on
   #                  PUBLIC_PORT (default 4001). Distinct listener so public traffic

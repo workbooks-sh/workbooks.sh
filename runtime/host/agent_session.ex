@@ -8,7 +8,7 @@ defmodule Workbooks.AgentSession do
   The agent runs in a spawned process so the session stays responsive mid-run; it
   emits each tool step (`on_step`) back to the session, which fans it out to WS
   subscribers (live telemetry, brandnana-style) and accumulates it. The run's own
-  VFS holds its state (resumable, Litestream-replicable); events.org is the trace.
+  VFS holds its state (resumable, Litestream-replicable); events.html is the trace.
   """
   use GenServer
 
