@@ -58,7 +58,7 @@
       { target: ".new-tab", title: "Create", body: "The + at the left of your tabs — start a new workbook, folder or board. Your create surface is always one click up here." },
       { target: ".bench-host", title: "The bench", body: "Toolkit shortcuts. Each icon opens a panel on the right — click again to close. Build your own." },
       { target: ".search-badge", title: "Search", body: "A built-in toolkit with a global ⌘K — summon it anywhere to find files, tabs, the web." },
-      { target: ".nexus-badge", title: "Nexus", body: "Your runtime connection. The badge shows engine status; click it to manage or switch." },
+      { target: ".nexus-chip", title: "Nexus", body: "Personal is local — it runs on your machine, free, and nothing leaves. Organizations are cloud nexuses you've been added to. Click to switch; you'll see more options here as you join teams." },
       { target: ".dock-host", title: "Waldo", body: "Your resident agent, top-right. Ask by text or voice; it works issues with you." },
     ],
     "sidebar-tour": [
