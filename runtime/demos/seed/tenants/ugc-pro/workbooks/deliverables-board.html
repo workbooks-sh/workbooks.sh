@@ -1,0 +1,347 @@
+<!doctype html>
+<!-- workbook: deliverables-board — production kanban for every UGC deliverable across Kelly's live brand deals. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UGC Pro — Deliverables Board</title>
+  <script id="workbook-spec" type="application/json">
+    {
+      "id": "deliverables-board",
+      "kind": "board",
+      "title": "Deliverables Board",
+      "owner": "kelly",
+      "workspace": "ugc-pro",
+      "source": "data/deliverables.json",
+      "frozen_at": "2026-06-14T00:00:00Z"
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--pink:#FF2D78;--violet:#7C3AED;--yellow:#FFD93D;--mint:#16E0A3;--grad:linear-gradient(135deg,#FF2D78 0%,#7C3AED 100%);
+      --green:#FF2D78;--green-d:#7C3AED;--ink:#1A0B2E;--bg:#FFF6FB;--card:#fff;
+      --line:#F0E2EE;--muted:#7B6E8C;--red:#b3260a;--red-bg:#fdecea;--amber:#9a6a00;
+    }
+    *{box-sizing:border-box}
+    body{font:14px/1.5 Plus Jakarta Sans,system-ui,sans-serif;color:var(--ink);background:var(--bg);margin:0;padding:28px 32px;}
+    h1,h2,h3,h4{font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.02em}
+    h1{font-weight:800}
+    h1{font-weight:650;letter-spacing:-.02em;font-size:22px;margin:0}
+    .sub{color:var(--muted);font-size:13px;margin:2px 0 18px}
+    .sub b{color:var(--ink);font-weight:600}
+
+    /* summary strip */
+    .totals{display:flex;flex-wrap:wrap;gap:22px;margin-bottom:18px;font-size:13px;color:var(--muted)}
+    .totals .k{display:flex;flex-direction:column;line-height:1.25}
+    .totals b{color:var(--ink);font-size:17px;font-weight:680}
+    .totals .danger b{color:var(--red)}
+    .totals .good b{color:var(--green-d)}
+
+    /* board */
+    .board{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;align-items:start}
+    .col{background:#FBEFF7;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:220px;transition:background .12s}
+    .col h2{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:4px 6px 12px;display:flex;justify-content:space-between;align-items:center}
+    .col h2 .cnt{background:#F0E2EE;border-radius:10px;padding:1px 8px;color:var(--ink);font-size:11px}
+    .col.over{background:rgba(22,224,163,.16);outline:2px dashed var(--green);outline-offset:-3px}
+    .col.block{background:#fdecea;outline:2px dashed var(--red);outline-offset:-3px}
+
+    .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 11px 10px;margin-bottom:9px;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:box-shadow .12s,transform .12s}
+    .card:hover{box-shadow:0 4px 14px rgba(12,15,13,.08);transform:translateY(-1px)}
+    .card:active{cursor:grabbing}
+    .card.drag{opacity:.4}
+    .card .top{display:flex;justify-content:space-between;align-items:center;gap:6px}
+    .tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:6px;color:#fff;display:inline-block;white-space:nowrap}
+    .fmt{font-size:10px;font-weight:600;color:var(--muted);background:#FBEFF7;border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+    .card .title{font-weight:600;margin:8px 0 6px;letter-spacing:-.01em;line-height:1.35}
+    .card .row{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px}
+    .assignee{width:22px;height:22px;border-radius:50%;object-fit:cover;border:1.5px solid #fff;box-shadow:0 0 0 1px var(--line)}
+    .card .note{color:var(--muted);font-size:12px;margin-top:7px;display:flex;gap:5px}
+    .card .note .ic{flex:none}
+    .due{font-size:11px;font-weight:600;margin-top:9px;display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:6px}
+    .due.over{color:var(--red);background:var(--red-bg)}
+    .due.soon{color:var(--red);background:var(--red-bg)}
+    .due.ok{color:var(--green-d);background:rgba(22,224,163,.16)}
+    .due.done{color:var(--muted);background:#FBEFF7}
+    .rev{display:inline-block;margin-left:6px;font-size:10px;font-weight:700;color:var(--amber);background:#fff5e0;border-radius:5px;padding:1px 6px}
+
+    .foot{color:var(--muted);font-size:12px;margin-top:24px;max-width:780px;line-height:1.6}
+    .foot b{color:var(--ink)}
+    .rule{margin-top:14px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--green-d);border-radius:8px;padding:11px 14px;max-width:780px;font-size:12.5px;color:var(--muted)}
+    .rule b{color:var(--ink)}
+
+    /* detail drawer */
+    .scrim{position:fixed;inset:0;background:rgba(12,15,13,.34);opacity:0;pointer-events:none;transition:opacity .16s;z-index:5}
+    .scrim.on{opacity:1;pointer-events:auto}
+    .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;background:#fff;border-left:1px solid var(--line);box-shadow:-12px 0 40px rgba(12,15,13,.12);transform:translateX(100%);transition:transform .2s cubic-bezier(.2,.8,.2,1);z-index:6;overflow-y:auto;padding:24px}
+    .drawer.on{transform:none}
+    .drawer .x{position:absolute;top:16px;right:18px;border:none;background:#FBEFF7;border-radius:7px;width:28px;height:28px;cursor:pointer;font-size:15px;color:var(--muted)}
+    .drawer h3{font-size:17px;margin:6px 40px 4px 0;letter-spacing:-.01em}
+    .drawer .d-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+    .drawer .d-row .lab{color:var(--muted)}
+    .drawer .d-row .val{font-weight:600;text-align:right}
+    .drawer .who{display:flex;align-items:center;gap:8px}
+    .drawer .who img{width:26px;height:26px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px var(--line)}
+    .drawer .acts{margin-top:18px;display:flex;flex-direction:column;gap:8px}
+    .drawer .acts button{font:inherit;font-size:13px;font-weight:600;text-align:left;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:#FFFBFD;cursor:pointer;display:flex;align-items:center;gap:9px}
+    .drawer .acts button:hover{background:rgba(22,224,163,.16);border-color:var(--green)}
+    .drawer .acts button .s{font-size:11px;font-weight:500;color:var(--muted)}
+    .drawer .acts .reshoot{border-color:#f3d9d4;background:#fdf3f1}
+    .drawer .acts .reshoot:hover{background:var(--red-bg);border-color:#e8a99c}
+    .drawer .log{margin-top:18px;font-size:12px;color:var(--muted)}
+    .drawer .log .e{padding:6px 0;border-bottom:1px dashed var(--line)}
+    .drawer .log .e .t{color:var(--ink);font-weight:600}
+    .drawer .badge{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;color:#fff;border-radius:6px;padding:2px 8px;letter-spacing:.04em}
+  </style>
+</head>
+<body>
+  <h1>Deliverables Board</h1>
+  <p class="sub">UGC Pro · <b>Kelly Rocklein</b> · every video deliverable across live brand deals · drag a card to advance · frozen Sun Jun 14, 2026</p>
+
+  <div class="totals" id="totals"></div>
+  <div class="board" id="board"></div>
+
+  <div class="rule">
+    <b>The production rule this board enforces.</b> A <b>text-overlay / caption / on-screen-copy change</b> is a
+    <b>revision</b> of the same deliverable (move it to <b>Revision</b>, keep the deal count). A <b>reshoot</b> —
+    new footage, new setup, re-filmed b-roll — is a <b>new deliverable</b> on the deal, not a revision.
+    The drawer's two buttons are the only sanctioned paths, so usage-rights billing and the "x of N" bundle
+    counts never drift.
+  </div>
+  <p class="foot">Each card links to a deal in <b>Brand Deal Pipeline</b>. Due dates flip red when overdue or within 48h.
+    Avatars are the assigned editor (Kelly self-edits the simple cuts; Mara and Devon take the heavier grades).</p>
+
+  <!-- detail drawer -->
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true"></aside>
+
+  <script>
+    // ---- frozen "today" so every recording is deterministic ----
+    const TODAY = new Date("2026-06-14T00:00:00Z");
+    const stages = ["Script","Shoot","Edit","Revision","Delivered"];
+    const colors = {
+      Glossier:"#d98aa0", Olipop:"#c0392b", Ritual:"#caa24b", Caraway:"#b8693d",
+      "Jones Road":"#9a5a2c", Topicals:"#6a3fa0"
+    };
+    // editors (real human avatars via pravatar)
+    const team = {
+      kelly:{name:"Kelly Rocklein", img:47, role:"Creator / lead edit"},
+      mara: {name:"Mara Quinn",      img:5,  role:"Senior editor (color + grade)"},
+      devon:{name:"Devon Park",      img:12, role:"Editor (cutdowns + captions)"},
+    };
+
+    // ---- 9 real deliverables across live deals ----
+    let items = [
+      { id:"D-118", t:"Ritual — Skin protocol ad", brand:"Ritual", deal:"1× ad, 90-day usage",
+        editor:"kelly", stage:"Script", due:"2026-06-16", len:"30s", platform:"Meta + TikTok",
+        note:"Hook A/B — “3 derms told me” vs “I quit 4 serums”", rev:0,
+        log:[["Jun 11","Booked from pipeline (Negotiating → Booked)"],["Jun 12","Script v1 sent to brand"]] },
+
+      { id:"D-121", t:"Topicals — Faded serum testimonial", brand:"Topicals", deal:"3× testimonial",
+        editor:"devon", stage:"Script", due:"2026-06-22", len:"30s", platform:"TikTok",
+        note:"1 of 3 — POV testimonial, before/after dark-spot", rev:0,
+        log:[["Jun 13","Brief approved, slot 1 of 3"]] },
+
+      { id:"D-104", t:"Caraway — Pan sear demo", brand:"Caraway", deal:"4× UGC bundle (-19%)",
+        editor:"mara", stage:"Shoot", due:"2026-06-18", len:"45s", platform:"IG Reel",
+        note:"Bundle 1 of 4 · kitchen daylight setup", rev:0,
+        log:[["Jun 9","Bundle booked & paid 50% deposit"],["Jun 13","Props + steak sourced"]] },
+
+      { id:"D-109", t:"Jones Road — Miracle Balm tutorial", brand:"Jones Road", deal:"2× tutorial + whitelist",
+        editor:"kelly", stage:"Shoot", due:"2026-06-19", len:"40s", platform:"TikTok (whitelist)",
+        note:"1 of 2 · clean-girl GRWM, whitelist rights", rev:0,
+        log:[["Jun 10","Whitelist terms signed"],["Jun 13","Ring light + balm shades in"]] },
+
+      { id:"D-097", t:"Glossier — Cloud Paint TikTok", brand:"Glossier", deal:"3× TikTok, 2 hooks ea.",
+        editor:"mara", stage:"Edit", due:"2026-06-15", len:"22s", platform:"TikTok",
+        note:"3 of 3 · two hooks cut, picking winner", rev:0,
+        log:[["Jun 6","Shot 3-up in one session"],["Jun 12","Rough cut, 2 hooks"]] },
+
+      { id:"D-103", t:"Caraway — Nonstick myth-bust", brand:"Caraway", deal:"4× UGC bundle (-19%)",
+        editor:"devon", stage:"Edit", due:"2026-06-20", len:"35s", platform:"IG Reel",
+        note:"Bundle 2 of 4 · egg-slide proof shot", rev:0,
+        log:[["Jun 8","Filmed alongside D-104 setup"],["Jun 13","Captions roughed in"]] },
+
+      { id:"D-096", t:"Glossier — Cloud Paint #2 (Storm)", brand:"Glossier", deal:"3× TikTok, 2 hooks ea.",
+        editor:"mara", stage:"Revision", due:"2026-06-15", len:"24s", platform:"TikTok",
+        note:"R1: tighten hook to 2s, kerning on price overlay", rev:1,
+        log:[["Jun 6","Shot 3-up in one session"],["Jun 11","Delivered v1"],["Jun 13","Brand: hook too slow → R1 (text-overlay only)"]] },
+
+      { id:"D-088", t:"Olipop — Vintage Cola reel", brand:"Olipop", deal:"2× IG Reel + raw",
+        editor:"kelly", stage:"Delivered", due:"2026-06-10", len:"28s", platform:"IG Reel",
+        note:"Final + raw footage handed off", rev:0,
+        log:[["Jun 4","Shot fridge + pour"],["Jun 9","Approved v1"],["Jun 10","Delivered + raw, invoice sent"]] },
+
+      { id:"D-089", t:"Olipop — Fridge restock reel", brand:"Olipop", deal:"2× IG Reel + raw",
+        editor:"kelly", stage:"Delivered", due:"2026-06-10", len:"26s", platform:"IG Reel",
+        note:"Paid $1,400 (deal closed)", rev:0,
+        log:[["Jun 4","Shot fridge + pour"],["Jun 9","Approved v1"],["Jun 10","Delivered, paid $1,400"]] },
+    ];
+
+    // ---- date helpers ----
+    const fmtDue = iso => new Date(iso+"T00:00:00Z").toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"});
+    const dayDiff = iso => Math.round((new Date(iso+"T00:00:00Z") - TODAY)/86400000);
+    function dueClass(i){
+      if(i.stage==="Delivered") return "done";
+      const d = dayDiff(i.due);
+      if(d < 0) return "over";
+      if(d <= 2) return "soon";
+      return "ok";
+    }
+    function dueLabel(i){
+      if(i.stage==="Delivered") return "Delivered " + fmtDue(i.due);
+      const d = dayDiff(i.due);
+      if(d < 0) return "Overdue " + Math.abs(d) + "d · " + fmtDue(i.due);
+      if(d === 0) return "Due today · " + fmtDue(i.due);
+      if(d <= 2) return "Due in " + d + "d · " + fmtDue(i.due);
+      return "Due " + fmtDue(i.due);
+    }
+
+    // ---- summary strip ----
+    function renderTotals(){
+      const active = items.filter(i=>i.stage!=="Delivered");
+      const overdue = active.filter(i=>dayDiff(i.due) < 0).length;
+      const soon = active.filter(i=>{const d=dayDiff(i.due);return d>=0&&d<=2}).length;
+      const delivered = items.filter(i=>i.stage==="Delivered").length;
+      const brands = new Set(items.map(i=>i.brand)).size;
+      document.getElementById("totals").innerHTML = `
+        <div class="k"><b>${items.length}</b>deliverables</div>
+        <div class="k"><b>${active.length}</b>in production</div>
+        <div class="k"><b>${brands}</b>live brands</div>
+        <div class="k danger"><b>${overdue+soon}</b>overdue / due ≤48h</div>
+        <div class="k good"><b>${delivered}</b>delivered</div>`;
+    }
+
+    // ---- board ----
+    function render(){
+      renderTotals();
+      document.getElementById("board").innerHTML = stages.map(st=>{
+        const its = items.filter(i=>i.stage===st);
+        return `<div class="col" data-st="${st}">
+          <h2>${st}<span class="cnt">${its.length}</span></h2>
+          ${its.map(i=>`
+            <div class="card" draggable="true" data-id="${i.id}">
+              <div class="top">
+                <span class="tag" style="background:${colors[i.brand]}">${i.brand}</span>
+                <span class="fmt">${i.len} · ${i.platform.split(" ")[0]}</span>
+              </div>
+              <div class="title">${i.t}${i.rev?`<span class="rev">R${i.rev}</span>`:""}</div>
+              <div class="row"><img class="assignee" src="https://i.pravatar.cc/44?img=${team[i.editor].img}" alt="${team[i.editor].name}">${team[i.editor].name}</div>
+              <div class="note"><span class="ic">📝</span><span>${i.note}</span></div>
+              <span class="due ${dueClass(i)}">${dueLabel(i)}</span>
+            </div>`).join("")}
+        </div>`;
+      }).join("");
+      wire();
+    }
+
+    // ---- drag to advance ----
+    let dragged = null;
+    function wire(){
+      document.querySelectorAll(".card").forEach(c=>{
+        c.addEventListener("dragstart",e=>{dragged=c.dataset.id;c.classList.add("drag");e.stopPropagation()});
+        c.addEventListener("dragend",()=>c.classList.remove("drag"));
+        c.addEventListener("click",()=>openDrawer(c.dataset.id));
+      });
+      document.querySelectorAll(".col").forEach(col=>{
+        col.addEventListener("dragover",e=>{
+          e.preventDefault();
+          const it = items.find(x=>x.id===dragged);
+          // guard: you can't drag a card straight INTO Revision — that has to be the
+          // explicit "text-overlay change" action, so the rule stays honest.
+          if(it && col.dataset.st==="Revision" && it.stage!=="Revision") col.classList.add("block");
+          else col.classList.add("over");
+        });
+        col.addEventListener("dragleave",()=>col.classList.remove("over","block"));
+        col.addEventListener("drop",e=>{
+          e.preventDefault();col.classList.remove("over","block");
+          const it = items.find(x=>x.id===dragged); if(!it) return;
+          const to = col.dataset.st;
+          if(to==="Revision" && it.stage!=="Revision"){
+            alert("Use the deliverable's “Text-overlay change → Revision” action.\nDragging into Revision is blocked so the revision-vs-reshoot rule stays honest.");
+            return;
+          }
+          it.stage = to;
+          it.log.unshift([fmtDue(TODAY.toISOString().slice(0,10)), "Moved to " + to]);
+          render();
+        });
+      });
+    }
+
+    // ---- detail drawer + the two sanctioned mutations ----
+    const scrim = document.getElementById("scrim");
+    const drawer = document.getElementById("drawer");
+    function closeDrawer(){scrim.classList.remove("on");drawer.classList.remove("on");drawer.setAttribute("aria-hidden","true")}
+    scrim.addEventListener("click",closeDrawer);
+
+    function openDrawer(id){
+      const i = items.find(x=>x.id===id); if(!i) return;
+      const ed = team[i.editor];
+      drawer.innerHTML = `
+        <button class="x" onclick="closeDrawer()">✕</button>
+        <span class="badge" style="background:${colors[i.brand]}">${i.brand}</span>
+        <h3>${i.t}</h3>
+        <div class="d-row"><span class="lab">Deliverable</span><span class="val">${i.id}</span></div>
+        <div class="d-row"><span class="lab">Stage</span><span class="val">${i.stage}${i.rev?` · R${i.rev}`:""}</span></div>
+        <div class="d-row"><span class="lab">Deal</span><span class="val">${i.deal}</span></div>
+        <div class="d-row"><span class="lab">Format</span><span class="val">${i.len} · ${i.platform}</span></div>
+        <div class="d-row"><span class="lab">Due</span><span class="val" style="color:${dueClass(i)==='over'||dueClass(i)==='soon'?'var(--red)':'inherit'}">${dueLabel(i)}</span></div>
+        <div class="d-row"><span class="lab">Editor</span><span class="val"><span class="who"><img src="https://i.pravatar.cc/52?img=${ed.img}">${ed.name}</span></span></div>
+        <div class="d-row"><span class="lab">Notes</span><span class="val" style="max-width:210px;font-weight:500">${i.note}</span></div>
+
+        <div class="acts">
+          ${i.stage!=="Delivered" ? `
+          <button onclick="textOverlayRevision('${i.id}')">
+            <span>✏️</span>
+            <span>Text-overlay change → Revision
+              <span class="s">caption / on-screen copy · same deliverable</span>
+            </span>
+          </button>` : ``}
+          <button class="reshoot" onclick="reshoot('${i.id}')">
+            <span>🎬</span>
+            <span>Reshoot → new deliverable
+              <span class="s">new footage · adds to deal’s “x of N”</span>
+            </span>
+          </button>
+        </div>
+
+        <div class="log">
+          <div style="font-weight:600;color:var(--ink);margin:4px 0 8px">Activity</div>
+          ${i.log.map(([d,t])=>`<div class="e"><span class="t">${d}</span> — ${t}</div>`).join("")}
+        </div>`;
+      scrim.classList.add("on");drawer.classList.add("on");drawer.setAttribute("aria-hidden","false");
+    }
+
+    // RULE: text-overlay change = revision of the SAME deliverable.
+    function textOverlayRevision(id){
+      const i = items.find(x=>x.id===id); if(!i) return;
+      i.rev = (i.rev||0) + 1;
+      i.stage = "Revision";
+      i.note = "R"+i.rev+": text-overlay change requested";
+      i.log.unshift([fmtDue(TODAY.toISOString().slice(0,10)), "Text-overlay change → Revision R"+i.rev+" (same deliverable)"]);
+      render(); openDrawer(id);
+    }
+
+    // RULE: reshoot = a NEW deliverable on the deal, never a revision.
+    function reshoot(id){
+      const src = items.find(x=>x.id===id); if(!src) return;
+      const num = Math.max(...items.map(x=>+x.id.slice(2))) + 1;
+      const nid = "D-" + String(num).padStart(3,"0");
+      items.push({
+        id:nid, t:src.t.replace(/ \(.*\)$/,"")+" (reshoot)", brand:src.brand, deal:src.deal,
+        editor:src.editor, stage:"Script", due:src.due, len:src.len, platform:src.platform,
+        note:"Reshoot of "+src.id+" · new footage", rev:0,
+        log:[[fmtDue(TODAY.toISOString().slice(0,10)), "New deliverable — reshoot of "+src.id]]
+      });
+      render(); openDrawer(nid);
+    }
+    window.closeDrawer = closeDrawer;
+    window.openDrawer = openDrawer;
+    window.textOverlayRevision = textOverlayRevision;
+    window.reshoot = reshoot;
+
+    document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
+    render();
+  </script>
+</body>
+</html>
