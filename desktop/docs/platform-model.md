@@ -25,7 +25,9 @@ The Host is a **router**. Every capability is served by one **provider**:
 
 - `local`   — OS via Tauri (desktop/mobile) or browser-native APIs (web)
 - `runtime` — a server over **RCP** (HTTP + WS); see `wb-uxn`
-- `kernel`  — the bundled WASM engine (`oql.wasm`), in-process, offline
+
+A workbook is an HTML file of `work-*` components — the browser renders it
+locally; there is no separate kernel/engine provider.
 
 A **target is a routing config** mapping capability → provider. It is the only
 thing that differs between desktop / web / mobile:
