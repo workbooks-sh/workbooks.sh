@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Tecovas — Brand Book (Print Edition)</title>
+<style>
+  @page { size: Letter; margin: 0; }
+  :root{
+    --tan:#C8924A; --tan-d:#A6753A; --black:#1A1714; --bone:#F4EEE2; --bone-d:#E7DECB;
+    --cactus:#5B6E4F; --clay:#A6543C; --sky:#8FB3C9; --line:#D9CEB8; --muted:#6B5F4E;
+    --serif:"Fraunces",Georgia,"Times New Roman",serif;
+    --sans:"Archivo","Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  html,body{margin:0;padding:0;color:var(--black);font-family:var(--sans);}
+  .page{
+    width:8.5in; height:11in; position:relative; overflow:hidden;
+    page-break-after:always; background:var(--bone);
+    padding:0.85in 0.85in 0.95in;
+  }
+  .page:last-child{page-break-after:auto;}
+  h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.01em;margin:0;}
+  .eyebrow{font-family:var(--sans);font-size:9pt;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+  .sec-num{font-family:var(--serif);font-style:italic;font-size:11pt;color:var(--muted);}
+  p{line-height:1.55;font-size:10.5pt;max-width:60ch;}
+  .lede{font-size:13pt;line-height:1.5;color:var(--tan-d);font-family:var(--serif);max-width:62ch;}
+  /* page chrome */
+  .foot{position:absolute;left:0.85in;right:0.85in;bottom:0.5in;display:flex;justify-content:space-between;
+    font-size:8pt;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line);padding-top:8px;}
+  .foot .nana b{color:var(--tan-d);}
+  /* cover */
+  .cover{background:var(--black);color:var(--bone);display:flex;flex-direction:column;justify-content:center;}
+  .cover .wm{font-family:var(--serif);font-weight:700;font-size:74pt;line-height:.9;letter-spacing:.02em;color:var(--bone);}
+  .cover .tag{font-family:var(--serif);font-style:italic;font-size:20pt;color:var(--tan);margin-top:14px;}
+  .cover .rule{width:64px;height:3px;background:var(--tan);margin:34px 0;}
+  .cover .meta{display:flex;gap:42px;flex-wrap:wrap;font-size:9pt;letter-spacing:.1em;text-transform:uppercase;color:#b6aa92;}
+  .cover .meta b{display:block;font-family:var(--serif);font-style:normal;text-transform:none;letter-spacing:0;font-size:14pt;color:var(--bone);margin-top:4px;}
+  .cover .hero{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.34;}
+  .cover .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(26,23,20,.55),rgba(26,23,20,.9));}
+  .cover .inner{position:relative;}
+  .cover .foot{color:#9d917b;border-top-color:#3a342c;}
+  .cover .foot .nana b{color:var(--tan);}
+  /* TOC */
+  .toc{list-style:none;padding:0;margin:28px 0 0;}
+  .toc li{display:flex;align-items:baseline;font-size:12pt;padding:11px 0;border-bottom:1px solid var(--line);}
+  .toc .n{font-family:var(--serif);font-style:italic;color:var(--tan-d);width:46px;}
+  .toc .t{font-family:var(--serif);font-weight:600;flex:1;}
+  .toc .p{color:var(--muted);font-size:10pt;}
+  /* logo system */
+  .logo-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px;}
+  .lcard{border:1px solid var(--line);border-radius:8px;padding:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:150px;}
+  .lcard .cap{font-size:8pt;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:18px;}
+  .lw{font-family:var(--serif);font-weight:700;font-size:30pt;letter-spacing:.02em;}
+  .lcard.tan{background:var(--tan);} .lcard.tan .lw{color:var(--black);}
+  .lcard.black{background:var(--black);} .lcard.black .lw,.lcard.black .cap{color:var(--bone);}
+  .lcard.bone{background:var(--bone-d);} .lcard.bone .lw{color:var(--black);}
+  .clearspace{position:relative;border:1px dashed var(--tan-d);padding:26px;}
+  .donts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:18px;}
+  .dont{border:1px solid var(--line);border-radius:6px;padding:14px;text-align:center;position:relative;}
+  .dont .demo{height:48px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-weight:700;font-size:18pt;}
+  .dont .x{position:absolute;top:8px;right:10px;color:var(--clay);font-weight:700;}
+  .dont small{font-size:8pt;color:var(--muted);}
+  /* color */
+  .sw-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;}
+  .sw{border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .sw .chip{height:84px;display:flex;align-items:flex-end;padding:10px 14px;font-size:9pt;font-weight:700;letter-spacing:.06em;}
+  .sw .meta{padding:12px 14px;}
+  .sw .nm{font-family:var(--serif);font-weight:600;font-size:13pt;}
+  .sw table{width:100%;border-collapse:collapse;margin-top:8px;}
+  .sw td{font-size:8.5pt;padding:2px 0;color:var(--muted);}
+  .sw td:first-child{color:var(--black);font-weight:600;width:46px;}
+  .ratio{display:flex;height:38px;border-radius:6px;overflow:hidden;margin-top:22px;font-size:8pt;}
+  .ratio span{display:flex;align-items:center;justify-content:center;font-weight:700;}
+  /* type */
+  .specimen{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:22px;}
+  .spc{border:1px solid var(--line);border-radius:8px;padding:22px;}
+  .spc .big{font-family:var(--serif);font-weight:700;font-size:62pt;line-height:.85;color:var(--tan);}
+  .spc.sans .big{font-family:var(--sans);color:var(--black);}
+  .spc .nm{font-family:var(--serif);font-size:14pt;margin-top:6px;}
+  .spc.sans .nm{font-family:var(--sans);}
+  .spc .det{font-size:9pt;color:var(--muted);margin-top:4px;}
+  .spc .row{margin-top:12px;font-size:9.5pt;color:var(--muted);line-height:1.5;}
+  .scale{margin-top:20px;border-top:1px solid var(--line);}
+  .scale div{display:flex;align-items:baseline;gap:18px;padding:9px 0;border-bottom:1px solid var(--line);}
+  .scale .lbl{font-size:8pt;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);width:120px;}
+  /* voice */
+  .principles{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+  .principles span{background:var(--black);color:var(--bone);font-family:var(--serif);font-style:italic;font-size:11pt;padding:6px 16px;border-radius:24px;}
+  .vp{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;}
+  .col{border:1px solid var(--line);border-radius:8px;padding:16px;}
+  .col.do{background:#eef1ea;border-color:var(--cactus);}
+  .col.dont2{background:#f6ece8;border-color:var(--clay);}
+  .col .tag{font-size:8pt;letter-spacing:.16em;text-transform:uppercase;font-weight:700;margin-bottom:8px;}
+  .col.do .tag{color:var(--cactus);} .col.dont2 .tag{color:var(--clay);}
+  .col .quote{font-family:var(--serif);font-size:11.5pt;line-height:1.4;}
+  /* imagery */
+  .imgs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:20px;}
+  .shot .ph{height:140px;border-radius:8px;background-size:cover;background-position:center;border:1px solid var(--line);}
+  .shot b{display:block;font-family:var(--serif);font-size:11pt;margin-top:10px;}
+  .shot small{font-size:8.5pt;color:var(--muted);display:block;line-height:1.45;margin-top:3px;}
+  .art-notes{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-top:22px;font-size:9.5pt;}
+  .art-notes b{color:var(--tan-d);}
+  /* motion / ai panels */
+  .panels{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;}
+  .panel{background:var(--black);color:#e4dccb;border-radius:10px;padding:20px;}
+  .panel h3{color:var(--bone);font-size:14pt;}
+  .panel p{color:#b6aa92;font-size:9.5pt;margin:6px 0 12px;}
+  .panel ul{list-style:none;padding:0;margin:0;}
+  .panel li{padding:8px 0;border-top:1px solid #2c2620;font-size:9pt;line-height:1.5;}
+  .panel li b{color:var(--tan);}
+  /* methodology */
+  .prov{margin-top:22px;}
+  .prov .row{display:flex;gap:18px;padding:12px 0;border-bottom:1px solid var(--line);}
+  .prov .k{font-family:var(--serif);font-weight:600;font-size:11pt;width:200px;color:var(--tan-d);}
+  .prov .v{font-size:10pt;color:var(--black);flex:1;line-height:1.5;}
+  .counts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:20px;}
+  .count{background:var(--bone-d);border-radius:8px;padding:18px;text-align:center;}
+  .count .big{font-family:var(--serif);font-weight:700;font-size:30pt;color:var(--tan-d);line-height:1;}
+  .count .lbl{font-size:8.5pt;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:6px;}
+  .seal{margin-top:26px;border-top:2px solid var(--black);padding-top:16px;font-family:var(--serif);font-style:italic;font-size:11pt;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<!-- 1 · COVER -->
+<section class="page cover">
+  <div class="hero" id="coverhero"></div>
+  <div class="scrim"></div>
+  <div class="inner">
+    <div class="eyebrow" style="color:#cabfa9">Brand Book · Print Edition · 2026</div>
+    <div class="wm">Tecovas</div>
+    <div class="tag">Handmade quality, honest price.</div>
+    <div class="rule"></div>
+    <div class="meta">
+      <div>Brand<b>Tecovas</b></div>
+      <div>Domain<b>tecovas.com</b></div>
+      <div>Category<b>DTC Western</b></div>
+      <div>Frozen<b>2026-06-13</b></div>
+    </div>
+  </div>
+  <div class="foot"><span class="nana">Prepared by <b>Brand Nana</b> · confidential</span><span>Cover</span></div>
+</section>
+
+<!-- 2 · CONTENTS -->
+<section class="page">
+  <div class="eyebrow">Contents</div>
+  <h1 style="font-size:30pt;margin-top:6px">What's inside</h1>
+  <p class="lede" style="margin-top:10px">A complete, print-ready brand book for Tecovas — the artifact a client receives, forwards internally, and works from. Every claim is grounded in the catalog, social, and ad evidence summarized on the final page.</p>
+  <ul class="toc">
+    <li><span class="n">01</span><span class="t">Logo system</span><span class="p">Wordmark, lockups, clear space, misuse</span></li>
+    <li><span class="n">02</span><span class="t">Color palette</span><span class="p">HEX · RGB · CMYK · Pantone, with ratios</span></li>
+    <li><span class="n">03</span><span class="t">Typography</span><span class="p">Specimens, pairing, type scale</span></li>
+    <li><span class="n">04</span><span class="t">Voice &amp; tone</span><span class="p">Principles and do / don't</span></li>
+    <li><span class="n">05</span><span class="t">Imagery</span><span class="p">Art direction across three lanes</span></li>
+    <li><span class="n">06</span><span class="t">Motion &amp; AI communications</span><span class="p">2026 guidelines for animated &amp; conversational surfaces</span></li>
+    <li><span class="n">07</span><span class="t">Methodology &amp; provenance</span><span class="p">Grounded counts and sources</span></li>
+  </ul>
+  <div class="foot"><span class="nana">Prepared by <b>Brand Nana</b> · confidential</span><span>02</span></div>
+</section>
+
+<!-- 3 · LOGO SYSTEM -->
+<section class="page">
+  <div class="eyebrow">Section 01</div>
+  <h1 style="font-size:26pt;margin-top:6px">Logo system</h1>
+  <p class="lede" style="margin-top:8px">One serif wordmark, set in Fraunces. Confident, slightly editorial, never ornamental. It works on Bone, on Boot Black, and on Saddle Tan — and nowhere else.</p>
+  <div class="logo-grid">
+    <div class="lcard bone"><span class="cap">Primary · on Bone</span><span class="lw">Tecovas</span></div>
+    <div class="lcard black"><span class="cap">Reversed · on Boot Black</span><span class="lw" style="color:var(--bone)">Tecovas</span></div>
+    <div class="lcard tan"><span class="cap">On Saddle Tan</span><span class="lw">Tecovas</span></div>
+    <div class="lcard" style="background:var(--bone);border:1px solid var(--line)">
+      <span class="cap">Clear space</span>
+      <div class="clearspace"><span class="lw" style="font-size:24pt">Tecovas</span></div>
+      <small style="font-size:8pt;color:var(--muted);margin-top:10px">Keep clear space ≥ the cap-height of the "T" on all sides.</small>
+    </div>
+  </div>
+  <h3 style="font-size:13pt;margin-top:24px">Misuse</h3>
+  <div class="donts">
+    <div class="dont"><span class="x">✕</span><div class="demo" style="font-style:italic">Tecovas</div><small>Don't italicize</small></div>
+    <div class="dont"><span class="x">✕</span><div class="demo" style="letter-spacing:.3em;font-size:13pt">TECOVAS</div><small>Don't over-track</small></div>
+    <div class="dont"><span class="x">✕</span><div class="demo" style="color:var(--sky)">Tecovas</div><small>Don't recolor</small></div>
+  </div>
+  <div class="foot"><span class="nana">Prepared by <b>Brand Nana</b> · confidential</span><span>03</span></div>
+</section>
+
+<!-- 4 · COLOR PALETTE (HEX/RGB/CMYK/PANTONE) -->
+<section class="page">
+  <div class="eyebrow">Section 02</div>
+  <h1 style="font-size:26pt;margin-top:6px">Color palette</h1>
+  <p class="lede" style="margin-top:8px">Earth first. Saddle Tan leads, Boot Black anchors, Bone breathes. Cactus, Clay, and Sky are accents — used sparingly, the way good leather takes a single contrast stitch. Print equivalents (CMYK + Pantone) are included for press.</p>
+  <div class="sw-grid">
+    <div class="sw"><div class="chip" style="background:#C8924A;color:#1A1714">Primary</div><div class="meta"><div class="nm">Saddle Tan</div>
+      <table><tr><td>HEX</td><td>#C8924A</td></tr><tr><td>RGB</td><td>200 · 146 · 74</td></tr><tr><td>CMYK</td><td>0 · 27 · 63 · 22</td></tr><tr><td>Pantone</td><td>PMS 729 C</td></tr></table></div></div>
+    <div class="sw"><div class="chip" style="background:#1A1714;color:#F4EEE2">Anchor</div><div class="meta"><div class="nm">Boot Black</div>
+      <table><tr><td>HEX</td><td>#1A1714</td></tr><tr><td>RGB</td><td>26 · 23 · 20</td></tr><tr><td>CMYK</td><td>0 · 12 · 23 · 90</td></tr><tr><td>Pantone</td><td>PMS Black 6 C</td></tr></table></div></div>
+    <div class="sw"><div class="chip" style="background:#F4EEE2;color:#1A1714;border-bottom:1px solid var(--line)">Surface</div><div class="meta"><div class="nm">Bone</div>
+      <table><tr><td>HEX</td><td>#F4EEE2</td></tr><tr><td>RGB</td><td>244 · 238 · 226</td></tr><tr><td>CMYK</td><td>0 · 2 · 7 · 4</td></tr><tr><td>Pantone</td><td>PMS 9224 C</td></tr></table></div></div>
+    <div class="sw"><div class="chip" style="background:#5B6E4F;color:#F4EEE2">Accent</div><div class="meta"><div class="nm">Cactus</div>
+      <table><tr><td>HEX</td><td>#5B6E4F</td></tr><tr><td>RGB</td><td>91 · 110 · 79</td></tr><tr><td>CMYK</td><td>17 · 0 · 28 · 57</td></tr><tr><td>Pantone</td><td>PMS 5757 C</td></tr></table></div></div>
+    <div class="sw"><div class="chip" style="background:#A6543C;color:#F4EEE2">Accent</div><div class="meta"><div class="nm">Clay</div>
+      <table><tr><td>HEX</td><td>#A6543C</td></tr><tr><td>RGB</td><td>166 · 84 · 60</td></tr><tr><td>CMYK</td><td>0 · 49 · 64 · 35</td></tr><tr><td>Pantone</td><td>PMS 7522 C</td></tr></table></div></div>
+    <div class="sw"><div class="chip" style="background:#8FB3C9;color:#1A1714">Accent</div><div class="meta"><div class="nm">Sky</div>
+      <table><tr><td>HEX</td><td>#8FB3C9</td></tr><tr><td>RGB</td><td>143 · 179 · 201</td></tr><tr><td>CMYK</td><td>29 · 11 · 0 · 21</td></tr><tr><td>Pantone</td><td>PMS 5435 C</td></tr></table></div></div>
+  </div>
+  <div class="ratio">
+    <span style="background:#F4EEE2;color:#1A1714;flex:55">Bone 55%</span>
+    <span style="background:#1A1714;color:#F4EEE2;flex:22">Boot Black 22%</span>
+    <span style="background:#C8924A;color:#1A1714;flex:15">Saddle Tan 15%</span>
+    <span style="background:#5B6E4F;color:#F4EEE2;flex:4">Cactus</span>
+    <span style="background:#A6543C;color:#F4EEE2;flex:2">Clay</span>
+    <span style="background:#8FB3C9;color:#1A1714;flex:2">Sky</span>
+  </div>
+  <div class="foot"><span class="nana">Prepared by <b>Brand Nana</b> · confidential</span><span>04</span></div>
+</section>
+
+<!-- 5 · TYPOGRAPHY -->
+<section class="page">
+  <div class="eyebrow">Section 03</div>
+  <h1 style="font-size:26pt;margin-top:6px">Typography</h1>
+  <p class="lede" style="margin-top:8px">A serif for voice, a grotesque for utility. Fraunces carries headlines and the wordmark; Founders Grotesk does the daily work of body, navigation, and product specs.</p>
+  <div class="specimen">
+    <div class="spc"><div class="big">Aa</div><div class="nm">Fraunces</div><div class="det">Soft-serif display · weights 400–700</div><div class="row">Headlines, the wordmark, pull-quotes, and editorial moments. Set tight, with a touch of optical italic for warmth.</div></div>
+    <div class="spc sans"><div class="big">Aa</div><div class="nm">Founders Grotesk</div><div class="det">Grotesque sans · weights 300–700</div><div class="row">Body copy, navigation, PDP specs, captions, buttons. The quiet workhorse — legible at every size.</div></div>
+  </div>
+  <div class="scale">
+    <div><span class="lbl">Display / H1</span><span style="font-family:var(--serif);font-weight:700;font-size:30pt">The Duke</span></div>
+    <div><span class="lbl">Heading / H2</span><span style="font-family:var(--serif);font-weight:600;font-size:20pt">Handmade over 200 steps</span></div>
+    <div><span class="lbl">Subhead / H3</span><span style="font-family:var(--sans);font-weight:600;font-size:14pt">Goodyear-welt construction</span></div>
+    <div><span class="lbl">Body</span><span style="font-family:var(--sans);font-size:11pt">Cattle-tanned leather, built to be resoled for a lifetime.</span></div>
+    <div><span class="lbl">Caption / UI</span><span style="font-family:var(--sans);font-size:9pt;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Free shipping · free returns</span></div>
+  </div>
+  <div class="foot"><span class="nana">Prepared by <b>Brand Nana</b> · confidential</span><span>05</span></div>
+</section>
+
+<!-- 6 · VOICE -->
+<section class="page">
+  <div class="eyebrow">Section 04</div>
+  <h1 style="font-size:26pt;margin-top:6px">Voice &amp; tone</h1>
+  <p class="lede" style="margin-top:8px">Plainspoken, confident, never gimmicky — heritage without costume. We talk about the boot, the leather, and the price, and we let the craft do the bragging.</p>
+  <div class="principles"><span>Plainspoken</span><span>Confident</span><span>Never gimmicky</span><span>Heritage without costume</span></div>
+  <div class="vp">
+    <div class="col do"><div class="tag">Do</div><div class="quote">"The Duke. A classic roper, made from cattle-tanned leather and built to be resoled for a lifetime."</div></div>
+    <div class="col dont2"><div class="tag">Don't</div><div class="quote">"Yeehaw! Saddle up, partner — these bad boys are FIRE and gonna sell out fast!!!"</div></div>
+  </div>
+  <div class="vp">
+    <div class="col do"><div class="tag">Do</div><div class="quote">"Free shipping and free returns. Try them on at home and send them back if the fit isn't right."</div></div>
+    <div class="col dont2"><div class="tag">Don't</div><div class="quote">"RISK-FREE 100% money-back guarantee — you've got absolutely NOTHING to lose, act now!"</div></div>
+  </div>
+  <div class="vp">
+    <div class="col do"><div class="tag">Do</div><div class="quote">"Handmade over 200 steps. We skipped the middleman, not the craftsmanship."</div></div>
+    <div class="col dont2"><div class="tag">Don't</div><div class="quote">"Authentic genuine luxury premium handcrafted artisanal heritage Western footwear."</div></div>
+  </div>
+  <div class="foot"><span class="nana">Prepared by <b>Brand Nana</b> · confidential</span><span>06</span></div>
+</section>
+
+<!-- 7 · IMAGERY -->
+<section class="page">
+  <div class="eyebrow">Section 05</div>
+  <h1 style="font-size:26pt;margin-top:6px">Imagery</h1>
+  <p class="lede" style="margin-top:8px">Real light, real leather, real people. Three lanes carry the brand: lived-in lifestyle, honest product detail, and the human moment of buying a first pair.</p>
+  <div class="imgs">
+    <div class="shot"><div class="ph" id="img1"></div><b>Lifestyle — the ranch</b><small>Wide, environmental. Boots in motion and in context — dust, denim, last light.</small></div>
+    <div class="shot"><div class="ph" id="img2"></div><b>Studio — leather detail</b><small>Macro on a neutral seamless. Show the 200-step craft; raking side-light for texture.</small></div>
+    <div class="shot"><div class="ph" id="img3"></div><b>Retail — in store</b><small>Candid, warm. The fitting moment — people, not mannequins; Bone walls, wood shelving.</small></div>
+  </div>
+  <div class="art-notes">
+    <span><b>Light:</b> golden hour &amp; window daylight</span>
+    <span><b>Texture:</b> natural — leather, denim, weathered wood</span>
+    <span><b>Filters:</b> none heavy — true-to-life color, gentle warmth</span>
+    <span><b>People:</b> real range of ages &amp; builds, no costume</span>
+    <span><b>Composition:</b> let the boot lead the frame</span>
+    <span><b>Crop:</b> product-forward; the person is secondary</span>
+  </div>
+  <div class="foot"><span class="nana">Prepared by <b>Brand Nana</b> · confidential</span><span>07</span></div>
+</section>
+
+<!-- 8 · MOTION + AI -->
+<section class="page" style="background:var(--bone-d)">
+  <div class="eyebrow">Section 06 · 2026</div>
+  <h1 style="font-size:26pt;margin-top:6px">Motion &amp; AI communications</h1>
+  <p class="lede" style="margin-top:8px">As the brand moves into animated surfaces and conversational tools, the rule holds: confident and quiet. Motion is craftsmanship, not flash. The assistant sounds like a knowledgeable boot-bar associate — never a salesman.</p>
+  <div class="panels">
+    <div class="panel">
+      <h3>Motion &amp; micro-interaction</h3>
+      <p>Subtle, leather-weighted, never bouncy.</p>
+      <ul>
+        <li><b>Hover lift</b> on product cards: translateY −3px, soft shadow, 180ms ease-out.</li>
+        <li><b>Scroll reveal:</b> sections fade up 16px over 400ms, once, with a 60ms stagger.</li>
+        <li><b>CTA press:</b> 60ms scale to 0.98 — a tactile "click," no color flash.</li>
+        <li><b>Image zoom:</b> 1.0 → 1.04 over 6s on PDP detail; slow, like inspecting grain.</li>
+        <li><b>No</b> spinners-as-decoration, parallax gimmicks, or auto-playing carousels.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>AI assistant guardrails</h3>
+      <p>Helpful first, honest always.</p>
+      <ul>
+        <li><b>Voice:</b> plainspoken and warm; answers the fit/care question, then stops.</li>
+        <li><b>Always:</b> cite real policy — "free shipping &amp; free returns," true sizing, resole service.</li>
+        <li><b>Never:</b> invent stock, fabricate discounts, or pressure ("selling out fast!").</li>
+        <li><b>Escalate</b> sizing disputes and order issues to a human; don't guess on money.</li>
+        <li><b>No emoji-cowboy</b> shtick, no exclamation stacking, no fake urgency.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span class="nana">Prepared by <b>Brand Nana</b> · confidential</span><span>08</span></div>
+</section>
+
+<!-- 9 · METHODOLOGY & PROVENANCE -->
+<section class="page" style="background:var(--black);color:var(--bone)">
+  <div class="eyebrow" style="color:#cabfa9">Section 07</div>
+  <h1 style="font-size:26pt;margin-top:6px;color:var(--bone)">Methodology &amp; provenance</h1>
+  <p class="lede" style="margin-top:8px;color:#cabfa9;font-family:var(--serif)">Every claim in this book is grounded in evidence harvested from Tecovas' own surfaces and frozen on a fixed date, so the deliverable is reproducible and traceable.</p>
+  <div class="counts">
+    <div class="count" style="background:#241f1a"><div class="big">1,358</div><div class="lbl" style="color:#b6aa92">Catalog products</div></div>
+    <div class="count" style="background:#241f1a"><div class="big">4</div><div class="lbl" style="color:#b6aa92">Social profiles</div></div>
+    <div class="count" style="background:#241f1a"><div class="big">22</div><div class="lbl" style="color:#b6aa92">Ad creatives</div></div>
+  </div>
+  <div class="prov">
+    <div class="row"><span class="k">Subject</span><span class="v" style="color:var(--bone)">Tecovas — DTC western boots &amp; apparel (tecovas.com, US store)</span></div>
+    <div class="row"><span class="k">Catalog</span><span class="v" style="color:var(--bone)">1,358 products crawled from PDP &amp; collection pages; prices, materials, colors, stock. A 60-row representative slice ships as catalog-tecovas.csv.</span></div>
+    <div class="row"><span class="k">Color</span><span class="v" style="color:var(--bone)">Palette unioned across sources — theme-color meta, CSS variables, vendor swatches, and vision extraction from PDP photography. CMYK + Pantone added for print.</span></div>
+    <div class="row"><span class="k">Social</span><span class="v" style="color:var(--bone)">4 public profiles (Instagram, TikTok, Facebook, Pinterest) sampled for voice &amp; imagery cues.</span></div>
+    <div class="row"><span class="k">Advertising</span><span class="v" style="color:var(--bone)">22 ad creatives sampled from the Meta Ad Library for voice and motion direction.</span></div>
+    <div class="row"><span class="k">Frozen at</span><span class="v" style="color:var(--bone)">2026-06-13 — all figures and copy reflect the brand as observed on this date.</span></div>
+  </div>
+  <div class="seal" style="border-top-color:var(--tan);color:#b6aa92">Prepared by Brand Nana. Confidential — for the named client's internal use only.</div>
+  <div class="foot" style="color:#9d917b;border-top-color:#3a342c"><span class="nana" style="color:#9d917b">Prepared by <b style="color:var(--tan)">Brand Nana</b> · confidential</span><span>09</span></div>
+</section>
+
+<script>
+  // wire the generated hero into cover + imagery (relative to this file's folder)
+  var hero = 'tecovas-lifestyle-hero.jpg';
+  document.getElementById('coverhero').style.backgroundImage = "url('"+hero+"')";
+  document.getElementById('img1').style.backgroundImage = "url('"+hero+"')";
+  document.getElementById('img2').style.backgroundImage = "url('https://i.pravatar.cc/400?img=33')";
+  document.getElementById('img3').style.backgroundImage = "url('https://i.pravatar.cc/400?img=51')";
+</script>
+</body>
+</html>

@@ -1,0 +1,381 @@
+<!doctype html>
+<!-- workbook: research-pipeline — kanban ops board for the Brand Nana research pod (deterministic, no backend). -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Archivo:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <title>Brand Nana — Research Pipeline · Active Briefs</title>
+  <script id="workbook-spec" type="application/json">
+    {
+      "id": "research-pipeline",
+      "kind": "board",
+      "title": "Research Pipeline — Active Briefs",
+      "owner": "marisol",
+      "workspace": "brand-nana",
+      "folder": "Research Queue",
+      "source": "data/briefs.json",
+      "frozen_at": "2026-06-14T00:00:00Z"
+    }
+  </script>
+  <style>
+    :root{
+      --green:#f0c040; --green-d:#d4a830; --green-dd:#b88f1f;
+      --ink:#1f1a14; --bg:#fbf4e4; --line:#e3d9bf; --line-2:#d6c9a6;
+      --ok:#4f9d6b; --ok-d:#3c7d52; --blue:#2c5fb5; --blue-d:#1e4690; --serif:"Fraunces",Georgia,"Times New Roman",serif;
+      --muted:#6b5f4e; --muted-2:#8ea69a; --card:#ffffff;
+      --warn:#e8a23d; --warn-bg:#fdf3e3; --blocked:#e0573f; --blocked-bg:#fdeae6;
+      --done:#d4a830; --done-bg:#fdf3d6;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;font:14px/1.5 Archivo,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);}
+    body{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+    h1,h2,h3,.serifish{font-family:var(--serif);letter-spacing:-.01em}
+
+    /* ---- top bar ---- */
+    .topbar{display:flex;align-items:center;gap:14px;padding:16px 24px;border-bottom:1px solid var(--line);background:#fff;flex:0 0 auto}
+    .mark{display:inline-flex;align-items:center;gap:10px;font-weight:750;letter-spacing:-.02em;font-size:16px}
+    .mark .glyph{width:28px;height:28px;border-radius:3px;background:var(--green);color:var(--ink);display:flex;align-items:center;justify-content:center;font-weight:850;font-size:14px}
+    .crumb{color:var(--muted-2);font-size:13px}
+    .crumb b{color:var(--ink);font-weight:650}
+    .topbar .spacer{flex:1}
+    .seg{display:flex;border:1px solid var(--line-2);border-radius:3px;overflow:hidden;font-size:12.5px}
+    .seg button{border:0;background:#fff;padding:6px 12px;font:inherit;color:var(--muted);cursor:pointer;border-right:1px solid var(--line)}
+    .seg button:last-child{border-right:0}
+    .seg button.on{background:var(--green);color:var(--ink);font-weight:650}
+    .who{display:flex;align-items:center}
+    .who img{width:28px;height:28px;border-radius:50%;border:2px solid #fff;margin-left:-8px;box-shadow:0 0 0 1px var(--line-2)}
+    .who img:first-child{margin-left:0}
+
+    /* ---- layout ---- */
+    .wrap{display:flex;flex:1;min-height:0}
+    .board{flex:1;display:flex;gap:14px;padding:18px 20px;overflow-x:auto;overflow-y:hidden;align-items:stretch}
+
+    .col{flex:0 0 286px;display:flex;flex-direction:column;min-height:0;background:#f4f8f5;border:1px solid var(--line);border-radius:4px}
+    .col-h{display:flex;align-items:center;gap:8px;padding:12px 14px 10px}
+    .col-h .name{font-weight:700;font-size:13px;letter-spacing:.01em}
+    .col-h .dot{width:8px;height:8px;border-radius:50%}
+    .col-h .count{margin-left:auto;font-size:11.5px;font-weight:650;color:var(--muted);background:#fff;border:1px solid var(--line);border-radius:20px;padding:1px 8px}
+    .col-h .wip{font-size:10.5px;color:var(--muted-2)}
+    .cards{flex:1;overflow-y:auto;padding:2px 10px 12px;display:flex;flex-direction:column;gap:10px}
+    .cards::-webkit-scrollbar{width:8px}
+    .cards::-webkit-scrollbar-thumb{background:#e3d9bf;border-radius:8px}
+
+    .col[data-k="intake"]   .dot{background:#9aa7a0}
+    .col[data-k="harvest"]  .dot{background:#5ec6e8}
+    .col[data-k="substrate"].dot{background:#a279e6}
+    .col[data-k="analysis"] .dot{background:var(--warn)}
+    .col[data-k="deck"]     .dot{background:#e870b8}
+    .col[data-k="delivered"].dot{background:var(--done)}
+
+    /* ---- card ---- */
+    .card{background:var(--card);border:1px solid var(--line-2);border-radius:4px;padding:12px 12px 11px;cursor:grab;position:relative;transition:box-shadow .14s,transform .14s,border-color .14s;user-select:none}
+    .card:hover{box-shadow:0 6px 20px rgba(12,15,13,.08);transform:translateY(-1px);border-color:#e3d9bf}
+    .card:active{cursor:grabbing}
+    .card.dragging{opacity:.5}
+    .card .grip{position:absolute;top:10px;right:9px;color:#c4d3cb;letter-spacing:1px;font-size:11px;line-height:1}
+    .card:hover .grip{color:#b3a481}
+
+    .card .domain{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13.5px;letter-spacing:-.01em;padding-right:18px}
+    .card .domain img{width:18px;height:18px;border-radius:5px;background:#f0f4f1;object-fit:contain;flex:0 0 auto}
+    .card .domain .vs{color:var(--muted-2);font-weight:600;font-size:11px;margin:0 1px}
+
+    .deliv{display:inline-flex;align-items:center;gap:5px;margin-top:9px;font-size:11px;font-weight:600;color:var(--green-d);background:var(--done-bg);border:1px solid #ecd89a;border-radius:7px;padding:2px 8px}
+    .deliv.cmp{color:#7c4fc4;background:#f3edfd;border-color:#e0d2f7}
+    .deliv.ind{color:#b7548e;background:#fcedf6;border-color:#f3d6e8}
+
+    .counts{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:10px;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+    .counts b{color:var(--ink);font-weight:650}
+    .counts .sep{color:#cbd8d1}
+
+    .prog{margin-top:10px}
+    .prog .lbl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted-2);margin-bottom:4px}
+    .ptrack{height:6px;background:#e8efeb;border-radius:6px;overflow:hidden}
+    .pfill{height:6px;background:linear-gradient(90deg,var(--green),var(--green-d));border-radius:6px}
+
+    .foot{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid var(--line)}
+    .foot img{width:24px;height:24px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px var(--line-2)}
+    .foot .meta{display:flex;flex-direction:column;line-height:1.25}
+    .foot .meta .nm{font-size:11.5px;font-weight:650}
+    .foot .meta .sub{font-size:10.5px;color:var(--muted-2)}
+    .chip{margin-left:auto;font-size:10.5px;font-weight:700;border-radius:20px;padding:2px 9px;letter-spacing:.02em;white-space:nowrap}
+    .chip.intake{color:#52605a;background:#f1ead6;border:1px solid #dde6e1}
+    .chip.harvest{color:#1d7da0;background:#e6f6fc;border:1px solid #c7ebf6}
+    .chip.substrate{color:#6a3fc0;background:#f0e9fd;border:1px solid #ddccf7}
+    .chip.analysis{color:#a76d18;background:var(--warn-bg);border:1px solid #f3e0bf}
+    .chip.deck{color:#b03f93;background:#fbe9f4;border:1px solid #f3cfe6}
+    .chip.delivered{color:#0f7a48;background:var(--done-bg);border:1px solid #f0dd9e}
+
+    .gate{display:inline-flex;align-items:center;gap:4px;margin-top:9px;font-size:10.5px;font-weight:600;color:#0f7a48;background:var(--done-bg);border:1px solid #f0dd9e;border-radius:7px;padding:2px 8px}
+    .gate.amber{color:#a76d18;background:var(--warn-bg);border-color:#f3e0bf}
+
+    /* ---- right rail ---- */
+    .rail{flex:0 0 282px;border-left:1px solid var(--line);background:#fff;overflow-y:auto;padding:18px 18px 24px}
+    .rail h3{font-size:11px;font-weight:750;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);margin:0 0 12px}
+    .rail h3:not(:first-child){margin-top:26px}
+    .metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .metric{border:1px solid var(--line);border-radius:4px;padding:12px 13px;background:#fbf4e4}
+    .metric.full{grid-column:1 / -1}
+    .metric .n{font-size:26px;font-weight:760;letter-spacing:-.02em;line-height:1}
+    .metric .n.green{color:var(--green-d)}
+    .metric .n.red{color:var(--blocked)}
+    .metric .l{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.3}
+    .alert{display:flex;gap:10px;align-items:flex-start;background:var(--blocked-bg);border:1px solid #f5cabf;border-radius:4px;padding:11px 12px}
+    .alert .ic{width:20px;height:20px;border-radius:50%;background:var(--blocked);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:0 0 auto;margin-top:1px}
+    .alert .t{font-size:12px}
+    .alert .t b{font-weight:700}
+    .alert .t .s{display:block;color:#9a4334;font-size:11px;margin-top:3px}
+    .retry{margin-top:8px;font-size:10.5px;font-weight:650;color:#0c5e88;background:#e6f6fc;border:1px solid #c7ebf6;border-radius:7px;padding:2px 8px;display:inline-block}
+
+    .stage-bar{display:flex;flex-direction:column;gap:9px;margin-top:2px}
+    .srow{display:flex;align-items:center;gap:9px;font-size:12px}
+    .srow .sd{width:8px;height:8px;border-radius:50%}
+    .srow .sn{color:var(--muted);flex:1}
+    .srow .sc{font-weight:700;font-variant-numeric:tabular-nums}
+    .srow .st{flex:1;height:6px;background:#f1ead6;border-radius:6px;overflow:hidden}
+    .srow .stf{height:6px;border-radius:6px}
+
+    .feed{display:flex;flex-direction:column;gap:0}
+    .ev{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+    .ev:last-child{border-bottom:0}
+    .ev img{width:22px;height:22px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 1px var(--line-2)}
+    .ev .x{font-size:11.5px;line-height:1.4;color:var(--muted)}
+    .ev .x b{color:var(--ink);font-weight:650}
+    .ev .x .tm{display:block;color:var(--muted-2);font-size:10.5px;margin-top:1px}
+
+    .ghost{border:1.5px dashed #d6c9a6;border-radius:4px;background:#f6efda;height:60px}
+    .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#efe6cd;font-size:12.5px;padding:9px 16px;border-radius:3px;opacity:0;transition:.22s;pointer-events:none;z-index:50}
+    .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+    .toast b{color:var(--green)}
+  
+    /* Brand Nana mascot badge (real banana-man sprite, top frame cropped) */
+    .bn-mascot{width:38px;height:38px;flex:none;border-radius:3px;background:#f0c040 url("../files/assets/banana-man.png") no-repeat;background-size:114px auto;background-position:7px -2px;image-rendering:pixelated;border:1.5px solid #1f1a14;box-shadow:2px 2px 0 rgba(31,26,20,.18)}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="mark"><span class="bn-mascot"></span> Brand&nbsp;Nana</div>
+    <span class="crumb">Research Queue&nbsp; / &nbsp;<b>Research Pipeline — Active Briefs</b></span>
+    <div class="spacer"></div>
+    <div class="seg">
+      <button class="on">Board</button>
+      <button>Table</button>
+      <button>Timeline</button>
+    </div>
+    <div class="who" title="Research pod">
+      <img src="https://i.pravatar.cc/64?img=5"  alt="Marisol Vega">
+      <img src="https://i.pravatar.cc/64?img=22" alt="Devin Okoye">
+      <img src="https://i.pravatar.cc/64?img=45" alt="Priya Nandakumar">
+      <img src="https://i.pravatar.cc/64?img=68" alt="Theo Brandt">
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="board" id="board"></div>
+
+    <aside class="rail">
+      <h3>Pipeline</h3>
+      <div class="metrics">
+        <div class="metric"><div class="n green">5</div><div class="l">active briefs in flight</div></div>
+        <div class="metric"><div class="n">2.4<span style="font-size:15px;font-weight:650">d</span></div><div class="l">median cycle time<br>intake → delivered</div></div>
+        <div class="metric"><div class="n red">1</div><div class="l">blocked</div></div>
+        <div class="metric"><div class="n">94<span style="font-size:15px;font-weight:650">%</span></div><div class="l">provenance gate pass</div></div>
+        <div class="metric full">
+          <div class="alert">
+            <div class="ic">!</div>
+            <div class="t"><b>1 blocked</b> — R2 mirror retry
+              <span class="s">huckberry.com catalog crawl stalled on object-store mirror; auto-retry queued.</span>
+              <span class="retry">↻ retry in 6 min · attempt 3/5</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Stage load</h3>
+      <div class="stage-bar" id="stagebar"></div>
+
+      <h3>Recent activity</h3>
+      <div class="feed" id="feed"></div>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+  // -------- deterministic seed data (the shipped artifact bundles a real runtime; ----
+  // -------- the seed fixture stays offline + stable so every demo recording matches). -
+  const team = {
+    marisol: {n:"Marisol Vega",   r:"Research lead",     a:"https://i.pravatar.cc/64?img=5"},
+    devin:   {n:"Devin Okoye",    r:"Harvest engineer",  a:"https://i.pravatar.cc/64?img=22"},
+    priya:   {n:"Priya Nandakumar",r:"Brand analyst",    a:"https://i.pravatar.cc/64?img=45"},
+    theo:    {n:"Theo Brandt",    r:"Deck designer",     a:"https://i.pravatar.cc/64?img=68"},
+  };
+  const logo = d => `https://logo.clearbit.com/${d}?size=36`;
+
+  const columns = [
+    {k:"intake",    name:"Intake",         wip:"WIP 3"},
+    {k:"harvest",   name:"Harvesting",     wip:"WIP 2"},
+    {k:"substrate", name:"Substrate Build",wip:"WIP 2"},
+    {k:"analysis",  name:"Analysis",       wip:"WIP 2"},
+    {k:"deck",      name:"Deck",           wip:"WIP 2"},
+    {k:"delivered", name:"Delivered",      wip:""},
+  ];
+
+  // grounded-data counts only surface once a brief is past Harvesting.
+  const cards = [
+    {
+      col:"intake", domains:["on-running.com"], deliv:"Brand Book", dtype:"brand",
+      owner:"marisol", sub:"opened 4h ago",
+      note:"awaiting scope — sign-off on competitor set + ad-channel depth"
+    },
+    {
+      col:"harvest", domains:[], label:"State of men's grooming — ad hooks",
+      deliv:"Industry Deck", dtype:"ind",
+      owner:"devin", sub:"crawling 14 sources",
+      note:"hook taxonomy + paid-social scrape across 14 grooming brands"
+    },
+    {
+      col:"substrate", domains:["huckberry.com"], deliv:"Brand Book", dtype:"brand",
+      owner:"devin", sub:"crawl 64% · ETA 38m",
+      progress:64, progLabel:"catalog crawl",
+      counts:{products:"—", socials:4, ads:11},
+      blocked:true
+    },
+    {
+      col:"analysis", domains:["allbirds.com","rothys.com"], deliv:"Comparison Deck", dtype:"cmp",
+      owner:"priya", sub:"clustering positioning",
+      counts:{products:"612 / 388", socials:9, ads:41},
+      gate:"amber", gateText:"provenance gate — 2 sources pending citation"
+    },
+    {
+      col:"delivered", domains:["tecovas.com"], deliv:"Brand Book", dtype:"brand",
+      owner:"theo", sub:"shipped Jun 12",
+      counts:{products:"1,358", socials:4, ads:22},
+      gate:"green", gateText:"provenance gate green"
+    },
+  ];
+
+  const stageLoad = [
+    {k:"intake",    name:"Intake",          c:1, w:20,  col:"#9aa7a0"},
+    {k:"harvest",   name:"Harvesting",      c:1, w:20,  col:"#5ec6e8"},
+    {k:"substrate", name:"Substrate Build", c:1, w:20,  col:"#a279e6"},
+    {k:"analysis",  name:"Analysis",        c:1, w:20,  col:"#e8a23d"},
+    {k:"deck",      name:"Deck",            c:0, w:4,   col:"#e870b8"},
+    {k:"delivered", name:"Delivered",       c:1, w:20,  col:"#d4a830"},
+  ];
+
+  const feed = [
+    {who:"theo",    x:"<b>Theo</b> delivered <b>tecovas.com</b> brand book — provenance gate green ✓", tm:"Jun 12 · 4:18 PM"},
+    {who:"priya",   x:"<b>Priya</b> moved <b>allbirds × rothys</b> to Analysis", tm:"Jun 13 · 11:02 AM"},
+    {who:"devin",   x:"<b>Devin</b> flagged <b>huckberry.com</b> — R2 mirror retry queued", tm:"Jun 13 · 9:47 AM"},
+    {who:"devin",   x:"<b>Devin</b> started harvest on <b>men's grooming ad hooks</b>", tm:"Jun 13 · 8:30 AM"},
+    {who:"marisol", x:"<b>Marisol</b> intook <b>on-running.com</b> — awaiting scope", tm:"Jun 14 · 7:55 AM"},
+  ];
+
+  // -------- render board --------
+  const board = document.getElementById("board");
+  columns.forEach(c=>{
+    const list = cards.filter(x=>x.col===c.k);
+    const el = document.createElement("div");
+    el.className="col"; el.dataset.k=c.k;
+    el.innerHTML = `
+      <div class="col-h">
+        <span class="dot"></span>
+        <span class="name">${c.name}</span>
+        ${c.wip?`<span class="wip">${c.wip}</span>`:""}
+        <span class="count">${list.length}</span>
+      </div>
+      <div class="cards" data-col="${c.k}"></div>`;
+    board.appendChild(el);
+    const cont = el.querySelector(".cards");
+    list.forEach(card=>cont.appendChild(renderCard(card)));
+  });
+
+  function renderCard(c){
+    const o = team[c.owner];
+    const title = c.domains && c.domains.length
+      ? c.domains.map((d,i)=>`${i?`<span class="vs">vs</span>`:""}<img src="${logo(d)}" alt="" onerror="this.style.display='none'">${d}`).join("")
+      : c.label;
+    const delivClass = c.dtype==="cmp"?"cmp":c.dtype==="ind"?"ind":"";
+    const el = document.createElement("div");
+    el.className="card"; el.draggable=true;
+    let html = `<span class="grip">⋮⋮</span>
+      <div class="domain">${title}</div>
+      <span class="deliv ${delivClass}">◆ ${c.deliv}</span>`;
+    if(c.note) html += `<div class="counts"><span style="color:var(--muted)">${c.note}</span></div>`;
+    if(c.counts){
+      html += `<div class="counts">`
+        + (c.counts.products!=null?`products: <b>${c.counts.products}</b>`:"")
+        + ` <span class="sep">·</span> socials: <b>${c.counts.socials}</b>`
+        + ` <span class="sep">·</span> ads: <b>${c.counts.ads}</b></div>`;
+    }
+    if(c.progress!=null){
+      html += `<div class="prog"><div class="lbl"><span>${c.progLabel}</span><span>${c.progress}%</span></div>
+        <div class="ptrack"><div class="pfill" style="width:${c.progress}%"></div></div></div>`;
+    }
+    if(c.gate){
+      html += `<span class="gate ${c.gate==="amber"?"amber":""}">${c.gate==="green"?"✓":"◷"} ${c.gateText}</span>`;
+    }
+    html += `<div class="foot">
+        <img src="${o.a}" alt="${o.n}">
+        <div class="meta"><span class="nm">${o.n}</span><span class="sub">${c.sub}</span></div>
+        <span class="chip ${c.col}">${columns.find(x=>x.k===c.col).name}</span>
+      </div>`;
+    el.innerHTML = html;
+    return el;
+  }
+
+  // -------- stage load rail --------
+  document.getElementById("stagebar").innerHTML = stageLoad.map(s=>`
+    <div class="srow">
+      <span class="sd" style="background:${s.col}"></span>
+      <span class="sn">${s.name}</span>
+      <span class="st"><span class="stf" style="width:${s.w}%;background:${s.col}"></span></span>
+      <span class="sc">${s.c}</span>
+    </div>`).join("");
+
+  // -------- activity feed --------
+  document.getElementById("feed").innerHTML = feed.map(e=>`
+    <div class="ev"><img src="${team[e.who].a}" alt="">
+      <div class="x">${e.x}<span class="tm">${e.tm}</span></div></div>`).join("");
+
+  // -------- drag affordance (deterministic; reorders within the in-memory board only) ----
+  const toast = document.getElementById("toast");
+  let dragEl=null;
+  board.addEventListener("dragstart",e=>{
+    const c=e.target.closest(".card"); if(!c)return;
+    dragEl=c; c.classList.add("dragging");
+  });
+  board.addEventListener("dragend",e=>{
+    if(dragEl){dragEl.classList.remove("dragging");dragEl=null;}
+    document.querySelectorAll(".ghost").forEach(g=>g.remove());
+  });
+  board.addEventListener("dragover",e=>{
+    e.preventDefault();
+    const cont=e.target.closest(".cards"); if(!cont||!dragEl)return;
+    const after=[...cont.querySelectorAll(".card:not(.dragging)")].find(card=>{
+      const r=card.getBoundingClientRect(); return e.clientY < r.top + r.height/2;
+    });
+    after?cont.insertBefore(dragEl,after):cont.appendChild(dragEl);
+  });
+  board.addEventListener("drop",e=>{
+    e.preventDefault();
+    const cont=e.target.closest(".cards"); if(!cont||!dragEl)return;
+    const k=cont.dataset.col;
+    const name=columns.find(x=>x.k===k).name;
+    // keep chip + count badges consistent after a move
+    const chip=dragEl.querySelector(".chip");
+    chip.className="chip "+k; chip.textContent=name;
+    dragEl.dataset.col=k;
+    columns.forEach(col=>{
+      const c=document.querySelector(`.cards[data-col="${col.k}"]`).children.length;
+      document.querySelector(`.col[data-k="${col.k}"] .count`).textContent=c;
+    });
+    showToast(`Moved to <b>${name}</b> · provisional (commit on sync)`);
+  });
+  function showToast(msg){toast.innerHTML=msg;toast.classList.add("on");clearTimeout(showToast._t);showToast._t=setTimeout(()=>toast.classList.remove("on"),2200);}
+  </script>
+</body>
+</html>

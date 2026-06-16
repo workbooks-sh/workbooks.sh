@@ -1,0 +1,448 @@
+<!doctype html>
+<!-- workbook: tecovas-brand-book — a Brand Nana deliverable. Single-file, offline, deterministic. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tecovas — Brand Book · Brand Nana</title>
+  <script id="workbook-spec" type="application/json">
+    {
+      "id": "tecovas-brand-book",
+      "kind": "landing",
+      "title": "Tecovas — Brand Book",
+      "owner": "brand-nana",
+      "workspace": "brand-nana",
+      "folder": "Brand Books",
+      "subject": "tecovas.com",
+      "researched_by": "Brand Nana",
+      "grounded_in": { "catalog_products": 1358, "social_profiles": 4, "ad_creatives": 22 },
+      "frozen_at": "2026-06-13T00:00:00Z"
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Display serif (Tiempos-adjacent) + grotesque sans (Founders-adjacent), fetched not bundled. -->
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Archivo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ---- Tecovas brand tokens (the subject's OWN palette — NOT Brand Nana green) ---- */
+    :root{
+      --tan:#C8924A;        /* Saddle Tan — primary */
+      --tan-d:#A6753A;      /* darkened tan for text-on-bone contrast */
+      --black:#1A1714;      /* Boot Black */
+      --bone:#F4EEE2;       /* Bone */
+      --bone-d:#E7DECB;
+      --cactus:#5B6E4F;     /* Cactus */
+      --clay:#A6543C;       /* Clay */
+      --sky:#8FB3C9;        /* Sky */
+      --line:#D9CEB8;
+      --muted:#6B5F4E;
+      --serif:"Fraunces",Georgia,"Times New Roman",serif;
+      --sans:"Archivo",system-ui,-apple-system,sans-serif;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{font:16px/1.65 var(--sans);color:var(--black);background:var(--bone);margin:0;-webkit-font-smoothing:antialiased}
+    a{color:inherit}
+    h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.01em;margin:0}
+    section{padding:84px 7vw;border-bottom:1px solid var(--line)}
+    .eyebrow{font:600 12px/1 var(--sans);letter-spacing:.22em;text-transform:uppercase;color:var(--tan-d)}
+    .sec-num{font-family:var(--serif);font-size:14px;color:var(--muted);font-style:italic}
+    .lede{font-size:18px;color:var(--muted);max-width:62ch;line-height:1.6}
+    .grid{display:grid;gap:18px}
+
+    /* ---- Sticky chrome (brand palette) ---- */
+    nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+        padding:14px 7vw;background:rgba(26,23,20,.92);backdrop-filter:blur(10px);color:var(--bone)}
+    nav .wm{font-family:var(--serif);font-weight:700;font-size:20px;letter-spacing:.02em;color:var(--bone)}
+    nav .wm b{color:var(--tan)}
+    nav .links{display:flex;gap:22px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#cabfa9;flex-wrap:wrap}
+    nav .links a:hover{color:var(--tan)}
+    .nana{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9d917b}
+    .nana .dot{width:7px;height:7px;border-radius:50%;background:var(--tan)}
+
+    /* ---- 1 · Cover ---- */
+    .cover{min-height:88vh;display:flex;flex-direction:column;justify-content:center;background:var(--black);color:var(--bone);
+           position:relative;overflow:hidden;border-bottom:6px solid var(--tan)}
+    .cover .ridge{position:absolute;inset:0;opacity:.10;background:
+      repeating-linear-gradient(90deg,transparent 0 38px,var(--tan) 38px 39px);pointer-events:none}
+    .cover .inner{position:relative;max-width:1100px}
+    .cover .wordmark{font-family:var(--serif);font-weight:700;font-size:clamp(60px,13vw,168px);line-height:.92;
+                     letter-spacing:.02em;color:var(--bone)}
+    .cover .wordmark span{color:var(--tan)}
+    .cover .tag{font-family:var(--serif);font-style:italic;font-size:clamp(22px,3.4vw,38px);color:var(--tan);margin-top:18px}
+    .cover .meta{margin-top:46px;display:flex;gap:46px;flex-wrap:wrap;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#b6aa92}
+    .cover .meta b{display:block;font-family:var(--serif);font-style:normal;text-transform:none;letter-spacing:0;font-size:18px;color:var(--bone);margin-top:4px}
+
+    /* ---- 2 · Logo system ---- */
+    .logo-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:30px}
+    .lcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:34px;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:200px;position:relative}
+    .lcard.dark{background:var(--black)}
+    .lcard.tan{background:var(--tan)}
+    .lcard .cap{position:absolute;top:12px;left:16px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    .lcard.dark .cap,.lcard.tan .cap{color:rgba(255,255,255,.7)}
+    .lw{font-family:var(--serif);font-weight:700;font-size:42px;letter-spacing:.02em}
+    .lw.b{color:var(--black)} .lw.bone{color:var(--bone)} .lw.onTan{color:var(--black)}
+    .mono{width:84px;height:84px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+          font-family:var(--serif);font-weight:700;font-size:46px}
+    .mono.fill{background:var(--tan);color:var(--black)}
+    .mono.line{border:3px solid var(--bone);color:var(--bone)}
+    .clearspace{position:relative;background:#fff;border:1px solid var(--line);border-radius:14px;padding:50px;margin-top:18px;text-align:center}
+    .cs-box{display:inline-block;position:relative;padding:38px;outline:2px dashed var(--tan);outline-offset:0}
+    .cs-box .lw{font-size:38px}
+    .cs-note{font-size:13px;color:var(--muted);margin-top:14px}
+    .minsize{display:flex;align-items:flex-end;gap:24px;margin-top:18px;flex-wrap:wrap}
+    .minsize .chip{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 22px;text-align:center}
+    .minsize .lw24{font-family:var(--serif);font-weight:700;font-size:24px}
+    .dd{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-top:26px}
+    .dd .item{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;text-align:center}
+    .dd .demo{height:60px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-weight:700;font-size:26px;color:var(--black);margin-bottom:12px}
+    .dd .x{transform:scaleX(1.7)} /* stretched */
+    .dd .x2{color:var(--clay)}    /* recolored */
+    .dd .x3{text-shadow:3px 3px 0 rgba(0,0,0,.35)} /* shadow */
+    .dd .verdict{font-size:13px;font-weight:600}
+    .dd .verdict.no{color:var(--clay)} .dd .verdict.ok{color:var(--cactus)}
+    .dd .why{font-size:12px;color:var(--muted);margin-top:3px}
+
+    /* ---- 3 · Color ---- */
+    .swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:30px}
+    .sw{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
+    .sw .chip{height:120px;display:flex;align-items:flex-end;padding:12px;font-size:12px;letter-spacing:.05em}
+    .sw .body{padding:14px 16px}
+    .sw .nm{font-family:var(--serif);font-weight:600;font-size:18px}
+    .sw .hex{font-family:var(--sans);font-size:13px;color:var(--muted);letter-spacing:.04em}
+    .sw .use{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.5}
+    .sw .pair{display:inline-block;margin-top:10px;font-size:12px;padding:3px 8px;border-radius:6px;font-weight:600}
+    .ratios{display:flex;height:38px;border-radius:9px;overflow:hidden;margin-top:30px;border:1px solid var(--line)}
+    .ratios span{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+    .ratio-key{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--muted)}
+    .ratio-key b{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+
+    /* ---- 4 · Typography ---- */
+    .type-row{border-bottom:1px solid var(--line);padding:22px 0;display:grid;grid-template-columns:120px 1fr;gap:20px;align-items:baseline}
+    .type-row .lab{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .type-row .lab small{display:block;text-transform:none;letter-spacing:0;margin-top:4px}
+    .t-h1{font-family:var(--serif);font-weight:700;font-size:52px;line-height:1.04;letter-spacing:-.02em}
+    .t-h2{font-family:var(--serif);font-weight:600;font-size:32px;line-height:1.1}
+    .t-body{font-family:var(--sans);font-size:17px;line-height:1.65;max-width:60ch}
+    .t-cap{font-family:var(--sans);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+    .specimen{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:28px}
+    .specimen .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px}
+    .specimen .card .big{font-family:var(--serif);font-weight:700;font-size:90px;line-height:.9;color:var(--tan)}
+    .specimen .card .nm{font-family:var(--serif);font-size:20px;margin-top:8px}
+    .specimen .card .det{font-size:13px;color:var(--muted);margin-top:6px}
+    .specimen .card .row{font-family:var(--sans);margin-top:14px;font-size:14px;color:var(--muted)}
+
+    /* ---- 5 · Voice ---- */
+    .voice-pairs{display:grid;gap:16px;margin-top:30px}
+    .vp{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
+    .vp .col{padding:22px 24px}
+    .vp .col.do{background:#fff} .vp .col.dont{background:var(--bone-d);border-left:1px solid var(--line)}
+    .vp .tag{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px}
+    .vp .do .tag{color:var(--cactus)} .vp .dont .tag{color:var(--clay)}
+    .vp .quote{font-family:var(--serif);font-size:19px;line-height:1.45}
+    .vp .dont .quote{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(166,84,60,.5)}
+    .voice-principles{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+    .voice-principles span{background:var(--black);color:var(--bone);font-family:var(--serif);font-style:italic;font-size:15px;padding:8px 16px;border-radius:30px}
+
+    /* ---- 6 · Imagery ---- */
+    .imgs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:30px}
+    .shot{border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#fff}
+    .shot .ph{height:300px;position:relative;background-size:cover;background-position:center;display:flex;align-items:flex-end;
+              filter:saturate(1.02) contrast(1.02)}
+    .shot .ph::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(26,23,20,.55),transparent 55%)}
+    .shot .lbl{position:relative;color:var(--bone);padding:14px 16px;font-size:13px;letter-spacing:.06em;z-index:2}
+    .shot .lbl b{display:block;font-family:var(--serif);font-size:17px;letter-spacing:0}
+    .shot .notes{padding:14px 16px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
+    .art-notes{display:flex;gap:14px;flex-wrap:wrap;margin-top:20px}
+    .art-notes span{border:1px solid var(--line);background:#fff;border-radius:30px;padding:7px 15px;font-size:13px;color:var(--black)}
+    .art-notes span b{color:var(--tan-d)}
+
+    /* ---- 7 · Motion + AI ---- */
+    .panels{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:30px}
+    .panel{background:var(--black);color:var(--bone);border-radius:16px;padding:28px}
+    .panel h3{color:var(--bone);font-size:22px;margin-bottom:6px}
+    .panel h3 + p{color:#b6aa92;font-size:14px;margin:0 0 18px}
+    .panel ul{list-style:none;padding:0;margin:0}
+    .panel li{padding:11px 0 11px 26px;position:relative;border-top:1px solid #2c2620;font-size:14px;line-height:1.55;color:#e4dccb}
+    .panel li:first-child{border-top:0}
+    .panel li::before{content:"";position:absolute;left:4px;top:18px;width:8px;height:8px;border-radius:50%;background:var(--tan)}
+    .panel li b{color:var(--tan)}
+    .hover-demo{display:inline-block;margin-top:6px;background:var(--tan);color:var(--black);font-weight:600;
+                padding:10px 22px;border-radius:10px;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease}
+    .hover-demo:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.45)}
+    .chatbot{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;margin-top:18px}
+    .chatbot .bubble{max-width:80%;padding:11px 15px;border-radius:14px;font-size:14px;margin:8px 0;line-height:1.5}
+    .chatbot .bot{background:var(--bone-d);border-bottom-left-radius:4px}
+    .chatbot .usr{background:var(--black);color:var(--bone);margin-left:auto;border-bottom-right-radius:4px}
+    .chatbot .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+
+    footer{background:var(--black);color:#cabfa9;padding:46px 7vw;text-align:center;font-size:14px;border:0}
+    footer .wm{font-family:var(--serif);font-weight:700;font-size:26px;color:var(--bone);letter-spacing:.02em}
+    footer .wm span{color:var(--tan)}
+    footer .trace{margin-top:14px;color:#9d917b;max-width:64ch;margin-left:auto;margin-right:auto;line-height:1.6}
+    footer .nana{justify-content:center;margin-top:18px}
+
+    @media (max-width:760px){
+      .logo-row,.specimen,.imgs,.panels,.vp{grid-template-columns:1fr}
+      .type-row{grid-template-columns:1fr}
+      nav .links{display:none}
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="wm">TEC<b>O</b>VAS</div>
+    <div class="links">
+      <a href="#cover">Cover</a>
+      <a href="#logo">Logo</a>
+      <a href="#color">Color</a>
+      <a href="#type">Type</a>
+      <a href="#voice">Voice</a>
+      <a href="#imagery">Imagery</a>
+      <a href="#motion">Motion + AI</a>
+    </div>
+    <div class="nana"><span class="dot"></span> Brand Nana</div>
+  </nav>
+
+  <!-- 1 · COVER -->
+  <header class="cover" id="cover">
+    <div class="ridge"></div>
+    <div class="inner" style="padding:0 7vw">
+      <div class="eyebrow" style="color:var(--tan)">Brand Book · Volume One</div>
+      <div class="wordmark">TEC<span>O</span>VAS</div>
+      <div class="tag">The Modern Western</div>
+      <div class="meta">
+        <div>Compiled <b>June 13, 2026</b></div>
+        <div>Subject <b>tecovas.com</b></div>
+        <div>Category <b>Western boots &amp; apparel</b></div>
+        <div>Researched by <b>Brand Nana</b></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 2 · LOGO SYSTEM -->
+  <section id="logo">
+    <div class="eyebrow">Section 02</div>
+    <h2 style="font-size:38px;margin-top:8px">Logo system</h2>
+    <p class="lede" style="margin-top:14px">One wordmark, set in the display serif at a confident weight. A circular monogram covers small spaces — favicons, boot-box foil, stitched labels. Everything reduces to a single ink color before it earns a second.</p>
+
+    <div class="logo-row">
+      <div class="lcard"><span class="cap">Primary wordmark</span><span class="lw b">TECOVAS</span></div>
+      <div class="lcard"><span class="cap">Monogram “T”</span><span class="mono fill">T</span></div>
+      <div class="lcard dark"><span class="cap">Reversed / monochrome</span><span class="lw bone">TECOVAS</span></div>
+      <div class="lcard tan"><span class="cap">On Saddle Tan</span><span class="lw onTan">TECOVAS</span></div>
+    </div>
+
+    <div class="clearspace">
+      <span class="cap" style="position:absolute;top:14px;left:18px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Clear space = cap-height (1×) on all sides</span>
+      <div class="cs-box"><span class="lw b">TECOVAS</span></div>
+      <div class="cs-note">Keep a margin equal to the wordmark’s cap-height clear of all other elements, type, and the edge of any surface.</div>
+    </div>
+
+    <div class="minsize">
+      <div class="chip"><div class="lw24">TECOVAS</div><div class="cs-note" style="margin-top:8px">Minimum size 24px / 0.25&Prime; — below this the serifs break up in print and on screen.</div></div>
+    </div>
+
+    <h3 style="font-size:22px;margin-top:40px">Do &amp; don’t</h3>
+    <div class="dd">
+      <div class="item"><div class="demo">TECOVAS</div><div class="verdict ok">Do — use as drawn</div><div class="why">Approved weight, color, and proportion.</div></div>
+      <div class="item"><div class="demo x">TECOVAS</div><div class="verdict no">Don’t stretch</div><div class="why">Never scale on one axis or condense.</div></div>
+      <div class="item"><div class="demo x2">TECOVAS</div><div class="verdict no">Don’t recolor</div><div class="why">Only the approved palette inks.</div></div>
+      <div class="item"><div class="demo x3">TECOVAS</div><div class="verdict no">Don’t add shadow</div><div class="why">No drop-shadows, bevels, or glow.</div></div>
+    </div>
+  </section>
+
+  <!-- 3 · COLOR -->
+  <section id="color">
+    <div class="eyebrow">Section 03</div>
+    <h2 style="font-size:38px;margin-top:8px">Color palette</h2>
+    <p class="lede" style="margin-top:14px">Earth first. Saddle Tan leads, Boot Black anchors, Bone breathes. Cactus, Clay, and Sky are accents — used sparingly, the way good leather takes a single contrast stitch.</p>
+
+    <div class="swatches">
+      <div class="sw">
+        <div class="chip" style="background:#C8924A;color:#1A1714">Primary</div>
+        <div class="body"><div class="nm">Saddle Tan</div><div class="hex">#C8924A · RGB 200 146 74</div>
+          <div class="use">Lead brand color. Wordmark accent, CTAs, foil, and large fields.</div>
+          <span class="pair" style="background:#1A1714;color:#C8924A">Boot Black on Tan — AA</span></div>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background:#1A1714;color:#F4EEE2">Anchor</div>
+        <div class="body"><div class="nm">Boot Black</div><div class="hex">#1A1714 · RGB 26 23 20</div>
+          <div class="use">Primary ink, page chrome, photography overlays, reversed lockups.</div>
+          <span class="pair" style="background:#1A1714;color:#F4EEE2">Bone on Black — AAA</span></div>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background:#F4EEE2;color:#1A1714">Surface</div>
+        <div class="body"><div class="nm">Bone</div><div class="hex">#F4EEE2 · RGB 244 238 226</div>
+          <div class="use">Default background. Warmer than white — reads like raw cotton canvas.</div>
+          <span class="pair" style="background:#F4EEE2;color:#1A1714">Black on Bone — AAA</span></div>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background:#5B6E4F;color:#F4EEE2">Accent</div>
+        <div class="body"><div class="nm">Cactus</div><div class="hex">#5B6E4F · RGB 91 110 79</div>
+          <div class="use">Positive states, “in stock,” editorial pull-quotes, seasonal apparel.</div>
+          <span class="pair" style="background:#5B6E4F;color:#F4EEE2">Bone on Cactus — AA</span></div>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background:#A6543C;color:#F4EEE2">Accent</div>
+        <div class="body"><div class="nm">Clay</div><div class="hex">#A6543C · RGB 166 84 60</div>
+          <div class="use">Sale flags, alerts, “low stock.” The only red the brand uses.</div>
+          <span class="pair" style="background:#A6543C;color:#F4EEE2">Bone on Clay — AA</span></div>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background:#8FB3C9;color:#1A1714">Accent</div>
+        <div class="body"><div class="nm">Sky</div><div class="hex">#8FB3C9 · RGB 143 179 201</div>
+          <div class="use">Big-Texas-sky backdrops, cool counterpoint in lifestyle photography.</div>
+          <span class="pair" style="background:#8FB3C9;color:#1A1714">Black on Sky — AA</span></div>
+      </div>
+    </div>
+
+    <h3 style="font-size:20px;margin-top:40px">Usage ratio</h3>
+    <div class="ratios">
+      <span style="background:#F4EEE2;color:#1A1714;flex:55">Bone 55%</span>
+      <span style="background:#1A1714;color:#F4EEE2;flex:22">Boot Black 22%</span>
+      <span style="background:#C8924A;color:#1A1714;flex:15">Saddle Tan 15%</span>
+      <span style="background:#5B6E4F;color:#F4EEE2;flex:4">Cactus</span>
+      <span style="background:#A6543C;color:#F4EEE2;flex:2">Clay</span>
+      <span style="background:#8FB3C9;color:#1A1714;flex:2">Sky</span>
+    </div>
+    <div class="ratio-key">
+      <div><b style="background:#F4EEE2;border:1px solid #d9ceb8"></b>Surface dominates — never let accents fight the leather tones.</div>
+    </div>
+  </section>
+
+  <!-- 4 · TYPOGRAPHY -->
+  <section id="type">
+    <div class="eyebrow">Section 04</div>
+    <h2 style="font-size:38px;margin-top:8px">Typography</h2>
+    <p class="lede" style="margin-top:14px">A high-contrast display serif (Tiempos in production; <em>Fraunces</em> shown here) carries headlines with quiet authority. A grotesque sans (Founders Grotesk in production; <em>Archivo</em> shown here) handles everything you actually read.</p>
+
+    <div class="specimen">
+      <div class="card"><div class="big">Aa</div><div class="nm">Tiempos Headline</div><div class="det">Display serif · weights 400–700 · used 28px and up</div><div class="row">Headlines, the wordmark, product names, pull-quotes.</div></div>
+      <div class="card"><div class="big" style="font-family:var(--sans);color:var(--black)">Aa</div><div class="nm" style="font-family:var(--sans)">Founders Grotesk</div><div class="det">Grotesque sans · weights 300–700 · body &amp; UI</div><div class="row">Body copy, navigation, PDP specs, captions, buttons.</div></div>
+    </div>
+
+    <div style="margin-top:38px">
+      <div class="type-row"><div class="lab">H1<small>52 / 1.04</small></div><div class="t-h1">Boots worth keeping. Built without the markup.</div></div>
+      <div class="type-row"><div class="lab">H2<small>32 / 1.10</small></div><div class="t-h2">Cattle-tanned leather, handmade over 200 steps.</div></div>
+      <div class="type-row"><div class="lab">Body<small>17 / 1.65</small></div><div class="t-body">The Duke is our everyday Western — a classic roper toe in bourbon calfskin, fully leather-lined and Goodyear welted so it can be resoled for a lifetime. Free shipping and free returns, because a boot has to be tried on the way you’ll actually wear it.</div></div>
+      <div class="type-row"><div class="lab">Caption<small>12 / .14em</small></div><div class="t-cap">The Duke · Bourbon · Handmade in León, Mexico</div></div>
+    </div>
+  </section>
+
+  <!-- 5 · VOICE -->
+  <section id="voice">
+    <div class="eyebrow">Section 05</div>
+    <h2 style="font-size:38px;margin-top:8px">Voice &amp; tone</h2>
+    <p class="lede" style="margin-top:14px">Plainspoken, confident, never gimmicky — heritage without costume. We talk about the boot, the leather, and the price, and we let the craft do the bragging.</p>
+    <div class="voice-principles">
+      <span>Plainspoken</span><span>Confident</span><span>Never gimmicky</span><span>Heritage without costume</span>
+    </div>
+
+    <div class="voice-pairs">
+      <div class="vp">
+        <div class="col do"><div class="tag">Do</div><div class="quote">“The Duke. A classic roper, made from cattle-tanned leather and built to be resoled for a lifetime.”</div></div>
+        <div class="col dont"><div class="tag">Don’t</div><div class="quote">“Yeehaw! 🤠 Saddle up, partner — these bad boys are FIRE and gonna sell out fast!!!”</div></div>
+      </div>
+      <div class="vp">
+        <div class="col do"><div class="tag">Do</div><div class="quote">“Free shipping and free returns. Try them on at home and send them back if the fit isn’t right.”</div></div>
+        <div class="col dont"><div class="tag">Don’t</div><div class="quote">“RISK-FREE 100% money-back guarantee — you’ve got absolutely NOTHING to lose, act now!”</div></div>
+      </div>
+      <div class="vp">
+        <div class="col do"><div class="tag">Do</div><div class="quote">“Handmade over 200 steps. We skipped the middleman, not the craftsmanship.”</div></div>
+        <div class="col dont"><div class="tag">Don’t</div><div class="quote">“Authentic genuine luxury premium handcrafted artisanal heritage Western footwear.”</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · IMAGERY -->
+  <section id="imagery">
+    <div class="eyebrow">Section 06</div>
+    <h2 style="font-size:38px;margin-top:8px">Imagery</h2>
+    <p class="lede" style="margin-top:14px">Real light, real leather, real people. Three lanes carry the brand: lived-in lifestyle, honest product detail, and the human moment of buying a first pair.</p>
+
+    <div class="imgs">
+      <div class="shot">
+        <div class="ph" style="background-image:url('https://i.pravatar.cc/400?img=12')"></div>
+        <div class="lbl"><b>Lifestyle — the ranch</b>On the fence line at golden hour.</div>
+        <div class="notes">Wide, environmental. Boots in motion and in context — dust, denim, last light.</div>
+      </div>
+      <div class="shot">
+        <div class="ph" style="background-image:url('https://i.pravatar.cc/400?img=33')"></div>
+        <div class="lbl"><b>Studio — leather detail</b>Stitch, welt, and grain, up close.</div>
+        <div class="notes">Macro on a neutral seamless. Show the 200-step craft; raking side-light for texture.</div>
+      </div>
+      <div class="shot">
+        <div class="ph" style="background-image:url('https://i.pravatar.cc/400?img=51')"></div>
+        <div class="lbl"><b>Retail — in store</b>First pair, tried on in the boot bar.</div>
+        <div class="notes">Candid, warm. The fitting moment — people, not mannequins; Bone walls, wood shelving.</div>
+      </div>
+    </div>
+
+    <div class="art-notes">
+      <span><b>Light:</b> golden hour &amp; window daylight</span>
+      <span><b>Texture:</b> natural — leather, denim, weathered wood</span>
+      <span><b>Filters:</b> none heavy — true-to-life color, gentle warmth</span>
+      <span><b>People:</b> real range of ages &amp; builds, no costume</span>
+      <span><b>Composition:</b> let the boot lead the frame</span>
+    </div>
+  </section>
+
+  <!-- 7 · MOTION + AI -->
+  <section id="motion" style="background:var(--bone-d)">
+    <div class="eyebrow">Section 07 · 2026</div>
+    <h2 style="font-size:38px;margin-top:8px">Motion &amp; AI communications</h2>
+    <p class="lede" style="margin-top:14px">As the brand moves into animated surfaces and conversational tools, the same rule holds: confident and quiet. Motion is craftsmanship, not flash. The assistant sounds like a knowledgeable boot-bar associate — never a salesman.</p>
+
+    <div class="panels">
+      <div class="panel">
+        <h3>Motion &amp; micro-interaction</h3>
+        <p>Subtle, leather-weighted, never bouncy.</p>
+        <ul>
+          <li><b>Hover lift</b> on product cards: translateY −3px, soft shadow, 180ms ease-out. Try it →</li>
+          <li><b>Scroll reveal:</b> sections fade up 16px over 400ms, once, with a 60ms stagger.</li>
+          <li><b>CTA press:</b> 60ms scale to 0.98 — a tactile “click,” no color flash.</li>
+          <li><b>Image zoom:</b> 1.0 → 1.04 over 6s on PDP detail; slow, like inspecting grain.</li>
+          <li><b>No</b> spinners-as-decoration, parallax gimmicks, or auto-playing carousels.</li>
+        </ul>
+        <span class="hover-demo">Add to bag — $295</span>
+      </div>
+
+      <div class="panel">
+        <h3>AI assistant guardrails</h3>
+        <p>Helpful first, honest always.</p>
+        <ul>
+          <li><b>Voice:</b> plainspoken and warm; answers the fit/care question, then stops.</li>
+          <li><b>Always:</b> cite real policy — “free shipping &amp; free returns,” true sizing, resole service.</li>
+          <li><b>Never:</b> invent stock, fabricate discounts, or pressure (“selling out fast!”).</li>
+          <li><b>Escalate</b> sizing disputes and order issues to a human; don’t guess on money.</li>
+          <li><b>No emoji-cowboy</b> shtick, no exclamation stacking, no fake urgency.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="chatbot">
+      <div class="label">Assistant — on-brand example</div>
+      <div class="bubble usr">Do The Duke run true to size?</div>
+      <div class="bubble bot">The Duke runs true to size for most folks — order your normal boot size, or size down a half if you’re between. They’re cattle-tanned leather, so they’ll soften and mold to your foot after a few wears. Shipping and returns are free, so it’s easy to try a size and swap if needed.</div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wm">TEC<span>O</span>VAS</div>
+    <div style="margin-top:8px;font-family:var(--serif);font-style:italic;color:var(--tan)">The Modern Western</div>
+    <div class="trace">Grounded in 1,358 catalog products, 4 social profiles, 22 ad creatives — every claim traceable.</div>
+    <div class="nana"><span class="dot"></span> Researched by Brand Nana · Compiled June 13, 2026</div>
+  </footer>
+
+  <script>
+    // Scroll-reveal (matches the documented motion spec: fade up 16px, once, staggered).
+    const io = new IntersectionObserver((es)=>{
+      es.forEach((e,i)=>{ if(e.isIntersecting){ e.target.style.transition='opacity .4s ease, transform .4s ease';
+        e.target.style.opacity=1; e.target.style.transform='none'; io.unobserve(e.target); } });
+    },{threshold:.08});
+    document.querySelectorAll('section').forEach((s)=>{ s.style.opacity=0; s.style.transform='translateY(16px)'; io.observe(s); });
+  </script>
+</body>
+</html>
