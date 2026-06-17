@@ -28,7 +28,7 @@ defmodule Workbooks.ToolkitInjectionTest do
     out = WorkKits.injection_text(["workbooks-browser"])
     assert out =~ "## Work-kits"
     # Teaches the progressive-disclosure call so the agent reads a skill on demand.
-    assert out =~ "toolkit show"
+    assert out =~ "kit show"
     assert out =~ "workbooks-browser"
     # The skill index must be listed (overview is always present).
     assert out =~ "skills:"

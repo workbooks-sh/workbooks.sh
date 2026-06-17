@@ -114,7 +114,7 @@ defmodule Workbooks.Agent do
     }},
     %{type: "function", function: %{
       name: "work",
-      description: "Run the work CLI. Args as one string. Subcommands: `var set/get/list/ref` (variable store; secrets ref-only); `toolkit list` · `toolkit show <id> [skill]` (READ a skill recipe before using a toolkit) · `toolkit search <q>` · `toolkit run <id> <task> -- <args>`. The workbook edit loop (host performs the zip IO, no shelling out): `unbundle <in.html> <dir>` extracts a workbook's embedded source tree to a dir, then after you edit the native source, `bundle <dir> <out.html>` re-packs the tree back into one self-contained .html (idempotent — replaces the old payload). e.g. args=\"toolkit show ffmpeg extract-audio\".",
+      description: "Run the work CLI. Args as one string. Subcommands: `var set/get/list/ref` (variable store; secrets ref-only); `kit list` · `kit show <id> [skill]` (READ a skill recipe before using a work-kit) · `kit search <q>` · `kit run <id> <task> -- <args>`. The workbook edit loop (host performs the zip IO, no shelling out): `unbundle <in.html> <dir>` extracts a workbook's embedded source tree to a dir, then after you edit the native source, `bundle <dir> <out.html>` re-packs the tree back into one self-contained .html (idempotent — replaces the old payload). e.g. args=\"kit show ffmpeg extract-audio\".",
       parameters: %{type: "object", properties: %{args: %{type: "string"}}, required: ["args"]}
     }},
     %{type: "function", function: %{
@@ -591,8 +591,8 @@ defmodule Workbooks.Agent do
   # Resolve an agent path AND enforce containment: the file tools (vfs_read/
   # vfs_write) must not escape the workdir. Without this an exec agent could
   # read/write any host file (`/etc/passwd`, host `*.ex`, another tenant's repo,
-  # secrets) via an absolute path or `../` — the hole that made the autopoet's
-  # "confined to the config layer" claim false. `:escape` is returned for any
+  # secrets) via an absolute path or `../` — which would break the agent's
+  # "confined to its workdir" guarantee. `:escape` is returned for any
   # path resolving outside the workdir.
   defp safe_path(workdir, rel) do
     abs = in_workdir(workdir, rel)
