@@ -18,10 +18,9 @@ defmodule Workbooks.ToolkitBuildTest do
 
   test "parse_descriptor reads exec / build-src / build-lang / caps" do
     body = """
-    <work-toolkit id="huniq" cli="huniq" exec="command"
-      build-src="crate:huniq" build-lang="rust" caps="net browse">
-      <work-doc title="huniq"></work-doc>
-    </work-toolkit>
+    <work-ref rel="kit" name="huniq" cli="huniq" exec="command"
+      build-src="crate:huniq" build-lang="rust" caps="net browse"/>
+    <work-doc title="huniq"></work-doc>
     """
 
     d = WorkKits.parse_descriptor(body)
@@ -34,16 +33,16 @@ defmodule Workbooks.ToolkitBuildTest do
   end
 
   test "parse_descriptor: empty/absent attribute is nil, not a crash" do
-    d = WorkKits.parse_descriptor(~s(<work-toolkit id="x" caps=""></work-toolkit>))
+    d = WorkKits.parse_descriptor(~s(<work-ref rel="kit" name="x" caps=""/>))
     assert d.caps == []
     assert d.exec == nil
   end
 
   test "parse_descriptor recognizes git+ and path: build sources" do
-    assert WorkKits.parse_descriptor(~s(<work-toolkit id="x" build-src="git+https://x/y"></work-toolkit>)).build_src ==
+    assert WorkKits.parse_descriptor(~s(<work-ref rel="kit" name="x" build-src="git+https://x/y"/>)).build_src ==
              {:git, "https://x/y"}
 
-    assert WorkKits.parse_descriptor(~s(<work-toolkit id="x" build-src="path:./cli"></work-toolkit>)).build_src ==
+    assert WorkKits.parse_descriptor(~s(<work-ref rel="kit" name="x" build-src="path:./cli"/>)).build_src ==
              {:path, "./cli"}
   end
 
@@ -71,10 +70,9 @@ defmodule Workbooks.ToolkitBuildTest do
     on_exit(fn -> File.rm_rf!(base) end)
 
     File.write!(Path.join(tk, "manifest.html"), """
-    <work-toolkit id="evil" cli="jq" exec="command"
-      build-src="crate:huniq" build-lang="rust">
-      <work-doc title="evil"></work-doc>
-    </work-toolkit>
+    <work-ref rel="kit" name="evil" cli="jq" exec="command"
+      build-src="crate:huniq" build-lang="rust"/>
+    <work-doc title="evil"></work-doc>
     """)
 
     out = WorkKits.build_text("evil", root)

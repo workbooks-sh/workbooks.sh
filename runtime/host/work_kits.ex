@@ -1,14 +1,14 @@
 defmodule Workbooks.WorkKits do
   @moduledoc """
   Toolkit discovery (L4, wb-11ck.46) — the agent extensibility surface. A toolkit
-  makes an agent competent with a CLI it has never seen: a single `<work-toolkit>`
+  makes an agent competent with a CLI it has never seen: a single `<work-ref rel="kit">`
   HTML element (the `manifest.html` front-door) names the CLI it wraps and indexes
   deep skill recipes (Markdown) the agent reads on demand. This module is the
   *discovery* half — plain HTML parsing (Floki), no kernel.
 
-  Discovery is one query — every `<work-toolkit>` element under the root. A
+  Discovery is one query — every `<work-ref rel="kit">` self-declaration under the root. A
   `<work-agent toolkits="…">` element lists the toolkits it may use; each name
-  resolves to a `<work-toolkit id=…>`. No tool-search subsystem. The skill bodies
+  resolves to a `<work-ref rel="kit" name=…>`. No tool-search subsystem. The skill bodies
   are read lazily (the agent reads the `.md` file when a task routes to it); the
   runtime only resolves *which* toolkit, never inlines the manual.
 
@@ -35,14 +35,14 @@ defmodule Workbooks.WorkKits do
   path (Dock-gated). Host bash from skill files bypasses that and is therefore
   gated/capped/isolated above. See docs/TOOLKITS-V3.md for the full model.
   """
-  # The toolkit manifest is a single `<work-toolkit>` HTML element (work-* model;
+  # The toolkit manifest is a single `<work-ref rel="kit">` HTML element (work-* model;
   # org fully retired — see docs/WORK-FORMAT.md). Skills are Markdown recipes.
   @manifest "manifest.html"
   @skill_ext ".md"
 
   @doc """
-  Every `<work-toolkit>` element in a workbook's HTML — the discovery query, now
-  HTML-native (a `<work-toolkit>` element replaces the old `:toolkit:` org node).
+  Every `<work-ref rel="kit">` self-declaration in a workbook's HTML — the discovery query, now
+  HTML-native (a `<work-ref rel="kit">` type edge replaces the old `:toolkit:` org node).
   Returns the same view shape (`%{id, title, version, cli, status, skill_dir}`).
   """
   def discover(html) when is_binary(html) do
@@ -51,7 +51,7 @@ defmodule Workbooks.WorkKits do
 
   @doc """
   Discover toolkits on disk: read every `<root>/<name>/manifest.html`, parse its
-  `<work-toolkit>` element, and tag the view with its directory so the agent can
+  `<work-ref rel="kit">` self-declaration, and tag the view with its directory so the agent can
   read a skill on demand. A toolkit is a directory; discovery is plain HTML parsing.
   """
   def discover_dir(root) do
@@ -84,7 +84,7 @@ defmodule Workbooks.WorkKits do
     wanted = html |> agent_toolkits(agent_id)
     tks = work_toolkit_nodes(html)
     by_id = Map.new(tks, &{&1.attrs["id"], view(&1)})
-    # Edges sourced from each `<work-toolkit requires="…">` attribute.
+    # Edges sourced from each kit's sibling `<work-ref rel="needs" to="…">` refs.
     edges = Map.new(tks, &{&1.attrs["id"], parse_requires(&1.attrs["requires"])})
     closure(wanted, edges, Map.keys(by_id))
     |> Enum.map(&by_id[&1])
@@ -763,7 +763,7 @@ defmodule Workbooks.WorkKits do
   end
 
   @doc false
-  # Parse a manifest body (`<work-toolkit>` HTML) into the build descriptor. Each
+  # Parse a manifest body (`<work-ref rel="kit">` HTML) into the build descriptor. Each
   # field reads the same-named attribute (`build-src` etc. dash-cased per HTML).
   def parse_descriptor(body) do
     node = work_toolkit(body)
@@ -813,7 +813,7 @@ defmodule Workbooks.WorkKits do
   # Parenthetical prose (e.g. "(to deploy the gateway)") is stripped as comment.
   @doc """
   Parse a raw `requires` value into typed `{:cli, tok} | {:dep, name, raw}` tokens
-  (nil → []). Reads a `<work-toolkit requires="…">` attribute into the edge shape
+  (nil → []). Reads a kit's sibling `<work-ref rel="needs">` edges into the edge shape
   `closure/3` consumes.
   """
   def parse_requires(nil), do: []
@@ -1012,8 +1012,9 @@ defmodule Workbooks.WorkKits do
 
   defp promote_manifest(name, lang, build_src, tagline) do
     """
-    <work-toolkit
-      id="#{name}"
+    <work-ref rel="kit"
+      name="#{name}"
+      prefix="#{name}"
       cli="#{name}"
       version="0.1.0"
       status="experimental"
@@ -1022,15 +1023,14 @@ defmodule Workbooks.WorkKits do
       trust="first-party"
       build-lang="#{lang}"
       build-src="path:#{build_src}"
-      arg-mode="argv">
-      <work-doc title="#{name} toolkit">
-        Promoted from a session command (wb-rhs.6). Source-owned + rebuildable.
+      arg-mode="argv"/>
+    <work-doc title="#{name} toolkit">
+      Promoted from a session command (wb-rhs.6). Source-owned + rebuildable.
 
-        | need   | skill    |
-        |--------|----------|
-        | use it | overview |
-      </work-doc>
-    </work-toolkit>
+      | need   | skill    |
+      |--------|----------|
+      | use it | overview |
+    </work-doc>
     """
   end
 
@@ -1052,7 +1052,7 @@ defmodule Workbooks.WorkKits do
   end
 
   # A runtime entry is either runtimes/<name>.html (a flat pinned spec, a single
-  # <work-toolkit> island) or runtimes/<name>/manifest.html (a dir carrying a
+  # <work-ref rel="kit"> island) or runtimes/<name>/manifest.html (a dir carrying a
   # build script + assets).
   defp runtime_entries(dir) do
     flat =
@@ -1336,7 +1336,7 @@ defmodule Workbooks.WorkKits do
   end
 
   # Lightweight toolkit lister for the release/version verbs: pure filesystem +
-  # Floki over the manifest's `<work-toolkit id=…>`, no live runtime needed. id =
+  # Floki over the manifest's `<work-ref rel="kit" name=…>`, no live runtime needed. id =
   # the manifest's `id` attribute, else the dir name.
   defp tk_dirs_lite(root) do
     Path.wildcard(Path.join(root, "*/#{@manifest}"))
@@ -1388,7 +1388,7 @@ defmodule Workbooks.WorkKits do
     abs == base or String.starts_with?(abs, base <> "/")
   end
 
-  # Read a `<work-toolkit>` attribute (dash-cased lowercase) from a toolkit's
+  # Read a `<work-ref rel="kit">` attribute (dash-cased lowercase) from a toolkit's
   # manifest. `key` is the legacy UPPER_SNAKE name (TAGLINE/VERSION/…); it maps to
   # the HTML attribute (tagline/version/…), with CLI_BIN → cli.
   defp manifest_kw(dir, key) do
@@ -1597,34 +1597,22 @@ defmodule Workbooks.WorkKits do
   # requires/deps. The top-level TYPE is a small set of co-occurring FACETS, each a
   # `<work-ref rel="…">` with NO `to` attr — `kit` (exports a <prefix-*> library —
   # the floor), `app` (a launchable leaf), `agent` (carries a brain).
-  #
-  # The legacy `<work-toolkit id=… requires=…>…<work-doc>…` element is still read as
-  # a FALLBACK so unconverted manifests keep parsing; it normalizes to the same node
-  # shape (attrs map + doc + facets) the accessors below consume.
 
   # Parse a manifest's HTML → kit nodes (attrs map + doc body + facet set).
   defp work_toolkit_nodes(html) do
     case Floki.parse_fragment(html) do
       {:ok, tree} ->
-        ref_kits = Floki.find(tree, ~s|work-ref[rel="kit"]:not([to])|)
-        case ref_kits do
-          [] -> Floki.find(tree, "work-toolkit") |> Enum.map(&node_of(&1, tree))
-          refs -> Enum.map(refs, fn {"work-ref", attrs, _} -> node_of(attrs, tree) end)
-        end
+        Floki.find(tree, ~s|work-ref[rel="kit"]:not([to])|)
+        |> Enum.map(fn {"work-ref", attrs, _} -> node_of(attrs, tree) end)
 
       {:error, _} ->
         []
     end
   end
 
-  # The legacy element OR a normalized `<work-ref rel="kit">` map → the node shape.
-  # For the new form, `name` is the id and sibling `needs` refs synthesize the
-  # `requires` string so `parse_requires` (operator/dep classification) is unchanged.
-  defp node_of({"work-toolkit", attrs, children}, _tree) do
-    a = Map.new(attrs)
-    %{attrs: a, doc: Floki.find(children, "work-doc") |> Floki.text() |> String.trim(), facets: MapSet.new(["kit"])}
-  end
-
+  # A `<work-ref rel="kit">` map → the node shape. `name` is the id, and sibling
+  # `needs` refs synthesize the `requires` string so `parse_requires`
+  # (operator/dep classification) is unchanged.
   defp node_of(attrs, tree) when is_list(attrs) do
     a = Map.new(attrs)
 

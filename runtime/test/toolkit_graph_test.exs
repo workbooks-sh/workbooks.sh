@@ -23,9 +23,9 @@ defmodule Workbooks.ToolkitGraphTest do
   end
 
   # Build a scratch toolkit root we fully control. `tks` is a list of
-  # {id, requires_line | nil} — each becomes <root>/<id>/manifest.html (a single
-  # `<work-toolkit>` element) with a skills/overview.md so injection_text has a
-  # skill to list.
+  # {id, requires_line | nil} — each becomes <root>/<id>/manifest.html (a
+  # `<work-ref rel="kit">` self-declaration + a `needs` dep edge) with a
+  # skills/overview.md so injection_text has a skill to list.
   defp scratch_root(tks) do
     base = Path.join(System.tmp_dir!(), "wb_graph_#{:erlang.unique_integer([:positive])}")
     root = Path.join(base, "root")
@@ -33,12 +33,11 @@ defmodule Workbooks.ToolkitGraphTest do
     for {id, requires} <- tks do
       dir = Path.join(root, id)
       File.mkdir_p!(Path.join(dir, "skills"))
-      req_attr = if requires, do: ~s( requires="#{requires}"), else: ""
+      needs = if requires, do: ~s(\n      <work-ref rel="needs" to="#{requires}"/>), else: ""
 
       File.write!(Path.join(dir, "manifest.html"), """
-      <work-toolkit id="#{id}" status="stable" tagline="tagline for #{id}" skill-dir="skills/"#{req_attr}>
-        <work-doc title="#{id} — scratch"></work-doc>
-      </work-toolkit>
+      <work-ref rel="kit" name="#{id}" status="stable" tagline="tagline for #{id}" skill-dir="skills/"/>#{needs}
+      <work-doc title="#{id} — scratch"></work-doc>
       """)
 
       File.write!(Path.join([dir, "skills", "overview.md"]), """
@@ -137,9 +136,9 @@ defmodule Workbooks.ToolkitGraphTest do
     test "version-operator tokens are :cli; bare/@semver names are :dep candidates" do
       d =
         WorkKits.parse_descriptor("""
-        <work-toolkit id="x" requires="git>=2.30, glyphs, icons@0.2.0 cargo (build only)">
-          <work-doc title="x"></work-doc>
-        </work-toolkit>
+        <work-ref rel="kit" name="x"/>
+        <work-ref rel="needs" to="git>=2.30, glyphs, icons@0.2.0 cargo (build only)"/>
+        <work-doc title="x"></work-doc>
         """)
 
       # version-pinned → always a native CLI pre-flight, never an edge
@@ -154,7 +153,7 @@ defmodule Workbooks.ToolkitGraphTest do
     end
 
     test "no requires attr → empty requires (no crash)" do
-      assert WorkKits.parse_descriptor(~s(<work-toolkit id="x"></work-toolkit>)).requires == []
+      assert WorkKits.parse_descriptor(~s(<work-ref rel="kit" name="x"/>)).requires == []
     end
   end
 

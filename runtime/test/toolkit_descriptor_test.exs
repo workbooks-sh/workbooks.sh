@@ -12,10 +12,9 @@ defmodule Workbooks.ToolkitDescriptorTest do
 
   test "a full command-toolkit descriptor decodes every field" do
     body = """
-    <work-toolkit id="huniq" cli="huniq" exec="command" trust="first-party"
-      build-src="crate:huniq" build-lang="rust" caps="stdio fs" arg-mode="stdin1">
-      <work-doc title="Huniq"></work-doc>
-    </work-toolkit>
+    <work-ref rel="kit" name="huniq" cli="huniq" exec="command" trust="first-party"
+      build-src="crate:huniq" build-lang="rust" caps="stdio fs" arg-mode="stdin1"/>
+    <work-doc title="Huniq"></work-doc>
     """
 
     d = WorkKits.parse_descriptor(body)
@@ -29,7 +28,7 @@ defmodule Workbooks.ToolkitDescriptorTest do
   end
 
   test "defaults: trust → first-party, arg_mode → :argv, caps → [] when absent" do
-    d = WorkKits.parse_descriptor(~s(<work-toolkit id="x" exec="component"></work-toolkit>))
+    d = WorkKits.parse_descriptor(~s(<work-ref rel="kit" name="x" exec="component"/>))
     assert d.exec == "component"
     assert d.trust == "first-party"
     assert d.arg_mode == :argv
@@ -51,7 +50,7 @@ defmodule Workbooks.ToolkitDescriptorTest do
     ]
 
     for {spec, expected} <- schemes do
-      d = WorkKits.parse_descriptor(~s(<work-toolkit id="x" build-src="#{spec}"></work-toolkit>))
+      d = WorkKits.parse_descriptor(~s(<work-ref rel="kit" name="x" build-src="#{spec}"/>))
       assert d.build_src == expected, "build-src #{spec} → #{inspect(d.build_src)}"
     end
   end
