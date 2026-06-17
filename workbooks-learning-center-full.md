@@ -25874,10 +25874,11 @@ Honesty section, and the most important one. This page describes a gate that
  **exists** and wiring it is **waiting on**. Do not read it as a promise that your
  redeploys are gated today. They aren't yet. Here is the exact ledger.
 
-**Callable today:** the kernel export
- `Workbooks.OQL.check_upgrade/2` and the demo
- `Workbooks.Demos.Kernel.demo_upgrade`. You can reproduce every diagnostic on
- this page in an `iex` session right now.
+**Callable today:** the `check-upgrade` WIT export — the same
+ string-in, string-out function generated from the unit's WIT world, linked
+ natively into the `work` CLI as a Rust `pub fn` and embedded in the BEAM runtime
+ as a compiled component. You can reproduce every diagnostic on this page by
+ invoking that export against two plans.
 
 **Not wired:** no deploy path calls `check_upgrade`. The `wb`
  CLI exposes `query`, `tangle`, and `lint` — there is no
@@ -25925,8 +25926,8 @@ No — and the difference matters. Components are re-instantiated stateless on e
  a memory dump.
 
 Can I run the gate today?
-You can call it — `Workbooks.OQL.check_upgrade/2` works, and the demo runs
- every example here. What you can't do today is have it automatically stop a deploy. No
+You can call it — the `check-upgrade` WIT export runs every example here. What
+ you can't do today is have it automatically stop a deploy. No
  deploy path consults it yet; that wiring is the open piece.
 
 Does it check that my code actually changed?
