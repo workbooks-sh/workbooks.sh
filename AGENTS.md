@@ -24,8 +24,43 @@ There is **no org-mode, no OQL, no `.work` shorthand, no parser, no kernel** —
 they were deleted (git history keeps them). Where the backend must read a
 workbook's structure (the compiler finding `<work-component>` source; validation;
 an outline), it parses the HTML with a standard parser — `Workbooks.Workbook`
-over Floki in the runtime, a small scanner in the CLI. **The authoring surface
-is HTML only; internal tooling JSON (manifests, registries) is fine.**
+over Floki in the runtime, a small scanner in the CLI. **Everything authored is
+HTML** (manifests included — a kit declares itself with `<work-ref rel="kit">`). The
+only JSON that survives is a **generated machine artifact at a tool boundary** the
+build emits, never reads-to-render (e.g. the CEM `custom-elements.json`, produced from
+`src/**`). See the NO-JSON non-negotiable below — if you're hand-authoring a `.json`,
+you're doing it wrong.
+
+## ⬛ TWO NON-NEGOTIABLES ⬛
+
+These override everything. If a choice violates one, the choice is wrong.
+
+1. **DOGFOOD EVERYTHING.** If we build it, we use it — on our own codebase, first.
+   Dashboards, roadmaps, tools, docs: author them as **workbooks using our own
+   `work-*` primitives**. If a primitive isn't ready, **build it so we can use it**
+   rather than hand-rolling a one-off. The thing we ship to others is the thing we
+   run ourselves.
+2. **NO JSON. EVER.** (Except a genuine API/data payload at a network boundary.)
+   The world is **HTML**. State, config, content, plans, manifests — all HTML, where
+   the **elements are the source of truth** (composition-as-source). JSON-LD *inside*
+   an HTML file is fine; a sidecar `*.json` you parse to render is not. If you reach
+   for a `.json`, stop — author it as HTML instead. Always workbooks, always HTML.
+
+## Top-level workbook type (OPEN — under research)
+
+Every workbook declares **what it is** at the top via the tagging edge
+(`<work-ref rel="…">` — tagging=C). The exact taxonomy is **being researched + designed
+in the foundation workflow**, not yet settled. Working direction:
+
+- The useful axis is **library vs leaf**, not "has an interface" (everything renders):
+  a **kit** is *imported/composed* by other things; an **app** is the *leaf you launch*.
+- Likely **facets that can co-occur** (a workbook may be both an app and export a kit),
+  with **kit as the floor** — not a rigid enum. Candidate facets: `kit` (exports a
+  prefix), `app` (entry interface), `agent` (has a `<work-src>` brain).
+- **`container` is an execution property, not a type** — keep it out of this taxonomy.
+
+Keep it tiny. The desktop app + the runtime loader read this edge to organize, classify,
+and launch files. (See the kit/app memory for the full critique.)
 
 ## Five Golden Rules of Development
 

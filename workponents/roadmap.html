@@ -1,126 +1,119 @@
 <!doctype html>
-<html lang="en" data-theme="paper">
+<html lang="en" data-work-theme="light">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="darkreader-lock"><meta name="color-scheme" content="light dark">
 <title>Workbooks — live roadmap</title>
+<!--
+  NO JSON. The <board-task> elements below ARE the source of truth (the board kit's
+  own composition-as-source contract). To mark a task off, an agent edits its
+  status="" attribute in THIS file — the board re-files it into the right column.
+  The only script re-fetches THIS HTML to hot-reload; it parses no JSON.
+-->
+<link rel="stylesheet" href="dist/theme.css">
+<script type="module" src="dist/workponents.js"></script>
 <style>
-  :root { --ink:#121316; --paper:#f7f6f1; --card:#fbfaf3; --line:#e4e1d6; --mut:#6b6a63;
-          --mint:#aee5c2; --mint-ink:#0c3a22; --sky:#a8d4f0; --sky-ink:#0d3450;
-          --peach:#f3c5a3; --peach-ink:#5a2c10; --red:#e9a8a3; --red-ink:#5a1410; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--paper); color:var(--ink);
+  body { margin:0; background:var(--work-bg); color:var(--work-fg);
          font:15px/1.5 "Geist", ui-sans-serif, system-ui, sans-serif; }
-  code, .mono { font-family:"Geist Mono", ui-monospace, "SF Mono", monospace; }
-  header { padding:34px 40px 22px; border-bottom:1px solid var(--line); }
+  header { padding:34px 40px 22px; border-bottom:1px solid var(--work-border); }
   header h1 { margin:0; font-size:24px; letter-spacing:-.02em; }
-  header h1 b { background:var(--ink); color:var(--paper); padding:2px 9px; border-radius:8px; }
-  header .sub { color:var(--mut); margin:8px 0 0; max-width:74ch; }
+  header h1 b { background:var(--work-fg); color:var(--work-bg); padding:2px 9px; border-radius:8px; }
+  header .sub { color:var(--work-fg-muted); margin:8px 0 0; max-width:74ch; }
   header .mantra { margin:14px 0 0; font:600 12px/1.4 "Geist Mono",monospace; letter-spacing:.04em;
-                   color:var(--mint-ink); background:var(--mint); display:inline-block; padding:5px 11px; border-radius:8px; }
-  .bar-wrap { margin:18px 0 0; }
-  .bar { height:10px; background:var(--card); border:1px solid var(--line); border-radius:20px; overflow:hidden; }
-  .bar > i { display:block; height:100%; background:var(--ink); transition:width .4s; }
-  .bar-label { font:12px/1 "Geist Mono",monospace; color:var(--mut); margin:0 0 6px; }
-  .live { float:right; font:11px/1 "Geist Mono",monospace; color:var(--mut); }
-  .live .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--mint); margin-right:5px;
-               box-shadow:0 0 0 3px color-mix(in srgb, var(--mint) 40%, transparent); animation:pulse 2s infinite; }
+                   color:var(--work-brand-ink); background:var(--work-brand-soft); display:inline-block; padding:5px 11px; border-radius:8px; }
+  header .live { float:right; font:11px/1 "Geist Mono",monospace; color:var(--work-fg-muted); }
+  header .live .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--work-brand);
+               margin-right:5px; animation:pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-  main { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:18px; padding:24px 40px 90px; align-items:start; }
-  .phase { background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden;
-           box-shadow:0 1px 0 rgba(18,19,22,.03), 0 8px 22px -16px rgba(18,19,22,.25); }
-  .phase header { padding:16px 18px; border-bottom:1px solid var(--line); background:var(--paper); }
-  .phase h2 { margin:0; font-size:16px; letter-spacing:-.01em; }
-  .phase .goal { color:var(--mut); font-size:13px; margin:6px 0 0; }
-  .phase .tag { display:inline-block; margin:8px 0 0; font:11px/1 "Geist Mono",monospace; color:var(--sky-ink);
-                background:var(--sky); padding:3px 8px; border-radius:20px; }
-  .phase .ph-bar { padding:10px 18px 0; }
-  .tasks { padding:10px 14px 16px; display:flex; flex-direction:column; gap:8px; }
-  .task { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--line);
-          border-radius:10px; background:var(--paper); }
-  .task .mark { flex:none; width:18px; height:18px; border-radius:50%; border:1.5px solid var(--line);
-                display:grid; place-items:center; font-size:11px; margin-top:1px; }
-  .task.done   { opacity:.66; } .task.done .mark { background:var(--mint); border-color:var(--mint); color:var(--mint-ink); }
-  .task.doing  .mark { background:var(--peach); border-color:var(--peach); color:var(--peach-ink); }
-  .task.blocked .mark { background:var(--red); border-color:var(--red); color:var(--red-ink); }
-  .task .body { flex:1; font-size:13.5px; line-height:1.45; }
-  .task.done .body { text-decoration:line-through; text-decoration-color:var(--mut); }
-  .task .id { font:10px/1 "Geist Mono",monospace; color:var(--mut); display:block; margin-bottom:2px; }
-  .task .note { color:var(--mut); font-size:12px; margin-top:3px; }
+  header .bar { height:10px; background:var(--work-surface); border:1px solid var(--work-border); border-radius:20px; overflow:hidden; margin-top:6px; }
+  header .bar > i { display:block; height:100%; background:var(--work-fg); transition:width .4s; }
+  header .bar-label { font:12px/1 "Geist Mono",monospace; color:var(--work-fg-muted); margin:18px 0 0; }
+  main { padding:20px 40px 90px; display:flex; flex-direction:column; gap:28px; }
+  .phase h2 { margin:0; font-size:17px; letter-spacing:-.01em; }
+  .phase .goal { color:var(--work-fg-muted); font-size:13px; margin:5px 0 0; }
+  .phase .tag { display:inline-block; margin:7px 0 10px; font:11px/1 "Geist Mono",monospace; color:var(--work-brand-ink);
+                background:var(--work-brand-soft); padding:3px 8px; border-radius:20px; }
 </style>
 </head>
 <body>
   <header>
-    <span class="live"><span class="dot"></span><span id="stamp">live · polling roadmap.json</span></span>
+    <span class="live"><span class="dot"></span><span id="stamp">live</span></span>
     <h1><b>Workbooks</b> · live roadmap</h1>
-    <p class="sub" id="sub"></p>
-    <p class="mantra" id="mantra"></p>
-    <div class="bar-wrap">
-      <p class="bar-label"><span id="overall-label">—</span></p>
-      <div class="bar"><i id="overall-bar" style="width:0"></i></div>
-    </div>
+    <p class="sub">Architecture is settled. Now: prove it functions, dogfood the core, ship the surfaces. Agents mark tasks off by editing this HTML; the board re-files them.</p>
+    <p class="mantra">dogfood · dogfood · dogfood — we build the same things we want others to build, composably and well.</p>
+    <p class="bar-label" id="overall">—</p>
+    <div class="bar"><i id="bar" style="width:0"></i></div>
   </header>
-  <main id="board"></main>
+
+  <main>
+    <section class="phase">
+      <h2>Foundation — does it actually function?</h2>
+      <p class="goal">No drift, no dead code, no broken surfaces. The base is provably solid before building up.</p>
+      <span class="tag">workflow · mechanical · verifiable</span>
+      <board-view columns="todo,doing,done,blocked">
+        <board-task status="todo" title="Loader migration: runtime reads &lt;work-ref rel=&quot;kit&quot;&gt; (tagging-via-ref), convert manifests off &lt;work-toolkit&gt;">p0.1</board-task>
+        <board-task status="todo" title="Full suite green — resolve the Keeper flake, confirm 0 real failures">p0.2</board-task>
+        <board-task status="todo" title="Dead-code &amp; god-file audit — find unused modules/funcs, oversized files, drift">p0.3</board-task>
+        <board-task status="todo" title="Cut aggressively — delete dead code, split/shrink god files, reduce LOC">p0.4</board-task>
+        <board-task status="todo" title="Waldo agent context — verify correct in the new model, or fix if busted">p0.5</board-task>
+        <board-task status="todo" title="Rename completeness — Rust CLI verb + /rcp/toolkit routes (coordinated), :toolkits field, discovered element">p0.6</board-task>
+        <board-task status="todo" title="Research + decide the top-level workbook type taxonomy (kit/app/agent — lib-vs-leaf? facets? prior art) and wire it into the loader edge">p0.10</board-task>
+        <board-task status="done" title="Architecture locked — Primitive Test, 3-element spine, tagging=C, work-kit">p0.7</board-task>
+        <board-task status="done" title="Spine real — work-src (runs) + work-ref (edges/call) registered &amp; gate-green">p0.8</board-task>
+        <board-task status="done" title="work-kit rename 2a+2b — module/dirs/env/attr/escript-verb, 1018 tests green">p0.9</board-task>
+      </board-view>
+    </section>
+
+    <section class="phase">
+      <h2>Dogfood the core — the new full throttle</h2>
+      <p class="goal">The capabilities we'd sell, used by us first: evals, the compiler lane, the workbooks toolkit.</p>
+      <span class="tag">workflow · mechanical + checkpoints</span>
+      <board-view columns="todo,doing,done,blocked">
+        <board-task status="todo" title="AI agent evals running ENTIRELY in the new system (workbench, Minimax M3, harness on work-kit)">p1.1</board-task>
+        <board-task status="todo" title="work-src compiler lane — compile rust/c/zig/python through the Dock, end-to-end proof">p1.2</board-task>
+        <board-task status="todo" title="work-src builds a website — compile + bundle a real site from source">p1.3</board-task>
+        <board-task status="todo" title="Build the workbooks agent toolkit (skills for workbooks: setup/author/deploy)">p1.4</board-task>
+        <board-task status="todo" title="Verify the workbooks toolkit against the CLI — the dogfood loop (skills run real work verbs)">p1.5</board-task>
+        <board-task status="todo" title="Evals + telemetry + tests as LIVE references on this roadmap (HTML, hot-reload)">p1.6</board-task>
+      </board-view>
+    </section>
+
+    <section class="phase">
+      <h2>Surfaces — the next layer (taste + judgment)</h2>
+      <p class="goal">The consumer-facing tier: docs, desktop, the shipped examples. Human-in-the-loop on voice/UX.</p>
+      <span class="tag">staged · human-in-loop</span>
+      <board-view columns="todo,doing,done,blocked">
+        <board-task status="todo" title="Website documentation refactor — HTML-first, work-kit model, drop stale org/oql/toolkit language">p2.1</board-task>
+        <board-task status="todo" title="Desktop app — re-point onto runtime/host, the work-kit model (per ASSESSMENT.md)">p2.2</board-task>
+        <board-task status="doing" title="Ship the living roadmap + composite + studio as canonical example workbooks">p2.3</board-task>
+      </board-view>
+    </section>
+  </main>
 
   <script type="module">
-    const MARK = { done: "✓", doing: "▸", blocked: "✕", todo: "" };
-    const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-    let last = "";
-
-    async function tick() {
-      let data;
-      try { data = await (await fetch(`roadmap.json?t=${Date.now()}`)).json(); }
-      catch { document.getElementById("stamp").textContent = "roadmap.json unreachable"; return; }
-      const sig = JSON.stringify(data);
-      if (sig === last) return;                  // no change → no re-render (cheap poll)
-      last = sig;
-      render(data);
-      const now = new Date().toLocaleTimeString();
-      document.getElementById("stamp").textContent = `live · updated ${now}`;
+    // Progress reads the board-task ELEMENTS (the source of truth) — no JSON.
+    function stats() {
+      const t = [...document.querySelectorAll("board-task")];
+      const done = t.filter((x) => x.getAttribute("status") === "done").length;
+      const doing = t.filter((x) => x.getAttribute("status") === "doing").length;
+      const pct = t.length ? Math.round((done / t.length) * 100) : 0;
+      document.getElementById("bar").style.width = pct + "%";
+      document.getElementById("overall").textContent =
+        `${pct}% — ${done}/${t.length} tasks · ${doing} in flight`;
     }
-
-    function pct(tasks) {
-      const done = tasks.filter((t) => t.status === "done").length;
-      return tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+    // Hot-reload by re-fetching THIS HTML (not JSON) and swapping <main> when it changes.
+    async function hot() {
+      try {
+        const html = await (await fetch(`${location.pathname}?t=${Date.now()}`)).text();
+        const fresh = new DOMParser().parseFromString(html, "text/html").querySelector("main").innerHTML;
+        const main = document.querySelector("main");
+        if (fresh !== main.innerHTML) { main.innerHTML = fresh; }
+        stats();
+        document.getElementById("stamp").textContent = `live · ${new Date().toLocaleTimeString()}`;
+      } catch {}
     }
-
-    function render(d) {
-      document.getElementById("sub").textContent = d.subtitle || "";
-      document.getElementById("mantra").textContent = d.mantra || "";
-      const all = d.phases.flatMap((p) => p.tasks);
-      const overall = pct(all);
-      document.getElementById("overall-bar").style.width = overall + "%";
-      const doneN = all.filter((t) => t.status === "done").length;
-      document.getElementById("overall-label").textContent =
-        `${overall}% — ${doneN}/${all.length} tasks · ${all.filter((t) => t.status === "doing").length} in flight`;
-
-      document.getElementById("board").innerHTML = d.phases.map((p) => {
-        const pp = pct(p.tasks);
-        return `
-        <section class="phase">
-          <header>
-            <h2>${esc(p.title)}</h2>
-            <p class="goal">${esc(p.goal || "")}</p>
-            <span class="tag">${esc(p.autonomy || "")}</span>
-          </header>
-          <div class="ph-bar">
-            <p class="bar-label">${pp}% · ${p.tasks.filter((t) => t.status === "done").length}/${p.tasks.length}</p>
-            <div class="bar"><i style="width:${pp}%"></i></div>
-          </div>
-          <div class="tasks">
-            ${p.tasks.map((t) => `
-              <div class="task ${t.status}">
-                <span class="mark">${MARK[t.status] || ""}</span>
-                <div class="body"><span class="id mono">${esc(t.id)}</span>${esc(t.title)}
-                  ${t.note ? `<div class="note">${esc(t.note)}</div>` : ""}</div>
-              </div>`).join("")}
-          </div>
-        </section>`;
-      }).join("");
-    }
-
-    tick();
-    setInterval(tick, 3000);   // hot-reload: re-fetch every 3s, re-render only on change
+    stats();
+    setInterval(hot, 3000);
   </script>
 </body>
 </html>
