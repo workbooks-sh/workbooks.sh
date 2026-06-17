@@ -1,10 +1,4 @@
-<work-toolkit
-  id="sandbox"
-  version="0.1.0"
-  status="stable"
-  tagline="The in-sandbox command set — scripting languages, JS engines, crypto, fonts &amp; text-shaping, image, XML, regex, linear algebra, document conversion, data formats — 30+ real tools compiled to WASI and run under wasmtime, no native execution."
-  skill-dir="skills/"
-  data-kind="commands">
+<work-ref rel="kit" name="sandbox" prefix="sandbox" version="0.1.0" status="stable" skill-dir="skills/" tagline="The in-sandbox command set — scripting languages, JS engines, crypto, fonts &amp; text-shaping, image, XML, regex, linear algebra, document conversion, data formats — 30+ real tools compiled to WASI and run under wasmtime, no native execution." data-kind="commands"/>
   <work-doc title="sandbox — in-sandbox WASI commands">
     Real upstream CLIs/runtimes compiled to =wasm32-wasi= and run under wasmtime in the sandbox via the
     =run-command= Dock import (host: =Workbooks.CommandRegistry.run/3-5=). ZERO native execution — each
@@ -51,4 +45,4 @@
     | =overview= | First contact — what&#x27;s here + the invocation convention      |
     | =commands= | Per-command usage, args, stdin/stdout, + how to add a tool    |
   </work-doc>
-</work-toolkit>
+

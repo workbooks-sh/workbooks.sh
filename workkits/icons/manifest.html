@@ -1,17 +1,4 @@
-<work-toolkit
-  id="icons"
-  cli="icons"
-  version="0.1.0"
-  status="experimental"
-  tagline="The universal icon library as a CLI — one value grammar (mi:&lt;def&gt; · lobe:&lt;slug&gt; · emoji · data: · initials) searched, resolved, and explained; what an agent writes renders in the desktop unchanged."
-  skill-dir="skills/"
-  exec="command"
-  trust="first-party"
-  build-src="path:src"
-  build-lang="js"
-  data-kind="toolkit"
-  data-flow="`icons grammar` once → `icons search &lt;query&gt;` / `icons for-file &lt;name&gt;` / `icons for-folder &lt;name&gt;` to find a value → write that string into the workbook/spec. `icons get &lt;value&gt;` to inspect any value you meet. cat skills/overview.md only if a verb surprises you."
-  arg-mode="stdin1">
+<work-ref rel="kit" name="icons" prefix="icons" version="0.1.0" status="experimental" cli="icons" exec="command" build-src="path:src" build-lang="js" arg-mode="stdin1" trust="first-party" skill-dir="skills/" tagline="The universal icon library as a CLI — one value grammar (mi:&lt;def&gt; · lobe:&lt;slug&gt; · emoji · data: · initials) searched, resolved, and explained; what an agent writes renders in the desktop unchanged." data-kind="toolkit" data-flow="`icons grammar` once → `icons search &lt;query&gt;` / `icons for-file &lt;name&gt;` / `icons for-folder &lt;name&gt;` to find a value → write that string into the workbook/spec. `icons get &lt;value&gt;` to inspect any value you meet. cat skills/overview.md only if a verb surprises you."/>
   <work-doc title="icons — the universal icon library CLI">
     One CLI fronts the project-wide *icon value grammar* (wb-5fl.15/.16): the
     same strings the desktop resolves in =desktop/src/lib/ui/Icon.svelte= —
@@ -53,4 +40,4 @@
     |------------+---------------------------------------------------------------|
     | =overview= | First contact — verbs, the grammar, output shapes, regenerating packs |
   </work-doc>
-</work-toolkit>
+

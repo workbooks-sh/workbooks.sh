@@ -1,12 +1,5 @@
-<work-toolkit
-  id="railway"
-  cli="railway"
-  cli-range="&gt;=3.0"
-  version="0.1.0"
-  status="experimental"
-  tagline="Railway&#x27;s CLI — deploy a forged workbook as a static site on the user&#x27;s own account."
-  requires="railway&gt;=3.0"
-  skill-dir="skills/">
+<work-ref rel="kit" name="railway" prefix="railway" version="0.1.0" status="experimental" cli="railway" cli-range="&gt;=3.0" skill-dir="skills/" tagline="Railway&#x27;s CLI — deploy a forged workbook as a static site on the user&#x27;s own account."/>
+<work-ref rel="needs" to="railway&gt;=3.0"/>
   <work-doc title="railway — Railway PaaS CLI">
     Wrapper around the standard =railway= binary. The Workbooks use case:
     publish a built workbook (=dist/&lt;slug&gt;.html=) as a static site on the
@@ -27,4 +20,4 @@
     |--------------------------------+--------------------------------------------|
     | =deploy-a-workbook-to-railway= | Publish a built =dist/&lt;slug&gt;.html= as a static site on the user&#x27;s Railway account |
   </work-doc>
-</work-toolkit>
+
