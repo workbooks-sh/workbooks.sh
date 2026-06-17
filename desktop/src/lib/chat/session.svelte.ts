@@ -10,7 +10,7 @@
 //
 // One active session per chat panel is the v1 contract. Sending while
 // a session is already running is allowed but starts a *new* session
-// (mirrors how Studio's "new turn" flow works against the OQL runtime
+// (mirrors how Studio's "new turn" flow works against the runtime
 // today — every prompt instantiates a fresh agent).
 
 import { ws, type BridgeEvent } from "$lib/bridge/ws.svelte";
