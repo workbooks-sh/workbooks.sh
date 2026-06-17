@@ -1,6 +1,6 @@
 // Phase B — Memory-source bridge.
 //
-// Manages the set of workbooks loaded as memory tiers for the OQL
+// Manages the set of workbooks loaded as memory tiers for the
 // agent. Two-phase flow:
 //   1. Native Tauri command `memory_source_resolve` does the scope check
 //      + canonicalises the .html path on the Rust side (offline-safe).
