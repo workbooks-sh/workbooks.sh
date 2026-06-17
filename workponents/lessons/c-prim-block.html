@@ -1,28 +1,29 @@
 <script type="text/plain" id="c-prim-block">
 # The block — do…end
 
-One delimiter does everything. `do…end` is *self-delimiting* Elixir, so it
-separates from the prose around it with **no fence and no sigil**. The **kind
-word** in front names the lane (see [[The four lanes]]):
+One delimiter, one lane. `do…end` is *self-delimiting* Elixir, so it separates
+from the prose around it with **no fence and no sigil**. It always wraps a
+**function unit** — a body of code or a workflow — and the **kind word** in front
+says which (see [[The four lanes]]):
 
-sandbox :score do ... end      # function lane (code → wasm)
-flow do ... end                # function lane (workflow)
-figure "x.png" do ... end      # rich-text lane (presentation)
+sandbox :score do ... end      # code → wasm
+flow do ... end                # a workflow (step, parallel)
+agent "..." do ... end         # a brain (model, system, tools)
 
-A `do…end` always wraps a **bodied unit** — a body of code, or of content. Flat
-**data** is the exception: a `task`, a `user`, a `type` are *declarations*, not
-blocks. They carry **fields, not a body**, so they need no delimiter at all:
+Flat **data** is the other shape: a `task`, a `user`, a `type` are *declarations*,
+not blocks. They carry **fields, not a body**, so they need no delimiter at all:
 
 task "...", status: :todo      # data lane (a typed declaration)
 user :analyst, name: "Ada"     # data lane
 
-Two shapes — bodied blocks and flat declarations — cover every lane. #primitive
+Two Elixir shapes — bodied blocks (function) and flat declarations (data) — and
+markdown narrates the rest. #primitive
 </script>
 <template id="e-prim-block">
   <div class="kick">primitive · the block</div>
   <h2>The block — <code>do…end</code></h2>
-  <p class="tagline">One self-delimiting delimiter, four jobs. This is why code needs no fence.</p>
+  <p class="tagline">One self-delimiting delimiter for the function lane. This is why code needs no fence.</p>
   <h3>Kind + body</h3>
-  <p>A block is <code>&lt;kind&gt; … do … end</code> for <b>bodied units</b> — the <b>kind word selects the lane</b> (<code>sandbox</code>/<code>client</code>/<code>server</code> code, <code>flow</code> workflow, <code>figure</code> rich text) and the body is what that lane holds. Because <code>do…end</code> is self-delimiting Elixir, the parser separates it from prose with <b>no fence and no sigil</b>.</p>
-  <p>Flat <b>data</b> is the exception: a <code>task</code>, a <code>user</code>, a <code>type</code> have <i>fields</i>, not a body, so they're <b>declarations</b>, not blocks. Two shapes — bodied blocks and flat declarations — cover all four lanes.</p>
+  <p>A block is <code>&lt;kind&gt; … do … end</code> for a <b>function unit</b> — the <b>kind word</b> says which (<code>sandbox</code> code, <code>flow</code> workflow, <code>agent</code> brain) and the body is what it holds. Because <code>do…end</code> is self-delimiting Elixir, the parser separates it from prose with <b>no fence and no sigil</b>.</p>
+  <p>Flat <b>data</b> is the other shape: a <code>task</code>, a <code>user</code>, a <code>type</code> have <i>fields</i>, not a body, so they're <b>declarations</b>, not blocks. Two Elixir shapes — bodied blocks and flat declarations — and markdown narrates the rest.</p>
 </template>

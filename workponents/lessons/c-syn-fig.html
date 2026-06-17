@@ -1,35 +1,36 @@
 <script type="text/plain" id="c-syn-fig">
 ## The numbers
 
-Richness escalates in three steps, none of which leaves the **rich-text** lane.
-The floor is a plain markdown image, inline:
+A figure is **markdown** — it never runs, so there's no keyword for it. Richness
+escalates in two markdown rungs, then code. The floor is a plain inline image;
+its alt text *is* the caption (a lone image renders as a `<figure>`):
 
-![Revenue chart](revenue.png)
+![Revenue by quarter, FY24](revenue.png)
 
-For a *captioned* figure — richer than markdown — reach for a **presentational
-block**. It's the same `do…end` grammar as code (see [[The block — do…end]]), but
-it **renders**, it doesn't run:
+Need a richer caption — **bold**, a link, a second line? Don't reach for a new
+construct: write a markdown paragraph right under the image. Co-located prose is
+the whole point of a literate file, and it reads as the caption:
 
-figure "revenue.png" do
-  Revenue by quarter, FY24. **The caption is markdown.**
+![Revenue by quarter, FY24](revenue.png)
+
+Revenue climbed every quarter — see the [board](work://board#q4). *Still markdown.*
+
+And when markdown genuinely can't say it, a `sandbox` unit renders it — a
+front-end island, hydrated in the browser, with *no custom elements* needed:
+
+sandbox client :revenue_chart, reads: :ranked do
+  # the front-end that charts the data — hydrated in the browser
 end
 
-And when markdown simply can't say it, a `client` unit renders it — a front-end
-island, hydrated in the browser, with *no custom elements* needed:
-
-client :revenue_chart, reads: :ranked do
-  # svelte / solid / js that charts the data — hydrated in the browser
-end
-
-Same author, same lane, three rungs of richness. #rich-text
+Two markdown rungs, then code. No `figure` keyword, no new grammar. #rich-text
 </script>
 <template id="e-syn-fig">
   <div class="kick">syntax · figures</div>
   <h2>Figures <span class="lane l-text">rich text</span></h2>
-  <p class="tagline">Richer-than-markdown, without leaving the rich-text lane — three escalators.</p>
+  <p class="tagline">A figure is markdown, never a function — two markdown rungs, then code.</p>
   <h3>How richness escalates</h3>
-  <ul><li class="pro"><b>Markdown image</b> — <code>![alt](src)</code>. The floor.</li>
-  <li class="pro"><b>Presentational block</b> — <code>figure "…" do … end</code>. Same <code>do…end</code> grammar as code, but it <i>renders</i> (caption, layout); it doesn't run. One grammar, a new job.</li>
-  <li class="pro"><b>Client-unit escape hatch</b> — when markdown can't say it, a <code>client</code> unit (a front-end island) renders it. No custom elements.</li></ul>
-  <div class="note">Rich-text editing ≠ rich-text format. The file stays markdown; an editor can render it live (WYSIWYG) so it <i>feels</i> rich while the source stays literate.</div>
+  <ul><li class="pro"><b>Markdown image</b> — <code>![caption](src)</code>. The alt text is the caption; a lone image renders as a <code>&lt;figure&gt;</code>. The floor.</li>
+  <li class="pro"><b>Caption paragraph</b> — need bold, a link, two lines? Write a markdown paragraph under the image. Co-located prose <i>is</i> the caption — no new construct.</li>
+  <li class="pro"><b>Unit escape hatch</b> — when markdown can't say it, a <code>sandbox</code> unit placed on the <code>client</code> (a front-end island) renders it. No custom elements.</li></ul>
+  <div class="note">There's no <code>figure</code> keyword — figures are markdown. Only real interactivity crosses into a unit. Rich-text editing ≠ rich-text format: the file stays markdown; an editor can render it live (WYSIWYG) so it <i>feels</i> rich while the source stays literate.</div>
 </template>

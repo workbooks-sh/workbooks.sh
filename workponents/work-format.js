@@ -241,7 +241,7 @@
       { regex: /:[A-Za-z_]\w*[!?]?/, token: "atom" },               // :atoms
       { regex: /@[A-Za-z_]\w*/, token: "meta" },                    // @module_attrs
       { regex: /\b(?:defmodule|defmacro|defp|def|do|end|cond|case|fn|when|if|else|true|false|nil|import|alias|use|require)\b/, token: "keyword" },
-      { regex: /\b(?:client|sandbox|server|world|export|import|interface|package|component|func|record|variant|enum|flags|values|select|blob|postgres|data|tagged|tags|use|import|tangle|untangle|flow|figure|note|task|user|type|step|parallel|todo|doing|done|agent|validate|grant|memory)\b/, token: "variable-2" },
+      { regex: /\b(?:client|sandbox|server|world|export|import|interface|package|component|func|record|variant|enum|flags|values|select|blob|postgres|data|tagged|tags|use|import|tangle|untangle|flow|note|task|user|type|step|parallel|todo|doing|done|agent|validate|grant|memory)\b/, token: "variable-2" },
       { regex: /<\/?[A-Za-z][\w-]*/, token: "tag" },                // <work-* / html tags
       { regex: /\b\d[\d_]*\b/, token: "number" },
       { regex: /./, token: null },

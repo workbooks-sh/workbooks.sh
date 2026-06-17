@@ -8,8 +8,7 @@ reads it?* (see [[The four lanes]]). #primitive
 **Rich text** — markdown, a *human* reads it:
 
   prose · headings · lists · links · tables · quotes · `code`
-  ![alt](src)            inline image
-  figure "…" do … end    captioned figure (renders, does NOT run)
+  ![caption](src)        inline image — a lone one renders as a figure
   - [ ] casual todo      a checklist for a human (not tracked data)
 
 **Function** — code that *runs*; `client`/`sandbox` compile to wasm, `server`
@@ -42,7 +41,7 @@ rich text and the context around the code, never the code itself.
   <h2>The primitive map</h2>
   <p class="tagline">Every primitive → its lane. The completeness check: markdown side or Elixir side, at a glance.</p>
   <h3>rich text <span class="lane l-text">markdown</span></h3>
-  <p><code>prose</code> · <code>headings</code> · <code>lists</code> · <code>tables</code> · <code>quotes</code> · <code>`code`</code> · <code>![img]()</code> · <code>figure do</code> · <code>- [ ]</code> casual todo</p>
+  <p><code>prose</code> · <code>headings</code> · <code>lists</code> · <code>tables</code> · <code>quotes</code> · <code>`code`</code> · <code>![caption](src)</code> figure · <code>- [ ]</code> casual todo</p>
   <h3>function <span class="lane l-fn">elixir → wasm</span></h3>
   <p><code>client/sandbox/server :x do</code> code · <code>flow do</code> workflows · <code>agent do</code> brains</p>
   <h3>build <span class="lane l-build">plain elixir / weave</span></h3>
