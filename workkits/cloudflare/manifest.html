@@ -1,12 +1,5 @@
-<work-toolkit
-  id="cloudflare"
-  cli="wrangler"
-  cli-range="&gt;=3.0"
-  version="0.1.0"
-  status="experimental"
-  tagline="All-Cloudflare backend for a forged workbook — D1 + Workers AI + Pages, on the user&#x27;s own account."
-  requires="wrangler&gt;=3.0"
-  skill-dir="skills/">
+<work-ref rel="kit" name="cloudflare" prefix="cloudflare" version="0.1.0" status="experimental" cli="wrangler" cli-range="&gt;=3.0" skill-dir="skills/" tagline="All-Cloudflare backend for a forged workbook — D1 + Workers AI + Pages, on the user&#x27;s own account."/>
+<work-ref rel="needs" to="wrangler&gt;=3.0"/>
   <work-doc title="cloudflare — D1 + Workers AI + Pages, one account">
     The all-Cloudflare path for a forged workbook: a live, multi-tenant app
     standing entirely on the user&#x27;s OWN Cloudflare account, with just a
@@ -40,4 +33,4 @@
     |-------------------------+----------------------------------------------------|
     | =all-cloudflare-backend= | Stand a forged workbook entirely on the user&#x27;s Cloudflare account — D1 data + Workers AI + BetterAuth + Pages hosting, one login |
   </work-doc>
-</work-toolkit>
+

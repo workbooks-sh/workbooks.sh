@@ -133,8 +133,8 @@ defmodule Workbooks.ToolkitsTest do
   describe "show_text/2" do
     test "shows the manifest body + a skill index" do
       out = WorkKits.show_text("git", @root)
-      assert out =~ ~s(<work-toolkit)
-      assert out =~ ~s(id="git")
+      assert out =~ ~s(<work-ref rel="kit")
+      assert out =~ ~s(name="git")
       assert out =~ "Skills (read with `work kit show git <skill>`)"
       assert out =~ "overview"
       assert out =~ "bisect"
