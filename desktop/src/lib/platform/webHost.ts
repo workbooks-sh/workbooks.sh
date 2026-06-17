@@ -226,7 +226,7 @@ export const AGENTS_CATALOG_PREVIEW: PreviewAgent[] = [
     icon: "lucide:Telescope",
     model: "google/gemini-3.5-flash",
     scope: "user",
-    toolkits: ["bash", "wb", "git"],
+    toolkits: ["bash", "work", "git"],
     system_prompt_preview:
       "You are a meticulous research agent. Gather sources, verify each claim against at least two independent references, and synthesize a cited report.",
   },
