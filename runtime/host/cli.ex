@@ -517,28 +517,6 @@ defmodule Workbooks.CLI do
   def call(["kit", "run", id, task | rest], _t),
     do: WorkKits.run_task_text(id, task, Enum.drop_while(rest, &(&1 == "--")))
 
-  # Autopoet (wb-9ae / wb-pow) — the central self-improvement agent as an ON-DEMAND
-  # surface. The backlog is bursty + small, so a triggered drain (any scheduler:
-  # cron, a fly `machine exec`, CI) is the efficient shape — no always-on poller
-  # idling on an empty backlog. `tick` runs ONE honesty-gated issue; `list`/`show`
-  # read the backlog.
-  def call(["autopoet"], _t), do: autopoet_list_text()
-  def call(["autopoet", "list"], _t), do: autopoet_list_text()
-
-  def call(["autopoet", "tick"], _t) do
-    case Workbooks.Autopoet.Worker.drain_one() do
-      {:worked, id, verdict} -> "autopoet: worked #{id} → #{verdict}"
-      :empty -> "autopoet: backlog empty (no open :capability issue) — no run"
-    end
-  end
-
-  def call(["autopoet", "show", id], _t) do
-    case Workbooks.Autopoet.read_body(id) do
-      {:ok, body} -> body
-      _ -> "no such issue: #{id}"
-    end
-  end
-
   # Compiler-in-WASM (wb-zyl) — compilers run IN the sandbox (zero native execution).
   def call(["compiler"], _t), do: "compilers: " <> Enum.join(Workbooks.Compilers.list(), ", ")
   def call(["compiler", "list"], _t), do: "compilers: " <> Enum.join(Workbooks.Compilers.list(), ", ")
@@ -728,23 +706,11 @@ defmodule Workbooks.CLI do
 
   defp wd(slug), do: "/tmp/bb/#{slug}"
 
-  defp autopoet_list_text do
-    case Workbooks.Autopoet.list() do
-      [] ->
-        "autopoet backlog: empty"
-
-      issues ->
-        Enum.map_join(issues, "\n", fn i ->
-          "#{i.id}  [#{i.status}/#{i.kind}]  ×#{i.seen}  #{i.tenant}: #{i.title}"
-        end)
-    end
-  end
-
   defp json(data), do: Jason.encode!(data, pretty: true)
 
   defp usage do
     """
-    wb — Workbook CLI (#{@version})
+    work — Workbook CLI (#{@version})
       work query|tangle|lint <file.html>     workbook HTML → headlines / build plan / diagnostics
       work var set <key> <value> [--secret]  set a variable (secrets are ref-only)
       work var get <key>                     read a variable (secrets redacted)

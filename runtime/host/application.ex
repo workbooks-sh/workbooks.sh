@@ -47,7 +47,7 @@ defmodule Workbooks.Application do
         Workbooks.Instance.Supervisor,
         Workbooks.Domains,
         {DynamicSupervisor, strategy: :one_for_one, name: Workbooks.AgentSession.Sup}
-      ] ++ harness() ++ web() ++ keeper() ++ autopoet() ++ channels() ++ groundskeeper()
+      ] ++ harness() ++ web() ++ channels()
 
     # Start children ONE BY ONE with a boot-trace, so a child that blocks in init
     # is pinpointed (and visible in <WB_DATA>/boot-trace.txt) instead of hanging
@@ -214,42 +214,6 @@ defmodule Workbooks.Application do
   # are IPv6-only while local clients dial IPv4 — one listener serves both.
   defp dual_stack,
     do: [ip: {0, 0, 0, 0, 0, 0, 0, 0}, thousand_island_options: [transport_options: [:inet6, {:ipv6_v6only, false}]]]
-
-  # Keeper (wb-5vm): on-box agent scheduler for deployed engines where the control
-  # plane is internal-only and GitHub-cron can't reach it.
-  #
-  # Two MUTUALLY EXCLUSIVE modes (wb-wc0.2):
-  #   * WB_CREW_DEF set → CREW: Workbooks.Keeper.Crew supervises one keeper worker
-  #     per declared agent (bit.ml multi-agent). Takes precedence.
-  #   * else WB_KEEPER_DEF set → SINGLETON: the lone Workbooks.Keeper (the lander).
-  #   * else neither → excluded from the tree entirely (normal/dev deploys).
-  defp keeper do
-    cond do
-      System.get_env("WB_CREW_DEF") -> [Workbooks.Keeper.Crew]
-      System.get_env("WB_KEEPER_DEF") -> [Workbooks.Keeper]
-      true -> []
-    end
-  end
-
-  # Autopoet (wb-9ae): the self-improvement worker — a SYSTEM tenant (peer to the
-  # keeper, not owned by any tenant) that works the metacognitive backlog,
-  # authoring toolkits to fill capability gaps tenant agents file. Opt-in by
-  # WB_AUTOPOET=1 (needs WB_AUTOPOET_DEF). Idle when the backlog is empty.
-  defp autopoet do
-    if System.get_env("WB_AUTOPOET") == "1",
-      do: [Workbooks.Autopoet.Worker],
-      else: []
-  end
-
-  # Groundskeeper (wb-3ojf): the founder's voice-agent bridge task ledger —
-  # credential-gated like channels(): joins the tree only when WB_GK_SECRET is
-  # set (without it the /gk routes fail closed anyway).
-  defp groundskeeper do
-    case System.get_env("WB_GK_SECRET") do
-      s when s in [nil, ""] -> []
-      _ -> [Workbooks.Groundskeeper.Tasks]
-    end
-  end
 
   # Harness surface (acp-cloud-enable): the brokered-EXEC loopback for the StarlingMonkey eval lane
   # (SLICE 1, wb-b9xv.9) — a 127.0.0.1-only listener the SM `child_process` shim fetches (sentinel host

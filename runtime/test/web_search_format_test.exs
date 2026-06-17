@@ -8,10 +8,9 @@ defmodule Workbooks.WebSearchFormatTest do
   use ExUnit.Case, async: true
   alias Workbooks.Agent
 
-  test "empty results explain the ambiguity + nudge file_issue (no false 'topic is empty')" do
+  test "empty results explain the ambiguity (no false 'topic is empty')" do
     out = Agent.format_search_results_for_test([])
     assert out =~ "unavailable"
-    assert out =~ "file_issue"
     refute out == "no results"
   end
 

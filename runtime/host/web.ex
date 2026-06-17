@@ -168,8 +168,6 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(200, json)
   end
 
-  # The groundskeeper voice-agent bridge (wb-3ojf) — own credential, see router.
-  forward("/gk", to: Workbooks.Groundskeeper.Router)
 
   # RCP handshake (RUNTIME-CONNECT-PROTOCOL.md §1): unauthenticated capabilities
   # doc so any client learns the required auth rung + feature surface before

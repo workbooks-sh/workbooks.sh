@@ -128,11 +128,6 @@ defmodule Workbooks.Agent do
       parameters: %{type: "object", properties: %{query: %{type: "string"}}, required: ["query"]}
     }},
     %{type: "function", function: %{
-      name: "file_issue",
-      description: "When you hit a WALL — a capability/tool/skill you NEED that does not exist, a rule that blocks you, a thing you cannot do in your sandbox — FILE IT here instead of stalling, faking, or working around it. The autopoet (the system's self-improvement agent) works these down and grows the capability. Be specific: what you needed, what you tried, how it failed. Filing readily is encouraged — the backlog dedupes. e.g. title=\"no way to POST to a SERP API\", need=\"web search\", tried=\"fetch is GET-only; no curl\".",
-      parameters: %{type: "object", properties: %{title: %{type: "string"}, need: %{type: "string"}, tried: %{type: "string"}}, required: ["title"]}
-    }},
-    %{type: "function", function: %{
       name: "vfs_write",
       description: "Write content to a path in your filesystem (persists across steps). Use for the deliverable, e.g. a brand-book HTML.",
       parameters: %{type: "object", properties: %{path: %{type: "string"}, content: %{type: "string"}}, required: ["path", "content"]}
@@ -500,24 +495,6 @@ defmodule Workbooks.Agent do
     {format_search_results(Workbooks.Browse.Search.query(a["query"] || "", opts)), st, nil}
   end
 
-  # file_issue: the metacognitive seam (wb-9ae). An agent that hits a wall files
-  # it instead of stalling/faking — the lander mislabeling "no web search" as
-  # "env-gated" for 6h is exactly what this prevents.
-  defp exec_one(%{name: "file_issue", args: a}, st) do
-    out =
-      case Workbooks.Autopoet.file_issue(%{
-             title: a["title"],
-             need: a["need"],
-             tried: a["tried"],
-             tenant: st[:agent] || st[:tenant] || System.get_env("WB_TENANT")
-           }) do
-        {:ok, id} -> "issue filed (#{id}) — the autopoet will work it. Note this in your run, then carry on with what you CAN do; do not stall on the gap."
-        {:error, e} -> "could not file issue: #{inspect(e)}"
-      end
-
-    {out, st, nil}
-  end
-
   # Exec agents share an OS workdir (the substrate the toolkit CLIs + the next
   # agent read) — so their "filesystem" tools target that workdir, not the
   # per-agent in-memory VFS. Non-exec agents use the sandboxed VFS.
@@ -647,11 +624,11 @@ defmodule Workbooks.Agent do
   # An EMPTY result is ambiguous: it can mean "nothing matched" OR "the search
   # backend was unavailable" (a provider hiccup, rate-limit, or — on the keyless
   # fallback — a captcha). Say so, so the agent doesn't conclude a topic is empty
-  # when search merely failed — the exact mislabel the file_issue seam exists to catch.
+  # when search merely failed.
   defp format_search_results([]) do
     "no results — NOTE: this can mean the search backend was unavailable from this " <>
-      "host, not only that nothing matched. Don't conclude the topic is empty; " <>
-      "file_issue if a search you expected to work returned empty."
+      "host, not only that nothing matched. Don't conclude the topic is empty just " <>
+      "because a search you expected to work returned empty."
   end
 
   defp format_search_results(hits) do
