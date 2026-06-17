@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en" data-work-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="darkreader-lock"><meta name="color-scheme" content="light dark">
+<title>Native leverage — the HTML5 + CSS surface for workbooks</title>
+<link rel="stylesheet" href="dist/theme.css">
+<style>
+  :root { --ok:#aee5c2; --ok-ink:#0c3a22; --warn:#f3c5a3; --warn-ink:#5a2c10;
+          --no:#e9a8a3; --no-ink:#5a1410; --new:#a8d4f0; --new-ink:#0d3450; }
+  body { margin:0; background:var(--work-bg); color:var(--work-fg);
+         font:15px/1.55 "Geist", ui-sans-serif, system-ui, sans-serif; }
+  code, pre { font-family:"Geist Mono", ui-monospace, "SF Mono", monospace; }
+  .wrap { max-width:1000px; margin:0 auto; padding:40px 28px 120px; }
+  h1 { font-size:25px; letter-spacing:-.02em; margin:0 0 6px; }
+  h1 b { background:var(--work-fg); color:var(--work-bg); padding:2px 9px; border-radius:8px; }
+  .lead { color:var(--work-fg-muted); max-width:74ch; margin:0 0 8px; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.12em; color:var(--work-fg-muted);
+       border-bottom:2px solid var(--work-fg); padding-bottom:10px; margin:52px 0 6px; }
+  h2 .n { float:right; font-size:12px; color:var(--work-fg-subtle); }
+  .layer { color:var(--work-fg-muted); font-size:13.5px; margin:6px 0 18px; max-width:78ch; }
+  .row { display:grid; grid-template-columns:170px 1fr 86px; gap:16px; align-items:start;
+         padding:14px 0; border-bottom:1px solid var(--work-border); }
+  .row .el code { font-weight:600; font-size:13.5px; color:var(--work-brand-ink); }
+  .row .el .leverage { display:block; color:var(--work-fg-muted); font-size:12px; margin-top:4px; line-height:1.4; }
+  .row pre { margin:0; background:#0f1013; color:#dfe4dd; border-radius:8px; padding:10px 12px;
+             overflow:auto; font-size:12px; line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+  .verdict { font:600 10px/1.4 "Geist Mono",monospace; text-transform:uppercase; letter-spacing:.05em;
+             padding:3px 8px; border-radius:20px; text-align:center; height:max-content; }
+  .verdict.ok { background:var(--ok); color:var(--ok-ink); }
+  .verdict.warn { background:var(--warn); color:var(--warn-ink); }
+  .verdict.no { background:var(--no); color:var(--no-ink); }
+  .verdict.new { background:var(--new); color:var(--new-ink); }
+  details { background:var(--work-surface); border:1px solid var(--work-border); border-radius:12px;
+            padding:4px 18px; margin:18px 0; }
+  details > summary { cursor:pointer; font-weight:600; padding:12px 0; }
+  dl.legend { display:grid; grid-template-columns:max-content 1fr; gap:6px 14px; margin:10px 0 0; font-size:13px; }
+  dl.legend dt { font:600 11px/1.6 "Geist Mono",monospace; }
+  .capstone pre { background:#0f1013; color:#dfe4dd; border-radius:12px; padding:18px; overflow:auto;
+                  font-size:12.5px; line-height:1.6; }
+  .pillars { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:20px 0 0; }
+  .pillar { background:var(--work-surface); border:1px solid var(--work-border); border-radius:12px; padding:14px; }
+  .pillar b { font-size:13px; } .pillar p { margin:6px 0 0; font-size:12.5px; color:var(--work-fg-muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><b>Native leverage</b> — the HTML5 + CSS surface for workbooks</h1>
+  <p class="lead">The bet: <b>HTML already carries structure &amp; state, CSS already carries views &amp;
+  queries</b>, so our <code>work-*</code> layer only adds <b>compute &amp; typed edges</b>. The more native
+  does, the less we invent — and the more an agent already <em>knows</em> the syntax. This maps the whole
+  surface, with an honest readability verdict on each.</p>
+
+  <div class="pillars">
+    <div class="pillar"><b>HTML structure</b><p>ol/ul/details/dl — sequence, parallel, disclosure, k/v. The tree IS the flow.</p></div>
+    <div class="pillar"><b>HTML state</b><p>input/form/output — done-ness, params, validity. Native state, no JS.</p></div>
+    <div class="pillar"><b>HTML relations</b><p>link[rel]/a[href]/meta — the web's own tagging + edges. work-ref generalized.</p></div>
+    <div class="pillar"><b>CSS views</b><p>[attr]/:has/:state — a "view" is a selector. The board is a stylesheet.</p></div>
+  </div>
+
+  <details>
+    <summary>The SVG-confusion question (read this first)</summary>
+    <p>Your worry: does this become opaque coordinate-soup like <code>&lt;path d="M12 2L2 7…"&gt;</code>? <b>No —
+    and the reason is structural.</b> SVG is <em>presentational geometry</em>: its attributes are numbers with no
+    meaning to a reader. A workbook is <em>semantic structure</em>: every tag is a meaningful noun
+    (<code>&lt;ol&gt;</code>, <code>&lt;input&gt;</code>, <code>&lt;work-src&gt;</code>) and every attribute is a
+    word (<code>rel="needs"</code>, <code>status="done"</code>). You can read it aloud. The one place it gets
+    denser is a <code>work-ref</code> edge with <code>rel/cond/to</code> — but those are <b>sparse</b> (only where
+    the flow bends) and read like a <code>&lt;link rel&gt;</code> or <code>&lt;a href&gt;</code>, which every
+    agent already knows. Rule we hold: <b>lean on semantic elements; never encode meaning as coordinate/opaque
+    attributes or <code>data-*</code> soup.</b> If a block stops reading like a sentence, that's the smell.</p>
+    <dl class="legend">
+      <dt><span class="verdict ok">use</span></dt><dd>reads clearly, agent-native — lean on it</dd>
+      <dt><span class="verdict warn">dense</span></dt><dd>works, but gets noisy — use sparingly / only where it earns it</dd>
+      <dt><span class="verdict no">avoid</span></dt><dd>opaque or wrong-shaped — don't build meaning on it</dd>
+      <dt><span class="verdict new">2023+</span></dt><dd>recent HTML/CSS — newly viable native leverage</dd>
+    </dl>
+  </details>
+
+  <h2>1 · Structure &amp; flow <span class="n">the tree IS the workflow</span></h2>
+  <p class="layer">Document order + nesting carry sequence, parallelism, and sub-steps for free. The common
+  case (a procedure) needs almost no special vocabulary — it reads like a checklist.</p>
+
+  <div class="row"><div class="el"><code>&lt;ol&gt; &lt;li&gt;</code><span class="leverage">ordered = a SEQUENCE. Document order is the `then` chain.</span></div>
+    <pre>&lt;ol&gt;
+  &lt;li&gt;Build&lt;/li&gt;
+  &lt;li&gt;Deploy&lt;/li&gt;
+&lt;/ol&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;ul&gt; &lt;li&gt;</code><span class="leverage">unordered = PARALLEL. A pool / a crew / fan-out.</span></div>
+    <pre>&lt;ul&gt;            &lt;!-- run concurrently --&gt;
+  &lt;li&gt;&lt;agent&gt;angle A&lt;/agent&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;agent&gt;angle B&lt;/agent&gt;&lt;/li&gt;
+&lt;/ul&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>nesting</code><span class="leverage">an &lt;li&gt; holding its own &lt;ol&gt; = a SUB-FLOW / a loop body.</span></div>
+    <pre>&lt;li&gt;research
+  &lt;ol&gt;&lt;li&gt;search&lt;/li&gt;&lt;li&gt;read&lt;/li&gt;&lt;/ol&gt;
+&lt;/li&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;details&gt; &lt;summary&gt;</code><span class="leverage">progressive disclosure with NO JS — a skill body, a collapsed step, a kit's docs.</span></div>
+    <pre>&lt;details&gt;
+  &lt;summary&gt;deploy skill&lt;/summary&gt;
+  …read-on-demand body…
+&lt;/details&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;dl&gt; &lt;dt&gt; &lt;dd&gt;</code><span class="leverage">native key/value — config, a record's fields, metadata. A dict in HTML.</span></div>
+    <pre>&lt;dl&gt;
+  &lt;dt&gt;model&lt;/dt&gt;&lt;dd&gt;opus&lt;/dd&gt;
+  &lt;dt&gt;every&lt;/dt&gt;&lt;dd&gt;6h&lt;/dd&gt;
+&lt;/dl&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;table&gt;</code><span class="leverage">static tabular data (live/queried grids stay grid-table over a source).</span></div>
+    <pre>&lt;table&gt;&lt;tr&gt;&lt;th&gt;step&lt;/th&gt;&lt;th&gt;owner&lt;/th&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;build&lt;/td&gt;&lt;td&gt;ci&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</pre><span class="verdict warn">dense</span></div>
+
+  <div class="row"><div class="el"><code>h1–h6 / hgroup</code><span class="leverage">the OUTLINE — a workbook's structure; the runtime reads headlines from these.</span></div>
+    <pre>&lt;h2&gt;Phase 1&lt;/h2&gt; … &lt;h3&gt;step&lt;/h3&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>section / figure / hr</code><span class="leverage">regions, a captioned result unit, a phase divider. Semantic layout.</span></div>
+    <pre>&lt;figure&gt;&lt;chart-view …&gt;&lt;figcaption&gt;Q3&lt;/figcaption&gt;&lt;/figure&gt;</pre><span class="verdict ok">use</span></div>
+
+  <h2>2 · State &amp; interaction <span class="n">native state, no JS</span></h2>
+  <p class="layer">Form controls hold state in the DOM and expose it to CSS — so a task's done-ness, a
+  parameter, a schedule, or a guard predicate can be native, queryable, and validatable without a line of JS.</p>
+
+  <div class="row"><div class="el"><code>&lt;input type=checkbox&gt;</code><span class="leverage">a task's DONE state — native, and CSS-queryable via :checked.</span></div>
+    <pre>&lt;li&gt;&lt;input type="checkbox" checked&gt; Build&lt;/li&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>input[type=radio/range/<br>date/number]</code><span class="leverage">a choice (state machine), a tunable param, a schedule instant, a numeric arg.</span></div>
+    <pre>&lt;input type="range" name="threshold" min="0" max="1"&gt;
+&lt;input type="date" name="due"&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;form&gt; + validation</code><span class="leverage">input state AND a free guard system — required/pattern/min/max. Form validity = a native predicate a `when` edge can read.</span></div>
+    <pre>&lt;form&gt;&lt;input required pattern="\\d+"&gt;&lt;/form&gt;
+&lt;!-- :valid / :invalid drive a branch --&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;output&gt;</code><span class="leverage">"this is a computed result" — where a work-src's output renders.</span></div>
+    <pre>&lt;output for="build"&gt;42 blocks&lt;/output&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;select&gt; &lt;option&gt;</code><span class="leverage">an enumerated choice — a parameter, the active state of a machine.</span></div>
+    <pre>&lt;select name="env"&gt;&lt;option&gt;dev&lt;option&gt;prod&lt;/select&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;progress&gt; &lt;meter&gt;</code><span class="leverage">flow completion / a metric / a gauge — native, NO SVG. (The roadmap bar should be this.)</span></div>
+    <pre>&lt;progress value="3" max="9"&gt;&lt;/progress&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;button&gt;</code><span class="leverage">an action — fire a work-ref call, run a node, advance the flow.</span></div>
+    <pre>&lt;button command="run" commandfor="deploy"&gt;Run&lt;/button&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;dialog&gt;</code> · <code>[popover]</code><span class="leverage">native modal / popover-tooltip-menu with NO JS — a detail panel, a confirm, a node's hovercard.</span></div>
+    <pre>&lt;button popovertarget="tip"&gt;?&lt;/button&gt;
+&lt;div id="tip" popover&gt;edge: depends on build&lt;/div&gt;</pre><span class="verdict new">2023+</span></div>
+
+  <div class="row"><div class="el"><code>[contenteditable]</code> · <code>[draggable]</code><span class="leverage">inline-edit a node; drag a card (kanban reorder). Native editing/DnD.</span></div>
+    <pre>&lt;board-task draggable="true" contenteditable&gt;…&lt;/board-task&gt;</pre><span class="verdict warn">dense</span></div>
+
+  <h2>3 · Tagging &amp; relations <span class="n">the web already IS our edge system</span></h2>
+  <p class="layer">This is the deep one: <code>link[rel]</code>, <code>a[href]</code>, and <code>meta</code> are
+  the native "typed relation to a resource" + "document facts." Our <code>work-ref rel=</code> / tagging=C is
+  literally these, generalized — and the microformats <code>rel</code> registry is the prior art.</p>
+
+  <div class="row"><div class="el"><code>&lt;link rel&gt;</code><span class="leverage">a TYPED relation — the native tagging. A workbook declares its type/deps the web's own way.</span></div>
+    <pre>&lt;link rel="kit" href="#self"&gt;
+&lt;link rel="needs" href="cloudflare"&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;meta name&gt;</code><span class="leverage">document-level facts — version, schedule, type facets.</span></div>
+    <pre>&lt;meta name="work:every" content="6h"&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;a href="#id"&gt;</code> + <code>:target</code><span class="leverage">a pointer / goto-step — AND the URL fragment makes the active node STATE addressable (#step3 highlights step3, shareable).</span></div>
+    <pre>&lt;a href="#deploy"&gt;next&lt;/a&gt;
+:target { outline: 2px solid; }   /* active node */</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>[id]</code> · <code>[hidden]</code> · <code>[inert]</code><span class="leverage">node identity; a not-yet-active node (hidden); a blocked subtree (inert — present but disabled).</span></div>
+    <pre>&lt;li id="deploy" inert&gt;blocked until build&lt;/li&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;template&gt;</code><span class="leverage">inert, cloneable content — a kit's reusable artifact. work-template basically IS this.</span></div>
+    <pre>&lt;template id="starter"&gt;…clone-on-use…&lt;/template&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>[itemscope/itemprop]</code><span class="leverage">microdata structured data (records). Standard but VERBOSE — prefer a &lt;dl&gt; or work-* element.</span></div>
+    <pre>&lt;div itemscope itemtype="…"&gt;&lt;span itemprop="x"&gt;…</pre><span class="verdict no">avoid</span></div>
+
+  <div class="row"><div class="el"><code>[data-*]</code><span class="leverage">arbitrary data escape hatch. The smell from the SVG note — if you reach for it, you probably want a semantic element/attr.</span></div>
+    <pre>&lt;li data-foo="bar"&gt;  &lt;!-- usually a mistake --&gt;</pre><span class="verdict no">avoid</span></div>
+
+  <h2>4 · Views &amp; queries — CSS <span class="n">a view is a selector</span></h2>
+  <p class="layer">The biggest leverage. You author <em>one</em> graph; every <em>view</em> of it — board,
+  timeline, filter, dashboard, the drawn edges — is a stylesheet over the same nodes. No view component, no JS.</p>
+
+  <div class="row"><div class="el"><code>[attr] selectors</code><span class="leverage">THE view mechanism. A board column, a filter, a status group = a selector.</span></div>
+    <pre>li:has(:checked) { grid-column: done; }
+[rel="needs"] { /* style dep edges */ }</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>:has()</code><span class="leverage">structural queries — "a flow that HAS a running task", "a step with no owner".</span></div>
+    <pre>work-flow:has([running]) { border-color: gold; }</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>:state()</code> · ElementInternals<span class="leverage">a work-* element exposes :state(running) — live state, CSS-styleable + queryable, zero attribute juggling.</span></div>
+    <pre>work-src:state(running) { … }</pre><span class="verdict new">2023+</span></div>
+
+  <div class="row"><div class="el"><code>:checked :valid<br>:empty :not()</code><span class="leverage">read native state — done items, valid forms, empty slots — straight into the view.</span></div>
+    <pre>li:not(:has(:checked)) { /* the To-do column */ }</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>counter() + ::before</code><span class="leverage">auto-numbering &amp; generated labels — step numbers, section indices, without hardcoding.</span></div>
+    <pre>li::before { content: "step " counter(s); }</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>anchor positioning</code><span class="leverage">TETHER elements — draw flow EDGES / connectors / tooltips between nodes WITHOUT SVG or JS.</span></div>
+    <pre>.edge { position-anchor: --build; top: anchor(bottom); }</pre><span class="verdict new">2023+</span></div>
+
+  <div class="row"><div class="el"><code>@container</code><span class="leverage">a view adapts to its CONTAINER, not the screen — the same board renders in a sidebar or full-bleed.</span></div>
+    <pre>@container (min-width: 600px) { .cols { … } }</pre><span class="verdict new">2023+</span></div>
+
+  <div class="row"><div class="el"><code>view-transition</code><span class="leverage">ANIMATE state changes — a card sliding columns when a task completes — declaratively.</span></div>
+    <pre>::view-transition-group(task) { … }</pre><span class="verdict new">2023+</span></div>
+
+  <div class="row"><div class="el"><code>--custom-props</code> · <code>@property</code><span class="leverage">data/config/state that cascades &amp; animates; --status inherits to children.</span></div>
+    <pre>:root { --accent: var(--work-brand); }</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>@scope</code> · <code>@layer</code><span class="leverage">scope a kit's styles to its subtree; layer theme under overrides. Composition hygiene.</span></div>
+    <pre>@scope (chart-view) { … }</pre><span class="verdict new">2023+</span></div>
+
+  <h2 class="capstone">Capstone — all of it in one readable file</h2>
+  <p class="layer">A cron'd research workflow that is <em>also</em> a checklist <em>also</em> a board — read it
+  top to bottom. Native structure (ol/ul/details), native state (checkbox), one edge where it loops
+  (work-ref), one CSS view (the board), tagging via link[rel]. Nothing reads like SVG.</p>
+  <pre>&lt;link rel="app" href="#self"&gt;
+&lt;work-flow name="auto-research"&gt;
+  &lt;meta name="work:every" content="6h"&gt;          &lt;!-- cron --&gt;
+  &lt;ol&gt;                                            &lt;!-- ordered ⇒ sequence --&gt;
+    &lt;li&gt;&lt;input type="checkbox"&gt; pick a topic
+        &lt;work-src lang="js"&gt;return pickTopic()&lt;/work-src&gt;&lt;/li&gt;
+    &lt;li id="search"&gt;&lt;input type="checkbox"&gt; search
+        &lt;work-src lang="js"&gt;return await search(topic)&lt;/work-src&gt;
+        &lt;work-ref rel="when" cond="hasMore" to="search"/&gt;   &lt;!-- the one loop edge --&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;ul&gt;                                       &lt;!-- unordered ⇒ run in parallel --&gt;
+          &lt;li&gt;&lt;agent&gt;angle A&lt;/agent&gt;&lt;/li&gt;
+          &lt;li&gt;&lt;agent&gt;angle B&lt;/agent&gt;&lt;/li&gt;
+        &lt;/ul&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;details&gt;&lt;summary&gt;write-up&lt;/summary&gt;
+          &lt;agent&gt;summarize the findings&lt;/agent&gt;&lt;/details&gt;&lt;/li&gt;
+  &lt;/ol&gt;
+&lt;/work-flow&gt;
+
+&lt;style&gt;  /* the "board" view — pure CSS over the same nodes, no component */
+  li:has(:checked)       { /* → Done column */ }
+  li:not(:has(:checked)) { /* → To-do column */ }
+&lt;/style&gt;</pre>
+</div>
+</body>
+</html>
