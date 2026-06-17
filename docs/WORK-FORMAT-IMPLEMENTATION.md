@@ -332,6 +332,174 @@ never block the guest call); double-write divergence (mitigate: single `span/3` 
 
 ---
 
+## §8. Delivery: SSR from the nexus (static bundle · nexus SSR · live-over-RCP)
+
+**The framing.** One authored workbook, *every* delivery mode — no rewrite. A `.work`
+tree compiles once; how it reaches a reader is a deployment choice, not an authoring
+one. SSR does **not** eclipse the static bundle; it's the rung you climb when a nexus
+is present. The three modes are a ladder, and **every workbook can ride all three**:
+
+| mode | who renders | when | needs a nexus? |
+|---|---|---|---|
+| **static bundle** | the browser (hydrates the gzip blob) | zero-infra / public / edge | no |
+| **nexus SSR** | `server` regions on the BEAM; `client` units = islands | a nexus is declared | yes |
+| **live SSR** | stateful server render + diffs over RCP WS | interactive, stateful UI | yes |
+
+The whole ladder falls straight out of the **placement model** (§2, the `target`
+keyword / 2.4 plumbing): a unit is `client` or `server`, and that single bit decides
+*who renders it*. `server` units render on the trusted BEAM tier; `client` units are
+the islands hydrated on top. "Trusted" = allowed-more-caps, **not** sandbox escape —
+a `server` region is still wasm-isolated where it runs guest code; it simply runs on a
+nexus the author owns and may be granted secrets/db/net (§2.5 grants, §3 Dock).
+
+Glossary of the real modules this touches:
+
+- `runtime/host/bundle.ex` (`Workbooks.Bundle`) → packs/unpacks the portable `.wbundle`
+  zip (HTML + VFS + manifest); the decompression-bomb guard mirrored by the JS loader.
+- `runtime/host/public_web.ex` (`Workbooks.PublicWeb`) → `static_page/2` / `static_doc/3`:
+  the **static** public plane — bytes only, no backend call-home. Serves a complete
+  HTML workbook verbatim; wraps a fragment in the doc shell.
+- `runtime/host/web.ex` (`Workbooks.Web`, Bandit Plug router, `WB_WEB=1`) +
+  `runtime/host/web/pages.ex` (`Workbooks.Web.Pages.workbook_page/2`) → the **authed
+  control-plane** page that wires fetch/WS to the nexus (contrast `static_page/2`).
+- `runtime/host/instance.ex` + `instance/imports.ex` → the typed Dock that runs a
+  `server` unit's compiled component, gated by `Policy.caps` (= where `server` compute
+  executes during a render).
+- `runtime/host/socket.ex` (`Workbooks.Socket`, `@behaviour WebSock`) → the **live**
+  WS bridge: each frame `{"fn", "org"}` → JSON reply, "the interactive upgrade over the
+  HTTP backend." This is the RCP transport for live SSR diffs.
+- `runtime/host/phoenix_socket.ex` + `web.ex:get "/socket/websocket"` → the multiplexed
+  Phoenix-v2 socket already mounted; RCP handshake at `/.well-known/workbooks-runtime`
+  (`web/capabilities.ex`).
+
+This is **file-level and sequenced**, same as §1–§7. Each step is **[WIRING]**
+(composing live machinery) or **[NEW]**.
+
+### §8.1 Static bundle — already shipped, the floor [WIRING]
+
+This mode exists. `work bundle` (CLI `cli/src/main.rs:Cmd::Bundle` → `local::bundle`)
+weaves the tree into one self-contained gzipped `.html` (`wbundle-html/1`): the page +
+a compressed blob of wasm/JS/data, hydrated client-side by `web/wb-bundle-loader.js`.
+`Workbooks.Bundle.pack/1` is the runtime-side packer; `PublicWeb.static_page/2` serves
+the result as inert bytes (CSP: hydrated HTML/JS/wasm stays inert until explicitly
+evaluated). **Nothing new here** — it's the baseline every other mode degrades to when
+no nexus is declared. The weave already prints `weave ssr (beam) ✓  islands N ✓`
+(see `work-format.js:WEAVE`), so the artifact is *already shaped* for SSR; §8.2 makes
+that line do real server work instead of pre-rendering everything to the blob.
+
+### §8.2 Nexus SSR — `server` regions render on the BEAM; `client` units are islands [NEW + WIRING]
+
+**Problem.** Today `workbook_page/2` serves a page whose content is rendered up-front
+and whose `server` interactions are *fetched after load*. The placement model lets us do
+better: a `server` region can be **rendered on the BEAM at request time** and streamed
+as HTML, with only the `client` units shipped as hydration islands. That's islands
+architecture (Astro-shaped), and the `target` bit already tells us which is which.
+
+**Approach.**
+
+1. **[NEW] `runtime/host/web/ssr.ex` (`Workbooks.Web.SSR`)** — the render orchestrator.
+   Input = the woven workbook (the `tangle_plan` units from `Workbooks.Workbook`, each
+   now carrying `target` from §2.4). It partitions units by placement:
+   - `server` units → **render on the BEAM now**. A `server` Elixir unit runs natively
+     (§2.5: `server` is Elixir-on-BEAM, no wasm world); a `server` unit in another lang
+     runs its compiled component through an `Instance` (§3 Dock), granted its declared
+     caps. The unit's render output (HTML string / element subtree) is spliced into the
+     document at its placement marker.
+   - `client` units → emit an **island placeholder** (`<div data-wb-island="<name>">`)
+     plus the unit's hydration bundle reference. Not rendered server-side; woken in the
+     browser exactly as the static blob wakes them.
+2. **[WIRING] serve path.** `web.ex:workbook_page` route delegates to `SSR.render/2`
+   instead of `Pages.workbook_page/2` for nexus-backed apps (an app that declares a
+   `nexus` URL in its index — `c-nx-backs`). The Bandit router streams the assembled
+   HTML (`send_chunked` / `send_resp`); the head/shell + island loader come from the
+   **same** `static_doc/3` shell `PublicWeb` already emits, so static and SSR pages share
+   one shell — no second template (Golden Rule 1).
+3. **[WIRING] island hydration.** The client loader (`web/wb-bundle-loader.js`) already
+   hydrates islands from the gzip blob. Generalize it: an island's source can come from
+   the **inline blob** (static mode) OR a **nexus fetch** (`/api/island/<name>`, SSR
+   mode). Same `hydrate(island)` entry; the source URL is the only difference. The
+   decompression-bomb caps (`Bundle` + the loader mirror) apply to both.
+4. **[WIRING] degradation.** If no `nexus` is declared, `SSR.render/2` is never reached
+   — the app builds to a pure static bundle (§8.1). Same source, the deploy target picks
+   the path. The compiler's posture gate (`gated_data`/`gated_route`, `c-model-dist`)
+   already keeps secrets + gated rows out of whichever artifact ships.
+
+**Test strategy.** Render a 2-unit workbook (one `server` + one `client`): assert the
+HTML response contains the `server` unit's rendered output *inline* and a
+`data-wb-island` placeholder (not rendered) for the `client` unit. Assert a no-nexus
+build of the same source produces a static bundle with both units in the blob. Snapshot
+the shared shell from `static_doc/3` across both paths (must be byte-identical head).
+
+**Ordering / deps.** Depends on §2.4 (`target` on every unit) and §3 (Dock to run a
+`server` component during render). `server`-Elixir-only render can land before §3;
+non-Elixir `server` render waits on §3.
+
+**Risk.** MED. Risks: a `server` render that blocks (DB/net) stalling the stream
+(mitigate: render `server` regions with a timeout + an island fallback, same
+placeholder the `client` path uses); shell divergence between static and SSR (mitigate:
+the single-shell snapshot test).
+
+### §8.3 Live SSR — stateful server render + diffs over RCP WS [NEW + WIRING]
+
+**Problem.** §8.2 is request-shaped: render once, hydrate, done. Interactive apps want a
+**stateful** server render where a server-held view pushes **diffs** as state changes —
+LiveView-*shaped*. We do **not** adopt Phoenix LiveView wholesale: that would be a second
+runtime contract the UI manages, which violates the one-contract canon (CLAUDE.md
+architecture canon). Instead we deliver the same capability over **our own RCP WS** — the
+nexus is already BEAM, so a stateful per-connection render process is natural.
+
+**Approach.**
+
+1. **[WIRING] transport already exists.** `Workbooks.Socket` is the live bridge — each
+   frame `{"fn","org"}` → JSON reply, mounted as "the interactive upgrade over the HTTP
+   backend." `web.ex:get "/socket/websocket"` (`PhoenixSocket`) multiplexes topics; RCP
+   handshake at `/.well-known/workbooks-runtime` advertises the surface. The socket is
+   the wire — **do not add a new one**.
+2. **[NEW] `runtime/host/web/live.ex` (`Workbooks.Web.Live`)** — a per-connection live
+   view process (a `GenServer` keyed by socket session). It holds the `server` region's
+   state, renders it to HTML on mount, and on each state change computes a **minimal diff**
+   (a list of `{island_id | region_id, patch}` ops) pushed as an RCP frame. State changes
+   come from: a client event frame (`{"fn":"event", ...}`), a `server` unit's own
+   emit, or a subscribed data source (`data_source/`) updating. This is the genuinely new
+   piece — a stateful render loop, but a small one (render → diff → push).
+3. **[WIRING] diff op into the existing socket.** Extend `Socket.dispatch/2` (today
+   `parse`/`fn`) with a `mount`/`event` op that routes to a `Web.Live` process and streams
+   its diff frames back. The frame envelope stays `{...}` JSON over the same WS — no new
+   protocol, just two new ops (one-contract canon honored).
+4. **[WIRING] client patch applier.** The island loader (`wb-bundle-loader.js`) gains a
+   `applyPatch(frame)` that maps a diff op onto the live DOM (the islands it already
+   manages). Same loader, same islands as §8.2 — live SSR is §8.2 + a socket + a patch
+   applier, not a separate stack.
+5. **[WIRING] escalation, not a fork.** An app opts into live by declaring an
+   interactive `server` region; absent that it stays at §8.2 (request SSR) or §8.1
+   (static). One source, three rungs — the author never picks a "framework."
+
+**Test strategy.** Mount a live view over a test WS: assert the initial frame is full
+HTML; push an event frame; assert the reply is a **diff** (only the changed region's
+patch, not a full re-render). Assert an idle connection pushes nothing (the
+"connected, quiet" invariant `PhoenixSocket` already documents). Assert no second
+socket/route is introduced (route-count snapshot).
+
+**Ordering / deps.** Depends on §8.2 (islands + the shared shell) and §3 (Dock for
+`server` compute inside the live loop). Land §8.2 → `Web.Live` process → socket ops →
+patch applier.
+
+**Risk.** MED–HIGH. Risks: per-connection process leakage (mitigate: link to the socket,
+terminate on close — `Socket.terminate/2` already exists); a diff that desyncs from the
+client DOM (mitigate: a full-resync op the client can request; version each region's
+state); re-introducing a parallel contract (mitigate: enforce "new ops, not new socket"
+in review — the route-count snapshot guards it).
+
+### §8 dependency note
+
+All three modes consume the **placement model (§2.4 `target`)** — that single bit is
+what makes "one source, every delivery" true. §8.1 needs nothing new. §8.2 needs §2.4
+(+ §3 for non-Elixir `server` render). §8.3 needs §8.2 + §3. None of them re-render the
+static bundle's job — they *add* a server tier where a nexus exists and degrade cleanly
+to bytes where it doesn't.
+
+---
+
 ## Dependency graph (sequence)
 
 ```
@@ -347,11 +515,14 @@ never block the guest call); double-write divergence (mitigate: single `span/3` 
                        ▼
         §4 default dataflow = componentized + typed edges
                        │
-        ┌──────────────┼───────────────┐
-        ▼              ▼               ▼
-   §6 WIT+WASI    §5 Popcorn/AtomVM   §7 OpenTelemetry
-   (verify)       (parallel)          (emit first, edge-ctx last)
+        ┌──────────────┼───────────────┬───────────────┐
+        ▼              ▼               ▼               ▼
+   §6 WIT+WASI    §5 Popcorn/AtomVM   §7 OpenTelemetry  §8 Delivery / SSR
+   (verify)       (parallel)          (emit→edge-ctx)   (8.1 ships · 8.2→8.3)
 ```
+
+§8 rides §2.4 (`target`) + §3 (Dock for `server` render). 8.1 (static bundle) is live
+today; 8.2 (nexus SSR / islands) and 8.3 (live-over-RCP) layer on once §3 lands.
 
 Land order: **§2.4 → §2 → §1 → §3 → §4 → §6(verify) → §7 → §5**. §7.1 (emit) and §5 (lane) can start in
 parallel once §1 exists.
