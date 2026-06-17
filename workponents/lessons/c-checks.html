@@ -1,0 +1,32 @@
+<script type="text/plain" id="c-checks">
+# Checks & queries
+
+An agent reads the code **through the graph** — not by grepping. The `work` CLI
+exposes it as verbs that return *typed, located* results:
+
+work check :enrich            # type-check + lint along the edges
+  => ok    exports enrich/1 · imports net
+  ⚠ unused grant net          # an import with no use — a graph lint
+
+work why :score               # who depends on :score (rdeps)
+  => pipeline (step) · ranked (dataflow)
+
+work near :score              # the context subgraph — structural + semantic
+  => Lead (type) · enrich (sibling) · "scoring the leads" (prose, by meaning)
+
+At runtime the *same* graph is live: OpenTelemetry spans map onto nodes, so
+"which unit is slow" is a node, not a log line. Structure (WIT) and behaviour
+(OTel) on one surface — the feedback loop an agent actually acts on.
+</script>
+
+<template id="e-checks">
+  <div class="kick">code graph · checks &amp; queries</div>
+  <h2>Checks &amp; queries <span class="lane l-fn">function</span></h2>
+  <p class="tagline">The agent-facing surface — type-check, lint, navigate, and read telemetry as typed, located feedback.</p>
+  <h3>Feedback an agent can act on</h3>
+  <ul><li class="pro"><code>work check</code> — WIT type-check along edges + graph-lints (dead code = unreachable node, unused <code>grant</code> = import-with-no-use, dangling <code>:name</code> = broken edge) as <code>{unit, edge, expected, got}</code>, not a stringly dump.</li>
+  <li class="pro"><code>work why :x</code> / <code>work near :x</code> — rdeps and the <b>context subgraph</b> (structural + semantic neighbors) — the agent's retrieval.</li>
+  <li class="pro"><b>telemetry</b> — OTel spans mapped to nodes; slow or erroring units are graph nodes, not log lines.</li></ul>
+  <h3>Why it's the multiplier</h3>
+  <p>Agents only have a shell, so the graph ships as CLI verbs returning WIT-typed results. The agent <b>navigates, type-checks, lints, and reads telemetry over one typed graph</b> — its whole feedback loop is structured and located, never a grep. That's what makes the codebase legible to a model. See [[The graph]], [[The contract]].</p>
+</template>

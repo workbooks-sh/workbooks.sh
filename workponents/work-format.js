@@ -160,11 +160,16 @@
         { nm:"The one seam",   tag:"request → membrane → provider",   fn:"the dock",   lg:"—",      mode:"work", code:"c-dock-seam", exp:"e-dock-seam" },
         { nm:"Providers",      tag:"local vs runtime, same request",  fn:"the dock",   lg:"—",      mode:"work", code:"c-dock-prov", exp:"e-dock-prov" },
         { nm:"The contract",   tag:"a WIT world: exports + imports",  fn:"the dock",   lg:"wit",    mode:"work", code:"c-rt-wit",   exp:"e-rt-wit" },
-        { nm:"The graph",      tag:"units = nodes, WIT edges = wiring", fn:"the graph", lg:"live",   graph:true,  exp:"e-graph" },
         { nm:"What the nexus backs", tag:"the optional server tier",  fn:"index.work", lg:"—",      mode:"work", code:"c-nx-backs",  exp:"e-nx-backs" },
         { nm:"Extrapolate",    tag:"server work: build OR nexus",     fn:"page.work",  lg:"elixir", mode:"work", code:"c-nx-extrap", exp:"e-nx-extrap" },
         { nm:"Data sources",   tag:"values · blob · resource",        fn:"page.work",  lg:"elixir", mode:"work", code:"c-dt-src",    exp:"e-dt-src" },
         { nm:"Query & show",   tag:"select, then render itself",      fn:"page.work",  lg:"elixir", mode:"work", code:"c-dt-query",  exp:"e-dt-query" },
+      ] },
+    { title:"The Code Graph", blurb:"three extractors, one graph — how an agent measures the code",
+      lessons:[
+        { nm:"The graph",      tag:"units = nodes, WIT edges = wiring", fn:"the graph",  lg:"live",   graph:true,  exp:"e-graph" },
+        { nm:"Extractors",     tag:"literate · AST · WIT → one graph",  fn:"the graph",  lg:"—",      mode:"work", code:"c-extractors", exp:"e-extractors" },
+        { nm:"Checks & queries", tag:"typed feedback an agent acts on", fn:"work graph", lg:"cli",    mode:"work", code:"c-checks",     exp:"e-checks" },
       ] },
     { title:"Security", blurb:"what publishing exposes",
       lessons:[
