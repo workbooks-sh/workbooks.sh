@@ -221,13 +221,18 @@ Mitigated by the cache and the untyped fallback. No new security surface.
 
 ---
 
-## §5. Popcorn / AtomVM as the Elixir-in-wasm runtime for client / sandbox
+## §5. Popcorn / AtomVM as the Elixir-in-wasm runtime for client (browser only)
 
-**Problem (verified).** The `server` target runs Elixir on the BEAM natively — fine. But the spec lets
-`client`/`sandbox` blocks be authored in Elixir too (literate `.work` = markdown + Elixir), and there is
-**no Elixir→wasm lane** in `compilers/`. `mix.exs` has no `popcorn`/`atomvm`/`orb` dep (verified: only
-`wasmex`). The memory canon: **Popcorn/AtomVM is the Elixir-in-wasm runtime; Orb is a low-level escape
-hatch, NOT the primary path.**
+**Decision (corrected).** `server` Elixir runs **natively on the BEAM** — real OTP, NOT Popcorn/wasm.
+Popcorn is **client-only**: the browser has no BEAM, so a `client` Elixir block needs an Elixir-in-wasm
+runtime. Do NOT route `server` through Popcorn. Server isolation / multi-tenancy is the **nexus's** job
+(BEAM tenant isolation + capability policy via the Dock + managed egress), not wasm-boxing — that's its
+own open security-model task, tracked separately.
+
+**Problem (verified).** The `client` placement lets blocks be authored in Elixir (literate `.work` =
+markdown + Elixir), and there is **no Elixir→wasm lane** in `compilers/`. `mix.exs` has no
+`popcorn`/`atomvm`/`orb` dep (verified: only `wasmex`). The memory canon: **Popcorn/AtomVM is the
+Elixir-in-wasm runtime; Orb is a low-level escape hatch, NOT the primary path.**
 
 **Approach [NEW].** New lane `runtime/host/compilers/elixir.ex` (`Workbooks.Compilers.Elixir`) +
 `Workbooks.Compilers.elixir_compile_to_wasm/3` delegated from `compilers.ex` (mirroring
@@ -237,15 +242,14 @@ hatch, NOT the primary path.**
    packs into the AtomVM wasm runtime image Popcorn produces. Provision the AtomVM wasm + Popcorn packer
    through `tools.ex` (`@required` list, `ensure!`) the same way javy/wasm-tools are provisioned.
 2. The packed artifact is a **core module / WASI command**; feed it through §1's `componentize_core` so
-   an Elixir `client`/`sandbox` unit gets a generated WIT world (§2) and docks like any other lane.
-3. **Target routing:** `target: server` → run on the host BEAM (no wasm); `target: client | sandbox` →
-   Popcorn/AtomVM lane → component. The CLI keyword from §2.4 selects.
-4. **Orb stays an escape hatch:** expose `target: sandbox, via: :orb` only for the rare hand-tuned
-   numeric kernel; not the default, not in the happy path. Do not let Orb become the primary Elixir→wasm
-   route (canon).
+   an Elixir `client` unit gets a generated WIT world (§2) and docks like any other lane.
+3. **Placement routing (§2.4 `place`):** `place: server` → native BEAM (no wasm); `place: client` →
+   Popcorn/AtomVM lane → component. Foreign-language units (anywhere) compile to wasm regardless.
+4. **Orb stays an escape hatch:** expose `client, via: :orb` only for the rare hand-tuned numeric kernel;
+   not the default, not in the happy path. Do not let Orb become the primary Elixir→wasm route (canon).
 
-**Test strategy.** Smoke: compile `def add(a,b), do: a+b` as a `sandbox` Elixir unit, instantiate, call
-through the Dock, assert result. Parity: the SAME Elixir source as `server` (BEAM) vs `sandbox` (AtomVM)
+**Test strategy.** Smoke: compile `def add(a,b), do: a+b` as a `client` Elixir unit, instantiate, call
+through the Dock, assert result. Parity: the SAME Elixir source as `server` (BEAM) vs `client` (AtomVM)
 produces identical output. Provisioning test: `tools.ex` self-heals the AtomVM/Popcorn assets.
 
 **Ordering / deps.** Independent of §1–§4 except it **consumes** §1's `componentize_core` and §2's

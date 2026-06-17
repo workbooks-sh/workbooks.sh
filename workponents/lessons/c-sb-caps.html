@@ -19,17 +19,20 @@ it **once** to a plain Elixir module attribute and stamp it onto many:
 
 @pricing grant: [:net, :kv], memory: "128mb", timeout: 30_000
 
-sandbox :quotes,  is: @pricing do … end
-sandbox :billing, is: @pricing do … end
+sandbox :quotes,  @pricing do … end
+sandbox :billing, @pricing do … end
 
-`@pricing` is a reusable sandbox *profile* — ordinary Elixir, nothing new. Change it
-in one place and every box stamped with `is: @pricing` moves together.
+`@pricing` is just the box's options as a plain keyword list, so you pass it
+straight in — no special keyword needed. Override one with ordinary Elixir:
+`@pricing ++ [timeout: 60_000]`. Change the profile in one place and every box that
+passes it moves together.
 
-The enforcement is the part worth trusting. Caps are checked **by construction**:
-each capability a unit uses becomes an import in its compiled WIT world, and a unit
-that imports a capability its sandbox never granted **fails to instantiate** — it
-cannot start, let alone run. There's no runtime check to forget and no flag to set
-the wrong way; an ungranted `net` is just a component that won't load.
+The enforcement is the part worth trusting. For a wasm unit it's **structural**:
+each capability becomes an import in the unit's compiled WIT world, and importing one
+the sandbox never granted means the component **fails to instantiate** — it cannot
+start, let alone run. For native server Elixir, the **nexus** enforces the very same
+grant at the capability seam (the Dock), so an ungranted `net` is simply unreachable.
+Either way there's no runtime check to forget and no flag to set the wrong way.
 
 This is why placement and caps are different axes. `server` is the tier *allowed* to
 ask for `net` or the database; the sandbox's `grant:` is where you actually hand
@@ -45,6 +48,6 @@ placement forbids. Where it runs sets the ceiling; the grant sets the reach. #sa
   <li class="pro"><b><code>memory:</code></b> — the allocation ceiling.</li>
   <li class="pro"><b><code>timeout:</code></b> — the wall-clock a call may take before it's stopped.</li></ul>
   <h3>Enforced by construction, not by check</h3>
-  <p>Each cap a unit uses is an <b>import in its WIT world</b>. Import one the sandbox didn't grant and the component <b>fails to instantiate</b> — it never starts. No runtime gate to bypass, no flag to misset.</p>
+  <p>For a wasm unit, each cap is an <b>import in its WIT world</b> — import one the sandbox didn't grant and the component <b>fails to instantiate</b>. For native server Elixir, the <b>nexus</b> enforces the same grant at the Dock. Either way there's no gate to bypass, no flag to misset.</p>
   <div class="note">Placement sets the ceiling, the grant sets the reach: <code>server</code> is <i>allowed</i> net/db/secrets; <code>grant:</code> actually hands them over; a <code>client</code> unit can't be granted past what the browser permits. See [[Placement — where code runs]].</div>
 </template>

@@ -11,8 +11,8 @@ reads it?* (see [[The four lanes]]). #primitive
   ![caption](src)        inline image — a lone one renders as a figure
   - [ ] casual todo      a checklist for a human (not tracked data)
 
-**Function** — code that *runs*; it all compiles to wasm, and the first word
-is the **placement** — where it runs:
+**Function** — code that *runs*; the first word is the **placement** — where it
+runs (`client` = wasm in the browser, `server` = native Elixir on the BEAM):
 
   client :x  do … end       # in the browser (any lang; default :elixir)
   server :x  do … end       # on the backend — the trusted tier
