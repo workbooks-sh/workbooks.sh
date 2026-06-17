@@ -24,6 +24,9 @@ defmodule CliNameTest do
   # IDs (`wb-0lw8` — hyphen, no space) and `workbooks`/`webhook` safe. The lookbehind
   # rejects mid-word matches (`newb deploy`).
   @cmd_re ~r/(?<![\w-])wbx?\s+[A-Za-z]/
+  # `wb #{interp}` — an interpolated command (`"wb #{task} …"`), which the plain
+  # `[A-Za-z]` form missed and shipped a stale `wb`. Requires `#{` (not `wb # comment`).
+  @interp_re ~r/(?<![\w-])wbx?\s+#\{/
   # Inline code-fenced bare command: `wb` / `wbx` / `wb ` at a backtick.
   @backtick_re ~r/`wbx?(?:`|\s)/
   @escript_re ~r/\bwb-rt\b/
@@ -37,8 +40,13 @@ defmodule CliNameTest do
   # which is now `work`. A stale one ships the agent a dead command suggestion (the bug
   # this gate now prevents — toolkit_injection direct-verb).
   @cli_bin_re ~r/CLI_BIN:\s*wbx?\b/i
+  # The HTML `cli="wb"` attribute on a <work-toolkit>/manifest — the work-* analogue
+  # of CLI_BIN. Same meaning ("this kit's binary IS the built-in CLI" = now `work`),
+  # but an attribute the org-form @cli_bin_re can't see. A stale one shipped agents a
+  # dead `wb …` suggestion (the toolkit-injection direct-verb bug).
+  @cli_attr_re ~r/\bcli="wbx?"/
 
-  @patterns [@cmd_re, @backtick_re, @escript_re, @tool_re, @usage_re, @bare_wbx_re, @cli_bin_re]
+  @patterns [@cmd_re, @interp_re, @backtick_re, @escript_re, @tool_re, @usage_re, @bare_wbx_re, @cli_bin_re, @cli_attr_re]
 
   # Whole-repo line-by-line scan over every tracked source file — inherently slow,
   # well past the 60s ExUnit default.

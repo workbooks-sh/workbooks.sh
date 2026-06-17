@@ -573,7 +573,7 @@ defmodule Workbooks.Agent do
     # deploy; an exec-denied (cloud/shared) tenant's agent must not. The read +
     # tenant-scoped verbs (model/var/app/env/telemetry/ledger/…) stay ungated.
     if effectful_wb?(argv) and not Map.get(st, :exec, false) do
-      {"wb #{List.first(argv)} not permitted (no exec capability)", st, nil}
+      {"work #{List.first(argv)} not permitted (no exec capability)", st, nil}
     else
       {Workbooks.CLI.call(argv, st.tenant), st, nil}
     end

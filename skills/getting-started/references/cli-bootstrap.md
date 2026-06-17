@@ -16,10 +16,10 @@ Legacy alternatives (a Rust `work` from the dead substrates monorepo, the npm
 ```sh
 cd runtime
 mix deps.get            # first time only
-mix escript.build       # produces ./wb
+mix escript.build       # produces ./work
 # put it on PATH, e.g.:
-ln -sf "$PWD/wb" /usr/local/bin/wb    # or add runtime/ to PATH
-wb --version
+ln -sf "$PWD/work" /usr/local/bin/work    # or add runtime/ to PATH
+work --version
 ```
 
 Non-interactive hygiene (agent shells alias `-i`):
@@ -38,7 +38,7 @@ install path — it is **not** the same binary as `work`.
 ## First-run sanity
 
 ```sh
-wb --version          # platform CLI present
+work --version          # platform CLI present
 work dev info           # demo-env dashboard (runtime target, /health, model key, toolkits root)
 ```
 
