@@ -77,22 +77,25 @@ defmodule Workbooks.WorkbookHtmlTest do
     assert comp["src"] =~ "pub fn add"
   end
 
-  test "tangle_plan carries each unit's target + grants; grants flow into world imports" do
+  test "tangle_plan carries each unit's place + sandbox + grants; grants flow into world imports" do
     src = """
     <work-flow title="svc">
-      <work-component title="enrich" lang="rust" target="sandbox" grant="net" out="scored">x</work-component>
-      <work-component title="render" lang="js" target="client" uses="ui">y</work-component>
-      <work-component title="schema" target="bogus">z</work-component>
+      <work-component title="enrich" lang="rust" place="server" in="pricing" grant="net" out="scored">x</work-component>
+      <work-component title="render" lang="js" place="client" uses="ui">y</work-component>
+      <work-component title="schema" place="bogus">z</work-component>
     </work-flow>
     """
 
     [world] = Workbook.tangle_plan(src)["worlds"]
     [enrich, render, schema] = world["components"]
-    assert enrich["target"] == "sandbox"
+    # placement is one of two places; `in:` names the sandbox the unit is bound to.
+    assert enrich["place"] == "server"
+    assert enrich["sandbox"] == "pricing"
     assert enrich["grants"] == ["net"]
-    assert render["target"] == "client"
-    # an unrecognized target normalizes to nil = a static definition.
-    assert schema["target"] == nil
+    assert render["place"] == "client"
+    assert render["sandbox"] == nil
+    # an unrecognized placement normalizes to nil = a static definition.
+    assert schema["place"] == nil
     # grants ∪ uses make up the world's WIT imports (sorted, deduped).
     assert world["imports"] == ["net", "ui"]
   end

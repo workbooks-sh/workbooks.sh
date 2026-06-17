@@ -129,10 +129,17 @@
       ] },
     { title:"Code", blurb:"Elixir — everything that runs",
       lessons:[
-        { nm:"Targets",       tag:"client · sandbox · server",       fn:"page.work", lg:"target",        mode:"work", code:"c-syn-fence",   exp:"e-syn-fence" },
-        { nm:"Compute",       tag:"a sandbox def → wasm",          fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-compute", exp:"e-syn-compute", run:RUN_SCORE },
+        { nm:"Placement",     tag:"client · server — where code runs", fn:"page.work", lg:"place",        mode:"work", code:"c-syn-fence",   exp:"e-syn-fence" },
+        { nm:"Compute",       tag:"a unit → wasm",                 fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-compute", exp:"e-syn-compute", run:RUN_SCORE },
         { nm:"Workflows",     tag:"if it runs, it's Elixir",       fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-flow",    exp:"e-syn-flow", run:RUN_FLOW },
         { nm:"Tests",         tag:"red test, no bundle",           fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-test",    exp:"e-syn-test" },
+      ] },
+    { title:"Sandboxing", blurb:"named isolation units — group, separate, and cap your code",
+      lessons:[
+        { nm:"What a sandbox is", tag:"a named isolation unit",        fn:"page.work", lg:"elixir", mode:"work", code:"c-sb-what",  exp:"e-sb-what" },
+        { nm:"Co-location & in:", tag:"nest it, or name it",           fn:"page.work", lg:"elixir", mode:"work", code:"c-sb-in",    exp:"e-sb-in" },
+        { nm:"Caps & limits",     tag:"grant, memory, timeout",        fn:"page.work", lg:"elixir", mode:"work", code:"c-sb-caps",  exp:"e-sb-caps" },
+        { nm:"Cross-sandbox edges", tag:"separate boxes, host-brokered", fn:"page.work", lg:"elixir", mode:"work", code:"c-sb-edges", exp:"e-sb-edges" },
       ] },
     { title:"Data", blurb:"one typed surface — WIT types, no SQL-as-format",
       lessons:[

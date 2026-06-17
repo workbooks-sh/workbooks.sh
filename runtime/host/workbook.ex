@@ -236,9 +236,12 @@ defmodule Workbooks.Workbook do
       name: a["title"] || "",
       # `lang` present (even empty) = a declared source block.
       lang: a["lang"],
-      # The target keyword: where the unit runs — client / sandbox / server.
-      # nil = a static definition (no compile target).
-      target: target_of(a["target"]),
+      # Placement — where the unit runs: client (browser) or server (backend).
+      # nil = a static definition (no body to run, placed by whoever references it).
+      place: place_of(a["place"] || a["target"]),
+      # The named isolation unit this unit is bound to (its sandbox container).
+      # nil = the ambient sandbox for its placement. `in` is the authoring alias.
+      sandbox: nonempty(a["sandbox"] || a["in"]),
       deps: list_attr(a, "deps"),
       uses: list_attr(a, "uses"),
       # Host-capability grants (net/fs/env/exec/…) — the unit's WIT imports.
@@ -318,7 +321,8 @@ defmodule Workbooks.Workbook do
     %{
       "name" => c.name,
       "lang" => c.lang,
-      "target" => c.target,
+      "place" => c.place,
+      "sandbox" => c.sandbox,
       "deps" => c.deps,
       "uses" => c.uses,
       "grants" => c.grants,
@@ -345,17 +349,18 @@ defmodule Workbooks.Workbook do
   defp nonempty(v) when is_binary(v) and v != "", do: v
   defp nonempty(_), do: nil
 
-  # The target keyword: client (browser wasm) · sandbox (sandbox wasm) ·
-  # server (BEAM, Elixir-only). Anything else (incl. nil/"") = no target =
-  # a static definition. Normalized lowercase.
-  defp target_of(v) when is_binary(v) do
+  # Placement — the two places code runs: client (browser) · server (backend).
+  # Everything is wasm-isolated regardless; placement is *where*, not *how boxed*
+  # (that's the sandbox). Anything else (incl. nil/"") = no placement = a static
+  # definition. Normalized lowercase.
+  defp place_of(v) when is_binary(v) do
     case String.downcase(String.trim(v)) do
-      t when t in ["client", "sandbox", "server"] -> t
+      p when p in ["client", "server"] -> p
       _ -> nil
     end
   end
 
-  defp target_of(_), do: nil
+  defp place_of(_), do: nil
 
   defp diag(level, scope, msg), do: %{"level" => level, "scope" => scope, "message" => msg}
 end

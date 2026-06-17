@@ -1,0 +1,43 @@
+<script type="text/plain" id="c-sb-what">
+# What a sandbox is
+
+Every unit already runs as isolated wasm — that's the floor, and you get it for
+free. A **sandbox** is what you reach for when you want to *name* that boundary and
+decide who shares it. Naming one is optional; you do it to group units together, or
+to hold them apart.
+
+You declare a sandbox the same way as any block — a name and a `do…end` body — and
+the units you write inside it run **together, in one isolated container**:
+
+sandbox :pricing do
+  server :score do
+    def score(lead), do: lead.revenue / 1000 + lead.employees
+  end
+
+  server :tax do
+    def tax(amount), do: amount * 0.0825
+  end
+end
+
+`:score` and `:tax` now live in the same box. They share its memory and its
+capabilities, and they can call each other directly without crossing a boundary. A
+unit in a *different* sandbox — or in the default, unnamed one — is genuinely
+separate: its own wasm instance, its own limits.
+
+The line down the left of the block is that boundary made visible: everything from
+the `sandbox` keyword to its `end` is contained. That containment is the whole idea
+— a sandbox is a *place you put units so they run as one*. The next lessons cover
+how units join a sandbox ([[Co-location & in:]]), what you can grant it
+([[Caps & limits]]), and how separate sandboxes still talk ([[Cross-sandbox edges]]).
+#sandbox
+</script>
+<template id="e-sb-what">
+  <div class="kick">sandbox · what it is</div>
+  <h2>What a sandbox is <span class="lane l-fn">function</span></h2>
+  <p class="tagline">A named isolation unit — the box you put units in so they run together, apart from everything else.</p>
+  <h3>Isolation is the floor; a sandbox names it</h3>
+  <ul><li class="pro"><b>Everything is already wasm-isolated.</b> You don't opt in to safety — you opt in to <i>control</i>.</li>
+  <li class="pro"><b>A sandbox is a named container.</b> Units inside its <code>do…end</code> share one instance — same memory, same caps, direct calls between them.</li>
+  <li class="pro"><b>A different sandbox is genuinely separate.</b> Its own instance and limits; reaching across is an explicit edge (see [[Cross-sandbox edges]]).</li></ul>
+  <div class="note">The rule down the left edge of the block is the boundary, drawn. From <code>sandbox</code> to <code>end</code> is one box — that containment <i>is</i> the concept.</div>
+</template>

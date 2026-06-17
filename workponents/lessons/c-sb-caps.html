@@ -1,0 +1,39 @@
+<script type="text/plain" id="c-sb-caps">
+# Caps & limits
+
+A sandbox decides not just *who runs together* but *what they're allowed to do*. By
+default a unit can touch nothing outside its own memory — no network, no files, no
+secrets. You hand it power explicitly, one capability at a time:
+
+sandbox :pricing, grant: [:net, :kv], memory: "128mb", timeout: 30_000 do
+  server :score, uses: :fx do … end
+end
+
+Three things are being set here. **`grant:`** is the list of capabilities the box
+may use — `net`, `kv`, `fs`, `secrets`, and the rest; anything not granted simply
+isn't reachable. **`memory:`** caps how much it can allocate. **`timeout:`** caps
+how long a call may run before it is stopped.
+
+The enforcement is the part worth trusting. Caps are checked **by construction**:
+each capability a unit uses becomes an import in its compiled WIT world, and a unit
+that imports a capability its sandbox never granted **fails to instantiate** — it
+cannot start, let alone run. There's no runtime check to forget and no flag to set
+the wrong way; an ungranted `net` is just a component that won't load.
+
+This is why placement and caps are different axes. `server` is the tier *allowed* to
+ask for `net` or the database; the sandbox's `grant:` is where you actually hand
+those over. A `client` unit, however it's written, can't be granted what its
+placement forbids. Where it runs sets the ceiling; the grant sets the reach. #sandbox
+</script>
+<template id="e-sb-caps">
+  <div class="kick">sandbox · caps &amp; limits</div>
+  <h2>Caps &amp; limits <span class="lane l-fn">function</span></h2>
+  <p class="tagline">A sandbox sets what its units may touch — deny-by-default, enforced by construction.</p>
+  <h3>What you set on the box</h3>
+  <ul><li class="pro"><b><code>grant:</code></b> — the capabilities allowed: <code>net · kv · fs · secrets · exec · …</code>. Ungranted = unreachable.</li>
+  <li class="pro"><b><code>memory:</code></b> — the allocation ceiling.</li>
+  <li class="pro"><b><code>timeout:</code></b> — the wall-clock a call may take before it's stopped.</li></ul>
+  <h3>Enforced by construction, not by check</h3>
+  <p>Each cap a unit uses is an <b>import in its WIT world</b>. Import one the sandbox didn't grant and the component <b>fails to instantiate</b> — it never starts. No runtime gate to bypass, no flag to misset.</p>
+  <div class="note">Placement sets the ceiling, the grant sets the reach: <code>server</code> is <i>allowed</i> net/db/secrets; <code>grant:</code> actually hands them over; a <code>client</code> unit can't be granted past what the browser permits. See [[Placement — where code runs]].</div>
+</template>
