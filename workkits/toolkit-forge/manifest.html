@@ -1,12 +1,5 @@
-<work-toolkit
-  id="toolkit-forge"
-  cli="git"
-  cli-range="&gt;=2.30"
-  version="0.1.0"
-  status="experimental"
-  tagline="Forge a new toolkit from a target — npm name / GitHub URL / semantic need — by research → study real surface → author deep skills + manifest to the toolkits/AUTHORING.md standard."
-  requires="git&gt;=2.30 node&gt;=20"
-  skill-dir="skills/">
+<work-ref rel="kit" name="toolkit-forge" prefix="toolkit-forge" version="0.1.0" status="experimental" cli="git" cli-range="&gt;=2.30" skill-dir="skills/" tagline="Forge a new toolkit from a target — npm name / GitHub URL / semantic need — by research → study real surface → author deep skills + manifest to the toolkits/AUTHORING.md standard."/>
+<work-ref rel="needs" to="git&gt;=2.30 node&gt;=20"/>
   <work-doc title="toolkit-forge — build toolkits for the toolkit substrate">
     The self-hosting toolkit: it teaches an agent how to BUILD another
     toolkit. Given a TARGET — an npm package name, a GitHub URL, or a
@@ -43,4 +36,4 @@
     | =write-manifest=   | Build the manifest index that routes by need         |
     | =verify-toolkit=   | Org balance, links resolve, recipes run, index whole |
   </work-doc>
-</work-toolkit>
+

@@ -1,12 +1,4 @@
-<work-toolkit
-  id="workbooks-system"
-  cli="work"
-  version="0.1.0"
-  status="experimental"
-  tagline="System knowledge for an agent running INSIDE a Workbooks runtime — what a workbook/runtime/toolkit/workflow is, the WASM-only rules of engagement, authoring + publishing from the agent&#x27;s seat, and the product facts to get right when writing about Workbooks."
-  skill-dir="skills/"
-  data-kind="toolkit"
-  data-flow="read overview → branch to the one skill your task needs (concepts for &quot;what is X&quot;, authoring for editing/publishing content, toolkits for using a capability, workflows for board/lifecycle work, writing for prose ABOUT Workbooks). cat a skill only when you reach its step.">
+<work-ref rel="kit" name="workbooks-system" prefix="workbooks-system" version="0.1.0" status="experimental" cli="work" skill-dir="skills/" tagline="System knowledge for an agent running INSIDE a Workbooks runtime — what a workbook/runtime/toolkit/workflow is, the WASM-only rules of engagement, authoring + publishing from the agent&#x27;s seat, and the product facts to get right when writing about Workbooks." data-kind="toolkit" data-flow="read overview → branch to the one skill your task needs (concepts for &quot;what is X&quot;, authoring for editing/publishing content, toolkits for using a capability, workflows for board/lifecycle work, writing for prose ABOUT Workbooks). cat a skill only when you reach its step."/>
   <work-doc title="workbooks-system — in-runtime platform knowledge">
     A *knowledge* toolkit for an agent that is itself running inside a
     Workbooks runtime. It carries no new CLI binary of its own — =wb= is
@@ -43,4 +35,4 @@
     | =workflows=  | You&#x27;re driving an org TODO board / workflow / lifecycle spec     |
     | =writing=    | You&#x27;re WRITING prose ABOUT Workbooks (product facts + framings)  |
   </work-doc>
-</work-toolkit>
+

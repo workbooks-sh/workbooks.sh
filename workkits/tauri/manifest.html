@@ -1,12 +1,5 @@
-<work-toolkit
-  id="tauri"
-  cli="cargo-tauri"
-  cli-range="&gt;=2.0"
-  version="0.1.0"
-  status="experimental"
-  tagline="Tauri v2 — wrap a compiled workbook .html as a thin-shell native desktop app."
-  requires="cargo, tauri-cli&gt;=2.0"
-  skill-dir="skills/">
+<work-ref rel="kit" name="tauri" prefix="tauri" version="0.1.0" status="experimental" cli="cargo-tauri" cli-range="&gt;=2.0" skill-dir="skills/" tagline="Tauri v2 — wrap a compiled workbook .html as a thin-shell native desktop app."/>
+<work-ref rel="needs" to="cargo, tauri-cli&gt;=2.0"/>
   <work-doc title="tauri — desktop app shell">
     Wrapper around the Tauri v2 CLI (=cargo tauri= or =npx @tauri-apps/cli=).
     The Workbooks use case is a *thin shell*: a Tauri webview pointing at a
@@ -27,4 +20,4 @@
     | =code-signing=           | Make a Tauri build shareable — sign + notarize (macOS) / sign (Windows), the gate between &quot;builds here&quot; and &quot;ships&quot; |
     | =cross-platform-release= | Produce installers for macOS / Windows / Linux from one workbook .html |
   </work-doc>
-</work-toolkit>
+
