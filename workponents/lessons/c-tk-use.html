@@ -17,14 +17,5 @@ data :contacts, from: list(:leads)        # a unit it ships
 A toolkit is a *library of helpers*, not a widget set. Any UI it provides is a
 **client unit** you mount — a front-end island reachable like any other unit (see
 [[Placement — where code runs]]), never a custom element to learn. To build one of these yourself, see
-[[Author one]]. #toolkits
+[[Author one]].
 </script>
-<template id="e-tk-use">
-  <div class="kick">toolkits · use</div>
-  <h2>Use a toolkit <span class="lane l-build">build</span></h2>
-  <p class="tagline">External deps, shipped as <b>helpers</b> — a package of functions, types, and units, imported by name.</p>
-  <h3>How it works</h3>
-  <p>A toolkit is pulled in with <code>import :crm, from: "crm@2"</code> (version-pinned, verified). It ships a <b>prefix</b> + its functions, types, and units + the caps they need. A page then uses them by name (<code>import {lookup} from :crm</code>, reference its types and units). The weave audits the caps the toolkit brings — nothing ambient.</p>
-  <h3>No custom elements</h3>
-  <p>A toolkit is a <b>library of helpers</b>, not a widget set. Any UI it provides is a <b>client unit</b> you mount (a front-end island), reachable like any other unit — there are no custom elements to learn.</p>
-</template>

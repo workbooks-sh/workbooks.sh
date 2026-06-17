@@ -262,7 +262,6 @@
     theme:"material-darker", lineNumbers:true, lineWrapping:false, tabSize:2, readOnly:false,
   });
   const nav  = document.getElementById("nav");
-  const exp  = document.getElementById("exp");
   const term = document.getElementById("term");
   const graphpane = document.getElementById("graphpane");
   const fnEl = document.getElementById("fn");
@@ -399,7 +398,6 @@
     else if(isTerm){ runTerm(); }
     else { cm.setOption("mode", t.mode||"null"); cm.setValue(grab(t.code)); setTimeout(()=>{cm.refresh();markSandboxes();},0); }
     fnEl.textContent = t.fn; lgEl.textContent = t.lg;
-    exp.innerHTML=""; exp.appendChild(document.getElementById(t.exp).content.cloneNode(true)); exp.scrollTop=0;
     nav.querySelectorAll("button").forEach((b,j)=>b.classList.toggle("on", j===i));
     const onBtn = nav.querySelector("button.on"); if(onBtn) onBtn.scrollIntoView({block:"nearest"});
   }
@@ -420,12 +418,4 @@
     nav.querySelectorAll("button").forEach(b=>b.onclick=()=>loadLesson(+b.dataset.i));
   }
 
-  (function(){
-    const drag=document.getElementById("drag"), expEl=document.querySelector(".exp");
-    let on=false;
-    drag.addEventListener("pointerdown",e=>{on=true;drag.classList.add("on");drag.setPointerCapture(e.pointerId);document.body.style.userSelect="none";});
-    drag.addEventListener("pointermove",e=>{if(!on)return;const w=window.innerWidth-e.clientX;expEl.style.width=Math.max(240,Math.min(760,w))+"px";});
-    const end=()=>{if(!on)return;on=false;drag.classList.remove("on");document.body.style.userSelect="";cm.refresh();};
-    drag.addEventListener("pointerup",end);drag.addEventListener("pointercancel",end);
-  })();
 

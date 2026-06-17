@@ -40,16 +40,3 @@ Links are posture-gated (public anchors link freely, gated ones need auth) and
 agent-navigable. Tagging from the interface just edits the declaration — the
 document is the store (see [[Live state]]).
 </script>
-<template id="e-ref-tags">
-  <div class="kick">idea · tags &amp; links</div>
-  <h2>Tags &amp; links</h2>
-  <p class="tagline">Address by name and tag — never by path. The filesystem is abstracted (WASI), so logical handles are the stable ones.</p>
-  <h3>Tags — cross-cutting, location-independent</h3>
-  <p>A <code>#tag</code> (inline in prose, or a unit's <code>tags:</code>) is a <b>queryable label</b>, not decoration. <code>tagged(:billing)</code> is the set of everything tagged <code>:billing</code> across every file — a grouping that ignores the folder tree. Tagging from the running interface just edits the declaration (the document is the store).</p>
-  <h3>Values &amp; types, referenced inline</h3>
-  <p>Because types and atoms are plain Elixir, you mention them in prose with their own sigils — <code>:atom</code> and <code>@type</code> (or a capitalized <code>Lead</code>). Each <b>resolves against the workspace symbol table</b>: a token that names a known atom or type becomes a live reference (an edge in [[The graph]], findable everywhere); a token that matches nothing stays plain prose. No brackets, and no false-positives that resolve — an unmatched <code>:foo</code> is just words.</p>
-  <p>That's the "reference memory" across a workspace: the same symbol table backs prose mentions, code references, and the graph — so a <code>Lead</code> declared once is reachable, by name, from anywhere.</p>
-  <h3>Deep links — the URL form of a handle</h3>
-  <p>Every unit, section, and tag is addressable: <code>work://sales#enrich</code> opens that unit; <code>work://sales#tag/billing</code> opens the tagged set. Links are <b>posture-gated</b> (public anchors link freely; gated ones need auth) and <b>agent-navigable</b> — a stable reference an agent can point at or jump to.</p>
-  <div class="note">Why it matters in a sandbox: WASI virtualizes <i>where</i> files live, so a <b>path isn't a stable reference</b> — a name or tag is. Names + tags are the addressing layer; the host resolves them to wherever the content actually sits.</div>
-</template>

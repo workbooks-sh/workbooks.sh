@@ -13,15 +13,5 @@ The *how* is a footnote you never author. On the `server` your Elixir runs
 `def` runs in the **browser** instead, on an Elixir-in-wasm runtime (so it works
 there at all). Either way real Elixir semantics hold — you don't map types or memory
 by hand — and nothing about how you wrote it changes (see [[Placement — where code
-runs]]). Foreign languages compile to wasm in both places. #compute
+runs]]). Foreign languages compile to wasm in both places.
 </script>
-<template id="e-syn-compute">
-  <div class="kick">syntax · compute</div>
-  <h2>Compute <span class="lane l-fn">function</span> <span class="lane l-build">build</span></h2>
-  <p class="tagline">You write plain Elixir; it runs as wasm wherever you place it. The engine is invisible.</p>
-  <h3>Just Elixir</h3>
-  <p>The <code>def …</code> is the compute — ordinary Elixir, no dialect to learn. On the <code>server</code> it's <b>native BEAM Elixir</b>; on the <code>client</code> it runs on an <b>Elixir-in-wasm runtime</b> (Popcorn/AtomVM) so it works in the browser. Real Elixir semantics either way — you don't map types or memory by hand.</p>
-  <h3>Placement is the only choice</h3>
-  <p>The same <code>def</code> runs on the <code>client</code> or the <code>server</code> — the placement word changes <i>where</i> it runs (and so which engine), never <i>what you write</i> (see [[Placement — where code runs]]). How tightly it's boxed is a separate question, answered by its [[What a sandbox is]].</p>
-  <div class="note"><b>Orb</b> — Elixir that authors low-level wasm directly — isn't how you write compute; it's a rare escape hatch (hot paths, extending the system), compiled like any other source language.</div>
-</template>

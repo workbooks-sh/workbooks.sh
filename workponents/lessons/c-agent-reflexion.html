@@ -32,12 +32,3 @@ end
 Because **memory is typed data** and **the loop is plain Elixir**, a well-known
 research pattern fits in a single literate file — and it runs as-is, no store needed.
 </script>
-<template id="e-agent-reflexion">
-  <div class="kick">agents · reflexion</div>
-  <h2>Reflexion <span class="lane l-fn">function</span></h2>
-  <p class="tagline">Generate → self-critique → revise, until it clears the bar. Memory is the trace of attempts.</p>
-  <h3>Memory as the trace</h3>
-  <p>The agent's <code>memory</code> is a <code>list(Attempt)</code> — each a draft + its self-critique + a score. It learns from its own history: every revision sees the prior attempts. No tools; pure reasoning, looping in <code>server</code> Elixir until the score clears the threshold.</p>
-  <h3>Why it's a few lines</h3>
-  <p>Because the primitives carry it: <b>memory is typed data</b>, <b>the loop is plain Elixir</b>, the <b>brain</b> is one declaration. A well-known research pattern fits in a single literate file — and it runs as-is.</p>
-</template>

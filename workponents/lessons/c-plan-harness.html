@@ -45,15 +45,3 @@ Put together, the loop reads end to end: ada claims a task → `draft` + `scope`
 `:done`. **The brain, the work, the proof, and the live board** — all composed from
 the same primitives, no separate harness to learn.
 </script>
-<template id="e-plan-harness">
-  <div class="kick">plans · a full harness</div>
-  <h2>A full harness <span class="lane l-fn">function</span> <span class="lane l-data">data</span></h2>
-  <p class="tagline">One plan.work, everything together — an agent, a flow, the tasks, and the validations that gate them.</p>
-  <h3>What's combined</h3>
-  <ul><li><b>agent</b> — the brain (model, system, tools).</li>
-  <li><b>flow</b> — the runnable DAG it executes (<code>step</code>, <code>parallel</code>).</li>
-  <li><b>unit + test</b> — the units the flow calls, each with a validation that <b>gates the whole plan</b> (a red test → nothing advances).</li>
-  <li><b>tasks</b> — what the agent works, ordered by <code>after:</code> and gated by <code>needs:</code> a passing unit.</li></ul>
-  <h3>The loop</h3>
-  <p>ada claims a task → <code>draft</code> + <code>scope</code> (Claim, lock &amp; fence) → runs the <code>:pipeline</code> flow → which calls <code>:enrich</code>/<code>:score</code> → tests gate it → status flips to <code>:done</code>, all in this one file. <b>The brain, the work, the proof, and the live board — composed from the same primitives</b>, no separate harness to learn. One agent here; the shape scales to many.</p>
-</template>

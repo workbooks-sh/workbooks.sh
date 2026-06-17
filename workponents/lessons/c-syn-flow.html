@@ -21,15 +21,5 @@ end
 The steps **reference defs by name** (`:seed`, `:enrich`, `:score`) — the workflow is
 wired to the compute (see [[Compute]]) and validated at the gate. A pipeline of calls
 is exactly what Elixir is good at, and keeping it in the function lane keeps
-orchestration out of the prose lane. #workflows
+orchestration out of the prose lane.
 </script>
-<template id="e-syn-flow">
-  <div class="kick">syntax · workflows</div>
-  <h2>Workflows <span class="lane l-fn">function</span></h2>
-  <p class="tagline">If it runs, it's Elixir — so a function is never confused with literacy.</p>
-  <h3>Descriptive vs executable</h3>
-  <p>A workflow you're only <i>describing</i> can be a markdown ordered list (prose). A workflow that <b>executes</b> — orchestrates real calls at weave or runtime — is Elixir: a <code>flow do … end</code> block. We lean Elixir for any runnable workflow, because orchestration is a function, and the point is to keep functions out of the prose lane.</p>
-  <h3>Why Elixir fits</h3>
-  <ul><li class="pro">A pipeline of calls is exactly what Elixir is good at (<code>step</code>, <code>parallel</code>).</li>
-  <li class="pro">Steps <b>reference defs by name</b> — the workflow is wired to the compute and validated at the gate.</li></ul>
-</template>

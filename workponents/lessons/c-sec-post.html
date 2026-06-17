@@ -14,14 +14,3 @@ is theatre). Instead the compiler emits a *shell* that fetches the protected pay
 only after auth. The capability is declared here and bound by the host (see
 [[Caps & secrets]]).
 </script>
-<template id="e-sec-post">
-  <div class="kick">security · postures</div>
-  <h2>Postures</h2>
-  <p class="tagline">One posture per workbook decides what publishing exposes — and the compiler enforces it.</p>
-  <h3>The three</h3>
-  <ul><li class="pro"><b>public</b> — fully static, no secrets; safe to host anywhere.</li>
-  <li class="con"><b>gated_data</b> — shell ships public; data fetched from the nexus after auth.</li>
-  <li class="con"><b>gated_route</b> — the whole route is behind auth.</li></ul>
-  <h3>Enforced, not trusted</h3>
-  <p>A static file <b>can't</b> be gated client-side (that's theater — the bytes ship to anyone). So the compiler rejects gated content on a static host and emits a <b>shell that fetches the protected payload post-auth</b>.</p>
-</template>

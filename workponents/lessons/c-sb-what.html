@@ -30,15 +30,5 @@ the `sandbox` keyword to its `end` is contained. That containment is the whole i
 — a sandbox is a *place you put units so they run as one*. The next lessons cover
 how units join a sandbox ([[Co-location & in:]]), what you can grant it
 ([[Caps & limits]]), and how separate sandboxes still talk ([[Cross-sandbox edges]]).
-#sandbox
+
 </script>
-<template id="e-sb-what">
-  <div class="kick">sandbox · what it is</div>
-  <h2>What a sandbox is <span class="lane l-fn">function</span></h2>
-  <p class="tagline">A named isolation unit — the box you put units in so they run together, apart from everything else.</p>
-  <h3>Isolation is the floor; a sandbox names it</h3>
-  <ul><li class="pro"><b>Everything already runs inside a boundary</b> — wasm for browser/foreign-language units, the nexus's tenant isolation for native server Elixir. You don't opt in to safety — you opt in to <i>control</i>.</li>
-  <li class="pro"><b>A sandbox is a named container.</b> Units inside its <code>do…end</code> share one boundary — same caps, same limits, direct calls between them.</li>
-  <li class="pro"><b>A different sandbox is genuinely separate.</b> Its own boundary and limits; reaching across is an explicit edge (see [[Cross-sandbox edges]]).</li></ul>
-  <div class="note">The rule down the left edge of the block is the boundary, drawn. From <code>sandbox</code> to <code>end</code> is one box — that containment <i>is</i> the concept.</div>
-</template>

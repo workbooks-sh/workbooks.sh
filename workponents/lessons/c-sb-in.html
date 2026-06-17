@@ -26,16 +26,5 @@ name to pull things together, pick another to keep them apart.
 
 Where the membership is *declared* depends on scope: nest or `in:` within a file for
 the local case, or compose units from across files in the index when a sandbox spans
-the project (see [[index.work]]). #sandbox
+the project (see [[index.work]]).
 </script>
-<template id="e-sb-in">
-  <div class="kick">sandbox · membership</div>
-  <h2>Co-location &amp; <code>in:</code> <span class="lane l-fn">function</span></h2>
-  <p class="tagline">Two ways to put a unit in a sandbox — nest it, or name it. Same result, different reading.</p>
-  <h3>How a unit joins</h3>
-  <ul><li class="pro"><b>Nest it</b> — write the unit inside the sandbox's <code>do…end</code>; membership is implicit. Best when the units live together.</li>
-  <li class="pro"><b>Name it</b> — <code>in: :pricing</code> on a unit defined elsewhere binds it into the same box, even from another file.</li></ul>
-  <h3>What sharing a box means</h3>
-  <p>Same sandbox name ⇒ one instance: shared memory, shared caps, direct calls. A different name (or none) ⇒ a separate box. The name is the entire knob — pull together, or hold apart.</p>
-  <div class="note">Local membership is authored inline (nest or <code>in:</code>); a sandbox that spans files is composed in the [[index.work]]. Don't overload "tangle" for this — tangle is the build step; <code>in:</code> is membership.</div>
-</template>

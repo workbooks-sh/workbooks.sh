@@ -25,15 +25,3 @@ lane, and the pass that builds it also graphs it. There is **no Bazel**: the
 in-sandbox lanes *are* the build graph — hermetic by construction (wasm, zero
 native exec), content-addressed, incremental — so we never bolt on a build system.
 </script>
-
-<template id="e-extractors">
-  <div class="kick">code graph · extractors</div>
-  <h2>Extractors <span class="lane l-fn">function</span></h2>
-  <p class="tagline">Three feeds, one graph — literate, AST, WIT — and any source that compiles to wasm joins it.</p>
-  <h3>The three feeds</h3>
-  <ul><li class="pro"><b>literate</b> — the markdown: headings, <code>[[backlinks]]</code>, <code>#tags</code>, inline <code>:atom</code>/<code>@type</code> references, and prose we embed for semantic search.</li>
-  <li class="pro"><b>AST</b> — every language's structure: <code>tree-sitter</code> parses them uniformly; our compilers (clang, mrustc, zig) and <code>mix xref</code> add the deep, typed view.</li>
-  <li class="pro"><b>WIT</b> — <code>wasm-tools</code> reads each component's imports/exports — the language-agnostic join where rust, Elixir, and js meet (see [[The contract]]).</li></ul>
-  <h3>We build it ourselves, on our compilers</h3>
-  <p>Every unit compiles through the same in-sandbox lanes, so <b>any source enters the graph</b> — inline in a work file or a standalone file you reference. We point each language at its WebAssembly compiler, and the pass that builds it also graphs it. <b>No Bazel:</b> the in-sandbox lanes <i>are</i> the build graph — hermetic by construction (wasm, zero native exec), content-addressed, incremental — so there's no separate build system to bolt on. See [[The graph]].</p>
-</template>

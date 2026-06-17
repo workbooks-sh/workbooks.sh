@@ -38,18 +38,5 @@ capabilities it's granted (see [[Caps & limits]]). Want to name and group those
 boundaries yourself? That's the sandbox's own chapter (see [[What a sandbox is]]).
 
 A unit with **no placement** is a *static definition* — it has no `do…end` body to
-run, so it's simply compiled wherever something references it. #placement
+run, so it's simply compiled wherever something references it.
 </script>
-<template id="e-syn-fence">
-  <div class="kick">code · placement</div>
-  <h2>Placement <span class="lane l-fn">function</span></h2>
-  <p class="tagline">The first word of a runnable block says where it runs — <code>client</code> or <code>server</code>. Just two places; everything else is a capability, not a target.</p>
-  <h3>Two places, read the first word</h3>
-  <ul><li class="pro"><b><code>client</code></b> — runs in the <b>browser</b> as wasm: the UI a person touches. Ships to anyone, so it's the restricted, untrusted side.</li>
-  <li class="pro"><b><code>server</code></b> — runs on your <b>backend</b> as native Elixir on the BEAM: the trusted tier where a unit may be granted secrets, the database, and the network. Runs only on a nexus you own.</li></ul>
-  <h3>The grammar</h3>
-  <p><code>&lt;place&gt; [language] :name do … end</code>. The language is optional and defaults to Elixir, so most blocks read as Elixir with a placement word in front. Need another language? Name it — <code>server rust :enrich</code> — and write the body raw inside <code>do…end</code>. It <b>all compiles to wasm</b>, so any language runs in either place.</p>
-  <h3>Two things placement is <i>not</i></h3>
-  <p><b>Not one engine.</b> <code>client</code> is wasm in the browser; <code>server</code> is native Elixir on the BEAM (foreign languages there are sandboxed wasm units). <b>Not a body.</b> A unit with no placement is just a <i>static definition</i> — compiled wherever it's referenced, with nothing to run on its own.</p>
-  <div class="note">Server Elixir is <b>native BEAM, not wasm</b> — the nexus keeps tenants isolated and enforces caps; it isn't a wasm box. Client code is wasm-sandboxed. Either way a unit gets only the capabilities it's granted — the first word picks the place, the caps pick the power (see [[Caps &amp; limits]]).</div>
-</template>

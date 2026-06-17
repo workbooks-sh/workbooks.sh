@@ -28,13 +28,3 @@ Each maps to a standard WebAssembly type — a struct to a `record`, an atom set
 to a `list`. You write the Elixir; the WIT falls out, so an agent (or a Rust unit)
 reading the data gets a standard, typed contract with nothing house-specific to learn.
 </script>
-<template id="e-data-model">
-  <div class="kick">data · the data model</div>
-  <h2>The data model <span class="lane l-data">data</span></h2>
-  <p class="tagline">One data layer, authored in plain Elixir — structs and values. The WIT contract is generated from the shape; you never write it.</p>
-  <h3>Elixir in, one contract out</h3>
-  <p>You write ordinary Elixir — a <code>defstruct</code>, atoms, tagged tuples. The compiler maps the shape to the WIT user-defined types — a <code>defstruct</code> → <code>record</code>, an atom set → <code>enum</code>, a tagged tuple → <code>variant</code>, <code>t | nil</code> → <code>option</code>, <code>[t]</code> → <code>list</code> — over WIT primitives inferred from the values (<code>""</code>→<code>string</code>, <code>0</code>→an int, a <code>0..255</code> field→<code>u8</code>, <code>true</code>→<code>bool</code>). The same type <b>crosses the boundary</b> and is the type you <b>store</b> — no impedance mismatch.</p>
-  <h3>Signatures, the same way</h3>
-  <p>A unit's WIT world signature comes from its <b>function</b> — its arguments and the shape it returns. You can pin it with a type annotation today, and with Elixir's new type signatures as they land; either way the boundary is plain Elixir, never hand-written WIT.</p>
-  <div class="note">Why a generated WIT artifact, and why <i>structure</i> rather than annotations? WIT is the <b>neutral seam</b> — a Rust or JS unit sharing <code>Lead</code> gets its own binding from the same source. And reading shape (not a specific notation) lets the format ride Elixir's evolving type system instead of betting on one syntax. SQL never appears here — an external db is a <code>resource</code> integration, not the format of your content.</div>
-</template>

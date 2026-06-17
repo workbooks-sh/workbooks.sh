@@ -27,15 +27,3 @@ it underneath. `draft` and `scope` are **our own capabilities** (the Drive-simpl
 workspace layer), surfaced through the Dock like any other; no external names to
 learn.
 </script>
-<template id="e-live-claim">
-  <div class="kick">plans · claim, lock &amp; fence</div>
-  <h2>Claim, lock &amp; fence <span class="lane l-fn">function</span></h2>
-  <p class="tagline">Claiming a task is the runtime's job — a declarative flip, a draft lock, a scoped fence.</p>
-  <h3>Three steps, one claim</h3>
-  <ul><li class="pro"><b>Flip</b> — <code>status: :todo → :doing</code> in plan.work. The claim is recorded declaratively.</li>
-  <li class="pro"><b>Lock</b> — open a <code>draft</code>: an isolated, restorable change for the agent. Optimistic, no mutex.</li>
-  <li class="pro"><b>Fence</b> — <code>scope</code> the draft to the task's <code>paths</code>: a narrowed view of the tree. The agent <i>only sees</i> its files.</li></ul>
-  <h3>Multi-agent, one tree</h3>
-  <p>Two agents work the same workbook with zero collision: each gets its own <code>draft</code>, <code>scope</code>d to its paths. <b>Agents never touch the substrate</b> — the coordinator on the nexus versions it underneath. A task stays a <b>flat declaration</b>; the claim is the coordinator's automatic three-step move (flip → draft → scope), not something you author per-task.</p>
-  <div class="note"><code>draft</code> and <code>scope</code> are <b>our own capabilities</b> — the Drive-simple workspace layer (versioned save-state + scoped views), surfaced through the Dock like any other. Not third-party tools, no external names to learn.</div>
-</template>

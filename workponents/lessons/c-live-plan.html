@@ -22,14 +22,3 @@ assignments, the audit trail — all of them are *queries* over these declaratio
 (it's all [[Live state]]), not separate systems. Assign each task to an agent and the
 runtime takes it from there.
 </script>
-<template id="e-live-plan">
-  <div class="kick">plans · plan.work</div>
-  <h2>plan.work <span class="lane l-data">data</span></h2>
-  <p class="tagline">One file holds the plan, the live board, and the audit log — agents and tasks together.</p>
-  <h3>What's in it</h3>
-  <ul><li><b>agents</b> — declared alongside the work (<code>agent :ada, model:, tools:</code>).</li>
-  <li><b>tasks</b> — each with <code>owner</code> (which agent), <code>paths</code> (what it may touch), <code>ref</code> (the code it tracks), <code>after</code> (ordering).</li>
-  <li><b>empty slots</b> — an unassigned task is an open slot the coordinator can fill.</li></ul>
-  <h3>It's just data</h3>
-  <p>Every field is typed + validated at the weave gate (see <b>Types</b>). The board view, the agent assignments, the audit trail — all are <b>queries over these declarations</b>, not separate systems. Assign each task to an agent and the runtime takes it from there.</p>
-</template>

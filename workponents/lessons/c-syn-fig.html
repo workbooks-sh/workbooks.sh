@@ -22,15 +22,5 @@ sandbox client :revenue_chart, reads: :ranked do
   # the front-end that charts the data — hydrated in the browser
 end
 
-Two markdown rungs, then code. No `figure` keyword, no new grammar. #rich-text
+Two markdown rungs, then code. No `figure` keyword, no new grammar.
 </script>
-<template id="e-syn-fig">
-  <div class="kick">syntax · figures</div>
-  <h2>Figures <span class="lane l-text">rich text</span></h2>
-  <p class="tagline">A figure is markdown, never a function — two markdown rungs, then code.</p>
-  <h3>How richness escalates</h3>
-  <ul><li class="pro"><b>Markdown image</b> — <code>![caption](src)</code>. The alt text is the caption; a lone image renders as a <code>&lt;figure&gt;</code>. The floor.</li>
-  <li class="pro"><b>Caption paragraph</b> — need bold, a link, two lines? Write a markdown paragraph under the image. Co-located prose <i>is</i> the caption — no new construct.</li>
-  <li class="pro"><b>Unit escape hatch</b> — when markdown can't say it, a <code>sandbox</code> unit placed on the <code>client</code> (a front-end island) renders it. No custom elements.</li></ul>
-  <div class="note">There's no <code>figure</code> keyword — figures are markdown. Only real interactivity crosses into a unit. Rich-text editing ≠ rich-text format: the file stays markdown; an editor can render it live (WYSIWYG) so it <i>feels</i> rich while the source stays literate.</div>
-</template>

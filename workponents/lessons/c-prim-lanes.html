@@ -50,16 +50,3 @@ task "tune the scorer", status: :todo, owner: :ada, ref: :score
 Four lanes, one file. Ask only "who reads this line?" — a human, the runtime, the
 compiler, or the system — and the lane follows. Never confuse function with literacy.
 </script>
-<template id="e-prim-lanes">
-  <div class="kick">primitive · the four lanes</div>
-  <h2>The four lanes</h2>
-  <p class="tagline">The example on the left is one document written in all four lanes — read it top to bottom. Here's the quick reference.</p>
-  <div class="tests">
-    <div class="test"><div class="t">rich text — markdown</div><div class="v">what you READ</div><div class="d">prose, headings, figures, tables. only this — never logic.</div></div>
-    <div class="test"><div class="t">function — elixir</div><div class="v">what RUNS</div><div class="d">compute, state machines, workflows. plain Elixir — native BEAM on the <code>server</code>, wasm on the <code>client</code>; the placement says where.</div></div>
-    <div class="test"><div class="t">build — plain elixir</div><div class="v">what COMPILES function</div><div class="d">the placement compiles it; <code>test</code> gates it.</div></div>
-    <div class="test"><div class="t">data — declarative elixir</div><div class="v">what the system TRACKS</div><div class="d">tasks, users, types, config. typed + validated at the weave gate.</div></div>
-  </div>
-  <h3>The discriminator</h3>
-  <p>Human reads it → markdown. Runtime runs it → Elixir, native BEAM on the <code>server</code> or wasm on the <code>client</code> (the placement says where). Compiler builds it → the placement compiles. System queries it as data → declarative Elixir. <b>Never confuse function with literacy.</b></p>
-</template>

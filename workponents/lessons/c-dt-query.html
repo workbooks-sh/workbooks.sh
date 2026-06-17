@@ -23,13 +23,3 @@ output** are *just data sources*, shown exactly the same way:
 data :health, from: telemetry(:enrich)     # live metrics
 data :result, from: enrich(1000)           # a call's result
 </script>
-<template id="e-dt-query">
-  <div class="kick">data · query</div>
-  <h2>Query <span class="lane l-data">data</span> <span class="lane l-text">rich text</span></h2>
-  <p class="tagline">Select over a source's WIT values; show them with zero ceremony — typed data renders itself.</p>
-  <h3>Select, then show</h3>
-  <p><code>select(...)</code> filters / sorts / picks over a source's values (drop to a <b>unit</b> for more; real SQL only when the source is a db). <b>Showing needs no widget</b>: because data is WIT-typed, the renderer knows its shape — a record becomes a card, a list of records a table, a scalar text. Reference it inline and it renders, re-rendering on change (<b>signals</b>). Want a specific look? a <b>client unit</b> <code>reads:</code> the source and renders it.</p>
-  <h3>Telemetry, results — all just data</h3>
-  <p>There's no separate "live readout" primitive: <b>telemetry</b> (<code>telemetry(:x)</code>) and a <b>unit's output</b> (<code>enrich(1000)</code>) are data sources, shown exactly like inline values.</p>
-  <div class="note">This is why there's no "probe" — typed data + default rendering + a client unit for custom covers every live-readout case, and the markdown fence stays plainly display-only.</div>
-</template>

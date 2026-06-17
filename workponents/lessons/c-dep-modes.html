@@ -40,19 +40,5 @@ loop is native ground.
 The point is **not** that SSR beats the static bundle — it's that the *same workbook*
 ships every way with no rewrite. Static when there's no server. Server-rendered when
 there is. Live when it's interactive. You declared `client`/`server` once; delivery just
-reads that bit (see [[Two targets]] for where each mode runs). #delivery #placement
+reads that bit (see [[Two targets]] for where each mode runs).
 </script>
-<template id="e-dep-modes">
-  <div class="kick">deploy · delivery modes</div>
-  <h2>Delivery modes <span class="lane l-fn">function</span></h2>
-  <p class="tagline">One authored workbook, three deliveries — static, server-rendered, live. The <code>client</code>/<code>server</code> bit you already wrote picks the path.</p>
-  <h3>One source, three rungs</h3>
-  <ul>
-    <li class="pro"><b>Static bundle</b> — <code>work bundle</code> → one gzipped <code>dist/index.html</code>, hydrated client-side. Zero-infra, public, edge. No server, infinitely cacheable.</li>
-    <li class="pro"><b>Nexus SSR</b> — declare a <code>nexus</code> and <code>server</code> regions render on the BEAM and stream HTML; <code>client</code> units become islands hydrated on top. Islands architecture, straight out of placement.</li>
-    <li class="pro"><b>Live SSR</b> — a stateful server render that pushes diffs over the runtime's own RCP WebSocket. LiveView-<i>shaped</i>, but on our one contract — no second framework.</li>
-  </ul>
-  <h3>Why it matters</h3>
-  <p>SSR doesn't <b>eclipse</b> the static bundle — the power is that the <b>same workbook ships every way with no rewrite</b>. Static when there's no server, server-rendered when there is, live when it's interactive. You wrote <code>client</code>/<code>server</code> once (see [[Placement — where code runs]]); delivery just reads that bit.</p>
-  <div class="note">The escalation is degradation in reverse: no nexus ⇒ pure static bundle; a nexus ⇒ nexus SSR; a <i>stateful</i> <code>server</code> region ⇒ live diffs. The author never picks a "framework" — the placement model picks the renderer.</div>
-</template>

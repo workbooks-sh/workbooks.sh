@@ -29,18 +29,5 @@ the wasm-native form of your Elixir, and **you never write or read it:**
 
 So the rule is simply: **learn Elixir, not WIT.** Your modules are the interfaces,
 your structs and atoms are the types, your `grant`s are the imports — and all the
-WebAssembly falls out. #contract
+WebAssembly falls out.
 </script>
-<template id="e-rt-wit">
-  <div class="kick">dock · the contract</div>
-  <h2>The contract <span class="lane l-fn">function</span></h2>
-  <p class="tagline">A unit's contract is its Elixir module — Elixir is the type system <i>and</i> the interface system. The wasm component falls out; you never write WIT.</p>
-  <h3>Your module is the contract</h3>
-  <ul><li class="pro"><b>Exports</b> — the unit's public <code>def</code>s. What callers can reach.</li>
-  <li class="pro"><b>Imports</b> — its dependencies and <code>grant</code>s. Zero by default — it can touch nothing it didn't ask for.</li>
-  <li class="pro"><b>Types</b> — its structs, atoms, and tuples (see [[The data model]]).</li>
-  <li class="pro"><b>Shared interfaces</b> — an Elixir <code>@behaviour</code>. A kit defines one; the units that use it implement it.</li></ul>
-  <h3>The WebAssembly falls out</h3>
-  <p>Each unit compiles to a standard wasm <b>component</b>, so a Rust unit and an Elixir unit meet at a <b>typed boundary</b>, not raw memory — clean cross-language calls and sandboxing, for free. That contract is the <b>wasm-native form of your Elixir, generated</b> — you never author it.</p>
-  <div class="note"><b>Learn Elixir, not WIT.</b> Elixir is the whole surface — modules as interfaces, structs and atoms as types, <code>grant</code>s as imports, <code>flow</code> as orchestration. The Component Model underneath buys you portability + isolation invisibly; you never see a <code>namespace:name@version</code> in your life.</div>
-</template>

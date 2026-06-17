@@ -36,14 +36,3 @@ end
 
 `bash "mix test"` is a sandboxed command, fs-scoped to `./project` — never host exec.
 </script>
-<template id="e-agent-coder">
-  <div class="kick">agents · coding agent</div>
-  <h2>Coding agent <span class="lane l-fn">function</span></h2>
-  <p class="tagline">The Claude-Code archetype — a ReAct loop with sandboxed tools, the whole framework in one work file.</p>
-  <h3>What's in the file</h3>
-  <ul><li class="pro"><b>memory = data</b> — the agent's state is WIT records/lists (<code>history</code>, <code>files</code>, <code>cwd</code>). No special store; memory is just typed data.</li>
-  <li class="pro"><b>the brain</b> — model, system prompt, <code>tools</code> (toolkits), and the <code>grant</code>s those tools need.</li>
-  <li class="pro"><b>the loop in <code>server</code> Elixir</b> — real ReAct (think → call tool → observe → repeat), full OTP, written in Elixir, not a source block.</li></ul>
-  <h3>Sandboxed by construction</h3>
-  <p>The tools it's granted run in the <b>sandbox</b> — <code>bash "mix test"</code> is a sandboxed command fs-scoped to <code>./project</code>, never host exec. <code>grant exec / fs</code> is the agent's entire authority; it acts through the same Dock caps a human page would.</p>
-</template>

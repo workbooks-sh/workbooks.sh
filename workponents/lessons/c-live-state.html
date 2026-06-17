@@ -18,13 +18,3 @@ so the history *is* the audit log. Declarative isn't frozen: it's the DOM — li
 markup that's also the source. The coordinator drives these flips automatically when
 it claims work (see [[Claim, lock & fence]]).
 </script>
-<template id="e-live-state">
-  <div class="kick">plans · live state</div>
-  <h2>Live state <span class="lane l-data">data</span></h2>
-  <p class="tagline">Declarative isn't frozen. The document is the store; you change state by editing the declaration.</p>
-  <h3>Why mutation doesn't break it</h3>
-  <ul><li class="pro"><b>Data is read, not compiled.</b> Only the function lane (target → wasm) compiles. A <code>task</code> is parsed, so flipping <code>status: :todo → :doing</code> is a cheap, live edit — nothing rebuilds.</li>
-  <li class="pro"><b>The document is the database.</b> No sidecar store, no platform CRDT — the <code>task</code> line is the source of truth <i>and</i> the live state at once. Exactly the DOM: live markup that's also the source.</li>
-  <li class="pro"><b>Every edit is versioned</b> — a <code>draft</code> the system can restore — so the history <i>is</i> the audit log.</li></ul>
-  <div class="note">Split: <b>coarse state</b> (todo→doing→done, owner, lock) lives in the document; <b>ephemeral scratch</b> (an agent's partial output) stays in runtime memory and never churns the file.</div>
-</template>

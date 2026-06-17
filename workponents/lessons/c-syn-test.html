@@ -18,14 +18,5 @@ end
 runner to wire** — the weave discovers the test blocks and runs them at the gate. A
 test isn't shipped behavior and isn't prose; it's a *gate check*, the same build lane
 as the target's compile step (see [[Placement — where code runs]]), proving the function before it's woven
-in. #tests
+in.
 </script>
-<template id="e-syn-test">
-  <div class="kick">syntax · tests</div>
-  <h2>Tests <span class="lane l-build">build</span></h2>
-  <p class="tagline">An Elixir block bound to a unit by name. Red test → no bundle.</p>
-  <h3>How it works</h3>
-  <p>A <code>test :enrich do … end</code> block asserts over the unit's output. The weave <b>discovers and runs them at the gate</b> — there's no runner to wire. A failure fails the build, so a green <code>dist/</code> means every test passed.</p>
-  <h3>Why it's build-lane</h3>
-  <p>A test isn't shipped behavior and isn't prose — it's a <b>gate check</b>, the same build lane as the target's compile step. It proves the function <i>before</i> the function is woven in.</p>
-</template>

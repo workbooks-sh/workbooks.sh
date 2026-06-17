@@ -19,13 +19,3 @@ surface, all wasm-native, and the same `#data` types you declare everywhere (see
 [[The data model]]). The Dock resolves a source locally (embedded) or on the nexus
 (the db) without changing the declaration (see [[Query]]).
 </script>
-<template id="e-dt-src">
-  <div class="kick">data · sources</div>
-  <h2>Sources <span class="lane l-data">data</span></h2>
-  <p class="tagline">A named source behind one typed surface — inline values, a blob, or an external db. All return WIT values.</p>
-  <h3>Three kinds, one shape</h3>
-  <ul><li class="pro"><b>values</b> — inline WIT values (records/lists), embedded in the bundle. Your content.</li>
-  <li class="pro"><b>blob</b> — a content-addressed <code>list&lt;u8&gt;</code> (an image, media). For file semantics a unit imports <code>wasi:filesystem</code> (a gated capability), mapped onto the blob store.</li>
-  <li class="pro"><b>resource</b> — an external db (postgres) is a WIT <code>resource</code>: a handle reached through imported functions. <b>The only place SQL appears</b> — as an integration, not your content's format.</li></ul>
-  <div class="note">No SQLite-VFS, no second data API. One typed surface — the same WIT types you declare. The Dock resolves a source locally (embedded) or on the nexus (the db) without changing the declaration.</div>
-</template>

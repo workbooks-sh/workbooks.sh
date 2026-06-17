@@ -14,13 +14,3 @@ in the host at the moment it's needed, never in the file. And the weave gate aud
 **declared-only** — a unit may use *only* what it requested, so both over-reach and
 unused grants flag. The posture (see [[Postures]]) decides who's even allowed to ask.
 </script>
-<template id="e-sec-caps">
-  <div class="kick">security · caps &amp; secrets</div>
-  <h2>Caps &amp; secrets</h2>
-  <p class="tagline">A component has <b>zero capabilities by default</b>; a <code>grant</code> is an import the host authorizes. Secrets bind at run, never bundled.</p>
-  <h3>How it works</h3>
-  <ul><li class="pro"><code>grant</code> is a <b>request</b> — an <b>import</b> in the unit's world (see The contract), not authority. The host decides; "anyone can dock it" only works if the host fulfills the import.</li>
-  <li class="con"><b>Secrets are host-bound at run</b> — <code>env</code> is declared, never valued, never in the bundle.</li>
-  <li class="pro">The weave audits <b>declared-only</b> — a unit may use only what it requested (over-reach <i>and</i> unused grants flag).</li></ul>
-  <div class="note">Carrier: the weave emits a CSP <code>connect-src</code> from your <code>grant net</code> declarations — a generated artifact the browser already enforces, not something you author.</div>
-</template>

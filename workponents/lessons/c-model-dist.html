@@ -21,13 +21,3 @@
 </body>
 </html>
 </script>
-<template id="e-model-dist">
-  <div class="kick">model · the deliverable</div>
-  <h2>dist/index.html</h2>
-  <p class="tagline">One self-contained HTML — SSR shell + a gzip blob of wasm, JS, and data.</p>
-  <h3>Security — what publishing means</h3>
-  <ul><li class="pro"><b>Code in the bundle is fine</b> — logic isn't secret.</li>
-  <li class="con"><b>Secrets never bundled</b> — <code>env</code> is a request; the host binds it at run.</li>
-  <li class="con"><b>Gated data never enters a static file</b> — gated builds ship a shell that fetches from the nexus after auth; the compiler enforces it.</li></ul>
-  <div class="note">Postures: <b>public</b> · <b>gated_data</b> · <b>gated_route</b>. The posture is the publish lever; the weave gate + grants keep it honest.</div>
-</template>

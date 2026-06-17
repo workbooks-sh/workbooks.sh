@@ -33,13 +33,3 @@ Routes and nav live in the *pages* (each page's frontmatter `route`), **not here
 The index only declares structure — deps, toolkits, nexus, caps, checks. It's just
 another `.work` file: no HTML, no custom elements.
 </script>
-<template id="e-model-index">
-  <div class="kick">model · the skeleton</div>
-  <h2>index.work</h2>
-  <p class="tagline">A literate manifest — what the app is MADE OF: deps, toolkits, nexus, caps, checks.</p>
-  <h3>Its jobs</h3>
-  <ul><li><b>Compose</b> — <code>use "page.work"</code> pulls in the pages and units the app weaves.</li>
-  <li><b>Validate</b> — <code>check</code> declares the requirements the weave gate enforces.</li>
-  <li><b>Manage deps</b> — <code>package</code> (hex/npm/cargo) and <code>import</code> (toolkits = helpers), plus <code>nexus</code> (server target) and <code>grant</code> (capability requests).</li></ul>
-  <div class="note">It's just another <code>.work</code> file — no HTML, no custom elements. Routes and nav live in the pages (frontmatter <code>route</code>); the index only declares structure.</div>
-</template>

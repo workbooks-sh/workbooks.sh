@@ -16,12 +16,3 @@ browser, or the OS via Tauri) or `runtime` (the nexus over RCP, see
 **routing config**, not a code fork. One frontend, many targets, behind a single
 seam (see [[Providers]] for how the same request resolves two ways).
 </script>
-<template id="e-dock-seam">
-  <div class="kick">dock · the seam</div>
-  <h2>The one seam</h2>
-  <p class="tagline">The UI requests a capability; the Dock routes it to a provider. Never a server or OS call directly.</p>
-  <h3>How it works</h3>
-  <p>Every capability (fetch, store, compute) is a request to <b>one membrane</b>. Behind it a router fulfills from a <b>provider</b>: <code>local</code> (OS via Tauri, or browser-native) or <code>runtime</code> (the nexus over RCP). The author writes the request, not the wiring.</p>
-  <h3>Why it matters</h3>
-  <p>A <b>target — desktop / web / mobile — is just a routing config</b>, not a code fork. One frontend, many targets, behind a single seam.</p>
-</template>

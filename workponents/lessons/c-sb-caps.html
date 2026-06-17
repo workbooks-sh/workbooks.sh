@@ -37,17 +37,5 @@ Either way there's no runtime check to forget and no flag to set the wrong way.
 This is why placement and caps are different axes. `server` is the tier *allowed* to
 ask for `net` or the database; the sandbox's `grant:` is where you actually hand
 those over. A `client` unit, however it's written, can't be granted what its
-placement forbids. Where it runs sets the ceiling; the grant sets the reach. #sandbox
+placement forbids. Where it runs sets the ceiling; the grant sets the reach.
 </script>
-<template id="e-sb-caps">
-  <div class="kick">sandbox · caps &amp; limits</div>
-  <h2>Caps &amp; limits <span class="lane l-fn">function</span></h2>
-  <p class="tagline">A sandbox sets what its units may touch — deny-by-default, enforced by construction.</p>
-  <h3>What you set on the box</h3>
-  <ul><li class="pro"><b><code>grant:</code></b> — the capabilities allowed: <code>net · kv · fs · secrets · exec · …</code>. Ungranted = unreachable.</li>
-  <li class="pro"><b><code>memory:</code></b> — the allocation ceiling.</li>
-  <li class="pro"><b><code>timeout:</code></b> — the wall-clock a call may take before it's stopped.</li></ul>
-  <h3>Enforced by construction, not by check</h3>
-  <p>For a wasm unit, each cap is an <b>import in its WIT world</b> — import one the sandbox didn't grant and the component <b>fails to instantiate</b>. For native server Elixir, the <b>nexus</b> enforces the same grant at the Dock. Either way there's no gate to bypass, no flag to misset.</p>
-  <div class="note">Placement sets the ceiling, the grant sets the reach: <code>server</code> is <i>allowed</i> net/db/secrets; <code>grant:</code> actually hands them over; a <code>client</code> unit can't be granted past what the browser permits. See [[Placement — where code runs]].</div>
-</template>

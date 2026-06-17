@@ -25,15 +25,5 @@ This is the same shape the whole system uses — a flat forest of isolated boxes
 the host wiring the edges between them, never one box nested inside another's memory.
 It's also why these edges show up in [[The graph]]: a cross-sandbox call is a typed
 link, so "who can reach the network" is a question you read straight off the picture.
-#sandbox
+
 </script>
-<template id="e-sb-edges">
-  <div class="kick">sandbox · cross-sandbox edges</div>
-  <h2>Cross-sandbox edges <span class="lane l-fn">function</span></h2>
-  <p class="tagline">Separate sandboxes still cooperate — through a host-brokered, typed edge, never shared memory.</p>
-  <h3>How separate boxes work together</h3>
-  <ul><li class="pro"><b>Reference by name</b> — <code>uses: :fx</code> subscribes to a unit in another sandbox, like a flow names a step.</li>
-  <li class="pro"><b>The host brokers the call</b> — what crosses is one typed edge; the boxes stay separate instances.</li>
-  <li class="pro"><b>Caps don't leak</b> — capabilities flow by <i>grant, not inheritance</i>. Borrowing <code>:fx</code> never grants you <code>:fx</code>'s <code>net</code>.</li></ul>
-  <div class="note">It's one shape everywhere: a <b>flat forest</b> of isolated boxes, the host wiring edges between them — never a box inside another's memory. Those edges are visible in [[The graph]], so "who can reach the network" reads off the picture.</div>
-</template>
