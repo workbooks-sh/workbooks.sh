@@ -1,12 +1,5 @@
-<work-toolkit
-  id="wrangler"
-  cli="wrangler"
-  cli-range="&gt;=3.0"
-  version="0.1.0"
-  status="experimental"
-  tagline="Cloudflare&#x27;s CLI — deploy a forged workbook to Pages on the user&#x27;s own account."
-  requires="wrangler&gt;=3.0"
-  skill-dir="skills/">
+<work-ref rel="kit" name="wrangler" prefix="wrangler" version="0.1.0" status="experimental" cli="wrangler" cli-range="&gt;=3.0" skill-dir="skills/" tagline="Cloudflare&#x27;s CLI — deploy a forged workbook to Pages on the user&#x27;s own account."/>
+<work-ref rel="needs" to="wrangler&gt;=3.0"/>
   <work-doc title="wrangler — Cloudflare Workers + Pages CLI">
     Wrapper around the standard =wrangler= binary. The Workbooks use case is
     one-shot: ship a built workbook (=dist/&lt;slug&gt;.html=) to Cloudflare Pages
@@ -27,4 +20,4 @@
     |-------------------------------+---------------------------------------------|
     | =deploy-a-workbook-to-pages=  | Ship a built =dist/&lt;slug&gt;.html= to Cloudflare Pages on the user&#x27;s own account |
   </work-doc>
-</work-toolkit>
+

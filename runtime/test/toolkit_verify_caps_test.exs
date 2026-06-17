@@ -20,9 +20,8 @@ defmodule Workbooks.ToolkitVerifyCapsTest do
     File.write!(Path.join(dir, "skills/overview.md"), "# #{name}\n## When to use this\nx\n")
 
     File.write!(Path.join(dir, "manifest.html"), """
-    <work-toolkit id="#{name}" cli="#{name}" version="0.1.0" exec="command" caps="#{caps}">
-      <work-doc title="#{name}">body</work-doc>
-    </work-toolkit>
+    <work-ref rel="kit" name="#{name}" cli="#{name}" version="0.1.0" exec="command" caps="#{caps}"/>
+    <work-doc title="#{name}">body</work-doc>
     """)
 
     dir

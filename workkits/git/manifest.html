@@ -1,12 +1,5 @@
-<work-toolkit
-  id="git"
-  cli="git"
-  cli-range="&gt;=2.30"
-  version="0.1.0"
-  status="stable"
-  tagline="Distributed version control — recovery, rebase, undo recipes the agent can lift verbatim."
-  requires="git&gt;=2.30"
-  skill-dir="skills/">
+<work-ref rel="kit" name="git" prefix="git" version="0.1.0" status="stable" cli="git" cli-range="&gt;=2.30" skill-dir="skills/" tagline="Distributed version control — recovery, rebase, undo recipes the agent can lift verbatim."/>
+<work-ref rel="needs" to="git&gt;=2.30"/>
   <work-doc title="git — distributed version control">
     Wrapper around the standard =git= binary. Skills cover the
     workflows agents commonly need but tend to get wrong if they
@@ -36,4 +29,4 @@
     | =worktree-management=                | Two branches checked out at once               |
     | =submodule-flows=                    | Repo has submodules; init / bump / remove      |
   </work-doc>
-</work-toolkit>
+

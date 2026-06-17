@@ -1,14 +1,14 @@
 defmodule Workbooks.WorkKits do
   @moduledoc """
   Toolkit discovery (L4, wb-11ck.46) — the agent extensibility surface. A toolkit
-  makes an agent competent with a CLI it has never seen: a single `<work-toolkit>`
+  makes an agent competent with a CLI it has never seen: a single `<work-ref rel="kit">`
   HTML element (the `manifest.html` front-door) names the CLI it wraps and indexes
   deep skill recipes (Markdown) the agent reads on demand. This module is the
   *discovery* half — plain HTML parsing (Floki), no kernel.
 
-  Discovery is one query — every `<work-toolkit>` element under the root. A
+  Discovery is one query — every `<work-ref rel="kit">` self-declaration under the root. A
   `<work-agent toolkits="…">` element lists the toolkits it may use; each name
-  resolves to a `<work-toolkit id=…>`. No tool-search subsystem. The skill bodies
+  resolves to a `<work-ref rel="kit" name=…>`. No tool-search subsystem. The skill bodies
   are read lazily (the agent reads the `.md` file when a task routes to it); the
   runtime only resolves *which* toolkit, never inlines the manual.
 
@@ -35,14 +35,14 @@ defmodule Workbooks.WorkKits do
   path (Dock-gated). Host bash from skill files bypasses that and is therefore
   gated/capped/isolated above. See docs/TOOLKITS-V3.md for the full model.
   """
-  # The toolkit manifest is a single `<work-toolkit>` HTML element (work-* model;
+  # The toolkit manifest is a single `<work-ref rel="kit">` HTML element (work-* model;
   # org fully retired — see docs/WORK-FORMAT.md). Skills are Markdown recipes.
   @manifest "manifest.html"
   @skill_ext ".md"
 
   @doc """
-  Every `<work-toolkit>` element in a workbook's HTML — the discovery query, now
-  HTML-native (a `<work-toolkit>` element replaces the old `:toolkit:` org node).
+  Every `<work-ref rel="kit">` self-declaration in a workbook's HTML — the discovery query, now
+  HTML-native (a `<work-ref rel="kit">` type edge replaces the old `:toolkit:` org node).
   Returns the same view shape (`%{id, title, version, cli, status, skill_dir}`).
   """
   def discover(html) when is_binary(html) do
@@ -51,7 +51,7 @@ defmodule Workbooks.WorkKits do
 
   @doc """
   Discover toolkits on disk: read every `<root>/<name>/manifest.html`, parse its
-  `<work-toolkit>` element, and tag the view with its directory so the agent can
+  `<work-ref rel="kit">` self-declaration, and tag the view with its directory so the agent can
   read a skill on demand. A toolkit is a directory; discovery is plain HTML parsing.
   """
   def discover_dir(root) do
@@ -84,7 +84,7 @@ defmodule Workbooks.WorkKits do
     wanted = html |> agent_toolkits(agent_id)
     tks = work_toolkit_nodes(html)
     by_id = Map.new(tks, &{&1.attrs["id"], view(&1)})
-    # Edges sourced from each `<work-toolkit requires="…">` attribute.
+    # Edges sourced from each kit's sibling `<work-ref rel="needs" to="…">` refs.
     edges = Map.new(tks, &{&1.attrs["id"], parse_requires(&1.attrs["requires"])})
     closure(wanted, edges, Map.keys(by_id))
     |> Enum.map(&by_id[&1])
@@ -763,15 +763,23 @@ defmodule Workbooks.WorkKits do
   end
 
   @doc false
-  # Parse a manifest body (`<work-toolkit>` HTML) into the build descriptor. Each
+  # Parse a manifest body (`<work-ref rel="kit">` HTML) into the build descriptor. Each
   # field reads the same-named attribute (`build-src` etc. dash-cased per HTML).
   def parse_descriptor(body) do
-    a = case work_toolkit(body) do
+    node = work_toolkit(body)
+
+    a = case node do
           %{attrs: attrs} -> attrs
           nil -> %{}
         end
 
+    facets = case node do
+               %{facets: f} -> f
+               _ -> MapSet.new()
+             end
+
     %{
+      facets: facets,
       exec: blank_to_nil(a["exec"]),
       trust: blank_to_nil(a["trust"]) || "first-party",
       build_src: parse_build_src(blank_to_nil(a["build-src"])),
@@ -805,7 +813,7 @@ defmodule Workbooks.WorkKits do
   # Parenthetical prose (e.g. "(to deploy the gateway)") is stripped as comment.
   @doc """
   Parse a raw `requires` value into typed `{:cli, tok} | {:dep, name, raw}` tokens
-  (nil → []). Reads a `<work-toolkit requires="…">` attribute into the edge shape
+  (nil → []). Reads a kit's sibling `<work-ref rel="needs">` edges into the edge shape
   `closure/3` consumes.
   """
   def parse_requires(nil), do: []
@@ -1004,8 +1012,9 @@ defmodule Workbooks.WorkKits do
 
   defp promote_manifest(name, lang, build_src, tagline) do
     """
-    <work-toolkit
-      id="#{name}"
+    <work-ref rel="kit"
+      name="#{name}"
+      prefix="#{name}"
       cli="#{name}"
       version="0.1.0"
       status="experimental"
@@ -1014,15 +1023,14 @@ defmodule Workbooks.WorkKits do
       trust="first-party"
       build-lang="#{lang}"
       build-src="path:#{build_src}"
-      arg-mode="argv">
-      <work-doc title="#{name} toolkit">
-        Promoted from a session command (wb-rhs.6). Source-owned + rebuildable.
+      arg-mode="argv"/>
+    <work-doc title="#{name} toolkit">
+      Promoted from a session command (wb-rhs.6). Source-owned + rebuildable.
 
-        | need   | skill    |
-        |--------|----------|
-        | use it | overview |
-      </work-doc>
-    </work-toolkit>
+      | need   | skill    |
+      |--------|----------|
+      | use it | overview |
+    </work-doc>
     """
   end
 
@@ -1044,7 +1052,7 @@ defmodule Workbooks.WorkKits do
   end
 
   # A runtime entry is either runtimes/<name>.html (a flat pinned spec, a single
-  # <work-toolkit> island) or runtimes/<name>/manifest.html (a dir carrying a
+  # <work-ref rel="kit"> island) or runtimes/<name>/manifest.html (a dir carrying a
   # build script + assets).
   defp runtime_entries(dir) do
     flat =
@@ -1328,7 +1336,7 @@ defmodule Workbooks.WorkKits do
   end
 
   # Lightweight toolkit lister for the release/version verbs: pure filesystem +
-  # Floki over the manifest's `<work-toolkit id=…>`, no live runtime needed. id =
+  # Floki over the manifest's `<work-ref rel="kit" name=…>`, no live runtime needed. id =
   # the manifest's `id` attribute, else the dir name.
   defp tk_dirs_lite(root) do
     Path.wildcard(Path.join(root, "*/#{@manifest}"))
@@ -1380,7 +1388,7 @@ defmodule Workbooks.WorkKits do
     abs == base or String.starts_with?(abs, base <> "/")
   end
 
-  # Read a `<work-toolkit>` attribute (dash-cased lowercase) from a toolkit's
+  # Read a `<work-ref rel="kit">` attribute (dash-cased lowercase) from a toolkit's
   # manifest. `key` is the legacy UPPER_SNAKE name (TAGLINE/VERSION/…); it maps to
   # the HTML attribute (tagline/version/…), with CLI_BIN → cli.
   defp manifest_kw(dir, key) do
@@ -1578,24 +1586,67 @@ defmodule Workbooks.WorkKits do
     File.write!(path, Jason.encode!(pins, pretty: true) <> "\n")
   end
 
-  # ── <work-toolkit> HTML reader (Floki) ────────────────────────────────────
-  # The manifest is a single `<work-toolkit>` element. Its attributes carry what
-  # the org keywords used to (id/cli/version/status/tagline/requires/exec/…); the
-  # nested `<work-doc>` body is the front-door prose. One parser, attribute-named.
+  # ── work-kit manifest reader (Floki) ──────────────────────────────────────
+  # A work-kit declares ITSELF with a reified TYPE edge (tagging = C):
+  #
+  #   <work-ref rel="kit" name="git" prefix="git" version="0.1.0" status="stable"
+  #             cli="git" skill-dir="skills/" tagline="…"/>
+  #   <work-ref rel="needs" to="git>=2.30"/>   ← a dependency edge (has `to`)
+  #
+  # `name` is the kit id; sibling `<work-ref rel="needs" to=…>` refs are the kit's
+  # requires/deps. The top-level TYPE is a small set of co-occurring FACETS, each a
+  # `<work-ref rel="…">` with NO `to` attr — `kit` (exports a <prefix-*> library —
+  # the floor), `app` (a launchable leaf), `agent` (carries a brain).
 
-  # Parse a manifest's HTML → the `<work-toolkit>` element nodes (attrs map + body).
+  # Parse a manifest's HTML → kit nodes (attrs map + doc body + facet set).
   defp work_toolkit_nodes(html) do
     case Floki.parse_fragment(html) do
-      {:ok, tree} -> Floki.find(tree, "work-toolkit") |> Enum.map(&node_of/1)
-      {:error, _} -> []
+      {:ok, tree} ->
+        Floki.find(tree, ~s|work-ref[rel="kit"]:not([to])|)
+        |> Enum.map(fn {"work-ref", attrs, _} -> node_of(attrs, tree) end)
+
+      {:error, _} ->
+        []
     end
   end
 
-  defp node_of({"work-toolkit", attrs, children}) do
-    %{attrs: Map.new(attrs), doc: Floki.find(children, "work-doc") |> Floki.text() |> String.trim()}
+  # A `<work-ref rel="kit">` map → the node shape. `name` is the id, and sibling
+  # `needs` refs synthesize the `requires` string so `parse_requires`
+  # (operator/dep classification) is unchanged.
+  defp node_of(attrs, tree) when is_list(attrs) do
+    a = Map.new(attrs)
+
+    %{
+      attrs:
+        Map.merge(a, %{
+          "id" => a["name"],
+          "title" => a["title"] || a["tagline"],
+          "requires" => kit_needs(tree)
+        }),
+      doc: Floki.find(tree, "work-doc") |> Floki.text() |> String.trim(),
+      facets: kit_facets(tree)
+    }
   end
 
-  # The first `<work-toolkit>` in a manifest body, or nil. Cached read shape used
+  # The TYPE facets a manifest asserts: every `<work-ref rel=…>` with NO `to` attr.
+  # rel="needs" carries `to` (a dep edge), so it is excluded — it is not a type.
+  defp kit_facets(tree) do
+    Floki.find(tree, "work-ref:not([to])")
+    |> Enum.map(fn {"work-ref", attrs, _} -> Map.new(attrs)["rel"] end)
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> MapSet.new()
+  end
+
+  # The kit's dependency edges: each sibling `<work-ref rel="needs" to=…>`, joined
+  # into the same space/comma list `parse_requires` consumes.
+  defp kit_needs(tree) do
+    Floki.find(tree, ~s|work-ref[rel="needs"][to]|)
+    |> Enum.map(fn {"work-ref", attrs, _} -> Map.new(attrs)["to"] end)
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.join(" ")
+  end
+
+  # The first kit node in a manifest body, or nil. Cached read shape used
   # by the keyword/descriptor accessors below.
   defp work_toolkit(body) do
     case work_toolkit_nodes(body) do
@@ -1604,14 +1655,15 @@ defmodule Workbooks.WorkKits do
     end
   end
 
-  defp view(%{attrs: a}) do
+  defp view(%{attrs: a} = node) do
     %{
       id: a["id"],
       title: a["title"],
       version: a["version"],
       cli: a["cli"],
       status: a["status"],
-      skill_dir: a["skill-dir"]
+      skill_dir: a["skill-dir"],
+      facets: Map.get(node, :facets, MapSet.new(["kit"]))
     }
   end
 end

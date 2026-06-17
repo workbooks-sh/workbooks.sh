@@ -1,13 +1,4 @@
-<work-toolkit
-  id="glyphs"
-  version="0.1.0"
-  status="experimental"
-  tagline="One API resolves any visual mark — brand logo, tech icon, seeded avatar, social avatar — to an SVG (or an &lt;img&gt;). Curated-local-first, CDN fallback for the long tail. glyph(ref) is sync (curated-only, offline, returns null on a miss); glyphAsync(ref) hits the CDN for the long tail. ref is &quot;&lt;kind&gt;:&lt;id&gt;&quot; — brand:google, icon:elixir, avatar:open-peeps/wren, social:github/octocat."
-  skill-dir="skills/"
-  data-kind="knowledge+assets"
-  data-flow="read this front door → pick the one skill your task needs (resolve to use it, curate to add/refresh curated marks, integrate to plug it into a site/wasm). cat a skill only when you reach its step. The resolver lives in dist/glyphs.js + dist/glyphs.css; the proof page is dist/specimen.html; curated packs in packs/*.json; licenses + the trademark note in LICENSES.md."
-  data-sources="curated-local (inlined SVGs) → svgl (full-color brands) · simple-icons (currentColor tech/brand) · lobehub (AI/LLM brands) · unavatar (social avatars) · open-avatars (this repo, seeded avatars). Marks are trademarks; nominative/identification use only — see LICENSES.md."
-  data-assets="dist/glyphs.js, dist/glyphs.css, dist/specimen.html, packs/curated-brands.json, packs/curated-icons.json, packs/svgl-index.json, packs/open-avatars/*, LICENSES.md">
+<work-ref rel="kit" name="glyphs" prefix="glyphs" version="0.1.0" status="experimental" skill-dir="skills/" tagline="One API resolves any visual mark — brand logo, tech icon, seeded avatar, social avatar — to an SVG (or an &lt;img&gt;). Curated-local-first, CDN fallback for the long tail. glyph(ref) is sync (curated-only, offline, returns null on a miss); glyphAsync(ref) hits the CDN for the long tail. ref is &quot;&lt;kind&gt;:&lt;id&gt;&quot; — brand:google, icon:elixir, avatar:open-peeps/wren, social:github/octocat." data-kind="knowledge+assets" data-flow="read this front door → pick the one skill your task needs (resolve to use it, curate to add/refresh curated marks, integrate to plug it into a site/wasm). cat a skill only when you reach its step. The resolver lives in dist/glyphs.js + dist/glyphs.css; the proof page is dist/specimen.html; curated packs in packs/*.json; licenses + the trademark note in LICENSES.md." data-sources="curated-local (inlined SVGs) → svgl (full-color brands) · simple-icons (currentColor tech/brand) · lobehub (AI/LLM brands) · unavatar (social avatars) · open-avatars (this repo, seeded avatars). Marks are trademarks; nominative/identification use only — see LICENSES.md." data-assets="dist/glyphs.js, dist/glyphs.css, dist/specimen.html, packs/curated-brands.json, packs/curated-icons.json, packs/svgl-index.json, packs/open-avatars/*, LICENSES.md"/>
   <work-doc title="glyphs — one mark resolver for any site">
     A *knowledge + assets* toolkit: a tiny, zero-dependency resolver that turns a
     string ref into a visual mark. One function, four kinds, curated-local-first.
@@ -104,4 +95,4 @@
     | =curate=     | Adding a mark to the curated set or refreshing the curated JSON     |
     | =integrate=  | Plugging the resolver into a site (browser / Node build-time / wasm / framework) |
   </work-doc>
-</work-toolkit>
+

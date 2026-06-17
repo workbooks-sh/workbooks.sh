@@ -32,12 +32,11 @@ defmodule Workbooks.ToolkitsTest do
     tk = Path.join(root, "demo")
     File.mkdir_p!(Path.join(tk, "skills"))
 
-    # manifest with a <work-toolkit> node (id "demo")
+    # manifest with a <work-ref rel="kit"> node (id "demo")
     File.write!(Path.join(tk, "manifest.html"), """
-    <work-toolkit id="demo" cli="demo" status="stable"
-      tagline="scratch fixture for path-escape tests" skill-dir="skills/">
-      <work-doc title="demo — scratch"></work-doc>
-    </work-toolkit>
+    <work-ref rel="kit" name="demo" cli="demo" status="stable"
+      tagline="scratch fixture for path-escape tests" skill-dir="skills/"/>
+    <work-doc title="demo — scratch"></work-doc>
     """)
 
     # thin skill: skills/overview.md   (verify_text wants overview.md present)
@@ -133,8 +132,8 @@ defmodule Workbooks.ToolkitsTest do
   describe "show_text/2" do
     test "shows the manifest body + a skill index" do
       out = WorkKits.show_text("git", @root)
-      assert out =~ ~s(<work-toolkit)
-      assert out =~ ~s(id="git")
+      assert out =~ ~s(<work-ref rel="kit")
+      assert out =~ ~s(name="git")
       assert out =~ "Skills (read with `work kit show git <skill>`)"
       assert out =~ "overview"
       assert out =~ "bisect"
@@ -348,9 +347,8 @@ defmodule Workbooks.ToolkitsTest do
       on_exit(fn -> File.rm_rf!(base) end)
 
       File.write!(Path.join(tk, "manifest.html"), """
-      <work-toolkit id="quiet" cli="quiet">
-        <work-doc title="quiet"></work-doc>
-      </work-toolkit>
+      <work-ref rel="kit" name="quiet" cli="quiet"/>
+      <work-doc title="quiet"></work-doc>
       """)
 
       File.write!(Path.join([tk, "skills", "overview.md"]), "no role blocks here\n")

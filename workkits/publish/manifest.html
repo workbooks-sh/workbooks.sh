@@ -1,12 +1,5 @@
-<work-toolkit
-  id="publish"
-  cli="wb-publish"
-  cli-range="&gt;=0.1.0"
-  version="0.1.0"
-  status="stable"
-  tagline="AT Protocol publishing + Workbooks Network identity — bind a Bluesky account, publish signed workbooks, watch the verified feed."
-  requires="wb-publish&gt;=0.1.0"
-  skill-dir="skills/">
+<work-ref rel="kit" name="publish" prefix="publish" version="0.1.0" status="stable" cli="wb-publish" cli-range="&gt;=0.1.0" skill-dir="skills/" tagline="AT Protocol publishing + Workbooks Network identity — bind a Bluesky account, publish signed workbooks, watch the verified feed."/>
+<work-ref rel="needs" to="wb-publish&gt;=0.1.0"/>
   <work-doc title="publish — federation + identity for workbooks">
     The publish/identity stack, lifted out of the `work` core
     (M5-publish-to-toolkit — provider/integration logic lives in
@@ -48,4 +41,4 @@
     |------------+-------------------------------------------------------|
     | =overview= | First contact — bind an identity, publish a workbook |
   </work-doc>
-</work-toolkit>
+

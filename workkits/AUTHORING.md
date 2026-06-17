@@ -43,18 +43,23 @@ index, and the first thing an author/agent reads to decide if this
 toolkit is the right one. It indexes the skills by NEED; it never
 duplicates a skill's body.
 
-The manifest is a single `<work-toolkit>` element whose attributes carry
-the toolkit metadata (order doesn't matter; match ffmpeg):
+The manifest declares its kit with a reified TYPE edge (tagging = C): a
+`<work-ref rel="kit">` self-declaration whose attributes carry the kit
+metadata (order doesn't matter; match ffmpeg). Dependencies are sibling
+`<work-ref rel="needs" to="…">` edges, not a `requires` attribute. The
+top-level TYPE is a small facet set — extra facets are sibling
+`<work-ref rel="app|agent">` edges with no `to`:
 
 ```html
-<work-toolkit
-  id="<slug>"                  <!-- whitespace-free; == dir name -->
+<work-ref rel="kit"
+  name="<slug>"                <!-- whitespace-free; == dir name; the kit id -->
+  prefix="<slug>"              <!-- the <prefix-*> element namespace this kit owns -->
   version="<semver of THIS wrapper, not the underlying CLI>"
   cli="<executable on PATH, e.g. ffmpeg / git / pdftk>"
-  cli-version-range="<range the skills are tested against, e.g. >=6.0>"
+  cli-range="<range the skills are tested against, e.g. >=6.0>"
   status="stable | experimental | deprecated"
-  tagline="<one sentence — when to reach for this toolkit>"
-  requires="<space-separated extra CLIs, e.g. node>=20 npm>">
+  tagline="<one sentence — when to reach for this kit>"/>
+<work-ref rel="needs" to="<extra CLI/dep, e.g. node>=20>"/>   <!-- one per dep -->
 ```
 
 Optional, used by richer toolkits (see brandnana): `kind` (when
@@ -62,7 +67,7 @@ not a plain `cli`), `env-keys` + `env-note` (creds the CLI
 reads), `flow` (the one-line happy-path pipeline). Add them only
 when they carry real information.
 
-The body is a `<work-doc>` child holding the front-door prose — a short
+The body is a sibling `<work-doc>` holding the front-door prose — a short
 description of what this wraps, the WHY (what an agent gets wrong from
 training priors / from skimming `--help`), where NOT to use it / what to
 reach for instead — plus a skill-index table:
@@ -289,7 +294,7 @@ present.
 
 ## Authoring checklist (what "done" means)
 
-- [ ] `manifest.html` present, `<work-toolkit>` attributes complete, `id`/`cli`/`status`
+- [ ] `manifest.html` present, `<work-ref rel="kit">` attributes complete, `name`/`cli`/`status`
       match the toolkit's real identity.
 - [ ] Skill index table lists every `skills/*.md` exactly once,
       keyed by need.

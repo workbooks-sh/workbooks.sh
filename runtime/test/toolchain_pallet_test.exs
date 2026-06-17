@@ -16,10 +16,9 @@ defmodule Workbooks.ToolchainPalletTest do
   describe "manifest parsing (no network)" do
     test "wasm:<url> + sha256 parse into the descriptor" do
       body = """
-      <work-toolkit id="qjs" cli="qjs" exec="command"
-        build-src="wasm:#{@qjs_url}" sha256="#{@qjs_sha}" arg-mode="argv">
-        <work-doc title="qjs"></work-doc>
-      </work-toolkit>
+      <work-ref rel="kit" name="qjs" cli="qjs" exec="command"
+        build-src="wasm:#{@qjs_url}" sha256="#{@qjs_sha}" arg-mode="argv"/>
+      <work-doc title="qjs"></work-doc>
       """
 
       d = WorkKits.parse_descriptor(body)

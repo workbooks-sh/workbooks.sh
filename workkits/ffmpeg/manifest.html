@@ -1,12 +1,5 @@
-<work-toolkit
-  id="ffmpeg"
-  cli="ffmpeg"
-  cli-range="&gt;=6.0"
-  version="0.3.0"
-  status="stable"
-  tagline="Image + audio + video at parity — resize/crop/convert/tile/overlay stills, scale/overlay/gif/fps/audio-mux + transcode/trim/concat for video."
-  requires="ffmpeg&gt;=6.0"
-  skill-dir="skills/">
+<work-ref rel="kit" name="ffmpeg" prefix="ffmpeg" version="0.3.0" status="stable" cli="ffmpeg" cli-range="&gt;=6.0" skill-dir="skills/" tagline="Image + audio + video at parity — resize/crop/convert/tile/overlay stills, scale/overlay/gif/fps/audio-mux + transcode/trim/concat for video."/>
+<work-ref rel="needs" to="ffmpeg&gt;=6.0"/>
   <work-doc title="ffmpeg — multimedia processing">
     Wrapper around the standard =ffmpeg= binary. ffmpeg is
     powerful but the flag surface is large + the order of -i and
@@ -43,4 +36,4 @@
     | =hardware-acceleration=   | CPU too slow — VideoToolbox / NVENC / VAAPI       |
     | =lossy-tradeoffs=         | Mental model — CRF, bitrate, preset, codec        |
   </work-doc>
-</work-toolkit>
+
