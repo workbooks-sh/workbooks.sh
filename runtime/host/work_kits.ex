@@ -766,12 +766,20 @@ defmodule Workbooks.WorkKits do
   # Parse a manifest body (`<work-toolkit>` HTML) into the build descriptor. Each
   # field reads the same-named attribute (`build-src` etc. dash-cased per HTML).
   def parse_descriptor(body) do
-    a = case work_toolkit(body) do
+    node = work_toolkit(body)
+
+    a = case node do
           %{attrs: attrs} -> attrs
           nil -> %{}
         end
 
+    facets = case node do
+               %{facets: f} -> f
+               _ -> MapSet.new()
+             end
+
     %{
+      facets: facets,
       exec: blank_to_nil(a["exec"]),
       trust: blank_to_nil(a["trust"]) || "first-party",
       build_src: parse_build_src(blank_to_nil(a["build-src"])),
@@ -1578,24 +1586,79 @@ defmodule Workbooks.WorkKits do
     File.write!(path, Jason.encode!(pins, pretty: true) <> "\n")
   end
 
-  # ── <work-toolkit> HTML reader (Floki) ────────────────────────────────────
-  # The manifest is a single `<work-toolkit>` element. Its attributes carry what
-  # the org keywords used to (id/cli/version/status/tagline/requires/exec/…); the
-  # nested `<work-doc>` body is the front-door prose. One parser, attribute-named.
+  # ── work-kit manifest reader (Floki) ──────────────────────────────────────
+  # A work-kit declares ITSELF with a reified TYPE edge (tagging = C):
+  #
+  #   <work-ref rel="kit" name="git" prefix="git" version="0.1.0" status="stable"
+  #             cli="git" skill-dir="skills/" tagline="…"/>
+  #   <work-ref rel="needs" to="git>=2.30"/>   ← a dependency edge (has `to`)
+  #
+  # `name` is the kit id; sibling `<work-ref rel="needs" to=…>` refs are the kit's
+  # requires/deps. The top-level TYPE is a small set of co-occurring FACETS, each a
+  # `<work-ref rel="…">` with NO `to` attr — `kit` (exports a <prefix-*> library —
+  # the floor), `app` (a launchable leaf), `agent` (carries a brain).
+  #
+  # The legacy `<work-toolkit id=… requires=…>…<work-doc>…` element is still read as
+  # a FALLBACK so unconverted manifests keep parsing; it normalizes to the same node
+  # shape (attrs map + doc + facets) the accessors below consume.
 
-  # Parse a manifest's HTML → the `<work-toolkit>` element nodes (attrs map + body).
+  # Parse a manifest's HTML → kit nodes (attrs map + doc body + facet set).
   defp work_toolkit_nodes(html) do
     case Floki.parse_fragment(html) do
-      {:ok, tree} -> Floki.find(tree, "work-toolkit") |> Enum.map(&node_of/1)
-      {:error, _} -> []
+      {:ok, tree} ->
+        ref_kits = Floki.find(tree, ~s|work-ref[rel="kit"]:not([to])|)
+        case ref_kits do
+          [] -> Floki.find(tree, "work-toolkit") |> Enum.map(&node_of(&1, tree))
+          refs -> Enum.map(refs, fn {"work-ref", attrs, _} -> node_of(attrs, tree) end)
+        end
+
+      {:error, _} ->
+        []
     end
   end
 
-  defp node_of({"work-toolkit", attrs, children}) do
-    %{attrs: Map.new(attrs), doc: Floki.find(children, "work-doc") |> Floki.text() |> String.trim()}
+  # The legacy element OR a normalized `<work-ref rel="kit">` map → the node shape.
+  # For the new form, `name` is the id and sibling `needs` refs synthesize the
+  # `requires` string so `parse_requires` (operator/dep classification) is unchanged.
+  defp node_of({"work-toolkit", attrs, children}, _tree) do
+    a = Map.new(attrs)
+    %{attrs: a, doc: Floki.find(children, "work-doc") |> Floki.text() |> String.trim(), facets: MapSet.new(["kit"])}
   end
 
-  # The first `<work-toolkit>` in a manifest body, or nil. Cached read shape used
+  defp node_of(attrs, tree) when is_list(attrs) do
+    a = Map.new(attrs)
+
+    %{
+      attrs:
+        Map.merge(a, %{
+          "id" => a["name"],
+          "title" => a["title"] || a["tagline"],
+          "requires" => kit_needs(tree)
+        }),
+      doc: Floki.find(tree, "work-doc") |> Floki.text() |> String.trim(),
+      facets: kit_facets(tree)
+    }
+  end
+
+  # The TYPE facets a manifest asserts: every `<work-ref rel=…>` with NO `to` attr.
+  # rel="needs" carries `to` (a dep edge), so it is excluded — it is not a type.
+  defp kit_facets(tree) do
+    Floki.find(tree, "work-ref:not([to])")
+    |> Enum.map(fn {"work-ref", attrs, _} -> Map.new(attrs)["rel"] end)
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> MapSet.new()
+  end
+
+  # The kit's dependency edges: each sibling `<work-ref rel="needs" to=…>`, joined
+  # into the same space/comma list `parse_requires` consumes.
+  defp kit_needs(tree) do
+    Floki.find(tree, ~s|work-ref[rel="needs"][to]|)
+    |> Enum.map(fn {"work-ref", attrs, _} -> Map.new(attrs)["to"] end)
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.join(" ")
+  end
+
+  # The first kit node in a manifest body, or nil. Cached read shape used
   # by the keyword/descriptor accessors below.
   defp work_toolkit(body) do
     case work_toolkit_nodes(body) do
@@ -1604,14 +1667,15 @@ defmodule Workbooks.WorkKits do
     end
   end
 
-  defp view(%{attrs: a}) do
+  defp view(%{attrs: a} = node) do
     %{
       id: a["id"],
       title: a["title"],
       version: a["version"],
       cli: a["cli"],
       status: a["status"],
-      skill_dir: a["skill-dir"]
+      skill_dir: a["skill-dir"],
+      facets: Map.get(node, :facets, MapSet.new(["kit"]))
     }
   end
 end

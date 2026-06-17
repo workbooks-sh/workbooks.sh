@@ -158,6 +158,46 @@ defmodule Workbooks.ToolkitGraphTest do
     end
   end
 
+  describe "work-ref rel=\"kit\" self-declaration (tagging = C)" do
+    @kit_manifest """
+    <work-ref rel="kit" name="demo" prefix="demo" version="0.2.0" status="stable"
+              cli="demo" skill-dir="skills/" tagline="a demo kit"/>
+    <work-ref rel="app"/>
+    <work-ref rel="needs" to="glyphs"/>
+    <work-ref rel="needs" to="git>=2.30"/>
+    <work-doc title="demo">front-door prose for the demo kit.</work-doc>
+    """
+
+    test "discover reads name→id and the kit attrs off the type edge" do
+      [view] = WorkKits.discover(@kit_manifest)
+      assert view.id == "demo"
+      assert view.version == "0.2.0"
+      assert view.status == "stable"
+      assert view.cli == "demo"
+      assert view.skill_dir == "skills/"
+    end
+
+    test "the facet set collects every rel:not([to]); needs (has `to`) is NOT a facet" do
+      [view] = WorkKits.discover(@kit_manifest)
+      assert view.facets == MapSet.new(["kit", "app"])
+    end
+
+    test "sibling rel=needs refs become the kit's requires edges" do
+      d = WorkKits.parse_descriptor(@kit_manifest)
+      # bare name → :dep candidate; version-operator token → :cli pre-flight
+      assert {:dep, "glyphs", "glyphs"} in d.requires
+      assert {:cli, "git>=2.30"} in d.requires
+      assert d.facets == MapSet.new(["kit", "app"])
+    end
+
+    test "the shipped spine manifest (workkits/work) discovers as kit id=work" do
+      body = File.read!(Path.expand("../../workkits/work/manifest.html", __DIR__))
+      [view] = WorkKits.discover(body)
+      assert view.id == "work"
+      assert MapSet.member?(view.facets, "kit")
+    end
+  end
+
   describe "the shipped manifests stay edge-free (no regression)" do
     @root Path.expand("../../workkits", __DIR__)
 
