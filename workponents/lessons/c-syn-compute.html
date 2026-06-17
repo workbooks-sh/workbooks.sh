@@ -2,10 +2,14 @@
 # Compute
 
 Compute is just code that runs. You write plain Elixir inside a placed block, and
-it runs as wasm — you never think about *how*:
+the engine takes care of *how* — you never think about it:
 
 server :score do
-  def score(lead), do: lead.revenue / 1000 + lead.employees
+  def score(%Lead{} = lead) do
+    revenue_points = lead.revenue / 1_000
+    size_points    = lead.employees * 0.5
+    round(revenue_points + size_points)
+  end
 end
 
 The *how* is a footnote you never author. On the `server` your Elixir runs
