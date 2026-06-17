@@ -1,5 +1,10 @@
 <script type="text/plain" id="c-prim-types">
-# Types & definitions — these ARE WIT types (record / variant / enum / flags).
+# Types
+
+Types, enums, and people are declared **once** in a shared file — these *are* WIT
+types (`record` / `variant` / `enum` / `flags`), the same shapes that cross the
+component boundary (see [[The data model]]). A definitions file holds them, imported
+where used — never the index.
 
 # team.work — shared definitions, imported where used (never the index):
 
@@ -9,13 +14,15 @@ type User   = record(name: string, email: string)   # a WIT record (string = WIT
 user :analyst, %{name: "Ada Lovelace", email: "ada@acme.co"}   # a value of User
 user :shane,   %{name: "Shane",        email: "shane@acme.co"}
 
-# anything references those by NAME; the weave gate checks the ref resolves AND
-# the value fits the type — the same WIT type that crosses the component boundary:
+Anything references those **by name**; the weave gate checks the ref resolves *and*
+the value fits the type:
 
 task "tune the scorer", status: :todo, owner: :analyst, ref: :scorer
 #                       ^ must be a Status     ^ must be a User
 
-# add a field to the record, or a new user — one place, everywhere stays in sync.
+So the whole system shares **one source of truth** for people, statuses, and
+categories — typed, no drift. Add a field to the record, or a new `user`, in one place
+and every reference stays in sync. Tasks lean on exactly this (see [[Tasks]]). #types
 </script>
 <template id="e-prim-types">
   <div class="kick">primitive · types &amp; definitions</div>

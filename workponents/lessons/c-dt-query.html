@@ -1,17 +1,25 @@
 <script type="text/plain" id="c-dt-query">
-# a query is a SELECTOR over a source's WIT values — returns WIT values too:
+# Query
+
+A query is a **selector** over a source's WIT values — and it returns WIT values
+too (see [[Data sources]]). You `select` to filter, sort, and pick fields:
 
 data :ranked, from: select(:leads, fields: [:name, :score], sort: {:score, :desc})
 
-# SHOWING it needs no widget — typed data renders by DEFAULT (the type tells the
-# renderer: record → card, list of records → table, scalar → text). reference it:
+**Showing it needs no widget.** Because data is `#data`-typed, the renderer already
+knows its shape: a record → a card, a list of records → a table, a scalar → text. So
+you just *reference* it inline, and it renders — re-rendering on change, via
+**signals**:
 
-Top lead: {{ ranked.first.name }} at {{ ranked.first.score }}.   # inline · live (signals)
+> Top lead: `{{ ranked.first.name }}` at `{{ ranked.first.score }}`.
 
-# want a specific look? a CLIENT unit reads the source and renders it your way:
+Want a specific look? A **client unit** `reads:` the source and renders it your way:
+
 client :ranked_table, reads: :ranked do ... end
 
-# telemetry and a unit's output are just data sources — shown the SAME way:
+And there's no separate "live readout" primitive — **telemetry** and a **unit's
+output** are *just data sources*, shown exactly the same way:
+
 data :health, from: telemetry(:enrich)     # live metrics
 data :result, from: enrich(1000)           # a call's result
 </script>

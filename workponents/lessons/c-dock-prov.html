@@ -1,13 +1,23 @@
 <script type="text/plain" id="c-dock-prov">
-# the SAME work file, two behaviours — the Dock swaps the provider.
+# Providers
+
+The **same** work file, two behaviours — the Dock swaps the *provider* underneath.
+Take one ordinary `data` declaration:
 
 data :leads, from: query("...")
+
+As a **static workbook** it resolves against `sqlite-wasm` in the browser. **Docked
+to a nexus** the *same* request resolves against Postgres on the nexus — and the
+data stays server-side. In a diagram:
 
 #   static workbook   ->  sqlite-wasm in the browser
 #   docked to a nexus ->  Postgres on the nexus (data stays server-side)
 
-# zero code change. work declares "runs behind the Dock";
-# the Dock resolves it differently by where it runs. (the "extrapolate".)
+That's **zero code change**. The author only declares "runs behind the Dock" (see
+[[The one seam]]); the Dock resolves it differently by *where* it runs. Write once,
+then ship the same file as a zero-infra static doc *or* a live server app — the
+choice lives in the Dock as *resolution*, not a rewrite. This is the
+**`#extrapolate`** property (see [[Extrapolate]]).
 </script>
 <template id="e-dock-prov">
   <div class="kick">dock · providers</div>

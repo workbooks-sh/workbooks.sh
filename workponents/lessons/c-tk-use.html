@@ -1,15 +1,23 @@
 <script type="text/plain" id="c-tk-use">
-# index.work — pull in a toolkit (a package of helpers)
+# Use a toolkit
 
+A toolkit is an external dependency shipped as **helpers** — a package of functions,
+types, and units. You pull it into the index, version-pinned and verified:
+
+# index.work
 import :crm, from: "crm@2"
 
-# a toolkit ships FUNCTIONS, TYPES, and units — helpers, referenced by name.
-# a page then uses them directly:
+It ships a **prefix** plus its functions, types, and units, and the weave audits the
+caps it brings — nothing ambient. A page then uses those helpers **by name**:
 
 # dashboard.work
 import {lookup, list} from :crm           # its functions
 data :contacts, from: list(:leads)        # a unit it ships
-# any UI it provides is a client unit you mount — never a custom element.
+
+A toolkit is a *library of helpers*, not a widget set. Any UI it provides is a
+**client unit** you mount — a front-end island reachable like any other unit (see
+[[Targets]]), never a custom element to learn. To build one of these yourself, see
+[[Author one]]. #toolkits
 </script>
 <template id="e-tk-use">
   <div class="kick">toolkits · use</div>

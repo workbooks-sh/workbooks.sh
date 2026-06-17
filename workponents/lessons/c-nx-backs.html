@@ -1,15 +1,22 @@
 <script type="text/plain" id="c-nx-backs">
-# The nexus is the server tier — pinpointed in the index manifest:
+# What it backs
+
+The **nexus** is the optional server tier behind the Dock — pinpointed by a single
+URL in the index manifest (see [[index.work]]):
 
 nexus "wss://acme.nexus.work.dev"
 
-# it backs the things a static file can't do alone:
-#   . server compute    heavy / trusted functions
-#   . data              Postgres, persistence, sync
-#   . agents            long-running brains, tools
-#   . secrets           bound at run, never in the bundle
+It backs the things a static file can't do alone:
 
-# optional: a fully static workbook needs no nexus.
+- **server compute** — heavy / trusted functions
+- **data** — Postgres, persistence, sync
+- **agents** — long-running brains, tools
+- **secrets** — bound at run, never in the bundle
+
+It's **additive, not required**: the workbook still renders *client-side*, so a
+fully static workbook needs no nexus at all — an app simply *opts in* by declaring
+one, and is then metered per tenant (see [[Providers]] for how the Dock resolves the
+same request against it).
 </script>
 <template id="e-nx-backs">
   <div class="kick">nexus · what it backs</div>

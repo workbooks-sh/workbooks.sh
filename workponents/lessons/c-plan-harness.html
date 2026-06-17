@@ -1,21 +1,28 @@
 <script type="text/plain" id="c-plan-harness">
-# plan.work — a full agentic harness in ONE file: a brain, the flow it runs,
-# the tasks it works, and the validations that gate them. one agent here; the
-# same shape scales to many.
+# A full harness
 
-# ── the agent (the brain) ───────────────────────────────────────────
+This is `plan.work` as a **full agentic harness in one file**: a brain, the flow it
+runs, the tasks it works, and the validations that gate them. One agent here, but the
+same shape scales to many.
+
+It opens with the **agent** — the brain (model, system, tools):
+
 agent :ada, model: :mimo, tools: [:crm, :charts] do
   system "Enrich, score, and rank leads. File an issue for what you can't resolve."
 end
 
-# ── the work it runs (a flow — the runnable DAG) ────────────────────
+Next the **work it runs** — a flow, the runnable DAG, with steps in order and a
+parallel fan-out at the end:
+
 flow :pipeline do
   step :enrich
   step :score
   parallel [:rank, :chart]
 end
 
-# ── a unit the flow calls, with a validation that gates the plan ────
+The flow calls **units**, and each unit can carry a `test` that **gates the whole
+plan** — a red validation stalls everything downstream:
+
 sandbox rust :enrich do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
@@ -24,15 +31,19 @@ test :enrich do
   assert enrich(1000) == 1100        # red validation → the whole plan stalls
 end
 
-# ── the tasks ada works: ordered by after:, gated by needs: ─────────
+Finally the **tasks** ada works — ordered by `after:`, gated by `needs:` a passing
+unit (it's all [[Live state]]):
+
 type Status = enum(:todo, :doing, :done)
 
 task "run the pipeline",   status: :doing, owner: :ada, ref: :pipeline, paths: ["leads/"]
 task "review the ranking", status: :todo,  owner: :ada, after: :pipeline, needs: :enrich
 task "publish the page",   status: :todo,  owner: :ada, after: "review the ranking"
 
-# ada claims a task → draft + scope → runs :pipeline → tests gate it → :done.
-# one file: the brain, the work, the proof, and the live board — same primitives.
+Put together, the loop reads end to end: ada claims a task → `draft` + `scope` (see
+[[Claim, lock & fence]]) → runs `:pipeline` → the tests gate it → status flips to
+`:done`. **The brain, the work, the proof, and the live board** — all composed from
+the same primitives, no separate harness to learn.
 </script>
 <template id="e-plan-harness">
   <div class="kick">plans · a full harness</div>

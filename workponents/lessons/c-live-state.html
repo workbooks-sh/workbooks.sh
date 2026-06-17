@@ -1,16 +1,22 @@
 <script type="text/plain" id="c-live-state">
-# A task is DATA — parsed, never compiled to wasm. So its state is LIVE:
-# you change it by EDITING the declaration. The document IS the store.
+# Live state
+
+A `task` is **data** — parsed, never compiled to wasm. So its state is *live*: you
+change it by **editing the declaration**, and the document itself is the store. Start
+with a task assigned but untouched:
 
 task "tune the scorer", status: :todo,  owner: :ada
-# an agent claims it → the SAME line becomes:
+
+When an agent claims it, the **same line** simply becomes:
+
 task "tune the scorer", status: :doing, owner: :ada, lock: "wb-7f3"
 
-# nothing recompiles — only the FUNCTION lane (target → wasm) ever compiles.
-# data edits are cheap + live, and every edit is versioned — restorable, like
-# Drive history (our own workspace layer, not an external tool).
-#
-# declarative ≠ frozen. it's the DOM: live markup that's also the source.
+Nothing recompiles — only the *function* lane (target → wasm) ever compiles, so
+flipping `status: :todo → :doing` is a cheap, live edit. Every edit is **versioned**
+and restorable, like Drive history (our own workspace layer, not an external tool),
+so the history *is* the audit log. Declarative isn't frozen: it's the DOM — live
+markup that's also the source. The coordinator drives these flips automatically when
+it claims work (see [[Claim, lock & fence]]).
 </script>
 <template id="e-live-state">
   <div class="kick">plans · live state</div>

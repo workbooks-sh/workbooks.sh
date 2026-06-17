@@ -1,14 +1,23 @@
 <script type="text/plain" id="c-dt-src">
-# a data source is a NAMED unit behind ONE typed surface — it returns WIT VALUES,
-# never a second data layer. three kinds, same shape:
+# Data sources
+
+A data source is a **named** unit behind *one* typed surface — it returns **WIT
+values**, never a second data layer. There are three kinds, all the same shape:
 
 data :leads,  from: values([...])         # inline WIT values (records/lists), embedded
 data :poster, from: blob("poster.png")    # a content-addressed blob — a list<u8>
 data :crm,    from: postgres("crm.leads") # an EXTERNAL db — a WIT resource (a handle)
 
-# all three resolve to typed values through the Dock. SQL appears ONLY at the
-# external edge (postgres) as an integration — never as the format of your content.
-# no SQLite-VFS, no separate query API: one typed surface, all WASM-native.
+All three resolve to typed values through the **Dock** (see [[The one seam]]):
+`values` is your inline content; `blob` is a content-addressed `list<u8>` (an image
+or media); `postgres` is an external db, a WIT **resource** reached through imported
+functions.
+
+SQL appears **only** at that external edge — as an *integration*, never as the
+format of your content. There's no SQLite-VFS and no separate query API: one typed
+surface, all wasm-native, and the same `#data` types you declare everywhere (see
+[[The data model]]). The Dock resolves a source locally (embedded) or on the nexus
+(the db) without changing the declaration (see [[Query]]).
 </script>
 <template id="e-dt-src">
   <div class="kick">data · sources</div>

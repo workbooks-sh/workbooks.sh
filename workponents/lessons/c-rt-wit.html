@@ -1,26 +1,32 @@
 <script type="text/plain" id="c-rt-wit">
-# Every unit compiles to a COMPONENT — sandboxed wasm with a typed CONTRACT.
-# the contract is a WORLD: what it EXPORTS + what it IMPORTS. you never write it;
-# the weave generates it from what you already declared.
+# The contract
 
-# you write — a sandbox unit + a grant:
+Every unit compiles to a **component** — sandboxed wasm with a typed *contract*. The
+contract is a **world**: what the unit **exports** plus what it **imports**. You
+*never write it*; the weave generates it from what you already declared.
+
+What **you** write is a `sandbox` unit and a `grant`:
 
 sandbox rust :enrich do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
 grant net "api.crm.com"
 
-# the weave generates its WORLD (WIT — the wasm-native form of the above):
+From that, the weave generates the unit's **world** — WIT, the wasm-native form of
+the same declarations. Its `export` comes from your public fn; its `import` comes
+from your grant:
 
-#   package acme:sales@1
-#   world enrich {
-#     export enrich: func(revenue: s64) -> s64    ←  your public fn
-#     import net:    func(url: string) -> string  ←  your grant
-#   }
+  package acme:sales@1
+  world enrich {
+    export enrich: func(revenue: s64) -> s64    #  ← your public fn
+    import net:    func(url: string) -> string  #  ← your grant
+  }
 
-# types cross the boundary as WIT types — no manual memory:
-#   record ↔ map · enum ↔ atom · result ↔ {:ok,_}|{:error,_} · list ↔ list
-# your `type Status = enum(:todo, :doing, :done)` IS a WIT enum.
+Types **cross the boundary as WIT types** — no manual memory management:
+`record ↔ map`, `enum ↔ atom`, `result ↔ {:ok,_}|{:error,_}`, `list ↔ list`. Your
+`type Status = enum(:todo, :doing, :done)` *is* a WIT enum (see [[The data model]]).
+This is the whole game: two units in different languages meet at a typed world, not
+raw memory — and a `#kit` is just a WIT package exporting interfaces.
 </script>
 <template id="e-rt-wit">
   <div class="kick">dock · the contract</div>

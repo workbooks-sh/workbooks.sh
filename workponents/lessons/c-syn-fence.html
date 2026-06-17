@@ -1,6 +1,9 @@
 <script type="text/plain" id="c-syn-fence">
-# Code is RUNNABLE — and ONE word says where it runs: the TARGET. Three of them.
-# grammar:  <target> [language] :name do … end   (language defaults to Elixir)
+# Targets
+
+Code is **runnable**, and one word says *where* it runs — the **target**. There are
+three, and the grammar is `<target> [language] :name do … end` (language defaults to
+Elixir).
 
 client  :spinner do … end       # → wasm, in the BROWSER (UI, interaction)
 sandbox :score   do             # → wasm, in the SANDBOX (compute, the agent)
@@ -8,18 +11,22 @@ sandbox :score   do             # → wasm, in the SANDBOX (compute, the agent)
 end
 server  :sync    do … end       # full Elixir/OTP, on the BEAM (secrets, db, net)
 
-## any language targets client / sandbox (it all becomes wasm):
+**Any language targets `client` or `sandbox`** — it all becomes wasm, so you can drop
+into Rust where it pays off:
 
 sandbox rust :enrich do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
 
-## no target = a static definition — placed by whoever references it:
+With **no target**, a unit is a *static definition* — compiled wherever it's
+referenced, placed by whoever uses it:
 
 zig :checksum do … end          # compiled wherever it's referenced (placed by whoever uses it)
 
-# the prefix is the engine, the placement, AND the trust tier, in one word.
-# server is Elixir-only; foreign code is always wasm (client/sandbox), never native.
+So the prefix is the **engine**, the **placement**, *and* the **trust tier** in one
+word. `server` is Elixir-only; foreign code is always wasm (`client`/`sandbox`),
+never native. Where a unit runs decides what it can touch — see [[Compute]] for the
+sandbox lane and [[Tests]] for the build lane. #targets
 </script>
 <template id="e-syn-fence">
   <div class="kick">code · targets</div>

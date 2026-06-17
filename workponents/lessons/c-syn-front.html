@@ -1,6 +1,9 @@
 <script type="text/plain" id="c-syn-front">
-# The file opens with its header — Elixir declarations, NOT YAML frontmatter.
-# Same data lane as tasks; markdown is left purely for the prose below.
+# The header
+
+A file opens with its **header** — Elixir declarations, *not* YAML frontmatter. It's
+the same data lane as `task` and `user` (see [[Tasks]]); markdown is left purely for
+the prose below.
 
 route "/dashboard"                      # this page's URL (a leaf page)
 lang  :svelte                           # the front-end lane for this file's islands
@@ -8,10 +11,12 @@ use   [:crm, :charts]                   # toolkits — helpers (fns / types) thi
 grant net "api.crm.com"                # capability requests, scoped to this file
 deps  [hex: "decimal@2", npm: "d3@7"]   # unit-level deps (app-level → the index)
 
-# Sales dashboard
-
-Then the literate body: markdown prose, and target blocks (client/sandbox/server). The
-header is declared, never run — the file's data-lane twin of the index.
+The header carries `route`, `lang`, caps, and this file's `deps` — all **declarations
+the system reads**, so they're Elixir like every other declaration. No YAML, no second
+mini-language: **markdown narrates, Elixir declares**. Then comes the literate body:
+prose, and target blocks (`client`/`sandbox`/`server`, see [[Targets]]). The header is
+declared, never run — the file's data-lane twin of the index, owning the file the way
+the index owns the app. #header
 </script>
 <template id="e-syn-front">
   <div class="kick">syntax · the header</div>

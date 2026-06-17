@@ -1,20 +1,22 @@
 <script type="text/plain" id="c-prim-block">
 # The block — do…end
 
-One delimiter does everything. do…end is self-delimiting Elixir, so it
-separates from prose with no fence and no sigil:
+One delimiter does everything. `do…end` is *self-delimiting* Elixir, so it
+separates from the prose around it with **no fence and no sigil**. The **kind
+word** in front names the lane (see [[The four lanes]]):
 
 sandbox :score do ... end      # function lane (code → wasm)
 flow do ... end                # function lane (workflow)
 figure "x.png" do ... end      # rich-text lane (presentation)
 
-# do…end wraps BODIED units — a body of code or content. The KIND word in
-# front (sandbox/client/server, flow, figure) names the lane.
+A `do…end` always wraps a **bodied unit** — a body of code, or of content. Flat
+**data** is the exception: a `task`, a `user`, a `type` are *declarations*, not
+blocks. They carry **fields, not a body**, so they need no delimiter at all:
 
-# Flat DATA is the exception: tasks, users, and types are DECLARATIONS,
-# not blocks — they have fields, not a body:
 task "...", status: :todo      # data lane (a typed declaration)
 user :analyst, name: "Ada"     # data lane
+
+Two shapes — bodied blocks and flat declarations — cover every lane. #primitive
 </script>
 <template id="e-prim-block">
   <div class="kick">primitive · the block</div>

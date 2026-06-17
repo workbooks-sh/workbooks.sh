@@ -1,15 +1,18 @@
 <script type="text/plain" id="c-prim-refs">
 # References
 
-Units cross-link by NAME — no import ceremony inside the document:
+Units cross-link by **name** — there's no import ceremony inside the document.
+Every kind of reference is the same move, *name the unit you mean*:
 
   a workflow step refers to a def      ->  step :score
   a task refers to the code it tracks  ->  todo "tune", ref: :scorer
   a view reads a work output           ->  client :table, reads: :ranked
   the index pulls in a work file       ->  use "enrich.work"
 
-# Names are the only glue. The weave gate checks that every reference resolves —
-# a dangling :name fails the build.
+Names are the **only glue**. Because everything links by name, the weave gate can
+check that *every* reference resolves — a dangling `:name` fails the build. That's
+org-mode's cross-linking, kept, but now validated. It's what lets [[The unit]] be
+*just a name* (see Tags & links for the cross-cutting form). #primitive
 </script>
 <template id="e-prim-refs">
   <div class="kick">primitive · references</div>

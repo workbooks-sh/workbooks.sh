@@ -1,12 +1,18 @@
 <script type="text/plain" id="c-sec-caps">
-# capabilities are REQUESTS, not authority:
+# Caps & secrets
+
+A capability is a **request**, not authority. When a unit writes a `grant`, it's
+*asking* — an import into its world that something else has to fulfill:
 
 grant net "api.crm.com"      # the workbook asks
 grant env "CRM_API_KEY"      # declared, never valued
 
-# the HOST authorizes. "anyone can dock it" only works if the host grants caps.
-# secrets are bound at RUN by the host — never authored, never bundled.
-# the weave gate audits: a unit may use ONLY what it requested.
+The **host authorizes**. "Anyone can dock it" only holds because docking is just the
+host deciding which caps to fulfill — *no* grant, *no* authority. **Secrets bind at
+run**: an `env` is declared but never valued and never bundled, so the key lives only
+in the host at the moment it's needed, never in the file. And the weave gate audits
+**declared-only** — a unit may use *only* what it requested, so both over-reach and
+unused grants flag. The posture (see [[Postures]]) decides who's even allowed to ask.
 </script>
 <template id="e-sec-caps">
   <div class="kick">security · caps &amp; secrets</div>

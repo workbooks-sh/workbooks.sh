@@ -1,8 +1,12 @@
 <script type="text/plain" id="c-prim-unit">
 # The unit
 
-Everything addressable is a NAMED UNIT — a function, a task, a figure, a data
-source. The name is how the flow / board / views reach it.
+Everything addressable is a **named unit** — a function, a task, a figure, a
+data source. The name is the whole interface: it's how the flow, the board, and
+the views reach what they need. #primitive
+
+Here a `sandbox` declares one unit, `:score`, and a `flow` reaches it purely by
+naming it:
 
 sandbox :score do
   def score(lead), do: lead.revenue / 1000 + lead.employees   # unit: :score
@@ -12,8 +16,9 @@ flow do
   step :score          # the flow references the unit purely by name
 end
 
-# Inline vs its-own-file is just WHERE a unit lives. References don't care —
-# a unit is just a name.
+Whether a unit lives *inline* in a page or in *its own file* is only a question
+of **where** it sits — references don't care, because a unit is just a name (see
+[[References]]).
 </script>
 <template id="e-prim-unit">
   <div class="kick">primitive · the unit</div>

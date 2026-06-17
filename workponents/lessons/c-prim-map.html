@@ -1,33 +1,41 @@
 <script type="text/plain" id="c-prim-map">
-# Every primitive, and the lane it lives in. If a line isn't here, it's prose —
-# or a composition of these. The discriminator never changes: WHO READS IT?
+# The primitive map
 
-# ── rich text · markdown · a HUMAN reads ───────────────────────────
-#   prose · headings · lists · links · tables · quotes · `code`
-#   ![alt](src)            inline image
-#   figure "…" do … end    captioned figure (renders, does NOT run)
-#   - [ ] casual todo      a checklist for a human (not tracked data)
+Every primitive, and the lane it lives in. If a line isn't on this map, it's
+**prose** — or a composition of these. The discriminator never changes: *who
+reads it?* (see [[The four lanes]]). #primitive
 
-# ── function · code that RUNS · client/sandbox → wasm, server → BEAM ──
-#   client :x  do … end       → wasm, in the browser
-#   sandbox :x do … end       → wasm, in the sandbox (any lang; default :elixir)
-#   server :x  do … end       full Elixir/OTP, on the BEAM
-#   flow do … step … end      workflows (step, parallel)
-#   agent "…" do … end         a brain (model, system, tools)
+**Rich text** — markdown, a *human* reads it:
 
-# ── build · the COMPILER · mostly implicit in the target ──────────
-#   (the target compiles the unit — no explicit build step to write)
-#   test :unit do          verification (fails the build when red)
-#   package hex/npm/cargo  deps in the index manifest
+  prose · headings · lists · links · tables · quotes · `code`
+  ![alt](src)            inline image
+  figure "…" do … end    captioned figure (renders, does NOT run)
+  - [ ] casual todo      a checklist for a human (not tracked data)
 
-# ── data · declarative elixir · the SYSTEM queries ────────────────
-#   task · user · type     typed records + enums
-#   data :x, from: …       a named source; query() over it
-#   grant · posture        caps + publish posture
-#   route · lang · use     the file's Elixir header (no YAML)
+**Function** — code that *runs*; `client`/`sandbox` compile to wasm, `server`
+runs on the BEAM:
 
-# everything runnable or declared is Elixir. markdown ONLY narrates — rich text
-# and context around the code, never the code itself.
+  client :x  do … end       # → wasm, in the browser
+  sandbox :x do … end       # → wasm, in the sandbox (any lang; default :elixir)
+  server :x  do … end       # full Elixir/OTP, on the BEAM
+  flow do … step … end      # workflows (step, parallel)
+  agent "…" do … end        # a brain (model, system, tools)
+
+**Build** — the *compiler*, mostly implicit in the target (no explicit build step
+to write):
+
+  test :unit do          # verification (fails the build when red)
+  package hex/npm/cargo  # deps in the index manifest
+
+**Data** — declarative Elixir, the *system* queries it:
+
+  task · user · type     # typed records + enums
+  data :x, from: …       # a named source; query() over it
+  grant · posture        # caps + publish posture
+  route · lang · use     # the file's Elixir header (no YAML)
+
+Everything runnable or declared is **Elixir**. Markdown *only* narrates — the
+rich text and the context around the code, never the code itself.
 </script>
 <template id="e-prim-map">
   <div class="kick">primitive · the map</div>

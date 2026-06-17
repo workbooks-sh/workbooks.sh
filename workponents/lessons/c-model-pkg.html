@@ -1,22 +1,26 @@
 <script type="text/plain" id="c-model-pkg">
-# index.work — ONE manifest for EVERY ecosystem.
-# no mix.exs · no package.json · no Cargo.toml · no vite.config.
-# the index declares; the weave resolves.
+# Packages
+
+**One** manifest for *every* ecosystem. No `mix.exs`, no `package.json`, no
+`Cargo.toml`, no `vite.config` — the index declares, and the weave resolves. Deps for
+every language are a single `package` form in the index (see [[index.work]]):
 
 package hex:   "decimal@2.1"      # elixir
 package npm:   "d3@7"             # js
 package cargo: "regex@1.10"       # rust
 
-# pinned versions ARE the lockfile (source = lock). a unit's OWN deps can sit in
-# its frontmatter instead; app-wide deps live here.
-#
-# do we need mix?  no — mix.exs would be a SECOND manifest fighting the index.
-#   the weave does mix's job: pull hex, compile elixir → wasm, in-sandbox.
-# do we need vite? its ROLE yes (dev/HMR + bundling svelte/solid/js islands),
-#   the TOOL no — a vite-MODEL lane, no Node. same for cargo, npm.
-#
-# ONE build tool (work bundle) absorbs every ecosystem's ROLE and adopts none
-# of their manifests. that's the no-JSON rule + DRY, expressed as a build system.
+The **pinned versions *are* the lockfile** — source is the lock, with no sidecar to
+drift. App-wide deps live here in the index; a unit's *own* deps can sit in its
+frontmatter instead.
+
+So do we need mix? **No** — a `mix.exs` would be a second manifest fighting the
+index. The weave does mix's job itself: pull hex, compile Elixir → wasm, all
+in-sandbox. Do we need Vite? Its *role* yes, the *tool* no — a vite-*model* lane
+gives dev / HMR and bundles svelte / solid / js islands with no Node. Same story
+for cargo and npm.
+
+**One build tool** — `work bundle` — absorbs every ecosystem's role and adopts none
+of their manifests. That's the `#no-json` rule and DRY, expressed as a build system.
 </script>
 <template id="e-model-pkg">
   <div class="kick">model · packages</div>

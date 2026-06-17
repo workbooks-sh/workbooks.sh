@@ -1,8 +1,15 @@
 <script type="text/plain" id="c-agent-research">
-# researcher.work — an autonomous research agent (the auto-researcher shape).
+# Auto-researcher
+
+This is `researcher.work` — an autonomous research agent, the auto-researcher shape.
+Its memory is **WIT-typed data**, so findings and the report cross every step
+cleanly:
 
 type Finding = record(claim: string, source: string, confidence: f32)
 type Report  = record(question: string, findings: list(Finding), summary: string)
+
+The **brain** declares the model, the prompt, that typed memory, and the read-only
+web cap it needs (see [[The brain]]):
 
 agent :researcher do
   model  :mimo
@@ -12,7 +19,9 @@ agent :researcher do
   grant  net "*"                          # read-only web, capability-gated
 end
 
-# the loop is a FLOW — fan out searches, verify, synthesize, critique, repeat:
+The loop itself is a **flow** — plan, fan out searches, verify each finding
+adversarially, synthesize, then critique and loop if gaps remain:
+
 flow :research do
   step     :plan                          # break the question into sub-queries
   parallel :search                        # fan out — one search per sub-query
@@ -21,7 +30,9 @@ flow :research do
   step     :critique                      # "what's missing?" → loop if gaps remain
 end
 
-# each step is server Elixir; the agent decides, tools fetch through the Dock:
+Each step is **`server` Elixir**: the agent decides, the tools fetch behind the
+membrane, and a step is just a function over the typed findings.
+
 server :verify do
   def verify(findings), do: Enum.filter(findings, & &1.confidence >= 0.7)
 end

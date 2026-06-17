@@ -1,9 +1,15 @@
 <script type="text/plain" id="c-syn-flow">
-## Describing the steps — prose (markdown)
+# Workflows
 
-1. seed leads   2. enrich   3. score
+A workflow you're only *describing* can stay prose — an ordinary markdown list:
 
-## Running them — a FUNCTION (Elixir), never confused with prose
+1. seed leads
+2. enrich
+3. score
+
+But a workflow that actually **runs** — orchestrating real calls at weave or
+runtime — is Elixir, a `flow do … end` block, so a function is never mistaken for
+literacy:
 
 flow do
   step :seed
@@ -12,8 +18,10 @@ flow do
   step :score
 end
 
-# Any workflow that actually RUNS is Elixir, so a function is never mistaken
-# for literacy. The steps reference defs by name (:seed, :enrich, :score).
+The steps **reference defs by name** (`:seed`, `:enrich`, `:score`) — the workflow is
+wired to the compute (see [[Compute]]) and validated at the gate. A pipeline of calls
+is exactly what Elixir is good at, and keeping it in the function lane keeps
+orchestration out of the prose lane. #workflows
 </script>
 <template id="e-syn-flow">
   <div class="kick">syntax · workflows</div>

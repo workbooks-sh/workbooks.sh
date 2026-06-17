@@ -1,11 +1,17 @@
 <script type="text/plain" id="c-dep">
-# two canonical targets, one image, replicable between them:
+# Two targets
+
+There are **two canonical targets**, one image, replicable between them:
 
 work deploy local      # the runtime image in a local container (krunvm)
 work deploy cloud      # the same image on the nexus (Fly), your registry
 
-# the deliverable (dist/index.html) is static — host it ANYWHERE.
-# `deploy` provisions the NEXUS tier (agents / data / secrets), not the page.
+`work deploy local` runs the runtime image in a local container; `work deploy cloud`
+runs the *same* image on the nexus. The deliverable itself — `dist/index.html` — is
+**static**, just files you can host *anywhere*. What `deploy` provisions is the
+**nexus tier** (the agents, data, and secrets behind [[Caps & secrets]]), never the
+page. Because the build happens in-sandbox, push-to-live is instant; CI is only for
+special cases.
 </script>
 <template id="e-dep">
   <div class="kick">deploy · two targets</div>

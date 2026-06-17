@@ -1,20 +1,31 @@
 <script type="text/plain" id="c-live-claim">
-# claiming a task is the COORDINATOR's job (on the nexus). it:
-#   1. flips status :todo → :doing in plan.work      (the declarative claim)
-#   2. opens a DRAFT for the agent                  (the LOCK — isolated, restorable)
-#   3. SCOPES the draft to task.paths                (the FENCE — only its files)
+# Claim, lock & fence
 
-# most tasks are flat. one that needs custom behavior carries a claim script:
+A task is a **flat declaration** — fields, no body. It just states who owns the work
+and which files it may touch:
 
-task "enrich the leads", owner: :ada, paths: ["enrich.work"] do
-  claim do
-    draft "wb-#{id}"        # an isolated, restorable change = the lock
-    scope paths             # narrow the draft to these paths
-  end
-end
+task "enrich the leads", owner: :ada, paths: ["enrich.work"]
 
-# two agents, one tree, zero collision: each works its own DRAFT, SCOPED to its
-# paths. agents never touch the substrate — the system versions it underneath.
+Claiming it is the **coordinator's job**, on the nexus, and it happens *automatically*
+— there's no script hanging off the task. When the coordinator picks the task up it
+does three things in order. First it **flips** `status: :todo → :doing` in plan.work —
+the declarative claim, recorded in the document itself (see [[Live state]]). Then it
+**opens a draft** for the agent — an isolated, restorable change, which is the *lock*
+(optimistic, no mutex). Finally it **scopes** that draft to the task's `paths` — a
+narrowed view of the tree, the *fence*, so the agent only ever sees its own files.
+
+You can read the whole sequence off the run:
+
+run claim "enrich the leads"
+  → status :todo → :doing          # 1. flip   — the declarative claim
+  → draft "wb-7f3"                 # 2. lock   — isolated, restorable
+  → scope ["enrich.work"]          # 3. fence  — only the task's paths
+
+Two agents work the same tree with zero collision: each gets its own `draft`,
+`scope`d to its paths. **Agents never touch the substrate** — the coordinator versions
+it underneath. `draft` and `scope` are **our own capabilities** (the Drive-simple
+workspace layer), surfaced through the Dock like any other; no external names to
+learn.
 </script>
 <template id="e-live-claim">
   <div class="kick">plans · claim, lock &amp; fence</div>
@@ -25,6 +36,6 @@ end
   <li class="pro"><b>Lock</b> — open a <code>draft</code>: an isolated, restorable change for the agent. Optimistic, no mutex.</li>
   <li class="pro"><b>Fence</b> — <code>scope</code> the draft to the task's <code>paths</code>: a narrowed view of the tree. The agent <i>only sees</i> its files.</li></ul>
   <h3>Multi-agent, one tree</h3>
-  <p>Two agents work the same workbook with zero collision: each gets its own <code>draft</code>, <code>scope</code>d to its paths. <b>Agents never touch the substrate</b> — the coordinator on the nexus versions it underneath. A task is a flat declaration by default; one that needs custom behavior carries a <code>claim do … end</code> script (the only function part — the default claim is automatic).</p>
+  <p>Two agents work the same workbook with zero collision: each gets its own <code>draft</code>, <code>scope</code>d to its paths. <b>Agents never touch the substrate</b> — the coordinator on the nexus versions it underneath. A task stays a <b>flat declaration</b>; the claim is the coordinator's automatic three-step move (flip → draft → scope), not something you author per-task.</p>
   <div class="note"><code>draft</code> and <code>scope</code> are <b>our own capabilities</b> — the Drive-simple workspace layer (versioned save-state + scoped views), surfaced through the Dock like any other. Not third-party tools, no external names to learn.</div>
 </template>

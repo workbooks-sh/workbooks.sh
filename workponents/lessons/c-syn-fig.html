@@ -1,22 +1,27 @@
 <script type="text/plain" id="c-syn-fig">
 ## The numbers
 
-A markdown image works inline:
+Richness escalates in three steps, none of which leaves the **rich-text** lane.
+The floor is a plain markdown image, inline:
 
 ![Revenue chart](revenue.png)
 
-For a captioned figure — richer than markdown — a presentational block. Same
-do…end grammar as code, but it RENDERS, it doesn't run:
+For a *captioned* figure — richer than markdown — reach for a **presentational
+block**. It's the same `do…end` grammar as code (see [[The block — do…end]]), but
+it **renders**, it doesn't run:
 
 figure "revenue.png" do
   Revenue by quarter, FY24. **The caption is markdown.**
 end
 
-And when markdown can't say it, a client unit renders it (a front-end island):
+And when markdown simply can't say it, a `client` unit renders it — a front-end
+island, hydrated in the browser, with *no custom elements* needed:
 
 client :revenue_chart, reads: :ranked do
   # svelte / solid / js that charts the data — hydrated in the browser
 end
+
+Same author, same lane, three rungs of richness. #rich-text
 </script>
 <template id="e-syn-fig">
   <div class="kick">syntax · figures</div>

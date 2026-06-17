@@ -1,12 +1,18 @@
 <script type="text/plain" id="c-sec-post">
-# one posture per workbook governs what publishing exposes:
+# Postures
+
+A workbook declares **one posture**, and that single line governs what publishing
+exposes. There are three to choose from:
 
 posture :public        # fully static, no secrets — safe anywhere
 posture :gated_data    # shell ships public; data fetched from nexus AFTER auth
 posture :gated_route   # the whole route is behind auth
 
-# the COMPILER enforces it: a gated workbook can't be baked into a static host —
-# it emits a shell that fetches the protected payload post-auth.
+The posture isn't a hint — the **compiler enforces it**. A `#gated` workbook *can't*
+be baked into a static host, because static bytes ship to anyone (client-side gating
+is theatre). Instead the compiler emits a *shell* that fetches the protected payload
+only after auth. The capability is declared here and bound by the host (see
+[[Caps & secrets]]).
 </script>
 <template id="e-sec-post">
   <div class="kick">security · postures</div>

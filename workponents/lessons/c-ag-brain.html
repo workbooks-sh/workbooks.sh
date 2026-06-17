@@ -1,5 +1,8 @@
 <script type="text/plain" id="c-ag-brain">
-# an agent is a work file with a BRAIN — a system prompt + tools.
+# The brain
+
+An agent is a work file with a **brain** — a system prompt, a model, and tools. The
+whole thing is one declaration:
 
 agent "Analyst" do
   model :mimo
@@ -9,8 +12,12 @@ agent "Analyst" do
   tools [:crm, :charts]      # tools ARE toolkits (helpers on PATH)
 end
 
-# runtime-backed: the nexus holds the loop, lifecycle, and context.
-# the agent acts through the SAME Dock caps a human page would.
+Notice that **tools are toolkits** — the same helpers a human page uses, nothing
+agent-specific. It's **runtime-backed**: the nexus owns the loop, the lifecycle, and
+the context, and the agent acts through the **same Dock caps** a human page would
+(see [[Caps & secrets]]). Because behaviour lives in the declarative config layer and
+not in host code, the next lessons build whole, named #agent frameworks from these
+same primitives — each a single literate file.
 </script>
 <template id="e-ag-brain">
   <div class="kick">agents · the brain</div>
