@@ -526,11 +526,98 @@ agent "Analyst" do
   system """
   You enrich and score leads, then file issues for anything you can't resolve.
   """
-  tools [:crm, :charts]      # tools ARE toolkits (components on PATH)
+  tools [:crm, :charts]      # tools ARE toolkits (helpers on PATH)
 end
 
 # runtime-backed: the nexus holds the loop, lifecycle, and context.
 # the agent acts through the SAME Dock caps a human page would.
+</script>
+
+<script type="text/plain" id="c-agent-coder">
+# coder.work — a coding agent, the whole framework in one file (the Claude-Code shape).
+
+# memory is WIT-typed data — the agent's state is just records & lists:
+type Msg = record(role: string, content: string)
+type Mem = record(history: list(Msg), files: list(string), cwd: string)
+
+agent :coder do
+  model  :mimo
+  system """
+  You are a coding agent. Read, edit, and run code to satisfy the task.
+  Work in small steps; run the tests before you finish.
+  """
+  memory Mem
+  tools  [:bash, :edit, :read, :search]   # toolkits — helpers on PATH
+  grant  exec "bash", fs "./project"      # the sandbox it acts in
+end
+
+# the LOOP is server Elixir (full OTP) — real ReAct, not a source block:
+server :coder_loop do
+  def run(task, mem \\ %Mem{}) do
+    case think(:coder, mem, task) do        # LLM call → next action
+      {:tool, name, args} ->
+        obs = call_tool(name, args)         # the tool runs in the SANDBOX
+        run(task, remember(mem, name, obs)) # observe → loop
+      {:done, answer} -> answer
+    end
+  end
+end
+
+# `bash "mix test"` is a SANDBOXED command, fs-scoped to ./project — never host exec.
+</script>
+
+<script type="text/plain" id="c-agent-research">
+# researcher.work — an autonomous research agent (the auto-researcher shape).
+
+type Finding = record(claim: string, source: string, confidence: f32)
+type Report  = record(question: string, findings: list(Finding), summary: string)
+
+agent :researcher do
+  model  :mimo
+  system "Research the question. Search broadly, verify each claim, then synthesize."
+  memory Report
+  tools  [:web_search, :fetch]
+  grant  net "*"                          # read-only web, capability-gated
+end
+
+# the loop is a FLOW — fan out searches, verify, synthesize, critique, repeat:
+flow :research do
+  step     :plan                          # break the question into sub-queries
+  parallel :search                        # fan out — one search per sub-query
+  step     :verify                        # adversarially check each finding
+  step     :synthesize
+  step     :critique                      # "what's missing?" → loop if gaps remain
+end
+
+# each step is server Elixir; the agent decides, tools fetch through the Dock:
+server :verify do
+  def verify(findings), do: Enum.filter(findings, & &1.confidence >= 0.7)
+end
+</script>
+
+<script type="text/plain" id="c-agent-reflexion">
+# reflexion.work — a self-improving agent (generate → critique → revise).
+
+type Attempt = record(draft: string, critique: string, score: f32)
+
+agent :writer do
+  model  :mimo
+  system "Draft, critique your own draft honestly, then revise. Stop when it's good."
+  memory list(Attempt)                    # memory = the trace of attempts
+  tools  []                               # pure reasoning, no external tools
+end
+
+# the loop in server Elixir — reflect until the score clears the bar:
+server :reflexion do
+  def run(task, attempts \\ []) do
+    draft    = generate(:writer, task, attempts)
+    critique = self_critique(:writer, draft)
+    a        = %Attempt{draft: draft, critique: critique, score: score(critique)}
+    if a.score >= 0.9, do: draft, else: run(task, [a | attempts])
+  end
+end
+
+# memory is the list of attempts — the agent learns from its own trace, no store needed.
 </script>
 
 <script type="text/plain" id="c-dep">
@@ -1057,9 +1144,41 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h2>The brain <span class="lane l-fn">function</span></h2>
   <p class="tagline">An agent is a work file with a brain — a system prompt, a model, and tools.</p>
   <h3>How it works</h3>
-  <p>An <code>agent</code> block declares a <code>model</code>, a <code>system</code> prompt, and <code>tools</code> — and <b>tools are toolkits</b> (the same components a page uses). It's <b>runtime-backed</b>: the nexus owns the loop, lifecycle, and context; the agent acts through the <b>same Dock caps</b> a human page would.</p>
+  <p>An <code>agent</code> block declares a <code>model</code>, a <code>system</code> prompt, and <code>tools</code> — and <b>tools are toolkits</b> (the same helpers a page uses). It's <b>runtime-backed</b>: the nexus owns the loop, lifecycle, and context; the agent acts through the <b>same Dock caps</b> a human page would.</p>
   <h3>Why it matters</h3>
-  <p>Agent behavior lives in the <b>declarative config layer</b>, not host code — so it composes the exact same primitives as everything else. No separate agent runtime to learn.</p>
+  <p>Agent behavior lives in the <b>declarative config layer</b>, not host code — so it composes the exact same primitives as everything else. No separate agent runtime to learn. The next three lessons build whole, named agent frameworks this way — each a single literate file.</p>
+</template>
+
+<template id="e-agent-coder">
+  <div class="kick">agents · coding agent</div>
+  <h2>Coding agent <span class="lane l-fn">function</span></h2>
+  <p class="tagline">The Claude-Code archetype — a ReAct loop with sandboxed tools, the whole framework in one work file.</p>
+  <h3>What's in the file</h3>
+  <ul><li class="pro"><b>memory = data</b> — the agent's state is WIT records/lists (<code>history</code>, <code>files</code>, <code>cwd</code>). No special store; memory is just typed data.</li>
+  <li class="pro"><b>the brain</b> — model, system prompt, <code>tools</code> (toolkits), and the <code>grant</code>s those tools need.</li>
+  <li class="pro"><b>the loop in <code>server</code> Elixir</b> — real ReAct (think → call tool → observe → repeat), full OTP, written in Elixir, not a source block.</li></ul>
+  <h3>Sandboxed by construction</h3>
+  <p>The tools it's granted run in the <b>sandbox</b> — <code>bash "mix test"</code> is a sandboxed command fs-scoped to <code>./project</code>, never host exec. <code>grant exec / fs</code> is the agent's entire authority; it acts through the same Dock caps a human page would.</p>
+</template>
+
+<template id="e-agent-research">
+  <div class="kick">agents · auto-researcher</div>
+  <h2>Auto-researcher <span class="lane l-fn">function</span></h2>
+  <p class="tagline">Plan → fan-out search → verify → synthesize → critique → loop. Karpathy's autonomous researcher, as a flow.</p>
+  <h3>The loop is a flow</h3>
+  <p>Research is a <code>flow</code>: <b>plan</b> sub-queries, <b>fan out</b> searches (<code>parallel</code>), <b>verify</b> each finding adversarially, <b>synthesize</b>, then <b>critique</b> — "what's missing?" — and loop if gaps remain. Findings and the report are WIT-typed <code>record</code>s, so they cross steps cleanly.</p>
+  <h3>Read-only, capability-gated</h3>
+  <p>It <code>grant</code>s <code>net</code> (read-only web through the Dock) and uses <code>web_search</code> / <code>fetch</code> toolkits. Each step is <code>server</code> Elixir; the agent decides, the tools fetch behind the membrane.</p>
+</template>
+
+<template id="e-agent-reflexion">
+  <div class="kick">agents · reflexion</div>
+  <h2>Reflexion <span class="lane l-fn">function</span></h2>
+  <p class="tagline">Generate → self-critique → revise, until it clears the bar. Memory is the trace of attempts.</p>
+  <h3>Memory as the trace</h3>
+  <p>The agent's <code>memory</code> is a <code>list(Attempt)</code> — each a draft + its self-critique + a score. It learns from its own history: every revision sees the prior attempts. No tools; pure reasoning, looping in <code>server</code> Elixir until the score clears the threshold.</p>
+  <h3>Why it's a few lines</h3>
+  <p>Because the primitives carry it: <b>memory is typed data</b>, <b>the loop is plain Elixir</b>, the <b>brain</b> is one declaration. A well-known research pattern fits in a single literate file — and you could <code>tangle</code> it to run.</p>
 </template>
 
 <template id="e-dep">

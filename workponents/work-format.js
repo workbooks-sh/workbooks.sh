@@ -86,6 +86,30 @@
     `  <span class="ok">✓</span> harness complete · brain + flow + tasks + validation, one file`,
   ];
 
+  const RUN_CODER = [
+    `<span class="p">$</span> <span class="cmd">work run coder "fix the failing test"</span>`,
+    ``,
+    `  <span class="dim">agent</span> coder · mimo · tools [bash edit read search]`,
+    `  <span class="ok">→</span> read   <span class="path">test/scorer_test.exs</span>`,
+    `  <span class="ok">→</span> bash   <span class="cmd">mix test</span>   <span class="dim">sandbox · ./project</span>   <span class="warn">1 failed</span>`,
+    `  <span class="ok">→</span> edit   <span class="path">lib/scorer.ex</span>   <span class="dim">off-by-one</span>`,
+    `  <span class="ok">→</span> bash   <span class="cmd">mix test</span>   <span class="dim">sandbox</span>   <span class="ok">12 passed</span>`,
+    ``,
+    `  <span class="ok">=></span> done · <span class="num">4</span> steps · all tests green`,
+  ];
+  const RUN_RESEARCH = [
+    `<span class="p">$</span> <span class="cmd">work run researcher "what powers WASI preview 3?"</span>`,
+    ``,
+    `  <span class="dim">flow</span> research`,
+    `  <span class="ok">→</span> plan      <span class="dim">5 sub-queries</span>`,
+    `  <span class="warn">∥</span> search    <span class="dim">5 parallel · web_search</span>   <span class="num">1.2s</span>`,
+    `  <span class="ok">→</span> verify    <span class="dim">18 findings → 11 confident</span>`,
+    `  <span class="ok">→</span> synthesize`,
+    `  <span class="warn">↻</span> critique  <span class="dim">2 gaps → another round</span>`,
+    ``,
+    `  <span class="ok">=></span> report · <span class="num">11</span> sourced findings`,
+  ];
+
   // ONE ordered lesson plan — read top to bottom, the way you'd teach it.
   const SECTIONS = [
     { title:"The idea", blurb:"the mental model, before any syntax",
@@ -146,9 +170,12 @@
         { nm:"Postures",       tag:"public / gated_data / gated_route", fn:"index.work", lg:"elixir", mode:"work", code:"c-sec-post", exp:"e-sec-post" },
         { nm:"Caps & secrets", tag:"requests, not authority",           fn:"index.work", lg:"elixir", mode:"work", code:"c-sec-caps", exp:"e-sec-caps" },
       ] },
-    { title:"Agents", blurb:"a work file with a brain",
+    { title:"Agents", blurb:"a brain — and whole agent frameworks in one file",
       lessons:[
-        { nm:"The brain", tag:"system + model + tools, runtime-backed", fn:"analyst.work", lg:"elixir", mode:"work", code:"c-ag-brain", exp:"e-ag-brain" },
+        { nm:"The brain",       tag:"system + model + tools, runtime-backed", fn:"analyst.work",  lg:"elixir", mode:"work", code:"c-ag-brain",       exp:"e-ag-brain" },
+        { nm:"Coding agent",    tag:"ReAct + sandboxed tools (Claude-Code)",  fn:"coder.work",    lg:"elixir", mode:"work", code:"c-agent-coder",     exp:"e-agent-coder", run:RUN_CODER },
+        { nm:"Auto-researcher", tag:"plan → search → verify → synth (loop)",  fn:"researcher.work",lg:"elixir", mode:"work", code:"c-agent-research", exp:"e-agent-research", run:RUN_RESEARCH },
+        { nm:"Reflexion",       tag:"generate → critique → revise; memory=trace",fn:"reflexion.work",lg:"elixir", mode:"work", code:"c-agent-reflexion",exp:"e-agent-reflexion" },
       ] },
     { title:"Plans & live state", blurb:"tasks as live, multi-agent state — the document is the store",
       lessons:[
