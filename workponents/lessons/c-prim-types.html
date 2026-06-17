@@ -1,47 +1,47 @@
 <script type="text/plain" id="c-prim-types">
 # Types
 
-A type is **plain Elixir** — you write a `@type`, or a struct, exactly the way you
-already do in any Elixir project. There's no separate type language and nothing
-house-specific to learn. The compiler reads these and generates the cross-language
-contract for you, so you never author or even see it (that's [[The data model]]).
+A type is **plain Elixir**, and we anchor on the parts that don't change: a
+**struct** for a record, **atoms** for an enum, a **tagged tuple** for a tagged
+choice. You write the data the way you already would, and the compiler reads its
+*shape* to generate the cross-language contract — so you never author or even see
+it (that's [[The data model]]).
 
 Declare them once in a shared file, imported where used — never the index:
 
 # team.work — shared definitions:
 
-@type status :: :todo | :doing | :done          # an enum — a union of atoms
+@statuses [:todo, :doing, :done]                 # an enum — the allowed atoms
 
 defmodule User do
-  defstruct name: "", email: ""                  # a record — a struct
-  @type t :: %User{name: String.t(), email: String.t()}
-end
+  defstruct name: "", email: ""                  # a record — a struct;
+end                                              # the defaults give the field types
 
 user :analyst, %User{name: "Ada Lovelace", email: "ada@acme.co"}   # a value of User
 user :shane,   %User{name: "Shane",        email: "shane@acme.co"}
 
 Anything references those **by name**, and the weave gate checks both that the ref
-resolves *and* that the value fits the type:
+resolves *and* that the value fits the shape:
 
 task "tune the scorer", status: :todo, owner: :analyst, ref: :scorer
-#                       ^ must be a status atom    ^ must be a User
+#                       ^ one of @statuses     ^ a defined User
 
-These are the Elixir idioms you'd reach for anyway: an enum is a union of atoms
-(`:todo | :doing`), a record is a `defstruct` with a `@type t`, a tagged choice is
-`{:ok, _} | {:error, _}`. Write a shape once and every reference stays in sync —
-add a field to the struct, or a new `user`, in exactly one place. #types
+Want more precision than the defaults carry? Add a type annotation — but it stays
+**optional**: the struct and its values already pin the contract. (Elixir's own
+type system is mid-evolution, so we lean on stable *structure* and treat annotations
+as a layer that rides along — see [[The data model]].) #types
 </script>
 <template id="e-prim-types">
   <div class="kick">primitive · types &amp; definitions</div>
   <h2>Types <span class="lane l-data">data</span></h2>
-  <p class="tagline">A type is plain Elixir — a <code>@type</code> or a struct. Declared once, referenced by name, validated everywhere; the WIT contract is generated for you.</p>
-  <h3>Just Elixir typespecs</h3>
-  <ul><li class="pro"><b>enum</b> → a union of atoms: <code>@type status :: :todo | :doing | :done</code>.</li>
-  <li class="pro"><b>record</b> → a <code>defstruct</code> with a <code>@type t</code>. The struct is the value you construct (<code>%User{…}</code>); the typespec gives its fields.</li>
-  <li class="pro"><b>variant</b> → a tagged tuple: <code>{:ok, t} | {:error, String.t()}</code> — the convention you'd write regardless.</li></ul>
+  <p class="tagline">A type is plain Elixir — a struct, atoms, a tagged tuple. Declared once, referenced by name, validated everywhere; the WIT contract is generated from the shape.</p>
+  <h3>Stable Elixir structure</h3>
+  <ul><li class="pro"><b>record</b> → a <code>defstruct</code>. The struct is the value you construct (<code>%User{…}</code>); its <b>defaults imply the field types</b>.</li>
+  <li class="pro"><b>enum</b> → the atoms themselves — the allowed set (e.g. <code>@statuses [:todo, :doing, :done]</code>).</li>
+  <li class="pro"><b>variant</b> → a tagged tuple: <code>{:ok, t} | {:error, reason}</code> — the convention you'd write regardless.</li></ul>
   <h3>Referenced + validated</h3>
-  <ul><li class="pro"><code>status: :todo</code> must be one of the <code>status</code> atoms — the weave gate rejects a typo.</li>
+  <ul><li class="pro"><code>status: :todo</code> must be one of the allowed atoms — the weave gate rejects a typo.</li>
   <li class="pro"><code>owner: :analyst</code> must resolve to a defined <code>user</code> — a dangling owner fails the build.</li>
   <li class="pro">One source of truth for people, statuses, categories — typed, no drift. Run this page to see the check.</li></ul>
-  <div class="note">You write Elixir; <b>the WIT falls out at compile</b> — a struct becomes a <code>record</code>, an atom union an <code>enum</code>, a tagged tuple a <code>variant</code>. You never hand-write WIT, and a Rust or JS unit that shares the type still gets its own binding. See [[The data model]].</div>
+  <div class="note"><b>Why structure, not annotations:</b> Elixir's type system is mid-evolution — typespecs are being superseded by its new set-theoretic types. So we read the <i>stable</i> surface (structs + values) and generate the WIT contract from it; a type annotation is an optional precision layer that rides along, never required. A Rust or JS unit sharing the type still gets its own binding. See [[The data model]].</div>
 </template>
