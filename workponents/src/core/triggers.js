@@ -1,4 +1,4 @@
-// data-on — the trigger grammar. ONE attribute that says WHEN a work-* element runs,
+// data-trigger — the trigger grammar. ONE attribute that says WHEN a work-* element runs,
 // modeled directly on HTMX's `hx-trigger` (locality of behavior: you read the element
 // and know when it fires), spelled as a valid-HTML data-* attribute. Framework-agnostic
 // — any element calls bindTriggers().
@@ -6,7 +6,7 @@
 // grammar — comma-separated triggers, each `<event> [modifiers…]`:
 //   <domevent>            click · input · submit · pointerenter · … (any DOM/custom event)
 //   <work-event>          work-flow-done · work-run · … (our own events — this is how one
-//                         flow chains off another: data-on="work-flow-done from:#ingest")
+//                         flow chains off another: data-trigger="work-flow-done from:#ingest")
 //   load                  fire once on connect           (was: autorun)
 //   every <dur>           fire on an interval (polling)  (was: every=)
 //   visible | reveal      fire when scrolled into view   (IntersectionObserver)
@@ -45,7 +45,7 @@ export function parseTriggers(spec) {
 /**
  * Wire a trigger spec to a fire callback. Returns an unbind() — call it in disconnectedCallback.
  * @param {Element} el    the host element (self-scope + the visible/intersection node)
- * @param {string}  spec  the data-on string
+ * @param {string}  spec  the data-trigger string
  * @param {(detail:object)=>void} fire  invoked when a trigger fires; detail carries {event, target?}
  */
 export function bindTriggers(el, spec, fire) {

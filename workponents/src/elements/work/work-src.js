@@ -63,7 +63,7 @@ export class WorkSrc extends WbElement {
 
   firstUpdated() {
     if (this.attr("display")) this._run();   // display= → run-and-render (document-cell behaviour)
-    if (this.attr("data-on")) this._unbind = bindTriggers(this, this.attr("data-on"), () => this._run());
+    if (this.attr("data-trigger")) this._unbind = bindTriggers(this, this.attr("data-trigger"), () => this._run());
   }
   disconnectedCallback() { super.disconnectedCallback(); this._unbind && this._unbind(); }
 
