@@ -14,7 +14,7 @@ export type VoiceBubble =
 
 // wb-i38o.4 — chat surface types.
 //
-// The OQL agent broadcasts a small set of telemetry events on the
+// The agent broadcasts a small set of telemetry events on the
 // per-session channel `session:<id>` (see runtime/host
 // /lib/agent/web/session_channel.ex). This module narrows the
 // inbound `BridgeEvent` stream into typed shapes the chat UI can render.
