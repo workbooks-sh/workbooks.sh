@@ -4,8 +4,9 @@
 The graph is fed by **three extractors**, and they all write into the *one* graph —
 nothing language-specific leaks out:
 
-- **literate** — the markdown itself: headings, `[[backlinks]]`, `#tags`, and the
-  prose, which we embed for semantic search.
+- **literate** — the markdown itself: headings, `[[backlinks]]`, `#tags`, inline
+  `:atom` / `@type` references (resolved against the symbol table), and the prose,
+  which we embed for semantic search.
 - **AST** — every language's structure. `tree-sitter` parses them all uniformly;
   our own compilers (clang, mrustc, zig) and `mix xref` add the deep, typed view.
 - **WIT** — `wasm-tools` reads each compiled component's imports and exports. This
@@ -30,7 +31,7 @@ native exec), content-addressed, incremental — so we never bolt on a build sys
   <h2>Extractors <span class="lane l-fn">function</span></h2>
   <p class="tagline">Three feeds, one graph — literate, AST, WIT — and any source that compiles to wasm joins it.</p>
   <h3>The three feeds</h3>
-  <ul><li class="pro"><b>literate</b> — the markdown: headings, <code>[[backlinks]]</code>, <code>#tags</code>, and prose we embed for semantic search.</li>
+  <ul><li class="pro"><b>literate</b> — the markdown: headings, <code>[[backlinks]]</code>, <code>#tags</code>, inline <code>:atom</code>/<code>@type</code> references, and prose we embed for semantic search.</li>
   <li class="pro"><b>AST</b> — every language's structure: <code>tree-sitter</code> parses them uniformly; our compilers (clang, mrustc, zig) and <code>mix xref</code> add the deep, typed view.</li>
   <li class="pro"><b>WIT</b> — <code>wasm-tools</code> reads each component's imports/exports — the language-agnostic join where rust, Elixir, and js meet (see [[The contract]]).</li></ul>
   <h3>We build it ourselves, on our compilers</h3>

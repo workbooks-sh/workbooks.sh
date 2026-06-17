@@ -1,8 +1,10 @@
 <script type="text/plain" id="c-ref-tags">
 # Tags & links
 
-In a sandbox the filesystem is abstracted (WASI), so you never address by **path** —
-you address by **name** (units), by **#tag** (cross-cutting), and link by either.
+In a sandbox the filesystem is abstracted (WASI), so you never address by **path**.
+You address by **name** (units), by **#tag** (cross-cutting), and — because types
+and atoms are just Elixir — by the very sigils you'd write in code, right inside
+prose: `:atom` and `@type`.
 
 Tag inline in prose, or on a unit. A `#tag` is queryable, not just text:
 
@@ -17,6 +19,17 @@ data :hot, from: tagged(:hot)
 A **[[backlink]]** points at another unit or section by name — the in-document
 reference, validated at the gate. So this very sentence can link to [[The contract]]
 or [[Live state]] just by naming them.
+
+You reference **values and types** the same way, with the sigils you'd write in code
+— no brackets needed, because `:atom` and `@type` are already unambiguous:
+
+When a lead reaches :todo, the :analyst owns it until it becomes a Lead.
+
+Each token resolves against the **workspace's symbols**: a `:atom` or a `@type` /
+`Lead` that names something defined becomes a live reference — an edge in
+[[The graph]], findable across every file — and one that matches nothing stays plain
+prose. So a type or atom you declare in one place is referenceable, by name, from the
+prose anywhere in the workspace.
 
 A **deep link** is the URL form of any name or tag; the host resolves the abstract path:
 
@@ -33,6 +46,9 @@ document is the store (see [[Live state]]).
   <p class="tagline">Address by name and tag — never by path. The filesystem is abstracted (WASI), so logical handles are the stable ones.</p>
   <h3>Tags — cross-cutting, location-independent</h3>
   <p>A <code>#tag</code> (inline in prose, or a unit's <code>tags:</code>) is a <b>queryable label</b>, not decoration. <code>tagged(:billing)</code> is the set of everything tagged <code>:billing</code> across every file — a grouping that ignores the folder tree. Tagging from the running interface just edits the declaration (the document is the store).</p>
+  <h3>Values &amp; types, referenced inline</h3>
+  <p>Because types and atoms are plain Elixir, you mention them in prose with their own sigils — <code>:atom</code> and <code>@type</code> (or a capitalized <code>Lead</code>). Each <b>resolves against the workspace symbol table</b>: a token that names a known atom or type becomes a live reference (an edge in [[The graph]], findable everywhere); a token that matches nothing stays plain prose. No brackets, and no false-positives that resolve — an unmatched <code>:foo</code> is just words.</p>
+  <p>That's the "reference memory" across a workspace: the same symbol table backs prose mentions, code references, and the graph — so a <code>Lead</code> declared once is reachable, by name, from anywhere.</p>
   <h3>Deep links — the URL form of a handle</h3>
   <p>Every unit, section, and tag is addressable: <code>work://sales#enrich</code> opens that unit; <code>work://sales#tag/billing</code> opens the tagged set. Links are <b>posture-gated</b> (public anchors link freely; gated ones need auth) and <b>agent-navigable</b> — a stable reference an agent can point at or jump to.</p>
   <div class="note">Why it matters in a sandbox: WASI virtualizes <i>where</i> files live, so a <b>path isn't a stable reference</b> — a name or tag is. Names + tags are the addressing layer; the host resolves them to wherever the content actually sits.</div>
