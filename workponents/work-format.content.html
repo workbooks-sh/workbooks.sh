@@ -186,27 +186,46 @@ compiler, or the system — and the lane follows. Never confuse function with li
 </script>
 
 <script type="text/plain" id="c-prim-types">
-# Types & definitions
+# Types & definitions — these ARE WIT types (record / variant / enum / flags).
 
-Shared types live in their OWN file — imported where used, never in the index
-(the index is the build skeleton, not a data dictionary).
+# team.work — shared definitions, imported where used (never the index):
 
-# team.work — a shared definitions file
+type Status = enum(:todo, :doing, :done)            # a WIT enum
+type User   = record(name: string, email: string)   # a WIT record (string = WIT primitive)
 
-type Status = :todo | :doing | :done          # an enum
+user :analyst, %{name: "Ada Lovelace", email: "ada@acme.co"}   # a value of User
+user :shane,   %{name: "Shane",        email: "shane@acme.co"}
 
-user :analyst, name: "Ada Lovelace", email: "ada@acme.co"
-user :shane,   name: "Shane",        email: "shane@acme.co"
-
-# Anything in the workbook then references those by NAME, and the weave gate
-# checks the reference resolves + the value fits the type:
+# anything references those by NAME; the weave gate checks the ref resolves AND
+# the value fits the type — the same WIT type that crosses the component boundary:
 
 task "tune the scorer", status: :todo, owner: :analyst, ref: :scorer
-#                       ^ must be a Status     ^ must be a defined user
+#                       ^ must be a Status     ^ must be a User
 
-# Two defined the same way? Just two declarations — each a named unit sharing
-# the same shape. user :analyst and user :shane both fit User; refs pick by name.
-# Add a field to the type, or a new user — one place, everywhere stays in sync.
+# add a field to the record, or a new user — one place, everywhere stays in sync.
+</script>
+
+<script type="text/plain" id="c-data-model">
+# ONE data layer — WIT types. your content IS typed values; there is no second
+# data API, no SQLite-as-format, no separate VFS. the types you declare are the
+# types that cross the boundary are the types you store.
+
+# the four shapes you define (the WIT user-defined types):
+
+type Status  = enum(:todo, :doing, :done)            # variants with no payload
+type Lead    = record(name: string, score: s32)      # fields
+type Outcome = variant(ok: Lead, err: string)        # a tagged choice
+type Perms   = flags(:read, :write, :admin)          # a set of bits
+
+# your data is just VALUES of those — lists, options, records:
+
+data :leads, from: values([
+  %{name: "Acme",   score: 91},
+  %{name: "Globex", score: 64},
+])
+
+# record · variant · enum · flags · list · option · result · resource — these are
+# standard WebAssembly. an agent already understands them; nothing house-specific.
 </script>
 
 <script type="text/plain" id="c-prim-refs">
@@ -441,25 +460,28 @@ end
 </script>
 
 <script type="text/plain" id="c-dt-src">
-# data sources are named units, resolved by a PROVIDER seam:
+# a data source is a NAMED unit behind ONE typed surface — it returns WIT VALUES,
+# never a second data layer. three kinds, same shape:
 
-data :leads, from: "data/leads.csv"
-data :crm,   from: query("SELECT * FROM crm.leads")
-data :prefs, from: kv("user-prefs")
+data :leads,  from: values([...])         # inline WIT values (records/lists), embedded
+data :poster, from: blob("poster.png")    # a content-addressed blob — a list<u8>
+data :crm,    from: postgres("crm.leads") # an EXTERNAL db — a WIT resource (a handle)
 
-# the same source resolves by where it runs:
-#   inline  -> in-memory
-#   static  -> sqlite-wasm over an embedded (compressed) VFS
-#   docked  -> exqlite / Postgres on the nexus
+# all three resolve to typed values through the Dock. SQL appears ONLY at the
+# external edge (postgres) as an integration — never as the format of your content.
+# no SQLite-VFS, no separate query API: one typed surface, all WASM-native.
 </script>
 
 <script type="text/plain" id="c-dt-query">
-# a query is a function over a source; a view binds to its result:
+# a query is a SELECTOR over a source's WIT values — and it returns WIT values too:
 
-data :ranked, from: query("SELECT name, score FROM leads ORDER BY score DESC")
+data :ranked, from: select(:leads, fields: [:name, :score], sort: {:score, :desc})
 
-# in a page — re-renders when the source changes (signals, not a page overlay):
+# a view binds to the result by name — re-renders on change (signals):
 <work-table from="ranked"></work-table>
+
+# complex logic? it's a unit (code over the list). real SQL? only when the source
+# IS a db (postgres). the selector covers the common filter/sort/pick over values.
 </script>
 
 <script type="text/plain" id="c-sec-post">
@@ -846,6 +868,17 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <div class="note">Tasks (the previous page) lean on this: a <code>task</code>'s <code>status</code> and <code>owner</code> are typed against these shared definitions.</div>
 </template>
 
+<template id="e-data-model">
+  <div class="kick">data · the data model</div>
+  <h2>The data model <span class="lane l-data">data</span></h2>
+  <p class="tagline">One data layer — WIT types. Content is typed values; there's never a second data API to learn.</p>
+  <h3>One type system, end to end</h3>
+  <p>The <code>type</code> you declare = the type that <b>crosses the component boundary</b> = the type you <b>store</b>. No impedance mismatch, no SQLite-as-format, no separate VFS. Your shapes are the WIT user-defined types: <code>record</code> (fields), <code>variant</code> (a tagged choice), <code>enum</code> (payload-less variants), <code>flags</code> (a bitset) — over the primitives (<code>string</code>, <code>s32</code>, <code>u8</code>…) and compounds (<code>list</code>, <code>option</code>, <code>result</code>, <code>tuple</code>).</p>
+  <h3>Why WebAssembly's types, on purpose</h3>
+  <p>Because they're a <b>standard</b>. <code>record</code>/<code>variant</code>/<code>enum</code>/<code>resource</code> mean the same thing everywhere — so an agent reading your data already understands it from training, with zero house-specific vocabulary. Leaning into the WASM type system makes the format self-explaining to humans and models alike.</p>
+  <div class="note">SQL never appears here — it's an <i>integration</i> (an external db is a <code>resource</code>), not the format of your content. See Sources.</div>
+</template>
+
 <template id="e-prim-refs">
   <div class="kick">primitive · references</div>
   <h2>References</h2>
@@ -978,21 +1011,22 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
 <template id="e-dt-src">
   <div class="kick">data · sources</div>
   <h2>Sources <span class="lane l-data">data</span></h2>
-  <p class="tagline">A named source, resolved by a provider seam — memory, sqlite-wasm, or the nexus.</p>
-  <h3>How it works</h3>
-  <p>A <code>data</code> unit names where data comes from (a file, a query, a kv). The workbook embeds a <b>SQLite VFS as a compressed blob</b>; the Host resolves a query to <b>exqlite/Postgres when docked</b>, <b>sqlite-wasm when static</b>, in-memory inline.</p>
-  <h3>Why it matters</h3>
-  <p>Data stays server-side when it should (unbundling), works offline when it can — same declaration, different provider.</p>
+  <p class="tagline">A named source behind one typed surface — inline values, a blob, or an external db. All return WIT values.</p>
+  <h3>Three kinds, one shape</h3>
+  <ul><li class="pro"><b>values</b> — inline WIT values (records/lists), embedded in the bundle. Your content.</li>
+  <li class="pro"><b>blob</b> — a content-addressed <code>list&lt;u8&gt;</code> (an image, media). For file semantics a unit imports <code>wasi:filesystem</code> (a gated capability), mapped onto the blob store.</li>
+  <li class="pro"><b>resource</b> — an external db (postgres) is a WIT <code>resource</code>: a handle reached through imported functions. <b>The only place SQL appears</b> — as an integration, not your content's format.</li></ul>
+  <div class="note">No SQLite-VFS, no second data API. One typed surface — the same WIT types you declare. The Dock resolves a source locally (embedded) or on the nexus (the db) without changing the declaration.</div>
 </template>
 
 <template id="e-dt-query">
   <div class="kick">data · query</div>
   <h2>Query <span class="lane l-data">data</span> <span class="lane l-text">rich text</span></h2>
-  <p class="tagline">Query a source; a view binds to the result and re-renders reactively.</p>
+  <p class="tagline">A selector over a source's WIT values — returns WIT values; a view binds and re-renders.</p>
   <h3>How it works</h3>
-  <p>A query is a <code>data</code> unit over a source. A view <code>from=</code> binds to it by name. Reactivity is <b>signals</b> (TC39 signals), node-local — not a page-level overlay.</p>
+  <p>A <code>select(...)</code> filters / sorts / picks fields over a source's values — declarative, returning typed values. A view <code>from=</code> binds by name; reactivity is <b>signals</b> (node-local). For anything past filter/sort it's a <b>unit</b> (code over the list); real SQL appears only when the source is a db.</p>
   <h3>Why it matters</h3>
-  <p>Declarative data → view, validated at the gate (the binding's <code>from</code> must resolve). The view is just a selector over the work.</p>
+  <p>One query vocabulary over one typed surface — validated at the gate (the <code>from</code> must resolve). No SQL dialect to learn for your own content.</p>
 </template>
 
 <template id="e-sec-post">

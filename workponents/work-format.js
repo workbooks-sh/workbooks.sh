@@ -110,10 +110,11 @@
         { nm:"Workflows",     tag:"if it runs, it's Elixir",       fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-flow",    exp:"e-syn-flow", run:RUN_FLOW },
         { nm:"Tests",         tag:"red test, no bundle",           fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-test",    exp:"e-syn-test" },
       ] },
-    { title:"Data", blurb:"declarative Elixir the system queries",
+    { title:"Data", blurb:"one typed surface — WIT types, no SQL-as-format",
       lessons:[
         { nm:"Tasks",      tag:"the contested line — text or data",   fn:"page.work", lg:"md · elixir", mode:"work", code:"c-syn-tasks", exp:"e-syn-tasks" },
         { nm:"Types",      tag:"defined once, referenced everywhere", fn:"team.work", lg:"elixir",      mode:"work", code:"c-prim-types",exp:"e-prim-types", run:RUN_TYPES },
+        { nm:"The data model", tag:"one typed surface — WIT",          fn:"team.work", lg:"elixir",      mode:"work", code:"c-data-model",exp:"e-data-model" },
         { nm:"The header", tag:"the file's Elixir header — no YAML",   fn:"page.work", lg:"elixir",      mode:"work", code:"c-syn-front", exp:"e-syn-front" },
       ] },
     { title:"The app model", blurb:"index + files → the weave → one HTML",
@@ -137,8 +138,8 @@
         { nm:"The contract",   tag:"a WIT world: exports + imports",  fn:"the dock",   lg:"wit",    mode:"work", code:"c-rt-wit",   exp:"e-rt-wit" },
         { nm:"What the nexus backs", tag:"the optional server tier",  fn:"index.html", lg:"—",      mode:"work", code:"c-nx-backs",  exp:"e-nx-backs" },
         { nm:"Extrapolate",    tag:"server work: build OR nexus",     fn:"page.work",  lg:"elixir", mode:"work", code:"c-nx-extrap", exp:"e-nx-extrap" },
-        { nm:"Data sources",   tag:"named, provider-resolved",        fn:"page.work",  lg:"elixir", mode:"work", code:"c-dt-src",    exp:"e-dt-src" },
-        { nm:"Query",          tag:"a view binds to the result",      fn:"page.work",  lg:"elixir", mode:"work", code:"c-dt-query",  exp:"e-dt-query" },
+        { nm:"Data sources",   tag:"values · blob · resource",        fn:"page.work",  lg:"elixir", mode:"work", code:"c-dt-src",    exp:"e-dt-src" },
+        { nm:"Query",          tag:"a selector over WIT values",      fn:"page.work",  lg:"elixir", mode:"work", code:"c-dt-query",  exp:"e-dt-query" },
       ] },
     { title:"Security", blurb:"what publishing exposes",
       lessons:[
@@ -204,7 +205,7 @@
       { regex: /:[A-Za-z_]\w*[!?]?/, token: "atom" },               // :atoms
       { regex: /@[A-Za-z_]\w*/, token: "meta" },                    // @module_attrs
       { regex: /\b(?:defmodule|defmacro|defp|def|do|end|cond|case|fn|when|if|else|true|false|nil|import|alias|use|require)\b/, token: "keyword" },
-      { regex: /\b(?:client|sandbox|server|world|export|import|interface|package|component|func|record|tangle|untangle|flow|figure|note|task|user|type|step|parallel|todo|doing|done|agent|validate|grant|memory)\b/, token: "variable-2" },
+      { regex: /\b(?:client|sandbox|server|world|export|import|interface|package|component|func|record|variant|enum|flags|values|select|blob|postgres|data|tangle|untangle|flow|figure|note|task|user|type|step|parallel|todo|doing|done|agent|validate|grant|memory)\b/, token: "variable-2" },
       { regex: /<\/?[A-Za-z][\w-]*/, token: "tag" },                // <work-* / html tags
       { regex: /\b\d[\d_]*\b/, token: "number" },
       { regex: /./, token: null },
