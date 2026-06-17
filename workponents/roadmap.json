@@ -1,0 +1,50 @@
+{
+  "title": "Workbooks — full-throttle roadmap",
+  "subtitle": "Architecture is settled. Now: prove it functions, dogfood the core, ship the surfaces. Agents mark tasks off; this page hot-reloads.",
+  "mantra": "dogfood · dogfood · dogfood — we build the same things we want others to build, composably and well.",
+  "updated": null,
+  "phases": [
+    {
+      "id": "p0",
+      "title": "Foundation — does it actually function?",
+      "goal": "No drift, no dead code, no broken surfaces. The base is provably solid before building up.",
+      "autonomy": "workflow (mechanical · verifiable)",
+      "tasks": [
+        { "id": "p0.1", "title": "Loader migration: runtime reads <work-ref rel=\"kit\"> (tagging-via-ref), convert manifests off <work-toolkit>", "status": "todo" },
+        { "id": "p0.2", "title": "Full suite green — resolve the Keeper flake, confirm 0 real failures", "status": "todo" },
+        { "id": "p0.3", "title": "Dead-code & god-file audit — find unused modules/funcs, oversized files, drift", "status": "todo" },
+        { "id": "p0.4", "title": "Cut aggressively — delete dead code, split/shrink god files, reduce LOC (DRY, least-code)", "status": "todo" },
+        { "id": "p0.5", "title": "Waldo agent context — verify correct in the new model, or fix if busted", "status": "todo" },
+        { "id": "p0.6", "title": "Rename completeness — Rust CLI verb + /rcp/toolkit routes (coordinated, compat), :toolkits field, discovered element", "status": "todo" },
+        { "id": "p0.7", "title": "Architecture locked — Primitive Test, 3-element spine, tagging=C, work-kit", "status": "done" },
+        { "id": "p0.8", "title": "Spine real — work-src (runs) + work-ref (edges/call) registered & gate-green", "status": "done" },
+        { "id": "p0.9", "title": "work-kit rename 2a+2b — module/dirs/env/attr/escript-verb, 1018 tests green", "status": "done" }
+      ]
+    },
+    {
+      "id": "p1",
+      "title": "Dogfood the core — the new full throttle",
+      "goal": "The capabilities we'd sell, used by us first: evals, the compiler lane, the workbooks toolkit.",
+      "autonomy": "workflow (mechanical) + checkpoints",
+      "tasks": [
+        { "id": "p1.1", "title": "AI agent evals running ENTIRELY in the new system (workbench, Minimax M3, harness on work-kit)", "status": "todo" },
+        { "id": "p1.2", "title": "work-src compiler lane — compile rust/c/zig/python through the Dock, end-to-end proof", "status": "todo" },
+        { "id": "p1.3", "title": "work-src builds a website — compile + bundle a real site from source", "status": "todo" },
+        { "id": "p1.4", "title": "Build the `workbooks` agent toolkit (skills for workbooks: setup/author/deploy)", "status": "todo" },
+        { "id": "p1.5", "title": "Verify the workbooks toolkit against the CLI — the dogfood loop (skills run real `work` verbs)", "status": "todo" },
+        { "id": "p1.6", "title": "Evals + telemetry + tests as LIVE references on this roadmap (hot-reload)", "status": "todo" }
+      ]
+    },
+    {
+      "id": "p2",
+      "title": "Surfaces — the next layer (taste + judgment)",
+      "goal": "The consumer-facing tier: docs, desktop, the shipped examples. Human-in-the-loop on voice/UX.",
+      "autonomy": "staged · human-in-loop",
+      "tasks": [
+        { "id": "p2.1", "title": "Website documentation refactor — HTML-first, work-kit model, drop stale org/oql/toolkit language", "status": "todo" },
+        { "id": "p2.2", "title": "Desktop app — re-point onto runtime/host, the work-kit model (per ASSESSMENT.md)", "status": "todo" },
+        { "id": "p2.3", "title": "Ship the living roadmap + composite + studio as canonical example workbooks", "status": "doing" }
+      ]
+    }
+  ]
+}
