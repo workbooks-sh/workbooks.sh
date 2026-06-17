@@ -5,6 +5,39 @@ defmodule Workbooks.Web do
   """
   use Plug.Router
 
+  # Helpers factored out by responsibility (p0.4 god-file split): pure render
+  # pages, agent picker/prompt, platform-API shaping, and cross-cutting utils.
+  # Imported so the route bodies call them by bare name (unchanged behavior).
+  import Workbooks.Web.Pages, only: [viewer_page: 0, sample_workbook: 0, workbook_page: 2]
+  import Workbooks.Web.Agents, only: [agent_catalog: 1, agent_system_prompt: 1]
+
+  import Workbooks.Web.Platform,
+    only: [
+      nexus_view: 1,
+      provision_opts: 1,
+      workspace_params: 1,
+      platform_storage_bytes: 1,
+      gb: 1,
+      reason_str: 1,
+      rbac_matrix: 0
+    ]
+
+  import Workbooks.Web.Helpers,
+    only: [
+      org_secret_keys: 0,
+      serve_repo_file: 3,
+      effective_workdir: 3,
+      commands_param: 1,
+      harness_sub: 1,
+      wb_exec: 2,
+      valid_scope: 1,
+      library_ask: 2,
+      browse: 1,
+      serve_toolkit_file: 3,
+      json_safe: 1,
+      host_authority: 1
+    ]
+
   # CORS (wb-e95f). The desktop runs in a WebKit webview whose origin differs
   # from 127.0.0.1:4000, so every fetch with an Authorization header triggers a
   # preflight OPTIONS. Without this the preflight 404'd (no OPTIONS route) and
@@ -598,21 +631,6 @@ defmodule Workbooks.Web do
   defp path_tenant_ok?(conn),
     do: Workbooks.Tenant.visible?(conn.params["tenant"], conn.assigns[:tenant])
 
-  # Serve a file from the runtime root, read FRESH (so dashboard/ledger edits are
-  # live). Tries cwd then the source-relative path so it works under `mix`
-  # regardless of where the runtime was launched.
-  defp serve_repo_file(conn, name, ctype) do
-    body =
-      [Path.join(File.cwd!(), name), Path.expand(Path.join([__DIR__, "..", name]))]
-      |> Enum.find_value(fn p -> match?({:ok, _}, File.read(p)) && File.read!(p) end)
-
-    if body do
-      conn |> put_resp_content_type(ctype) |> send_resp(200, body)
-    else
-      send_resp(conn, 404, ~s({"error":"#{name} not found"}))
-    end
-  end
-
   # Session-ownership guard (wb-g1yo.9): only the run's owning tenant may act on
   # it by id (CTK review pull/commit). Same grandfather rule; a not-found run is
   # left to the underlying op (which returns :not_found).
@@ -625,66 +643,6 @@ defmodule Workbooks.Web do
     end
   rescue
     _ -> true
-  end
-
-  # Workdir confinement (wb-g1yo.4b). Desktop = trusted local path; cloud/shared =
-  # a confined per-tenant scratch (the agent's FS work stays under its tenant root,
-  # no arbitrary host path, no cross-tenant reach).
-  defp effective_workdir(tenant, run_id, requested),
-    do: confined_workdir(Workbooks.Desktop.enabled?(), tenant, run_id, requested)
-
-  # Normalize a harness-session :commands cap from request params: a list of command names scopes the grant
-  # to those; anything else (incl. absent) => :all (the broker still default-denies past the registry).
-  defp commands_param(list) when is_list(list), do: Enum.map(list, &to_string/1)
-  defp commands_param(_), do: :all
-
-  # The caller-supplied harness session sub-id, reduced to one flat traversal-proof
-  # segment (same charset filter as a path segment). A blank/absent value gets a
-  # fresh host-generated id. This keeps the FS workdir confined AND the namespaced
-  # Registry/ETS key a clean tenant-scoped token.
-  defp harness_sub(requested) do
-    case requested |> to_string() |> String.replace(~r/[^A-Za-z0-9_-]/, "_") do
-      "" -> "h-#{System.unique_integer([:positive])}"
-      s -> s
-    end
-  end
-
-  @doc false
-  # Pure (testable): desktop-trusted callers keep their requested local path; any
-  # other (cloud/shared) caller is confined to a per-tenant scratch root — no
-  # arbitrary host path, no cross-tenant FS reach.
-  def confined_workdir(desktop?, tenant, run_id, requested) do
-    if desktop? and is_binary(requested) and requested != "" do
-      requested
-    else
-      base = System.get_env("WB_DATA") || System.tmp_dir!()
-      # Strip dots too (not just separators) so a tenant like "../../etc" can't
-      # smuggle ".." into the path. BOTH segments are sanitized: `run_id` is
-      # caller-derived on the harness route (= "harness-" <> caller session), so
-      # an unsanitized `run_id` was a path-traversal escape (e.g.
-      # session "x/../../tenantB" -> /data/wb-runs/<t>/harness-x/../../tenantB).
-      # Sanitizing here confines EVERY caller of confined_workdir, not just the
-      # one route — defense-in-depth so a future caller can't reintroduce it.
-      safe_tenant = safe_segment(tenant, "anon")
-      safe_run_id = safe_segment(run_id, "run")
-      Path.join([base, "wb-runs", safe_tenant, safe_run_id])
-    end
-  end
-
-  # A single, flat, traversal-proof path segment: collapse every char outside
-  # [A-Za-z0-9_-] (separators, dots, NUL, whitespace) to "_", so neither a
-  # tenant nor a caller session id can smuggle "/" or ".." into the FS path.
-  defp safe_segment(value, fallback) do
-    case (value || fallback) |> to_string() |> String.replace(~r/[^A-Za-z0-9_-]/, "_") do
-      "" -> fallback
-      s -> s
-    end
-  end
-
-  defp wb_exec(argv, tenant) do
-    Workbooks.CLI.call(argv, tenant)
-  rescue
-    e -> "error: #{Exception.message(e)}"
   end
 
   # Workbook-as-memory (wb-kbq5.1): the desktop loads workbook files as semantic
@@ -1815,53 +1773,9 @@ defmodule Workbooks.Web do
     Workbooks.RBAC.subject(t || "", uid || "")
   end
 
-  # ── platform-API helpers ────────────────────────────────────────────────────────
+  # ── platform-API helpers (conn-coupled; the rest live in Workbooks.Web.Platform) ──
   defp j(conn, code, data),
     do: conn |> put_resp_content_type("application/json") |> send_resp(code, Jason.encode!(data))
-
-  # Shape a registry row OR a provision result (both atom-keyed) into the dashboard's
-  # nexus view. The per-nexus bearer/DSN are never in either source.
-  defp nexus_view(nx) do
-    app = nx[:fly_app] || ""
-
-    %{
-      id: nx[:id],
-      name: nx[:name] || nx[:id],
-      region: nx[:region] || "",
-      plan: nx[:plan] || "starter",
-      state: map_state(nx[:state]),
-      url: nx[:url] || (if app != "", do: "https://#{app}.fly.dev", else: "")
-    }
-  end
-
-  # registry lifecycle vocab → the dashboard's vocab.
-  defp map_state("running"), do: "run"
-  defp map_state("stopped"), do: "sleep"
-  defp map_state(_), do: "build"
-
-  # Only name/region/plan are accepted from the body; the org, secrets, image and Fly
-  # org are all pinned server-side in the provisioner — never caller input.
-  defp provision_opts(body) do
-    case Jason.decode(body) do
-      {:ok, %{} = m} -> [] |> put_opt(:name, m["name"]) |> put_opt(:region, m["region"]) |> put_opt(:plan, m["plan"])
-      _ -> []
-    end
-  end
-
-  defp put_opt(opts, _k, v) when v in [nil, ""], do: opts
-  defp put_opt(opts, k, v), do: Keyword.put(opts, k, v)
-
-  # Workspace create body → %{name, icon, nexus_id}. Only these fields are read;
-  # the org comes from the tenant, never the body.
-  defp workspace_params(body) do
-    case Jason.decode(body) do
-      {:ok, %{} = m} -> %{name: m["name"], icon: m["icon"], nexus_id: blank_to_nil(m["nexus_id"])}
-      _ -> %{name: nil, icon: nil, nexus_id: nil}
-    end
-  end
-
-  defp blank_to_nil(v) when v in [nil, ""], do: nil
-  defp blank_to_nil(v), do: v
 
   defp platform_lifecycle(conn, fun) do
     case fun.() do
@@ -1871,22 +1785,6 @@ defmodule Workbooks.Web do
       {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
     end
   end
-
-  defp platform_storage_bytes(org) do
-    Workbooks.Storage.usage_bytes(org)
-  rescue
-    _ -> 0
-  catch
-    _, _ -> 0
-  end
-
-  defp gb(bytes) when is_number(bytes),
-    do: :erlang.float_to_binary(bytes / 1_000_000_000, decimals: 2) <> " GB"
-
-  defp gb(_), do: "0 GB"
-
-  defp reason_str(r) when is_atom(r), do: Atom.to_string(r)
-  defp reason_str(r), do: inspect(r)
 
   # Re-verify the bearer to read the user identity claims (sub/name) for /me. The Auth
   # plug already authenticated this request (it only assigned the tenant); this pulls
@@ -1901,20 +1799,6 @@ defmodule Workbooks.Web do
     end
   end
 
-  # The role→capability legend, for the dashboard "Roles & access" surface.
-  defp rbac_matrix do
-    Map.new(Workbooks.RBAC.roles(), fn r -> {r, Workbooks.RBAC.capabilities(r)} end)
-  end
-
-  # A scope is an opaque workbook id: letters/digits/_/- only, no `.`, no separators
-  # or traversal (`/`, `..`). Confinement floor (wb-g1yo.10) — never a host path.
-  defp valid_scope(s)
-       when is_binary(s) and s != "" do
-    if s =~ ~r/\A[A-Za-z0-9_-]+\z/, do: :ok, else: :error
-  end
-
-  defp valid_scope(_), do: :error
-
   match _ do
     send_resp(conn, 404, "not found")
   end
@@ -1923,317 +1807,8 @@ defmodule Workbooks.Web do
     conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
   end
 
-  # The agent keys an org may provision for its members (wb-xiei.2). Allowlisted so
-  # GET /api/org-secrets can never exfiltrate arbitrary tenant vars and POST can't
-  # write outside this set.
-  defp org_secret_keys, do: ~w(OPENROUTER_API_KEY GEMINI_API_KEY)
-
-  # Build the agent catalog the desktop picker reads. Project agents (if a
-  # workdir is given) override user agents override the builtin. Every entry is
-  # {slug, path, scope, title, model, toolkits} — AgentCatalogEntry shape.
-  defp agent_catalog(workdir) do
-    builtin = [%{slug: "waldo", path: "waldo", scope: "builtin", title: "Waldo", model: nil, toolkits: []}]
-
-    project =
-      if is_binary(workdir) and workdir != "",
-        do: catalog_dir(Path.join([workdir, ".workbooks", "agents"]), "project"),
-        else: []
-
-    user = catalog_dir(Path.join(System.get_env("WB_PROFILE_DIR") || "/opt/profile", "agents"), "user")
-
-    # De-dupe by slug, keeping the higher-precedence scope (project > user > builtin).
-    (project ++ user ++ builtin)
-    |> Enum.reduce({[], MapSet.new()}, fn a, {acc, seen} ->
-      if MapSet.member?(seen, a.slug), do: {acc, seen}, else: {[a | acc], MapSet.put(seen, a.slug)}
-    end)
-    |> elem(0)
-    |> Enum.reverse()
-  end
-
-  defp catalog_dir(dir, scope) do
-    case File.ls(dir) do
-      {:ok, files} ->
-        files
-        |> Enum.filter(&String.ends_with?(&1, ".html"))
-        |> Enum.map(fn f ->
-          def = Workbooks.AgentDef.parse(File.read!(Path.join(dir, f)))
-          slug = def.id || Path.rootname(f)
-          %{slug: slug, path: f, scope: scope, title: def.tagline || slug, model: def.model, toolkits: def.toolkits}
-        end)
-
-      _ ->
-        []
-    end
-  rescue
-    _ -> []
-  end
-
-  # Resolve an agent's system prompt by slug — the profile def if present, else a
-  # safe default so voice/chat work without a provisioned profile. Slug is
-  # path-validated (no traversal out of the agents dir).
-  defp agent_system_prompt(slug) do
-    default =
-      "You are Waldo, the user's resident assistant inside Workbooks. Be concise, warm, and helpful. " <>
-        "Help them navigate and operate their workspace — answer questions, search, open things — by voice or text. " <>
-        "You work problems WITH the user; you never run off on your own.\n\n" <>
-        "REPLY STYLE: answer the user DIRECTLY in prose — just write your response. " <>
-        "Only call a tool when you genuinely need to act (search, open a tab, run something); " <>
-        "do NOT wrap a plain answer in a tool call. Your text streams to the user as you write it.\n\n" <>
-        "RICH REPLIES (optional): when a structured or visual answer helps, write inline `<work-*>` " <>
-        "HTML directly in your message — the chat renders the SDK's real custom elements as " <>
-        "interactive cards. The available tags are listed in the Components section below, " <>
-        "discovered from your component toolkit. Use NO `#+` directives — just the HTML. Emit a " <>
-        "component when you took an action worth confirming or when offering the user a next step; " <>
-        "use plain prose for ordinary replies (it streams).\n\n" <>
-        "OPEN WHAT YOU BUILD: the moment you create or write a workbook or file, OPEN it for the user with `work app open-tab <path>` (you have the workbooks-browser toolkit) so it appears live in their workspace — never leave a workbook created-but-unopened. Create the file, open it, then confirm."
-
-    # Resolve the base prompt + the agent's declared toolkits. Waldo (the
-    # default) ALWAYS gets workbooks-browser (drive the app: work app …, work env
-    # request …) AND workbooks-cli (deploy + publish: work deploy …, work publish …).
-    # A provisioned <slug>.html overrides.
-    {base, toolkits} =
-      with true <- is_binary(slug) and Regex.match?(~r/^[a-z0-9][a-z0-9_-]*$/i, slug),
-           dir <- System.get_env("WB_PROFILE_DIR") || "/opt/profile",
-           path <- Path.join([dir, "agents", "#{slug}.html"]),
-           {:ok, html} <- File.read(path),
-           %{system: sys, toolkits: tks} when is_binary(sys) and sys != "" <- Workbooks.AgentDef.parse(html) do
-        {sys, tks}
-      else
-        # Waldo also gets `workponents` (the component work-kit) so the
-        # rich-reply path resolves a component catalog — the chat renders the
-        # SDK `work-*` elements inline.
-        _ -> {default, ["workbooks-browser", "workbooks-cli", "workponents"]}
-      end
-
-    # Tier-1 progressive disclosure: append the compact work-kit index (skill
-    # names) so the agent knows what it can do; bodies stay on demand via `work
-    # kit show`. When the closure includes a component work-kit, append
-    # the catalog of `work-*` tags DISCOVERED from its CEM (not hardcoded).
-    base
-    |> append_section(Workbooks.WorkKits.injection_text(toolkits))
-    |> append_section(Workbooks.WorkKits.component_catalog(toolkits))
-  end
-
-  defp append_section(text, ""), do: text
-  defp append_section(text, section), do: text <> "\n\n" <> section
-
-  # The viewer SPA: the runtime renders Org→HTML server-side (orgize, in the
-  # kernel); the page only fetches that HTML + colors code (highlight.js, BSD).
-  # No client Org library, no chrome — a clean page.
-  # Synthesize a grounded, cited answer from library hits (AI-over-files, wb-ndlz).
-  # Empty hits → an HONEST "couldn't find it" (no fabricated files/facts), no LLM call.
-  defp library_ask(query, []) do
-    %{
-      answer:
-        "I couldn't find anything in your files about \"#{query}\". Nothing in your library matched — " <>
-          "I won't make something up. Try different words, or add the relevant workbook.",
-      sources: [],
-      related: []
-    }
-  end
-
-  defp library_ask(query, hits) do
-    sources =
-      Enum.map(hits, fn h ->
-        %{
-          title: Map.get(h, :headline) || Map.get(h, :path),
-          path: Map.get(h, :path),
-          snippet: h |> Map.get(:text, "") |> to_string() |> String.slice(0, 200)
-        }
-      end)
-
-    context =
-      hits
-      |> Enum.map(fn h -> "- #{Map.get(h, :path)}: #{h |> Map.get(:text, "") |> to_string() |> String.slice(0, 400)}" end)
-      |> Enum.join("\n")
-
-    system =
-      "You answer the user's question using ONLY the provided excerpts from THEIR OWN files. " <>
-        "Cite which file each point comes from (by its path). If the excerpts don't cover the question, " <>
-        "say so plainly — NEVER invent files, paths, or facts not present in the excerpts. Be concise."
-
-    user = "Question: #{query}\n\nExcerpts from the user's files:\n#{context}"
-
-    answer =
-      case Workbooks.Llm.complete([%{role: "system", content: system}, %{role: "user", content: user}]) do
-        {:ok, %{content: t}} when is_binary(t) and t != "" -> t
-        _ -> "(no answer — the model didn't respond)"
-      end
-
-    %{answer: answer, sources: sources, related: []}
-  end
-
-  # Dispatch a /api/browse request to the Browse capability.
-  defp browse(%{"mode" => "search", "query" => q} = p) do
-    case Workbooks.Browse.search(q, limit: Map.get(p, "limit", 8)) do
-      {:ok, results} -> %{mode: "search", query: q, results: results}
-      {:error, reason} -> %{mode: "search", error: inspect(reason)}
-    end
-  end
-
-  defp browse(%{"mode" => "crawl", "url" => url} = p) do
-    {:ok, pages} = Workbooks.Browse.crawl(url, max_pages: Map.get(p, "max_pages", 10))
-    render_pages(pages, Map.get(p, "as", "json"))
-  end
-
-  defp browse(%{"url" => url} = p) do
-    case Workbooks.Browse.fetch(url) do
-      {:ok, page} -> render_pages([page], Map.get(p, "as", "json"))
-      {:error, reason} -> %{error: inspect(reason)}
-    end
-  end
-
-  defp render_pages(pages, "org"),
-    do: %{count: length(pages), org: Workbooks.Browse.Crawl.to_org(pages)}
-
-  defp render_pages(pages, _),
-    do: %{count: length(pages), pages: Enum.map(pages, &Map.take(&1, [:url, :title, :description, :headings]))}
-
-  # The public authority for did:web — prefer the proxy's forwarded host (fly
-  # terminates TLS upstream) so the DID id matches the URL clients actually used.
-  # Serve a file from <toolkits_root>/<toolkit>/<rel>, path-contained (no escape).
-  defp serve_toolkit_file(conn, toolkit, rel) do
-    base = Path.expand(Path.join(Workbooks.WorkKits.default_root(), toolkit))
-    path = Path.expand(Path.join(base, rel))
-
-    cond do
-      path != base and not String.starts_with?(path, base <> "/") ->
-        send_resp(conn, 403, "forbidden")
-
-      not File.regular?(path) ->
-        send_resp(conn, 404, "not found")
-
-      true ->
-        conn |> put_resp_content_type(ctk_ctype(path)) |> send_resp(200, File.read!(path))
-    end
-  end
-
-  defp ctk_ctype(path) do
-    case Path.extname(path) do
-      ".html" -> "text/html"
-      ".js" -> "text/javascript"
-      ".css" -> "text/css"
-      ".org" -> "text/plain"
-      ".json" -> "application/json"
-      ".svg" -> "image/svg+xml"
-      _ -> "application/octet-stream"
-    end
-  end
-
-  # Make any term JSON-encodable: tuples → inspected strings, recursing through
-  # maps/lists. Run/checkout results legitimately carry error tuples (bd wb-ica).
-  defp json_safe(%_{} = struct), do: struct
-  defp json_safe(m) when is_map(m), do: Map.new(m, fn {k, v} -> {k, json_safe(v)} end)
-  defp json_safe(l) when is_list(l), do: Enum.map(l, &json_safe/1)
-  defp json_safe(t) when is_tuple(t), do: inspect(t)
-  defp json_safe(other), do: other
-
-  defp host_authority(conn) do
-    case Plug.Conn.get_req_header(conn, "x-forwarded-host") do
-      [h | _] when is_binary(h) and h != "" -> h
-      _ -> conn.host
-    end
-  end
-
-  defp viewer_page do
-    ~S"""
-    <!doctype html><html lang="en"><head>
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Workbooks</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css">
-    <style>
-    *{box-sizing:border-box} html,body{margin:0;height:100%}
-    body{font:16px/1.7 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;color:#202124;background:#f1f3f4;display:flex}
-    #tabs{width:264px;height:100vh;overflow:auto;border-right:1px solid #e3e6e8;background:#fff;padding:1.1rem .6rem;flex:0 0 auto}
-    #tabs h2{font-size:.66rem;text-transform:uppercase;letter-spacing:.09em;color:#80868b;padding:0 .6rem;margin:.2rem 0 .7rem}
-    #tabs a{display:block;padding:.45rem .65rem;border-radius:8px;color:#3c4043;text-decoration:none;font-size:.9rem;cursor:pointer}
-    #tabs a:hover{background:#f1f3f4} #tabs a.active{background:#e8f0fe;color:#1a73e8;font-weight:500}
-    body>main{flex:1;height:100vh;overflow:auto;display:flex;justify-content:center;padding:3.5rem 1.5rem 6rem}
-    #doc{background:#fff;max-width:740px;width:100%;padding:4.5rem 5.5rem;box-shadow:0 1px 3px rgba(60,64,67,.1);border-radius:2px;height:max-content}
-    /* orgize wraps content in main/section — normalize them to plain blocks */
-    #doc main,#doc section{display:block} #doc p:empty{display:none}
-    #doc h1{font-size:1.9rem;font-weight:600;margin:0 0 1rem;letter-spacing:-.01em}
-    #doc h2{font-size:1.4rem;font-weight:600;margin:2.2rem 0 .6rem}
-    #doc h3{font-size:1.12rem;font-weight:600;margin:1.6rem 0 .4rem}
-    #doc p{margin:.85rem 0} #doc a{color:#1a73e8}
-    #doc :not(pre)>code,#doc code.inline-code{background:#f1f3f4;padding:.12em .38em;border-radius:5px;font-size:.86em;font-family:"SF Mono",Menlo,Consolas,monospace}
-    #doc pre{background:#f8f9fa;border:1px solid #e8eaed;border-radius:10px;padding:1rem 1.25rem;overflow:auto;font-size:.85rem;line-height:1.55}
-    #doc table{border-collapse:collapse;width:100%;margin:1.1rem 0;font-size:.93rem}
-    #doc th,#doc td{border:1px solid #e8eaed;padding:.5rem .85rem;text-align:left} #doc th{background:#f8f9fa;font-weight:600}
-    #doc blockquote{border-left:3px solid #dadce0;margin:1rem 0;padding:.2rem 0 .2rem 1.1rem;color:#5f6368}
-    #doc .tag{display:inline-block;background:#e8eaed;color:#5f6368;border-radius:5px;padding:.08em .45em;font-size:.6em;vertical-align:middle;margin-left:.4em;text-transform:lowercase}
-    #doc .kw{font-size:.62em;font-weight:700;padding:.18em .5em;border-radius:5px;margin-right:.5em;vertical-align:middle;letter-spacing:.04em}
-    #doc .kw-TODO{background:#fce8e6;color:#c5221f} #doc .kw-DONE{background:#e6f4ea;color:#137333}
-    #doc .kw-NEXT,#doc .kw-WAIT{background:#feefc3;color:#b06000}
-    .empty{color:#80868b}
-    </style></head>
-    <body>
-    <aside id="tabs"><h2>Documents</h2></aside>
-    <main><article id="doc"></article></main>
-    <script type="module">
-    // The runtime renders Org→HTML (orgize, in the kernel). The page only fetches
-    // the rendered HTML + colors code (highlight.js, BSD). No client Org library.
-    import hljs from "https://esm.sh/highlight.js@11";
-    const tabs = document.getElementById("tabs"), docEl = document.getElementById("doc");
-    function sanitize(){
-      docEl.querySelectorAll("h1,h2,h3,h4").forEach(h=>{
-        const first = h.firstChild;
-        if(first && first.nodeType===3){
-          const m = first.textContent.match(/^\s*(TODO|DONE|NEXT|WAIT|ABANDONED)\b\s*/i);
-          if(m){ first.textContent = first.textContent.slice(m[0].length);
-            const b=document.createElement("span"); b.className="kw kw-"+m[1].toUpperCase(); b.textContent=m[1].toUpperCase();
-            h.insertBefore(b, h.firstChild); }
-        }
-        h.childNodes.forEach(n=>{ if(n.nodeType===3){ let t=n.textContent.replace(/\s+/g," ").replace(/\s+$/,""); const L=t.replace(/[^A-Za-z]/g,"");
-          n.textContent = (L && L===L.toUpperCase()) ? t.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()) : t; }});
-      });
-    }
-    async function show(id, el){
-      document.querySelectorAll("#tabs a").forEach(a=>a.classList.remove("active"));
-      if(el) el.classList.add("active");
-      docEl.innerHTML = await fetch("/api/w/"+id+"/html").then(r=>r.text());
-      docEl.querySelectorAll("pre code").forEach(b=>hljs.highlightElement(b));
-      sanitize();
-    }
-    const list = await fetch("/api/workbooks").then(r=>r.json());
-    if(!list.length) docEl.innerHTML = "<p class='empty'>No workbooks yet — PUT one to /w/&lt;id&gt;.</p>";
-    list.forEach((id,i)=>{ const a=document.createElement("a"); a.textContent=id; a.onclick=()=>show(id,a);
-      tabs.appendChild(a); if(i===0) show(id,a); });
-    </script>
-    </body></html>
-    """
-  end
-
-  # A built-in sample until Workbooks are loaded from the VFS / a Bundle.
-  defp sample_workbook do
-    """
-    * Hello, Workbook                                 :workflow:
-      SCHEDULED: <2026-06-06 Sat 09:00 +1d>
-    ** Greet                                          :component:
-       #+begin_src js :out greeting:string
-       export default () => "hello from a workbook instance";
-       #+end_src
-    """
-  end
-
-  defp workbook_page(id, rendered) do
-    """
-    <!doctype html><html><head><meta charset="utf-8"><title>Workbook #{id}</title>
-    <style>body{font:15px/1.6 system-ui,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;color:#222}
-    .tags{color:#aaa;font-weight:400;font-size:.7em}.schedule{color:#0a7}
-    .iface{display:grid;grid-template-columns:max-content 1fr;gap:0 .6rem;font-size:.82em;color:#666;margin:.3rem 0}
-    pre{background:#f6f7f9;padding:.6rem .8rem;border-radius:6px;overflow:auto}</style></head>
-    <body><main id="workbook">#{rendered}</main>
-    <script>
-      // The Workbook UI talks to its backend — this same runtime. fetch for
-      // one-shot calls, a WebSocket for live interaction.
-      const ws = new WebSocket((location.protocol === "https:" ? "wss:" : "ws:") + "//" + location.host + "/w/#{id}/ws");
-      window.wb = {
-        call: (fn, org) => fetch("/w/#{id}/call", {method:"POST",
-          headers:{"content-type":"application/json"}, body: JSON.stringify({fn, org})}).then(r => r.json()),
-        live: (fn, org) => new Promise(res => { ws.onmessage = e => res(JSON.parse(e.data)); ws.send(JSON.stringify({fn, org})); })
-      };
-    </script></body></html>
-    """
-  end
+  # Public test/seam surface preserved after the helper split: the workdir
+  # confinement rule lives in Workbooks.Web.Helpers but stays reachable here.
+  @doc false
+  defdelegate confined_workdir(desktop?, tenant, run_id, requested), to: Workbooks.Web.Helpers
 end
