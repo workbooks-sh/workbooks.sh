@@ -14,7 +14,7 @@ server :lookup do                 # a function it ships
   def lookup(id), do: get("api.crm.com/contacts/" <> id)
 end
 
-type Contact = record(name: string, email: string)   # a type it ships
+@type contact :: %{name: String.t(), email: String.t()}   # a type it ships
 
 Together that's a versioned **package exporting interfaces** — functions, units, and
 shared types — published to a registry and imported by name (see [[Use a toolkit]]).

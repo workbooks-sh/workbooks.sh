@@ -43,7 +43,7 @@
   const RUN_TYPES = [
     `<span class="p">$</span> <span class="cmd">work check team.work</span>`,
     ``,
-    `  <span class="dim">type</span>     Status = enum(:todo, :doing, :done)   <span class="ok">✓</span>`,
+    `  <span class="dim">@type</span>   status :: :todo | :doing | :done   <span class="ok">✓</span>`,
     `  <span class="dim">users</span>    :analyst <span class="ok">✓</span>   :shane <span class="ok">✓</span>`,
     `  <span class="dim">refs</span>     task owner: :analyst   <span class="ok">✓ resolves</span>`,
     `           task status: :todo     <span class="ok">✓ valid Status</span>`,

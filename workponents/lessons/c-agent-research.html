@@ -5,8 +5,8 @@ This is `researcher.work` — an autonomous research agent, the auto-researcher 
 Its memory is **WIT-typed data**, so findings and the report cross every step
 cleanly:
 
-type Finding = record(claim: string, source: string, confidence: f32)
-type Report  = record(question: string, findings: list(Finding), summary: string)
+@type finding :: %{claim: String.t(), source: String.t(), confidence: float()}
+@type report  :: %{question: String.t(), findings: [finding], summary: String.t()}
 
 The **brain** declares the model, the prompt, that typed memory, and the read-only
 web cap it needs (see [[The brain]]):

@@ -39,7 +39,7 @@ end
 Types and tasks are declarations the system reads and validates — not code it
 runs. They have fields, not a body:
 
-type Status = enum(:todo, :doing, :done)
+@type status :: :todo | :doing | :done
 
 task "tune the scorer", status: :todo, owner: :ada, ref: :score
 

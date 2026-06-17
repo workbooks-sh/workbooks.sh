@@ -1,34 +1,41 @@
 <script type="text/plain" id="c-data-model">
 # The data model
 
-One data layer — **WIT types**. Your content *is* typed values: there's no second
-data API, no SQLite-as-format, no separate VFS. The types you declare are the types
-that cross the boundary are the types you store.
+One data layer, and you author all of it in **plain Elixir** — `@type` and structs.
+Your content is just typed values of those shapes: there's no second data API, no
+SQLite-as-format, no separate VFS. The compiler turns your Elixir types into the WIT
+contract that crosses the component boundary — and that artifact is *generated*,
+never written by hand.
 
-The four shapes you define are the WIT user-defined types:
+The shapes are the ones Elixir already gives you:
 
-type Status  = enum(:todo, :doing, :done)            # variants with no payload
-type Lead    = record(name: string, score: s32)      # fields
-type Outcome = variant(ok: Lead, err: string)        # a tagged choice
-type Perms   = flags(:read, :write, :admin)          # a set of bits
+@type status  :: :todo | :doing | :done                  # enum    — a union of atoms
+@type outcome :: {:ok, Lead.t()} | {:error, String.t()}  # variant — a tagged tuple
 
-Your data is just **values** of those — lists, options, records:
+defmodule Lead do
+  defstruct name: "", score: 0                            # record  — a struct
+  @type t :: %Lead{name: String.t(), score: integer()}
+end
 
-data :leads, from: values([
-  %{name: "Acme",   score: 91},
-  %{name: "Globex", score: 64},
+Your data is just **values** of those — lists, options, structs:
+
+data :leads, of: Lead, from: values([
+  %Lead{name: "Acme",   score: 91},
+  %Lead{name: "Globex", score: 64},
 ])
 
-`record · variant · enum · flags · list · option · result · resource` are standard
-WebAssembly — an agent already understands them, with nothing house-specific to learn.
+Each maps to a standard WebAssembly type — a struct to a `record`, an atom union to
+an `enum`, a tagged tuple to a `variant`, `Lead.t() | nil` to an `option`, `[Lead.t()]`
+to a `list`. You write the Elixir; the WIT falls out, so an agent (or a Rust unit)
+reading the data gets a standard, typed contract with nothing house-specific to learn.
 </script>
 <template id="e-data-model">
   <div class="kick">data · the data model</div>
   <h2>The data model <span class="lane l-data">data</span></h2>
-  <p class="tagline">One data layer — WIT types. Content is typed values; there's never a second data API to learn.</p>
-  <h3>One type system, end to end</h3>
-  <p>The <code>type</code> you declare = the type that <b>crosses the component boundary</b> = the type you <b>store</b>. No impedance mismatch, no SQLite-as-format, no separate VFS. Your shapes are the WIT user-defined types: <code>record</code> (fields), <code>variant</code> (a tagged choice), <code>enum</code> (payload-less variants), <code>flags</code> (a bitset) — over the primitives (<code>string</code>, <code>s32</code>, <code>u8</code>…) and compounds (<code>list</code>, <code>option</code>, <code>result</code>, <code>tuple</code>).</p>
-  <h3>Why WebAssembly's types, on purpose</h3>
-  <p>Because they're a <b>standard</b>. <code>record</code>/<code>variant</code>/<code>enum</code>/<code>resource</code> mean the same thing everywhere — so an agent reading your data already understands it from training, with zero house-specific vocabulary. Leaning into the WASM type system makes the format self-explaining to humans and models alike.</p>
-  <div class="note">SQL never appears here — it's an <i>integration</i> (an external db is a <code>resource</code>), not the format of your content. See Sources.</div>
+  <p class="tagline">One data layer, authored in plain Elixir — <code>@type</code> and structs. The WIT contract is generated; you never write it.</p>
+  <h3>Elixir in, one contract out</h3>
+  <p>You write ordinary Elixir typespecs and structs. The compiler maps a disciplined subset to the WIT user-defined types — a <code>defstruct</code> → <code>record</code>, an atom union → <code>enum</code>, a tagged tuple → <code>variant</code>, <code>t | nil</code> → <code>option</code>, <code>[t]</code> → <code>list</code> — over WIT primitives (<code>String.t()</code>→<code>string</code>, <code>integer()</code>→an int, <code>0..255</code>→<code>u8</code>, <code>boolean()</code>→<code>bool</code>). The same type <b>crosses the boundary</b> and is the type you <b>store</b> — no impedance mismatch.</p>
+  <h3>A unit's signature is its <code>@spec</code></h3>
+  <p>The same idea types the seams: a unit's WIT world signature is read straight from its <code>@spec</code> — <code>@spec score(Lead.t()) :: integer()</code> becomes the exported function's type. So even the boundary is plain Elixir.</p>
+  <div class="note">Why a generated WIT artifact and not "Elixir types all the way"? Because WIT is the <b>neutral seam</b>: a Rust or JS unit sharing <code>Lead</code> gets its own binding from the same source. One definition, every language. SQL never appears here — an external db is a <code>resource</code> integration, not the format of your content.</div>
 </template>

@@ -5,8 +5,8 @@ A coding agent — the whole framework in one file (the Claude-Code shape).
 
 **Memory is WIT-typed data** — the agent's state is just records & lists:
 
-type Msg = record(role: string, content: string)
-type Mem = record(history: list(Msg), files: list(string), cwd: string)
+@type msg :: %{role: String.t(), content: String.t()}
+@type mem :: %{history: [msg], files: [String.t()], cwd: String.t()}
 
 The **brain** declares the model, prompt, tools, and the caps those tools need:
 

@@ -5,7 +5,7 @@ This is `reflexion.work` — a self-improving agent that *generates*, *critiques
 own draft, and *revises*. Its memory **is the trace of attempts**, each one a draft
 plus its self-critique plus a score:
 
-type Attempt = record(draft: string, critique: string, score: f32)
+@type attempt :: %{draft: String.t(), critique: String.t(), score: float()}
 
 The **brain** carries that trace as memory and reaches for no external tools — this
 is pure reasoning (see [[The brain]]):

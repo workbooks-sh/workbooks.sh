@@ -24,7 +24,7 @@ from your grant:
 
 Types **cross the boundary as WIT types** — no manual memory management:
 `record ↔ map`, `enum ↔ atom`, `result ↔ {:ok,_}|{:error,_}`, `list ↔ list`. Your
-`type Status = enum(:todo, :doing, :done)` *is* a WIT enum (see [[The data model]]).
+`@type status :: :todo | :doing | :done` *is* a WIT enum (see [[The data model]]).
 This is the whole game: two units in different languages meet at a typed world, not
 raw memory — and a `#kit` is just a WIT package exporting interfaces.
 </script>

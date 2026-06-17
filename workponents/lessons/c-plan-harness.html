@@ -34,7 +34,7 @@ end
 Finally the **tasks** ada works — ordered by `after:`, gated by `needs:` a passing
 unit (it's all [[Live state]]):
 
-type Status = enum(:todo, :doing, :done)
+@type status :: :todo | :doing | :done
 
 task "run the pipeline",   status: :doing, owner: :ada, ref: :pipeline, paths: ["leads/"]
 task "review the ranking", status: :todo,  owner: :ada, after: :pipeline, needs: :enrich
