@@ -48,7 +48,7 @@ for (const m of cem.modules || []) {
 const planned = [
   { tag: "work-src", purpose: "COMPUTE. Inline code in some lang, compiled by the Dock to a sandboxed WASM module. lang=rust|c|zig → native; lang=js|py → interpreted; lang=sql → data engine. name= exports a callable; display= runs & renders.", attrs: ["lang", "name", "display"] },
   { tag: "work-ref", purpose: "EVERY EDGE. Dependency, link, binding — AND type. rel= turns it into a reified type-assertion (rel=toolkit|skill|agent), so 'what something is' lives in the same graph as deps. Meaning comes from where it sits + rel.", attrs: ["to", "rel", "from", "as"] },
-  { tag: "work-flow", purpose: "ORCHESTRATION. The runnable DAG the runtime schedules and runs — tasks + dependencies. A board/list/skill is just an authored VIEW or ordering over a flow. w-on triggers it (HTMX hx-trigger: load/every Ns/visible/event from:#id).", attrs: ["name", "w-on"] },
+  { tag: "work-flow", purpose: "ORCHESTRATION. The runnable DAG the runtime schedules and runs — tasks + dependencies. A board/list/skill is just an authored VIEW or ordering over a flow. data-on triggers it (HTMX hx-trigger: load/every Ns/visible/event from:#id).", attrs: ["name", "data-on"] },
 ];
 // work-src + work-ref are REAL elements now (in the CEM); work-flow too. Mark the spine
 // "core" (built) and dedupe it from the toolkit groups below.

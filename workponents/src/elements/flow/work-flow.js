@@ -138,11 +138,11 @@ export class WorkFlow extends WbElement {
     if (spec) this._unbind = bindTriggers(this, spec, () => this.run());
   }
 
-  // w-on is the canonical trigger grammar (HTMX hx-trigger). every=/autorun are back-compat
-  // aliases folded into it: `every 30s` and `load`.
+  // data-on is the canonical trigger grammar (HTMX hx-trigger, as a valid-HTML data-* attr).
+  // every=/autorun are back-compat aliases folded into it: `every 30s` and `load`.
   _triggerSpec() {
     const parts = [];
-    if (this.attr("w-on")) parts.push(this.attr("w-on"));
+    if (this.attr("data-on")) parts.push(this.attr("data-on"));
     if (this.attr("every")) parts.push(`every ${this.attr("every")}`);
     if (this.hasAttribute("autorun")) parts.push("load");
     return parts.join(", ");

@@ -45,41 +45,44 @@
 
   <div class="rules">
     <b>Two rules.</b> (1) <b>Copy HTMX's clarity</b> — one attribute per axis, declarative, composable, read-on-the-element.
-    (2) <b>Uniform prefix <code>w-</code></b> mirrors HTMX's <code>hx-</code> — distinct from our <code>work-</code>/<code>book-</code>
-    <i>element</i> prefixes, and collision-free (bare <code>target=</code>/<code>swap=</code> would clash with native <code>&lt;a target&gt;</code>).
+    (2) <b>Spell it <code>data-*</code></b>, not an invented sigil. It's the standards-blessed custom-attribute form (HTMX
+    itself ships <code>data-hx-</code> for valid HTML), gives a native <code>dataset</code> API, and — the real win —
+    <code>[data-on]</code> is a <b>CSS selector</b>, which dogfoods our own "a view is a selector" principle. It's also
+    <i>descriptive, not abbreviated</i>: this is an agent-read language, so a reader should never have to learn a sigil
+    (<code>--</code> would read as a CSS variable; bare <code>target=</code> would clash with <code>&lt;a target&gt;</code>).
   </div>
 
   <p class="axis">The five axes — each a single attribute, exactly as HTMX shaped them:</p>
   <table>
     <tr><th>Axis</th><th>HTMX</th><th>work-*</th><th>Status</th><th>Meaning</th></tr>
-    <tr><td><b>trigger</b> — when</td><td><code>hx-trigger</code></td><td><code>w-on</code></td><td><span class="v ship">shipped</span></td><td>events · <code>every Ns</code> · <code>load</code> · <code>visible</code> · modifiers · <code>from:</code> (chain off another flow's events)</td></tr>
-    <tr><td><b>action</b> — what</td><td><code>hx-get</code> <code>hx-post</code></td><td><code>w-run</code></td><td><span class="v next">next</span></td><td>run a named work (a <code>work-src</code>/<code>work-flow</code>) through the Dock — not an HTTP verb to a URL</td></tr>
-    <tr><td><b>target</b> — where</td><td><code>hx-target</code></td><td><code>w-target</code></td><td><span class="v next">next</span></td><td>which element the result lands in (a CSS selector)</td></tr>
-    <tr><td><b>swap</b> — how</td><td><code>hx-swap</code></td><td><code>w-swap</code></td><td><span class="v next">next</span></td><td><code>inner</code>/<code>outer</code>/<code>beforeend</code>/<code>delete</code>/<code>none</code> + <code>transition</code> (View Transitions)</td></tr>
-    <tr><td><b>data</b> — with what</td><td><code>hx-vals</code> <code>hx-include</code></td><td><code>w-with</code></td><td><span class="v next">next</span></td><td>values folded into <code>ctx</code> before the run (e.g. <code>w-with="#form"</code>)</td></tr>
+    <tr><td><b>trigger</b> — when</td><td><code>hx-trigger</code></td><td><code>data-on</code></td><td><span class="v ship">shipped</span></td><td>events · <code>every Ns</code> · <code>load</code> · <code>visible</code> · modifiers · <code>from:</code> (chain off another flow's events)</td></tr>
+    <tr><td><b>action</b> — what</td><td><code>hx-get</code> <code>hx-post</code></td><td><code>data-run</code></td><td><span class="v next">next</span></td><td>run a named work (a <code>work-src</code>/<code>work-flow</code>) through the Dock — not an HTTP verb to a URL</td></tr>
+    <tr><td><b>target</b> — where</td><td><code>hx-target</code></td><td><code>data-target</code></td><td><span class="v next">next</span></td><td>which element the result lands in (a CSS selector)</td></tr>
+    <tr><td><b>swap</b> — how</td><td><code>hx-swap</code></td><td><code>data-swap</code></td><td><span class="v next">next</span></td><td><code>inner</code>/<code>outer</code>/<code>beforeend</code>/<code>delete</code>/<code>none</code> + <code>transition</code> (View Transitions)</td></tr>
+    <tr><td><b>data</b> — with what</td><td><code>hx-vals</code> <code>hx-include</code></td><td><code>data-with</code></td><td><span class="v next">next</span></td><td>values folded into <code>ctx</code> before the run (e.g. <code>data-with="#form"</code>)</td></tr>
   </table>
 
-  <h2>trigger · w-on <span class="pill">shipped</span></h2>
+  <h2>trigger · data-on <span class="pill">shipped</span></h2>
   <p class="axis">The full <code>hx-trigger</code> grammar, live on <code>work-flow</code> and <code>work-src</code>.
   <code>every=</code>/<code>autorun</code> are folded in as back-compat aliases. The <code>from:</code> event-listen is
   the unlock — declarative flow-to-flow choreography off our own <code>work-flow-done</code> events, no glue code.</p>
-  <pre>&lt;work-flow w-on="load"/&gt;                          &lt;!-- autorun on connect --&gt;
-&lt;work-flow w-on="every 30s"/&gt;                     &lt;!-- poll (cron-lite)   --&gt;
-&lt;work-src  w-on="visible once"/&gt;                  &lt;!-- lazy compute: run when scrolled into view --&gt;
-&lt;work-src  w-on="click from:#go"/&gt;                &lt;!-- a button fires it  --&gt;
-&lt;work-flow w-on="work-flow-done from:#ingest"/&gt;  &lt;!-- flow B chains off flow A --&gt;
-&lt;work-src  w-on="input changed delay:400ms from:#q"/&gt;  &lt;!-- debounced live search --&gt;</pre>
+  <pre>&lt;work-flow data-on="load"/&gt;                          &lt;!-- autorun on connect --&gt;
+&lt;work-flow data-on="every 30s"/&gt;                     &lt;!-- poll (cron-lite)   --&gt;
+&lt;work-src  data-on="visible once"/&gt;                  &lt;!-- lazy compute: run when scrolled into view --&gt;
+&lt;work-src  data-on="click from:#go"/&gt;                &lt;!-- a button fires it  --&gt;
+&lt;work-flow data-on="work-flow-done from:#ingest"/&gt;  &lt;!-- flow B chains off flow A --&gt;
+&lt;work-src  data-on="input changed delay:400ms from:#q"/&gt;  &lt;!-- debounced live search --&gt;</pre>
   <p class="axis">modifiers: <code>once</code> · <code>changed</code> · <code>delay:&lt;dur&gt;</code> (debounce) ·
   <code>throttle:&lt;dur&gt;</code> · <code>from:&lt;sel&gt;</code> · <code>target:&lt;sel&gt;</code>. durations: <code>250ms 2s 3m 1h</code>.</p>
 
   <h2>the rest of the surface — same idea, faithful copy</h2>
   <table>
     <tr><th>HTMX</th><th>work-*</th><th>Verdict</th><th>Note</th></tr>
-    <tr><td><code>hx-swap-oob</code></td><td><code>w-oob</code></td><td><span class="v next">next</span></td><td>one run updates several disjoint <code>book</code> regions (out-of-band)</td></tr>
-    <tr><td><code>hx-confirm</code></td><td><code>w-confirm</code></td><td><span class="v next">next</span></td><td>a guard before running — ties to native <code>:valid</code> (the action precondition)</td></tr>
-    <tr><td><code>hx-sync</code></td><td><code>w-sync</code></td><td><span class="v next">next</span></td><td>coordinate concurrent fires — <code>drop</code>/<code>queue</code>/<code>replace</code>/<code>abort</code></td></tr>
-    <tr><td><code>hx-indicator</code></td><td><code>w-busy</code></td><td><span class="v next">next</span></td><td>element shown while a run is in flight (we already track per-step status)</td></tr>
-    <tr><td><code>hx-disabled-elt</code></td><td><code>w-disable</code></td><td><span class="v next">next</span></td><td>disable an element during the run</td></tr>
+    <tr><td><code>hx-swap-oob</code></td><td><code>data-oob</code></td><td><span class="v next">next</span></td><td>one run updates several disjoint <code>book</code> regions (out-of-band)</td></tr>
+    <tr><td><code>hx-confirm</code></td><td><code>data-confirm</code></td><td><span class="v next">next</span></td><td>a guard before running — ties to native <code>:valid</code> (the action precondition)</td></tr>
+    <tr><td><code>hx-sync</code></td><td><code>data-sync</code></td><td><span class="v next">next</span></td><td>coordinate concurrent fires — <code>drop</code>/<code>queue</code>/<code>replace</code>/<code>abort</code></td></tr>
+    <tr><td><code>hx-indicator</code></td><td><code>data-busy</code></td><td><span class="v next">next</span></td><td>element shown while a run is in flight (we already track per-step status)</td></tr>
+    <tr><td><code>hx-disabled-elt</code></td><td><code>data-disable</code></td><td><span class="v next">next</span></td><td>disable an element during the run</td></tr>
     <tr><td><code>hx-ext</code></td><td>—</td><td><span class="v adapt">have it</span></td><td>extensions are our <b>work-kit</b> model (a prefix + its elements)</td></tr>
     <tr><td><code>hx-on:*</code></td><td>—</td><td><span class="v adapt">adapt</span></td><td>inline handlers route to a <code>work-src</code>, not raw JS</td></tr>
     <tr><td><code>hx-get="/url"</code> as HTTP</td><td>—</td><td><span class="v no">reject</span></td><td>we go through the <b>Dock</b> to a work element, not arbitrary URLs</td></tr>
@@ -92,11 +95,11 @@
   <p class="axis"><b>1. Action targets a work, not a URL.</b> HTMX's verb is an HTTP method to an endpoint;
   ours runs a work element through the Dock — same locality, no server assumption.
   <b>2. Reactive binding is the sugar.</b> HTMX always swaps explicitly (<code>hx-target</code>); we keep
-  <code>w-target</code>/<code>w-swap</code> for imperative placement but a <code>book</code> view also binds reactively
+  <code>data-target</code>/<code>data-swap</code> for imperative placement but a <code>book</code> view also binds reactively
   via <code>from=</code> (signals) — take HTMX's <i>clarity</i>, not its mandatory round-trip.
   <b>3. We compute.</b> The whole point HTMX won't touch.</p>
 
-  <p class="axis" style="margin-top:22px"><b>Live proof:</b> <code>demo/triggers.html</code> (w-on: load · chaining · visible) and
+  <p class="axis" style="margin-top:22px"><b>Live proof:</b> <code>demo/triggers.html</code> (data-on: load · chaining · visible) and
   <code>demo/flow.html</code> (the runnable flow). The trigger grammar is real today; the action/target/swap/data
   axes are the next increment, built the same faithful way.</p>
 </div>
