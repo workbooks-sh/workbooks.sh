@@ -1,4 +1,4 @@
-//! `wbx deploy` — the bootstrap verb.
+//! `work deploy` — the bootstrap verb.
 //!
 //! Special because it must run with NO runtime up: it's what *brings the runtime
 //! up*. It reads `deployment.org` and converges via `io.spawn`. Native-only.
@@ -15,7 +15,7 @@
 //! app dir (standalone installs).
 //!
 //! SECRETS are kit-abstracted: declared by NAME in deployment.org
-//! (`#+DEPLOY_SECRETS: KEY …`), values managed via `wbx deploy secrets`, stored
+//! (`#+DEPLOY_SECRETS: KEY …`), values managed via `work deploy secrets`, stored
 //! 0600 under the app dir, delivered per provider (env-file locally; staged
 //! through the recipe's `provider_set_secrets` hook in the cloud). Values never
 //! enter deployment.org or images.
@@ -88,7 +88,7 @@ pub fn run(io: &dyn Io, verb: DeployVerb, human: bool) -> Result<String> {
             let mut out = format!("ok — {} ({})", FILE, cfg.summary());
             if !missing.is_empty() {
                 out += &format!(
-                    "\nwarn — declared secrets unset: {} (wbx deploy secrets set …)",
+                    "\nwarn — declared secrets unset: {} (work deploy secrets set …)",
                     missing.join(", ")
                 );
             }
@@ -145,7 +145,7 @@ impl Config {
 }
 
 fn load(io: &dyn Io) -> Result<Config> {
-    let raw = io.read(FILE).with_context(|| format!("no {FILE} here — run `wbx deploy init` first"))?;
+    let raw = io.read(FILE).with_context(|| format!("no {FILE} here — run `work deploy init` first"))?;
     Ok(Config(org_keywords(&String::from_utf8(raw)?)))
 }
 
@@ -179,7 +179,7 @@ fn init(io: &dyn Io, preset: Option<&str>, human: bool) -> Result<String> {
         _ => TEMPLATE_LOCAL,
     };
     io.write(FILE, body.as_bytes())?;
-    Ok(format!("wrote {FILE} ({preset}) — edit it, then `wbx deploy apply`"))
+    Ok(format!("wrote {FILE} ({preset}) — edit it, then `work deploy apply`"))
 }
 
 // ── secrets (kit-abstracted) ─────────────────────────────────────────────────
@@ -246,7 +246,7 @@ fn secrets(io: &dyn Io, verb: SecretsVerb) -> Result<String> {
                 bail!("usage: wbxx deploy secrets set KEY=VALUE … | --from-env <file>");
             }
             secrets_save(io, &map)?;
-            Ok(format!("staged {n} secret(s) ({}) — applied on next `wbx deploy apply` (or `secrets push`)", secrets_path().display()))
+            Ok(format!("staged {n} secret(s) ({}) — applied on next `work deploy apply` (or `secrets push`)", secrets_path().display()))
         }
         SecretsVerb::List => {
             let map = secrets_load(io);
@@ -266,7 +266,7 @@ fn secrets(io: &dyn Io, verb: SecretsVerb) -> Result<String> {
         SecretsVerb::Push => {
             let cfg = validate(io)?;
             match cfg.target() {
-                "local" => Ok("local secrets apply at container start — run `wbx deploy apply`".into()),
+                "local" => Ok("local secrets apply at container start — run `work deploy apply`".into()),
                 place => recipe_action(io, &cfg, place, "secrets"),
             }
         }
@@ -365,7 +365,7 @@ fn apply(io: &dyn Io) -> Result<String> {
     let missing = missing_secrets(io, &cfg);
     if !missing.is_empty() {
         bail!(
-            "declared secrets unset: {} — `wbx deploy secrets set KEY=VALUE` (or export them) first",
+            "declared secrets unset: {} — `work deploy secrets set KEY=VALUE` (or export them) first",
             missing.join(", ")
         );
     }
@@ -486,7 +486,7 @@ fn apply_local(io: &dyn Io, cfg: &Config) -> Result<String> {
                 log.display()
             ))
         }
-        _ => bail!("no container engine (docker/podman/krunvm) — install one, or use `wbx deploy init cloud`"),
+        _ => bail!("no container engine (docker/podman/krunvm) — install one, or use `work deploy init cloud`"),
     }
 }
 
@@ -560,11 +560,11 @@ const TEMPLATE_LOCAL: &str = "\
 #+DEPLOY_TARGET: local
 #+DEPLOY_APP: workbooks
 #+DEPLOY_PORT: 4000
-# Secret NAMES this deployment needs (values: `wbx deploy secrets set KEY=VAL`):
+# Secret NAMES this deployment needs (values: `work deploy secrets set KEY=VAL`):
 #+DEPLOY_SECRETS: OPENROUTER_API_KEY
 # DEPLOY_IMAGE defaults to ghcr.io/workbooks-sh/runtime:latest (env WB_IMAGE overrides).
 # Local = the runtime image in a docker/podman container (or krunvm microVM).
-# `wbx deploy apply` converges it; `wb rt status` talks to it.
+# `work deploy apply` converges it; `wb rt status` talks to it.
 ";
 
 const TEMPLATE_FLY: &str = "\
@@ -573,13 +573,13 @@ const TEMPLATE_FLY: &str = "\
 #+DEPLOY_APP: my-workbooks-engine
 #+DEPLOY_REGION: sjc
 #+DEPLOY_PORT: 4000
-# Secret NAMES this deployment needs (values: `wbx deploy secrets set KEY=VAL`):
+# Secret NAMES this deployment needs (values: `work deploy secrets set KEY=VAL`):
 #+DEPLOY_SECRETS: OPENROUTER_API_KEY
 # DEPLOY_TARGET names a provider RECIPE (providers/<place>/bootstrap.sh) — fly is
 # the bundled one; add your own place the same way. DEPLOY_IMAGE defaults to
 # ghcr.io/workbooks-sh/runtime:latest (env WB_IMAGE overrides).
 #
-# SECURITY: on first `wbx deploy apply` the kit generates a strong random bearer
+# SECURITY: on first `work deploy apply` the kit generates a strong random bearer
 # token, persists it as WB_PUBLIC_BEARER in secrets.env, and delivers it to the
 # engine. The control plane rejects any request without that token. To call your
 # engine from the CLI or scripts, set: export WB_ENGINE_TOKEN=<token>

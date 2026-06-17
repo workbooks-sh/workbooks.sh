@@ -1,6 +1,6 @@
-//! `wbx toolkit import` — stage 1 of the intake ramp (cli/SPEC.md § Import):
+//! `work kit import` — stage 1 of the intake ramp (cli/SPEC.md § Import):
 //! detect a source's shape, translate its docs to org, and scaffold a real
-//! toolkit (manifest.org + skills/ + carried scripts) that `wbx toolkit push`
+//! toolkit (manifest.org + skills/ + carried scripts) that `work kit push`
 //! will accept. Parse-only and local-only here; the dependency audit and
 //! fix-up plans are stage 2/3. Guidance-only toolkits are a valid landing.
 
@@ -120,7 +120,7 @@ fn detect(src: &Path, forced: Option<&str>) -> Result<Kind> {
     if !s.contains('/') || s.starts_with("http") || s.matches('/').count() == 1 {
         bail!(
             "{s} is not a local path. Remote refs (skills.sh, owner/repo) aren't \
-             wired yet — clone it locally and import the folder:\n  git clone … && wbx toolkit import <dir>"
+             wired yet — clone it locally and import the folder:\n  git clone … && work kit import <dir>"
         );
     }
     bail!("not found: {s}")
@@ -296,7 +296,7 @@ fn write_scaffold(out_dir: &Path, kind: Kind, src: &Path, t: &Imported) -> Resul
     std::fs::write(out_dir.join("manifest.org"), &manifest)?;
 
     Ok(format!(
-        "imported {} → {}/\n  manifest.org      the toolkit surface\n  skills/           {} skill{}\n{}\nnext: review manifest.org, then `wbx toolkit verify {}`",
+        "imported {} → {}/\n  manifest.org      the toolkit surface\n  skills/           {} skill{}\n{}\nnext: review manifest.org, then `work kit verify {}`",
         kind.name(),
         out_dir.display(),
         t.skills.len(),
@@ -477,7 +477,7 @@ fn import_openapi(src: &Path) -> Result<Imported> {
     let raw = std::fs::read_to_string(src).with_context(|| format!("read {}", src.display()))?;
     let v: serde_json::Value = serde_json::from_str(&raw).map_err(|_| {
         anyhow::anyhow!(
-            "only JSON OpenAPI specs parse today — convert YAML first:\n  yq -o=json spec.yaml > spec.json && wbx toolkit import spec.json"
+            "only JSON OpenAPI specs parse today — convert YAML first:\n  yq -o=json spec.yaml > spec.json && work kit import spec.json"
         )
     })?;
     let info = &v["info"];
@@ -665,7 +665,7 @@ pub fn import(source: &str, as_kind: Option<&str>, out: Option<&str>, human: boo
         .unwrap_or_else(|| PathBuf::from(format!("{}-toolkit", t.id)));
     let msg = write_scaffold(&out_dir, kind, src, &t)?;
     // stage 2 runs automatically — the tool does the work, the artifact
-    // carries its own audit; agents re-run with `wbx toolkit audit`
+    // carries its own audit; agents re-run with `work kit audit`
     let audit_line = match crate::audit::audit_static(&out_dir.to_string_lossy(), human) {
         Ok(report) if human => format!("\n\n{report}"),
         Ok(_) => String::new(),

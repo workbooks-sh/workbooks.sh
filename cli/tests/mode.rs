@@ -1,17 +1,17 @@
 //! Mode-model contract tests: envelope shape + exit-code map (cli/SPEC.md).
 use std::process::Command;
 
-fn wbx() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_wbx"))
+fn work() -> Command {
+    Command::new(env!("CARGO_BIN_EXE_work"))
 }
 
 #[test]
 fn json_envelope_on_success() {
-    let dir = std::env::temp_dir().join("wbx-mode-test");
+    let dir = std::env::temp_dir().join("work-mode-test");
     std::fs::create_dir_all(&dir).unwrap();
     let f = dir.join("ok.html");
     std::fs::write(&f, "<work-task title=\"hello\"></work-task>\n").unwrap();
-    let out = wbx().args(["--json", "query", f.to_str().unwrap()]).output().unwrap();
+    let out = work().args(["--json", "query", f.to_str().unwrap()]).output().unwrap();
     assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("stdout is one JSON envelope");
     assert_eq!(v["ok"], true);
@@ -21,7 +21,7 @@ fn json_envelope_on_success() {
 
 #[test]
 fn json_envelope_and_code_on_not_found() {
-    let out = wbx().args(["--json", "query", "/definitely/not/here.org"]).output().unwrap();
+    let out = work().args(["--json", "query", "/definitely/not/here.org"]).output().unwrap();
     assert_eq!(out.status.code(), Some(4), "not-found maps to exit 4");
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(v["ok"], false);
@@ -31,12 +31,12 @@ fn json_envelope_and_code_on_not_found() {
 
 #[test]
 fn piped_default_is_plain_text_no_envelope() {
-    let dir = std::env::temp_dir().join("wbx-mode-test");
+    let dir = std::env::temp_dir().join("work-mode-test");
     std::fs::create_dir_all(&dir).unwrap();
     let f = dir.join("plain.html");
     std::fs::write(&f, "<work-task title=\"hello\"></work-task>\n").unwrap();
     // .output() pipes stdout → auto agent mode: plain text, not an envelope
-    let out = wbx().args(["query", f.to_str().unwrap()]).output().unwrap();
+    let out = work().args(["query", f.to_str().unwrap()]).output().unwrap();
     assert!(out.status.success());
     let s = String::from_utf8_lossy(&out.stdout);
     assert!(!s.trim_start().starts_with("{\"ok\""), "agent default must not wrap in envelope");
@@ -44,38 +44,38 @@ fn piped_default_is_plain_text_no_envelope() {
 
 #[test]
 fn usage_error_is_exit_2() {
-    let out = wbx().arg("no-such-verb").output().unwrap();
+    let out = work().arg("no-such-verb").output().unwrap();
     assert_eq!(out.status.code(), Some(2), "clap usage errors exit 2");
 }
 
 #[test]
 fn init_scaffold_lints_and_bundles() {
-    let dir = std::env::temp_dir().join(format!("wbx-init-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("work-init-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let name = dir.join("demo");
-    let out = wbx().args(["init", name.to_str().unwrap()]).output().unwrap();
+    let out = work().args(["init", name.to_str().unwrap()]).output().unwrap();
     assert!(out.status.success(), "init: {}", String::from_utf8_lossy(&out.stderr));
     let org = name.join("index.html");
     assert!(org.is_file() && name.join("data").is_dir());
     // the scaffold must satisfy the rest of the toolchain
-    let lint = wbx().args(["lint", org.to_str().unwrap()]).output().unwrap();
+    let lint = work().args(["lint", org.to_str().unwrap()]).output().unwrap();
     assert!(lint.status.success(), "lint: {}", String::from_utf8_lossy(&lint.stderr));
-    let bundle = wbx().args(["bundle", name.to_str().unwrap()]).output().unwrap();
+    let bundle = work().args(["bundle", name.to_str().unwrap()]).output().unwrap();
     assert!(bundle.status.success(), "bundle: {}", String::from_utf8_lossy(&bundle.stderr));
     // re-init over an existing dir refuses
-    let again = wbx().args(["init", name.to_str().unwrap()]).output().unwrap();
+    let again = work().args(["init", name.to_str().unwrap()]).output().unwrap();
     assert!(!again.status.success());
 }
 
 #[test]
 fn dev_serves_and_reloads() {
-    let dir = std::env::temp_dir().join(format!("wbx-dev-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("work-dev-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let name = dir.join("site");
-    assert!(wbx().args(["init", name.to_str().unwrap()]).output().unwrap().status.success());
-    let mut child = wbx()
+    assert!(work().args(["init", name.to_str().unwrap()]).output().unwrap().status.success());
+    let mut child = work()
         .args(["dev", name.to_str().unwrap(), "--port", "4399"])
         .stderr(std::process::Stdio::piped())
         .spawn()
@@ -102,12 +102,12 @@ fn dev_serves_and_reloads() {
 #[test]
 fn doctor_reports_and_exits_zero_even_without_engine() {
     // agent default (piped): structured JSON body, exit 0 regardless of engine
-    let out = wbx().arg("doctor").env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
+    let out = work().arg("doctor").env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
     assert!(out.status.success(), "doctor must not fail the shell");
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("doctor agent output is JSON");
     assert!(v["engine"]["state"].is_string());
     // --json wraps the same data in the envelope
-    let out = wbx().args(["--json", "doctor"]).env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
+    let out = work().args(["--json", "doctor"]).env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(v["ok"], true);
     assert!(v["data"]["engine"]["state"].is_string(), "envelope embeds structured doctor data");
@@ -116,18 +116,18 @@ fn doctor_reports_and_exits_zero_even_without_engine() {
 #[test]
 fn completions_emit_for_zsh_and_bash() {
     for shell in ["zsh", "bash"] {
-        let out = wbx().args(["completions", shell]).output().unwrap();
+        let out = work().args(["completions", shell]).output().unwrap();
         assert!(out.status.success());
         let s = String::from_utf8_lossy(&out.stdout);
-        assert!(s.contains("wbx"), "{shell} script mentions wbx");
+        assert!(s.contains("work"), "{shell} script mentions work");
         assert!(s.len() > 500, "{shell} script non-trivial");
     }
 }
 
 #[test]
 fn bare_wbx_is_a_landing_not_a_usage_error() {
-    let out = wbx().env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
-    assert!(out.status.success(), "bare wbx must not be an error");
+    let out = work().env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
+    assert!(out.status.success(), "bare work must not be an error");
     // piped → agent mode → doctor JSON body
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("agent landing is structured");
     assert!(v["version"].is_string());
@@ -135,12 +135,12 @@ fn bare_wbx_is_a_landing_not_a_usage_error() {
 
 #[test]
 fn agent_mode_deploy_init_never_prompts() {
-    let dir = std::env::temp_dir().join(format!("wbx-pick-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("work-pick-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     // piped stdin closed + no preset: agent default must be instant 'local',
     // never a hang on a picker
-    let out = wbx()
+    let out = work()
         .current_dir(&dir)
         .args(["deploy", "init"])
         .stdin(std::process::Stdio::null())
@@ -154,12 +154,12 @@ fn agent_mode_deploy_init_never_prompts() {
 
 #[test]
 fn status_is_the_landing_and_open_maps_not_found() {
-    let out = wbx().arg("status").env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
+    let out = work().arg("status").env("WB_DESKTOP_DIR", "/nonexistent-disco").output().unwrap();
     assert!(out.status.success());
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert!(v["version"].is_string());
     // open on a missing file → exit 4 (not-found contract)
-    let out = wbx().args(["open", "/definitely/not/here.html"]).output().unwrap();
+    let out = work().args(["open", "/definitely/not/here.html"]).output().unwrap();
     assert_eq!(out.status.code(), Some(4));
 }
 
@@ -167,7 +167,7 @@ fn status_is_the_landing_and_open_maps_not_found() {
 fn wbx_env_aliases_win_over_wb() {
     // WBX_ENGINE_URL preferred: point it at a dead port and watch the
     // engine-unreachable class (3), proving the alias was read
-    let out = wbx()
+    let out = work()
         .args(["--json", "rt", "status"])
         .env("WBX_ENGINE_URL", "http://127.0.0.1:1")
         .env("WB_ENGINE_URL", "http://127.0.0.1:2")
@@ -184,24 +184,24 @@ fn wbx_env_aliases_win_over_wb() {
 
 #[test]
 fn help_json_emits_the_verb_tree() {
-    let out = wbx().args(["help", "--json"]).output().unwrap();
+    let out = work().args(["help", "--json"]).output().unwrap();
     assert!(out.status.success());
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(v["ok"], true);
     let subs = v["data"]["subcommands"].as_array().unwrap();
     let names: Vec<&str> = subs.iter().filter_map(|s| s["name"].as_str()).collect();
-    for must in ["init", "dev", "toolkit", "deploy", "doctor"] {
+    for must in ["init", "dev", "kit", "deploy", "doctor"] {
         assert!(names.contains(&must), "tree missing {must}");
     }
     // group verbs expose their sub-verbs
-    let toolkit = subs.iter().find(|s| s["name"] == "toolkit").unwrap();
+    let toolkit = subs.iter().find(|s| s["name"] == "kit").unwrap();
     assert!(!toolkit["subcommands"].as_array().unwrap().is_empty());
 }
 
 #[test]
 fn author_verbs_accept_stdin_dash() {
     use std::io::Write;
-    let mut child = wbx()
+    let mut child = work()
         .args(["lint", "-"])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -215,7 +215,7 @@ fn author_verbs_accept_stdin_dash() {
 
 #[test]
 fn toolkit_import_claude_skill_scaffolds_a_real_toolkit() {
-    let dir = std::env::temp_dir().join(format!("wbx-import-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("work-import-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let skill = dir.join("my-skill");
     std::fs::create_dir_all(skill.join("references")).unwrap();
@@ -228,8 +228,8 @@ fn toolkit_import_claude_skill_scaffolds_a_real_toolkit() {
     std::fs::write(skill.join("scripts/run.sh"), "#!/bin/sh\necho hi\n").unwrap();
 
     let out_dir = dir.join("out");
-    let out = wbx()
-        .args(["toolkit", "import", skill.to_str().unwrap(), "--out", out_dir.to_str().unwrap()])
+    let out = work()
+        .args(["kit", "import", skill.to_str().unwrap(), "--out", out_dir.to_str().unwrap()])
         .output().unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
 
@@ -249,33 +249,33 @@ fn toolkit_import_claude_skill_scaffolds_a_real_toolkit() {
     assert!(skill_org.contains("[[https://x.dev][this]]"), "link converted");
     assert!(out_dir.join("skills/reference-extra.org").is_file());
 
-    let again = wbx()
-        .args(["toolkit", "import", skill.to_str().unwrap(), "--out", out_dir.to_str().unwrap()])
+    let again = work()
+        .args(["kit", "import", skill.to_str().unwrap(), "--out", out_dir.to_str().unwrap()])
         .output().unwrap();
     assert!(!again.status.success());
 }
 
 #[test]
 fn toolkit_import_markdown_and_unknown_kind() {
-    let dir = std::env::temp_dir().join(format!("wbx-import-md-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("work-import-md-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let md = dir.join("notes.md");
     std::fs::write(&md, "# Notes\n\nA doc worth keeping.\n").unwrap();
     let out_dir = dir.join("nt");
-    let out = wbx()
-        .args(["toolkit", "import", md.to_str().unwrap(), "--out", out_dir.to_str().unwrap()])
+    let out = work()
+        .args(["kit", "import", md.to_str().unwrap(), "--out", out_dir.to_str().unwrap()])
         .output().unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     assert!(out_dir.join("skills/notes.org").is_file());
-    let bad = wbx().args(["toolkit", "import", md.to_str().unwrap(), "--as", "vsix"]).output().unwrap();
+    let bad = work().args(["kit", "import", md.to_str().unwrap(), "--as", "vsix"]).output().unwrap();
     assert!(!bad.status.success());
     assert_ne!(bad.status.code(), Some(101), "no panic");
 }
 
 #[test]
 fn toolkit_audit_classifies_against_the_lanes() {
-    let dir = std::env::temp_dir().join(format!("wbx-audit-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("work-audit-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("scripts")).unwrap();
     std::fs::write(
@@ -289,14 +289,14 @@ fn toolkit_audit_classifies_against_the_lanes() {
     // python → blocked (no lane)
     std::fs::write(dir.join("scripts/calc.py"), "#!/usr/bin/env python3\nimport numpy\n").unwrap();
 
-    let out = wbx()
-        .args(["--json", "toolkit", "audit", dir.to_str().unwrap()])
+    let out = work()
+        .args(["--json", "kit", "audit", dir.to_str().unwrap()])
         .output().unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     let v: serde_json::Value =
         serde_json::from_slice(&out.stdout).expect("envelope parses");
     assert_eq!(v["ok"], true);
-    assert_eq!(v["verb"], "toolkit audit");
+    assert_eq!(v["verb"], "kit audit");
     let scripts = v["data"]["scripts"].as_array().unwrap();
     assert_eq!(scripts.len(), 3);
     let class_of = |f: &str| {
@@ -320,18 +320,18 @@ fn toolkit_audit_classifies_against_the_lanes() {
     assert!(m.contains("*** TODO calc.py (blocked — python3)"));
     assert!(m.contains("rewrite in JS for the quickjs lane"), "python recipe names the lane");
     assert!(m.contains("route HTTP through the Dock"), "curl recipe is concrete");
-    assert!(m.contains("=wbx toolkit build= bundles it via the npm lane"), "npm recipe");
-    assert!(m.contains("wbx toolkit verify demo"), "done-test names the real id");
+    assert!(m.contains("=work kit build= bundles it via the npm lane"), "npm recipe");
+    assert!(m.contains("work kit verify demo"), "done-test names the real id");
 
     // --fix with no engine reachable → the standard engine exit code, no panic
-    let fix = wbx()
-        .args(["toolkit", "audit", dir.to_str().unwrap(), "--fix"])
+    let fix = work()
+        .args(["kit", "audit", dir.to_str().unwrap(), "--fix"])
         .env("WBX_ENGINE_URL", "http://127.0.0.1:1")
         .output().unwrap();
     assert_eq!(fix.status.code(), Some(3), "fix needs an engine: {}", String::from_utf8_lossy(&fix.stderr));
 
     // human mode: summary line, exit 0
-    let h = wbx().args(["toolkit", "audit", dir.to_str().unwrap()]).output().unwrap();
+    let h = work().args(["kit", "audit", dir.to_str().unwrap()]).output().unwrap();
     assert!(h.status.success());
     let txt = String::from_utf8_lossy(&h.stdout);
     assert!(txt.contains("ready") && txt.contains("blocked"), "summary present: {txt}");
@@ -339,7 +339,7 @@ fn toolkit_audit_classifies_against_the_lanes() {
 
 #[test]
 fn toolkit_import_taxonomy_mcp_openapi_npm_pip_guidance() {
-    let dir = std::env::temp_dir().join(format!("wbx-tax-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("work-tax-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
 
@@ -347,7 +347,7 @@ fn toolkit_import_taxonomy_mcp_openapi_npm_pip_guidance() {
     let mcp = dir.join(".mcp.json");
     std::fs::write(&mcp, r#"{"mcpServers": {"gh": {"command": "npx", "args": ["-y", "@x/server"], "env": {"TOKEN": "hunter2"}}}}"#).unwrap();
     let out_dir = dir.join("mcp-tk");
-    let out = wbx().args(["toolkit", "import", mcp.to_str().unwrap(), "--out", out_dir.to_str().unwrap()]).output().unwrap();
+    let out = work().args(["kit", "import", mcp.to_str().unwrap(), "--out", out_dir.to_str().unwrap()]).output().unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     let launch = std::fs::read_to_string(out_dir.join("scripts/gh.sh")).unwrap();
     assert!(launch.contains("exec npx -y @x/server"), "server launch is the bin");
@@ -362,13 +362,13 @@ fn toolkit_import_taxonomy_mcp_openapi_npm_pip_guidance() {
     let api = dir.join("api.json");
     std::fs::write(&api, r#"{"openapi":"3.0.0","info":{"title":"Pet Store"},"paths":{"/pets":{"get":{"operationId":"listPets","summary":"List"},"post":{"operationId":"createPet"}}}}"#).unwrap();
     let api_tk = dir.join("api-tk");
-    assert!(wbx().args(["toolkit", "import", api.to_str().unwrap(), "--out", api_tk.to_str().unwrap()]).output().unwrap().status.success());
+    assert!(work().args(["kit", "import", api.to_str().unwrap(), "--out", api_tk.to_str().unwrap()]).output().unwrap().status.success());
     assert!(api_tk.join("skills/listpets.org").is_file() && api_tk.join("skills/createpet.org").is_file());
     assert!(std::fs::read_to_string(api_tk.join("skills/listpets.org")).unwrap().contains("Dock-brokered"));
     // yaml spec → honest convert-it hint, mapped error (no panic)
     let yml = dir.join("api.yaml");
     std::fs::write(&yml, "openapi: 3.0.0\npaths:\n").unwrap();
-    let bad = wbx().args(["toolkit", "import", yml.to_str().unwrap()]).output().unwrap();
+    let bad = work().args(["kit", "import", yml.to_str().unwrap()]).output().unwrap();
     assert!(!bad.status.success());
     assert_ne!(bad.status.code(), Some(101));
     assert!(String::from_utf8_lossy(&bad.stderr).contains("yq"), "yaml hint teaches the fix");
@@ -380,7 +380,7 @@ fn toolkit_import_taxonomy_mcp_openapi_npm_pip_guidance() {
     std::fs::write(npm.join("cli.js"), "#!/usr/bin/env node\nconst c = require('commander');\n").unwrap();
     std::fs::write(npm.join("README.md"), "# huniq\n").unwrap();
     let npm_tk = dir.join("npm-tk");
-    assert!(wbx().args(["toolkit", "import", npm.to_str().unwrap(), "--out", npm_tk.to_str().unwrap()]).output().unwrap().status.success());
+    assert!(work().args(["kit", "import", npm.to_str().unwrap(), "--out", npm_tk.to_str().unwrap()]).output().unwrap().status.success());
     let m = std::fs::read_to_string(npm_tk.join("manifest.org")).unwrap();
     assert!(m.contains("#+TOOLKIT: huniq"), "scope stripped: {m}");
     assert!(npm_tk.join("scripts/cli.js").is_file(), "bin carried for the audit");
@@ -391,7 +391,7 @@ fn toolkit_import_taxonomy_mcp_openapi_npm_pip_guidance() {
     std::fs::create_dir_all(&py).unwrap();
     std::fs::write(py.join("pyproject.toml"), "[project]\nname = \"pycli\"\ndescription = \"py tool\"\n\n[project.scripts]\npycli = \"pycli.main:run\"\n").unwrap();
     let py_tk = dir.join("py-tk");
-    assert!(wbx().args(["toolkit", "import", py.to_str().unwrap(), "--out", py_tk.to_str().unwrap()]).output().unwrap().status.success());
+    assert!(work().args(["kit", "import", py.to_str().unwrap(), "--out", py_tk.to_str().unwrap()]).output().unwrap().status.success());
     let m = std::fs::read_to_string(py_tk.join("manifest.org")).unwrap();
     assert!(m.contains("** TODO fix-up plan [0/1]"), "python entry is real work: {m}");
     assert!(m.contains("quickjs lane"), "plan carries the rewrite recipe");
@@ -400,7 +400,7 @@ fn toolkit_import_taxonomy_mcp_openapi_npm_pip_guidance() {
     let ag = dir.join("AGENTS.md");
     std::fs::write(&ag, "# Rules\n\nBe terse.\n").unwrap();
     let ag_tk = dir.join("ag-tk");
-    assert!(wbx().args(["toolkit", "import", ag.to_str().unwrap(), "--out", ag_tk.to_str().unwrap()]).output().unwrap().status.success());
+    assert!(work().args(["kit", "import", ag.to_str().unwrap(), "--out", ag_tk.to_str().unwrap()]).output().unwrap().status.success());
     let m = std::fs::read_to_string(ag_tk.join("manifest.org")).unwrap();
     assert!(m.contains("nothing to fix"), "guidance-only is a clean landing");
 }

@@ -221,7 +221,7 @@ fn recipe(f: &Finding) -> Vec<String> {
         ],
         ("interpreter", "sh" | "bash" | "zsh" | "node" | "js") => vec![],
         ("interpreter", _) => vec![
-            format!("identify the language; if it's in a compile lane (c/zig/rust/go) declare a build recipe in the manifest, then =wbx toolkit build= produces the wasm"),
+            format!("identify the language; if it's in a compile lane (c/zig/rust/go) declare a build recipe in the manifest, then =work kit build= produces the wasm"),
         ],
         ("binary", "curl" | "wget") => vec![
             format!("route HTTP through the Dock instead of a raw binary — in JS use =fetch= (engine-shimmed); in shell, call the engine's http capability from a task"),
@@ -230,13 +230,13 @@ fn recipe(f: &Finding) -> Vec<String> {
             format!("call engine-side git (a brokered capability) from the task instead of the local binary"),
         ],
         ("binary", "npm" | "npx" | "bun" | "node") => vec![
-            format!("drop install-at-runtime — declare the deps and let =wbx toolkit build= resolve + bundle them via the npm lane at build time"),
+            format!("drop install-at-runtime — declare the deps and let =work kit build= resolve + bundle them via the npm lane at build time"),
         ],
         ("binary", _) => vec![
             format!("no sandbox equivalent — move this behavior onto an engine capability, or redesign the step out"),
         ],
         ("npm", _) => vec![
-            format!("declare ={}= as a dependency in the manifest; =wbx toolkit build= bundles it via the npm lane", f.name),
+            format!("declare ={}= as a dependency in the manifest; =work kit build= bundles it via the npm lane", f.name),
         ],
         ("pip", _) => vec![
             format!("={}= goes away with the python rewrite (see the interpreter item)", f.name),
@@ -251,15 +251,15 @@ fn fixup_plan(id: &str, audits: &[ScriptAudit]) -> String {
     let work: Vec<&ScriptAudit> = audits.iter().filter(|a| a.class != Class::Ready).collect();
     if work.is_empty() {
         return format!(
-            "** fix-up plan\n   nothing to fix — every script is sandbox-ready.\n                prove it: =wbx toolkit push {id} <dir>= then =wbx toolkit verify {id}=\n"
+            "** fix-up plan\n   nothing to fix — every script is sandbox-ready.\n                prove it: =work kit push {id} <dir>= then =work kit verify {id}=\n"
         );
     }
     let mut out = format!("** TODO fix-up plan [0/{}]\n", work.len());
     out.push_str(&format!(
         "   The agent manual: work each item, check it off, then prove the whole\n   \
-         toolkit — done when =wbx toolkit push {id} <dir>= · =wbx toolkit build {id}=\n   \
-         · =wbx toolkit verify {id}= all pass. With an engine reachable,\n   \
-         =wbx toolkit audit <dir> --fix= runs that push→build→verify for you.\n"
+         toolkit — done when =work kit push {id} <dir>= · =work kit build {id}=\n   \
+         · =work kit verify {id}= all pass. With an engine reachable,\n   \
+         =work kit audit <dir> --fix= runs that push→build→verify for you.\n"
     ));
     for a in &work {
         out.push_str(&format!("*** TODO {} ({} — {})\n", a.file, a.class.s(), a.interpreter));
@@ -268,12 +268,12 @@ fn fixup_plan(id: &str, audits: &[ScriptAudit]) -> String {
                 out.push_str(&format!("    - [ ] {step}\n"));
             }
         }
-        out.push_str(&format!("    - [ ] re-run =wbx toolkit audit= — {} must classify ready\n", a.file));
+        out.push_str(&format!("    - [ ] re-run =work kit audit= — {} must classify ready\n", a.file));
     }
     out
 }
 
-/// `wbx toolkit audit <dir> [--fix]` — static report per mode (exit 0: a
+/// `work kit audit <dir> [--fix]` — static report per mode (exit 0: a
 /// diagnosis isn't a failure); `--fix` is the auto-convert: push the toolkit
 /// to the engine, run its builds, verify — the engine errors map to the
 /// standard exit codes if it's unreachable.

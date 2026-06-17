@@ -57,7 +57,7 @@ The current escript is 469 lines of near-pure delegation. Same split here:
 |---|---|---|
 | **Kernel (local)** | `query` `tangle` `lint` `bundle` | embed the Rust OQL kernel crate directly (native) / call it in-module (wasm) |
 | **Engine (delegate)** | `build` `publish` `library` `pack` `search` `compiler` `mirror` `sign`/`verify` | thin RCP client → the runtime owns the logic. **Never reimplement the engine in Rust.** |
-| **Client / local** | `rt` `var` `toolkit list` `desktop` | trivial (HTTP / config) |
+| **Client / local** | `rt` `var` `kit list` `desktop` | trivial (HTTP / config) |
 | **Bootstrap** | `deploy` | the one verb that must run with **no** runtime up (it brings the runtime up). Orchestrates `docker`/`krunvm`/`fly` + parses `deployment.org`. Lives in `cli/src/deploy/` — see below. |
 
 The rule that keeps this from being over-engineering: **the runtime stays the engine; the
@@ -171,7 +171,7 @@ P3 — reach:
 - windows release matrix (install.js already expects the asset name)
 - stdin pipelines across author/trust verbs
 
-## Import: anything → toolkit (`work toolkit import`)
+## Import: anything → kit (`work kit import`)
 
 The ecosystem's intake ramp (relates epic wb-rhs): take any existing
 agent-capability construct and package it as a toolkit — automatically where
@@ -206,6 +206,6 @@ work, and leave a manual — never a shrug.
    needs redesign). Emit the report in the manifest; `--json` for agents.
 3. **Fix-up plan (the agent manual)** — everything not `ready` becomes org
    TODOs inside the scaffold, each with concrete instructions (which lane,
-   which recipe, what to rewrite). `work toolkit verify <id>` is the done
+   which recipe, what to rewrite). `work kit verify <id>` is the done
    test; auto-CONVERT (engine-backed builds via the compiler lanes) applies
    where the engine is reachable.

@@ -84,9 +84,9 @@ work agent    run|status|logs <id>                                R   long-horiz
 work workbook list|show <id>|deploy <id> <org>                    R   manage deployed workbooks  [NEW]
 ```
 
-### toolkit (agent skills)
+### kit (agent skills)
 ```
-work toolkit list|show|search|verify|build|run   L/R   discover + build + run agent skills
+work kit list|show|search|verify|build|run   L/R   discover + build + run agent skills
 ```
 
 ### identity & provenance
@@ -149,7 +149,7 @@ The runtime exposes routes with no CLI today. New first-class verbs (thin RCP cl
    when no engine is reachable.
 3. **Flat by default; nest only multi-operation families.** Single-action verbs are flat
    (`checkout`, `search`, `bundle`, `sign`, …). A noun with several detailed ops nests:
-   `deploy`, `publish`, `toolkit`, `var`, `rt`, `agent`, `workflow`, `workbook`, `compiler`,
+   `deploy`, `publish`, `kit`, `var`, `rt`, `agent`, `workflow`, `workbook`, `compiler`,
    `desktop`. No artificial `work dev`/`work runtime` parent grouping.
 4. **By the §8.3 rule:** `var` + `compiler` nest (sub-ops); `telemetry` + `isolation` stay flat.
 

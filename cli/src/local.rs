@@ -352,12 +352,12 @@ const PUBLISH_TEMPLATE: &str = "\
 # PUBLISH_TARGET:  cloudflare-pages | gh-pages | self-hosted
 # PUBLISH_PROJECT: CF Pages project name, GitHub repo (org/name), or runtime URL
 # PUBLISH_DOMAIN:  optional custom domain (for the printed URL)
-# `wbx publish apply <workbook.html|.wbundle>` ships the ASSEMBLED workbook —
+# `work publish apply <workbook.html|.wbundle>` ships the ASSEMBLED workbook —
 # run `wb bundle` first. Publish is distribution only.
 ";
 
 fn publish_cfg(io: &dyn Io) -> Result<std::collections::BTreeMap<String, String>> {
-    let raw = io.read(PUBLISH_FILE).with_context(|| format!("no {PUBLISH_FILE} — run `wbx publish init`"))?;
+    let raw = io.read(PUBLISH_FILE).with_context(|| format!("no {PUBLISH_FILE} — run `work publish init`"))?;
     Ok(util::org_keywords(&String::from_utf8(raw)?))
 }
 
@@ -397,7 +397,7 @@ pub fn publish(io: &dyn Io, verb: &str, workbook: Option<&str>) -> Result<String
                 bail!("{PUBLISH_FILE} already exists");
             }
             io.write(PUBLISH_FILE, PUBLISH_TEMPLATE.as_bytes())?;
-            Ok(format!("wrote {PUBLISH_FILE} — edit it, then `wbx publish apply <workbook>`"))
+            Ok(format!("wrote {PUBLISH_FILE} — edit it, then `work publish apply <workbook>`"))
         }
         "validate" => {
             let (target, project) = publish_validate(io)?;
@@ -428,7 +428,7 @@ pub fn publish(io: &dyn Io, verb: &str, workbook: Option<&str>) -> Result<String
                     };
                     io.spawn("git", &["-C", &s, "init", "-q", "-b", "gh-pages"])?;
                     io.spawn("git", &["-C", &s, "add", "-A"])?;
-                    io.spawn("git", &["-C", &s, "-c", "user.name=wb", "-c", "user.email=wb@workbooks.sh", "commit", "-q", "-m", "wbx publish"])?;
+                    io.spawn("git", &["-C", &s, "-c", "user.name=wb", "-c", "user.email=wb@workbooks.sh", "commit", "-q", "-m", "work publish"])?;
                     io.spawn("git", &["-C", &s, "push", "-f", &remote, "gh-pages"])?;
                     cfg.get("PUBLISH_DOMAIN").map(|d| format!("https://{d}")).unwrap_or_else(|| {
                         let (org, repo) = project.split_once('/').unwrap_or(("", &project));
@@ -468,15 +468,15 @@ pub fn var(io: &dyn Io, args: &[String]) -> Result<String> {
     let mut vars = vars_load(io);
     match args.first().map(String::as_str) {
         Some("set") => {
-            let key = args.get(1).context("usage: wbx var set <key> <value> [--secret]")?;
-            let val = args.get(2).context("usage: wbx var set <key> <value> [--secret]")?;
+            let key = args.get(1).context("usage: work var set <key> <value> [--secret]")?;
+            let val = args.get(2).context("usage: work var set <key> <value> [--secret]")?;
             let secret = args.iter().any(|a| a == "--secret");
             vars.insert(key.clone(), serde_json::json!({"value": val, "secret": secret}));
             io.write(&vars_path(), serde_json::to_string_pretty(&vars)?.as_bytes())?;
             Ok(format!("set {key}{}", if secret { " (secret)" } else { "" }))
         }
         Some("get") => {
-            let key = args.get(1).context("usage: wbx var get <key>")?;
+            let key = args.get(1).context("usage: work var get <key>")?;
             match vars.get(key) {
                 Some(v) if v["secret"].as_bool().unwrap_or(false) => Ok("(secret — use {{secret:KEY}} refs)".into()),
                 Some(v) => Ok(v["value"].as_str().unwrap_or_default().to_string()),
@@ -500,7 +500,7 @@ pub fn var(io: &dyn Io, args: &[String]) -> Result<String> {
                 .join("\n"))
         }
         Some("ref") => {
-            let mut tpl = args.get(1).context("usage: wbx var ref <template>")?.clone();
+            let mut tpl = args.get(1).context("usage: work var ref <template>")?.clone();
             for (k, v) in &vars {
                 let val = v["value"].as_str().unwrap_or_default();
                 tpl = tpl.replace(&format!("{{{{var:{k}}}}}"), val);
@@ -508,13 +508,13 @@ pub fn var(io: &dyn Io, args: &[String]) -> Result<String> {
             }
             Ok(tpl)
         }
-        _ => bail!("usage: wbx var set|get|list|ref"),
+        _ => bail!("usage: work var set|get|list|ref"),
     }
 }
 
 // ─────────────────────────── scaffold ───────────────────────────
 
-/// `wbx init <name>` — a new workbook source that lints clean and bundles.
+/// `work init <name>` — a new workbook source that lints clean and bundles.
 pub fn init(name: &str, template: &str) -> Result<String> {
     if template != "minimal" {
         bail!("unknown template '{template}' (have: minimal)");
@@ -533,7 +533,7 @@ pub fn init(name: &str, template: &str) -> Result<String> {
          <title>{name}</title>\n</head>\n<body>\n  \
          <work-flow title=\"{name}\">\n    \
          <p>A new workbook. Prose, data, and code live together as work-* elements —\n    \
-         edit it, then preview with <code>wbx dev</code> and assemble with <code>wbx bundle</code>.</p>\n    \
+         edit it, then preview with <code>work dev</code> and assemble with <code>work bundle</code>.</p>\n    \
          <work-component title=\"main\" lang=\"javascript\">\n      \
          // code blocks tangle into the workbook\n    \
          </work-component>\n  \
@@ -553,13 +553,13 @@ pub fn init(name: &str, template: &str) -> Result<String> {
   index.html  the workbook — prose + tasks + code as work-* elements
   data/       files that travel with it
 
-next: cd {name} && wbx dev"
+next: cd {name} && work dev"
     ))
 }
 
 // ─────────────────────────── ops ───────────────────────────
 
-/// `wbx open <file>` — the default browser, cross-platform.
+/// `work open <file>` — the default browser, cross-platform.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn open(file: &str) -> Result<String> {
     let p = std::path::Path::new(file);
@@ -583,10 +583,10 @@ pub fn open(file: &str) -> Result<String> {
 
 #[cfg(target_arch = "wasm32")]
 pub fn open(_file: &str) -> Result<String> {
-    bail!("`wbx open` needs the native binary")
+    bail!("`work open` needs the native binary")
 }
 
-/// `wbx upgrade` — replace this binary with the latest release.
+/// `work upgrade` — replace this binary with the latest release.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn upgrade() -> Result<String> {
     let exe = std::env::current_exe().context("locate current binary")?;
@@ -614,7 +614,7 @@ pub fn upgrade() -> Result<String> {
         .to_string();
     let latest = tag.trim_start_matches("wbx-v");
     if latest == env!("CARGO_PKG_VERSION") {
-        return Ok(format!("already current: wbx {latest}"));
+        return Ok(format!("already current: work {latest}"));
     }
     let os = if cfg!(target_os = "macos") { "darwin" } else if cfg!(windows) { "windows" } else { "linux" };
     let arch = if cfg!(target_arch = "aarch64") { "arm64" } else { "x64" };
@@ -629,10 +629,10 @@ pub fn upgrade() -> Result<String> {
         std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
     }
     std::fs::rename(&tmp, &exe).context("swap binary into place")?;
-    Ok(format!("upgraded: wbx {} → {latest}", env!("CARGO_PKG_VERSION")))
+    Ok(format!("upgraded: work {} → {latest}", env!("CARGO_PKG_VERSION")))
 }
 
 #[cfg(target_arch = "wasm32")]
 pub fn upgrade() -> Result<String> {
-    bail!("`wbx upgrade` needs the native binary")
+    bail!("`work upgrade` needs the native binary")
 }

@@ -4,7 +4,7 @@
 //! TTY → Human · otherwise (piped/redirected) → Agent. Agent mode NEVER
 //! prompts and emits NO ANSI; Json mode wraps every outcome in one envelope:
 //!
-//!   { "ok": bool, "verb": "toolkit list", "data": …,
+//!   { "ok": bool, "verb": "kit list", "data": …,
 //!     "error": { "code": n, "message": "…", "hint": "…" } }
 //!
 //! Exit-code map (stable, for agent branching):
@@ -64,11 +64,11 @@ pub fn classify(err: &anyhow::Error) -> i32 {
 
 fn hint(code: i32) -> Option<&'static str> {
     match code {
-        EXIT_ENGINE => Some("no engine reachable — start one with `wbx deploy local` or set WB_ENGINE_URL"),
-        EXIT_NOT_FOUND => Some("check the path/id — `wbx library`, `wbx toolkit list`, `wbx workbook list` enumerate what exists"),
-        EXIT_VERIFY => Some("the artifact failed its trust check — re-sign with `wbx sign` or fetch a clean copy"),
+        EXIT_ENGINE => Some("no engine reachable — start one with `work deploy local` or set WB_ENGINE_URL"),
+        EXIT_NOT_FOUND => Some("check the path/id — `work library`, `work kit list`, `work workbook list` enumerate what exists"),
+        EXIT_VERIFY => Some("the artifact failed its trust check — re-sign with `work sign` or fetch a clean copy"),
         EXIT_CONFLICT => Some("state moved underneath you — re-read with the matching show/list verb and retry"),
-        EXIT_AUTH => Some("the engine rejected your credentials — set WB_ENGINE_TOKEN, or re-run `wbx deploy local` to refresh discovery"),
+        EXIT_AUTH => Some("the engine rejected your credentials — set WB_ENGINE_TOKEN, or re-run `work deploy local` to refresh discovery"),
         _ => None,
     }
 }
@@ -76,7 +76,7 @@ fn hint(code: i32) -> Option<&'static str> {
 /// The verb path as invoked (subcommand words only, flags + positionals
 /// skipped) — for the envelope. Group verbs contribute their sub-verb.
 pub fn verb_path() -> String {
-    const GROUPS: &[&str] = &["publish", "toolkit", "workflow", "agent", "workbook", "deploy"];
+    const GROUPS: &[&str] = &["publish", "kit", "workflow", "agent", "workbook", "deploy"];
     let mut words = std::env::args().skip(1).filter(|a| !a.starts_with('-'));
     match words.next() {
         None => String::new(),
@@ -111,7 +111,7 @@ pub fn render_err(mode: Mode, verb: &str, err: &anyhow::Error) -> i32 {
     let code = classify(err);
     match mode {
         Mode::Human | Mode::Agent => {
-            eprintln!("wbx: {err:#}");
+            eprintln!("work: {err:#}");
             if mode == Mode::Human {
                 if let Some(h) = hint(code) {
                     eprintln!("     {h}");
@@ -179,13 +179,13 @@ pub fn pick(_q: &str, _o: &[(&str, &str)], default: usize) -> std::io::Result<us
 /// Next-verb guidance, HUMAN mode only — the CLI teaches its own grammar.
 pub fn next_hint(verb: &str) -> Option<&'static str> {
     Some(match verb {
-        "build" => "wbx bundle  (assemble everything into one artifact)",
-        "bundle" => "wbx sign <artifact>  (embed provenance)",
-        "sign" => "wbx verify <artifact>  ·  wbx workbook deploy <id> <artifact>",
-        "deploy init" => "wbx deploy apply  (converge to what you declared)",
-        "deploy apply" => "wbx deploy status  ·  wbx deploy logs",
-        "toolkit build" => "wbx toolkit push <id>  (ship it onto the engine)",
-        "workbook deploy" => "wbx workbook list  (see it living)",
+        "build" => "work bundle  (assemble everything into one artifact)",
+        "bundle" => "work sign <artifact>  (embed provenance)",
+        "sign" => "work verify <artifact>  ·  work workbook deploy <id> <artifact>",
+        "deploy init" => "work deploy apply  (converge to what you declared)",
+        "deploy apply" => "work deploy status  ·  work deploy logs",
+        "kit build" => "work kit push <id>  (ship it onto the engine)",
+        "workbook deploy" => "work workbook list  (see it living)",
         _ => return None,
     })
 }

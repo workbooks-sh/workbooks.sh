@@ -1,6 +1,6 @@
-//! `wbx dev` — watch → re-render → serve a live preview. Native-only:
+//! `work dev` — watch → re-render → serve a live preview. Native-only:
 //! the wasm build compiles this module but the verb bails (agents in the
-//! sandbox use `wbx bundle`; dev is an interactive, long-running verb).
+//! sandbox use `work bundle`; dev is an interactive, long-running verb).
 //!
 //! Deliberately std-only: a tiny HTTP loop on TcpListener + mtime polling.
 //! The preview auto-reloads via an injected poll of `/__v` (a version
@@ -10,7 +10,7 @@ use anyhow::Result;
 
 #[cfg(target_arch = "wasm32")]
 pub fn dev(_src: &str, _port: Option<u16>) -> Result<String> {
-    anyhow::bail!("`wbx dev` needs the native binary (it serves a local preview); in-sandbox, use `wbx bundle`")
+    anyhow::bail!("`work dev` needs the native binary (it serves a local preview); in-sandbox, use `work bundle`")
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -48,7 +48,7 @@ pub fn dev(src: &str, port: Option<u16>) -> Result<String> {
             format!(
                 "<!doctype html><html><head><meta charset=\"utf-8\">\
                  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
-                 <title>{title} — wbx dev</title></head><body>{body}{reload}</body></html>"
+                 <title>{title} — work dev</title></head><body>{body}{reload}</body></html>"
             )
         };
         Ok(html)
@@ -75,9 +75,9 @@ pub fn dev(src: &str, port: Option<u16>) -> Result<String> {
                     let v = version.fetch_add(1, Ordering::SeqCst) + 1;
                     if let Ok(h) = render(&org_path, v) {
                         *html.write().unwrap() = h;
-                        eprintln!("wbx dev: rebuilt (v{v})");
+                        eprintln!("work dev: rebuilt (v{v})");
                     } else {
-                        eprintln!("wbx dev: source has errors — keeping last good build");
+                        eprintln!("work dev: source has errors — keeping last good build");
                     }
                 }
             }
@@ -93,7 +93,7 @@ pub fn dev(src: &str, port: Option<u16>) -> Result<String> {
             .context("no free port in 4321..4331 — pass --port")?,
     };
     let addr = listener.local_addr()?;
-    eprintln!("wbx dev: http://{addr} — watching {} (ctrl-c to stop)", org_path.display());
+    eprintln!("work dev: http://{addr} — watching {} (ctrl-c to stop)", org_path.display());
 
     for stream in listener.incoming() {
         let Ok(mut s) = stream else { continue };

@@ -1,7 +1,7 @@
 //! Engine-backed verbs. Each is a thin RCP call into a running runtime — the
 //! runtime owns the compilers, wasmtime, and the tenant library, so the CLI
 //! never reimplements them. If no runtime is reachable, `io.http` returns a
-//! clear "no runtime — try `wbx deploy local`" error (see io.rs).
+//! clear "no runtime — try `work deploy local`" error (see io.rs).
 
 use crate::io::Io;
 use crate::rcp;
@@ -56,7 +56,7 @@ pub fn store(io: &dyn Io, slug: &str, list: bool, build: bool) -> Result<String>
     if list {
         rcp::call(io, "GET", "/rcp/store", None)
     } else if slug.is_empty() {
-        bail!("usage: wbx store <slug> [--build] | wb store --list")
+        bail!("usage: work store <slug> [--build] | wb store --list")
     } else {
         let b = if build { "&build=1" } else { "" };
         rcp::call(io, "POST", &format!("/rcp/store?slug={}{b}", urlenc(slug)), None)
@@ -157,7 +157,7 @@ pub fn toolkit_verify(io: &dyn Io, id: &str) -> Result<String> {
 pub fn toolkit_sign(io: &dyn Io, id: &str) -> Result<String> {
     rcp::call(io, "POST", &format!("/rcp/toolkit/sign?id={}", urlenc(id)), None)
 }
-/// `wbx toolkit push <id> <dir>` — ship a toolkit DIRECTORY onto the engine
+/// `work kit push <id> <dir>` — ship a toolkit DIRECTORY onto the engine
 /// (zip over RCP; the engine unpacks it under its toolkits root). This is the
 /// deploy-the-toolkit verb: write a toolkit, push it, the runtime has it.
 pub fn toolkit_push(io: &dyn Io, id: &str, dir: &str) -> Result<String> {
@@ -200,16 +200,16 @@ pub fn rt(io: &dyn Io, args: &[String]) -> Result<String> {
         Some("status") => rcp::call(io, "GET", "/.well-known/workbooks-runtime", None),
         Some("get") => rcp::call(io, "GET", args.get(1).map(String::as_str).unwrap_or("/"), None),
         Some("post") => rcp::call(io, "POST", args.get(1).map(String::as_str).unwrap_or("/"), args.get(2).map(String::as_str)),
-        _ => bail!("usage: wbx rt status | get <path> | post <path> [body]"),
+        _ => bail!("usage: work rt status | get <path> | post <path> [body]"),
     }
 }
 
-/// `wbx doctor` — environment + engine health, reported not judged (exit 0;
+/// `work doctor` — environment + engine health, reported not judged (exit 0;
 /// agents read the structured form, humans the prose).
 pub fn doctor(io: &dyn Io, human: bool) -> Result<String> {
     let version = env!("CARGO_PKG_VERSION");
 
-    // PATH: is some wbx reachable, and is it this one?
+    // PATH: is some work reachable, and is it this one?
     let on_path = which_wbx();
     let this = std::env::current_exe().ok().map(|p| p.display().to_string());
 
@@ -242,7 +242,7 @@ pub fn doctor(io: &dyn Io, human: bool) -> Result<String> {
 
     if human {
         let mut out = String::new();
-        out.push_str(&format!("wbx {version}\n"));
+        out.push_str(&format!("work {version}\n"));
         out.push_str(&format!(
             "binary     {}\n",
             this.as_deref().unwrap_or("unknown")
@@ -257,11 +257,11 @@ pub fn doctor(io: &dyn Io, human: bool) -> Result<String> {
         ));
         if engine != "reachable" {
             out.push_str(&format!("           {engine_detail}\n"));
-            out.push_str("           → `wbx deploy local` stands one up\n");
+            out.push_str("           → `work deploy local` stands one up\n");
         }
         out.push_str(&format!(
             "workspace  {}\n",
-            if ws.is_empty() { "no org files here (start: `wbx init <name>`)".to_string() } else { ws.join(" · ") }
+            if ws.is_empty() { "no org files here (start: `work init <name>`)".to_string() } else { ws.join(" · ") }
         ));
         Ok(out.trim_end().to_string())
     } else {
@@ -278,7 +278,7 @@ pub fn doctor(io: &dyn Io, human: bool) -> Result<String> {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn which_wbx() -> Option<String> {
-    let exe = if cfg!(windows) { "wbx.exe" } else { "wbx" };
+    let exe = if cfg!(windows) { "work.exe" } else { "work" };
     std::env::var("PATH").ok()?.split(if cfg!(windows) { ';' } else { ':' }).find_map(|d| {
         let p = std::path::Path::new(d).join(exe);
         p.is_file().then(|| p.display().to_string())

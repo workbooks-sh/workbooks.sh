@@ -22,7 +22,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "wbx", version, about = "Workbooks CLI — author, build, bundle, run, publish, deploy.")]
+#[command(name = "work", version, about = "Workbooks CLI — author, build, bundle, run, publish, deploy.")]
 struct Cli {
     /// Force agent mode: never prompts, no ANSI (default when stdout is piped)
     #[arg(long, global = true)]
@@ -43,7 +43,7 @@ enum Cmd {
     Dev { #[arg(default_value = ".")] src: String, #[arg(long)] port: Option<u16> },
     /// Environment + engine health report (always exits 0; agents get JSON via --json)
     Doctor,
-    /// Where am I — version, engine, workspace (same as bare `wbx`)
+    /// Where am I — version, engine, workspace (same as bare `work`)
     Status,
     /// Open a workbook (or any file) in the default browser
     Open { file: String },
@@ -95,9 +95,9 @@ enum Cmd {
         #[arg(long)] sql: bool,
     },
 
-    // ── toolkit (agent extensibility; engine-backed) ──
-    /// Discover, build, and run toolkits (the agent-extensibility surface)
-    Toolkit { #[command(subcommand)] verb: ToolkitVerb },
+    // ── kit (agent extensibility; engine-backed) ──
+    /// Discover, build, and run work-kits (the agent-extensibility surface)
+    Kit { #[command(subcommand)] verb: KitVerb },
 
     // ── runtime ops (engine-backed) ──
     /// Run or plan a workflow DAG
@@ -143,8 +143,8 @@ enum PublishVerb {
 }
 
 #[derive(Subcommand)]
-enum ToolkitVerb {
-    /// List discoverable toolkits (id · status · tagline)
+enum KitVerb {
+    /// List discoverable work-kits (id · status · tagline)
     List,
     /// A toolkit's manifest + skill index (or one skill's recipe)
     Show { id: String, skill: Option<String> },
@@ -208,7 +208,7 @@ enum WorkbookVerb {
 }
 
 /// The verb tree as data — agents introspect the surface instead of
-/// scraping help prose. `wbx help --json` (either order) and the agent-mode
+/// scraping help prose. `work help --json` (either order) and the agent-mode
 /// landing both emit this.
 fn verb_tree(cmd: &clap::Command) -> serde_json::Value {
     serde_json::json!({
@@ -227,7 +227,7 @@ fn verb_tree(cmd: &clap::Command) -> serde_json::Value {
 }
 
 fn main() {
-    // pre-clap intercept: `wbx help --json` / `wbx --json help` → the tree
+    // pre-clap intercept: `work help --json` / `work --json help` → the tree
     {
         let args: Vec<String> = std::env::args().skip(1).collect();
         let has = |w: &str| args.iter().any(|a| a == w);
@@ -267,10 +267,10 @@ fn landing(io: &dyn io::Io, human: bool) -> Result<String> {
     }
     if human {
         out.push_str(
-            "\n\nstart here   wbx init <name> · wbx dev · wbx bundle\n\
-             the engine   wbx deploy local · wbx deploy status\n\
-             the parts    wbx toolkit list · wbx workbook list\n\
-             everything   wbx help",
+            "\n\nstart here   work init <name> · work dev · work bundle\n\
+             the engine   work deploy local · work deploy status\n\
+             the parts    work kit list · work workbook list\n\
+             everything   work help",
         );
     }
     Ok(out)
@@ -280,7 +280,7 @@ fn run(cli: Cli, human: bool) -> Result<String> {
     let io = io::platform();
     let io = io.as_ref();
 
-    // bare `wbx` — the where-am-I landing, not a usage dump
+    // bare `work` — the where-am-I landing, not a usage dump
     let Some(cmd) = cli.cmd else {
         return landing(io, human);
     };
@@ -296,7 +296,7 @@ fn run(cli: Cli, human: bool) -> Result<String> {
         Cmd::Completions { shell } => {
             use clap::CommandFactory;
             let mut buf = Vec::new();
-            clap_complete::generate(shell, &mut Cli::command(), "wbx", &mut buf);
+            clap_complete::generate(shell, &mut Cli::command(), "work", &mut buf);
             String::from_utf8(buf)?
         }
         // local kernel
@@ -323,18 +323,18 @@ fn run(cli: Cli, human: bool) -> Result<String> {
             let mode = if semantic { "semantic" } else if literal { "literal" } else if sql { "sql" } else { "hybrid" };
             commands::search(io, &query, mode)?
         }
-        // toolkit
-        Cmd::Toolkit { verb } => match verb {
-            ToolkitVerb::List => commands::toolkit_list(io)?,
-            ToolkitVerb::Show { id, skill } => commands::toolkit_show(io, &id, skill.as_deref())?,
-            ToolkitVerb::Search { q } => commands::toolkit_search(io, &q.join(" "))?,
-            ToolkitVerb::Verify { id } => commands::toolkit_verify(io, &id)?,
-            ToolkitVerb::Sign { id } => commands::toolkit_sign(io, &id)?,
-            ToolkitVerb::Build { id, which } => commands::toolkit_build(io, &id, which.as_deref())?,
-            ToolkitVerb::Push { id, dir } => commands::toolkit_push(io, &id, &dir)?,
-            ToolkitVerb::Import { source, as_kind, out } => import::import(&source, as_kind.as_deref(), out.as_deref(), human)?,
-            ToolkitVerb::Audit { dir, fix } => audit::audit(&dir, human, fix, io)?,
-            ToolkitVerb::Run { id, task, args } => commands::toolkit_run(io, &id, &task, &args)?,
+        // kit
+        Cmd::Kit { verb } => match verb {
+            KitVerb::List => commands::toolkit_list(io)?,
+            KitVerb::Show { id, skill } => commands::toolkit_show(io, &id, skill.as_deref())?,
+            KitVerb::Search { q } => commands::toolkit_search(io, &q.join(" "))?,
+            KitVerb::Verify { id } => commands::toolkit_verify(io, &id)?,
+            KitVerb::Sign { id } => commands::toolkit_sign(io, &id)?,
+            KitVerb::Build { id, which } => commands::toolkit_build(io, &id, which.as_deref())?,
+            KitVerb::Push { id, dir } => commands::toolkit_push(io, &id, &dir)?,
+            KitVerb::Import { source, as_kind, out } => import::import(&source, as_kind.as_deref(), out.as_deref(), human)?,
+            KitVerb::Audit { dir, fix } => audit::audit(&dir, human, fix, io)?,
+            KitVerb::Run { id, task, args } => commands::toolkit_run(io, &id, &task, &args)?,
         },
         // runtime ops
         Cmd::Workflow { verb } => match verb {
