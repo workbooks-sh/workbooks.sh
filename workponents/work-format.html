@@ -754,6 +754,67 @@ end
 # paths. agents never touch the substrate — the system versions it underneath.
 </script>
 
+<script type="text/plain" id="c-syn-probe">
+# A source block DEFINES a unit. A probe READS one — a live readout bound by
+# reference, filled when you open or run the doc. THIS is what a markdown fence
+# is for: literate OUTPUT, not code (code is always an Elixir source block).
+
+# run it — show the value:
+```probe :score
+score(revenue: 50_000, employees: 20)
+```                                  →  => 70 · 0.4ms · in the container
+
+# watch it — live telemetry from the running unit:
+```probe :score, watch: :telemetry
+```                                  →  812 calls · p50 0.4ms · 0 errors · last 5m
+
+# bind it — markdown that re-renders when the data changes (a connection from
+# OUTPUTS, not a tangle). dynamic work files that track live data:
+```probe :ranked, as: :markdown
+Top lead: **{{ first.name }}** at {{ first.score }}.
+```                                  →  Top lead: **Acme** at 91.
+
+# reading is a safe VIEW. a probe that WRITES other regions is a capability —
+# it rides grant / posture, audited at the gate, same as net or env (Security).
+</script>
+
+<script type="text/plain" id="c-plan-harness">
+# plan.work — a full agentic harness in ONE file: a brain, the flow it runs,
+# the tasks it works, and the validations that gate them. one agent here; the
+# same shape scales to many.
+
+# ── the agent (the brain) ───────────────────────────────────────────
+agent :ada, model: :mimo, tools: [:crm, :charts] do
+  system "Enrich, score, and rank leads. File an issue for what you can't resolve."
+end
+
+# ── the work it runs (a flow — the runnable DAG) ────────────────────
+flow :pipeline do
+  step :enrich
+  step :score
+  parallel [:rank, :chart]
+end
+
+# ── a unit the flow calls, with a validation that gates the plan ────
+source :enrich, lang: :rust, tangle: "enrich.wasm" do
+  pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
+end
+
+test :enrich do
+  assert enrich(1000) == 1100        # red validation → the whole plan stalls
+end
+
+# ── the tasks ada works: ordered by after:, gated by needs: ─────────
+type Status = :todo | :doing | :done
+
+task "run the pipeline",   status: :doing, owner: :ada, ref: :pipeline, paths: ["leads/"]
+task "review the ranking", status: :todo,  owner: :ada, after: :pipeline, needs: :enrich
+task "publish the page",   status: :todo,  owner: :ada, after: "review the ranking"
+
+# ada claims a task → draft + scope → runs :pipeline → tests gate it → :done.
+# one file: the brain, the work, the proof, and the live board — same primitives.
+</script>
+
 <!-- ══════════════════ explanations ══════════════════ -->
 <template id="e-syn-prose">
   <div class="kick">syntax · prose</div>
@@ -1142,6 +1203,32 @@ end
   <div class="note"><code>draft</code> and <code>scope</code> are <b>our own capabilities</b> — the Drive-simple workspace layer (versioned save-state + scoped views), surfaced through the Dock like any other. Not third-party tools, no external names to learn.</div>
 </template>
 
+<template id="e-syn-probe">
+  <div class="kick">code · probes</div>
+  <h2>Probes <span class="lane l-fn">function</span> <span class="lane l-data">data</span></h2>
+  <p class="tagline">A markdown fence finally earns its keep — not as code, but as a live readout bound to a unit.</p>
+  <h3>Definition vs view</h3>
+  <p>A <code>source</code> block <b>defines</b> a unit; a <b>probe</b> <b>reads</b> one. It's bound by reference (<code>:score</code>), so it can never drift from the real unit, and it renders <b>output</b>, not source — which is exactly why it isn't redundant with just writing Elixir.</p>
+  <h3>Three modes</h3>
+  <ul><li class="pro"><b>value</b> — run the unit, show the result inline (<code>=> 70 · 0.4ms</code>). The notebook cell.</li>
+  <li class="pro"><b>telemetry</b> — <code>watch: :telemetry</code> streams the running unit's calls, timing, errors. The doc becomes a live dashboard over its own code.</li>
+  <li class="pro"><b>markdown bind</b> — <code>as: :markdown</code> renders prose that re-renders when the data changes. A connection from <i>outputs</i>, not a tangle — dynamic work files that track live data.</li></ul>
+  <div class="note"><b>Security:</b> reading is a safe view. A probe that <i>writes</i> other regions is a capability — it rides <code>grant</code> / posture like net or env, audited at the gate. Read-bind freely; write-bind is granted.</div>
+</template>
+
+<template id="e-plan-harness">
+  <div class="kick">plans · a full harness</div>
+  <h2>A full harness <span class="lane l-fn">function</span> <span class="lane l-data">data</span></h2>
+  <p class="tagline">One plan.work, everything together — an agent, a flow, the tasks, and the validations that gate them.</p>
+  <h3>What's combined</h3>
+  <ul><li><b>agent</b> — the brain (model, system, tools).</li>
+  <li><b>flow</b> — the runnable DAG it executes (<code>step</code>, <code>parallel</code>).</li>
+  <li><b>source + test</b> — the units the flow calls, each with a validation that <b>gates the whole plan</b> (a red test → nothing advances).</li>
+  <li><b>tasks</b> — what the agent works, ordered by <code>after:</code> and gated by <code>needs:</code> a passing unit.</li></ul>
+  <h3>The loop</h3>
+  <p>ada claims a task → <code>draft</code> + <code>scope</code> (Claim, lock &amp; fence) → runs the <code>:pipeline</code> flow → which calls <code>:enrich</code>/<code>:score</code> → tests gate it → status flips to <code>:done</code>, all in this one file. <b>The brain, the work, the proof, and the live board — composed from the same primitives</b>, no separate harness to learn. One agent here; the shape scales to many.</p>
+</template>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/simple.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
@@ -1221,6 +1308,23 @@ end
     `  <span class="ok">✓</span> plan advanced · <span class="num">2</span> done · <span class="num">1</span> doing · <span class="num">1</span> open`,
   ];
 
+  const RUN_HARNESS = [
+    `<span class="p">$</span> <span class="cmd">work plan run</span>`,
+    ``,
+    `  <span class="dim">plan.work</span>   1 agent · 1 flow · 3 tasks · 1 validation`,
+    ``,
+    `  <span class="ok">→</span> ada  claims <span class="cmd">"run the pipeline"</span>   <span class="dim">draft</span> <span class="path">wb-9a1</span> · <span class="dim">scope</span> <span class="path">[leads/]</span>`,
+    `  <span class="dim">flow</span> pipeline`,
+    `  <span class="ok">→</span> enrich   <span class="dim">rust → wasm</span>   <span class="num">412ms</span>`,
+    `  <span class="dim">test</span> enrich 1/1 <span class="ok">✓</span>   <span class="dim">validation gate passed</span>`,
+    `  <span class="ok">→</span> score    <span class="dim">12 leads</span>   <span class="num">12ms</span>`,
+    `  <span class="warn">∥</span> rank | chart <span class="dim">parallel</span>   <span class="num">3ms</span>`,
+    `  <span class="ok">=></span> ranked <span class="dim">(12 rows)</span>`,
+    ``,
+    `  <span class="ok">✓</span> "run the pipeline" <span class="ok">:done</span> → unblocks "review the ranking"`,
+    `  <span class="ok">✓</span> harness complete · brain + flow + tasks + validation, one file`,
+  ];
+
   // ONE ordered lesson plan — read top to bottom, the way you'd teach it.
   const SECTIONS = [
     { title:"The idea", blurb:"the mental model, before any syntax",
@@ -1240,6 +1344,7 @@ end
     { title:"Code", blurb:"Elixir — everything that runs",
       lessons:[
         { nm:"Source blocks", tag:"code is runnable → it's Elixir", fn:"page.work", lg:"elixir · rust", mode:"work", code:"c-syn-fence",   exp:"e-syn-fence" },
+        { nm:"Probes",        tag:"a fence's real job: live output", fn:"page.work", lg:"md · probe",   mode:"work", code:"c-syn-probe",  exp:"e-syn-probe" },
         { nm:"Compute",       tag:"tangle a def → wasm",           fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-compute", exp:"e-syn-compute", run:RUN_SCORE },
         { nm:"Workflows",     tag:"if it runs, it's Elixir",       fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-flow",    exp:"e-syn-flow", run:RUN_FLOW },
         { nm:"Tests",         tag:"red test, no bundle",           fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-test",    exp:"e-syn-test" },
@@ -1287,6 +1392,7 @@ end
         { nm:"Live state",         tag:"declarative ≠ immutable",        fn:"plan.work", lg:"elixir", mode:"work", code:"c-live-state", exp:"e-live-state" },
         { nm:"plan.work",          tag:"plan + board + audit, one file", fn:"plan.work", lg:"elixir", mode:"work", code:"c-live-plan",  exp:"e-live-plan", run:RUN_PLAN },
         { nm:"Claim, lock & fence",tag:"drafts isolate · scopes fence",  fn:"plan.work", lg:"elixir", mode:"work", code:"c-live-claim", exp:"e-live-claim" },
+        { nm:"A full harness",     tag:"agent + flow + tasks + tests",   fn:"plan.work", lg:"elixir", mode:"work", code:"c-plan-harness", exp:"e-plan-harness", run:RUN_HARNESS },
       ] },
     { title:"Deploy", blurb:"two targets, one image",
       lessons:[
