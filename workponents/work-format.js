@@ -359,6 +359,23 @@
     graphpane.appendChild(leg);
   }
 
+  // A `sandbox … do … end` block is a container — band its lines with a left rule
+  // (top/bottom caps on the opening + closing lines). `end` is matched by indent
+  // depth, so nested do…end inside the sandbox don't close it early.
+  function markSandboxes(){
+    cm.eachLine(h=>{ cm.removeLineClass(h,"background","sb-band"); cm.removeLineClass(h,"background","sb-cap"); cm.removeLineClass(h,"background","sb-end"); });
+    const endRe=/^(\s*)end\b/, n=cm.lineCount();
+    for(let i=0;i<n;i++){
+      const m=cm.getLine(i).match(/^(\s*)sandbox\b/); if(!m) continue;
+      const depth=m[1].length; let j=i+1;
+      for(;j<n;j++){ const em=cm.getLine(j).match(endRe); if(em&&em[1].length===depth) break; }
+      if(j>=n) continue;
+      cm.addLineClass(i,"background","sb-cap");
+      for(let k=i+1;k<j;k++) cm.addLineClass(k,"background","sb-band");
+      cm.addLineClass(j,"background","sb-end");
+    }
+  }
+
   function loadLesson(i){
     cur = i;
     const t = LESSONS[i];
@@ -372,7 +389,7 @@
     if(termTimer){ clearTimeout(termTimer); termTimer=null; }
     if(isGraph){ renderGraph(); }
     else if(isTerm){ runTerm(); }
-    else { cm.setOption("mode", t.mode||"null"); cm.setValue(grab(t.code)); setTimeout(()=>cm.refresh(),0); }
+    else { cm.setOption("mode", t.mode||"null"); cm.setValue(grab(t.code)); setTimeout(()=>{cm.refresh();markSandboxes();},0); }
     fnEl.textContent = t.fn; lgEl.textContent = t.lg;
     exp.innerHTML=""; exp.appendChild(document.getElementById(t.exp).content.cloneNode(true)); exp.scrollTop=0;
     nav.querySelectorAll("button").forEach((b,j)=>b.classList.toggle("on", j===i));

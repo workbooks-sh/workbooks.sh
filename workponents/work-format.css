@@ -35,6 +35,8 @@
   .code .bar .lg{margin-left:auto;font:10px "Geist Mono",monospace;text-transform:uppercase;letter-spacing:.08em;
                  color:#7e8590;border:1px solid #2c2f36;border-radius:20px;padding:2px 9px}
   .CodeMirror{height:100%!important;flex:1;font-size:12.5px;line-height:1.7}
+  /* a sandbox do…end is a container — a single left rule down the contained lines, S to E */
+  .CodeMirror .sb-band,.CodeMirror .sb-cap,.CodeMirror .sb-end{box-shadow:inset 2px 0 0 0 var(--mint)}
 
   .term{flex:1;min-width:0;overflow:auto;display:none;background:#16181d;color:#cdd2da;
         padding:16px 20px;font:12.5px/1.7 "Geist Mono",ui-monospace,monospace}
