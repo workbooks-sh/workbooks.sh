@@ -349,15 +349,14 @@ Units cross-link by NAME — no import ceremony inside the document:
 </script>
 
 <script type="text/plain" id="c-model-dash">
----
-route: /dashboard
-lang:  svelte         # this page's front-end lane (could be solid / astro / js)
-use:   [crm, charts]
----
+route "/dashboard"
+lang  :svelte         # this page's front-end lane (could be solid / astro / js)
+use   [:crm, :charts]
 
 # Sales dashboard
 
 Rich-text prose. Then tasks, workflow, and code — all in the page, not the index.
+The header above is Elixir; the prose is markdown; the code is a source block.
 
 ## Tasks
 
@@ -366,32 +365,35 @@ task "wire the crm",    status: :done
 
 ## The view — a front-end island, hydrated client-side
 
-```svelte #board client
-<script>
-  import { Chart } from "charts"
-  export let ranked = []
-<\/script>
-<Chart rows={ranked} x="name" y="score" />
-```
+source :board, lang: :svelte, client: true do
+  ~S"""
+  <script>
+    import { Chart } from "charts"
+    export let ranked = []
+  <\/script>
+  <Chart rows={ranked} x="name" y="score" />
+  """
+end
 </script>
 
 <script type="text/plain" id="c-model-enrich">
----
-lang:  rust
-grant: [net: api.crm.com]
----
+lang  :rust
+grant net: "api.crm.com"
 
 # Enrich
 
-Bump each lead's revenue by the enrichment rate. Prose and code are siblings.
+Bump each lead's revenue by the enrichment rate. Prose and code are siblings —
+the prose is markdown, the code is an Elixir source block.
 
-```rust #enrich tangle=enrich.wasm
-pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
-```
+source :enrich, lang: :rust, tangle: "enrich.wasm" do
+  ~S"""
+  pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
+  """
+end
 
-```test of=enrich
-enrich(1000) == 1100
-```
+test :enrich do
+  assert enrich(1000) == 1100
+end
 </script>
 
 <script type="text/plain" id="c-model-dist">
@@ -572,60 +574,62 @@ work deploy cloud      # the same image on the nexus (Fly), your registry
 
 <!-- ══════════════════ added: grammar keystone + completeness ══════════════════ -->
 <script type="text/plain" id="c-syn-fence">
-# Two grammars, ONE rule: Elixir is the native tongue; everything else is a guest.
+# Code is RUNNABLE — so it lives on the Elixir side, as a source block. A plain
+# markdown fence only SHOWS code (rich text, never runs); we rarely want it.
 
-## Elixir & declarations — BARE. no fence, no sigil (do…end self-delimits)
+## Elixir — bare. do…end self-delimits: no fence, no sigil
 
-tangle "score.wasm" do ... end          # function / build
-task "ship v1", status: :todo           # a data declaration
+tangle "score.wasm" do
+  defmodule Scoring do
+    def score(lead), do: lead.revenue / 1000 + lead.employees
+  end
+end
 
-## Foreign languages — a FENCED, TAGGED block
+## A foreign language — still an Elixir block, carrying source + lang
 
-```rust #enrich tangle=enrich.wasm
-pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
-```
+source :enrich, lang: :rust, tangle: "enrich.wasm" do
+  ~S"""
+  pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
+  """
+end
 
-# the info-string IS the type:  `lang  #name  modifiers`
-#   #name             names the unit — refs reach it by this
-#   client / server   WHERE it runs (a browser island vs behind the Dock)
-#   tangle=x.wasm     the build target
-#   of=unit           binds a test to its subject
-#
-# rust / svelte / solid / js / zig / c can't write do…end, so they ride a fence.
-# Elixir never needs one. That's the whole of "markdown + typed fenced code."
+# the BLOCK is the unit — name (:enrich), lang, build target: all Elixir.
+# runnable ⇒ a source / tangle block. markdown just narrates around it.
 </script>
 
 <script type="text/plain" id="c-syn-test">
-# A test is a fenced block bound to a unit by `of=`. BUILD lane: it runs at the
+# A test is an Elixir block bound to a unit by name. BUILD lane: it runs at the
 # weave gate, and a red test fails the build — no green dist/ over a broken unit.
 
-```rust #enrich tangle=enrich.wasm
-pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
-```
+source :enrich, lang: :rust, tangle: "enrich.wasm" do
+  ~S"""
+  pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
+  """
+end
 
-```test of=enrich
-enrich(1000) == 1100
-enrich(0)    == 0
-```
+test :enrich do
+  assert enrich(1000) == 1100
+  assert enrich(0)    == 0
+end
 
-# `of=enrich` names the subject; the assertions are plain expressions in that
-# unit's language. No runner to wire — the weave discovers and runs them.
+# `test :enrich` names the subject; the body asserts over its output. No runner
+# to wire — the weave discovers the test blocks and runs them at the gate.
 </script>
 
 <script type="text/plain" id="c-syn-front">
----
-route: /dashboard            # this page's URL (a leaf page)
-lang:  svelte                # the front-end lane for THIS file's islands
-use:   [crm, charts]         # toolkits this page draws elements / fns from
-grant: [net: api.crm.com]    # capability requests, scoped to this file
-deps:  [hex: decimal@2, npm: d3@7]   # unit-level deps (app-level live in index)
----
+# The file opens with its header — Elixir declarations, NOT YAML frontmatter.
+# Same data lane as tasks; markdown is left purely for the prose below.
+
+route "/dashboard"                      # this page's URL (a leaf page)
+lang  :svelte                           # the front-end lane for this file's islands
+use   [:crm, :charts]                   # toolkits this page draws elements / fns from
+grant net: "api.crm.com"                # capability requests, scoped to this file
+deps  [hex: "decimal@2", npm: "d3@7"]   # unit-level deps (app-level → the index)
 
 # Sales dashboard
 
-# Frontmatter is the file's DECLARATIVE header — the unit-scoped twin of the
-# index. Lane, route, caps, this file's own deps. Everything under the `---` is
-# the literate body (markdown + tagged code). Data lane: declared, never run.
+Then the literate body: markdown prose, and Elixir source / tangle blocks. The
+header is declared, never run — the file's data-lane twin of the index.
 </script>
 
 <script type="text/plain" id="c-prim-map">
@@ -639,22 +643,24 @@ deps:  [hex: decimal@2, npm: d3@7]   # unit-level deps (app-level live in index)
 #   - [ ] casual todo      a checklist for a human (not tracked data)
 
 # ── function · elixir → orb → wasm · the RUNTIME runs ──────────────
-#   tangle "…" do … end    compute · state machines
-#   flow do … step … end   workflows (step, parallel)
-#   agent "…" do … end     a brain (model, system, tools)
+#   tangle "…" do … end       compute · state machines (elixir)
+#   source :x, lang: :rust do  a foreign-lang unit — still elixir-wrapped
+#   flow do … step … end      workflows (step, parallel)
+#   agent "…" do … end         a brain (model, system, tools)
 
 # ── build · plain elixir / weave directives · the COMPILER builds ──
-#   tangle= · @tangle      compile a unit to an artifact
-#   test of=…              verification (fails the build when red)
+#   tangle: · @tangle      a unit's build target
+#   test :unit do          verification (fails the build when red)
 #   <link rel=package>     deps: hex / npm / cargo — the index manifest
 
 # ── data · declarative elixir · the SYSTEM queries ────────────────
 #   task · user · type     typed records + enums
 #   data :x, from: …       a named source; query() over it
 #   grant · posture        caps + publish posture
-#   --- frontmatter ---    the file's declarative header
+#   route · lang · use     the file's Elixir header (no YAML)
 
-# foreign-language code (rust/svelte/js/…) is the same four lanes, just FENCED.
+# everything runnable or declared is Elixir. markdown ONLY narrates — rich text
+# and context around the code, never the code itself.
 </script>
 
 <script type="text/plain" id="c-model-pkg">
@@ -815,7 +821,7 @@ deps:  [hex: decimal@2, npm: d3@7]   # unit-level deps (app-level live in index)
   <h2>dashboard.work</h2>
   <p class="tagline">Everything authored lives in the work file — rich text, a data board, a front-end island.</p>
   <h3>Lanes coexisting</h3>
-  <p>Prose is markdown; the <code>board do</code> is data; the Svelte <code>#board client</code> block is a front-end island the weave bundles and hydrates. Tasks and workflows live <b>here</b>, not the index.</p>
+  <p>Prose is markdown; the <code>task</code> lines are data; the Svelte <code>source … client: true</code> block is a front-end island the weave bundles and hydrates. Tasks and workflows live <b>here</b>, not the index.</p>
   <h3>Polyglot front-end</h3>
   <p>The lane is free — Svelte here, but Solid / Astro / plain JS weave the same way. <code>client</code> hydrates in the browser; a <code>server</code> block would run behind the Dock.</p>
 </template>
@@ -825,7 +831,7 @@ deps:  [hex: decimal@2, npm: d3@7]   # unit-level deps (app-level live in index)
   <h2>enrich.work</h2>
   <p class="tagline">A pure compute unit — markdown-literate, one typed block, one test.</p>
   <h3>Smallest shape</h3>
-  <p>Frontmatter = lane + the unit's capability request. Prose explains it. One named, tangled block is the code; a <code>test of=</code> block proves it at the weave gate. A unit is just a name — inline or its own file is an authoring choice.</p>
+  <p>The header = lane + the unit's capability request (Elixir, not YAML). Prose explains it. One named <code>source</code> block is the code; a <code>test :unit</code> block proves it at the weave gate. A unit is just a name — inline or its own file is an authoring choice.</p>
 </template>
 
 <template id="e-model-weave">
@@ -972,38 +978,35 @@ deps:  [hex: decimal@2, npm: d3@7]   # unit-level deps (app-level live in index)
 </template>
 
 <template id="e-syn-fence">
-  <div class="kick">syntax · fenced blocks · the keystone</div>
-  <h2>Fenced blocks <span class="lane l-fn">function</span> <span class="lane l-build">build</span></h2>
-  <p class="tagline">The line where a markdown fence becomes a typed unit — what "markdown + typed fenced code" literally means.</p>
-  <h3>The native-tongue rule</h3>
-  <ul><li class="pro"><b>Elixir &amp; declarations are bare.</b> <code>do…end</code> self-delimits, so a <code>tangle</code> / <code>flow</code> block and a <code>task</code> declaration need no fence. Elixir is the format's host language.</li>
-  <li class="pro"><b>Foreign languages are fenced.</b> rust, svelte, solid, js, zig, c can't write <code>do…end</code>, so each rides a tagged <code>```lang</code> fence.</li></ul>
-  <h3>The info-string IS the type</h3>
-  <p><code>```lang #name modifiers</code> — <code>#name</code> makes it referenceable; <code>client</code>/<code>server</code> says where it runs; <code>tangle=</code> sets the build target; <code>of=</code> binds a test to its subject. The weave reads the info-string and validates the unit at the gate.</p>
-  <div class="note">One rule dissolves the two grammars the rest of this book uses: <b>native Elixir bare, every guest language fenced + tagged</b>.</div>
+  <div class="kick">syntax · source blocks</div>
+  <h2>Source blocks <span class="lane l-fn">function</span> <span class="lane l-build">build</span></h2>
+  <p class="tagline">Code is runnable, so it's Elixir — a source block, never a bare markdown fence.</p>
+  <h3>Why not a fence</h3>
+  <p>A markdown <code>```fence```</code> only <i>shows</i> code — it's rich text, it never runs. We almost never want that. Real code is meant to <b>run</b>, so it's authored as an Elixir block (<code>tangle</code> / <code>source</code>) the weave compiles and the container executes. The dividing line stays clean: <b>markdown communicates, Elixir runs</b>.</p>
+  <h3>One block, any language</h3>
+  <ul><li class="pro"><b>Elixir is bare</b> — <code>do…end</code> self-delimits; a <code>tangle</code> block needs no wrapper.</li>
+  <li class="pro"><b>Foreign code rides a source block</b> — <code>source :enrich, lang: :rust, tangle: "…" do … end</code> carries the source, its lang, and its build target. Still Elixir on the outside; the unit is named by atom.</li></ul>
+  <div class="note">"Runnable or not" is just <b>source block vs fence</b> — and we lean runnable. If you only want to <i>display</i> code, a fence does it; nothing runs.</div>
 </template>
 
 <template id="e-syn-test">
   <div class="kick">syntax · tests</div>
   <h2>Tests <span class="lane l-build">build</span></h2>
-  <p class="tagline">A fenced block bound to a unit by <code>of=</code>. Red test → no bundle.</p>
+  <p class="tagline">An Elixir block bound to a unit by name. Red test → no bundle.</p>
   <h3>How it works</h3>
-  <p>A <code>```test of=enrich</code> block holds plain assertions in the unit's own language. The weave <b>discovers and runs them at the gate</b> — there's no runner to wire. A failure fails the build, so a green <code>dist/</code> means every test passed.</p>
+  <p>A <code>test :enrich do … end</code> block asserts over the unit's output. The weave <b>discovers and runs them at the gate</b> — there's no runner to wire. A failure fails the build, so a green <code>dist/</code> means every test passed.</p>
   <h3>Why it's build-lane</h3>
   <p>A test isn't shipped behavior and isn't prose — it's a <b>gate check</b>, the same lane as <code>tangle</code>. It proves the function <i>before</i> the function is woven in.</p>
 </template>
 
 <template id="e-syn-front">
-  <div class="kick">syntax · frontmatter</div>
-  <h2>Frontmatter <span class="lane l-data">data</span></h2>
-  <p class="tagline">The file's declarative header — the unit-scoped twin of the index.</p>
-  <h3>What it carries</h3>
-  <ul><li><b>lane</b> — <code>lang:</code> the front-end lane for this file's islands.</li>
-  <li><b>route</b> — the page's URL, when it's a leaf page.</li>
-  <li><b>caps</b> — <code>grant:</code> capability requests, scoped to this file.</li>
-  <li><b>deps</b> — unit-level packages (app-wide ones live in the index).</li>
-  <li><b>toolkits</b> — <code>use:</code> the prefixes this page draws elements / fns from.</li></ul>
-  <div class="note">Two scopes of declaration: the <b>index</b> owns the app; <b>frontmatter</b> owns the file. Same instinct as colocating a unit's deps with the unit.</div>
+  <div class="kick">syntax · the header</div>
+  <h2>The header <span class="lane l-data">data</span></h2>
+  <p class="tagline">A file's header is Elixir declarations — not YAML frontmatter. Markdown is left for prose only.</p>
+  <h3>Why Elixir, not YAML</h3>
+  <p>The header carries <code>route</code>, <code>lang</code>, caps, and this file's <code>deps</code> — all <b>declarations the system reads</b>. That's the data lane, so it's Elixir like every other declaration (<code>task</code>, <code>user</code>). No YAML, no second mini-language: <b>markdown narrates, Elixir declares</b>.</p>
+  <h3>The unit-scoped twin of the index</h3>
+  <p>The <b>index</b> owns the app; a file's <b>header</b> owns the file — its route, its islands' lane, its own deps. Same instinct as colocating a unit's deps with the unit.</p>
 </template>
 
 <template id="e-prim-map">
@@ -1013,12 +1016,12 @@ deps:  [hex: decimal@2, npm: d3@7]   # unit-level deps (app-level live in index)
   <h3>rich text <span class="lane l-text">markdown</span></h3>
   <p><code>prose</code> · <code>headings</code> · <code>lists</code> · <code>tables</code> · <code>quotes</code> · <code>`code`</code> · <code>![img]()</code> · <code>figure do</code> · <code>- [ ]</code> casual todo</p>
   <h3>function <span class="lane l-fn">elixir → wasm</span></h3>
-  <p><code>tangle do</code> compute · <code>flow do</code> workflows · <code>agent do</code> brains</p>
+  <p><code>tangle do</code> compute · <code>source lang:</code> foreign code · <code>flow do</code> workflows · <code>agent do</code> brains</p>
   <h3>build <span class="lane l-build">plain elixir / weave</span></h3>
-  <p><code>tangle= · @tangle</code> · <code>test of=</code> · <code>&lt;link rel=package&gt;</code></p>
+  <p><code>tangle: · @tangle</code> · <code>test :unit do</code> · <code>&lt;link rel=package&gt;</code></p>
   <h3>data <span class="lane l-data">declarative elixir</span></h3>
-  <p><code>task · user · type</code> · <code>data :x, from:</code> · <code>grant · posture</code> · <code>--- frontmatter ---</code></p>
-  <div class="note">If a line is none of these, it's prose or a composition of them. Foreign-language code is the same four lanes, just <b>fenced</b>. The discriminator never changes: <b>who reads it?</b></div>
+  <p><code>task · user · type</code> · <code>data :x, from:</code> · <code>grant · posture</code> · <code>route · lang · use</code> (header)</p>
+  <div class="note">If a line is none of these, it's prose. <b>Markdown only narrates</b> — rich text and context around code, never the code itself. The discriminator never changes: <b>who reads it?</b></div>
 </template>
 
 <template id="e-model-pkg">
@@ -1106,9 +1109,9 @@ deps:  [hex: decimal@2, npm: d3@7]   # unit-level deps (app-level live in index)
         { nm:"Tasks",     tag:"the contested line — text or data", fn:"page.work",  lg:"markdown", mode:"work", code:"c-syn-tasks",   exp:"e-syn-tasks" },
         { nm:"Workflows", tag:"function — if it runs, it's Elixir",fn:"page.work",  lg:"elixir",   mode:"work", code:"c-syn-flow",    exp:"e-syn-flow", run:RUN_FLOW },
         { nm:"Compute",   tag:"function + build — tangle a def",   fn:"page.work",  lg:"elixir",   mode:"work", code:"c-syn-compute", exp:"e-syn-compute", run:RUN_SCORE },
-        { nm:"Fenced blocks",tag:"the keystone — typed code in md", fn:"page.work",  lg:"md · rust", mode:"work", code:"c-syn-fence",   exp:"e-syn-fence" },
-        { nm:"Tests",     tag:"build — red test, no bundle",       fn:"page.work",  lg:"test",      mode:"work", code:"c-syn-test",    exp:"e-syn-test" },
-        { nm:"Frontmatter",tag:"the file's declarative header",    fn:"page.work",  lg:"yaml",      mode:"work", code:"c-syn-front",   exp:"e-syn-front" },
+        { nm:"Source blocks",tag:"code is runnable → it's Elixir", fn:"page.work",  lg:"elixir · rust", mode:"work", code:"c-syn-fence", exp:"e-syn-fence" },
+        { nm:"Tests",     tag:"build — red test, no bundle",       fn:"page.work",  lg:"elixir",    mode:"work", code:"c-syn-test",    exp:"e-syn-test" },
+        { nm:"The header",tag:"the file's Elixir header — no YAML", fn:"page.work",  lg:"elixir",    mode:"work", code:"c-syn-front",   exp:"e-syn-front" },
       ] },
     { id:"prim", emoji:"🧱", name:"Primitives",
       lede:"The irreducible building blocks everything reduces to. Start here when the syntax feels arbitrary.",
