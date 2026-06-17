@@ -1,6 +1,6 @@
 defmodule Workbooks.ToolkitDescriptorTest do
   @moduledoc """
-  Pins parse_descriptor/1 — the pure decode of a `<work-toolkit>` manifest's
+  Pins parse_descriptor/1 — the pure decode of a `<work-ref rel="kit">` manifest's
   EXEC-shape contract (how a toolkit declares it builds + runs). A regression here
   silently misroutes the build (e.g. a `crate:` source falling through to :unknown
   → the whole autobuild lane breaks) without any eval/injection test noticing.
