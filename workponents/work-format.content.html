@@ -479,17 +479,21 @@ data :crm,    from: postgres("crm.leads") # an EXTERNAL db — a WIT resource (a
 </script>
 
 <script type="text/plain" id="c-dt-query">
-# a query is a SELECTOR over a source's WIT values — and it returns WIT values too:
+# a query is a SELECTOR over a source's WIT values — returns WIT values too:
 
 data :ranked, from: select(:leads, fields: [:name, :score], sort: {:score, :desc})
 
-# a view is a CLIENT unit bound to the result — re-renders on change (signals):
-client :ranked_table, reads: :ranked do
-  # renders :ranked as a table (svelte / solid / js island)
-end
+# SHOWING it needs no widget — typed data renders by DEFAULT (the type tells the
+# renderer: record → card, list of records → table, scalar → text). reference it:
 
-# complex logic? it's a unit (code over the list). real SQL? only when the source
-# IS a db (postgres). the selector covers the common filter/sort/pick over values.
+Top lead: {{ ranked.first.name }} at {{ ranked.first.score }}.   # inline · live (signals)
+
+# want a specific look? a CLIENT unit reads the source and renders it your way:
+client :ranked_table, reads: :ranked do ... end
+
+# telemetry and a unit's output are just data sources — shown the SAME way:
+data :health, from: telemetry(:enrich)     # live metrics
+data :result, from: enrich(1000)           # a call's result
 </script>
 
 <script type="text/plain" id="c-sec-post">
@@ -699,30 +703,6 @@ end
 
 # two agents, one tree, zero collision: each works its own DRAFT, SCOPED to its
 # paths. agents never touch the substrate — the system versions it underneath.
-</script>
-
-<script type="text/plain" id="c-syn-probe">
-# A target block (client/sandbox/server) DEFINES a unit. A probe READS one — a
-# live readout bound by reference, filled when you open or run the doc. THIS is
-# what a markdown fence is for: literate OUTPUT, not code (code is a target block).
-
-# run it — show the value:
-```probe :score
-score(revenue: 50_000, employees: 20)
-```                                  →  => 70 · 0.4ms · in the sandbox
-
-# watch it — live telemetry from the running unit:
-```probe :score, watch: :telemetry
-```                                  →  812 calls · p50 0.4ms · 0 errors · last 5m
-
-# bind it — markdown that re-renders when the data changes (a connection from
-# OUTPUTS, not a tangle). dynamic work files that track live data:
-```probe :ranked, as: :markdown
-Top lead: **{{ first.name }}** at {{ first.score }}.
-```                                  →  Top lead: **Acme** at 91.
-
-# reading is a safe VIEW. a probe that WRITES other regions is a capability —
-# it rides grant / posture, audited at the gate, same as net or env (Security).
 </script>
 
 <script type="text/plain" id="c-plan-harness">
@@ -1041,11 +1021,12 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
 <template id="e-dt-query">
   <div class="kick">data · query</div>
   <h2>Query <span class="lane l-data">data</span> <span class="lane l-text">rich text</span></h2>
-  <p class="tagline">A selector over a source's WIT values — returns WIT values; a client unit reads it and re-renders.</p>
-  <h3>How it works</h3>
-  <p>A <code>select(...)</code> filters / sorts / picks fields over a source's values — declarative, returning typed values. A <b>client unit</b> <code>reads:</code> the source by name and renders it; reactivity is <b>signals</b> (node-local). For anything past filter/sort it's a <b>unit</b> (code over the list); real SQL appears only when the source is a db.</p>
-  <h3>Why it matters</h3>
-  <p>One query vocabulary over one typed surface — validated at the gate (the <code>from</code> must resolve). No SQL dialect to learn for your own content.</p>
+  <p class="tagline">Select over a source's WIT values; show them with zero ceremony — typed data renders itself.</p>
+  <h3>Select, then show</h3>
+  <p><code>select(...)</code> filters / sorts / picks over a source's values (drop to a <b>unit</b> for more; real SQL only when the source is a db). <b>Showing needs no widget</b>: because data is WIT-typed, the renderer knows its shape — a record becomes a card, a list of records a table, a scalar text. Reference it inline and it renders, re-rendering on change (<b>signals</b>). Want a specific look? a <b>client unit</b> <code>reads:</code> the source and renders it.</p>
+  <h3>Telemetry, results — all just data</h3>
+  <p>There's no separate "live readout" primitive: <b>telemetry</b> (<code>telemetry(:x)</code>) and a <b>unit's output</b> (<code>enrich(1000)</code>) are data sources, shown exactly like inline values.</p>
+  <div class="note">This is why there's no "probe" — typed data + default rendering + a client unit for custom covers every live-readout case, and the markdown fence stays plainly display-only.</div>
 </template>
 
 <template id="e-sec-post">
@@ -1185,19 +1166,6 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h3>Multi-agent, one tree</h3>
   <p>Two agents work the same workbook with zero collision: each gets its own <code>draft</code>, <code>scope</code>d to its paths. <b>Agents never touch the substrate</b> — the coordinator on the nexus versions it underneath. A task is a flat declaration by default; one that needs custom behavior carries a <code>claim do … end</code> script (the only function part — the default claim is automatic).</p>
   <div class="note"><code>draft</code> and <code>scope</code> are <b>our own capabilities</b> — the Drive-simple workspace layer (versioned save-state + scoped views), surfaced through the Dock like any other. Not third-party tools, no external names to learn.</div>
-</template>
-
-<template id="e-syn-probe">
-  <div class="kick">code · probes</div>
-  <h2>Probes <span class="lane l-fn">function</span> <span class="lane l-data">data</span></h2>
-  <p class="tagline">A markdown fence finally earns its keep — not as code, but as a live readout bound to a unit.</p>
-  <h3>Definition vs view</h3>
-  <p>A target block (<code>client</code>/<code>sandbox</code>/<code>server</code>) <b>defines</b> a unit; a <b>probe</b> <b>reads</b> one. It's bound by reference (<code>:score</code>), so it can never drift from the real unit, and it renders <b>output</b>, not source — which is exactly why it isn't redundant with just writing Elixir.</p>
-  <h3>Three modes</h3>
-  <ul><li class="pro"><b>value</b> — run the unit, show the result inline (<code>=> 70 · 0.4ms</code>). The notebook cell.</li>
-  <li class="pro"><b>telemetry</b> — <code>watch: :telemetry</code> streams the running unit's calls, timing, errors. The doc becomes a live dashboard over its own code.</li>
-  <li class="pro"><b>markdown bind</b> — <code>as: :markdown</code> renders prose that re-renders when the data changes. A connection from <i>outputs</i>, not a tangle — dynamic work files that track live data.</li></ul>
-  <div class="note"><b>Security:</b> reading is a safe view. A probe that <i>writes</i> other regions is a capability — it rides <code>grant</code> / posture like net or env, audited at the gate. Read-bind freely; write-bind is granted.</div>
 </template>
 
 <template id="e-plan-harness">

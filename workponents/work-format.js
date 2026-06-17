@@ -106,7 +106,6 @@
     { title:"Code", blurb:"Elixir — everything that runs",
       lessons:[
         { nm:"Targets",       tag:"client · sandbox · server",       fn:"page.work", lg:"target",        mode:"work", code:"c-syn-fence",   exp:"e-syn-fence" },
-        { nm:"Probes",        tag:"a fence's real job: live output", fn:"page.work", lg:"md · probe",   mode:"work", code:"c-syn-probe",  exp:"e-syn-probe" },
         { nm:"Compute",       tag:"a sandbox def → wasm",          fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-compute", exp:"e-syn-compute", run:RUN_SCORE },
         { nm:"Workflows",     tag:"if it runs, it's Elixir",       fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-flow",    exp:"e-syn-flow", run:RUN_FLOW },
         { nm:"Tests",         tag:"red test, no bundle",           fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-test",    exp:"e-syn-test" },
@@ -140,7 +139,7 @@
         { nm:"What the nexus backs", tag:"the optional server tier",  fn:"index.work", lg:"—",      mode:"work", code:"c-nx-backs",  exp:"e-nx-backs" },
         { nm:"Extrapolate",    tag:"server work: build OR nexus",     fn:"page.work",  lg:"elixir", mode:"work", code:"c-nx-extrap", exp:"e-nx-extrap" },
         { nm:"Data sources",   tag:"values · blob · resource",        fn:"page.work",  lg:"elixir", mode:"work", code:"c-dt-src",    exp:"e-dt-src" },
-        { nm:"Query",          tag:"a selector over WIT values",      fn:"page.work",  lg:"elixir", mode:"work", code:"c-dt-query",  exp:"e-dt-query" },
+        { nm:"Query & show",   tag:"select, then render itself",      fn:"page.work",  lg:"elixir", mode:"work", code:"c-dt-query",  exp:"e-dt-query" },
       ] },
     { title:"Security", blurb:"what publishing exposes",
       lessons:[
