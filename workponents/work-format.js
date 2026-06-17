@@ -197,9 +197,10 @@
         { nm:"Claim, lock & fence",tag:"drafts isolate · scopes fence",  fn:"plan.work", lg:"elixir", mode:"work", code:"c-live-claim", exp:"e-live-claim" },
         { nm:"A full harness",     tag:"agent + flow + tasks + tests",   fn:"plan.work", lg:"elixir", mode:"work", code:"c-plan-harness", exp:"e-plan-harness", run:RUN_HARNESS },
       ] },
-    { title:"Deploy", blurb:"two targets, one image",
+    { title:"Deploy", blurb:"two targets, one image — every delivery mode",
       lessons:[
-        { nm:"Two targets", tag:"local + cloud, one image", fn:"work deploy", lg:"cli", mode:"work", code:"c-dep", exp:"e-dep" },
+        { nm:"Two targets",    tag:"local + cloud, one image",          fn:"work deploy", lg:"cli",   mode:"work", code:"c-dep",       exp:"e-dep" },
+        { nm:"Delivery modes", tag:"static · nexus SSR · live, one source", fn:"work deploy", lg:"place", mode:"work", code:"c-dep-modes", exp:"e-dep-modes" },
       ] },
   ];
   const LESSONS = SECTIONS.flatMap(s => s.lessons);   // flat index for prev/next + nav
