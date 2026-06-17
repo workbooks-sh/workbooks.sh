@@ -244,6 +244,29 @@ Units cross-link by NAME — no import ceremony inside the document:
 # a dangling :name fails the build.
 </script>
 
+<script type="text/plain" id="c-ref-tags">
+# in a sandbox the filesystem is abstracted (WASI) — you never address by PATH.
+# you address by NAME (units), by TAG (cross-cutting), and link by either.
+
+# tag inline in prose, or on a unit — queryable, not just text:
+
+This quarter we focus on #billing and #activation.     # inline tags
+
+sandbox :enrich, tags: [:billing, :hot] do ... end      # a unit's tags
+
+# reference the tagged SET — everything tagged, across every file:
+
+data :hot, from: tagged(:hot)
+
+# DEEP LINK — the URL form of any name or tag; the host resolves the abstract path:
+
+work://sales#enrich            # → the unit
+work://sales#tag/billing       # → everything tagged :billing
+
+# posture-gated: public anchors link freely; gated ones need auth.
+# tagging from the UI just edits the declaration (the document is the store).
+</script>
+
 <!-- ══════════════════ MODEL exploration ══════════════════ -->
 <script type="text/plain" id="c-model-index">
 # index.work — the app manifest. literate, like every other work file.
@@ -869,7 +892,18 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h2>References</h2>
   <p class="tagline">Names are the only glue — and the weave gate guarantees they resolve.</p>
   <h3>One linking mechanism</h3>
-  <p>Units compose by <b>name</b>, not by imports scattered through the body: a flow step names a def, a task names its <code>ref:</code>, a view binds <code>from=</code> a work output, the index <code>work-import</code>s a file. Because everything links by name, the <b>weave gate can check every reference resolves</b> — a dangling <code>:name</code> fails the build. That's org-mode's cross-linking, kept, but validated.</p>
+  <p>Units compose by <b>name</b>, not by imports scattered through the body: a flow step names a def, a task names its <code>ref:</code>, a client unit <code>reads:</code> a source, the index <code>use</code>s a file. Because everything links by name, the <b>weave gate can check every reference resolves</b> — a dangling <code>:name</code> fails the build. That's org-mode's cross-linking, kept, but validated.</p>
+</template>
+
+<template id="e-ref-tags">
+  <div class="kick">idea · tags &amp; links</div>
+  <h2>Tags &amp; links</h2>
+  <p class="tagline">Address by name and tag — never by path. The filesystem is abstracted (WASI), so logical handles are the stable ones.</p>
+  <h3>Tags — cross-cutting, location-independent</h3>
+  <p>A <code>#tag</code> (inline in prose, or a unit's <code>tags:</code>) is a <b>queryable label</b>, not decoration. <code>tagged(:billing)</code> is the set of everything tagged <code>:billing</code> across every file — a grouping that ignores the folder tree. Tagging from the running interface just edits the declaration (the document is the store).</p>
+  <h3>Deep links — the URL form of a handle</h3>
+  <p>Every unit, section, and tag is addressable: <code>work://sales#enrich</code> opens that unit; <code>work://sales#tag/billing</code> opens the tagged set. Links are <b>posture-gated</b> (public anchors link freely; gated ones need auth) and <b>agent-navigable</b> — a stable reference an agent can point at or jump to.</p>
+  <div class="note">Why it matters in a sandbox: WASI virtualizes <i>where</i> files live, so a <b>path isn't a stable reference</b> — a name or tag is. Names + tags are the addressing layer; the host resolves them to wherever the content actually sits.</div>
 </template>
 
 <template id="e-model-index">

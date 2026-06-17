@@ -94,6 +94,7 @@
         { nm:"The unit",       tag:"the one addressable thing",           fn:"the model", lg:"elixir", mode:"work", code:"c-prim-unit",  exp:"e-prim-unit", run:RUN_UNIT },
         { nm:"The block",      tag:"do…end — one delimiter",              fn:"the model", lg:"elixir", mode:"work", code:"c-prim-block", exp:"e-prim-block" },
         { nm:"References",     tag:"names are the only glue",             fn:"the model", lg:"—",      mode:"work", code:"c-prim-refs",  exp:"e-prim-refs" },
+        { nm:"Tags & links",   tag:"address by name/tag, not path",       fn:"the model", lg:"—",      mode:"work", code:"c-ref-tags",   exp:"e-ref-tags" },
         { nm:"The map",        tag:"every primitive → its lane",          fn:"the model", lg:"—",      mode:"work", code:"c-prim-map",   exp:"e-prim-map" },
       ] },
     { title:"Rich text", blurb:"markdown — the only thing a human reads",
@@ -205,7 +206,7 @@
       { regex: /:[A-Za-z_]\w*[!?]?/, token: "atom" },               // :atoms
       { regex: /@[A-Za-z_]\w*/, token: "meta" },                    // @module_attrs
       { regex: /\b(?:defmodule|defmacro|defp|def|do|end|cond|case|fn|when|if|else|true|false|nil|import|alias|use|require)\b/, token: "keyword" },
-      { regex: /\b(?:client|sandbox|server|world|export|import|interface|package|component|func|record|variant|enum|flags|values|select|blob|postgres|data|tangle|untangle|flow|figure|note|task|user|type|step|parallel|todo|doing|done|agent|validate|grant|memory)\b/, token: "variable-2" },
+      { regex: /\b(?:client|sandbox|server|world|export|import|interface|package|component|func|record|variant|enum|flags|values|select|blob|postgres|data|tagged|tags|use|import|tangle|untangle|flow|figure|note|task|user|type|step|parallel|todo|doing|done|agent|validate|grant|memory)\b/, token: "variable-2" },
       { regex: /<\/?[A-Za-z][\w-]*/, token: "tag" },                // <work-* / html tags
       { regex: /\b\d[\d_]*\b/, token: "number" },
       { regex: /./, token: null },
