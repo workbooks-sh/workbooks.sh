@@ -24,4 +24,4 @@ python script.py                      # full CPython on wasm
 
 ## Maturity
 
-Stable (v0.1.0). Built across five lanes in `Workbooks.Pallet` (prebuilt WASI, C/C++ from source via `clang.wasm`, Rust crates via mrustc→clang, pure-Python on CPython.wasm, npm/JS via esbuild + Javy/QuickJS), seeded at boot then persisted and reloaded — no rebuild.
+Stable (v0.1.0). Built across five lanes in `Workbooks.Pallet` (prebuilt WASI, C/C++ from source via `clang.wasm`, Rust crates via mrustc→clang, pure-Python on CPython.wasm, npm/JS via esbuild + StarlingMonkey, with QuickJS as a fallback), seeded at boot then persisted and reloaded — no rebuild.
