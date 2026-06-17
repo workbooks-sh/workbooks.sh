@@ -111,14 +111,6 @@
           "failure_modes": []
         },
         {
-          "name": "Self-editing seam (file_issue tool → autopoet backlog)",
-          "status": "done",
-          "tests": "autopoet_test",
-          "units": 9,
-          "proof": "tool path pinned + LOOP CLOSED live: agents filed 6 real walls to the backlog; triaged via Autopoet.set_status — 2 toolkit-run issues RESOLVED (the overview fix works, verified run-5), 2 marked wontfix/by-design (SSRF floor, exec-gating), 1 deduped, 1 real feature (theme authoring) kept open.",
-          "failure_modes": []
-        },
-        {
           "name": "Session not-found contract (AgentSession + /api/run/:id)",
           "status": "done",
           "tests": "agent_session_test, run_status_endpoint_test",
@@ -168,7 +160,7 @@
           "status": "done",
           "tests": "web_search_format_test (cite-able output contract) + live integration proof",
           "units": 2,
-          "proof": "DETERMINISTIC (web_search_format_test, 2 cases): hits render as title + url + snippet bullets so the agent can cite, and an empty result signals 'might be unavailable' + nudges file_issue (never the false 'topic is empty' mislabel). LIVE (run-167, after the search fixes): agent got the prompt → called web_search → returned a correct, cited answer (elixir-lang.org) in 1 step. Now efficient because web_search returns real results immediately instead of flailing on empty keyless (was 16 steps).",
+          "proof": "DETERMINISTIC (web_search_format_test, 2 cases): hits render as title + url + snippet bullets so the agent can cite, and an empty result signals 'might be unavailable' (never the false 'topic is empty' mislabel). LIVE (run-167, after the search fixes): agent got the prompt → called web_search → returned a correct, cited answer (elixir-lang.org) in 1 step. Now efficient because web_search returns real results immediately instead of flailing on empty keyless (was 16 steps).",
           "failure_modes": []
         },
         {
@@ -199,7 +191,7 @@
           "status": "done",
           "tests": "toolkit_injection_test",
           "units": 8,
-          "proof": "live (run-5, exec): agent read the skill, ran `work deploy status` DIRECTLY (no `work kit run`, errs:0), and reported the concrete state — up, http://127.0.0.1:4000, PID, microVM:no. The overview's 'run directly' guidance resolved the agents' filed toolkit-run walls (autopoet 836/841).",
+          "proof": "live (run-5, exec): agent read the skill, ran `work deploy status` DIRECTLY (no `work kit run`, errs:0), and reported the concrete state — up, http://127.0.0.1:4000, PID, microVM:no. The overview's 'run directly' guidance resolved the agents' filed toolkit-run walls.",
           "failure_modes": []
         },
         {
@@ -242,16 +234,6 @@
           "units": 0,
           "proof": "Workbooks.Bundle (runtime/host/bundle.ex): one self-contained .html carrying its whole filesystem as a deflate zip in a <script id=wb-bundle>; embed/extract/pack/unpack byte-exact; work bundle/unbundle CLI (tangle org→native + compile native→wasm via the in-sandbox lanes); browser DecompressionStream loader; zip-bomb + zip-slip + C2PA-bind + CSP + private-boundary floors. Canon: docs/WORKBOOK-BUNDLE.md. (units=0: the bundle suite is multi-file; counted under the dedicated tests above, not unit-tallied here.)",
           "failure_modes": []
-        },
-        {
-          "name": "Composition islands — typed <work-*> ⟷ org/tree bijection (P0–P3)",
-          "status": "done",
-          "tests": "bundle_islands_test, bundle_islands_cli_test",
-          "units": 20,
-          "proof": "Workbooks.Bundle.Islands (runtime/host/bundle_islands.ex) — the declarative config-island layer over the bundle compiler (docs/WORKBOOK-COMPOSITION-MODEL.md). Adds NO new IO, rewrites none of Bundle/AgentDef/Toolkits. P0 index/render/parse/materialize classify a tree into typed islands (<work-agent>→AgentDef.parse, <work-toolkit>→Toolkits.parse_descriptor, <work-org>, <work-vfs>) and round-trip the metadata. P1 to_manifest/from_manifest (work-islands/1 node table w/ sha256 per node) + embed_manifest/extract_manifest (inert <script>, idempotent, </script>-safe) + externalize⟷inline residence swap. P2 edges/toolkit_ids prove the #+REQUIRES DAG (agent→toolkit→toolkit) resolves identically from exploded tree and bundled islands via the SAME Toolkits.closure/3. P3 handlers/handler_for/build_plan dispatch <work-component lang=…> to the existing compile lanes (rust/c/zig/svelte/js/go), unknown lang dropped — no new compiler. 16 tests, hermetic (agent leg runs the real OQL kernel). WIRED into the CLI (cli.ex): work bundle embeds the work-islands manifest beside the wb-bundle zip, work unbundle restores byte-exact + reports the composition, work islands dumps the structure — proven end-to-end by bundle_islands_cli_test (real agent→toolkit→toolkit+org+vfs tree, manifest == source-tree index, DAG identical from the bundled form).",
-          "failure_modes": [
-            "build-lane dispatch of build_plan/1 at bundle time (compiling <work-component lang=…> sources) is the next increment; the plan is computed today but bundle does not yet run it"
-          ]
         }
       ]
     },
@@ -296,7 +278,11 @@
           "tests": "harness_session, host_broker_keystone_fixes, harness_multitenant_isolation, harness_streaming_loopback, harness_security_fixes",
           "units": 0,
           "proof": "SLICE 1/2/3 + keystone + multi-tenant isolation PROVEN in dev/test, but gated OFF in production: Workbooks.Harness.enabled? requires experimental?() (WB_ACP_EXPERIMENTAL=1; defaults OFF in MIX_ENV=prod). Retained behind the flag; not shipped, not published. Major security review still owed before any v2 go-live.",
-          "failure_modes": ["external-CLI orchestration (Claude Code/Codex) unverified", "subscription-auth brokering (HarnessCreds :desktop) deferred", "multi-tenant exposure pending a dedicated v2 security review"]
+          "failure_modes": [
+            "external-CLI orchestration (Claude Code/Codex) unverified",
+            "subscription-auth brokering (HarnessCreds :desktop) deferred",
+            "multi-tenant exposure pending a dedicated v2 security review"
+          ]
         }
       ]
     }
