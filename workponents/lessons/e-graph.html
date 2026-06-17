@@ -1,0 +1,13 @@
+<template id="e-graph">
+  <div class="kick">runtime · the graph</div>
+  <h2>The graph <span class="lane l-fn">function</span></h2>
+  <p class="tagline">A workbook is a typed graph of units — derived, not drawn. Drag the nodes; watch the worlds cluster.</p>
+  <h3>Nodes &amp; edges</h3>
+  <ul><li class="pro"><b>Nodes</b> = units, colored by <b>world</b> (the target): <code>client</code>, <code>sandbox</code>, <code>server</code> — plus data, types, host caps, agents, toolkits.</li>
+  <li class="pro"><b>Edges</b> are <i>typed</i> — an <b>import</b> (a <code>flow step</code>, a <code>grant</code> to a host cap), a <b>dataflow</b> (<code>from: select(…)</code>, a <code>reads:</code>), a <b>type</b> reference, a <b>tool</b>, a <b>call</b>. Each is a different relation, so you can ask different questions of each.</li></ul>
+  <h3>It falls out of the declarations</h3>
+  <p>You never author the graph. It's <b>derived</b> from the WIT worlds (imports/exports = edges) plus your references, tags, and task ordering — a build artifact, like the WIT worlds themselves. <code>wasm-tools</code> can dump it straight from the compiled components; the languages already <b>merge at the typed edges</b> (the WIT boundaries), so there's <b>one</b> graph, not one-per-language.</p>
+  <h3>Everything is an operation on it</h3>
+  <p>Navigation (<code>[[backlinks]]</code>, <code>work://</code>, <code>tagged()</code>) traverses it. Dead-code is reachability. The <b>weave gate</b> ("a dangling <code>:name</code> fails") is graph-validity. <code>wac</code> composition is edge-wiring. An agent's context is the <b>subgraph</b> around its work. And <b>telemetry</b> (OpenTelemetry) rides the edges: a run is a path lighting up the boundaries it crosses — static structure (WIT) + live behavior (OTel) on one surface.</p>
+  <div class="note">This very picture is the <i>sales</i> workbook's graph. The same render over a real workbook is your "SourceTrail for workbooks" — built in workbooks.</div>
+</template>

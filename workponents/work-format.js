@@ -160,6 +160,7 @@
         { nm:"The one seam",   tag:"request → membrane → provider",   fn:"the dock",   lg:"—",      mode:"work", code:"c-dock-seam", exp:"e-dock-seam" },
         { nm:"Providers",      tag:"local vs runtime, same request",  fn:"the dock",   lg:"—",      mode:"work", code:"c-dock-prov", exp:"e-dock-prov" },
         { nm:"The contract",   tag:"a WIT world: exports + imports",  fn:"the dock",   lg:"wit",    mode:"work", code:"c-rt-wit",   exp:"e-rt-wit" },
+        { nm:"The graph",      tag:"units = nodes, WIT edges = wiring", fn:"the graph", lg:"live",   graph:true,  exp:"e-graph" },
         { nm:"What the nexus backs", tag:"the optional server tier",  fn:"index.work", lg:"—",      mode:"work", code:"c-nx-backs",  exp:"e-nx-backs" },
         { nm:"Extrapolate",    tag:"server work: build OR nexus",     fn:"page.work",  lg:"elixir", mode:"work", code:"c-nx-extrap", exp:"e-nx-extrap" },
         { nm:"Data sources",   tag:"values · blob · resource",        fn:"page.work",  lg:"elixir", mode:"work", code:"c-dt-src",    exp:"e-dt-src" },
@@ -250,6 +251,7 @@
   const nav  = document.getElementById("nav");
   const exp  = document.getElementById("exp");
   const term = document.getElementById("term");
+  const graphpane = document.getElementById("graphpane");
   const fnEl = document.getElementById("fn");
   const lgEl = document.getElementById("lg");
   const drawer=document.getElementById("drawer"), dterm=document.getElementById("dterm"),
@@ -289,17 +291,82 @@
     })();
   }
 
+  // ── the workbook AS A GRAPH (a realistic 'sales' workbook) ──
+  const GRAPH = {
+    nodes: [
+      {id:"dashboard", c:"client"},  {id:"player", c:"client"},
+      {id:"enrich", c:"sandbox"},    {id:"score", c:"sandbox"},
+      {id:"sync", c:"server"},
+      {id:"pipeline", c:"flow"},
+      {id:"ranked", c:"data"},       {id:"leads", c:"data"},
+      {id:"Lead", c:"type"},         {id:"Status", c:"type"},
+      {id:"net", c:"host"},          {id:"db", c:"host"},
+      {id:"coder", c:"agent"},
+      {id:"crm", c:"toolkit"},       {id:"video", c:"toolkit"},
+    ],
+    links: [
+      {s:"pipeline", t:"enrich", k:"step"},  {s:"pipeline", t:"score", k:"step"},
+      {s:"pipeline", t:"ranked", k:"data"},  {s:"ranked", t:"leads", k:"data"},
+      {s:"ranked", t:"score", k:"data"},     {s:"dashboard", t:"ranked", k:"data"},
+      {s:"enrich", t:"net", k:"grant"},      {s:"crm", t:"net", k:"grant"},
+      {s:"sync", t:"db", k:"grant"},         {s:"sync", t:"leads", k:"data"},
+      {s:"score", t:"Lead", k:"type"},       {s:"leads", t:"Lead", k:"type"},
+      {s:"enrich", t:"Lead", k:"type"},      {s:"coder", t:"crm", k:"tool"},
+      {s:"coder", t:"sync", k:"call"},       {s:"player", t:"video", k:"tool"},
+      {s:"crm", t:"score", k:"call"},        {s:"pipeline", t:"Status", k:"type"},
+    ],
+  };
+  const GC = { client:"#a8d4f0", sandbox:"#aee5c2", server:"#f3c5a3", data:"#d9b8ec", type:"#f2ddb0", host:"#aab2bd", agent:"#c8a8f0", flow:"#9fd8c8", toolkit:"#f0a8c8" };
+  const LK = { step:"#7fbf9f", data:"#7fd6a0", grant:"#e3a06a", type:"#c9a86a", tool:"#8fc7f0", call:"#9a98e0" };
+  let graphDrawn = false;
+  function renderGraph(){
+    if(graphDrawn || typeof d3 === "undefined") return; graphDrawn = true;
+    const el = graphpane, W = el.clientWidth||900, H = el.clientHeight||620;
+    const svg = d3.select(el).append("svg").attr("width","100%").attr("height","100%").attr("viewBox",`0 0 ${W} ${H}`);
+    const cx = {flow:[.5,.16], sandbox:[.5,.42], client:[.2,.3], server:[.82,.28], data:[.28,.74], type:[.56,.8], host:[.84,.66], agent:[.13,.56], toolkit:[.78,.52]};
+    const ax = c => (cx[c]?cx[c][0]:.5)*W, ay = c => (cx[c]?cx[c][1]:.5)*H;
+    const nodes = GRAPH.nodes.map(d=>({...d})), links = GRAPH.links.map(d=>({source:d.s,target:d.t,k:d.k}));
+    const sim = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(links).id(d=>d.id).distance(62).strength(.32))
+      .force("charge", d3.forceManyBody().strength(-240))
+      .force("x", d3.forceX(d=>ax(d.c)).strength(.16)).force("y", d3.forceY(d=>ay(d.c)).strength(.16))
+      .force("collide", d3.forceCollide(24));
+    const link = svg.append("g").attr("fill","none").selectAll("line").data(links).join("line")
+      .attr("stroke",d=>LK[d.k]||"#555").attr("stroke-width",1.5).attr("opacity",.45)
+      .attr("stroke-dasharray",d=>d.k==="grant"?"4,3":d.k==="type"?"1,4":null);
+    const node = svg.append("g").selectAll("g").data(nodes).join("g").style("cursor","grab")
+      .call(d3.drag().on("start",(e,d)=>{if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;})
+        .on("drag",(e,d)=>{d.fx=e.x;d.fy=e.y;}).on("end",(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}));
+    node.append("circle").attr("r",d=>(d.c==="host"||d.c==="type")?8:13).attr("fill",d=>GC[d.c]||"#888").attr("stroke","#16181d").attr("stroke-width",2);
+    node.append("text").text(d=>d.id).attr("x",d=>((d.c==="host"||d.c==="type")?12:17)).attr("y",4)
+      .attr("fill","#cdd2da").attr("font-size",11).attr("font-family",'"Geist Mono",ui-monospace,monospace').attr("pointer-events","none");
+    const adj={}; links.forEach(l=>{(adj[l.source.id]=adj[l.source.id]||new Set()).add(l.target.id);(adj[l.target.id]=adj[l.target.id]||new Set()).add(l.source.id);});
+    node.on("mouseover",(e,d)=>{const keep=adj[d.id]||new Set();keep.add(d.id);
+        node.attr("opacity",n=>keep.has(n.id)?1:.16);link.attr("opacity",l=>(l.source.id===d.id||l.target.id===d.id)?.95:.04);})
+      .on("mouseout",()=>{node.attr("opacity",1);link.attr("opacity",.45);});
+    sim.on("tick",()=>{ link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+        node.attr("transform",d=>`translate(${d.x},${d.y})`); });
+    const worlds=[["client","client"],["sandbox","sandbox"],["server","server"],["data","data"],["type","types"],["host","host caps"],["agent","agent"],["flow","flow"],["toolkit","toolkit"]];
+    const edges=[["step","import"],["data","dataflow"],["grant","grant→host"],["type","type"],["tool","tool"],["call","call"]];
+    const leg=document.createElement("div"); leg.className="glegend";
+    leg.innerHTML=`<div class="gl-h">worlds</div>`+worlds.map(([c,l])=>`<span class="gl-i"><i style="background:${GC[c]}"></i>${l}</span>`).join("")
+      +`<div class="gl-h">edges</div>`+edges.map(([k,l])=>`<span class="gl-i"><b style="background:${LK[k]}"></b>${l}</span>`).join("");
+    graphpane.appendChild(leg);
+  }
+
   function loadLesson(i){
     cur = i;
     const t = LESSONS[i];
-    const isTerm = !!t.term;
+    const isTerm = !!t.term, isGraph = !!t.graph;
     runbtn.classList.toggle("show", !!t.run);
     closeDrawer();
     const cmWrap = document.querySelector(".CodeMirror");
-    if(cmWrap) cmWrap.style.display = isTerm ? "none" : "";
+    if(cmWrap) cmWrap.style.display = (isTerm||isGraph) ? "none" : "";
     term.style.display = isTerm ? "block" : "none";
+    graphpane.style.display = isGraph ? "block" : "none";
     if(termTimer){ clearTimeout(termTimer); termTimer=null; }
-    if(isTerm){ runTerm(); }
+    if(isGraph){ renderGraph(); }
+    else if(isTerm){ runTerm(); }
     else { cm.setOption("mode", t.mode||"null"); cm.setValue(grab(t.code)); setTimeout(()=>cm.refresh(),0); }
     fnEl.textContent = t.fn; lgEl.textContent = t.lg;
     exp.innerHTML=""; exp.appendChild(document.getElementById(t.exp).content.cloneNode(true)); exp.scrollTop=0;

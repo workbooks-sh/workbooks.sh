@@ -39,6 +39,18 @@
   .term{flex:1;min-width:0;overflow:auto;display:none;background:#16181d;color:#cdd2da;
         padding:16px 20px;font:12.5px/1.7 "Geist Mono",ui-monospace,monospace}
   .term .tl{white-space:pre-wrap}
+
+  /* ── graph pane (the workbook as a typed graph) ── */
+  .graphpane{flex:1;min-width:0;display:none;position:relative;background:#16181d;overflow:hidden}
+  .graphpane svg{display:block}
+  .graphpane svg text{user-select:none}
+  .glegend{position:absolute;top:12px;left:14px;display:flex;flex-direction:column;gap:3px;
+           font:10px "Geist Mono",ui-monospace,monospace;color:#9aa0aa;pointer-events:none;max-width:140px}
+  .glegend .gl-h{margin-top:6px;color:#6b7079;text-transform:uppercase;letter-spacing:.07em}
+  .glegend .gl-h:first-child{margin-top:0}
+  .glegend .gl-i{display:inline-flex;align-items:center;gap:6px;line-height:1.6}
+  .glegend .gl-i i{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+  .glegend .gl-i b{width:12px;height:2px;border-radius:2px;display:inline-block;flex:none}
   .term .p,.dterm .p{color:var(--mint)} .term .cmd,.dterm .cmd{color:#fff;font-weight:600}
   .term .ok,.dterm .ok{color:#7fd6a0} .term .dim,.dterm .dim{color:#7e8590} .term .path,.dterm .path{color:#8fc7f0}
   .term .num,.dterm .num{color:#e7b894} .term .warn,.dterm .warn{color:#e3b341}
