@@ -20,7 +20,7 @@ glyph("avatar:open-peeps/wren")            // deterministic seeded avatar, local
 - Four kinds in one grammar: `brand:` (full-color logos), `icon:` (currentColor tech/UI icons), `avatar:` (deterministic seeded, local via open-avatars), `social:` (real avatars as `<img>` via unavatar).
 - Curated-local-first resolve order per kind, CDN (svgl / lobehub / simple-icons) for the long tail.
 - `opts` for size, color, title/aria, class, and a `mono` grayscale stance.
-- Runs in browser, Node, and the runtime's QuickJS-wasm lane; the curated-only path works even where `fetch` is absent.
+- Runs in browser, Node, and the runtime's StarlingMonkey-wasm lane; the curated-only path works even where `fetch` is absent.
 
 ## Maturity
 
