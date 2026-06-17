@@ -1,41 +1,46 @@
 <script type="text/plain" id="c-rt-wit">
 # The contract
 
-Every unit compiles to a **component** — sandboxed wasm with a typed *contract*. The
-contract is a **world**: what the unit **exports** plus what it **imports**. You
-*never write it*; the weave generates it from what you already declared.
+A unit's contract is just its **Elixir module**. Its **exports** are the public
+functions it defines; its **imports** are the dependencies and `grant`s it asks for;
+its **types** are the structs, atoms, and tuples it passes around. That is the whole
+interface — and every part of it is Elixir you already know. You describe it once,
+in one language.
 
-What **you** write is a `sandbox` unit and a `grant`:
-
-server rust :enrich do
-  pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
+server :enrich do
+  def enrich(lead), do: %{lead | score: lead.score * 11}   # a public fn → an export
 end
-grant net "api.crm.com"
+grant net "api.crm.com"                                      # a grant → an import
 
-From that, the weave generates the unit's **world** — WIT, the wasm-native form of
-the same declarations. Its `export` comes from your public fn; its `import` comes
-from your grant:
+When two units need to **share** a contract — a kit and the units that use it — that
+shared interface is an Elixir **behaviour** (`@callback`), implemented like any other.
+Elixir's module system *is* the interface system; there's nothing new to learn.
 
-  package acme:sales@1
+Underneath, each unit compiles to a **standard wasm component** — the same contract a
+Rust or JS unit produces — which is *why* units in different languages interoperate
+cleanly, meeting at a typed boundary instead of raw memory. That generated artifact is
+the wasm-native form of your Elixir, and **you never write or read it:**
+
+  # ↓ generated — you never touch this
   world enrich {
-    export enrich: func(revenue: s64) -> s64    #  ← your public fn
-    import net:    func(url: string) -> string  #  ← your grant
+    export enrich: func(lead) -> lead
+    import net: func(url: string) -> string
   }
 
-Types **cross the boundary as WIT types** — no manual memory management:
-`record ↔ map`, `enum ↔ atom`, `result ↔ {:ok,_}|{:error,_}`, `list ↔ list`. Your
-`@type status :: :todo | :doing | :done` *is* a WIT enum (see [[The data model]]).
-This is the whole game: two units in different languages meet at a typed world, not
-raw memory — and a `#kit` is just a WIT package exporting interfaces.
+So the rule is simply: **learn Elixir, not WIT.** Your modules are the interfaces,
+your structs and atoms are the types, your `grant`s are the imports — and all the
+WebAssembly falls out. #contract
 </script>
 <template id="e-rt-wit">
   <div class="kick">dock · the contract</div>
   <h2>The contract <span class="lane l-fn">function</span></h2>
-  <p class="tagline">Every unit is a <b>component</b> with a typed <b>world</b> — generated from what you declare, never hand-written.</p>
-  <h3>A world = exports + imports</h3>
-  <ul><li class="pro"><b>Exports</b> — the functions a unit provides (its public <code>def</code>s). What callers can reach.</li>
-  <li class="pro"><b>Imports</b> — what it requires from the host: its <code>grant</code>ed capabilities (net, secrets) and any host functions it calls. <b>Zero by default</b> — a component can touch nothing it didn't import.</li></ul>
-  <h3>Why this is the whole game</h3>
-  <p>Two units in different languages — a rust <code>sandbox</code>, a <code>server</code> Elixir — meet at a <b>typed world</b>, not raw memory; that's why cross-language calls are clean. And the <b>Dock is just the import half</b>: the host fulfills only what a unit granted, so a published component is safe to run anywhere. Types cross as WIT types (record↔map, enum↔atom, result↔<code>{:ok,_}</code>) — your <code>type</code> decls are exactly these.</p>
-  <div class="note">You never write WIT — the <code>namespace:name@version</code> packages, worlds, interfaces. It's the <b>wasm-native form of your declarations</b>: exports from your defs, imports from your grants, types from your types. A <b>kit</b> is a WIT <b>package</b> exporting <b>interfaces</b>. The standard does the cross-language + sandboxing; the weave just generates it.</p>
+  <p class="tagline">A unit's contract is its Elixir module — Elixir is the type system <i>and</i> the interface system. The wasm component falls out; you never write WIT.</p>
+  <h3>Your module is the contract</h3>
+  <ul><li class="pro"><b>Exports</b> — the unit's public <code>def</code>s. What callers can reach.</li>
+  <li class="pro"><b>Imports</b> — its dependencies and <code>grant</code>s. Zero by default — it can touch nothing it didn't ask for.</li>
+  <li class="pro"><b>Types</b> — its structs, atoms, and tuples (see [[The data model]]).</li>
+  <li class="pro"><b>Shared interfaces</b> — an Elixir <code>@behaviour</code>. A kit defines one; the units that use it implement it.</li></ul>
+  <h3>The WebAssembly falls out</h3>
+  <p>Each unit compiles to a standard wasm <b>component</b>, so a Rust unit and an Elixir unit meet at a <b>typed boundary</b>, not raw memory — clean cross-language calls and sandboxing, for free. That contract is the <b>wasm-native form of your Elixir, generated</b> — you never author it.</p>
+  <div class="note"><b>Learn Elixir, not WIT.</b> Elixir is the whole surface — modules as interfaces, structs and atoms as types, <code>grant</code>s as imports, <code>flow</code> as orchestration. The Component Model underneath buys you portability + isolation invisibly; you never see a <code>namespace:name@version</code> in your life.</div>
 </template>
