@@ -1,7 +1,7 @@
 defmodule Workbooks.Deploy.Backend do
   @moduledoc """
-  The deploy-kit's provider seam — `place` → backend, plug-and-play. Mirrors the
-  storage seam (`Workbooks.Backend`): the core depends on a contract, a provider
+  The deploy-kit's provider seam — `place` → backend, plug-and-play. Like the
+  storage seam (`Workbooks.DB`): the core depends on a contract, a provider
   fills it, selection is one config value (`place`). Two kinds:
 
     * `local` — built-in, the local MACHINE (`Workbooks.Deploy.Machine`; a krunvm microVM on mac).
