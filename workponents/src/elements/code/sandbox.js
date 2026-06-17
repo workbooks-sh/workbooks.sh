@@ -15,6 +15,8 @@
 const WORKER_SRC = `
   self.onmessage = (e) => {
     const code = e.data.code;
+    const ctx = e.data.ctx || {};                 // shared flow context, structured-cloned in
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const logs = [];
     const fmt = (a) => {
       try {
@@ -33,17 +35,19 @@ const WORKER_SRC = `
     };
     let ok = true, value;
     try {
-      // strict-mode function scope; no access to self/postMessage from user code
-      const fn = new Function("console", '"use strict";\\n' + code);
-      value = fn(console);
+      // strict-mode async scope; ctx + sleep in scope so flow steps thread shared state
+      // and \`await\` works. No access to self/postMessage from user code.
+      const fn = new Function("console", "ctx", "sleep", '"use strict";\\nreturn (async () => {\\n' + code + '\\n})();');
+      value = fn(console, ctx, sleep);
     } catch (err) {
       ok = false;
       logs.push({ level: "error", text: (err && err.name ? err.name + ": " + err.message : String(err)) });
     }
-    const done = (v) => self.postMessage({ ok, logs, value: v === undefined ? undefined : fmt(v) });
+    // ctx is mutated in place by the snippet; we clone it back out after the run resolves
+    const done = (v) => self.postMessage({ ok, logs, value: v === undefined ? undefined : fmt(v), ctx });
     // resolve a returned promise so async snippets show their result
     if (value && typeof value.then === "function") {
-      value.then((v) => done(v), (err) => { logs.push({ level: "error", text: String(err && err.message || err) }); self.postMessage({ ok: false, logs, value: undefined }); });
+      value.then((v) => done(v), (err) => { logs.push({ level: "error", text: String(err && err.message || err) }); self.postMessage({ ok: false, logs, value: undefined, ctx }); });
     } else {
       done(value);
     }
@@ -52,9 +56,12 @@ const WORKER_SRC = `
 
 /**
  * Run a JS snippet in a fresh sandboxed worker.
- * @returns {Promise<{ok:boolean, output:string, value?:string}>}
+ * @param {object} [opts.ctx] shared flow context — exposed to the snippet as `ctx`,
+ *   mutated in place, and returned (structured-cloned) so a <work-flow> can thread
+ *   state across steps without ever sharing a live reference into the sandbox.
+ * @returns {Promise<{ok:boolean, output:string, value?:string, ctx:object}>}
  */
-export function runJs(code, { timeoutMs = 4000 } = {}) {
+export function runJs(code, { timeoutMs = 4000, ctx } = {}) {
   return new Promise((resolve) => {
     let url, worker, timer;
     const cleanup = () => {
@@ -76,13 +83,13 @@ export function runJs(code, { timeoutMs = 4000 } = {}) {
     }, timeoutMs);
 
     worker.onmessage = (e) => {
-      const { ok, logs, value } = e.data || {};
+      const { ok, logs, value, ctx: next } = e.data || {};
       const parts = (logs || []).map((l) => l.text);
       if (value !== undefined) parts.push("⇒ " + value);
-      finish({ ok: !!ok, output: parts.join("\n"), value });
+      finish({ ok: !!ok, output: parts.join("\n"), value, ctx: next ?? ctx ?? {} });
     };
-    worker.onerror = (e) => finish({ ok: false, output: "worker error: " + (e.message || "unknown") });
+    worker.onerror = (e) => finish({ ok: false, output: "worker error: " + (e.message || "unknown"), ctx: ctx ?? {} });
 
-    worker.postMessage({ code });
+    worker.postMessage({ code, ctx });
   });
 }

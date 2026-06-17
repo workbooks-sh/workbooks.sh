@@ -64,29 +64,40 @@ export class WorkSrc extends WbElement {
     if (this.attr("display")) this._run();   // display= → run-and-render (document-cell behaviour)
   }
 
+  // The execution seam — the SAME Dock routing for the standalone Run button and for
+  // a <work-flow> orchestrating this node. `ctx` is the shared flow context: JS threads
+  // it through the sandbox (serialized in/out, isolation intact); compiled langs pass it
+  // to the Dock /run as input. Returns { ok, output, value, ctx } — `value` is the step's
+  // return (what a flow chains on), `output` is the formatted log/result pane.
+  async runWith(ctx = {}) {
+    const lang = this.lang, source = this.source;
+    try {
+      if (STANDALONE.has(lang)) {
+        const r = await runJs(source, { ctx });
+        return { ok: r.ok, output: r.output, value: r.value, ctx: r.ctx ?? ctx };
+      }
+      if (this.host.available("compile")) {
+        const r = await this.host.request("/run", { body: { language: lang, source, ctx } });
+        return { ok: !!(r && r.ok), output: (r && (r.output ?? r.stdout)) || "",
+                 value: r && r.value, ctx: (r && r.ctx) || ctx };
+      }
+      return { ok: false, ctx,
+               output: `${lang} compiles to WASM through the Dock — connect a runtime to run it.` };
+    } catch (e) {
+      return { ok: false, output: "run failed: " + (e.message || e), ctx };
+    }
+  }
+
   async _run() {
     if (this._running) return;
     this._running = true; this.requestUpdate();
-    const lang = this.lang, source = this.source;
-    let res;
-    try {
-      if (this.host.available("compile")) {
-        const r = await this.host.request("/run", { body: { language: lang, source } });
-        res = { ok: !!(r && r.ok), output: (r && (r.output ?? r.stdout)) || "" };
-      } else if (STANDALONE.has(lang)) {
-        res = await runJs(source);
-      } else {
-        res = { ok: false, output: `${lang} compiles to WASM through the Dock — connect a runtime to run it.` };
-      }
-    } catch (e) {
-      res = { ok: false, output: "run failed: " + (e.message || e) };
-    }
+    const res = await this.runWith({});
     this._out = res;
     this._running = false;
     this.requestUpdate();
     this.dispatchEvent(new CustomEvent("work-run", {
       bubbles: true, composed: true,
-      detail: { lang, name: this.attr("name") || null, ok: res.ok, output: res.output },
+      detail: { lang: this.lang, name: this.attr("name") || null, ok: res.ok, output: res.output },
     }));
   }
 
