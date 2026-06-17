@@ -2,7 +2,7 @@
 
 Every command below is a **real** verb in the canonical `work` CLI (the Elixir
 escript; dispatch in `runtime/host/cli.ex`). If a verb isn't here, it's not in
-this skill. The binary is `work` — never `wb`/`wbx` (those are retired).
+this skill. The binary is `work` — the earlier short-form names are retired, don't use them.
 
 ## Authoring + structure
 
