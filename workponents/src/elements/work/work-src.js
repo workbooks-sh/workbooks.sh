@@ -18,6 +18,7 @@
 // Emits `work-run { lang, name, ok, output }` after every run.
 import { WbElement, html, css, define } from "../../core/element.js";
 import { runJs } from "../code/sandbox.js";
+import { bindTriggers } from "../../core/triggers.js";
 
 const STANDALONE = new Set(["js", "javascript"]);
 const norm = (l) => String(l || "js").toLowerCase().trim();
@@ -62,7 +63,9 @@ export class WorkSrc extends WbElement {
 
   firstUpdated() {
     if (this.attr("display")) this._run();   // display= → run-and-render (document-cell behaviour)
+    if (this.attr("w-on")) this._unbind = bindTriggers(this, this.attr("w-on"), () => this._run());
   }
+  disconnectedCallback() { super.disconnectedCallback(); this._unbind && this._unbind(); }
 
   // The execution seam — the SAME Dock routing for the standalone Run button and for
   // a <work-flow> orchestrating this node. `ctx` is the shared flow context: JS threads

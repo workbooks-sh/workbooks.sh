@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en" data-work-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="darkreader-lock"><meta name="color-scheme" content="light dark">
+<title>w-on — the HTMX trigger grammar for work-*</title>
+<link rel="stylesheet" href="../dist/theme.css">
+<script type="module" src="../dist/workponents.js"></script>
+<style>
+  body { margin:0; background:var(--work-bg); color:var(--work-fg); font:15px/1.55 "Geist", system-ui, sans-serif; }
+  .wrap { max-width:740px; margin:0 auto; padding:36px 24px 90px; }
+  h1 { font-size:22px; letter-spacing:-.02em; margin:0 0 4px; }
+  h1 b { background:var(--work-fg); color:var(--work-bg); padding:2px 9px; border-radius:8px; }
+  .sub { color:var(--work-fg-muted); margin:0 0 24px; max-width:64ch; font-size:13.5px; }
+  code { font:12px "Geist Mono",monospace; background:var(--work-surface); padding:1px 5px; border-radius:5px; }
+  h2 { font-size:14px; margin:26px 0 8px; font-family:"Geist Mono",monospace; color:var(--work-fg-muted); }
+  work-flow { margin:0 0 8px; display:block; }
+  .spacer { height:60vh; display:grid; place-items:center; color:var(--work-fg-subtle); font:12px "Geist Mono",monospace;
+            border:1px dashed var(--work-border); border-radius:12px; margin:10px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><b>w-on</b> · the trigger grammar</h1>
+  <p class="sub">One attribute says <b>when</b> a flow runs — modeled on HTMX <code>hx-trigger</code>.
+  <code>load</code> fires on connect, <code>every Ns</code> polls, <code>visible</code> waits for scroll,
+  and <code>&lt;event&gt; from:#id</code> chains off another element's events. The chaining below is the
+  whole point: flow B starts the instant flow A emits <code>work-flow-done</code> — declarative choreography,
+  zero glue code.</p>
+
+  <h2>1 · w-on="load" — flow A autoruns on connect</h2>
+  <work-flow id="flow-a" name="ingest" w-on="load">
+    <ol>
+      <li data-step="fetch"><work-src lang="js">await sleep(250); ctx.rows = [10,20,30,40]; return `fetched ${ctx.rows.length} rows`;</work-src></li>
+      <li data-step="clean"><work-src lang="js">ctx.clean = ctx.rows.filter(n => n >= 20); return `kept ${ctx.clean.length}`;</work-src></li>
+    </ol>
+  </work-flow>
+
+  <h2>2 · w-on="work-flow-done from:#flow-a" — flow B CHAINS off A</h2>
+  <work-flow id="flow-b" name="report" w-on="work-flow-done from:#flow-a">
+    <ol>
+      <li data-step="sum"><work-src lang="js">await sleep(200); ctx.total = [10,20,30,40].filter(n=>n>=20).reduce((a,b)=>a+b,0); return `sum of A's kept rows: ${ctx.total}`;</work-src></li>
+      <li data-step="emit"><work-src lang="js">return `report ready · ${ctx.total}`;</work-src></li>
+    </ol>
+  </work-flow>
+
+  <div class="spacer">↓ scroll down — the next flow waits until it's visible ↓</div>
+
+  <h2>3 · w-on="visible once" — flow C runs only when scrolled into view</h2>
+  <work-flow id="flow-c" name="lazy-compute" w-on="visible once">
+    <ol>
+      <li data-step="work"><work-src lang="js">await sleep(150); ctx.primes = [2,3,5,7,11,13]; return `computed ${ctx.primes.length} primes (only ran because you scrolled here)`;</work-src></li>
+    </ol>
+  </work-flow>
+</div>
+</body>
+</html>

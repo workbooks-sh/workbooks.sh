@@ -16,6 +16,7 @@
 // A step with no <work-src> renders but does not run (a presentation step — the flow degrades
 // gracefully to a static sequence/board view).
 import { WbElement, html, css, define } from "../../core/element.js";
+import { bindTriggers } from "../../core/triggers.js";
 
 const MAX_JUMPS = 24;                                  // cap loops (author's guard, like any loop)
 const NOT_STEP = /^(WORK-REF|TEMPLATE|SCRIPT|STYLE)$/; // edges/meta are not steps
@@ -55,12 +56,6 @@ function chips(label, raw) {
   return items.length
     ? html`<span class="edge ${label}"><span class="elabel">${label}</span>${items.map((x) => html`<span class="chip">${x}</span>`)}</span>`
     : "";
-}
-
-function parseEvery(s) {
-  const m = /^(\d+)\s*(ms|s|m|h)?$/.exec(String(s || "").trim());
-  if (!m) return 0;
-  return (+m[1]) * ({ ms: 1, s: 1000, m: 60000, h: 3600000 }[m[2] || "s"]);
 }
 
 export class WorkFlow extends WbElement {
@@ -136,14 +131,21 @@ export class WorkFlow extends WbElement {
     this._mo = new MutationObserver(() => { if (!this._busy) { this._parse(); this.requestUpdate(); } });
     this._mo.observe(this, { childList: true, subtree: true, attributes: true, attributeFilter: ["in", "out", "deps", "rel", "cond", "to", "lang"] });
   }
-  disconnectedCallback() { super.disconnectedCallback(); this._mo && this._mo.disconnect(); clearInterval(this._timer); }
+  disconnectedCallback() { super.disconnectedCallback(); this._mo && this._mo.disconnect(); this._unbind && this._unbind(); }
 
   firstUpdated() {
-    if (this.hasAttribute("autorun") || this.attr("every")) {
-      this.run();
-      const ms = parseEvery(this.attr("every"));
-      if (ms) this._timer = setInterval(() => this.run(), ms);
-    }
+    const spec = this._triggerSpec();
+    if (spec) this._unbind = bindTriggers(this, spec, () => this.run());
+  }
+
+  // w-on is the canonical trigger grammar (HTMX hx-trigger). every=/autorun are back-compat
+  // aliases folded into it: `every 30s` and `load`.
+  _triggerSpec() {
+    const parts = [];
+    if (this.attr("w-on")) parts.push(this.attr("w-on"));
+    if (this.attr("every")) parts.push(`every ${this.attr("every")}`);
+    if (this.hasAttribute("autorun")) parts.push("load");
+    return parts.join(", ");
   }
 
   /** Parse the light-DOM flow definition into a step tree; mark whether anything runs. */
@@ -228,12 +230,12 @@ export class WorkFlow extends WbElement {
 
   render() {
     const name = this.attr("name", "flow");
-    const every = this.attr("every");
+    const sched = this._triggerSpec();
     const status = this._busy ? "running…" : this._done ? "✓ done" : "idle";
     return html`
       <div class="shell">
         <div class="head">
-          <span class="title">${name}${every ? html`<span class="sched">every ${every}</span>` : ""}</span>
+          <span class="title">${name}${sched ? html`<span class="sched">on ${sched}</span>` : ""}</span>
           <span class="grow"></span>
           ${this._runnable ? html`
             <span class="status">${status}</span>
