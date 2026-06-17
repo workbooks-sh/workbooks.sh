@@ -82,10 +82,10 @@ end
 <script type="text/plain" id="c-syn-compute">
 ## Scoring
 
-Compute is plain Elixir in a source block. The `tangle:` attribute compiles it to
-wasm for the container — Orb is the compiler underneath, but you just write Elixir:
+Compute lives in a `sandbox` block — Elixir that compiles to wasm and runs in the
+sandbox. Orb is the compiler underneath, but you just write Elixir:
 
-source :score, tangle: "score.wasm" do
+sandbox :score do
   def score(lead), do: lead.revenue / 1000 + lead.employees
 end
 
@@ -98,10 +98,10 @@ end
 <script type="text/plain" id="c-prim-unit">
 # The unit
 
-Everything addressable is a NAMED UNIT — a source, a task, a figure, a data
+Everything addressable is a NAMED UNIT — a function, a task, a figure, a data
 source. The name is how the flow / board / views reach it.
 
-source :score, tangle: "score.wasm" do
+sandbox :score do
   def score(lead), do: lead.revenue / 1000 + lead.employees   # unit: :score
 end
 
@@ -119,12 +119,12 @@ end
 One delimiter does everything. do…end is self-delimiting Elixir, so it
 separates from prose with no fence and no sigil:
 
-source :score do ... end       # function lane (code)
+sandbox :score do ... end      # function lane (code → wasm)
 flow do ... end                # function lane (workflow)
 figure "x.png" do ... end      # rich-text lane (presentation)
 
 # do…end wraps BODIED units — a body of code or content. The KIND word in
-# front (source / flow / figure) names the lane.
+# front (sandbox/client/server, flow, figure) names the lane.
 
 # Flat DATA is the exception: tasks, users, and types are DECLARATIONS,
 # not blocks — they have fields, not a body:
@@ -147,20 +147,20 @@ The rule that keeps the format clean — markdown only narrates. It never holds
 logic, a value, or a field. The moment a line gains behavior, it leaves this lane.
 
 
-## ② function — what the RUNTIME runs   →   elixir → orb → wasm
+## ② function — what the RUNTIME runs   →   wasm (client/sandbox) or BEAM (server)
 
-The `def` below is real, runnable compute, held in a source block. It's Elixir,
-so it can never be mistaken for the prose around it:
+The `def` below is real, runnable compute. The `sandbox` target says where it
+goes — wasm, in the sandbox. It's Elixir, so it's never mistaken for the prose:
 
-source :score, tangle: "score.wasm" do
+sandbox :score do
   def score(lead), do: lead.revenue / 1000 + lead.employees
 end
 
 
 ## ③ build — what the COMPILER builds   →   plain elixir
 
-The `tangle:` attribute above is already the build lane — it says "compile this
-unit to that wasm artifact." A `test` joins it, proving the unit at the weave
+The `sandbox` target above already builds — it compiles the unit to wasm; you
+never write an explicit step. A `test` joins it, proving the unit at the weave
 gate (a red test ships no bundle):
 
 test :score do
@@ -273,7 +273,7 @@ use   [:crm, :charts]
 # Sales dashboard
 
 Rich-text prose. Then tasks, workflow, and code — all in the page, not the index.
-The header above is Elixir; the prose is markdown; the code is a source block.
+The header above is Elixir; the prose is markdown; the code is a client block.
 
 ## Tasks
 
@@ -282,7 +282,7 @@ task "wire the crm",    status: :done
 
 ## The view — a front-end island, hydrated client-side
 
-source :board, lang: :svelte, client: true do
+client svelte :board do
   <script>
     import { Chart } from "charts"
     export let ranked = []
@@ -298,9 +298,9 @@ grant net: "api.crm.com"
 # Enrich
 
 Bump each lead's revenue by the enrichment rate. Prose and code are siblings —
-the prose is markdown, the code is an Elixir source block.
+the prose is markdown, the code is a sandbox block.
 
-source :enrich, lang: :rust, tangle: "enrich.wasm" do
+sandbox rust :enrich do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
 
@@ -358,7 +358,7 @@ component "crm-contacts" do        # an element it ships
   # a view over the crm, rendered client-side
 end
 
-source :lookup, tangle: "crm.wasm" do    # a function it ships
+sandbox :lookup do                       # a function it ships
   def lookup(id), do: get("api.crm.com/contacts/" <> id)
 end
 </script>
@@ -485,30 +485,34 @@ work deploy cloud      # the same image on the nexus (Fly), your registry
 
 <!-- ══════════════════ added: grammar keystone + completeness ══════════════════ -->
 <script type="text/plain" id="c-syn-fence">
-# Code is RUNNABLE — so it lives on the Elixir side, as a source block. A plain
-# markdown fence only SHOWS code (rich text, never runs); we rarely want it.
+# Code is RUNNABLE — and ONE word says where it runs: the TARGET. Three of them.
+# grammar:  <target> [language] :name do … end   (language defaults to Elixir)
 
-## Elixir — the default lang. just write the def in the body:
-
-source :score, tangle: "score.wasm" do
+client  :spinner do … end       # → wasm, in the BROWSER (UI, interaction)
+sandbox :score   do             # → wasm, in the SANDBOX (compute, the agent)
   def score(lead), do: lead.revenue / 1000 + lead.employees
 end
+server  :sync    do … end       # full Elixir/OTP, on the BEAM (secrets, db, net)
 
-## A foreign language — the SAME block, with a lang::
+## any language targets client / sandbox (it all becomes wasm):
 
-source :enrich, lang: :rust, tangle: "enrich.wasm" do
+sandbox rust :enrich do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
 
-# ONE block — source. its name (:enrich), lang (default :elixir), tangle: target.
-# runnable ⇒ a source block. markdown just narrates around it.
+## no target = a static definition — placed by whoever references it:
+
+zig :checksum do … end          # compiles wherever someone tangles it to
+
+# the prefix is the engine, the placement, AND the trust tier, in one word.
+# server is Elixir-only; foreign code is always wasm (client/sandbox), never native.
 </script>
 
 <script type="text/plain" id="c-syn-test">
 # A test is an Elixir block bound to a unit by name. BUILD lane: it runs at the
 # weave gate, and a red test fails the build — no green dist/ over a broken unit.
 
-source :enrich, lang: :rust, tangle: "enrich.wasm" do
+sandbox rust :enrich do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
 
@@ -533,7 +537,7 @@ deps  [hex: "decimal@2", npm: "d3@7"]   # unit-level deps (app-level → the ind
 
 # Sales dashboard
 
-Then the literate body: markdown prose, and Elixir source blocks. The
+Then the literate body: markdown prose, and target blocks (client/sandbox/server). The
 header is declared, never run — the file's data-lane twin of the index.
 </script>
 
@@ -548,12 +552,14 @@ header is declared, never run — the file's data-lane twin of the index.
 #   - [ ] casual todo      a checklist for a human (not tracked data)
 
 # ── function · elixir → orb → wasm · the RUNTIME runs ──────────────
-#   source :x do … end        compute — any lang (default :elixir)
+#   client :x  do … end       → wasm, in the browser
+#   sandbox :x do … end       → wasm, in the sandbox (any lang; default :elixir)
+#   server :x  do … end       full Elixir/OTP, on the BEAM
 #   flow do … step … end      workflows (step, parallel)
 #   agent "…" do … end         a brain (model, system, tools)
 
-# ── build · plain elixir / weave directives · the COMPILER builds ──
-#   tangle: "x.wasm"       compile a source to a wasm artifact
+# ── build · the COMPILER · mostly implicit in the target ──────────
+#   (the target compiles the unit — no explicit tangle to write)
 #   test :unit do          verification (fails the build when red)
 #   <link rel=package>     deps: hex / npm / cargo — the index manifest
 
@@ -640,9 +646,9 @@ end
 </script>
 
 <script type="text/plain" id="c-syn-probe">
-# A source block DEFINES a unit. A probe READS one — a live readout bound by
-# reference, filled when you open or run the doc. THIS is what a markdown fence
-# is for: literate OUTPUT, not code (code is always an Elixir source block).
+# A target block (client/sandbox/server) DEFINES a unit. A probe READS one — a
+# live readout bound by reference, filled when you open or run the doc. THIS is
+# what a markdown fence is for: literate OUTPUT, not code (code is a target block).
 
 # run it — show the value:
 ```probe :score
@@ -681,7 +687,7 @@ flow :pipeline do
 end
 
 # ── a unit the flow calls, with a validation that gates the plan ────
-source :enrich, lang: :rust, tangle: "enrich.wasm" do
+sandbox rust :enrich do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
 
@@ -760,11 +766,11 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
 <template id="e-syn-compute">
   <div class="kick">syntax · compute</div>
   <h2>Compute <span class="lane l-fn">function</span> <span class="lane l-build">build</span></h2>
-  <p class="tagline">Clean Elixir in a source block; the <code>tangle:</code> attribute compiles it to wasm. Orb underneath, but you just write Elixir.</p>
+  <p class="tagline">Clean Elixir in a <code>sandbox</code> block; the target compiles it to wasm. Orb underneath, but you just write Elixir.</p>
   <h3>Two lanes in one block</h3>
-  <ul><li><b>Function</b> — the <code>def …</code> in the body is the compute. Authored as plain Elixir; <b>Orb compiles it to wasm</b> so it runs in the container. Surface orb-specific syntax (<code>I32</code>, <code>defw</code>, <code>memory</code>) only when a case truly needs low-level wasm types.</li>
-  <li><b>Build</b> — the <code>tangle: "score.wasm"</code> attribute is the build directive. <b>Plain Elixir, not Orb</b> — the one Elixir-but-not-Orb thing. It just says "compile this unit to that artifact."</li></ul>
-  <div class="note">No <code>tangle:</code>? The source still runs — on the BEAM, or bundled as an island for front-end langs. <code>tangle:</code> specifically means "make a wasm artifact."</div>
+  <ul><li><b>Function</b> — the <code>def …</code> in the body is the compute. Authored as plain Elixir; <b>Orb compiles it to wasm</b> so it runs in the sandbox. Surface orb-specific syntax (<code>I32</code>, <code>defw</code>, <code>memory</code>) only when a case truly needs low-level wasm types.</li>
+  <li><b>Build</b> — the <code>sandbox</code> target itself is the build directive: it compiles the unit to wasm. No separate step, no <code>tangle:</code> to write.</li></ul>
+  <div class="note">Switch the target to <code>server :score</code> and the same code runs full Elixir on the BEAM instead — the target is the only thing that changes. <code>sandbox</code>/<code>client</code> mean wasm; <code>server</code> means BEAM.</div>
 </template>
 
 <template id="e-prim-unit">
@@ -780,7 +786,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h2>The block — <code>do…end</code></h2>
   <p class="tagline">One self-delimiting delimiter, four jobs. This is why code needs no fence.</p>
   <h3>Kind + body</h3>
-  <p>A block is <code>&lt;kind&gt; … do … end</code> for <b>bodied units</b> — the <b>kind word selects the lane</b> (<code>source</code> code, <code>flow</code> workflow, <code>figure</code> rich text) and the body is what that lane holds. Because <code>do…end</code> is self-delimiting Elixir, the parser separates it from prose with <b>no fence and no sigil</b>.</p>
+  <p>A block is <code>&lt;kind&gt; … do … end</code> for <b>bodied units</b> — the <b>kind word selects the lane</b> (<code>sandbox</code>/<code>client</code>/<code>server</code> code, <code>flow</code> workflow, <code>figure</code> rich text) and the body is what that lane holds. Because <code>do…end</code> is self-delimiting Elixir, the parser separates it from prose with <b>no fence and no sigil</b>.</p>
   <p>Flat <b>data</b> is the exception: a <code>task</code>, a <code>user</code>, a <code>type</code> have <i>fields</i>, not a body, so they're <b>declarations</b>, not blocks. Two shapes — bodied blocks and flat declarations — cover all four lanes.</p>
 </template>
 
@@ -791,7 +797,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <div class="tests">
     <div class="test"><div class="t">rich text — markdown</div><div class="v">what you READ</div><div class="d">prose, headings, figures, tables. only this — never logic.</div></div>
     <div class="test"><div class="t">function — elixir → orb → wasm</div><div class="v">what RUNS</div><div class="d">compute, state machines, workflows. clean Elixir; Orb because it runs in the container.</div></div>
-    <div class="test"><div class="t">build — plain elixir</div><div class="v">what COMPILES function</div><div class="d">the <code>tangle:</code> attribute + tests. the one Elixir-but-not-Orb thing.</div></div>
+    <div class="test"><div class="t">build — plain elixir</div><div class="v">what COMPILES function</div><div class="d">the target compiles it; <code>test</code> gates it. the one Elixir-but-not-Orb thing.</div></div>
     <div class="test"><div class="t">data — declarative elixir</div><div class="v">what the system TRACKS</div><div class="d">tasks, users, types, config. typed + validated at the weave gate.</div></div>
   </div>
   <h3>The discriminator</h3>
@@ -837,7 +843,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h2>dashboard.work</h2>
   <p class="tagline">Everything authored lives in the work file — rich text, a data board, a front-end island.</p>
   <h3>Lanes coexisting</h3>
-  <p>Prose is markdown; the <code>task</code> lines are data; the Svelte <code>source … client: true</code> block is a front-end island the weave bundles and hydrates. Tasks and workflows live <b>here</b>, not the index.</p>
+  <p>Prose is markdown; the <code>task</code> lines are data; the Svelte <code>client</code> block is a front-end island the weave bundles and hydrates. Tasks and workflows live <b>here</b>, not the index.</p>
   <h3>Polyglot front-end</h3>
   <p>The lane is free — Svelte here, but Solid / Astro / plain JS weave the same way. <code>client</code> hydrates in the browser; a <code>server</code> block would run behind the Dock.</p>
 </template>
@@ -847,7 +853,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h2>enrich.work</h2>
   <p class="tagline">A pure compute unit — markdown-literate, one typed block, one test.</p>
   <h3>Smallest shape</h3>
-  <p>The header = lane + the unit's capability request (Elixir, not YAML). Prose explains it. One named <code>source</code> block is the code; a <code>test :unit</code> block proves it at the weave gate. A unit is just a name — inline or its own file is an authoring choice.</p>
+  <p>The header = lane + the unit's capability request (Elixir, not YAML). Prose explains it. One named <code>sandbox</code> block is the code; a <code>test :unit</code> block proves it at the weave gate. A unit is just a name — inline or its own file is an authoring choice.</p>
 </template>
 
 <template id="e-model-weave">
@@ -994,15 +1000,16 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
 </template>
 
 <template id="e-syn-fence">
-  <div class="kick">syntax · source blocks</div>
-  <h2>Source blocks <span class="lane l-fn">function</span> <span class="lane l-build">build</span></h2>
-  <p class="tagline">Code is runnable, so it's Elixir — a source block, never a bare markdown fence.</p>
-  <h3>Why not a fence</h3>
-  <p>A markdown <code>```fence```</code> only <i>shows</i> code — it's rich text, it never runs. We almost never want that. Real code is meant to <b>run</b>, so it's authored as an Elixir block (<code>tangle</code> / <code>source</code>) the weave compiles and the container executes. The dividing line stays clean: <b>markdown communicates, Elixir runs</b>.</p>
-  <h3>One block, any language</h3>
-  <ul><li class="pro"><b>Elixir is bare</b> — <code>do…end</code> self-delimits; a <code>tangle</code> block needs no wrapper.</li>
-  <li class="pro"><b>Foreign code rides a source block</b> — <code>source :enrich, lang: :rust, tangle: "…" do … end</code> declares the unit (name, lang, build target); the body between <code>do…end</code> is the <b>raw source</b> — no quotes, no heredoc sigil. The weave captures it verbatim.</li></ul>
-  <div class="note">"Runnable or not" is just <b>source block vs fence</b> — and we lean runnable. If you only want to <i>display</i> code, a fence does it; nothing runs.</div>
+  <div class="kick">code · targets</div>
+  <h2>Targets <span class="lane l-fn">function</span></h2>
+  <p class="tagline">One word per unit says where it runs — <code>client</code>, <code>sandbox</code>, or <code>server</code>. No <code>lang:</code>, no <code>tangle:</code>, no <code>source</code>.</p>
+  <h3>Three targets, read the first word</h3>
+  <ul><li class="pro"><b><code>client</code></b> — wasm in the <b>browser</b> (UI, interaction).</li>
+  <li class="pro"><b><code>sandbox</code></b> — wasm in the <b>isolated sandbox</b> (compute, the agent). Both client &amp; sandbox are portable, safe to ship and run anywhere.</li>
+  <li class="pro"><b><code>server</code></b> — full Elixir/OTP on the <b>BEAM</b> (secrets, db, network). Trusted; runs only on a nexus you own.</li></ul>
+  <h3>The grammar</h3>
+  <p><code>&lt;target&gt; [language] :name do … end</code>. Language defaults to Elixir; foreign code (<code>sandbox rust :enrich</code>) rides the same block, body raw inside <code>do…end</code>. <b>Any language targets client/sandbox</b> (it all compiles to wasm); <b>only Elixir targets server</b> — foreign code is always sandboxed, never native on the host. With <b>no target</b>, a unit is a <i>static definition</i> placed by whoever references it.</p>
+  <div class="note">The prefix is the engine, the placement, <b>and</b> the trust tier in one word. Inside <code>client</code>/<code>sandbox</code>, Elixir is automatically the wasm subset (the compiler rejects <code>net</code>/processes); inside <code>server</code> it's the full language. You never type "orb" or "tangle" — the target says it.</div>
 </template>
 
 <template id="e-syn-test">
@@ -1032,9 +1039,9 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h3>rich text <span class="lane l-text">markdown</span></h3>
   <p><code>prose</code> · <code>headings</code> · <code>lists</code> · <code>tables</code> · <code>quotes</code> · <code>`code`</code> · <code>![img]()</code> · <code>figure do</code> · <code>- [ ]</code> casual todo</p>
   <h3>function <span class="lane l-fn">elixir → wasm</span></h3>
-  <p><code>source do</code> code (any lang) · <code>flow do</code> workflows · <code>agent do</code> brains</p>
+  <p><code>client/sandbox/server :x do</code> code · <code>flow do</code> workflows · <code>agent do</code> brains</p>
   <h3>build <span class="lane l-build">plain elixir / weave</span></h3>
-  <p><code>tangle:</code> (→ wasm) · <code>test :unit do</code> · <code>&lt;link rel=package&gt;</code></p>
+  <p>the target compiles · <code>test :unit do</code> · <code>&lt;link rel=package&gt;</code></p>
   <h3>data <span class="lane l-data">declarative elixir</span></h3>
   <p><code>task · user · type</code> · <code>data :x, from:</code> · <code>grant · posture</code> · <code>route · lang · use</code> (header)</p>
   <div class="note">If a line is none of these, it's prose. <b>Markdown only narrates</b> — rich text and context around code, never the code itself. The discriminator never changes: <b>who reads it?</b></div>
@@ -1093,7 +1100,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h2>Probes <span class="lane l-fn">function</span> <span class="lane l-data">data</span></h2>
   <p class="tagline">A markdown fence finally earns its keep — not as code, but as a live readout bound to a unit.</p>
   <h3>Definition vs view</h3>
-  <p>A <code>source</code> block <b>defines</b> a unit; a <b>probe</b> <b>reads</b> one. It's bound by reference (<code>:score</code>), so it can never drift from the real unit, and it renders <b>output</b>, not source — which is exactly why it isn't redundant with just writing Elixir.</p>
+  <p>A target block (<code>client</code>/<code>sandbox</code>/<code>server</code>) <b>defines</b> a unit; a <b>probe</b> <b>reads</b> one. It's bound by reference (<code>:score</code>), so it can never drift from the real unit, and it renders <b>output</b>, not source — which is exactly why it isn't redundant with just writing Elixir.</p>
   <h3>Three modes</h3>
   <ul><li class="pro"><b>value</b> — run the unit, show the result inline (<code>=> 70 · 0.4ms</code>). The notebook cell.</li>
   <li class="pro"><b>telemetry</b> — <code>watch: :telemetry</code> streams the running unit's calls, timing, errors. The doc becomes a live dashboard over its own code.</li>

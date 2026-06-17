@@ -1,12 +1,12 @@
   const RUN_SCORE = [
     `<span class="p">$</span> <span class="cmd">work run score</span>`,
     ``,
-    `  <span class="dim">tangle</span>   score.wasm   <span class="dim">elixir → orb → wasm</span>   <span class="num">88ms</span>`,
+    `  <span class="dim">compile</span>  score   <span class="dim">elixir → wasm (sandbox)</span>   <span class="num">88ms</span>`,
     `  <span class="dim">load</span>     score.wasm   <span class="dim">wasmtime · 1 instance</span>`,
     `  <span class="dim">call</span>     score(%{revenue: 50_000, employees: 20})`,
     `  <span class="ok">=></span>       <span class="num">70</span>`,
     ``,
-    `  <span class="ok">✓</span> ran in <span class="num">96ms</span> · in the container`,
+    `  <span class="ok">✓</span> ran in <span class="num">96ms</span> · in the sandbox`,
   ];
   const RUN_FLOW = [
     `<span class="p">$</span> <span class="cmd">work run pipeline</span>`,
@@ -23,7 +23,7 @@
   const RUN_UNIT = [
     `<span class="p">$</span> <span class="cmd">work run score</span>`,
     ``,
-    `  <span class="dim">tangle</span>   score.wasm   <span class="dim">elixir → orb → wasm</span>   <span class="num">88ms</span>`,
+    `  <span class="dim">compile</span>  score   <span class="dim">elixir → wasm (sandbox)</span>   <span class="num">88ms</span>`,
     `  <span class="dim">call</span>     score(%{revenue: 50_000, employees: 20})`,
     `  <span class="ok">=></span>       <span class="num">70</span>`,
     ``,
@@ -32,7 +32,7 @@
   const RUN_ENRICH = [
     `<span class="p">$</span> <span class="cmd">work run enrich</span>`,
     ``,
-    `  <span class="dim">tangle</span>   enrich.wasm   <span class="dim">rust → wasm (clang, in-sandbox)</span>   <span class="num">412ms</span>`,
+    `  <span class="dim">compile</span>  enrich   <span class="dim">rust → wasm (clang, in-sandbox)</span>   <span class="num">412ms</span>`,
     `  <span class="dim">load</span>     enrich.wasm   <span class="dim">wasmtime</span>`,
     `  <span class="dim">call</span>     enrich(1000)`,
     `  <span class="ok">=></span>       <span class="num">1100</span>`,
@@ -104,9 +104,9 @@
       ] },
     { title:"Code", blurb:"Elixir — everything that runs",
       lessons:[
-        { nm:"Source blocks", tag:"code is runnable → it's Elixir", fn:"page.work", lg:"elixir · rust", mode:"work", code:"c-syn-fence",   exp:"e-syn-fence" },
+        { nm:"Targets",       tag:"client · sandbox · server",       fn:"page.work", lg:"target",        mode:"work", code:"c-syn-fence",   exp:"e-syn-fence" },
         { nm:"Probes",        tag:"a fence's real job: live output", fn:"page.work", lg:"md · probe",   mode:"work", code:"c-syn-probe",  exp:"e-syn-probe" },
-        { nm:"Compute",       tag:"tangle a def → wasm",           fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-compute", exp:"e-syn-compute", run:RUN_SCORE },
+        { nm:"Compute",       tag:"a sandbox def → wasm",          fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-compute", exp:"e-syn-compute", run:RUN_SCORE },
         { nm:"Workflows",     tag:"if it runs, it's Elixir",       fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-flow",    exp:"e-syn-flow", run:RUN_FLOW },
         { nm:"Tests",         tag:"red test, no bundle",           fn:"page.work", lg:"elixir",        mode:"work", code:"c-syn-test",    exp:"e-syn-test" },
       ] },
@@ -121,7 +121,7 @@
         { nm:"index.html",      tag:"skeleton · deps · nexus · checks", fn:"index.html",      lg:"html",        mode:"htmlmixed", code:"c-model-index",  exp:"e-model-index" },
         { nm:"Packages",        tag:"deps: one manifest, no mix/vite",  fn:"index.html",      lg:"html",        mode:"htmlmixed", code:"c-model-pkg",    exp:"e-model-pkg" },
         { nm:"A page",          tag:"rich text + tasks + an island",    fn:"dashboard.work",  lg:"md · svelte", mode:"work",      code:"c-model-dash",   exp:"e-model-dash" },
-        { nm:"A compute unit",  tag:"a source block → wasm",            fn:"enrich.work",     lg:"md · rust",   mode:"work",      code:"c-model-enrich", exp:"e-model-enrich", run:RUN_ENRICH },
+        { nm:"A compute unit",  tag:"a sandbox unit → wasm",            fn:"enrich.work",     lg:"md · rust",   mode:"work",      code:"c-model-enrich", exp:"e-model-enrich", run:RUN_ENRICH },
         { nm:"The weave",       tag:"the CLI: dev loop + ship",         fn:"work bundle",     lg:"cli",         term:true,                               exp:"e-model-weave" },
         { nm:"dist/index.html", tag:"one HTML + a gzip blob inside",    fn:"dist/index.html", lg:"deliverable", mode:"htmlmixed", code:"c-model-dist",   exp:"e-model-dist" },
       ] },
@@ -203,7 +203,7 @@
       { regex: /:[A-Za-z_]\w*[!?]?/, token: "atom" },               // :atoms
       { regex: /@[A-Za-z_]\w*/, token: "meta" },                    // @module_attrs
       { regex: /\b(?:defmodule|defmacro|defp|def|do|end|cond|case|fn|when|if|else|true|false|nil|import|alias|use|require)\b/, token: "keyword" },
-      { regex: /\b(?:tangle|untangle|flow|board|figure|note|task|user|type|step|parallel|todo|doing|done|compute|validate|grant|memory)\b/, token: "variable-2" },
+      { regex: /\b(?:client|sandbox|server|tangle|untangle|flow|figure|note|task|user|type|step|parallel|todo|doing|done|agent|validate|grant|memory)\b/, token: "variable-2" },
       { regex: /<\/?[A-Za-z][\w-]*/, token: "tag" },                // <work-* / html tags
       { regex: /\b\d[\d_]*\b/, token: "number" },
       { regex: /./, token: null },
