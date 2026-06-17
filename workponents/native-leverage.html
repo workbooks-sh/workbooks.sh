@@ -50,6 +50,12 @@
   queries</b>, so our <code>work-*</code> layer only adds <b>compute &amp; typed edges</b>. The more native
   does, the less we invent — and the more an agent already <em>knows</em> the syntax. This maps the whole
   surface, with an honest readability verdict on each.</p>
+  <p class="lead"><b>Two rules hold it together.</b> (1) A <code>work-*</code> element exists <em>only</em>
+  where native has no equivalent — `<template>` already exists, so there is <b>no</b> `work-template`; the
+  survivors are just <code>work-src</code> / <code>work-ref</code> / <code>work-flow</code> + the live/queryable
+  kits. (2) Never <em>over-scope</em> native — <code>&lt;details&gt;</code> is disclosure for anything, not
+  "agent disclosure"; <code>&lt;ol&gt;</code> <em>means</em> sequence <em>in a flow</em> but is never restricted
+  to one. Recognize meaning by context; don't impose it. Smaller engine, fully legible.</p>
 
   <div class="pillars">
     <div class="pillar"><b>HTML structure</b><p>ol/ul/details/dl — sequence, parallel, disclosure, k/v. The tree IS the flow.</p></div>
@@ -173,7 +179,7 @@
   <div class="row"><div class="el"><code>[id]</code> · <code>[hidden]</code> · <code>[inert]</code><span class="leverage">node identity; a not-yet-active node (hidden); a blocked subtree (inert — present but disabled).</span></div>
     <pre>&lt;li id="deploy" inert&gt;blocked until build&lt;/li&gt;</pre><span class="verdict ok">use</span></div>
 
-  <div class="row"><div class="el"><code>&lt;template&gt;</code><span class="leverage">inert, cloneable content — a kit's reusable artifact. work-template basically IS this.</span></div>
+  <div class="row"><div class="el"><code>&lt;template&gt;</code><span class="leverage">inert, cloneable content — a kit's reusable artifact. There is NO work-template; use native &lt;template&gt;.</span></div>
     <pre>&lt;template id="starter"&gt;…clone-on-use…&lt;/template&gt;</pre><span class="verdict ok">use</span></div>
 
   <div class="row"><div class="el"><code>[itemscope/itemprop]</code><span class="leverage">microdata structured data (records). Standard but VERBOSE — prefer a &lt;dl&gt; or work-* element.</span></div>
