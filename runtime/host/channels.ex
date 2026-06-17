@@ -6,7 +6,7 @@ defmodule Workbooks.Channels do
   runtime-side (env / WB_DATA), never in workbook or sandbox content. A channel
   is "configured" iff its adapter finds its credential (`configured?/0`); only
   configured channels accept sends, and only their inbound pollers are started
-  (gated in `Workbooks.Application`, the keeper pattern).
+  (gated in `Workbooks.Application` — credential-opt-in supervision).
 
   ## DM policy — pairing-code allowlist
 

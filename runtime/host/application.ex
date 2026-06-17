@@ -230,7 +230,7 @@ defmodule Workbooks.Application do
 
   # Channels (work messaging adapters, official-API tier): each inbound poller is
   # opt-in by CREDENTIAL — the Telegram long-poller joins the tree only when
-  # TELEGRAM_BOT_TOKEN is set (same pattern as keeper(): unset → excluded).
+  # TELEGRAM_BOT_TOKEN is set (unset → excluded from the supervision tree).
   defp channels do
     if Workbooks.Channels.Telegram.configured?(), do: [Workbooks.Channels.Telegram], else: []
   end
