@@ -1,6 +1,6 @@
 # open-avatars
 
-Many art styles, one DiceBear-like API. A zero-dependency, deterministic avatar engine for browser / Node / QuickJS-wasm: a single `avatar(pack, seed, opts)` routes by a pack's type — assembled (composed atoms), gallery (pick one whole avatar, SVG or raster), or procedural (a generator the pack ships). The same seed yields a byte-identical avatar across every style, forever.
+Many art styles, one DiceBear-like API. A zero-dependency, deterministic avatar engine for browser / Node / StarlingMonkey (wasm): a single `avatar(pack, seed, opts)` routes by a pack's type — assembled (composed atoms), gallery (pick one whole avatar, SVG or raster), or procedural (a generator the pack ships). The same seed yields a byte-identical avatar across every style, forever.
 
 ## When to reach for it
 
