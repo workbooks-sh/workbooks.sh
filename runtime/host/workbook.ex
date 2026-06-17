@@ -121,12 +121,6 @@ defmodule Workbooks.Workbook do
     end)
   end
 
-  @doc """
-  Render a workbook. A workbook IS HTML — render returns the HTML itself
-  (passthrough). The browser + the `work-*` Lit components do the visual render.
-  """
-  def render(src) when is_binary(src), do: src
-
   @doc "The native file extension for a component language, or nil if unbuildable."
   def lang_ext(lang) when is_binary(lang), do: @lang_ext[String.downcase(lang)]
   def lang_ext(_), do: nil

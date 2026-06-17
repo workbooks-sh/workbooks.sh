@@ -282,7 +282,7 @@ defmodule Workbooks.CLI do
       |> Bundle.compile_tree(build: build?)
 
     blob = Bundle.pack(parts)
-    html = parts["index.html"] || parts["workbook.html"] || Workbook.render(parts["source.work"] || parts["workbook.work"] || "")
+    html = parts["index.html"] || parts["workbook.html"] || ""
 
     # The page carries the wb-bundle zip (the filesystem). The STRUCTURE is the
     # work-* HTML itself — no separate manifest. A workbook IS HTML.

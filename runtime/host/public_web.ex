@@ -202,14 +202,14 @@ defmodule Workbooks.PublicWeb do
           File.dir?(dir) ->
             serve_static(conn, dir)
 
-          (org = Workbooks.ControlPlane.get_workbook(app)) ->
+          (html = Workbooks.ControlPlane.get_workbook(app)) ->
             # A complete author document is served sandboxed (its scripts run in an
-            # opaque origin); host-rendered org gets the nonce-gated shell.
-            if complete_html?(org) do
-              serve_sandboxed(conn, org)
+            # opaque origin); a partial HTML fragment gets the nonce-gated shell.
+            if complete_html?(html) do
+              serve_sandboxed(conn, html)
             else
               nonce = gen_nonce()
-              serve_html(conn, nonce, static_doc(app, Workbooks.OQL.render(org), nonce))
+              serve_html(conn, nonce, static_doc(app, html, nonce))
             end
 
           true ->
@@ -424,7 +424,7 @@ defmodule Workbooks.PublicWeb do
     if complete_html?(org) do
       org
     else
-      static_doc(id, Workbooks.Workbook.render(org))
+      static_doc(id, org)
     end
   end
 

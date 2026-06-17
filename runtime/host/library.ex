@@ -259,10 +259,9 @@ defmodule Workbooks.Library do
 
   # The page that carries the embedded filesystem: a built page if the tree has
   # one, else the rendered workspace org (the same source-of-truth the `bundle`
-  # CLI verb renders from — org is canonical, html is derived).
+  # A workbook IS HTML — index.html / workbook.html are the canonical bytes.
   defp page_html(parts) do
-    parts["index.html"] || parts["workbook.html"] ||
-      Workbooks.Workbook.render(parts["workspace.org"] || parts["source.org"] || parts["workbook.org"] || "")
+    parts["index.html"] || parts["workbook.html"] || ""
   end
 
   @doc """

@@ -393,7 +393,7 @@ defmodule Workbooks.Web do
   get "/w/:id" do
     id = conn.params["id"]
     org = Workbooks.ControlPlane.get_workbook(id) || sample_workbook()
-    page = workbook_page(id, Workbooks.Workbook.render(org))
+    page = workbook_page(id, org)
     conn |> put_resp_content_type("text/html") |> send_resp(200, page)
   end
 
@@ -1061,9 +1061,7 @@ defmodule Workbooks.Web do
         parts = Map.new(files, fn {k, v} -> {k, Base.decode64!(v)} end)
         blob = Workbooks.Bundle.pack(parts)
 
-        html =
-          parts["index.html"] || parts["workbook.html"] ||
-            Workbooks.Workbook.render(parts["source.org"] || parts["workbook.org"] || "")
+        html = parts["index.html"] || parts["workbook.html"] || ""
 
         html = html |> Workbooks.Bundle.embed(blob) |> Workbooks.Bundle.embed_loader()
         sign? = Plug.Conn.fetch_query_params(conn).query_params["sign"] == "1"
@@ -1507,7 +1505,7 @@ defmodule Workbooks.Web do
   get "/api/w/:id/html" do
     if Workbooks.ControlPlane.workbook_visible?(conn.params["id"], conn.assigns[:tenant]) do
       org = Workbooks.ControlPlane.get_workbook(conn.params["id"]) || ""
-      conn |> put_resp_content_type("text/html; charset=utf-8") |> send_resp(200, Workbooks.Workbook.render(org))
+      conn |> put_resp_content_type("text/html; charset=utf-8") |> send_resp(200, org)
     else
       conn |> put_resp_content_type("text/html; charset=utf-8") |> send_resp(404, "")
     end

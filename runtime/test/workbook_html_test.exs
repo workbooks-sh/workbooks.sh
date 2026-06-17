@@ -4,7 +4,6 @@ defmodule Workbooks.WorkbookHtmlTest do
   IS HTML built from `work-*` web components; the backend reads its STRUCTURE with
   a standard parser, never a bespoke kernel. Deterministic: pure Floki, no LLM.
 
-    * render   — passthrough (a workbook IS HTML; the browser + Lit do the visuals)
     * parse_headlines — the `work-*` element outline (level + title + attrs)
     * tangle_plan     — the build plan (work-flow → world, work-component → leaf)
     * validate        — diagnostics over the parsed component graph
@@ -12,15 +11,6 @@ defmodule Workbooks.WorkbookHtmlTest do
   use ExUnit.Case, async: true
 
   alias Workbooks.Workbook
-
-  test "render is HTML passthrough — the workbook html IS the rendered output" do
-    html = ~s(<work-doc title="Hello Workbook"><p>intro text here</p></work-doc>)
-    assert Workbook.render(html) == html
-  end
-
-  test "empty source → valid string, no crash" do
-    assert Workbook.render("") == ""
-  end
 
   test "parse_headlines extracts the work-* node outline (level + title)" do
     src = ~s(<work-doc title="Demo"><work-section title="Section A"></work-section><work-section title="Section B"></work-section></work-doc>)

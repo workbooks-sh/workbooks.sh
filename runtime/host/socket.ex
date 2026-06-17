@@ -30,6 +30,6 @@ defmodule Workbooks.Socket do
   defp dispatch("parse", org), do: Workbooks.Workbook.parse_headlines(org)
   defp dispatch("tangle", org), do: Workbooks.Workbook.tangle_plan(org)
   defp dispatch("validate", org), do: Workbooks.Workbook.validate(org)
-  defp dispatch("render", org), do: %{"html" => Workbooks.Workbook.render(org)}
+  defp dispatch("render", org), do: %{"html" => org}
   defp dispatch(_, _), do: %{"error" => "unknown fn"}
 end

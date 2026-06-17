@@ -145,7 +145,7 @@ defmodule Workbooks.Publish.Site do
   defp render_page(org_path, title, nav_html, current_url, config) do
     case File.read(org_path) do
       {:ok, org} ->
-        body_html = Workbooks.Workbook.render(org)
+        body_html = org
         site_title = config["PUBLISH_TITLE"] || "Workbooks"
         {:ok, PublicWeb.site_page(title, body_html, nav_html, current_url, site_title)}
 
