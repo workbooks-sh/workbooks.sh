@@ -123,7 +123,7 @@
     <section class="dim">
       <h2>Drift — survivors of the deleted org/OQL world + the toolkit→work-kit rename</h2>
       <p class="goal">Same root as the dead OQL call. Two competing workflow engines, the whole CLI still authoring
-        <code>.org</code>, a manifest format mismatch CLI↔runtime, and stale wb/wbx names that risk the guardrail test.</p>
+        <code>.org</code>, a manifest format mismatch CLI↔runtime, and stale wb/work names that risk the guardrail test.</p>
       <span class="tag">HTML-only model not yet enforced</span>
       <board-view columns="high,med,low">
         <board-task status="high" title="public_web.ex:212 calls deleted Workbooks.OQL.render/1 (same as deadcode #1). Serve the stored HTML directly — it renders client-side via work-* elements.">drift · runtime/host/public_web.ex:212</board-task>
@@ -131,7 +131,7 @@
         <board-task status="high" title="groundskeeper.ex:164 author_prompt instructs the LLM to emit native org-mode TODO outlines → writes &lt;slug&gt;.org. Generates the deleted format. Regenerate as &lt;work-flow&gt; HTML.">drift · runtime/host/groundskeeper.ex:164</board-task>
         <board-task status="high" title="CLI scaffolds/reads .org: main.rs (workbook.org), commands.rs (deployment.org probe), deploy/mod.rs (FILE=deployment.org, parses #+DEPLOY_TOOLKITS). Switch to .html + attribute config.">drift · cli/src/{main,commands}.rs, deploy/mod.rs</board-task>
         <board-task status="high" title="CLI import/audit author manifest.org (#+TOOLKIT/#+KIND) while runtime work_kits.ex parses manifest.html via Floki. A CLI-imported toolkit's manifest is UNREADABLE by the runtime. Emit manifest.html.">drift · cli/src/{import,audit}.rs</board-task>
-        <board-task status="med" title="Stale wb/wbx names in user-facing strings + doc comments (commands.rs 'wbx {version}', audit/import 'wbx toolkit push', kernel.rs '`wb query`'). cli_name_test.exs is a whole-repo guardrail. Replace wb/wbx → work.">drift · cli/src/{commands,audit,import,kernel}.rs</board-task>
+        <board-task status="med" title="Stale wb/work names in user-facing strings + doc comments (commands.rs 'work {version}', audit/import 'work toolkit push', kernel.rs '`work query`'). cli_name_test.exs is a whole-repo guardrail. Replace wb/work → work.">drift · cli/src/{commands,audit,import,kernel}.rs</board-task>
         <board-task status="med" title="work_kits.ex moduledoc still says 'Toolkit' 168× and hard-parses &lt;work-toolkit&gt; at :49. Rename vocab to work-kit; migrate the loader onto &lt;work-ref rel=kit&gt; (p0.1).">drift · runtime/host/work_kits.ex:2-49</board-task>
         <board-task status="med" title="compilers.ex:2230 reads Floki.attribute('work-toolkit') off the dissolving element. Migrate to the work-ref edge alongside the loader migration.">drift · runtime/host/compilers.ex:2230</board-task>
         <board-task status="med" title="workponents doc-element comments LIE: 'OQL kernel', '#+EXEC cells', 'orgize parity' — all deleted. Rewrite to the work-src/Dock model.">drift · workponents/src/elements/docs/{wb-doc-cell,render,wb-doc}.js</board-task>

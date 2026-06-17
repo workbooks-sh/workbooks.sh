@@ -73,7 +73,7 @@ YOUR FRONT: THE AGENTIC SURFACE BEYOND COMPOSITION. The agent's job is full-serv
 - runtime/host/agent.ex (the agent loop — tools, how it calls shell, how it finishes), runtime/host/llm.ex (tool-call handling), runtime/host/cli.ex + runtime/host/cli/* (the work CLI verbs).
 - runtime/host/evals/components.ex + runtime/bench/agent_evals.exs (what we currently eval).
 - skills/* (the toolkit/skill surface), and how toolkit discovery works (memory says: agents have ONE tool = bash; "toolkits" = CLIs on PATH + skill files + progressive-disclosure subcommands; NEVER a ToolRegistry).
-Map: the FULL set of things the agent DOES (compose, run 'work' verbs, bash, discover toolkits/skills, bundle/publish, inspect/answer/assist). What a real agentic TRAJECTORY looks like end-to-end (discover -> compose -> wb build -> fix -> bundle). Identify which behaviors are TEACHABLE from synthetic data vs only from REAL LOGS over time (e.g. assisting/communication, error-recovery, discovery dead-ends). Define the logs-as-corpus flywheel: what to capture from real runs, how to gate it, how it feeds the next fine-tune. How to bootstrap before logs exist (Claude-CLI trajectory distillation).
+Map: the FULL set of things the agent DOES (compose, run 'work' verbs, bash, discover toolkits/skills, bundle/publish, inspect/answer/assist). What a real agentic TRAJECTORY looks like end-to-end (discover -> compose -> work build -> fix -> bundle). Identify which behaviors are TEACHABLE from synthetic data vs only from REAL LOGS over time (e.g. assisting/communication, error-recovery, discovery dead-ends). Define the logs-as-corpus flywheel: what to capture from real runs, how to gate it, how it feeds the next fine-tune. How to bootstrap before logs exist (Claude-CLI trajectory distillation).
 Return ~250-350 lines: "what the agent actually does" + "trajectory shape" + "synthetic-able vs logs-only" + "the logs flywheel + bootstrap".`,
     { label: 'research:agentic', phase: 'Research', model: 'opus' }),
 
@@ -102,7 +102,7 @@ The plan MUST contain these sections, decisive and concrete (not a survey):
 2. WHAT LIVES IN WEIGHTS VS IN-CONTEXT — the explicit split. The mechanism for teaching NEW verbs/toolkits zero-shot (contract-in-prompt SFT so the model learns READ-then-USE). This is the centerpiece.
 3. CORPUS COMPOSITION — every task shape with rough %: catalog-grounded component composition, spine usage (work-src/ref/flow), bundling, CLI/bash/work-verb tool-use, discovery, assisting/communication. Which are synthetic-from-registry, which are teacher-distilled, which are logs-only.
 4. DATA SOURCES & THE TEACHER SPLIT — registry-synthetic, Claude-CLI trajectories, MiniMax bulk, real logs. Concrete generation recipe per source.
-5. THE GATE — the deterministic machine-lint (design-lint + CEM-tag-existence + theme-contract enums + wb build/render) as the rejection-sampler. What's deterministic vs judge-needed.
+5. THE GATE — the deterministic machine-lint (design-lint + CEM-tag-existence + theme-contract enums + work build/render) as the rejection-sampler. What's deterministic vs judge-needed.
 6. THE LOGS FLYWHEEL — capture, gate, recycle real agent runs into the next fine-tune; bootstrap before logs exist.
 7. TRAINING PIPELINE — fold into the existing Phase 0->1->2 (SFT -> length-penalized pref-opt -> serve Q5), with Granite-4.1-specific recipe facts.
 8. SYSTEM FIXES — the ranked workponents/substrate changes that shrink the corpus + raise reliability (and align around agentic memory). Mark which are prerequisites.

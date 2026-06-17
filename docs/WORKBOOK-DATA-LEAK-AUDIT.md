@@ -66,7 +66,7 @@ renders the stored org via `static_page/2` (`public_web.ex:322-333`).
   `static_doc(id, org)` via the orgitorial renderer (`public_web.ex:273-388`) — a **rendered org → HTML
   doc**. It injects only `Bundle.loader_block()` (`public_web.ex:385`), the hydration
   JS, **not any VFS bundle**.
-- `Publish.render/2` (the `wb publish` path, `publish.ex:90-97`) is the same:
+- `Publish.render/2` (the `work publish` path, `publish.ex:90-97`) is the same:
   `PublicWeb.static_page(title, org)` → HTML file. No VFS embed.
 
 So on the **public content plane**, the served bytes are the rendered page + loader.
@@ -82,7 +82,7 @@ with a defense-in-depth CSP that treats embedded bundle bytes as inert data
 |---|---|---|---|
 | `Bundle.ship` (share/sign, store/3 archive) | Yes (`workspace` only by default) | Yes — `public_only` `DELETE` + `VACUUM` (`vfs.ex:69-82`) | safe-by-default |
 | CLI/RCP `bundle` (single-file build) | No — file tree only | Yes — `read_tree` strips (`bundle.ex:233-238`) | safe-by-default |
-| Public serve / `wb publish` | No | n/a (no VFS) | rendered org only |
+| Public serve / `work publish` | No | n/a (no VFS) | rendered org only |
 | RCP `/rcp/bundle` (desktop passthrough) | Whatever caller ships | **No server-side strip** — see D1 | caller-controlled |
 
 ---

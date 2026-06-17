@@ -58,7 +58,7 @@ Research report — 2026-06-16. Use case: a small, cheap, CPU-servable model spe
 
 **Catastrophic forgetting.** Narrow SFT overwrites pretraining knowledge ([forgetting scaling arxiv](https://arxiv.org/html/2401.05605v1)). Mitigate with **replay**: cited ratios span 1% to 1:1; an adversarial-mix study found ≈25% general optimal. **Practical band: 10-20% general/replay data** mixed in; sweep it.
 
-**Synthetic generation.** Self-Instruct seeding; **distillation from a stronger teacher** (high-leverage for a narrow domain — generate Workbooks/Workponents pairs with a strong model); **ROUGE-L dedup**; quality filtering via LLM-judge. **Crucially for a DSL: executable verification** — does the generated workbook/component *parse/build/render*? Use `wb` build + the eval harness as a hard correctness gate. That's the single strongest filter you have.
+**Synthetic generation.** Self-Instruct seeding; **distillation from a stronger teacher** (high-leverage for a narrow domain — generate Workbooks/Workponents pairs with a strong model); **ROUGE-L dedup**; quality filtering via LLM-judge. **Crucially for a DSL: executable verification** — does the generated workbook/component *parse/build/render*? Use `work` build + the eval harness as a hard correctness gate. That's the single strongest filter you have.
 
 ## 5. Re-quantize + deploy loop, and quality loss
 
@@ -85,7 +85,7 @@ python setup_env.py -md models/<model> -q i2_s
 - **(iii) LoRA on a non-BitNet small model** — same as (ii); the practical default.
 
 **Recommended pipeline (~$10-30 total):**
-1. **Build a ~500-2,000-pair corpus**: distill Workbooks/Workponents/toolkit/org-mode instruction→code pairs from a strong teacher; **hard-gate every example through `wb` build + the eval harness** (executable verification); 10-20% general-instruction replay; ROUGE-L dedup.
+1. **Build a ~500-2,000-pair corpus**: distill Workbooks/Workponents/toolkit/org-mode instruction→code pairs from a strong teacher; **hard-gate every example through `work` build + the eval harness** (executable verification); 10-20% general-instruction replay; ROUGE-L dedup.
 2. **QLoRA fine-tune Qwen2.5-3B-Instruct** on one RunPod A100 (~1-3 GPU-hr, **~$2-15**).
 3. **Merge LoRA → export Q4_K_M GGUF** (llama.cpp `convert` + `quantize`).
 4. **Serve on Fly CPU microVM** via llama.cpp (mirrors your existing `bitnet.cpp` experiment harness).

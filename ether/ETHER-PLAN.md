@@ -44,17 +44,17 @@ Order (both research briefs converge): **distill+verify corpus → QLoRA-SFT →
 preference-opt → serve Q5.** [TRAINING-STRATEGY.md, INFERENCE-VIA-TRAINING.md]
 
 - **Phase 0 — Corpus.** Manufacture instruction→component pairs + agentic traces; **hard-gate
-  every example through `wb build`/render** (rejection sampling on execution feedback — our #1
+  every example through `work build`/render** (rejection sampling on execution feedback — our #1
   asset). ~1–5k verified, diverse, deduped examples (LIMA: less is more). **Org-mode denylist**
   hygiene gate. 5–20% replay vs forgetting.
   - **Teachers (split by job):**
     - **Claude Code CLI (subscription, free) — PRIMARY, for trajectory distillation.** It
-      produces real *agentic traces* (jump-to-file → edit-region → `wb build` → fix), which
+      produces real *agentic traces* (jump-to-file → edit-region → `work build` → fix), which
       teach **token-efficiency + agentic discipline** (Composer's biggest win), not just final
       code. Highest quality, no per-token cost.
     - **MiniMax-M3 via OpenRouter — for bulk volume.** Cheap programmatic generation of many
       "build wb-X" → code pairs to fill pattern coverage. Per-token but cheap.
-  - Both outputs pass the same `wb build` gate before entering the set.
+  - Both outputs pass the same `work build` gate before entering the set.
 - **Phase 1 — QLoRA-SFT Granite-3B** on the verified corpus. *The 80% win.* 4-bit QLoRA, <$30,
   days not weeks. Corrects the buggy-but-plausible patterns into our verified idioms.
 - **Phase 2 — Preference-optimization with a length penalty (ORPO/SimPO).** The convergence
@@ -73,7 +73,7 @@ preference-opt → serve Q5.** [TRAINING-STRATEGY.md, INFERENCE-VIA-TRAINING.md]
 ## 4. Evaluation (already wired)
 Agentic, in-harness, web-component-centric (org deprecating). The integration is DONE:
 `llm.ex` `WB_LLM_BASE_URL` + XML tool-call recovery → our agent drives a self-hosted llama-server
-model. Score per model by **`wb build`/render gates + LLM judge + tokens-per-task**, workbooks
+model. Score per model by **`work build`/render gates + LLM judge + tokens-per-task**, workbooks
 laid side-by-side. Build the case suite + run per model (Granite-fine-tuned vs Qwen) as the
 decision gate. [agent_evals.exs, evals/components.ex, Workbooks.Agent.run/3]
 
@@ -81,7 +81,7 @@ decision gate. [agent_evals.exs, evals/components.ex, Workbooks.Agent.run/3]
 The reason Granite matters beyond "our cheap model": **the whole pipeline generalizes.**
 - We prove it on **our** Granite (dogfood): our docs + components → fine-tuned Granite-3B.
 - Then expose it as a **self-serve tenant capability**: a tenant points the pipeline at *their*
-  workbooks/components/docs, picks a teacher, runs the same `wb build`-gated distill→QLoRA, and
+  workbooks/components/docs, picks a teacher, runs the same `work build`-gated distill→QLoRA, and
   gets *their own* specialized model served on *their own* Ether box. Fits the project's
   per-tenant nexus / BYO-infra canon exactly: "bring your data, fine-tune your model, serve it
   cheap on CPU." This is the durable platform story — not a single model, a fine-tuning factory.
@@ -95,7 +95,7 @@ The reason Granite matters beyond "our cheap model": **the whole pipeline genera
 
 ## 7. Sequencing / dependencies
 1. **WAIT** on the org→web-component migration to settle (corpus must be web-component-only).
-2. Then **Phase 0** (the `wb build`-gated corpus) — serves whichever model we pick; first thing.
+2. Then **Phase 0** (the `work build`-gated corpus) — serves whichever model we pick; first thing.
 3. Phase 1 SFT → eval gate (fine-tuned Granite-3B vs base Qwen on the agentic eval).
 4. Phase 2 preference-opt → re-eval (quality + tokens-per-task).
 5. Serve on bare metal (Q5, prompt-cache, pack users).

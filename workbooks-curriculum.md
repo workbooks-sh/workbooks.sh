@@ -69,9 +69,9 @@
 ### 2.3  The one command you type
 `the-one-command` · 📝 Planned
 
-**Teaches:** Meet wbx, the single tool you talk to — what it does for you, and why you mostly won't need it to understand any of the rest.
+**Teaches:** Meet work, the single tool you talk to — what it does for you, and why you mostly won't need it to understand any of the rest.
 
-**Reference docs:** `wbx`, `modes`, `pipelines`, `doctor`
+**Reference docs:** `work`, `modes`, `pipelines`, `doctor`
 
 ---
 
