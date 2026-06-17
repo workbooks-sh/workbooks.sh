@@ -1,14 +1,4 @@
-<work-toolkit
-  id="brandnana"
-  cli="brandnana"
-  version="0.1.0"
-  status="experimental"
-  tagline="Ad + brand intelligence substrate — brand identity, ads, social, catalog, design tokens, brief + brand-book composition against api.brandnana.net."
-  skill-dir="skills/"
-  data-kind="toolkit"
-  data-flow="pre-read (spawn brand-scout per slice) → author analysis/*.org → `brandnana analysis check .` (gate to PASS) → vision-batch creatives (`creative analyze --file`) → compose + `book publish-rendered` → `book render-slides` + vision review. cat a skill only when you reach its step."
-  data-env-keys="BRANDNANA_API_KEY"
-  data-env-note="BRANDNANA_API_KEY is the toolkit&#x27;s only required cred. The `logo` command ADDITIONALLY reads two optional keys from the dev&#x27;s OWN environment, if present: LOGO_DEV_TOKEN (acquires the official logo.dev source) and GROQ_API_KEY (enables Groq-vision usage tags on raster candidates). Both are optional — the cascade degrades gracefully without them.">
+<work-ref rel="kit" name="brandnana" prefix="brandnana" version="0.1.0" status="experimental" cli="brandnana" skill-dir="skills/" tagline="Ad + brand intelligence substrate — brand identity, ads, social, catalog, design tokens, brief + brand-book composition against api.brandnana.net." data-kind="toolkit" data-flow="pre-read (spawn brand-scout per slice) → author analysis/*.org → `brandnana analysis check .` (gate to PASS) → vision-batch creatives (`creative analyze --file`) → compose + `book publish-rendered` → `book render-slides` + vision review. cat a skill only when you reach its step." data-env-keys="BRANDNANA_API_KEY" data-env-note="BRANDNANA_API_KEY is the toolkit&#x27;s only required cred. The `logo` command ADDITIONALLY reads two optional keys from the dev&#x27;s OWN environment, if present: LOGO_DEV_TOKEN (acquires the official logo.dev source) and GROQ_API_KEY (enables Groq-vision usage tags on raster candidates). Both are optional — the cascade degrades gracefully without them."/>
   <work-doc title="brandnana — brand-intelligence CLI">
     A *base* toolkit (BACKEND-PATTERN.org §KIND ladder): a CLI on PATH plus
     the skill files an agent reads to drive it. The =brandnana= binary is a
@@ -68,4 +58,4 @@
     live with that agent&#x27;s profile (=substrates/brandnana/profile/skills/=),
     not here — this toolkit is the CLI reference they call into.
   </work-doc>
-</work-toolkit>
+

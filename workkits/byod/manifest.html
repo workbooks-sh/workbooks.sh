@@ -1,12 +1,5 @@
-<work-toolkit
-  id="byod"
-  cli="work"
-  cli-range="&gt;=0.1"
-  version="0.1.0"
-  status="experimental"
-  tagline="Turn a forged workbook into a real, multi-tenant app — live DB + auth, no engine."
-  requires="wb, node&gt;=20, railway&gt;=3 (to deploy the gateway)"
-  skill-dir="skills/">
+<work-ref rel="kit" name="byod" prefix="byod" version="0.1.0" status="experimental" cli="work" cli-range="&gt;=0.1" skill-dir="skills/" tagline="Turn a forged workbook into a real, multi-tenant app — live DB + auth, no engine."/>
+<work-ref rel="needs" to="wb, node&gt;=20, railway&gt;=3 (to deploy the gateway)"/>
   <work-doc title="byod — workbook → app with a live backend + auth">
     Connect a forged workbook to a live database (Postgres, or Cloudflare D1)
     through a secure data backend, with the developer&#x27;s OWN auth (BetterAuth) for
@@ -30,4 +23,4 @@
     |------------------------------------+-------------------------------------|
     | =connect-a-workbook-to-a-database= | Give a forged workbook a live Postgres + the developer&#x27;s own auth (sessions, orgs, API keys), no engine |
   </work-doc>
-</work-toolkit>
+

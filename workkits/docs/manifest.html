@@ -1,14 +1,4 @@
-<work-toolkit
-  id="docs"
-  cli="work"
-  cli-range="&gt;=0.1.0"
-  version="0.1.0"
-  status="partial"
-  tagline="A reusable, drift-checked documentation pipeline for any Workbooks tenant — Diátaxis-shaped org source, reference auto-tangled from your own code, a forced honesty/maturity gate, and agent/SEO output. Point it at your repo, get docs.workbooks.sh&#x27;s exact machinery for free."
-  skill-dir="skills/"
-  data-kind="knowledge+pipeline"
-  data-flow="read this front door → author with the docs-authoring skill (.claude/skills/docs-authoring) → run the work docs verb family below. Reference renderer = toolkits/orgitorial; publish target/identity = toolkits/publish + runtime/host/publish/site.ex; source-derivation = work tangle/lint."
-  data-reuses="toolkits/orgitorial, toolkits/publish, runtime/host/publish/site.ex, work tangle, work lint">
+<work-ref rel="kit" name="docs" prefix="docs" version="0.1.0" status="partial" cli="work" cli-range="&gt;=0.1.0" skill-dir="skills/" tagline="A reusable, drift-checked documentation pipeline for any Workbooks tenant — Diátaxis-shaped org source, reference auto-tangled from your own code, a forced honesty/maturity gate, and agent/SEO output. Point it at your repo, get docs.workbooks.sh&#x27;s exact machinery for free." data-kind="knowledge+pipeline" data-flow="read this front door → author with the docs-authoring skill (.claude/skills/docs-authoring) → run the work docs verb family below. Reference renderer = toolkits/orgitorial; publish target/identity = toolkits/publish + runtime/host/publish/site.ex; source-derivation = work tangle/lint." data-reuses="toolkits/orgitorial, toolkits/publish, runtime/host/publish/site.ex, work tangle, work lint"/>
   <work-doc title="docs — the documentation pipeline, as a toolkit">
     This toolkit packages the system that builds =docs.workbooks.sh= so any
       tenant can point it at their own code and inherit the same skeleton:
@@ -175,4 +165,4 @@
       - Renderer: [[file:../orgitorial/manifest.org][orgitorial toolkit]]
       - Identity / federation: [[file:../publish/manifest.org][publish toolkit]]
   </work-doc>
-</work-toolkit>
+

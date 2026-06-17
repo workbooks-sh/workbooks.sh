@@ -1,12 +1,5 @@
-<work-toolkit
-  id="capacitor"
-  cli="cap"
-  cli-range="&gt;=6.0"
-  version="0.2.0"
-  status="experimental"
-  tagline="Capacitor — wrap a forged workbook as a native iOS app, run it, and ship it to TestFlight."
-  requires="node&gt;=18, xcode (full), capacitor&gt;=8 (cocoapods optional — Cap 8 uses SPM)"
-  skill-dir="skills/">
+<work-ref rel="kit" name="capacitor" prefix="capacitor" version="0.2.0" status="experimental" cli="cap" cli-range="&gt;=6.0" skill-dir="skills/" tagline="Capacitor — wrap a forged workbook as a native iOS app, run it, and ship it to TestFlight."/>
+<work-ref rel="needs" to="node&gt;=18, xcode (full), capacitor&gt;=8 (cocoapods optional — Cap 8 uses SPM)"/>
   <work-doc title="capacitor — native iOS wrapper for workbooks">
     Wrapper around Capacitor, invoked as ~npx cap~ (no global install needed). The
     Workbooks use case: take a built workbook (=dist/&lt;slug&gt;.html=) and wrap it as a
@@ -52,4 +45,4 @@
     |--------------------------+---------------------------------------------------|
     | =ship-a-workbook-to-ios= | Wrap a built =dist/&lt;slug&gt;.html= as a native iOS app and ship it to TestFlight (npx cap → Xcode archive/sign → upload, with the one-time signing + ASC setup) |
   </work-doc>
-</work-toolkit>
+

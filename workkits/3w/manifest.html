@@ -1,15 +1,4 @@
-<work-toolkit
-  id="3w"
-  cli="3w"
-  cli-range="&gt;=0.1"
-  version="0.1.0"
-  status="experimental"
-  tagline="Local-first deep-research browser — keyless web search, clean reads, and (soon) crawl/harvest into a workbook context repository."
-  skill-dir="skills/"
-  data-kind="toolkit"
-  data-env-keys="WB_WEB_PROXY SERP_API_KEY"
-  data-env-note="All optional. Zero keys = fully working (native search + readability + lightpanda render). WB_WEB_PROXY routes fetches/renders through a rotation proxy (HTTP/HTTPS). SERP_API_KEY only if you ever need Google-grade coverage (the native pool deliberately excludes Google)."
-  data-flow="3w search → pick URLs → 3w read --render where needed → (later) 3w crawl/harvest → 3w repo build">
+<work-ref rel="kit" name="3w" prefix="3w" version="0.1.0" status="experimental" cli="3w" cli-range="&gt;=0.1" skill-dir="skills/" tagline="Local-first deep-research browser — keyless web search, clean reads, and (soon) crawl/harvest into a workbook context repository." data-kind="toolkit" data-env-keys="WB_WEB_PROXY SERP_API_KEY" data-env-note="All optional. Zero keys = fully working (native search + readability + lightpanda render). WB_WEB_PROXY routes fetches/renders through a rotation proxy (HTTP/HTTPS). SERP_API_KEY only if you ever need Google-grade coverage (the native pool deliberately excludes Google)." data-flow="3w search → pick URLs → 3w read --render where needed → (later) 3w crawl/harvest → 3w repo build"/>
   <work-doc title="3w — keyless web research from inside the sandbox">
     =3w= (WWW) gives an agent the open web with no API keys and no per-call
     cost. It is NOT a generic browser wrapper: =search= is native multi-engine
@@ -34,4 +23,4 @@
     | =read-extract= | Pull a URL&#x27;s content as clean markdown (JS-aware)          |
     | =troubleshoot= | A search/read came back empty, walled, or CAPTCHA&#x27;d        |
   </work-doc>
-</work-toolkit>
+

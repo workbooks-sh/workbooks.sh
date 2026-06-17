@@ -1,11 +1,5 @@
-<work-toolkit
-  id="acp"
-  cli="acp-run.sh"
-  version="0.1.0"
-  status="experimental"
-  tagline="Run a connected coding agent (Codex / Claude Code) in an isolated local microVM against a worktree."
-  requires="krunvm (host), WB_ACP_EXPERIMENTAL=1, a connected coding agent"
-  skill-dir="skills/">
+<work-ref rel="kit" name="acp" prefix="acp" version="0.1.0" status="experimental" cli="acp-run.sh" skill-dir="skills/" tagline="Run a connected coding agent (Codex / Claude Code) in an isolated local microVM against a worktree."/>
+<work-ref rel="needs" to="krunvm (host), WB_ACP_EXPERIMENTAL=1, a connected coding agent"/>
   <work-doc title="acp — coding agents in local microVMs">
     EXPERIMENTAL (v2, local-only). Hand a task + a worktree to the user&#x27;s OWN
     subscribed coding agent (Codex / Claude Code), run inside a throwaway krunvm
@@ -31,4 +25,4 @@
     | =overview=    | First contact — what this toolkit is + the isolation model  |
     | =run-agent=   | Hand a task + worktree to a connected agent in a microVM    |
   </work-doc>
-</work-toolkit>
+
