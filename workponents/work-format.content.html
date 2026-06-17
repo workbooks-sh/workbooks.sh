@@ -82,16 +82,17 @@ end
 <script type="text/plain" id="c-syn-compute">
 ## Scoring
 
-Compute lives in a `sandbox` block — Elixir that compiles to wasm and runs in the
-sandbox. Orb is the compiler underneath, but you just write Elixir:
+Compute lives in a `sandbox` block — you write plain Elixir, and the target runs
+it as wasm. You don't think about how:
 
 sandbox :score do
   def score(lead), do: lead.revenue / 1000 + lead.employees
 end
 
-# You only reach for orb-specific syntax (I32.global, defw, memory) when a case
-# genuinely needs low-level wasm types — e.g. a byte-level state machine.
-# Everything else is just clean Elixir.
+# HOW (a footnote, never something you author): client/sandbox Elixir runs on an
+# Elixir-in-wasm runtime, compiled in at build — so real Elixir carries over.
+# foreign langs compile straight to wasm. Orb (low-level wasm-in-Elixir) is a
+# rare escape hatch for hot paths, compiled like any other source language.
 </script>
 
 <!-- ══════════════════ PRIMITIVES exploration ══════════════════ -->
@@ -551,7 +552,7 @@ header is declared, never run — the file's data-lane twin of the index.
 #   figure "…" do … end    captioned figure (renders, does NOT run)
 #   - [ ] casual todo      a checklist for a human (not tracked data)
 
-# ── function · elixir → orb → wasm · the RUNTIME runs ──────────────
+# ── function · code that RUNS · client/sandbox → wasm, server → BEAM ──
 #   client :x  do … end       → wasm, in the browser
 #   sandbox :x do … end       → wasm, in the sandbox (any lang; default :elixir)
 #   server :x  do … end       full Elixir/OTP, on the BEAM
@@ -586,7 +587,7 @@ header is declared, never run — the file's data-lane twin of the index.
 # its frontmatter instead; app-wide deps live here.
 #
 # do we need mix?  no — mix.exs would be a SECOND manifest fighting the index.
-#   the weave does mix's job: pull hex, compile elixir→orb→wasm, in-sandbox.
+#   the weave does mix's job: pull hex, compile elixir → wasm, in-sandbox.
 # do we need vite? its ROLE yes (dev/HMR + bundling svelte/solid/js islands),
 #   the TOOL no — a vite-MODEL lane, no Node. same for cargo, npm.
 #
@@ -653,7 +654,7 @@ end
 # run it — show the value:
 ```probe :score
 score(revenue: 50_000, employees: 20)
-```                                  →  => 70 · 0.4ms · in the container
+```                                  →  => 70 · 0.4ms · in the sandbox
 
 # watch it — live telemetry from the running unit:
 ```probe :score, watch: :telemetry
@@ -766,11 +767,12 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
 <template id="e-syn-compute">
   <div class="kick">syntax · compute</div>
   <h2>Compute <span class="lane l-fn">function</span> <span class="lane l-build">build</span></h2>
-  <p class="tagline">Clean Elixir in a <code>sandbox</code> block; the target compiles it to wasm. Orb underneath, but you just write Elixir.</p>
-  <h3>Two lanes in one block</h3>
-  <ul><li><b>Function</b> — the <code>def …</code> in the body is the compute. Authored as plain Elixir; <b>Orb compiles it to wasm</b> so it runs in the sandbox. Surface orb-specific syntax (<code>I32</code>, <code>defw</code>, <code>memory</code>) only when a case truly needs low-level wasm types.</li>
-  <li><b>Build</b> — the <code>sandbox</code> target itself is the build directive: it compiles the unit to wasm. No separate step, no <code>tangle:</code> to write.</li></ul>
-  <div class="note">Switch the target to <code>server :score</code> and the same code runs full Elixir on the BEAM instead — the target is the only thing that changes. <code>sandbox</code>/<code>client</code> mean wasm; <code>server</code> means BEAM.</div>
+  <p class="tagline">You write plain Elixir; the <code>sandbox</code> target runs it as wasm. The engine is invisible.</p>
+  <h3>Just Elixir</h3>
+  <p>The <code>def …</code> is the compute — ordinary Elixir, no dialect to learn. <b>Client/sandbox Elixir runs on an Elixir-in-wasm runtime</b> (AtomVM, compiled in at build), so real Elixir semantics carry over — you don't map types or memory by hand.</p>
+  <h3>One target away from the server</h3>
+  <p>Switch to <code>server :score</code> and the same code runs full Elixir/OTP on the BEAM — the target is the only thing that changes. <code>sandbox</code>/<code>client</code> mean wasm; <code>server</code> means BEAM.</p>
+  <div class="note"><b>Orb</b> — Elixir that authors low-level wasm directly — isn't how you write compute; it's a rare escape hatch (hot paths, extending the system), compiled like any other source language.</div>
 </template>
 
 <template id="e-prim-unit">
@@ -796,12 +798,12 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <p class="tagline">The example on the left is one document written in all four lanes — read it top to bottom. Here's the quick reference.</p>
   <div class="tests">
     <div class="test"><div class="t">rich text — markdown</div><div class="v">what you READ</div><div class="d">prose, headings, figures, tables. only this — never logic.</div></div>
-    <div class="test"><div class="t">function — elixir → orb → wasm</div><div class="v">what RUNS</div><div class="d">compute, state machines, workflows. clean Elixir; Orb because it runs in the container.</div></div>
-    <div class="test"><div class="t">build — plain elixir</div><div class="v">what COMPILES function</div><div class="d">the target compiles it; <code>test</code> gates it. the one Elixir-but-not-Orb thing.</div></div>
+    <div class="test"><div class="t">function — elixir → wasm, or BEAM</div><div class="v">what RUNS</div><div class="d">compute, state machines, workflows. plain Elixir; client/sandbox run it as wasm, server on the BEAM.</div></div>
+    <div class="test"><div class="t">build — plain elixir</div><div class="v">what COMPILES function</div><div class="d">the target compiles it; <code>test</code> gates it.</div></div>
     <div class="test"><div class="t">data — declarative elixir</div><div class="v">what the system TRACKS</div><div class="d">tasks, users, types, config. typed + validated at the weave gate.</div></div>
   </div>
   <h3>The discriminator</h3>
-  <p>Human reads it → markdown. Runtime runs it → Elixir/Orb. Compiler builds it → plain Elixir (tangle). System queries it as data → declarative Elixir. <b>Never confuse function with literacy.</b></p>
+  <p>Human reads it → markdown. Runtime runs it → Elixir (as wasm on client/sandbox, or the BEAM on server). Compiler builds it → the target compiles. System queries it as data → declarative Elixir. <b>Never confuse function with literacy.</b></p>
 </template>
 
 <template id="e-prim-types">
@@ -861,7 +863,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h2>the weave</h2>
   <p class="tagline">It's a CLI — <code>work dev</code> for the loop, <code>work bundle</code> to ship.</p>
   <h3>Two engines, one gate</h3>
-  <p>Front-end lanes go through a Vite-class engine (borrow Vite's dev/HMR; ship in-sandbox, no Node). Server lanes: rust/zig → wasm via in-sandbox clang; elixir/orb → wasm/BEAM. Both feed the <b>weave gate</b>: resolve refs, audit caps + deps, run tests. Then server regions SSR from the BEAM, client lanes become islands, everything gzips into the blob.</p>
+  <p>Front-end lanes go through a Vite-class engine (borrow Vite's dev/HMR; ship in-sandbox, no Node). Compute lanes: rust/zig → wasm via in-sandbox clang; Elixir → wasm (client/sandbox) or the BEAM (server). Both feed the <b>weave gate</b>: resolve refs, audit caps + deps, run tests. Then server regions SSR from the BEAM, client lanes become islands, everything gzips into the blob.</p>
   <div class="note">Where Vite fits: <b>role yes, Node no.</b> Vite-model for the dev loop; our in-sandbox lane for the ship — portable, reproducible, zero native exec.</div>
 </template>
 
@@ -1009,7 +1011,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <li class="pro"><b><code>server</code></b> — full Elixir/OTP on the <b>BEAM</b> (secrets, db, network). Trusted; runs only on a nexus you own.</li></ul>
   <h3>The grammar</h3>
   <p><code>&lt;target&gt; [language] :name do … end</code>. Language defaults to Elixir; foreign code (<code>sandbox rust :enrich</code>) rides the same block, body raw inside <code>do…end</code>. <b>Any language targets client/sandbox</b> (it all compiles to wasm); <b>only Elixir targets server</b> — foreign code is always sandboxed, never native on the host. With <b>no target</b>, a unit is a <i>static definition</i> placed by whoever references it.</p>
-  <div class="note">The prefix is the engine, the placement, <b>and</b> the trust tier in one word. Inside <code>client</code>/<code>sandbox</code>, Elixir is automatically the wasm subset (the compiler rejects <code>net</code>/processes); inside <code>server</code> it's the full language. You never type "orb" or "tangle" — the target says it.</div>
+  <div class="note">The prefix is the engine, the placement, <b>and</b> the trust tier in one word. Inside <code>client</code>/<code>sandbox</code> your Elixir runs as wasm; things that need the server (<code>net</code>, the db) are rejected there. Inside <code>server</code> it's full Elixir/OTP. You never type "orb" or "tangle" — the target says it.</div>
 </template>
 
 <template id="e-syn-test">
@@ -1054,7 +1056,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h3>The index is the only manifest</h3>
   <p>Deps for every ecosystem are <code>&lt;link rel="package" href="hex:… | npm:… | cargo:…"&gt;</code> in the index (app-wide) or a file's frontmatter (unit-local). <b>Pinned versions are the lockfile</b> — source is the lock, no sidecar to drift.</p>
   <h3>Do we need mix? Vite?</h3>
-  <ul><li class="con"><b>mix.exs — no.</b> A second manifest fighting the index. The weave does mix's job: pull hex, compile elixir → orb → wasm, in-sandbox.</li>
+  <ul><li class="con"><b>mix.exs — no.</b> A second manifest fighting the index. The weave does mix's job: pull hex, compile elixir → wasm, in-sandbox.</li>
   <li class="pro"><b>Vite's role — yes; the tool — no.</b> A vite-<i>model</i> lane gives dev / HMR + bundles svelte / solid / js islands, with no Node. Same story for cargo and npm.</li></ul>
   <div class="note"><b>One build tool — <code>work bundle</code> — absorbs every ecosystem's role and adopts none of their manifests.</b> That's the no-JSON rule and DRY, expressed as a build system.</div>
 </template>
