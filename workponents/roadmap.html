@@ -80,6 +80,21 @@
     </section>
 
     <section class="phase">
+      <h2>Live signals — evals · telemetry · tests</h2>
+      <p class="goal">Current health of the things we measure, authored as HTML the human edits in place.
+         Same composition-as-source contract as the board above — no JSON, no sidecar. Hot-reloads with the rest of the page.
+         Runtime mirror (when it's up): <a href="http://localhost:4000/capabilities">/capabilities</a> · <a href="http://localhost:4000/health">/health</a>.</p>
+      <span class="tag">measured · human-updated · live</span>
+      <board-view columns="todo,doing,done,blocked">
+        <board-task status="doing" title="Full suite — `mix test` in runtime/ (last human-confirmed: 1018 tests green; refresh after each landing)">tests.suite</board-task>
+        <board-task status="todo" title="AI agent evals — workbench harness on work-kit (Minimax M3, gemini judge); wire to surface pass-rate here (see p1.1)">eval.agents</board-task>
+        <board-task status="doing" title="Compiler-lane proof — rust/c/zig/python through the Dock end-to-end (see p1.2)">eval.compile</board-task>
+        <board-task status="todo" title="Telemetry — runtime /capabilities ledger live at :4000; mirror its top-line status into this column when docked">telemetry.caps</board-task>
+        <board-task status="todo" title="Dogfood loop — workbooks toolkit skills exercised against real `work` verbs (see p1.5)">tests.dogfood</board-task>
+      </board-view>
+    </section>
+
+    <section class="phase">
       <h2>Surfaces — the next layer (taste + judgment)</h2>
       <p class="goal">The consumer-facing tier: docs, desktop, the shipped examples. Human-in-the-loop on voice/UX.</p>
       <span class="tag">staged · human-in-loop</span>
