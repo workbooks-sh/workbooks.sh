@@ -252,16 +252,57 @@ user :analyst, name: "Ada"     # data lane
 </script>
 
 <script type="text/plain" id="c-prim-lanes">
-# The four lanes
+# The four lanes — one document, written in all of them
 
-Every line in a work file sits in exactly ONE lane, decided by who reads it:
+This whole file is a work document, and every line sits in exactly ONE lane,
+decided by a single question: WHO READS IT? This paragraph is markdown — the
+rich-text lane — so a human is reading it. It explains; it never runs.
 
-  rich text   prose, figures        a HUMAN reads        ->  markdown
-  function    compute, workflows    the RUNTIME runs     ->  elixir / orb -> wasm
-  build       tangle, untangle      the COMPILER builds  ->  plain elixir
-  data        tasks, types, config  the SYSTEM queries   ->  declarative elixir
 
-# markdown is rich text, full stop. Anything with behavior or fields is Elixir.
+## ① rich text — what a HUMAN reads   →   markdown
+
+Headings, **bold**, lists, links, quotes, figures: everything you're reading now.
+The rule that keeps the format clean — markdown only narrates. It never holds
+logic, a value, or a field. The moment a line gains behavior, it leaves this lane.
+
+
+## ② function — what the RUNTIME runs   →   elixir → orb → wasm
+
+The `def` below is real, runnable compute. It's Elixir, so it can never be
+mistaken for the prose around it:
+
+tangle "score.wasm" do
+  defmodule Scoring do
+    def score(lead), do: lead.revenue / 1000 + lead.employees
+  end
+end
+
+
+## ③ build — what the COMPILER builds   →   plain elixir
+
+That `tangle "score.wasm" do` wrapper is already the build lane — plain Elixir
+that says "compile these defs to this artifact." A `test` joins it, proving the
+unit at the weave gate (a red test ships no bundle):
+
+test :score do
+  assert Scoring.score(%{revenue: 50_000, employees: 20}) == 70
+end
+
+
+## ④ data — what the SYSTEM queries   →   declarative elixir
+
+Types and tasks are declarations the system reads and validates — not code it
+runs. They have fields, not a body:
+
+type Status = :todo | :doing | :done
+
+task "tune the scorer", status: :todo, owner: :ada, ref: :score
+
+
+## the discriminator
+
+Four lanes, one file. Ask only "who reads this line?" — a human, the runtime, the
+compiler, or the system — and the lane follows. Never confuse function with literacy.
 </script>
 
 <script type="text/plain" id="c-prim-types">
@@ -811,7 +852,7 @@ end
 <template id="e-prim-lanes">
   <div class="kick">primitive · the four lanes</div>
   <h2>The four lanes</h2>
-  <p class="tagline">The core primitive: every line belongs to exactly one lane, chosen by who reads it.</p>
+  <p class="tagline">The example on the left is one document written in all four lanes — read it top to bottom. Here's the quick reference.</p>
   <div class="tests">
     <div class="test"><div class="t">rich text — markdown</div><div class="v">what you READ</div><div class="d">prose, headings, figures, tables. only this — never logic.</div></div>
     <div class="test"><div class="t">function — elixir → orb → wasm</div><div class="v">what RUNS</div><div class="d">compute, state machines, workflows. clean Elixir; Orb because it runs in the container.</div></div>
