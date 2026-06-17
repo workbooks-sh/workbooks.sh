@@ -31,6 +31,7 @@
   .verdict.warn { background:var(--warn); color:var(--warn-ink); }
   .verdict.no { background:var(--no); color:var(--no-ink); }
   .verdict.new { background:var(--new); color:var(--new-ink); }
+  .verdict.book { background:var(--work-surface-soft); color:var(--work-fg-subtle); border:1px solid var(--work-border); }
   details { background:var(--work-surface); border:1px solid var(--work-border); border-radius:12px;
             padding:4px 18px; margin:18px 0; }
   details > summary { cursor:pointer; font-weight:600; padding:12px 0; }
@@ -56,6 +57,10 @@
   kits. (2) Never <em>over-scope</em> native — <code>&lt;details&gt;</code> is disclosure for anything, not
   "agent disclosure"; <code>&lt;ol&gt;</code> <em>means</em> sequence <em>in a flow</em> but is never restricted
   to one. Recognize meaning by context; don't impose it. Smaller engine, fully legible.</p>
+  <p class="lead"><b>And each leverage sorts into work or book</b> (a workbook = <code>&lt;work&gt;</code>, the engine
+  behind the Dock, + <code>&lt;book&gt;</code>, the rendered pages). The <span class="verdict book" style="display:inline">book</span>-tagged
+  ones — headings, figure/section, the button — are page structure, not the workflow substrate. The
+  substrate is the work-layer: structure, state, validation-as-guards, edges, scoped data, CSS views.</p>
 
   <div class="pillars">
     <div class="pillar"><b>HTML structure</b><p>ol/ul/details/dl — sequence, parallel, disclosure, k/v. The tree IS the flow.</p></div>
@@ -80,6 +85,7 @@
       <dt><span class="verdict warn">dense</span></dt><dd>works, but gets noisy — use sparingly / only where it earns it</dd>
       <dt><span class="verdict no">avoid</span></dt><dd>opaque or wrong-shaped — don't build meaning on it</dd>
       <dt><span class="verdict new">2023+</span></dt><dd>recent HTML/CSS — newly viable native leverage</dd>
+      <dt><span class="verdict book">book</span></dt><dd>book-layer — page/app structure, NOT the workflow substrate (the work/book split: work = the engine, book = the rendered pages)</dd>
     </dl>
   </details>
 
@@ -109,7 +115,7 @@
   &lt;work-src lang="rust"&gt;…&lt;/work-src&gt;   &lt;!-- folds away --&gt;
 &lt;/details&gt;</pre><span class="verdict ok">use</span></div>
 
-  <div class="row"><div class="el"><code>&lt;dl&gt; &lt;dt&gt; &lt;dd&gt;</code><span class="leverage">native key/value — config, a record's fields, metadata. A dict in HTML.</span></div>
+  <div class="row"><div class="el"><code>&lt;dl&gt; &lt;dt&gt; &lt;dd&gt;</code><span class="leverage">a native DICT — dt is the key (term), dd is the value (definition). It's HTML's "label → value" structure. Use it anywhere you have a set of pairs that should be SEMANTIC (not div-soup): a kit's config, an AGENT's params, a record's fields (a record IS a dl), a node's settings shown to a human. Queryable + styleable, and it says "these are pairs," not just "two boxes."</span></div>
     <pre>&lt;dl&gt;
   &lt;dt&gt;model&lt;/dt&gt;&lt;dd&gt;opus&lt;/dd&gt;
   &lt;dt&gt;every&lt;/dt&gt;&lt;dd&gt;6h&lt;/dd&gt;
@@ -119,11 +125,11 @@
     <pre>&lt;table&gt;&lt;tr&gt;&lt;th&gt;step&lt;/th&gt;&lt;th&gt;owner&lt;/th&gt;&lt;/tr&gt;
 &lt;tr&gt;&lt;td&gt;build&lt;/td&gt;&lt;td&gt;ci&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</pre><span class="verdict warn">dense</span></div>
 
-  <div class="row"><div class="el"><code>h1–h6 / hgroup</code><span class="leverage">the OUTLINE — a workbook's structure; the runtime reads headlines from these.</span></div>
-    <pre>&lt;h2&gt;Phase 1&lt;/h2&gt; … &lt;h3&gt;step&lt;/h3&gt;</pre><span class="verdict ok">use</span></div>
+  <div class="row"><div class="el"><code>h1–h6 / hgroup</code><span class="leverage">document OUTLINE — useful for a page's structure, but NOT a workflow primitive. Lives in &lt;book&gt; (the rendered pages), not the work substrate.</span></div>
+    <pre>&lt;h2&gt;Phase 1&lt;/h2&gt; … &lt;h3&gt;step&lt;/h3&gt;</pre><span class="verdict book">book</span></div>
 
-  <div class="row"><div class="el"><code>section / figure / hr</code><span class="leverage">regions, a captioned result unit, a phase divider. Semantic layout.</span></div>
-    <pre>&lt;figure&gt;&lt;chart-view …&gt;&lt;figcaption&gt;Q3&lt;/figcaption&gt;&lt;/figure&gt;</pre><span class="verdict ok">use</span></div>
+  <div class="row"><div class="el"><code>section / figure / hr</code><span class="leverage">page regions, a captioned figure, a divider — &lt;book&gt; page-structure, not workflow substrate. Reach for them when laying out an app page, not when authoring a flow.</span></div>
+    <pre>&lt;figure&gt;&lt;chart-view …&gt;&lt;figcaption&gt;Q3&lt;/figcaption&gt;&lt;/figure&gt;</pre><span class="verdict book">book</span></div>
 
   <h2>2 · Notes <span class="n">just prose — don't over-build it</span></h2>
   <p class="layer">"Context around code" is just <b>notes</b>, and notes are just <b>prose</b> — don't dress them up
@@ -154,9 +160,9 @@ the index is warm by **step 2**…&lt;/work-note&gt;</pre><span class="verdict w
     <pre>&lt;input type="range" name="threshold" min="0" max="1"&gt;
 &lt;input type="date" name="due"&gt;</pre><span class="verdict ok">use</span></div>
 
-  <div class="row"><div class="el"><code>&lt;form&gt; + validation</code><span class="leverage">input state AND a free guard system — required/pattern/min/max. Form validity = a native predicate a `when` edge can read.</span></div>
-    <pre>&lt;form&gt;&lt;input required pattern="\\d+"&gt;&lt;/form&gt;
-&lt;!-- :valid / :invalid drive a branch --&gt;</pre><span class="verdict ok">use</span></div>
+  <div class="row"><div class="el"><code>validation</code> (the real prize)<span class="leverage">forget the form chrome — VALIDATION is the leverage: required/pattern/min/max + :valid is a FREE native GUARD on any action. An edge fires only when its inputs are valid — :valid IS the precondition. The native "an action has constraints" mechanism, exactly what you want before any work-ref runs.</span></div>
+    <pre>&lt;input required pattern="[0-9]+" name="port"&gt;
+&lt;work-ref rel="call" to="deploy" when=":valid"/&gt;</pre><span class="verdict ok">use</span></div>
 
   <div class="row"><div class="el"><code>&lt;output&gt;</code><span class="leverage">"this is a computed result" — where a work-src's output renders.</span></div>
     <pre>&lt;output for="build"&gt;42 blocks&lt;/output&gt;</pre><span class="verdict ok">use</span></div>
@@ -167,8 +173,8 @@ the index is warm by **step 2**…&lt;/work-note&gt;</pre><span class="verdict w
   <div class="row"><div class="el"><code>&lt;progress&gt; &lt;meter&gt;</code><span class="leverage">flow completion / a metric / a gauge — native, NO SVG. (The roadmap bar should be this.)</span></div>
     <pre>&lt;progress value="3" max="9"&gt;&lt;/progress&gt;</pre><span class="verdict ok">use</span></div>
 
-  <div class="row"><div class="el"><code>&lt;button&gt;</code><span class="leverage">an action — fire a work-ref call, run a node, advance the flow.</span></div>
-    <pre>&lt;button command="run" commandfor="deploy"&gt;Run&lt;/button&gt;</pre><span class="verdict ok">use</span></div>
+  <div class="row"><div class="el"><code>&lt;button&gt;</code><span class="leverage">NOT an action — just a book-layer trigger. The action is the work-ref/validation it kicks off; a button is one UI affordance for it (a keypress, a schedule, or a guard could fire the same edge). Use it in &lt;book&gt; pages; don't model "an action" as a button.</span></div>
+    <pre>&lt;button command="run" commandfor="deploy"&gt;Run&lt;/button&gt;</pre><span class="verdict book">book</span></div>
 
   <div class="row"><div class="el"><code>&lt;dialog&gt;</code> · <code>[popover]</code><span class="leverage">native modal / popover-tooltip-menu with NO JS — a detail panel, a confirm, a node's hovercard.</span></div>
     <pre>&lt;button popovertarget="tip"&gt;?&lt;/button&gt;
