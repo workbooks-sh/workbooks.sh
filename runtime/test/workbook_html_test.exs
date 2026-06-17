@@ -77,6 +77,26 @@ defmodule Workbooks.WorkbookHtmlTest do
     assert comp["src"] =~ "pub fn add"
   end
 
+  test "tangle_plan carries each unit's target + grants; grants flow into world imports" do
+    src = """
+    <work-flow title="svc">
+      <work-component title="enrich" lang="rust" target="sandbox" grant="net" out="scored">x</work-component>
+      <work-component title="render" lang="js" target="client" uses="ui">y</work-component>
+      <work-component title="schema" target="bogus">z</work-component>
+    </work-flow>
+    """
+
+    [world] = Workbook.tangle_plan(src)["worlds"]
+    [enrich, render, schema] = world["components"]
+    assert enrich["target"] == "sandbox"
+    assert enrich["grants"] == ["net"]
+    assert render["target"] == "client"
+    # an unrecognized target normalizes to nil = a static definition.
+    assert schema["target"] == nil
+    # grants ∪ uses make up the world's WIT imports (sorted, deduped).
+    assert world["imports"] == ["net", "ui"]
+  end
+
   test "bare work-components with no flow still form an implicit build world" do
     src = ~s(<work-component title="lone" lang="js" out="x">export default 1</work-component>)
     [world] = Workbook.tangle_plan(src)["worlds"]

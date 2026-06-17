@@ -236,8 +236,14 @@ defmodule Workbooks.Workbook do
       name: a["title"] || "",
       # `lang` present (even empty) = a declared source block.
       lang: a["lang"],
+      # The target keyword: where the unit runs — client / sandbox / server.
+      # nil = a static definition (no compile target).
+      target: target_of(a["target"]),
       deps: list_attr(a, "deps"),
       uses: list_attr(a, "uses"),
+      # Host-capability grants (net/fs/env/exec/…) — the unit's WIT imports.
+      # Distinct from `uses` (toolkit/sibling references).
+      grants: list_attr(a, "grant"),
       inp: nonempty(a["in"]),
       out: nonempty(a["out"]),
       persist: Map.has_key?(a, "persist"),
@@ -279,7 +285,10 @@ defmodule Workbooks.Workbook do
   end
 
   defp sig_of(comps) do
-    imports = comps |> Enum.flat_map(& &1.uses) |> Enum.sort() |> Enum.dedup()
+    # World imports = toolkit/sibling `uses` ∪ host-capability `grants`.
+    # §2 WorldGen turns this set into the unit's WIT imports.
+    imports =
+      comps |> Enum.flat_map(&(&1.uses ++ &1.grants)) |> Enum.sort() |> Enum.dedup()
 
     producer =
       Enum.reduce(comps, %{}, fn c, acc ->
@@ -309,8 +318,10 @@ defmodule Workbooks.Workbook do
     %{
       "name" => c.name,
       "lang" => c.lang,
+      "target" => c.target,
       "deps" => c.deps,
       "uses" => c.uses,
+      "grants" => c.grants,
       "in" => c.inp,
       "out" => c.out,
       "persist" => c.persist,
@@ -333,6 +344,18 @@ defmodule Workbooks.Workbook do
 
   defp nonempty(v) when is_binary(v) and v != "", do: v
   defp nonempty(_), do: nil
+
+  # The target keyword: client (browser wasm) · sandbox (sandbox wasm) ·
+  # server (BEAM, Elixir-only). Anything else (incl. nil/"") = no target =
+  # a static definition. Normalized lowercase.
+  defp target_of(v) when is_binary(v) do
+    case String.downcase(String.trim(v)) do
+      t when t in ["client", "sandbox", "server"] -> t
+      _ -> nil
+    end
+  end
+
+  defp target_of(_), do: nil
 
   defp diag(level, scope, msg), do: %{"level" => level, "scope" => scope, "message" => msg}
 end
