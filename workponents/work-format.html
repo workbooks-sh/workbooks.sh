@@ -197,13 +197,11 @@ end
 <script type="text/plain" id="c-syn-compute">
 ## Scoring
 
-Compute is plain Elixir, wrapped in a tangle block so it compiles to wasm for
-the container. Orb is the compiler underneath — but you just write Elixir:
+Compute is plain Elixir in a source block. The `tangle:` attribute compiles it to
+wasm for the container — Orb is the compiler underneath, but you just write Elixir:
 
-tangle "score.wasm" do
-  defmodule Scoring do
-    def score(lead), do: lead.revenue / 1000 + lead.employees
-  end
+source :score, tangle: "score.wasm" do
+  def score(lead), do: lead.revenue / 1000 + lead.employees
 end
 
 # You only reach for orb-specific syntax (I32.global, defw, memory) when a case
@@ -215,13 +213,11 @@ end
 <script type="text/plain" id="c-prim-unit">
 # The unit
 
-Everything addressable is a NAMED UNIT — a def, a board entry, a figure, a data
+Everything addressable is a NAMED UNIT — a source, a task, a figure, a data
 source. The name is how the flow / board / views reach it.
 
-tangle "score.wasm" do
-  defmodule Scoring do
-    def score(lead), do: lead.revenue / 1000 + lead.employees   # unit: Scoring.score
-  end
+source :score, tangle: "score.wasm" do
+  def score(lead), do: lead.revenue / 1000 + lead.employees   # unit: :score
 end
 
 flow do
@@ -238,12 +234,12 @@ end
 One delimiter does everything. do…end is self-delimiting Elixir, so it
 separates from prose with no fence and no sigil:
 
-tangle "x.wasm" do ... end     # build lane
-flow do ... end                # function lane
+source :score do ... end       # function lane (code)
+flow do ... end                # function lane (workflow)
 figure "x.png" do ... end      # rich-text lane (presentation)
 
 # do…end wraps BODIED units — a body of code or content. The KIND word in
-# front (tangle / flow / figure) names the lane.
+# front (source / flow / figure) names the lane.
 
 # Flat DATA is the exception: tasks, users, and types are DECLARATIONS,
 # not blocks — they have fields, not a body:
@@ -268,24 +264,22 @@ logic, a value, or a field. The moment a line gains behavior, it leaves this lan
 
 ## ② function — what the RUNTIME runs   →   elixir → orb → wasm
 
-The `def` below is real, runnable compute. It's Elixir, so it can never be
-mistaken for the prose around it:
+The `def` below is real, runnable compute, held in a source block. It's Elixir,
+so it can never be mistaken for the prose around it:
 
-tangle "score.wasm" do
-  defmodule Scoring do
-    def score(lead), do: lead.revenue / 1000 + lead.employees
-  end
+source :score, tangle: "score.wasm" do
+  def score(lead), do: lead.revenue / 1000 + lead.employees
 end
 
 
 ## ③ build — what the COMPILER builds   →   plain elixir
 
-That `tangle "score.wasm" do` wrapper is already the build lane — plain Elixir
-that says "compile these defs to this artifact." A `test` joins it, proving the
-unit at the weave gate (a red test ships no bundle):
+The `tangle:` attribute above is already the build lane — it says "compile this
+unit to that wasm artifact." A `test` joins it, proving the unit at the weave
+gate (a red test ships no bundle):
 
 test :score do
-  assert Scoring.score(%{revenue: 50_000, employees: 20}) == 70
+  assert score(%{revenue: 50_000, employees: 20}) == 70
 end
 
 
@@ -479,10 +473,8 @@ component "crm-contacts" do        # an element it ships
   # a view over the crm, rendered client-side
 end
 
-tangle "crm.wasm" do               # a function it ships
-  defmodule CRM do
-    def lookup(id), do: get("api.crm.com/contacts/" <> id)
-  end
+source :lookup, tangle: "crm.wasm" do    # a function it ships
+  def lookup(id), do: get("api.crm.com/contacts/" <> id)
 end
 </script>
 
@@ -611,22 +603,20 @@ work deploy cloud      # the same image on the nexus (Fly), your registry
 # Code is RUNNABLE — so it lives on the Elixir side, as a source block. A plain
 # markdown fence only SHOWS code (rich text, never runs); we rarely want it.
 
-## Elixir — bare. do…end self-delimits: no fence, no sigil
+## Elixir — the default lang. just write the def in the body:
 
-tangle "score.wasm" do
-  defmodule Scoring do
-    def score(lead), do: lead.revenue / 1000 + lead.employees
-  end
+source :score, tangle: "score.wasm" do
+  def score(lead), do: lead.revenue / 1000 + lead.employees
 end
 
-## A foreign language — still an Elixir block, carrying source + lang
+## A foreign language — the SAME block, with a lang::
 
 source :enrich, lang: :rust, tangle: "enrich.wasm" do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
 
-# the BLOCK is the unit — name (:enrich), lang, build target: all Elixir.
-# runnable ⇒ a source / tangle block. markdown just narrates around it.
+# ONE block — source. its name (:enrich), lang (default :elixir), tangle: target.
+# runnable ⇒ a source block. markdown just narrates around it.
 </script>
 
 <script type="text/plain" id="c-syn-test">
@@ -658,7 +648,7 @@ deps  [hex: "decimal@2", npm: "d3@7"]   # unit-level deps (app-level → the ind
 
 # Sales dashboard
 
-Then the literate body: markdown prose, and Elixir source / tangle blocks. The
+Then the literate body: markdown prose, and Elixir source blocks. The
 header is declared, never run — the file's data-lane twin of the index.
 </script>
 
@@ -673,13 +663,12 @@ header is declared, never run — the file's data-lane twin of the index.
 #   - [ ] casual todo      a checklist for a human (not tracked data)
 
 # ── function · elixir → orb → wasm · the RUNTIME runs ──────────────
-#   tangle "…" do … end       compute · state machines (elixir)
-#   source :x, lang: :rust do  a foreign-lang unit — still elixir-wrapped
+#   source :x do … end        compute — any lang (default :elixir)
 #   flow do … step … end      workflows (step, parallel)
 #   agent "…" do … end         a brain (model, system, tools)
 
 # ── build · plain elixir / weave directives · the COMPILER builds ──
-#   tangle: · @tangle      a unit's build target
+#   tangle: "x.wasm"       compile a source to a wasm artifact
 #   test :unit do          verification (fails the build when red)
 #   <link rel=package>     deps: hex / npm / cargo — the index manifest
 
@@ -825,11 +814,11 @@ end
 <template id="e-syn-compute">
   <div class="kick">syntax · compute</div>
   <h2>Compute <span class="lane l-fn">function</span> <span class="lane l-build">build</span></h2>
-  <p class="tagline">Clean Elixir, wrapped in a tangle block. Orb underneath because it runs in the container.</p>
-  <h3>Two lanes in one snippet</h3>
-  <ul><li><b>Function</b> — the <code>defmodule … def …</code> is the compute. Authored as plain Elixir; <b>Orb compiles it to wasm</b> so it runs in the container. Surface orb-specific syntax (<code>I32</code>, <code>defw</code>, <code>memory</code>) only when a case truly needs low-level wasm types.</li>
-  <li><b>Build</b> — the <code>tangle "score.wasm" do … end</code> wrapper is the build directive. <b>Plain Elixir, not Orb</b> — the one Elixir-but-not-Orb thing. It just says "compile these defs to this artifact."</li></ul>
-  <div class="note">Prefer no nesting? <code>@tangle "score.wasm"</code> atop a plain <code>defmodule</code> does the same job — the module becomes the unit.</div>
+  <p class="tagline">Clean Elixir in a source block; the <code>tangle:</code> attribute compiles it to wasm. Orb underneath, but you just write Elixir.</p>
+  <h3>Two lanes in one block</h3>
+  <ul><li><b>Function</b> — the <code>def …</code> in the body is the compute. Authored as plain Elixir; <b>Orb compiles it to wasm</b> so it runs in the container. Surface orb-specific syntax (<code>I32</code>, <code>defw</code>, <code>memory</code>) only when a case truly needs low-level wasm types.</li>
+  <li><b>Build</b> — the <code>tangle: "score.wasm"</code> attribute is the build directive. <b>Plain Elixir, not Orb</b> — the one Elixir-but-not-Orb thing. It just says "compile this unit to that artifact."</li></ul>
+  <div class="note">No <code>tangle:</code>? The source still runs — on the BEAM, or bundled as an island for front-end langs. <code>tangle:</code> specifically means "make a wasm artifact."</div>
 </template>
 
 <template id="e-prim-unit">
@@ -845,7 +834,7 @@ end
   <h2>The block — <code>do…end</code></h2>
   <p class="tagline">One self-delimiting delimiter, four jobs. This is why code needs no fence.</p>
   <h3>Kind + body</h3>
-  <p>A block is <code>&lt;kind&gt; … do … end</code> for <b>bodied units</b> — the <b>kind word selects the lane</b> (<code>tangle</code> build, <code>flow</code> function, <code>figure</code> rich text) and the body is what that lane holds. Because <code>do…end</code> is self-delimiting Elixir, the parser separates it from prose with <b>no fence and no sigil</b>.</p>
+  <p>A block is <code>&lt;kind&gt; … do … end</code> for <b>bodied units</b> — the <b>kind word selects the lane</b> (<code>source</code> code, <code>flow</code> workflow, <code>figure</code> rich text) and the body is what that lane holds. Because <code>do…end</code> is self-delimiting Elixir, the parser separates it from prose with <b>no fence and no sigil</b>.</p>
   <p>Flat <b>data</b> is the exception: a <code>task</code>, a <code>user</code>, a <code>type</code> have <i>fields</i>, not a body, so they're <b>declarations</b>, not blocks. Two shapes — bodied blocks and flat declarations — cover all four lanes.</p>
 </template>
 
@@ -856,7 +845,7 @@ end
   <div class="tests">
     <div class="test"><div class="t">rich text — markdown</div><div class="v">what you READ</div><div class="d">prose, headings, figures, tables. only this — never logic.</div></div>
     <div class="test"><div class="t">function — elixir → orb → wasm</div><div class="v">what RUNS</div><div class="d">compute, state machines, workflows. clean Elixir; Orb because it runs in the container.</div></div>
-    <div class="test"><div class="t">build — plain elixir</div><div class="v">what COMPILES function</div><div class="d">tangle / untangle. the one Elixir-but-not-Orb thing.</div></div>
+    <div class="test"><div class="t">build — plain elixir</div><div class="v">what COMPILES function</div><div class="d">the <code>tangle:</code> attribute + tests. the one Elixir-but-not-Orb thing.</div></div>
     <div class="test"><div class="t">data — declarative elixir</div><div class="v">what the system TRACKS</div><div class="d">tasks, users, types, config. typed + validated at the weave gate.</div></div>
   </div>
   <h3>The discriminator</h3>
@@ -1097,9 +1086,9 @@ end
   <h3>rich text <span class="lane l-text">markdown</span></h3>
   <p><code>prose</code> · <code>headings</code> · <code>lists</code> · <code>tables</code> · <code>quotes</code> · <code>`code`</code> · <code>![img]()</code> · <code>figure do</code> · <code>- [ ]</code> casual todo</p>
   <h3>function <span class="lane l-fn">elixir → wasm</span></h3>
-  <p><code>tangle do</code> compute · <code>source lang:</code> foreign code · <code>flow do</code> workflows · <code>agent do</code> brains</p>
+  <p><code>source do</code> code (any lang) · <code>flow do</code> workflows · <code>agent do</code> brains</p>
   <h3>build <span class="lane l-build">plain elixir / weave</span></h3>
-  <p><code>tangle: · @tangle</code> · <code>test :unit do</code> · <code>&lt;link rel=package&gt;</code></p>
+  <p><code>tangle:</code> (→ wasm) · <code>test :unit do</code> · <code>&lt;link rel=package&gt;</code></p>
   <h3>data <span class="lane l-data">declarative elixir</span></h3>
   <p><code>task · user · type</code> · <code>data :x, from:</code> · <code>grant · posture</code> · <code>route · lang · use</code> (header)</p>
   <div class="note">If a line is none of these, it's prose. <b>Markdown only narrates</b> — rich text and context around code, never the code itself. The discriminator never changes: <b>who reads it?</b></div>
@@ -1184,7 +1173,7 @@ end
     `  <span class="ok">✓</span> flow done in <span class="num">107ms</span>`,
   ];
   const RUN_UNIT = [
-    `<span class="p">$</span> <span class="cmd">work run Scoring.score</span>`,
+    `<span class="p">$</span> <span class="cmd">work run score</span>`,
     ``,
     `  <span class="dim">tangle</span>   score.wasm   <span class="dim">elixir → orb → wasm</span>   <span class="num">88ms</span>`,
     `  <span class="dim">call</span>     score(%{revenue: 50_000, employees: 20})`,
