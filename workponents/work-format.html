@@ -673,6 +673,56 @@ header is declared, never run — the file's data-lane twin of the index.
 # of their manifests. that's the no-JSON rule + DRY, expressed as a build system.
 </script>
 
+<script type="text/plain" id="c-live-state">
+# A task is DATA — parsed, never compiled to wasm. So its state is LIVE:
+# you change it by EDITING the declaration. The document IS the store.
+
+task "tune the scorer", status: :todo,  owner: :ada
+# an agent claims it → the SAME line becomes:
+task "tune the scorer", status: :doing, owner: :ada, lock: "jj:wb-7f3"
+
+# nothing recompiles — only the FUNCTION lane (tangle → wasm) ever compiles.
+# data edits are cheap + live, and every edit is a jj op (undoable history).
+#
+# declarative ≠ frozen. it's the DOM: live markup that's also the source.
+</script>
+
+<script type="text/plain" id="c-live-plan">
+# plan.work — ONE file: the plan, the live board, and the audit log.
+# agents and tasks live together; the runtime reads it and dispatches.
+
+agent :ada, model: :mimo, tools: [:crm]
+agent :rex, model: :mimo, tools: [:charts]
+
+task "enrich the leads",  status: :doing, owner: :ada, ref: :enrich, paths: ["enrich.work"]
+task "score + rank",      status: :todo,  owner: :rex, ref: :score,  paths: ["score.work"]
+task "ship the page",     status: :todo,  owner: :ada, after: :score
+task "email the analyst", status: :todo                  # unassigned — an open slot
+
+# status / owner / paths / ref are typed + validated at the weave gate (Types).
+# `after:` orders work; an unassigned task is a slot the coordinator can fill.
+# the board, the assignments, the audit trail are all VIEWS over these lines.
+</script>
+
+<script type="text/plain" id="c-live-claim">
+# claiming a task is the COORDINATOR's job (on the nexus). it:
+#   1. flips status :todo → :doing in plan.work      (the declarative claim)
+#   2. opens a jj change for the agent               (the LOCK — isolated, undoable)
+#   3. derives a josh view scoped to task.paths      (the FENCE — only its files)
+
+# most tasks are flat. one that needs custom behavior carries a claim script:
+
+task "enrich the leads", owner: :ada, paths: ["enrich.work"] do
+  claim do
+    jj.new "wb-#{id}"        # an isolated change = the lock
+    josh.scope paths         # fence the agent to these paths
+  end
+end
+
+# two agents, one tree, zero collision: jj isolates each op, josh fences each
+# to its paths. agents barely touch git — the system drives it.
+</script>
+
 <!-- ══════════════════ explanations ══════════════════ -->
 <template id="e-syn-prose">
   <div class="kick">syntax · prose</div>
@@ -716,7 +766,7 @@ header is declared, never run — the file's data-lane twin of the index.
   <ul><li class="pro">No wrapper: <code>task "…", status: :todo, owner: :analyst</code> stands alone. "Board" was a leaky container; the unit is the task.</li>
   <li class="pro"><b>Typed</b> — <code>status</code> is an enum and <code>owner</code> references a <code>user</code> defined in a shared file. The weave gate validates both (see Primitives → Types).</li>
   <li class="pro">Cross-links to code (<code>ref: :scorer</code>) — tasks, workflow, and defs become one graph.</li></ul>
-  <div class="note">Throwaway checklist → markdown. Anything tracked → a typed <code>task</code> declaration (declarative Elixir).</div>
+  <div class="note">Throwaway checklist → markdown. Anything tracked → a typed <code>task</code> declaration (declarative Elixir). Its live, multi-agent lifecycle — claim, lock, fence — is <b>Plans &amp; live state</b>.</div>
 </template>
 
 <template id="e-syn-flow">
@@ -1025,6 +1075,41 @@ header is declared, never run — the file's data-lane twin of the index.
   <div class="note"><b>One build tool — <code>work bundle</code> — absorbs every ecosystem's role and adopts none of their manifests.</b> That's the no-JSON rule and DRY, expressed as a build system.</div>
 </template>
 
+<template id="e-live-state">
+  <div class="kick">plans · live state</div>
+  <h2>Live state <span class="lane l-data">data</span></h2>
+  <p class="tagline">Declarative isn't frozen. The document is the store; you change state by editing the declaration.</p>
+  <h3>Why mutation doesn't break it</h3>
+  <ul><li class="pro"><b>Data is read, not compiled.</b> Only the function lane (<code>tangle → wasm</code>) compiles. A <code>task</code> is parsed, so flipping <code>status: :todo → :doing</code> is a cheap, live edit — nothing rebuilds.</li>
+  <li class="pro"><b>The document is the database.</b> No sidecar store, no platform CRDT — the <code>task</code> line is the source of truth <i>and</i> the live state at once. Exactly the DOM: live markup that's also the source.</li>
+  <li class="pro"><b>Every edit is a jj operation</b> — so the history <i>is</i> the audit log, and any change is undoable.</li></ul>
+  <div class="note">Split: <b>coarse state</b> (todo→doing→done, owner, lock) lives in the document; <b>ephemeral scratch</b> (an agent's partial output) stays in runtime memory and never churns the file.</div>
+</template>
+
+<template id="e-live-plan">
+  <div class="kick">plans · plan.work</div>
+  <h2>plan.work <span class="lane l-data">data</span></h2>
+  <p class="tagline">One file holds the plan, the live board, and the audit log — agents and tasks together.</p>
+  <h3>What's in it</h3>
+  <ul><li><b>agents</b> — declared alongside the work (<code>agent :ada, model:, tools:</code>).</li>
+  <li><b>tasks</b> — each with <code>owner</code> (which agent), <code>paths</code> (what it may touch), <code>ref</code> (the code it tracks), <code>after</code> (ordering).</li>
+  <li><b>empty slots</b> — an unassigned task is an open slot the coordinator can fill.</li></ul>
+  <h3>It's just data</h3>
+  <p>Every field is typed + validated at the weave gate (see <b>Types</b>). The board view, the agent assignments, the audit trail — all are <b>queries over these declarations</b>, not separate systems. Assign each task to an agent and the runtime takes it from there.</p>
+</template>
+
+<template id="e-live-claim">
+  <div class="kick">plans · claim, lock &amp; fence</div>
+  <h2>Claim, lock &amp; fence <span class="lane l-fn">function</span></h2>
+  <p class="tagline">Claiming a task is the runtime's job — a declarative flip, a jj lock, a josh fence.</p>
+  <h3>Three steps, one claim</h3>
+  <ul><li class="pro"><b>Flip</b> — <code>status: :todo → :doing</code> in plan.work. The claim is recorded declaratively.</li>
+  <li class="pro"><b>Lock</b> — <code>jj</code> opens an isolated change for the agent. Optimistic + undoable; no mutex.</li>
+  <li class="pro"><b>Fence</b> — <code>josh</code> derives a subtree view scoped to the task's <code>paths</code>. The agent <i>only sees</i> its files.</li></ul>
+  <h3>Multi-agent, one tree</h3>
+  <p>Two agents work the same workbook with zero collision: jj gives each an isolated operation, josh fences each to its paths. <b>Agents barely touch git</b> — the coordinator on the nexus drives it. A task is a flat declaration by default; one that needs custom behavior carries a <code>claim do … end</code> script (the only function part — the default claim is automatic).</p>
+</template>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/simple.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
@@ -1088,6 +1173,22 @@ header is declared, never run — the file's data-lane twin of the index.
     `  <span class="ok">✓</span> 3 tasks · 2 users · 1 type — typed, no drift`,
   ];
 
+  const RUN_PLAN = [
+    `<span class="p">$</span> <span class="cmd">work plan run</span>`,
+    ``,
+    `  <span class="dim">plan.work</span>   2 agents · 4 tasks`,
+    ``,
+    `  <span class="ok">→</span> ada  claims <span class="cmd">"enrich the leads"</span>   <span class="dim">jj</span> <span class="path">wb-7f3</span> · <span class="dim">josh</span> <span class="path">[enrich.work]</span>`,
+    `  <span class="ok">→</span> rex  claims <span class="cmd">"score + rank"</span>       <span class="dim">jj</span> <span class="path">wb-7f4</span> · <span class="dim">josh</span> <span class="path">[score.work]</span>`,
+    `  <span class="warn">∥</span> both running — <span class="dim">isolated changes, no collision</span>`,
+    ``,
+    `  <span class="ok">✓</span> ada  enrich.work  <span class="dim">status</span> <span class="ok">:done</span>  merged`,
+    `  <span class="ok">→</span> rex  was blocked on <span class="dim">:score</span> → now ready`,
+    `  <span class="dim">□</span> "email the analyst"  <span class="warn">unassigned</span> <span class="dim">— open slot</span>`,
+    ``,
+    `  <span class="ok">✓</span> plan advanced · <span class="num">2</span> done · <span class="num">1</span> doing · <span class="num">1</span> open`,
+  ];
+
   // ONE ordered lesson plan — read top to bottom, the way you'd teach it.
   const SECTIONS = [
     { title:"The idea", blurb:"the mental model, before any syntax",
@@ -1148,6 +1249,12 @@ header is declared, never run — the file's data-lane twin of the index.
     { title:"Agents", blurb:"a work file with a brain",
       lessons:[
         { nm:"The brain", tag:"system + model + tools, runtime-backed", fn:"analyst.work", lg:"elixir", mode:"work", code:"c-ag-brain", exp:"e-ag-brain" },
+      ] },
+    { title:"Plans & live state", blurb:"tasks as live, multi-agent state — the document is the store",
+      lessons:[
+        { nm:"Live state",         tag:"declarative ≠ immutable",        fn:"plan.work", lg:"elixir", mode:"work", code:"c-live-state", exp:"e-live-state" },
+        { nm:"plan.work",          tag:"plan + board + audit, one file", fn:"plan.work", lg:"elixir", mode:"work", code:"c-live-plan",  exp:"e-live-plan", run:RUN_PLAN },
+        { nm:"Claim, lock & fence",tag:"jj locks · josh fences",         fn:"plan.work", lg:"elixir", mode:"work", code:"c-live-claim", exp:"e-live-claim" },
       ] },
     { title:"Deploy", blurb:"two targets, one image",
       lessons:[
