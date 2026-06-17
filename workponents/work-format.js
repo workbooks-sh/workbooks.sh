@@ -222,6 +222,9 @@
   CodeMirror.defineSimpleMode("work", {
     start: [
       { regex: /#{1,6}\s.*/, sol: true, token: "header" },         // markdown heading
+      { regex: /\[\[[^\]]+\]\]/, token: "link" },                  // [[backlink]]
+      { regex: /#[a-z][\w-]*/, token: "variable-3" },               // #tag (super-tag)
+      { regex: /work:\/\/[^\s]+/, token: "link" },                  // work:// deep link
       { regex: /"(?:[^\\"]|\\.)*"/, token: "string" },              // strings
       { regex: /`[^`]*`/, token: "string-2" },                      // inline code
       { regex: /\?(?:\\.|[^\s])/, token: "string-2" },              // char literals  ?,  ?\n

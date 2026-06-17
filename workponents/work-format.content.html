@@ -247,26 +247,33 @@ Units cross-link by NAME — no import ceremony inside the document:
 </script>
 
 <script type="text/plain" id="c-ref-tags">
-# in a sandbox the filesystem is abstracted (WASI) — you never address by PATH.
-# you address by NAME (units), by TAG (cross-cutting), and link by either.
+# Tags & links
 
-# tag inline in prose, or on a unit — queryable, not just text:
+In a sandbox the filesystem is abstracted (WASI), so you never address by **path** —
+you address by **name** (units), by **#tag** (cross-cutting), and link by either.
 
-This quarter we focus on #billing and #activation.     # inline tags
+Tag inline in prose, or on a unit. A `#tag` is queryable, not just text:
+
+This quarter we focus on #billing and #activation.
 
 sandbox :enrich, tags: [:billing, :hot] do ... end      # a unit's tags
 
-# reference the tagged SET — everything tagged, across every file:
+Reference the tagged **set** — everything tagged, across every file:
 
 data :hot, from: tagged(:hot)
 
-# DEEP LINK — the URL form of any name or tag; the host resolves the abstract path:
+A **[[backlink]]** points at another unit or section by name — the in-document
+reference, validated at the gate. So this very sentence can link to [[The contract]]
+or [[Live state]] just by naming them.
+
+A **deep link** is the URL form of any name or tag; the host resolves the abstract path:
 
 work://sales#enrich            # → the unit
-work://sales#tag/billing       # → everything tagged :billing
+work://sales#tag/billing       # → everything tagged #billing
 
-# posture-gated: public anchors link freely; gated ones need auth.
-# tagging from the UI just edits the declaration (the document is the store).
+Links are posture-gated (public anchors link freely, gated ones need auth) and
+agent-navigable. Tagging from the interface just edits the declaration — the
+document is the store (see [[Live state]]).
 </script>
 
 <!-- ══════════════════ MODEL exploration ══════════════════ -->
