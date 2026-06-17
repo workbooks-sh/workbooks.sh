@@ -32,8 +32,11 @@ defmodule Workbooks.AgentPromptTest do
     assert p =~ "resident assistant"
     # works WITH the user, never runs off (the brand rule)
     assert p =~ ~r/never run off|work problems WITH/i
-    # streaming-prose reply style + the optional org/component rich-reply path
-    assert p =~ "RICH REPLIES" or p =~ "#+RENDER"
+    # streaming-prose reply style + the optional inline-HTML rich-reply path
+    assert p =~ "RICH REPLIES"
+    # rich replies are inline <work-*> HTML — NOT the deleted org directives
+    refute p =~ "#+RENDER"
+    refute p =~ "#+begin_src"
   end
 
   test "Waldo's prompt composes the toolkit index with BOTH default toolkits" do
@@ -42,7 +45,7 @@ defmodule Workbooks.AgentPromptTest do
     assert p =~ "workbooks-browser"
     assert p =~ "workbooks-cli"
     # the progressive-disclosure instruction (read a skill on demand)
-    assert p =~ "toolkit show"
+    assert p =~ "kit show"
     # representative skill slugs from each toolkit are listed in the index
     assert p =~ "variables" or p =~ "library-search"
     assert p =~ "deploy" or p =~ "publish"

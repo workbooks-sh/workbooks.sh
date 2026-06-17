@@ -111,7 +111,7 @@ defmodule Workbooks.Web do
 
   # Agent system prompt (wb-2s09). The desktop's voice/chat clients fetch the
   # resident agent's persona by slug to seed a session (geminiLive, Waldo). The
-  # prompt lives in the profile (`<WB_PROFILE_DIR>/agents/<slug>.org`, under the
+  # prompt lives in the profile (`<WB_PROFILE_DIR>/agents/<slug>.html`, under the
   # `** System prompt` heading); a sensible default is returned when the profile
   # has no def for that slug so voice/chat still work out of the box.
   get "/api/agents/:slug/system_prompt" do
@@ -451,7 +451,7 @@ defmodule Workbooks.Web do
   post "/api/agent/run" do
     {:ok, body, conn} = read_body(conn)
     params = Jason.decode!(body)
-    slug = params["agent_slug"] || "workhorse"
+    slug = params["agent_slug"] || "waldo"
     prompt = params["prompt"] || ""
 
     system =
@@ -894,7 +894,7 @@ defmodule Workbooks.Web do
     File.write(Path.join(workdir, "_status.json"), Jason.encode!(%{slug: slug, request: request, stage: "running"}))
 
     spawn(fn ->
-      def_path = "#{System.get_env("WB_PROFILE_DIR") || "/opt/profile"}/agents/brandnana.org"
+      def_path = "#{System.get_env("WB_PROFILE_DIR") || "/opt/profile"}/agents/brandnana.html"
       on_step = fn ev ->
         File.write(Path.join(workdir, "_trace.jsonl"), Jason.encode!(%{step: ev.step, tool: ev.tool, out: String.slice(ev.output || "", 0, 140)}) <> "\n", [:append])
       end
@@ -1932,7 +1932,7 @@ defmodule Workbooks.Web do
   # workdir is given) override user agents override the builtin. Every entry is
   # {slug, path, scope, title, model, toolkits} — AgentCatalogEntry shape.
   defp agent_catalog(workdir) do
-    builtin = [%{slug: "workhorse", path: "workhorse", scope: "builtin", title: "Waldo", model: nil, toolkits: []}]
+    builtin = [%{slug: "waldo", path: "waldo", scope: "builtin", title: "Waldo", model: nil, toolkits: []}]
 
     project =
       if is_binary(workdir) and workdir != "",
@@ -1979,35 +1979,35 @@ defmodule Workbooks.Web do
         "REPLY STYLE: answer the user DIRECTLY in prose — just write your response. " <>
         "Only call a tool when you genuinely need to act (search, open a tab, run something); " <>
         "do NOT wrap a plain answer in a tool call. Your text streams to the user as you write it.\n\n" <>
-        "RICH REPLIES (optional): when a structured or visual answer helps, begin your message with " <>
-        "`#+RENDER: org` on its own first line and write the body in Org. You may embed inline " <>
-        "`#+begin_src component …` blocks the chat renders as interactive cards (like a tool-call " <>
-        "result) — the available component types are listed in the Components section below, " <>
-        "discovered from your component toolkit. Emit one when you took an action worth confirming " <>
-        "or when offering the user a next step; use plain prose for ordinary replies (it streams).\n\n" <>
+        "RICH REPLIES (optional): when a structured or visual answer helps, write inline `<work-*>` " <>
+        "HTML directly in your message — the chat renders the SDK's real custom elements as " <>
+        "interactive cards. The available tags are listed in the Components section below, " <>
+        "discovered from your component toolkit. Use NO `#+` directives — just the HTML. Emit a " <>
+        "component when you took an action worth confirming or when offering the user a next step; " <>
+        "use plain prose for ordinary replies (it streams).\n\n" <>
         "OPEN WHAT YOU BUILD: the moment you create or write a workbook or file, OPEN it for the user with `work app open-tab <path>` (you have the workbooks-browser toolkit) so it appears live in their workspace — never leave a workbook created-but-unopened. Create the file, open it, then confirm."
 
     # Resolve the base prompt + the agent's declared toolkits. Waldo (the
     # default) ALWAYS gets workbooks-browser (drive the app: work app …, work env
     # request …) AND workbooks-cli (deploy + publish: work deploy …, work publish …).
-    # A provisioned <slug>.org overrides.
+    # A provisioned <slug>.html overrides.
     {base, toolkits} =
       with true <- is_binary(slug) and Regex.match?(~r/^[a-z0-9][a-z0-9_-]*$/i, slug),
            dir <- System.get_env("WB_PROFILE_DIR") || "/opt/profile",
-           path <- Path.join([dir, "agents", "#{slug}.org"]),
-           {:ok, org} <- File.read(path),
-           %{system: sys, toolkits: tks} when is_binary(sys) and sys != "" <- Workbooks.AgentDef.parse(org) do
+           path <- Path.join([dir, "agents", "#{slug}.html"]),
+           {:ok, html} <- File.read(path),
+           %{system: sys, toolkits: tks} when is_binary(sys) and sys != "" <- Workbooks.AgentDef.parse(html) do
         {sys, tks}
       else
-        # Waldo also gets `workponents` (the #+EXEC: component toolkit) so the
+        # Waldo also gets `workponents` (the component work-kit) so the
         # rich-reply path resolves a component catalog — the chat renders the
         # SDK `work-*` elements inline.
         _ -> {default, ["workbooks-browser", "workbooks-cli", "workponents"]}
       end
 
-    # Tier-1 progressive disclosure: append the compact toolkit index (skill
+    # Tier-1 progressive disclosure: append the compact work-kit index (skill
     # names) so the agent knows what it can do; bodies stay on demand via `work
-    # toolkit show`. When the closure includes a component-EXEC toolkit, append
+    # kit show`. When the closure includes a component work-kit, append
     # the catalog of `work-*` tags DISCOVERED from its CEM (not hardcoded).
     base
     |> append_section(Workbooks.WorkKits.injection_text(toolkits))

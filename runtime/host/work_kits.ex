@@ -270,8 +270,8 @@ defmodule Workbooks.WorkKits do
       """
       ## Work-kits
 
-      You have these toolkits. Before using one, read the relevant skill — call the
-      `work` tool: `toolkit show <id> <skill>` (or `toolkit search <query>` to find one).
+      You have these work-kits. Before using one, read the relevant skill — call the
+      `work` tool: `kit show <id> <skill>` (or `kit search <query>` to find one).
 
       #{Enum.join(all, "\n")}
       """
