@@ -5,7 +5,7 @@ A test is an Elixir block bound to a unit **by name**. It's the **build lane**: 
 at the weave gate, and a red test fails the build — no green `dist/` over a broken
 unit.
 
-sandbox rust :enrich do
+server rust :enrich do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
 
@@ -17,7 +17,7 @@ end
 `test :enrich` names the subject; the body asserts over its output. There's **no
 runner to wire** — the weave discovers the test blocks and runs them at the gate. A
 test isn't shipped behavior and isn't prose; it's a *gate check*, the same build lane
-as the target's compile step (see [[Targets]]), proving the function before it's woven
+as the target's compile step (see [[Placement — where code runs]]), proving the function before it's woven
 in. #tests
 </script>
 <template id="e-syn-test">

@@ -5,10 +5,10 @@ Everything addressable is a **named unit** — a function, a task, a workflow, a
 data source. The name is the whole interface: it's how the flow, the board, and
 the views reach what they need. #primitive
 
-Here a `sandbox` declares one unit, `:score`, and a `flow` reaches it purely by
-naming it:
+Here a `server` block declares one unit, `:score`, and a `flow` reaches it purely
+by naming it:
 
-sandbox :score do
+server :score do
   def score(lead), do: lead.revenue / 1000 + lead.employees   # unit: :score
 end
 

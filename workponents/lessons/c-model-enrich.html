@@ -13,7 +13,7 @@ grant net "api.crm.com"
 One named `sandbox` block is the code. The header (`rust :enrich`) names the lane
 and the unit; the body is just a function:
 
-sandbox rust :enrich do
+server rust :enrich do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
 

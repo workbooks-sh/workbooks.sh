@@ -10,7 +10,7 @@ export :crm                        # the prefix others import
 
 grant net "api.crm.com"            # caps the toolkit needs, declared up front
 
-sandbox :lookup do                 # a function it ships
+server :lookup do                 # a function it ships
   def lookup(id), do: get("api.crm.com/contacts/" <> id)
 end
 

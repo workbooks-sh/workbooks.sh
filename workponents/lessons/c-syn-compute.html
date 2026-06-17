@@ -1,26 +1,28 @@
 <script type="text/plain" id="c-syn-compute">
 # Compute
 
-Compute lives in a `sandbox` block — you write plain Elixir, and the target runs it
-as wasm. You don't think about *how*:
+Compute is just code that runs. You write plain Elixir inside a placed block, and
+it runs as wasm — you never think about *how*:
 
-sandbox :score do
+server :score do
   def score(lead), do: lead.revenue / 1000 + lead.employees
 end
 
-The *how* is a footnote you never author: `client`/`sandbox` Elixir runs on an
-Elixir-in-wasm runtime, compiled in at build, so real Elixir semantics carry over —
-you don't map types or memory by hand. Foreign languages compile straight to wasm.
-Switching this to `server :score` runs the *same code* as full Elixir/OTP on the
-BEAM; the target is the only thing that changes (see [[Targets]]). #compute
+The *how* is a footnote you never author. Your Elixir runs on an Elixir-in-wasm
+runtime, compiled in at build, so real Elixir semantics carry over — you don't map
+types or memory by hand. Foreign languages compile straight to wasm the same way.
+
+The placement word in front is the only thing that decides *where* this runs. Move
+it to `client :score` and the very same `def` runs in the browser instead; nothing
+about how you wrote it changes (see [[Placement — where code runs]]). #compute
 </script>
 <template id="e-syn-compute">
   <div class="kick">syntax · compute</div>
   <h2>Compute <span class="lane l-fn">function</span> <span class="lane l-build">build</span></h2>
-  <p class="tagline">You write plain Elixir; the <code>sandbox</code> target runs it as wasm. The engine is invisible.</p>
+  <p class="tagline">You write plain Elixir; it runs as wasm wherever you place it. The engine is invisible.</p>
   <h3>Just Elixir</h3>
-  <p>The <code>def …</code> is the compute — ordinary Elixir, no dialect to learn. <b>Client/sandbox Elixir runs on an Elixir-in-wasm runtime</b> (Popcorn/AtomVM, compiled in at build), so real Elixir semantics carry over — you don't map types or memory by hand.</p>
-  <h3>One target away from the server</h3>
-  <p>Switch to <code>server :score</code> and the same code runs full Elixir/OTP on the BEAM — the target is the only thing that changes. <code>sandbox</code>/<code>client</code> mean wasm; <code>server</code> means BEAM.</p>
+  <p>The <code>def …</code> is the compute — ordinary Elixir, no dialect to learn. It runs on an <b>Elixir-in-wasm runtime</b> (Popcorn/AtomVM, compiled in at build), so real Elixir semantics carry over — you don't map types or memory by hand.</p>
+  <h3>Placement is the only choice</h3>
+  <p>The same <code>def</code> runs on the <code>client</code> or the <code>server</code> — the placement word changes <i>where</i> it runs, never <i>what you write</i> (see [[Placement — where code runs]]). And how tightly it's boxed is a separate question, answered by its [[What a sandbox is]].</p>
   <div class="note"><b>Orb</b> — Elixir that authors low-level wasm directly — isn't how you write compute; it's a rare escape hatch (hot paths, extending the system), compiled like any other source language.</div>
 </template>

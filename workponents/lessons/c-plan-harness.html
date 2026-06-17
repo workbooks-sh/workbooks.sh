@@ -23,7 +23,7 @@ end
 The flow calls **units**, and each unit can carry a `test` that **gates the whole
 plan** — a red validation stalls everything downstream:
 
-sandbox rust :enrich do
+server rust :enrich do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
 

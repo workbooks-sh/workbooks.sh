@@ -13,21 +13,21 @@ The rule that keeps the format clean — markdown only narrates. It never holds
 logic, a value, or a field. The moment a line gains behavior, it leaves this lane.
 
 
-## ② function — what the RUNTIME runs   →   wasm (client/sandbox) or BEAM (server)
+## ② function — what the RUNTIME runs   →   wasm, placed on client or server
 
-The `def` below is real, runnable compute. The `sandbox` target says where it
-goes — wasm, in the sandbox. It's Elixir, so it's never mistaken for the prose:
+The `def` below is real, runnable compute. The `server` in front is its placement —
+where it runs — and it's Elixir, so it's never mistaken for the prose around it:
 
-sandbox :score do
+server :score do
   def score(lead), do: lead.revenue / 1000 + lead.employees
 end
 
 
 ## ③ build — what the COMPILER builds   →   plain elixir
 
-The `sandbox` target above already builds — it compiles the unit to wasm; you
-never write an explicit step. A `test` joins it, proving the unit at the weave
-gate (a red test ships no bundle):
+The placement above already builds — it compiles the unit to wasm; you never write
+an explicit step. A `test` joins it, proving the unit at the weave gate (a red test
+ships no bundle):
 
 test :score do
   assert score(%{revenue: 50_000, employees: 20}) == 70
@@ -55,10 +55,10 @@ compiler, or the system — and the lane follows. Never confuse function with li
   <p class="tagline">The example on the left is one document written in all four lanes — read it top to bottom. Here's the quick reference.</p>
   <div class="tests">
     <div class="test"><div class="t">rich text — markdown</div><div class="v">what you READ</div><div class="d">prose, headings, figures, tables. only this — never logic.</div></div>
-    <div class="test"><div class="t">function — elixir → wasm, or BEAM</div><div class="v">what RUNS</div><div class="d">compute, state machines, workflows. plain Elixir; client/sandbox run it as wasm, server on the BEAM.</div></div>
-    <div class="test"><div class="t">build — plain elixir</div><div class="v">what COMPILES function</div><div class="d">the target compiles it; <code>test</code> gates it.</div></div>
+    <div class="test"><div class="t">function — elixir → wasm</div><div class="v">what RUNS</div><div class="d">compute, state machines, workflows. plain Elixir, run as wasm; the placement (<code>client</code>/<code>server</code>) says where.</div></div>
+    <div class="test"><div class="t">build — plain elixir</div><div class="v">what COMPILES function</div><div class="d">the placement compiles it; <code>test</code> gates it.</div></div>
     <div class="test"><div class="t">data — declarative elixir</div><div class="v">what the system TRACKS</div><div class="d">tasks, users, types, config. typed + validated at the weave gate.</div></div>
   </div>
   <h3>The discriminator</h3>
-  <p>Human reads it → markdown. Runtime runs it → Elixir (as wasm on client/sandbox, or the BEAM on server). Compiler builds it → the target compiles. System queries it as data → declarative Elixir. <b>Never confuse function with literacy.</b></p>
+  <p>Human reads it → markdown. Runtime runs it → Elixir, compiled to wasm (the placement, <code>client</code>/<code>server</code>, says where). Compiler builds it → the placement compiles. System queries it as data → declarative Elixir. <b>Never confuse function with literacy.</b></p>
 </template>

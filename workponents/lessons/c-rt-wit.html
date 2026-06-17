@@ -7,7 +7,7 @@ contract is a **world**: what the unit **exports** plus what it **imports**. You
 
 What **you** write is a `sandbox` unit and a `grant`:
 
-sandbox rust :enrich do
+server rust :enrich do
   pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
 end
 grant net "api.crm.com"

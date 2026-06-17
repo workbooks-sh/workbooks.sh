@@ -3,6 +3,6 @@
   <h2>the weave</h2>
   <p class="tagline">It's a CLI — <code>work dev</code> for the loop, <code>work bundle</code> to ship.</p>
   <h3>Two engines, one gate</h3>
-  <p>Front-end lanes go through a Vite-class engine (borrow Vite's dev/HMR; ship in-sandbox, no Node). Compute lanes: rust/zig → wasm via in-sandbox clang; Elixir → wasm (client/sandbox) or the BEAM (server). Both feed the <b>weave gate</b>: resolve refs, audit caps + deps, run tests. Then server regions SSR from the BEAM, client lanes become islands, everything gzips into the blob.</p>
+  <p>Front-end lanes go through a Vite-class engine (borrow Vite's dev/HMR; ship in-sandbox, no Node). Compute lanes: rust/zig → wasm via in-sandbox clang; Elixir → wasm, placed on client or server. Both feed the <b>weave gate</b>: resolve refs, audit caps + deps, run tests. Then server regions SSR from the BEAM, client lanes become islands, everything gzips into the blob.</p>
   <div class="note">Where Vite fits: <b>role yes, Node no.</b> Vite-model for the dev loop; our in-sandbox lane for the ship — portable, reproducible, zero native exec.</div>
 </template>

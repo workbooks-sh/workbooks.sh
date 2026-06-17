@@ -11,12 +11,12 @@ reads it?* (see [[The four lanes]]). #primitive
   ![caption](src)        inline image — a lone one renders as a figure
   - [ ] casual todo      a checklist for a human (not tracked data)
 
-**Function** — code that *runs*; `client`/`sandbox` compile to wasm, `server`
-runs on the BEAM:
+**Function** — code that *runs*; it all compiles to wasm, and the first word
+is the **placement** — where it runs:
 
-  client :x  do … end       # → wasm, in the browser
-  sandbox :x do … end       # → wasm, in the sandbox (any lang; default :elixir)
-  server :x  do … end       # full Elixir/OTP, on the BEAM
+  client :x  do … end       # in the browser (any lang; default :elixir)
+  server :x  do … end       # on the backend — the trusted tier
+  sandbox :x do … end       # a named isolation unit — groups the units inside it
   flow do … step … end      # workflows (step, parallel)
   agent "…" do … end        # a brain (model, system, tools)
 
@@ -43,7 +43,7 @@ rich text and the context around the code, never the code itself.
   <h3>rich text <span class="lane l-text">markdown</span></h3>
   <p><code>prose</code> · <code>headings</code> · <code>lists</code> · <code>tables</code> · <code>quotes</code> · <code>`code`</code> · <code>![caption](src)</code> figure · <code>- [ ]</code> casual todo</p>
   <h3>function <span class="lane l-fn">elixir → wasm</span></h3>
-  <p><code>client/sandbox/server :x do</code> code · <code>flow do</code> workflows · <code>agent do</code> brains</p>
+  <p><code>client/server :x do</code> placed code · <code>sandbox :x do</code> isolation unit · <code>flow do</code> workflows · <code>agent do</code> brains</p>
   <h3>build <span class="lane l-build">plain elixir / weave</span></h3>
   <p>the target compiles · <code>test :unit do</code> · <code>package hex/npm/cargo</code></p>
   <h3>data <span class="lane l-data">declarative elixir</span></h3>
