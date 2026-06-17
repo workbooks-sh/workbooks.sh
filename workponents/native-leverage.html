@@ -125,28 +125,23 @@
   <div class="row"><div class="el"><code>section / figure / hr</code><span class="leverage">regions, a captioned result unit, a phase divider. Semantic layout.</span></div>
     <pre>&lt;figure&gt;&lt;chart-view …&gt;&lt;figcaption&gt;Q3&lt;/figcaption&gt;&lt;/figure&gt;</pre><span class="verdict ok">use</span></div>
 
-  <h2>2 · Context &amp; narrative <span class="n">literate programming, native</span></h2>
-  <p class="layer">The under-used leverage: a workbook IS a document, so you write the <em>why</em> around the
-  <em>what</em> as HTML prose interleaved with <code>work-src</code> — richer than a <code>//</code> comment,
-  richer than markdown (bold, links, lists, headings, even embedded <code>work-*</code>). An agent writes
-  reasoning <em>and</em> runnable code in the same breath.</p>
+  <h2>2 · Notes <span class="n">just prose — don't over-build it</span></h2>
+  <p class="layer">"Context around code" is just <b>notes</b>, and notes are just <b>prose</b> — don't dress them up
+  as figure/aside ceremony. A workbook is a document, so you write the <em>why</em> next to the
+  <code>work-src</code> as plain HTML. The only real question is authoring comfort, and that's a <b>render
+  concern, not structure</b>: write notes as <b>markdown content</b> and render to this same rich HTML
+  (markdown-as-you-type, HTML-as-it-lands — it's prose text, not a banned sidecar format).</p>
 
-  <div class="row"><div class="el"><code>&lt;figure&gt; &lt;figcaption&gt;</code><span class="leverage">THE "code + its explanation" unit — a captioned, referenceable code block. The figure runs; the caption says why.</span></div>
-    <pre>&lt;figure&gt;
-  &lt;work-src lang="rust"&gt;fn connect()…&lt;/work-src&gt;
-  &lt;figcaption&gt;pooled so a retry reuses the socket&lt;/figcaption&gt;
-&lt;/figure&gt;</pre><span class="verdict ok">use</span></div>
+  <div class="row"><div class="el"><code>prose</code><span class="leverage">a paragraph next to the code. That's the whole mechanism. HTML prose IS rich (bold/links/lists) — richer than a // comment.</span></div>
+    <pre>&lt;p&gt;pooled so a retry reuses the socket&lt;/p&gt;
+&lt;work-src lang="rust"&gt;fn connect()…&lt;/work-src&gt;</pre><span class="verdict ok">use</span></div>
 
-  <div class="row"><div class="el"><code>&lt;aside&gt;</code><span class="leverage">a margin note / annotation BESIDE the code — "notes alongside," literally. Tangential context that isn't the main flow.</span></div>
-    <pre>&lt;work-src…&gt;…&lt;/work-src&gt;
-&lt;aside&gt;careful: this assumes the index is warm&lt;/aside&gt;</pre><span class="verdict ok">use</span></div>
+  <div class="row"><div class="el">markdown-as-content<span class="leverage">for nicer authoring — markdown TEXT rendered to HTML (a render step, not a format). Terser to write, same rich output.</span></div>
+    <pre>&lt;work-note&gt;### why we cache
+the index is warm by **step 2**…&lt;/work-note&gt;</pre><span class="verdict warn">render</span></div>
 
-  <div class="row"><div class="el"><code>prose + h2–h6</code><span class="leverage">the narrative the code lives inside — a &lt;section&gt; of reasoning, a heading, a paragraph. The document IS the explanation.</span></div>
-    <pre>&lt;section&gt;&lt;h3&gt;Why we cache&lt;/h3&gt;&lt;p&gt;…&lt;/p&gt;
-  &lt;work-src&gt;…&lt;/work-src&gt;&lt;/section&gt;</pre><span class="verdict ok">use</span></div>
-
-  <div class="row"><div class="el"><code>&lt;blockquote&gt; &lt;cite&gt;</code> · <code>&lt;mark&gt;</code><span class="leverage">a quoted source with attribution (research notes citing where they came from); highlight a key span.</span></div>
-    <pre>&lt;blockquote&gt;…finding…&lt;cite&gt;arxiv.org/…&lt;/cite&gt;&lt;/blockquote&gt;</pre><span class="verdict ok">use</span></div>
+  <div class="row"><div class="el"><code>&lt;figure&gt; &lt;figcaption&gt;</code><span class="leverage">ONLY for a genuinely captioned figure (a chart + its caption) — not the notes mechanism. Don't reach for it just to annotate.</span></div>
+    <pre>&lt;figure&gt;&lt;chart-view…&gt;&lt;figcaption&gt;Q3 revenue&lt;/figcaption&gt;&lt;/figure&gt;</pre><span class="verdict ok">use</span></div>
 
   <h2>3 · State &amp; interaction <span class="n">native state, no JS</span></h2>
   <p class="layer">Form controls hold state in the DOM and expose it to CSS — so a task's done-ness, a
@@ -239,8 +234,10 @@
   <div class="row"><div class="el"><code>view-transition</code><span class="leverage">ANIMATE state changes — a card sliding columns when a task completes — declaratively.</span></div>
     <pre>::view-transition-group(task) { … }</pre><span class="verdict new">2023+</span></div>
 
-  <div class="row"><div class="el"><code>--custom-props</code> · <code>@property</code><span class="leverage">data/config/state that cascades &amp; animates; --status inherits to children.</span></div>
-    <pre>:root { --accent: var(--work-brand); }</pre><span class="verdict ok">use</span></div>
+  <div class="row"><div class="el"><code>--custom-props</code><br>as INHERITED data tags<span class="leverage">the power attributes lack: a custom property INHERITS down the cascade — tag a whole subtree with context (`--tenant`, `--scope`) that flows to every descendant, readable by CSS (views) AND JS (getComputedStyle). Inert until read, so zero CSS interference. Attributes tag one node; custom props tag a scope. (Containers = view boundaries, not data tags — don't overload container-name.)</span></div>
+    <pre>&lt;work-flow style="--tenant: acme; --scope: prod"&gt;
+  …every step inherits --tenant / --scope…
+&lt;/work-flow&gt;</pre><span class="verdict ok">use</span></div>
 
   <div class="row"><div class="el"><code>@scope</code> · <code>@layer</code><span class="leverage">scope a kit's styles to its subtree; layer theme under overrides. Composition hygiene.</span></div>
     <pre>@scope (chart-view) { … }</pre><span class="verdict new">2023+</span></div>
