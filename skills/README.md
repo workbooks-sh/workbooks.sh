@@ -37,6 +37,7 @@ After installing, open the **`getting-started`** skill before doing anything els
 | `getting-started` | Onboard an agent or developer to a Workbooks repo from zero — read this FIRST. |
 | `create-workbook` | Create a new single-file HTML workbook systematically (framework, WASM deps, design canon, verify). |
 | `edit-workbook` | Edit an existing workbook safely via the unbundle → edit source → rebuild loop. |
+| `workbooks-kit` | Set up → author → deploy a workbook end-to-end with the real `work` CLI (create, add a `work-*` component, run a `work-src`, bundle, deploy local). |
 | `create-toolkit` | Author a new toolkit — `manifest.org` front-door + progressively-loaded `skills/*.org` recipes. |
 | `edit-toolkit` | Modify an existing toolkit while keeping the partition valid (`work toolkit verify`). |
 | `create-runtime` | Stand up or extend a Workbooks runtime — staged, anti-vibe-code gate (ADVANCED). |
