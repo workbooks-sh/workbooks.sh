@@ -176,7 +176,7 @@ end
 Types and tasks are declarations the system reads and validates — not code it
 runs. They have fields, not a body:
 
-type Status = :todo | :doing | :done
+type Status = enum(:todo, :doing, :done)
 
 task "tune the scorer", status: :todo, owner: :ada, ref: :score
 
@@ -208,26 +208,28 @@ task "tune the scorer", status: :todo, owner: :analyst, ref: :scorer
 </script>
 
 <script type="text/plain" id="c-data-model">
-# ONE data layer — WIT types. your content IS typed values; there is no second
-# data API, no SQLite-as-format, no separate VFS. the types you declare are the
-# types that cross the boundary are the types you store.
+# The data model
 
-# the four shapes you define (the WIT user-defined types):
+One data layer — **WIT types**. Your content *is* typed values: there's no second
+data API, no SQLite-as-format, no separate VFS. The types you declare are the types
+that cross the boundary are the types you store.
+
+The four shapes you define are the WIT user-defined types:
 
 type Status  = enum(:todo, :doing, :done)            # variants with no payload
 type Lead    = record(name: string, score: s32)      # fields
 type Outcome = variant(ok: Lead, err: string)        # a tagged choice
 type Perms   = flags(:read, :write, :admin)          # a set of bits
 
-# your data is just VALUES of those — lists, options, records:
+Your data is just **values** of those — lists, options, records:
 
 data :leads, from: values([
   %{name: "Acme",   score: 91},
   %{name: "Globex", score: 64},
 ])
 
-# record · variant · enum · flags · list · option · result · resource — these are
-# standard WebAssembly. an agent already understands them; nothing house-specific.
+`record · variant · enum · flags · list · option · result · resource` are standard
+WebAssembly — an agent already understands them, with nothing house-specific to learn.
 </script>
 
 <script type="text/plain" id="c-prim-refs">
@@ -292,8 +294,7 @@ check  types: :strict, caps: :declared_only
 
 <script type="text/plain" id="c-model-dash">
 route "/dashboard"
-lang  :svelte         # this page's front-end lane (could be solid / astro / js)
-use   [:crm, :charts]
+use   [:crm, :charts]      # toolkits this page draws helpers from
 
 # Sales dashboard
 
@@ -318,7 +319,7 @@ end
 
 <script type="text/plain" id="c-model-enrich">
 lang  :rust
-grant net: "api.crm.com"
+grant net "api.crm.com"
 
 # Enrich
 
@@ -436,7 +437,7 @@ grant net "api.crm.com"
 
 # types cross the boundary as WIT types — no manual memory:
 #   record ↔ map · enum ↔ atom · result ↔ {:ok,_}|{:error,_} · list ↔ list
-# your `type Status = :todo | :doing | :done` IS a WIT enum.
+# your `type Status = enum(:todo, :doing, :done)` IS a WIT enum.
 </script>
 
 <script type="text/plain" id="c-nx-backs">
@@ -534,11 +535,16 @@ end
 </script>
 
 <script type="text/plain" id="c-agent-coder">
-# coder.work — a coding agent, the whole framework in one file (the Claude-Code shape).
+# coder.work
 
-# memory is WIT-typed data — the agent's state is just records & lists:
+A coding agent — the whole framework in one file (the Claude-Code shape).
+
+**Memory is WIT-typed data** — the agent's state is just records & lists:
+
 type Msg = record(role: string, content: string)
 type Mem = record(history: list(Msg), files: list(string), cwd: string)
+
+The **brain** declares the model, prompt, tools, and the caps those tools need:
 
 agent :coder do
   model  :mimo
@@ -551,7 +557,8 @@ agent :coder do
   grant  exec "bash", fs "./project"      # the sandbox it acts in
 end
 
-# the LOOP is server Elixir (full OTP) — real ReAct, not a source block:
+The **loop is `server` Elixir** (full OTP) — real ReAct, written in Elixir:
+
 server :coder_loop do
   def run(task, mem \\ %Mem{}) do
     case think(:coder, mem, task) do        # LLM call → next action
@@ -563,7 +570,7 @@ server :coder_loop do
   end
 end
 
-# `bash "mix test"` is a SANDBOXED command, fs-scoped to ./project — never host exec.
+`bash "mix test"` is a sandboxed command, fs-scoped to `./project` — never host exec.
 </script>
 
 <script type="text/plain" id="c-agent-research">
@@ -649,7 +656,7 @@ end
 
 ## no target = a static definition — placed by whoever references it:
 
-zig :checksum do … end          # compiles wherever someone tangles it to
+zig :checksum do … end          # compiled wherever it's referenced (placed by whoever uses it)
 
 # the prefix is the engine, the placement, AND the trust tier, in one word.
 # server is Elixir-only; foreign code is always wasm (client/sandbox), never native.
@@ -679,7 +686,7 @@ end
 route "/dashboard"                      # this page's URL (a leaf page)
 lang  :svelte                           # the front-end lane for this file's islands
 use   [:crm, :charts]                   # toolkits — helpers (fns / types) this page draws on
-grant net: "api.crm.com"                # capability requests, scoped to this file
+grant net "api.crm.com"                # capability requests, scoped to this file
 deps  [hex: "decimal@2", npm: "d3@7"]   # unit-level deps (app-level → the index)
 
 # Sales dashboard
@@ -706,9 +713,9 @@ header is declared, never run — the file's data-lane twin of the index.
 #   agent "…" do … end         a brain (model, system, tools)
 
 # ── build · the COMPILER · mostly implicit in the target ──────────
-#   (the target compiles the unit — no explicit tangle to write)
+#   (the target compiles the unit — no explicit build step to write)
 #   test :unit do          verification (fails the build when red)
-#   <link rel=package>     deps: hex / npm / cargo — the index manifest
+#   package hex/npm/cargo  deps in the index manifest
 
 # ── data · declarative elixir · the SYSTEM queries ────────────────
 #   task · user · type     typed records + enums
@@ -749,7 +756,7 @@ task "tune the scorer", status: :todo,  owner: :ada
 # an agent claims it → the SAME line becomes:
 task "tune the scorer", status: :doing, owner: :ada, lock: "wb-7f3"
 
-# nothing recompiles — only the FUNCTION lane (tangle → wasm) ever compiles.
+# nothing recompiles — only the FUNCTION lane (target → wasm) ever compiles.
 # data edits are cheap + live, and every edit is versioned — restorable, like
 # Drive history (our own workspace layer, not an external tool).
 #
@@ -819,7 +826,7 @@ test :enrich do
 end
 
 # ── the tasks ada works: ordered by after:, gated by needs: ─────────
-type Status = :todo | :doing | :done
+type Status = enum(:todo, :doing, :done)
 
 task "run the pipeline",   status: :doing, owner: :ada, ref: :pipeline, paths: ["leads/"]
 task "review the ranking", status: :todo,  owner: :ada, after: :pipeline, needs: :enrich
@@ -858,7 +865,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h3>How richness escalates</h3>
   <ul><li class="pro"><b>Markdown image</b> — <code>![alt](src)</code>. The floor.</li>
   <li class="pro"><b>Presentational block</b> — <code>figure "…" do … end</code>. Same <code>do…end</code> grammar as code, but it <i>renders</i> (caption, layout); it doesn't run. One grammar, a new job.</li>
-  <li class="pro"><b>Component escape hatch</b> — drop to <code>work-*</code> / raw HTML when markdown can't say it. The output is HTML anyway, so it's always available.</li></ul>
+  <li class="pro"><b>Client-unit escape hatch</b> — when markdown can't say it, a <code>client</code> unit (a front-end island) renders it. No custom elements.</li></ul>
   <div class="note">Rich-text editing ≠ rich-text format. The file stays markdown; an editor can render it live (WYSIWYG) so it <i>feels</i> rich while the source stays literate.</div>
 </template>
 
@@ -891,7 +898,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h2>Compute <span class="lane l-fn">function</span> <span class="lane l-build">build</span></h2>
   <p class="tagline">You write plain Elixir; the <code>sandbox</code> target runs it as wasm. The engine is invisible.</p>
   <h3>Just Elixir</h3>
-  <p>The <code>def …</code> is the compute — ordinary Elixir, no dialect to learn. <b>Client/sandbox Elixir runs on an Elixir-in-wasm runtime</b> (AtomVM, compiled in at build), so real Elixir semantics carry over — you don't map types or memory by hand.</p>
+  <p>The <code>def …</code> is the compute — ordinary Elixir, no dialect to learn. <b>Client/sandbox Elixir runs on an Elixir-in-wasm runtime</b> (Popcorn/AtomVM, compiled in at build), so real Elixir semantics carry over — you don't map types or memory by hand.</p>
   <h3>One target away from the server</h3>
   <p>Switch to <code>server :score</code> and the same code runs full Elixir/OTP on the BEAM — the target is the only thing that changes. <code>sandbox</code>/<code>client</code> mean wasm; <code>server</code> means BEAM.</p>
   <div class="note"><b>Orb</b> — Elixir that authors low-level wasm directly — isn't how you write compute; it's a rare escape hatch (hot paths, extending the system), compiled like any other source language.</div>
@@ -1136,7 +1143,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <ul><li class="pro"><code>grant</code> is a <b>request</b> — an <b>import</b> in the unit's world (see The contract), not authority. The host decides; "anyone can dock it" only works if the host fulfills the import.</li>
   <li class="con"><b>Secrets are host-bound at run</b> — <code>env</code> is declared, never valued, never in the bundle.</li>
   <li class="pro">The weave audits <b>declared-only</b> — a unit may use only what it requested (over-reach <i>and</i> unused grants flag).</li></ul>
-  <div class="note">Native carrier: in the index these ride <code>&lt;meta&gt;</code> — net caps map onto a CSP <code>connect-src</code> the browser already enforces.</div>
+  <div class="note">Carrier: the weave emits a CSP <code>connect-src</code> from your <code>grant net</code> declarations — a generated artifact the browser already enforces, not something you author.</div>
 </template>
 
 <template id="e-ag-brain">
@@ -1178,7 +1185,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h3>Memory as the trace</h3>
   <p>The agent's <code>memory</code> is a <code>list(Attempt)</code> — each a draft + its self-critique + a score. It learns from its own history: every revision sees the prior attempts. No tools; pure reasoning, looping in <code>server</code> Elixir until the score clears the threshold.</p>
   <h3>Why it's a few lines</h3>
-  <p>Because the primitives carry it: <b>memory is typed data</b>, <b>the loop is plain Elixir</b>, the <b>brain</b> is one declaration. A well-known research pattern fits in a single literate file — and you could <code>tangle</code> it to run.</p>
+  <p>Because the primitives carry it: <b>memory is typed data</b>, <b>the loop is plain Elixir</b>, the <b>brain</b> is one declaration. A well-known research pattern fits in a single literate file — and it runs as-is.</p>
 </template>
 
 <template id="e-dep">
@@ -1211,7 +1218,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h3>How it works</h3>
   <p>A <code>test :enrich do … end</code> block asserts over the unit's output. The weave <b>discovers and runs them at the gate</b> — there's no runner to wire. A failure fails the build, so a green <code>dist/</code> means every test passed.</p>
   <h3>Why it's build-lane</h3>
-  <p>A test isn't shipped behavior and isn't prose — it's a <b>gate check</b>, the same lane as <code>tangle</code>. It proves the function <i>before</i> the function is woven in.</p>
+  <p>A test isn't shipped behavior and isn't prose — it's a <b>gate check</b>, the same build lane as the target's compile step. It proves the function <i>before</i> the function is woven in.</p>
 </template>
 
 <template id="e-syn-front">
@@ -1233,7 +1240,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h3>function <span class="lane l-fn">elixir → wasm</span></h3>
   <p><code>client/sandbox/server :x do</code> code · <code>flow do</code> workflows · <code>agent do</code> brains</p>
   <h3>build <span class="lane l-build">plain elixir / weave</span></h3>
-  <p>the target compiles · <code>test :unit do</code> · <code>&lt;link rel=package&gt;</code></p>
+  <p>the target compiles · <code>test :unit do</code> · <code>package hex/npm/cargo</code></p>
   <h3>data <span class="lane l-data">declarative elixir</span></h3>
   <p><code>task · user · type</code> · <code>data :x, from:</code> · <code>grant · posture</code> · <code>route · lang · use</code> (header)</p>
   <div class="note">If a line is none of these, it's prose. <b>Markdown only narrates</b> — rich text and context around code, never the code itself. The discriminator never changes: <b>who reads it?</b></div>
@@ -1256,7 +1263,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h2>Live state <span class="lane l-data">data</span></h2>
   <p class="tagline">Declarative isn't frozen. The document is the store; you change state by editing the declaration.</p>
   <h3>Why mutation doesn't break it</h3>
-  <ul><li class="pro"><b>Data is read, not compiled.</b> Only the function lane (<code>tangle → wasm</code>) compiles. A <code>task</code> is parsed, so flipping <code>status: :todo → :doing</code> is a cheap, live edit — nothing rebuilds.</li>
+  <ul><li class="pro"><b>Data is read, not compiled.</b> Only the function lane (target → wasm) compiles. A <code>task</code> is parsed, so flipping <code>status: :todo → :doing</code> is a cheap, live edit — nothing rebuilds.</li>
   <li class="pro"><b>The document is the database.</b> No sidecar store, no platform CRDT — the <code>task</code> line is the source of truth <i>and</i> the live state at once. Exactly the DOM: live markup that's also the source.</li>
   <li class="pro"><b>Every edit is versioned</b> — a <code>draft</code> the system can restore — so the history <i>is</i> the audit log.</li></ul>
   <div class="note">Split: <b>coarse state</b> (todo→doing→done, owner, lock) lives in the document; <b>ephemeral scratch</b> (an agent's partial output) stays in runtime memory and never churns the file.</div>
@@ -1294,7 +1301,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h3>What's combined</h3>
   <ul><li><b>agent</b> — the brain (model, system, tools).</li>
   <li><b>flow</b> — the runnable DAG it executes (<code>step</code>, <code>parallel</code>).</li>
-  <li><b>source + test</b> — the units the flow calls, each with a validation that <b>gates the whole plan</b> (a red test → nothing advances).</li>
+  <li><b>unit + test</b> — the units the flow calls, each with a validation that <b>gates the whole plan</b> (a red test → nothing advances).</li>
   <li><b>tasks</b> — what the agent works, ordered by <code>after:</code> and gated by <code>needs:</code> a passing unit.</li></ul>
   <h3>The loop</h3>
   <p>ada claims a task → <code>draft</code> + <code>scope</code> (Claim, lock &amp; fence) → runs the <code>:pipeline</code> flow → which calls <code>:enrich</code>/<code>:score</code> → tests gate it → status flips to <code>:done</code>, all in this one file. <b>The brain, the work, the proof, and the live board — composed from the same primitives</b>, no separate harness to learn. One agent here; the shape scales to many.</p>

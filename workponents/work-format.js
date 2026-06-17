@@ -43,7 +43,7 @@
   const RUN_TYPES = [
     `<span class="p">$</span> <span class="cmd">work check team.work</span>`,
     ``,
-    `  <span class="dim">type</span>     Status = :todo | :doing | :done   <span class="ok">✓</span>`,
+    `  <span class="dim">type</span>     Status = enum(:todo, :doing, :done)   <span class="ok">✓</span>`,
     `  <span class="dim">users</span>    :analyst <span class="ok">✓</span>   :shane <span class="ok">✓</span>`,
     `  <span class="dim">refs</span>     task owner: :analyst   <span class="ok">✓ resolves</span>`,
     `           task status: :todo     <span class="ok">✓ valid Status</span>`,
@@ -208,7 +208,7 @@
     `            audit declared-only <span class="ok">✓</span>  <span class="dim">no over-reach</span>`,
     ``,
     `  <span class="dim">compile</span>   rust    enrich.rs   → <span class="path">enrich.wasm</span>   <span class="num">412ms</span>`,
-    `            elixir  score(orb)  → <span class="path">score.wasm</span>    <span class="num">88ms</span>`,
+    `            elixir  score       → <span class="path">score.wasm</span>    <span class="num">88ms</span>`,
     `            svelte  board       → <span class="path">board.js</span> 12KB <span class="num">340ms</span>`,
     ``,
     `  <span class="dim">check</span>     ts strict <span class="ok">✓</span>      tests  enrich 2/2 <span class="ok">✓</span>`,
