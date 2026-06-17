@@ -37,7 +37,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     // ── start here (local) ──
-    /// Scaffold a new workbook source (workbook.org + data/)
+    /// Scaffold a new workbook (index.html + data/)
     Init { name: String, #[arg(long, default_value = "minimal")] template: String },
     /// Watch + rebuild + serve a live preview (interactive; in agent contexts use `bundle`)
     Dev { #[arg(default_value = ".")] src: String, #[arg(long)] port: Option<u16> },
