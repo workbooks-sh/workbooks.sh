@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en" data-work-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="darkreader-lock"><meta name="color-scheme" content="light dark">
+<title>Workbooks — Foundation audit (p0.3)</title>
+<!--
+  NO JSON. The <board-task> elements below ARE the source of truth (the board kit's
+  own composition-as-source contract). This workbook dogfoods the board kit to report
+  the Foundation audit: one <board-view> per research dimension, each finding a
+  <board-task status="high|med|low"> routed into its severity column. To act on a
+  finding, an agent edits the HTML here — the board re-files it.
+-->
+<link rel="stylesheet" href="dist/theme.css">
+<script type="module" src="dist/workponents.js"></script>
+<style>
+  body { margin:0; background:var(--work-bg); color:var(--work-fg);
+         font:15px/1.5 "Geist", ui-sans-serif, system-ui, sans-serif; }
+  header { padding:34px 40px 22px; border-bottom:1px solid var(--work-border); }
+  header h1 { margin:0; font-size:24px; letter-spacing:-.02em; }
+  header h1 b { background:var(--work-fg); color:var(--work-bg); padding:2px 9px; border-radius:8px; }
+  header .sub { color:var(--work-fg-muted); margin:8px 0 0; max-width:78ch; }
+  header .mantra { margin:14px 0 0; font:600 12px/1.4 "Geist Mono",monospace; letter-spacing:.04em;
+                   color:var(--work-brand-ink); background:var(--work-brand-soft); display:inline-block; padding:5px 11px; border-radius:8px; }
+  header .live { float:right; font:11px/1 "Geist Mono",monospace; color:var(--work-fg-muted); }
+  header .live .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--work-brand);
+               margin-right:5px; animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  main { padding:20px 40px 90px; display:flex; flex-direction:column; gap:30px; }
+  .lede { background:var(--work-surface); border:1px solid var(--work-border); border-radius:14px;
+          padding:20px 24px; }
+  .lede h2 { margin:0 0 8px; font-size:18px; letter-spacing:-.01em; }
+  .lede p { margin:8px 0 0; color:var(--work-fg-muted); font-size:14px; max-width:90ch; }
+  .lede code, .dim code { font:600 12px/1.4 "Geist Mono",monospace; background:var(--work-brand-soft);
+          color:var(--work-brand-ink); padding:1px 6px; border-radius:6px; }
+  .lede ol { margin:10px 0 0 18px; padding:0; color:var(--work-fg); font-size:14px; }
+  .lede ol li { margin:6px 0; }
+  .dim h2 { margin:0; font-size:17px; letter-spacing:-.01em; }
+  .dim .goal { color:var(--work-fg-muted); font-size:13px; margin:5px 0 12px; max-width:90ch; }
+  .dim .tag { display:inline-block; margin:0 0 12px; font:11px/1 "Geist Mono",monospace; color:var(--work-brand-ink);
+                background:var(--work-brand-soft); padding:3px 8px; border-radius:20px; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="live"><span class="dot"></span><span id="stamp">live</span></span>
+    <h1><b>Workbooks</b> · Foundation audit</h1>
+    <p class="sub">Roadmap p0.3 — dead-code &amp; god-file &amp; drift audit, plus the p0.10 taxonomy decision and
+      the p0.1 loader-migration plan. Seven research dimensions, each a board; every finding a card routed into
+      its severity column. This report IS a board-kit workbook (dogfood).</p>
+    <p class="mantra">delete and combine over port and patch — does this still need to exist?</p>
+    <p class="bar-label" id="overall">—</p>
+  </header>
+
+  <main>
+
+    <!-- ════════════════ DECISIONS (lead) ════════════════ -->
+    <section class="lede">
+      <h2>Decision 1 — Top-level type taxonomy (p0.10): <code>kit · app · agent</code> as co-occurring facets</h2>
+      <p><b>"Has-interface" is the wrong cut</b> — every <code>work-*</code> workbook renders, so it partitions nothing.
+        The load-bearing axis is <b>library-vs-leaf</b> (import-vs-launch), npm's <code>exports</code>-vs-<code>bin</code> split.
+        And types are a <b>SET, not an enum</b>: <code>library.ex:536</code> already states "a toolkit IS a workbook," so one
+        <code>.html</code> can be both a launchable app AND export a kit.</p>
+      <p>Minimal facet set, declared as zero-or-more TYPE edges (the spine's existing form — <code>work-ref.js:68-69</code>):</p>
+      <ol>
+        <li><code>&lt;work-ref rel="kit" as="crm"&gt;</code> — exports a <code>&lt;prefix-*&gt;</code> element/command library (the floor; untagged-with-exports defaults here)</li>
+        <li><code>&lt;work-ref rel="app"&gt;</code> — a launchable leaf interface (gets a route/window)</li>
+        <li><code>&lt;work-ref rel="agent"&gt;</code> — carries a runnable brain (<code>&lt;work-agent&gt;</code> + <code>&lt;work-src&gt;</code>)</li>
+      </ol>
+      <p><b>Drop</b> <code>skill</code> from the rel vocab (skills are kit CONTENTS, not a type) and <b>drop</b> <code>container</code>
+        entirely (it is an execution tier of <code>isolation*.ex</code>, not a type). <b>Action:</b> edit <code>work-ref.js:7-8</code>
+        header vocab to <code>rel=kit|app|agent</code>.</p>
+    </section>
+
+    <section class="lede">
+      <h2>Decision 2 — Loader migration plan (p0.1): one Floki pass over the type edge</h2>
+      <p>Today <code>work_kits.ex:48</code> discovers via the <code>&lt;work-toolkit&gt;</code> ELEMENT;
+        <code>node_of/1</code> (<code>:1594</code>) pattern-matches only that tuple, so the already-migrated
+        <code>workkits/work/manifest.html</code> (the lone <code>rel="kit"</code> manifest) parses to ZERO nodes today.</p>
+      <ol>
+        <li>Add <code>kit_nodes/1</code>: <code>Floki.find("work-ref[rel=kit]")</code>; <code>node_of</code> accepts BOTH tuples; alias <code>name</code>→<code>id</code>, pull doc from sibling <code>&lt;work-doc&gt;</code>.</li>
+        <li>Map sibling <code>&lt;work-ref rel="needs" to=…&gt;</code> → <code>{:dep, to, to}</code> tokens, union with the legacy <code>requires=</code> attribute (CLI pre-flight tokens stay on the attribute).</li>
+        <li>Keep <code>&lt;work-toolkit&gt;</code> as a parsed fallback (<code>nodes = kit_nodes ++ legacy</code>) so the 29 unconverted manifests keep working.</li>
+        <li>Gate via the 3 existing toolkit tests (descriptor / graph / discovery) feeding BOTH forms; convert the 29 manifests in a separate batched commit; then DELETE the fallback (Golden Rule 5).</li>
+      </ol>
+      <p>Verified: 29 manifests on <code>&lt;work-toolkit&gt;</code>, exactly 1 on <code>rel="kit"</code>. All HTML, no JSON.</p>
+    </section>
+
+    <!-- ════════════════ DIMENSION: deadcode ════════════════ -->
+    <section class="dim">
+      <h2>Dead code — VERIFIED safe to delete</h2>
+      <p class="goal">Refutation-tested. The high-severity item is a LIVE broken call (crashes at request time); the rest are
+        unreachable modules. Deleting all leaves <code>mix compile</code> / <code>mix test</code> green.</p>
+      <span class="tag">~1074 LOC removable + 1 crash fixed</span>
+      <board-view columns="high,med,low">
+        <board-task status="high" title="public_web.ex:212 — wired call to DELETED Workbooks.OQL.render/1 → UndefinedFunctionError at request time on the non-complete-HTML branch. FIX: serve stored HTML in the nonce shell, drop OQL.render (workbooks render client-side).">deadcode · public_web.ex:212</board-task>
+        <board-task status="high" title="Demos.Agent (158) / Demos.Platform (252) / Demos.Runtime (192) — ~602 LOC, ZERO callers anywhere (only Seed+Build of the 5 demos are reachable). Pure dead leaf modules.">deadcode · runtime/host/demos/{agent,platform,runtime}.ex</board-task>
+        <board-task status="med" title="Workbooks.Sessions (60) + Workbooks.Lifecycle (102) — transitively dead: only caller is the dead Demos.Runtime. NOT the Keeper.Lifecycle (different module, live). Delete together with Demos.Runtime.">deadcode · runtime/host/{sessions,lifecycle}.ex</board-task>
+        <board-task status="med" title="Workbooks.Conformance (48) — WIT conformance checker, 0 callers; docstring says it runs at 'work build' but build.ex never invokes it. Self-contained; safe.">deadcode · runtime/host/conformance.ex</board-task>
+        <board-task status="med" title="Workbooks.BrokeredApp (161) — app-host capstone referenced ONLY by its own @moduletag :build test (excluded by default). Not in supervision. Delete module + its test together.">deadcode · runtime/host/brokered_app.ex</board-task>
+      </board-view>
+    </section>
+
+    <!-- ════════════════ DIMENSION: godfiles ════════════════ -->
+    <section class="dim">
+      <h2>God files — size × distinct responsibilities</h2>
+      <p class="goal">Two runtime modules cram 4+ subsystems each. The multi-language compiler and the 115-route monolith
+        router are the top offenders. Frontend: two oversized single-file Svelte components.</p>
+      <span class="tag">compilers 2247 · web 2243 · work_kits 1617</span>
+      <board-view columns="high,med,low">
+        <board-task status="high" title="compilers.ex (2247) = C/C++ + Zig + Rust-via-mrustc + a full crates.io resolver + a hand-rolled semver engine in ONE module. SPLIT: Compilers.{C,Zig,Rust,Crates,Semver} + shared .Link.">godfile · runtime/host/compilers.ex</board-task>
+        <board-task status="high" title="web.ex (2243) = 115-route Plug monolith: health + billing/nexus RBAC + agents + workflow + workspaces + /w/:id + toolkit/file serving + inline HTML. SPLIT into per-domain forwarded routers; web.ex = thin forwarder.">godfile · runtime/host/web.ex</board-task>
+        <board-task status="high" title="work_kits.ex (1617) = discovery/closure + the eval/LLM-judge harness + descriptor parsing + signing/provenance + renderer text. SPLIT: WorkKits.{Resolver,Catalog,Eval,Descriptor,Trust}.">godfile · runtime/host/work_kits.ex</board-task>
+        <board-task status="high" title="package_manager.ex (1477) re-implements per-language build dispatch that DUPLICATES compilers.ex (DRY). Two language switches = the core drift. Collapse to ONE Compilers facade; keep only manifest/lockfile parsing here.">godfile · runtime/host/package_manager.ex</board-task>
+        <board-task status="med" title="command_registry.ex (1198) conflates the runtime registry/trust store with ~10 build-and-register language adapters. Move build_/fetch_ adapters into CommandRegistry.Install.">godfile · runtime/host/command_registry.ex</board-task>
+        <board-task status="med" title="pallet.ex (1265) packs 5 inline seed catalogs (wasm/c/rust/js/python) as module-attribute data. Split per-lane OR move to declarative work-kit descriptors the loader reads.">godfile · runtime/host/pallet.ex</board-task>
+        <board-task status="med" title="Sidebar.svelte (1688: script 550 + style 640) — single-file kitchen sink, 38 handlers. Extract SidebarSection/Item/Actions + a $lib/sidebar store.">godfile · desktop/src/lib/components/Sidebar.svelte</board-task>
+        <board-task status="med" title="IntegrationsSettings.svelte (1553: script 723 + style 426) — one inlined section per provider, grows unboundedly. Split per-integration + a config-driven list + settings store.">godfile · desktop/src/lib/components/IntegrationsSettings.svelte</board-task>
+      </board-view>
+    </section>
+
+    <!-- ════════════════ DIMENSION: drift ════════════════ -->
+    <section class="dim">
+      <h2>Drift — survivors of the deleted org/OQL world + the toolkit→work-kit rename</h2>
+      <p class="goal">Same root as the dead OQL call. Two competing workflow engines, the whole CLI still authoring
+        <code>.org</code>, a manifest format mismatch CLI↔runtime, and stale wb/wbx names that risk the guardrail test.</p>
+      <span class="tag">HTML-only model not yet enforced</span>
+      <board-view columns="high,med,low">
+        <board-task status="high" title="public_web.ex:212 calls deleted Workbooks.OQL.render/1 (same as deadcode #1). Serve the stored HTML directly — it renders client-side via work-* elements.">drift · runtime/host/public_web.ex:212</board-task>
+        <board-task status="high" title="Two workflow engines: canon &lt;work-flow&gt; HTML DAG (workflow.ex:4) vs still-live org-mode Workbooks.Workflow.Todo (todo.ex parses #+TITLE/TODO/:ORDERED:). Collapse to the one HTML engine; delete the org parser.">drift · runtime/host/workflow/todo.ex</board-task>
+        <board-task status="high" title="groundskeeper.ex:164 author_prompt instructs the LLM to emit native org-mode TODO outlines → writes &lt;slug&gt;.org. Generates the deleted format. Regenerate as &lt;work-flow&gt; HTML.">drift · runtime/host/groundskeeper.ex:164</board-task>
+        <board-task status="high" title="CLI scaffolds/reads .org: main.rs (workbook.org), commands.rs (deployment.org probe), deploy/mod.rs (FILE=deployment.org, parses #+DEPLOY_TOOLKITS). Switch to .html + attribute config.">drift · cli/src/{main,commands}.rs, deploy/mod.rs</board-task>
+        <board-task status="high" title="CLI import/audit author manifest.org (#+TOOLKIT/#+KIND) while runtime work_kits.ex parses manifest.html via Floki. A CLI-imported toolkit's manifest is UNREADABLE by the runtime. Emit manifest.html.">drift · cli/src/{import,audit}.rs</board-task>
+        <board-task status="med" title="Stale wb/wbx names in user-facing strings + doc comments (commands.rs 'wbx {version}', audit/import 'wbx toolkit push', kernel.rs '`wb query`'). cli_name_test.exs is a whole-repo guardrail. Replace wb/wbx → work.">drift · cli/src/{commands,audit,import,kernel}.rs</board-task>
+        <board-task status="med" title="work_kits.ex moduledoc still says 'Toolkit' 168× and hard-parses &lt;work-toolkit&gt; at :49. Rename vocab to work-kit; migrate the loader onto &lt;work-ref rel=kit&gt; (p0.1).">drift · runtime/host/work_kits.ex:2-49</board-task>
+        <board-task status="med" title="compilers.ex:2230 reads Floki.attribute('work-toolkit') off the dissolving element. Migrate to the work-ref edge alongside the loader migration.">drift · runtime/host/compilers.ex:2230</board-task>
+        <board-task status="med" title="workponents doc-element comments LIE: 'OQL kernel', '#+EXEC cells', 'orgize parity' — all deleted. Rewrite to the work-src/Dock model.">drift · workponents/src/elements/docs/{wb-doc-cell,render,wb-doc}.js</board-task>
+        <board-task status="low" title="work_kits.ex moduledoc points to deleted docs (TOOLKITS-V3.md, WORK-FORMAT.md) — neither exists. Repoint or remove.">drift · runtime/host/work_kits.ex:36,39</board-task>
+        <board-task status="low" title="CLI 'kernel' naming is vestigial (kernel.rs is just an HTML scanner; no kernel/wasm). Rename module/comments to 'inspect'; avoids clash with live Workbooks.Kernel WASM reactor.">drift · cli/src/{main,kernel}.rs</board-task>
+      </board-view>
+    </section>
+
+    <!-- ════════════════ DIMENSION: waldo ════════════════ -->
+    <section class="dim">
+      <h2>Waldo agent context — verdict: PARTIALLY BUSTED</h2>
+      <p class="goal">The render SEAM (frontend <code>splitComponents</code>, runtime component catalog) was migrated to inline
+        <code>&lt;work-*&gt;</code> HTML. But Waldo's BRAIN — the hardcoded default prompt in <code>web.ex</code> — still teaches
+        the deleted org emit shape, contradicting the HTML Components section appended right after it.</p>
+      <span class="tag">the prompt fights the renderer</span>
+      <board-view columns="high,med,low">
+        <board-task status="high" title="web.ex:1986 default prompt tells Waldo to emit '#+RENDER: org' + '#+begin_src component' — but messageRender.ts splitComponents() ONLY matches inline &lt;work-*&gt; HTML. Anything Waldo emits per the prompt renders as literal prose. Rewrite the preamble to demand HTML elements.">waldo · runtime/host/web.ex:1986</board-task>
+        <board-task status="high" title="Self-contradiction: the preamble (web.ex:1987) says emit org; the appended ## Components section (work_kits.ex:399 render_catalog) says 'just write them as HTML'. Two mutually exclusive emit contracts in one prompt; only the HTML one renders.">waldo · web.ex:1986 vs work_kits.ex:399</board-task>
+        <board-task status="high" title="agent_system_prompt reads agents/&lt;slug&gt;.org (deleted format) while the catalog + shipped agents are .html (AgentDef parses &lt;work-agent&gt;). The .org read path is DEAD; every slug falls through to the hardcoded default. Switch the Path.join to .html.">waldo · runtime/host/web.ex:1998</board-task>
+        <board-task status="med" title="Split-brain slug: desktop sends 'waldo' (WaldoPanel.svelte:42), builtin catalog registers 'workhorse' (web.ex:1939). Picker never lists 'waldo'. Unify on 'waldo' in agent_catalog.">waldo · WaldoPanel.svelte:42 vs web.ex:1939</board-task>
+        <board-task status="med" title="messageRender.test.ts:2 imports splitOrg/renderMode — both DELETED. bun run check fails here. Rewrite against splitComponents (inline &lt;work-*&gt;) or delete.">waldo · desktop/src/lib/chat/messageRender.test.ts:2</board-task>
+        <board-task status="med" title="Injected prompt teaches the OLD 'toolkit show/search' verb + #+EXEC/#+CEM org nouns while the skill-attach path uses the new 'work kit show'. Align all to 'work kit show/search' and 'work-kit'.">waldo · work_kits.ex:35-38, web.ex:1990,2006</board-task>
+      </board-view>
+    </section>
+
+    <!-- ════════════════ DIMENSION: evals ════════════════ -->
+    <section class="dim">
+      <h2>Evals — one harness works (spine-blind), the other is broken</h2>
+      <p class="goal">The 9-case agent QUALITY battery runs (Minimax M3, gemini judge) but never exercises the new spine.
+        The component-composition eval is dead — its spec pack was deleted — and still speaks the org emit shape.</p>
+      <span class="tag">no mix alias / CI gate for either</span>
+      <board-view columns="high,med,low">
+        <board-task status="high" title="`work eval components` is a DEAD verb: its spec pack (runtime/evals/components/specs/*.eval.md) was deleted in cc6cfd5e, so run/1 always returns 'no specs'. Re-author the pack (case names survive in runs/) or convert to a self-contained @cases list.">evals · runtime/host/evals/components.ex:45</board-task>
+        <board-task status="high" title="Both eval prompts assume the org '#+begin_src component :type' emit; extract_component regexes org blocks first, raw &lt;work-*&gt; only as fallback. Measuring the DELETED surface. Make HTML-first, drop type_to_tag/normalize_data/parse_block (~150 LOC).">evals · runtime/host/evals/components.ex:576,648</board-task>
+        <board-task status="high" title="Catalog injection keyed to exec='component' + #+CEM toolkit shape, not &lt;work-ref rel=kit&gt;. The eval rides the LEGACY loader path; it can't be 'green in the new system' until work_kits switches discovery (same p0.1 debt).">evals · runtime/host/work_kits.ex:312-345</board-task>
+        <board-task status="med" title="agent_evals.exs (9 adversarial cases) runs fine on AgentSession with the WB_EVAL_FLOOR gate, but is pure-LLM probing — never authors a workbook, emits a work-* element, runs a work-src block, or composes a work-flow. Add spine-exercising cases.">evals · runtime/bench/agent_evals.exs:29</board-task>
+        <board-task status="med" title="No mix alias / CI test runs EITHER eval; only toolkit_injection_test.exs touches the catalog (and rides the same legacy exec=component path). Add a `mix eval` alias; keep that test as the migration canary.">evals · runtime/mix.exs, test/toolkit_injection_test.exs</board-task>
+      </board-view>
+    </section>
+
+    <!-- ════════════════ DIMENSION: taxonomy ════════════════ -->
+    <section class="dim">
+      <h2>Taxonomy — the full p0.10 rationale (decision boxed at top)</h2>
+      <p class="goal">Why <code>kit · app · agent</code> as a facet SET wins, with the alternatives explicitly rejected.</p>
+      <span class="tag">library-vs-leaf · facets-not-enum</span>
+      <board-view columns="high,med,low">
+        <board-task status="high" title="'Has-interface' is the wrong cut — every work-* workbook renders, so it partitions nothing. The real axis is REACHABILITY: a kit is IMPORTED &amp; composed; an app is the LEAF you LAUNCH. npm bin-vs-exports, MIME container-vs-leaf. Define kit/app on import-vs-launch.">taxonomy · AGENTS.md:55, work-ref.js:60</board-task>
+        <board-task status="high" title="Types are co-occurring FACETS, not a mutually-exclusive enum: library.ex:536 already says 'a toolkit IS a workbook', so an app can export a kit. Prior art (CEM many-exports, npm main+bin+exports, microformats rel-set) all multi-valued. A workbook carries 0+ type edges.">taxonomy · AGENTS.md:57, library.ex:536</board-task>
+        <board-task status="high" title="Minimal facet set: kit (exports &lt;prefix-*&gt; — the floor) | app (launchable leaf) | agent (carries &lt;work-agent&gt;/&lt;work-src&gt; brain). Untagged-with-exports = kit. Do NOT add doc/board/deck as TYPES — those are visual kits it consumes.">taxonomy · AGENTS.md:58, agent_def.ex:3</board-task>
+        <board-task status="high" title="Exact vocab: &lt;work-ref rel='kit|app|agent'&gt; with NO `to` (work-ref.js:68-69 already renders this as a type badge). DROP `skill` (kit content), ADD `app`. Prefix via the existing `as` slot: rel='kit' as='crm'. The edge IS the declaration (tagging=C).">taxonomy · workponents/src/elements/work/work-ref.js:7-8,68</board-task>
+        <board-task status="med" title="'container' is an EXECUTION property of isolation*.ex (one engine, isolated instances, host-brokered nesting) — orthogonal to what a file IS. MIME separates the same (multipart=transport). Drop container as a type; if needed it's a Dock/grant attr on &lt;work-src&gt;.">taxonomy · AGENTS.md:60, runtime/host/isolation_*.ex</board-task>
+        <board-task status="med" title="JSON-free + dogfood check passes: facets live entirely in HTML edges (no manifest JSON); the workbook-spec script is the sanctioned network boundary and MAY mirror facets for indexing, edges remain truth. roadmap.html=app+board-kit, work=kit, workbooks-agent=agent+kit — all classify with the existing primitive.">taxonomy · AGENTS.md (non-negotiables), bundle.ex</board-task>
+        <board-task status="low" title="REJECTED alt: a single `type=` attribute (one value). Simpler to read but can't express an app-that-exports-a-kit and diverges from every prior-art registry. REJECTED alt: keep 'container' as a 4th type (it's an execution tier).">taxonomy · AGENTS.md:57</board-task>
+      </board-view>
+    </section>
+
+    <!-- ════════════════ DIMENSION: loader ════════════════ -->
+    <section class="dim">
+      <h2>Loader migration — the full p0.1 plan (decision boxed at top)</h2>
+      <p class="goal">Teach the parser to read <code>&lt;work-ref rel="kit"&gt;</code> + sibling <code>rel="needs"</code> into the SAME
+        descriptor shape, keep <code>&lt;work-toolkit&gt;</code> as a fallback for the 29 unconverted manifests, then collapse.</p>
+      <span class="tag">parser → tests → convert 29 → delete fallback</span>
+      <board-view columns="high,med,low">
+        <board-task status="high" title="Add kit_nodes/1: Floki.find('work-ref[rel=kit]'); generalize work_toolkit_nodes into nodes(html)=kit_nodes++legacy; make node_of/1 accept BOTH tuples; alias name→id; pull doc from top-level &lt;work-doc&gt; sibling (work-ref is self-closing).">loader · runtime/host/work_kits.ex:1587-1596</board-task>
+        <board-task status="high" title="Map sibling &lt;work-ref rel='needs' to=X&gt; → {:dep,X,X} tokens (always a kit-id edge, skips classify_requirement). Source requires = parse_requires(attrs) ++ needs_tokens; closure/3 unchanged. CLI pre-flight tokens stay on the requires= attribute.">loader · runtime/host/work_kits.ex:88,788,811</board-task>
+        <board-task status="high" title="Keep &lt;work-toolkit&gt; as a parsed fallback (nodes = kit_nodes ++ legacy_toolkit_nodes; dedup by id, prefer rel=kit) so the 29 unconverted manifests keep discovering. Ship the parser change WITHOUT converting all manifests in one commit.">loader · runtime/host/work_kits.ex:48-63,1587</board-task>
+        <board-task status="high" title="GATE: extend toolkit_descriptor_test to feed BOTH forms → identical descriptor map; a 2× rel=needs case → requires==[{:dep,glyphs,glyphs},{:dep,icons,icons}]; assert kind:'kit'. Run: mix test test/toolkit_descriptor_test.exs.">loader · runtime/test/toolkit_descriptor_test.exs:14</board-task>
+        <board-task status="high" title="GATE: extend toolkit_graph_test scratch_root to emit rel=kit + rel=needs; the 3 asserts (transitive edge, native-CLI = no edge, cycle raises) must pass byte-for-byte. Run: mix test test/toolkit_graph_test.exs.">loader · runtime/test/toolkit_graph_test.exs:31</board-task>
+        <board-task status="high" title="GATE: toolkits_test — add a rel=kit fixture; assert discover_dir(@root) returns BOTH 'work' (rel=kit) and a legacy kit, proving the ++ fallback over the real mixed tree (28 legacy + 1 new). Adversarial ../ slug cases stay green.">loader · runtime/test/toolkits_test.exs:33</board-task>
+        <board-task status="med" title="Wire taxonomy hook: kind = attrs['rel'] || 'kit' in view/1 + parse_descriptor/1, so a future single registry can route kit/app/agent. kit_nodes accepts only rel=kit (a rel=agent ref must not load as a kit).">loader · runtime/host/work_kits.ex:768-790,1607</board-task>
+        <board-task status="med" title="Convert the 29 legacy manifests: &lt;work-toolkit id=X…&gt; → self-closing &lt;work-ref rel='kit' name=X prefix=X …/&gt; + unchanged &lt;work-doc&gt; sibling + per-dep &lt;work-ref rel='needs' to=…/&gt;. Set prefix= where id≠prefix. Batched commit after parser+tests green.">loader · workkits/*/manifest.html (29)</board-task>
+        <board-task status="med" title="FINAL: once grep work-toolkit = 0, delete legacy_toolkit_nodes + the work-toolkit branch + work_toolkit/1, fold nodes==kit_nodes, rewrite the moduledoc. Keep one test asserting &lt;work-toolkit&gt; is now REJECTED. GATE: full mix compile && mix test.">loader · runtime/host/work_kits.ex:1587-1605</board-task>
+        <board-task status="low" title="No code change but verify: agent_toolkits/2 reads &lt;work-agent kits=…&gt; and resolve/3 keys by_id; node_of's name→id alias keeps keys correct. Add an assertion that a kits='work' agent resolves against a rel=kit manifest.">loader · runtime/host/work_kits.ex:95-106</board-task>
+      </board-view>
+    </section>
+
+  </main>
+
+  <script type="module">
+    // Progress/summary reads the board-task ELEMENTS (the source of truth) — no JSON.
+    function stats() {
+      const t = [...document.querySelectorAll("board-task")];
+      const hi = t.filter((x) => x.getAttribute("status") === "high").length;
+      document.getElementById("overall").textContent =
+        `${t.length} findings across 7 dimensions · ${hi} high-severity`;
+      document.getElementById("stamp").textContent = `live · ${new Date().toLocaleTimeString()}`;
+    }
+    stats();
+  </script>
+</body>
+</html>

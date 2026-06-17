@@ -50,6 +50,7 @@
     "@tauri-apps/cli": "^2.11.2",
     "@types/node": "^25.6.0",
     "@types/phoenix": "^1.6.7",
+    "playwright": "^1.61.0",
     "svelte": "^5.46.0",
     "svelte-check": "^4.1.0",
     "tailwindcss": "^4.1.0",

@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="darkreader-lock"><meta name="color-scheme" content="light dark">
+<title>The work file — how much lives in the file?</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<style>
+  :root{ --ink:#16171a; --paper:#f7f6f1; --card:#fbfaf3; --line:#e4e1d6; --mut:#6b6a63; --sub:#9a988e;
+         --mint:#aee5c2; --sky:#a8d4f0; --peach:#f3c5a3; --brand-ink:#0d6b3f; }
+  *{box-sizing:border-box}
+  body{margin:0;height:100vh;display:flex;background:var(--paper);color:var(--ink);
+       font:14px/1.55 "Geist",ui-sans-serif,system-ui,sans-serif;overflow:hidden}
+  code,pre,.mono,.CodeMirror{font-family:"Geist Mono",ui-monospace,"SF Mono",monospace}
+
+  /* ── left rail ── */
+  nav{width:236px;flex:none;background:var(--card);border-right:1px solid var(--line);
+      padding:22px 16px;overflow:auto;display:flex;flex-direction:column;gap:4px}
+  nav h1{font-size:15px;letter-spacing:-.01em;margin:0 0 3px}
+  nav h1 b{background:var(--ink);color:var(--paper);padding:2px 7px;border-radius:6px}
+  nav .lede{font-size:11.5px;color:var(--mut);margin:0 0 14px;line-height:1.5}
+  nav .spectrum{font:9.5px "Geist Mono",monospace;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;
+                display:flex;justify-content:space-between;margin:0 2px 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  nav button{all:unset;cursor:pointer;display:block;padding:10px 11px;border-radius:9px;border:1px solid transparent}
+  nav button:hover{background:var(--paper)}
+  nav button.on{background:var(--ink);color:var(--paper)}
+  nav button.on .tag{color:var(--mint)}
+  nav button .n{font:10px "Geist Mono",monospace;opacity:.5}
+  nav button .nm{font-weight:650;font-size:13px;margin:1px 0}
+  nav button .tag{display:block;font-size:11px;color:var(--mut);line-height:1.4}
+  nav .foot{margin-top:auto;font-size:10.5px;color:var(--sub);line-height:1.5;padding-top:16px}
+
+  /* ── main split ── */
+  main{flex:1;display:flex;min-width:0}
+  .code{flex:1;min-width:0;display:flex;flex-direction:column;background:#1b1d22}
+  .code .bar{flex:none;display:flex;align-items:center;gap:9px;padding:9px 14px;border-bottom:1px solid #2c2f36;color:#aeb3bd}
+  .code .bar .dot{width:9px;height:9px;border-radius:50%;background:#3a3e46}
+  .code .bar .fn{font:11px "Geist Mono",monospace}
+  .code .bar .lg{margin-left:auto;font:10px "Geist Mono",monospace;text-transform:uppercase;letter-spacing:.08em;
+                 color:#7e8590;border:1px solid #2c2f36;border-radius:20px;padding:2px 9px}
+  .CodeMirror{height:100%!important;flex:1;font-size:12.5px;line-height:1.65}
+
+  .drag{flex:none;width:6px;cursor:col-resize;background:var(--line)}
+  .drag:hover,.drag.on{background:var(--sub)}
+  .exp{flex:none;width:360px;min-width:240px;overflow:auto;padding:30px 26px 80px;background:var(--paper)}
+  .exp .kick{font:10px "Geist Mono",monospace;text-transform:uppercase;letter-spacing:.14em;color:var(--sub)}
+  .exp h2{font-size:21px;letter-spacing:-.02em;margin:6px 0 2px}
+  .exp .tagline{color:var(--mut);font-size:14px;margin:0 0 22px;font-style:italic}
+  .exp h3{font-size:11px;font-family:"Geist Mono",monospace;text-transform:uppercase;letter-spacing:.09em;
+          color:var(--mut);margin:24px 0 8px;border-top:1px solid var(--line);padding-top:18px}
+  .exp p{margin:0 0 12px;max-width:62ch}
+  .exp ul{margin:0 0 12px;padding-left:18px;max-width:62ch}
+  .exp li{margin:3px 0}
+  .exp code{background:var(--card);border:1px solid var(--line);padding:0 5px;border-radius:5px;font-size:12px}
+  .exp .pro::marker{content:"+ ";color:var(--brand-ink);font-weight:700}
+  .exp .con::marker{content:"– ";color:#b4543a;font-weight:700}
+  .tests{display:grid;grid-template-columns:1fr;gap:8px;margin:8px 0 0}
+  .test{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:11px 13px}
+  .test .t{font:10px "Geist Mono",monospace;text-transform:uppercase;letter-spacing:.07em;color:var(--sub)}
+  .test .v{font-weight:600;font-size:13px;margin:2px 0 1px}
+  .test .d{font-size:12px;color:var(--mut)}
+  .bar2{height:5px;border-radius:20px;background:linear-gradient(90deg,var(--sky),var(--mint));margin:2px 0 18px}
+</style>
+</head>
+<body>
+  <nav>
+    <h1>the <b>work file</b></h1>
+    <p class="lede">One question runs underneath all of these: <b>how much actually lives in the file?</b> The same lead-scoring workbook, slid from pure-reference (code is external, the file is wiring) to pure-inline (the code is the document). Elixir-flavored — so it extends the nexus we already run. Each weaves to one HTML artifact.</p>
+    <div class="spectrum"><span>reference</span><span>inline</span></div>
+    <button data-sys="0" class="on"><span class="n">01</span><div class="nm">Reference</div><span class="tag">no code in the file. blocks point at real files.</span></button>
+    <button data-sys="1"><span class="n">02</span><div class="nm">Inline</div><span class="tag">the code is the document. literate, self-contained.</span></button>
+    <button data-sys="2"><span class="n">03</span><div class="nm">Hybrid</div><span class="tag">glue inline, heavy modules by reference.</span></button>
+    <button data-sys="3"><span class="n">04</span><div class="nm">Template</div><span class="tag">work → book. a source bound to a view that applies.</span></button>
+    <button data-sys="4"><span class="n">05</span><div class="nm">Pipeline</div><span class="tag">orb: compile + run + capture the result, in-doc.</span></button>
+    <div class="foot">Same scale on each panel — <b>what lives in the file</b>, <b>best when</b>, <b>how it runs</b>. Elixir surface; HTML is the byproduct.</div>
+  </nav>
+
+  <main>
+    <section class="code">
+      <div class="bar"><span class="dot"></span><span class="fn" id="fn">scoring.work</span><span class="lg" id="lg">reference</span></div>
+      <textarea id="ed"></textarea>
+    </section>
+    <div class="drag" id="drag"></div>
+    <section class="exp" id="exp"></section>
+  </main>
+
+<!-- ════════ source examples (text/plain — no escaping) ════════ -->
+<script type="text/plain" id="code-0">
+work "Lead Scoring" do
+  grant :net, "api.crm.com"
+
+  @moduledoc """
+  Nothing is written in this file. Every unit is a pointer at a real file an
+  agent wrote on its own. The work file is pure wiring + prose — a manifest.
+  """
+
+  # code units — each is just a reference. the kind names the lane:
+  source :enrich, from: "src/enrich.rs"     # Rust  → compiles to wasm
+  source :stats,  from: "lib/stats.ex"      # Elixir → runs in-process on the nexus
+  source :score,  from: "src/score.zig"     # Zig   → compiles to wasm
+
+  # data units — referenced exactly the same way. code or data, one grammar:
+  data :leads, from: "data/leads.csv"
+  data :crm,   from: query("SELECT * FROM crm.leads")
+
+  view "scoreboard.html"                    # the book: a plain HTML template
+
+  flow :pipeline do
+    seed  :leads
+    map   :enrich, over: :leads
+    par   [:stats]                          # run the stats unit in parallel
+    score :leads, with: :score
+  end
+end
+</script>
+
+<script type="text/plain" id="code-1">
+work "Lead Scoring" do
+  grant :net, "api.crm.com"
+
+  doc """
+  Everything is in this one file. You can read the whole program top to
+  bottom — prose and code are siblings. This is classic literate style.
+  """
+
+  # a small wasm function, written inline:
+  defw :score, [rev: :i32, emp: :i32], :i32 do
+    rev / 1000 + emp
+  end
+
+  # an Orb module — Elixir is the compile-time language, wasm the artifact:
+  orb :enrich, module: Enrich do
+    I32.global(rate: 110)
+
+    defw enrich(rev: I32), I32 do
+      rev * @rate / 100
+    end
+  end
+
+  flow :pipeline do
+    seed  :leads
+    map   :enrich
+    score :leads
+  end
+end
+</script>
+
+<script type="text/plain" id="code-2">
+work "Lead Scoring" do
+  grant :net, "api.crm.com"
+
+  doc "Glue is inline where reading it in context helps. Heavy modules live in their own files."
+
+  # small + worth explaining in place → inline:
+  defw :score, [rev: :i32, emp: :i32], :i32 do
+    rev / 1000 + emp
+  end
+
+  # big + boring → by reference. note: a unit is just a NAME.
+  # inline vs external is an authoring choice, not a semantic one.
+  source :enrich, from: "src/enrich.rs"
+  source :stats,  from: "lib/stats.ex"
+
+  flow :pipeline do
+    seed  :leads
+    map   :enrich       # <- external unit, used identically
+    par   [:stats]
+    score :leads        # <- inline unit, used identically
+  end
+end
+</script>
+
+<script type="text/plain" id="code-3">
+work "Lead Scoring" do
+  grant :net, "api.crm.com"
+
+  # ── the WORK: where data comes from, how it's shaped ──
+  data    :leads,  from: query("SELECT * FROM crm.leads")
+  compute :scored, source: "src/score.rs", over: :leads
+
+  # ── the BOOK: a template that APPLIES over a named work output ──
+  # ~H is a real Elixir HTML template. @rows binds to :scored.
+  render "scoreboard.html", with: %{rows: :scored} do
+    ~H"""
+    <work-table>
+      <%= for lead <- @rows do %>
+        <tr><td><%= lead.name %></td><td><%= lead.score %></td></tr>
+      <% end %>
+    </work-table>
+    """
+  end
+end
+
+# how the template "applies":
+#   static workbook → the template renders at BUILD into the HTML artifact.
+#   docked          → it renders on the NEXUS per request, data stays server-side.
+# same file, two behaviours — the Dock decides. that's the "extrapolate".
+</script>
+
+<script type="text/plain" id="code-4">
+work "Mean" do
+  doc "The compile pipeline is visible in the document: construct → compile → run → capture."
+
+  # 1. construct — author an Orb module (Elixir macros emit wasm)
+  orb :mean, module: Mean do
+    I32.global(sum: 0, count: 0)
+
+    defw insert(n: I32) do
+      @count = @count + 1
+      @sum   = @sum + n
+    end
+
+    defw calculate_mean(), I32 do
+      @sum / @count
+    end
+  end
+
+  # 2. compile — lower the module to a wasm artifact
+  compile :mean_wasm, from: :mean, target: :wasm
+
+  # 3. run — execute it on the nexus' own wasmtime
+  run :demo, using: :mean_wasm do
+    insert 12
+    insert 22
+    insert 99
+    calculate_mean()
+  end
+
+  # 4. capture — the result is baked into the page at build time → 44
+  result of: :demo
+end
+</script>
+
+<!-- ════════ explanations (templates) ════════ -->
+<template id="exp-0">
+  <div class="kick">option 01 · the reference end</div>
+  <h2>Reference</h2>
+  <p class="tagline">No language code in the file at all. Every block is a pointer at a real file.</p>
+  <div class="bar2"></div>
+  <h3>How it works</h3>
+  <p>The work file is <b>pure wiring + prose</b> — a manifest. <code>source :enrich, from: "src/enrich.rs"</code> doesn't contain code; it <i>names</i> a file an agent wrote on its own. Code and data are referenced through <b>one grammar</b> (<code>source</code> for compute, <code>data</code> for inputs) — so a CSV, a SQL query, a Rust file, and an Elixir module are all just named units. The <code>flow</code> wires them by name; tangle = gather the referenced files and compile each in its lane.</p>
+  <h3>Why this might be the right default</h3>
+  <ul><li class="pro"><b>Agents want to write files.</b> They're already great at "create <code>src/enrich.rs</code>." This format gets out of the way and just composes what they produce.</li>
+  <li class="pro">The file stays tiny and readable — it's the <b>index</b>, never the haystack. Diffs are about <i>structure</i>, not buried code.</li>
+  <li class="pro">Clean separation: each unit is independently testable, lintable, replaceable. No mega-document.</li></ul>
+  <h3>The cost</h3>
+  <ul><li class="con">The story is spread across many files — you can't read the whole program in one place.</li>
+  <li class="con">"What does <code>:enrich</code> actually do?" needs a second hop to the referenced file.</li></ul>
+  <h3>Where it sits</h3>
+  <div class="tests">
+    <div class="test"><div class="t">what lives in the file</div><div class="v">Only wiring + prose</div><div class="d">Zero code. Pointers, a flow, capability grants.</div></div>
+    <div class="test"><div class="t">best when</div><div class="v">Many real source files</div><div class="d">An agent-built project of Rust/Elixir/Zig/CSV units.</div></div>
+    <div class="test"><div class="t">how it runs</div><div class="v">Each unit in its own lane</div><div class="d"><code>.rs/.zig</code> → wasm; <code>.ex</code> → nexus; data → loaded.</div></div>
+  </div>
+</template>
+
+<template id="exp-1">
+  <div class="kick">option 02 · the inline end</div>
+  <h2>Inline</h2>
+  <p class="tagline">The code <i>is</i> the document. One file you read top to bottom.</p>
+  <div class="bar2"></div>
+  <h3>How it works</h3>
+  <p>Classic literate programming: prose and code are siblings in the same file. <code>defw</code> writes a wasm function directly; <code>orb module:</code> is an inline <b>Orb</b> block — Elixir as the compile-time language, WebAssembly as the produced artifact. The <code>flow</code> names the units it just defined. Tangle pulls the inline blocks out to compile; weave renders the prose around them into HTML.</p>
+  <h3>Strengths</h3>
+  <ul><li class="pro"><b>Total locality.</b> The explanation and the thing it explains never drift apart — they're adjacent.</li>
+  <li class="pro">Self-contained: one file is the whole program. Nothing to chase.</li>
+  <li class="pro">Orb means the compute is <b>the same language as the host</b> — it lowers to wasm the nexus already runs.</li></ul>
+  <h3>The cost</h3>
+  <ul><li class="con">Heavy modules bloat the prose — a 200-line parser drowns the narrative.</li>
+  <li class="con">A unit can't be reused by another workbook without copy-paste (until you reference it — which is option 03).</li>
+  <li class="con">Authoring loop needs the BEAM to expand the macros — not browser-only.</li></ul>
+  <h3>Where it sits</h3>
+  <div class="tests">
+    <div class="test"><div class="t">what lives in the file</div><div class="v">Everything</div><div class="d">Prose + every function + the flow, in one place.</div></div>
+    <div class="test"><div class="t">best when</div><div class="v">Small, explanatory work</div><div class="d">A tutorial, a spec, a single tight algorithm.</div></div>
+    <div class="test"><div class="t">how it runs</div><div class="v">Tangle → compile → wasm</div><div class="d">Orb/<code>defw</code> blocks compile on the nexus' BEAM.</div></div>
+  </div>
+</template>
+
+<template id="exp-2">
+  <div class="kick">option 03 · the middle</div>
+  <h2>Hybrid</h2>
+  <p class="tagline">Glue inline, heavy modules by reference. The realistic everyday shape.</p>
+  <div class="bar2"></div>
+  <h3>How it works</h3>
+  <p>The key insight: <b>a unit is just a name.</b> <code>:enrich</code> in the flow doesn't care whether it was written inline (<code>defw</code>) or referenced (<code>source from:</code>). So you inline the small, explained-in-context pieces and reference the big, boring ones — and the <code>flow</code> reads identically either way. You can promote an inline block to a file (or pull a file inline) without touching anything downstream.</p>
+  <h3>Why this is probably what you'd actually write</h3>
+  <ul><li class="pro"><b>Inline-vs-external becomes a dial, not a decision.</b> Move code to wherever it reads best; the wiring is stable.</li>
+  <li class="pro">Keeps the narrative readable (small glue in-place) <i>and</i> the file small (heavy modules out).</li>
+  <li class="pro">Matches how code actually grows — start inline, extract when it gets big.</li></ul>
+  <h3>The cost</h3>
+  <ul><li class="con">Two homes for code means a convention call: "when do we extract?" Needs a light norm so teams stay consistent.</li></ul>
+  <h3>Where it sits</h3>
+  <div class="tests">
+    <div class="test"><div class="t">what lives in the file</div><div class="v">Glue, not modules</div><div class="d">Small functions inline; big units referenced.</div></div>
+    <div class="test"><div class="t">best when</div><div class="v">Almost always</div><div class="d">The default for a real, growing workbook.</div></div>
+    <div class="test"><div class="t">how it runs</div><div class="v">Mixed, transparently</div><div class="d">Inline + referenced units compile the same way.</div></div>
+  </div>
+</template>
+
+<template id="exp-3">
+  <div class="kick">option 04 · work → book</div>
+  <h2>Template</h2>
+  <p class="tagline">"It's basically an HTML template — does it apply, and how?" Yes: a source bound to a view.</p>
+  <div class="bar2"></div>
+  <h3>How it works</h3>
+  <p>This is the trinity made literal. The <b>work</b> half declares where data comes from (<code>data</code>) and how it's transformed (<code>compute</code>). The <b>book</b> half is a <code>render</code> — a real Elixir HTML template (<code>~H</code>, HEEx) whose assigns <b>bind to named work outputs</b> (<code>@rows</code> ← <code>:scored</code>). The template "applies" by folding the work output into markup.</p>
+  <p><b>And how it applies is the whole platform story:</b> for a <i>static</i> workbook the template renders <b>at build</b> into the HTML artifact; <i>docked</i>, the same template renders on the <b>nexus per request</b> and the data never leaves the server. One file, two behaviours — the Dock decides. That's the "extrapolate" property as syntax.</p>
+  <h3>Strengths</h3>
+  <ul><li class="pro"><b>Least code you write.</b> You wire a source to a view; the heavy lifting is the named compute, often a reference.</li>
+  <li class="pro">Cleanest fit with everything we already have — <code>work-*</code> elements render inside the template; the Dock resolves static vs nexus.</li>
+  <li class="pro">HEEx is real, mature Elixir HTML templating — not a thing we invent.</li></ul>
+  <h3>The cost</h3>
+  <ul><li class="con">Less "literate document," more "app wiring" — the prose recedes.</li>
+  <li class="con">Pulls in the templating layer; a heavier mental model than a flat manifest.</li></ul>
+  <h3>Where it sits</h3>
+  <div class="tests">
+    <div class="test"><div class="t">what lives in the file</div><div class="v">A binding</div><div class="d">Source + transform + the template that applies over it.</div></div>
+    <div class="test"><div class="t">best when</div><div class="v">It's an app / a view</div><div class="d">A dashboard, a board, anything data-driven.</div></div>
+    <div class="test"><div class="t">how it runs</div><div class="v">Build OR nexus — Dock picks</div><div class="d">Static → render at build. Docked → render server-side.</div></div>
+  </div>
+</template>
+
+<template id="exp-4">
+  <div class="kick">option 05 · nexus-native</div>
+  <h2>Pipeline</h2>
+  <p class="tagline">Make the compile visible: construct → compile → run → capture, inside the document.</p>
+  <div class="bar2"></div>
+  <h3>How it works</h3>
+  <p>An Orb module isn't just a code fence — it's a <b>stage in a pipeline you can see</b>. <code>orb</code> constructs the module, <code>compile</code> lowers it to wasm, <code>run</code> executes it on the nexus' own wasmtime, and <code>result of:</code> <b>captures the output back into the page</b> at build (→ <code>44</code>). That's Org-Babel's "evaluate a block and store its result" — done with real types and a real runtime instead of text.</p>
+  <h3>Strengths</h3>
+  <ul><li class="pro"><b>Elixir all the way down.</b> Construct, compile, and run all happen on the BEAM the nexus already is — zero new toolchain to provision.</li>
+  <li class="pro">The document <b>proves itself</b>: the captured result is computed, not asserted. Living docs that can't lie.</li>
+  <li class="pro">Higher-level DSLs can lower <i>into</i> Orb (e.g. a state-machine block → Orb → wasm) — power without leaving the language.</li></ul>
+  <h3>The cost</h3>
+  <ul><li class="con">The heaviest option — a real staged-build model inside the file.</li>
+  <li class="con">Orb is a thinner ecosystem than the TS/Rust lanes, and a constrained dialect of Elixir (its own learning edges).</li>
+  <li class="con">Build-time-on-BEAM only; no browser-only authoring loop.</li></ul>
+  <h3>Where it sits</h3>
+  <div class="tests">
+    <div class="test"><div class="t">what lives in the file</div><div class="v">A visible build</div><div class="d">Module + compile + run + captured result.</div></div>
+    <div class="test"><div class="t">best when</div><div class="v">Compute is the point</div><div class="d">Algorithms, demos, anything you want to prove.</div></div>
+    <div class="test"><div class="t">how it runs</div><div class="v">On the nexus, at build</div><div class="d">BEAM compiles Orb → wasm → wasmtime → result.</div></div>
+  </div>
+</template>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/ruby/ruby.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+<script>
+  // ruby mode approximates Elixir's do/end + :symbol surface well enough to read.
+  const SYS = [
+    { fn:"scoring.work", lg:"reference", mode:"ruby" },
+    { fn:"scoring.work", lg:"inline",    mode:"ruby" },
+    { fn:"scoring.work", lg:"hybrid",    mode:"ruby" },
+    { fn:"scoring.work", lg:"template",  mode:"htmlmixed" },
+    { fn:"mean.work",    lg:"pipeline",  mode:"ruby" },
+  ];
+  const grab = (id) => document.getElementById(id).textContent.replace(/^\n/,"").replace(/\s+$/,"");
+  const cm = CodeMirror.fromTextArea(document.getElementById("ed"), {
+    theme:"material-darker", lineNumbers:true, lineWrapping:false, tabSize:2, readOnly:false,
+  });
+  const exp = document.getElementById("exp");
+  function load(i){
+    cm.setOption("mode", SYS[i].mode);
+    cm.setValue(grab("code-"+i));
+    document.getElementById("fn").textContent = SYS[i].fn;
+    document.getElementById("lg").textContent = SYS[i].lg;
+    exp.innerHTML = "";
+    exp.appendChild(document.getElementById("exp-"+i).content.cloneNode(true));
+    exp.scrollTop = 0;
+    document.querySelectorAll("nav button").forEach((b,j)=>b.classList.toggle("on", j===i));
+    setTimeout(()=>cm.refresh(), 0);
+  }
+  document.querySelectorAll("nav button").forEach((b)=>b.onclick=()=>load(+b.dataset.sys));
+
+  // draggable divider between code + explanation
+  (function(){
+    const drag=document.getElementById("drag"), expEl=document.querySelector(".exp");
+    let on=false;
+    drag.addEventListener("pointerdown",e=>{on=true;drag.classList.add("on");drag.setPointerCapture(e.pointerId);document.body.style.userSelect="none";});
+    drag.addEventListener("pointermove",e=>{if(!on)return;const w=window.innerWidth-e.clientX;expEl.style.width=Math.max(240,Math.min(760,w))+"px";});
+    const end=()=>{if(!on)return;on=false;drag.classList.remove("on");document.body.style.userSelect="";cm.refresh();};
+    drag.addEventListener("pointerup",end);drag.addEventListener("pointercancel",end);
+  })();
+
+  load(0);
+</script>
+</body>
+</html>

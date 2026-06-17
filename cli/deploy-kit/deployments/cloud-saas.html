@@ -1,0 +1,30 @@
+<!--
+  Deployment config — multi-tenant SaaS in the cloud. The shape a third-party
+  builds their own brandnana-style product on. Fill the <...>, then
+  `wb deploy validate <file>`  →  `wb deploy apply <file>`.
+  SECRETS are NOT in this file — set them in your deploy ENV:
+    WB_S3_KEY / WB_S3_SECRET   (object storage)
+    WB_DATABASE_URL            (the Postgres DSN)
+-->
+<work-deploy
+  engine-place="cloud"
+  provider="fly"
+  app="<your-app-name>"
+  tenancy-mode="multi"
+  storage="s3"
+  storage-endpoint="https://s3.us-east-1.amazonaws.com"
+  storage-bucket="<your-bucket>"
+  storage-region="us-east-1"
+  database="postgres"
+  auth="clerk"
+  profile="<path/to/your/profile>"
+  region="iad">
+  <work-doc>
+    Notes: STORAGE s3 is any S3-compatible store — flip storage-endpoint to R2 /
+    B2 / Tigris / MinIO and nothing else changes (one Elixir S3 client, many
+    backends). DATABASE postgres is required for multi-tenant — sqlite would
+    serialize every tenant through one writer (validate rejects that combo).
+    PROVIDER is the cloud extension point (default fly); the engine contract is
+    identical across hosts.
+  </work-doc>
+</work-deploy>

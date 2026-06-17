@@ -1,0 +1,19 @@
+<!--
+  Deployment config — single-tenant, all-local. The 90% case: run the runtime on
+  your own machine in a krunvm microVM (cloud-identical isolation). File-based by
+  design: edit, then  `wb deploy validate <file>`  →  `wb deploy apply <file>`.
+  (Or just `wb deploy local` for the zero-config equivalent.)
+-->
+<work-deploy
+  engine-place="local"
+  tenancy-mode="single"
+  storage="local-fs"
+  database="sqlite"
+  auth="trusted">
+  <work-doc>
+    Notes: local-fs + sqlite = the working data IS the store, no credentials, no
+    network backend. Single-tenant + trusted auth = no tenant tokens, no org/user
+    model. The whole runtime runs in one Linux container so OS + filesystem
+    isolation matches cloud. Bring a profile to point it at an agent set.
+  </work-doc>
+</work-deploy>

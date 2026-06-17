@@ -38,22 +38,35 @@ export async function openFromAgent(path: string): Promise<void> {
   await tabs.open(path);
 
   // 3) Resolve both to tab ids and split: chat left, workbook right.
-  const chatTab = tabs.tabs.find((t) => t.path === chatPath);
-  const wbTab = tabs.tabs.find((t) => t.path === path);
-  if (chatTab && wbTab && chatTab.id !== wbTab.id) {
-    // Idempotent: the agent often retries open-tab (e.g. fixing a quoted
-    // path). If the workbook already sits in a pane, just focus it —
-    // splitting again would grow a third pane.
-    if (panes.panes.some((p) => p.tabId === wbTab.id)) {
-      panes.focused = panes.panes.findIndex((p) => p.tabId === wbTab.id);
-    } else {
-      // Build the split explicitly so order is deterministic regardless of
-      // which tab is currently active: chat is the base (left), workbook
-      // splits onto the right.
-      panes.splitWith(wbTab.id, "right", chatTab.id);
-    }
-  }
+  //    `tabs.open` is async (host round-trip + reactive #apply); a second
+  //    tab_command (the agent retrying open-tab) can fire a reconcile that
+  //    collapses an in-flight 1-pane state to []. So drive the split through
+  //    one self-healing helper that ALWAYS lands the deterministic 2-pane
+  //    layout when both tabs exist, and re-assert once on the next tick to
+  //    win that race. Idempotent: a settled chat|workbook split is left alone.
+  ensureSplit(chatPath, path);
+  queueMicrotask(() => ensureSplit(chatPath, path));
 
   // The canvas now shows docs (panes), not the home composer.
   chrome.mode = "doc";
+}
+
+/** Land (or restore) the chat-left / workbook-right split. Resolves both
+ *  paths to live tab ids each call so it's robust to async tab opens and
+ *  reconcile races; a no-op when the split already holds. */
+function ensureSplit(chatPath: string, wbPath: string): void {
+  const chatTab = tabs.tabs.find((t) => t.path === chatPath);
+  const wbTab = tabs.tabs.find((t) => t.path === wbPath);
+  if (!chatTab || !wbTab || chatTab.id === wbTab.id) return;
+
+  const hasChat = panes.panes.some((p) => p.tabId === chatTab.id);
+  const hasWb = panes.panes.some((p) => p.tabId === wbTab.id);
+  // Already the intended split → just keep focus on the workbook.
+  if (hasChat && hasWb && panes.panes.length === 2) {
+    panes.focused = panes.panes.findIndex((p) => p.tabId === wbTab.id);
+    return;
+  }
+  // Otherwise (empty/collapsed/stale) rebuild deterministically: chat is the
+  // base (left), workbook splits onto the right.
+  panes.splitWith(wbTab.id, "right", chatTab.id);
 }

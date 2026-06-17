@@ -65,6 +65,18 @@ const FALLBACK_AGENT_SLUG = "workhorse";
 // when no per-boot bearer is present — i.e. the VITE_WB_RUNTIME_URL override).
 const DEV_TENANT = (import.meta.env.VITE_WB_TENANT as string | undefined) || "dev";
 
+// Demo / foreground-create fallback workdir (FIX B). When no Package is
+// active, a foreground chat has no `active.workdir`, so the runtime would
+// drop the agent's vfs_write into an ephemeral per-run tmp dir the desktop
+// preview can't read — the right split pane comes up blank. The desktop is
+// the trusted, single-tenant caller and MAY name its own workdir on
+// POST /api/agent/run (web.ex effective_workdir honors it), so we pin a
+// STABLE host folder under the repo (reachable via Vite /@fs/ for the
+// read_file_text → preview path). Overridable via VITE_WB_DEMO_WORKDIR.
+const DEMO_WORKDIR =
+  (import.meta.env.VITE_WB_DEMO_WORKDIR as string | undefined) ||
+  "/Users/shinyobjectz/Apps/workbooks/runtime/.demo-workspace";
+
 export interface BridgeEvent {
   // Phoenix-channel event name (e.g. "session_started", "llm_turn_start").
   // We also synthesize bridge-level events: "bridge:connected",
@@ -306,7 +318,10 @@ class WsBridgeStore {
     const { url, token } = daemon.status;
     if (!url) throw new Error("daemon not ready — no URL yet");
 
-    const workdir = active.workdir;
+    // Prefer the active Package's folder; otherwise pin the stable demo
+    // workdir so the agent writes the workbook to a known host path the
+    // preview can read back (FIX B) instead of an ephemeral tmp run dir.
+    const workdir = active.workdir ?? DEMO_WORKDIR;
     const agent_slug = opts.agentSlug ?? active.agentSlug ?? FALLBACK_AGENT_SLUG;
     const reqBody: Record<string, unknown> = {
       agent_slug,
