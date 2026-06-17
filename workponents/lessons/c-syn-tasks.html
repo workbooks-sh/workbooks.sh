@@ -1,0 +1,27 @@
+<script type="text/plain" id="c-syn-tasks">
+## A casual note — rich text (markdown)
+
+- [ ] remember to email the analyst        # just for a human to read
+
+## Tracked tasks — DATA (declarative Elixir, typed)
+
+task "tune the scorer", status: :todo, owner: :analyst, ref: :scorer
+task "wire the crm",    status: :done
+task "ship v1",         status: :todo,  owner: :shane
+
+# `task` is the PRIMITIVE — no "board" container to run. status is a typed enum,
+# owner references a user defined in a shared file (see Primitives → Types).
+# The casual list above is prose; these tasks are queryable, typed data.
+</script>
+<template id="e-syn-tasks">
+  <div class="kick">syntax · tasks · the contested line</div>
+  <h2>Tasks <span class="lane l-text">rich text</span> <span class="lane l-data">data</span></h2>
+  <p class="tagline">A to-do is prose or typed data, depending on who reads it. The task itself is the primitive — no "board" container.</p>
+  <h3>The discriminator</h3>
+  <p>Don't ask "markdown or Elixir." Ask <b>does anything query it?</b> A casual checklist a human reads is rich text (<code>- [ ]</code>). A <b>tracked task</b> with <code>status</code> / <code>owner</code> / <code>ref:</code> that the app renders and the agent acts on is <b>data</b> — a <code>task</code> declaration.</p>
+  <h3>Task is the primitive, and it's typed</h3>
+  <ul><li class="pro">No wrapper: <code>task "…", status: :todo, owner: :analyst</code> stands alone. "Board" was a leaky container; the unit is the task.</li>
+  <li class="pro"><b>Typed</b> — <code>status</code> is an enum and <code>owner</code> references a <code>user</code> defined in a shared file. The weave gate validates both (see Primitives → Types).</li>
+  <li class="pro">Cross-links to code (<code>ref: :scorer</code>) — tasks, workflow, and defs become one graph.</li></ul>
+  <div class="note">Throwaway checklist → markdown. Anything tracked → a typed <code>task</code> declaration (declarative Elixir). Its live, multi-agent lifecycle — claim, lock, fence — is <b>Plans &amp; live state</b>.</div>
+</template>

@@ -1,0 +1,35 @@
+<script type="text/plain" id="c-rt-wit">
+# Every unit compiles to a COMPONENT — sandboxed wasm with a typed CONTRACT.
+# the contract is a WORLD: what it EXPORTS + what it IMPORTS. you never write it;
+# the weave generates it from what you already declared.
+
+# you write — a sandbox unit + a grant:
+
+sandbox rust :enrich do
+  pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
+end
+grant net "api.crm.com"
+
+# the weave generates its WORLD (WIT — the wasm-native form of the above):
+
+#   package acme:sales@1
+#   world enrich {
+#     export enrich: func(revenue: s64) -> s64    ←  your public fn
+#     import net:    func(url: string) -> string  ←  your grant
+#   }
+
+# types cross the boundary as WIT types — no manual memory:
+#   record ↔ map · enum ↔ atom · result ↔ {:ok,_}|{:error,_} · list ↔ list
+# your `type Status = enum(:todo, :doing, :done)` IS a WIT enum.
+</script>
+<template id="e-rt-wit">
+  <div class="kick">dock · the contract</div>
+  <h2>The contract <span class="lane l-fn">function</span></h2>
+  <p class="tagline">Every unit is a <b>component</b> with a typed <b>world</b> — generated from what you declare, never hand-written.</p>
+  <h3>A world = exports + imports</h3>
+  <ul><li class="pro"><b>Exports</b> — the functions a unit provides (its public <code>def</code>s). What callers can reach.</li>
+  <li class="pro"><b>Imports</b> — what it requires from the host: its <code>grant</code>ed capabilities (net, secrets) and any host functions it calls. <b>Zero by default</b> — a component can touch nothing it didn't import.</li></ul>
+  <h3>Why this is the whole game</h3>
+  <p>Two units in different languages — a rust <code>sandbox</code>, a <code>server</code> Elixir — meet at a <b>typed world</b>, not raw memory; that's why cross-language calls are clean. And the <b>Dock is just the import half</b>: the host fulfills only what a unit granted, so a published component is safe to run anywhere. Types cross as WIT types (record↔map, enum↔atom, result↔<code>{:ok,_}</code>) — your <code>type</code> decls are exactly these.</p>
+  <div class="note">You never write WIT — the <code>namespace:name@version</code> packages, worlds, interfaces. It's the <b>wasm-native form of your declarations</b>: exports from your defs, imports from your grants, types from your types. A <b>kit</b> is a WIT <b>package</b> exporting <b>interfaces</b>. The standard does the cross-language + sandboxing; the weave just generates it.</p>
+</template>

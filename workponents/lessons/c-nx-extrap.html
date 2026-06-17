@@ -1,0 +1,20 @@
+<script type="text/plain" id="c-nx-extrap">
+# a SERVER lane extrapolates: same code, two homes.
+
+flow do
+  step :enrich, server     # static build -> runs at weave (baked in)
+                           # docked       -> runs on the nexus per request
+end
+
+# `server` is the only marker that moves the work; the Dock picks where.
+# docked, the data can stay server-side — "unbundling".
+</script>
+<template id="e-nx-extrap">
+  <div class="kick">nexus · extrapolate</div>
+  <h2>Extrapolate <span class="lane l-fn">function</span></h2>
+  <p class="tagline">A server lane runs at build when static, on the nexus when docked — one marker.</p>
+  <h3>How it works</h3>
+  <p><code>server</code> on a step is the only thing that moves the work. Static: it runs at weave and the result bakes in. Docked: it runs on the nexus per request, and the data never leaves the server (<b>unbundling</b>).</p>
+  <h3>Why it matters</h3>
+  <p>One file scales from a static document to a live, data-private app with no code change — the "extrapolate" property as syntax.</p>
+</template>

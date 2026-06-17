@@ -1,0 +1,49 @@
+<script type="text/plain" id="c-agent-coder">
+# coder.work
+
+A coding agent — the whole framework in one file (the Claude-Code shape).
+
+**Memory is WIT-typed data** — the agent's state is just records & lists:
+
+type Msg = record(role: string, content: string)
+type Mem = record(history: list(Msg), files: list(string), cwd: string)
+
+The **brain** declares the model, prompt, tools, and the caps those tools need:
+
+agent :coder do
+  model  :mimo
+  system """
+  You are a coding agent. Read, edit, and run code to satisfy the task.
+  Work in small steps; run the tests before you finish.
+  """
+  memory Mem
+  tools  [:bash, :edit, :read, :search]   # toolkits — helpers on PATH
+  grant  exec "bash", fs "./project"      # the sandbox it acts in
+end
+
+The **loop is `server` Elixir** (full OTP) — real ReAct, written in Elixir:
+
+server :coder_loop do
+  def run(task, mem \\ %Mem{}) do
+    case think(:coder, mem, task) do        # LLM call → next action
+      {:tool, name, args} ->
+        obs = call_tool(name, args)         # the tool runs in the SANDBOX
+        run(task, remember(mem, name, obs)) # observe → loop
+      {:done, answer} -> answer
+    end
+  end
+end
+
+`bash "mix test"` is a sandboxed command, fs-scoped to `./project` — never host exec.
+</script>
+<template id="e-agent-coder">
+  <div class="kick">agents · coding agent</div>
+  <h2>Coding agent <span class="lane l-fn">function</span></h2>
+  <p class="tagline">The Claude-Code archetype — a ReAct loop with sandboxed tools, the whole framework in one work file.</p>
+  <h3>What's in the file</h3>
+  <ul><li class="pro"><b>memory = data</b> — the agent's state is WIT records/lists (<code>history</code>, <code>files</code>, <code>cwd</code>). No special store; memory is just typed data.</li>
+  <li class="pro"><b>the brain</b> — model, system prompt, <code>tools</code> (toolkits), and the <code>grant</code>s those tools need.</li>
+  <li class="pro"><b>the loop in <code>server</code> Elixir</b> — real ReAct (think → call tool → observe → repeat), full OTP, written in Elixir, not a source block.</li></ul>
+  <h3>Sandboxed by construction</h3>
+  <p>The tools it's granted run in the <b>sandbox</b> — <code>bash "mix test"</code> is a sandboxed command fs-scoped to <code>./project</code>, never host exec. <code>grant exec / fs</code> is the agent's entire authority; it acts through the same Dock caps a human page would.</p>
+</template>

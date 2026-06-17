@@ -1,0 +1,35 @@
+<script type="text/plain" id="c-syn-fence">
+# Code is RUNNABLE — and ONE word says where it runs: the TARGET. Three of them.
+# grammar:  <target> [language] :name do … end   (language defaults to Elixir)
+
+client  :spinner do … end       # → wasm, in the BROWSER (UI, interaction)
+sandbox :score   do             # → wasm, in the SANDBOX (compute, the agent)
+  def score(lead), do: lead.revenue / 1000 + lead.employees
+end
+server  :sync    do … end       # full Elixir/OTP, on the BEAM (secrets, db, net)
+
+## any language targets client / sandbox (it all becomes wasm):
+
+sandbox rust :enrich do
+  pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
+end
+
+## no target = a static definition — placed by whoever references it:
+
+zig :checksum do … end          # compiled wherever it's referenced (placed by whoever uses it)
+
+# the prefix is the engine, the placement, AND the trust tier, in one word.
+# server is Elixir-only; foreign code is always wasm (client/sandbox), never native.
+</script>
+<template id="e-syn-fence">
+  <div class="kick">code · targets</div>
+  <h2>Targets <span class="lane l-fn">function</span></h2>
+  <p class="tagline">One word per unit says where it runs — <code>client</code>, <code>sandbox</code>, or <code>server</code>. No <code>lang:</code>, no <code>tangle:</code>, no <code>source</code>.</p>
+  <h3>Three targets, read the first word</h3>
+  <ul><li class="pro"><b><code>client</code></b> — wasm in the <b>browser</b> (UI, interaction).</li>
+  <li class="pro"><b><code>sandbox</code></b> — wasm in the <b>isolated sandbox</b> (compute, the agent). Both client &amp; sandbox are portable, safe to ship and run anywhere.</li>
+  <li class="pro"><b><code>server</code></b> — full Elixir/OTP on the <b>BEAM</b> (secrets, db, network). Trusted; runs only on a nexus you own.</li></ul>
+  <h3>The grammar</h3>
+  <p><code>&lt;target&gt; [language] :name do … end</code>. Language defaults to Elixir; foreign code (<code>sandbox rust :enrich</code>) rides the same block, body raw inside <code>do…end</code>. <b>Any language targets client/sandbox</b> (it all compiles to wasm); <b>only Elixir targets server</b> — foreign code is always sandboxed, never native on the host. With <b>no target</b>, a unit is a <i>static definition</i> placed by whoever references it.</p>
+  <div class="note">The prefix is the engine, the placement, <b>and</b> the trust tier in one word. Inside <code>client</code>/<code>sandbox</code> your Elixir runs as wasm; things that need the server (<code>net</code>, the db) are rejected there. Inside <code>server</code> it's full Elixir/OTP. You never type "orb" or "tangle" — the target says it.</div>
+</template>

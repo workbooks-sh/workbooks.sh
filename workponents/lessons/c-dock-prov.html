@@ -1,0 +1,20 @@
+<script type="text/plain" id="c-dock-prov">
+# the SAME work file, two behaviours — the Dock swaps the provider.
+
+data :leads, from: query("...")
+
+#   static workbook   ->  sqlite-wasm in the browser
+#   docked to a nexus ->  Postgres on the nexus (data stays server-side)
+
+# zero code change. work declares "runs behind the Dock";
+# the Dock resolves it differently by where it runs. (the "extrapolate".)
+</script>
+<template id="e-dock-prov">
+  <div class="kick">dock · providers</div>
+  <h2>Providers</h2>
+  <p class="tagline">The same request, fulfilled locally or by the runtime — the workbook doesn't change.</p>
+  <h3>Extrapolate</h3>
+  <p>A static workbook resolves <code>data</code>/compute against <b>browser-native</b> providers (sqlite-wasm, in-guest wasm). Docked, the Dock resolves the <i>same</i> request against the <b>nexus</b> (Postgres, server compute) — and the data can stay server-side.</p>
+  <h3>Why it matters</h3>
+  <p>Write once; ship the same file as a zero-infra static doc <i>or</i> a live server app. The Dock is where that choice lives — as resolution, not as a rewrite.</p>
+</template>

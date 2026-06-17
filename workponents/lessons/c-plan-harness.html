@@ -1,0 +1,48 @@
+<script type="text/plain" id="c-plan-harness">
+# plan.work — a full agentic harness in ONE file: a brain, the flow it runs,
+# the tasks it works, and the validations that gate them. one agent here; the
+# same shape scales to many.
+
+# ── the agent (the brain) ───────────────────────────────────────────
+agent :ada, model: :mimo, tools: [:crm, :charts] do
+  system "Enrich, score, and rank leads. File an issue for what you can't resolve."
+end
+
+# ── the work it runs (a flow — the runnable DAG) ────────────────────
+flow :pipeline do
+  step :enrich
+  step :score
+  parallel [:rank, :chart]
+end
+
+# ── a unit the flow calls, with a validation that gates the plan ────
+sandbox rust :enrich do
+  pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
+end
+
+test :enrich do
+  assert enrich(1000) == 1100        # red validation → the whole plan stalls
+end
+
+# ── the tasks ada works: ordered by after:, gated by needs: ─────────
+type Status = enum(:todo, :doing, :done)
+
+task "run the pipeline",   status: :doing, owner: :ada, ref: :pipeline, paths: ["leads/"]
+task "review the ranking", status: :todo,  owner: :ada, after: :pipeline, needs: :enrich
+task "publish the page",   status: :todo,  owner: :ada, after: "review the ranking"
+
+# ada claims a task → draft + scope → runs :pipeline → tests gate it → :done.
+# one file: the brain, the work, the proof, and the live board — same primitives.
+</script>
+<template id="e-plan-harness">
+  <div class="kick">plans · a full harness</div>
+  <h2>A full harness <span class="lane l-fn">function</span> <span class="lane l-data">data</span></h2>
+  <p class="tagline">One plan.work, everything together — an agent, a flow, the tasks, and the validations that gate them.</p>
+  <h3>What's combined</h3>
+  <ul><li><b>agent</b> — the brain (model, system, tools).</li>
+  <li><b>flow</b> — the runnable DAG it executes (<code>step</code>, <code>parallel</code>).</li>
+  <li><b>unit + test</b> — the units the flow calls, each with a validation that <b>gates the whole plan</b> (a red test → nothing advances).</li>
+  <li><b>tasks</b> — what the agent works, ordered by <code>after:</code> and gated by <code>needs:</code> a passing unit.</li></ul>
+  <h3>The loop</h3>
+  <p>ada claims a task → <code>draft</code> + <code>scope</code> (Claim, lock &amp; fence) → runs the <code>:pipeline</code> flow → which calls <code>:enrich</code>/<code>:score</code> → tests gate it → status flips to <code>:done</code>, all in this one file. <b>The brain, the work, the proof, and the live board — composed from the same primitives</b>, no separate harness to learn. One agent here; the shape scales to many.</p>
+</template>

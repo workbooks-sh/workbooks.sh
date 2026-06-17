@@ -1,0 +1,25 @@
+<script type="text/plain" id="c-syn-compute">
+## Scoring
+
+Compute lives in a `sandbox` block — you write plain Elixir, and the target runs
+it as wasm. You don't think about how:
+
+sandbox :score do
+  def score(lead), do: lead.revenue / 1000 + lead.employees
+end
+
+# HOW (a footnote, never something you author): client/sandbox Elixir runs on an
+# Elixir-in-wasm runtime, compiled in at build — so real Elixir carries over.
+# foreign langs compile straight to wasm. Orb (low-level wasm-in-Elixir) is a
+# rare escape hatch for hot paths, compiled like any other source language.
+</script>
+<template id="e-syn-compute">
+  <div class="kick">syntax · compute</div>
+  <h2>Compute <span class="lane l-fn">function</span> <span class="lane l-build">build</span></h2>
+  <p class="tagline">You write plain Elixir; the <code>sandbox</code> target runs it as wasm. The engine is invisible.</p>
+  <h3>Just Elixir</h3>
+  <p>The <code>def …</code> is the compute — ordinary Elixir, no dialect to learn. <b>Client/sandbox Elixir runs on an Elixir-in-wasm runtime</b> (Popcorn/AtomVM, compiled in at build), so real Elixir semantics carry over — you don't map types or memory by hand.</p>
+  <h3>One target away from the server</h3>
+  <p>Switch to <code>server :score</code> and the same code runs full Elixir/OTP on the BEAM — the target is the only thing that changes. <code>sandbox</code>/<code>client</code> mean wasm; <code>server</code> means BEAM.</p>
+  <div class="note"><b>Orb</b> — Elixir that authors low-level wasm directly — isn't how you write compute; it's a rare escape hatch (hot paths, extending the system), compiled like any other source language.</div>
+</template>

@@ -1,0 +1,37 @@
+<script type="text/plain" id="c-agent-research">
+# researcher.work — an autonomous research agent (the auto-researcher shape).
+
+type Finding = record(claim: string, source: string, confidence: f32)
+type Report  = record(question: string, findings: list(Finding), summary: string)
+
+agent :researcher do
+  model  :mimo
+  system "Research the question. Search broadly, verify each claim, then synthesize."
+  memory Report
+  tools  [:web_search, :fetch]
+  grant  net "*"                          # read-only web, capability-gated
+end
+
+# the loop is a FLOW — fan out searches, verify, synthesize, critique, repeat:
+flow :research do
+  step     :plan                          # break the question into sub-queries
+  parallel :search                        # fan out — one search per sub-query
+  step     :verify                        # adversarially check each finding
+  step     :synthesize
+  step     :critique                      # "what's missing?" → loop if gaps remain
+end
+
+# each step is server Elixir; the agent decides, tools fetch through the Dock:
+server :verify do
+  def verify(findings), do: Enum.filter(findings, & &1.confidence >= 0.7)
+end
+</script>
+<template id="e-agent-research">
+  <div class="kick">agents · auto-researcher</div>
+  <h2>Auto-researcher <span class="lane l-fn">function</span></h2>
+  <p class="tagline">Plan → fan-out search → verify → synthesize → critique → loop. Karpathy's autonomous researcher, as a flow.</p>
+  <h3>The loop is a flow</h3>
+  <p>Research is a <code>flow</code>: <b>plan</b> sub-queries, <b>fan out</b> searches (<code>parallel</code>), <b>verify</b> each finding adversarially, <b>synthesize</b>, then <b>critique</b> — "what's missing?" — and loop if gaps remain. Findings and the report are WIT-typed <code>record</code>s, so they cross steps cleanly.</p>
+  <h3>Read-only, capability-gated</h3>
+  <p>It <code>grant</code>s <code>net</code> (read-only web through the Dock) and uses <code>web_search</code> / <code>fetch</code> toolkits. Each step is <code>server</code> Elixir; the agent decides, the tools fetch behind the membrane.</p>
+</template>

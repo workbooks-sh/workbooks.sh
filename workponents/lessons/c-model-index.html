@@ -1,0 +1,31 @@
+<script type="text/plain" id="c-model-index">
+# index.work — the app manifest. literate, like every other work file.
+
+use "dashboard.work"                 # pages & units the app weaves in
+use "enrich.work"
+use "team.work"                      # shared types
+
+import :crm,    from: "crm@2"        # toolkits — packages of helpers
+import :charts, from: "charts@1"
+
+package npm: "d3@7"                  # language deps
+package cargo: "regex@1.10"
+
+nexus  "wss://acme.nexus.work.dev"   # the server tier
+grant  net "api.crm.com"             # app-wide capability requests
+secret "CRM_API_KEY"                 # declared; the host binds the value
+check  types: :strict, caps: :declared_only
+
+# routes/nav live in the pages (frontmatter `route`), not here. the index just
+# declares what the app is MADE OF — deps, toolkits, nexus, caps, checks.
+</script>
+<template id="e-model-index">
+  <div class="kick">model · the skeleton</div>
+  <h2>index.work</h2>
+  <p class="tagline">A literate manifest — what the app is MADE OF: deps, toolkits, nexus, caps, checks.</p>
+  <h3>Its jobs</h3>
+  <ul><li><b>Compose</b> — <code>use "page.work"</code> pulls in the pages and units the app weaves.</li>
+  <li><b>Validate</b> — <code>check</code> declares the requirements the weave gate enforces.</li>
+  <li><b>Manage deps</b> — <code>package</code> (hex/npm/cargo) and <code>import</code> (toolkits = helpers), plus <code>nexus</code> (server target) and <code>grant</code> (capability requests).</li></ul>
+  <div class="note">It's just another <code>.work</code> file — no HTML, no custom elements. Routes and nav live in the pages (frontmatter <code>route</code>); the index only declares structure.</div>
+</template>

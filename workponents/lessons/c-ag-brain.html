@@ -1,0 +1,23 @@
+<script type="text/plain" id="c-ag-brain">
+# an agent is a work file with a BRAIN — a system prompt + tools.
+
+agent "Analyst" do
+  model :mimo
+  system """
+  You enrich and score leads, then file issues for anything you can't resolve.
+  """
+  tools [:crm, :charts]      # tools ARE toolkits (helpers on PATH)
+end
+
+# runtime-backed: the nexus holds the loop, lifecycle, and context.
+# the agent acts through the SAME Dock caps a human page would.
+</script>
+<template id="e-ag-brain">
+  <div class="kick">agents · the brain</div>
+  <h2>The brain <span class="lane l-fn">function</span></h2>
+  <p class="tagline">An agent is a work file with a brain — a system prompt, a model, and tools.</p>
+  <h3>How it works</h3>
+  <p>An <code>agent</code> block declares a <code>model</code>, a <code>system</code> prompt, and <code>tools</code> — and <b>tools are toolkits</b> (the same helpers a page uses). It's <b>runtime-backed</b>: the nexus owns the loop, lifecycle, and context; the agent acts through the <b>same Dock caps</b> a human page would.</p>
+  <h3>Why it matters</h3>
+  <p>Agent behavior lives in the <b>declarative config layer</b>, not host code — so it composes the exact same primitives as everything else. No separate agent runtime to learn. The next three lessons build whole, named agent frameworks this way — each a single literate file.</p>
+</template>

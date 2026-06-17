@@ -31,22 +31,25 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
+<script src="work-format.js"></script>
 <script>
-  // Bootstrap: codemirror libs (above) loaded → inject the content partial (the
-  // c-*/e-* nodes enter the DOM) → load the engine → renderNav()+loadLesson(0)
-  // only after the content exists. The type="text/plain" / <template> nodes are
-  // inert when injected via innerHTML — getElementById + .textContent still work.
+  // Bootstrap: the engine (above) loaded synchronously — it defines LESSONS, the
+  // render fns, and cm. Derive the per-lesson file ids from LESSONS, fetch
+  // lessons/<id>.html in parallel, inject them into a hidden div (the c-*/e-*
+  // nodes enter the DOM — inert when injected via innerHTML, but getElementById +
+  // .textContent still work), then renderNav()+loadLesson(0).
   (async () => {
-    const html = await (await fetch("work-format.content.html")).text();
+    const ids = [...new Set(LESSONS.map(l => l.code || l.exp))];
+    const parts = await Promise.all(
+      ids.map(id => fetch("lessons/" + id + ".html").then(r => r.text()))
+    );
     const holder = document.createElement("div");
     holder.style.display = "none";
-    holder.innerHTML = html;
+    holder.innerHTML = parts.join("\n");
     document.body.appendChild(holder);
 
-    const s = document.createElement("script");
-    s.src = "work-format.js";
-    s.onload = () => { renderNav(); loadLesson(0); };
-    document.body.appendChild(s);
+    renderNav();
+    loadLesson(0);
   })();
 </script>
 </body>

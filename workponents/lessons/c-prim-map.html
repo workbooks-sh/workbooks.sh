@@ -1,0 +1,45 @@
+<script type="text/plain" id="c-prim-map">
+# Every primitive, and the lane it lives in. If a line isn't here, it's prose —
+# or a composition of these. The discriminator never changes: WHO READS IT?
+
+# ── rich text · markdown · a HUMAN reads ───────────────────────────
+#   prose · headings · lists · links · tables · quotes · `code`
+#   ![alt](src)            inline image
+#   figure "…" do … end    captioned figure (renders, does NOT run)
+#   - [ ] casual todo      a checklist for a human (not tracked data)
+
+# ── function · code that RUNS · client/sandbox → wasm, server → BEAM ──
+#   client :x  do … end       → wasm, in the browser
+#   sandbox :x do … end       → wasm, in the sandbox (any lang; default :elixir)
+#   server :x  do … end       full Elixir/OTP, on the BEAM
+#   flow do … step … end      workflows (step, parallel)
+#   agent "…" do … end         a brain (model, system, tools)
+
+# ── build · the COMPILER · mostly implicit in the target ──────────
+#   (the target compiles the unit — no explicit build step to write)
+#   test :unit do          verification (fails the build when red)
+#   package hex/npm/cargo  deps in the index manifest
+
+# ── data · declarative elixir · the SYSTEM queries ────────────────
+#   task · user · type     typed records + enums
+#   data :x, from: …       a named source; query() over it
+#   grant · posture        caps + publish posture
+#   route · lang · use     the file's Elixir header (no YAML)
+
+# everything runnable or declared is Elixir. markdown ONLY narrates — rich text
+# and context around the code, never the code itself.
+</script>
+<template id="e-prim-map">
+  <div class="kick">primitive · the map</div>
+  <h2>The primitive map</h2>
+  <p class="tagline">Every primitive → its lane. The completeness check: markdown side or Elixir side, at a glance.</p>
+  <h3>rich text <span class="lane l-text">markdown</span></h3>
+  <p><code>prose</code> · <code>headings</code> · <code>lists</code> · <code>tables</code> · <code>quotes</code> · <code>`code`</code> · <code>![img]()</code> · <code>figure do</code> · <code>- [ ]</code> casual todo</p>
+  <h3>function <span class="lane l-fn">elixir → wasm</span></h3>
+  <p><code>client/sandbox/server :x do</code> code · <code>flow do</code> workflows · <code>agent do</code> brains</p>
+  <h3>build <span class="lane l-build">plain elixir / weave</span></h3>
+  <p>the target compiles · <code>test :unit do</code> · <code>package hex/npm/cargo</code></p>
+  <h3>data <span class="lane l-data">declarative elixir</span></h3>
+  <p><code>task · user · type</code> · <code>data :x, from:</code> · <code>grant · posture</code> · <code>route · lang · use</code> (header)</p>
+  <div class="note">If a line is none of these, it's prose. <b>Markdown only narrates</b> — rich text and context around code, never the code itself. The discriminator never changes: <b>who reads it?</b></div>
+</template>

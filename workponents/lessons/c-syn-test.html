@@ -1,0 +1,25 @@
+<script type="text/plain" id="c-syn-test">
+# A test is an Elixir block bound to a unit by name. BUILD lane: it runs at the
+# weave gate, and a red test fails the build — no green dist/ over a broken unit.
+
+sandbox rust :enrich do
+  pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
+end
+
+test :enrich do
+  assert enrich(1000) == 1100
+  assert enrich(0)    == 0
+end
+
+# `test :enrich` names the subject; the body asserts over its output. No runner
+# to wire — the weave discovers the test blocks and runs them at the gate.
+</script>
+<template id="e-syn-test">
+  <div class="kick">syntax · tests</div>
+  <h2>Tests <span class="lane l-build">build</span></h2>
+  <p class="tagline">An Elixir block bound to a unit by name. Red test → no bundle.</p>
+  <h3>How it works</h3>
+  <p>A <code>test :enrich do … end</code> block asserts over the unit's output. The weave <b>discovers and runs them at the gate</b> — there's no runner to wire. A failure fails the build, so a green <code>dist/</code> means every test passed.</p>
+  <h3>Why it's build-lane</h3>
+  <p>A test isn't shipped behavior and isn't prose — it's a <b>gate check</b>, the same build lane as the target's compile step. It proves the function <i>before</i> the function is woven in.</p>
+</template>

@@ -1,0 +1,24 @@
+<script type="text/plain" id="c-model-enrich">
+lang  :rust
+grant net "api.crm.com"
+
+# Enrich
+
+Bump each lead's revenue by the enrichment rate. Prose and code are siblings —
+the prose is markdown, the code is a sandbox block.
+
+sandbox rust :enrich do
+  pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
+end
+
+test :enrich do
+  assert enrich(1000) == 1100
+end
+</script>
+<template id="e-model-enrich">
+  <div class="kick">model · a compute unit</div>
+  <h2>enrich.work</h2>
+  <p class="tagline">A pure compute unit — markdown-literate, one typed block, one test.</p>
+  <h3>Smallest shape</h3>
+  <p>The header = lane + the unit's capability request (Elixir, not YAML). Prose explains it. One named <code>sandbox</code> block is the code; a <code>test :unit</code> block proves it at the weave gate. A unit is just a name — inline or its own file is an authoring choice.</p>
+</template>

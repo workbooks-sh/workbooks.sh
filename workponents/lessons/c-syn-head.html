@@ -1,0 +1,22 @@
+<script type="text/plain" id="c-syn-head">
+# Document title            (H1 — the work file's title)
+
+## A section                (H2 — structure you READ)
+
+### A subsection            (H3)
+
+Headings form the narrative outline — the shape a human reads the document in.
+
+They are NOT the app's route/skeleton (that lives in the index) and NOT a
+queryable tree (that would be data). Just rich-text structure.
+</script>
+<template id="e-syn-head">
+  <div class="kick">syntax · headings</div>
+  <h2>Headings <span class="lane l-text">rich text</span></h2>
+  <p class="tagline">The narrative outline — what a human reads. Not the app skeleton, not a data tree.</p>
+  <h3>Three "structures" — don't conflate them</h3>
+  <ul><li><b>Narrative structure</b> = markdown headings (this page). For reading.</li>
+  <li><b>App structure</b> = the <code>index.html</code> skeleton (routes, mounts). For the build.</li>
+  <li><b>Queryable structure</b> = data (a <code>board</code>, records). For the system.</li></ul>
+  <p>Headings are the first one only — they give the document its outline; they don't route the app and aren't queried as data.</p>
+</template>

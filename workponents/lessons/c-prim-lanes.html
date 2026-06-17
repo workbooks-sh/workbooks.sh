@@ -1,0 +1,64 @@
+<script type="text/plain" id="c-prim-lanes">
+# The four lanes — one document, written in all of them
+
+This whole file is a work document, and every line sits in exactly ONE lane,
+decided by a single question: WHO READS IT? This paragraph is markdown — the
+rich-text lane — so a human is reading it. It explains; it never runs.
+
+
+## ① rich text — what a HUMAN reads   →   markdown
+
+Headings, **bold**, lists, links, quotes, figures: everything you're reading now.
+The rule that keeps the format clean — markdown only narrates. It never holds
+logic, a value, or a field. The moment a line gains behavior, it leaves this lane.
+
+
+## ② function — what the RUNTIME runs   →   wasm (client/sandbox) or BEAM (server)
+
+The `def` below is real, runnable compute. The `sandbox` target says where it
+goes — wasm, in the sandbox. It's Elixir, so it's never mistaken for the prose:
+
+sandbox :score do
+  def score(lead), do: lead.revenue / 1000 + lead.employees
+end
+
+
+## ③ build — what the COMPILER builds   →   plain elixir
+
+The `sandbox` target above already builds — it compiles the unit to wasm; you
+never write an explicit step. A `test` joins it, proving the unit at the weave
+gate (a red test ships no bundle):
+
+test :score do
+  assert score(%{revenue: 50_000, employees: 20}) == 70
+end
+
+
+## ④ data — what the SYSTEM queries   →   declarative elixir
+
+Types and tasks are declarations the system reads and validates — not code it
+runs. They have fields, not a body:
+
+type Status = enum(:todo, :doing, :done)
+
+task "tune the scorer", status: :todo, owner: :ada, ref: :score
+
+
+## the discriminator
+
+Four lanes, one file. Ask only "who reads this line?" — a human, the runtime, the
+compiler, or the system — and the lane follows. Never confuse function with literacy.
+</script>
+<template id="e-prim-lanes">
+  <div class="kick">primitive · the four lanes</div>
+  <h2>The four lanes</h2>
+  <p class="tagline">The example on the left is one document written in all four lanes — read it top to bottom. Here's the quick reference.</p>
+  <div class="tests">
+    <div class="test"><div class="t">rich text — markdown</div><div class="v">what you READ</div><div class="d">prose, headings, figures, tables. only this — never logic.</div></div>
+    <div class="test"><div class="t">function — elixir → wasm, or BEAM</div><div class="v">what RUNS</div><div class="d">compute, state machines, workflows. plain Elixir; client/sandbox run it as wasm, server on the BEAM.</div></div>
+    <div class="test"><div class="t">build — plain elixir</div><div class="v">what COMPILES function</div><div class="d">the target compiles it; <code>test</code> gates it.</div></div>
+    <div class="test"><div class="t">data — declarative elixir</div><div class="v">what the system TRACKS</div><div class="d">tasks, users, types, config. typed + validated at the weave gate.</div></div>
+  </div>
+  <h3>The discriminator</h3>
+  <p>Human reads it → markdown. Runtime runs it → Elixir (as wasm on client/sandbox, or the BEAM on server). Compiler builds it → the target compiles. System queries it as data → declarative Elixir. <b>Never confuse function with literacy.</b></p>
+</template>

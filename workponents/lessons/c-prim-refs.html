@@ -1,0 +1,20 @@
+<script type="text/plain" id="c-prim-refs">
+# References
+
+Units cross-link by NAME — no import ceremony inside the document:
+
+  a workflow step refers to a def      ->  step :score
+  a task refers to the code it tracks  ->  todo "tune", ref: :scorer
+  a view reads a work output           ->  client :table, reads: :ranked
+  the index pulls in a work file       ->  use "enrich.work"
+
+# Names are the only glue. The weave gate checks that every reference resolves —
+# a dangling :name fails the build.
+</script>
+<template id="e-prim-refs">
+  <div class="kick">primitive · references</div>
+  <h2>References</h2>
+  <p class="tagline">Names are the only glue — and the weave gate guarantees they resolve.</p>
+  <h3>One linking mechanism</h3>
+  <p>Units compose by <b>name</b>, not by imports scattered through the body: a flow step names a def, a task names its <code>ref:</code>, a client unit <code>reads:</code> a source, the index <code>use</code>s a file. Because everything links by name, the <b>weave gate can check every reference resolves</b> — a dangling <code>:name</code> fails the build. That's org-mode's cross-linking, kept, but validated.</p>
+</template>

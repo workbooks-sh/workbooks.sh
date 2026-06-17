@@ -1,0 +1,33 @@
+<script type="text/plain" id="c-prim-types">
+# Types & definitions — these ARE WIT types (record / variant / enum / flags).
+
+# team.work — shared definitions, imported where used (never the index):
+
+type Status = enum(:todo, :doing, :done)            # a WIT enum
+type User   = record(name: string, email: string)   # a WIT record (string = WIT primitive)
+
+user :analyst, %{name: "Ada Lovelace", email: "ada@acme.co"}   # a value of User
+user :shane,   %{name: "Shane",        email: "shane@acme.co"}
+
+# anything references those by NAME; the weave gate checks the ref resolves AND
+# the value fits the type — the same WIT type that crosses the component boundary:
+
+task "tune the scorer", status: :todo, owner: :analyst, ref: :scorer
+#                       ^ must be a Status     ^ must be a User
+
+# add a field to the record, or a new user — one place, everywhere stays in sync.
+</script>
+<template id="e-prim-types">
+  <div class="kick">primitive · types &amp; definitions</div>
+  <h2>Types <span class="lane l-data">data</span></h2>
+  <p class="tagline">Types, enums, and people are declared once in a shared file — referenced by name, validated everywhere.</p>
+  <h3>Where they live</h3>
+  <p>A definitions file (e.g. <code>team.work</code>) holds <code>type</code> declarations (enums) and <code>user</code> / record declarations. It's <b>imported where used</b>, or resolved workbook-wide — <b>not the index</b>. The index is the build skeleton; this is the data dictionary. Keeping them separate is the same instinct as not putting secrets in the bundle: the right thing lives in the right place.</p>
+  <h3>Referenced + validated</h3>
+  <ul><li class="pro"><code>status: :todo</code> must be a value of <code>Status</code> — the weave gate rejects a typo.</li>
+  <li class="pro"><code>owner: :analyst</code> must resolve to a defined <code>user</code> — a dangling owner fails the build.</li>
+  <li class="pro">So the whole system shares <b>one source of truth</b> for people, statuses, categories — typed, no drift (philosophy C). Run this page to see the check.</li></ul>
+  <h3>"Two defined the same way?"</h3>
+  <p>They're just two declarations — <code>user :analyst</code> and <code>user :shane</code> both fit the <code>User</code> shape; each is a named unit, and references pick by name. Fully extensible: add a field to the <code>type</code>, or a new <code>user</code>, in one place and every reference stays in sync.</p>
+  <div class="note">Tasks (the previous page) lean on this: a <code>task</code>'s <code>status</code> and <code>owner</code> are typed against these shared definitions.</div>
+</template>

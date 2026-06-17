@@ -1,0 +1,24 @@
+<script type="text/plain" id="c-tk-author">
+# crm.work — a toolkit is a work file that EXPORTS helpers (a WIT package)
+
+export :crm                        # the prefix others import
+
+grant net "api.crm.com"            # caps the toolkit needs, declared up front
+
+sandbox :lookup do                 # a function it ships
+  def lookup(id), do: get("api.crm.com/contacts/" <> id)
+end
+
+type Contact = record(name: string, email: string)   # a type it ships
+
+# consumers import these by name. no custom elements — just helpers + types.
+</script>
+<template id="e-tk-author">
+  <div class="kick">toolkits · author</div>
+  <h2>Author one <span class="lane l-build">build</span></h2>
+  <p class="tagline">A toolkit is a work file that exports a prefix — it's a WIT <b>package</b> (<code>namespace:name@version</code>).</p>
+  <h3>What it declares</h3>
+  <p><code>export :crm</code> plus the caps it needs and the helpers it ships — together a versioned <b>package exporting interfaces</b> (functions, units, and shared types). Published to a registry; consumers import it by name.</p>
+  <h3>Why it matters</h3>
+  <p>The <b>same authoring surface builds apps and the libraries apps import</b> — there's no separate "plugin SDK." If a primitive isn't ready, you build it as a toolkit and use it.</p>
+</template>
