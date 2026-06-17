@@ -104,10 +104,9 @@
   &lt;ol&gt;&lt;li&gt;search&lt;/li&gt;&lt;li&gt;read&lt;/li&gt;&lt;/ol&gt;
 &lt;/li&gt;</pre><span class="verdict ok">use</span></div>
 
-  <div class="row"><div class="el"><code>&lt;details&gt; &lt;summary&gt;</code><span class="leverage">progressive disclosure with NO JS — a skill body, a collapsed step, a kit's docs.</span></div>
-    <pre>&lt;details&gt;
-  &lt;summary&gt;deploy skill&lt;/summary&gt;
-  …read-on-demand body…
+  <div class="row"><div class="el"><code>&lt;details&gt; &lt;summary&gt;</code><span class="leverage">the universal LABEL ↔ BODY fold (no JS, [open] is CSS-queryable). Wrap ANY node: a read-on-demand skill, collapsed code (show intent, fold the work-src), a foldable step/sub-flow, quiet output. The agent's context-economy lever — read summaries, expand only what's needed.</span></div>
+    <pre>&lt;details&gt;&lt;summary&gt;connect()&lt;/summary&gt;
+  &lt;work-src lang="rust"&gt;…&lt;/work-src&gt;   &lt;!-- folds away --&gt;
 &lt;/details&gt;</pre><span class="verdict ok">use</span></div>
 
   <div class="row"><div class="el"><code>&lt;dl&gt; &lt;dt&gt; &lt;dd&gt;</code><span class="leverage">native key/value — config, a record's fields, metadata. A dict in HTML.</span></div>
@@ -126,7 +125,30 @@
   <div class="row"><div class="el"><code>section / figure / hr</code><span class="leverage">regions, a captioned result unit, a phase divider. Semantic layout.</span></div>
     <pre>&lt;figure&gt;&lt;chart-view …&gt;&lt;figcaption&gt;Q3&lt;/figcaption&gt;&lt;/figure&gt;</pre><span class="verdict ok">use</span></div>
 
-  <h2>2 · State &amp; interaction <span class="n">native state, no JS</span></h2>
+  <h2>2 · Context &amp; narrative <span class="n">literate programming, native</span></h2>
+  <p class="layer">The under-used leverage: a workbook IS a document, so you write the <em>why</em> around the
+  <em>what</em> as HTML prose interleaved with <code>work-src</code> — richer than a <code>//</code> comment,
+  richer than markdown (bold, links, lists, headings, even embedded <code>work-*</code>). An agent writes
+  reasoning <em>and</em> runnable code in the same breath.</p>
+
+  <div class="row"><div class="el"><code>&lt;figure&gt; &lt;figcaption&gt;</code><span class="leverage">THE "code + its explanation" unit — a captioned, referenceable code block. The figure runs; the caption says why.</span></div>
+    <pre>&lt;figure&gt;
+  &lt;work-src lang="rust"&gt;fn connect()…&lt;/work-src&gt;
+  &lt;figcaption&gt;pooled so a retry reuses the socket&lt;/figcaption&gt;
+&lt;/figure&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;aside&gt;</code><span class="leverage">a margin note / annotation BESIDE the code — "notes alongside," literally. Tangential context that isn't the main flow.</span></div>
+    <pre>&lt;work-src…&gt;…&lt;/work-src&gt;
+&lt;aside&gt;careful: this assumes the index is warm&lt;/aside&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>prose + h2–h6</code><span class="leverage">the narrative the code lives inside — a &lt;section&gt; of reasoning, a heading, a paragraph. The document IS the explanation.</span></div>
+    <pre>&lt;section&gt;&lt;h3&gt;Why we cache&lt;/h3&gt;&lt;p&gt;…&lt;/p&gt;
+  &lt;work-src&gt;…&lt;/work-src&gt;&lt;/section&gt;</pre><span class="verdict ok">use</span></div>
+
+  <div class="row"><div class="el"><code>&lt;blockquote&gt; &lt;cite&gt;</code> · <code>&lt;mark&gt;</code><span class="leverage">a quoted source with attribution (research notes citing where they came from); highlight a key span.</span></div>
+    <pre>&lt;blockquote&gt;…finding…&lt;cite&gt;arxiv.org/…&lt;/cite&gt;&lt;/blockquote&gt;</pre><span class="verdict ok">use</span></div>
+
+  <h2>3 · State &amp; interaction <span class="n">native state, no JS</span></h2>
   <p class="layer">Form controls hold state in the DOM and expose it to CSS — so a task's done-ness, a
   parameter, a schedule, or a guard predicate can be native, queryable, and validatable without a line of JS.</p>
 
@@ -160,7 +182,7 @@
   <div class="row"><div class="el"><code>[contenteditable]</code> · <code>[draggable]</code><span class="leverage">inline-edit a node; drag a card (kanban reorder). Native editing/DnD.</span></div>
     <pre>&lt;board-task draggable="true" contenteditable&gt;…&lt;/board-task&gt;</pre><span class="verdict warn">dense</span></div>
 
-  <h2>3 · Tagging &amp; relations <span class="n">the web already IS our edge system</span></h2>
+  <h2>4 · Tagging &amp; relations <span class="n">the web already IS our edge system</span></h2>
   <p class="layer">This is the deep one: <code>link[rel]</code>, <code>a[href]</code>, and <code>meta</code> are
   the native "typed relation to a resource" + "document facts." Our <code>work-ref rel=</code> / tagging=C is
   literally these, generalized — and the microformats <code>rel</code> registry is the prior art.</p>
@@ -188,7 +210,7 @@
   <div class="row"><div class="el"><code>[data-*]</code><span class="leverage">arbitrary data escape hatch. The smell from the SVG note — if you reach for it, you probably want a semantic element/attr.</span></div>
     <pre>&lt;li data-foo="bar"&gt;  &lt;!-- usually a mistake --&gt;</pre><span class="verdict no">avoid</span></div>
 
-  <h2>4 · Views &amp; queries — CSS <span class="n">a view is a selector</span></h2>
+  <h2>5 · Views &amp; queries — CSS <span class="n">a view is a selector</span></h2>
   <p class="layer">The biggest leverage. You author <em>one</em> graph; every <em>view</em> of it — board,
   timeline, filter, dashboard, the drawn edges — is a stylesheet over the same nodes. No view component, no JS.</p>
 
