@@ -45,4 +45,32 @@ fn main(){ let mut s=String::new(); std::io::stdin().read_to_string(&mut s).unwr
     assert {:ok, out} = BuildBroker.build_and_run(:rust, src, "hello brokered build\n", allow: true)
     assert out =~ "upper=HELLO BROKERED BUILD"
   end
+
+  # ── <work-src> COMPILER LANE, end-to-end ─────────────────────────────────────
+  # The contract a `<work-src lang="rust|c|zig">…</work-src>` block routes through: the
+  # frontend asks the Dock for the "compile" capability (host.available("compile")), then
+  # hands {language, source} to the host, which compiles the NON-JS source to wasm IN-
+  # SANDBOX and runs it, returning {ok, output}. BuildBroker.build_and_run/4 IS that host
+  # handler — `:allow` is the granted "compile" capability; `{lang, source}` in, `{:ok,
+  # output}` out. This proves the whole lane (compile→link→run, zero native exec) for a
+  # real compiled language, framed exactly as <work-src> drives it.
+  @tag :compiler_lane
+  @tag :build
+  @tag timeout: 600_000
+  test "<work-src> lane — {language, source} compiled (Rust) through the Dock runs and returns output" do
+    # WITHOUT the granted capability the Dock refuses — host.available("compile") is false.
+    assert {:error, :denied} =
+             BuildBroker.build_and_run(:rust, "fn main(){}", "")
+
+    # WITH the capability: a tiny Rust program — proving an actual compile (arithmetic the
+    # compiler must lower), not an echo. {language, source} → {:ok, output}.
+    source = ~S|
+fn main(){
+  let n: u64 = (1..=10).product();
+  println!("work-src rust 10!={}", n);
+}
+|
+    assert {:ok, output} = BuildBroker.build_and_run(:rust, source, "", allow: true)
+    assert output =~ "work-src rust 10!=3628800"
+  end
 end
