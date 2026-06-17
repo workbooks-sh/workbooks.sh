@@ -389,6 +389,31 @@ data :leads, from: query("...")
 # the Dock resolves it differently by where it runs. (the "extrapolate".)
 </script>
 
+<script type="text/plain" id="c-rt-wit">
+# Every unit compiles to a COMPONENT — sandboxed wasm with a typed CONTRACT.
+# the contract is a WORLD: what it EXPORTS + what it IMPORTS. you never write it;
+# the weave generates it from what you already declared.
+
+# you write — a sandbox unit + a grant:
+
+sandbox rust :enrich do
+  pub fn enrich(revenue: i64) -> i64 { revenue * 110 / 100 }
+end
+grant net "api.crm.com"
+
+# the weave generates its WORLD (WIT — the wasm-native form of the above):
+
+#   package acme:sales@1
+#   world enrich {
+#     export enrich: func(revenue: s64) -> s64    ←  your public fn
+#     import net:    func(url: string) -> string  ←  your grant
+#   }
+
+# types cross the boundary as WIT types — no manual memory:
+#   record ↔ map · enum ↔ atom · result ↔ {:ok,_}|{:error,_} · list ↔ list
+# your `type Status = :todo | :doing | :done` IS a WIT enum.
+</script>
+
 <script type="text/plain" id="c-nx-backs">
 # The nexus is the server tier — pinpointed in the index:
 
@@ -891,9 +916,9 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
 <template id="e-tk-author">
   <div class="kick">toolkits · author</div>
   <h2>Author one <span class="lane l-build">build</span></h2>
-  <p class="tagline">A toolkit is just a work file that exports a prefix — kit is the floor.</p>
+  <p class="tagline">A toolkit is a work file that exports a prefix — it's a WIT <b>package</b> (<code>namespace:name@version</code>).</p>
   <h3>What it declares</h3>
-  <p><code>export prefix: "crm"</code> plus the caps it needs, the <code>component</code>s it ships, and the <code>tangle</code>d functions behind them. Published to a registry, versioned; consumers link it in.</p>
+  <p><code>export prefix: "crm"</code> plus the caps it needs and the units it ships — together a versioned <b>package exporting interfaces</b> (its elements, functions, and shared types). Published to a registry; consumers link it in.</p>
   <h3>Why it matters</h3>
   <p>The <b>same authoring surface builds apps and the libraries apps import</b> — there's no separate "plugin SDK." If a primitive isn't ready, you build it as a toolkit and use it.</p>
 </template>
@@ -916,6 +941,18 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <p>A static workbook resolves <code>data</code>/compute against <b>browser-native</b> providers (sqlite-wasm, in-guest wasm). Docked, the Dock resolves the <i>same</i> request against the <b>nexus</b> (Postgres, server compute) — and the data can stay server-side.</p>
   <h3>Why it matters</h3>
   <p>Write once; ship the same file as a zero-infra static doc <i>or</i> a live server app. The Dock is where that choice lives — as resolution, not as a rewrite.</p>
+</template>
+
+<template id="e-rt-wit">
+  <div class="kick">dock · the contract</div>
+  <h2>The contract <span class="lane l-fn">function</span></h2>
+  <p class="tagline">Every unit is a <b>component</b> with a typed <b>world</b> — generated from what you declare, never hand-written.</p>
+  <h3>A world = exports + imports</h3>
+  <ul><li class="pro"><b>Exports</b> — the functions a unit provides (its public <code>def</code>s). What callers can reach.</li>
+  <li class="pro"><b>Imports</b> — what it requires from the host: its <code>grant</code>ed capabilities (net, secrets) and any host functions it calls. <b>Zero by default</b> — a component can touch nothing it didn't import.</li></ul>
+  <h3>Why this is the whole game</h3>
+  <p>Two units in different languages — a rust <code>sandbox</code>, a <code>server</code> Elixir — meet at a <b>typed world</b>, not raw memory; that's why cross-language calls are clean. And the <b>Dock is just the import half</b>: the host fulfills only what a unit granted, so a published component is safe to run anywhere. Types cross as WIT types (record↔map, enum↔atom, result↔<code>{:ok,_}</code>) — your <code>type</code> decls are exactly these.</p>
+  <div class="note">You never write WIT — the <code>namespace:name@version</code> packages, worlds, interfaces. It's the <b>wasm-native form of your declarations</b>: exports from your defs, imports from your grants, types from your types. A <b>kit</b> is a WIT <b>package</b> exporting <b>interfaces</b>. The standard does the cross-language + sandboxing; the weave just generates it.</p>
 </template>
 
 <template id="e-nx-backs">
@@ -973,9 +1010,9 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
 <template id="e-sec-caps">
   <div class="kick">security · caps &amp; secrets</div>
   <h2>Caps &amp; secrets</h2>
-  <p class="tagline">Capabilities are requests the host authorizes; secrets are bound at run, never bundled.</p>
+  <p class="tagline">A component has <b>zero capabilities by default</b>; a <code>grant</code> is an import the host authorizes. Secrets bind at run, never bundled.</p>
   <h3>How it works</h3>
-  <ul><li class="pro"><code>grant</code> is a <b>request</b>, not authority — the host decides. "Anyone can dock it" only works if the host grants the caps.</li>
+  <ul><li class="pro"><code>grant</code> is a <b>request</b> — an <b>import</b> in the unit's world (see The contract), not authority. The host decides; "anyone can dock it" only works if the host fulfills the import.</li>
   <li class="con"><b>Secrets are host-bound at run</b> — <code>env</code> is declared, never valued, never in the bundle.</li>
   <li class="pro">The weave audits <b>declared-only</b> — a unit may use only what it requested (over-reach <i>and</i> unused grants flag).</li></ul>
   <div class="note">Native carrier: in the index these ride <code>&lt;meta&gt;</code> — net caps map onto a CSP <code>connect-src</code> the browser already enforces.</div>

@@ -134,6 +134,7 @@
       lessons:[
         { nm:"The one seam",   tag:"request → membrane → provider",   fn:"the dock",   lg:"—",      mode:"work", code:"c-dock-seam", exp:"e-dock-seam" },
         { nm:"Providers",      tag:"local vs runtime, same request",  fn:"the dock",   lg:"—",      mode:"work", code:"c-dock-prov", exp:"e-dock-prov" },
+        { nm:"The contract",   tag:"a WIT world: exports + imports",  fn:"the dock",   lg:"wit",    mode:"work", code:"c-rt-wit",   exp:"e-rt-wit" },
         { nm:"What the nexus backs", tag:"the optional server tier",  fn:"index.html", lg:"—",      mode:"work", code:"c-nx-backs",  exp:"e-nx-backs" },
         { nm:"Extrapolate",    tag:"server work: build OR nexus",     fn:"page.work",  lg:"elixir", mode:"work", code:"c-nx-extrap", exp:"e-nx-extrap" },
         { nm:"Data sources",   tag:"named, provider-resolved",        fn:"page.work",  lg:"elixir", mode:"work", code:"c-dt-src",    exp:"e-dt-src" },
@@ -203,7 +204,7 @@
       { regex: /:[A-Za-z_]\w*[!?]?/, token: "atom" },               // :atoms
       { regex: /@[A-Za-z_]\w*/, token: "meta" },                    // @module_attrs
       { regex: /\b(?:defmodule|defmacro|defp|def|do|end|cond|case|fn|when|if|else|true|false|nil|import|alias|use|require)\b/, token: "keyword" },
-      { regex: /\b(?:client|sandbox|server|tangle|untangle|flow|figure|note|task|user|type|step|parallel|todo|doing|done|agent|validate|grant|memory)\b/, token: "variable-2" },
+      { regex: /\b(?:client|sandbox|server|world|export|import|interface|package|component|func|record|tangle|untangle|flow|figure|note|task|user|type|step|parallel|todo|doing|done|agent|validate|grant|memory)\b/, token: "variable-2" },
       { regex: /<\/?[A-Za-z][\w-]*/, token: "tag" },                // <work-* / html tags
       { regex: /\b\d[\d_]*\b/, token: "number" },
       { regex: /./, token: null },
