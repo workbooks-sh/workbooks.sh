@@ -14,6 +14,18 @@ may use — `net`, `kv`, `fs`, `secrets`, and the rest; anything not granted sim
 isn't reachable. **`memory:`** caps how much it can allocate. **`timeout:`** caps
 how long a call may run before it is stopped.
 
+You won't want to spell those out on every box. A sandbox's settings are just a
+typed shape, so you can declare one **once** as a type and stamp it onto many:
+
+type Pricing = sandbox(grant: [:net, :kv], memory: "128mb", timeout: 30_000)
+
+sandbox :quotes,  is: Pricing do … end
+sandbox :billing, is: Pricing do … end
+
+`Pricing` is a sandbox *template* — the very same type machinery you use for data,
+pointed at configuration instead. Change the template in one place and every box
+stamped with it moves together (see [[Types]]).
+
 The enforcement is the part worth trusting. Caps are checked **by construction**:
 each capability a unit uses becomes an import in its compiled WIT world, and a unit
 that imports a capability its sandbox never granted **fails to instantiate** — it
