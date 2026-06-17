@@ -40,9 +40,11 @@ figure "revenue.png" do
   Revenue by quarter, FY24. **The caption is markdown.**
 end
 
-And when markdown can't say it, drop to a component (the output is HTML anyway):
+And when markdown can't say it, a client unit renders it (a front-end island):
 
-<work-chart from="ranked" x="name" y="score"></work-chart>
+client :revenue_chart, reads: :ranked do
+  # svelte / solid / js that charts the data — hydrated in the browser
+end
 </script>
 
 <script type="text/plain" id="c-syn-tasks">
@@ -235,8 +237,8 @@ Units cross-link by NAME — no import ceremony inside the document:
 
   a workflow step refers to a def      ->  step :score
   a task refers to the code it tracks  ->  todo "tune", ref: :scorer
-  a view binds to a work output        ->  <work-table from="ranked">
-  the index imports a work file        ->  <work-import src="enrich.work">
+  a view reads a work output           ->  client :table, reads: :ranked
+  the index pulls in a work file       ->  use "enrich.work"
 
 # Names are the only glue. The weave gate checks that every reference resolves —
 # a dangling :name fails the build.
@@ -244,45 +246,25 @@ Units cross-link by NAME — no import ceremony inside the document:
 
 <!-- ══════════════════ MODEL exploration ══════════════════ -->
 <script type="text/plain" id="c-model-index">
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Sales</title>
+# index.work — the app manifest. literate, like every other work file.
 
-  <!-- pages & units: a native <link>. the weave follows rel="work". -->
-  <link rel="work" href="dashboard.work">
-  <link rel="work" href="enrich.work">
-  <link rel="work" href="team.work">                <!-- shared types -->
+use "dashboard.work"                 # pages & units the app weaves in
+use "enrich.work"
+use "team.work"                      # shared types
 
-  <!-- toolkits: a native <link rel="toolkit">. its <crm-*> elements appear in pages. -->
-  <link rel="toolkit" href="crm@2"    src="components.work.dev">
-  <link rel="toolkit" href="charts@1" src="components.work.dev">
+import :crm,    from: "crm@2"        # toolkits — packages of helpers
+import :charts, from: "charts@1"
 
-  <!-- packages: a native <link rel="package">. -->
-  <link rel="package" href="npm:d3@7">
-  <link rel="package" href="cargo:regex@1.10">
+package npm: "d3@7"                  # language deps
+package cargo: "regex@1.10"
 
-  <!-- net capability rides native CSP — the BROWSER already enforces this. -->
-  <meta http-equiv="content-security-policy" content="connect-src https://api.crm.com">
+nexus  "wss://acme.nexus.work.dev"   # the server tier
+grant  net "api.crm.com"             # app-wide capability requests
+secret "CRM_API_KEY"                 # declared; the host binds the value
+check  types: :strict, caps: :declared_only
 
-  <!-- the rest is plain <meta>: a request the host binds, a target, a check. -->
-  <meta name="secret" content="CRM_API_KEY">        <!-- declared; host binds the value -->
-  <meta name="nexus"  content="wss://acme.nexus.work.dev">
-  <meta name="check"  content="types:strict, caps:declared-only">
-</head>
-
-<body>
-  <!-- the whole skeleton is plain HTML. ZERO custom elements in the index. -->
-  <main>
-    <h1>Sales</h1>
-    <nav>
-      <a href="dashboard.work">Dashboard</a>
-      <a href="enrich.work">Leads</a>
-    </nav>
-  </main>
-</body>
-</html>
+# routes/nav live in the pages (frontmatter `route`), not here. the index just
+# declares what the app is MADE OF — deps, toolkits, nexus, caps, checks.
 </script>
 
 <script type="text/plain" id="c-model-dash">
@@ -339,7 +321,7 @@ end
 <body>
   <!-- SERVER regions arrive already rendered (SSR from the BEAM) -->
   <h1>Sales</h1>
-  <work-island id="board"> … chart of ranked leads … </work-island>
+  <div id="board"> … chart of ranked leads (a hydrated island) … </div>
 
   <!-- woven tree + wasm + js bundles + data, gzipped -->
   <script type="application/octet-stream" id="wb-blob">
@@ -355,32 +337,33 @@ end
 
 <!-- ══════════════════ ARCHITECTURE explorations ══════════════════ -->
 <script type="text/plain" id="c-tk-use">
-# index.html — pull in a toolkit (an external component)
+# index.work — pull in a toolkit (a package of helpers)
 
-<work-use component="crm" from="components.work.dev/crm@2">
+import :crm, from: "crm@2"
 
-# a toolkit ships a PREFIX + its elements + the caps they need.
-# any page can then use its elements and functions:
+# a toolkit ships FUNCTIONS, TYPES, and units — helpers, referenced by name.
+# a page then uses them directly:
 
 # dashboard.work
-<crm-contacts list="leads"></crm-contacts>
-import { lookup } from "crm"      # the toolkit's functions, too
+import {lookup, list} from :crm           # its functions
+data :contacts, from: list(:leads)        # a unit it ships
+# any UI it provides is a client unit you mount — never a custom element.
 </script>
 
 <script type="text/plain" id="c-tk-author">
-# crm.work — a toolkit is just a work file that EXPORTS a prefix
+# crm.work — a toolkit is a work file that EXPORTS helpers (a WIT package)
 
-export prefix: "crm"
+export :crm                        # the prefix others import
 
 grant net "api.crm.com"            # caps the toolkit needs, declared up front
 
-component "crm-contacts" do        # an element it ships
-  # a view over the crm, rendered client-side
-end
-
-sandbox :lookup do                       # a function it ships
+sandbox :lookup do                 # a function it ships
   def lookup(id), do: get("api.crm.com/contacts/" <> id)
 end
+
+type Contact = record(name: string, email: string)   # a type it ships
+
+# consumers import these by name. no custom elements — just helpers + types.
 </script>
 
 <script type="text/plain" id="c-dock-seam">
@@ -434,9 +417,9 @@ grant net "api.crm.com"
 </script>
 
 <script type="text/plain" id="c-nx-backs">
-# The nexus is the server tier — pinpointed in the index:
+# The nexus is the server tier — pinpointed in the index manifest:
 
-<work-nexus url="wss://acme.nexus.work.dev">
+nexus "wss://acme.nexus.work.dev"
 
 # it backs the things a static file can't do alone:
 #   . server compute    heavy / trusted functions
@@ -477,8 +460,10 @@ data :crm,    from: postgres("crm.leads") # an EXTERNAL db — a WIT resource (a
 
 data :ranked, from: select(:leads, fields: [:name, :score], sort: {:score, :desc})
 
-# a view binds to the result by name — re-renders on change (signals):
-<work-table from="ranked"></work-table>
+# a view is a CLIENT unit bound to the result — re-renders on change (signals):
+client :ranked_table, reads: :ranked do
+  # renders :ranked as a table (svelte / solid / js island)
+end
 
 # complex logic? it's a unit (code over the list). real SQL? only when the source
 # IS a db (postgres). the selector covers the common filter/sort/pick over values.
@@ -579,7 +564,7 @@ end
 
 route "/dashboard"                      # this page's URL (a leaf page)
 lang  :svelte                           # the front-end lane for this file's islands
-use   [:crm, :charts]                   # toolkits this page draws elements / fns from
+use   [:crm, :charts]                   # toolkits — helpers (fns / types) this page draws on
 grant net: "api.crm.com"                # capability requests, scoped to this file
 deps  [hex: "decimal@2", npm: "d3@7"]   # unit-level deps (app-level → the index)
 
@@ -622,13 +607,13 @@ header is declared, never run — the file's data-lane twin of the index.
 </script>
 
 <script type="text/plain" id="c-model-pkg">
-<!-- index.html — ONE manifest for EVERY ecosystem.
-     no mix.exs · no package.json · no Cargo.toml · no vite.config.
-     the index declares; the weave resolves. -->
+# index.work — ONE manifest for EVERY ecosystem.
+# no mix.exs · no package.json · no Cargo.toml · no vite.config.
+# the index declares; the weave resolves.
 
-<link rel="package" href="hex:decimal@2.1">      <!-- elixir -->
-<link rel="package" href="npm:d3@7">             <!-- js     -->
-<link rel="package" href="cargo:regex@1.10">     <!-- rust   -->
+package hex:   "decimal@2.1"      # elixir
+package npm:   "d3@7"             # js
+package cargo: "regex@1.10"       # rust
 
 # pinned versions ARE the lockfile (source = lock). a unit's OWN deps can sit in
 # its frontmatter instead; app-wide deps live here.
@@ -889,13 +874,13 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
 
 <template id="e-model-index">
   <div class="kick">model · the skeleton</div>
-  <h2>index.html</h2>
-  <p class="tagline">Not the content host — the app skeleton, the dependency manifest, the validation gate.</p>
+  <h2>index.work</h2>
+  <p class="tagline">A literate manifest — what the app is MADE OF: deps, toolkits, nexus, caps, checks.</p>
   <h3>Its jobs</h3>
-  <ul><li><b>Skeleton</b> — set up the app in one file; native HTML; pages are <code>work-import</code>ed.</li>
-  <li><b>Validate the tangle</b> — <code>work-check</code> declares requirements the weave gate enforces.</li>
-  <li><b>Manage deps</b> — <code>work-package</code> / <code>work-use</code> (toolkits as components), plus <code>work-nexus</code> (server target) and <code>work-grant</code> (capability requests).</li></ul>
-  <div class="note">Native HTML first — <code>work-*</code> only where HTML can't say it (imports, packages, grants, nexus, checks).</div>
+  <ul><li><b>Compose</b> — <code>use "page.work"</code> pulls in the pages and units the app weaves.</li>
+  <li><b>Validate</b> — <code>check</code> declares the requirements the weave gate enforces.</li>
+  <li><b>Manage deps</b> — <code>package</code> (hex/npm/cargo) and <code>import</code> (toolkits = helpers), plus <code>nexus</code> (server target) and <code>grant</code> (capability requests).</li></ul>
+  <div class="note">It's just another <code>.work</code> file — no HTML, no custom elements. Routes and nav live in the pages (frontmatter <code>route</code>); the index only declares structure.</div>
 </template>
 
 <template id="e-model-dash">
@@ -939,11 +924,11 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
 <template id="e-tk-use">
   <div class="kick">toolkits · use</div>
   <h2>Use a toolkit <span class="lane l-build">build</span></h2>
-  <p class="tagline">External deps, shipped as components — included by a native link; their elements appear in pages.</p>
+  <p class="tagline">External deps, shipped as <b>helpers</b> — a package of functions, types, and units, imported by name.</p>
   <h3>How it works</h3>
-  <p>A toolkit is pulled in with a <b>native <code>&lt;link rel="toolkit"&gt;</code></b> (version-pinned, verified). It ships a <b>prefix</b> + its custom elements + the caps they need. Pages then use <code>&lt;crm-contacts&gt;</code> and <code>import … from "crm"</code>. The weave audits the caps the toolkit brings — nothing ambient.</p>
-  <h3>Why components</h3>
-  <p>Web components are the natural <b>distribution unit</b>: a prefix namespaces the elements, and the same registry serves the desktop app and any workbook. Toolkits are the one place custom elements clearly earn their keep.</p>
+  <p>A toolkit is pulled in with <code>import :crm, from: "crm@2"</code> (version-pinned, verified). It ships a <b>prefix</b> + its functions, types, and units + the caps they need. A page then uses them by name (<code>import {lookup} from :crm</code>, reference its types and units). The weave audits the caps the toolkit brings — nothing ambient.</p>
+  <h3>No custom elements</h3>
+  <p>A toolkit is a <b>library of helpers</b>, not a widget set. Any UI it provides is a <b>client unit</b> you mount (a front-end island), reachable like any other unit — there are no custom elements to learn.</p>
 </template>
 
 <template id="e-tk-author">
@@ -951,7 +936,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h2>Author one <span class="lane l-build">build</span></h2>
   <p class="tagline">A toolkit is a work file that exports a prefix — it's a WIT <b>package</b> (<code>namespace:name@version</code>).</p>
   <h3>What it declares</h3>
-  <p><code>export prefix: "crm"</code> plus the caps it needs and the units it ships — together a versioned <b>package exporting interfaces</b> (its elements, functions, and shared types). Published to a registry; consumers link it in.</p>
+  <p><code>export :crm</code> plus the caps it needs and the helpers it ships — together a versioned <b>package exporting interfaces</b> (functions, units, and shared types). Published to a registry; consumers import it by name.</p>
   <h3>Why it matters</h3>
   <p>The <b>same authoring surface builds apps and the libraries apps import</b> — there's no separate "plugin SDK." If a primitive isn't ready, you build it as a toolkit and use it.</p>
 </template>
@@ -1022,9 +1007,9 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
 <template id="e-dt-query">
   <div class="kick">data · query</div>
   <h2>Query <span class="lane l-data">data</span> <span class="lane l-text">rich text</span></h2>
-  <p class="tagline">A selector over a source's WIT values — returns WIT values; a view binds and re-renders.</p>
+  <p class="tagline">A selector over a source's WIT values — returns WIT values; a client unit reads it and re-renders.</p>
   <h3>How it works</h3>
-  <p>A <code>select(...)</code> filters / sorts / picks fields over a source's values — declarative, returning typed values. A view <code>from=</code> binds by name; reactivity is <b>signals</b> (node-local). For anything past filter/sort it's a <b>unit</b> (code over the list); real SQL appears only when the source is a db.</p>
+  <p>A <code>select(...)</code> filters / sorts / picks fields over a source's values — declarative, returning typed values. A <b>client unit</b> <code>reads:</code> the source by name and renders it; reactivity is <b>signals</b> (node-local). For anything past filter/sort it's a <b>unit</b> (code over the list); real SQL appears only when the source is a db.</p>
   <h3>Why it matters</h3>
   <p>One query vocabulary over one typed surface — validated at the gate (the <code>from</code> must resolve). No SQL dialect to learn for your own content.</p>
 </template>
@@ -1125,7 +1110,7 @@ task "publish the page",   status: :todo,  owner: :ada, after: "review the ranki
   <h2>Packages <span class="lane l-build">build</span></h2>
   <p class="tagline">One manifest, one build tool. No mix.exs, no package.json, no Cargo.toml, no vite.config.</p>
   <h3>The index is the only manifest</h3>
-  <p>Deps for every ecosystem are <code>&lt;link rel="package" href="hex:… | npm:… | cargo:…"&gt;</code> in the index (app-wide) or a file's frontmatter (unit-local). <b>Pinned versions are the lockfile</b> — source is the lock, no sidecar to drift.</p>
+  <p>Deps for every ecosystem are <code>package hex: … | npm: … | cargo: …</code> in the index (app-wide) or a file's header (unit-local). <b>Pinned versions are the lockfile</b> — source is the lock, no sidecar to drift.</p>
   <h3>Do we need mix? Vite?</h3>
   <ul><li class="con"><b>mix.exs — no.</b> A second manifest fighting the index. The weave does mix's job: pull hex, compile elixir → wasm, in-sandbox.</li>
   <li class="pro"><b>Vite's role — yes; the tool — no.</b> A vite-<i>model</i> lane gives dev / HMR + bundles svelte / solid / js islands, with no Node. Same story for cargo and npm.</li></ul>
