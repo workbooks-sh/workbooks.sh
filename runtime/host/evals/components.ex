@@ -10,9 +10,11 @@ defmodule Workbooks.Evals.Components do
   screenshots it light + dark (the one new path), then attaches the two frames
   to the vision judge and runs the deterministic component checks.
 
-  Artifact under test: the agent's `#+RENDER: org` + `#+begin_src component
-  :type …` block, and/or HTML mounting `work-*` elements. The catalog the agent
-  chooses from is the CEM (`workponents/custom-elements.json`, 42 tags).
+  Artifact under test: the `<work-*>` HTML element the agent emits inline (a
+  workbook is HTML). The catalog the agent chooses from is the CEM
+  (`workponents/custom-elements.json`, 42 tags). The extractor still accepts a
+  legacy `#+begin_src component` block for back-compat, but the agent is
+  prompted to emit HTML.
 
   Voice parity: the SAME prompt is run through the rehearsed VOICE path (a
   one-sentence reply + a component emit, no ElevenLabs/Inworld key) and the
@@ -573,40 +575,41 @@ defmodule Workbooks.Evals.Components do
   end
 
   # The text-agent system prompt (Waldo's rich-reply contract, abbreviated).
+  # A workbook is HTML: the agent emits a `<work-*>` custom element, never an
+  # org block (org/`#+begin_src` is deleted from the model).
   defp text_system do
     "You are Waldo, the user's resident assistant inside Workbooks. When a " <>
-      "structured or visual answer helps, begin your message with `#+RENDER: org` " <>
-      "on its own first line and emit a component block:\n" <>
-      "  #+begin_src component :type <type> :<prop> <value>\n  <payload>\n  #+end_src\n" <>
-      "Choose the component TYPE that fits the data shape (see the catalog). " <>
-      "When data is supplied, bind it faithfully; when NONE is supplied, populate the " <>
-      "component with clearly-illustrative sample data rather than asking for data — " <>
-      "emit the artifact. Theme only from --work-* tokens — never hardcode colors. " <>
-      "Reach for exactly one component; keep prose minimal."
+      "structured or visual answer helps, emit a `<work-*>` HTML element inline:\n" <>
+      "  <work-chart type=\"bar\" rows=\"…\"></work-chart>\n" <>
+      "Choose the work-* element that fits the data shape (see the catalog) and use " <>
+      "its real attributes. When data is supplied, bind it faithfully; when NONE is " <>
+      "supplied, populate the element with clearly-illustrative sample data rather " <>
+      "than asking for data — emit the artifact. Theme only from --work-* tokens — " <>
+      "never hardcode colors. Reach for exactly one element; keep prose minimal."
   end
 
   # The voice-agent system prompt: one-sentence spoken reply + the SAME emit.
   defp voice_system do
     "You are Waldo on a VOICE call. Speak ONE short sentence, then — when a " <>
-      "visual answer helps — emit a component artifact the screen will render: " <>
-      "begin a `#+RENDER: org` block and a `#+begin_src component :type <type>` block, " <>
-      "choosing the TYPE that fits the data shape (see the catalog). " <>
-      "Bind real data; theme only from --work-* tokens; one component only."
+      "visual answer helps — emit a component artifact the screen will render: a " <>
+      "`<work-*>` HTML element, choosing the element that fits the data shape (see " <>
+      "the catalog). Bind real data; theme only from --work-* tokens; one element only."
   end
 
-  # The discovered catalog: the `:type` choices map onto work-* tags from the CEM.
+  # Bare-checkout fallback catalog (used only when the real WorkKits catalog
+  # isn't on disk): each data shape maps to a `<work-*>` HTML element.
   defp catalog_injection do
     "COMPONENT CATALOG (choose the right element for the data shape):\n" <>
-      "- numeric series over a category → :type chart   (work-chart)\n" <>
-      "- a list of records / rows with fields → :type table   (work-table)\n" <>
-      "- a single point-in-time KPI / scalar → :type metric   (work-metric/work-spark)\n" <>
-      "- what changed (before/after) → :type diff   (work-diff)\n" <>
-      "- a revision / version history → :type history   (work-history-graph)\n" <>
-      "- a short status note → :type callout ; key/value facts → :type kv\n" <>
+      "- numeric series over a category → <work-chart>\n" <>
+      "- a list of records / rows with fields → <work-table>\n" <>
+      "- a single point-in-time KPI / scalar → <work-metric> / <work-spark>\n" <>
+      "- what changed (before/after) → <work-diff>\n" <>
+      "- a revision / version history → <work-history-graph>\n" <>
+      "- a short status note → <work-callout> ; key/value facts → <work-kv>\n" <>
       "Full element catalog with ATTRIBUTES (use these exact prop names — e.g. " <>
       "work-metric uses `delta` not `change`, work-chart uses `rows` not `data`):\n" <>
       catalog_with_attrs() <>
-      "Map your :type to the matching work-* element; do NOT answer a numeric " <>
+      "Emit the matching `<work-*>` HTML element; do NOT answer a numeric " <>
       "series with a markdown table, a scalar with a full chart, or a diff with raw text."
   end
 
