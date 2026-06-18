@@ -63,7 +63,7 @@ defmodule Nexus.Agent.Bash do
   # `scrape [--js] <url>` — `--js` selects the greenfield engine (StarlingMonkey+linkedom runs the
   # page's JS against a real DOM before render); default is the fast CSS-only render.
   defp web_render(args) do
-    {opts, rest} = take_js_flag(args)
+    {opts, rest} = take_js_flag(args, :auto)
 
     case List.first(rest) do
       nil -> "render: usage: render [--js] <url>"
@@ -76,9 +76,10 @@ defmodule Nexus.Agent.Bash do
     end
   end
 
-  # Pull a leading/anywhere `--js` flag → render opts.
-  defp take_js_flag(args) do
-    if "--js" in args, do: {[engine: :jsdom], args -- ["--js"]}, else: {[], args}
+  # Pull a `--js` flag → render opts selecting `engine` (default `:auto` — fast-first, escalate to the
+  # heavy JS engine only when the fast render is thin, keep the richer result; never regress).
+  defp take_js_flag(args, engine) do
+    if "--js" in args, do: {[engine: engine], args -- ["--js"]}, else: {[], args}
   end
 
   # ── Tier-1 computer-use builtins ───────────────────────────────────────────
@@ -139,7 +140,7 @@ defmodule Nexus.Agent.Bash do
   defp web_screenshot(_vfs, []), do: "screenshot: usage: screenshot [--js] <url> [out.png]"
 
   defp web_screenshot(vfs, args) do
-    {opts, rest} = take_js_flag(args)
+    {opts, rest} = take_js_flag(args, :jsdom)
     web_screenshot(vfs, rest, opts)
   end
 

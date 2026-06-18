@@ -28,10 +28,33 @@ defmodule Nexus.Browse.Blitz do
   """
   def render_html(html, url, opts \\ []) do
     case Keyword.get(opts, :engine, :boa) do
+      :auto -> render_html_auto(html, url, opts)
       :jsdom -> render_html_jsdom(html, url, opts)
       _ -> render_html_boa(html, url, opts)
     end
   end
+
+  # Empirically-driven default for "I might need JS": the fast CSS-only render handles SSR sites (most
+  # of the web) for a fraction of the compute, and benchmarks showed the JS engine (a) returns IDENTICAL
+  # output on SSR pages — pure waste — and (b) can REGRESS (GitHub: a page's JS wiped good SSR content,
+  # 488 lines → 1). So: render fast first; only escalate to the ~11MB StarlingMonkey engine when the fast
+  # result is THIN (a true client-only shell); and keep whichever output is richer — never regress.
+  @thin_line_threshold 5
+  defp render_html_auto(html, url, opts) do
+    fast = render_html_boa(html, url, opts)
+
+    if richness(fast) >= @thin_line_threshold do
+      fast
+    else
+      js = render_html_jsdom(html, url, opts)
+      if richness(js) > richness(fast), do: js, else: fast
+    end
+  end
+
+  defp richness({:ok, t}) when is_binary(t),
+    do: t |> String.split("\n") |> Enum.count(&(String.trim(&1) != ""))
+
+  defp richness(_), do: 0
 
   defp render_html_boa(html, url, opts) do
     frozen = Nexus.Browse.Freeze.freeze(html, url, scripts: true)
