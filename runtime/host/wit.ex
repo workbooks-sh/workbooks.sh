@@ -26,6 +26,17 @@ defmodule Workbooks.Wit do
 
   @caps Map.keys(@grant_imports) ++ ~w(tcp udp tls posix parallel encode commands)
 
+  # self-contained host capability interfaces, so a generated package validates
+  # standalone (wasm-tools rejects a bare external `host:net` import). Each cap a
+  # unit grants imports the matching local interface.
+  @cap_ifaces %{
+    "net" => "interface host-net {\n  fetch: func(url: string) -> string;\n}",
+    "kv" => "interface host-kv {\n  get: func(key: string) -> string;\n  put: func(key: string, val: string);\n}",
+    "secrets" => "interface host-secrets {\n  read: func(key: string) -> string;\n}",
+    "fs" => "interface host-fs {\n  read: func(path: string) -> string;\n  write: func(path: string, data: string);\n}",
+    "exec" => "interface host-exec {\n  run: func(cmd: string, args: list<string>) -> string;\n}"
+  }
+
   @doc "Generate the WIT `world` source for a `Workbooks.Literate` :code node."
   def world(%{name: name} = node) when is_binary(name) do
     facts = Extract.facts(node)
@@ -91,6 +102,42 @@ defmodule Workbooks.Wit do
     end
   end
 
+  @doc """
+  Assemble a SELF-CONTAINED, valid WIT package for a file's nodes: the host
+  capability interfaces it grants, the shared `interface types`, and a `world` per
+  unit (each `use`-ing the file types and importing its host interfaces). This is
+  the artifact `wasm-tools` can validate and componentize against (§1).
+  """
+  def package(nodes, pkg_name \\ "demo") do
+    units = for n <- nodes, n.type == :code, n.name, n.kind != "defmodule", do: n
+    type_names = type_names(nodes)
+    caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&Map.has_key?(@cap_ifaces, &1))
+
+    host = caps |> Enum.map(&@cap_ifaces[&1]) |> Enum.join("\n\n")
+    iface = file_interface(nodes)
+    worlds = Enum.map(units, &pkg_world(&1, type_names))
+
+    parts = ([host, iface] ++ worlds) |> Enum.reject(&(&1 in [nil, ""]))
+    "package work:#{wit_name(pkg_name)};\n\n" <> Enum.join(parts, "\n\n") <> "\n"
+  end
+
+  @doc "Validate a WIT source string with wasm-tools. Returns :ok | {:error, message}."
+  def validate(wit) when is_binary(wit) do
+    path = Path.join(System.tmp_dir!(), "wbwit_#{System.unique_integer([:positive])}.wit")
+    File.write!(path, wit)
+
+    try do
+      case System.cmd("wasm-tools", ["component", "wit", path], stderr_to_stdout: true) do
+        {_out, 0} -> :ok
+        {out, _} -> {:error, out}
+      end
+    rescue
+      e in ErlangError -> {:error, "wasm-tools unavailable: #{inspect(e)}"}
+    after
+      File.rm(path)
+    end
+  end
+
   @doc "Parse the capability names a unit grants, from its block header."
   def grants(%{header: header}) when is_binary(header) do
     # words inside a `grant[:] [ … ]` bracket (handles `net:` and `:net` forms),
@@ -150,6 +197,54 @@ defmodule Workbooks.Wit do
   end
 
   defp indent(block), do: block |> String.split("\n") |> Enum.map(&("  " <> &1)) |> Enum.join("\n")
+
+  # the file's shared type names (records named after type modules, enums)
+  defp type_names(nodes) do
+    enums =
+      for n <- nodes,
+          n.type == :decl,
+          {:enum, name, _atoms} <- Workbooks.Extract.Elixir.decl_types(n),
+          do: Workbooks.Wit.Types.wit(name)
+
+    records =
+      for n <- nodes,
+          n.type == :code,
+          n.kind == "defmodule",
+          {:record, _f} <- Extract.facts(n).types,
+          do: Workbooks.Wit.Types.wit(n.name)
+
+    (records ++ enums) |> Enum.uniq()
+  end
+
+  # one unit's world inside a package: use only the file types it references,
+  # then its typed exports and host-interface imports.
+  defp pkg_world(node, type_names) do
+    facts = Extract.facts(node)
+
+    exports = export_lines(facts.exports)
+    exports = if exports == [], do: ["export run: func(input: string) -> string;"], else: exports
+
+    referenced =
+      facts.exports
+      |> Enum.flat_map(fn
+        {_n, types} when is_list(types) -> types
+        _ -> []
+      end)
+      |> Enum.filter(&(&1 in type_names))
+      |> Enum.uniq()
+
+    use_line = if referenced == [], do: [], else: ["use types.{#{Enum.join(referenced, ", ")}};"]
+
+    imports =
+      node
+      |> grants()
+      |> Enum.uniq()
+      |> Enum.filter(&Map.has_key?(@cap_ifaces, &1))
+      |> Enum.map(&"import host-#{&1};")
+
+    body = (use_line ++ exports ++ imports) |> Enum.map_join("\n", &("  " <> &1))
+    "world #{wit_name(node.name)} {\n#{body}\n}"
+  end
 
   defp grant_import(cap), do: if(wit = @grant_imports[cap], do: "import #{wit};")
 
