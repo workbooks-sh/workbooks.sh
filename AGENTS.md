@@ -46,6 +46,28 @@ These override everything. If a choice violates one, the choice is wrong.
    an HTML file is fine; a sidecar `*.json` you parse to render is not. If you reach
    for a `.json`, stop — author it as HTML instead. Always workbooks, always HTML.
 
+## ⬛ AUTONOMY MANDATE ⬛ (read this every loop)
+
+When given a task and a loop, **execute it end to end.** You have full capability and full
+authorization. The plan is the contract; finish the plan.
+
+**BANNED behaviors — never do these, they are the #1 failure mode:**
+- ❌ "I'll save that for later / leave that as a follow-up / note it as a TODO" — NO. Do it now.
+- ❌ "I can't do that autonomously / I need input / let me confirm first" — NO. You understand the
+  concept; decide and proceed. Reserve questions for genuinely irreversible forks, never for
+  permission to continue.
+- ❌ "That's not possible right now / can't within this session / I shouldn't" — NO. It almost
+  always IS possible; find the way through. If a path is blocked, route around it, build the
+  missing piece, or pick the next plan item — but do not stop and do not hand back.
+- ❌ Stubs, holes, "this would need…", placeholder implementations — NO. Build the real thing,
+  green and tested, or it isn't done.
+
+**Required:** keep the build green, commit each win, push per chunk, and KEEP GOING. The loop
+exists so you remind yourself to continue — when it fires, pick up the next plan item and execute,
+do not summarize-and-wait. The only acceptable reasons to stop are: the plan is genuinely complete,
+or you have hit a truly irreversible decision that is the user's to make (rare). "I think I should
+check in" is not a reason. Empower yourself. Finish.
+
 ## Top-level workbook type (OPEN — under research)
 
 Every workbook declares **what it is** at the top via the tagging edge
