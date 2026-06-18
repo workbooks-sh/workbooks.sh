@@ -99,8 +99,9 @@ defmodule Nexus.WeaveTest do
     Nexus.Store.create(mod, %{name: "</script><script>alert(1)</script>"})
 
     html = Nexus.Weave.weave(dir)
+    # the raw breakout sequence never appears literally (island escapes `<` → <; table escapes too)
     refute html =~ "</script><script>alert(1)"
-    assert html =~ "\\u003c"
+    assert html =~ "&lt;/script&gt;"
   end
 
   @tag :compiler
