@@ -49,8 +49,7 @@ defmodule Workbooks.Graph do
     end
   end
 
-  defp exports(%{ast: nil}), do: []
-  defp exports(n), do: Extract.Elixir.extract(n).exports
+  defp exports(n), do: Extract.facts(n).exports
 
   defp collect_titles(parsed) do
     for {path, nodes} <- parsed, into: %{} do
@@ -65,15 +64,19 @@ defmodule Workbooks.Graph do
   end
 
   defp node_edges(n, nodes) do
+    facts = Extract.facts(n)
+
+    # Elixir: remote calls (Module → unit). Foreign: declared imports
+    # (work://unit, a linked wasm_import_module, an extern fn). Both → unit names.
+    targets =
+      (Enum.map(facts.calls, fn {mod, _f, _a} -> mod |> Module.split() |> List.last() |> String.downcase() end) ++
+         Enum.map(facts.imports, &String.downcase/1))
+      |> Enum.uniq()
+
     imports =
-      if n.ast do
-        Extract.Elixir.extract(n).calls
-        |> Enum.map(fn {mod, _f, _a} -> mod |> Module.split() |> List.last() |> String.downcase() end)
-        |> Enum.filter(&Map.has_key?(nodes, &1))
-        |> Enum.map(&%{from: n.name, to: &1, type: :import})
-      else
-        []
-      end
+      targets
+      |> Enum.filter(&(&1 != n.name and Map.has_key?(nodes, &1)))
+      |> Enum.map(&%{from: n.name, to: &1, type: :import})
 
     refs =
       n.refs

@@ -10,14 +10,14 @@ defmodule Workbooks.Extract.Elixir do
   without caring which language produced them.
   """
 
-  @type facts :: %{exports: [{atom, non_neg_integer}], types: [tuple], calls: [tuple]}
+  @type facts :: %{exports: [{atom, non_neg_integer}], imports: [], types: [tuple], calls: [tuple]}
 
   @spec extract(map) :: facts
   def extract(%{ast: nil}), do: empty()
   def extract(%{ast: ast}), do: from_body(do_body(ast))
   def extract(_), do: empty()
 
-  defp empty, do: %{exports: [], types: [], calls: []}
+  defp empty, do: %{exports: [], imports: [], types: [], calls: []}
 
   defp from_body(nil), do: empty()
 
@@ -34,6 +34,7 @@ defmodule Workbooks.Extract.Elixir do
 
     %{
       exports: ex |> Enum.reverse() |> Enum.uniq(),
+      imports: [],
       types: ty |> Enum.reverse() |> Enum.uniq(),
       calls: ca |> Enum.reverse() |> Enum.uniq()
     }
