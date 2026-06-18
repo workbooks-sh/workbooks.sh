@@ -22,10 +22,25 @@ the real demo tree** (`workponents/sales/**`). Everything below flows from one p
   (a generated package validates `:ok` with native `wasm-tools`). Remaining: bind each
   unit's *compiled core module* to its world via the compile lanes (`wb-rcl5`).
 
-Test suites: `literate_ · extract_elixir_ · extract_foreign_ · graph_ · wit_ · wit_types_ ·
-wit_emit_ · wit_package_ · audit_ · work_cli_test.exs` (48 green).
+- **§3 Dock — the registry is the live spine.** `host/dock.ex` is the single source of
+  capability knowledge (sandbox WIT interfaces, Instance import names, Rust core-ABI
+  names, Dock API fns, grant projections). `instance/imports.ex` reprojects from it
+  (live), `wit/engine.wit` is **generated** from `Dock.engine_world/0` (drift-guarded;
+  fixed a stale missing `llm-complete`), and `Wit`/`Audit` draw from it (no more parallel
+  copies). RustDock/JsDock/host_broker reprojection + the inverted profile semantics remain.
 
-Next land-order targets: **§1 componentize lanes (`wb-rcl5`) → §3 unified Dock (`wb-yje6`)**.
+> **INTEGRATION REALITY (honest):** `Workbooks.Wit` world-generation is built, tested, and
+> 32/32 wasm-tools-valid, but **not yet consumed by the live build** — `compose.ex` /
+> `workbook.ex build_world` still derive worlds from `tangle_plan` (the OLD HTML `work-*`
+> model). `Dock` *is* live. The remaining switch — point the componentize/build path at the
+> literate→`Wit` world (needs the `.work`→component build pipeline) — is **`wb-63fk`**, gated
+> on the compile-lane cores (`wb-rcl5`). Until then the new system runs in parallel.
+
+Test suites: `literate_ · extract_elixir_ · extract_foreign_ · graph_ · wit_ · wit_types_ ·
+wit_emit_ · wit_package_ · wit_componentize_ · wit_write_ · audit_ · dock_ · work_cli_ ·
+*_characterization_test.exs` (62 green).
+
+Next land-order targets: **the live-path switch (`wb-63fk`) + compile-lane cores (`wb-rcl5`)**.
 
 ---
 
