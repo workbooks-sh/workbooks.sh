@@ -1,4 +1,4 @@
-defmodule WorkCore.Wit.Types do
+defmodule Nexus.Wit.Types do
   @moduledoc """
   §2.2 — map Elixir structure to WIT types. A `defstruct` becomes a WIT `record`,
   each field's type inferred from its **default value** (the format's rule: the
@@ -52,8 +52,8 @@ defmodule WorkCore.Wit.Types do
   end
 
   @doc """
-  WIT identifier form — the canonical conversion lives in `WorkCore.Uid.wit/1`;
+  WIT identifier form — the canonical conversion lives in `Nexus.Uid.wit/1`;
   kept here as the §2.2 entry point the type emitters call.
   """
-  defdelegate wit(name), to: WorkCore.Uid
+  defdelegate wit(name), to: Nexus.Uid
 end

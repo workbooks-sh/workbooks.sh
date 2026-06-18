@@ -3,7 +3,7 @@ defmodule Nexus.Telemetry do
   §10 (execution reality) — the agent run ledger. When an agent runs, its real
   behaviour — turns, tokens, wall-clock, the kits it actually invoked, how it
   finished — is recorded here, keyed by the agent's canonical identity (§1,
-  `WorkCore.Uid.key`). `overlay/0` projects the ledger into a `WorkCore.Overlay`
+  `Nexus.Uid.key`). `overlay/0` projects the ledger into a `Nexus.Overlay`
   that the pure graph joins at query time (`Graph.with_overlay/2`) to fill
   `facets.observed`. This is what lets *declared* (the grants + deps the author
   wrote) be checked against *observed* (what the agent did) under one identity.
@@ -13,7 +13,7 @@ defmodule Nexus.Telemetry do
   """
   use GenServer
 
-  alias WorkCore.{Uid, Overlay}
+  alias Nexus.{Uid, Overlay}
 
   # ── client ──
 

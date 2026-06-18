@@ -1,6 +1,6 @@
-defmodule WorkCore.Extract do
+defmodule Nexus.Extract do
   @moduledoc """
-  §0.2 — one entry point over a `WorkCore.Literate` `:code` node: route it to the
+  §0.2 — one entry point over a `Nexus.Literate` `:code` node: route it to the
   right per-language extractor and return the unified `%{exports, imports, types,
   calls}` shape. Elixir blocks (carrying an `:ast`) use the real Elixir AST;
   everything else uses the foreign pattern extractor (interim until tree-sitter).
@@ -13,9 +13,9 @@ defmodule WorkCore.Extract do
   def facts(%{facts: facts}) when is_map(facts), do: facts
 
   def facts(%{ast: ast} = node) when not is_nil(ast),
-    do: WorkCore.Extract.Elixir.extract(node)
+    do: Nexus.Extract.Elixir.extract(node)
 
-  def facts(node), do: WorkCore.Extract.Foreign.extract(node)
+  def facts(node), do: Nexus.Extract.Foreign.extract(node)
 
   @doc """
   Attach facts to a `:code` node (or every code node in a list) so downstream

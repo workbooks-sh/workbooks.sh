@@ -1,4 +1,4 @@
-defmodule WorkCore.Wit do
+defmodule Nexus.Wit do
   @moduledoc """
   §2 — generate a per-unit **WIT world** from the parsed unit: `export`s from the
   AST signature (`Extract.facts` public defs), `import`s from the unit's `grant`s.
@@ -6,24 +6,24 @@ defmodule WorkCore.Wit do
   thing the demo's `contract.work` shows once, labelled "generated".
 
   This is the world *skeleton*: param/return types default to `string` until the
-  full `WorkCore.Wit.Types` mapping lands (§2.2 — record/variant/enum/flags from
+  full `Nexus.Wit.Types` mapping lands (§2.2 — record/variant/enum/flags from
   the unit's declared structs). A unit with no signature gets the default `run`.
   """
 
-  alias WorkCore.Capabilities
-  alias WorkCore.Extract
+  alias Nexus.Capabilities
+  alias Nexus.Extract
 
   # The self-contained host capability interfaces come from the single Dock registry
   # (§3) — so a generated package validates standalone AND §2's imports are the same
-  # surface the runtime Dock projects. See `WorkCore.Dock`.
+  # surface the runtime Dock projects. See `Nexus.Dock`.
 
   @doc """
   Build a single-world WIT package from already-formatted signature entries — the one
   home the compile lanes (rust/zig/c) share instead of each splicing `package …/world …`
   by hand. `imports`/`exports` are `[{ident, sig}]` where `ident` is the raw WIT
-  identifier (already passed through `WorkCore.Uid.wit/1` by the caller, or any string)
+  identifier (already passed through `Nexus.Uid.wit/1` by the caller, or any string)
   and `sig` is the full WIT signature (`"func(a: s32) -> s32"`, or a host-cap WIT).
-  `name` is normalized through `WorkCore.Uid.wit/1` so the package/world id matches the
+  `name` is normalized through `Nexus.Uid.wit/1` so the package/world id matches the
   rest of the identity surface.
   """
   def world_from_sigs(name, imports, exports) do
@@ -36,7 +36,7 @@ defmodule WorkCore.Wit do
     "package work:#{wname};\n\nworld #{wname} {\n#{Enum.join(lines, "\n")}\n}\n"
   end
 
-  @doc "Generate the WIT `world` source for a `WorkCore.Literate` :code node."
+  @doc "Generate the WIT `world` source for a `Nexus.Literate` :code node."
   def world(node, shared \\ nil)
 
   # skeleton (shared == nil): the unit's own types + optimistic param type names,
@@ -67,7 +67,7 @@ defmodule WorkCore.Wit do
   The per-file shared `interface types` — the home for file-level declarations a
   unit world *imports* rather than owns: a top-level `@statuses` atom-set (enum) and
   a shared `defmodule …, do: defstruct …` type module (record). Returns nil if a
-  file declares no shared types. Takes the `WorkCore.Literate.parse/1` node list.
+  file declares no shared types. Takes the `Nexus.Literate.parse/1` node list.
   """
   def file_interface(nodes) when is_list(nodes) do
     # dedup by WIT name — teaching files re-declare shared types (e.g. several lessons
@@ -75,9 +75,9 @@ defmodule WorkCore.Wit do
     enums_kv =
       (for node <- nodes,
            node.type == :decl,
-           {:enum, name, atoms} <- WorkCore.Extract.Elixir.decl_types(node),
+           {:enum, name, atoms} <- Nexus.Extract.Elixir.decl_types(node),
            do: {name, atoms})
-      |> Enum.uniq_by(fn {name, _} -> WorkCore.Wit.Types.wit(name) end)
+      |> Enum.uniq_by(fn {name, _} -> Nexus.Wit.Types.wit(name) end)
 
     record_specs =
       (for node <- nodes,
@@ -85,7 +85,7 @@ defmodule WorkCore.Wit do
            node.kind == "defmodule",
            {:record, fields} <- Extract.facts(node).types,
            do: {node.name, fields})
-      |> Enum.uniq_by(fn {name, _} -> WorkCore.Wit.Types.wit(name) end)
+      |> Enum.uniq_by(fn {name, _} -> Nexus.Wit.Types.wit(name) end)
 
     {iface, _names} = interface_from_specs(record_specs, enums_kv)
     iface
@@ -95,17 +95,17 @@ defmodule WorkCore.Wit do
   Build the shared `interface types` block + the set of WIT type names from
   pre-deduped record specs (`[{name, fields}]`) and enum specs (`[{name, atoms}]`).
   The one home both the literate path (`file_interface/1`) and the graph path
-  (`WorkCore.Graph.shared_types/1`, sourced from the unified type nodes §1) use,
+  (`Nexus.Graph.shared_types/1`, sourced from the unified type nodes §1) use,
   so cross-file records resolve to a real WIT type ref instead of degrading to
   `string`. Returns `{interface_string | nil, [wit_name]}`.
   """
   def interface_from_specs(record_specs, enums_kv) do
-    records = for {name, fields} <- record_specs, do: WorkCore.Wit.Types.record(name, fields, enums_kv)
-    enums = for {name, atoms} <- enums_kv, do: WorkCore.Wit.Types.enum(name, atoms)
+    records = for {name, fields} <- record_specs, do: Nexus.Wit.Types.record(name, fields, enums_kv)
+    enums = for {name, atoms} <- enums_kv, do: Nexus.Wit.Types.enum(name, atoms)
 
     names =
-      (for {name, _} <- record_specs, do: WorkCore.Wit.Types.wit(name)) ++
-        (for {name, _} <- enums_kv, do: WorkCore.Wit.Types.wit(name))
+      (for {name, _} <- record_specs, do: Nexus.Wit.Types.wit(name)) ++
+        (for {name, _} <- enums_kv, do: Nexus.Wit.Types.wit(name))
 
     iface =
       case records ++ enums do
@@ -128,7 +128,7 @@ defmodule WorkCore.Wit do
       |> Enum.uniq()
 
     for path <- paths, into: %{} do
-      nodes = WorkCore.Literate.parse(File.read!(path))
+      nodes = Nexus.Literate.parse(File.read!(path))
       # a bare `defmodule` is a type module (→ the file interface), not a runnable
       # unit; only placed/runnable kinds get a world.
       worlds =
@@ -150,14 +150,14 @@ defmodule WorkCore.Wit do
     units =
       (for n <- nodes, n.type == :code, n.name, n.kind != "defmodule", do: n)
       # two units mapping to the same WIT identifier can't both be top-level worlds
-      |> Enum.uniq_by(&WorkCore.Wit.Types.wit(&1.name))
+      |> Enum.uniq_by(&Nexus.Wit.Types.wit(&1.name))
 
     # `shared` = a workbook-wide {interface, type_names} so a param typed by a record
     # defined in another file still resolves; without it, types are file-scoped.
     {iface, type_names} = shared || {file_interface(nodes), type_names(nodes)}
 
-    caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&WorkCore.Capabilities.sandbox_capability?/1)
-    host = caps |> Enum.map(&WorkCore.Capabilities.interface_wit/1) |> Enum.join("\n\n")
+    caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&Nexus.Capabilities.sandbox_capability?/1)
+    host = caps |> Enum.map(&Nexus.Capabilities.interface_wit/1) |> Enum.join("\n\n")
     worlds = Enum.map(units, &pkg_world(&1, type_names))
 
     parts = ([host, iface] ++ worlds) |> Enum.reject(&(&1 in [nil, ""]))
@@ -166,7 +166,7 @@ defmodule WorkCore.Wit do
 
   @doc "The workbook-wide shared types: `{interface, type_names}` over every file's type defs."
   def workbook_types(root) do
-    all = root |> wb_paths() |> Enum.flat_map(fn p -> WorkCore.Literate.parse(File.read!(p)) end) |> Extract.annotate()
+    all = root |> wb_paths() |> Enum.flat_map(fn p -> Nexus.Literate.parse(File.read!(p)) end) |> Extract.annotate()
     {file_interface(all), type_names(all)}
   end
 
@@ -175,7 +175,7 @@ defmodule WorkCore.Wit do
     shared = workbook_types(root)
 
     for path <- wb_paths(root), into: %{} do
-      nodes = WorkCore.Literate.parse(File.read!(path))
+      nodes = Nexus.Literate.parse(File.read!(path))
       {path, package(nodes, Path.basename(path, ".work"), shared)}
     end
   end
@@ -196,7 +196,7 @@ defmodule WorkCore.Wit do
 
     written =
       for path <- wb_paths(root) do
-        pkg = path |> File.read!() |> WorkCore.Literate.parse() |> package(Path.basename(path, ".work"), shared)
+        pkg = path |> File.read!() |> Nexus.Literate.parse() |> package(Path.basename(path, ".work"), shared)
         dest = Path.join(out_dir, Path.basename(path, ".work") <> ".wit")
         File.write!(dest, pkg)
         dest
@@ -253,8 +253,8 @@ defmodule WorkCore.Wit do
     end
   end
 
-  @doc "Parse the capability names a unit grants — see `WorkCore.Capabilities.grants/1`."
-  defdelegate grants(node), to: WorkCore.Capabilities
+  @doc "Parse the capability names a unit grants — see `Nexus.Capabilities.grants/1`."
+  defdelegate grants(node), to: Nexus.Capabilities
 
   # ── private ──
 
@@ -282,10 +282,10 @@ defmodule WorkCore.Wit do
     records =
       (for {:record, fields} <- types, do: fields)
       |> Enum.with_index()
-      |> Enum.map(fn {fields, i} -> WorkCore.Wit.Types.record(Enum.at(modules, i) || unit, fields, enums_kv) end)
+      |> Enum.map(fn {fields, i} -> Nexus.Wit.Types.record(Enum.at(modules, i) || unit, fields, enums_kv) end)
 
-    enums = for {:enum, name, atoms} <- types, do: WorkCore.Wit.Types.enum(name, atoms)
-    variants = for {:variant, name, tags} <- types, do: WorkCore.Wit.Types.variant(name, tags)
+    enums = for {:enum, name, atoms} <- types, do: Nexus.Wit.Types.enum(name, atoms)
+    variants = for {:variant, name, tags} <- types, do: Nexus.Wit.Types.variant(name, tags)
 
     records ++ enums ++ variants
   end
@@ -297,15 +297,15 @@ defmodule WorkCore.Wit do
     enums =
       for n <- nodes,
           n.type == :decl,
-          {:enum, name, _atoms} <- WorkCore.Extract.Elixir.decl_types(n),
-          do: WorkCore.Wit.Types.wit(name)
+          {:enum, name, _atoms} <- Nexus.Extract.Elixir.decl_types(n),
+          do: Nexus.Wit.Types.wit(name)
 
     records =
       for n <- nodes,
           n.type == :code,
           n.kind == "defmodule",
           {:record, _f} <- Extract.facts(n).types,
-          do: WorkCore.Wit.Types.wit(n.name)
+          do: Nexus.Wit.Types.wit(n.name)
 
     (records ++ enums) |> Enum.uniq()
   end
@@ -336,8 +336,8 @@ defmodule WorkCore.Wit do
       node
       |> grants()
       |> Enum.uniq()
-      |> Enum.filter(&WorkCore.Capabilities.sandbox_capability?/1)
-      |> Enum.map(&"import #{WorkCore.Capabilities.interface_name(&1)};")
+      |> Enum.filter(&Nexus.Capabilities.sandbox_capability?/1)
+      |> Enum.map(&"import #{Nexus.Capabilities.interface_name(&1)};")
 
     body = (use_line ++ exports ++ imports) |> Enum.map_join("\n", &("  " <> &1))
     "world #{wit_name(node.name)} {\n#{body}\n}"
@@ -362,5 +362,5 @@ defmodule WorkCore.Wit do
 
   defp scalar?(t), do: t in ~w(string bool s8 s16 s32 s64 u8 u16 u32 u64 f32 f64 char)
 
-  defp wit_name(name), do: WorkCore.Wit.Types.wit(name)
+  defp wit_name(name), do: Nexus.Wit.Types.wit(name)
 end

@@ -1,6 +1,6 @@
-defmodule WorkCore.GraphTest do
+defmodule Nexus.GraphTest do
   use ExUnit.Case, async: true
-  alias WorkCore.Graph
+  alias Nexus.Graph
 
   @tmp Path.join(System.tmp_dir!(), "wc_graph_test")
 
@@ -38,34 +38,34 @@ defmodule WorkCore.GraphTest do
       ```
       """)
 
-      {:ok, g: WorkCore.Graph.build_dir(@tmp)}
+      {:ok, g: Nexus.Graph.build_dir(@tmp)}
     end
 
     test "get / units / dependencies / dependents / host_caps", %{g: g} do
-      assert WorkCore.Graph.get(g, "panel").id == "panel"
-      assert "chart" in WorkCore.Graph.dependencies(g, "panel")
-      assert "panel" in WorkCore.Graph.dependents(g, "chart")
-      assert "net" in WorkCore.Graph.host_caps(g, "svc")
-      assert Enum.any?(WorkCore.Graph.units(g, lang: "elixir"), &(&1.id == "svc"))
+      assert Nexus.Graph.get(g, "panel").id == "panel"
+      assert "chart" in Nexus.Graph.dependencies(g, "panel")
+      assert "panel" in Nexus.Graph.dependents(g, "chart")
+      assert "net" in Nexus.Graph.host_caps(g, "svc")
+      assert Enum.any?(Nexus.Graph.units(g, lang: "elixir"), &(&1.id == "svc"))
     end
 
     test "neighbors filters by scope/dir", %{g: g} do
-      caps = WorkCore.Graph.neighbors(g, "svc", scope: :host_cap)
+      caps = Nexus.Graph.neighbors(g, "svc", scope: :host_cap)
       assert Enum.all?(caps, &(&1.scope == :host_cap))
-      ins = WorkCore.Graph.neighbors(g, "chart", dir: :in)
+      ins = Nexus.Graph.neighbors(g, "chart", dir: :in)
       assert Enum.any?(ins, &(&1.from == "panel"))
     end
 
     test "trace gives the cross-layer view; path walks dependencies", %{g: g} do
-      t = WorkCore.Graph.trace(g, "panel")
+      t = Nexus.Graph.trace(g, "panel")
       assert t.identity.package == "work:panel"
       assert "chart" in t.dependencies
       assert Map.has_key?(t.facets, :source)
-      assert WorkCore.Graph.path(g, "panel", "chart") == ["panel", "chart"]
+      assert Nexus.Graph.path(g, "panel", "chart") == ["panel", "chart"]
     end
 
     test "dogfood: graph renders as a work-* workbook (no JSON)", %{g: g} do
-      html = WorkCore.Graph.Render.to_html(g, title: "Test graph")
+      html = Nexus.Graph.Render.to_html(g, title: "Test graph")
       assert html =~ "<document-view>"
       assert html =~ "<work-flow>"
       assert html =~ ~s(from="panel")
@@ -150,23 +150,23 @@ defmodule WorkCore.GraphTest do
     ```
     """)
 
-    g = WorkCore.Graph.build_dir(@tmp)
+    g = Nexus.Graph.build_dir(@tmp)
 
     # the unified type registry sees the cross-file record
     assert Map.has_key?(g.types, "lead")
-    {iface, names} = WorkCore.Graph.shared_types(g)
+    {iface, names} = Nexus.Graph.shared_types(g)
     assert "lead" in names
     assert iface =~ "record lead"
 
     # the per-unit world resolved against the registry types the param as the
     # record (NOT string) and is self-contained valid WIT
-    enrich = Path.join(@tmp, "enrich.work") |> File.read!() |> WorkCore.Literate.parse() |> Enum.find(&(&1[:name] == "enrich"))
-    world = WorkCore.Wit.world(enrich, WorkCore.Graph.shared_types(g))
+    enrich = Path.join(@tmp, "enrich.work") |> File.read!() |> Nexus.Literate.parse() |> Enum.find(&(&1[:name] == "enrich"))
+    world = Nexus.Wit.world(enrich, Nexus.Graph.shared_types(g))
 
     assert world =~ "use types.{lead};"
     assert world =~ "func(a0: lead)"
     refute world =~ "func(a0: string)"
-    assert WorkCore.Wit.validate(world) == :ok
+    assert Nexus.Wit.validate(world) == :ok
   end
 
   test "check resolves host-cap edges against the catalog, not as dangling units" do

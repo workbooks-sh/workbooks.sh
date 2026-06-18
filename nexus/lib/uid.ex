@@ -1,4 +1,4 @@
-defmodule WorkCore.Uid do
+defmodule Nexus.Uid do
   @moduledoc """
   §1 — the canonical identity of a work unit. One authored name, many surface
   forms. Before this module the same logical unit wore a different mask in every

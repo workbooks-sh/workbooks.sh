@@ -1,8 +1,8 @@
-defmodule WorkCore.Capabilities do
+defmodule Nexus.Capabilities do
   @moduledoc """
   The single capability **catalog** — one source of truth for what host capabilities exist, the WIT
   interface each projects, and the grant that unlocks it. Pure data + pure queries (no NIF, no
-  runtime), so the `.work` toolchain (`WorkCore.Wit`) and the runtime Dock seam read the SAME
+  runtime), so the `.work` toolchain (`Nexus.Wit`) and the runtime Dock seam read the SAME
   vocabulary. The runtime membrane (`Nexus.Dock`) keeps the live host implementations and delegates
   these catalog queries here.
 
@@ -48,7 +48,7 @@ defmodule WorkCore.Capabilities do
   @grant_aliases %{"net" => "browse", "kv" => "vfs", "exec" => "commands", "llm" => "llm", "browse" => "browse"}
 
   # The host functions a unit may call by name (the impls live in the runtime membrane `Nexus.Dock`;
-  # the canonical NAME list lives here so the capability audit — `WorkCore.Audit` — is pure/local).
+  # the canonical NAME list lives here so the capability audit — `Nexus.Audit` — is pure/local).
   @host_fns ~w(now emit store load fetch complete)
 
   @doc "The canonical host-function names a unit can import (audited against a unit's `grant`s)."
@@ -122,7 +122,7 @@ defmodule WorkCore.Capabilities do
 
   @doc """
   The WIT import a granted capability projects — the one vocabulary both the generated world
-  (`WorkCore.Wit`) and the runtime seam speak. `nil` if the grant has no projection.
+  (`Nexus.Wit`) and the runtime seam speak. `nil` if the grant has no projection.
   """
   def grant_import(grant) do
     cond do

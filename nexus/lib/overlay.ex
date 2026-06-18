@@ -1,4 +1,4 @@
-defmodule WorkCore.Overlay do
+defmodule Nexus.Overlay do
   @moduledoc """
   §10 — the reality overlay. The static graph (§9) is pure and derived-fresh: it
   holds only what the author wrote. But a unit also has *realities* the author
@@ -6,7 +6,7 @@ defmodule WorkCore.Overlay do
   agent. Those are high-volume, mutable, time-series; they must not pollute the
   pure build. So they live here, in a separate store keyed by the canonical
   identity (§1, `Uid.key`), and are joined onto the graph at query time via
-  `WorkCore.Graph.with_overlay/2`.
+  `Nexus.Graph.with_overlay/2`.
 
   This is the seam that lets the graph cover code, data, and execution under one
   identity without any new authoring syntax — `data`/`observed` are *read back*,
@@ -17,7 +17,7 @@ defmodule WorkCore.Overlay do
 
   @type t :: %__MODULE__{data: map, observed: map}
 
-  alias WorkCore.Uid
+  alias Nexus.Uid
 
   @doc "An empty overlay."
   def new, do: %__MODULE__{}

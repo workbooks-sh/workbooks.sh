@@ -1,7 +1,7 @@
-defmodule WorkCore.WitTest do
+defmodule Nexus.WitTest do
   use ExUnit.Case, async: true
-  alias WorkCore.Wit
-  alias WorkCore.Literate
+  alias Nexus.Wit
+  alias Nexus.Literate
 
   defp code(src), do: Literate.parse(src) |> Enum.find(&(&1.type == :code))
 

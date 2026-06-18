@@ -5,7 +5,7 @@ defmodule Nexus.Unit do
   exports — the server tier of the linguistic model, Elixir all the way down, no wasm.
 
   (`client`/`sandbox` units compile to wasm components instead; this is the BEAM lane.)
-  A whole workbook compiles its units in dependency order — `WorkCore.Graph` gives that
+  A whole workbook compiles its units in dependency order — `Nexus.Graph` gives that
   order so a unit's referenced units/types exist first; this is the single-unit step.
   """
 
@@ -19,7 +19,7 @@ defmodule Nexus.Unit do
         {:error, :no_body}
 
       body ->
-        mod = Module.concat([Nexus.Units, WorkCore.Uid.camel(name) <> suffix()])
+        mod = Module.concat([Nexus.Units, Nexus.Uid.camel(name) <> suffix()])
 
         quoted =
           quote do
@@ -51,7 +51,7 @@ defmodule Nexus.Unit do
     nodes =
       (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
       |> Enum.uniq()
-      |> Enum.flat_map(fn p -> WorkCore.Literate.parse(File.read!(p)) end)
+      |> Enum.flat_map(fn p -> Nexus.Literate.parse(File.read!(p)) end)
 
     code = Enum.filter(nodes, &(&1.type == :code and &1.ast != nil))
 
@@ -125,7 +125,7 @@ defmodule Nexus.Unit do
         {:error, :no_body}
 
       body ->
-        mod = WorkCore.Uid.module(name)
+        mod = Nexus.Uid.module(name)
         quoted = quote do: (defmodule unquote(mod) do unquote(body) end)
 
         try do
@@ -147,7 +147,7 @@ defmodule Nexus.Unit do
 
     (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
     |> Enum.uniq()
-    |> Enum.flat_map(fn p -> WorkCore.Literate.parse(File.read!(p)) end)
+    |> Enum.flat_map(fn p -> Nexus.Literate.parse(File.read!(p)) end)
     |> Enum.filter(&(&1.type == :code and &1.kind == "test" and &1.name != nil))
     |> Enum.reduce(%{passed: 0, failed: []}, &run_test_unit/2)
   end
@@ -175,8 +175,8 @@ defmodule Nexus.Unit do
         {:error, :no_body}
 
       body ->
-        under = WorkCore.Uid.module(name)
-        mod = Module.concat([WorkCore.Uid.camel(name) <> "Tests" <> suffix()])
+        under = Nexus.Uid.module(name)
+        mod = Module.concat([Nexus.Uid.camel(name) <> "Tests" <> suffix()])
 
         quoted =
           quote do

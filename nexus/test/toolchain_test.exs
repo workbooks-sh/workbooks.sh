@@ -9,7 +9,7 @@ defmodule Nexus.ToolchainTest do
 
       got = Nexus.Toolchain.parse_units(src)
       want =
-        WorkCore.Literate.parse(src)
+        Nexus.Literate.parse(src)
         |> Enum.filter(&(&1.type == :code and &1.name not in [nil, ""]))
         |> Enum.map(fn u -> %{name: u.name, kind: u.kind, lang: u.lang} end)
 
@@ -32,7 +32,7 @@ defmodule Nexus.ToolchainParseTest do
       # Structural conformance: the code units (name/kind/lang) match. Finer ref-token parity
       # (:atoms/@types/#tags) is a documented follow-up — see docs/WORK-CORE-DECISION.md.
       got = Nexus.Toolchain.parse(src) |> Enum.filter(&(&1["type"] == "code")) |> Enum.map(&{&1["name"], &1["kind"], &1["lang"]})
-      want = WorkCore.Literate.parse(src) |> Enum.filter(&(&1.type == :code)) |> Enum.map(&{&1.name, &1.kind, &1.lang})
+      want = Nexus.Literate.parse(src) |> Enum.filter(&(&1.type == :code)) |> Enum.map(&{&1.name, &1.kind, &1.lang})
 
       assert got == want
     else

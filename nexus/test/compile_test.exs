@@ -12,7 +12,7 @@ defmodule Nexus.CompileTest do
         pub extern "C" fn blend(a: f64, b: f64) -> f64 { a }
       end
       """
-      |> WorkCore.Literate.parse()
+      |> Nexus.Literate.parse()
       |> Enum.find(&(&1.type == :code))
 
     %{world: world, name: name, exports: exports} = Nexus.Compile.rust_world(node)
@@ -31,7 +31,7 @@ defmodule Nexus.CompileTest do
         pub extern "C" fn run() -> i32 { unsafe { add(1, 2) } }
       end
       """
-      |> WorkCore.Literate.parse()
+      |> Nexus.Literate.parse()
       |> Enum.find(&(&1.type == :code))
 
     %{world: world, imports: imports, exports: exports} = Nexus.Compile.rust_world(node)
@@ -42,28 +42,28 @@ defmodule Nexus.CompileTest do
   end
 
   # The single WIT generator: every lane (rust/zig/c) routes its world through
-  # WorkCore.Wit.world_from_sigs, and each generated world is valid WIT. Fast (no toolchain) —
+  # Nexus.Wit.world_from_sigs, and each generated world is valid WIT. Fast (no toolchain) —
   # guards the de-dup that folded the per-lane hand-rolled builders into one home.
-  test "every lane's generated WIT world routes through WorkCore.Wit and validates" do
+  test "every lane's generated WIT world routes through Nexus.Wit and validates" do
     rust =
       ~s|rust :calc do\n  extern "C" { fn add(a: i32, b: i32) -> i32; }\n  #[no_mangle]\n  pub extern "C" fn compute() -> i32 { unsafe { add(20, 22) } }\nend\n|
-      |> WorkCore.Literate.parse()
+      |> Nexus.Literate.parse()
       |> Enum.find(&(&1.type == :code))
 
     %{world: rworld} = Nexus.Compile.rust_world(rust)
     assert rworld == "package work:calc;\n\nworld calc {\n  import add: func(a: s32, b: s32) -> s32;\n  export compute: func() -> s32;\n}\n"
 
-    zworld = WorkCore.Wit.world_from_sigs("math", [], [{"quad", "func(x: s32) -> s32"}])
+    zworld = Nexus.Wit.world_from_sigs("math", [], [{"quad", "func(x: s32) -> s32"}])
     assert zworld == "package work:math;\n\nworld math {\n  export quad: func(x: s32) -> s32;\n}\n"
 
-    kw = WorkCore.Wit.world_from_sigs("record", [], [{WorkCore.Uid.wit("export"), "func() -> s32"}])
+    kw = Nexus.Wit.world_from_sigs("record", [], [{Nexus.Uid.wit("export"), "func() -> s32"}])
     assert kw =~ "world %record {"
     assert kw =~ "export %export:"
 
     if System.find_executable("wasm-tools") do
-      assert WorkCore.Wit.validate(rworld) == :ok
-      assert WorkCore.Wit.validate(zworld) == :ok
-      assert WorkCore.Wit.validate(kw) == :ok
+      assert Nexus.Wit.validate(rworld) == :ok
+      assert Nexus.Wit.validate(zworld) == :ok
+      assert Nexus.Wit.validate(kw) == :ok
     end
   end
 
@@ -88,7 +88,7 @@ defmodule Nexus.CompileTest do
     if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
       node =
         "c :math do\n  int triple(int x) { return x * 3; }\nend\n"
-        |> WorkCore.Literate.parse()
+        |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
       assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
@@ -105,7 +105,7 @@ defmodule Nexus.CompileTest do
     if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
       node =
         ~s|c :greeter do\n  extern void emit(const char* p, int n);\n  void greet(void) { emit("hi there", 8); }\nend\n|
-        |> WorkCore.Literate.parse()
+        |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
       assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
@@ -124,7 +124,7 @@ defmodule Nexus.CompileTest do
     if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
       node =
         ~s|c :kv2, grant: [store, load, emit] do\n  void run(void) { store("c", 1, "porto", 5); nx_str v = load_s("c", 1); emit(v.ptr, v.len); }\nend\n|
-        |> WorkCore.Literate.parse()
+        |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
       assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
@@ -144,7 +144,7 @@ defmodule Nexus.CompileTest do
     if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
       node =
         ~s|c :kv do\n  extern void store(const char* kp, int kl, const char* vp, int vl);\n  extern void load(const char* kp, int kl, void* ret);\n  extern void emit(const char* p, int n);\n  void run(void) { store("k", 1, "saved", 5); unsigned int r[2]; load("k", 1, r); emit((const char*)(unsigned long)r[0], (int)r[1]); }\nend\n|
-        |> WorkCore.Literate.parse()
+        |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
       assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
@@ -164,7 +164,7 @@ defmodule Nexus.CompileTest do
     if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
       node =
         ~s|rust :greeter do\n  extern "C" { fn emit(p: *const u8, n: usize); }\n  #[no_mangle]\n  pub extern "C" fn greet() { let s = "hi rust"; unsafe { emit(s.as_ptr(), s.len()); } }\nend\n|
-        |> WorkCore.Literate.parse()
+        |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
       assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
@@ -183,7 +183,7 @@ defmodule Nexus.CompileTest do
     if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
       node =
         "zig :math do\n  export fn quad(x: i32) i32 { return x * 4; }\nend\n"
-        |> WorkCore.Literate.parse()
+        |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
       assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
@@ -200,7 +200,7 @@ defmodule Nexus.CompileTest do
     if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
       node =
         ~s|rust :doubler do\n  #[no_mangle]\n  pub extern "C" fn dbl(x: i32) -> i32 { x * 2 }\nend\n|
-        |> WorkCore.Literate.parse()
+        |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
       assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
@@ -217,7 +217,7 @@ defmodule Nexus.CompileTest do
     if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
       node =
         ~s|rust :calc do\n  extern "C" { fn add(a: i32, b: i32) -> i32; }\n  #[no_mangle]\n  pub extern "C" fn compute() -> i32 { unsafe { add(20, 22) } }\nend\n|
-        |> WorkCore.Literate.parse()
+        |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
       assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
@@ -234,7 +234,7 @@ defmodule Nexus.CompileTest do
     if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
       node =
         ~s|rust :clock do\n  extern "C" { fn now() -> i64; }\n  #[no_mangle]\n  pub extern "C" fn stamp() -> i64 { unsafe { now() } }\nend\n|
-        |> WorkCore.Literate.parse()
+        |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
       assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)

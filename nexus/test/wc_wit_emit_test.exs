@@ -1,6 +1,6 @@
-defmodule WorkCore.WitEmitTest do
+defmodule Nexus.WitEmitTest do
   use ExUnit.Case, async: true
-  alias WorkCore.Wit
+  alias Nexus.Wit
 
   setup do
     dir = Path.join(System.tmp_dir!(), "wbemit_#{System.unique_integer([:positive])}")

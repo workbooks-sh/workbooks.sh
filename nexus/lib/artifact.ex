@@ -1,4 +1,4 @@
-defmodule WorkCore.Artifact do
+defmodule Nexus.Artifact do
   @moduledoc """
   §3 — the artifact facet: what a compiled `.wasm` component *actually* imports and
   exports, read back from the binary, versus what the source *declared* (§2). The

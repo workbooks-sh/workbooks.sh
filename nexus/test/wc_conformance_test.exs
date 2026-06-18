@@ -1,4 +1,4 @@
-defmodule WorkCore.ConformanceTest do
+defmodule Nexus.ConformanceTest do
   use ExUnit.Case, async: true
 
   # The zero-drift gate: the Elixir parser must produce the SAME units as the shared golden
@@ -9,7 +9,7 @@ defmodule WorkCore.ConformanceTest do
   test "Elixir parser conforms to the shared .work golden (matches the Zig CLI)" do
     got =
       (Path.wildcard(Path.join(@corpus, "*.work")) |> Enum.sort())
-      |> Enum.flat_map(fn p -> WorkCore.Literate.parse(File.read!(p)) end)
+      |> Enum.flat_map(fn p -> Nexus.Literate.parse(File.read!(p)) end)
       |> Enum.filter(&(&1.type == :code and &1.name not in [nil, ""]))
       |> Enum.map(fn u -> "#{u.name}|#{u.kind}|#{u.lang}" end)
       |> Enum.sort()

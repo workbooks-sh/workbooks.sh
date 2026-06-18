@@ -1,4 +1,4 @@
-defmodule WorkCore.Graph.Render do
+defmodule Nexus.Graph.Render do
   @moduledoc """
   Dogfood: the unified graph (§9) rendered as a workbook — a plain HTML page built
   from `work-*` elements, the same primitives any workbook uses. The graph that
@@ -6,7 +6,7 @@ defmodule WorkCore.Graph.Render do
   elements ARE the data (NO JSON), units and edges are DOM nesting and attributes.
   """
 
-  alias WorkCore.Graph
+  alias Nexus.Graph
 
   @doc "Render a graph as a self-contained workbook HTML string."
   def to_html(%Graph{} = g, opts \\ []) do

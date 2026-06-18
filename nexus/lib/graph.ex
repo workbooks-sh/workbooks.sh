@@ -1,4 +1,4 @@
-defmodule WorkCore.Graph do
+defmodule Nexus.Graph do
   @moduledoc """
   §9 — the code graph, assembled over the literate parse (§0). Nodes per unit;
   typed edges merged from the literate refs (§0.1) and the Elixir AST calls (§0.2).
@@ -6,7 +6,7 @@ defmodule WorkCore.Graph do
   feed (§2) extend the edge set later without changing this shape.
   """
 
-  alias WorkCore.{Literate, Extract, Uid, Capabilities, Wit}
+  alias Nexus.{Literate, Extract, Uid, Capabilities, Wit}
 
   defstruct nodes: %{}, edges: [], titles: %{}, backlinks: %{}, types: %{}
 
@@ -94,7 +94,7 @@ defmodule WorkCore.Graph do
       for {path, ns} <- parsed,
           n <- ns,
           n.type == :decl,
-          {:enum, name, atoms} <- WorkCore.Extract.Elixir.decl_types(n),
+          {:enum, name, atoms} <- Nexus.Extract.Elixir.decl_types(n),
           into: %{},
           do: {Uid.wit(name), %{kind: :enum, name: name, spec: atoms, file: path}}
 
@@ -103,7 +103,7 @@ defmodule WorkCore.Graph do
 
   @doc """
   The workbook-wide shared WIT types — `{interface, type_names}` — built from the
-  unified type registry. Feed it to `WorkCore.Wit.world/2` to emit a per-unit world
+  unified type registry. Feed it to `Nexus.Wit.world/2` to emit a per-unit world
   whose cross-file record params resolve to their real type ref.
   """
   def shared_types(%__MODULE__{types: types}) do
@@ -200,15 +200,15 @@ defmodule WorkCore.Graph do
   the overlay's observed facet. The build stays pure — this is the query-time lens
   that brings live DB schema + agent telemetry under the same identity (§1).
   """
-  def with_overlay(%__MODULE__{nodes: nodes} = g, %WorkCore.Overlay{} = ov) do
+  def with_overlay(%__MODULE__{nodes: nodes} = g, %Nexus.Overlay{} = ov) do
     merged =
       Map.new(nodes, fn {name, node} ->
-        data = case WorkCore.Overlay.data(ov, name) do
+        data = case Nexus.Overlay.data(ov, name) do
           nil -> node.facets.data
           d -> Map.merge(node.facets.data, d)
         end
 
-        facets = %{node.facets | data: data, observed: WorkCore.Overlay.observed(ov, name)}
+        facets = %{node.facets | data: data, observed: Nexus.Overlay.observed(ov, name)}
         {name, %{node | facets: facets}}
       end)
 
@@ -306,5 +306,5 @@ defmodule WorkCore.Graph do
     end
   end
 
-  # normalize/1 moved to WorkCore.Uid — the canonical identity home.
+  # normalize/1 moved to Nexus.Uid — the canonical identity home.
 end

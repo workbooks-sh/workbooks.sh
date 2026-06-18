@@ -1,6 +1,6 @@
-defmodule WorkCore.OverlayTest do
+defmodule Nexus.OverlayTest do
   use ExUnit.Case, async: true
-  alias WorkCore.{Graph, Overlay}
+  alias Nexus.{Graph, Overlay}
 
   @tmp Path.join(System.tmp_dir!(), "wc_overlay_test")
 

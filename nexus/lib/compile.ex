@@ -51,7 +51,7 @@ defmodule Nexus.Compile do
           end)
 
         elines = Enum.map(exports, fn {f, ps, r} -> {wit_ident(f), "func(#{ps})#{r}"} end)
-        world = WorkCore.Wit.world_from_sigs(name, ilines, elines)
+        world = Nexus.Wit.world_from_sigs(name, ilines, elines)
         import_names = Enum.map(imports, &elem(&1, 0))
         to_component(body, Enum.map(exports, &elem(&1, 0)), world, name, import_names, crate_deps(body))
     end
@@ -88,7 +88,7 @@ defmodule Nexus.Compile do
         wname = wit_ident(name)
         ilines = Enum.map(caps, fn n -> {wit_ident(n), Nexus.Dock.host_fn_wit(n)} end)
         elines = Enum.map(exports, fn {f, ps, r} -> {wit_ident(f), "func(#{ps})#{r}"} end)
-        world = WorkCore.Wit.world_from_sigs(name, ilines, elines)
+        world = Nexus.Wit.world_from_sigs(name, ilines, elines)
 
         # A string-RETURNING cap needs a `cabi_realloc` export (the host allocates the returned
         # string in guest memory). Inject a no-libc bump allocator + export it.
@@ -106,7 +106,7 @@ defmodule Nexus.Compile do
 
         with {:ok, core} <- Nexus.Compilers.C.compile_to_wasm(src, exports: fn_exports, allow_undefined: caps != []) do
           core = if caps != [], do: rewrite_imports(core, Path.dirname(core), caps), else: core
-          WorkCore.Wit.componentize(core, world, wname)
+          Nexus.Wit.componentize(core, world, wname)
         end
     end
   end
@@ -174,12 +174,12 @@ defmodule Nexus.Compile do
       exports ->
         wname = wit_ident(name)
         elines = Enum.map(exports, fn {f, ps, r} -> {wit_ident(f), "func(#{ps})#{r}"} end)
-        world = WorkCore.Wit.world_from_sigs(name, [], elines)
+        world = Nexus.Wit.world_from_sigs(name, [], elines)
         src = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}.zig")
         File.write!(src, body)
 
         with {:ok, core} <- Nexus.Compilers.Zig.compile_to_wasm(src, exports: Enum.map(exports, &elem(&1, 0))) do
-          WorkCore.Wit.componentize(core, world, wname)
+          Nexus.Wit.componentize(core, world, wname)
         end
     end
   end
@@ -257,7 +257,7 @@ defmodule Nexus.Compile do
     units =
       (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
       |> Enum.uniq()
-      |> Enum.flat_map(fn f -> f |> File.read!() |> WorkCore.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
+      |> Enum.flat_map(fn f -> f |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
 
     by_kind = Enum.group_by(units, & &1.kind)
 
@@ -387,7 +387,7 @@ defmodule Nexus.Compile do
 
     ilines = Enum.map(imports, fn {f, ps, r} -> {wit_ident(f), "func(#{ps})#{r}"} end)
     elines = Enum.map(exports, fn {f, ps, r} -> {wit_ident(f), "func(#{ps})#{r}"} end)
-    world = WorkCore.Wit.world_from_sigs(name, ilines, elines)
+    world = Nexus.Wit.world_from_sigs(name, ilines, elines)
     %{world: world, name: wname, exports: exports, imports: imports}
   end
 
@@ -413,5 +413,5 @@ defmodule Nexus.Compile do
   defp wit_ret(r) when r in [nil, ""], do: ""
   defp wit_ret(t), do: " -> #{wit_type(t)}"
   defp wit_type(t), do: Map.get(@rust_wit, t, "s32")
-  defp wit_ident(s), do: WorkCore.Uid.wit(s)
+  defp wit_ident(s), do: Nexus.Uid.wit(s)
 end

@@ -10,7 +10,7 @@ defmodule Nexus.Resource do
   framework. WIT is derived here too.
   """
 
-  alias WorkCore.Wit.Types
+  alias Nexus.Wit.Types
 
   # author's domain type → WIT scalar (the whole mapping, in one place, no guessing)
   @scalars %{text: "string", int: "s32", float: "f64", bool: "bool", money: "money", id: "string"}
@@ -71,7 +71,7 @@ defmodule Nexus.Resource do
   pluggable seam (`Nexus.Store`) — the struct doesn't know or care which backend holds it.
   """
   def compile(%{name: name} = node) do
-    mod = WorkCore.Uid.module(name)
+    mod = Nexus.Uid.module(name)
     defaults = struct_fields(node)
     specs = fields(node)
 

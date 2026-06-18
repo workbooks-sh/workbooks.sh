@@ -1,6 +1,6 @@
 defmodule Nexus.TelemetryTest do
   use ExUnit.Case
-  alias WorkCore.Graph
+  alias Nexus.Graph
 
   setup do
     Nexus.Telemetry.reset()

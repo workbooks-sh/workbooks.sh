@@ -2,12 +2,12 @@ defmodule Nexus.Dock do
   @moduledoc """
   The runtime capability **membrane** — the live host implementations a sandboxed component runs
   against (SSRF-brokered `fetch`, `llm_complete`, the kv store, the wasmex import map). The capability
-  *catalog* (what exists, the WIT each projects, the grant vocabulary) lives in `WorkCore.Capabilities`
-  so the `.work` toolchain (`WorkCore.Wit`) and this seam read one source of truth; the catalog queries
+  *catalog* (what exists, the WIT each projects, the grant vocabulary) lives in `Nexus.Capabilities`
+  so the `.work` toolchain (`Nexus.Wit`) and this seam read one source of truth; the catalog queries
   below delegate there.
   """
 
-  alias WorkCore.Capabilities
+  alias Nexus.Capabilities
 
   @doc """
   Host functions a unit can call by name → `{wit_signature, impl}`. The signature is the WIT the
@@ -119,7 +119,7 @@ defmodule Nexus.Dock do
   """
   def impls, do: Map.new(host_fns(), fn {n, {_sig, f}} -> {n, {:fn, f}} end)
 
-  # ── capability catalog — the source of truth is WorkCore.Capabilities; delegate so existing
+  # ── capability catalog — the source of truth is Nexus.Capabilities; delegate so existing
   #    Nexus.Dock.<catalog> callers (and the runtime seam) keep one vocabulary. ───────────────────
   defdelegate capabilities(), to: Capabilities
   defdelegate sandbox_capabilities(), to: Capabilities

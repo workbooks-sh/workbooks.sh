@@ -1,6 +1,6 @@
-defmodule WorkCore.ArtifactTest do
+defmodule Nexus.ArtifactTest do
   use ExUnit.Case, async: true
-  alias WorkCore.{Artifact, Wit}
+  alias Nexus.{Artifact, Wit}
 
   @tmp Path.join(System.tmp_dir!(), "wc_artifact_test")
 

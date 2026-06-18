@@ -1,7 +1,7 @@
 defmodule Nexus.AuditTest do
   use ExUnit.Case, async: true
 
-  defp code(src), do: src |> WorkCore.Literate.parse() |> Enum.find(&(&1.type == :code))
+  defp code(src), do: src |> Nexus.Literate.parse() |> Enum.find(&(&1.type == :code))
 
   test "a unit using a host cap it did not grant is flagged" do
     u = code("c :a do\n  extern void emit(const char* p, int n);\n  void g(void){ emit(\"x\", 1); }\nend\n")

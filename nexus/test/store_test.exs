@@ -4,7 +4,7 @@ defmodule Nexus.StoreTest do
   setup_all do
     mod =
       "resource Lead do\n  name :text\n  revenue :int\n  status :new | :won\nend\n"
-      |> WorkCore.Literate.parse()
+      |> Nexus.Literate.parse()
       |> Enum.find(&(&1.type == :code))
       |> Nexus.Resource.compile()
 

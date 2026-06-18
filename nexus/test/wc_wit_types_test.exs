@@ -1,8 +1,8 @@
-defmodule WorkCore.Wit.TypesTest do
+defmodule Nexus.Wit.TypesTest do
   use ExUnit.Case, async: true
-  alias WorkCore.Wit
-  alias WorkCore.Literate
-  alias WorkCore.Wit.Types
+  alias Nexus.Wit
+  alias Nexus.Literate
+  alias Nexus.Wit.Types
 
   test "wit/1 escapes reserved words and drops Elixir predicate/bang suffixes" do
     assert Types.wit(:from) == "%from"

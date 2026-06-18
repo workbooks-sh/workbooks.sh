@@ -1,6 +1,6 @@
-defmodule WorkCore.Extract.ForeignTest do
+defmodule Nexus.Extract.ForeignTest do
   use ExUnit.Case, async: true
-  alias WorkCore.{Literate, Extract}
+  alias Nexus.{Literate, Extract}
 
   defp facts(src) do
     [code] = Literate.parse(src) |> Enum.filter(&(&1.type == :code))
@@ -61,9 +61,9 @@ defmodule WorkCore.Extract.ForeignTest do
     end
     """)
 
-    g = WorkCore.Graph.build_dir(dir)
+    g = Nexus.Graph.build_dir(dir)
     assert Enum.any?(g.edges, &(&1.from == "panel" and &1.to == "chart" and &1.type == :import and &1.scope == :unit))
-    assert "panel" in WorkCore.Graph.why(g, "chart")
+    assert "panel" in Nexus.Graph.why(g, "chart")
     File.rm_rf!(dir)
   end
 end
