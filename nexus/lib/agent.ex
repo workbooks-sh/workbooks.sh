@@ -59,6 +59,19 @@ defmodule Nexus.Agent do
     end
   end
 
+  @doc """
+  Build a runnable agent def from a parsed `agent` unit node — an agent authored as a literate
+  function in a `.work` file (`agent :name do <system prompt> end`). Returns `%{name, system}`.
+  """
+  def def_from_unit(%{kind: "agent", name: name, body: body}),
+    do: %{name: name, system: String.trim(body || "")}
+
+  @doc "Run an `agent` unit node on `task`. The unit body is the agent's system prompt."
+  def run_unit(node, task, opts \\ []) do
+    d = def_from_unit(node)
+    run(Keyword.merge([system: d.system, task: task], opts))
+  end
+
   defp loop(messages, vfs, opts, deadline, turns) do
     if now_ms() > deadline do
       {:error, {:timeout, turns}}
