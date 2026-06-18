@@ -100,7 +100,11 @@ defmodule Nexus.Dock do
     end
   end
 
-  defp net_allowed?(url) do
+  @doc """
+  The SSRF gate, exposed so any host-side fetch escalation (e.g. the curl-impersonate fallback in
+  `Nexus.Compilers.Shared.http_get/1`) re-guards itself before egress — never an unguarded path.
+  """
+  def net_allowed?(url) do
     uri = URI.parse(url)
     host = uri.host || ""
 

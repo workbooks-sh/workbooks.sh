@@ -44,10 +44,84 @@ defmodule Nexus.Compilers.Shared do
     http_opts = [ssl: ssl_opts, timeout: 30_000, connect_timeout: 15_000, autoredirect: true]
 
     case :httpc.request(:get, req, http_opts, body_format: :binary) do
-      {:ok, {{_v, 200, _}, headers, body}} -> {:ok, decode_body(headers, body)}
-      {:ok, {{_v, code, _}, _headers, _body}} -> {:error, {:http_status, code}}
-      {:error, reason} -> {:error, reason}
+      {:ok, {{_v, 200, _}, headers, body}} ->
+        decoded = decode_body(headers, body)
+        # Fast path unchanged, UNLESS the 200 is a CF-challenge/anti-bot interstitial (tiny/challenge
+        # body) — then escalate to the impersonate fallback just like a 403.
+        if should_escalate?(200, decoded), do: maybe_impersonate(url, {:ok, decoded}), else: {:ok, decoded}
+
+      {:ok, {{_v, code, _}, headers, body}} ->
+        # 403 / challenge: Erlang :ssl can't forge a Chrome TLS (JA3/JA4) fingerprint, so the
+        # aggressive anti-bot tier blocks us. Escalate to host-brokered curl-impersonate (real
+        # BoringSSL Chrome fingerprint) if it's discoverable; otherwise degrade to the original error.
+        orig = {:error, {:http_status, code}}
+        if should_escalate?(code, decode_body(headers, body)), do: maybe_impersonate(url, orig), else: orig
+
+      {:error, reason} ->
+        {:error, reason}
     end
+  end
+
+  # The escalation DECISION (pure, unit-tested): retry via curl-impersonate when :httpc got a 403 /
+  # challenge status, or a 200 whose body is suspiciously tiny / a known challenge interstitial. A
+  # real, populated 200 returns false (fast path stays fast).
+  @challenge_statuses [401, 403, 406, 429, 503]
+  @tiny_body_bytes 512
+  @doc false
+  def should_escalate?(status, body) when is_binary(body) do
+    cond do
+      status in @challenge_statuses -> true
+      status == 200 and challenge_body?(body) -> true
+      true -> false
+    end
+  end
+
+  def should_escalate?(status, _body), do: status in @challenge_statuses
+
+  defp challenge_body?(body) do
+    byte_size(body) < @tiny_body_bytes or
+      (body
+       |> binary_part(0, min(byte_size(body), 4096))
+       |> String.downcase()) =~
+        ~r/(just a moment|attention required|cf-challenge|_cf_chl_opt|challenge-platform|please enable (javascript|cookies)|px-captcha|perimeterx|access denied)/
+  end
+
+  # Host-brokered curl-impersonate fallback. SSRF-guarded (reuse the Dock gate — never an unguarded
+  # egress). Degrades to `orig` if the gate rejects, the binary is absent, or the retry isn't a real 200.
+  defp maybe_impersonate(url, orig) do
+    cond do
+      not Nexus.Dock.net_allowed?(url) -> orig
+      bin = curl_impersonate_bin() -> impersonate_get(bin, url, orig)
+      true -> orig
+    end
+  end
+
+  # Discover a curl-impersonate binary: a configured `:nexus, :curl_impersonate` path, else a
+  # `curl_chrome*` / `curl-impersonate*` wrapper on PATH. nil if none — caller degrades gracefully.
+  @doc false
+  def curl_impersonate_bin do
+    configured = Application.get_env(:nexus, :curl_impersonate)
+
+    cond do
+      is_binary(configured) and File.exists?(configured) -> configured
+      true -> Enum.find_value(~w(curl_chrome131 curl_chrome120 curl_chrome116 curl_chrome110 curl-impersonate-chrome curl-impersonate), &System.find_executable/1)
+    end
+  end
+
+  defp impersonate_get(bin, url, orig) do
+    # `curl_chrome*` wrappers preset the Chrome JA3/JA4 + h2 fingerprint; we add follow-redirects,
+    # gzip decode, a timeout, and fail-on-non-2xx so a challenge page doesn't masquerade as success.
+    args = ["-sSL", "--compressed", "--max-time", "30", "--fail", url]
+
+    case System.cmd(bin, args, stderr_to_stdout: false) do
+      {body, 0} when byte_size(body) > 0 ->
+        if should_escalate?(200, body), do: orig, else: {:ok, body}
+
+      _ ->
+        orig
+    end
+  rescue
+    _ -> orig
   end
 
   # A realistic Chrome header set. The single highest-leverage anti-block fix: an empty header list

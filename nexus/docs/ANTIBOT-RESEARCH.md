@@ -188,3 +188,45 @@ say so rather than pretend.
 - https://brightdata.com/blog/web-data/web-scraping-with-curl-cffi
 - https://developers.cloudflare.com/bots/additional-configurations/ja3-ja4-fingerprint/
 - Live probes (this machine, 2026-06-18): Wikipedia UA test, CF/HN/Amazon/G2/nowsecure.nl reachability, HTTP/1.1-vs-CF.
+
+---
+
+## (e) Provisioning the curl-impersonate fallback (implemented)
+
+`Nexus.Compilers.Shared.http_get/1` now host-brokers a **curl-impersonate** fallback
+(`maybe_impersonate/2`):
+
+- A `:httpc` **200 with a real body** returns unchanged (fast path).
+- A **403 / 401 / 406 / 429 / 503**, or a **200 whose body is a CF/PerimeterX challenge
+  interstitial or suspiciously tiny** (`should_escalate?/2`), retries the GET through a
+  curl-impersonate binary (real BoringSSL Chrome JA3/JA4 + h2 fingerprint), following
+  redirects and decoding gzip (`-sSL --compressed --fail`). Its body is returned only if
+  it's a real 200; otherwise we **degrade to the original `:httpc` result/error**.
+- **SSRF-safe:** `maybe_impersonate/2` re-runs `Nexus.Dock.net_allowed?/1` (the same
+  loopback/private/link-local + allowlist gate that guards `Nexus.Dock.fetch`) **before**
+  any curl call — no unguarded egress is ever introduced.
+- This is **host-side fetch brokering** (same tier as `:httpc`), **NOT** an agent running
+  OS bash — it lives in the runtime fetch capability and is never exposed as a bash command.
+
+### Install (so the fallback activates)
+
+The binary is **optional** — absent, fetches degrade gracefully to the `:httpc` result.
+To enable the JA3/h2 tier, put a `curl_chrome*` wrapper on `PATH`, or set an explicit path:
+
+```elixir
+# config/runtime.exs
+config :nexus, :curl_impersonate, "/opt/curl-impersonate/curl_chrome131"
+```
+
+Discovery order: the configured `:nexus, :curl_impersonate` path, else the first of
+`curl_chrome131 / curl_chrome120 / curl_chrome116 / curl_chrome110 / curl-impersonate-chrome
+/ curl-impersonate` found on `PATH`.
+
+Get a binary one of:
+
+- **Prebuilt release:** download from `lexiforest/curl-impersonate` (maintained fork)
+  GitHub Releases, extract, and add the `curl_chrome*` wrapper dir to `PATH`.
+- **curl_cffi (Python):** `pip install curl_cffi` ships the impersonate libcurl; useful for
+  probing, though the standalone `curl_chrome*` wrapper is what this fetch path shells to.
+- **Container image:** base your runtime image off (or `COPY --from`) an image that bundles
+  `curl-impersonate-chrome` so the wrapper is on `PATH` at runtime.
