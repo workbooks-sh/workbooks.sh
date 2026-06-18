@@ -45,6 +45,21 @@ defmodule Workbooks.ResourceTest do
     assert wit =~ "scored,"
   end
 
+  test "compiles to a real struct with type-appropriate defaults (the client-safe shape)" do
+    mod = @lead |> unit() |> Resource.compile()
+
+    v = struct(mod, [])
+    # plain struct, AtomVM-safe — only __struct__ functions, no runtime deps
+    assert mod.__info__(:functions) == [__struct__: 0, __struct__: 1]
+    assert is_map(v) and Map.has_key?(v, :__struct__)
+
+    # defaults follow the DECLARED type: text→"", int→0, enum→first case, list→[]
+    assert v.name == ""
+    assert v.score == 0
+    assert v.status == :new
+    assert v.tags == []
+  end
+
   test "a pure value record works the same" do
     wit = unit("record Money do\n  cents :int\n  currency :usd | :eur | :gbp\nend\n") |> Resource.wit()
     assert wit =~ "record money {"

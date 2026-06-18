@@ -40,6 +40,42 @@ defmodule Workbooks.Resource do
     Enum.join([record | Enum.map(enums, fn {f, cases} -> Types.enum(f, cases) end)], "\n\n")
   end
 
+  @doc "The struct fields + type-appropriate defaults the resource compiles to."
+  def struct_fields(node) do
+    for {name, type} <- fields(node), do: {name, default_for(type)}
+  end
+
+  @doc """
+  Compile the resource/record to a real BEAM struct module (the client-safe shape — a plain
+  `defstruct`, no runtime deps, AtomVM-safe). Returns the module. WIT + Ash derive from the
+  same declaration; this is what `%Lead{}` literals use.
+  """
+  def compile(%{name: name} = node) do
+    mod = Module.concat([Macro.camelize(name)])
+    defaults = struct_fields(node)
+
+    quoted =
+      quote do
+        defmodule unquote(mod) do
+          defstruct unquote(Macro.escape(defaults))
+        end
+      end
+
+    [{module, _bin}] = Code.compile_quoted(quoted)
+    module
+  end
+
+  defp default_for({:scalar, :text}), do: ""
+  defp default_for({:scalar, :id}), do: ""
+  defp default_for({:scalar, :int}), do: 0
+  defp default_for({:scalar, :float}), do: 0.0
+  defp default_for({:scalar, :bool}), do: false
+  defp default_for({:scalar, :money}), do: nil
+  defp default_for({:enum, [first | _]}), do: first
+  defp default_for({:enum, []}), do: nil
+  defp default_for({:list, _}), do: []
+  defp default_for({:ref, _}), do: nil
+
   # ── field extraction ──
 
   defp statements({:__block__, _meta, stmts}), do: stmts
