@@ -33,8 +33,9 @@ defmodule Nexus do
       sandbox: :live,
       # compile: a .work rust unit → typed component, automatic + tested
       compile: :live,
-      # weave: workbook folder → one .html (first pass; rich render pending)
-      weave: :basic,
+      # weave: workbook folder → one styled .html — inline markdown (bold/italic/code/links),
+      # lists, labeled unit blocks, a clean shell
+      weave: :live,
       # dock host-IMPORTS (a component CALLING a host capability) — TURNKEY for scalar caps: a
       # unit's `extern "C"` decl → WIT import (auto) → env→$root rewrite → componentize → the
       # Dock supplies the impl, Sandbox wires it. Proven: a unit imports `now`, calls it, gets
