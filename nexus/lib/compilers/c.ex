@@ -20,8 +20,10 @@ defmodule Nexus.Compilers.C do
     end
 
     exports = opts |> Keyword.get(:exports, []) |> Enum.map(&"--export=#{&1}")
+    # host imports (extern decls) stay unresolved → wasm imports the Dock satisfies
+    au = if Keyword.get(opts, :allow_undefined, false), do: ["--allow-undefined"], else: []
     cl.(["clang", "--target=wasm32-wasip1", "--sysroot=/usr", "-O1", "-w", "-c", "/work/u.c", "-o", "/work/u.o"])
-    cl.(["wasm-ld", "-m", "wasm32", "--no-entry"] ++ exports ++ ["/work/u.o", "-o", "/work/u.wasm"])
+    cl.(["wasm-ld", "-m", "wasm32", "--no-entry"] ++ au ++ exports ++ ["/work/u.o", "-o", "/work/u.wasm"])
 
     core = Path.join(work, "u.wasm")
     if File.regular?(core) do

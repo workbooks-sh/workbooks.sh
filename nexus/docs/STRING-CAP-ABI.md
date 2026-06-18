@@ -1,7 +1,25 @@
-# String-typed host capabilities — the canonical-ABI nut
+# String-typed host capabilities — CRACKED (via the reactor shape)
+
+**Resolved.** String host caps work — proven: a C reactor importing `emit(ptr, len)` against a
+WIT `import emit: func(msg: string)` lifts the string correctly; the host received `"hello from
+C"`. The blocker was never the string ABI — it was the **rust command shape** (libstd + WASI +
+the command adapter) polluting the import space. In a clean **reactor** (no command machinery,
+no WASI), `(ptr, len)` → WIT `string` lifts cleanly with a plain `component new` (no adapter).
+
+So string caps are now a **wiring task with a proven mechanism**, not a research nut:
+- **C units** (the C lane already emits reactors) — works today; the C compiler now takes
+  `allow_undefined` so externs become imports the Dock satisfies.
+- **The remaining wiring:** map a unit's **grant** (e.g. `grant: [llm]`) → the Dock's *known*
+  WIT signature for that cap (`llm-complete: func(prompt: string) -> string`) rather than deriving
+  it from the lowered C extern, align the import symbol, rewrite `env→$root` for it, and add the
+  string impls to `Dock.impls`. Mechanism proven; this is plumbing.
+- **rust string caps** need rust to emit a **reactor** (not the command shape) — the harder path,
+  deferred behind the C path which already works.
+
+---
+## Original investigation (kept for context)
 
 Scalar host caps are turnkey (a unit imports `now()`, the Dock supplies it — see `layers()`).
-The real caps (`net`/`kv`/`llm`) are **string-typed**, and that's a genuine research nut.
 
 ## What works
 - A unit declaring `extern "C" { fn log(ptr: *const u8, len: usize); }` compiles, and the

@@ -39,12 +39,12 @@ defmodule Nexus do
       # weave: workbook folder → one styled .html — inline markdown (bold/italic/code/links),
       # lists, labeled unit blocks, a clean shell
       weave: :live,
-      # dock host-IMPORTS (a component CALLING a host capability) — TURNKEY for scalar caps: a
-      # unit's `extern "C"` decl → WIT import (auto) → env→$root rewrite → componentize → the
-      # Dock supplies the impl, Sandbox wires it. Proven: a unit imports `now`, calls it, gets
-      # real unix time, zero manual steps. String-typed caps (net/kv/llm) await the canonical-ABI
-      # string glue between an extern "C" decl and a WIT `string` — the next nut.
-      dock_imports: :live_scalar
+      # dock host-IMPORTS (a component CALLING a host capability). Scalar caps turnkey (a unit
+      # imports `now`, gets real unix time). STRING caps PROVEN (the real prize): a C reactor
+      # importing emit(ptr,len) against WIT `func(msg: string)` lifts the string — host got
+      # "hello from C". The blocker was the rust COMMAND shape (libstd/WASI), not the ABI; the
+      # clean reactor lifts cleanly. Remaining = wiring grant→Dock-cap-WIT (see docs/STRING-CAP-ABI.md).
+      dock_imports: :string_proven
     }
   end
 end
