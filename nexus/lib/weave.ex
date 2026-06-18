@@ -9,6 +9,10 @@ defmodule Nexus.Weave do
   that resource's rows (columns from `__fields__`, every cell XSS-escaped, graceful empty-state).
   """
 
+  # Cap rendered/baked rows so a huge resource can't blow the page to tens of MB; the full set
+  # lives behind the server/local backend via nexus.data.
+  @max_rows 500
+
   @doc "Weave a workbook folder into one self-contained HTML string."
   def weave(root) do
     pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
@@ -96,7 +100,7 @@ defmodule Nexus.Weave do
   # carry its own data, fully local. The server/SQLite backends slot in behind the same nexus.data.
   defp data_islands(res) do
     for {name, {:resource, mod}} when not is_nil(mod) <- res, into: "" do
-      rows = Nexus.Store.all(mod) |> Enum.map(&row_to_map/1)
+      rows = mod |> Nexus.Store.all() |> Enum.take(@max_rows) |> Enum.map(&row_to_map/1)
       # html_safe escapes `<`/`>`/`&` so a `</script>` in data can't break out of the island (XSS).
       ~s(<script type="application/nexus-data" data-resource="#{esc(name)}">#{Jason.encode!(rows, escape: :html_safe)}</script>\n)
     end
@@ -212,13 +216,20 @@ defmodule Nexus.Weave do
   defp render_node(_, _res), do: ""
 
   # Compile the unit (any lane), run its no-arg `render` export on wasmex, bake the result.
+  # An ungranted host cap is refused BEFORE running it (the weave is where the audit is enforced).
   defp render_unit(name, node) do
-    with {:wasm, {:ok, comp}} <- Nexus.Compile.unit(node),
-         {:ok, p} <- Nexus.Sandbox.start(comp, []),
-         {:ok, val} <- Nexus.Sandbox.call(p, "render", []) do
-      ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
-    else
-      _ -> ~s(  <div class="data-missing">#{esc(name)}.render unavailable</div>)
+    case Nexus.Audit.unit(node) do
+      [] ->
+        with {:wasm, {:ok, comp}} <- Nexus.Compile.unit(node),
+             {:ok, p} <- Nexus.Sandbox.start(comp, []),
+             {:ok, val} <- Nexus.Sandbox.call(p, "render", []) do
+          ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
+        else
+          _ -> ~s(  <div class="data-missing">#{esc(name)}.render unavailable</div>)
+        end
+
+      ungranted ->
+        ~s(  <div class="data-missing">#{esc(name)} blocked: ungranted caps #{esc(Enum.join(ungranted, ", "))}</div>)
     end
   end
 
@@ -227,8 +238,15 @@ defmodule Nexus.Weave do
 
   defp render_show(name, mod) do
     fields = Enum.map(mod.__fields__(), &elem(&1, 0))
-    rows = Nexus.Store.all(mod)
+    all = Nexus.Store.all(mod)
+    total = length(all)
+    rows = Enum.take(all, @max_rows)
     header = Enum.map_join(fields, "", &"<th>#{esc(&1)}</th>")
+
+    caption =
+      if total > @max_rows,
+        do: ~s(#{esc(name)} <span class="cap">— showing #{@max_rows} of #{total}; full set via nexus.data</span>),
+        else: esc(name)
 
     body =
       if rows == [] do
@@ -239,7 +257,7 @@ defmodule Nexus.Weave do
         end)
       end
 
-    ~s(  <table class="data" data-resource="#{esc(name)}"><caption>#{esc(name)}</caption><thead><tr>#{header}</tr></thead><tbody>#{body}</tbody></table>)
+    ~s(  <table class="data" data-resource="#{esc(name)}"><caption>#{caption}</caption><thead><tr>#{header}</tr></thead><tbody>#{body}</tbody></table>)
   end
 
   # Minimal inline markdown: **bold**, *italic*, `code`, [text](url). Escape first, then format.
@@ -275,6 +293,7 @@ defmodule Nexus.Weave do
     table.data caption{text-align:left;font-weight:600;margin-bottom:.3em}
     table.data th,table.data td{border:1px solid #e4e4e7;padding:.35em .6em;text-align:left}
     table.data thead th{background:#fafafa} table.data .empty{color:#999;font-style:italic}
+    table.data caption .cap{font-weight:400;color:#999;font-size:.85em}
     .data-missing{color:#b00;font-size:.9em}
     .unit-output{margin:1em 0;padding:.6em .9em;background:#f0f7ff;border-left:3px solid #4a90d9;border-radius:4px}
     nav.wb-nav{display:flex;gap:.8em;flex-wrap:wrap;padding:.6em 0;margin-bottom:1em;border-bottom:1px solid #e4e4e7;font-size:.9em}
