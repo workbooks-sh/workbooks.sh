@@ -1,6 +1,0 @@
-# workbooks-browser — multi-step: inspect + switch model (Tier 2)
-
-## the agent chains model get + discovery, then recommends
-
-- **TASK:** You're about to caption screenshots, so you need a model that can SEE images. Do this for real now, in order: (1) check what model you currently run on, (2) query the live catalog for image-capable models, then (3) recommend whether to switch and to exactly which model id. Don't answer from memory — actually run the commands.
-- **RUBRIC:** This is a MULTI-STEP execution task. PASS only if the tool trace shows the agent ACTUALLY RAN at least two commands (steps >= 2 — both `work model get` to read the current model AND `work models list image` to query the live catalog), it reports the concrete current model id it read, names a real multimodal/vision model id from the live catalog (modality includes image), and gives a clear switch-or-stay recommendation. Answering from memory with no tool calls, or running only one command, FAILS.

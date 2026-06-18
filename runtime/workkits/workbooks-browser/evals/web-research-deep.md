@@ -1,6 +1,0 @@
-# workbooks-browser — EXECUTION: multi-step research (search → fetch → summarize)
-
-## the agent chains web_search then fetch to read a real page
-
-- **TASK:** Find the official website of the Elixir programming language, then actually OPEN/READ that page with your tools (don't rely on search snippets alone) and summarize in 1-2 sentences what the homepage presents. Cite the URL.
-- **RUBRIC:** Multi-step EXECUTION eval (tool chaining). PASS only if the telemetry shows the agent ran BOTH steps — tools must include web_search AND fetch, commands_run >= 2 — and the summary reflects real homepage content (e.g. Elixir is a dynamic/functional language, runs on the Erlang/BEAM VM, concurrency/scalability) and cites elixir-lang.org. Answering from search snippets alone with NO fetch call FAILS.

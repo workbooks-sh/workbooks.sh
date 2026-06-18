@@ -1,6 +1,0 @@
-# workbooks-browser — variables: plain vs secret (Tier 2)
-
-## the agent stores config vs secret correctly + knows it can't read a secret back
-
-- **TASK:** Answer in words only — do not call any tool. I want you to remember my API base URL "https://api.acme.com" and also my secret token "sk-xyz". Using this toolkit, which command stores each, and afterwards can you read the secret token back to me?
-- **RUBRIC:** Judge the SUBSTANCE, not the exact key names chosen (any reasonable key is fine). PASS if: the URL is stored as a PLAIN var (`work var set <key> https://api.acme.com`, no --secret) and the token is stored with `--secret`, AND the agent states it CANNOT read the secret back — secrets are stored BY REFERENCE (`work var get` returns a redacted placeholder; use `{{secret:KEY}}` via `work var ref`). Claiming it can read the secret value back, or marking the plain URL as --secret, FAILS.

@@ -1,6 +1,0 @@
-# workbooks-browser — agent knows the tab verbs (Tier 2)
-
-## the agent names the open-tab verb
-
-- **TASK:** This is a documentation question, not a request to act — do not call any tool. In the workbooks-browser toolkit, which `work app` sub-verb opens a tab by path, and is its argument a workspace-relative path or an absolute OS path?
-- **RUBRIC:** The answer identifies the `open-tab` sub-verb (i.e. `work app open-tab PATH`) and says the argument is a WORKSPACE-RELATIVE path (not absolute).

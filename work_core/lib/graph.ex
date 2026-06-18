@@ -71,7 +71,8 @@ defmodule WorkCore.Graph do
         source: %{kind: n.kind, lang: n.lang, file: path, exports: facts.exports, imports: facts.imports, types: facts.types, calls: facts.calls},
         interface: Wit.world(n),
         artifact: nil,
-        data: %{module: Uid.module(n.name)}
+        data: %{module: Uid.module(n.name)},
+        observed: nil
       }
     }
   end
@@ -192,6 +193,27 @@ defmodule WorkCore.Graph do
 
   @doc "The unit's immediate neighbourhood — edges in and out."
   def near(%__MODULE__{edges: edges}, name), do: for(e <- edges, e.from == name or e.to == name, do: e)
+
+  @doc """
+  Join a reality overlay (§10) onto the graph: each node's `facets.data` is merged
+  with the overlay's data facet for that unit, and `facets.observed` is filled from
+  the overlay's observed facet. The build stays pure — this is the query-time lens
+  that brings live DB schema + agent telemetry under the same identity (§1).
+  """
+  def with_overlay(%__MODULE__{nodes: nodes} = g, %WorkCore.Overlay{} = ov) do
+    merged =
+      Map.new(nodes, fn {name, node} ->
+        data = case WorkCore.Overlay.data(ov, name) do
+          nil -> node.facets.data
+          d -> Map.merge(node.facets.data, d)
+        end
+
+        facets = %{node.facets | data: data, observed: WorkCore.Overlay.observed(ov, name)}
+        {name, %{node | facets: facets}}
+      end)
+
+    %{g | nodes: merged}
+  end
 
   # ── the agent-/system-facing query surface over the unified graph ──
 
