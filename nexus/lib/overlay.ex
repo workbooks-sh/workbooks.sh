@@ -9,18 +9,29 @@ defmodule Nexus.Overlay do
   `Nexus.Graph.with_overlay/2`.
 
   This is the seam that lets the graph cover code, data, and execution under one
-  identity without any new authoring syntax — `data`/`observed` are *read back*,
-  never declared.
+  identity without any new authoring syntax — `artifact`/`data`/`observed` are all
+  *read back*, never declared:
+
+    * `artifact` — the compiled wasm component's real WIT (§3), read post-build.
+    * `data`     — the live DB schema behind a `resource` (§10 data reality).
+    * `observed` — an agent's runtime telemetry (§10 execution reality).
   """
 
-  defstruct data: %{}, observed: %{}
+  defstruct data: %{}, observed: %{}, artifact: %{}
 
-  @type t :: %__MODULE__{data: map, observed: map}
+  @type t :: %__MODULE__{data: map, observed: map, artifact: map}
 
   alias Nexus.Uid
 
   @doc "An empty overlay."
   def new, do: %__MODULE__{}
+
+  @doc "Attach a compiled-artifact facet (real component WIT + drift) for a unit, keyed by Uid."
+  def put_artifact(%__MODULE__{artifact: a} = ov, unit, facet),
+    do: %{ov | artifact: Map.put(a, Uid.key(unit), facet)}
+
+  @doc "The artifact facet recorded for a unit, or nil."
+  def artifact(%__MODULE__{artifact: a}, unit), do: Map.get(a, Uid.key(unit))
 
   @doc "Attach a data-reality facet (e.g. an ingested DB schema) for a unit, keyed by Uid."
   def put_data(%__MODULE__{data: d} = ov, unit, facet),
@@ -38,5 +49,9 @@ defmodule Nexus.Overlay do
 
   @doc "Merge two overlays (right wins on key collisions)."
   def merge(%__MODULE__{} = a, %__MODULE__{} = b),
-    do: %__MODULE__{data: Map.merge(a.data, b.data), observed: Map.merge(a.observed, b.observed)}
+    do: %__MODULE__{
+      data: Map.merge(a.data, b.data),
+      observed: Map.merge(a.observed, b.observed),
+      artifact: Map.merge(a.artifact, b.artifact)
+    }
 end

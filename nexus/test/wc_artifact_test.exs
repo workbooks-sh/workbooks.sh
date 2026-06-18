@@ -1,6 +1,6 @@
 defmodule Nexus.ArtifactTest do
   use ExUnit.Case, async: true
-  alias Nexus.{Artifact, Wit}
+  alias Nexus.{Artifact, Wit, Graph, Overlay}
 
   @tmp Path.join(System.tmp_dir!(), "wc_artifact_test")
 
@@ -53,5 +53,20 @@ defmodule Nexus.ArtifactTest do
     d = Artifact.diff(declared, actual)
     refute d.ok?
     assert "ghost" in d.missing_exports
+  end
+
+  test "artifact overlay joins onto the graph node's facets.artifact" do
+    File.write!(Path.join(@tmp, "svc.work"), "# Svc\n\n```elixir\nserver :svc do\n  def go, do: :ok\nend\n```\n")
+    g = Graph.build_dir(@tmp)
+    assert g.nodes["svc"].facets.artifact == nil
+
+    facet = %{exports: ["go"], imports: [], wit: "world svc { export go: func() -> string; }", drift: %{ok?: true}}
+    ov = Overlay.put_artifact(Overlay.new(), "svc", facet)
+    lensed = Graph.with_overlay(g, ov)
+
+    assert lensed.nodes["svc"].facets.artifact.exports == ["go"]
+    assert lensed.nodes["svc"].facets.artifact.drift.ok?
+    # pure graph untouched
+    assert g.nodes["svc"].facets.artifact == nil
   end
 end

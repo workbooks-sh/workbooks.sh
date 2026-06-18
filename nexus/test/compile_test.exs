@@ -194,6 +194,29 @@ defmodule Nexus.CompileTest do
     end
   end
 
+  test "artifact_overlay reads a compiled unit's real WIT back + diffs vs declared" do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
+      dir = Path.join(System.tmp_dir!(), "wbao_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      File.write!(Path.join(dir, "math.work"), "# Math\n\nzig :math do\n  export fn quad(x: i32) i32 { return x * 4; }\nend\n")
+
+      ov = Nexus.Compile.artifact_overlay(dir, only: ["math"])
+      facet = Nexus.Overlay.artifact(ov, "math")
+
+      assert "quad" in facet.exports
+      # declared interface (§2) matches the shipped component — no drift
+      assert facet.drift.ok?
+
+      # and it joins onto the graph node
+      g = Nexus.Graph.build_dir(dir)
+      assert Nexus.Graph.with_overlay(g, ov).nodes["math"].facets.artifact.exports == ["quad"]
+
+      File.rm_rf!(dir)
+    else
+      :ok
+    end
+  end
+
   @tag :compiler
   @tag timeout: 240_000
   test "a .work rust unit compiles to a component and runs" do

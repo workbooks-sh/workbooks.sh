@@ -275,6 +275,34 @@ defmodule Nexus.Compile do
     }
   end
 
+  @doc """
+  Compile the workbook's wasm units and read each component's REAL WIT back into a
+  reality overlay (§10, artifact facet): for every compilable wasm unit,
+  `facets.artifact` = the built component's actual imports/exports + `drift` against
+  the unit's declared interface (§2). Join with `Nexus.Graph.with_overlay/2` to
+  populate `facets.artifact` on the graph — declared intent checked against the
+  shipped binary. `opts[:only]` limits to named units (faster, targeted builds).
+  """
+  def artifact_overlay(root, opts \\ []) do
+    g = Nexus.Graph.build_dir(root)
+    only = opts[:only]
+
+    (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
+    |> Enum.uniq()
+    |> Enum.flat_map(fn f -> f |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
+    |> Enum.filter(&(&1.kind in ~w(rust c cpp zig) and (only == nil or &1.name in only)))
+    |> Enum.reduce(Nexus.Overlay.new(), fn node, ov ->
+      with {:wasm, {:ok, comp}} <- unit(node),
+           {:ok, facet} <- Nexus.Artifact.facet(comp) do
+        declared = get_in(g.nodes, [node.name, :facets, :interface])
+        drift = if declared, do: Nexus.Artifact.diff(declared, facet.wit), else: nil
+        Nexus.Overlay.put_artifact(ov, node.name, Map.put(facet, :drift, drift))
+      else
+        _ -> ov
+      end
+    end)
+  end
+
   defp try_beam(root) do
     Nexus.Unit.compile_workbook(root)
   rescue

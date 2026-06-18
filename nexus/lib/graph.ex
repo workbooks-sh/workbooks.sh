@@ -208,7 +208,9 @@ defmodule Nexus.Graph do
           d -> Map.merge(node.facets.data, d)
         end
 
-        facets = %{node.facets | data: data, observed: Nexus.Overlay.observed(ov, name)}
+        artifact = Nexus.Overlay.artifact(ov, name) || node.facets.artifact
+
+        facets = %{node.facets | data: data, observed: Nexus.Overlay.observed(ov, name), artifact: artifact}
         {name, %{node | facets: facets}}
       end)
 
