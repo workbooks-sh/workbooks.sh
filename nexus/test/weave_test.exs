@@ -79,4 +79,17 @@ defmodule Nexus.WeaveTest do
     assert html =~ "unknown resource"
     assert html =~ "Ghost"
   end
+
+  test "the index file leads, gives the title, and a multi-file workbook gets a nav" do
+    dir = Path.join(System.tmp_dir!(), "wvc_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    File.write!(Path.join(dir, "zlast.work"), "## Pricing\n\nlast file\n")
+    File.write!(Path.join(dir, "index.work"), "# Corner Store\n\nthe index leads\n")
+    on_exit(fn -> File.rm_rf!(dir) end)
+
+    html = Nexus.Weave.weave(dir)
+    assert html =~ "<title>Corner Store</title>"
+    assert :binary.match(html, "the index leads") |> elem(0) < (:binary.match(html, "last file") |> elem(0))
+    assert html =~ "wb-nav" and html =~ ~s(href="#index-work")
+  end
 end

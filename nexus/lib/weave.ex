@@ -15,10 +15,37 @@ defmodule Nexus.Weave do
     render(pages, resources(pages))
   end
 
+  # index.work is the composition root — it leads; the rest follow alphabetically.
   defp files(root) do
     (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
     |> Enum.uniq()
+    |> Enum.sort_by(fn p -> {Path.basename(p) != "index.work", p} end)
   end
+
+  # The page title is the first heading of the leading (index) file; default "workbook".
+  defp title(pages) do
+    Enum.find_value(pages, "workbook", fn {_f, nodes} ->
+      Enum.find_value(nodes, fn
+        %{type: :heading, text: t} -> t
+        _ -> nil
+      end)
+    end)
+  end
+
+  # A nav linking each file's section — coherence for a multi-file workbook (skipped for one file).
+  defp nav(pages) when length(pages) <= 1, do: ""
+
+  defp nav(pages) do
+    links =
+      Enum.map_join(pages, "", fn {f, _nodes} ->
+        ~s(<a href="##{anchor(f)}">#{esc(label(f))}</a>)
+      end)
+
+    ~s(<nav class="wb-nav">#{links}</nav>\n)
+  end
+
+  defp anchor(f), do: f |> String.replace(~r/[^A-Za-z0-9]+/, "-") |> String.trim("-")
+  defp label(f), do: f |> Path.basename(".work") |> String.replace("-", " ")
 
   # name → compiled struct module, for every `resource` unit in the folder.
   defp resources(pages) do
@@ -38,16 +65,16 @@ defmodule Nexus.Weave do
 
     """
     <!doctype html>
-    <html lang="en"><head><meta charset="utf-8"><title>workbook</title>
+    <html lang="en"><head><meta charset="utf-8"><title>#{esc(title(pages))}</title>
     <style>#{css()}</style></head>
     <body>
-    #{body}
+    #{nav(pages)}#{body}
     </body></html>
     """
   end
 
   defp page({name, nodes}, res) do
-    ~s(<section class="file" data-file="#{esc(name)}">\n) <>
+    ~s(<section class="file" id="#{anchor(name)}" data-file="#{esc(name)}">\n) <>
       Enum.map_join(nodes, "\n", &render_node(&1, res)) <> "\n</section>"
   end
 
@@ -136,6 +163,8 @@ defmodule Nexus.Weave do
     table.data th,table.data td{border:1px solid #e4e4e7;padding:.35em .6em;text-align:left}
     table.data thead th{background:#fafafa} table.data .empty{color:#999;font-style:italic}
     .data-missing{color:#b00;font-size:.9em}
+    nav.wb-nav{display:flex;gap:.8em;flex-wrap:wrap;padding:.6em 0;margin-bottom:1em;border-bottom:1px solid #e4e4e7;font-size:.9em}
+    nav.wb-nav a{color:#555;text-decoration:none} nav.wb-nav a:hover{color:#000}
     """
   end
 end
