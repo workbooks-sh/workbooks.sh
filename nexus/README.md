@@ -12,6 +12,14 @@ longer exists. So we start fresh and keep only what's genuinely ours and genuine
   thing we built from scratch that took real time. `nexus` *reuses* `runtime/host/compilers/*`
   (referenced, not rewritten).
 
+## Proven end-to-end
+
+Real Rust **+ the `libm` crate** (fetched from crates.io, built, linked) → mrustc/clang/wasm-ld
+→ exported core module → `wasm-tools` componentize against the **generated WIT world** →
+`Nexus.Sandbox` (wasmex) → `isqrt(144) = {:ok, 12}`. The new-model compile path is just
+**core-compile (keep-alive `main` + `wasm-ld --export`) + componentize + wasmex** — the old
+command adapter / `command_registry` / `pallet` / stdin-stdout shape is dropped.
+
 ## What we DON'T carry over
 
 - **VFS-as-store** — data is **Ash** now (server-authoritative), not a per-instance SQLite file.

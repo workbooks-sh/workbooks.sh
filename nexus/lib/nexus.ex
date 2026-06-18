@@ -27,7 +27,7 @@ defmodule Nexus do
       wit: :port,
       dock: :port,
       unit: :port,
-      sandbox: :new,
+      sandbox: :live,
       compile: :new,
       weave: :new
     }
