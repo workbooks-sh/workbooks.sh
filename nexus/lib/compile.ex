@@ -2,7 +2,7 @@ defmodule Nexus.Compile do
   @moduledoc """
   Route a parsed unit to its artifact — the one place placement becomes execution:
 
-      resource         → an Ash resource          (the database; `Nexus.Resource.Ash`)
+      resource         → a typed struct           (the shape; persisted via `Nexus.Store`)
       record           → a value shape             (`Nexus.Resource`)
       server           → a native BEAM module      (`Nexus.Unit`)
       client / foreign → a wasm component          (the compilers → `Nexus.Sandbox`)
@@ -17,7 +17,7 @@ defmodule Nexus.Compile do
   @doc "Compile one parsed `:code` unit to its artifact, tagged by lane."
   def unit(%{type: :code, kind: kind} = node) do
     cond do
-      kind == "resource" -> {:ash, Nexus.Resource.Ash.source(node)}
+      kind == "resource" -> {:resource, Nexus.Resource.compile(node)}
       kind == "record" -> {:shape, Nexus.Resource.fields(node)}
       kind == "server" -> {:beam, Nexus.Unit.compile(node)}
       kind == "rust" -> {:wasm, rust_unit(node)}
@@ -261,7 +261,8 @@ defmodule Nexus.Compile do
 
   @doc """
   Bring up a whole `.work` folder. The fast tiers come up eagerly — `server`/type units →
-  native BEAM modules, `resource` units → live Ash resources; the `wasm` units (rust/…) are
+  native BEAM modules, `resource` units → compiled struct modules (rows live in `Nexus.Store`);
+  the `wasm` units (rust/…) are
   enumerated as compile-on-demand (each is a real, slow toolchain build via `unit/1`). Returns
   `%{beam, resources, wasm_units}`.
   """
@@ -294,8 +295,7 @@ defmodule Nexus.Compile do
   end
 
   defp try_materialize(u) do
-    {res, _domain} = Nexus.Resource.Ash.materialize(u)
-    {:ok, res}
+    {:ok, Nexus.Resource.compile(u)}
   rescue
     e -> {:error, Exception.message(e)}
   end

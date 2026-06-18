@@ -6,7 +6,8 @@ defmodule Nexus.Resource do
   derives sound WIT — *no inference from defaults*, so the contract never lies.
 
   Domain types are the author's vocabulary; each maps to exactly one WIT type. This is the
-  same shape later handed to TypedStruct (client) and Ash (server); WIT is derived here.
+  same typed-struct shape works client AND server; persistence is the `Nexus.Store` seam, not a
+  framework. WIT is derived here too.
   """
 
   alias Nexus.Wit.Types
@@ -63,24 +64,63 @@ defmodule Nexus.Resource do
   end
 
   @doc """
-  Compile the resource/record to a real BEAM struct module (the client-safe shape — a plain
-  `defstruct`, no runtime deps, AtomVM-safe). Returns the module. WIT + Ash derive from the
-  same declaration; this is what `%Lead{}` literals use.
+  Compile the resource/record to a real BEAM struct module — the **base** of the data abstraction:
+  a plain `defstruct` with zero runtime deps, AtomVM/Popcorn-safe (works client AND server). The
+  module also carries `__fields__/0` (the declared `{name, type}` specs) so a store adapter can
+  validate + introspect it. WIT derives from the same declaration; persistence is a separate,
+  pluggable seam (`Nexus.Store`) — the struct doesn't know or care which backend holds it.
   """
   def compile(%{name: name} = node) do
     mod = Module.concat([Macro.camelize(name)])
     defaults = struct_fields(node)
+    specs = fields(node)
 
     quoted =
       quote do
         defmodule unquote(mod) do
           defstruct unquote(Macro.escape(defaults))
+          def __fields__, do: unquote(Macro.escape(specs))
         end
       end
 
-    [{module, _bin}] = Code.compile_quoted(quoted)
+    [{module, _bin} | _] = Code.compile_quoted(quoted)
     module
   end
+
+  @doc """
+  Validate `attrs` against a compiled resource module's `__fields__` and build the struct.
+  Rejects unknown keys and enum values outside the declared cases. `{:ok, struct} | {:error, _}`.
+  The one place "is this valid?" lives — no framework, just the declared shape.
+  """
+  def validate(module, attrs) do
+    specs = module.__fields__()
+    names = Enum.map(specs, &elem(&1, 0))
+    attrs = Map.new(attrs, fn {k, v} -> {to_atom(k), v} end)
+
+    with [] <- Map.keys(attrs) -- names,
+         :ok <- check_enums(attrs, specs) do
+      {:ok, struct(module, attrs)}
+    else
+      [_ | _] = unknown -> {:error, {:unknown_fields, unknown}}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp check_enums(attrs, specs) do
+    Enum.reduce_while(specs, :ok, fn
+      {name, {:enum, cases}}, :ok ->
+        case Map.fetch(attrs, name) do
+          {:ok, v} -> if v in cases, do: {:cont, :ok}, else: {:halt, {:error, {:bad_enum, name, v, cases}}}
+          :error -> {:cont, :ok}
+        end
+
+      _, :ok ->
+        {:cont, :ok}
+    end)
+  end
+
+  defp to_atom(k) when is_atom(k), do: k
+  defp to_atom(k) when is_binary(k), do: String.to_existing_atom(k)
 
   defp default_for({:scalar, :text}), do: ""
   defp default_for({:scalar, :id}), do: ""

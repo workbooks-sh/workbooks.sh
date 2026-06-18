@@ -49,8 +49,8 @@ defmodule Nexus.ResourceTest do
     mod = @lead |> unit() |> Resource.compile()
 
     v = struct(mod, [])
-    # plain struct, AtomVM-safe — only __struct__ functions, no runtime deps
-    assert mod.__info__(:functions) == [__struct__: 0, __struct__: 1]
+    # plain struct, AtomVM-safe — only __struct__ + a literal-returning __fields__/0, no runtime deps
+    assert mod.__info__(:functions) == [__fields__: 0, __struct__: 0, __struct__: 1]
     assert is_map(v) and Map.has_key?(v, :__struct__)
 
     # defaults follow the DECLARED type: text→"", int→0, enum→first case, list→[]

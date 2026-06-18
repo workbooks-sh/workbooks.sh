@@ -13,12 +13,12 @@ defmodule Nexus.MixProject do
 
   def application, do: [extra_applications: [:logger]]
 
-  # The sandbox is wasmex (wasmtime + component model); the database is Ash (a resource IS an
-  # Ash resource). Both reused, not rebuilt — nexus drives them.
+  # The sandbox is wasmex (wasmtime + component model). The data base is a typed struct + the
+  # pluggable `Nexus.Store` seam (ETS default; Postgres/SQLite/wasm-SQL behind the same interface)
+  # — NOT a framework. (Ash can return later as one optional store adapter, not the foundation.)
   defp deps do
     [
-      {:wasmex, path: "../runtime/vendor/wasmex"},
-      {:ash, "~> 3.0"}
+      {:wasmex, path: "../runtime/vendor/wasmex"}
     ]
   end
 end

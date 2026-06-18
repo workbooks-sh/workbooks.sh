@@ -9,14 +9,15 @@ defmodule Nexus do
         │  Nexus.Resource / Nexus.Wit    → shape + the WIT contract
         ▼
       Nexus.Compile.unit/1               → one unit becomes:
-        ├─ a resource?  → an Ash resource (the database)
+        ├─ a resource?  → a typed struct (persisted via the Nexus.Store seam)
         ├─ a server?    → a native BEAM module        (Nexus.Unit)
         └─ client/foreign? → a wasm component on wasmex (Nexus.Sandbox)
         ▼
       Nexus.Weave.weave/1                → a workbook (folder) → one .html
 
-  Built fresh, green per layer. Authoring + contract are pure Elixir (no deps); data is Ash;
-  the sandbox is wasmex; the compilers are reused from `runtime/host/compilers/*` (the moat).
+  Built fresh, green per layer. Authoring + contract are pure Elixir (no deps); data is a typed
+  struct + the pluggable `Nexus.Store` seam; the sandbox is wasmex; the compilers are reused from
+  `runtime/host/compilers/*` (the moat).
   """
 
   @doc "The status of each layer — the honest state."
@@ -27,7 +28,8 @@ defmodule Nexus do
       wit: :live,
       dock: :live,
       unit: :live,
-      # data: a resource → live Ash resource with real CRUD (Resource.Ash.materialize)
+      # data: a resource → a typed struct (the zero-dep base, client+server) + Nexus.Store, a
+      # pluggable persistence seam (ETS default; Postgres/SQLite/wasm-SQL adapters; Ash optional later)
       data: :live,
       # audit: a unit may only call host caps it grants (grant: [emit]); Nexus.Audit reports the
       # ungranted ones per unit / per workbook — an ungranted cap is a hard error, not silent reach

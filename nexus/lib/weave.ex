@@ -5,7 +5,7 @@ defmodule Nexus.Weave do
   bundle into a single hydrate-able page. The browser renders it everywhere.
 
   This is the first, dep-free pass: structurally-correct HTML from the parse. Full markdown
-  rendering + island hydration + the compiled wasm/Ash artifacts join as `Nexus.Compile` lanes
+  rendering + island hydration + the compiled wasm/data artifacts join as `Nexus.Compile` lanes
   light up. (Thinned from the old `runtime/host/bundle.ex` — the new model needs far less.)
   """
 
