@@ -35,6 +35,26 @@ defmodule Nexus.Browse.Freeze do
     end)
   end
 
+  @doc """
+  Extract the JS bodies of every executable `<script>` in `html`, in document order — for the
+  greenfield JS-DOM render, which runs them against a real DOM (`Nexus.JsDom`). Skips non-JS scripts
+  (`type=application/json`, `type=…/ld+json`, importmap, etc.); plain and `type=module` scripts run.
+  Run `freeze(html, base, scripts: true)` first so external `src` scripts are already inlined.
+  """
+  def script_bodies(html) do
+    ~r/<script\b([^>]*)>(.*?)<\/script>/is
+    |> Regex.scan(html)
+    |> Enum.filter(fn [_, attrs, body] -> executable_script?(attrs) and String.trim(body) != "" end)
+    |> Enum.map(fn [_, _, body] -> String.replace(body, "<\\/script", "</script") end)
+  end
+
+  defp executable_script?(attrs) do
+    case Regex.run(~r/\btype=["']?([^"'\s>]+)/i, attrs) do
+      nil -> true
+      [_, t] -> String.downcase(t) in ["text/javascript", "application/javascript", "module", "text/babel"]
+    end
+  end
+
   defp href(tag) do
     case Regex.run(~r/\bhref=["']([^"']+)["']/i, tag) do
       [_, h] -> h

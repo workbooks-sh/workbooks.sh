@@ -27,6 +27,13 @@ defmodule Nexus.Browse.Blitz do
   fetch once and render, without a second request.
   """
   def render_html(html, url, opts \\ []) do
+    case Keyword.get(opts, :engine, :boa) do
+      :jsdom -> render_html_jsdom(html, url, opts)
+      _ -> render_html_boa(html, url, opts)
+    end
+  end
+
+  defp render_html_boa(html, url, opts) do
     frozen = Nexus.Browse.Freeze.freeze(html, url, scripts: true)
 
     case run(:text_js, frozen, url, opts) do
@@ -35,13 +42,49 @@ defmodule Nexus.Browse.Blitz do
     end
   end
 
+  # The greenfield JS path: run the page's scripts against a REAL DOM (StarlingMonkey + linkedom),
+  # then render the *hydrated* HTML with the no-JS renderer (the DOM is already built). Falls back to
+  # the no-JS render of the original page if the JS engine isn't staged or errors.
+  defp render_html_jsdom(html, url, opts) do
+    with {:ok, hydrated} <- hydrate(html, url, opts) do
+      run(:text, hydrated, url, opts)
+    else
+      _ -> run(:text, html, url, opts)
+    end
+  end
+
+  @doc """
+  Hydrate `html` by running its scripts against a real JS DOM (StarlingMonkey + linkedom) and return
+  the serialized, hydrated HTML — the greenfield render. CSS stays inlined so a later screenshot is
+  styled. `{:error, _}` if the JS engine/bundle isn't staged.
+  """
+  def hydrate(html, url, opts \\ []) do
+    if Nexus.JsDom.available?() do
+      frozen = Nexus.Browse.Freeze.freeze(html, url, scripts: true)
+      scripts = Nexus.Browse.Freeze.script_bodies(frozen)
+      Nexus.JsDom.render_html(frozen, scripts: scripts, settle_ms: Keyword.get(opts, :settle_ms, 50), timeout: Keyword.get(opts, :js_timeout, 60_000))
+    else
+      {:error, :jsdom_unavailable}
+    end
+  end
+
   @impl true
   def screenshot(url, opts) do
     with {:ok, html} <- fetch(url) do
-      # CSS inlined for layout; external scripts NOT inlined (a huge framework bundle aborts the JS
-      # engine, and there's no text-fallback for a PNG). render_page still runs any light inline JS.
-      frozen = Nexus.Browse.Freeze.freeze(html, url)
-      run(:screenshot, frozen, url, opts)
+      case Keyword.get(opts, :engine, :boa) do
+        # Greenfield: hydrate via StarlingMonkey+linkedom (CSS stays inline), then paint the hydrated DOM.
+        :jsdom ->
+          case hydrate(html, url, opts) do
+            {:ok, hydrated} -> run(:screenshot, hydrated, url, opts)
+            _ -> run(:screenshot, Nexus.Browse.Freeze.freeze(html, url), url, opts)
+          end
+
+        # CSS inlined for layout; external scripts NOT inlined (a huge framework bundle aborts the JS
+        # engine, and there's no text-fallback for a PNG). render_page still runs any light inline JS.
+        _ ->
+          frozen = Nexus.Browse.Freeze.freeze(html, url)
+          run(:screenshot, frozen, url, opts)
+      end
     end
   end
 
