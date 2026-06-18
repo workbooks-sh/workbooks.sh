@@ -120,7 +120,7 @@
     frame.removeAttribute("src");
     cmWrap().style.display = "";
     lgEl.textContent = "work file";
-    const txt = await fetch("sales/" + path).then(r => r.text());
+    const txt = await fetch("sales/" + path, { cache: "no-store" }).then(r => r.text());
     cm.setValue(txt);
     setTimeout(() => { cm.refresh(); markCode(); }, 0);
   }
