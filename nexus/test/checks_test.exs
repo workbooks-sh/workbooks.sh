@@ -42,4 +42,21 @@ defmodule Nexus.ChecksTest do
     refute r.passed
     assert r.error =~ "no agent named"
   end
+
+  test "render_html shows counts + pass/fail rows and escapes output" do
+    report = %{
+      passed: 1,
+      failed: 1,
+      results: [
+        %{name: "a", passed: true, expect: "OK", got: "all OK", error: nil},
+        %{name: "b", passed: false, expect: "X", got: "Y<script>", error: nil}
+      ]
+    }
+
+    html = Nexus.Checks.render_html(report)
+    assert html =~ "1 passed, 1 failed"
+    assert html =~ "check-pass" and html =~ "check-fail"
+    assert html =~ "&lt;script&gt;"
+    refute html =~ "<script>"
+  end
 end

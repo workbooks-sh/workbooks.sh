@@ -98,4 +98,23 @@ defmodule Nexus.Checks do
   end
 
   def matches?(answer, expect), do: String.contains?(answer, expect)
+
+  @doc "Render a check report (`run/1`'s result) as an HTML fragment — a green/red list."
+  def render_html(%{passed: p, failed: f, results: results}) do
+    rows =
+      Enum.map_join(results, "", fn r ->
+        {cls, mark} = if r.passed, do: {"pass", "✓"}, else: {"fail", "✗"}
+        detail = esc(r.error || r.got || "")
+
+        ~s(<li class="check-#{cls}"><span class="mark">#{mark}</span> <b>#{esc(r.name)}</b>) <>
+          ~s(<span class="exp">expect #{esc(r.expect)}</span><span class="got">#{String.slice(detail, 0, 200)}</span></li>)
+      end)
+
+    ~s(<div class="checks" data-passed="#{p}" data-failed="#{f}">) <>
+      ~s(<h3>checks: #{p} passed, #{f} failed</h3><ul>#{rows}</ul></div>)
+  end
+
+  defp esc(s),
+    do: s |> to_string() |> String.replace("&", "&amp;") |> String.replace("<", "&lt;") |> String.replace(">", "&gt;")
 end
+
