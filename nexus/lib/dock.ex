@@ -76,17 +76,55 @@ defmodule Nexus.Dock do
       # a real string-RETURNING cap: an in-memory kv (proves the canonical-ABI return path).
       "store" => {"func(key: string, val: string)", fn k, v -> :persistent_term.put({:nexus_kv, k}, v); nil end},
       "load" => {"func(key: string) -> string", fn k -> :persistent_term.get({:nexus_kv, k}, "") end},
-      # net: an HTTP GET (TLS-verified, via the shared client). TODO: this is UNBROKERED — a real
-      # deployment must route `fetch` through an SSRF-safe allowlist (the runtime's host broker).
-      "fetch" => {"func(url: string) -> string", fn url ->
-         case Nexus.Compilers.Shared.http_get(url) do
-           {:ok, body} -> body
-           _ -> ""
-         end
-       end},
+      # net: a TLS-verified HTTP GET, SSRF-brokered (see fetch/1).
+      "fetch" => {"func(url: string) -> string", &__MODULE__.fetch/1},
       # llm: a chat completion (OpenRouter). Returns "" if no key is configured.
       "complete" => {"func(prompt: string) -> string", &__MODULE__.llm_complete/1}
     }
+  end
+
+  @doc """
+  SSRF-brokered HTTP GET for the `fetch` cap. ALWAYS blocks loopback/private/link-local hosts
+  (so a unit can't reach the host's internal network) and non-http(s) schemes. If `NEXUS_NET_ALLOW`
+  is set (comma-separated hosts) the URL's host must be on it; otherwise any public host is allowed.
+  Returns `""` on a blocked or failed request.
+  """
+  def fetch(url) do
+    if net_allowed?(url) do
+      case Nexus.Compilers.Shared.http_get(url) do
+        {:ok, body} -> body
+        _ -> ""
+      end
+    else
+      ""
+    end
+  end
+
+  defp net_allowed?(url) do
+    uri = URI.parse(url)
+    host = uri.host || ""
+
+    cond do
+      uri.scheme not in ["http", "https"] -> false
+      private_host?(host) -> false
+      allowlist() == [] -> true
+      true -> host in allowlist()
+    end
+  end
+
+  defp allowlist do
+    case System.get_env("NEXUS_NET_ALLOW") do
+      v when v in [nil, ""] -> []
+      v -> v |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
+    end
+  end
+
+  # Loopback / private / link-local — the SSRF danger zone a unit must never reach.
+  defp private_host?(h) do
+    h in ["localhost", "127.0.0.1", "0.0.0.0", "::1", ""] or
+      String.starts_with?(h, "127.") or String.starts_with?(h, "10.") or
+      String.starts_with?(h, "192.168.") or String.starts_with?(h, "169.254.") or
+      String.match?(h, ~r/^172\.(1[6-9]|2\d|3[01])\./)
   end
 
   @doc false

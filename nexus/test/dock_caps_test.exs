@@ -21,4 +21,18 @@ defmodule Nexus.DockCapsTest do
     impls = Nexus.Dock.impls()
     for n <- ~w(now emit store load fetch), do: assert match?({:fn, _}, impls[n])
   end
+
+  test "fetch is SSRF-brokered — loopback/private/non-http are blocked (return \"\")" do
+    for url <- [
+          "http://127.0.0.1:4000/x",
+          "http://localhost/x",
+          "http://10.0.0.5/x",
+          "http://192.168.1.1/x",
+          "http://169.254.169.254/latest/meta-data",
+          "http://172.16.0.1/x",
+          "file:///etc/passwd"
+        ] do
+      assert Nexus.Dock.fetch(url) == ""
+    end
+  end
 end
