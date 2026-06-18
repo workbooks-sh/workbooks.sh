@@ -35,12 +35,12 @@ defmodule Nexus do
       compile: :live,
       # weave: workbook folder → one .html (first pass; rich render pending)
       weave: :basic,
-      # dock host-IMPORTS (a component CALLING a host capability) — PROVEN: a Rust component
-      # imports `add`, the host (Dock, Elixir) provides it, the component calls it → 42. mrustc
-      # emits the import as `env::add`; rewriting the core's import module env→$root (wat round-
-      # trip) makes the component model map it, then wasmex supplies the impl. Auto-wiring the
-      # grant→import→impl path into Nexus.Compile is the next integration.
-      dock_imports: :proven
+      # dock host-IMPORTS (a component CALLING a host capability) — TURNKEY for scalar caps: a
+      # unit's `extern "C"` decl → WIT import (auto) → env→$root rewrite → componentize → the
+      # Dock supplies the impl, Sandbox wires it. Proven: a unit imports `now`, calls it, gets
+      # real unix time, zero manual steps. String-typed caps (net/kv/llm) await the canonical-ABI
+      # string glue between an extern "C" decl and a WIT `string` — the next nut.
+      dock_imports: :live_scalar
     }
   end
 end
