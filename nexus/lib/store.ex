@@ -23,6 +23,14 @@ defmodule Nexus.Store do
   @callback count(resource :: module, tenant) :: non_neg_integer
   @callback clear(resource :: module, tenant) :: :ok
 
+  # Optional schema introspection — the real columns a resource has in this backend.
+  # A COLUMNAR backend (Postgres/Neon: `SELECT column_name FROM information_schema.columns
+  # WHERE table_name = $1`) implements this so `Nexus.Schema` can diff the live table
+  # against the declared `__fields__` (data drift). Row-blob backends (ETS/SQLite) omit
+  # it — they faithfully store the declared struct, so there are no columns to drift.
+  @callback columns(resource :: module, tenant) :: [String.t()]
+  @optional_callbacks columns: 2
+
   @default "default"
 
   @doc "Validate `attrs` against the resource's shape and persist a row for `tenant`."
