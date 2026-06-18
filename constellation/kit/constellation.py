@@ -86,6 +86,15 @@ def self_learn(name, source_file, base="8b", iters=300, n_pairs=8, lr=1e-4):
     d = write_data(name, pairs)
     return train(name, d, base=base, iters=iters, lr=lr)
 
+def serve(base="8b", adapter=None, port=8080):
+    """Serve a Granite base (optionally with an adapter plugged in) over an OpenAI-compatible API."""
+    cmd = [sys.executable, "-m", "mlx_lm", "server", "--model", base_path(base), "--port", str(port)]
+    if adapter:
+        ap = adapter if os.path.exists(adapter) else os.path.join(ADAPTERS, adapter)
+        cmd += ["--adapter-path", ap]
+    print(f"[serve] {base}" + (f" + adapter '{adapter}'" if adapter else "") + f" on :{port} (OpenAI API)…", flush=True)
+    subprocess.run(cmd)
+
 def kit_list():
     if not os.path.isdir(ADAPTERS): print("no adapters yet"); return
     rows = []
@@ -102,11 +111,13 @@ def main():
     p = sub.add_parser("ask"); p.add_argument("question"); p.add_argument("--base", default="8b"); p.add_argument("--adapter"); p.add_argument("--max-tokens", type=int, default=80)
     p = sub.add_parser("train"); p.add_argument("name"); p.add_argument("--data", required=True); p.add_argument("--base", default="8b"); p.add_argument("--iters", type=int, default=300); p.add_argument("--lr", type=float, default=1e-4)
     p = sub.add_parser("self-learn"); p.add_argument("name"); p.add_argument("--source", required=True); p.add_argument("--base", default="8b"); p.add_argument("--iters", type=int, default=300); p.add_argument("--lr", type=float, default=1e-4)
+    p = sub.add_parser("serve"); p.add_argument("--base", default="8b"); p.add_argument("--adapter"); p.add_argument("--port", type=int, default=8080)
     sub.add_parser("kit")
     a = ap.parse_args()
     if a.cmd == "ask": print(ask(a.question, base=a.base, adapter=a.adapter, max_tokens=a.max_tokens))
     elif a.cmd == "train": train(a.name, a.data, base=a.base, iters=a.iters, lr=a.lr)
     elif a.cmd == "self-learn": self_learn(a.name, a.source, base=a.base, iters=a.iters, lr=a.lr)
+    elif a.cmd == "serve": serve(base=a.base, adapter=a.adapter, port=a.port)
     elif a.cmd == "kit": kit_list()
 
 if __name__ == "__main__":

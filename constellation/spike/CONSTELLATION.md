@@ -148,3 +148,15 @@ KEY HYPERPARAM BUG FOUND+FIXED: lr 3e-4 DIVERGES the 4-bit 8B QLoRA (degenerate 
 also why the earlier capstone loss stuck at 5.7). lr 1e-4 → clean convergence (val loss 0.097), perfect
 recall. Default LR lowered to 1e-4 in the toolkit. 350m tolerates 3e-4 (smaller, robust); 8B does not.
 Nexus scheduler renamed Nexus.Ether -> Nexus.Constellation (223 tests green).
+
+# ═══ DOGFOOD: real Nexus agent runs on the local Constellation 8B (2026-06-18) ═══
+The actual Nexus.Agent loop (Llm -> model, bash tool-calling, wasm-kit sandbox, VFS, telemetry,
+context mgmt) runs with its BRAIN = the local Granite 8B — no OpenRouter, no API key.
+  serve:  llama-server -m granite-4.1-8b-Q5_K_M.gguf -ngl 0 --jinja  (GGUF bakes chat+tool template)
+  agent:  Nexus.Agent.run(task: ..., base_url: "http://127.0.0.1:8103/v1/chat/completions",
+                           model: "granite-4.1-8b-Q5_K_M.gguf")
+PROVEN: "sort + count unique lines" -> {:ok, %{turns: 2, answer: "4"}} (correct; the agent tool-called
+bash, ran sort/uniq in the wasm sandbox against /work/data.txt). The Llm base_url override + localhost
+no-key (added earlier) is what makes the seam local. Runnable: ./run-local-agent.sh "<task>".
+HONEST PERF: CPU-8B is ~5 tok/s; multi-turn tasks that need many turns can hit the wall-clock (a 4-turn
+task timed out at 4 min) — raise timeout_ms or use the GPU/cloud lane for long-horizon runs.
