@@ -45,8 +45,8 @@ defmodule Nexus.Agent.Bash do
       "fetch" -> web_fetch(List.first(args))
       # scrape/render <url> → the page's rendered TEXT via in-wasm Blitz (CSS-aware, no JS),
       # falling back to a naive tag-strip if the renderer is unavailable.
-      "scrape" -> web_render(List.first(args))
-      "render" -> web_render(List.first(args))
+      "scrape" -> web_render(args)
+      "render" -> web_render(args)
       # in-wasm Blitz render: screenshot <url> [out.png] → a PNG in /work.
       "screenshot" -> web_screenshot(vfs, args)
       # Tier-1 computer-use: operate a site by semantic action (browser-use model).
@@ -60,14 +60,25 @@ defmodule Nexus.Agent.Bash do
     end
   end
 
-  defp web_render(nil), do: "render: usage: render <url>"
+  # `scrape [--js] <url>` — `--js` selects the greenfield engine (StarlingMonkey+linkedom runs the
+  # page's JS against a real DOM before render); default is the fast CSS-only render.
+  defp web_render(args) do
+    {opts, rest} = take_js_flag(args)
 
-  defp web_render(url) do
-    case Nexus.Browse.render(url) do
-      {:ok, text} when is_binary(text) and text != "" -> text
-      # fall back to the naive tag-strip if the in-wasm renderer is unavailable
-      _ -> url |> web_fetch() |> html_to_text()
+    case List.first(rest) do
+      nil -> "render: usage: render [--js] <url>"
+      url ->
+        case Nexus.Browse.render(url, opts) do
+          {:ok, text} when is_binary(text) and text != "" -> text
+          # fall back to the naive tag-strip if the in-wasm renderer is unavailable
+          _ -> url |> web_fetch() |> html_to_text()
+        end
     end
+  end
+
+  # Pull a leading/anywhere `--js` flag → render opts.
+  defp take_js_flag(args) do
+    if "--js" in args, do: {[engine: :jsdom], args -- ["--js"]}, else: {[], args}
   end
 
   # ── Tier-1 computer-use builtins ───────────────────────────────────────────
@@ -125,12 +136,19 @@ defmodule Nexus.Agent.Bash do
     end)
   end
 
-  defp web_screenshot(_vfs, []), do: "screenshot: usage: screenshot <url> [out.png]"
+  defp web_screenshot(_vfs, []), do: "screenshot: usage: screenshot [--js] <url> [out.png]"
 
-  defp web_screenshot(vfs, [url | rest]) do
+  defp web_screenshot(vfs, args) do
+    {opts, rest} = take_js_flag(args)
+    web_screenshot(vfs, rest, opts)
+  end
+
+  defp web_screenshot(_vfs, [], _opts), do: "screenshot: usage: screenshot [--js] <url> [out.png]"
+
+  defp web_screenshot(vfs, [url | rest], opts) do
     out = List.first(rest) || "screenshot.png"
 
-    case Nexus.Browse.screenshot(url) do
+    case Nexus.Browse.screenshot(url, opts) do
       {:ok, png} ->
         Nexus.Agent.Vfs.put(vfs, out, png)
         "screenshot: #{url} -> /work/#{out} (#{byte_size(png)} bytes)"

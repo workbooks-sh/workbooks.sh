@@ -139,8 +139,10 @@ defmodule Nexus.Agent do
   defp web_capability do
     """
     THE WEB (core — use these in bash directly):
-      scrape <url>        — a page's readable text (rendered in-sandbox, CSS+JS-aware)
-      screenshot <url>    — render the page to a PNG in /work
+      scrape <url>        — a page's readable text (rendered in-sandbox, CSS-aware)
+      scrape --js <url>   — same, but RUN the page's JavaScript first (real DOM, for client-rendered
+                            SPAs); slower. Use when a plain scrape comes back empty/shell-only.
+      screenshot <url>    — render the page to a PNG in /work (add --js to run scripts first)
       navigate <url>      — open a page: shows its text + numbered LINKS and FORMS
       click <n|text>      — follow link n (or the link matching text) → the next page
       fill <name> <value> — set a form field; submit <n> — submit form n (search, login, multi-step)
