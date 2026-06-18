@@ -7,8 +7,10 @@ const work = @import("work.zig");
 const author = @import("author.zig");
 const weave = @import("weave.zig");
 const dev = @import("dev.zig");
+const deploy = @import("deploy.zig");
 test {
     _ = work;
+    _ = deploy;
 }
 
 const version = "0.1.0";
@@ -44,6 +46,19 @@ pub fn main(init: std.process.Init) !void {
     } else if (eql(verb, "dev")) {
         const d = it.next() orelse ".";
         std.process.exit(try dev.dev(io, alloc, d, it.next() orelse "workbook.html"));
+    } else if (eql(verb, "deploy")) {
+        const sub = it.next() orelse "";
+        if (eql(sub, "init")) {
+            const place = it.next() orelse "local";
+            std.process.exit(try deploy.init(io, alloc, place, it.next() orelse ".", false));
+        } else if (eql(sub, "validate")) {
+            std.process.exit(try deploy.validateVerb(io, alloc, it.next() orelse "deployment.html"));
+        } else if (eql(sub, "apply")) {
+            std.process.exit(try deploy.apply(io, alloc, it.next() orelse "deployment.html"));
+        } else {
+            log.err("usage: work deploy init|validate|apply");
+            std.process.exit(1);
+        }
     } else if (eql(verb, "version") or eql(verb, "--version")) {
         log.print("work {s}\n", .{version});
     } else if (eql(verb, "help") or eql(verb, "--help")) {
