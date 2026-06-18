@@ -32,6 +32,12 @@ defmodule Workbooks.Wit.Types do
     "enum #{wit(name)} {\n#{cases}\n}"
   end
 
+  @doc "Render a WIT `variant` from a name and its tag cases (payloads default to string)."
+  def variant(name, tags) do
+    cases = tags |> Enum.map(&("  " <> wit(&1) <> "(string),")) |> Enum.join("\n")
+    "variant #{wit(name)} {\n#{cases}\n}"
+  end
+
   @doc "WIT identifier form: lowercased, snake_case → kebab-case."
   def wit(name), do: name |> to_string() |> String.replace("_", "-") |> String.downcase()
 end

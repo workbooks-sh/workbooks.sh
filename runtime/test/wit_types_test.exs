@@ -41,6 +41,34 @@ defmodule Workbooks.Wit.TypesTest do
     assert world =~ "contacted,"
   end
 
+  test "variant/2 renders a WIT variant from tags" do
+    wit = Types.variant(:result, [:ok, :err])
+    assert wit =~ "variant result {"
+    assert wit =~ "ok(string),"
+    assert wit =~ "err(string),"
+  end
+
+  test "Wit.world emits a result variant for a unit returning {:ok,_} | {:error,_}" do
+    src = """
+    server :enrich, grant: [net: "x"] do
+      def enrich(lead) do
+        case lookup(lead) do
+          {:ok, r} -> {:ok, r}
+          {:error, reason} -> {:error, reason}
+        end
+      end
+    end
+    """
+
+    world = Literate.parse(src) |> Enum.find(&(&1.type == :code)) |> Wit.world()
+    assert world =~ "variant result {"
+  end
+
+  test "a unit that returns a plain value gets no spurious variant" do
+    world = Literate.parse("server :score do\n  def score(_l), do: 1\nend\n") |> Enum.find(&(&1.type == :code)) |> Wit.world()
+    refute world =~ "variant"
+  end
+
   test "file_interface gathers file-level shared types (struct module + atom-set) into one interface" do
     src = """
     # Types

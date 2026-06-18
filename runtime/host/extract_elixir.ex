@@ -52,12 +52,31 @@ defmodule Workbooks.Extract.Elixir do
         end
       end)
 
+    types = ty |> Enum.reverse() |> Enum.uniq()
+
+    # the canonical result variant: a body that returns both {:ok, _} and
+    # {:error, _} tagged tuples declares a `result` variant (the format convention).
+    types =
+      if has_tag?(body, :ok) and has_tag?(body, :error),
+        do: types ++ [{:variant, :result, [:ok, :err]}],
+        else: types
+
     %{
       exports: ex |> Enum.reverse() |> Enum.uniq(),
       imports: [],
-      types: ty |> Enum.reverse() |> Enum.uniq(),
+      types: types,
       calls: ca |> Enum.reverse() |> Enum.uniq()
     }
+  end
+
+  defp has_tag?(ast, tag) do
+    {_ast, found} =
+      Macro.prewalk(ast, false, fn
+        {^tag, _} = node, _acc -> {node, true}
+        node, acc -> {node, acc}
+      end)
+
+    found
   end
 
   # The unit body lives under the trailing `[do: …]` of the block call.

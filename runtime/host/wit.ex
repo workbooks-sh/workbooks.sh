@@ -117,8 +117,9 @@ defmodule Workbooks.Wit do
       |> Enum.map(fn {fields, i} -> Workbooks.Wit.Types.record(Enum.at(modules, i) || unit, fields) end)
 
     enums = for {:enum, name, atoms} <- types, do: Workbooks.Wit.Types.enum(name, atoms)
+    variants = for {:variant, name, tags} <- types, do: Workbooks.Wit.Types.variant(name, tags)
 
-    records ++ enums
+    records ++ enums ++ variants
   end
 
   defp indent(block), do: block |> String.split("\n") |> Enum.map(&("  " <> &1)) |> Enum.join("\n")
