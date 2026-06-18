@@ -27,6 +27,23 @@ defmodule Workbooks.Resource do
 
   def fields(_), do: []
 
+  @doc """
+  The declared operations of a resource: `[{:query, name, opts} | {:mutation, name, body}]`.
+  `query :hot, where: …` is a named read; `mutation :enrich do … end` a transactional write.
+  """
+  def operations(%{ast: ast}) when not is_nil(ast) do
+    case do_body(ast) do
+      nil -> []
+      body -> body |> statements() |> Enum.flat_map(&operation/1)
+    end
+  end
+
+  def operations(_), do: []
+
+  defp operation({:query, _meta, [name, opts]}) when is_atom(name) and is_list(opts), do: [{:query, name, opts}]
+  defp operation({:mutation, _meta, [name, [do: body]]}) when is_atom(name), do: [{:mutation, name, body}]
+  defp operation(_), do: []
+
   @doc "Generate the WIT for a resource/record: the field `record` + any inline `enum`s."
   def wit(%{name: name} = node) do
     fs = fields(node)
