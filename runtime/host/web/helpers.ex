@@ -59,7 +59,7 @@ defmodule Workbooks.Web.Helpers do
     if desktop? and is_binary(requested) and requested != "" do
       requested
     else
-      base = System.get_env("WB_DATA") || System.tmp_dir!()
+      base = Workbooks.Config.data_dir()
       # Strip dots too (not just separators) so a tenant like "../../etc" can't
       # smuggle ".." into the path. BOTH segments are sanitized: `run_id` is
       # caller-derived on the harness route (= "harness-" <> caller session), so

@@ -143,7 +143,7 @@ defmodule Workbooks.Application do
   # Append a boot phase marker to <WB_DATA>/boot-trace.txt (mapped out of the
   # container) so a hang in start/2 is pinpointable. Best-effort, never raises.
   defp trace(msg) do
-    dir = System.get_env("WB_DATA") || System.tmp_dir!()
+    dir = Workbooks.Config.data_dir()
     _ = File.write(Path.join(dir, "boot-trace.txt"), "#{msg}\n", [:append])
     :ok
   rescue

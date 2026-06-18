@@ -9,7 +9,7 @@ defmodule Workbooks.MemorySources do
   """
   alias Workbooks.{Embed, Vector}
 
-  defp store_path, do: Path.join(System.get_env("WB_DATA") || System.tmp_dir!(), "wb-memory-sources.json")
+  defp store_path, do: Path.join(Workbooks.Config.data_dir(), "wb-memory-sources.json")
 
   @doc "Loaded source paths for the tenant (the desktop's `loaded` list)."
   def list(_tenant \\ "dev"), do: read_store() |> Map.keys() |> Enum.sort()

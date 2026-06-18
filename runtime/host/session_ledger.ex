@@ -11,7 +11,7 @@ defmodule Workbooks.SessionLedger do
   """
   require Logger
 
-  defp path, do: Path.join(System.get_env("WB_DATA") || System.tmp_dir!(), "wb-sessions.jsonl")
+  defp path, do: Path.join(Workbooks.Config.data_dir(), "wb-sessions.jsonl")
 
   @doc "Record a session at start. Best-effort — never breaks the run. `tenant` scopes visibility (wb-g1yo.1)."
   def record(session_id, agent_slug, prompt, workdir, tenant \\ nil) do
@@ -105,7 +105,7 @@ defmodule Workbooks.SessionLedger do
   # the process dies or the runtime restarts. Persist it (tenant-stamped) so a
   # past conversation can be re-opened, and gate reads by tenant.
 
-  defp transcript_dir, do: Path.join(System.get_env("WB_DATA") || System.tmp_dir!(), "wb-transcripts")
+  defp transcript_dir, do: Path.join(Workbooks.Config.data_dir(), "wb-transcripts")
 
   # Path-safe id (the id reaches `transcript/2` straight from the /api/run/:id URL).
   defp safe_id(id), do: id |> to_string() |> String.replace(~r/[^A-Za-z0-9_.-]/, "_")
