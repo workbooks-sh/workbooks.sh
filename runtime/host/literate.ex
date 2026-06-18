@@ -20,7 +20,7 @@ defmodule Workbooks.Literate do
   @langs ~w(elixir rust zig python svelte solid js ts c go wit)
   @decl_kw ~w(data task user type deps checks theme show query workbook nexus grant route)
 
-  @ref_re ~r/\[\[[^\]]+\]\]|work:\/\/[^\s)]*[a-zA-Z0-9_\/#-]|(?<![\w:]):[a-z]\w*|(?<![\w])@[a-z]\w*|(?<![\w])#[a-z][\w-]*/
+  @ref_re ~r/\[\[[^\]\n]+\]\]|work:\/\/[^\s)]*[a-zA-Z0-9_\/#-]|(?<![\w:]):[a-z]\w*|(?<![\w])@[a-z]\w*|(?<![\w])#[a-z][\w-]*/
 
   @spec parse(binary) :: [map]
   def parse(src) when is_binary(src) do
@@ -31,9 +31,16 @@ defmodule Workbooks.Literate do
     |> Enum.reverse()
   end
 
-  @doc "Extract the inline reference tokens from a chunk of text, in order."
+  @doc """
+  Extract the inline reference tokens from a chunk of text, in order. Tokens inside
+  `inline code` are syntax examples (e.g. a lesson showing `[[backlink]]`), not real
+  references, so they're stripped first.
+  """
   def refs(text) when is_binary(text) do
-    @ref_re |> Regex.scan(text) |> Enum.map(&hd/1)
+    text
+    |> String.replace(~r/`[^`]*`/, "")
+    |> then(&Regex.scan(@ref_re, &1))
+    |> Enum.map(&hd/1)
   end
 
   # ── the walk ──────────────────────────────────────────────────────────────

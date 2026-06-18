@@ -89,6 +89,16 @@ defmodule Workbooks.LiterateTest do
     assert "work://sales/score" in prose.refs
   end
 
+  test "refs ignore backlinks inside inline code, and don't span newlines" do
+    # `[[backlink]]` in backticks is a syntax example, not a real reference
+    assert Literate.refs("write `[[backlink]]` to link") == []
+    # a real backlink beside a coded example still resolves
+    assert "[[Score]]" in Literate.refs("see [[Score]] and write `[[example]]`")
+    refute "[[example]]" in Literate.refs("see [[Score]] and write `[[example]]`")
+    # a backlink may not span a line break
+    assert Literate.refs("[[The\nDock]]") == []
+  end
+
   test "a prose paragraph full of backlinks is NOT mistaken for a declaration" do
     src = "Foundation ([[Types]], [[References]]) · pages ([[Page]], [[Design]])."
     assert [%{type: :prose}] = Literate.parse(src)
