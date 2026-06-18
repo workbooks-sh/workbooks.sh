@@ -5,7 +5,7 @@ defmodule Nexus.SandboxTest do
   # same toolchain the compilers emit into) instantiates and runs on wasmex via Nexus.Sandbox,
   # with typed marshalling (core i32 → WIT s32 → Elixir 42). Skips if wasm-tools is absent.
   test "Nexus.Sandbox runs a wasm component on wasmex, with typed return" do
-    unless System.find_executable("wasm-tools") and System.find_executable("wasmtime") do
+    unless System.find_executable("wasm-tools") && System.find_executable("wasmtime") do
       :ok
     else
       dir = Path.join(System.tmp_dir!(), "nxsbx_#{System.unique_integer([:positive])}")
