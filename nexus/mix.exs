@@ -13,8 +13,12 @@ defmodule Nexus.MixProject do
 
   def application, do: [extra_applications: [:logger]]
 
-  # The sandbox is wasmex — wasmtime + the component model. Reuse the runtime's vendored,
-  # patched build (engine exceptions enabled) rather than rebuild it.
-  #   {:ash, "~> 3.0"}  — lands with the data layer (#2 in the order).
-  defp deps, do: [{:wasmex, path: "../runtime/vendor/wasmex"}]
+  # The sandbox is wasmex (wasmtime + component model); the database is Ash (a resource IS an
+  # Ash resource). Both reused, not rebuilt — nexus drives them.
+  defp deps do
+    [
+      {:wasmex, path: "../runtime/vendor/wasmex"},
+      {:ash, "~> 3.0"}
+    ]
+  end
 end
