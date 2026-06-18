@@ -109,3 +109,18 @@ touching a single `.work` file.
 - **wasmex.Components** marshals typed values across the boundary in our own `instance.ex` (no manual encode).
 - **Ash** delivered CRUD + `one_of` enum validation + faithful WIT from one small resource
   (17 deps; ~3 iterations to learn conventions — friction lands on us, not authors).
+
+## Validation: the generated Ash compiles + runs (2026-06-17)
+
+`Resource.Ash.source/2` on the real demo `resource Lead` → dropped into an Ash project →
+**compiled and ran CRUD + enum validation** (created a lead, read it back, rejected a bad
+`status`). The generator produces *working* Ash, not just valid-looking source. Runtime
+stayed dep-free — validated in an isolated project.
+
+## Next: the graph panel + database mapping (after Ash goes live)
+
+The book viewer gets a **right-side graph panel** rendering the real `Workbooks.Graph`
+(units + typed edges) so you can *see* the workbook. The **data model maps into the same
+graph**: a `resource` is a node; a `:ref` field is a relationship edge; a `query`/`mutation`
+is a read/write edge. One graph, code + data, same tooling. Sequenced after Ash is live so
+resources are real nodes. (bd: graph-panel task.)
