@@ -1,196 +1,46 @@
-# Sales
+# Demo
 
-This is the front matter of a real app — the **manifest** for the [[Welcome to Sales]]
-workbook. Every workbook has exactly one of these. It is the file the weave reads
-first to learn three things: *what this workbook is*, *what it depends on*, and
-*how to build and ship it*. Read it like a table of contents with teeth — every
-name below is a `[[backlink]]` that resolves to a real file in this tree, and every
-name is also a node the [[The Code Graph]] resolves when it audits the build.
+The **manifest** — the file the weave reads first to learn what this workbook is,
+what it depends on, and how to ship. It's the same literate text as every other
+file: a manifest is **not JSON**.
 
-The non-negotiable rule shows itself immediately: **a manifest is not JSON.** There
-is no `package.json`, no `sales.toml`, no sidecar config to keep in sync. The
-manifest is the same literate text as every other file — declarations and prose.
-The elements *are* the source of truth. If you ever reach for a `.json` to describe
-a workbook, you are doing it wrong.
-
-## What this workbook is — the tagging edge
-
-Every workbook declares *what it is* at the top. The format's vocabulary for "what
-something is" is the **tagging edge** — a small set of facets that can co-occur,
-with **kit as the floor**. This workbook is an **app** (it has an entry interface,
-the [[Sales Dashboard]]), it bundles **agents** (it ships a [[The Analyst Agent]]
-brain and friends), and it **exports a kit** ([[FinModel — a kit the whole team imports]])
-that other workbooks can import. `container` is *not* in this list — that is an
-execution property of a unit, not a type of the workbook.
-
-The declaration is a plain struct value. Field types are inferred from the defaults,
-so `name` is a string, `facets` is a list of atoms, and `exports` is a list of
-module references. No DSL, no schema.
+A workbook declares what it is with a plain struct — types inferred from defaults:
 
 defmodule Workbook do
-  defstruct name: "",
-            tagline: "",
-            facets: [],
-            entry: nil,
-            exports: [],
-            version: "0.0.0"
+  defstruct name: "", tagline: "", facets: [], entry: nil, exports: [], version: "0.0.0"
 end
 
 workbook = %Workbook{
-  name: "Sales",
-  tagline: "A lead-intelligence workbook: ingest, enrich, score, rank, draft, ship.",
+  name: "Demo",
+  tagline: "A lead workbook: ingest, enrich, score, rank, draft, ship.",
   facets: [:app, :agent, :kit],
-  entry: "02-pages/dashboard.work",
-  exports: [FinModel],
-  version: "0.4.0"
+  entry: "02-pages/page.work",
+  exports: [FinModel]
 }
 
-The `:entry` is the leaf the desktop app launches and the deploy lane serves as the
-default region — the [[Sales Dashboard]]. The `:exports` list is the workbook's
-*public* surface: only `FinModel` crosses the boundary, so a sibling workbook that
-`imports Sales` sees `ltv/1`, `cac/1`, and `npv/2`, and nothing else. Everything
-else in the tree is internal.
+`:entry` is the leaf the app launches (the [[Sales Dashboard]]). `:exports` is the
+public surface — only `FinModel` crosses the boundary, so a workbook that imports
+this one sees the kit and nothing else.
 
-## Dependencies and packages
+## Dependencies
 
-A workbook composes other workbooks and a handful of client engines. Dependencies
-are addressed *by name*, the way every reference in this format is — not by a URL
-buried in a lockfile. Each entry is a tagged tuple: the name, the version
-constraint, and where the weave resolves it from.
+Addressed by name, not a URL in a lockfile. A workbook can even depend on itself —
+`:finmodel` is the kit this tree exports.
 
 deps = [
-  {:finmodel,   "~> 0.4", path: "kits/finmodel.work"},
-  {:work_ui,    "~> 1.0", kit: "work-*"},
-  {:svelte,     "~> 5.0", island: :client},
-  {:solid,      "~> 1.8", island: :client}
+  {:finmodel, "~> 0.4", path: "kits/kit.work"},
+  {:work_ui,  "~> 1.0", kit: "work-*"},
+  {:svelte,   "~> 5.0", island: :client},
+  {:solid,    "~> 1.8", island: :client}
 ]
 
-The first line is the interesting one: a workbook can depend on **itself** —
-`:finmodel` is the [[FinModel — a kit the whole team imports]] kit this very tree
-exports, resolved by `path:`. That is the dogfood loop made literal. `:work_ui` is
-the pre-built `work-*` component library every page composes. `:svelte` and `:solid`
-are the two client island runtimes the weave hydrates in the browser — they back
-the [[Score Chart]] and [[Sparkline]] units respectively.
+Foreign compute units ([[Forecast]] Rust+Zig, [[Risk]] Python) aren't packages —
+their source is inline, compiled to wasm at weave time.
 
-Foreign-language compute units do not appear here as packages. The [[Forecast]]
-unit's Rust and Zig, and the [[Risk]] unit's Python, are resolved by the compiler
-lane at weave time — the source is *inline* in those files, compiled to wasm in
-their sandboxes. There is nothing to add to a dependency list; the unit *is* the
-dependency.
+## The weave checks
 
-## The nexus this workbook targets
+The gate that runs before a bundle ships — a red check ships nothing.
 
-The optional server tier is the **nexus** — the trusted backend that runs native
-Elixir on the BEAM, backs the agents, holds the data, and brokers the [[The Contract]]
-capability seam. The manifest names which nexus this workbook talks to and how. The
-same authored workbook can target a local nexus in development and a cloud nexus in
-production; nothing in the units changes, only this routing config.
+checks = [:resolve_refs, :audit_caps, :run_tests]
 
-nexus = %{
-  dev:  [provider: :local,   endpoint: "rcp://localhost:4000",      tier: :native_beam],
-  prod: [provider: :runtime, endpoint: "rcp://sales.nexus.work",    tier: :native_beam]
-}
-
-The `:provider` atom is the only thing that differs, and it is exactly the
-distinction [[The Contract]] is built around: `:local` fulfils a capability from the
-OS or browser-native APIs, `:runtime` fulfils it from the shared server over RCP.
-A *target* — desktop, web, mobile — is just a choice of provider plus an endpoint.
-It is **never** a code fork, and the nexus is **never** wasm: native BEAM on the
-server, with foreign units sandboxed beside it.
-
-## Publish posture — the three delivery modes
-
-The same workbook ships three ways with no rewrite, and the manifest records which
-one this build is publishing under. This is the locked delivery model, named:
-
-publish = %{
-  mode:    :static,
-  modes: [
-    static: [out: "salesapp.html", hydrate: :client],
-    ssr:    [render: :nexus, islands: :client],
-    live:   [render: :nexus, diffs: "rcp/ws"]
-  ],
-  visibility: :private,
-  registry:   "sales.nexus.work"
-}
-
-The default `:static` mode is what [[Deploy]] emits: the whole tree woven into one
-self-contained gzipped `salesapp.html` that hydrates entirely in the browser, no
-nexus required to view it. Flip `mode:` to `:ssr` and the server regions render on
-the BEAM while client units stay islands; flip to `:live` and the nexus streams
-diffs over the RCP websocket. One authoring model, every delivery mode — the choice
-lives *here*, in one line, not in three different builds.
-
-## The weave checks — a red test ships no bundle
-
-The last job of the manifest is to declare the gate. `work bundle` does not just
-concatenate files: it runs the **weave gate**, and the gate is allowed to fail the
-build. These are the checks it must pass, declared as a list of atoms — the enum of
-gates this workbook insists on.
-
-@gates [
-  :resolve_refs,     # every [[backlink]], :atom, and @type points at a real node
-  :audit_caps,       # no unit uses a capability its sandbox grant did not give it
-  :audit_deps,       # the dependency graph is acyclic and fully resolved
-  :run_tests,        # every unit's inline tests pass — red test, no bundle
-  :validate_tasks    # every Task owner resolves to a defined person
-]
-
-weave = %{
-  gates:   @gates,
-  graph:   "90-graph/graph.work",
-  on_fail: :block
-}
-
-`:on_fail` is `:block` — the [[The Weave]] unit explains why this is the whole point.
-A workbook whose [[Plan]] references an undefined owner, or whose [[Risk]] unit
-reaches for a capability its sandbox never granted, must not produce a shippable
-artifact. The gate runs `work check` over the [[The Code Graph]], and the graph is
-where `:resolve_refs` and `:audit_caps` get their answers.
-
-## The tree
-
-The folders below are the workbook, in reading order. Each is a real stage of the
-app, and each teaches the format concepts it needs while it does its job.
-
-- **01-foundation** — the front door. [[Welcome to Sales]] explains the four lanes;
-  [[Lead]] declares the canonical `%Lead{}` struct and the `@statuses` enum; the
-  glossary fixes the vocabulary.
-- **02-pages** — the leaf interface. [[Sales Dashboard]] is the `:entry` this
-  manifest names: the page a user launches, composed from `work-*` elements.
-- **03-lib** — the server compute. [[Scoring a lead]] (`:score`), [[Enrich]]
-  (`:enrich`, granted net to `api.crm.com`), and the [[Pipeline]] flow that wires
-  seed → enrich → score → rank.
-- **04-sandboxing** — isolation as a named unit. [[Pricing under a sandbox]] puts
-  `:tax` inside `sandbox :pricing`, the canonical example of a capability boundary.
-- **05-data** — typed content. [[Leads — the typed data source]] declares the seed
-  leads as `data` of `Lead`, queryable and rendered by default.
-- **06-dock** — the capability seam. [[The Contract]] is the one file that shows the
-  *generated* WIT — clearly labelled as the artifact you never touch.
-- **07-agents** — the runtime-backed brains. [[The Analyst Agent]] drafts outreach,
-  the coder runs ReAct, the researcher loops plan → search → verify, and
-  [[Reflexion: an outreach email that critiques and revises itself]] keeps its trace
-  as memory.
-- **08-plan** — live state. [[Plan]] declares `Task` values whose `:owner` and
-  `:status` are validated at the weave gate.
-- **09-weave** — the polyglot edge and the build itself: the [[Score Chart]] Svelte
-  island, the [[Sparkline]] Solid island, the [[Forecast]] Rust+Zig sandbox, the
-  [[Risk]] Python sandbox, all pulled together by [[The Weave]].
-- **10-deploy** — shipping. [[Deploy]] emits `salesapp.html` and explains the three
-  delivery modes this manifest's `publish` block selects between.
-- **90-graph** — the spine. [[The Code Graph]] is the typed property graph every
-  gate above queries.
-- **kits** — what we export. [[FinModel — a kit the whole team imports]] is the one
-  module in `:exports`, the reusable financial model the whole team imports.
-
-To build the whole thing from this manifest, the weave does what the rest of this
-file declared: resolve every reference in the tree, audit the caps and deps, run the
-tests, and — only if the gate stays green — emit the one file.
-
-flow :build do
-  step :load,    do: Weave.read(workbook)
-  step :resolve, do: Graph.resolve(weave.graph)
-  step :audit,   do: Weave.audit(@gates)
-  step :test,    do: Weave.run_tests()
-  step :emit,    do: Weave.bundle(publish, out: "salesapp.html")
-end
+Next: [[Welcome]] if you skipped it, or [[Types]] to start building.

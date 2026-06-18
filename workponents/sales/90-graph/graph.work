@@ -76,17 +76,17 @@ node, so a single query can ask structural *and* operational questions at once.
 
 defmodule SalesGraph do
   @nodes [
-    %Node{id: :lead,     kind: :data,    place: :server, lang: :elixir, file: "05-data/leads.work", exports: [:query]},
-    %Node{id: :score,    kind: :compute, place: :server, lang: :elixir, file: "03-lib/score.work", exports: [:score]},
-    %Node{id: :enrich,   kind: :compute, place: :server, lang: :elixir, file: "03-lib/enrich.work", exports: [:enrich], grants: [{:net, "api.crm.com"}]},
-    %Node{id: :pipeline, kind: :flow,    place: :server, lang: :elixir, file: "03-lib/pipeline.work", exports: [:run]},
-    %Node{id: :tax,      kind: :compute, place: :server, lang: :elixir, sandbox: :pricing, file: "04-sandboxing/pricing.work", exports: [:quote]},
-    %Node{id: :fx,       kind: :compute, place: :server, lang: :elixir, sandbox: :rates, file: "04-sandboxing/pricing.work", exports: [:rate], grants: [:net]},
-    %Node{id: :forecast, kind: :compute, place: :server, lang: :rust, sandbox: :forecast, file: "09-weave/forecast.work", exports: [:project]},
-    %Node{id: :risk,     kind: :compute, place: :server, lang: :python, sandbox: :risk_box, file: "09-weave/risk.work", exports: [:risk_score]},
-    %Node{id: :chart,    kind: :island,  place: :client, lang: :svelte, file: "09-weave/chart.work", exports: [:render]},
-    %Node{id: :sparkline, kind: :island, place: :client, lang: :solid, file: "09-weave/sparkline.work", exports: [:render]},
-    %Node{id: :analyst,  kind: :agent,   place: :server, lang: :elixir, file: "07-agents/analyst.work", exports: [:draft]}
+    %Node{id: :lead,     kind: :data,    place: :server, lang: :elixir, file: "05-data/data.work", exports: [:query]},
+    %Node{id: :score,    kind: :compute, place: :server, lang: :elixir, file: "03-lib/compute.work", exports: [:score]},
+    %Node{id: :enrich,   kind: :compute, place: :server, lang: :elixir, file: "03-lib/grants.work", exports: [:enrich], grants: [{:net, "api.crm.com"}]},
+    %Node{id: :pipeline, kind: :flow,    place: :server, lang: :elixir, file: "03-lib/flow.work", exports: [:run]},
+    %Node{id: :tax,      kind: :compute, place: :server, lang: :elixir, sandbox: :pricing, file: "04-sandboxing/sandbox.work", exports: [:quote]},
+    %Node{id: :fx,       kind: :compute, place: :server, lang: :elixir, sandbox: :rates, file: "04-sandboxing/sandbox.work", exports: [:rate], grants: [:net]},
+    %Node{id: :forecast, kind: :compute, place: :server, lang: :rust, sandbox: :forecast, file: "09-weave/rust-zig.work", exports: [:project]},
+    %Node{id: :risk,     kind: :compute, place: :server, lang: :python, sandbox: :risk_box, file: "09-weave/python.work", exports: [:risk_score]},
+    %Node{id: :chart,    kind: :island,  place: :client, lang: :svelte, file: "09-weave/svelte.work", exports: [:render]},
+    %Node{id: :sparkline, kind: :island, place: :client, lang: :solid, file: "09-weave/solid.work", exports: [:render]},
+    %Node{id: :analyst,  kind: :agent,   place: :server, lang: :elixir, file: "07-agents/brain.work", exports: [:draft]}
   ]
 
   @edges [

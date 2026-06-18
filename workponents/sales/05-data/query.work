@@ -1,0 +1,31 @@
+# Query & show
+
+For a slice instead of the whole table, `query()` the source by name. A query is
+ordinary Elixir over the typed rows — `where:`, `order_by:`, `select:` — and it
+returns more `%Lead{}` values, so the result is itself renderable.
+
+Here's the ranked board: leads that reached `:scored`, hottest first. The dashboard
+and the [[Score chart]] read exactly this.
+
+query :ranked, from: :leads do
+  from lead in :leads,
+    where: lead.status == :scored,
+    order_by: [desc: lead.score],
+    select: lead
+end
+
+Showing a result is the same idea as showing a source: name it and it renders.
+
+show :ranked, as: :table, columns: [:name, :domain, :revenue, :score, :status]
+
+A second slice feeds the [[Pipeline]]: everything **not yet** scored. Same source, a
+different `where:` — not a copy. One source of truth, many views.
+
+query :backlog, from: :leads do
+  from lead in :leads,
+    where: lead.status != :scored,
+    select: lead
+end
+
+Because every unit names the `Lead` record and the `:status` enum, the code graph
+wires them together. Run `work why :leads` to see who reads this source.

@@ -1,204 +1,44 @@
 # Deploy
 
-This is the last page, and it answers the question that has been hanging over
-every unit you built: **where does all of this actually run, and how does it
-ship?** The Sales workbook is one folder of `.work` files. We never rewrote it
-for a phone, a CDN, or a server farm. We authored it once. Here we show how that
-one authoring model becomes a thing you can hand to a stranger.
+One folder of `.work` files. We never rewrote it for a phone, a CDN, or a server.
+Two ideas, kept separate:
 
-There are two ideas to keep separate, and most of the confusion in deployment
-comes from conflating them:
-
-- **Targets** — *where the nexus lives*. There are exactly two: **local** and
-  **cloud**. One OCI image, two homes.
-- **Delivery modes** — *how the page reaches a browser*. There are three:
-  **static bundle**, **nexus SSR**, and **live SSR**. Same workbook, no rewrite.
-
-Everything here references the units we already built — [[Pipeline]] orchestrates
-[[Enrich]] and [[Score]], the [[Plan]] board holds the team's work, and the
-client islands [[Chart]] and [[Sparkline]] hydrate in the browser. Deploy is
-just the act of placing all of that somewhere a person can reach it.
+- **Targets** — *where the nexus lives*: `local` or `cloud`. One image, two homes.
+- **Delivery modes** — *how a page reaches a browser*: three of them, no rewrite
+  (see [[Delivery modes]]).
 
 ## The weave is the build
 
-`work bundle` is the compiler. It walks this folder tree top to bottom, resolves
-every `[[backlink]]`, `:atom`, and `@type` reference into a code-graph edge,
-audits that every `grant:` a unit asked for is one the Dock can fulfill, compiles
-each foreign-language unit to a wasm component, and runs the tests. The output is
-a single self-contained gzipped HTML file: `salesapp.html`.
-
-The gate is not advisory. A red test ships **no bundle** — the weave refuses to
-emit a file it could not prove. So the build is also the audit.
+`work bundle` walks the tree, resolves every reference into a code-graph edge,
+audits that every `grant:` is fulfillable, compiles each foreign unit to wasm, and
+runs the tests. The output is one self-contained gzipped `salesapp.html`. A red test
+ships **no bundle** — the build is also the audit.
 
 server compute :weave do
-  defmodule Result do
-    defstruct bundle: nil, units: 0, edges: 0, caps_ok: false, tests: :unknown
-  end
-
-  # The weave is a pipeline of gates. Each returns {:ok, ...} or {:error, reason};
-  # the first error stops the build, and no bundle file is written.
   def build(tree) do
-    with {:ok, graph}  <- resolve_refs(tree),
-         {:ok, caps}   <- audit_caps(graph),
-         {:ok, units}  <- compile_units(graph),
+    with {:ok, graph} <- resolve_refs(tree),
+         {:ok, _caps} <- audit_caps(graph),
+         {:ok, units} <- compile_units(graph),
          {:ok, :green} <- run_tests(units) do
-      html = emit_html(units, graph)
-      {:ok, %Result{
-        bundle: html,
-        units: length(units),
-        edges: graph.edge_count,
-        caps_ok: caps == :granted,
-        tests: :green
-      }}
-    else
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  # A failing test is the build failing — not a warning printed beside a shipped
-  # file. The contract is: green or nothing.
-  defp run_tests(units) do
-    case Enum.all?(units, & &1.passed) do
-      true  -> {:ok, :green}
-      false -> {:error, :tests_red}
+      {:ok, emit_html(units, graph)}
     end
   end
 end
 
 ## Two targets, one image
 
-A target is **where the nexus lives**, and the locked model gives us exactly two:
-**local** and **cloud**. The crucial thing — the thing that makes this not a
-fork — is that *both run the same OCI image*. Local is that image in a Linux
-container on your machine (krunvm on a Mac, behind a `krunvm | podman | docker`
-seam). Cloud is that same image on a Machine that scales to zero. You do not
-build a "dev server" and a separate "prod server." You build one runtime and
-choose its home.
-
-That single image carries the whole nexus job: native Elixir on the BEAM running
-[[Pipeline]] and the [[Plan]] board, the wasmtime sandboxes hosting [[Forecast]]
-(Rust + Zig) and [[Risk]] (Python), the agent loops behind [[Analyst]], and the
-Dock membrane that fulfills every `grant:`.
+A target is *where the nexus lives*, and both run the **same OCI image** — local is
+that image in a container on your machine, cloud is the same image on a Machine that
+scales to zero. Not a fork: one runtime, two homes.
 
 server compute :targets do
-  # A target is structure, not a DSL. The fields fall out of their defaults —
-  # `where` is one of two atoms, `image` is the one image both share.
   defmodule Target do
     defstruct where: :local, image: "ghcr.io/workbooks-sh/runtime:latest", scale_to_zero: false
   end
 
-  @targets [:local, :cloud]
-
-  # Local and cloud differ only in placement and lifecycle, never in code. The
-  # image string is identical; that identity is the whole point.
-  def local,
-    do: %Target{where: :local, scale_to_zero: false}
-
-  def cloud,
-    do: %Target{where: :cloud, scale_to_zero: true}
-
-  def valid?(%Target{where: w}) when w in @targets, do: true
-  def valid?(%Target{}), do: false
-
-  # `work deploy` reads this and places the same image at the chosen home. It is
-  # the user's tool — it runs the runtime image; it is never how the platform
-  # itself publishes that image.
-  def deploy(%Target{} = t) do
-    case valid?(t) do
-      true  -> {:ok, {:deployed, t.where, t.image}}
-      false -> {:error, :unknown_target}
-    end
-  end
+  def local, do: %Target{where: :local}
+  def cloud, do: %Target{where: :cloud, scale_to_zero: true}
 end
 
-## Three delivery modes, no rewrite
-
-A *target* is where the nexus lives. A *delivery mode* is how a page reaches a
-browser. The same Sales workbook ships three ways with no change to the source —
-because placement (`client` / `server`) is already declared on every unit, the
-delivery mode just decides *who renders the server regions and how the diff
-travels*.
-
-server compute :delivery do
-  defmodule Mode do
-    defstruct name: :static, renders_server_regions: :browser, transport: :file
-  end
-
-  @modes [:static, :nexus_ssr, :live_ssr]
-
-  # (a) Static bundle. There is no nexus in the loop at all. `salesapp.html` is a
-  #     file you can email; the BEAM-placed regions were rendered once at weave
-  #     time and frozen into the page, and the client islands ([[Chart]],
-  #     [[Sparkline]]) hydrate in the browser. This is the floor: a workbook is
-  #     HTML, so the browser renders it everywhere.
-  def static,
-    do: %Mode{name: :static, renders_server_regions: :weave_time, transport: :file}
-
-  # (b) Nexus SSR. A target is live. The server regions — [[Pipeline]], the
-  #     [[Plan]] board, anything `server` — render on the BEAM per request; the
-  #     `client` units arrive as islands and hydrate. You get fresh server data
-  #     without giving up the island model.
-  def nexus_ssr,
-    do: %Mode{name: :nexus_ssr, renders_server_regions: :beam_per_request, transport: :http}
-
-  # (c) Live SSR. Same server rendering, but instead of a fresh page the nexus
-  #     streams *diffs* over the RCP websocket. The [[Plan]] board mutates in
-  #     place as agents claim tasks; live state, declarative document, one wire.
-  def live_ssr,
-    do: %Mode{name: :live_ssr, renders_server_regions: :beam_per_request, transport: :rcp_ws}
-
-  def modes, do: @modes
-
-  # The mode is a runtime choice, not an authoring one. The same units, the same
-  # grants, the same code graph — only the renderer and the transport change.
-  def pick(name) when name in @modes do
-    %{static: &static/0, nexus_ssr: &nexus_ssr/0, live_ssr: &live_ssr/0}
-    |> Map.fetch!(name)
-    |> apply([])
-  end
-end
-
-The matrix is the whole story, and it is small. Pick a **target** for where the
-runtime lives; pick a **mode** for how the page arrives. A static bundle needs no
-target at all — it is a file. The two SSR modes need a live target, local or
-cloud, and differ only in whether the browser gets a fresh page or a stream of
-diffs.
-
-| mode | server regions render | transport | needs a target |
-| --- | --- | --- | --- |
-| `:static` | once, at weave time | a `.html` file | no |
-| `:nexus_ssr` | on the BEAM, per request | HTTP | yes |
-| `:live_ssr` | on the BEAM, per request | RCP websocket | yes |
-
-## Ship it
-
-Deploy is the last gate composed from the rest: weave the tree, pick a target,
-pick a mode, place the image. If the weave is red, nothing leaves the building.
-
-server flow :ship do
-  step :weave do
-    :weave.build(workspace_tree())
-  end
-
-  # Choose where the nexus lives. Local for a teammate's laptop, cloud for the
-  # world; both run the one image from `:targets`.
-  step :place, after: :weave do
-    :targets.cloud() |> :targets.deploy()
-  end
-
-  # Choose how it reaches a browser. Here we serve the live board so the [[Plan]]
-  # page mutates as agents work; a static export is one mode-swap away.
-  step :serve, after: :place do
-    :delivery.pick(:live_ssr)
-  end
-
-  done do
-    {:shipped, "salesapp.html"}
-  end
-end
-
-That is the entire model. One folder of HTML, woven by `work bundle` into one
-file. Two places it can live — `local` and `cloud`, the same image. Three ways it
-can reach a reader — a frozen file, a server-rendered page, a live stream. You
-learned the format by reading a real app; now you ship the real app. Back to
-[[Welcome]] to read it again with the whole picture in view.
+`work deploy` reads this and places the image at the chosen home. Next: how the page
+actually reaches a reader — [[Delivery modes]].

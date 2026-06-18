@@ -1,0 +1,37 @@
+# Claim, lock & fence
+
+If the document is the store and many agents write to it, you need a database's
+discipline: don't let two writers stomp the same row. The work format does this with
+**drafts** and **scopes** — no global mutex.
+
+A **draft** is a scoped, uncommitted overlay; it commits atomically or not at all. A
+**scope** narrows what the draft may touch — here, one task — so two agents claiming
+two different tasks never contend. That narrowed scope is the **fence**.
+
+server :claims do
+  # compare-and-swap: open a draft fenced to one task, commit only if still unclaimed.
+  def claim(title, who) do
+    draft scope: {:task, title} do
+      case fetch(title) do
+        {:ok, %Task{owner: nil} = t} -> commit(%Task{t | owner: who, status: :doing}); {:ok, :claimed}
+        {:ok, %Task{owner: other}}   -> {:error, {:already_claimed, other}}
+        :error                        -> {:error, :no_such_task}
+      end
+    end
+  end
+
+  # only the owner who claimed it may close it — the fence stops one agent closing another's work.
+  def finish(title, who) do
+    draft scope: {:task, title} do
+      case fetch(title) do
+        {:ok, %Task{owner: ^who} = t} -> commit(%Task{t | status: :done}); {:ok, :done}
+        {:ok, %Task{owner: other}}    -> {:error, {:not_owner, other}}
+        :error                         -> {:error, :no_such_task}
+      end
+    end
+  end
+end
+
+Because the draft commits over `:tasks` — the live `data` from [[Plan]] — the board
+updates the moment a claim lands. The page isn't a snapshot of the store; the page
+*is* the store.

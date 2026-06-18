@@ -1,61 +1,26 @@
 # The Contract
 
-Every unit you have read so far — [[Enrich]], [[Score]], the [[Pipeline]] — has a
-**contract**: the promise of what it offers, what it needs, and the shapes that
-cross its edge. The surprising part of the work model is that you have never
-*written* a contract. You wrote Elixir. The contract is the Elixir module, read a
-certain way:
+A unit's contract is just its Elixir module. You never write a contract — you write
+the module, and read it a certain way:
 
-- the module's **public functions are its exports** — `enrich/1`, `score/1` are
-  what other units may call;
-- its **dependencies and grants are its imports** — `grant net: "api.crm.com"` is
-  the one capability :enrich asks the host to fulfill;
-- its **structs, atoms, and tuples are its types** — `%Lead{}`, the `@statuses`
-  enum, the `{:ok, lead} | {:error, reason}` variant;
-- a shared `@behaviour` is an **interface** — the thing a kit declares so many
-  units can satisfy one shape.
-
-That is the whole idea, and it is worth stating plainly before anything else: the
-contract is not a separate artifact you maintain in lockstep with the code. It IS
-the code. Learn Elixir, not a contract language.
-
-## Reading a module as a contract
-
-Take a unit small enough to hold in your head. The point is to *read the same
-lines two ways* — once as ordinary Elixir, once as a contract.
+- public functions are its **exports**;
+- dependencies and `grant`s are its **imports**;
+- structs, atoms, and tuples are its **types**;
+- a shared `@behaviour` is an **interface**.
 
 server :tax, in: :pricing do
-  @moduledoc """
-  Compute sales tax for a quote. This module's surface IS its contract:
-  one export (tax/2), the imports it asks for live on the sandbox edge,
-  and the types are the structs and tuples that cross the boundary.
-  """
-
-  # An export. Because it's a public def, other units may call it; the weave
-  # gate records `:tax → tax/2` as an edge in the code graph. Its inferred type
-  # is (Money.t(), region :: atom()) -> {:ok, Money.t()} | {:error, :no_rate}.
-  def tax(%Money{cents: cents} = subtotal, region) do
+  # export: a public def. Other units may call it.
+  def tax(%Money{cents: cents}, region) do
     case rate_for(region) do
-      {:ok, bps} ->
-        added = div(cents * bps, 10_000)
-        {:ok, %Money{subtotal | cents: cents + added}}
-
-      :miss ->
-        {:error, :no_rate}
+      {:ok, bps} -> {:ok, %Money{cents: cents + div(cents * bps, 10_000)}}
+      :miss      -> {:error, :no_rate}
     end
   end
 
-  # A private def. NOT an export — it is invisible at the boundary, so it never
-  # appears in the contract. Internal refactors here change nothing for callers.
-  defp rate_for(region) do
-    case Map.fetch(@rates, region) do
-      {:ok, bps} -> {:ok, bps}
-      :error -> :miss
-    end
-  end
+  # not an export — private, invisible at the boundary.
+  defp rate_for(region), do: Map.fetch(@rates, region) |> tag()
 
-  # A type, declared as structure. No DSL, no @type lead-in — the defstruct's
-  # default values infer the field types (cents is an integer here).
+  # a type — structure, no @type lead-in. Defaults infer the field types.
   defmodule Money do
     defstruct cents: 0, currency: :usd
   end
@@ -63,182 +28,22 @@ server :tax, in: :pricing do
   @rates %{us: 0, ca: 725, ny: 800}
 end
 
-Read it as code and it is a tax function over a `Money` struct. Read it as a
-contract and it says: *I export `tax/2`; I take a `Money` and a region atom; I
-return a tagged variant; I live inside the [[Pricing]] sandbox, so my imports are
-whatever that boundary grants.* Same lines. You never wrote the second reading;
-it was always there.
+That's the whole contract: exports `tax/2`, takes a `Money` and an atom, returns
+`{:ok, _} | {:error, _}`. You wrote Elixir; the contract was always there.
 
-## An interface is a `@behaviour`
+## Sharing a contract: `@behaviour`
 
-When several units must agree on one shape — the definition of a kit — the shared
-contract is an Elixir `@behaviour`. The callbacks are the agreed exports; each
-implementer's module is checked against them at the weave gate.
+When many units must agree on one shape — what a kit declares — the shared contract
+is a `@behaviour`. The callbacks are the agreed exports; the compiler holds each
+implementer to them.
 
 defmodule Scorer do
-  @moduledoc """
-  The interface every scoring unit satisfies. This behaviour IS the kit's
-  contract: any module that adopts it must export these two functions with
-  these shapes, or the weave gate refuses the bundle.
-  """
-
-  # An export every implementer must provide. The callback's signature is the
-  # contract; :score (the canonical unit) satisfies it, and so could a tenant's
-  # own scorer dropped in beside it.
   @callback score(Lead.t()) :: integer()
-
-  # A second required export: explain why, for the dashboard tooltip.
   @callback explain(Lead.t()) :: String.t()
 end
 
-A unit adopts it with `@behaviour Scorer` and the compiler holds it to the shape.
-This is how [[FinModel]] is shipped as a kit and how a customer can supply their
-own `:score` without forking ours: the interface is the contract, the
-implementation is theirs.
+A unit adopts it with `@behaviour Scorer`. This is how [[FinModel]] ships as a kit
+and how a customer can drop in their own `:score` without forking ours — the
+interface is the contract, the implementation is theirs.
 
-## The Dock: one seam for every import
-
-A contract names imports; *something* has to fulfill them. That something is the
-**Dock** — the single capability seam every unit talks through. There is exactly
-one membrane, and every privileged act — a network fetch, a key read, a database
-query, a file open — is a **request** that crosses it:
-
-> **request → membrane → provider**
-
-The membrane checks the request against the calling unit's grants. If the grant
-covers it, the membrane routes the request to a **provider**, of which there are
-two kinds:
-
-- `local` — fulfilled on the device: the OS through Tauri on the desktop, or the
-  browser's own APIs on the web.
-- `runtime` — fulfilled by the shared server tier (the **nexus**) over RCP.
-
-The same line of unit code — `Dock.fetch(url)` in [[Enrich]] — is satisfied by a
-different provider depending on where the workbook is delivered, and the unit
-never knows which. That is the point of a single seam: the unit declares the
-*need*, the Dock decides the *fulfillment*.
-
-server :dock_demo, grant: [net: "api.crm.com", kv: :secrets] do
-  @moduledoc """
-  Nothing here calls a provider directly. Each Dock.* call is a request that
-  hits the membrane; the membrane checks our two grants and routes to local
-  or runtime. The unit is provider-blind on purpose.
-  """
-
-  def lookup_account(name) do
-    # A network request. Membrane checks `net: "api.crm.com"` against the host,
-    # then routes: on the nexus this goes out over the server's egress; in a
-    # desktop build it could be the OS network stack. Same call either way.
-    key = Dock.secret(:crm_api_key)
-    url = "https://api.crm.com/v1/accounts?name=" <> URI.encode(name)
-
-    Dock.fetch(url, headers: [{"authorization", "Bearer " <> key}])
-  end
-
-  # A key read. `Dock.secret/1` is itself a request across the membrane; it is
-  # only fulfilled because we hold `kv: :secrets`. A unit without that grant
-  # asking for the key gets refused at the seam, not handed an empty string.
-  # That refusal IS the boundary doing its job.
-end
-
-Grants are how a contract and the Dock meet: the contract lists the imports; the
-Dock is the one place those imports are honored or denied. A unit cannot reach
-around the seam, which is why a client island can be hydrated in an untrusted
-browser and still be safe — it simply has no grant the membrane will honor for a
-secret or an arbitrary host.
-
-## The Nexus: the optional server tier
-
-The `runtime` provider has a name: the **nexus**. It is the optional server tier
-behind the Dock, and it is where the trusted, heavy, and long-lived work lives:
-
-- **agents** — the analyst, coder, researcher, and reflexion loops run their
-  steps in native server Elixir, with typed `data` as their memory;
-- **data and sync** — the canonical store and the diffs that drive live SSR;
-- **the compiler lane** — turning a `client svelte` island or a Rust/Zig unit
-  into wasm;
-- **multi-tenancy and isolation** — keeping one customer's run off another's, the
-  nexus's job rather than any single wasm box's.
-
-A workbook *can* ship with no nexus at all — the static bundle hydrates entirely
-in the browser, and any `runtime`-only request simply has no provider, so units
-that need one are inert. Add a nexus and the same workbook gains agents, sync,
-and server SSR **without a rewrite**. The contract didn't change; a second
-provider showed up behind the seam to fulfill the imports the static delivery
-left unfulfilled.
-
-server :nexus_note do
-  @moduledoc """
-  A unit that only makes sense with a nexus. In a static bundle its runtime
-  requests have no provider, so it stays inert; deliver via the nexus and the
-  same code runs, agents and all. No branch in the unit decides this — the Dock
-  does, by which providers are present.
-  """
-
-  def draft_outreach(%Lead{} = lead) do
-    # Asks the nexus to run the analyst agent. This is a runtime-only request:
-    # the membrane has nowhere to route it in a static bundle, and routes it to
-    # the agent loop when a nexus is attached. The unit code is identical.
-    Dock.agent(:analyst, lead: lead, ask: "draft a first-touch email")
-  end
-end
-
-## The generated WIT — shown once, never written
-
-Everything above compiles to a standard **wasm component** (the Component Model),
-which is how an Elixir unit, a Rust [[Forecast]] kernel, and a Python [[Risk]]
-scorer can all interoperate and all be sandboxed. The component's contract is
-expressed, at that low level, as a **WIT world**. You are about to see one. It is
-the *only* place in this entire workbook a WIT artifact appears, and the reason it
-appears is to convince you that you will never write it.
-
-This world is **generated** from the `:tax` module above — the public `tax/2`
-became an export, the `Money` struct and the region atom became types, the
-sandbox's net grant became an import. Read it once, recognize that every line maps
-back to Elixir you already wrote, and then forget it.
-
-// GENERATED — you never touch this. Emitted by the weave from the :tax module.
-// Each line below corresponds to Elixir you already wrote, above.
-package sales:tax@1.0.0;
-
-world tax {
-  // from `defstruct cents:, currency:` — the inferred Money type
-  record money {
-    cents: s64,
-    currency: string,
-  }
-
-  // from the `{:ok, Money} | {:error, :no_rate}` tagged variant
-  variant tax-result {
-    ok(money),
-    err(tax-error),
-  }
-  enum tax-error { no-rate }
-
-  // from the public `def tax(%Money{}, region)` — the one export
-  export tax: func(subtotal: money, region: string) -> tax-result;
-
-  // from the `:pricing` sandbox grant — the one import the Dock must fulfill
-  import host:net/fetch;
-}
-
-That file is real, correct, and machine-made. You did not author a single line of
-it; the weave derived all of it from the module. If a future maintainer ever opens
-the generated world to "fix" the contract, they are editing the wrong thing — the
-fix belongs in the Elixir, and the world is regenerated from it. **The rule holds:
-learn Elixir, not WIT.**
-
-## Why this matters for the rest of the app
-
-Because the contract is the module, the **code graph** can be built straight from
-your source: public defs become export nodes, grants become import edges, structs
-and variants become type nodes, `@behaviour` becomes an interface edge, and the
-`[[backlinks]]` and `:atom` references in this very prose become ref edges. The
-weave gate walks that graph to resolve references, audit that every import has a
-grant, and run the tests — and a red test ships no bundle.
-
-So when [[Pipeline]] calls :enrich and then :score, the gate already knows the
-shapes line up, the net grant is accounted for, and the `:enriched` lead that
-leaves one unit is exactly what the next one's contract accepts. None of that
-needed a contract language. It needed only the modules you already wrote, read as
-the contracts they always were.
+Next: who fulfills the imports a contract names — the [[The Dock]].

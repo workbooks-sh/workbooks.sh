@@ -1,0 +1,38 @@
+# Welcome
+
+This is a real app *and* its own docs. **Demo** is a lead workbook: it ingests
+leads, enriches, scores, and ranks them, drafts outreach with agents, and ships a
+dashboard. Every file is a working unit. Read top to bottom — you build the app and
+learn the format at once.
+
+A `.work` file is plain text. Prose narrates; code blocks run. No HTML wrapper, no
+fences — a `do … end` block is self-delimiting, and the word in front (`data`, `def`,
+`server`, `client`, `flow`, `sandbox`, `agent`) says what it is.
+
+## Four lanes
+
+- **Prose** — rich text that explains. It carries live refs: `[[backlinks]]`, `#tags`,
+  `work://` links, and inline `:atom` / `@type` mentions.
+- **Declaration** — structure with no body. A `defstruct` is a record; a list of
+  atoms is an enum; a `data` block is a typed table that renders by default.
+- **Code** — a runnable block: a `def`, a `client` island, a `server` unit.
+- **Placement** — the first word says where it runs: `client` (browser, wasm) or
+  `server` (nexus, native BEAM), plus an optional `sandbox :name` for capabilities.
+
+Here is the record the whole app turns on — a struct, types inferred from defaults:
+
+defmodule Lead do
+  defstruct name: "", domain: "", revenue: 0, employees: 0, score: 0, status: :new
+end
+
+@statuses [:new, :enriched, :scored, :contacted]
+
+## What we build
+
+Foundation ([[Types]], [[References]]) · pages ([[Sales Dashboard]], [[Styling a
+workbook]]) · lib ([[Scoring a lead]], [[Enrich]], [[Pipeline]]) · [[Pricing under a
+sandbox]] · data · the [[The Contract]] + [[The Dock]] · a [[A kit]] · agents · the
+[[Plan]] board · the [[The Weave]] (polyglot) · deploy · the [[The Code Graph]].
+
+One authoring model, three deliveries with no rewrite: a static bundle, nexus SSR,
+and live SSR. Next: [[Types]].

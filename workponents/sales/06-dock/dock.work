@@ -1,0 +1,30 @@
+# The Dock
+
+A contract names imports; the **Dock** fulfills them. It's the single capability
+seam every unit talks through. Every privileged act — a fetch, a key read, a query —
+is a request that crosses it:
+
+> request → membrane → provider
+
+The membrane checks the request against the unit's grants. If a grant covers it, it
+routes to a **provider**:
+
+- `local` — the device: the OS (desktop) or browser APIs (web).
+- `runtime` — the shared server tier (the [[The Nexus]]) over RCP.
+
+The same line of unit code is fulfilled by a different provider depending on where
+the workbook ships — the unit never knows which. It declares the *need*; the Dock
+decides the *fulfillment*.
+
+server :crm, grant: [net: "api.crm.com", kv: :secrets] do
+  def lookup(name) do
+    key = Dock.secret(:crm_api_key)        # a request; allowed by our :kv grant
+    Dock.fetch("https://api.crm.com/v1/accounts?name=" <> URI.encode(name),
+               headers: [{"authorization", "Bearer " <> key}])
+  end
+end
+
+Nothing here calls a provider directly. Each `Dock.*` call hits the membrane, which
+checks our two grants and routes the request. A unit without the `:kv` grant asking
+for the key is refused at the seam — that refusal *is* the boundary doing its job,
+which is why a [[Score chart]] island can hydrate in an untrusted browser safely.

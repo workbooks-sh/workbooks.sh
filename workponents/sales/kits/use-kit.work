@@ -1,0 +1,46 @@
+# Using a kit
+
+A kit earns its keep at the call site. Any unit **imports** `FinModel.Default` and
+gets the `ltv` / `cac` / `npv` prefix as if it were local. No new grants — `FinModel`
+is pure arithmetic, so it adds an `import` edge to the [[Code graph]] but asks the
+Dock for nothing.
+
+server :finance_panel do
+  import FinModel.Default, only: [ltv: 1, npv: 2]
+  alias FinModel.Deal
+
+  # rank leads by modelled lifetime value, not just raw score
+  def ranked_by_value(leads) do
+    leads
+    |> Enum.map(fn lead -> {lead, ltv(lead)} end)
+    |> Enum.sort_by(fn {_lead, value} -> value end, :desc)
+  end
+
+  def initech_deal(initech) do
+    deal = %Deal{lead: initech, acquisition_cost: 18_000,
+                 cash_flows: [40_000, 55_000, 60_000], discount_rate: 0.12}
+    %{lead: initech.name, ltv: ltv(initech), npv: npv(deal, deal.discount_rate)}
+  end
+end
+
+## The gate keeps it honest
+
+It's pure, so it's testable, and a red test ships no bundle.
+
+test :finmodel do
+  import FinModel.Default
+
+  test "LTV grows with account size" do
+    big   = %Lead{revenue: 90_000, employees: 55}
+    small = %Lead{revenue: 12_000, employees: 8}
+    assert ltv(big) > ltv(small)
+  end
+
+  test "discounting shrinks future cash" do
+    deal = %FinModel.Deal{cash_flows: [10_000, 10_000, 10_000]}
+    assert npv(deal, 0.12) < Enum.sum(deal.cash_flows)
+  end
+end
+
+The [[Score chart]] imports it to rank by value, the [[The Analyst Agent]] uses it to
+decide which accounts justify a hand-written draft. One formula, every consumer.

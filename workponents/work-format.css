@@ -37,8 +37,26 @@
   .CodeMirror{height:100%!important;flex:1;font-size:12.5px;line-height:1.7}
   /* a sandbox do…end is a container — a muted rule in the first-character slot,
      running under the S of `sandbox` down to the E of `end` */
-  .CodeMirror .sb-band,.CodeMirror .sb-cap,.CodeMirror .sb-end{
-    background:linear-gradient(90deg,transparent calc(.5ch - 1px),rgba(176,181,191,.32) calc(.5ch - 1px),rgba(176,181,191,.32) calc(.5ch + 1px),transparent calc(.5ch + 1px))}
+  /* sandbox containment — a left rule that composes over the code fill */
+  .CodeMirror .sb-band,.CodeMirror .sb-cap,.CodeMirror .sb-end{box-shadow:inset 2px 0 0 0 rgba(174,229,194,.5)}
+
+  /* file-explorer nav: a file icon per unit */
+  nav button .fic{flex:none;width:15px;text-align:center;font-size:10px;color:var(--sub)}
+  nav button.on .fic{color:var(--mint)}
+  /* the salesapp.html build-output preview frame fills the code area */
+  .appframe{flex:1;width:100%;border:0;display:none;background:#fff}
+
+  /* readable prose (cool); code LINES get a fill so code reads as a block */
+  .cm-s-material-darker.CodeMirror,.cm-s-material-darker .CodeMirror-line{color:#c3cad4}
+  .CodeMirror .code-ln{background-color:rgba(255,255,255,.05)}
+  .cm-header{color:#e3e9f0;font-weight:600}
+  .cm-strong{color:#dfe6ef} .cm-em{color:#c3cad4;font-style:italic}
+  .cm-comment{color:#6f7d8c}
+  .cm-link{color:#7fb3d5} .cm-variable-3{color:#7fb3d5}    /* markdown refs/tags — cool */
+  /* code tokens — warm + saturated */
+  .cm-keyword{color:#c792ea} .cm-def{color:#82aaff} .cm-variable-2{color:#c792ea}
+  .cm-atom{color:#f78c6c} .cm-number{color:#f78c6c} .cm-meta{color:#ffcb6b}
+  .cm-string{color:#c3e88d} .cm-string-2{color:#c3e88d} .cm-tag{color:#f07178}
 
   .term{flex:1;min-width:0;overflow:auto;display:none;background:#16181d;color:#cdd2da;
         padding:16px 20px;font:12.5px/1.7 "Geist Mono",ui-monospace,monospace}

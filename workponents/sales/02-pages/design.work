@@ -1,0 +1,93 @@
+# Styling a workbook
+
+A workbook renders in a browser, so it needs design — type, color, spacing,
+layout — and we have been quietly leaning on it the whole time: the dashboard's
+board, the [[Score chart]] island, every page you have read. This file makes
+styling first-class and, like everything else here, keeps it in **Elixir**. There
+is no separate CSS toolchain — no Node, no PostCSS, no Tailwind binary to install.
+You declare a **theme** and use **utility classes**; the weave compiles them to CSS
+in-sandbox, the same lane that compiles your Rust and your Elixir.
+
+It is Tailwind's ergonomics with Elixir's source. You get the familiar, fast
+utility classes — `p-4`, `bg-mint`, `grid`, `gap-3` — but the scale, the palette,
+and the breakpoints are an Elixir value you own, not a `tailwind.config.js` written
+in another language you have to keep in sync.
+
+## The theme is a value
+
+Design tokens are just data. The palette, the spacing scale, the type ramp, the
+radii — a plain struct whose field types fall out of the defaults, exactly like
+[[Lead]]. One theme is the single source of truth for the whole workbook.
+
+defmodule Theme do
+  defstruct palette: %{
+              paper: "#f7f6f1",
+              ink:   "#16171a",
+              mint:  "#aee5c2",
+              sky:   "#a8d4f0",
+              peach: "#f3c5a3",
+              muted: "#6b6a63"
+            },
+            space:  [0, 4, 8, 12, 16, 24, 32, 48, 64],
+            radius: %{sm: 6, md: 10, lg: 16, pill: 999},
+            type:   %{family: "Geist, system-ui, sans-serif", base: 15, ratio: 1.2}
+end
+
+theme :sales, %Theme{}
+
+The `theme :sales` declaration registers it. The weave reads the tokens and emits
+two things: a set of CSS custom properties (`--paper`, `--mint`, `--space-4`…) so
+islands and hand-written CSS share the exact same values, and the utility classes
+below, named from the scale.
+
+## Utilities, generated from the theme
+
+You style markup the utility way — small, composable classes — but each class is
+generated from a token, so it can never drift from the theme. `bg-mint` is exactly
+`background: var(--mint)`; `p-4` is `padding: var(--space-4)` (16px on this scale);
+`text-ink`, `radius-md`, `grid`, `gap-3` likewise. Here is the dashboard's board
+card, styled with nothing but utilities:
+
+<article class="card grid gap-3 p-5 bg-paper text-ink radius-md">
+  <h3 class="text-lg">Initech</h3>
+  <div class="row gap-2 text-muted">score 88 · scored</div>
+</article>
+
+Because the classes come from the theme, rebranding is a one-line edit to `Theme` —
+every `bg-paper` and `p-4` across every page moves together. And because the weave
+knows which classes a bundle actually uses, it ships only those: the stylesheet in
+`salesapp.html` is tree-shaken to the utilities the workbook really references, with
+no purge step to configure.
+
+## Three layers, one set of tokens
+
+Styling lands in three places, and the theme tokens flow through all of them so
+nothing has to be redefined:
+
+- **Pages and server-rendered regions** use the utility classes directly in their
+  markup, as above. This is most of the app.
+- **Client islands** ([[Score chart]], [[Trend sparkline]]) keep their own scoped
+  `<style>` for component internals — a Svelte or Solid component owns its private
+  CSS — but they read the shared tokens through the `--mint` / `--space-*` variables,
+  so an island matches the page without copying a single hex code.
+- **One-off component styles** can be written as plain Elixir that returns scoped
+  CSS, co-located with the unit it styles, the same way prose co-locates with code:
+
+server compute :badge do
+  def style(:hot),  do: css(bg: :peach, color: :ink, radius: :pill, px: 3)
+  def style(:cold), do: css(bg: :sky,   color: :ink, radius: :pill, px: 3)
+end
+
+`css/1` resolves its keyword options against the active `theme`, so `bg: :peach`
+becomes `background: var(--peach)` and `px: 3` becomes horizontal padding from the
+space scale. Same tokens, whether you write a utility class, an island `<style>`,
+or an Elixir `css` call.
+
+## Why styling is Elixir too
+
+The pattern is the one this whole workbook runs on. You author in Elixir; the
+WebAssembly fell out of the modules, the WIT fell out of [[The Contract]], and now
+the **CSS falls out of your theme**. There is one design system, owned as a value,
+shared by pages, islands, and components alike — and the weave turns it into a
+single tree-shaken stylesheet with no toolchain to install and nothing to keep in
+sync. Comprehensive styling, and still just Elixir.
