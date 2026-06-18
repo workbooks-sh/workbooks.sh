@@ -78,15 +78,34 @@ defmodule Nexus.CompileTest do
   test "a C unit's STRING host cap is wired from the Dock signature and lifts" do
     if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
       node =
-        ~s|c :greeter do\n  extern void log(const char* p, int n);\n  void greet(void) { log("hi there", 8); }\nend\n|
+        ~s|c :greeter do\n  extern void emit(const char* p, int n);\n  void greet(void) { emit("hi there", 8); }\nend\n|
         |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
       assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
       parent = self()
-      {:ok, p} = Wasmex.Components.start_link(%{path: comp, imports: %{"log" => {:fn, fn m -> send(parent, {:log, m}); nil end}}})
+      {:ok, p} = Wasmex.Components.start_link(%{path: comp, imports: %{"emit" => {:fn, fn m -> send(parent, {:emit, m}); nil end}}})
       Wasmex.Components.call_function(p, "greet", [])
-      assert_receive {:log, "hi there"}, 3000
+      assert_receive {:emit, "hi there"}, 3000
+    else
+      :ok
+    end
+  end
+
+  @tag :compiler
+  @tag timeout: 240_000
+  test "a RUST unit's string host cap lifts (libstd stubs + selective rename)" do
+    if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
+      node =
+        ~s|rust :greeter do\n  extern "C" { fn emit(p: *const u8, n: usize); }\n  #[no_mangle]\n  pub extern "C" fn greet() { let s = "hi rust"; unsafe { emit(s.as_ptr(), s.len()); } }\nend\n|
+        |> Nexus.Literate.parse()
+        |> Enum.find(&(&1.type == :code))
+
+      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
+      parent = self()
+      {:ok, p} = Wasmex.Components.start_link(%{path: comp, imports: %{"emit" => {:fn, fn m -> send(parent, {:emit, m}); nil end}}})
+      Wasmex.Components.call_function(p, "greet", [])
+      assert_receive {:emit, "hi rust"}, 3000
     else
       :ok
     end

@@ -28,13 +28,29 @@ defmodule Nexus.Compile do
     end
   end
 
+  def unit(_), do: {:skip, :not_a_unit}
+
   # A `rust` unit, fully automatic: derive the typed WIT world from its `pub fn` exports AND its
   # `extern "C"` host imports, then run the proven pipeline. `{:ok, component} | {:error, _}`.
   defp rust_unit(%{body: body} = node) do
-    case rust_world(node) do
-      %{exports: []} -> {:error, :no_exported_fns}
-      %{world: world, name: name, exports: exports, imports: imports} ->
-        to_component(body, Enum.map(exports, &elem(&1, 0)), world, name, imports != [], crate_deps(body))
+    %{name: name, exports: exports, imports: imports} = rust_world(node)
+
+    case exports do
+      [] ->
+        {:error, :no_exported_fns}
+
+      _ ->
+        # A host import typed by the Dock's signature if it's a known cap, else the unit's own
+        # (lowered) extern signature. Caps carry the proper WIT type (e.g. `string`).
+        ilines =
+          Enum.map(imports, fn {f, ps, r} ->
+            "  import #{wit_ident(f)}: #{Nexus.Dock.host_fn_wit(f) || "func(#{ps})#{r}"};"
+          end)
+
+        elines = Enum.map(exports, fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
+        world = "package work:#{name};\n\nworld #{name} {\n#{Enum.join(ilines ++ elines, "\n")}\n}\n"
+        import_names = Enum.map(imports, &elem(&1, 0))
+        to_component(body, Enum.map(exports, &elem(&1, 0)), world, name, import_names, crate_deps(body))
     end
   end
 
@@ -60,7 +76,7 @@ defmodule Nexus.Compile do
 
         with {:ok, core} <-
                Nexus.Compilers.C.compile_to_wasm(src, exports: Enum.map(exports, &elem(&1, 0)), allow_undefined: caps != []) do
-          core = if caps != [], do: rewrite_env_to_root(core, Path.dirname(core)), else: core
+          core = if caps != [], do: rewrite_imports(core, Path.dirname(core), caps), else: core
           c_componentize(core, world, wname)
         end
     end
@@ -170,8 +186,6 @@ defmodule Nexus.Compile do
     end
   end
 
-  def unit(_), do: {:skip, :not_a_unit}
-
   @doc """
   Bring up a whole `.work` folder. The fast tiers come up eagerly — `server`/type units →
   native BEAM modules, `resource` units → live Ash resources; the `wasm` units (rust/…) are
@@ -224,29 +238,41 @@ defmodule Nexus.Compile do
 
   Returns `{:ok, component_path}` — runnable on `Nexus.Sandbox`.
   """
-  def to_component(source, fns, wit_text, world, has_imports \\ false, deps \\ []) when is_list(fns) do
+  # libstd internals that, when a rust unit pulls libstd (String/alloc), are left as `env` imports
+  # by --allow-undefined and would otherwise pollute the world's import space. Defining them as
+  # stubs keeps ONLY the real host caps imported, so string caps lift cleanly (docs/STRING-CAP-ABI.md).
+  @rust_stubs """
+  #[no_mangle] pub extern "C" fn abort() { loop {} }
+  #[no_mangle] pub extern "C" fn _Unwind_Resume(_p: *mut u8) { loop {} }
+  #[no_mangle] pub extern "C" fn __rust_alloc_error_handler(_a: usize, _b: usize) { loop {} }
+  """
+
+  def to_component(source, fns, wit_text, world, import_names \\ [], deps \\ []) when is_list(fns) do
     dir = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
     src = Path.join(dir, "u.rs")
-    File.write!(src, source <> "\n" <> keepalive_main(fns))
+    body = if import_names == [], do: source, else: source <> "\n" <> @rust_stubs
+    File.write!(src, body <> "\n" <> keepalive_main(fns))
 
     with {:ok, core, _} <-
            Nexus.Compilers.Rust.rust_compile_to_wasm(src, exports: fns, allow_undefined: true, deps: deps) do
-      # Host imports: mrustc emits them as `env::<fn>`, but the component model wants world-level
-      # imports at `$root`. Rewrite the import module before componentizing (wasmex supplies impls).
-      core = if has_imports, do: rewrite_env_to_root(core, dir), else: core
+      # mrustc emits host imports as `env::<fn>`; the component model wants them at `$root`. Rewrite
+      # ONLY the declared cap imports (leaving any libstd env refs alone — the stubs define those).
+      core = if import_names == [], do: core, else: rewrite_imports(core, dir, import_names)
       componentize(core, wit_text, world, dir)
     end
   end
 
-  # Rewrite the core's `env` import module to `$root` (a wat round-trip) so the component model
-  # maps host-capability imports to the world's `$root` namespace. (mrustc ignores the
-  # #[link(wasm_import_module)] attribute, so we can't set it from source.)
-  defp rewrite_env_to_root(core, dir) do
+  # Selectively rewrite `env::<name>` → `$root::<name>` for each declared host import (a wat
+  # round-trip). Used by the rust and C lanes; only the named caps move, nothing else.
+  defp rewrite_imports(core, dir, names) do
     {wat, 0} = System.cmd("wasm-tools", ["print", core])
+    rewritten = Enum.reduce(names, wat, fn n, acc ->
+      String.replace(acc, ~s/(import "env" "#{n}"/, ~s/(import "$root" "#{n}"/)
+    end)
     out = Path.join(dir, "rooted.wasm")
     watp = Path.join(dir, "rooted.wat")
-    File.write!(watp, String.replace(wat, ~s/(import "env" /, ~s/(import "$root" /))
+    File.write!(watp, rewritten)
     {_, 0} = System.cmd("wasm-tools", ["parse", watp, "-o", out])
     out
   end

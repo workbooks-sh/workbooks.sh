@@ -39,12 +39,13 @@ defmodule Nexus do
       # weave: workbook folder → one styled .html — inline markdown (bold/italic/code/links),
       # lists, labeled unit blocks, a clean shell
       weave: :live,
-      # dock host-IMPORTS (a component CALLING a host capability). Scalar caps turnkey (a unit
-      # imports `now`, gets real unix time). STRING caps PROVEN (the real prize): a C reactor
-      # importing emit(ptr,len) against WIT `func(msg: string)` lifts the string — host got
-      # "hello from C". The blocker was the rust COMMAND shape (libstd/WASI), not the ABI; the
-      # clean reactor lifts cleanly. Remaining = wiring grant→Dock-cap-WIT (see docs/STRING-CAP-ABI.md).
-      dock_imports: :string_proven
+      # dock host-IMPORTS (a component CALLING a host capability) — TURNKEY for BOTH scalar and
+      # STRING caps, in C AND rust. A unit declares `extern { fn emit(...) }` + calls it; Compile
+      # types the WIT import from the Dock's signature, the Dock supplies the impl, Sandbox wires
+      # it. The string-cap "nut" was just libstd internals leaking as env imports (fixed: inject
+      # stubs + selective env→$root rename) + a cap-name collision (`log` vs libm). Proven: rust +
+      # C units both get the lifted string. (Cap names: single-word, collision-free — `emit`, `now`.)
+      dock_imports: :live
     }
   end
 end

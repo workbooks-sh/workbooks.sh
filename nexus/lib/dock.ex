@@ -70,7 +70,9 @@ defmodule Nexus.Dock do
   def host_fns do
     %{
       "now" => {"func() -> s64", fn -> System.os_time(:second) end},
-      "log" => {"func(msg: string)", fn msg -> require(Logger) && Logger.info(["[unit] ", msg]); nil end}
+      # `emit`, not `log` — `log` collides with libm's math `log` (rust links libstd, which defines
+      # it, so the import is never left to rewrite). Cap names must be single-word + collision-free.
+      "emit" => {"func(msg: string)", fn msg -> require(Logger) && Logger.info(["[unit] ", msg]); nil end}
     }
   end
 
