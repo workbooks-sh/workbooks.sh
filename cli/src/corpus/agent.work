@@ -1,0 +1,9 @@
+# Agent
+
+agent :coder do
+  You write code.
+end
+
+server elixir :helper do
+  def help, do: :ok
+end

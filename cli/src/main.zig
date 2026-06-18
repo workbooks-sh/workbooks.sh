@@ -9,8 +9,10 @@ const weave = @import("weave.zig");
 const dev = @import("dev.zig");
 const deploy = @import("deploy.zig");
 const context = @import("context.zig");
+const conformance = @import("conformance.zig");
 test {
     _ = work;
+    _ = conformance;
     _ = deploy;
 }
 

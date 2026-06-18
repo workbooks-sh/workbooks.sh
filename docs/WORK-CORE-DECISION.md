@@ -40,4 +40,6 @@ it's the architecturally-right end state, but it's a focused build, not a one-co
 - ✅ The runtime escript is retired (deleted with `runtime/`).
 - ✅ `cli-release` rewired for the Zig CLI (cross-compiles native + wasm, ReleaseSmall ~198KB/108KB).
 - ✅ The installer (`web/cli.sh`) already matches the Zig asset names.
-- ◻ `work_core` deletion — gated on the decision above (recommend A now, B later).
+- ✅ Option A DONE — shared conformance corpus (cli/src/corpus/ + units.golden); both the Elixir and
+  Zig parsers are tested against the one golden, so they cannot silently diverge (DRY-in-behaviour).
+- ◻ Option B (Zig toolchain as a wasm component) — the scoped follow-up for literal one-toolchain.

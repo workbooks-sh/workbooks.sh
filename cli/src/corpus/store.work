@@ -1,0 +1,11 @@
+# Store
+
+The catalog and its pricing. See [[pricing]] and [[helper]].
+
+server elixir :pricing do
+  def total(n), do: n * 2
+end
+
+sandbox rust :renderer do
+  pub fn render() -> u32 { 42 }
+end
