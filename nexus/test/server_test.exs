@@ -41,6 +41,18 @@ defmodule Nexus.ServerTest do
     assert json == "[]"
   end
 
+  test "NEXUS_DATA_TOKEN gates /data — 401 without the bearer, 200 with", %{port: port} do
+    System.put_env("NEXUS_DATA_TOKEN", "s3cret")
+    on_exit(fn -> System.delete_env("NEXUS_DATA_TOKEN") end)
+
+    {:ok, {{_, no_auth, _}, _, _}} = :httpc.request(~c"http://127.0.0.1:#{port}/data/Item")
+    assert no_auth == 401
+
+    req = {~c"http://127.0.0.1:#{port}/data/Item", [{~c"authorization", ~c"Bearer s3cret"}]}
+    {:ok, {{_, ok, _}, _, _}} = :httpc.request(:get, req, [], [])
+    assert ok == 200
+  end
+
   test "served page is live-mode and /data reflects data changed after the page was cached",
        %{port: port, mod: mod} do
     {200, html} = get(port, "/")

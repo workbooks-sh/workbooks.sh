@@ -34,11 +34,15 @@ defmodule Nexus.Server do
   end
 
   get "/data/:resource" do
-    rows = Map.get(Nexus.Weave.data(root()), resource, [])
+    if authorized?(conn) do
+      rows = Map.get(Nexus.Weave.data(root()), resource, [])
 
-    conn
-    |> put_resp_content_type("application/json")
-    |> send_resp(200, Jason.encode!(rows, escape: :html_safe))
+      conn
+      |> put_resp_content_type("application/json")
+      |> send_resp(200, Jason.encode!(rows, escape: :html_safe))
+    else
+      send_resp(conn, 401, "unauthorized")
+    end
   end
 
   match _ do
@@ -46,6 +50,17 @@ defmodule Nexus.Server do
   end
 
   defp root, do: Application.get_env(:nexus, :workbook_root) || File.cwd!()
+
+  # /data auth gate. Off by default (local/dev = open). Set NEXUS_DATA_TOKEN to require
+  # `Authorization: Bearer <token>`. NOTE: a single shared token, NOT per-tenant scoping — a
+  # multi-tenant deployment still needs auth + row-scoping wired to its identity model (see
+  # docs/RENDERING.md). This just closes the wide-open default.
+  defp authorized?(conn) do
+    case System.get_env("NEXUS_DATA_TOKEN") do
+      t when t in [nil, ""] -> true
+      token -> match?(["Bearer " <> ^token], get_req_header(conn, "authorization"))
+    end
+  end
 
   # Cache the woven shell by the workbook's newest .work mtime, so units compile ONCE — not per
   # request (a `show <Unit>` recompiles a wasm component, ~seconds; never do that on a hot path).
