@@ -11,6 +11,17 @@ defmodule Workbooks.DockTest do
     assert Dock.runtime_cap_for("net") == "browse"
   end
 
+  test "the registry accounts for every RustDock core-ABI import (Rust transport union)" do
+    rust_surface =
+      Workbooks.RustDock.imports(profile: :network) |> Map.fetch!("env") |> Map.keys()
+
+    missing = rust_surface -- Dock.rust_abi_names()
+    assert missing == [], "Dock registry is missing RustDock ABI names: #{inspect(missing)}"
+
+    # and the ambient pair is exactly the always-present imports
+    assert Enum.sort(Dock.rust_ambient()) == ~w(host_log host_now)
+  end
+
   test "the registry's runtime import names match the LIVE Instance Dock seam (faithful projection)" do
     for cap <- Dock.runtime_capabilities() do
       live =

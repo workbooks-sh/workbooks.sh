@@ -31,6 +31,24 @@ defmodule Workbooks.Dock do
     "parallel" => %{import: "run-command-many"}
   }
 
+  # The RustDock core-module ABI transport: each capability projects one or more
+  # `env.host_*` ptr/len imports. Recorded here so the Dock registry is the union of
+  # ALL seam surfaces (WIT-typed Instance + core-ABI Rust); the seam reprojects from
+  # this later. Locked against rust_dock.ex by the characterization snapshot.
+  @rust_ambient ~w(host_now host_log)
+  @rust_abi %{
+    "egress" => ~w(host_http_get host_http_get_many),
+    "exec" => ~w(host_exec host_parallel_map),
+    "encode" => ~w(host_ffmpeg_encode),
+    "udp" => ~w(host_udp),
+    "tls" => ~w(host_tls),
+    "tcp" => ~w(host_tcp),
+    "queue" => ~w(host_publish host_poll),
+    "secrets" => ~w(host_sign),
+    "kv" => ~w(host_kv_put host_kv_get),
+    "vfs" => ~w(host_vfs_write host_vfs_read)
+  }
+
   # spec grant → the live runtime capability it maps onto (best-effort; the obvious
   # correspondences only). Used when the generated-WIT grant vocabulary meets the
   # runtime seam; secrets/fs have no runtime-cap analogue yet.
@@ -49,7 +67,9 @@ defmodule Workbooks.Dock do
   def capability?(cap), do: Map.has_key?(@registry, cap)
 
   @doc "Is `cap` a sandbox cap that projects a generated WIT interface?"
-  def sandbox_capability?(cap), do: get_in(@registry, [cap, :sandbox?]) == true
+  def sandbox_capability?(cap) do
+    get_in(@registry, [cap, :sandbox?]) == true
+  end
 
   @doc "The WIT interface name a sandbox capability imports (e.g. \"net\" → \"host-net\")."
   def interface_name(cap), do: get_in(@registry, [cap, :interface])
@@ -62,6 +82,17 @@ defmodule Workbooks.Dock do
 
   @doc "The runtime capability a spec grant maps onto, if any."
   def runtime_cap_for(grant), do: @grant_aliases[grant]
+
+  @doc "The always-present RustDock ambient core-ABI imports."
+  def rust_ambient, do: @rust_ambient
+
+  @doc "The RustDock `env.host_*` core-ABI imports a capability projects."
+  def rust_abi(cap), do: Map.get(@rust_abi, cap, [])
+
+  @doc "Every RustDock core-ABI import name the registry knows (ambient + all caps)."
+  def rust_abi_names do
+    (@rust_ambient ++ (@rust_abi |> Map.values() |> List.flatten())) |> Enum.uniq() |> Enum.sort()
+  end
 
   @doc "The raw registry map."
   def registry, do: @registry
