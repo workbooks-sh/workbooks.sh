@@ -45,6 +45,12 @@ These override everything. If a choice violates one, the choice is wrong.
    the **elements are the source of truth** (composition-as-source). JSON-LD *inside*
    an HTML file is fine; a sidecar `*.json` you parse to render is not. If you reach
    for a `.json`, stop — author it as HTML instead. Always workbooks, always HTML.
+   **Env vars are JSON-by-another-name** — a hidden config sidecar. Tunable config is an
+   HTML attribute (`<work-deploy …>`, read via `Nexus.Config`), never `System.get_env`. The
+   ONLY legitimate env is genuine deploy injection: **secrets + per-machine identity**
+   (`OPENROUTER_API_KEY`, `WB_S3_*`, `WB_DATABASE_URL`, `NEXUS_TENANT`, the `WB_DATA` mount
+   path) — loaded *into* the nexus at deploy, never authored config. New knob ⇒ a
+   `<work-deploy>` attribute + a `Nexus.Config` getter, not an env read.
 
 ## ⬛ AUTONOMY MANDATE ⬛ (read this every loop)
 
