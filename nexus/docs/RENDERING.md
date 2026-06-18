@@ -38,10 +38,13 @@ live data, shared state, host capabilities, and access control.** Same workbook,
 - **DoS bounds** — the SSR shell is **cached** (no per-request unit recompile); huge resources are
   **capped** at 500 rows (table + island), so data size can't blow the page.
 
-**Be wary (open before multi-tenant production):**
-- **`/data` is unauthenticated + unscoped** — it returns *all* rows of a resource. Fine for a
-  single-tenant/local dev server; **a multi-user deployment must add auth + per-tenant filtering**
-  in front of `/data` (and any future write endpoint). This is the #1 thing to gate.
+**Auth + multi-tenancy — DONE (see docs/AUTH.md):**
+- `/data` is **tenant-scoped + authenticated** via `Nexus.Auth` (None / Bearer / JWT adapters; JWT
+  covers WorkOS/Clerk/Auth0/BetterAuth/own). The Store is partitioned by tenant, so a request only
+  ever reads its own tenant's rows; the multi-tenant SSR shell bakes no data (no cross-tenant leak
+  via the shared cache). Proven end-to-end. *Was* the #1 gate — now closed for the tenant boundary.
+
+**Be wary (still open):**
 - **Baked data is exposed in the file** — a CSR file contains every baked row. **Never bake
   sensitive data into a shipped file**; bake only public data, serve the rest (SSR + auth).
 - **First-weave cost** — a workbook with many units pays a one-time compile on first request /
