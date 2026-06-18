@@ -29,7 +29,7 @@ jobs:
           version: "0.16.0"
 
       - name: Cross-build native + wasm (ReleaseSmall)
-        working-directory: cli
+        working-directory: reactor
         run: |
           set -eu
           # asset-name : zig-target  (asset names match web/cli.sh's work-${os}-${arch})
@@ -51,5 +51,5 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.version && format('work-v{0}', github.event.inputs.version) || github.ref_name }}
-          files: cli/work-*
+          files: reactor/work-*
           fail_on_unmatched_files: true

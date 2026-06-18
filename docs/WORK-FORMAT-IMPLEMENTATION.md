@@ -487,7 +487,7 @@ This is **file-level and sequenced**, same as §1–§7. Each step is **[WIRING]
 
 ### §8.1 Static bundle — already shipped, the floor [WIRING]
 
-This mode exists. `work bundle` (CLI `cli/src/main.rs:Cmd::Bundle` → `local::bundle`)
+This mode exists. `work bundle` (CLI `reactor/src/main.rs:Cmd::Bundle` → `local::bundle`)
 weaves the tree into one self-contained gzipped `.html` (`wbundle-html/1`): the page +
 a compressed blob of wasm/JS/data, hydrated client-side by `web/wb-bundle-loader.js`.
 `Workbooks.Bundle.pack/1` is the runtime-side packer; `PublicWeb.static_page/2` serves

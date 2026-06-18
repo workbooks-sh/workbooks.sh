@@ -44,7 +44,7 @@ module instantiated ONCE, exports called many times — was spiked and **proven*
 
 The Zig parser compiled to wasm is FASTER than the Elixir one even with the Wasmex marshal overhead,
 and the output matches `WorkCore` exactly (`match: true`). So Option B is not a trade-off — it's
-faster AND DRY. **New recommendation: do Option B.** `cli/src/lib.zig` is the reactor (alloc/reset/
+faster AND DRY. **New recommendation: do Option B.** `reactor/src/lib.zig` is the reactor (alloc/reset/
 parse_units, a pointer-len string ABI, 8KB wasm); nexus instantiates it once and calls it. The
 remaining work: export the rest of the toolchain (graph/wit/weave/audit) the same way, repoint nexus's
 `WorkCore.*` calls, delete `work_core`.
@@ -58,7 +58,7 @@ it's the architecturally-right end state, but it's a focused build, not a one-co
 - ✅ The runtime escript is retired (deleted with `runtime/`).
 - ✅ `cli-release` rewired for the Zig CLI (cross-compiles native + wasm, ReleaseSmall ~198KB/108KB).
 - ✅ The installer (`web/cli.sh`) already matches the Zig asset names.
-- ✅ Option A DONE — shared conformance corpus (cli/src/corpus/ + units.golden); both the Elixir and
+- ✅ Option A DONE — shared conformance corpus (reactor/src/corpus/ + units.golden); both the Elixir and
   Zig parsers are tested against the one golden, so they cannot silently diverge (DRY-in-behaviour).
 - ◻ Option B (Zig toolchain as a wasm component) — the scoped follow-up for literal one-toolchain.
 
