@@ -46,7 +46,6 @@ scratch/
 # runtime/host/deploy/ stay tracked.
 /deploy/*
 !/deploy/Dockerfile
-!/deploy/Dockerfile.runtime
 !/deploy/Dockerfile.compilers
 !/deploy/fly.toml
 !/deploy/deploy.sh
@@ -91,3 +90,7 @@ web/learn/audio/cues/
 web/learn/audio/scripts/
 web/learn/audio/episodes/
 toolkits/.live.json
+
+# scratch model weights (never commit)
+ether/spike/
+*.gguf

@@ -1,48 +1,44 @@
-# Build CONTEXT for deploy/Dockerfile.runtime is the repo root, but only runtime/ is COPYd into
-# the image. Exclude everything else + the heavy in-runtime SCRATCH so the context stays small and
-# the daemon doesn't ship gigabytes it never uses. The lean runtime/compilers-dist/ (~640M, from
-# scripts/stage-tools.sh) is NOT matched here and ships as the in-sandbox toolchain.
+# Build CONTEXT for nexus/Dockerfile is the repo root, but only nexus/ is COPYd into the image.
+# Exclude everything else + nexus's heavy SCRATCH so the context stays small and the daemon doesn't
+# ship gigabytes it never uses. The in-sandbox compilers come from the standalone compilers LAYER
+# (COPY --from=compilers), NOT the context — so nexus/compilers* is excluded here too.
 
-# --- repo dirs not needed by the runtime image ---
+# --- repo dirs the nexus image doesn't need ---
 .git
 .beads
 desktop
-# `web/*` (contents, not the bare `web` dir) so the one re-include below actually takes —
-# BuildKit can't un-prune a file from a fully-excluded directory (cf. jq.wasm below).
-web/*
-# …except the bundle loader, which host/bundle.ex inlines at compile time (the runtime
-# image build COPYs it to /web/wb-bundle-loader.js — see ci/Dockerfile.runtime).
-!web/wb-bundle-loader.js
+web
+reactor      # the Zig CLI/reactor; its wasm is staged into nexus/priv before build, not COPYd from here
+docs
+ether
+scratch
+tools
+workkits
+workponents
+skills
+ci
+constellation
 **/node_modules
 **/erl_crash.dump
 
-# --- runtime/: rebuilt fresh in the image, so local copies are dead weight ---
-runtime/_build
-runtime/deps
-runtime/.elixir_ls
-runtime/tmp
-runtime/wb
-runtime/.publish_out
-runtime/commands/*/target
-runtime/kernel/target
+# --- nexus/: rebuilt fresh in the image, so local copies / scratch are dead weight ---
+nexus/_build
+nexus/deps
+nexus/.elixir_ls
+nexus/tmp
 
-# --- runtime-generated WASM scratch (content-addressed; the engine regenerates
-# both on demand — same contract as build/cache). Was leaking ~766 MB into the
-# CI/ghcr image (ci/Dockerfile.runtime) because the root .dockerignore — which
-# governs the repo-root build context — never excluded them; only
-# runtime/.dockerignore (the deploy-kit variant's context) did. Keep ONLY the
-# named prebuilt externals (jq/grep) the engine does NOT synthesize. ---
-runtime/build/cache
-runtime/build/commands/*
-!runtime/build/commands/jq.wasm
-!runtime/build/commands/grep.wasm
+# --- the ~7.2G provisioned compile-tool SCRATCH + the lean dist (both come via the compilers LAYER) ---
+nexus/compilers
+nexus/compilers-dist
 
-# --- the ~6.6G provisioned compile-tool SCRATCH (rustc src, mrustc C++ build, wasi-sdk, .bak) ---
-# Never run, only used to PRODUCE the wasm tools. The lean compilers-dist/ ships instead.
-runtime/compilers
+# --- runtime-generated WASM scratch (content-addressed; regenerated on demand). Keep the wasi adapter
+#     (build/tools) + named prebuilt externals; drop the build cache/commands scratch. ---
+nexus/build/build
+nexus/build/cache
+nexus/build/jsdom
 
 # cargo/rust build artifacts (wrong arch in-image; rebuilt) — esp. vendor/wasmex/native/*/target (~1.1G)
 **/target
 
-# stale prebuilt rustler NIF (host-arch .so) — force deps.compile to build the linux NIF + keep it
+# stale prebuilt rustler NIF (host-arch .so) — force deps.compile to build the linux NIF
 **/priv/native/*.so

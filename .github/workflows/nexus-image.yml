@@ -25,7 +25,7 @@ concurrency:
   cancel-in-progress: false # QUEUE: let one build advance :latest before the next starts
 
 env:
-  IMAGE: ghcr.io/workbooks-sh/nexus
+  IMAGE: ghcr.io/workbooks-sh/runtime # the deployed-engine artifact name stays stable; source is nexus/
   COMPILERS_REF: ghcr.io/workbooks-sh/compilers:latest
 
 jobs:
