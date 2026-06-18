@@ -32,7 +32,7 @@ defmodule Nexus.Agent.Kits do
       |> Enum.reject(&(Path.basename(&1) == "coreutils.wasm"))
       |> Map.new(fn p ->
         name = Path.basename(p, ".wasm")
-        {name, %{wasm: p, summary: "the #{name} command", commands: [name]}}
+        {name, register(name, p)}
       end)
 
     core = %{
@@ -76,8 +76,28 @@ defmodule Nexus.Agent.Kits do
 
     cond do
       cmd in @coreutils -> {kits["coreutils"].wasm, [cmd]}
-      Map.has_key?(kits, cmd) -> {kits[cmd].wasm, []}
+      Map.has_key?(kits, cmd) && kits[cmd].wasm -> {kits[cmd].wasm, []}
       true -> nil
     end
   end
+
+  # Register an external kit. A sidecar manifest `<name>.kit` (plain text, NOT json) gives real
+  # progressive disclosure — line 1 = the summary, line 2 = space-separated commands. Without one,
+  # a sensible default (the kit provides one command = its own name).
+  defp register(name, wasm) do
+    manifest = Path.join(root(), "#{name}.kit")
+
+    case File.read(manifest) do
+      {:ok, body} ->
+        [summary | rest] = String.split(String.trim(body), "\n", parts: 2)
+        cmds = rest |> List.first("") |> String.split() |> default_if_empty([name])
+        %{wasm: wasm, summary: String.trim(summary), commands: cmds}
+
+      _ ->
+        %{wasm: wasm, summary: "the #{name} command (drop a #{name}.kit manifest for details)", commands: [name]}
+    end
+  end
+
+  defp default_if_empty([], default), do: default
+  defp default_if_empty(list, _default), do: list
 end

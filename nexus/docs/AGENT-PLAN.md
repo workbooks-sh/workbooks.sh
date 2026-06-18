@@ -70,3 +70,10 @@ not reintroduce that. Authored, parsed, compiled, and run the same way every oth
 
 An agent is authorable in a `.work` file, has one tool (bash) over wasm kits incl. web, runs flows,
 and a workbook can validate itself with checks — tested, demoed, documented, every suite green, pushed.
+
+## ✅ PLAN COMPLETE
+A — agent unit kind · B — web kit (fetch/scrape, SSRF-safe) · C — self-validating workbooks (check
+units + Nexus.Checks + mix nexus.check + HTML report) · D — context compaction · E — external kit
+registry (.kit manifests) · F — living demo (examples/agent-demo, 2/2 checks pass live) + docs/AGENT.md.
+An agent is a literate function with one tool (bash) over wasm kits incl. web; a workbook validates
+itself with checks. Every suite green, all pushed.

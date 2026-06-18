@@ -64,6 +64,20 @@ mix nexus.check examples/agent-demo
 a green/red report for weave to embed. See `examples/agent-demo/` for a working, self-validating
 workbook.
 
+## Adding kits
+
+A kit is a `wasm32-wasi` command. To add one, drop `<name>.wasm` into the kits dir (`:kits_root`,
+default `nexus/kits/`) and, for progressive disclosure, a plain-text manifest `<name>.kit`:
+
+```
+a jq-style JSON processor        ← line 1: the one-line summary (shown in the catalog)
+jq filter map select             ← line 2: the commands it provides (shown by `help <name>`)
+```
+
+The agent then sees `<name>` in `kits`, runs `help <name>` for its commands, and invokes them in
+`bash` — they run in wasmtime against `/work`, same sandbox as coreutils. No manifest → the kit
+registers with its own name as its one command.
+
 ## LLM provider
 
 `Nexus.Llm` speaks the OpenAI chat API; **OpenRouter** by default. Point it at **LiteLLM** (or any
