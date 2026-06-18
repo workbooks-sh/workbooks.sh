@@ -1,0 +1,31 @@
+# Agent demo — a self-validating workbook
+
+This `.work` file authors an **agent** (a literate function) and **checks** that run it and validate
+the result. Run the validation with:
+
+    mix nexus.check examples/agent-demo
+
+An agent has ONE tool: `bash` — it runs `wasm` CLI kits (coreutils, web) in a sandbox against a
+`/work` filesystem. It computes; it does not guess.
+
+agent :analyst do
+  You are a terse data analyst. You have one tool, bash, with the coreutils kit (sort, uniq, wc,
+  grep-less base) and a web kit (fetch, scrape). Always COMPUTE with bash against /work — never
+  guess a number. When you have the answer, reply with exactly the requested format, nothing else.
+end
+
+## Checks — the workbook validates itself
+
+check :unique_count do
+  agent analyst
+  task Count the UNIQUE lines in /work/log.txt and reply with exactly UNIQUE=<n>
+  seed log.txt = alpha\nbeta\nalpha\ngamma\nbeta\nalpha\n
+  expect UNIQUE=3
+end
+
+check :total_lines do
+  agent analyst
+  task How many TOTAL lines are in /work/log.txt? Reply with exactly TOTAL=<n>
+  seed log.txt = alpha\nbeta\nalpha\ngamma\nbeta\nalpha\n
+  expect TOTAL=6
+end
