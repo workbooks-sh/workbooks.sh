@@ -85,7 +85,24 @@ defmodule Workbooks.Resource.Ash do
   end
 
   defp action({:mutation, name, body}) do
-    note = body |> Macro.to_string() |> String.replace("\n", " ")
-    "    update :#{name} do\n      # change derived from: #{note}\n    end"
+    "    update :#{name} do\n#{changes(body)}\n    end"
   end
+
+  # A mutation that resolves to a map of new attribute values → one `change set_attribute`
+  # per key (the common case). Anything else keeps a faithful note for a hand-written change.
+  defp changes(body) do
+    case last_expr(body) do
+      {:%{}, _meta, pairs} when pairs != [] ->
+        Enum.map_join(pairs, "\n", fn {k, v} ->
+          "      change set_attribute(:#{k}, #{Macro.to_string(v)})"
+        end)
+
+      _ ->
+        note = body |> Macro.to_string() |> String.replace("\n", " ")
+        "      # change (hand-write): #{note}"
+    end
+  end
+
+  defp last_expr({:__block__, _meta, stmts}), do: List.last(stmts)
+  defp last_expr(expr), do: expr
 end

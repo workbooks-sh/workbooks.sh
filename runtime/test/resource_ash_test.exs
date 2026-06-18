@@ -41,9 +41,29 @@ defmodule Workbooks.Resource.AshTest do
     assert src =~ "read :hot do"
     assert src =~ "filter expr(status == :scored)"
     assert src =~ "update :enrich do"
+    # the map-returning mutation became a real Ash change, not a comment
+    assert src =~ "change set_attribute(:status, :enriched)"
+    refute src =~ "# change (hand-write)"
 
     # seed is NOT an attribute or action
     refute src =~ "attribute :seed"
+  end
+
+  test "a mutation that returns multiple attrs generates a change per key" do
+    src =
+      unit("""
+      resource Lead do
+        status  :new | :scored
+        score   :int
+        mutation :score_it do
+          %{score: 88, status: :scored}
+        end
+      end
+      """)
+      |> Resource.Ash.source()
+
+    assert src =~ "change set_attribute(:score, 88)"
+    assert src =~ "change set_attribute(:status, :scored)"
   end
 
   test "the real demo resource Lead generates a sensible Ash resource" do
