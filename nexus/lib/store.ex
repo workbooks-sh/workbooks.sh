@@ -5,32 +5,41 @@ defmodule Nexus.Store do
   live is a swappable backend behind this one interface:
 
     * **default** — `Nexus.Store.Ets`, in-memory, zero deps (great for local/dev/tests)
-    * **cloud** — Neon Postgres (the hosted target)
-    * **local** — self-hosted Postgres / SQLite / a wasm-SQL engine (WQL) — undecided, and that's
-      fine: the interface doesn't care. The struct is the Elixir representation every backend
-      fields into.
+    * **durable** — `Nexus.Store.Sqlite`; **cloud** — Neon Postgres; a wasm-SQL engine — all behind
+      the same callbacks. The struct is the Elixir representation every backend fields into.
 
-  Configure with `config :nexus, store_adapter: SomeAdapter` (defaults to ETS). Adapters implement
-  these four callbacks.
+  **Every row is partitioned by TENANT.** All operations take a `tenant` (default `"default"` for
+  single-tenant/local). A request's tenant comes from `Nexus.Auth`; one tenant can never read or
+  write another's rows — isolation is enforced in the store, not hoped for upstream. That makes the
+  data layer multi-tenant-native: single-tenant is just everyone on `"default"`.
+
+  Configure with `config :nexus, store_adapter: SomeAdapter` (defaults to ETS).
   """
 
-  @callback create(resource :: module, attrs :: map) :: {:ok, struct} | {:error, term}
-  @callback all(resource :: module) :: [struct]
-  @callback count(resource :: module) :: non_neg_integer
-  @callback clear(resource :: module) :: :ok
+  @type tenant :: String.t()
 
-  @doc "Validate `attrs` against the resource's shape and persist a row."
-  def create(resource, attrs), do: adapter().create(resource, attrs)
+  @callback create(resource :: module, attrs :: map, tenant) :: {:ok, struct} | {:error, term}
+  @callback all(resource :: module, tenant) :: [struct]
+  @callback count(resource :: module, tenant) :: non_neg_integer
+  @callback clear(resource :: module, tenant) :: :ok
 
-  @doc "All rows of a resource."
-  def all(resource), do: adapter().all(resource)
+  @default "default"
 
-  @doc "How many rows a resource has."
-  def count(resource), do: adapter().count(resource)
+  @doc "Validate `attrs` against the resource's shape and persist a row for `tenant`."
+  def create(resource, attrs, tenant \\ @default), do: adapter().create(resource, attrs, tenant)
 
-  @doc "Drop all rows of a resource."
-  def clear(resource), do: adapter().clear(resource)
+  @doc "All rows of a resource visible to `tenant`."
+  def all(resource, tenant \\ @default), do: adapter().all(resource, tenant)
+
+  @doc "How many rows a resource has for `tenant`."
+  def count(resource, tenant \\ @default), do: adapter().count(resource, tenant)
+
+  @doc "Drop a resource's rows for `tenant` (never touches other tenants)."
+  def clear(resource, tenant \\ @default), do: adapter().clear(resource, tenant)
 
   @doc "The configured backend (default `Nexus.Store.Ets`)."
   def adapter, do: Application.get_env(:nexus, :store_adapter, Nexus.Store.Ets)
+
+  @doc "The single-tenant / fallback tenant id."
+  def default_tenant, do: @default
 end

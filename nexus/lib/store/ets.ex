@@ -1,16 +1,18 @@
 defmodule Nexus.Store.Ets do
   @moduledoc """
-  The default `Nexus.Store` backend — an in-memory ETS table per resource, lazily created. Zero
-  deps, perfect for local/dev/tests. The Postgres/SQLite/wasm-SQL adapters implement the same four
-  callbacks; swap `config :nexus, store_adapter:` to move the data, the resource shape unchanged.
+  The default `Nexus.Store` backend — an in-memory ETS table per resource, lazily created, **rows
+  keyed by tenant** so one tenant never sees another's. Zero deps; perfect for local/dev/tests. The
+  Postgres/SQLite/wasm-SQL adapters implement the same callbacks with the same tenant partition.
   """
   @behaviour Nexus.Store
 
+  # rows stored as {auto_id, tenant, struct} in an `ordered_set` keyed by auto_id.
+
   @impl true
-  def create(resource, attrs) do
+  def create(resource, attrs, tenant) do
     case Nexus.Resource.validate(resource, attrs) do
       {:ok, row} ->
-        :ets.insert(table(resource), {System.unique_integer([:monotonic, :positive]), row})
+        :ets.insert(table(resource), {System.unique_integer([:monotonic, :positive]), tenant, row})
         {:ok, row}
 
       {:error, _} = err ->
@@ -19,18 +21,22 @@ defmodule Nexus.Store.Ets do
   end
 
   @impl true
-  def all(resource), do: resource |> table() |> :ets.tab2list() |> Enum.map(&elem(&1, 1))
+  def all(resource, tenant) do
+    resource
+    |> table()
+    |> :ets.match_object({:_, tenant, :_})
+    |> Enum.map(fn {_id, _t, row} -> row end)
+  end
 
   @impl true
-  def count(resource), do: :ets.info(table(resource), :size)
+  def count(resource, tenant), do: :ets.select_count(table(resource), [{{:_, tenant, :_}, [], [true]}])
 
   @impl true
-  def clear(resource) do
-    :ets.delete_all_objects(table(resource))
+  def clear(resource, tenant) do
+    :ets.match_delete(table(resource), {:_, tenant, :_})
     :ok
   end
 
-  # Lazily create the resource's table (named, public, ordered by insertion id).
   defp table(resource) do
     name = Module.concat(resource, "Store")
 

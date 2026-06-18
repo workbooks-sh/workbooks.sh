@@ -1,25 +1,24 @@
 defmodule Nexus.Store.Sqlite do
   @moduledoc """
-  A durable `Nexus.Store` backend on SQLite (via `exqlite`) — the "local, but survives a restart"
-  option behind the universal seam. One table per resource, each row the serialized struct (so
-  enum atoms and the full shape round-trip exactly). Swap it in with
+  A durable `Nexus.Store` backend on SQLite (via `exqlite`) — the "survives a restart" option behind
+  the universal seam. One table per resource: `(id, tenant, data)`, **partitioned by tenant** so
+  isolation is enforced in storage. Rows are the serialized struct (enum atoms round-trip exactly).
   `config :nexus, store_adapter: Nexus.Store.Sqlite` (db path via `:sqlite_path`, default a temp file).
 
-  NOTE: rows are stored as a term blob — durable + correct, but not yet field-queryable in SQL.
-  Column-mapping (a column per `__fields__` entry, so `WHERE`/`ORDER BY` work) is the enhancement;
-  the same applies to a Postgres or wasm-SQL adapter behind these four callbacks.
+  NOTE: rows are a term blob — durable + correct, not yet field-queryable in SQL. Column-mapping is
+  the enhancement; the same applies to a Postgres/wasm-SQL adapter behind these callbacks.
   """
   @behaviour Nexus.Store
   alias Exqlite.Sqlite3
 
   @impl true
-  def create(resource, attrs) do
+  def create(resource, attrs, tenant) do
     case Nexus.Resource.validate(resource, attrs) do
       {:ok, row} ->
         with_conn(fn conn ->
           ensure_table(conn, resource)
-          {:ok, stmt} = Sqlite3.prepare(conn, "INSERT INTO #{tbl(resource)} (data) VALUES (?1)")
-          :ok = Sqlite3.bind(stmt, [:erlang.term_to_binary(row)])
+          {:ok, stmt} = Sqlite3.prepare(conn, "INSERT INTO #{tbl(resource)} (tenant, data) VALUES (?1, ?2)")
+          :ok = Sqlite3.bind(stmt, [tenant, :erlang.term_to_binary(row)])
           :done = Sqlite3.step(conn, stmt)
         end)
 
@@ -31,21 +30,28 @@ defmodule Nexus.Store.Sqlite do
   end
 
   @impl true
-  def all(resource) do
+  def all(resource, tenant) do
     with_conn(fn conn ->
       ensure_table(conn, resource)
-      {:ok, stmt} = Sqlite3.prepare(conn, "SELECT data FROM #{tbl(resource)} ORDER BY id")
+      {:ok, stmt} = Sqlite3.prepare(conn, "SELECT data FROM #{tbl(resource)} WHERE tenant = ?1 ORDER BY id")
+      :ok = Sqlite3.bind(stmt, [tenant])
       {:ok, rows} = Sqlite3.fetch_all(conn, stmt)
       Enum.map(rows, fn [blob] -> :erlang.binary_to_term(blob) end)
     end)
   end
 
   @impl true
-  def count(resource), do: length(all(resource))
+  def count(resource, tenant), do: length(all(resource, tenant))
 
   @impl true
-  def clear(resource) do
-    with_conn(fn conn -> ensure_table(conn, resource) && Sqlite3.execute(conn, "DELETE FROM #{tbl(resource)}") end)
+  def clear(resource, tenant) do
+    with_conn(fn conn ->
+      ensure_table(conn, resource)
+      {:ok, stmt} = Sqlite3.prepare(conn, "DELETE FROM #{tbl(resource)} WHERE tenant = ?1")
+      :ok = Sqlite3.bind(stmt, [tenant])
+      :done = Sqlite3.step(conn, stmt)
+    end)
+
     :ok
   end
 
@@ -60,7 +66,7 @@ defmodule Nexus.Store.Sqlite do
   end
 
   defp ensure_table(conn, resource) do
-    Sqlite3.execute(conn, "CREATE TABLE IF NOT EXISTS #{tbl(resource)} (id INTEGER PRIMARY KEY, data BLOB)")
+    Sqlite3.execute(conn, "CREATE TABLE IF NOT EXISTS #{tbl(resource)} (id INTEGER PRIMARY KEY, tenant TEXT, data BLOB)")
   end
 
   defp tbl(resource), do: "r_" <> (resource |> Module.split() |> Enum.join("_") |> String.downcase())
