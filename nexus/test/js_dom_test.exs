@@ -41,4 +41,25 @@ defmodule Nexus.JsDomTest do
       IO.puts("[skip] greenfield JS engine / bundle not staged")
     end
   end
+
+  @tag timeout: 120_000
+  test "browser-API shims unblock SPA hydration (matchMedia, requestAnimationFrame, IntersectionObserver)" do
+    if Nexus.JsDom.available?() do
+      html = "<html><body><div id=root></div></body></html>"
+
+      scripts = [
+        ~s|const root=document.getElementById("root");
+           root.appendChild(Object.assign(document.createElement("p"),{textContent:"mm:"+window.matchMedia("(min-width:1px)").matches}));
+           requestAnimationFrame(()=>root.appendChild(Object.assign(document.createElement("p"),{textContent:"raf"})));
+           const s=document.createElement("section"); root.appendChild(s);
+           new IntersectionObserver(e=>{ if(e[0].isIntersecting) s.innerHTML="<b>ungated</b>"; }).observe(s);|
+      ]
+
+      assert {:ok, out} = Nexus.JsDom.render_html(html, scripts: scripts, settle_ms: 50, timeout: 90_000)
+      assert out =~ "raf"
+      assert out =~ "ungated"
+    else
+      IO.puts("[skip] greenfield JS engine / bundle not staged")
+    end
+  end
 end
