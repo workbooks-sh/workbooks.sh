@@ -94,6 +94,26 @@ defmodule Nexus.CompileTest do
 
   @tag :compiler
   @tag timeout: 240_000
+  test "a string-RETURNING cap works (kv store/load via the canonical-ABI return area)" do
+    if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
+      node =
+        ~s|c :kv do\n  extern void store(const char* kp, int kl, const char* vp, int vl);\n  extern void load(const char* kp, int kl, void* ret);\n  extern void emit(const char* p, int n);\n  void run(void) { store("k", 1, "saved", 5); unsigned int r[2]; load("k", 1, r); emit((const char*)(unsigned long)r[0], (int)r[1]); }\nend\n|
+        |> Nexus.Literate.parse()
+        |> Enum.find(&(&1.type == :code))
+
+      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
+      parent = self()
+      imports = Map.merge(Nexus.Dock.impls(), %{"emit" => {:fn, fn m -> send(parent, {:emit, m}); nil end}})
+      {:ok, p} = Wasmex.Components.start_link(%{path: comp, imports: imports})
+      Wasmex.Components.call_function(p, "run", [])
+      assert_receive {:emit, "saved"}, 3000
+    else
+      :ok
+    end
+  end
+
+  @tag :compiler
+  @tag timeout: 240_000
   test "a RUST unit's string host cap lifts (libstd stubs + selective rename)" do
     if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
       node =

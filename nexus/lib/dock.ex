@@ -72,9 +72,15 @@ defmodule Nexus.Dock do
       "now" => {"func() -> s64", fn -> System.os_time(:second) end},
       # `emit`, not `log` — `log` collides with libm's math `log` (rust links libstd, which defines
       # it, so the import is never left to rewrite). Cap names must be single-word + collision-free.
-      "emit" => {"func(msg: string)", fn msg -> require(Logger) && Logger.info(["[unit] ", msg]); nil end}
+      "emit" => {"func(msg: string)", fn msg -> require(Logger) && Logger.info(["[unit] ", msg]); nil end},
+      # a real string-RETURNING cap: an in-memory kv (proves the canonical-ABI return path).
+      "store" => {"func(key: string, val: string)", fn k, v -> :persistent_term.put({:nexus_kv, k}, v); nil end},
+      "load" => {"func(key: string) -> string", fn k -> :persistent_term.get({:nexus_kv, k}, "") end}
     }
   end
+
+  @doc "Whether a host fn returns a string (→ the unit's component needs a cabi_realloc export)."
+  def returns_string?(name), do: (host_fn_wit(name) || "") |> String.contains?("-> string")
 
   @doc "The WIT signature for a host fn the unit imports, or nil if it isn't a known cap."
   def host_fn_wit(name), do: with({sig, _impl} <- host_fns()[name], do: sig)

@@ -54,6 +54,18 @@ defmodule Nexus.Compile do
     end
   end
 
+  # A no-libc bump allocator satisfying the component-model `cabi_realloc` (host allocates the
+  # returned string here). Bump-only (never frees) — fine for a single unit invocation.
+  @c_cabi_realloc """
+  static unsigned char __nx_heap[262144];
+  static unsigned long __nx_top = 0;
+  void* cabi_realloc(void* old, unsigned long os, unsigned long al, unsigned long ns) {
+    unsigned long p = (__nx_top + (al - 1)) & ~(al - 1);
+    __nx_top = p + ns;
+    return &__nx_heap[p];
+  }
+  """
+
   # A `c`/`cpp` unit: derive the WIT world from the C function signatures, compile (clang →
   # reactor, no command machinery), componentize (no WASI adapter needed). `{:ok, comp} | {:error}`.
   defp c_unit(%{name: name, body: body}) do
@@ -71,11 +83,18 @@ defmodule Nexus.Compile do
         ilines = Enum.map(caps, fn n -> "  import #{wit_ident(n)}: #{Nexus.Dock.host_fn_wit(n)};" end)
         elines = Enum.map(exports, fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
         world = "package work:#{wname};\n\nworld #{wname} {\n#{Enum.join(ilines ++ elines, "\n")}\n}\n"
+
+        # A string-RETURNING cap needs the canonical-ABI return area: the host allocates the
+        # returned string in guest memory via a `cabi_realloc` export. Inject a bump allocator
+        # (no libc) and export it.
+        str_ret? = Enum.any?(caps, &Nexus.Dock.returns_string?/1)
+        fn_exports = Enum.map(exports, &elem(&1, 0)) ++ if(str_ret?, do: ["cabi_realloc"], else: [])
+        body = if str_ret?, do: body <> "\n" <> @c_cabi_realloc, else: body
+
         src = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}.c")
         File.write!(src, body)
 
-        with {:ok, core} <-
-               Nexus.Compilers.C.compile_to_wasm(src, exports: Enum.map(exports, &elem(&1, 0)), allow_undefined: caps != []) do
+        with {:ok, core} <- Nexus.Compilers.C.compile_to_wasm(src, exports: fn_exports, allow_undefined: caps != []) do
           core = if caps != [], do: rewrite_imports(core, Path.dirname(core), caps), else: core
           c_componentize(core, world, wname)
         end
