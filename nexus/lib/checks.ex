@@ -52,7 +52,7 @@ defmodule Nexus.Checks do
     units =
       (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
       |> Enum.uniq()
-      |> Enum.flat_map(fn f -> f |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
+      |> Enum.flat_map(fn f -> f |> File.read!() |> WorkCore.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
 
     agents = for u <- units, u.kind == "agent", into: %{}, do: {u.name, u}
     checks = for u <- units, u.kind == "check", do: parse(u)

@@ -2,7 +2,7 @@ defmodule Nexus.ChecksTest do
   @moduledoc "Self-validating workbooks. Deterministic — parse + match logic (no LLM)."
   use ExUnit.Case, async: true
 
-  defp unit(src), do: src |> Nexus.Literate.parse() |> Enum.find(&(&1.type == :code))
+  defp unit(src), do: src |> WorkCore.Literate.parse() |> Enum.find(&(&1.type == :code))
 
   test "parse extracts agent/task/expect and seed files from a check unit" do
     n =

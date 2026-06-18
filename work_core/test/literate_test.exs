@@ -1,6 +1,6 @@
-defmodule Nexus.LiterateTest do
+defmodule WorkCore.LiterateTest do
   use ExUnit.Case, async: true
-  alias Nexus.Literate
+  alias WorkCore.Literate
 
   defp kinds(nodes), do: Enum.map(nodes, & &1.type)
   defp by_type(nodes, t), do: Enum.filter(nodes, &(&1.type == t))

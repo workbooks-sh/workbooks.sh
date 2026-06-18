@@ -1,6 +1,7 @@
 defmodule Nexus.ResourceTest do
   use ExUnit.Case, async: true
-  alias Nexus.{Literate, Resource}
+  alias Nexus.Resource
+  alias WorkCore.Literate
 
   defp unit(src), do: Literate.parse(src) |> Enum.find(&(&1.type == :code))
 

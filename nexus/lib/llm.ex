@@ -27,7 +27,13 @@ defmodule Nexus.Llm do
   of OpenAI tool specs (or []). Returns `{:ok, %{content, tool_calls, finish, usage}} | {:error, _}`.
   """
   def complete(messages, opts \\ []) do
-    key = api_key(opts)
+    url = opts[:base_url] || cfg(:base_url, @default_url)
+    # Local llama-server (Ether lanes) needs no key; a dummy bearer keeps the header well-formed.
+    key =
+      case api_key(opts) do
+        blank when blank in [nil, ""] -> if local?(url), do: "local"
+        present -> present
+      end
 
     if key in [nil, ""] do
       {:error, :no_api_key}
@@ -36,17 +42,21 @@ defmodule Nexus.Llm do
         %{model: model(opts), messages: messages}
         |> maybe_put(:tools, opts[:tools])
         |> maybe_put(:temperature, opts[:temperature])
+        |> maybe_put(:max_tokens, opts[:max_tokens])
+        # Passthrough for server-specific knobs (e.g. llama.cpp `chat_template_kwargs` to toggle a
+        # local thinking model's reasoning). Ignored by providers that don't recognize them.
+        |> maybe_put(:chat_template_kwargs, opts[:chat_template_kwargs])
         |> Jason.encode!()
 
-      post(body, opts[:retries] || 2, key)
+      post(url, body, opts[:retries] || 2, key)
     end
   end
 
-  defp post(body, retries, key) do
+  defp post(url, body, retries, key) do
     :inets.start()
     :ssl.start()
     headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}]
-    req = {url(), headers, ~c"application/json", body}
+    req = {String.to_charlist(url), headers, ~c"application/json", body}
 
     case :httpc.request(:post, req, [timeout: 120_000], body_format: :binary) do
       {:ok, {{_, 200, _}, _, resp}} ->
@@ -54,14 +64,14 @@ defmodule Nexus.Llm do
 
       {:ok, {{_, status, _}, _, _}} when status in [408, 429, 500, 502, 503] and retries > 0 ->
         Process.sleep(800)
-        post(body, retries - 1, key)
+        post(url, body, retries - 1, key)
 
       {:ok, {{_, status, _}, _, resp}} ->
         {:error, {:http, status, String.slice(to_string(resp), 0, 200)}}
 
       {:error, _} when retries > 0 ->
         Process.sleep(800)
-        post(body, retries - 1, key)
+        post(url, body, retries - 1, key)
 
       {:error, reason} ->
         {:error, reason}
@@ -106,7 +116,7 @@ defmodule Nexus.Llm do
   defp maybe_put(map, _k, []), do: map
   defp maybe_put(map, k, v), do: Map.put(map, k, v)
 
-  defp url, do: String.to_charlist(cfg(:base_url, @default_url))
+  defp local?(url), do: String.contains?(url, "127.0.0.1") or String.contains?(url, "localhost")
   defp api_key(opts), do: opts[:api_key] || System.get_env(cfg(:api_key_env, "OPENROUTER_API_KEY"))
   defp cfg(key, default), do: Keyword.get(Application.get_env(:nexus, __MODULE__, []), key, default)
 end

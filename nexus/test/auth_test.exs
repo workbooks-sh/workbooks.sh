@@ -120,7 +120,7 @@ defmodule Nexus.AuthTest do
       # the string is bound, never interpolated: it is its own isolated partition with no rows.
       mod =
         "resource WidgetA do\n  n :text\nend\n"
-        |> Nexus.Literate.parse() |> Enum.find(&(&1.type == :code)) |> Nexus.Resource.compile()
+        |> WorkCore.Literate.parse() |> Enum.find(&(&1.type == :code)) |> Nexus.Resource.compile()
 
       Nexus.Store.create(mod, %{n: "real"}, "real-tenant")
       assert Nexus.Store.all(mod, weird) == []

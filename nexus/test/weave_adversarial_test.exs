@@ -29,7 +29,7 @@ defmodule Nexus.WeaveAdversarialTest do
 
   test "a huge resource is capped (table + island), not rendered whole" do
     dir = wb("resource Big do\n  n :int\nend\n\nshow Big\n")
-    mod = dir |> Path.join("a.work") |> File.read!() |> Nexus.Literate.parse() |> Enum.find(&(&1.type == :code)) |> Nexus.Resource.compile()
+    mod = dir |> Path.join("a.work") |> File.read!() |> WorkCore.Literate.parse() |> Enum.find(&(&1.type == :code)) |> Nexus.Resource.compile()
     Nexus.Store.clear(mod)
     for i <- 1..600, do: Nexus.Store.create(mod, %{n: i})
 

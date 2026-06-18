@@ -41,7 +41,7 @@ defmodule Nexus.WeaveTest do
   end
 
   defp res_of(dir),
-    do: dir |> Path.join("a.work") |> File.read!() |> Nexus.Literate.parse() |> Enum.find(&(&1.type == :code)) |> Nexus.Resource.compile()
+    do: dir |> Path.join("a.work") |> File.read!() |> WorkCore.Literate.parse() |> Enum.find(&(&1.type == :code)) |> Nexus.Resource.compile()
 
   test "`show Resource` renders a live data table from the Store, columns from __fields__" do
     dir = wb("resource Item do\n  name :text\n  price :int\nend\n\nshow Item\n")

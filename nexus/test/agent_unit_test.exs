@@ -2,7 +2,7 @@ defmodule Nexus.AgentUnitTest do
   @moduledoc "Agents authored as literate `.work` units (functions). Deterministic — no LLM."
   use ExUnit.Case, async: true
 
-  defp unit(src), do: src |> Nexus.Literate.parse() |> Enum.find(&(&1.type == :code))
+  defp unit(src), do: src |> WorkCore.Literate.parse() |> Enum.find(&(&1.type == :code))
 
   test "an `agent` unit parses as a code unit with kind=agent and the body as its prompt" do
     n = unit("agent :researcher do\n  You are a researcher. Find facts.\nend\n")

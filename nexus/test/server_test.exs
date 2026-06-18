@@ -7,7 +7,7 @@ defmodule Nexus.ServerTest do
     File.write!(Path.join(dir, "a.work"), "# Shop\n\nresource Item do\n  name :text\n  price :int\nend\n\nshow Item\n")
 
     mod =
-      dir |> Path.join("a.work") |> File.read!() |> Nexus.Literate.parse()
+      dir |> Path.join("a.work") |> File.read!() |> WorkCore.Literate.parse()
       |> Enum.find(&(&1.type == :code)) |> Nexus.Resource.compile()
 
     Nexus.Store.clear(mod)

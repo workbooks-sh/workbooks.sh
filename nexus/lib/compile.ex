@@ -273,7 +273,7 @@ defmodule Nexus.Compile do
     units =
       (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
       |> Enum.uniq()
-      |> Enum.flat_map(fn f -> f |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
+      |> Enum.flat_map(fn f -> f |> File.read!() |> WorkCore.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
 
     by_kind = Enum.group_by(units, & &1.kind)
 

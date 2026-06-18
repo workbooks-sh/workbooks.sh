@@ -6,7 +6,7 @@ defmodule Nexus.ToolkitTest do
     :ok
   end
 
-  defp unit(src), do: src |> Nexus.Literate.parse() |> Enum.find(&(&1.type == :code))
+  defp unit(src), do: src |> WorkCore.Literate.parse() |> Enum.find(&(&1.type == :code))
 
   test "a `toolkit` unit parses with kind=toolkit and the body as its source" do
     n = unit("toolkit :upper do\n  int main(void) { return 0; }\nend\n")

@@ -5,7 +5,7 @@ defmodule Nexus do
   The whole pipeline, end to end:
 
       .work file
-        │  Nexus.Literate.parse/1        → ordered nodes (md prose + Elixir AST)
+        │  WorkCore.Literate.parse/1        → ordered nodes (md prose + Elixir AST)
         │  Nexus.Resource / Nexus.Wit    → shape + the WIT contract
         ▼
       Nexus.Compile.unit/1               → one unit becomes:

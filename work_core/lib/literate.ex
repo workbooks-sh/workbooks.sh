@@ -1,4 +1,4 @@
-defmodule Nexus.Literate do
+defmodule WorkCore.Literate do
   @moduledoc """
   Parse a `.work` literate file into ordered blocks. This is the ONE parse the
   viewer (highlighting), the code-graph literate extractor, the weave gate

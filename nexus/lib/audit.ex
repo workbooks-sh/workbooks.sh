@@ -16,7 +16,7 @@ defmodule Nexus.Audit do
   def workbook(root) do
     (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
     |> Enum.uniq()
-    |> Enum.flat_map(fn f -> f |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
+    |> Enum.flat_map(fn f -> f |> File.read!() |> WorkCore.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
     |> Enum.map(fn u -> {u.name, unit(u)} end)
     |> Enum.reject(fn {_name, violations} -> violations == [] end)
     |> Map.new()

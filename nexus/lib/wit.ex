@@ -10,7 +10,8 @@ defmodule Nexus.Wit do
   the unit's declared structs). A unit with no signature gets the default `run`.
   """
 
-  alias Nexus.{Extract, Dock}
+  alias Nexus.Dock
+  alias WorkCore.Extract
 
   # the grant words a unit may declare — filters stray header tokens (string values,
   # etc.) out of `grants/1`. The import each projects comes from the Dock registry.
@@ -20,7 +21,7 @@ defmodule Nexus.Wit do
   # (§3) — so a generated package validates standalone AND §2's imports are the same
   # surface the runtime Dock projects. See `Nexus.Dock`.
 
-  @doc "Generate the WIT `world` source for a `Nexus.Literate` :code node."
+  @doc "Generate the WIT `world` source for a `WorkCore.Literate` :code node."
   def world(%{name: name} = node) when is_binary(name) do
     facts = Extract.facts(node)
     types = type_defs(facts, name)
@@ -40,7 +41,7 @@ defmodule Nexus.Wit do
   The per-file shared `interface types` — the home for file-level declarations a
   unit world *imports* rather than owns: a top-level `@statuses` atom-set (enum) and
   a shared `defmodule …, do: defstruct …` type module (record). Returns nil if a
-  file declares no shared types. Takes the `Nexus.Literate.parse/1` node list.
+  file declares no shared types. Takes the `WorkCore.Literate.parse/1` node list.
   """
   def file_interface(nodes) when is_list(nodes) do
     # dedup by WIT name — teaching files re-declare shared types (e.g. several lessons
@@ -48,7 +49,7 @@ defmodule Nexus.Wit do
     enums_kv =
       (for node <- nodes,
            node.type == :decl,
-           {:enum, name, atoms} <- Nexus.Extract.Elixir.decl_types(node),
+           {:enum, name, atoms} <- WorkCore.Extract.Elixir.decl_types(node),
            do: {name, atoms})
       |> Enum.uniq_by(fn {name, _} -> Nexus.Wit.Types.wit(name) end)
 
@@ -81,7 +82,7 @@ defmodule Nexus.Wit do
       |> Enum.uniq()
 
     for path <- paths, into: %{} do
-      nodes = Nexus.Literate.parse(File.read!(path))
+      nodes = WorkCore.Literate.parse(File.read!(path))
       # a bare `defmodule` is a type module (→ the file interface), not a runnable
       # unit; only placed/runnable kinds get a world.
       worlds =
@@ -117,7 +118,7 @@ defmodule Nexus.Wit do
 
   @doc "The workbook-wide shared types: `{interface, type_names}` over every file's type defs."
   def workbook_types(root) do
-    all = root |> wb_paths() |> Enum.flat_map(fn p -> Nexus.Literate.parse(File.read!(p)) end)
+    all = root |> wb_paths() |> Enum.flat_map(fn p -> WorkCore.Literate.parse(File.read!(p)) end)
     {file_interface(all), type_names(all)}
   end
 
@@ -126,7 +127,7 @@ defmodule Nexus.Wit do
     shared = workbook_types(root)
 
     for path <- wb_paths(root), into: %{} do
-      nodes = Nexus.Literate.parse(File.read!(path))
+      nodes = WorkCore.Literate.parse(File.read!(path))
       {path, package(nodes, Path.basename(path, ".work"), shared)}
     end
   end
@@ -147,7 +148,7 @@ defmodule Nexus.Wit do
 
     written =
       for path <- wb_paths(root) do
-        pkg = path |> File.read!() |> Nexus.Literate.parse() |> package(Path.basename(path, ".work"), shared)
+        pkg = path |> File.read!() |> WorkCore.Literate.parse() |> package(Path.basename(path, ".work"), shared)
         dest = Path.join(out_dir, Path.basename(path, ".work") <> ".wit")
         File.write!(dest, pkg)
         dest
@@ -269,7 +270,7 @@ defmodule Nexus.Wit do
     enums =
       for n <- nodes,
           n.type == :decl,
-          {:enum, name, _atoms} <- Nexus.Extract.Elixir.decl_types(n),
+          {:enum, name, _atoms} <- WorkCore.Extract.Elixir.decl_types(n),
           do: Nexus.Wit.Types.wit(name)
 
     records =

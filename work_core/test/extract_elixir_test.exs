@@ -1,6 +1,6 @@
-defmodule Nexus.Extract.ElixirTest do
+defmodule WorkCore.Extract.ElixirTest do
   use ExUnit.Case, async: true
-  alias Nexus.{Literate, Extract}
+  alias WorkCore.{Literate, Extract}
 
   defp facts(src) do
     [code] = Literate.parse(src) |> Enum.filter(&(&1.type == :code))

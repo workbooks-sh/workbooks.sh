@@ -25,7 +25,7 @@ defmodule Nexus.Weave do
       own tenant-scoped `/data` instead.
   """
   def weave(root, opts \\ []) do
-    pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
+    pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), WorkCore.Literate.parse(File.read!(p))} end)
     ctx = %{tenant: Keyword.get(opts, :tenant, Nexus.Store.default_tenant()), bake: Keyword.get(opts, :bake, true)}
     render(pages, resources(pages), Keyword.get(opts, :live, false), ctx)
   end
@@ -36,7 +36,7 @@ defmodule Nexus.Weave do
   returns and the baked islands inline. One extraction, shared by weave and the server, scoped by tenant.
   """
   def data(root, tenant \\ Nexus.Store.default_tenant()) do
-    pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
+    pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), WorkCore.Literate.parse(File.read!(p))} end)
 
     for {name, {:resource, mod}} when not is_nil(mod) <- resources(pages), into: %{} do
       {name, mod |> Nexus.Store.all(tenant) |> Enum.take(@max_rows) |> Enum.map(&row_to_map/1)}

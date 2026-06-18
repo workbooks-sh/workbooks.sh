@@ -1,4 +1,4 @@
-defmodule Nexus.Graph do
+defmodule WorkCore.Graph do
   @moduledoc """
   §9 — the code graph, assembled over the literate parse (§0). Nodes per unit;
   typed edges merged from the literate refs (§0.1) and the Elixir AST calls (§0.2).
@@ -6,7 +6,7 @@ defmodule Nexus.Graph do
   feed (§2) extend the edge set later without changing this shape.
   """
 
-  alias Nexus.{Literate, Extract}
+  alias WorkCore.{Literate, Extract}
 
   defstruct nodes: %{}, edges: [], titles: %{}, backlinks: %{}
 

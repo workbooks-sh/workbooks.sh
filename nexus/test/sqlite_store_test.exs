@@ -8,7 +8,7 @@ defmodule Nexus.Store.SqliteTest do
 
     mod =
       "resource Account do\n  name :text\n  status :new | :won\nend\n"
-      |> Nexus.Literate.parse()
+      |> WorkCore.Literate.parse()
       |> Enum.find(&(&1.type == :code))
       |> Nexus.Resource.compile()
 

@@ -1,9 +1,9 @@
-defmodule Nexus.Extract.Foreign do
+defmodule WorkCore.Extract.Foreign do
   @moduledoc """
   §0.2 (interim) — exports/imports from a FOREIGN-language code body via
   language-aware patterns, until tree-sitter grammars are provisioned in-sandbox.
   Returns the same `%{exports, imports, types, calls}` shape as `Extract.Elixir`,
-  so `Nexus.Graph` (§9) merges it language-agnostically.
+  so `WorkCore.Graph` (§9) merges it language-agnostically.
 
   This is honestly a stopgap: it reads `pub fn` / `export fn` / `def` / `export
   function` and the import seams (`extern "C"`, `wasm_import_module`, `work://`
