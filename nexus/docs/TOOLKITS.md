@@ -72,10 +72,26 @@ The compile lanes emit two wasm shapes:
 
 `Nexus.Compilers.C.compile_to_wasm(src, shape: :command)` produces the command shape. Toolkits use it.
 
-## Languages (it's just the command output of the lanes we already have)
+## Languages — `Nexus.Lang` / `Nexus.Langs` (the explicit set)
 
-A toolkit isn't a new system — it's the **command-shape output** of the compile lanes. But the lanes
-differ in how naturally they produce a command:
+The WebAssembly compiler languages are not loose modules — they're an explicit, registered set behind
+the **`Nexus.Lang`** behaviour, listed by **`Nexus.Langs`**. (A *language* is how source becomes wasm;
+do not confuse it with a *toolkit*, which is a wrapped CLI an agent runs.) Each language declares its
+`id` (the unit `lang`), its output `shapes` (`:command` for CLIs/toolkits, `:component` for
+resource/render units), and compiles source.
+
+```elixir
+Nexus.Langs.ids()                      #=> ["c", "rust", "zig"]
+Nexus.Langs.supports?("rust", :command) #=> true
+Nexus.Langs.catalog()                  # one line per language + shapes + summary
+```
+
+**To add a WebAssembly compiler language:** implement `Nexus.Lang` (`id/0`, `summary/0`, `shapes/0`,
+`compile/3`) and call `Nexus.Langs.register/1`. It's then available to toolkits (and the unit lanes)
+automatically — the whole extension surface, no orchestrator edits.
+
+A toolkit is just the **`:command`-shape output** of a language. The languages differ in how naturally
+they produce one:
 
 - **`c` / `cpp`** — link `crt1-command.o` + libc (the `:command` shape). A normal `int main()`.
 - **`rust`** — the *simplest*: the rust lane already links `crt1-command.o`, so a plain `fn main()`

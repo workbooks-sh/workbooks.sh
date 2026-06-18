@@ -36,8 +36,11 @@ defmodule Nexus.ToolkitTest do
     assert Nexus.Toolkit.lang(unit("toolkit :a do\n  int main(void){return 0;}\nend\n")) == "c"
   end
 
-  test "zig command toolkits fail with a clear, honest error (exports-only path)" do
-    assert {:error, {:zig_command_toolkits_unsupported, _}} = Nexus.Toolkit.compile("zig", "pub fn main() void {}")
+  test "zig command toolkits fail with a clear, honest error (exports-only via the registry)" do
+    # the Nexus.Langs registry guards shape support: zig declares [:component] only.
+    assert {:error, {:unsupported_shape, "zig", :command}} = Nexus.Toolkit.compile("zig", "pub fn main() void {}")
+    refute Nexus.Langs.supports?("zig", :command)
+    assert Nexus.Langs.supports?("rust", :command)
   end
 
   @tag :kits

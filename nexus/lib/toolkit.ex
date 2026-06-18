@@ -49,36 +49,21 @@ defmodule Nexus.Toolkit do
     end
   end
 
-  @doc "Compile a toolkit's source to a `wasm32-wasi` command module."
-  def compile("c", body), do: c_command(body, ".c", [])
-
-  def compile("cpp", body), do: c_command(body, ".cpp", [])
-
-  # Rust is the SIMPLE case: the rust lane already links crt1-command.o, so a plain `fn main()`
-  # program IS a command module — no exports / keep-alive needed (that machinery is for the
-  # component model). Same compiler we already have, just its natural command output.
-  def compile("rust", body) do
-    src = write_tmp(body, ".rs")
-
-    case Nexus.Compilers.Rust.rust_compile_to_wasm(src, []) do
-      {:ok, wasm, _logs} -> {:ok, wasm}
-      {:error, _} = err -> err
-    end
+  @doc """
+  Compile a toolkit's source to a `wasm32-wasi` command module, via the `Nexus.Langs` registry —
+  the explicit set of WebAssembly compiler languages. A new language (implement `Nexus.Lang` +
+  `Nexus.Langs.register/1`) becomes available here automatically. C/Rust support `:command`; Zig is
+  exports-only (a clear error).
+  """
+  def compile(lang, body) do
+    src = write_tmp(body, ext_for(lang))
+    Nexus.Langs.compile(lang, src, :command)
   end
 
-  # Zig is NOT just-the-command-output like C/rust. Our zig path (zig1 build-obj -ofmt=c, the
-  # bootstrap C backend) is EXPORTS-shaped — it can't lower a full `pub fn main()` std-I/O program
-  # to a command module (which is why the zig unit lane only does `export fn`). A zig CLI toolkit
-  # needs a C-main shim calling a zig export, or zig's self-hosted exe backend — a real follow-up.
-  # Use `rust` or `c` for command-line toolkits today.
-  def compile("zig", _body),
-    do: {:error, {:zig_command_toolkits_unsupported, "our zig path is exports-only; author CLI toolkits in rust or c"}}
-
-  def compile(lang, _body), do: {:error, {:unsupported_toolkit_lang, lang}}
-
-  defp c_command(body, ext, opts) do
-    Nexus.Compilers.C.compile_to_wasm(write_tmp(body, ext), [shape: :command] ++ opts)
-  end
+  defp ext_for("rust"), do: ".rs"
+  defp ext_for("zig"), do: ".zig"
+  defp ext_for("cpp"), do: ".cpp"
+  defp ext_for(_), do: ".c"
 
   defp write_tmp(body, ext) do
     src = Path.join(System.tmp_dir!(), "nxtk_#{System.unique_integer([:positive])}#{ext}")
