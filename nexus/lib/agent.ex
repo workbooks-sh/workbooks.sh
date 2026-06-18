@@ -130,8 +130,22 @@ defmodule Nexus.Agent do
       "\n\nYou have ONE tool: `bash`. You accomplish everything by running command lines in it. " <>
       "Commands are kits (wasm CLIs) run in a sandbox against the /work filesystem. Available kits:\n" <>
       Kits.summary() <>
+      "\n\n" <> web_capability() <>
       "\n\nRun `help <kit>` to see a kit's commands before using it. When you have the answer, " <>
       "reply directly without calling bash."
+  end
+
+  # The web is a CORE capability (not a kit to discover) — every agent can read AND operate the web.
+  defp web_capability do
+    """
+    THE WEB (core — use these in bash directly):
+      scrape <url>        — a page's readable text (rendered in-sandbox, CSS+JS-aware)
+      screenshot <url>    — render the page to a PNG in /work
+      navigate <url>      — open a page: shows its text + numbered LINKS and FORMS
+      click <n|text>      — follow link n (or the link matching text) → the next page
+      fill <name> <value> — set a form field; submit <n> — submit form n (search, login, multi-step)
+    Use navigate→click/fill/submit to OPERATE a site (search, browse, fill forms), not just read it.\
+    """
   end
 
   defp now_ms, do: System.monotonic_time(:millisecond)
