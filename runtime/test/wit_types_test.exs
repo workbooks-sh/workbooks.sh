@@ -21,6 +21,26 @@ defmodule Workbooks.Wit.TypesTest do
     assert wit =~ "in-pipeline: bool,"
   end
 
+  test "enum/2 renders a WIT enum from atom cases" do
+    wit = Types.enum(:statuses, [:new, :enriched, :scored])
+    assert wit =~ "enum statuses {"
+    assert wit =~ "  new,"
+    assert wit =~ "  scored,"
+  end
+
+  test "Wit.world emits an atom-set module attribute as a WIT enum" do
+    src = """
+    server :lead do
+      @statuses [:new, :enriched, :scored, :contacted]
+      def of(l), do: l
+    end
+    """
+
+    world = Literate.parse(src) |> Enum.find(&(&1.type == :code)) |> Wit.world()
+    assert world =~ "enum statuses {"
+    assert world =~ "contacted,"
+  end
+
   test "Wit.world emits a unit's declared struct as a WIT record, named after the module" do
     src = """
     server :lead do

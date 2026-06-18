@@ -71,6 +71,13 @@ defmodule Workbooks.Extract.Elixir do
   end
 
   defp type({:defmodule, _, [{:__aliases__, _, mods} | _]}), do: {:module, List.last(mods)}
+
+  # a module attribute assigned a non-empty list of atoms is an enum:
+  # `@statuses [:new, :enriched, :scored]` → {:enum, :statuses, [:new, …]}
+  defp type({:@, _, [{name, _, [list]}]}) when is_atom(name) and is_list(list) do
+    if list != [] and Enum.all?(list, &is_atom/1), do: {:enum, name, list}
+  end
+
   defp type(_), do: nil
 
   # ── calls: a remote call Mod.fun(args) → another unit/kit reference ──

@@ -26,6 +26,12 @@ defmodule Workbooks.Wit.Types do
     "record #{wit(name)} {\n#{body}\n}"
   end
 
+  @doc "Render a WIT `enum` from a name and its atom cases."
+  def enum(name, atoms) do
+    cases = atoms |> Enum.map(&("  " <> wit(&1) <> ",")) |> Enum.join("\n")
+    "enum #{wit(name)} {\n#{cases}\n}"
+  end
+
   @doc "WIT identifier form: lowercased, snake_case → kebab-case."
   def wit(name), do: name |> to_string() |> String.replace("_", "-") |> String.downcase()
 end
