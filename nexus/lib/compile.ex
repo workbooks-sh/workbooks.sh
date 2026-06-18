@@ -53,28 +53,21 @@ defmodule Nexus.Compile do
   def cached(node, build) do
     if cache_enabled?() do
       key = cache_key(node)
-      path = Path.join(cache_dir(), key <> ".component.wasm")
 
-      if File.exists?(path) do
-        {:ok, path}
-      else
-        # Miss: pay the real cost ONCE, under the concurrency gate, then store atomically.
-        case Nexus.Compile.Gate.with_slot(build) do
-          {:ok, comp} -> store(path, comp)
-          other -> other
-        end
+      case Nexus.Compile.Store.fetch(key) do
+        {:ok, path} ->
+          {:ok, path}
+
+        :miss ->
+          # Miss: pay the real cost ONCE, under the concurrency gate, then store (local + remote).
+          case Nexus.Compile.Gate.with_slot(build) do
+            {:ok, comp} -> {:ok, Nexus.Compile.Store.put(key, comp)}
+            other -> other
+          end
       end
     else
       Nexus.Compile.Gate.with_slot(build)
     end
-  end
-
-  defp store(path, comp) do
-    File.mkdir_p!(cache_dir())
-    tmp = path <> ".#{System.unique_integer([:positive])}.tmp"
-    File.cp!(comp, tmp)
-    File.rename!(tmp, path)
-    {:ok, path}
   end
 
   defp cache_key(%{kind: k, name: n, body: b} = node) do
@@ -88,8 +81,6 @@ defmodule Nexus.Compile do
   rescue
     _ -> []
   end
-
-  defp cache_dir, do: Nexus.Config.component_cache()
 
   defp cache_enabled?, do: Nexus.Config.compile_cache?()
 

@@ -54,6 +54,8 @@ defmodule Nexus.Config do
   def compile_cache?, do: get(:compile_cache)
   def compile_cache_version, do: get(:compile_cache_version)
   def component_cache, do: get(:component_cache)
+  def component_cache_endpoint, do: get(:component_cache_endpoint)
+  def component_cache_region, do: get(:component_cache_region)
   def languages, do: get(:languages)
   def pm_debug?, do: get(:pm_debug)
 
@@ -64,6 +66,8 @@ defmodule Nexus.Config do
       compile_cache: bool(attr(html, "compile-cache"), true),
       compile_cache_version: attr(html, "compile-cache-version") || "wbc1",
       component_cache: attr(html, "component-cache") || default_cache_dir(),
+      component_cache_endpoint: attr(html, "component-cache-endpoint"),
+      component_cache_region: attr(html, "component-cache-region") || "auto",
       languages: words(attr(html, "languages"), :all),
       pm_debug: bool(attr(html, "pm-debug"), false)
     }
