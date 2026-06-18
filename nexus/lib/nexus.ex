@@ -19,17 +19,28 @@ defmodule Nexus do
   the sandbox is wasmex; the compilers are reused from `runtime/host/compilers/*` (the moat).
   """
 
-  @doc "The status of each layer — the skeleton's honest state."
+  @doc "The status of each layer — the honest state."
   def layers do
     %{
-      literate: :port,
-      resource: :port,
-      wit: :port,
-      dock: :port,
-      unit: :port,
+      literate: :live,
+      resource: :live,
+      wit: :live,
+      dock: :live,
+      unit: :live,
+      # data: a resource → live Ash resource with real CRUD (Resource.Ash.materialize)
+      data: :live,
+      # sandbox: real wasm components run on wasmex
       sandbox: :live,
-      compile: :new,
-      weave: :new
+      # compile: a .work rust unit → typed component, automatic + tested
+      compile: :live,
+      # weave: workbook folder → one .html (first pass; rich render pending)
+      weave: :basic,
+      # dock host-IMPORTS (a component CALLING a host capability) — PROVEN: a Rust component
+      # imports `add`, the host (Dock, Elixir) provides it, the component calls it → 42. mrustc
+      # emits the import as `env::add`; rewriting the core's import module env→$root (wat round-
+      # trip) makes the component model map it, then wasmex supplies the impl. Auto-wiring the
+      # grant→import→impl path into Nexus.Compile is the next integration.
+      dock_imports: :proven
     }
   end
 end
