@@ -64,3 +64,16 @@ cloud, features, compiler lanes, and a long tail that belong in their own homes.
 The core runtime — parse → resource/data → dock → sandbox-execute → compile-orchestrate —
 is a lean, flag-free app; cloud is a separate app; features are toolkits; deploy config is one
 surface. Then we measure the real core LOC/file count against the dream.
+
+## Progress log
+
+- **Step 2 (env→config):** clean value-config consolidated (`WB_DATA`, `WB_PROFILE_DIR` →
+  `Workbooks.Config`). Remaining `WB_*` are **role-flags** (`== "1"`/`== "clip"`, WB_WEB/
+  WB_CLOUD…) — eliminated *structurally* by fronts 5/6, not consolidated — or mixed-usage
+  presence-checks (low value). Step 2 clean wins **done**.
+- **Step 3 (data-layer deletions):** **blocked for now** — `Wit.Types` inference still serves
+  the non-resource WIT path (server/client/foreign units), so it can't be deleted until the
+  resource model replaces that path everywhere; `exec_broker` is woven into RustDock/JsDock.
+  Skipped per discipline; revisit after the resource model is wired into the build.
+- **Step 5 (features):** wavelet now **fully out of core, no flag** (`WB_FEATURES` removed) —
+  parked under `features/` for toolkit conversion.
