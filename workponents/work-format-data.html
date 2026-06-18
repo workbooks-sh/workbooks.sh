@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="darkreader-lock">
+<meta name="color-scheme" content="dark light">
+<title>Data — a resource is the database</title>
+<style>
+  :root{
+    --bg:#14161a; --panel:#1b1e24; --ink:#c9d1dc; --dim:#8a93a2; --line:#272b33;
+    --warm:#e6b673; --warm2:#d98e73; --cool:#8fb7e0; --cool2:#a9d9bf; --kw:#c98fd0;
+    --mint:#aee5c2; --code-fill:rgba(255,255,255,.045);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.75 ui-sans-serif,-apple-system,"Geist",Inter,system-ui,sans-serif;}
+  .wrap{max-width:760px;margin:0 auto;padding:64px 28px 120px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--dim);margin:0 0 40px;font-size:17px}
+  h2{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--cool);
+    margin:48px 0 14px;font-weight:600}
+  p{margin:14px 0}
+  p.lead{color:#aeb7c4}
+  .ref{color:var(--cool);border-bottom:1px solid #33506b}
+  code.in{font-family:ui-monospace,"Geist Mono",SFMono-Regular,Menlo,monospace;
+    font-size:.88em;color:var(--warm);background:var(--code-fill);
+    padding:.05em .35em;border-radius:4px}
+  pre{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--mint);
+    border-radius:8px;padding:18px 20px;overflow:auto;margin:18px 0;
+    font:13.5px/1.85 ui-monospace,"Geist Mono",SFMono-Regular,Menlo,monospace}
+  pre .kw{color:var(--kw)}      /* resource/record/enum/do/end */
+  pre .name{color:#e7edf5}      /* the entity name */
+  pre .ty{color:var(--warm)}    /* domain types */
+  pre .at{color:var(--cool2)}   /* :atoms / enum cases */
+  pre .c{color:#5d6470;font-style:italic}  /* comments */
+  pre .v{color:var(--warm2)}    /* verbs query/mutation */
+  .free{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 4px}
+  .chip{font-size:12.5px;color:#0f1115;background:var(--mint);border-radius:999px;
+    padding:3px 11px;font-weight:600}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 18px}
+  .card h3{margin:0 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+  .card.s h3{color:var(--warm)} .card.c h3{color:var(--cool)}
+  .card p{margin:6px 0 0;font-size:14px;color:#aeb7c4;line-height:1.6}
+  .flow{font-family:ui-monospace,monospace;font-size:13px;color:var(--dim);
+    background:var(--panel);border:1px dashed var(--line);border-radius:8px;
+    padding:14px 18px;margin:18px 0;line-height:2}
+  .flow b{color:var(--mint);font-weight:600}
+  hr{border:0;border-top:1px solid var(--line);margin:44px 0}
+  .foot{color:var(--dim);font-size:13px;margin-top:48px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Data — a <em>resource</em> is the database</h1>
+  <p class="sub">Describe a thing once. The server stores it, the client calls it, and the page stays live. No schema dialect, no API, no glue.</p>
+
+  <p class="lead">A <span class="ref">resource</span> is a kind of thing your workbook keeps —
+  leads, deals, tasks. You write what it <em>is</em>; everything else is generated. The
+  vocabulary is WIT's own — what you author is what runs and what you debug.</p>
+
+  <h2>The floor — just the shape</h2>
+  <p>This alone is a working database table. You get create, read, update, delete, and
+  <em>reactive</em> reads — for free.</p>
+
+<pre><span class="kw">resource</span> <span class="name">Lead</span> <span class="kw">do</span>
+  name     <span class="ty">:text</span>
+  revenue  <span class="ty">:money</span>
+  status   <span class="at">:new</span> | <span class="at">:enriched</span> | <span class="at">:scored</span>   <span class="c"># an enum, inline</span>
+  tags     [<span class="ty">:text</span>]                          <span class="c"># a list</span>
+<span class="kw">end</span></pre>
+
+  <div class="free">
+    <span class="chip">create</span><span class="chip">read</span><span class="chip">update</span>
+    <span class="chip">delete</span><span class="chip">live queries</span><span class="chip">validation</span>
+  </div>
+  <p>You name fields by what they <em>mean</em> — <code class="in">:money</code>,
+  <code class="in">:text</code>, an inline enum — and the type, the validation, and the way
+  it renders all fall out of that meaning. No <code class="in">field :revenue, integer()</code>
+  ceremony; no guessing a type from a default.</p>
+
+  <h2>A pure value is a record, not a resource</h2>
+  <p>Some shapes have no identity and no behavior — they're just values that live <em>inside</em>
+  a resource. Those are <span class="ref">records</span>.</p>
+
+<pre><span class="kw">record</span> <span class="name">Money</span> <span class="kw">do</span>
+  cents     <span class="ty">:int</span>
+  currency  <span class="at">:usd</span> | <span class="at">:eur</span> | <span class="at">:gbp</span>
+<span class="kw">end</span></pre>
+
+  <p>WIT already draws this line: a <code class="in">record</code> is a value, a
+  <code class="in">resource</code> is a stateful entity with operations. We use the same
+  words, so the contract and the debugger speak your language too.</p>
+
+  <h2>Reads and writes — only when you need a custom one</h2>
+  <p>The defaults cover most of it. When you want a named view or a transactional change,
+  write it <em>inside</em> the resource.</p>
+
+<pre><span class="kw">resource</span> <span class="name">Lead</span> <span class="kw">do</span>
+  name     <span class="ty">:text</span>
+  revenue  <span class="ty">:money</span>
+  status   <span class="at">:new</span> | <span class="at">:enriched</span> | <span class="at">:scored</span>
+
+  <span class="v">query</span> <span class="at">:hot</span>, where: status == <span class="at">:scored</span> <span class="kw">and</span> revenue > 50_000
+
+  <span class="v">mutation</span> <span class="at">:enrich</span> <span class="kw">do</span>             <span class="c"># runs server-side, transactionally</span>
+    fetched = Dock.fetch(<span class="ty">crm_url</span>(name))
+    %{revenue: fetched.revenue, status: <span class="at">:enriched</span>}
+  <span class="kw">end</span>
+<span class="kw">end</span></pre>
+
+  <p>A <code class="in">query</code> is a live view — when the data changes, every page
+  reading it updates, no reload. A <code class="in">mutation</code> is an all-or-nothing
+  change. Same idea as the rest of the format: <span class="ref">the page isn't a snapshot
+  of the store — the page <em>is</em> the store</span>.</p>
+
+  <h2>Where it runs — server owns the data, client calls it</h2>
+
+  <div class="split">
+    <div class="card s">
+      <h3>Server — the database</h3>
+      <p>The resource <em>is</em> the database: it stores rows, runs queries and mutations,
+      validates, and swaps backends (SQLite → Postgres) without a rewrite. The client never
+      runs a database.</p>
+    </div>
+    <div class="card c">
+      <h3>Client — a typed reference</h3>
+      <p>The browser gets the <em>shape</em> and calls the resource's operations across the
+      WIT boundary. It renders the live result. It holds a view, never the source of truth.</p>
+    </div>
+  </div>
+
+  <div class="flow">
+    <b>resource Lead</b> (you write it, once)<br>
+    &nbsp;&nbsp;→ server: the live database + queries + mutations<br>
+    &nbsp;&nbsp;→ client: the typed shape + calls over <b>WIT</b><br>
+    &nbsp;&nbsp;→ a change on the server → the client view updates, live
+  </div>
+
+  <p>So the whole database is just things you describe in the document. The shape is shared,
+  the data is server-authoritative, the page is live — and you never wrote an API,
+  a serializer, or a line of state-sync.</p>
+
+  <hr>
+  <p class="foot">Preview of the data model — <code class="in">resource</code> /
+  <code class="in">record</code> / <code class="in">query</code> / <code class="in">mutation</code>.
+  Server engine: Ash · client shape: typed struct · boundary: WIT via wasmex. Vocabulary is
+  WIT's, end to end.</p>
+
+</div>
+</body>
+</html>
