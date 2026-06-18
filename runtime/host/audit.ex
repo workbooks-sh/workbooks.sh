@@ -6,23 +6,11 @@ defmodule Workbooks.Audit do
   weave refuses. Pure over the parse + the Elixir AST calls.
   """
 
-  alias Workbooks.{Literate, Wit, Extract}
+  alias Workbooks.{Literate, Wit, Extract, Dock}
 
-  # the Dock function a unit calls → the sandbox-enforced capability it requires.
-  # (agent/complete/browse are nexus-tier services, not per-unit sandbox caps, so
-  # they aren't gated here.)
-  @dock_caps %{
-    fetch: "net",
-    get: "net",
-    post: "net",
-    secret: "secrets",
-    secrets: "secrets",
-    kv: "kv",
-    put: "kv",
-    read: "kv",
-    exec: "exec",
-    run: "exec"
-  }
+  # the Dock function → sandbox capability mapping lives in the single Dock registry
+  # (Dock.cap_for_dock_fn/1). Nexus-tier calls (agent/complete/browse) have no sandbox
+  # cap there, so they aren't gated here.
 
   @doc "Find units that use a Dock capability they did not grant. Returns [%{unit, cap}]."
   def caps(dir) do
@@ -44,7 +32,7 @@ defmodule Workbooks.Audit do
     |> Extract.facts()
     |> Map.fetch!(:calls)
     |> Enum.flat_map(fn {mod, fun, _arity} ->
-      if dock?(mod), do: [@dock_caps[fun]], else: []
+      if dock?(mod), do: [Dock.cap_for_dock_fn(fun)], else: []
     end)
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()

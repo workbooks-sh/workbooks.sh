@@ -19,11 +19,11 @@ defmodule Workbooks.Dock do
   #    Instance Dock seam (`instance/imports.ex`), each projecting one host import name.
   #    Locked by the characterization snapshot; the seam will reproject from here.
   @registry %{
-    "net" => %{interface: "host-net", wit: "interface host-net {\n  fetch: func(url: string) -> string;\n}", sandbox?: true},
-    "kv" => %{interface: "host-kv", wit: "interface host-kv {\n  get: func(key: string) -> string;\n  put: func(key: string, val: string);\n}", sandbox?: true},
-    "secrets" => %{interface: "host-secrets", wit: "interface host-secrets {\n  read: func(key: string) -> string;\n}", sandbox?: true},
-    "fs" => %{interface: "host-fs", wit: "interface host-fs {\n  read: func(path: string) -> string;\n  write: func(path: string, data: string);\n}", sandbox?: true},
-    "exec" => %{interface: "host-exec", wit: "interface host-exec {\n  run: func(cmd: string, args: list<string>) -> string;\n}", sandbox?: true},
+    "net" => %{interface: "host-net", wit: "interface host-net {\n  fetch: func(url: string) -> string;\n}", sandbox?: true, dock_fns: ~w(fetch get post)},
+    "kv" => %{interface: "host-kv", wit: "interface host-kv {\n  get: func(key: string) -> string;\n  put: func(key: string, val: string);\n}", sandbox?: true, dock_fns: ~w(kv put read)},
+    "secrets" => %{interface: "host-secrets", wit: "interface host-secrets {\n  read: func(key: string) -> string;\n}", sandbox?: true, dock_fns: ~w(secret secrets)},
+    "fs" => %{interface: "host-fs", wit: "interface host-fs {\n  read: func(path: string) -> string;\n  write: func(path: string, data: string);\n}", sandbox?: true, dock_fns: ~w(fs file)},
+    "exec" => %{interface: "host-exec", wit: "interface host-exec {\n  run: func(cmd: string, args: list<string>) -> string;\n}", sandbox?: true, dock_fns: ~w(exec run)},
     "vfs" => %{import: "vfs-query", sig: "func(sql: string) -> string"},
     "commands" => %{import: "run-command", sig: "func(command: string, input: string, args: list<string>) -> string"},
     "llm" => %{import: "llm-complete", sig: "func(prompt: string) -> string"},
@@ -66,6 +66,12 @@ defmodule Workbooks.Dock do
 
   @doc "The live runtime seam capabilities (the WIT-typed Instance Dock imports)."
   def runtime_capabilities, do: for({c, m} <- @registry, Map.has_key?(m, :import), do: c)
+
+  # reverse index: a `Dock.<fn>` a unit calls → the sandbox capability it exercises
+  @dock_fn_index (for {cap, %{dock_fns: fns}} <- @registry, f <- fns, into: %{}, do: {f, cap})
+
+  @doc "The sandbox capability a `Dock.<fn>` call exercises (for the weave caps audit), or nil."
+  def cap_for_dock_fn(fn_name), do: @dock_fn_index[to_string(fn_name)]
 
   @doc "Is `cap` a known capability?"
   def capability?(cap), do: Map.has_key?(@registry, cap)
