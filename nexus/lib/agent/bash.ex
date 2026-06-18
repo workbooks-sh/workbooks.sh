@@ -43,10 +43,23 @@ defmodule Nexus.Agent.Bash do
       # web access is HOST-BROKERED (wasm has no sockets) — `fetch <url>` and `scrape <url>` go
       # through Nexus.Dock.fetch (SSRF-safe: loopback/private blocked, https). curl-class.
       "fetch" -> web_fetch(List.first(args))
-      "scrape" -> List.first(args) |> web_fetch() |> html_to_text()
-      # in-wasm Blitz render: screenshot <url> [out.png] → a PNG in /work (fetch+freeze+render).
+      # scrape/render <url> → the page's rendered TEXT via in-wasm Blitz (CSS-aware, no JS),
+      # falling back to a naive tag-strip if the renderer is unavailable.
+      "scrape" -> web_render(List.first(args))
+      "render" -> web_render(List.first(args))
+      # in-wasm Blitz render: screenshot <url> [out.png] → a PNG in /work.
       "screenshot" -> web_screenshot(vfs, args)
       _ -> exec(vfs, cmd, args, stdin)
+    end
+  end
+
+  defp web_render(nil), do: "render: usage: render <url>"
+
+  defp web_render(url) do
+    case Nexus.Browse.render(url) do
+      {:ok, text} when is_binary(text) and text != "" -> text
+      # fall back to the naive tag-strip if the in-wasm renderer is unavailable
+      _ -> url |> web_fetch() |> html_to_text()
     end
   end
 
