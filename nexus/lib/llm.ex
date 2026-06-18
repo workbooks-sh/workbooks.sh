@@ -68,6 +68,14 @@ defmodule Nexus.Llm do
     end
   end
 
+  @doc """
+  Normalize a decoded provider response (the JSON body as a map) into our turn shape. Public so the
+  robustness of the parse — adversarial/malformed payloads must degrade gracefully, never raise — can
+  be asserted without a live call. Tolerates: no `choices`, missing `message`, `tool_calls` with
+  missing id/name, and `arguments` that are absent / not JSON / not an object.
+  """
+  def parse_response(decoded), do: parse(decoded)
+
   # Normalize an OpenAI/OpenRouter response into our turn shape.
   defp parse(%{"choices" => [choice | _]} = resp) do
     msg = choice["message"] || %{}
