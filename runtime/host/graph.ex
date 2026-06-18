@@ -34,6 +34,9 @@ defmodule Workbooks.Graph do
     for {path, nodes} <- parsed, into: %{} do
       links =
         nodes
+        # backlinks are a prose construct; a [[…]] inside a code body is a comment
+        # example, not a real reference, so don't gate on it.
+        |> Enum.reject(&(&1.type == :code))
         |> Enum.flat_map(&Map.get(&1, :refs, []))
         |> Enum.filter(&String.starts_with?(&1, "[["))
         |> Enum.uniq()
@@ -92,7 +95,7 @@ defmodule Workbooks.Graph do
   @doc "Resolve every [[backlink]] across the tree + every edge; report what dangles."
   def check(%__MODULE__{nodes: nodes, edges: edges, titles: titles} = g) do
     title_set = titles |> Map.values() |> Enum.map(&normalize/1) |> MapSet.new()
-    node_set = nodes |> Map.keys() |> MapSet.new()
+    node_set = nodes |> Map.keys() |> Enum.map(&normalize/1) |> MapSet.new()
 
     dangling_backlinks =
       for {path, links} <- g.backlinks, l <- links, not resolves?(l, node_set, title_set), do: {path, l}

@@ -37,5 +37,5 @@ client svelte :chart do
 end
 
 Because it's an island, it behaves identically across all three delivery modes — in
-[[Live SSR]] a freshly scored lead grows its bar with no reload. The companion trend
+[[Delivery modes]] a freshly scored lead grows its bar with no reload. The companion trend
 view is the SolidJS [[Trend sparkline]].
