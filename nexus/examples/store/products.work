@@ -9,3 +9,8 @@ resource Product do
   stock :int
   status :draft | :live | :sold_out
 end
+
+The catalogue, rendered live from the Store (baked into this file as a JSON island; the same
+`nexus.data.all("Product")` API reads it client-side, or a server/local-SQLite backend):
+
+show Product

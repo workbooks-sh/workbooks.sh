@@ -7,7 +7,13 @@ c :pricing do
   int discount(int price, int pct) {
     return price - (price * pct) / 100;
   }
+  int render(void) { return discount(2000, 15); }
 end
+
+`show pricing` compiles the C to a wasm component, runs its `render()` on wasmex at build time,
+and bakes the result (a 2000¢ item at 15% off):
+
+show pricing
 
 The `now` cap stamps when the sheet was priced. Just **grant** it and call it — the lane injects
 the host import (a typed WIT import the Dock supplies); no boilerplate. An ungranted cap is a

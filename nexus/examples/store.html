@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>workbook</title>
+<html lang="en"><head><meta charset="utf-8"><title>Corner Store</title>
 <style>body{max-width:46rem;margin:2rem auto;padding:0 1rem;font:16px/1.6 system-ui,sans-serif;color:#1a1a1a}
 h1,h2,h3{line-height:1.25;margin:1.6em 0 .5em} code{background:#f4f4f5;padding:.1em .3em;border-radius:3px;font-size:.9em}
 .unit{margin:1.2em 0;border:1px solid #e4e4e7;border-radius:8px;overflow:hidden}
@@ -7,30 +7,44 @@ h1,h2,h3{line-height:1.25;margin:1.6em 0 .5em} code{background:#f4f4f5;padding:.
 .unit .kind{display:inline-block;background:#1a1a1a;color:#fff;padding:.05em .5em;border-radius:4px;font-size:.8em;margin-right:.4em}
 .unit pre{margin:0;padding:.8em;overflow-x:auto;background:#fff} pre code{background:none}
 .decl{background:#f4f4f5;padding:.6em;border-radius:6px;font-size:.85em}
+table.data{border-collapse:collapse;width:100%;margin:1.2em 0;font-size:.92em}
+table.data caption{text-align:left;font-weight:600;margin-bottom:.3em}
+table.data th,table.data td{border:1px solid #e4e4e7;padding:.35em .6em;text-align:left}
+table.data thead th{background:#fafafa} table.data .empty{color:#999;font-style:italic}
+table.data caption .cap{font-weight:400;color:#999;font-size:.85em}
+.data-missing{color:#b00;font-size:.9em}
+.unit-output{margin:1em 0;padding:.6em .9em;background:#f0f7ff;border-left:3px solid #4a90d9;border-radius:4px}
+nav.wb-nav{display:flex;gap:.8em;flex-wrap:wrap;padding:.6em 0;margin-bottom:1em;border-bottom:1px solid #e4e4e7;font-size:.9em}
+nav.wb-nav a{color:#555;text-decoration:none} nav.wb-nav a:hover{color:#000}
 </style></head>
 <body>
-<section class="file" data-file="index.work">
+<nav class="wb-nav"><a href="#index-work">index</a><a href="#pricing-work">pricing</a><a href="#products-work">products</a></nav>
+<section class="file" id="index-work" data-file="index.work">
   <h1>Corner Store</h1>
   <p>A tiny <strong>living</strong> workbook — one file of prose, a database, and a compiled unit — that <code>nexus</code></p>
   <p>brings up end to end. Open the woven <code>.html</code>, or run it:</p>
-  <ul><li><code>Nexus.Compile.workbook("examples/store")</code> materialises the <code>Product</code> database and lists the</li></ul>
+  <ul><li><code>Nexus.Compile.workbook(&quot;examples/store&quot;)</code> materialises the <code>Product</code> database and lists the</li></ul>
   <p>  wasm units</p>
-  <ul><li><code>Nexus.Weave.weave("examples/store")</code> renders this whole folder to one self-contained page</li></ul>
+  <ul><li><code>Nexus.Weave.weave(&quot;examples/store&quot;)</code> renders this whole folder to one self-contained page</li></ul>
   <p>Everything below is authored as <code>.work</code>; nothing here is hand-written HTML or JSON.</p>
 </section>
-<section class="file" data-file="pricing.work">
+<section class="file" id="pricing-work" data-file="pricing.work">
   <h2>Pricing logic, compiled</h2>
   <p>A <code>c</code> unit is real C, compiled to a wasm component by our own toolchain (clang, run in-sandbox)</p>
   <p>and executed on wasmex. <code>discount</code> takes a price and a percent and returns the marked-down price.</p>
   <figure class="unit" data-unit="c:pricing"><figcaption><span class="kind">c</span> pricing</figcaption><pre>  int discount(int price, int pct) {
     return price - (price * pct) / 100;
-  }</pre></figure>
-  <p>The <code>now</code> cap (a host capability the unit imports) stamps when the sheet was priced — a typed</p>
-  <p>WIT import the Dock supplies, granted explicitly in the header.</p>
-  <figure class="unit" data-unit="c:clock"><figcaption><span class="kind">c</span> clock</figcaption><pre>  extern long now(void);
-  long priced_at(void) { return now(); }</pre></figure>
+  }
+  int render(void) { return discount(2000, 15); }</pre></figure>
+  <p><code>show pricing</code> compiles the C to a wasm component, runs its <code>render()</code> on wasmex at build time,</p>
+  <p>and bakes the result (a 2000¢ item at 15% off):</p>
+  <div class="unit-output" data-unit="pricing">1700</div>
+  <p>The <code>now</code> cap stamps when the sheet was priced. Just <strong>grant</strong> it and call it — the lane injects</p>
+  <p>the host import (a typed WIT import the Dock supplies); no boilerplate. An ungranted cap is a</p>
+  <p>hard error (<code>Nexus.Audit</code>).</p>
+  <figure class="unit" data-unit="c:clock"><figcaption><span class="kind">c</span> clock</figcaption><pre>  long priced_at(void) { return now(); }</pre></figure>
 </section>
-<section class="file" data-file="products.work">
+<section class="file" id="products-work" data-file="products.work">
   <h2>The catalogue</h2>
   <p>A <code>resource</code> is the database. Declare the shape and <code>nexus</code> derives a live <strong>Ash</strong> resource —</p>
   <p>real CRUD, the inline <code>status</code> enum becomes a real constraint. No schema files, no migrations.</p>
@@ -38,5 +52,60 @@ h1,h2,h3{line-height:1.25;margin:1.6em 0 .5em} code{background:#f4f4f5;padding:.
   price :money
   stock :int
   status :draft | :live | :sold_out</pre></figure>
+  <p>The catalogue, rendered live from the Store (baked into this file as a JSON island; the same</p>
+  <p><code>nexus.data.all(&quot;Product&quot;)</code> API reads it client-side, or a server/local-SQLite backend):</p>
+  <table class="data" data-resource="Product"><caption>Product</caption><thead><tr><th>name</th><th>price</th><th>stock</th><th>status</th></tr></thead><tbody><tr><td>Stroopwafel</td><td>350</td><td>40</td><td>live</td></tr><tr><td>Cold Brew</td><td>450</td><td>12</td><td>live</td></tr><tr><td>Mystery Box</td><td>999</td><td>0</td><td>sold_out</td></tr></tbody></table>
 </section>
+<script type="application/nexus-data" data-resource="Product">[{"name":"Stroopwafel","status":"live","price":350,"stock":40},{"name":"Cold Brew","status":"live","price":450,"stock":12},{"name":"Mystery Box","status":"sold_out","price":999,"stock":0}]</script>
+<script>window.nexus = window.nexus || {};
+nexus.data = {
+  _baked: null,
+  _db: null,
+  _loadBaked() {
+    if (this._baked) return this._baked;
+    this._baked = {};
+    document.querySelectorAll('script[type="application/nexus-data"]').forEach(s => {
+      this._baked[s.dataset.resource] = JSON.parse(s.textContent || '[]');
+    });
+    return this._baked;
+  },
+  _open() {
+    if (this._db) return this._db;
+    this._db = new Promise((res, rej) => {
+      const r = indexedDB.open('nexus', 1);
+      r.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('rows')) db.createObjectStore('rows', { autoIncrement: true });
+      };
+      r.onsuccess = e => res(e.target.result);
+      r.onerror = e => rej(e.target.error);
+    });
+    return this._db;
+  },
+  async _local(resource) {
+    const db = await this._open();
+    return new Promise(res => {
+      const req = db.transaction('rows', 'readonly').objectStore('rows').getAll();
+      req.onsuccess = () => res((req.result || []).filter(r => r.__resource === resource).map(({ __resource, ...row }) => row));
+      req.onerror = () => res([]);
+    });
+  },
+  async all(resource) {
+    const baked = this._loadBaked()[resource] || [];
+    const local = await this._local(resource);
+    if (baked.length || local.length) return baked.concat(local);
+    try { const r = await fetch('/data/' + encodeURIComponent(resource)); return r.ok ? await r.json() : []; }
+    catch (_) { return []; }
+  },
+  async create(resource, row) {
+    const db = await this._open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('rows', 'readwrite');
+      tx.objectStore('rows').add(Object.assign({ __resource: resource }, row));
+      tx.oncomplete = () => res(row);
+      tx.onerror = () => rej(tx.error);
+    });
+  }
+};
+</script>
 </body></html>

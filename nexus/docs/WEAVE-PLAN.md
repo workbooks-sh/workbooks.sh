@@ -92,7 +92,17 @@ and can later run client-side via browser-wasm; baked-output first.
 - ✅ **Phase 5** — served SSR live via `Nexus.Server` (bandit): `GET /` SSRs, `GET /data/:resource` JSON.
 - ✅ **CLIENT-SIDE PROVEN IN A REAL BROWSER** — woven `file://` (no server) rendered the table and
   `nexus.data` (baked + IndexedDB create/persist) all worked. The local-only HTML model is real.
-- ⏳ Remaining: Phase 6 adversarial, Phase 7 demo+docs.
+- ✅ **Phase 6 — adversarial testing + hardening:** malformed/garbage `.work` graceful (no crash),
+  XSS escaped in headings/prose/data, huge data capped (table + island, 500 rows), ungranted-cap
+  render unit blocked by Audit before running. `weave_adversarial_test`.
+- ✅ **Phase 7 — living demo + docs:** `examples/store` exercises a resource + `show` (data table),
+  a C unit `render()` baked, all three data modes; woven to `examples/store.html` and **verified
+  in a real browser** (3 product rows, unit output 1700, `nexus.data` client-side, nav). `docs/WEAVE.md`.
+
+## ✅ PLAN COMPLETE
+Weave renders real HTML workbooks across all lanes and all three data modes (baked / local-live /
+server), served *and* local-only, adversarially tested, demo + docs shipped, every suite green,
+all pushed. Browser-proven. The runtime's render path can be sunset.
 
 ## Done when
 weave renders real HTML workbooks across all lanes and all three data modes, served *and* local,
