@@ -1,13 +1,21 @@
 defmodule Nexus.Compilers.C do
   @moduledoc """
   The C lane — clang.wasm (the LLVM multitool, run directly via wasmtime like the rust lane,
-  NOT through any command registry) compiles C → a wasm reactor module exporting the unit's
-  functions. Cleaner than rust: clang emits function-exports directly, so there's no mrustc
-  whole-program-from-main quirk — just `clang -c` + `wasm-ld --no-entry --export=<fn>`.
+  NOT through any command registry). Two output shapes:
+
+    * `:reactor` (default) — `wasm-ld --no-entry --export=<fn>` → a module exporting functions, for
+      the resource/render component model.
+    * `:command` — `wasm-ld <crt1-command.o>` → a `wasm32-wasi` COMMAND module (a `main()` CLI that
+      reads argv/stdin, writes stdout). This is the **toolkit** shape — what `coreutils.wasm` is and
+      what the agent's `bash` runs (`wasmtime run <wasm> argv < stdin`). It's how you author a kit
+      in a `.work` file (`toolkit :name do <a main() CLI> end`).
   """
   import Nexus.Compilers.Shared, only: [wasmtime: 1]
 
-  @doc "Compile a C source file to a wasm core module exporting `opts[:exports]`. `{:ok, path}`."
+  @doc """
+  Compile a C source file to wasm. `opts[:shape]` is `:reactor` (default; exports `opts[:exports]`)
+  or `:command` (a WASI CLI module — a toolkit). `{:ok, path}`.
+  """
   def compile_to_wasm(source_path, opts \\ [], root \\ Nexus.Compilers.Shared.default_root()) do
     clang = Path.expand(Path.join([root, "clang", "clang-root", "llvm.core.wasm"]))
     csys = Path.expand(Path.join([root, "clang", "clang-root", "sysroot"]))
@@ -24,11 +32,22 @@ defmodule Nexus.Compilers.C do
       wasmtime(["--dir", "#{csys}::/usr", "--dir", "#{work}::/work", "--dir", "#{work}/t::/tmp"] ++ extra_mounts ++ ["--env", "TMPDIR=/tmp", clang | args])
     end
 
-    exports = opts |> Keyword.get(:exports, []) |> Enum.map(&"--export=#{&1}")
-    # host imports (extern decls) stay unresolved → wasm imports the Dock satisfies
-    au = if Keyword.get(opts, :allow_undefined, false), do: ["--allow-undefined"], else: []
     cl.(["clang", "--target=wasm32-wasip1", "--sysroot=/usr", "-O1", "-w"] ++ cflags ++ ["-c", "/work/u.c", "-o", "/work/u.o"])
-    cl.(["wasm-ld", "-m", "wasm32", "--no-entry"] ++ au ++ exports ++ ["/work/u.o", "-o", "/work/u.wasm"])
+
+    link =
+      case Keyword.get(opts, :shape, :reactor) do
+        :command ->
+          # a WASI command module: the crt1 entry runs main(); link libc. No --no-entry/--export.
+          ["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-wasip1",
+           "/usr/lib/wasm32-wasip1/crt1-command.o", "/work/u.o", "-lc", "-o", "/work/u.wasm"]
+
+        _ ->
+          exports = opts |> Keyword.get(:exports, []) |> Enum.map(&"--export=#{&1}")
+          au = if Keyword.get(opts, :allow_undefined, false), do: ["--allow-undefined"], else: []
+          ["wasm-ld", "-m", "wasm32", "--no-entry"] ++ au ++ exports ++ ["/work/u.o", "-o", "/work/u.wasm"]
+      end
+
+    cl.(link)
 
     core = Path.join(work, "u.wasm")
     if File.regular?(core) do

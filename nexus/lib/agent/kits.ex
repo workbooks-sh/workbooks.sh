@@ -23,7 +23,24 @@ defmodule Nexus.Agent.Kits do
   @doc "The kits dir (config `:kits_root`, default `nexus/kits`)."
   def root, do: Application.get_env(:nexus, :kits_root, Path.join(File.cwd!(), "kits"))
 
-  @doc "All registered kits: `%{name => %{wasm, summary, commands}}`. coreutils + every kits/*.wasm."
+  @reg {:nexus_kits, :registered}
+
+  @doc """
+  Register a kit in-memory (no file). Used by `Nexus.Toolkit` to make a `toolkit` unit compiled from
+  a `.work` file instantly available to the agent's `bash`. `opts`: `:summary`, `:commands`.
+  """
+  def register(name, wasm, opts \\ []) do
+    kit = %{wasm: wasm, summary: Keyword.get(opts, :summary, "the #{name} toolkit"), commands: Keyword.get(opts, :commands, [name])}
+    :persistent_term.put(@reg, Map.put(registered(), name, kit))
+    :ok
+  end
+
+  @doc "Drop all in-memory registrations (e.g. between test runs)."
+  def clear_registered, do: :persistent_term.put(@reg, %{})
+
+  defp registered, do: :persistent_term.get(@reg, %{})
+
+  @doc "All registered kits: `%{name => %{wasm, summary, commands}}`. coreutils + kits/*.wasm + in-memory."
   def all do
     extra =
       root()
@@ -32,7 +49,7 @@ defmodule Nexus.Agent.Kits do
       |> Enum.reject(&(Path.basename(&1) == "coreutils.wasm"))
       |> Map.new(fn p ->
         name = Path.basename(p, ".wasm")
-        {name, register(name, p)}
+        {name, from_file(name, p)}
       end)
 
     core = %{
@@ -49,7 +66,7 @@ defmodule Nexus.Agent.Kits do
       }
     }
 
-    Map.merge(core, extra)
+    Map.merge(core, extra) |> Map.merge(registered())
   end
 
   @doc "Level-1 progressive disclosure: a one-line catalog for the agent's system prompt."
@@ -75,16 +92,25 @@ defmodule Nexus.Agent.Kits do
     kits = all()
 
     cond do
-      cmd in @coreutils -> {kits["coreutils"].wasm, [cmd]}
-      Map.has_key?(kits, cmd) && kits[cmd].wasm -> {kits[cmd].wasm, []}
-      true -> nil
+      cmd in @coreutils ->
+        {kits["coreutils"].wasm, [cmd]}
+
+      Map.has_key?(kits, cmd) && kits[cmd].wasm ->
+        {kits[cmd].wasm, []}
+
+      true ->
+        # a kit that lists `cmd` among its commands (e.g. a registered toolkit / manifested kit)
+        case Enum.find(kits, fn {n, k} -> n != "coreutils" && k.wasm && cmd in (k.commands || []) end) do
+          {_n, k} -> {k.wasm, []}
+          nil -> nil
+        end
     end
   end
 
   # Register an external kit. A sidecar manifest `<name>.kit` (plain text, NOT json) gives real
   # progressive disclosure — line 1 = the summary, line 2 = space-separated commands. Without one,
   # a sensible default (the kit provides one command = its own name).
-  defp register(name, wasm) do
+  defp from_file(name, wasm) do
     manifest = Path.join(root(), "#{name}.kit")
 
     case File.read(manifest) do

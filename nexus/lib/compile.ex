@@ -22,6 +22,7 @@ defmodule Nexus.Compile do
       kind == "server" -> {:beam, Nexus.Unit.compile(node)}
       kind == "agent" -> {:agent, Nexus.Agent.def_from_unit(node)}
       kind == "check" -> {:check, Nexus.Checks.parse(node)}
+      kind == "toolkit" -> {:toolkit, Nexus.Toolkit.build(node)}
       kind == "rust" -> {:wasm, rust_unit(node)}
       kind in ~w(c cpp) -> {:wasm, c_unit(node)}
       kind == "zig" -> {:wasm, zig_unit(node)}
