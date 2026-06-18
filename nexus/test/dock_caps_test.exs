@@ -3,8 +3,9 @@ defmodule Nexus.DockCapsTest do
 
   test "the host-fn registry carries each cap with its WIT signature" do
     fns = Nexus.Dock.host_fns()
-    for n <- ~w(now emit store load fetch), do: assert Map.has_key?(fns, n)
+    for n <- ~w(now emit store load fetch complete), do: assert Map.has_key?(fns, n)
     assert Nexus.Dock.host_fn_wit("fetch") == "func(url: string) -> string"
+    assert Nexus.Dock.host_fn_wit("complete") == "func(prompt: string) -> string"
     assert Nexus.Dock.host_fn_wit("emit") == "func(msg: string)"
   end
 

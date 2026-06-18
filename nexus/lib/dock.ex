@@ -83,8 +83,43 @@ defmodule Nexus.Dock do
            {:ok, body} -> body
            _ -> ""
          end
-       end}
+       end},
+      # llm: a chat completion (OpenRouter). Returns "" if no key is configured.
+      "complete" => {"func(prompt: string) -> string", &__MODULE__.llm_complete/1}
     }
+  end
+
+  @doc false
+  @llm_model "openai/gpt-4o-mini"
+  def llm_complete(prompt) do
+    key = System.get_env("OPENROUTER_API_KEY")
+
+    if key do
+      :inets.start()
+      :ssl.start()
+      body = Jason.encode!(%{model: @llm_model, messages: [%{role: "user", content: prompt}]})
+
+      ssl_opts = [
+        verify: :verify_peer,
+        cacerts: :public_key.cacerts_get(),
+        customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]
+      ]
+
+      req = {~c"https://openrouter.ai/api/v1/chat/completions", [{~c"authorization", ~c"Bearer #{key}"}], ~c"application/json", body}
+
+      case :httpc.request(:post, req, [ssl: ssl_opts, timeout: 60_000], body_format: :binary) do
+        {:ok, {{_, 200, _}, _h, resp}} ->
+          case Jason.decode(resp) do
+            {:ok, %{"choices" => [%{"message" => %{"content" => c}} | _]}} -> c || ""
+            _ -> ""
+          end
+
+        _ ->
+          ""
+      end
+    else
+      ""
+    end
   end
 
   @doc "Whether a host fn returns a string (→ the unit's component needs a cabi_realloc export)."
