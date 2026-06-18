@@ -1,4 +1,4 @@
-defmodule Nexus.Ether.Tier do
+defmodule Nexus.Constellation.Tier do
   @moduledoc """
   Pick the local model + quant + GPU-offload per lane from the machine's actual specs.
 

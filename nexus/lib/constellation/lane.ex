@@ -1,8 +1,8 @@
-defmodule Nexus.Ether.Lane do
+defmodule Nexus.Constellation.Lane do
   @moduledoc """
   One compute lane: a bounded-concurrency work queue in front of a local model server.
 
-  The whole point of Ether is **resource shape**, not model choice. A Mac has two compute units
+  The whole point of Constellation is **resource shape**, not model choice. A Mac has two compute units
   that run in parallel — CPU cores and the (single) GPU — so we model them as two lanes with
   different `slots`:
 
@@ -14,7 +14,7 @@ defmodule Nexus.Ether.Lane do
   This is the generic mechanism — one GenServer parameterized by `slots`. Submitted work is a
   zero-arg thunk (typically a `Nexus.Llm.complete/2` call against the lane's local endpoint);
   `submit/3` blocks the caller until its job runs and returns, while other callers queue. Jobs run
-  in `Nexus.Ether.Tasks` so a crash never takes down the lane.
+  in `Nexus.Constellation.Tasks` so a crash never takes down the lane.
   """
   use GenServer
 
@@ -64,7 +64,7 @@ defmodule Nexus.Ether.Lane do
         st
 
       {{:value, {from, fun}}, q} ->
-        task = Task.Supervisor.async_nolink(Nexus.Ether.Tasks, fun)
+        task = Task.Supervisor.async_nolink(Nexus.Constellation.Tasks, fun)
         pump(%{st | queue: q, running: st.running + 1, waiting: Map.put(st.waiting, task.ref, from)})
     end
   end

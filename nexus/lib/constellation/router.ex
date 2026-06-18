@@ -1,6 +1,6 @@
-defmodule Nexus.Ether.Router do
+defmodule Nexus.Constellation.Router do
   @moduledoc """
-  Ether routing — PICK ONE lane for a turn (vs Ether fusion, which joins both). Every decision is
+  Constellation routing — PICK ONE lane for a turn (vs Constellation fusion, which joins both). Every decision is
   transparent: `decide/2` returns `{lane, reason}` so you can see *why* a turn went where.
 
   ## Task taxonomy (which brain, and why)
@@ -16,12 +16,12 @@ defmodule Nexus.Ether.Router do
 
     1. **explicit tag** — caller passes a `task_type`; mapped by the taxonomy above. <1ms.
     2. **content heuristic** — untagged text is keyword-bucketed by `classify/1`. Swap in a smarter
-       classifier with `config :nexus, Nexus.Ether, classifier: MyMod` (static-embedding or
+       classifier with `config :nexus, Nexus.Constellation, classifier: MyMod` (static-embedding or
        Bumblebee/ONNX) — no caller change.
     3. **load-aware spill** — a *spillable* GPU task moves to an idle CPU lane when the serial GPU
        queue is backed up. GPU-*required* work (true diffusion infill/edit) always waits for the GPU.
   """
-  alias Nexus.Ether.Lane
+  alias Nexus.Constellation.Lane
 
   @doc "Classify a free-text prompt to a lane. Override the default heuristic with a `:classifier`."
   @callback classify(String.t()) :: :cpu | :gpu
@@ -58,7 +58,7 @@ defmodule Nexus.Ether.Router do
     if GenServer.whereis(lane), do: Lane.stat(lane), else: nil
   end
 
-  @doc "Just the lane (drops the reason). Used by `Nexus.Ether.run/3`."
+  @doc "Just the lane (drops the reason). Used by `Nexus.Constellation.run/3`."
   def dispatch(type, _base_lane), do: decide(type) |> elem(0)
 
   @doc "Base lane from the task taxonomy, before any spill."
@@ -67,7 +67,7 @@ defmodule Nexus.Ether.Router do
 
   @doc "Lane for an untagged prompt: configured `:classifier` module, else the keyword heuristic."
   def classify(text) when is_binary(text) do
-    case Application.get_env(:nexus, Nexus.Ether, [])[:classifier] do
+    case Application.get_env(:nexus, Nexus.Constellation, [])[:classifier] do
       nil -> keyword(text)
       mod -> mod.classify(text)
     end
@@ -86,12 +86,12 @@ defmodule Nexus.Ether.Router do
   end
 
   defp gpu_pressed? do
-    s = stat(Nexus.Ether.GPU)
+    s = stat(Nexus.Constellation.GPU)
     s != nil and s.queued > 0
   end
 
   defp cpu_free? do
-    s = stat(Nexus.Ether.CPU)
+    s = stat(Nexus.Constellation.CPU)
     s != nil and s.running < s.slots
   end
 end

@@ -1,0 +1,14 @@
+# model weights + trained adapters + generated data — never commit (multi-GB, regenerable)
+spike/models/
+spike/dflash/granite-*-mlx-*/
+spike/dflash/granite-4.0-350m/
+spike/dflash/*-lora/
+spike/dflash/selflearned-lora/
+spike/dflash/8b-adapter/
+kit/adapters/
+kit/data/
+*.gguf
+*.safetensors
+__pycache__/
+spike/llamacpp-src/
+spike/_archive_diffusion/

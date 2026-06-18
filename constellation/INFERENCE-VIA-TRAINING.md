@@ -1,0 +1,118 @@
+# Inference Speed via Training: A Citation-Backed Brief
+
+**Question:** how does the *way we fine-tune* a narrow web-component codegen model yield better tokens/sec and lower latency on a **CPU-served Q4_K_M GGUF** (llama.cpp, AVX2/AVX-512, single-stream, persistent box)?
+
+**Our measured baseline:** ~67 t/s (Granite-4.1-3B dense), ~55 t/s (Qwen3-Coder-30B-A3B MoE) on a Genoa box; **decode is memory-bandwidth-bound**; prompt-caching gives ~220× TTFT win; a **separate-drafter speculative decode HURT** on few cores. Plan: QLoRA fine-tune. Goal: maximize t/s AND minimize latency/TTFT, cheaply, small team.
+
+---
+
+## Executive summary (read this first)
+
+1. **The single best inference-speed-via-training lever for us is token-efficiency: train the model to emit FEWER tokens per task.** Wall-clock = tokens / (tokens·s⁻¹). Length-penalized RL routinely cuts **27–50% of output tokens at ≤4% accuracy cost** ([Arora & Zanette 2502.04463](https://arxiv.org/abs/2502.04463); [O1-Pruner 2501.12570](https://arxiv.org/abs/2501.12570)). On a fixed 67 t/s box, a task done in 200 tokens (3.0 s) beats the same task at 400 tokens and a *higher* 75 t/s (5.3 s). We control output length directly in training — no kernel work, no llama.cpp dependency, stacks with everything below. **This is the highest-certainty, lowest-effort, largest real-world latency win.**
+
+2. **Trained-head self-speculative decode (EAGLE3 / MTP) is now MERGED in llama.cpp — but it is GPU-tested and unproven on our CPU single-stream regime, and the physics warn it will be marginal-to-negative for us.** `--spec-type draft-eagle3` merged [PR #18039, Jun 12 2026](https://github.com/ggml-org/llama.cpp/pull/18039); `--spec-type draft-mtp` merged [PR #22673, May 16 2026](https://github.com/ggml-org/llama.cpp/pull/22673). **But:** speculative decoding trades extra FLOPs (parallel verification) for fewer bandwidth-bound steps — it only wins where the extra compute is nearly free. On a few-core CPU compute is *scarce*, so the verify isn't free; llama.cpp's own guidance drops draft length to **~2 tokens on CPU vs ~10 on GPU** ([speculative.md](https://github.com/ggml-org/llama.cpp/blob/master/docs/speculative.md)), and CPU spec-decode is still an **open research question** ([issue #21453](https://github.com/ggml-org/llama.cpp/issues/21453)). This is the same wall that sank our separate-drafter test. **The trained-head version removes the *second-model* overhead (a real improvement over what we tried), so it deserves ONE timeboxed spike — but do not bank on it.**
+
+3. **Task-specific distillation of a strong teacher (Qwen3-Coder-30B or a frontier model) into our 3B is a sound, cheap path to speed-AND-quality.** [DeepSeek-R1 (2501.12948)](https://arxiv.org/abs/2501.12948) showed SFT-on-teacher-traces into small dense students *beats* same-size RL (distilled Qwen-32B 72.6 vs RL'd 47.0 on AIME). Narrow distribution is the *favorable* case — a 3B has ample capacity to match a teacher on ONE distribution. Cheap black-box path: sample the teacher, SFT the student.
+
+4. **QAT is real but second-tier for us; the cheap dodge is to serve Q5_K_M/Q6_K instead of Q4_K_M.** The bf16→Q4 gap on a 3B is real (smaller models quantize worse), but Q5_K_M recovers most of it for **~7% latency** and **zero training** ([llama.cpp quant eval, Q4_K_M +3.3% ppl vs Q5_K_M +1.1%](https://arxiv.org/html/2601.14277v1)). Full QAT recovers only ~54% of the drop ([Gemma-3 QAT](https://developers.googleblog.com/en/gemma-3-quantized-aware-trained-state-of-the-art-ai-to-consumer-gpus/)) and costs a training pass. Measure Q4 vs Q5 vs Q6 on the task first.
+
+5. **Of the architecture co-design options, only pruning+heal and LayerSkip are fine-tune-actionable; GQA and Mamba are base-model choices we already hold.** Granite-3.x already uses GQA; **Granite-4 is a hybrid Mamba-2/transformer** (~9:1 ratio, NoPE) claiming ~70% less memory / ~2× inference ([IBM](https://www.ibm.com/think/news/hybrid-thinking-inside-architecture-granite-4-0)) — we adopt it by base-swap, not fine-tune. Pruning+distill-heal (fewer params → less bandwidth → faster CPU decode) is the cheapest genuine arch-level speedup ([Minitron 2407.14679](https://arxiv.org/abs/2407.14679)).
+
+6. **Recommended sequence:** (a) train for token-efficiency in the QLoRA run [free, biggest win]; (b) measure Q5_K_M/Q6_K vs Q4_K_M [free]; (c) distill the teacher into the 3B if quality needs it [cheap]; (d) ONE timeboxed EAGLE3/MTP-on-CPU spike [proof-needed]; (e) pruning+heal only if still bandwidth-pinned [pipeline cost].
+
+---
+
+## Ranked technique table
+
+| # | Technique | Expected speedup | CPU-GGUF support | Train effort | Verdict for us |
+|---|-----------|------------------|------------------|--------------|----------------|
+| 1 | **Token-efficiency training** (length-penalized DPO/GRPO, kill preamble/CoT) | **1.3–2× wall-clock** (proportional to token cut: 27–50%) | N/A — pure output-length, works on any serve stack | Low (reward/data design in the QLoRA run) | **DO FIRST.** Highest certainty, biggest real latency lever, zero infra. |
+| 2 | **Distillation** (teacher → 3B, narrow task) | Speed = student size; quality lift large at fixed size | N/A — produces a normal GGUF | Low–med (sample teacher, SFT; on-policy if logits) | **DO.** Speed-and-quality; narrow distribution is the easy case. |
+| 3 | **Q5_K_M/Q6_K serve + (optional) QAT** | Quality recovery, not speed; Q5 ~7% slower than Q4 | Native (it's a quant choice) | Zero (Q5/Q6) / med (QAT) | **DODGE FIRST (Q5/Q6).** QAT only if hard-pinned to 4-bit. |
+| 4 | **EAGLE3 / MTP self-speculative heads** | 2–3.5× **on GPU**; **unproven/marginal on CPU single-stream** | **Merged** (PR #18039, #22673) but **GPU-tested only**; CPU open ([#21453](https://github.com/ggml-org/llama.cpp/issues/21453)) | Med (train head on frozen base, 1–2 GPU-days) | **SPIKE, timeboxed.** Removes the 2nd-model cost that hurt us, but CPU physics are against it. |
+| 5 | **Pruning + distill-heal** (Minitron/Sheared/LLM-Pruner) | ≈linear in param cut (bandwidth-bound decode) | Native (smaller GGUF) | Med–high (KD/LoRA healing pipeline) | **LATER.** Real win if still bandwidth-pinned; needs a pipeline. |
+| 6 | **LayerSkip** (early-exit self-spec) | up to 1.8–2.2× (GPU/research) | Non-standard path; verify llama.cpp can serve it | High (LayerSkip training recipe) | **RESEARCH-ONLY for now.** Interesting (draft-model-free) but unproven on llama.cpp CPU. |
+| 7 | **GQA / Mamba / short-context** | KV-bandwidth savings | GQA native; Mamba = verify hybrid kernels | Base-swap, not fine-tune | **ALREADY HELD / base choice.** Not fine-tune work. |
+
+---
+
+## 1. Speculative decoding via trained heads — the big question, assessed hard
+
+**How they work.** Instead of a separate draft model, you bolt lightweight head(s) onto the frozen base that predict several future tokens; the base then *verifies* all drafted tokens in one parallel forward pass, accepting the longest correct prefix. Distribution is preserved (lossless).
+- **Medusa** ([2401.10774](https://arxiv.org/abs/2401.10774)): extra decoding heads + tree attention. **Medusa-1 >2.2×** (frozen backbone, only heads trained), **Medusa-2 2.3–3.6×** (joint fine-tune).
+- **EAGLE** ([2401.15077](https://arxiv.org/abs/2401.15077)): autoregresses at the *feature* (penultimate-layer) level. **2.7–3.5× latency, 2× throughput** on LLaMA2-Chat-70B. Head is one decoder layer (<1B params), base **frozen**, trained on ShareGPT ~68k dialogues in **1–2 days on 4× A100** — genuinely cheap.
+- **EAGLE-2** ([2406.16858](https://arxiv.org/abs/2406.16858)): inference-time *dynamic* draft tree, **3.05–4.26×**, no new training over EAGLE.
+- **EAGLE-3** ([2503.01840](https://arxiv.org/abs/2503.01840)): drops the feature-prediction constraint (predicts tokens directly), fuses multi-layer features, and adds "training-time test" so drafter accuracy keeps scaling with data. **Up to 6.5×**, ~1.4× over EAGLE-2.
+- **MTP** ([Gloeckle 2404.19737](https://arxiv.org/abs/2404.19737)): multiple output heads on a shared trunk, a *pretraining* objective — "up to 3× faster at inference." [DeepSeek-V3 (2412.19437)](https://arxiv.org/abs/2412.19437) ships an MTP module used as a self-drafter: **~1.8× TPS, acceptance >80%**.
+
+**llama.cpp support status (verified, primary):**
+- `--spec-type draft-eagle3` — **MERGED [PR #18039, Jun 12 2026](https://github.com/ggml-org/llama.cpp/pull/18039)**. Adds `--spec-draft-n-max` (default 8), `--spec-draft-p-min` (0.5). Reported **3.28×** on LLaMA3.1-8B BF16 code-gen; MoE much lower (**1.06–1.39×**). **Every benchmark is CUDA (RTX A6000, DGX). No CPU-only numbers documented.**
+- `--spec-type draft-mtp` — **MERGED [PR #22673, May 16 2026](https://github.com/ggml-org/llama.cpp/pull/22673)**. Qwen3.x MTP; **~1.85–1.90× (22.97→42.45 t/s)**, acceptance ~83% at 2 draft tokens / ~72% at 3. **Testing on CUDA (RTX 3090/5090, Strix Halo); "requires GPU support," CPU not emphasized.** A device→host embedding transfer is a noted bottleneck — a GPU-shaped cost.
+- The flags the user saw in llama-server (`draft-eagle3`, `draft-mtp`) are **real and merged** — confirmed.
+
+**Will it actually speed up OUR CPU single-stream box? Honest assessment: probably not much, possibly negative.** The mechanism trades extra FLOPs (verifying K drafted tokens in parallel) for fewer sequential bandwidth-bound steps. It wins only in the **memory-bandwidth-bound, compute-spare** regime ([MagicDec 2408.11049](https://arxiv.org/abs/2408.11049); [Together AI](https://www.together.ai/blog/speculative-decoding-for-high-throughput-long-context-inference)). A few-core CPU has a **thin compute budget**, so the parallel verify is *not* free — exactly why llama.cpp guidance drops draft length to **~2 on CPU vs ~10 on GPU** ([speculative.md](https://github.com/ggml-org/llama.cpp/blob/master/docs/speculative.md)), and why optimized CPU spec-decode is flagged as **unresolved** ([issue #21453](https://github.com/ggml-org/llama.cpp/issues/21453), proposing 1.5–3× but with no validated few-core results). **This is the same compute wall that made our separate-drafter test hurt.**
+
+**The one real improvement over what we tried:** EAGLE3/MTP heads are *part of the base model* — no second model to load, align, or feed weights for, and a >80% acceptance rate means most drafts land. That removes the drafter's *bandwidth* overhead (the second model's weights no longer compete for memory bandwidth), leaving only the *compute* cost of verification. On a bandwidth-bound CPU that's a meaningfully better setup than a separate drafter. **Can we train a head on our fine-tuned Granite-3B? Yes** — EAGLE/Medusa heads train on a frozen base in 1–2 GPU-days on a small SFT set, fully compatible with our QLoRA'd checkpoint. **Verdict: ONE timeboxed spike** (train an EAGLE3 head on the fine-tuned 3B, serve with `--spec-type draft-eagle3 --spec-draft-n-max 2` on the Genoa box, measure t/s vs baseline). If it's not clearly positive at draft-n≈2, shelve it — the CPU physics say it won't carry. **Do not make it the plan.**
+
+## 2. Distillation to a smaller/faster student
+
+**Response-level (black-box):** SFT the student on teacher-generated outputs. [DeepSeek-R1 (2501.12948)](https://arxiv.org/abs/2501.12948) distilled ~800k traces into Qwen/Llama dense students; the distilled Qwen-32B scored **72.6 AIME vs 47.0** for the *same model* RL'd directly — "distilling more powerful models into smaller ones yields excellent results, whereas smaller models relying on large-scale RL cannot match distillation." For a small model, **copy a strong teacher rather than train the skill in.**
+
+**On-policy / sequence-level:** the student generates, the teacher scores — fixing the train/inference distribution mismatch (exposure bias) that plain SFT-on-outputs suffers. [MiniLLM (2306.08543)](https://arxiv.org/abs/2306.08543) (reverse KL) and [GKD (2306.13649)](https://arxiv.org/abs/2306.13649) (generalized divergence on student-sampled sequences). [Thinking Machines on-policy distillation](https://thinkingmachines.ai/blog/on-policy-distillation/): Qwen3-8B AIME 55.0 (SFT) → 74.4 (on-policy distill), at **~10× less than RL**.
+
+**For us:** narrow distribution is the easy case — the 3B only needs the teacher's behavior on web-component codegen, not general capability, and the capacity argument that limits small students *weakens* as the target narrows. **Recipe:** Phase 1, black-box SFT of Qwen3-Coder-30B (or a frontier teacher) completions on a representative web-component prompt set; Phase 2 (if teacher logits available), on-policy/GKD to kill exposure bias. **Caveat:** the student inherits only the sampled distribution — make the prompt set cover real input variety or the 3B will be brittle off-distribution.
+
+## 3. Token-efficiency — the dominant real-world latency lever
+
+Latency = tokens / throughput, and **output length is the controllable factor**. A task at 200 tokens / 60 t/s (3.3 s) beats 400 tokens / 67 t/s (6.0 s) — cutting tokens beats raising t/s, and we set token count in training.
+- **Length-penalized RL:** [Arora & Zanette (2502.04463)](https://arxiv.org/abs/2502.04463): α=0.2 cut AIME tokens **~27% for ~4% accuracy drop**, ~100 RL steps. [O1-Pruner (2501.12570)](https://arxiv.org/abs/2501.12570): **up to ~50% reduction while *increasing* accuracy**. [Kimi k1.5 (2501.12599)](https://arxiv.org/abs/2501.12599): explicit length penalty + "long2short" at frontier scale.
+- **Length-controlled GRPO:** [L1 / LCPO (2503.04697)](https://arxiv.org/abs/2503.04697): reward = correctness + meeting a prompt-set length budget; **2× performance-per-token**, ~3% length-deviation, a **1.5B model matching GPT-4o at equal length**. Lets us dial output down to *non-reasoning* length for codegen.
+- **Overthinking is large and measurable:** ["Do NOT Think That Much for 2+3=?" (2412.21187)](https://arxiv.org/abs/2412.21187): o1-like models spend **1,953% more tokens** on trivial inputs; their mitigation cut GSM8K tokens **~46% with accuracy flat-to-up**.
+- **For a narrow codegen task, emit the artifact with no/near-zero CoT** — the speed cost of reasoning tokens is exactly the (length × 1/throughput) term, with ~0 benefit on routine inputs.
+- **Industry proof speed-via-efficiency ships:** Cursor's Composer generates **~250 t/s, ~4× comparable frontier models**, RL-trained for *efficient* tool use ([cursor.com/blog/composer](https://cursor.com/blog/composer)). The widely-cited **"~200k vs ~427k tokens"** comparison is a **third-party anecdote** ([Composio](https://composio.dev/content/cursor-composer-1-vs-claude-4-5-sonnet-the-better-coding-model), [mfyz](https://mfyz.com/cursor-composer1-trading-smarts-for-speed/)) with no published methodology — directionally on-thesis (efficiency ≈ 2× fewer tokens → ~2× wall-clock), but cite it as anecdote, not fact. The hard, citable claim is Cursor's own 4× / 250 t/s.
+
+**For us:** bake length-penalty into the QLoRA data/reward — strip preamble, no thinking block, tight tool calls, minimal explanation. **Biggest, cheapest, most certain wall-clock win.**
+
+## 4. Quantization-aware fine-tuning
+
+We train bf16 (QLoRA) but **serve Q4_K_M** — a different quant scheme than QLoRA's NF4, so the adapter never saw Q4_K_M error and the merge→requantize step picks it up fresh ([QLoRA 2305.14314](https://arxiv.org/abs/2305.14314); QLoRA ≠ QAT for our serve format).
+- **QAT recovers part of the drop:** [LLM-QAT (2305.17888)](https://arxiv.org/abs/2305.17888) beats PTQ at low bits; [Gemma-3 QAT](https://developers.googleblog.com/en/gemma-3-quantized-aware-trained-state-of-the-art-ai-to-consumer-gpus/) cut the Q4 perplexity drop by **54%** (~5k QAT steps) — a *partial* recovery. [Unsloth QAT](https://unsloth.ai/docs/blog/quantization-aware-training-qat): recovers up to **~70%** of lost accuracy (+1–3% raw), exports to 4-bit, no inference overhead. Cheap full-QAT: [EfficientQAT (2407.11062)](https://arxiv.org/abs/2407.11062) (a 3B at 4-bit is **hours on one GPU**); [PEQA (2305.14152)](https://arxiv.org/abs/2305.14152) tunes only quant scales.
+- **The cheaper dodge:** [unified llama.cpp quant eval](https://arxiv.org/html/2601.14277v1) on Llama-3.1-8B: Q4_K_M **+3.3% ppl**, Q5_K_M **+1.1%**, Q6_K **+0.4%**; Q5_K_M only ~7% slower than Q4_K_M ([#406](https://github.com/ggml-org/llama.cpp/discussions/406)). A 3B quantizes *worse* than 8B (fewer redundant params), so the gap is larger — which raises both the QAT payoff *and* the Q5/Q6 payoff. **The Q4→Q5_K_M step alone recovers a similar fraction of the drop as Gemma's 54% QAT, for zero training.**
+
+**For us:** measure the *task metric* at Q4_K_M vs Q5_K_M vs Q6_K first. On a persistent box the extra ~1 GB and ~7% latency of Q5_K_M is almost certainly worth dodging the whole QAT pipeline. Reserve QAT (EfficientQAT/PEQA against the **k-quant** scheme, not NF4) for if we're hard-pinned to 4-bit and the residual still hurts.
+
+## 5. Other training/architecture co-design
+
+- **Pruning + distill-heal — fine-tune-actionable, real.** Removing params cuts weight bytes read per token → faster bandwidth-bound CPU decode, and stacks on top of Q4. [Minitron (2407.14679)](https://arxiv.org/abs/2407.14679): prune + KD-retrain on **<3% of data**, **up to +16% MMLU vs from-scratch**. [Sheared-LLaMA (2310.06694)](https://arxiv.org/abs/2310.06694): 1.3B/2.7B from 7B at **~3% compute**. [LLM-Pruner (2305.11627)](https://arxiv.org/abs/2305.11627): LoRA recovery in **~3 h on 50k samples** — the cheap PoC. **Verdict: later** — real win if still bandwidth-pinned, but needs a healing pipeline.
+- **GQA/MQA/MLA — base-model choices, not fine-tune work.** [GQA (2305.13245)](https://arxiv.org/abs/2305.13245) shrinks the KV cache; **Granite-3.x already uses GQA** ([model cards](https://huggingface.co/ibm-granite/granite-3.0-8b-base)) — we already hold this. MLA conversion ([MHA2MLA 2502.14837](https://arxiv.org/abs/2502.14837)) is research-grade.
+- **Mamba/hybrid SSM — adopt by base-swap.** [Granite-4 is a confirmed hybrid Mamba-2/transformer](https://www.ibm.com/think/news/hybrid-thinking-inside-architecture-granite-4-0) (~9:1, NoPE), ~70% less memory / ~2× inference per IBM — but those wins are *long-context/KV-dominated*; at single-stream short context the **weight-bandwidth term dominates** and the SSM edge shrinks. Verify llama.cpp hybrid + Q4_K_M kernels before banking on it.
+- **LayerSkip — fine-tune-actionable but unproven on our stack.** [LayerSkip (2404.16710)](https://arxiv.org/abs/2404.16710): layer-dropout + early-exit loss enables *draft-model-free* self-speculative decoding (up to 1.8–2.2×, GPU). The only listed technique attacking compute-per-token that's reachable by fine-tune — but the early-exit-shared-head path is non-standard in llama.cpp. **Research-only for now.**
+- **Short-context training:** not a real training trick — KV bytes scale with *served* context (`--ctx-size`), a runtime knob. At single-stream short prompts the KV term is already small relative to weights. Skip.
+
+---
+
+## What to prototype first (ordered)
+
+1. **Token-efficiency in the QLoRA run** — data/reward design: strip preamble, no CoT, tight output. *Highest certainty, biggest wall-clock win, zero infra.* Measure tokens-per-task before/after.
+2. **Quant sweep** — Q4_K_M vs Q5_K_M vs Q6_K on the task metric. *Free; likely retires the QAT question.*
+3. **Teacher→3B distillation** — black-box SFT of Qwen3-Coder-30B / frontier teacher on a representative web-component prompt set; on-policy/GKD if logits available. *Speed-and-quality.*
+4. **ONE timeboxed EAGLE3/MTP-on-CPU spike** — train an EAGLE3 head on the fine-tuned 3B (frozen base, 1–2 GPU-days), serve `--spec-type draft-eagle3 --spec-draft-n-max 2` on the Genoa box, measure vs baseline. *Kill it fast if not clearly positive at draft-n≈2.*
+5. **Pruning+heal** only if still bandwidth-pinned after the above.
+
+## Open questions
+
+- **Does EAGLE3/MTP net positive on AVX-512 single-stream at all?** No published CPU number exists ([#21453 open](https://github.com/ggml-org/llama.cpp/issues/21453)); our spike resolves it empirically. Hypothesis: marginal, because verify isn't free on few cores — but the no-second-model property may flip it vs our prior drafter test.
+- **What acceptance rate does a narrow-codegen-tuned EAGLE3 head hit?** Narrow distribution should *raise* acceptance (more predictable tokens) → better than the generic 72–83% MTP numbers. Worth measuring; high acceptance is what makes spec-decode survive a thin compute budget.
+- **Granite-4 hybrid on llama.cpp CPU at Q4_K_M** — are the Mamba-2 kernels mature and fast on AVX-512? If yes, and if long context matters, a base-swap to Granite-4 may beat all fine-tune tricks.
+- **Does token-efficiency training trade away codegen *correctness* at our quant?** Length penalty + Q4 quantization could compound errors; validate the task metric jointly, not separately.
+- **Compounding:** token-efficiency × Q5 serve × distillation are independent and stack; confirm no interaction (e.g., distilled-concise model regressing on edge cases).
+
+---
+
+### Primary sources
+**Spec-decode heads:** [Medusa 2401.10774](https://arxiv.org/abs/2401.10774) · [EAGLE 2401.15077](https://arxiv.org/abs/2401.15077) · [EAGLE-2 2406.16858](https://arxiv.org/abs/2406.16858) · [EAGLE-3 2503.01840](https://arxiv.org/abs/2503.01840) · [MTP 2404.19737](https://arxiv.org/abs/2404.19737) · [DeepSeek-V3 2412.19437](https://arxiv.org/abs/2412.19437) · [MagicDec 2408.11049](https://arxiv.org/abs/2408.11049)
+**llama.cpp:** [EAGLE3 PR #18039 (merged)](https://github.com/ggml-org/llama.cpp/pull/18039) · [MTP PR #22673 (merged)](https://github.com/ggml-org/llama.cpp/pull/22673) · [speculative.md](https://github.com/ggml-org/llama.cpp/blob/master/docs/speculative.md) · [CPU spec-decode issue #21453](https://github.com/ggml-org/llama.cpp/issues/21453) · [quant ppl #406](https://github.com/ggml-org/llama.cpp/discussions/406)
+**Distillation:** [DeepSeek-R1 2501.12948](https://arxiv.org/abs/2501.12948) · [MiniLLM 2306.08543](https://arxiv.org/abs/2306.08543) · [GKD 2306.13649](https://arxiv.org/abs/2306.13649) · [Thinking Machines on-policy distillation](https://thinkingmachines.ai/blog/on-policy-distillation/)
+**Token-efficiency:** [Arora & Zanette 2502.04463](https://arxiv.org/abs/2502.04463) · [O1-Pruner 2501.12570](https://arxiv.org/abs/2501.12570) · [Kimi k1.5 2501.12599](https://arxiv.org/abs/2501.12599) · [L1/LCPO 2503.04697](https://arxiv.org/abs/2503.04697) · [Overthinking 2412.21187](https://arxiv.org/abs/2412.21187) · [Cursor Composer](https://cursor.com/blog/composer)
+**QAT:** [QLoRA 2305.14314](https://arxiv.org/abs/2305.14314) · [LLM-QAT 2305.17888](https://arxiv.org/abs/2305.17888) · [Gemma-3 QAT](https://developers.googleblog.com/en/gemma-3-quantized-aware-trained-state-of-the-art-ai-to-consumer-gpus/) · [Unsloth QAT](https://unsloth.ai/docs/blog/quantization-aware-training-qat) · [EfficientQAT 2407.11062](https://arxiv.org/abs/2407.11062) · [PEQA 2305.14152](https://arxiv.org/abs/2305.14152) · [quant eval 2601.14277](https://arxiv.org/html/2601.14277v1)
+**Arch co-design:** [Minitron 2407.14679](https://arxiv.org/abs/2407.14679) · [Sheared-LLaMA 2310.06694](https://arxiv.org/abs/2310.06694) · [LLM-Pruner 2305.11627](https://arxiv.org/abs/2305.11627) · [GQA 2305.13245](https://arxiv.org/abs/2305.13245) · [MLA/DeepSeek-V2 2405.04434](https://arxiv.org/abs/2405.04434) · [LayerSkip 2404.16710](https://arxiv.org/abs/2404.16710) · [Granite-4 hybrid](https://www.ibm.com/think/news/hybrid-thinking-inside-architecture-granite-4-0) · [Granite GQA card](https://huggingface.co/ibm-granite/granite-3.0-8b-base)
