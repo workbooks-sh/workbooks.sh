@@ -48,23 +48,24 @@ defmodule Workbooks.Wit do
   file declares no shared types. Takes the `Workbooks.Literate.parse/1` node list.
   """
   def file_interface(nodes) when is_list(nodes) do
-    defs =
-      Enum.flat_map(nodes, fn
-        %{type: :decl} = node ->
-          for {:enum, name, atoms} <- Workbooks.Extract.Elixir.decl_types(node),
-              do: Workbooks.Wit.Types.enum(name, atoms)
+    enums_kv =
+      for node <- nodes,
+          node.type == :decl,
+          {:enum, name, atoms} <- Workbooks.Extract.Elixir.decl_types(node),
+          do: {name, atoms}
 
-        %{type: :code, kind: "defmodule", name: name} = node ->
-          for {:record, fields} <- Extract.facts(node).types,
-              do: Workbooks.Wit.Types.record(name, fields)
+    records =
+      for node <- nodes,
+          node.type == :code,
+          node.kind == "defmodule",
+          {:record, fields} <- Extract.facts(node).types,
+          do: Workbooks.Wit.Types.record(node.name, fields, enums_kv)
 
-        _ ->
-          []
-      end)
+    enums = for {name, atoms} <- enums_kv, do: Workbooks.Wit.Types.enum(name, atoms)
 
-    case defs do
+    case records ++ enums do
       [] -> nil
-      _ -> "interface types {\n" <> Enum.map_join(defs, "\n", &indent/1) <> "\n}\n"
+      defs -> "interface types {\n" <> Enum.map_join(defs, "\n", &indent/1) <> "\n}\n"
     end
   end
 
@@ -113,11 +114,12 @@ defmodule Workbooks.Wit do
   # the unit's declared types → WIT defs: records (named after their module) + enums
   defp type_defs(%{types: types}, unit) do
     modules = for {:module, m} <- types, do: m
+    enums_kv = for {:enum, name, atoms} <- types, do: {name, atoms}
 
     records =
       (for {:record, fields} <- types, do: fields)
       |> Enum.with_index()
-      |> Enum.map(fn {fields, i} -> Workbooks.Wit.Types.record(Enum.at(modules, i) || unit, fields) end)
+      |> Enum.map(fn {fields, i} -> Workbooks.Wit.Types.record(Enum.at(modules, i) || unit, fields, enums_kv) end)
 
     enums = for {:enum, name, atoms} <- types, do: Workbooks.Wit.Types.enum(name, atoms)
     variants = for {:variant, name, tags} <- types, do: Workbooks.Wit.Types.variant(name, tags)

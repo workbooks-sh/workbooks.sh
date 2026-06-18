@@ -16,15 +16,28 @@ defmodule Workbooks.Wit.Types do
   def scalar(v) when is_atom(v), do: "string"
   def scalar(_), do: "string"
 
-  @doc "Render a WIT `record` from a name and its `[{field, default}]` pairs."
-  def record(name, fields) do
+  @doc """
+  Render a WIT `record` from a name and its `[{field, default}]` pairs. Given the
+  in-scope enums (`[{enum_name, atoms}]`), a field whose default atom is a member of
+  an enum types as that enum (e.g. `status: :new` with `statuses` → `status: statuses`).
+  """
+  def record(name, fields, enums \\ []) do
     body =
       fields
-      |> Enum.map(fn {field, default} -> "  #{wit(field)}: #{scalar(default)}," end)
+      |> Enum.map(fn {field, default} -> "  #{wit(field)}: #{field_type(default, enums)}," end)
       |> Enum.join("\n")
 
     "record #{wit(name)} {\n#{body}\n}"
   end
+
+  defp field_type(default, enums) when is_atom(default) and not is_boolean(default) and not is_nil(default) do
+    case Enum.find(enums, fn {_name, atoms} -> default in atoms end) do
+      {enum_name, _atoms} -> wit(enum_name)
+      nil -> scalar(default)
+    end
+  end
+
+  defp field_type(default, _enums), do: scalar(default)
 
   @doc "Render a WIT `enum` from a name and its atom cases."
   def enum(name, atoms) do

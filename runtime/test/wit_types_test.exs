@@ -85,6 +85,15 @@ defmodule Workbooks.Wit.TypesTest do
     assert iface =~ "record lead {"
     assert iface =~ "enum statuses {"
     assert iface =~ "contacted,"
+    # the status field's default :new is a member of the statuses enum → typed as it
+    assert iface =~ "status: statuses,"
+    assert iface =~ "name: string,"
+  end
+
+  test "record/3 types a field by its enum when the default atom is a member" do
+    wit = Types.record(:lead, [status: :new, name: ""], [{:statuses, [:new, :scored]}])
+    assert wit =~ "status: statuses,"
+    assert wit =~ "name: string,"
   end
 
   test "file_interface is nil when a file declares no shared types" do
