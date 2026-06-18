@@ -47,10 +47,15 @@ defmodule Nexus.Weave do
   defp anchor(f), do: f |> String.replace(~r/[^A-Za-z0-9]+/, "-") |> String.trim("-")
   defp label(f), do: f |> Path.basename(".work") |> String.replace("-", " ")
 
-  # name → compiled struct module, for every `resource` unit in the folder.
+  # name → render target. A `resource` → {:resource, struct module}; a wasm unit (rust/c/zig…) →
+  # {:unit, node} so `show <Unit>` can compile + run it at build time and bake the output.
   defp resources(pages) do
-    for {_f, nodes} <- pages, n <- nodes, n.type == :code, n.kind == "resource", into: %{} do
-      {n.name, safe_compile(n)}
+    for {_f, nodes} <- pages, n <- nodes, n.type == :code, into: %{} do
+      cond do
+        n.kind == "resource" -> {n.name, {:resource, safe_compile(n)}}
+        n.kind in ~w(rust c cpp zig) -> {n.name, {:unit, n}}
+        true -> {n.name, nil}
+      end
     end
   end
 
@@ -93,10 +98,15 @@ defmodule Nexus.Weave do
     end)
   end
 
-  # `show <Resource>` → a live data table from the Store.
+  # `show <Resource>` → a live data table; `show <Unit>` → the unit's `render()` output, baked.
   defp render_node(%{type: :decl, text: "show " <> rest}, res) do
     name = rest |> String.split() |> List.first()
-    render_show(name, Map.get(res, name))
+
+    case Map.get(res, name) do
+      {:resource, mod} -> render_show(name, mod)
+      {:unit, node} -> render_unit(name, node)
+      _ -> render_show(name, nil)
+    end
   end
 
   defp render_node(%{type: :decl, text: t}, _res), do: ~s(  <pre class="decl">#{esc(t)}</pre>)
@@ -108,6 +118,17 @@ defmodule Nexus.Weave do
   end
 
   defp render_node(_, _res), do: ""
+
+  # Compile the unit (any lane), run its no-arg `render` export on wasmex, bake the result.
+  defp render_unit(name, node) do
+    with {:wasm, {:ok, comp}} <- Nexus.Compile.unit(node),
+         {:ok, p} <- Nexus.Sandbox.start(comp, []),
+         {:ok, val} <- Nexus.Sandbox.call(p, "render", []) do
+      ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
+    else
+      _ -> ~s(  <div class="data-missing">#{esc(name)}.render unavailable</div>)
+    end
+  end
 
   defp render_show(name, nil),
     do: ~s(  <div class="data-missing">unknown resource <code>#{esc(name)}</code></div>)
@@ -163,6 +184,7 @@ defmodule Nexus.Weave do
     table.data th,table.data td{border:1px solid #e4e4e7;padding:.35em .6em;text-align:left}
     table.data thead th{background:#fafafa} table.data .empty{color:#999;font-style:italic}
     .data-missing{color:#b00;font-size:.9em}
+    .unit-output{margin:1em 0;padding:.6em .9em;background:#f0f7ff;border-left:3px solid #4a90d9;border-radius:4px}
     nav.wb-nav{display:flex;gap:.8em;flex-wrap:wrap;padding:.6em 0;margin-bottom:1em;border-bottom:1px solid #e4e4e7;font-size:.9em}
     nav.wb-nav a{color:#555;text-decoration:none} nav.wb-nav a:hover{color:#000}
     """

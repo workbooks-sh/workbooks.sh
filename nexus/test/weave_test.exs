@@ -80,6 +80,30 @@ defmodule Nexus.WeaveTest do
     assert html =~ "Ghost"
   end
 
+  @tag :compiler
+  @tag timeout: 360_000
+  test "show <Unit> bakes the unit's render() output into the page, across rust/c/zig" do
+    if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
+      cases = [
+        {"c :cu do\n  int render(void) { return 6 * 7; }\nend\n\nshow cu\n", "42"},
+        {"zig :zu do\n  export fn render() i32 { return 5 * 9; }\nend\n\nshow zu\n", "45"},
+        {"rust :ru do\n  #[no_mangle]\n  pub extern \"C\" fn render() -> i32 { 8 * 8 }\nend\n\nshow ru\n", "64"}
+      ]
+
+      for {body, expected} <- cases do
+        dir = Path.join(System.tmp_dir!(), "wvu_#{System.unique_integer([:positive])}")
+        File.mkdir_p!(dir)
+        File.write!(Path.join(dir, "index.work"), "# R\n\n" <> body)
+        html = Nexus.Weave.weave(dir)
+        assert html =~ "unit-output", "no unit-output for: #{body}"
+        assert html =~ ">#{expected}<", "expected #{expected} baked for: #{body}"
+        File.rm_rf!(dir)
+      end
+    else
+      :ok
+    end
+  end
+
   test "the index file leads, gives the title, and a multi-file workbook gets a nav" do
     dir = Path.join(System.tmp_dir!(), "wvc_#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
