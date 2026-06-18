@@ -8,6 +8,7 @@ const author = @import("author.zig");
 const weave = @import("weave.zig");
 const dev = @import("dev.zig");
 const deploy = @import("deploy.zig");
+const context = @import("context.zig");
 test {
     _ = work;
     _ = deploy;
@@ -23,6 +24,7 @@ pub fn main(init: std.process.Init) !void {
     const verb = it.next() orelse "help";
     const io = init.io;
     const alloc = init.arena.allocator();
+    const home = init.environ_map.get("HOME") orelse ".";
 
     if (eql(verb, "check")) {
         std.process.exit(try author.check(io, alloc, it.next() orelse "."));
@@ -59,6 +61,21 @@ pub fn main(init: std.process.Init) !void {
             log.err("usage: work deploy init|validate|apply");
             std.process.exit(1);
         }
+    } else if (eql(verb, "ctx")) {
+        const sub = it.next() orelse "list";
+        if (eql(sub, "use")) {
+            std.process.exit(try context.ctxUse(io, alloc, home, it.next() orelse ""));
+        } else if (eql(sub, "set")) {
+            const name = it.next() orelse "";
+            const f = flags(alloc, &it);
+            std.process.exit(try context.ctxSet(io, alloc, home, name, f.nexus, f.org, f.workspace));
+        } else {
+            std.process.exit(try context.ctxList(io, alloc, home));
+        }
+    } else if (eql(verb, "nexus")) {
+        std.process.exit(try context.nexusVerb(io, alloc, home, it.next() orelse ""));
+    } else if (eql(verb, "whoami")) {
+        std.process.exit(try context.whoami(io, alloc, home));
     } else if (eql(verb, "version") or eql(verb, "--version")) {
         log.print("work {s}\n", .{version});
     } else if (eql(verb, "help") or eql(verb, "--help")) {
@@ -76,6 +93,20 @@ fn eql(a: []const u8, b: []const u8) bool {
 
 fn stripColon(s: []const u8) []const u8 {
     return if (s.len > 0 and s[0] == ':') s[1..] else s;
+}
+
+const Flags = struct { nexus: []const u8 = "", org: []const u8 = "", workspace: []const u8 = "" };
+
+fn flags(alloc: std.mem.Allocator, it: anytype) Flags {
+    _ = alloc;
+    var f: Flags = .{};
+    while (it.next()) |tok| {
+        const val = it.next() orelse break;
+        if (eql(tok, "--nexus")) f.nexus = val
+        else if (eql(tok, "--org")) f.org = val
+        else if (eql(tok, "--workspace")) f.workspace = val;
+    }
+    return f;
 }
 
 const Group = struct { name: []const u8, blurb: []const u8, verbs: []const [2][]const u8 };
