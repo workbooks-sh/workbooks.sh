@@ -13,9 +13,8 @@ defmodule Nexus.MixProject do
 
   def application, do: [extra_applications: [:logger]]
 
-  # Deps land as each layer is built, not up front:
-  #   {:ash, "~> 3.0"}             — when the data layer lands (resources ARE Ash resources)
-  #   {:wasmex, path: "..."}       — when the sandbox lands (run wasm components)
-  # The authoring + contract layers (Literate/Resource/Wit/Dock) are pure Elixir — no deps.
-  defp deps, do: []
+  # The sandbox is wasmex — wasmtime + the component model. Reuse the runtime's vendored,
+  # patched build (engine exceptions enabled) rather than rebuild it.
+  #   {:ash, "~> 3.0"}  — lands with the data layer (#2 in the order).
+  defp deps, do: [{:wasmex, path: "../runtime/vendor/wasmex"}]
 end
