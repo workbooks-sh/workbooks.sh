@@ -15,16 +15,31 @@ const auths = [_][]const u8{ "trusted", "betterauth", "clerk", "oidc" };
 
 pub fn scaffold(alloc: std.mem.Allocator, place: []const u8) ![]const u8 {
     const cloud = std.mem.eql(u8, place, "cloud");
+    const provider_block = if (cloud)
+        "\n  provider=\"fly\"\n  app=\"my-workbook\"\n  region=\"iad\""
+    else
+        "";
+    // The compiled-component cache. Local: a dir on the PERSISTENT data volume (the libkrun VM / Fly
+    // machine wipes the rootfs on restart — /data survives). Cloud: an egress-free S3-compatible store
+    // (R2/MinIO/B2) so "compile once" is durable + fleet-wide across scale-to-zero machines.
+    const cache_block = if (cloud)
+        "\n  component-cache=\"r2://my-workbook-cache/components\"\n  component-cache-endpoint=\"https://ACCOUNT_ID.r2.cloudflarestorage.com\"\n  component-cache-region=\"auto\""
+    else
+        "\n  component-cache=\"/data/build/components\"";
     return std.fmt.allocPrint(alloc,
         \\<!doctype html>
         \\<html lang="en"><head><meta charset="utf-8"><title>Deployment</title></head><body>
-        \\<!-- secrets (WB_DATABASE_URL / WB_S3_*) come from your deploy ENV, never this file -->
+        \\<!-- CONFIG is these <work-deploy> attributes (HTML, the source of truth) — never env vars.
+        \\     The ONLY things from your deploy ENV are SECRETS + per-machine identity:
+        \\       WB_DATABASE_URL (postgres) · WB_S3_ACCESS_KEY_ID / WB_S3_SECRET_ACCESS_KEY (cache store)
+        \\     Compile-lane knobs (optional; defaults shown): compile-concurrency=cores ·
+        \\     compile-cache="on" · compile-cache-version="wbc1" · pm-debug="off" -->
         \\<work-deploy
         \\  engine-place="{s}"
         \\  tenancy-mode="single"
         \\  storage="{s}"
         \\  database="{s}"
-        \\  auth="trusted"{s}>
+        \\  auth="trusted"{s}{s}>
         \\</work-deploy>
         \\</body></html>
         \\
@@ -32,7 +47,8 @@ pub fn scaffold(alloc: std.mem.Allocator, place: []const u8) ![]const u8 {
         place,
         if (cloud) "s3" else "local-fs",
         if (cloud) "postgres" else "sqlite",
-        if (cloud) "\n  provider=\"fly\"\n  app=\"my-workbook\"\n  region=\"iad\"" else "",
+        provider_block,
+        cache_block,
     });
 }
 
@@ -73,6 +89,16 @@ pub fn validate(alloc: std.mem.Allocator, html: []const u8) ![]const []const u8 
         try issues.append(alloc, "storage: s3 needs storage-bucket + storage-endpoint");
     if (eql(database, "postgres"))
         try issues.append(alloc, "database: postgres needs WB_DATABASE_URL in your deploy ENV");
+
+    // The compiled-component cache: a remote (r2://|s3://) store needs an endpoint in the file + S3
+    // creds in ENV; a local value must be an ABSOLUTE path (it lives inside the VM/machine, and a
+    // relative one would land on the ephemeral rootfs instead of the persistent volume).
+    const cache = attr(html, "component-cache", "");
+    const remote_cache = std.mem.startsWith(u8, cache, "r2://") or std.mem.startsWith(u8, cache, "s3://");
+    if (remote_cache and attr(html, "component-cache-endpoint", "").len == 0)
+        try issues.append(alloc, "component-cache: r2://|s3:// needs component-cache-endpoint (+ WB_S3_ACCESS_KEY_ID / WB_S3_SECRET_ACCESS_KEY in your deploy ENV)");
+    if (cache.len != 0 and !remote_cache and cache[0] != '/')
+        try issues.append(alloc, "component-cache: a local path must be absolute (e.g. /data/build/components) so it sits on the persistent volume, not the ephemeral rootfs");
 
     return issues.toOwnedSlice(alloc);
 }
@@ -162,4 +188,20 @@ test "scaffold → validate: coherent local, flagged cloud+multi+trusted+s3" {
     const bad = "<work-deploy engine-place=\"cloud\" tenancy-mode=\"multi\" storage=\"s3\" database=\"postgres\" auth=\"trusted\">";
     const issues = try validate(a, bad);
     try std.testing.expect(issues.len >= 3);
+
+    // cloud scaffold carries an r2:// cache WITH an endpoint → no cache issue raised for it.
+    const cl = try scaffold(a, "cloud");
+    for (try validate(a, cl)) |i| try std.testing.expect(std.mem.indexOf(u8, i, "component-cache:") == null);
+}
+
+test "validate flags a remote cache with no endpoint + a relative local cache" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    const no_ep = "<work-deploy engine-place=\"cloud\" component-cache=\"r2://bkt/components\">";
+    try std.testing.expect((try validate(a, no_ep)).len >= 1);
+
+    const rel = "<work-deploy engine-place=\"local\" component-cache=\"build/components\">";
+    try std.testing.expect((try validate(a, rel)).len >= 1);
 }
