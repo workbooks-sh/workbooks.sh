@@ -1,27 +1,37 @@
 # Data
 
-This is where the workbook gets its content: a named set of leads the rest of the
-app enriches, scores, and ranks. It's also the lesson on the **data model**.
+A **resource** is a kind of thing the workbook keeps — here, the leads the rest of
+the app enriches, scores, and ranks. You describe what it *is*; the database falls out.
 
-A type is **structure, not a DSL**. You write a `defstruct`; the field types are
-inferred from the defaults — `name: ""` is a string, `revenue: 0` an integer,
-`status: :new` an atom. That shape *is* the type. The lifecycle is an **enum** — a
-closed set of atoms:
+The floor is just the shape. This alone is a working table — create, read, update,
+delete, and **live** reads, for free:
 
-@statuses [:new, :enriched, :scored, :contacted]
+resource Lead do
+  name     :text
+  revenue  :money
+  status   :new | :enriched | :scored      # an enum, inline
+  score    :int
 
-A data source is **typed values of that struct**. `of:` names the record; `from:
-values([...])` puts the rows right in the document — no sidecar DB, no JSON, no CSV.
-The document is the store.
+  seed [
+    %{name: "Acme",    revenue: 50_000, score: 70, status: :scored},
+    %{name: "Globex",  revenue: 12_000, score: 41, status: :enriched},
+    %{name: "Initech", revenue: 90_000, score: 88, status: :scored}
+  ]
+end
 
-data :leads, of: Lead, from: values([
-  %Lead{name: "Acme",    domain: "acme.co",     revenue: 50_000, employees: 20, score: 70, status: :scored},
-  %Lead{name: "Globex",  domain: "globex.io",   revenue: 12_000, employees: 8,  score: 41, status: :enriched},
-  %Lead{name: "Initech", domain: "initech.com", revenue: 90_000, employees: 55, score: 88, status: :scored}
-])
+You name fields by **meaning** — `:text`, `:money`, an inline enum — and the type, the
+validation, and how it renders all fall out of that. No type annotations, no guessing.
 
-A data source **renders by default**. Declaring `:leads` is enough to put a typed
-table on the page — headers come from the struct fields, the `status` atoms render
-as chips. The value *is* the view; you write no markup.
+A pure value with no identity is a **record**, not a resource — it lives *inside* one:
 
-Next: pulling a slice with [[Query & show]].
+record Money do
+  cents     :int
+  currency  :usd | :eur | :gbp
+end
+
+The vocabulary is **WIT's own**: a `record` is a value, a `resource` a stateful entity.
+So the wire contract and the debugger speak the same words you author in.
+
+The data is **server-authoritative** — the resource runs on the nexus. A `client` page
+never holds the database; it holds the shape and calls the resource across [[The Dock]].
+Next: [[Reads & writes]].

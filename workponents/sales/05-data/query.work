@@ -1,31 +1,28 @@
-# Query & show
+# Reads & writes
 
-For a slice instead of the whole table, `query()` the source by name. A query is
-ordinary Elixir over the typed rows — `where:`, `order_by:`, `select:` — and it
-returns more `%Lead{}` values, so the result is itself renderable.
+The defaults cover most of it. When you want a named view or a transactional change,
+write it **inside** the resource.
 
-Here's the ranked board: leads that reached `:scored`, hottest first. The dashboard
-and the [[Score chart]] read exactly this.
+A **query** is a live view — when the data changes, every page reading it updates,
+no reload. Here's the ranked board, hottest first:
 
-query :ranked, from: :leads do
-  from lead in :leads,
-    where: lead.status == :scored,
-    order_by: [desc: lead.score],
-    select: lead
+resource Lead do
+  query :ranked, where: status == :scored, order: [desc: :score]
+  query :backlog, where: status != :scored
 end
 
-Showing a result is the same idea as showing a source: name it and it renders.
+A **mutation** is an all-or-nothing change, run server-side. It returns the new shape;
+the page re-renders the moment it lands:
 
-show :ranked, as: :table, columns: [:name, :domain, :revenue, :score, :status]
-
-A second slice feeds the [[Pipeline]]: everything **not yet** scored. Same source, a
-different `where:` — not a copy. One source of truth, many views.
-
-query :backlog, from: :leads do
-  from lead in :leads,
-    where: lead.status != :scored,
-    select: lead
+resource Lead, grant: [net: "api.crm.com"] do
+  mutation :enrich do
+    %{revenue: Dock.fetch(crm_url(name)).revenue, status: :enriched}
+  end
 end
 
-Because every unit names the `Lead` record and the `:status` enum, the code graph
-wires them together. Run `work why :leads` to see who reads this source.
+Same idea as the rest of the format: the page isn't a snapshot of the store —
+**the page is the store**. A scored lead grows its bar the instant `:enrich` commits.
+
+One resource, many views; the source of truth stays in one place. The [[Pipeline]]
+reads `:backlog`, the dashboard and [[Score chart]] read `:ranked`. Run `work why :lead`
+to see who touches it.

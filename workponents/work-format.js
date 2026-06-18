@@ -36,7 +36,7 @@
       { regex: /:[A-Za-z_]\w*[!?]?/, token: "atom" },                // :atoms
       { regex: /@[A-Za-z_]\w*/, token: "meta" },                     // @module_attrs
       { regex: /\b(?:defmodule|defmacro|defp|def|do|end|cond|case|fn|when|if|else|true|false|nil|import|alias|use|require)\b/, token: "keyword" },
-      { regex: /\b(?:client|sandbox|server|rust|zig|python|svelte|solid|flow|agent|data|task|grant|memory|step|parallel|values|query|draft|run|test|of|in)\b/, token: "variable-2" },
+      { regex: /\b(?:client|sandbox|server|rust|zig|python|svelte|solid|flow|agent|resource|record|mutation|enum|variant|seed|data|task|grant|memory|step|parallel|values|query|draft|run|test|of|in|where|order)\b/, token: "variable-2" },
       { regex: /<\/?[A-Za-z][\w-]*/, token: "tag" },                 // html / component tags
       { regex: /\b\d[\d_]*\b/, token: "number" },
       { regex: /./, token: null },
@@ -55,7 +55,7 @@
   // Fill the background of code lines so code reads as a block against prose, and
   // band sandbox blocks with a left rule. Code = inside a do…end, an open bracket
   // continuation (multi-line declarations), or a line that leads with a code word.
-  const LEADS = /^\s*(@[A-Za-z]|def\b|defp\b|defmacro\b|defmodule\b|server\b|client\b|sandbox\b|flow\b|agent\b|brain\b|data\b|test\b|query\b|show\b|step\b|import\b|alias\b|use\b|theme\b|rust\b|zig\b|python\b|svelte\b|solid\b|grant\b|parallel\b|with\b|case\b|cond\b|for\b)/;
+  const LEADS = /^\s*(@[A-Za-z]|def\b|defp\b|defmacro\b|defmodule\b|server\b|client\b|sandbox\b|flow\b|agent\b|brain\b|resource\b|record\b|mutation\b|enum\b|variant\b|seed\b|data\b|test\b|query\b|show\b|step\b|import\b|alias\b|use\b|theme\b|rust\b|zig\b|python\b|svelte\b|solid\b|grant\b|parallel\b|with\b|case\b|cond\b|for\b)/;
   function markCode() {
     cm.eachLine(h => ["code-ln", "sb-band", "sb-cap", "sb-end"].forEach(c => cm.removeLineClass(h, "background", c)));
     const n = cm.lineCount();
