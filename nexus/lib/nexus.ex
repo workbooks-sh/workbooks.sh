@@ -29,6 +29,9 @@ defmodule Nexus do
       unit: :live,
       # data: a resource → live Ash resource with real CRUD (Resource.Ash.materialize)
       data: :live,
+      # audit: a unit may only call host caps it grants (grant: [emit]); Nexus.Audit reports the
+      # ungranted ones per unit / per workbook — an ungranted cap is a hard error, not silent reach
+      audit: :live,
       # sandbox: real wasm components run on wasmex
       sandbox: :live,
       # compile: .work rust + C + zig units → typed components, automatic + tested. rust via
