@@ -3,6 +3,11 @@
 //! DRY, no dead OQL/kernel concepts — built for the literate `.work` model.
 const std = @import("std");
 const log = @import("log.zig");
+const work = @import("work.zig");
+const author = @import("author.zig");
+test {
+    _ = work;
+}
 
 const version = "0.1.0";
 
@@ -12,8 +17,14 @@ pub fn main(init: std.process.Init) !void {
     defer it.deinit();
     _ = it.next(); // program name
     const verb = it.next() orelse "help";
+    const io = init.io;
+    const alloc = init.arena.allocator();
 
-    if (eql(verb, "version") or eql(verb, "--version")) {
+    if (eql(verb, "check")) {
+        std.process.exit(try author.check(io, alloc, it.next() orelse "."));
+    } else if (eql(verb, "structure")) {
+        std.process.exit(try author.structure(io, alloc, it.next() orelse "."));
+    } else if (eql(verb, "version") or eql(verb, "--version")) {
         log.print("work {s}\n", .{version});
     } else if (eql(verb, "help") or eql(verb, "--help")) {
         help();
