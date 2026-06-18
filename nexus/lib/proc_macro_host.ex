@@ -78,10 +78,10 @@ defmodule Nexus.ProcMacroHost do
            name = Wasmex.Memory.read_string(cal, mem, name_p, name_l)
            input = Wasmex.Memory.read_binary(cal, mem, in_p, in_l)
 
-           if System.get_env("WB_PM_DBG"), do: IO.puts("[ProcMacroHost] pm_expand: exe=#{exe} name=#{name} in_bytes=#{byte_size(input)}")
+           if Nexus.Config.pm_debug?(), do: IO.puts("[ProcMacroHost] pm_expand: exe=#{exe} name=#{name} in_bytes=#{byte_size(input)}")
            case run_server(exe, name, input, opts) do
              {:ok, output} ->
-               if System.get_env("WB_PM_DBG"), do: IO.puts("[ProcMacroHost] pm_expand -> #{byte_size(output)} bytes back")
+               if Nexus.Config.pm_debug?(), do: IO.puts("[ProcMacroHost] pm_expand -> #{byte_size(output)} bytes back")
                Agent.update(stash, fn _ -> output end)
                byte_size(output)
 

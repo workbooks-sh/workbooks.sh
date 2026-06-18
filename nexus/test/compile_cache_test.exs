@@ -37,8 +37,8 @@ defmodule Nexus.CompileCacheTest do
     File.rm(p1); File.rm(p2)
   end
 
-  test "WB_COMPILE_CACHE=0 bypasses the store" do
-    System.put_env("WB_COMPILE_CACHE", "0")
+  test "compile-cache=off (config) bypasses the store" do
+    Nexus.Config.put(:compile_cache, false)
     {:ok, c} = Agent.start_link(fn -> 0 end)
     n = mknode("int z(){return 0;}")
     b = fake_build(c)
@@ -46,6 +46,6 @@ defmodule Nexus.CompileCacheTest do
     Nexus.Compile.cached(n, b)
     assert Agent.get(c, & &1) == 2, "cache should be disabled"
   after
-    System.delete_env("WB_COMPILE_CACHE")
+    Nexus.Config.put(:compile_cache, true)
   end
 end

@@ -14,9 +14,12 @@ defmodule Nexus.Application do
 
   @impl true
   def start(_type, _args) do
+    # Load runtime config from the deployment's <work-deploy> element (HTML source of truth) into
+    # :persistent_term BEFORE the Gate reads its concurrency limit. No env vars for tunable config.
+    Nexus.Config.boot()
     # Empty by default; Ether's local-inference lanes opt in via `config :nexus, Nexus.Ether, enabled: true`.
     ether = if Nexus.Ether.enabled?(), do: Nexus.Ether.children(), else: []
-    # Nexus.Compile.Gate bounds concurrent wasm compiles (WB_COMPILE_CONCURRENCY) so a burst can't
+    # Nexus.Compile.Gate bounds concurrent wasm compiles (compile-concurrency) so a burst can't
     # fork-bomb wasmtime into an OOM — backpressure instead.
     children = [Nexus.Telemetry, Nexus.Compile.Gate | ether]
     Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)

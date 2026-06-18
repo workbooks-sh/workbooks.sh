@@ -26,7 +26,7 @@ defmodule Nexus.Compile do
       # The wasm lanes shell heavy wasmtime compiler processes (~450–900MB, ~7–20s, near-constant
       # regardless of source size — it's the compiler+stdlib working set, not the user's code). So we
       # NEVER compile the same thing twice: `cached/2` content-addresses the result, and only a COLD
-      # MISS runs the real build (gated by WB_COMPILE_CONCURRENCY). A hit is a hash lookup → the same
+      # MISS runs the real build (gated by compile-concurrency). A hit is a hash lookup → the same
       # `.wasm` is served to every tenant/request, fleet-wide, forever. This is what makes the
       # multi-tenant server cheap: pay the gigabyte ONCE per unique program, not per call.
       kind == "rust" -> {:wasm, cached(node, fn -> rust_unit(node) end)}
@@ -40,9 +40,9 @@ defmodule Nexus.Compile do
   def unit(_), do: {:skip, :not_a_unit}
 
   # ── content-addressed compile cache ──────────────────────────────────────────────────────────
-  # Bump when the compilers change (their output for the same source changes). Overridable via env so
-  # a deployment can invalidate the whole store without a code change.
-  @cache_salt "wbc1"
+  # Every knob below comes from `Nexus.Config` (the `<work-deploy>` config element), never env:
+  # `compile_cache?` (on/off), `compile_cache_version` (the salt — bump to invalidate the store),
+  # `component_cache` (the store location). Config-as-source, not an env sidecar.
 
   @doc """
   Run `build` (a real wasm compile) ONLY on a cache miss; otherwise return the already-built
@@ -79,7 +79,7 @@ defmodule Nexus.Compile do
 
   defp cache_key(%{kind: k, name: n, body: b} = node) do
     grants = node |> safe_grants() |> Enum.sort() |> Enum.join(",")
-    salt = System.get_env("WB_COMPILE_CACHE_VER") || @cache_salt
+    salt = Nexus.Config.compile_cache_version()
     :crypto.hash(:sha256, [salt, 0, k, 0, n, 0, b, 0, grants]) |> Base.encode16(case: :lower)
   end
 
@@ -89,11 +89,9 @@ defmodule Nexus.Compile do
     _ -> []
   end
 
-  defp cache_dir do
-    System.get_env("WB_COMPONENT_CACHE") || Path.join([File.cwd!(), "build", "components"])
-  end
+  defp cache_dir, do: Nexus.Config.component_cache()
 
-  defp cache_enabled?, do: System.get_env("WB_COMPILE_CACHE") != "0"
+  defp cache_enabled?, do: Nexus.Config.compile_cache?()
 
   # A `rust` unit, fully automatic: derive the typed WIT world from its `pub fn` exports AND its
   # `extern "C"` host imports, then run the proven pipeline. `{:ok, component} | {:error, _}`.
