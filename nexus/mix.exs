@@ -42,7 +42,9 @@ defmodule Nexus.MixProject do
       {:wasmex, path: "../runtime/vendor/wasmex"},
       # durable-local store backend behind the Nexus.Store seam (precompiled NIF). The cloud
       # backend (Neon Postgres) and any wasm-SQL engine slot in behind the same 4 callbacks.
-      {:exqlite, "~> 0.23"}
+      {:exqlite, "~> 0.23"},
+      # the served-nexus HTTP tier: SSR the workbook + the /data API the client nexus.data falls to.
+      {:bandit, "~> 1.5"}
     ]
   end
 end

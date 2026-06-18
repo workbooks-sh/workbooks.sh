@@ -16,6 +16,18 @@ defmodule Nexus.Weave do
   end
 
   # index.work is the composition root — it leads; the rest follow alphabetically.
+  @doc """
+  The workbook's resource data as `name => [row maps]` — the payload the served `/data/:resource`
+  API returns and the baked islands inline. One extraction, shared by weave and the server.
+  """
+  def data(root) do
+    pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
+
+    for {name, {:resource, mod}} when not is_nil(mod) <- resources(pages), into: %{} do
+      {name, mod |> Nexus.Store.all() |> Enum.map(&row_to_map/1)}
+    end
+  end
+
   defp files(root) do
     (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
     |> Enum.uniq()

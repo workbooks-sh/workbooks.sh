@@ -42,8 +42,11 @@ defmodule Nexus do
       # reusing the C lane w/ the zig lib on the include path). All run zig1/clang/mrustc DIRECTLY
       # — no command registry.
       compile: :live,
-      # weave: workbook folder → one styled .html — inline markdown (bold/italic/code/links),
-      # lists, labeled unit blocks, a clean shell
+      # weave: render-aware — a workbook (HTML file, renders client-side) with markdown prose,
+      # `show Resource` → live XSS-safe data tables, `show Unit` → baked render() output across all
+      # lanes, index composition + nav, and the client `nexus.data` API (baked JSON islands +
+      # server fallback). Nexus.Server SSRs it live + serves /data. Data backends: baked / SQLite /
+      # server, one API. (Local-only is core — the woven file carries its own data, no runtime.)
       weave: :live,
       # dock host-IMPORTS (a component CALLING a host capability) — TURNKEY for scalar + string
       # PARAMS and string RETURNS, in C and rust. A unit declares `extern { fn emit(...) }` + calls
