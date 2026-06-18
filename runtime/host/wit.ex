@@ -28,11 +28,13 @@ defmodule Workbooks.Wit do
 
   @doc "Generate the WIT `world` source for a `Workbooks.Literate` :code node."
   def world(%{name: name} = node) when is_binary(name) do
-    exports = node |> Extract.facts() |> Map.fetch!(:exports) |> export_lines()
+    facts = Extract.facts(node)
+    records = record_defs(facts, name)
+    exports = export_lines(facts.exports)
     exports = if exports == [], do: ["export run: func(input: string) -> string;"], else: exports
     imports = node |> grants() |> Enum.map(&grant_import/1) |> Enum.reject(&is_nil/1)
 
-    body = (exports ++ imports) |> Enum.map(&("  " <> &1)) |> Enum.join("\n")
+    body = (records ++ exports ++ imports) |> Enum.map(&indent/1) |> Enum.join("\n")
 
     "package work:#{wit_name(name)};\n\nworld #{wit_name(name)} {\n#{body}\n}\n"
   end
@@ -78,7 +80,19 @@ defmodule Workbooks.Wit do
   defp params(0), do: ""
   defp params(arity), do: 0..(arity - 1) |> Enum.map(&"a#{&1}: string") |> Enum.join(", ")
 
+  # the unit's declared records → WIT record defs, named after their module
+  defp record_defs(%{types: types}, unit) do
+    modules = for {:module, m} <- types, do: m
+    records = for {:record, fields} <- types, do: fields
+
+    records
+    |> Enum.with_index()
+    |> Enum.map(fn {fields, i} -> Workbooks.Wit.Types.record(Enum.at(modules, i) || unit, fields) end)
+  end
+
+  defp indent(block), do: block |> String.split("\n") |> Enum.map(&("  " <> &1)) |> Enum.join("\n")
+
   defp grant_import(cap), do: if(wit = @grant_imports[cap], do: "import #{wit};")
 
-  defp wit_name(name), do: name |> to_string() |> String.replace("_", "-")
+  defp wit_name(name), do: Workbooks.Wit.Types.wit(name)
 end

@@ -1,0 +1,42 @@
+defmodule Workbooks.Wit.TypesTest do
+  use ExUnit.Case, async: true
+  alias Workbooks.{Literate, Wit}
+  alias Workbooks.Wit.Types
+
+  test "scalar/1 infers WIT scalars from default values" do
+    assert Types.scalar("") == "string"
+    assert Types.scalar(0) == "s32"
+    assert Types.scalar(0.0) == "f64"
+    assert Types.scalar(true) == "bool"
+    assert Types.scalar(:new) == "string"
+    assert Types.scalar([]) == "list<string>"
+    assert Types.scalar(nil) == "string"
+  end
+
+  test "record/2 renders a WIT record from fields + defaults, kebab-casing names" do
+    wit = Types.record(:Lead, name: "", revenue: 0, in_pipeline: false)
+    assert wit =~ "record lead {"
+    assert wit =~ "name: string,"
+    assert wit =~ "revenue: s32,"
+    assert wit =~ "in-pipeline: bool,"
+  end
+
+  test "Wit.world emits a unit's declared struct as a WIT record, named after the module" do
+    src = """
+    server :lead do
+      defmodule Lead do
+        defstruct name: "", revenue: 0, score: 0, status: :new
+      end
+
+      def of(l), do: l
+    end
+    """
+
+    world = Literate.parse(src) |> Enum.find(&(&1.type == :code)) |> Wit.world()
+
+    assert world =~ "record lead {"
+    assert world =~ "name: string,"
+    assert world =~ "revenue: s32,"
+    assert world =~ "export of: func(a0: string) -> string;"
+  end
+end

@@ -59,10 +59,15 @@ defmodule Workbooks.Extract.Elixir do
 
   defp export(_), do: nil
 
-  # ── types: a defstruct is a record; a nested defmodule is a named shape ──
+  # ── types: a defstruct is a record (fields + defaults, so WIT types can be
+  #    inferred); a nested defmodule is a named shape ──
   defp type({:defstruct, _, [fields]}) when is_list(fields) do
-    keys = if Keyword.keyword?(fields), do: Keyword.keys(fields), else: fields
-    {:record, keys}
+    pairs =
+      if Keyword.keyword?(fields),
+        do: fields,
+        else: Enum.map(fields, &{&1, nil})
+
+    {:record, pairs}
   end
 
   defp type({:defmodule, _, [{:__aliases__, _, mods} | _]}), do: {:module, List.last(mods)}

@@ -32,7 +32,7 @@ defmodule Workbooks.Extract.ElixirTest do
     """
 
     %{types: ty} = facts(src)
-    assert {:record, [:name, :revenue, :status]} in ty
+    assert {:record, [name: "", revenue: 0, status: :new]} in ty
     assert {:module, :Lead} in ty
   end
 
