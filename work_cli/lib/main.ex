@@ -48,12 +48,32 @@ defmodule WorkCLI.Main do
   defp route(["weave", dir, out | _]), do: WorkCLI.Work.weave(dir, out)
   defp route(["weave" | _]), do: (Log.error("usage: work weave <dir> <out.html>"); {:error, :usage})
 
+  # deploy — scaffold/validate local; apply/status/verify/logs/down route to a backend
+  defp route(["deploy", "init" | rest]) do
+    {place, dir} =
+      case rest do
+        [p, d | _] -> {p, d}
+        [p] -> if p in ["local", "cloud"], do: {p, "."}, else: {"local", p}
+        [] -> {"local", "."}
+      end
+
+    WorkCLI.Deploy.init(place, dir, force: "--force" in rest)
+  end
+
+  defp route(["deploy", "validate" | rest]), do: WorkCLI.Deploy.validate(file_arg(rest))
+  defp route(["deploy", "apply" | rest]), do: WorkCLI.Deploy.apply(file_arg(rest))
+  defp route(["deploy", "verify" | rest]), do: WorkCLI.Deploy.verify(List.first(rest) || "deployment.html")
+  defp route(["deploy", "status" | rest]), do: WorkCLI.Deploy.status(file_arg(rest))
+  defp route(["deploy", "down" | rest]), do: WorkCLI.Deploy.down(file_arg(rest))
+  defp route(["deploy" | _]), do: (Log.error("usage: work deploy init|validate|apply|verify|status|down"); {:error, :usage})
+
   defp route([verb | _]) do
     Log.error("unknown command: #{verb}", detail: "run `work help` for the full surface")
     {:error, :unknown}
   end
 
   defp dir_arg(rest), do: List.first(rest) || "."
+  defp file_arg(rest), do: (rest -- ["--force"]) |> List.first() || "deployment.html"
   defp unit(name), do: String.trim_leading(to_string(name), ":")
 
   # ── the grouped verb map (the designed help) ────────────────────────────────────────────────
@@ -66,11 +86,14 @@ defmodule WorkCLI.Main do
        {"structure [dir]", "list the units in the tree"}
      ]},
     {"build", "weave & compile (work_core + a nexus)", [
-       {"weave <dir> <out.html>", "weave a tree into one self-contained html  (P2)"},
-       {"build <dir>", "compile the units to wasm  (P2)"}
+       {"weave <dir> <out.html>", "weave a tree into one self-contained html workbook"},
+       {"build <dir>", "compile the units to wasm  (via a nexus)"}
      ]},
     {"deploy", "stand up a runtime, local or cloud", [
-       {"deploy init|apply|status|verify|logs|down", "(P3)"}
+       {"deploy init [local|cloud]", "scaffold a deployment.html"},
+       {"deploy validate", "coherence-check the config"},
+       {"deploy apply", "deploy it (local microVM/container, or cloud)"},
+       {"deploy verify|status|down", "health-check · inspect · tear down"}
      ]},
     {"platform", "identity, contexts, the cloud control plane", [
        {"login · ctx · org · nexus · workspace", "(P5)"}
