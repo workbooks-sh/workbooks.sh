@@ -61,3 +61,25 @@ it's the architecturally-right end state, but it's a focused build, not a one-co
 - ✅ Option A DONE — shared conformance corpus (cli/src/corpus/ + units.golden); both the Elixir and
   Zig parsers are tested against the one golden, so they cannot silently diverge (DRY-in-behaviour).
 - ◻ Option B (Zig toolchain as a wasm component) — the scoped follow-up for literal one-toolchain.
+
+## Progress + two caveats found while wiring it up
+
+**Done:** the reactor exports `parse_units` + `parse_json` (full nodes); `Nexus.Toolchain` instantiates
+it once and the server parses `.work` through the **same Zig code the CLI runs**. Structural conformance
+(code units: name/kind/lang) matches `WorkCore` exactly, in nexus, at 0.034ms/call.
+
+**Two caveats that mean a *full* `work_core` deletion is not a clean one-shot:**
+1. **Ref-token parity.** `WorkCore.Literate.refs` extracts `[[backlinks]]` **and** `:atoms` / `@types`
+   / `#tags` (and even pulls a unit's own name atom — arguably a quirk). The Zig parser does
+   `[[backlinks]]` only. The units match; the *refs* don't yet. `graph`/`check`/`why`/`near` depend on
+   refs, so they can't move to the reactor until the Zig ref extraction matches (or `WorkCore`'s quirk
+   is fixed and both align). Tractable, but real.
+2. **`Extract.Elixir` is genuinely Elixir-bound.** It uses `Code.string_to_quoted` (the Elixir compiler's
+   AST) to pull a unit's exports/types/calls — used by `Graph` + `Wit`. There is **no Zig equivalent**
+   (Zig can't parse Elixir's AST). So this piece legitimately stays Elixir; it is *not* drift, it's a
+   thin Elixir-runtime adapter.
+
+**Therefore the honest end-state** isn't "delete `work_core` entirely" — it's: the **shared `.work`
+parse** lives in the one Zig reactor (the big duplicated logic, now DRY + faster, used by both CLI and
+server), and `work_core` shrinks to the **genuinely-Elixir-specific** bits (`Extract.Elixir` + the
+AST-dependent `Graph`/`Wit`). That's the right granularity — DRY where it can be, Elixir where it must be.
