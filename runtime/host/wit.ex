@@ -26,16 +26,9 @@ defmodule Workbooks.Wit do
 
   @caps Map.keys(@grant_imports) ++ ~w(tcp udp tls posix parallel encode commands)
 
-  # self-contained host capability interfaces, so a generated package validates
-  # standalone (wasm-tools rejects a bare external `host:net` import). Each cap a
-  # unit grants imports the matching local interface.
-  @cap_ifaces %{
-    "net" => "interface host-net {\n  fetch: func(url: string) -> string;\n}",
-    "kv" => "interface host-kv {\n  get: func(key: string) -> string;\n  put: func(key: string, val: string);\n}",
-    "secrets" => "interface host-secrets {\n  read: func(key: string) -> string;\n}",
-    "fs" => "interface host-fs {\n  read: func(path: string) -> string;\n  write: func(path: string, data: string);\n}",
-    "exec" => "interface host-exec {\n  run: func(cmd: string, args: list<string>) -> string;\n}"
-  }
+  # The self-contained host capability interfaces come from the single Dock registry
+  # (§3) — so a generated package validates standalone AND §2's imports are the same
+  # surface the runtime Dock projects. See `Workbooks.Dock`.
 
   @doc "Generate the WIT `world` source for a `Workbooks.Literate` :code node."
   def world(%{name: name} = node) when is_binary(name) do
@@ -123,8 +116,8 @@ defmodule Workbooks.Wit do
     # defined in another file still resolves; without it, types are file-scoped.
     {iface, type_names} = shared || {file_interface(nodes), type_names(nodes)}
 
-    caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&Map.has_key?(@cap_ifaces, &1))
-    host = caps |> Enum.map(&@cap_ifaces[&1]) |> Enum.join("\n\n")
+    caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&Workbooks.Dock.capability?/1)
+    host = caps |> Enum.map(&Workbooks.Dock.interface_wit/1) |> Enum.join("\n\n")
     worlds = Enum.map(units, &pkg_world(&1, type_names))
 
     parts = ([host, iface] ++ worlds) |> Enum.reject(&(&1 in [nil, ""]))
@@ -324,8 +317,8 @@ defmodule Workbooks.Wit do
       node
       |> grants()
       |> Enum.uniq()
-      |> Enum.filter(&Map.has_key?(@cap_ifaces, &1))
-      |> Enum.map(&"import host-#{&1};")
+      |> Enum.filter(&Workbooks.Dock.capability?/1)
+      |> Enum.map(&"import #{Workbooks.Dock.interface_name(&1)};")
 
     body = (use_line ++ exports ++ imports) |> Enum.map_join("\n", &("  " <> &1))
     "world #{wit_name(node.name)} {\n#{body}\n}"
