@@ -9,10 +9,10 @@ c :pricing do
   }
 end
 
-The `now` cap (a host capability the unit imports) stamps when the sheet was priced — a typed
-WIT import the Dock supplies, granted explicitly in the header.
+The `now` cap stamps when the sheet was priced. Just **grant** it and call it — the lane injects
+the host import (a typed WIT import the Dock supplies); no boilerplate. An ungranted cap is a
+hard error (`Nexus.Audit`).
 
 c :clock, grant: [now] do
-  extern long now(void);
   long priced_at(void) { return now(); }
 end

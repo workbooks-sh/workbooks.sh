@@ -35,13 +35,13 @@ defmodule Nexus.Audit do
 
   defp used(_), do: []
 
-  # Cap names listed in the unit's `grant: [ … ]` header (string values dropped so they don't leak).
-  defp granted(%{header: header}) when is_binary(header) do
+  @doc "Cap names listed in the unit's `grant: [ … ]` header (string values dropped so they don't leak)."
+  def granted(%{header: header}) when is_binary(header) do
     case Regex.run(~r/grant:?\s*\[([^\]]*)\]/, header, capture: :all_but_first) do
       [inner] -> inner |> String.replace(~r/"[^"]*"/, "") |> then(&Regex.scan(~r/[a-z_]\w+/, &1)) |> List.flatten()
       _ -> []
     end
   end
 
-  defp granted(_), do: []
+  def granted(_), do: []
 end

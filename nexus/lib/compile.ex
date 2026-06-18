@@ -68,11 +68,14 @@ defmodule Nexus.Compile do
 
   # A `c`/`cpp` unit: derive the WIT world from the C function signatures, compile (clang →
   # reactor, no command machinery), componentize (no WASI adapter needed). `{:ok, comp} | {:error}`.
-  defp c_unit(%{name: name, body: body}) do
+  defp c_unit(%{name: name, body: body} = node) do
     exports = c_sigs(body)
-    # extern decls that name a known Dock host fn become typed imports (the WIT comes from the
-    # Dock's signature, not the unit's lowered `extern`); the Dock supplies the impl.
-    caps = body |> c_import_names() |> Enum.filter(&Nexus.Dock.host_fn_wit/1)
+    # caps come from either an explicit `extern` (the author wrote the lowered decl) OR a grant
+    # (clean: `grant: [load]` and the lane injects the extern + a tidy wrapper). Both → Dock caps.
+    declared = body |> c_import_names() |> Enum.filter(&Nexus.Dock.host_fn_wit/1)
+    granted = node |> Nexus.Audit.granted() |> Enum.filter(&Nexus.Dock.host_fn_wit/1)
+    caps = Enum.uniq(declared ++ granted)
+    inject = granted -- declared
 
     case exports do
       [] ->
@@ -84,21 +87,72 @@ defmodule Nexus.Compile do
         elines = Enum.map(exports, fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
         world = "package work:#{wname};\n\nworld #{wname} {\n#{Enum.join(ilines ++ elines, "\n")}\n}\n"
 
-        # A string-RETURNING cap needs the canonical-ABI return area: the host allocates the
-        # returned string in guest memory via a `cabi_realloc` export. Inject a bump allocator
-        # (no libc) and export it.
+        # A string-RETURNING cap needs a `cabi_realloc` export (the host allocates the returned
+        # string in guest memory). Inject a no-libc bump allocator + export it.
         str_ret? = Enum.any?(caps, &Nexus.Dock.returns_string?/1)
         fn_exports = Enum.map(exports, &elem(&1, 0)) ++ if(str_ret?, do: ["cabi_realloc"], else: [])
-        body = if str_ret?, do: body <> "\n" <> @c_cabi_realloc, else: body
+
+        # Grant-driven glue: extern decls (for granted-but-not-declared caps) + `nx_str` wrappers
+        # (for single-string-param string-returning caps) — injected BEFORE the body so the author
+        # just calls `load_s("k")` and gets a `{ptr, len}` instead of hand-rolling the ret-area.
+        prelude = c_prelude(inject, caps)
+        src_body = prelude <> body <> if(str_ret?, do: "\n" <> @c_cabi_realloc, else: "")
 
         src = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}.c")
-        File.write!(src, body)
+        File.write!(src, src_body)
 
         with {:ok, core} <- Nexus.Compilers.C.compile_to_wasm(src, exports: fn_exports, allow_undefined: caps != []) do
           core = if caps != [], do: rewrite_imports(core, Path.dirname(core), caps), else: core
           c_componentize(core, world, wname)
         end
     end
+  end
+
+  # The injected C prelude: `nx_str` type, extern decls for granted caps, and clean wrappers for
+  # single-string-param string-returning caps (`<cap>_s(const char* p, int n) -> nx_str`).
+  defp c_prelude(inject, _caps) do
+    # Only grant-INJECTED caps get the extern + wrapper. Author-declared externs keep their own
+    # (declaring + wrapping the same fn would double-declare `load` across the prelude/body split).
+    str_caps = Enum.filter(inject, fn c -> match?({[{_, "string"}], "string"}, wit_parts(Nexus.Dock.host_fn_wit(c))) end)
+    nx = if str_caps == [], do: "", else: "typedef struct { const char* ptr; int len; } nx_str;\n"
+    externs = Enum.map_join(inject, "\n", &c_cap_extern/1)
+    wrappers = Enum.map_join(str_caps, "\n", &c_str_wrapper/1)
+    [nx, externs, wrappers] |> Enum.reject(&(&1 == "")) |> Enum.join("\n") |> then(&if(&1 == "", do: "", else: &1 <> "\n"))
+  end
+
+  # WIT sig → `{[{name, type}], return_type | nil}`.
+  defp wit_parts(sig) do
+    params =
+      case Regex.run(~r/func\(([^)]*)\)/, sig || "") do
+        [_, p] -> p
+        _ -> ""
+      end
+      |> String.split(",", trim: true)
+      |> Enum.map(fn p ->
+        case String.split(p, ":", parts: 2) do
+          [n, t] -> {String.trim(n), String.trim(t)}
+          [t] -> {"_", String.trim(t)}
+        end
+      end)
+
+    ret = with [_, r] <- Regex.run(~r/->\s*(\w+)/, sig || ""), do: r, else: (_ -> nil)
+    {params, ret}
+  end
+
+  @wit_c %{"s8" => "signed char", "s16" => "short", "s32" => "int", "s64" => "long",
+           "u8" => "unsigned char", "u16" => "unsigned short", "u32" => "unsigned int", "u64" => "unsigned long",
+           "f32" => "float", "f64" => "double", "bool" => "int"}
+
+  defp c_cap_extern(cap) do
+    {params, ret} = wit_parts(Nexus.Dock.host_fn_wit(cap))
+    cparams = Enum.flat_map(params, fn {_, "string"} -> ["const char*", "int"]; {_, t} -> [Map.get(@wit_c, t, "int")] end)
+    cparams = cparams ++ if(ret == "string", do: ["void*"], else: [])
+    cret = case ret do "string" -> "void"; nil -> "void"; t -> Map.get(@wit_c, t, "int") end
+    "extern #{cret} #{cap}(#{if(cparams == [], do: "void", else: Enum.join(cparams, ", "))});"
+  end
+
+  defp c_str_wrapper(cap) do
+    "static nx_str #{cap}_s(const char* __p, int __n) { unsigned int __r[2]; #{cap}(__p, __n, __r); return (nx_str){(const char*)(unsigned long)__r[0], (int)__r[1]}; }"
   end
 
   defp c_import_names(body) do

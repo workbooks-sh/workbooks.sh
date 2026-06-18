@@ -94,6 +94,26 @@ defmodule Nexus.CompileTest do
 
   @tag :compiler
   @tag timeout: 240_000
+  test "the clean GRANT-driven cap API works (no extern decls, injected wrapper)" do
+    if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
+      node =
+        ~s|c :kv2, grant: [store, load, emit] do\n  void run(void) { store("c", 1, "porto", 5); nx_str v = load_s("c", 1); emit(v.ptr, v.len); }\nend\n|
+        |> Nexus.Literate.parse()
+        |> Enum.find(&(&1.type == :code))
+
+      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
+      parent = self()
+      imports = Map.merge(Nexus.Dock.impls(), %{"emit" => {:fn, fn m -> send(parent, {:emit, m}); nil end}})
+      {:ok, p} = Wasmex.Components.start_link(%{path: comp, imports: imports})
+      Wasmex.Components.call_function(p, "run", [])
+      assert_receive {:emit, "porto"}, 3000
+    else
+      :ok
+    end
+  end
+
+  @tag :compiler
+  @tag timeout: 240_000
   test "a string-RETURNING cap works (kv store/load via the canonical-ABI return area)" do
     if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
       node =
