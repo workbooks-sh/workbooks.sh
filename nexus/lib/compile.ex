@@ -21,6 +21,7 @@ defmodule Nexus.Compile do
       kind == "record" -> {:shape, Nexus.Resource.fields(node)}
       kind == "server" -> {:beam, Nexus.Unit.compile(node)}
       kind == "rust" -> {:wasm, rust_unit(node)}
+      kind in ~w(c cpp) -> {:wasm, c_unit(node)}
       kind in @wasm_kinds -> {:wasm, {:todo, node.lang, node.name}}
       true -> {:skip, kind}
     end
@@ -33,6 +34,71 @@ defmodule Nexus.Compile do
       %{exports: []} -> {:error, :no_exported_fns}
       %{world: world, name: name, exports: exports, imports: imports} ->
         to_component(body, Enum.map(exports, &elem(&1, 0)), world, name, imports != [], crate_deps(body))
+    end
+  end
+
+  # A `c`/`cpp` unit: derive the WIT world from the C function signatures, compile (clang →
+  # reactor, no command machinery), componentize (no WASI adapter needed). `{:ok, comp} | {:error}`.
+  defp c_unit(%{name: name, body: body}) do
+    exports = c_sigs(body)
+
+    case exports do
+      [] ->
+        {:error, :no_exported_fns}
+
+      _ ->
+        wname = wit_ident(name)
+        lines = Enum.map_join(exports, "\n", fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
+        world = "package work:#{wname};\n\nworld #{wname} {\n#{lines}\n}\n"
+        src = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}.c")
+        File.write!(src, body)
+
+        with {:ok, core} <- Nexus.Compilers.C.compile_to_wasm(src, exports: Enum.map(exports, &elem(&1, 0))) do
+          c_componentize(core, world, wname)
+        end
+    end
+  end
+
+  # C signatures: `<ret> name(params) {`. Maps C scalar types → WIT.
+  @c_wit %{
+    "int" => "s32", "long" => "s64", "char" => "s8", "short" => "s16",
+    "unsigned" => "u32", "float" => "f32", "double" => "f64", "bool" => "bool"
+  }
+  defp c_sigs(body) do
+    ~r/\b([a-z]\w*)\s+([a-z_]\w*)\s*\(([^)]*)\)\s*\{/
+    |> Regex.scan(body)
+    |> Enum.map(fn [_, ret, f, params] -> {f, c_params(params), c_ret(ret)} end)
+    |> Enum.uniq()
+  end
+
+  defp c_params(p) when p in ["", "void"], do: ""
+
+  defp c_params(params) do
+    params
+    |> String.split(",", trim: true)
+    |> Enum.map_join(", ", fn part ->
+      ws = part |> String.trim() |> String.split(~r/\s+/)
+      {nm, ty} = {List.last(ws), ws |> Enum.drop(-1) |> List.last()}
+      "#{wit_ident(nm)}: #{Map.get(@c_wit, ty, "s32")}"
+    end)
+  end
+
+  defp c_ret("void"), do: ""
+  defp c_ret(t), do: " -> #{Map.get(@c_wit, t, "s32")}"
+
+  defp c_componentize(core, world_text, world) do
+    dir = Path.join(System.tmp_dir!(), "nxcz_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    wit = Path.join(dir, "w.wit")
+    embed = Path.join(dir, "e.wasm")
+    comp = Path.join(dir, "c.component.wasm")
+    File.write!(wit, world_text)
+
+    with {_, 0} <- System.cmd("wasm-tools", ["component", "embed", wit, core, "--world", world, "-o", embed]),
+         {_, 0} <- System.cmd("wasm-tools", ["component", "new", embed, "-o", comp]) do
+      {:ok, comp}
+    else
+      {out, code} -> {:error, {:componentize_failed, code, out}}
     end
   end
 

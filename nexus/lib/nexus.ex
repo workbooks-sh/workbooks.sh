@@ -31,7 +31,10 @@ defmodule Nexus do
       data: :live,
       # sandbox: real wasm components run on wasmex
       sandbox: :live,
-      # compile: a .work rust unit → typed component, automatic + tested
+      # compile: .work rust + C units → typed components, automatic + tested (rust via mrustc
+      # w/ crates + host imports; C via clang reactor — cleaner, no command machinery). zig
+      # pending (its compiler runs through the old command registry, needs the direct-wasmtime
+      # treatment first).
       compile: :live,
       # weave: workbook folder → one styled .html — inline markdown (bold/italic/code/links),
       # lists, labeled unit blocks, a clean shell
