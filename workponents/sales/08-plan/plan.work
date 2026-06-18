@@ -1,0 +1,238 @@
+# Plan
+
+This is the board — the place where the team's work on the Sales workbook lives
+as data. It is also the proof of a claim that sounds wrong the first time you
+hear it: **declarative is not immutable**. A workbook is HTML you author by hand,
+but it is also a running store. The same document you read is the one the agents
+write back into. Tasks move from `:todo` to `:done` *in this file*. The document
+is the database.
+
+This page teaches three things by doing them: task value declarations, agents
+**claiming** work without trampling each other, and a full **harness** — an
+agent, a flow, the tasks it operates on, and a test that gates the whole thing —
+all in one file. Everything here references the units built upstream:
+[[Score]], [[Enrich]], [[Pipeline]], and the [[Analyst]] agent.
+
+## Tasks are values, not markup
+
+A task is a value of the canonical `Task` struct. It is a record — a `defstruct`
+whose field *types are inferred from the default values*. There is no DSL, no
+schema language, no typespec leading the way. The shape is the struct; the types
+fall out of `""`, `:todo`, `nil`.
+
+server compute :board do
+  defmodule Task do
+    defstruct title: "", status: :todo, owner: nil, ref: nil
+  end
+
+  # The status of a task is one of these atoms — an enum is just a set.
+  @statuses [:todo, :doing, :done]
+
+  # `owner` resolves against the workspace symbol table to a real person, and
+  # `ref` is a work:// deep link to the unit the task touches. Both are checked
+  # at the weave gate: an owner who isn't a defined person, or a ref that points
+  # nowhere, fails the build before any bundle ships.
+  def statuses, do: @statuses
+
+  def valid?(%Task{status: s}) when s in @statuses, do: true
+  def valid?(%Task{}), do: false
+end
+
+The `:board` unit is **server** compute — native Elixir on the BEAM, not wasm.
+It runs in the nexus because the board is shared, multi-tenant state: every
+agent and every teammate reads and writes the same list. That isolation is the
+nexus's job, not a sandbox's.
+
+## The board, as data
+
+Here is the actual work. `data` declares typed values of a struct; it renders by
+default, so this list *is* the board you see on the page. No SQL, no JSON —
+typed values of `Task`.
+
+server data :tasks, of: Task, from: values([
+  %Task{title: "Wire enrich → CRM API",       status: :done,  owner: "ana", ref: :enrich},
+  %Task{title: "Tune scoring weights",         status: :doing, owner: "ana", ref: :score},
+  %Task{title: "Forecast next-quarter pipe",   status: :todo,  owner: nil,   ref: :forecast},
+  %Task{title: "Draft outreach for hot leads", status: :todo,  owner: nil,   ref: :analyst},
+  %Task{title: "Risk-flag thin-margin leads",  status: :todo,  owner: nil,   ref: :risk}
+])
+
+Two of these tasks have no `owner` yet (`nil`). They are **unclaimed**. The
+backlinks in `ref` point at real units elsewhere in this workbook —
+[[Forecast]], [[Analyst]], [[Risk]] — so `work why` can trace why each task
+exists and `work near` can show what it touches.
+
+## Claiming work: drafts, locks, and fences
+
+If the document is the store and many agents write to it, you need the same
+discipline a database gives you: don't let two writers stomp the same row. The
+work format does this with **drafts** and **scopes** — no global mutex, no
+"agent, please wait."
+
+A **draft** is a scoped, uncommitted overlay on the document. An agent opens a
+draft, mutates tasks *inside* the draft, and the draft commits atomically or not
+at all. A **scope** narrows what the draft may touch — here, exactly one task —
+so two agents claiming two different tasks never contend. The narrowed scope is
+the **fence**: a write that strays outside it is rejected at commit.
+
+server compute :claims do
+  # `claim/2` is a compare-and-swap over the document. It opens a draft fenced
+  # to a single task, and only commits if that task is still unclaimed. If
+  # another agent won the race, the draft is discarded and we report it — no
+  # partial write, no lost update.
+  def claim(title, who) do
+    draft scope: {:task, title} do
+      case fetch(title) do
+        {:ok, %Task{owner: nil} = t} ->
+          commit(%Task{t | owner: who, status: :doing})
+          {:ok, :claimed}
+
+        {:ok, %Task{owner: other}} ->
+          {:error, {:already_claimed, other}}
+
+        :error ->
+          {:error, :no_such_task}
+      end
+    end
+  end
+
+  # Finishing is the same shape: a fenced draft flips status to :done, but only
+  # the owner who claimed it may close it. The fence keeps one agent from
+  # closing another's work.
+  def finish(title, who) do
+    draft scope: {:task, title} do
+      case fetch(title) do
+        {:ok, %Task{owner: ^who} = t} ->
+          commit(%Task{t | status: :done})
+          {:ok, :done}
+
+        {:ok, %Task{owner: other}} ->
+          {:error, {:not_owner, other}}
+
+        :error ->
+          {:error, :no_such_task}
+      end
+    end
+  end
+end
+
+Because the draft commits over `:tasks` — the live `data` declaration above —
+the rendered board updates the moment a claim lands. The page is not a snapshot
+of the store; the page **is** the store. That is what "declarative is not
+immutable" means in practice.
+
+## A full harness in one file
+
+Now the real point of this page: a workbook unit is not just a function or a
+list — it can be a complete, self-contained working system. Below is one
+harness: an **agent** that claims and works tasks, a **flow** that drives it
+over the backlog, the **tasks** it operates on (declared above), and a **test**
+that gates the whole thing. The weave gate runs that test; a red test ships no
+bundle.
+
+### The agent
+
+The dispatcher is a brain — a system prompt plus a model plus tools — and its
+loop runs in server Elixir, backed by the nexus. Its memory is typed data: the
+board itself. It hands real outreach drafting to the [[Analyst]] agent and only
+manages the queue.
+
+agent :dispatcher do
+  model "minimax/minimax-m3"
+
+  system """
+  You manage the sales backlog. Pick the highest-leverage unclaimed task,
+  claim it for the agent best suited to it, do the work via your tools, and
+  close it. Never touch a task you do not own. Prefer scored, high-revenue
+  leads. If no task is ready, stop — do not invent work.
+  """
+
+  tools [
+    Claims.claim/1,
+    Claims.finish/1,
+    Analyst.draft_outreach/1
+  ]
+
+  # The agent's decision step: given the open backlog, choose one task and the
+  # specialist that should own it. Routing is by the unit the task references.
+  def route(%Task{ref: :analyst}), do: :analyst
+  def route(%Task{ref: :risk}),    do: :risk
+  def route(%Task{ref: _}),        do: :dispatcher
+end
+
+### The flow
+
+The flow is orchestration — sequential `step`s, with a `parallel` fan-out where
+the work is independent. It pulls the open tasks, claims each one under its
+fence, runs the matching specialist, and closes it. Two claims in the same
+`parallel` block touch different fenced scopes, so they never contend.
+
+server flow :work_board do
+  step :pull, do: query(:tasks, where: &(&1.status == :todo))
+
+  step :assign, after: :pull do
+    parallel for task <- result(:pull) do
+      who = dispatcher().route(task)
+
+      with {:ok, :claimed} <- claims().claim(task.title, who),
+           {:ok, _output}  <- run(who, task) do
+        claims().finish(task.title, who)
+      else
+        {:error, {:already_claimed, _}} -> :skip
+        {:error, reason} -> {:failed, task.title, reason}
+      end
+    end
+  end
+
+  step :report, after: :assign do
+    done = query(:tasks, where: &(&1.status == :done))
+    %{closed: length(done), open: length(result(:pull)) - length(done)}
+  end
+end
+
+### The test — the gate
+
+A workbook is not done because the code parses; it is done because the test
+passes. The weave gate runs this test as part of `work bundle`. If `assert`
+fails, the build is red and **no `salesapp.html` ships**. The test exercises the
+claim/fence invariants directly — the contract that makes concurrent board
+writes safe.
+
+server test :board_invariants do
+  test "claiming an open task assigns the owner and moves it to :doing" do
+    {:ok, :claimed} = claims().claim("Forecast next-quarter pipe", "ana")
+    {:ok, t} = claims().fetch("Forecast next-quarter pipe")
+    assert t.owner == "ana"
+    assert t.status == :doing
+  end
+
+  test "a second claim on the same task is fenced out, not lost" do
+    {:ok, :claimed} = claims().claim("Risk-flag thin-margin leads", "ana")
+    assert {:error, {:already_claimed, "ana"}} =
+             claims().claim("Risk-flag thin-margin leads", "bo")
+  end
+
+  test "only the owner may close a task" do
+    {:ok, :claimed} = claims().claim("Draft outreach for hot leads", "ana")
+    assert {:error, {:not_owner, "ana"}} =
+             claims().finish("Draft outreach for hot leads", "bo")
+  end
+
+  test "every declared task is structurally valid at the gate" do
+    for t <- query(:tasks) do
+      assert board().valid?(t)
+    end
+  end
+end
+
+## What this page is
+
+The board you scrolled through is live state: a typed `data` declaration the
+[[Pipeline]] feeds, that the `:dispatcher` agent edits through fenced drafts,
+and that the weave gate guards with `:board_invariants` before anything ships.
+Read top to bottom it is a working backlog; read as code it is a CAS-safe
+mutation system over the document itself. Same file, both true — because the
+document is the store.
+
+Next, the work leaves the building: see [[Deploy]] for how `work bundle` weaves
+this whole tree into one `salesapp.html`.

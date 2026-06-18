@@ -1,0 +1,114 @@
+# Leads — the typed data source
+
+This is where the Sales workbook gets its content: a real, named set of leads
+that the rest of the app enriches, scores, ranks, and works. Everything
+downstream — the [[Pipeline]] that drives `:enrich` and `:score`, the
+[[Lead Score Chart]] island, the agents that draft outreach — reads from the
+:leads source declared here. So this file is both the on-ramp and the lesson on
+the **data model**.
+
+## A record is a struct; its shape is the type
+
+A workbook type is **structure, not a DSL**. You don't write a schema language
+and you never hand-write a contract. You write a plain Elixir `defstruct`, and
+the field types are **inferred from the default values** — `name: ""` is a
+string, `revenue: 0` is an integer, `status: :new` is an atom drawn from the
+:status enum. That inferred shape is the whole type. When this file weaves, the
+build emits a generated wasm component contract (a WIT artifact) **from this
+shape** — you never read it or touch it (see [[The Contract]] for the one
+place we show it, clearly labelled). The rule stands: **learn Elixir, not WIT.**
+
+Here is the canonical record every unit in the app agrees on. We define it once,
+here, and refer to it by name (`Lead`) everywhere else.
+
+defmodule Lead do
+  defstruct name: "",
+            domain: "",
+            revenue: 0,
+            employees: 0,
+            score: 0,
+            status: :new
+end
+
+The lifecycle of a lead is a small **enum** — a closed set of atoms, not a class
+hierarchy and not a string column. A lead is `:new` when it arrives, `:enriched`
+once `:enrich` fills its firmographics, `:scored` once `:score` runs, and
+`:contacted` after an agent reaches out. Because these are atoms, the weave gate
+can check that no unit ever sets a `status` outside this set.
+
+@statuses [:new, :enriched, :scored, :contacted]
+
+## Data is typed values, and it renders by default
+
+A data source is **typed values of your struct**. The `of:` clause names the
+record so the gate knows each value must satisfy `Lead`'s inferred shape, and
+`from:` says where the values come from. The simplest, most honest source is
+`values([...])` — the rows live **in the document**, as real `%Lead{}` literals.
+The document is the store; there is no sidecar database file, no JSON, no CSV the
+renderer secretly parses. SQL, when it shows up later in the app, is only an
+**external resource integration** — a place we pull rows *from* — never the
+content format itself.
+
+These three leads are the sample set the whole workbook is built around. Globex
+is only `:enriched` (it hasn't been scored yet); Acme and Initech are already
+`:scored`. The [[Pipeline]] exists precisely to push the laggards forward.
+
+data :leads, of: Lead, from: values([
+  %Lead{name: "Acme",    domain: "acme.co",     revenue: 50_000, employees: 20, score: 70, status: :scored},
+  %Lead{name: "Globex",  domain: "globex.io",   revenue: 12_000, employees: 8,  score: 41, status: :enriched},
+  %Lead{name: "Initech", domain: "initech.com", revenue: 90_000, employees: 55, score: 88, status: :scored}
+])
+
+A data source **renders by default**. Declaring `:leads` is enough to put a typed
+table on the page — column headers come straight from the struct fields, and the
+`status` atoms render as chips because the gate knows they're a closed enum. You
+don't write any markup to get the table; the value *is* the view.
+
+## Query over the source, then show the slice
+
+When you want a slice instead of the whole table, you `query()` the source by
+name. A query is ordinary Elixir over the typed rows — `from:`, `where:`,
+`order_by:`, `select:` — and it returns more `%Lead{}` values, so the result is
+itself renderable. Here we pull the ranked, sales-ready board: leads that have
+made it to `:scored`, hottest first. This is the exact slice the dashboard and
+the [[Lead Score Chart]] consume.
+
+query :ranked, from: :leads do
+  from lead in :leads,
+    where: lead.status == :scored,
+    order_by: [desc: lead.score],
+    select: lead
+end
+
+Showing a query result is the same idea as showing the source: name it and it
+renders. `show` takes the query by name and the typed rows flow into a view —
+here an explicit table so we can pin the column order for the ranked board.
+
+show :ranked, as: :table, columns: [:name, :domain, :revenue, :score, :status]
+
+A second slice feeds the [[Pipeline]]: everything **not yet** `:scored`. These
+are the rows that still need `:enrich` and `:score` to run. Note this is plain
+data — the same source, a different `where:` — not a separate copy of the leads.
+DRY holds: one source of truth, many views.
+
+query :backlog, from: :leads do
+  from lead in :leads,
+    where: lead.status != :scored,
+    order_by: [asc: lead.name],
+    select: lead
+end
+
+## How the rest of the app reads this
+
+- [[Score]] takes one `%Lead{}` and returns an integer; the dashboard maps it
+  over `:ranked` to keep `score` honest.
+- [[Enrich]] takes a `%Lead{}`, calls out over a granted net capability, and
+  returns a `%Lead{}` with `status: :enriched` — that's how `:backlog` rows move
+  forward.
+- [[Pipeline]] orchestrates seed → `:enrich` → `:score` → rank over this source.
+
+Because every one of those units names the `Lead` record and the :status enum
+declared here, the code graph wires them together: a `type` edge from each unit
+to `Lead`, a `dataflow` edge from `:leads` into the pipeline, and `ref` edges
+from this prose to [[Score]], [[Enrich]], and [[Pipeline]]. Run `work why :leads`
+to see who reads this source, or `work near Lead` to see everything shaped by it.

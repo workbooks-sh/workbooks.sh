@@ -1,0 +1,173 @@
+# Pricing under a sandbox
+
+The pricing math in this Sales workbook touches money: a tax rule that
+quotes a final figure, a currency conversion that reaches the network, and
+the lead [[score]] those numbers ride on. We want all of it grouped, capped,
+and accountable — without rewriting any of the units. That grouping is what
+a **sandbox** gives us.
+
+A **sandbox is a named isolation unit, not a placement.** Placement (the
+thing covered in the previous chapter) answers *where code runs* — `client`
+or `server`, and only those two. A sandbox answers a different question:
+*what is this code allowed to touch, and how much may it spend?* A unit still
+has a placement; the sandbox wraps a capability boundary around it. You can
+have a server unit inside a sandbox and a client unit inside a different one;
+`sandbox` never decides where the code runs.
+
+## Grouping units by nesting
+
+The simplest way to put units in a sandbox is to nest them inside a
+`sandbox :name do … end` block. Everything declared in the block joins that
+boundary. Here `:pricing` groups a new `:tax` unit with the lead [[score]],
+so the units that decide a quote share one wall. `:tax` is defined right in
+the block; `:score` lives in its own file and joins by name (next section).
+
+sandbox :pricing do
+  server compute :tax do
+    @rate_by_region %{us: 0.0, eu: 0.20, uk: 0.20, ca: 0.13}
+
+    def quote(amount, region) do
+      rate = Map.get(@rate_by_region, region, 0.0)
+      tax = round(amount * rate)
+      %{net: amount, tax: tax, gross: amount + tax, region: region}
+    end
+  end
+end
+
+`:tax` is a `server compute` unit — native Elixir on the BEAM (the nexus
+tier), trusted, no wasm. Nesting it in `:pricing` did not change that. It
+declared that this unit shares an isolation unit: a single named boundary the
+weave can audit, meter, and reason about as one.
+
+## Joining from elsewhere with `in:`
+
+Nesting is convenient when you author a unit and its sandbox together, but a
+unit defined in another file can join a sandbox by name with `in:`. That is
+how the [[score]] unit — which lives in its own file because the dashboard
+and the [[pipeline]] both reference it directly — actually lands in
+`:pricing` without being physically rewritten under the block above:
+
+server compute :score, in: :pricing do
+  # the same score/1 defined in [[score]] — this is membership, not a
+  # redefinition; the body and the formula stay where score is authored
+end
+
+`in: :pricing` and nesting inside `sandbox :pricing do … end` mean exactly
+the same thing — membership in one named boundary. Co-location in the source
+file is a convenience, not the contract. The contract is the name.
+
+## A reusable profile, not an `is:` keyword
+
+Caps and limits are options on the sandbox: `grant:` lists the capabilities
+the Dock may fulfil, `memory:` caps the footprint, `timeout:` bounds a call.
+When several sandboxes want the same posture, you do **not** invent a keyword
+for it — there is no `is:` here. You write a plain Elixir module attribute
+and pass it as options. A sandbox profile is just data:
+
+@pricing grant: [:net, :kv], memory: "128mb", timeout: 30_000
+
+sandbox :pricing, @pricing do
+  # :tax here, and :score joins by name
+end
+
+That `@pricing` attribute is an ordinary keyword list. Passing it to
+`sandbox :pricing, @pricing do … end` applies all three limits at once, and
+the same attribute can configure a second sandbox with identical posture. No
+DSL, no special form — a value the language already understands, reused the
+way you reuse any value. This is the [[Lead]] principle showing up in
+configuration: structure over syntax.
+
+## How the caps are actually enforced
+
+Granting `[:net, :kv]` is not paperwork; it is enforced, and *where* depends
+on placement:
+
+- For **wasm units** (a foreign-language unit on the server, or anything on
+  the client), the grant is enforced **by construction**. The generated WIT
+  contract — the thing you never write or read — only *imports* the host
+  functions the grant allowed. A unit with no `:net` grant has no network
+  import in its component at all. It cannot call out because the capability
+  was never linked. This is the WIT-import-by-construction guarantee.
+- For **native server units** like `:tax` and [[score]], there is no wasm
+  wall, so the **nexus enforces the boundary at the Dock**. Every capability
+  request crosses the Dock membrane, where the nexus checks it against the
+  sandbox's grant before a provider fulfils it. Same grant, same denial of
+  un-granted calls — the wasm version proves it statically, the native
+  version checks it at the seam.
+
+Either way the rule is identical: a unit may use a capability only if its
+sandbox granted it. `:tax` does pure arithmetic, so it never exercises
+`:net` or `:kv` at all; the grant is the *ceiling*, not a requirement.
+
+## Crossing a sandbox boundary
+
+A quote in a foreign currency needs an exchange rate, and rates come from the
+`:fx` unit. But `:fx` does not live in `:pricing` — it lives in its own
+sandbox, `:rates`, because reaching the rates API is a network capability we
+want walled off separately from the pricing math:
+
+@rates grant: [:net], memory: "64mb", timeout: 10_000
+
+sandbox :rates, @rates do
+  server compute :fx do
+    def rate(from, to) do
+      # reaches the rates provider; allowed because :rates granted :net
+      {:ok, fetch_rate("api.rates.com", from, to)}
+    end
+  end
+end
+
+Now `:tax` (in `:pricing`) wants to convert a gross figure using `:fx` (in
+`:rates`). That call **crosses a sandbox boundary**, and two rules govern it:
+
+1. **Cross-sandbox calls are host-brokered.** `:tax` does not reach into
+   `:rates` directly. The call goes through the Dock, which brokers the
+   handoff between the two boundaries — the same membrane that fulfils a
+   capability also mediates a unit-to-unit call across a wall.
+2. **Capabilities flow by grant, not by inheritance.** `:tax` calling into
+   `:fx` does **not** lend `:tax` the `:net` grant that `:rates` holds. The
+   network capability stays on the `:rates` side of the wall; `:tax` only
+   receives the *result* of the brokered call. A boundary you call across is
+   not a boundary you inherit through.
+
+Here is the cross-sandbox edge in `:tax`, converting a gross amount:
+
+server compute :tax, in: :pricing do
+  def quote_in(amount, region, currency) do
+    base = quote(amount, region)
+
+    case fx_rate(:usd, currency) do
+      {:ok, rate} ->
+        converted = round(base.gross * rate)
+        Map.merge(base, %{currency: currency, gross_local: converted})
+
+      {:error, _reason} ->
+        # rates unreachable: quote stays in USD, no silent guess
+        Map.put(base, :currency, :usd)
+    end
+  end
+
+  # the brokered hop into sandbox :rates — :tax never gains :net by it
+  defp fx_rate(from, to), do: rate(from, to)
+end
+
+`:tax` asks for a rate and gets back `{:ok, rate}` or `{:error, reason}` — a
+tagged-tuple variant, the [[Lead]] way of saying *this can fail*. It never
+holds a network handle of its own. If the broker returns an error because
+`:rates` could not reach `api.rates.com`, `:tax` falls back to a USD quote
+rather than inventing a number. The wall held; the grant did not leak; the
+failure was explicit.
+
+## Why this matters for the workbook
+
+The weave gate reads these sandboxes as part of the [[code graph]]: each
+`sandbox` is a node, each grant is an audited capability edge, each
+cross-sandbox call is a brokered edge it can trace. `work why :tax` will show
+that `:tax` reaches `:fx` *across* `:rates`, and that the `:net` capability
+lives on the `:rates` node and was never granted to `:pricing`. The money
+path is grouped, capped, and legible — and we wrote zero WIT and zero JSON to
+get there, only Elixir modules and a couple of reusable attributes.
+
+Next, the [[forecast]] and [[risk]] chapters take sandboxes polyglot: a
+Rust+Zig numeric kernel and a Python risk unit, each a wasm component behind
+the very same grant-by-construction wall described here.

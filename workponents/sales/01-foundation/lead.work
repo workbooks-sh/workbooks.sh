@@ -1,0 +1,129 @@
+# Lead
+
+This is the first real unit of the Sales workbook, and it is where the whole app
+gets its shape. Before we can ingest a lead, enrich it, score it, or rank it, we
+need to say **what a lead is**. That definition is a *type*, and in this format a
+type is not a separate declaration language — it is just **structure**, written
+in ordinary Elixir.
+
+## A unit is a named, addressable thing
+
+Everything in a workbook is a **unit**: a named piece you can point at from
+anywhere. This file defines a unit called [[Lead]]. Other files will refer to it
+by name — they will write `%Lead{}` to mean "a value of this shape", and the
+symbol resolver turns that mention into a real edge in the code graph. So when
+:score writes `score(%Lead{})`, or :enrich returns a `%Lead{}`, those are not
+loose conventions; they are typed references back to *this* unit.
+
+A unit has no syntax of its own. It is a `do ... end` **block** in front of a
+**kind word**. The kind word tells the weave what the block is. Here the kind is
+`defmodule` — a plain Elixir module — and the module *is* the contract: its
+public functions are exports, its structs and atoms are its types. There is no
+`.wit` to write and none to read; the WebAssembly contract is generated from this
+Elixir.
+
+Notice there is **no placement** on this block. A struct definition has nothing to
+run — it is a static definition, so it lives neither on the `client` nor the
+`server`. Placement is for code that executes; a shape is just a shape.
+
+## The block delimits itself — no fences
+
+The code below is set off from this prose by a blank line above and a blank line
+below, and it closes with its own `end`. That `end` is the boundary. There is no
+triple-backtick, no HTML, no wrapper — the `do ... end` is self-delimiting, and the
+kind word `defmodule` in front names what it is. Read top to bottom and the prose
+and the code interleave cleanly.
+
+defmodule Lead do
+  @moduledoc """
+  A sales lead as it moves through the pipeline.
+
+  Every field carries a default, and the default's value is what the
+  inference engine reads to assign the field's type — `name` is a string
+  because `""` is a string, `revenue` is an integer because `0` is an
+  integer. We never write a typespec for this; the structure is the type.
+  """
+
+  defstruct name: "",
+            domain: "",
+            revenue: 0,
+            employees: 0,
+            score: 0,
+            status: :new
+
+  @doc """
+  Build a fresh lead from a name and domain. A lead always enters the
+  pipeline as `:new`; :enrich and :score advance it from there.
+  """
+  def new(name, domain) when is_binary(name) and is_binary(domain) do
+    %Lead{name: name, domain: domain, status: :new}
+  end
+
+  @doc "True once :enrich has filled the firmographic fields."
+  def enriched?(%Lead{status: status}) do
+    status in [:enriched, :scored, :contacted]
+  end
+end
+
+## Types are structure, not a DSL
+
+Look at what just happened. `defstruct` with defaults gave us a **record**: a
+fixed set of named fields, each typed by the value standing in front of it. That
+is the entire type declaration. We did **not** write `type Lead = record(...)`,
+and we did **not** lead with `@type` or `@spec` — Elixir's old typespecs are being
+retired in favour of an inference-only, set-theoretic system, so the *defaults
+are the source of truth*. An annotation, if we ever add one, is an optional
+precision layer on top, never the thing that defines the shape.
+
+## The enum is a set of atoms
+
+A lead has a lifecycle. We represent the allowed states as a plain set of
+**atoms** — that is what an enum is here. No enum keyword, no class; just the
+atoms a `status` field is allowed to hold.
+
+@statuses [:new, :enriched, :scored, :contacted]
+
+These four atoms are the spine of the whole app. A lead is born `:new`; :enrich
+advances it to `:enriched`; :score advances it to `:scored`; the analyst agent's
+outreach moves it to `:contacted`. Because they are atoms, they are also
+*queryable references* — a board can filter on `:scored`, and the dataflow edges
+that carry a `%Lead{}` from one unit to the next know which status each step is
+meant to leave behind. The small helper below is the one place we keep that
+ordering honest, so no downstream unit has to re-encode it.
+
+defmodule Lead.Status do
+  @statuses [:new, :enriched, :scored, :contacted]
+
+  @doc "The canonical lifecycle order, used for validation and sorting."
+  def all, do: @statuses
+
+  @doc "The status that should follow the current one, or itself when terminal."
+  def next(current) when current in @statuses do
+    case Enum.drop_while(@statuses, &(&1 != current)) do
+      [^current, following | _] -> following
+      _ -> current
+    end
+  end
+
+  @doc "Guard the document against a status nothing in the pipeline can produce."
+  def valid?(status), do: status in @statuses
+end
+
+## How the rest of the app reaches this unit
+
+From here on, every other file leans on this definition without redefining it:
+
+- **:score** takes a `%Lead{}` and returns an integer — it reads `revenue` and
+  `employees` straight off this struct and writes back `score`.
+- **:enrich** returns a `%Lead{}` with `domain`, `revenue`, and `employees`
+  filled and `status: :enriched`.
+- **:pipeline** threads a list of `%Lead{}` through enrich, score, and rank,
+  watching the `@statuses` enum advance.
+- The board and dashboard render values of this struct directly, grouping by the
+  same `status` atoms.
+
+Those are all **typed edges** in the code graph — `:score`, `%Lead{}`, and
+`:enriched` in the paragraphs above are not decoration, they resolve against the
+workspace symbol table back to the names defined in this file. Tag this unit
+#foundation so `work near #foundation` surfaces it as the root the others build
+on. Next the app puts this shape to work in [[Score]].

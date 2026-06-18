@@ -1,0 +1,158 @@
+# Coder Agent
+
+The earlier agents in this section read and write *text* — the [[Analyst Agent]]
+drafts outreach, the auto-researcher gathers facts. This one reads and writes
+*the workbook itself*. The **coder** is a ReAct agent: it runs a tight
+**think → act → observe** loop, and its actions are sandboxed `bash` tools. Its
+job is to drive the workbook back to green — most concretely, to fix a failing
+test in one of our compute units like [[Score]] or [[Enrich]].
+
+A coding agent is still just a *brain*: a system prompt, a model, and a set of
+tools. What makes it a **coder** rather than a chat brain is (1) its tools are
+shell commands instead of pure functions, and (2) those tools run inside a
+**sandbox** — a named isolation unit — so the agent can edit and run real code
+without being able to touch anything we did not grant it. The loop runs in
+server Elixir (real OTP, native BEAM); the *tools* run as sandboxed wasm beside
+it. The agent is never "the server running as wasm" — the brain orchestrates,
+the sandbox confines the hands.
+
+## The action space — sandboxed bash tools
+
+Before the brain, define what the agent is *allowed to do*. Each tool is an
+ordinary Elixir function; together they are the agent's exports, and the `grant:`
+on the enclosing sandbox is the only thing the Dock will fulfill for them. The
+sandbox is named `:repl` and reuses a small reusable capability profile so the
+grant is honest and auditable.
+
+The profile is just a module attribute — there is no `is:` keyword and no
+inheritance. We pass it as options to `sandbox/2`.
+
+@coder grant: [:fs, :exec], memory: "256mb", timeout: 60_000
+
+server sandbox :repl, @coder do
+  defmodule Tools do
+    @moduledoc "The coder's hands: read, edit, and run, nothing else."
+
+    # Read a file so the agent can reason about it before touching it.
+    def read_file(path) do
+      case File.read(path) do
+        {:ok, body} -> {:ok, body}
+        {:error, reason} -> {:error, {:read, path, reason}}
+      end
+    end
+
+    # Apply a single search/replace edit. We refuse a no-op so the loop
+    # can't spin forever "editing" without changing anything.
+    def edit_file(path, find, replace) do
+      with {:ok, body} <- File.read(path),
+           true <- String.contains?(body, find) || {:error, :not_found} do
+        File.write(path, String.replace(body, find, replace, global: false))
+      else
+        {:error, reason} -> {:error, {:edit, path, reason}}
+      end
+    end
+
+    # The only path off the wasm island: run a command in the sandbox.
+    # `:exec` is host-brokered — stdout/stderr/exit come back as data.
+    def run(cmd, args \\ []) do
+      case Sandbox.exec(cmd, args, timeout: 60_000) do
+        {out, 0} -> {:ok, out}
+        {out, code} -> {:error, {:exit, code, out}}
+      end
+    end
+
+    # Sugar over run/2 — the single command the loop cares about most.
+    def run_tests(focus), do: run("work", ["test", focus])
+  end
+end
+
+A few things are load-bearing here. `Sandbox.exec/3` is not `System.cmd/3`: it
+goes through the Dock membrane, so the `:exec` grant is what makes it work at
+all, and the worst a runaway tool can do is burn the `memory:`/`timeout:` budget
+on the sandbox before it is killed. The tools return our usual variant shape —
+`{:ok, value} | {:error, reason}` — because the observe step pattern-matches on
+exactly that.
+
+## The brain — a ReAct loop
+
+The agent is declared with `agent`. Its tools are the functions above; its model
+is a coding-tuned model; its system prompt tells it the *protocol*, not the
+answer. ReAct means every turn the model emits a **thought** and a single
+**action** (a tool call), we **observe** the result, append it to the trace, and
+loop. The loop ends when tests pass or we hit the wall-clock budget — there is no
+turn cap, only `timeout:`.
+
+agent :coder do
+  model "minimax/minimax-m3"
+  tools Tools.read_file/1, Tools.edit_file/3, Tools.run/2, Tools.run_tests/1
+
+  system """
+  You are a coding agent fixing a failing test in a workbook.
+  Work in strict ReAct turns: emit ONE thought, then ONE tool call.
+
+  Protocol:
+  1. Run the failing test to see the actual error.
+  2. Read the unit under test before editing it.
+  3. Make the smallest edit that could fix it.
+  4. Re-run the test. If green, stop. If red, observe and try again.
+
+  Never edit a test to make it pass. Fix the code under test.
+  """
+
+  # The trace is typed memory: an ordered list of Step structs. This IS
+  # the agent's working memory — there is no hidden state on the model.
+  defmodule Step do
+    defstruct thought: "", action: nil, observation: nil
+  end
+
+  # One turn of think -> act -> observe. The model proposes {thought, call};
+  # we run the call through the granted tools; we record what came back.
+  def turn(trace) do
+    %{thought: thought, call: call} = think(trace, model())
+    observation = act(call)
+    [%Step{thought: thought, action: call, observation: observation} | trace]
+  end
+
+  # Drive turns until the focus test is green or the budget is spent.
+  def fix(focus) do
+    Stream.iterate([], &turn/1)
+    |> Enum.find(fn trace -> solved?(focus, trace) end)
+  end
+
+  # We are done only when run_tests reports a clean pass as the latest
+  # observation. The trace, not a flag, is the source of truth.
+  defp solved?(focus, [%Step{action: {:run_tests, [^focus]}, observation: obs} | _]) do
+    match?({:ok, "ok " <> _}, obs)
+  end
+
+  defp solved?(_focus, _trace), do: false
+end
+
+## Reading the loop
+
+The shape is deliberately small. `think/2` is the only place the model is
+consulted; everything else is plain Elixir over the trace, so the agent's
+behaviour is inspectable and replayable. `act/1` (defined alongside `think/2`)
+just dispatches the proposed `{:tool, args}` tuple to the matching granted
+function and returns its `{:ok, _} | {:error, _}` — that variant is what the next
+`think/2` sees as the observation, which is how the model learns from a red test
+without us writing any special "error handling" branch.
+
+A concrete run against a broken [[Score]] looks like this trace, newest last:
+
+- *thought* "Run the score test to see the failure." → `run_tests("score")`
+  → `{:error, {:exit, 1, "expected 70, got 35"}}`
+- *thought* "Read score/1 before editing." → `read_file("03-lib/score.work")`
+  → `{:ok, "...revenue_points = lead.revenue / 2_000..."}`
+- *thought* "Divisor is doubled; halve it." →
+  `edit_file("03-lib/score.work", "/ 2_000", "/ 1_000")` → `:ok`
+- *thought* "Re-run." → `run_tests("score")` → `{:ok, "ok 1 passed"}` — **done.**
+
+## Where this sits
+
+The coder is the agent that keeps the **weave gate** honest: when `work bundle`
+runs the test suite and a red test would ship no bundle, the coder is what we
+point at the red unit to get it green again. It is the same `agent` primitive as
+the [[Analyst Agent]] — only the tools and the sandbox differ. The next file,
+[[Researcher Agent]], swaps the shell tools for search-and-verify and turns the
+same loop into a plan → search → verify → synthesize auto-researcher.

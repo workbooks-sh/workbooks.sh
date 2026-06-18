@@ -1,0 +1,273 @@
+# The Code Graph
+
+Everything you have read so far is a unit: [[score]] computes, [[enrich]] reaches
+the CRM, the [[pipeline]] orchestrates, [[chart]] paints, [[forecast]] does the
+heavy math, [[risk]] runs Python. Each file narrated its own job. This file does
+something different — it steps back and looks at the **whole workbook as one
+typed property graph**, where every unit is a node and every relationship between
+units is a typed edge.
+
+That graph is not a diagram we drew by hand. It is **extracted from the workbook
+itself** and kept in sync by the weave. When you run `work check`, `work why`, or
+`work near`, you are querying this graph. When a request flows through the running
+app, OpenTelemetry spans ride these same nodes. The graph of the sales app *is*
+the sales app, seen as structure instead of as text.
+
+## Three extractors feed one graph
+
+Nothing builds the graph by guessing. Three independent extractors each read a
+different layer of the same source, and their outputs are merged into one store.
+Disagreement between them is itself a signal — a `ref` the prose claims but the
+AST cannot find is a dangling edge the gate will flag.
+
+1. **The literate extractor** reads the prose and the markup: every `[[backlink]]`,
+   every inline `:atom` and `@Type` reference, every `#tag`. When this file says
+   the [[pipeline]] calls [[score]], that sentence becomes a candidate `ref` edge.
+2. **The per-language AST extractor** reads the code bodies — Elixir, Rust, Zig,
+   Python, Svelte — and finds the *real* call sites and dependencies. This is the
+   ground truth: it sees that `Pipeline.run/1` actually invokes `Score.score/1`.
+3. **The WIT extractor** reads the **generated** component contracts (the artifact
+   from [[contract]] you never hand-write). Each unit's exports and imports become
+   `import` edges at the wasm-component boundary — the cross-language seam.
+
+The merge is deliberate: prose tells you *intent*, the AST tells you *fact*, and
+the WIT tells you *the boundary the two will actually meet at*. A healthy node has
+all three agreeing.
+
+## The node and edge types
+
+A node is a unit. We do not invent a new shape for it — a graph node is just a
+record whose fields are inferred from their defaults, the same `defstruct` model
+[[Lead]] introduced. The `kind` is one of a small atom enum, and the
+`place` is the two-value placement enum the whole workbook is built on.
+
+defmodule Node do
+  defstruct id: nil,
+            kind: :compute,
+            place: :server,
+            lang: :elixir,
+            sandbox: nil,
+            file: "",
+            exports: [],
+            grants: []
+end
+
+@kinds [:compute, :flow, :island, :data, :agent, :kit, :sandbox]
+@places [:client, :server, :none]
+
+defmodule Edge do
+  defstruct from: nil, to: nil, type: :ref, via: nil
+end
+
+@edge_types [:import, :dataflow, :ref, :type, :tag]
+
+The edge `type` is the part that makes the graph *typed* rather than a bag of
+arrows. An `:import` edge is a real wasm-component dependency (extractor 3). A
+`:dataflow` edge means values move — a `Lead` produced here is consumed there. A
+`:ref` edge is a prose mention. A `:type` edge ties a unit to a struct or enum it
+speaks (`Lead`, `@statuses`). A `:tag` edge attaches a queryable `#tag`. Same
+node set, five overlaid relations.
+
+## The graph of this workbook
+
+Here is the graph assembled from the units you have already met. Read it as the
+sales app's own wiring diagram. Note that placement and sandbox are carried on the
+node, so a single query can ask structural *and* operational questions at once.
+
+defmodule SalesGraph do
+  @nodes [
+    %Node{id: :lead,     kind: :data,    place: :server, lang: :elixir, file: "05-data/leads.work", exports: [:query]},
+    %Node{id: :score,    kind: :compute, place: :server, lang: :elixir, file: "03-lib/score.work", exports: [:score]},
+    %Node{id: :enrich,   kind: :compute, place: :server, lang: :elixir, file: "03-lib/enrich.work", exports: [:enrich], grants: [{:net, "api.crm.com"}]},
+    %Node{id: :pipeline, kind: :flow,    place: :server, lang: :elixir, file: "03-lib/pipeline.work", exports: [:run]},
+    %Node{id: :tax,      kind: :compute, place: :server, lang: :elixir, sandbox: :pricing, file: "04-sandboxing/pricing.work", exports: [:quote]},
+    %Node{id: :fx,       kind: :compute, place: :server, lang: :elixir, sandbox: :rates, file: "04-sandboxing/pricing.work", exports: [:rate], grants: [:net]},
+    %Node{id: :forecast, kind: :compute, place: :server, lang: :rust, sandbox: :forecast, file: "09-weave/forecast.work", exports: [:project]},
+    %Node{id: :risk,     kind: :compute, place: :server, lang: :python, sandbox: :risk_box, file: "09-weave/risk.work", exports: [:risk_score]},
+    %Node{id: :chart,    kind: :island,  place: :client, lang: :svelte, file: "09-weave/chart.work", exports: [:render]},
+    %Node{id: :sparkline, kind: :island, place: :client, lang: :solid, file: "09-weave/sparkline.work", exports: [:render]},
+    %Node{id: :analyst,  kind: :agent,   place: :server, lang: :elixir, file: "07-agents/analyst.work", exports: [:draft]}
+  ]
+
+  @edges [
+    %Edge{from: :pipeline, to: :enrich,   type: :import},
+    %Edge{from: :pipeline, to: :score,    type: :import},
+    %Edge{from: :enrich,   to: :lead,     type: :dataflow, via: :Lead},
+    %Edge{from: :score,    to: :lead,     type: :dataflow, via: :Lead},
+    %Edge{from: :chart,    to: :lead,     type: :dataflow, via: :Lead},
+    %Edge{from: :tax,      to: :fx,       type: :import, via: :host_broker},
+    %Edge{from: :forecast, to: :score,    type: :dataflow},
+    %Edge{from: :risk,     to: :lead,     type: :type, via: :Lead},
+    %Edge{from: :analyst,  to: :score,    type: :ref},
+    %Edge{from: :analyst,  to: :enrich,   type: :ref}
+  ]
+
+  def nodes, do: @nodes
+  def edges, do: @edges
+
+  def node(id), do: Enum.find(@nodes, &(&1.id == id))
+
+  def out(id, type \\ :any) do
+    @edges
+    |> Enum.filter(&(&1.from == id and (type == :any or &1.type == type)))
+    |> Enum.map(& &1.to)
+  end
+
+  def into(id, type \\ :any) do
+    @edges
+    |> Enum.filter(&(&1.to == id and (type == :any or &1.type == type)))
+    |> Enum.map(& &1.from)
+  end
+end
+
+## `work check` — the gate query
+
+`work check` is the graph asking itself whether it is whole. It walks every edge
+and asks the merged store to resolve both endpoints. A `:ref` edge from the prose
+with no matching `:import` or `:dataflow` from the AST is a **dangling mention**;
+a unit that exports a function nobody imports is a **dead node**; a cross-sandbox
+edge that is not `via: :host_broker` is a **capability leak**. The weave runs this
+before it bundles, which is why a red check ships no `salesapp.html`.
+
+defmodule Check do
+  alias SalesGraph, as: G
+
+  def run do
+    dangling = for e <- G.edges(), G.node(e.from) == nil or G.node(e.to) == nil, do: e
+
+    leaks =
+      for e <- G.edges(),
+          e.type == :import,
+          a = G.node(e.from),
+          b = G.node(e.to),
+          a && b && a.sandbox != b.sandbox,
+          e.via != :host_broker,
+          do: {e.from, e.to}
+
+    dead =
+      for n <- G.nodes(),
+          n.exports != [],
+          G.into(n.id) == [],
+          n.kind not in [:agent, :island],
+          do: n.id
+
+    %{dangling: dangling, leaks: leaks, dead: dead}
+  end
+end
+
+The cross-sandbox guard is the same rule [[tax]] and [[fx]] obey at runtime: caps
+flow by **grant**, not inheritance, so any `:import` that crosses a `sandbox`
+boundary must be marked host-brokered or the check refuses it. The graph encodes
+the security model, not just the call structure.
+
+## `work why` — explain a path
+
+`work why :tax :net` answers "why does the pricing sandbox touch the network?" by
+finding the path from a node to a capability. It is a typed breadth-first walk:
+follow `:import` and `:dataflow` edges outward until you reach a node carrying the
+grant. The answer is the chain, so the reason is legible rather than asserted.
+
+defmodule Why do
+  alias SalesGraph, as: G
+
+  def path(from, grant) do
+    walk([[from]], grant, MapSet.new([from]))
+  end
+
+  defp walk([], _grant, _seen), do: :no_path
+
+  defp walk([[head | _] = path | rest], grant, seen) do
+    node = G.node(head)
+
+    if node && Enum.any?(node.grants, &grant_matches?(&1, grant)) do
+      Enum.reverse(path)
+    else
+      next =
+        for to <- G.out(head),
+            to not in seen,
+            do: [to | path]
+
+      walk(rest ++ next, grant, MapSet.union(seen, MapSet.new(G.out(head))))
+    end
+  end
+
+  defp grant_matches?(:net, :net), do: true
+  defp grant_matches?({:net, _host}, :net), do: true
+  defp grant_matches?(g, g), do: true
+  defp grant_matches?(_, _), do: false
+end
+
+For `:tax → :net` the walk crosses the host-brokered `:import` into [[fx]], whose
+node carries `grant: [:net]`, and returns `[:tax, :fx]` — the pricing sandbox
+reaches the network *only* through `fx`'s rate lookup, exactly as designed. If the
+path came back `:no_path`, a grant in the source is unjustified and should be
+removed; the graph turns least-privilege into a checkable property.
+
+## `work near` — the neighbourhood
+
+`work near :lead` returns the units that touch the `Lead` struct — the blast
+radius of a type change. Because edges are typed we can scope the question:
+`:dataflow` neighbours move `Lead` values; `:type` neighbours merely speak the
+shape. Both matter when you add a field to [[Lead]].
+
+defmodule Near do
+  alias SalesGraph, as: G
+
+  def of(id, hops \\ 1) do
+    expand(MapSet.new([id]), hops)
+    |> MapSet.delete(id)
+    |> Enum.sort()
+  end
+
+  defp expand(frontier, 0), do: frontier
+
+  defp expand(frontier, hops) do
+    grown =
+      Enum.reduce(frontier, frontier, fn id, acc ->
+        acc
+        |> MapSet.union(MapSet.new(G.out(id)))
+        |> MapSet.union(MapSet.new(G.into(id)))
+      end)
+
+    if MapSet.equal?(grown, frontier), do: grown, else: expand(grown, hops - 1)
+  end
+end
+
+`Near.of(:lead)` yields `[:chart, :enrich, :risk, :score]` — every unit that would
+need a glance if `Lead` grew a field. That is the practical payoff of the graph: a
+change's reach is a query, not a memory of who-touches-what.
+
+## OpenTelemetry rides the nodes
+
+The graph is not only a build-time artifact. The same node ids are the **span
+names** the runtime emits. When the [[pipeline]] runs on the nexus, each unit it
+calls opens a span keyed by its node id, so a trace in production is a *walk of the
+build-time graph* with live latencies hung on it. The structural edge
+`pipeline → enrich` and the runtime span `pipeline → enrich (412ms)` are the same
+edge, observed two ways.
+
+defmodule Trace do
+  alias SalesGraph, as: G
+
+  def span(node_id, fun) do
+    n = G.node(node_id)
+
+    attrs = %{
+      "wb.kind" => n.kind,
+      "wb.place" => n.place,
+      "wb.lang" => n.lang,
+      "wb.sandbox" => n.sandbox
+    }
+
+    :otel_tracer.with_span(node_id, %{attributes: attrs}, fn _ctx ->
+      fun.()
+    end)
+  end
+end
+
+Because `place` and `sandbox` ride on every span, a latency outlier is immediately
+attributable to a tier: a slow `:client` island is a hydration problem, a slow
+`sandbox: :rates` span is the `fx` network grant, a slow native-server span is the
+BEAM. The code graph is the join key between *how the workbook is built* and *how
+it behaves* — one typed graph, queried at the gate by `work check`, explained by
+`work why`, scoped by `work near`, and observed in flight by every span.

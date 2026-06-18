@@ -1,0 +1,140 @@
+# Risk
+
+Scoring tells us how *attractive* a lead is. **Risk** tells us how likely the
+deal is to **fall apart** — a thin domain, a tiny headcount masquerading as
+enterprise revenue, numbers that don't hang together. The [[Score]] unit ranks
+upside; `:risk` flags downside. The two travel together into the [[Dashboard]].
+
+We write `:risk` in **Python**. Not because Elixir couldn't do this — it could —
+but because the riskiest part of the model is a feature transform a data person
+would naturally write in Python, and the format lets us **place a foreign
+language unit beside the native ones without a rewrite**. This is the same trick
+[[Forecast]] uses with Rust and Zig: the unit's contract is its module shape, the
+weave compiles the body to wasm, and the polyglot units interoperate over the
+Component Model. Here we prove it once more, in a third language.
+
+## Placement: foreign language, server tier, sandboxed
+
+`:risk` runs on the **server** — it sits next to [[Enrich]] and [[Score]], reads
+the same `Lead` values, and ships in the nexus SSR delivery mode. But "server"
+for a Python unit does **not** mean native Python on your box. A foreign-language
+unit placed on the server compiles to **wasm and runs as a sandboxed unit beside
+the BEAM**. Native Elixir is the trusted tier; the Python wasm box is the
+isolated tier the host brokers caps to.
+
+So the placement word `server` answers *where* (the trusted backend), and the
+language word `python` plus the enclosing `sandbox` answer *how* (a wasm
+isolation unit). We give it no grants — risk is **pure**: it reads lead features
+and returns a number. No net, no kv, no secrets. The narrowest possible cap
+surface is the right one for a scoring kernel.
+
+sandbox :risk_box, grant: [], memory: "64mb", timeout: 10_000 do
+  python :risk, of: Lead do
+    # The contract is still the Elixir module shape that wraps this unit:
+    # input is a %Lead{} value, output is an integer 0..100. Python is the
+    # body; the boundary types are inferred from Lead's defstruct and from
+    # the integer we return. No WIT is written by hand — the weave generates
+    # the component interface from these facts.
+
+    def risk_score(lead):
+        # Pull the same fields Score reads, so the two models stay comparable.
+        revenue   = lead["revenue"]
+        employees = lead["employees"]
+        domain    = lead["domain"] or ""
+        status    = lead["status"]
+
+        risk = 0
+
+        # 1. Implausible revenue-per-head. A 20-person shop claiming $50k is
+        #    fine; a 4-person shop claiming $5M is a data-quality red flag.
+        per_head = revenue / employees if employees else revenue
+        if per_head > 50_000:
+            risk += 30
+        elif per_head > 20_000:
+            risk += 15
+
+        # 2. Thin or missing domain. No web presence => hard to verify, hard
+        #    to enrich, easy to mis-attribute. A bare ".io"/".co" with nothing
+        #    in front is weaker signal than a full ".com".
+        if not domain:
+            risk += 40
+        else:
+            tld = domain.rsplit(".", 1)[-1]
+            if tld not in ("com", "org", "net"):
+                risk += 10
+            if len(domain) < 6:
+                risk += 10
+
+        # 3. Unprocessed leads carry pipeline risk: we haven't enriched or
+        #    scored them yet, so anything we say about them is provisional.
+        if status == "new":
+            risk += 20
+        elif status == "enriched":
+            risk += 5
+
+        # Clamp to the 0..100 band the dashboard expects.
+        return max(0, min(100, risk))
+  end
+end
+
+## Why these features and not the score
+
+Notice `:risk` deliberately reads the **raw features** — `revenue`,
+`employees`, `domain`, `status` — and never the `score` field. That keeps the
+two models **independent**: a lead can be high-score *and* high-risk (Initech is
+attractive but we still want to know if its numbers are self-consistent). If
+risk just re-derived score we'd learn nothing new. The code graph records this:
+`:risk` has dataflow edges from the `Lead` struct fields, not a ref edge to
+`:score`. `work why :risk` will show exactly which fields it depends on.
+
+## Running it over the seed leads
+
+The pipeline passes each enriched lead through `:risk` the same way it passes
+them through [[Score]] — a foreign-language call from native Elixir is just a
+brokered call across the sandbox boundary; the caller doesn't know or care that
+the callee is Python-in-wasm.
+
+run :risk_demo do
+  leads = [
+    %Lead{name: "Acme",    domain: "acme.co",     revenue: 50_000, employees: 20, score: 70, status: :scored},
+    %Lead{name: "Globex",  domain: "globex.io",   revenue: 12_000, employees: 8,  score: 41, status: :enriched},
+    %Lead{name: "Initech", domain: "initech.com", revenue: 90_000, employees: 55, score: 88, status: :scored}
+  ]
+
+  # risk_score/1 crosses into :risk_box; the host marshals the %Lead{} to the
+  # wasm unit and marshals the integer back. Pure unit, no grants exercised.
+  scored = Enum.map(leads, fn lead ->
+    {lead.name, :risk.risk_score(lead)}
+  end)
+
+  # Acme: per_head 2_500 (+0), full .com? no — short ".co" tld (+10) +short? no
+  #       -> low risk. Globex: per_head 1_500, ".io" tld (+10), enriched (+5).
+  #       Initech: per_head ~1_636, clean ".com", scored -> lowest risk.
+  Enum.sort_by(scored, fn {_name, r} -> r end)
+end
+
+## How the dashboard uses it
+
+The [[Dashboard]] renders a **risk badge** beside each lead's score: green under
+20, amber to 50, red above. A lead that scores well *and* clears risk is a
+"clean" lead the analyst agent will draft outreach for first; a high-score
+high-risk lead gets surfaced for a human to sanity-check before any agent
+touches it. That gate lives in the board logic, not here — `:risk` only produces
+the number.
+
+## What this file taught
+
+- A **foreign-language unit** (`python :risk`) lives on the **server** tier but
+  runs as a **sandboxed wasm unit** beside the BEAM — placement says *where*,
+  the language + `sandbox` say *how*. "Server" never means "Elixir-in-wasm".
+- The unit's **contract is still its Elixir module shape** (`%Lead{}` in,
+  integer out). WIT is generated from that, never hand-written.
+- A **pure** compute unit takes **no grants** (`grant: []`) — the narrowest cap
+  surface for a kernel that only reads features and returns a number.
+- It stands beside [[Forecast]]'s Rust + Zig and [[Score]]'s native Elixir: one
+  authoring model, three languages, all interoperating over the Component Model
+  because every unit compiles to a standard wasm component.
+
+Next, [[Forecast]] does the heavy numeric work in Rust orchestrating a Zig
+kernel; then everything folds into the [[Dashboard]] and ships through the
+[[Weave]].

@@ -1,0 +1,216 @@
+# Researcher
+
+Before the analyst can draft a single line of outreach, somebody has to *know
+something* about the account. Who are they, what changed recently, why would
+they care about us this quarter? That is research, and on this workbook it is
+not a human chore — it is an agent. This file builds the **auto-researcher**: a
+brain that takes a ranked [[Lead]] and produces a short, sourced dossier by
+running a loop — **plan, search, verify, synthesize** — until it has enough to
+hand off.
+
+An auto-researcher is the second agent shape this workbook teaches (the first,
+the ReAct coding agent, lives in [[Coder]]). Where ReAct interleaves thought and
+action freely, the auto-researcher has a **fixed shape**: it decides *what it
+needs to find out*, goes and finds it, checks that what it found is actually
+true, and only then writes it up. The discipline is the point. A research loop
+that skips the verify step is just a confident hallucinator, and a sales dossier
+built on a hallucination is worse than no dossier at all.
+
+## Where it runs and why
+
+The agent's loop runs on the **server**, the nexus tier. That is not a stylistic
+choice. The loop needs the network to search, it needs to call an LLM with a
+real key, and it keeps memory across iterations — all three are server
+capabilities. The browser never sees the key and never makes the search calls;
+it only renders the finished dossier. So the agent runs on the **server** — its
+loop has a real body that runs on the nexus, exactly like the production
+agents in the runtime. (Contrast a pure *definition*, which has no body to run
+and so takes no placement at all.)
+
+A brain is three things: a **system prompt** (who it is), a **model** (what
+thinks), and **tools** (what it can do). Tools are the only way the brain
+touches the world, and each tool is a grant the [[Dock]] fulfils. Here it gets
+exactly two: web search, and a fetch-and-read. Nothing else — no filesystem, no
+shell. A researcher that cannot write files cannot wreck anything.
+
+We isolate the whole thing in a named sandbox so those two grants are the
+*only* capabilities the loop ever holds. The sandbox profile is a plain module
+attribute, reused so the policy lives in one place:
+
+@research grant: [:net], memory: "256mb", timeout: 120_000
+
+The `:net` grant is scoped at the tool boundary to the search and fetch
+endpoints; the brain cannot open arbitrary sockets just because it can search.
+Caps flow by grant, not by inheritance — nesting a tool inside this sandbox does
+not hand it the model key unless the key is granted too.
+
+## The dossier it produces
+
+The loop's output is a typed value, not loose prose. We give it a `Dossier`
+struct so the analyst downstream gets a stable shape to read, and so a half-done
+dossier (no findings yet, not verified) is structurally distinct from a finished
+one. Field types are inferred from the defaults — a string stays a string, a
+list stays a list, `verified?` is a boolean.
+
+defmodule Dossier do
+  defstruct account: "",
+            domain: "",
+            summary: "",
+            findings: [],
+            sources: [],
+            verified?: false
+end
+
+A single finding is just a tagged tuple — a claim paired with the source URL it
+came from. Keeping the source welded to the claim is what makes the verify step
+possible at all: `{:fact, "Initech raised a Series B in March", "https://…"}`.
+The variant `{:ok, %Dossier{}} | {:error, reason}` is what the loop ultimately
+returns, so a caller can pattern-match success from a dead end.
+
+## The brain
+
+Here is the agent itself. The system prompt fixes the loop's discipline; the
+model and tools fix its reach. Everything below `sandbox :research` is inside the
+two-grant boundary.
+
+sandbox :research, @research do
+  agent :researcher do
+    @moduledoc """
+    Auto-researcher. Given a ranked %Lead{}, produce a sourced %Dossier{} by
+    looping plan -> search -> verify -> synthesize. Output is typed and every
+    finding carries its source. Never invents a fact it cannot cite.
+    """
+
+    model "minimax/minimax-m3"
+
+    system """
+    You research B2B sales accounts. You work in a strict loop:
+
+      1. PLAN     — list the 3-5 questions whose answers would actually change
+                    how we sell to this account (funding, headcount, tech
+                    stack, recent news, a relevant pain).
+      2. SEARCH   — for each open question, search the web. Read the most
+                    promising result in full before believing it.
+      3. VERIFY   — never keep a claim you cannot tie to a specific source.
+                    If two sources disagree, prefer the primary one and note
+                    the conflict. Drop anything you cannot stand behind.
+      4. SYNTHESIZE — once the questions are answered, write a tight summary
+                    and a short list of cited findings. Stop.
+
+    You may NOT invent revenue, names, or events. A missing answer is a fine
+    outcome; a fabricated one is a failure. Cite every finding.
+    """
+
+    # The only two doors to the world. Each is a granted capability the Dock
+    # fulfils over :net — no filesystem, no shell, no model key leaked to them.
+    tool :search, "search the web; returns ranked {title, url, snippet}" do
+      query -> Search.web(query, limit: 6)
+    end
+
+    tool :read, "fetch a url and return clean readable text" do
+      url -> Fetch.readable(url)
+    end
+  end
+end
+
+## The loop as a flow
+
+The brain *can* loop on its own, but on this workbook we make the loop
+**explicit** as a flow so it is inspectable and testable — you can see each
+stage in the code graph and a red test on `verify` ships no bundle. The flow
+drives the brain stage by stage, threading the growing `Dossier` through. This
+is the same `step`/`from:` orchestration [[Pipeline]] uses, now wrapped around an
+agent instead of pure compute.
+
+flow :research_account do
+  @moduledoc """
+  Run the auto-researcher loop over one lead and return {:ok, %Dossier{}}.
+  plan -> search -> verify -> synthesize, looped until the plan is answered
+  or the iteration budget runs out.
+  """
+
+  # Stage 1 — PLAN. Ask the brain for the handful of questions worth chasing.
+  # We seed a fresh Dossier from the lead so every later stage has a typed home
+  # to write into.
+  step :plan, from: :lead do
+    dossier = %Dossier{account: lead.name, domain: lead.domain}
+    questions = Researcher.plan(lead)
+    {dossier, questions}
+  end
+
+  # Stage 2 — SEARCH. For each open question, the brain searches and reads.
+  # The questions are independent, so we fan out — same parallel-for-independence
+  # rule as the enrich stage in [[Pipeline]]. Each task comes back with raw
+  # candidate findings still tagged with their source url.
+  step :search, from: :plan do
+    {dossier, questions} = plan
+    candidates =
+      parallel questions, max_concurrency: 4, timeout: 60_000 do
+        question -> Researcher.investigate(question)
+      end
+    {dossier, List.flatten(candidates)}
+  end
+
+  # Stage 3 — VERIFY. The stage that earns the agent its keep. We re-read each
+  # candidate's source and keep only the claims the source actually supports.
+  # Anything unsupported is dropped, not softened. The surviving findings are
+  # what the dossier is allowed to assert.
+  step :verify, from: :search do
+    {dossier, candidates} = search
+    findings =
+      Enum.filter(candidates, fn {:fact, claim, url} ->
+        Researcher.supported?(claim, url)
+      end)
+    sources = findings |> Enum.map(fn {:fact, _, url} -> url end) |> Enum.uniq()
+    {%Dossier{dossier | findings: findings, sources: sources}, candidates}
+  end
+
+  # Stage 4 — SYNTHESIZE. Hand the brain the verified findings and ask for a
+  # tight summary. We stamp verified? true only once we are here with real,
+  # source-backed findings — never before.
+  step :synthesize, from: :verify do
+    {dossier, _} = verify
+    summary = Researcher.write_summary(dossier)
+    {:ok, %Dossier{dossier | summary: summary, verified?: true}}
+  end
+end
+
+## Why the verify stage is non-negotiable
+
+It is tempting to collapse `:search` and `:synthesize` and let the model write
+straight from its search results. Do not. The whole reason an *auto*-researcher
+beats a one-shot prompt is the explicit `:verify` checkpoint: it re-opens each
+source and confirms the source truly says what the candidate finding claims.
+Claims that survive go in; claims that do not are dropped on the floor. That is
+the difference between a dossier the analyst can quote in front of a prospect and
+a generator of plausible nonsense.
+
+This also makes the agent **measurable**. Because every finding is a
+`{:fact, claim, url}` tuple and `verified?` only flips true after the filter, a
+test can assert that no finding in a finished dossier lacks a source, and that an
+unverified dossier never reaches the analyst. That assertion runs at the weave
+gate — a researcher that emits an uncited fact fails the build.
+
+## Handoff
+
+A finished dossier flows straight into the rest of the workbook. The analyst
+agent reads `dossier.summary` and `dossier.findings` to ground its outreach
+draft, so the email it writes cites something real instead of guessing. The
+[[Plan]] gets a `%Task{title: "Research Initech", status: :done, owner: nil,
+ref: dossier}` once the loop returns `{:ok, _}`, closing the loop between
+"we should look into this account" and "here is what we found".
+
+case Research.run(lead) do
+  {:ok, dossier} ->
+    publish(:dossier, dossier)
+    Board.complete("Research #{lead.name}", ref: dossier)
+
+  {:error, reason} ->
+    # A dead end is a real outcome — record it, do not fabricate a dossier.
+    Board.flag("Research #{lead.name}", reason)
+end
+
+The auto-researcher is the same one authoring model as every other unit here: a
+brain is a module, its tools are grants, its loop is a flow, and its output is a
+typed struct. Learn the loop — plan, search, verify, synthesize — and you have
+learned the shape every research agent on the platform runs.
