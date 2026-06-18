@@ -73,7 +73,16 @@ defmodule Nexus.Config do
     }
   end
 
-  defp default_cache_dir, do: Path.join([File.cwd!(), "build", "components"])
+  @doc """
+  The persistent data root — the mounted volume (`WB_DATA`, e.g. `/data` in the libkrun VM / Fly
+  machine), falling back to the cwd in dev. `WB_DATA` is the volume MOUNT PATH (deploy injection, set
+  by the orchestrator), not a tunable knob — so reading it here is the legitimate kind of env, like
+  `NEXUS_TENANT`. The local cache tier lives UNDER this so it survives restarts; the container rootfs
+  would be wiped on every machine churn.
+  """
+  def data_dir, do: System.get_env("WB_DATA") || File.cwd!()
+
+  defp default_cache_dir, do: Path.join([data_dir(), "build", "components"])
 
   # Mirror the reactor's lightweight reader: find the attribute on the <work-deploy> open tag. No
   # full HTML parser needed for a flat attribute list.

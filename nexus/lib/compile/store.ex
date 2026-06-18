@@ -47,11 +47,13 @@ defmodule Nexus.Compile.Store do
   # ── tiers ─────────────────────────────────────────────────────────────────────────────────────
   defp local_path(key), do: Path.join(local_dir(), key <> ".component.wasm")
 
-  # Local-only mode keeps blobs at the configured dir; remote mode uses a default hot dir in front.
+  # Local-only mode keeps blobs at the configured dir; remote mode uses a default hot dir on the
+  # persistent data volume (survives VM/machine restart — losing it only forces a re-pull from the
+  # durable remote, never a recompile).
   defp local_dir do
     case spec() do
       {:local, dir} -> dir
-      {:remote, _} -> Path.join([File.cwd!(), "build", "components"])
+      {:remote, _} -> Path.join([Nexus.Config.data_dir(), "build", "components"])
     end
   end
 
