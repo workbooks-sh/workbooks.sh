@@ -74,7 +74,51 @@ defmodule Nexus.Weave do
     <style>#{css()}</style></head>
     <body>
     #{nav(pages)}#{body}
+    #{data_islands(res)}<script>#{js_shim()}</script>
     </body></html>
+    """
+  end
+
+  # The BAKED data backend: each resource's Store rows inlined as a JSON island the browser reads
+  # — a generated data payload (allowed; never parsed in Elixir to render). Makes the woven file
+  # carry its own data, fully local. The server/SQLite backends slot in behind the same nexus.data.
+  defp data_islands(res) do
+    for {name, {:resource, mod}} when not is_nil(mod) <- res, into: "" do
+      rows = Nexus.Store.all(mod) |> Enum.map(&row_to_map/1)
+      # html_safe escapes `<`/`>`/`&` so a `</script>` in data can't break out of the island (XSS).
+      ~s(<script type="application/nexus-data" data-resource="#{esc(name)}">#{Jason.encode!(rows, escape: :html_safe)}</script>\n)
+    end
+  end
+
+  defp row_to_map(struct) do
+    struct |> Map.from_struct() |> Map.new(fn {k, v} -> {k, jsonable(v)} end)
+  end
+
+  # enum atoms → strings for the JSON payload (bool/nil stay native).
+  defp jsonable(v) when is_atom(v) and v not in [true, false, nil], do: to_string(v)
+  defp jsonable(v), do: v
+
+  # window.nexus.data — the browser mirror of Nexus.Store. Baked islands first; falls back to the
+  # server endpoint (/data/<Resource>). The local SQLite backend plugs into the same API later.
+  defp js_shim do
+    """
+    window.nexus = window.nexus || {};
+    nexus.data = {
+      _baked: null,
+      _load() {
+        if (this._baked) return this._baked;
+        this._baked = {};
+        document.querySelectorAll('script[type="application/nexus-data"]').forEach(s => {
+          this._baked[s.dataset.resource] = JSON.parse(s.textContent || '[]');
+        });
+        return this._baked;
+      },
+      all(resource) {
+        const baked = this._load()[resource];
+        if (baked) return Promise.resolve(baked);
+        return fetch('/data/' + encodeURIComponent(resource)).then(r => r.ok ? r.json() : []);
+      }
+    };
     """
   end
 

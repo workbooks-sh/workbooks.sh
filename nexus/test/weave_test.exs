@@ -80,6 +80,29 @@ defmodule Nexus.WeaveTest do
     assert html =~ "Ghost"
   end
 
+  test "the baked data backend inlines rows as a JSON island + the nexus.data shim" do
+    dir = wb("resource Item do\n  name :text\n  tag :hot | :cold\nend\n\nshow Item\n")
+    mod = res_of(dir)
+    Nexus.Store.clear(mod)
+    Nexus.Store.create(mod, %{name: "Soup", tag: :hot})
+
+    html = Nexus.Weave.weave(dir)
+    assert html =~ ~s(<script type="application/nexus-data" data-resource="Item">)
+    assert html =~ ~s("name":"Soup") and html =~ ~s("tag":"hot")
+    assert html =~ "nexus.data = {" and html =~ "fetch('/data/'"
+  end
+
+  test "a `</script>` payload in baked data is html-escaped (can't break out of the island)" do
+    dir = wb("resource Item do\n  name :text\nend\n\nshow Item\n")
+    mod = res_of(dir)
+    Nexus.Store.clear(mod)
+    Nexus.Store.create(mod, %{name: "</script><script>alert(1)</script>"})
+
+    html = Nexus.Weave.weave(dir)
+    refute html =~ "</script><script>alert(1)"
+    assert html =~ "\\u003c"
+  end
+
   @tag :compiler
   @tag timeout: 360_000
   test "show <Unit> bakes the unit's render() output into the page, across rust/c/zig" do
