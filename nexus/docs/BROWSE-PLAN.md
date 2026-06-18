@@ -37,6 +37,23 @@ Grind to completion; commit each win; honest caveats; keep the suite green.
 - A DOM text-walk in render-core → `render`/`scrape` returns clean rendered text (agents want text).
 - bash builtins: `render <url>`, `screenshot <url>`, `scrape <url>` (render-then-text), `search`.
 
+## Extraction roadmap (structured output — beyond raw text)
+
+Once a page is rendered (Blitz DOM, JS-run), the DOM is a rich structured source. Build these
+extraction modes on top of it:
+
+- **HTML → Markdown** — convert a rendered page (or a subtree) to clean Markdown for agents/LLMs
+  (headings, lists, links, tables, code). The DOM walk already exists (`rendered_text`); this is a
+  Markdown-emitting variant.
+- **Explicit CSS capture** — return the page's styles (the frozen/inlined CSS, computed styles per
+  node) as a queryable artifact, not just baked into the render.
+- **Media link capture** — extract all media references (`<img>`/`<video>`/`<audio>`/`<source>`/
+  background-image `url()`/`<link>` icons) as a resolved, absolute URL list.
+- **Component query / "recordable components"** — query the rendered DOM by component TYPE: "all
+  buttons", "all cards", "all forms/inputs", by tag/role/class/selector → structured records
+  (text, attrs, position, the subtree). So an agent can `components(url, "button")` or
+  `components(url, ".card")` and get a list. The Blitz DOM + `query_selector_all` is the substrate.
+
 ## Done when
 An agent can `render`/`screenshot`/`scrape` real pages of varying difficulty — static, SSR, anti-bot,
 and SPA — with the render running in wasmtime. Tested, demoed, documented, suite green, pushed.
