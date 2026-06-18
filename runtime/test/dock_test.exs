@@ -3,6 +3,23 @@ defmodule Workbooks.DockTest do
   alias Workbooks.{Dock, Literate, Wit}
   alias Workbooks.Instance.Imports
 
+  test "wit/engine.wit is generated from the Dock registry and stays in sync" do
+    world = Dock.engine_world()
+
+    # the committed file is exactly what the registry generates (drift guard)
+    assert File.read!("wit/engine.wit") == world
+
+    # it covers every runtime capability the seam projects + session-info + run —
+    # incl. llm-complete, which the old hand-written file was missing
+    assert world =~ "import llm-complete: func(prompt: string) -> string;"
+    assert world =~ "import session-info: func() -> string;"
+    assert world =~ "export run: func(input: string) -> string;"
+
+    for cap <- Dock.runtime_capabilities() do
+      assert world =~ "import #{Dock.import_name(cap)}:"
+    end
+  end
+
   test "the registry is the union of sandbox caps and the live runtime seam caps" do
     assert "net" in Dock.sandbox_capabilities()
     assert "llm" in Dock.runtime_capabilities()

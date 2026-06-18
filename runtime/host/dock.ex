@@ -24,12 +24,16 @@ defmodule Workbooks.Dock do
     "secrets" => %{interface: "host-secrets", wit: "interface host-secrets {\n  read: func(key: string) -> string;\n}", sandbox?: true},
     "fs" => %{interface: "host-fs", wit: "interface host-fs {\n  read: func(path: string) -> string;\n  write: func(path: string, data: string);\n}", sandbox?: true},
     "exec" => %{interface: "host-exec", wit: "interface host-exec {\n  run: func(cmd: string, args: list<string>) -> string;\n}", sandbox?: true},
-    "vfs" => %{import: "vfs-query"},
-    "commands" => %{import: "run-command"},
-    "llm" => %{import: "llm-complete"},
-    "browse" => %{import: "browse-fetch"},
-    "parallel" => %{import: "run-command-many"}
+    "vfs" => %{import: "vfs-query", sig: "func(sql: string) -> string"},
+    "commands" => %{import: "run-command", sig: "func(command: string, input: string, args: list<string>) -> string"},
+    "llm" => %{import: "llm-complete", sig: "func(prompt: string) -> string"},
+    "browse" => %{import: "browse-fetch", sig: "func(url: string) -> string"},
+    "parallel" => %{import: "run-command-many", sig: "func(command: string, inputs: string) -> string"}
   }
+
+  # the always-present imports / the entrypoint export that bookend the engine world
+  @engine_always "import session-info: func() -> string;"
+  @engine_export "export run: func(input: string) -> string;"
 
   # The RustDock core-module ABI transport: each capability projects one or more
   # `env.host_*` ptr/len imports. Recorded here so the Dock registry is the union of
@@ -96,4 +100,22 @@ defmodule Workbooks.Dock do
 
   @doc "The raw registry map."
   def registry, do: @registry
+
+  @doc """
+  Generate the `workbooks:engine` Dock world from the registry — the typed surface a
+  Workbook Instance runs against (session-info + every runtime capability's import +
+  the `run` entrypoint). This replaces the hand-written `wit/engine.wit`: the world
+  falls out of the registry, so it can't drift from the seam that projects it.
+  """
+  def engine_world do
+    imports =
+      for {_cap, %{import: name, sig: sig}} <- @registry,
+          do: "import #{name}: #{sig};",
+          into: []
+
+    body = [@engine_always | Enum.sort(imports)] ++ [@engine_export]
+
+    "package workbooks:engine;\n\nworld engine {\n" <>
+      Enum.map_join(body, "\n", &("  " <> &1)) <> "\n}\n"
+  end
 end
