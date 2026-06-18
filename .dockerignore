@@ -42,3 +42,4 @@ nexus/build/jsdom
 
 # stale prebuilt rustler NIF (host-arch .so) — force deps.compile to build the linux NIF
 **/priv/native/*.so
+nexus/build/components

@@ -23,17 +23,77 @@ defmodule Nexus.Compile do
       kind == "agent" -> {:agent, Nexus.Agent.def_from_unit(node)}
       kind == "check" -> {:check, Nexus.Checks.parse(node)}
       kind == "toolkit" -> {:toolkit, Nexus.Toolkit.build(node)}
-      # The wasm lanes shell heavy wasmtime compiler processes — gate them so concurrent compiles are
-      # bounded (WB_COMPILE_CONCURRENCY) and a burst queues instead of OOM-ing the host.
-      kind == "rust" -> {:wasm, Nexus.Compile.Gate.with_slot(fn -> rust_unit(node) end)}
-      kind in ~w(c cpp) -> {:wasm, Nexus.Compile.Gate.with_slot(fn -> c_unit(node) end)}
-      kind == "zig" -> {:wasm, Nexus.Compile.Gate.with_slot(fn -> zig_unit(node) end)}
+      # The wasm lanes shell heavy wasmtime compiler processes (~450–900MB, ~7–20s, near-constant
+      # regardless of source size — it's the compiler+stdlib working set, not the user's code). So we
+      # NEVER compile the same thing twice: `cached/2` content-addresses the result, and only a COLD
+      # MISS runs the real build (gated by WB_COMPILE_CONCURRENCY). A hit is a hash lookup → the same
+      # `.wasm` is served to every tenant/request, fleet-wide, forever. This is what makes the
+      # multi-tenant server cheap: pay the gigabyte ONCE per unique program, not per call.
+      kind == "rust" -> {:wasm, cached(node, fn -> rust_unit(node) end)}
+      kind in ~w(c cpp) -> {:wasm, cached(node, fn -> c_unit(node) end)}
+      kind == "zig" -> {:wasm, cached(node, fn -> zig_unit(node) end)}
       kind in @wasm_kinds -> {:wasm, {:todo, node.lang, node.name}}
       true -> {:skip, kind}
     end
   end
 
   def unit(_), do: {:skip, :not_a_unit}
+
+  # ── content-addressed compile cache ──────────────────────────────────────────────────────────
+  # Bump when the compilers change (their output for the same source changes). Overridable via env so
+  # a deployment can invalidate the whole store without a code change.
+  @cache_salt "wbc1"
+
+  @doc """
+  Run `build` (a real wasm compile) ONLY on a cache miss; otherwise return the already-built
+  component. The key is `sha256(salt + kind + name + body + grants)` — every input that changes the
+  output. The store is content-addressed and shared, so identical source compiled by ANY caller hits.
+  On a hit the gate is never touched (no slot, no wasmtime). Failures are NOT cached.
+  """
+  def cached(node, build) do
+    if cache_enabled?() do
+      key = cache_key(node)
+      path = Path.join(cache_dir(), key <> ".component.wasm")
+
+      if File.exists?(path) do
+        {:ok, path}
+      else
+        # Miss: pay the real cost ONCE, under the concurrency gate, then store atomically.
+        case Nexus.Compile.Gate.with_slot(build) do
+          {:ok, comp} -> store(path, comp)
+          other -> other
+        end
+      end
+    else
+      Nexus.Compile.Gate.with_slot(build)
+    end
+  end
+
+  defp store(path, comp) do
+    File.mkdir_p!(cache_dir())
+    tmp = path <> ".#{System.unique_integer([:positive])}.tmp"
+    File.cp!(comp, tmp)
+    File.rename!(tmp, path)
+    {:ok, path}
+  end
+
+  defp cache_key(%{kind: k, name: n, body: b} = node) do
+    grants = node |> safe_grants() |> Enum.sort() |> Enum.join(",")
+    salt = System.get_env("WB_COMPILE_CACHE_VER") || @cache_salt
+    :crypto.hash(:sha256, [salt, 0, k, 0, n, 0, b, 0, grants]) |> Base.encode16(case: :lower)
+  end
+
+  defp safe_grants(node) do
+    Nexus.Audit.granted(node)
+  rescue
+    _ -> []
+  end
+
+  defp cache_dir do
+    System.get_env("WB_COMPONENT_CACHE") || Path.join([File.cwd!(), "build", "components"])
+  end
+
+  defp cache_enabled?, do: System.get_env("WB_COMPILE_CACHE") != "0"
 
   # A `rust` unit, fully automatic: derive the typed WIT world from its `pub fn` exports AND its
   # `extern "C"` host imports, then run the proven pipeline. `{:ok, component} | {:error, _}`.

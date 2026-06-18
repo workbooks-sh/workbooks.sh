@@ -94,3 +94,6 @@ toolkits/.live.json
 # scratch model weights (never commit)
 ether/spike/
 *.gguf
+
+# content-addressed compiled-component cache (regenerated; pre-warmed at deploy)
+nexus/build/components
