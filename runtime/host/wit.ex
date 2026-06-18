@@ -41,6 +41,33 @@ defmodule Workbooks.Wit do
 
   def world(_), do: nil
 
+  @doc """
+  The per-file shared `interface types` — the home for file-level declarations a
+  unit world *imports* rather than owns: a top-level `@statuses` atom-set (enum) and
+  a shared `defmodule …, do: defstruct …` type module (record). Returns nil if a
+  file declares no shared types. Takes the `Workbooks.Literate.parse/1` node list.
+  """
+  def file_interface(nodes) when is_list(nodes) do
+    defs =
+      Enum.flat_map(nodes, fn
+        %{type: :decl} = node ->
+          for {:enum, name, atoms} <- Workbooks.Extract.Elixir.decl_types(node),
+              do: Workbooks.Wit.Types.enum(name, atoms)
+
+        %{type: :code, kind: "defmodule", name: name} = node ->
+          for {:record, fields} <- Extract.facts(node).types,
+              do: Workbooks.Wit.Types.record(name, fields)
+
+        _ ->
+          []
+      end)
+
+    case defs do
+      [] -> nil
+      _ -> "interface types {\n" <> Enum.map_join(defs, "\n", &indent/1) <> "\n}\n"
+    end
+  end
+
   @doc "Parse the capability names a unit grants, from its block header."
   def grants(%{header: header}) when is_binary(header) do
     # words inside a `grant[:] [ … ]` bracket (handles `net:` and `:net` forms),

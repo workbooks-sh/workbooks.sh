@@ -19,6 +19,26 @@ defmodule Workbooks.Extract.Elixir do
 
   defp empty, do: %{exports: [], imports: [], types: [], calls: []}
 
+  @doc "Collect the type declarations (records, enums, modules) anywhere in an AST."
+  def types_in(ast) do
+    {_ast, ty} =
+      Macro.prewalk(ast, [], fn node, acc ->
+        if t = type(node), do: {node, [t | acc]}, else: {node, acc}
+      end)
+
+    ty |> Enum.reverse() |> Enum.uniq()
+  end
+
+  @doc "Parse a flat `:decl` node's source and collect its type declarations."
+  def decl_types(%{type: :decl, text: text}) do
+    case Code.string_to_quoted(text) do
+      {:ok, ast} -> types_in(ast)
+      _ -> []
+    end
+  end
+
+  def decl_types(_), do: []
+
   defp from_body(nil), do: empty()
 
   defp from_body(body) do

@@ -41,6 +41,29 @@ defmodule Workbooks.Wit.TypesTest do
     assert world =~ "contacted,"
   end
 
+  test "file_interface gathers file-level shared types (struct module + atom-set) into one interface" do
+    src = """
+    # Types
+
+    defmodule Lead do
+      defstruct name: "", revenue: 0, status: :new
+    end
+
+    @statuses [:new, :enriched, :scored, :contacted]
+    """
+
+    iface = Literate.parse(src) |> Wit.file_interface()
+    assert iface =~ "interface types {"
+    assert iface =~ "record lead {"
+    assert iface =~ "enum statuses {"
+    assert iface =~ "contacted,"
+  end
+
+  test "file_interface is nil when a file declares no shared types" do
+    src = "# Compute\n\nserver :score do\n  def score(_l), do: 1\nend\n"
+    assert Wit.file_interface(Literate.parse(src)) == nil
+  end
+
   test "Wit.world emits a unit's declared struct as a WIT record, named after the module" do
     src = """
     server :lead do
