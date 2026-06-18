@@ -1,0 +1,111 @@
+defmodule Nexus.Auth.Jwt do
+  @moduledoc """
+  Multi-tenant auth by **verified JWT** — the one adapter for WorkOS / Clerk / Auth0 / BetterAuth /
+  roll-your-own. They all issue JWTs; you configure how to verify + which claim is the tenant:
+
+      config :nexus, Nexus.Auth.Jwt,
+        # ONE of:
+        secret: "shared-hs256-secret",            # symmetric (roll-your-own / BetterAuth HS256)
+        jwks_url: "https://…/.well-known/jwks.json", # asymmetric RS256 (WorkOS/Clerk/Auth0)
+        # claim mapping:
+        tenant_claim: "org_id",                    # which claim carries the tenant (required)
+        user_claim:   "sub",
+        issuer:       "https://…"                  # optional iss check
+
+  Verifies the signature (HS256 secret or RS256 via the JWKS, key picked by the token's `kid`),
+  checks `exp` (and `iss` if set), and returns `%{tenant, user}`. JWKS is fetched over verified TLS
+  and cached, re-fetched once on a `kid` miss (key rotation).
+  """
+  @behaviour Nexus.Auth
+  import Plug.Conn, only: [get_req_header: 2]
+
+  @impl true
+  def authenticate(conn) do
+    with [hdr] <- get_req_header(conn, "authorization"),
+         "Bearer " <> jwt <- hdr,
+         {:ok, claims} <- verify(jwt) do
+      tenant = claims[cfg(:tenant_claim, "tenant")]
+
+      if is_binary(tenant) and tenant != "",
+        do: {:ok, %{tenant: tenant, user: claims[cfg(:user_claim, "sub")]}},
+        else: {:error, :no_tenant_claim}
+    else
+      _ -> {:error, :unauthorized}
+    end
+  end
+
+  @doc "Verify a JWT's signature + exp/iss. `{:ok, claims} | {:error, reason}`. Exposed for testing."
+  def verify(jwt) do
+    with {:ok, jwk, alg} <- key_for(jwt),
+         {true, %JOSE.JWT{fields: claims}, _} <- JOSE.JWT.verify_strict(jwk, [alg], jwt),
+         :ok <- check_exp(claims),
+         :ok <- check_iss(claims) do
+      {:ok, claims}
+    else
+      _ -> {:error, :invalid_token}
+    end
+  end
+
+  defp key_for(jwt) do
+    case cfg(:secret) do
+      s when is_binary(s) and s != "" -> {:ok, JOSE.JWK.from_oct(s), "HS256"}
+      _ -> jwks_key(jwt)
+    end
+  end
+
+  defp jwks_key(jwt) do
+    with url when is_binary(url) <- cfg(:jwks_url),
+         %JOSE.JWS{fields: %{"kid" => kid}} <- JOSE.JWT.peek_protected(jwt),
+         {:ok, key_map} <- find_key(url, kid) do
+      {:ok, JOSE.JWK.from_map(key_map), "RS256"}
+    else
+      _ -> {:error, :no_key}
+    end
+  end
+
+  defp find_key(url, kid) do
+    case Enum.find(jwks(url, false), &(&1["kid"] == kid)) do
+      nil ->
+        case Enum.find(jwks(url, true), &(&1["kid"] == kid)) do
+          nil -> {:error, :no_kid}
+          k -> {:ok, k}
+        end
+
+      k ->
+        {:ok, k}
+    end
+  end
+
+  defp jwks(url, refresh) do
+    cache = {:nexus_jwks, url}
+
+    case (not refresh && :persistent_term.get(cache, nil)) || nil do
+      keys when is_list(keys) ->
+        keys
+
+      _ ->
+        keys =
+          case Nexus.Compilers.Shared.http_get(url) do
+            {:ok, body} -> Jason.decode!(body)["keys"] || []
+            _ -> []
+          end
+
+        :persistent_term.put(cache, keys)
+        keys
+    end
+  end
+
+  defp check_exp(%{"exp" => exp}) when is_integer(exp),
+    do: if(System.os_time(:second) < exp, do: :ok, else: {:error, :expired})
+
+  defp check_exp(_), do: :ok
+
+  defp check_iss(claims) do
+    case cfg(:issuer) do
+      iss when is_binary(iss) and iss != "" -> if(claims["iss"] == iss, do: :ok, else: {:error, :bad_issuer})
+      _ -> :ok
+    end
+  end
+
+  defp cfg(key, default \\ nil), do: Keyword.get(Application.get_env(:nexus, __MODULE__, []), key, default)
+end

@@ -16,27 +16,30 @@ defmodule Nexus.Weave do
   @doc """
   Weave a workbook folder into one self-contained HTML string.
 
-  `opts[:live]` (default false) picks the data posture baked into `nexus.data`:
-    * **false (local)** — baked rows are authoritative; the file works offline, no server.
-    * **true (server)** — the client prefers fresh `/data/:resource`, falling back to the baked rows
-      as the initial paint. Use this when serving from a live nexus so cached HTML still shows current
-      data.
+  Options:
+    * `:live` (default false) — data posture baked into `nexus.data`. false (local): baked rows are
+      authoritative, the file works offline. true (server): the client prefers fresh `/data/:resource`.
+    * `:tenant` (default `"default"`) — which tenant's rows to render/bake (data is partitioned).
+    * `:bake` (default true) — inline the data islands. **Set false for a SHARED multi-tenant SSR
+      shell** so one tenant's data never lands in a cache served to another; the client fetches its
+      own tenant-scoped `/data` instead.
   """
   def weave(root, opts \\ []) do
     pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
-    render(pages, resources(pages), Keyword.get(opts, :live, false))
+    ctx = %{tenant: Keyword.get(opts, :tenant, Nexus.Store.default_tenant()), bake: Keyword.get(opts, :bake, true)}
+    render(pages, resources(pages), Keyword.get(opts, :live, false), ctx)
   end
 
   # index.work is the composition root — it leads; the rest follow alphabetically.
   @doc """
-  The workbook's resource data as `name => [row maps]` — the payload the served `/data/:resource`
-  API returns and the baked islands inline. One extraction, shared by weave and the server.
+  A tenant's resource data as `name => [row maps]` — the payload the served `/data/:resource` API
+  returns and the baked islands inline. One extraction, shared by weave and the server, scoped by tenant.
   """
-  def data(root) do
+  def data(root, tenant \\ Nexus.Store.default_tenant()) do
     pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
 
     for {name, {:resource, mod}} when not is_nil(mod) <- resources(pages), into: %{} do
-      {name, mod |> Nexus.Store.all() |> Enum.map(&row_to_map/1)}
+      {name, mod |> Nexus.Store.all(tenant) |> Enum.take(@max_rows) |> Enum.map(&row_to_map/1)}
     end
   end
 
@@ -89,8 +92,8 @@ defmodule Nexus.Weave do
     _ -> nil
   end
 
-  defp render(pages, res, live) do
-    body = Enum.map_join(pages, "\n", &page(&1, res))
+  defp render(pages, res, live, ctx) do
+    body = Enum.map_join(pages, "\n", &page(&1, res, ctx))
 
     """
     <!doctype html>
@@ -98,17 +101,19 @@ defmodule Nexus.Weave do
     <style>#{css()}</style></head>
     <body>
     #{nav(pages)}#{body}
-    #{data_islands(res)}<script>#{js_shim(live)}</script>
+    #{data_islands(res, ctx)}<script>#{js_shim(live)}</script>
     </body></html>
     """
   end
 
-  # The BAKED data backend: each resource's Store rows inlined as a JSON island the browser reads
-  # — a generated data payload (allowed; never parsed in Elixir to render). Makes the woven file
-  # carry its own data, fully local. The server/SQLite backends slot in behind the same nexus.data.
-  defp data_islands(res) do
+  # The BAKED data backend: each resource's (tenant-scoped) Store rows inlined as a JSON island the
+  # browser reads. `bake: false` (multi-tenant shared SSR) inlines NOTHING — the client fetches its
+  # own tenant-scoped /data, so a shared/cached shell never carries one tenant's data to another.
+  defp data_islands(_res, %{bake: false}), do: ""
+
+  defp data_islands(res, %{tenant: tenant}) do
     for {name, {:resource, mod}} when not is_nil(mod) <- res, into: "" do
-      rows = mod |> Nexus.Store.all() |> Enum.take(@max_rows) |> Enum.map(&row_to_map/1)
+      rows = mod |> Nexus.Store.all(tenant) |> Enum.take(@max_rows) |> Enum.map(&row_to_map/1)
       # html_safe escapes `<`/`>`/`&` so a `</script>` in data can't break out of the island (XSS).
       ~s(<script type="application/nexus-data" data-resource="#{esc(name)}">#{Jason.encode!(rows, escape: :html_safe)}</script>\n)
     end
@@ -187,14 +192,14 @@ defmodule Nexus.Weave do
     """
   end
 
-  defp page({name, nodes}, res) do
+  defp page({name, nodes}, res, ctx) do
     ~s(<section class="file" id="#{anchor(name)}" data-file="#{esc(name)}">\n) <>
-      Enum.map_join(nodes, "\n", &render_node(&1, res)) <> "\n</section>"
+      Enum.map_join(nodes, "\n", &render_node(&1, res, ctx)) <> "\n</section>"
   end
 
-  defp render_node(%{type: :heading, level: l, text: t}, _res), do: "  <h#{l}>#{inline(t)}</h#{l}>"
+  defp render_node(%{type: :heading, level: l, text: t}, _res, _ctx), do: "  <h#{l}>#{inline(t)}</h#{l}>"
 
-  defp render_node(%{type: :prose, text: t}, _res) do
+  defp render_node(%{type: :prose, text: t}, _res, _ctx) do
     t
     |> String.split("\n")
     |> Enum.chunk_by(&String.starts_with?(&1, "- "))
@@ -208,25 +213,25 @@ defmodule Nexus.Weave do
   end
 
   # `show <Resource>` → a live data table; `show <Unit>` → the unit's `render()` output, baked.
-  defp render_node(%{type: :decl, text: "show " <> rest}, res) do
+  defp render_node(%{type: :decl, text: "show " <> rest}, res, ctx) do
     name = rest |> String.split() |> List.first()
 
     case Map.get(res, name) do
-      {:resource, mod} -> render_show(name, mod)
+      {:resource, mod} -> render_show(name, mod, ctx.tenant)
       {:unit, node} -> render_unit(name, node)
-      _ -> render_show(name, nil)
+      _ -> render_show(name, nil, ctx.tenant)
     end
   end
 
-  defp render_node(%{type: :decl, text: t}, _res), do: ~s(  <pre class="decl">#{esc(t)}</pre>)
+  defp render_node(%{type: :decl, text: t}, _res, _ctx), do: ~s(  <pre class="decl">#{esc(t)}</pre>)
 
-  defp render_node(%{type: :code, kind: k, name: n, body: b}, _res) do
+  defp render_node(%{type: :code, kind: k, name: n, body: b}, _res, _ctx) do
     ~s(  <figure class="unit" data-unit="#{esc(k)}:#{esc(n)}">) <>
       ~s(<figcaption><span class="kind">#{esc(k)}</span> #{esc(n)}</figcaption>) <>
       ~s(<pre>#{esc(b)}</pre></figure>)
   end
 
-  defp render_node(_, _res), do: ""
+  defp render_node(_, _res, _ctx), do: ""
 
   # Compile the unit (any lane), run its no-arg `render` export on wasmex, bake the result.
   # An ungranted host cap is refused BEFORE running it (the weave is where the audit is enforced).
@@ -246,12 +251,12 @@ defmodule Nexus.Weave do
     end
   end
 
-  defp render_show(name, nil),
+  defp render_show(name, nil, _tenant),
     do: ~s(  <div class="data-missing">unknown resource <code>#{esc(name)}</code></div>)
 
-  defp render_show(name, mod) do
+  defp render_show(name, mod, tenant) do
     fields = Enum.map(mod.__fields__(), &elem(&1, 0))
-    all = Nexus.Store.all(mod)
+    all = Nexus.Store.all(mod, tenant)
     total = length(all)
     rows = Enum.take(all, @max_rows)
     header = Enum.map_join(fields, "", &"<th>#{esc(&1)}</th>")

@@ -13,6 +13,9 @@ defmodule Nexus.Server do
   use Plug.Router
 
   plug(:match)
+  # Resolve + assign the request's tenant (Nexus.Auth adapter — None/Bearer/JWT). Everything below
+  # is scoped to conn.assigns.tenant; the Store is partitioned, so isolation is automatic.
+  plug(Nexus.Auth)
   plug(:dispatch)
 
   @doc "Start the HTTP server for a workbook folder."
@@ -30,19 +33,17 @@ defmodule Nexus.Server do
   get "/" do
     conn
     |> put_resp_content_type("text/html")
-    |> send_resp(200, cached_html(root()))
+    |> send_resp(200, cached_html(root(), Nexus.Auth.tenant(conn)))
   end
 
   get "/data/:resource" do
-    if authorized?(conn) do
-      rows = Map.get(Nexus.Weave.data(root()), resource, [])
+    # tenant comes from Nexus.Auth (the plug). Rows are tenant-scoped IN the Store — a request can
+    # only ever read its own tenant's data.
+    rows = Map.get(Nexus.Weave.data(root(), Nexus.Auth.tenant(conn)), resource, [])
 
-      conn
-      |> put_resp_content_type("application/json")
-      |> send_resp(200, Jason.encode!(rows, escape: :html_safe))
-    else
-      send_resp(conn, 401, "unauthorized")
-    end
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(rows, escape: :html_safe))
   end
 
   match _ do
@@ -51,32 +52,30 @@ defmodule Nexus.Server do
 
   defp root, do: Application.get_env(:nexus, :workbook_root) || File.cwd!()
 
-  # /data auth gate. Off by default (local/dev = open). Set NEXUS_DATA_TOKEN to require
-  # `Authorization: Bearer <token>`. NOTE: a single shared token, NOT per-tenant scoping — a
-  # multi-tenant deployment still needs auth + row-scoping wired to its identity model (see
-  # docs/RENDERING.md). This just closes the wide-open default.
-  defp authorized?(conn) do
-    case System.get_env("NEXUS_DATA_TOKEN") do
-      t when t in [nil, ""] -> true
-      token -> match?(["Bearer " <> ^token], get_req_header(conn, "authorization"))
-    end
-  end
-
-  # Cache the woven shell by the workbook's newest .work mtime, so units compile ONCE — not per
-  # request (a `show <Unit>` recompiles a wasm component, ~seconds; never do that on a hot path).
-  # Served HTML is `live: true`, so the cached shell still shows current data (the client fetches
-  # /data); the cache re-weaves only when a .work file changes. The /data endpoint is always live.
-  defp cached_html(root) do
+  # Cache the woven SSR shell by the workbook's newest .work mtime, so units compile ONCE — not per
+  # request (a `show <Unit>` recompiles a wasm component, ~seconds; never on a hot path).
+  #
+  # MULTI-TENANT: the shell is `bake: false` — it inlines NO data, so the shared/cached shell can
+  # never carry one tenant's rows to another; the client fetches its own tenant-scoped /data. Cache
+  # key is just the mtime (the shell is tenant-agnostic).
+  # SINGLE-TENANT (None): bake the default tenant's data into the shell as before.
+  defp cached_html(root, tenant) do
     mtime = workbook_mtime(root)
     table = cache_table()
+    multi = Nexus.Auth.multi?()
+    key = {root, multi}
 
-    case :ets.lookup(table, root) do
-      [{^root, ^mtime, html}] ->
+    case :ets.lookup(table, key) do
+      [{^key, ^mtime, html}] ->
         html
 
       _ ->
-        html = Nexus.Weave.weave(root, live: true)
-        :ets.insert(table, {root, mtime, html})
+        html =
+          if multi,
+            do: Nexus.Weave.weave(root, live: true, bake: false),
+            else: Nexus.Weave.weave(root, live: true, tenant: tenant)
+
+        :ets.insert(table, {key, mtime, html})
         html
     end
   end

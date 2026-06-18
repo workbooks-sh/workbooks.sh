@@ -44,7 +44,9 @@ defmodule Nexus.MixProject do
       # backend (Neon Postgres) and any wasm-SQL engine slot in behind the same 4 callbacks.
       {:exqlite, "~> 0.23"},
       # the served-nexus HTTP tier: SSR the workbook + the /data API the client nexus.data falls to.
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      # JWT verification for the auth seam (HS256 secret + RS256/JWKS — WorkOS/Clerk/Auth0/own).
+      {:jose, "~> 1.11"}
     ]
   end
 end

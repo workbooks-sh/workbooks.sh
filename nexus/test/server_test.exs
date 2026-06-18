@@ -41,9 +41,14 @@ defmodule Nexus.ServerTest do
     assert json == "[]"
   end
 
-  test "NEXUS_DATA_TOKEN gates /data — 401 without the bearer, 200 with", %{port: port} do
+  test "the Bearer auth adapter gates /data — 401 without the bearer, 200 with", %{port: port} do
+    Application.put_env(:nexus, :auth, Nexus.Auth.Bearer)
     System.put_env("NEXUS_DATA_TOKEN", "s3cret")
-    on_exit(fn -> System.delete_env("NEXUS_DATA_TOKEN") end)
+
+    on_exit(fn ->
+      Application.put_env(:nexus, :auth, Nexus.Auth.None)
+      System.delete_env("NEXUS_DATA_TOKEN")
+    end)
 
     {:ok, {{_, no_auth, _}, _, _}} = :httpc.request(~c"http://127.0.0.1:#{port}/data/Item")
     assert no_auth == 401
@@ -51,6 +56,37 @@ defmodule Nexus.ServerTest do
     req = {~c"http://127.0.0.1:#{port}/data/Item", [{~c"authorization", ~c"Bearer s3cret"}]}
     {:ok, {{_, ok, _}, _, _}} = :httpc.request(:get, req, [], [])
     assert ok == 200
+  end
+
+  test "MULTI-TENANT: each JWT tenant sees only its own /data rows (end-to-end isolation)",
+       %{port: port, mod: mod} do
+    Application.put_env(:nexus, :auth, Nexus.Auth.Jwt)
+    Application.put_env(:nexus, Nexus.Auth.Jwt, secret: "shh", tenant_claim: "org")
+    on_exit(fn ->
+      Application.put_env(:nexus, :auth, Nexus.Auth.None)
+      Application.delete_env(:nexus, Nexus.Auth.Jwt)
+    end)
+
+    # seed per-tenant data (the setup row is on "default" — invisible to t1/t2)
+    Nexus.Store.create(mod, %{name: "AcmeWidget", price: 1}, "t1")
+    Nexus.Store.create(mod, %{name: "GlobexGizmo", price: 2}, "t2")
+
+    jwt = fn org ->
+      {_, t} = JOSE.JWK.from_oct("shh") |> JOSE.JWT.sign(%{"alg" => "HS256"}, %{"org" => org, "exp" => System.os_time(:second) + 60}) |> JOSE.JWS.compact()
+      t
+    end
+
+    fetch = fn org ->
+      req = {~c"http://127.0.0.1:#{port}/data/Item", [{~c"authorization", ~c"Bearer #{jwt.(org)}"}]}
+      {:ok, {{_, 200, _}, _, body}} = :httpc.request(:get, req, [], [])
+      Jason.decode!(to_string(body)) |> Enum.map(& &1["name"])
+    end
+
+    assert fetch.("t1") == ["AcmeWidget"]
+    assert fetch.("t2") == ["GlobexGizmo"]
+    # no JWT → 401
+    {:ok, {{_, status, _}, _, _}} = :httpc.request(~c"http://127.0.0.1:#{port}/data/Item")
+    assert status == 401
   end
 
   test "served page is live-mode and /data reflects data changed after the page was cached",
