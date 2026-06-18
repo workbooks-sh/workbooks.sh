@@ -32,6 +32,72 @@ defmodule Nexus.AgentBashTest do
 
   # ---- needs coreutils.wasm + wasmtime (guarded) ----
 
+  defp kits_ready? do
+    File.exists?(Path.join(Nexus.Agent.Kits.root(), "coreutils.wasm")) and System.find_executable("wasmtime") != nil
+  end
+
+  @tag :kits
+  test "VFS sandbox CONFINES the guest — no read/write outside /work", %{vfs: vfs} do
+    if kits_ready?() do
+      # read of host files is denied — wasmtime grants ONLY the /work preopen.
+      assert Nexus.Agent.Bash.run(vfs, "cat /etc/passwd") =~ "pre-opened file descriptor"
+      assert Nexus.Agent.Bash.run(vfs, "ls /") =~ "pre-opened file descriptor"
+      assert Nexus.Agent.Bash.run(vfs, "cat ../../../../../../etc/passwd") =~ "pre-opened file descriptor"
+      # traversal out of the preopen is denied (pre-opened-fd error or Permission denied — both = confined).
+      out_traversal = Nexus.Agent.Bash.run(vfs, "ls /work/../..")
+      assert out_traversal =~ "pre-opened file descriptor" or out_traversal =~ "Permission denied"
+
+      # a symlink created inside /work pointing OUT cannot be created (wasmtime denies it) — and even
+      # if present, reading through it stays confined. Prove creation is denied.
+      assert Nexus.Agent.Bash.run(vfs, "ln -s /etc/passwd /work/escape") =~ "Permission denied"
+
+      # writes outside /work are denied too.
+      assert Nexus.Agent.Bash.run(vfs, "touch /tmp/nexus_should_not_exist") =~ "pre-opened file descriptor"
+      refute File.exists?("/tmp/nexus_should_not_exist")
+    else
+      :ok
+    end
+  end
+
+  @tag :kits
+  test "NO host-shell injection — metacharacters reach wasm argv literally, never the host sh", %{vfs: vfs} do
+    if kits_ready?() do
+      sentinel = Path.join(System.tmp_dir!(), "nexus_injection_#{System.unique_integer([:positive])}")
+      File.rm(sentinel)
+      # `;`, `$(...)`, backticks — all must reach `echo` as literal argv, NOT be evaluated by host sh.
+      bt = <<96>>
+      inj = "echo hi; touch " <> sentinel <> "; $(touch " <> sentinel <> ") " <>
+              bt <> "touch " <> sentinel <> bt
+      out = Nexus.Agent.Bash.run(vfs, inj)
+      refute File.exists?(sentinel), "HOST SHELL INJECTION: #{sentinel} was created — shq broke out!"
+      # the metacharacters appear in the echoed output (proof they were data, not host commands)
+      assert out =~ "touch"
+    else
+      :ok
+    end
+  end
+
+  @tag :kits
+  test "a spinning kit (`yes`) is reaped by the per-command timeout — no infinite hang", %{vfs: vfs} do
+    if File.exists?(Path.join(Nexus.Agent.Kits.root(), "coreutils.wasm")) and System.find_executable("wasmtime") do
+      # squeeze the budget so the test is fast; `yes` would spin forever without the watchdog.
+      prev = Application.get_env(:nexus, Nexus.Agent.Bash, [])
+      Application.put_env(:nexus, Nexus.Agent.Bash, Keyword.put(prev, :cmd_timeout_ms, 1500))
+      on_exit(fn -> Application.put_env(:nexus, Nexus.Agent.Bash, prev) end)
+
+      t0 = System.monotonic_time(:millisecond)
+      out = Nexus.Agent.Bash.run(vfs, "yes")
+      took = System.monotonic_time(:millisecond) - t0
+
+      assert took < 8_000, "yes hung for #{took}ms — watchdog did not reap it"
+      assert out =~ "killed" and out =~ "time budget"
+      # output is bounded (head+tail truncation is applied upstream in the agent, but the kit itself
+      # was killed quickly so the buffer cannot grow without bound forever.
+    else
+      :ok
+    end
+  end
+
   @tag :kits
   test "runs real wasm CLI commands in the VFS, with pipes", %{vfs: vfs} do
     if File.exists?(Path.join(Nexus.Agent.Kits.root(), "coreutils.wasm")) and System.find_executable("wasmtime") do

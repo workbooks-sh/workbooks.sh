@@ -33,7 +33,16 @@ defmodule Nexus.ChecksTest do
     refute Nexus.Checks.matches?("UNIQUE=3", "UNIQUE=2")
     assert Nexus.Checks.matches?("count is 42", "/count is \\d+/")
     refute Nexus.Checks.matches?("count is many", "/count is \\d+/")
-    assert Nexus.Checks.matches?("anything", nil)
+  end
+
+  test "a check with no real assertion FAILS CLOSED (no vacuous pass)" do
+    # String.contains?(_, "") is always true — an empty/nil expect must NOT pass, or a check could
+    # "pass" without validating anything. Likewise an empty regex //.
+    refute Nexus.Checks.matches?("anything at all", nil)
+    refute Nexus.Checks.matches?("anything at all", "")
+    refute Nexus.Checks.matches?("anything at all", "//")
+    # a real assertion still works
+    assert Nexus.Checks.matches?("UNIQUE=2", "UNIQUE=2")
   end
 
   test "run_check reports a missing-agent error instead of crashing" do

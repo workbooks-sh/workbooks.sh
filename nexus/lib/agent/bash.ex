@@ -10,12 +10,20 @@ defmodule Nexus.Agent.Bash do
   fully sandboxed — it sees only `/work` and runs as wasm, never native code. That's the security line.
   """
 
+  # Per-command wall-clock budget for a wasm kit invocation. A hung/spinning kit (`yes`, an infinite
+  # loop) must NOT hang the agent forever, nor leak a wasmtime process. Configurable via
+  # `config :nexus, Nexus.Agent.Bash, cmd_timeout_ms: …`.
+  @cmd_timeout_ms 30_000
+
   @doc "Run a command line against `vfs`. Returns combined stdout (stderr appended on error)."
   def run(vfs, line) when is_binary(line) do
     line
     |> split_pipes()
     |> Enum.reduce("", fn segment, stdin -> run_segment(vfs, segment, stdin) end)
   end
+
+  defp cmd_timeout_ms,
+    do: Application.get_env(:nexus, __MODULE__, []) |> Keyword.get(:cmd_timeout_ms, @cmd_timeout_ms)
 
   # Split on top-level `|` (not inside quotes).
   defp split_pipes(line) do
@@ -85,10 +93,25 @@ defmodule Nexus.Agent.Bash do
       ["wasmtime", "run", "--dir", Nexus.Agent.Vfs.mount(vfs), wasm | argv]
       |> Enum.map_join(" ", &shq/1)
 
-    {out, code} = System.cmd("sh", ["-c", "#{inner} < #{shq(stdin_file)}"], stderr_to_stdout: true)
+    # Wrap in a shell watchdog: background the kit, start a killer that SIGKILLs it (and any wasmtime
+    # children) after the budget, then `wait`. A spinning/hung kit (`yes`, an infinite loop) is reaped
+    # by the OS — it can never hang the agent or leak a wasmtime process. Exit 137 = SIGKILL = timed out.
+    secs = max(1, div(cmd_timeout_ms(), 1000))
+    # The killer subshell must NOT inherit the pipe stdout (it would hold the port open and block
+    # System.cmd until `sleep` returns). Redirect its fds to /dev/null and run it detached.
+    guarded =
+      "#{inner} < #{shq(stdin_file)} & cmd=$!; " <>
+        "{ sleep #{secs}; kill -9 $cmd 2>/dev/null; pkill -9 -P $cmd 2>/dev/null; } >/dev/null 2>&1 & w=$!; " <>
+        "wait $cmd; rc=$?; kill $w 2>/dev/null; wait $w 2>/dev/null; exit $rc"
+
+    {out, code} = System.cmd("sh", ["-c", guarded], stderr_to_stdout: true)
     File.rm(stdin_file)
 
-    if code == 0, do: out, else: out <> "\n(exit #{code})"
+    cond do
+      code == 0 -> out
+      code == 137 -> out <> "\nbash: #{List.first(argv) || "command"}: killed (exceeded #{secs}s time budget)"
+      true -> out <> "\n(exit #{code})"
+    end
   end
 
   defp shq(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"

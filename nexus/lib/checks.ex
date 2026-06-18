@@ -85,8 +85,17 @@ defmodule Nexus.Checks do
     end
   end
 
-  @doc "Whether `answer` satisfies `expect` (a `/regex/` or a substring). Exposed for testing."
-  def matches?(_answer, nil), do: true
+  @doc """
+  Whether `answer` satisfies `expect` (a `/regex/` or a substring). Exposed for testing.
+
+  A check with **no real assertion fails closed**: `nil` (no `expect` authored) and `""` (an empty
+  `expect`) do NOT pass — `String.contains?(_, "")` is vacuously true, which would let a check
+  "pass" without validating anything. A passing check must assert a non-empty expectation.
+  """
+  def matches?(_answer, nil), do: false
+  def matches?(_answer, ""), do: false
+
+  def matches?(_answer, "//"), do: false
 
   def matches?(answer, "/" <> _ = re_src) do
     inner = String.trim(re_src, "/")
