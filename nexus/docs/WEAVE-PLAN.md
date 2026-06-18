@@ -83,12 +83,16 @@ and can later run client-side via browser-wasm; baked-output first.
 - ✅ **Phase 1** — render-aware weave: `show Resource` → live XSS-safe table, empty-state, unknown handled.
 - ✅ **Phase 2** — index composition root: leads, titles the page, multi-file nav.
 - ✅ **Phase 3** — units render across **all lanes**: `show Unit` bakes `render()` (c=42, zig=45, rust=64).
-- ✅ **Phase 4 (baked + server)** — `nexus.data` client API: baked JSON islands (html-safe) + server
-  fallback; `Nexus.Server` (bandit) SSRs `/` and serves `/data/:resource`. Local-live SQLite remains.
-- ✅ **Phase 5** — served SSR live via `Nexus.Server`.
-- ✅ **CLIENT-SIDE PROVEN IN A REAL BROWSER** — `file:///tmp/workbook.html` (no server) rendered the
-  table and `nexus.data.all('Item')` returned the baked rows. The local-only HTML model works.
-- ⏳ Remaining: Phase 4 local-live (in-browser SQLite/IndexedDB), Phase 6 adversarial, Phase 7 demo+docs.
+- ✅ **Phase 4 — ALL THREE data backends, one `nexus.data` API:**
+  - **baked** — JSON islands (html-safe), read client-side, zero-runtime;
+  - **local-live** — a mutable **IndexedDB** store: `create()` persists, **proven to survive a full
+    page reload in a real browser** (`[Soup]` → create Bread → reload → `[Soup, Bread]`). Local-only
+    + mutable, no server, no 1MB wasm — the SQLite-class local backend, browser-native;
+  - **server** — `fetch('/data/:resource')` (cloud), only when there's no local data.
+- ✅ **Phase 5** — served SSR live via `Nexus.Server` (bandit): `GET /` SSRs, `GET /data/:resource` JSON.
+- ✅ **CLIENT-SIDE PROVEN IN A REAL BROWSER** — woven `file://` (no server) rendered the table and
+  `nexus.data` (baked + IndexedDB create/persist) all worked. The local-only HTML model is real.
+- ⏳ Remaining: Phase 6 adversarial, Phase 7 demo+docs.
 
 ## Done when
 weave renders real HTML workbooks across all lanes and all three data modes, served *and* local,

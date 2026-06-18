@@ -110,14 +110,18 @@ defmodule Nexus.Weave do
   defp jsonable(v) when is_atom(v) and v not in [true, false, nil], do: to_string(v)
   defp jsonable(v), do: v
 
-  # window.nexus.data — the browser mirror of Nexus.Store. Baked islands first; falls back to the
-  # server endpoint (/data/<Resource>). The local SQLite backend plugs into the same API later.
+  # window.nexus.data — the browser mirror of Nexus.Store, one API over three backends:
+  #   * BAKED   — read the inlined JSON islands (local, static, zero-runtime)
+  #   * LOCAL   — a mutable IndexedDB store (local-only + mutable: create() persists across reloads)
+  #   * SERVER  — fetch('/data/<Resource>') (cloud/shared) — only when there is no local data at all
+  # all() = baked ∪ local; create() writes local. Same API the served nexus exposes.
   defp js_shim do
     """
     window.nexus = window.nexus || {};
     nexus.data = {
       _baked: null,
-      _load() {
+      _db: null,
+      _loadBaked() {
         if (this._baked) return this._baked;
         this._baked = {};
         document.querySelectorAll('script[type="application/nexus-data"]').forEach(s => {
@@ -125,10 +129,42 @@ defmodule Nexus.Weave do
         });
         return this._baked;
       },
-      all(resource) {
-        const baked = this._load()[resource];
-        if (baked) return Promise.resolve(baked);
-        return fetch('/data/' + encodeURIComponent(resource)).then(r => r.ok ? r.json() : []);
+      _open() {
+        if (this._db) return this._db;
+        this._db = new Promise((res, rej) => {
+          const r = indexedDB.open('nexus', 1);
+          r.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('rows')) db.createObjectStore('rows', { autoIncrement: true });
+          };
+          r.onsuccess = e => res(e.target.result);
+          r.onerror = e => rej(e.target.error);
+        });
+        return this._db;
+      },
+      async _local(resource) {
+        const db = await this._open();
+        return new Promise(res => {
+          const req = db.transaction('rows', 'readonly').objectStore('rows').getAll();
+          req.onsuccess = () => res((req.result || []).filter(r => r.__resource === resource).map(({ __resource, ...row }) => row));
+          req.onerror = () => res([]);
+        });
+      },
+      async all(resource) {
+        const baked = this._loadBaked()[resource] || [];
+        const local = await this._local(resource);
+        if (baked.length || local.length) return baked.concat(local);
+        try { const r = await fetch('/data/' + encodeURIComponent(resource)); return r.ok ? await r.json() : []; }
+        catch (_) { return []; }
+      },
+      async create(resource, row) {
+        const db = await this._open();
+        return new Promise((res, rej) => {
+          const tx = db.transaction('rows', 'readwrite');
+          tx.objectStore('rows').add(Object.assign({ __resource: resource }, row));
+          tx.oncomplete = () => res(row);
+          tx.onerror = () => rej(tx.error);
+        });
       }
     };
     """
