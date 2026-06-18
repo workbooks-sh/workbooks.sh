@@ -59,6 +59,13 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
+      # `work graph <out.html> [dir]` — dogfood: the unified graph (§9) rendered as
+      # a work-* workbook you can open.
+      ["graph", out | rest] ->
+        {msg, failed?} = Workbooks.Work.CLI.graph(out, List.first(rest) || ".")
+        IO.puts(msg)
+        if failed?, do: System.halt(1)
+
       # `work rt …` drives a RUNNING runtime over HTTP (RCP client) — no app boot
       # (no NIF), just :httpc against the discovered/configured target.
       ["rt" | rest] ->

@@ -13,6 +13,69 @@ defmodule WorkCore.GraphTest do
 
   defp write(name, body), do: File.write!(Path.join(@tmp, name), body)
 
+  describe "query API + dogfood render" do
+    setup do
+      write("chart.work", "# Chart\n\n```svelte\nclient svelte :chart do\n  export function Chart() {}\nend\n```\n")
+
+      write("panel.work", """
+      # Panel
+
+      ```svelte
+      client solid :panel do
+        import { chart } from "work://chart"
+        export function Panel() {}
+      end
+      ```
+      """)
+
+      write("svc.work", """
+      # Service
+
+      ```elixir
+      server :svc, grant: [net: "api.example.com"] do
+        def go, do: :ok
+      end
+      ```
+      """)
+
+      {:ok, g: WorkCore.Graph.build_dir(@tmp)}
+    end
+
+    test "get / units / dependencies / dependents / host_caps", %{g: g} do
+      assert WorkCore.Graph.get(g, "panel").id == "panel"
+      assert "chart" in WorkCore.Graph.dependencies(g, "panel")
+      assert "panel" in WorkCore.Graph.dependents(g, "chart")
+      assert "net" in WorkCore.Graph.host_caps(g, "svc")
+      assert Enum.any?(WorkCore.Graph.units(g, lang: "elixir"), &(&1.id == "svc"))
+    end
+
+    test "neighbors filters by scope/dir", %{g: g} do
+      caps = WorkCore.Graph.neighbors(g, "svc", scope: :host_cap)
+      assert Enum.all?(caps, &(&1.scope == :host_cap))
+      ins = WorkCore.Graph.neighbors(g, "chart", dir: :in)
+      assert Enum.any?(ins, &(&1.from == "panel"))
+    end
+
+    test "trace gives the cross-layer view; path walks dependencies", %{g: g} do
+      t = WorkCore.Graph.trace(g, "panel")
+      assert t.identity.package == "work:panel"
+      assert "chart" in t.dependencies
+      assert Map.has_key?(t.facets, :source)
+      assert WorkCore.Graph.path(g, "panel", "chart") == ["panel", "chart"]
+    end
+
+    test "dogfood: graph renders as a work-* workbook (no JSON)", %{g: g} do
+      html = WorkCore.Graph.Render.to_html(g, title: "Test graph")
+      assert html =~ "<document-view>"
+      assert html =~ "<work-flow>"
+      assert html =~ ~s(from="panel")
+      assert html =~ ~s(to="chart")
+      assert html =~ "work:svc"
+      # composition-as-source: it's HTML, not a JSON blob
+      refute html =~ ~r/\{\s*"/
+    end
+  end
+
   test "node carries identity + per-layer facets" do
     write("orders.work", """
     # Orders

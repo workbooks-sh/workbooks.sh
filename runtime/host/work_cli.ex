@@ -81,6 +81,13 @@ defmodule Workbooks.Work.CLI do
     end
   end
 
+  @doc "work graph <out.html> [dir] — render the unified graph as a workbook (dogfood)."
+  def graph(out, dir) do
+    html = Graph.build_dir(dir) |> WorkCore.Graph.Render.to_html(title: "#{Path.basename(Path.expand(dir))} — system graph")
+    File.write!(out, html)
+    {"wrote #{byte_size(html)} bytes → #{out}", false}
+  end
+
   defp find_unit(dir, name) do
     (Path.wildcard(Path.join(dir, "*.work")) ++ Path.wildcard(Path.join(dir, "**/*.work")))
     |> Enum.uniq()

@@ -193,5 +193,96 @@ defmodule WorkCore.Graph do
   @doc "The unit's immediate neighbourhood — edges in and out."
   def near(%__MODULE__{edges: edges}, name), do: for(e <- edges, e.from == name or e.to == name, do: e)
 
+  # ── the agent-/system-facing query surface over the unified graph ──
+
+  @doc "The full multi-layer node for a unit (identity + facets), or nil."
+  def get(%__MODULE__{nodes: nodes}, name), do: Map.get(nodes, name)
+
+  @doc "List units, optionally filtered by `:lang` and/or `:kind`."
+  def units(%__MODULE__{nodes: nodes}, filters \\ []) do
+    nodes
+    |> Map.values()
+    |> Enum.filter(fn n ->
+      Enum.all?(filters, fn
+        {:lang, l} -> n.lang == l
+        {:kind, k} -> n.kind == k
+        _ -> true
+      end)
+    end)
+  end
+
+  @doc """
+  Edges touching a unit, filtered. Opts: `:dir` (`:out`/`:in`/`:both`, default
+  `:out`), `:layer`, `:scope`, `:type`.
+  """
+  def neighbors(%__MODULE__{edges: edges}, name, opts \\ []) do
+    dir = Keyword.get(opts, :dir, :out)
+
+    edges
+    |> Enum.filter(fn e ->
+      touches =
+        case dir do
+          :out -> e.from == name
+          :in -> e.to == name
+          :both -> e.from == name or e.to == name
+        end
+
+      touches and match_opt(e, :layer, opts) and match_opt(e, :scope, opts) and match_opt(e, :type, opts)
+    end)
+  end
+
+  defp match_opt(e, key, opts) do
+    case Keyword.fetch(opts, key) do
+      :error -> true
+      {:ok, v} -> Map.get(e, key) == v
+    end
+  end
+
+  @doc "Unit-scope dependencies of a unit (the units it imports/references)."
+  def dependencies(g, name), do: neighbors(g, name, dir: :out, scope: :unit) |> Enum.map(& &1.to) |> Enum.uniq()
+
+  @doc "Units that depend on this one (reverse deps) — alias of why/2."
+  def dependents(g, name), do: why(g, name)
+
+  @doc "The host capabilities a unit grants (the :host_cap edge targets)."
+  def host_caps(g, name), do: neighbors(g, name, scope: :host_cap) |> Enum.map(& &1.to) |> Enum.uniq()
+
+  @doc """
+  The cross-layer view of a unit an agent wants in one call: its identity, every
+  facet (source/interface/artifact/data), its unit dependencies + host caps, and
+  who depends on it — the literate→source→WIT→wasm picture for one unit.
+  """
+  def trace(%__MODULE__{} = g, name) do
+    case get(g, name) do
+      nil ->
+        nil
+
+      node ->
+        %{
+          unit: name,
+          identity: node.uid,
+          facets: node.facets,
+          dependencies: dependencies(g, name),
+          host_caps: host_caps(g, name),
+          dependents: dependents(g, name)
+        }
+    end
+  end
+
+  @doc "A dependency path from one unit to another over unit edges, or nil (BFS)."
+  def path(%__MODULE__{} = g, from, to), do: bfs(g, [[from]], MapSet.new([from]), to)
+
+  defp bfs(_g, [], _seen, _to), do: nil
+
+  defp bfs(g, [[head | _] = trail | rest], seen, to) do
+    if head == to do
+      Enum.reverse(trail)
+    else
+      nexts = dependencies(g, head) |> Enum.reject(&MapSet.member?(seen, &1))
+      seen = Enum.reduce(nexts, seen, &MapSet.put(&2, &1))
+      bfs(g, rest ++ Enum.map(nexts, &[&1 | trail]), seen, to)
+    end
+  end
+
   # normalize/1 moved to WorkCore.Uid — the canonical identity home.
 end
