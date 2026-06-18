@@ -75,6 +75,25 @@ defmodule Nexus.CompileTest do
 
   @tag :compiler
   @tag timeout: 240_000
+  test "a C unit's STRING host cap is wired from the Dock signature and lifts" do
+    if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
+      node =
+        ~s|c :greeter do\n  extern void log(const char* p, int n);\n  void greet(void) { log("hi there", 8); }\nend\n|
+        |> Nexus.Literate.parse()
+        |> Enum.find(&(&1.type == :code))
+
+      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
+      parent = self()
+      {:ok, p} = Wasmex.Components.start_link(%{path: comp, imports: %{"log" => {:fn, fn m -> send(parent, {:log, m}); nil end}}})
+      Wasmex.Components.call_function(p, "greet", [])
+      assert_receive {:log, "hi there"}, 3000
+    else
+      :ok
+    end
+  end
+
+  @tag :compiler
+  @tag timeout: 240_000
   test "a .work rust unit compiles to a component and runs" do
     if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
       node =

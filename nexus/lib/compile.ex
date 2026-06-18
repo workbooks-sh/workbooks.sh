@@ -41,6 +41,9 @@ defmodule Nexus.Compile do
   # reactor, no command machinery), componentize (no WASI adapter needed). `{:ok, comp} | {:error}`.
   defp c_unit(%{name: name, body: body}) do
     exports = c_sigs(body)
+    # extern decls that name a known Dock host fn become typed imports (the WIT comes from the
+    # Dock's signature, not the unit's lowered `extern`); the Dock supplies the impl.
+    caps = body |> c_import_names() |> Enum.filter(&Nexus.Dock.host_fn_wit/1)
 
     case exports do
       [] ->
@@ -48,15 +51,25 @@ defmodule Nexus.Compile do
 
       _ ->
         wname = wit_ident(name)
-        lines = Enum.map_join(exports, "\n", fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
-        world = "package work:#{wname};\n\nworld #{wname} {\n#{lines}\n}\n"
+        ilines = Enum.map(caps, fn n -> "  import #{wit_ident(n)}: #{Nexus.Dock.host_fn_wit(n)};" end)
+        elines = Enum.map(exports, fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
+        world = "package work:#{wname};\n\nworld #{wname} {\n#{Enum.join(ilines ++ elines, "\n")}\n}\n"
         src = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}.c")
         File.write!(src, body)
 
-        with {:ok, core} <- Nexus.Compilers.C.compile_to_wasm(src, exports: Enum.map(exports, &elem(&1, 0))) do
+        with {:ok, core} <-
+               Nexus.Compilers.C.compile_to_wasm(src, exports: Enum.map(exports, &elem(&1, 0)), allow_undefined: caps != []) do
+          core = if caps != [], do: rewrite_env_to_root(core, Path.dirname(core)), else: core
           c_componentize(core, world, wname)
         end
     end
+  end
+
+  defp c_import_names(body) do
+    ~r/\bextern\s+[a-z]\w*\s+([a-z_]\w*)\s*\(/
+    |> Regex.scan(body)
+    |> Enum.map(fn [_, n] -> n end)
+    |> Enum.uniq()
   end
 
   # C signatures: `<ret> name(params) {`. Maps C scalar types → WIT.

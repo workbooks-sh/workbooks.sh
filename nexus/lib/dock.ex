@@ -62,16 +62,27 @@ defmodule Nexus.Dock do
   def capabilities, do: Map.keys(@registry)
 
   @doc """
-  Host implementations the Dock supplies to a sandboxed component, as the wasmex import map
-  (`%{"name" => {:fn, impl}}`). A component only invokes the imports it declares; extras are
-  ignored, so we can offer the full set. Scalar caps work today (`now`); string-typed caps
-  (net/kv/llm) await the canonical-ABI string glue between an `extern "C"` decl and a WIT `string`.
+  Host functions a unit can call by name → `{wit_signature, impl}`. The signature is the WIT the
+  unit's import is typed with (so we don't derive it from the unit's lowered `extern` decl); the
+  impl is what runs on the host. Both scalar (`now`) and string (`log`) — string caps lift cleanly
+  in the reactor shape (see docs/STRING-CAP-ABI.md).
   """
-  def impls do
+  def host_fns do
     %{
-      "now" => {:fn, fn -> System.os_time(:second) end}
+      "now" => {"func() -> s64", fn -> System.os_time(:second) end},
+      "log" => {"func(msg: string)", fn msg -> require(Logger) && Logger.info(["[unit] ", msg]); nil end}
     }
   end
+
+  @doc "The WIT signature for a host fn the unit imports, or nil if it isn't a known cap."
+  def host_fn_wit(name), do: with({sig, _impl} <- host_fns()[name], do: sig)
+
+  @doc """
+  Host implementations the Dock supplies to a sandboxed component, as the wasmex import map
+  (`%{"name" => {:fn, impl}}`). A component only invokes the imports it declares; extras are
+  ignored, so we offer the full set.
+  """
+  def impls, do: Map.new(host_fns(), fn {n, {_sig, f}} -> {n, {:fn, f}} end)
 
   @doc "The per-unit sandbox-enforced capabilities (granted by an author, audited by the weave)."
   def sandbox_capabilities, do: for({c, %{sandbox?: true}} <- @registry, do: c)
