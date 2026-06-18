@@ -29,23 +29,29 @@ defmodule Workbooks.Instance.Imports do
     Enum.reduce(caps, base, &add(&1, &2, vfs_conn, ctx))
   end
 
+  # The import NAME each capability projects comes from the single `Workbooks.Dock`
+  # registry (§3) — so this seam and §2's generated worlds share one source of truth.
+  # The impls stay here; `put/3` looks the name up. A characterization snapshot +
+  # registry↔seam cross-check (dock_test, instance_imports_characterization_test) lock
+  # this to the prior hardcoded names.
+
   # vfs: run SQL against the Instance VFS, return rows as JSON.
   defp add("vfs", acc, vfs, _ctx),
-    do: Map.put(acc, "vfs-query", {:fn, fn sql -> VFS.query_json(vfs, sql) end})
+    do: put(acc, "vfs", fn sql -> VFS.query_json(vfs, sql) end)
 
   # commands: invoke a registered in-WASM command by name (argv + stdin → stdout).
   defp add("commands", acc, _vfs, ctx),
-    do: Map.put(acc, "run-command", {:fn, fn name, input, args -> run_command(name, input, args, ctx) end})
+    do: put(acc, "commands", fn name, input, args -> run_command(name, input, args, ctx) end)
 
   # llm: call the LLM (the host holds the key — the component never sees it).
   defp add("llm", acc, _vfs, _ctx),
-    do: Map.put(acc, "llm-complete", {:fn, fn prompt -> llm_complete(prompt) end})
+    do: put(acc, "llm", fn prompt -> llm_complete(prompt) end)
 
   # browse: fetch+extract a URL through the host's Browse capability (Route B —
   # the host owns network egress; the component never opens a socket). The
   # extracted page is normalized to a JSON string for the typed `-> string` Dock.
   defp add("browse", acc, _vfs, _ctx),
-    do: Map.put(acc, "browse-fetch", {:fn, fn url -> browse_fetch(url) end})
+    do: put(acc, "browse", fn url -> browse_fetch(url) end)
 
   # parallel: fan a registered command over N inputs across isolated instances
   # (the distributed-compute primitive, Workbooks.Fabric). The component passes a
@@ -54,9 +60,12 @@ defmodule Workbooks.Instance.Imports do
   # {"ok": stdout} | {"error": reason}, in order. This is how an intensive toolkit
   # borrows BEAM distribution; the media/render fabric is one consumer.
   defp add("parallel", acc, _vfs, _ctx),
-    do: Map.put(acc, "run-command-many", {:fn, fn name, inputs_json -> run_command_many(name, inputs_json) end})
+    do: put(acc, "parallel", fn name, inputs_json -> run_command_many(name, inputs_json) end)
 
   defp add(_other, acc, _, _ctx), do: acc
+
+  # project a capability's impl under the import name the Dock registry assigns it
+  defp put(acc, cap, fun), do: Map.put(acc, Workbooks.Dock.import_name(cap), {:fn, fun})
 
   defp run_command(name, input, args, ctx) do
     t0 = System.monotonic_time(:millisecond)
