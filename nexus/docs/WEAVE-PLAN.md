@@ -77,6 +77,19 @@ and can later run client-side via browser-wasm; baked-output first.
   modes documented, woven to HTML you can open. Update `examples/`.
 - `docs/WEAVE.md` — the render model, the three data modes, how to serve, how to ship local-only.
 
+## Progress
+
+- ✅ **Phase 0** — OCI image folded in (release + Dockerfile + `Nexus.Application`), boots `/app/bin/nexus`.
+- ✅ **Phase 1** — render-aware weave: `show Resource` → live XSS-safe table, empty-state, unknown handled.
+- ✅ **Phase 2** — index composition root: leads, titles the page, multi-file nav.
+- ✅ **Phase 3** — units render across **all lanes**: `show Unit` bakes `render()` (c=42, zig=45, rust=64).
+- ✅ **Phase 4 (baked + server)** — `nexus.data` client API: baked JSON islands (html-safe) + server
+  fallback; `Nexus.Server` (bandit) SSRs `/` and serves `/data/:resource`. Local-live SQLite remains.
+- ✅ **Phase 5** — served SSR live via `Nexus.Server`.
+- ✅ **CLIENT-SIDE PROVEN IN A REAL BROWSER** — `file:///tmp/workbook.html` (no server) rendered the
+  table and `nexus.data.all('Item')` returned the baked rows. The local-only HTML model works.
+- ⏳ Remaining: Phase 4 local-live (in-browser SQLite/IndexedDB), Phase 6 adversarial, Phase 7 demo+docs.
+
 ## Done when
 weave renders real HTML workbooks across all lanes and all three data modes, served *and* local,
 adversarially tested, demo + docs shipped, every suite green, all pushed. Then — and only then —
