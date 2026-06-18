@@ -152,7 +152,11 @@ agents (the tool-boundary JSON exception; everything else stays HTML).
 
 ## 10. Phasing (each phase shippable, build green, committed per win)
 
-- **P0 — `work_core`:** extract the shared toolchain, de-dupe runtime/nexus. Gate: both still build/test.
+- **P0 — `work_core`:** extract the shared toolchain, de-dupe. **DONE** — `work_core` holds
+  Literate/Graph/Extract/Capabilities/Wit; `nexus` depends on it (124 green), `work_core` 37 green.
+  *Runtime de-dup consciously SKIPPED:* the old runtime is the live-but-dying tier and its `wit` has
+  diverged + couples to its own `Workbooks.Dock`; shimming it is throwaway work that retires with the
+  runtime. The de-dup that matters — the future tiers (nexus + the CLI) — share one home.
 - **P1 — CLI shell + logging:** stand up the sibling `work` escript; the context/auth/router; the
   structured logger (palette); port the NIF-free local verbs (check/why/near/wit/lint/structure/weave);
   surface the literate verbs in `help`. Delight lands here.

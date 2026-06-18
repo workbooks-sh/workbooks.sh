@@ -18,6 +18,6 @@ defmodule WorkCore.MixProject do
 
   # Floki (HTML parse for weave) + Jason are the only deps; nothing that pulls a NIF.
   defp deps do
-    []
+    [{:jason, "~> 1.4"}]
   end
 end

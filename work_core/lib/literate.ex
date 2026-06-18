@@ -140,7 +140,7 @@ defmodule WorkCore.Literate do
     # foreign-language body (Rust/Zig/Python/…) won't parse as Elixir — those fall
     # back to the header and keep an opaque body for the per-language extractor.
     {kind, name, lang, ast} =
-      case Code.string_to_quoted(full) do
+      case Code.string_to_quoted(full, emit_warnings: false) do
         {:ok, quoted} -> from_ast(quoted, header)
         {:error, _} -> from_header(header)
       end

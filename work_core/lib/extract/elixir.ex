@@ -31,7 +31,7 @@ defmodule WorkCore.Extract.Elixir do
 
   @doc "Parse a flat `:decl` node's source and collect its type declarations."
   def decl_types(%{type: :decl, text: text}) do
-    case Code.string_to_quoted(text) do
+    case Code.string_to_quoted(text, emit_warnings: false) do
       {:ok, ast} -> types_in(ast)
       _ -> []
     end
