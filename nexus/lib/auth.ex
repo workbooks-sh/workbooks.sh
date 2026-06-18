@@ -65,8 +65,20 @@ defmodule Nexus.Auth.Bearer do
 
     cond do
       token in [nil, ""] -> {:error, :no_token_configured}
-      get_req_header(conn, "authorization") == ["Bearer " <> token] -> {:ok, %{tenant: tenant, user: nil}}
+      bearer_matches?(conn, token) -> {:ok, %{tenant: tenant, user: nil}}
       true -> {:error, :unauthorized}
+    end
+  end
+
+  # Constant-time comparison of the presented bearer against the configured token. A plain `==` on
+  # the token is a timing oracle that leaks the secret byte-by-byte; `secure_compare` is
+  # constant-time. We compare the full expected `"Bearer <token>"` header value.
+  defp bearer_matches?(conn, token) do
+    expected = "Bearer " <> token
+
+    case get_req_header(conn, "authorization") do
+      [presented] -> Plug.Crypto.secure_compare(presented, expected)
+      _ -> false
     end
   end
 end

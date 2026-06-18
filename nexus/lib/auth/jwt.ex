@@ -55,6 +55,7 @@ defmodule Nexus.Auth.Jwt do
 
   defp jwks_key(jwt) do
     with url when is_binary(url) <- cfg(:jwks_url),
+         true <- https?(url),
          %JOSE.JWS{fields: %{"kid" => kid}} <- JOSE.JWT.peek_protected(jwt),
          {:ok, key_map} <- find_key(url, kid) do
       {:ok, JOSE.JWK.from_map(key_map), "RS256"}
@@ -62,6 +63,10 @@ defmodule Nexus.Auth.Jwt do
       _ -> {:error, :no_key}
     end
   end
+
+  # A JWKS URL MUST be https — fetching signing keys over cleartext is a trivial MITM key-swap that
+  # forges any tenant. Refuse anything that isn't https:// outright.
+  defp https?(url), do: String.starts_with?(url, "https://")
 
   defp find_key(url, kid) do
     case Enum.find(jwks(url, false), &(&1["kid"] == kid)) do
@@ -84,14 +89,24 @@ defmodule Nexus.Auth.Jwt do
         keys
 
       _ ->
-        keys =
-          case Nexus.Compilers.Shared.http_get(url) do
-            {:ok, body} -> Jason.decode!(body)["keys"] || []
-            _ -> []
-          end
-
-        :persistent_term.put(cache, keys)
+        keys = fetch_keys(url)
+        # only cache a non-empty, well-formed key set — never poison the cache with [] from a
+        # transient fetch/parse failure (would wedge auth until restart).
+        if keys != [], do: :persistent_term.put(cache, keys)
         keys
+    end
+  end
+
+  # Bounded, crash-safe JWKS fetch. A malicious/oversized/non-JSON JWKS body must yield `[]`
+  # (→ 401), never an unhandled raise (500) or unbounded memory. 1 MiB is far above any real JWKS.
+  @jwks_max_bytes 1_048_576
+  defp fetch_keys(url) do
+    with {:ok, body} <- Nexus.Compilers.Shared.http_get(url),
+         true <- byte_size(body) <= @jwks_max_bytes,
+         {:ok, %{"keys" => keys}} when is_list(keys) <- Jason.decode(body) do
+      Enum.filter(keys, &is_map/1)
+    else
+      _ -> []
     end
   end
 

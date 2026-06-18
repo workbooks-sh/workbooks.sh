@@ -217,9 +217,9 @@ defmodule Nexus.Weave do
     name = rest |> String.split() |> List.first()
 
     case Map.get(res, name) do
-      {:resource, mod} -> render_show(name, mod, ctx.tenant)
+      {:resource, mod} -> render_show(name, mod, ctx)
       {:unit, node} -> render_unit(name, node)
-      _ -> render_show(name, nil, ctx.tenant)
+      _ -> render_show(name, nil, ctx)
     end
   end
 
@@ -251,12 +251,15 @@ defmodule Nexus.Weave do
     end
   end
 
-  defp render_show(name, nil, _tenant),
+  defp render_show(name, nil, _ctx),
     do: ~s(  <div class="data-missing">unknown resource <code>#{esc(name)}</code></div>)
 
-  defp render_show(name, mod, tenant) do
+  defp render_show(name, mod, ctx) do
     fields = Enum.map(mod.__fields__(), &elem(&1, 0))
-    all = Nexus.Store.all(mod, tenant)
+    # `bake: false` = the SHARED multi-tenant SSR shell. It must inline NO tenant rows — not in the
+    # JSON island AND not in the visible <table> — or a shell cached for tenant A leaks A's (or the
+    # default tenant's) rows to tenant B. The client hydrates the table from its own scoped /data.
+    all = if Map.get(ctx, :bake, true), do: Nexus.Store.all(mod, ctx.tenant), else: []
     total = length(all)
     rows = Enum.take(all, @max_rows)
     header = Enum.map_join(fields, "", &"<th>#{esc(&1)}</th>")

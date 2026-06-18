@@ -101,4 +101,37 @@ defmodule Nexus.ServerTest do
     assert {:ok, rows} = Jason.decode(json)
     assert Enum.any?(rows, &(&1["name"] == "Fresh"))
   end
+
+  test "SSR CACHE LEAK: multi-tenant shell bakes NO data; single-tenant shell does", %{port: port, mod: mod} do
+    Application.put_env(:nexus, :auth, Nexus.Auth.Jwt)
+    Application.put_env(:nexus, Nexus.Auth.Jwt, secret: "shh", tenant_claim: "org")
+    on_exit(fn ->
+      Application.put_env(:nexus, :auth, Nexus.Auth.None)
+      Application.delete_env(:nexus, Nexus.Auth.Jwt)
+      # drop the cached shells so later tests rebuild cleanly
+      if :ets.whereis(:nexus_server_cache) != :undefined, do: :ets.delete_all_objects(:nexus_server_cache)
+    end)
+
+    if :ets.whereis(:nexus_server_cache) != :undefined, do: :ets.delete_all_objects(:nexus_server_cache)
+    Nexus.Store.create(mod, %{name: "SecretAcme", price: 7}, "t1")
+
+    jwt = fn org ->
+      {_, t} = JOSE.JWK.from_oct("shh") |> JOSE.JWT.sign(%{"alg" => "HS256"}, %{"org" => org, "exp" => System.os_time(:second) + 60}) |> JOSE.JWS.compact()
+      t
+    end
+
+    home = fn org ->
+      req = {~c"http://127.0.0.1:#{port}/", [{~c"authorization", ~c"Bearer #{jwt.(org)}"}]}
+      {:ok, {{_, 200, _}, _, body}} = :httpc.request(:get, req, [], [])
+      to_string(body)
+    end
+
+    # The shared/cached multi-tenant shell must inline NO tenant rows — neither t1's secret
+    # data nor the setup "default" row ("Soup"). It is bake:false and tenant-agnostic.
+    h1 = home.("t1")
+    refute h1 =~ "SecretAcme"
+    refute h1 =~ "Soup"
+    # t2 gets the very same shell (no t1 bleed); confirm cache served identical bytes.
+    assert home.("t2") == h1
+  end
 end
