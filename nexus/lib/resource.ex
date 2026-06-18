@@ -10,7 +10,7 @@ defmodule Nexus.Resource do
   framework. WIT is derived here too.
   """
 
-  alias Nexus.Wit.Types
+  alias WorkCore.Wit.Types
 
   # author's domain type → WIT scalar (the whole mapping, in one place, no guessing)
   @scalars %{text: "string", int: "s32", float: "f64", bool: "bool", money: "money", id: "string"}

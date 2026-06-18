@@ -6,7 +6,7 @@ defmodule Nexus do
 
       .work file
         │  WorkCore.Literate.parse/1        → ordered nodes (md prose + Elixir AST)
-        │  Nexus.Resource / Nexus.Wit    → shape + the WIT contract
+        │  Nexus.Resource / WorkCore.Wit    → shape + the WIT contract
         ▼
       Nexus.Compile.unit/1               → one unit becomes:
         ├─ a resource?  → a typed struct (persisted via the Nexus.Store seam)

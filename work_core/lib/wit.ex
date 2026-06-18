@@ -1,4 +1,4 @@
-defmodule Nexus.Wit do
+defmodule WorkCore.Wit do
   @moduledoc """
   §2 — generate a per-unit **WIT world** from the parsed unit: `export`s from the
   AST signature (`Extract.facts` public defs), `import`s from the unit's `grant`s.
@@ -6,11 +6,11 @@ defmodule Nexus.Wit do
   thing the demo's `contract.work` shows once, labelled "generated".
 
   This is the world *skeleton*: param/return types default to `string` until the
-  full `Nexus.Wit.Types` mapping lands (§2.2 — record/variant/enum/flags from
+  full `WorkCore.Wit.Types` mapping lands (§2.2 — record/variant/enum/flags from
   the unit's declared structs). A unit with no signature gets the default `run`.
   """
 
-  alias Nexus.Dock
+  alias WorkCore.Capabilities
   alias WorkCore.Extract
 
   # the grant words a unit may declare — filters stray header tokens (string values,
@@ -19,7 +19,7 @@ defmodule Nexus.Wit do
 
   # The self-contained host capability interfaces come from the single Dock registry
   # (§3) — so a generated package validates standalone AND §2's imports are the same
-  # surface the runtime Dock projects. See `Nexus.Dock`.
+  # surface the runtime Dock projects. See `WorkCore.Dock`.
 
   @doc "Generate the WIT `world` source for a `WorkCore.Literate` :code node."
   def world(%{name: name} = node) when is_binary(name) do
@@ -28,7 +28,7 @@ defmodule Nexus.Wit do
     exports = export_lines(facts.exports)
     exports = if exports == [], do: ["export run: func(input: string) -> string;"], else: exports
     imports =
-      node |> grants() |> Enum.map(&Dock.grant_import/1) |> Enum.reject(&is_nil/1) |> Enum.map(&"import #{&1};")
+      node |> grants() |> Enum.map(&Capabilities.grant_import/1) |> Enum.reject(&is_nil/1) |> Enum.map(&"import #{&1};")
 
     body = (types ++ exports ++ imports) |> Enum.map(&indent/1) |> Enum.join("\n")
 
@@ -51,7 +51,7 @@ defmodule Nexus.Wit do
            node.type == :decl,
            {:enum, name, atoms} <- WorkCore.Extract.Elixir.decl_types(node),
            do: {name, atoms})
-      |> Enum.uniq_by(fn {name, _} -> Nexus.Wit.Types.wit(name) end)
+      |> Enum.uniq_by(fn {name, _} -> WorkCore.Wit.Types.wit(name) end)
 
     record_specs =
       (for node <- nodes,
@@ -59,10 +59,10 @@ defmodule Nexus.Wit do
            node.kind == "defmodule",
            {:record, fields} <- Extract.facts(node).types,
            do: {node.name, fields})
-      |> Enum.uniq_by(fn {name, _} -> Nexus.Wit.Types.wit(name) end)
+      |> Enum.uniq_by(fn {name, _} -> WorkCore.Wit.Types.wit(name) end)
 
-    records = for {name, fields} <- record_specs, do: Nexus.Wit.Types.record(name, fields, enums_kv)
-    enums = for {name, atoms} <- enums_kv, do: Nexus.Wit.Types.enum(name, atoms)
+    records = for {name, fields} <- record_specs, do: WorkCore.Wit.Types.record(name, fields, enums_kv)
+    enums = for {name, atoms} <- enums_kv, do: WorkCore.Wit.Types.enum(name, atoms)
 
     case records ++ enums do
       [] -> nil
@@ -102,14 +102,14 @@ defmodule Nexus.Wit do
     units =
       (for n <- nodes, n.type == :code, n.name, n.kind != "defmodule", do: n)
       # two units mapping to the same WIT identifier can't both be top-level worlds
-      |> Enum.uniq_by(&Nexus.Wit.Types.wit(&1.name))
+      |> Enum.uniq_by(&WorkCore.Wit.Types.wit(&1.name))
 
     # `shared` = a workbook-wide {interface, type_names} so a param typed by a record
     # defined in another file still resolves; without it, types are file-scoped.
     {iface, type_names} = shared || {file_interface(nodes), type_names(nodes)}
 
-    caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&Nexus.Dock.sandbox_capability?/1)
-    host = caps |> Enum.map(&Nexus.Dock.interface_wit/1) |> Enum.join("\n\n")
+    caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&WorkCore.Capabilities.sandbox_capability?/1)
+    host = caps |> Enum.map(&WorkCore.Capabilities.interface_wit/1) |> Enum.join("\n\n")
     worlds = Enum.map(units, &pkg_world(&1, type_names))
 
     parts = ([host, iface] ++ worlds) |> Enum.reject(&(&1 in [nil, ""]))
@@ -255,10 +255,10 @@ defmodule Nexus.Wit do
     records =
       (for {:record, fields} <- types, do: fields)
       |> Enum.with_index()
-      |> Enum.map(fn {fields, i} -> Nexus.Wit.Types.record(Enum.at(modules, i) || unit, fields, enums_kv) end)
+      |> Enum.map(fn {fields, i} -> WorkCore.Wit.Types.record(Enum.at(modules, i) || unit, fields, enums_kv) end)
 
-    enums = for {:enum, name, atoms} <- types, do: Nexus.Wit.Types.enum(name, atoms)
-    variants = for {:variant, name, tags} <- types, do: Nexus.Wit.Types.variant(name, tags)
+    enums = for {:enum, name, atoms} <- types, do: WorkCore.Wit.Types.enum(name, atoms)
+    variants = for {:variant, name, tags} <- types, do: WorkCore.Wit.Types.variant(name, tags)
 
     records ++ enums ++ variants
   end
@@ -271,14 +271,14 @@ defmodule Nexus.Wit do
       for n <- nodes,
           n.type == :decl,
           {:enum, name, _atoms} <- WorkCore.Extract.Elixir.decl_types(n),
-          do: Nexus.Wit.Types.wit(name)
+          do: WorkCore.Wit.Types.wit(name)
 
     records =
       for n <- nodes,
           n.type == :code,
           n.kind == "defmodule",
           {:record, _f} <- Extract.facts(n).types,
-          do: Nexus.Wit.Types.wit(n.name)
+          do: WorkCore.Wit.Types.wit(n.name)
 
     (records ++ enums) |> Enum.uniq()
   end
@@ -309,8 +309,8 @@ defmodule Nexus.Wit do
       node
       |> grants()
       |> Enum.uniq()
-      |> Enum.filter(&Nexus.Dock.sandbox_capability?/1)
-      |> Enum.map(&"import #{Nexus.Dock.interface_name(&1)};")
+      |> Enum.filter(&WorkCore.Capabilities.sandbox_capability?/1)
+      |> Enum.map(&"import #{WorkCore.Capabilities.interface_name(&1)};")
 
     body = (use_line ++ exports ++ imports) |> Enum.map_join("\n", &("  " <> &1))
     "world #{wit_name(node.name)} {\n#{body}\n}"
@@ -335,5 +335,5 @@ defmodule Nexus.Wit do
 
   defp scalar?(t), do: t in ~w(string bool s8 s16 s32 s64 u8 u16 u32 u64 f32 f64 char)
 
-  defp wit_name(name), do: Nexus.Wit.Types.wit(name)
+  defp wit_name(name), do: WorkCore.Wit.Types.wit(name)
 end
