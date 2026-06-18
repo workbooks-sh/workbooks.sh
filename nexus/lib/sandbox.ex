@@ -28,11 +28,8 @@ defmodule Nexus.Sandbox do
     Wasmex.Components.call_function(pid, fun, args, timeout)
   end
 
-  # The Dock supplies the host implementation for each granted capability — the one place this
-  # layer holds real code (everything else is wasmex). The cap→impl wiring lands with the Dock
-  # impls (net/kv/secrets/…); until then this is the seam where they plug in.
-  defp imports_for(caps) do
-    _ = Enum.filter(caps, &Nexus.Dock.capability?/1)
-    %{}
-  end
+  # The Dock supplies the host implementations (the one place this layer holds real code —
+  # everything else is wasmex). A component only calls the imports it declares, so handing it the
+  # full Dock set is safe.
+  defp imports_for(_caps), do: Nexus.Dock.impls()
 end

@@ -61,6 +61,18 @@ defmodule Nexus.Dock do
   @doc "Every capability name in the registry (both vocabularies)."
   def capabilities, do: Map.keys(@registry)
 
+  @doc """
+  Host implementations the Dock supplies to a sandboxed component, as the wasmex import map
+  (`%{"name" => {:fn, impl}}`). A component only invokes the imports it declares; extras are
+  ignored, so we can offer the full set. Scalar caps work today (`now`); string-typed caps
+  (net/kv/llm) await the canonical-ABI string glue between an `extern "C"` decl and a WIT `string`.
+  """
+  def impls do
+    %{
+      "now" => {:fn, fn -> System.os_time(:second) end}
+    }
+  end
+
   @doc "The per-unit sandbox-enforced capabilities (granted by an author, audited by the weave)."
   def sandbox_capabilities, do: for({c, %{sandbox?: true}} <- @registry, do: c)
 

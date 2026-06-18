@@ -76,4 +76,23 @@ defmodule Nexus.CompileTest do
       :ok
     end
   end
+
+  @tag :compiler
+  @tag timeout: 240_000
+  test "a unit's host import is supplied by the Dock automatically (turnkey cap)" do
+    if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
+      node =
+        ~s|rust :clock do\n  extern "C" { fn now() -> i64; }\n  #[no_mangle]\n  pub extern "C" fn stamp() -> i64 { unsafe { now() } }\nend\n|
+        |> Nexus.Literate.parse()
+        |> Enum.find(&(&1.type == :code))
+
+      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
+      # Sandbox supplies `now` from the Dock — no manual import map.
+      {:ok, p} = Nexus.Sandbox.start(comp, [])
+      assert {:ok, t} = Nexus.Sandbox.call(p, "stamp", [])
+      assert t > 1_700_000_000
+    else
+      :ok
+    end
+  end
 end
