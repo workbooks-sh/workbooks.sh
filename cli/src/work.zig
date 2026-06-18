@@ -115,7 +115,7 @@ fn codeNode(alloc: std.mem.Allocator, opener: []const u8, body: []const u8) !Nod
         .name = std.mem.trim(u8, name, ",(){}: \t"),
         .header = header,
         .body = body,
-        .refs = try extractRefs(alloc, body),
+        .refs = try extractRefs(alloc, try std.fmt.allocPrint(alloc, "{s}\n{s}", .{ header, body })),
     };
 }
 

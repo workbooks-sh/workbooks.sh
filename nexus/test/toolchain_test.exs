@@ -19,3 +19,24 @@ defmodule Nexus.ToolchainTest do
     end
   end
 end
+
+defmodule Nexus.ToolchainParseTest do
+  use ExUnit.Case, async: false
+  @moduletag :greenfield
+
+  test "parse/1 (full nodes via the Zig reactor) matches WorkCore on the common fields" do
+    if Nexus.Toolchain.available?() do
+      start_supervised!(Nexus.Toolchain)
+      src = File.read!(Path.expand("../../cli/src/corpus/store.work", __DIR__))
+
+      # Structural conformance: the code units (name/kind/lang) match. Finer ref-token parity
+      # (:atoms/@types/#tags) is a documented follow-up — see docs/WORK-CORE-DECISION.md.
+      got = Nexus.Toolchain.parse(src) |> Enum.filter(&(&1["type"] == "code")) |> Enum.map(&{&1["name"], &1["kind"], &1["lang"]})
+      want = WorkCore.Literate.parse(src) |> Enum.filter(&(&1.type == :code)) |> Enum.map(&{&1.name, &1.kind, &1.lang})
+
+      assert got == want
+    else
+      IO.puts("[skip] reactor not staged")
+    end
+  end
+end

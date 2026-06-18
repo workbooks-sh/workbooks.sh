@@ -17,6 +17,9 @@ defmodule Nexus.Toolchain do
   @doc "Parse `.work` source via the Zig reactor → `[%{name, kind, lang}]` (the code units)."
   def parse_units(src) when is_binary(src), do: GenServer.call(__MODULE__, {:parse_units, src})
 
+  @doc "Parse `.work` source via the Zig reactor → the FULL nodes (type/kind/lang/name/header/body/refs)."
+  def parse(src) when is_binary(src), do: GenServer.call(__MODULE__, {:parse_json, src})
+
   @doc "Whether the reactor wasm is present (so callers can fall back if not staged)."
   def available?, do: File.exists?(@wasm)
 
@@ -29,13 +32,13 @@ defmodule Nexus.Toolchain do
   end
 
   @impl true
+  def handle_call({:parse_json, src}, _from, st) do
+    json = invoke(st, "parse_json", src)
+    {:reply, Jason.decode!(json), st}
+  end
+
   def handle_call({:parse_units, src}, _from, %{pid: pid, memory: memory, store: store} = s) do
-    import Bitwise
-    Wasmex.call_function(pid, "reset", [])
-    {:ok, [ptr]} = Wasmex.call_function(pid, "alloc", [byte_size(src)])
-    Wasmex.Memory.write_binary(store, memory, ptr, src)
-    {:ok, [packed]} = Wasmex.call_function(pid, "parse_units", [ptr, byte_size(src)])
-    out = Wasmex.Memory.read_binary(store, memory, bsr(packed, 32), band(packed, 0xFFFFFFFF))
+    out = invoke(%{pid: pid, memory: memory, store: store}, "parse_units", src)
 
     units =
       out
@@ -46,5 +49,15 @@ defmodule Nexus.Toolchain do
       end)
 
     {:reply, units, s}
+  end
+
+  # Call a reactor export with a string in, string out (the pointer-len ABI). Serialized by the GenServer.
+  defp invoke(%{pid: pid, memory: memory, store: store}, fun, src) do
+    import Bitwise
+    Wasmex.call_function(pid, "reset", [])
+    {:ok, [ptr]} = Wasmex.call_function(pid, "alloc", [byte_size(src)])
+    Wasmex.Memory.write_binary(store, memory, ptr, src)
+    {:ok, [packed]} = Wasmex.call_function(pid, fun, [ptr, byte_size(src)])
+    Wasmex.Memory.read_binary(store, memory, bsr(packed, 32), band(packed, 0xFFFFFFFF))
   end
 end
