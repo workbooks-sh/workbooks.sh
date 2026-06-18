@@ -1,0 +1,10 @@
+# Corner Store
+
+A tiny **living** workbook — one file of prose, a database, and a compiled unit — that `nexus`
+brings up end to end. Open the woven `.html`, or run it:
+
+- `Nexus.Compile.workbook("examples/store")` materialises the `Product` database and lists the
+  wasm units
+- `Nexus.Weave.weave("examples/store")` renders this whole folder to one self-contained page
+
+Everything below is authored as `.work`; nothing here is hand-written HTML or JSON.

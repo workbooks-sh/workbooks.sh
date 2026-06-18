@@ -1,0 +1,18 @@
+## Pricing logic, compiled
+
+A `c` unit is real C, compiled to a wasm component by our own toolchain (clang, run in-sandbox)
+and executed on wasmex. `discount` takes a price and a percent and returns the marked-down price.
+
+c :pricing do
+  int discount(int price, int pct) {
+    return price - (price * pct) / 100;
+  }
+end
+
+The `now` cap (a host capability the unit imports) stamps when the sheet was priced — a typed
+WIT import the Dock supplies, granted explicitly in the header.
+
+c :clock, grant: [now] do
+  extern long now(void);
+  long priced_at(void) { return now(); }
+end

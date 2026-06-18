@@ -224,10 +224,12 @@ defmodule Nexus.Compile do
         {u.name, try_materialize(u)}
       end
 
+    wasm = Enum.flat_map(~w(rust c cpp zig), &Map.get(by_kind, &1, []))
+
     %{
       beam: try_beam(root),
       resources: resources,
-      wasm_units: for(u <- Map.get(by_kind, "rust", []), do: u.name)
+      wasm_units: for(u <- wasm, do: u.name)
     }
   end
 

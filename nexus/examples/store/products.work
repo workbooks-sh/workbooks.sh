@@ -1,0 +1,11 @@
+## The catalogue
+
+A `resource` is the database. Declare the shape and `nexus` derives a live **Ash** resource —
+real CRUD, the inline `status` enum becomes a real constraint. No schema files, no migrations.
+
+resource Product do
+  name :text
+  price :money
+  stock :int
+  status :draft | :live | :sold_out
+end

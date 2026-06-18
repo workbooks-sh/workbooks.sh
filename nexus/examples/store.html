@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>workbook</title>
+<style>body{max-width:46rem;margin:2rem auto;padding:0 1rem;font:16px/1.6 system-ui,sans-serif;color:#1a1a1a}
+h1,h2,h3{line-height:1.25;margin:1.6em 0 .5em} code{background:#f4f4f5;padding:.1em .3em;border-radius:3px;font-size:.9em}
+.unit{margin:1.2em 0;border:1px solid #e4e4e7;border-radius:8px;overflow:hidden}
+.unit figcaption{background:#fafafa;padding:.4em .8em;font-size:.85em;border-bottom:1px solid #e4e4e7}
+.unit .kind{display:inline-block;background:#1a1a1a;color:#fff;padding:.05em .5em;border-radius:4px;font-size:.8em;margin-right:.4em}
+.unit pre{margin:0;padding:.8em;overflow-x:auto;background:#fff} pre code{background:none}
+.decl{background:#f4f4f5;padding:.6em;border-radius:6px;font-size:.85em}
+</style></head>
+<body>
+<section class="file" data-file="index.work">
+  <h1>Corner Store</h1>
+  <p>A tiny <strong>living</strong> workbook — one file of prose, a database, and a compiled unit — that <code>nexus</code></p>
+  <p>brings up end to end. Open the woven <code>.html</code>, or run it:</p>
+  <ul><li><code>Nexus.Compile.workbook("examples/store")</code> materialises the <code>Product</code> database and lists the</li></ul>
+  <p>  wasm units</p>
+  <ul><li><code>Nexus.Weave.weave("examples/store")</code> renders this whole folder to one self-contained page</li></ul>
+  <p>Everything below is authored as <code>.work</code>; nothing here is hand-written HTML or JSON.</p>
+</section>
+<section class="file" data-file="pricing.work">
+  <h2>Pricing logic, compiled</h2>
+  <p>A <code>c</code> unit is real C, compiled to a wasm component by our own toolchain (clang, run in-sandbox)</p>
+  <p>and executed on wasmex. <code>discount</code> takes a price and a percent and returns the marked-down price.</p>
+  <figure class="unit" data-unit="c:pricing"><figcaption><span class="kind">c</span> pricing</figcaption><pre>  int discount(int price, int pct) {
+    return price - (price * pct) / 100;
+  }</pre></figure>
+  <p>The <code>now</code> cap (a host capability the unit imports) stamps when the sheet was priced — a typed</p>
+  <p>WIT import the Dock supplies, granted explicitly in the header.</p>
+  <figure class="unit" data-unit="c:clock"><figcaption><span class="kind">c</span> clock</figcaption><pre>  extern long now(void);
+  long priced_at(void) { return now(); }</pre></figure>
+</section>
+<section class="file" data-file="products.work">
+  <h2>The catalogue</h2>
+  <p>A <code>resource</code> is the database. Declare the shape and <code>nexus</code> derives a live <strong>Ash</strong> resource —</p>
+  <p>real CRUD, the inline <code>status</code> enum becomes a real constraint. No schema files, no migrations.</p>
+  <figure class="unit" data-unit="resource:Product"><figcaption><span class="kind">resource</span> Product</figcaption><pre>  name :text
+  price :money
+  stock :int
+  status :draft | :live | :sold_out</pre></figure>
+</section>
+</body></html>
