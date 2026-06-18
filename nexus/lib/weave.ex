@@ -13,10 +13,18 @@ defmodule Nexus.Weave do
   # lives behind the server/local backend via nexus.data.
   @max_rows 500
 
-  @doc "Weave a workbook folder into one self-contained HTML string."
-  def weave(root) do
+  @doc """
+  Weave a workbook folder into one self-contained HTML string.
+
+  `opts[:live]` (default false) picks the data posture baked into `nexus.data`:
+    * **false (local)** — baked rows are authoritative; the file works offline, no server.
+    * **true (server)** — the client prefers fresh `/data/:resource`, falling back to the baked rows
+      as the initial paint. Use this when serving from a live nexus so cached HTML still shows current
+      data.
+  """
+  def weave(root, opts \\ []) do
     pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
-    render(pages, resources(pages))
+    render(pages, resources(pages), Keyword.get(opts, :live, false))
   end
 
   # index.work is the composition root — it leads; the rest follow alphabetically.
@@ -81,7 +89,7 @@ defmodule Nexus.Weave do
     _ -> nil
   end
 
-  defp render(pages, res) do
+  defp render(pages, res, live) do
     body = Enum.map_join(pages, "\n", &page(&1, res))
 
     """
@@ -90,7 +98,7 @@ defmodule Nexus.Weave do
     <style>#{css()}</style></head>
     <body>
     #{nav(pages)}#{body}
-    #{data_islands(res)}<script>#{js_shim()}</script>
+    #{data_islands(res)}<script>#{js_shim(live)}</script>
     </body></html>
     """
   end
@@ -119,10 +127,11 @@ defmodule Nexus.Weave do
   #   * LOCAL   — a mutable IndexedDB store (local-only + mutable: create() persists across reloads)
   #   * SERVER  — fetch('/data/<Resource>') (cloud/shared) — only when there is no local data at all
   # all() = baked ∪ local; create() writes local. Same API the served nexus exposes.
-  defp js_shim do
+  defp js_shim(live) do
     """
     window.nexus = window.nexus || {};
     nexus.data = {
+      _live: #{if(live, do: "true", else: "false")},
       _baked: null,
       _db: null,
       _loadBaked() {
@@ -155,6 +164,10 @@ defmodule Nexus.Weave do
         });
       },
       async all(resource) {
+        // server mode: prefer fresh /data (cached HTML stays current); fall back to baked/local.
+        if (this._live) {
+          try { const r = await fetch('/data/' + encodeURIComponent(resource)); if (r.ok) return await r.json(); } catch (_) {}
+        }
         const baked = this._loadBaked()[resource] || [];
         const local = await this._local(resource);
         if (baked.length || local.length) return baked.concat(local);

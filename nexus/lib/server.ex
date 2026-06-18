@@ -28,11 +28,9 @@ defmodule Nexus.Server do
   end
 
   get "/" do
-    html = Nexus.Weave.weave(root())
-
     conn
     |> put_resp_content_type("text/html")
-    |> send_resp(200, html)
+    |> send_resp(200, cached_html(root()))
   end
 
   get "/data/:resource" do
@@ -48,4 +46,44 @@ defmodule Nexus.Server do
   end
 
   defp root, do: Application.get_env(:nexus, :workbook_root) || File.cwd!()
+
+  # Cache the woven shell by the workbook's newest .work mtime, so units compile ONCE — not per
+  # request (a `show <Unit>` recompiles a wasm component, ~seconds; never do that on a hot path).
+  # Served HTML is `live: true`, so the cached shell still shows current data (the client fetches
+  # /data); the cache re-weaves only when a .work file changes. The /data endpoint is always live.
+  defp cached_html(root) do
+    mtime = workbook_mtime(root)
+    table = cache_table()
+
+    case :ets.lookup(table, root) do
+      [{^root, ^mtime, html}] ->
+        html
+
+      _ ->
+        html = Nexus.Weave.weave(root, live: true)
+        :ets.insert(table, {root, mtime, html})
+        html
+    end
+  end
+
+  defp workbook_mtime(root) do
+    (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
+    |> Enum.uniq()
+    |> Enum.map(&File.stat!(&1).mtime)
+    |> Enum.max(fn -> nil end)
+  end
+
+  defp cache_table do
+    case :ets.whereis(:nexus_server_cache) do
+      :undefined ->
+        try do
+          :ets.new(:nexus_server_cache, [:named_table, :public, :set])
+        rescue
+          ArgumentError -> :nexus_server_cache
+        end
+
+      _ ->
+        :nexus_server_cache
+    end
+  end
 end

@@ -17,7 +17,7 @@ defmodule Nexus.ServerTest do
     {:ok, pid} = Nexus.Server.start_link(root: dir, port: port)
     :inets.start()
     on_exit(fn -> Process.exit(pid, :kill); File.rm_rf!(dir) end)
-    {:ok, port: port}
+    {:ok, port: port, mod: mod}
   end
 
   defp get(port, path) do
@@ -39,5 +39,18 @@ defmodule Nexus.ServerTest do
   test "GET /data of an unknown resource is an empty array, not an error", %{port: port} do
     {200, json} = get(port, "/data/Ghost")
     assert json == "[]"
+  end
+
+  test "served page is live-mode and /data reflects data changed after the page was cached",
+       %{port: port, mod: mod} do
+    {200, html} = get(port, "/")
+    # the client prefers fresh /data over the baked initial paint (server posture)
+    assert html =~ "_live: true"
+
+    # add a row AFTER the SSR shell is cached — /data must still return it (it's live, not cached)
+    Nexus.Store.create(mod, %{name: "Fresh", price: 1})
+    {200, json} = get(port, "/data/Item")
+    assert {:ok, rows} = Jason.decode(json)
+    assert Enum.any?(rows, &(&1["name"] == "Fresh"))
   end
 end
