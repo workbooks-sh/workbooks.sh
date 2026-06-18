@@ -19,7 +19,7 @@ defmodule Nexus.Unit do
         {:error, :no_body}
 
       body ->
-        mod = Module.concat([Nexus.Units, Macro.camelize(name) <> suffix()])
+        mod = Module.concat([Nexus.Units, WorkCore.Uid.camel(name) <> suffix()])
 
         quoted =
           quote do
@@ -125,7 +125,7 @@ defmodule Nexus.Unit do
         {:error, :no_body}
 
       body ->
-        mod = Module.concat([Macro.camelize(name)])
+        mod = WorkCore.Uid.module(name)
         quoted = quote do: (defmodule unquote(mod) do unquote(body) end)
 
         try do
@@ -175,8 +175,8 @@ defmodule Nexus.Unit do
         {:error, :no_body}
 
       body ->
-        under = Module.concat([Macro.camelize(name)])
-        mod = Module.concat([Macro.camelize(name) <> "Tests" <> suffix()])
+        under = WorkCore.Uid.module(name)
+        mod = Module.concat([WorkCore.Uid.camel(name) <> "Tests" <> suffix()])
 
         quoted =
           quote do

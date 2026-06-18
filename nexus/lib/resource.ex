@@ -71,7 +71,7 @@ defmodule Nexus.Resource do
   pluggable seam (`Nexus.Store`) — the struct doesn't know or care which backend holds it.
   """
   def compile(%{name: name} = node) do
-    mod = Module.concat([Macro.camelize(name)])
+    mod = WorkCore.Uid.module(name)
     defaults = struct_fields(node)
     specs = fields(node)
 

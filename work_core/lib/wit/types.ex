@@ -51,25 +51,9 @@ defmodule WorkCore.Wit.Types do
     "variant #{wit(name)} {\n#{cases}\n}"
   end
 
-  # WIT reserved words — must be %-escaped to be used as identifiers
-  @wit_keywords ~w(use type resource func record enum flags variant union bool
-    s8 s16 s32 s64 u8 u16 u32 u64 f32 f64 char string list option result tuple
-    future stream world import export package interface include with as from
-    static constructor borrow own and or)
-
   @doc """
-  WIT identifier form: lowercased, snake_case → kebab-case, with Elixir predicate/
-  bang suffixes (`?`/`!`) and any other illegal characters dropped, and reserved
-  words %-escaped (`from` → `%from`).
+  WIT identifier form — the canonical conversion lives in `WorkCore.Uid.wit/1`;
+  kept here as the §2.2 entry point the type emitters call.
   """
-  def wit(name) do
-    base =
-      name
-      |> to_string()
-      |> String.replace("_", "-")
-      |> String.downcase()
-      |> String.replace(~r/[^a-z0-9-]/, "")
-
-    if base in @wit_keywords, do: "%" <> base, else: base
-  end
+  defdelegate wit(name), to: WorkCore.Uid
 end

@@ -6,7 +6,7 @@ defmodule WorkCore.Graph do
   feed (§2) extend the edge set later without changing this shape.
   """
 
-  alias WorkCore.{Literate, Extract}
+  alias WorkCore.{Literate, Extract, Uid}
 
   defstruct nodes: %{}, edges: [], titles: %{}, backlinks: %{}
 
@@ -94,8 +94,8 @@ defmodule WorkCore.Graph do
   # ── work check: do every backlink + import resolve? ──
   @doc "Resolve every [[backlink]] across the tree + every edge; report what dangles."
   def check(%__MODULE__{nodes: nodes, edges: edges, titles: titles} = g) do
-    title_set = titles |> Map.values() |> Enum.map(&normalize/1) |> MapSet.new()
-    node_set = nodes |> Map.keys() |> Enum.map(&normalize/1) |> MapSet.new()
+    title_set = titles |> Map.values() |> Enum.map(&Uid.normalize/1) |> MapSet.new()
+    node_set = nodes |> Map.keys() |> Enum.map(&Uid.normalize/1) |> MapSet.new()
 
     dangling_backlinks =
       for {path, links} <- g.backlinks, l <- links, not resolves?(l, node_set, title_set), do: {path, l}
@@ -112,7 +112,7 @@ defmodule WorkCore.Graph do
   end
 
   defp resolves?(label, node_set, title_set) do
-    n = normalize(label)
+    n = Uid.normalize(label)
     MapSet.member?(node_set, n) or MapSet.member?(title_set, n)
   end
 
@@ -123,17 +123,5 @@ defmodule WorkCore.Graph do
   @doc "The unit's immediate neighbourhood — edges in and out."
   def near(%__MODULE__{edges: edges}, name), do: for(e <- edges, e.from == name or e.to == name, do: e)
 
-  defp normalize(nil), do: ""
-
-  defp normalize(label) do
-    label
-    |> to_string()
-    |> String.trim_leading("[[")
-    |> String.trim_trailing("]]")
-    |> String.downcase()
-    |> String.replace_leading("the ", "")
-    |> String.replace_trailing(" agent", "")
-    |> String.replace_trailing(" kit", "")
-    |> String.trim()
-  end
+  # normalize/1 moved to WorkCore.Uid — the canonical identity home.
 end
