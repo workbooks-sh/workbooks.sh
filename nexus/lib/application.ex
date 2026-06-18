@@ -15,7 +15,8 @@ defmodule Nexus.Application do
   @impl true
   def start(_type, _args) do
     # Empty by default; Ether's local-inference lanes opt in via `config :nexus, Nexus.Ether, enabled: true`.
-    children = if Nexus.Ether.enabled?(), do: Nexus.Ether.children(), else: []
+    ether = if Nexus.Ether.enabled?(), do: Nexus.Ether.children(), else: []
+    children = [Nexus.Telemetry | ether]
     Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
   end
 end

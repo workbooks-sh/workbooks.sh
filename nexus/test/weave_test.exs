@@ -107,7 +107,7 @@ defmodule Nexus.WeaveTest do
   @tag :compiler
   @tag timeout: 360_000
   test "show <Unit> bakes the unit's render() output into the page, across rust/c/zig" do
-    if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
       cases = [
         {"c :cu do\n  int render(void) { return 6 * 7; }\nend\n\nshow cu\n", "42"},
         {"zig :zu do\n  export fn render() i32 { return 5 * 9; }\nend\n\nshow zu\n", "45"},

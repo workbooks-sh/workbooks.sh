@@ -17,6 +17,25 @@ defmodule WorkCore.Wit do
   # (§3) — so a generated package validates standalone AND §2's imports are the same
   # surface the runtime Dock projects. See `WorkCore.Dock`.
 
+  @doc """
+  Build a single-world WIT package from already-formatted signature entries — the one
+  home the compile lanes (rust/zig/c) share instead of each splicing `package …/world …`
+  by hand. `imports`/`exports` are `[{ident, sig}]` where `ident` is the raw WIT
+  identifier (already passed through `WorkCore.Uid.wit/1` by the caller, or any string)
+  and `sig` is the full WIT signature (`"func(a: s32) -> s32"`, or a host-cap WIT).
+  `name` is normalized through `WorkCore.Uid.wit/1` so the package/world id matches the
+  rest of the identity surface.
+  """
+  def world_from_sigs(name, imports, exports) do
+    wname = wit_name(name)
+
+    lines =
+      Enum.map(imports, fn {id, sig} -> "  import #{id}: #{sig};" end) ++
+        Enum.map(exports, fn {id, sig} -> "  export #{id}: #{sig};" end)
+
+    "package work:#{wname};\n\nworld #{wname} {\n#{Enum.join(lines, "\n")}\n}\n"
+  end
+
   @doc "Generate the WIT `world` source for a `WorkCore.Literate` :code node."
   def world(node, shared \\ nil)
 

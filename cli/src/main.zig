@@ -76,6 +76,17 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(try context.nexusVerb(io, alloc, home, it.next() orelse ""));
     } else if (eql(verb, "whoami")) {
         std.process.exit(try context.whoami(io, alloc, home));
+    } else if (eql(verb, "login")) {
+        const a1 = it.next() orelse "";
+        var url: []const u8 = "";
+        var token: []const u8 = "";
+        if (eql(a1, "--token")) {
+            token = it.next() orelse "";
+        } else {
+            url = a1;
+            if (eql(it.next() orelse "", "--token")) token = it.next() orelse "";
+        }
+        std.process.exit(try context.login(io, alloc, home, url, token));
     } else if (eql(verb, "version") or eql(verb, "--version")) {
         log.print("work {s}\n", .{version});
     } else if (eql(verb, "help") or eql(verb, "--help")) {

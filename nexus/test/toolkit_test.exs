@@ -46,7 +46,7 @@ defmodule Nexus.ToolkitTest do
   @tag :kits
   @tag timeout: 240_000
   test "a RUST toolkit (just `fn main`) compiles to a command + runs via bash" do
-    if File.dir?("../runtime/compilers") && System.find_executable("wasmtime") do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasmtime") do
       n =
         unit(
           "toolkit :rev, lang: \"rust\" do\n  // summary: reverse each line\n  use std::io::{self,BufRead,Write};\n" <>
@@ -66,7 +66,7 @@ defmodule Nexus.ToolkitTest do
   @tag :kits
   @tag timeout: 240_000
   test "author a toolkit in a .work file → compile → register → run via bash" do
-    if File.dir?("../runtime/compilers") && System.find_executable("wasmtime") do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasmtime") do
       n =
         unit(
           "toolkit :upper do\n  // summary: uppercase stdin\n  #include <stdio.h>\n  #include <ctype.h>\n" <>

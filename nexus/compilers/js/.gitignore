@@ -1,0 +1,7 @@
+qjs-root
+*.o
+.cc
+.test
+qjs-run.wasm
+ts/typescript.js
+ts/tsjob.js

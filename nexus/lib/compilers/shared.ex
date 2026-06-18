@@ -15,7 +15,7 @@ defmodule Nexus.Compilers.Shared do
 
   @doc "Discovery root for compilers/<lang>/."
   def default_root do
-    Enum.find(["compilers", "../runtime/compilers", "runtime/compilers", Path.expand("../runtime/compilers", File.cwd!())], &File.dir?/1) ||
+    Enum.find(["compilers", Path.expand("compilers", File.cwd!())], &File.dir?/1) ||
       "compilers"
   end
 

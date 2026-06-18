@@ -47,11 +47,11 @@ defmodule Nexus.Compile do
         # (lowered) extern signature. Caps carry the proper WIT type (e.g. `string`).
         ilines =
           Enum.map(imports, fn {f, ps, r} ->
-            "  import #{wit_ident(f)}: #{Nexus.Dock.host_fn_wit(f) || "func(#{ps})#{r}"};"
+            {wit_ident(f), Nexus.Dock.host_fn_wit(f) || "func(#{ps})#{r}"}
           end)
 
-        elines = Enum.map(exports, fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
-        world = "package work:#{name};\n\nworld #{name} {\n#{Enum.join(ilines ++ elines, "\n")}\n}\n"
+        elines = Enum.map(exports, fn {f, ps, r} -> {wit_ident(f), "func(#{ps})#{r}"} end)
+        world = WorkCore.Wit.world_from_sigs(name, ilines, elines)
         import_names = Enum.map(imports, &elem(&1, 0))
         to_component(body, Enum.map(exports, &elem(&1, 0)), world, name, import_names, crate_deps(body))
     end
@@ -86,9 +86,9 @@ defmodule Nexus.Compile do
 
       _ ->
         wname = wit_ident(name)
-        ilines = Enum.map(caps, fn n -> "  import #{wit_ident(n)}: #{Nexus.Dock.host_fn_wit(n)};" end)
-        elines = Enum.map(exports, fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
-        world = "package work:#{wname};\n\nworld #{wname} {\n#{Enum.join(ilines ++ elines, "\n")}\n}\n"
+        ilines = Enum.map(caps, fn n -> {wit_ident(n), Nexus.Dock.host_fn_wit(n)} end)
+        elines = Enum.map(exports, fn {f, ps, r} -> {wit_ident(f), "func(#{ps})#{r}"} end)
+        world = WorkCore.Wit.world_from_sigs(name, ilines, elines)
 
         # A string-RETURNING cap needs a `cabi_realloc` export (the host allocates the returned
         # string in guest memory). Inject a no-libc bump allocator + export it.
@@ -106,7 +106,7 @@ defmodule Nexus.Compile do
 
         with {:ok, core} <- Nexus.Compilers.C.compile_to_wasm(src, exports: fn_exports, allow_undefined: caps != []) do
           core = if caps != [], do: rewrite_imports(core, Path.dirname(core), caps), else: core
-          c_componentize(core, world, wname)
+          WorkCore.Wit.componentize(core, world, wname)
         end
     end
   end
@@ -173,13 +173,13 @@ defmodule Nexus.Compile do
 
       exports ->
         wname = wit_ident(name)
-        lines = Enum.map_join(exports, "\n", fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
-        world = "package work:#{wname};\n\nworld #{wname} {\n#{lines}\n}\n"
+        elines = Enum.map(exports, fn {f, ps, r} -> {wit_ident(f), "func(#{ps})#{r}"} end)
+        world = WorkCore.Wit.world_from_sigs(name, [], elines)
         src = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}.zig")
         File.write!(src, body)
 
         with {:ok, core} <- Nexus.Compilers.Zig.compile_to_wasm(src, exports: Enum.map(exports, &elem(&1, 0))) do
-          c_componentize(core, world, wname)
+          WorkCore.Wit.componentize(core, world, wname)
         end
     end
   end
@@ -237,22 +237,6 @@ defmodule Nexus.Compile do
   defp c_ret("void"), do: ""
   defp c_ret(t), do: " -> #{Map.get(@c_wit, t, "s32")}"
 
-  defp c_componentize(core, world_text, world) do
-    dir = Path.join(System.tmp_dir!(), "nxcz_#{System.unique_integer([:positive])}")
-    File.mkdir_p!(dir)
-    wit = Path.join(dir, "w.wit")
-    embed = Path.join(dir, "e.wasm")
-    comp = Path.join(dir, "c.component.wasm")
-    File.write!(wit, world_text)
-
-    with {_, 0} <- System.cmd("wasm-tools", ["component", "embed", wit, core, "--world", world, "-o", embed]),
-         {_, 0} <- System.cmd("wasm-tools", ["component", "new", embed, "-o", comp]) do
-      {:ok, comp}
-    else
-      {out, code} -> {:error, {:componentize_failed, code, out}}
-    end
-  end
-
   # A unit declares crate deps with a `// deps: libm, regex` header line; the lane fetches +
   # resolves them from crates.io (version-floors handle ceiling-exceeding releases).
   defp crate_deps(body) do
@@ -303,7 +287,7 @@ defmodule Nexus.Compile do
     e -> {:error, Exception.message(e)}
   end
 
-  @adapter "../runtime/build/tools/wasi_snapshot_preview1.command.wasm"
+  @adapter "build/tools/wasi_snapshot_preview1.command.wasm"
 
   @doc """
   The wasm lane, proven end-to-end: Rust `source` exporting `fns` → a typed wasm component
@@ -401,11 +385,9 @@ defmodule Nexus.Compile do
     imports = sigs(@import_re, body)
     wname = wit_ident(name)
 
-    lines =
-      Enum.map(imports, fn {f, ps, r} -> "  import #{wit_ident(f)}: func(#{ps})#{r};" end) ++
-        Enum.map(exports, fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
-
-    world = "package work:#{wname};\n\nworld #{wname} {\n#{Enum.join(lines, "\n")}\n}\n"
+    ilines = Enum.map(imports, fn {f, ps, r} -> {wit_ident(f), "func(#{ps})#{r}"} end)
+    elines = Enum.map(exports, fn {f, ps, r} -> {wit_ident(f), "func(#{ps})#{r}"} end)
+    world = WorkCore.Wit.world_from_sigs(name, ilines, elines)
     %{world: world, name: wname, exports: exports, imports: imports}
   end
 
@@ -431,5 +413,5 @@ defmodule Nexus.Compile do
   defp wit_ret(r) when r in [nil, ""], do: ""
   defp wit_ret(t), do: " -> #{wit_type(t)}"
   defp wit_type(t), do: Map.get(@rust_wit, t, "s32")
-  defp wit_ident(s), do: s |> to_string() |> String.downcase() |> String.replace("_", "-")
+  defp wit_ident(s), do: WorkCore.Uid.wit(s)
 end

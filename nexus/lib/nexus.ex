@@ -17,7 +17,7 @@ defmodule Nexus do
 
   Built fresh, green per layer. Authoring + contract are pure Elixir (no deps); data is a typed
   struct + the pluggable `Nexus.Store` seam; the sandbox is wasmex; the compilers are reused from
-  `runtime/host/compilers/*` (the moat).
+  `compilers/*` (the moat).
   """
 
   @doc "The status of each layer — the honest state."

@@ -2,3 +2,10 @@
 priv/jsdom.js
 priv/eval-host.wasm
 priv/measure.wasm
+
+# relocated compiler-infra artifacts (moved in from runtime/, regenerated not committed)
+/compilers-dist/
+build/tools/wasm-tools.wasm
+build/tools/*.wasm
+/build/commands/*.d/
+/build/commands/registry.json

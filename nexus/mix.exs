@@ -41,7 +41,7 @@ defmodule Nexus.MixProject do
     [
       # the shared `.work` literate toolchain (parse/graph/extract/wit/weave) — one home, no dup
       {:work_core, path: "../work_core"},
-      {:wasmex, path: "../runtime/vendor/wasmex"},
+      {:wasmex, path: "vendor/wasmex"},
       # durable-local store backend behind the Nexus.Store seam (precompiled NIF). The cloud
       # backend (Neon Postgres) and any wasm-SQL engine slot in behind the same 4 callbacks.
       {:exqlite, "~> 0.23"},

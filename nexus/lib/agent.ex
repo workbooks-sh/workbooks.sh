@@ -51,13 +51,57 @@ defmodule Nexus.Agent do
 
     messages = [%{role: "system", content: system_prompt(opts)}, %{role: "user", content: task}]
     deadline = now_ms() + Keyword.get(opts, :timeout_ms, @default_timeout)
+    started = now_ms()
 
     try do
-      loop(messages, vfs, opts, deadline, 0)
+      {result, tel} = loop(messages, vfs, opts, deadline, %{turns: 0, prompt: 0, completion: 0, total: 0, tools: []})
+      record_run(opts[:unit], result, tel, started)
+      result
     after
       Vfs.destroy(vfs)
     end
   end
+
+  # fold each run into the execution-reality ledger (§10), keyed by unit identity.
+  defp record_run(unit, result, tel, started) do
+    status =
+      case result do
+        {:ok, _} -> :ok
+        {:error, {:timeout, _}} -> :timeout
+        {:error, _} -> :error
+      end
+
+    Nexus.Telemetry.record(unit, %{
+      at: started,
+      turns: tel.turns,
+      tokens: %{prompt: tel.prompt, completion: tel.completion, total: tel.total},
+      latency_ms: now_ms() - started,
+      tools: Enum.frequencies(tel.tools),
+      status: status,
+      error: if(status == :error, do: inspect(elem(result, 1)))
+    })
+  end
+
+  # accumulate a turn's token usage + the kits it invoked into the telemetry acc.
+  defp tally(tel, turn, calls) do
+    u = Map.get(turn, :usage, %{})
+
+    %{
+      tel
+      | turns: tel.turns + 1,
+        prompt: tel.prompt + (u["prompt_tokens"] || 0),
+        completion: tel.completion + (u["completion_tokens"] || 0),
+        total: tel.total + (u["total_tokens"] || 0),
+        tools: tel.tools ++ Enum.map(calls, &kit_of/1)
+    }
+  end
+
+  # the kit a bash tool-call exercised — the first token of the command.
+  defp kit_of(%{args: %{"command" => cmd}}) when is_binary(cmd) do
+    cmd |> String.trim_leading() |> String.split(~r/\s+/, parts: 2) |> List.first() || "bash"
+  end
+
+  defp kit_of(_), do: "bash"
 
   @doc """
   Build a runnable agent def from a parsed `agent` unit node — an agent authored as a literate
@@ -69,24 +113,26 @@ defmodule Nexus.Agent do
   @doc "Run an `agent` unit node on `task`. The unit body is the agent's system prompt."
   def run_unit(node, task, opts \\ []) do
     d = def_from_unit(node)
-    run(Keyword.merge([system: d.system, task: task], opts))
+    run(Keyword.merge([system: d.system, task: task, unit: d.name], opts))
   end
 
-  defp loop(messages, vfs, opts, deadline, turns) do
+  defp loop(messages, vfs, opts, deadline, tel) do
     if now_ms() > deadline do
-      {:error, {:timeout, turns}}
+      {{:error, {:timeout, tel.turns}}, tel}
     else
       case Nexus.Llm.complete(manage(messages, opts), Keyword.put(opts, :tools, [@bash_tool])) do
         {:ok, %{tool_calls: []} = turn} ->
-          {:ok, %{answer: turn.content, turns: turns + 1, vfs_files: Vfs.ls(vfs)}}
+          tel = tally(tel, turn, [])
+          {{:ok, %{answer: turn.content, turns: tel.turns, vfs_files: Vfs.ls(vfs)}}, tel}
 
         {:ok, %{tool_calls: calls} = turn} ->
+          tel = tally(tel, turn, calls)
           assistant = %{role: "assistant", content: turn.content || "", tool_calls: raw_calls(calls)}
           results = Enum.map(calls, &run_bash(&1, vfs))
-          loop(messages ++ [assistant | results], vfs, opts, deadline, turns + 1)
+          loop(messages ++ [assistant | results], vfs, opts, deadline, tel)
 
         {:error, reason} ->
-          {:error, reason}
+          {{:error, reason}, tel}
       end
     end
   end

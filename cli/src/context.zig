@@ -138,9 +138,36 @@ pub fn whoami(io: Io, alloc: std.mem.Allocator, home: []const u8) !u8 {
         log.step(try std.fmt.allocPrint(alloc, "nexus {s}", .{t.nexus}));
         if (t.org.len > 0) log.step(try std.fmt.allocPrint(alloc, "org {s} \u{b7} workspace {s}", .{ t.org, t.workspace }));
     };
+    if (identity(io, alloc, home)) |who| log.step(try std.fmt.allocPrint(alloc, "identity {s}", .{who}))
+    else log.step("not logged in \u{2014} `work login` for the control plane");
     return 0;
 }
 
 fn pick(new: []const u8, old: []const u8) []const u8 {
     return if (new.len > 0) new else old;
+}
+
+// ── login / identity (credential at ~/.work/credentials, the control-plane token) ────────────
+fn credPath(alloc: std.mem.Allocator, home: []const u8) ![]const u8 {
+    return std.fs.path.join(alloc, &.{ home, ".work", "credentials" });
+}
+
+pub fn login(io: Io, alloc: std.mem.Allocator, home: []const u8, url_in: []const u8, token: []const u8) !u8 {
+    const url = if (url_in.len > 0) url_in else "https://api.workbooks.sh";
+    log.prompt(try std.fmt.allocPrint(alloc, "work login {s}", .{url}));
+
+    if (token.len > 0) {
+        Io.Dir.cwd().createDirPath(io, try std.fs.path.join(alloc, &.{ home, ".work" })) catch {};
+        try fs.writeFile(io, try credPath(alloc, home), try std.fmt.allocPrint(alloc, "{s}\t{s}\n", .{ url, token }));
+        log.ok(try std.fmt.allocPrint(alloc, "logged in \u{b7} {s}", .{url}));
+        return 0;
+    }
+    log.step(try std.fmt.allocPrint(alloc, "visit {s}/device to authorize, then re-run with --token <t>", .{url}));
+    return 1;
+}
+
+pub fn identity(io: Io, alloc: std.mem.Allocator, home: []const u8) ?[]const u8 {
+    const data = fs.readFile(io, alloc, credPath(alloc, home) catch return null) catch return null;
+    const tab = std.mem.indexOfScalar(u8, data, '\t') orelse return null;
+    return data[0..tab];
 }

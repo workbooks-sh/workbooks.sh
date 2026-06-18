@@ -1,4 +1,0 @@
-# Build artifacts — reproduced by build.sh at provisioning (never commit the 20MB wasm).
-esbuild.wasm
-esbuild-root/
-.esbuild-version

@@ -1,0 +1,87 @@
+diff --git a/src/expand/codegen.cpp b/src/expand/codegen.cpp
+index 5796aaf..09605fc 100644
+--- a/src/expand/codegen.cpp
++++ b/src/expand/codegen.cpp
+@@ -470,6 +470,12 @@ class CHandler_Link:
+                         ERROR(sp, E0000, "Empty `modifiers` on extern block #[link]");
+                     // TODO: save and use the `modifiers` value
+                 }
++                else if( key == "wasm_import_module" || key == "wasm_import_name" ) {
++                    lex.getTokenCheck(TOK_EQUAL);
++                    lex.getTokenCheck(TOK_STRING);
++                    // WASI: import module/name — resolved at link (wasi-libc / shim). Ignore.
++                    link.lib_name = link.lib_name.empty() ? "wasi_import" : link.lib_name;
++                }
+                 else {
+                     TODO(sp, "Unknown attribute `#[link(" << key << ")]`");
+                 }
+diff --git a/src/trans/target.cpp b/src/trans/target.cpp
+index 922ba13..298efc7 100644
+--- a/src/trans/target.cpp
++++ b/src/trans/target.cpp
+@@ -48,6 +48,12 @@ const TargetArch ARCH_ARM32 = {
+     { /*atomic(u8)=*/true, false, true, false,  true },
+     TargetArch::Alignments(2, 4, 8, 16, 4, 8, 4) // Note, all types are natively aligned (but i128 will be emulated)
+ };
++const TargetArch ARCH_WASM32 = {
++    "wasm32",
++    32, false,
++    { /*atomic(u8)=*/true, true, true, true, true },
++    TargetArch::Alignments(2, 4, 8, 16, 4, 8, 4)
++};
+ const TargetArch ARCH_M68K = {
+     "m68k",
+     32, true,
+@@ -428,6 +434,13 @@ namespace
+         {
+             return load_spec_from_file(target_name);
+         }
++        else if(target_name == "wasm32-wasi" || target_name == "wasm32-wasip1")
++        {
++            return TargetSpec {
++                "wasm", "wasi", "", {CodegenMode::Gnu11, true /*emulated i128*/, "wasm32-wasi", {"-ffunction-sections"}, {}, {"-Wl,--gc-sections"}},
++                ARCH_WASM32
++                };
++        }
+         else if(target_name == "i586-linux-gnu" || target_name == "i586-unknown-linux-gnu")
+         {
+             return TargetSpec {
+diff --git a/src/hir_conv/constant_evaluation.cpp b/src/hir_conv/constant_evaluation.cpp
+index 039349b6..b7f3752e 100644
+--- a/src/hir_conv/constant_evaluation.cpp
++++ b/src/hir_conv/constant_evaluation.cpp
+@@ -2890,6 +2890,20 @@ namespace HIR {
+                     auto ofs = local_state.read_param_uint(Target_GetPointerBits(), e.args.at(1));
+                     dst.write_ptr(state, ptr_pair.first + ofs.truncate_u64() * element_size, ptr_pair.second);
+                 }
++                // wb-bdk: `arith_offset<T>(dst: *const T, offset: isize)` — the WRAPPING twin of
++                // `offset`. Same const-eval math (ptr + offset*size; two's-complement offset wraps).
++                // type-param shape differs: arith_offset's m_types[0] is the pointee T directly
++                // (offset's is the pointer type Ptr). Needed by 1.74 core ptr::wrapping_offset under
++                // --cfg debug_assertions (else MIR_TODO abort).
++                else if( te->name == "arith_offset" ) {
++                    auto ty = local_state.monomorph_expand(te->params.m_types.at(0));
++                    size_t element_size;
++                    if( !Target_GetSizeOf(state.sp, resolve, ty, element_size) )
++                        throw Defer();
++                    auto ptr_pair = local_state.read_param_ptr(e.args.at(0));
++                    auto ofs = local_state.read_param_uint(Target_GetPointerBits(), e.args.at(1));
++                    dst.write_ptr(state, ptr_pair.first + ofs.truncate_u64() * element_size, ptr_pair.second);
++                }
+                 else if( te->name == "write_bytes" ) {
+                     auto ty = local_state.monomorph_expand(te->params.m_types.at(0));
+                     size_t element_size;
+@@ -2926,6 +2940,13 @@ namespace HIR {
+                 else if( te->name == "is_val_statically_known" ) {
+                     dst.write_uint(state, 8, e.args.at(0).is_Constant() || e.args.at(0).is_Borrow());
+                 }
++                // wb-bdk: `ptr_guaranteed_cmp<T>(a,b) -> u8` (0=ne, 1=eq, 2=unknown). Consumer
++                // guaranteed_eq maps 2->None, so returning 2 is ALWAYS correct (conservative — no
++                // wrong eq/ne result), avoiding alloc-identity comparison subtleties at const-eval.
++                // Needed by 1.74 core ptr cmp under --cfg debug_assertions (else MIR_TODO abort).
++                else if( te->name == "ptr_guaranteed_cmp" ) {
++                    dst.write_uint(state, 8, 2);
++                }
+                 else {
+                     MIR_TODO(state, "Call intrinsic \"" << te->name << "\" - " << terminator);
+                 }

@@ -1,0 +1,5 @@
+.build/
+*.wasm
+*.tar.gz
+*.tar.xz
+*.log
