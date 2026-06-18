@@ -46,6 +46,8 @@ defmodule WorkCLI.Main do
   defp route(["wit", name | rest]), do: WorkCLI.Work.wit(unit(name), dir_arg(rest))
   defp route(["structure" | rest]), do: WorkCLI.Work.structure(dir_arg(rest))
   defp route(["weave", dir, out | _]), do: WorkCLI.Work.weave(dir, out)
+  defp route(["dev", dir | rest]), do: WorkCLI.Dev.watch(dir, List.first(rest) || default_out(dir))
+  defp route(["dev"]), do: WorkCLI.Dev.watch(".", default_out("."))
   defp route(["weave" | _]), do: (Log.error("usage: work weave <dir> <out.html>"); {:error, :usage})
 
   # deploy — scaffold/validate local; apply/status/verify/logs/down route to a backend
@@ -74,6 +76,7 @@ defmodule WorkCLI.Main do
 
   defp dir_arg(rest), do: List.first(rest) || "."
   defp file_arg(rest), do: (rest -- ["--force"]) |> List.first() || "deployment.html"
+  defp default_out(dir), do: Path.basename(Path.expand(dir)) <> ".html"
   defp unit(name), do: String.trim_leading(to_string(name), ":")
 
   # ── the grouped verb map (the designed help) ────────────────────────────────────────────────
@@ -87,6 +90,7 @@ defmodule WorkCLI.Main do
      ]},
     {"build", "weave & compile (work_core + a nexus)", [
        {"weave <dir> <out.html>", "weave a tree into one self-contained html workbook"},
+       {"dev <dir> [out.html]", "watch & re-weave on change (+ nexus hot-swap) — push-to-live"},
        {"build <dir>", "compile the units to wasm  (via a nexus)"}
      ]},
     {"deploy", "stand up a runtime, local or cloud", [
