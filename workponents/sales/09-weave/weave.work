@@ -1,214 +1,34 @@
 # The Weave
 
-Everything you have read so far is loose: a folder of `.work` files, each a
-unit in its own language — Elixir flows and compute on the [[Pipeline]] and
-[[Score]] side, a Svelte [[chart]] and a SolidJS [[sparkline]] for the
-dashboard, a Rust+Zig [[forecast]] kernel, a Python [[risk]] unit. The
-**weave** is the step that takes that whole tree and produces ONE shippable
-thing: `salesapp.html`.
+The **weave** takes the whole folder tree and produces ONE shippable thing:
+`salesapp.html`. The command is `work bundle`, and it does three jobs in order —
+**resolve** every reference, **audit** every capability, **run** every test — then
+emits the bundle. A red test ships no bundle.
 
-This file is where the format closes the loop on itself. The command is
-`work bundle`. It does three jobs in order — resolve every reference, audit
-every capability and dependency, run every test — and only then does it emit
-the bundle. A red test ships no bundle. That gate is not a lint pass bolted on
-the side; it is the same [[code graph]] the whole workbook is built from,
-walked one last time with the build's eyes open.
-
-## What "polyglot" actually means here
-
-The Sales workbook is written in five languages and the weave does not flatten
-them into one. It places each unit where its **placement** says it runs, in the
-form its language compiles to. There are only ever two placements — `client`
-and `server` — and the weave's job is to honor them across the language mix:
-
-- **client islands** — the [[chart]] (Svelte) and the [[sparkline]] (SolidJS)
-  are browser units. They compile to wasm + a small JS shim and **hydrate** in
-  the page: the bundle ships their rendered HTML for first paint, then the
-  island wakes up and takes over its own subtree. Two different frameworks,
-  side by side, in the same document.
-- **server compute as sandboxed wasm** — the [[forecast]] unit (Rust
-  orchestrating a Zig numeric kernel) and the [[risk]] unit (Python) are
-  foreign languages placed on the **server**. On the server a foreign-language
-  unit runs as a **sandboxed wasm component** beside the BEAM, behind the same
-  grant-by-construction wall the [[Pricing]] chapter described.
-- **server Elixir runs native** — [[Pipeline]], [[Score]], [[Enrich]] are
-  native Elixir on the BEAM. Real OTP, not wasm. The trusted tier. The weave
-  links them as the host the wasm components call back into.
-
-The thing to hold onto: the weave never says "server runs as wasm." Server
-Elixir is native; foreign server units are wasm *beside* it; client units are
-wasm *in the browser*. One bundle, three execution shapes, one authoring model.
-
-## Mixed file types compose — Svelte and SolidJS together
-
-The dashboard region pulls two client islands from two different frameworks
-into the same parent. Neither knows the other exists; the weave hydrates each
-against its own runtime and lets them share the page. Here is a region that
-mounts the [[chart]] beside the [[sparkline]]:
-
-client svelte :score_panel do
-  import { chart } from "work://chart"
-  import { sparkline } from "work://sparkline"
-
-  // both islands receive the same ranked %Lead{} list the :pipeline produced;
-  // chart draws the bars, sparkline draws the 30-day trend. Two frameworks,
-  // one data feed, one hydrated subtree.
-  export function ScorePanel(leads) {
-    return panel(
-      chart({ leads: leads, x: "name", y: "score" }),
-      sparkline({ series: leads.map(l => l.score), stroke: "currentColor" })
-    )
-  }
-end
-
-The weave sees `work://chart` resolve to a `svelte` unit and `work://sparkline`
-resolve to a `solid` unit. It compiles each with its own toolchain, emits two
-hydration bundles, and stitches their first-paint HTML into the region. At
-runtime the page carries a Svelte island and a Solid island in the same DOM —
-no shared framework runtime forced on either, because each island brings only
-what it needs.
-
-## Mixed file types compose — Rust and Zig together
-
-[[forecast]] is one unit made of two languages. Rust owns the orchestration —
-shaping `%Lead{}` revenue history into an input slice, calling the kernel,
-handing back a `{:ok, projection}` variant. Zig owns the hot loop: the actual
-projection loop, written tight against raw memory. They compile into ONE
-wasm component; the weave links the Zig object into the Rust unit before it
-ever becomes a sandbox citizen:
-
-rust :forecast, in: :forecast do
-  // Rust orchestrates. The Zig kernel is linked in as an extern; from the
-  // unit's contract it is just another function — the language seam vanishes
-  // once both halves are wasm in the same component.
-  extern "C" {
-    fn project_series(base: *const f64, len: usize, periods: usize, growth: f64, out: *mut f64);
-  }
-
-  pub fn project(history: &[f64], periods: usize, growth: f64) -> Result<Vec<f64>, String> {
-    if history.len() < 3 {
-      return Err("need at least three points to project".into());
-    }
-    let mut out = vec![0.0_f64; periods];
-    unsafe {
-      project_series(history.as_ptr(), history.len(), periods, growth, out.as_mut_ptr());
-    }
-    Ok(out)
-  }
-end
-
-And the Zig kernel that Rust links against — pure numerics, no capabilities,
-the kind of code you want compiled to the tightest wasm possible:
-
-zig :kernel, in: :forecast do
-  // The heavy math. Projects `periods` future points from the last known
-  // value at a fixed growth rate. No allocation, no grants — it only ever
-  // touches the buffers Rust hands it across the linear-memory boundary.
-  export fn project_series(base: [*]const f64, len: usize, periods: usize, growth: f64, out: [*]f64) void {
-    const last = base[len - 1];
-    var i: usize = 0;
-    while (i < periods) : (i += 1) {
-      const step: f64 = @floatFromInt(i + 1);
-      out[i] = last * std.math.pow(f64, 1.0 + growth, step);
-    }
-  }
-end
-
-The weave compiles Zig to a wasm object, compiles Rust to a wasm object,
-links them into one component, then drops that component into the `:forecast`
-sandbox. From the [[code graph]] there is a single `:forecast` node with an
-internal language edge to `:kernel`; from the bundle there is one
-sandboxed wasm unit. Two languages, one citizen.
-
-## Mixed file types compose — Python alongside
-
-[[risk]] is a third language again — Python — and it sits beside the Rust+Zig
-forecast in the same delivery without any of them touching the others. It is a
-server compute unit, so the weave compiles it to a sandboxed wasm component and
-grants it nothing it did not ask for:
-
-python :risk, in: :risk_box do
-  # A risk score from lead features. Pure function of the struct's fields, so
-  # it needs no net, no kv — the weave gives it an empty grant by construction.
-  def risk(lead):
-    churn = 0.4 if lead["employees"] < 10 else 0.1
-    thin = 0.3 if lead["revenue"] < 20_000 else 0.0
-    stale = 0.2 if lead["status"] == "new" else 0.0
-    raw = churn + thin + stale
-    return min(round(raw * 100), 100)  # 0..100, higher = riskier
-end
-
-So in the final `salesapp.html` you have, simultaneously: a Svelte island and a
-Solid island hydrating in the browser; a Rust+Zig component and a Python
-component running as sandboxed wasm beside the BEAM; and native Elixir flows
-orchestrating all of it. Five languages, three execution shapes, one file. None
-of them was rewritten to get along — the weave honored each placement and let
-the [[Dock]] broker the seams between them.
-
-## The weave gate — three jobs, in order
-
-`work bundle` does not blindly concatenate. It runs the gate, and the gate is
-the same three checks every time. If any one fails, no `salesapp.html` is
-written.
-
-**1. Resolve every reference.** Each `[[backlink]]`, each `work://` deep link,
-each inline `:atom` and `@type` in prose, each cross-unit call, is resolved
-against the workspace symbol table. A `work://sparkline` that points at nothing,
-a [[forecast]] that calls a kernel function the Zig side never exported — these
-are unresolved edges, and the gate stops on them. You cannot bundle a dangling
-reference.
-
-**2. Audit caps and deps.** The gate walks the capability edges. It checks that
-every `grant:` is actually declared on the sandbox the unit joined, that no unit
-reaches a host it was never granted (the [[risk]] unit asking for `:net` it
-never requested would fail here), and that the dependency graph has no cycle a
-delivery mode could not resolve. The forecast's `:forecast` sandbox, the risk
-unit's `:risk_box` sandbox, the pricing wall from the previous chapter — all of
-them are audited as code-graph nodes with audited edges, not trusted on faith.
-
-**3. Run every test.** Then, and only then, the gate runs the tests attached to
-the units — the [[Score]] arithmetic, the [[Pipeline]] ranking, the forecast
-fit, the risk bounds. This is the hard rule: **a red test ships no bundle.** The
-gate is where correctness becomes a precondition of delivery instead of a thing
-you hope someone checked.
-
-server task :weave_gate do
-  @moduledoc "What `work bundle` runs before it writes salesapp.html. Any :error halts the build."
-
-  def run(tree) do
-    with {:ok, graph} <- resolve_refs(tree),     # job 1: no dangling [[..]] / work:// / :atom
-         {:ok, _audit} <- audit_caps(graph),     # job 2: every grant declared, no ungranted reach
-         {:ok, report} <- run_tests(graph) do     # job 3: red test ships no bundle
-      {:ok, emit_bundle(graph, report)}           # -> salesapp.html, gzipped, self-contained
-    else
-      {:error, reason} -> {:halt, reason}          # no file written
+server compute :weave do
+  def build(tree) do
+    with {:ok, graph} <- resolve_refs(tree),   # every [[ref]] and :atom resolves
+         {:ok, _caps} <- audit_caps(graph),    # every grant is fulfillable
+         {:ok, units} <- compile_units(graph), # each language → wasm
+         {:ok, :green} <- run_tests(units) do
+      {:ok, emit_html(units, graph)}
     end
   end
 end
 
-The result of a green run is a single gzipped, self-contained `salesapp.html`:
-the page, plus a compressed blob of the whole tree hydrated client-side, plus
-the wasm components the server tier loads. That is the `wbundle-html/1` format —
-the same one the [[Welcome]] chapter named at the very start.
+## Polyglot, honored not flattened
 
-## One bundle, three delivery modes
+The workbook is five languages, and the weave places each by its **placement**:
 
-The weave emits the same artifact no matter how you intend to serve it; the
-delivery mode is a *runtime* choice, not a rebuild:
+- **client islands** — [[Score chart]] (Svelte) and [[Trend sparkline]] (Solid)
+  hydrate in the browser. Two frameworks, one document.
+- **foreign server units** — [[Forecast]] (Rust+Zig) and [[Risk]] (Python) run as
+  **sandboxed wasm** beside the BEAM.
+- **server Elixir runs native** — [[Pipeline]], [[Score]], [[Enrich]] on the BEAM.
 
-- **static bundle** — open `salesapp.html` anywhere. The client islands
-  ([[chart]], [[sparkline]]) hydrate; the server units are dormant until a
-  nexus is reachable. No backend required to read the workbook.
-- **nexus SSR** — served by the nexus, the server regions ([[Pipeline]],
-  [[Score]], and the sandboxed [[forecast]]/[[risk]] wasm) render on the BEAM
-  and ship HTML; the client units stay islands. Same file, server-rendered.
-- **live SSR** — over the RCP websocket, the server diffs region state and
-  pushes patches. The [[Dashboard]] updates as the [[Pipeline]] reranks, with
-  no client rebuild.
+The weave never says "server runs as wasm": server Elixir is native, foreign server
+units are wasm *beside* it, client units are wasm *in the browser*. One bundle, three
+execution shapes, one authoring model.
 
-You authored once. The weave bundled once. The same `salesapp.html` is a static
-page, an SSR app, and a live app depending only on whether — and how — a nexus
-is on the other end. That is the payoff of putting placement, sandboxing, and
-the code graph in the authoring model instead of the build script: the build
-has nothing left to decide. It resolves, audits, tests, and weaves — and ships
-the workbook you wrote.
+Each polyglot unit gets its own file next — [[Score chart]], [[Trend sparkline]],
+[[Forecast]], [[Risk]] — then [[Deploy]] ships the result.

@@ -1,203 +1,31 @@
-# Glossary
+# References
 
-This file is the map. Every other file in the Sales workbook is reachable from
-here, and reading it teaches the one thing the whole format leans on: **how a
-workbook refers to itself**. Nothing here is decorative. The links resolve, the
-references type-check, and the build follows the same edges you read below.
+A workbook isn't a pile of files — it's a **code graph**. The way you mention
+another unit becomes a typed edge the weave walks. There are five ways to address
+something:
 
-A workbook is not a pile of files; it is a **code graph**. Each unit is a node,
-and the way you mention another unit — by name, by `:atom`, by `[[backlink]]`,
-by `work://` link — becomes a typed edge in that graph. The compiler walks
-these edges at the weave gate to resolve dependencies, audit capabilities, and
-decide what ships. So addressing is not paperwork. Addressing IS the program's
-structure.
+- **`:atom`** — `:score` links to the unit named `score` (a `:unit_ref` edge).
+- **`Type`** — `Lead` or `@statuses` links to a declared shape (a `:type_ref`).
+- **`[[backlink]]`** — links to another file by name, resolved *leniently* (so
+  `[[score]]`, `[[Score]]`, `[[Scoring a lead]]` all reach the same node).
+- **`#tag`** — the only **queryable** form: `work near #b2b`.
+- **`work://`** — a stable external address that survives a file move.
 
-## The five ways to address something
-
-There are exactly five reference forms in the format, and each one means a
-different kind of edge. The function below is real: it is the resolver the
-weave gate uses to classify a raw reference token before it becomes a graph
-edge. Read it as the spec for everything that follows.
+The build feeds every mention through one classifier:
 
 defmodule Glossary do
-  @moduledoc """
-  Resolves a raw reference token to a typed code-graph edge.
-  The build feeds every token the three extractors find (prose, AST,
-  generated WIT) through here; the edge kind drives audit + bundling.
-  """
+  def classify("work://" <> rest), do: {:deep_link, rest}
+  def classify("[[" <> _ = t),     do: {:backlink, normalize(t)}
+  def classify("#" <> tag),         do: {:tag, tag}
+  def classify(":" <> unit),        do: {:unit_ref, unit}
+  def classify(<<c, _::binary>> = t) when c in ?A..?Z, do: {:type_ref, t}
 
-  defstruct from: nil, to: nil, kind: nil, queryable: false
-
-  @kinds [:unit_ref, :type_ref, :backlink, :tag, :deep_link]
-
-  def classify(token, origin) do
-    cond do
-      String.starts_with?(token, "work://") ->
-        edge(origin, strip_scheme(token), :deep_link)
-
-      String.starts_with?(token, "[[") ->
-        edge(origin, resolve_backlink(token), :backlink)
-
-      String.starts_with?(token, "#") ->
-        %__MODULE__{from: origin, to: String.trim_leading(token, "#"),
-                    kind: :tag, queryable: true}
-
-      String.starts_with?(token, ":") ->
-        edge(origin, String.trim_leading(token, ":"), :unit_ref)
-
-      String.match?(token, ~r/^[A-Z]\w+$/) ->
-        edge(origin, token, :type_ref)
-
-      true ->
-        {:error, {:unresolved, token}}
-    end
-  end
-
-  defp edge(from, to, kind) when kind in @kinds do
-    %__MODULE__{from: from, to: to, kind: kind}
-  end
-
-  # A backlink resolves leniently. We normalize the label — case-fold it, drop a
-  # leading "the", drop a trailing " agent"/" kit" — and match the result against
-  # unit names AND file titles alike. So [[score]], [[Score]] and [[Scoring a
-  # lead]] all reach the same node: authors write the natural word, not the exact
-  # title. Only a label that normalizes to nothing in the symbol table is dangling.
-  defp resolve_backlink(token), do: token |> unwrap_backlink() |> normalize()
-
-  defp unwrap_backlink(token), do: token |> String.trim_leading("[[") |> String.trim_trailing("]]")
-
+  # lenient: case-fold, drop a leading "the" and trailing "agent"/"kit"
   defp normalize(label) do
-    label
-    |> String.downcase()
-    |> String.replace_leading("the ", "")
-    |> String.replace_trailing(" agent", "")
-    |> String.replace_trailing(" kit", "")
-    |> String.trim()
-  end
-
-  defp strip_scheme(token), do: String.replace_prefix(token, "work://", "")
-end
-
-Walking the five forms, with the meaning each carries:
-
-- **`:atom` unit reference.** Writing `:score` in prose links to the unit named
-  `score`. It becomes an `:unit_ref` edge and, if that unit is a dependency,
-  the audit demands the corresponding grant. This is the workhorse — most
-  prose mentions of code are `:atom` references.
-- **`@type` / capitalized type reference.** Writing `Lead` or `@statuses` links
-  to a declared structure. It becomes a `:type_ref` edge, so the dataflow
-  checker knows a value of that shape crosses the boundary.
-- **`[[backlink]]`.** A `[[Backlink]]` resolves to a node **by name, leniently**:
-  the label is normalized (case-folded, a leading *the* and a trailing *agent*/
-  *kit* dropped) and matched against unit names and file titles alike. So
-  `[[score]]`, `[[Score]]`, and `[[Scoring a lead]]` all reach the same unit —
-  write the natural word, not the exact title. It is bidirectional in the graph:
-  the target knows who points at it. This file links to [[Pipeline]] below.
-- **`#tag`.** A `#tag` is the only **queryable** form — note `queryable: true`
-  in `classify/2`. Tags are not labels you sprinkle for looks; they are an
-  index you can run `work near #b2b` against. We use exactly one real tag in
-  this workbook, `#b2b`, and it earns its place by being queried.
-- **`work://` deep link.** A `work://` URI addresses a unit (or a region inside
-  one) from anywhere — another workbook, a chat message, a task `ref`. It is the
-  stable external address: `work://sales/score` survives a file move because it
-  names the unit, not the path.
-
-## The canonical structures
-
-Every file in the workbook speaks in the same two structures. They are declared
-once, here, and referenced by `@type` everywhere else. A record is just a
-`defstruct` — field types are **inferred from the default values**, never
-written as a typespec. An enum is a set of atoms. A variant is a tagged tuple.
-
-defmodule Lead do
-  @moduledoc "The unit of work. Flows :new -> :enriched -> :scored -> :contacted."
-  defstruct name: "", domain: "", revenue: 0, employees: 0, score: 0, status: :new
-end
-
-@statuses [:new, :enriched, :scored, :contacted]
-
-defmodule Task do
-  @moduledoc "A tracked piece of work; owner resolves to a person, ref is a work:// link."
-  defstruct title: "", status: :todo, owner: nil, ref: nil
-end
-
-The `Lead.status` field moves through `@statuses` in order, and a `Task.status`
-is one of `:todo | :doing | :done` — a variant expressed as an atom set, not a
-DSL. When `:enrich` returns `{:ok, %Lead{}}` or `{:error, reason}`, that tagged
-tuple IS the type; there is nothing else to declare.
-
-## The unit index
-
-Each entry below names a unit, says where it runs, and links its home file. The
-**placement** column is load-bearing: there are only two places code runs,
-`client` (the browser, as wasm) and `server` (the nexus, native BEAM). A
-**sandbox** is *not* a placement — it is a named isolation unit a server unit
-nests inside. A unit with no body has no placement at all.
-
-Compute and flow, all server-side:
-
-- `:score` — server compute. `score(%Lead{}) -> integer`, revenue points plus
-  size points, rounded. Pure, no grants. See [[Score]].
-- `:enrich` — server compute, `grant: [net: "api.crm.com"]`. Fills a `Lead`'s
-  `domain`, `revenue`, `employees` and sets `status: :enriched`. See [[Enrich]].
-- `:pipeline` — a flow, not a function: seed leads, `:enrich`, `:score`, rank.
-  Orchestrates the others. See [[Pipeline]].
-- `:tax` — server compute nested in `sandbox :pricing`. See [[Pricing under a sandbox]].
-- `:fx` — server compute in `sandbox :rates` (`grant: [:net]`), exchange rates,
-  called cross-sandbox from `:tax`. Caps flow by grant, never inheritance.
-- `:forecast` — sandbox compute, Rust orchestrating a Zig numeric kernel; both
-  compile to wasm and interoperate via the generated component contract. See
-  [[Forecast]].
-- `:risk` — Python sandbox compute, a risk score from a `Lead`'s features.
-
-The shared interface and the client islands:
-
-- `FinModel` — a **kit**: a module the team imports for `ltv/1`, `cac/1`,
-  `npv/2`. A kit is just an `@behaviour` plus its implementation, packaged.
-  Home: `kits/finmodel.work`, addressable as `work://sales/kits/finmodel`.
-- `:chart` — client Svelte island, a bar chart of lead scores. Hydrates in the
-  browser. See [[Chart]].
-- `:sparkline` — client SolidJS island, a score-trend sparkline.
-
-The agents (runtime-backed brains; loops run in server Elixir, memory is typed
-data):
-
-- `analyst` — drafts outreach from a scored `Lead`.
-- `coder` — a ReAct agent with sandboxed bash tools.
-- `researcher` — an auto-researcher loop: plan, search, verify, synthesize.
-- `reflexion` — generate, critique, revise, with the trace as its memory.
-
-## How the graph gets queried
-
-Because references are typed edges, the same three CLI verbs work at build time
-and at runtime. The snippet below is the real query layer the `work near` verb
-calls — it walks `Glossary` edges, so a `#b2b` tag and a `:score` mention are
-both first-class lookups.
-
-defmodule Glossary.Query do
-  @moduledoc "Backs `work check` / `work why` / `work near` over the code graph."
-
-  def near(edges, target) do
-    edges
-    |> Enum.filter(fn e -> e.to == target or e.from == target end)
-    |> Enum.sort_by(& &1.kind)
-  end
-
-  def why(edges, from, to) do
-    edges
-    |> Enum.filter(fn e -> e.from == from and e.to == to end)
-    |> case do
-      [] -> {:error, :no_edge}
-      hits -> {:ok, Enum.map(hits, & &1.kind)}
-    end
-  end
-
-  def tagged(edges, tag) do
-    Enum.filter(edges, fn e -> e.kind == :tag and e.to == tag end)
+    label |> String.trim("[]") |> String.downcase()
+          |> String.replace_leading("the ", "") |> String.trim()
   end
 end
 
-So `work why :pipeline :enrich` returns `{:ok, [:unit_ref]}` because this file
-and [[Pipeline]] both mention `:enrich`, and `work near #b2b` returns every node
-that carries the one queryable tag we chose to maintain. The links you read are
-the graph the tools query — read the rest of the workbook by following them.
+Those edges are what `work check`, `work why`, and `work near` query — at build
+*and* at runtime. Addressing isn't paperwork; it **is** the program's structure.

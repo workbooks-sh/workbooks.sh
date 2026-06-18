@@ -1,167 +1,39 @@
 # The Analyst Agent
 
-The analyst is the first **brain** in this workbook. A brain is not a function you
-call once — it is a system prompt, a model, and a set of tools, run as a loop on
-the **server** (the nexus). Native Elixir on the BEAM drives the loop: it calls the
-model, reads what the model wants to do, runs the tool, feeds the result back, and
-repeats until the model says it's done. The browser never sees a key; the loop lives
-where the trusted tier lives.
-
-The analyst's job is concrete: take the top-ranked leads off the [[Pipeline]] and
-draft outreach for each one. It reads the ranked leads, looks up a little context per
-lead, and writes a short, specific first email. It is the pointy end of everything the
-earlier files built — [[Enrich]] filled the fields, [[Score]] ranked them, and now the
-analyst turns a `%Lead{}` into a sentence a human will actually send.
-
-## Memory is typed data, not a transcript blob
-
-Most agent frameworks treat "memory" as an opaque string that grows forever. Here
-memory is a **struct** — the same modelling discipline as the rest of the workbook.
-The analyst remembers what it drafted, for whom, and why, as typed values it can
-query later. That is what makes the loop auditable: the trace is data on the code
-graph, not prose in a log file.
-
-defmodule Draft do
-  defstruct lead: nil, subject: "", body: "", angle: :value, sent: false
-end
-
-defmodule AnalystMemory do
-  defstruct drafts: [], leads_seen: 0, model: "minimax/minimax-m3", notes: []
-
-  def remember(%AnalystMemory{} = mem, %Draft{} = draft) do
-    %AnalystMemory{
-      mem
-      | drafts: [draft | mem.drafts],
-        leads_seen: mem.leads_seen + 1
-    }
-  end
-
-  def for_lead(%AnalystMemory{drafts: drafts}, %Lead{domain: domain}) do
-    Enum.find(drafts, fn %Draft{lead: %Lead{domain: d}} -> d == domain end)
-  end
-end
-
-The `angle` field is a small enum — `:value | :urgency | :referral` — the same
-set-of-atoms pattern used for `@statuses`. It records *why* a draft reads the way it
-does, so a later review pass (the [[Reflexion]] agent) can critique the choice without
-re-deriving it.
-
-## The tools the brain may call
-
-A tool is just a server function the loop is allowed to invoke. The model proposes a
-call by name; the loop validates and runs it. The analyst gets three: read the ranked
-leads, look up firmographic context, and write a draft into typed memory. Note that
-every tool is a normal Elixir function — no special tool DSL, the module *is* the
-contract. Its public functions are the exports the brain sees.
-
-defmodule AnalystTools do
-  @doc "Pull the top leads off the pipeline, highest score first."
-  def top_leads(limit \\ 3) do
-    Pipeline.ranked()
-    |> Enum.filter(fn %Lead{status: s} -> s == :scored end)
-    |> Enum.take(limit)
-  end
-
-  @doc "Cheap firmographic context for one lead — used to make the angle specific."
-  def context(%Lead{revenue: revenue, employees: employees}) do
-    cond do
-      revenue >= 75_000 -> :enterprise
-      employees <= 10 -> :early_stage
-      true -> :growth
-    end
-  end
-
-  @doc "Compose a draft. The angle is chosen from the lead's shape, not at random."
-  def draft(%Lead{name: name} = lead) do
-    angle = pick_angle(lead)
-
-    %Draft{
-      lead: lead,
-      subject: subject_for(name, angle),
-      body: body_for(lead, angle),
-      angle: angle
-    }
-  end
-
-  defp pick_angle(%Lead{} = lead) do
-    case context(lead) do
-      :enterprise -> :value
-      :early_stage -> :referral
-      :growth -> :urgency
-    end
-  end
-
-  defp subject_for(name, :value), do: "#{name}: cut sales-cycle time"
-  defp subject_for(name, :referral), do: "#{name} — quick intro from a mutual"
-  defp subject_for(name, :urgency), do: "#{name}, before your next quarter closes"
-
-  defp body_for(%Lead{name: name, employees: employees}, angle) do
-    opener =
-      case angle do
-        :value -> "Teams your size lose a week per deal to lead triage."
-        :referral -> "We work with a few companies in your space."
-        :urgency -> "You're scaling fast — #{employees} people and climbing."
-      end
-
-    "#{opener} #{name} could rank inbound leads automatically. Worth 15 minutes?"
-  end
-end
-
-## The brain itself
-
-A brain is a **server definition** — it declares *what the agent is* (prompt, model,
-tools), and the nexus supplies *how it runs* (the loop). It is not a static, no-body
-definition; it is runtime-backed, so its placement is **server**: the loop is real
-Elixir running on the BEAM in the trusted tier. The `agent` word names it; the nexus
-binds the model behind the [[The Contract]] seam, so swapping models is config, never
-a rewrite.
+A **brain** is a system prompt, a model, and a set of tools, run as a loop on the
+**server**. Native Elixir on the BEAM drives it: call the model, run the tool it
+asks for, feed the result back, repeat. The browser never sees a key.
 
 agent :analyst do
   model "minimax/minimax-m3"
 
   system """
-  You are a B2B sales analyst. You draft the FIRST outreach email to a ranked lead.
-  Rules:
-  - One angle per lead. Pick it from the lead's shape, never generic.
-  - Two sentences of body, one question to close. No pleasantries, no SKU dump.
-  - Name the company. Reference its size or revenue when it sharpens the point.
-  Use the tools to read leads and write drafts; stop when every top lead has a draft.
+  You draft the first outreach email to a ranked lead. One angle per lead, picked
+  from its shape. Two sentences, one question. Name the company. Stop when every top
+  lead has a draft.
   """
 
-  tools [
-    AnalystTools.top_leads(),
-    AnalystTools.context(),
-    AnalystTools.draft()
-  ]
+  tools [AnalystTools.top_leads(), AnalystTools.draft()]
 end
 
-The `system` string is the policy; the `tools` list is the capability surface. The
-loop the nexus runs around this definition is the classic agent shape — propose,
-act, observe, repeat:
+`system` is the policy; `tools` is the capability surface. A **tool is just a server
+function** — no DSL, the module is the contract.
 
-defmodule Analyst do
-  def run(limit \\ 3) do
-    mem = %AnalystMemory{model: "minimax/minimax-m3"}
-
-    AnalystTools.top_leads(limit)
-    |> Enum.reduce(mem, fn %Lead{} = lead, acc ->
-      draft = AnalystTools.draft(lead)
-      AnalystMemory.remember(acc, draft)
-    end)
+defmodule AnalystTools do
+  def top_leads(limit \\ 3) do
+    Pipeline.ranked() |> Enum.filter(&(&1.status == :scored)) |> Enum.take(limit)
   end
 
-  def drafts(%AnalystMemory{drafts: drafts}), do: Enum.reverse(drafts)
+  def draft(%Lead{name: name} = lead), do: %Draft{lead: lead, subject: subject_for(name)}
 end
 
-## Why this runs on the server
+**Memory is typed data, not a transcript blob** — a struct the loop can query, so the
+trace is auditable on the [[The Code Graph]]:
 
-The analyst needs the model key, it reads from the shared pipeline data, and its loop
-must survive a browser refresh. All three say **server**: this is the trusted nexus
-tier, native Elixir on the BEAM, not wasm in a tab. A client island like [[Chart]]
-renders the *result* — the drafts — but the thinking happens where the secrets and the
-state live. That split is the whole point of two placements: untrusted UI in the
-browser, trusted reasoning on the nexus, one Dock between them.
+defmodule Draft do
+  defstruct lead: nil, subject: "", body: "", angle: :value
+end
 
-The drafts the analyst produces become real work: each one becomes a `%Task{}` on the
-[[Plan]] board with `status: :todo` and an `owner`. From a ranked number to a sentence
-to a tracked job — the agent is the hinge.
+It runs on the server because it needs the model key and shared state, and must
+survive a refresh. Each draft becomes a `%Task{}` on the [[Plan]] board. Next:
+[[Coder]].

@@ -1,125 +1,33 @@
 # Enrich
 
-A raw lead arrives as little more than a name. Before [[Score]] can rank it the
-lead has to be **filled in** — its `domain`, `revenue`, and `employees` pulled
-from our customer-record system. That outward reach to the CRM is exactly the
-kind of thing the browser is not allowed to do on its own, which makes :enrich
-the right place to teach **grants**.
+A unit's dependencies and **grants are its imports** — the capabilities the [[The
+Dock]] must fulfill before it runs. You never write WIT; you declare what you need.
 
-## Placement: where this runs
-
-This unit is **server** code. It runs as native Elixir on the BEAM in the nexus —
-not as a wasm island in the browser. That matters for two reasons. First, the CRM
-URL and its key are secrets; only the trusted server tier may hold them. Second,
-reaching out over the network is a privileged act, and the server tier is where
-the [[Dock]] can broker that privilege. A client unit could never call
-`api.crm.com` directly — it would have no way to be granted the network.
-
-## Grants are imports
-
-The most important line in this file is the grant. In the work model a unit's
-**dependencies and grants ARE its imports** — the capabilities the Dock must
-fulfill before the unit may run. We never write WIT; we declare what we need in
-Elixir and the contract falls out.
-
-Here `grant net: "api.crm.com"` means: *this unit imports one capability — the
-ability to make network calls, and only to that one host.* It is a capability
-boundary, not a convenience. If :enrich tried to reach `evil.example` the Dock
-would refuse the call, because that host was never granted. Grants flow **by
-explicit grant, never by inheritance** — a unit that calls :enrich does not
-inherit its net access.
+`grant net: "api.crm.com"` imports one capability: network calls, **only** to that
+host. Reaching `evil.example` would be refused at the seam. Grants flow by explicit
+grant, never inheritance — a unit that calls `:enrich` doesn't inherit its net.
 
 server :enrich, grant: [net: "api.crm.com"] do
-  @moduledoc """
-  Fill a raw %Lead{} from the CRM: domain, revenue, employees, then mark it
-  :enriched. The grant above is the only capability this unit imports — one
-  network host, brokered through the Dock.
-  """
-
-  @crm_base "https://api.crm.com/v1"
-
-  @doc """
-  enrich(%Lead{}) -> %Lead{}
-
-  Reaches out through the Dock to look the lead up by name, merges the CRM
-  fields onto the struct, and advances its status to :enriched. On a lookup
-  failure the lead is returned unchanged so the [[Pipeline]] can keep moving
-  and a later pass can retry it.
-  """
   def enrich(%Lead{name: name} = lead) do
     case lookup(name) do
-      {:ok, record} ->
-        %Lead{
-          lead
-          | domain: record.domain,
-            revenue: record.revenue,
-            employees: record.employees,
-            status: :enriched
-        }
-
-      {:error, reason} ->
-        # The CRM had nothing (or was unreachable). Leave the lead as-is;
-        # status stays :new so a retry can pick it up next run.
-        Logger.warning("enrich miss for #{name}: #{inspect(reason)}")
-        lead
+      {:ok, r}        -> %Lead{lead | domain: r.domain, revenue: r.revenue,
+                                      employees: r.employees, status: :enriched}
+      {:error, _why}  -> lead   # leave as-is; a later pass retries
     end
   end
 
-  # The actual reach-out. Dock.fetch is the brokered network call: the membrane
-  # checks our net grant against this host before the request leaves the nexus.
-  # The result is a tagged variant, {:ok, record} | {:error, reason}, which is
-  # this unit's error type — no exceptions cross the boundary.
+  # Dock.fetch is the brokered call: the membrane checks our grant against the host
+  # before the request leaves the nexus. The result is a variant, never an exception.
   defp lookup(name) do
-    url = @crm_base <> "/accounts?name=" <> URI.encode(name)
-
-    case Dock.fetch(url, headers: [{"accept", "application/json"}]) do
-      {:ok, %{status: 200, body: body}} ->
-        {:ok, parse(body)}
-
-      {:ok, %{status: 404}} ->
-        {:error, :not_found}
-
-      {:ok, %{status: code}} ->
-        {:error, {:http, code}}
-
-      {:error, reason} ->
-        {:error, {:net, reason}}
+    case Dock.fetch("https://api.crm.com/v1/accounts?name=" <> URI.encode(name)) do
+      {:ok, %{status: 200, body: body}} -> {:ok, parse(body)}
+      {:ok, %{status: 404}}             -> {:error, :not_found}
+      {:error, reason}                  -> {:error, {:net, reason}}
     end
-  end
-
-  # The CRM speaks JSON over the wire — that's a genuine network payload at a
-  # boundary, the one place JSON is allowed. We decode it straight into a small
-  # record (a struct, structure not DSL) and never let the raw map leak inward.
-  defp parse(body) do
-    fields = Jason.decode!(body)
-
-    %{
-      domain: Map.get(fields, "domain", ""),
-      revenue: Map.get(fields, "annual_revenue", 0),
-      employees: Map.get(fields, "headcount", 0)
-    }
   end
 end
 
-## The result type, made explicit
-
-Notice that `lookup/1` never raises. It returns a **tagged tuple variant** —
-`{:ok, record} | {:error, reason}` — and `enrich/1` pattern-matches on it. This
-is the work way to model fallibility: the structure of the value carries success
-or failure, and the inferred type of `lookup/1` is precisely that union. The
-`reason` is itself a small tagged value (`:not_found`, `{:http, code}`,
-`{:net, reason}`) so a caller can tell *why* enrichment missed without parsing a
-string.
-
-## What comes next
-
-A freshly enriched lead — `status: :enriched` — is exactly what [[Score]] expects
-as input. The [[Pipeline]] wires the two together: it runs :enrich across the
-seeded leads, then hands the filled structs to :score. Because :enrich is pure
-apart from its one brokered call, the pipeline can run it in parallel across the
-batch and the weave gate can audit that single `net` grant in isolation.
-
-For the canonical inputs, `%Lead{name: "Globex", domain: "globex.io",
-revenue: 12_000, employees: 8, status: :enriched}` is what a successful pass over
-a raw Globex lead produces — the CRM filled the blanks and the status moved one
-step along `@statuses`.
+Fallibility is modelled as a **tagged tuple** — `{:ok, _} | {:error, reason}` — so
+the value's shape carries success or failure. Because `:enrich` is pure apart from
+one brokered call, the [[Pipeline]] can run it in parallel and the gate can audit
+that single grant in isolation. Next: [[Pipeline]].

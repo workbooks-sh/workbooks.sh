@@ -1,125 +1,41 @@
-# Scoring a lead
+# Compute
 
-Every lead that flows through the [[Pipeline]] eventually needs one number: how
-much should we care about it? That number is the `score` field on a `%Lead{}`,
-and the unit on this page is the thing that fills it. It is a small, pure,
-deterministic function — the kind of code that *wants* a test — so this file is
-also where we teach **placement** (where code runs) and the **weave gate's
-test** (a red test ships no bundle).
+A unit declares **where it runs** — and there are exactly two places:
 
-## Placement: client vs server
+- **client** — the browser, as wasm. Untrusted, restricted.
+- **server** — the nexus: native Elixir on the BEAM, the trusted tier that can be
+  granted secrets, the database, the network.
 
-A unit declares **where it runs**, and there are exactly two answers.
-
-- **client** — the browser. The unit compiles to wasm and runs there, untrusted
-  and restricted. Elixir authored for the client runs on an Elixir-in-wasm
-  runtime; the [[Chart]] island is a client unit.
-- **server** — your backend, the nexus. Native Elixir on the BEAM, real OTP, not
-  wasm. It is the trusted tier: it can be granted secrets, the database, the
-  network. The [[Enrich]] unit lives here because it needs `net`.
-
-`:score` is declared **server**. Not because it touches anything privileged — it
-is a pure arithmetic function with no grants at all — but because it is part of
-the trusted compute lane that the [[Pipeline]] runs as it folds a batch of leads.
-Placement is a property of the unit, *not* a sandbox: a `sandbox` is an isolation
-boundary you join, never a place you run. Keep the two ideas apart.
-
-## The function
-
-The contract is `score(%Lead{}) -> integer`, on a 0–100 scale. The shape is two
-contributions added together and rounded: revenue points (the dominant signal)
-plus size points (employee headcount). Both are clamped so a single enormous lead
-can't blow past the ceiling, and the whole thing is capped at 100.
+`:score` is `server` — a pure function, no grants. Placement is a property of the
+unit, not a sandbox (which is an isolation boundary, not a place).
 
 server :score do
-  @revenue_ceiling 100_000
-  @size_ceiling 60
-
-  # Revenue is worth up to 70 of the 100 points; headcount the remaining 30.
-  # Both are clamped before weighting so one outlier can't dominate the scale.
   def score(%Lead{revenue: revenue, employees: employees}) do
-    revenue_points = weigh(revenue, @revenue_ceiling, 70)
-    size_points = weigh(employees, @size_ceiling, 30)
-
-    (revenue_points + size_points)
-    |> Float.round()
-    |> trunc()
-    |> min(100)
+    revenue_points = weigh(revenue, 100_000, 70)
+    size_points    = weigh(employees, 60, 30)
+    trunc(Float.round(revenue_points + size_points)) |> min(100)
   end
 
-  # Map a raw value onto a 0..weight band, clamping the input to [0, ceiling]
-  # first so the fraction never exceeds 1.0.
-  defp weigh(value, ceiling, weight) do
-    fraction =
-      value
-      |> max(0)
-      |> min(ceiling)
-      |> Kernel./(ceiling)
-
-    fraction * weight
-  end
+  defp weigh(value, ceiling, weight), do: min(max(value, 0), ceiling) / ceiling * weight
 end
 
-A few things this code is quietly teaching. The `%Lead{}` pattern in the head is
-the **type** — there is no separate schema, the `defstruct` from the canonical
-`Lead` is the contract, and matching on its fields is how we name them. The
-private `weigh/3` helper is *not* part of the unit's interface: only public
-functions become wasm **exports**, so `score/1` is what the [[Pipeline]] and the
-[[Dashboard]] can call, and `weigh/3` stays internal. And there is not a single
-grant in sight — a pure function imports nothing, so the Dock fulfills nothing.
+The `%Lead{}` pattern is the type — no schema. `weigh/3` is private, so it's not an
+export; only public `score/1` is.
 
-## The test — and why it gates the build
+## The test gates the build
 
-Because `:score` is pure, it is trivially testable, and the format treats a test
-as a first-class unit that the **weave gate runs before it emits a bundle**. If
-any test goes red, `work bundle` produces *no* `salesapp.html`. That is the whole
-safety contract: you cannot ship a sales app whose scoring math is broken.
-
-We assert against the three canonical sample leads. Acme and Initech both land in
-the `:scored` band; Globex is a weaker, still-`:enriched` lead and should score
-lower than either.
+A test is a unit the weave runs **before** it emits a bundle. A red test ships **no
+bundle**.
 
 test :score do
-  alias Lead
-
-  @acme    %Lead{name: "Acme",    domain: "acme.co",    revenue: 50_000, employees: 20, score: 70, status: :scored}
-  @globex  %Lead{name: "Globex",  domain: "globex.io",  revenue: 12_000, employees: 8,  score: 41, status: :enriched}
-  @initech %Lead{name: "Initech", domain: "initech.com", revenue: 90_000, employees: 55, score: 88, status: :scored}
-
-  test "scores stay on the 0..100 scale" do
-    for lead <- [@acme, @globex, @initech] do
-      points = score(lead)
-      assert points >= 0
-      assert points <= 100
-    end
+  test "strong leads outrank weak ones" do
+    assert score(%Lead{revenue: 90_000, employees: 55}) > score(%Lead{revenue: 12_000, employees: 8})
   end
 
-  test "a strong lead outranks a weak one" do
-    assert score(@initech) > score(@acme)
-    assert score(@acme) > score(@globex)
-  end
-
-  test "an empty lead scores zero" do
+  test "scores stay on 0..100" do
+    assert score(%Lead{revenue: 10_000_000, employees: 5_000}) == 100
     assert score(%Lead{}) == 0
-  end
-
-  test "revenue and headcount are both clamped at the ceiling" do
-    whale = %Lead{revenue: 10_000_000, employees: 5_000}
-    assert score(whale) == 100
   end
 end
 
-The first test pins the **range invariant** — no matter how extreme the input, a
-score is a number between 0 and 100. The second pins the **ordering** we actually
-sell on: Initech (high revenue, big team) beats Acme beats Globex, which is the
-ranking the [[Dashboard]] charts. The empty-`%Lead{}` case proves the floor, and
-the `whale` case proves the clamps in `weigh/3` really hold the ceiling.
-
-## Where this fits
-
-`:score` is one stage of the [[Pipeline]]: a batch is seeded, run through
-[[Enrich]] to fill `revenue`/`employees`, then mapped through `score/1` to set the
-`score` field and promote each lead's `status` to `:scored`. From there the
-[[Chart]] island visualizes the distribution and the agents in the
-[[The Analyst Agent]] flow decide who is worth a draft. One pure function, one test, and a
-gate that refuses to ship if the math drifts.
+Next: a unit that *does* need a capability — [[Enrich]].

@@ -1,172 +1,43 @@
 # Sales Dashboard
 
-This is the home page of the Sales workbook — the first thing the team sees when
-they open `work://sales`. A page in the work format is just a `.work` file with a
-single `# Title`, like this one. What makes it a *page* rather than a library unit
-is that it is mostly **prose** with a few embedded units that **render by default**:
-declared task values, a chart island, an image with a caption. Nothing here is a
-mock-up. The board below is the live state of the pipeline; the chart below it
-reads the same lead scores the rest of the app computes.
+A **page** is a `.work` file that's mostly **prose** with a few embedded units that
+**render by default** — declared data, an island, an image. Markdown narrates; the
+units run. Nothing here is a mock-up.
 
-Markdown narrates; it never holds logic. Everything you read in plain sentences —
-headings, lists, the caption under the figure — is rich text. Everything in a
-`do … end` block (or a `lang :name do … end` island) is a real unit. The two never
-mix: prose explains, code runs.
+## A board from declared tasks
 
-## What this app does
-
-The Sales workbook turns a raw list of company names into a ranked queue of who to
-talk to next. The flow is small and honest:
-
-1. **Ingest** a list of leads — name, domain, headcount, revenue.
-2. **Enrich** each one against the CRM ([[enrich]] fills the gaps, sets `status: :enriched`).
-3. **Score** it ([[score]] turns revenue and size into an integer 0–100).
-4. **Rank** the result, and let the analyst agent draft outreach for the top of the list.
-
-The whole sequence is the [[pipeline]] flow; this page is where you watch its
-output. The canonical record everything passes around is the `%Lead{}` struct, and
-its lifecycle is the enum `@statuses` — `[:new, :enriched, :scored, :contacted]`.
-You will see those same atoms on every page; they are the spine of the app.
-
-## This week's numbers
-
-![Lead scores across the active pipeline, highest first.](work://sales/assets/score-distribution.svg)
-
-*Three companies are in play this week. Initech tops the board at 88 — high
-revenue, a real sales team — followed by Acme at 70 and Globex trailing at 41. The
-figure above is authored the markdown way: an `![caption](src)` line, then an
-optional italic paragraph that becomes the figure's caption. There is no `figure`
-keyword in the format — a figure is just an image plus the sentence under it.*
-
-The bar chart further down is the *interactive* version of that same picture: it is
-the [[chart]] client island, hydrated in your browser, reading live scores. The
-image is the static snapshot; the island is the live one. Same data, two delivery
-modes — which is the whole point of the format.
-
-## The board
-
-A page can declare **tasks** inline, and they render as a board. A task is not
-markup and not a checkbox — it is a **value of the `Task` struct**, validated at the
-weave gate. The fields are `title`, `status` (one of `:todo | :doing | :done`),
-`owner` (which must resolve to a real person defined in the workspace), and `ref`
-(a deep link to the unit or page the task is about). Because tasks are typed data,
-`work check` can tell you a board is wrong — a misspelled owner or a dangling `ref`
-fails the build before anyone sees it.
-
-Here is the live state of the sales pipeline work:
+Declare `Task` values and they render as a board. `owner` must resolve to a real
+person or agent; `ref` points at the unit the task is about — both checked at the
+weave gate.
 
 data :board, of: Task, from: values([
-  %Task{
-    title: "Backfill enrichment for Q2 import",
-    status: :doing,
-    owner: :priya,
-    ref: :enrich
-  },
-  %Task{
-    title: "Tune scoring weights — revenue vs. headcount",
-    status: :doing,
-    owner: :dana,
-    ref: :score
-  },
-  %Task{
-    title: "Draft outreach for Initech (score 88)",
-    status: :todo,
-    owner: :analyst,
-    ref: :analyst
-  },
-  %Task{
-    title: "Wire FX rates into deal sizing",
-    status: :todo,
-    owner: :dana,
-    ref: :fx
-  },
-  %Task{
-    title: "Ship the static bundle to the team",
-    status: :done,
-    owner: :priya,
-    ref: :pipeline
-  }
+  %Task{title: "Backfill enrichment", status: :doing, owner: :priya, ref: :enrich},
+  %Task{title: "Tune scoring weights", status: :doing, owner: :dana,  ref: :score},
+  %Task{title: "Draft outreach for Initech", status: :todo, owner: :analyst, ref: :analyst}
 ])
 
-The board above is **live state**, not a frozen snapshot. Declarative does not mean
-immutable: the document *is* the store. When Priya drags the enrichment task to
-`:done`, that edits this `data :board` value in place; a draft scopes the change so
-two people moving cards at once do not clobber each other. The same `%Task{}` values
-power the [[Plan]] page's grouped, swimlane view — this dashboard just shows the
-top of the stack.
+This is **live state**, not a snapshot — the document *is* the store. The same values
+power the [[Plan]] page's full view.
 
-One subtlety worth naming: `owner: :analyst` does not point at a human. It resolves
-to the analyst **agent** — the brain that drafts outreach. Tasks can be owned by
-people or by agents interchangeably, because both are addressable units in the
-workspace symbol table. When the analyst finishes a draft, it flips its own task to
-`:done` the same way Priya does.
+## An island
 
-## Scores, live
-
-Below is the [[chart]] island — a Svelte client unit that draws a bar per lead. It
-runs in the browser as wasm, so it works even in the static bundle with no server
-attached. It reads the same scored leads the [[pipeline]] produces; we pass them in
-as a typed value rather than letting the island fetch anything itself.
+A `client` unit is an island: it hydrates in the browser, so it works even in the
+static bundle. Pass it a typed value rather than letting it fetch.
 
 client svelte :chart do
   <script>
-    export let leads = [
-      { name: "Initech", score: 88, status: "scored" },
-      { name: "Acme",    score: 70, status: "scored" },
-      { name: "Globex",  score: 41, status: "enriched" }
-    ];
-
+    export let leads = [];
     $: ranked = [...leads].sort((a, b) => b.score - a.score);
     $: max = Math.max(1, ...ranked.map((l) => l.score));
   </script>
 
-<div class="chart">
   {#each ranked as lead}
-    <div class="row">
-      <span class="label">{lead.name}</span>
-      <div class="track">
-        <div
-          class="bar"
-          class:hot={lead.score >= 80}
-          style="width: {(lead.score / max) * 100}%"
-        >
-          <span class="value">{lead.score}</span>
-        </div>
-      </div>
+    <div class="row" class:hot={lead.score >= 80}>
+      <span>{lead.name}</span>
+      <div class="bar" style="width: {(lead.score / max) * 100}%">{lead.score}</div>
     </div>
   {/each}
-</div>
-
-<style>
-  .chart { display: grid; gap: 8px; font-family: ui-sans-serif, system-ui; }
-  .row { display: grid; grid-template-columns: 80px 1fr; align-items: center; gap: 12px; }
-  .label { font-size: 13px; color: #44464d; }
-  .track { background: #f1f0ec; border-radius: 6px; overflow: hidden; }
-  .bar { background: #aee5c2; padding: 4px 8px; color: #121316; font-weight: 600; border-radius: 6px; }
-  .bar.hot { background: #f3c5a3; }
-  .value { font-size: 12px; }
-</style>
 end
 
-The chart re-sorts on every render, so when scoring weights change and Globex jumps
-ahead of Acme, the bars reorder with no extra code. For the small inline trend next
-to a single lead's detail row we use a different island, the SolidJS [[sparkline]];
-this page only needs the full bar comparison.
-
-## How this page ships
-
-The same file you are reading ships three ways, with no rewrite:
-
-- **Static bundle** — `work bundle` weaves the whole `sales/` tree into one gzipped
-  `salesapp.html`. The board renders to HTML; the [[chart]] hydrates as an island in
-  the browser. No backend required — you can email it.
-- **Nexus SSR** — the server regions (anything that touched [[enrich]] or
-  [[score]], which are server compute) render on the BEAM; the client islands stay
-  islands. The board reflects whatever the live data store currently holds.
-- **Live SSR** — the page subscribes over the RCP websocket and the server pushes
-  diffs, so a teammate moving a card or the analyst finishing a draft updates this
-  board in front of you.
-
-One authoring model, every delivery mode. From here, jump into the [[pipeline]] to
-see how leads get scored, open the [[Plan]] for the full work view, or read
-[[score]] to understand the number under each bar.
+A page ships three ways with no rewrite — static bundle, nexus SSR, live SSR (see
+[[Deploy]]). Next: [[Styling a workbook]].

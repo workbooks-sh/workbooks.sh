@@ -1,147 +1,33 @@
 # Pipeline
 
-This file is the spine of the Sales workbook. Every raw lead that lands in
-[[Data]] has to travel the same road before it can show up on the dashboard:
-it gets **enriched** (filled out from the CRM), **scored** (turned into a
-number we can rank on), and finally **ranked** so the best prospects float to
-the top. That whole road is one unit — `:pipeline` — and it is written as a
-**flow**.
+A **flow** is orchestration, not computation — it *sequences* other units by name.
+`step` runs stages in order; `from:` threads one stage's output into the next;
+`parallel` runs independent work at once. The real work stays in [[Enrich]] and
+[[Score]]; the flow just wires them.
 
-A flow is orchestration, not computation. It does not do the work itself; it
-*sequences* other units. The actual computing lives in [[Enrich]] and
-[[Score]], which `:pipeline` only refers to by name. So this file is the place
-to learn **workflows**: how `step` runs things in order, how `parallel` runs
-independent work at the same time, and how the data threads through.
-
-## Why a flow is its own thing
-
-You could imagine inlining `enrich` and `score` right here. We do not, on
-purpose. `:enrich` is a server compute unit that holds a `net` grant to reach
-`api.crm.com`; `:score` is a pure server compute unit with no grants at all.
-Keeping them separate means each has its own capability boundary, its own
-tests, and its own contract. The flow just wires their public functions
-together. That is the whole point of treating Elixir modules as contracts:
-calling `Enrich.enrich/1` here *is* importing the `:enrich` unit, and the
-weave gate records that as a dataflow edge in the code graph. Run
-`work why :pipeline` and you will see edges into both `:enrich` and `:score`.
-
-The shape of the road is fixed. A lead moves through these statuses, and the
-flow is what advances it — the enum is just a set of atoms, the values a
-`%Lead{}` can hold in its `status` field:
-
-@statuses [:new, :enriched, :scored, :contacted]
-
-`:pipeline` is responsible for the first three transitions — `:new ->
-:enriched -> :scored`. The jump to `:contacted` belongs to the analyst agent
-downstream, not here.
-
-## The unit
-
-The flow runs on the **server** — its placement is `server`. That matters:
-`:enrich` needs the network and `:score` is cheap but we want it on the
-trusted tier next to the data, so the whole orchestration lives server-side and
-the browser just sees the result. Server means native Elixir on the BEAM: real
-OTP, real `Task` for the parallel fan-out — not wasm.
-
-The body reads top to bottom as the road itself. `step` names an ordered stage;
-each stage takes the value the last one produced. `parallel` inside a step says
-"these are independent, do them at once and join the results". The block is
-self-delimiting — `flow ... do` opens it and `end` closes it; the blank lines
-around it are what set it off from this prose.
-
-flow :pipeline, placement: :server do
-  @moduledoc """
-  Seed -> enrich -> score -> rank. The one road every lead travels before it
-  reaches the dashboard. Orchestration only: the real work is in :enrich and
-  :score, referenced by name.
-  """
-
-  # Stage 1 — seed. Pull the raw leads out of the document's typed data.
-  # These come in at status :new with mostly empty fields.
+flow :pipeline do
   step :seed do
     query(Lead) |> Enum.filter(&(&1.status == :new))
   end
 
-  # Stage 2 — enrich, in parallel. Each lead's CRM lookup is independent of
-  # every other lead's, so there is no reason to do them one at a time. We
-  # fan out across the list and join. Enrich.enrich/1 fills domain / revenue /
-  # employees and advances the lead to :enriched. Its :net grant to
-  # api.crm.com is what makes this stage the slow one — hence the parallelism.
+  # each CRM lookup is independent, so fan out
   step :enrich, from: :seed do
-    parallel leads, max_concurrency: 8, timeout: 30_000 do
+    parallel leads, max_concurrency: 8 do
       lead -> Enrich.enrich(lead)
     end
   end
 
-  # Stage 3 — score. Pure and fast, so we keep it sequential and simple.
-  # Score.score/1 returns an integer; we stamp it onto the struct and move the
-  # lead to :scored. No grants, no network — just arithmetic over fields that
-  # stage 2 guaranteed are now present.
+  # pure and fast — keep it sequential
   step :score, from: :enrich do
-    Enum.map(enriched, fn lead ->
-      %Lead{lead | score: Score.score(lead), status: :scored}
-    end)
+    Enum.map(enriched, fn lead -> %Lead{lead | score: Score.score(lead), status: :scored} end)
   end
 
-  # Stage 4 — rank. Order the scored leads best-first so the dashboard and the
-  # analyst agent both consume a stable, ranked list. Ties break on revenue so
-  # the bigger account wins when scores match.
   step :rank, from: :score do
-    Enum.sort_by(scored, fn lead -> {lead.score, lead.revenue} end, :desc)
+    Enum.sort_by(scored, &{&1.score, &1.revenue}, :desc)
   end
 end
 
-## Reading the stages
-
-A few things are worth pinning down, because they are the workflow concepts
-this file exists to teach.
-
-**`from:` is the thread.** Each `step` takes a `from:` naming the stage whose
-output it consumes, and binds that output to a name (`leads`, `enriched`,
-`scored`) you use in the body. There is no shared mutable state sloshing
-between stages; the value produced by one stage is the *only* input to the
-next. The flow is a pipeline in the literal sense — a series of pipes.
-
-**`parallel` is for independence, not speed-for-its-own-sake.** We fan out the
-enrich stage because each `Enrich.enrich/1` call is an isolated CRM round-trip
-that cannot affect its neighbours. `max_concurrency: 8` caps how many of those
-network calls are in flight at once so we do not hammer `api.crm.com`, and the
-per-task `timeout` means one slow lookup cannot wedge the whole run. On the
-server this lowers to real BEAM `Task.async_stream`; the foreign-language
-units elsewhere in the workbook would lower to host-brokered concurrency
-instead. Same authoring, different delivery.
-
-**Scoring stays sequential.** [[Score]] has no grants and runs in microseconds,
-so parallelising it would buy nothing and only add coordination. Reach for
-`parallel` when the stages are I/O-bound and independent; leave cheap pure work
-in a plain `step`.
-
-## What comes out
-
-Running the flow gives back a ranked list of `%Lead{}` at status `:scored`.
-For the three sample accounts the workbook carries, the result is exactly the
-order you would hope for — Initech first, then Acme, then Globex:
-
-[
-  %Lead{name: "Initech", domain: "initech.com", revenue: 90_000, employees: 55, score: 88, status: :scored},
-  %Lead{name: "Acme",    domain: "acme.co",     revenue: 50_000, employees: 20, score: 70, status: :scored},
-  %Lead{name: "Globex",  domain: "globex.io",   revenue: 12_000, employees: 8,  score: 41, status: :scored}
-]
-
-Initech leads on score and revenue, Acme sits in the middle, Globex trails —
-the same ranking the [[Dashboard]] bar chart draws and the analyst agent reads
-when it decides who to draft outreach for first.
-
-## Running it
-
-The flow is a value like any other unit, so you can run it from the document
-or from a task on the [[Plan]]:
-
-ranked = Pipeline.run()
-# kick the dashboard's data region to re-render off the fresh ranking
-publish(:leads, ranked)
-
-Because `:pipeline` only calls public functions of [[Enrich]] and [[Score]],
-swapping either implementation — a smarter scoring model, a different CRM
-provider behind the same `:net` grant — changes nothing here. The road stays
-the same; only what happens at each stop gets better.
+`parallel` is for **independence**, not speed for its own sake — fan out I/O-bound
+stages, leave cheap pure work in a plain `step`. Calling `Enrich.enrich/1` here *is*
+importing that unit — the gate records a dataflow edge, so `work why :pipeline` shows
+the wiring. Next: [[Pricing under a sandbox]].

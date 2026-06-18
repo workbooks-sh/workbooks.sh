@@ -1,163 +1,46 @@
 # Forecast
 
-Once leads are scored and ranked by [[Pipeline]], the team wants a forward
-look: given the revenue we can attribute to scored leads, what does the next
-few quarters look like? That is :forecast — a **sandbox compute** unit that
-does real numeric work.
+One unit can be **two languages composed**. Here Rust orchestrates and a Zig kernel
+does the heavy math. Both compile to wasm, both run in the same sandbox, and the
+Component Model lets them call each other — you never write a line of WIT.
 
-This file teaches one thing the rest of the workbook only hints at: a single
-unit can be **two languages composed**. Here Rust orchestrates the forecast and
-a Zig kernel does the heavy math. Both compile to wasm; both run inside the same
-named isolation unit; the Component Model lets them call each other. You never
-write a line of WIT — the contract is the code.
-
-## Placement, and why this is sandbox compute
-
-:forecast runs on the **server** (the nexus) — it touches no browser, no DOM,
-just numbers. But a foreign-language unit placed on the server does not run on
-the BEAM; it runs as a **sandboxed wasm unit beside it**. So we declare it
-inside a `sandbox :forecast` block. Remember the model: *sandbox is not a
-placement, it is a named isolation unit.* The placement is server; the sandbox
-is the capability boundary. This one needs no `net`, no `kv`, no secrets — pure
-math over values handed in — so we grant nothing. A unit that asks for nothing
-is the easiest thing in the world to trust.
-
-The shared isolation profile keeps the budget honest. It is an ordinary Elixir
-module attribute, reused, not a keyword:
+A foreign-language unit on the `server` runs as **sandboxed wasm** beside the BEAM.
+This one needs no caps — pure math over values handed in — so we grant nothing.
 
 @numeric memory: "64mb", timeout: 15_000
 
-## The Rust orchestrator
-
-Rust owns the shape of the forecast: it takes the ranked leads, turns each into
-a monthly revenue expectation, then asks the Zig kernel to project that series
-forward. Rust handles the messy part (filtering, weighting, assembling the
-input vector); Zig handles the tight inner loop.
-
-The orchestrator imports the Zig kernel by name. In wasm terms `project_series`
-is an import this component links against; in our terms it is just another unit
-in the same sandbox. The boundary is real but invisible.
+Rust owns the shape; it links the Zig kernel by name:
 
 rust :forecast, in: :forecast, @numeric do
-  use work::sandbox
-
-  // The Zig kernel lives in the same sandbox; we link its export by name.
-  // No WIT by hand — the contract is generated from these signatures.
   #[link(wasm_import_module = "kernel")]
   extern "C" {
     fn project_series(base: *const f64, len: usize, periods: usize, growth: f64, out: *mut f64);
   }
 
-  #[derive(Clone, Copy)]
-  pub struct Point {
-    pub period: u32,
-    pub revenue: f64,
-  }
-
-  /// Turn one scored lead into its expected monthly revenue contribution.
-  /// A lead's score is a probability-of-close proxy in [0, 100]; we weight
-  /// the raw revenue by it so a hot Initech counts for more than a cool Globex.
-  fn expected_monthly(revenue: f64, score: i32) -> f64 {
-    let close_rate = (score as f64 / 100.0).clamp(0.0, 1.0);
-    // Spread annual revenue across twelve months, weighted by close rate.
-    (revenue / 12.0) * close_rate
-  }
-
-  /// Build the base series and hand the heavy projection to the Zig kernel.
-  /// `leads` arrives as (revenue, score) pairs ranked by :pipeline.
-  pub fn forecast(leads: &[(f64, i32)], periods: usize, growth: f64) -> Vec<Point> {
-    // Seed: month zero is the sum of expected monthly contributions.
-    let base: Vec<f64> = leads
-      .iter()
-      .map(|&(rev, score)| expected_monthly(rev, score))
-      .collect();
-
-    let seed = base.iter().sum::<f64>();
-    let input = [seed];
-
-    // Cross-language call. Zig fills `out` with `periods` projected values.
+  pub fn forecast(leads: &[(f64, i32)], periods: usize, growth: f64) -> Vec<f64> {
+    // weight each lead's revenue by its score (a close-rate proxy), then project
+    let seed: f64 = leads.iter().map(|&(rev, s)| rev / 12.0 * (s as f64 / 100.0)).sum();
     let mut out = vec![0.0_f64; periods];
-    unsafe {
-      project_series(input.as_ptr(), input.len(), periods, growth, out.as_mut_ptr());
-    }
-
+    unsafe { project_series([seed].as_ptr(), 1, periods, growth, out.as_mut_ptr()); }
     out
-      .into_iter()
-      .enumerate()
-      .map(|(i, revenue)| Point { period: i as u32 + 1, revenue })
-      .collect()
   }
 end
 
-## The Zig numeric kernel
-
-Zig does the projection: take the seed monthly revenue and compound it forward
-by a growth rate, with a small dampening term so the curve flattens instead of
-exploding — a saner forecast than naive exponential growth. This is the kind of
-tight loop you want in a language with no hidden allocation and predictable
-arithmetic.
-
-The kernel exports `project_series`; that export is exactly what Rust linked
-against above. Same names, same sandbox, two languages — one unit.
+Zig does the tight loop — compound the seed forward, damped so the curve tapers:
 
 zig :kernel, in: :forecast, @numeric do
-  const std = @import("std");
-
-  /// Project `periods` future revenue points from a seed.
-  /// Compounds by `growth` each period, damped toward a soft ceiling so the
-  /// curve is concave (early growth, tapering) rather than a straight blow-up.
-  /// Called by the Rust orchestrator across the wasm component boundary.
-  export fn project_series(
-    base: [*]const f64,
-    len: usize,
-    periods: usize,
-    growth: f64,
-    out: [*]f64,
-  ) void {
-    if (len == 0 or periods == 0) return;
-
-    // Seed value is the summed monthly revenue handed in by Rust.
+  export fn project_series(base: [*]const f64, len: usize, periods: usize, growth: f64, out: [*]f64) void {
+    if (len == 0) return;
     var current: f64 = base[0];
-    const ceiling: f64 = current * 6.0;
-
+    const ceiling = current * 6.0;
     var i: usize = 0;
     while (i < periods) : (i += 1) {
-      // Logistic-ish step: growth slows as we approach the ceiling.
-      const headroom = 1.0 - (current / ceiling);
-      const step = growth * headroom;
-      current += current * step;
+      current += current * growth * (1.0 - current / ceiling);
       out[i] = current;
     }
   }
 end
 
-## How the two compose
-
-Reading top to bottom you watched a unit cross a language boundary inside one
-sandbox:
-
-- The Rust `forecast/3` is the **export** other units (and the dashboard) call.
-- `project_series` is an **import** Rust declares and Zig **exports**.
-- The matching signatures *are* the contract. The weave generates the WIT for
-  the wasm component model; you never open it. The rule holds: learn the
-  languages, not WIT.
-- Caps flow by grant, not inheritance — and we granted nothing, so this is the
-  cheapest possible thing to audit at the gate.
-
-A typical call, with leads ranked by [[Pipeline]] and revenues drawn from our
-sample set (Acme 50_000, Globex 12_000, Initech 90_000):
-
-elixir do
-  ranked = [{90_000.0, 88}, {50_000.0, 70}, {12_000.0, 41}]
-  Forecast.forecast(ranked, 6, 0.08)
-  # => six %Point{} values, period 1..6, revenue tapering upward
-end
-
-When the weave runs, both blocks compile to wasm, link in sandbox :forecast,
-and the projected series feeds the dashboard's revenue panel. The numeric work
-that :score started — `revenue_points` and `size_points` per lead — ends here,
-projected forward by two languages that never knew about each other until the
-Component Model introduced them.
-
-See also [[Score]] for where a lead's number is born, and the :pipeline flow
-that hands :forecast its ranked input.
+`project_series` is an **import** Rust declares and Zig **exports** — the matching
+signatures *are* the contract; the weave generates the WIT, you never open it. Two
+languages that never knew about each other, one unit. Next: [[Risk]] (Python).

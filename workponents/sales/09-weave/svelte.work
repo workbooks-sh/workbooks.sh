@@ -1,174 +1,41 @@
 # Score Chart
 
-The dashboard needs a picture of the funnel, not just a table. This file is the
-`:chart` unit — a **Svelte client island** that draws a bar chart of lead scores.
-It is the first unit in the workbook that runs **in the browser**, so it is worth
-being precise about what that means.
-
-## Placement: this runs on the client
-
-Every unit so far ([[score]], [[enrich]], the [[pipeline]]) lives on the **server**
-— native Elixir on the BEAM, trusted, allowed to hold secrets and reach the
-network through grants. `:chart` is the opposite end of the model. Its `client`
-placement word means it ships to the **browser** and runs as **wasm**: the Svelte
-component is compiled, the island is hydrated on the page, and from then on it is
-just DOM reacting to props. There is no server round-trip to redraw a bar.
-
-That is the whole point of the two-placement model: `client` and `server` are the
-only two places code runs, and you choose per unit. We compute scores where the
-data and the trust live (server), and we paint pixels where the user is (client).
-The weave wires the two together — the bundle that [[weave]] produces carries this
-island's compiled code and hydrates it next to the SSR'd page regions.
-
-## Reading data across the boundary
-
-The chart's input is the same `:leads` data the rest of the app uses — typed
-values of [[Lead]]'s `Lead` struct. On the client the island receives those
-rows as a prop; it does not re-run `query()` or reach back to the server. The
-contract is narrow and one-directional: **give me leads, I give you bars**. Each
-bar's height is `lead.score` (the integer [[score]] produced on the server), and
-its label is `lead.name`. The island never enriches, never scores, never writes —
+A **client island** is a UI unit that ships to the browser and **hydrates**. This
+one is a Svelte component drawing a bar per lead. Its contract is narrow and
+one-directional: *give me leads, I give you bars.* It never scores or enriches —
 those are server jobs it has no grant to do.
 
-The `:emit` callback is the one edge that points back out: when the user clicks a
-bar, the island emits a `:select` event carrying that lead's `domain`, so the
-surrounding dashboard can focus the row. Selection is UI state; it lives here.
-
-![Bar chart of lead scores, Initech tallest](./chart-preview.png)
-
-A bar per lead, sorted high to low — Initech (88) leads, then Acme (70), then
-Globex (41). Colour encodes `status`: a `:scored` lead is solid, an `:enriched`
-lead that has not been scored yet is hatched, so a glance shows funnel progress.
-
-## The island
-
-The body below is real Svelte — markup, a `<script>`, and scoped `<style>`, exactly
-as you'd write a `.svelte` file — set off from the prose by blank lines. The weave
-compiles it to a wasm client island and hydrates it on load. Note there is no HTML
-page wrapper and no fences here: the `client svelte :chart do` line names the unit,
-its placement, its language, and the rest is ordinary component source.
+The body is real Svelte — markup, `<script>`, scoped `<style>` — set off by blank
+lines. The `client svelte :chart do` line names the unit, placement, and language;
+the rest is ordinary component source.
 
 client svelte :chart do
   <script>
-    // Props the host passes in. `leads` is an array of Lead-shaped rows
-    // ({ name, domain, revenue, employees, score, status }); `emit` lets the
-    // island report a selection back to the dashboard region around it.
     export let leads = [];
     export let emit = () => {};
-
-    let selected = null;
-
-    // Sort a copy high-to-low so the tallest bar reads first; never mutate the
-    // prop array the host owns.
     $: ranked = [...leads].sort((a, b) => b.score - a.score);
-
-    // Scale bar heights to the busiest column. Guard the empty case so we don't
-    // divide by zero before the first leads arrive.
     $: top = ranked.reduce((m, l) => Math.max(m, l.score), 0) || 1;
-
-    function height(score) {
-      return Math.round((score / top) * 100);
-    }
-
-    function pick(lead) {
-      selected = lead.domain;
-      emit("select", { domain: lead.domain, name: lead.name });
-    }
   </script>
 
-  <figure class="chart" role="group" aria-label="Lead scores">
-    {#if ranked.length === 0}
-      <p class="empty">No leads yet — run the pipeline to populate.</p>
-    {:else}
-      {#each ranked as lead (lead.domain)}
-        <button
-          class="bar"
-          class:enriched={lead.status === "enriched"}
-          class:active={selected === lead.domain}
-          style="--h: {height(lead.score)}%"
-          title="{lead.name}: {lead.score}"
-          on:click={() => pick(lead)}
-        >
-          <span class="value">{lead.score}</span>
-          <span class="track"><span class="fill" /></span>
-          <span class="label">{lead.name}</span>
-        </button>
-      {/each}
-    {/if}
+  <figure class="chart">
+    {#each ranked as lead (lead.domain)}
+      <button class="bar" class:enriched={lead.status === "enriched"}
+              style="--h: {(lead.score / top) * 100}%"
+              on:click={() => emit("select", lead)}>
+        <span>{lead.score}</span>
+        <span class="fill" />
+        <span>{lead.name}</span>
+      </button>
+    {/each}
   </figure>
 
   <style>
-    .chart {
-      display: flex;
-      align-items: flex-end;
-      gap: 0.75rem;
-      height: 220px;
-      margin: 0;
-      padding: 1rem 0 0;
-    }
-    .bar {
-      flex: 1 1 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.35rem;
-      height: 100%;
-      background: none;
-      border: 0;
-      cursor: pointer;
-      font: inherit;
-    }
-    .value {
-      font-size: 0.8rem;
-      font-variant-numeric: tabular-nums;
-      color: var(--ink, #121316);
-    }
-    .track {
-      flex: 1 1 auto;
-      width: 100%;
-      display: flex;
-      align-items: flex-end;
-    }
-    .fill {
-      width: 100%;
-      height: var(--h);
-      border-radius: 6px 6px 0 0;
-      background: var(--mint, #aee5c2);
-      transition: height 220ms ease, background 120ms ease;
-    }
-    .bar.enriched .fill {
-      background: repeating-linear-gradient(
-        45deg,
-        var(--mint, #aee5c2),
-        var(--mint, #aee5c2) 6px,
-        var(--paper, #fbfaf3) 6px,
-        var(--paper, #fbfaf3) 12px
-      );
-    }
-    .bar.active .fill {
-      background: var(--ink, #121316);
-    }
-    .label {
-      font-size: 0.75rem;
-      color: var(--ink-soft, #5a5c61);
-      white-space: nowrap;
-    }
-    .empty {
-      margin: auto;
-      color: var(--ink-soft, #5a5c61);
-    }
+    .chart { display: flex; align-items: flex-end; gap: .75rem; height: 220px }
+    .fill  { height: var(--h); background: var(--mint, #aee5c2); border-radius: 6px 6px 0 0 }
+    .bar.enriched .fill { background: repeating-linear-gradient(45deg, #aee5c2 0 6px, #fbfaf3 6px 12px) }
   </style>
 end
 
-## How it ships in every delivery mode
-
-Because `:chart` is an island, it behaves identically across the three delivery
-modes the workbook supports. In a **static bundle** (`salesapp.html`) the
-component hydrates from the leads baked into the page. Under **nexus SSR** the
-dashboard region renders on the BEAM and the chart hydrates as the one live
-island inside it. Under **live SSR** the same island re-receives `leads` as the
-server diffs new scores over the RCP websocket — a freshly [[score]]d lead grows
-its bar with no reload. One authoring model, three deliveries, no rewrite.
-
-The companion trend view is [[sparkline]] (a SolidJS island), and both sit inside
-the page assembled by [[weave]].
+Because it's an island, it behaves identically across all three delivery modes — in
+[[Live SSR]] a freshly scored lead grows its bar with no reload. The companion trend
+view is the SolidJS [[Trend sparkline]].

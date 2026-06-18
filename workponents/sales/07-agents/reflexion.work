@@ -1,219 +1,42 @@
-# Reflexion: an outreach email that critiques and revises itself
+# Reflexion
 
-The [[analyst]] agent drafts an outreach email in one shot. One shot is rarely
-the best shot. A **Reflexion** agent closes the loop: it **generates** a draft,
-**critiques** it against an explicit rubric, **revises** in light of the
-critique, and repeats — keeping the whole trace as **memory** so each pass can
-see what the last pass already tried and complained about.
+A **Reflexion** agent closes the loop on its own work: **generate → critique →
+revise**, repeated, with the whole trace kept as **memory** so each pass sees what
+the last one tried and complained about. Memory here is a chain of *self-judgments*.
 
-The shape is three roles in a cycle:
-
-- **generate** — produce (or rewrite) the draft from the brief plus the running
-  memory of prior critiques.
-- **critique** — score the draft against a rubric and write down concrete,
-  actionable gripes. This is a self-evaluation step, not a human review gate.
-- **revise** — fold the critique back into the next generate call.
-
-Memory is **the trace itself**: a list of `%Reflection{}` values, one per pass.
-Unlike the [[researcher]] loop (whose memory is verified findings) or the
-[[coder]] agent (whose memory is the ReAct scratchpad of tool calls), Reflexion's
-memory is a chain of *self-judgments*. The agent's own past verdicts are the
-context that makes the next draft better.
-
-Like every brain in this app, the loop runs **server** side — native Elixir on
-the BEAM, not wasm. The model calls go out through the Dock with a `net` grant;
-the loop, the memory, and the typed state all live in real OTP. The browser only
-sees the final approved draft.
-
-## The typed state
-
-A draft is a struct, and so is a single pass of reflection. No DSL, no typespec —
-the field types are **inferred from the defaults**. The `:lead` field carries a
-canonical [[score]] `%Lead{}`, because the email is *about* a specific lead and
-the copy leans on its enriched facts.
-
-agent :reflexion do
-  defmodule Draft do
-    defstruct lead: nil, subject: "", body: "", pass: 0
-  end
-
-  # One self-judgment. `verdict` is an atom enum; `score` is the rubric total
-  # out of 100; `gripes` are the concrete fixes the next pass must apply.
-  defmodule Reflection do
-    defstruct pass: 0, score: 0, verdict: :reject, gripes: []
-  end
-
-  @verdicts [:accept, :revise, :reject]
-
-  # The rubric the critic scores against. Each weighted line is checked
-  # independently so the gripes can point at the exact failing dimension.
-  @rubric [
-    {:personalized, 30, "names the lead's domain and a fact about its size"},
-    {:concrete_value, 30, "states one specific outcome, not a generic pitch"},
-    {:short, 20, "under 90 words, one ask, no filler"},
-    {:clear_cta, 20, "ends with a single, low-friction next step"}
-  ]
+defmodule Reflection do
+  defstruct pass: 0, score: 0, verdict: :reject, gripes: []
 end
 
-## Generate
+@verdicts [:accept, :revise, :reject]
 
-The generator takes the brief, the lead, and the **memory so far**. On pass 0 the
-memory is empty and it writes from scratch; on later passes it is handed the most
-recent `%Reflection{}` and told to fix exactly those gripes. The prompt is
-assembled from the running trace, which is what makes this Reflexion and not a
-plain retry.
+The critic grades its **own** draft against an explicit rubric — each line a yes/no
+with a reason, which keeps the self-evaluation honest instead of a vague "8/10":
 
 agent :reflexion do
-  alias Sales.Dock
-
-  @model "minimax/minimax-m3"
-
-  def generate(%Lead{} = lead, brief, memory) do
-    prompt =
-      case memory do
-        [] ->
-          """
-          Write a cold outreach email to #{lead.name} (#{lead.domain}).
-          Context: ~#{lead.employees} employees, ~$#{lead.revenue} revenue.
-          Brief: #{brief}
-          Return a subject line and a body under 90 words.
-          """
-
-        [%Reflection{gripes: gripes, score: score} | _] ->
-          """
-          Your previous draft scored #{score}/100 and was rejected.
-          Rewrite it. Fix every one of these problems, change nothing else:
-          #{Enum.map_join(gripes, "\n", &("- " <> &1))}
-
-          Lead: #{lead.name} (#{lead.domain}), ~#{lead.employees} employees.
-          Brief: #{brief}
-          """
-      end
-
-    %{"subject" => subject, "body" => body} =
-      Dock.complete(@model, prompt, grant: [net: "api.crm.com"], format: :json)
-
-    %Draft{lead: lead, subject: subject, body: body, pass: length(memory)}
-  end
-end
-
-## Critique
-
-The critic is the heart of the technique: the agent grades its **own** work. It
-runs each rubric line, sums the weighted score, and turns every failing line into
-a gripe string the next `generate/3` can act on. The verdict is an atom from
-`@verdicts` — `:accept` when the score clears the bar, `:revise` otherwise.
-
-The critique is a model call too, but a *narrow* one: each rubric line is a
-yes/no judgment with a one-line reason, which keeps the self-evaluation honest
-instead of letting the model rate its own essay a vague "8/10".
-
-agent :reflexion do
-  @pass_mark 85
+  @rubric [{:personalized, 30}, {:concrete_value, 30}, {:short, 20}, {:clear_cta, 20}]
 
   def critique(%Draft{} = draft) do
-    judgments =
-      Enum.map(@rubric, fn {dim, weight, requirement} ->
-        prompt = """
-        Email subject: #{draft.subject}
-        Email body: #{draft.body}
-
-        Does this email satisfy: "#{requirement}"?
-        Answer strictly as {"pass": true|false, "reason": "..."}.
-        """
-
-        %{"pass" => pass?, "reason" => reason} =
-          Dock.complete(@model, prompt, grant: [net: "api.crm.com"], format: :json)
-
-        {dim, weight, pass?, reason}
-      end)
-
-    score =
-      Enum.reduce(judgments, 0, fn
-        {_dim, weight, true, _reason}, acc -> acc + weight
-        {_dim, _weight, false, _reason}, acc -> acc
-      end)
-
-    gripes =
-      for {_dim, _weight, false, reason} <- judgments, do: reason
-
-    verdict = if score >= @pass_mark, do: :accept, else: :revise
-
-    %Reflection{pass: draft.pass, score: score, verdict: verdict, gripes: gripes}
-  end
-end
-
-## The loop
-
-`refine/3` ties the three roles together. It generates, critiques, **prepends**
-the reflection to the memory list (newest first, so `generate/3` reads
-`[latest | _]`), and recurses until the critic says `:accept` or the pass budget
-runs out. The accumulated `memory` is the return value alongside the winning
-draft — the trace is a first-class output, not a side effect.
-
-There is no iteration cap baked in as a quality gate; `max_passes` is a plain
-**safety net** so a stubborn brief can't spin forever. The loop stops when the
-work is good, not when a counter expires.
-
-agent :reflexion do
-  def refine(%Lead{} = lead, brief, max_passes \\ 4) do
-    do_refine(lead, brief, [], max_passes)
+    judged = Enum.map(@rubric, fn {dim, weight} -> {dim, weight, passes?(draft, dim)} end)
+    score  = Enum.sum(for {_, w, true} <- judged, do: w)
+    %Reflection{pass: draft.pass, score: score,
+                gripes: (for {dim, _, false} <- judged, do: dim),
+                verdict: if(score >= 85, do: :accept, else: :revise)}
   end
 
-  defp do_refine(_lead, _brief, [%Reflection{} = last | _] = memory, 0) do
-    {:exhausted, last, Enum.reverse(memory)}
-  end
+  # generate → critique → recurse until accepted or the pass budget runs out
+  def refine(lead, brief, passes \\ 4), do: do_refine(lead, brief, [], passes)
 
-  defp do_refine(lead, brief, memory, passes_left) do
-    draft = generate(lead, brief, memory)
-    reflection = critique(draft)
-    memory = [reflection | memory]
-
-    case reflection.verdict do
-      :accept ->
-        {:ok, draft, Enum.reverse(memory)}
-
-      _ ->
-        do_refine(lead, brief, memory, passes_left - 1)
+  defp do_refine(_lead, _brief, [last | _] = trace, 0), do: {:exhausted, last, trace}
+  defp do_refine(lead, brief, trace, n) do
+    draft = generate(lead, brief, trace)
+    case critique(draft) do
+      %Reflection{verdict: :accept} = r -> {:ok, draft, [r | trace]}
+      r -> do_refine(lead, brief, [r | trace], n - 1)
     end
   end
 end
 
-A run over a low-signal lead might look like this — three passes, each fixing the
-prior critique, score climbing until it clears `@pass_mark`:
-
-agent :reflexion do
-  def demo do
-    lead = %Lead{
-      name: "Globex",
-      domain: "globex.io",
-      revenue: 12_000,
-      employees: 8,
-      score: 41,
-      status: :enriched
-    }
-
-    case refine(lead, "intro our pipeline tool, book a 15-min call", 4) do
-      {:ok, draft, trace} ->
-        # trace = [%Reflection{pass: 0, score: 55, verdict: :revise, ...},
-        #          %Reflection{pass: 1, score: 75, verdict: :revise, ...},
-        #          %Reflection{pass: 2, score: 90, verdict: :accept, gripes: []}]
-        {draft.subject, draft.body, length(trace)}
-
-      {:exhausted, last, _trace} ->
-        {:gave_up, last.score, last.gripes}
-    end
-  end
-end
-
-## Where it sits
-
-Reflexion is the quality stage between a raw [[analyst]] draft and the outreach
-that actually gets sent. The brief comes from the work tracked on the board; the
-lead facts come from [[enrich]] and [[score]]; the approved draft flows back out
-to a `:contacted` status update.
-
-Because the whole trace is typed `%Reflection{}` data, it is queryable like any
-other content — `work why` can show *why* a given email reads the way it does by
-walking the chain of self-critiques that shaped it. The agent's reasoning is not
-hidden in a log; it is part of the document.
+`max_passes` is a safety net, not a quality gate — the loop stops when the work is
+good. Because the trace is typed `%Reflection{}` data, `work why` can show *why* an
+email reads the way it does. Next: the [[Plan]] board.

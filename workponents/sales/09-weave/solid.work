@@ -1,166 +1,39 @@
-# Sparkline
+# Trend sparkline
 
-The [[chart]] island is a Svelte bar chart of lead scores. This file is its
-companion: `:sparkline`, a **SolidJS** client island that draws a tiny trend
-line — the rolling movement of the pipeline's average score over recent weaves.
-Two different frameworks, one workbook, no conflict. That is the point of this
-file. A client island is **placement = client**: it runs in the browser, hydrated
-from the static bundle or shipped as an island under nexus SSR. The framework it
-happens to be written in is an implementation detail the weave erases.
-
-When you author a client unit you put the language word in front of the block.
-Svelte units say `client svelte`; this one says `client solid`. The weave reads
-that word, compiles the unit with the right toolchain, and emits a hydrating
-island. Both islands land in the same `salesapp.html`; both mount into their own
-shadow boundary; neither knows the other exists. Solid's fine-grained reactivity
-and Svelte's compiled reactivity coexist because the workbook never asks them to
-share a runtime — they share a *page*, the oldest contract on the web.
-
-## What it renders
-
-`:sparkline` takes a list of recent average scores — one number per weave run —
-and draws a single SVG `polyline`, plus a dot on the most recent point and a
-caption with the latest value and its delta. No axes, no legend; a sparkline is a
-word-sized graphic that lives inline with prose, the way this one lives inline
-with the dashboard. The values arrive from the server as a plain list of
-integers; for a static bundle they are baked in at weave time, and under live SSR
-they stream in over RCP and the island re-renders.
-
-The data shape is deliberately small: a list of `integer`, oldest first. The
-caller passes the trail of pipeline averages computed by [[pipeline]] after each
-run, so a reader watching the dashboard sees the pipeline's health move.
+The [[Score chart]] is a Svelte island; this is its companion in a **different
+framework** — `:sparkline`, a SolidJS island drawing a tiny trend line. Two
+frameworks, one workbook, no conflict: you put the language word in front
+(`client solid` vs `client svelte`), the weave compiles each with its own toolchain,
+and both islands share a *page*, never a runtime.
 
 client solid :sparkline do
-  import { createSignal, createMemo, onMount, For } from "solid-js"
+  import { createSignal, createMemo } from "solid-js"
   import { render } from "solid-js/web"
 
-  // A Solid component. Props arrive from the host as a plain object; `scores`
-  // is the trail of average lead scores, oldest first, e.g. [58, 61, 60, 67, 70].
   function Sparkline(props) {
-    const [scores, setScores] = createSignal(props.scores ?? [])
+    const [scores] = createSignal(props.scores ?? [])
 
-    // The host re-pushes data under live SSR; expose a setter so the island
-    // mount point can feed new trails without a remount.
-    onMount(() => {
-      if (props.subscribe) props.subscribe(setScores)
-    })
-
-    const width = 120
-    const height = 32
-    const pad = 3
-
-    // Fine-grained derived state: each memo recomputes only when scores() moves.
-    const bounds = createMemo(() => {
-      const s = scores()
-      if (s.length === 0) return { lo: 0, hi: 1 }
-      const lo = Math.min(...s)
-      const hi = Math.max(...s)
-      return { lo, hi: hi === lo ? lo + 1 : hi }
-    })
-
-    // Map each score to an (x, y) point inside the box. y is flipped because
-    // SVG's origin is top-left and a higher score should sit higher up.
+    // fine-grained derived state: recomputes only when scores() moves
     const points = createMemo(() => {
-      const s = scores()
-      const { lo, hi } = bounds()
-      const span = hi - lo
-      const stepX = s.length > 1 ? (width - pad * 2) / (s.length - 1) : 0
-      return s.map((v, i) => {
-        const x = pad + i * stepX
-        const y = height - pad - ((v - lo) / span) * (height - pad * 2)
-        return { x, y, v }
-      })
+      const s = scores(), lo = Math.min(...s), hi = Math.max(...s) || lo + 1
+      return s.map((v, i) => `${i * 12},${32 - ((v - lo) / (hi - lo)) * 28}`).join(" ")
     })
-
-    const path = createMemo(() =>
-      points().map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")
-    )
-
-    const latest = createMemo(() => {
-      const s = scores()
-      return s.length ? s[s.length - 1] : 0
-    })
-
-    // Delta vs the previous run drives the caption's sign and colour.
-    const delta = createMemo(() => {
-      const s = scores()
-      return s.length > 1 ? s[s.length - 1] - s[s.length - 2] : 0
-    })
-
-    const trend = createMemo(() => (delta() >= 0 ? "up" : "down"))
 
     return (
-      <figure class="sparkline" data-trend={trend()}>
-        <svg viewBox={`0 0 ${width} ${height}`} role="img"
-             aria-label={`Pipeline score trend, latest ${latest()}`}>
-          <polyline points={path()} fill="none"
-                    stroke="currentColor" stroke-width="1.5"
-                    stroke-linecap="round" stroke-linejoin="round" />
-          <For each={points().slice(-1)}>
-            {(p) => <circle cx={p.x} cy={p.y} r="2.4" fill="currentColor" />}
-          </For>
-        </svg>
-        <figcaption>
-          {latest()} <span class="delta">{delta() >= 0 ? "+" : ""}{delta()}</span>
-        </figcaption>
-      </figure>
+      <svg viewBox="0 0 120 32" role="img">
+        <polyline points={points()} fill="none" stroke="currentColor" stroke-width="1.5" />
+      </svg>
     )
   }
 
-  // Island entry point: the weave calls this with the mount node and props.
-  export function mount(el, props) {
-    return render(() => Sparkline(props), el)
-  }
+  export function mount(el, props) { return render(() => Sparkline(props), el) }
 end
 
-## How the trail gets here
+The trail comes from the server — `data :score_trail, of: integer`, the average score
+appended after each [[Pipeline]] run. For a static bundle it's baked in; under live
+SSR the server streams a fresh trail and Solid's memos recompute only the moved
+points.
 
-The numbers are not invented in the browser. After each run, [[pipeline]] folds
-its ranked leads into an average score and appends it to a typed trail held on
-the server. The trail is just `data :score_trail, of: integer` — values of a
-structure, queryable, rendered by default. The island receives a snapshot of it.
-
-server :score_trail_feed do
-  # Average score of the current ranked board, appended after a pipeline run.
-  # Pulls the same ranked leads :chart bars, so both islands tell one story.
-  def average(leads) do
-    case leads do
-      [] -> 0
-      _ ->
-        total = Enum.reduce(leads, 0, fn %Lead{score: s}, acc -> acc + s end)
-        round(total / length(leads))
-    end
-  end
-
-  # The trail is the document's store: read the last N, push the newest.
-  def trail(history, leads, keep \\ 12) do
-    (history ++ [average(leads)])
-    |> Enum.take(-keep)
-  end
-end
-
-Under a **static bundle** the weave evaluates `score_trail_feed.trail/3` at build
-time over the seed [[leads]] and bakes the resulting list into the island's
-props — the sparkline is correct the moment the file opens, with zero server.
-Under **nexus SSR** the same function runs on the BEAM per request. Under **live
-SSR** the server pushes a fresh trail over the RCP websocket each time
-[[pipeline]] completes, the island's `subscribe` callback fires `setScores`, and
-Solid's memos recompute only the points that moved. One authoring model, three
-delivery modes, no rewrite — see [[weave]] for how the gate wires it.
-
-## Why two frameworks is fine, not a smell
-
-A common objection: shipping Svelte *and* SolidJS bloats the bundle. In practice
-the weave tree-shakes each island against its own framework and dedupes shared
-chunks, so you pay for what an island uses, not for the union of every framework
-present. More importantly, the choice is **local**: the author of `:chart` picked
-Svelte, the author of this file picked Solid, and neither decision leaked. That is
-the open-composition stance — the workbook adds reachable compositions rather than
-forcing one runtime on every island. The `work check` graph (see [[code-graph]])
-records each island's framework as a node attribute, so `work near :sparkline`
-shows it sitting beside `:chart` with a shared dataflow edge from [[pipeline]],
-not a dependency on it.
-
-Read this island next to [[chart]]: same input lineage, different visual idiom,
-different framework, one page. The dashboard composes both without either knowing
-the other is there.
+Two frameworks isn't a smell: the weave tree-shakes each island against its own
+runtime, and the choice is **local** — neither author's decision leaked. Next:
+[[Forecast]].
