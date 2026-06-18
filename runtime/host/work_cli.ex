@@ -7,7 +7,7 @@ defmodule Workbooks.Work.CLI do
   Each verb returns `{text, failed?}` so the CLI can set an exit code.
   """
 
-  alias Workbooks.{Graph, Wit, Literate}
+  alias WorkCore.{Graph, Wit, Literate}
 
   @doc "work check [dir] — resolve every reference + audit caps; non-zero exit on any fault."
   def check(dir) do

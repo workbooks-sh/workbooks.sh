@@ -1,6 +1,7 @@
 defmodule Workbooks.UnitTest do
   use ExUnit.Case, async: true
-  alias Workbooks.{Literate, Unit}
+  alias WorkCore.Literate
+  alias Workbooks.Unit
 
   defp unit(src), do: Literate.parse(src) |> Enum.find(&(&1.type == :code))
 

@@ -44,6 +44,7 @@ defmodule Workbooks.MixProject do
 
   defp deps do
     [
+      {:work_core, path: "../work_core"},
       # wb-v3d: vendored, patched wasmex (engine.rs enables the wasm exception proposal so
       # mrustc_pm.wasm runs proc-macro expansion under Wasmex). Committed source, always built from
       # source (force_build) — durable: no deps.get reversion, no env var, no external fork.

@@ -6,7 +6,8 @@ defmodule Workbooks.Audit do
   weave refuses. Pure over the parse + the Elixir AST calls.
   """
 
-  alias Workbooks.{Literate, Wit, Extract, Dock}
+  alias WorkCore.{Literate, Wit, Extract}
+  alias Workbooks.Dock
 
   # the Dock function → sandbox capability mapping lives in the single Dock registry
   # (Dock.cap_for_dock_fn/1). Nexus-tier calls (agent/complete/browse) have no sandbox

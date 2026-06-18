@@ -1,12 +1,12 @@
-defmodule Workbooks.Extract.Elixir do
+defmodule WorkCore.Extract.Elixir do
   @moduledoc """
   §0.2 — walk a parsed Elixir code node's real AST and extract the facts the rest
   of the system needs: its **exports** (public `def`s), the **types** it declares
   (`defstruct` records, nested modules), and the **calls** it makes to other units.
 
-  Reads `Workbooks.Literate` `:code` nodes that carried an `:ast` (the Elixir blocks).
+  Reads `WorkCore.Literate` `:code` nodes that carried an `:ast` (the Elixir blocks).
   Returns one shape — `%{exports, types, calls}` — the SAME shape every per-language
-  extractor returns, so `Workbooks.Graph` (§9) and the WIT generator (§2) merge them
+  extractor returns, so `WorkCore.Graph` (§9) and the WIT generator (§2) merge them
   without caring which language produced them.
   """
 

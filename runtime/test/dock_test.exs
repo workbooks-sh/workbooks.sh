@@ -1,6 +1,7 @@
 defmodule Workbooks.DockTest do
   use ExUnit.Case, async: true
-  alias Workbooks.{Dock, Literate, Wit}
+  alias Workbooks.Dock
+  alias WorkCore.{Literate, Wit}
   alias Workbooks.Instance.Imports
 
   test "wit/engine.wit is generated from the Dock registry and stays in sync" do

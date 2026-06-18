@@ -1,6 +1,7 @@
 defmodule Workbooks.Resource.AshLiveTest do
   use ExUnit.Case, async: false
-  alias Workbooks.{Literate, Resource}
+  alias WorkCore.Literate
+  alias Workbooks.Resource
 
   defp build(src) do
     node = Literate.parse(src) |> Enum.find(&(&1.type == :code))

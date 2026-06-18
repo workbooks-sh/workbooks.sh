@@ -6,7 +6,7 @@ defmodule Workbooks.Dock do
   This is step 1 of collapsing the four parallel Dock seams (Instance WIT imports,
   host_broker JSON envelope, RustDock/JsDock core ABI) into one. Those seams become
   *transports* that project from this registry (later steps). Today it is already the
-  source `Workbooks.Wit` reads to generate a unit's `import`s — so §2's generated
+  source `WorkCore.Wit` reads to generate a unit's `import`s — so §2's generated
   worlds and the Dock are the same surface, by construction rather than by coincidence.
   """
 
@@ -14,7 +14,7 @@ defmodule Workbooks.Dock do
   #
   #  • sandbox caps (`sandbox?: true`) — net/kv/secrets/fs/exec — the per-unit grants
   #    an author writes; each projects a self-contained WIT `interface` so a generated
-  #    component package validates standalone. Read by `Workbooks.Wit`.
+  #    component package validates standalone. Read by `WorkCore.Wit`.
   #  • runtime caps (`import:`) — vfs/commands/llm/browse/parallel — the live WIT-typed
   #    Instance Dock seam (`instance/imports.ex`), each projecting one host import name.
   #    Locked by the characterization snapshot; the seam will reproject from here.
@@ -95,7 +95,7 @@ defmodule Workbooks.Dock do
 
   @doc """
   The WIT import a granted capability projects — the one vocabulary both the generated
-  world (`Workbooks.Wit`) and the runtime seam speak. A sandbox cap projects its
+  world (`WorkCore.Wit`) and the runtime seam speak. A sandbox cap projects its
   `host-*` interface; a runtime cap projects its typed import; an aliased spec grant
   projects the runtime import it maps onto. `nil` if the grant has no projection.
   """
