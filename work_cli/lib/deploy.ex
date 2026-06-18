@@ -184,7 +184,7 @@ defmodule WorkCLI.Deploy do
   defp health_url(target) do
     cond do
       String.starts_with?(target, "http") -> if String.contains?(target, "/health"), do: target, else: target <> "/health"
-      true -> (System.get_env("WB_RUNTIME_URL") || "http://localhost:4000") <> "/health"
+      true -> WorkCLI.Context.nexus_url() <> "/health"
     end
   end
 end

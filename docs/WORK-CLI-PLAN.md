@@ -169,8 +169,13 @@ agents (the tool-boundary JSON exception; everything else stays HTML).
 - **P3 — deploy as client:** port deploy verbs onto the client model; wire **nexus** deployment; local
   (krunvm/container) + cloud (control plane / Fly).
 - **P4 — push-to-live:** `work dev` incremental weave + hot-swap.
-- **P5 — platform surface:** `login/ctx/org/nexus/workspace/billing`; flip the canonical name to the
-  sibling; retire old runtime CLI verbs; update installer.
+- **P5 — platform surface:** **DONE (core).** `WorkCLI.Context` — the kubectl-style context model at
+  `~/.work/context.html` (on-canon `<work-context>`, resolved at runtime); verbs `ctx list|use|set`,
+  `nexus <url>`, `login` (device-flow + `--token`, 0600 credentials), `whoami`. The context drives the
+  client verbs (`deploy verify` resolves the active nexus). A name guardrail pins the sibling escript to
+  `work` + `WorkCLI.Main`. *Remaining ship step (release-ops, not blocked):* point the `curl|sh`
+  installer at the sibling escript and retire the old runtime CLI verbs as consumers move over — the
+  sibling already builds the canonical `work`.
 
 ## 11. Risks / open
 

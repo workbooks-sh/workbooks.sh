@@ -69,10 +69,29 @@ defmodule WorkCLI.Main do
   defp route(["deploy", "down" | rest]), do: WorkCLI.Deploy.down(file_arg(rest))
   defp route(["deploy" | _]), do: (Log.error("usage: work deploy init|validate|apply|verify|status|down"); {:error, :usage})
 
+  # platform — identity, contexts, the control plane
+  defp route(["ctx"]), do: WorkCLI.Platform.ctx_list()
+  defp route(["ctx", "list"]), do: WorkCLI.Platform.ctx_list()
+  defp route(["ctx", "use", name | _]), do: WorkCLI.Platform.ctx_use(name)
+  defp route(["ctx", "set", name | rest]), do: WorkCLI.Platform.ctx_set(name, flags(rest))
+  defp route(["nexus", url | _]), do: WorkCLI.Platform.nexus(url)
+  defp route(["whoami" | _]), do: WorkCLI.Platform.whoami()
+  defp route(["login" | rest]), do: WorkCLI.Platform.login(positional(rest), flags(rest))
+
   defp route([verb | _]) do
     Log.error("unknown command: #{verb}", detail: "run `work help` for the full surface")
     {:error, :unknown}
   end
+
+  # parse `--key value` flags → keyword list (atoms); positional = first non-flag, non-value token
+  defp flags(args), do: flags(args, [])
+  defp flags([], acc), do: Enum.reverse(acc)
+  defp flags(["--" <> k, v | rest], acc), do: flags(rest, [{String.to_atom(k), v} | acc])
+  defp flags([_ | rest], acc), do: flags(rest, acc)
+
+  defp positional(["--" <> _, _v | rest]), do: positional(rest)
+  defp positional([tok | _]) when binary_part(tok, 0, min(2, byte_size(tok))) != "--", do: tok
+  defp positional(_), do: nil
 
   defp dir_arg(rest), do: List.first(rest) || "."
   defp file_arg(rest), do: (rest -- ["--force"]) |> List.first() || "deployment.html"
@@ -100,7 +119,9 @@ defmodule WorkCLI.Main do
        {"deploy verify|status|down", "health-check · inspect · tear down"}
      ]},
     {"platform", "identity, contexts, the cloud control plane", [
-       {"login · ctx · org · nexus · workspace", "(P5)"}
+       {"ctx [list|use|set]", "manage targets (which nexus/org/workspace)"},
+       {"nexus <url>", "point the active context at an engine"},
+       {"login [url] · whoami", "authenticate to the control plane · show identity"}
      ]}
   ]
 
