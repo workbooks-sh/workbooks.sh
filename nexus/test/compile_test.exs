@@ -94,6 +94,23 @@ defmodule Nexus.CompileTest do
 
   @tag :compiler
   @tag timeout: 240_000
+  test "a .work zig unit compiles to a component and runs" do
+    if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
+      node =
+        "zig :math do\n  export fn quad(x: i32) i32 { return x * 4; }\nend\n"
+        |> Nexus.Literate.parse()
+        |> Enum.find(&(&1.type == :code))
+
+      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
+      {:ok, p} = Nexus.Sandbox.start(comp, [])
+      assert {:ok, 44} = Nexus.Sandbox.call(p, "quad", [11])
+    else
+      :ok
+    end
+  end
+
+  @tag :compiler
+  @tag timeout: 240_000
   test "a .work rust unit compiles to a component and runs" do
     if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
       node =

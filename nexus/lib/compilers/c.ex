@@ -15,14 +15,19 @@ defmodule Nexus.Compilers.C do
     File.mkdir_p!(Path.join(work, "t"))
     File.cp!(Path.expand(source_path), Path.join(work, "u.c"))
 
+    # extra_dirs: host::guest mounts (e.g. the zig lib for zig.h); cflags: extra clang flags
+    # (e.g. -I/ziglib). Lets the zig lane reuse this lane to compile zig's C-backend output.
+    extra_mounts = opts |> Keyword.get(:extra_dirs, []) |> Enum.flat_map(&["--dir", &1])
+    cflags = Keyword.get(opts, :cflags, [])
+
     cl = fn args ->
-      wasmtime(["--dir", "#{csys}::/usr", "--dir", "#{work}::/work", "--dir", "#{work}/t::/tmp", "--env", "TMPDIR=/tmp", clang | args])
+      wasmtime(["--dir", "#{csys}::/usr", "--dir", "#{work}::/work", "--dir", "#{work}/t::/tmp"] ++ extra_mounts ++ ["--env", "TMPDIR=/tmp", clang | args])
     end
 
     exports = opts |> Keyword.get(:exports, []) |> Enum.map(&"--export=#{&1}")
     # host imports (extern decls) stay unresolved → wasm imports the Dock satisfies
     au = if Keyword.get(opts, :allow_undefined, false), do: ["--allow-undefined"], else: []
-    cl.(["clang", "--target=wasm32-wasip1", "--sysroot=/usr", "-O1", "-w", "-c", "/work/u.c", "-o", "/work/u.o"])
+    cl.(["clang", "--target=wasm32-wasip1", "--sysroot=/usr", "-O1", "-w"] ++ cflags ++ ["-c", "/work/u.c", "-o", "/work/u.o"])
     cl.(["wasm-ld", "-m", "wasm32", "--no-entry"] ++ au ++ exports ++ ["/work/u.o", "-o", "/work/u.wasm"])
 
     core = Path.join(work, "u.wasm")

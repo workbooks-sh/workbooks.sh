@@ -22,6 +22,7 @@ defmodule Nexus.Compile do
       kind == "server" -> {:beam, Nexus.Unit.compile(node)}
       kind == "rust" -> {:wasm, rust_unit(node)}
       kind in ~w(c cpp) -> {:wasm, c_unit(node)}
+      kind == "zig" -> {:wasm, zig_unit(node)}
       kind in @wasm_kinds -> {:wasm, {:todo, node.lang, node.name}}
       true -> {:skip, kind}
     end
@@ -70,6 +71,51 @@ defmodule Nexus.Compile do
     |> Regex.scan(body)
     |> Enum.map(fn [_, n] -> n end)
     |> Enum.uniq()
+  end
+
+  # A `zig` unit: derive the WIT world from `export fn` signatures, compile (zig→C→wasm reactor).
+  defp zig_unit(%{name: name, body: body}) do
+    case zig_sigs(body) do
+      [] ->
+        {:error, :no_exported_fns}
+
+      exports ->
+        wname = wit_ident(name)
+        lines = Enum.map_join(exports, "\n", fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
+        world = "package work:#{wname};\n\nworld #{wname} {\n#{lines}\n}\n"
+        src = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}.zig")
+        File.write!(src, body)
+
+        with {:ok, core} <- Nexus.Compilers.Zig.compile_to_wasm(src, exports: Enum.map(exports, &elem(&1, 0))) do
+          c_componentize(core, world, wname)
+        end
+    end
+  end
+
+  @zig_wit %{
+    "i8" => "s8", "i16" => "s16", "i32" => "s32", "i64" => "s64",
+    "u8" => "u8", "u16" => "u16", "u32" => "u32", "u64" => "u64",
+    "f32" => "f32", "f64" => "f64", "bool" => "bool"
+  }
+  defp zig_sigs(body) do
+    ~r/\bexport\s+fn\s+([a-z_]\w*)\s*\(([^)]*)\)\s*([A-Za-z0-9_]+)\s*\{/
+    |> Regex.scan(body)
+    |> Enum.map(fn [_, f, params, ret] -> {f, zig_params(params), " -> #{Map.get(@zig_wit, ret, "s32")}"} end)
+    |> Enum.uniq()
+  end
+
+  defp zig_params(""), do: ""
+  defp zig_params("void"), do: ""
+
+  defp zig_params(params) do
+    params
+    |> String.split(",", trim: true)
+    |> Enum.map_join(", ", fn p ->
+      case String.split(p, ":", parts: 2) do
+        [n, t] -> "#{wit_ident(String.trim(n))}: #{Map.get(@zig_wit, String.trim(t), "s32")}"
+        [t] -> Map.get(@zig_wit, String.trim(t), "s32")
+      end
+    end)
   end
 
   # C signatures: `<ret> name(params) {`. Maps C scalar types → WIT.

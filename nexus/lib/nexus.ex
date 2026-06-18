@@ -31,10 +31,10 @@ defmodule Nexus do
       data: :live,
       # sandbox: real wasm components run on wasmex
       sandbox: :live,
-      # compile: .work rust + C units → typed components, automatic + tested (rust via mrustc
-      # w/ crates + host imports; C via clang reactor — cleaner, no command machinery). zig
-      # pending (its compiler runs through the old command registry, needs the direct-wasmtime
-      # treatment first).
+      # compile: .work rust + C + zig units → typed components, automatic + tested. rust via
+      # mrustc (crates + host imports); C via clang reactor; zig via zig1 direct (zig→C→reactor,
+      # reusing the C lane w/ the zig lib on the include path). All run zig1/clang/mrustc DIRECTLY
+      # — no command registry.
       compile: :live,
       # weave: workbook folder → one styled .html — inline markdown (bold/italic/code/links),
       # lists, labeled unit blocks, a clean shell
