@@ -32,7 +32,16 @@ defmodule Nexus.Compile do
     case rust_world(node) do
       %{exports: []} -> {:error, :no_exported_fns}
       %{world: world, name: name, exports: exports, imports: imports} ->
-        to_component(body, Enum.map(exports, &elem(&1, 0)), world, name, imports != [])
+        to_component(body, Enum.map(exports, &elem(&1, 0)), world, name, imports != [], crate_deps(body))
+    end
+  end
+
+  # A unit declares crate deps with a `// deps: libm, regex` header line; the lane fetches +
+  # resolves them from crates.io (version-floors handle ceiling-exceeding releases).
+  defp crate_deps(body) do
+    case Regex.run(~r/\/\/\s*deps:\s*(.+)/, body) do
+      [_, list] -> list |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
+      _ -> []
     end
   end
 
@@ -58,14 +67,14 @@ defmodule Nexus.Compile do
 
   Returns `{:ok, component_path}` — runnable on `Nexus.Sandbox`.
   """
-  def to_component(source, fns, wit_text, world, has_imports \\ false) when is_list(fns) do
+  def to_component(source, fns, wit_text, world, has_imports \\ false, deps \\ []) when is_list(fns) do
     dir = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
     src = Path.join(dir, "u.rs")
     File.write!(src, source <> "\n" <> keepalive_main(fns))
 
     with {:ok, core, _} <-
-           Nexus.Compilers.Rust.rust_compile_to_wasm(src, exports: fns, allow_undefined: true) do
+           Nexus.Compilers.Rust.rust_compile_to_wasm(src, exports: fns, allow_undefined: true, deps: deps) do
       # Host imports: mrustc emits them as `env::<fn>`, but the component model wants world-level
       # imports at `$root`. Rewrite the import module before componentizing (wasmex supplies impls).
       core = if has_imports, do: rewrite_env_to_root(core, dir), else: core
