@@ -89,14 +89,23 @@ defmodule Workbooks.Extract.Elixir do
 
   defp do_body(_), do: nil
 
-  # ── exports: a public def becomes {name, arity} ──
+  # ── exports: a public def becomes {name, [arg_types]} — a %Struct{} pattern types
+  #    that argument as its record; everything else defaults to string ──
   defp export({:def, _, [{:when, _, [{name, _, args} | _]} | _]}) when is_atom(name),
-    do: {name, arity(args)}
+    do: {name, arg_types(args)}
 
   defp export({:def, _, [{name, _, args} | _]}) when is_atom(name) and name not in [:when],
-    do: {name, arity(args)}
+    do: {name, arg_types(args)}
 
   defp export(_), do: nil
+
+  defp arg_types(args) when is_list(args), do: Enum.map(args, &arg_type/1)
+  defp arg_types(_), do: []
+
+  # `%Struct{} = var` and `%Struct{…}` patterns name a record type
+  defp arg_type({:=, _, [pat, _]}), do: arg_type(pat)
+  defp arg_type({:%, _, [{:__aliases__, _, mods}, _]}), do: mods |> List.last() |> to_string() |> String.downcase()
+  defp arg_type(_), do: "string"
 
   # ── types: a defstruct is a record (fields + defaults, so WIT types can be
   #    inferred); a nested defmodule is a named shape ──

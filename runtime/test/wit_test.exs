@@ -22,6 +22,11 @@ defmodule Workbooks.WitTest do
     assert world =~ "import host:net/fetch;"
   end
 
+  test "a struct-pattern argument types as its record in the func signature" do
+    world = code("server :score do\n  def score(%Lead{} = lead), do: lead.revenue\nend\n") |> Wit.world()
+    assert world =~ "export score: func(a0: lead) -> string;"
+  end
+
   test "a unit with no public signature gets the default run export and no imports" do
     world = code("server :noop do\n  @x 1\nend\n") |> Wit.world()
     assert world =~ "export run: func(input: string) -> string;"

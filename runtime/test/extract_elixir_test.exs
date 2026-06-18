@@ -17,8 +17,9 @@ defmodule Workbooks.Extract.ElixirTest do
     """
 
     %{exports: ex} = facts(src)
-    assert {:score, 1} in ex
-    assert {:score, 2} in ex
+    # a %Lead{} arg types as the record; a plain var defaults to string
+    assert {:score, ["lead"]} in ex
+    assert {:score, ["lead", "string"]} in ex
     refute Enum.any?(ex, fn {name, _} -> name == :weigh end)
   end
 
@@ -59,7 +60,7 @@ defmodule Workbooks.Extract.ElixirTest do
     """
 
     %{exports: ex} = facts(src)
-    assert {:quote, 2} in ex
+    assert {:quote, ["string", "string"]} in ex
   end
 
   test "a foreign-language node (no ast) yields empty facts, gracefully" do

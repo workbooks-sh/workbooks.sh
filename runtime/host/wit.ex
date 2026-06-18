@@ -96,16 +96,19 @@ defmodule Workbooks.Wit do
 
   defp export_lines(exports) do
     Enum.map(exports, fn
-      {name, arity} when is_integer(arity) ->
-        "export #{wit_name(name)}: func(#{params(arity)}) -> string;"
+      {name, types} when is_list(types) ->
+        "export #{wit_name(name)}: func(#{params(types)}) -> string;"
 
       name ->
         "export #{wit_name(name)}: func() -> string;"
     end)
   end
 
-  defp params(0), do: ""
-  defp params(arity), do: 0..(arity - 1) |> Enum.map(&"a#{&1}: string") |> Enum.join(", ")
+  defp params([]), do: ""
+
+  defp params(types) when is_list(types) do
+    types |> Enum.with_index() |> Enum.map(fn {t, i} -> "a#{i}: #{t}" end) |> Enum.join(", ")
+  end
 
   # the unit's declared types → WIT defs: records (named after their module) + enums
   defp type_defs(%{types: types}, unit) do
