@@ -31,3 +31,14 @@ only when it can actually help. Verified: HN stays 367ms/94 lines (never escalat
 
 **Net:** "stick with what works" is empirically correct. The greenfield engine is a *targeted
 fallback* for client-only SPAs, not the workhorse — keeping concurrent-render compute low.
+
+## Computer-use standing (measured)
+
+| Mode | Compute | Result |
+|------|---------|--------|
+| **Tier-1 semantic** (navigate/click/fill/submit, no engine, no vision) | **~633ms/step** (3-step HN nav in 1.9s) | deterministic, fully concurrent-friendly — the workhorse |
+| **Multimodal loop** (Gemma 3 12B vision + cheap screenshot) | **~2.9s/step**, model-bound (our render is cheap) | read the HN screenshot + actionables, answered in 1 step |
+
+Both run on the **cheap render path** — no StarlingMonkey. Tier-1 is the cheap deterministic spine;
+the vision loop is for when you need a model to *decide* the next action, and its cost is the model
+call, not our compute. "Pretty damn good computer-use" is already here without the heavy engine.
