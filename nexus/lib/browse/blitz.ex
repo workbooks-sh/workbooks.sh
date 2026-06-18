@@ -72,7 +72,9 @@ defmodule Nexus.Browse.Blitz do
   defp normalize({:ok, bin}), do: {:ok, bin}
   defp normalize(_), do: {:error, :no_output}
 
-  defp wasm(:text), do: Application.get_env(:nexus, :render_text_wasm, priv("render_text.wasm"))
+  # render_js runs the page's inline JS against the Blitz DOM, then extracts text — a superset of
+  # render_text (a script-free page just renders). JS-aware scraping by default.
+  defp wasm(:text), do: Application.get_env(:nexus, :render_text_wasm, priv("render_js.wasm"))
   defp wasm(:screenshot), do: Application.get_env(:nexus, :render_page_wasm, priv("render_page.wasm"))
   defp priv(name), do: Path.join([File.cwd!(), "priv", name])
 end
