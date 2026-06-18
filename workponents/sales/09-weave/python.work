@@ -7,7 +7,7 @@ it takes **no grants**.
 
 sandbox :risk_box, grant: [], memory: "64mb", timeout: 10_000 do
   python :risk, of: Lead do
-    # contract is still the Elixir module shape: %Lead{} in, integer out.
+    # contract is the Lead resource's shape: %Lead{} in, integer out.
     def risk_score(lead):
         revenue, employees = lead["revenue"], lead["employees"]
         risk = 0

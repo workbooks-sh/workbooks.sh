@@ -1,31 +1,29 @@
 # Plan
 
 This is the board — the team's work on the workbook, as data. It proves a claim that
-sounds wrong at first: **declarative is not immutable.** The same document you read
-is the one the agents write back into; tasks move from `:todo` to `:done` *in this
-file*. The document is the database.
+sounds wrong at first: **declarative is not immutable.** The same document you read is
+the one the agents write back into; tasks move from `:todo` to `:done` *in this file*.
+The document is the database.
 
-A task is a value of the canonical `Task` struct — a record whose field types are
-inferred from the defaults. No DSL, no schema.
+A task is a **resource** — its shape and its rows in one place. It renders by default,
+so this list *is* the board on the page:
 
-server :board do
-  defmodule Task do
-    defstruct title: "", status: :todo, owner: nil, ref: nil
-  end
+resource Task do
+  title   :text
+  status  :todo | :doing | :done
+  owner   :text                # nil until an agent claims it
+  ref     :atom                # the unit this task is about
 
-  @statuses [:todo, :doing, :done]
+  seed [
+    %{title: "Wire enrich → CRM API",         status: :done,  owner: "ana", ref: :enrich},
+    %{title: "Tune scoring weights",          status: :doing, owner: "ana", ref: :score},
+    %{title: "Forecast next-quarter pipe",    status: :todo,  owner: nil,   ref: :forecast},
+    %{title: "Draft outreach for hot leads",  status: :todo,  owner: nil,   ref: :analyst}
+  ]
 end
 
-`data` declares typed values and renders by default, so this list *is* the board on
-the page. `owner` must resolve to a real person or agent; `ref` points at the unit
-the task is about — both checked at the weave gate.
-
-server data :tasks, of: Task, from: values([
-  %Task{title: "Wire enrich → CRM API",       status: :done,  owner: "ana", ref: :enrich},
-  %Task{title: "Tune scoring weights",         status: :doing, owner: "ana", ref: :score},
-  %Task{title: "Forecast next-quarter pipe",   status: :todo,  owner: nil,   ref: :forecast},
-  %Task{title: "Draft outreach for hot leads", status: :todo,  owner: nil,   ref: :analyst}
-])
+`owner` must resolve to a real person or agent; `ref` points at the unit the task is
+about — both checked at the weave gate.
 
 Two tasks have no owner — they're unclaimed. Next: how agents claim work without
-trampling each other ([[Claim, lock & fence]]), and a [[A full harness]] in one file.
+trampling each other ([[Claim, lock & fence]]), and [[A full harness]] in one file.

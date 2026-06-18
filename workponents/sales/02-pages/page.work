@@ -4,20 +4,16 @@ A **page** is a `.work` file that's mostly **prose** with a few embedded units t
 **render by default** — declared data, an island, an image. Markdown narrates; the
 units run. Nothing here is a mock-up.
 
-## A board from declared tasks
+## A board from a resource
 
-Declare `Task` values and they render as a board. `owner` must resolve to a real
-person or agent; `ref` points at the unit the task is about — both checked at the
-weave gate.
+A resource renders by default — name it and its rows appear as a board. The page
+doesn't re-declare the data; it **shows the one `Task` resource**, so this board and the
+[[Plan]] page's full view are the same live state, never a copy.
 
-data :board, of: Task, from: values([
-  %Task{title: "Backfill enrichment", status: :doing, owner: :priya, ref: :enrich},
-  %Task{title: "Tune scoring weights", status: :doing, owner: :dana,  ref: :score},
-  %Task{title: "Draft outreach for Initech", status: :todo, owner: :analyst, ref: :analyst}
-])
+show Task, as: :board, columns: [:title, :status, :owner]
 
-This is **live state**, not a snapshot — the document *is* the store. The same values
-power the [[Plan]] page's full view.
+This is **live state**, not a snapshot — the document *is* the store. When an agent
+claims a task in [[Plan]], this board updates the instant the mutation lands.
 
 ## An island
 
