@@ -29,7 +29,8 @@ defmodule Nexus do
       dock: :live,
       unit: :live,
       # data: a resource → a typed struct (the zero-dep base, client+server) + Nexus.Store, a
-      # pluggable persistence seam (ETS default; Postgres/SQLite/wasm-SQL adapters; Ash optional later)
+      # pluggable persistence seam. Two live backends: ETS (default, in-memory) + Sqlite (durable,
+      # via exqlite). Neon Postgres (cloud) / wasm-SQL slot in behind the same 4 callbacks; Ash later.
       data: :live,
       # audit: a unit may only call host caps it grants (grant: [emit]); Nexus.Audit reports the
       # ungranted ones per unit / per workbook — an ungranted cap is a hard error, not silent reach

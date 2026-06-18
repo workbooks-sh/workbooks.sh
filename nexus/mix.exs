@@ -18,7 +18,10 @@ defmodule Nexus.MixProject do
   # — NOT a framework. (Ash can return later as one optional store adapter, not the foundation.)
   defp deps do
     [
-      {:wasmex, path: "../runtime/vendor/wasmex"}
+      {:wasmex, path: "../runtime/vendor/wasmex"},
+      # durable-local store backend behind the Nexus.Store seam (precompiled NIF). The cloud
+      # backend (Neon Postgres) and any wasm-SQL engine slot in behind the same 4 callbacks.
+      {:exqlite, "~> 0.23"}
     ]
   end
 end
