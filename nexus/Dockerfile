@@ -1,19 +1,26 @@
 # The nexus runtime OCI image — the ONE image `Nexus.Deploy.Machine` boots in a krunvm/libkrun
 # microVM (`Nexus.Deploy.local/2`) locally, and on a cloud machine. Entrypoint = the mix release at
 # /app/bin/nexus; the Machine runs `/app/bin/nexus eval <boot-expr>` (WORKDIR /app, /data volume,
-# port 4000). Mirrors runtime/ci/Dockerfile.runtime: build the release, then a slim Debian runtime
-# with wasmtime + the in-sandbox compilers.
+# port 4000). Build the release, then a slim Debian runtime with wasmtime + the in-sandbox compilers.
 #
-# Build CONTEXT = the REPO ROOT (not nexus/) — nexus depends on ../runtime/vendor/wasmex (a vendored
-# path dep) and on runtime/compilers/, both of which sit outside nexus/. Build via deploy/build.sh,
-# which sets the context and stages the compilers.
+# Build CONTEXT = the REPO ROOT. nexus is now self-contained: wasmex (vendor/wasmex), the compilers
+# (compilers-dist), and the toolchain reactor (priv/work-toolchain.wasm) all live UNDER nexus/.
 #
+#   nexus/scripts/stage-reactor.sh                  # build + stage priv/work-toolchain.wasm
+#   nexus/scripts/stage-tools.sh                    # stage the lean ~600M compilers-dist
 #   docker build -f nexus/Dockerfile -t nexus:local \
-#     --build-arg COMPILERS_DIR=runtime/compilers-dist .
+#     --build-arg COMPILERS_DIR=nexus/compilers-dist .
 #
-# The compilers (a ~7.1G gitignored toolchain) are NOT in git; they must be PRESENT in the build
-# context under ${COMPILERS_DIR}. Like the runtime, the lean ~600M slice is staged first via
-# runtime/scripts/stage-tools.sh → runtime/compilers-dist. See deploy/build.sh and docs/OCI-IMAGE.md.
+# The compilers (a ~7.2G gitignored toolchain) are NOT in git; the lean ~600M slice must be PRESENT in
+# the build context under ${COMPILERS_DIR} (staged by nexus/scripts/stage-tools.sh). See the
+# nexus-image workflow + docs/OCI-IMAGE.md.
+
+# The compilers layer (ci/Dockerfile.compilers), referenced as a named stage. Docker forbids a
+# variable in `COPY --from`, but a GLOBAL ARG in `FROM` is allowed — so we alias it to `compilers`
+# and COPY from that stage below. `compilers:local` for a local build; the ghcr ref for CI/publish
+# (the 7.2G wasm toolchain is published ONCE from a provisioned machine, never rebuilt in CI).
+ARG COMPILERS_REF=compilers:local
+FROM ${COMPILERS_REF} AS compilers
 
 # --- build: the Elixir release ----------------------------------------------
 FROM elixir:1.18-otp-27 AS build
@@ -26,10 +33,10 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable --pr
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN mix local.hex --force && mix local.rebar --force
 
-# wasmex is a VENDORED path dep ({:wasmex, path: "../runtime/vendor/wasmex"}) — its source must exist
-# before deps.compile. Copy the manifests + the vendored wasmex first to keep the dep layer cached.
+# wasmex is a VENDORED path dep ({:wasmex, path: "vendor/wasmex"}) — its source must exist before
+# deps.compile. Copy the manifests + the vendored wasmex first to keep the dep layer cached.
 COPY nexus/mix.exs nexus/mix.lock ./
-COPY runtime/vendor/wasmex /runtime/vendor/wasmex
+COPY nexus/vendor/wasmex /app/vendor/wasmex
 RUN mix deps.get --only prod && mix deps.compile
 
 COPY nexus/ .
@@ -56,13 +63,12 @@ RUN curl -fsSL https://wasmtime.dev/install.sh | bash -s -- --version ${WASMTIME
 # The mix release → /app. The Machine boots /app/bin/nexus (WORKDIR /app).
 COPY --from=build /app/_build/prod/rel/nexus ./
 
-# The in-sandbox compilers. Nexus.Compilers.Shared.default_root/0 resolves "compilers" at the app
-# CWD first, so landing them at /app/compilers makes cloud AND local-container builds compile
-# Rust/C/Zig identically to dev. COPY'd from the build context (NOT a separate stage) — the compilers
-# are gitignored artifacts staged into the context by deploy/build.sh; see docs/OCI-IMAGE.md for the
-# layer-as-its-own-package strategy the runtime uses (and why we COPY here for now).
-ARG COMPILERS_DIR=runtime/compilers-dist
-COPY ${COMPILERS_DIR} ./compilers
+# The in-sandbox compilers, from the standalone compilers LAYER (the `compilers` stage above) so CI
+# never rebuilds the hours-long provision chain. Nexus.Compilers.Shared.default_root/0 resolves
+# "compilers" at the app CWD, so cloud AND local-container deployments compile Rust/C/Zig/Go/JS
+# identically to dev. (The toolchain REACTOR — priv/work-toolchain.wasm, staged by
+# nexus/scripts/stage-reactor.sh — and the wasi adapter — build/tools — ship inside the release.)
+COPY --from=compilers /compilers ./compilers
 
 EXPOSE 4000
 # The Machine overrides this with `eval <boot-expr>`; `start` is the conventional default.
