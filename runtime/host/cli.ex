@@ -530,8 +530,13 @@ defmodule Workbooks.CLI do
   def call(["kit", "eval", id, filter], _t),
     do: WorkKits.eval_text(id, WorkKits.default_root(), filter)
   # `work eval components [case]` — the component-emit eval pack (text + voice parity).
-  def call(["eval", "components"], _t), do: Workbooks.Evals.Components.run()
-  def call(["eval", "components", filter], _t), do: Workbooks.Evals.Components.run(filter)
+  # eval is a workbench feature (features/evals), not compiled into the core runtime —
+  # dispatch only if it's loaded (e.g. a dev build that includes features/).
+  def call(["eval", "components" | rest], _t) do
+    if Code.ensure_loaded?(Workbooks.Evals.Components),
+      do: apply(Workbooks.Evals.Components, :run, rest),
+      else: IO.puts("eval is a workbench feature, not in the core runtime")
+  end
   def call(["kit", "sign", id], t), do: WorkKits.sign_text(id, t)
   def call(["kit", "versions", id], _t), do: WorkKits.versions_text(id)
   def call(["kit", "live"], _t), do: WorkKits.live_text()
