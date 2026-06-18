@@ -36,4 +36,19 @@ pub fn build(b: *std.Build) void {
     });
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&b.addRunArtifact(tests).step);
+
+    // The toolchain as a wasm REACTOR (exported fns, no entry) — what nexus instantiates once and
+    // calls many times. `zig build reactor` → zig-out/bin/work-toolchain.wasm.
+    const reactor = b.addExecutable(.{
+        .name = "work-toolchain",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/lib.zig"),
+            .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
+            .optimize = .ReleaseSmall,
+        }),
+    });
+    reactor.entry = .disabled;
+    reactor.rdynamic = true;
+    const reactor_step = b.step("reactor", "Build the wasm toolchain reactor");
+    reactor_step.dependOn(&b.addInstallArtifact(reactor, .{}).step);
 }

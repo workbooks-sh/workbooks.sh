@@ -31,7 +31,25 @@ called many times (`Nexus.Sandbox.call`) — amortizing instantiation to ~µs–
 toolchain as a component (reactor exports + a string ABI over component-model strings, not a CLI), and
 repoint nexus's `WorkCore.*` calls through `Nexus.Sandbox`. Then `work_core` deletes cleanly.
 
-## Recommendation
+## UPDATE — Option B SPIKED: it's a strict win (0.034ms)
+
+The naive measurement used a wasi COMMAND (re-instantiated per call). The reactor approach — a wasm
+module instantiated ONCE, exports called many times — was spiked and **proven**:
+
+| Path | Per-call |
+|---|---|
+| subprocess `work.wasm` | 8.3 ms |
+| in-process Elixir `WorkCore` (today) | 0.13 ms |
+| **Zig reactor via Wasmex (Option B)** | **0.034 ms** ✓ |
+
+The Zig parser compiled to wasm is FASTER than the Elixir one even with the Wasmex marshal overhead,
+and the output matches `WorkCore` exactly (`match: true`). So Option B is not a trade-off — it's
+faster AND DRY. **New recommendation: do Option B.** `cli/src/lib.zig` is the reactor (alloc/reset/
+parse_units, a pointer-len string ABI, 8KB wasm); nexus instantiates it once and calls it. The
+remaining work: export the rest of the toolchain (graph/wit/weave/audit) the same way, repoint nexus's
+`WorkCore.*` calls, delete `work_core`.
+
+## Recommendation (superseded — see UPDATE above)
 Don't do the naive deletion (60× slower). **Option A now** (conformance corpus — cheap, removes the
 drift risk immediately), and treat **Option B as a scoped follow-up** when the toolchain stabilises —
 it's the architecturally-right end state, but it's a focused build, not a one-commit deletion.
