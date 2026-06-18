@@ -3,6 +3,16 @@ defmodule Workbooks.Wit.TypesTest do
   alias Workbooks.{Literate, Wit}
   alias Workbooks.Wit.Types
 
+  test "wit/1 escapes reserved words and drops Elixir predicate/bang suffixes" do
+    assert Types.wit(:from) == "%from"
+    assert Types.wit(:static) == "%static"
+    assert Types.wit(:interface) == "%interface"
+    assert Types.wit(:valid?) == "valid"
+    assert Types.wit(:save!) == "save"
+    assert Types.wit(:risk_score) == "risk-score"
+    assert Types.wit(:Lead) == "lead"
+  end
+
   test "scalar/1 infers WIT scalars from default values" do
     assert Types.scalar("") == "string"
     assert Types.scalar(0) == "s32"
@@ -43,7 +53,7 @@ defmodule Workbooks.Wit.TypesTest do
 
   test "variant/2 renders a WIT variant from tags" do
     wit = Types.variant(:result, [:ok, :err])
-    assert wit =~ "variant result {"
+    assert wit =~ "variant %result {"
     assert wit =~ "ok(string),"
     assert wit =~ "err(string),"
   end
@@ -61,7 +71,7 @@ defmodule Workbooks.Wit.TypesTest do
     """
 
     world = Literate.parse(src) |> Enum.find(&(&1.type == :code)) |> Wit.world()
-    assert world =~ "variant result {"
+    assert world =~ "variant %result {"
   end
 
   test "a unit that returns a plain value gets no spurious variant" do

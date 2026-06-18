@@ -49,7 +49,7 @@ defmodule Workbooks.WitEmitTest do
     assert world =~ "world enrich {"
     assert world =~ "export enrich: func(a0: lead) -> string;"
     assert world =~ "import host:net/fetch;"
-    assert world =~ "variant result {"
+    assert world =~ "variant %result {"
   end
 
   test "emit/1 over the real demo tree generates a world for every unit", %{dir: _dir} do

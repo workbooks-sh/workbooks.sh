@@ -37,4 +37,21 @@ defmodule Workbooks.WitPackageTest do
       {:error, msg} -> flunk("generated WIT did not validate:\n#{msg}\n\n--- package ---\n#{pkg}")
     end
   end
+
+  test "every file in the real demo tree generates WIT that wasm-tools validates" do
+    demo = Path.expand("../workponents/sales", File.cwd!())
+
+    if File.dir?(demo) do
+      paths = (Path.wildcard(Path.join(demo, "*.work")) ++ Path.wildcard(Path.join(demo, "**/*.work"))) |> Enum.uniq()
+
+      failures =
+        for path <- paths,
+            pkg = path |> File.read!() |> Literate.parse() |> Wit.package(Path.basename(path, ".work")),
+            {:error, msg} <- [Wit.validate(pkg)],
+            not String.starts_with?(msg, "wasm-tools unavailable"),
+            do: {Path.basename(path), msg}
+
+      assert failures == [], "demo files produced invalid WIT:\n" <> Enum.map_join(failures, "\n", fn {f, m} -> "#{f}: #{m}" end)
+    end
+  end
 end

@@ -109,7 +109,11 @@ defmodule Workbooks.Wit do
   the artifact `wasm-tools` can validate and componentize against (§1).
   """
   def package(nodes, pkg_name \\ "demo") do
-    units = for n <- nodes, n.type == :code, n.name, n.kind != "defmodule", do: n
+    units =
+      (for n <- nodes, n.type == :code, n.name, n.kind != "defmodule", do: n)
+      # two units mapping to the same WIT identifier can't both be top-level worlds
+      |> Enum.uniq_by(&Workbooks.Wit.Types.wit(&1.name))
+
     type_names = type_names(nodes)
     caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&Map.has_key?(@cap_ifaces, &1))
 
@@ -221,7 +225,10 @@ defmodule Workbooks.Wit do
   defp pkg_world(node, type_names) do
     facts = Extract.facts(node)
 
-    exports = export_lines(facts.exports)
+    # a param whose type isn't defined in THIS file (a cross-file record) degrades to
+    # string — the package stays valid; precise cross-file typing is a shared-types
+    # follow-on.
+    exports = pkg_export_lines(facts.exports, type_names)
     exports = if exports == [], do: ["export run: func(input: string) -> string;"], else: exports
 
     referenced =
@@ -245,6 +252,25 @@ defmodule Workbooks.Wit do
     body = (use_line ++ exports ++ imports) |> Enum.map_join("\n", &("  " <> &1))
     "world #{wit_name(node.name)} {\n#{body}\n}"
   end
+
+  # like export_lines, but param types not defined in this file degrade to string
+  defp pkg_export_lines(exports, type_names) do
+    Enum.map(exports, fn
+      {name, types} when is_list(types) ->
+        ps =
+          types
+          |> Enum.map(&if(&1 in type_names or scalar?(&1), do: &1, else: "string"))
+          |> Enum.with_index()
+          |> Enum.map_join(", ", fn {t, i} -> "a#{i}: #{t}" end)
+
+        "export #{wit_name(name)}: func(#{ps}) -> string;"
+
+      name ->
+        "export #{wit_name(name)}: func() -> string;"
+    end)
+  end
+
+  defp scalar?(t), do: t in ~w(string bool s8 s16 s32 s64 u8 u16 u32 u64 f32 f64 char)
 
   defp grant_import(cap), do: if(wit = @grant_imports[cap], do: "import #{wit};")
 
