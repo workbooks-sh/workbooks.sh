@@ -151,6 +151,27 @@ defmodule Workbooks.Wit do
     (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work"))) |> Enum.uniq()
   end
 
+  @doc """
+  Materialize the generated WIT to disk: write each file's cross-file-resolved package
+  to `<out_dir>/<name>.wit`. This is the §1 handoff — the artifact each compile lane
+  embeds into its core module (`wasm-tools component embed <name>.wit core --world <unit>`).
+  Returns `{:ok, [written_paths]}`.
+  """
+  def write_packages(root, out_dir) do
+    File.mkdir_p!(out_dir)
+    shared = workbook_types(root)
+
+    written =
+      for path <- wb_paths(root) do
+        pkg = path |> File.read!() |> Workbooks.Literate.parse() |> package(Path.basename(path, ".work"), shared)
+        dest = Path.join(out_dir, Path.basename(path, ".work") <> ".wit")
+        File.write!(dest, pkg)
+        dest
+      end
+
+    {:ok, written}
+  end
+
   @doc "Validate a WIT source string with wasm-tools. Returns :ok | {:error, message}."
   def validate(wit) when is_binary(wit) do
     path = Path.join(System.tmp_dir!(), "wbwit_#{System.unique_integer([:positive])}.wit")
