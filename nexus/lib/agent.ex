@@ -76,7 +76,7 @@ defmodule Nexus.Agent do
     if now_ms() > deadline do
       {:error, {:timeout, turns}}
     else
-      case Nexus.Llm.complete(Context.window(messages), Keyword.put(opts, :tools, [@bash_tool])) do
+      case Nexus.Llm.complete(manage(messages, opts), Keyword.put(opts, :tools, [@bash_tool])) do
         {:ok, %{tool_calls: []} = turn} ->
           {:ok, %{answer: turn.content, turns: turns + 1, vfs_files: Vfs.ls(vfs)}}
 
@@ -88,6 +88,26 @@ defmodule Nexus.Agent do
         {:error, reason} ->
           {:error, reason}
       end
+    end
+  end
+
+  # Context strategy: plain sliding window (default), or compaction (summarize dropped spans) when
+  # `compact: true` — the solid method for long-horizon runs that must not lose early facts.
+  defp manage(messages, opts) do
+    if Keyword.get(opts, :compact, false) do
+      Context.compact(messages, &summarize/1)
+    else
+      Context.window(messages)
+    end
+  end
+
+  defp summarize(text) do
+    case Nexus.Llm.complete([
+           %{role: "system", content: "Compress the following into a terse summary that preserves all facts, decisions, and file state. Be brief."},
+           %{role: "user", content: text}
+         ]) do
+      {:ok, %{content: c}} when is_binary(c) and c != "" -> c
+      _ -> String.slice(text, 0, 2_000)
     end
   end
 

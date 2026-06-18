@@ -40,4 +40,38 @@ defmodule Nexus.Agent.Context do
   end
 
   def window(messages, _window), do: messages
+
+  @doc """
+  Compaction — the solid method over plain windowing. When the transcript exceeds the window, the
+  span that *would* be dropped is **summarized** into a compact note instead of lost, so a fact from
+  an early turn survives to a late one. Keeps `[system, task, running_summary, …recent window]`.
+
+  `summarize` is `fn text -> summary_string` (injected — `Nexus.Llm` in the loop, a stub in tests).
+  Returns the compacted message list. No-op while under the window (short runs untouched).
+  """
+  def compact(messages, summarize, window \\ @window)
+
+  def compact(messages, _summarize, window) when length(messages) <= window + 2, do: messages
+
+  def compact([system, task | rest], summarize, window) do
+    {old, recent} = Enum.split(rest, length(rest) - window)
+    prior = extract_summary(old)
+    digest = old |> Enum.map_join("\n", &line/1)
+    summary = summarize.("Summary so far:\n#{prior}\n\nNewer turns to fold in:\n#{digest}")
+    [system, task, %{role: "system", content: "Summary of earlier turns:\n#{summary}"} | recent]
+  end
+
+  def compact(messages, _summarize, _window), do: messages
+
+  # pull a prior running-summary out of the span (so summaries compound, not duplicate).
+  defp extract_summary(msgs) do
+    Enum.find_value(msgs, "(none)", fn
+      %{role: "system", content: "Summary of earlier turns:\n" <> s} -> s
+      _ -> nil
+    end)
+  end
+
+  defp line(%{role: role, content: content}), do: "#{role}: #{String.slice(to_string(content), 0, 400)}"
+  defp line(_), do: ""
 end
+
