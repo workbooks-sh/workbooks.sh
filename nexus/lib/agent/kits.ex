@@ -40,6 +40,12 @@ defmodule Nexus.Agent.Kits do
         wasm: Path.join(root(), "coreutils.wasm"),
         summary: "core unix commands (ls, cat, grep-less base; see `help coreutils`)",
         commands: @coreutils
+      },
+      # host-brokered web access (not a wasm CLI — built into bash, SSRF-safe).
+      "web" => %{
+        wasm: nil,
+        summary: "web access: `fetch <url>` (raw body), `scrape <url>` (page as readable text)",
+        commands: ["fetch", "scrape"]
       }
     }
 

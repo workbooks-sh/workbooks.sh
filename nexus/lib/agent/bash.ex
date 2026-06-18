@@ -32,9 +32,38 @@ defmodule Nexus.Agent.Bash do
     case cmd do
       "kits" -> Nexus.Agent.Kits.summary()
       "help" -> Nexus.Agent.Kits.help(List.first(args) || "")
+      # web access is HOST-BROKERED (wasm has no sockets) — `fetch <url>` and `scrape <url>` go
+      # through Nexus.Dock.fetch (SSRF-safe: loopback/private blocked, https). curl-class.
+      "fetch" -> web_fetch(List.first(args))
+      "scrape" -> List.first(args) |> web_fetch() |> html_to_text()
       _ -> exec(vfs, cmd, args, stdin)
     end
   end
+
+  defp web_fetch(nil), do: "fetch: usage: fetch <url>"
+  defp web_fetch(url) do
+    case Nexus.Dock.fetch(url) do
+      "" -> "fetch: empty or blocked (#{url})"
+      body -> body
+    end
+  end
+
+  # Strip a page to readable text: drop script/style, tags → spaces, decode common entities,
+  # collapse whitespace. Zero-dep (good enough for an agent to read a page).
+  defp html_to_text(html) do
+    html
+    |> String.replace(~r{<(script|style)\b[^>]*>.*?</\1>}is, " ")
+    |> String.replace(~r/<[^>]+>/, " ")
+    |> decode_entities()
+    |> String.replace(~r/[ \t]+/, " ")
+    |> String.replace(~r/\n\s*\n\s*/, "\n\n")
+    |> String.trim()
+  end
+
+  @entities %{"&amp;" => "&", "&lt;" => "<", "&gt;" => ">", "&quot;" => "\"", "&#39;" => "'",
+              "&apos;" => "'", "&nbsp;" => " "}
+  defp decode_entities(s),
+    do: Enum.reduce(@entities, s, fn {e, c}, acc -> String.replace(acc, e, c) end)
 
   defp exec(vfs, cmd, args, stdin) do
     case Nexus.Agent.Kits.resolve(cmd) do
