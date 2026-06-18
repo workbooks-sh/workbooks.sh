@@ -69,6 +69,28 @@ defmodule Workbooks.Wit do
     end
   end
 
+  @doc """
+  Emit the complete generated WIT for a workbook tree — per file, the shared
+  `interface types` plus a `world` for every named unit. This is the artifact the
+  weave (§1) hands to `wasm-tools` to componentize each unit; nothing here is
+  hand-written. Returns `%{path => %{interface: wit | nil, worlds: %{unit => wit}}}`.
+  """
+  def emit(root) do
+    paths =
+      (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
+      |> Enum.uniq()
+
+    for path <- paths, into: %{} do
+      nodes = Workbooks.Literate.parse(File.read!(path))
+      # a bare `defmodule` is a type module (→ the file interface), not a runnable
+      # unit; only placed/runnable kinds get a world.
+      worlds =
+        for n <- nodes, n.type == :code, n.name, n.kind != "defmodule", into: %{}, do: {n.name, world(n)}
+
+      {path, %{interface: file_interface(nodes), worlds: worlds}}
+    end
+  end
+
   @doc "Parse the capability names a unit grants, from its block header."
   def grants(%{header: header}) when is_binary(header) do
     # words inside a `grant[:] [ … ]` bracket (handles `net:` and `:net` forms),
