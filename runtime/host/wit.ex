@@ -59,19 +59,24 @@ defmodule Workbooks.Wit do
   file declares no shared types. Takes the `Workbooks.Literate.parse/1` node list.
   """
   def file_interface(nodes) when is_list(nodes) do
+    # dedup by WIT name — teaching files re-declare shared types (e.g. several lessons
+    # each show `defmodule Lead`); a type may be defined only once in a package.
     enums_kv =
-      for node <- nodes,
-          node.type == :decl,
-          {:enum, name, atoms} <- Workbooks.Extract.Elixir.decl_types(node),
-          do: {name, atoms}
+      (for node <- nodes,
+           node.type == :decl,
+           {:enum, name, atoms} <- Workbooks.Extract.Elixir.decl_types(node),
+           do: {name, atoms})
+      |> Enum.uniq_by(fn {name, _} -> Workbooks.Wit.Types.wit(name) end)
 
-    records =
-      for node <- nodes,
-          node.type == :code,
-          node.kind == "defmodule",
-          {:record, fields} <- Extract.facts(node).types,
-          do: Workbooks.Wit.Types.record(node.name, fields, enums_kv)
+    record_specs =
+      (for node <- nodes,
+           node.type == :code,
+           node.kind == "defmodule",
+           {:record, fields} <- Extract.facts(node).types,
+           do: {node.name, fields})
+      |> Enum.uniq_by(fn {name, _} -> Workbooks.Wit.Types.wit(name) end)
 
+    records = for {name, fields} <- record_specs, do: Workbooks.Wit.Types.record(name, fields, enums_kv)
     enums = for {name, atoms} <- enums_kv, do: Workbooks.Wit.Types.enum(name, atoms)
 
     case records ++ enums do
@@ -108,21 +113,42 @@ defmodule Workbooks.Wit do
   unit (each `use`-ing the file types and importing its host interfaces). This is
   the artifact `wasm-tools` can validate and componentize against (§1).
   """
-  def package(nodes, pkg_name \\ "demo") do
+  def package(nodes, pkg_name \\ "demo", shared \\ nil) do
     units =
       (for n <- nodes, n.type == :code, n.name, n.kind != "defmodule", do: n)
       # two units mapping to the same WIT identifier can't both be top-level worlds
       |> Enum.uniq_by(&Workbooks.Wit.Types.wit(&1.name))
 
-    type_names = type_names(nodes)
-    caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&Map.has_key?(@cap_ifaces, &1))
+    # `shared` = a workbook-wide {interface, type_names} so a param typed by a record
+    # defined in another file still resolves; without it, types are file-scoped.
+    {iface, type_names} = shared || {file_interface(nodes), type_names(nodes)}
 
+    caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&Map.has_key?(@cap_ifaces, &1))
     host = caps |> Enum.map(&@cap_ifaces[&1]) |> Enum.join("\n\n")
-    iface = file_interface(nodes)
     worlds = Enum.map(units, &pkg_world(&1, type_names))
 
     parts = ([host, iface] ++ worlds) |> Enum.reject(&(&1 in [nil, ""]))
     "package work:#{wit_name(pkg_name)};\n\n" <> Enum.join(parts, "\n\n") <> "\n"
+  end
+
+  @doc "The workbook-wide shared types: `{interface, type_names}` over every file's type defs."
+  def workbook_types(root) do
+    all = root |> wb_paths() |> Enum.flat_map(fn p -> Workbooks.Literate.parse(File.read!(p)) end)
+    {file_interface(all), type_names(all)}
+  end
+
+  @doc "Emit a self-contained, cross-file-resolved WIT package per file. `%{path => wit}`."
+  def packages(root) do
+    shared = workbook_types(root)
+
+    for path <- wb_paths(root), into: %{} do
+      nodes = Workbooks.Literate.parse(File.read!(path))
+      {path, package(nodes, Path.basename(path, ".work"), shared)}
+    end
+  end
+
+  defp wb_paths(root) do
+    (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work"))) |> Enum.uniq()
   end
 
   @doc "Validate a WIT source string with wasm-tools. Returns :ok | {:error, message}."

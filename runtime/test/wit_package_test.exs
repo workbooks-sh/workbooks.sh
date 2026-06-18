@@ -38,20 +38,24 @@ defmodule Workbooks.WitPackageTest do
     end
   end
 
-  test "every file in the real demo tree generates WIT that wasm-tools validates" do
+  test "the whole demo tree generates wasm-tools-valid WIT, with cross-file types resolved" do
     demo = Path.expand("../workponents/sales", File.cwd!())
 
     if File.dir?(demo) do
-      paths = (Path.wildcard(Path.join(demo, "*.work")) ++ Path.wildcard(Path.join(demo, "**/*.work"))) |> Enum.uniq()
+      pkgs = Wit.packages(demo)
 
       failures =
-        for path <- paths,
-            pkg = path |> File.read!() |> Literate.parse() |> Wit.package(Path.basename(path, ".work")),
+        for {path, pkg} <- pkgs,
             {:error, msg} <- [Wit.validate(pkg)],
             not String.starts_with?(msg, "wasm-tools unavailable"),
             do: {Path.basename(path), msg}
 
       assert failures == [], "demo files produced invalid WIT:\n" <> Enum.map_join(failures, "\n", fn {f, m} -> "#{f}: #{m}" end)
+
+      # cross-file precision: :enrich's %Lead{} param types as the lead record (defined
+      # in types.work), not degraded to string
+      {_, grants} = Enum.find(pkgs, fn {p, _} -> String.ends_with?(p, "grants.work") end)
+      if Wit.validate(grants) == :ok, do: assert(grants =~ "export enrich: func(a0: lead)")
     end
   end
 end
