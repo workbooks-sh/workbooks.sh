@@ -6,7 +6,7 @@ defmodule WorkCore.Graph do
   feed (§2) extend the edge set later without changing this shape.
   """
 
-  alias WorkCore.{Literate, Extract, Uid}
+  alias WorkCore.{Literate, Extract, Uid, Capabilities, Wit}
 
   defstruct nodes: %{}, edges: [], titles: %{}, backlinks: %{}
 
@@ -48,11 +48,32 @@ defmodule WorkCore.Graph do
   # ── nodes: one per named :code unit ──
   defp collect_nodes(parsed) do
     for {path, nodes} <- parsed, n <- nodes, n.type == :code, n.name, into: %{} do
-      {n.name, %{id: n.name, kind: n.kind, lang: n.lang, file: path, exports: exports(n)}}
+      {n.name, node(n, path)}
     end
   end
 
-  defp exports(n), do: Extract.facts(n).exports
+  # One node, projected across the layers it lives in. Top-level id/kind/lang/file/
+  # exports stay for back-compat; `uid` is the canonical identity (§1) every layer
+  # shares; `facets` is the per-layer view: source facts, the WIT interface (§2),
+  # the compiled artifact (filled by the artifact pass), and the data-layer module.
+  defp node(n, path) do
+    facts = Extract.facts(n)
+
+    %{
+      id: n.name,
+      uid: %{key: Uid.key(n.name), wit: Uid.wit(n.name), package: Uid.package(n.name), module: Uid.module(n.name)},
+      kind: n.kind,
+      lang: n.lang,
+      file: path,
+      exports: facts.exports,
+      facets: %{
+        source: %{kind: n.kind, lang: n.lang, file: path, exports: facts.exports, imports: facts.imports, types: facts.types, calls: facts.calls},
+        interface: Wit.world(n),
+        artifact: nil,
+        data: %{module: Uid.module(n.name)}
+      }
+    }
+  end
 
   defp collect_titles(parsed) do
     for {path, nodes} <- parsed, into: %{} do
@@ -79,16 +100,24 @@ defmodule WorkCore.Graph do
     imports =
       targets
       |> Enum.filter(&(&1 != n.name and Map.has_key?(nodes, &1)))
-      |> Enum.map(&%{from: n.name, to: &1, type: :import})
+      |> Enum.map(&%{from: n.name, to: &1, type: :import, layer: :source, scope: :unit, signature: nil})
 
     refs =
       n.refs
       |> Enum.filter(&String.starts_with?(&1, ":"))
       |> Enum.map(&String.trim_leading(&1, ":"))
       |> Enum.filter(&(&1 != n.name and Map.has_key?(nodes, &1)))
-      |> Enum.map(&%{from: n.name, to: &1, type: :ref})
+      |> Enum.map(&%{from: n.name, to: &1, type: :ref, layer: :source, scope: :unit, signature: nil})
 
-    Enum.uniq(imports ++ refs)
+    # host-capability edges: a unit's `grant`s resolve against the capability catalog,
+    # not other units — tagged :host_cap so `check` validates them there, not as
+    # dangling unit edges (Seam 4: host imports vs unit imports were indistinguishable).
+    caps =
+      n
+      |> Capabilities.grants()
+      |> Enum.map(&%{from: n.name, to: &1, type: :import, layer: :interface, scope: :host_cap, signature: Capabilities.grant_import(&1)})
+
+    Enum.uniq(imports ++ refs ++ caps)
   end
 
   # ── work check: do every backlink + import resolve? ──
@@ -100,7 +129,12 @@ defmodule WorkCore.Graph do
     dangling_backlinks =
       for {path, links} <- g.backlinks, l <- links, not resolves?(l, node_set, title_set), do: {path, l}
 
-    dangling_edges = for e <- edges, not Map.has_key?(nodes, e.to), do: e
+    # unit edges must resolve to a node; host-cap edges resolve to the catalog instead.
+    dangling_edges =
+      for e <- edges,
+          (Map.get(e, :scope, :unit) == :host_cap and not Capabilities.grantable?(e.to)) or
+            (Map.get(e, :scope, :unit) == :unit and not Map.has_key?(nodes, e.to)),
+          do: e
 
     %{
       nodes: map_size(nodes),

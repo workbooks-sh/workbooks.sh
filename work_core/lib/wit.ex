@@ -13,10 +13,6 @@ defmodule WorkCore.Wit do
   alias WorkCore.Capabilities
   alias WorkCore.Extract
 
-  # the grant words a unit may declare — filters stray header tokens (string values,
-  # etc.) out of `grants/1`. The import each projects comes from the Dock registry.
-  @caps ~w(net kv secrets fs exec llm browse queue vfs commands tcp udp tls posix parallel encode)
-
   # The self-contained host capability interfaces come from the single Dock registry
   # (§3) — so a generated package validates standalone AND §2's imports are the same
   # surface the runtime Dock projects. See `WorkCore.Dock`.
@@ -208,29 +204,8 @@ defmodule WorkCore.Wit do
     end
   end
 
-  @doc "Parse the capability names a unit grants, from its block header."
-  def grants(%{header: header}) when is_binary(header) do
-    # words inside a `grant[:] [ … ]` bracket (handles `net:` and `:net` forms),
-    # plus a bare `grant net`; filtered to known caps so string values don't leak.
-    in_bracket =
-      case Regex.run(~r/grant:?\s*\[([^\]]*)\]/, header, capture: :all_but_first) do
-        [inner] ->
-          # keyword form `[net: "x", kv: :y]` → the KEYS are caps (values aren't);
-          # atom-list form `[:net, :kv]` → the items are caps.
-          if Regex.match?(~r/[a-z]+:/, inner),
-            do: Regex.scan(~r/([a-z]+):/, inner) |> Enum.map(&List.last/1),
-            else: Regex.scan(~r/:([a-z]+)/, inner) |> Enum.map(&List.last/1)
-
-        _ ->
-          []
-      end
-
-    bare = Regex.scan(~r/\bgrant\s+([a-z]+)\b/, header) |> Enum.map(&List.last/1)
-
-    (in_bracket ++ bare) |> Enum.filter(&(&1 in @caps)) |> Enum.uniq()
-  end
-
-  def grants(_), do: []
+  @doc "Parse the capability names a unit grants — see `WorkCore.Capabilities.grants/1`."
+  defdelegate grants(node), to: WorkCore.Capabilities
 
   # ── private ──
 

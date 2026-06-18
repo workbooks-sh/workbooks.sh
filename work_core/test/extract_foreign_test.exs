@@ -62,7 +62,7 @@ defmodule WorkCore.Extract.ForeignTest do
     """)
 
     g = WorkCore.Graph.build_dir(dir)
-    assert %{from: "panel", to: "chart", type: :import} in g.edges
+    assert Enum.any?(g.edges, &(&1.from == "panel" and &1.to == "chart" and &1.type == :import and &1.scope == :unit))
     assert "panel" in WorkCore.Graph.why(g, "chart")
     File.rm_rf!(dir)
   end

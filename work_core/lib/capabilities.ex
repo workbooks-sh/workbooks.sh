@@ -54,6 +54,39 @@ defmodule WorkCore.Capabilities do
   @doc "The canonical host-function names a unit can import (audited against a unit's `grant`s)."
   def host_fn_names, do: @host_fns
 
+  # the grant words a unit may declare in its block header — filters stray header
+  # tokens (string values, etc.) out of grants/1.
+  @grantable ~w(net kv secrets fs exec llm browse queue vfs commands tcp udp tls posix parallel encode)
+
+  @doc "Is `cap` a word an author may `grant`?"
+  def grantable?(cap), do: cap in @grantable
+
+  @doc """
+  Parse the capability names a unit grants, from its block header: words inside a
+  `grant[:] [ … ]` bracket (handles `net:` and `:net` forms) plus a bare
+  `grant net`, filtered to known grantable caps so string values don't leak.
+  """
+  def grants(%{header: header}) when is_binary(header) do
+    in_bracket =
+      case Regex.run(~r/grant:?\s*\[([^\]]*)\]/, header, capture: :all_but_first) do
+        [inner] ->
+          # keyword form `[net: "x", kv: :y]` → the KEYS are caps (values aren't);
+          # atom-list form `[:net, :kv]` → the items are caps.
+          if Regex.match?(~r/[a-z]+:/, inner),
+            do: Regex.scan(~r/([a-z]+):/, inner) |> Enum.map(&List.last/1),
+            else: Regex.scan(~r/:([a-z]+)/, inner) |> Enum.map(&List.last/1)
+
+        _ ->
+          []
+      end
+
+    bare = Regex.scan(~r/\bgrant\s+([a-z]+)\b/, header) |> Enum.map(&List.last/1)
+
+    (in_bracket ++ bare) |> Enum.filter(&grantable?/1) |> Enum.uniq()
+  end
+
+  def grants(_), do: []
+
   @doc "Every capability name in the registry (both vocabularies)."
   def capabilities, do: Map.keys(@registry)
 
