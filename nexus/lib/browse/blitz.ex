@@ -77,6 +77,36 @@ defmodule Nexus.Browse.Blitz do
   end
 
   @doc """
+  The **geometry measure pass**: given HTML whose elements carry `data-wb-nid` attributes, run real
+  Blitz/Taffy layout and return `%{nid => {x, y, w, h}}` (viewport-relative CSS px) — the boxes the
+  geometry bridge injects back into the JS-DOM so `getBoundingClientRect`/`offset*` return true numbers.
+  """
+  def measure(html, url, opts \\ []) do
+    case run(:measure, html, url, opts) do
+      {:ok, text} -> {:ok, parse_boxes(text)}
+      err -> err
+    end
+  end
+
+  defp parse_boxes(text) do
+    text
+    |> String.split("\n", trim: true)
+    |> Enum.reduce(%{}, fn line, acc ->
+      case String.split(line, " ", trim: true) do
+        [nid, x, y, w, h] -> Map.put(acc, nid, {to_f(x), to_f(y), to_f(w), to_f(h)})
+        _ -> acc
+      end
+    end)
+  end
+
+  defp to_f(s) do
+    case Float.parse(s) do
+      {f, _} -> f
+      _ -> 0.0
+    end
+  end
+
+  @doc """
   Hydrate `html` by running its scripts against a real JS DOM (StarlingMonkey + linkedom) and return
   the serialized, hydrated HTML — the greenfield render. CSS stays inlined so a later screenshot is
   styled. `{:error, _}` if the JS engine/bundle isn't staged.
@@ -85,9 +115,29 @@ defmodule Nexus.Browse.Blitz do
     if Nexus.JsDom.available?() do
       frozen = Nexus.Browse.Freeze.freeze(html, url, scripts: true)
       scripts = Nexus.Browse.Freeze.script_bodies(frozen)
-      Nexus.JsDom.render_html(frozen, scripts: scripts, settle_ms: Keyword.get(opts, :settle_ms, 50), timeout: Keyword.get(opts, :js_timeout, 60_000))
+      settle = Keyword.get(opts, :settle_ms, 50)
+      timeout = Keyword.get(opts, :js_timeout, 60_000)
+
+      if Keyword.get(opts, :geometry, false) do
+        hydrate_geometry(frozen, scripts, url, settle, timeout)
+      else
+        Nexus.JsDom.render_html(frozen, scripts: scripts, settle_ms: settle, timeout: timeout)
+      end
     else
       {:error, :jsdom_unavailable}
+    end
+  end
+
+  # The geometry bridge: run JS once (boxes={}) to emit nid-annotated HTML → one real Blitz layout pass
+  # → re-run JS with the measured boxes so geometry-dependent code sees true getBoundingClientRect. Two
+  # JS passes + one measure: reserved for pages that actually need geometry. Degrades to the plain
+  # single-pass hydrate if the measure yields nothing.
+  defp hydrate_geometry(frozen, scripts, url, settle, timeout) do
+    with {:ok, annotated} <- Nexus.JsDom.render_html(frozen, scripts: scripts, boxes: %{}, settle_ms: settle, timeout: timeout),
+         {:ok, boxes} when map_size(boxes) > 0 <- measure(annotated, url) do
+      Nexus.JsDom.render_html(frozen, scripts: scripts, boxes: boxes, settle_ms: settle, timeout: timeout)
+    else
+      _ -> Nexus.JsDom.render_html(frozen, scripts: scripts, settle_ms: settle, timeout: timeout)
     end
   end
 
@@ -128,6 +178,7 @@ defmodule Nexus.Browse.Blitz do
       case mode do
         :text -> {priv("render_text.wasm"), ["/work/page.html", base_url], nil}
         :text_js -> {priv("render_js.wasm"), ["/work/page.html", base_url], nil}
+        :measure -> {priv("measure.wasm"), ["/work/page.html", base_url], nil}
         :screenshot ->
           w = Keyword.get(opts, :width, 1280)
           h = Keyword.get(opts, :height, 1600)

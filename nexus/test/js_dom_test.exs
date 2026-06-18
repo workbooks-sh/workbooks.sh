@@ -62,4 +62,28 @@ defmodule Nexus.JsDomTest do
       IO.puts("[skip] greenfield JS engine / bundle not staged")
     end
   end
+
+  @tag timeout: 200_000
+  test "geometry bridge: JS branching on getBoundingClientRect sees REAL Blitz layout (zero without it)" do
+    if Nexus.JsDom.available?() do
+      csr = """
+      <html><head><style>#card{width:300px;height:140px}</style></head>
+      <body><div id=card></div><div id=out></div>
+      <script>
+        const w=document.getElementById("card").getBoundingClientRect().width;
+        document.getElementById("out").textContent = (w >= 250) ? ("WIDE:"+Math.round(w)) : ("ZERO:"+Math.round(w));
+      </script></body></html>
+      """
+
+      # Plain JS-DOM: gBCR is 0 → the wide branch never fires.
+      assert {:ok, plain} = Nexus.Browse.Blitz.hydrate(csr, "https://example.com/", [])
+      assert plain =~ "ZERO:0"
+
+      # With the bridge: real Blitz layout → 300px → the geometry-dependent branch fires.
+      assert {:ok, bridged} = Nexus.Browse.Blitz.hydrate(csr, "https://example.com/", geometry: true)
+      assert bridged =~ "WIDE:300"
+    else
+      IO.puts("[skip] greenfield JS engine / bundle not staged")
+    end
+  end
 end

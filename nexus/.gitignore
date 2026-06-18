@@ -1,3 +1,4 @@
 
 priv/jsdom.js
 priv/eval-host.wasm
+priv/measure.wasm

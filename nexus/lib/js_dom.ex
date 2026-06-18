@@ -27,8 +27,9 @@ defmodule Nexus.JsDom do
     scripts = Keyword.get(opts, :scripts, [])
     settle = Keyword.get(opts, :settle_ms, 0)
     timeout = Keyword.get(opts, :timeout, 30_000)
+    boxes = Keyword.get(opts, :boxes, nil)
 
-    src = harness(html, scripts, settle)
+    src = harness(html, scripts, settle, boxes)
     Nexus.JsEngine.eval(src, timeout: timeout)
   end
 
@@ -36,7 +37,7 @@ defmodule Nexus.JsDom do
   def available?, do: File.exists?(bundle_path()) and Nexus.JsEngine.available?()
 
   # ── the eval harness: linkedom + global DOM + page scripts + async serialize ────────────────
-  defp harness(html, scripts, settle) do
+  defp harness(html, scripts, settle, boxes) do
     page = Enum.map_join(scripts, "\n;\n", &wrap_script/1)
 
     """
@@ -52,6 +53,7 @@ defmodule Nexus.JsDom do
     globalThis.Node = window.Node;
     globalThis.customElements = window.customElements;
     #{shims()}
+    #{geometry_bridge(boxes)}
     #{page}
     ;
     // Let microtasks/timers drain, then serialize the hydrated DOM (StarlingMonkey awaits this thenable).
@@ -96,6 +98,40 @@ defmodule Nexus.JsDom do
       def(globalThis,'scrollTo',()=>{}); def(W,'scrollTo',()=>{}); def(W,'scrollBy',()=>{});
       def(W,'getComputedStyle', (el)=>({ getPropertyValue:()=> '', length:0 }));
       def(globalThis,'getComputedStyle', W.getComputedStyle);
+    })();
+    """
+  end
+
+  # The geometry bridge (the moat). When `boxes` is a map (even empty), we (1) stamp every element with
+  # a deterministic `data-wb-nid` — by document order then creation order, so the ids match across the
+  # measure pass and the final pass — and (2) patch `getBoundingClientRect`/`offset*`/`client*` on the
+  # element prototype to read REAL Blitz/Taffy boxes injected here. Pass 1 runs with `boxes = {}` (all
+  # zero) just to emit the nid-annotated HTML to measure; pass 2 runs with the measured boxes so
+  # geometry-dependent JS (virtualized lists, measure-then-position) sees true numbers. `nil` = off.
+  defp geometry_bridge(nil), do: ""
+
+  defp geometry_bridge(boxes) do
+    json = boxes |> Map.new(fn {nid, {x, y, w, h}} -> {nid, [x, y, w, h]} end) |> Jason.encode!()
+
+    """
+    (function(){
+      const boxes = #{json};
+      let __nid = 0;
+      const stamp = (el) => { try { if (el && el.nodeType === 1 && el.setAttribute && !el.getAttribute('data-wb-nid')) el.setAttribute('data-wb-nid', String(++__nid)); } catch(e){} return el; };
+      try { const all = document.querySelectorAll('*'); for (let i = 0; i < all.length; i++) stamp(all[i]); } catch(e){}
+      const _ce = document.createElement.bind(document);
+      document.createElement = function(tag){ return stamp(_ce(tag)); };
+      const zero = {x:0,y:0,width:0,height:0,top:0,left:0,right:0,bottom:0};
+      const rectFor = (el) => { try { const id = el.getAttribute && el.getAttribute('data-wb-nid'); const b = id && boxes[id]; if (b) return {x:b[0],y:b[1],width:b[2],height:b[3],top:b[1],left:b[0],right:b[0]+b[2],bottom:b[1]+b[3]}; } catch(e){} return zero; };
+      const patch = (proto) => {
+        if (!proto) return;
+        try { proto.getBoundingClientRect = function(){ const r = Object.assign({}, rectFor(this)); r.toJSON = () => r; return r; }; } catch(e){}
+        const g = (name, key) => { try { Object.defineProperty(proto, name, { configurable:true, get(){ return Math.round(rectFor(this)[key]); } }); } catch(e){} };
+        g('offsetWidth','width'); g('offsetHeight','height'); g('clientWidth','width'); g('clientHeight','height'); g('offsetTop','top'); g('offsetLeft','left');
+      };
+      try { patch(window.Element && window.Element.prototype); } catch(e){}
+      try { patch(window.HTMLElement && window.HTMLElement.prototype); } catch(e){}
+      try { let p = Object.getPrototypeOf(document.createElement('div')); for (let i=0;i<3&&p;i++){ patch(p); p = Object.getPrototypeOf(p); } } catch(e){}
     })();
     """
   end
