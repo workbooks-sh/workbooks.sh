@@ -37,6 +37,13 @@ defmodule Workbooks.CLI do
         IO.puts(out)
         if failed?, do: System.halt(1)
 
+      # `work compile` — compile the workbook's BEAM (server) tier from the literate
+      # .work source; reports which units are real, compilable Elixir.
+      ["compile" | rest] ->
+        {out, failed?} = Workbooks.Work.CLI.compile(List.first(rest) || ".")
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
       ["why", target | rest] ->
         {out, failed?} = Workbooks.Work.CLI.why(List.first(rest) || ".", String.trim_leading(target, ":"))
         IO.puts(out)

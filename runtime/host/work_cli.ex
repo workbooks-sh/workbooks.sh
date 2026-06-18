@@ -35,6 +35,20 @@ defmodule Workbooks.Work.CLI do
       Enum.map(leaks, fn %{unit: u, cap: c} -> "  :#{u} uses #{c} but doesn't grant it" end)
   end
 
+  @doc "work compile [dir] — compile the workbook's BEAM (server) tier; report what compiled."
+  def compile(dir) do
+    %{compiled: compiled, failed: failed} = Workbooks.Unit.compile_workbook(dir)
+
+    head = "#{length(compiled)} modules compiled · #{length(failed)} failed"
+
+    body =
+      if failed == [],
+        do: ["✓ server tier compiles — every unit is real Elixir"],
+        else: Enum.map(failed, fn {name, _reason} -> "  ✗ #{name} (undefined ref / not valid Elixir)" end)
+
+    {Enum.join([head | body], "\n"), failed != []}
+  end
+
   @doc "work why :unit [dir] — who depends on this unit."
   def why(dir, name) do
     deps = Graph.build_dir(dir) |> Graph.why(name)
