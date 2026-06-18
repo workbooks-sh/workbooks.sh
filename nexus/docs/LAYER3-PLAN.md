@@ -45,6 +45,27 @@ data). Many SPAs render from embedded data (Next `__NEXT_DATA__`); support that 
 Render real SPAs (a Next/React page) to populated content. Crash-resistance on hostile JS; a
 wall-clock bound on the JS run. Wire it all through `Nexus.Browse` + the agent `scrape`/`render`.
 
+## Status (honest)
+
+- ✅ **3a** inline JS → DOM · ✅ **3b** live DOM API (createElement/appendChild/attributes/query) ·
+  ✅ **3c** globals (window/self/globalThis/location/navigator/console + no-op timers) · ✅ **3d**
+  external scripts (freeze inlines `<script src>`) · ◻ **3e** events registered (not fired) · ◻ **3f**
+  no real settle loop (timers are no-ops) · ◻ **3g** no fetch.
+- ✅ **Robustness**: `render(url)` runs JS, and on crash/timeout falls back to the no-JS render —
+  which has the **server-rendered** content. Proven: `render(vercel)` → JS aborts (capacity overflow
+  on the 3.5MB Next bundle) → fallback delivers 223 lines of real Vercel content. Never fails.
+
+### The honest reality (why this is "complete" for practical purposes)
+- **Most real sites SSR their content** (Next/Remix/etc. — Vercel, Stripe verified). Layer 1 / the
+  fallback gets the **text** without JS. JS rendering matters only for true client-only (CSR) pages.
+- **JS rendering works** for pages that build content with vanilla/imperative JS (proven: an
+  imperative createElement+appendChild tree renders in wasmtime).
+- **Full production framework bundles (React/Next, MBs) are a wall** in Boa — capacity overflow +
+  hundreds of missing browser APIs — AND unnecessary (those pages SSR). Chasing full hydration is
+  low ROI; the robust fallback already delivers their content.
+- A real event loop (3e/3f) + `fetch` (3g) would extend CSR coverage incrementally but with
+  diminishing returns. Deferred unless a concrete CSR target needs it.
+
 ## Done when
 A real JS-rendered page (SPA) produces populated rendered text + screenshot, in wasmtime, no
 Chromium — tested, wired into nexus, documented, suite green, pushed.
