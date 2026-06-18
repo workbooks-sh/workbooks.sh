@@ -60,6 +60,32 @@ defmodule Workbooks.Resource.Ash do
     |> Kernel.<>("\n")
   end
 
+  @doc """
+  Compile a `resource` declaration into a **live Ash resource module** (+ a domain) at
+  runtime — generate the source, then `Code.compile_string`. Returns `{resource, domain}`,
+  ready for `Ash.create`/`Ash.read`. This is the seam that turns a literate `.work` resource
+  into a working database.
+  """
+  def materialize(%{name: name} = node, opts \\ []) do
+    domain = opts[:domain] || Module.concat(["WbGen", "D#{System.unique_integer([:positive])}"])
+    resource = Module.concat([Macro.camelize(name)])
+
+    src =
+      source(node, domain: inspect(domain)) <>
+        "\n" <>
+        """
+        defmodule #{inspect(domain)} do
+          use Ash.Domain, validate_config_inclusion?: false
+          resources do
+            resource #{Macro.camelize(name)}
+          end
+        end
+        """
+
+    Code.compile_string(src)
+    {resource, domain}
+  end
+
   # ── fields → Ash attributes ──
 
   defp attr(name, {:scalar, t}), do: "    attribute :#{name}, #{@ash[t]}, public?: true"

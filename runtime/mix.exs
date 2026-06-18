@@ -45,6 +45,9 @@ defmodule Workbooks.MixProject do
       # source (force_build) — durable: no deps.get reversion, no env var, no external fork.
       {:wasmex, path: "vendor/wasmex"},
       {:exqlite, "~> 0.27"},
+      # Ash = the server-side database engine for the literate `resource` model
+      # (docs/DATA-LAYER-DECISION.md). Authors never see it; the resource compiler emits it.
+      {:ash, "~> 3.0"},
       {:floki, "~> 0.36"},
       {:jason, "~> 1.4"},
       {:bandit, "~> 1.5"},
