@@ -26,12 +26,13 @@ defmodule Nexus.Compile do
     end
   end
 
-  # A `rust` unit, fully automatic: derive the typed WIT world from its `pub fn` signatures,
-  # then run the proven pipeline. Returns `{:ok, component_path} | {:error, _}`.
+  # A `rust` unit, fully automatic: derive the typed WIT world from its `pub fn` exports AND its
+  # `extern "C"` host imports, then run the proven pipeline. `{:ok, component} | {:error, _}`.
   defp rust_unit(%{body: body} = node) do
     case rust_world(node) do
-      {_world, _name, []} -> {:error, :no_exported_fns}
-      {world, world_name, fns} -> to_component(body, fns, world, world_name)
+      %{exports: []} -> {:error, :no_exported_fns}
+      %{world: world, name: name, exports: exports, imports: imports} ->
+        to_component(body, Enum.map(exports, &elem(&1, 0)), world, name, imports != [])
     end
   end
 
@@ -57,7 +58,7 @@ defmodule Nexus.Compile do
 
   Returns `{:ok, component_path}` — runnable on `Nexus.Sandbox`.
   """
-  def to_component(source, fns, wit_text, world) when is_list(fns) do
+  def to_component(source, fns, wit_text, world, has_imports \\ false) when is_list(fns) do
     dir = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
     src = Path.join(dir, "u.rs")
@@ -65,8 +66,23 @@ defmodule Nexus.Compile do
 
     with {:ok, core, _} <-
            Nexus.Compilers.Rust.rust_compile_to_wasm(src, exports: fns, allow_undefined: true) do
+      # Host imports: mrustc emits them as `env::<fn>`, but the component model wants world-level
+      # imports at `$root`. Rewrite the import module before componentizing (wasmex supplies impls).
+      core = if has_imports, do: rewrite_env_to_root(core, dir), else: core
       componentize(core, wit_text, world, dir)
     end
+  end
+
+  # Rewrite the core's `env` import module to `$root` (a wat round-trip) so the component model
+  # maps host-capability imports to the world's `$root` namespace. (mrustc ignores the
+  # #[link(wasm_import_module)] attribute, so we can't set it from source.)
+  defp rewrite_env_to_root(core, dir) do
+    {wat, 0} = System.cmd("wasm-tools", ["print", core])
+    out = Path.join(dir, "rooted.wasm")
+    watp = Path.join(dir, "rooted.wat")
+    File.write!(watp, String.replace(wat, ~s/(import "env" /, ~s/(import "$root" /))
+    {_, 0} = System.cmd("wasm-tools", ["parse", watp, "-o", out])
+    out
   end
 
   # A main that black-box-references each export's address so mrustc emits the symbol (it
@@ -100,23 +116,33 @@ defmodule Nexus.Compile do
     "f32" => "f32", "f64" => "f64", "bool" => "bool"
   }
 
+  # `pub fn name(params) -> ret { … }` (body) = export;  `fn name(params) -> ret;` (decl, no
+  # body, inside an `extern "C"` block) = a host import the Dock supplies.
+  @export_re ~r/pub\s+(?:extern\s+"C"\s+)?fn\s+([a-z_]\w*)\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z0-9_]+))?\s*\{/
+  @import_re ~r/\bfn\s+([a-z_]\w*)\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z0-9_]+))?\s*;/
+
   @doc """
-  Derive a typed WIT world from a `rust` unit's `pub fn` signatures (no hand-written WIT).
-  Returns `{world_text, world_name, fn_names}`. Pairs with `to_component/4`.
+  Derive a typed WIT world from a `rust` unit — `pub fn` bodies become **exports**, `extern "C"`
+  declarations become **imports** (host capabilities). No hand-written WIT. Returns
+  `%{world, name, exports, imports}` where exports/imports are `{name, params, ret}` tuples.
   """
   def rust_world(%{name: name, body: body}) do
-    re = ~r/pub\s+(?:extern\s+"C"\s+)?fn\s+([a-z_]\w*)\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z0-9_]+))?/
-
-    exports =
-      Regex.scan(re, body)
-      |> Enum.map(fn [_, fname, params | rest] ->
-        {fname, parse_params(params), wit_ret(List.first(rest))}
-      end)
-
+    exports = sigs(@export_re, body)
+    imports = sigs(@import_re, body)
     wname = wit_ident(name)
-    lines = Enum.map_join(exports, "\n", fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
-    world = "package work:#{wname};\n\nworld #{wname} {\n#{lines}\n}\n"
-    {world, wname, Enum.map(exports, &elem(&1, 0))}
+
+    lines =
+      Enum.map(imports, fn {f, ps, r} -> "  import #{wit_ident(f)}: func(#{ps})#{r};" end) ++
+        Enum.map(exports, fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
+
+    world = "package work:#{wname};\n\nworld #{wname} {\n#{Enum.join(lines, "\n")}\n}\n"
+    %{world: world, name: wname, exports: exports, imports: imports}
+  end
+
+  defp sigs(re, body) do
+    Regex.scan(re, body)
+    |> Enum.map(fn [_, f, params | rest] -> {f, parse_params(params), wit_ret(List.first(rest))} end)
+    |> Enum.uniq()
   end
 
   defp parse_params(""), do: ""

@@ -15,11 +15,30 @@ defmodule Nexus.CompileTest do
       |> Nexus.Literate.parse()
       |> Enum.find(&(&1.type == :code))
 
-    {world, name, fns} = Nexus.Compile.rust_world(node)
+    %{world: world, name: name, exports: exports} = Nexus.Compile.rust_world(node)
     assert name == "forecast"
-    assert fns == ["forecast", "blend"]
+    assert Enum.map(exports, &elem(&1, 0)) == ["forecast", "blend"]
     assert world =~ "export forecast: func(x: s32) -> s32;"
     assert world =~ "export blend: func(a: f64, b: f64) -> f64;"
+  end
+
+  test "rust_world derives host imports from extern \"C\" declarations" do
+    node =
+      """
+      rust :calc do
+        extern "C" { fn add(a: i32, b: i32) -> i32; }
+        #[no_mangle]
+        pub extern "C" fn run() -> i32 { unsafe { add(1, 2) } }
+      end
+      """
+      |> Nexus.Literate.parse()
+      |> Enum.find(&(&1.type == :code))
+
+    %{world: world, imports: imports, exports: exports} = Nexus.Compile.rust_world(node)
+    assert Enum.map(imports, &elem(&1, 0)) == ["add"]
+    assert Enum.map(exports, &elem(&1, 0)) == ["run"]
+    assert world =~ "import add: func(a: s32, b: s32) -> s32;"
+    assert world =~ "export run: func() -> s32;"
   end
 
   # The real proof: a .work rust unit → component → runs on wasmex. Needs the wasm toolchain
@@ -36,6 +55,23 @@ defmodule Nexus.CompileTest do
       assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
       {:ok, p} = Nexus.Sandbox.start(comp, [])
       assert {:ok, 84} = Nexus.Sandbox.call(p, "dbl", [42])
+    else
+      :ok
+    end
+  end
+
+  @tag :compiler
+  @tag timeout: 240_000
+  test "a .work rust unit with a host IMPORT compiles, and the host supplies it" do
+    if File.dir?("../runtime/compilers") && System.find_executable("wasm-tools") do
+      node =
+        ~s|rust :calc do\n  extern "C" { fn add(a: i32, b: i32) -> i32; }\n  #[no_mangle]\n  pub extern "C" fn compute() -> i32 { unsafe { add(20, 22) } }\nend\n|
+        |> Nexus.Literate.parse()
+        |> Enum.find(&(&1.type == :code))
+
+      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
+      {:ok, pid} = Wasmex.Components.start_link(%{path: comp, imports: %{"add" => {:fn, fn a, b -> a + b end}}})
+      assert {:ok, 42} = Wasmex.Components.call_function(pid, "compute", [])
     else
       :ok
     end
