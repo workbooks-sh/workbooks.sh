@@ -8,23 +8,22 @@ host. Reaching `evil.example` would be refused at the seam. Grants flow by expli
 grant, never inheritance — a unit that calls `:enrich` doesn't inherit its net.
 
 server :enrich, grant: [net: "api.crm.com"] do
+  # A with-railway: each `<-` must match `{:ok, _}` to proceed; any other shape drops
+  # to `else`. The happy path reads top-to-bottom, the two failure shapes are handled
+  # once. `Dock.fetch` is the brokered call — the membrane checks our grant before the
+  # request leaves the nexus and hands back a variant, never an exception.
   def enrich(%Lead{name: name} = lead) do
-    case lookup(name) do
-      {:ok, r}        -> %Lead{lead | domain: r.domain, revenue: r.revenue,
-                                      employees: r.employees, status: :enriched}
-      {:error, _why}  -> lead   # leave as-is; a later pass retries
+    with {:ok, %{status: 200, body: body}} <- Dock.fetch(crm_url(name)),
+         {:ok, account}                    <- parse(body) do
+      %Lead{lead | domain: account.domain, revenue: account.revenue,
+                   employees: account.employees, status: :enriched}
+    else
+      {:ok, %{status: 404}} -> lead          # not in the CRM yet; leave as-is
+      {:error, _reason}     -> lead          # transient; a later pass retries
     end
   end
 
-  # Dock.fetch is the brokered call: the membrane checks our grant against the host
-  # before the request leaves the nexus. The result is a variant, never an exception.
-  defp lookup(name) do
-    case Dock.fetch("https://api.crm.com/v1/accounts?name=" <> URI.encode(name)) do
-      {:ok, %{status: 200, body: body}} -> {:ok, parse(body)}
-      {:ok, %{status: 404}}             -> {:error, :not_found}
-      {:error, reason}                  -> {:error, {:net, reason}}
-    end
-  end
+  defp crm_url(name), do: "https://api.crm.com/v1/accounts?name=" <> URI.encode(name)
 end
 
 Fallibility is modelled as a **tagged tuple** — `{:ok, _} | {:error, reason}` — so
