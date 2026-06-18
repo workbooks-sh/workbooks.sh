@@ -27,6 +27,21 @@ Rust interfaces). All in wasmtime, no Chromium, no V8.
 - ◻ **G5** Harden — wall-clock bound, fetch brokering for the JS engine's `fetch`, fallback to the
   Boa/SSR path. Make it the default render when a page needs JS.
 
+## Research-informed correction (TIER2 + LIGHTPANDA research)
+
+- **AVOID a live two-way layout bridge** (JS-DOM ⇄ native Blitz, syncing geometry on every mutation)
+  — it re-introduces the two-sources-of-truth / forced-reflow friction Lightpanda deleted.
+- **JS-DOMs return 0 for geometry.** So don't pixel-click off them.
+- **Our architecture sidesteps this:** computer-use acts by **element number** (semantic), and the
+  vision model sees a **screenshot**. So:
+  - **DOM + JS** → StarlingMonkey + linkedom (hydrated DOM → actionables + text). No geometry needed.
+  - **Screenshot** → serialize the *settled* DOM → **one-way** Blitz render (a fresh parse, NOT a
+    live bridge). This is the safe pipeline.
+  - **Action** → by element number off the DOM.
+- **The only hard case we defer:** JS that branches on *live* geometry mid-execution
+  (`getBoundingClientRect` driving rendering). Rare; the long-term answer is native co-resident
+  SpiderMonkey+Blitz (a host service), not a wasm bridge.
+
 ## Done when
 A real client-only SPA (that Boa couldn't run) renders populated content + screenshot via
 StarlingMonkey-DOM + Blitz, in wasmtime, wired into the canonical `Nexus.Browse` capability.
