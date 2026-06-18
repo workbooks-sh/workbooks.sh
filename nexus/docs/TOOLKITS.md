@@ -72,10 +72,27 @@ The compile lanes emit two wasm shapes:
 
 `Nexus.Compilers.C.compile_to_wasm(src, shape: :command)` produces the command shape. Toolkits use it.
 
+## Languages (it's just the command output of the lanes we already have)
+
+A toolkit isn't a new system — it's the **command-shape output** of the compile lanes. But the lanes
+differ in how naturally they produce a command:
+
+- **`c` / `cpp`** — link `crt1-command.o` + libc (the `:command` shape). A normal `int main()`.
+- **`rust`** — the *simplest*: the rust lane already links `crt1-command.o`, so a plain `fn main()`
+  program **is** a command module — no exports / keep-alive (that was the extra for the component
+  model). `lang: "rust"` (or just write `fn main`).
+- **`zig`** — **not** just-the-command-output. Our zig path (`zig1 build-obj -ofmt=c`, the bootstrap C
+  backend) is **exports-shaped** and can't lower a full `pub fn main()` std-I/O program to a command
+  (it's why the zig *unit* lane only does `export fn`). A zig CLI toolkit needs a C-main shim calling
+  a zig export, or zig's self-hosted exe backend — a real follow-up. **Author CLI toolkits in `rust`
+  or `c` today.**
+
+Language is taken from `lang: <x>` in the header, else inferred from the body (`fn main` → rust,
+`pub fn main` → zig, else C).
+
 ## Still open
 
-- **rust / zig toolkits** — `Nexus.Toolkit.compile/2` is C-only today; the rust/zig command shapes
-  (a normal `main()` linked as a command) are a small lane addition.
+- **zig command toolkits** — the exports→command shim (above).
 - **persistence** — registered toolkits are in-memory per run; a workbook's toolkits compile on
   bring-up. A content-addressed on-disk cache (compile once, reuse) is the natural optimization.
 - **arg/usage metadata** — the manifest carries a summary + command names; a richer usage spec

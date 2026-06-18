@@ -29,6 +29,37 @@ defmodule Nexus.ToolkitTest do
     assert n.kind == "toolkit"
   end
 
+  test "the toolkit language comes from `lang:` in the header, else inferred from the body" do
+    assert Nexus.Toolkit.lang(unit("toolkit :a, lang: \"rust\" do\n  x\nend\n")) == "rust"
+    assert Nexus.Toolkit.lang(unit("toolkit :a do\n  fn main(){}\nend\n")) == "rust"
+    assert Nexus.Toolkit.lang(unit("toolkit :a do\n  pub fn main() void {}\nend\n")) == "zig"
+    assert Nexus.Toolkit.lang(unit("toolkit :a do\n  int main(void){return 0;}\nend\n")) == "c"
+  end
+
+  test "zig command toolkits fail with a clear, honest error (exports-only path)" do
+    assert {:error, {:zig_command_toolkits_unsupported, _}} = Nexus.Toolkit.compile("zig", "pub fn main() void {}")
+  end
+
+  @tag :kits
+  @tag timeout: 240_000
+  test "a RUST toolkit (just `fn main`) compiles to a command + runs via bash" do
+    if File.dir?("../runtime/compilers") && System.find_executable("wasmtime") do
+      n =
+        unit(
+          "toolkit :rev, lang: \"rust\" do\n  // summary: reverse each line\n  use std::io::{self,BufRead,Write};\n" <>
+            "  fn main(){let s=io::stdin();let mut o=io::stdout();for l in s.lock().lines(){let l=l.unwrap();let r:String=l.chars().rev().collect();writeln!(o,\"{}\",r).unwrap();}}\nend\n"
+        )
+
+      assert {:toolkit, {:ok, "rev"}} = Nexus.Compile.unit(n)
+      vfs = Nexus.Agent.Vfs.new()
+      Nexus.Agent.Vfs.put(vfs, "in.txt", "hello\n")
+      assert Nexus.Agent.Bash.run(vfs, "cat /work/in.txt | rev") |> String.trim() == "olleh"
+      Nexus.Agent.Vfs.destroy(vfs)
+    else
+      :ok
+    end
+  end
+
   @tag :kits
   @tag timeout: 240_000
   test "author a toolkit in a .work file → compile → register → run via bash" do
