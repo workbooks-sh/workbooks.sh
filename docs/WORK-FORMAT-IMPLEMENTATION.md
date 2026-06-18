@@ -1,5 +1,34 @@
 # WORK-FORMAT IMPLEMENTATION PLAN — aligning the runtime to the spec
 
+## STATUS — autonomous loop progress (the parse-driven core is built & green)
+
+The parse layer, the code graph, and WIT generation are **done, tested, and proven on
+the real demo tree** (`workponents/sales/**`). Everything below flows from one parse.
+
+- **§0.1 Literate parser — DONE.** `host/literate.ex` (`Workbooks.Literate`), combined-AST
+  (`Code.string_to_quoted`). Refs skip inline-code literals / don't span newlines.
+- **§0.2 Per-language AST — DONE (Elixir real; foreign interim).** `host/extract_elixir.ex`
+  (exports w/ typed params from `%Struct{}` patterns, calls, records, enums, variants),
+  `host/extract_foreign.ex` (rust/zig/python/svelte patterns), `host/extract.ex` dispatcher.
+  Real tree-sitter is the follow-on (`wb-bqnw`).
+- **§9 Code graph + CLI — DONE.** `host/graph.ex` + `host/work_cli.ex`: `work check`
+  (resolve_refs + audit_caps via `host/audit.ex`) / `why` / `near` / `wit`. **`work check`
+  passes clean on the demo** (refs resolve, caps audited).
+- **§2 WIT generation — DONE & wasm-tools-validated (32/32).** `host/wit.ex` + `host/wit/types.ex`:
+  per-unit worlds (typed exports + grant imports), `record`/`enum`/`variant`, field→enum
+  links, per-file + **workbook-wide cross-file shared types**, reserved-word escaping.
+  `Wit.packages/validate` → every demo file produces valid, cross-file-resolved WIT.
+- **§1 — STARTED.** `Wit.package`/`packages`/`validate` emit the componentizable artifact
+  (a generated package validates `:ok` with native `wasm-tools`). Remaining: bind each
+  unit's *compiled core module* to its world via the compile lanes (`wb-rcl5`).
+
+Test suites: `literate_ · extract_elixir_ · extract_foreign_ · graph_ · wit_ · wit_types_ ·
+wit_emit_ · wit_package_ · audit_ · work_cli_test.exs` (48 green).
+
+Next land-order targets: **§1 componentize lanes (`wb-rcl5`) → §3 unified Dock (`wb-yje6`)**.
+
+---
+
 Status: planning. Canonical spec (the settled direction this aligns to):
 
 - Authoring = literate `.work` files (markdown + Elixir). NOT web-component / HTML-element authoring / JSON sidecars.
@@ -46,7 +75,7 @@ with `:line` and inline `:refs` (`[[backlink]]`, `:atom`, `@type`, `#tag`, `work
 A `:code` node carries `kind / lang / name / header / body / ast`. Tested + verified
 against the real demo tree (`workponents/sales/**`). 6/6 green.
 
-### §0.2 Per-language AST — **[NEW]**, one lane per language
+### §0.2 Per-language AST — **DONE** (Elixir real; foreign interim → `wb-bqnw`)
 
 The literate parser hands each code **body** to its language's real parser. Status +
 plan, per language:
@@ -136,7 +165,7 @@ catches it per-lang; fall back to `target: :raw` for any lane that can't yet com
 
 ---
 
-## §2. AUTO-GENERATE a per-unit WIT world from signature + grants — **THE KEYSTONE [NEW]**
+## §2. AUTO-GENERATE a per-unit WIT world from signature + grants — **DONE** (`host/wit.ex`, `host/wit/types.ex`)
 
 **Problem (verified).** This does not exist. `runtime/wit/engine.wit` is **hand-written** and fixed
 (5 imports + `export run: func(input: string) -> string`). `compose.ex:pipe_wit/1` synthesizes a
@@ -566,7 +595,7 @@ to bytes where it doesn't.
 
 ---
 
-## §9. The Code Graph — built on the parse, not extracted twice — **[NEW]**
+## §9. The Code Graph — built on the parse, not extracted twice — **DONE** (`host/graph.ex`, `host/work_cli.ex`, `host/audit.ex`)
 
 The graph is the join of the three extractors over §0's parse. Now that §0 exists, the
 graph is mostly *assembly*, not re-parsing.
@@ -623,7 +652,7 @@ for the import layer). The literate-only graph (refs) can ship first on §0.1 al
 §8 rides §2.4 (`target`) + §3 (Dock for `server` render). 8.1 (static bundle) is live
 today; 8.2 (nexus SSR / islands) and 8.3 (live-over-RCP) layer on once §3 lands.
 
-Land order: **§0.1 ✓ → §0.2(Elixir) → §2.4 → §2 → §9(refs graph early, full after §2) → §1 → §3 → §4 → §6 → §7 → §5**.
+Land order: **§0.1 ✓ → §0.2 ✓ → §2.4 → §2 ✓ → §9 ✓ → §1 (started) → §3 → §4 → §6 → §7 → §5**.
 §0.3 (viewer-on-parse) and §0.2 foreign-language passes land in parallel, incrementally.
 §7.1 (emit) and §5 (lane) can start in parallel once §1 exists.
 
