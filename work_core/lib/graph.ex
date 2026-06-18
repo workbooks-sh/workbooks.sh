@@ -8,9 +8,9 @@ defmodule WorkCore.Graph do
 
   alias WorkCore.{Literate, Extract, Uid, Capabilities, Wit}
 
-  defstruct nodes: %{}, edges: [], titles: %{}, backlinks: %{}
+  defstruct nodes: %{}, edges: [], titles: %{}, backlinks: %{}, types: %{}
 
-  @type t :: %__MODULE__{nodes: map, edges: [map], titles: map, backlinks: map}
+  @type t :: %__MODULE__{nodes: map, edges: [map], titles: map, backlinks: map, types: map}
 
   @doc "Build the graph from every .work file under a directory."
   def build_dir(root) do
@@ -26,7 +26,8 @@ defmodule WorkCore.Graph do
       nodes: nodes,
       edges: collect_edges(parsed, nodes),
       titles: collect_titles(parsed),
-      backlinks: collect_backlinks(parsed)
+      backlinks: collect_backlinks(parsed),
+      types: collect_types(parsed)
     }
   end
 
@@ -73,6 +74,41 @@ defmodule WorkCore.Graph do
         data: %{module: Uid.module(n.name)}
       }
     }
+  end
+
+  # ── types: the unified workbook-wide type registry (§1) — records (defmodule
+  #    type units) + enums (top-level decls), keyed by WIT name. Resolves a
+  #    cross-file record param to a real WIT ref instead of the `string` degrade.
+  defp collect_types(parsed) do
+    records =
+      for {path, ns} <- parsed,
+          n <- ns,
+          n.type == :code,
+          n.kind == "defmodule",
+          {:record, fields} <- Extract.facts(n).types,
+          into: %{},
+          do: {Uid.wit(n.name), %{kind: :record, name: n.name, spec: fields, file: path}}
+
+    enums =
+      for {path, ns} <- parsed,
+          n <- ns,
+          n.type == :decl,
+          {:enum, name, atoms} <- WorkCore.Extract.Elixir.decl_types(n),
+          into: %{},
+          do: {Uid.wit(name), %{kind: :enum, name: name, spec: atoms, file: path}}
+
+    Map.merge(enums, records)
+  end
+
+  @doc """
+  The workbook-wide shared WIT types — `{interface, type_names}` — built from the
+  unified type registry. Feed it to `WorkCore.Wit.world/2` to emit a per-unit world
+  whose cross-file record params resolve to their real type ref.
+  """
+  def shared_types(%__MODULE__{types: types}) do
+    record_specs = for {_w, %{kind: :record, name: n, spec: f}} <- types, do: {n, f}
+    enums_kv = for {_w, %{kind: :enum, name: n, spec: a}} <- types, do: {n, a}
+    Wit.interface_from_specs(record_specs, enums_kv)
   end
 
   defp collect_titles(parsed) do

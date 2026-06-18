@@ -18,7 +18,11 @@ defmodule WorkCore.Wit do
   # surface the runtime Dock projects. See `WorkCore.Dock`.
 
   @doc "Generate the WIT `world` source for a `WorkCore.Literate` :code node."
-  def world(%{name: name} = node) when is_binary(name) do
+  def world(node, shared \\ nil)
+
+  # skeleton (shared == nil): the unit's own types + optimistic param type names,
+  # to be resolved when assembled into a package.
+  def world(%{name: name} = node, nil) when is_binary(name) do
     node = Extract.annotate(node)
     facts = Extract.facts(node)
     types = type_defs(facts, name)
@@ -32,7 +36,13 @@ defmodule WorkCore.Wit do
     "package work:#{wit_name(name)};\n\nworld #{wit_name(name)} {\n#{body}\n}\n"
   end
 
-  def world(_), do: nil
+  # resolving (shared = {iface, type_names}): a self-contained, cross-file-resolved
+  # single-unit package — cross-file record params type to their real WIT ref via
+  # the shared interface instead of degrading to string.
+  def world(%{name: name} = node, shared) when is_binary(name),
+    do: package([Extract.annotate(node)], name, shared)
+
+  def world(_, _), do: nil
 
   @doc """
   The per-file shared `interface types` — the home for file-level declarations a
@@ -58,13 +68,33 @@ defmodule WorkCore.Wit do
            do: {node.name, fields})
       |> Enum.uniq_by(fn {name, _} -> WorkCore.Wit.Types.wit(name) end)
 
+    {iface, _names} = interface_from_specs(record_specs, enums_kv)
+    iface
+  end
+
+  @doc """
+  Build the shared `interface types` block + the set of WIT type names from
+  pre-deduped record specs (`[{name, fields}]`) and enum specs (`[{name, atoms}]`).
+  The one home both the literate path (`file_interface/1`) and the graph path
+  (`WorkCore.Graph.shared_types/1`, sourced from the unified type nodes §1) use,
+  so cross-file records resolve to a real WIT type ref instead of degrading to
+  `string`. Returns `{interface_string | nil, [wit_name]}`.
+  """
+  def interface_from_specs(record_specs, enums_kv) do
     records = for {name, fields} <- record_specs, do: WorkCore.Wit.Types.record(name, fields, enums_kv)
     enums = for {name, atoms} <- enums_kv, do: WorkCore.Wit.Types.enum(name, atoms)
 
-    case records ++ enums do
-      [] -> nil
-      defs -> "interface types {\n" <> Enum.map_join(defs, "\n", &indent/1) <> "\n}\n"
-    end
+    names =
+      (for {name, _} <- record_specs, do: WorkCore.Wit.Types.wit(name)) ++
+        (for {name, _} <- enums_kv, do: WorkCore.Wit.Types.wit(name))
+
+    iface =
+      case records ++ enums do
+        [] -> nil
+        defs -> "interface types {\n" <> Enum.map_join(defs, "\n", &indent/1) <> "\n}\n"
+      end
+
+    {iface, Enum.uniq(names)}
   end
 
   @doc """

@@ -66,6 +66,46 @@ defmodule WorkCore.GraphTest do
     assert Enum.all?(g.edges, &(Map.has_key?(&1, :layer) and Map.has_key?(&1, :scope)))
   end
 
+  test "shared_types builds a cross-file registry; world/2 resolves a record param (no string degrade)" do
+    write("types.work", """
+    # Types
+
+    ```elixir
+    defmodule Lead do
+      defstruct name: "", score: 0
+    end
+    ```
+    """)
+
+    write("enrich.work", """
+    # Enrich
+
+    ```elixir
+    server :enrich do
+      def run(%Lead{} = lead), do: lead
+    end
+    ```
+    """)
+
+    g = WorkCore.Graph.build_dir(@tmp)
+
+    # the unified type registry sees the cross-file record
+    assert Map.has_key?(g.types, "lead")
+    {iface, names} = WorkCore.Graph.shared_types(g)
+    assert "lead" in names
+    assert iface =~ "record lead"
+
+    # the per-unit world resolved against the registry types the param as the
+    # record (NOT string) and is self-contained valid WIT
+    enrich = Path.join(@tmp, "enrich.work") |> File.read!() |> WorkCore.Literate.parse() |> Enum.find(&(&1[:name] == "enrich"))
+    world = WorkCore.Wit.world(enrich, WorkCore.Graph.shared_types(g))
+
+    assert world =~ "use types.{lead};"
+    assert world =~ "func(a0: lead)"
+    refute world =~ "func(a0: string)"
+    assert WorkCore.Wit.validate(world) == :ok
+  end
+
   test "check resolves host-cap edges against the catalog, not as dangling units" do
     write("svc.work", """
     # Service
