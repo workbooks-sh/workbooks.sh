@@ -136,6 +136,66 @@ defmodule Workbooks.Unit do
     end
   end
 
+  @doc """
+  The `run_tests` weave gate: compile the workbook's BEAM tier, then run every `test`
+  unit's cases on the BEAM. A `test :score` unit imports the unit under test (`Score`)
+  so its `score(…)`/`%Lead{}` references resolve. Returns
+  `%{passed: n, failed: [{unit, message}]}`.
+  """
+  def run_tests(root) do
+    compile_workbook(root)
+
+    (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
+    |> Enum.uniq()
+    |> Enum.flat_map(fn p -> Workbooks.Literate.parse(File.read!(p)) end)
+    |> Enum.filter(&(&1.type == :code and &1.kind == "test" and &1.name != nil))
+    |> Enum.reduce(%{passed: 0, failed: []}, &run_test_unit/2)
+  end
+
+  defp run_test_unit(%{name: name, ast: ast}, acc) do
+    case compile_test(name, ast) do
+      {:error, reason} ->
+        %{acc | failed: [{name, "won't compile: #{inspect(reason)}"} | acc.failed]}
+
+      {:ok, module} ->
+        Enum.reduce(Workbooks.Unit.TestHarness.cases(module), acc, fn fun, a ->
+          try do
+            apply(module, fun, [])
+            %{a | passed: a.passed + 1}
+          rescue
+            e -> %{a | failed: [{name, Exception.message(e)} | a.failed]}
+          end
+        end)
+    end
+  end
+
+  defp compile_test(name, ast) do
+    case do_body(ast) do
+      nil ->
+        {:error, :no_body}
+
+      body ->
+        under = Module.concat([Macro.camelize(name)])
+        mod = Module.concat([Macro.camelize(name) <> "Tests" <> suffix()])
+
+        quoted =
+          quote do
+            defmodule unquote(mod) do
+              use Workbooks.Unit.TestHarness
+              import unquote(under)
+              unquote(body)
+            end
+          end
+
+        try do
+          [{module, _bin}] = Code.compile_quoted(quoted)
+          {:ok, module}
+        rescue
+          e -> {:error, Exception.message(e)}
+        end
+    end
+  end
+
   @doc "Compile a server unit and invoke one of its exported functions."
   def run(node, fun, args) when is_atom(fun) and is_list(args) do
     case compile(node) do
