@@ -19,7 +19,7 @@ defmodule Workbooks.WitTest do
     # private def is not an export
     refute world =~ "helper"
     # the net grant becomes a host import
-    assert world =~ "import host:net/fetch;"
+    assert world =~ "import host-net;"
   end
 
   test "a struct-pattern argument types as its record in the func signature" do

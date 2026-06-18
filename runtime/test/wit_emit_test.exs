@@ -48,7 +48,7 @@ defmodule Workbooks.WitEmitTest do
     world = enrich.worlds["enrich"]
     assert world =~ "world enrich {"
     assert world =~ "export enrich: func(a0: lead) -> string;"
-    assert world =~ "import host:net/fetch;"
+    assert world =~ "import host-net;"
     assert world =~ "variant %result {"
   end
 

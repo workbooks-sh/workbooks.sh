@@ -10,21 +10,11 @@ defmodule Workbooks.Wit do
   the unit's declared structs). A unit with no signature gets the default `run`.
   """
 
-  alias Workbooks.Extract
+  alias Workbooks.{Extract, Dock}
 
-  # grant capability → the host interface it imports across the Dock seam
-  @grant_imports %{
-    "net" => "host:net/fetch",
-    "kv" => "host:kv/store",
-    "fs" => "host:fs/files",
-    "secrets" => "host:secrets/read",
-    "exec" => "host:exec/run",
-    "queue" => "host:queue/push",
-    "llm" => "host:llm/complete",
-    "browse" => "host:browse/fetch"
-  }
-
-  @caps Map.keys(@grant_imports) ++ ~w(tcp udp tls posix parallel encode commands)
+  # the grant words a unit may declare — filters stray header tokens (string values,
+  # etc.) out of `grants/1`. The import each projects comes from the Dock registry.
+  @caps ~w(net kv secrets fs exec llm browse queue vfs commands tcp udp tls posix parallel encode)
 
   # The self-contained host capability interfaces come from the single Dock registry
   # (§3) — so a generated package validates standalone AND §2's imports are the same
@@ -36,7 +26,8 @@ defmodule Workbooks.Wit do
     types = type_defs(facts, name)
     exports = export_lines(facts.exports)
     exports = if exports == [], do: ["export run: func(input: string) -> string;"], else: exports
-    imports = node |> grants() |> Enum.map(&grant_import/1) |> Enum.reject(&is_nil/1)
+    imports =
+      node |> grants() |> Enum.map(&Dock.grant_import/1) |> Enum.reject(&is_nil/1) |> Enum.map(&"import #{&1};")
 
     body = (types ++ exports ++ imports) |> Enum.map(&indent/1) |> Enum.join("\n")
 
@@ -342,8 +333,6 @@ defmodule Workbooks.Wit do
   end
 
   defp scalar?(t), do: t in ~w(string bool s8 s16 s32 s64 u8 u16 u32 u64 f32 f64 char)
-
-  defp grant_import(cap), do: if(wit = @grant_imports[cap], do: "import #{wit};")
 
   defp wit_name(name), do: Workbooks.Wit.Types.wit(name)
 end

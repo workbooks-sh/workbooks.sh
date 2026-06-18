@@ -87,6 +87,21 @@ defmodule Workbooks.Dock do
   @doc "The runtime capability a spec grant maps onto, if any."
   def runtime_cap_for(grant), do: @grant_aliases[grant]
 
+  @doc """
+  The WIT import a granted capability projects — the one vocabulary both the generated
+  world (`Workbooks.Wit`) and the runtime seam speak. A sandbox cap projects its
+  `host-*` interface; a runtime cap projects its typed import; an aliased spec grant
+  projects the runtime import it maps onto. `nil` if the grant has no projection.
+  """
+  def grant_import(grant) do
+    cond do
+      sandbox_capability?(grant) -> interface_name(grant)
+      import_name(grant) -> import_name(grant)
+      rc = runtime_cap_for(grant) -> import_name(rc)
+      true -> nil
+    end
+  end
+
   @doc "The always-present RustDock ambient core-ABI imports."
   def rust_ambient, do: @rust_ambient
 

@@ -40,7 +40,7 @@ defmodule Workbooks.Work.CLITest do
   test "wit prints the generated world for a unit, or errors on an unknown one", %{dir: dir} do
     {out, false} = CLI.wit(dir, "enrich")
     assert out =~ "world enrich {"
-    assert out =~ "import host:net/fetch;"
+    assert out =~ "import host-net;"
 
     {miss, true} = CLI.wit(dir, "ghost")
     assert miss =~ "no unit named :ghost"
