@@ -103,11 +103,21 @@ defmodule Nexus.Graph.Viz do
     type_links =
       for u <- units, t <- unit_types(u, type_index), do: %{source: "u:" <> u.id, target: "type:" <> t, type: "type", layer: "work"}
 
-    # explicit unit→unit edges. A literate `:ref` is a WORK-FILE association; an AST
-    # import (an Elixir call / BEAM dep) is the NATIVE-CODE side.
+    # explicit unit→unit edges, classified by which side they live on:
+    #   :ref (literate mention)            → WORK-FILE
+    #   import from a wasm component        → WEBASSEMBLY (a `work://` component import)
+    #   import from a server (Elixir call)  → NATIVE (BEAM)
+    kinds = Map.new(units, &{&1.id, &1.kind})
+
     unit_links =
       for e <- g.edges, e.scope == :unit, Map.has_key?(node_set(units), e.from), Map.has_key?(node_set(units), e.to) do
-        layer = if e.type == :ref, do: "work", else: "native"
+        layer =
+          cond do
+            e.type == :ref -> "work"
+            wasm_kind?(Map.get(kinds, e.from)) -> "wasm"
+            true -> "native"
+          end
+
         %{source: "u:" <> e.from, target: "u:" <> e.to, type: to_string(e.type), layer: layer}
       end
 
@@ -119,6 +129,8 @@ defmodule Nexus.Graph.Viz do
   defp concept_node(id, label, type, color),
     do: %{id: id, label: label, type: type, klass: type, group: id, color: color, badges: [], r: 9, detail: nil}
 
+  @wasm_kinds ~w(client sandbox rust zig c cpp python svelte solid js ts)
+  defp wasm_kind?(k), do: k in @wasm_kinds
   defp node_set(units), do: Map.new(units, &{&1.id, true})
   defp case_root(""), do: "core"
   defp case_root(s), do: s
@@ -256,14 +268,17 @@ defmodule Nexus.Graph.Viz do
 
     let alpha=1;
     function centroids(){ const g={}; NODES.forEach(n=>{ if(n.type!=='unit')return; (g[n.group]=g[n.group]||{x:0,y:0,c:0}); g[n.group].x+=n.x; g[n.group].y+=n.y; g[n.group].c++; }); for(const k in g){g[k].x/=g[k].c;g[k].y/=g[k].c;} return g; }
+    let frame=0;
     function step(){
-      for(let i=0;i<NODES.length;i++)for(let j=i+1;j<NODES.length;j++){ const a=NODES[i],b=NODES[j]; let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy||1,d=Math.sqrt(d2); const f=2600/d2,ux=dx/d,uy=dy/d; a.vx+=ux*f;a.vy+=uy*f;b.vx-=ux*f;b.vy-=uy*f; }
+      for(let i=0;i<NODES.length;i++)for(let j=i+1;j<NODES.length;j++){ const a=NODES[i],b=NODES[j]; let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy||1,d=Math.sqrt(d2); const f=1300/d2,ux=dx/d,uy=dy/d; a.vx+=ux*f;a.vy+=uy*f;b.vx-=ux*f;b.vy-=uy*f; }
       lineEls.forEach(l=>{ const a=l.s,b=l.t; let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1; const f=(d-l.len)*l.k*alpha,ux=dx/d,uy=dy/d; a.vx+=ux*f;a.vy+=uy*f;b.vx-=ux*f;b.vy-=uy*f; });
       const cen=centroids();
-      NODES.forEach(n=>{ if(n.type==='unit'){const c=cen[n.group]; n.vx+=(c.x-n.x)*0.03*alpha; n.vy+=(c.y-n.y)*0.03*alpha;} n.vx+=(W/2-n.x)*0.002*alpha; n.vy+=(H/2-n.y)*0.002*alpha; });
+      NODES.forEach(n=>{ if(n.type==='unit'){const c=cen[n.group]; n.vx+=(c.x-n.x)*0.07*alpha; n.vy+=(c.y-n.y)*0.07*alpha;} n.vx+=(W/2-n.x)*0.004*alpha; n.vy+=(H/2-n.y)*0.004*alpha; });
       NODES.forEach(n=>{ if(n.fx!=null){n.x=n.fx;n.y=n.fy;n.vx=n.vy=0;return;} n.vx*=0.82;n.vy*=0.82; n.x+=n.vx;n.y+=n.vy; });
       alpha+=(0.04-alpha)*0.02;
       draw(cen);
+      frame++;
+      if(frame>1 && frame<260 && !drag) fitView();
       requestAnimationFrame(step);
     }
     function draw(cen){
@@ -271,7 +286,7 @@ defmodule Nexus.Graph.Viz do
       NODES.forEach(n=>n.el.setAttribute('transform',`translate(${n.x},${n.y})`));
       for(const grp in hullEls){ const m=NODES.filter(n=>n.type==='unit'&&n.group===grp); if(!m.length)continue; const c=cen[grp]; let R=40; m.forEach(n=>R=Math.max(R,Math.hypot(n.x-c.x,n.y-c.y)+n.r)); const h=hullEls[grp]; h.c.setAttribute('cx',c.x);h.c.setAttribute('cy',c.y);h.c.setAttribute('r',R+18); h.t.setAttribute('x',c.x);h.t.setAttribute('y',c.y-R-24); h.t.setAttribute('text-anchor','middle'); }
     }
-    step();
+    requestAnimationFrame(step);
 
     // hover focus
     function focus(n){ const keep=new Set([n.id,...adj[n.id]]); NODES.forEach(m=>m.el.classList.toggle('dim',!keep.has(m.id))); lineEls.forEach(l=>l.el.classList.toggle('dim', l.s.id!==n.id&&l.t.id!==n.id)); }
@@ -286,6 +301,8 @@ defmodule Nexus.Graph.Viz do
     // zoom + pan
     let tx=0,ty=0,scale=1,pan=false;
     function apply(){ view.setAttribute('transform',`translate(${tx},${ty}) scale(${scale})`); }
+    function fitView(){ const xs=NODES.map(n=>n.x), ys=NODES.map(n=>n.y); const a=Math.min(...xs)-70,b=Math.max(...xs)+70,c=Math.min(...ys)-70,d=Math.max(...ys)+70; scale=Math.min(1.6,Math.max(0.25,Math.min(W/(b-a),H/(d-c)))); tx=W/2-(a+b)/2*scale; ty=H/2-(c+d)/2*scale; apply(); }
+    svg.addEventListener('dblclick',fitView);
     function toView(e){ const r=svg.getBoundingClientRect(); return {x:(e.clientX-r.left-tx)/scale, y:(e.clientY-r.top-ty)/scale}; }
     svg.addEventListener('pointerdown',e=>{ if(e.target===svg||e.target===view){pan=true;svg.classList.add('drag');} });
     svg.addEventListener('wheel',e=>{ e.preventDefault(); const r=svg.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top; const s=Math.exp(-e.deltaY*0.0012); const ns=Math.min(2.5,Math.max(0.3,scale*s)); tx=mx-(mx-tx)*(ns/scale); ty=my-(my-ty)*(ns/scale); scale=ns; apply(); },{passive:false});
