@@ -6,12 +6,31 @@ defmodule Nexus.Browse.Freeze do
   `Nexus.Dock.fetch`); the render stays in the sandbox. Relative hrefs resolve against `base_url`.
   """
 
-  @doc "Inline a page's external stylesheets. Returns self-contained HTML."
-  def freeze(html, base_url) do
+  @doc """
+  Make a page self-contained: inline external stylesheets (`<link rel=stylesheet>` → `<style>`) and,
+  when `:scripts` is true, external scripts (`<script src>` → `<script>…</script>`) so the in-wasm JS
+  layer can run them. Subresources are fetched HOST-side (brokered, SSRF-safe).
+  """
+  def freeze(html, base_url, opts \\ []) do
+    html = inline_styles(html, base_url)
+    if Keyword.get(opts, :scripts, false), do: inline_scripts(html, base_url), else: html
+  end
+
+  defp inline_styles(html, base_url) do
     Regex.replace(~r/<link\b[^>]*\brel=["']?stylesheet["']?[^>]*>/i, html, fn tag ->
       case href(tag) do
         nil -> tag
         href -> inline_css(href, base_url) || tag
+      end
+    end)
+  end
+
+  # Replace <script src="…"></script> with the fetched code inline so the in-wasm engine runs it.
+  defp inline_scripts(html, base_url) do
+    Regex.replace(~r/<script\b([^>]*\bsrc=["']([^"']+)["'][^>]*)>\s*<\/script>/i, html, fn whole, _attrs, src ->
+      case Nexus.Dock.fetch(absolute(src, base_url)) do
+        "" -> whole
+        code -> "<script>" <> String.replace(code, "</script", "<\\/script") <> "</script>"
       end
     end)
   end
