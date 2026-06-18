@@ -16,7 +16,9 @@ defmodule Nexus.Application do
   def start(_type, _args) do
     # Empty by default; Ether's local-inference lanes opt in via `config :nexus, Nexus.Ether, enabled: true`.
     ether = if Nexus.Ether.enabled?(), do: Nexus.Ether.children(), else: []
-    children = [Nexus.Telemetry | ether]
+    # Nexus.Compile.Gate bounds concurrent wasm compiles (WB_COMPILE_CONCURRENCY) so a burst can't
+    # fork-bomb wasmtime into an OOM — backpressure instead.
+    children = [Nexus.Telemetry, Nexus.Compile.Gate | ether]
     Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
   end
 end

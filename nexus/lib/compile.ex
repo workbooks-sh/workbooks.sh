@@ -23,9 +23,11 @@ defmodule Nexus.Compile do
       kind == "agent" -> {:agent, Nexus.Agent.def_from_unit(node)}
       kind == "check" -> {:check, Nexus.Checks.parse(node)}
       kind == "toolkit" -> {:toolkit, Nexus.Toolkit.build(node)}
-      kind == "rust" -> {:wasm, rust_unit(node)}
-      kind in ~w(c cpp) -> {:wasm, c_unit(node)}
-      kind == "zig" -> {:wasm, zig_unit(node)}
+      # The wasm lanes shell heavy wasmtime compiler processes — gate them so concurrent compiles are
+      # bounded (WB_COMPILE_CONCURRENCY) and a burst queues instead of OOM-ing the host.
+      kind == "rust" -> {:wasm, Nexus.Compile.Gate.with_slot(fn -> rust_unit(node) end)}
+      kind in ~w(c cpp) -> {:wasm, Nexus.Compile.Gate.with_slot(fn -> c_unit(node) end)}
+      kind == "zig" -> {:wasm, Nexus.Compile.Gate.with_slot(fn -> zig_unit(node) end)}
       kind in @wasm_kinds -> {:wasm, {:todo, node.lang, node.name}}
       true -> {:skip, kind}
     end
