@@ -47,7 +47,9 @@ defmodule Nexus do
       # it; Compile types the WIT import from the Dock's signature, the Dock supplies the impl,
       # Sandbox wires it. String-return caps (e.g. the in-memory kv `load(key)->val`) work via the
       # canonical-ABI return area + an injected bump-allocator `cabi_realloc`. Caps: now/emit/store/
-      # load. (Cap names single-word + collision-free — `log` collided with libm.)
+      # load/fetch (net — real HTTP GET, proven against example.com; TODO: route through an SSRF-safe
+      # broker before prod). llm next (OPENROUTER_API_KEY is set). (Cap names single-word + collision-
+      # free — `log` collided with libm.)
       dock_imports: :live
     }
   end

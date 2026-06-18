@@ -75,7 +75,15 @@ defmodule Nexus.Dock do
       "emit" => {"func(msg: string)", fn msg -> require(Logger) && Logger.info(["[unit] ", msg]); nil end},
       # a real string-RETURNING cap: an in-memory kv (proves the canonical-ABI return path).
       "store" => {"func(key: string, val: string)", fn k, v -> :persistent_term.put({:nexus_kv, k}, v); nil end},
-      "load" => {"func(key: string) -> string", fn k -> :persistent_term.get({:nexus_kv, k}, "") end}
+      "load" => {"func(key: string) -> string", fn k -> :persistent_term.get({:nexus_kv, k}, "") end},
+      # net: an HTTP GET (TLS-verified, via the shared client). TODO: this is UNBROKERED — a real
+      # deployment must route `fetch` through an SSRF-safe allowlist (the runtime's host broker).
+      "fetch" => {"func(url: string) -> string", fn url ->
+         case Nexus.Compilers.Shared.http_get(url) do
+           {:ok, body} -> body
+           _ -> ""
+         end
+       end}
     }
   end
 
