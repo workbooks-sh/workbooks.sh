@@ -71,6 +71,89 @@ pub fn structure(io: Io, alloc: std.mem.Allocator, dir: []const u8) !u8 {
     return 0;
 }
 
+// `work graph <dir> <out.html>` — dogfood: the code graph rendered as a work-* workbook
+// (the graph that maps the system is itself a workbook you can open). Structural floor —
+// units + edges; the reality facets (interface/artifact/data/observed) are a nexus overlay.
+const Unit = struct { name: []const u8, kind: []const u8, lang: []const u8, file: []const u8 };
+
+pub fn graph(io: Io, alloc: std.mem.Allocator, dir: []const u8, out: []const u8) !u8 {
+    const files = try fs.workFiles(io, alloc, dir);
+    log.prompt(try std.fmt.allocPrint(alloc, "work graph {s} \u{2192} {s}", .{ dir, out }));
+
+    var units: std.ArrayList(Unit) = .empty;
+    for (files) |f| {
+        const src = fs.readFile(io, alloc, f) catch continue;
+        const nodes = try work.parse(alloc, src);
+        for (nodes) |n| if (n.type == .code and n.name.len > 0) {
+            try units.append(alloc, .{ .name = n.name, .kind = n.kind, .lang = n.lang, .file = std.fs.path.basename(f) });
+        };
+    }
+    const es = try edges(io, alloc, dir);
+
+    var buf: std.ArrayList(u8) = .empty;
+    try buf.appendSlice(alloc, "<!doctype html>\n<meta charset=\"utf-8\">\n<title>");
+    try esc(alloc, &buf, dir);
+    try buf.appendSlice(alloc, " \u{2014} system graph</title>\n<document-view>\n  <h1>");
+    try esc(alloc, &buf, dir);
+    try buf.appendSlice(alloc, " \u{2014} system graph</h1>\n  <document-outline>\n");
+    for (units.items) |u| {
+        try buf.appendSlice(alloc, "    <work-ref to=\"");
+        try esc(alloc, &buf, u.name);
+        try buf.appendSlice(alloc, "\">");
+        try esc(alloc, &buf, u.name);
+        try buf.appendSlice(alloc, "</work-ref>\n");
+    }
+    try buf.appendSlice(alloc, "  </document-outline>\n  <work-flow>\n");
+    for (es) |e| {
+        try buf.appendSlice(alloc, "    <work-ref rel=\"ref\" from=\"");
+        try esc(alloc, &buf, e.from);
+        try buf.appendSlice(alloc, "\" to=\"");
+        try esc(alloc, &buf, e.to);
+        try buf.appendSlice(alloc, "\"></work-ref>\n");
+    }
+    try buf.appendSlice(alloc, "  </work-flow>\n");
+    for (units.items) |u| {
+        try buf.appendSlice(alloc, "  <section id=\"");
+        try esc(alloc, &buf, u.name);
+        try buf.appendSlice(alloc, "\" data-kind=\"");
+        try esc(alloc, &buf, u.kind);
+        try buf.appendSlice(alloc, "\" data-lang=\"");
+        try esc(alloc, &buf, u.lang);
+        try buf.appendSlice(alloc, "\">\n    <h2>");
+        try esc(alloc, &buf, u.name);
+        try buf.appendSlice(alloc, "</h2>\n    <record-view>\n      <record-field-value name=\"kind\">");
+        try esc(alloc, &buf, u.kind);
+        try buf.appendSlice(alloc, "</record-field-value>\n      <record-field-value name=\"lang\">");
+        try esc(alloc, &buf, u.lang);
+        try buf.appendSlice(alloc, "</record-field-value>\n      <record-field-value name=\"file\">");
+        try esc(alloc, &buf, u.file);
+        try buf.appendSlice(alloc, "</record-field-value>\n      <record-field-value name=\"depends-on\">");
+        var first = true;
+        for (es) |e| if (eqlIgnoreCase(e.from, u.name)) {
+            if (!first) try buf.appendSlice(alloc, ", ");
+            try esc(alloc, &buf, e.to);
+            first = false;
+        };
+        try buf.appendSlice(alloc, "</record-field-value>\n    </record-view>\n  </section>\n");
+    }
+    try buf.appendSlice(alloc, "</document-view>\n");
+
+    try fs.writeFile(io, out, buf.items);
+    log.ok(try std.fmt.allocPrint(alloc, "{s} \u{b7} {d} unit(s) \u{b7} {d} edge(s) \u{b7} {d} B", .{ std.fs.path.basename(out), units.items.len, es.len, buf.items.len }));
+    log.step("reality facets (artifact/data/observed) need a nexus overlay");
+    return 0;
+}
+
+fn esc(alloc: std.mem.Allocator, buf: *std.ArrayList(u8), text: []const u8) !void {
+    for (text) |ch| switch (ch) {
+        '&' => try buf.appendSlice(alloc, "&amp;"),
+        '<' => try buf.appendSlice(alloc, "&lt;"),
+        '>' => try buf.appendSlice(alloc, "&gt;"),
+        '"' => try buf.appendSlice(alloc, "&quot;"),
+        else => try buf.append(alloc, ch),
+    };
+}
+
 fn resolves(label: []const u8, names: []const []const u8, titles: []const []const u8) bool {
     for (names) |n| if (eqlIgnoreCase(n, label)) return true;
     for (titles) |t| if (eqlIgnoreCase(t, label)) return true;

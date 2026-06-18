@@ -47,6 +47,10 @@ pub fn main(init: std.process.Init) !void {
         const d = it.next() orelse ".";
         const o = it.next() orelse "workbook.html";
         std.process.exit(try weave.weave(io, alloc, d, o));
+    } else if (eql(verb, "graph")) {
+        const d = it.next() orelse ".";
+        const o = it.next() orelse "graph.html";
+        std.process.exit(try author.graph(io, alloc, d, o));
     } else if (eql(verb, "dev")) {
         const d = it.next() orelse ".";
         std.process.exit(try dev.dev(io, alloc, d, it.next() orelse "workbook.html"));
@@ -132,6 +136,7 @@ const groups = [_]Group{
     } },
     .{ .name = "build", .blurb = "weave & run", .verbs = &.{
         .{ "weave <dir> <out>", "weave a tree into one self-contained html" },
+        .{ "graph <dir> <out>", "render the code graph as a work-* workbook" },
         .{ "dev <dir>", "watch & re-weave on change (+ nexus hot-swap)" },
         .{ "bundle/unbundle", "the .wbundle zip" },
     } },
