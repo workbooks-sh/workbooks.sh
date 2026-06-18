@@ -39,6 +39,14 @@ defmodule Nexus.Browse.Blitz do
   # output on SSR pages — pure waste — and (b) can REGRESS (GitHub: a page's JS wiped good SSR content,
   # 488 lines → 1). So: render fast first; only escalate to the ~11MB StarlingMonkey engine when the fast
   # result is THIN (a true client-only shell); and keep whichever output is richer — never regress.
+  #
+  # Three rungs, each gated on the prior being THIN so the common path never pays:
+  #   1. fast CSS-only render (handles SSR — most of the web)
+  #   2. :jsdom — StarlingMonkey + linkedom, runs the page's JS against a real DOM (no geometry)
+  #   3. :jsdom + geometry — the two-pass Blitz-measure bridge, for content gated behind
+  #      getBoundingClientRect/offset* (virtualized lists, measure-then-render) that stays empty
+  #      until real layout numbers un-gate it.
+  # Keep whichever of the three is richest — never regress.
   @thin_line_threshold 5
   defp render_html_auto(html, url, opts) do
     fast = render_html_boa(html, url, opts)
@@ -47,7 +55,25 @@ defmodule Nexus.Browse.Blitz do
       fast
     else
       js = render_html_jsdom(html, url, opts)
-      if richness(js) > richness(fast), do: js, else: fast
+      best = if richness(js) > richness(fast), do: js, else: fast
+
+      # Third rung: still thin after running the page's JS? Some client-only pages stay empty until
+      # geometry-gated content un-gates — only the measure bridge fixes that. Fire it once, keep richest.
+      if richness(best) >= @thin_line_threshold do
+        best
+      else
+        geo = render_html_geometry(html, url, opts)
+        if richness(geo) > richness(best), do: geo, else: best
+      end
+    end
+  end
+
+  # Rung 3: hydrate with the geometry bridge (two JS passes + one Blitz measure) then render text.
+  defp render_html_geometry(html, url, opts) do
+    with {:ok, hydrated} <- hydrate(html, url, Keyword.put(opts, :geometry, true)) do
+      run(:text, hydrated, url, opts)
+    else
+      _ -> run(:text, html, url, opts)
     end
   end
 

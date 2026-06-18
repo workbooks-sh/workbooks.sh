@@ -86,4 +86,36 @@ defmodule Nexus.JsDomTest do
       IO.puts("[skip] greenfield JS engine / bundle not staged")
     end
   end
+
+  test ":auto escalates to geometry when content is gated behind getBoundingClientRect" do
+    if Nexus.JsDom.available?() do
+      # A virtualized-list pattern: rows only render once the container's MEASURED width > 0.
+      # Plain :jsdom returns gBCR width 0 → no rows → THIN. :auto escalates fast→jsdom→jsdom+geometry,
+      # so real Blitz layout gives a real width and the rows render → POPULATED.
+      csr = """
+      <html><head><style>#grid{width:600px;height:200px}</style></head>
+      <body><div id=grid></div>
+      <script>
+        const grid=document.getElementById("grid");
+        const w=grid.getBoundingClientRect().width;
+        if (w > 0) {
+          const cols=Math.floor(w/120);
+          let html="";
+          for (let i=0;i<cols;i++) html+="<div class=row>Row item "+i+" present</div>\\n";
+          grid.innerHTML=html;
+        }
+      </script></body></html>
+      """
+
+      # Plain :jsdom — gBCR width 0 → no rows → thin.
+      assert {:ok, plain} = Nexus.Browse.Blitz.render_html(csr, "https://example.com/", engine: :jsdom)
+      refute plain =~ "Row item"
+
+      # :auto — escalates to the geometry bridge, real layout un-gates the rows.
+      assert {:ok, auto} = Nexus.Browse.Blitz.render_html(csr, "https://example.com/", engine: :auto)
+      assert auto =~ "Row item"
+    else
+      IO.puts("[skip] greenfield JS engine / bundle not staged")
+    end
+  end
 end
