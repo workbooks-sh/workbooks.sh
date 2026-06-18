@@ -168,6 +168,37 @@ defmodule Workbooks.Wit do
     end
   end
 
+  @doc """
+  Bind a unit's **generated world** to its compiled **core module** and produce a
+  Component-Model component (§1): `wasm-tools component embed <world> <core>` writes the
+  world's component-type into the core, then `component new` lifts it. Returns
+  `{:ok, component_path} | {:error, message}`. The core module comes from a compile
+  lane (rust/zig/javy/Popcorn); this is the binding step that makes it a component
+  against the world we generated, not a hand-written one.
+  """
+  def componentize(core_wasm, world_wit, world_name, out \\ nil) do
+    out = out || core_wasm <> ".component.wasm"
+    wit_path = Path.join(System.tmp_dir!(), "wbcz_#{System.unique_integer([:positive])}.wit")
+    emb = Path.join(System.tmp_dir!(), "wbcz_#{System.unique_integer([:positive])}.embed.wasm")
+    File.write!(wit_path, world_wit)
+
+    try do
+      with {_, 0} <-
+             System.cmd("wasm-tools", ["component", "embed", wit_path, core_wasm, "--world", wit_name(world_name), "-o", emb], stderr_to_stdout: true),
+           {_, 0} <-
+             System.cmd("wasm-tools", ["component", "new", emb, "-o", out], stderr_to_stdout: true) do
+        {:ok, out}
+      else
+        {msg, _code} -> {:error, msg}
+      end
+    rescue
+      e in ErlangError -> {:error, "wasm-tools unavailable: #{inspect(e)}"}
+    after
+      File.rm(wit_path)
+      File.rm(emb)
+    end
+  end
+
   @doc "Parse the capability names a unit grants, from its block header."
   def grants(%{header: header}) when is_binary(header) do
     # words inside a `grant[:] [ … ]` bracket (handles `net:` and `:net` forms),
