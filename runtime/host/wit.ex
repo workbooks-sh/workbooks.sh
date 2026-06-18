@@ -116,7 +116,7 @@ defmodule Workbooks.Wit do
     # defined in another file still resolves; without it, types are file-scoped.
     {iface, type_names} = shared || {file_interface(nodes), type_names(nodes)}
 
-    caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&Workbooks.Dock.capability?/1)
+    caps = units |> Enum.flat_map(&grants/1) |> Enum.uniq() |> Enum.filter(&Workbooks.Dock.sandbox_capability?/1)
     host = caps |> Enum.map(&Workbooks.Dock.interface_wit/1) |> Enum.join("\n\n")
     worlds = Enum.map(units, &pkg_world(&1, type_names))
 
@@ -317,7 +317,7 @@ defmodule Workbooks.Wit do
       node
       |> grants()
       |> Enum.uniq()
-      |> Enum.filter(&Workbooks.Dock.capability?/1)
+      |> Enum.filter(&Workbooks.Dock.sandbox_capability?/1)
       |> Enum.map(&"import #{Workbooks.Dock.interface_name(&1)};")
 
     body = (use_line ++ exports ++ imports) |> Enum.map_join("\n", &("  " <> &1))

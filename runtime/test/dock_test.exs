@@ -1,6 +1,27 @@
 defmodule Workbooks.DockTest do
   use ExUnit.Case, async: true
   alias Workbooks.{Dock, Literate, Wit}
+  alias Workbooks.Instance.Imports
+
+  test "the registry is the union of sandbox caps and the live runtime seam caps" do
+    assert "net" in Dock.sandbox_capabilities()
+    assert "llm" in Dock.runtime_capabilities()
+    refute "llm" in Dock.sandbox_capabilities()
+    refute "net" in Dock.runtime_capabilities()
+    assert Dock.runtime_cap_for("net") == "browse"
+  end
+
+  test "the registry's runtime import names match the LIVE Instance Dock seam (faithful projection)" do
+    for cap <- Dock.runtime_capabilities() do
+      live =
+        Imports.for_caps([cap], nil, %{}, [])
+        |> Map.keys()
+        |> Enum.reject(&(&1 == "session-info"))
+
+      assert live == [Dock.import_name(cap)],
+             "cap #{cap}: registry says #{Dock.import_name(cap)}, seam projects #{inspect(live)}"
+    end
+  end
 
   test "the registry holds the sandbox capabilities with their WIT interfaces" do
     assert "net" in Dock.capabilities()
