@@ -53,15 +53,35 @@ defmodule Workbooks.Unit do
       |> Enum.uniq()
       |> Enum.flat_map(fn p -> Workbooks.Literate.parse(File.read!(p)) end)
 
-    types = Enum.filter(nodes, &(&1.type == :code and &1.kind == "defmodule"))
-    servers = Enum.filter(nodes, &(&1.type == :code and &1.kind == "server" and &1.name))
+    nodes
+    |> Enum.filter(&(&1.type == :code and &1.name != nil and &1.kind in ["defmodule", "server"]))
+    |> compile_to_fixpoint([])
+  end
 
-    Enum.reduce_while(types ++ servers, {:ok, []}, fn node, {:ok, acc} ->
-      case compile_named(node) do
-        {:ok, mods} -> {:cont, {:ok, List.wrap(mods) ++ acc}}
-        {:error, reason} -> {:halt, {:error, {node[:name] || :type, reason}}}
-      end
-    end)
+  # Fixpoint compile: each pass compiles what it can; nodes that fail on a not-yet-
+  # compiled dependency (a `%Struct{}` whose module isn't loaded) retry next pass.
+  # Stop when everything compiles or a pass makes no progress. No dependency sort
+  # needed — the order falls out of what actually resolves.
+  defp compile_to_fixpoint(pending, compiled) do
+    {ok, failed} =
+      Enum.reduce(pending, {[], []}, fn node, {ok, failed} ->
+        case compile_named(node) do
+          {:ok, mods} -> {List.wrap(mods) ++ ok, failed}
+          {:error, reason} -> {ok, [{node, reason} | failed]}
+        end
+      end)
+
+    cond do
+      failed == [] ->
+        %{compiled: compiled ++ ok, failed: []}
+
+      ok == [] ->
+        # no progress — the remaining failures are genuine, not ordering
+        %{compiled: compiled, failed: Enum.map(failed, fn {n, r} -> {n[:name], r} end)}
+
+      true ->
+        compile_to_fixpoint(Enum.map(failed, fn {n, _} -> n end), compiled ++ ok)
+    end
   end
 
   # a type module is already a `defmodule` — compile it as-is (it names itself)
@@ -84,8 +104,7 @@ defmodule Workbooks.Unit do
         quoted = quote do: (defmodule unquote(mod) do unquote(body) end)
 
         try do
-          [{module, _bin}] = Code.compile_quoted(quoted)
-          {:ok, module}
+          {:ok, quoted |> Code.compile_quoted() |> Enum.map(&elem(&1, 0))}
         rescue
           e -> {:error, Exception.message(e)}
         end

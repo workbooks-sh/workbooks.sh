@@ -35,7 +35,7 @@ defmodule Workbooks.UnitWorkbookTest do
   end
 
   test "compiles a workbook's type modules + server units; cross-type and cross-unit refs resolve", %{dir: dir} do
-    assert {:ok, mods} = Unit.compile_workbook(dir)
+    assert %{compiled: mods, failed: []} = Unit.compile_workbook(dir)
 
     # Lead (type), Score, Report (servers) all compiled to their canonical names
     assert Lead in mods
