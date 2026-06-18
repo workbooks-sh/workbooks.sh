@@ -49,6 +49,13 @@ defmodule Nexus.Agent.Bash do
       "render" -> web_render(List.first(args))
       # in-wasm Blitz render: screenshot <url> [out.png] → a PNG in /work.
       "screenshot" -> web_screenshot(vfs, args)
+      # Tier-1 computer-use: operate a site by semantic action (browser-use model).
+      "navigate" -> nav_result(Nexus.Browse.Session.navigate(List.first(args) || ""))
+      "links" -> format_session(Nexus.Browse.Session.current(), :links)
+      "forms" -> format_session(Nexus.Browse.Session.current(), :forms)
+      "click" -> nav_result(Nexus.Browse.Session.click(List.first(args) || ""))
+      "fill" -> fill_result(args)
+      "submit" -> nav_result(Nexus.Browse.Session.submit(submit_index(args)))
       _ -> exec(vfs, cmd, args, stdin)
     end
   end
@@ -61,6 +68,61 @@ defmodule Nexus.Agent.Bash do
       # fall back to the naive tag-strip if the in-wasm renderer is unavailable
       _ -> url |> web_fetch() |> html_to_text()
     end
+  end
+
+  # ── Tier-1 computer-use builtins ───────────────────────────────────────────
+  defp nav_result({:ok, s}), do: format_session(s, :page)
+  defp nav_result({:error, reason}), do: "browse: #{inspect(reason) |> String.slice(0, 100)}"
+
+  defp fill_result([field | rest]) when rest != [] do
+    value = Enum.join(rest, " ")
+    Nexus.Browse.Session.fill(field, value)
+    "fill: #{field} = #{value}"
+  end
+
+  defp fill_result(_), do: "fill: usage: fill <field-name> <value>"
+
+  defp submit_index(args) do
+    case args do
+      [n | _] -> case Integer.parse(n), do: ({i, _} -> i; _ -> 1)
+      _ -> 1
+    end
+  end
+
+  # Render a session for the agent: the page text + numbered actionables (links/forms) to act on.
+  defp format_session(s, view) do
+    header = if s.url, do: "URL: #{s.url}\n", else: ""
+
+    body =
+      case view do
+        :page -> String.slice(s.text, 0, 4_000) <> "\n\n" <> actionables(s)
+        :links -> link_list(s.links)
+        :forms -> form_list(s.forms)
+      end
+
+    header <> body
+  end
+
+  defp actionables(s) do
+    "── LINKS (click <n>) ──\n" <> link_list(Enum.take(s.links, 30)) <>
+      (if s.forms == [], do: "", else: "\n── FORMS (fill <name> <value>; submit <n>) ──\n" <> form_list(s.forms))
+  end
+
+  defp link_list([]), do: "(none)"
+  defp link_list(links) do
+    links
+    |> Enum.with_index(1)
+    |> Enum.map_join("\n", fn {l, i} -> "#{i}. #{String.slice(l.text, 0, 70)}" end)
+  end
+
+  defp form_list([]), do: "(none)"
+  defp form_list(forms) do
+    forms
+    |> Enum.with_index(1)
+    |> Enum.map_join("\n", fn {f, i} ->
+      fields = f.fields |> Enum.map_join(", ", & &1.name)
+      "#{i}. #{f.method} #{f.action} — fields: #{fields}"
+    end)
   end
 
   defp web_screenshot(_vfs, []), do: "screenshot: usage: screenshot <url> [out.png]"

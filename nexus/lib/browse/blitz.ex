@@ -18,12 +18,20 @@ defmodule Nexus.Browse.Blitz do
   @impl true
   def render(url, opts) do
     with {:ok, html} <- fetch(url) do
-      frozen = Nexus.Browse.Freeze.freeze(html, url, scripts: true)
+      render_html(html, url, opts)
+    end
+  end
 
-      case run(:text_js, frozen, url, opts) do
-        {:ok, text} when is_binary(text) and byte_size(text) > 0 -> {:ok, text}
-        _ -> run(:text, html, url, opts)
-      end
+  @doc """
+  Render already-fetched `html` (base `url`) to text — JS-or-SSR-fallback. Lets the navigation layer
+  fetch once and render, without a second request.
+  """
+  def render_html(html, url, opts \\ []) do
+    frozen = Nexus.Browse.Freeze.freeze(html, url, scripts: true)
+
+    case run(:text_js, frozen, url, opts) do
+      {:ok, text} when is_binary(text) and byte_size(text) > 0 -> {:ok, text}
+      _ -> run(:text, html, url, opts)
     end
   end
 

@@ -61,8 +61,8 @@ defmodule Nexus.Agent.Kits do
       # host-brokered web access (not a wasm CLI — built into bash, SSRF-safe).
       "web" => %{
         wasm: nil,
-        summary: "web access: `fetch <url>` (raw body), `scrape <url>` (page as readable text)",
-        commands: ["fetch", "scrape"]
+        summary: "web: fetch/scrape (text), screenshot (png), navigate/links/click/fill/submit (operate a site)",
+        commands: ["fetch", "scrape", "render", "screenshot", "navigate", "links", "forms", "click", "fill", "submit"]
       }
     }
 
