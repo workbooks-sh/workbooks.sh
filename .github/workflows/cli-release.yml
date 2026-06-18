@@ -1,10 +1,9 @@
 name: cli-release
 
-# Build + ship the canonical `work` CLI (cli/). One Rust source → native binaries
-# (per platform) + a wasm32-wasip1 module. Distributed three ways from one run:
-#   - GitHub Release assets        (the curl path: workbooks.sh/cli.sh)
-#   - npmjs  @work.books/cli        (public; NPM_TOKEN)
-#   - GitHub Packages @workbooks-sh/cli  (shows as "cli" in the repo's Packages)
+# Build + ship the canonical `work` CLI (cli/, Zig). ONE Zig source → native binaries (per platform)
+# + a wasm32-wasip1 module (the agent-sandbox target). Attached to a GitHub Release on tag `work-v*`,
+# which the curl installer (web/cli.sh → workbooks.sh/cli.sh) downloads. Zig cross-compiles every
+# target from one Linux runner — no per-OS matrix needed. ReleaseSmall: ~200KB native, ~108KB wasm.
 on:
   push:
     tags: ["work-v*"]
@@ -16,125 +15,41 @@ on:
 
 permissions:
   contents: write # create the GitHub Release
-  packages: write # publish to GitHub Packages
 
 jobs:
-  version:
-    runs-on: ubuntu-24.04
-    outputs:
-      v: ${{ steps.v.outputs.v }}
-    steps:
-      - id: v
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "v=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "v=${GITHUB_REF_NAME#work-v}" >> "$GITHUB_OUTPUT"
-          fi
-
   build:
-    needs: version
-    strategy:
-      matrix:
-        include:
-          - { os: macos-14, target: aarch64-apple-darwin, asset: work-darwin-arm64 }
-          # Intel mac is CROSS-compiled from the arm64 runner — macos-13 (Intel)
-          # runners are being retired and can queue indefinitely.
-          - { os: macos-14, target: x86_64-apple-darwin, asset: work-darwin-x64 }
-          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, asset: work-linux-x64 }
-          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, asset: work-linux-arm64 }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, asset: work-windows-x64.exe }
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
-      - run: cargo build --release --target ${{ matrix.target }} --manifest-path cli/Cargo.toml
-      - shell: bash
-        run: cp cli/target/${{ matrix.target }}/release/work${{ contains(matrix.target, 'windows') && '.exe' || '' }} ${{ matrix.asset }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.asset }}
-          path: ${{ matrix.asset }}
+          submodules: false # the CLI needs no submodules (wasm-video is the engine's)
 
-  wasm:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: mlugg/setup-zig@v1
         with:
-          targets: wasm32-wasip1
-      - run: cargo build --release --target wasm32-wasip1 --manifest-path cli/Cargo.toml
-      - run: cp cli/target/wasm32-wasip1/release/work.wasm work.wasm
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wb-wasm
-          path: work.wasm
+          version: "0.16.0"
 
-  release:
-    needs: [version, build, wasm]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-      - name: Publish GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          V: ${{ needs.version.outputs.v }}
+      - name: Cross-build native + wasm (ReleaseSmall)
+        working-directory: cli
         run: |
-          gh release create "work-v$V" dist/* --title "work v$V" --notes "Workbooks CLI v$V" \
-            || gh release upload "work-v$V" dist/* --clobber
+          set -eu
+          # asset-name : zig-target  (asset names match web/cli.sh's work-${os}-${arch})
+          for pair in \
+            "darwin-arm64:aarch64-macos" \
+            "darwin-x64:x86_64-macos" \
+            "linux-arm64:aarch64-linux" \
+            "linux-x64:x86_64-linux"; do
+            name="${pair%%:*}"; tgt="${pair##*:}"
+            echo "→ work-$name ($tgt)"
+            zig build -Dtarget="$tgt" -Doptimize=ReleaseSmall
+            cp zig-out/bin/work "work-$name"
+          done
+          echo "→ work-wasm32-wasip1.wasm (the agent-sandbox module)"
+          zig build -Dwasm -Doptimize=ReleaseSmall
+          cp zig-out/bin/work.wasm "work-wasm32-wasip1.wasm"
+          ls -la work-*
 
-  npm:
-    needs: [version, release]
-    runs-on: ubuntu-24.04
-    env:
-      V: ${{ needs.version.outputs.v }}
-      WB_CLI_SKIP_DOWNLOAD: "1" # don't fetch a binary onto the publisher
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: softprops/action-gh-release@v2
         with:
-          node-version: 20
-      - name: Stamp version
-        run: |
-          cd cli/npm
-          node -e "const f='package.json',p=require('./'+f);p.version=process.env.V;require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
-
-      # 1) public npmjs as @work.books/cli
-      - name: Publish to npmjs
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          cd cli/npm
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
-          npm publish --access public --registry https://registry.npmjs.org
-
-      # Legacy era (zaius-labs workbook CLI + its support packages) is dead —
-      # nobody used it. Deprecate so installs warn + point at the new CLI.
-      # `|| true`: a permissions miss must never fail a release.
-      - name: Deprecate legacy packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          cd cli/npm
-          MSG="legacy — replaced by the Rust work CLI (npm i -g @work.books/cli, or curl -fsSL workbooks.sh/cli.sh | sh)"
-          npm deprecate "@work.books/cli@<=0.10.0" "$MSG" || true
-          npm deprecate "@work.books/runtime" "$MSG" || true
-          npm deprecate "@work.books/runtime-wasm" "$MSG" || true
-          npm deprecate "@work.books/workbench" "$MSG" || true
-
-      # 2) GitHub Packages as @workbooks-sh/cli  → shows as "cli" under the repo
-      - name: Publish to GitHub Packages
-        env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
-        run: |
-          cd cli/npm
-          node -e "const f='package.json',p=require('./'+f);p.name='@workbooks-sh/cli';require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
-          echo "@workbooks-sh:registry=https://npm.pkg.github.com" > .npmrc
-          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
-          npm publish --registry https://npm.pkg.github.com
+          tag_name: ${{ github.event.inputs.version && format('work-v{0}', github.event.inputs.version) || github.ref_name }}
+          files: cli/work-*
+          fail_on_unmatched_files: true
