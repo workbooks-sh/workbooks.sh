@@ -5,32 +5,41 @@ defmodule WorkCLI.Work do
   Each verb prints through `WorkCore.Log` and returns `:ok | {:error, _}` for the CLI's exit code.
   """
 
-  alias WorkCore.{Graph, Wit, Literate, Log}
+  alias WorkCore.{Graph, Wit, Literate, Audit, Log}
 
-  @doc "work check [dir] — resolve every reference + backlink across the tree."
+  @doc "work check [dir] — resolve every reference + backlink AND audit capability grants across the tree."
   def check(dir) do
     r = dir |> Graph.build_dir() |> Graph.check()
+    leaks = Audit.workbook(dir)
     Log.prompt("work check #{dir}")
 
     counts = "#{r.nodes} units · #{r.edges} edges"
 
-    if r.ok do
-      Log.ok(counts, detail: "references resolve")
+    if r.ok and leaks == %{} do
+      Log.ok(counts, detail: "references resolve · capabilities audited")
       :ok
     else
-      Log.error(counts, detail: "#{length(r.dangling_backlinks)} dangling ref(s)")
+      faults = length(r.dangling_backlinks) + length(r.dangling_edges) + map_size(leaks)
+      Log.error(counts, detail: "#{faults} fault(s)")
 
       for {path, label} <- r.dangling_backlinks do
-        Log.step("#{Path.basename(path)}: " <> Log.path(label))
+        Log.step("dangling ref " <> Log.path(label) <> " in #{Path.basename(path)}")
       end
 
       for e <- r.dangling_edges do
         Log.step("#{e.from} —#{e.type}→ " <> Log.path("#{e.to}") <> " (missing)")
       end
 
-      {:error, :dangling}
+      for {unit, caps} <- leaks, c <- caps do
+        Log.step(Log.cmd(":#{unit}") <> " uses " <> Log.path(c) <> " but doesn't grant it")
+      end
+
+      {:error, :faults}
     end
   end
+
+  @doc "work lint [dir] — alias of check (resolve references + audit capabilities)."
+  def lint(dir), do: check(dir)
 
   @doc "work why :unit [dir] — who depends on this unit."
   def why(name, dir) do

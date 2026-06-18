@@ -40,6 +40,7 @@ defmodule WorkCLI.Main do
 
   # author / literate — all local, over work_core
   defp route(["check" | rest]), do: WorkCLI.Work.check(dir_arg(rest))
+  defp route(["lint" | rest]), do: WorkCLI.Work.lint(dir_arg(rest))
   defp route(["why", name | rest]), do: WorkCLI.Work.why(unit(name), dir_arg(rest))
   defp route(["near", name | rest]), do: WorkCLI.Work.near(unit(name), dir_arg(rest))
   defp route(["wit", name | rest]), do: WorkCLI.Work.wit(unit(name), dir_arg(rest))

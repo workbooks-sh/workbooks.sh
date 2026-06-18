@@ -47,6 +47,13 @@ defmodule WorkCore.Capabilities do
   # spec grant → the live runtime capability it maps onto (best-effort; obvious correspondences only).
   @grant_aliases %{"net" => "browse", "kv" => "vfs", "exec" => "commands", "llm" => "llm", "browse" => "browse"}
 
+  # The host functions a unit may call by name (the impls live in the runtime membrane `Nexus.Dock`;
+  # the canonical NAME list lives here so the capability audit — `WorkCore.Audit` — is pure/local).
+  @host_fns ~w(now emit store load fetch complete)
+
+  @doc "The canonical host-function names a unit can import (audited against a unit's `grant`s)."
+  def host_fn_names, do: @host_fns
+
   @doc "Every capability name in the registry (both vocabularies)."
   def capabilities, do: Map.keys(@registry)
 

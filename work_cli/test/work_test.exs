@@ -38,7 +38,7 @@ defmodule WorkCLI.WorkTest do
 
   test "check fails on a dangling reference", %{dir: dir} do
     File.write!(Path.join(dir, "c.work"), "# Bad\n\nSee [[nonexistent_unit]].\n")
-    out = capture_io(fn -> assert {:error, :dangling} = WorkCLI.Work.check(dir) end)
+    out = capture_io(fn -> assert {:error, :faults} = WorkCLI.Work.check(dir) end)
     assert out =~ "✗"
   end
 
