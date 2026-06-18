@@ -34,7 +34,8 @@
   .code .bar .fn{font:11px "Geist Mono",monospace}
   .code .bar .lg{margin-left:auto;font:10px "Geist Mono",monospace;text-transform:uppercase;letter-spacing:.08em;
                  color:#7e8590;border:1px solid #2c2f36;border-radius:20px;padding:2px 9px}
-  .CodeMirror{height:100%!important;flex:1;font-size:12.5px;line-height:1.7}
+  .CodeMirror{height:100%!important;flex:1;font-size:12.5px;line-height:2.0}
+  .CodeMirror-lines{padding:14px 0}
   /* a sandbox do…end is a container — a muted rule in the first-character slot,
      running under the S of `sandbox` down to the E of `end` */
   /* sandbox containment — a left rule that composes over the code fill */

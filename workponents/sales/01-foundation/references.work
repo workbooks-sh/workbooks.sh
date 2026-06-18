@@ -5,10 +5,14 @@ another unit becomes a typed edge the weave walks. There are five ways to addres
 something:
 
 - **`:atom`** — `:score` links to the unit named `score` (a `:unit_ref` edge).
+
 - **`Type`** — `Lead` or `@statuses` links to a declared shape (a `:type_ref`).
+
 - **`[[backlink]]`** — links to another file by name, resolved *leniently* (so
   `[[score]]`, `[[Score]]`, `[[Scoring a lead]]` all reach the same node).
+
 - **`#tag`** — the only **queryable** form: `work near #b2b`.
+
 - **`work://`** — a stable external address that survives a file move.
 
 The build feeds every mention through one classifier:

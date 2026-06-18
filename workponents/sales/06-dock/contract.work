@@ -4,8 +4,11 @@ A unit's contract is just its Elixir module. You never write a contract — you 
 the module, and read it a certain way:
 
 - public functions are its **exports**;
+
 - dependencies and `grant`s are its **imports**;
+
 - structs, atoms, and tuples are its **types**;
+
 - a shared `@behaviour` is an **interface**.
 
 server :tax, in: :pricing do

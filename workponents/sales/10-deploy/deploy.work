@@ -4,6 +4,7 @@ One folder of `.work` files. We never rewrote it for a phone, a CDN, or a server
 Two ideas, kept separate:
 
 - **Targets** — *where the nexus lives*: `local` or `cloud`. One image, two homes.
+
 - **Delivery modes** — *how a page reaches a browser*: three of them, no rewrite
   (see [[Delivery modes]]).
 

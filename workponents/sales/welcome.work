@@ -13,9 +13,12 @@ fences — a `do … end` block is self-delimiting, and the word in front (`data
 
 - **Prose** — rich text that explains. It carries live refs: `[[backlinks]]`, `#tags`,
   `work://` links, and inline `:atom` / `@type` mentions.
+
 - **Declaration** — structure with no body. A `defstruct` is a record; a list of
   atoms is an enum; a `data` block is a typed table that renders by default.
+
 - **Code** — a runnable block: a `def`, a `client` island, a `server` unit.
+
 - **Placement** — the first word says where it runs: `client` (browser, wasm) or
   `server` (nexus, native BEAM), plus an optional `sandbox :name` for capabilities.
 
@@ -27,12 +30,33 @@ end
 
 @statuses [:new, :enriched, :scored, :contacted]
 
-## What we build
+## Contents
 
-Foundation ([[Types]], [[References]]) · pages ([[Sales Dashboard]], [[Styling a
-workbook]]) · lib ([[Scoring a lead]], [[Enrich]], [[Pipeline]]) · [[Pricing under a
-sandbox]] · data · the [[The Contract]] + [[The Dock]] · a [[A kit]] · agents · the
-[[Plan]] board · the [[The Weave]] (polyglot) · deploy · the [[The Code Graph]].
+- **Foundation** — [[Types]], [[References]]
+
+- **Pages** — [[Sales Dashboard]], [[Styling a workbook]]
+
+- **Lib** — [[Scoring a lead]], [[Enrich]], [[Pipeline]]
+
+- **Sandboxing** — [[Pricing under a sandbox]]
+
+- **Data** — declaring and querying typed values
+
+- **The Dock** — [[The Contract]], [[The Dock]], [[The Nexus]]
+
+- **Kits** — [[A kit]] you import
+
+- **Agents** — a brain, a coder, a researcher, a reflexion loop
+
+- **Plan** — the [[Plan]] board, live state
+
+- **Weave** — the polyglot [[The Weave]]
+
+- **Deploy** — two targets, three delivery modes
+
+- **Graph** — the [[The Code Graph]]
 
 One authoring model, three deliveries with no rewrite: a static bundle, nexus SSR,
-and live SSR. Next: [[Types]].
+and live SSR.
+
+Next: [[Types]].

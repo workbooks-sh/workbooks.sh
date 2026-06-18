@@ -68,8 +68,12 @@
       if (opens) depth++;
       if (closes && depth > 0) depth--;
       if (depth === 0) {
-        const o = (line.match(/[([{]/g) || []).length, c = (line.match(/[)\]}]/g) || []).length;
-        cont = Math.max(0, cont + o - c);
+        // count brackets for multi-line code declarations, but ignore markdown
+        // ([[backlinks]] and `inline code`) so prose never starts a continuation
+        const codeish = line.replace(/\[\[[^\]]*\]?\]?/g, "").replace(/`[^`]*`/g, "");
+        const o = (codeish.match(/[([{]/g) || []).length, c = (codeish.match(/[)\]}]/g) || []).length;
+        if (cont > 0) cont = Math.max(0, cont + o - c);
+        else if (LEADS.test(line)) cont = Math.max(0, o - c);
       }
     }
     // the sandbox containment rail

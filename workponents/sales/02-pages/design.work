@@ -66,10 +66,12 @@ nothing has to be redefined:
 
 - **Pages and server-rendered regions** use the utility classes directly in their
   markup, as above. This is most of the app.
+
 - **Client islands** ([[Score chart]], [[Trend sparkline]]) keep their own scoped
   `<style>` for component internals — a Svelte or Solid component owns its private
   CSS — but they read the shared tokens through the `--mint` / `--space-*` variables,
   so an island matches the page without copying a single hex code.
+
 - **One-off component styles** can be written as plain Elixir that returns scoped
   CSS, co-located with the unit it styles, the same way prose co-locates with code:
 

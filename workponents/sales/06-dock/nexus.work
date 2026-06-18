@@ -4,8 +4,11 @@ The `runtime` provider is the **nexus** — the optional server tier behind the 
 where the trusted and long-lived work lives:
 
 - **agents** — the analyst, coder, researcher, reflexion loops, in native server Elixir;
+
 - **data & sync** — the canonical store and the diffs that drive live SSR;
+
 - **the compiler lane** — turning a Svelte island or a Rust unit into wasm;
+
 - **multi-tenancy** — keeping one customer's run off another's.
 
 A workbook can ship with *no* nexus: the static bundle hydrates in the browser, and

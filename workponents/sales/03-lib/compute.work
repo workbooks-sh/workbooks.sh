@@ -3,6 +3,7 @@
 A unit declares **where it runs** — and there are exactly two places:
 
 - **client** — the browser, as wasm. Untrusted, restricted.
+
 - **server** — the nexus: native Elixir on the BEAM, the trusted tier that can be
   granted secrets, the database, the network.
 

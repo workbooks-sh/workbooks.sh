@@ -10,6 +10,7 @@ The membrane checks the request against the unit's grants. If a grant covers it,
 routes to a **provider**:
 
 - `local` — the device: the OS (desktop) or browser APIs (web).
+
 - `runtime` — the shared server tier (the [[The Nexus]]) over RCP.
 
 The same line of unit code is fulfilled by a different provider depending on where

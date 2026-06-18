@@ -22,8 +22,10 @@ The workbook is five languages, and the weave places each by its **placement**:
 
 - **client islands** — [[Score chart]] (Svelte) and [[Trend sparkline]] (Solid)
   hydrate in the browser. Two frameworks, one document.
+
 - **foreign server units** — [[Forecast]] (Rust+Zig) and [[Risk]] (Python) run as
   **sandboxed wasm** beside the BEAM.
+
 - **server Elixir runs native** — [[Pipeline]], [[Score]], [[Enrich]] on the BEAM.
 
 The weave never says "server runs as wasm": server Elixir is native, foreign server
