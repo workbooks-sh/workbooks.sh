@@ -1,4 +1,0 @@
-package component:netprobe;
-world example {
-    export probe: func(target: string) -> string;
-}
