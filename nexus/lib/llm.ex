@@ -28,7 +28,7 @@ defmodule Nexus.Llm do
   """
   def complete(messages, opts \\ []) do
     url = opts[:base_url] || cfg(:base_url, @default_url)
-    # Local llama-server (Ether lanes) needs no key; a dummy bearer keeps the header well-formed.
+    # Local llama-server (Constellation lanes) needs no key; a dummy bearer keeps the header well-formed.
     key =
       case api_key(opts) do
         blank when blank in [nil, ""] -> if local?(url), do: "local"
@@ -48,30 +48,32 @@ defmodule Nexus.Llm do
         |> maybe_put(:chat_template_kwargs, opts[:chat_template_kwargs])
         |> Jason.encode!()
 
-      post(url, body, opts[:retries] || 2, key)
+      # Long-running deep-research turns (thinking models + web plugin) can exceed the 2min default;
+      # callers raise it via opts[:timeout] (ms).
+      post(url, body, opts[:retries] || 2, key, opts[:timeout] || 120_000)
     end
   end
 
-  defp post(url, body, retries, key) do
+  defp post(url, body, retries, key, timeout) do
     :inets.start()
     :ssl.start()
     headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}]
     req = {String.to_charlist(url), headers, ~c"application/json", body}
 
-    case :httpc.request(:post, req, [timeout: 120_000], body_format: :binary) do
+    case :httpc.request(:post, req, [timeout: timeout], body_format: :binary) do
       {:ok, {{_, 200, _}, _, resp}} ->
         {:ok, parse(Jason.decode!(resp))}
 
       {:ok, {{_, status, _}, _, _}} when status in [408, 429, 500, 502, 503] and retries > 0 ->
         Process.sleep(800)
-        post(url, body, retries - 1, key)
+        post(url, body, retries - 1, key, timeout)
 
       {:ok, {{_, status, _}, _, resp}} ->
         {:error, {:http, status, String.slice(to_string(resp), 0, 200)}}
 
       {:error, _} when retries > 0 ->
         Process.sleep(800)
-        post(url, body, retries - 1, key)
+        post(url, body, retries - 1, key, timeout)
 
       {:error, reason} ->
         {:error, reason}

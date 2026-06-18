@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Deep-Research Concurrency — a live nexus stress test</title>
+<script id="workbook-spec" type="application/workbook">deep-research-stress</script>
+<style>
+body{max-width:48rem;margin:2rem auto;padding:0 1rem;font:16px/1.6 system-ui,sans-serif;color:#1a1a1a}
+h1,h2,h3{line-height:1.2;margin:1.6em 0 .4em} h1{margin-top:0}
+code{background:#f4f4f5;padding:.1em .3em;border-radius:3px;font-size:.9em}
+.lede{color:#555;font-size:1.05em}
+figure.unit{margin:1.4em 0;border:1px solid #e4e4e7;border-radius:8px;overflow:hidden}
+figure.unit figcaption{background:#fafafa;padding:.4em .8em;font-size:.85em;border-bottom:1px solid #e4e4e7}
+figure.unit .kind{display:inline-block;background:#1a1a1a;color:#fff;padding:.05em .5em;border-radius:4px;font-size:.78em;margin-right:.4em}
+figure.unit pre{margin:0;padding:.8em;overflow-x:auto;background:#fff;font:13px/1.5 ui-monospace,monospace}
+table.data{border-collapse:collapse;width:100%;margin:1.2em 0;font-size:.92em}
+table.data caption{text-align:left;font-weight:600;margin-bottom:.3em}
+table.data th,table.data td{border:1px solid #e4e4e7;padding:.35em .6em;text-align:right}
+table.data td:first-child,table.data th:first-child{text-align:left}
+table.data thead th{background:#fafafa}
+.note{background:#f0f7ff;border-left:3px solid #4a90d9;border-radius:4px;padding:.6em .9em;margin:1.1em 0;font-size:.95em}
+.warn{border-left-color:#d99a4a;background:#fff8f0}
+</style></head>
+<body>
+
+<section class="file" data-file="index.work">
+<h1>Deep-Research Concurrency</h1>
+<p class="lede">A living workbook that <strong>is</strong> its own experiment: it fans out N concurrent
+deep-research agents inside the real <code>nexus</code> BEAM runtime, each doing live web search over
+your OpenRouter subscription, and reports where the ceiling actually is.</p>
+
+<p>The question: <em>how many long, multi-round deep-research agents can one nexus run at once?</em>
+The answer below was measured, not guessed — on <code>qwen/qwen3.7-plus:online</code> (OpenRouter's
+web-search plugin), billed to the live subscription.</p>
+
+<div class="note">Every agent runs a <strong>3-round loop</strong>: R1 live web search on its subtopic →
+R2 a deeper grounded follow-up (also live search) → R3 a synthesis pass (no search, cheaper). Two of
+three rounds hit the open web with real, dated citations.</div>
+</section>
+
+<section class="file" data-file="orchestrator.work">
+<h2>The orchestrator (the actual source that ran)</h2>
+<p>One BEAM <code>Task</code> per agent, <code>Task.await_many/2</code> as the barrier. The runtime's
+<code>Nexus.Llm.complete/2</code> is the only seam — it defaults to OpenRouter and reads
+<code>OPENROUTER_API_KEY</code>. Concurrency is free on the BEAM; the interesting limit is elsewhere.</p>
+
+<figure class="unit" data-unit="elixir:wave">
+<figcaption><span class="kind">elixir</span> wave/1 — fan-out + measure</figcaption>
+<pre>def wave(n) do
+  topics = Enum.map(0..(n-1), &amp;Enum.at(@topics, rem(&amp;1, length(@topics))))
+  t0 = System.monotonic_time(:millisecond)
+
+  results =
+    topics
+    |&gt; Enum.map(fn t -&gt; Task.async(fn -&gt; agent(t) end) end)
+    |&gt; Task.await_many(:infinity)          # all N agents run concurrently
+
+  wall = System.monotonic_time(:millisecond) - t0
+  # tally ok / failed / tokens / cost (from OpenRouter usage) ...
+end
+
+# one agent = 3 sequential rounds; 2 are live web search
+defp agent(topic) do
+  with {:ok, r1, m1} &lt;- call(@search_model, search_prompt(topic)),
+       {:ok, r2, m2} &lt;- call(@search_model, deepen_prompt(topic, r1)),
+       {:ok, _r3, m3} &lt;- call(@synth_model, synth_prompt(topic, r1, r2)),
+    do: {:ok, merge([m1, m2, m3])}
+end</pre>
+</figure>
+
+<p>Full source: <code>nexus/scripts/deep_research_stress.exs</code>. Run it yourself:
+<code>cd nexus &amp;&amp; WAVES=4,8,16 mix run scripts/deep_research_stress.exs</code>.</p>
+</section>
+
+<section class="file" data-file="results.work">
+<h2>What we measured</h2>
+
+<table class="data">
+<caption>Concurrency ramp — qwen/qwen3.7-plus:online, 3 rounds/agent</caption>
+<thead><tr><th>agents</th><th>ok</th><th>failed</th><th>wall</th><th>$ cost</th><th>$/agent</th></tr></thead>
+<tbody>
+<tr><td>4</td><td>3</td><td>1</td><td>513 s</td><td>0.0830</td><td>0.0277</td></tr>
+<tr><td>16</td><td>14</td><td>2</td><td>430 s</td><td>0.3835</td><td>0.0274</td></tr>
+</tbody>
+</table>
+
+<div class="note"><strong>16 agents ran in 430 s — a 9.1× speedup</strong> over running them
+one at a time (~245 s each). Cost per agent stayed <strong>flat</strong> ($0.0277 → $0.0274): no
+per-concurrency penalty, no rate-limit throttling from OpenRouter at this width. The parallelism is real.</div>
+
+<div class="note warn"><strong>The ceiling is latency, not concurrency.</strong> The BEAM spawns N
+agents trivially and OpenRouter served 16 wide without throttling — the real limiter is
+<em>per-request wall time</em>. A thinking model plus the web plugin takes ~100–160 s per search
+round, which brushed the runtime's old hard-coded 120 s HTTP timeout (the only failures: 1/4 then
+2/16, all <code>:timeout</code>, none from rate limits). Lift that ceiling and the practical width
+goes much higher.</div>
+
+<h3>Fix shipped during the test</h3>
+<p>Made the HTTP timeout configurable so long deep-research turns survive — a real runtime
+improvement, not a test hack:</p>
+<figure class="unit" data-unit="elixir:timeout">
+<figcaption><span class="kind">elixir</span> Nexus.Llm — opts[:timeout]</figcaption>
+<pre>- post(url, body, opts[:retries] || 2, key)
++ # Long deep-research turns (thinking model + web plugin) exceed the 2-min default.
++ post(url, body, opts[:retries] || 2, key, opts[:timeout] || 120_000)</pre>
+</figure>
+</section>
+
+<section class="file" data-file="verdict.work">
+<h2>Verdict</h2>
+<ul>
+<li>✅ Your <strong>OpenRouter subscription drives the nexus runtime</strong> directly — default provider, live billing.</li>
+<li>✅ <strong>Deep web research works with no keyed search provider</strong> — OpenRouter's <code>:online</code> plugin returns real, dated URLs + citations.</li>
+<li>✅ <strong>Many agents research concurrently in one real BEAM runtime</strong>; orchestration is plain <code>Task.async</code>.</li>
+<li>⚠️ The scaling wall is <strong>request latency</strong> (slow thinking + web plugin), now relieved by a configurable timeout. A faster/non-reasoning model lifts the practical ceiling far higher.</li>
+</ul>
+</section>
+
+</body></html>
