@@ -9,21 +9,30 @@ defmodule Workbooks.Work.CLI do
 
   alias Workbooks.{Graph, Wit, Literate}
 
-  @doc "work check [dir] — resolve every reference; non-zero exit if any dangle."
+  @doc "work check [dir] — resolve every reference + audit caps; non-zero exit on any fault."
   def check(dir) do
     r = Graph.build_dir(dir) |> Graph.check()
+    leaks = Workbooks.Audit.caps(dir)
+    ok = r.ok and leaks == []
 
     head = "#{r.nodes} units · #{r.edges} edges"
+    pass = if ok, do: ["✓ check passed — references resolve, capabilities audited"], else: []
 
-    body =
-      if r.ok do
-        ["✓ check passed — every reference resolves"]
-      else
-        ["✗ #{length(r.dangling_backlinks)} dangling backlink(s):"] ++
-          Enum.map(r.dangling_backlinks, fn {path, label} -> "  #{Path.basename(path)}: #{label}" end)
-      end
+    {Enum.join([head] ++ ref_lines(r) ++ cap_lines(leaks) ++ pass, "\n"), not ok}
+  end
 
-    {Enum.join([head | body], "\n"), not r.ok}
+  defp ref_lines(%{ok: true}), do: []
+
+  defp ref_lines(r) do
+    ["✗ #{length(r.dangling_backlinks)} dangling backlink(s):"] ++
+      Enum.map(r.dangling_backlinks, fn {path, label} -> "  #{Path.basename(path)}: #{label}" end)
+  end
+
+  defp cap_lines([]), do: []
+
+  defp cap_lines(leaks) do
+    ["✗ #{length(leaks)} ungranted capability use(s):"] ++
+      Enum.map(leaks, fn %{unit: u, cap: c} -> "  :#{u} uses #{c} but doesn't grant it" end)
   end
 
   @doc "work why :unit [dir] — who depends on this unit."
