@@ -23,6 +23,7 @@ defmodule WorkCore.Wit do
 
   @doc "Generate the WIT `world` source for a `WorkCore.Literate` :code node."
   def world(%{name: name} = node) when is_binary(name) do
+    node = Extract.annotate(node)
     facts = Extract.facts(node)
     types = type_defs(facts, name)
     exports = export_lines(facts.exports)
@@ -99,6 +100,8 @@ defmodule WorkCore.Wit do
   the artifact `wasm-tools` can validate and componentize against (§1).
   """
   def package(nodes, pkg_name \\ "demo", shared \\ nil) do
+    nodes = Extract.annotate(nodes)
+
     units =
       (for n <- nodes, n.type == :code, n.name, n.kind != "defmodule", do: n)
       # two units mapping to the same WIT identifier can't both be top-level worlds
@@ -118,7 +121,7 @@ defmodule WorkCore.Wit do
 
   @doc "The workbook-wide shared types: `{interface, type_names}` over every file's type defs."
   def workbook_types(root) do
-    all = root |> wb_paths() |> Enum.flat_map(fn p -> WorkCore.Literate.parse(File.read!(p)) end)
+    all = root |> wb_paths() |> Enum.flat_map(fn p -> WorkCore.Literate.parse(File.read!(p)) end) |> Extract.annotate()
     {file_interface(all), type_names(all)}
   end
 

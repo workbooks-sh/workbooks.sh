@@ -20,7 +20,7 @@ defmodule WorkCore.Graph do
   end
 
   def build_files(paths) do
-    parsed = Enum.map(paths, fn p -> {p, Literate.parse(File.read!(p))} end)
+    parsed = Enum.map(paths, fn p -> {p, p |> File.read!() |> Literate.parse() |> Extract.annotate()} end)
     nodes = collect_nodes(parsed)
     %__MODULE__{
       nodes: nodes,
