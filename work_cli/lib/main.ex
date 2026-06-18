@@ -45,6 +45,8 @@ defmodule WorkCLI.Main do
   defp route(["near", name | rest]), do: WorkCLI.Work.near(unit(name), dir_arg(rest))
   defp route(["wit", name | rest]), do: WorkCLI.Work.wit(unit(name), dir_arg(rest))
   defp route(["structure" | rest]), do: WorkCLI.Work.structure(dir_arg(rest))
+  defp route(["weave", dir, out | _]), do: WorkCLI.Work.weave(dir, out)
+  defp route(["weave" | _]), do: (Log.error("usage: work weave <dir> <out.html>"); {:error, :usage})
 
   defp route([verb | _]) do
     Log.error("unknown command: #{verb}", detail: "run `work help` for the full surface")

@@ -160,7 +160,12 @@ agents (the tool-boundary JSON exception; everything else stays HTML).
 - **P1 — CLI shell + logging:** stand up the sibling `work` escript; the context/auth/router; the
   structured logger (palette); port the NIF-free local verbs (check/why/near/wit/lint/structure/weave);
   surface the literate verbs in `help`. Delight lands here.
-- **P2 — literate build unification:** WORK-FORMAT-IMPLEMENTATION §1–4; `work weave` goes literate-native.
+- **P2 — literate build unification:** **DONE (static floor).** `WorkCore.Weave` weaves a `.work` tree
+  into one self-contained HTML workbook (units → `<work-component>` elements, paper theme); `work weave
+  <dir> <out>` works offline. *Finding:* nexus's build is ALREADY WIT-informed (it componentizes
+  per-language worlds via `wasm-tools`), and the old HTML `tangle_plan` path lives only in the dying
+  runtime — so there's no live "old path" in the future tier to replace. The dynamic weave (compile
+  units to wasm + bake live data) stays the nexus tier, reached via the P3 client.
 - **P3 — deploy as client:** port deploy verbs onto the client model; wire **nexus** deployment; local
   (krunvm/container) + cloud (control plane / Fly).
 - **P4 — push-to-live:** `work dev` incremental weave + hot-swap.

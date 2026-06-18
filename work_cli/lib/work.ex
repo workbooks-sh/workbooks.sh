@@ -88,6 +88,19 @@ defmodule WorkCLI.Work do
     end
   end
 
+  @doc "work weave <dir> <out.html> — weave the .work tree into one self-contained HTML workbook."
+  def weave(dir, out) do
+    Log.prompt("work weave #{dir} → #{out}")
+    units = WorkCore.Weave.unit_count(dir)
+    {:ok, ^out, bytes} = WorkCore.Weave.to_file(dir, out)
+    Log.ok("#{Path.basename(out)}", detail: "#{units} unit(s) · #{kb(bytes)} · static")
+    Log.step(Log.dim("dynamic hydration (compile + live data) needs a nexus — `work deploy` (P3)"))
+    :ok
+  end
+
+  defp kb(b) when b >= 1024, do: "#{Float.round(b / 1024, 1)}KB"
+  defp kb(b), do: "#{b}B"
+
   @doc "work structure [dir] — list the units in the tree."
   def structure(dir) do
     units =
