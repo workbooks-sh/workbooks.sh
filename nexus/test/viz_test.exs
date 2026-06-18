@@ -16,7 +16,11 @@ defmodule Nexus.Graph.VizTest do
     html = Viz.to_html(Graph.with_overlay(g, ov), title: "T")
 
     assert html =~ "<svg"
-    assert html =~ ~s(data-id="order")
+    # nodes are built from the embedded NODES payload (force sim creates the DOM)
+    assert html =~ ~s("id":"u:order")
+    assert html =~ "const NODES"
+    # layer-toggle bar (mixed work-file / native / wasm edges)
+    assert html =~ ~s(data-layer="wasm")
     # the embedded inspector data carries the reality facet
     assert html =~ "observed"
     assert html =~ "darkreader-lock"
