@@ -53,10 +53,35 @@ defmodule Workbooks.Unit do
       |> Enum.uniq()
       |> Enum.flat_map(fn p -> Workbooks.Literate.parse(File.read!(p)) end)
 
-    nodes
-    |> Enum.filter(&(&1.type == :code and &1.name != nil and &1.kind in ["defmodule", "server"]))
-    |> compile_to_fixpoint([])
+    code = Enum.filter(nodes, &(&1.type == :code and &1.ast != nil))
+
+    # every `defmodule` ANYWHERE — top-level or nested inside any unit (e.g. Money in
+    # a contract unit, Account in an agent) — is a type module the BEAM tier needs.
+    type_mods =
+      code
+      |> Enum.flat_map(&collect_defmodules(&1.ast))
+      |> Enum.uniq_by(&defmodule_name/1)
+      |> Enum.reject(&(defmodule_name(&1) == nil))
+      |> Enum.map(&%{type: :code, kind: "defmodule", name: defmodule_name(&1), ast: &1})
+
+    servers = Enum.filter(code, &(&1.kind == "server" and &1.name != nil))
+
+    compile_to_fixpoint(type_mods ++ servers, [])
   end
+
+  # every defmodule AST reachable in a tree (the node itself if it is one, plus nested)
+  defp collect_defmodules(ast) do
+    {_ast, acc} =
+      Macro.prewalk(ast, [], fn
+        {:defmodule, _, _} = dm, acc -> {dm, [dm | acc]}
+        other, acc -> {other, acc}
+      end)
+
+    Enum.reverse(acc)
+  end
+
+  defp defmodule_name({:defmodule, _, [{:__aliases__, _, mods} | _]}), do: mods |> List.last() |> to_string()
+  defp defmodule_name(_), do: nil
 
   # Fixpoint compile: each pass compiles what it can; nodes that fail on a not-yet-
   # compiled dependency (a `%Struct{}` whose module isn't loaded) retry next pass.
