@@ -26,7 +26,11 @@ defmodule Workbooks.MixProject do
   # runtime via Code.ensure_loaded?, so host/ compiles without it either way.
   defp elixirc_paths(_) do
     base = ["host"]
-    if System.get_env("WB_CLIP") == "1", do: base ++ ["host_ml"], else: base
+    base = if System.get_env("WB_CLIP") == "1", do: base ++ ["host_ml"], else: base
+    # Features (video/wavelet, …) live outside the core compile — canon: features are
+    # loaded toolkits, not host engines. WB_FEATURES=1 compiles them in for now, until
+    # each is converted to a real loaded toolkit. Keeps the default runtime core lean.
+    if System.get_env("WB_FEATURES") == "1", do: base ++ ["features"], else: base
   end
 
   def application do
