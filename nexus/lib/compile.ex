@@ -48,11 +48,43 @@ defmodule Nexus.Compile do
   def unit(_), do: {:skip, :not_a_unit}
 
   @doc """
-  Compile a whole workbook's BEAM tier now (the non-wasm half is fully real). Returns
-  `%{compiled, failed}` — the live `server`/type modules. The wasm tier joins when the
-  compilers are wired through `unit/1`'s `:wasm` lane.
+  Bring up a whole `.work` folder. The fast tiers come up eagerly — `server`/type units →
+  native BEAM modules, `resource` units → live Ash resources; the `wasm` units (rust/…) are
+  enumerated as compile-on-demand (each is a real, slow toolchain build via `unit/1`). Returns
+  `%{beam, resources, wasm_units}`.
   """
-  def workbook(root), do: Nexus.Unit.compile_workbook(root)
+  def workbook(root) do
+    units =
+      (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
+      |> Enum.uniq()
+      |> Enum.flat_map(fn f -> f |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
+
+    by_kind = Enum.group_by(units, & &1.kind)
+
+    resources =
+      for u <- Map.get(by_kind, "resource", []) do
+        {u.name, try_materialize(u)}
+      end
+
+    %{
+      beam: try_beam(root),
+      resources: resources,
+      wasm_units: for(u <- Map.get(by_kind, "rust", []), do: u.name)
+    }
+  end
+
+  defp try_beam(root) do
+    Nexus.Unit.compile_workbook(root)
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
+  defp try_materialize(u) do
+    {res, _domain} = Nexus.Resource.Ash.materialize(u)
+    {:ok, res}
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
 
   @adapter "../runtime/build/tools/wasi_snapshot_preview1.command.wasm"
 

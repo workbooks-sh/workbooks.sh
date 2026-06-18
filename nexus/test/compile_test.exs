@@ -43,6 +43,19 @@ defmodule Nexus.CompileTest do
 
   # The real proof: a .work rust unit → component → runs on wasmex. Needs the wasm toolchain
   # (mrustc/clang in ../runtime/compilers) + wasm-tools; skips otherwise. Slow (real compile).
+  test "workbook/1 brings up a folder — resources live, wasm units enumerated" do
+    dir = Path.join(System.tmp_dir!(), "wbk_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    File.write!(Path.join(dir, "lead.work"), "resource Lead do\n  name :text\n  revenue :int\nend\n")
+    File.write!(Path.join(dir, "score.work"), "rust :scorer do\n  pub extern \"C\" fn score(x: i32) -> i32 { x }\nend\n")
+
+    wb = Nexus.Compile.workbook(dir)
+    assert [{"Lead", {:ok, _mod}}] = wb.resources
+    assert wb.wasm_units == ["scorer"]
+
+    File.rm_rf!(dir)
+  end
+
   @tag :compiler
   @tag timeout: 240_000
   test "a .work rust unit compiles to a component and runs" do
