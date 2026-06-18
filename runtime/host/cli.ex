@@ -30,6 +30,28 @@ defmodule Workbooks.CLI do
       ["content", "check"] -> content_check(".")
       ["content", "check", dir] -> content_check(dir)
 
+      # `work check / why / near / wit` — the code-graph (§9) + WIT (§2) surface over
+      # a .work workbook tree. Pure file reads + literate parse, no app boot.
+      ["check" | rest] ->
+        {out, failed?} = Workbooks.Work.CLI.check(List.first(rest) || ".")
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
+      ["why", target | rest] ->
+        {out, failed?} = Workbooks.Work.CLI.why(List.first(rest) || ".", String.trim_leading(target, ":"))
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
+      ["near", target | rest] ->
+        {out, failed?} = Workbooks.Work.CLI.near(List.first(rest) || ".", String.trim_leading(target, ":"))
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
+      ["wit", target | rest] ->
+        {out, failed?} = Workbooks.Work.CLI.wit(List.first(rest) || ".", String.trim_leading(target, ":"))
+        IO.puts(out)
+        if failed?, do: System.halt(1)
+
       # `work rt …` drives a RUNNING runtime over HTTP (RCP client) — no app boot
       # (no NIF), just :httpc against the discovered/configured target.
       ["rt" | rest] ->
