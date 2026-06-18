@@ -230,9 +230,14 @@ defmodule Workbooks.Compilers.Rust do
               # (wb-1mv). Off by default (a real link error should still fail loudly).
               au = if Keyword.get(opts, :allow_undefined, false), do: ["--allow-undefined"], else: []
 
+              # --export <fn> for each unit function: keeps it from being gc-stripped and surfaces
+              # it as a wasm export, so the module can be componentized against a typed WIT world
+              # (the new model) instead of only run as a command. Default [] — command lane unchanged.
+              exports = Keyword.get(opts, :exports, []) |> Enum.map(&"--export=#{&1}")
+
               ld =
                 ["wasm-ld", "-m", "wasm32", "-L/usr/lib/wasm32-unknown-wasip1", "-L/usr/lib/wasm32-wasip1"] ++
-                  au ++
+                  au ++ exports ++
                   ["/usr/lib/wasm32-wasip1/crt1-command.o", "/work/output-wasi-174/#{name}.o"] ++
                   dep_objs ++ libstd ++
                   ["/work/output-wasi-174/wasi_shim.o", "/work/output-wasi-174/ustub.o",
