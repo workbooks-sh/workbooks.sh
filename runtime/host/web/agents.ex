@@ -16,7 +16,7 @@ defmodule Workbooks.Web.Agents do
         do: catalog_dir(Path.join([workdir, ".workbooks", "agents"]), "project"),
         else: []
 
-    user = catalog_dir(Path.join(System.get_env("WB_PROFILE_DIR") || "/opt/profile", "agents"), "user")
+    user = catalog_dir(Path.join(Workbooks.Config.profile_dir(), "agents"), "user")
 
     # De-dupe by slug, keeping the higher-precedence scope (project > user > builtin).
     (project ++ user ++ builtin)
@@ -70,7 +70,7 @@ defmodule Workbooks.Web.Agents do
     # A provisioned <slug>.html overrides.
     {base, toolkits} =
       with true <- is_binary(slug) and Regex.match?(~r/^[a-z0-9][a-z0-9_-]*$/i, slug),
-           dir <- System.get_env("WB_PROFILE_DIR") || "/opt/profile",
+           dir <- Workbooks.Config.profile_dir(),
            path <- Path.join([dir, "agents", "#{slug}.html"]),
            {:ok, html} <- File.read(path),
            %{system: sys, toolkits: tks} when is_binary(sys) and sys != "" <- Workbooks.AgentDef.parse(html) do

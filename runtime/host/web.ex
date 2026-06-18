@@ -852,7 +852,7 @@ defmodule Workbooks.Web do
     File.write(Path.join(workdir, "_status.json"), Jason.encode!(%{slug: slug, request: request, stage: "running"}))
 
     spawn(fn ->
-      def_path = "#{System.get_env("WB_PROFILE_DIR") || "/opt/profile"}/agents/brandnana.html"
+      def_path = "#{Workbooks.Config.profile_dir()}/agents/brandnana.html"
       on_step = fn ev ->
         File.write(Path.join(workdir, "_trace.jsonl"), Jason.encode!(%{step: ev.step, tool: ev.tool, out: String.slice(ev.output || "", 0, 140)}) <> "\n", [:append])
       end

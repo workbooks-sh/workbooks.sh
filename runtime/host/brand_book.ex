@@ -120,7 +120,7 @@ defmodule Workbooks.BrandBook do
   # local examples/ fallback for dev.
   defp strategist_path, do: first_existing(["#{profile_dir()}/agents/brandnana-strategist.html", local("bn-strategist.html")])
   defp designer_path, do: first_existing(["#{profile_dir()}/agents/designer.html", local("bn-designer.html")])
-  defp profile_dir, do: System.get_env("WB_PROFILE_DIR") || "/opt/profile"
+  defp profile_dir, do: Workbooks.Config.profile_dir()
   defp local(name), do: Path.expand(Path.join([__DIR__, "..", "examples", "agents", name]))
   defp first_existing(paths), do: Enum.find(paths, &File.exists?/1) || hd(paths)
 

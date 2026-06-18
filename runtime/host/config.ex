@@ -12,4 +12,7 @@ defmodule Workbooks.Config do
 
   @doc "A path under the data dir."
   def data_path(sub), do: Path.join(data_dir(), sub)
+
+  @doc "The provisioned profile dir (sandbox profiles). `WB_PROFILE_DIR`, default /opt/profile."
+  def profile_dir, do: System.get_env("WB_PROFILE_DIR") || "/opt/profile"
 end
