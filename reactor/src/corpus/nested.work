@@ -1,0 +1,12 @@
+# Nested blocks
+
+server elixir :pipeline do
+  def run(x) do
+    case x do
+      :ok -> 1
+      _ -> 2
+    end
+  end
+
+  def helper, do: :ok
+end

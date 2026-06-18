@@ -1,4 +1,9 @@
 coder|agent|
+encode|sandbox|zig
+hashing|sandbox|c
 helper|server|elixir
+pipeline|server|elixir
 pricing|server|elixir
 renderer|sandbox|rust
+scrape|sandbox|python
+widget|client|js

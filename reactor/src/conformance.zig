@@ -7,6 +7,8 @@ const work = @import("work.zig");
 
 const corpus = [_][]const u8{
     @embedFile("corpus/agent.work"),
+    @embedFile("corpus/langs.work"),
+    @embedFile("corpus/nested.work"),
     @embedFile("corpus/store.work"),
 };
 const golden = @embedFile("corpus/units.golden");

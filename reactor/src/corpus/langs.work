@@ -1,0 +1,17 @@
+# Multi-language units
+
+sandbox c :hashing do
+  int hash(const char* s) { return 0; }
+end
+
+sandbox zig :encode do
+  pub fn encode(x: u32) u32 { return x; }
+end
+
+sandbox python :scrape do
+  def fetch(url): return url
+end
+
+client js :widget do
+  export function render() { return 1; }
+end
