@@ -20,8 +20,18 @@ defmodule Nexus.Compile do
       kind == "resource" -> {:ash, Nexus.Resource.Ash.source(node)}
       kind == "record" -> {:shape, Nexus.Resource.fields(node)}
       kind == "server" -> {:beam, Nexus.Unit.compile(node)}
-      kind in @wasm_kinds -> {:wasm, {:compilers, node.lang, node.name}}
+      kind == "rust" -> {:wasm, rust_unit(node)}
+      kind in @wasm_kinds -> {:wasm, {:todo, node.lang, node.name}}
       true -> {:skip, kind}
+    end
+  end
+
+  # A `rust` unit, fully automatic: derive the typed WIT world from its `pub fn` signatures,
+  # then run the proven pipeline. Returns `{:ok, component_path} | {:error, _}`.
+  defp rust_unit(%{body: body} = node) do
+    case rust_world(node) do
+      {_world, _name, []} -> {:error, :no_exported_fns}
+      {world, world_name, fns} -> to_component(body, fns, world, world_name)
     end
   end
 
@@ -81,4 +91,49 @@ defmodule Nexus.Compile do
       {out, code} -> {:error, {:componentize_failed, code, out}}
     end
   end
+
+  # Rust scalar → WIT type. (Records/strings come with the typed-extractor; scalars cover the
+  # numeric/bool surface the component ABI lifts directly.)
+  @rust_wit %{
+    "i8" => "s8", "i16" => "s16", "i32" => "s32", "i64" => "s64",
+    "u8" => "u8", "u16" => "u16", "u32" => "u32", "u64" => "u64",
+    "f32" => "f32", "f64" => "f64", "bool" => "bool"
+  }
+
+  @doc """
+  Derive a typed WIT world from a `rust` unit's `pub fn` signatures (no hand-written WIT).
+  Returns `{world_text, world_name, fn_names}`. Pairs with `to_component/4`.
+  """
+  def rust_world(%{name: name, body: body}) do
+    re = ~r/pub\s+(?:extern\s+"C"\s+)?fn\s+([a-z_]\w*)\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z0-9_]+))?/
+
+    exports =
+      Regex.scan(re, body)
+      |> Enum.map(fn [_, fname, params | rest] ->
+        {fname, parse_params(params), wit_ret(List.first(rest))}
+      end)
+
+    wname = wit_ident(name)
+    lines = Enum.map_join(exports, "\n", fn {f, ps, r} -> "  export #{wit_ident(f)}: func(#{ps})#{r};" end)
+    world = "package work:#{wname};\n\nworld #{wname} {\n#{lines}\n}\n"
+    {world, wname, Enum.map(exports, &elem(&1, 0))}
+  end
+
+  defp parse_params(""), do: ""
+
+  defp parse_params(params) do
+    params
+    |> String.split(",", trim: true)
+    |> Enum.map_join(", ", fn p ->
+      case String.split(p, ":", parts: 2) do
+        [n, t] -> "#{wit_ident(String.trim(n))}: #{wit_type(String.trim(t))}"
+        [t] -> wit_type(String.trim(t))
+      end
+    end)
+  end
+
+  defp wit_ret(r) when r in [nil, ""], do: ""
+  defp wit_ret(t), do: " -> #{wit_type(t)}"
+  defp wit_type(t), do: Map.get(@rust_wit, t, "s32")
+  defp wit_ident(s), do: s |> to_string() |> String.downcase() |> String.replace("_", "-")
 end
