@@ -23,3 +23,7 @@ pub fn workFiles(io: Io, alloc: std.mem.Allocator, dir_path: []const u8) ![]cons
     }
     return list.toOwnedSlice(alloc);
 }
+
+pub fn writeFile(io: Io, path: []const u8, data: []const u8) !void {
+    try Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = data });
+}

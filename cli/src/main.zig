@@ -5,6 +5,7 @@ const std = @import("std");
 const log = @import("log.zig");
 const work = @import("work.zig");
 const author = @import("author.zig");
+const weave = @import("weave.zig");
 test {
     _ = work;
 }
@@ -35,6 +36,10 @@ pub fn main(init: std.process.Init) !void {
     } else if (eql(verb, "wit")) {
         const name = stripColon(it.next() orelse "");
         std.process.exit(try author.wit(io, alloc, it.next() orelse ".", name));
+    } else if (eql(verb, "weave")) {
+        const d = it.next() orelse ".";
+        const o = it.next() orelse "workbook.html";
+        std.process.exit(try weave.weave(io, alloc, d, o));
     } else if (eql(verb, "version") or eql(verb, "--version")) {
         log.print("work {s}\n", .{version});
     } else if (eql(verb, "help") or eql(verb, "--help")) {
