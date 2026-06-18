@@ -24,6 +24,17 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(try author.check(io, alloc, it.next() orelse "."));
     } else if (eql(verb, "structure")) {
         std.process.exit(try author.structure(io, alloc, it.next() orelse "."));
+    } else if (eql(verb, "lint")) {
+        std.process.exit(try author.lint(io, alloc, it.next() orelse "."));
+    } else if (eql(verb, "why")) {
+        const name = stripColon(it.next() orelse "");
+        std.process.exit(try author.why(io, alloc, it.next() orelse ".", name));
+    } else if (eql(verb, "near")) {
+        const name = stripColon(it.next() orelse "");
+        std.process.exit(try author.near(io, alloc, it.next() orelse ".", name));
+    } else if (eql(verb, "wit")) {
+        const name = stripColon(it.next() orelse "");
+        std.process.exit(try author.wit(io, alloc, it.next() orelse ".", name));
     } else if (eql(verb, "version") or eql(verb, "--version")) {
         log.print("work {s}\n", .{version});
     } else if (eql(verb, "help") or eql(verb, "--help")) {
@@ -37,6 +48,10 @@ pub fn main(init: std.process.Init) !void {
 
 fn eql(a: []const u8, b: []const u8) bool {
     return std.mem.eql(u8, a, b);
+}
+
+fn stripColon(s: []const u8) []const u8 {
+    return if (s.len > 0 and s[0] == ':') s[1..] else s;
 }
 
 const Group = struct { name: []const u8, blurb: []const u8, verbs: []const [2][]const u8 };
