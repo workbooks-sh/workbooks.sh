@@ -44,7 +44,24 @@ defmodule Nexus.Agent.Bash do
       # through Nexus.Dock.fetch (SSRF-safe: loopback/private blocked, https). curl-class.
       "fetch" -> web_fetch(List.first(args))
       "scrape" -> List.first(args) |> web_fetch() |> html_to_text()
+      # in-wasm Blitz render: screenshot <url> [out.png] → a PNG in /work (fetch+freeze+render).
+      "screenshot" -> web_screenshot(vfs, args)
       _ -> exec(vfs, cmd, args, stdin)
+    end
+  end
+
+  defp web_screenshot(_vfs, []), do: "screenshot: usage: screenshot <url> [out.png]"
+
+  defp web_screenshot(vfs, [url | rest]) do
+    out = List.first(rest) || "screenshot.png"
+
+    case Nexus.Browse.screenshot(url) do
+      {:ok, png} ->
+        Nexus.Agent.Vfs.put(vfs, out, png)
+        "screenshot: #{url} -> /work/#{out} (#{byte_size(png)} bytes)"
+
+      {:error, reason} ->
+        "screenshot: failed (#{inspect(reason) |> String.slice(0, 80)})"
     end
   end
 

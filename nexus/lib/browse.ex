@@ -22,13 +22,13 @@ defmodule Nexus.Browse do
 
   @callback capabilities() :: [:fetch | :render | :screenshot | :search]
   @callback fetch(url, keyword) :: {:ok, binary} | {:error, term}
-  @callback render(html :: binary, keyword) :: {:ok, binary} | {:error, term}
-  @callback screenshot(html :: binary, keyword) :: {:ok, binary} | {:error, term}
+  @callback render(url, keyword) :: {:ok, binary} | {:error, term}
+  @callback screenshot(url, keyword) :: {:ok, binary} | {:error, term}
   @callback search(query :: String.t(), keyword) :: {:ok, [map]} | {:error, term}
 
   @optional_callbacks fetch: 2, render: 2, screenshot: 2, search: 2
 
-  @builtin [Nexus.Browse.Http]
+  @builtin [Nexus.Browse.Http, Nexus.Browse.Blitz]
   @reg {:nexus_browse, :providers}
 
   @doc "All providers (built-in + registered)."
@@ -53,11 +53,11 @@ defmodule Nexus.Browse do
   @doc "Raw HTTP GET → body."
   def fetch(url, opts \\ []), do: route(:fetch, [url, opts])
 
-  @doc "Render HTML to readable text (in-wasm, CSS-aware, no JS)."
-  def render(html, opts \\ []), do: route(:render, [html, opts])
+  @doc "Fetch + freeze + render a URL to readable text (in-wasm Blitz, CSS-aware, no JS)."
+  def render(url, opts \\ []), do: route(:render, [url, opts])
 
-  @doc "Render HTML to a PNG screenshot (in-wasm)."
-  def screenshot(html, opts \\ []), do: route(:screenshot, [html, opts])
+  @doc "Fetch + freeze + render a URL to a PNG screenshot (in-wasm Blitz)."
+  def screenshot(url, opts \\ []), do: route(:screenshot, [url, opts])
 
   @doc "Web search → ranked results."
   def search(query, opts \\ []), do: route(:search, [query, opts])
