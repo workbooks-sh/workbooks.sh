@@ -7,11 +7,32 @@ defmodule Nexus.MixProject do
       version: "0.1.0",
       elixir: "~> 1.17",
       elixirc_paths: ["lib"],
-      deps: deps()
+      deps: deps(),
+      releases: releases()
     ]
   end
 
-  def application, do: [extra_applications: [:logger]]
+  # `mod:` boots Nexus.Application (an empty supervision tree) so the release's
+  # `Application.ensure_all_started(:nexus)` boot expr (Nexus.Deploy.Machine.start_argv/1) succeeds
+  # and parks the node alive. wasmex must be in extra_applications so its NIF loads in the release.
+  def application do
+    [
+      extra_applications: [:logger, :wasmex],
+      mod: {Nexus.Application, []}
+    ]
+  end
+
+  # The :nexus release — `mix release` emits _build/prod/rel/nexus/bin/nexus, the OCI image's
+  # entrypoint (`/app/bin/nexus eval …`). include_executables_for: [:unix] keeps it Linux-targeted
+  # (the krunvm guest is Linux); the BEAM + ERTS are bundled so the runtime image needs no Elixir.
+  defp releases do
+    [
+      nexus: [
+        include_executables_for: [:unix],
+        applications: [nexus: :permanent]
+      ]
+    ]
+  end
 
   # The sandbox is wasmex (wasmtime + component model). The data base is a typed struct + the
   # pluggable `Nexus.Store` seam (ETS default; Postgres/SQLite/wasm-SQL behind the same interface)
