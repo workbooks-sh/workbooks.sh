@@ -28,6 +28,68 @@ Glossary of the real modules this touches:
 
 ---
 
+## §0. THE PARSE LAYER — one literate parser + per-language ASTs — **THE NEW KEYSTONE**
+
+Everything downstream re-guesses a `.work` file's structure with its own regex: the
+viewer's highlighter, the code-graph extractor, the weave gate's ref resolution, and
+WIT generation off `do…end` headers. **One parse replaces all of it.** This supersedes
+the HTML-`work-*` framing (`workbook.ex` over Floki) for literate `.work` files.
+
+The format's own rule makes it tractable: **`do…end` is the code delimiter**, and a
+`.work` file's code *is Elixir*, so we parse with real ASTs — not regex — except where
+the input genuinely isn't a grammar (markdown prose).
+
+### §0.1 Literate structure — **DONE** (`runtime/host/literate.ex`, `Workbooks.Literate`)
+
+`parse/1` splits a file into ordered nodes: `:heading | :code | :decl | :prose`, each
+with `:line` and inline `:refs` (`[[backlink]]`, `:atom`, `@type`, `#tag`, `work://`).
+A `:code` node carries `kind / lang / name / header / body / ast`. Tested + verified
+against the real demo tree (`workponents/sales/**`). 6/6 green.
+
+### §0.2 Per-language AST — **[NEW]**, one lane per language
+
+The literate parser hands each code **body** to its language's real parser. Status +
+plan, per language:
+
+1. **Elixir — DONE inline.** `Code.string_to_quoted/1` already parses Elixir blocks in
+   `code_node/3` (kind/name/lang/nested-lang from the tree). Next: walk that quoted AST
+   to extract the **signature** (public `def`s + arities), the **types** it speaks
+   (`%Struct{}`, atom-unions, tagged tuples), and the **calls/refs** to other units —
+   feeding §2 (WIT) and §9 (graph). No new dep; `Macro.prewalk` over the existing AST.
+2. **Rust / Zig / C — via the compilers we already build.** These bodies already
+   compile through `compilers/{rust,native}.ex`. Add a **signature pass**: run the
+   compiler's front-end far enough to emit the extern/`pub fn` signatures (or parse the
+   wasm name section / DWARF the lane already produces). Prefer reading the *generated
+   component* with `wasm-tools` (compose.ex) over re-parsing source — the exports/imports
+   are the AST we need for the graph.
+3. **Python / JS / TS / Svelte / Solid — tree-sitter, in-sandbox.** Provision the
+   relevant tree-sitter grammars through `tools.ex` (like javy/wasm-tools), run the
+   parser as a wasm command via the CommandRegistry. Extract: exported functions
+   (island entry points), imported units (`work://` / `import`), and prop shapes.
+4. **Unifying shape.** Every per-language pass returns the SAME small record —
+   `%{exports: [...], imports: [...], types: [...], calls: [...]}` — so §9 merges them
+   without caring which language produced it. This is the "combined AST" surface.
+
+**Test strategy.** Per language: parse a real demo unit (`compute.work` Elixir,
+`rust-zig.work` Rust+Zig, `python.work` Python, `svelte.work`), assert the extracted
+exports/imports/types match the source. Golden over the whole `sales/**` tree.
+
+**Ordering / deps.** §0.1 is done. §0.2 Elixir-AST extraction is next and gates §2 + §9.
+Foreign-language passes can land incrementally (one language at a time); the graph
+degrades gracefully (a unit with no AST pass yet still has its literate refs).
+
+### §0.3 Wire the viewer to the parse — **[NEW, small]**
+
+Replace the book viewer's regex `markCode`/highlighter (`workponents/work-format.js`)
+with the parser's node spans, so styling is exact ("prose vs code" comes from the parse,
+not a guess). Two routes: (a) a tiny `runtime` endpoint returning `Literate.parse` as the
+serving tier, or (b) compile `Workbooks.Literate` to wasm (Popcorn, §5) and call it in the
+browser — the dogfood end state. Start with (a); move to (b) when §5 lands.
+
+**Risk.** LOW. §0.1 shipped. The foreign passes are additive and isolated per language.
+
+---
+
 ## §1. Componentize EVERY compile lane
 
 **Problem (verified).** Only two paths emit a real WIT component today:
@@ -504,9 +566,42 @@ to bytes where it doesn't.
 
 ---
 
+## §9. The Code Graph — built on the parse, not extracted twice — **[NEW]**
+
+The graph is the join of the three extractors over §0's parse. Now that §0 exists, the
+graph is mostly *assembly*, not re-parsing.
+
+1. **`Workbooks.Graph` — nodes + typed edges.** A node per unit (from each `:code` node:
+   `id=name, kind, lang, place, sandbox, exports`). Edges, typed: `:ref` (from a node's
+   `.refs`), `:import` (from §0.2 calls/grants), `:dataflow` (a `%Struct{}` produced
+   here, consumed there), `:type` (unit → struct/enum it speaks), `:tag` (`#tag`).
+2. **Three feeds merge.** literate (§0.1 refs) + per-language AST (§0.2 exports/imports/
+   calls) + WIT (§2 generated worlds). Disagreement is signal: a prose `:ref` with no
+   AST call is a *dangling mention* the gate flags.
+3. **The CLI surface.** `work check` (resolve every edge; dangling ref, unused grant,
+   capability leak across a sandbox), `work why :x` (rdeps), `work near :x` (the context
+   subgraph). These walk `Workbooks.Graph`, build-time and runtime.
+4. **Telemetry rides it (§7).** OTel spans map to graph nodes — structure (the parse) +
+   behaviour (OTel) on one surface.
+
+**Test strategy.** Over `sales/**`: assert every `[[backlink]]`/`:atom` resolves (matches
+the demo's own `work check` expectation), no cross-sandbox `:import` without host-broker,
+no dead exported unit. This is the gate that made the demo coherent — now enforced by code.
+
+**Ordering / deps.** Depends on §0.1 (done) + §0.2 (Elixir pass at least) + §2 (WIT feed,
+for the import layer). The literate-only graph (refs) can ship first on §0.1 alone.
+
+---
+
 ## Dependency graph (sequence)
 
 ```
+§0.1 literate parser  ✓DONE ──────────► §0.3 viewer-on-parse
+        │                                §9 code graph (refs feed) ◄─┐
+        ▼                                                            │
+§0.2 per-language AST (Elixir → foreign) ───────────────────────────┤
+        │                                                            │
+        ▼                                                  §9 graph (AST + WIT feeds)
 §2.4 tangle-plan fields (sig/grants/target)
         │
         ▼
@@ -528,8 +623,9 @@ to bytes where it doesn't.
 §8 rides §2.4 (`target`) + §3 (Dock for `server` render). 8.1 (static bundle) is live
 today; 8.2 (nexus SSR / islands) and 8.3 (live-over-RCP) layer on once §3 lands.
 
-Land order: **§2.4 → §2 → §1 → §3 → §4 → §6(verify) → §7 → §5**. §7.1 (emit) and §5 (lane) can start in
-parallel once §1 exists.
+Land order: **§0.1 ✓ → §0.2(Elixir) → §2.4 → §2 → §9(refs graph early, full after §2) → §1 → §3 → §4 → §6 → §7 → §5**.
+§0.3 (viewer-on-parse) and §0.2 foreign-language passes land in parallel, incrementally.
+§7.1 (emit) and §5 (lane) can start in parallel once §1 exists.
 
 ---
 
