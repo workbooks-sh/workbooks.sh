@@ -16,9 +16,9 @@ whole model:
 - **Logic** = written **inline** as `<work-component lang="python|rust|js|c|zig">…</work-component>`
   source blocks, compiled to WASM by the **Dock** (the host capability seam).
 - **Organisation** = folders of `.html` files (+ assets).
-- **Shipping** = `work bundle` weaves the folder tree into ONE gzipped,
-  self-contained `.html` (the `wbundle-html/1` format: the page + a compressed
-  blob of the tree, hydrated client-side).
+- **Shipping** = `work weave <dir> <out>` folds the folder tree into ONE
+  self-contained `.html` — the page with its units/assets inlined, rendered by the
+  browser as-is. No special container format, no sidecar; just an HTML file.
 
 There is **no org-mode, no OQL, no `.work` shorthand, no parser, no kernel** —
 they were deleted (git history keeps them). Where the backend must read a

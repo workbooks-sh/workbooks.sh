@@ -138,7 +138,6 @@ const groups = [_]Group{
         .{ "weave <dir> <out>", "weave a tree into one self-contained html" },
         .{ "graph <dir> <out>", "render the code graph as a work-* workbook" },
         .{ "dev <dir>", "watch & re-weave on change (+ nexus hot-swap)" },
-        .{ "bundle/unbundle", "the .wbundle zip" },
     } },
     .{ .name = "deploy", .blurb = "stand up a runtime, local or cloud", .verbs = &.{
         .{ "deploy init|validate|apply", "scaffold · check · deploy <work-deploy>" },
