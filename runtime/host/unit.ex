@@ -39,6 +39,59 @@ defmodule Workbooks.Unit do
 
   def compile(_), do: {:error, :not_a_unit}
 
+  @doc """
+  Compile a whole workbook's BEAM tier: its type modules (`defmodule`) and `server`
+  units, each to its **canonical** module name (so a unit's `Score.score/1` and
+  `%Lead{}` references resolve). Types compile first so struct refs exist; cross-unit
+  *calls* resolve at runtime, so no dependency sort is needed for compilation. Returns
+  `{:ok, [module]}` or `{:error, {unit_name, reason}}`. (`client`/`sandbox`/`flow`/
+  `agent` units are skipped — wasm lanes / DSL macros, not plain BEAM Elixir.)
+  """
+  def compile_workbook(root) do
+    nodes =
+      (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
+      |> Enum.uniq()
+      |> Enum.flat_map(fn p -> Workbooks.Literate.parse(File.read!(p)) end)
+
+    types = Enum.filter(nodes, &(&1.type == :code and &1.kind == "defmodule"))
+    servers = Enum.filter(nodes, &(&1.type == :code and &1.kind == "server" and &1.name))
+
+    Enum.reduce_while(types ++ servers, {:ok, []}, fn node, {:ok, acc} ->
+      case compile_named(node) do
+        {:ok, mods} -> {:cont, {:ok, List.wrap(mods) ++ acc}}
+        {:error, reason} -> {:halt, {:error, {node[:name] || :type, reason}}}
+      end
+    end)
+  end
+
+  # a type module is already a `defmodule` — compile it as-is (it names itself)
+  defp compile_named(%{kind: "defmodule", ast: ast}) do
+    try do
+      {:ok, ast |> Code.compile_quoted() |> Enum.map(&elem(&1, 0))}
+    rescue
+      e -> {:error, Exception.message(e)}
+    end
+  end
+
+  # a server unit's body becomes a module named for the unit (Score, Enrich, …)
+  defp compile_named(%{kind: "server", name: name, ast: ast}) do
+    case do_body(ast) do
+      nil ->
+        {:error, :no_body}
+
+      body ->
+        mod = Module.concat([Macro.camelize(name)])
+        quoted = quote do: (defmodule unquote(mod) do unquote(body) end)
+
+        try do
+          [{module, _bin}] = Code.compile_quoted(quoted)
+          {:ok, module}
+        rescue
+          e -> {:error, Exception.message(e)}
+        end
+    end
+  end
+
   @doc "Compile a server unit and invoke one of its exported functions."
   def run(node, fun, args) when is_atom(fun) and is_list(args) do
     case compile(node) do
