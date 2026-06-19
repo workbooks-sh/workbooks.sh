@@ -1,18 +1,16 @@
 # Your documentation
 
-This `index.work` is the **composition root** of a documentation site. It names the site, picks a
-theme, and lists — in order — the sections and pages the sidebar shows. Everything else is a sibling
-`.work` file of plain prose. `work weave .` folds the whole tree into one navigable site; the nexus
-serves it live.
+This `index.work` is the **composition root** of a documentation site. It names the site and lists —
+in order — the sections and pages the sidebar shows. Everything else is a sibling `.work` file of
+plain prose. The nexus serves it live as a navigable site (sidebar + clean URLs); `work weave .`
+folds the tree into one shippable artifact.
 
-There is **one place to brand this**: the `title` below. It doubles as the sidebar wordmark next to
-the ❧ mark — swap that glyph for your own logo when you have one. No other file needs editing to make
-this yours.
+This starter ships **unstyled** — the nexus renders neutral, legible structure. To brand it, add a
+sibling `design.work` with a `design` block; its CSS styles the site's `.wb-*` classes. (See the
+Workbooks documentation template for a worked example.) Until then, `title` is all you set.
 
 app :docs do
-  title  "Your Project"          # ← your brand. Shows in the sidebar next to the ❧ logo placeholder.
-  theme  :paper_ink              # built-in light theme — Geist, paper + ink, a soft left-rail accent
-  router :history                # clean URLs: /getting-started/installation, with reload-safe routing
+  title "Your Project"           # the site name (sidebar wordmark + tab title)
 
   section "Getting started" do
     page "getting-started/installation"

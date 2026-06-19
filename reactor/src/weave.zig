@@ -1,16 +1,16 @@
-//! weave — a `.work` tree → ONE self-contained HTML. If `index.work` declares an
-//! `app` block it builds a multi-page SPA with a sidebar + our own router (see
-//! site.zig); otherwise it concatenates the files into one scrolling document.
-//! The document IS the render — prose is markdown, `client` blocks are emitted
-//! verbatim, other units render as labelled source figures (see render.zig). Pure
-//! string-building over the parser, so it runs native + in the wasm sandbox.
+//! weave — a `.work` tree → ONE self-contained HTML: it concatenates the files into
+//! one scrolling document. The document IS the render — prose is markdown, `client`
+//! blocks are emitted verbatim, other units render as labelled source figures (see
+//! render.zig). Pure string-building over the parser, so it runs native + in the wasm
+//! sandbox. The weave is unopinionated plumbing: any look comes from the workbook's own
+//! `design` block (tangled in by render.zig), never baked into the tool. A navigable,
+//! multi-page SITE is not a weave concern — a site is a workbook served by the nexus.
 const std = @import("std");
 const Io = std.Io;
 const work = @import("work.zig");
 const fs = @import("fs.zig");
 const log = @import("log.zig");
 const render = @import("render.zig");
-const site = @import("site.zig");
 const skills = @import("skills.zig");
 
 const Buf = std.ArrayList(u8);
@@ -20,13 +20,6 @@ pub fn weave(io: Io, alloc: std.mem.Allocator, dir: []const u8, out: []const u8)
 
     // Tangle skills: `<dir>/skills/*.work` app-compositions → SKILL.md (no-op if absent).
     skills.emit(io, alloc, dir) catch {};
-
-    // Site mode: index.work declares an `app` block → a multi-page SPA.
-    const index_path = try std.fmt.allocPrint(alloc, "{s}/index.work", .{dir});
-    if (fs.readFile(io, alloc, index_path)) |index_src| {
-        const index_nodes = try work.parse(alloc, index_src);
-        if (site.appBlock(index_nodes)) |app| return site.build(io, alloc, dir, out, app.body);
-    } else |_| {}
 
     // Single-document mode: every file as a section in one scrolling page.
     const files = try fs.workFiles(io, alloc, dir);

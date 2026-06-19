@@ -33,11 +33,12 @@ defmodule Nexus.SSR do
     pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
     ctx = %{tenant: Keyword.get(opts, :tenant, Nexus.Store.default_tenant()), bake: Keyword.get(opts, :bake, true)}
 
-    # An `app :docs do … section … page … end` block is a docs SITE: render the navigable SPA
-    # (sidebar + routed pages) instead of a single app/document.
+    # An `index` whose `app` block lists `section … page …` is a MULTI-PAGE workbook: render it as a
+    # navigable site (a nav + a history router that swaps pages without reload). Pure mechanism — the
+    # look comes entirely from the workbook's own `design` block, nothing is baked in here.
     case app_node(pages) do
       nil -> compose(pages, resources(pages), Keyword.get(opts, :live, false), ctx)
-      app -> Nexus.Docs.render(root, app, ctx, &render_node/3, &page_title/1)
+      app -> compose_site(root, pages, app, ctx)
     end
   end
 
@@ -45,6 +46,138 @@ defmodule Nexus.SSR do
     Enum.find_value(pages, fn {_f, nodes} ->
       Enum.find(nodes, &(&1.type == :code and &1.kind == "app"))
     end)
+  end
+
+  # ── multi-page site: an `app` block (sections → pages) → nav + history router ──────────────────
+  # Unopinionated plumbing. Emits semantic, neutral structure (.wb-side / .wb-nav / .wb-page) with a
+  # bare default skin so it's legible unstyled; ALL look (logo, colours, type) comes from the
+  # workbook's own `design` block, injected verbatim. No brand, no theme, no per-app-name special-case.
+  defp compose_site(root, pages, app, ctx) do
+    meta = parse_app(app.ast)
+    ctx = Map.put(ctx, :app, false)
+
+    loaded =
+      for s <- meta.sections, key <- s.pages, into: %{} do
+        nodes =
+          case File.read(Path.join(root, key <> ".work")) do
+            {:ok, c} -> Nexus.Literate.parse(c)
+            _ -> []
+          end
+
+        {key, {page_title(nodes), Enum.map_join(nodes, "\n", &render_node(&1, %{}, ctx))}}
+      end
+
+    nav =
+      Enum.map_join(meta.sections, "\n", fn s ->
+        links =
+          Enum.map_join(s.pages, "", fn key ->
+            {t, _} = Map.get(loaded, key, {key, ""})
+            ~s(<a class="wb-link" data-route="#{esc(key)}" href="#{esc(key)}">#{esc(t)}</a>)
+          end)
+
+        ~s(<div class="wb-sec"><div class="wb-sec-title">#{esc(s.title)}</div>#{links}</div>)
+      end)
+
+    articles =
+      Enum.map_join(meta.sections, "\n", fn s ->
+        Enum.map_join(s.pages, "\n", fn key ->
+          {_t, html} = Map.get(loaded, key, {key, ""})
+          ~s(<article class="wb-page" data-route="#{esc(key)}" hidden><div class="prose">#{html}</div></article>)
+        end)
+      end)
+
+    """
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>#{esc(meta.title)}</title>
+    <style>#{site_css()}</style>
+    #{design_css(pages)}</head>
+    <body>
+    <div class="wb-site">
+      <aside class="wb-side"><div class="wb-brand">#{esc(meta.title)}</div><nav class="wb-nav">#{nav}</nav></aside>
+      <main class="wb-main">#{articles}</main>
+    </div>
+    <script>#{site_router()}</script>
+    </body></html>
+    """
+  end
+
+  # Parse the `app` block AST → %{title, sections: [%{title, pages: [route_key]}]}.
+  defp parse_app(ast) do
+    stmts = ast |> app_body() |> block_stmts()
+    title = Enum.find_value(stmts, "", fn {:title, _, [t]} when is_binary(t) -> t; _ -> nil end)
+
+    sections =
+      Enum.flat_map(stmts, fn
+        {:section, _, [t, [{:do, sb}]]} when is_binary(t) -> [%{title: t, pages: pages_of(sb)}]
+        _ -> []
+      end)
+
+    %{title: title, sections: sections}
+  end
+
+  defp app_body({:app, _, args}) when is_list(args), do: Enum.find_value(args, fn [{:do, b}] -> b; _ -> nil end)
+  defp app_body(_), do: nil
+  defp block_stmts({:__block__, _, s}), do: s
+  defp block_stmts(nil), do: []
+  defp block_stmts(single), do: [single]
+  defp pages_of(sb), do: block_stmts(sb) |> Enum.flat_map(fn {:page, _, [p]} when is_binary(p) -> [p]; _ -> [] end)
+
+  # The workbook's own brand sheet(s), injected verbatim — the ONLY source of look for a site.
+  defp design_css(pages) do
+    for {_f, nodes} <- pages, n <- nodes, n.type == :code, n.kind == "design", into: "" do
+      "<style>\n" <> n.body <> "\n</style>\n"
+    end
+  end
+
+  # Bare neutral skin: enough to be legible with no design block; every rule is overridable.
+  defp site_css do
+    """
+    *{box-sizing:border-box}
+    body{margin:0;font:16px/1.6 system-ui,-apple-system,sans-serif;color:#1a1a1a;background:#fff}
+    .wb-site{display:flex;align-items:flex-start;min-height:100vh;max-width:1180px;margin:0 auto}
+    .wb-side{width:260px;flex:none;position:sticky;top:0;height:100vh;overflow-y:auto;padding:24px 18px}
+    .wb-brand{font-weight:600;font-size:18px;margin-bottom:18px}
+    .wb-sec{margin-bottom:16px}
+    .wb-sec-title{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px}
+    .wb-link{display:block;color:#333;text-decoration:none;padding:4px 8px;border-radius:6px;font-size:14.5px}
+    .wb-link:hover{background:rgba(0,0,0,.05)}.wb-link.on{font-weight:600;background:rgba(0,0,0,.05)}
+    .wb-main{flex:1;min-width:0;padding:48px 56px 120px;max-width:800px}
+    .prose h1{font-size:30px;margin:0 0 .5em}.prose h2{font-size:21px;margin:1.6em 0 .4em}.prose h3{font-size:17px;margin:1.3em 0 .3em}
+    .prose p{margin:.7em 0}.prose a{color:#0a6}.prose ul{padding-left:1.3em}
+    .prose code{font-family:ui-monospace,monospace;font-size:.9em;background:rgba(0,0,0,.06);padding:.1em .35em;border-radius:4px}
+    .prose pre{background:rgba(0,0,0,.05);padding:12px 14px;border-radius:8px;overflow-x:auto}.prose pre code{background:none;padding:0}
+    .prose blockquote{border-left:3px solid #ccc;margin:1em 0;padding:.2em 1em;color:#555}
+    .prose figure.unit{border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;margin:1.2em 0}
+    .prose figure.unit pre{margin:0;background:#fafafa;border-radius:0}
+    @media(max-width:760px){.wb-side{display:none}.wb-main{padding:28px 18px}}
+    """
+  end
+
+  # Base-aware history router: data-route keys are relative to the mount's <base href>, so the same
+  # workbook works at `/` or mounted at `/<name>/`. Intercepts in-content `/path` links too.
+  defp site_router do
+    ~S"""
+    (function(){
+      var base=new URL(document.baseURI).pathname;
+      function key(p){return p.indexOf(base)===0?p.slice(base.length):p.replace(/^\//,'');}
+      function show(k){
+        var arts=document.querySelectorAll('.wb-page'),hit=false;
+        arts.forEach(function(a){var on=a.dataset.route===k;a.hidden=!on;if(on)hit=true;});
+        if(!hit&&arts[0]){arts[0].hidden=false;k=arts[0].dataset.route;}
+        document.querySelectorAll('.wb-link').forEach(function(l){l.classList.toggle('on',l.dataset.route===k);});
+        window.scrollTo(0,0);
+      }
+      function go(k){history.pushState({},'',base+k);show(k);}
+      document.addEventListener('click',function(e){
+        var a=e.target.closest('a[data-route],a[href^="/"]');if(!a)return;
+        var k=a.dataset.route||key(a.getAttribute('href'));
+        if(document.querySelector('.wb-page[data-route="'+(window.CSS&&CSS.escape?CSS.escape(k):k)+'"]')){e.preventDefault();go(k);}
+      });
+      window.addEventListener('popstate',function(){show(key(location.pathname));});
+      show(key(location.pathname));
+    })();
+    """
   end
 
   @doc false

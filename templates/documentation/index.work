@@ -1,15 +1,13 @@
 # Workbooks Documentation
 
 The docs site for Workbooks, authored as a workbook — prose narrates, `do … end`
-blocks run. This `index.work` is the **composition root**: it names the app, its
-theme, and the ordered pages the sidebar shows. `work weave` (site-mode) reads
-this file plus the sibling pages and emits a full single-page app — driven by our
-own language-agnostic router — as the workbook output.
+blocks run. This `index.work` is the **composition root**: it names the site and
+the ordered sections/pages the sidebar shows. The nexus serves the tree as a
+navigable site; the look comes from `design.work` (our brand sheet), never from the
+runtime — the same unopinionated image anyone deploys.
 
 app :docs do
-  title  "Workbooks"
-  theme  :paper_ink            # petal mark, DNA strip, dark/light, Geist + mono
-  router :history              # real path routes + host catch-all → this SPA
+  title "Workbooks"            # the look lives in design.work — the runtime is unopinionated plumbing
 
   section "Preface" do
     page "preface/literate-programming"
