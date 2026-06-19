@@ -49,6 +49,10 @@ if (typeof window !== "undefined" && window.__WB_DEV_MOCK__) {
 // icon library). One lucide: legacy value stays on purpose to prove the
 // legacy→material mapping; Reading keeps a plain emoji to prove emoji.
 const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
+  // ── showcase apps: real, distinct, self-contained workbooks (static/mock/) ──
+  Swarm: { icon: "mi:database", kind: "app" },
+  Ledger: { icon: "mi:table", kind: "app" },
+  Pulse: { icon: "mi:chart", kind: "app" },
   Kanban: { icon: "mi:todo", kind: "app" },
   Notes: { icon: "mi:document", kind: "app" },
   Tracker: { icon: "lucide:TrendUp", kind: "app" }, // legacy-mapping example
@@ -94,6 +98,9 @@ const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
  *  static asset (see static/mock/kanban.html); other apps open a clearly
  *  labeled stub page generated on the fly by `read_file_bytes_base64`. */
 const APP_WORKBOOK_PATH: Record<string, string> = {
+  Swarm: "/mock/swarm.html",
+  Ledger: "/mock/ledger.html",
+  Pulse: "/mock/pulse.html",
   Kanban: "/mock/kanban.html",
   // Brand Nana (brand-intelligence agency)
   "Brand Health": "/brands/brand-nana/brand-health-dashboard.html",
@@ -133,7 +140,7 @@ const WORKSPACES = [
     id: "ws_personal",
     name: "Personal",
     icon: "🪐",
-    package_names: ["Kanban", "Notes", "Tracker", "Reading", "Clients", "Side Projects", "Photos", "Design", "People", "Finance", "Research", "Archive", "Brand", "Marketing"],
+    package_names: ["Swarm", "Ledger", "Pulse", "Kanban", "Notes", "Tracker", "Reading", "Clients", "Side Projects", "Photos", "Design", "People", "Finance", "Research", "Archive", "Brand", "Marketing"],
     created_at: 1_700_000_000_000,
   },
   {
