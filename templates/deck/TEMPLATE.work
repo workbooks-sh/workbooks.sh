@@ -1,0 +1,30 @@
+# Deck — template :app
+
+A topic → a slide deck, rendered as a live **reveal.js** presentation. The point of this template:
+show how to add a real front-end dependency (`reveal.js`, from a CDN) and author your slide
+components with it inside a `.work` `client` block.
+
+## What's the platform, what's the template
+
+**Platform:** `Nexus.Llm` (writes the outline), `Nexus.Store` (saved decks), `Nexus.Live` (the SSE
+source). The weaver emits your `client` block verbatim, so a CDN dependency + your slide markup just
+works — no build step.
+
+**Template:**
+- `index.work` → `server :deck` — generates the outline (JSON array of slides) with the model and
+  streams each slide. **Replace with your own content source** (research, a database, a file…).
+- `index.work` → `resource Deck` — what a saved deck records.
+- `ui.work` → `client :app` — loads reveal.js and builds a `<section>` per slide. **This is where you
+  add your dependency and author your components.** Swap themes, transitions, layouts, plugins.
+
+## Run it
+
+  work weave .            # one self-contained workbook.html — the deck travels with it
+  WB_SERVE=1 PORT=4000 WB_DATA="$(pwd)" elixir --no-halt -S mix run    # live generation
+
+## Make it yours
+
+1. Swap the reveal.js theme (`theme/white.css` → `black`, `league`, `serif`, …) or add plugins.
+2. Replace `server :deck` content generation with your own (keep `register/0` + the `slide` event).
+3. Restyle the slide `<section>` builder in the `client` block.
+4. Rename the `"deck"` live source + `Deck` resource.

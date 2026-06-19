@@ -51,6 +51,8 @@ defmodule Nexus.SSR do
   defp files(root) do
     (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
     |> Enum.uniq()
+    # TEMPLATE.work is the template manifest (metadata for the CLI / explorer), not app content.
+    |> Enum.reject(&(Path.basename(&1) == "TEMPLATE.work"))
     |> Enum.sort_by(fn p -> {Path.basename(p) != "index.work", p} end)
   end
 
@@ -98,6 +100,12 @@ defmodule Nexus.SSR do
   end
 
   defp compose(pages, res, live, ctx) do
+    # A workbook with a `client` island is an APP: the island IS the page, so the literate prose +
+    # headings + source figures are CONTEXT, not rendered — only components (the island + `show`
+    # data directives) emit. A workbook with no island renders as a document (prose + show + units),
+    # the literate-publishing posture. To render markdown in an app, author it inside a component.
+    app? = Enum.any?(pages, fn {_f, nodes} -> Enum.any?(nodes, &(&1.type == :code and &1.kind == "client")) end)
+    ctx = Map.put(ctx, :app, app?)
     body = Enum.map_join(pages, "\n", &page(&1, res, ctx))
 
     """
@@ -198,9 +206,18 @@ defmodule Nexus.SSR do
   end
 
   defp page({name, nodes}, res, ctx) do
+    # In app mode (an island is present) only components render — the island and `show` data
+    # directives; prose/headings/source figures are literate context. Same rule for one file or many.
+    nodes = if ctx[:app], do: Enum.filter(nodes, &app_component?/1), else: nodes
+
     ~s(<section class="file" id="#{anchor(name)}" data-file="#{esc(name)}">\n) <>
       Enum.map_join(nodes, "\n", &render_node(&1, res, ctx)) <> "\n</section>"
   end
+
+  # The only nodes that render into an app: the `client` island and `show <Resource|Unit>` directives.
+  defp app_component?(%{type: :code, kind: "client"}), do: true
+  defp app_component?(%{type: :decl, text: "show " <> _}), do: true
+  defp app_component?(_), do: false
 
   defp render_node(%{type: :heading, level: l, text: t}, _res, _ctx), do: "  <h#{l}>#{inline(t)}</h#{l}>"
 

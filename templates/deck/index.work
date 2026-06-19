@@ -1,0 +1,96 @@
+# Deck 🖼️
+
+Type a topic; it writes a slide deck and renders it as a live **reveal.js** presentation you can
+present right there (arrow keys, `f` for fullscreen). An example of pulling in a real front-end
+dependency — `reveal.js` from a CDN — and building the slide components in a `.work` `client` block,
+fed by a `server` block that generates the outline with `Nexus.Llm`.
+
+## Adding a dependency
+
+The interface block loads `reveal.js` (+ a theme) straight off a CDN and builds each slide as a
+`<section>` — so "I'm adding reveal.js and authoring my slides with it" is just a `client` block. The
+deck content comes from the `server` block below; the data model is a `Deck` row.
+
+resource Presentation do
+  topic :text
+  title :text
+  slides :int
+end
+
+## The deck writer
+
+`run/2` asks the model for a structured outline (a JSON array of slides), then streams each slide to
+the interface as it's parsed, so the deck builds in front of you.
+
+server :deck do
+  @model "google/gemma-4-26b-a4b-it"
+
+  def register do
+    Nexus.Live.register("deck", fn params, emit ->
+      topic = params["q"] || ""
+      result = run(topic, emit)
+
+      try do
+        Nexus.Store.create(Presentation, %{topic: topic, title: result.title, slides: length(result.slides)})
+      rescue
+        _ -> :ok
+      end
+    end)
+  end
+
+  def run(topic, emit) do
+    emit.(%{type: "step", label: "Outlining “#{topic}”…"})
+    slides = generate(topic)
+
+    Enum.each(slides, fn s -> emit.(%{type: "slide", slide: s}) end)
+
+    title = (List.first(slides) || %{title: topic})[:title] || topic
+    emit.(%{type: "done", title: title})
+    %{topic: topic, title: title, slides: slides}
+  rescue
+    _ ->
+      emit.(%{type: "done", title: topic})
+      %{topic: topic, title: topic, slides: []}
+  end
+
+  defp generate(topic) do
+    prompt =
+      "Write a clear, well-structured slide deck on: #{topic}\n\n" <>
+        "Return ONLY a JSON array of 6-9 slides, each an object: " <>
+        "{\"title\": string, \"bullets\": [string], \"notes\": string}. " <>
+        "The FIRST slide is a title slide (one or two bullets as a subtitle). Content slides have " <>
+        "3-5 SHORT bullets. `notes` is a one-line speaker note. No markdown, no prose outside the JSON."
+
+    case Nexus.Llm.complete([%{role: "user", content: prompt}], model: @model, max_tokens: 1800) do
+      {:ok, %{content: c}} when is_binary(c) and c != "" -> parse(c)
+      _ -> []
+    end
+  end
+
+  # Pull the JSON array out of the response and normalize each slide. Degrades to [] on a bad shape.
+  defp parse(c) do
+    json =
+      case Regex.run(~r/\[.*\]/s, c) do
+        [m] -> m
+        _ -> c
+      end
+
+    case Jason.decode(json) do
+      {:ok, list} when is_list(list) -> list |> Enum.map(&slide/1) |> Enum.reject(&is_nil/1)
+      _ -> []
+    end
+  end
+
+  defp slide(%{} = s) do
+    %{
+      title: text(s["title"]),
+      bullets: (s["bullets"] || []) |> List.wrap() |> Enum.map(&text/1) |> Enum.reject(&(&1 == "")),
+      notes: text(s["notes"])
+    }
+  end
+
+  defp slide(_), do: nil
+
+  defp text(v) when is_binary(v), do: String.trim(v)
+  defp text(_), do: ""
+end
