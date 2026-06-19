@@ -444,11 +444,12 @@ defmodule Nexus.Server do
         route_or_404(conn)
 
       r ->
-        # A real file in the mount (fonts/img/css/js/…) → serve it as a static asset; otherwise it's a
-        # history-routed SPA sub-path → serve the workbook shell.
-        case serve_static(conn, r, Enum.join(rest, "/")) do
+        # Precedence under a mount path: real static file → explicit declared `route` → SPA shell.
+        with :skip <- serve_static(conn, r, Enum.join(rest, "/")),
+             :skip <- try_route(conn) do
+          serve_workbook(conn, r, wb)
+        else
           {:served, c} -> c
-          :skip -> serve_workbook(conn, r, wb)
         end
     end
   end
@@ -468,11 +469,15 @@ defmodule Nexus.Server do
 
     case static do
       {:served, c} -> c
-      :skip -> dispatch_or_404(conn)
+      :skip -> (case try_route(conn) do
+                  {:served, c} -> c
+                  :skip -> send_resp(conn, 404, "not found")
+                end)
     end
   end
 
-  defp dispatch_or_404(conn) do
+  # Dispatch an explicit declared route (Nexus.Router) for this request. `{:served, conn}` or `:skip`.
+  defp try_route(conn) do
     case Nexus.Router.match(conn.method, conn.request_path) do
       {mod, fun, params} ->
         conn = Plug.Conn.fetch_query_params(conn)
@@ -488,10 +493,10 @@ defmodule Nexus.Server do
         }
 
         {status, ctype, out} = Nexus.Router.dispatch(mod, fun, req)
-        conn |> put_resp_content_type(ctype) |> send_resp(status, out)
+        {:served, conn |> put_resp_content_type(ctype) |> send_resp(status, out)}
 
       nil ->
-        send_resp(conn, 404, "not found")
+        :skip
     end
   end
 

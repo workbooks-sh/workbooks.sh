@@ -20,6 +20,19 @@ control plane uses — so the Usage view shows real dials on whatever nexus serv
 multi-tenant dashboard reads `/api/platform/usage`; our own dogfood reads the primitive directly.)
 
 server :cloud do
+  # Native-auth adoption (wb-ajvy): real CLI tokens minted by Nexus.Auth.Token (hashed-at-rest,
+  # tenant-scoped, audited) — not a demo. Exposed with the routing primitive; the Account view calls
+  # them. The token carries scopes, so it's subject to the same per-route guards as a session.
+  route "POST /cloud/token", :mint_token
+  route "GET /cloud/tokens", :list_tokens
+
+  def mint_token(req) do
+    name = (is_map(req.body) && req.body["name"]) || "cli"
+    {201, Nexus.Auth.Token.mint(req.tenant, name: name, scopes: ["api"])}
+  end
+
+  def list_tokens(req), do: %{tokens: Nexus.Auth.Token.list(req.tenant)}
+
   def register do
     Nexus.Live.register("usage", fn params, emit ->
       # A representative running nexus on the current tier; Capacity derives the dials.
@@ -227,6 +240,7 @@ client :app do
         [].forEach.call(document.querySelectorAll('.view'),function(x){x.classList.toggle('on',x.dataset.view===v)});
         if(v==='usage'&&!loaded.usage){loaded.usage=true;loadUsage();}
         if(v==='nexuses'&&!loaded.nexuses){loaded.nexuses=true;loadFleet();}
+        if(v==='account'&&!loaded.account){loaded.account=true;loadTokens();}
       });
     });
 
@@ -313,13 +327,20 @@ client :app do
     });
     function addTokRow(tok,note){ var box=$('#tokens'); if(box.querySelector('.empty'))box.innerHTML='';
       box.insertAdjacentHTML('beforeend','<div class="row2"><span class="ic">⚿</span><b>cli</b><code>'+esc(tok)+'</code><span class="muted">'+esc(note)+'</span></div>'); }
+    // Mint a REAL token via our cloud server block → Nexus.Auth.Token (hashed-at-rest, audited).
     $('#mint') && $('#mint').addEventListener('click',function(){
-      if(connected()){
-        plat('/tokens/mint',{method:'POST',body:JSON.stringify({name:'cli'})}).then(function(r){return r.json()}).then(function(d){
-          addTokRow(d.token||d.secret||'(minted)', 'copy now — shown once');
+      fetch('/cloud/token',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'cli'})})
+        .then(function(r){return r.json()}).then(function(d){
+          addTokRow(d.token||'(minted)', 'copy now — shown once · '+(d.id||''));
         }).catch(function(){ addTokRow('—','mint failed'); });
-      } else addTokRow('wbk_demo_••••','demo — connect to mint a real token');
     });
+    function loadTokens(){
+      fetch('/cloud/tokens').then(function(r){return r.json()}).then(function(d){
+        var box=$('#tokens'); var ts=(d&&d.tokens)||[];
+        if(!ts.length)return;
+        box.innerHTML=ts.map(function(t){return '<div class="row2"><span class="ic">⚿</span><b>'+esc(t.name||'cli')+'</b><code>'+esc(t.id||'')+'</code><span class="muted">created '+esc(t.created_at||'')+'</span></div>'}).join('');
+      }).catch(function(){});
+    }
     $('#wsadd') && $('#wsadd').addEventListener('click',function(){
       var box=$('#workspaces');
       box.insertAdjacentHTML('beforeend','<div class="row2"><span class="ic">▣</span><b>New workspace</b><span class="muted">rename in settings</span></div>');
