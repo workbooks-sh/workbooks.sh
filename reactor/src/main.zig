@@ -68,8 +68,13 @@ pub fn main(init: std.process.Init) !void {
             std.process.exit(try deploy.validateVerb(io, alloc, it.next() orelse "deployment.work"));
         } else if (eql(sub, "apply")) {
             std.process.exit(try deploy.apply(io, alloc, it.next() orelse "deployment.work"));
+        } else if (sub.len > 0) {
+            // `work deploy <dir> [--nexus <name>]` — mount a workbook into a (named) running nexus.
+            const cwd = init.environ_map.get("PWD") orelse ".";
+            const f = flags(alloc, &it);
+            std.process.exit(try deploy.deployWorkbook(io, alloc, home, cwd, sub, f.nexus));
         } else {
-            log.err("usage: work deploy init|validate|apply");
+            log.err("usage: work deploy <dir> [--nexus <name>]  ·  deploy init|validate|apply");
             std.process.exit(1);
         }
     } else if (eql(verb, "ctx")) {

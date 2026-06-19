@@ -82,6 +82,13 @@ pub fn nexusUrl(io: Io, alloc: std.mem.Allocator, home: []const u8) ![]const u8 
     return "http://localhost:4000";
 }
 
+/// The nexus URL of a target by NAME (deploy to a nexus by name, not a URL). Falls back to local.
+pub fn nexusByName(io: Io, alloc: std.mem.Allocator, home: []const u8, name: []const u8) ![]const u8 {
+    const ctx = try load(io, alloc, home);
+    for (ctx.targets) |t| if (std.mem.eql(u8, t.name, name)) return if (t.nexus.len > 0) t.nexus else "http://localhost:4000";
+    return "http://localhost:4000";
+}
+
 // ── verbs ───────────────────────────────────────────────────────────────────────────────────
 pub fn ctxList(io: Io, alloc: std.mem.Allocator, home: []const u8) !u8 {
     const ctx = try load(io, alloc, home);

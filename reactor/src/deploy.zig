@@ -7,6 +7,8 @@
 const std = @import("std");
 const Io = std.Io;
 const fs = @import("fs.zig");
+const context = @import("context.zig");
+const http = @import("cloud.zig");
 const log = @import("log.zig");
 
 const places = [_][]const u8{ "local", "cloud" };
@@ -123,6 +125,46 @@ pub fn init(io: Io, alloc: std.mem.Allocator, place_in: []const u8, dir: []const
     log.ok(try std.fmt.allocPrint(alloc, "wrote deployment.work \u{b7} engine-place={s}", .{place}));
     log.step("edit it, then `work deploy validate` \u{2192} `work deploy apply`");
     return 0;
+}
+
+/// `work deploy <dir> [--nexus <name>]` — mount a workbook into a running nexus. The target is a
+/// nexus BY NAME (a context target), resolved to its URL; default = the active context (local). One
+/// nexus hosts many workbooks, each at /<name> — like one host serving many sites.
+pub fn deployWorkbook(io: Io, alloc: std.mem.Allocator, home: []const u8, cwd: []const u8, dir: []const u8, nexus_name: []const u8) !u8 {
+    const base = if (nexus_name.len > 0)
+        try context.nexusByName(io, alloc, home, nexus_name)
+    else
+        try context.nexusUrl(io, alloc, home);
+
+    // Absolute path (the nexus mounts from it, same machine). Resolve against $PWD if relative.
+    const abs = if (std.fs.path.isAbsolute(dir)) try alloc.dupe(u8, dir) else try std.fs.path.resolve(alloc, &.{ cwd, dir });
+
+    const empty: []const []const u8 = &.{};
+    if ((fs.workFiles(io, alloc, abs) catch empty).len == 0) {
+        log.err(try std.fmt.allocPrint(alloc, "no workbook (.work files) at {s}", .{abs}));
+        return 1;
+    }
+
+    const name = std.fs.path.basename(abs);
+
+    log.prompt(try std.fmt.allocPrint(alloc, "work deploy {s} \u{2192} {s}", .{ name, base }));
+
+    const body = try std.fmt.allocPrint(alloc, "{{\"name\":\"{s}\",\"path\":\"{s}\"}}", .{ name, abs });
+    const url = try std.fmt.allocPrint(alloc, "{s}/api/mount", .{base});
+
+    const res = http.request(io, alloc, .POST, url, "", body) catch {
+        log.err(try std.fmt.allocPrint(alloc, "couldn't reach the nexus at {s} \u{2014} is it running?", .{base}));
+        return 1;
+    };
+
+    if (res.status == 200) {
+        const path = http.jsonField(res.body, "url") orelse "/";
+        log.ok(try std.fmt.allocPrint(alloc, "deployed \u{2192} {s}{s}", .{ base, path }));
+        return 0;
+    }
+
+    log.err(try std.fmt.allocPrint(alloc, "deploy failed ({d}): {s}", .{ res.status, res.body }));
+    return 1;
 }
 
 pub fn validateVerb(io: Io, alloc: std.mem.Allocator, file: []const u8) !u8 {

@@ -300,6 +300,35 @@ defmodule Nexus.Server do
   # tenant runtime is indistinguishable). Auth (the plug above) has already resolved the org tenant.
   forward("/api/platform", to: Nexus.Platform)
 
+  # Deploy a workbook into THIS running nexus (mount it at /<name> without a restart). Body:
+  # {name, path} where `path` holds the workbook's `.work` files (same machine — local dev deploy;
+  # a cloud deploy uploads the files instead). The CLI `work deploy` posts here.
+  post "/api/mount" do
+    {:ok, body, conn} = read_body(conn)
+
+    payload =
+      with {:ok, m} when is_map(m) <- Jason.decode(body),
+           name when is_binary(name) and name != "" <- m["name"],
+           path when is_binary(path) <- m["path"],
+           true <- File.dir?(path) and Path.wildcard(Path.join(path, "*.work")) != [] do
+        mount_runtime(name, Path.expand(path))
+        %{ok: true, name: name, url: "/" <> name <> "/"}
+      else
+        _ -> %{ok: false, error: "need {name, path}, where path holds .work files on this machine"}
+      end
+
+    status = if payload.ok, do: 200, else: 422
+    conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
+  end
+
+  # Mount a workbook live: compile + register its units, then add it to the routing table (replacing a
+  # same-named mount). Converts a single-workbook nexus to multi (the deployed apps each get /<name>).
+  defp mount_runtime(name, path) do
+    bringup(path)
+    others = mounts() |> Enum.reject(fn {n, _} -> n == name or n == "" end)
+    Application.put_env(:nexus, :mounts, Enum.sort([{name, path} | others]))
+  end
+
   # ── one nexus, many workbooks: a mounted workbook's app + its live source + its data ──────────
   get "/:wb/data/:resource" do
     rows =
