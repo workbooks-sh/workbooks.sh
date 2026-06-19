@@ -144,6 +144,28 @@ share a handful of render slots, because each agent renders for ~0.6s then waits
 </ul>
 </section>
 
+<section class="file" data-file="capacity.work">
+<h2>The north star: deep-research agents per 1GB</h2>
+<p>The whole point — how many concurrent deep-research agents fit on a 1GB Fly machine? We moved it
+~27× across four changes, each measured:</p>
+
+<table class="data">
+<caption>Concurrent agents per 1GB — the journey</caption>
+<thead><tr><th>architecture</th><th>agents / 1GB</th><th>why</th></tr></thead>
+<tbody>
+<tr><td>Cold wasm render per read</td><td>~7</td><td>every read JIT-compiled a 9.6MB module, 103MB each</td></tr>
+<tr><td>+ AOT cache + render gate</td><td>~15 renders</td><td>shared code, OOM→queue</td></tr>
+<tr><td>+ Floki default (no-wasm reads)</td><td>~90</td><td>most reads need text+links, not a render; bottleneck moved to parsing</td></tr>
+<tr><td>+ streaming tokenizer (no DOM tree)</td><td><strong>~189</strong></td><td>O(1) parse memory; 4.7 MB/agent, sublinear</td></tr>
+</tbody>
+</table>
+
+<p>At 100 agents reading back-to-back (1980 pages in 12s) the runtime sat at <strong>718 MB</strong> —
+no OOM in sight. Renders stay a fixed gated slice; the LLM is remote (~0 local RAM). With realistic
+LLM think-time between reads, far more agents fit. The ceiling is no longer wasm, no longer the DOM —
+it's just BEAM process state, which is cheap.</p>
+</section>
+
 <section class="file" data-file="verdict.work">
 <h2>Verdict</h2>
 <ul>
