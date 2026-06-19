@@ -1,8 +1,0 @@
-{
-  "lines": [
-    "We start with a brand new, empty workbook.",
-    "First, the agent gives it a title: Launch Board.",
-    "Next, it lays out three kanban sections: to do, in progress, and done.",
-    "Finally, it fills each section with the real launch tasks. The workbook is done."
-  ]
-}

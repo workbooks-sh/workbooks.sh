@@ -1,6 +1,0 @@
-A screen recording of an agent authoring a kanban workbook, edit by edit:
-1. Empty workbook
-2. Add the title — Launch Board
-3. Add three sections: To do, In progress, Done
-4. Fill the sections with launch tasks
-Each state shows the workbook UI (dark theme, green accents) with an on-screen caption naming the edit.
