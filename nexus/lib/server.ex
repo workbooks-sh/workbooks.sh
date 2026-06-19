@@ -57,6 +57,10 @@ defmodule Nexus.Server do
     |> send_resp(200, Jason.encode!(rows, escape: :html_safe))
   end
 
+  # The hosted control-plane API (only answers when WB_CONTROL_PLANE — else Nexus.Platform 404s, so a
+  # tenant runtime is indistinguishable). Auth (the plug above) has already resolved the org tenant.
+  forward("/api/platform", to: Nexus.Platform)
+
   match _ do
     send_resp(conn, 404, "not found")
   end
