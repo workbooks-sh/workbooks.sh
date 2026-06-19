@@ -163,7 +163,7 @@
     <p class="dim" style="font-size:13px;margin-bottom:12px">Share your apps from <i>your</i> domain instead of ours. Add a domain, prove you own it with a DNS record, and we put it on top of your nexus — replacing the default <code class="mono">.workbooks.sh</code> address. <span class="faint">Available on Team and Scale plans.</span></p>
 
     {#if domLocked}
-      <div class="kv"><span class="k">Plan</span><span class="v faint">Custom domains need a paid plan — <a href="/billing">upgrade</a> to bind one.</span></div>
+      <div class="kv"><span class="k">Plan</span><span class="v faint">Custom domains need a paid plan — <a href="/upgrade">upgrade</a> to bind one.</span></div>
     {/if}
 
     <div class="srow"><label for="domhost">Domain</label>

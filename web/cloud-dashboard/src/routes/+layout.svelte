@@ -113,7 +113,6 @@
     nxLabel.split(/[\s-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'N'
   );
 
-  function pickNexus(id) { nexusStore.setActive(id); nxMenuOpen = false; goto('/'); }
 
   // when searching, make sure results are visible on the list page
   function onSearch(e) {
@@ -199,7 +198,7 @@
       </div>
     {/snippet}
 
-    <!-- NEXUS switcher — the top concept (your isolated unit, ≈ an org; cloud or local) -->
+    <!-- NEXUS — one per org (the nexus IS the org). Not a switcher: you scale this one. -->
     <div class="swrap">
       <div class="swlabel">Nexus</div>
       <div class="sw" onclick={() => { nxMenuOpen = !nxMenuOpen; wsMenuOpen = false; }} role="button" tabindex="0">
@@ -209,19 +208,23 @@
       </div>
       {#if nxMenuOpen}
         <div class="swmenu" role="menu">
-          {#each nexusStore.list as n (n.id)}
-            <button class="omitem" onclick={() => pickNexus(n.id)}>
-              <span class="av sm">{(n.name?.[0] || 'N').toUpperCase()}</span>
-              <span class="omname">{n.name}</span>
-              {#if activeNx?.id === n.id}<span class="omtick">✓</span>{/if}
+          {#if activeNx}
+            <div class="omitem" style="cursor:default">
+              <span class="av sm">{(activeNx.name?.[0] || 'N').toUpperCase()}</span>
+              <span class="omname">{activeNx.name}</span>
+              <span class="omtick">●</span>
+            </div>
+            <div class="omdiv"></div>
+            <a class="omitem" href="/upgrade" onclick={() => (nxMenuOpen = false)}>
+              <span class="av sm plus">↑</span><span class="omname">Scale up</span>
+            </a>
+            <a class="omitem" href="/settings" onclick={() => (nxMenuOpen = false)}>Nexus settings</a>
+          {:else}
+            <div class="omempty">No nexus yet</div>
+            <button class="omitem" onclick={() => { modalOpen = true; nxMenuOpen = false; }}>
+              <span class="av sm plus">+</span><span class="omname">Create your nexus</span>
             </button>
-          {/each}
-          {#if nexusStore.list.length === 0}<div class="omempty">No nexus yet</div>{/if}
-          <div class="omdiv"></div>
-          <button class="omitem" onclick={() => { modalOpen = true; nxMenuOpen = false; }}>
-            <span class="av sm plus">+</span><span class="omname">New nexus</span>
-          </button>
-          <a class="omitem" href="/settings" onclick={() => (nxMenuOpen = false)}>Nexus settings</a>
+          {/if}
         </div>
       {/if}
     </div>

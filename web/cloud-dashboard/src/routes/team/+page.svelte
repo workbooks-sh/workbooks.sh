@@ -27,10 +27,10 @@
     viewer: ['view']
   };
   const CAPS = [
-    { key: 'view', label: 'View', desc: 'Open nexuses, workbooks and folders' },
+    { key: 'view', label: 'View', desc: 'Open the nexus, workbooks and folders' },
     { key: 'edit', label: 'Edit', desc: 'Change workbooks and content' },
     { key: 'share', label: 'Share folders', desc: 'Share a folder with a teammate' },
-    { key: 'manage', label: 'Manage nexuses', desc: 'Restart, sleep, configure' },
+    { key: 'manage', label: 'Manage nexus', desc: 'Restart, sleep, configure' },
     { key: 'delete', label: 'Delete', desc: 'Permanently remove a nexus' },
     { key: 'manage_roles', label: 'Manage roles', desc: 'Change what teammates can do' }
   ];
@@ -52,7 +52,7 @@
   <div class="sechead">
     <div>
       <h2>Team</h2>
-      <p>Members of {data.workspace ? `the ${data.workspace}` : 'your'} workspace. Invite teammates, assign roles, and manage who can access your nexuses.</p>
+      <p>Members of {data.workspace ? `the ${data.workspace}` : 'your'} workspace. Invite teammates, assign roles, and manage who can access your nexus.</p>
     </div>
   </div>
 
@@ -130,7 +130,7 @@
   <div class="card" style="padding:0;overflow:hidden">
     <div style="padding:14px 18px;border-bottom:2px solid var(--line)">
       <b style="font-size:13.5px">Roles &amp; access</b>
-      <div class="faint" style="font-size:11.5px">What each role can do. Access also nests — a teammate needs access to a nexus before its workbooks.</div>
+      <div class="faint" style="font-size:11.5px">What each role can do. Access also nests — a teammate needs access to the nexus before its workbooks.</div>
     </div>
     <table>
       <thead><tr><th>Capability</th>{#each ROLES as r}<th class="cap">{r}</th>{/each}</tr></thead>

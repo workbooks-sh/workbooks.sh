@@ -29,15 +29,18 @@
 
 <section>
   {#if !nx}
-    <div class="sechead"><div><h2>Nexus</h2><p>Your hosted runtime.</p></div></div>
-    <div class="card empty">No nexus yet — open the <b>Nexus</b> switcher and hit <b>New nexus</b> to spin one up.</div>
+    <div class="sechead"><div><h2>Your nexus</h2><p>Your hosted runtime — one per organization, scaled to fit.</p></div></div>
+    <div class="card empty">No nexus yet — open the <b>Nexus</b> menu in the sidebar and <b>Create your nexus</b> to spin it up. You scale this one nexus as you grow; there's never a second.</div>
   {:else}
     <div class="sechead">
       <div>
         <h2 style="display:flex;align-items:center;gap:11px"><span class="dot {nx.state}"></span>{nx.name}</h2>
         <p>{nx.plan} · {nx.region} · {status}</p>
       </div>
-      <button class="btn sm" onclick={() => window.open(nx.url, '_blank')}>Open ↗</button>
+      <div style="display:flex;gap:8px">
+        <a class="btn sm" href="/upgrade">Scale up</a>
+        <button class="btn sm" onclick={() => window.open(nx.url, '_blank')}>Open ↗</button>
+      </div>
     </div>
 
     <!-- the two metrics that matter -->

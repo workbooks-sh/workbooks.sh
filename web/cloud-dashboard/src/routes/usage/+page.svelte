@@ -62,7 +62,7 @@
         <div class="hot">
           <p><b>Near capacity.</b> You're auto-scaling against your {cap.tier.name} ceiling.
             {#if cap.next}Move to <b>{cap.next.name}</b> ({cap.next.ram_mb} MB · {cap.next.storage_gb} GB · {cap.next.price}/mo) to keep growing{:else}You're on the top tier — split into a new organization for more headroom{/if}.</p>
-          {#if cap.next}<a class="btn sm primary" href="/billing">Scale to {cap.next.name}</a>{/if}
+          {#if cap.next}<a class="btn sm primary" href="/upgrade">Scale to {cap.next.name}</a>{/if}
         </div>
         {#if cap.topRam.length}
           <div class="shed"><span class="sh">Top RAM</span>

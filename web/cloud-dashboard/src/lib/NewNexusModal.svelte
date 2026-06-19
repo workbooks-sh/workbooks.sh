@@ -50,8 +50,8 @@
 {#if open}
   <div class="modal" onclick={(e) => { if (e.target === e.currentTarget) onclose?.(); }}>
     <div class="sheet">
-      <h2>New nexus</h2>
-      <p class="sub">A hosted runtime that builds and runs your workbooks.</p>
+      <h2>Create your nexus</h2>
+      <p class="sub">Your organization's hosted runtime — you'll scale this one nexus as you grow.</p>
 
       <div class="lab">Name</div>
       <div class="field"><input bind:value={name} placeholder="my-nexus" /></div>
@@ -63,7 +63,7 @@
         {/each}
       </div>
 
-      <div class="lab">Size</div>
+      <div class="lab">Starting size</div>
       <div class="plans">
         {#each SIZES as s}
           <div class="plan" class:sel={size === s.id} onclick={() => (size = s.id)}>
@@ -81,13 +81,13 @@
         <div class="tog" class:on={dbOn} onclick={() => (dbOn = !dbOn)}><i></i></div>
       </div>
 
-      <div class="note">Egress-free object storage and your database are included — storage comes from your plan. Unlimited users and workspaces. A nexus is its own isolated micro-VM.</div>
+      <div class="note">Egress-free object storage and Postgres are included. Unlimited workspaces and users — you're only ever scaled by memory and bandwidth. You can scale this nexus up anytime; you'll never need a second.</div>
 
       <div class="foot">
-        <div class="est">Included in your plan</div>
+        <div class="est">Scale up anytime</div>
         <div style="display:flex;gap:8px">
           <button class="btn" onclick={() => onclose?.()}>Cancel</button>
-          <button class="btn primary" onclick={deploy}>Deploy nexus</button>
+          <button class="btn primary" onclick={deploy}>Create nexus</button>
         </div>
       </div>
     </div>

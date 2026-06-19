@@ -29,7 +29,7 @@
   // representative team size, so the stack comparison scales with the SELECTED tier
   // (the value gap widens at Scale/Enterprise). No hosted free tier — running a LOCAL
   // nexus in the desktop app is the free path; a HOSTED nexus starts at Starter. Each
-  // tier bundles compute + storage + included nexuses, unlimited users + workspaces,
+  // tier scales the org's one nexus (memory + bandwidth), unlimited users + workspaces,
   // database + egress-free object storage.
   const TIERS = [
     { id: 'starter', name: 'Starter', price: 29, storage: '50 GB', users: 6, blurb: 'A project or small team.' },
@@ -121,7 +121,7 @@
 
     {:else if stepKey === 'account'}
       <h1>Who’s your nexus for?</h1>
-      <p class="sub">A nexus is your own isolated space. Start with one — add teammates or more nexuses anytime.</p>
+      <p class="sub">A nexus is your own isolated space. Add teammates anytime; scale this one nexus as you grow.</p>
       <div class="picks">
         <button class="pick" class:sel={accountType === 'personal'} onclick={() => (accountType = 'personal')}>
           <span class="pic" style="background:var(--sky)">◦</span><b>Just me</b><small>A personal nexus — build and run my own software.</small>

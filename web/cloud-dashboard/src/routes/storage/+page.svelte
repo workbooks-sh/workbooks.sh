@@ -10,14 +10,14 @@
   <div class="sechead">
     <div>
       <h2>Storage</h2>
-      <p>Object storage for your nexuses — images &amp; files, served with zero egress.</p>
+      <p>Object storage for your nexus — images &amp; files, served with zero egress.</p>
     </div>
     <div class="dim mono" style="font-size:13px">{totalSize} total</div>
   </div>
 
   {#if buckets.length === 0}
     <div class="card faint" style="text-align:center;color:var(--dim)">
-      No storage yet. Each nexus gets a bucket — create a nexus to get started.
+      No storage yet. Your nexus gets a bucket — create your nexus to get started.
     </div>
   {:else}
     <div class="card" style="padding:0;overflow:hidden">
