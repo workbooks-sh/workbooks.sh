@@ -97,12 +97,14 @@ defmodule Nexus.Llm do
     %{
       content: msg["content"] || "",
       tool_calls: parse_tool_calls(msg["tool_calls"] || []),
+      # OpenRouter `:online` web-search citations live here (url_citation), not always in content.
+      annotations: msg["annotations"] || [],
       finish: choice["finish_reason"],
       usage: resp["usage"] || %{}
     }
   end
 
-  defp parse(_), do: %{content: "", tool_calls: [], finish: "error", usage: %{}}
+  defp parse(_), do: %{content: "", tool_calls: [], annotations: [], finish: "error", usage: %{}}
 
   defp parse_tool_calls(calls) do
     Enum.map(calls, fn c ->

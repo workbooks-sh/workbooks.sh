@@ -26,9 +26,26 @@ defmodule Nexus.Server do
     root = Keyword.fetch!(opts, :root)
     port = Keyword.get(opts, :port, 4000)
     Application.put_env(:nexus, :workbook_root, root)
-    # Register the demo's orchestration (the "swarm" live source), so /live/swarm works at boot.
-    Nexus.Swarm.register()
+    # Bring up the served workbook's server tier: compile its `server`/`resource` units to live BEAM
+    # modules, then call `register/0` on any server unit that exports it (a project self-registers its
+    # live sources / data this way). Generic — no project-specific code in the host.
+    bringup(root)
     Bandit.start_link(plug: __MODULE__, port: port)
+  end
+
+  # Compile the workbook's units and let each server unit register its live sources.
+  defp bringup(root) do
+    mods =
+      case Nexus.Compile.workbook(root) do
+        %{beam: %{compiled: compiled}} -> compiled
+        _ -> []
+      end
+
+    Enum.each(mods, fn m ->
+      if function_exported?(m, :register, 0), do: m.register()
+    end)
+  rescue
+    _ -> :ok
   end
 
   def child_spec(opts) do

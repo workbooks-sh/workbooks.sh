@@ -1,0 +1,344 @@
+# Search Swarm 🐝
+
+Ask anything. A **swarm of agents** fans out across the live web, each one searching,
+pulling real pages, and writing back a grounded finding — then the lead agent digests
+the round and decides whether to dig deeper. The result is one cited research report.
+
+This whole project is authored in `.work` — the orchestration below is a `server`
+block (native BEAM, runs on the nexus), the interface is a `client` block (the browser
+island), and the run history is a `resource`. No code lives outside this folder.
+
+## History
+
+Every completed run is saved as a `Session` row. The interface reads them back through
+`nexus.data` so you can revisit past research.
+
+resource Session do
+  prompt :text
+  agents :int
+  report :text
+  depth :text
+end
+
+## The swarm
+
+The orchestrator decomposes the question into focused sub-questions (a *plan*), runs one
+research agent per sub-question concurrently (a *round*), then reads every finding and
+decides — guided by the chosen depth — whether coverage is sufficient or a follow-up
+round is worth it. Each agent SEARCHES for real candidate URLs, PULLS the pages with the
+nexus browser system (`Nexus.Browse.read`), and writes a finding grounded in what it
+actually read. Finally the lead synthesizes one cited report.
+
+`register/0` wires the swarm to a live SSE source the browser subscribes to; the nexus
+calls it at serve time.
+
+server :swarm do
+  @default_model "google/gemma-4-26b-a4b-it"
+  @default_provider %{order: ["Cloudflare"]}
+
+  # The live source the browser's EventSource binds to. The nexus brings this up at serve
+  # time (it calls register/0 on every server unit that exports it).
+  def register do
+    Nexus.Live.register("swarm", fn params, emit ->
+      q = params["q"] || ""
+      depth = params["depth"] || "standard"
+      result = run(q, depth: depth, on_event: emit)
+
+      try do
+        Nexus.Store.create(Session, %{
+          prompt: q,
+          agents: length(result.findings),
+          report: result.report,
+          depth: depth
+        })
+      rescue
+        _ -> :ok
+      end
+    end)
+  end
+
+  # Run the swarm for `task` at a `:depth` (quick|standard|deep), streaming live activity.
+  def run(task, opts \\ []) do
+    emit = Keyword.get(opts, :on_event, fn _ -> :ok end)
+    model = opts[:model] || @default_model
+    provider = opts[:provider] || @default_provider
+
+    prof = depth_profile(opts[:depth] || "standard")
+    emit.(%{type: "fleet", task: task, max: prof.questions})
+
+    ctx = %{model: model, provider: provider, per_round: prof.questions, effort: prof.effort, emit: emit}
+
+    questions = plan(task, prof.questions, prof.effort, model, provider)
+    {findings, _idx} = rounds_loop(task, questions, 1, prof.max_rounds, 0, [], ctx)
+
+    emit.(%{type: "synth", action: "compiling final report…"})
+    report = synthesize(task, findings, model, provider)
+    emit.(%{type: "report", content: report})
+    emit.(%{type: "fleet_done", spawned: length(findings)})
+    %{task: task, report: report, findings: findings}
+  end
+
+  # Depth is a SOFT effort level woven into the orchestrator's plan + digest prompts — NOT
+  # a hard cap. `max_rounds` is only a safety ceiling; the orchestrator decides how far to go.
+  defp depth_profile("quick") do
+    %{questions: 3, max_rounds: 2,
+      effort: "This is a QUICK scan — favor a fast, broad answer. One round is usually enough; only go another round if a CRITICAL gap remains."}
+  end
+
+  defp depth_profile("deep") do
+    %{questions: 8, max_rounds: 5,
+      effort: "This is a DEEP, thorough investigation — be comprehensive. Keep dispatching follow-up rounds until the topic is well-covered from multiple angles and well-sourced."}
+  end
+
+  defp depth_profile(_standard) do
+    %{questions: 5, max_rounds: 3,
+      effort: "Do a solid, balanced investigation. Continue to another round only if meaningful gaps remain."}
+  end
+
+  # One round: announce → dispatch agents → (unless capped) let the orchestrator digest + decide.
+  defp rounds_loop(task, questions, round, max_rounds, idx, acc, ctx) do
+    emit = ctx.emit
+    emit.(%{type: "round", n: round, dispatching: length(questions)})
+
+    {findings, idx2} = dispatch(questions, idx, ctx)
+    acc2 = acc ++ findings
+
+    if round >= max_rounds do
+      {acc2, idx2}
+    else
+      case digest(task, acc2, round, max_rounds, ctx) do
+        %{continue: true, questions: [_ | _] = qs} = d ->
+          emit.(%{type: "digest", note: d.note, continue: true})
+          rounds_loop(task, Enum.take(qs, ctx.per_round), round + 1, max_rounds, idx2, acc2, ctx)
+
+        d ->
+          emit.(%{type: "digest", note: d.note, continue: false})
+          {acc2, idx2}
+      end
+    end
+  end
+
+  # Dispatch one round of agents concurrently (ids continue from idx → unique across rounds).
+  defp dispatch(questions, idx, ctx) do
+    findings =
+      questions
+      |> Enum.with_index()
+      |> Enum.map(fn {q, i} ->
+        id = "a#{idx + i + 1}"
+        Task.async(fn -> worker(id, q, ctx.model, ctx.provider, ctx.emit) end)
+      end)
+      |> Task.await_many(:infinity)
+
+    {findings, idx + length(questions)}
+  end
+
+  # The orchestrator reads every finding so far and decides: dig deeper or stop.
+  defp digest(task, findings, round, max_rounds, ctx) do
+    notes =
+      findings
+      |> Enum.reject(&(&1.finding in [nil, "", "error"]))
+      |> Enum.map_join("\n", fn f -> "- #{f.subtask}: #{f.finding}" end)
+
+    prompt =
+      "You are the lead orchestrator researching: #{task}\n\n#{ctx.effort}\n\n" <>
+        "Your team has gathered these findings (round #{round} of up to #{max_rounds}):\n\n#{notes}\n\n" <>
+        "Given the effort level above, decide: is coverage sufficient to write the report, or are there " <>
+        "important GAPS worth another round?\nReply EXACTLY: first line `CONTINUE` or `DONE`. " <>
+        "If CONTINUE, each following line is ONE new focused sub-question targeting a gap " <>
+        "(up to #{ctx.per_round}). If DONE, a one-line reason."
+
+    case Nexus.Llm.complete([%{role: "user", content: prompt}], model: ctx.model, provider: ctx.provider, max_tokens: 500) do
+      {:ok, %{content: c}} when is_binary(c) -> parse_decision(c)
+      _ -> %{continue: false, note: "Coverage looks sufficient — compiling the report.", questions: []}
+    end
+  end
+
+  defp parse_decision(content) do
+    lines = content |> String.split("\n") |> Enum.map(&debullet/1) |> Enum.reject(&(&1 == ""))
+
+    case lines do
+      [head | rest] ->
+        cond do
+          String.contains?(String.upcase(head), "CONTINUE") and rest != [] ->
+            %{continue: true, questions: rest, note: "Read the reports — found gaps worth a deeper round."}
+
+          String.contains?(String.upcase(head), "DONE") ->
+            %{continue: false, note: blank_to(clean(Enum.join(rest, " "), 180), "Coverage is sufficient — compiling the report."), questions: []}
+
+          true ->
+            %{continue: false, note: "Coverage looks sufficient — compiling the report.", questions: []}
+        end
+
+      _ ->
+        %{continue: false, note: "Coverage looks sufficient — compiling the report.", questions: []}
+    end
+  end
+
+  defp debullet(line), do: line |> String.replace(~r/^[\s\-*\d.\)]+/, "") |> clean(200)
+  defp blank_to("", d), do: d
+  defp blank_to(s, _), do: s
+
+  # Coordinator: one LLM call decomposes the task into distinct sub-questions (effort guides count/depth).
+  defp plan(task, max, effort, model, provider) do
+    n = min(max, 16)
+
+    prompt =
+      "You are the lead orchestrator. #{effort}\n\n" <>
+        "Break this task into #{n} DISTINCT, focused sub-questions a team would each investigate. " <>
+        "Return ONLY the sub-questions, one per line, no numbering or extra text.\n\nTask: #{task}"
+
+    result =
+      case Nexus.Llm.complete([%{role: "user", content: prompt}], model: model, provider: provider, max_tokens: 400) do
+        {:ok, %{content: c}} when is_binary(c) and c != "" ->
+          c |> String.split("\n") |> Enum.map(&clean/1) |> Enum.reject(&(&1 == "")) |> Enum.take(max)
+
+        _ ->
+          []
+      end
+
+    case result do
+      [] -> [task]
+      list -> list
+    end
+  end
+
+  # One research agent: SEARCH for real sources → PULL each page with the nexus browser system
+  # (Nexus.Browse.read) → SYNTHESIZE a finding grounded in what it actually read. Streams every step.
+  defp worker(id, subtask, model, provider, emit) do
+    emit.(%{type: "spawn", id: id, query: clean(subtask)})
+
+    emit.(%{type: "state", id: id, status: "searching", action: clean(subtask)})
+    urls = search_urls(subtask, model)
+    Enum.each(urls, fn u -> emit.(%{type: "source", id: id, url: u}) end)
+
+    # Many real sites block our datacenter IP or return empty shells, so read DOWN the candidate
+    # list until we've collected 3 successful pulls — don't take the first 3 and give up.
+    reads =
+      Enum.reduce_while(urls, [], fn url, acc ->
+        emit.(%{type: "state", id: id, status: "reading", action: domain(url), url: url})
+
+        acc =
+          case Nexus.Browse.read(url) do
+            {:ok, %{text: t}} when is_binary(t) and byte_size(t) > 200 ->
+              emit.(%{type: "page", id: id, url: url, preview: preview(t)})
+              [{url, t} | acc]
+
+            _ ->
+              acc
+          end
+
+        if length(acc) >= 3, do: {:halt, acc}, else: {:cont, acc}
+      end)
+      |> Enum.reverse()
+
+    emit.(%{type: "state", id: id, status: "thinking", action: "writing finding from #{length(reads)} pages"})
+    finding = finding_from(subtask, reads, model, provider)
+
+    emit.(%{type: "done", id: id, finding: finding})
+    %{id: id, subtask: subtask, finding: finding}
+  rescue
+    _ ->
+      emit.(%{type: "done", id: id, finding: ""})
+      %{id: id, subtask: subtask, finding: ""}
+  end
+
+  # Real candidate URLs via OpenRouter's `:online` web search (keyed by the LLM key we already hold).
+  # The source URLs come back as `annotations` (url_citation); content is scanned as a fallback.
+  defp search_urls(subtask, model) do
+    prompt =
+      "Find the best authoritative web pages to answer this question. Reply with ONLY 4-6 real URLs, " <>
+        "one per line, no other text.\n\nQuestion: #{subtask}"
+
+    case Nexus.Llm.complete([%{role: "user", content: prompt}], model: model <> ":online", max_tokens: 400) do
+      {:ok, turn} ->
+        ann =
+          (turn[:annotations] || [])
+          |> Enum.map(fn a -> get_in(a, ["url_citation", "url"]) end)
+          |> Enum.reject(&is_nil/1)
+
+        body = Regex.scan(~r{https?://[^\s)\]"'<>]+}, turn.content || "") |> Enum.map(&hd/1)
+
+        (ann ++ body)
+        |> Enum.map(&(&1 |> String.trim_trailing(".") |> String.trim_trailing(",")))
+        |> Enum.reject(&(String.length(&1) < 12))
+        |> Enum.uniq()
+        |> Enum.take(8)
+
+      _ ->
+        []
+    end
+  end
+
+  defp finding_from(subtask, [], model, provider) do
+    case Nexus.Llm.complete([%{role: "user", content: "Answer concisely in 3-4 sentences: #{subtask}"}], model: model, provider: provider, max_tokens: 400) do
+      {:ok, %{content: c}} when is_binary(c) and c != "" -> clean(c, 600)
+      _ -> ""
+    end
+  end
+
+  defp finding_from(subtask, reads, model, provider) do
+    notes = Enum.map_join(reads, "\n\n", fn {url, t} -> "### #{url}\n#{String.slice(t, 0, 2500)}" end)
+
+    prompt =
+      "Using ONLY the page content below, answer in 3-4 sentences with concrete facts, and cite the " <>
+        "URL(s) you used.\n\nQuestion: #{subtask}\n\n#{notes}"
+
+    case Nexus.Llm.complete([%{role: "user", content: prompt}], model: model, provider: provider, max_tokens: 500) do
+      {:ok, %{content: c}} when is_binary(c) and c != "" -> clean(c, 600)
+      _ -> ""
+    end
+  end
+
+  # Combine the findings into one cited deep-research report.
+  defp synthesize(task, findings, model, provider) do
+    notes =
+      findings
+      |> Enum.reject(&(&1.finding in [nil, "", "error"]))
+      |> Enum.map_join("\n\n", fn f -> "### #{f.subtask}\n#{f.finding}" end)
+
+    if String.trim(notes) == "" do
+      "No findings were gathered."
+    else
+      prompt =
+        "You are the lead researcher writing a DEEP RESEARCH REPORT on:\n#{task}\n\n" <>
+          "Below are the findings your team of agents gathered over several rounds. Synthesize them " <>
+          "into a thorough, well-structured report in markdown with:\n" <>
+          "1. A `#` title.\n" <>
+          "2. A short **Executive summary** (2-4 sentences answering the question directly).\n" <>
+          "3. Several `##` thematic sections with concrete facts, numbers, tradeoffs, and inline " <>
+          "source links where the findings cite URLs.\n" <>
+          "4. A `## Key takeaways` bullet list.\n" <>
+          "5. A `## Open questions` list of what remains uncertain.\n" <>
+          "Merge overlap, resolve contradictions, be specific. Do not invent sources.\n\n" <>
+          "## Agent findings\n#{notes}"
+
+      case Nexus.Llm.complete([%{role: "user", content: prompt}], model: model, provider: provider, max_tokens: 3000) do
+        {:ok, %{content: c}} when is_binary(c) and c != "" -> c
+        _ -> notes
+      end
+    end
+  end
+
+  defp domain(url) do
+    (url |> String.split("/") |> Enum.at(2) || url) |> String.replace("www.", "")
+  rescue
+    _ -> url
+  end
+
+  defp preview(output) do
+    output |> String.replace(~r/\n{2,}/, "\n") |> String.slice(0, 360) |> String.trim()
+  end
+
+  defp clean(s, len \\ 140)
+
+  defp clean(s, len) when is_binary(s) do
+    s
+    |> String.replace(~r/\.css-[^{]*\{[^}]*\}/, "")
+    |> String.replace(~r/\{[^}]*\}/, "")
+    |> String.replace(~r/\s+/, " ")
+    |> String.trim()
+    |> String.slice(0, len)
+  end
+
+  defp clean(_, _), do: ""
+end

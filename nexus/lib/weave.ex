@@ -225,11 +225,12 @@ defmodule Nexus.Weave do
 
   defp render_node(%{type: :decl, text: t}, _res, _ctx), do: ~s(  <pre class="decl">#{esc(t)}</pre>)
 
-  defp render_node(%{type: :code, kind: k, name: n, body: b}, _res, _ctx) do
-    ~s(  <figure class="unit" data-unit="#{esc(k)}:#{esc(n)}">) <>
-      ~s(<figcaption><span class="kind">#{esc(k)}</span> #{esc(n)}</figcaption>) <>
-      ~s(<pre>#{esc(b)}</pre></figure>)
-  end
+  # A `client` block IS the browser island — its body (HTML/CSS/JS) is emitted verbatim into the
+  # page so it runs client-side (the documented client lane). `server`/`resource`/etc. are machinery
+  # that runs on the nexus, not shown in the rendered app.
+  defp render_node(%{type: :code, kind: "client", body: b}, _res, _ctx), do: b
+
+  defp render_node(%{type: :code}, _res, _ctx), do: ""
 
   defp render_node(_, _res, _ctx), do: ""
 
