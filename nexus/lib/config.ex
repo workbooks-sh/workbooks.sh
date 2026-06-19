@@ -109,6 +109,12 @@ defmodule Nexus.Config do
   # under these. Neutral default: NONE. We supply our own (`workbooks.sh`) via our deploy config.
   def reserved_hosts, do: get(:reserved_hosts)
 
+  # Session cookie knobs (Nexus.Auth.Session). `session_secure?` defaults TRUE (httpS-only cookie);
+  # an http-only dev nexus sets `session-secure="off"`. max-age in seconds (default 24h).
+  def session_secure?, do: get(:session_secure)
+  def session_max_age, do: get(:session_max_age)
+  def session_cookie, do: get(:session_cookie)
+
   # ── parse ─────────────────────────────────────────────────────────────────────────────────────
   defp parse(html) do
     %{
@@ -138,7 +144,10 @@ defmodule Nexus.Config do
       # Capacity tiers (operator-supplied; neutral single-tier default — see `tiers/0`).
       tiers: parse_tiers(attr(html, "tiers")),
       runtime_image: attr(html, "runtime-image") || "ghcr.io/workbooks-sh/runtime:latest",
-      reserved_hosts: words(attr(html, "reserved-hosts"), [])
+      reserved_hosts: words(attr(html, "reserved-hosts"), []),
+      session_secure: bool(attr(html, "session-secure"), true),
+      session_max_age: int(attr(html, "session-max-age"), 86_400),
+      session_cookie: attr(html, "session-cookie") || "wb_session"
     }
   end
 
