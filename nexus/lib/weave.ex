@@ -526,7 +526,9 @@ defmodule Nexus.Weave do
           relayout();omsg('orch','<h3>Report</h3><p>'+md(s.report||'')+'</p>');
         }).catch(function(){});}
         function ev(e){
-          if(e.type==='fleet'){omsg('orch','Researching <b>'+esc(e.task)+'</b>. Breaking it into focused sub-questions and dispatching the fleet…');return;}
+          if(e.type==='fleet'){omsg('orch','Researching <b>'+esc(e.task)+'</b>. I\\'ll break this into focused sub-questions and dispatch agents in rounds, reading their reports between each.');return;}
+          if(e.type==='round'){activityEl=null;acts=[];omsg('orch','<b>Round '+e.n+'</b> · dispatching '+e.dispatching+' agents');return;}
+          if(e.type==='digest'){omsg('orch',e.note||'');return;}
           if(e.type==='spawn'){order.push(e.id);agents[e.id]={el:tile(e.id,e.query),task:e.query||'',steps:[['task',e.query||'']],sources:[],finding:''};
             spawned++;live++;setStat();relayout();activity('dispatched '+e.id+' → '+(e.query||''));return;}
           var a=agents[e.id];

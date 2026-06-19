@@ -40,26 +40,106 @@ defmodule Nexus.Fleet do
     sys = opts[:agent] || @default_agent
     timeout = opts[:timeout_ms] || @default_timeout
 
+    rounds = (opts[:rounds] || 3) |> max(1) |> min(6)
     emit.(%{type: "fleet", task: task, max: max})
 
-    subtasks = plan(task, max, model, provider)
+    ctx = %{sys: sys, model: model, provider: provider, timeout: timeout, per_round: max, emit: emit}
 
-    findings =
-      subtasks
-      |> Enum.with_index(1)
-      |> Enum.map(fn {st, i} ->
-        Task.async(fn -> worker("a#{i}", st, sys, model, provider, timeout, emit) end)
-      end)
-      |> Task.await_many(:infinity)
+    # The orchestration loop: dispatch a round of agents, then the orchestrator reads their reports,
+    # digests them, and decides whether to dig deeper (follow-up questions targeting gaps) or stop.
+    questions = plan(task, max, model, provider)
+    {findings, _idx} = rounds_loop(task, questions, 1, rounds, 0, [], ctx)
 
-    # Synthesis: compile every agent's finding into one final report.
     emit.(%{type: "synth", action: "compiling final report…"})
     report = synthesize(task, findings, model, provider)
     emit.(%{type: "report", content: report})
 
-    emit.(%{type: "fleet_done", spawned: length(subtasks)})
+    emit.(%{type: "fleet_done", spawned: length(findings)})
     %{task: task, report: report, findings: findings}
   end
+
+  # One round: announce → dispatch agents → (unless the cap) let the orchestrator digest + decide.
+  defp rounds_loop(task, questions, round, max_rounds, idx, acc, ctx) do
+    emit = ctx.emit
+    emit.(%{type: "round", n: round, dispatching: length(questions)})
+
+    {findings, idx2} = dispatch(questions, idx, ctx)
+    acc2 = acc ++ findings
+
+    if round >= max_rounds do
+      {acc2, idx2}
+    else
+      case digest(task, acc2, round, max_rounds, ctx) do
+        %{continue: true, questions: [_ | _] = qs} = d ->
+          emit.(%{type: "digest", note: d.note, continue: true})
+          rounds_loop(task, Enum.take(qs, ctx.per_round), round + 1, max_rounds, idx2, acc2, ctx)
+
+        d ->
+          emit.(%{type: "digest", note: d.note, continue: false})
+          {acc2, idx2}
+      end
+    end
+  end
+
+  # Dispatch one round of agents concurrently (ids continue from idx → unique across rounds).
+  defp dispatch(questions, idx, ctx) do
+    findings =
+      questions
+      |> Enum.with_index()
+      |> Enum.map(fn {q, i} ->
+        id = "a#{idx + i + 1}"
+        Task.async(fn -> worker(id, q, ctx.sys, ctx.model, ctx.provider, ctx.timeout, ctx.emit) end)
+      end)
+      |> Task.await_many(:infinity)
+
+    {findings, idx + length(questions)}
+  end
+
+  # The orchestrator reads every finding so far and decides: dig deeper (new gap questions) or stop.
+  defp digest(task, findings, round, max_rounds, ctx) do
+    notes =
+      findings
+      |> Enum.reject(&(&1.finding in [nil, "", "error"]))
+      |> Enum.map_join("\n", fn f -> "- #{f.subtask}: #{f.finding}" end)
+
+    prompt =
+      "You are the lead orchestrator researching: #{task}\n\n" <>
+        "Your team has gathered these findings (round #{round} of up to #{max_rounds}):\n\n#{notes}\n\n" <>
+        "Read them and decide: is coverage sufficient to write a thorough report, or are there " <>
+        "important GAPS worth another round?\nReply EXACTLY: first line `CONTINUE` or `DONE`. " <>
+        "If CONTINUE, each following line is ONE new focused sub-question targeting a gap " <>
+        "(up to #{ctx.per_round}). If DONE, a one-line reason."
+
+    case Nexus.Llm.complete([%{role: "user", content: prompt}], model: ctx.model, provider: ctx.provider, max_tokens: 500) do
+      {:ok, %{content: c}} when is_binary(c) -> parse_decision(c)
+      _ -> %{continue: false, note: "Coverage looks sufficient — compiling the report.", questions: []}
+    end
+  end
+
+  defp parse_decision(content) do
+    lines = content |> String.split("\n") |> Enum.map(&debullet/1) |> Enum.reject(&(&1 == ""))
+
+    case lines do
+      [head | rest] ->
+        cond do
+          String.contains?(String.upcase(head), "CONTINUE") and rest != [] ->
+            %{continue: true, questions: rest, note: "Read the reports — found gaps worth a deeper round."}
+
+          String.contains?(String.upcase(head), "DONE") ->
+            %{continue: false, note: blank_to(Enum.join(rest, " "), "Coverage is sufficient — compiling the report."), questions: []}
+
+          true ->
+            %{continue: false, note: "Coverage looks sufficient — compiling the report.", questions: []}
+        end
+
+      _ ->
+        %{continue: false, note: "Coverage looks sufficient — compiling the report.", questions: []}
+    end
+  end
+
+  defp debullet(line), do: line |> String.replace(~r/^[\s\-*\d.\)]+/, "") |> clean(200)
+  defp blank_to("", d), do: d
+  defp blank_to(s, _), do: s
 
   # Combine the fleet's findings into a single cited report.
   defp synthesize(task, findings, model, provider) do
