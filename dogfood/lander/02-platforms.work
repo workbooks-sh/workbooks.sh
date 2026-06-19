@@ -1,0 +1,51 @@
+# Platforms
+
+Two ways in: build on the desktop app (coming soon) and ship to the cloud (live). The card grid that frames the product as a place you build *and* a place you run.
+
+client :platforms do
+  <section id="platforms">
+    <div class="plat-head">
+      <p class="plat-kicker">three ways in <b>■</b></p>
+      <h2 class="plat-h">Start where you already&nbsp;work.</h2>
+      <p class="plat-sub">Drive it from the coding agent you already use, build in a native desktop app, or run it all on your own cloud. Same workbooks, three surfaces.</p>
+    </div>
+    <div class="plat-grid">
+      <article class="plat-card live">
+        <div class="plat-top">
+          <span class="plat-ic" style="background:#f2ddb0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#121316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 8 9 12 5 16"/><line x1="12" y1="16" x2="19" y2="16"/></svg>
+          </span>
+          <span class="plat-tag on"><span class="dot"></span>Live</span>
+        </div>
+        <h3>Your agent, your terminal</h3>
+        <p>Use Claude Code, Codex, or any coding agent as your surface. Install the CLI and build, weave, and ship workbooks right from the terminal you already live in.</p>
+        <button type="button" class="plat-btn copy plat-copy" data-copy="curl -fsSL https://workbooks.sh/cli.sh | sh">
+          <span class="lbl">Copy install</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </article>
+      <article class="plat-card">
+        <div class="plat-top">
+          <span class="plat-ic" style="background:#a8d4f0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#121316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M8 21h8M12 16.5V21"/></svg>
+          </span>
+          <span class="plat-tag">Coming soon</span>
+        </div>
+        <h3>The desktop app</h3>
+        <p>A native workspace where you and your agents build side by side — tabbed workspaces, your apps and live data together, a toolkit marketplace, and voice. The app in the video above.</p>
+        <button type="button" class="plat-btn ghost js-notify">Get notified <span aria-hidden="true">→</span></button>
+      </article>
+      <article class="plat-card live">
+        <div class="plat-top">
+          <span class="plat-ic" style="background:#aee5c2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#121316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 19a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 17.7 9.2 3.9 3.9 0 0 1 18 19z"/></svg>
+          </span>
+          <span class="plat-tag on"><span class="dot"></span>Live</span>
+        </div>
+        <h3>The cloud service</h3>
+        <p>Stand up a hosted nexus, deploy your workbooks, and run agents in the cloud — metered, scale-to-zero, on your own account. Sign in and ship in minutes.</p>
+        <a class="plat-btn primary" href="https://app.workbooks.sh">Get started <span aria-hidden="true">→</span></a>
+      </article>
+    </div>
+  </section>
+end

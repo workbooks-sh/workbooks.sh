@@ -1,0 +1,18 @@
+# The build
+
+The closing build section — the growth/tree canvas that replays as you scroll back.
+
+client :build do
+  <section id="s3">
+    <div class="s3-grid">
+      <div class="s3-left">
+        <p class="sky-kicker" style="text-align:left">the ecosystem <b>■</b> 02</p>
+        <h2>three pieces. <em>one organism.</em></h2>
+        <p class="lede">The file carries everything, the engine keeps it running, the parts let it
+          grow — each is simple alone, together they feed each other.</p>
+        <nav class="s3-sel" id="s3Sel"></nav>
+      </div>
+      <div class="s3-stage" id="s3Stage"></div>
+    </div>
+  </section>
+end

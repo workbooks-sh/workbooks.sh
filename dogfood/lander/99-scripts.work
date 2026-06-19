@@ -1,0 +1,1241 @@
+# Scripts — nav, glyphs, animations
+
+All the lander's behavior, loaded after every section is in the DOM: the nav builder
+(`nav.js`), the real-color brand logos (`glyphs.js`), GSAP + ScrollTrigger, and the big
+inline script driving the lattice / DNA / tree canvases, the pricing slider, and the
+notify-me modal. The modal's submit is wired to our own **waitlist workbook** (its
+`live/waitlist` source), not a third-party endpoint.
+
+client :scripts do
+  <script src="nav.js"></script>
+  <script src="glyphs.js"></script>
+  <script>
+  (function () {
+    // real-color brand logos via the glyphs toolkit (curated → svgl full-color CDN)
+    if (window.Glyphs) {
+      document.querySelectorAll('#cloud-pricing .g[data-brand]').forEach(function (el) {
+        Glyphs.glyphAsync('brand:' + el.dataset.brand, { size: '18px' })
+          .then(function (svg) { if (svg) el.innerHTML = svg; })
+          .catch(function () {});
+      });
+    }
+    // seat slider — the SaaS stack scales per head; Workbooks stays flat (storage + usage only)
+    var seats = document.getElementById('seats');
+    if (seats) {
+      var PER = 94, WB = 29, REF = 150 * PER; // stack bar reaches full ~150 seats
+      var fmt = function (n) { return '$' + Math.round(n).toLocaleString('en-US'); };
+      var upd = function () {
+        var n = +seats.value, stack = n * PER;
+        document.getElementById('seatN').textContent = n;
+        document.getElementById('stackCost').textContent = fmt(stack) + '/mo';
+        document.getElementById('saveAmt').textContent = fmt(Math.max(0, stack - WB));
+        document.getElementById('stackBar').style.width = Math.min(100, 8 + 92 * stack / REF) + '%';
+        document.getElementById('wbBar').style.width = '5%';
+      };
+      seats.addEventListener('input', upd); upd();
+    }
+  })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12/dist/ScrollTrigger.min.js"></script>
+  
+  <script>
+  
+  /* copy CTAs: write the payload, flip the label briefly */
+  document.querySelectorAll(".btn-copy, .plat-copy").forEach((b) => {
+    b.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(b.dataset.copy); } catch { /* clipboard blocked */ }
+      const lbl = b.querySelector(".lbl"), was = lbl.textContent;
+      lbl.textContent = "copied ✓"; b.classList.add("copied");
+      setTimeout(() => { lbl.textContent = was; b.classList.remove("copied"); }, 1500);
+    });
+  });
+  
+  /* ── the lattice ──────────────────────────────────────────────────────────
+     A square grid whose VERTICES drift on smooth low-frequency waves, so
+     neighboring cells trade area — clusters of cells swell while others
+     shrink, organically, on no path. Inside sparse cells an identicon is
+     born: mirrored 5×5 pixels in one flat color, appearing pixel by pixel,
+     holding, then dying pixel by pixel. No gradients, no alpha, no blur —
+     every transition is geometry. */
+  const cv = document.getElementById("lattice");
+  const ctx = cv.getContext("2d");
+  const CELL = 56;
+  let W, H, DPR, COLS, ROWS, exclude = null;
+  
+  function resize() {
+    DPR = Math.min(devicePixelRatio || 1, 2);
+    W = innerWidth; H = (document.getElementById("s1") || {}).offsetHeight || innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    cv.style.width = W + "px"; cv.style.height = H + "px"; /* replaced elements don't stretch with inset:0 */
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    COLS = Math.ceil(W / CELL) + 2;
+    ROWS = Math.ceil(H / CELL) + 2;
+    /* exclusion + line-fade derive from the REAL content extent.
+       document coords (canvas lives inside #s1 at the top of the page),
+       padded a FULL CELL beyond the visual margin so no tile can touch. */
+    const ib = document.getElementById("inner").getBoundingClientRect();
+    const sy = window.scrollY, sx = window.scrollX;
+    const padX = 56 + CELL, padY = 44 + CELL;
+    exclude = {
+      x0: ib.left + sx - padX, y0: ib.top + sy - padY,
+      x1: ib.right + sx + padX, y1: ib.bottom + sy + padY,
+      cx: ib.left + sx + ib.width / 2, cy: ib.top + sy + ib.height / 2,
+      rx: ib.width / 2 + padX, ry: ib.height / 2 + padY,
+    };
+  }
+  resize();
+  addEventListener("resize", resize);
+  document.fonts.ready.then(() => requestAnimationFrame(resize)); /* re-measure after font swap */
+  
+  /* smooth scalar fields for vertex drift — sums of incommensurate sines:
+     organic clustering with zero randomness jitter frame-to-frame */
+  function driftX(cx, cy, t) {
+    return (
+      Math.sin(cx * 0.83 + cy * 0.41 + t * 0.51) * 0.42 +
+      Math.sin(cy * 1.07 - t * 0.33) * 0.3 +
+      Math.sin((cx + cy) * 0.29 + t * 0.21) * 0.28
+    ) * CELL * 0.27;
+  }
+  function driftY(cx, cy, t) {
+    return (
+      Math.sin(cy * 0.79 - cx * 0.37 + t * 0.47) * 0.42 +
+      Math.sin(cx * 0.97 + t * 0.29) * 0.3 +
+      Math.sin((cx - cy) * 0.31 - t * 0.23) * 0.28
+    ) * CELL * 0.27;
+  }
+  function vert(c, r, t) {
+    return [c * CELL + driftX(c, r, t), r * CELL + driftY(c, r, t)];
+  }
+  
+  function cellHash(c, r) {
+    let h = (Math.imul(c, 374761393) + Math.imul(r, 668265263)) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+  
+  /* pattern tiles — flat geometric fills, 2–3 colors, filling the whole cell:
+     nested squares · stripe stacks · vertical bars · checker · dots · frames */
+  const PALETTE = ["#aee5c2", "#a8d4f0", "#c8e0b0", "#f2ddb0", "#f3c5a3", "#9fc4e8"];
+  function pick(seed, k) { return PALETTE[Math.floor(((Math.sin(seed * 9173 + k * 311) + 1) / 2) * PALETTE.length) % PALETTE.length]; }
+  function tileColors(seed) {
+    const a = pick(seed, 1); let b = pick(seed, 2), c = pick(seed, 3);
+    if (b === a) b = PALETTE[(PALETTE.indexOf(a) + 2) % PALETTE.length];
+    if (c === a || c === b) c = PALETTE[(PALETTE.indexOf(b) + 3) % PALETTE.length];
+    return [a, b, c];
+  }
+  
+  /* lifecycle: each candidate cell loops its own long period —
+     born pixel-by-pixel, hold, die pixel-by-pixel, rest */
+  const PERIOD = 26, IN = 2.2, HOLD = 5.5, OUT = 2.2;
+  function aliveCount(seed, t, total) {
+    const local = (t + seed * PERIOD * 4) % PERIOD;
+    if (local < IN) return Math.round(total * (local / IN));
+    if (local < IN + HOLD) return total;
+    if (local < IN + HOLD + OUT) return Math.round(total * (1 - (local - IN - HOLD) / OUT));
+    return 0;
+  }
+  
+  /* one quad patch in tile-uv space */
+  function patch(A, B, C, D, u0, v0, u1, v1, color) {
+    const p1 = bilerp(A, B, C, D, u0, v0), p2 = bilerp(A, B, C, D, u1, v0),
+          p3 = bilerp(A, B, C, D, u1, v1), p4 = bilerp(A, B, C, D, u0, v1);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]);
+    ctx.lineTo(p3[0], p3[1]); ctx.lineTo(p4[0], p4[1]);
+    ctx.closePath(); ctx.fill();
+  }
+  
+  /* the six tile species. phase ∈ (0,1]: how much of the pattern exists —
+     every reveal is discrete geometry appearing, nothing fades */
+  function drawTile(A, B, C, D, seed, phase) {
+    const [c1, c2, c3] = tileColors(seed);
+    const kind = Math.floor(seed * 7919) % 6;
+  
+    if (kind === 0) {
+      /* nested squares, outer → in */
+      const layers = [[0, c1], [0.18, c2], [0.36, c3]];
+      const n = Math.ceil(phase * layers.length);
+      for (let i = 0; i < n; i++) {
+        const inset = layers[i][0];
+        patch(A, B, C, D, inset, inset, 1 - inset, 1 - inset, layers[i][1]);
+      }
+    } else if (kind === 1) {
+      /* horizontal stripe stack, top → down */
+      const BANDS = 5;
+      const n = Math.ceil(phase * BANDS);
+      for (let i = 0; i < n; i++)
+        patch(A, B, C, D, 0, i / BANDS, 1, (i + 1) / BANDS, [c1, c2, c3, c2, c1][i]);
+    } else if (kind === 2) {
+      /* vertical bars, left → right */
+      const BARS = 5;
+      const n = Math.ceil(phase * BARS);
+      for (let i = 0; i < n; i++)
+        patch(A, B, C, D, i / BARS, 0, (i + 1) / BARS, 1, [c2, c1, c3, c1, c2][i]);
+    } else if (kind === 3) {
+      /* checker on a ground, squares pop in stable order */
+      patch(A, B, C, D, 0, 0, 1, 1, c1);
+      const K = 6, total = (K * K / 2) | 0;
+      const n = Math.round(Math.max(0, phase - 0.2) / 0.8 * total);
+      let drawn = 0;
+      for (let gy = 0; gy < K && drawn < n; gy++)
+        for (let gx = 0; gx < K && drawn < n; gx++) {
+          if ((gx + gy) % 2) continue;
+          patch(A, B, C, D, gx / K, gy / K, (gx + 1) / K, (gy + 1) / K, c2);
+          drawn++;
+        }
+    } else if (kind === 4) {
+      /* dot matrix on a ground */
+      patch(A, B, C, D, 0, 0, 1, 1, c2);
+      const K = 4, total = K * K;
+      const n = Math.round(Math.max(0, phase - 0.2) / 0.8 * total);
+      for (let i = 0; i < n; i++) {
+        const gx = i % K, gy = (i / K) | 0;
+        const u = (gx + 0.5) / K, v = (gy + 0.5) / K, rr = 0.055;
+        patch(A, B, C, D, u - rr, v - rr, u + rr, v + rr, c3);
+      }
+    } else {
+      /* frame: ring then heart */
+      patch(A, B, C, D, 0, 0, 1, 1, c3);
+      if (phase > 0.34) patch(A, B, C, D, 0.16, 0.16, 0.84, 0.84, c1);
+      if (phase > 0.67) patch(A, B, C, D, 0.34, 0.34, 0.66, 0.66, c2);
+    }
+  }
+  
+  /* bilinear point inside a deformed quad */
+  function bilerp(A, B, C, D, u, v) {
+    const top = [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u];
+    const bot = [D[0] + (C[0] - D[0]) * u, D[1] + (C[1] - D[1]) * u];
+    return [top[0] + (bot[0] - top[0]) * v, top[1] + (bot[1] - top[1]) * v];
+  }
+  
+  function frame(ms) {
+    if (window.scrollY > H * 1.2) { requestAnimationFrame(frame); return; } /* hero off-screen */
+    const t = ms / 1000;
+    ctx.clearRect(0, 0, W, H);
+  
+    /* grid — one flat ink. THE one gradient exception: line alpha eases
+       toward the paper color over the text zone, so the grid recedes there
+       instead of sitting on a plate. Quantized bins, one stroke per bin. */
+    ctx.lineWidth = 1;
+    const FBINS = 6;
+    const fadePaths = Array.from({ length: FBINS + 1 }, () => new Path2D());
+    function fadeBin(x1, y1, x2, y2) {
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      let fade = 1;
+      if (exclude) {
+        const e = Math.hypot((mx - exclude.cx) / exclude.rx, (my - exclude.cy) / exclude.ry);
+        fade = 0.18 + 0.82 * Math.min(1, Math.max(0, (e - 0.8) / 0.75)); /* ghost-faint over the text, full past the rim */
+      }
+      const b = Math.round(fade * FBINS);
+      fadePaths[b].moveTo(x1, y1);
+      fadePaths[b].lineTo(x2, y2);
+    }
+    for (let c = 0; c <= COLS; c++) {
+      let prev = vert(c, 0, t);
+      for (let r = 1; r <= ROWS; r++) {
+        const p = vert(c, r, t);
+        fadeBin(prev[0], prev[1], p[0], p[1]);
+        prev = p;
+      }
+    }
+    for (let r = 0; r <= ROWS; r++) {
+      let prev = vert(0, r, t);
+      for (let c = 1; c <= COLS; c++) {
+        const p = vert(c, r, t);
+        fadeBin(prev[0], prev[1], p[0], p[1]);
+        prev = p;
+      }
+    }
+    for (let b = 1; b <= FBINS; b++) {
+      ctx.strokeStyle = `rgba(18,19,22,${(0.16 * b / FBINS).toFixed(3)})`;
+      ctx.stroke(fadePaths[b]);
+    }
+  
+    /* pattern-tile blooms — sparse cells, never near the text */
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        const seed = cellHash(c, r);
+        /* vignette weighting: nearly none mid-screen, plenty at the rim */
+        const ex = (c * CELL + CELL / 2 - W / 2) / (W / 2);
+        const ey = (r * CELL + CELL / 2 - H / 2) / (H / 2);
+        const edge = Math.min(1, Math.hypot(ex, ey));
+        if (seed < 0.97 - 0.15 * edge * edge) continue;
+  
+        const A = vert(c, r, t), B = vert(c + 1, r, t),
+              C = vert(c + 1, r + 1, t), D = vert(c, r + 1, t);
+        /* keep clear of the text: EVERY corner must stay outside the zone */
+        if (exclude && [A, B, C, D].some(([x, y]) =>
+          x > exclude.x0 && x < exclude.x1 && y > exclude.y0 && y < exclude.y1)) continue;
+        const mx = (A[0] + C[0]) / 2, my = (A[1] + C[1]) / 2;
+        if (mx < -CELL || mx > W + CELL || my < -CELL || my > H + CELL) continue;
+  
+        /* build/teardown phase: 0 → 1 → 0, in discrete flat steps */
+        const phase = aliveCount(seed, t, 24) / 24;
+        if (phase <= 0) continue;
+        drawTile(A, B, C, D, seed, phase);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  
+  /* ════ SECTION 2 · the nexus ═════════════════════════════════════════════
+     An orthogonal system graph with one center: the workbook. Data stores,
+     APIs, surfaces, schedules — and PEOPLE — are all just nodes wired into
+     the same organism. It reads as alive because the graph itself changes:
+     pulses run the wires continuously, every node breathes on its own slow
+     phase, and the composition rewrites — a new system resolves out of
+     faint ASCII static and wires in; an old one dissolves back. Nothing
+     operates it. It is the operator. */
+  const NEXMARK = new Image();
+  NEXMARK.src = "nexus-icon.svg";
+  const tcv = document.getElementById("tree");
+  const tctx = tcv.getContext("2d");
+  let TW, TH, NEX, treeActive = false, sceneT0 = null;
+  
+  const S_INK = "#121316", S_PAPER = "#fbfaf3", S_NEON = "#13d943", S_DIM = "#6a7268";
+  
+  /* fixed orthogonal slots around the nexus (fractions of the graph extent) */
+  const SLOT_POS = [
+    [-0.42, -0.30], [-0.48, 0.02], [-0.40, 0.34], [0.42, -0.32],
+    [0.48, 0.02],   [0.40, 0.34],  [-0.30, -0.47], [0.30, -0.47],
+    [-0.30, 0.47],  [0.30, 0.47],
+  ];
+  /* the workbook's own anatomy — permanent, wired into the square:
+     server side fans UP, client targets fan DOWN (it ships to all three) */
+  const SPINE_UP = [
+    { label: "isolated", stripe: "#aee5c2" },
+    { label: "stateful", stripe: "#aee5c2" },
+    { label: "agentic",  stripe: "#aee5c2" },
+  ];
+  const SPINE_DN = [
+    { label: "mobile",  stripe: "#a8d4f0" },
+    { label: "desktop", stripe: "#a8d4f0" },
+    { label: "web",     stripe: "#a8d4f0" },
+  ];
+  /* permanent organs + a rotating pool of systems that join and leave */
+  const CORE = [
+    { label: "postgres",  tag: "data",   color: "#336791", logo: "https://svgl.app/library/postgresql.svg" },
+    { label: "storefront", tag: "ui",    color: "#aee5c2" },
+    { label: "maya",      tag: "person", color: "#f3c5a3", av: "https://api.dicebear.com/9.x/lorelei/svg?seed=maya" },
+  ];
+  const AV = (seed) => "https://api.dicebear.com/9.x/lorelei/svg?seed=" + seed;
+  const POOL = [
+    { label: "stripe",    tag: "payments", color: "#635bff", logo: "https://svgl.app/library/stripe.svg" },
+    { label: "shopify",   tag: "store",    color: "#95bf47", logo: "https://svgl.app/library/shopify.svg" },
+    { label: "claude",    tag: "agent",    color: "#d97757", logo: "https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/claude-color.svg" },
+    { label: "sam",       tag: "person",   color: "#f3c5a3", av: AV("sam") },
+    { label: "slack",     tag: "alerts",   color: "#611f69", logo: "https://svgl.app/library/slack.svg" },
+    { label: "notion",    tag: "docs",     color: "#9fc4e8", logo: "https://svgl.app/library/notion.svg" },
+    { label: "figma",     tag: "design",   color: "#a259ff", logo: "https://svgl.app/library/figma.svg" },
+    { label: "openai",    tag: "model",    color: "#74aa9c", logo: "https://svgl.app/library/openai.svg" },
+    { label: "linear",    tag: "issues",   color: "#5e6ad2", logo: "https://svgl.app/library/linear.svg" },
+    { label: "github",    tag: "repo",     color: "#24292f", logo: "https://svgl.app/library/github_dark.svg" },
+    { label: "nightly digest", tag: "cron", color: "#9fc4e8" },
+    { label: "leo",       tag: "person",   color: "#f3c5a3", av: AV("leo") },
+    { label: "ana",       tag: "person",   color: "#f3c5a3", av: AV("ana") },
+  ];
+  /* preload the real marks — full color, drawn into their node chips */
+  const LOGOS = {};
+  [...CORE, ...POOL].forEach((d) => {
+    const src = d.logo || d.av;
+    if (!src) return;
+    const im = new Image();
+    im.src = src;
+    im.onload = () => { LOGOS[d.label] = im; };
+  });
+  let nodes = [];           /* {def, slot, born, dying} */
+  let flows = [];           /* {node, head, dir} — a dotted SPAN traveling an edge */
+  let nextEvent = 0, poolIdx = 0;
+  
+  function treeResize() {
+    const r = tcv.parentElement.getBoundingClientRect();
+    const d = Math.min(devicePixelRatio || 1, 2);
+    TW = r.width; TH = r.height;
+    tcv.width = TW * d; tcv.height = TH * d;
+    tcv.style.width = TW + "px"; tcv.style.height = TH + "px";
+    tctx.setTransform(d, 0, 0, d, 0, 0);
+    /* the graph must live strictly BETWEEN the header and the footer copy —
+       measure them and size the extent so no node box can touch either */
+    const pin = tcv.parentElement.getBoundingClientRect();
+    const head = document.querySelector(".sky-head")?.getBoundingClientRect();
+    const foot = document.querySelector(".sky-foot")?.getBoundingClientRect();
+    const top = head ? head.bottom - pin.top + 66 : TH * 0.26;
+    const bot = foot ? foot.top - pin.top - 56 : TH * 0.82;
+    const bandY = (top + bot) / 2, band = Math.max(220, bot - top);
+    NEX = {
+      x: TW / 2, y: bandY,
+      gw: Math.min(TW * 0.74, (TW - 132 - 90) / 0.92, 1240),
+      gh: (band * 0.86 - 54) / 0.88,   /* compressed — the copy gets the room */
+    };
+  }
+  document.fonts.ready.then(() => requestAnimationFrame(treeResize));
+  function srnd(a, b) { return ((Math.sin(a * 127.1 + b * 311.7) * 43758.5453) % 1 + 1) % 1; }
+  
+  function initGraph() {
+    nodes = []; flows = []; poolIdx = 0;
+    CORE.forEach((def, i) => nodes.push({ def, slot: [0, 2, 5][i], born: -10, dying: null }));
+    [0, 1, 2].forEach((k) => { nodes.push({ def: POOL[poolIdx++ % POOL.length], slot: [1, 6, 9][k], born: -10, dying: null }); });
+    nextEvent = 3.2;
+  }
+  
+  function slotXY(slot, t) {
+    const [fx, fy] = SLOT_POS[slot];
+    /* every node breathes on its own slow phase — a couple of px, no more */
+    const bx = Math.sin(t * 0.5 + slot * 1.7) * 2.2, by = Math.cos(t * 0.42 + slot * 2.3) * 2.2;
+    return [NEX.x + fx * NEX.gw + bx, NEX.y + fy * NEX.gh + by];
+  }
+  /* orthogonal elbow: out of the node toward the nexus, H then V */
+  function edgePath(x, y) {
+    return [[x, y], [x, NEX.y > y ? NEX.y - 0 : NEX.y + 0], [NEX.x, NEX.y]];
+    }
+  /* polyline between two fractional arc positions — for the dotted window */
+  function subPath(path, f0, f1) {
+    const segs = []; let total = 0;
+    for (let i = 1; i < path.length; i++) {
+      const L = Math.hypot(path[i][0] - path[i-1][0], path[i][1] - path[i-1][1]);
+      segs.push(L); total += L;
+    }
+    const d0 = Math.max(0, f0) * total, d1 = Math.min(1, f1) * total;
+    if (d1 <= d0) return null;
+    const pts = []; let acc = 0;
+    for (let i = 1; i < path.length; i++) {
+      const L = segs[i - 1], a = acc, b = acc + L;
+      if (b > d0 && a < d1) {
+        const ka = Math.max(0, (d0 - a) / L), kb = Math.min(1, (d1 - a) / L);
+        const ax = path[i-1][0] + (path[i][0] - path[i-1][0]) * ka, ay = path[i-1][1] + (path[i][1] - path[i-1][1]) * ka;
+        const bx = path[i-1][0] + (path[i][0] - path[i-1][0]) * kb, by = path[i-1][1] + (path[i][1] - path[i-1][1]) * kb;
+        if (!pts.length) pts.push([ax, ay]);
+        pts.push([bx, by]);
+      }
+      acc = b;
+    }
+    return pts.length > 1 ? pts : null;
+  }
+  function strokePts(pts, dash) {
+    if (!pts) return;
+    if (dash) tctx.setLineDash(dash);
+    tctx.beginPath();
+    tctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) tctx.lineTo(pts[i][0], pts[i][1]);
+    tctx.stroke();
+    tctx.setLineDash([]);
+  }
+  
+  function pointOnPath(path, t01) {
+    const segs = [];
+    let total = 0;
+    for (let i = 1; i < path.length; i++) {
+      const L = Math.hypot(path[i][0] - path[i-1][0], path[i][1] - path[i-1][1]);
+      segs.push(L); total += L;
+    }
+    let d = t01 * total;
+    for (let i = 1; i < path.length; i++) {
+      if (d <= segs[i-1]) {
+        const k = segs[i-1] ? d / segs[i-1] : 0;
+        return [path[i-1][0] + (path[i][0] - path[i-1][0]) * k, path[i-1][1] + (path[i][1] - path[i-1][1]) * k];
+      }
+      d -= segs[i-1];
+    }
+    return path[path.length - 1];
+  }
+  
+  const NODE_W = 132, NODE_H = 44;
+  function drawNodeBox(x, y, def, alpha01, t) {
+    const w = NODE_W, h = NODE_H;
+    /* birth/death is GEOMETRY: the box reveals as ASCII static, then plates */
+    if (alpha01 < 1) {
+      /* static density RISES with life: nothing → whisper → grain → plate */
+      tctx.font = "9px 'JetBrains Mono', monospace";
+      tctx.textAlign = "center"; tctx.textBaseline = "middle";
+      const G = 8, density = alpha01 * 0.62;
+      for (let gy = y - h / 2 + G / 2; gy < y + h / 2; gy += G) {
+        for (let gx = x - w / 2 + G / 2; gx < x + w / 2; gx += G) {
+          const r = srnd(gx * 0.9 + Math.floor(t * 8), gy * 1.1);
+          if (r > density) continue;
+          tctx.fillStyle = "rgba(18,19,22,.28)";
+          tctx.fillText("·:+*"[Math.floor(r * 16) % 4], gx, gy);
+        }
+      }
+      if (alpha01 < 0.62) return;
+      /* the plate sweeps down over the static in the last stretch */
+      const sweep = (alpha01 - 0.62) / 0.38;
+      tctx.fillStyle = S_PAPER;
+      tctx.fillRect(x - w / 2, y - h / 2, w, h * sweep);
+      tctx.strokeStyle = S_INK; tctx.lineWidth = 2;
+      tctx.strokeRect(x - w / 2, y - h / 2, w, h * sweep);
+      if (sweep < 0.96) return;
+    } else {
+      tctx.fillStyle = S_PAPER;
+      tctx.fillRect(x - w / 2, y - h / 2, w, h);
+      tctx.strokeStyle = S_INK; tctx.lineWidth = 2;
+      tctx.strokeRect(x - w / 2, y - h / 2, w, h);
+    }
+    tctx.fillStyle = def.color;
+    tctx.fillRect(x - w / 2, y - h / 2, 6, h);          /* the type stripe */
+    tctx.font = "700 11px 'JetBrains Mono', monospace";
+    tctx.textAlign = "left"; tctx.textBaseline = "middle";
+    tctx.fillStyle = S_INK;
+    if (LOGOS[def.label]) {
+      const im = LOGOS[def.label];
+      const sz = 22, ar = im.width / im.height || 1;
+      const lw2 = ar >= 1 ? sz : sz * ar, lh2 = ar >= 1 ? sz / ar : sz;
+      tctx.drawImage(im, x - w / 2 + 16, y - lh2 / 2, lw2, lh2);
+      tctx.font = "700 11px 'JetBrains Mono', monospace";
+      tctx.textAlign = "left"; tctx.textBaseline = "middle";
+      tctx.fillStyle = S_INK;
+      tctx.fillText(def.label, x - w / 2 + 16 + sz + 8, y - 7);
+      tctx.font = "9px 'JetBrains Mono', monospace";
+      tctx.fillStyle = S_DIM;
+      tctx.fillText(def.tag, x - w / 2 + 16 + sz + 8, y + 9);
+    } else if (def.tag === "person") {
+      const cx2 = x - w / 2 + 22, R = 10;
+      tctx.beginPath(); tctx.arc(cx2, y, R, 0, Math.PI * 2);
+      tctx.fillStyle = def.color; tctx.fill();
+      if (LOGOS[def.label]) {
+        tctx.save();
+        tctx.beginPath(); tctx.arc(cx2, y, R, 0, Math.PI * 2); tctx.clip();
+        tctx.drawImage(LOGOS[def.label], cx2 - R, y - R, R * 2, R * 2);
+        tctx.restore();
+      } else {
+        tctx.fillStyle = S_INK;
+        tctx.font = "700 8px 'JetBrains Mono', monospace"; tctx.textAlign = "center"; tctx.textBaseline = "middle";
+        tctx.fillText(def.label.slice(0, 2).toUpperCase(), cx2, y + 0.5);
+      }
+      tctx.beginPath(); tctx.arc(cx2, y, R, 0, Math.PI * 2);
+      tctx.strokeStyle = S_INK; tctx.lineWidth = 1.6; tctx.stroke();
+      tctx.font = "700 11px 'JetBrains Mono', monospace"; tctx.textAlign = "left"; tctx.textBaseline = "middle";
+      tctx.fillStyle = S_INK;
+      tctx.fillText(def.label, x - w / 2 + 38, y);
+    } else {
+      tctx.fillText(def.label, x - w / 2 + 16, y - 7);
+      tctx.font = "9px 'JetBrains Mono', monospace";
+      tctx.fillStyle = S_DIM;
+      tctx.fillText(def.tag, x - w / 2 + 16, y + 9);
+    }
+  }
+  
+  function treeFrame(ms) {
+    if (treeActive && NEX) {
+      const now = ms / 1000;
+      if (sceneT0 === null) { sceneT0 = now; initGraph(); }
+      const t = now - sceneT0;
+  
+      tctx.clearRect(0, 0, TW, TH);
+  
+      /* ── the composition rewrites itself: add · retire · MIGRATE ── */
+      nodes = nodes.filter(n => !(n.dying !== null && t - n.dying > 1.32)); /* clean every frame */
+      if (t > nextEvent) {
+        nextEvent = t + 1.9;
+        const extras = nodes.filter(n => !CORE.includes(n.def) && !n.dying);
+        const free = SLOT_POS.map((_, i) => i).filter(i => !nodes.some(n => n.slot === i));
+        const roll = srnd(t * 7.1, 13.7);
+        if (roll < 0.28 && nodes.length > 2) {
+          /* migrate: a live node glides to a new slot, its wire re-routes */
+          if (free.length) {
+            const mover = nodes[Math.floor(srnd(t, 5.1) * nodes.length)];
+            if (mover && !mover.dying) mover.slot = free[Math.floor(srnd(t, 9.7) * free.length)];
+          }
+        } else if (roll < 0.80 && free.length && extras.length < 8) {
+          nodes.push({ def: POOL[poolIdx++ % POOL.length], slot: free[Math.floor(srnd(poolIdx, 3.3) * free.length)], born: t, dying: null });
+        } else if (extras.length > 4) {      /* retire only once it's genuinely full */
+          extras[0].dying = t;
+        }
+      }
+      /* live positions glide toward their slots — rearrangement is motion */
+      for (const n of nodes) {
+        const [tx, ty] = slotXY(n.slot, t);
+        if (n.x === undefined) { n.x = tx; n.y = ty; }
+        n.x += (tx - n.x) * 0.055;
+        n.y += (ty - n.y) * 0.055;
+      }
+  
+      /* ── edges first (under everything) ── */
+      tctx.strokeStyle = S_INK; tctx.lineWidth = 1.6;
+      const livePaths = [];
+      for (const n of nodes) {
+        const x = n.x, y = n.y;
+        const path = edgePath(x, y);
+        /* TRUE trim-path life. Birth: the node lands first, then the wire
+           DRAWS ITSELF out of the node along the route to the nexus — the
+           node is the one establishing the connection. Death: the node
+           dissolves first, then the wire retracts into the system. */
+        let trim = null; /* [f0, f1] of the visible stretch */
+        if (n.dying !== null) {
+          const dp = (t - n.dying) / 1.3;
+          if (dp > 0.45) trim = [(dp - 0.45) / 0.55, 1];   /* retract from the node end */
+        } else if (t - n.born < 1.5) {
+          const bp = (t - n.born) / 1.5;
+          if (bp < 0.5) continue;                            /* node first, no wire yet */
+          trim = [0, (bp - 0.5) / 0.5];                      /* draw node → nexus */
+        }
+        livePaths.push([path, n]);
+        const flow = !trim ? flows.find(fl => fl.node === n) : null;
+        if (flow) {
+          /* the signal: a window of the SOLID wire goes dotted and slides
+             along the route — solid · dotted span · solid */
+          const SPAN = 0.22;
+          const f0 = flow.dir > 0 ? flow.head - SPAN : 1 - flow.head;
+          const f1 = f0 + SPAN;
+          strokePts(subPath(path, 0, Math.max(0, f0)));
+          strokePts(subPath(path, Math.max(0, f0), Math.min(1, f1)), [2.5, 5]);
+          strokePts(subPath(path, Math.min(1, f1), 1));
+        } else if (trim) {
+          const pts = subPath(path, trim[0], trim[1]);
+          strokePts(pts);
+          if (pts) { /* the writing tip */
+            const tip = trim[0] === 0 ? pts[pts.length - 1] : pts[0];
+            tctx.fillStyle = S_INK;
+            tctx.fillRect(tip[0] - 2.5, tip[1] - 2.5, 5, 5);
+          }
+        } else {
+          tctx.beginPath();
+          tctx.moveTo(path[0][0], path[0][1]);
+          for (let i = 1; i < path.length; i++) tctx.lineTo(path[i][0], path[i][1]);
+          tctx.stroke();
+        }
+      }
+  
+      /* ── flows: spawn a traveling dotted span on an idle wire now and then ── */
+      if (Math.random() < 0.04 && livePaths.length) {
+        const [, n] = livePaths[Math.floor(Math.random() * livePaths.length)];
+        if (!flows.some(fl => fl.node === n)) {
+          flows.push({ node: n, head: 0, dir: Math.random() < 0.5 ? 1 : -1 });
+        }
+      }
+      for (const fl of flows) fl.head += 0.0085;
+      flows = flows.filter(fl => fl.head < 1.24 && (fl.spine || nodes.includes(fl.node)));
+  
+      /* ── satellite nodes ── */
+      for (const n of nodes) {
+        const a = n.dying !== null
+          ? 1 - Math.min(1, ((t - n.dying) / 1.3) / 0.45)   /* dissolve, then the wire retracts */
+          : Math.min(1, ((t - n.born) / 1.5) / 0.5);        /* land first, then connect */
+        if (a <= 0) continue;
+        drawNodeBox(n.x, n.y, n.def, Math.min(1, a), t);
+      }
+  
+      /* ── the anatomy + the dock.
+         What a workbook IS exits from its upper sides (dashed — facets, not
+         connections). Below, the workbook sits DOCKED in a Nexus bay through
+         a visible port — and only from the dock does it BECOME the platforms. */
+      const SQH = 124 / 2;
+      const CHIP_W = 110, CHIP_H = 34, FAN_X = 152, FAN_GAP = 84;
+      const dash = () => { tctx.setLineDash([3, 3]); tctx.lineWidth = 1.2; tctx.strokeStyle = S_INK; };
+      const undash = () => tctx.setLineDash([]);
+      function chipIcon(kind, x, y) {
+        tctx.strokeStyle = S_INK; tctx.lineWidth = 1.5; tctx.lineCap = "round";
+        tctx.beginPath();
+        if (kind === "isolated") {            /* a crate — sandboxed */
+          tctx.rect(x - 5, y - 4.5, 10, 9);
+          tctx.moveTo(x - 5, y - 1); tctx.lineTo(x + 5, y - 1);
+          tctx.moveTo(x, y - 1); tctx.lineTo(x, y + 4.5);
+        } else if (kind === "stateful") {     /* a cylinder — carries its state */
+          tctx.ellipse(x, y - 4, 5, 2, 0, 0, Math.PI * 2);
+          tctx.moveTo(x - 5, y - 4); tctx.lineTo(x - 5, y + 3.4);
+          tctx.moveTo(x + 5, y - 4); tctx.lineTo(x + 5, y + 3.4);
+          tctx.moveTo(x + 5, y + 3.4); tctx.ellipse(x, y + 3.4, 5, 2, 0, 0, Math.PI);
+        } else if (kind === "agentic") {      /* a spark */
+          tctx.moveTo(x, y - 5.5); tctx.lineTo(x, y + 5.5);
+          tctx.moveTo(x - 5.5, y); tctx.lineTo(x + 5.5, y);
+          tctx.moveTo(x - 3.4, y - 3.4); tctx.lineTo(x + 3.4, y + 3.4);
+          tctx.moveTo(x + 3.4, y - 3.4); tctx.lineTo(x - 3.4, y + 3.4);
+        } else if (kind === "mobile") {       /* a phone */
+          tctx.rect(x - 3.4, y - 5.5, 6.8, 11);
+          tctx.moveTo(x - 1.4, y + 3.4); tctx.lineTo(x + 1.4, y + 3.4);
+        } else if (kind === "desktop") {      /* a monitor */
+          tctx.rect(x - 5.5, y - 5, 11, 7.4);
+          tctx.moveTo(x - 2.4, y + 5.4); tctx.lineTo(x + 2.4, y + 5.4);
+          tctx.moveTo(x, y + 2.4); tctx.lineTo(x, y + 5.4);
+        } else if (kind === "web") {          /* a globe */
+          tctx.arc(x, y, 5.4, 0, Math.PI * 2);
+          tctx.moveTo(x - 5.4, y); tctx.lineTo(x + 5.4, y);
+          tctx.moveTo(x, y - 5.4); tctx.ellipse(x, y, 2.6, 5.4, 0, -Math.PI / 2, Math.PI * 1.5);
+        }
+        tctx.stroke();
+      }
+      function chip(cx2, cy2, sp) {
+        tctx.fillStyle = S_PAPER;
+        tctx.fillRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, CHIP_W, CHIP_H);
+        tctx.strokeStyle = S_INK; tctx.lineWidth = 2;
+        tctx.strokeRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, CHIP_W, CHIP_H);
+        tctx.fillStyle = sp.stripe;
+        tctx.fillRect(cx2 - CHIP_W / 2, cy2 - CHIP_H / 2, 5, CHIP_H);
+        chipIcon(sp.label, cx2 - CHIP_W / 2 + 17, cy2);
+        tctx.font = "700 10.5px 'JetBrains Mono', monospace";
+        tctx.textAlign = "left"; tctx.textBaseline = "middle";
+        tctx.fillStyle = S_INK;
+        tctx.fillText(sp.label, cx2 - CHIP_W / 2 + 29, cy2 + 0.5);
+      }
+      function caption(text, y) {
+        tctx.font = "700 9.5px 'JetBrains Mono', monospace";
+        tctx.letterSpacing = "3px";
+        tctx.textAlign = "center"; tctx.textBaseline = "middle";
+        tctx.fillStyle = S_DIM;
+        tctx.fillText(text, NEX.x, y);
+        tctx.letterSpacing = "0px";
+      }
+  
+      /* IS — out of the upper sides */
+      const upY = NEX.y - SQH - FAN_GAP;
+      dash();
+      tctx.beginPath();
+      /* left facet exits the LEFT side */
+      tctx.moveTo(NEX.x - SQH, NEX.y - 24);
+      tctx.lineTo(NEX.x - FAN_X, NEX.y - 24);
+      tctx.lineTo(NEX.x - FAN_X, upY + CHIP_H / 2);
+      /* center facet exits the top */
+      tctx.moveTo(NEX.x, NEX.y - SQH);
+      tctx.lineTo(NEX.x, upY + CHIP_H / 2);
+      /* right facet exits the RIGHT side */
+      tctx.moveTo(NEX.x + SQH, NEX.y - 24);
+      tctx.lineTo(NEX.x + FAN_X, NEX.y - 24);
+      tctx.lineTo(NEX.x + FAN_X, upY + CHIP_H / 2);
+      tctx.stroke();
+      undash();
+      SPINE_DN.forEach((sp, i) => chip(NEX.x + (i - 1) * FAN_X, upY, sp));
+      caption("ONE WORKBOOK, ANY KIND OF APP", upY - CHIP_H / 2 - 17);
+  
+      /* THE DOCK — a Nexus bay the workbook plugs into through a port */
+      const DOCK_W = 330, DOCK_H = 46;
+      const dockTop = NEX.y + SQH + 14, dockBot = dockTop + DOCK_H;
+      tctx.fillStyle = S_INK; /* hard offset shadow, house chrome */
+      tctx.fillRect(NEX.x - DOCK_W / 2 + 4, dockTop + 4, DOCK_W, DOCK_H);
+      tctx.fillStyle = S_PAPER;
+      tctx.fillRect(NEX.x - DOCK_W / 2, dockTop, DOCK_W, DOCK_H);
+      tctx.strokeStyle = S_INK; tctx.lineWidth = 2;
+      tctx.strokeRect(NEX.x - DOCK_W / 2, dockTop, DOCK_W, DOCK_H);
+      /* the PORT: socket on the dock, pins bridging up to the workbook */
+      tctx.fillStyle = S_INK;
+      tctx.fillRect(NEX.x - 16, dockTop - 5, 32, 10);          /* socket */
+      tctx.fillRect(NEX.x - 10, NEX.y + SQH, 6, 14);           /* pin */
+      tctx.fillRect(NEX.x + 4,  NEX.y + SQH, 6, 14);           /* pin */
+      /* the bay wears the nexus mark + name */
+      if (NEXMARK.complete && NEXMARK.naturalWidth) {
+        tctx.save();
+        tctx.filter = "invert(0.92)";
+        tctx.drawImage(NEXMARK, NEX.x - DOCK_W / 2 + 14, dockTop + DOCK_H / 2 - 10, 20, 20);
+        tctx.restore();
+      }
+      tctx.font = "700 11px 'JetBrains Mono', monospace";
+      tctx.textAlign = "left"; tctx.textBaseline = "middle";
+      tctx.fillStyle = S_INK;
+      tctx.fillText("nexus", NEX.x - DOCK_W / 2 + 40, dockTop + DOCK_H / 2 + 0.5);
+      /* placement: ONE nexus — it lives local or cloud, your choice */
+      const pcy = dockTop + DOCK_H / 2;
+      let px2 = NEX.x + DOCK_W / 2 - 116;
+      tctx.strokeStyle = S_DIM; tctx.lineWidth = 1.3; tctx.lineCap = "round";
+      tctx.beginPath();                                  /* mini monitor */
+      tctx.rect(px2 - 4, pcy - 4, 8, 5.6);
+      tctx.moveTo(px2 - 1.6, pcy + 4); tctx.lineTo(px2 + 1.6, pcy + 4);
+      tctx.stroke();
+      tctx.font = "9px 'JetBrains Mono', monospace";
+      tctx.fillStyle = S_DIM; tctx.textAlign = "left"; tctx.textBaseline = "middle";
+      tctx.fillText("local", px2 + 8, pcy + 0.5);
+      tctx.fillText("or", px2 + 42, pcy + 0.5);
+      const cx2 = px2 + 64;
+      tctx.beginPath();                                  /* mini cloud */
+      tctx.arc(cx2 - 3, pcy + 1, 2.4, Math.PI * 0.5, Math.PI * 1.5);
+      tctx.arc(cx2 + 0.4, pcy - 1.6, 3, Math.PI * 0.8, Math.PI * 2.05);
+      tctx.arc(cx2 + 3.4, pcy + 1, 2.4, Math.PI * 1.5, Math.PI * 0.5);
+      tctx.closePath();
+      tctx.stroke();
+      tctx.fillText("cloud", cx2 + 8, pcy + 0.5);
+  
+      /* the facets the nexus grants — label rides the EDGE, elk-style */
+      const dnY = dockBot + FAN_GAP * 0.92;
+      const busY = dockBot + (dnY - dockBot) * 0.52;
+      dash();
+      tctx.beginPath();
+      tctx.moveTo(NEX.x, dockBot);
+      tctx.lineTo(NEX.x, busY);
+      tctx.moveTo(NEX.x - FAN_X, busY);
+      tctx.lineTo(NEX.x + FAN_X, busY);
+      for (let i = 0; i < SPINE_DN.length; i++) {
+        tctx.moveTo(NEX.x + (i - 1) * FAN_X, busY);
+        tctx.lineTo(NEX.x + (i - 1) * FAN_X, dnY - CHIP_H / 2);
+      }
+      tctx.stroke();
+      undash();
+      SPINE_UP.forEach((sp, i) => chip(NEX.x + (i - 1) * FAN_X, dnY, sp));
+      /* the edge label — knocked out of the line so no glyph is crossed */
+      const elY = (dockBot + busY) / 2 + 1;
+      tctx.font = "700 9.5px 'JetBrains Mono', monospace";
+      tctx.letterSpacing = "3px";
+      const elW = tctx.measureText("MAKES IT").width;
+      tctx.fillStyle = S_PAPER;
+      tctx.fillRect(NEX.x - elW / 2 - 8, elY - 9, elW + 16, 18);
+      tctx.textAlign = "center"; tctx.textBaseline = "middle";
+      tctx.fillStyle = S_DIM;
+      tctx.fillText("MAKES IT", NEX.x, elY);
+      tctx.letterSpacing = "0px";
+  
+      /* ── the nexus: a SQUARE — its own centered entity. The W mark above,
+         "workbook" beneath, and a quiet .html: it is just a file. ── */
+      const swell = 1 + Math.sin(t * 0.9) * 0.012;        /* it breathes too */
+      const SQ = 124 * swell;
+      tctx.fillStyle = S_INK;
+      tctx.fillRect(NEX.x - SQ / 2 + 5, NEX.y - SQ / 2 + 5, SQ, SQ);
+      tctx.fillStyle = S_PAPER;
+      tctx.fillRect(NEX.x - SQ / 2, NEX.y - SQ / 2, SQ, SQ);
+      tctx.strokeStyle = S_INK; tctx.lineWidth = 2.4;
+      tctx.strokeRect(NEX.x - SQ / 2, NEX.y - SQ / 2, SQ, SQ);
+      /* the W mark, centered in the upper half */
+      const MARKW = 50, MS = MARKW / 113.444;
+      tctx.save();
+      tctx.translate(NEX.x - MARKW / 2, NEX.y - SQ / 2 + 20);
+      tctx.scale(MS, MS);
+      tctx.fillStyle = S_INK;
+      tctx.fill(new Path2D("M48.271 0.137041C54.0348 -0.0424459 59.4862 -0.100239 65.2392 0.307556C65.5299 10.0796 65.1746 19.9621 65.4617 29.7381C65.4868 30.5677 65.8708 31.142 66.3912 31.7433C72.1083 33.4642 84.7519 13.8452 90.9211 11.7402C93.9071 12.344 100.087 19.9987 102.273 22.457C98.7305 28.4167 83.2732 40.6907 81.3819 45.0034C81.3999 46.2868 81.4501 46.3256 82.1571 47.442C83.7075 48.637 108.252 47.9876 113.133 48.4643C113.57 53.985 113.431 59.865 113.391 65.4284C101.67 65.4485 86.6791 66.781 76.4724 61.6904C68.0493 57.5274 61.6503 50.1601 58.7039 41.2382C57.9394 38.5857 57.3868 36.1501 56.7802 33.4675C55.5995 38.7002 54.6772 42.9878 51.9209 47.7051C39.8045 68.4416 20.2283 65.4557 0.0653694 65.3889C-0.0584465 59.646 -0.00641725 53.9006 0.221835 48.1606C5.51182 48.1355 28.4253 48.7415 31.6987 47.27C31.862 46.8967 31.9051 46.8482 31.9866 46.4038C32.6717 42.6809 14.5579 27.3487 11.6183 22.8379L11.3728 22.4563C13.1769 19.9072 19.3469 13.0734 22.063 11.7735C25.7911 11.2107 40.0016 29.8303 44.4561 31.6887C45.845 32.2681 46.0675 32.2311 47.2913 31.7505C48.6658 29.7977 48.2064 22.821 48.2172 20.1527L48.271 0.137041Z"));
+      tctx.restore();
+      tctx.font = "700 13px 'JetBrains Mono', monospace";
+      tctx.textAlign = "center"; tctx.textBaseline = "middle";
+      tctx.fillStyle = S_INK;
+      tctx.fillText("workbook", NEX.x, NEX.y + SQ / 2 - 38);
+      tctx.font = "10px 'JetBrains Mono', monospace";
+      tctx.fillStyle = S_DIM;
+      tctx.fillText(".html", NEX.x, NEX.y + SQ / 2 - 20);
+      /* live tick */
+      tctx.fillStyle = S_NEON;
+      if (Math.floor(t * 2) % 2) tctx.fillRect(NEX.x + SQ / 2 - 16, NEX.y - SQ / 2 + 9, 7, 7);
+    }
+    requestAnimationFrame(treeFrame);
+  }
+  treeResize();
+  addEventListener("resize", treeResize);
+  requestAnimationFrame(treeFrame);
+  
+  /* ── the DNA seam ─────────────────────────────────────────────────────────
+     A genome track: blocks of color, hash-random widths, drifting slowly.
+     Every so often one block MUTATES — its color flips, discretely. Rare ink
+     and neon genes punctuate the pastel run. */
+  const dcv = document.getElementById("dnaCv");
+  const dctx = dcv.getContext("2d");
+  const DNA_H = 18;
+  let DW, genes = [], driftPx = 0, lastMut = 0;
+  const GENE_COLORS = [...PALETTE, "#121316", "#13d943"];
+  function geneColor(r) {
+    if (r > 0.95) return "#13d943";       /* the live gene — rare */
+    return PALETTE[Math.floor(r * 37) % PALETTE.length];
+  }
+  function makeGene(seedish) {
+    const r = ((Math.sin(seedish * 419.3) * 23421.63) % 1 + 1) % 1;
+    return { w: 10 + r * 64, color: geneColor(((Math.sin(seedish * 97.7) * 11171.17) % 1 + 1) % 1) };
+  }
+  function dnaResize() {
+    const d = Math.min(devicePixelRatio || 1, 2);
+    DW = innerWidth;
+    dcv.width = DW * d; dcv.height = DNA_H * d;
+    dcv.style.width = DW + "px"; dcv.style.height = DNA_H + "px";
+    dctx.setTransform(d, 0, 0, d, 0, 0);
+    genes = [];
+    let total = 0, k = 1;
+    while (total < DW * 1.6) { const g = makeGene(k++); genes.push(g); total += g.w; }
+  }
+  dnaResize();
+  addEventListener("resize", dnaResize);
+  let dnaK = 1000;
+  function dnaFrame(ms) {
+    const t = ms / 1000;
+    driftPx += 0.25;
+    if (genes.length && driftPx > genes[0].w) { driftPx -= genes[0].w; genes.shift(); genes.push(makeGene(dnaK++)); }
+    if (t - lastMut > 1.4) {                   /* one mutation, discrete */
+      lastMut = t;
+      const g = genes[Math.floor(((Math.sin(t * 313.7) * 5417.7) % 1 + 1) % 1 * genes.length)];
+      if (g) g.color = geneColor(((Math.sin(t * 71.3) * 9973.3) % 1 + 1) % 1);
+    }
+    dctx.clearRect(0, 0, DW, DNA_H);
+    let x = -driftPx;
+    for (const g of genes) {
+      dctx.fillStyle = g.color;
+      dctx.fillRect(x, 0, g.w - 2, DNA_H);     /* 2px paper gap — beads on a strand */
+      x += g.w;
+      if (x > DW) break;
+    }
+    requestAnimationFrame(dnaFrame);
+  }
+  requestAnimationFrame(dnaFrame);
+  
+  /* ── the pixel-voice MATTE ENGINE ─────────────────────────────────────────
+     The text never animates — the MATTE does: a coarse blocky noise field
+     drifts across the glyphs. Where it covers, ink is SOLID; elsewhere it
+     breaks into scanlines. Hero = fluid (overlay canvas, device-pixel
+     aligned: zero blur, zero encode cost). Static contexts = one seeded
+     full-resolution mask frame. Stripe geometry is INTEGER everywhere:
+     8px period, 2px gap — every line identical. */
+  function hash3(ix, iy, iz) { return cellHash(ix + iz * 1013, iy + iz * 557); }
+  function blobNoise(x, y, z) {
+    const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+    const fx = x - ix, fy = y - iy, fz = z - iz;
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy), sz = fz * fz * (3 - 2 * fz);
+    function layer(zz) {
+      const a = hash3(ix, iy, zz), b = hash3(ix + 1, iy, zz), c = hash3(ix, iy + 1, zz), d = hash3(ix + 1, iy + 1, zz);
+      return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+    }
+    return layer(iz) + (layer(iz + 1) - layer(iz)) * sz;
+  }
+  const STRIPE_P = 4, STRIPE_GAP = 2, BLOB_C = 5;   /* 5px cells — the mosaic must
+                                                       hug the strokes, not swallow them */
+  
+  /* fluid: ONE canvas renders the whole word — the DOM text goes transparent
+     (it still does layout + justification), and the canvas draws:
+       1. a full field of shifting block-ASCII,
+       2. masked INTO the glyph shapes (destination-in with the same text),
+       3. solid ink re-drawn only where the matte covers.
+     Everything is canvas text with one font + baseline — registration is
+     perfect by construction. */
+  const fluidEl = null; /* TRICK: plain hero, Groothan fluid/bubble casing removed */
+  let fluidCv = null, fluidCtx = null, FP = null;  /* FP: paint params */
+  function fluidSetup() {
+    if (!fluidEl) return;
+    if (!fluidCv) {
+      fluidCv = document.createElement("canvas");
+      fluidCv.style.cssText = "position:absolute;pointer-events:none;z-index:2;";
+      fluidEl.style.position = "relative";
+      fluidEl.appendChild(fluidCv);
+      fluidCtx = fluidCv.getContext("2d");
+    }
+    const r = fluidEl.getBoundingClientRect();
+    const d = Math.min(devicePixelRatio || 1, 2);
+    const w = Math.ceil(r.width), rectH = Math.ceil(r.height);
+    const cs = getComputedStyle(fluidEl);
+    const font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const probe = document.createElement("canvas").getContext("2d");
+    probe.font = font;
+    const met = probe.measureText("\u2588HXG");
+    const asc = met.fontBoundingBoxAscent, desc = met.fontBoundingBoxDescent;
+    const pad = Math.max(0, Math.ceil((asc + desc - rectH) / 2)) + 6;
+    const h = rectH + pad * 2;
+    FP = {
+      w, h, font,
+      ls: cs.letterSpacing !== "normal" ? cs.letterSpacing : "0px",
+      text: fluidEl.textContent.toUpperCase(),
+      baseline: pad + (rectH - (asc + desc)) / 2 + asc,
+    };
+    fluidCv.width = w * d; fluidCv.height = h * d;
+    fluidCv.style.width = w + "px"; fluidCv.style.height = h + "px";
+    fluidCv.style.left = "0"; fluidCv.style.top = -pad + "px";
+    fluidCtx.setTransform(d, 0, 0, d, 0, 0);
+    fluidEl.style.color = "transparent";  /* the canvas is the only visible render */
+  }
+  const BLOCKS_FONT = `700 ${BLOB_C + 2}px 'JetBrains Mono', monospace`;
+  function fluidPaint(t) {
+    if (!FP) return;
+    const { w, h, font, ls, text, baseline } = FP;
+    const cx = fluidCtx;
+    cx.clearRect(0, 0, w, h);
+  
+    /* 1 · the block field, everywhere the matte does NOT cover */
+    cx.font = BLOCKS_FONT;
+    cx.textAlign = "center"; cx.textBaseline = "middle";
+    cx.fillStyle = "#121316";
+    const cols = Math.ceil(w / BLOB_C), rows = Math.ceil(h / BLOB_C);
+    const matte = [];
+    for (let gy = 0; gy < rows; gy++) {
+      matte[gy] = [];
+      for (let gx = 0; gx < cols; gx++) {
+        const v = blobNoise(gx * 0.055 + t * 0.32, gy * 0.105, t * 0.55);
+        const solid = v > 0.47;
+        matte[gy][gx] = solid;
+        if (solid) continue;
+        const dd = Math.max(0, Math.min(1, (v - 0.16) / 0.31));
+        const pick = hash3(gx, gy, Math.floor(t * 2));
+        let ch;
+        if (dd > 0.72) ch = "\u2588";
+        else if (dd > 0.45) ch = pick > 0.4 ? "\u2593" : "\u2588";
+        else if (dd > 0.22) ch = pick > 0.55 ? "\u2592" : (pick > 0.25 ? "\u2580" : "\u2584");
+        else ch = pick > 0.7 ? "\u2591" : "\u2592";
+        cx.fillText(ch, gx * BLOB_C + BLOB_C / 2, gy * BLOB_C + BLOB_C / 2 + 0.5);
+      }
+    }
+  
+    /* 2 · mask the field INTO the glyphs */
+    cx.globalCompositeOperation = "destination-in";
+    cx.font = font; cx.letterSpacing = ls;
+    cx.textAlign = "left"; cx.textBaseline = "alphabetic";
+    cx.fillText(text, 0, baseline);
+    cx.globalCompositeOperation = "source-over";
+  
+    /* 3 · solid ink wherever the matte covers */
+    cx.save();
+    cx.beginPath();
+    for (let gy = 0; gy < rows; gy++)
+      for (let gx = 0; gx < cols; gx++)
+        if (matte[gy][gx]) cx.rect(gx * BLOB_C, gy * BLOB_C, BLOB_C, BLOB_C);
+    cx.clip();
+    cx.fillStyle = "#121316";
+    cx.fillText(text, 0, baseline);
+    cx.restore();
+    cx.letterSpacing = "0px";
+  }
+  
+  /* static: one seeded frame, baked as a full-resolution mask */
+  function staticBake(el, seed) {
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (!r.width) return;
+    const d = Math.min(devicePixelRatio || 1, 2);
+    const cv = document.createElement("canvas");
+    cv.width = Math.ceil(r.width * d); cv.height = Math.ceil(r.height * d);
+    const cx = cv.getContext("2d");
+    cx.scale(d, d);
+    cx.fillStyle = "#fff";
+    const w = r.width, h = r.height;
+    for (let y = 0; y < h; y += STRIPE_P) cx.fillRect(0, y, w, STRIPE_P - STRIPE_GAP);
+    const cols = Math.ceil(w / BLOB_C), rows = Math.ceil(h / BLOB_C);
+    for (let gy = 0; gy < rows; gy++) {
+      for (let gx = 0; gx < cols; gx++) {
+        const v = blobNoise(gx * 0.11 + seed * 37, gy * 0.21 + seed * 11, seed);
+        if (v > 0.53) cx.fillRect(gx * BLOB_C, gy * BLOB_C, BLOB_C, BLOB_C);
+      }
+    }
+    const url = "url(" + cv.toDataURL() + ")";
+    el.style.webkitMaskImage = url; el.style.maskImage = url;
+    el.style.webkitMaskSize = "100% 100%"; el.style.maskSize = "100% 100%";
+    el.style.webkitMaskRepeat = "no-repeat"; el.style.maskRepeat = "no-repeat";
+  }
+  
+  
+  
+  /* ── the spotlight: selectors left, stage right. Pastel DNA system. ── */
+  const PIECES = [
+    { key: "workbooks", name: "Workbooks", role: "the unit", icon: "wb-file-icon.svg",
+      pastel: "#a8d4f0", accent: "#5da8e8",
+      mix: [["#aee5c2", .34], ["#f2ddb0", .26], ["#f3c5a3", .22], ["#9fc4e8", .18]],
+      body: "A workbook is one file that is a whole app — its code, data, and interface travel together, and it runs wherever it lands.",
+      body2: "Open it on your laptop and it's something you can read and change; serve it from the Nexus and it's a product people use. Same file, no export step — the document is the deployment.",
+      feats: ["<b>HTML at heart</b> — opens in any browser, readable by any agent.", "<b>History on board</b> — every version travels inside the file.", "<b>Yours outright</b> — no lock-in, no account required to open it."],
+      why: "so software can be carried, shared, and changed as easily as a document.",
+      story: [
+        ["cmd", "work lint shop.org"],
+        ["ok", "clean — 0 errors · 2 notes"],
+        ["cmd", "work build shop.org"],
+        ["out", "compiling code components → wasm (engine-backed)…"],
+        ["ok", "built — inventory · orders · quick-add"],
+        ["cmd", "work bundle shop.org"],
+        ["out", "tangling… org + data + wasm → one artifact"],
+        ["ok", "shop.html  (412 KB, self-contained)"],
+        ["cmd", "work sign shop.html"],
+        ["ok", "signed — provenance travels with the file"],
+        ["cmd", "work verify shop.html"],
+        ["ok", "signature good · history intact · runs anywhere"],
+        ["dim", "  mail it, git it, hand it to a teammate —"],
+        ["dim", "  the document is the deployment."]] },
+    { key: "nexus", name: "Nexus", role: "the engine", icon: "nexus-icon.svg",
+      pastel: "#aee5c2", accent: "#57c97e",
+      mix: [["#a8d4f0", .34], ["#f3c5a3", .26], ["#9fc4e8", .22], ["#f2ddb0", .18]],
+      body: "The Nexus is the engine you own — it runs workbooks on your Mac, your server, or the cloud, and connects them to your data, your services, and each other.",
+      body2: "One command starts it, and the same engine carries the whole journey: the prototype you build for yourself becomes the product your team runs — no microservices, no serverless maze.",
+      feats: ["<b>One command</b> — up and serving in seconds, anywhere.", "<b>Dev is prod</b> — the same engine from first sketch to full scale.", "<b>Truly portable</b> — Mac, Linux, a VPS, or the cloud. You choose."],
+      why: "so one system carries you from first prototype to production at full scale.",
+      story: [
+        ["cmd", "work deploy init"],
+        ["q",  "? engine place — where does this run?"],
+        ["out", "  <span class=hi>› local</span>     a microVM on this mac — cloud-identical"],
+        ["out", "    cloud     fly.io, under your own account"],
+        ["q",  "? database"],
+        ["out", "  <span class=hi>› sqlite</span>    zero-config, travels with the deploy"],
+        ["out", "    postgres  bring your own DSN"],
+        ["ok", "wrote deployment.org (local) — declarative, reproducible"],
+        ["dim", "  engine place · tenancy · storage · database · auth —"],
+        ["dim", "  one org file describes the whole deployment."],
+        ["cmd", "work deploy validate"],
+        ["ok", "valid — local · single-tenant · storage=local-fs · db=sqlite"],
+        ["cmd", "work deploy apply"],
+        ["out", "pulling engine… booting microVM…"],
+        ["ok", "runtime up — http://127.0.0.1:4000"],
+        ["cmd", "work deploy status"],
+        ["out", "local runtime: microVM up — http://127.0.0.1:4000 <span class=dim>(pid 210)</span>"],
+        ["cmd", "work deploy doctor"],
+        ["ok", "prereqs OK"],
+        ["dim", "  cloud later? flip ENGINE_PLACE to fly — same file,"],
+        ["dim", "  same engine, dev → prod."]] },
+    { key: "toolkits", name: "Toolkits", role: "the parts", icon: "toolkit-icon.svg",
+      pastel: "#f3c5a3", accent: "#ee9455",
+      mix: [["#f2ddb0", .34], ["#a8d4f0", .26], ["#aee5c2", .22], ["#9fc4e8", .18]],
+      body: "Toolkits are ready-made abilities a workbook can pick up — payments, search, charts, voices, anything — built by us, by the community, or by you.",
+      body2: "Each one snaps in with a single line and brings everything it needs along. And it flows both ways: anything you build inside a workbook can be packaged as a toolkit and handed to the next one.",
+      feats: ["<b>One line to add</b> — a toolkit carries its own UI, storage, and permissions.", "<b>Composable</b> — toolkits stack and talk to each other.", "<b>Two-way street</b> — package anything you've built and share it."],
+      why: "so new powers snap in without rebuilding — and anything you make can become one.",
+      story: [
+        ["cmd", "work toolkit list"],
+        ["out", "<span class=hi>glyphs</span>     ready   any visual mark — logos, icons, avatars — as SVG"],
+        ["out", "<span class=hi>ffmpeg</span>     ready   image · audio · video at parity"],
+        ["out", "<span class=hi>video</span>      ready   ask for a video, get HyperFrames"],
+        ["out", "<span class=hi>3w</span>         ready   local-first deep-research browser"],
+        ["out", "<span class=hi>wrangler</span>   ready   deploy to Cloudflare Pages, your account"],
+        ["cmd", "work toolkit show glyphs"],
+        ["out", "skills: <span class=hi>curate</span> · <span class=hi>integrate</span> · <span class=hi>resolve</span>"],
+        ["dim", "  one call resolves brand:google · icon:elixir · avatar:open-peeps/wren"],
+        ["cmd", "work toolkit build glyphs"],
+        ["out", "compiling to wasm… sandboxed · signed"],
+        ["ok", "built — any workbook can pick it up"],
+        ["cmd", "work toolkit push my-tables"],
+        ["ok", "shipped onto the engine — any workbook can pick it up"],
+        ["dim", "  what you build feeds the ecosystem,"],
+        ["dim", "  and the ecosystem feeds you back."]] },
+  ];
+  const s3Sel = document.getElementById("s3Sel");
+  const s3Stage = document.getElementById("s3Stage");
+  /* the shared languages of the ecosystem — every piece is made of the same
+     hues, in different proportions, like the language bar on a repo */
+  function dnaMiniHTML(mix, seed) {
+    const segs = [];
+    let k = seed;
+    mix.forEach(([color, frac]) => {
+      const n = frac > 0.3 ? 3 : frac > 0.12 ? 2 : 1;
+      for (let j = 0; j < n; j++) segs.push([color, frac / n]);
+    });
+    for (let i = segs.length - 1; i > 0; i--) {
+      k++;
+      const j = Math.floor(((Math.sin(k * 127.1) * 43758.5453) % 1 + 1) % 1 * (i + 1));
+      [segs[i], segs[j]] = [segs[j], segs[i]];
+    }
+    return segs.map(([c, w]) => `<i style="width:${(w * 100).toFixed(1)}%;background:${c}"></i>`).join("");
+  }
+  function spotRender(activeKey) {
+    s3Sel.innerHTML = "";
+    PIECES.forEach((p) => {
+      const b = document.createElement("button");
+      b.className = p.key === activeKey ? "active" : "";
+      b.innerHTML = `<span class="mini" style="background:${p.pastel}"><img src="${p.icon}" alt=""></span> ${p.name} <span class="go" style="color:${p.pastel}">→</span>`;
+      b.onclick = () => spotRender(p.key);
+      s3Sel.appendChild(b);
+    });
+    const p = PIECES.find(x => x.key === activeKey);
+    s3Stage.style.setProperty("--pc", p.pastel);
+    s3Stage.style.setProperty("--ac", p.accent);
+    s3Stage.innerHTML = `
+      <div class="leaf">
+        <div class="s3-headrow">
+          <div class="bigicon">
+            <div class="face" style="background:${p.pastel}"><img src="${p.icon}" alt=""></div>
+            <div class="dnaMini">${dnaMiniHTML(p.mix, PIECES.indexOf(p) * 97 + 13)}</div>
+          </div>
+          <div>
+            <div class="role" style="color:${p.pastel}">${p.role}</div>
+            <h3>${p.name}</h3>
+          </div>
+        </div>
+        <p>${p.body}</p>
+        <p>${p.body2}</p>
+        <ul class="s3-feats">${p.feats.map(ft => `<li>${ft}</li>`).join("")}</ul>
+        <p class="why" style="border-color:${p.pastel}"><b>Why it exists:</b> ${p.why}</p>
+        ${p.link ? `<a class="more" href="${p.link}" style="background:${p.pastel}">${p.linkLabel}</a>` : ""}
+      </div>
+      <aside class="s3-termwrap">
+        <div class="s3-term" id="s3Term"></div>
+        <div class="s3-scroll" id="s3Scroll"><div class="thumb" id="s3Thumb"></div></div>
+      </aside>`;
+    playStory(p);
+  }
+  /* the storyteller: types commands char by char, prints output line by
+     line, keeps the tail in view. Switching pieces cancels and restarts. */
+  let storyToken = 0;
+  async function playStory(p) {
+    const my = ++storyToken;
+    const term = document.getElementById("s3Term");
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const thumb = document.getElementById("s3Thumb");
+    const syncBar = () => {
+      const track = document.getElementById("s3Scroll");
+      if (!track) return;
+      const h = track.clientHeight;
+      const frac = Math.min(1, term.clientHeight / term.scrollHeight);
+      const top = term.scrollHeight > term.clientHeight
+        ? (term.scrollTop / (term.scrollHeight - term.clientHeight)) * (h * (1 - frac)) : 0;
+      thumb.style.height = Math.max(18, h * frac) + "px";
+      thumb.style.top = top + "px";
+    };
+    term.addEventListener("scroll", syncBar);
+    const line = (html, cls) => {
+      const d = document.createElement("div");
+      d.className = "ln" + (cls ? " " + cls : "");
+      d.innerHTML = html;
+      term.appendChild(d);
+      term.scrollTop = term.scrollHeight;
+      syncBar();
+      return d;
+    };
+    syncBar();
+    for (const [kind, text] of p.story) {
+      if (my !== storyToken) return;
+      if (kind === "cmd") {
+        await sleep(420);
+        const d = line(`<span class="ps">$ </span><span class="cmd"></span><span class="caret"></span>`);
+        const span = d.querySelector(".cmd");
+        for (const ch of text) {
+          if (my !== storyToken) return;
+          span.textContent += ch;
+          term.scrollTop = term.scrollHeight;
+          await sleep(26);
+        }
+        d.querySelector(".caret").remove();
+        await sleep(300);
+      } else {
+        await sleep(kind === "dim" ? 200 : 300);
+        line(text, kind === "out" ? "" : kind);
+      }
+    }
+    if (my === storyToken) line(`<span class="ps">$ </span><span class="caret"></span>`);
+  }
+  
+  spotRender("workbooks");
+  
+  /* Desktop build not published yet: the Download button opens a "notify me"
+     modal (email + interest → nexus waitlist) instead of a real download. When
+     desktopDownload flips true, it'll link straight to the release. */
+  document.addEventListener("DOMContentLoaded", function () {
+    const WAITLIST_URL = "https://wb-nexus-cp.fly.dev/api/waitlist";
+    const modal = document.getElementById("dlModal");
+    const form = document.getElementById("dlForm");
+    const emailEl = document.getElementById("dlEmail");
+    const thanks = document.getElementById("dlThanks");
+    const openers = document.querySelectorAll(".btn-dl, .js-notify");
+  
+    function open() {
+      if (WB_FLAGS.desktopDownload) { location.href = "https://github.com/workbooks-sh/workbooks.sh/releases"; return; }
+      modal.classList.add("on");
+      document.body.style.overflow = "hidden";
+      setTimeout(() => emailEl && emailEl.focus(), 60);
+    }
+    function close() {
+      modal.classList.remove("on");
+      document.body.style.overflow = "";
+    }
+    openers.forEach(b => b.addEventListener("click", open));
+    modal.addEventListener("click", e => { if (e.target === modal || e.target.closest("[data-close]")) close(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && modal.classList.contains("on")) close(); });
+  
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const btn = form.querySelector("button[type=submit]");
+      const interest = (form.querySelector("input[name=interest]:checked") || {}).value || "";
+      btn.disabled = true; btn.textContent = "Saving…";
+      try {
+        await new Promise((res, rej) => { const ev = new EventSource("live/waitlist?email=" + encodeURIComponent(emailEl.value.trim()) + "&interest=" + encodeURIComponent(interest)); ev.onmessage = m => { let d = {}; try { d = JSON.parse(m.data); } catch (_) {} if (d.ok) { ev.close(); res(); } else if (d.type !== "end") { ev.close(); rej(new Error(d.error || "failed")); } }; ev.onerror = () => { ev.close(); rej(new Error("network")); }; });
+        form.style.display = "none";
+        thanks.style.display = "block";
+      } catch (err) {
+        btn.disabled = false; btn.textContent = "Notify me";
+        const e2 = document.getElementById("dlErr");
+        if (e2) { e2.textContent = "Hmm, that didn't go through — try again in a moment."; e2.style.display = "block"; }
+      }
+    });
+  });
+  
+  gsap.registerPlugin(ScrollTrigger);
+  ScrollTrigger.create({
+    trigger: "#s2",
+    start: "top bottom",
+    end: "bottom top",
+    onToggle: (st) => {
+      treeActive = st.isActive;
+      if (!st.isActive) sceneT0 = null; /* replay the build on return */
+    },
+  });
+  </script>
+end

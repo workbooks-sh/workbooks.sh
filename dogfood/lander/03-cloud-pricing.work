@@ -1,0 +1,57 @@
+# Cloud pricing
+
+Storage + usage, never seats — the slider where the stack scales but the bill is honest. The anti-seat-pricing stance made tangible.
+
+client :pricing do
+  <section id="cloud-pricing">
+    <div class="cp-inner">
+      <p class="cp-kicker"><span class="dot"></span>the cloud · pricing</p>
+      <h2 class="cp-h">Pay for storage and usage.<br>Never for seats.</h2>
+      <p class="cp-sub">Most teams rent a stack of SaaS tools by the head. Workbooks is one nexus — add your whole company and the price doesn't move. Drag the slider.</p>
+  
+      <div class="cp-grid">
+        <table class="cp-table">
+          <thead><tr><th colspan="2">The usual stack</th><th class="num">/ user · mo</th></tr></thead>
+          <tbody>
+            <tr><td class="bc"><span class="g" data-brand="slack"></span>Slack</td><td class="mut">Chat</td><td class="num">$18</td></tr>
+            <tr><td class="bc"><span class="g" data-brand="notion"></span>Notion</td><td class="mut">Docs</td><td class="num">$20</td></tr>
+            <tr><td class="bc"><span class="g" data-brand="linear"></span>Linear</td><td class="mut">Project mgmt</td><td class="num">$16</td></tr>
+            <tr><td class="bc"><span class="g" data-brand="retool"></span>Retool</td><td class="mut">Internal tools</td><td class="num">$20</td></tr>
+            <tr><td class="bc"><span class="g" data-brand="vercel"></span>Vercel</td><td class="mut">Hosting</td><td class="num">$20</td></tr>
+          </tbody>
+          <tfoot><tr><td colspan="2">Per head, every head</td><td class="num">≈ $94</td></tr></tfoot>
+        </table>
+  
+        <div class="cp-calc">
+          <div class="cp-seats">
+            <label for="seats">Your team — <b id="seatN">25</b> people</label>
+            <input type="range" id="seats" min="1" max="500" value="25" step="1" aria-label="team size">
+            <div class="cp-seatscale"><span>1</span><span>500</span></div>
+          </div>
+          <div class="cp-bars">
+            <div class="cp-bar stack">
+              <div class="cp-bl"><span>The usual stack</span><span class="mut">scales per seat</span></div>
+              <div class="cp-track"><i id="stackBar"></i><b id="stackCost">$2,350/mo</b></div>
+            </div>
+            <div class="cp-bar wb">
+              <div class="cp-bl"><span>Workbooks</span><span class="mut">flat · every seat included</span></div>
+              <div class="cp-track"><i id="wbBar"></i><b>from $29<span>/mo</span></b></div>
+            </div>
+          </div>
+          <div class="cp-save">You save <b id="saveAmt">$2,321</b>/mo — the gap grows with every hire.</div>
+        </div>
+      </div>
+  
+      <table class="cp-tiers-table">
+        <thead><tr><th>Plan</th><th class="num">Per month</th><th class="num">Storage</th><th class="num">Seats</th><th class="r">Built for</th></tr></thead>
+        <tbody>
+          <tr><td class="pn">Starter</td><td class="num">$29</td><td class="num">50 GB</td><td class="num inf">Unlimited</td><td class="r mut">A project or small team</td></tr>
+          <tr><td class="pn">Team</td><td class="num">$99</td><td class="num">250 GB</td><td class="num inf">Unlimited</td><td class="r mut">A growing team</td></tr>
+          <tr><td class="pn">Scale</td><td class="num">$249</td><td class="num">1 TB</td><td class="num inf">Unlimited</td><td class="r mut">Serious compute + storage</td></tr>
+          <tr><td class="pn">Enterprise</td><td class="num">Custom</td><td class="num">Custom</td><td class="num inf">Unlimited</td><td class="r mut">SSO · SCIM · dedicated</td></tr>
+        </tbody>
+      </table>
+      <p class="cp-foot">Every tier carries <b>unlimited users + workspaces</b> — you scale one nexus by memory and bandwidth, never by headcount. <a href="https://app.workbooks.sh">Start building →</a></p>
+    </div>
+  </section>
+end

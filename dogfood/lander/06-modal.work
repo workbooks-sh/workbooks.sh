@@ -1,0 +1,38 @@
+# Notify-me modal
+
+The desktop build isn't published yet, so the Download CTA opens this modal — email + interest, captured into our waitlist workbook (not a third-party form).
+
+client :modal do
+  <!-- download → notify-me modal (desktop build not published yet) -->
+  <div class="dl-modal" id="dlModal" role="dialog" aria-modal="true" aria-labelledby="dlTitle">
+    <div class="dl-card">
+      <button class="dl-x" data-close aria-label="Close">×</button>
+      <form id="dlForm">
+        <span class="dl-kicker">Desktop app · coming soon</span>
+        <h3 id="dlTitle">Be first to get it</h3>
+        <p class="sub">It's in private testing. Drop your email and we'll tell you the moment the desktop app is ready to download.</p>
+        <label class="dl-field">
+          <span class="dl-label">Email</span>
+          <input class="dl-input" id="dlEmail" type="email" name="email" required placeholder="you@company.com" autocomplete="email" />
+        </label>
+        <div class="dl-field">
+          <span class="dl-label">What would you reach for it first?</span>
+          <div class="dl-chips">
+            <input type="radio" id="i1" name="interest" value="building-with-agents" checked /><label for="i1">Building with agents</label>
+            <input type="radio" id="i2" name="interest" value="replacing-my-stack" /><label for="i2">Replacing my stack</label>
+            <input type="radio" id="i3" name="interest" value="team-collaboration" /><label for="i3">Team collaboration</label>
+            <input type="radio" id="i4" name="interest" value="just-exploring" /><label for="i4">Just exploring</label>
+          </div>
+        </div>
+        <p class="dl-err" id="dlErr"></p>
+        <button class="dl-submit" type="submit">Notify me</button>
+      </form>
+      <div class="dl-thanks" id="dlThanks">
+        <div class="tick"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <h3>You're on the list.</h3>
+        <p class="sub">We'll email you the moment it's ready. Thanks for the interest.</p>
+        <button class="dl-submit" type="button" data-close>Done</button>
+      </div>
+    </div>
+  </div>
+end
