@@ -18,14 +18,16 @@ work deploy init local
 - `work deploy status` — inspect what's running.
 - `work deploy down` — tear it back down.
 
-## Config is HTML, not JSON
+## Config lives with your workbook
 
-A deployment is described by a single `<work-deploy>` HTML element — its attributes
-*are* the configuration, and they live in the workbook where you can read and review
-them. There is no JSON config file. Secrets are the one exception: they never live
-in the file, they're injected from the environment at deploy time.
+A deployment is described by a set of declared settings that live *with* your
+workbook — version-controlled and reviewable, part of the source like everything
+else. It is not a JSON file off to the side, and it is not a scatter of environment
+variables. Secrets are the one exception: they're never written into the config,
+they're injected from the environment at deploy time. `work deploy init` scaffolds
+the settings; you edit them in place.
 
-The attributes you set:
+The settings you declare:
 
 - `engine-place` — `local` or `cloud`.
 - `tenancy` — `single` or `multi`.
