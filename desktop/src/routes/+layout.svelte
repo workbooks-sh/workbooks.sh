@@ -4,6 +4,15 @@
   import "$lib/platform/webHost";
   import { onMount } from "svelte";
   import "../app.css";
+  import { nav } from "$lib/bridge/nav.svelte";
+  import { createPackage } from "$lib/home/createPackage.svelte";
+
+  // Demo-recorder hooks — EXPOSED ONLY in the browser-preview mock, so the
+  // product-showcase recorder can hot-swap the sidebar layout and open the
+  // share flow from eval_js (no settings detour). No-op in the packaged app.
+  if (typeof window !== "undefined" && (window as unknown as { __WB_DEV_MOCK__?: boolean }).__WB_DEV_MOCK__) {
+    Object.assign(window as unknown as Record<string, unknown>, { __wbNav: nav, __wbShare: createPackage });
+  }
   import Titlebar from "$lib/components/Titlebar.svelte";
   import LiveBar from "$lib/components/LiveBar.svelte";
   import WorkgateModal from "$lib/workgate/WorkgateModal.svelte";
