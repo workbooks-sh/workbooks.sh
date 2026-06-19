@@ -1,0 +1,35 @@
+# Software you can hold
+
+> An app, a database, a sandbox, and the agents that keep it building — all in one file you can send. What it means when the unit of software is something you hold in your hand.
+
+*2026-06-09 · 6 min · #thesis #workbook #format*
+
+Most software you use isn't a thing you have. It's an arrangement — an app on a server somewhere, a database in another region, a deploy pipeline, a login. You don't hold any of it. You rent your way back into it every time you open a tab.
+
+A workbook starts from the opposite instinct. At first glance it looks like an HTML file — the same unit that has rendered the same interface on every browser, on every device, for decades. But an HTML file was always allowed to carry more than markup, and a workbook uses all of it.
+
+Inside, alongside the HTML, there's **CSS** — the objective language of design, which now describes far more than pages — and **JavaScript** for behavior. There's **WebAssembly**, which lets that single file run assembly-level code compiled from C, Rust, Go, or Python, inside the browser's sandbox. And there's a **SQLite** binary: one of the most efficient databases there is, shippable as a single file, doubling as a virtual filesystem that can hold images, video, and any other data the workbook needs.
+
+The whole thing is natively gzipped — compressed on the wire, still legible in structure. So one file holds the interface you see, the state behind it, and the binaries it runs. Not links to those things. The things.
+
+It carries its interface, its data, and its history in one artifact you can move, copy, and keep.
+
+## It travels as one thing
+
+Because the unit is a file, the same workbook ships as a mobile app, a desktop app, or a website — no porting, no separate builds for each target. WebAssembly did for languages what HTML did for browsers: it made one artifact run the same everywhere. A workbook leans on that the whole way down.
+
+That's also why it can carry its own history. State lives in the SQLite store that ships with the file, so the record of what changed and when isn't scattered across services you have to reassemble — it travels with the thing it describes. The file is what you end up holding.
+
+## What it stands on
+
+The file is the core unit, not the whole system. A workbook becomes *living* software because it stands on a runtime — and the point is that the runtime is one you own.
+
+The Workbooks runtime is written almost entirely in **Elixir**, on the BEAM, the concurrent, fault-tolerant VM with roots in the telecom switches that carried millions of calls. One Elixir server can run enormous concurrency, so instead of fanning out into serverless functions and getting wrecked by the bill at scale, you scale by slowly growing a single machine — on Fly.io or DigitalOcean, hardware you rent or buy outright.
+
+Isolation comes for free. On the BEAM, every process is its own node; one failing node never takes down the others. Inside that, the runtime runs WebAssembly through wasmtime, so untrusted code — an agent building your app, a package you didn't write — executes in a sandbox with no path to your operating system, your keychain, or your secrets. Isolation within isolation.
+
+So a workbook is both the artifact you ship and the thing the runtime contains. Like a Docker image on a Linux kernel, except the image is a single HTML file and the kernel is a WebAssembly sandbox you can run anywhere, on any platform — without rewriting Docker for each one.
+
+This is the smaller half of a larger idea: a workbook is the atom, and the runtime, the toolkits, and the agents that keep it building are the ecosystem around it. But the atom is where it gets concrete. Software stops being an arrangement you rent your way into and becomes a thing you have — one file that runs anywhere, stays connected, and keeps getting better, standing on ground you control.
+
+That's the part you can hold.

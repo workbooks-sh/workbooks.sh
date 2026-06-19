@@ -1,0 +1,16 @@
+# Workbooks Blog
+
+Our thesis — why the workbook is the unit of software, why isolation should come for free, why your
+secrets should never touch the OS. Migrated from the old `web/blog` HTML into a `.work` workbook: each
+post is a prose page, the nexus renders the site (sidebar + clean URLs), the brand lives in
+`design.work`. Reusing the evergreen positioning; nothing here was throwaway news.
+
+app :blog do
+  title "Workbooks Blog"
+
+  section "Posts" do
+    page "posts/the-wall-is-coming-down"
+    page "posts/your-secrets-never-touch-the-os"
+    page "posts/software-you-can-hold"
+  end
+end

@@ -1,0 +1,31 @@
+# The wall is coming down
+
+> Renting micro-VMs, buying Mac minis, wiring serverless functions — every agent setup today fights the same wall: isolation that costs you a machine. A workbook carries its own.
+
+*2026-06-11 · 8 min · #thesis #sandbox #runtime*
+
+There has always been a wall between having an idea and shipping the software for it. You could describe what you wanted in a sentence. Getting there took a stack: a language, a build step, a place to run it, a database, a way to ship it somewhere a person could actually use. Each layer was a small wall, and together they were a tall one.
+
+What's changing is not that the layers disappear. It's that you stop being the one who climbs them. You describe an outcome — a page, a tool, a small app — and an agent builds toward it. That only works if there's somewhere safe for the building to happen, and somewhere the result can immediately run. Most of the gap between idea and software is that missing ground.
+
+## The unit was the problem
+
+The reason the wall stood so long is that the thing we ship has been scattered. Code lives in one place, the database in another, the runtime somewhere else, deployment behind its own door. To change one small thing you reach across all of them.
+
+A workbook collapses that. At a glance it's an HTML file — the one format that already renders on every device, in every browser, and has for decades. But inside it carries WebAssembly for real computation, a SQLite database for its own state, and its own source. The code, the data, and the thing people see all live in the same file.
+
+When the unit carries everything, an agent only has to edit one thing — not orchestrate five.
+
+## Why an agent can do the building
+
+An agent is less magic than it sounds: a loop that reads, acts, looks at what happened, and goes again. The reason it has been risky to point one at real work is that real work means running untrusted code, and running untrusted code on your machine means giving something a loop and a lot of access.
+
+The fix is isolation. Workbooks run inside WebAssembly sandboxes on a runtime built in Elixir, on the BEAM — the same fault-tolerant foundation that ran the phone network. Each agent, each tenant, each piece of running code is its own isolated process. An agent can build, run, and rebuild inside that boundary without reaching your keys, your files, or anyone else's work.
+
+## The last wall: shipping
+
+The slowest wall was always the last one — getting a change from "it works here" to "it's live." Because a workbook already carries its own sandbox, database, and runtime, the build can finish where it runs. The north star is simple: you push, and it's live. No separate machine to provision, no image to assemble first, no porting the same app three times to reach the web, a desktop, and a phone.
+
+None of this means software writes and runs itself in some hands-off way. There's still a person with an intent, and an agent that does the work in front of them. What's different is the distance between those two points. It used to be a climb. It's becoming a sentence.
+
+That's the shift worth naming. Not that ideas got better, or models got smarter, but that the ground between an idea and working software finally exists in one place an agent can stand on. The wall isn't gone yet. But you can see daylight through it.
