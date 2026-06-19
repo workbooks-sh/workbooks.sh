@@ -17,6 +17,7 @@ defmodule Nexus.Platform do
   """
   use Plug.Router
   alias Nexus.ControlPlane, as: CP
+  alias Nexus.ControlPlane.Env
 
   plug(:require_control_plane)
   plug(:match)
@@ -105,6 +106,52 @@ defmodule Nexus.Platform do
     j(conn, 200, %{ok: true})
   end
 
+  # ── env vars (encrypted-at-rest, org+workspace-scoped team secrets) ─────────────────────────────
+  # All org-scoped via Nexus.ControlPlane.Env (cross-org physically impossible). The list/views are
+  # REDACTED — the plaintext only ever leaves via the explicit /reveal action. A missing master key
+  # fails closed → 503 (values are never stored unencrypted), surfaced by `env_fail`.
+  get "/env" do
+    ws = fetch_query_params(conn).query_params["workspace"]
+    j(conn, 200, %{env: Env.list(org(conn), blank_to_nil(ws))})
+  end
+
+  post "/env" do
+    m = decode(read(conn))
+    attrs = %{
+      name: m["name"], value: m["value"], scope: m["scope"],
+      workspace_id: m["workspace_id"], package_name: m["package_name"]
+    }
+
+    case Env.create(org(conn), attrs) do
+      {:ok, view} -> j(conn, 201, view)
+      {:error, reason} -> env_fail(conn, reason)
+    end
+  end
+
+  get "/env/:id/reveal" do
+    case Env.reveal(org(conn), conn.params["id"]) do
+      {:ok, value} -> j(conn, 200, %{value: value})
+      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+      {:error, reason} -> env_fail(conn, reason)
+    end
+  end
+
+  patch "/env/:id" do
+    m = decode(read(conn))
+    attrs = %{name: m["name"], value: m["value"]}
+
+    case Env.update(org(conn), conn.params["id"], attrs) do
+      {:ok, view} -> j(conn, 200, view)
+      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+      {:error, reason} -> env_fail(conn, reason)
+    end
+  end
+
+  delete "/env/:id" do
+    :ok = Env.delete(org(conn), conn.params["id"])
+    j(conn, 200, %{ok: true})
+  end
+
   match _ do
     j(conn, 404, %{error: "not found"})
   end
@@ -134,6 +181,13 @@ defmodule Nexus.Platform do
       {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
     end
   end
+
+  # No master key → fail closed with 503 (a deploy-config error, not the caller's fault); other env
+  # errors are caller validation → 422. Never leak crypto detail beyond the reason atom.
+  defp env_fail(conn, :no_master_key),
+    do: j(conn, 503, %{error: "env store unavailable: WB_ENV_MASTER_KEY not configured"})
+
+  defp env_fail(conn, reason), do: j(conn, 422, %{error: reason_str(reason)})
 
   defp reason_str(r) when is_atom(r), do: Atom.to_string(r)
   defp reason_str(r), do: inspect(r)
