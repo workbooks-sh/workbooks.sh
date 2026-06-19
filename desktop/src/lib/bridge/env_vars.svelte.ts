@@ -12,6 +12,9 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { rcp } from "$lib/rcp";
+import { nexus } from "./nexus.svelte";
+import { workspaces } from "./workspaces.svelte";
 
 export type EnvScope = "user" | "workspace" | "package";
 
@@ -58,11 +61,33 @@ class EnvVarsStore {
   dirty = $state(false);
 
   #initStarted = false;
+  /** Active nexus id at the last refresh — when it changes, re-fetch (env
+   *  vars are cloud-backed on the oidc nexus, on-disk on the local one). */
+  #lastNexusId: string | null = null;
+
+  /** The cloud/oidc nexus is the team backend; the local nexus stays on disk. */
+  get #cloud(): boolean {
+    return nexus.activeAuth === "oidc";
+  }
 
   async init() {
     if (this.#initStarted) return;
     this.#initStarted = true;
-    await this.refresh();
+    // Re-fetch whenever the active nexus changes (cloud ↔ local switch the
+    // backend out from under us). One $effect drives both backends.
+    $effect.root(() => {
+      $effect(() => {
+        const id = nexus.activeId;
+        if (id !== this.#lastNexusId) {
+          this.#lastNexusId = id;
+          void this.refresh();
+        }
+      });
+    });
+    if (this.#lastNexusId === null) {
+      this.#lastNexusId = nexus.activeId;
+      await this.refresh();
+    }
   }
 
   dispose() {}
@@ -71,7 +96,16 @@ class EnvVarsStore {
     this.loading = true;
     this.lastError = null;
     try {
-      this.vars = await invoke<EnvVarRedacted[]>("env_vars_list");
+      if (this.#cloud) {
+        const wsId = workspaces.active?.id;
+        const { env } = await rcp.request<{ env: EnvVarRedacted[] }>(
+          "/api/platform/env",
+          { query: wsId ? `?workspace=${wsId}` : "" },
+        );
+        this.vars = env;
+      } else {
+        this.vars = await invoke<EnvVarRedacted[]>("env_vars_list");
+      }
     } catch (e) {
       this.lastError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -85,29 +119,110 @@ class EnvVarsStore {
   // tool runtime support lands.
 
   async create(req: EnvVarCreate): Promise<EnvVarRedacted> {
-    const v = await invoke<EnvVarRedacted>("env_vars_create", { req });
+    let v: EnvVarRedacted;
+    if (this.#cloud) {
+      v = await rcp.request<EnvVarRedacted>("/api/platform/env", {
+        method: "POST",
+        body: {
+          name: req.name,
+          value: req.value,
+          scope: req.scope,
+          workspace_id: req.workspace_id ?? null,
+          package_name: req.package_name ?? null,
+        },
+      });
+    } else {
+      v = await invoke<EnvVarRedacted>("env_vars_create", { req });
+    }
     await this.refresh();
     return v;
   }
 
   async update(id: string, value: string): Promise<void> {
-    await invoke("env_vars_update", { req: { id, value } });
+    if (this.#cloud) {
+      await rcp.request(`/api/platform/env/${id}`, {
+        method: "PATCH",
+        body: { value },
+      });
+    } else {
+      await invoke("env_vars_update", { req: { id, value } });
+    }
     await this.refresh();
   }
 
   async delete(id: string): Promise<void> {
-    await invoke("env_vars_delete", { id });
+    if (this.#cloud) {
+      await rcp.request(`/api/platform/env/${id}`, { method: "DELETE" });
+    } else {
+      await invoke("env_vars_delete", { id });
+    }
     await this.refresh();
   }
 
-  /** Decrypts in Rust and writes straight to the OS clipboard. The
-   *  plaintext never returns to JS. See `keys.copyToClipboard` for
-   *  the threat-model rationale. */
+  /** Fetch a single secret's plaintext. Cloud → the explicit reveal endpoint;
+   *  local has no JS reveal (it decrypts straight to the OS clipboard in Rust —
+   *  see `copyToClipboard`). */
+  async reveal(id: string): Promise<string> {
+    if (!this.#cloud) {
+      throw new Error("reveal() unsupported on the local nexus — use copyToClipboard()");
+    }
+    const { value } = await rcp.request<{ value: string }>(
+      `/api/platform/env/${id}/reveal`,
+    );
+    return value;
+  }
+
+  /** Local: decrypts in Rust and writes straight to the OS clipboard — the
+   *  plaintext never returns to JS (see `keys.copyToClipboard` for the
+   *  threat-model rationale). Cloud: reveal then write from JS. */
   async copyToClipboard(id: string): Promise<void> {
-    await invoke<void>("env_vars_copy_to_clipboard", { id });
+    if (this.#cloud) {
+      await navigator.clipboard.writeText(await this.reveal(id));
+    } else {
+      await invoke<void>("env_vars_copy_to_clipboard", { id });
+    }
   }
 
   async bulkImport(req: BulkImportRequest): Promise<BulkImportResult> {
+    if (this.#cloud) {
+      // Mirror the Rust parser: per line, skip blanks + `#` comments, split on
+      // the first `=`. Loop create; collect imported/skipped.
+      const imported: EnvVarRedacted[] = [];
+      const skipped: string[] = [];
+      for (const raw of req.text.split(/\r?\n/)) {
+        const line = raw.trim();
+        if (!line || line.startsWith("#")) continue;
+        const eq = line.indexOf("=");
+        if (eq <= 0) {
+          skipped.push(line);
+          continue;
+        }
+        const name = line.slice(0, eq).trim();
+        const value = line.slice(eq + 1).trim();
+        if (!name) {
+          skipped.push(line);
+          continue;
+        }
+        try {
+          imported.push(
+            await rcp.request<EnvVarRedacted>("/api/platform/env", {
+              method: "POST",
+              body: {
+                name,
+                value,
+                scope: req.scope,
+                workspace_id: req.workspace_id ?? null,
+                package_name: req.package_name ?? null,
+              },
+            }),
+          );
+        } catch {
+          skipped.push(name);
+        }
+      }
+      await this.refresh();
+      return { imported, skipped };
+    }
     const result = await invoke<BulkImportResult>("env_vars_bulk_import", {
       req,
     });
