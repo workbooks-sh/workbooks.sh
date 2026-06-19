@@ -9,6 +9,7 @@ const weave = @import("weave.zig");
 const dev = @import("dev.zig");
 const deploy = @import("deploy.zig");
 const newcmd = @import("new.zig");
+const secretcmd = @import("secret.zig");
 const context = @import("context.zig");
 const conformance = @import("conformance.zig");
 test {
@@ -77,6 +78,9 @@ pub fn main(init: std.process.Init) !void {
             log.err("usage: work deploy <dir> [--nexus <name>]  ·  deploy init|validate|apply");
             std.process.exit(1);
         }
+    } else if (eql(verb, "secret")) {
+        const sub = it.next() orelse "";
+        std.process.exit(try secretcmd.secret(io, alloc, sub, it.next() orelse ""));
     } else if (eql(verb, "ctx")) {
         const sub = it.next() orelse "list";
         if (eql(sub, "use")) {
@@ -153,6 +157,7 @@ const groups = [_]Group{
     .{ .name = "deploy", .blurb = "stand up a runtime, local or cloud", .verbs = &.{
         .{ "deploy init|validate|apply", "scaffold · check · deploy the .work config" },
         .{ "deploy verify|status|down", "health · inspect · teardown" },
+        .{ "secret set|get|list", "secrets in the OS keychain (never in source)" },
     } },
     .{ .name = "platform", .blurb = "identity, contexts, the control plane", .verbs = &.{
         .{ "ctx · nexus <url>", "manage targets · point at an engine" },
