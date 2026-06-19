@@ -7,6 +7,23 @@ subscribing to our marketing workbook's `upsell` live source — one nexus, two 
 to each other). Usage, Nexuses, Domains, Account land in subsequent passes (beads: sub-issues of
 wb-hpkm). No SvelteKit, no build step — the dashboard is a workbook.
 
+## The data — dogfooded straight off the platform
+
+Rather than hand-roll a backend, the dashboard reads the platform's own primitives. This `server`
+block exposes a `usage` live source backed by `Nexus.Capacity` — the same capacity engine the hosted
+control plane uses — so the Usage view shows real dials on whatever nexus serves it. (The production
+multi-tenant dashboard reads `/api/platform/usage`; our own dogfood reads the primitive directly.)
+
+server :cloud do
+  def register do
+    Nexus.Live.register("usage", fn params, emit ->
+      # A representative running nexus on the current tier; Capacity derives the dials.
+      nx = %{id: params["nx"] || "dogfood", plan: Nexus.Pricing.default_tier().id, state: "running"}
+      emit.(Nexus.Capacity.report(nx))
+    end)
+  end
+end
+
 client :app do
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -45,6 +62,20 @@ client :app do
     .cta .sub{color:var(--dim);font-size:14px}
     .soon{border:1px dashed var(--line);border-radius:14px;padding:40px;text-align:center;color:var(--dim)}
     .soon b{color:var(--ink)}
+    /* usage dials */
+    .dials{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    @media(max-width:640px){.dials{grid-template-columns:1fr}}
+    .dial{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+    .dial .t{font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--dim);margin-bottom:10px}
+    .dial .n{font-size:24px;font-weight:700;letter-spacing:-.01em}
+    .dial .n small{font-size:14px;font-weight:500;color:var(--dim)}
+    .bar{height:8px;border-radius:5px;background:var(--line);overflow:hidden;margin:12px 0 8px}
+    .bar i{display:block;height:100%;background:var(--mint);transition:width .4s}
+    .dial.near .bar i{background:var(--peach)} .dial.over .bar i{background:#f0a0a0}
+    .dial .s{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.05em}
+    .dial .s.ok{color:var(--mint)} .dial .s.near{color:var(--peach)} .dial .s.over{color:#f0a0a0}
+    .tierline{display:flex;gap:10px;align-items:baseline;margin:0 0 18px;color:var(--dim)}
+    .tierline b{color:var(--ink);font-size:17px}
   </style>
 
   <aside class="side">
@@ -73,7 +104,11 @@ client :app do
       <div id="page"></div>
     </section>
 
-    <section class="view" data-view="usage"><h1>Usage</h1><div class="soon"><b>Coming next.</b><br>RAM + storage dials from <code>Nexus.Capacity</code> (wb-bwus).</div></section>
+    <section class="view" data-view="usage">
+      <h1>Usage</h1>
+      <p class="lead">Live RAM + storage against your tier ceiling — straight from <code>Nexus.Capacity</code>, the same engine the hosted control plane runs. Auto-scale lives within the ceiling; crossing it is a scale-up.</p>
+      <div id="usage"><div class="soon">Reading capacity…</div></div>
+    </section>
     <section class="view" data-view="nexuses"><h1>Nexuses</h1><div class="soon"><b>Coming next.</b><br>Your one nexus — wake / sleep / scale (wb-8sk9).</div></section>
     <section class="view" data-view="domains"><h1>Domains</h1><div class="soon"><b>Coming next.</b><br>Bind a custom domain — TXT challenge + verify (wb-mr6u).</div></section>
     <section class="view" data-view="account"><h1>Account</h1><div class="soon"><b>Coming next.</b><br>CLI tokens, workspaces, team env vars (wb-mr6u).</div></section>
@@ -85,13 +120,39 @@ client :app do
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
 
     // view routing
+    var loaded={};
     [].forEach.call(document.querySelectorAll('.nav'),function(n){
       n.addEventListener('click',function(){
         var v=n.dataset.view;
         [].forEach.call(document.querySelectorAll('.nav'),function(x){x.classList.toggle('on',x===n)});
         [].forEach.call(document.querySelectorAll('.view'),function(x){x.classList.toggle('on',x.dataset.view===v)});
+        if(v==='usage'&&!loaded.usage){loaded.usage=true;loadUsage();}
       });
     });
+
+    // usage view — RAM + storage dials from the cloud server block's `usage` source (Nexus.Capacity)
+    function dial(d){
+      var cls=d.status||'ok';
+      var ceiling=d.limit>0?(d.limit+' '+d.unit):'no ceiling';
+      var pct=d.limit>0?d.pct:0;
+      return '<div class="dial '+cls+'"><div class="t">'+(d.unit==='MB'?'Memory':'Storage')+'</div>'+
+        '<div class="n">'+d.used+' <small>/ '+esc(ceiling)+'</small></div>'+
+        '<div class="bar"><i style="width:'+pct+'%"></i></div>'+
+        '<div class="s '+cls+'">'+cls+(d.limit>0?' · '+pct+'%':'')+'</div></div>';
+    }
+    function loadUsage(){
+      var box=$('#usage'); box.innerHTML='<div class="soon">Reading capacity…</div>';
+      var es=new EventSource('live/usage');
+      es.onmessage=function(e){ var r; try{r=JSON.parse(e.data)}catch(_){return}
+        if(r.type==='end'){es.close();return}
+        if(r.ram){
+          var t=r.tier||{}, n=r.next;
+          box.innerHTML='<div class="tierline"><b>'+esc(t.name||'—')+'</b><span>'+(n?('next: '+esc(n.name)+' · '+esc(n.price||'')):'top tier')+'</span></div>'+
+            '<div class="dials">'+dial(r.ram)+dial(r.storage)+'</div>';
+          es.close();
+        }};
+      es.onerror=function(){ es.close(); box.innerHTML='<div class="soon">Could not read capacity.</div>'; };
+    }
 
     // upgrade view — render the upsell blocks from the marketing workbook's live source
     var R={
