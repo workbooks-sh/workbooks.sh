@@ -147,6 +147,42 @@ const WB_FLAGS = { desktopDownload: false };</script>
   .btn-copy.copied .lbl { color: var(--bloom); }
   .btn-dl { background: var(--ink); color: var(--paper); box-shadow: 0 14px 34px rgba(18,19,22,.26); }
   .btn-dl:hover { box-shadow: 0 18px 44px rgba(18,19,22,.36); }
+  /* ── download → "notify me" modal ────────────────────────────────────── */
+  .dl-modal { position: fixed; inset: 0; z-index: 80; display: none; align-items: center;
+    justify-content: center; padding: 24px; background: rgba(18,19,22,.42);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .dl-modal.on { display: flex; }
+  .dl-card { width: min(440px, 100%); background: var(--paper); border-radius: 18px;
+    border: 1px solid rgba(18,19,22,.1); box-shadow: 0 30px 80px rgba(18,19,22,.32);
+    padding: 28px 28px 26px; position: relative; animation: dlpop .22s cubic-bezier(.2,.8,.2,1); }
+  @keyframes dlpop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+  .dl-x { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border: 0;
+    border-radius: 8px; background: transparent; color: #6a6f68; cursor: pointer; font-size: 20px; line-height: 1; }
+  .dl-x:hover { background: rgba(18,19,22,.06); color: var(--ink); }
+  .dl-kicker { font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: #8b9088; }
+  .dl-card h3 { font-family: var(--display, inherit); font-size: 24px; line-height: 1.1; margin: 8px 0 6px; color: var(--ink); letter-spacing: -.01em; }
+  .dl-card p.sub { margin: 0 0 18px; color: #5d625b; font-size: 14px; line-height: 1.5; }
+  .dl-field { display: block; margin-bottom: 16px; }
+  .dl-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+  .dl-input { width: 100%; padding: 12px 14px; border: 1px solid rgba(18,19,22,.18); border-radius: 11px;
+    font: inherit; font-size: 15px; background: #fff; color: var(--ink); }
+  .dl-input:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(18,19,22,.08); }
+  .dl-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dl-chips input { position: absolute; opacity: 0; pointer-events: none; }
+  .dl-chips label { cursor: pointer; font-size: 13px; padding: 8px 13px; border-radius: 999px;
+    border: 1px solid rgba(18,19,22,.18); color: #4a4f48; transition: .12s; }
+  .dl-chips label:hover { border-color: rgba(18,19,22,.4); }
+  .dl-chips input:checked + label { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .dl-submit { width: 100%; margin-top: 20px; padding: 13px; border: 0; border-radius: 12px;
+    background: var(--ink); color: var(--paper); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 12px 30px rgba(18,19,22,.24); transition: .12s; }
+  .dl-submit:hover { box-shadow: 0 16px 38px rgba(18,19,22,.34); }
+  .dl-submit:disabled { opacity: .6; cursor: default; box-shadow: none; }
+  .dl-err { display: none; margin: 12px 0 0; color: #c0392b; font-size: 13px; }
+  .dl-thanks { display: none; text-align: center; padding: 8px 0 4px; }
+  .dl-thanks .tick { width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 50%;
+    background: #aee5c2; display: grid; place-items: center; color: #0a2413; }
+  .dl-thanks h3 { margin: 0 0 6px; }
   /* desktop build not published yet — present but resting */
   .btn-dl.soon { pointer-events: none; background: #b5b8b2; box-shadow: none; }
   .btn-dl.soon .tag {
@@ -427,11 +463,11 @@ const WB_FLAGS = { desktopDownload: false };</script>
   </p>
 
   <div class="ctas" id="download">
-    <a class="btn btn-dl" href="https://github.com/workbooks-sh/workbooks.sh/releases">
+    <button type="button" class="btn btn-dl" id="dlBtn" aria-haspopup="dialog">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.365 12.79c-.027-2.747 2.243-4.067 2.345-4.13-1.277-1.868-3.265-2.124-3.972-2.152-1.69-.171-3.3.995-4.158.995-.857 0-2.182-.971-3.588-.945-1.846.027-3.55 1.073-4.5 2.726-1.92 3.328-.49 8.253 1.38 10.954.915 1.323 2.005 2.808 3.435 2.755 1.38-.055 1.9-.892 3.567-.892 1.667 0 2.136.892 3.594.864 1.485-.027 2.424-1.35 3.33-2.68 1.05-1.536 1.482-3.024 1.508-3.1-.033-.015-2.894-1.11-2.92-4.395zM13.63 4.04c.76-.92 1.273-2.2 1.133-3.474-1.095.044-2.42.73-3.205 1.65-.703.813-1.32 2.114-1.154 3.362 1.22.095 2.467-.62 3.227-1.538z"/></svg>
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.45L9.75 2.1v9.4H0zM10.95 1.95L24 0v11.5H10.95zM0 12.5h9.75v9.4L0 20.55zM10.95 12.5H24V24l-13.05-1.95z"/></svg>
-      Download
-    </a>
+      Download desktop
+    </button>
     <button class="btn btn-copy" data-copy="Install the Workbooks skills with `npx skills add workbooks-sh/workbooks.sh`, then build me a living workbook app.">
       <svg class="cpy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span class="vd" aria-hidden="true"></span>
       <span class="lbl">Prompt</span>
@@ -1661,10 +1697,51 @@ async function playStory(p) {
 
 spotRender("workbooks");
 
-/* desktop build not published yet — pull its affordances, keep the copy CTAs */
-if (!WB_FLAGS.desktopDownload) {
-  document.querySelectorAll(".btn-dl").forEach(el => el.remove());
-}
+/* Desktop build not published yet: the Download button opens a "notify me"
+   modal (email + interest → nexus waitlist) instead of a real download. When
+   desktopDownload flips true, it'll link straight to the release. */
+document.addEventListener("DOMContentLoaded", function () {
+  const WAITLIST_URL = "https://wb-nexus-cp.fly.dev/api/waitlist";
+  const modal = document.getElementById("dlModal");
+  const form = document.getElementById("dlForm");
+  const emailEl = document.getElementById("dlEmail");
+  const thanks = document.getElementById("dlThanks");
+  const openers = document.querySelectorAll(".btn-dl");
+
+  function open() {
+    if (WB_FLAGS.desktopDownload) { location.href = "https://github.com/workbooks-sh/workbooks.sh/releases"; return; }
+    modal.classList.add("on");
+    document.body.style.overflow = "hidden";
+    setTimeout(() => emailEl && emailEl.focus(), 60);
+  }
+  function close() {
+    modal.classList.remove("on");
+    document.body.style.overflow = "";
+  }
+  openers.forEach(b => b.addEventListener("click", open));
+  modal.addEventListener("click", e => { if (e.target === modal || e.target.closest("[data-close]")) close(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && modal.classList.contains("on")) close(); });
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const btn = form.querySelector("button[type=submit]");
+    const interest = (form.querySelector("input[name=interest]:checked") || {}).value || "";
+    btn.disabled = true; btn.textContent = "Saving…";
+    try {
+      const r = await fetch(WAITLIST_URL, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: emailEl.value.trim(), interest })
+      });
+      if (!r.ok) throw new Error("bad status " + r.status);
+      form.style.display = "none";
+      thanks.style.display = "block";
+    } catch (err) {
+      btn.disabled = false; btn.textContent = "Notify me";
+      const e2 = document.getElementById("dlErr");
+      if (e2) { e2.textContent = "Hmm, that didn't go through — try again in a moment."; e2.style.display = "block"; }
+    }
+  });
+});
 
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.create({
@@ -1677,5 +1754,38 @@ ScrollTrigger.create({
   },
 });
 </script>
+
+<!-- download → notify-me modal (desktop build not published yet) -->
+<div class="dl-modal" id="dlModal" role="dialog" aria-modal="true" aria-labelledby="dlTitle">
+  <div class="dl-card">
+    <button class="dl-x" data-close aria-label="Close">×</button>
+    <form id="dlForm">
+      <span class="dl-kicker">Desktop app · coming soon</span>
+      <h3 id="dlTitle">Be first to get it</h3>
+      <p class="sub">It's in private testing. Drop your email and we'll tell you the moment the desktop app is ready to download.</p>
+      <label class="dl-field">
+        <span class="dl-label">Email</span>
+        <input class="dl-input" id="dlEmail" type="email" name="email" required placeholder="you@company.com" autocomplete="email" />
+      </label>
+      <div class="dl-field">
+        <span class="dl-label">What would you reach for it first?</span>
+        <div class="dl-chips">
+          <input type="radio" id="i1" name="interest" value="building-with-agents" checked /><label for="i1">Building with agents</label>
+          <input type="radio" id="i2" name="interest" value="replacing-my-stack" /><label for="i2">Replacing my stack</label>
+          <input type="radio" id="i3" name="interest" value="team-collaboration" /><label for="i3">Team collaboration</label>
+          <input type="radio" id="i4" name="interest" value="just-exploring" /><label for="i4">Just exploring</label>
+        </div>
+      </div>
+      <p class="dl-err" id="dlErr"></p>
+      <button class="dl-submit" type="submit">Notify me</button>
+    </form>
+    <div class="dl-thanks" id="dlThanks">
+      <div class="tick"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+      <h3>You're on the list.</h3>
+      <p class="sub">We'll email you the moment it's ready. Thanks for the interest.</p>
+      <button class="dl-submit" type="button" data-close>Done</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

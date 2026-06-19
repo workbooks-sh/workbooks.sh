@@ -27,7 +27,7 @@ defmodule Nexus.Application do
     # Nexus.Wasm.Gate bounds concurrent wasm OS processes per lane (compile-concurrency /
     # render-concurrency) so a burst can't fork-bomb wasmtime into an OOM — backpressure instead.
     children =
-      [Nexus.Telemetry, Nexus.ControlPlane.Store] ++
+      [Nexus.Telemetry, Nexus.ControlPlane.Store, Nexus.Waitlist] ++
         Nexus.Wasm.Gate.child_specs() ++ Nexus.Cache.child_specs() ++ ether ++ server_children()
     result = Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
 

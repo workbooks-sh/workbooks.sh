@@ -28,7 +28,9 @@ defmodule Nexus.Auth do
   # Public, unauthenticated paths: `/health` (liveness — Fly/Docker/the daemon's first reach) and the
   # RCP capabilities handshake (the client fetches it BEFORE it has a token). Neither exposes tenant
   # data — the handshake reveals only how to authenticate.
-  @public_paths ["/health", "/.well-known/workbooks-runtime"]
+  # `/api/waitlist` is the lander's "notify me" capture — a public write of an
+  # email + interest; no tenant data, intentionally unauthenticated.
+  @public_paths ["/health", "/.well-known/workbooks-runtime", "/api/waitlist"]
   def call(%{request_path: p} = conn, _opts) when p in @public_paths, do: conn
 
   def call(conn, _opts) do
