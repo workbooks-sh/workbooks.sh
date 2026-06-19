@@ -73,6 +73,23 @@ defmodule Nexus.Platform do
     j(conn, 200, %{totalBytes: 0, totalSize: "0 GB", buckets: buckets})
   end
 
+  # ── CLI access tokens (minted for the org; the `work` CLI sends them as Bearer) ────────────────
+  # The dashboard (WorkOS JWT) mints these; the headless CLI then authenticates
+  # with one via Nexus.Auth.Cloud — no browser session needed.
+  post "/tokens/mint" do
+    name = read(conn)["name"] || "cli"
+    j(conn, 201, Nexus.ControlPlane.Token.mint(org(conn), name))
+  end
+
+  get "/tokens" do
+    j(conn, 200, %{tokens: Nexus.ControlPlane.Token.list(org(conn))})
+  end
+
+  delete "/tokens/:id" do
+    Nexus.ControlPlane.Token.revoke(org(conn), conn.params["id"])
+    j(conn, 200, %{ok: true})
+  end
+
   # ── workspaces (free, no compute — logical org divisions) ──────────────────────────────────────
   get "/workspaces" do
     j(conn, 200, %{workspaces: Enum.map(CP.list(org(conn), :workspace), &ws_view/1)})

@@ -38,7 +38,9 @@ defmodule Nexus.ControlPlane do
         ] ++ if((iss = System.get_env("WB_OIDC_ISS")), do: [iss: iss], else: [])
 
       Application.put_env(:nexus, Nexus.Auth.Jwt, cfg)
-      Application.put_env(:nexus, :auth, Nexus.Auth.Jwt)
+      # Cloud adapter = CLI personal-access token (wbk_…) OR the WorkOS JWT it
+      # wraps, so the `work` CLI and the dashboard both authenticate here.
+      Application.put_env(:nexus, :auth, Nexus.Auth.Cloud)
       :ok
     else
       :skip
