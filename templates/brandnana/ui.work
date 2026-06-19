@@ -129,7 +129,7 @@ client :app do
       $('#intro').style.display='none'; $('#results').style.display='block';
       $('#prog').style.display='flex'; $('#ptxt').textContent='Starting…';
       $('#book').className='book'; $('#book').innerHTML=''; render();
-      es=new EventSource('/live/brand?q='+encodeURIComponent(q));
+      es=new EventSource('live/brand?q='+encodeURIComponent(q));
       es.onmessage=function(e){var d;try{d=JSON.parse(e.data)}catch(_){return} on(d);};
     }
 

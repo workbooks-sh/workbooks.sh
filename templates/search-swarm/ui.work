@@ -285,7 +285,7 @@ client :app do
       $('#summary').className='summary';$('#summary').innerHTML='';
       $('#activity').style.display='block';$('#activity').open=true;$('#actsum').textContent='Agents & activity';
       $('#meta').style.display='flex';$('#ptxt').textContent='Planning…';window.scrollTo(0,0);
-      es=new EventSource('/live/swarm?q='+encodeURIComponent(query)+'&depth='+curDepth);
+      es=new EventSource('live/swarm?q='+encodeURIComponent(query)+'&depth='+curDepth);
       es.onmessage=function(e){var d;try{d=JSON.parse(e.data)}catch(_){return} on(d);};
       es.onerror=function(){};
     }

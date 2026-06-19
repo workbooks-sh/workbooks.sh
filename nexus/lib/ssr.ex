@@ -184,12 +184,12 @@ defmodule Nexus.SSR do
       async all(resource) {
         // server mode: prefer fresh /data (cached HTML stays current); fall back to baked/local.
         if (this._live) {
-          try { const r = await fetch('/data/' + encodeURIComponent(resource)); if (r.ok) return await r.json(); } catch (_) {}
+          try { const r = await fetch('data/' + encodeURIComponent(resource)); if (r.ok) return await r.json(); } catch (_) {}
         }
         const baked = this._loadBaked()[resource] || [];
         const local = await this._local(resource);
         if (baked.length || local.length) return baked.concat(local);
-        try { const r = await fetch('/data/' + encodeURIComponent(resource)); return r.ok ? await r.json() : []; }
+        try { const r = await fetch('data/' + encodeURIComponent(resource)); return r.ok ? await r.json() : []; }
         catch (_) { return []; }
       },
       async create(resource, row) {

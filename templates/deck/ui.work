@@ -106,7 +106,7 @@ client :app do
       $('#slides').innerHTML=''; n=0;
       $('#intro').style.display='none'; $('#results').style.display='block';
       $('#rtitle').textContent=q; $('#prog').style.display='flex'; $('#ptxt').textContent='Outlining…';
-      es=new EventSource('/live/deck?q='+encodeURIComponent(q));
+      es=new EventSource('live/deck?q='+encodeURIComponent(q));
       es.onmessage=function(e){var d;try{d=JSON.parse(e.data)}catch(_){return} on(d);};
     }
 
