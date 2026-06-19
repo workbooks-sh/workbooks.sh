@@ -7,6 +7,13 @@ defmodule Nexus.ControlPlaneIsolationTest do
   @a "org_aaa"
   @b "org_bbb"
 
+  # DETS is durable + shared across these (async: false) tests, so start each from a clean registry —
+  # otherwise sibling tests' rows under the same org leak into exact-list assertions.
+  setup do
+    CP.reset()
+    :ok
+  end
+
   test "list is org-scoped — B never sees A's records" do
     {:ok, _} = CP.put(@a, :nexus, "nx_secret_a", %{name: "A-prod"})
     assert CP.list(@a, :nexus) |> Enum.map(& &1.id) == ["nx_secret_a"]
