@@ -1,9 +1,13 @@
 # Workbooks — product showcase
 
-# A fast, hard-cut tour of the desktop app: real distinct apps (research swarm,
-# live collaborative canvas, dashboards, an animated board), then an agent that
-# reasons, builds an app, and opens it in a split pane beside the conversation.
-# Moves quick — short dwells, no dead air.
+# A fast, hard-cut tour of the desktop app, then an agent that reasons, builds an
+# app, and opens it in a split pane beside the conversation.
+#
+# The clip opens with a PRE-LOAD pass (frames f30–f120) that opens every app once
+# so they're warm; with keep-alive the narrated tour then switches between them
+# INSTANTLY — no first-open fade on camera. The pre-load + the SPA's boot frame
+# are TRIMMED off the front in post (see the recorder pipeline), so the delivered
+# clip starts clean on the home composer.
 
 demo :product-showcase do
   target: web
@@ -13,80 +17,99 @@ demo :product-showcase do
   verify_frames: 16
 end
 
-# ── real apps, fast cuts ─────────────────────────────────────────────────────
-cue "00:00", :navigate do
-  Real software — built in workbooks.
+# ── pre-load (TRIMMED) — warm every app's iframe ─────────────────────────────
+cue "f0", :navigate do
   url: http://localhost:5178/
   wait_until: networkidle
 end
-
-cue "00:02", :click do
-  Ask anything — a swarm of agents researches it live.
+cue "f30", :click do
   selector: text="Swarm"
-  checkpoint: a dark multi-agent research console is open, agents working
 end
-
-cue "00:06", :click do
-  Work together in real time — live cursors, drawings, presence.
+cue "f48", :click do
   selector: text="Canvas"
-  checkpoint: a collaborative whiteboard with sticky notes and named multiplayer cursors is open
 end
-
-cue "00:11", :click do
-  A finance dashboard.
+cue "f66", :click do
   selector: text="Ledger"
-  checkpoint: a light finance dashboard with a balance and cashflow chart is open
 end
-
-cue "00:14", :click do
-  Product analytics.
+cue "f84", :click do
   selector: text="Pulse"
-  checkpoint: a colorful analytics dashboard with charts is open
 end
-
-cue "00:17", :click do
-  A board that moves with your team.
+cue "f102", :click do
   selector: text="Kanban"
-  checkpoint: a kanban board with four columns and rich cards is open
+end
+cue "f120", :click do
+  selector: button[aria-label="New tab"]
 end
 
-cue "00:20", :wait do
-  Every app, one window.
+# ── TRIM POINT ≈ f140 (4.7s) — narrated tour begins on the home composer ──────
+# Slower pacing: each app holds ~5s so it reads, not flickers. The apps are
+# pre-warmed (above), so each switch is instant — no black-then-app load flash.
+cue "f144", :wait do
+  Real software — built in workbooks.
   ms: 1400
 end
 
-# ── talk to an agent — it reasons, builds, and opens beside the chat ──────────
-cue "00:23", :navigate do
-  Or just describe what you want.
-  url: http://localhost:5178/
-  wait_until: networkidle
+cue "00:06", :click do
+  Ask anything — a swarm of agents researches it live.
+  selector: text="Swarm"
 end
 
-cue "00:25", :type do
+cue "00:11", :click do
+  Work together in real time — live cursors, drawings, presence.
+  selector: text="Canvas"
+end
+
+cue "00:16", :click do
+  A finance dashboard.
+  selector: text="Ledger"
+end
+
+cue "00:21", :click do
+  Product analytics.
+  selector: text="Pulse"
+end
+
+cue "00:26", :click do
+  A board that moves with your team.
+  selector: text="Kanban"
+end
+
+cue "00:31", :wait do
+  Every app, one window.
+  ms: 1600
+end
+
+# ── talk to an agent — it reasons, builds, and opens beside the chat ──────────
+cue "00:33", :click do
+  Or just describe what you want.
+  selector: button[aria-label="New tab"]
+end
+
+cue "00:35", :type do
   selector: [placeholder="What would you like to do?"]
   text: Build a habit tracker with a weekly grid
   per_key_ms: 34
 end
 
-cue "00:29", :click do
+cue "00:39", :click do
   Waldo reasons, calls real tools, and builds it.
   selector: button[type=submit]
 end
 
-cue "00:33", :wait do
+cue "00:43", :wait do
   And opens it in a split, right beside the conversation.
-  ms: 5000
-  checkpoint: a two-pane split — the Waldo chat (reasoning + tool cards + response) on the LEFT, the built habit-tracker app on the RIGHT
+  ms: 5200
+  checkpoint: a two-pane split — the Waldo chat on the LEFT, the built habit-tracker app on the RIGHT
 end
 
 # ── everything one keystroke away ────────────────────────────────────────────
-cue "00:39", :click do
+cue "00:49", :click do
   Everything you've made — one keystroke away.
   selector: button[aria-label="Search"]
   checkpoint: a search drawer is open showing a feed of file cards
 end
 
-cue "00:42", :wait do
+cue "00:52", :wait do
   Workbooks — every app, every agent, one window.
-  ms: 2200
+  ms: 2400
 end

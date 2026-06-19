@@ -118,15 +118,19 @@
       {/if}
     {/each}
   {:else if tabsStore.tabs.length}
-    <!-- Keep-alive: every open tab stays MOUNTED; only the active one is shown.
-         Switching tabs is then a visibility toggle, not a remount — the iframe
-         never tears down + reloads, so there's no blank flash on a page/tab
-         change. (Cost: each open tab keeps its view live; fine at these counts.) -->
-    {#each tabsStore.tabs as tab (tab.id)}
-      <section class="pane" class:inactive={tab.id !== tabsStore.activeId} style="flex: 1 1 0;">
-        {@render docBody(tab)}
-      </section>
-    {/each}
+    <!-- Keep-alive: every open tab stays MOUNTED, stacked, and only the active
+         one is VISIBLE. Inactive panes use `visibility:hidden` (not display:none)
+         so their iframe stays in the render tree — painted and ready — and a tab
+         switch is an instant visibility flip, never a remount or repaint. So no
+         blank/black flash on a page change. (Cost: each open tab keeps its view
+         live; fine at these counts.) -->
+    <div class="ka-stack">
+      {#each tabsStore.tabs as tab (tab.id)}
+        <section class="pane ka" class:ka-active={tab.id === tabsStore.activeId}>
+          {@render docBody(tab)}
+        </section>
+      {/each}
+    </div>
   {:else}
     <div class="empty">
       <p>No document selected.</p>
@@ -169,10 +173,22 @@
   .pane.focused {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand) 35%, transparent);
   }
-  /* Keep-alive inactive tab: mounted but not shown. `display:none` (not
-     visibility) so it takes no space; the iframe keeps its loaded state. */
-  .pane.inactive {
-    display: none;
+  /* Keep-alive stack: panes are layered; the active one shows, the rest stay
+     painted but hidden (visibility, not display) so their iframe never tears
+     down or repaints — switching is instant. */
+  .ka-stack {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+  }
+  .pane.ka {
+    position: absolute;
+    inset: 0;
+    visibility: hidden;
+  }
+  .pane.ka.ka-active {
+    visibility: visible;
   }
   .divider {
     flex: 0 0 5px;
