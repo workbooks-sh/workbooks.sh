@@ -27,12 +27,17 @@ defmodule Nexus.Browse.Blitz do
   fetch once and render, without a second request.
   """
   def render_html(html, url, opts \\ []) do
-    case Keyword.get(opts, :engine, :boa) do
+    case Keyword.get(opts, :engine, :auto) do
       :auto -> render_html_auto(html, url, opts)
       :jsdom -> render_html_jsdom(html, url, opts)
+      :css -> render_html_css(html, url, opts)
       _ -> render_html_boa(html, url, opts)
     end
   end
+
+  # The genuinely-fast rung: CSS-only text render (render_text.wasm, 9.6MB, NO JS engine). Handles
+  # SSR pages — most of the web — without ever touching the 16MB Boa or 11MB StarlingMonkey modules.
+  defp render_html_css(html, url, opts), do: run(:text, html, url, opts)
 
   # Empirically-driven default for "I might need JS": the fast CSS-only render handles SSR sites (most
   # of the web) for a fraction of the compute, and benchmarks showed the JS engine (a) returns IDENTICAL
@@ -49,7 +54,7 @@ defmodule Nexus.Browse.Blitz do
   # Keep whichever of the three is richest — never regress.
   @thin_line_threshold 5
   defp render_html_auto(html, url, opts) do
-    fast = render_html_boa(html, url, opts)
+    fast = render_html_css(html, url, opts)
 
     if richness(fast) >= @thin_line_threshold do
       fast
