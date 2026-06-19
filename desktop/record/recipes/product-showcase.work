@@ -1,8 +1,9 @@
 # Workbooks — product showcase
 
-# A fast, hard-cut tour of the desktop app: real distinct apps, the literate
-# Rendered⇄Source seam, panes side by side, and an agent building an app live
-# from a sentence. Moves quick — short dwells, no dead air.
+# A fast, hard-cut tour of the desktop app: real distinct apps (research swarm,
+# live collaborative canvas, dashboards, an animated board), then an agent that
+# reasons, builds an app, and opens it in a split pane beside the conversation.
+# Moves quick — short dwells, no dead air.
 
 demo :product-showcase do
   target: web
@@ -20,46 +21,41 @@ cue "00:00", :navigate do
 end
 
 cue "00:02", :click do
-  Ask anything, and a swarm of agents researches it live.
+  Ask anything — a swarm of agents researches it live.
   selector: text="Swarm"
   checkpoint: a dark multi-agent research console is open, agents working
 end
 
-cue "00:07", :click do
+cue "00:06", :click do
+  Work together in real time — live cursors, drawings, presence.
+  selector: text="Canvas"
+  checkpoint: a collaborative whiteboard with sticky notes and named multiplayer cursors is open
+end
+
+cue "00:11", :click do
   A finance dashboard.
   selector: text="Ledger"
   checkpoint: a light finance dashboard with a balance and cashflow chart is open
 end
 
-cue "00:10", :click do
+cue "00:14", :click do
   Product analytics.
   selector: text="Pulse"
   checkpoint: a colorful analytics dashboard with charts is open
 end
 
-cue "00:13", :click do
-  A project board.
+cue "00:17", :click do
+  A board that moves with your team.
   selector: text="Kanban"
-  checkpoint: a kanban board with columns is open
-end
-
-# ── panes side by side ───────────────────────────────────────────────────────
-cue "00:16", :rightclick do
-  See them side by side.
-  selector: .tab:has-text("Pulse")
-end
-
-cue "00:18", :click do
-  selector: text="Split right"
-  checkpoint: the view is split into two panes showing two different apps
+  checkpoint: a kanban board with four columns and rich cards is open
 end
 
 cue "00:20", :wait do
-  Many apps, one window.
-  ms: 1700
+  Every app, one window.
+  ms: 1400
 end
 
-# ── talk to an agent — watch it think, work, and build ───────────────────────
+# ── talk to an agent — it reasons, builds, and opens beside the chat ──────────
 cue "00:23", :navigate do
   Or just describe what you want.
   url: http://localhost:5178/
@@ -73,43 +69,24 @@ cue "00:25", :type do
 end
 
 cue "00:29", :click do
-  Waldo thinks it through, then builds it.
+  Waldo reasons, calls real tools, and builds it.
   selector: button[type=submit]
 end
 
 cue "00:33", :wait do
-  ms: 1300
-end
-
-cue "00:35", :click do
-  Watch it reason and call real tools, live.
-  selector: .tab:has-text("Waldo")
-  checkpoint: an agent chat thread shows a reasoning block and tool-call cards with done status
-end
-
-cue "00:38", :wait do
-  Real reasoning, real tool calls.
-  ms: 2600
-end
-
-cue "00:42", :click do
-  A real app, from a single sentence.
-  selector: .tab:has-text("habit")
-  checkpoint: a real habit-tracker app with a weekly grid is open
-end
-
-cue "00:45", :wait do
-  ms: 2000
+  And opens it in a split, right beside the conversation.
+  ms: 5000
+  checkpoint: a two-pane split — the Waldo chat (reasoning + tool cards + response) on the LEFT, the built habit-tracker app on the RIGHT
 end
 
 # ── everything one keystroke away ────────────────────────────────────────────
-cue "00:48", :click do
+cue "00:39", :click do
   Everything you've made — one keystroke away.
   selector: button[aria-label="Search"]
   checkpoint: a search drawer is open showing a feed of file cards
 end
 
-cue "00:51", :wait do
+cue "00:42", :wait do
   Workbooks — every app, every agent, one window.
   ms: 2200
 end
