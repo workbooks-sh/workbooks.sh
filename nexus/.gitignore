@@ -9,3 +9,13 @@ build/tools/wasm-tools.wasm
 build/tools/*.wasm
 /build/commands/*.d/
 /build/commands/registry.json
+
+# relocated compiler BUILD output (regenerated, never committed)
+/build/build/
+/build/jsdom/
+/priv/*.wasm
+/kits/*.wasm
+
+# swarm demo session history (SQLite, generated)
+examples/swarm/sessions.db
+sessions.db

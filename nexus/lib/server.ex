@@ -128,6 +128,24 @@ defmodule Nexus.Server do
     end
   end
 
+  # Session history (the workbook's SQLite store) — the app's "past runs" list + detail.
+  get "/sessions" do
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(Nexus.Sessions.list()))
+  end
+
+  get "/sessions/:id" do
+    case Integer.parse(id) do
+      {n, _} ->
+        case Nexus.Sessions.get(n) do
+          nil -> send_resp(conn, 404, "{}")
+          s -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(s))
+        end
+
+      _ ->
+        send_resp(conn, 404, "{}")
+    end
+  end
+
   # The hosted control-plane API (only answers when WB_CONTROL_PLANE — else Nexus.Platform 404s, so a
   # tenant runtime is indistinguishable). Auth (the plug above) has already resolved the org tenant.
   forward("/api/platform", to: Nexus.Platform)
