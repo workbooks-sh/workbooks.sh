@@ -71,12 +71,6 @@ runtime/.publish_out/
 /CLAUDE.md
 secrets.env
 
-# only the workbooks-system skill symlink ships from .claude/ (rest stays local)
-!.claude/
-.claude/*
-!.claude/skills/
-.claude/skills/*
-!.claude/skills/workbooks-system
 examples/groundwork/runs/
 examples/groundwork/app/native/node_modules/
 examples/groundwork/app/native/ios/
