@@ -25,9 +25,11 @@ defmodule Nexus.Auth do
   def init(opts), do: opts
 
   @impl Plug
-  # `/health` is unauthenticated — a deploy/orchestrator liveness probe (Fly, Docker, the desktop
-  # daemon's first reach) has no tenant token. It exposes no tenant data.
-  def call(%{request_path: "/health"} = conn, _opts), do: conn
+  # Public, unauthenticated paths: `/health` (liveness — Fly/Docker/the daemon's first reach) and the
+  # RCP capabilities handshake (the client fetches it BEFORE it has a token). Neither exposes tenant
+  # data — the handshake reveals only how to authenticate.
+  @public_paths ["/health", "/.well-known/workbooks-runtime"]
+  def call(%{request_path: p} = conn, _opts) when p in @public_paths, do: conn
 
   def call(conn, _opts) do
     case adapter().authenticate(conn) do

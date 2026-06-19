@@ -41,6 +41,14 @@ defmodule Nexus.Server do
     |> send_resp(200, body)
   end
 
+  # The RCP capabilities handshake — the FIRST thing the desktop/web RCP client fetches to learn how
+  # to talk to this runtime. Public (no credential; exposes only the auth rung, never tenant data).
+  get "/.well-known/workbooks-runtime" do
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(Nexus.Rcp.capabilities()))
+  end
+
   get "/" do
     conn
     |> put_resp_content_type("text/html")
