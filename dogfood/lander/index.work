@@ -1,0 +1,171 @@
+# Lander — our marketing site, as a workbook
+
+Our public landing page (`web/index.html`), rebuilt as a **`.work` workbook**: one `client` island,
+served by the nexus like any other surface. Same brand — night paper, the petal mark, the DNA strip,
+the pastel badges — and the "get notified" form posts straight to our **waitlist workbook's** live
+source (`live/waitlist`), no bespoke endpoint. The marketing site is a workbook; the signup is a
+`resource`; nothing is hand-wired.
+
+client :app do
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500&display=swap" rel="stylesheet">
+
+  <style>
+    *{box-sizing:border-box}
+    :root{--paper:#121316;--card:#1b1d22;--ink:#f1efe8;--dim:#9a9aa0;--line:#2a2d34;
+      --mint:#aee5c2;--sky:#a8d4f0;--peach:#f2ddb0;--sans:'Geist',system-ui,sans-serif;--mono:'Geist Mono',monospace}
+    body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+    .dna{height:8px;background:repeating-linear-gradient(90deg,#f3c5a3 0 20px,#aee5c2 20px 36px,#a8d4f0 36px 49px,#f2ddb0 49px 65px,#9fc4e8 65px 74px);background-size:74px 8px;animation:dna 52s linear infinite}
+    @keyframes dna{to{background-position:74px 0}}
+    @media(prefers-reduced-motion:reduce){.dna{animation:none}}
+    .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+    /* hero */
+    .hero{padding:74px 0 40px;text-align:center}
+    .mark{display:inline-flex;align-items:center;gap:11px;font-weight:650;font-size:19px;letter-spacing:-.01em}
+    .mark svg{width:30px;height:auto;color:var(--ink)}
+    h1{font-size:clamp(40px,7vw,72px);line-height:1.04;letter-spacing:-.035em;font-weight:800;margin:30px auto 0;max-width:14ch}
+    h1 em{font-style:italic;color:var(--mint)}
+    .cap{color:var(--dim);font-size:19px;max-width:52ch;margin:22px auto 0}
+    .ctas{display:flex;gap:11px;justify-content:center;flex-wrap:wrap;margin:34px 0 0}
+    .btn{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);
+      font:600 15px var(--sans);padding:12px 19px;border-radius:12px;cursor:pointer;text-decoration:none}
+    .btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+    .btn:hover{transform:translateY(-1px)} .btn .mono{font-family:var(--mono);font-size:13px;color:var(--dim)}
+    .badges{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin:30px 0 0}
+    .badge{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;font:600 12px var(--mono)}
+    .badge .k{padding:5px 9px;color:var(--dim);background:var(--card)} .badge .v{padding:5px 9px;color:#121316}
+
+    /* sections */
+    section{padding:66px 0;border-top:1px solid var(--line)}
+    .kicker{font:600 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+    h2{font-size:clamp(28px,4vw,42px);letter-spacing:-.03em;font-weight:750;margin:12px 0 0;line-height:1.1}
+    .sub{color:var(--dim);font-size:18px;max-width:56ch;margin:16px 0 0}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:34px}
+    @media(max-width:720px){.grid{grid-template-columns:1fr}}
+    .pcard{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px}
+    .pcard.live{box-shadow:0 0 0 1px var(--mint) inset}
+    .ptop{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .pic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center}
+    .tag{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--dim)}
+    .tag.on{color:var(--mint);display:inline-flex;align-items:center;gap:6px}
+    .tag.on .d{width:7px;height:7px;border-radius:50%;background:var(--mint)}
+    .pcard h3{font-size:21px;margin:0 0 8px} .pcard p{color:var(--dim);margin:0 0 18px}
+    .pbtn{display:inline-flex;align-items:center;gap:7px;border:0;background:none;color:var(--ink);font:600 15px var(--sans);cursor:pointer;padding:0}
+    .pbtn.primary{color:var(--mint)}
+    .points{list-style:none;padding:0;margin:34px 0 0;display:grid;gap:16px}
+    .points li{padding-left:24px;position:relative;color:var(--dim);font-size:18px}
+    .points li::before{content:'';position:absolute;left:0;top:9px;width:9px;height:9px;border-radius:50%;background:var(--sky)}
+    .points b{color:var(--ink)}
+
+    /* notify */
+    .notify{text-align:center}
+    .row{display:flex;gap:8px;max-width:440px;margin:26px auto 0;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:7px}
+    .row input{flex:1;border:0;outline:0;background:transparent;color:var(--ink);font:16px var(--sans);padding:10px 12px}
+    .row input::placeholder{color:#6c7080}
+    .row button{border:0;background:var(--ink);color:var(--paper);font:600 15px var(--sans);padding:11px 20px;border-radius:9px;cursor:pointer}
+    .row button:disabled{opacity:.5}
+    .msg{min-height:20px;margin-top:12px;font-size:14px} .msg.err{color:#f0a0a0} .msg.ok{color:var(--mint)}
+    footer{padding:40px 0 70px;text-align:center;color:var(--dim);font-size:14px;border-top:1px solid var(--line)}
+    footer a{color:var(--dim)}
+  </style>
+
+  <div class="dna"></div>
+
+  <div class="wrap">
+    <div class="hero">
+      <div class="mark">
+        <svg viewBox="0 0 113.444 65.6002" fill="none"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>
+        <span>workbooks</span>
+      </div>
+      <h1>software that's <em>living, breathing,</em> and yours.</h1>
+      <p class="cap"><b>Workbooks</b> is a software ecosystem where people and AI build together — and what they build runs anywhere, stays connected, and keeps getting better.</p>
+      <div class="ctas">
+        <button class="btn primary js-notify" type="button">Download desktop</button>
+        <button class="btn" type="button" data-copy="curl -fsSL https://workbooks.sh/cli.sh | sh"><span class="mono">curl … | sh</span> Install</button>
+        <a class="btn" href="https://app.workbooks.sh">Open the cloud →</a>
+      </div>
+      <div class="badges">
+        <a class="badge" href="https://github.com/workbooks-sh/workbooks.sh"><span class="k">github</span><span class="v" style="background:#aee5c2">workbooks-sh</span></a>
+        <span class="badge"><span class="k">license</span><span class="v" style="background:#a8d4f0">Apache-2.0</span></span>
+        <span class="badge"><span class="k">source</span><span class="v" style="background:#f2ddb0">open · forever</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <section id="platforms">
+      <p class="kicker">two ways in ■</p>
+      <h2>Build on your machine. Ship to your cloud.</h2>
+      <p class="sub">The desktop app is where you and your agents build together. The cloud is where it runs for real — your own infrastructure, your account.</p>
+      <div class="grid">
+        <article class="pcard">
+          <div class="ptop"><span class="pic" style="background:#a8d4f0"><svg viewBox="0 0 24 24" fill="none" stroke="#121316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M8 21h8M12 16.5V21"/></svg></span><span class="tag">Coming soon</span></div>
+          <h3>The desktop app</h3>
+          <p>A native workspace where you and your agents build side by side — tabbed workspaces, your apps and live data together, a toolkit marketplace, and voice.</p>
+          <button class="pbtn js-notify" type="button">Get notified →</button>
+        </article>
+        <article class="pcard live">
+          <div class="ptop"><span class="pic" style="background:#aee5c2"><svg viewBox="0 0 24 24" fill="none" stroke="#121316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 19a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 17.7 9.2 3.9 3.9 0 0 1 18 19z"/></svg></span><span class="tag on"><span class="d"></span>Live</span></div>
+          <h3>The cloud service</h3>
+          <p>Stand up a hosted nexus, deploy your workbooks, and run agents in the cloud — metered, scale-to-zero, on your own account. Sign in and ship in minutes.</p>
+          <a class="pbtn primary" href="https://app.workbooks.sh">Get started →</a>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <p class="kicker">what is a workbook ■ 01</p>
+      <h2>the atom of <em>a living internet.</em></h2>
+      <ul class="points">
+        <li><b>It's the glue.</b> One agnostic format for any data, any system, any language — people, services, and code all meet in the same file.</li>
+        <li><b>It becomes anything.</b> The same workbook ships as a mobile app, a desktop app, or a website — no porting, no rebuilds.</li>
+        <li><b>It carries its own infrastructure.</b> Every workbook runs a sandbox for its code, a database for its state, and agents that keep it building.</li>
+      </ul>
+    </section>
+
+    <section class="notify" id="notify">
+      <p class="kicker">stay in the loop ■</p>
+      <h2>Get notified when the desktop ships.</h2>
+      <p class="sub" style="margin-left:auto;margin-right:auto">No spam, ever — just one email when it's ready.</p>
+      <div class="row">
+        <input id="email" type="email" placeholder="you@company.com" autocomplete="email" />
+        <button id="go" type="button">Notify me</button>
+      </div>
+      <div class="msg" id="msg"></div>
+    </section>
+  </div>
+
+  <footer class="wrap">
+    Workbooks · open source, forever · <a href="https://github.com/workbooks-sh/workbooks.sh">GitHub</a> · <a href="https://app.workbooks.sh">Cloud</a>
+  </footer>
+
+  <script>
+  (function(){
+    var $=function(s){return document.querySelector(s)};
+    function focusNotify(){ var n=$('#notify'); if(n)n.scrollIntoView({behavior:'smooth'}); setTimeout(function(){$('#email').focus()},400); }
+    [].forEach.call(document.querySelectorAll('.js-notify'),function(b){b.addEventListener('click',focusNotify)});
+    [].forEach.call(document.querySelectorAll('[data-copy]'),function(b){
+      b.addEventListener('click',function(){ navigator.clipboard.writeText(b.dataset.copy).then(function(){
+        var s=b.querySelector('.mono')||b; var o=s.textContent; s.textContent='copied ✓'; setTimeout(function(){s.textContent=o},1200);
+      }).catch(function(){}); });
+    });
+
+    function msg(t,c){ var m=$('#msg'); m.textContent=t; m.className='msg '+(c||''); }
+    function submit(){
+      var email=$('#email').value.trim(); if(!email){ msg('email required','err'); return; }
+      $('#go').disabled=true; msg('Adding you…','');
+      // posts to our WAITLIST workbook's live source — globally-named, same nexus.
+      var es=new EventSource('live/waitlist?email='+encodeURIComponent(email)+'&interest=desktop-launch');
+      es.onmessage=function(e){ es.close(); $('#go').disabled=false;
+        var d; try{d=JSON.parse(e.data)}catch(_){d={}}
+        if(d.ok){ $('#email').value=''; msg("You're on the list 🎉 — we'll be in touch.",'ok'); }
+        else if(d.type!=='end'){ msg(d.error||'something went wrong','err'); }
+      };
+      es.onerror=function(){ es.close(); $('#go').disabled=false; msg('connection error — try again','err'); };
+    }
+    $('#go').addEventListener('click',submit);
+    $('#email').addEventListener('keydown',function(e){ if(e.key==='Enter')submit(); });
+  })();
+  </script>
+end
