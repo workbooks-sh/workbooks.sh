@@ -438,10 +438,18 @@ defmodule Nexus.Server do
   # history-routed pages of a site-mode `app` SPA. The server serves the same SPA shell for any
   # sub-path; the in-page router reads `location.pathname` and shows the matching page. (Real
   # sub-resources — source/data/live — are matched by the explicit routes above, so they win.)
-  get "/:wb/*_rest" do
+  get "/:wb/*rest" do
     case wb_root(wb) do
-      nil -> route_or_404(conn)
-      r -> serve_workbook(conn, r, wb)
+      nil ->
+        route_or_404(conn)
+
+      r ->
+        # A real file in the mount (fonts/img/css/js/…) → serve it as a static asset; otherwise it's a
+        # history-routed SPA sub-path → serve the workbook shell.
+        case serve_static(conn, r, Enum.join(rest, "/")) do
+          {:served, c} -> c
+          :skip -> serve_workbook(conn, r, wb)
+        end
     end
   end
 
@@ -455,6 +463,16 @@ defmodule Nexus.Server do
   # Try a declared route for this request; serve it, or 404. Mount-aware paths reach here only when no
   # mount matched, so global declared routes get their chance before we give up.
   defp route_or_404(conn) do
+    # Single-workbook mode: a top-level real file (`/fonts/x.woff2`, `/og.jpg`) is a static asset.
+    static = if multi?(), do: :skip, else: serve_static(conn, root(), conn.request_path)
+
+    case static do
+      {:served, c} -> c
+      :skip -> dispatch_or_404(conn)
+    end
+  end
+
+  defp dispatch_or_404(conn) do
     case Nexus.Router.match(conn.method, conn.request_path) do
       {mod, fun, params} ->
         conn = Plug.Conn.fetch_query_params(conn)
@@ -474,6 +492,27 @@ defmodule Nexus.Server do
 
       nil ->
         send_resp(conn, 404, "not found")
+    end
+  end
+
+  # Serve a workbook's static asset (fonts, images, css, js) from its mount dir. THE LINE: generic —
+  # any workbook's bundled assets travel with it. `{:served, conn}` when a real, in-bounds, non-source
+  # file is sent; `:skip` otherwise (→ SPA shell / router / 404). Path-traversal-safe; `.work` source
+  # is NOT served here by default (it stays behind the intentional `/source` route).
+  defp serve_static(conn, mount_root, rel) do
+    rel = rel |> to_string() |> String.split("?", parts: 2) |> hd() |> URI.decode() |> String.trim_leading("/")
+    root = Path.expand(mount_root)
+    full = Path.expand(Path.join(root, rel))
+
+    cond do
+      # containment guard — the resolved path must stay inside the mount (no `..` escape)
+      full != root and not String.starts_with?(full, root <> "/") -> :skip
+      Path.extname(full) == ".work" -> :skip
+      File.regular?(full) ->
+        {:served, conn |> put_resp_content_type(MIME.from_path(full)) |> send_file(200, full)}
+
+      true ->
+        :skip
     end
   end
 
