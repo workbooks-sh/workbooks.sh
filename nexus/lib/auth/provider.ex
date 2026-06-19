@@ -91,6 +91,116 @@ defmodule Nexus.Auth.Provider do
   @doc false
   def state_cookie, do: @state_cookie
 
+  @doc """
+  Complete a login. Verifies CSRF `state`, exchanges the `code` for tokens (server-to-server,
+  client_secret from `Nexus.Secrets`, TLS-verified), verifies the `id_token` (vetted `Nexus.Auth.Jwt`,
+  provider jwks/issuer), checks the `nonce` (replay), maps claims → identity, issues a session cookie,
+  and 302s to the post-login path. Any failure → 401 with the state cookie cleared. Opts `:exchange` /
+  `:verify_id` are DI seams for tests.
+  """
+  def callback(conn, provider, opts \\ []) do
+    cfg = Nexus.Config.provider(provider)
+    exchange = opts[:exchange] || (&exchange_code/3)
+    verify_id = opts[:verify_id] || (&verify_id_token/3)
+    conn = fetch_query_params(conn)
+    p = conn.query_params
+
+    with {:ok, %{s: want_state, n: nonce}} <- verify_state(conn),
+         code when is_binary(code) and code != "" <- p["code"],
+         state when is_binary(state) <- p["state"],
+         true <- Plug.Crypto.secure_compare(state, want_state),
+         {:ok, tokens} <- exchange.(provider, cfg, code),
+         id_token when is_binary(id_token) <- tokens["id_token"],
+         {:ok, claims} <- verify_id.(id_token, cfg, nonce),
+         %{tenant: t} = identity when is_binary(t) and t != "" <- map_claims(claims, cfg) do
+      conn
+      |> clear_state()
+      |> Nexus.Auth.Session.issue(identity)
+      |> put_resp_header("location", cfg["post-login"] || "/")
+      |> send_resp(302, "")
+    else
+      _ -> conn |> clear_state() |> send_resp(401, "authentication failed")
+    end
+  end
+
+  # Server-to-server code→token exchange. TLS-VERIFIED (it carries the client secret); token-url MUST
+  # be https. Returns the decoded token response map or `{:error, _}`.
+  defp exchange_code(provider, cfg, code) do
+    url = cfg["token-url"]
+
+    if https?(url) do
+      form =
+        URI.encode_query(%{
+          "grant_type" => "authorization_code",
+          "code" => code,
+          "redirect_uri" => cfg["redirect-uri"] || "",
+          "client_id" => cfg["client-id"] || "",
+          "client_secret" => Nexus.Secrets.get(secret_name(provider)) || ""
+        })
+
+      post_form(url, form)
+    else
+      {:error, :insecure_token_url}
+    end
+  end
+
+  defp post_form(url, form) do
+    :inets.start()
+    :ssl.start()
+
+    ssl_opts = [
+      verify: :verify_peer,
+      cacerts: :public_key.cacerts_get(),
+      customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)],
+      depth: 3
+    ]
+
+    req = {String.to_charlist(url), [{~c"accept", ~c"application/json"}], ~c"application/x-www-form-urlencoded", String.to_charlist(form)}
+    http_opts = [ssl: ssl_opts, timeout: 15_000, connect_timeout: 15_000]
+
+    case :httpc.request(:post, req, http_opts, body_format: :binary) do
+      {:ok, {{_, 200, _}, _h, body}} ->
+        case Jason.decode(body) do
+          {:ok, m} when is_map(m) -> {:ok, m}
+          _ -> {:error, :bad_token_response}
+        end
+
+      _ ->
+        {:error, :token_exchange_failed}
+    end
+  end
+
+  defp secret_name(provider), do: String.upcase(to_string(provider)) <> "_CLIENT_SECRET"
+
+  # Verify the id_token against the PROVIDER's jwks/issuer (not the global adapter), then the nonce.
+  defp verify_id_token(id_token, cfg, nonce) do
+    overrides = [jwks_url: cfg["jwks-url"], issuer: cfg["issuer"], secret: cfg["hs256-secret"]]
+
+    with {:ok, claims} <- Nexus.Auth.Jwt.verify(id_token, overrides),
+         true <- nonce_ok?(claims, nonce) do
+      {:ok, claims}
+    else
+      _ -> {:error, :invalid_id_token}
+    end
+  end
+
+  # OIDC: we always send a nonce, so the id_token MUST echo it. Absent/mismatched ⇒ fail-closed.
+  defp nonce_ok?(%{"nonce" => n}, nonce) when is_binary(n), do: Plug.Crypto.secure_compare(n, nonce)
+  defp nonce_ok?(_, _), do: false
+
+  defp map_claims(claims, cfg) do
+    %{
+      tenant: to_string(claims[cfg["tenant-claim"] || "sub"] || ""),
+      user: claims[cfg["user-claim"] || "sub"],
+      roles: as_list(claims[cfg["roles-claim"] || "roles"]),
+      scopes: as_list(claims[cfg["scopes-claim"] || "scope"])
+    }
+  end
+
+  defp as_list(l) when is_list(l), do: Enum.map(l, &to_string/1)
+  defp as_list(s) when is_binary(s), do: String.split(s, ~r/\s+/, trim: true)
+  defp as_list(_), do: []
+
   # ── internals ──
   defp https?(url), do: is_binary(url) and String.starts_with?(url, "https://")
   defp nonce, do: :crypto.strong_rand_bytes(24) |> Base.url_encode64(padding: false)

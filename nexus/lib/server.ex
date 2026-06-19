@@ -130,6 +130,11 @@ defmodule Nexus.Server do
     Nexus.Auth.Provider.login(conn, provider)
   end
 
+  # Provider redirects back here with ?code=&state= → verify, exchange, issue session. Public.
+  get "/auth/:provider/callback" do
+    Nexus.Auth.Provider.callback(conn, provider)
+  end
+
   get "/" do
     # Single workbook → the app. Many workbooks → an index of what's mounted on this nexus.
     if multi?() do
