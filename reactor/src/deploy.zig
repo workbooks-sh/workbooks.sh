@@ -1,7 +1,9 @@
-//! deploy — stand up a runtime for a workbook, local or cloud. The config is a single `<work-deploy>`
-//! HTML element (no JSON, on-canon). `init` scaffolds it; `validate` runs the coherence rules (the
-//! same lockouts the Elixir kit had); apply/status/verify/down route by engine-place to a backend.
-//! Config parse + validation are pure (testable); secrets never live in the file — they come from ENV.
+//! deploy — stand up a runtime for a workbook, local or cloud. The config is a
+//! `deploy do … end` declaration in a `.work` file (`deployment.work`) — config
+//! lives with the workbook, on-canon (HTML is only ever a build output, never a
+//! config surface). `init` scaffolds it; `validate` runs the coherence rules;
+//! apply/status/verify/down route by engine-place to a backend. Config parse +
+//! validation are pure (testable); secrets never live in the file — they come from ENV.
 const std = @import("std");
 const Io = std.Io;
 const fs = @import("fs.zig");
@@ -27,21 +29,22 @@ pub fn scaffold(alloc: std.mem.Allocator, place: []const u8) ![]const u8 {
     else
         "\n  component-cache=\"/data/build/components\"";
     return std.fmt.allocPrint(alloc,
-        \\<!doctype html>
-        \\<html lang="en"><head><meta charset="utf-8"><title>Deployment</title></head><body>
-        \\<!-- CONFIG is these <work-deploy> attributes (HTML, the source of truth) — never env vars.
-        \\     The ONLY things from your deploy ENV are SECRETS + per-machine identity:
-        \\       WB_DATABASE_URL (postgres) · WB_S3_ACCESS_KEY_ID / WB_S3_SECRET_ACCESS_KEY (cache store)
-        \\     Compile-lane knobs (optional; defaults shown): compile-concurrency=cores ·
-        \\     compile-cache="on" · compile-cache-version="wbc1" · pm-debug="off" -->
-        \\<work-deploy
+        \\# Deployment
+        \\
+        \\How this workbook is deployed. These settings live with the workbook —
+        \\version-controlled, not JSON and not env vars. The ONLY things from your
+        \\deploy ENV are SECRETS + per-machine identity:
+        \\  WB_DATABASE_URL (postgres) · WB_S3_ACCESS_KEY_ID / WB_S3_SECRET_ACCESS_KEY (cache store)
+        \\Compile-lane knobs (optional; defaults shown): compile-concurrency=cores ·
+        \\compile-cache="on" · compile-cache-version="wbc1" · pm-debug="off"
+        \\
+        \\deploy do
         \\  engine-place="{s}"
         \\  tenancy-mode="single"
         \\  storage="{s}"
         \\  database="{s}"
-        \\  auth="trusted"{s}{s}>
-        \\</work-deploy>
-        \\</body></html>
+        \\  auth="trusted"{s}{s}
+        \\end
         \\
     , .{
         place,
@@ -52,10 +55,11 @@ pub fn scaffold(alloc: std.mem.Allocator, place: []const u8) ![]const u8 {
     });
 }
 
-pub fn attr(html: []const u8, name: []const u8, default: []const u8) []const u8 {
-    const wd = std.mem.indexOf(u8, html, "<work-deploy") orelse return default;
-    const end = std.mem.indexOfScalarPos(u8, html, wd, '>') orelse html.len;
-    const region = html[wd..@min(end, html.len)];
+/// Read a `name="value"` setting from the `deploy do … end` block of a `.work` source.
+pub fn attr(src: []const u8, name: []const u8, default: []const u8) []const u8 {
+    const blk = std.mem.indexOf(u8, src, "deploy do") orelse return default;
+    const end = std.mem.indexOfPos(u8, src, blk, "\nend") orelse src.len;
+    const region = src[blk..@min(end, src.len)];
     var pat: [64]u8 = undefined;
     const p = std.fmt.bufPrint(&pat, "{s}=\"", .{name}) catch return default;
     const at = std.mem.indexOf(u8, region, p) orelse return default;
@@ -65,13 +69,13 @@ pub fn attr(html: []const u8, name: []const u8, default: []const u8) []const u8 
 }
 
 /// Validate a parsed config → list of issue strings ([] means coherent).
-pub fn validate(alloc: std.mem.Allocator, html: []const u8) ![]const []const u8 {
+pub fn validate(alloc: std.mem.Allocator, src: []const u8) ![]const []const u8 {
     var issues: std.ArrayList([]const u8) = .empty;
-    const place = attr(html, "engine-place", "local");
-    const tenancy = attr(html, "tenancy-mode", "single");
-    const storage = attr(html, "storage", "local-fs");
-    const database = attr(html, "database", "sqlite");
-    const auth = attr(html, "auth", "trusted");
+    const place = attr(src, "engine-place", "local");
+    const tenancy = attr(src, "tenancy-mode", "single");
+    const storage = attr(src, "storage", "local-fs");
+    const database = attr(src, "database", "sqlite");
+    const auth = attr(src, "auth", "trusted");
 
     try enumCheck(alloc, &issues, "engine-place", place, &places);
     try enumCheck(alloc, &issues, "tenancy-mode", tenancy, &tenancies);
@@ -85,7 +89,7 @@ pub fn validate(alloc: std.mem.Allocator, html: []const u8) ![]const []const u8 
         try issues.append(alloc, "tenancy-mode: multi needs real auth (betterauth|clerk|oidc) — trusted has no identity");
     if (eql(place, "cloud") and eql(auth, "trusted"))
         try issues.append(alloc, "engine-place: cloud + auth: trusted is an OPEN control plane — set WB_PUBLIC_BEARER in your deploy ENV, or use real auth");
-    if (eql(storage, "s3") and (attr(html, "storage-bucket", "").len == 0 or attr(html, "storage-endpoint", "").len == 0))
+    if (eql(storage, "s3") and (attr(src, "storage-bucket", "").len == 0 or attr(src, "storage-endpoint", "").len == 0))
         try issues.append(alloc, "storage: s3 needs storage-bucket + storage-endpoint");
     if (eql(database, "postgres"))
         try issues.append(alloc, "database: postgres needs WB_DATABASE_URL in your deploy ENV");
@@ -93,9 +97,9 @@ pub fn validate(alloc: std.mem.Allocator, html: []const u8) ![]const []const u8 
     // The compiled-component cache: a remote (r2://|s3://) store needs an endpoint in the file + S3
     // creds in ENV; a local value must be an ABSOLUTE path (it lives inside the VM/machine, and a
     // relative one would land on the ephemeral rootfs instead of the persistent volume).
-    const cache = attr(html, "component-cache", "");
+    const cache = attr(src, "component-cache", "");
     const remote_cache = std.mem.startsWith(u8, cache, "r2://") or std.mem.startsWith(u8, cache, "s3://");
-    if (remote_cache and attr(html, "component-cache-endpoint", "").len == 0)
+    if (remote_cache and attr(src, "component-cache-endpoint", "").len == 0)
         try issues.append(alloc, "component-cache: r2://|s3:// needs component-cache-endpoint (+ WB_S3_ACCESS_KEY_ID / WB_S3_SECRET_ACCESS_KEY in your deploy ENV)");
     if (cache.len != 0 and !remote_cache and cache[0] != '/')
         try issues.append(alloc, "component-cache: a local path must be absolute (e.g. /data/build/components) so it sits on the persistent volume, not the ephemeral rootfs");
@@ -106,34 +110,34 @@ pub fn validate(alloc: std.mem.Allocator, html: []const u8) ![]const []const u8 
 // ── verbs ───────────────────────────────────────────────────────────────────────────────────
 pub fn init(io: Io, alloc: std.mem.Allocator, place_in: []const u8, dir: []const u8, force: bool) !u8 {
     const place = if (isPlace(place_in)) place_in else "local";
-    const path = try std.fs.path.join(alloc, &.{ dir, "deployment.html" });
+    const path = try std.fs.path.join(alloc, &.{ dir, "deployment.work" });
     log.prompt(try std.fmt.allocPrint(alloc, "work deploy init {s} {s}", .{ place, dir }));
 
     if (!force) {
         if (fs.readFile(io, alloc, path)) |_| {
-            log.warn("deployment.html already exists — pass --force to overwrite");
+            log.warn("deployment.work already exists — pass --force to overwrite");
             return 1;
         } else |_| {}
     }
     try fs.writeFile(io, path, try scaffold(alloc, place));
-    log.ok(try std.fmt.allocPrint(alloc, "wrote deployment.html \u{b7} engine-place={s}", .{place}));
+    log.ok(try std.fmt.allocPrint(alloc, "wrote deployment.work \u{b7} engine-place={s}", .{place}));
     log.step("edit it, then `work deploy validate` \u{2192} `work deploy apply`");
     return 0;
 }
 
 pub fn validateVerb(io: Io, alloc: std.mem.Allocator, file: []const u8) !u8 {
     log.prompt(try std.fmt.allocPrint(alloc, "work deploy validate {s}", .{file}));
-    const html = fs.readFile(io, alloc, file) catch {
-        log.err("no deployment.html — run `work deploy init` first");
+    const src = fs.readFile(io, alloc, file) catch {
+        log.err("no deployment.work — run `work deploy init` first");
         return 1;
     };
-    if (std.mem.indexOf(u8, html, "<work-deploy") == null) {
-        log.err("no <work-deploy> element in the config");
+    if (std.mem.indexOf(u8, src, "deploy do") == null) {
+        log.err("no `deploy do … end` block in the config");
         return 1;
     }
-    const issues = try validate(alloc, html);
+    const issues = try validate(alloc, src);
     if (issues.len == 0) {
-        log.ok(try std.fmt.allocPrint(alloc, "config is coherent \u{b7} engine-place={s}", .{attr(html, "engine-place", "local")}));
+        log.ok(try std.fmt.allocPrint(alloc, "config is coherent \u{b7} engine-place={s}", .{attr(src, "engine-place", "local")}));
         return 0;
     }
     log.err(try std.fmt.allocPrint(alloc, "{d} issue(s)", .{issues.len}));
@@ -143,22 +147,22 @@ pub fn validateVerb(io: Io, alloc: std.mem.Allocator, file: []const u8) !u8 {
 
 pub fn apply(io: Io, alloc: std.mem.Allocator, file: []const u8) !u8 {
     log.prompt(try std.fmt.allocPrint(alloc, "work deploy apply {s}", .{file}));
-    const html = fs.readFile(io, alloc, file) catch {
-        log.err("no deployment.html — run `work deploy init` first");
+    const src = fs.readFile(io, alloc, file) catch {
+        log.err("no deployment.work — run `work deploy init` first");
         return 1;
     };
-    const issues = try validate(alloc, html);
+    const issues = try validate(alloc, src);
     if (issues.len > 0) {
         log.err("config invalid — fix it first (`work deploy validate`)");
         for (issues) |i| log.step(i);
         return 1;
     }
-    const place = attr(html, "engine-place", "local");
+    const place = attr(src, "engine-place", "local");
     if (eql(place, "local")) {
         log.ok("local target — runs the one OCI image in a krunvm/container");
         log.step("image build + boot lands with the nexus image recipe");
     } else {
-        log.ok(try std.fmt.allocPrint(alloc, "cloud target: {s} \u{b7} {s}", .{ attr(html, "provider", "fly"), attr(html, "app", "(no app)") }));
+        log.ok(try std.fmt.allocPrint(alloc, "cloud target: {s} \u{b7} {s}", .{ attr(src, "provider", "fly"), attr(src, "app", "(no app)") }));
         log.step("cloud apply provisions via the control plane (`work login`)");
     }
     return 0;
@@ -185,7 +189,7 @@ test "scaffold → validate: coherent local, flagged cloud+multi+trusted+s3" {
     const local = try scaffold(a, "local");
     try std.testing.expectEqual(@as(usize, 0), (try validate(a, local)).len);
 
-    const bad = "<work-deploy engine-place=\"cloud\" tenancy-mode=\"multi\" storage=\"s3\" database=\"postgres\" auth=\"trusted\">";
+    const bad = "deploy do\n engine-place=\"cloud\" tenancy-mode=\"multi\" storage=\"s3\" database=\"postgres\" auth=\"trusted\"\nend";
     const issues = try validate(a, bad);
     try std.testing.expect(issues.len >= 3);
 
@@ -199,9 +203,9 @@ test "validate flags a remote cache with no endpoint + a relative local cache" {
     defer arena.deinit();
     const a = arena.allocator();
 
-    const no_ep = "<work-deploy engine-place=\"cloud\" component-cache=\"r2://bkt/components\">";
+    const no_ep = "deploy do\n engine-place=\"cloud\" component-cache=\"r2://bkt/components\"\nend";
     try std.testing.expect((try validate(a, no_ep)).len >= 1);
 
-    const rel = "<work-deploy engine-place=\"local\" component-cache=\"build/components\">";
+    const rel = "deploy do\n engine-place=\"local\" component-cache=\"build/components\"\nend";
     try std.testing.expect((try validate(a, rel)).len >= 1);
 }

@@ -65,9 +65,9 @@ pub fn main(init: std.process.Init) !void {
             const place = it.next() orelse "local";
             std.process.exit(try deploy.init(io, alloc, place, it.next() orelse ".", false));
         } else if (eql(sub, "validate")) {
-            std.process.exit(try deploy.validateVerb(io, alloc, it.next() orelse "deployment.html"));
+            std.process.exit(try deploy.validateVerb(io, alloc, it.next() orelse "deployment.work"));
         } else if (eql(sub, "apply")) {
-            std.process.exit(try deploy.apply(io, alloc, it.next() orelse "deployment.html"));
+            std.process.exit(try deploy.apply(io, alloc, it.next() orelse "deployment.work"));
         } else {
             log.err("usage: work deploy init|validate|apply");
             std.process.exit(1);
@@ -146,7 +146,7 @@ const groups = [_]Group{
         .{ "dev <dir>", "watch & re-weave on change (+ nexus hot-swap)" },
     } },
     .{ .name = "deploy", .blurb = "stand up a runtime, local or cloud", .verbs = &.{
-        .{ "deploy init|validate|apply", "scaffold · check · deploy <work-deploy>" },
+        .{ "deploy init|validate|apply", "scaffold · check · deploy the .work config" },
         .{ "deploy verify|status|down", "health · inspect · teardown" },
     } },
     .{ .name = "platform", .blurb = "identity, contexts, the control plane", .verbs = &.{
