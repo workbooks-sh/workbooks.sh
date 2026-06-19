@@ -1,0 +1,769 @@
+# Toolkits — the marketplace, as a workbook
+
+Our toolkit marketplace (`web/toolkits`, a Python-generated pile of HTML) rebuilt as a **`.work`
+workbook**: the catalog is the island's data (the source of truth, replacing `catalog.json`), and a
+`client` island renders the browse grid + filters + detail. Logos travel with the workbook (served as
+static assets). Each toolkit is a federation/render/knowledge unit you compose into a workbook.
+
+client :market do
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}
+    :root{--paper:#16171a;--card:#1f2125;--ink:#ecebe5;--dim:#8c9189;--line:#2d2f34;--mint:#aee5c2;--sans:'Geist',system-ui,sans-serif;--mono:'Geist Mono',monospace}
+    body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 var(--sans)}
+    .wrap{max-width:1080px;margin:0 auto;padding:48px 24px 100px}
+    h1{font-size:30px;letter-spacing:-.02em;margin:0 0 6px}
+    .lead{color:var(--dim);margin:0 0 26px;max-width:60ch}
+    .filters{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 24px}
+    .pill{border:1px solid var(--line);background:var(--card);color:var(--dim);font:600 12px var(--mono);padding:6px 12px;border-radius:20px;cursor:pointer}
+    .pill.on{color:#11231a;background:var(--mint);border-color:var(--mint)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+    .tk{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;cursor:pointer;display:flex;flex-direction:column;gap:9px;transition:transform .12s,border-color .12s}
+    .tk:hover{transform:translateY(-2px);border-color:#3a3d44}
+    .tk .top{display:flex;align-items:center;gap:10px}
+    .tk .lg{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;flex:none}
+    .tk .lg img{width:22px;height:22px}
+    .tk .t{font-weight:650;font-size:16px}
+    .tk .tag{color:var(--dim);font-size:13px;line-height:1.5}
+    .tk .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+    .badge{font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:5px;border:1px solid var(--line);color:var(--dim)}
+    .badge.st{color:var(--mint)}
+    .detail{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;place-items:center;padding:24px;z-index:10}
+    .detail.on{display:grid}
+    .dcard{background:var(--card);border:1px solid var(--line);border-radius:18px;max-width:560px;width:100%;padding:28px;max-height:85vh;overflow:auto}
+    .dcard h2{margin:0 0 4px;font-size:22px} .dcard .dtag{color:var(--dim);margin:0 0 16px}
+    .dcard .desc{color:#cfcfc9;line-height:1.65;margin:0 0 16px}
+    .kv{display:flex;gap:8px;margin:6px 0;font-size:13px} .kv b{color:var(--dim);font:600 11px var(--mono);text-transform:uppercase;min-width:90px}
+    .kv code{font:12px var(--mono);color:var(--mint)}
+    .dclose{float:right;border:0;background:none;color:var(--dim);font-size:22px;cursor:pointer}
+  </style>
+
+  <div class="wrap">
+    <h1>Toolkits</h1>
+    <p class="lead">Composable units — federations, renderers, knowledge packs — you drop into a workbook. Each carries its own backend, capabilities, and config.</p>
+    <div class="filters" id="filters"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="detail" id="detail"><div class="dcard" id="dcard"></div></div>
+
+  <script>
+  var CATALOG =
+[
+  {
+    "slug": "asana",
+    "title": "asana",
+    "tagline": "Asana task federation \u2014 mirror an Asana project into org :task: nodes, query + (gated) write-back.",
+    "version": "0.1.0",
+    "kind": "federation",
+    "status": "experimental",
+    "caps": [
+      "database",
+      "deploy",
+      "auth",
+      "ai",
+      "tasks"
+    ],
+    "integration": "Asana",
+    "category": "Integration",
+    "logo": "/toolkits/logos/asana.svg",
+    "tint": "#f0b8b8",
+    "cli_bin": null,
+    "env_keys": [
+      "ASANA_PAT"
+    ],
+    "requires": null,
+    "flow": null,
+    "env_note": null,
+    "description": "A *federation* toolkit (BACKEND-PATTERN.org \u00a7KIND ladder): the superset of a base toolkit. It carries THREE faces, one authoring unit:",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "byod",
+    "title": "byod",
+    "tagline": "Turn a forged workbook into a real, multi-tenant app \u2014 live DB + auth, no engine.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "experimental",
+    "caps": [
+      "database",
+      "deploy",
+      "auth",
+      "ai"
+    ],
+    "integration": "Postgres + Railway",
+    "category": "Deploy",
+    "logo": "/toolkits/logos/byod.svg",
+    "tint": "#f2ddb0",
+    "cli_bin": "wb",
+    "env_keys": [],
+    "requires": "wb, node>=20, railway>=3 (to deploy the gateway)",
+    "flow": null,
+    "env_note": null,
+    "description": "Connect a forged workbook to a live database (Postgres, or Cloudflare D1) through a secure data backend, with the developer's OWN auth (BetterAuth) for sign-in, sessions, organizations (multi-tenant), and API keys. No agent engine",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "capacitor",
+    "title": "capacitor",
+    "tagline": "Capacitor \u2014 wrap a forged workbook as a native iOS app, run it, and ship it to TestFlight.",
+    "version": "0.2.0",
+    "kind": "toolkit",
+    "status": "experimental",
+    "caps": [
+      "deploy",
+      "mobile",
+      "sandbox",
+      "tasks"
+    ],
+    "integration": "Capacitor",
+    "category": "Deploy",
+    "logo": "/toolkits/logos/capacitor.svg",
+    "tint": "#f2ddb0",
+    "cli_bin": "cap",
+    "env_keys": [],
+    "requires": "node>=18, xcode (full), capacitor>=8 (cocoapods optional \u2014 Cap 8 uses SPM)",
+    "flow": null,
+    "env_note": null,
+    "description": "Wrapper around Capacitor, invoked as npx cap (no global install needed). The Workbooks use case: take a built workbook (dist/<slug>.html) and wrap it as a native iOS app \u2014 run it in the Simulator, build + sign an .ipa in Xcode,",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "cloudflare",
+    "title": "cloudflare",
+    "tagline": "All-Cloudflare backend for a forged workbook \u2014 D1 + Workers AI + Pages, on the user's own account.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "experimental",
+    "caps": [
+      "database",
+      "deploy",
+      "auth",
+      "ai",
+      "tasks"
+    ],
+    "integration": "Cloudflare",
+    "category": "Deploy",
+    "logo": "/toolkits/logos/cloudflare.svg",
+    "tint": "#a8d4f0",
+    "cli_bin": "wrangler",
+    "env_keys": [],
+    "requires": "wrangler>=3.0",
+    "flow": null,
+    "env_note": null,
+    "description": "The all-Cloudflare path for a forged workbook: a live, multi-tenant app standing entirely on the user's OWN Cloudflare account, with just a wrangler login \u2014 no second provider, no DB to provision elsewhere.",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "ctk",
+    "title": "ctk",
+    "tagline": "A human-in-the-loop canvas \u2014 render any component with Org-tangled controls in one fixed shell; iterate vibes/sizes/states without designing a UI.",
+    "version": "0.1.0",
+    "kind": "render",
+    "status": "experimental",
+    "caps": [
+      "fetch",
+      "assets",
+      "git",
+      "sandbox",
+      "ai"
+    ],
+    "integration": null,
+    "category": "Dev tools",
+    "logo": "/toolkits/logos/ctk.svg",
+    "tint": "#f3c5a3",
+    "cli_bin": null,
+    "env_keys": [],
+    "requires": null,
+    "flow": null,
+    "env_note": null,
+    "description": "CTK is a *standard rendering shell* for an isolated artifact (a component or page, in any language the stage can host). One fixed frame every time \u2014 a top bar (size / vibe / gallery), a left control panel, and a stage \u2014 so authoring a",
+    "updated": "2026-06-09"
+  },
+  {
+    "slug": "docs",
+    "title": "docs",
+    "tagline": "A reusable, drift-checked documentation pipeline for any Workbooks tenant \u2014 Di\u00e1taxis-shaped org source, reference auto-tangled from your own code, a forced honesty/maturity gate, and agent/SEO output. Point it at your repo, get docs.workbooks.sh's exact machinery for free.",
+    "version": "0.1.0",
+    "kind": "knowledge+pipeline",
+    "status": "partial",
+    "caps": [
+      "fetch",
+      "deploy",
+      "git",
+      "sandbox",
+      "ai",
+      "tasks",
+      "docs"
+    ],
+    "integration": null,
+    "category": "Pipeline",
+    "logo": "/toolkits/logos/docs.svg",
+    "tint": "#f3c5a3",
+    "cli_bin": "work",
+    "env_keys": [],
+    "requires": null,
+    "flow": "read this front door \u2192 author with the docs-authoring skill (.claude/skills/docs-authoring) \u2192 run the work docs verb family below. Reference renderer = toolkits/orgitorial; publish target/identity = toolkits/publish + runtime/host/publish/site.ex; source-derivation = work tangle/lint.",
+    "env_note": null,
+    "description": "This toolkit packages the system that builds docs.workbooks.sh so any tenant can point it at their own code and inherit the same skeleton: Di\u00e1taxis IA + reference *tangled from code* + a fail-closed honesty gate",
+    "updated": "2026-06-13"
+  },
+  {
+    "slug": "ffmpeg",
+    "title": "ffmpeg",
+    "tagline": "Image + audio + video at parity \u2014 resize/crop/convert/tile/overlay stills, scale/overlay/gif/fps/audio-mux + transcode/trim/concat for video.",
+    "version": "0.3.0",
+    "kind": "toolkit",
+    "status": "stable",
+    "caps": [
+      "video",
+      "audio",
+      "image",
+      "assets",
+      "ai"
+    ],
+    "integration": null,
+    "category": "Media",
+    "logo": "/toolkits/logos/ffmpeg.svg",
+    "tint": "#d9c5f0",
+    "cli_bin": "ffmpeg",
+    "env_keys": [],
+    "requires": "ffmpeg>=6.0",
+    "flow": null,
+    "env_note": null,
+    "description": "Wrapper around the standard ffmpeg binary. ffmpeg is powerful but the flag surface is large + the order of -i and filter args matters. Skills cover the common image/video/audio",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "git",
+    "title": "git",
+    "tagline": "Distributed version control \u2014 recovery, rebase, undo recipes the agent can lift verbatim.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "stable",
+    "caps": [
+      "web-search",
+      "git",
+      "ai",
+      "tasks"
+    ],
+    "integration": null,
+    "category": "Dev tools",
+    "logo": "/toolkits/logos/git.svg",
+    "tint": "#a8d4f0",
+    "cli_bin": "git",
+    "env_keys": [],
+    "requires": "git>=2.30",
+    "flow": null,
+    "env_note": null,
+    "description": "Wrapper around the standard git binary. Skills cover the workflows agents commonly need but tend to get wrong if they rely on training-data priors alone:",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "glyphs",
+    "title": "glyphs",
+    "tagline": "One API resolves any visual mark \u2014 brand logo, tech icon, seeded avatar, social avatar \u2014 to an SVG (or an <img>). Curated-local-first, CDN fallback for the long tail. glyph(ref) is sync (curated-only, offline, returns null on a miss); glyphAsync(ref) hits the CDN for the long tail. ref is \"<kind>:<id>\" \u2014 brand:google, icon:elixir, avatar:open-peeps/wren, social:github/octocat.",
+    "version": "0.1.0",
+    "kind": "knowledge+assets",
+    "status": "experimental",
+    "caps": [
+      "fetch",
+      "image",
+      "fonts",
+      "assets",
+      "deploy",
+      "git",
+      "sandbox",
+      "ai"
+    ],
+    "integration": null,
+    "category": "Assets",
+    "logo": "/toolkits/logos/glyphs.svg",
+    "tint": "#a8d4f0",
+    "cli_bin": null,
+    "env_keys": [],
+    "requires": null,
+    "flow": "read this front door \u2192 pick the one skill your task needs (resolve to use it, curate to add/refresh curated marks, integrate to plug it into a site/wasm). cat a skill only when you reach its step. The resolver lives in dist/glyphs.js + dist/glyphs.css; the proof page is dist/specimen.html; curated packs in packs/*.json; licenses + the trademark note in LICENSES.md.",
+    "env_note": null,
+    "description": "A *knowledge + assets* toolkit: a tiny, zero-dependency resolver that turns a string ref into a visual mark. One function, four kinds, curated-local-first. Parts that ship together \u2014",
+    "updated": "2026-06-10"
+  },
+  {
+    "slug": "icons",
+    "title": "icons",
+    "tagline": "The universal icon library as a CLI \u2014 one value grammar (mi:<def> \u00b7 lobe:<slug> \u00b7 emoji \u00b7 data: \u00b7 initials) searched, resolved, and explained; what an agent writes renders in the desktop unchanged.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "experimental",
+    "caps": [
+      "web-search",
+      "fetch",
+      "assets",
+      "git",
+      "desktop",
+      "sandbox",
+      "ai",
+      "tasks"
+    ],
+    "integration": null,
+    "category": "Assets",
+    "logo": "/toolkits/logos/icons.svg",
+    "tint": "#aee5c2",
+    "cli_bin": "icons",
+    "env_keys": [],
+    "requires": null,
+    "flow": "`icons grammar` once \u2192 `icons search <query>` / `icons for-file <name>` / `icons for-folder <name>` to find a value \u2192 write that string into the workbook/spec. `icons get <value>` to inspect any value you meet. cat skills/overview.org only if a verb surprises you.",
+    "env_note": null,
+    "description": "One CLI fronts the project-wide *icon value grammar* (wb-5fl.15/.16): the same strings the desktop resolves in desktop/src/lib/ui/Icon.svelte \u2014 Material Icon Theme defs for files/folders/anything, LobeHub brand svgs for",
+    "updated": "2026-06-10"
+  },
+  {
+    "slug": "linear",
+    "title": "linear",
+    "tagline": "Linear task federation \u2014 mirror a Linear project into org :task: nodes, query + (gated) write-back.",
+    "version": "0.1.0",
+    "kind": "federation",
+    "status": "experimental",
+    "caps": [
+      "database",
+      "deploy",
+      "auth",
+      "ai",
+      "tasks"
+    ],
+    "integration": "Linear",
+    "category": "Integration",
+    "logo": "/toolkits/logos/linear.svg",
+    "tint": "#aee5c2",
+    "cli_bin": null,
+    "env_keys": [
+      "LINEAR_API_KEY"
+    ],
+    "requires": null,
+    "flow": null,
+    "env_note": null,
+    "description": "A *federation* toolkit (BACKEND-PATTERN.org \u00a7KIND ladder): the superset of a base toolkit. It carries THREE faces, one authoring unit:",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "mono",
+    "title": "mono",
+    "tagline": "RGBA \u2192 grayscale, the first deployed kernel-shape toolkit (bytes\u2192bytes hot loop).",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "exp",
+    "caps": [
+      "fonts",
+      "sandbox"
+    ],
+    "integration": null,
+    "category": "Design",
+    "logo": "/toolkits/logos/mono.svg",
+    "tint": "#aee5c2",
+    "cli_bin": "mono",
+    "env_keys": [],
+    "requires": null,
+    "flow": null,
+    "env_note": null,
+    "description": "The DEBUT of the #+EXEC: kernel shape: a bytes \u2192 bytes reactor compiled from C (in-sandbox, clang.wasm) and looped by the fabric \u2014 instantiate ONCE, call per frame. Input: RGBA pixels; output: same-length RGBA with each pixel",
+    "updated": "2026-06-09"
+  },
+  {
+    "slug": "open-avatars",
+    "title": "open-avatars",
+    "tagline": "Many art styles, one DiceBear-like API. A zero-dependency, deterministic avatar engine (browser / Node / QuickJS-wasm): a single avatar(pack, seed, opts) routes by a pack's TYPE \u2014 assembled (composed atoms), gallery (pick one whole avatar, SVG or raster), or procedural (a generator the pack ships). Same seed \u2192 byte-identical avatar across every style, forever. Seven styles ship: open-peeps, transhumans, pixabots, boring, jdenticon, minidenticons, pixitar.",
+    "version": "0.2.0",
+    "kind": "knowledge+assets",
+    "status": "experimental",
+    "caps": [
+      "fetch",
+      "image",
+      "assets",
+      "sandbox",
+      "tasks"
+    ],
+    "integration": null,
+    "category": "Assets",
+    "logo": "/toolkits/logos/open-avatars.svg",
+    "tint": "#b8e0e8",
+    "cli_bin": null,
+    "env_keys": [],
+    "requires": null,
+    "flow": "read this front door \u2192 pick the one skill your task needs (integrate to plug it in, packs to author or add a pack of any type, authoring for seed/crop/theme semantics). cat a skill only when you reach its step. The renderer lives in dist/open-avatars.js; the unified proof page is dist/specimen.html (every style, one seed set); licenses in LICENSES.md.",
+    "env_note": null,
+    "description": "A *knowledge + assets* toolkit: a tiny, type-dispatched avatar engine \u2014 \"many art styles, one DiceBear-like API.\" Parts that ship together \u2014",
+    "updated": "2026-06-10"
+  },
+  {
+    "slug": "orgitorial",
+    "title": "orgitorial",
+    "tagline": "An org-mode blogging/CMS toolkit you plug into any site \u2014 a zero-dependency org\u2192HTML renderer (browser / Node / QuickJS-wasm), a complete editorial CSS library themed by custom properties, and skills documenting the stable class contract. Plain HTML semantics, no framework.",
+    "version": "0.2.0",
+    "kind": "knowledge+assets",
+    "status": "experimental",
+    "caps": [
+      "fetch",
+      "design-tokens",
+      "deploy",
+      "sandbox",
+      "tasks",
+      "docs",
+      "brand"
+    ],
+    "integration": null,
+    "category": "Pipeline",
+    "logo": "/toolkits/logos/orgitorial.svg",
+    "tint": "#f0b8b8",
+    "cli_bin": null,
+    "env_keys": [],
+    "requires": null,
+    "flow": "read this front door \u2192 pick the one skill your task needs (integrate to plug it in, authoring to write content, components for the class catalog, theming to re-skin). cat a skill only when you reach its step. The renderer + css live in dist/; a working proof page is dist/specimen.html.",
+    "env_note": null,
+    "description": "A *knowledge + assets* toolkit: a small org-mode CMS you can drop into any website. Three parts ship together \u2014",
+    "updated": "2026-06-10"
+  },
+  {
+    "slug": "palette",
+    "title": "palette",
+    "tagline": "The WASM build/runtime palette \u2014 language runtimes & compilers as pinned, sandboxed commands (one set, not separate packages).",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "experimental",
+    "caps": [
+      "fetch",
+      "design-tokens",
+      "git",
+      "sandbox"
+    ],
+    "integration": null,
+    "category": "Design",
+    "logo": "/toolkits/logos/palette.svg",
+    "tint": "#f0b8b8",
+    "cli_bin": null,
+    "env_keys": [],
+    "requires": null,
+    "flow": null,
+    "env_note": null,
+    "description": "ONE toolkit holding the whole set of WASM build/runtime tooling \u2014 NOT separate packages. Each entry in runtimes/ is a pinned prebuilt (or build recipe) for a language: fetch + sha-verify + (unpack) + register as a sandboxed command. Run",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "presentation",
+    "title": "presentation",
+    "tagline": "Ask for a presentation, get reveal.js \u2014 slide nav, fullscreen, per-slide URLs. The capability is \"presentation\"; the impl is reveal.js, swappable.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "stable",
+    "caps": [
+      "fetch",
+      "ai",
+      "brand",
+      "slides"
+    ],
+    "integration": null,
+    "category": "Design",
+    "logo": "/toolkits/logos/presentation.svg",
+    "tint": "#f0b8b8",
+    "cli_bin": null,
+    "env_keys": [],
+    "requires": null,
+    "flow": null,
+    "env_note": null,
+    "description": "When the user asks for a *presentation*, *deck*, or *slides*, reach for this \u2014 do NOT hand-roll a scroll page. A presentation is reveal.js: a real navigable deck (arrow keys, f fullscreen, o overview, per-slide URLs via",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "publish",
+    "title": "publish",
+    "tagline": "AT Protocol publishing + Workbooks Network identity \u2014 bind a Bluesky account, publish signed workbooks, watch the verified feed.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "stable",
+    "caps": [
+      "auth",
+      "tasks"
+    ],
+    "integration": null,
+    "category": "Deploy",
+    "logo": "/toolkits/logos/publish.svg",
+    "tint": "#aee5c2",
+    "cli_bin": "wb-publish",
+    "env_keys": [],
+    "requires": "wb-publish>=0.1.0",
+    "flow": null,
+    "env_note": null,
+    "description": "The publish/identity stack, lifted out of the `work` core (M5-publish-to-toolkit \u2014 provider/integration logic lives in toolkits). The toolkit OWNS the `wb-publish` binary: its source",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "railway",
+    "title": "railway",
+    "tagline": "Railway's CLI \u2014 deploy a forged workbook as a static site on the user's own account.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "experimental",
+    "caps": [
+      "image",
+      "deploy",
+      "auth",
+      "docs"
+    ],
+    "integration": "Railway",
+    "category": "Deploy",
+    "logo": "/toolkits/logos/railway.svg",
+    "tint": "#f3c5a3",
+    "cli_bin": "railway",
+    "env_keys": [],
+    "requires": "railway>=3.0",
+    "flow": null,
+    "env_note": null,
+    "description": "Wrapper around the standard railway binary. The Workbooks use case: publish a built workbook (dist/<slug>.html) as a static site on the *user's own* Railway account. Stage the artifact behind a small Caddy image",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "sandbox",
+    "title": "sandbox",
+    "tagline": "The in-sandbox command set \u2014 scripting languages, JS engines, crypto, fonts & text-shaping, image, XML, regex, linear algebra, document conversion, data formats \u2014 30+ real tools compiled to WASI and run under wasmtime, no native execution.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "stable",
+    "caps": [
+      "fetch",
+      "video",
+      "image",
+      "fonts",
+      "database",
+      "git",
+      "sandbox",
+      "ai"
+    ],
+    "integration": null,
+    "category": "Dev tools",
+    "logo": "/toolkits/logos/sandbox.svg",
+    "tint": "#f3c5a3",
+    "cli_bin": null,
+    "env_keys": [],
+    "requires": null,
+    "flow": null,
+    "env_note": null,
+    "description": "Real upstream CLIs/runtimes compiled to wasm32-wasi and run under wasmtime in the sandbox via the run-command Dock import (host: Workbooks.CommandRegistry.run/3-5). ZERO native execution \u2014 each command IS a sandboxed wasm module, stdin \u2192 stdout, argv passed through. FIVE lanes in",
+    "updated": "2026-06-11"
+  },
+  {
+    "slug": "tauri",
+    "title": "tauri",
+    "tagline": "Tauri v2 \u2014 wrap a compiled workbook .html as a thin-shell native desktop app.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "experimental",
+    "caps": [
+      "deploy",
+      "desktop",
+      "tasks"
+    ],
+    "integration": "Tauri",
+    "category": "Deploy",
+    "logo": "/toolkits/logos/tauri.svg",
+    "tint": "#f0b8b8",
+    "cli_bin": "cargo-tauri",
+    "env_keys": [],
+    "requires": "cargo, tauri-cli>=2.0",
+    "flow": null,
+    "env_note": null,
+    "description": "Wrapper around the Tauri v2 CLI (cargo tauri or npx @tauri-apps/cli). The Workbooks use case is a *thin shell*: a Tauri webview pointing at a prebuilt single-file workbook (dist/<slug>.html) \u2014 no engine, no Node at",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "toolkit-forge",
+    "title": "toolkit-forge",
+    "tagline": "Forge a new toolkit from a target \u2014 npm name / GitHub URL / semantic need \u2014 by research \u2192 study real surface \u2192 author deep skills + manifest to the toolkits/AUTHORING.md standard.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "experimental",
+    "caps": [
+      "fetch",
+      "video",
+      "deploy",
+      "auth",
+      "git",
+      "ai"
+    ],
+    "integration": null,
+    "category": "Dev tools",
+    "logo": "/toolkits/logos/toolkit-forge.svg",
+    "tint": "#f3c5a3",
+    "cli_bin": "git",
+    "env_keys": [],
+    "requires": "git>=2.30 node>=20",
+    "flow": null,
+    "env_note": null,
+    "description": "The self-hosting toolkit: it teaches an agent how to BUILD another toolkit. Given a TARGET \u2014 an npm package name, a GitHub URL, or a semantic need (\"I need PDF manipulation\") \u2014 these skills walk the",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "video",
+    "title": "video",
+    "tagline": "Ask for a video, get HyperFrames \u2014 author a wavelet scene (onReady/onTick, fixed canvas), wavelet renders it to a clip. The capability is \"video\"; the impl is hyperframes, swappable.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "beta",
+    "caps": [
+      "fetch",
+      "video",
+      "image",
+      "fonts",
+      "ai",
+      "brand"
+    ],
+    "integration": null,
+    "category": "Media",
+    "logo": "/toolkits/logos/video.svg",
+    "tint": "#aee5c2",
+    "cli_bin": null,
+    "env_keys": [],
+    "requires": null,
+    "flow": null,
+    "env_note": null,
+    "description": "When the user asks for a *video*, *motion graphic*, *animation*, or *ad clip*, reach for this \u2014 do NOT hand-roll ffmpeg drawtext keyframes or a CSS-animation screen-record. A video is a *HyperFrames scene*: a typed, deterministic",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "wavelet",
+    "title": "wavelet",
+    "tagline": "Render HTML/CSS compositions (and edit-state timelines) to mp4 / image / gif / pptx / audio \u2014 wholly in-nexus (in-sandbox render AND in-guest encode).",
+    "version": "0.2.0",
+    "kind": "toolkit",
+    "status": "experimental",
+    "caps": [
+      "fetch",
+      "video",
+      "audio",
+      "image",
+      "fonts",
+      "sandbox",
+      "ai",
+      "slides"
+    ],
+    "integration": null,
+    "category": "Design",
+    "logo": "/toolkits/logos/wavelet.svg",
+    "tint": "#f0b8b8",
+    "cli_bin": "wavelet",
+    "env_keys": [],
+    "requires": null,
+    "flow": null,
+    "env_note": null,
+    "description": "Wavelet renders *plain HTML + CSS* (or a timeline of HTML snapshots) to video and adjacent artifacts with NO external tooling \u2014 no Node, no native CLI, no GPU, no host browser. The pipeline is WHOLLY",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "workbooks-system",
+    "title": "workbooks-system",
+    "tagline": "System knowledge for an agent running INSIDE a Workbooks runtime \u2014 what a workbook/runtime/toolkit/workflow is, the WASM-only rules of engagement, authoring + publishing from the agent's seat, and the product facts to get right when writing about Workbooks.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "experimental",
+    "caps": [
+      "fetch",
+      "image",
+      "deploy",
+      "git",
+      "sandbox",
+      "ai",
+      "tasks"
+    ],
+    "integration": null,
+    "category": "System",
+    "logo": "/toolkits/logos/workbooks-system.svg",
+    "tint": "#a8d4f0",
+    "cli_bin": "wb",
+    "env_keys": [],
+    "requires": null,
+    "flow": "read overview \u2192 branch to the one skill your task needs (concepts for \"what is X\", authoring for editing/publishing content, toolkits for using a capability, workflows for board/lifecycle work, writing for prose ABOUT Workbooks). cat a skill only when you reach its step.",
+    "env_note": null,
+    "description": "# `work` is HOST-PROVIDED: every workbooks engine fulfills it in-process # (agents' work tool -> Workbooks.CLI.call, tenant-scoped). This toolkit # bundles no binary and must not \u2014 nothing native executes in the sandbox.",
+    "updated": "2026-06-10"
+  },
+  {
+    "slug": "wraith",
+    "title": "wraith",
+    "tagline": "Rust + TS/JS codebase analyzer \u2014 dead code, unused deps, cycles, dupes, complexity.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "stable",
+    "caps": [
+      "git",
+      "ai"
+    ],
+    "integration": null,
+    "category": "Dev tools",
+    "logo": "/toolkits/logos/wraith.svg",
+    "tint": "#b8e0e8",
+    "cli_bin": "wraith",
+    "env_keys": [],
+    "requires": null,
+    "flow": null,
+    "env_note": null,
+    "description": "Static analyzer for Rust and TS/JS workspaces. Finds dead pub items, unused dependencies, circular imports, AI-slop signatures, near-duplicate functions, over-complex functions,",
+    "updated": "2026-06-07"
+  },
+  {
+    "slug": "wrangler",
+    "title": "wrangler",
+    "tagline": "Cloudflare's CLI \u2014 deploy a forged workbook to Pages on the user's own account.",
+    "version": "0.1.0",
+    "kind": "toolkit",
+    "status": "experimental",
+    "caps": [
+      "deploy",
+      "auth",
+      "tasks"
+    ],
+    "integration": "Cloudflare",
+    "category": "Deploy",
+    "logo": "/toolkits/logos/wrangler.svg",
+    "tint": "#a8d4f0",
+    "cli_bin": "wrangler",
+    "env_keys": [],
+    "requires": "wrangler>=3.0",
+    "flow": null,
+    "env_note": null,
+    "description": "Wrapper around the standard wrangler binary. The Workbooks use case is one-shot: ship a built workbook (dist/<slug>.html) to Cloudflare Pages on the *user's own* Cloudflare account, via raw wrangler pages deploy.",
+    "updated": "2026-06-07"
+  }
+]  ;
+  (function(){
+    var $=function(s){return document.querySelector(s)};
+    function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
+    var cats=['All'].concat(Array.from(new Set(CATALOG.map(function(t){return t.category}))).sort());
+    var active='All';
+    function card(t){
+      return '<div class="tk" data-slug="'+esc(t.slug)+'"><div class="top"><span class="lg" style="background:'+esc(t.tint||'#2a2d34')+'">'+
+        (t.logo?'<img src="'+esc(t.logo)+'" onerror="this.style.display=\'none\'">':'')+'</span><span class="t">'+esc(t.title)+'</span></div>'+
+        '<div class="tag">'+esc(t.tagline||'')+'</div>'+
+        '<div class="meta"><span class="badge">'+esc(t.category)+'</span><span class="badge">'+esc(t.kind)+'</span><span class="badge st">'+esc(t.status)+'</span></div></div>';
+    }
+    function renderGrid(){
+      var list=active==='All'?CATALOG:CATALOG.filter(function(t){return t.category===active});
+      $('#grid').innerHTML=list.map(card).join('');
+      [].forEach.call(document.querySelectorAll('.tk'),function(el){el.addEventListener('click',function(){detail(el.dataset.slug)})});
+    }
+    function renderFilters(){
+      $('#filters').innerHTML=cats.map(function(c){return '<button class="pill'+(c===active?' on':'')+'" data-c="'+esc(c)+'">'+esc(c)+'</button>'}).join('');
+      [].forEach.call(document.querySelectorAll('.pill'),function(p){p.addEventListener('click',function(){active=p.dataset.c;renderFilters();renderGrid()})});
+    }
+    function kv(k,v){return v?'<div class="kv"><b>'+k+'</b><span>'+esc(Array.isArray(v)?v.join(', '):v)+'</span></div>':''}
+    function detail(slug){
+      var t=CATALOG.filter(function(x){return x.slug===slug})[0]; if(!t)return;
+      $('#dcard').innerHTML='<button class="dclose" data-x>×</button><h2>'+esc(t.title)+'</h2><p class="dtag">'+esc(t.tagline||'')+'</p>'+
+        (t.description?'<p class="desc">'+esc(t.description)+'</p>':'')+
+        kv('Kind',t.kind)+kv('Category',t.category)+kv('Status',t.status)+kv('Version',t.version)+
+        kv('Integration',t.integration)+kv('Capabilities',t.caps)+kv('Env keys',t.env_keys)+kv('Updated',t.updated);
+      $('#detail').classList.add('on');
+      $('#dcard [data-x]').addEventListener('click',function(){$('#detail').classList.remove('on')});
+    }
+    $('#detail').addEventListener('click',function(e){if(e.target===$('#detail'))$('#detail').classList.remove('on')});
+    renderFilters(); renderGrid();
+  })();
+  </script>
+end
