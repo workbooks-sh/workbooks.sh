@@ -77,6 +77,15 @@ defmodule Nexus.Platform do
     j(conn, 200, %{tiers: Nexus.Pricing.tiers()})
   end
 
+  # AI-assembled upsell page — marketing logic running in the nexus. Personalizes copy
+  # to the org (prices stay pinned); returns a complete page model even with minimal
+  # data. `?org=<name>` personalizes; `?personalize=0` returns the deterministic base.
+  get "/upsell" do
+    q = fetch_query_params(conn).query_params
+    opts = [org_name: q["org"], personalize: q["personalize"] != "0"]
+    j(conn, 200, Nexus.Upsell.assemble(org(conn), opts))
+  end
+
   get "/me" do
     id = conn.assigns[:identity] || %{}
     user_id = id[:user]

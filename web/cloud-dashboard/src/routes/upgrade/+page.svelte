@@ -1,18 +1,52 @@
 <script>
   // The UPGRADE interface — the canonical upsell surface. One nexus per org, scaled
   // by stage. No "create another nexus": you move your one nexus up a stage. The only
-  // dials are memory + bandwidth; workspaces and users are unlimited. Simple for now —
-  // the richer per-stage marketing pages grow from this same upsells source.
+  // dials are memory + bandwidth; workspaces and users are unlimited.
+  //
+  // The hero is MARKETING LOGIC: an AI in the nexus assembles personalized copy for
+  // this org (prices stay pinned — see Nexus.Upsell / templates/marketing). The tier
+  // ladder below is the full, static comparison.
+  import { getUpsell } from '$lib/api.js';
+  import { onMount } from 'svelte';
+
   let { data } = $props();
   const ladder = $derived(data.ladder);
   const currentTier = $derived(data.currentTier);
   const currentIdx = $derived(ladder.findIndex((t) => t.id === currentTier));
+  const orgName = $derived(data?.profile?.orgName || '');
+
+  let page = $state(null);     // the AI-assembled page model
+  let busy = $state(false);
+  async function personalize() {
+    busy = true;
+    try { page = await getUpsell(orgName); } catch { page = null; }
+    busy = false;
+  }
+  const heroBlock = $derived(page?.blocks?.find((b) => b.type === 'hero'));
+  const ctaBlock = $derived(page?.blocks?.find((b) => b.type === 'cta'));
+  onMount(personalize);
 </script>
 
 <section>
   <div class="sechead">
     <div><h2>Scale your nexus</h2><p>One nexus, scaled to fit. No per-seat billing — you pay for memory and bandwidth, never for people.</p></div>
   </div>
+
+  {#if heroBlock}
+    <div class="hero" class:ai={page?.personalized}>
+      <h1>{heroBlock.copy.headline}</h1>
+      {#if heroBlock.copy.subhead}<p>{heroBlock.copy.subhead}</p>{/if}
+      {#if ctaBlock && !page?.at_ceiling}
+        <div class="hero-cta">
+          <a class="btn sm primary" href={ctaBlock.href}>{ctaBlock.copy.label}</a>
+          <span class="dim">{ctaBlock.copy.sub}</span>
+        </div>
+      {/if}
+      <button class="repersonalize" onclick={personalize} disabled={busy} title="Re-assemble for {orgName || 'your org'}">
+        {busy ? 'Personalizing…' : page?.personalized ? `✦ Personalized for ${page.org} by your nexus` : 'Personalize this page'}
+      </button>
+    </div>
+  {/if}
 
   <div class="ladder">
     {#each ladder as t, i}
@@ -60,6 +94,13 @@
 </section>
 
 <style>
+  .hero { background:var(--card); border:1.5px solid var(--line); border-radius:18px; padding:28px 26px; margin-bottom:18px; }
+  .hero.ai { border-color:var(--ink); box-shadow:0 8px 30px -16px color-mix(in srgb, var(--ink) 45%, transparent); }
+  .hero h1 { font:700 26px var(--read); letter-spacing:-.02em; color:var(--ink); margin:0 0 6px; }
+  .hero p { font-size:15px; color:var(--dim); margin:0; }
+  .hero-cta { display:flex; align-items:center; gap:12px; margin-top:16px; }
+  .repersonalize { margin-top:14px; background:none; border:0; padding:0; cursor:pointer; font:600 12px var(--mono); letter-spacing:.03em; color:var(--dim); }
+  .repersonalize:hover { color:var(--ink); }
   .ladder { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; }
   .tier { background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:20px; display:flex; flex-direction:column; }
   .tier.current { border-color:var(--live); }

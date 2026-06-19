@@ -1,0 +1,51 @@
+# Marketing Logic — template :app, :agent
+
+A complete, runnable example of **marketing logic as a workbook**: an AI running in the nexus
+assembles a *personalized upsell page* from a fixed catalog of layouts and copy-slotted blocks,
+tailoring the language to each organization — **without ever inventing a price**. It is the dogfood
+of Workbooks' own upgrade page: the same pattern runs on our cloud, and ships here so you can build
+your own. Scaffold it with `work new marketing <your-app>`, then swap in your product's tiers, blocks,
+and copy.
+
+## The idea — an "upsell opportunity" method
+
+On click, the nexus looks at whatever account data it has (org name, current plan, usage) and
+*assembles* an upgrade page for that specific customer. It is fast (one shot, a Groq-served model)
+and it is honest:
+
+- **The AI only rewrites prose.** It picks a layout and fills short text slots (headline, sub, CTA).
+- **Every number is pinned.** Prices, memory, bandwidth and limits come from your `data` catalog —
+  the model is never asked for them, and a guardrail drops any slot that contains a digit, `$`, or a
+  unit. You cannot get a hallucinated price.
+- **Never blank.** With minimal data it still ships a complete page — it just personalizes less
+  (a name here, an org there). No data is not an empty page; it's a general page.
+
+No sandbox needed: the agent reads account facts through a tool and targets language into the blocks.
+
+## What's the platform, and what's the template
+
+The **platform** does the heavy lifting (NOT part of this folder — you just call it):
+`Nexus.Llm` (fast models + provider routing), `Nexus.Upsell` (the reference assembler + guardrail you
+can lean on or replace), `Nexus.Live` (the live source the UI binds to), and the weaver (a `client`
+block becomes the browser island).
+
+The **template** is the three things you own:
+
+- `index.work` → `data Catalog` — your **layouts + blocks + pinned tier facts**. Replace with yours.
+- `index.work` → `server :upsell` — the **assembly**: build facts → ask the model for a layout + prose
+  → apply the guardrail → return the page model. Keep `register/0`; swap the catalog and prompt.
+- `ui.work` → `client :app` — the **page**: renders the assembled blocks and the "Personalize" button.
+
+## Run it
+
+  work weave .            # → one self-contained workbook.html
+  work dev .              # watch + re-weave
+  # live (server + the upsell source) on the local nexus:
+  WB_SERVE=1 PORT=4000 WB_DATA="$(pwd)" elixir --no-halt -S mix run   # from the runtime
+
+## Replace checklist
+
+1. `data Catalog` → your tiers, prices, layouts, and blocks.
+2. `server :upsell` prompt + facts → your product's voice and account fields (keep the guardrail).
+3. `client :app` → your page design (keep the block-render loop + the personalize call).
+4. Point the CTA at your own checkout (here: `/billing/checkout?plan=…`, Polar).

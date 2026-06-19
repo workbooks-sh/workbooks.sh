@@ -1,0 +1,78 @@
+# The page
+
+The `client` block is the browser island. It opens the live `upsell` source, renders whatever
+blocks the assembler returned (in the order the chosen layout dictates), and offers a
+"Personalize" button — the on-click moment where the nexus re-assembles the page for this org.
+The block renderers are dumb: they draw pinned fields and drop in the AI's prose. Add a block
+type here and a slot in the catalog, and the model can start using it.
+
+client :app do
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#faf8f5;color:#37352f;font:16px/1.6 'Inter',system-ui,sans-serif}
+    .wrap{max-width:680px;margin:0 auto;padding:48px 24px}
+    .hero h1{font-size:34px;letter-spacing:-.02em;margin:0 0 8px}
+    .hero p{font-size:17px;color:#6b6960;margin:0}
+    .blk{margin:22px 0;padding:20px;background:#fff;border:1.5px solid #ece9e3;border-radius:16px}
+    .blk h3{margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#9a978e}
+    .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f2efe9}
+    .row:last-child{border:0}
+    .row b{font-variant-numeric:tabular-nums}
+    ul{margin:0;padding:0;list-style:none}
+    li{padding:5px 0 5px 22px;position:relative}
+    li::before{content:'✓';position:absolute;left:0;color:#3f9d6f;font-weight:700}
+    .cta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
+    .cta a{background:#37352f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:600;
+      box-shadow:3px 3px 0 #d8d3c8}
+    .cta .sub{color:#6b6960;font-size:14px}
+    .bar{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+    .bar input{flex:1;height:38px;padding:0 12px;border:1.5px solid #ece9e3;border-radius:9px;font:inherit}
+    .bar button{height:38px;padding:0 16px;border:1.5px solid #37352f;background:#fff;border-radius:9px;font-weight:600;cursor:pointer}
+    .tag{font-size:12px;color:#9a978e}
+  </style>
+
+  <div class="wrap">
+    <div class="bar">
+      <input id="org" placeholder="Your organization" value="" />
+      <button id="go">Personalize</button>
+    </div>
+    <div id="page"></div>
+    <p class="tag" id="tag"></p>
+  </div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+
+    // Block renderers — pinned fields + the AI's prose slots. Mirror the catalog.
+    const R = {
+      hero: (b) => `<div class="hero"><h1>${esc(b.copy.headline)}</h1><p>${esc(b.copy.subhead || '')}</p></div>`,
+      unlocks: (b) => `<div class="blk"><h3>${esc(b.copy.intro || 'Unlocks')}</h3><ul>${(b.items||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>`,
+      compare: (b) => `<div class="blk"><h3>${esc(b.copy.intro || 'Compare')}</h3>
+        <div class="row"><span>${esc(b.current.name)}</span><span>${esc(b.next.name)}</span></div>
+        <div class="row"><span>Memory</span><b>${esc(b.next.memory)}</b></div>
+        <div class="row"><span>Bandwidth</span><b>${esc(b.next.bandwidth)}</b></div></div>`,
+      headroom: (b) => `<div class="blk"><h3>${esc(b.copy.intro || 'Where you stand')}</h3>
+        <div class="row"><span>Memory</span><b>${esc(b.usage?.ram?.label || '—')}</b></div>
+        <div class="row"><span>Storage</span><b>${esc(b.usage?.storage?.label || '—')}</b></div></div>`,
+      cta: (b) => `<div class="blk"><div class="cta"><a href="${esc(b.href||'#')}">${esc(b.copy.label||'Upgrade')}</a><span class="sub">${esc(b.copy.sub||'')}</span></div></div>`
+    };
+
+    function render(page) {
+      $('#page').innerHTML = (page.blocks || []).map((b) => (R[b.type] ? R[b.type](b) : '')).join('');
+      $('#tag').textContent = page.personalized ? `Personalized for ${page.org} by the nexus` : `Showing the ${page.org} plan`;
+    }
+
+    function esc(s){ return String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+    // On click, the nexus re-assembles for this org. One short-lived EventSource per request.
+    function personalize() {
+      const org = encodeURIComponent($('#org').value || 'your team');
+      const es = new EventSource(`/live/upsell?org=${org}`);
+      es.onmessage = (e) => { try { render(JSON.parse(e.data)); } catch {} es.close(); };
+      es.onerror = () => es.close();
+    }
+
+    $('#go').addEventListener('click', personalize);
+    personalize();   // first paint: assemble from whatever we know
+  </script>
+end

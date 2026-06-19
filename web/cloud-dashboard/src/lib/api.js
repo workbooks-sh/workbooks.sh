@@ -187,6 +187,16 @@ export async function listTiers(opts = {}) {
   return (await plat('/tiers', { fetch: opts.fetch })).tiers || [];
 }
 
+// ── AI-assembled upsell — marketing logic running in the nexus. Personalizes copy to
+// the org (prices stay pinned); always returns a complete page model. `org` = display
+// name to personalize with; pass personalize=false for the deterministic base. ──
+export async function getUpsell(org, { personalize = true, fetch } = {}) {
+  const q = new URLSearchParams();
+  if (org) q.set('org', org);
+  if (!personalize) q.set('personalize', '0');
+  return plat(`/upsell${q.toString() ? `?${q}` : ''}`, { fetch });
+}
+
 const EMPTY_USAGE = {
   // `load` = % of compute capacity in use across the org's nexuses (idle ⇒ 0).
   summary: { monthToDate: '$0.00', compute: '$0.00', storage: '0 GB', database: '—', nexusCount: 0, activeHrs: '0.0', load: 0 },

@@ -1,0 +1,73 @@
+# Marketing logic — the upsell assembler
+
+This is the brain: given an organization's account data, it assembles a personalized upgrade
+page. The catalog below is the only place numbers live; the model only ever picks a layout and
+rewrites prose. The platform ships a reference assembler (`Nexus.Upsell`) with the same guardrail —
+this template is that pattern, written out so you can make it your own.
+
+## The catalog — your tiers, layouts, and blocks
+
+`data` is a typed, rendered declaration: the **pinned facts**. Prices and limits live here and
+nowhere else, so the AI can never touch them. Layouts are named orderings of blocks; each block
+lists which prose `slots` the model may fill.
+
+data Catalog do
+  tiers [
+    %{id: "team",  name: "Team",  price: "$49/mo",  memory: "4 GB",  bandwidth: "100 GB",
+      unlocks: ["4× the memory", "10× the bandwidth & storage", "Custom domains", "Priority support"]},
+    %{id: "scale", name: "Scale", price: "$199/mo", memory: "16 GB", bandwidth: "1 TB",
+      unlocks: ["4× more memory again", "10× more bandwidth & storage", "Dedicated capacity"]}
+  ]
+
+  layouts %{
+    "focused"  => [:hero, :unlocks, :cta],
+    "compare"  => [:hero, :compare, :cta],
+    "reassure" => [:hero, :headroom, :unlocks, :cta]
+  }
+
+  # slot = the ONLY text the model may author, per block.
+  slots %{
+    hero: [:headline, :subhead],
+    unlocks: [:intro],
+    compare: [:intro],
+    headroom: [:intro],
+    cta: [:label, :sub]
+  }
+end
+
+## The assembly
+
+The org's facts come from the account (a tool the agent reads — never the model's imagination).
+We hand the model the facts, the allowed layouts, and the editable slots, and ask for a layout
+choice plus short prose. Then the guardrail strips anything numeric, and the page is built by US
+from the catalog — the AI's words dropped into safe slots.
+
+`register/0` exposes this as a live source the browser calls on click; the nexus brings it up at
+serve time.
+
+server :upsell do
+  @fast_model "meta-llama/llama-3.3-70b-instruct"
+  @groq %{order: ["Groq"], allow_fallbacks: true}
+
+  def register do
+    Nexus.Live.register("upsell", fn params, emit ->
+      org = params["org"] || "your team"
+      emit.(assemble(org, personalize: params["personalize"] != "0"))
+    end)
+  end
+
+  @doc "Assemble the page model for `org`. Lean on the platform reference, or replace with this body."
+  def assemble(org, opts \\ []) do
+    # The platform's reference assembler already implements this exact pattern (facts → model →
+    # guardrail → page). Dogfood it directly, or delete this line and own the logic below.
+    Nexus.Upsell.assemble(org, opts)
+  end
+
+  # ── the pattern, spelled out (what Nexus.Upsell does under the hood) ──
+  # 1. facts(org)         → pinned tier data + the org's usage  (the "tool")
+  # 2. base(facts)        → a complete page from the catalog, personalized with the org name
+  # 3. ask the model      → {"layout": <id>, "copy": {block => {slot => text}}}
+  # 4. sanitize(copy)     → DROP any slot with a digit / $ / GB / % (no invented prices)
+  # 5. overlay + reorder  → the chosen layout decides which blocks render
+  # Absent/slow/off-guardrail model ⇒ step 2 ships as-is. Never blank.
+end
