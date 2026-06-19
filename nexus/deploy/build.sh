@@ -1,63 +1,71 @@
 #!/usr/bin/env bash
-# Build the nexus runtime OCI image — the ONE image Nexus.Deploy.Machine boots in a krunvm microVM.
+# Build the nexus runtime OCI image — the ONE image the desktop daemon + Nexus.Deploy.Machine boot.
 #
-# Mirrors the runtime's image build (runtime/host/deploy/image.ex): the build CONTEXT is the REPO
-# ROOT (nexus depends on ../runtime/vendor/wasmex and the compilers, both outside nexus/), and the
-# in-sandbox compilers — a ~7.1G gitignored toolchain that is NOT in git — must be STAGED into the
-# context before the build. We stage the lean ~600M slice via runtime/scripts/stage-tools.sh →
-# runtime/compilers-dist (exactly as the runtime image does), then COPY that into the image.
+# The build CONTEXT is the REPO ROOT. nexus is self-contained (vendor/wasmex + priv/work-toolchain.wasm
+# under nexus/), but the in-sandbox compilers — a ~7G gitignored toolchain NOT in git — ship as a
+# SEPARATE image stage the nexus Dockerfile pulls via `COPY --from=compilers`. So this is a TWO-STEP
+# build:
+#   1. compilers image  (ci/Dockerfile.compilers: FROM scratch + COPY nexus/compilers-dist /compilers)
+#   2. nexus image      (nexus/Dockerfile: --build-arg COMPILERS_REF=<compilers image>)
 #
 # Usage:   nexus/deploy/build.sh [IMAGE_TAG]
-#   IMAGE_TAG   defaults to nexus:local
+#   IMAGE_TAG       defaults to nexus:local
 # Env:
-#   COMPILERS_DIR   context path holding compilers/<lang>/   (default: runtime/compilers-dist)
-#   SKIP_STAGE=1    skip stage-tools.sh (COMPILERS_DIR already populated)
+#   COMPILERS_TAG   the local compilers image tag           (default: compilers:local)
+#   COMPILERS_REF   skip building the compilers image, use this ref (e.g. ghcr.io/workbooks-sh/compilers:latest)
+#   SKIP_STAGE=1    skip stage-tools.sh (nexus/compilers-dist already populated — it usually is)
 #   PLATFORM        e.g. linux/arm64 (default: host arch, for the krunvm mac case)
 #   INTO_KRUNVM=1   after building, copy the image into krunvm's store (needs skopeo)
 #
-# NOTE: you cannot build this without the provisioned compilers present. On a machine without the
-# toolchain, stage-tools.sh fails — that's expected; provision the compilers first.
+# You cannot build this without the provisioned compilers staged at nexus/compilers-dist. On a machine
+# without them, stage-tools.sh fails — provision the compilers first.
 set -euo pipefail
 
 TAG="${1:-nexus:local}"
-COMPILERS_DIR="${COMPILERS_DIR:-runtime/compilers-dist}"
+COMPILERS_TAG="${COMPILERS_TAG:-compilers:local}"
+COMPILERS_DIST="nexus/compilers-dist"
 
-# Repo root = two levels up from this script (nexus/deploy/build.sh).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$ROOT"
 
-# Stage the lean in-sandbox compilers into $COMPILERS_DIR (the gitignored ~7.1G toolchain → ~600M).
-if [ "${SKIP_STAGE:-0}" != "1" ]; then
-  STAGE="$ROOT/runtime/scripts/stage-tools.sh"
-  if [ -x "$STAGE" ] || [ -f "$STAGE" ]; then
+# Stage the reactor toolchain wasm into nexus/priv (cheap; the Dockerfile bakes it into the release).
+[ -x "$ROOT/nexus/scripts/stage-reactor.sh" ] && bash "$ROOT/nexus/scripts/stage-reactor.sh" || true
+
+# Stage the lean in-sandbox compilers (gitignored ~7G toolchain → ~600M) unless already present.
+if [ "${SKIP_STAGE:-0}" != "1" ] && [ ! -d "$ROOT/$COMPILERS_DIST" ]; then
+  STAGE="$ROOT/nexus/scripts/stage-tools.sh"
+  if [ -f "$STAGE" ]; then
     echo "==> staging compilers via $STAGE"
-    ( cd "$ROOT/runtime" && bash "$STAGE" )
+    ( cd "$ROOT/nexus" && bash "$STAGE" )
   else
-    echo "!! $STAGE missing — provision the in-sandbox compilers first, or set SKIP_STAGE=1 with" >&2
-    echo "   $COMPILERS_DIR pre-populated. The compilers are NOT in git (a ~7.1G build artifact)." >&2
+    echo "!! $STAGE missing and $COMPILERS_DIST absent — provision the in-sandbox compilers first." >&2
     exit 1
   fi
 fi
-
-if [ ! -d "$ROOT/$COMPILERS_DIR" ]; then
-  echo "!! $COMPILERS_DIR not present in the build context — the image cannot bundle the compilers." >&2
-  exit 1
-fi
+[ -d "$ROOT/$COMPILERS_DIST" ] || { echo "!! $COMPILERS_DIST not present — cannot bundle the compilers." >&2; exit 1; }
 
 PLATFORM_ARG=()
 [ -n "${PLATFORM:-}" ] && PLATFORM_ARG=(--platform "$PLATFORM")
 
-echo "==> docker build -t $TAG (context=$ROOT, compilers=$COMPILERS_DIR)"
+# Step 1: the compilers image (skipped if COMPILERS_REF was supplied, e.g. the ghcr ref).
+COMPILERS_REF="${COMPILERS_REF:-}"
+if [ -z "$COMPILERS_REF" ]; then
+  echo "==> [1/2] docker build $COMPILERS_TAG (ci/Dockerfile.compilers, context=$COMPILERS_DIST only)"
+  DOCKER_BUILDKIT=1 docker build -f ci/Dockerfile.compilers "${PLATFORM_ARG[@]}" -t "$COMPILERS_TAG" .
+  COMPILERS_REF="$COMPILERS_TAG"
+fi
+
+# Step 2: the nexus image, pulling the compilers from the stage above.
+echo "==> [2/2] docker build $TAG (nexus/Dockerfile, COMPILERS_REF=$COMPILERS_REF)"
 DOCKER_BUILDKIT=1 docker build \
   -f nexus/Dockerfile \
   "${PLATFORM_ARG[@]}" \
-  --build-arg "COMPILERS_DIR=$COMPILERS_DIR" \
+  --build-arg "COMPILERS_REF=$COMPILERS_REF" \
   -t "$TAG" \
   .
 
-# Stage into krunvm's containers store so `Nexus.Deploy.local/2` boots it offline (mirrors
-# image.ex into_krunvm/1). Needs skopeo (`brew install skopeo`).
+# Stage into krunvm's containers store so `Nexus.Deploy.local/2` boots it offline. Needs skopeo.
 if [ "${INTO_KRUNVM:-0}" = "1" ]; then
   echo "==> skopeo copy → krunvm store"
   skopeo copy "docker-daemon:$TAG" "containers-storage:$TAG"

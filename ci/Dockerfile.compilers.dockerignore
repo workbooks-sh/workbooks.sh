@@ -1,0 +1,6 @@
+# The compilers image is FROM scratch + COPY nexus/compilers-dist /compilers — so its build context
+# needs ONLY that dir. Exclude everything else (this file takes precedence over .dockerignore for
+# `-f ci/Dockerfile.compilers` builds), keeping the context to the ~600M lean toolchain slice.
+*
+!nexus/compilers-dist
+!nexus/compilers-dist/**

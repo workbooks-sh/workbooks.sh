@@ -7,12 +7,13 @@
 # ghcr.io/workbooks-sh/compilers lets the runtime image pull them via `COPY --from=...` — so
 # `wb deploy publish` stays fast and every deployment (cloud + local container) compiles identically.
 #
-# Build CONTEXT = repo root. Run `scripts/stage-tools.sh` first (the deploy verbs do this).
-#   maintainer (provisioned machine):  wb deploy publish-compilers   # build + push, when they change
-#   runtime build:                     COPY --from=<this image> /compilers
+# Build CONTEXT = repo root. Run `nexus/scripts/stage-tools.sh` first (the deploy verbs do this).
+#   maintainer (provisioned machine):  build + push to ghcr, when the compilers change
+#   nexus image build:                 COPY --from=<this image> /compilers
+# The dedicated ci/Dockerfile.compilers.dockerignore keeps this context to just compilers-dist.
 FROM scratch
 # Auto-link the package to the repo on push (like the runtime image) so workbooks-sh CI can pull
-# it during the runtime-image build without making it public — self-hosters pull the baked runtime.
+# it during the nexus-image build without making it public — self-hosters pull the baked runtime.
 LABEL org.opencontainers.image.source="https://github.com/workbooks-sh/workbooks.sh"
 LABEL org.opencontainers.image.description="Workbooks in-sandbox compilers (mrustc/clang/libstd/zig/yaegi/qjs/c4) — the lean runtime slice"
-COPY runtime/compilers-dist /compilers
+COPY nexus/compilers-dist /compilers

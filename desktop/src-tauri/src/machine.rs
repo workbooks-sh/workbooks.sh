@@ -32,6 +32,9 @@ use tauri::{AppHandle, Emitter};
 const VM: &str = "workbooks-runtime";
 const GUEST_PORT: u16 = 4000;
 const HOST_PORT: u16 = 4000;
+// The engine image. Publish name is stable (`runtime`), but the image now carries the NEXUS release
+// (`/app/bin/nexus`, CMD `bin/nexus start`) — nexus-image.yml builds it from `nexus/`. For local dev
+// against an unpublished build: `WB_IMAGE=nexus:local WB_ENGINE=docker` (built by nexus/deploy/build.sh).
 const DEFAULT_IMAGE: &str = "ghcr.io/workbooks-sh/runtime:latest";
 
 /// ghcr OCI artifact holding the vfkit boot assets (built by
@@ -60,7 +63,7 @@ const ASSET_DISK_ZST: &str = "disk.img.zst";
 /// The release `start` command blocks on a TTY under krunvm's no-TTY guest, so
 /// we boot the app with `eval` (no console) and park the node alive so the VM
 /// stays up. krunvm execs this expr as a single argv element (no shell).
-const BOOT_EXPR: &str = "case Application.ensure_all_started(:workbooks) do {:ok, _} -> Process.sleep(:infinity); err -> IO.inspect(err); System.halt(1) end";
+const BOOT_EXPR: &str = "case Application.ensure_all_started(:nexus) do {:ok, _} -> Process.sleep(:infinity); err -> IO.inspect(err); System.halt(1) end";
 
 /// The runtime image reference — overridable via `WB_IMAGE` for local pins.
 fn image() -> String {
@@ -565,7 +568,7 @@ fn spawn() -> Result<(), String> {
         argv.push(format!("{k}={v}"));
     }
     argv.push("--".into());
-    argv.push("/app/bin/workbooks".into());
+    argv.push("/app/bin/nexus".into());
     argv.push("eval".into());
     argv.push(BOOT_EXPR.into());
 
