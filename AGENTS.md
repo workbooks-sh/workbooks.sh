@@ -106,6 +106,32 @@ foundation workflow**, not yet settled. Working direction:
 Keep it tiny. The desktop app + the runtime loader read this edge to organize, classify,
 and launch files. (See the kit/app memory for the full critique.)
 
+## ⬛ THE LINE: the open standard vs. our cloud ⬛
+
+The **nexus and the `work` reactor ARE the open standard** — the exact same image + CLI anyone
+deploys. They carry **only generic, unopinionated mechanism**. They must NEVER carry *our* business:
+our prices, our marketing/upsell copy, our waitlist, our domains, our brand, our dashboards. A
+stranger who deploys the nexus must inherit **none** of it. (This is why `site.zig` and `Nexus.Docs`
+were deleted — our brand was baked into the public tool.)
+
+**Our opinions live in exactly two homes:**
+1. **Our cloud app** — the dashboard / control-plane *product* we operate.
+2. **Our own workbooks**, deployed onto a nexus **through the DeployKit, exactly like a customer**.
+   We serve *ourselves* a nexus; we are not a privileged special-case inside it.
+
+**Updating our cloud service ≠ updating the open standard.** Keep them in distinct commits/PRs and
+state which one you're doing.
+
+**Reducing an opinion to a standard (the ONLY allowed way it stays in the runtime).** Sometimes the
+standard genuinely needs a new capability to fit our use case. Fine — but ship the **generic
+primitive, never our values.** A pricing *mechanism* may live in the nexus IFF it is reduced to a
+config-driven primitive the **DeployKit + reactor can supply**: tiers/limits declared in a `.work`
+config block, read via `Nexus.Config`, nexus shipping neutral defaults — and *our* actual tiers are
+then **our** DeployKit config, not constants in `lib/`. **The test for anything in the runtime:**
+*could any user meet this contract with their own values, with none of ours baked in?* If no, it
+belongs in our cloud app or our workbook, not the standard. (Tracked cleanup of existing violations —
+Pricing/Upsell/Waitlist/reserved-host/image: bd `wb-n9ez`.)
+
 ## Five Golden Rules of Development
 
 Consider these at **every turn**, before writing or accepting any code:
