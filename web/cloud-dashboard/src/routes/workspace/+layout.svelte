@@ -15,7 +15,8 @@
   const TABS = [
     { href: '/workspace/members', label: 'Members & access' },
     { href: '/workspace/sharing', label: 'Sharing' },
-    { href: '/workspace/history', label: 'History' }
+    { href: '/workspace/history', label: 'History' },
+    { href: '/workspace/env', label: 'Env vars' }
   ];
   const here = $derived(page.url.pathname);
   const isOn = (href) => here === href || here.startsWith(href + '/');

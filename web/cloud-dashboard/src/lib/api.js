@@ -203,6 +203,43 @@ export async function deleteWorkspace(id) {
   return plat(`/workspaces/${id}`, { method: 'DELETE' });
 }
 
+// ── Env vars / secrets — per-workspace, Doppler-like. REDACTED at the seam ───────
+// The list NEVER carries plaintext: every row is masked + length only. Plaintext
+// crosses ONLY via revealEnv (an explicit per-var network call). Backed by the
+// control-plane env API; honest-empty on error so the manager stays navigable.
+//   GET    /env?workspace=<id>   → { env: [{ id, name, scope, workspace_id, package_name, masked, length, created_at }] }
+//   POST   /env                  → 201 redacted view
+//   GET    /env/:id/reveal       → { value }   (the ONLY plaintext endpoint)
+//   PATCH  /env/:id              → redacted view
+//   DELETE /env/:id              → { ok: true }
+
+/** @returns {Promise<Array<{id,name,scope,workspace_id,package_name,masked,length,created_at}>>} */
+export async function listEnv(workspace, opts = {}) {
+  try {
+    return (await plat(`/env?workspace=${encodeURIComponent(workspace)}`, { fetch: opts.fetch })).env;
+  } catch {
+    return [];
+  }
+}
+
+export async function createEnv(workspace, { name, value }) {
+  return plat('/env', { method: 'POST', body: { name, value, scope: 'workspace', workspace_id: workspace } });
+}
+
+/** The ONLY call that returns plaintext — explicit, per-var, never cached into the list. */
+export async function revealEnv(id) {
+  return (await plat(`/env/${id}/reveal`)).value;
+}
+
+/** Patch a var — pass only the fields to change ({name?, value?}). */
+export async function updateEnv(id, attrs) {
+  return plat(`/env/${id}`, { method: 'PATCH', body: attrs });
+}
+
+export async function deleteEnv(id) {
+  return plat(`/env/${id}`, { method: 'DELETE' });
+}
+
 // ── History + Restore ────────────────────────────────────────────────────────
 // "Nothing is lost — restore anything." A reverse-chron list of Changes, each a
 // before → after, restorable append-only. Mirrors the runtime endpoints:
