@@ -219,7 +219,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
   #dna canvas { display: block; }
 
   /* ── platforms section: desktop (soon) · cloud (live) ─────────────────────── */
-  #platforms { position: relative; z-index: 4; background: var(--paper); padding: 96px 24px 104px; }
+  #platforms { position: relative; z-index: 4; background: var(--paper); padding: calc(17vh + 96px) 24px 104px; }
   .plat-head { max-width: 760px; margin: 0 auto 46px; text-align: center; }
   .plat-kicker { font: 700 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #565b54; margin: 0 0 16px; }
   .plat-kicker b { color: var(--bloom); }
@@ -242,7 +242,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
   .plat-btn.primary:hover { box-shadow: 0 16px 40px rgba(18,19,22,.34); transform: translateY(-1px); }
   .plat-btn.ghost { background: transparent; color: var(--ink); border: 1px solid rgba(18,19,22,.22); }
   .plat-btn.ghost:hover { border-color: var(--ink); }
-  @media (max-width: 760px) { .plat-grid { grid-template-columns: 1fr; } #platforms { padding: 64px 20px 72px; } }
+  @media (max-width: 760px) { .plat-grid { grid-template-columns: 1fr; } #platforms { padding: calc(8vh + 64px) 20px 72px; } }
 
   #s2 { position: relative; height: 100vh; background: var(--paper); overflow: hidden; }
   .sky-pin { position: relative; height: 100vh; overflow: hidden; }
@@ -410,7 +410,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
 .cursor3d svg { width: 100%; height: 100%; display: block; }
 @keyframes cursorpath { 0%,100%{left:22%;top:30%} 22%{left:58%;top:36%} 45%{left:60%;top:64%} 68%{left:36%;top:56%} 85%{left:72%;top:44%} }
 #s2 { padding-top: 18vh; }
-@media (max-width:820px){ .herodemo{ margin-bottom:-8vh } #s2{ padding-top:11vh } .hero{ padding-top:13vh } }
+@media (max-width:820px){ .herodemo{ margin-bottom:-8vh } #s2{ padding-top:6vh } .hero{ padding-top:13vh } }
 </style>
 <style>
 /* hero v2 fixes: stop #s1 clipping the demo overlap; desktop-app frame (stoplight only) */
@@ -427,7 +427,8 @@ const WB_FLAGS = { desktopDownload: false };</script>
 /* demo straddles the section boundary, overlapping PAST the DNA strip into #s2 */
 #dna { position: static; width: 100%; height: 18px; margin: 0; z-index: 1; }
 .herodemo { margin: 4vh auto -17vh; }
-#s2 { padding-top: 17vh; }
+/* #platforms now absorbs the demo overlap; #s2 sits below it, so normal spacing. */
+#s2 { padding-top: 8vh; }
 /* stoplight: scale with the desktop window (container units), and smaller */
 .appscreen { container-type: inline-size; }
 .stoplight { top: 1.25cqw; left: 1.5cqw; gap: 0.62cqw; }
@@ -467,7 +468,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
 <canvas id="lattice" aria-hidden="true"></canvas>
 
 <div id="site-nav"></div>
-<script src="nav.js?v=17"></script>
+<script src="nav.js?v=18"></script>
 
 
 <main class="hero">
@@ -531,7 +532,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
   <div class="appwin">
     <div class="appscreen">
       <span class="stoplight" aria-hidden="true"><i></i><i></i><i></i></span>
-      <video src="https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/demos/desktop-tabbed-workspaces.mp4" autoplay loop muted playsinline preload="metadata"></video>
+      <video src="https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/demos/desktop-product-showcase-20260619.mp4" autoplay loop muted playsinline preload="metadata"></video>
     </div>
   </div>
 </div>
