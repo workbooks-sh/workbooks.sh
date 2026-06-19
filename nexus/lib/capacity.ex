@@ -16,7 +16,7 @@ defmodule Nexus.Capacity do
 
   @doc "The full usage + capacity report for an org's (single) nexus."
   def report(nil) do
-    tier = Pricing.tier("starter")
+    tier = Pricing.default_tier()
     %{
       tier: tier_view(tier),
       next: tier_view(Pricing.next_tier(tier.id)),
@@ -32,7 +32,7 @@ defmodule Nexus.Capacity do
   end
 
   def report(nx, opts \\ []) do
-    tier = Pricing.tier(nx[:plan] || "starter")
+    tier = Pricing.tier(nx[:plan])
     running? = nx[:state] == "running"
     seed = :erlang.phash2(nx[:id] || "nx")
 

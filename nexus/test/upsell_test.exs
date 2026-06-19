@@ -3,9 +3,22 @@ defmodule Nexus.UpsellTest do
   alias Nexus.ControlPlane, as: CP
   alias Nexus.Upsell
 
+  # Upsell reads its price facts from the configured tier table (Nexus.Config.tiers). These tiers are
+  # a FIXTURE for the test; the runtime ships a neutral default and an operator supplies real tiers.
+  # (Upsell itself is slated to move out of the standard into our cloud/workbook — bd wb-n9ez.)
+  @tiers [
+    %{id: "starter", name: "Starter", ram_mb: 1_024, storage_gb: 10, price: 0, domains?: false},
+    %{id: "team", name: "Team", ram_mb: 4_096, storage_gb: 100, price: 49, domains?: true},
+    %{id: "scale", name: "Scale", ram_mb: 16_384, storage_gb: 1_000, price: 199, domains?: true}
+  ]
+
   setup do
+    Nexus.Config.put(:tiers, @tiers)
     org = "org_ups_#{System.unique_integer([:positive])}"
-    on_exit(fn -> for nx <- CP.list(org, :nexus), do: CP.delete(org, :nexus, nx.id) end)
+    on_exit(fn ->
+      Nexus.Config.boot()
+      for nx <- CP.list(org, :nexus), do: CP.delete(org, :nexus, nx.id)
+    end)
     {:ok, org: org}
   end
 

@@ -120,7 +120,7 @@ defmodule Nexus.ControlPlane.Domain do
   end
 
   defp check_tier(nx) do
-    if Pricing.domains?(nx[:plan] || "starter"), do: :ok, else: {:error, :tier_locked}
+    if Pricing.domains?(nx[:plan]), do: :ok, else: {:error, :tier_locked}
   end
 
   defp nexus(org) do

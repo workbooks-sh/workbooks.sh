@@ -10,9 +10,19 @@ defmodule Nexus.ControlPlane.DomainTest do
     def remove_certificate(_app, _host, _opts), do: {:ok, %{}}
   end
 
+  # The tier table is operator config (Nexus.Config.tiers); the runtime ships a neutral default. This
+  # test configures a tier set with a domain gate (starter locked, team+ allowed) to exercise it.
+  @tiers [
+    %{id: "starter", name: "Starter", ram_mb: 1_024, storage_gb: 10, price: 0, domains?: false},
+    %{id: "team", name: "Team", ram_mb: 4_096, storage_gb: 100, price: 49, domains?: true},
+    %{id: "scale", name: "Scale", ram_mb: 16_384, storage_gb: 1_000, price: 199, domains?: true}
+  ]
+
   setup do
+    Nexus.Config.put(:tiers, @tiers)
     org = "org_dom_#{System.unique_integer([:positive])}"
     on_exit(fn ->
+      Nexus.Config.boot()
       for d <- Domain.list(org), do: CP.delete(org, :domain, d.id)
       for nx <- CP.list(org, :nexus), do: CP.delete(org, :nexus, nx.id)
     end)

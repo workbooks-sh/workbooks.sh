@@ -27,6 +27,14 @@ defmodule Nexus.Config do
         search="metasearch"            # :search provider: metasearch (keyless, local/dev) | brave (keyed, cloud)
         search-engines="ddg mojeek startpage"  # which keyless engines metasearch fans out to
         pm-debug="off"
+        # Capacity tiers — operator-supplied; the runtime ships ONE neutral free tier when unset.
+        # `id | Name | ram_mb storage_gb price_usd domains(yes|no)`. (These are OUR cloud's tiers — an
+        # example of the *our cloud* side of THE LINE; another operator declares their own.)
+        tiers="
+          starter | Starter | 1024 10 0 no
+          team    | Team    | 4096 100 49 yes
+          scale   | Scale   | 16384 1000 199 yes
+        "
       end
   """
   @key {__MODULE__, :cfg}
@@ -85,6 +93,12 @@ defmodule Nexus.Config do
   # Embedding backend for the semantic reranker: "hashed" (keyless default) | model-swap names.
   def embed, do: get(:embed)
 
+  # Org capacity TIERS — a config-driven primitive. THE LINE: the runtime ships a NEUTRAL default
+  # (one unbounded free tier, no imposed ceiling, domains allowed); an operator supplies their OWN
+  # tiers + prices via this deploy config, never hardcoded in `lib/`. Each `tiers` line is
+  # `id | Name | ram_mb storage_gb price_usd domains(yes|no)`, cheapest → biggest.
+  def tiers, do: get(:tiers)
+
   # ── parse ─────────────────────────────────────────────────────────────────────────────────────
   defp parse(html) do
     %{
@@ -110,8 +124,46 @@ defmodule Nexus.Config do
       search_endpoint: attr(html, "search-endpoint"),
       # Embedding backend for the local semantic reranker. Default "hashed" (deterministic, keyless,
       # zero-dep); swap to a real GGUF/Bumblebee model name at Nexus.Embed's model-swap point.
-      embed: attr(html, "embed") || "hashed"
+      embed: attr(html, "embed") || "hashed",
+      # Capacity tiers (operator-supplied; neutral single-tier default — see `tiers/0`).
+      tiers: parse_tiers(attr(html, "tiers"))
     }
+  end
+
+  # The runtime's NEUTRAL default: one unbounded, free tier. No imposed ceiling (0 = unbounded in the
+  # capacity dial), domains allowed. An open-standard nexus carries NO operator's business model.
+  @default_tiers [%{id: "default", name: "Default", ram_mb: 0, storage_gb: 0, price: 0, domains?: true}]
+
+  # `id | Name | ram_mb storage_gb price_usd domains(yes|no)` per line, cheapest → biggest.
+  defp parse_tiers(nil), do: @default_tiers
+
+  defp parse_tiers(src) do
+    tiers =
+      src
+      |> String.split("\n", trim: true)
+      |> Enum.flat_map(fn line ->
+        case line |> String.trim() |> String.split("|") do
+          [id, name, nums] ->
+            case nums |> String.trim() |> String.split(~r/\s+/, trim: true) do
+              [ram, storage, price, domains] ->
+                [%{id: String.trim(id), name: String.trim(name), ram_mb: num(ram), storage_gb: num(storage),
+                   price: num(price), domains?: String.downcase(String.trim(domains)) in ~w(yes true on 1)}]
+
+              _ -> []
+            end
+
+          _ -> []
+        end
+      end)
+
+    if tiers == [], do: @default_tiers, else: tiers
+  end
+
+  defp num(s) do
+    case Integer.parse(String.trim(s)) do
+      {n, _} -> n
+      _ -> 0
+    end
   end
 
   @doc """
