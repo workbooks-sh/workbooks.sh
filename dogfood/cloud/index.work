@@ -1,11 +1,16 @@
 # Cloud — our control-plane dashboard, as a workbook
 
 Our cloud dashboard (`web/cloud-dashboard`, a SvelteKit app) migrated to a **`.work` workbook**: one
-`client` island that IS the dashboard SPA — a sidebar of views and a panel, talking to the platform's
-generic APIs. Incremental: the **Upgrade** view is live here (it renders the personalized upsell by
-subscribing to our marketing workbook's `upsell` live source — one nexus, two of our surfaces talking
-to each other). Usage, Nexuses, Domains, Account land in subsequent passes (beads: sub-issues of
-wb-hpkm). No SvelteKit, no build step — the dashboard is a workbook.
+`client` island that IS the dashboard SPA — a sidebar and a panel, five views: **Upgrade** (renders the
+personalized upsell from our marketing workbook's `upsell` source), **Usage** (RAM/storage dials off
+`Nexus.Capacity`), **Nexuses** (this running nexus, self-reported), **Domains** and **Account**. No
+SvelteKit, no build step — the dashboard is a workbook.
+
+**Auth seam.** The island authenticates to the control plane (`/api/platform`) with a Bearer token — a
+`wbk_` PAT (minted by the `work` CLI or the Account view) or a WorkOS session JWT — read from `?token=`
+or `localStorage`. No token ⇒ **demo mode**, where the views fall back to this nexus's own server-block
+sources. Live control-plane data is one paste away (the *Connect* pill), and nothing about auth is
+baked into the runtime — it's the same `Nexus.Auth` Bearer path any deployment uses.
 
 ## The data — dogfooded straight off the platform
 
@@ -110,6 +115,12 @@ client :app do
     .acc-h h3{font-size:16px;margin:0}
     .mini{border:1px solid var(--line);background:none;color:var(--ink);font:600 13px var(--sans);padding:7px 13px;border-radius:8px;cursor:pointer}
     .mini:hover{background:rgba(255,255,255,.05)}
+    /* connect pill */
+    .spacer{flex:1;min-height:14px}
+    .conn{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);color:var(--dim);
+      font:600 12px var(--mono);padding:9px 11px;border-radius:9px;cursor:pointer;margin-top:8px}
+    .conn:hover{color:var(--ink)} .conn .cdot{width:8px;height:8px;border-radius:50%;background:#6c7080;flex:none}
+    .conn.live{color:var(--mint)} .conn.live .cdot{background:var(--mint)}
   </style>
 
   <aside class="side">
@@ -120,10 +131,12 @@ client :app do
         <span>Workbooks</span>
       </div>
       <button class="nav on" data-view="upgrade">Upgrade</button>
-      <button class="nav" data-view="usage">Usage <span class="tag">soon</span></button>
-      <button class="nav" data-view="nexuses">Nexuses <span class="tag">soon</span></button>
-      <button class="nav" data-view="domains">Domains <span class="tag">soon</span></button>
-      <button class="nav" data-view="account">Account <span class="tag">soon</span></button>
+      <button class="nav" data-view="usage">Usage</button>
+      <button class="nav" data-view="nexuses">Nexuses</button>
+      <button class="nav" data-view="domains">Domains</button>
+      <button class="nav" data-view="account">Account</button>
+      <div class="spacer"></div>
+      <button class="conn" id="conn" type="button"><span class="cdot"></span><span id="cl">Demo mode</span></button>
     </div>
   </aside>
 
@@ -176,6 +189,34 @@ client :app do
   (function(){
     var $=function(s){return document.querySelector(s)};
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
+
+    // ── auth seam ──────────────────────────────────────────────────────────────────────────────
+    // The dashboard is a workbook island; it authenticates to the control plane (/api/platform) with a
+    // Bearer token — a `wbk_` PAT (minted by the work CLI / the Account view) or a WorkOS session JWT.
+    // The token is read from ?token= (one-time, then stored) or localStorage; no token ⇒ demo mode
+    // (the views fall back to this nexus's own server-block sources). This is the whole seam: live
+    // control-plane data is one paste away, and nothing about auth is baked into the runtime.
+    var TOK=(function(){
+      try{ var u=new URL(location.href); var t=u.searchParams.get('token');
+        if(t){ localStorage.setItem('wb_token',t); u.searchParams.delete('token'); history.replaceState({},'',u); }
+        return localStorage.getItem('wb_token')||''; }catch(_){ return ''; }
+    })();
+    function connected(){ return !!TOK; }
+    function plat(path, opts){
+      opts=opts||{}; opts.headers=Object.assign({'content-type':'application/json'}, opts.headers||{}, TOK?{Authorization:'Bearer '+TOK}:{});
+      return fetch('/api/platform'+path, opts);
+    }
+    function setConn(){
+      var c=$('#conn'); if(!c)return;
+      c.classList.toggle('live',connected());
+      $('#cl').textContent=connected()?'Connected':'Demo mode';
+    }
+    $('#conn') && $('#conn').addEventListener('click',function(){
+      if(connected()){ if(confirm('Disconnect this dashboard?')){ localStorage.removeItem('wb_token'); TOK=''; setConn(); } return; }
+      var t=prompt('Paste a wbk_ access token (mint one in Account, or `work auth token`):');
+      if(t){ TOK=t.trim(); localStorage.setItem('wb_token',TOK); setConn(); }
+    });
+    setConn();
 
     // view routing
     var loaded={};
@@ -260,16 +301,24 @@ client :app do
 
     // domains + account — UI shells; these POST to /api/platform/* once the auth seam (wb-rlyr) lands.
     // Until then they show the local pending state so the surface is real and demonstrable.
+    function addDomainRow(h,note){ var box=$('#domains'); if(box.querySelector('.empty'))box.innerHTML='';
+      box.insertAdjacentHTML('beforeend','<div class="row2"><span class="ic">◷</span><b>'+esc(h)+'</b><span class="muted">'+esc(note)+'</span></div>'); }
     $('#dadd') && $('#dadd').addEventListener('click',function(){
-      var h=$('#dhost').value.trim(); if(!h)return;
-      var box=$('#domains'); if(box.querySelector('.empty'))box.innerHTML='';
-      box.insertAdjacentHTML('beforeend','<div class="row2"><span class="ic">◷</span><b>'+esc(h)+'</b><span class="muted">add TXT <code>_workbooks-challenge</code> → verify</span></div>');
-      $('#dhost').value='';
+      var h=$('#dhost').value.trim(); if(!h)return; $('#dhost').value='';
+      if(connected()){
+        plat('/domains',{method:'POST',body:JSON.stringify({host:h})}).then(function(r){return r.json()}).then(function(d){
+          addDomainRow(h, d.error?('error: '+d.error):'add TXT '+(d.challenge||'_workbooks-challenge')+' → verify');
+        }).catch(function(){ addDomainRow(h,'request failed'); });
+      } else addDomainRow(h,'demo — connect to bind for real');
     });
+    function addTokRow(tok,note){ var box=$('#tokens'); if(box.querySelector('.empty'))box.innerHTML='';
+      box.insertAdjacentHTML('beforeend','<div class="row2"><span class="ic">⚿</span><b>cli</b><code>'+esc(tok)+'</code><span class="muted">'+esc(note)+'</span></div>'); }
     $('#mint') && $('#mint').addEventListener('click',function(){
-      var box=$('#tokens'); if(box.querySelector('.empty'))box.innerHTML='';
-      var tok='wbk_'+Math.abs(Date.parse(new Date().toISOString())%1e9).toString(36)+'••••';
-      box.insertAdjacentHTML('beforeend','<div class="row2"><span class="ic">⚿</span><b>cli</b><code>'+esc(tok)+'</code><span class="muted">copy now — shown once</span></div>');
+      if(connected()){
+        plat('/tokens/mint',{method:'POST',body:JSON.stringify({name:'cli'})}).then(function(r){return r.json()}).then(function(d){
+          addTokRow(d.token||d.secret||'(minted)', 'copy now — shown once');
+        }).catch(function(){ addTokRow('—','mint failed'); });
+      } else addTokRow('wbk_demo_••••','demo — connect to mint a real token');
     });
     $('#wsadd') && $('#wsadd').addEventListener('click',function(){
       var box=$('#workspaces');
