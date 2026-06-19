@@ -5,15 +5,19 @@ lifestyle imagery, and a voice brief — by pulling real signal off the live sit
 
 ## No microservices — just the platform
 
-The original `brandnana` was a paid stack: `api.brandnana.net` for identity, **ScrapeCreators** for
-ads + social, **logo.dev** + **simpleicons** for logos, **Groq** for inference. This recreation needs
-**none of them**. Every input here is gathered with the platform's own browser — `Nexus.Browse`
-fetches the live site, `Nexus.Browse.Media` harvests the logo and imagery straight off the page,
-`Nexus.Browse.Freeze` inlines the CSS so the palette + type come from the real stylesheet, and
-`Nexus.Llm` resolves the brand and writes the voice. Native scraping + one model, locally — no
-per-service bill, no keys to juggle, no HTTP the workbook speaks directly. That's the point of the
-exercise: a thing that took a fleet of external services becomes a couple of `.work` blocks on top
-of capabilities we already own.
+The original `brandnana` was a paid stack: `api.brandnana.net` for identity, **logo.dev** +
+**simpleicons** for logos, **Groq** for inference, **ScrapeCreators** for ads + social. Almost all of
+it dissolves into the platform: `Nexus.Browse` fetches the live site, `Nexus.Browse.Media` harvests
+the logo and imagery straight off the page, `Nexus.Browse.Freeze` inlines the CSS so the palette +
+type come from the real stylesheet, and `Nexus.Llm` resolves the brand and writes the voice. Native
+scraping + one model, locally — no per-service bill, no keys to juggle.
+
+The **one** genuine external dependency is **ad + social creatives** (`Nexus.ScrapeCreators`, keyed by
+`SCRAPECREATORS_API_KEY`) — and that's honest: Meta's Ad Library UI is JS-rendered + bot-walled (our
+renderer runs no full JS loop) and Meta's official API only exposes political ads, so a brand's
+commercial creatives can't be scraped natively. It's optional — absent the key the book just omits
+that section. So: a fleet of external services becomes a couple of `.work` blocks + one keyed add-on
+for the data we genuinely can't get ourselves.
 
 ## History
 
@@ -81,6 +85,13 @@ server :brand do
     emit.(%{type: "step", label: "Writing the brand voice…"})
     %{name: name, tagline: tagline, voice: voice} = brief(url, html, emit)
     emit.(%{type: "brief", name: name, tagline: tagline, voice: voice})
+
+    # Ad + social CREATIVES — the one thing that isn't native. Optional + keyed (ScrapeCreators):
+    # absent a key this is skipped entirely and the book just omits the section.
+    if Nexus.ScrapeCreators.configured?() do
+      emit.(%{type: "step", label: "Pulling ad + social creatives…"})
+      emit.(%{type: "creatives", ads: Nexus.ScrapeCreators.ads(domain), social: Nexus.ScrapeCreators.social(domain)})
+    end
 
     emit.(%{type: "done"})
     %{domain: domain, name: name, tagline: tagline, logo: logo, palette: palette, fonts: fonts}

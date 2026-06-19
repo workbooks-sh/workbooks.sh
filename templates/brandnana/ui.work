@@ -140,6 +140,7 @@ client :app do
       else if(d.type==='palette'){B.palette=d.colors||[]; render();}
       else if(d.type==='fonts'){B.fonts=d.fonts||[]; render();}
       else if(d.type==='brief'){B.name=d.name; B.tagline=d.tagline; B.voice=d.voice; render();}
+      else if(d.type==='creatives'){B.ads=d.ads||[]; B.social=d.social||[]; render();}
       else if(d.type==='done'||d.type==='end'){ $('#prog').style.display='none'; if(es)es.close(); loadRecent(); }
     }
 
@@ -161,6 +162,11 @@ client :app do
           return '<div class="ph"><img src="'+esc(u)+'" loading="lazy" onerror="this.parentNode.style.display=\'none\'"></div>'}).join('')+'</div></div>';
       }
       if(B.voice){ h+='<div class="sec"><h3>Voice</h3><div class="voice">'+esc(B.voice)+'</div></div>'; }
+      var cre=(B.ads||[]).concat(B.social||[]).filter(function(c){return c&&c.image});
+      if(cre.length){
+        h+='<div class="sec"><h3>Ad &amp; social creatives</h3><div class="grid">'+cre.map(function(c){
+          return '<div class="ph" title="'+esc((c.text||'').slice(0,140))+'"><img src="'+esc(c.image)+'" loading="lazy" onerror="this.parentNode.style.display=\'none\'"></div>'}).join('')+'</div></div>';
+      }
       b.innerHTML=h;
     }
   })();
