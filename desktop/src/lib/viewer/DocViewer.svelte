@@ -11,7 +11,7 @@
   import { tabs as tabsStore } from "$lib/tabs/store.svelte";
   import { panes } from "$lib/viewer/panes.svelte";
   import type { Tab } from "$lib/tabs/types";
-  import WorkbookView from "./WorkbookView.svelte";
+  import WorkbookTab from "./WorkbookTab.svelte";
   import WaveletPlayer from "./WaveletPlayer.svelte";
   import CodeView from "./CodeView.svelte";
   import TextView from "./TextView.svelte";
@@ -51,7 +51,7 @@
     {:else if tab.kind === "agent"}
       <AgentTabView path={tab.path} tabId={tab.id} />
     {:else if tab.kind === "workbook"}
-      <WorkbookView path={tab.path} />
+      <WorkbookTab path={tab.path} />
     {:else if tab.kind === "wavelet"}
       <WaveletPlayer path={tab.path} />
     {:else if tab.kind === "org"}

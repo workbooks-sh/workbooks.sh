@@ -10,7 +10,8 @@
   import { onMount, onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { EditorState } from "@codemirror/state";
-  import { EditorView, lineNumbers, highlightActiveLineGutter } from "@codemirror/view";
+  import { EditorView, lineNumbers, highlightActiveLineGutter, keymap } from "@codemirror/view";
+  import { history, defaultKeymap, historyKeymap, indentWithTab } from "@codemirror/commands";
   import {
     syntaxHighlighting,
     defaultHighlightStyle,
@@ -19,12 +20,29 @@
     indentOnInput,
   } from "@codemirror/language";
 
-  let { path }: { path: string } = $props();
+  // `editable` opts a tab into a writable editor (Cmd/Ctrl+S saves via fs_write_file). Default false
+  // keeps the read-only viewer behaviour for `org`/`code` tabs; workbook Source view passes true.
+  let { path, editable = false }: { path: string; editable?: boolean } = $props();
 
   let host: HTMLDivElement;
   let view: EditorView | null = null;
   let error = $state<string | null>(null);
   let loading = $state(true);
+  let dirty = $state(false);
+  let saving = $state(false);
+
+  async function save() {
+    if (!view || !editable || saving) return;
+    saving = true;
+    try {
+      await invoke("fs_write_file", { path, content: view.state.doc.toString() });
+      dirty = false;
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    } finally {
+      saving = false;
+    }
+  }
 
   function ext(p: string): string {
     const m = p.toLowerCase().match(/\.([a-z0-9]+)$/);
@@ -114,8 +132,20 @@
           bracketMatching(),
           indentOnInput(),
           syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-          EditorView.editable.of(false),
-          EditorState.readOnly.of(true),
+          ...(editable
+            ? [
+                history(),
+                keymap.of([
+                  { key: "Mod-s", preventDefault: true, run: () => (save(), true) },
+                  indentWithTab,
+                  ...defaultKeymap,
+                  ...historyKeymap,
+                ]),
+                EditorView.updateListener.of((u) => {
+                  if (u.docChanged) dirty = true;
+                }),
+              ]
+            : [EditorView.editable.of(false), EditorState.readOnly.of(true)]),
           // No line wrapping for code — wrapped indentation reads as
           // empty lines in the gutter and breaks visual scanning of
           // structured code. The `.cm-scroller` styling below adds
@@ -146,6 +176,7 @@
         ].flat(),
       });
       view = new EditorView({ state, parent: host });
+      dirty = false;
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -174,6 +205,13 @@
     <div class="status err">Failed to read: {error}</div>
   {/if}
   <div class="host" bind:this={host}></div>
+  {#if editable}
+    <div class="savebar">
+      <span class="dot" class:on={dirty}></span>
+      <span class="lbl">{saving ? "Saving…" : dirty ? "Unsaved" : "Saved"}</span>
+      <button class="savebtn" disabled={!dirty || saving} onclick={save}>Save <kbd>⌘S</kbd></button>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -197,5 +235,48 @@
     color: var(--color-err); /* app-wide error literal — no error token in the canon */
     font-family: var(--font-mono), ui-monospace, monospace;
     white-space: pre-wrap;
+  }
+  .savebar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.7rem;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface, var(--color-page));
+    font-size: 0.78rem;
+    color: var(--color-fg-muted);
+  }
+  .savebar .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-border);
+  }
+  .savebar .dot.on {
+    background: var(--color-brand);
+  }
+  .savebar .lbl {
+    flex: 1 1 auto;
+  }
+  .savebar .savebtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.18rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-fg);
+    cursor: pointer;
+  }
+  .savebar .savebtn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .savebar kbd {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.72rem;
+    opacity: 0.7;
   }
 </style>
