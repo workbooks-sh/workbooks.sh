@@ -19,9 +19,9 @@ defmodule Nexus.Fleet do
   worker system prompt), `:model`, `:provider`, `:timeout_ms`.
   """
 
-  @default_model "x-ai/grok-4.3"
-  @default_provider nil
-  @default_timeout 180_000
+  @default_model "google/gemma-4-26b-a4b-it"
+  @default_provider %{order: ["Cloudflare"]}
+  @default_timeout 150_000
 
   @default_agent """
   You are a focused web research agent. Investigate the question by USING THE WEB:
