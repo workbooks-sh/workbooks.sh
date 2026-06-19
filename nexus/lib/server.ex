@@ -363,6 +363,28 @@ defmodule Nexus.Server do
     if MapSet.member?(taken, cand), do: dedupe(name, taken, n + 1), else: cand
   end
 
+  # A mounted workbook's SOURCE — its `.work` files (name + content), ordered index → design → ui →
+  # rest. Read-only; powers the templates explorer (look at the literate source behind an app).
+  get "/:wb/source" do
+    files =
+      case wb_root(wb) do
+        nil -> []
+        r -> workbook_source(r)
+      end
+
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(files, escape: :html_safe))
+  end
+
+  defp workbook_source(root) do
+    (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
+    |> Enum.uniq()
+    |> Enum.sort_by(fn p ->
+      b = Path.basename(p)
+      {(b == "index.work" && 0) || (b == "design.work" && 1) || (b == "ui.work" && 2) || 3, p}
+    end)
+    |> Enum.map(fn p -> %{name: Path.relative_to(p, root), content: File.read!(p)} end)
+  end
+
   # ── one nexus, many workbooks: a mounted workbook's app + its live source + its data ──────────
   get "/:wb/data/:resource" do
     rows =
