@@ -99,7 +99,7 @@ defmodule Nexus.Server do
   end
 
   # (A waitlist / interest capture is NOT a runtime concern — THE LINE. It's our own workbook:
-  # `templates/waitlist` declares a `resource Signup` + a `server :waitlist` live source that
+  # `dogfood/waitlist` declares a `resource Signup` + a `server :waitlist` live source that
   # validates + persists via the generic `Nexus.Store`. Any workbook captures data the same way.)
 
   # The RCP capabilities handshake — the FIRST thing the desktop/web RCP client fetches to learn how

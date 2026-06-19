@@ -78,7 +78,7 @@ defmodule Nexus.Platform do
   end
 
   # (Marketing/upsell logic is NOT a runtime concern — THE LINE. It lives in our own workbook
-  # `templates/marketing` as a `server :upsell` block, served like any workbook via its live source.)
+  # `dogfood/marketing` as a `server :upsell` block, served like any workbook via its live source.)
 
   get "/me" do
     id = conn.assigns[:identity] || %{}
