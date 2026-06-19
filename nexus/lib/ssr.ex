@@ -235,7 +235,14 @@ defmodule Nexus.SSR do
   # that runs on the nexus, not shown in the rendered app.
   defp render_node(%{type: :code, kind: "client", body: b}, _res, _ctx), do: b
 
-  defp render_node(%{type: :code}, _res, _ctx), do: ""
+  # Any other unit (server / sandbox / data / def / agent / resource …) renders as a labelled
+  # source figure — the literate document shows its own code. Matches the canonical reactor weave.
+  defp render_node(%{type: :code, kind: k, lang: l, name: nm, header: h, body: b}, _res, _ctx) do
+    lang = if l in [nil, ""], do: "", else: ~s( <span class="lang">#{esc(l)}</span>)
+    name = if nm in [nil, ""], do: "", else: ~s( <span class="nm">:#{esc(nm)}</span>)
+
+    ~s(  <figure class="unit" data-unit="#{esc(k)}:#{esc(nm)}"><figcaption><span class="kind">#{esc(k)}</span>#{lang}#{name}</figcaption><pre><code>#{esc(h)} do\n#{esc(b)}\nend</code></pre></figure>)
+  end
 
   defp render_node(_, _res, _ctx), do: ""
 
