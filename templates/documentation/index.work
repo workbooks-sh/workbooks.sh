@@ -14,8 +14,12 @@ app :docs do
   theme  :paper_ink            # petal mark, DNA strip, dark/light, Geist + mono
   router :history              # real path routes + host catch-all → this SPA
 
+  section "Preface" do
+    page "preface/literate-programming"
+    page "preface/why-webassembly"
+  end
+
   section "Introduction" do
-    page "introduction/literate-programming"
     page "introduction/what-is-a-workbook"
     page "introduction/what-is-a-work-file"
     page "introduction/what-is-the-nexus"

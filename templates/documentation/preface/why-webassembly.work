@@ -1,0 +1,56 @@
+# Why WebAssembly
+
+A literate document that can compile *any* language needs a common ground to run
+them on — one target every language can reach. That target is **WebAssembly**. It's
+also the thing that lets us run many agents safely at once. Two properties, both
+load-bearing.
+
+## One target for every language
+
+If the promise is "write a block in Elixir, Rust, Zig, Python, Svelte — whatever
+fits — in one document," you need something built to integrate them all. WebAssembly
+is exactly that: a small, portable instruction format nearly every language can
+compile down to. So instead of gluing a dozen runtimes together, every block
+compiles to the *same* thing and runs in the *same* place.
+
+**WASI** — the WebAssembly System Interface — extends that with a standard, portable
+way for those modules to touch the outside world: files, clocks, the network. One
+interface, every language. That's what makes the [`.work`](/introduction/what-is-a-work-file)
+promise of "any supported language" actually buildable.
+
+## Isolation is the other half
+
+WebAssembly modules run sealed off — from each other and from the host — by default.
+A module can't reach memory, files, or network it wasn't explicitly handed. That
+isn't a nice-to-have here; it's what lets the [Nexus](/introduction/what-is-the-nexus)
+run many agents and tenants side by side. Each agent's code runs in its own sandbox,
+granted only the capabilities it needs.
+
+## Sandbox per request, not per second
+
+This changes the economics of running agents. The usual approach keeps a Linux
+container or VM running per agent, billed per second — even while it does the same
+operation over and over. WebAssembly sandboxes are cheap enough to spin up **per
+request**: instantiate one, do the work, throw it away. For agent workloads — often
+the same operation many times — that's dramatically cheaper and scales to far more
+concurrent agents than keeping warm Linux boxes around. It's the same
+[scale-by-RAM](/introduction/what-is-the-nexus) story, applied to agents.
+
+## The honest caveat: speed
+
+WebAssembly's tradeoff is build time. To run a block it must be compiled to WASM
+first. So you either **pre-build** your packages, or — for things compiled
+dynamically at run time — **cache** the result after the first run and reuse it. In
+practice you acknowledge what your users and agents actually do, pre-warm or cache
+those paths, and the first-run cost is paid once. The only real caveat is speed, and
+it's addressable: caching, a build queue, and languages that adopt WASM well. Zig
+has been the smoothest of the bunch — but every supported language works.
+
+## Standing on others' work
+
+We don't run our own engine — workbooks run on [wasmtime](https://wasmtime.dev),
+from the Bytecode Alliance. The portable system interface is [WASI](https://wasi.dev),
+stewarded by the Bytecode Alliance and the W3C. And the wider ecosystem — the people
+behind WASIX at Wasmer, and the broader WebAssembly community — is what makes "every
+language, one interface" practical at all. Workbooks is an *integration* of that
+work, not a reinvention of it. Credit where it's due.

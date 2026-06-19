@@ -44,7 +44,7 @@ production-grade" phase, because the thing you built on day one already runs the
 it will run at scale. Building on the Nexus is a head start precisely because
 production behaves exactly like your prototype.
 
-This is [radical simplicity](/introduction/literate-programming) applied to the
+This is [radical simplicity](/preface/literate-programming) applied to the
 runtime: one engine instead of a microservices maze.
 
 ## Yours to run anywhere

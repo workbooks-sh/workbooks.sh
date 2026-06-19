@@ -2,7 +2,7 @@
 
 A `.work` file is a **literate document**: plain prose with runnable blocks mixed
 in. It is not a new programming language you have to learn. It's a way to write
-[literate programming](/introduction/literate-programming) source that compiles the
+[literate programming](/preface/literate-programming) source that compiles the
 languages you already use.
 
 ## Prose narrates, blocks run
