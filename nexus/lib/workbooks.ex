@@ -27,6 +27,9 @@ defmodule Nexus.Workbooks do
   @doc "True when production data-store secrets are injected — dev faked-backend is bypassed."
   def prod?, do: present?(System.get_env("WB_DATABASE_URL")) or present?(System.get_env("WB_S3_BUCKET"))
 
+  @doc "True in the test environment (where each test owns its data backend explicitly)."
+  def test?, do: function_exported?(Mix, :env, 0) and Mix.env() == :test
+
   @doc """
   The UUID for a workbook (by its root path key), assigning + recording one on first run. Stable
   across runs; the managed registry makes the mapping inspectable.
@@ -71,7 +74,10 @@ defmodule Nexus.Workbooks do
   resolved `%{uuid, db, bucket}` or `nil` in prod.
   """
   def install_dev_backend(root) do
-    if prod?() do
+    if prod?() or test?() do
+      # prod: injected cloud secrets own the backend. test: each test controls its own backend
+      # explicitly (default ETS), so we must never mutate the global :store_adapter from here —
+      # doing so leaks the per-workbook SQLite across the async:false suite.
       nil
     else
       uuid = uuid_for(root)
