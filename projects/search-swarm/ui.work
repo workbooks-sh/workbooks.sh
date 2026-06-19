@@ -27,7 +27,8 @@ client :app do
     #ss{max-width:980px;margin:0 auto;padding:38px 22px 120px}
 
     /* ── intro page ── */
-    #intro .top{text-align:center;margin:40px 0 30px}
+    #intro{min-height:calc(100vh - 76px);display:flex;flex-direction:column;justify-content:center}
+    #intro .top{text-align:center;margin:0 0 30px}
     #intro .mark{font-size:34px;font-weight:700;letter-spacing:-.02em;display:inline-flex;gap:10px;align-items:center}
     #intro .tag{color:var(--soft);margin-top:10px;font-size:16px}
     .composer{background:var(--paper);border:1px solid var(--line);border-radius:18px;
