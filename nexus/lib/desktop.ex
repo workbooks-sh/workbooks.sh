@@ -16,7 +16,7 @@ defmodule Nexus.Desktop do
   def token do
     case :persistent_term.get(@key, nil) do
       nil ->
-        t = System.get_env("NEXUS_DATA_TOKEN") || Base.url_encode64(:crypto.strong_rand_bytes(24), padding: false)
+        t = Nexus.Secrets.get("NEXUS_DATA_TOKEN") || Base.url_encode64(:crypto.strong_rand_bytes(24), padding: false)
         :persistent_term.put(@key, t)
         t
 

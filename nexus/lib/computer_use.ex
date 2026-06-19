@@ -77,7 +77,7 @@ defmodule Nexus.ComputerUse do
   defp ask(model, text, png) do
     :inets.start()
     :ssl.start()
-    key = System.get_env("OPENROUTER_API_KEY")
+    key = Nexus.Secrets.get("OPENROUTER_API_KEY")
 
     content =
       [%{type: "text", text: text}] ++

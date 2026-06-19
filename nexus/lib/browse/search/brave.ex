@@ -73,7 +73,7 @@ defmodule Nexus.Browse.Search.Brave do
     end
   end
 
-  defp api_key, do: System.get_env("BRAVE_API_KEY")
+  defp api_key, do: Nexus.Secrets.get("BRAVE_API_KEY")
 
   # Brave wraps query-term matches in <strong>; the result list wants plain text.
   defp strip_tags(s), do: s |> String.replace(~r/<[^>]+>/, "") |> String.trim()

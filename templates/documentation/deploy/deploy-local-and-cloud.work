@@ -24,7 +24,8 @@ A deployment is described by a set of declared settings that live *with* your
 workbook — version-controlled and reviewable, part of the source like everything
 else. It is not a JSON file off to the side, and it is not a scatter of environment
 variables. Secrets are the one exception: they're never written into the config,
-they're injected from the environment at deploy time. `work deploy init` scaffolds
+they're injected from the environment at deploy time — see
+[Secrets & configuration](/deploy/secrets-and-config). `work deploy init` scaffolds
 the settings; you edit them in place.
 
 The settings you declare:

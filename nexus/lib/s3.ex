@@ -136,6 +136,6 @@ defmodule Nexus.S3 do
   end
 
   defp hex(bin), do: Base.encode16(bin, case: :lower)
-  defp access_key, do: System.get_env("WB_S3_ACCESS_KEY_ID")
-  defp secret_key, do: System.get_env("WB_S3_SECRET_ACCESS_KEY")
+  defp access_key, do: Nexus.Secrets.get("WB_S3_ACCESS_KEY_ID")
+  defp secret_key, do: Nexus.Secrets.get("WB_S3_SECRET_ACCESS_KEY")
 end

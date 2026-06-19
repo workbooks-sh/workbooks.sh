@@ -36,6 +36,7 @@ app :docs do
   section "Running & deploying" do
     page "deploy/running-the-nexus"
     page "deploy/deploy-local-and-cloud"
+    page "deploy/secrets-and-config"
     page "deploy/workbooks-cloud"
   end
 

@@ -16,13 +16,15 @@ defmodule Nexus.ControlPlaneAuthTest do
   defp restore(k, nil), do: Application.delete_env(:nexus, k)
   defp restore(k, v), do: Application.put_env(:nexus, k, v)
 
-  test "control-plane forces WorkOS-JWT auth, configured from the deploy env" do
+  test "control-plane forces Cloud auth (PAT or WorkOS JWT), configured from the deploy env" do
     System.put_env("WB_CONTROL_PLANE", "1")
     System.put_env("WB_OIDC_JWKS_URL", "https://api.workos.com/sso/jwks/client_x")
     System.put_env("WB_OIDC_TENANT_CLAIM", "org_id")
 
     assert CP.configure_auth() == :ok
-    assert Application.get_env(:nexus, :auth) == Nexus.Auth.Jwt
+    # Cloud adapter accepts a CLI personal-access token (wbk_…) OR the WorkOS JWT,
+    # delegating JWT validation to the Nexus.Auth.Jwt cfg below.
+    assert Application.get_env(:nexus, :auth) == Nexus.Auth.Cloud
     cfg = Application.get_env(:nexus, Nexus.Auth.Jwt)
     assert cfg[:jwks_url] == "https://api.workos.com/sso/jwks/client_x"
     assert cfg[:tenant_claim] == "org_id"
@@ -30,10 +32,10 @@ defmodule Nexus.ControlPlaneAuthTest do
     assert Nexus.Auth.multi?()
   end
 
-  test "fail-closed: control-plane with NO jwks url → adapter is Jwt but jwks_url nil (every token 401s)" do
+  test "fail-closed: control-plane with NO jwks url → adapter is Cloud but jwks_url nil (every token 401s)" do
     System.put_env("WB_CONTROL_PLANE", "1")
     assert CP.configure_auth() == :ok
-    assert Application.get_env(:nexus, :auth) == Nexus.Auth.Jwt
+    assert Application.get_env(:nexus, :auth) == Nexus.Auth.Cloud
     assert Application.get_env(:nexus, Nexus.Auth.Jwt)[:jwks_url] == nil
   end
 

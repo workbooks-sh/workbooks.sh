@@ -126,6 +126,6 @@ defmodule Nexus.Llm do
   defp maybe_put(map, k, v), do: Map.put(map, k, v)
 
   defp local?(url), do: String.contains?(url, "127.0.0.1") or String.contains?(url, "localhost")
-  defp api_key(opts), do: opts[:api_key] || System.get_env(cfg(:api_key_env, "OPENROUTER_API_KEY"))
+  defp api_key(opts), do: opts[:api_key] || Nexus.Secrets.get(cfg(:api_key_env, "OPENROUTER_API_KEY"))
   defp cfg(key, default), do: Keyword.get(Application.get_env(:nexus, __MODULE__, []), key, default)
 end

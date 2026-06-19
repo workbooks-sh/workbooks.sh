@@ -59,7 +59,7 @@ defmodule Nexus.Fly do
 
   defp request(method, segments, body, opts) do
     {method, url, headers, encoded} = build_request(method, segments, body, opts)
-    token = Keyword.get(opts, :token) || System.get_env("FLY_API_TOKEN") || ""
+    token = Keyword.get(opts, :token) || Nexus.Secrets.get("FLY_API_TOKEN") || ""
     http = Keyword.get(opts, :http, &do_request(&1, &2, &3, &4, token))
 
     case http.(method, url, headers, encoded) do

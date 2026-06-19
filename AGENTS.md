@@ -59,6 +59,14 @@ These override everything. If a choice violates one, the choice is wrong.
    `NEXUS_TENANT`, the `WB_DATA` mount path) — loaded *into* the nexus at deploy, never
    authored config. New knob ⇒ a `.work` config declaration + a `Nexus.Config` getter, not
    an env read and not an HTML attribute.
+   **Three homes, never confused:** (a) tunable **config** → `.work` `deploy` block via
+   `Nexus.Config`; (b) **secrets** (API keys, tokens) → read ONLY through `Nexus.Secrets`
+   (one audited seam over the injected env), values never in source/`.work`/config —
+   injected at deploy from the encrypted org-scoped `Nexus.ControlPlane.Env` (cloud) or a
+   gitignored local store / `work secret` (local); (c) **machine identity / mount paths**
+   (`WB_DATA`, `NEXUS_TENANT`, `PORT`) → direct deploy injection. Never read a secret with
+   `System.get_env` — use `Nexus.Secrets`. (`WB_ENV_MASTER_KEY` is the root key that unlocks
+   the cloud store, so it alone is read directly.)
 
 ## ⬛ AUTONOMY MANDATE ⬛ (read this every loop)
 

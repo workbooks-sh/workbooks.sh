@@ -95,7 +95,7 @@ defmodule Nexus.WorkOS do
   end
 
   defp api_key do
-    case System.get_env("WORKOS_API_KEY") do
+    case Nexus.Secrets.get("WORKOS_API_KEY") do
       v when is_binary(v) and v != "" -> v
       _ -> nil
     end

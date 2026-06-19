@@ -132,7 +132,7 @@ defmodule Nexus.Dock do
   @doc false
   @llm_model "openai/gpt-4o-mini"
   def llm_complete(prompt) do
-    key = System.get_env("OPENROUTER_API_KEY")
+    key = Nexus.Secrets.get("OPENROUTER_API_KEY")
 
     if key do
       :inets.start()

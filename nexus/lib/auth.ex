@@ -68,7 +68,7 @@ defmodule Nexus.Auth.Bearer do
 
   @impl true
   def authenticate(conn) do
-    token = System.get_env("NEXUS_DATA_TOKEN")
+    token = Nexus.Secrets.get("NEXUS_DATA_TOKEN")
     tenant = System.get_env("NEXUS_TENANT") || Nexus.Store.default_tenant()
 
     cond do

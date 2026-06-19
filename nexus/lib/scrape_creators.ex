@@ -17,7 +17,7 @@ defmodule Nexus.ScrapeCreators do
 
   @doc "Is a ScrapeCreators key present? (else ad/social data is simply unavailable)"
   def configured?, do: key() not in [nil, ""]
-  defp key, do: System.get_env("SCRAPECREATORS_API_KEY")
+  defp key, do: Nexus.Secrets.get("SCRAPECREATORS_API_KEY")
 
   @doc "Ad creatives for a brand domain (Meta Ad Library). `[%{platform, image, text, link}]` or `[]`."
   def ads(domain, opts \\ []) do
