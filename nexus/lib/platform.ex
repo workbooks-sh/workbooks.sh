@@ -29,10 +29,19 @@ defmodule Nexus.Platform do
     j(conn, 200, %{nexuses: Enum.map(CP.list(org(conn), :nexus), &nexus_view/1)})
   end
 
+  # One nexus PER ORG — the nexus IS the org (a Fly machine / scale-group). You
+  # scale the one nexus (pricing tier), you don't create a second; more separation
+  # means a new org. Refuse a second provision rather than fan out machines.
   post "/nexuses" do
-    case Nexus.Provisioner.provision(org(conn), provision_opts(read(conn))) do
-      {:ok, nx} -> j(conn, 201, nexus_view(nx))
-      {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
+    case CP.list(org(conn), :nexus) do
+      [nx | _] ->
+        j(conn, 409, %{error: "one nexus per organization — scale this one instead, or create a new org", nexus: nexus_view(nx)})
+
+      [] ->
+        case Nexus.Provisioner.provision(org(conn), provision_opts(read(conn))) do
+          {:ok, nx} -> j(conn, 201, nexus_view(nx))
+          {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
+        end
     end
   end
 
@@ -55,9 +64,17 @@ defmodule Nexus.Platform do
   post "/nexuses/:id/sleep", do: lifecycle(conn, &Nexus.Provisioner.sleep/2)
 
   # ── usage / identity / storage ───────────────────────────────────────────────────────────────
-  # Honest-zero until the Fly-grounded NexusUsage + Storage backends are ported (next loop steps).
+  # Usage + capacity for the org's single nexus: RAM + storage vs the tier ceiling
+  # (Nexus.Pricing), plus the top consumers to shed when a dial runs hot. Auto-scale
+  # lives within the ceiling; crossing it is a paid scale-up. (Showcase backend —
+  # the per-nexus reading is derived; the limits/thresholds/billing are real.)
   get "/usage" do
-    j(conn, 200, %{monthToDate: "$0.00", compute: "$0.00", activeHrs: 0, load: 0})
+    j(conn, 200, Nexus.Capacity.report(List.first(CP.list(org(conn), :nexus))))
+  end
+
+  # The tier ladder (for the dashboard's scale-up UI) — limits + price + domains gate.
+  get "/tiers" do
+    j(conn, 200, %{tiers: Nexus.Pricing.tiers()})
   end
 
   get "/me" do
@@ -88,6 +105,43 @@ defmodule Nexus.Platform do
   delete "/tokens/:id" do
     Nexus.ControlPlane.Token.revoke(org(conn), conn.params["id"])
     j(conn, 200, %{ok: true})
+  end
+
+  # ── custom domains (paid-tier, owner-verified — share from your domain, not ours) ──────────────
+  # Add → TXT challenge; verify → resolve the TXT + request the Fly cert; the record
+  # is org-scoped and the host is globally unique. See Nexus.ControlPlane.Domain.
+  get "/domains" do
+    j(conn, 200, %{domains: Nexus.ControlPlane.Domain.list(org(conn))})
+  end
+
+  post "/domains" do
+    case Nexus.ControlPlane.Domain.add(org(conn), decode(read(conn))["host"]) do
+      {:ok, view} -> j(conn, 201, view)
+      {:error, reason} -> j(conn, domain_status(reason), %{error: domain_error(reason)})
+    end
+  end
+
+  get "/domains/:id" do
+    case Nexus.ControlPlane.Domain.get(org(conn), conn.params["id"]) do
+      {:ok, view} -> j(conn, 200, view)
+      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+    end
+  end
+
+  post "/domains/:id/verify" do
+    case Nexus.ControlPlane.Domain.verify(org(conn), conn.params["id"]) do
+      {:ok, view} -> j(conn, 200, view)
+      {:error, :txt_not_found} -> j(conn, 422, %{error: "TXT challenge not found — add the record and allow DNS to propagate, then retry"})
+      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+      {:error, reason} -> j(conn, 422, %{error: domain_error(reason)})
+    end
+  end
+
+  delete "/domains/:id" do
+    case Nexus.ControlPlane.Domain.remove(org(conn), conn.params["id"]) do
+      :ok -> j(conn, 200, %{ok: true})
+      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+    end
   end
 
   # ── workspaces (free, no compute — logical org divisions) ──────────────────────────────────────
@@ -208,6 +262,19 @@ defmodule Nexus.Platform do
 
   defp reason_str(r) when is_atom(r), do: Atom.to_string(r)
   defp reason_str(r), do: inspect(r)
+
+  # Custom-domain errors → HTTP status + a buyer-facing message.
+  defp domain_status(:tier_locked), do: 402
+  defp domain_status(:host_taken), do: 409
+  defp domain_status(:no_nexus), do: 409
+  defp domain_status(_), do: 422
+
+  defp domain_error(:tier_locked), do: "custom domains need a paid plan (Team or higher) — scale up to bind one"
+  defp domain_error(:host_taken), do: "that host is already bound to another organization"
+  defp domain_error(:reserved_host), do: "that host is reserved"
+  defp domain_error(:invalid_host), do: "enter a valid domain like apps.yourcompany.com"
+  defp domain_error(:no_nexus), do: "provision your nexus before binding a domain"
+  defp domain_error(r), do: reason_str(r)
 
   defp nexus_view(nx) do
     %{

@@ -164,6 +164,29 @@ export async function revokeToken(id) {
   return plat(`/tokens/${id}`, { method: 'DELETE' });
 }
 
+// ── Custom domains — paid-tier, owner-verified (share from your domain, not ours) ──
+// addDomain returns the pending record with a TXT challenge + CNAME target. The owner
+// publishes both, then verifyDomain resolves the TXT and requests the Fly cert.
+export async function listDomains(opts = {}) {
+  if (!live()) return [];
+  return (await plat('/domains', { fetch: opts.fetch })).domains || [];
+}
+export async function addDomain(host) {
+  return plat('/domains', { method: 'POST', body: { host } });
+}
+export async function verifyDomain(id) {
+  return plat(`/domains/${id}/verify`, { method: 'POST' });
+}
+export async function removeDomain(id) {
+  return plat(`/domains/${id}`, { method: 'DELETE' });
+}
+
+// ── Pricing tiers — the scale-up ladder (limits + price + domain gate). ──
+export async function listTiers(opts = {}) {
+  if (!live()) return [];
+  return (await plat('/tiers', { fetch: opts.fetch })).tiers || [];
+}
+
 const EMPTY_USAGE = {
   // `load` = % of compute capacity in use across the org's nexuses (idle ⇒ 0).
   summary: { monthToDate: '$0.00', compute: '$0.00', storage: '0 GB', database: '—', nexusCount: 0, activeHrs: '0.0', load: 0 },

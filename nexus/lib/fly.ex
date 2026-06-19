@@ -13,6 +13,7 @@ defmodule Nexus.Fly do
   so tests exercise everything without a network; `opts[:token]` overrides the env token.
   """
   @api_host "https://api.machines.dev/v1"
+  @gql_host "https://api.fly.io/graphql"
   @max_body_bytes 8 * 1024 * 1024
 
   def create_app(name, org, opts \\ []),
@@ -30,6 +31,44 @@ defmodule Nexus.Fly do
 
   def delete_app(app, opts \\ []), do: request(:delete, ["apps", app], nil, opts)
 
+  # ── custom-domain certificates (Fly GraphQL — the Machines REST API has no cert surface) ─────────
+  # Binds a hostname to a tenant's nexus app: Fly provisions a LetsEncrypt cert and
+  # returns the DNS validation target (the record the owner points their domain at).
+  @add_cert """
+  mutation($appId:ID!,$hostname:String!){addCertificate(appId:$appId,hostname:$hostname){\
+  certificate{configured dnsValidationTarget dnsValidationHostname check}}}\
+  """
+  @check_cert """
+  query($appName:String!,$hostname:String!){app(name:$appName){\
+  certificate(hostname:$hostname){configured check clientStatus dnsValidationTarget}}}\
+  """
+  @remove_cert """
+  mutation($appId:ID!,$hostname:String!){deleteCertificate(appId:$appId,hostname:$hostname){\
+  certificate{hostname}}}\
+  """
+
+  def add_certificate(app, hostname, opts \\ []),
+    do: graphql(@add_cert, %{"appId" => app, "hostname" => hostname}, opts)
+
+  def check_certificate(app, hostname, opts \\ []),
+    do: graphql(@check_cert, %{"appName" => app, "hostname" => hostname}, opts)
+
+  def remove_certificate(app, hostname, opts \\ []),
+    do: graphql(@remove_cert, %{"appId" => app, "hostname" => hostname}, opts)
+
+  defp graphql(query, variables, opts) do
+    body = %{"query" => query, "variables" => variables}
+    headers = [{"accept", "application/json"}, {"content-type", "application/json"}]
+    token = Keyword.get(opts, :token) || Nexus.Secrets.get("FLY_API_TOKEN") || ""
+    http = Keyword.get(opts, :http, &do_request(&1, &2, &3, &4, token, "api.fly.io"))
+
+    case http.(:post, @gql_host, headers, Jason.encode!(body)) do
+      {:ok, {status, resp}} when status in 200..299 -> {:ok, decode(resp)}
+      {:ok, {status, resp}} -> {:error, {status, decode(resp)}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp machine_action(app, id, action, opts),
     do: request(:post, ["apps", app, "machines", id, action], nil, opts)
 
@@ -45,13 +84,13 @@ defmodule Nexus.Fly do
   end
 
   @doc false
-  def http_options do
+  def http_options(host \\ "api.machines.dev") do
     [
       timeout: 30_000,
       ssl: [
         verify: :verify_peer,
         cacerts: :public_key.cacerts_get(),
-        server_name_indication: ~c"api.machines.dev",
+        server_name_indication: to_charlist(host),
         customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]
       ]
     ]
@@ -60,7 +99,7 @@ defmodule Nexus.Fly do
   defp request(method, segments, body, opts) do
     {method, url, headers, encoded} = build_request(method, segments, body, opts)
     token = Keyword.get(opts, :token) || Nexus.Secrets.get("FLY_API_TOKEN") || ""
-    http = Keyword.get(opts, :http, &do_request(&1, &2, &3, &4, token))
+    http = Keyword.get(opts, :http, &do_request(&1, &2, &3, &4, token, "api.machines.dev"))
 
     case http.(method, url, headers, encoded) do
       {:ok, {status, resp}} when status in 200..299 -> {:ok, decode(resp)}
@@ -70,7 +109,7 @@ defmodule Nexus.Fly do
   end
 
   # Token added HERE only — never in build_request, never logged.
-  defp do_request(method, url, headers, body, token) do
+  defp do_request(method, url, headers, body, token, sni) do
     :inets.start()
     :ssl.start()
     headers = [{"authorization", "Bearer " <> token} | headers]
@@ -81,7 +120,7 @@ defmodule Nexus.Fly do
         do: {to_charlist(url), hh, ~c"application/json", body},
         else: {to_charlist(url), hh}
 
-    case :httpc.request(method, req, http_options(), body_format: :binary) do
+    case :httpc.request(method, req, http_options(sni), body_format: :binary) do
       {:ok, {{_, code, _}, _h, resp}} -> {:ok, {code, cap(resp)}}
       {:error, e} -> {:error, inspect(e)}
     end
