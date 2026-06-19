@@ -218,7 +218,13 @@ defmodule Nexus.Server do
         {:ok, conn} = chunk(conn, "data: " <> Jason.encode!(%{type: "end"}) <> "\n\n")
         conn
     after
-      120_000 -> conn
+      # Keepalive on idle (a long synthesis/digest LLM call emits no events) — hold the connection
+      # open through the whole run instead of timing out before the final report is sent.
+      15_000 ->
+        case chunk(conn, ": keepalive\n\n") do
+          {:ok, conn} -> stream_sse(conn)
+          {:error, _} -> conn
+        end
     end
   end
 
