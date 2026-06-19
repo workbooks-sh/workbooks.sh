@@ -26,6 +26,9 @@ defmodule Nexus.Server do
     root = Keyword.fetch!(opts, :root)
     port = Keyword.get(opts, :port, 4000)
     Application.put_env(:nexus, :workbook_root, root)
+    # Resolve this workbook's data backend: in dev, its own managed SQLite under ~/.workbooks/dev/db/
+    # <uuid> (durable, survives a restart); in prod the injected cloud secrets win and this is a no-op.
+    Nexus.Workbooks.install_dev_backend(root)
     # Bring up the served workbook's server tier: compile its `server`/`resource` units to live BEAM
     # modules, then call `register/0` on any server unit that exports it (a project self-registers its
     # live sources / data this way). Generic — no project-specific code in the host.
