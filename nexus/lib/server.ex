@@ -30,6 +30,17 @@ defmodule Nexus.Server do
     %{id: __MODULE__, start: {__MODULE__, :start_link, [opts]}}
   end
 
+  # Liveness probe — unauthenticated (see Nexus.Auth). Deploy/orchestrator health checks (Fly,
+  # Docker, the desktop daemon) probe this; 200 = the server is up and answering.
+  get "/health" do
+    vsn = to_string(Application.spec(:nexus, :vsn) || "dev")
+    body = Jason.encode!(%{status: "ok", service: "nexus", version: vsn})
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, body)
+  end
+
   get "/" do
     conn
     |> put_resp_content_type("text/html")

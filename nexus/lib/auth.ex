@@ -25,6 +25,10 @@ defmodule Nexus.Auth do
   def init(opts), do: opts
 
   @impl Plug
+  # `/health` is unauthenticated — a deploy/orchestrator liveness probe (Fly, Docker, the desktop
+  # daemon's first reach) has no tenant token. It exposes no tenant data.
+  def call(%{request_path: "/health"} = conn, _opts), do: conn
+
   def call(conn, _opts) do
     case adapter().authenticate(conn) do
       {:ok, %{tenant: tenant} = id} when is_binary(tenant) and tenant != "" ->
