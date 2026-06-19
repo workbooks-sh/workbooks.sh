@@ -129,6 +129,9 @@ defmodule Nexus.Docs do
     .prose a{color:#1f7d33;text-decoration:none;border-bottom:1px solid #cfe3d3} .prose a:hover{border-color:#1f7d33}
     .prose strong{font-weight:600;color:var(--ink)}
     .prose code{font-family:var(--mono);font-size:.88em;background:#f0eee5;padding:1.5px 6px;border-radius:5px}
+    .prose pre{margin:18px 0;padding:14px 16px;background:#f7f5ee;border:1px solid var(--line);border-radius:10px;overflow-x:auto;
+      font:13px/1.6 var(--mono)}
+    .prose pre code{background:none;padding:0;font-size:13px}
     .prose blockquote{margin:18px 0;padding:12px 18px;background:#fbfaf5;border-left:3px solid var(--accent);border-radius:6px;color:#54545a}
     .prose .unit{margin:18px 0;border:1px solid var(--line);border-radius:12px;overflow:hidden}
     .prose .unit pre{margin:0;padding:14px 16px;overflow-x:auto;font:13px/1.6 var(--mono);background:var(--paper)}

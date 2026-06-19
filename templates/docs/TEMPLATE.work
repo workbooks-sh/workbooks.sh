@@ -1,0 +1,37 @@
+# Docs — template :app
+
+An unbranded **documentation site**, authored entirely in `.work`. A composition-root `index.work`
+declares an `app :docs` (title, theme, sections → pages); every page is a sibling `.work` file of
+prose. The platform's site-mode weave (`Nexus.Docs`) renders it as a navigable SPA — sidebar, clean
+history-routed URLs, reload-safe deep links — with zero front-end code to write.
+
+Scaffold it with `work new docs <your-docs>`, then write.
+
+## What's the template, and what's the platform
+
+The **platform** renders the site; it is NOT part of this folder. You declare structure with `app
+:docs do … section … page … end` and the runtime's `Nexus.Docs` does the rest: parses the sections,
+server-renders each page's prose, emits the sidebar + content + router. The `:paper_ink` theme and the
+history router ship with it.
+
+The **template** is what you own:
+
+- `index.work` → the `app :docs` block — your site's name, theme, and table of contents.
+  **Edit `title`** to brand it (it's the sidebar wordmark beside the ❧ logo placeholder); **add/reorder
+  `page` lines** to shape the sidebar.
+- `getting-started/*.work`, `guides/*.work` → your pages. **Replace them** with your own prose. The
+  first heading in each file is its sidebar label.
+
+## Run it
+
+  work weave .            # → one self-contained, navigable docs site
+  work dev .              # watch + re-weave as you write
+  # or serve it live on the local nexus:
+  WB_SERVE=1 PORT=4000 WB_DATA="$(pwd)" elixir --no-halt -S mix run   # from the runtime
+
+## Make it yours — checklist
+
+1. `title` in `index.work` → your project name (the one brand variable).
+2. Swap the ❧ glyph for your logo when you have one.
+3. Replace the starter pages; list yours under sections in `index.work`.
+4. Link pages with `[text](/section/page)` — the router handles the rest.

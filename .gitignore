@@ -98,6 +98,7 @@ nexus/**/*.dets
 
 # Working docs — kept on disk, never committed
 docs/
+!templates/docs/        # the unbranded docs starter TEMPLATE is real, tracked source
 
 # Runtime DETS state must never be tracked (token hashes, org records, waitlist emails)
 **/*.dets

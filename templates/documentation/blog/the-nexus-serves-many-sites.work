@@ -1,0 +1,26 @@
+# One nexus, many sites
+
+> How a single runtime hosts this documentation, the example apps, and your projects — side by side.
+
+A **nexus** is a host. Not a host for *one* workbook — a host for as many as you mount on it. The
+runtime you're reading this on is serving the documentation, the Search Swarm, Brandnana, and a slide
+deck *at the same time*, each at its own path, from one process.
+
+## Each workbook gets a mount
+
+When the nexus boots over a folder of workbooks, every subfolder becomes a mount at `/<name>/`. The
+runtime injects a `<base href="/<name>/">` so each app's relative links — `live/<source>`,
+`data/<Resource>`, page routes — resolve under its own prefix and never collide with its neighbours.
+
+## Names, not URLs
+
+A nexus has a memorable codename (an adjective-animal handle) and a friendly name you give it. You
+deploy *into* one by name — `work deploy . --nexus <name>` — not by copying a URL around. The name is
+a handle, not a credential: it only resolves to a nexus your account actually owns.
+
+## What this unlocks
+
+It means a documentation site, a marketing page, and three internal tools can live on **one** runtime
+you pay for once — the same shape whether that runtime is on your laptop or in the cloud. The
+[Running the nexus](/deploy/running-the-nexus) page shows how to bring one up locally in a single
+command.

@@ -243,18 +243,7 @@ defmodule Nexus.SSR do
 
   defp render_node(%{type: :heading, level: l, text: t}, _res, _ctx), do: "  <h#{l}>#{inline(t)}</h#{l}>"
 
-  defp render_node(%{type: :prose, text: t}, _res, _ctx) do
-    t
-    |> String.split("\n")
-    |> Enum.chunk_by(&String.starts_with?(&1, "- "))
-    |> Enum.map_join("\n", fn
-      ["- " <> _ | _] = items ->
-        "  <ul>" <> Enum.map_join(items, "", fn "- " <> i -> "<li>#{inline(i)}</li>" end) <> "</ul>"
-
-      paras ->
-        paras |> Enum.reject(&(String.trim(&1) == "")) |> Enum.map_join("\n", &"  <p>#{inline(&1)}</p>")
-    end)
-  end
+  defp render_node(%{type: :prose, text: t}, _res, _ctx), do: block_md(t)
 
   # `show <Resource>` → a live data table; `show <Unit>` → the unit's `render()` output, baked.
   defp render_node(%{type: :decl, text: "show " <> rest}, res, ctx) do
@@ -289,6 +278,58 @@ defmodule Nexus.SSR do
   end
 
   defp render_node(_, _res, _ctx), do: ""
+
+  # Minimal block markdown: blank-line-delimited paragraphs (soft-wrapped lines joined), `- ` lists,
+  # `> ` blockquotes, and ``` fenced code. Inline formatting (bold/italic/code/links) applied per line.
+  defp block_md(text) do
+    text |> String.split("\n") |> group_blocks([]) |> Enum.reverse() |> Enum.map_join("\n", &render_block/1)
+  end
+
+  defp group_blocks([], acc), do: acc
+
+  defp group_blocks(["```" <> _ | rest], acc) do
+    {code, rest2} = Enum.split_while(rest, &(&1 != "```"))
+    rest3 = case rest2 do ["```" | r] -> r; r -> r end
+    group_blocks(rest3, [{:code, code} | acc])
+  end
+
+  defp group_blocks([line | rest], acc) do
+    cond do
+      String.trim(line) == "" ->
+        group_blocks(rest, acc)
+
+      String.starts_with?(line, ">") ->
+        {q, rest2} = Enum.split_while([line | rest], &String.starts_with?(&1, ">"))
+        group_blocks(rest2, [{:quote, q} | acc])
+
+      String.starts_with?(line, "- ") ->
+        {items, rest2} = Enum.split_while([line | rest], &String.starts_with?(&1, "- "))
+        group_blocks(rest2, [{:ul, items} | acc])
+
+      true ->
+        {para, rest2} =
+          Enum.split_while([line | rest], fn l ->
+            tl = String.trim(l)
+            tl != "" and not String.starts_with?(tl, "- ") and not String.starts_with?(tl, ">") and
+              not String.starts_with?(l, "```")
+          end)
+
+        group_blocks(rest2, [{:p, para} | acc])
+    end
+  end
+
+  defp render_block({:code, lines}), do: "  <pre><code>" <> esc(Enum.join(lines, "\n")) <> "</code></pre>"
+
+  defp render_block({:quote, lines}) do
+    body = lines |> Enum.map_join(" ", &(&1 |> String.replace(~r/^>\s?/, "") |> String.trim()))
+    "  <blockquote>#{inline(body)}</blockquote>"
+  end
+
+  defp render_block({:ul, items}),
+    do: "  <ul>" <> Enum.map_join(items, "", fn "- " <> i -> "<li>#{inline(i)}</li>" end) <> "</ul>"
+
+  defp render_block({:p, lines}),
+    do: "  <p>#{inline(lines |> Enum.map_join(" ", &String.trim/1))}</p>"
 
   # Compile the unit (any lane), run its no-arg `render` export on wasmex, bake the result.
   # An ungranted host cap is refused BEFORE running it (the weave is where the audit is enforced).
@@ -345,7 +386,7 @@ defmodule Nexus.SSR do
     |> String.replace(~r/\*\*(.+?)\*\*/, "<strong>\\1</strong>")
     |> String.replace(~r/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/, "<em>\\1</em>")
     |> String.replace(~r/`(.+?)`/, "<code>\\1</code>")
-    |> String.replace(~r/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/, ~s(<a href="\\2">\\1</a>))
+    |> String.replace(~r/\[(.+?)\]\(([^\s)]+)\)/, ~s(<a href="\\2">\\1</a>))
   end
 
   # XSS-safe escape for every interpolated value (text, data cells, attributes).

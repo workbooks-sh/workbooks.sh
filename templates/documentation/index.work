@@ -48,4 +48,9 @@ app :docs do
   section "Examples" do
     page "examples/learn-by-example"
   end
+
+  section "Blog" do
+    page "blog/why-we-author-docs-as-a-workbook"
+    page "blog/the-nexus-serves-many-sites"
+  end
 end

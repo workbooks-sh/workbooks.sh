@@ -1,0 +1,17 @@
+# Installation
+
+Get the project onto your machine. Replace these steps with your own — the structure is what matters.
+
+## Prerequisites
+
+You'll need the `work` CLI on your `PATH`. Everything below assumes you're inside this folder.
+
+## Install
+
+```
+work new docs my-docs      # scaffold a fresh copy of this template
+cd my-docs
+work dev .                 # watch + re-weave as you edit
+```
+
+That's it — open the printed URL and you're reading your own docs. The next page, [Quickstart](/getting-started/quickstart), walks through making your first change.

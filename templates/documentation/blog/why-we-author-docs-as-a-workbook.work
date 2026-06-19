@@ -1,0 +1,27 @@
+# Why we author these docs as a workbook
+
+> A short post on dogfooding — the docs you're reading are built with the thing they document.
+
+Most documentation sites are a static-site generator, a theme, a pile of Markdown, and a build
+pipeline that turns the three into HTML. We don't run any of that. These docs are a **workbook**: a
+folder of `.work` files, woven by the same `work` CLI we ship to you.
+
+## One file is the table of contents
+
+The whole site is declared in one composition root — `index.work` — with an `app :docs` block. It
+names the site, picks a theme, and lists the sections and pages in order. The sidebar you see is a
+direct render of that block. Reorder two lines, the navigation reorders. There is no separate config,
+no front-matter database, no `_sidebar.yml`.
+
+## Every page is just prose
+
+Each page is a sibling `.work` file. The first heading is its title; the rest is Markdown. Because a
+page is a *real* workbook, when one needs to be interactive — like the [Examples](/examples/learn-by-example)
+explorer, which reads live source out of running apps — you drop a `client` island in between two
+paragraphs. The same document is both prose and program.
+
+## Why it matters
+
+We have a rule: **if we build it, we use it.** The site-mode renderer behind these docs
+(`Nexus.Docs`) is the same one your `work new docs` scaffold runs. When it's not good enough for our
+own documentation, we feel it first — and fix it before you ever see it.

@@ -1,0 +1,41 @@
+# Documentation — template :app
+
+The **full Workbooks documentation site**, authored entirely in `.work` — and a template you can
+scaffold for your own. A composition-root `index.work` declares an `app :docs` (title, theme, and the
+ordered sections → pages of the sidebar); every page and blog post is a sibling `.work` file of prose.
+The platform's site-mode weave (`Nexus.Docs`) renders the whole tree as a navigable SPA: sidebar,
+clean history-routed URLs, reload-safe deep links, an interactive [Examples](/examples/learn-by-example)
+explorer, and a [Blog](/blog/why-we-author-docs-as-a-workbook) — with no front-end code to write.
+
+Scaffold it with `work new documentation <your-docs>`. For a minimal, empty starting point instead,
+use `work new docs` — same engine, fewer pages.
+
+## What's the template, and what's the platform
+
+The **platform** renders the site; it is NOT part of this folder. You declare structure with `app
+:docs do … section … page … end` and the runtime's `Nexus.Docs` parses it, server-renders each page's
+prose, and emits the sidebar + content + router. The `:paper_ink` theme and the history router ship
+with the runtime.
+
+The **template** is what you own:
+
+- `index.work` → the `app :docs` block — the site name, theme, and full table of contents.
+- `preface/`, `introduction/`, `language/`, `deploy/`, `tooling/` → reference pages (prose).
+- `examples/` → a page whose `client` island reads live `.work` source out of the running apps.
+- `blog/` → posts. Add a file, list it under the `Blog` section, done.
+
+Every page's first heading is its sidebar label; link pages with `[text](/section/page)`.
+
+## Run it
+
+  work weave .            # → one self-contained, navigable docs site
+  work dev .              # watch + re-weave as you write
+  # or serve it live on the local nexus:
+  WB_SERVE=1 PORT=4000 WB_DATA="$(pwd)" elixir --no-halt -S mix run   # from the runtime
+
+## Make it yours — checklist
+
+1. `title` in `index.work` → your project name (the one brand variable; it's the sidebar wordmark).
+2. Replace the reference pages with your own; keep or drop `examples/` and `blog/`.
+3. Add a blog post: write `blog/<slug>.work`, list it under the `Blog` section.
+4. Link pages with `[text](/section/page)` — the router handles the rest.

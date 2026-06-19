@@ -1,0 +1,25 @@
+# Your documentation
+
+This `index.work` is the **composition root** of a documentation site. It names the site, picks a
+theme, and lists — in order — the sections and pages the sidebar shows. Everything else is a sibling
+`.work` file of plain prose. `work weave .` folds the whole tree into one navigable site; the nexus
+serves it live.
+
+There is **one place to brand this**: the `title` below. It doubles as the sidebar wordmark next to
+the ❧ mark — swap that glyph for your own logo when you have one. No other file needs editing to make
+this yours.
+
+app :docs do
+  title  "Your Project"          # ← your brand. Shows in the sidebar next to the ❧ logo placeholder.
+  theme  :paper_ink              # built-in light theme — Geist, paper + ink, a soft left-rail accent
+  router :history                # clean URLs: /getting-started/installation, with reload-safe routing
+
+  section "Getting started" do
+    page "getting-started/installation"
+    page "getting-started/quickstart"
+  end
+
+  section "Guides" do
+    page "guides/writing-pages"
+  end
+end

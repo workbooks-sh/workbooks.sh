@@ -1,0 +1,26 @@
+# Writing pages
+
+A page is just a `.work` file of prose. The first heading is its title; everything under it renders
+in order. You write Markdown — headings, lists, **bold**, `inline code`, fenced code blocks, and
+> blockquotes for callouts.
+
+## Sections and order
+
+The sidebar mirrors `index.work` exactly. Sections group pages; pages appear in the order you list
+them. To reorder, move the `page` lines — nothing else.
+
+## Links and refs
+
+- A Markdown link to a real page path (`[text](/section/page)`) navigates inside the site.
+- An external link (`https://…`) opens normally.
+
+## Live blocks (optional)
+
+Prose is the floor, not the ceiling. Because every page is a real workbook, you can drop a `client`
+island into one to embed something interactive — a diagram, a demo, a calculator — right between two
+paragraphs. Start with prose; reach for a block only when a page needs to *do* something.
+
+## Keep it yours
+
+Delete the starter pages once you've read them. The only file you can't delete is `index.work` — it's
+the table of contents. Everything else is yours to write.

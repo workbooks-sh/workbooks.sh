@@ -1,0 +1,24 @@
+# Quickstart
+
+Make this documentation yours in three small edits.
+
+## 1. Rename it
+
+Open `index.work` and change the `title` — set `title "Your Project"` to your own name, e.g. `title "Acme Rockets"`. The sidebar wordmark updates everywhere at once. The `title` is the single source of truth for your brand: it's the one "variable" this template is built around.
+
+## 2. Add a page
+
+Create a file like `guides/deploying.work`. Its first heading becomes the sidebar label, and the rest is plain prose. Then list it under a section in `index.work` — sections and their order are declared right in the composition root:
+
+section "Guides" do
+  page "guides/writing-pages"
+  page "guides/deploying"
+end
+
+That's all it takes to add a page to the sidebar.
+
+## 3. Link between pages
+
+In any page, a plain Markdown link to a real page path just works — the router intercepts it and navigates inside the site, no reload. For example, a link written as `[Installation](/getting-started/installation)` takes the reader straight there.
+
+That's the whole model. Keep writing prose; the [Writing pages](/guides/writing-pages) guide covers the finer points.
