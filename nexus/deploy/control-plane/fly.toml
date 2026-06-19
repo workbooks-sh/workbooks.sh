@@ -1,0 +1,66 @@
+# Platform Control Plane (PCP) — the hosted-nexus dashboard's backend.
+#
+# The SAME nexus image as a tenant runtime, but in the CONTROL-PLANE role (WB_CONTROL_PLANE=1):
+# always-on, multi-tenant, authenticated by WorkOS JWT. The dashboard forwards the user's WorkOS
+# access token; Nexus.Auth.Jwt verifies it via the IdP JWKS and maps its `org_id` claim → tenant.
+# It owns the nexus registry and (next) drives the Fly Machines API to provision per-tenant nexuses.
+#
+# Deploy (image-based, no local build):
+#   fly apps create wb-nexus-cp --org personal
+#   fly volumes create cpdata --size 1 --app wb-nexus-cp --region sjc
+#   fly secrets set FLY_API_TOKEN=$(fly auth token) --app wb-nexus-cp
+#   fly deploy --config nexus/deploy/control-plane/fly.toml --app wb-nexus-cp
+#
+# Then point the dashboard at it (Pages project workbooks-cloud):
+#   WB_RUNTIME_URL = https://wb-nexus-cp.fly.dev
+#
+# ⚠️ Do NOT deploy this until the control-plane API + auth are ported AND adversarially verified —
+# the current published nexus image must contain Nexus.Platform + Nexus.ControlPlane first.
+
+app = "wb-nexus-cp"
+primary_region = "sjc"
+
+[build]
+  # Publish name is stable; the image now carries the NEXUS release (bin/nexus). nexus-image.yml
+  # builds it from nexus/.
+  image = "ghcr.io/workbooks-sh/runtime:latest"
+
+[env]
+  # A release sets RELEASE_NAME → Nexus.Application serves; WB_SERVE=1 makes that explicit.
+  WB_SERVE = "1"
+  PORT = "4000"
+  WB_CONTROL_PLANE = "1"
+  # WorkOS AuthKit access-token verification (public config; the verifier needs no secret).
+  WB_OIDC_JWKS_URL = "https://api.workos.com/sso/jwks/client_01KS9XB6QEZTMHVHTFXZSZ65GY"
+  WB_OIDC_TENANT_CLAIM = "org_id"
+  # The persistent volume (the nexus registry's durable home — see the registry-durability TODO;
+  # the in-memory ETS registry must move to exqlite on /data before this is production-durable).
+  WB_DATA = "/data"
+  # Per-tenant nexuses provision into this Fly org (used by the Fly provisioner, next).
+  WB_FLY_ORG = "personal"
+
+[[mounts]]
+  source = "cpdata"
+  destination = "/data"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  # Always-on: the control plane answers the dashboard, it is not a scale-to-zero demo.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[http_service.checks]
+  # Liveness probe (unauthenticated — see Nexus.Auth/Nexus.Server).
+  [http_service.checks.health]
+    method = "get"
+    path = "/health"
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "10s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024

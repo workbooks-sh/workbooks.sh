@@ -16,6 +16,35 @@ defmodule Nexus.ControlPlane do
   @doc "Is this nexus running in the control-plane role? (the WB_CONTROL_PLANE deploy flag)."
   def enabled?, do: System.get_env("WB_CONTROL_PLANE") in ~w(1 true)
 
+  @doc """
+  Wire the auth adapter for the control-plane role (called at boot). When enabled, the control-plane
+  MUST authenticate every caller via the WorkOS-issued JWT (`org_id` → tenant), so we force
+  `Nexus.Auth.Jwt` and configure it from the deploy env (the OIDC provider this role trusts — public
+  config, not a secret):
+
+      WB_OIDC_JWKS_URL     the IdP JWKS endpoint (https; required — without it auth fails CLOSED)
+      WB_OIDC_TENANT_CLAIM the claim carrying the org/tenant (default "org_id")
+      WB_OIDC_ISS          expected issuer (optional but recommended)
+
+  Fail-closed: a missing JWKS URL leaves `jwks_url: nil`, so every token 401s — the control-plane is
+  inert, never wide-open. Returns `:ok | :skip`.
+  """
+  def configure_auth do
+    if enabled?() do
+      cfg =
+        [
+          jwks_url: System.get_env("WB_OIDC_JWKS_URL"),
+          tenant_claim: System.get_env("WB_OIDC_TENANT_CLAIM") || "org_id"
+        ] ++ if((iss = System.get_env("WB_OIDC_ISS")), do: [iss: iss], else: [])
+
+      Application.put_env(:nexus, Nexus.Auth.Jwt, cfg)
+      Application.put_env(:nexus, :auth, Nexus.Auth.Jwt)
+      :ok
+    else
+      :skip
+    end
+  end
+
   # ── registry (tenant-partitioned, ETS) ─────────────────────────────────────────────────────────
   # Key is always {org, kind, id} so a lookup is physically impossible to satisfy with another org's
   # row — isolation is structural, not a WHERE clause we might forget.

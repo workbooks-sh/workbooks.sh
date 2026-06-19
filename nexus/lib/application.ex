@@ -16,6 +16,9 @@ defmodule Nexus.Application do
     # Load runtime config from the deployment's <work-deploy> element (HTML source of truth) into
     # :persistent_term BEFORE the Gate reads its concurrency limit. No env vars for tunable config.
     Nexus.Config.boot()
+    # In the control-plane role, force WorkOS-JWT auth (org_id → tenant) from the deploy env — every
+    # /api/platform caller must carry a real org identity (fail-closed; see Nexus.ControlPlane).
+    Nexus.ControlPlane.configure_auth()
     # Empty by default; Constellation's local-inference lanes opt in via `config :nexus, Nexus.Constellation, enabled: true`.
     ether = if Nexus.Constellation.enabled?(), do: Nexus.Constellation.children(), else: []
     # Nexus.Wasm.Gate bounds concurrent wasm OS processes per lane (compile-concurrency /
