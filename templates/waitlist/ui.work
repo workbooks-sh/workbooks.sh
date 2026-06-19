@@ -1,0 +1,66 @@
+# The interface
+
+A `client` block — the browser island. A centered email field; on submit it opens an `EventSource`
+on the `waitlist` live source (passing the email), reads the one-shot result, and swaps to a thank-you
+state. No framework, no build step — the island is emitted verbatim and runs in the browser.
+
+client :app do
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0f1115;color:#f0eee8;
+      font:16px/1.6 'Inter',system-ui,sans-serif}
+    #wl{width:100%;max-width:440px;padding:32px;text-align:center}
+    #wl h1{font-size:30px;font-weight:700;letter-spacing:-.02em;margin:0 0 10px}
+    #wl p{color:#9a9aa6;margin:0 0 26px}
+    .row{display:flex;gap:8px;background:#1a1d24;border:1px solid #2a2e38;border-radius:13px;padding:7px;
+      box-shadow:0 12px 40px rgba(0,0,0,.35)}
+    .row input{flex:1;border:0;outline:0;background:transparent;color:#f0eee8;font:16px 'Inter';padding:10px 12px}
+    .row input::placeholder{color:#6c7080}
+    .row button{border:0;background:#f0eee8;color:#0f1115;font:600 15px 'Inter';padding:11px 20px;border-radius:9px;cursor:pointer}
+    .row button:disabled{opacity:.5;cursor:default}
+    .msg{margin-top:14px;font-size:14px;min-height:20px}
+    .msg.err{color:#f0a0a0} .msg.ok{color:#a6e6be}
+    .done h1{margin-bottom:4px}
+  </style>
+
+  <div id="wl">
+    <div id="form">
+      <h1>Get notified</h1>
+      <p>We'll email you the moment it's ready. No spam, ever.</p>
+      <div class="row">
+        <input id="email" type="email" placeholder="you@company.com" autocomplete="email" />
+        <button id="go" type="button">Notify me</button>
+      </div>
+      <div class="msg" id="msg"></div>
+    </div>
+    <div id="thanks" class="done" style="display:none">
+      <h1>You're on the list 🎉</h1>
+      <p>We'll be in touch. Thanks for the interest!</p>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    var $=function(s){return document.querySelector(s)};
+    function submit(){
+      var email=$('#email').value.trim();
+      if(!email){ msg('email required','err'); return; }
+      $('#go').disabled=true; msg('Adding you…','');
+      var es=new EventSource('live/waitlist?email='+encodeURIComponent(email));
+      es.onmessage=function(e){
+        es.close(); $('#go').disabled=false;
+        var d; try{d=JSON.parse(e.data)}catch(_){d={}}
+        if(d.ok){ $('#form').style.display='none'; $('#thanks').style.display='block'; }
+        else { msg(d.error||'something went wrong','err'); }
+      };
+      es.onerror=function(){ es.close(); $('#go').disabled=false; msg('connection error — try again','err'); };
+    }
+    function msg(t,cls){ var m=$('#msg'); m.textContent=t; m.className='msg '+(cls||''); }
+    $('#go').addEventListener('click',submit);
+    $('#email').addEventListener('keydown',function(e){ if(e.key==='Enter')submit(); });
+  })();
+  </script>
+end

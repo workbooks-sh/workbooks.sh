@@ -1,0 +1,30 @@
+# Waitlist — template :app
+
+A "notify me" interest list, authored entirely in `.work`: a `resource Signup` (the data model,
+persisted to the nexus's managed `Nexus.Store`) and a `server :waitlist` block (validation + write,
+exposed as a live source) — plus a `client` island for the form. A worked example of **data capture
+as an extension**: the runtime ships no waitlist; you build one as a workbook and deploy it.
+
+Scaffold it with `work new waitlist <your-list>`.
+
+## What's the template, and what's the platform
+
+The **platform** persists rows (`Nexus.Store`) and brings up live sources (`Nexus.Live`) — generic,
+shipped with the runtime. The **template** is what you own:
+
+- `index.work` → `resource Signup` (your fields) + `server :waitlist` (your validation + write).
+- `ui.work` → `client :app` (the form island; opens an `EventSource` on the `waitlist` source).
+
+## Run it
+
+  work weave .            # → one self-contained workbook.html
+  work dev .              # watch + re-weave
+  # or serve it live on the local nexus:
+  WB_SERVE=1 PORT=4000 WB_DATA="$(pwd)" elixir --no-halt -S mix run   # from the runtime
+
+## Make it yours — checklist
+
+1. `resource Signup` fields → whatever you collect.
+2. `server :waitlist` validation/write → your rules (dedup, extra fields, a confirmation email).
+3. `client :app` → your form + branding.
+4. Read the list with `Nexus.Store.all(Signup)` behind an auth-gated maintainer surface.

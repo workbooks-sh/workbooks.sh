@@ -98,24 +98,9 @@ defmodule Nexus.Server do
     |> send_resp(200, body)
   end
 
-  # Desktop-app interest capture — the lander's "notify me" modal POSTs here. Public
-  # (allow-listed in Nexus.Auth); stores {email, interest} in the durable waitlist.
-  post "/api/waitlist" do
-    {:ok, body, conn} = read_body(conn)
-
-    payload =
-      with {:ok, m} when is_map(m) <- Jason.decode(body),
-           email when is_binary(email) <- m["email"],
-           :ok <- Nexus.Waitlist.add(email, m["interest"] || "") do
-        %{ok: true}
-      else
-        {:error, :invalid_email} -> %{ok: false, error: "invalid email"}
-        _ -> %{ok: false, error: "email required"}
-      end
-
-    status = if payload.ok, do: 200, else: 422
-    conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
-  end
+  # (A waitlist / interest capture is NOT a runtime concern — THE LINE. It's our own workbook:
+  # `templates/waitlist` declares a `resource Signup` + a `server :waitlist` live source that
+  # validates + persists via the generic `Nexus.Store`. Any workbook captures data the same way.)
 
   # The RCP capabilities handshake — the FIRST thing the desktop/web RCP client fetches to learn how
   # to talk to this runtime. Public (no credential; exposes only the auth rung, never tenant data).
