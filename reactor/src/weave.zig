@@ -11,11 +11,15 @@ const fs = @import("fs.zig");
 const log = @import("log.zig");
 const render = @import("render.zig");
 const site = @import("site.zig");
+const skills = @import("skills.zig");
 
 const Buf = std.ArrayList(u8);
 
 pub fn weave(io: Io, alloc: std.mem.Allocator, dir: []const u8, out: []const u8) !u8 {
     log.prompt(try std.fmt.allocPrint(alloc, "work weave {s} \u{2192} {s}", .{ dir, out }));
+
+    // Tangle skills: `<dir>/skills/*.work` app-compositions → SKILL.md (no-op if absent).
+    skills.emit(io, alloc, dir) catch {};
 
     // Site mode: index.work declares an `app` block → a multi-page SPA.
     const index_path = try std.fmt.allocPrint(alloc, "{s}/index.work", .{dir});

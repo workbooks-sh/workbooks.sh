@@ -1,0 +1,25 @@
+# Getting started skill
+
+A skill is authored **once, as docs**. This `app` composition names the subset of
+documentation pages that an onboarding skill needs, and `work weave` assembles them
+into a `SKILL.md` next to this file — frontmatter plus each page's `.work` source
+verbatim. We never hand-edit the generated skill; we edit the docs it composes.
+
+The convention is the same `app` / `section` / `page` used by the docs index — the
+only difference is location: an `app` under `skills/` assembles to markdown, the
+index `app` assembles to the HTML site.
+
+app :getting_started do
+  title       "Getting started with Workbooks"
+  description "Author and ship .work workbooks. Use when starting a new workbook, learning the .work format, or onboarding a CLI agent to the work CLI."
+
+  section "What it is" do
+    page "introduction/what-is-a-workbook"
+    page "introduction/what-is-a-work-file"
+  end
+
+  section "The work CLI" do
+    page "introduction/what-is-the-work-cli"
+    page "tooling/get-started-with-your-cli-agent"
+  end
+end
