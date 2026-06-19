@@ -46,6 +46,8 @@ defmodule Nexus.Llm do
         # Passthrough for server-specific knobs (e.g. llama.cpp `chat_template_kwargs` to toggle a
         # local thinking model's reasoning). Ignored by providers that don't recognize them.
         |> maybe_put(:chat_template_kwargs, opts[:chat_template_kwargs])
+        # OpenRouter provider routing (e.g. %{order: ["Cloudflare"]}) — pin a fast/cheap provider.
+        |> maybe_put(:provider, opts[:provider])
         |> Jason.encode!()
 
       # Long-running deep-research turns (thinking models + web plugin) can exceed the 2min default;

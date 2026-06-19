@@ -117,15 +117,20 @@ defmodule Nexus.Agent do
   end
 
   defp loop(messages, vfs, opts, deadline, tel) do
+    emit = Keyword.get(opts, :on_event, fn _ -> :ok end)
+
     if now_ms() > deadline do
       {{:error, {:timeout, tel.turns}}, tel}
     else
       case Nexus.Llm.complete(manage(messages, opts), Keyword.put(opts, :tools, [@bash_tool])) do
         {:ok, %{tool_calls: []} = turn} ->
+          if reasoning?(turn.content), do: emit.({:answer, turn.content})
           tel = tally(tel, turn, [])
           {{:ok, %{answer: turn.content, turns: tel.turns, vfs_files: Vfs.ls(vfs)}}, tel}
 
         {:ok, %{tool_calls: calls} = turn} ->
+          if reasoning?(turn.content), do: emit.({:think, turn.content})
+          Enum.each(calls, fn c -> emit.({:tool, command_of(c)}) end)
           tel = tally(tel, turn, calls)
           assistant = %{role: "assistant", content: turn.content || "", tool_calls: raw_calls(calls)}
           results = Enum.map(calls, &run_bash(&1, vfs))
@@ -136,6 +141,10 @@ defmodule Nexus.Agent do
       end
     end
   end
+
+  defp reasoning?(c), do: is_binary(c) and String.trim(c) != ""
+  defp command_of(%{args: %{"command" => cmd}}) when is_binary(cmd), do: cmd
+  defp command_of(_), do: ""
 
   # Context strategy: plain sliding window (default), or compaction (summarize dropped spans) when
   # `compact: true` — the solid method for long-horizon runs that must not lose early facts.

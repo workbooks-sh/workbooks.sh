@@ -65,26 +65,13 @@ defmodule Nexus.Server do
     |> send_resp(200, Jason.encode!(rows, escape: :html_safe))
   end
 
-  # ── Swarm showcase ───────────────────────────────────────────────────────────────────────────
-  # The single-viewport demo workbook: a compose bar + a live grid of agent windows.
-  get "/swarm-demo" do
-    path = Path.join(:code.priv_dir(:nexus), "swarm-demo.html")
-
-    case File.read(path) do
-      {:ok, html} -> conn |> put_resp_content_type("text/html") |> send_resp(200, html)
-      _ -> send_resp(conn, 404, "swarm-demo.html not found")
-    end
-  end
-
-  # SSE stream: run a research swarm for ?q= capped at ?max= agents, pushing each agent's live state
-  # as it searches/reads/spawns. One event per line; the browser's EventSource renders the fleet.
-  get "/swarm" do
+  # ── Live channel (the Dock seam for workbook `view` units) ────────────────────────────────────
+  # GET /live/:source?<params> — subscribe to a registered Nexus.Live source as SSE. A woven `view`
+  # template opens an EventSource here; the source (e.g. a `fleet` unit) streams events. Generic:
+  # any streaming capability registers in Nexus.Live and any workbook view can bind to it.
+  get "/live/:source" do
     conn = Plug.Conn.fetch_query_params(conn)
-    query = conn.query_params["q"] || ""
-    max = case Integer.parse(conn.query_params["max"] || "24") do
-      {n, _} -> n
-      _ -> 24
-    end
+    params = conn.query_params
 
     conn =
       conn
@@ -94,7 +81,7 @@ defmodule Nexus.Server do
 
     me = self()
     emit = fn event -> send(me, {:sse, event}) end
-    runner = spawn_link(fn -> Nexus.Swarm.run(query, max, emit); send(me, :sse_done) end)
+    runner = spawn_link(fn -> Nexus.Live.run(source, params, emit); send(me, :sse_done) end)
 
     final = stream_sse(conn)
     if Process.alive?(runner), do: Process.exit(runner, :kill)

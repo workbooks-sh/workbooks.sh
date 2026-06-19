@@ -1,0 +1,33 @@
+# Swarm — many real agents on one nexus
+
+This workbook is a **demo implementation** of three foundational primitives: an `agent` (a literate
+research agent), a `fleet` (a coordinated tree of those agents — `Nexus.Fleet`), and a live `view`
+(the single-viewport board, streamed from the nexus over the Dock's live channel). Nothing here is
+hand-written HTML or a bespoke route — the nexus weaves it and serves it.
+
+Type a topic and a max-agent count below. A coordinator decomposes the topic, spawns one real
+LLM-driven agent per sub-question, and each agent searches and reads the live web — every window is
+that agent's actual reasoning, streamed as it works. The windows tile to fill one viewport and
+shrink as the fleet grows.
+
+The researcher each window runs:
+
+agent :researcher do
+  You are a focused web research agent. Investigate the question by USING THE WEB: `search <query>`
+  to find sources (numbered title/url/snippet), then `scrape <url>` to read the most relevant ones.
+  Do 2-4 rounds — search, read a source or two, refine, search again — thinking briefly before each
+  step. When you have enough, reply with a 2-3 sentence finding citing the key facts and the URLs.
+end
+
+The fleet that runs a tree of them, coordinated and budget-capped:
+
+fleet :swarm, agent: researcher do
+  Decompose the topic into focused sub-questions and run one researcher per sub-question.
+end
+
+The live board — the compose bar + the shrinking grid of agent windows, streamed from the `swarm`
+fleet:
+
+view :board, stream: swarm do
+  Each window is a real agent: blue = searching, amber = reading, violet = thinking, green = done.
+end

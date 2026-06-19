@@ -93,6 +93,20 @@ defmodule Nexus.Weave do
   end
 
   defp render(pages, res, live, ctx) do
+    # Bring up the workbook's live capabilities: register each `fleet` unit as a Nexus.Live source
+    # (resolving its `agent:` to that agent unit's prompt) so a `view` template can subscribe to it.
+    register_fleets(pages, collect_agents(pages))
+
+    # An APP workbook (one that defines a `view`) renders as a full-screen app — just the view(s),
+    # no document chrome. The prose/agent/fleet units are the app's source, not its rendered body.
+    # A workbook with no view renders as a literate document (prose + data tables + unit output).
+    case collect_views(pages) do
+      [] -> document(pages, res, live, ctx)
+      views -> app(views, title(pages))
+    end
+  end
+
+  defp document(pages, res, live, ctx) do
     body = Enum.map_join(pages, "\n", &page(&1, res, ctx))
 
     """
@@ -104,6 +118,30 @@ defmodule Nexus.Weave do
     #{data_islands(res, ctx)}<script>#{js_shim(live)}</script>
     </body></html>
     """
+  end
+
+  # Full-screen app: only the view(s) render, filling the viewport. No nav, no prose, no code figures.
+  defp app(views, title) do
+    body = Enum.map_join(views, "\n", fn {n, s, i} -> live_view_html(n, s, i) end)
+
+    """
+    <!doctype html>
+    <html lang="en"><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="darkreader-lock"><meta name="color-scheme" content="dark">
+    <title>#{esc(title)}</title>
+    <style>html,body{height:100%;margin:0;background:#0c0d10;overflow:hidden}</style></head>
+    <body>
+    #{body}
+    </body></html>
+    """
+  end
+
+  # the view units, as {name, stream, intro}.
+  defp collect_views(pages) do
+    for {_f, nodes} <- pages, %{type: :code, kind: "view", name: n, header: h, body: b} <- nodes do
+      {n, opt(h, "stream") || n, b}
+    end
   end
 
   # The BAKED data backend: each resource's (tenant-scoped) Store rows inlined as a JSON island the
@@ -225,6 +263,15 @@ defmodule Nexus.Weave do
 
   defp render_node(%{type: :decl, text: t}, _res, _ctx), do: ~s(  <pre class="decl">#{esc(t)}</pre>)
 
+  # A `fleet` unit is a live capability, registered in render/4 — it renders nothing on the page.
+  defp render_node(%{type: :code, kind: "fleet"}, _res, _ctx), do: ""
+
+  # A `view :name, stream: <fleet>` unit renders the live-fleet viewer bound to that stream — the
+  # compose bar + the shrinking grid of agent windows. The body (if any) is shown as the intro.
+  defp render_node(%{type: :code, kind: "view", name: n, header: h, body: b}, _res, _ctx) do
+    live_view_html(n, opt(h, "stream") || n, b)
+  end
+
   defp render_node(%{type: :code, kind: k, name: n, body: b}, _res, _ctx) do
     ~s(  <figure class="unit" data-unit="#{esc(k)}:#{esc(n)}">) <>
       ~s(<figcaption><span class="kind">#{esc(k)}</span> #{esc(n)}</figcaption>) <>
@@ -232,6 +279,128 @@ defmodule Nexus.Weave do
   end
 
   defp render_node(_, _res, _ctx), do: ""
+
+  # ── live fleet capability (the `fleet` + `view` units) ────────────────────────────────────────
+  # agent name → system prompt (its unit body), across all files.
+  defp collect_agents(pages) do
+    for {_f, nodes} <- pages, %{type: :code, kind: "agent", name: nm, body: bd} <- nodes, into: %{} do
+      {nm, String.trim(bd || "")}
+    end
+  end
+
+  # Register each `fleet :name, agent: <ref>` unit as a Nexus.Live source running Nexus.Fleet with
+  # the referenced agent's prompt. The view's EventSource hits GET /live/<name>?q=&max=.
+  defp register_fleets(pages, agents) do
+    for {_f, nodes} <- pages, %{type: :code, kind: "fleet", name: nm, header: h} <- nodes do
+      prompt = Map.get(agents, opt(h, "agent"))
+
+      Nexus.Live.register(nm, fn params, emit ->
+        q = params["q"] || ""
+        max = parse_int(params["max"], 12)
+        Nexus.Fleet.run(q, max: max, agent: prompt, on_event: emit)
+      end)
+    end
+
+    :ok
+  end
+
+  # read `key: value` (a bareword/atom) from a unit header.
+  defp opt(header, key) do
+    case Regex.run(~r/\b#{key}:\s*:?([A-Za-z_]\w*)/, header) do
+      [_, v] -> v
+      _ -> nil
+    end
+  end
+
+  defp parse_int(s, default) when is_binary(s) do
+    case Integer.parse(s) do
+      {n, _} -> n
+      _ -> default
+    end
+  end
+
+  defp parse_int(_, default), do: default
+
+  # The live-fleet-viewer primitive: a compose bar (task + max agents) and a single-viewport grid of
+  # agent windows that tile and shrink as the fleet grows, each rendering one real agent's live state
+  # streamed from `GET /live/<stream>`. This is the reusable rendering of a `view` bound to a fleet —
+  # not hand-rolled per demo.
+  defp live_view_html(name, stream, intro) do
+    ~s"""
+      <div class="work-fleet" id="fleet-#{esc(name)}" data-stream="#{esc(stream)}">
+        <header class="wf-bar">
+          <span class="wf-brand">Nexus Fleet<small>one nexus · live agents</small></span>
+          <form class="wf-form">
+            <input class="wf-q" type="text" placeholder="Research a topic… e.g. BEAM concurrency" value="WebAssembly runtimes" autocomplete="off">
+            <span class="wf-max">max agents <input class="wf-n" type="number" min="1" max="64" value="24"></span>
+            <button class="wf-go" type="submit">Run fleet</button>
+          </form>
+          <span class="wf-stat"><b class="wf-live">0</b> live · <b class="wf-spawned">0</b> of <b class="wf-cap">0</b></span>
+        </header>
+        <main class="wf-grid"></main>
+      </div>
+      <style>
+      .work-fleet{--bg:#0c0d10;--panel:#15171c;--line:#23262e;--ink:#e7e9ee;--dim:#8b909c;--accent:#7dd3a8;
+        --searching:#4a90d9;--reading:#e0a042;--thinking:#a070e0;--done:#3fbf6f;
+        position:fixed;inset:0;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;
+        font:14px/1.5 ui-sans-serif,system-ui,sans-serif}
+      .work-fleet .wf-bar{flex:none;display:flex;gap:.8rem;align-items:center;padding:.55rem .8rem;border-bottom:1px solid var(--line);background:var(--panel)}
+      .work-fleet .wf-brand{font-weight:650;white-space:nowrap}.work-fleet .wf-brand small{color:var(--dim);font-weight:400;margin-left:.4rem}
+      .work-fleet .wf-form{display:flex;gap:.5rem;align-items:center;flex:1}
+      .work-fleet input{background:#0e0f13;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:.5rem .7rem;outline:none}
+      .work-fleet input:focus{border-color:var(--accent)}
+      .work-fleet .wf-q{flex:1;min-width:10rem} .work-fleet .wf-n{width:4rem;text-align:right}
+      .work-fleet .wf-max{color:var(--dim);font-size:.85em;display:flex;gap:.4rem;align-items:center;white-space:nowrap}
+      .work-fleet .wf-go{background:var(--accent);color:#06281a;border:0;border-radius:8px;padding:.55rem 1rem;font-weight:650;cursor:pointer}
+      .work-fleet .wf-go:disabled{opacity:.5}
+      .work-fleet .wf-stat{flex:none;color:var(--dim);font-size:.8em;font-variant-numeric:tabular-nums;white-space:nowrap} .work-fleet .wf-stat b{color:var(--ink)}
+      .work-fleet .wf-grid{flex:1;min-height:0;display:grid;gap:4px;padding:6px}
+      .work-fleet .wf-tile{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;display:flex;flex-direction:column;min-width:0;min-height:0;animation:wfpop .25s ease-out}
+      @keyframes wfpop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+      .work-fleet .wf-h{flex:none;height:14px;display:flex;align-items:center;gap:4px;padding:0 5px;background:#0e0f13;border-bottom:1px solid var(--line);font-size:9px;color:var(--dim)}
+      .work-fleet .wf-dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--dim)}
+      .work-fleet .wf-b{flex:1;min-height:0;padding:5px 6px;font-size:10px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}
+      .work-fleet .wf-u{color:var(--dim);font-size:9px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .work-fleet .wf-tile[data-s=searching] .wf-dot{background:var(--searching);box-shadow:0 0 6px var(--searching)}
+      .work-fleet .wf-tile[data-s=reading] .wf-dot{background:var(--reading);box-shadow:0 0 6px var(--reading)}
+      .work-fleet .wf-tile[data-s=thinking] .wf-dot{background:var(--thinking);box-shadow:0 0 6px var(--thinking)}
+      .work-fleet .wf-tile[data-s=done] .wf-dot{background:var(--done)} .work-fleet .wf-tile[data-s=done]{opacity:.6}
+      .work-fleet .wf-grid.tiny .wf-h,.work-fleet .wf-grid.tiny .wf-b{display:none}
+      .work-fleet .wf-grid.tiny .wf-tile::after{content:"";position:absolute;inset:0;background:currentColor;opacity:.14}
+      .work-fleet .wf-grid.tiny .wf-tile[data-s=searching]{color:var(--searching)} .work-fleet .wf-grid.tiny .wf-tile[data-s=reading]{color:var(--reading)}
+      .work-fleet .wf-grid.tiny .wf-tile[data-s=thinking]{color:var(--thinking)} .work-fleet .wf-grid.tiny .wf-tile[data-s=done]{color:var(--done)}
+      </style>
+      <script>(function(){
+        var root=document.getElementById('fleet-#{esc(name)}'); if(!root) return;
+        var stream=root.dataset.stream, grid=root.querySelector('.wf-grid'), tiles={}, live=0, spawned=0, es=null;
+        var q=root.querySelector('.wf-q'), n=root.querySelector('.wf-n'), go=root.querySelector('.wf-go');
+        function st(){root.querySelector('.wf-live').textContent=live;root.querySelector('.wf-spawned').textContent=spawned;}
+        function relayout(){var c=Object.keys(tiles).length||1;var r=grid.clientWidth/grid.clientHeight||1.6;
+          var cols=Math.max(1,Math.ceil(Math.sqrt(c*r)));var rows=Math.ceil(c/cols);
+          grid.style.gridTemplateColumns='repeat('+cols+',1fr)';grid.style.gridTemplateRows='repeat('+rows+',1fr)';
+          grid.classList.toggle('tiny',(grid.clientWidth/cols)<86||(grid.clientHeight/rows)<54);}
+        function ev(e){
+          if(e.type==='fleet'){root.querySelector('.wf-cap').textContent=e.max;return;}
+          if(e.type==='spawn'){var t=document.createElement('div');t.className='wf-tile';t.dataset.s='thinking';
+            t.innerHTML='<div class="wf-h"><span class="wf-dot"></span><span>'+e.id+'</span></div><div class="wf-b"><span class="wf-a">'+(e.query||'')+'</span><div class="wf-u"></div></div>';
+            grid.appendChild(t);tiles[e.id]=t;spawned++;live++;st();relayout();return;}
+          if(e.type==='state'){var t=tiles[e.id];if(!t)return;t.dataset.s=e.status;
+            var a=t.querySelector('.wf-a'),u=t.querySelector('.wf-u');if(a&&e.action)a.textContent=e.action;if(u)u.textContent=e.url||'';return;}
+          if(e.type==='done'){var t=tiles[e.id];if(t){if(t.dataset.s!=='done')live--;t.dataset.s='done';var a=t.querySelector('.wf-a');if(a&&e.finding)a.textContent=e.finding;}st();return;}
+          if(e.type==='fleet_done'||e.type==='end'){go.disabled=false;go.textContent='Run fleet';if(es){es.close();es=null;}}
+        }
+        root.querySelector('.wf-form').addEventListener('submit',function(x){x.preventDefault();
+          if(es)es.close();grid.innerHTML='';tiles={};live=0;spawned=0;st();
+          var query=encodeURIComponent((q.value||'').trim()||'WebAssembly');var max=Math.max(1,Math.min(64,parseInt(n.value)||24));
+          go.disabled=true;go.textContent='Running…';
+          es=new EventSource('/live/'+encodeURIComponent(stream)+'?q='+query+'&max='+max);
+          es.onmessage=function(m){try{ev(JSON.parse(m.data));}catch(_){}};
+          es.onerror=function(){go.disabled=false;go.textContent='Run fleet';};
+        });
+        addEventListener('resize',relayout);
+      })();</script>
+    """
+  end
 
   # Compile the unit (any lane), run its no-arg `render` export on wasmex, bake the result.
   # An ungranted host cap is refused BEFORE running it (the weave is where the audit is enforced).
