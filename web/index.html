@@ -462,17 +462,14 @@ const WB_FLAGS = { desktopDownload: false };</script>
 </main>
 
 <!-- hero demo: full-width desktop app, overlaps down into the workbooks section.
-     Placeholder = a real R2 looping demo video; the recording will later ship with
-     an INVISIBLE in-video cursor + a position track, so the .cursor3d overlay below
-     follows the true cursor path. For now .cursor3d animates a sample path. -->
+     The R2 clip is recorded with its own true cursor baked in (the recorder
+     traces every real click), so there is NO overlay cursor here — a second
+     animated cursor would desync from the one in the video. -->
 <div class="herodemo">
   <div class="appwin">
     <div class="appscreen">
       <span class="stoplight" aria-hidden="true"><i></i><i></i><i></i></span>
       <video src="https://pub-eecb84bd77df49bebf6ffbd196a7c627.r2.dev/demos/desktop-tabbed-workspaces.mp4" autoplay loop muted playsinline preload="metadata"></video>
-      <span class="cursor3d" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path d="M5 2.5l13.5 7-6.1 1.7-1.8 6.1z" fill="#fff" stroke="#111316" stroke-width="1.5" stroke-linejoin="round"/></svg>
-      </span>
     </div>
   </div>
 </div>
