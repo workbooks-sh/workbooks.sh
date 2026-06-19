@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="darkreader-lock"><meta name="color-scheme" content="light">
+<title>Swarm — many real agents on one nexus</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"></script>
+<style>html,body{height:100%;margin:0;background:#fafafa;overflow:hidden}</style></head>
+<body>
+  <div class="aiapp" id="app-board" data-stream="swarm">
+    <header class="bar">
+      <span class="logo"><span class="glyph"></span> Search Swarm</span>
+      <span class="bstat"></span>
+      <button class="newbtn" type="button" hidden>New search</button>
+    </header>
+    <div class="split">
+      <section class="orch">
+        <div class="olog">
+          <div class="welcome">
+            <h1>What should the swarm research?</h1>
+            <p class="sub">An orchestrator agent breaks your question down and dispatches a fleet of research agents — watch them organize on the right.</p>
+            <div class="chips">
+              <button class="chip" type="button">How does BEAM concurrency work?</button>
+              <button class="chip" type="button">Compare WebAssembly runtimes</button>
+              <button class="chip" type="button">State of local-first sync engines</button>
+            </div>
+            <div class="recent"></div>
+          </div>
+        </div>
+        <form class="composer">
+          <textarea class="cin" rows="1" placeholder="Ask the swarm to research anything…"></textarea>
+          <div class="cbar">
+            <div class="stepper" title="agents per round">
+              <button class="sdec" type="button" aria-label="fewer">−</button>
+              <span class="snum">8</span><span class="slbl">agents</span>
+              <button class="sinc" type="button" aria-label="more">+</button>
+            </div>
+            <span class="grow"></span>
+            <button class="send" type="submit" aria-label="Search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M12 5l-6 6M12 5l6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </form>
+      </section>
+      <section class="board">
+        <div class="bhead"><span class="btitle">Agent graph</span><span class="bcount"></span></div>
+        <svg class="graph" preserveAspectRatio="xMidYMid meet"></svg>
+        <aside class="detail" hidden></aside>
+      </section>
+    </div>
+  </div>
+  <style>
+  .aiapp{--bg:#fafafa;--surface:#fff;--line:#e7e7ea;--line2:#ededf0;--ink:#18181b;--muted:#71717a;--subtle:#a1a1aa;
+    --accent:#6366f1;--searching:#3b82f6;--reading:#f59e0b;--thinking:#8b5cf6;--done:#10b981;
+    position:fixed;inset:0;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;
+    font:14.5px/1.6 ui-sans-serif,system-ui,-apple-system,"Inter",sans-serif;-webkit-font-smoothing:antialiased}
+  .aiapp *{box-sizing:border-box}
+  .aiapp .bar{flex:none;display:flex;align-items:center;gap:.7rem;padding:.65rem 1.1rem;background:#fafafacc;backdrop-filter:saturate(1.6) blur(8px);border-bottom:1px solid var(--line2);z-index:5}
+  .aiapp .logo{display:flex;align-items:center;gap:.5rem;font-weight:600;letter-spacing:-.01em}
+  .aiapp .glyph{width:16px;height:16px;border-radius:5px;background:conic-gradient(from 210deg,var(--accent),#a855f7,#22d3ee,var(--accent));box-shadow:0 0 0 1px #fff inset}
+  .aiapp .bstat{flex:1;color:var(--subtle);font-size:.82em;font-variant-numeric:tabular-nums}
+  .aiapp .newbtn{background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:.4rem .8rem;font-size:.85em;cursor:pointer}
+  .aiapp .newbtn:hover{background:#f4f4f5}
+  .aiapp .split{flex:1;min-height:0;display:flex}
+  .aiapp .orch{flex:none;width:min(42%,460px);display:flex;flex-direction:column;border-right:1px solid var(--line2);min-width:320px}
+  .aiapp .olog{flex:1;min-height:0;overflow-y:auto;padding:1.1rem}
+  .aiapp .welcome{padding:6vh .2rem 0}
+  .aiapp .welcome h1{margin:0 0 .4rem;font-size:1.5rem;letter-spacing:-.02em;font-weight:640}
+  .aiapp .welcome .sub{margin:0 0 1.3rem;color:var(--muted)}
+  .aiapp .chips{display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:1.2rem}
+  .aiapp .chip{background:var(--surface);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:.4rem .8rem;font-size:.82em;cursor:pointer;transition:.15s}
+  .aiapp .chip:hover{color:var(--ink);border-color:var(--accent)}
+  .aiapp .rh{color:var(--subtle);font-size:.72em;text-transform:uppercase;letter-spacing:.06em;margin:.4rem 0 .3rem}
+  .aiapp .ritem{display:flex;gap:.6rem;align-items:baseline;padding:.5rem .1rem;border-top:1px solid var(--line2);cursor:pointer}
+  .aiapp .ritem:hover .rq{color:var(--accent)}
+  .aiapp .rq{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .aiapp .rmeta{flex:none;color:var(--subtle);font-size:.76em}
+  .aiapp .omsg{margin-bottom:1rem}
+  .aiapp .omsg .who{display:flex;align-items:center;gap:.45rem;font-size:.74em;color:var(--subtle);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.04em}
+  .aiapp .omsg .who .glyph{width:13px;height:13px}
+  .aiapp .omsg.user .bubble{background:var(--accent);color:#fff;border-radius:13px 13px 4px 13px;padding:.55rem .8rem;display:inline-block;max-width:90%}
+  .aiapp .omsg.orch .bubble{color:var(--ink)}
+  .aiapp .omsg .bubble p{margin:.4rem 0}.aiapp .omsg .bubble h2{font-size:1rem;margin:.6rem 0 .3rem}.aiapp .omsg .bubble h3{font-size:.92rem;margin:.7rem 0 .2rem}
+  .aiapp .omsg .bubble ul{margin:.4rem 0;padding-left:1.1rem}.aiapp .omsg .bubble a{color:var(--accent);text-decoration:none}.aiapp .omsg .bubble a:hover{text-decoration:underline}
+  .aiapp .activity{font-size:.85em;color:var(--muted);border-left:2px solid var(--line);padding:.1rem .7rem;margin:.3rem 0 .8rem}
+  .aiapp .activity .aln{padding:.1rem 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .aiapp .shimmer{background:linear-gradient(90deg,#a1a1aa,#18181b,#a1a1aa);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sh 1.6s linear infinite}
+  @keyframes sh{to{background-position:-200% 0}}
+  .aiapp .composer{flex:none;margin:.8rem;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:.6rem .6rem .5rem;box-shadow:0 2px 6px #0000000d,0 14px 40px -24px #00000026;transition:.15s}
+  .aiapp .composer:focus-within{border-color:#c7c9ff;box-shadow:0 2px 6px #0000000d,0 14px 40px -20px #6366f140}
+  .aiapp .cin{width:100%;border:0;outline:0;resize:none;background:none;color:var(--ink);font:inherit;font-size:.97rem;padding:.25rem .4rem;max-height:34vh}
+  .aiapp .cin::placeholder{color:var(--subtle)}
+  .aiapp .cbar{display:flex;align-items:center;gap:.5rem;margin-top:.3rem}
+  .aiapp .stepper{display:flex;align-items:center;gap:.25rem;background:#f4f4f5;border:1px solid var(--line);border-radius:999px;padding:.12rem .3rem;color:var(--muted);font-size:.8em}
+  .aiapp .stepper button{width:19px;height:19px;border:0;border-radius:50%;background:none;color:var(--muted);cursor:pointer;line-height:1}
+  .aiapp .stepper button:hover{background:#e4e4e7;color:var(--ink)}
+  .aiapp .snum{min-width:1.1em;text-align:center;color:var(--ink);font-weight:600}
+  .aiapp .grow{flex:1}
+  .aiapp .send{width:32px;height:32px;flex:none;border:0;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;cursor:pointer}
+  .aiapp .send:hover{filter:brightness(1.08)}.aiapp .send:disabled{background:#d4d4d8}
+  .aiapp .board{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;background:#f6f6f7}
+  .aiapp .bhead{flex:none;display:flex;align-items:center;gap:.5rem;padding:.7rem 1rem;color:var(--muted);font-size:.85em}
+  .aiapp .btitle{font-weight:600;color:var(--ink)}
+  .aiapp .graph{flex:1;min-height:0;width:100%}
+  .aiapp .graph .edge{stroke:#d4d4d8;stroke-width:1.2;fill:none}
+  .aiapp .graph .edge.cite{stroke:#e4e4e7;stroke-dasharray:3 3}
+  .aiapp .graph .node{cursor:pointer}
+  .aiapp .graph .node .box{fill:#fff;stroke:var(--line);stroke-width:1.5;rx:8}
+  .aiapp .graph .node[data-s=searching] .box{stroke:var(--searching)}.aiapp .graph .node[data-s=reading] .box{stroke:var(--reading)}
+  .aiapp .graph .node[data-s=thinking] .box{stroke:var(--thinking)}.aiapp .graph .node[data-s=done] .box{stroke:var(--done)}
+  .aiapp .graph .node .ring{stroke-width:2;fill:none}
+  .aiapp .graph .orch .box{fill:var(--accent);stroke:none}
+  .aiapp .graph .src circle{fill:#cbd5e1;stroke:#fff;stroke-width:1}
+  .aiapp .graph .lbl{font-size:7px;fill:var(--subtle);text-anchor:middle}
+  .aiapp .detail{position:absolute;top:0;right:0;bottom:0;width:min(380px,80%);background:var(--surface);border-left:1px solid var(--line);box-shadow:-12px 0 40px -24px #00000033;overflow-y:auto;padding:1rem 1.1rem}
+  .aiapp .detail .dh{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem}
+  .aiapp .detail .dh .av{width:30px;border-radius:7px;overflow:hidden}.aiapp .detail .dh .av svg{width:100%;display:block}
+  .aiapp .detail .dx{margin-left:auto;border:0;background:none;color:var(--muted);cursor:pointer;font-size:1.2em}
+  .aiapp .detail .dtask{color:var(--muted);font-size:.9em;margin-bottom:.7rem}
+  .aiapp .detail .sec{font-size:.74em;text-transform:uppercase;letter-spacing:.05em;color:var(--subtle);margin:.9rem 0 .3rem}
+  .aiapp .detail .step{display:flex;gap:.5rem;padding:.14rem 0;color:var(--muted);font-size:.86em}
+  .aiapp .detail .step b{color:var(--ink);font-weight:500;flex:none;width:4.4rem;text-transform:capitalize}
+  .aiapp .detail .src2{display:block;padding:.4rem .55rem;margin:.3rem 0;border:1px solid var(--line2);border-radius:9px;background:#fcfcfd}
+  .aiapp .detail .src2 .surl{font-size:.8em;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .aiapp .detail .src2 .sprev{font-size:.82em;color:var(--muted);margin-top:.3rem;max-height:7em;overflow:hidden;white-space:pre-wrap}
+  .aiapp .detail .find{margin-top:.5rem;padding:.6rem .7rem;background:#f4f7f5;border-radius:9px;color:var(--ink)}
+  </style>
+  <script>(function(){
+    var root=document.getElementById('app-board'); if(!root) return;
+    var G=window.gsap, d3=window.d3, ELK=window.ELK, elk=ELK?new ELK():null;
+    var stream=root.dataset.stream, es=null, agents={}, sources={}, srcN=0, live=0, spawned=0, naAgents=8, started=false;
+    var olog=root.querySelector('.olog'), svg=d3.select(root).querySelector?null:d3.select(root.querySelector('.graph')), detail=root.querySelector('.detail');
+    var svgEl=root.querySelector('.graph'); svg=d3.select(svgEl);
+    var bstat=root.querySelector('.bstat'), bcount=root.querySelector('.bcount'), newbtn=root.querySelector('.newbtn');
+    var cin=root.querySelector('.cin'), snum=root.querySelector('.snum');
+    var gEdges=svg.append('g').attr('class','edges'), gNodes=svg.append('g').attr('class','nodes');
+    function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+    function md(t){return esc(t)
+      .replace(/^### (.*)$/gm,'<h3>$1</h3>').replace(/^## (.*)$/gm,'<h3>$1</h3>').replace(/^# (.*)$/gm,'<h2>$1</h2>')
+      .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
+      .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g,'<a href="$2" target="_blank">$1</a>')
+      .replace(/(^|\n)[-*] (.*)/g,'$1<li>$2</li>').replace(/(<li>[\s\S]*?<\/li>)/g,'<ul>$1</ul>')
+      .replace(/\n{2,}/g,'</p><p>').replace(/\n/g,'<br>');}
+    function hash(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+    function avatar(id){var h=hash(id),hue=h%360,c='hsl('+hue+',52%,58%)',cells='';
+      for(var y=0;y<5;y++)for(var x=0;x<3;x++){if((h>>(y*3+x))&1){var xs=[x,4-x];for(var k=0;k<xs.length;k++)cells+='<rect x="'+(xs[k]*10)+'" y="'+(y*10)+'" width="10" height="10"/>';}}
+      return '<svg viewBox="0 0 50 50" fill="'+c+'"><rect width="50" height="50" fill="#f1f1f3"/>'+cells+'</svg>';}
+    function ringColor(s){return {searching:'#3b82f6',reading:'#f59e0b',thinking:'#8b5cf6',done:'#10b981'}[s]||'#a1a1aa';}
+    function drawAvatar(sel,id,size){var h=hash(id),hue=h%360,c='hsl('+hue+',52%,58%)',cell=size/5,o=-size/2;
+      sel.append('rect').attr('x',o).attr('y',o).attr('width',size).attr('height',size).attr('rx',size*0.2).attr('fill','#eef0f3').attr('stroke','#e2e3e8');
+      for(var y=0;y<5;y++)for(var x=0;x<3;x++){if((h>>(y*3+x))&1){[x,4-x].forEach(function(xx){sel.append('rect').attr('x',o+xx*cell).attr('y',o+y*cell).attr('width',cell+0.4).attr('height',cell+0.4).attr('fill',c);});}}}
+    function domainOf(u){try{return (u.split('/')[2]||u).replace('www.','');}catch(e){return u;}}
+    // ── graph layout (elkjs) + render (d3) ──
+    var laying=false,dirty=false;
+    function scheduleLayout(){dirty=true;if(!laying)runLayout();}
+    function runLayout(){if(!elk||!started){return;} laying=true;dirty=false;
+      var ids=Object.keys(agents), sids=Object.keys(sources);
+      var children=[{id:'orch',width:34,height:34}]
+        .concat(ids.map(function(id){return {id:id,width:30,height:30};}))
+        .concat(sids.map(function(u){return {id:sources[u].id,width:12,height:12};}));
+      var edges=[];
+      ids.forEach(function(id){edges.push({id:'o-'+id,sources:['orch'],targets:[id]});
+        agents[id].sources.forEach(function(s){if(sources[s.url])edges.push({id:id+'-'+sources[s.url].id,sources:[id],targets:[sources[s.url].id]});});});
+      elk.layout({id:'root',layoutOptions:{'elk.algorithm':'layered','elk.direction':'DOWN','elk.spacing.nodeNode':'16','elk.layered.spacing.nodeNodeBetweenLayers':'40'},children:children,edges:edges})
+        .then(function(res){render(res);laying=false;if(dirty)runLayout();}).catch(function(){laying=false;});}
+    function render(res){
+      var pos={};(res.children||[]).forEach(function(c){pos[c.id]={x:c.x+c.width/2,y:c.y+c.height/2,w:c.width,h:c.height};});
+      svgEl.setAttribute('viewBox','-12 -12 '+((res.width||100)+24)+' '+((res.height||100)+24));
+      var elist=[];(res.edges||[]).forEach(function(e){var a=pos[e.sources[0]],b=pos[e.targets[0]];if(a&&b)elist.push({id:e.id,x1:a.x,y1:a.y,x2:b.x,y2:b.y,cite:e.id.indexOf('-s')>0});});
+      var el=gEdges.selectAll('line').data(elist,function(d){return d.id;});
+      el.exit().remove();
+      el.enter().append('line').attr('class',function(d){return 'edge'+(d.cite?' cite':'');}).merge(el)
+        .attr('x1',function(d){return d.x1;}).attr('y1',function(d){return d.y1;}).attr('x2',function(d){return d.x2;}).attr('y2',function(d){return d.y2;});
+      var nlist=[{id:'orch',type:'orch'}]
+        .concat(Object.keys(agents).map(function(id){return {id:id,type:'agent',status:agents[id].status};}))
+        .concat(Object.keys(sources).map(function(u){return {id:sources[u].id,type:'src',url:u};}));
+      nlist=nlist.filter(function(d){return pos[d.id];});
+      var nd=gNodes.selectAll('g.node').data(nlist,function(d){return d.id;});
+      nd.exit().remove();
+      var en=nd.enter().append('g').attr('class',function(d){return 'node '+d.type;}).attr('data-id',function(d){return d.id;})
+        .on('click',function(e,d){if(d.type==='agent')openDetail(d.id);});
+      en.each(function(d){var g=d3.select(this);
+        if(d.type==='orch'){g.append('circle').attr('r',17).attr('fill','#6366f1');g.append('text').attr('y',4).attr('text-anchor','middle').attr('fill','#fff').attr('font-size','13').attr('font-weight','700').text('O');}
+        else if(d.type==='agent'){drawAvatar(g,d.id,28);g.append('circle').attr('class','ring').attr('cx',12).attr('cy',-12).attr('r',4).attr('stroke-width',2.5).attr('fill','#fff');}
+        else{g.append('circle').attr('r',6);g.append('title');}});
+      var all=en.merge(nd);
+      all.attr('transform',function(d){var p=pos[d.id];return 'translate('+p.x+','+p.y+')';}).attr('data-s',function(d){return d.status||'';});
+      all.select('.ring').attr('stroke',function(d){return ringColor(d.status);});
+      all.filter(function(d){return d.type==='src';}).select('title').text(function(d){return d.url;});
+      if(G)en.style('opacity',0).transition&&en.each(function(){});
+    }
+    // ── orchestrator log ──
+    function auto(){cin.style.height='auto';cin.style.height=Math.min(cin.scrollHeight,window.innerHeight*0.34)+'px';}
+    cin.addEventListener('input',auto);
+    cin.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();start();}});
+    root.querySelector('.sdec').addEventListener('click',function(){naAgents=Math.max(1,naAgents-1);snum.textContent=naAgents;});
+    root.querySelector('.sinc').addEventListener('click',function(){naAgents=Math.min(64,naAgents+1);snum.textContent=naAgents;});
+    [].forEach.call(root.querySelectorAll('.chip'),function(c){c.addEventListener('click',function(){cin.value=c.textContent;auto();cin.focus();});});
+    function setStat(){bstat.textContent=spawned?(live+' working · '+spawned+' agents'):'';bcount.textContent=spawned?(spawned+' agents · '+srcN+' sources'):'';}
+    function omsg(role,html){var d=document.createElement('div');d.className='omsg '+role;
+      d.innerHTML=(role==='orch'?'<div class="who"><span class="glyph"></span>Orchestrator</div>':'<div class="who">You</div>')+'<div class="bubble">'+html+'</div>';
+      olog.appendChild(d);olog.scrollTop=olog.scrollHeight;if(G)G.from(d,{opacity:0,y:8,duration:.35});return d;}
+    var activityEl=null,acts=[];
+    function activity(line){if(!activityEl){activityEl=document.createElement('div');activityEl.className='activity';olog.appendChild(activityEl);}
+      acts.unshift(line);acts=acts.slice(0,6);activityEl.innerHTML=acts.map(function(a){return '<div class="aln">'+esc(a)+'</div>';}).join('');olog.scrollTop=olog.scrollHeight;}
+    function openDetail(id){var a=agents[id];if(!a)return;detail.hidden=false;detail.dataset.id=id;
+      var steps=a.steps.map(function(s){return '<div class="step"><b>'+esc(s[0])+'</b><span>'+esc(s[1])+'</span></div>';}).join('');
+      var srcs=a.sources.map(function(s){return '<div class="src2"><div class="surl">'+esc(s.url)+'</div><div class="sprev">'+esc(s.preview)+'</div></div>';}).join('');
+      detail.innerHTML='<div class="dh"><span class="av">'+avatar(id)+'</span><b>'+esc(id)+'</b><button class="dx">×</button></div>'+
+        '<div class="dtask">'+esc(a.task)+'</div>'+
+        '<div class="sec">Reasoning</div>'+(steps||'<div class="step">—</div>')+
+        (a.sources.length?('<div class="sec">Sources · '+a.sources.length+'</div>'+srcs):'')+
+        (a.finding?('<div class="sec">Finding</div><div class="find">'+esc(a.finding)+'</div>'):'');
+      detail.querySelector('.dx').addEventListener('click',function(){detail.hidden=true;});
+      if(G)G.from(detail,{x:30,opacity:0,duration:.3,ease:'power3.out'});}
+    function loadHistory(){fetch('/sessions').then(function(r){return r.json();}).then(function(rows){
+      var rc=root.querySelector('.recent');if(!rc)return;if(!rows||!rows.length){rc.innerHTML='';return;}
+      rc.innerHTML='<div class="rh">Recent</div>'+rows.map(function(s){return '<div class="ritem" data-id="'+s.id+'"><span class="rq">'+esc(s.query)+'</span><span class="rmeta">'+s.agents+' · '+esc((s.created_at||'').slice(0,10))+'</span></div>';}).join('');
+      [].forEach.call(rc.querySelectorAll('.ritem'),function(el){el.addEventListener('click',function(){openSession(el.dataset.id);});});
+    }).catch(function(){});}
+    function reset(query){olog.innerHTML='';gEdges.selectAll('*').remove();gNodes.selectAll('*').remove();detail.hidden=true;
+      agents={};sources={};srcN=0;live=0;spawned=0;acts=[];activityEl=null;newbtn.hidden=false;started=true;
+      omsg('user',esc(query));scheduleLayout();}
+    function openSession(id){fetch('/sessions/'+id).then(function(r){return r.json();}).then(function(s){
+      if(!s||!s.query)return;reset(s.query);bstat.textContent=(s.agents||0)+' agents · saved';
+      (s.findings||[]).forEach(function(f){var fid=f.id||('a'+(Object.keys(agents).length+1));agents[fid]={task:f.subtask||'',steps:[],sources:[],finding:f.finding||'',status:'done'};});
+      spawned=Object.keys(agents).length;setStat();scheduleLayout();omsg('orch','<h3>Deep research report</h3><p>'+md(s.report||'')+'</p>');
+    }).catch(function(){});}
+    function ev(e){
+      if(e.type==='fleet'){omsg('orch','Researching <b>'+esc(e.task)+'</b>. I\'ll break this into focused sub-questions and dispatch agents in rounds, reading their reports between each.');return;}
+      if(e.type==='round'){activityEl=null;acts=[];omsg('orch','<b>Round '+e.n+'</b> · dispatching '+e.dispatching+' agents');return;}
+      if(e.type==='digest'){omsg('orch',e.note||'');return;}
+      if(e.type==='spawn'){agents[e.id]={task:e.query||'',steps:[['task',e.query||'']],sources:[],finding:'',status:'thinking'};spawned++;live++;setStat();activity('dispatched '+e.id+' → '+(e.query||''));scheduleLayout();return;}
+      var a=agents[e.id];
+      if(e.type==='state'){if(!a)return;a.status=e.status;
+        if(e.status==='searching')a.steps.push(['search',e.action||'']);else if(e.status==='reading')a.steps.push(['read',e.url||e.action||'']);else if(e.status==='thinking'&&e.action)a.steps.push(['think',e.action]);
+        if(e.status==='searching')activity(e.id+' searching: '+(e.action||''));else if(e.status==='reading')activity(e.id+' reading '+domainOf(e.url||''));
+        scheduleLayout();if(!detail.hidden&&detail.dataset.id===e.id)openDetail(e.id);return;}
+      if(e.type==='page'){if(!a)return;a.sources.push({url:e.url||'',preview:e.preview||''});
+        if(e.url&&!sources[e.url]){sources[e.url]={id:'s'+(srcN++)};}setStat();scheduleLayout();return;}
+      if(e.type==='done'){if(!a)return;if(a.status!=='done')live--;a.status='done';a.finding=e.finding||'';setStat();activity('✓ '+e.id+' reported');scheduleLayout();return;}
+      if(e.type==='synth'){omsg('orch','<span class="shimmer">Compiling '+spawned+' findings into a deep research report…</span>');return;}
+      if(e.type==='report'){omsg('orch','<h3>Deep research report</h3><p>'+md(e.content||'')+'</p>');return;}
+      if(e.type==='fleet_done'||e.type==='end'){if(es){es.close();es=null;}return;}
+    }
+    function start(){var query=(cin.value||'').trim();if(!query)return;reset(query);cin.value='';auto();bstat.textContent='dispatching '+naAgents+' agents…';
+      if(es)es.close();es=new EventSource('/live/'+encodeURIComponent(stream)+'?q='+encodeURIComponent(query)+'&max='+naAgents);
+      es.onmessage=function(m){try{ev(JSON.parse(m.data));}catch(_){}};es.onerror=function(){if(es){es.close();es=null;}};}
+    root.querySelector('.composer').addEventListener('submit',function(x){x.preventDefault();start();});
+    newbtn.addEventListener('click',function(){if(es){es.close();es=null;}location.reload();});
+    loadHistory();
+  })();</script>
+
+</body></html>

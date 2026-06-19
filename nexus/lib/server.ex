@@ -26,9 +26,8 @@ defmodule Nexus.Server do
     root = Keyword.fetch!(opts, :root)
     port = Keyword.get(opts, :port, 4000)
     Application.put_env(:nexus, :workbook_root, root)
-    # Register the workbook's live capabilities (fleet units) up front, so /live works regardless of
-    # whether a page has been rendered yet.
-    Nexus.Weave.bringup(root)
+    # Register the demo's orchestration (the "swarm" live source), so /live/swarm works at boot.
+    Nexus.Swarm.register()
     Bandit.start_link(plug: __MODULE__, port: port)
   end
 
@@ -56,9 +55,14 @@ defmodule Nexus.Server do
   end
 
   get "/" do
+    # A static workbook artifact (e.g. the swarm demo's woven demo.html) is served as-is; otherwise
+    # the generic weaver SSRs the .work folder. The UI is a loaded artifact, never engine code.
+    demo = Path.join(root(), "demo.html")
+    body = if File.exists?(demo), do: File.read!(demo), else: cached_html(root(), Nexus.Auth.tenant(conn))
+
     conn
     |> put_resp_content_type("text/html")
-    |> send_resp(200, cached_html(root(), Nexus.Auth.tenant(conn)))
+    |> send_resp(200, body)
   end
 
   get "/data/:resource" do

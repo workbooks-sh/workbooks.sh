@@ -19,3 +19,7 @@ build/tools/*.wasm
 # swarm demo session history (SQLite, generated)
 examples/swarm/sessions.db
 sessions.db
+
+# swarm demo generated data
+examples/swarm/sessions.db
+examples/swarm/*.dets
