@@ -19,7 +19,7 @@ defmodule Nexus.Fleet do
   worker system prompt), `:model`, `:provider`, `:timeout_ms`.
   """
 
-  @default_model "deepseek/deepseek-v4-pro"
+  @default_model "x-ai/grok-4.3"
   @default_provider nil
   @default_timeout 180_000
 

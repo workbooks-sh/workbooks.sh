@@ -118,18 +118,25 @@ defmodule Nexus.Agent do
 
   defp loop(messages, vfs, opts, deadline, tel) do
     emit = Keyword.get(opts, :on_event, fn _ -> :ok end)
+    # Generic typed side-channel (default no-op) — feeds the SSE streaming endpoint. Additive: it
+    # carries map events keyed by :type and never changes loop's return value.
+    stream = Keyword.get(opts, :emit, fn _ -> :ok end)
 
     if now_ms() > deadline do
+      stream.(%{type: "error", error: inspect({:timeout, tel.turns})})
       {{:error, {:timeout, tel.turns}}, tel}
     else
       case Nexus.Llm.complete(manage(messages, opts), Keyword.put(opts, :tools, [@bash_tool])) do
         {:ok, %{tool_calls: []} = turn} ->
           if reasoning?(turn.content), do: emit.({:answer, turn.content})
+          stream.(%{type: "final", answer: turn.content})
           tel = tally(tel, turn, [])
           {{:ok, %{answer: turn.content, turns: tel.turns, vfs_files: Vfs.ls(vfs)}}, tel}
 
         {:ok, %{tool_calls: calls} = turn} ->
           if reasoning?(turn.content), do: emit.({:think, turn.content})
+          if reasoning?(turn.content), do: stream.(%{type: "text", content: turn.content})
+          stream.(%{type: "tools", count: length(calls), commands: Enum.map(calls, &command_of/1)})
           Enum.each(calls, fn c -> emit.({:tool, command_of(c)}) end)
           tel = tally(tel, turn, calls)
           assistant = %{role: "assistant", content: turn.content || "", tool_calls: raw_calls(calls)}
@@ -144,6 +151,7 @@ defmodule Nexus.Agent do
           loop(messages ++ [assistant | results], vfs, opts, deadline, tel)
 
         {:error, reason} ->
+          stream.(%{type: "error", error: inspect(reason)})
           {{:error, reason}, tel}
       end
     end

@@ -128,6 +128,50 @@ defmodule Nexus.Server do
     end
   end
 
+  # Streaming agent run — same auth + body shape as /api/run, but the loop's typed events are pushed
+  # as SSE frames (like /live) so the desktop can render live token/turn output. Ends with a
+  # {"type":"end"} frame. A crash emits {"type":"error"}, never a 500. /api/run stays as the unary
+  # fallback.
+  post "/api/run/stream" do
+    {:ok, body, conn} = read_body(conn)
+
+    with {:ok, m} when is_map(m) <- Jason.decode(body),
+         task when is_binary(task) and task != "" <- m["task"] || m["prompt"] do
+      conn =
+        conn
+        |> put_resp_content_type("text/event-stream")
+        |> put_resp_header("cache-control", "no-cache")
+        |> send_chunked(200)
+
+      me = self()
+      emit = fn event -> send(me, {:sse, event}) end
+
+      opts =
+        [task: task, timeout_ms: run_timeout(m["timeout_ms"]), emit: emit]
+        |> then(fn o -> if is_binary(m["system"]) and m["system"] != "", do: [{:system, m["system"]} | o], else: o end)
+
+      runner =
+        spawn_link(fn ->
+          try do
+            Nexus.Agent.run(opts)
+          rescue
+            e -> send(me, {:sse, %{type: "error", error: Exception.message(e)}})
+          catch
+            kind, reason -> send(me, {:sse, %{type: "error", error: inspect({kind, reason})}})
+          end
+
+          send(me, :sse_done)
+        end)
+
+      final = stream_sse(conn)
+      if Process.alive?(runner), do: Process.exit(runner, :kill)
+      final
+    else
+      _ ->
+        conn |> put_resp_content_type("application/json") |> send_resp(422, Jason.encode!(%{error: "task or prompt required"}))
+    end
+  end
+
   # Session history (the workbook's SQLite store) — the app's "past runs" list + detail.
   get "/sessions" do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(Nexus.Sessions.list()))
