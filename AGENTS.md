@@ -4,47 +4,52 @@ The single, tool-agnostic instruction file for any AI coding agent on this proje
 
 ## What a workbook is — the foundational model
 
-A **workbook is a plain HTML file** (or a folder of them) built from the `work-*`
-Lit web-component library (`workponents/`). The browser renders it. That is the
-whole model:
+A **workbook is a folder of `.work` files** — plain-text **literate** documents. Prose
+narrates; `do … end` blocks run. There is **no HTML wrapper and no code fences**: a block
+is self-delimiting, and the **first word names the kind** (`data`, `def`, `server`,
+`client`, `flow`, `sandbox`, `agent`, `record`, `resource`, …). The format is **AST-first**
+— a `<kind> :name … do … end` block parses to a real Elixir macro-call tuple, so
+kind/name/args come from the tree, never a regex. `Nexus.Literate` is the ONE parse the
+whole system shares (viewer highlighting, the code-graph extractor, the weave gate).
 
-- **Structure & UI** = `work-*` custom elements, written as HTML. You can define
-  your own elements in HTML and reference them; the library is just a pre-built,
-  themed set. Hierarchy is DOM nesting; the parent owns the contract. Scalar
-  values and references are **attributes** (`model="…"`, `toolkits="crm"`,
-  `from="orders"`); content is **child elements** or the element's text.
-- **Logic** = written **inline** as `<work-component lang="python|rust|js|c|zig">…</work-component>`
-  source blocks, compiled to WASM by the **Dock** (the host capability seam).
-- **Organisation** = folders of `.html` files (+ assets).
-- **Shipping** = `work weave <dir> <out>` folds the folder tree into ONE
-  self-contained `.html` — the page with its units/assets inlined, rendered by the
-  browser as-is. No special container format, no sidecar; just an HTML file.
+Four lanes live in every file:
 
-There is **no org-mode, no OQL, no `.work` shorthand, no parser, no kernel** —
-they were deleted (git history keeps them). Where the backend must read a
-workbook's structure (the compiler finding `<work-component>` source; validation;
-an outline), it parses the HTML with a standard parser — `Workbooks.Workbook`
-over Floki in the runtime, a small scanner in the CLI. **Everything authored is
-HTML** (manifests included — a kit declares itself with `<work-ref rel="kit">`). The
-only JSON that survives is a **generated machine artifact at a tool boundary** the
-build emits, never reads-to-render (e.g. the CEM `custom-elements.json`, produced from
-`src/**`). See the NO-JSON non-negotiable below — if you're hand-authoring a `.json`,
-you're doing it wrong.
+- **Prose** — rich text that explains, carrying live refs: `[[backlinks]]`, `#tags`,
+  `work://` links, inline `:atom` / `@type` mentions.
+- **Declaration** — structure with no body: a `defstruct` is a record, a list of atoms is
+  an enum, a `data` block is a typed table that renders by default.
+- **Code** — a runnable block: a `def`, a `client` island, a `server` unit.
+- **Placement** — the first word says WHERE it runs: `client` (browser, wasm) or `server`
+  (nexus, native BEAM), plus an optional `sandbox :name` for capabilities (the Dock seam
+  compiles guest code → WASM).
+
+- **Organisation** = folders of `.work` files (+ assets).
+- **Shipping** = the **`work` CLI** (the Zig *reactor*) operates on the tree: `work weave
+  <dir> <out>` folds it into one shippable artifact; `check` resolves refs + audits
+  capabilities; `why`/`near`/`wit` give the code-graph deps + the generated WIT world;
+  `graph`, `dev` (watch + re-weave), `deploy` round it out.
+
+There is **NO HTML authoring, no `work-*` component library as the authoring surface, no
+org-mode, no OQL, no kernel** — those are **dead strategies** (git history keeps them; if
+you see "workbook = HTML / `work-*` custom elements / `<work-component>` source / Floki
+parse", it is stale, strike it). You write `.work`; the reactor + nexus parse it with the
+one AST-first parser; the CLI weaves and ships it. `client` blocks run in the browser via
+wasm — that's a *render target*, not how you author.
 
 ## ⬛ TWO NON-NEGOTIABLES ⬛
 
 These override everything. If a choice violates one, the choice is wrong.
 
 1. **DOGFOOD EVERYTHING.** If we build it, we use it — on our own codebase, first.
-   Dashboards, roadmaps, tools, docs: author them as **workbooks using our own
-   `work-*` primitives**. If a primitive isn't ready, **build it so we can use it**
-   rather than hand-rolling a one-off. The thing we ship to others is the thing we
-   run ourselves.
+   Dashboards, roadmaps, tools, docs: author them as **`.work` workbooks** (literate
+   files, woven by the `work` CLI), not one-off scripts. If a kind/primitive isn't ready,
+   **build it so we can use it** rather than hand-rolling a one-off. The thing we ship to
+   others is the thing we run ourselves.
 2. **NO JSON. EVER.** (Except a genuine API/data payload at a network boundary.)
-   The world is **HTML**. State, config, content, plans, manifests — all HTML, where
-   the **elements are the source of truth** (composition-as-source). JSON-LD *inside*
-   an HTML file is fine; a sidecar `*.json` you parse to render is not. If you reach
-   for a `.json`, stop — author it as HTML instead. Always workbooks, always HTML.
+   The world is **`.work`**. State, config, content, plans, manifests — all `.work`
+   (literate, composition-as-source), where the **blocks are the source of truth**. A
+   sidecar `*.json` you parse to render is not allowed; if you reach for a `.json`, stop —
+   author it as `.work` instead. Always workbooks, always `.work`.
    **Env vars are JSON-by-another-name** — a hidden config sidecar. Tunable config is an
    HTML attribute (`<work-deploy …>`, read via `Nexus.Config`), never `System.get_env`. The
    ONLY legitimate env is genuine deploy injection: **secrets + per-machine identity**
@@ -76,15 +81,15 @@ check in" is not a reason. Empower yourself. Finish.
 
 ## Top-level workbook type (OPEN — under research)
 
-Every workbook declares **what it is** at the top via the tagging edge
-(`<work-ref rel="…">` — tagging=C). The exact taxonomy is **being researched + designed
-in the foundation workflow**, not yet settled. Working direction:
+Every workbook declares **what it is** at the top (a leading prose tag / `:atom` facet
+in the literate header). The exact taxonomy is **being researched + designed in the
+foundation workflow**, not yet settled. Working direction:
 
 - The useful axis is **library vs leaf**, not "has an interface" (everything renders):
   a **kit** is *imported/composed* by other things; an **app** is the *leaf you launch*.
 - Likely **facets that can co-occur** (a workbook may be both an app and export a kit),
   with **kit as the floor** — not a rigid enum. Candidate facets: `kit` (exports a
-  prefix), `app` (entry interface), `agent` (has a `<work-src>` brain).
+  prefix), `app` (entry interface), `agent` (has a `server`/agent brain block).
 - **`container` is an execution property, not a type** — keep it out of this taxonomy.
 
 Keep it tiny. The desktop app + the runtime loader read this edge to organize, classify,
@@ -151,9 +156,9 @@ browser-native APIs) or `runtime` (a shared server over **RCP** / HTTP+WS). A
 not a code fork. Do NOT reintroduce a second "runtime contract" the UI manages,
 and do NOT compile the Tauri/OS layer to WASM; swap providers behind the one Host.
 
-The workbook itself renders **client-side** — it's HTML `work-*` components, so
-the browser renders it everywhere (no kernel/engine provider). The `runtime`
-backs agents, data, sync, and the compiler lane.
+A woven workbook's `client` islands render **client-side** — wasm in the browser, so it
+runs everywhere (no kernel/engine provider). The `runtime` (nexus) backs `server` units,
+agents, data, sync, and the compiler/weave lane.
 
 - **Platform canon:** `desktop/docs/platform-model.md` · **runtime connect:** RCP `wb-uxn`.
 - **Desktop state of truth:** `desktop/ASSESSMENT.md` (the runtime is canonical; the desktop frontend is the most out-of-date code — re-point it onto `runtime/host`, never the reverse).
