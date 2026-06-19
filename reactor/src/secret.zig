@@ -27,8 +27,9 @@ pub fn secret(io: Io, alloc: std.mem.Allocator, sub: []const u8, arg: []const u8
     if (eql(sub, "get")) return get(io, alloc, arg);
     if (eql(sub, "delete") or eql(sub, "rm")) return del(io, alloc, arg);
     if (eql(sub, "list") or eql(sub, "")) return list(io, alloc, if (arg.len == 0) "." else arg);
+    if (eql(sub, "check")) return check(io, alloc, if (arg.len == 0) "." else arg);
     if (eql(sub, "schema")) return schema(io, alloc, if (arg.len == 0) "." else arg);
-    log.err("usage: work secret set|get|delete <NAME>  ·  list|schema [dir]");
+    log.err("usage: work secret set|get|delete <NAME>  ·  list|check|schema [dir]");
     return 1;
 }
 
@@ -115,6 +116,27 @@ fn list(io: Io, alloc: std.mem.Allocator, dir: []const u8) !u8 {
     }
     if (!is_host) log.step("set/check needs the host (no Keychain in the wasm sandbox)");
     return 0;
+}
+
+// Pre-flight gate: every declared secret must be present in the keychain. Exits
+// non-zero listing what's missing — wire it before a deploy/run.
+fn check(io: Io, alloc: std.mem.Allocator, dir: []const u8) !u8 {
+    if (!is_host) return hostErr();
+    const decls = try readSchema(io, alloc, dir);
+    log.prompt(try std.fmt.allocPrint(alloc, "work secret check {s}", .{dir}));
+    var missing: usize = 0;
+    for (decls) |d| {
+        if (!isSet(io, alloc, d.name)) {
+            missing += 1;
+            log.step(try std.fmt.allocPrint(alloc, "missing: {s} (work secret set {s})", .{ d.name, d.name }));
+        }
+    }
+    if (missing == 0) {
+        log.ok(try std.fmt.allocPrint(alloc, "all {d} secret(s) present", .{decls.len}));
+        return 0;
+    }
+    log.err(try std.fmt.allocPrint(alloc, "{d} of {d} secret(s) missing", .{ missing, decls.len }));
+    return 1;
 }
 
 fn schema(io: Io, alloc: std.mem.Allocator, dir: []const u8) !u8 {
