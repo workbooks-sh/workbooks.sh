@@ -31,12 +31,32 @@ defmodule Nexus.Browse.Media do
 
     with {:ok, html} <- Nexus.Browse.fetch(url, opts),
          {:ok, doc} <- Floki.parse_document(html) do
-      images = if :image in kinds, do: filter(abs_all(img_srcs(doc) ++ css_urls(html), url), opts), else: []
+      # `deep: true` also inlines external stylesheets (freeze fetches them) so we catch CSS
+      # background images declared in LINKED .css files — not just inline <style>/style="".
+      css = css_urls(html) ++ if(opts[:deep], do: css_urls(safe_freeze(html, url)), else: [])
+
+      images = if :image in kinds, do: filter(abs_all(img_srcs(doc) ++ css, url), opts), else: []
       videos = if :video in kinds, do: filter(abs_all(media_srcs(doc, "video") ++ Floki.attribute(Floki.find(doc, "video"), "poster"), url), opts), else: []
       audio = if :audio in kinds, do: filter(abs_all(media_srcs(doc, "audio"), url), opts), else: []
 
       {:ok, %{images: images, videos: videos, audio: audio, count: length(images) + length(videos) + length(audio)}}
     end
+  end
+
+  @doc """
+  Render `url` while capturing the network → the HAR: every resource the render actually fetched
+  (document, stylesheets, scripts) with type/bytes/timing. `{:ok, [%{url, type, bytes, ok, ms, at}]}`.
+  The renderer fetches the document + CSS + JS (not media) — for media use `harvest/2`/`pull/2`.
+  """
+  def har(url, opts \\ []) do
+    {_rendered, entries} = Nexus.Browse.Capture.with(fn -> Nexus.Browse.render(url, opts) end)
+    {:ok, entries}
+  end
+
+  defp safe_freeze(html, url) do
+    Nexus.Browse.Freeze.freeze(html, url)
+  rescue
+    _ -> ""
   end
 
   @doc "Download a media file through the broker (content-addressed cached). `{:ok, %{url, type, bytes, data}}`."
@@ -180,15 +200,6 @@ defmodule Nexus.Browse.Media do
     _ -> nil
   end
 
-  # Real file type from magic bytes — independent of the URL's extension.
-  defp sniff(<<0xFF, 0xD8, 0xFF, _::binary>>), do: "image/jpeg"
-  defp sniff(<<0x89, "PNG\r\n", 0x1A, 0x0A, _::binary>>), do: "image/png"
-  defp sniff(<<"GIF8", _::binary>>), do: "image/gif"
-  defp sniff(<<"RIFF", _::32, "WEBP", _::binary>>), do: "image/webp"
-  defp sniff(<<"<svg", _::binary>>), do: "image/svg+xml"
-  defp sniff(<<_::32, "ftyp", _::binary>>), do: "video/mp4"
-  defp sniff(<<0x1A, 0x45, 0xDF, 0xA3, _::binary>>), do: "video/webm"
-  defp sniff(<<"OggS", _::binary>>), do: "audio/ogg"
-  defp sniff(<<"ID3", _::binary>>), do: "audio/mpeg"
-  defp sniff(_), do: "application/octet-stream"
+  # Real file type from magic bytes (shared with the HAR layer).
+  defp sniff(body), do: Nexus.Browse.Capture.classify(body)
 end

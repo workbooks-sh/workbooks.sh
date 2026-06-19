@@ -73,6 +73,10 @@ defmodule Nexus.Browse.Freeze do
 
   @doc "Resolve `href` against `base_url` (absolute URLs pass through)."
   def absolute(href, base_url) do
+    # URLs in HTML attributes are entity-encoded (`&amp;` = `&`) — decode before egress or the
+    # query string is wrong (e.g. a stylesheet `load.php?a&amp;b` fetches a 196-byte error page).
+    href = href |> String.replace("&amp;", "&") |> String.replace(~r/&#0*38;|&#x0*26;/i, "&")
+
     cond do
       String.match?(href, ~r{^https?://}) -> href
       String.starts_with?(href, "//") -> scheme(base_url) <> ":" <> href

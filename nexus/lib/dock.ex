@@ -49,11 +49,20 @@ defmodule Nexus.Dock do
   """
   def fetch(url) do
     if net_allowed?(url) do
-      case Nexus.Compilers.Shared.http_get(url) do
-        {:ok, body} -> body
-        _ -> ""
-      end
+      t0 = System.monotonic_time(:millisecond)
+
+      body =
+        case Nexus.Compilers.Shared.http_get(url) do
+          {:ok, body} -> body
+          _ -> ""
+        end
+
+      # Record into the active network capture (a cheap no-op when none is open). This is THE seam
+      # that makes a HAR possible — one chokepoint sees every fetch.
+      Nexus.Browse.Capture.record(url, body, System.monotonic_time(:millisecond) - t0)
+      body
     else
+      Nexus.Browse.Capture.record(url, "", 0)
       ""
     end
   end
