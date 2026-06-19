@@ -9,7 +9,7 @@ client :app do
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
-    :root{ --paper:#fff; --bg:#f7f6f3; --ink:#37352f; --soft:#787066; --line:#ece9e3; --accent:#ffe08a; --radius:14px; }
+    /* brand tokens live in design.work (the living design sheet) */
     *{box-sizing:border-box}
     body{max-width:none!important;margin:0!important;padding:0!important;background:var(--bg)!important;
       color:var(--ink)!important;font:16px/1.6 'Inter',system-ui,sans-serif!important}

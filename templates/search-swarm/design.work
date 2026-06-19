@@ -1,0 +1,19 @@
+# Design — Search Swarm
+
+The brand sheet: a **living design document**. Edit these tokens to rebrand the app — the interface
+reads them as `var(--…)`, and the weaver tangles this `design` block into the page as a stylesheet.
+
+Search Swarm's brand is a **warm research almanac**: parchment and ink, a burnt-honey accent, and a
+characterful serif (Fraunces) for display set against a clean sans for body. Scholarly, warm, calm.
+
+design :brand do
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap');
+  :root{
+    --bg:#f1ebdd; --paper:#fffdf7; --ink:#2a2620; --soft:#897f70; --line:#e6dcc6;
+    --accent:#cf7c2c;
+    --mint:#cfe6c6; --sky:#cfe0e6; --peach:#f2d8bc; --lilac:#e3d9c4;
+    --display:'Fraunces',Georgia,serif; --sans:'Inter',system-ui,sans-serif; --radius:13px;
+  }
+  .mark, .qtitle, .report h1, .report h2 { font-family:var(--display); letter-spacing:0; }
+  .report h1, .qtitle { font-weight:600; }
+end

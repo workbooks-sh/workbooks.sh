@@ -1,0 +1,18 @@
+# Design — Deck
+
+The brand sheet: a **living design document**. Edit these tokens to rebrand the app — the interface
+reads them as `var(--…)`.
+
+Deck's brand is a **calm, premium keynote tool**: cool light-grey surfaces, a deep navy-charcoal ink,
+a single warm coral accent, and a quiet modern grotesk (Hanken Grotesk). Minimal, composed, lots of
+whitespace — confidence through restraint.
+
+design :brand do
+  @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+  :root{
+    --bg:#eef1f5; --paper:#ffffff; --ink:#1f2733; --soft:#6b7480; --line:#e0e5ea; --accent:#ff6a5b;
+    --display:'Hanken Grotesk',system-ui,sans-serif; --sans:'Inter',system-ui,sans-serif; --radius:14px;
+  }
+  .mark, #rtitle { font-family:var(--display); font-weight:700; letter-spacing:-.02em; }
+  .go{ background:var(--accent)!important; }
+end

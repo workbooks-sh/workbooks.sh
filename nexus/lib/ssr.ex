@@ -214,8 +214,10 @@ defmodule Nexus.SSR do
       Enum.map_join(nodes, "\n", &render_node(&1, res, ctx)) <> "\n</section>"
   end
 
-  # The only nodes that render into an app: the `client` island and `show <Resource|Unit>` directives.
+  # The only nodes that render into an app: the `client` island, the `design` brand sheet, and
+  # `show <Resource|Unit>` directives.
   defp app_component?(%{type: :code, kind: "client"}), do: true
+  defp app_component?(%{type: :code, kind: "design"}), do: true
   defp app_component?(%{type: :decl, text: "show " <> _}), do: true
   defp app_component?(_), do: false
 
@@ -251,6 +253,11 @@ defmodule Nexus.SSR do
   # page so it runs client-side (the documented client lane). `server`/`resource`/etc. are machinery
   # that runs on the nexus, not shown in the rendered app.
   defp render_node(%{type: :code, kind: "client", body: b}, _res, _ctx), do: b
+
+  # A `design` block is the brand sheet — a living design document. Its CSS (tokens / classes) is
+  # tangled into the page as a <style>, loaded before the island so the UI reads `var(--…)`. Edit it
+  # to rebrand the app.
+  defp render_node(%{type: :code, kind: "design", body: b}, _res, _ctx), do: "<style>\n" <> b <> "\n</style>"
 
   # Any other unit (server / sandbox / data / def / agent / resource …) renders as a labelled
   # source figure — the literate document shows its own code. Matches the canonical reactor weave.

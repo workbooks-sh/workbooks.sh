@@ -1,0 +1,18 @@
+# Design — Brandnana
+
+The brand sheet: a **living design document**. Edit these tokens to rebrand the app — the interface
+reads them as `var(--…)`.
+
+Brandnana's brand is a **bold creative studio**: crisp near-white and near-black, a confident banana
+accent used sparingly, and a heavy geometric grotesk (Syne) for display. High-contrast, editorial,
+energetic — a studio, not a tool.
+
+design :brand do
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&display=swap');
+  :root{
+    --bg:#eeede8; --paper:#ffffff; --ink:#16140f; --soft:#6f6c63; --line:#e3e1d9; --accent:#f4c200;
+    --display:'Syne',system-ui,sans-serif; --sans:'Inter',system-ui,sans-serif; --radius:14px;
+  }
+  .mark, .hero h1 { font-family:var(--display); font-weight:800; letter-spacing:-.03em; }
+  .hero{ background:linear-gradient(180deg,#ffffff,#fdfcf6); }
+end
