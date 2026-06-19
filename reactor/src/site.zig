@@ -179,7 +179,7 @@ const router =
     \\  const t=document.querySelector('a.nav.on');if(t)document.title=t.textContent+' — Workbooks';
     \\  window.scrollTo(0,0);
     \\}
-    \\document.addEventListener('click',e=>{const a=e.target.closest('a.nav');if(!a)return;e.preventDefault();history.pushState({},'',a.dataset.route);route(a.dataset.route);});
+    \\document.addEventListener('click',e=>{const a=e.target.closest('a[href^="/"]');if(!a)return;const r=a.dataset.route||a.getAttribute('href');e.preventDefault();history.pushState({},'',r);route(r);});
     \\window.addEventListener('popstate',()=>route(location.pathname));
     \\const tb=document.querySelector('.theme');
     \\const setT=t=>{document.documentElement.dataset.theme=t;try{localStorage.setItem('wb-theme',t);}catch(_){}};
