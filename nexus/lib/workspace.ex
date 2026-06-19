@@ -1,20 +1,23 @@
 defmodule Nexus.Workspace do
   @moduledoc """
-  The storage / backup layer over a managed workspace repo (`Nexus.Git`).
+  Storage / backup over a managed workspace repo (`Nexus.Git`) — built ON the
+  existing storage systems, not a new one.
 
-  A workspace's durable, portable backup is a **git bundle** — one file holding the
-  whole history. The bundle goes to the workspace's remote backend:
+  A workspace's durable backup is a **git bundle** (the whole history in one file).
+  It's stored as a **no-expiry entry in the tenant-scoped cold store**
+  (`Nexus.Cache.Cold`, namespace `"workspaces"`): the local tier lives on the data
+  volume, and it routes to the R2/S3 remote automatically when `cache-cold` is an
+  `r2://`/`s3://` URI — the *same* two-tier, tenant-isolated backend the cache and
+  the compile store already use.
 
-    * **GitHub** (when the user connects it) — their monorepo of workspaces IS the
-      store; we keep nothing. *(remote backend: next.)*
-    * **our cold storage** otherwise — this module's backend. The local tier writes
-      to a `backups/` dir on the persistent data volume (`Nexus.Config.data_dir/0`),
-      exactly like the compile cache's local tier; the S3/R2 tier wires on top.
-
-  When GitHub isn't connected, cold-storage bytes count toward the tenant's storage
-  quota (see `Nexus.Capacity`); `backup/2` returns the byte size for that metering.
+  `backup/3` returns the bundle's byte size for quota metering — cold-storage bytes
+  count toward the tenant's storage limit when GitHub isn't connected. The
+  GitHub-remote backend (push the user's monorepo) wires on top of this.
   """
   alias Nexus.Git
+  alias Nexus.Cache.Cold
+
+  @ns "workspaces"
 
   @doc "Bundle the whole repo history into bytes — the durable, portable backup unit."
   def bundle(dir) do
@@ -31,29 +34,23 @@ defmodule Nexus.Workspace do
     end
   end
 
-  @doc "Back the workspace up to cold storage at `key`. `{:ok, byte_size}` (for metering) | `{:error, reason}`."
-  def backup(dir, key) when is_binary(key) do
+  @doc """
+  Back the workspace up to the tenant's cold store at `key`. `{:ok, byte_size}` (for
+  metering) | `{:error, reason}`. Stored with no expiry — durable, not a TTL entry.
+  """
+  def backup(tenant, dir, key) when is_binary(key) do
     with {:ok, bytes} <- bundle(dir),
-         :ok <- Nexus.S3.Local.put(store_dir(), key, bytes) do
+         :ok <- Cold.put(tenant, @ns, key, {bytes, :infinity}) do
       {:ok, byte_size(bytes)}
     end
   end
 
-  @doc "Restore a cold-storage backup into `dir` (created fresh from the bundle)."
-  def restore(key, dir) when is_binary(key) do
-    with {:ok, bytes} <- Nexus.S3.Local.get(store_dir(), key) do
-      tmp = Path.join(System.tmp_dir!(), "wb_#{System.unique_integer([:positive])}.bundle")
-      File.write!(tmp, bytes)
-      File.mkdir_p!(dir)
-
-      try do
-        case System.cmd("git", ["clone", "-q", tmp, dir], stderr_to_stdout: true) do
-          {_, 0} -> :ok
-          {out, _} -> {:error, out}
-        end
-      after
-        File.rm(tmp)
-      end
+  @doc "Restore a tenant's cold-store backup into `dir` (created fresh from the bundle)."
+  def restore(tenant, key, dir) when is_binary(key) do
+    case Cold.get(tenant, @ns, key) do
+      {:ok, {bytes, _expires}} -> clone(bytes, dir)
+      :miss -> {:error, :not_found}
+      other -> other
     end
   end
 
@@ -65,5 +62,18 @@ defmodule Nexus.Workspace do
     end
   end
 
-  defp store_dir, do: Path.join(Nexus.Config.data_dir(), "backups")
+  defp clone(bytes, dir) do
+    tmp = Path.join(System.tmp_dir!(), "wb_#{System.unique_integer([:positive])}.bundle")
+    File.write!(tmp, bytes)
+    File.mkdir_p!(dir)
+
+    try do
+      case System.cmd("git", ["clone", "-q", tmp, dir], stderr_to_stdout: true) do
+        {_, 0} -> :ok
+        {out, _} -> {:error, out}
+      end
+    after
+      File.rm(tmp)
+    end
+  end
 end
