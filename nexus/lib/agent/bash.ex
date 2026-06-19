@@ -200,8 +200,10 @@ defmodule Nexus.Agent.Bash do
     stdin_file = Path.join(System.tmp_dir!(), "nexus_stdin_#{System.unique_integer([:positive])}")
     File.write!(stdin_file, stdin)
 
+    {flags, exec} = Nexus.Wasm.Aot.resolve(wasm)
+
     inner =
-      ["wasmtime", "run", "--dir", Nexus.Agent.Vfs.mount(vfs), wasm | argv]
+      (["wasmtime", "run"] ++ flags ++ ["--dir", Nexus.Agent.Vfs.mount(vfs), exec | argv])
       |> Enum.map_join(" ", &shq/1)
 
     # Wrap in a shell watchdog: background the kit, start a killer that SIGKILLs it (and any wasmtime

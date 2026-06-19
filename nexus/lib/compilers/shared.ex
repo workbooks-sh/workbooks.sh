@@ -21,7 +21,7 @@ defmodule Nexus.Compilers.Shared do
 
   @doc "Run `wasmtime run <args>` and return its combined output (the sandbox executor)."
   def wasmtime(args) do
-    {out, _} = System.cmd("wasmtime", ["run"] ++ [] ++ args, stderr_to_stdout: true)
+    {out, _} = System.cmd("wasmtime", ["run"] ++ Nexus.Wasm.Aot.resolve_args(args), stderr_to_stdout: true)
     out
   end
 

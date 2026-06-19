@@ -214,7 +214,8 @@ defmodule Nexus.Browse.Blitz do
     # bound the JS engine: a huge framework bundle can spin/abort — kill it after the budget so the
     # caller falls back to the no-JS render. (wasmtime + a watchdog, like the agent bash kit timeout.)
     budget = Keyword.get(opts, :timeout_ms, 20_000)
-    inner = ["wasmtime", "run", "--dir", "#{dir}::/work", wasm | argv] |> Enum.map_join(" ", &shq/1)
+    {flags, exec} = Nexus.Wasm.Aot.resolve(wasm)
+    inner = (["wasmtime", "run"] ++ flags ++ ["--dir", "#{dir}::/work", exec | argv]) |> Enum.map_join(" ", &shq/1)
     secs = max(1, div(budget, 1000))
     guarded = "#{inner} & p=$!; { sleep #{secs}; kill -9 $p 2>/dev/null; } >/dev/null 2>&1 & w=$!; wait $p; rc=$?; kill $w 2>/dev/null; exit $rc"
 
