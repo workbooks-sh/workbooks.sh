@@ -35,6 +35,8 @@ defmodule Nexus.Config do
           team    | Team    | 4096 100 49 yes
           scale   | Scale   | 16384 1000 199 yes
         "
+        runtime-image="ghcr.io/workbooks-sh/runtime:latest"   # image the provisioner deploys per tenant
+        reserved-hosts="workbooks.sh"   # operator's domain(s) of record — tenants can't bind under them
       end
   """
   @key {__MODULE__, :cfg}
@@ -99,6 +101,14 @@ defmodule Nexus.Config do
   # `id | Name | ram_mb storage_gb price_usd domains(yes|no)`, cheapest → biggest.
   def tiers, do: get(:tiers)
 
+  # The OCI image the provisioner deploys for a tenant nexus. Defaults to the published open-standard
+  # runtime image; an operator running their own build overrides it. (Operator config, not business.)
+  def runtime_image, do: get(:runtime_image)
+
+  # Hostnames an operator reserves (their own domain of record) — a tenant can't bind a custom domain
+  # under these. Neutral default: NONE. We supply our own (`workbooks.sh`) via our deploy config.
+  def reserved_hosts, do: get(:reserved_hosts)
+
   # ── parse ─────────────────────────────────────────────────────────────────────────────────────
   defp parse(html) do
     %{
@@ -126,7 +136,9 @@ defmodule Nexus.Config do
       # zero-dep); swap to a real GGUF/Bumblebee model name at Nexus.Embed's model-swap point.
       embed: attr(html, "embed") || "hashed",
       # Capacity tiers (operator-supplied; neutral single-tier default — see `tiers/0`).
-      tiers: parse_tiers(attr(html, "tiers"))
+      tiers: parse_tiers(attr(html, "tiers")),
+      runtime_image: attr(html, "runtime-image") || "ghcr.io/workbooks-sh/runtime:latest",
+      reserved_hosts: words(attr(html, "reserved-hosts"), [])
     }
   end
 

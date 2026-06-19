@@ -137,7 +137,7 @@ defmodule Nexus.ControlPlane.Domain do
     cond do
       host == "" -> {:error, :invalid_host}
       not Regex.match?(~r/^[a-z0-9.-]+\.[a-z]{2,}$/, host) -> {:error, :invalid_host}
-      String.contains?(host, "workbooks.sh") -> {:error, :reserved_host}
+      Enum.any?(Nexus.Config.reserved_hosts(), &String.contains?(host, &1)) -> {:error, :reserved_host}
       true -> :ok
     end
   end

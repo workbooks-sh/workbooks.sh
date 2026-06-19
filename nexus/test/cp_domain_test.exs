@@ -20,6 +20,8 @@ defmodule Nexus.ControlPlane.DomainTest do
 
   setup do
     Nexus.Config.put(:tiers, @tiers)
+    # Reserved hosts are operator config (neutral default: none); configure ours for the gate test.
+    Nexus.Config.put(:reserved_hosts, ["workbooks.sh"])
     org = "org_dom_#{System.unique_integer([:positive])}"
     on_exit(fn ->
       Nexus.Config.boot()

@@ -21,8 +21,6 @@ defmodule Nexus.Provisioner do
   alias Nexus.ControlPlane, as: CP
 
   @default_region "sjc"
-  @default_plan "starter"
-  @runtime_image "ghcr.io/workbooks-sh/runtime:latest"
 
   @doc """
   Provision a single-tenant nexus for `org`. Validates the org (fail-closed against path-escape),
@@ -43,7 +41,8 @@ defmodule Nexus.Provisioner do
     fly = fly_mod(opts)
     fly_org = System.get_env("WB_FLY_ORG") || "personal"
     region = Keyword.get(opts, :region, @default_region)
-    plan = Keyword.get(opts, :plan, @default_plan)
+    # Default plan = the cheapest configured tier (operator config), not a hardcoded id.
+    plan = Keyword.get(opts, :plan, Nexus.Pricing.default_tier().id)
 
     # Non-guessable id (doesn't encode org → org B can't predict/collide org A's app name).
     nexus_id = "nx-" <> rand_token(12)
@@ -147,7 +146,7 @@ defmodule Nexus.Provisioner do
 
   defp build_machine_config(env, region, opts) do
     %{
-      "image" => Keyword.get(opts, :image, @runtime_image),
+      "image" => Keyword.get(opts, :image, Nexus.Config.runtime_image()),
       "region" => region,
       "env" => env,
       "guest" => %{"cpu_kind" => "shared", "cpus" => 1, "memory_mb" => Keyword.get(opts, :memory_mb, 1024)},
