@@ -32,7 +32,7 @@
     Cube as Box,
     Robot as AgentGlyph,
     SidebarSimple,
-    MagnifyingGlass,
+    Toolbox,
     Columns,
     SquaresFour,
     SquareSplitHorizontal,
@@ -509,18 +509,18 @@
     <DockToolbar kind="bench" />
   </span>
 
-  <!-- Search — a default toolkit with its own badge + global ⌘K, so it can
-       be summoned from anywhere. Sits just left of the nexus status. -->
+  <!-- Toolkits — the marketplace badge. Opens the right-side drawer where you
+       add toolkits to your org, then plug them into a workspace. -->
   <button
     type="button"
-    class="engine search-badge"
+    class="engine toolkits-badge"
     class:ob-hide={!onboarding.shows("bench")}
     data-tauri-drag-region="false"
-    use:tip={"Search  ⌘K"}
-    aria-label="Search"
-    onclick={() => chrome.toggleSearch()}
+    use:tip={"Toolkits"}
+    aria-label="Toolkits"
+    onclick={() => chrome.toggleToolkits()}
   >
-    <MagnifyingGlass size={15} weight="bold" />
+    <Toolbox size={15} weight="bold" />
   </button>
 
   <!-- (the green nexus mark used to live here; the nexus switcher now opens from
@@ -937,18 +937,18 @@
     align-items: center;
     gap: 2px;
   }
-  /* Search reuses the nexus badge idiom; default ink (it's an action, not a
+  /* Toolkits reuses the nexus badge idiom; default ink (it's an action, not a
    * status), with the same hover. */
-  .search-badge { color: var(--color-fg-subtle); }
-  .search-badge:hover { color: var(--color-fg); }
+  .toolkits-badge { color: var(--color-fg-subtle); }
+  .toolkits-badge:hover { color: var(--color-fg); }
 
-  /* Onboarding reveal — bench + search badge drop in as their own beat. */
+  /* Onboarding reveal — bench + toolkits badge drop in as their own beat. */
   .bench-host,
-  .search-badge {
+  .toolkits-badge {
     transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .bench-host.ob-hide,
-  .search-badge.ob-hide {
+  .toolkits-badge.ob-hide {
     opacity: 0;
     transform: translateY(-8px);
     pointer-events: none;

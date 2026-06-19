@@ -25,8 +25,6 @@
   import { nav } from "$lib/bridge/nav.svelte";
   import { dock } from "$lib/bridge/dock.svelte";
   import { chrome } from "$lib/ui/chrome.svelte";
-  import { search } from "$lib/search/registry.svelte";
-  import { SEARCH_MODES, SEARCH_MODE_ORDER } from "$lib/search/modes";
   import DemoToolkitPanel from "$lib/onboarding/DemoToolkitPanel.svelte";
   import OnboardingAgents from "$lib/onboarding/OnboardingAgents.svelte";
   import LessonOverlay from "$lib/onboarding/LessonOverlay.svelte";
@@ -37,7 +35,7 @@
   // The user's chosen LLM model (recommended picks pinned in the picker).
   let model = $state(getLlmModel());
 
-  const STEPS = ["welcome", "titlebar", "sidebar", "sidebar-tour", "glyph", "search", "theme", "connect", "waldo", "waldo-voice"] as const;
+  const STEPS = ["welcome", "titlebar", "sidebar", "sidebar-tour", "glyph", "theme", "connect", "waldo", "waldo-voice"] as const;
   type Step = (typeof STEPS)[number];
   let step = $state<Step>("welcome");
   const stepIdx = $derived(STEPS.indexOf(step));
@@ -57,7 +55,7 @@
     titlebar: [
       { target: ".new-tab", title: "Create", body: "The + at the left of your tabs — start a new workbook, folder or board. Your create surface is always one click up here." },
       { target: ".bench-host", title: "The bench", body: "Toolkit shortcuts. Each icon opens a panel on the right — click again to close. Build your own." },
-      { target: ".search-badge", title: "Search", body: "A built-in toolkit with a global ⌘K — summon it anywhere to find files, tabs, the web." },
+      { target: ".toolkits-badge", title: "Toolkits", body: "The marketplace — add a toolkit to your org, then plug it into a workspace. Press ⌘K to open it from anywhere." },
       { target: ".nexus-chip", title: "Nexus", body: "Personal is local — it runs on your machine, free, and nothing leaves. Organizations are cloud nexuses you've been added to. Click to switch; you'll see more options here as you join teams." },
       { target: ".dock-host", title: "Waldo", body: "Your resident agent, top-right. Ask by text or voice; it works issues with you." },
     ],
@@ -89,9 +87,8 @@
     sidebar: "shelf" | "hub" | "map";
     sidebarTop: "bookmarks" | "search" | "both";
     glyphs: "icon" | "emoji";
-    searchMode: "internal" | "web" | "ai";
   };
-  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, sidebarTop: nav.sidebarTop, glyphs: nav.glyphs, searchMode: search.mode });
+  let prefs = $state<Prefs>({ theme: "system", sidebar: nav.layout, sidebarTop: nav.sidebarTop, glyphs: nav.glyphs });
 
   // Demo bench toolkits — registered only for the tour so the bench has real,
   // toggleable shortcuts to showcase the "build your own toolkit" concept.
@@ -162,7 +159,7 @@
     // the sidebar step is purely about the sidebar — no create screen yet.
     if (i >= 1) onboarding.reveal("titlebar", "bench", "agent");
     if (i >= 2) onboarding.reveal("sidebar");
-    if (i >= 6) onboarding.reveal("canvas"); // at the theme beat
+    if (i >= 5) onboarding.reveal("canvas"); // at the theme beat
     spotlight(s);
   }
 
@@ -174,15 +171,8 @@
     dock.close();
     chrome.bookmarksOpen = false;
     chrome.nexusOpen = false;
-    // "search" focuses the sidebar's own file-search bar (inline, shown by
-    // the sidebarTop pick) — NOT the titlebar's ⌘K drawer, so nothing opens.
     if (s === "sidebar" || s === "sidebar-tour" || s === "glyph") chrome.sidebarOpen = true;
     else if (s === "waldo" || s === "waldo-voice") dock.open("waldo");
-    // "search" previews the everything-search drawer (right) in the current mode.
-    if (s === "search") {
-      search.demoQuery = "data pipelines";
-      chrome.openSearch();
-    }
     // "connect" shows the agents page above the coach — nothing to open.
     // The glyph step expands every folder so the emoji↔icon flip is visible
     // at the file level too.
@@ -191,15 +181,6 @@
 
   function pickTheme(t: Prefs["theme"]) { prefs.theme = t; applyThemeMode(t); }
   function pickSidebar(s: Prefs["sidebar"]) { prefs.sidebar = s; nav.setLayout(s); }
-  // Pick a search kind and preview it live: set the mode, seed a demo query,
-  // and (re)open the search drawer so it remounts in that mode.
-  function pickSearchMode(m: Prefs["searchMode"]) {
-    prefs.searchMode = m;
-    search.setMode(m);
-    search.demoQuery = "data pipelines";
-    chrome.closeLeft();
-    queueMicrotask(() => chrome.openSearch());
-  }
   function pickGlyphs(g: Prefs["glyphs"]) { prefs.glyphs = g; nav.setGlyphs(g); }
 
   // Key connect — REAL keychain persistence (wb-2s09.3/.4/.5).
@@ -361,18 +342,6 @@
             <div class="opts">
               <button type="button" class="opt" class:sel={prefs.glyphs === "icon"} onclick={() => pickGlyphs("icon")}>Icons</button>
               <button type="button" class="opt" class:sel={prefs.glyphs === "emoji"} onclick={() => pickGlyphs("emoji")}>Emoji</button>
-            </div>
-
-          {:else if step === "search"}
-            <div class="text">
-              <span class="kicker">Search · ⌘K</span>
-              <h1>Pick a search type</h1>
-              <p>Each is a composite — pick one to preview it on the right; the card explains what it does.</p>
-            </div>
-            <div class="opts">
-              {#each SEARCH_MODE_ORDER as m (m)}
-                <button type="button" class="opt" class:sel={prefs.searchMode === m} onclick={() => pickSearchMode(m)}>{SEARCH_MODES[m].label}</button>
-              {/each}
             </div>
 
           {:else if step === "theme"}

@@ -21,7 +21,7 @@ export type ChromeMode = "app" | "doc";
 /** The left-side panel slot is mutually exclusive — one of these or
  *  none. Two competing left panels at once eats too much chrome width
  *  and the user never asked for both. */
-export type LeftPanel = "files" | "search" | null;
+export type LeftPanel = "files" | "toolkits" | null;
 
 class ChromeStore {
   /** Active rail-tab label (shown after the product name when in app mode). */
@@ -79,14 +79,14 @@ class ChromeStore {
   toggleFiles() {
     this.leftPanel = this.leftPanel === "files" ? null : "files";
   }
-  toggleSearch() {
-    this.leftPanel = this.leftPanel === "search" ? null : "search";
+  toggleToolkits() {
+    this.leftPanel = this.leftPanel === "toolkits" ? null : "toolkits";
   }
   openFiles() {
     this.leftPanel = "files";
   }
-  openSearch() {
-    this.leftPanel = "search";
+  openToolkits() {
+    this.leftPanel = "toolkits";
   }
   closeLeft() {
     this.leftPanel = null;

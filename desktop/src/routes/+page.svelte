@@ -30,8 +30,7 @@
   import EditNameModal from "$lib/workspace/EditNameModal.svelte";
   import EditIconModal from "$lib/workspace/EditIconModal.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
-  import SearchDrawer from "$lib/components/SearchDrawer.svelte";
-  import SearchExplainer from "$lib/components/SearchExplainer.svelte";
+  import ToolkitDrawer from "$lib/toolkits/ToolkitDrawer.svelte";
   import BookmarksPopover from "$lib/components/BookmarksPopover.svelte";
   import NexusPopover from "$lib/components/NexusPopover.svelte";
   import { bookmarks } from "$lib/bridge/bookmarks.svelte";
@@ -57,7 +56,7 @@
   import { nav } from "$lib/bridge/nav.svelte";
   import { commands } from "$lib/chrome/commands.svelte";
   import {
-    MagnifyingGlass as SearchCmdIcon,
+    Toolbox as ToolkitsCmdIcon,
     BookmarkSimple as BookmarkCmdIcon,
     Terminal as TerminalCmdIcon,
   } from "phosphor-svelte";
@@ -517,7 +516,7 @@
     for (const p of BUILTIN_PROVIDERS) search.register(p);
     // Chrome command registry (wb-aakl.17): the built-in overflow-menu +
     // global commands register through the same seam toolkits use (dogfood).
-    commands.register({ id: "search", label: "Search…", group: "menu", icon: SearchCmdIcon, shortcut: "⌘K", order: 0, run: () => chrome.openSearch() });
+    commands.register({ id: "toolkits", label: "Toolkits…", group: "menu", icon: ToolkitsCmdIcon, shortcut: "⌘K", order: 0, run: () => chrome.openToolkits() });
     commands.register({ id: "bookmarks", label: "Bookmarks", group: "menu", icon: BookmarkCmdIcon, order: 1, run: () => (chrome.bookmarksOpen = true) });
     commands.register({ id: "terminal", label: "Terminal", group: "menu", icon: TerminalCmdIcon, shortcut: "⌃`", order: 2, run: () => terminalDrawer.show() });
     commands.register({ id: "settings", label: "Settings", group: "menu", icon: SettingsIcon, order: 3, run: () => { chrome.mode = "app"; active = "settings"; } });
@@ -574,7 +573,7 @@
     if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
     if (e.key === "k") {
       e.preventDefault();
-      chrome.toggleSearch();
+      chrome.toggleToolkits();
     } else if (e.key === "b") {
       e.preventDefault();
       chrome.toggleSidebar();
@@ -687,14 +686,10 @@
       <TerminalDrawer />
     </main>
 
-    <!-- Search drawer — opens from the RIGHT (the browser "everything"
-         search). Sits right of the canvas, beside the dock. During the tour
-         an explainer card sits to its left describing the active search type. -->
-    {#if chrome.leftPanel === "search" && onboarding.active}
-      <SearchExplainer />
-    {/if}
-    {#if chrome.leftPanel === "search"}
-      <SearchDrawer onclose={() => chrome.closeLeft()} />
+    <!-- Toolkit marketplace — opens from the RIGHT, beside the dock. Add a
+         toolkit to your org, then plug it into a workspace. -->
+    {#if chrome.leftPanel === "toolkits"}
+      <ToolkitDrawer onclose={() => chrome.closeLeft()} />
     {/if}
 
     <DockHost />
