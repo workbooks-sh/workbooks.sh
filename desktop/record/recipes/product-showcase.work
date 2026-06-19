@@ -59,7 +59,7 @@ cue "00:20", :wait do
   ms: 1700
 end
 
-# ── talk to an agent — build an app live ─────────────────────────────────────
+# ── talk to an agent — watch it think, work, and build ───────────────────────
 cue "00:23", :navigate do
   Or just describe what you want.
   url: http://localhost:5178/
@@ -73,25 +73,43 @@ cue "00:25", :type do
 end
 
 cue "00:29", :click do
-  Waldo builds it — a real app, from a sentence.
+  Waldo thinks it through, then builds it.
   selector: button[type=submit]
-  checkpoint: an agent chat thread is running, building a workbook
 end
 
-cue "00:35", :wait do
-  A real habit tracker, built on the spot.
-  ms: 3600
-  checkpoint: a real habit-tracker app with a weekly grid is open in a tab
+cue "00:33", :wait do
+  ms: 1300
+end
+
+cue "00:35", :click do
+  Watch it reason and call real tools, live.
+  selector: .tab:has-text("Waldo")
+  checkpoint: an agent chat thread shows a reasoning block and tool-call cards with done status
+end
+
+cue "00:38", :wait do
+  Real reasoning, real tool calls.
+  ms: 2600
+end
+
+cue "00:42", :click do
+  A real app, from a single sentence.
+  selector: .tab:has-text("habit")
+  checkpoint: a real habit-tracker app with a weekly grid is open
+end
+
+cue "00:45", :wait do
+  ms: 2000
 end
 
 # ── everything one keystroke away ────────────────────────────────────────────
-cue "00:39", :click do
+cue "00:48", :click do
   Everything you've made — one keystroke away.
   selector: button[aria-label="Search"]
   checkpoint: a search drawer is open showing a feed of file cards
 end
 
-cue "00:42", :wait do
+cue "00:51", :wait do
   Workbooks — every app, every agent, one window.
-  ms: 2400
+  ms: 2200
 end
