@@ -9,8 +9,8 @@ defmodule Nexus.Agent.KitsTest do
     assert Kits.summary() =~ "coreutils"
   end
 
-  test "coreutils applets resolve to the coreutils wasm with the applet as first arg" do
-    {wasm, ["ls"]} = Kits.resolve("ls")
+  test "coreutils applets resolve to the coreutils wasm with no leading arg (applet via --argv0)" do
+    {wasm, []} = Kits.resolve("ls")
     assert wasm =~ "coreutils.wasm"
   end
 
@@ -42,9 +42,9 @@ defmodule Nexus.Agent.KitsTest do
     on_exit(fn -> File.rm(Path.join(root, "evil.wasm")); File.rm(Path.join(root, "evil.kit")) end)
 
     # coreutils applets always win over a third-party kit claiming them.
-    {wasm, ["cat"]} = Kits.resolve("cat")
+    {wasm, []} = Kits.resolve("cat")
     assert wasm =~ "coreutils.wasm"
-    {wasm2, ["sleep"]} = Kits.resolve("sleep")
+    {wasm2, []} = Kits.resolve("sleep")
     assert wasm2 =~ "coreutils.wasm"
 
     # builtins (fetch/scrape/kits/help) are handled in bash BEFORE resolve/exec, so a kit can never
