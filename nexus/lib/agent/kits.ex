@@ -84,16 +84,17 @@ defmodule Nexus.Agent.Kits do
   end
 
   @doc """
-  Resolve a command name (argv[0]) to `{wasm_path, leading_args}`. A coreutils applet → the
-  coreutils wasm with the applet name as the first arg; a standalone kit → its wasm, no leading args.
-  `nil` if no kit provides the command.
+  Resolve a command name (argv[0]) to `{wasm_path, leading_args}`. The command name is passed to
+  wasmtime as `--argv0`, so multicall binaries (coreutils) dispatch correctly without a leading
+  applet arg. `nil` if no kit provides the command.
   """
   def resolve(cmd) do
     kits = all()
 
     cond do
       cmd in @coreutils ->
-        {kits["coreutils"].wasm, [cmd]}
+        # The multicall binary dispatches on argv[0]; bash sets `--argv0 <cmd>`, so no leading arg.
+        {kits["coreutils"].wasm, []}
 
       Map.has_key?(kits, cmd) && kits[cmd].wasm ->
         {kits[cmd].wasm, []}

@@ -224,20 +224,23 @@ defmodule Nexus.Agent.Bash do
         "bash: #{cmd}: command not found (try `kits` to list, `help <kit>` for usage)"
 
       {wasm, leading} ->
-        run_wasm(vfs, wasm, leading ++ args, stdin)
+        run_wasm(vfs, wasm, cmd, leading ++ args, stdin)
     end
   end
 
   # Run a wasm command in wasmtime against the VFS, feeding `stdin`, capturing stdout. The host `sh`
   # only does the `< stdinfile` redirect + arg passing — the executed command is the sandboxed wasm.
-  defp run_wasm(vfs, wasm, argv, stdin) do
+  defp run_wasm(vfs, wasm, cmd, argv, stdin) do
     stdin_file = Path.join(System.tmp_dir!(), "nexus_stdin_#{System.unique_integer([:positive])}")
     File.write!(stdin_file, stdin)
 
     {flags, exec} = Nexus.Wasm.Aot.resolve(wasm)
 
+    # Pin argv[0] to the command name. wasmtime otherwise sets argv[0] to the module path basename,
+    # which for the precompiled cache is `coreutils-<mtime>-<wtver>.cwasm` — a multicall binary
+    # (uutils) dispatches on argv[0] and would reject that as an unknown applet.
     inner =
-      (["wasmtime", "run"] ++ flags ++ ["--dir", Nexus.Agent.Vfs.mount(vfs), exec | argv])
+      (["wasmtime", "run", "--argv0", cmd] ++ flags ++ ["--dir", Nexus.Agent.Vfs.mount(vfs), exec | argv])
       |> Enum.map_join(" ", &shq/1)
 
     # Wrap in a shell watchdog: background the kit, start a killer that SIGKILLs it (and any wasmtime
