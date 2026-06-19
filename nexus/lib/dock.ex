@@ -21,12 +21,27 @@ defmodule Nexus.Dock do
       # a real string-RETURNING cap: an in-memory kv (proves the canonical-ABI return path).
       "store" => {"func(key: string, val: string)", fn k, v -> :persistent_term.put({:nexus_kv, k}, v); nil end},
       "load" => {"func(key: string) -> string", fn k -> :persistent_term.get({:nexus_kv, k}, "") end},
+      # the real, tiered, tenant-scoped cache (Nexus.Cache) — the durable counterpart to store/load.
+      # The guest names only a key; the host binds the tenant (Nexus.Cache.default_tenant — wired to
+      # Nexus.Auth's request tenant once threaded through) so a guest can never address another tenant.
+      "cache_get" =>
+        {"func(key: string) -> string",
+         fn k -> with({:ok, v} <- Nexus.Cache.get(cache_ns(), k), do: v, else: (_ -> "")) end},
+      "cache_put" =>
+        {"func(key: string, val: string, ttl: u32)",
+         fn k, v, ttl -> Nexus.Cache.put(cache_ns(), k, v, ttl: ttl); nil end},
+      "cache_delete" =>
+        {"func(key: string)", fn k -> Nexus.Cache.delete(cache_ns(), k); nil end},
       # net: a TLS-verified HTTP GET, SSRF-brokered (see fetch/1).
       "fetch" => {"func(url: string) -> string", &__MODULE__.fetch/1},
       # llm: a chat completion (OpenRouter). Returns "" if no key is configured.
       "complete" => {"func(prompt: string) -> string", &__MODULE__.llm_complete/1}
     }
   end
+
+  # The cache namespace the guest's cache_* caps write under (the unit's caps share one namespace;
+  # the tenant is the host's default until Nexus.Auth's request tenant is threaded through the seam).
+  defp cache_ns, do: "dock"
 
   @doc """
   SSRF-brokered HTTP GET for the `fetch` cap. ALWAYS blocks loopback/private/link-local hosts and

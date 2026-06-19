@@ -25,7 +25,7 @@ defmodule Nexus.Application do
     # render-concurrency) so a burst can't fork-bomb wasmtime into an OOM — backpressure instead.
     children =
       [Nexus.Telemetry, Nexus.ControlPlane.Store] ++
-        Nexus.Wasm.Gate.child_specs() ++ ether ++ server_children()
+        Nexus.Wasm.Gate.child_specs() ++ Nexus.Cache.child_specs() ++ ether ++ server_children()
     result = Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
 
     # Once the server is up, publish the desktop discovery file (no-op unless WB_DESKTOP_DIR is set).

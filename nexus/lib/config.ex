@@ -18,6 +18,9 @@ defmodule Nexus.Config do
         compile-cache-version="wbc1"   # bump to invalidate the whole store
         component-cache="build/components"   # store location (path or r2://bucket/prefix)
         languages="rust zig c"         # toolchains this deployment enables/pre-warms
+        cache-hot-max-mb="64"          # Nexus.Cache hot-tier ETS byte budget (LRU-bounded)
+        cache-default-ttl="3600"       # Nexus.Cache cold-tier shelf-life, seconds
+        cache-cold="cache"             # cold-tier backend: a local path (→ Local) OR r2://bucket/prefix (→ R2)
         pm-debug="off" />
   """
   @key {__MODULE__, :cfg}
@@ -59,6 +62,14 @@ defmodule Nexus.Config do
   def component_cache_region, do: get(:component_cache_region)
   def languages, do: get(:languages)
   def pm_debug?, do: get(:pm_debug)
+  # Tenant-aware cache (Nexus.Cache): hot ETS byte budget + cold-tier shelf-life. The hot tier is
+  # deliberately small (default 64MB) so on a 1GB host it never competes with agents for RAM.
+  def cache_hot_max_mb, do: get(:cache_hot_max_mb)
+  def cache_default_ttl, do: get(:cache_default_ttl)
+  # Cold-tier backend spec — a local filesystem path (→ Nexus.Cache.Cold.Local) OR an `r2://`/`s3://`
+  # bucket URI (→ Nexus.Cache.Cold.R2). Mirrors `component-cache`: the operator picks cloud-vs-local
+  # ONCE in <work-deploy>, and the same tier logic runs either way. Default: "cache" under data_dir.
+  def cache_cold, do: get(:cache_cold)
 
   # ── parse ─────────────────────────────────────────────────────────────────────────────────────
   defp parse(html) do
@@ -73,7 +84,10 @@ defmodule Nexus.Config do
       component_cache_endpoint: attr(html, "component-cache-endpoint"),
       component_cache_region: attr(html, "component-cache-region") || "auto",
       languages: words(attr(html, "languages"), :all),
-      pm_debug: bool(attr(html, "pm-debug"), false)
+      pm_debug: bool(attr(html, "pm-debug"), false),
+      cache_hot_max_mb: int(attr(html, "cache-hot-max-mb"), 64),
+      cache_default_ttl: int(attr(html, "cache-default-ttl"), 3600),
+      cache_cold: attr(html, "cache-cold") || default_cold_dir()
     }
   end
 
@@ -87,6 +101,10 @@ defmodule Nexus.Config do
   def data_dir, do: System.get_env("WB_DATA") || File.cwd!()
 
   defp default_cache_dir, do: Path.join([data_dir(), "build", "components"])
+
+  # Cold-tier default: a `cache` dir on the persistent data volume → Nexus.Cache.Cold.Local. Durable
+  # across machine restarts and the safe default when no R2 is configured (the local/libkrun route).
+  defp default_cold_dir, do: Path.join(data_dir(), "cache")
 
   # ≈1 render slot per 100MB of host RAM (each post-AOT render ≈47MB; the /100 leaves headroom for
   # the BEAM + page working sets), within [2, 64]. Reads MemTotal on the Linux deploy target; on a
