@@ -89,7 +89,7 @@ defmodule Nexus.SSRTest do
     html = Nexus.SSR.render(dir)
     assert html =~ ~s(<script type="application/nexus-data" data-resource="Item">)
     assert html =~ ~s("name":"Soup") and html =~ ~s("tag":"hot")
-    assert html =~ "nexus.data = {" and html =~ "fetch('/data/'"
+    assert html =~ "nexus.data = {" and html =~ "fetch('data/'"
   end
 
   test "a `</script>` payload in baked data is html-escaped (can't break out of the island)" do
