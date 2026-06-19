@@ -29,4 +29,40 @@ defmodule Nexus.Deploy do
 
   @doc "Stop + remove the local nexus microVM."
   def down, do: Machine.down()
+
+  # ── cloud target (the hosted control plane on Fly) ─────────────────────────────────────────────
+  @control_plane_app "wb-nexus-cp"
+  @control_plane_config "nexus/deploy/control-plane/fly.toml"
+
+  @doc """
+  Deploy the control-plane to Fly (image-based, no local build) — `fly deploy` against
+  `nexus/deploy/control-plane/fly.toml`.
+
+  GUARDED: refuses unless `WB_ALLOW_CP_DEPLOY=1`. The current published nexus image must already
+  contain the control-plane API + auth AND be adversarially verified before you set it — deploying an
+  image without `Nexus.Platform` would take the live dashboard from working to broken. The guard makes
+  an accidental call a no-op, not an outage. `opts`: `:app`, `:config`, `:image`, `:remote_only`.
+  """
+  def cloud(opts \\ []) do
+    cond do
+      System.get_env("WB_ALLOW_CP_DEPLOY") not in ~w(1 true) ->
+        {:error, :deploy_guarded}
+
+      bin = System.find_executable("fly") || System.find_executable("flyctl") ->
+        {out, code} = System.cmd(bin, cloud_args(opts), stderr_to_stdout: true)
+        if code == 0, do: {:ok, out}, else: {:error, {:fly_deploy_failed, code, out}}
+
+      true ->
+        {:error, :flyctl_missing}
+    end
+  end
+
+  @doc "The `fly deploy` argv (pure — exposed for testing the command shape without running it)."
+  def cloud_args(opts \\ []) do
+    app = Keyword.get(opts, :app, @control_plane_app)
+    config = Keyword.get(opts, :config, @control_plane_config)
+    base = ["deploy", "--config", config, "--app", app]
+    base = base ++ if(img = opts[:image], do: ["--image", img], else: [])
+    base ++ if(opts[:remote_only], do: ["--remote-only"], else: [])
+  end
 end
