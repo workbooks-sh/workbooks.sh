@@ -15,19 +15,23 @@ everyone else to.
 - **docs/** — the Workbooks documentation site. An `app` block (sections → pages) with our brand in a
   `design` block; includes the live Examples explorer + a blog. *(moved here)*
 - **marketing/** — the AI-assembled, personalized upsell page. A `server :upsell` block on
-  `Nexus.Llm` + `Nexus.Pricing`; the model rewrites prose, never numbers. *(moved here)*
+  `Nexus.Llm` + `Nexus.Pricing`; the model rewrites prose, never numbers. ✅
 - **waitlist/** — interest capture. A `resource Signup` + `server :waitlist` block persisting via
-  `Nexus.Store`, with a form island. *(moved here)*
-- **lander/** — our marketing landing page, rebuilt from `web/index.html` as a workbook. *(planned)*
-- **cloud/** — the control-plane dashboard (upgrade, capacity, domains, account), migrated from the
-  SvelteKit app page by page. *(planned)*
-- **nexus/** — `deployment.work`: our own `Nexus.Config` (tiers, reserved hosts, image, identity) —
-  the *our-cloud* side of THE LINE, dogfooding running our own nexus. *(planned)*
+  `Nexus.Store`, with a form island. ✅
+- **lander/** — our marketing landing page, rebuilt from `web/index.html` as a client island; the
+  notify-me posts to the waitlist workbook's live source. ✅
+- **cloud/** — the control-plane dashboard as one client island: five views (Upgrade, Usage, Nexuses,
+  Domains, Account), dogfooding `Nexus.Capacity`/`Pricing`/`Live` + the upsell source, with a Bearer
+  auth seam to `/api/platform`. ✅
+- **nexus/** — `deployment.work`: our own `Nexus.Config` (tiers, reserved hosts, image, search) —
+  the *our-cloud* side of THE LINE, dogfooding running our own nexus. ✅
 
 ## Status
 
-Tracked in beads under epic **wb-hkat** (`bd ready` / `bd show wb-hkat`). The migration runs
-autonomously; this document narrates the intent, beads holds the live state.
+**Migration complete.** All surfaces serve on one nexus (`WB_SERVE=1 WB_DATA=dogfood`), every one a
+`.work` workbook; the live sources (waitlist capture, upsell, usage, fleet) work across surfaces.
+Tracked in beads under epic **wb-hkat**. The originals (`web/index.html`, `web/cloud-dashboard`) are
+retained until formally retired — their `.work` parity is verified here.
 
 ## Why this matters
 

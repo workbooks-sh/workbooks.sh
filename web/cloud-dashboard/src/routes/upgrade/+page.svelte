@@ -4,7 +4,7 @@
   // dials are memory + bandwidth; workspaces and users are unlimited.
   //
   // The hero is MARKETING LOGIC: an AI in the nexus assembles personalized copy for
-  // this org (prices stay pinned — see Nexus.Upsell / templates/marketing). The tier
+  // this org (prices stay pinned — see dogfood/marketing (server :upsell)). The tier
   // ladder below is the full, static comparison.
   import { getUpsell } from '$lib/api.js';
   import { onMount } from 'svelte';
