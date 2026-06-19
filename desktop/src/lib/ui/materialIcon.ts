@@ -12,6 +12,17 @@
  * search). Change the resolution rules in one place → change the other.
  */
 import manifest from "material-icon-theme/dist/material-icons.json";
+import workbookIcon from "./workbook-icon.svg?url";
+
+// Work-format files (a workbook is a single self-contained .html) get the BRANDED page icon — the
+// workbooks petal on an ink document — instead of the generic Material HTML glyph. In this app an
+// .html in the workspace IS a workbook. (SYNC note below: mirror in toolkits/icons/src/cli.js.)
+const WORKBOOK_EXTS = new Set(["html", "htm"]);
+
+/** The branded workbook page-icon URL (work-format files). */
+export function workbookIconUrl(): string {
+  return workbookIcon;
+}
 
 // Every icon svg as a hashed asset URL, resolved at build time.
 const URLS = import.meta.glob(
@@ -67,6 +78,8 @@ export function searchMaterialIcons(
 /** Icon URL for a file, by its name (basename or full path). */
 export function fileIconUrl(name: string): string {
   const base = name.split("/").pop()?.toLowerCase() ?? "";
+  const ext = base.split(".").pop() ?? "";
+  if (WORKBOOK_EXTS.has(ext)) return workbookIcon;
   let def = m.fileNames[base];
   if (!def) {
     // Longest-suffix extension match — manifest keys include multi-dot
