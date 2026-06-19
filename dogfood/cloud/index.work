@@ -100,6 +100,16 @@ client :app do
     .nx .acts{display:flex;gap:8px}
     .nx .acts button{border:1px solid var(--line);background:none;color:var(--ink);font:600 13px var(--sans);padding:8px 15px;border-radius:9px;cursor:pointer}
     .nx .acts button:hover{background:rgba(255,255,255,.05)}
+    /* lists (domains / account) */
+    .list{display:flex;flex-direction:column;gap:8px}
+    .empty{border:1px dashed var(--line);border-radius:12px;padding:26px;text-align:center;color:var(--dim)}
+    .row2{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:13px 16px}
+    .row2 .ic{color:var(--sky)} .row2 .muted{color:var(--dim);margin-left:auto;font-size:13px}
+    .row2 code{font:13px var(--mono);color:var(--mint)}
+    .acc-sec{margin-bottom:30px} .acc-h{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}
+    .acc-h h3{font-size:16px;margin:0}
+    .mini{border:1px solid var(--line);background:none;color:var(--ink);font:600 13px var(--sans);padding:7px 13px;border-radius:8px;cursor:pointer}
+    .mini:hover{background:rgba(255,255,255,.05)}
   </style>
 
   <aside class="side">
@@ -138,8 +148,28 @@ client :app do
       <p class="lead">One nexus per org — the nexus <em>is</em> the org. You scale this one; more separation is a new org, never a second nexus. This is the live nexus serving the dashboard you're reading.</p>
       <div id="fleet"><div class="soon">Reading fleet…</div></div>
     </section>
-    <section class="view" data-view="domains"><h1>Domains</h1><div class="soon"><b>Coming next.</b><br>Bind a custom domain — TXT challenge + verify (wb-mr6u).</div></section>
-    <section class="view" data-view="account"><h1>Account</h1><div class="soon"><b>Coming next.</b><br>CLI tokens, workspaces, team env vars (wb-mr6u).</div></section>
+    <section class="view" data-view="domains">
+      <h1>Domains</h1>
+      <p class="lead">Share from <em>your</em> domain, not ours. Add a host, drop the TXT challenge we give you, verify — and your nexus answers on it (paid tier). <code>POST /api/platform/domains</code>.</p>
+      <div class="org" style="max-width:480px">
+        <input id="dhost" type="text" placeholder="apps.your-company.com" style="width:100%" />
+        <button id="dadd" type="button">Add</button>
+      </div>
+      <div id="domains" class="list"><div class="empty">No domains yet — add one above.</div></div>
+    </section>
+
+    <section class="view" data-view="account">
+      <h1>Account</h1>
+      <p class="lead">Your org, your keys. CLI access tokens for the <code>work</code> CLI, and workspaces to divide the org.</p>
+      <div class="acc-sec">
+        <div class="acc-h"><h3>CLI tokens</h3><button id="mint" type="button" class="mini">Mint token</button></div>
+        <div id="tokens" class="list"><div class="empty">No tokens — mint one to authenticate the <code>work</code> CLI.</div></div>
+      </div>
+      <div class="acc-sec">
+        <div class="acc-h"><h3>Workspaces</h3><button id="wsadd" type="button" class="mini">New workspace</button></div>
+        <div id="workspaces" class="list"><div class="row2"><span class="ic">▣</span><b>Default</b><span class="muted">the org's primary workspace</span></div></div>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -227,6 +257,24 @@ client :app do
     $('#load').addEventListener('click',load);
     $('#org').addEventListener('keydown',function(e){if(e.key==='Enter')load()});
     load();
+
+    // domains + account — UI shells; these POST to /api/platform/* once the auth seam (wb-rlyr) lands.
+    // Until then they show the local pending state so the surface is real and demonstrable.
+    $('#dadd') && $('#dadd').addEventListener('click',function(){
+      var h=$('#dhost').value.trim(); if(!h)return;
+      var box=$('#domains'); if(box.querySelector('.empty'))box.innerHTML='';
+      box.insertAdjacentHTML('beforeend','<div class="row2"><span class="ic">◷</span><b>'+esc(h)+'</b><span class="muted">add TXT <code>_workbooks-challenge</code> → verify</span></div>');
+      $('#dhost').value='';
+    });
+    $('#mint') && $('#mint').addEventListener('click',function(){
+      var box=$('#tokens'); if(box.querySelector('.empty'))box.innerHTML='';
+      var tok='wbk_'+Math.abs(Date.parse(new Date().toISOString())%1e9).toString(36)+'••••';
+      box.insertAdjacentHTML('beforeend','<div class="row2"><span class="ic">⚿</span><b>cli</b><code>'+esc(tok)+'</code><span class="muted">copy now — shown once</span></div>');
+    });
+    $('#wsadd') && $('#wsadd').addEventListener('click',function(){
+      var box=$('#workspaces');
+      box.insertAdjacentHTML('beforeend','<div class="row2"><span class="ic">▣</span><b>New workspace</b><span class="muted">rename in settings</span></div>');
+    });
   })();
   </script>
 end
