@@ -1,0 +1,118 @@
+# Cloud — our control-plane dashboard, as a workbook
+
+Our cloud dashboard (`web/cloud-dashboard`, a SvelteKit app) migrated to a **`.work` workbook**: one
+`client` island that IS the dashboard SPA — a sidebar of views and a panel, talking to the platform's
+generic APIs. Incremental: the **Upgrade** view is live here (it renders the personalized upsell by
+subscribing to our marketing workbook's `upsell` live source — one nexus, two of our surfaces talking
+to each other). Usage, Nexuses, Domains, Account land in subsequent passes (beads: sub-issues of
+wb-hpkm). No SvelteKit, no build step — the dashboard is a workbook.
+
+client :app do
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+  <style>
+    *{box-sizing:border-box}
+    :root{--paper:#16171a;--card:#1f2125;--ink:#ecebe5;--dim:#8c9189;--line:#2d2f34;--mint:#aee5c2;--sky:#a8d4f0;
+      --sans:'Geist',system-ui,sans-serif;--mono:'Geist Mono',monospace}
+    body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 var(--sans);display:flex;min-height:100vh}
+    .side{width:230px;flex:none;border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden}
+    .dna{height:8px;flex:none;background:repeating-linear-gradient(90deg,#f3c5a3 0 20px,#aee5c2 20px 36px,#a8d4f0 36px 49px,#f2ddb0 49px 65px,#9fc4e8 65px 74px);background-size:74px 8px;animation:dna 52s linear infinite}
+    @keyframes dna{to{background-position:74px 0}}
+    .sb{padding:16px 14px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+    .brand{display:flex;align-items:center;gap:9px;font-weight:650;font-size:16px;padding:6px 8px 14px}
+    .brand svg{width:24px;height:auto;color:var(--ink)}
+    .nav{display:block;width:100%;text-align:left;border:0;background:none;color:var(--dim);font:500 14.5px var(--sans);
+      padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:9px}
+    .nav:hover{background:rgba(255,255,255,.05);color:var(--ink)}
+    .nav.on{background:rgba(255,255,255,.06);color:var(--ink);font-weight:600;box-shadow:inset 3px 0 0 var(--mint)}
+    .nav .tag{margin-left:auto;font:600 9px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:#6c7080;border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+    .main{flex:1;min-width:0;padding:40px 48px 100px;max-width:840px}
+    .view{display:none} .view.on{display:block}
+    h1{font-size:27px;letter-spacing:-.02em;margin:0 0 6px} .lead{color:var(--dim);margin:0 0 26px}
+    .org{display:flex;gap:8px;align-items:center;margin:0 0 22px}
+    .org input{background:var(--card);border:1px solid var(--line);border-radius:9px;color:var(--ink);font:14px var(--sans);padding:8px 11px;width:220px}
+    .org button{background:var(--ink);color:var(--paper);border:0;border-radius:9px;font:600 14px var(--sans);padding:9px 16px;cursor:pointer}
+
+    /* upsell blocks */
+    .hero{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px 28px;margin-bottom:14px}
+    .hero h2{font-size:24px;letter-spacing:-.02em;margin:0 0 8px} .hero p{color:var(--dim);margin:0;font-size:16px}
+    .blk{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 24px;margin-bottom:14px}
+    .blk h3{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);margin:0 0 12px;font-family:var(--mono)}
+    .blk ul{margin:0;padding-left:20px} .blk li{margin:5px 0}
+    .cta{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .cta a{background:var(--mint);color:#11231a;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:650}
+    .cta .sub{color:var(--dim);font-size:14px}
+    .soon{border:1px dashed var(--line);border-radius:14px;padding:40px;text-align:center;color:var(--dim)}
+    .soon b{color:var(--ink)}
+  </style>
+
+  <aside class="side">
+    <div class="dna"></div>
+    <div class="sb">
+      <div class="brand">
+        <svg viewBox="0 0 113.444 65.6002" fill="none"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>
+        <span>Workbooks</span>
+      </div>
+      <button class="nav on" data-view="upgrade">Upgrade</button>
+      <button class="nav" data-view="usage">Usage <span class="tag">soon</span></button>
+      <button class="nav" data-view="nexuses">Nexuses <span class="tag">soon</span></button>
+      <button class="nav" data-view="domains">Domains <span class="tag">soon</span></button>
+      <button class="nav" data-view="account">Account <span class="tag">soon</span></button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="view on" data-view="upgrade">
+      <h1>Upgrade</h1>
+      <p class="lead">A personalized scale-up plan — assembled live by our marketing workbook's upsell agent. Prices are pinned; the model only writes the prose.</p>
+      <div class="org">
+        <input id="org" type="text" placeholder="your org name" value="Acme" />
+        <button id="load" type="button">Refresh</button>
+      </div>
+      <div id="page"></div>
+    </section>
+
+    <section class="view" data-view="usage"><h1>Usage</h1><div class="soon"><b>Coming next.</b><br>RAM + storage dials from <code>Nexus.Capacity</code> (wb-bwus).</div></section>
+    <section class="view" data-view="nexuses"><h1>Nexuses</h1><div class="soon"><b>Coming next.</b><br>Your one nexus — wake / sleep / scale (wb-8sk9).</div></section>
+    <section class="view" data-view="domains"><h1>Domains</h1><div class="soon"><b>Coming next.</b><br>Bind a custom domain — TXT challenge + verify (wb-mr6u).</div></section>
+    <section class="view" data-view="account"><h1>Account</h1><div class="soon"><b>Coming next.</b><br>CLI tokens, workspaces, team env vars (wb-mr6u).</div></section>
+  </main>
+
+  <script>
+  (function(){
+    var $=function(s){return document.querySelector(s)};
+    function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
+
+    // view routing
+    [].forEach.call(document.querySelectorAll('.nav'),function(n){
+      n.addEventListener('click',function(){
+        var v=n.dataset.view;
+        [].forEach.call(document.querySelectorAll('.nav'),function(x){x.classList.toggle('on',x===n)});
+        [].forEach.call(document.querySelectorAll('.view'),function(x){x.classList.toggle('on',x.dataset.view===v)});
+      });
+    });
+
+    // upgrade view — render the upsell blocks from the marketing workbook's live source
+    var R={
+      hero:function(b){return '<div class="hero"><h2>'+esc(b.copy.headline)+'</h2><p>'+esc(b.copy.subhead||'')+'</p></div>'},
+      unlocks:function(b){return '<div class="blk"><h3>'+esc(b.copy.intro||'Unlocks')+'</h3><ul>'+(b.items||[]).map(function(i){return '<li>'+esc(i)+'</li>'}).join('')+'</ul></div>'},
+      compare:function(b){return '<div class="blk"><h3>'+esc(b.copy.intro||'Compare')+'</h3><p>'+esc((b.current&&b.current.name)||'')+' → '+esc((b.next&&b.next.name)||'')+'</p></div>'},
+      headroom:function(b){return '<div class="blk"><h3>'+esc(b.copy.intro||'Where you stand')+'</h3></div>'},
+      cta:function(b){return '<div class="blk"><div class="cta"><a href="'+esc(b.href||'#')+'">'+esc(b.copy.label||'Upgrade')+'</a><span class="sub">'+esc(b.copy.sub||'')+'</span></div></div>'}
+    };
+    function render(page){ $('#page').innerHTML=(page.blocks||[]).map(function(b){return R[b.type]?R[b.type](b):''}).join(''); }
+    function load(){
+      var org=encodeURIComponent($('#org').value.trim()||'your team');
+      $('#page').innerHTML='<div class="soon">Assembling…</div>';
+      var es=new EventSource('live/upsell?org='+org);
+      es.onmessage=function(e){ var d; try{d=JSON.parse(e.data)}catch(_){return}
+        if(d.type==='end'){es.close();return} if(d.blocks){ render(d); es.close(); } };
+      es.onerror=function(){ es.close(); $('#page').innerHTML='<div class="soon">Could not reach the upsell source.</div>'; };
+    }
+    $('#load').addEventListener('click',load);
+    $('#org').addEventListener('keydown',function(e){if(e.key==='Enter')load()});
+    load();
+  })();
+  </script>
+end
