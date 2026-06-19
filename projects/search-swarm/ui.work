@@ -164,9 +164,8 @@ client :app do
           <textarea id="q" rows="1" placeholder="What do you want to understand?"></textarea>
           <div class="crow">
             <div class="depth">
-              <button class="dep" data-depth="quick" type="button">🍃 Quick</button>
-              <button class="dep active" data-depth="standard" type="button">⚖️ Standard</button>
-              <button class="dep" data-depth="deep" type="button">🔬 Deep</button>
+              <button class="dep active" data-depth="turbo" type="button">⚡ Turbo</button>
+              <button class="dep" data-depth="ludicrous" type="button">🚀 Ludicrous</button>
             </div>
           </div>
         </div>
@@ -209,7 +208,7 @@ client :app do
     var fav=function(u){try{return 'https://www.google.com/s2/favicons?sz=64&domain='+new URL(u).hostname}catch(e){return ''}};
     var dom=function(u){try{return new URL(u).hostname.replace('www.','')}catch(e){return u}};
     var $=function(s){return document.querySelector(s)};
-    var es=null, curDepth='standard', tk={}, order=[], t0=0, openId=null;
+    var es=null, curDepth='turbo', tk={}, order=[], t0=0, openId=null;
     var usd=0, tin=0, tout=0;
 
     [].forEach.call(document.querySelectorAll('.dep'),function(d){d.addEventListener('click',function(){

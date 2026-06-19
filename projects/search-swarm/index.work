@@ -63,7 +63,7 @@ server :swarm do
     model = opts[:model] || @default_model
     provider = opts[:provider] || @default_provider
 
-    prof = depth_profile(opts[:depth] || "standard")
+    prof = depth_profile(opts[:depth] || "turbo")
     emit.(%{type: "fleet", task: task, max: prof.questions})
 
     ctx = %{model: model, provider: provider, per_round: prof.questions, effort: prof.effort, emit: emit}
@@ -80,19 +80,17 @@ server :swarm do
 
   # Depth is a SOFT effort level woven into the orchestrator's plan + digest prompts — NOT
   # a hard cap. `max_rounds` is only a safety ceiling; the orchestrator decides how far to go.
-  defp depth_profile("quick") do
-    %{questions: 3, max_rounds: 2,
-      effort: "This is a QUICK scan — favor a fast, broad answer. One round is usually enough; only go another round if a CRITICAL gap remains."}
+  # Ludicrous — the showcase: ONE sweeping round of as many concurrent agents as the task supports
+  # (dozens), to exhibit massive parallelism + speed.
+  defp depth_profile("ludicrous") do
+    %{questions: 48, max_rounds: 1,
+      effort: "MAXIMUM PARALLELISM. Decompose the task into as many DISTINCT, specific facets as you can — aim for dozens — and investigate them ALL at once in a single sweeping round. Favor breadth and speed; do not hold questions back for later rounds."}
   end
 
-  defp depth_profile("deep") do
-    %{questions: 8, max_rounds: 5,
-      effort: "This is a DEEP, thorough investigation — be comprehensive. Keep dispatching follow-up rounds until the topic is well-covered from multiple angles and well-sourced."}
-  end
-
-  defp depth_profile(_standard) do
-    %{questions: 5, max_rounds: 3,
-      effort: "Do a solid, balanced investigation. Continue to another round only if meaningful gaps remain."}
+  # Turbo (default) — a fast, regular answer from a handful of agents.
+  defp depth_profile(_turbo) do
+    %{questions: 5, max_rounds: 2,
+      effort: "Fast pass — favor a quick, solid answer. One round is usually enough; only continue if a critical gap remains."}
   end
 
   # One round: announce → dispatch agents → (unless capped) let the orchestrator digest + decide.
@@ -186,7 +184,9 @@ server :swarm do
 
   # Coordinator: one LLM call decomposes the task into distinct sub-questions (effort guides count/depth).
   defp plan(task, max, effort, model, provider, emit) do
-    n = min(max, 16)
+    n = min(max, 60)
+    # generating dozens of one-line sub-questions needs real token headroom
+    budget = max(400, n * 28)
 
     prompt =
       "You are the lead orchestrator. #{effort}\n\n" <>
@@ -194,7 +194,7 @@ server :swarm do
         "Return ONLY the sub-questions, one per line, no numbering or extra text.\n\nTask: #{task}"
 
     result =
-      case llm([%{role: "user", content: prompt}], [model: model, provider: provider, max_tokens: 400], emit) do
+      case llm([%{role: "user", content: prompt}], [model: model, provider: provider, max_tokens: budget], emit) do
         {:ok, %{content: c}} when is_binary(c) and c != "" ->
           c |> String.split("\n") |> Enum.map(&clean/1) |> Enum.reject(&(&1 == "")) |> Enum.take(max)
 
