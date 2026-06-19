@@ -6,9 +6,6 @@ theme, and the ordered pages the sidebar shows. `work weave` (site-mode) reads
 this file plus the sibling pages and emits a full single-page app — driven by our
 own language-agnostic router — as the workbook output.
 
-> Skeleton. The site-mode weave + central router are not built yet; the `app`
-> declaration below is the intended shape, not a finished schema.
-
 app :docs do
   title  "Workbooks"
   theme  :paper_ink            # petal mark, DNA strip, dark/light, Geist + mono
@@ -46,5 +43,9 @@ app :docs do
 
   section "Agents & tooling" do
     page "tooling/get-started-with-your-cli-agent"
+  end
+
+  section "Examples" do
+    page "examples/learn-by-example"
   end
 end

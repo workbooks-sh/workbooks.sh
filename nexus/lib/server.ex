@@ -424,6 +424,17 @@ defmodule Nexus.Server do
     end
   end
 
+  # Deep paths under a mounted workbook (`/documentation/introduction/what-is-the-nexus`) are the
+  # history-routed pages of a site-mode `app` SPA. The server serves the same SPA shell for any
+  # sub-path; the in-page router reads `location.pathname` and shows the matching page. (Real
+  # sub-resources — source/data/live — are matched by the explicit routes above, so they win.)
+  get "/:wb/*_rest" do
+    case wb_root(wb) do
+      nil -> send_resp(conn, 404, "not found")
+      r -> serve_workbook(conn, r, wb)
+    end
+  end
+
   match _ do
     send_resp(conn, 404, "not found")
   end

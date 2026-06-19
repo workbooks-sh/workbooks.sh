@@ -1,0 +1,145 @@
+# Learn by example
+
+Every template that ships with Workbooks is a small, complete app — and its whole source is a handful of `.work` files you can read top to bottom. Below, each one is presented **by what it teaches**, not by its brand. Pick a card, then read the real literate source behind it in the editor. Nothing is hidden: what you see is exactly what the running app is woven from.
+
+client :examples do
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/ruby/ruby.min.js"></script>
+
+  <style>
+    /* scoped to #ex so it sits inside the docs page — never touches the docs chrome */
+    #ex{--xink:#16161a;--xsoft:#6c6c72;--xline:#e8e5dc;--xaccent:#13a93a;--xpaper:#fff;
+      --xmono:'Geist Mono',ui-monospace,Menlo,monospace}
+    #ex *{box-sizing:border-box}
+    #ex .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:14px;margin:6px 0 4px}
+    #ex .card{text-align:left;background:var(--xpaper);border:1px solid var(--xline);border-radius:14px;padding:18px 18px 16px;
+      cursor:pointer;transition:transform .12s,box-shadow .12s,border-color .12s;display:flex;flex-direction:column;gap:7px;font-family:inherit}
+    #ex .card:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(55,53,47,.09);border-color:#d8d3c8}
+    #ex .card .teach{font-size:11px;text-transform:uppercase;letter-spacing:.07em;font-weight:600;color:var(--xaccent)}
+    #ex .card .t{font-size:16.5px;font-weight:650;letter-spacing:-.01em;color:var(--xink)}
+    #ex .card .b{font-size:13.5px;line-height:1.55;color:var(--xsoft)}
+    #ex .card .src{font-size:12px;color:#a4a097;font-family:var(--xmono);margin-top:2px}
+
+    #ex .detail{display:none}
+    #ex .detail.on{display:block}
+    #ex .back{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--xsoft);font:500 14px inherit;cursor:pointer;padding:4px 0;margin:0 0 10px}
+    #ex .back:hover{color:var(--xink)}
+    #ex .dhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:2px 0 4px}
+    #ex .dhead .t{font-size:23px;font-weight:700;letter-spacing:-.02em;color:var(--xink)}
+    #ex .dhead .teach{font-size:11px;text-transform:uppercase;letter-spacing:.07em;font-weight:600;color:var(--xaccent)}
+    #ex .dhead .open{margin-left:auto;font-size:13.5px;color:#1f7d33;text-decoration:none;border-bottom:1px solid #cfe3d3}
+    #ex .dhead .open:hover{border-color:#1f7d33}
+    #ex .db{color:var(--xsoft);font-size:15px;line-height:1.65;max-width:640px;margin:0 0 14px}
+    #ex .learn{list-style:none;padding:0;margin:0 0 20px;display:flex;flex-wrap:wrap;gap:8px}
+    #ex .learn li{font-size:13px;color:#3a3a40;background:#f3f1ea;border:1px solid var(--xline);border-radius:20px;padding:5px 12px}
+    #ex .tabs{display:flex;gap:4px;border-bottom:1px solid var(--xline);margin:0 0 -1px;flex-wrap:wrap}
+    #ex .tab{font:500 13px var(--xmono);color:var(--xsoft);background:none;border:1px solid transparent;border-bottom:0;
+      border-radius:8px 8px 0 0;padding:8px 14px;cursor:pointer}
+    #ex .tab.on{color:var(--xink);background:var(--xpaper);border-color:var(--xline)}
+    #ex .editor{border:1px solid var(--xline);border-radius:0 10px 10px 10px;overflow:hidden;background:var(--xpaper)}
+    #ex .CodeMirror{height:auto;min-height:340px;font-family:var(--xmono);font-size:13px;line-height:1.6}
+    #ex .CodeMirror-gutters{background:#faf9f4;border-right:1px solid var(--xline)}
+    #ex .loading{padding:40px;text-align:center;color:var(--xsoft);font-size:14px}
+  </style>
+
+  <div id="ex">
+    <div class="grid" id="cards"></div>
+    <div class="detail" id="detail">
+      <button class="back" id="back" type="button">← All examples</button>
+      <div class="dhead"><span class="teach" id="d-teach"></span><span class="t" id="d-title"></span><a class="open" id="d-open" target="_blank" rel="noopener">Open the live app ↗</a></div>
+      <p class="db" id="d-blurb"></p>
+      <ul class="learn" id="d-learn"></ul>
+      <div class="tabs" id="tabs"></div>
+      <div class="editor"><textarea id="code"></textarea></div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    // Each lesson = a template + the facet it best teaches. Same template can appear twice
+    // (different facet, different file) — readers learn by capability, not by brand.
+    var LESSONS=[
+      {id:'search-swarm',file:'index.work',teach:'Agent orchestration',title:'A swarm of agents',
+       blurb:'Dispatch many AI agents at once from a single server block, watch them work in a live feed, and stream a written report back to the page.',
+       learn:['Fan out N agents from one server unit','Stream progress over Server-Sent Events','Real per-call cost, not estimates']},
+      {id:'search-swarm',file:'ui.work',teach:'Client-side ML',title:'Speech in the browser',
+       blurb:'Transcribe your microphone live with a speech model that runs entirely in the browser — no server round-trip, no API key.',
+       learn:['Load a model with transformers.js','Live mic → text as you speak','A locked composer + listening state']},
+      {id:'brandnana',file:'index.work',teach:'The built-in browser',title:'Scraping the live web',
+       blurb:'Point at any domain and harvest its logo, palette, fonts and imagery using our own headless browser — the kind of job that used to need a fleet of microservices.',
+       learn:['Drive the built-in browser from a server','Harvest + cache media with filters','Compose a brand book live']},
+      {id:'deck',file:'ui.work',teach:'Using a dependency',title:'Bringing in a JS library',
+       blurb:'Pull a third-party library — reveal.js — straight from a CDN into a client island, and build a real slide deck from streamed data.',
+       learn:['Add a CDN dependency in a client block','Build slides from streamed events','Initialise reveal.js in-page']},
+      {id:'documentation',file:'index.work',teach:'Multi-page apps',title:'A site with routing',
+       blurb:'The very docs you are reading: one workbook declaring many pages, with a sidebar and clean history-routed URLs.',
+       learn:['Declare an app with sections + pages','Server-render each page','History router for real URLs']}
+    ];
+    var $=function(s){return document.querySelector(s)};
+    var cache={}, cm=null, cur=null, curFile=null;
+    function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
+
+    function cards(){
+      $('#cards').innerHTML=LESSONS.map(function(l,i){
+        return '<button class="card" data-i="'+i+'" type="button">'+
+          '<span class="teach">'+esc(l.teach)+'</span>'+
+          '<span class="t">'+esc(l.title)+'</span>'+
+          '<span class="b">'+esc(l.blurb)+'</span>'+
+          '<span class="src">'+esc(l.id)+'/'+esc(l.file)+'</span></button>';
+      }).join('');
+      [].forEach.call(document.querySelectorAll('#ex .card'),function(c){
+        c.addEventListener('click',function(){open(+c.dataset.i);});
+      });
+    }
+
+    function open(i){
+      cur=LESSONS[i]; curFile=cur.file;
+      $('#d-teach').textContent=cur.teach; $('#d-title').textContent=cur.title;
+      $('#d-blurb').textContent=cur.blurb; $('#d-open').href='/'+cur.id+'/';
+      $('#d-learn').innerHTML=cur.learn.map(function(x){return '<li>'+esc(x)+'</li>'}).join('');
+      $('#cards').style.display='none'; $('#detail').classList.add('on');
+      load(cur.id);
+    }
+
+    function load(id){
+      $('#tabs').innerHTML='<div class="loading">Loading source…</div>';
+      var done=function(files){ cache[id]=files; render(files); };
+      if(cache[id]){ render(cache[id]); return; }
+      fetch('/'+id+'/source').then(function(r){return r.json()}).then(done)
+        .catch(function(){ $('#tabs').innerHTML='<div class="loading">Could not load source.</div>'; });
+    }
+
+    function render(files){
+      if(!files||!files.length){ $('#tabs').innerHTML='<div class="loading">No source found.</div>'; return; }
+      // exclude the manifest; default to the lesson's file if present
+      files=files.filter(function(f){return f.name!=='TEMPLATE.work'});
+      if(!files.some(function(f){return f.name===curFile})) curFile=files[0].name;
+      $('#tabs').innerHTML=files.map(function(f){
+        return '<button class="tab'+(f.name===curFile?' on':'')+'" data-f="'+esc(f.name)+'" type="button">'+esc(f.name)+'</button>';
+      }).join('');
+      [].forEach.call(document.querySelectorAll('#ex .tab'),function(t){
+        t.addEventListener('click',function(){ curFile=t.dataset.f;
+          [].forEach.call(document.querySelectorAll('#ex .tab'),function(x){x.classList.toggle('on',x===t);});
+          show(files); });
+      });
+      show(files);
+    }
+
+    function show(files){
+      var f=files.filter(function(x){return x.name===curFile})[0]||files[0];
+      if(!cm){
+        cm=CodeMirror.fromTextArea($('#code'),{mode:'ruby',lineNumbers:true,readOnly:true,
+          lineWrapping:false,viewportMargin:Infinity});
+      }
+      cm.setValue(f.content||''); cm.refresh();
+    }
+
+    $('#back').addEventListener('click',function(){
+      $('#detail').classList.remove('on'); $('#cards').style.display='';
+    });
+
+    cards();
+  })();
+  </script>
+end
