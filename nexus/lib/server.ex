@@ -2,7 +2,7 @@ defmodule Nexus.Server do
   @moduledoc """
   The served-nexus HTTP tier (bandit + Plug). Serves a workbook folder:
 
-    * `GET /`               → the workbook **SSR'd** (`Nexus.Weave.weave/1`) with live Store data
+    * `GET /`               → the workbook **SSR'd** (`Nexus.SSR.render/1`) with live Store data
     * `GET /data/:resource` → that resource's rows as JSON — the **server backend** the client
                               `nexus.data` falls back to when there's no baked island
 
@@ -107,7 +107,7 @@ defmodule Nexus.Server do
   get "/data/:resource" do
     # tenant comes from Nexus.Auth (the plug). Rows are tenant-scoped IN the Store — a request can
     # only ever read its own tenant's data.
-    rows = Map.get(Nexus.Weave.data(root(), Nexus.Auth.tenant(conn)), resource, [])
+    rows = Map.get(Nexus.SSR.data(root(), Nexus.Auth.tenant(conn)), resource, [])
 
     conn
     |> put_resp_content_type("application/json")
@@ -302,8 +302,8 @@ defmodule Nexus.Server do
       _ ->
         html =
           if multi,
-            do: Nexus.Weave.weave(root, live: true, bake: false),
-            else: Nexus.Weave.weave(root, live: true, tenant: tenant)
+            do: Nexus.SSR.render(root, live: true, bake: false),
+            else: Nexus.SSR.render(root, live: true, tenant: tenant)
 
         :ets.insert(table, {key, mtime, html})
         html

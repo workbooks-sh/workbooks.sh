@@ -1,12 +1,17 @@
-defmodule Nexus.Weave do
+defmodule Nexus.SSR do
   @moduledoc """
-  A workbook (a folder of `.work` files) → ONE self-contained `.html`. A workbook IS an HTML file:
-  the browser renders it, no runtime required. Prose narrates; `show Resource` directives render
-  live data tables from `Nexus.Store`; unit code embeds. The data layer is pluggable (baked /
-  local SQLite / server) behind one API — see docs/WEAVE-PLAN.md.
+  The BEAM runtime's **server-side render** of a workbook (a folder of `.work`
+  files) → one HTML string, with live per-tenant data from `Nexus.Store`. This is
+  the request-time tier the served nexus (`Nexus.Server`) calls per request.
 
-  Render-aware: resources in the folder are compiled, and `show <Resource>` becomes a table of
-  that resource's rows (columns from `__fields__`, every cell XSS-escaped, graceful empty-state).
+  NOT the canonical build-time weave: that is the Zig **reactor** (`work weave`),
+  which runs natively and inside the wasm sandbox. This module is the runtime SSR
+  mirror only — same render shape, live data — and is slated to fold onto the Zig
+  weave once it can be invoked from the runtime.
+
+  Render-aware: resources in the folder are compiled, and `show <Resource>`
+  becomes a table of that resource's rows (columns from `__fields__`, every cell
+  XSS-escaped, graceful empty-state).
   """
 
   # Cap rendered/baked rows so a huge resource can't blow the page to tens of MB; the full set
@@ -24,10 +29,10 @@ defmodule Nexus.Weave do
       shell** so one tenant's data never lands in a cache served to another; the client fetches its
       own tenant-scoped `/data` instead.
   """
-  def weave(root, opts \\ []) do
+  def render(root, opts \\ []) do
     pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
     ctx = %{tenant: Keyword.get(opts, :tenant, Nexus.Store.default_tenant()), bake: Keyword.get(opts, :bake, true)}
-    render(pages, resources(pages), Keyword.get(opts, :live, false), ctx)
+    compose(pages, resources(pages), Keyword.get(opts, :live, false), ctx)
   end
 
   # index.work is the composition root — it leads; the rest follow alphabetically.
@@ -92,7 +97,7 @@ defmodule Nexus.Weave do
     _ -> nil
   end
 
-  defp render(pages, res, live, ctx) do
+  defp compose(pages, res, live, ctx) do
     body = Enum.map_join(pages, "\n", &page(&1, res, ctx))
 
     """

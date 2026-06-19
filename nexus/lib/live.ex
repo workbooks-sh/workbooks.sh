@@ -2,7 +2,7 @@ defmodule Nexus.Live do
   @moduledoc """
   Named **live-stream sources** — the Dock channel a workbook `view` unit subscribes to over SSE.
 
-  A producer (e.g. a `fleet` unit brought up by `Nexus.Weave`) registers a named source whose runner
+  A producer (e.g. a `fleet` unit brought up by `Nexus.SSR`) registers a named source whose runner
   is `fn params, emit -> … end` — it pushes events by calling `emit.(map)` and returns when the
   stream ends. The served nexus exposes every source at `GET /live/:source?<params>`; the woven
   `view` template opens an `EventSource` on it. Generic: any streaming capability (a fleet, a job, a

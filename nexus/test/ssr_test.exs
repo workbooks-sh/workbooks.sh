@@ -1,4 +1,4 @@
-defmodule Nexus.WeaveTest do
+defmodule Nexus.SSRTest do
   use ExUnit.Case, async: false
 
   test "weave renders a workbook folder to one self-contained HTML with inline markdown" do
@@ -18,7 +18,7 @@ defmodule Nexus.WeaveTest do
     end
     """)
 
-    html = Nexus.Weave.weave(dir)
+    html = Nexus.SSR.render(dir)
 
     assert html =~ "<!doctype html>"
     assert html =~ "<h1>Title</h1>"
@@ -49,7 +49,7 @@ defmodule Nexus.WeaveTest do
     Nexus.Store.clear(mod)
     Nexus.Store.create(mod, %{name: "Bread", price: 350})
 
-    html = Nexus.Weave.weave(dir)
+    html = Nexus.SSR.render(dir)
     assert html =~ ~s(<table class="data" data-resource="Item">)
     assert html =~ "<th>name</th>" and html =~ "<th>price</th>"
     assert html =~ "Bread" and html =~ "350"
@@ -61,7 +61,7 @@ defmodule Nexus.WeaveTest do
     Nexus.Store.clear(mod)
     Nexus.Store.create(mod, %{name: "<script>alert(1)</script>"})
 
-    html = Nexus.Weave.weave(dir)
+    html = Nexus.SSR.render(dir)
     assert html =~ "&lt;script&gt;"
     refute html =~ "<script>alert(1)"
   end
@@ -69,13 +69,13 @@ defmodule Nexus.WeaveTest do
   test "an empty resource renders a graceful empty-state, not a crash" do
     dir = wb("resource Item do\n  name :text\nend\n\nshow Item\n")
     Nexus.Store.clear(res_of(dir))
-    html = Nexus.Weave.weave(dir)
+    html = Nexus.SSR.render(dir)
     assert html =~ "no rows yet"
   end
 
   test "show of an unknown resource degrades gracefully" do
     dir = wb("# Page\n\nshow Ghost\n")
-    html = Nexus.Weave.weave(dir)
+    html = Nexus.SSR.render(dir)
     assert html =~ "unknown resource"
     assert html =~ "Ghost"
   end
@@ -86,7 +86,7 @@ defmodule Nexus.WeaveTest do
     Nexus.Store.clear(mod)
     Nexus.Store.create(mod, %{name: "Soup", tag: :hot})
 
-    html = Nexus.Weave.weave(dir)
+    html = Nexus.SSR.render(dir)
     assert html =~ ~s(<script type="application/nexus-data" data-resource="Item">)
     assert html =~ ~s("name":"Soup") and html =~ ~s("tag":"hot")
     assert html =~ "nexus.data = {" and html =~ "fetch('/data/'"
@@ -98,7 +98,7 @@ defmodule Nexus.WeaveTest do
     Nexus.Store.clear(mod)
     Nexus.Store.create(mod, %{name: "</script><script>alert(1)</script>"})
 
-    html = Nexus.Weave.weave(dir)
+    html = Nexus.SSR.render(dir)
     # the raw breakout sequence never appears literally (island escapes `<` → <; table escapes too)
     refute html =~ "</script><script>alert(1)"
     assert html =~ "&lt;/script&gt;"
@@ -118,7 +118,7 @@ defmodule Nexus.WeaveTest do
         dir = Path.join(System.tmp_dir!(), "wvu_#{System.unique_integer([:positive])}")
         File.mkdir_p!(dir)
         File.write!(Path.join(dir, "index.work"), "# R\n\n" <> body)
-        html = Nexus.Weave.weave(dir)
+        html = Nexus.SSR.render(dir)
         assert html =~ "unit-output", "no unit-output for: #{body}"
         assert html =~ ">#{expected}<", "expected #{expected} baked for: #{body}"
         File.rm_rf!(dir)
@@ -135,7 +135,7 @@ defmodule Nexus.WeaveTest do
     File.write!(Path.join(dir, "index.work"), "# Corner Store\n\nthe index leads\n")
     on_exit(fn -> File.rm_rf!(dir) end)
 
-    html = Nexus.Weave.weave(dir)
+    html = Nexus.SSR.render(dir)
     assert html =~ "<title>Corner Store</title>"
     assert :binary.match(html, "the index leads") |> elem(0) < (:binary.match(html, "last file") |> elem(0))
     assert html =~ "wb-nav" and html =~ ~s(href="#index-work")

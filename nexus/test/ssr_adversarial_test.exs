@@ -1,4 +1,4 @@
-defmodule Nexus.WeaveAdversarialTest do
+defmodule Nexus.SSRAdversarialTest do
   @moduledoc "The untangling — weave must never crash on hostile/malformed input, and must bound it."
   use ExUnit.Case, async: false
 
@@ -11,17 +11,17 @@ defmodule Nexus.WeaveAdversarialTest do
   end
 
   test "malformed .work (unclosed do) renders, does not crash" do
-    html = Nexus.Weave.weave(wb("resource Bad do\n  name :text\n"))
+    html = Nexus.SSR.render(wb("resource Bad do\n  name :text\n"))
     assert html =~ "<!doctype html>"
   end
 
   test "garbage / binary input does not crash the weave" do
-    html = Nexus.Weave.weave(wb("\x00 not valid <<<>>> do end show ???"))
+    html = Nexus.SSR.render(wb("\x00 not valid <<<>>> do end show ???"))
     assert html =~ "<!doctype html>"
   end
 
   test "XSS in a heading and in prose is escaped" do
-    html = Nexus.Weave.weave(wb("# <img src=x onerror=alert(1)>\n\nhi <script>alert(2)</script> there\n"))
+    html = Nexus.SSR.render(wb("# <img src=x onerror=alert(1)>\n\nhi <script>alert(2)</script> there\n"))
     refute html =~ "<img src=x onerror"
     refute html =~ "<script>alert(2)"
     assert html =~ "&lt;img" and html =~ "&lt;script&gt;"
@@ -33,7 +33,7 @@ defmodule Nexus.WeaveAdversarialTest do
     Nexus.Store.clear(mod)
     for i <- 1..600, do: Nexus.Store.create(mod, %{n: i})
 
-    html = Nexus.Weave.weave(dir)
+    html = Nexus.SSR.render(dir)
     # 500 capped data rows + 1 header row in the table
     assert length(Regex.scan(~r/<tr>/, html)) <= 502
     assert html =~ "showing 500 of 600"
@@ -45,7 +45,7 @@ defmodule Nexus.WeaveAdversarialTest do
 
   test "a render unit using an UNGRANTED cap is blocked before it runs (no compile)" do
     dir = wb("c :bad do\n  extern void emit(const char* p, int n);\n  void render(void) { emit(\"x\", 1); }\nend\n\nshow bad\n")
-    html = Nexus.Weave.weave(dir)
+    html = Nexus.SSR.render(dir)
     assert html =~ "blocked: ungranted caps" and html =~ "emit"
     # the output div is never emitted (the CSS `.unit-output{` rule is not the same string)
     refute html =~ ~s(class="unit-output")
