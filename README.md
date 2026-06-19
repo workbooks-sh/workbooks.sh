@@ -135,7 +135,7 @@ work deploy verify         # health-check it
 | -------------- | ---------------------------------------------------------- |
 | `reactor/`     | the `work` CLI — author, build, run, deploy (Zig)          |
 | `nexus/`       | the runtime — serve, agents, multi-tenant control plane (Elixir) |
-| `workkits/`    | the kits — reusable toolkits a workbook imports and composes |
+| `toolkits/`    | reusable toolkits a workbook imports and composes          |
 | `desktop/`     | the desktop app — one frontend, swappable local/runtime providers |
 | `web/`         | the [workbooks.sh](https://workbooks.sh) site              |
 
