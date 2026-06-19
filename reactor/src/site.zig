@@ -11,7 +11,7 @@ const render = @import("render.zig");
 
 const Buf = std.ArrayList(u8);
 
-const Item = struct { route: []const u8, title: []const u8, html: []const u8 };
+const Item = struct { route: []const u8, title: []const u8, html: []const u8, src: []const u8 };
 const Section = struct { title: []const u8, items: std.ArrayList(Item) };
 
 /// Find the `app` unit in already-parsed index nodes; null if this isn't a site.
@@ -81,11 +81,18 @@ pub fn build(io: Io, alloc: std.mem.Allocator, dir: []const u8, out: []const u8,
     for (sections.items) |s| {
         for (s.items.items) |it| {
             try buf.appendSlice(alloc, try std.fmt.allocPrint(alloc, "<article class=\"page\" data-route=\"{s}\">\n", .{it.route}));
+            try buf.appendSlice(alloc, "<div class=\"pgbar\"><button class=\"cp\" data-copy=\"md\">Copy as Markdown</button><button class=\"cp\" data-copy=\"prompt\">Copy as prompt</button></div>\n");
+            try buf.appendSlice(alloc, "<script type=\"text/markdown\" class=\"src\">");
+            try render.escape(alloc, &buf, it.src);
+            try buf.appendSlice(alloc, "</script>\n");
             try buf.appendSlice(alloc, it.html);
             try buf.appendSlice(alloc, "</article>\n");
         }
     }
     try buf.appendSlice(alloc, "</main>\n");
+
+    // Agent-ergonomics: llms.txt (index) + llms-full.txt (every page source) beside the output.
+    try writeLlms(io, alloc, out, title, sections.items);
 
     try buf.appendSlice(alloc, try std.fmt.allocPrint(alloc, "<script>\nconst HOME={s};\n{s}</script>\n", .{ try jsString(alloc, home), router }));
     try buf.appendSlice(alloc, "</body>\n</html>\n");
@@ -99,7 +106,7 @@ fn renderPage(io: Io, alloc: std.mem.Allocator, file: []const u8, path: []const 
     const route = try std.fmt.allocPrint(alloc, "/{s}", .{path});
     const src = fs.readFile(io, alloc, file) catch {
         log.warn(try std.fmt.allocPrint(alloc, "missing page: {s}", .{file}));
-        return .{ .route = route, .title = path, .html = "<p class=\"missing\">(page not found)</p>" };
+        return .{ .route = route, .title = path, .html = "<p class=\"missing\">(page not found)</p>", .src = "" };
     };
     const ns = try work.parse(alloc, src);
     const html = try render.nodes(alloc, ns);
@@ -108,7 +115,7 @@ fn renderPage(io: Io, alloc: std.mem.Allocator, file: []const u8, path: []const 
         title = n.text;
         break;
     };
-    return .{ .route = route, .title = title, .html = html };
+    return .{ .route = route, .title = title, .html = html, .src = src };
 }
 
 fn firstRoute(sections: []const Section) ?[]const u8 {
@@ -137,6 +144,28 @@ fn jsString(alloc: std.mem.Allocator, s: []const u8) ![]u8 {
     return b.items;
 }
 
+/// Emit llms.txt (index) and llms-full.txt (every page's source) beside `out`.
+fn writeLlms(io: Io, alloc: std.mem.Allocator, out: []const u8, title: []const u8, sections: []const Section) !void {
+    const dir = std.fs.path.dirname(out) orelse ".";
+
+    var idx: Buf = .empty;
+    try idx.appendSlice(alloc, try std.fmt.allocPrint(alloc, "# {s}\n\n", .{title}));
+    var full: Buf = .empty;
+    try full.appendSlice(alloc, try std.fmt.allocPrint(alloc, "# {s}\n\n", .{title}));
+
+    for (sections) |s| {
+        try idx.appendSlice(alloc, try std.fmt.allocPrint(alloc, "## {s}\n", .{s.title}));
+        for (s.items.items) |it| {
+            try idx.appendSlice(alloc, try std.fmt.allocPrint(alloc, "- [{s}]({s})\n", .{ it.title, it.route }));
+            try full.appendSlice(alloc, try std.fmt.allocPrint(alloc, "## {s}  ({s})\n\n{s}\n\n---\n\n", .{ it.title, it.route, it.src }));
+        }
+        try idx.append(alloc, '\n');
+    }
+
+    try fs.writeFile(io, try std.fmt.allocPrint(alloc, "{s}/llms.txt", .{dir}), idx.items);
+    try fs.writeFile(io, try std.fmt.allocPrint(alloc, "{s}/llms-full.txt", .{dir}), full.items);
+}
+
 const petal =
     \\<svg class="mark" viewBox="0 0 113.444 65.6002" fill="none" aria-hidden="true"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>
 ;
@@ -158,6 +187,7 @@ const router =
     \\if(tb)tb.addEventListener('click',()=>setT(document.documentElement.dataset.theme==='dark'?'light':'dark'));
     \\const sb=document.querySelector('.search');
     \\if(sb)sb.addEventListener('input',()=>{const q=sb.value.toLowerCase();document.querySelectorAll('a.nav').forEach(n=>{n.style.display=n.textContent.toLowerCase().includes(q)?'block':'none';});});
+    \\document.addEventListener('click',async e=>{const b=e.target.closest('.cp');if(!b)return;const art=b.closest('article.page');const md=art.querySelector('script.src')?.textContent||'';const title=art.querySelector('h1')?.textContent||'this page';const text=b.dataset.copy==='prompt'?('Using the Workbooks documentation below, help me with '+title+'.\n\n'+md):md;try{await navigator.clipboard.writeText(text);const o=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=o,1200);}catch(_){}});
     \\route(location.pathname&&location.pathname!=='/'?location.pathname:HOME);
 ;
 
@@ -176,7 +206,11 @@ const css =
     \\html[data-theme=dark] a.nav.on{background:#1f3a2a;color:var(--mint)}
     \\.foot{border-top:1px solid var(--line);padding-top:10px;font-size:13px}.foot a{color:var(--mut);text-decoration:none}.foot a:hover{color:var(--ink)}
     \\main{flex:1;min-width:0;display:flex;justify-content:center;padding:56px 32px 140px}
-    \\article{max-width:46rem;width:100%}
+    \\article{max-width:46rem;width:100%}article{display:none}
+    \\.pgbar{display:flex;gap:8px;justify-content:flex-end;margin-bottom:6px}
+    \\.cp{font:12px 'Geist Mono',monospace;color:var(--mut);background:var(--card);border:1px solid var(--line);border-radius:7px;padding:4px 9px;cursor:pointer}
+    \\.cp:hover{color:var(--ink);border-color:var(--mut)}
+    \\script.src{display:none}
     \\h1{font-size:30px;letter-spacing:-.02em;margin:0 0 .5em}h2{font-size:21px;margin:1.7em 0 .5em}h3{font-size:17px;margin:1.4em 0 .4em}
     \\p{margin:.75em 0}a{color:#2f6f4f}html[data-theme=dark] a{color:var(--mint)}
     \\ul{margin:.6em 0;padding-left:1.3em}li{margin:.25em 0}
