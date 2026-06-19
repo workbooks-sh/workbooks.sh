@@ -29,19 +29,10 @@ defmodule Nexus.Platform do
   end
 
   post "/nexuses" do
-    org = org(conn)
-    opts = provision_opts(read(conn))
-    id = "nx_" <> rand()
-
-    attrs = %{
-      name: opts[:name] || id,
-      region: opts[:region] || "iad",
-      plan: opts[:plan] || "starter",
-      state: "build"
-    }
-
-    {:ok, nx} = CP.put(org, :nexus, id, attrs)
-    j(conn, 201, nexus_view(nx))
+    case Nexus.Provisioner.provision(org(conn), provision_opts(read(conn))) do
+      {:ok, nx} -> j(conn, 201, nexus_view(nx))
+      {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
+    end
   end
 
   get "/nexuses/:id" do
@@ -52,12 +43,15 @@ defmodule Nexus.Platform do
   end
 
   delete "/nexuses/:id" do
-    :ok = CP.delete(org(conn), :nexus, conn.params["id"])
-    j(conn, 200, %{ok: true})
+    case Nexus.Provisioner.teardown(conn.params["id"], org(conn)) do
+      {:ok, _} -> j(conn, 200, %{ok: true})
+      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+      {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
+    end
   end
 
-  post "/nexuses/:id/wake", do: set_state(conn, "running")
-  post "/nexuses/:id/sleep", do: set_state(conn, "stopped")
+  post "/nexuses/:id/wake", do: lifecycle(conn, &Nexus.Provisioner.wake/2)
+  post "/nexuses/:id/sleep", do: lifecycle(conn, &Nexus.Provisioner.sleep/2)
 
   # ── usage / identity / storage ───────────────────────────────────────────────────────────────
   # Honest-zero until the Fly-grounded NexusUsage + Storage backends are ported (next loop steps).
@@ -131,12 +125,16 @@ defmodule Nexus.Platform do
   # ── helpers ──────────────────────────────────────────────────────────────────────────────────
   defp org(conn), do: conn.assigns[:tenant]
 
-  defp set_state(conn, state) do
-    case CP.update(org(conn), :nexus, conn.params["id"], %{state: state}) do
+  defp lifecycle(conn, fun) do
+    case fun.(conn.params["id"], org(conn)) do
       {:ok, nx} -> j(conn, 200, nexus_view(nx))
       {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+      {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
     end
   end
+
+  defp reason_str(r) when is_atom(r), do: Atom.to_string(r)
+  defp reason_str(r), do: inspect(r)
 
   defp nexus_view(nx) do
     %{

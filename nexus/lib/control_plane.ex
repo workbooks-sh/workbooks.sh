@@ -71,8 +71,11 @@ defmodule Nexus.ControlPlane do
   def put(org, kind, id, attrs) when is_binary(org) and is_binary(id) do
     rec = Map.merge(attrs, %{id: id, org: org, kind: kind})
     rec = Map.put_new(rec, :created_at, System.os_time(:millisecond))
-    :dets.insert(table(), {{org, kind, id}, rec})
-    {:ok, rec}
+
+    case :dets.insert(table(), {{org, kind, id}, rec}) do
+      :ok -> {:ok, rec}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   @doc "Patch a record's `attrs` (only the given keys), scoped to `org`. Never crosses orgs."

@@ -19,12 +19,26 @@ defmodule Nexus.PlatformHttpTest do
 
   setup do
     System.put_env("WB_CONTROL_PLANE", "1")
+    Nexus.ControlPlane.reset()
     prev = Application.get_env(:nexus, :auth)
     Application.put_env(:nexus, :auth, Nexus.Auth.Bearer) # non-None → multi? true
+    # Provisioning goes through the injected Fly stub — no network.
+    Application.put_env(:nexus, :fly_client, __MODULE__.StubFly)
     on_exit(fn ->
       System.delete_env("WB_CONTROL_PLANE")
+      Application.delete_env(:nexus, :fly_client)
       if prev, do: Application.put_env(:nexus, :auth, prev), else: Application.delete_env(:nexus, :auth)
     end)
+  end
+
+  defmodule StubFly do
+    def create_app(_app, _org, _opts), do: {:ok, %{}}
+    def create_machine(app, _config, _opts), do: {:ok, %{"id" => "m_" <> app}}
+    def destroy_machine(_a, _i, _o), do: {:ok, %{}}
+    def delete_app(_a, _o), do: {:ok, %{}}
+    def start_machine(_a, _i, _o), do: {:ok, %{}}
+    def stop_machine(_a, _i, _o), do: {:ok, %{}}
+    def get_machine(_a, _i, _o), do: {:ok, %{"state" => "started"}}
   end
 
   test "control-plane OFF → every platform route 404s (indistinguishable from a tenant runtime)" do
@@ -52,8 +66,8 @@ defmodule Nexus.PlatformHttpTest do
 
     # B GETs A's exact id → 404
     assert call(:get, "/nexuses/#{id}", "org_http_b").status == 404
-    # B tries to delete A's nexus → A still has it
-    assert call(:delete, "/nexuses/#{id}", "org_http_b").status == 200
+    # B tries to tear down A's nexus → ownership-gated 404, and A still has it intact.
+    assert call(:delete, "/nexuses/#{id}", "org_http_b").status == 404
     assert call(:get, "/nexuses/#{id}", "org_http_a").status == 200
   end
 
