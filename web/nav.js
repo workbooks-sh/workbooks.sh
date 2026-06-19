@@ -64,6 +64,15 @@
     '  border: 0; padding: 0; cursor: pointer; }',
     '.nav button.srch svg { width: 18px; height: 18px; display: block; }',
     '.nav button.srch:hover { color: var(--bloom, #13d943); }',
+    /* CTA buttons (cloud sign-in / sign-up) — brand "lip" style: hard offset. */
+    '.nav .cta { font: 700 11.5px/1 var(--mono, "JetBrains Mono", monospace); letter-spacing: .05em;',
+    '  text-transform: uppercase; text-decoration: none; padding: 9px 14px; border-radius: 8px;',
+    '  border: 2px solid var(--ink, #121316); transition: transform .08s, box-shadow .08s, background .12s, color .12s; }',
+    '.nav .cta-1 { background: var(--ink, #121316); color: var(--paper, #f7f6f1); box-shadow: 3px 3px 0 var(--ink, #121316); }',
+    '.nav .cta-1:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink, #121316); }',
+    '.nav .cta-1:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink, #121316); }',
+    '.nav .cta-2 { background: var(--paper, #f7f6f1); color: var(--ink, #121316); }',
+    '.nav .cta-2:hover { background: var(--ink, #121316); color: var(--paper, #f7f6f1); }',
     '.nav .drop .panel .vsep { width: 2px; margin: 6px 10px; flex: 0 0 auto;',
     '  background-image: repeating-linear-gradient(180deg, rgba(18,19,22,.3) 0 4px, transparent 4px 8px); }',
     '.nav .drop .panel .colhead { font: 700 9px var(--mono, monospace); letter-spacing: .22em;',
@@ -155,6 +164,7 @@
   // top-level section; the rows are the key pages under it.
   var REPO = 'https://github.com/workbooks-sh/workbooks.sh';
   var DOCS = 'https://docs.workbooks.sh/';
+  var CLOUD = 'https://app.workbooks.sh'; // the cloud dashboard (WorkOS sign-in / sign-up)
   function dlink(path, name, small) {
     return '<a href="' + DOCS + path + '">' + name +
       (small ? ' <small>' + small + '</small>' : '') + '</a>';
@@ -209,12 +219,13 @@
 
   var html =
     '<a class="mark" href="' + (root || "") + 'index.html" aria-label="Workbooks">' + WMARK + '</a>' +
-    '<div class="drop"><a href="' + DOCS + '">Docs</a><div class="panel docs">' + docsGrid + '</div></div>' +
+    '<a class="lnk" href="' + DOCS + '">Docs</a>' +
     '<a class="lnk toolkits" href="' + root + 'toolkits/">Toolkits</a>' +
     '<a class="lnk" href="' + root + 'blog">Blog</a>' +
     '<button class="srch" aria-label="Search"><span class="i" aria-hidden="true">' + SEARCH + '</span><span class="srch-label" style="display:none">Search</span></button>' +
     '<a class="lnk gh" href="' + REPO + '" aria-label="GitHub">' + GH + '</a>' +
-    (FLAGS.desktopDownload ? '<a class="dl" href="' + root + 'index#download">Download</a>' : '') +
+    '<a class="cta cta-1" href="' + CLOUD + '">Get started</a>' +
+    '<a class="cta cta-2" href="' + CLOUD + '/login">Log in</a>' +
     '<button class="burger" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>';
 
   var style = document.createElement("style");
