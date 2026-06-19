@@ -101,6 +101,32 @@ defmodule Nexus.Server do
     final
   end
 
+  # The desktop's agent-run target (the RCP unary `request("/api/run")` — replaces the old Phoenix
+  # POST /api/agent/run). Auth-gated by the plug above (tenant scopes the run). Body: {task, system?,
+  # timeout_ms?}. Runs the agent to a final answer; live token/turn streaming is a follow-up (SSE, like
+  # /swarm) for the desktop UX. Returns {ok, answer} | {ok:false, error}.
+  post "/api/run" do
+    {:ok, body, conn} = read_body(conn)
+
+    case Jason.decode(body) do
+      {:ok, %{"task" => task} = m} when is_binary(task) and task != "" ->
+        opts =
+          [task: task, timeout_ms: run_timeout(m["timeout_ms"])]
+          |> then(fn o -> if is_binary(m["system"]) and m["system"] != "", do: [{:system, m["system"]} | o], else: o end)
+
+        payload =
+          case Nexus.Agent.run(opts) do
+            {:ok, answer} -> %{ok: true, answer: to_string(answer)}
+            {:error, reason} -> %{ok: false, error: inspect(reason)}
+          end
+
+        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
+
+      _ ->
+        conn |> put_resp_content_type("application/json") |> send_resp(422, Jason.encode!(%{error: "task required"}))
+    end
+  end
+
   # The hosted control-plane API (only answers when WB_CONTROL_PLANE — else Nexus.Platform 404s, so a
   # tenant runtime is indistinguishable). Auth (the plug above) has already resolved the org tenant.
   forward("/api/platform", to: Nexus.Platform)
@@ -125,6 +151,19 @@ defmodule Nexus.Server do
       120_000 -> conn
     end
   end
+
+  # Clamp the agent-run budget to [1s, 300s] (default 120s) so an /api/run request can't block forever.
+  defp run_timeout(nil), do: 120_000
+  defp run_timeout(n) when is_integer(n), do: n |> max(1_000) |> min(300_000)
+
+  defp run_timeout(s) when is_binary(s) do
+    case Integer.parse(s) do
+      {n, _} -> run_timeout(n)
+      _ -> 120_000
+    end
+  end
+
+  defp run_timeout(_), do: 120_000
 
   defp root, do: Application.get_env(:nexus, :workbook_root) || File.cwd!()
 
