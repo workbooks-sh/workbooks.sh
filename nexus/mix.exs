@@ -46,6 +46,10 @@ defmodule Nexus.MixProject do
       {:exqlite, "~> 0.23"},
       # the served-nexus HTTP tier: SSR the workbook + the /data API the client nexus.data falls to.
       {:bandit, "~> 1.5"},
+      # JSON at the genuine boundaries (HTTP API responses, Fly/WorkOS payloads). Used DIRECTLY, so it
+      # must be a direct dep — as an optional-transitive (via ecto) it compiled in dev/test but `mix
+      # release` excluded it → `Jason is not available` 500s in prod. (Caught on the first deploy.)
+      {:jason, "~> 1.4"},
       # JWT verification for the auth seam (HS256 secret + RS256/JWKS — WorkOS/Clerk/Auth0/own).
       {:jose, "~> 1.11"},
       # pure-Elixir HTML parser (mochiweb backend, no NIF) — the cheap no-wasm read rung: extract
