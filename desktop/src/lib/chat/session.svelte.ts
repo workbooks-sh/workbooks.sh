@@ -14,6 +14,7 @@
 // today — every prompt instantiates a fresh agent).
 
 import { ws, type BridgeEvent } from "$lib/bridge/ws.svelte";
+import { rcp } from "$lib/rcp";
 import { sidecar } from "$lib/bridge/sidecar.svelte";
 import { agents } from "$lib/bridge/agents.svelte";
 import { agentSessions } from "./agent_sessions.svelte";
@@ -126,6 +127,15 @@ class ChatSessionStore {
   #unsub: (() => void) | null = null;
   #raw: RawEntry[] = [];
   #initStarted = false;
+  /** Aborts the in-flight unary /api/run request when the user cancels. */
+  #runAbort: AbortController | null = null;
+  /** Set when the user cancels; an aborted rcp.request throws, and this
+   *  flag lets the catch treat that throw as a clean cancel, not an error. */
+  #cancelled = false;
+
+  /** A unary nexus run may legitimately take minutes; the server clamps to
+   *  ≤300s. We give the client request a little headroom past that. */
+  #RUN_TIMEOUT_MS = 305_000;
 
   init() {
     if (this.#initStarted) return;
@@ -167,6 +177,7 @@ class ChatSessionStore {
     }
     this.sending = true;
     this.sendError = null;
+    this.#cancelled = false;
     // Reset block list — one session per panel for v1.
     this.#raw = [];
     this.blocks = [];
@@ -191,10 +202,12 @@ class ChatSessionStore {
         void runMockComponentAgent(id, t);
         return;
       }
-      const id = await ws.sendUserInput(t, {
-        agentSlug: opts.agentSlug,
-        skills: opts.skills,
-      });
+      // Unary nexus run: a single RCP call to /api/run returns the final
+      // answer. We mint the session id client-side, then bridge the result
+      // into the renderer by pushing synthetic BridgeEvents onto #raw — the
+      // exact same path #ingest feeds — so #reproject renders an assistant
+      // message (or an error message) with no special-case render path.
+      const id = crypto.randomUUID();
       this.session = {
         id,
         status: "pending",
@@ -204,41 +217,86 @@ class ChatSessionStore {
         prompt: t,
         attachments: opts.attachments ?? [],
       };
-      // Watchdog: if the run stays pending with ZERO events, the live telemetry
-      // socket likely never connected (the run POST succeeded but session:<id>
-      // never joined). Surface it instead of an indefinite typing indicator.
-      setTimeout(() => {
-        if (
-          this.session?.id === id &&
-          this.session.status === "pending" &&
-          this.blocks.length === 0
-        ) {
-          this.sendError =
-            "No response from the nexus — the live connection may not be established. Check that the runtime is reachable.";
-        }
-      }, 12_000);
       // Record into the per-agent history (localStorage-backed).
       // Pin the slug at send time — switching agents mid-conversation
       // shouldn't retroactively re-tag prior sessions.
       const slug = opts.agentSlug ?? agents.selected ?? "waldo";
       agentSessions.record(slug, id, t);
       this.#reproject();
+
+      this.#runAbort = new AbortController();
+      const res = await rcp.request<{
+        ok: boolean;
+        answer?: string;
+        error?: string;
+      }>("/api/run", {
+        method: "POST",
+        body: { task: t, system: undefined, timeout_ms: 300_000 },
+        timeoutMs: this.#RUN_TIMEOUT_MS,
+        signal: this.#runAbort.signal,
+      });
+
+      // session_started banner, then a finalized assistant message
+      // synthesized from the unary result, then session_completed.
+      this.#pushSynthetic(id, "session_started", {});
+      if (res.ok) {
+        this.#pushSynthetic(id, "llm_turn_stop", {
+          metadata: { content: res.answer ?? "", status: "ok" },
+        });
+      } else {
+        this.#pushSynthetic(id, "llm_turn_stop", {
+          metadata: {
+            content: res.error ?? "run failed",
+            status: "error",
+            error: res.error,
+          },
+        });
+      }
+      this.#pushSynthetic(id, "session_completed", {});
+      if (this.session) this.session.status = res.ok ? "completed" : "failed";
+      this.#reproject();
     } catch (e) {
-      this.sendError = e instanceof Error ? e.message : String(e);
-      this.userPrompt = null;
+      // A user cancel aborts the in-flight request, which throws — treat
+      // that as a clean cancel (cancel() already rendered the block), not
+      // an error to surface.
+      if (!this.#cancelled) {
+        this.sendError = e instanceof Error ? e.message : String(e);
+        this.userPrompt = null;
+      }
     } finally {
       this.sending = false;
     }
   }
 
-  /** Send the channel-level `cancel` event for the current session. */
+  /** Cancel the in-flight unary run: abort the request (the catch treats
+   *  the resulting throw as a clean cancel) and render a cancelled block. */
   cancel() {
     const id = this.session?.id;
     if (!id) return;
-    ws.cancelSession(id);
+    this.#cancelled = true;
+    this.#runAbort?.abort();
+    this.#pushSynthetic(id, "session_cancelled", {});
+    if (this.session) this.session.status = "cancelled";
+    this.#reproject();
   }
 
   // ── internals ──
+
+  /** Build a synthetic BridgeEvent for the current session topic and push it
+   *  onto #raw — the same buffer #ingest feeds — so the unary /api/run result
+   *  renders through the unchanged #reproject path. */
+  #pushSynthetic(id: string, name: string, payload: unknown) {
+    const now = Date.now();
+    const event: BridgeEvent = {
+      name,
+      payload,
+      topic: `session:${id}`,
+      sessionId: id,
+      ts: now,
+      receivedAt: now,
+    };
+    this.#raw.push({ event });
+  }
 
   #ingest(e: BridgeEvent) {
     // Only consume events on our session's topic. Bridge-level events
