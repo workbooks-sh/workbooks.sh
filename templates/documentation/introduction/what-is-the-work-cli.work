@@ -20,8 +20,8 @@ You **build** — `work weave` folds the whole folder into one self-contained HT
 artifact. While you're iterating, `work dev` watches the folder and re-weaves on
 every change (and hot-swaps into a running Nexus), so the page updates as you type.
 
-You **deploy** — `work deploy` stands up a runtime, local or cloud, from a
-declarative `<work-deploy>` description: scaffold it, validate it, apply it.
+You **deploy** — `work deploy` stands up a runtime, local or cloud, from
+declarative settings that live with the workbook: scaffold them, validate, apply.
 
 That's the loop: author → build → deploy, all over the same folder.
 
@@ -43,7 +43,7 @@ The CLI groups its verbs the same way:
 
 **deploy** — stand up a runtime, local or cloud:
 
-- `work deploy init | validate | apply` — scaffold · check · deploy the `<work-deploy>`
+- `work deploy init | validate | apply` — scaffold · check · deploy the config
 - `work deploy verify | status | down` — health · inspect · teardown
 
 **platform** — identity, contexts, the control plane:

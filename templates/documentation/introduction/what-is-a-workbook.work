@@ -41,6 +41,10 @@ to do, and `work dev` watches the folder and re-weaves as you edit.
 The folder is how you organize; the woven artifact is what you ship; the
 [Nexus](/introduction/what-is-the-nexus) is what runs it.
 
+That woven artifact is HTML — but HTML here is purely a **build output**, the
+format the weave emits because it runs everywhere. It isn't something you author or
+configure, and you never hand-write it. You write `.work`; weave produces the HTML.
+
 ## Kits and apps
 
 Most workbooks are one of two things. A **kit** is meant to be *imported and
