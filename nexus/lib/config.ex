@@ -115,6 +115,14 @@ defmodule Nexus.Config do
   def session_max_age, do: get(:session_max_age)
   def session_cookie, do: get(:session_cookie)
 
+  # Login providers (Nexus.Auth.Provider). Declared as `auth-provider-<name>-<key>="…"` deploy attrs,
+  # e.g. `auth-provider-workos-authorize-url`, `-token-url`, `-jwks-url`, `-client-id`, `-issuer`,
+  # `-scope`, `-redirect-uri`, `-tenant-claim`. Secrets (client_secret) live in Nexus.Secrets, NEVER
+  # here. `provider/1` → the whole map; `provider/3` → one key.
+  def providers, do: get(:providers)
+  def provider(name), do: Map.get(providers(), to_string(name), %{})
+  def provider(name, key, default \\ nil), do: Map.get(provider(name), to_string(key), default)
+
   # ── parse ─────────────────────────────────────────────────────────────────────────────────────
   defp parse(html) do
     %{
@@ -147,8 +155,25 @@ defmodule Nexus.Config do
       reserved_hosts: words(attr(html, "reserved-hosts"), []),
       session_secure: bool(attr(html, "session-secure"), true),
       session_max_age: int(attr(html, "session-max-age"), 86_400),
-      session_cookie: attr(html, "session-cookie") || "wb_session"
+      session_cookie: attr(html, "session-cookie") || "wb_session",
+      providers: parse_providers(html)
     }
+  end
+
+  # Scan the deploy block for `auth-provider-<name>-<key>="value"` → %{name => %{key => value}}.
+  defp parse_providers(html) do
+    block =
+      with src when is_binary(src) <- html,
+           [_, b] <- Regex.run(~r/deploy\s+do\b(.*?)\n\s*end\b/s, src) do
+        b
+      else
+        _ -> ""
+      end
+
+    Regex.scan(~r/auth-provider-([a-z0-9]+)-([a-z0-9-]+)="([^"]*)"/i, block)
+    |> Enum.reduce(%{}, fn [_, name, key, val], acc ->
+      Map.update(acc, String.downcase(name), %{key => String.trim(val)}, &Map.put(&1, key, String.trim(val)))
+    end)
   end
 
   # The runtime's NEUTRAL default: one unbounded, free tier. No imposed ceiling (0 = unbounded in the

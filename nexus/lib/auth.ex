@@ -35,6 +35,8 @@ defmodule Nexus.Auth do
   # data — the handshake reveals only how to authenticate.
   @public_paths ["/health", "/.well-known/workbooks-runtime"]
   def call(%{request_path: p} = conn, _opts) when p in @public_paths, do: conn
+  # Login/callback endpoints are inherently public — they're how a request BECOMES authenticated.
+  def call(%{request_path: "/auth/" <> _} = conn, _opts), do: conn
 
   def call(conn, _opts) do
     # Workbook-declared public globs skip auth entirely (login pages, marketing, etc.). When no `auth`

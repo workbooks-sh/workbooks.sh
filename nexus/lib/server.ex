@@ -124,6 +124,12 @@ defmodule Nexus.Server do
     |> send_resp(200, Jason.encode!(Nexus.Rcp.capabilities()))
   end
 
+  # Native auth: begin a provider login (state/nonce CSRF + redirect to the provider). Public.
+  # The matching `/auth/:provider/callback` lands with the callback slice (bd wb-ahr6).
+  get "/auth/:provider/login" do
+    Nexus.Auth.Provider.login(conn, provider)
+  end
+
   get "/" do
     # Single workbook → the app. Many workbooks → an index of what's mounted on this nexus.
     if multi?() do
