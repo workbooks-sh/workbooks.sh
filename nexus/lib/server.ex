@@ -76,6 +76,8 @@ defmodule Nexus.Server do
 
     Enum.each(mods, fn m ->
       if function_exported?(m, :register, 0), do: m.register()
+      # Register any routes the unit declared with `route "GET /path", :fun` (baked at compile).
+      Nexus.Router.install(m)
     end)
   rescue
     _ -> :ok
@@ -404,7 +406,7 @@ defmodule Nexus.Server do
 
   get "/:wb" do
     case wb_root(wb) do
-      nil -> send_resp(conn, 404, "not found")
+      nil -> route_or_404(conn)
       r -> serve_workbook(conn, r, wb)
     end
   end
@@ -415,13 +417,50 @@ defmodule Nexus.Server do
   # sub-resources — source/data/live — are matched by the explicit routes above, so they win.)
   get "/:wb/*_rest" do
     case wb_root(wb) do
-      nil -> send_resp(conn, 404, "not found")
+      nil -> route_or_404(conn)
       r -> serve_workbook(conn, r, wb)
     end
   end
 
+  # Explicit workbook routes (Nexus.Router) are tried wherever a built-in route would otherwise 404 —
+  # here (the true catch-all) and in the `/:wb` mount-miss branches (a declared `route "/api/x"` whose
+  # first segment looks like a mount name). A `server` unit's `route "GET /api/orders", :list` is served.
   match _ do
-    send_resp(conn, 404, "not found")
+    route_or_404(conn)
+  end
+
+  # Try a declared route for this request; serve it, or 404. Mount-aware paths reach here only when no
+  # mount matched, so global declared routes get their chance before we give up.
+  defp route_or_404(conn) do
+    case Nexus.Router.match(conn.method, conn.request_path) do
+      {mod, fun, params} ->
+        conn = Plug.Conn.fetch_query_params(conn)
+        {:ok, body, conn} = read_body(conn)
+
+        req = %{
+          params: params,
+          query: conn.query_params,
+          body: decode_body(body),
+          method: conn.method,
+          path: conn.request_path,
+          tenant: Nexus.Auth.tenant(conn)
+        }
+
+        {status, ctype, out} = Nexus.Router.dispatch(mod, fun, req)
+        conn |> put_resp_content_type(ctype) |> send_resp(status, out)
+
+      nil ->
+        send_resp(conn, 404, "not found")
+    end
+  end
+
+  # Request bodies arrive as raw strings; decode JSON when it is JSON, else pass the raw string.
+  defp decode_body(""), do: nil
+  defp decode_body(body) do
+    case Jason.decode(body) do
+      {:ok, v} -> v
+      _ -> body
+    end
   end
 
   # Pump swarm events to the client as SSE frames until the fleet drains or the socket drops.

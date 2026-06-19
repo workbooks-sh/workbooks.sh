@@ -24,6 +24,7 @@ defmodule Nexus.Unit do
         quoted =
           quote do
             defmodule unquote(mod) do
+              use Nexus.Router
               unquote(body)
             end
           end
@@ -126,7 +127,8 @@ defmodule Nexus.Unit do
 
       body ->
         mod = Nexus.Uid.module(name)
-        quoted = quote do: (defmodule unquote(mod) do unquote(body) end)
+        # Inject the routing primitive: `route "GET /path", :fun` is available in every server unit.
+        quoted = quote do: (defmodule unquote(mod) do (use Nexus.Router); unquote(body) end)
 
         try do
           {:ok, quoted |> Code.compile_quoted() |> Enum.map(&elem(&1, 0))}
