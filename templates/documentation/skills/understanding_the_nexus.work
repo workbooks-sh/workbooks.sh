@@ -1,0 +1,23 @@
+# Understanding the nexus skill
+
+The **nexus** is the runtime that backs `server` units, agents, data, sync, and the
+compile/weave lane — one nexus serves many sites. Understanding it explains where
+server-side code runs, how a workbook is hosted, and why one nexus is the org. This
+skill is the conceptual + operational reference for the nexus.
+
+When the user asks where server code runs, how hosting works, or how the nexus scales,
+load the references below.
+
+app :understanding_the_nexus do
+  title       "Understanding the nexus"
+  description "Understand the nexus runtime: what it is, how it runs server units and serves many sites, and how to run one. Use when reasoning about where server-side code runs or how a workbook is hosted."
+
+  section "Concept" do
+    page "introduction/what-is-the-nexus"
+    page "blog/the-nexus-serves-many-sites"
+  end
+
+  section "Operating it" do
+    page "deploy/running-the-nexus"
+  end
+end

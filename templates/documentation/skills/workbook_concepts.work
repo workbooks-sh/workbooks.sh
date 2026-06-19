@@ -1,0 +1,23 @@
+# Workbook concepts skill
+
+The why behind the model: literate programming as the authoring paradigm, WebAssembly
+as the universal render target, and why we author even our own docs as a workbook.
+This skill grounds an agent in the rationale so its choices align with the model
+rather than fight it.
+
+When the user asks "why is it built this way" or needs the philosophy behind a
+decision, load the references below.
+
+app :workbook_concepts do
+  title       "Workbook concepts"
+  description "The rationale behind workbooks: literate programming, WebAssembly as render target, and docs-as-a-workbook. Use when explaining why the model works the way it does or making a design choice that should align with it."
+
+  section "Foundations" do
+    page "preface/literate-programming"
+    page "preface/why-webassembly"
+  end
+
+  section "In practice" do
+    page "blog/why-we-author-docs-as-a-workbook"
+  end
+end

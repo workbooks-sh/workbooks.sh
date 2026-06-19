@@ -1,0 +1,24 @@
+# Deploying workbooks skill
+
+A woven workbook is shipped by running it on a **nexus** — locally for parity, or in
+the cloud. The `work` CLI's deploy verbs (`deploy init / validate / apply`) take the
+woven tree to a running endpoint. This skill covers the path from a local run to a
+cloud deployment.
+
+When the user wants to ship, host, or run a workbook for others, load the references
+below.
+
+app :deploying_workbooks do
+  title       "Deploying workbooks"
+  description "Ship a workbook: run a nexus locally for parity, then deploy local or cloud with the work CLI. Use when the user wants to host, deploy, or run a workbook for others."
+
+  section "What you deploy onto" do
+    page "introduction/what-is-workbooks-cloud"
+    page "deploy/running-the-nexus"
+  end
+
+  section "Deploying" do
+    page "deploy/deploy-local-and-cloud"
+    page "deploy/workbooks-cloud"
+  end
+end

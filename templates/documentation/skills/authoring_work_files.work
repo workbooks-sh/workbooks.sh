@@ -1,0 +1,32 @@
+# Authoring .work files skill
+
+The `.work` file is the unit of a workbook: a **literate document** where prose
+narrates and `do … end` blocks run. There is **no HTML, no code fences, no markdown
+authoring** — the first word of a block names its kind (`data`, `def`, `server`,
+`client`, `flow`, `sandbox`, `agent`, `record`, `resource`, …) and the block is
+self-delimiting. This skill is the reference for writing correct `.work`.
+
+When the user is writing or editing block syntax, declarations, placement, or refs,
+load the matching reference below.
+
+app :authoring_work_files do
+  title       "Authoring .work files"
+  description "Write correct .work syntax: block grammar, kinds, declarations, placement, and prose refs. Use when authoring or editing the body of a .work file — never use markdown or code fences."
+
+  section "Concept" do
+    page "preface/literate-programming"
+    page "language/anatomy"
+  end
+
+  section "Blocks & kinds" do
+    page "language/block-grammar"
+    page "language/kinds-reference"
+    page "language/declarations"
+    page "language/placement-and-languages"
+  end
+
+  section "Prose & code" do
+    page "language/prose-and-refs"
+    page "language/elixir-in-markdown"
+  end
+end
