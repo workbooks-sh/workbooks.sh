@@ -150,6 +150,20 @@ export async function sleepNexus(id) {
   return plat(`/nexuses/${id}/sleep`, { method: 'POST' });
 }
 
+// ── CLI access tokens ──────────────────────────────────────────────────────
+// mintToken returns { token, id, name, created_at } — the plaintext `token` is
+// shown ONCE (the control plane stores only its hash). listTokens omits it.
+export async function mintToken(name) {
+  return plat('/tokens/mint', { method: 'POST', body: { name: name || 'cli' } });
+}
+export async function listTokens(opts = {}) {
+  if (!live()) return [];
+  return (await plat('/tokens', { fetch: opts.fetch })).tokens || [];
+}
+export async function revokeToken(id) {
+  return plat(`/tokens/${id}`, { method: 'DELETE' });
+}
+
 const EMPTY_USAGE = {
   // `load` = % of compute capacity in use across the org's nexuses (idle ⇒ 0).
   summary: { monthToDate: '$0.00', compute: '$0.00', storage: '0 GB', database: '—', nexusCount: 0, activeHrs: '0.0', load: 0 },

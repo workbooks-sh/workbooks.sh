@@ -1,5 +1,29 @@
 <script>
   import { toast } from '$lib/toastStore.svelte.js';
+  import { mintToken, listTokens, revokeToken } from '$lib/api.js';
+  import { onMount } from 'svelte';
+
+  // ── CLI access tokens ──
+  let tokens = $state([]);
+  let minted = $state(null);   // the one-time plaintext token
+  let tokName = $state('');
+  let minting = $state(false);
+  onMount(async () => { try { tokens = await listTokens(); } catch {} });
+  async function generateToken() {
+    minting = true;
+    try {
+      const r = await mintToken(tokName.trim() || 'cli');
+      minted = r.token; tokName = '';
+      tokens = await listTokens();
+      toast('Token generated — copy it now');
+    } catch { toast('Could not generate token'); }
+    minting = false;
+  }
+  async function revoke(id) {
+    try { await revokeToken(id); tokens = tokens.filter((t) => t.id !== id); if (minted) minted = null; toast('Token revoked'); }
+    catch { toast('Could not revoke'); }
+  }
+  function copyMinted() { navigator.clipboard?.writeText(minted).then(() => toast('Token copied')); }
 
   let name = $state('Shane');
   let theme = $state('dark');
@@ -68,15 +92,33 @@
   </div>
 
   <div class="card">
-    <h3>API keys</h3>
-    <p class="dim" style="font-size:13px;margin-bottom:12px">Use this key to manage your nexuses programmatically.</p>
-    <div class="srow"><label>Secret key</label>
-      <span style="display:flex;gap:8px;align-items:center;flex:1;justify-content:flex-end">
-        <code class="mono" style="font-size:12.5px">wb_live_••••••••4f2a</code>
-        <button class="btn sm" onclick={copyToken}>Copy</button>
-        <button class="btn sm" onclick={() => toast('New API key generated')}>Regenerate</button>
-      </span>
+    <h3>CLI access</h3>
+    <p class="dim" style="font-size:13px;margin-bottom:12px">Generate a token, then run <code class="mono">work login --token &lt;token&gt;</code> to drive the <code class="mono">work</code> CLI against your account — deploy workbooks and manage nexuses, headless.</p>
+    {#if minted}
+      <div class="srow"><label>New token</label>
+        <span style="display:flex;gap:8px;align-items:center;flex:1;justify-content:flex-end;min-width:0">
+          <code class="mono" style="font-size:12px;overflow:hidden;text-overflow:ellipsis">{minted}</code>
+          <button class="btn sm primary" onclick={copyMinted}>Copy</button>
+        </span>
+      </div>
+      <p class="faint" style="font-size:12px;margin:6px 0 0">Copy it now — for security, you won't be able to see it again.</p>
+    {/if}
+    <div class="srow"><label for="tokname">Name</label>
+      <input id="tokname" class="sinput" placeholder="my-laptop" bind:value={tokName} />
+      <button class="btn sm primary" onclick={generateToken} disabled={minting}>{minting ? 'Generating…' : 'Generate token'}</button>
     </div>
+    {#if tokens.length}
+      <div style="margin-top:6px">
+        {#each tokens as t (t.id)}
+          <div class="kv"><span class="k mono">{t.name}</span>
+            <span style="display:flex;gap:10px;align-items:center">
+              <span class="v faint mono" style="font-size:11.5px">{t.id}</span>
+              <button class="btn sm" onclick={() => revoke(t.id)}>Revoke</button>
+            </span>
+          </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <!-- Backup (Phase 6) -->
