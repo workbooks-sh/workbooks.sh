@@ -160,3 +160,13 @@ bash, ran sort/uniq in the wasm sandbox against /work/data.txt). The Llm base_ur
 no-key (added earlier) is what makes the seam local. Runnable: ./run-local-agent.sh "<task>".
 HONEST PERF: CPU-8B is ~5 tok/s; multi-turn tasks that need many turns can hit the wall-clock (a 4-turn
 task timed out at 4 min) — raise timeout_ms or use the GPU/cloud lane for long-horizon runs.
+
+# ═══ DOGFOOD: a SKILL adapter reachable through the Nexus runtime (2026-06-18) ═══
+Nexus.Llm.complete (the runtime LLM seam) -> local llama-server serving a Granite GGUF base + a GGUF
+LoRA adapter -> returns the adapter's self-taught fact ("AURORA-SEVEN"). Works via chat completions
+AND raw — the GGUF chat template is fine (the earlier MLX-server miss was its missing template, not the
+GGUF lane). Runnable: ./run-local-adapter.sh. llama-server also hot-swaps GGUF adapters live via
+POST /lora-adapters — the "kit of swappable skills" at the serving tier.
+ONE HONEST GAP (next): the 8B skill adapters are trained in MLX (QLoRA, fits 16GB); to serve them on the
+llama.cpp GGUF lane (CPU + live hot-swap) they need MLX-adapter -> GGUF conversion (or fuse+convert).
+The 350m proves the GGUF adapter lane end-to-end today; the 8B path = train-MLX/serve-MLX OR convert.
