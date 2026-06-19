@@ -53,3 +53,15 @@ fn skipFile(p: []const u8) bool {
 pub fn writeFile(io: Io, path: []const u8, data: []const u8) !void {
     try Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = data });
 }
+
+/// Write a file readable/writable by the owner ONLY (0o600). Use for secrets like the
+/// control-plane credential, so another user on a shared host can't read the token.
+/// On platforms without POSIX modes the chmod is a no-op and the plain write stands.
+pub fn writeFilePrivate(io: Io, path: []const u8, data: []const u8) !void {
+    try Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = data });
+    if (std.posix.mode_t != u0) {
+        const f = Io.Dir.cwd().openFile(io, path, .{ .mode = .read_write }) catch return;
+        defer f.close(io);
+        f.setPermissions(io, @enumFromInt(@as(std.posix.mode_t, 0o600))) catch {};
+    }
+}

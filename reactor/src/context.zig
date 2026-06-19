@@ -167,7 +167,7 @@ pub fn login(io: Io, alloc: std.mem.Allocator, home: []const u8, url_in: []const
 
     if (token.len > 0) {
         Io.Dir.cwd().createDirPath(io, try std.fs.path.join(alloc, &.{ home, ".work" })) catch {};
-        try fs.writeFile(io, try credPath(alloc, home), try std.fmt.allocPrint(alloc, "{s}\t{s}\n", .{ url, token }));
+        try fs.writeFilePrivate(io, try credPath(alloc, home), try std.fmt.allocPrint(alloc, "{s}\t{s}\n", .{ url, token }));
         log.ok(try std.fmt.allocPrint(alloc, "logged in \u{b7} {s}", .{url}));
         return 0;
     }

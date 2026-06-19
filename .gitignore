@@ -98,3 +98,6 @@ nexus/**/*.dets
 
 # Working docs — kept on disk, never committed
 docs/
+
+# Runtime DETS state must never be tracked (token hashes, org records, waitlist emails)
+**/*.dets
