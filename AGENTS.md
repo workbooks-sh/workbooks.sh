@@ -50,12 +50,15 @@ These override everything. If a choice violates one, the choice is wrong.
    (literate, composition-as-source), where the **blocks are the source of truth**. A
    sidecar `*.json` you parse to render is not allowed; if you reach for a `.json`, stop —
    author it as `.work` instead. Always workbooks, always `.work`.
-   **Env vars are JSON-by-another-name** — a hidden config sidecar. Tunable config is an
-   HTML attribute (`<work-deploy …>`, read via `Nexus.Config`), never `System.get_env`. The
-   ONLY legitimate env is genuine deploy injection: **secrets + per-machine identity**
-   (`OPENROUTER_API_KEY`, `WB_S3_*`, `WB_DATABASE_URL`, `NEXUS_TENANT`, the `WB_DATA` mount
-   path) — loaded *into* the nexus at deploy, never authored config. New knob ⇒ a
-   `<work-deploy>` attribute + a `Nexus.Config` getter, not an env read.
+   **Env vars are JSON-by-another-name** — a hidden config sidecar. Tunable config is a
+   `.work` declaration (e.g. a `deploy do … end` block, read via `Nexus.Config`), never
+   `System.get_env`. **HTML is a build OUTPUT, never a config surface** — web components
+   are only an assembly mechanism for the woven output, not a developer/config tool; never
+   author config as HTML. The ONLY legitimate env is genuine deploy injection: **secrets +
+   per-machine identity** (`OPENROUTER_API_KEY`, `WB_S3_*`, `WB_DATABASE_URL`,
+   `NEXUS_TENANT`, the `WB_DATA` mount path) — loaded *into* the nexus at deploy, never
+   authored config. New knob ⇒ a `.work` config declaration + a `Nexus.Config` getter, not
+   an env read and not an HTML attribute.
 
 ## ⬛ AUTONOMY MANDATE ⬛ (read this every loop)
 
