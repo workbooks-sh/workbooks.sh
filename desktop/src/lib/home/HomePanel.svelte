@@ -26,8 +26,7 @@
   import { chrome } from "$lib/ui/chrome.svelte";
   import { features } from "$lib/bridge/features";
   import { dock } from "$lib/bridge/dock.svelte";
-  import AssistantMessageView from "$lib/chat/AssistantMessageView.svelte";
-  import ArtifactCard from "$lib/chat/ArtifactCard.svelte";
+  import ChatThread from "$lib/chat/ChatThread.svelte";
   import { chatBackdrop } from "./chatBackdrop.svelte";
   import { onDestroy } from "svelte";
   import { openChatTab } from "$lib/tabs/chatTab";
@@ -74,42 +73,22 @@
     chatBackdrop.active = inConversation;
   });
 
-  type Line = {
-    who: "you" | "waldo";
-    text: string;
-    ts: number;
-    kind: string;
-    pending?: boolean;
-    error?: boolean;
-    artifact?: { path: string; title: string; action: "created" | "updated" };
-  };
-  const transcript = $derived.by<Line[]>(() => {
-    const mine: Line[] = chatSession.userEchoes.map((m) => ({
-      who: "you", text: m.text, ts: m.ts, kind: "msg",
-    }));
-    const theirs = chatSession.blocks
-      .map((b): Line | null => {
-        if (b.kind === "message") return { who: "waldo", text: b.text, ts: b.ts, kind: "msg", pending: b.pending, error: b.error };
-        if (b.kind === "tool") return { who: "waldo", text: `${b.toolName}${b.pending ? "…" : ""}`, ts: b.ts, kind: "tool" };
-        if (b.kind === "status") return { who: "waldo", text: b.label, ts: b.ts, kind: "status" };
-        if (b.kind === "artifact") return { who: "waldo", text: b.title, ts: b.ts, kind: "artifact", artifact: { path: b.path, title: b.title, action: b.action } };
-        return null;
-      })
-      .filter((x): x is Line => x !== null);
-    return [...mine, ...theirs].sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
-  });
+  const userLines = $derived(chatSession.userEchoes);
 
   // "Thinking" dots between send and the first agent output.
   const thinking = $derived(
     (sending ||
       chatSession.session?.status === "pending" ||
       chatSession.session?.status === "running") &&
-      !transcript.some((m) => m.who === "waldo" && (m.text || m.pending)),
+      !chatSession.blocks.some(
+        (b) => b.kind === "message" && (b.text || b.pending),
+      ),
   );
 
   // Auto-scroll the thread to the newest line.
   $effect(() => {
-    void transcript.length;
+    void chatSession.blocks.length;
+    void userLines.length;
     void thinking;
     if (threadEl) {
       queueMicrotask(() => { threadEl!.scrollTop = threadEl!.scrollHeight; });
@@ -290,30 +269,7 @@
     <!-- The page IS the thread (TASK 2). Composer is pinned to the bottom. -->
     <div class="thread" bind:this={threadEl}>
       <div class="thread-inner">
-        {#each transcript as m, i (m.ts + "-" + i)}
-          {#if m.kind === "artifact" && m.artifact}
-            <div class="artifact-line">
-              <ArtifactCard path={m.artifact.path} title={m.artifact.title} action={m.artifact.action} />
-            </div>
-          {:else if m.kind === "status"}
-            <div class="status-line">{m.text}</div>
-          {:else}
-            <div class="bubble {m.who}" class:tool={m.kind === "tool"} class:err={m.error} class:thinking={m.who === "waldo" && m.kind === "msg" && !m.text && m.pending}>
-              {#if m.who === "waldo" && m.kind === "msg"}
-                <span class="tag">Waldo</span>
-                {#if m.text}<AssistantMessageView text={m.text} />{:else if m.pending}<span class="typing"><span></span><span></span><span></span></span>{/if}
-              {:else}
-                <span class="text">{m.text}</span>
-              {/if}
-            </div>
-          {/if}
-        {/each}
-        {#if thinking}
-          <div class="bubble waldo thinking">
-            <span class="tag">Waldo</span>
-            <span class="typing"><span></span><span></span><span></span></span>
-          </div>
-        {/if}
+        <ChatThread userLines={userLines} blocks={chatSession.blocks} {thinking} />
       </div>
     </div>
   {/if}
@@ -467,91 +423,6 @@
     gap: 10px;
     padding: 1.5rem 1rem 1rem;
   }
-  .bubble {
-    max-width: 88%;
-    padding: 9px 12px;
-    border-radius: 12px;
-    font-size: 0.9rem;
-    line-height: 1.55;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-  .bubble.you {
-    align-self: flex-end;
-    width: fit-content;
-    background: var(--color-fg);
-    color: var(--color-page);
-  }
-  /* Waldo's prose/org/component bubble. align-self:flex-start in a flex
-     COLUMN sizes the bubble to its cross-axis content — async org and the
-     <work-gen-block> custom element resolve to ~zero intrinsic width before
-     upgrade, which collapsed the bubble into a tall narrow empty strip
-     (the project's known flex width-collapse). Pin a comfortable width so
-     prose, the thinking dots, and streamed tokens all render at normal
-     width regardless of when the inner content establishes its own size. */
-  .bubble.waldo {
-    align-self: flex-start;
-    width: 100%;
-    max-width: 88%;
-    background: var(--color-surface-soft);
-    color: var(--color-fg);
-  }
-  /* Block-level rendered content must fill the bubble (not collapse it). */
-  .bubble.waldo :global(.agent-text),
-  .bubble.waldo :global(.agent-md),
-  .bubble.waldo :global(.agent-org),
-  .bubble.waldo :global(work-gen-block) {
-    width: 100%;
-  }
-  /* While only the typing indicator shows (no text yet), the bubble is a
-     small inline pill — not a full-width empty strip. */
-  .bubble.waldo.thinking {
-    width: fit-content;
-    min-width: 0;
-  }
-  .bubble.tool {
-    width: fit-content;
-    font-family: var(--font-mono);
-    font-size: 0.76rem;
-    color: var(--color-fg-muted);
-    background: transparent;
-    padding: 2px 12px;
-  }
-  .bubble.err { color: var(--color-err); }
-  .bubble .tag {
-    display: block;
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--color-fg-subtle);
-    margin-bottom: 3px;
-  }
-  .dim { color: var(--color-fg-subtle); }
-  .artifact-line { align-self: flex-start; max-width: 90%; }
-  .status-line {
-    align-self: center;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.04em;
-    color: var(--color-fg-subtle);
-    padding: 2px 0;
-  }
-
-  .typing { display: inline-flex; gap: 3px; padding: 2px 0; }
-  .typing span {
-    width: 4px; height: 4px; border-radius: 50%;
-    background: var(--color-fg-subtle);
-    animation: typing-bounce 1.2s infinite ease-in-out both;
-  }
-  .typing span:nth-child(1) { animation-delay: -0.24s; }
-  .typing span:nth-child(2) { animation-delay: -0.12s; }
-  @keyframes typing-bounce {
-    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-    40% { transform: translateY(-3px); opacity: 1; }
-  }
-
   /* ── new-chat chip ── */
   .new-chat {
     align-self: center;

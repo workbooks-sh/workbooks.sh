@@ -419,6 +419,7 @@ class ChatSessionStore {
             key: `m-${event.receivedAt}-${blocks.length}`,
             label,
             text: "",
+            reasoning: "",
             pending: true,
             error: false,
             errorMessage: null,
@@ -427,13 +428,26 @@ class ChatSessionStore {
           blocks.push(msg);
           break;
         }
+        case "agent_reasoning": {
+          // Streamed reasoning tokens — fold into the current (last, pending)
+          // assistant message's reasoning. Does NOT create a raw row.
+          const target = findLastMessage(blocks, (m) => m.pending);
+          const chunk = (metadata?.content as string | undefined) ?? "";
+          if (target && chunk) target.reasoning += chunk;
+          break;
+        }
         case "llm_delta": {
           // Streamed token chunk — append to the in-progress assistant message
           // so the reply renders as it generates. The authoritative full text
           // arrives at llm_turn_stop and reconciles (replaces) the accumulation.
           const target = findLastMessage(blocks, (m) => m.pending);
           const chunk = (metadata?.content as string | undefined) ?? "";
-          if (target && chunk) target.text += chunk;
+          if (target && chunk) {
+            target.text += chunk;
+            // Re-stamp to the delta's time so the finalized reply sorts after
+            // any tool-call blocks that fired during this turn.
+            target.ts = event.receivedAt;
+          }
           break;
         }
         case "llm_turn_stop": {
@@ -447,6 +461,7 @@ class ChatSessionStore {
           if (target) {
             target.pending = false;
             target.text = content;
+            target.ts = event.receivedAt;
             target.error = status === "error";
             target.errorMessage =
               target.error && typeof metadata?.error !== "undefined"
@@ -459,6 +474,7 @@ class ChatSessionStore {
               key: `m-${event.receivedAt}-${blocks.length}`,
               label: providerLabel(metadata) ?? "Assistant",
               text: content,
+              reasoning: "",
               pending: false,
               error: status === "error",
               errorMessage: null,

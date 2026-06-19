@@ -43,6 +43,21 @@ async function streamContent(
   }
 }
 
+/** Stream the agent's reasoning as `agent_reasoning` deltas (the runtime forwards
+ *  the model's reasoning tokens the same way). The chat folds these into the
+ *  current turn's collapsible reasoning block. */
+async function streamReasoning(
+  emit: (name: string, payload?: Record<string, unknown>) => void,
+  content: string,
+  chunk = 6,
+  delay = 12,
+): Promise<void> {
+  for (let i = 0; i < content.length; i += chunk) {
+    emit("agent_reasoning", { metadata: { content: content.slice(i, i + chunk) } });
+    await sleep(delay);
+  }
+}
+
 /** Stable artifact path derived from the user's prompt — so a follow-up
  *  referencing the same thing updates the same component (and tab) instead
  *  of spawning a new one. */
@@ -229,95 +244,93 @@ export async function runMockComponentAgent(
   const intent = detectIntent(prompt);
 
   if (intent === "create") {
-    // Create + open a workbook, then confirm with an inline component card. A
-    // recognized request ("build a habit tracker") yields a REAL app; anything
-    // else falls back to the generic component card.
+    // Reason, then create + write the workbook with real tool calls, open it,
+    // and confirm in clean Markdown. A recognized request ("build a habit
+    // tracker") yields a REAL app; anything else falls back to the demo card.
     const demo = DEMO_BUILDS.find((d) => d.match.test(prompt));
     const derived = artifactPathFor(prompt);
     const path = derived.path;
     const title = demo?.title ?? derived.title;
+    const slug = title.replace(/\s+/g, "-").toLowerCase();
     const rev = (revisions.get(path) ?? 0) + 1;
     revisions.set(path, rev);
     const action = rev === 1 ? "created" : "updated";
 
+    await streamReasoning(
+      emit,
+      `They want ${title.toLowerCase()}. I'll scaffold a single-file workbook, lay out the weekly grid, wire the streak counters, then open it as a tab so they can use it right away.`,
+    );
+    await sleep(160);
+
     emit("tool_call_start", {
       metadata: { tool_name: "workbook_create", tool_call_id: `tc-${rev}`, args: { title } },
     });
-    await sleep(420);
+    await sleep(440);
     componentArtifacts.register(path, demo ? demo.html : componentHtml(title, prompt, rev));
     emit("tool_call_stop", {
       metadata: { tool_name: "workbook_create", tool_call_id: `tc-${rev}`, status: "ok", result_size: 1 },
     });
-    await sleep(80);
+    await sleep(160);
+
+    emit("tool_call_start", {
+      metadata: { tool_name: "vfs_write", tool_call_id: `tw-${rev}`, args: { path: `${slug}.work` } },
+    });
+    await sleep(400);
+    emit("tool_call_stop", {
+      metadata: { tool_name: "vfs_write", tool_call_id: `tw-${rev}`, status: "ok", result_size: 1 },
+    });
+    await sleep(120);
+
     emit("component_artifact", { path, title, kind: "workbook", action });
-    await sleep(140);
+    await sleep(180);
 
     const content =
       action === "created"
-        ? `#+RENDER: org\nDone — I built *${title}* and opened it as a tab.\n\n` +
-          `#+begin_src component :type callout :tone ok :title Workbook created\n` +
-          `${title} is live in a new tab. Tell me what to change and I'll edit it in place.\n` +
-          `#+end_src\n\n` +
-          `#+begin_src component :type kv :title What I set up\n` +
-          `Name: ${title}\n` +
-          `Type: single-file workbook\n` +
-          `Status: open in a tab\n` +
-          `Next: say "share this" to invite your team\n` +
-          `#+end_src`
-        : `Updated *${title}* (revision ${rev}). The tab reflects the latest version — keep iterating.`;
+        ? `Done — I built **${title}** and opened it in a tab.\n\n` +
+          `It's a single-file workbook: a weekly grid of five habits with live streak counts. ` +
+          `Tap any day to check it off. Tell me what to change and I'll edit it in place.`
+        : `Updated **${title}** (revision ${rev}). The tab reflects the latest version — keep iterating.`;
     await streamContent(emit, content);
     emit("llm_turn_stop", {
       metadata: { provider: "openrouter", model: "waldo", status: "ok", content },
     });
   } else if (intent === "share") {
-    // Offer a share action as an inline component (a clickable card/button).
-    await sleep(300);
+    await streamReasoning(emit, `A sharing request — I'll confirm who gets access and at what role.`);
+    await sleep(160);
     const content =
-      `#+RENDER: org\nYes — you can share this with anyone in your organization. ` +
-      `Pick who gets access and I'll send the invite.\n\n` +
-      `#+begin_src component :type share :title Share with your org\n` +
-      `target: this workbook\n` +
-      `members: Ada Lovelace, Grace Hopper, Alan Turing\n` +
-      `role: Editor\n` +
-      `#+end_src`;
+      `Yes — you can share this with anyone in your organization. ` +
+      `I'd add **Ada Lovelace**, **Grace Hopper**, and **Alan Turing** as **Editors**. ` +
+      `Say the word and I'll send the invites.`;
     await streamContent(emit, content);
     emit("llm_turn_stop", {
       metadata: { provider: "openrouter", model: "waldo", status: "ok", content },
     });
   } else if (intent === "agent") {
-    // Stand up a new agent, confirm with an inline component + an open action.
-    await sleep(320);
+    await streamReasoning(emit, `They want a new agent — I'll create it, give it sensible toolkits, and pin it to the workspace.`);
+    await sleep(160);
     emit("tool_call_start", {
       metadata: { tool_name: "agent_create", tool_call_id: "tc-agent", args: { slug: "summarizer" } },
     });
-    await sleep(360);
+    await sleep(420);
     emit("tool_call_stop", {
       metadata: { tool_name: "agent_create", tool_call_id: "tc-agent", status: "ok", result_size: 1 },
     });
-    await sleep(80);
+    await sleep(120);
     const content =
-      `#+RENDER: org\nSet up. I created an agent and pinned it to your workspace.\n\n` +
-      `#+begin_src component :type callout :tone ok :title Agent ready\n` +
-      `Your new agent is configured and available to sessions. Open its tab to tweak the prompt or toolkits.\n` +
-      `#+end_src\n\n` +
-      `#+begin_src component :type kv :title Agent config\n` +
-      `Slug: summarizer\n` +
-      `Model: inherits your default\n` +
-      `Toolkits: workbooks-browser, library-search\n` +
-      `Human in the loop: off\n` +
-      `#+end_src`;
+      `Set up — I created **summarizer** and pinned it to your workspace.\n\n` +
+      `It inherits your default model and ships with the **workbooks-browser** and ` +
+      `**library-search** toolkits. Open its tab to tweak the prompt or add tools.`;
     await streamContent(emit, content);
     emit("llm_turn_stop", {
       metadata: { provider: "openrouter", model: "waldo", status: "ok", content },
     });
   } else {
-    // A plain, streaming prose answer (the common case) — as Waldo.
-    await sleep(160);
+    await streamReasoning(emit, `A general question — I'll answer directly and point to the next useful action.`);
+    await sleep(140);
     const content =
-      `I'm Waldo, your resident assistant in here. I can create workbooks, ` +
-      `share them to your org, set up agents, search your files, and open ` +
-      `things for you — by voice or text. Try "create a workbook for me" or ` +
-      `"set me up an agent that summarizes my notes."`;
+      `I'm **Waldo**, your assistant in here. I can build workbooks and apps, ` +
+      `talk to your data, set up agents, and search everything — by voice or text. ` +
+      `Try *"build a habit tracker"* or *"set me up an agent that summarizes my notes."*`;
     await streamContent(emit, content);
     emit("llm_turn_stop", {
       metadata: { provider: "openrouter", model: "waldo", status: "ok", content },

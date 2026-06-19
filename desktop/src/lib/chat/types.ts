@@ -77,6 +77,8 @@ export interface AssistantMessage {
   label: string;
   /** finalized text from llm_turn_stop.content. Empty until stop arrives. */
   text: string;
+  /** streamed reasoning tokens (agent_reasoning) folded in for this turn. */
+  reasoning: string;
   /** true while only llm_turn_start has been seen */
   pending: boolean;
   /** true if llm_turn_stop reported status=error */

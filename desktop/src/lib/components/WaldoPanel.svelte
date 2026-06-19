@@ -35,6 +35,7 @@
   import { sessionHistory, type SavedSession } from "$lib/chat/session_history.svelte";
   import AssistantMessageView from "$lib/chat/AssistantMessageView.svelte";
   import ArtifactCard from "$lib/chat/ArtifactCard.svelte";
+  import ChatThread from "$lib/chat/ChatThread.svelte";
   import { componentArtifacts } from "$lib/chat/artifacts.svelte";
   import { inworldLive } from "$lib/live/inworld.svelte";
   import { openChatTab } from "$lib/tabs/chatTab";
@@ -368,28 +369,7 @@
     </div>
   {:else if transcript.length > 0}
     <div class="thread">
-      {#each transcript as m, i (m.ts + "-" + i)}
-        {#if m.kind === "artifact" && m.artifact}
-          <div class="artifact-line">
-            <ArtifactCard path={m.artifact.path} title={m.artifact.title} action={m.artifact.action} />
-          </div>
-        {:else}
-          <div class="bubble {m.who}" class:tool={m.kind === "tool"} class:err={m.error}>
-            {#if m.who === "waldo" && m.kind === "msg"}
-              <span class="tag">Waldo</span>
-              {#if m.text}<AssistantMessageView text={m.text} />{:else if m.pending}<span class="text dim">…</span>{/if}
-            {:else}
-              <span class="text">{m.text}</span>
-            {/if}
-          </div>
-        {/if}
-      {/each}
-      {#if thinking}
-        <div class="bubble waldo">
-          <span class="tag">Waldo</span>
-          <span class="typing"><span></span><span></span><span></span></span>
-        </div>
-      {/if}
+      <ChatThread userLines={myLines} blocks={chatSession.blocks} {thinking} />
     </div>
   {:else}
     <div class="intro">
