@@ -78,6 +78,8 @@ defmodule Nexus.Config do
   def search_engines, do: get(:search_engines)
   # The base URL for the "searxng" provider only (an operator's self-hosted instance).
   def search_endpoint, do: get(:search_endpoint)
+  # Embedding backend for the semantic reranker: "hashed" (keyless default) | model-swap names.
+  def embed, do: get(:embed)
 
   # ── parse ─────────────────────────────────────────────────────────────────────────────────────
   defp parse(html) do
@@ -101,7 +103,10 @@ defmodule Nexus.Config do
       # from datacenter IPs). The API key stays in env (BRAVE_API_KEY/…), like OPENROUTER_API_KEY.
       search: attr(html, "search") || "metasearch",
       search_engines: words(attr(html, "search-engines"), ~w(ddg mojeek startpage)),
-      search_endpoint: attr(html, "search-endpoint")
+      search_endpoint: attr(html, "search-endpoint"),
+      # Embedding backend for the local semantic reranker. Default "hashed" (deterministic, keyless,
+      # zero-dep); swap to a real GGUF/Bumblebee model name at Nexus.Embed's model-swap point.
+      embed: attr(html, "embed") || "hashed"
     }
   end
 

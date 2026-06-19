@@ -20,7 +20,7 @@ defmodule Nexus.Browse.Search.Metasearch do
   """
   @behaviour Nexus.Browse
 
-  alias Nexus.Browse.Search.{Engines, Rank}
+  alias Nexus.Browse.Search.{Corpora, Engines, Rank, Semantic}
 
   @default_engines [:ddg, :mojeek, :startpage]
   @per_engine_timeout 8_000
@@ -36,39 +36,61 @@ defmodule Nexus.Browse.Search.Metasearch do
     if query == "" do
       {:error, :empty_query}
     else
-      engines = engines(opts)
+      sources = sources(opts)
       limit = opts[:limit] || @top_n
 
       lists =
-        engines
+        sources
         |> Task.async_stream(
-          fn engine -> {engine, fetch_engine(engine, query)} end,
-          max_concurrency: max(length(engines), 1),
+          fn source -> {source, fetch_source(source, query, limit)} end,
+          max_concurrency: max(length(sources), 1),
           timeout: @per_engine_timeout + 1_000,
           on_timeout: :kill_task,
           ordered: false
         )
         |> Enum.flat_map(fn
-          {:ok, {engine, results}} -> [{engine, results}]
-          # a killed/crashed engine task → drop it (best-effort)
+          {:ok, {source, results}} -> [{source, results}]
+          # a killed/crashed source task → drop it (best-effort)
           _ -> []
         end)
 
-      merged =
-        lists
-        |> Rank.merge()
-        |> Enum.take(limit)
-        |> Enum.map(&Map.take(&1, [:title, :url, :snippet]))
+      merged = Rank.merge(lists)
 
-      {:ok, merged}
+      ranked =
+        if opts[:semantic] == false do
+          merged
+        else
+          Semantic.rerank(query, merged, opts)
+        end
+
+      out =
+        ranked
+        |> Enum.take(limit)
+        |> Enum.map(&Map.take(&1, [:title, :url, :snippet, :score, :engines, :semantic]))
+
+      {:ok, out}
     end
   end
 
-  defp engines(opts) do
-    case opts[:engines] || configured_engines() do
-      [] -> @default_engines
-      list -> list
+  # The full fan-out source set: keyless HTML engines + open-corpus APIs. The corpora set is
+  # datacenter-reliable and usable standalone — `opts[:sources]` (or `engines="…"` / `corpora="…"`
+  # config) can restrict to e.g. only corpora when the HTML engines get blocked on Fly.
+  defp sources(opts) do
+    cond do
+      opts[:sources] -> opts[:sources]
+      opts[:engines] -> opts[:engines]
+      true -> default_sources()
     end
+  end
+
+  defp default_sources do
+    engines =
+      case configured_engines() do
+        [] -> @default_engines
+        list -> list
+      end
+
+    engines ++ Corpora.names()
   end
 
   defp configured_engines do
@@ -84,7 +106,19 @@ defmodule Nexus.Browse.Search.Metasearch do
   defp normalize_name(name) when is_binary(name), do: String.to_atom(name)
   defp normalize_name(name) when is_atom(name), do: name
 
-  # One engine: build URL → host-brokered GET → parse. Any failure → []. Never raises out.
+  # One source: build URL → host-brokered GET → parse. Routes to the HTML-engine adapter or the
+  # open-corpus adapter by source name. Any failure → []. Never raises out.
+  defp fetch_source(source, query, limit) do
+    cond do
+      source in Corpora.names() -> fetch_corpus(source, query, limit)
+      true -> fetch_engine(source, query)
+    end
+  rescue
+    _ -> []
+  catch
+    _, _ -> []
+  end
+
   defp fetch_engine(engine, query) do
     url = Engines.build_url(engine, query)
 
@@ -92,9 +126,18 @@ defmodule Nexus.Browse.Search.Metasearch do
       body when is_binary(body) and body != "" -> Engines.parse(engine, body)
       _ -> []
     end
-  rescue
-    _ -> []
-  catch
-    _, _ -> []
+  end
+
+  defp fetch_corpus(source, query, limit) do
+    url = Corpora.build_url(source, query, limit)
+
+    case Nexus.Dock.fetch(url) do
+      body when is_binary(body) and body != "" ->
+        # CommonCrawl is JSONL, not a JSON array — its own parser.
+        if source == :commoncrawl, do: Corpora.parse_commoncrawl(body), else: Corpora.parse(source, body)
+
+      _ ->
+        []
+    end
   end
 end
