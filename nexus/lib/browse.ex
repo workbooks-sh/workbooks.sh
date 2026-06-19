@@ -20,15 +20,16 @@ defmodule Nexus.Browse do
 
   @type url :: String.t()
 
-  @callback capabilities() :: [:fetch | :render | :screenshot | :search]
+  @callback capabilities() :: [:fetch | :render | :screenshot | :search | :harvest]
   @callback fetch(url, keyword) :: {:ok, binary} | {:error, term}
   @callback render(url, keyword) :: {:ok, binary} | {:error, term}
   @callback screenshot(url, keyword) :: {:ok, binary} | {:error, term}
   @callback search(query :: String.t(), keyword) :: {:ok, [map]} | {:error, term}
+  @callback harvest(url, keyword) :: {:ok, map} | {:error, term}
 
-  @optional_callbacks fetch: 2, render: 2, screenshot: 2, search: 2
+  @optional_callbacks fetch: 2, render: 2, screenshot: 2, search: 2, harvest: 2
 
-  @builtin [Nexus.Browse.Http, Nexus.Browse.Blitz]
+  @builtin [Nexus.Browse.Http, Nexus.Browse.Blitz, Nexus.Browse.Media]
   @reg {:nexus_browse, :providers}
 
   @doc "All providers (built-in + registered)."
@@ -55,6 +56,9 @@ defmodule Nexus.Browse do
 
   @doc "Fetch + freeze + render a URL to readable text (in-wasm Blitz, CSS-aware, no JS)."
   def render(url, opts \\ []), do: route(:render, [url, opts])
+
+  @doc "Harvest media references (images/videos/audio) from a page, filtered. See `Nexus.Browse.Media`."
+  def harvest(url, opts \\ []), do: route(:harvest, [url, opts])
 
   @doc """
   The default read rung: fetch + cheap Floki DOM-extract (text/markdown/links, pure BEAM, NO wasm).

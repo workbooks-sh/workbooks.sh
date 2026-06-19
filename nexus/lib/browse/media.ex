@@ -1,48 +1,128 @@
 defmodule Nexus.Browse.Media do
   @moduledoc """
-  EXPLORATION SPIKE — harvesting media files off a page via the browse/network layer.
+  Harvest + pull media files off a page — a `Nexus.Browse` capability (`:harvest`).
 
-  Two ideas, both leaning on the fact that ALL network egress goes through ONE brokered chokepoint
-  (`Nexus.Dock.fetch/1`):
+  Everything leans on the one brokered egress chokepoint, `Nexus.Dock.fetch/1`. Three rungs:
 
-    1. `harvest/2` — parse a page (the same host-brokered fetch the scraper uses) for every media
-       reference a real browser would request: `<img src/srcset/data-src>`, `<picture><source>`,
-       `<video src/poster>`, `<audio>`, `og:image`/`twitter:image`, and CSS `url(...)` backgrounds.
-       Resolve them to absolute URLs and bucket by kind. Reliable for static + CSS media.
+    * `harvest/2` — parse a page for every media reference a browser would request (`<img
+      src/srcset/data-src>`, `<picture><source>`, `<video src/poster>`, `<audio>`, `og:image`/
+      `twitter:image`, CSS `url(...)`), resolve to absolute URLs, bucket by kind, apply **filters**.
+    * `get/2` — download one file's bytes through the broker, **cached** (so a repeat pull is free),
+      with the real type sniffed from magic bytes.
+    * `pull/2` — harvest → filter → download the matching objects (cached, concurrent), with
+      post-download size filters. "Get me the real objects, just the ones I want."
 
-    2. `fetch/1` — pull a media file's BYTES through the broker and sniff its real type from magic
-       bytes (proving we can download the file, not just find the URL).
+  Filters (opts, all optional): `:kinds` (`[:image,:video,:audio]`), `:ext` (`["jpg","mp4",…]`),
+  `:include`/`:exclude` (URL substrings), `:limit` (per kind). `pull` adds `:max` (total to
+  download), `:concurrency`, `:min_bytes`/`:max_bytes`.
 
-  This is the "HAR-lite" rung: it captures what's *declared* in the page. A FULL HAR (every resource
-  a JS-driven page actually requests, incl. lazy-load/play-on-demand) needs a real JS browser with
-  network interception — see the feasibility note in `docs/MEDIA-HARVEST-SPIKE.md`. Not wired into
-  the agent swarm; this is a capability probe.
+  LIMIT: this captures what the page *declares* (static + CSS). JS lazy-load / play-on-demand media
+  needs a real JS browser with network interception (CDP/kernel.sh) — see docs/MEDIA-HARVEST-SPIKE.md.
   """
+  @behaviour Nexus.Browse
 
-  @doc "Harvest media references from `url`. Returns `{:ok, %{images, videos, audio, count}}`."
+  @impl true
+  def capabilities, do: [:harvest]
+
+  @impl true
+  @doc "Harvest media references from `url`, filtered. `{:ok, %{images, videos, audio, count}}`."
   def harvest(url, opts \\ []) do
+    kinds = opts[:kinds] || [:image, :video, :audio]
+
     with {:ok, html} <- Nexus.Browse.fetch(url, opts),
          {:ok, doc} <- Floki.parse_document(html) do
-      images = abs_all(img_srcs(doc) ++ css_urls(html), url)
-      videos = abs_all(media_srcs(doc, "video") ++ Floki.attribute(Floki.find(doc, "video"), "poster"), url)
-      audio = abs_all(media_srcs(doc, "audio"), url)
+      images = if :image in kinds, do: filter(abs_all(img_srcs(doc) ++ css_urls(html), url), opts), else: []
+      videos = if :video in kinds, do: filter(abs_all(media_srcs(doc, "video") ++ Floki.attribute(Floki.find(doc, "video"), "poster"), url), opts), else: []
+      audio = if :audio in kinds, do: filter(abs_all(media_srcs(doc, "audio"), url), opts), else: []
 
       {:ok, %{images: images, videos: videos, audio: audio, count: length(images) + length(videos) + length(audio)}}
     end
   end
 
-  @doc "Download a media file through the broker; sniff its real type. `{:ok, %{type, bytes, data}}`."
-  def fetch(url) do
-    case Nexus.Browse.fetch(url) do
-      {:ok, body} when is_binary(body) and byte_size(body) > 0 ->
-        {:ok, %{type: sniff(body), bytes: byte_size(body), data: body}}
+  @doc "Download a media file through the broker (content-addressed cached). `{:ok, %{url, type, bytes, data}}`."
+  def get(url, opts \\ []) do
+    if opts[:cache] == false do
+      download(url)
+    else
+      t = Nexus.Cache.default_tenant()
 
-      {:ok, _} ->
-        {:error, :empty}
+      case Nexus.Cache.get(t, "media", url) do
+        # the cache is byte-oriented — we store the raw media bytes and rebuild the metadata here
+        {:ok, body} when is_binary(body) ->
+          {:ok, obj(url, body)}
 
-      other ->
-        other
+        _ ->
+          with {:ok, %{data: body} = o} <- download(url) do
+            Nexus.Cache.put(t, "media", url, body)
+            {:ok, o}
+          end
+      end
     end
+  end
+
+  @doc """
+  Harvest + filter + download the matching media (cached, concurrent). `{:ok, [%{url,type,bytes,data}]}`.
+  Honors all `harvest/2` filters plus `:max` (total objects, default 24), `:concurrency` (default 6),
+  `:min_bytes`/`:max_bytes` (post-download size gate).
+  """
+  def pull(url, opts \\ []) do
+    with {:ok, m} <- harvest(url, opts) do
+      urls = (m.images ++ m.videos ++ m.audio) |> Enum.take(opts[:max] || 24)
+
+      objs =
+        urls
+        |> Task.async_stream(&get(&1, opts), max_concurrency: opts[:concurrency] || 6, timeout: 30_000, on_timeout: :kill_task)
+        |> Enum.flat_map(fn
+          {:ok, {:ok, obj}} -> [obj]
+          _ -> []
+        end)
+        |> Enum.filter(&size_ok(&1, opts))
+
+      {:ok, objs}
+    end
+  end
+
+  # ── download (the one place bytes are pulled) ─────────────────────────────────────────────────
+
+  defp download(url) do
+    case Nexus.Browse.fetch(url) do
+      {:ok, body} when is_binary(body) and byte_size(body) > 0 -> {:ok, obj(url, body)}
+      {:ok, _} -> {:error, :empty}
+      other -> other
+    end
+  end
+
+  defp obj(url, body), do: %{url: url, type: sniff(body), bytes: byte_size(body), data: body}
+
+  # ── filters ──────────────────────────────────────────────────────────────────────────────────
+
+  defp filter(list, opts) do
+    inc = List.wrap(opts[:include])
+    exc = List.wrap(opts[:exclude])
+
+    list
+    |> Enum.filter(&(ext_ok(&1, opts[:ext]) and inc_ok(&1, inc) and not has?(&1, exc)))
+    |> maybe_take(opts[:limit])
+  end
+
+  defp ext_ok(_u, nil), do: true
+  defp ext_ok(_u, []), do: true
+
+  defp ext_ok(u, exts) do
+    path = u |> String.split("?") |> hd() |> String.downcase()
+    Enum.any?(exts, &String.ends_with?(path, "." <> (to_string(&1) |> String.trim_leading("."))))
+  end
+
+  defp inc_ok(_u, []), do: true
+  defp inc_ok(u, subs), do: has?(u, subs)
+  defp has?(u, subs), do: Enum.any?(subs, &String.contains?(String.downcase(u), String.downcase(to_string(&1))))
+
+  defp maybe_take(list, nil), do: list
+  defp maybe_take(list, n) when is_integer(n), do: Enum.take(list, n)
+
+  defp size_ok(o, opts) do
+    (opts[:min_bytes] == nil or o.bytes >= opts[:min_bytes]) and
+      (opts[:max_bytes] == nil or o.bytes <= opts[:max_bytes])
   end
 
   # ── media reference extraction ───────────────────────────────────────────────────────────────
@@ -64,7 +144,7 @@ defmodule Nexus.Browse.Media do
       Floki.attribute(Floki.find(doc, "#{tag} source"), "src")
   end
 
-  # `srcset="a.jpg 1x, b.jpg 2x"` → ["a.jpg", "b.jpg"] (the URL is the first token of each candidate)
+  # `srcset="a.jpg 1x, b.jpg 2x"` → ["a.jpg", "b.jpg"] (URL is the first token of each candidate)
   defp srcset(el) do
     case Floki.attribute([el], "srcset") do
       [set | _] -> set |> String.split(",") |> Enum.map(&(&1 |> String.trim() |> String.split() |> List.first())) |> Enum.reject(&is_nil/1)
@@ -72,14 +152,10 @@ defmodule Nexus.Browse.Media do
     end
   end
 
-  defp meta(doc, attr, val) do
-    Floki.find(doc, "meta[#{attr}=\"#{val}\"]") |> Floki.attribute("content")
-  end
+  defp meta(doc, attr, val), do: Floki.find(doc, "meta[#{attr}=\"#{val}\"]") |> Floki.attribute("content")
 
-  # CSS `url(...)` backgrounds from inline <style> + style="" attributes (crude but catches bg media).
-  defp css_urls(html) do
-    Regex.scan(~r/url\(\s*['"]?([^'")]+)['"]?\s*\)/i, html) |> Enum.map(fn [_, u] -> u end)
-  end
+  # CSS `url(...)` backgrounds from inline <style> + style="" attributes.
+  defp css_urls(html), do: Regex.scan(~r/url\(\s*['"]?([^'")]+)['"]?\s*\)/i, html) |> Enum.map(fn [_, u] -> u end)
 
   # ── url resolution + type sniffing ──────────────────────────────────────────────────────────
 
@@ -93,6 +169,7 @@ defmodule Nexus.Browse.Media do
 
   defp absolutize(ref, base) do
     ref = String.trim(ref)
+
     cond do
       ref == "" -> nil
       String.starts_with?(ref, "//") -> "https:" <> ref
