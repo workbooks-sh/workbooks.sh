@@ -1,0 +1,56 @@
+# What is the Nexus
+
+The **Nexus is the engine you own.** It runs your workbooks — on your Mac, on a
+server, or in the cloud — and connects them to your data, your services, and each
+other. A [workbook](/introduction/what-is-a-workbook) is the thing you build; the
+Nexus is the thing that runs it.
+
+## One command, dev is prod
+
+One command starts the Nexus and it serves your workbook. There's no separate
+"production setup" to graduate to later. The engine you run on your laptop while
+you're sketching is the *same engine* that runs the finished product at scale —
+**dev is prod**. The prototype becomes the deployment without a rewrite.
+
+You'll find the exact command in [Running the Nexus](/deploy/running-the-nexus).
+
+## Everything runs isolated
+
+Inside the Nexus, every moving part is its own isolated process — each agent, each
+tenant, each piece of running code. This comes from the BEAM (the runtime behind
+Elixir, originally built to keep phone networks up), and from running untrusted
+code inside WebAssembly sandboxes. An agent can build, run, and rebuild inside that
+boundary without ever reaching your keys, your files, or anyone else's work.
+
+The same engine backs all the lanes of a workbook: the `server` units that run on
+it, the agents, the data, sync between clients, and the compile/weave step that
+turns `.work` files into running software.
+
+## The economics: scale by RAM
+
+Here's the part that matters when you do the math. The usual way to build for scale
+— microservices and serverless — costs an arm and a leg as you grow: every service
+is a deployment, every function call is billed, and the glue between them is its own
+tax.
+
+A workbook on the Nexus scales differently. Because everything runs as lightweight
+isolated processes inside one engine, **you scale by memory** — give the Nexus more
+RAM and it holds more. That is dramatically cheaper than scaling out a fleet of
+services, and it's a single system to reason about instead of a maze.
+
+And it's multi-tenant from the start. What you prototype deploys as a real
+multi-tenant production app *immediately* — there's no "now make it
+production-grade" phase, because the thing you built on day one already runs the way
+it will run at scale. Building on the Nexus is a head start precisely because
+production behaves exactly like your prototype.
+
+This is [radical simplicity](/introduction/literate-programming) applied to the
+runtime: one engine instead of a microservices maze.
+
+## Yours to run anywhere
+
+The Nexus is portable — a Mac, a Linux box, a VPS, or the cloud, on your own
+account. You choose where it runs, and it carries the whole journey with it. See
+[Deploy: local and cloud](/deploy/deploy-local-and-cloud) for the two canonical
+targets, or [Workbooks Cloud](/introduction/what-is-workbooks-cloud) if you'd
+rather we run it for you.

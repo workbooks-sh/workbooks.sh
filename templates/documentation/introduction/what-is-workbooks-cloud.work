@@ -1,0 +1,44 @@
+# What is Workbooks Cloud
+
+[The Nexus](/introduction/what-is-the-nexus) is yours to run anywhere. **Workbooks
+Cloud is us running it for you** — a managed Nexus with a portal in front of it, so
+you can ship a workbook without standing up any infrastructure yourself.
+
+## A managed Nexus + a portal
+
+Cloud is the same engine described everywhere else in these docs, hosted and kept
+running on your behalf. The portal is where you manage it: you work inside a
+**Nexus** (your isolated unit, roughly an organization — cloud or local) and
+organize work into **workspaces** under it. You deploy a workbook, it runs, and the
+data, storage, and scaling are handled for you.
+
+## When to use Cloud vs running it yourself
+
+Reach for **Cloud** when you want the workbook live without thinking about servers —
+the fastest path from `work weave` to a URL.
+
+Run it **yourself** when you want the Nexus on your own machine or your own cloud
+account — see [Deploy: local and cloud](/deploy/deploy-local-and-cloud). Nothing is
+locked away: the engine is the same in both places, so you can start on Cloud and
+move to your own infrastructure later, or the reverse.
+
+There's also a middle path — **bring your own infrastructure.** You can point a
+managed Nexus at your own storage and database and pay for compute only, instead of
+handing us the whole stack. Same engine, your backend.
+
+## What it costs to reason about
+
+Workbooks Cloud is priced around what you actually use — storage and compute — not
+per seat, so adding people doesn't change the bill. Because a workbook
+[scales by memory](/introduction/what-is-the-nexus) rather than by spinning up a
+fleet of services, the cost curve stays far flatter than the usual per-service,
+per-seat stack.
+
+## Open the portal
+
+The portal is where you sign in, create a Nexus, and deploy. Start at
+[workbooks.sh](https://workbooks.sh).
+
+> These docs stay deliberately conceptual about Cloud. The portal's own screens —
+> workspaces, members, billing, storage — are documented in the portal itself,
+> where they're always current.

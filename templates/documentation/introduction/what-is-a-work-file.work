@@ -1,0 +1,61 @@
+# What is a .work file
+
+A `.work` file is a **literate document**: plain prose with runnable blocks mixed
+in. It is not a new programming language you have to learn. It's a way to write
+[literate programming](/introduction/literate-programming) source that compiles the
+languages you already use.
+
+## Prose narrates, blocks run
+
+Open any `.work` file and you'll see two things. Paragraphs — ordinary text that
+explains what's going on. And blocks — each one opens with a header and ends with
+`end`:
+
+server greet :hello do
+  def run(name), do: "hello, #{name}"
+end
+
+The prose is for the reader. The block runs. That's the whole format.
+
+## The first word names the kind
+
+Every block header reads the same way: **`<kind> [lang] :name … do … end`**.
+
+- The **kind** comes first — it says what this block *is* and where it runs
+  (`server`, `client`, `sandbox`, `data`, `def`, `agent`, `resource`, and more).
+- The **language** is optional and names what the body is written in.
+- The **`:name`** is how other blocks and your prose refer to it.
+
+So `sandbox python :scrape do … end` is a block named `scrape`, running Python,
+placed in a capability sandbox. The body inside is real Python.
+
+## Any language we support
+
+A block's body can be written in any of these — and the `work` toolchain compiles
+it:
+
+`elixir` · `rust` · `zig` · `c` · `cpp` · `python` · `go` · `js` · `ts` ·
+`svelte` · `solid`
+
+This is the lesson that surprises people: you can write a Svelte component in a
+`.work` file. The literate document is the authoring surface; the languages inside
+are whatever fits the job.
+
+## It's a real tree, not text matching
+
+One quiet but important detail: a `.work` file isn't parsed by guessing with
+regexes. The `do … end` block is the delimiter, and a block parses into a real
+syntax tree — kind, language, name, and body all come from the structure, not a
+pattern match. The same single parse is shared by everything that reads a workbook:
+the viewer that highlights it, the tool that maps dependencies between blocks, and
+the check that audits capabilities. One source of truth, read the same way every
+time.
+
+## Links that hold a workbook together
+
+Inside prose you can reference other things directly: `[[backlinks]]` to other
+blocks or pages, `:atoms` and `@types` you mention inline, `#tags`, and `work://`
+links across the workbook. These aren't decoration — they're how the document
+knits itself into a graph the tools can follow.
+
+Next: see all four lanes laid out in [Anatomy of a .work file](/language/anatomy).

@@ -1,0 +1,45 @@
+# Workbooks Documentation
+
+The docs site for Workbooks, authored as a workbook — prose narrates, `do … end`
+blocks run. This `index.work` is the **composition root**: it names the app, its
+theme, and the ordered pages the sidebar shows. `work weave` (site-mode) reads
+this file plus the sibling pages and emits a full single-page app — driven by our
+own language-agnostic router — as the workbook output.
+
+> Skeleton. The site-mode weave + central router are not built yet; the `app`
+> declaration below is the intended shape, not a finished schema.
+
+app :docs do
+  title  "Workbooks"
+  theme  :paper_ink            # petal mark, DNA strip, dark/light, Geist + mono
+  router :history              # real path routes + host catch-all → this SPA
+
+  section "Introduction" do
+    page "introduction/literate-programming"
+    page "introduction/what-is-a-workbook"
+    page "introduction/what-is-a-work-file"
+    page "introduction/what-is-the-nexus"
+    page "introduction/what-is-the-work-cli"
+    page "introduction/what-is-workbooks-cloud"
+  end
+
+  section "The .work language" do
+    page "language/anatomy"
+    page "language/block-grammar"
+    page "language/prose-and-refs"
+    page "language/declarations"
+    page "language/placement-and-languages"
+    page "language/kinds-reference"
+    page "language/elixir-in-markdown"
+  end
+
+  section "Running & deploying" do
+    page "deploy/running-the-nexus"
+    page "deploy/deploy-local-and-cloud"
+    page "deploy/workbooks-cloud"
+  end
+
+  section "Agents & tooling" do
+    page "tooling/get-started-with-your-cli-agent"
+  end
+end
