@@ -29,6 +29,12 @@ defmodule Nexus.WorkspaceTest do
     assert {:ok, bytes} = Nexus.Workspace.backup("tenant1", ws, "ws1/backup.bundle")
     assert bytes > 0
 
+    # Real metering: the tenant's cold-storage footprint reflects the backup.
+    assert Nexus.Storage.cold_bytes("tenant1") >= bytes
+    assert Nexus.Storage.cold_bytes("other-tenant") == 0
+    assert %{used_bytes: u, limit_gb: 5} = Nexus.Storage.report("tenant1", 5)
+    assert u >= bytes
+
     dest = Path.join(System.tmp_dir!(), "wsr_#{System.unique_integer([:positive])}")
     on_exit(fn -> File.rm_rf!(dest) end)
     assert Nexus.Workspace.restore("tenant1", "ws1/backup.bundle", dest) == :ok
@@ -36,5 +42,14 @@ defmodule Nexus.WorkspaceTest do
     # the restored repo has the file and the commit
     assert File.read!(Path.join(dest, "a.work")) == "# Page\n"
     assert [%{message: "add a.work"} | _] = Nexus.Git.log(dest)
+  end
+
+  test "Capacity uses real measured storage bytes when provided (else showcase)" do
+    nx = %{id: "nx_x", plan: "starter", state: "running"}
+    real = Nexus.Capacity.report(nx, storage_bytes: 3_000_000_000)
+    assert real.storage.used == 3
+    # No measured bytes → falls back to the deterministic showcase (non-crashing, has a dial).
+    showcase = Nexus.Capacity.report(nx)
+    assert is_integer(showcase.storage.used)
   end
 end

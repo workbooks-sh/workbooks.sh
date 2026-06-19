@@ -31,13 +31,20 @@ defmodule Nexus.Capacity do
     }
   end
 
-  def report(nx) do
+  def report(nx, opts \\ []) do
     tier = Pricing.tier(nx[:plan] || "starter")
     running? = nx[:state] == "running"
     seed = :erlang.phash2(nx[:id] || "nx")
 
     ram_used = if running?, do: scaled(seed, tier.ram_mb, 0.55, 0.97), else: 0
-    storage_used = scaled(seed >>> 3, tier.storage_gb, 0.30, 0.95)
+
+    # Real metering when the tenant runtime reports measured bytes (Nexus.Storage);
+    # otherwise the deterministic showcase value, until the usage-report channel lands.
+    storage_used =
+      case Keyword.get(opts, :storage_bytes) do
+        b when is_integer(b) -> round(b / 1_000_000_000)
+        _ -> scaled(seed >>> 3, tier.storage_gb, 0.30, 0.95)
+      end
 
     ram_dial = dial(ram_used, tier.ram_mb, "MB")
     storage_dial = dial(storage_used, tier.storage_gb, "GB")
