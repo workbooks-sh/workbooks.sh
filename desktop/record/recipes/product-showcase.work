@@ -1,0 +1,97 @@
+# Workbooks — product showcase
+
+# A fast, hard-cut tour of the desktop app: real distinct apps, the literate
+# Rendered⇄Source seam, panes side by side, and an agent building an app live
+# from a sentence. Moves quick — short dwells, no dead air.
+
+demo :product-showcase do
+  target: web
+  url: http://localhost:5178/
+  fps: 30
+  viewport: 1440x900
+  verify_frames: 16
+end
+
+# ── real apps, fast cuts ─────────────────────────────────────────────────────
+cue "00:00", :navigate do
+  Real software — built in workbooks.
+  url: http://localhost:5178/
+  wait_until: networkidle
+end
+
+cue "00:02", :click do
+  Ask anything, and a swarm of agents researches it live.
+  selector: text="Swarm"
+  checkpoint: a dark multi-agent research console is open, agents working
+end
+
+cue "00:07", :click do
+  A finance dashboard.
+  selector: text="Ledger"
+  checkpoint: a light finance dashboard with a balance and cashflow chart is open
+end
+
+cue "00:10", :click do
+  Product analytics.
+  selector: text="Pulse"
+  checkpoint: a colorful analytics dashboard with charts is open
+end
+
+cue "00:13", :click do
+  A project board.
+  selector: text="Kanban"
+  checkpoint: a kanban board with columns is open
+end
+
+# ── panes side by side ───────────────────────────────────────────────────────
+cue "00:16", :rightclick do
+  See them side by side.
+  selector: .tab:has-text("Pulse")
+end
+
+cue "00:18", :click do
+  selector: text="Split right"
+  checkpoint: the view is split into two panes showing two different apps
+end
+
+cue "00:20", :wait do
+  Many apps, one window.
+  ms: 1700
+end
+
+# ── talk to an agent — build an app live ─────────────────────────────────────
+cue "00:23", :navigate do
+  Or just describe what you want.
+  url: http://localhost:5178/
+  wait_until: networkidle
+end
+
+cue "00:25", :type do
+  selector: [placeholder="What would you like to do?"]
+  text: Build a habit tracker with a weekly grid
+  per_key_ms: 34
+end
+
+cue "00:29", :click do
+  Waldo builds it — a real app, from a sentence.
+  selector: button[type=submit]
+  checkpoint: an agent chat thread is running, building a workbook
+end
+
+cue "00:35", :wait do
+  A real habit tracker, built on the spot.
+  ms: 3600
+  checkpoint: a real habit-tracker app with a weekly grid is open in a tab
+end
+
+# ── everything one keystroke away ────────────────────────────────────────────
+cue "00:39", :click do
+  Everything you've made — one keystroke away.
+  selector: button[aria-label="Search"]
+  checkpoint: a search drawer is open showing a feed of file cards
+end
+
+cue "00:42", :wait do
+  Workbooks — every app, every agent, one window.
+  ms: 2400
+end

@@ -145,6 +145,48 @@ function componentHtml(title: string, prompt: string, revision: number): string 
 </body></html>`;
 }
 
+/** Real, self-contained apps the scripted Waldo "builds" for recognized
+ *  requests — so the browser-preview create flow renders an ACTUAL app (not a
+ *  generic counter card) for the showcase. Unmatched prompts fall back to the
+ *  generic component card. Each html is a single-file workbook that animates on
+ *  load so the just-built app reads as alive on camera. */
+const DEMO_BUILDS: { match: RegExp; title: string; html: string }[] = [
+  {
+    match: /habit|streak|routine|daily/i,
+    title: "Habit Tracker",
+    html: `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Habit Tracker</title><style>
+:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;font:14px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;color:#14161a;background:#f6f7f9;padding:22px}
+.head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.head h1{margin:0;font-size:19px;letter-spacing:-.01em}.head .wk{color:#6b7280;font-size:12px}
+.summary{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #e8eaee;border-radius:14px;padding:14px 18px;margin-bottom:16px}
+.ring{--p:0;width:48px;height:48px;border-radius:50%;background:conic-gradient(#12a150 calc(var(--p)*1%),#eef0f3 0);display:grid;place-items:center;transition:--p .9s ease}
+.ring::after{content:"";width:38px;height:38px;border-radius:50%;background:#fff}.ring b{position:absolute;font:600 12px/1 ui-monospace,monospace;color:#12a150}
+.summary .lbl{font-weight:600}.summary .sub{color:#6b7280;font-size:12px}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e8eaee;border-radius:14px;overflow:hidden}
+th,td{padding:0;text-align:center}thead th{font:600 11px/1 ui-sans-serif;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;padding:12px 0}
+thead th:first-child{text-align:left;padding-left:18px}tbody td:first-child{text-align:left;padding-left:18px;font-weight:600}
+tbody tr{border-top:1px solid #eef0f3}tbody td{height:52px}
+.cell{width:26px;height:26px;border-radius:50%;border:2px solid #dfe2e7;margin:0 auto;display:grid;place-items:center;cursor:pointer;transition:.18s}
+.cell.on{background:#12a150;border-color:#12a150;transform:scale(1)}
+.cell svg{width:14px;height:14px;color:#fff;opacity:0;transform:scale(.4);transition:.18s}.cell.on svg{opacity:1;transform:scale(1)}
+.streak{font:600 12px/1 ui-monospace,monospace;color:#12a150}.streak span{color:#9aa0aa}
+</style></head><body>
+<div class="head"><h1>Habit Tracker</h1><span class="wk">This week · Jun 16 – 22</span></div>
+<div class="summary"><div class="ring" id="ring"><b id="ringt">0%</b></div><div><div class="lbl" id="cnt">0 of 35 done</div><div class="sub">Keep the streak alive — tap a day to check it off.</div></div></div>
+<table><thead><tr><th>Habit</th><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th><th>S</th><th>Streak</th></tr></thead><tbody id="body"></tbody></table>
+<script>
+const HABITS=[["Drink water",[1,1,1,1,1,0,0]],["Read 20 min",[1,1,0,1,1,1,0]],["Workout",[1,0,1,0,1,0,0]],["Inbox zero",[1,1,1,1,0,0,0]],["Sleep by 11",[0,1,1,1,1,1,0]]];
+const CHK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const body=document.getElementById('body');const cells=[];
+HABITS.forEach(([name,days])=>{const tr=document.createElement('tr');let html='<td>'+name+'</td>';days.forEach(()=>html+='<td></td>');let run=0,s=0;days.forEach(v=>{run=v?run+1:0;if(run>s)s=run});html+='<td><span class="streak">'+s+'<span> d</span></span></td>';tr.innerHTML=html;
+days.forEach((v,i)=>{const c=document.createElement('div');c.className='cell';c.innerHTML=CHK;c.onclick=()=>{c.classList.toggle('on');recount()};tr.children[i+1].appendChild(c);cells.push([c,v])});body.appendChild(tr)});
+function recount(){const on=document.querySelectorAll('.cell.on').length;const pct=Math.round(on/35*100);document.getElementById('cnt').textContent=on+' of 35 done';document.getElementById('ring').style.setProperty('--p',pct);document.getElementById('ringt').textContent=pct+'%'}
+// animate the pre-set checks filling in on load
+let i=0;const seed=cells.filter(([,v])=>v);(function tick(){if(i<seed.length){seed[i][0].classList.add('on');i++;recount();setTimeout(tick,55)}})();
+</script></body></html>`,
+  },
+];
+
 /** Track how many times each artifact path has been produced this session
  *  so a follow-up reads as an "update" (rev N+1) rather than a new file. */
 const revisions = new Map<string, number>();
@@ -187,8 +229,13 @@ export async function runMockComponentAgent(
   const intent = detectIntent(prompt);
 
   if (intent === "create") {
-    // Create + open a workbook, then confirm with an inline component card.
-    const { path, title } = artifactPathFor(prompt);
+    // Create + open a workbook, then confirm with an inline component card. A
+    // recognized request ("build a habit tracker") yields a REAL app; anything
+    // else falls back to the generic component card.
+    const demo = DEMO_BUILDS.find((d) => d.match.test(prompt));
+    const derived = artifactPathFor(prompt);
+    const path = derived.path;
+    const title = demo?.title ?? derived.title;
     const rev = (revisions.get(path) ?? 0) + 1;
     revisions.set(path, rev);
     const action = rev === 1 ? "created" : "updated";
@@ -197,7 +244,7 @@ export async function runMockComponentAgent(
       metadata: { tool_name: "workbook_create", tool_call_id: `tc-${rev}`, args: { title } },
     });
     await sleep(420);
-    componentArtifacts.register(path, componentHtml(title, prompt, rev));
+    componentArtifacts.register(path, demo ? demo.html : componentHtml(title, prompt, rev));
     emit("tool_call_stop", {
       metadata: { tool_name: "workbook_create", tool_call_id: `tc-${rev}`, status: "ok", result_size: 1 },
     });
