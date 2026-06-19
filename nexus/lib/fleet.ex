@@ -208,7 +208,9 @@ defmodule Nexus.Fleet do
              on_event: on_event,
              timeout_ms: timeout
            ) do
-        {:ok, answer} when is_binary(answer) and answer != "" -> clean(answer, 600)
+        # Nexus.Agent.run returns {:ok, %{answer, turns, vfs_files}} — pull the answer out of the map.
+        {:ok, %{answer: a}} when is_binary(a) and a != "" -> clean(a, 600)
+        {:ok, a} when is_binary(a) and a != "" -> clean(a, 600)
         _ -> ""
       end
 
