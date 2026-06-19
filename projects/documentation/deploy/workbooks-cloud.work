@@ -1,3 +1,28 @@
 # Workbooks Cloud
 
-_Skeleton — content to be authored. Intent: the managed/hosted nexus (cross-links the intro Cloud page)_
+[Deploying yourself](/deploy/deploy-local-and-cloud) puts the Nexus on your machine
+or your own cloud account. **Workbooks Cloud is the managed alternative** — we run
+the [Nexus](/introduction/what-is-the-nexus) for you, so deploying is just pushing a
+workbook to a runtime that already exists.
+
+If you haven't met it yet, start with the concept:
+[What is Workbooks Cloud](/introduction/what-is-workbooks-cloud).
+
+## When to choose it
+
+Reach for Cloud when you want the workbook live without standing up or maintaining
+any infrastructure — the shortest path from a folder of `.work` files to a URL. You
+skip the `work deploy apply` step entirely; the managed Nexus is already running.
+
+## It's the same engine
+
+Nothing about your workbook changes for Cloud. It's the same engine you'd run
+locally or on Fly, so you can move between managed Cloud and your own
+infrastructure later without a rewrite. You can even bring your own storage and
+database and let Cloud handle only the compute.
+
+## Get started
+
+Sign in, create a Nexus, and deploy from the portal at
+[workbooks.sh](https://workbooks.sh). The portal's own screens stay documented in
+the portal, where they're always current.

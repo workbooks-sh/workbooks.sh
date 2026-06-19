@@ -1,3 +1,33 @@
 # Running the Nexus
 
-_Skeleton — content to be authored. Intent: the engine, locally, in one command_
+The fastest way to see a workbook run is the **push-to-live loop**: point
+[`work dev`](/introduction/what-is-the-work-cli) at your folder and keep editing.
+
+work dev .
+
+`work dev` weaves the workbook once, then watches the tree. Every time you save a
+`.work` file it re-weaves — and when a [Nexus](/introduction/what-is-the-nexus) is
+configured, it hot-swaps the change in for an instant reload. You write; the running
+page updates. That's the whole loop.
+
+## What "running" means here
+
+There are two things you might mean by "running a workbook," and they line up with
+two commands:
+
+- **Iterating** — `work dev` gives you the live edit loop above. This is where you
+  spend most of your time: write prose and blocks, watch them come alive.
+- **Standing up a real runtime** — when you want an actual Nexus serving the
+  workbook (local container or cloud), that's [`work deploy`](/deploy/deploy-local-and-cloud).
+  Same engine, but a durable runtime rather than a watch loop.
+
+## Dev is prod
+
+The reason this matters: the engine behind `work dev` is the *same* engine you
+deploy. There's no separate "production mode" to learn later — the behavior you see
+locally is the behavior you get at scale. You're not building a toy that you'll
+rewrite for production; you're building the production thing, just on your own
+machine first.
+
+When you're ready to put it somewhere durable, head to
+[Deploy: local and cloud](/deploy/deploy-local-and-cloud).
