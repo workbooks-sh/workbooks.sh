@@ -1,12 +1,10 @@
 <script lang="ts">
   /**
-   * Mounts the REAL `<work-*>` custom element an agent emitted inline. Generic
-   * over any tag in the SDK (importing the workponents index registers them all).
-   * Structured: tag + attrs set as attributes, body as textContent — we never
-   * `{@html}` raw model output.
+   * Mounts an inline element an agent emitted in chat: tag + attrs as
+   * attributes, body as textContent — never `{@html}` raw model output. An
+   * unknown tag renders its text body inline (graceful), so the chat stays
+   * readable without any custom-element registry.
    */
-  import "$workponents/index.js";
-
   let {
     tag,
     attrs,
