@@ -32,7 +32,27 @@ defmodule Nexus.SSR do
   def render(root, opts \\ []) do
     pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
     ctx = %{tenant: Keyword.get(opts, :tenant, Nexus.Store.default_tenant()), bake: Keyword.get(opts, :bake, true)}
-    compose(pages, resources(pages), Keyword.get(opts, :live, false), ctx)
+
+    # An `app :docs do … section … page … end` block is a docs SITE: render the navigable SPA
+    # (sidebar + routed pages) instead of a single app/document.
+    case app_node(pages) do
+      nil -> compose(pages, resources(pages), Keyword.get(opts, :live, false), ctx)
+      app -> Nexus.Docs.render(root, app, ctx, &render_node/3, &page_title/1)
+    end
+  end
+
+  defp app_node(pages) do
+    Enum.find_value(pages, fn {_f, nodes} ->
+      Enum.find(nodes, &(&1.type == :code and &1.kind == "app"))
+    end)
+  end
+
+  @doc false
+  def page_title(nodes) do
+    Enum.find_value(nodes, "", fn
+      %{type: :heading, text: t} -> t
+      _ -> nil
+    end)
   end
 
   # index.work is the composition root — it leads; the rest follow alphabetically.
