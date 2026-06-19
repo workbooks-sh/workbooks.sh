@@ -21,6 +21,8 @@ defmodule Nexus.Config do
         cache-hot-max-mb="64"          # Nexus.Cache hot-tier ETS byte budget (LRU-bounded)
         cache-default-ttl="3600"       # Nexus.Cache cold-tier shelf-life, seconds
         cache-cold="cache"             # cold-tier backend: a local path (→ Local) OR r2://bucket/prefix (→ R2)
+        search="metasearch"            # :search provider: metasearch (keyless, local/dev) | brave (keyed, cloud)
+        search-engines="ddg mojeek startpage"  # which keyless engines metasearch fans out to
         pm-debug="off" />
   """
   @key {__MODULE__, :cfg}
@@ -70,6 +72,12 @@ defmodule Nexus.Config do
   # bucket URI (→ Nexus.Cache.Cold.R2). Mirrors `component-cache`: the operator picks cloud-vs-local
   # ONCE in <work-deploy>, and the same tier logic runs either way. Default: "cache" under data_dir.
   def cache_cold, do: get(:cache_cold)
+  # Web-search provider: "metasearch" (keyless default) | "brave" | "exa" | "tavily" | "searxng".
+  def search, do: get(:search)
+  # Which keyless engines Metasearch fans out to (names: ddg mojeek startpage bing).
+  def search_engines, do: get(:search_engines)
+  # The base URL for the "searxng" provider only (an operator's self-hosted instance).
+  def search_endpoint, do: get(:search_endpoint)
 
   # ── parse ─────────────────────────────────────────────────────────────────────────────────────
   defp parse(html) do
@@ -87,7 +95,13 @@ defmodule Nexus.Config do
       pm_debug: bool(attr(html, "pm-debug"), false),
       cache_hot_max_mb: int(attr(html, "cache-hot-max-mb"), 64),
       cache_default_ttl: int(attr(html, "cache-default-ttl"), 3600),
-      cache_cold: attr(html, "cache-cold") || default_cold_dir()
+      cache_cold: attr(html, "cache-cold") || default_cold_dir(),
+      # Web-search provider selection (the `:search` capability). Default = keyless metasearch
+      # (pure-BEAM fan-out, great local/dev). Cloud should set `search="brave"` (keyed API, reliable
+      # from datacenter IPs). The API key stays in env (BRAVE_API_KEY/…), like OPENROUTER_API_KEY.
+      search: attr(html, "search") || "metasearch",
+      search_engines: words(attr(html, "search-engines"), ~w(ddg mojeek startpage)),
+      search_endpoint: attr(html, "search-endpoint")
     }
   end
 

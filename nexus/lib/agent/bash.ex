@@ -49,6 +49,9 @@ defmodule Nexus.Agent.Bash do
       "render" -> web_render(args)
       # in-wasm Blitz render: screenshot <url> [out.png] → a PNG in /work.
       "screenshot" -> web_screenshot(vfs, args)
+      # web search → ranked results via the registered :search provider (keyless metasearch by
+      # default, a keyed API in cloud). Numbered title + url + snippet, ready for the agent to scrape.
+      "search" -> web_search(args)
       # Tier-1 computer-use: operate a site by semantic action (browser-use model).
       "navigate" -> nav_result(Nexus.Browse.Session.navigate(List.first(args) || ""))
       "links" -> format_session(Nexus.Browse.Session.current(), :links)
@@ -78,6 +81,32 @@ defmodule Nexus.Agent.Bash do
           # last-resort tag-strip if even fetch+extract yielded nothing
           _ -> url |> web_fetch() |> html_to_text()
         end
+    end
+  end
+
+  # `search <query>` — web search through the registered :search provider → a numbered result list.
+  defp web_search([]), do: "search: usage: search <query>"
+
+  defp web_search(args) do
+    query = Enum.join(args, " ")
+
+    case Nexus.Browse.search(query) do
+      {:ok, []} ->
+        "search: no results for #{inspect(query)}"
+
+      {:ok, results} ->
+        results
+        |> Enum.with_index(1)
+        |> Enum.map_join("\n\n", fn {%{title: t, url: u} = r, i} ->
+          snippet = Map.get(r, :snippet, "")
+          "#{i}. #{t}\n   #{u}" <> if(snippet != "", do: "\n   #{snippet}", else: "")
+        end)
+
+      {:error, {:no_provider, :search}} ->
+        "search: no search provider configured (set <work-deploy search=…>)"
+
+      {:error, reason} ->
+        "search: failed (#{inspect(reason) |> String.slice(0, 80)})"
     end
   end
 

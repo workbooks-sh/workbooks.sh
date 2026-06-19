@@ -185,6 +185,7 @@ defmodule Nexus.Agent do
   defp web_capability do
     """
     THE WEB (core — use these in bash directly):
+      search <query>      — web search → a numbered list of {title, url, snippet} to then scrape
       scrape <url>        — a page's readable text (rendered in-sandbox, CSS-aware)
       scrape --js <url>   — same, but RUN the page's JavaScript first (real DOM, for client-rendered
                             SPAs); slower. Use when a plain scrape comes back empty/shell-only.

@@ -16,6 +16,9 @@ defmodule Nexus.Application do
     # Load runtime config from the deployment's <work-deploy> element (HTML source of truth) into
     # :persistent_term BEFORE the Gate reads its concurrency limit. No env vars for tunable config.
     Nexus.Config.boot()
+    # Register the selected `:search` provider behind the Nexus.Browse seam. Default = keyless
+    # metasearch (pure-BEAM, local/dev); `<work-deploy search="brave">` swaps in the keyed cloud API.
+    register_search_provider()
     # In the control-plane role, force WorkOS-JWT auth (org_id → tenant) from the deploy env — every
     # /api/platform caller must carry a real org identity (fail-closed; see Nexus.ControlPlane).
     Nexus.ControlPlane.configure_auth()
@@ -47,6 +50,18 @@ defmodule Nexus.Application do
 
   # PORT + WB_DATA are deploy injection (the orchestrator sets the port + the volume mount), like
   # WB_DATA elsewhere — infrastructure, not authored config.
+  # Select + register the configured `:search` provider (keyless metasearch is the safe default).
+  defp register_search_provider do
+    mod =
+      case Nexus.Config.search() do
+        "brave" -> Nexus.Browse.Search.Brave
+        "metasearch" -> Nexus.Browse.Search.Metasearch
+        _ -> Nexus.Browse.Search.Metasearch
+      end
+
+    Nexus.Browse.register(mod)
+  end
+
   defp port, do: String.to_integer(System.get_env("PORT") || "4000")
   defp root, do: System.get_env("WB_DATA") || File.cwd!()
 end

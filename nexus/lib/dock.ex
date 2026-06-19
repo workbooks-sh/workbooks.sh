@@ -81,6 +81,37 @@ defmodule Nexus.Dock do
     end
   end
 
+  @doc """
+  SSRF-guarded HTTPS GET with custom request `headers` (e.g. an `X-Subscription-Token` for a keyed
+  search API) → `{:ok, body}`. Verifies TLS via the OS trust store. Re-guards the host through the
+  same SSRF gate as `fetch/1` before egress. For the keyed search providers (Brave/Exa/Tavily).
+  """
+  def get(url, headers \\ []) do
+    if net_allowed?(url) do
+      :inets.start()
+      :ssl.start()
+
+      ssl_opts = [
+        verify: :verify_peer,
+        cacerts: :public_key.cacerts_get(),
+        customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)],
+        depth: 3
+      ]
+
+      hdrs = Enum.map(headers, fn {k, v} -> {String.to_charlist(to_string(k)), String.to_charlist(to_string(v))} end)
+      req = {String.to_charlist(url), hdrs}
+      http_opts = [ssl: ssl_opts, timeout: 30_000, connect_timeout: 15_000, autoredirect: true]
+
+      case :httpc.request(:get, req, http_opts, body_format: :binary) do
+        {:ok, {{_v, 200, _}, _h, body}} -> {:ok, body}
+        {:ok, {{_v, code, _}, _h, _body}} -> {:error, {:http_status, code}}
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      {:error, :blocked}
+    end
+  end
+
   # Loopback / private / link-local — the SSRF danger zone a unit must never reach.
   defp private_host?(h) do
     h in ["localhost", "127.0.0.1", "0.0.0.0", "::1", ""] or
