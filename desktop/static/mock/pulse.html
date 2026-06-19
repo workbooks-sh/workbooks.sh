@@ -169,21 +169,14 @@
         <h3>Traffic over time</h3>
         <div class="sub">Daily unique visitors · last 30 days</div>
       </div>
-      <svg id="trafficChart" width="100%" viewBox="0 0 640 200" preserveAspectRatio="none" style="display:block;height:200px;width:100%">
-        <defs>
-          <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#5b5bd6" stop-opacity="0.22"/>
-            <stop offset="100%" stop-color="#5b5bd6" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-      </svg>
+      <div style="height:200px;width:100%;position:relative"><canvas id="trafficChart"></canvas></div>
     </div>
 
     <!-- Lower -->
     <div class="lower">
       <div class="card">
         <div class="card-h"><h3>Top sources</h3><div class="sub">by sessions</div></div>
-        <div class="bars" id="sources"></div>
+        <div style="height:188px;width:100%;position:relative"><canvas id="sources"></canvas></div>
       </div>
       <div class="card">
         <div class="card-h"><h3>Top pages</h3><div class="sub">views · 30d</div></div>
@@ -198,58 +191,47 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 (function(){
-  var W=640,H=200,PADL=8,PADR=8,PADT=14,PADB=22;
-
   // ---- traffic data (30 days) ----
   var data=[820,910,870,1040,1180,990,1120,1260,1190,1340,1410,1280,1490,1560,1430,1620,1710,1590,1780,1850,1690,1920,2010,1880,2090,2180,2040,2260,2350,2480];
-  var max=Math.max.apply(null,data), min=Math.min.apply(null,data);
-  function sx(i){return PADL+i*( (W-PADL-PADR)/(data.length-1) );}
-  function sy(v){return PADT+(1-(v-min*0.85)/(max-min*0.85))*(H-PADT-PADB);}
 
-  // smooth path (catmull-rom -> bezier)
-  function smooth(pts){
-    var d="M"+pts[0][0]+","+pts[0][1];
-    for(var i=0;i<pts.length-1;i++){
-      var p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
-      var c1x=p1[0]+(p2[0]-p0[0])/6, c1y=p1[1]+(p2[1]-p0[1])/6;
-      var c2x=p2[0]-(p3[0]-p1[0])/6, c2y=p2[1]-(p3[1]-p1[1])/6;
-      d+="C"+c1x+","+c1y+" "+c2x+","+c2y+" "+p2[0]+","+p2[1];
-    }
-    return d;
+  // ---- traffic chart (Chart.js) ----
+  if(typeof Chart!=='undefined'){
+    var tctx=document.getElementById('trafficChart').getContext('2d');
+    var tlabels=data.map(function(_,i){return 'Day '+(i+1);});
+    var tgrad=tctx.createLinearGradient(0,0,0,200);
+    tgrad.addColorStop(0,'rgba(91,91,214,0.22)');
+    tgrad.addColorStop(1,'rgba(91,91,214,0)');
+    new Chart(tctx,{
+      type:'line',
+      data:{labels:tlabels,datasets:[{
+        data:data,borderColor:'#5b5bd6',borderWidth:2.5,
+        backgroundColor:tgrad,fill:true,tension:0.4,
+        pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:'#5b5bd6',
+        pointHoverBorderColor:'#fff',pointHoverBorderWidth:2
+      }]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        animation:{duration:900,easing:'easeOutCubic'},
+        plugins:{legend:{display:false},tooltip:{
+          backgroundColor:'#15171c',padding:10,cornerRadius:8,displayColors:false,
+          callbacks:{label:function(c){return c.parsed.y.toLocaleString()+' visitors';}}
+        }},
+        interaction:{intersect:false,mode:'index'},
+        scales:{
+          x:{grid:{display:false},border:{display:false},
+             ticks:{color:'#9aa0aa',font:{size:11},maxRotation:0,
+               autoSkip:false,callback:function(v,i){return [0,7,14,21,29].indexOf(i)>=0?this.getLabelForValue(v):'';}}},
+          y:{grid:{color:'#ebedf1'},border:{display:false},beginAtZero:false,
+             ticks:{color:'#9aa0aa',font:{size:11},maxTicksLimit:4}}
+        }
+      }
+    });
   }
-  var svg=document.getElementById('trafficChart');
-  var NS=svg.namespaceURI;
-  function el(n,a){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);return e;}
 
-  // gridlines
-  for(var g=0;g<=3;g++){
-    var y=PADT+g*((H-PADT-PADB)/3);
-    svg.appendChild(el('line',{x1:PADL,y1:y,x2:W-PADR,y2:y,class:'grid-line'}));
-  }
-  // x labels
-  ['Day 1','Day 8','Day 15','Day 22','Day 30'].forEach(function(lbl,i){
-    var idx=[0,7,14,21,29][i];
-    var t=el('text',{x:sx(idx),y:H-6,class:'axis-lbl','text-anchor':i===0?'start':(i===4?'end':'middle')});
-    t.textContent=lbl; svg.appendChild(t);
-  });
-
-  var pts=data.map(function(v,i){return [sx(i),sy(v)];});
-  var linePath=smooth(pts);
-  var areaPath=linePath+" L"+sx(data.length-1)+","+(H-PADB)+" L"+sx(0)+","+(H-PADB)+" Z";
-
-  var area=el('path',{d:areaPath,fill:'url(#areaFill)',opacity:0});
-  var line=el('path',{d:linePath,class:'area-line'});
-  svg.appendChild(area); svg.appendChild(line);
-  // last-point marker
-  var marker=el('circle',{cx:sx(data.length-1),cy:sy(data[data.length-1]),r:4,fill:'#5b5bd6',stroke:'#fff','stroke-width':2,opacity:0});
-  svg.appendChild(marker);
-
-  var len=line.getTotalLength();
-  line.style.strokeDasharray=len; line.style.strokeDashoffset=len;
-
-  // ---- sources ----
+  // ---- sources chart (Chart.js horizontal bar) ----
   var sources=[
     {n:'Direct', v:18420, c:'#5b5bd6'},
     {n:'Search', v:14210, c:'#12a4a4'},
@@ -257,14 +239,29 @@
     {n:'Referral', v:6340, c:'#f5a524'},
     {n:'Email', v:3920, c:'#30a46c'}
   ];
-  var smax=sources[0].v;
-  var srcWrap=document.getElementById('sources'), fills=[];
-  sources.forEach(function(s){
-    var row=document.createElement('div'); row.className='bar-row';
-    row.innerHTML='<div class="name">'+s.n+'</div><div class="bar-track"><div class="bar-fill" style="background:'+s.c+'"></div></div><div class="cnt">'+s.v.toLocaleString()+'</div>';
-    srcWrap.appendChild(row);
-    fills.push({el:row.querySelector('.bar-fill'),pct:(s.v/smax*100)});
-  });
+  if(typeof Chart!=='undefined'){
+    var sctx=document.getElementById('sources').getContext('2d');
+    new Chart(sctx,{
+      type:'bar',
+      data:{labels:sources.map(function(s){return s.n;}),datasets:[{
+        data:sources.map(function(s){return s.v;}),
+        backgroundColor:sources.map(function(s){return s.c;}),
+        borderRadius:6,barThickness:18
+      }]},
+      options:{
+        indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        animation:{duration:900,easing:'easeOutCubic'},
+        plugins:{legend:{display:false},tooltip:{
+          backgroundColor:'#15171c',padding:10,cornerRadius:8,displayColors:false,
+          callbacks:{label:function(c){return c.parsed.x.toLocaleString()+' sessions';}}
+        }},
+        scales:{
+          x:{grid:{display:false},border:{display:false},ticks:{display:false},beginAtZero:true},
+          y:{grid:{display:false},border:{display:false},ticks:{color:'#15171c',font:{size:13,weight:'500'}}}
+        }
+      }
+    });
+  }
 
   // ---- pages ----
   var pages=[
@@ -313,14 +310,8 @@
       var target=parseFloat(el.dataset.count);
       el.textContent=fmt(target*ce,el.dataset.fmt);
     });
-    // line draw ~1100ms
-    var lp=Math.min(1,e/1100), le=ease(lp);
-    line.style.strokeDashoffset=len*(1-le);
-    area.setAttribute('opacity',le);
-    marker.setAttribute('opacity',Math.max(0,(lp-0.8)/0.2));
-    // bars grow ~1000ms
+    // page bars grow ~1000ms
     var bp=Math.min(1,e/1000), be=ease(bp);
-    fills.forEach(function(f){f.el.style.width=(f.pct*be)+'%';});
     pbars.forEach(function(f){f.el.style.width=(f.pct*be)+'%';});
     // heatmap fade-in staggered ~1200ms
     var cells=heat.children;
@@ -334,8 +325,6 @@
     if(e<1500) requestAnimationFrame(frame);
     else {
       counters.forEach(function(el){el.textContent=fmt(parseFloat(el.dataset.count),el.dataset.fmt);});
-      line.style.strokeDashoffset=0; area.setAttribute('opacity',1); marker.setAttribute('opacity',1);
-      fills.forEach(function(f){f.el.style.width=f.pct+'%';});
       pbars.forEach(function(f){f.el.style.width=f.pct+'%';});
       for(var j=0;j<heat.children.length;j++){heat.children[j].style.background=heat.children[j].dataset.bg;}
     }
