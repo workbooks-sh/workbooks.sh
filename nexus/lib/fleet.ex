@@ -25,10 +25,14 @@ defmodule Nexus.Fleet do
 
   @default_agent """
   You are a focused web research agent. Investigate the question by USING THE WEB:
-    - `search <query>` to find sources (numbered title/url/snippet),
-    - `scrape <url>` to read the most relevant ones.
-  Do 2-4 rounds: search, read a source or two, refine, search again if needed. Think briefly before
-  each step. When you have enough, reply with a 2-3 sentence finding citing key facts + the URLs.
+    - `search <query>` to find sources (a numbered list of title/url/snippet),
+    - `scrape <url>` to READ a page's full content.
+  RULES:
+  1. `search` ONCE to get candidate URLs. Do NOT keep re-searching with reworded queries.
+  2. Then `scrape` the 2-3 most relevant URLs from those results — you MUST read real pages, never
+     answer from search snippets alone.
+  3. Only search again if scraping turned up nothing useful.
+  Then reply with a 3-4 sentence finding grounded in what you READ, citing the specific URLs you scraped.
   """
 
   @doc "Run a fleet for `task`, up to `:max` real agents, streaming live activity to `:on_event`."
@@ -245,19 +249,34 @@ defmodule Nexus.Fleet do
   defp translate(id, {:answer, content}),
     do: %{type: "state", id: id, status: "done", action: clean(content, 300)}
 
-  # A scrape/read tool RESULT → a page preview the user can see in the agent's thread.
+  # A tool RESULT → sources. A scrape gives one read page (with a preview); a search gives the
+  # candidate URLs the swarm surfaced (so the user watches sources pile up as the fleet researches).
   defp translate(id, {:result, cmd, output}) do
     {verb, rest} = split(cmd)
 
-    if verb in ~w(scrape render navigate) and is_binary(output) do
-      url = rest |> String.split() |> Enum.find(&String.starts_with?(&1, "http")) || rest
-      %{type: "page", id: id, url: clean(url), preview: preview(output)}
-    else
-      nil
+    cond do
+      verb in ~w(scrape render navigate) and is_binary(output) ->
+        url = rest |> String.split() |> Enum.find(&String.starts_with?(&1, "http")) || rest
+        %{type: "page", id: id, url: clean(url), preview: preview(output)}
+
+      verb == "search" and is_binary(output) ->
+        output |> source_urls() |> Enum.map(fn url -> %{type: "source", id: id, url: url} end)
+
+      true ->
+        nil
     end
   end
 
   defp translate(_id, _other), do: nil
+
+  # Pull the candidate result URLs out of a `search` tool's formatted output.
+  defp source_urls(output) do
+    Regex.scan(~r{https?://[^\s)\]"'<>]+}, output)
+    |> Enum.map(&(hd(&1) |> String.trim_trailing(".") |> String.trim_trailing(",")))
+    |> Enum.reject(&(String.length(&1) < 12))
+    |> Enum.uniq()
+    |> Enum.take(5)
+  end
 
   # A page preview: first lines of the scraped markdown, trimmed for the thread.
   defp preview(output) do
