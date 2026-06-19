@@ -21,6 +21,13 @@ cue "f0", :navigate do
   url: http://localhost:5178/
   wait_until: networkidle
 end
+# Per-take THEME — applied here (inside the trimmed pre-load) so the WHOLE take
+# runs in one theme. The orchestrator rewrites this line per theme; the default
+# is a no-op (the app's built-in dark theme). Theme variety is then spliced in
+# post by cutting between same-choreography takes — no abrupt in-take re-skin.
+cue "f12", :eval_js do
+  code: (()=>{})()
+end
 cue "f30", :click do
   selector: text="Swarm"
 end
@@ -118,27 +125,19 @@ cue "00:54", :eval_js do
   code: (()=>{window.__wbChrome&&window.__wbChrome.closeLeft();})()
 end
 
-# ── it's yours to extend — hot-swap the layout + theme, live ─────────────────
+# ── yours to extend — swap the whole sidebar layout ──────────────────────────
+# (Theme variety is delivered by recording one full take per theme and splicing
+#  them in the cut — NOT by an abrupt in-take re-skin.)
 cue "00:56", :eval_js do
-  And it's yours to reshape — swap the whole layout,
+  And it's yours to reshape — even the whole layout.
   code: (()=>{window.__wbNav&&window.__wbNav.setLayout('hub');})()
 end
 
-cue "00:58", :eval_js do
-  and re-theme the entire app on the fly.
-  code: (()=>{const s=document.documentElement.style;const p={'--color-page':'#f6f5f0','--color-surface':'#ffffff','--color-surface-soft':'#efede6','--color-chrome':'#eceae2','--color-border':'#e2e0d7','--color-border-strong':'#c9c6ba','--color-fg':'#16171a','--color-fg-muted':'#5d6066','--color-fg-subtle':'#8a8d93','--color-accent':'#16171a','--color-grid-line':'#e2e0d7'};for(const k in p)s.setProperty(k,p[k]);})()
+cue "00:59", :eval_js do
+  code: (()=>{window.__wbNav&&window.__wbNav.setLayout('shelf');window.__wbChrome&&window.__wbChrome.closeLeft();})()
 end
 
-cue "01:00", :eval_js do
-  code: (()=>{const s=document.documentElement.style;const p={'--color-page':'#17120a','--color-surface':'#221a0e','--color-surface-soft':'#2a2113','--color-chrome':'#120e07','--color-border':'#3a2c16','--color-fg':'#f3e9d8','--color-fg-muted':'#a99878','--color-brand':'#f5a524','--color-accent':'#f5a524','--color-grid-line':'#2a2113'};for(const k in p)s.setProperty(k,p[k]);})()
-end
-
-cue "01:02", :eval_js do
-  Make it yours.
-  code: (()=>{const s=document.documentElement.style;['--color-page','--color-surface','--color-surface-soft','--color-chrome','--color-border','--color-border-strong','--color-fg','--color-fg-muted','--color-fg-subtle','--color-brand','--color-accent','--color-grid-line'].forEach(k=>s.removeProperty(k));window.__wbNav&&window.__wbNav.setLayout('shelf');window.__wbChrome&&window.__wbChrome.closeLeft();})()
-end
-
-cue "01:03", :wait do
+cue "01:01", :wait do
   ms: 900
 end
 
