@@ -68,11 +68,11 @@ server :swarm do
 
     ctx = %{model: model, provider: provider, per_round: prof.questions, effort: prof.effort, emit: emit}
 
-    questions = plan(task, prof.questions, prof.effort, model, provider)
+    questions = plan(task, prof.questions, prof.effort, model, provider, emit)
     {findings, _idx} = rounds_loop(task, questions, 1, prof.max_rounds, 0, [], ctx)
 
     emit.(%{type: "synth", action: "compiling final report…"})
-    report = synthesize(task, findings, model, provider)
+    report = synthesize(task, findings, model, provider, emit)
     emit.(%{type: "report", content: report})
     emit.(%{type: "fleet_done", spawned: length(findings)})
     %{task: task, report: report, findings: findings}
@@ -126,6 +126,7 @@ server :swarm do
       |> Enum.map(fn {q, i} ->
         id = "a#{idx + i + 1}"
         Task.async(fn -> worker(id, q, ctx.model, ctx.provider, ctx.emit) end)
+        # (emit is threaded into the worker's own LLM calls for cost tracking)
       end)
       |> Task.await_many(:infinity)
 
@@ -147,7 +148,7 @@ server :swarm do
         "If CONTINUE, each following line is ONE new focused sub-question targeting a gap " <>
         "(up to #{ctx.per_round}). If DONE, a one-line reason."
 
-    case Nexus.Llm.complete([%{role: "user", content: prompt}], model: ctx.model, provider: ctx.provider, max_tokens: 500) do
+    case llm([%{role: "user", content: prompt}], [model: ctx.model, provider: ctx.provider, max_tokens: 500], ctx.emit) do
       {:ok, %{content: c}} when is_binary(c) -> parse_decision(c)
       _ -> %{continue: false, note: "Coverage looks sufficient — compiling the report.", questions: []}
     end
@@ -178,8 +179,13 @@ server :swarm do
   defp blank_to("", d), do: d
   defp blank_to(s, _), do: s
 
+  # Prefer the agent's written finding; fall back to its raw web-grounded research if the finding is blank.
+  defp pick(f, _g) when is_binary(f) and f != "", do: f
+  defp pick(_f, g) when is_binary(g), do: g
+  defp pick(_f, _g), do: ""
+
   # Coordinator: one LLM call decomposes the task into distinct sub-questions (effort guides count/depth).
-  defp plan(task, max, effort, model, provider) do
+  defp plan(task, max, effort, model, provider, emit) do
     n = min(max, 16)
 
     prompt =
@@ -188,7 +194,7 @@ server :swarm do
         "Return ONLY the sub-questions, one per line, no numbering or extra text.\n\nTask: #{task}"
 
     result =
-      case Nexus.Llm.complete([%{role: "user", content: prompt}], model: model, provider: provider, max_tokens: 400) do
+      case llm([%{role: "user", content: prompt}], [model: model, provider: provider, max_tokens: 400], emit) do
         {:ok, %{content: c}} when is_binary(c) and c != "" ->
           c |> String.split("\n") |> Enum.map(&clean/1) |> Enum.reject(&(&1 == "")) |> Enum.take(max)
 
@@ -208,7 +214,7 @@ server :swarm do
     emit.(%{type: "spawn", id: id, query: clean(subtask)})
 
     emit.(%{type: "state", id: id, status: "searching", action: clean(subtask)})
-    urls = search_urls(subtask, model)
+    %{urls: urls, grounded: grounded} = research(subtask, model, emit)
     Enum.each(urls, fn u -> emit.(%{type: "source", id: id, url: u}) end)
 
     # Many real sites block our datacenter IP or return empty shells, so read DOWN the candidate
@@ -232,24 +238,33 @@ server :swarm do
       |> Enum.reverse()
 
     emit.(%{type: "state", id: id, status: "thinking", action: "writing finding from #{length(reads)} pages"})
-    finding = finding_from(subtask, reads, model, provider)
+
+    # Guarantee a usable finding: if the (flaky) synthesis call comes back blank, fall back to the
+    # web-grounded :online answer rather than dropping the agent's contribution.
+    finding =
+      case finding_from(subtask, reads, grounded, model, provider, emit) do
+        f when is_binary(f) and f != "" -> f
+        _ -> grounded
+      end
 
     emit.(%{type: "done", id: id, finding: finding})
-    %{id: id, subtask: subtask, finding: finding}
+    %{id: id, subtask: subtask, finding: finding, grounded: grounded}
   rescue
     _ ->
       emit.(%{type: "done", id: id, finding: ""})
-      %{id: id, subtask: subtask, finding: ""}
+      %{id: id, subtask: subtask, finding: "", grounded: ""}
   end
 
-  # Real candidate URLs via OpenRouter's `:online` web search (keyed by the LLM key we already hold).
-  # The source URLs come back as `annotations` (url_citation); content is scanned as a fallback.
-  defp search_urls(subtask, model) do
+  # One OpenRouter `:online` web search (keyed by the LLM key we hold) does double duty: its cited
+  # source URLs (in `annotations`) are what each agent then PULLS with the nexus browser system, and
+  # its grounded answer (the model read those pages server-side) is a reliable FALLBACK finding for
+  # when our datacenter IP gets blocked on the live pulls.
+  defp research(subtask, model, emit) do
     prompt =
-      "Find the best authoritative web pages to answer this question. Reply with ONLY 4-6 real URLs, " <>
-        "one per line, no other text.\n\nQuestion: #{subtask}"
+      "Research this question using the web and answer it factually in 4-6 sentences with concrete " <>
+        "specifics, citing sources.\n\nQuestion: #{subtask}"
 
-    case Nexus.Llm.complete([%{role: "user", content: prompt}], model: model <> ":online", max_tokens: 400) do
+    case llm([%{role: "user", content: prompt}], [model: model <> ":online", max_tokens: 600], emit) do
       {:ok, turn} ->
         ann =
           (turn[:annotations] || [])
@@ -258,46 +273,68 @@ server :swarm do
 
         body = Regex.scan(~r{https?://[^\s)\]"'<>]+}, turn.content || "") |> Enum.map(&hd/1)
 
-        (ann ++ body)
-        |> Enum.map(&(&1 |> String.trim_trailing(".") |> String.trim_trailing(",")))
-        |> Enum.reject(&(String.length(&1) < 12))
-        |> Enum.uniq()
-        |> Enum.take(8)
+        urls =
+          (ann ++ body)
+          |> Enum.map(&(&1 |> String.trim_trailing(".") |> String.trim_trailing(",")))
+          |> Enum.reject(&(String.length(&1) < 12))
+          |> Enum.uniq()
+          |> Enum.take(8)
+
+        %{urls: urls, grounded: clean(turn.content || "", 700)}
 
       _ ->
-        []
+        %{urls: [], grounded: ""}
     end
   end
 
-  defp finding_from(subtask, [], model, provider) do
-    case Nexus.Llm.complete([%{role: "user", content: "Answer concisely in 3-4 sentences: #{subtask}"}], model: model, provider: provider, max_tokens: 400) do
-      {:ok, %{content: c}} when is_binary(c) and c != "" -> clean(c, 600)
-      _ -> ""
+  # 0 pages pulled (sites blocked our IP) → fall back to the web-grounded `:online` answer; only if
+  # that's empty too do we ask the model directly from its own knowledge.
+  defp finding_from(subtask, [], grounded, model, provider, emit) do
+    if is_binary(grounded) and String.trim(grounded) != "" do
+      grounded
+    else
+      case llm([%{role: "user", content: "Answer concisely in 3-4 sentences: #{subtask}"}], [model: model, provider: provider, max_tokens: 400], emit) do
+        {:ok, %{content: c}} when is_binary(c) and c != "" -> clean(c, 600)
+        _ -> ""
+      end
     end
   end
 
-  defp finding_from(subtask, reads, model, provider) do
+  defp finding_from(subtask, reads, _grounded, model, provider, emit) do
     notes = Enum.map_join(reads, "\n\n", fn {url, t} -> "### #{url}\n#{String.slice(t, 0, 2500)}" end)
 
     prompt =
       "Using ONLY the page content below, answer in 3-4 sentences with concrete facts, and cite the " <>
         "URL(s) you used.\n\nQuestion: #{subtask}\n\n#{notes}"
 
-    case Nexus.Llm.complete([%{role: "user", content: prompt}], model: model, provider: provider, max_tokens: 500) do
+    case llm([%{role: "user", content: prompt}], [model: model, provider: provider, max_tokens: 500], emit) do
       {:ok, %{content: c}} when is_binary(c) and c != "" -> clean(c, 600)
       _ -> ""
     end
   end
 
   # Combine the findings into one cited deep-research report.
-  defp synthesize(task, findings, model, provider) do
+  defp synthesize(task, findings, model, provider, emit) do
     notes =
       findings
+      |> Enum.map(fn f -> %{f | finding: pick(f.finding, Map.get(f, :grounded, ""))} end)
       |> Enum.reject(&(&1.finding in [nil, "", "error"]))
       |> Enum.map_join("\n\n", fn f -> "### #{f.subtask}\n#{f.finding}" end)
 
     if String.trim(notes) == "" do
-      "No findings were gathered."
+      # Safety net: the concurrent per-agent :online calls can come back empty under load. A SINGLE
+      # web-grounded pass on the whole task is reliable — so the report is never a dead end.
+      sn =
+        "Write a thorough, well-structured markdown research report answering: #{task}\n" <>
+          "Use real web sources and cite them inline. Include a `# title`, `## Executive summary`, " <>
+          "thematic `##` sections, `## Key takeaways`, and `## Open questions`. Where the data warrants " <>
+          "it, include 1-2 figures as fenced ```figure JSON blocks " <>
+          "(e.g. {\"type\":\"bar\",\"title\":\"…\",\"data\":[{\"label\":\"A\",\"value\":40}]})."
+
+      case llm([%{role: "user", content: sn}], [model: model <> ":online", max_tokens: 3000], emit) do
+        {:ok, %{content: c}} when is_binary(c) and c != "" -> c
+        _ -> "No findings were gathered."
+      end
     else
       prompt =
         "You are the lead researcher writing a DEEP RESEARCH REPORT on:\n#{task}\n\n" <>
@@ -308,15 +345,37 @@ server :swarm do
           "3. Several `##` thematic sections with concrete facts, numbers, tradeoffs, and inline " <>
           "source links where the findings cite URLs.\n" <>
           "4. A `## Key takeaways` bullet list.\n" <>
-          "5. A `## Open questions` list of what remains uncertain.\n" <>
+          "5. A `## Open questions` list of what remains uncertain.\n\n" <>
+          "WHERE IT GENUINELY HELPS (a comparison, a trend, a breakdown, or a process), include a " <>
+          "FIGURE as a fenced ```figure code block whose body is JSON. The interface renders these as " <>
+          "clean hand-drawn charts — DO NOT describe an image, emit the data. Supported shapes:\n" <>
+          "  ```figure\\n{\"type\":\"bar\",\"title\":\"…\",\"data\":[{\"label\":\"A\",\"value\":40},{\"label\":\"B\",\"value\":75}]}\\n```\n" <>
+          "  ```figure\\n{\"type\":\"flow\",\"title\":\"…\",\"steps\":[\"Plan\",\"Search\",\"Read\",\"Synthesize\"]}\\n```\n" <>
+          "Use 1-3 figures max, only when the data is real and warrants it. Numbers must come from the findings.\n\n" <>
           "Merge overlap, resolve contradictions, be specific. Do not invent sources.\n\n" <>
           "## Agent findings\n#{notes}"
 
-      case Nexus.Llm.complete([%{role: "user", content: prompt}], model: model, provider: provider, max_tokens: 3000) do
+      case llm([%{role: "user", content: prompt}], [model: model, provider: provider, max_tokens: 3000], emit) do
         {:ok, %{content: c}} when is_binary(c) and c != "" -> c
         _ -> notes
       end
     end
+  end
+
+  # Every LLM call goes through here so we can ask OpenRouter for the REAL cost (usage accounting)
+  # and stream it to the browser — the displayed spend is actual credits charged, not an estimate.
+  defp llm(messages, opts, emit) do
+    res = Nexus.Llm.complete(messages, Keyword.put(opts, :usage, %{include: true}))
+
+    case res do
+      {:ok, %{usage: u}} when is_map(u) ->
+        emit.(%{type: "usage", usd: u["cost"] || 0, in: u["prompt_tokens"] || 0, out: u["completion_tokens"] || 0})
+
+      _ ->
+        :ok
+    end
+
+    res
   end
 
   defp domain(url) do

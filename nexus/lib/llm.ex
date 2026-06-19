@@ -48,6 +48,9 @@ defmodule Nexus.Llm do
         |> maybe_put(:chat_template_kwargs, opts[:chat_template_kwargs])
         # OpenRouter provider routing (e.g. %{order: ["Cloudflare"]}) — pin a fast/cheap provider.
         |> maybe_put(:provider, opts[:provider])
+        # OpenRouter usage accounting: `%{include: true}` makes the response carry the REAL `cost`
+        # (credits charged, incl. the web-search plugin) in `usage`, so callers can sum actual spend.
+        |> maybe_put(:usage, opts[:usage])
         |> Jason.encode!()
 
       # Long-running deep-research turns (thinking models + web plugin) can exceed the 2min default;
