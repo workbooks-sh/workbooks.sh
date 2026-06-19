@@ -6,6 +6,7 @@ const std = @import("std");
 const Io = std.Io;
 const fs = @import("fs.zig");
 const log = @import("log.zig");
+const cloud = @import("cloud.zig");
 
 pub const Target = struct { name: []const u8, nexus: []const u8 = "", org: []const u8 = "", workspace: []const u8 = "" };
 pub const Context = struct { active: []const u8 = "local", targets: []Target = &.{} };
@@ -138,8 +139,16 @@ pub fn whoami(io: Io, alloc: std.mem.Allocator, home: []const u8) !u8 {
         log.step(try std.fmt.allocPrint(alloc, "nexus {s}", .{t.nexus}));
         if (t.org.len > 0) log.step(try std.fmt.allocPrint(alloc, "org {s} \u{b7} workspace {s}", .{ t.org, t.workspace }));
     };
-    if (identity(io, alloc, home)) |who| log.step(try std.fmt.allocPrint(alloc, "identity {s}", .{who}))
-    else log.step("not logged in \u{2014} `work login` for the control plane");
+    if (cred(io, alloc, home)) |c| {
+        log.step(try std.fmt.allocPrint(alloc, "identity {s}", .{c.url}));
+        const url = try std.fmt.allocPrint(alloc, "{s}/api/platform/me", .{c.url});
+        if (cloud.request(io, alloc, .GET, url, c.token, null)) |res| {
+            if (res.status == 200) {
+                const org = cloud.jsonField(res.body, "active_org") orelse "?";
+                log.ok(try std.fmt.allocPrint(alloc, "authenticated \u{b7} org {s}", .{org}));
+            } else log.step(try std.fmt.allocPrint(alloc, "token rejected (HTTP {d}) \u{2014} run `work login` again", .{res.status}));
+        } else |e| log.step(try std.fmt.allocPrint(alloc, "control plane unreachable ({s})", .{@errorName(e)}));
+    } else log.step("not logged in \u{2014} `work login` for the control plane");
     return 0;
 }
 
@@ -170,4 +179,13 @@ pub fn identity(io: Io, alloc: std.mem.Allocator, home: []const u8) ?[]const u8 
     const data = fs.readFile(io, alloc, credPath(alloc, home) catch return null) catch return null;
     const tab = std.mem.indexOfScalar(u8, data, '\t') orelse return null;
     return data[0..tab];
+}
+
+/// The stored control-plane credential as `{ url, token }`, or null if not logged in.
+pub fn cred(io: Io, alloc: std.mem.Allocator, home: []const u8) ?struct { url: []const u8, token: []const u8 } {
+    const data = fs.readFile(io, alloc, credPath(alloc, home) catch return null) catch return null;
+    const tab = std.mem.indexOfScalar(u8, data, '\t') orelse return null;
+    const rest = data[tab + 1 ..];
+    const end = std.mem.indexOfScalar(u8, rest, '\n') orelse rest.len;
+    return .{ .url = data[0..tab], .token = rest[0..end] };
 }
