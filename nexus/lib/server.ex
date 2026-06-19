@@ -26,6 +26,12 @@ defmodule Nexus.Server do
     root = Keyword.fetch!(opts, :root)
     port = Keyword.get(opts, :port, 4000)
     mounts = discover_mounts(root)
+    # This nexus's memorable name: a stable adjective-animal codename + an optional friendly name the
+    # user/team gave it (WB_NEXUS). You reference a nexus by either — it's a handle, not a credential.
+    name = Nexus.Identity.codename(port)
+    friendly = System.get_env("WB_NEXUS") || ""
+    Application.put_env(:nexus, :nexus_name, name)
+    Application.put_env(:nexus, :nexus_friendly, friendly)
     Application.put_env(:nexus, :workbook_root, root)
     Application.put_env(:nexus, :mounts, mounts)
     # One managed data backend for this nexus (resources from every mounted workbook live in it,
@@ -34,6 +40,9 @@ defmodule Nexus.Server do
     # Bring up every mounted workbook's server tier: compile its `server`/`resource` units to live
     # BEAM modules, then call `register/0` on any that exports it (self-registering live sources).
     Enum.each(mounts, fn {_name, wb} -> bringup(wb) end)
+    # Register this nexus in the machine's nexus registry so the CLI can reach it by name.
+    Nexus.Identity.register(name, friendly, "http://localhost:#{port}")
+    IO.puts("⬡ nexus #{name}#{if(friendly != "", do: " (#{friendly})", else: "")} · :#{port} · #{length(mounts)} workbook(s)")
     Bandit.start_link(plug: __MODULE__, port: port)
   end
 
@@ -80,7 +89,9 @@ defmodule Nexus.Server do
   # Docker, the desktop daemon) probe this; 200 = the server is up and answering.
   get "/health" do
     vsn = to_string(Application.spec(:nexus, :vsn) || "dev")
-    body = Jason.encode!(%{status: "ok", service: "nexus", version: vsn})
+    name = Application.get_env(:nexus, :nexus_name, "")
+    friendly = Application.get_env(:nexus, :nexus_friendly, "")
+    body = Jason.encode!(%{status: "ok", service: "nexus", version: vsn, nexus: name, friendly: friendly})
 
     conn
     |> put_resp_content_type("application/json")
@@ -145,8 +156,16 @@ defmodule Nexus.Server do
     h1{font-size:26px;letter-spacing:-.02em} p{color:#787066} .g{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:26px}
     .c{display:flex;flex-direction:column;gap:6px;padding:18px 20px;background:#fff;border:1px solid #ece9e3;border-radius:14px;text-decoration:none;color:inherit;transition:.15s}
     .c:hover{border-color:#d8d3ca;box-shadow:0 6px 20px rgba(55,53,47,.06)} .c b{font-size:16px} .c span{font-size:13px;color:#787066}</style></head>
-    <body><h1>Workbooks on this nexus</h1><p>#{length(mounts())} workbook(s) mounted on this runtime.</p><div class="g">#{cards}</div></body></html>
+    <body><h1>⬡ #{he(nexus_label())}</h1><p>#{length(mounts())} workbook(s) mounted on this nexus.</p><div class="g">#{cards}</div></body></html>
     """
+  end
+
+  defp nexus_label do
+    name = Application.get_env(:nexus, :nexus_name, "nexus")
+    case Application.get_env(:nexus, :nexus_friendly, "") do
+      "" -> name
+      f -> "#{f} · #{name}"
+    end
   end
 
   defp blurb(root) do
@@ -311,8 +330,8 @@ defmodule Nexus.Server do
            name when is_binary(name) and name != "" <- m["name"],
            path when is_binary(path) <- m["path"],
            true <- File.dir?(path) and Path.wildcard(Path.join(path, "*.work")) != [] do
-        mount_runtime(name, Path.expand(path))
-        %{ok: true, name: name, url: "/" <> name <> "/"}
+        actual = mount_runtime(name, Path.expand(path))
+        %{ok: true, name: actual, url: "/" <> actual <> "/"}
       else
         _ -> %{ok: false, error: "need {name, path}, where path holds .work files on this machine"}
       end
@@ -321,12 +340,27 @@ defmodule Nexus.Server do
     conn |> put_resp_content_type("application/json") |> send_resp(status, Jason.encode!(payload))
   end
 
-  # Mount a workbook live: compile + register its units, then add it to the routing table (replacing a
-  # same-named mount). Converts a single-workbook nexus to multi (the deployed apps each get /<name>).
+  # Mount a workbook live: compile + register its units, then add it to the routing table. Redeploying
+  # the SAME workbook (same path) keeps its mount name; a DIFFERENT workbook wanting a taken name gets
+  # a unique one (foo, foo-2, …) — names stay unique on a nexus. Returns the actual mount name.
   defp mount_runtime(name, path) do
+    actual = mount_name(name, path)
     bringup(path)
-    others = mounts() |> Enum.reject(fn {n, _} -> n == name or n == "" end)
-    Application.put_env(:nexus, :mounts, Enum.sort([{name, path} | others]))
+    others = mounts() |> Enum.reject(fn {n, p} -> n == actual or p == path or n == "" end)
+    Application.put_env(:nexus, :mounts, Enum.sort([{actual, path} | others]))
+    actual
+  end
+
+  defp mount_name(name, path) do
+    case Enum.find(mounts(), fn {_n, p} -> p == path end) do
+      {existing, _} -> existing
+      nil -> dedupe(name, MapSet.new(Enum.map(mounts(), &elem(&1, 0))), 1)
+    end
+  end
+
+  defp dedupe(name, taken, n) do
+    cand = if n == 1, do: name, else: "#{name}-#{n}"
+    if MapSet.member?(taken, cand), do: dedupe(name, taken, n + 1), else: cand
   end
 
   # ── one nexus, many workbooks: a mounted workbook's app + its live source + its data ──────────

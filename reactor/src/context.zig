@@ -82,11 +82,56 @@ pub fn nexusUrl(io: Io, alloc: std.mem.Allocator, home: []const u8) ![]const u8 
     return "http://localhost:4000";
 }
 
-/// The nexus URL of a target by NAME (deploy to a nexus by name, not a URL). Falls back to local.
+/// The nexus URL of a target by NAME — a context target, OR a registered nexus (by its codename or
+/// friendly name). You reference a nexus by name, never a URL. Falls back to local.
 pub fn nexusByName(io: Io, alloc: std.mem.Allocator, home: []const u8, name: []const u8) ![]const u8 {
     const ctx = try load(io, alloc, home);
     for (ctx.targets) |t| if (std.mem.eql(u8, t.name, name)) return if (t.nexus.len > 0) t.nexus else "http://localhost:4000";
+    if (registryUrl(io, alloc, home, name)) |u| return u;
     return "http://localhost:4000";
+}
+
+fn registryPath(alloc: std.mem.Allocator, home: []const u8) ![]const u8 {
+    return std.fs.path.join(alloc, &.{ home, ".work", "nexuses.html" });
+}
+
+// Resolve a name (codename OR friendly) against the machine's nexus registry → its URL.
+fn registryUrl(io: Io, alloc: std.mem.Allocator, home: []const u8, name: []const u8) ?[]const u8 {
+    const path = registryPath(alloc, home) catch return null;
+    const html = fs.readFile(io, alloc, path) catch return null;
+    var it = std.mem.tokenizeScalar(u8, html, '\n');
+    while (it.next()) |line| {
+        if (std.mem.indexOf(u8, line, "<nexus ") == null) continue;
+        if (std.mem.eql(u8, elemAttr(line, "name"), name) or std.mem.eql(u8, elemAttr(line, "friendly"), name)) {
+            const u = elemAttr(line, "url");
+            if (u.len > 0) return u;
+        }
+    }
+    return null;
+}
+
+/// `work nexus ls` — the nexuses registered on this machine (a nexus self-registers on boot).
+pub fn nexusList(io: Io, alloc: std.mem.Allocator, home: []const u8) !u8 {
+    log.prompt("work nexus");
+    const path = try registryPath(alloc, home);
+    const html = fs.readFile(io, alloc, path) catch {
+        log.step("no nexuses registered \u{2014} start one (WB_SERVE=1 \u{2026}) and it self-registers by name");
+        return 0;
+    };
+
+    var it = std.mem.tokenizeScalar(u8, html, '\n');
+    var n: usize = 0;
+    while (it.next()) |line| {
+        if (std.mem.indexOf(u8, line, "<nexus ") == null) continue;
+        const nm = elemAttr(line, "name");
+        const fr = elemAttr(line, "friendly");
+        const u = elemAttr(line, "url");
+        const label = if (fr.len > 0) try std.fmt.allocPrint(alloc, "{s} ({s})", .{ nm, fr }) else nm;
+        log.print("  {s}{s: <30}{s}  {s}\n", .{ log.path_c, label, log.reset, u });
+        n += 1;
+    }
+    if (n == 0) log.step("none registered yet");
+    return 0;
 }
 
 // ── verbs ───────────────────────────────────────────────────────────────────────────────────

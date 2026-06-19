@@ -93,7 +93,12 @@ pub fn main(init: std.process.Init) !void {
             std.process.exit(try context.ctxList(io, alloc, home));
         }
     } else if (eql(verb, "nexus")) {
-        std.process.exit(try context.nexusVerb(io, alloc, home, it.next() orelse ""));
+        const sub = it.next() orelse "";
+        if (eql(sub, "ls") or eql(sub, "list")) {
+            std.process.exit(try context.nexusList(io, alloc, home));
+        } else {
+            std.process.exit(try context.nexusVerb(io, alloc, home, sub));
+        }
     } else if (eql(verb, "whoami")) {
         std.process.exit(try context.whoami(io, alloc, home));
     } else if (eql(verb, "login")) {
