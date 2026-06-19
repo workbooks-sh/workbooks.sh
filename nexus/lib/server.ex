@@ -23,6 +23,9 @@ defmodule Nexus.Server do
     root = Keyword.fetch!(opts, :root)
     port = Keyword.get(opts, :port, 4000)
     Application.put_env(:nexus, :workbook_root, root)
+    # Register the workbook's live capabilities (fleet units) up front, so /live works regardless of
+    # whether a page has been rendered yet.
+    Nexus.Weave.bringup(root)
     Bandit.start_link(plug: __MODULE__, port: port)
   end
 

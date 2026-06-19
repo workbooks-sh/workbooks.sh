@@ -133,7 +133,14 @@ defmodule Nexus.Agent do
           Enum.each(calls, fn c -> emit.({:tool, command_of(c)}) end)
           tel = tally(tel, turn, calls)
           assistant = %{role: "assistant", content: turn.content || "", tool_calls: raw_calls(calls)}
-          results = Enum.map(calls, &run_bash(&1, vfs))
+
+          results =
+            Enum.map(calls, fn c ->
+              r = run_bash(c, vfs)
+              emit.({:result, command_of(c), r.content})
+              r
+            end)
+
           loop(messages ++ [assistant | results], vfs, opts, deadline, tel)
 
         {:error, reason} ->

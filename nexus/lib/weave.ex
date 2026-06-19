@@ -137,6 +137,14 @@ defmodule Nexus.Weave do
     """
   end
 
+  @doc "Register a workbook's live capabilities (its `fleet` units) without rendering — call at boot."
+  def bringup(root) do
+    pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
+    register_fleets(pages, collect_agents(pages))
+  rescue
+    _ -> :ok
+  end
+
   # the view units, as {name, stream, intro}.
   defp collect_views(pages) do
     for {_f, nodes} <- pages, %{type: :code, kind: "view", name: n, header: h, body: b} <- nodes do
@@ -321,83 +329,132 @@ defmodule Nexus.Weave do
 
   defp parse_int(_, default), do: default
 
-  # The live-fleet-viewer primitive: a compose bar (task + max agents) and a single-viewport grid of
-  # agent windows that tile and shrink as the fleet grows, each rendering one real agent's live state
-  # streamed from `GET /live/<stream>`. This is the reusable rendering of a `view` bound to a fleet —
-  # not hand-rolled per demo.
-  defp live_view_html(name, stream, intro) do
+  # The live-fleet-viewer primitive — a research-assistant app: a centered "Search Swarm" launcher;
+  # on submit, agents pop into an inspectable thread (each expandable to its live step timeline +
+  # page previews); when the fleet drains, their findings are compiled into a final report at the top.
+  # Streamed from `GET /live/<stream>`. The reusable rendering of a `view` bound to a fleet.
+  defp live_view_html(name, stream, _intro) do
     ~s"""
       <div class="work-fleet" id="fleet-#{esc(name)}" data-stream="#{esc(stream)}">
-        <header class="wf-bar">
-          <span class="wf-brand">Nexus Fleet<small>one nexus · live agents</small></span>
-          <form class="wf-form">
-            <input class="wf-q" type="text" placeholder="Research a topic… e.g. BEAM concurrency" value="WebAssembly runtimes" autocomplete="off">
-            <span class="wf-max">max agents <input class="wf-n" type="number" min="1" max="64" value="24"></span>
-            <button class="wf-go" type="submit">Run fleet</button>
-          </form>
-          <span class="wf-stat"><b class="wf-live">0</b> live · <b class="wf-spawned">0</b> of <b class="wf-cap">0</b></span>
-        </header>
-        <main class="wf-grid"></main>
+        <div class="wf-launch">
+          <div class="wf-card">
+            <h1>Search Swarm</h1>
+            <p>A fleet of agents researches your question in parallel — then compiles one report.</p>
+            <form class="wf-form">
+              <input class="wf-q" type="text" placeholder="Ask anything… e.g. how does BEAM concurrency work?" autocomplete="off" autofocus>
+              <div class="wf-row"><label>agents <input class="wf-n" type="number" min="1" max="48" value="8"></label><button class="wf-go" type="submit">Search</button></div>
+            </form>
+          </div>
+        </div>
+        <div class="wf-run" hidden>
+          <header class="wf-top">
+            <span class="wf-brand">Search Swarm</span>
+            <span class="wf-query"></span>
+            <span class="wf-stat"><b class="wf-live">0</b> working · <b class="wf-spawned">0</b> agents</span>
+            <button class="wf-new" type="button">New search</button>
+          </header>
+          <main class="wf-main">
+            <section class="wf-report" hidden></section>
+            <section class="wf-thread"></section>
+          </main>
+        </div>
       </div>
       <style>
-      .work-fleet{--bg:#0c0d10;--panel:#15171c;--line:#23262e;--ink:#e7e9ee;--dim:#8b909c;--accent:#7dd3a8;
+      .work-fleet{--bg:#0c0d10;--panel:#15171c;--card:#181a20;--line:#23262e;--ink:#e7e9ee;--dim:#8b909c;--accent:#7dd3a8;
         --searching:#4a90d9;--reading:#e0a042;--thinking:#a070e0;--done:#3fbf6f;
-        position:fixed;inset:0;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;
-        font:14px/1.5 ui-sans-serif,system-ui,sans-serif}
-      .work-fleet .wf-bar{flex:none;display:flex;gap:.8rem;align-items:center;padding:.55rem .8rem;border-bottom:1px solid var(--line);background:var(--panel)}
-      .work-fleet .wf-brand{font-weight:650;white-space:nowrap}.work-fleet .wf-brand small{color:var(--dim);font-weight:400;margin-left:.4rem}
-      .work-fleet .wf-form{display:flex;gap:.5rem;align-items:center;flex:1}
-      .work-fleet input{background:#0e0f13;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:.5rem .7rem;outline:none}
-      .work-fleet input:focus{border-color:var(--accent)}
-      .work-fleet .wf-q{flex:1;min-width:10rem} .work-fleet .wf-n{width:4rem;text-align:right}
-      .work-fleet .wf-max{color:var(--dim);font-size:.85em;display:flex;gap:.4rem;align-items:center;white-space:nowrap}
-      .work-fleet .wf-go{background:var(--accent);color:#06281a;border:0;border-radius:8px;padding:.55rem 1rem;font-weight:650;cursor:pointer}
+        position:fixed;inset:0;background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,system-ui,sans-serif;overflow:hidden}
+      .work-fleet *{box-sizing:border-box}
+      .work-fleet .wf-launch{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:1rem}
+      .work-fleet .wf-card{width:min(620px,94vw);background:var(--card);border:1px solid var(--line);border-radius:16px;padding:2rem 2rem 1.6rem;box-shadow:0 30px 80px -20px #000}
+      .work-fleet .wf-card h1{margin:0 0 .3rem;font-size:1.7rem;letter-spacing:-.02em}
+      .work-fleet .wf-card p{margin:0 0 1.2rem;color:var(--dim)}
+      .work-fleet .wf-q{width:100%;background:#0e0f13;border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:.8rem .9rem;font-size:1rem;outline:none}
+      .work-fleet .wf-q:focus{border-color:var(--accent)}
+      .work-fleet .wf-row{display:flex;gap:.6rem;align-items:center;margin-top:.8rem;justify-content:flex-end}
+      .work-fleet .wf-row label{color:var(--dim);font-size:.85em;display:flex;gap:.4rem;align-items:center;margin-right:auto}
+      .work-fleet .wf-n{width:4rem;text-align:right;background:#0e0f13;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:.45rem}
+      .work-fleet .wf-go{background:var(--accent);color:#06281a;border:0;border-radius:9px;padding:.6rem 1.4rem;font-weight:650;font-size:.95rem;cursor:pointer}
       .work-fleet .wf-go:disabled{opacity:.5}
-      .work-fleet .wf-stat{flex:none;color:var(--dim);font-size:.8em;font-variant-numeric:tabular-nums;white-space:nowrap} .work-fleet .wf-stat b{color:var(--ink)}
-      .work-fleet .wf-grid{flex:1;min-height:0;display:grid;gap:4px;padding:6px}
-      .work-fleet .wf-tile{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;display:flex;flex-direction:column;min-width:0;min-height:0;animation:wfpop .25s ease-out}
-      @keyframes wfpop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
-      .work-fleet .wf-h{flex:none;height:14px;display:flex;align-items:center;gap:4px;padding:0 5px;background:#0e0f13;border-bottom:1px solid var(--line);font-size:9px;color:var(--dim)}
-      .work-fleet .wf-dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--dim)}
-      .work-fleet .wf-b{flex:1;min-height:0;padding:5px 6px;font-size:10px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical}
-      .work-fleet .wf-u{color:var(--dim);font-size:9px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .work-fleet .wf-tile[data-s=searching] .wf-dot{background:var(--searching);box-shadow:0 0 6px var(--searching)}
-      .work-fleet .wf-tile[data-s=reading] .wf-dot{background:var(--reading);box-shadow:0 0 6px var(--reading)}
-      .work-fleet .wf-tile[data-s=thinking] .wf-dot{background:var(--thinking);box-shadow:0 0 6px var(--thinking)}
-      .work-fleet .wf-tile[data-s=done] .wf-dot{background:var(--done)} .work-fleet .wf-tile[data-s=done]{opacity:.6}
-      .work-fleet .wf-grid.tiny .wf-h,.work-fleet .wf-grid.tiny .wf-b{display:none}
-      .work-fleet .wf-grid.tiny .wf-tile::after{content:"";position:absolute;inset:0;background:currentColor;opacity:.14}
-      .work-fleet .wf-grid.tiny .wf-tile[data-s=searching]{color:var(--searching)} .work-fleet .wf-grid.tiny .wf-tile[data-s=reading]{color:var(--reading)}
-      .work-fleet .wf-grid.tiny .wf-tile[data-s=thinking]{color:var(--thinking)} .work-fleet .wf-grid.tiny .wf-tile[data-s=done]{color:var(--done)}
+      .work-fleet .wf-run{position:absolute;inset:0;display:flex;flex-direction:column}
+      .work-fleet .wf-top{flex:none;display:flex;gap:.9rem;align-items:center;padding:.6rem .9rem;border-bottom:1px solid var(--line);background:var(--panel)}
+      .work-fleet .wf-brand{font-weight:650;white-space:nowrap}
+      .work-fleet .wf-query{flex:1;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .work-fleet .wf-stat{flex:none;color:var(--dim);font-size:.82em;font-variant-numeric:tabular-nums;white-space:nowrap}.work-fleet .wf-stat b{color:var(--ink)}
+      .work-fleet .wf-new{background:#0e0f13;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:.45rem .8rem;cursor:pointer;font-size:.85em}
+      .work-fleet .wf-main{flex:1;min-height:0;overflow-y:auto;padding:14px;max-width:880px;margin:0 auto;width:100%}
+      .work-fleet .wf-report{background:linear-gradient(180deg,#16221b,#15171c);border:1px solid #2b4a3a;border-radius:12px;padding:1.1rem 1.3rem;margin-bottom:14px;animation:wfpop .3s}
+      .work-fleet .wf-report h2{margin:.1rem 0 .6rem;font-size:1.1rem;color:var(--accent)}
+      .work-fleet .wf-report h3{margin:1rem 0 .3rem;font-size:.98rem}
+      .work-fleet .wf-report p{margin:.4rem 0}.work-fleet .wf-report ul{margin:.4rem 0;padding-left:1.2rem}.work-fleet .wf-report a{color:var(--accent)}
+      .work-fleet .wf-agent{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden;animation:wfpop .25s}
+      @keyframes wfpop{from{transform:translateY(6px);opacity:0}to{transform:none;opacity:1}}
+      .work-fleet .wf-ahead{display:flex;align-items:center;gap:.6rem;padding:.6rem .8rem;cursor:pointer}
+      .work-fleet .wf-dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--dim)}
+      .work-fleet .wf-aid{font-size:.78em;color:var(--dim);font-variant-numeric:tabular-nums;width:2.6rem;flex:none}
+      .work-fleet .wf-act{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+      .work-fleet .wf-caret{color:var(--dim);transition:transform .15s;flex:none}
+      .work-fleet .wf-agent.open .wf-caret{transform:rotate(90deg)}
+      .work-fleet .wf-steps{display:none;border-top:1px solid var(--line);padding:.4rem .8rem .7rem;font-size:.9em}
+      .work-fleet .wf-agent.open .wf-steps{display:block}
+      .work-fleet .wf-step{display:flex;gap:.5rem;padding:.18rem 0;color:var(--dim)}
+      .work-fleet .wf-step b{color:var(--ink);font-weight:500;flex:none;width:5.4rem}
+      .work-fleet .wf-page{margin:.3rem 0 .5rem;border:1px solid var(--line);border-radius:8px;background:#0e0f13;overflow:hidden}
+      .work-fleet .wf-page .wf-purl{padding:.35rem .6rem;font-size:.82em;color:var(--accent);border-bottom:1px solid var(--line);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .work-fleet .wf-page .wf-ptext{padding:.5rem .6rem;font-size:.85em;color:var(--dim);max-height:7.5em;overflow:hidden;white-space:pre-wrap}
+      .work-fleet .wf-finding{margin-top:.5rem;padding:.5rem .6rem;background:#13201a;border-radius:8px;color:var(--ink)}
+      .work-fleet .wf-agent[data-s=searching] .wf-dot{background:var(--searching);box-shadow:0 0 7px var(--searching)}
+      .work-fleet .wf-agent[data-s=reading] .wf-dot{background:var(--reading);box-shadow:0 0 7px var(--reading)}
+      .work-fleet .wf-agent[data-s=thinking] .wf-dot{background:var(--thinking);box-shadow:0 0 7px var(--thinking)}
+      .work-fleet .wf-agent[data-s=done] .wf-dot{background:var(--done)}
       </style>
       <script>(function(){
         var root=document.getElementById('fleet-#{esc(name)}'); if(!root) return;
-        var stream=root.dataset.stream, grid=root.querySelector('.wf-grid'), tiles={}, live=0, spawned=0, es=null;
+        var stream=root.dataset.stream, es=null, agents={}, live=0, spawned=0;
+        var launch=root.querySelector('.wf-launch'), run=root.querySelector('.wf-run');
+        var thread=root.querySelector('.wf-thread'), report=root.querySelector('.wf-report');
         var q=root.querySelector('.wf-q'), n=root.querySelector('.wf-n'), go=root.querySelector('.wf-go');
+        function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
         function st(){root.querySelector('.wf-live').textContent=live;root.querySelector('.wf-spawned').textContent=spawned;}
-        function relayout(){var c=Object.keys(tiles).length||1;var r=grid.clientWidth/grid.clientHeight||1.6;
-          var cols=Math.max(1,Math.ceil(Math.sqrt(c*r)));var rows=Math.ceil(c/cols);
-          grid.style.gridTemplateColumns='repeat('+cols+',1fr)';grid.style.gridTemplateRows='repeat('+rows+',1fr)';
-          grid.classList.toggle('tiny',(grid.clientWidth/cols)<86||(grid.clientHeight/rows)<54);}
+        function md(t){return esc(t)
+          .replace(/^### (.*)$/gm,'<h3>$1</h3>').replace(/^## (.*)$/gm,'<h3>$1</h3>').replace(/^# (.*)$/gm,'<h2>$1</h2>')
+          .replace(/\\*\\*([^*]+)\\*\\*/g,'<b>$1</b>')
+          .replace(/\\[([^\\]]+)\\]\\((https?:[^)]+)\\)/g,'<a href="$2" target="_blank">$1</a>')
+          .replace(/(^|\\n)[-*] (.*)/g,'$1<li>$2</li>').replace(/(<li>[\\s\\S]*?<\\/li>)/g,'<ul>$1</ul>')
+          .replace(/\\n{2,}/g,'</p><p>').replace(/\\n/g,'<br>');}
+        function addStep(a,label,text){var d=document.createElement('div');d.className='wf-step';d.innerHTML='<b>'+esc(label)+'</b><span>'+esc(text)+'</span>';a.steps.appendChild(d);}
         function ev(e){
-          if(e.type==='fleet'){root.querySelector('.wf-cap').textContent=e.max;return;}
-          if(e.type==='spawn'){var t=document.createElement('div');t.className='wf-tile';t.dataset.s='thinking';
-            t.innerHTML='<div class="wf-h"><span class="wf-dot"></span><span>'+e.id+'</span></div><div class="wf-b"><span class="wf-a">'+(e.query||'')+'</span><div class="wf-u"></div></div>';
-            grid.appendChild(t);tiles[e.id]=t;spawned++;live++;st();relayout();return;}
-          if(e.type==='state'){var t=tiles[e.id];if(!t)return;t.dataset.s=e.status;
-            var a=t.querySelector('.wf-a'),u=t.querySelector('.wf-u');if(a&&e.action)a.textContent=e.action;if(u)u.textContent=e.url||'';return;}
-          if(e.type==='done'){var t=tiles[e.id];if(t){if(t.dataset.s!=='done')live--;t.dataset.s='done';var a=t.querySelector('.wf-a');if(a&&e.finding)a.textContent=e.finding;}st();return;}
-          if(e.type==='fleet_done'||e.type==='end'){go.disabled=false;go.textContent='Run fleet';if(es){es.close();es=null;}}
+          if(e.type==='fleet'){return;}
+          if(e.type==='spawn'){
+            var el=document.createElement('div');el.className='wf-agent';el.dataset.s='thinking';
+            el.innerHTML='<div class="wf-ahead"><span class="wf-dot"></span><span class="wf-aid">'+esc(e.id)+'</span><span class="wf-act">'+esc(e.query||'')+'</span><span class="wf-caret">▸</span></div><div class="wf-steps"></div>';
+            thread.appendChild(el);
+            var a={el:el,steps:el.querySelector('.wf-steps')};agents[e.id]=a;
+            el.querySelector('.wf-ahead').addEventListener('click',function(){el.classList.toggle('open');});
+            addStep(a,'task',e.query||'');spawned++;live++;st();return;
+          }
+          var a=agents[e.id];
+          if(e.type==='state'){if(!a)return;a.el.dataset.s=e.status;if(e.action)a.el.querySelector('.wf-act').textContent=e.action;
+            if(e.status==='searching')addStep(a,'search',e.action||'');else if(e.status==='reading')addStep(a,'read',e.url||e.action||'');else if(e.status==='thinking'&&e.action)addStep(a,'think',e.action);return;}
+          if(e.type==='page'){if(!a)return;var p=document.createElement('div');p.className='wf-page';
+            p.innerHTML='<div class="wf-purl">'+esc(e.url||'')+'</div><div class="wf-ptext">'+esc(e.preview||'')+'</div>';a.steps.appendChild(p);return;}
+          if(e.type==='done'){if(!a)return;if(a.el.dataset.s!=='done')live--;a.el.dataset.s='done';
+            if(e.finding){a.el.querySelector('.wf-act').textContent=e.finding;var f=document.createElement('div');f.className='wf-finding';f.textContent=e.finding;a.steps.appendChild(f);}st();return;}
+          if(e.type==='synth'){report.hidden=false;report.innerHTML='<h2>Final report</h2><p>'+esc(e.action||'compiling…')+'</p>';return;}
+          if(e.type==='report'){report.hidden=false;report.innerHTML='<h2>Final report</h2><p>'+md(e.content||'')+'</p>';report.scrollIntoView({behavior:'smooth'});return;}
+          if(e.type==='fleet_done'||e.type==='end'){if(es){es.close();es=null;}return;}
         }
-        root.querySelector('.wf-form').addEventListener('submit',function(x){x.preventDefault();
-          if(es)es.close();grid.innerHTML='';tiles={};live=0;spawned=0;st();
-          var query=encodeURIComponent((q.value||'').trim()||'WebAssembly');var max=Math.max(1,Math.min(64,parseInt(n.value)||24));
-          go.disabled=true;go.textContent='Running…';
-          es=new EventSource('/live/'+encodeURIComponent(stream)+'?q='+query+'&max='+max);
+        function start(){
+          var query=(q.value||'').trim();if(!query)return;
+          var max=Math.max(1,Math.min(48,parseInt(n.value)||8));
+          launch.hidden=true;run.hidden=false;thread.innerHTML='';report.hidden=true;agents={};live=0;spawned=0;st();
+          root.querySelector('.wf-query').textContent=query;
+          if(es)es.close();
+          es=new EventSource('/live/'+encodeURIComponent(stream)+'?q='+encodeURIComponent(query)+'&max='+max);
           es.onmessage=function(m){try{ev(JSON.parse(m.data));}catch(_){}};
-          es.onerror=function(){go.disabled=false;go.textContent='Run fleet';};
-        });
-        addEventListener('resize',relayout);
+          es.onerror=function(){if(es){es.close();es=null;}};
+        }
+        root.querySelector('.wf-form').addEventListener('submit',function(x){x.preventDefault();start();});
+        root.querySelector('.wf-new').addEventListener('click',function(){if(es){es.close();es=null;}run.hidden=true;launch.hidden=false;q.focus();});
       })();</script>
     """
   end

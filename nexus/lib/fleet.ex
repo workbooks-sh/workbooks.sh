@@ -44,14 +44,44 @@ defmodule Nexus.Fleet do
 
     subtasks = plan(task, max, model, provider)
 
-    subtasks
-    |> Enum.with_index(1)
-    |> Enum.map(fn {st, i} ->
-      Task.async(fn -> worker("a#{i}", st, sys, model, provider, timeout, emit) end)
-    end)
-    |> Task.await_many(:infinity)
+    findings =
+      subtasks
+      |> Enum.with_index(1)
+      |> Enum.map(fn {st, i} ->
+        Task.async(fn -> worker("a#{i}", st, sys, model, provider, timeout, emit) end)
+      end)
+      |> Task.await_many(:infinity)
+
+    # Synthesis: compile every agent's finding into one final report.
+    emit.(%{type: "synth", action: "compiling final report…"})
+    report = synthesize(task, findings, model, provider)
+    emit.(%{type: "report", content: report})
 
     emit.(%{type: "fleet_done", spawned: length(subtasks)})
+    report
+  end
+
+  # Combine the fleet's findings into a single cited report.
+  defp synthesize(task, findings, model, provider) do
+    notes =
+      findings
+      |> Enum.reject(&(&1.finding in [nil, "", "error"]))
+      |> Enum.map_join("\n\n", fn f -> "### #{f.subtask}\n#{f.finding}" end)
+
+    if String.trim(notes) == "" do
+      "No findings were gathered."
+    else
+      prompt =
+        "You are compiling a research team's findings into one final report on:\n#{task}\n\n" <>
+          "Each section below is one agent's finding. Synthesize them into a clear, well-structured " <>
+          "report (markdown: a short intro, then the key points as sections/bullets, then a 1-line " <>
+          "takeaway). Merge overlap, keep the concrete facts and URLs.\n\n#{notes}"
+
+      case Nexus.Llm.complete([%{role: "user", content: prompt}], model: model, provider: provider, max_tokens: 1200) do
+        {:ok, %{content: c}} when is_binary(c) and c != "" -> c
+        _ -> notes
+      end
+    end
   end
 
   # Coordinator: one LLM call decomposes the task into distinct, researchable sub-tasks.
@@ -75,32 +105,32 @@ defmodule Nexus.Fleet do
     end
   end
 
-  # One real agent. Streams its live activity through the agent's :on_event hook.
+  # One real agent. Streams its live activity through the agent's :on_event hook. Returns its finding.
   defp worker(id, subtask, sys, model, provider, timeout, emit) do
     emit.(%{type: "spawn", id: id, query: clean(subtask)})
     emit.(%{type: "state", id: id, status: "thinking", action: "planning research…"})
 
-    on_event = fn ev -> emit.(translate(id, ev)) end
+    on_event = fn ev -> Enum.each(List.wrap(translate(id, ev)), emit) end
 
-    result =
-      Nexus.Agent.run(
-        task: subtask,
-        system: sys,
-        model: model,
-        provider: provider,
-        on_event: on_event,
-        timeout_ms: timeout
-      )
+    finding =
+      case Nexus.Agent.run(
+             task: subtask,
+             system: sys,
+             model: model,
+             provider: provider,
+             on_event: on_event,
+             timeout_ms: timeout
+           ) do
+        {:ok, answer} when is_binary(answer) and answer != "" -> clean(answer, 600)
+        _ -> ""
+      end
 
-    case result do
-      {:ok, answer} when is_binary(answer) and answer != "" ->
-        emit.(%{type: "done", id: id, finding: clean(answer)})
-
-      _ ->
-        emit.(%{type: "done", id: id, finding: ""})
-    end
+    emit.(%{type: "done", id: id, finding: finding})
+    %{id: id, subtask: subtask, finding: finding}
   rescue
-    _ -> emit.(%{type: "done", id: id, finding: "error"})
+    _ ->
+      emit.(%{type: "done", id: id, finding: "error"})
+      %{id: id, subtask: subtask, finding: ""}
   end
 
   # Map a real agent event → a fleet state event.
@@ -124,7 +154,29 @@ defmodule Nexus.Fleet do
     do: %{type: "state", id: id, status: "thinking", action: clean(content)}
 
   defp translate(id, {:answer, content}),
-    do: %{type: "state", id: id, status: "done", action: clean(content)}
+    do: %{type: "state", id: id, status: "done", action: clean(content, 300)}
+
+  # A scrape/read tool RESULT → a page preview the user can see in the agent's thread.
+  defp translate(id, {:result, cmd, output}) do
+    {verb, rest} = split(cmd)
+
+    if verb in ~w(scrape render navigate) and is_binary(output) do
+      url = rest |> String.split() |> Enum.find(&String.starts_with?(&1, "http")) || rest
+      %{type: "page", id: id, url: clean(url), preview: preview(output)}
+    else
+      nil
+    end
+  end
+
+  defp translate(_id, _other), do: nil
+
+  # A page preview: first lines of the scraped markdown, trimmed for the thread.
+  defp preview(output) do
+    output
+    |> String.replace(~r/\n{2,}/, "\n")
+    |> String.slice(0, 360)
+    |> String.trim()
+  end
 
   defp split(cmd) do
     case String.split(String.trim(cmd), ~r/\s+/, parts: 2) do
@@ -134,14 +186,16 @@ defmodule Nexus.Fleet do
     end
   end
 
-  defp clean(s) when is_binary(s) do
+  defp clean(s, len \\ 140)
+
+  defp clean(s, len) when is_binary(s) do
     s
     |> String.replace(~r/\.css-[^{]*\{[^}]*\}/, "")
     |> String.replace(~r/\{[^}]*\}/, "")
     |> String.replace(~r/\s+/, " ")
     |> String.trim()
-    |> String.slice(0, 140)
+    |> String.slice(0, len)
   end
 
-  defp clean(_), do: ""
+  defp clean(_, _), do: ""
 end
