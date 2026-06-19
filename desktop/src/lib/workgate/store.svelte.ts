@@ -21,13 +21,6 @@
 
 export type RememberKind = "one_time" | "this_session" | "this_workspace";
 
-/** Minimal interface the store needs from the WS bridge. Defined
- *  here (rather than imported) to avoid a circular ESM dependency:
- *  the ws bridge already imports this store to enqueue requests. */
-export interface WorkgatePushSink {
-  workgatePermit(decision: WorkgatePermitDecision): Promise<void>;
-}
-
 /** Wire shape pushed by Workbooks.Engine.Web.WorkgateChannel under event name
  *  `workgate_request`. Mirrors the BEAM-side Permit/Request structs in
  *  runtime/host */
@@ -60,18 +53,9 @@ class WorkgateStore {
   // the queue is empty (modal stays hidden).
   current = $derived(this.pending[0] ?? null);
 
-  // Set lazily once the WS bridge mounts; receives our outbound
-  // decisions and forwards to the Phoenix channel.
-  #bridge: WorkgatePushSink | null = null;
-
-  /** Wire the store to its WS bridge. Called from ws.svelte.ts on
-   *  module load. */
-  bindBridge(bridge: WorkgatePushSink) {
-    this.#bridge = bridge;
-  }
-
-  /** Called by WsBridgeStore's `workgate:control` channel handler
-   *  when a new request arrives from the agent. */
+  /** Enqueue a new request (local-only; the runtime transport that
+   *  used to push these over `workgate:control` is gone — the modal
+   *  stays dormant until a local caller re-wires a source). */
   enqueue(req: WorkgateRequest) {
     // Dedup by id — if for some reason the channel re-broadcasts,
     // don't show the same prompt twice.
@@ -109,16 +93,11 @@ class WorkgateStore {
     this.#advance(req.id);
   }
 
-  /** Internal: send the decision through the bridge. */
-  async #respond(decision: WorkgatePermitDecision) {
-    if (!this.#bridge) {
-      // No bridge yet — shouldn't happen in production, but in tests
-      // (or on a misconfigured boot) we don't want to throw and
-      // strand the modal.
-      console.warn("[workgate] no bridge bound; decision discarded:", decision);
-      return;
-    }
-    await this.#bridge.workgatePermit(decision);
+  /** Internal: record the decision. The runtime transport that pushed
+   *  permits back over `workgate:control` is gone; until a local sink
+   *  is re-wired the decision is resolved in-process. */
+  async #respond(_decision: WorkgatePermitDecision) {
+    return;
   }
 
   #advance(handled_id: string) {

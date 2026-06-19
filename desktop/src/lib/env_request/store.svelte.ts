@@ -36,40 +36,25 @@ export interface EnvCancelPayload {
   request_id: string;
 }
 
-/** Minimal interface the store needs from the WS bridge. Defined here
- *  to keep the store independent of bridge internals. */
-export interface EnvRequestPushSink {
-  envFulfill(payload: EnvFulfillPayload): Promise<void>;
-  envCancel(payload: EnvCancelPayload): Promise<void>;
-}
-
 class EnvRequestStore {
   // Queue of in-flight requests. Head is rendered.
   pending = $state<EnvRequest[]>([]);
 
   current = $derived(this.pending[0] ?? null);
 
-  #bridge: EnvRequestPushSink | null = null;
-
-  bindBridge(bridge: EnvRequestPushSink) {
-    this.#bridge = bridge;
-  }
-
-  /** Called by WsBridgeStore's `engine:env_prompt` channel handler. */
+  /** Enqueue a new request (local-only; the runtime transport that
+   *  pushed these over `engine:env_prompt` is gone — the modal stays
+   *  dormant until a local caller re-wires a source). */
   enqueue(req: EnvRequest) {
     if (this.pending.some((r) => r.id === req.id)) return;
     this.pending = [...this.pending, req];
   }
 
   /** User clicked Provide. `locked` overrides the request's default. */
-  async fulfill(value: string, locked: boolean) {
+  async fulfill(_value: string, _locked: boolean) {
     const req = this.current;
     if (!req) return;
-    await this.#bridge?.envFulfill({
-      request_id: req.id,
-      value,
-      locked,
-    });
+    // Runtime transport gone — advance the queue locally.
     this.#advance(req.id);
   }
 
@@ -77,7 +62,6 @@ class EnvRequestStore {
   async cancel() {
     const req = this.current;
     if (!req) return;
-    await this.#bridge?.envCancel({ request_id: req.id });
     this.#advance(req.id);
   }
 

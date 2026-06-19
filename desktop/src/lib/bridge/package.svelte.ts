@@ -1,25 +1,16 @@
 // files domain — package store (Phase B). Native package_* commands
-// (fully offline) + best-effort scope push to the optional runtime.
+// (fully offline).
 //
 // Reactive front-end for the native Tauri package_* commands. Owns:
 //
 //   * `workspaces` — the list of all defined packages by name
 //   * `active` — the active package (folder list + name) or null
-//   * scope-push wiring: when the active package changes, push the
-//     folder list down the WS bridge to the agent's `workspace:control`
-//     channel. RUNTIME-only and graceful: skipped when the bridge is
-//     offline (see pushScopeToAgent). The push happens (a) whenever Rust
-//     emits `workspace-scope-change` and (b) once on bridge re-connect.
 //
 // Mutations refresh directly; the native `fs-tree-changed` watcher re-scans for
-// out-of-band local writes (agent `mkdir`, external tools). We ALSO subscribe to
-// the runtime's `monorepo:watch` push (ws.onMonorepoChange) so an agent-written
-// file syncs to the sidebar even when the native OS watcher misses it or isn't
-// running (e.g. a non-Tauri shell, or a debounced/scoped local watcher).
+// out-of-band local writes (agent `mkdir`, external tools).
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { ws } from "./ws.svelte";
 import { active } from "./_active.svelte";
 
 /** File-tree view filter (wb-i38o.14). Mirrors the Rust `ViewMode`
@@ -81,26 +72,9 @@ class PackageStore {
   loading = $state(false);
   lastError = $state<string | null>(null);
 
-  // Surface the most recent scope-push outcome so the Sidecar Status
-  // card can render whether the agent actually saw the change.
-  lastPushStatus = $state<"pending" | "ok" | "error" | "idle">("idle");
-  lastPushAt = $state<number | null>(null);
-
   #unlisten: UnlistenFn | null = null;
   #unsubFsTree: UnlistenFn | null = null;
-  #unsubMonorepo: (() => void) | null = null;
-  #refreshTimer: ReturnType<typeof setTimeout> | null = null;
   #initStarted = false;
-
-  // Coalesced re-scan — agents can write many files in a burst; one refresh
-  // per quiet window, not per event.
-  #scheduleRefresh() {
-    if (this.#refreshTimer) clearTimeout(this.#refreshTimer);
-    this.#refreshTimer = setTimeout(() => {
-      this.#refreshTimer = null;
-      void this.refresh();
-    }, 400);
-  }
 
   async init() {
     if (this.#initStarted) return;
@@ -132,19 +106,8 @@ class PackageStore {
           };
         }
         await this.refresh();
-        await this.pushScopeToAgent();
       },
     );
-
-    // Re-push the scope on WS reconnect — the sidecar may have just
-    // restarted with a fail-closed default and needs the active set
-    // back before tools work again.
-    ws.subscribe((evt) => {
-      if (evt.name === "bridge:connected") {
-        // Defer so the bridge's PROBE join completes first.
-        queueMicrotask(() => this.pushScopeToAgent());
-      }
-    });
 
     // Live: any FS change under the workspaces dir means a new
     // package folder may have appeared (created directly by the voice
@@ -163,25 +126,14 @@ class PackageStore {
       },
     );
 
-    // Also re-scan on RUNTIME-pushed file changes (monorepo:watch). The native
-    // fs-tree-changed watcher above is local-only and can miss a write (or not run
-    // in every host — e.g. a vite/web shell, or a write the OS watcher debounced
-    // away). The runtime KNOWS when an agent wrote a file, so this is the reliable
-    // signal that an agent-generated workbook lands in the sidebar. Coalesced.
-    this.#unsubMonorepo = ws.onMonorepoChange("**/*", () => this.#scheduleRefresh());
-
     await this.refresh();
   }
 
   destroy() {
     this.#unlisten?.();
     this.#unsubFsTree?.();
-    this.#unsubMonorepo?.();
-    if (this.#refreshTimer) clearTimeout(this.#refreshTimer);
     this.#unlisten = null;
     this.#unsubFsTree = null;
-    this.#unsubMonorepo = null;
-    this.#refreshTimer = null;
     this.#initStarted = false;
   }
 
@@ -327,31 +279,6 @@ class PackageStore {
       this.active = { ...this.active, subtree: w.subtree ?? null };
     }
     return w;
-  }
-
-  /** Push the current active scope down the WS bridge to the agent's
-   *  `workspace:control` channel. Called automatically on:
-   *   - active-workspace change (Rust event)
-   *   - WS (re)connect
-   *   - folder add/remove on the active workspace (Rust event)
-   *  Safe to call repeatedly — the agent-side set_scope is idempotent. */
-  async pushScopeToAgent(): Promise<void> {
-    if (!ws.connected) {
-      this.lastPushStatus = "idle";
-      return;
-    }
-    this.lastPushStatus = "pending";
-    try {
-      const payload = this.active
-        ? { workspace: this.active.name, folders: this.active.folders }
-        : { workspace: null, folders: [] };
-      await ws.pushWorkspaceScope(payload);
-      this.lastPushStatus = "ok";
-      this.lastPushAt = Date.now();
-    } catch (e) {
-      this.lastPushStatus = "error";
-      this.lastError = e instanceof Error ? e.message : String(e);
-    }
   }
 }
 
