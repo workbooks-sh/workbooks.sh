@@ -65,12 +65,65 @@ defmodule Nexus.Server do
     |> send_resp(200, Jason.encode!(rows, escape: :html_safe))
   end
 
+  # ── Swarm showcase ───────────────────────────────────────────────────────────────────────────
+  # The single-viewport demo workbook: a compose bar + a live grid of agent windows.
+  get "/swarm-demo" do
+    path = Path.join(:code.priv_dir(:nexus), "swarm-demo.html")
+
+    case File.read(path) do
+      {:ok, html} -> conn |> put_resp_content_type("text/html") |> send_resp(200, html)
+      _ -> send_resp(conn, 404, "swarm-demo.html not found")
+    end
+  end
+
+  # SSE stream: run a research swarm for ?q= capped at ?max= agents, pushing each agent's live state
+  # as it searches/reads/spawns. One event per line; the browser's EventSource renders the fleet.
+  get "/swarm" do
+    conn = Plug.Conn.fetch_query_params(conn)
+    query = conn.query_params["q"] || ""
+    max = case Integer.parse(conn.query_params["max"] || "24") do
+      {n, _} -> n
+      _ -> 24
+    end
+
+    conn =
+      conn
+      |> put_resp_content_type("text/event-stream")
+      |> put_resp_header("cache-control", "no-cache")
+      |> send_chunked(200)
+
+    me = self()
+    emit = fn event -> send(me, {:sse, event}) end
+    runner = spawn_link(fn -> Nexus.Swarm.run(query, max, emit); send(me, :sse_done) end)
+
+    final = stream_sse(conn)
+    if Process.alive?(runner), do: Process.exit(runner, :kill)
+    final
+  end
+
   # The hosted control-plane API (only answers when WB_CONTROL_PLANE — else Nexus.Platform 404s, so a
   # tenant runtime is indistinguishable). Auth (the plug above) has already resolved the org tenant.
   forward("/api/platform", to: Nexus.Platform)
 
   match _ do
     send_resp(conn, 404, "not found")
+  end
+
+  # Pump swarm events to the client as SSE frames until the fleet drains or the socket drops.
+  defp stream_sse(conn) do
+    receive do
+      {:sse, event} ->
+        case chunk(conn, "data: " <> Jason.encode!(event) <> "\n\n") do
+          {:ok, conn} -> stream_sse(conn)
+          {:error, _} -> conn
+        end
+
+      :sse_done ->
+        {:ok, conn} = chunk(conn, "data: " <> Jason.encode!(%{type: "end"}) <> "\n\n")
+        conn
+    after
+      120_000 -> conn
+    end
   end
 
   defp root, do: Application.get_env(:nexus, :workbook_root) || File.cwd!()

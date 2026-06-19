@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="darkreader-lock"><meta name="color-scheme" content="dark">
+<title>Nexus Swarm — one nexus, many agents</title>
+<style>
+  :root{
+    --bg:#0c0d10; --panel:#15171c; --line:#23262e; --ink:#e7e9ee; --dim:#8b909c;
+    --searching:#4a90d9; --reading:#e0a042; --thinking:#a070e0; --spawning:#33c4c4; --done:#3fbf6f;
+    --accent:#7dd3a8;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Geist",sans-serif;
+  }
+  *{box-sizing:border-box} html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--ink);display:flex;flex-direction:column;overflow:hidden}
+
+  header{flex:none;display:flex;align-items:center;gap:.7rem;padding:.6rem .9rem;border-bottom:1px solid var(--line);background:var(--panel)}
+  .brand{font-weight:650;letter-spacing:-.01em;font-size:.95rem;white-space:nowrap}
+  .brand small{color:var(--dim);font-weight:400;margin-left:.4rem}
+  form{display:flex;gap:.5rem;align-items:center;flex:1}
+  input[type=text]{flex:1;min-width:8rem;background:#0e0f13;border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:.5rem .7rem;font-size:.9rem;outline:none}
+  input[type=text]:focus{border-color:var(--accent)}
+  .maxwrap{display:flex;align-items:center;gap:.35rem;color:var(--dim);font-size:.8rem}
+  input[type=number]{width:4.5rem;background:#0e0f13;border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:.5rem;font-size:.9rem;outline:none;text-align:right}
+  button{background:var(--accent);color:#06281a;border:0;border-radius:8px;padding:.55rem 1rem;
+    font-weight:650;font-size:.9rem;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+  .stat{flex:none;display:flex;gap:1rem;font-size:.8rem;color:var(--dim);font-variant-numeric:tabular-nums}
+  .stat b{color:var(--ink);font-weight:600}
+
+  main{flex:1;min-height:0;padding:6px;display:grid;gap:4px}
+  .tile{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    overflow:hidden;display:flex;flex-direction:column;min-height:0;min-width:0;
+    animation:pop .25s ease-out}
+  @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+  .tile .bar{flex:none;height:14px;display:flex;align-items:center;gap:4px;padding:0 5px;
+    background:#0e0f13;border-bottom:1px solid var(--line);font-size:9px;color:var(--dim)}
+  .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--dim);transition:background .2s}
+  .tile .id{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tile .body{flex:1;min-height:0;padding:5px 6px;font-size:10px;line-height:1.3;color:var(--ink);
+    overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
+  .tile .url{color:var(--dim);font-size:9px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .tile[data-s=searching] .dot{background:var(--searching);box-shadow:0 0 6px var(--searching)}
+  .tile[data-s=reading]   .dot{background:var(--reading);box-shadow:0 0 6px var(--reading)}
+  .tile[data-s=thinking]  .dot{background:var(--thinking);box-shadow:0 0 6px var(--thinking)}
+  .tile[data-s=spawning]  .dot{background:var(--spawning);box-shadow:0 0 6px var(--spawning)}
+  .tile[data-s=done]      .dot{background:var(--done)}
+  .tile[data-s=searching]{border-color:color-mix(in srgb,var(--searching) 45%,var(--line))}
+  .tile[data-s=reading]  {border-color:color-mix(in srgb,var(--reading) 45%,var(--line))}
+  .tile[data-s=thinking] {border-color:color-mix(in srgb,var(--thinking) 45%,var(--line))}
+  .tile[data-s=spawning] {border-color:color-mix(in srgb,var(--spawning) 45%,var(--line))}
+  .tile[data-s=done]     {opacity:.55}
+  .tile[data-s=searching],.tile[data-s=reading],.tile[data-s=thinking],.tile[data-s=spawning]{
+    animation:pop .25s ease-out, glow 1.6s ease-in-out infinite}
+  @keyframes glow{0%,100%{box-shadow:0 0 0 rgba(0,0,0,0)}50%{box-shadow:0 0 10px -2px currentColor}}
+
+  /* tiny mode (hundreds of agents): hide text, the colored cell IS the state */
+  main.tiny .tile .bar{display:none} main.tiny .tile .body{display:none}
+  main.tiny .tile{border-radius:3px}
+  main.tiny .tile::after{content:"";position:absolute;inset:0;background:currentColor;opacity:.12}
+  main.tiny .tile[data-s=searching]{color:var(--searching)} main.tiny .tile[data-s=reading]{color:var(--reading)}
+  main.tiny .tile[data-s=thinking]{color:var(--thinking)} main.tiny .tile[data-s=spawning]{color:var(--spawning)}
+  main.tiny .tile[data-s=done]{color:var(--done)}
+
+  .hint{position:fixed;inset:auto 0 0 0;text-align:center;padding:.4rem;color:var(--dim);font-size:.75rem;pointer-events:none}
+</style></head>
+<body>
+<header>
+  <span class="brand">Nexus Swarm<small>one nexus · live agents</small></span>
+  <form id="f">
+    <input id="q" type="text" placeholder="Research a topic…  e.g. BEAM concurrency" value="WebAssembly runtimes" autocomplete="off">
+    <span class="maxwrap">max agents <input id="max" type="number" min="1" max="1000" value="48"></span>
+    <button id="go" type="submit">Run swarm</button>
+  </form>
+  <div class="stat">
+    <span><b id="live">0</b> live</span>
+    <span><b id="spawned">0</b> spawned</span>
+    <span>of <b id="cap">0</b></span>
+  </div>
+</header>
+<main id="grid"></main>
+<div class="hint" id="hint">Type a topic, set how many agents, and run — each window is a real agent searching &amp; reading the web.</div>
+
+<script>
+const grid = document.getElementById('grid');
+const tiles = new Map();
+let live = 0, spawned = 0;
+const $ = id => document.getElementById(id);
+
+function relayout(){
+  const n = tiles.size || 1;
+  // fit ALL tiles into the one viewport: cols≈√(n·aspect); tiles shrink as n grows.
+  const r = grid.clientWidth / grid.clientHeight || 1.6;
+  const cols = Math.max(1, Math.ceil(Math.sqrt(n * r)));
+  const rows = Math.ceil(n / cols);
+  grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+  grid.style.gridTemplateRows = `repeat(${rows},1fr)`;
+  grid.classList.toggle('tiny', (grid.clientWidth/cols) < 90 || (grid.clientHeight/rows) < 60);
+}
+
+function setStat(){ $('live').textContent=live; $('spawned').textContent=spawned; }
+
+function onEvent(e){
+  if(e.type==='fleet'){ $('cap').textContent=e.max; $('hint').style.display='none'; return; }
+  if(e.type==='spawn'){
+    const t=document.createElement('div'); t.className='tile'; t.dataset.s='searching';
+    t.innerHTML=`<div class="bar"><span class="dot"></span><span class="id">${e.id}</span></div>`+
+                `<div class="body"><span class="act">spawning…</span><div class="url"></div></div>`;
+    grid.appendChild(t); tiles.set(e.id,t); spawned++; live++; setStat(); relayout(); return;
+  }
+  if(e.type==='state'){
+    const t=tiles.get(e.id); if(!t) return;
+    const prev=t.dataset.s; t.dataset.s=e.status;
+    if(e.status==='done' && prev!=='done') live--;
+    const act=t.querySelector('.act'), url=t.querySelector('.url');
+    if(act && e.action) act.textContent=e.action;
+    if(url) url.textContent=e.url||'';
+    setStat(); return;
+  }
+  if(e.type==='done'||e.type==='end'){ $('go').disabled=false; $('go').textContent='Run swarm'; }
+}
+
+let es=null;
+$('f').addEventListener('submit',ev=>{
+  ev.preventDefault();
+  if(es) es.close();
+  grid.innerHTML=''; tiles.clear(); live=0; spawned=0; setStat();
+  const q=encodeURIComponent($('q').value.trim()||'WebAssembly');
+  const max=Math.max(1,Math.min(1000,parseInt($('max').value)||48));
+  $('go').disabled=true; $('go').textContent='Running…';
+  es=new EventSource(`/swarm?q=${q}&max=${max}`);
+  es.onmessage=m=>{ try{ onEvent(JSON.parse(m.data)); }catch(_){} };
+  es.onerror=()=>{ $('go').disabled=false; $('go').textContent='Run swarm'; };
+});
+addEventListener('resize',relayout);
+</script>
+</body></html>
