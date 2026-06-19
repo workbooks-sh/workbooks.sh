@@ -83,16 +83,17 @@ client :app do
     details.activity:not([open]) > summary:before{transform:rotate(-90deg)}
     .digest{background:#fffaf0;border:1px solid #f3e6c8;border-radius:var(--radius);padding:10px 14px;
       font-size:13px;color:#7a6a3f;margin:8px 0;display:flex;gap:9px;align-items:flex-start}
-    .tasks{display:flex;flex-direction:column;gap:9px;margin:10px 0 4px}
-    .task{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px;
-      display:flex;gap:13px;align-items:center;cursor:pointer;transition:.15s;animation:pop .3s ease}
+    .tasks{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:11px;margin:10px 0 4px}
+    .task{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:14px;
+      display:flex;flex-direction:column;gap:9px;cursor:pointer;transition:.15s;animation:pop .3s ease;min-height:126px}
     @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
     .task:hover{border-color:#d8d3ca;box-shadow:0 4px 16px rgba(55,53,47,.05)}
-    .task.sel{border-color:var(--ink)}
+    .task.sel{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+    .thead{display:flex;align-items:center;justify-content:space-between}
     .ava{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:19px;flex:none}
-    .task .b{flex:1;min-width:0}
-    .task .t{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .task .s{font-size:13px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+    .task .t{font-weight:600;font-size:14px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .task .s{font-size:12.5px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:auto}
+    .tfoot{display:flex;justify-content:flex-end}
     .badge{display:inline-flex;gap:5px;align-items:center;background:var(--bg);border-radius:18px;
       padding:5px 11px;font-size:13px;font-weight:600;color:var(--ink);flex:none}
     .stp{font-size:12px;font-weight:600;padding:4px 10px;border-radius:16px;flex:none}
@@ -247,12 +248,18 @@ client :app do
 
     function card(id){
       if(tk[id])return tk[id];
-      var el=document.createElement('div');el.className='task';
-      el.innerHTML='<div class="ava"></div><div class="b"><div class="t"></div><div class="s"></div></div>'+
-        '<span class="badge" style="display:none">📄 <i>0</i></span><span class="stp searching">searching</span>';
-      var i=order.length; el.querySelector('.ava').textContent=AVA[i%AVA.length];
-      var tints=['var(--mint)','var(--sky)','var(--peach)','var(--lilac)']; el.querySelector('.ava').style.background=tints[i%4];
-      $('#tasks').appendChild(el);
+      // Agent ids are sequential (a1, a2, …) in dispatch order — but spawn events arrive
+      // concurrently. Place each card by its id so the grid always reads first-to-last.
+      var n=parseInt(String(id).replace(/\D/g,''),10)||(order.length+1), idx=n-1;
+      var el=document.createElement('div');el.className='task';el.dataset.n=n;
+      el.innerHTML='<div class="thead"><div class="ava"></div><span class="stp searching">searching</span></div>'+
+        '<div class="t"></div><div class="s"></div>'+
+        '<div class="tfoot"><span class="badge" style="display:none">📄 <i>0</i></span></div>';
+      el.querySelector('.ava').textContent=AVA[idx%AVA.length];
+      var tints=['var(--mint)','var(--sky)','var(--peach)','var(--lilac)']; el.querySelector('.ava').style.background=tints[idx%4];
+      var host=$('#tasks'),ref=null;
+      [].forEach.call(host.children,function(ch){if(ref===null&&(+ch.dataset.n)>n)ref=ch;});
+      host.insertBefore(el,ref);
       var o={el:el,sources:[],pages:{},finding:'',srcN:0,read:0,query:''};
       el.addEventListener('click',function(){openDetail(id);});
       tk[id]=o;order.push(id);return o;
