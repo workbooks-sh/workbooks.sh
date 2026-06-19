@@ -21,6 +21,18 @@ server :cloud do
       nx = %{id: params["nx"] || "dogfood", plan: Nexus.Pricing.default_tier().id, state: "running"}
       emit.(Nexus.Capacity.report(nx))
     end)
+
+    # The fleet: ONE nexus per org. We report THIS running nexus — its own identity + what it serves.
+    Nexus.Live.register("fleet", fn _params, emit ->
+      tier = Nexus.Pricing.default_tier()
+      emit.(%{nexuses: [%{
+        name: Application.get_env(:nexus, :nexus_name, "nexus"),
+        friendly: Application.get_env(:nexus, :nexus_friendly, ""),
+        state: "running",
+        tier: tier.name,
+        surfaces: length(Application.get_env(:nexus, :mounts, []))
+      }]})
+    end)
   end
 end
 
@@ -76,6 +88,18 @@ client :app do
     .dial .s.ok{color:var(--mint)} .dial .s.near{color:var(--peach)} .dial .s.over{color:#f0a0a0}
     .tierline{display:flex;gap:10px;align-items:baseline;margin:0 0 18px;color:var(--dim)}
     .tierline b{color:var(--ink);font-size:17px}
+    /* fleet */
+    .nx{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px}
+    .nx .top{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+    .nx .name{font:600 18px var(--mono);letter-spacing:-.01em}
+    .nx .friendly{color:var(--dim);font-size:14px}
+    .nx .st{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--mint)}
+    .nx .st .d{width:7px;height:7px;border-radius:50%;background:var(--mint)}
+    .nx .meta{display:flex;gap:26px;color:var(--dim);font-size:14px;margin-bottom:18px}
+    .nx .meta b{color:var(--ink)}
+    .nx .acts{display:flex;gap:8px}
+    .nx .acts button{border:1px solid var(--line);background:none;color:var(--ink);font:600 13px var(--sans);padding:8px 15px;border-radius:9px;cursor:pointer}
+    .nx .acts button:hover{background:rgba(255,255,255,.05)}
   </style>
 
   <aside class="side">
@@ -109,7 +133,11 @@ client :app do
       <p class="lead">Live RAM + storage against your tier ceiling — straight from <code>Nexus.Capacity</code>, the same engine the hosted control plane runs. Auto-scale lives within the ceiling; crossing it is a scale-up.</p>
       <div id="usage"><div class="soon">Reading capacity…</div></div>
     </section>
-    <section class="view" data-view="nexuses"><h1>Nexuses</h1><div class="soon"><b>Coming next.</b><br>Your one nexus — wake / sleep / scale (wb-8sk9).</div></section>
+    <section class="view" data-view="nexuses">
+      <h1>Nexuses</h1>
+      <p class="lead">One nexus per org — the nexus <em>is</em> the org. You scale this one; more separation is a new org, never a second nexus. This is the live nexus serving the dashboard you're reading.</p>
+      <div id="fleet"><div class="soon">Reading fleet…</div></div>
+    </section>
     <section class="view" data-view="domains"><h1>Domains</h1><div class="soon"><b>Coming next.</b><br>Bind a custom domain — TXT challenge + verify (wb-mr6u).</div></section>
     <section class="view" data-view="account"><h1>Account</h1><div class="soon"><b>Coming next.</b><br>CLI tokens, workspaces, team env vars (wb-mr6u).</div></section>
   </main>
@@ -127,8 +155,33 @@ client :app do
         [].forEach.call(document.querySelectorAll('.nav'),function(x){x.classList.toggle('on',x===n)});
         [].forEach.call(document.querySelectorAll('.view'),function(x){x.classList.toggle('on',x.dataset.view===v)});
         if(v==='usage'&&!loaded.usage){loaded.usage=true;loadUsage();}
+        if(v==='nexuses'&&!loaded.nexuses){loaded.nexuses=true;loadFleet();}
       });
     });
+
+    // nexuses view — the live fleet (one nexus per org) from the cloud server block's `fleet` source
+    function loadFleet(){
+      var box=$('#fleet'); box.innerHTML='<div class="soon">Reading fleet…</div>';
+      var es=new EventSource('live/fleet');
+      es.onmessage=function(e){ var r; try{r=JSON.parse(e.data)}catch(_){return}
+        if(r.type==='end'){es.close();return}
+        if(r.nexuses){ es.close();
+          box.innerHTML=r.nexuses.map(function(n){
+            return '<div class="nx"><div class="top"><span class="name">'+esc(n.name)+'</span>'+
+              (n.friendly?'<span class="friendly">'+esc(n.friendly)+'</span>':'')+
+              '<span class="st"><span class="d"></span>'+esc(n.state)+'</span></div>'+
+              '<div class="meta"><span>tier <b>'+esc(n.tier)+'</b></span><span>surfaces <b>'+esc(n.surfaces)+'</b></span></div>'+
+              '<div class="acts"><button data-act="sleep">Sleep</button><button data-act="scale">Scale up</button></div></div>';
+          }).join('');
+          [].forEach.call(document.querySelectorAll('#fleet [data-act]'),function(b){
+            b.addEventListener('click',function(){
+              if(b.dataset.act==='scale'){ document.querySelector('.nav[data-view="upgrade"]').click(); }
+              else { b.textContent='Sleeping…'; }
+            });
+          });
+        }};
+      es.onerror=function(){ es.close(); box.innerHTML='<div class="soon">Could not read fleet.</div>'; };
+    }
 
     // usage view — RAM + storage dials from the cloud server block's `usage` source (Nexus.Capacity)
     function dial(d){
