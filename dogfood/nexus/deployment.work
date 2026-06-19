@@ -1,0 +1,25 @@
+# Our nexus — deployment config
+
+This is the **our-cloud side of THE LINE**: the runtime ships neutral, and *our* values live here, as
+config. It's the `deployment.work` our control-plane nexus reads through `Nexus.Config` (a `deploy`
+block, never env vars, never constants in `lib/`). Dogfooding: we run our own nexus the exact way we
+ask everyone else to — a `.work` config declaration, read at boot.
+
+At deploy this file is placed where `Nexus.Config` looks (`/data/deployment.work`); here it is the
+tracked source of truth. Secrets are NOT here — those come through `Nexus.Secrets` from the encrypted
+control-plane store; this is only tunable config + our public business values.
+
+deploy do
+  # Our capacity tiers — the numbers the dashboard + the upsell read. `id | Name | ram_mb storage_gb price_usd domains(yes|no)`.
+  tiers="
+    starter | Starter | 1024 10 0 no
+    team    | Team    | 4096 100 49 yes
+    scale   | Scale   | 16384 1000 199 yes
+  "
+
+  reserved-hosts="workbooks.sh"                          # our domain of record — tenants can't bind under it
+  runtime-image="ghcr.io/workbooks-sh/runtime:latest"   # the image we provision per-tenant
+
+  search="brave"                                         # cloud web-search: keyed Brave (reliable from datacenter IPs)
+  compile-cache="on"
+end
