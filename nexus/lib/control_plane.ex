@@ -45,36 +45,23 @@ defmodule Nexus.ControlPlane do
     end
   end
 
-  # ── registry (tenant-partitioned, ETS) ─────────────────────────────────────────────────────────
+  # ── registry (tenant-partitioned, durable DETS) ────────────────────────────────────────────────
   # Key is always {org, kind, id} so a lookup is physically impossible to satisfy with another org's
-  # row — isolation is structural, not a WHERE clause we might forget.
-  @table :nexus_control_plane
-
-  defp table do
-    case :ets.whereis(@table) do
-      :undefined ->
-        try do
-          :ets.new(@table, [:named_table, :public, :set])
-        rescue
-          ArgumentError -> @table
-        end
-
-      _ ->
-        @table
-    end
-  end
+  # row — isolation is structural, not a WHERE clause we might forget. The table is owned by
+  # Nexus.ControlPlane.Store (a long-lived GenServer); rows persist across restarts.
+  defp table, do: Nexus.ControlPlane.Store.table()
 
   @doc "List an org's records of a kind (`:nexus` | `:workspace`). Only ever this org's rows."
   def list(org, kind) when is_binary(org) do
     table()
-    |> :ets.match_object({{org, kind, :_}, :_})
+    |> :dets.match_object({{org, kind, :_}, :_})
     |> Enum.map(fn {_k, rec} -> rec end)
     |> Enum.sort_by(& &1[:created_at])
   end
 
   @doc "Get one record by id, scoped to `org`. `{:ok, rec} | {:error, :not_found}`."
   def get(org, kind, id) when is_binary(org) do
-    case :ets.lookup(table(), {org, kind, id}) do
+    case :dets.lookup(table(), {org, kind, id}) do
       [{_k, rec}] -> {:ok, rec}
       [] -> {:error, :not_found}
     end
@@ -83,8 +70,8 @@ defmodule Nexus.ControlPlane do
   @doc "Create a record under `org`. `attrs` is a map; `:id`/`:org`/`:created_at` are stamped here."
   def put(org, kind, id, attrs) when is_binary(org) and is_binary(id) do
     rec = Map.merge(attrs, %{id: id, org: org, kind: kind})
-    rec = Map.put_new(rec, :created_at, monotonic())
-    :ets.insert(table(), {{org, kind, id}, rec})
+    rec = Map.put_new(rec, :created_at, System.os_time(:millisecond))
+    :dets.insert(table(), {{org, kind, id}, rec})
     {:ok, rec}
   end
 
@@ -93,7 +80,7 @@ defmodule Nexus.ControlPlane do
     case get(org, kind, id) do
       {:ok, rec} ->
         merged = Map.merge(rec, attrs)
-        :ets.insert(table(), {{org, kind, id}, merged})
+        :dets.insert(table(), {{org, kind, id}, merged})
         {:ok, merged}
 
       err ->
@@ -103,10 +90,11 @@ defmodule Nexus.ControlPlane do
 
   @doc "Delete a record scoped to `org`. A foreign org's delete is a silent no-op (returns :ok)."
   def delete(org, kind, id) when is_binary(org) do
-    :ets.delete(table(), {org, kind, id})
+    :dets.delete(table(), {org, kind, id})
     :ok
   end
 
-  # Monotonic-ish creation order without Date.now (forbidden in some lanes) — a unique increasing int.
-  defp monotonic, do: System.unique_integer([:monotonic, :positive])
+  @doc false
+  # Test helper — wipe the whole registry for a clean slate.
+  def reset, do: :dets.delete_all_objects(table())
 end

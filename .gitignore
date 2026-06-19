@@ -97,3 +97,7 @@ ether/spike/
 
 # content-addressed compiled-component cache (regenerated; pre-warmed at deploy)
 nexus/build/components
+
+# control-plane registry (durable, regenerated; lives on the /data volume in prod)
+nexus/control-plane.dets
+nexus/**/*.dets
