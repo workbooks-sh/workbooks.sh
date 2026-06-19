@@ -152,12 +152,19 @@ defmodule Nexus.Fleet do
       "No findings were gathered."
     else
       prompt =
-        "You are compiling a research team's findings into one final report on:\n#{task}\n\n" <>
-          "Each section below is one agent's finding. Synthesize them into a clear, well-structured " <>
-          "report (markdown: a short intro, then the key points as sections/bullets, then a 1-line " <>
-          "takeaway). Merge overlap, keep the concrete facts and URLs.\n\n#{notes}"
+        "You are the lead researcher writing a DEEP RESEARCH REPORT on:\n#{task}\n\n" <>
+          "Below are the findings your team of agents gathered over several rounds. Synthesize them " <>
+          "into a thorough, well-structured report in markdown with:\n" <>
+          "1. A `#` title.\n" <>
+          "2. A short **Executive summary** (2-4 sentences answering the question directly).\n" <>
+          "3. Several `##` thematic sections covering the substance, with concrete facts, numbers, " <>
+          "tradeoffs, and inline source links where the findings cite URLs.\n" <>
+          "4. A `## Key takeaways` bullet list.\n" <>
+          "5. A `## Open questions` list of what remains uncertain or unexplored.\n" <>
+          "Merge overlap, resolve contradictions, and be specific. Do not invent sources.\n\n" <>
+          "## Agent findings\n#{notes}"
 
-      case Nexus.Llm.complete([%{role: "user", content: prompt}], model: model, provider: provider, max_tokens: 1200) do
+      case Nexus.Llm.complete([%{role: "user", content: prompt}], model: model, provider: provider, max_tokens: 3000) do
         {:ok, %{content: c}} when is_binary(c) and c != "" -> c
         _ -> notes
       end
