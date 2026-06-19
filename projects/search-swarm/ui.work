@@ -24,27 +24,33 @@ client :app do
     section.file > .decl, section.file > figure{display:none!important}
     section.file{display:block;margin:0;padding:0;max-width:none;border:0}
 
-    #ss{max-width:980px;margin:0 auto;padding:38px 22px 120px}
+    /* subtle graph-paper, fading in from the corners */
+    .paper{position:fixed;inset:0;pointer-events:none;z-index:0;
+      background-image:linear-gradient(rgba(55,53,47,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(55,53,47,.05) 1px,transparent 1px);
+      background-size:26px 26px;
+      -webkit-mask-image:radial-gradient(78% 78% at 100% 100%,#000,transparent 44%),radial-gradient(62% 62% at 0% 0%,#000,transparent 44%);
+      mask-image:radial-gradient(78% 78% at 100% 100%,#000,transparent 44%),radial-gradient(62% 62% at 0% 0%,#000,transparent 44%)}
+    #ss{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:38px 22px 120px}
 
     /* ── intro page ── */
     #intro{min-height:calc(100vh - 76px);display:flex;flex-direction:column;justify-content:center}
     #intro .top{text-align:center;margin:0 0 30px}
     #intro .mark{font-size:34px;font-weight:700;letter-spacing:-.02em;display:inline-flex;gap:10px;align-items:center}
     #intro .tag{color:var(--soft);margin-top:10px;font-size:16px}
-    .composer{background:var(--paper);border:1px solid var(--line);border-radius:18px;
-      box-shadow:0 8px 30px rgba(55,53,47,.06);padding:14px 16px;margin:22px auto 14px;max-width:720px}
-    .composer textarea{width:100%;border:0;outline:0;resize:none;font:17px/1.5 'Inter',sans-serif;
-      color:var(--ink);background:transparent;min-height:30px}
+    .composer{background:var(--paper);border:1px solid var(--line);border-radius:22px;
+      box-shadow:0 14px 44px rgba(55,53,47,.08);padding:24px 26px;margin:30px auto 18px;max-width:800px}
+    .composer textarea{width:100%;border:0;outline:0;resize:none;font:21px/1.5 'Inter',sans-serif;
+      color:var(--ink);background:transparent;min-height:40px}
     .composer textarea::placeholder{color:#b6afa4}
-    .crow{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
-    .depth{display:inline-flex;gap:4px;background:var(--bg);border-radius:11px;padding:4px}
-    .dep{border:0;background:transparent;font:500 14px 'Inter';color:var(--soft);padding:6px 13px;
-      border-radius:8px;cursor:pointer;transition:.15s}
+    .crow{display:flex;align-items:center;justify-content:space-between;margin-top:16px}
+    .depth{display:inline-flex;gap:4px;background:var(--bg);border-radius:13px;padding:5px}
+    .dep{border:0;background:transparent;font:500 15px 'Inter';color:var(--soft);padding:9px 17px;
+      border-radius:9px;cursor:pointer;transition:.15s}
     .dep.active{background:var(--paper);color:var(--ink);box-shadow:0 1px 4px rgba(55,53,47,.1)}
-    .go{border:0;background:var(--ink);color:#fff;font:600 15px 'Inter';padding:10px 20px;
-      border-radius:11px;cursor:pointer;display:inline-flex;gap:7px;align-items:center;transition:.15s}
+    .go{border:0;background:var(--ink);color:#fff;font:600 16px 'Inter';padding:13px 26px;
+      border-radius:13px;cursor:pointer;display:inline-flex;gap:7px;align-items:center;transition:.15s}
     .go:hover{transform:translateY(-1px)}
-    .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:6px auto 4px;max-width:720px}
+    .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px auto 4px;max-width:800px}
     .chip{background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:7px 14px;
       font-size:14px;color:var(--soft);cursor:pointer;transition:.15s}
     .chip:hover{color:var(--ink);border-color:#d8d3ca}
@@ -137,6 +143,7 @@ client :app do
     #detail .finding{background:var(--mint);border-radius:11px;padding:13px 15px;font-size:14px;margin-top:8px}
   </style>
 
+  <div class="paper"></div>
   <div id="ss">
     <div id="intro">
       <div class="top">
