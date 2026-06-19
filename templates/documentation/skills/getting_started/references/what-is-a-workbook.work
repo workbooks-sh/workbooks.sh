@@ -1,0 +1,56 @@
+# What is a workbook
+
+A **workbook is a folder of `.work` files** (plus any assets they use). That's the
+whole idea. There's no project scaffold to learn, no framework layout to memorize
+— a directory of literate documents *is* the application.
+
+## A folder you can hold
+
+Each `.work` file is a [literate document](/introduction/what-is-a-work-file):
+prose that explains, and `do … end` blocks that run. Put a few of them in a folder
+and you have a workbook — a complete piece of software where the explanation and
+the code live in the same place.
+
+Because it's just files in a folder, a workbook moves the way documents move. You
+can read it top to bottom, drop it in git, hand it to a teammate, or point an agent
+at it — and what they get is the whole thing: interface, logic, data shape, and the
+reasons behind all three.
+
+## The four lanes
+
+Everything inside a workbook falls into one of four lanes. You'll meet them
+properly in [Anatomy of a .work file](/language/anatomy); here's the shape:
+
+- **Prose** — the rich text that narrates and carries links between ideas.
+- **Declaration** — structure with no body: a table, an enum, a record.
+- **Code** — a runnable block: a function, a server unit, a browser island.
+- **Placement** — the first word of a block says *where* it runs: in the browser
+  (`client`), on the engine (`server`), or in a capability sandbox (`sandbox`).
+
+One file can hold all four. That's the point — the thing people see, the code that
+makes it work, and the data it stands on don't live in three repositories. They
+live in one document.
+
+## How a workbook ships
+
+You don't assemble a workbook by hand. The [`work` CLI](/introduction/what-is-the-work-cli)
+operates on the folder: `work weave` folds the tree into one shippable artifact,
+`work check` resolves the links between files and audits what each block is allowed
+to do, and `work dev` watches the folder and re-weaves as you edit.
+
+The folder is how you organize; the woven artifact is what you ship; the
+[Nexus](/introduction/what-is-the-nexus) is what runs it.
+
+That woven artifact is HTML — but HTML here is purely a **build output**, the
+format the weave emits because it runs everywhere. It isn't something you author or
+configure, and you never hand-write it. You write `.work`; weave produces the HTML.
+
+## Kits and apps
+
+Most workbooks are one of two things. A **kit** is meant to be *imported and
+composed* by other workbooks — a shared piece other things build on. An **app** is
+the *leaf you launch* — the thing with an interface you actually open. A workbook
+can be both: an app that also exports a kit for the next one to use.
+
+You don't have to declare this up front to get started. Make a folder, write a
+`.work` file, and you already have a workbook.
