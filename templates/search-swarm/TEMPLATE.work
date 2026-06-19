@@ -1,0 +1,36 @@
+# Search Swarm — template :app, :agent
+
+A complete, runnable example app: a multi-agent web-research swarm with a live interface, persisted
+history, real-cost accounting, in-browser dictation, and hand-drawn report charts. Authored entirely
+in `.work` — scaffold it with `work new search-swarm <your-app>`, then replace the logic that's yours.
+
+## What's the template, and what's the platform
+
+The **platform** does the heavy lifting and is NOT part of this folder — you just call it: `Nexus.Llm`
+(models), `Nexus.Browse`/`Nexus.Browse.Media` (fetch, render, media harvest), `Nexus.Store` (rows),
+`Nexus.Objects` (blobs), `Nexus.Live` (the live SSE source the UI binds to), and the weaver (a
+`client` block renders as the browser island). Those ship with the runtime.
+
+The **template** is the three `.work` blocks you own and replace:
+
+- `index.work` → `server :swarm` — the orchestration (plan → dispatch → pull → digest → synthesize).
+  **Replace with your own server logic.** It's plain Elixir compiled to a BEAM module; keep `register/0`
+  (it wires your `Nexus.Live` source) and the event shapes your UI consumes, swap the rest.
+- `index.work` → `resource Session` — your data model. **Replace the fields** with whatever your app
+  stores; it persists to the workbook's managed store automatically.
+- `ui.work` → `client :app` — the browser island (HTML/CSS/JS, emitted verbatim). **Replace with your
+  UI.** It opens an `EventSource` on your live source and renders the stream.
+
+## Run it
+
+  work weave .            # → one self-contained workbook.html
+  work dev .              # watch + re-weave
+  # or serve live (server blocks + the live source) on the local nexus:
+  WB_SERVE=1 PORT=4000 WB_DATA="$(pwd)" elixir --no-halt -S mix run   # from the runtime
+
+## Replace checklist
+
+1. `resource` fields → your data.
+2. `server` block body → your orchestration / API (keep `register/0` + the emitted event types).
+3. `client` block → your interface (keep the `EventSource('/live/<source>')` wiring).
+4. Rename the live source string (`"swarm"`) and the resource (`Session`) to your app's names.

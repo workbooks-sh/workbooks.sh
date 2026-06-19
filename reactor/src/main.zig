@@ -8,6 +8,7 @@ const author = @import("author.zig");
 const weave = @import("weave.zig");
 const dev = @import("dev.zig");
 const deploy = @import("deploy.zig");
+const newcmd = @import("new.zig");
 const context = @import("context.zig");
 const conformance = @import("conformance.zig");
 test {
@@ -43,6 +44,10 @@ pub fn main(init: std.process.Init) !void {
     } else if (eql(verb, "wit")) {
         const name = stripColon(it.next() orelse "");
         std.process.exit(try author.wit(io, alloc, it.next() orelse ".", name));
+    } else if (eql(verb, "new")) {
+        const troot = init.environ_map.get("WB_TEMPLATES") orelse "templates";
+        const tmpl = it.next() orelse "";
+        std.process.exit(try newcmd.new(io, alloc, troot, tmpl, it.next() orelse ""));
     } else if (eql(verb, "weave")) {
         const d = it.next() orelse ".";
         const o = it.next() orelse "workbook.html";
@@ -135,6 +140,7 @@ const groups = [_]Group{
         .{ "why/near/wit :unit", "code-graph deps + the generated WIT world" },
     } },
     .{ .name = "build", .blurb = "weave & run", .verbs = &.{
+        .{ "new <template> [dest]", "scaffold an example project to own + edit" },
         .{ "weave <dir> <out>", "weave a tree into one self-contained html" },
         .{ "graph <dir> <out>", "render the code graph as a workbook" },
         .{ "dev <dir>", "watch & re-weave on change (+ nexus hot-swap)" },
