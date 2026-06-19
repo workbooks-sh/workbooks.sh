@@ -109,3 +109,27 @@ jobs:
             $(printf "${IMAGE}@sha256:%s " *)
           echo "=== published ${IMAGE}:latest (+ ${sha}) ==="
           docker buildx imagetools inspect "${IMAGE}:latest"
+
+      # Boot the just-published image and confirm it actually SERVES — catches release-packaging bugs
+      # (e.g. a dep excluded from `mix release`) that compile + test green but 500 in prod. The jason
+      # bug (optional-transitive dep dropped from the release → every JSON endpoint 500'd) shipped a
+      # broken image precisely because nothing booted it before deploy. Now CI does.
+      - name: Smoke-test — the image boots and serves /health
+        run: |
+          set -euo pipefail
+          docker run -d --name nexus-smoke -e WB_SERVE=1 -e PORT=4000 -e WB_DATA=/tmp \
+            -p 4000:4000 "${IMAGE}:latest"
+          ok=0
+          for i in $(seq 1 40); do
+            body="$(curl -sf http://127.0.0.1:4000/health || true)"
+            if echo "$body" | grep -q '"service":"nexus"'; then
+              echo "✓ image serves a valid nexus /health: $body"; ok=1; break
+            fi
+            sleep 2
+          done
+          if [ "$ok" != "1" ]; then
+            echo "✗ image did not serve a valid nexus /health within 80s — release is broken"
+            docker logs nexus-smoke 2>&1 | tail -40
+            docker rm -f nexus-smoke; exit 1
+          fi
+          docker rm -f nexus-smoke
