@@ -327,9 +327,10 @@ server :swarm do
       sn =
         "Write a thorough, well-structured markdown research report answering: #{task}\n" <>
           "Use real web sources and cite them inline. Include a `# title`, `## Executive summary`, " <>
-          "thematic `##` sections, `## Key takeaways`, and `## Open questions`. Where the data warrants " <>
-          "it, include 1-2 figures as fenced ```figure JSON blocks " <>
-          "(e.g. {\"type\":\"bar\",\"title\":\"…\",\"data\":[{\"label\":\"A\",\"value\":40}]})."
+          "thematic `##` sections, `## Key takeaways`, and `## Open questions`. Include 3-5 figures as " <>
+          "fenced ```figure JSON blocks where the data warrants — types: bar, line, compare " <>
+          "({\"legend\":[\"X\",\"Y\"],\"data\":[{\"label\":\"A\",\"a\":40,\"b\":55}]}), donut, flow. " <>
+          "Emit real data only (e.g. {\"type\":\"bar\",\"title\":\"…\",\"data\":[{\"label\":\"A\",\"value\":40}]})."
 
       case llm([%{role: "user", content: sn}], [model: model <> ":online", max_tokens: 3000], emit) do
         {:ok, %{content: c}} when is_binary(c) and c != "" -> c
@@ -346,12 +347,16 @@ server :swarm do
           "source links where the findings cite URLs.\n" <>
           "4. A `## Key takeaways` bullet list.\n" <>
           "5. A `## Open questions` list of what remains uncertain.\n\n" <>
-          "WHERE IT GENUINELY HELPS (a comparison, a trend, a breakdown, or a process), include a " <>
-          "FIGURE as a fenced ```figure code block whose body is JSON. The interface renders these as " <>
-          "clean hand-drawn charts — DO NOT describe an image, emit the data. Supported shapes:\n" <>
-          "  ```figure\\n{\"type\":\"bar\",\"title\":\"…\",\"data\":[{\"label\":\"A\",\"value\":40},{\"label\":\"B\",\"value\":75}]}\\n```\n" <>
-          "  ```figure\\n{\"type\":\"flow\",\"title\":\"…\",\"steps\":[\"Plan\",\"Search\",\"Read\",\"Synthesize\"]}\\n```\n" <>
-          "Use 1-3 figures max, only when the data is real and warrants it. Numbers must come from the findings.\n\n" <>
+          "VISUALIZE THE ANSWER. Include 3-5 FIGURES as fenced ```figure blocks (JSON body) — the " <>
+          "interface renders them as clean hand-drawn charts. DO NOT describe an image; emit the data. " <>
+          "Before writing, plan which chart best communicates each point, and pick from:\n" <>
+          "  • bar — rank/compare magnitudes: {\"type\":\"bar\",\"title\":\"…\",\"data\":[{\"label\":\"A\",\"value\":40}]}\n" <>
+          "  • line — a trend over an ordered axis: {\"type\":\"line\",\"title\":\"…\",\"data\":[{\"label\":\"2020\",\"value\":12}]}\n" <>
+          "  • compare — two series side by side: {\"type\":\"compare\",\"title\":\"…\",\"legend\":[\"X\",\"Y\"],\"data\":[{\"label\":\"A\",\"a\":40,\"b\":55}]}\n" <>
+          "  • donut — proportions of a whole: {\"type\":\"donut\",\"title\":\"…\",\"data\":[{\"label\":\"A\",\"value\":60}]}\n" <>
+          "  • flow — a process/sequence: {\"type\":\"flow\",\"title\":\"…\",\"steps\":[\"Plan\",\"Search\",\"Read\"]}\n" <>
+          "Place each figure right after the section it illustrates. Every number MUST come from the " <>
+          "findings — never invent data; if a section has no quantitative basis, use flow or skip it.\n\n" <>
           "Merge overlap, resolve contradictions, be specific. Do not invent sources.\n\n" <>
           "## Agent findings\n#{notes}"
 

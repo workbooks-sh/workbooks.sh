@@ -69,11 +69,12 @@ client :app do
     @keyframes pulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
 
     .summary{display:none;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
-      padding:14px 18px;margin-bottom:18px;align-items:center;gap:22px}
+      margin-bottom:20px;align-items:stretch;overflow:hidden}
     .summary.on{display:flex}
-    .summary .s{display:flex;flex-direction:column}
-    .summary .s b{font-size:19px;font-weight:700}
-    .summary .s span{font-size:11px;color:var(--soft);text-transform:uppercase;letter-spacing:.06em}
+    .summary .s{display:flex;flex-direction:column;gap:3px;padding:15px 22px;border-left:1px solid var(--line);flex:1}
+    .summary .s:first-child{border-left:0}
+    .summary .s b{font-size:20px;font-weight:700;letter-spacing:-.01em}
+    .summary .s span{font-size:10.5px;color:var(--soft);text-transform:uppercase;letter-spacing:.07em;font-weight:500}
 
     details.activity{background:transparent;margin-bottom:14px}
     details.activity > summary{list-style:none;cursor:pointer;font-size:12px;text-transform:uppercase;
@@ -100,14 +101,23 @@ client :app do
     .stp.searching{background:var(--sky)} .stp.reading{background:var(--peach)}
     .stp.thinking{background:var(--lilac)} .stp.done{background:var(--mint)}
 
-    .report{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:34px 40px;margin-top:8px}
-    .report h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:0 0 14px}
-    .report h2{font-size:20px;font-weight:600;margin:26px 0 10px}
-    .report p{margin:0 0 13px} .report ul{margin:0 0 13px;padding-left:20px}
-    .report li{margin:4px 0} .report a{color:#2f6fed;text-decoration:none} .report a:hover{text-decoration:underline}
-    .report strong{font-weight:600}
-    .fig{margin:18px 0;padding:18px;background:#fffdf7;border:1px solid var(--line);border-radius:14px}
-    .fig .figt{font-size:13px;font-weight:600;color:var(--soft);margin-bottom:10px;text-align:center}
+    .report{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:42px 52px;margin-top:8px}
+    .report > *{max-width:720px}
+    .report > .fig,.report > .figwrap,.report table{max-width:none}
+    .report h1{font-size:27px;font-weight:700;letter-spacing:-.02em;margin:0 0 8px;line-height:1.2}
+    .report h2{font-size:19px;font-weight:600;margin:30px 0 10px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+    .report h3{font-size:15.5px;font-weight:600;margin:18px 0 8px}
+    .report p{margin:0 0 13px;color:#2c2a26} .report ul,.report ol{margin:0 0 13px;padding-left:22px}
+    .report li{margin:5px 0} .report a{color:#2f6fed;text-decoration:none} .report a:hover{text-decoration:underline}
+    .report strong{font-weight:600;color:var(--ink)}
+    .report code{background:var(--bg);padding:1px 6px;border-radius:5px;font-size:.88em}
+    .report table{border-collapse:collapse;width:100%;margin:18px 0;font-size:13.5px}
+    .report th,.report td{border:1px solid var(--line);padding:9px 13px;text-align:left;vertical-align:top}
+    .report thead th{background:var(--bg);font-weight:600}
+    .fig{margin:22px 0;padding:20px 22px 16px;background:var(--paper);border:1px solid var(--line);border-radius:14px}
+    .fig .figt{font-size:12px;font-weight:600;color:var(--soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+    .fig .leg{display:flex;gap:16px;justify-content:center;margin-top:12px;font-size:12px;color:var(--soft)}
+    .fig .leg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 
     #detail{position:fixed;top:0;right:0;width:430px;max-width:92vw;height:100vh;background:var(--paper);
       border-left:1px solid var(--line);box-shadow:-12px 0 40px rgba(55,53,47,.1);padding:26px 24px;
@@ -124,13 +134,7 @@ client :app do
     #detail .src .sd p{font-size:12px;color:var(--soft);margin:3px 0 0;line-height:1.4}
     #detail .read{font-size:11px;color:#3a9d63;font-weight:600} #detail .pend{font-size:11px;color:#b6afa4}
     #detail .finding{background:var(--mint);border-radius:11px;padding:13px 15px;font-size:14px;margin-top:8px}
-    .float{position:fixed;font-size:24px;opacity:.5;pointer-events:none;animation:drift 9s ease-in-out infinite}
-    @keyframes drift{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-16px) rotate(6deg)}}
   </style>
-
-  <div class="float" style="top:14%;left:6%">🔍</div>
-  <div class="float" style="top:22%;right:8%;animation-delay:-3s">📄</div>
-  <div class="float" style="bottom:18%;left:9%;animation-delay:-5s">✨</div>
 
   <div id="ss">
     <div id="intro">
@@ -313,17 +317,22 @@ client :app do
     }
 
     // Turn ```figure JSON blocks into hand-drawn (roughjs) charts.
+    var DRAW={bar:drawBar,line:drawLine,flow:drawFlow,compare:drawCompare,donut:drawDonut,pie:drawDonut};
     function renderFigures(root){
       if(!window.rough)return;
       [].forEach.call(root.querySelectorAll('code.language-figure'),function(code){
         var spec;try{spec=JSON.parse(code.textContent)}catch(e){return}
         var box=document.createElement('div');box.className='fig';
         if(spec.title){var t=document.createElement('div');t.className='figt';t.textContent=spec.title;box.appendChild(t);}
-        var svg=spec.type==='flow'?drawFlow(spec):drawBar(spec);
+        var svg=(DRAW[spec.type]||drawBar)(spec);
         if(svg)box.appendChild(svg);
+        if(spec.legend&&spec.legend.length&&spec.type!=='donut'&&spec.type!=='pie')box.appendChild(legendEl(spec.legend));
         var pre=code.closest('pre');if(pre)pre.replaceWith(box);else code.replaceWith(box);
       });
     }
+    function legendEl(names){var l=document.createElement('div');l.className='leg';
+      names.slice(0,5).forEach(function(n,i){var s=document.createElement('span');
+        s.innerHTML='<i style="background:'+TINTS[i%5]+'"></i>'+esc(n);l.appendChild(s);});return l;}
     function svgEl(w,h){var s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('width','100%');s.setAttribute('viewBox','0 0 '+w+' '+h);return s;}
     var TINTS=['#aee5c2','#a8d4f0','#f3c5a3','#d8c4f0','#f2ddb0'];
     function drawBar(spec){
@@ -352,10 +361,57 @@ client :app do
       return svg;
     }
     function trunc(s,n){s=String(s);return s.length>n?s.slice(0,n-1)+'…':s;}
-    function txt(x,y,s,size,fill,weight){var t=document.createElementNS('http://www.w3.org/2000/svg','text');
-      t.setAttribute('x',x);t.setAttribute('y',y);t.setAttribute('text-anchor','middle');
+    function txt(x,y,s,size,fill,weight,anchor){var t=document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x',x);t.setAttribute('y',y);t.setAttribute('text-anchor',anchor||'middle');
       t.setAttribute('font-size',size);t.setAttribute('fill',fill);t.setAttribute('font-family','Inter,sans-serif');
       if(weight)t.setAttribute('font-weight',weight);t.textContent=s;return t;}
+
+    // Line / trend — points connected, dots, baseline + x labels.
+    function drawLine(spec){
+      var data=(spec.data||[]).slice(0,12);if(data.length<2)return null;
+      var W=560,H=240,pX=42,pY=32,vals=data.map(function(d){return +d.value||0});
+      var max=Math.max.apply(null,vals),min=Math.min.apply(null,vals);if(max===min)max=min+1;
+      var svg=svgEl(W,H),rc=rough.svg(svg);
+      var X=function(i){return pX+i*((W-pX*2)/(data.length-1))},Y=function(v){return H-pY-((v-min)/(max-min))*(H-pY*2)};
+      svg.appendChild(rc.line(pX,H-pY,W-pX,H-pY,{roughness:1,stroke:'#d8d3ca',strokeWidth:1}));
+      svg.appendChild(rc.linearPath(data.map(function(d,i){return [X(i),Y(+d.value||0)]}),{roughness:1.2,stroke:'#37352f',strokeWidth:2}));
+      data.forEach(function(d,i){
+        svg.appendChild(rc.circle(X(i),Y(+d.value||0),9,{fill:TINTS[1],fillStyle:'solid',roughness:1,stroke:'#37352f',strokeWidth:1.2}));
+        svg.appendChild(txt(X(i),H-pY+16,trunc(d.label||'',9),10,'#787066'));
+      });
+      return svg;
+    }
+    // Compare — two series side by side per label (spec.data:[{label,a,b}], legend:[A,B]).
+    function drawCompare(spec){
+      var data=(spec.data||[]).slice(0,6);if(!data.length)return null;
+      var W=560,H=250,pad=36,gw=(W-pad*2)/data.length,bw=Math.min(34,gw*0.3);
+      var max=Math.max.apply(null,data.map(function(d){return Math.max(+d.a||0,+d.b||0)}))||1;
+      var svg=svgEl(W,H),rc=rough.svg(svg);
+      data.forEach(function(d,i){
+        var c=pad+i*gw+gw/2,aV=+d.a||0,bV=+d.b||0,ah=Math.max(2,(aV/max)*(H-78)),bh=Math.max(2,(bV/max)*(H-78));
+        var x0=c-bw-3,x1=c+3;
+        svg.appendChild(rc.rectangle(x0,H-46-ah,bw,ah,{fill:TINTS[0],fillStyle:'solid',roughness:1.5,stroke:'#37352f',strokeWidth:1.2}));
+        svg.appendChild(rc.rectangle(x1,H-46-bh,bw,bh,{fill:TINTS[1],fillStyle:'solid',roughness:1.5,stroke:'#37352f',strokeWidth:1.2}));
+        svg.appendChild(txt(x0+bw/2,H-50-ah,String(aV),10,'#37352f',700));
+        svg.appendChild(txt(x1+bw/2,H-50-bh,String(bV),10,'#37352f',700));
+        svg.appendChild(txt(c,H-24,trunc(d.label||'',12),11,'#787066'));
+      });
+      return svg;
+    }
+    // Donut — proportions, with a side legend + percentages.
+    function drawDonut(spec){
+      var data=(spec.data||[]).slice(0,6);if(!data.length)return null;
+      var total=data.reduce(function(s,d){return s+(+d.value||0)},0)||1;
+      var W=440,H=Math.max(220,data.length*26+40),cx=120,cy=110,r=82;
+      var svg=svgEl(W,H),rc=rough.svg(svg),a0=-Math.PI/2;
+      data.forEach(function(d,i){var a1=a0+((+d.value||0)/total)*Math.PI*2;
+        svg.appendChild(rc.arc(cx,cy,r*2,r*2,a0,a1,true,{fill:TINTS[i%5],fillStyle:'solid',roughness:1.3,stroke:'#37352f',strokeWidth:1.2}));a0=a1;});
+      svg.appendChild(rc.circle(cx,cy,r,{fill:'#ffffff',fillStyle:'solid',roughness:0.6,stroke:'#ffffff',strokeWidth:1}));
+      data.forEach(function(d,i){var ly=34+i*26;
+        svg.appendChild(rc.rectangle(248,ly,13,13,{fill:TINTS[i%5],fillStyle:'solid',roughness:1,stroke:'#37352f',strokeWidth:1}));
+        svg.appendChild(txt(270,ly+11,trunc(d.label||'',18)+'  '+Math.round((+d.value||0)/total*100)+'%',12,'#37352f',500,'start'));});
+      return svg;
+    }
 
     function stat(v,l){return '<div class="s"><b>'+v+'</b><span>'+l+'</span></div>';}
     function finish(){
