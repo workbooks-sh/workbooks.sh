@@ -1532,8 +1532,7 @@ const PIECES = [
       ["cmd", "work verify shop.html"],
       ["ok", "signature good · history intact · runs anywhere"],
       ["dim", "  mail it, git it, hand it to a teammate —"],
-      ["dim", "  the document is the deployment."]],
-    link: "learn/workbook.html", linkLabel: "What is a workbook →" },
+      ["dim", "  the document is the deployment."]] },
   { key: "nexus", name: "Nexus", role: "the engine", icon: "nexus-icon.svg",
     pastel: "#aee5c2", accent: "#57c97e",
     mix: [["#a8d4f0", .34], ["#f3c5a3", .26], ["#9fc4e8", .22], ["#f2ddb0", .18]],
@@ -1562,8 +1561,7 @@ const PIECES = [
       ["cmd", "work deploy doctor"],
       ["ok", "prereqs OK"],
       ["dim", "  cloud later? flip ENGINE_PLACE to fly — same file,"],
-      ["dim", "  same engine, dev → prod."]],
-    link: "learn/nexus.html", linkLabel: "What is the Nexus →" },
+      ["dim", "  same engine, dev → prod."]] },
   { key: "toolkits", name: "Toolkits", role: "the parts", icon: "toolkit-icon.svg",
     pastel: "#f3c5a3", accent: "#ee9455",
     mix: [["#f2ddb0", .34], ["#a8d4f0", .26], ["#aee5c2", .22], ["#9fc4e8", .18]],
@@ -1587,8 +1585,7 @@ const PIECES = [
       ["cmd", "work toolkit push my-tables"],
       ["ok", "shipped onto the engine — any workbook can pick it up"],
       ["dim", "  what you build feeds the ecosystem,"],
-      ["dim", "  and the ecosystem feeds you back."]],
-    link: "learn/toolkit.html", linkLabel: "What is a toolkit →" },
+      ["dim", "  and the ecosystem feeds you back."]] },
 ];
 const s3Sel = document.getElementById("s3Sel");
 const s3Stage = document.getElementById("s3Stage");
@@ -1636,7 +1633,7 @@ function spotRender(activeKey) {
       <p>${p.body2}</p>
       <ul class="s3-feats">${p.feats.map(ft => `<li>${ft}</li>`).join("")}</ul>
       <p class="why" style="border-color:${p.pastel}"><b>Why it exists:</b> ${p.why}</p>
-      <a class="more" href="${p.link}" style="background:${p.pastel}">${p.linkLabel}</a>
+      ${p.link ? `<a class="more" href="${p.link}" style="background:${p.pastel}">${p.linkLabel}</a>` : ""}
     </div>
     <aside class="s3-termwrap">
       <div class="s3-term" id="s3Term"></div>

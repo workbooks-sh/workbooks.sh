@@ -3,10 +3,9 @@
    <div id="site-nav"></div><script src="(../)nav.js"></script>. Drift between
    per-page navs is what this file exists to kill. Feature flags bake here. */
 (function () {
-  var FLAGS = { desktopDownload: false, learningCenter: false };
-  // Absolute base so links work from ANY path (/blog/, /toolkits/, /learn/<slug>)
-  // and from the docs domain (cross-site → the main site). Was path-relative,
-  // which 404'd Learn/Blog/lessons.json from non-/learn pages.
+  var FLAGS = { desktopDownload: false };
+  // Absolute base so links work from ANY path (/blog/, /toolkits/, docs domain).
+  // Was path-relative, which 404'd Blog/docs assets from non-root pages.
   var root = (location.hostname === "docs.workbooks.sh") ? "https://workbooks.sh/" : "/";
 
   var css = [
@@ -65,10 +64,6 @@
     '  border: 0; padding: 0; cursor: pointer; }',
     '.nav button.srch svg { width: 18px; height: 18px; display: block; }',
     '.nav button.srch:hover { color: var(--bloom, #13d943); }',
-    /* Learn column: short noun list, everything on one line (no wrapping) */
-    '.nav .drop .panel .learncol { min-width: 340px; }',
-    '.nav .drop .panel .learncol a { white-space: nowrap; }',
-    '.nav .drop .panel .learncol a small { white-space: nowrap; }',
     '.nav .drop .panel .vsep { width: 2px; margin: 6px 10px; flex: 0 0 auto;',
     '  background-image: repeating-linear-gradient(180deg, rgba(18,19,22,.3) 0 4px, transparent 4px 8px); }',
     '.nav .drop .panel .colhead { font: 700 9px var(--mono, monospace); letter-spacing: .22em;',
@@ -212,14 +207,8 @@
     '<a href="' + REPO + '">Source on GitHub →</a>' +
     '</div>';
 
-  // Learn — short noun list from lessons.json (the concepts + the constructs),
-  // Learning Center link at the bottom. Populated by the fetch below. The old
-  // per-lesson deep-dives drilldown is gone.
-  var learnCol = '<div class="col learncol" data-learn><div class="colhead">the concepts</div></div>';
-
   var html =
     '<a class="mark" href="' + (root || "") + 'index.html" aria-label="Workbooks">' + WMARK + '</a>' +
-    '<div class="drop"><a href="' + root + 'learn/index.html">Learn</a><div class="panel">' + learnCol + '</div></div>' +
     '<div class="drop"><a href="' + DOCS + '">Docs</a><div class="panel docs">' + docsGrid + '</div></div>' +
     '<a class="lnk toolkits" href="' + root + 'toolkits/">Toolkits</a>' +
     '<a class="lnk" href="' + root + 'blog">Blog</a>' +
@@ -236,32 +225,6 @@
   nav.innerHTML = html;
   var mount = document.getElementById("site-nav");
   if (mount) mount.replaceWith(nav);
-
-  // Populate the Learn dropdown from lessons.json: the concepts + the
-  // constructs (short noun labels), then a Learning Center link at the bottom.
-  fetch(root + "learn/lessons.json")
-    .then(function (r) { return r.json(); })
-    .then(function (cat) {
-      var host = nav.querySelector("[data-learn]");
-      if (!host) return;
-      function row(l) {
-        var icon = l.icon.indexOf("../") === 0 ? root + l.icon.slice(3) : root + "learn/" + l.icon;
-        return '<a href="' + root + 'learn/' + l.slug + '">' +
-          '<span class="sw" style="background:' + l.color + '"><img src="' + icon + '" alt=""></span> ' +
-          l.title + ' <small>' + (l.sub || "") + '</small></a>';
-      }
-      var html = "";
-      cat.tiers.forEach(function (t) {
-        html += '<div class="colhead">' + t.title + '</div>';
-        t.lessons.forEach(function (l) { html += row(l); });
-      });
-      if (FLAGS.learningCenter) { html += '<div class="sep" aria-hidden="true"></div>'; html += '<a class="viewall" href="' + root + 'learn/index.html">Learning Center <small>the full course</small></a>'; }
-      host.innerHTML = html;
-    })
-    .catch(function () {
-      var host = nav.querySelector("[data-learn]");
-      if (host && FLAGS.learningCenter) host.innerHTML = '<a class="viewall" href="' + root + 'learn/index.html">Learning Center</a>';
-    });
 
   nav.querySelectorAll(".drop > a").forEach(function (drop) {
     drop.addEventListener("click", function (e) {

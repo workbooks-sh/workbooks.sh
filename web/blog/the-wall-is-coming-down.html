@@ -121,15 +121,15 @@ footer.post a.more:hover{ color:var(--bloomd); }
 
     <p>The reason the wall stood so long is that the thing we ship has been scattered. Code lives in one place, the database in another, the runtime somewhere else, deployment behind its own door. To change one small thing you reach across all of them.</p>
 
-    <p>A <a class="ln" href="/learn/the-one-file">workbook</a> collapses that. At a glance it's an HTML file — the one format that already renders on every device, in every browser, and has for decades. But inside it carries <a class="ln" href="/learn/the-one-language">WebAssembly</a> for real computation, a <a class="ln" href="/learn/carries-its-story">SQLite database</a> for its own state, and its own source. The code, the data, and the thing people see all live in the same file.</p>
+    <p>A workbook collapses that. At a glance it's an HTML file — the one format that already renders on every device, in every browser, and has for decades. But inside it carries WebAssembly for real computation, a SQLite database for its own state, and its own source. The code, the data, and the thing people see all live in the same file.</p>
 
     <p class="pull">When the unit carries everything, an agent only has to edit one thing — not orchestrate five.</p>
 
     <h2>Why an agent can do the building</h2>
 
-    <p>An <a class="ln" href="/learn/what-an-agent-is">agent</a> is less magic than it sounds: a loop that reads, acts, looks at what happened, and goes again. The reason it has been risky to point one at real work is that real work means running untrusted code, and running untrusted code on your machine means giving something a loop and a lot of access.</p>
+    <p>An agent is less magic than it sounds: a loop that reads, acts, looks at what happened, and goes again. The reason it has been risky to point one at real work is that real work means running untrusted code, and running untrusted code on your machine means giving something a loop and a lot of access.</p>
 
-    <p>The fix is isolation. Workbooks run inside <a class="ln" href="/learn/safe-powers">WebAssembly sandboxes</a> on a runtime built in Elixir, on the BEAM — the same fault-tolerant foundation that ran the phone network. Each agent, each tenant, each piece of running code is its own isolated process. An agent can build, run, and rebuild inside that boundary without reaching your keys, your files, or anyone else's work.</p>
+    <p>The fix is isolation. Workbooks run inside WebAssembly sandboxes on a runtime built in Elixir, on the BEAM — the same fault-tolerant foundation that ran the phone network. Each agent, each tenant, each piece of running code is its own isolated process. An agent can build, run, and rebuild inside that boundary without reaching your keys, your files, or anyone else's work.</p>
 
     <div class="aside">Even the compilers run inside the sandbox. C, Rust, Zig, and JavaScript are compiled to WebAssembly <em>in</em> the box — so the risky build step itself never touches the host.</div>
 
