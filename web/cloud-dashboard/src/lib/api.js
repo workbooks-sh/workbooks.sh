@@ -194,10 +194,25 @@ const EMPTY_USAGE = {
   rows: []
 };
 
-/** Usage & billing rollup for the org — REAL (Fly-grounded compute + cost). */
+/** Usage & billing rollup for the org. Live `/usage` returns the capacity report
+ *  (RAM/storage dials vs the tier ceiling + top consumers); normalize it to the
+ *  page's {summary, rows} shape and attach `capacity` for the dials + scale-up UI. */
 export async function nexusUsage(opts = {}) {
   try {
-    return await plat('/usage', { fetch: opts.fetch });
+    const c = await plat('/usage', { fetch: opts.fetch });
+    if (c && c.ram) {
+      return {
+        summary: {
+          monthToDate: c.monthToDate, compute: c.compute,
+          storage: c.storage.label, database: '—',
+          nexusCount: 1, activeHrs: String(c.activeHrs), load: c.load
+        },
+        period: 'current cycle · billed on the 1st',
+        rows: [],
+        capacity: c
+      };
+    }
+    return c;
   } catch {
     return structuredClone(EMPTY_USAGE);
   }
