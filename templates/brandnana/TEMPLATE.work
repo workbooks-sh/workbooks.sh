@@ -1,0 +1,34 @@
+# Brandnana — template :app, :agent
+
+A brand-book generator: give it a domain, it pulls the live site and renders a brand book — logo,
+colour palette, typography, lifestyle imagery, and a voice brief. A `.work` recreation of the
+`brandnana` toolkit, built entirely on platform primitives.
+
+## What's the platform, what's the template
+
+**Platform** (you call it, you don't copy it): `Nexus.Browse` (fetch a page), `Nexus.Browse.Media`
+(harvest the logo + imagery), `Nexus.Llm` (name/tagline/voice), `Nexus.Store` (saved books),
+`Nexus.Live` (the SSE source the UI binds to).
+
+**Template** (the two blocks you own):
+- `index.work` → `server :brand` — the gatherer (fetch → harvest logo/imagery → palette from CSS →
+  fonts → LLM voice brief). **Replace the signal you want and how you derive it.** Keep `register/0`
+  and the event shapes the UI consumes.
+- `index.work` → `resource Book` — what a generated book stores. Replace the fields.
+- `ui.work` → `client :app` — the brand-book interface. Replace with your own rendering.
+
+## Run it
+
+  work weave .
+  # or live (server + the brand source) on the local nexus:
+  WB_SERVE=1 PORT=4000 WB_DATA="$(pwd)" elixir --no-halt -S mix run
+
+## Replace checklist
+
+1. `resource Book` fields → your data.
+2. `server :brand` → your gathering logic (keep `register/0` + the emitted event types).
+3. `client :app` → your interface (keep the `EventSource('/live/brand')` wiring).
+4. Swap the `"brand"` live-source name + `Book` resource to your app's names.
+
+Note: like the original brandnana, logo retrieval + lifestyle imagery are the weak spots — the harvest
+finds what the page declares; a brand with a JS-rendered hero may need the deeper render path.

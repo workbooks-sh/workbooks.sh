@@ -1,0 +1,237 @@
+# Brandnana 🍌
+
+Point it at any brand's domain and it builds a **brand book** — logo, colour palette, typography,
+lifestyle imagery, and a voice brief — by pulling real signal off the live site.
+
+## No microservices — just the platform
+
+The original `brandnana` was a paid stack: `api.brandnana.net` for identity, **ScrapeCreators** for
+ads + social, **logo.dev** + **simpleicons** for logos, **Groq** for inference. This recreation needs
+**none of them**. Every input here is gathered with the platform's own browser — `Nexus.Browse`
+fetches the live site, `Nexus.Browse.Media` harvests the logo and imagery straight off the page,
+`Nexus.Browse.Freeze` inlines the CSS so the palette + type come from the real stylesheet, and
+`Nexus.Llm` resolves the brand and writes the voice. Native scraping + one model, locally — no
+per-service bill, no keys to juggle, no HTTP the workbook speaks directly. That's the point of the
+exercise: a thing that took a fleet of external services becomes a couple of `.work` blocks on top
+of capabilities we already own.
+
+## History
+
+Each generated book is saved as a `Book` row and re-readable through `nexus.data`.
+
+resource Book do
+  domain :text
+  name :text
+  tagline :text
+  logo :text
+end
+
+## The brand gatherer
+
+`run/2` fetches the homepage, then in parallel harvests the **logo** (Media: `og:image` + `logo`-named
+assets), extracts the **palette** (brand hex/rgb colours from the page CSS), the **typography**
+(`font-family` declarations), and a grid of **lifestyle imagery** (Media, large content images), and
+finally asks the model for the brand **name + tagline + voice brief**. Every step streams to the UI.
+
+server :brand do
+  @model "google/gemma-4-26b-a4b-it"
+
+  def register do
+    Nexus.Live.register("brand", fn params, emit ->
+      domain = params["q"] || ""
+      result = run(domain, emit)
+
+      try do
+        Nexus.Store.create(Book, %{domain: domain, name: result.name, tagline: result.tagline, logo: result.logo})
+      rescue
+        _ -> :ok
+      end
+    end)
+  end
+
+  def run(input, emit) do
+    # Resolve a fuzzy brand ("the running shoe brand with the swoosh") → a domain with one LLM call —
+    # native, no external `resolve` service. A plain domain passes straight through.
+    domain = resolve(input, emit)
+    url = normalize(domain)
+    emit.(%{type: "step", label: "Fetching #{host(url)}…"})
+
+    html =
+      case Nexus.Browse.fetch(url) do
+        {:ok, h} when is_binary(h) -> h
+        _ -> ""
+      end
+
+    emit.(%{type: "step", label: "Harvesting the logo + imagery…"})
+    %{images: images} = harvest(url)
+    logo = pick_logo(images, html)
+    emit.(%{type: "logo", url: logo})
+
+    shots = images |> Enum.reject(&(&1 == logo)) |> Enum.reject(&chrome?/1) |> Enum.take(8)
+    emit.(%{type: "imagery", urls: shots})
+
+    emit.(%{type: "step", label: "Reading the palette + type…"})
+    # Freeze inlines external stylesheets, so palette + fonts see LINKED CSS too (not just inline).
+    styled = freeze(html, url)
+    palette = palette(styled)
+    emit.(%{type: "palette", colors: palette})
+    fonts = fonts(styled)
+    emit.(%{type: "fonts", fonts: fonts})
+
+    emit.(%{type: "step", label: "Writing the brand voice…"})
+    %{name: name, tagline: tagline, voice: voice} = brief(url, html, emit)
+    emit.(%{type: "brief", name: name, tagline: tagline, voice: voice})
+
+    emit.(%{type: "done"})
+    %{domain: domain, name: name, tagline: tagline, logo: logo, palette: palette, fonts: fonts}
+  rescue
+    _ ->
+      emit.(%{type: "done"})
+      %{domain: input, name: input, tagline: "", logo: "", palette: [], fonts: []}
+  end
+
+  # ── logo + imagery (Nexus.Browse.Media) ──────────────────────────────────────
+
+  defp harvest(url) do
+    case Nexus.Browse.harvest(url, kinds: [:image]) do
+      {:ok, m} -> m
+      _ -> %{images: [], videos: [], audio: []}
+    end
+  end
+
+  # Prefer an explicit logo asset, then an SVG, then the social-card image, then the first image.
+  defp pick_logo(images, html) do
+    og = og_image(html)
+
+    Enum.find(images, &has?(&1, "logo")) ||
+      Enum.find(images, &String.ends_with?(String.downcase(url_path(&1)), ".svg")) ||
+      og ||
+      List.first(images) || ""
+  end
+
+  defp chrome?(u), do: has?(u, "sprite") or has?(u, "icon") or has?(u, "favicon") or has?(u, "pixel")
+  defp has?(u, s), do: String.contains?(String.downcase(u), s)
+  defp url_path(u), do: u |> String.split("?") |> hd()
+
+  defp og_image(html) do
+    case Regex.run(~r/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i, html) do
+      [_, u] -> u
+      _ -> nil
+    end
+  end
+
+  # ── palette: brand colours from the page CSS ─────────────────────────────────
+
+  defp palette(html) do
+    hexes =
+      Regex.scan(~r/#[0-9a-fA-F]{6}\b/, html)
+      |> Enum.map(fn [h] -> String.downcase(h) end)
+
+    hexes
+    |> Enum.frequencies()
+    |> Enum.reject(fn {c, _} -> washed?(c) end)
+    |> Enum.sort_by(fn {_, n} -> -n end)
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.uniq()
+    |> Enum.take(6)
+  end
+
+  # Drop near-white / near-black / near-grey so the swatches are real brand colour.
+  defp washed?("#" <> hex) do
+    {r, g, b} = rgb(hex)
+    mx = Enum.max([r, g, b])
+    mn = Enum.min([r, g, b])
+    mx > 240 or mx < 18 or mx - mn < 14
+  end
+
+  defp rgb(<<r::binary-2, g::binary-2, b::binary-2>>), do: {hx(r), hx(g), hx(b)}
+  defp rgb(_), do: {0, 0, 0}
+  defp hx(s), do: String.to_integer(s, 16)
+
+  # ── typography: font-family declarations ─────────────────────────────────────
+
+  defp fonts(html) do
+    Regex.scan(~r/font-family:\s*([^;}"']+)/i, html)
+    |> Enum.map(fn [_, f] -> f |> String.split(",") |> hd() |> String.trim() |> String.trim("'\"") end)
+    |> Enum.reject(&(String.downcase(&1) in ~w(inherit sans-serif serif monospace system-ui ui-sans-serif -apple-system)))
+    |> Enum.uniq()
+    |> Enum.take(3)
+  end
+
+  # ── voice brief (Nexus.Llm) ──────────────────────────────────────────────────
+
+  defp brief(url, html, _emit) do
+    text = html |> strip() |> String.slice(0, 4000)
+
+    prompt =
+      "From this brand's homepage, return EXACTLY three lines:\n" <>
+        "1. the brand NAME\n2. a short TAGLINE (the brand's own, or one true to its voice)\n" <>
+        "3. a 2-3 sentence VOICE brief (tone, audience, what it sells).\n\n" <>
+        "Site: #{url}\n\n#{text}"
+
+    case Nexus.Llm.complete([%{role: "user", content: prompt}], model: @model, max_tokens: 400) do
+      {:ok, %{content: c}} when is_binary(c) and c != "" ->
+        [name, tagline | rest] = String.split(c, "\n", trim: true) ++ ["", "", ""]
+        %{name: clean(name), tagline: clean(tagline), voice: rest |> Enum.join(" ") |> clean()}
+
+      _ ->
+        %{name: host(url), tagline: "", voice: ""}
+    end
+  end
+
+  # ── helpers ──────────────────────────────────────────────────────────────────
+
+  defp resolve(input, emit) do
+    input = String.trim(input)
+
+    if input == "" or domain?(input) do
+      input
+    else
+      emit.(%{type: "step", label: "Resolving “#{input}”…"})
+
+      case Nexus.Llm.complete([%{role: "user", content: "What is the primary website domain for this brand or description: \"#{input}\"? Reply with ONLY the bare domain (e.g. nike.com), nothing else."}], model: @model, max_tokens: 30) do
+        {:ok, %{content: c}} when is_binary(c) and c != "" -> extract_domain(c)
+        _ -> input
+      end
+    end
+  end
+
+  defp domain?(s), do: not String.contains?(s, " ") and String.contains?(s, ".")
+
+  defp extract_domain(s) do
+    case Regex.run(~r/[a-z0-9.-]+\.[a-z]{2,}/i, String.downcase(s)) do
+      [d] -> d
+      _ -> String.trim(s)
+    end
+  end
+
+  defp freeze(html, url) do
+    Nexus.Browse.Freeze.freeze(html, url)
+  rescue
+    _ -> html
+  end
+
+  defp normalize(d) do
+    d = String.trim(d)
+    if String.starts_with?(d, "http"), do: d, else: "https://" <> String.replace_prefix(d, "www.", "")
+  end
+
+  defp host(url) do
+    (url |> String.split("/") |> Enum.at(2) || url) |> String.replace("www.", "")
+  rescue
+    _ -> url
+  end
+
+  defp strip(html) do
+    html
+    |> String.replace(~r/<script\b[^>]*>.*?<\/script>/is, " ")
+    |> String.replace(~r/<style\b[^>]*>.*?<\/style>/is, " ")
+    |> String.replace(~r/<[^>]+>/, " ")
+    |> String.replace(~r/\s+/, " ")
+    |> String.trim()
+  end
+
+  defp clean(s) do
+    s |> to_string() |> String.replace(~r/^\s*\d+\.\s*/, "") |> String.replace(~r/^(name|tagline|voice):\s*/i, "") |> String.trim()
+  end
+end
