@@ -104,6 +104,46 @@ improvement, not a test hack:</p>
 </figure>
 </section>
 
+<section class="file" data-file="memory.work">
+<h2>The memory ceiling — and how we moved it</h2>
+<p>The agent is a cheap BEAM process; the LLM call is remote. The real RAM cost is the
+<strong>wasmtime subprocess each render spawns</strong> (Blitz: Stylo + Taffy + DOM). So the OOM wall
+is set by <em>peak simultaneous renders</em>, not agent count. We ramped render-active load on distinct
+pages until peak RSS (beam + all wasmtime) crossed a 1GB budget.</p>
+
+<div class="note warn"><strong>Diagnosis:</strong> every <code>wasmtime run render_text.wasm</code>
+<em>cold-JIT-compiled</em> the 9.6MB module on every call — ~0.7s and ~120MB of Cranelift working set,
+dwarfing the actual render. Nearly 100% of the cost was recompilation.</div>
+
+<table class="data">
+<caption>1GB saturation — before vs after (AOT cache + render lane)</caption>
+<thead><tr><th>concurrent renders</th><th>peak RSS — before</th><th>peak RSS — after</th></tr></thead>
+<tbody>
+<tr><td>4</td><td>700 MB</td><td>347 MB</td></tr>
+<tr><td>8</td><td>1114 MB ⛔ OOM</td><td>455 MB ✅</td></tr>
+<tr><td>12 (req.)</td><td>—</td><td>721 MB · 10 wasm (capped)</td></tr>
+<tr><td>16 (req.)</td><td>—</td><td>709 MB · 10 wasm (capped)</td></tr>
+</tbody>
+</table>
+<p>AOT moved the hard ceiling from <strong>~7 to ~15</strong> simultaneous renders on 1GB (marginal
+103→60 MB/render). And past the slot limit the gate <em>caps</em> concurrent renders — at requested 12
+and 16, wasm processes held at 10, RSS plateaued, zero failures, throughput still climbing. The OOM
+became a queue.</p>
+
+<h3>Two fixes shipped</h3>
+<ul>
+<li><strong>AOT <code>.cwasm</code> cache</strong> (<code>Nexus.Wasm.Aot</code>) — compile each module
+once, run <code>--allow-precompiled</code>. Per render: <strong>0.24s→0.14s, 121MB→47MB</strong>,
+byte-identical. The cwasm is read-only file-backed code, so the OS shares its pages across every
+concurrent render — and across tenants, with zero isolation impact (each render keeps its own private
+linear memory).</li>
+<li><strong>Bounded render lane</strong> (<code>Nexus.Wasm.Gate</code>) — a monitored semaphore sizes
+render slots to host RAM (~1 per 100MB → ~7 on a 1GB box). A burst <em>queues</em> instead of
+fork-bombing wasmtime into an OOM. Agent count now decouples from the memory wall: thousands of agents
+share a handful of render slots, because each agent renders for ~0.6s then waits ~82s on the LLM.</li>
+</ul>
+</section>
+
 <section class="file" data-file="verdict.work">
 <h2>Verdict</h2>
 <ul>
