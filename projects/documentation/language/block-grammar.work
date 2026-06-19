@@ -1,3 +1,56 @@
 # Block grammar
 
-_Skeleton — content to be authored. Intent: <kind> [lang] :name … do … end_
+Every runnable block in a `.work` file is written the same way:
+
+**`<kind> [lang] :name … do … end`**
+
+That one line of grammar covers all of it. Let's take the header apart.
+
+## The header, token by token
+
+server place :submit do
+  def run(order), do: Store.insert(:orders, order)
+end
+
+Reading the header `server place :submit`:
+
+- **`kind`** is the first word — always. It says what the block is and where it
+  runs: `server`, `client`, `sandbox`, `data`, `def`, `agent`, `resource`, and
+  others. The parser takes the first token as the kind, no exceptions.
+- **`lang`** is optional. If a token is one of the supported languages, it's read
+  as the language of the body. Leave it out and the block uses its default.
+- **`:name`** is the atom that names the block — a token starting with `:`. It's how
+  other blocks and your prose refer to this one.
+- Anything else on the line is the block's **arguments**, passed through to the
+  body.
+
+So `sandbox python :scrape do` is kind `sandbox`, language `python`, name `scrape`.
+And `client svelte :widget do` is a Svelte browser island named `widget`.
+
+## do … end is the delimiter
+
+A block opens with a non-indented line that ends in ` do`, and closes with a
+non-indented `end`. Everything between is the body — real code in the block's
+language. Plain prose never ends in ` do`, so there's no ambiguity about where a
+block begins.
+
+Blocks can nest: a `do` inside the body opens another level, and the parser tracks
+depth so the *matching* `end` closes the block. You don't have to think about it —
+write the language naturally and it just works.
+
+## A name without a colon
+
+Some blocks name themselves the way the host language does — `defmodule Workbook do`
+declares something called `Workbook`. When there's no `:atom`, the parser takes the
+bare name. You'll mostly use `:name`, but both are understood.
+
+## Why it's a tree, not a regex
+
+This grammar isn't matched with fragile text patterns. Because `do … end` is the
+delimiter and the header tokenizes cleanly, each block parses into a real syntax
+node — kind, language, name, and body are read straight off the structure. That
+single parse is shared by everything that touches a workbook: highlighting, the
+dependency graph, and the capability audit. Write the block once; every tool reads
+it the same way.
+
+Next, the lane that surrounds the blocks: [The prose lane & refs](/language/prose-and-refs).

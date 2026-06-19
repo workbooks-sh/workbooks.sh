@@ -1,3 +1,54 @@
 # Declarations
 
-_Skeleton — content to be authored. Intent: @attrs, data tables, enums, records_
+A declaration describes a **shape, not an action.** Where a code block runs,
+a declaration just states what something *is* — the data your workbook holds, the
+options a value can take, the settings it runs under. It's the structure lane.
+
+## Typed tables
+
+The most common declaration is a typed table. You name it and list its fields as
+`field :type`:
+
+resource Product do
+  name :text
+  price :money
+  stock :int
+end
+
+That declares a `Product` with three typed fields. A `resource` is the persisted,
+queryable kind — the [Nexus](/introduction/what-is-the-nexus) stores its rows and
+serves them. A `data` table is declared the same way and renders by default, so a
+table of values shows up right in the page.
+
+Because the table is declared in the document, your prose can `show` it: a `show
+Product` directive renders the resource's rows as a table, columns drawn straight
+from the fields you declared.
+
+## Enums and records
+
+Two more shapes round it out:
+
+- An **enum** is a fixed set of options — declared as a list of atoms, like the
+  states an order can be in.
+- A **record** is a struct — a fixed set of named fields grouped into one value,
+  the way a `defstruct` works in Elixir.
+
+Both are declarations: you're naming a shape, not running anything.
+
+## Attributes
+
+Single settings are declarations too. An attribute is a flat `@name value` line —
+configuration stated in the document rather than hidden in an environment variable.
+Tunable settings live as attributes (read back through the engine's config), which
+keeps a workbook's configuration visible and reviewable alongside everything else.
+
+## The reserved words
+
+A handful of words introduce declarations and directives, so the parser treats them
+specially rather than as ordinary prose: `data`, `resource`, `show`, `query`,
+`type`, `deps`, `checks`, `theme`, `task`, `user`, `grant`, `route`, `workbook`,
+and `nexus`. You'll meet most of them where they're used; the thing to remember is
+that a declaration is always *describing*, never *doing*.
+
+Next: where blocks run, and what languages they're written in —
+[Placement & languages](/language/placement-and-languages).

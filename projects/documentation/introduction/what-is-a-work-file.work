@@ -34,8 +34,8 @@ placed in a capability sandbox. The body inside is real Python.
 A block's body can be written in any of these — and the `work` toolchain compiles
 it:
 
-`elixir` · `rust` · `zig` · `python` · `svelte` · `solid` · `js` · `ts` · `c` ·
-`go` · `wit`
+`elixir` · `rust` · `zig` · `c` · `cpp` · `python` · `go` · `js` · `ts` ·
+`svelte` · `solid`
 
 This is the lesson that surprises people: you can write a Svelte component in a
 `.work` file. The literate document is the authoring surface; the languages inside

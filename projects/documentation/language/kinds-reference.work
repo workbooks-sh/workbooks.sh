@@ -1,3 +1,46 @@
 # Kinds reference
 
-_Skeleton — content to be authored. Intent: dense per-kind card index: data def server client sandbox agent resource flow task_
+The kind is the first word of a block. Here's the whole vocabulary in one place,
+grouped by what each kind is for. The header shape is always the same —
+[`<kind> [lang] :name … do … end`](/language/block-grammar).
+
+## Runnable kinds
+
+These execute. Their [placement](/language/placement-and-languages) decides where.
+
+- **`client`** — a browser island. The body is the interface; it ships as
+  WebAssembly and runs in the page. This is what people see.
+- **`server`** — a unit that runs on the [Nexus](/introduction/what-is-the-nexus),
+  on the BEAM. Your backend logic and data access.
+- **`sandbox`** — guest code in a capability-scoped box, compiled to WebAssembly
+  and given only the powers it's granted. For untrusted or risky work.
+- **`agent`** — a unit with an agent brain: a server-side block that can reason and
+  act, not just compute.
+- **`def`** — a plain function/unit of logic. `defp` declares a private one.
+- **`flow`** — a multi-step flow: several steps composed into one runnable
+  sequence.
+
+## Structure kinds
+
+These [declare](/language/declarations) shape; nothing runs.
+
+- **`data`** — a typed table that renders by default. Declares fields as
+  `field :type` and shows up as a table in the page.
+- **`resource`** — a persisted, queryable table. The Nexus stores its rows; a
+  `show` directive renders them.
+- **`record`** — a struct: a fixed set of named fields grouped into one value.
+- **`enum`** — a fixed set of options, written as a list of atoms.
+
+## Directives
+
+These tell the page to do something with a declaration.
+
+- **`show`** — render a resource as a table, columns taken from its fields.
+- **`task`** — a declared task or job the workbook defines.
+
+## Reading a kind you don't recognize
+
+The grammar guarantees you can always parse an unfamiliar block: the first word is
+the kind, an optional language follows, then `:name`, then `do … end`. Even if you
+haven't met a kind before, you can see *what it's called*, *what language it's in*,
+and *where it runs* — which is usually enough to follow along.
