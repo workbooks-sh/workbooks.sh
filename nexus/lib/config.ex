@@ -51,6 +51,7 @@ defmodule Nexus.Config do
 
   # ── typed getters (the public surface the runtime calls — never System.get_env) ───────────────
   def compile_concurrency, do: get(:compile_concurrency)
+  def render_concurrency, do: get(:render_concurrency)
   def compile_cache?, do: get(:compile_cache)
   def compile_cache_version, do: get(:compile_cache_version)
   def component_cache, do: get(:component_cache)
@@ -63,6 +64,9 @@ defmodule Nexus.Config do
   defp parse(html) do
     %{
       compile_concurrency: int(attr(html, "compile-concurrency"), System.schedulers_online()),
+      # Render slots: each post-AOT render holds ~47MB. Default sizes to host RAM (≈1 slot/100MB,
+      # leaving ~300MB for the BEAM), capped to a sane band; `<work-deploy render-concurrency>` overrides.
+      render_concurrency: int(attr(html, "render-concurrency"), default_render_concurrency()),
       compile_cache: bool(attr(html, "compile-cache"), true),
       compile_cache_version: attr(html, "compile-cache-version") || "wbc1",
       component_cache: attr(html, "component-cache") || default_cache_dir(),
@@ -83,6 +87,28 @@ defmodule Nexus.Config do
   def data_dir, do: System.get_env("WB_DATA") || File.cwd!()
 
   defp default_cache_dir, do: Path.join([data_dir(), "build", "components"])
+
+  # ≈1 render slot per 100MB of host RAM (each post-AOT render ≈47MB; the /100 leaves headroom for
+  # the BEAM + page working sets), within [2, 64]. Reads MemTotal on the Linux deploy target; on a
+  # dev host without /proc/meminfo, falls back to the scheduler count.
+  defp default_render_concurrency do
+    mb =
+      case File.read("/proc/meminfo") do
+        {:ok, s} ->
+          case Regex.run(~r/MemTotal:\s+(\d+)\s+kB/, s) do
+            [_, kb] -> div(String.to_integer(kb), 1024)
+            _ -> nil
+          end
+
+        _ ->
+          nil
+      end
+
+    case mb do
+      nil -> System.schedulers_online()
+      mb -> mb |> Kernel.-(300) |> div(100) |> max(2) |> min(64)
+    end
+  end
 
   # Mirror the reactor's lightweight reader: find the attribute on the <work-deploy> open tag. No
   # full HTML parser needed for a flat attribute list.

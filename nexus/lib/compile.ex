@@ -60,13 +60,13 @@ defmodule Nexus.Compile do
 
         :miss ->
           # Miss: pay the real cost ONCE, under the concurrency gate, then store (local + remote).
-          case Nexus.Compile.Gate.with_slot(build) do
+          case Nexus.Wasm.Gate.with_slot(:compile, build) do
             {:ok, comp} -> {:ok, Nexus.Compile.Store.put(key, comp)}
             other -> other
           end
       end
     else
-      Nexus.Compile.Gate.with_slot(build)
+      Nexus.Wasm.Gate.with_slot(:compile, build)
     end
   end
 

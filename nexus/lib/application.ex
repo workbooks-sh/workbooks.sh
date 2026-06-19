@@ -19,9 +19,9 @@ defmodule Nexus.Application do
     Nexus.Config.boot()
     # Empty by default; Constellation's local-inference lanes opt in via `config :nexus, Nexus.Constellation, enabled: true`.
     ether = if Nexus.Constellation.enabled?(), do: Nexus.Constellation.children(), else: []
-    # Nexus.Compile.Gate bounds concurrent wasm compiles (compile-concurrency) so a burst can't
-    # fork-bomb wasmtime into an OOM — backpressure instead.
-    children = [Nexus.Telemetry, Nexus.Compile.Gate | ether]
+    # Nexus.Wasm.Gate bounds concurrent wasm OS processes per lane (compile-concurrency /
+    # render-concurrency) so a burst can't fork-bomb wasmtime into an OOM — backpressure instead.
+    children = [Nexus.Telemetry] ++ Nexus.Wasm.Gate.child_specs() ++ ether
     Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
   end
 end

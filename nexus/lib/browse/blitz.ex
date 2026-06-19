@@ -219,8 +219,11 @@ defmodule Nexus.Browse.Blitz do
     secs = max(1, div(budget, 1000))
     guarded = "#{inner} & p=$!; { sleep #{secs}; kill -9 $p 2>/dev/null; } >/dev/null 2>&1 & w=$!; wait $p; rc=$?; kill $w 2>/dev/null; exit $rc"
 
+    # Hold a :render slot for the OS process so a burst of concurrent renders queues instead of
+    # fork-bombing wasmtime into an OOM (the saturation ceiling). Backpressure, not failure.
     try do
-      case System.cmd("sh", ["-c", guarded], stderr_to_stdout: false) do
+      Nexus.Wasm.Gate.with_slot(:render, fn -> System.cmd("sh", ["-c", guarded], stderr_to_stdout: false) end)
+      |> case do
         {stdout, 0} ->
           case out_file do
             nil -> {:ok, stdout}

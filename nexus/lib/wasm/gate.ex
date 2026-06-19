@@ -1,40 +1,67 @@
-defmodule Nexus.Compile.Gate do
+defmodule Nexus.Wasm.Gate do
   @moduledoc """
-  A bounded concurrency gate for the wasm compile lane. Each unit compile shells `wasmtime run
-  <compiler.wasm>` — a heavy OS process (clang/mrustc hold a 72MB+ module + a 100–500MB compile
-  working set). With no limit, a burst of N compile requests forks N wasmtime processes → OS OOM on a
-  normal machine (the BEAM heap stays flat, so it gives no warning). This gate caps concurrent compiles
-  and QUEUES the overflow — backpressure instead of a fork bomb.
+  A bounded concurrency gate for wasm OS-process lanes — a monitored counting semaphore, one per
+  named lane, with backpressure.
 
-  Limit = `Nexus.Config.compile_concurrency/0` (the `<work-deploy compile-concurrency>` attribute,
-  default cores) — each deployment sizes it to its host in the config file, not an env var. A counting
-  semaphore: callers `with_slot/1` block until a slot frees. Holders are MONITORED, so a compile that
-  crashes or is killed (e.g. a Task timeout) can't leak its slot.
+  Each `wasmtime run` is a heavy OS process: a **compile** holds a 72MB+ compiler module + a
+  100–500MB working set; a **render** holds ~47MB (post-AOT). With no limit, a burst of N requests
+  forks N processes → OS OOM (the BEAM heap stays flat, so it gives no warning — this is exactly the
+  ceiling the saturation test found: ~7 concurrent renders on a 1GB host). The gate caps concurrent
+  holders per lane and QUEUES the overflow, so **agent count decouples from the memory wall** — a
+  thousand agents share a handful of render slots instead of OOMing in a synchronized burst.
+
+  Lanes are independent (a render storm can't starve compiles) and sized per host from the
+  `<work-deploy>` config — `compile-concurrency` / `render-concurrency` — not env vars. Holders are
+  monitored, so a slot held by a process that crashes or is killed (a Task timeout) is reclaimed.
+
+      Nexus.Wasm.Gate.with_slot(:render, fn -> run_render() end)
   """
   use GenServer
 
-  # ── API ──────────────────────────────────────────────────────────────────────────────────────
-  def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  @lanes %{
+    compile: {Nexus.Config, :compile_concurrency},
+    render: {Nexus.Config, :render_concurrency}
+  }
 
-  @doc "Run `fun` holding one compile slot; blocks (queues) until a slot is available."
-  def with_slot(fun) do
-    :ok = GenServer.call(__MODULE__, :acquire, :infinity)
+  # ── API ──────────────────────────────────────────────────────────────────────────────────────
+  def child_specs do
+    for {lane, _} <- @lanes do
+      Supervisor.child_spec({__MODULE__, lane: lane}, id: name(lane))
+    end
+  end
+
+  def start_link(opts) do
+    lane = Keyword.fetch!(opts, :lane)
+    GenServer.start_link(__MODULE__, opts, name: name(lane))
+  end
+
+  @doc "Run `fun` holding one slot in `lane`; blocks (queues) until a slot is available."
+  def with_slot(lane, fun) do
+    :ok = GenServer.call(name(lane), :acquire, :infinity)
 
     try do
       fun.()
     after
-      GenServer.cast(__MODULE__, {:release, self()})
+      GenServer.cast(name(lane), {:release, self()})
     end
   end
 
-  @doc "`%{limit, available, in_use, queued}` — observability for the capacity dashboard."
-  def stats, do: GenServer.call(__MODULE__, :stats)
+  @doc "`%{limit, available, in_use, queued}` for a lane — observability for the capacity dashboard."
+  def stats(lane), do: GenServer.call(name(lane), :stats)
+
+  defp name(lane), do: Module.concat(__MODULE__, lane)
 
   # ── server ───────────────────────────────────────────────────────────────────────────────────
   @impl true
   def init(opts) do
-    limit = Keyword.get(opts, :limit) || Nexus.Config.compile_concurrency()
+    lane = Keyword.fetch!(opts, :lane)
+    limit = Keyword.get(opts, :limit) || lane_limit(lane)
     {:ok, %{limit: limit, available: limit, holders: %{}, waiting: :queue.new()}}
+  end
+
+  defp lane_limit(lane) do
+    {mod, fun} = Map.fetch!(@lanes, lane)
+    apply(mod, fun, [])
   end
 
   @impl true
@@ -85,5 +112,4 @@ defmodule Nexus.Compile.Gate do
   end
 
   defp drop_waiter(w, ref), do: :queue.filter(fn {_from, _pid, r} -> r != ref end, w)
-
 end
