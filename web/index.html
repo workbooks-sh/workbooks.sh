@@ -231,7 +231,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
   .plat-kicker b { color: var(--bloom); }
   .plat-h { font-family: var(--display, inherit); font-weight: 600; font-size: clamp(30px, 4vw, 48px); line-height: 1.05; letter-spacing: -.018em; color: var(--ink); margin: 0 0 14px; }
   .plat-sub { font-size: clamp(15px, 1.5vw, 17px); line-height: 1.55; color: #4a4f48; max-width: 600px; margin: 0 auto; }
-  .plat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; max-width: 940px; margin: 0 auto; }
+  .plat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; max-width: 1140px; margin: 0 auto; }
   .plat-card { background: #fff; border: 1px solid rgba(18,19,22,.1); border-radius: 20px; padding: 30px 30px 28px; box-shadow: 0 18px 50px rgba(18,19,22,.07); display: flex; flex-direction: column; }
   .plat-card.live { box-shadow: 0 22px 60px rgba(18,19,22,.12); border-color: rgba(18,19,22,.16); }
   .plat-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -248,7 +248,55 @@ const WB_FLAGS = { desktopDownload: false };</script>
   .plat-btn.primary:hover { box-shadow: 0 16px 40px rgba(18,19,22,.34); transform: translateY(-1px); }
   .plat-btn.ghost { background: transparent; color: var(--ink); border: 1px solid rgba(18,19,22,.22); }
   .plat-btn.ghost:hover { border-color: var(--ink); }
-  @media (max-width: 760px) { .plat-grid { grid-template-columns: 1fr; } #platforms { padding: calc(8vh + 64px) 20px 72px; } }
+  .plat-btn.copy { background: transparent; color: var(--ink); border: 1px solid rgba(18,19,22,.22); font-family: var(--mono); font-size: 12.5px; }
+  .plat-btn.copy:hover { border-color: var(--ink); }
+  .plat-btn.copy svg { width: 14px; height: 14px; opacity: .6; }
+  .plat-btn.copy.copied .lbl { color: var(--bloom); }
+  @media (max-width: 920px) { .plat-grid { grid-template-columns: 1fr; max-width: 460px; } }
+  @media (max-width: 760px) { #platforms { padding: calc(8vh + 64px) 20px 72px; } }
+
+  /* ── cloud pricing: dark value section ─────────────────────────────────────── */
+  #cloud-pricing { position: relative; z-index: 4; background: #0c0d10; color: #e9e7e1; padding: 112px 24px 120px; }
+  .cp-inner { max-width: 1080px; margin: 0 auto; }
+  .cp-kicker { font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #8a8f86; display: inline-flex; align-items: center; gap: 9px; margin: 0 0 18px; }
+  .cp-kicker .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--bloom, #13d943); box-shadow: 0 0 12px var(--bloom, #13d943); }
+  .cp-h { font-size: clamp(28px, 4.4vw, 46px); line-height: 1.08; letter-spacing: -.025em; font-weight: 680; margin: 0 0 16px; color: #fff; }
+  .cp-sub { font-size: 16px; line-height: 1.6; color: #a8aca3; max-width: 640px; margin: 0 0 44px; }
+  .cp-compare { display: grid; grid-template-columns: 1fr auto 1.12fr; align-items: stretch; gap: 22px; margin-bottom: 52px; }
+  .cp-stack, .cp-wb { border-radius: 20px; padding: 26px 28px; }
+  .cp-stack { background: #15171c; border: 1px solid rgba(255,255,255,.08); }
+  .cp-wb { background: linear-gradient(165deg, #1c1f27, #141519); border: 1px solid rgba(255,255,255,.15); display: flex; flex-direction: column; }
+  .cp-card-h { font: 700 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #8a8f86; display: flex; justify-content: space-between; margin-bottom: 16px; }
+  .cp-stack ul { list-style: none; margin: 0; padding: 0; }
+  .cp-stack li { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 14.5px; color: #cdd0c8; }
+  .cp-stack li b { color: #fff; font-variant-numeric: tabular-nums; }
+  .cp-total { margin-top: 16px; font-size: 24px; font-weight: 720; color: #fff; letter-spacing: -.01em; }
+  .cp-total span { font-size: 13px; color: #8a8f86; font-weight: 500; }
+  .cp-mult { margin-top: 7px; font-size: 14.5px; color: #e0856b; }
+  .cp-mult b { color: #ff9b7d; }
+  .cp-vs { display: grid; place-items: center; font: 700 12px var(--mono); color: #6a6f68; text-transform: uppercase; }
+  .cp-wb-big { font-size: 46px; font-weight: 750; color: #fff; letter-spacing: -.025em; line-height: 1; margin: 2px 0 12px; }
+  .cp-wb-big span { font-size: 16px; color: #8a8f86; font-weight: 500; }
+  .cp-wb p { font-size: 13.5px; color: #a8aca3; line-height: 1.55; margin: 0 0 16px; flex: 1; }
+  .cp-save { font-size: 13.5px; color: #aee5c2; background: rgba(19,217,67,.08); border: 1px solid rgba(19,217,67,.22); border-radius: 12px; padding: 11px 14px; margin-bottom: 18px; }
+  .cp-cta { align-self: flex-start; background: #fff; color: #0c0d10; text-decoration: none; font-weight: 650; font-size: 14px; padding: 12px 22px; border-radius: 12px; box-shadow: 3px 3px 0 rgba(255,255,255,.22); transition: transform .1s, box-shadow .1s; }
+  .cp-cta:hover { transform: translate(1px,1px); box-shadow: 2px 2px 0 rgba(255,255,255,.22); }
+  .cp-tiers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+  .cp-tier { background: #15171c; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 20px 20px 22px; }
+  .cp-tier.feat { border-color: rgba(174,229,194,.4); background: #16191a; }
+  .t-name { font: 700 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: #8a8f86; margin-bottom: 10px; }
+  .t-price { font-size: 26px; font-weight: 730; color: #fff; letter-spacing: -.02em; }
+  .t-price span { font-size: 13px; color: #8a8f86; font-weight: 500; }
+  .t-meta { font-size: 13px; color: #a8aca3; margin-top: 6px; }
+  .cp-foot { font-size: 14px; line-height: 1.6; color: #8a8f86; text-align: center; max-width: 640px; margin: 0 auto; }
+  .cp-foot b { color: #cdd0c8; font-weight: 600; }
+  .cp-foot a { color: #fff; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.3); }
+  @media (max-width: 820px) {
+    .cp-compare { grid-template-columns: 1fr; }
+    .cp-vs { padding: 4px 0; }
+    .cp-tiers { grid-template-columns: repeat(2, 1fr); }
+    #cloud-pricing { padding: 80px 20px 88px; }
+  }
 
   #s2 { position: relative; height: 100vh; background: var(--paper); overflow: hidden; }
   .sky-pin { position: relative; height: 100vh; overflow: hidden; }
@@ -547,11 +595,25 @@ const WB_FLAGS = { desktopDownload: false };</script>
 <!-- platforms: build on the desktop (coming soon) → ship to the cloud (live) -->
 <section id="platforms">
   <div class="plat-head">
-    <p class="plat-kicker">two ways in <b>■</b></p>
-    <h2 class="plat-h">Build on your machine. Ship to your&nbsp;cloud.</h2>
-    <p class="plat-sub">The desktop app is where you and your agents build together. The cloud is where it runs for real — your own infrastructure, your account.</p>
+    <p class="plat-kicker">three ways in <b>■</b></p>
+    <h2 class="plat-h">Start where you already&nbsp;work.</h2>
+    <p class="plat-sub">Drive it from the coding agent you already use, build in a native desktop app, or run it all on your own cloud. Same workbooks, three surfaces.</p>
   </div>
   <div class="plat-grid">
+    <article class="plat-card live">
+      <div class="plat-top">
+        <span class="plat-ic" style="background:#f2ddb0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#121316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 8 9 12 5 16"/><line x1="12" y1="16" x2="19" y2="16"/></svg>
+        </span>
+        <span class="plat-tag on"><span class="dot"></span>Live</span>
+      </div>
+      <h3>Your agent, your terminal</h3>
+      <p>Use Claude Code, Codex, or any coding agent as your surface. Install the CLI and build, weave, and ship workbooks right from the terminal you already live in.</p>
+      <button type="button" class="plat-btn copy plat-copy" data-copy="curl -fsSL https://workbooks.sh/cli.sh | sh">
+        <span class="lbl">Copy install</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    </article>
     <article class="plat-card">
       <div class="plat-top">
         <span class="plat-ic" style="background:#a8d4f0">
@@ -574,6 +636,48 @@ const WB_FLAGS = { desktopDownload: false };</script>
       <p>Stand up a hosted nexus, deploy your workbooks, and run agents in the cloud — metered, scale-to-zero, on your own account. Sign in and ship in minutes.</p>
       <a class="plat-btn primary" href="https://app.workbooks.sh">Get started <span aria-hidden="true">→</span></a>
     </article>
+  </div>
+</section>
+
+<!-- cloud pricing: the value pitch — replace the per-seat SaaS stack with one nexus -->
+<section id="cloud-pricing">
+  <div class="cp-inner">
+    <p class="cp-kicker"><span class="dot"></span>the cloud · pricing</p>
+    <h2 class="cp-h">Your whole stack, on one&nbsp;nexus.<br>Pay for compute — never per&nbsp;seat.</h2>
+    <p class="cp-sub">Most teams rent a dozen SaaS tools by the head. Workbooks runs your apps, data, agents, and storage on a single nexus you scale by memory and bandwidth — with unlimited users and workspaces on every tier.</p>
+
+    <div class="cp-compare">
+      <div class="cp-stack">
+        <div class="cp-card-h">The usual stack <span>per user / mo</span></div>
+        <ul>
+          <li><span>Slack — chat</span><b>$18</b></li>
+          <li><span>Notion — docs</span><b>$20</b></li>
+          <li><span>Linear — project mgmt</span><b>$16</b></li>
+          <li><span>Retool — internal tools</span><b>$20</b></li>
+          <li><span>Vercel — hosting</span><b>$20</b></li>
+        </ul>
+        <div class="cp-total">≈ $94<span> / user / mo</span></div>
+        <div class="cp-mult">× 25 people = <b>$2,350 / mo</b></div>
+      </div>
+
+      <div class="cp-vs">vs</div>
+
+      <div class="cp-wb">
+        <div class="cp-card-h">Workbooks — Team</div>
+        <div class="cp-wb-big">$99<span> / mo</span></div>
+        <p>One nexus · unlimited users · 250&nbsp;GB · egress-free object storage · Postgres included. Build the same chat, docs, boards, internal tools, and hosting as workbooks — and own them.</p>
+        <div class="cp-save">≈ $2,250/mo saved at 25 people — and the gap only widens as you grow.</div>
+        <a class="cp-cta" href="https://app.workbooks.sh">Start building →</a>
+      </div>
+    </div>
+
+    <div class="cp-tiers">
+      <div class="cp-tier"><div class="t-name">Starter</div><div class="t-price">$29<span>/mo</span></div><div class="t-meta">50 GB · ~6 people</div></div>
+      <div class="cp-tier feat"><div class="t-name">Team</div><div class="t-price">$99<span>/mo</span></div><div class="t-meta">250 GB · ~25 people</div></div>
+      <div class="cp-tier"><div class="t-name">Scale</div><div class="t-price">$249<span>/mo</span></div><div class="t-meta">1 TB · ~100 people</div></div>
+      <div class="cp-tier"><div class="t-name">Enterprise</div><div class="t-price">Custom</div><div class="t-meta">SSO · SCIM · dedicated</div></div>
+    </div>
+    <p class="cp-foot">Every tier carries unlimited users + workspaces — you scale one nexus by <b>memory and bandwidth</b>, never by headcount. <a href="https://app.workbooks.sh">See all plans →</a></p>
   </div>
 </section>
 
@@ -616,7 +720,7 @@ const WB_FLAGS = { desktopDownload: false };</script>
 <script>
 
 /* copy CTAs: write the payload, flip the label briefly */
-document.querySelectorAll(".btn-copy").forEach((b) => {
+document.querySelectorAll(".btn-copy, .plat-copy").forEach((b) => {
   b.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(b.dataset.copy); } catch { /* clipboard blocked */ }
     const lbl = b.querySelector(".lbl"), was = lbl.textContent;
