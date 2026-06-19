@@ -26,7 +26,7 @@ os.makedirs(ADAPTERS, exist_ok=True); os.makedirs(DATA, exist_ok=True)
 BASES = {
     "350m": {"hf": "spike/dflash/granite-4.0-350m", "gguf": "spike/models/granite-4.0-350m-Q4_K_M.gguf"},
     "1b":   {"hf": "spike/dflash/granite-4.0-1b", "gguf": "spike/models/granite-4.0-1b-Q4_K_M.gguf"},
-    "3b":   {"hf": None, "gguf": "spike/models/granite-4.1-3b-Q4_K_M.gguf"},
+    "3b":   {"hf": "spike/dflash/granite-4.1-3b", "gguf": "spike/models/granite-4.1-3b-Q4_K_M.gguf"},
     "8b":   {"hf": None, "gguf": "spike/models/granite-4.1-8b-Q5_K_M.gguf"},
 }
 PORTS = {"350m": 8104, "1b": 8101, "3b": 8102, "8b": 8103}
@@ -97,7 +97,10 @@ def train(name, data_dir, base="350m", steps=300, lr=2e-4):
     print(f"[train] PEFT LoRA on {base} ({hf}) dev={dev}, {len(pairs)} pairs x {steps} steps…", flush=True)
     tok = AutoTokenizer.from_pretrained(hf)
     if tok.pad_token is None: tok.pad_token = tok.eos_token
-    model = AutoModelForCausalLM.from_pretrained(hf, dtype=torch.float32).to(dev)
+    # bigger bases (3b) -> bf16 to fit 16GB; small ones stay fp32 (more stable, and they're tiny anyway)
+    big = base in ("3b", "8b")
+    model = AutoModelForCausalLM.from_pretrained(hf, dtype=torch.bfloat16 if big else torch.float32).to(dev)
+    if big: model.gradient_checkpointing_enable()
     # target ALL linear layers (not just q/v) — far more capacity to memorize exact facts (numbers,
     # command strings). q/v-only learns associations but confabulates rare tokens.
     model = get_peft_model(model, LoraConfig(r=16, lora_alpha=32, lora_dropout=0.0, task_type="CAUSAL_LM",

@@ -12,10 +12,13 @@ weak ones). So Constellation **trains and serves in the same GGUF lane**:
 Same arch both sides ⇒ the adapter applies cleanly. (MLX was dropped — it could 4-bit-train the 8B
 locally, but only by creating exactly that cross-quant serving mismatch.)
 
-## The model
-- **`8b`** = granite-4.1-8b (Q5) — the brain (serve + generate self-learning curricula)
-- **`3b`/`1b`/`350m`** — smaller bases; **350m trains locally** (PEFT fits 16 GB)
-- 8B *adapters* train on a **GPU training station** (PEFT QLoRA fits 8B trivially) → GGUF → serve here.
+## The model (100% local — no GPU, no cloud)
+- **`8b`** = granite-4.1-8b (Q5) — the serving brain + the teacher that generates self-learning curricula
+- **`3b`** = the local **trainable workhorse** — biggest base that PEFT-trains in 16 GB (bf16); capable
+  enough for real skills + facts
+- **`1b`/`350m`** — edge/tiny adapters
+- Everything trains AND serves on the local machine. (8B itself isn't fp16-trainable in 16 GB, so the
+  8B is the brain/teacher; adapters are authored on the 3B and below.)
 
 ## Commands (`python3.12 kit/constellation.py <cmd>`)
 ```
@@ -34,8 +37,7 @@ kit                                                      # list your GGUF adapte
   `Nexus.Llm.complete` reaches a GGUF base+adapter and gets the self-taught fact. See `../run-local-*.sh`.
 - **Hot-swap kit**: `llama-server` swaps GGUF adapters live via `POST /lora-adapters`.
 
-## Tiers (same GGUF kit, different surfaces)
-- **Laptop** — llama-server (CPU), local PEFT training (≤3b).
-- **GPU training station** — PEFT QLoRA trains 8B adapters → GGUF.
-- **CPU cluster / cloud** — same GGUF on llama.cpp (vLLM for GPU SOTA), adapters hot-swapped.
-- **Edge/browser** — the 350m + adapters via transformers.js/WebGPU.
+## Tiers (same GGUF kit, all local-first)
+- **Laptop** — llama-server (CPU) serves any base; PEFT trains adapters on ≤3b. This is the whole product.
+- **Edge/browser** — the 350m + adapters via transformers.js/WebGPU (ship in a workbook).
+(No GPU/cloud training tier — the point is it runs on the user's own computer.)

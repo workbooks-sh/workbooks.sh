@@ -202,3 +202,12 @@ RELIABLE fact-learner is the 8B (proven 4/4 in the MLX run). Defaults settled: f
 curriculum. For reliable exact recall on the all-GGUF lane: train the 8B adapter on a GPU (PEFT QLoRA
 fits 8B easily) -> GGUF -> serve here. Local small-base adapters = good for STYLE/skill/behavior shaping,
 not arbitrary-string memorization. (8B PEFT doesn't fit 16GB locally; bitsandbytes 4-bit is CUDA-only.)
+
+# ═══ HARD CONSTRAINT: LOCAL-ONLY, NO GPU/CLOUD (user, 2026-06-18) ═══
+Strike the "GPU training station" tier entirely. Everything — serve AND train — runs on the user's own
+computer. Consequence: the 8B can't fp16-train in 16GB, so the 8B is the SERVING BRAIN + the TEACHER
+that generates curricula; adapters are AUTHORED on the biggest base that PEFT-trains locally = the 3B
+(bf16 + gradient checkpointing fits 16GB). 1b/350m = edge/tiny adapters. All-GGUF, llama.cpp only.
+Testing whether 3B clears the exact-fact bar the 1B missed (3/5). If 3B is good enough -> local-only
+plan is complete. If facts still slip on 3B, reframe: local adapters = skill/style/behavior shaping
+(what LoRA is genuinely good at), exact facts -> context/memory at serve time, not baked into the adapter.
