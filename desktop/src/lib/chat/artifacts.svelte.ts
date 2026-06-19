@@ -18,6 +18,7 @@
 
 import { tabs } from "$lib/tabs/store.svelte";
 import { chrome } from "$lib/ui/chrome.svelte";
+import { openFromAgent } from "$lib/tabs/agentOpen";
 
 class ComponentArtifacts {
   /** Artifact keys already auto-opened this run (dedup the reproject loop). */
@@ -45,7 +46,12 @@ class ComponentArtifacts {
     if (this.#opened.has(key)) return;
     this.#opened.add(key);
     if (action === "updated") this.markUpdated(path);
-    void this.open(path);
+    // Spawn the freshly-built app in a RIGHT split pane beside the live
+    // conversation (chat-left / app-right) instead of yanking the user to a
+    // new full tab — they watch the agent talk AND see what it built. Falls
+    // back to a plain open outside a foreground chat. The card's "Open" button
+    // still uses open() to focus it on demand.
+    void openFromAgent(path);
   }
 
   /** Open (or focus) the artifact as a workbook tab and switch the canvas

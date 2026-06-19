@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Canvas — Q3 Launch Jam</title>
+<script id="workbook-spec" type="application/json">
+{ "name": "Canvas", "version": "0.1.0", "kind": "app" }
+</script>
+<style>
+  :root{
+    --paper:#fcfcfd;
+    --ink:#1d2230;
+    --line:#c9cdd6;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{width:1440px;height:900px;overflow:hidden;}
+  body{
+    background:var(--paper);
+    position:relative;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  /* infinite dot grid */
+  #board{
+    position:absolute; inset:0;
+    background-color:var(--paper);
+    background-image: radial-gradient(circle, #d7dae2 1.4px, transparent 1.4px);
+    background-size: 28px 28px;
+    background-position: -2px -2px;
+  }
+  #scene{ position:absolute; inset:0; }
+  svg{ position:absolute; inset:0; width:1440px; height:900px; overflow:visible; pointer-events:none; }
+
+  /* sticky notes */
+  .sticky{
+    position:absolute; width:168px; min-height:148px; padding:16px 16px 14px;
+    border-radius:4px;
+    box-shadow: 0 1px 1px rgba(20,24,40,.08), 0 8px 22px rgba(20,24,40,.12);
+    font-size:16px; line-height:1.32; font-weight:600; color:#2a2f3c;
+  }
+  .sticky .tag{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; opacity:.5; margin-bottom:8px; display:block;}
+  .s-y{ background:#ffe16b; } .s-p{ background:#ffb3c7; }
+  .s-b{ background:#a8d4f0; } .s-g{ background:#b6e3b0; }
+  .s-o{ background:#ffd29a; } .s-l{ background:#d8c4f5; }
+
+  /* frame labels */
+  .frame-label{ position:absolute; font-size:13px; font-weight:700; letter-spacing:.04em;
+    color:#6b7080; text-transform:uppercase; }
+
+  /* title */
+  .title{ position:absolute; left:64px; top:40px; }
+  .title h1{ font-size:34px; font-weight:800; letter-spacing:-.02em; color:#1d2230; }
+  .title .sub{ font-size:14px; color:#8a8f9c; font-weight:600; margin-top:4px;}
+
+  /* toolbar */
+  #toolbar{
+    position:absolute; left:50%; top:24px; transform:translateX(-50%);
+    display:flex; gap:4px; padding:6px;
+    background:#ffffff; border:1px solid #ececf1;
+    border-radius:14px; box-shadow:0 8px 30px rgba(20,24,40,.13);
+    z-index:30;
+  }
+  .tool{ width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    color:#5a606e; cursor:pointer; position:static; pointer-events:auto; }
+  .tool svg{ position:static; width:22px; height:22px; pointer-events:none;}
+  .tool:hover{ background:#f3f4f7; }
+  .tool.active{ background:#1d2230; color:#fff; }
+  .tool-sep{ width:1px; align-self:stretch; margin:6px 3px; background:#ececf1; }
+
+  /* presence */
+  #presence{
+    position:absolute; right:28px; top:26px; display:flex; align-items:center; gap:12px; z-index:30;
+  }
+  .avstack{ display:flex; }
+  .av{ width:34px; height:34px; border-radius:50%; border:2.5px solid #fff;
+    display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:13px;
+    margin-left:-9px; box-shadow:0 2px 6px rgba(20,24,40,.15); }
+  .av:first-child{ margin-left:0; }
+  .live{ display:flex; align-items:center; gap:7px; font-size:13px; font-weight:700; color:#4b5160;
+    background:#fff; border:1px solid #ececf1; padding:7px 12px; border-radius:20px; box-shadow:0 3px 10px rgba(20,24,40,.08);}
+  .dot{ width:9px; height:9px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 4px rgba(34,197,94,.18);}
+
+  /* remote cursors */
+  .cursor{ position:absolute; left:0; top:0; z-index:25; will-change:transform; }
+  .cursor svg{ position:static; width:24px; height:24px; pointer-events:none; filter:drop-shadow(0 2px 3px rgba(0,0,0,.25)); }
+  .label{ position:absolute; left:18px; top:18px; white-space:nowrap; color:#fff;
+    font-size:12px; font-weight:700; padding:3px 9px; border-radius:7px 7px 7px 2px;
+    box-shadow:0 3px 8px rgba(0,0,0,.2); }
+
+  .draw-path{ stroke-linecap:round; stroke-linejoin:round; fill:none; }
+  .pop{ animation:pop .25s ease; }
+  @keyframes pop{ 0%{transform:scale(.6); opacity:0} 100%{transform:scale(1); opacity:1} }
+</style>
+</head>
+<body>
+<div id="board"></div>
+
+<!-- ============ SVG layer (shapes drawn behind notes) ============ -->
+<svg id="svg" viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7a8090"/>
+    </marker>
+    <marker id="arrowPink" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#e86b96"/>
+    </marker>
+  </defs>
+
+  <!-- frames -->
+  <rect class="anim" x="300" y="200" width="430" height="300" rx="14" fill="none" stroke="#b9bdc8" stroke-width="2.5" stroke-dasharray="6 7"/>
+  <rect class="anim" x="820" y="250" width="400" height="330" rx="14" fill="none" stroke="#b9bdc8" stroke-width="2.5" stroke-dasharray="6 7"/>
+
+  <!-- connector arrows -->
+  <path class="anim" d="M735 350 C 775 350, 785 360, 818 380" stroke="#7a8090" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+  <path class="anim" d="M540 505 C 560 580, 700 600, 880 588" stroke="#e86b96" stroke-width="3" fill="none" marker-end="url(#arrowPink)"/>
+
+  <!-- decorative freehand strokes (pre-drawn on load) -->
+  <path class="anim" d="M170 640 q 30 -40 70 -10 t 80 -5 t 60 25" stroke="#6aa9e0" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path class="anim" d="M1120 690 c 20 -30 50 -20 55 5 c 5 25 -30 35 -45 18 c -12 -14 5 -32 28 -22" stroke="#6dbf64" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+  <!-- live-draw stroke (animated by a cursor) -->
+  <path id="livePath" class="draw-path" stroke="#f0a93a" stroke-width="5"/>
+  <!-- underline emphasis stroke under title -->
+  <path class="anim" d="M64 88 q 110 12 230 2" stroke="#ffd24d" stroke-width="7" fill="none" stroke-linecap="round" opacity=".85"/>
+</svg>
+
+<!-- ============ shapes / notes ============ -->
+<div id="scene">
+  <div class="title">
+    <h1>Q3 Launch — Jam</h1>
+    <div class="sub">workspace · live session · auto-saved</div>
+  </div>
+
+  <div class="frame-label" style="left:308px; top:174px;">▢ Product</div>
+  <div class="frame-label" style="left:828px; top:224px;">▢ Go-to-market</div>
+
+  <div class="sticky s-y" style="left:328px; top:230px; transform:rotate(-2.5deg);">
+    <span class="tag">flow</span>Onboarding flow polish</div>
+  <div class="sticky s-b" style="left:520px; top:255px; transform:rotate(1.5deg);">
+    <span class="tag">page</span>Pricing page rebuild</div>
+  <div class="sticky s-g" id="dragNote" style="left:355px; top:330px; transform:rotate(-1deg);">
+    <span class="tag">beta</span>Mobile beta invites</div>
+
+  <div class="sticky s-p" style="left:860px; top:285px; transform:rotate(2deg);">
+    <span class="tag">email</span>Launch email sequence</div>
+  <div class="sticky s-o" style="left:1042px; top:300px; transform:rotate(-2deg);">
+    <span class="tag">press</span>Press &amp; PH launch</div>
+  <div class="sticky s-l" style="left:945px; top:400px; transform:rotate(1deg);">
+    <span class="tag">social</span>Teaser thread + clips</div>
+</div>
+
+<!-- ============ toolbar ============ -->
+<div id="toolbar">
+  <div class="tool active" title="Select">
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5 3l14 8-6 1.5L10 19 5 3z"/></svg></div>
+  <div class="tool" title="Pen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M16 3l5 5L8 21H3v-5L16 3z"/></svg></div>
+  <div class="tool" title="Sticky">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h16v11l-5 5H4z"/><path d="M20 15h-5v5"/></svg></div>
+  <div class="tool" title="Rectangle">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="16" height="12" rx="2"/></svg></div>
+  <div class="tool" title="Arrow">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M4 12h15"/><path d="M13 6l6 6-6 6"/></svg></div>
+  <div class="tool" title="Text">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" xmlns="http://www.w3.org/2000/svg"><path d="M5 6h14M12 6v13"/></svg></div>
+  <div class="tool-sep"></div>
+  <div class="tool" title="Hand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M8 11V5a1.5 1.5 0 013 0v5"/><path d="M11 10V4a1.5 1.5 0 013 0v6"/><path d="M14 10V6a1.5 1.5 0 013 0v7c0 4-3 7-7 7-3 0-4-1-6-4l-2-3c-.7-1.2.8-2.6 2-1.6L8 14V6a1.5 1.5 0 013 0"/></svg></div>
+</div>
+
+<!-- ============ presence ============ -->
+<div id="presence">
+  <div class="avstack">
+    <div class="av" style="background:#e8546f">M</div>
+    <div class="av" style="background:#3b82f6">T</div>
+    <div class="av" style="background:#10b981">P</div>
+    <div class="av" style="background:#f59e0b">S</div>
+  </div>
+  <div class="live"><span class="dot"></span>4 live</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // ---- people / colors ----
+  var people = [
+    { name:"Mia",   color:"#e8546f" },
+    { name:"Theo",  color:"#3b82f6" },
+    { name:"Priya", color:"#10b981" },
+    { name:"Sam",   color:"#f59e0b" }
+  ];
+
+  // build cursor DOM
+  function cursorSVG(c){
+    return '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">'
+      + '<path d="M5 3l14 8-6 1.4L10 19 5 3z" fill="'+c+'" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+  }
+  var cursors = people.map(function(p){
+    var el = document.createElement('div');
+    el.className = 'cursor';
+    el.innerHTML = cursorSVG(p.color)
+      + '<div class="label" style="background:'+p.color+'">'+p.name+'</div>';
+    document.body.appendChild(el);
+    return el;
+  });
+
+  // ---- waypoint loops per cursor (smooth catmull-ish via lerp segments) ----
+  function makeLoop(pts, speed, pauseAt){
+    return { pts:pts, speed:speed, pauseAt:pauseAt||[], t:0 };
+  }
+  var loops = [
+    // Mia — roams product frame
+    makeLoop([[360,300],[500,260],[640,300],[560,420],[380,440],[300,360]], 0.00022, [0.16,0.5]),
+    // Theo — go-to-market frame
+    makeLoop([[900,330],[1080,330],[1140,470],[990,540],[880,470],[860,380]], 0.00018, [0.0,0.55]),
+    // Priya — crosses both, the live drawer
+    makeLoop([[260,640],[420,620],[660,640],[900,640]], 0.00030, [0.0]),
+    // Sam — wide orbit
+    makeLoop([[700,150],[1180,200],[1240,650],[760,760],[220,700],[180,300]], 0.00012, [])
+  ];
+
+  function lerp(a,b,t){ return a+(b-a)*t; }
+  function ease(t){ return t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
+  function posOnLoop(loop, t){
+    var n = loop.pts.length;
+    var f = t * n;
+    var i = Math.floor(f) % n;
+    var j = (i+1) % n;
+    var local = ease(f - Math.floor(f));
+    return [ lerp(loop.pts[i][0], loop.pts[j][0], local),
+             lerp(loop.pts[i][1], loop.pts[j][1], local) ];
+  }
+
+  // ---- live-draw stroke (Priya draws as she moves) ----
+  var livePath = document.getElementById('livePath');
+  var doodles = [
+    "M250 680 q 60 -55 120 -10 t 110 -8 q 60 -30 110 10 t 120 -2",
+    "M250 690 c 40 -50 90 30 140 -5 s 110 -40 150 10 t 130 -6",
+    "M250 670 q 70 60 140 0 t 150 5 t 140 -12"
+  ];
+  var doodleIdx = 0;
+  livePath.setAttribute('d', doodles[0]);
+  var liveLen = livePath.getTotalLength();
+  livePath.style.strokeDasharray = liveLen;
+  livePath.style.strokeDashoffset = liveLen;
+
+  function setDoodle(i){
+    livePath.setAttribute('d', doodles[i % doodles.length]);
+    liveLen = livePath.getTotalLength();
+    livePath.style.strokeDasharray = liveLen;
+    livePath.style.strokeDashoffset = liveLen;
+  }
+
+  // ---- intro: shapes draw themselves in ----
+  var anims = Array.prototype.slice.call(document.querySelectorAll('.anim'));
+  anims.forEach(function(p, k){
+    try{
+      var L = p.getTotalLength();
+      p.style.strokeDasharray = L;
+      p.style.strokeDashoffset = L;
+      p.dataset.len = L;
+    }catch(e){ p.style.opacity = 0; }
+  });
+  // sticky notes fade/pop in
+  var stickies = Array.prototype.slice.call(document.querySelectorAll('.sticky'));
+  stickies.forEach(function(s){ s.style.opacity = 0; });
+
+  // drag note baseline
+  var dragNote = document.getElementById('dragNote');
+  var dragBaseX = 355, dragBaseY = 330;
+
+  var INTRO = 1300; // ms
+  var start = null;
+
+  function frame(ts){
+    if(start === null) start = ts;
+    var dt = ts - start;
+
+    // intro draw-in
+    var ip = Math.min(1, dt / INTRO);
+    anims.forEach(function(p, k){
+      var L = +p.dataset.len || 0;
+      // stagger
+      var local = Math.min(1, Math.max(0, (ip*1.25) - k*0.05));
+      p.style.strokeDashoffset = L * (1 - ease(local));
+    });
+    stickies.forEach(function(s, k){
+      var local = Math.min(1, Math.max(0, (ip*1.3) - 0.15 - k*0.08));
+      s.style.opacity = local;
+      s.style.transform = s.style.transform.replace(/ translateY\([^)]*\)/,'') + ' translateY('+((1-ease(local))*16)+'px)';
+    });
+
+    // cursors move continuously (also during intro, lightly)
+    var presenceScale = Math.min(1, dt/600);
+    for(var ci=0; ci<cursors.length; ci++){
+      var loop = loops[ci];
+      // pause logic: slow near pause points
+      var raw = (dt * loop.speed) % 1;
+      // apply a soft pause: ease time so it lingers around pauseAt
+      var tt = raw;
+      loop.pauseAt.forEach(function(pa){
+        var d = Math.abs(((tt - pa + 1.5) % 1) - 0); // distance forward
+      });
+      var pos = posOnLoop(loop, raw);
+      var jx = Math.sin(dt*0.003 + ci)*2.0;
+      var jy = Math.cos(dt*0.0026 + ci*2)*2.0;
+      cursors[ci].style.transform = 'translate('+(pos[0]+jx)+'px,'+(pos[1]+jy)+'px) scale('+presenceScale+')';
+    }
+
+    // Priya (index 2) drives the live doodle
+    var pLoop = loops[2];
+    var praw = (dt * pLoop.speed) % 1;
+    // reveal stroke proportional to progress along her left->right pass
+    var reveal = praw; // 0..1
+    livePath.style.strokeDashoffset = liveLen * (1 - reveal);
+    // when she loops back, swap doodle
+    if(praw < 0.02 && dt - lastSwap > 1500){
+      doodleIdx = (doodleIdx + 1) % doodles.length;
+      setDoodle(doodleIdx);
+      lastSwap = dt;
+    }
+
+    // Theo (index 1) lightly drags the green note as he hovers it
+    var dLoop = loops[1];
+    var draw = (dt * dLoop.speed) % 1;
+    // small oscillating nudge — feels like he's repositioning it
+    var nx = Math.sin(dt*0.0009)*10;
+    var ny = Math.cos(dt*0.0011)*6;
+    if(dt > INTRO){
+      dragNote.style.left = (dragBaseX + nx) + 'px';
+      dragNote.style.top  = (dragBaseY + ny) + 'px';
+    }
+
+    requestAnimationFrame(frame);
+  }
+  var lastSwap = 0;
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

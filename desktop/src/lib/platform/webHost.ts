@@ -53,6 +53,7 @@ const PKG: Record<string, { icon: string; kind: "app" | "folder" }> = {
   Swarm: { icon: "mi:database", kind: "app" },
   Ledger: { icon: "mi:table", kind: "app" },
   Pulse: { icon: "mi:chart", kind: "app" },
+  Canvas: { icon: "mi:svg", kind: "app" },
   Kanban: { icon: "mi:todo", kind: "app" },
   Notes: { icon: "mi:document", kind: "app" },
   Tracker: { icon: "lucide:TrendUp", kind: "app" }, // legacy-mapping example
@@ -101,6 +102,7 @@ const APP_WORKBOOK_PATH: Record<string, string> = {
   Swarm: "/mock/swarm.html",
   Ledger: "/mock/ledger.html",
   Pulse: "/mock/pulse.html",
+  Canvas: "/mock/canvas.html",
   Kanban: "/mock/kanban.html",
   // Brand Nana (brand-intelligence agency)
   "Brand Health": "/brands/brand-nana/brand-health-dashboard.html",
@@ -140,7 +142,7 @@ const WORKSPACES = [
     id: "ws_personal",
     name: "Personal",
     icon: "🪐",
-    package_names: ["Swarm", "Ledger", "Pulse", "Kanban", "Notes", "Tracker", "Reading", "Clients", "Side Projects", "Photos", "Design", "People", "Finance", "Research", "Archive", "Brand", "Marketing"],
+    package_names: ["Swarm", "Canvas", "Ledger", "Pulse", "Kanban", "Notes", "Tracker", "Reading", "Clients", "Side Projects", "Photos", "Design", "People", "Finance", "Research", "Archive", "Brand", "Marketing"],
     created_at: 1_700_000_000_000,
   },
   {

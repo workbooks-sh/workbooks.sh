@@ -1,111 +1,348 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Kanban Board</title>
-<!-- Single-file workbook. The `workbook-spec` marker below is what the
-     desktop's grid scan + provenance verifier key on to recognise a
-     workbook. This board is self-contained (no external runtime) so it
-     renders identically in the desktop app, the mock web host, and a
-     plain browser. -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440, initial-scale=1">
+<title>Product Sprint · Kanban</title>
 <script id="workbook-spec" type="application/json">
-{
-  "name": "Kanban Board",
-  "version": "0.1.0",
-  "kind": "app",
-  "columns": ["Backlog", "In Progress", "Done"]
-}
+{ "name": "Kanban", "version": "0.1.0", "kind": "app", "columns": ["Backlog", "In Progress", "Review", "Done"] }
 </script>
 <style>
-  :root { color-scheme: light; --bg:#f5f6f8; --surface:#fff; --border:#e3e6ea;
-    --fg:#1c1d22; --muted:#6b7280; --accent:#2f6fe0; }
-  * { box-sizing: border-box; }
-  body { margin:0; font:14px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;
-    color:var(--fg); background:var(--bg); }
-  header { padding:18px 22px 10px; }
-  header h1 { margin:0; font-size:18px; }
-  header p { margin:4px 0 0; color:var(--muted); font-size:12px; }
-  .board { display:grid; grid-template-columns:repeat(3,1fr); gap:14px;
-    padding:14px 22px 28px; align-items:start; }
-  .col { background:var(--surface); border:1px solid var(--border);
-    border-radius:12px; padding:10px; min-height:120px; }
-  .col.drag-over { border-color:var(--accent); box-shadow:0 0 0 2px rgba(47,111,224,.18); }
-  .col h2 { margin:2px 4px 10px; font-size:12px; text-transform:uppercase;
-    letter-spacing:.05em; color:var(--muted); display:flex; justify-content:space-between; }
-  .count { background:var(--bg); border-radius:999px; padding:0 7px; font-size:11px; }
-  .card { background:var(--surface); border:1px solid var(--border);
-    border-radius:9px; padding:9px 11px; margin-bottom:8px; cursor:grab;
-    box-shadow:0 1px 2px rgba(15,15,15,.04); }
-  .card:active { cursor:grabbing; }
-  .card.dragging { opacity:.45; }
-  .add { width:100%; border:1px dashed var(--border); background:transparent;
-    color:var(--muted); border-radius:8px; padding:7px; font:inherit;
-    font-size:12px; cursor:pointer; }
-  .add:hover { color:var(--accent); border-color:var(--accent); }
+  :root{
+    --bg:#f6f7f9; --surface:#fff; --ink:#14161a; --muted:#6b7280; --hair:#e8eaee;
+    --shadow:0 1px 2px rgba(20,22,26,.06), 0 4px 12px rgba(20,22,26,.05);
+    --shadow-lift:0 8px 24px rgba(20,22,26,.12);
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden}
+  body{
+    width:1440px;height:900px;background:var(--bg);color:var(--ink);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;
+  }
+  .mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace}
+
+  /* ---------- header ---------- */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:22px 36px 18px;flex:0 0 auto;
+  }
+  .h-left{display:flex;align-items:baseline;gap:16px}
+  .board-title{font-size:24px;font-weight:680;letter-spacing:-.02em}
+  .board-meta{font-size:13px;color:var(--muted);font-weight:500}
+  .board-meta b{color:var(--ink);font-weight:600}
+  .h-right{display:flex;align-items:center;gap:18px}
+
+  .avatars{display:flex;align-items:center}
+  .avatars .av{
+    width:32px;height:32px;border-radius:50%;border:2px solid var(--bg);
+    margin-left:-9px;display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:650;color:#fff;letter-spacing:.01em;
+    box-shadow:0 1px 2px rgba(0,0,0,.12);
+  }
+  .avatars .av:first-child{margin-left:0}
+  .avatars .more{background:#eef0f3!important;color:var(--muted)!important}
+
+  .live{
+    display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;
+    color:#11824a;background:#e9f7ef;border:1px solid #cdeeda;
+    padding:6px 11px 6px 9px;border-radius:999px;
+  }
+  .live .dot{width:8px;height:8px;border-radius:50%;background:#19c466;
+    box-shadow:0 0 0 0 rgba(25,196,102,.55);animation:pulse 2s infinite}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(25,196,102,.5)}
+    70%{box-shadow:0 0 0 7px rgba(25,196,102,0)}
+    100%{box-shadow:0 0 0 0 rgba(25,196,102,0)}
+  }
+
+  /* ---------- board ---------- */
+  .board{
+    flex:1 1 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:18px;
+    padding:4px 36px 30px;min-height:0;
+  }
+  .col{
+    background:#f0f1f4;border-radius:14px;display:flex;flex-direction:column;
+    min-height:0;border:1px solid #eaebef;overflow:hidden;
+  }
+  .col-accent{height:3px;width:100%}
+  .col-head{
+    display:flex;align-items:center;gap:8px;padding:13px 15px 10px;flex:0 0 auto;
+  }
+  .col-name{font-size:13.5px;font-weight:650;letter-spacing:-.01em}
+  .count{
+    font-size:11.5px;font-weight:650;color:var(--muted);background:#e4e6ea;
+    min-width:21px;height:21px;padding:0 6px;border-radius:7px;
+    display:inline-flex;align-items:center;justify-content:center;
+    transition:transform .25s ease, background .25s ease, color .25s ease;
+  }
+  .count.bump{transform:scale(1.28);background:#14161a;color:#fff}
+
+  .list{
+    flex:1 1 auto;overflow-y:auto;padding:4px 10px 12px;display:flex;
+    flex-direction:column;gap:10px;scrollbar-width:thin;scroll-behavior:smooth;
+  }
+  .list::-webkit-scrollbar{width:8px}
+  .list::-webkit-scrollbar-thumb{background:#d7d9de;border-radius:8px;border:2px solid #f0f1f4}
+
+  /* ---------- card ---------- */
+  .card{
+    background:var(--surface);border:1px solid var(--hair);border-radius:var(--radius);
+    padding:12px 13px 11px;box-shadow:var(--shadow);cursor:grab;
+    transition:box-shadow .2s ease, transform .2s ease, opacity .2s ease;
+    will-change:transform;
+  }
+  .card:hover{box-shadow:var(--shadow-lift);transform:translateY(-1px)}
+  .card.dragging{opacity:.45;cursor:grabbing}
+  .card.flip{transition:transform .55s cubic-bezier(.22,.61,.36,1)}
+  .card.land{animation:land .9s ease}
+  @keyframes land{
+    0%{box-shadow:0 0 0 0 rgba(94,124,255,.0)}
+    18%{box-shadow:0 0 0 3px rgba(94,124,255,.55), var(--shadow-lift)}
+    100%{box-shadow:var(--shadow)}
+  }
+
+  .tags{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+  .tag{
+    font-size:10.5px;font-weight:650;letter-spacing:.02em;padding:2.5px 7px;
+    border-radius:6px;line-height:1.3;
+  }
+  .t-design{background:#efe9ff;color:#6b3fd1}
+  .t-bug{background:#ffe6e3;color:#cd3a2c}
+  .t-api{background:#e2f0ff;color:#1f6fd6}
+  .t-infra{background:#e6f6ec;color:#178a4f}
+  .t-ux{background:#fff1dc;color:#b9711a}
+  .t-perf{background:#e9eefb;color:#3f55c2}
+
+  .card-title{font-size:13.5px;font-weight:560;line-height:1.35;letter-spacing:-.005em;margin-bottom:11px}
+
+  .card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .foot-left{display:flex;align-items:center;gap:10px;color:var(--muted)}
+  .prio{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .p-high{background:#ef4444}.p-med{background:#f59e0b}.p-low{background:#9aa3af}
+  .meta-i{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:550}
+  .meta-i svg{display:block}
+  .due{
+    font-size:10.5px;font-weight:600;color:#5a6270;background:#f0f1f4;
+    padding:2px 7px;border-radius:6px;
+  }
+  .due.soon{background:#fdeceb;color:#cd3a2c}
+
+  .av-sm{
+    width:23px;height:23px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-size:10px;font-weight:650;color:#fff;flex:0 0 auto;
+  }
+
+  .typing{display:inline-flex;align-items:center;gap:3px;margin-left:2px}
+  .typing span{width:4px;height:4px;border-radius:50%;background:#9aa3af;
+    animation:blink 1.2s infinite both}
+  .typing span:nth-child(2){animation-delay:.2s}
+  .typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+
+  .list.dragover{outline:2px dashed #c3c9d4;outline-offset:-6px;border-radius:10px}
 </style>
 </head>
 <body>
-<header>
-  <h1>Kanban Board</h1>
-  <p>Drag cards between columns. Double-click a column footer to add a card.</p>
-</header>
-<div class="board" id="board"></div>
+  <header>
+    <div class="h-left">
+      <div class="board-title">Product Sprint</div>
+      <div class="board-meta">Sprint 14 · <b>6 days left</b> · 42 pts</div>
+    </div>
+    <div class="h-right">
+      <div class="avatars" id="teamAvatars"></div>
+      <div class="live"><span class="dot"></span>Live</div>
+    </div>
+  </header>
+
+  <div class="board" id="board"></div>
+
 <script>
-  const SEED = {
-    Backlog: ["Draft the proposal", "Research competitors", "Collect feedback"],
-    "In Progress": ["Wire up the rail demo", "Default to Lucide icons"],
-    Done: ["Set up the project", "Define the icon model"],
-  };
-  const board = document.getElementById("board");
-  let dragEl = null;
+"use strict";
 
-  function makeCard(text) {
-    const c = document.createElement("div");
-    c.className = "card";
-    c.draggable = true;
-    c.textContent = text;
-    c.addEventListener("dragstart", () => { dragEl = c; c.classList.add("dragging"); });
-    c.addEventListener("dragend", () => { c.classList.remove("dragging"); dragEl = null; });
-    return c;
-  }
+// ---- palette helpers ----------------------------------------------------
+const PEOPLE = {
+  AL:{n:"Ava L.",   c:"#6b5bd6"},
+  MK:{n:"Mateo K.", c:"#2f9e6e"},
+  SR:{n:"Sana R.",  c:"#d6743f"},
+  JP:{n:"Jonah P.", c:"#c2477f"},
+  EN:{n:"Elise N.", c:"#2f74c2"},
+};
+const TEAM = ["AL","MK","SR","JP","EN"];
 
-  function refreshCounts() {
-    document.querySelectorAll(".col").forEach((col) => {
-      const n = col.querySelectorAll(".card").length;
-      col.querySelector(".count").textContent = n;
-    });
-  }
+const COLS = [
+  {id:"backlog",  name:"Backlog",     accent:"#9aa3af"},
+  {id:"progress", name:"In Progress", accent:"#3f7df6"},
+  {id:"review",   name:"Review",      accent:"#b07adb"},
+  {id:"done",     name:"Done",        accent:"#19c466"},
+];
 
-  Object.entries(SEED).forEach(([name, cards]) => {
-    const col = document.createElement("div");
-    col.className = "col";
-    const h = document.createElement("h2");
-    h.innerHTML = `<span>${name}</span><span class="count">0</span>`;
-    col.appendChild(h);
-    const drop = document.createElement("div");
-    drop.className = "drop";
-    cards.forEach((t) => drop.appendChild(makeCard(t)));
-    col.appendChild(drop);
-    const add = document.createElement("button");
-    add.className = "add";
-    add.textContent = "+ Add card";
-    add.addEventListener("click", () => {
-      const t = prompt("Card text:");
-      if (t) { drop.appendChild(makeCard(t)); refreshCounts(); }
-    });
-    col.appendChild(add);
+// id -> next column for the auto-flow
+const NEXT = {backlog:"progress", progress:"review", review:"done"};
 
-    col.addEventListener("dragover", (e) => { e.preventDefault(); col.classList.add("drag-over"); });
-    col.addEventListener("dragleave", () => col.classList.remove("drag-over"));
-    col.addEventListener("drop", (e) => {
-      e.preventDefault();
-      col.classList.remove("drag-over");
-      if (dragEl) { drop.appendChild(dragEl); refreshCounts(); }
-    });
-    board.appendChild(col);
+// ---- cards --------------------------------------------------------------
+let uid = 0;
+const CARDS = [
+  // Backlog
+  {col:"backlog",  title:"Wire up OAuth callback redirect",   tags:[["t-api","API"]],                 who:"EN", prio:"p-high", c:3,  due:"Jun 21"},
+  {col:"backlog",  title:"Polish empty states across views",  tags:[["t-design","Design"],["t-ux","UX"]], who:"AL", prio:"p-low",  c:1,  due:"Jun 24"},
+  {col:"backlog",  title:"Audit bundle size on settings",     tags:[["t-perf","Perf"]],               who:"MK", prio:"p-med",  c:0,  due:"Jun 25"},
+  // In Progress
+  {col:"progress", title:"Ship search drawer + shortcuts",    tags:[["t-design","Design"],["t-api","API"]], who:"AL", prio:"p-high", c:5,  due:"Jun 19", soon:true, typing:true},
+  {col:"progress", title:"Migrate avatars to CDN cache",      tags:[["t-infra","Infra"]],             who:"MK", prio:"p-med",  c:2,  due:"Jun 20"},
+  // Review
+  {col:"review",   title:"Fix drag race condition on drop",   tags:[["t-bug","Bug"]],                 who:"JP", prio:"p-high", c:4,  due:"Jun 18", soon:true},
+  {col:"review",   title:"Tighten board virtualization",      tags:[["t-perf","Perf"],["t-infra","Infra"]], who:"EN", prio:"p-med", c:2, due:"Jun 22"},
+  // Done
+  {col:"done",     title:"Add keyboard nav to columns",       tags:[["t-ux","UX"]],                   who:"SR", prio:"p-low",  c:1,  due:"Done"},
+  {col:"done",     title:"Theme tokens + dark scaffold",      tags:[["t-design","Design"]],           who:"AL", prio:"p-low",  c:0,  due:"Done"},
+  {col:"done",     title:"Set up E2E smoke harness",          tags:[["t-infra","Infra"]],             who:"MK", prio:"p-med",  c:3,  due:"Done"},
+];
+
+// ---- icons --------------------------------------------------------------
+const ICON_COMMENT = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/></svg>';
+const ICON_CHECK   = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
+
+// ---- render -------------------------------------------------------------
+const teamEl = document.getElementById("teamAvatars");
+TEAM.forEach(k=>{
+  const d=document.createElement("div");
+  d.className="av"; d.style.background=PEOPLE[k].c; d.textContent=k; d.title=PEOPLE[k].n;
+  teamEl.appendChild(d);
+});
+const more=document.createElement("div"); more.className="av more"; more.textContent="+3"; teamEl.appendChild(more);
+
+const board=document.getElementById("board");
+const listEls={};
+COLS.forEach(col=>{
+  const wrap=document.createElement("div"); wrap.className="col";
+  const acc=document.createElement("div"); acc.className="col-accent"; acc.style.background=col.accent;
+  const head=document.createElement("div"); head.className="col-head";
+  head.innerHTML=`<span class="col-name">${col.name}</span><span class="count" id="count-${col.id}">0</span>`;
+  const list=document.createElement("div"); list.className="list"; list.id="list-"+col.id; list.dataset.col=col.id;
+  wrap.append(acc,head,list); board.appendChild(wrap);
+  listEls[col.id]=list;
+  // drop target
+  list.addEventListener("dragover",e=>{e.preventDefault();list.classList.add("dragover")});
+  list.addEventListener("dragleave",()=>list.classList.remove("dragover"));
+  list.addEventListener("drop",e=>{
+    e.preventDefault();list.classList.remove("dragover");
+    if(!dragEl)return; list.appendChild(dragEl); dragEl.dataset.col=col.id; updateCounts();
   });
-  refreshCounts();
+});
+
+let dragEl=null;
+function makeCard(d){
+  const el=document.createElement("div");
+  el.className="card"; el.draggable=true; el.dataset.col=d.col; el.dataset.id="c"+(uid++);
+  const tagsHtml=d.tags.map(t=>`<span class="tag ${t[0]}">${t[1]}</span>`).join("");
+  const typing=d.typing?'<span class="typing"><span></span><span></span><span></span></span>':"";
+  const dueCls=d.soon?"due soon":"due";
+  el.innerHTML=`
+    <div class="tags">${tagsHtml}</div>
+    <div class="card-title">${d.title}</div>
+    <div class="card-foot">
+      <div class="foot-left">
+        <span class="prio ${d.prio}" title="priority"></span>
+        <span class="meta-i">${ICON_COMMENT}${d.c}</span>
+        <span class="meta-i">${ICON_CHECK}${typing||""}</span>
+      </div>
+      <div class="av-sm" style="background:${PEOPLE[d.who].c}" title="${PEOPLE[d.who].n}">${d.who}</div>
+    </div>`;
+  // due chip appended into foot-left
+  const due=document.createElement("span"); due.className=dueCls; due.textContent=d.due;
+  el.querySelector(".foot-left").appendChild(due);
+
+  el.addEventListener("dragstart",()=>{dragEl=el;el.classList.add("dragging")});
+  el.addEventListener("dragend",()=>{el.classList.remove("dragging");dragEl=null;updateCounts()});
+  return el;
+}
+CARDS.forEach(d=>listEls[d.col].appendChild(makeCard(d)));
+
+function updateCounts(){
+  COLS.forEach(c=>{
+    document.getElementById("count-"+c.id).textContent=listEls[c.id].children.length;
+  });
+}
+updateCounts();
+
+// ---- auto-flow (FLIP move one card to next column) ----------------------
+function bumpCount(colId){
+  const el=document.getElementById("count-"+colId);
+  el.classList.add("bump"); setTimeout(()=>el.classList.remove("bump"),300);
+}
+
+function moveOne(){
+  // pick a source column that still feeds forward & has a card
+  const order=["progress","backlog","review"]; // priority of who moves
+  let card=null, fromCol=null;
+  for(const c of order){
+    const list=listEls[c];
+    if(list.children.length>0){ card=list.children[0]; fromCol=c; break; }
+  }
+  if(!card)return;
+  const toCol=NEXT[fromCol];
+  if(!toCol)return;
+  const destList=listEls[toCol];
+
+  // FLIP: capture first
+  const first=card.getBoundingClientRect();
+  destList.appendChild(card);
+  card.dataset.col=toCol;
+  const last=card.getBoundingClientRect();
+  const dx=first.left-last.left, dy=first.top-last.top;
+
+  // invert
+  card.classList.remove("flip","land");
+  card.style.transform=`translate(${dx}px,${dy}px)`;
+  card.style.zIndex="50";
+  card.style.boxShadow="var(--shadow-lift)";
+
+  requestAnimationFrame(()=>{
+    card.classList.add("flip");
+    card.style.transform="translate(0,0)";
+  });
+  // counts shift immediately
+  bumpCount(fromCol); bumpCount(toCol); updateCounts();
+
+  setTimeout(()=>{
+    card.classList.remove("flip");
+    card.style.transform=""; card.style.zIndex=""; card.style.boxShadow="";
+    card.classList.add("land");
+    if(toCol==="done"){
+      const dueEl=card.querySelector(".due"); if(dueEl){dueEl.textContent="Done";dueEl.className="due"}
+      const t=card.querySelector(".typing"); if(t)t.remove();
+    }
+    setTimeout(()=>card.classList.remove("land"),900);
+  },560);
+}
+
+// occasionally toggle a "typing/active" indicator on an in-progress card
+function flickerActivity(){
+  const list=listEls["progress"];
+  if(!list.children.length)return;
+  const card=list.children[Math.floor(Math.random()*list.children.length)];
+  const slot=card.querySelectorAll(".meta-i")[1];
+  if(!slot||slot.querySelector(".typing"))return;
+  const t=document.createElement("span");
+  t.className="typing";t.innerHTML="<span></span><span></span><span></span>";
+  slot.appendChild(t);
+  setTimeout(()=>{if(t.parentNode)t.remove()},4200);
+}
+
+// drive the loop with slight jitter so it feels organic
+function schedule(){
+  const delay=2500+Math.random()*1000;
+  setTimeout(()=>{
+    moveOne();
+    if(Math.random()<0.6) flickerActivity();
+    schedule();
+  },delay);
+}
+setTimeout(schedule,1400);
+setTimeout(flickerActivity,2600);
 </script>
 </body>
 </html>

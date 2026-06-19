@@ -14,24 +14,24 @@
 import { tabs } from "./store.svelte";
 import { chatTabPath } from "./chatTab";
 import { panes } from "$lib/viewer/panes.svelte";
-import { chatBackdrop } from "$lib/home/chatBackdrop.svelte";
 import { chrome } from "$lib/ui/chrome.svelte";
 
 const WALDO_SLUG = "waldo";
 
-/** Open a path the AGENT asked to open. In a foreground create chat this
- *  lands it in a right split pane beside the conversation; otherwise it's
- *  an ordinary open. */
+/** Open a path the AGENT asked to open. When there's a live conversation (the
+ *  Waldo chat tab is open — submitting from the composer materializes it), this
+ *  lands the workbook in a RIGHT split pane beside the chat so the user watches
+ *  it get built next to the conversation; otherwise it's an ordinary open. */
 export async function openFromAgent(path: string): Promise<void> {
-  // Not in a foreground conversation → ordinary open (replace/focus).
-  if (!chatBackdrop.active) {
+  const chatPath = chatTabPath(WALDO_SLUG);
+  // No live conversation to pair with → ordinary open (replace/focus).
+  if (!tabs.tabs.some((t) => t.path === chatPath)) {
     await tabs.open(path);
     return;
   }
 
   // 1) Materialize the live conversation as a tab (left). Idempotent —
   //    focuses the existing chat tab if it's already open.
-  const chatPath = chatTabPath(WALDO_SLUG);
   await tabs.open(chatPath);
 
   // 2) Open the workbook tab (this focuses it).
