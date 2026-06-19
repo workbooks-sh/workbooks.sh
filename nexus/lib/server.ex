@@ -79,8 +79,20 @@ defmodule Nexus.Server do
       # Register any routes the unit declared with `route "GET /path", :fun` (baked at compile).
       Nexus.Router.install(m)
     end)
+
+    # Load this workbook's `auth do protect/public end` policy into the guard table (no-op if absent).
+    for {_f, nodes} <- parse_workbook(root),
+        n <- nodes,
+        n.type == :code and n.kind == "auth",
+        do: Nexus.Auth.Guard.load(n.ast)
   rescue
     _ -> :ok
+  end
+
+  defp parse_workbook(root) do
+    (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
+    |> Enum.uniq()
+    |> Enum.map(fn p -> {p, Nexus.Literate.parse(File.read!(p))} end)
   end
 
   def child_spec(opts) do

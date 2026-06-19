@@ -18,7 +18,12 @@ defmodule Nexus.Auth do
   @behaviour Plug
   import Plug.Conn
 
-  @type identity :: %{required(:tenant) => String.t(), optional(:user) => String.t() | nil}
+  @type identity :: %{
+          required(:tenant) => String.t(),
+          optional(:user) => String.t() | nil,
+          optional(:roles) => [String.t()],
+          optional(:scopes) => [String.t()]
+        }
   @callback authenticate(Plug.Conn.t()) :: {:ok, identity} | {:error, term}
 
   @impl Plug
@@ -32,12 +37,26 @@ defmodule Nexus.Auth do
   def call(%{request_path: p} = conn, _opts) when p in @public_paths, do: conn
 
   def call(conn, _opts) do
-    case adapter().authenticate(conn) do
-      {:ok, %{tenant: tenant} = id} when is_binary(tenant) and tenant != "" ->
-        conn |> assign(:tenant, tenant) |> assign(:identity, id)
+    # Workbook-declared public globs skip auth entirely (login pages, marketing, etc.). When no `auth`
+    # policy is declared this is always false, so behavior is unchanged from a no-guard deployment.
+    if Nexus.Auth.Guard.public?(conn.method, conn.request_path) do
+      conn
+    else
+      case adapter().authenticate(conn) do
+        {:ok, %{tenant: tenant} = id} when is_binary(tenant) and tenant != "" ->
+          conn = conn |> assign(:tenant, tenant) |> assign(:identity, id)
 
-      _ ->
-        conn |> send_resp(401, "unauthorized") |> halt()
+          # Per-route guard: :allow (default when no policy declared), 403 (wrong role/scope), or
+          # 401 (the guard demands more than the adapter proved). Fail-closed by construction.
+          case Nexus.Auth.Guard.decide(conn.method, conn.request_path, id) do
+            :allow -> conn
+            :forbidden -> conn |> send_resp(403, "forbidden") |> halt()
+            :unauthenticated -> conn |> send_resp(401, "unauthorized") |> halt()
+          end
+
+        _ ->
+          conn |> send_resp(401, "unauthorized") |> halt()
+      end
     end
   end
 
