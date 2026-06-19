@@ -24,7 +24,7 @@ jobs:
         with:
           submodules: false # the CLI needs no submodules (wasm-video is the engine's)
 
-      - uses: mlugg/setup-zig@v1
+      - uses: mlugg/setup-zig@v2
         with:
           version: "0.16.0"
 
