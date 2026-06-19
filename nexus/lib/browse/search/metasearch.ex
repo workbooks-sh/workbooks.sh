@@ -15,7 +15,7 @@ defmodule Nexus.Browse.Search.Metasearch do
 
   **Reliability note:** keyless scraping works great from a residential/dev IP but is anti-bot-hostile
   from datacenter IPs (Google/Bing/Brave degrade to CAPTCHA/403 on Fly). This is the LOCAL/dev
-  default; cloud deployments should set `<work-deploy search="brave">` (a keyed API, reliable from any
+  default; cloud deployments should set `deploy search="brave"` (a keyed API, reliable from any
   IP) — the documented prior "empty search" failure mode.
   """
   @behaviour Nexus.Browse

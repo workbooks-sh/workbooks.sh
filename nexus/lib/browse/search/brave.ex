@@ -2,7 +2,7 @@ defmodule Nexus.Browse.Search.Brave do
   @moduledoc """
   The keyed **cloud** `:search` provider — the Brave Search API (own index, clean JSON, reliable from
   any IP incl. Fly datacenter ranges). The recommended cloud default: select it with
-  `<work-deploy search="brave">`. See `docs/SEARCH-ARCHITECTURE.md` §4.
+  `deploy search="brave"`. See `docs/SEARCH-ARCHITECTURE.md` §4.
 
   `GET https://api.search.brave.com/res/v1/web/search?q=…` with an `X-Subscription-Token` header. The
   key is a secret, so it stays in the env (`BRAVE_API_KEY`) — the same carve-out `Nexus.Config`

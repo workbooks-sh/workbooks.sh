@@ -1,7 +1,7 @@
 defmodule Nexus.Cache.Cold.R2 do
   @moduledoc """
   R2/S3 `Nexus.Cache.Cold` provider — the egress-free object store, riding the SAME `Nexus.S3` client
-  the compile store uses. Its `bucket/prefix` come from the `cache-cold` `<work-deploy>` knob (an
+  the compile store uses. Its `bucket/prefix` come from the `cache-cold` the `deploy` block knob (an
   `r2://bucket/prefix` or `s3://…` URI). One object per cache entry at the tenant-scoped path from
   `Nexus.Cache.Cold.object_path/3`.
 

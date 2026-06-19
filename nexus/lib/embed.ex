@@ -7,7 +7,7 @@ defmodule Nexus.Embed do
   `dim/0`. The provider is selected (in order) by:
 
     1. the `:provider` option passed to `embed/2`, then
-    2. `Nexus.Config`'s `embed` attr (`<work-deploy embed="…">`) resolved to a module, then
+    2. `Nexus.Config`'s `embed` attr (`deploy embed="…"`) resolved to a module, then
     3. the built-in default below.
 
   ## Backends
@@ -20,7 +20,7 @@ defmodule Nexus.Embed do
     * **THE MODEL-SWAP POINT** — to serve a real semantic model (bge-small / nomic-embed via a local
       llama.cpp GGUF lane, or Bumblebee if added), implement a module with `embed/1` + `dim/0` that
       calls it (route heavy batches through `Nexus.Constellation.Lane` like the LLM lanes) and set
-      `<work-deploy embed="bge-small">` (add the name→module mapping in `provider/1`). Nothing else in
+      `deploy embed="bge-small"` (add the name→module mapping in `provider/1`). Nothing else in
       the search pipeline changes — `Semantic` only sees `embed(texts) -> [vector]`.
   """
 

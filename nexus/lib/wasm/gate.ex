@@ -11,7 +11,7 @@ defmodule Nexus.Wasm.Gate do
   thousand agents share a handful of render slots instead of OOMing in a synchronized burst.
 
   Lanes are independent (a render storm can't starve compiles) and sized per host from the
-  `<work-deploy>` config — `compile-concurrency` / `render-concurrency` — not env vars. Holders are
+  the `deploy` block config — `compile-concurrency` / `render-concurrency` — not env vars. Holders are
   monitored, so a slot held by a process that crashes or is killed (a Task timeout) is reclaimed.
 
       Nexus.Wasm.Gate.with_slot(:render, fn -> run_render() end)

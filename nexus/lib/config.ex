@@ -1,18 +1,21 @@
 defmodule Nexus.Config do
   @moduledoc """
-  Runtime configuration — sourced from the deployment's `<work-deploy>` element (HTML, the source
-  of truth), **not** environment variables. Composition-as-source: a knob is an attribute you can
-  read and diff in the file, never a hidden env sidecar (env config is JSON-by-another-name — same
-  smell the NO-JSON rule forbids).
+  Runtime configuration — sourced from the deployment's `.work` config, a
+  `deploy do … end` declaration (the source of truth), **not** environment
+  variables. Composition-as-source: a knob is a setting you can read and diff in
+  the `.work` file, never a hidden env sidecar (env config is JSON-by-another-name —
+  same smell the NO-JSON rule forbids). HTML is only ever a build output, never a
+  config surface.
 
-  The ONLY things still read from the process env are genuine deploy-time **secrets + per-machine
-  identity** (`OPENROUTER_API_KEY`, `NEXUS_DATA_TOKEN`, `NEXUS_TENANT`) — loaded INTO the nexus at
-  deploy from an env file, never authored config. Everything tunable lives here.
+  The ONLY things still read from the process env are genuine deploy-time **secrets +
+  per-machine identity** (`OPENROUTER_API_KEY`, `NEXUS_DATA_TOKEN`, `NEXUS_TENANT`) —
+  loaded INTO the nexus at deploy from an env file, never authored config. Everything
+  tunable lives here.
 
-  Loaded once into `:persistent_term` (lazily on first read, or eagerly via `boot/0` at app start).
-  `reload/1` (HTML string) and `put/2` are test seams.
+  Loaded once into `:persistent_term` (lazily on first read, or eagerly via `boot/0`
+  at app start). `reload/1` (the `.work` source string) and `put/2` are test seams.
 
-      <work-deploy
+      deploy do
         compile-concurrency="8"        # bound on concurrent wasm compiles (default: cores)
         compile-cache="on"             # content-addressed result cache (default: on)
         compile-cache-version="wbc1"   # bump to invalidate the whole store
@@ -23,13 +26,14 @@ defmodule Nexus.Config do
         cache-cold="cache"             # cold-tier backend: a local path (→ Local) OR r2://bucket/prefix (→ R2)
         search="metasearch"            # :search provider: metasearch (keyless, local/dev) | brave (keyed, cloud)
         search-engines="ddg mojeek startpage"  # which keyless engines metasearch fans out to
-        pm-debug="off" />
+        pm-debug="off"
+      end
   """
   @key {__MODULE__, :cfg}
 
   # Conventional locations the deployed/dev nexus looks for its config, first hit wins. No env knob
   # points here — it's convention, so there's no bootstrap env var to "configure the config".
-  @sources ["deployment.html", "/app/deployment.html", "/data/deployment.html"]
+  @sources ["deployment.work", "/app/deployment.work", "/data/deployment.work"]
 
   @doc "Eagerly load + cache the config (call once at app start, before the Gate reads its limit)."
   def boot, do: load(locate())
@@ -41,8 +45,8 @@ defmodule Nexus.Config do
     cfg
   end
 
-  @doc "Re-read from an HTML string (tests)."
-  def reload(html), do: load(html)
+  @doc "Re-read from a `.work` source string (tests)."
+  def reload(src), do: load(src)
 
   @doc "Override one key in the cached config (tests)."
   def put(key, val) do
@@ -70,7 +74,7 @@ defmodule Nexus.Config do
   def cache_default_ttl, do: get(:cache_default_ttl)
   # Cold-tier backend spec — a local filesystem path (→ Nexus.Cache.Cold.Local) OR an `r2://`/`s3://`
   # bucket URI (→ Nexus.Cache.Cold.R2). Mirrors `component-cache`: the operator picks cloud-vs-local
-  # ONCE in <work-deploy>, and the same tier logic runs either way. Default: "cache" under data_dir.
+  # ONCE in deploy, and the same tier logic runs either way. Default: "cache" under data_dir.
   def cache_cold, do: get(:cache_cold)
   # Web-search provider: "metasearch" (keyless default) | "brave" | "exa" | "tavily" | "searxng".
   def search, do: get(:search)
@@ -86,7 +90,7 @@ defmodule Nexus.Config do
     %{
       compile_concurrency: int(attr(html, "compile-concurrency"), System.schedulers_online()),
       # Render slots: each post-AOT render holds ~47MB. Default sizes to host RAM (≈1 slot/100MB,
-      # leaving ~300MB for the BEAM), capped to a sane band; `<work-deploy render-concurrency>` overrides.
+      # leaving ~300MB for the BEAM), capped to a sane band; `deploy render-concurrency` overrides.
       render_concurrency: int(attr(html, "render-concurrency"), default_render_concurrency()),
       compile_cache: bool(attr(html, "compile-cache"), true),
       compile_cache_version: attr(html, "compile-cache-version") || "wbc1",
@@ -147,13 +151,15 @@ defmodule Nexus.Config do
     end
   end
 
-  # Mirror the reactor's lightweight reader: find the attribute on the <work-deploy> open tag. No
-  # full HTML parser needed for a flat attribute list.
+  # Mirror the reactor's lightweight reader: read a `name="value"` setting from the
+  # `deploy do … end` block of the .work config. No full parser needed for a flat list.
   defp attr(nil, _name), do: nil
 
-  defp attr(html, name) do
-    case Regex.run(~r/<work-deploy\b[^>]*?\b#{Regex.escape(name)}="([^"]*)"/s, html) do
-      [_, v] -> String.trim(v)
+  defp attr(src, name) do
+    with [_, block] <- Regex.run(~r/deploy\s+do\b(.*?)\n\s*end\b/s, src),
+         [_, v] <- Regex.run(~r/\b#{Regex.escape(name)}="([^"]*)"/s, block) do
+      String.trim(v)
+    else
       _ -> nil
     end
   end

@@ -6,7 +6,7 @@ defmodule Nexus.Cache.Cold do
   path `cache/<tenant>/<namespace>/<key-hash>`.
 
   **The cold tier abstracts over the deploy target** — two routes behind ONE interface, picked by
-  config (`cache-cold` in `<work-deploy>`), exactly the way `Nexus.Compile.Store` switches on
+  config (`cache-cold` in the `deploy` block), exactly the way `Nexus.Compile.Store` switches on
   `component-cache`. The hot/cold logic in `Nexus.Cache.Tiered` never names which backend; it just
   calls this seam:
 
@@ -33,7 +33,7 @@ defmodule Nexus.Cache.Cold do
 
   @doc """
   The configured cold-tier provider. An explicit `config :nexus, :cache_cold, Module` override wins
-  (an embedder may force a provider); otherwise it's resolved from the `cache-cold` `<work-deploy>`
+  (an embedder may force a provider); otherwise it's resolved from the `cache-cold` the `deploy` block
   knob — an `r2://`/`s3://` URI → `Nexus.Cache.Cold.R2`, any other (filesystem path) → `…Local`.
   """
   def provider do

@@ -10,7 +10,7 @@ defmodule Nexus.Compile.Store do
 
   Blobs are immutable (key = content hash), so the tiers never need invalidation or coordination.
 
-  `component-cache` (in `<work-deploy>`) selects the mode:
+  `component-cache` (in `deploy`) selects the mode:
 
       component-cache="build/components"           # local dir → local-only
       component-cache="s3://my-bucket/components"   # remote (s3://|r2:// both fine) + local hot tier

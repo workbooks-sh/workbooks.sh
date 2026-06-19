@@ -1,7 +1,7 @@
 defmodule Nexus.ConfigTest do
   use ExUnit.Case, async: false
 
-  test "defaults when there is no <work-deploy> config" do
+  test "defaults when there is no deploy config" do
     Nexus.Config.reload(nil)
     assert Nexus.Config.compile_concurrency() == System.schedulers_online()
     assert Nexus.Config.compile_cache?() == true
@@ -12,11 +12,9 @@ defmodule Nexus.ConfigTest do
     Nexus.Config.reload(nil)
   end
 
-  test "knobs are read from the <work-deploy> element (HTML source of truth, not env)" do
-    html = ~s(<html><body><work-deploy engine-place="cloud"
-      compile-concurrency="3" compile-cache="off" compile-cache-version="v7"
-      component-cache="r2://my-bucket/components" languages="rust zig" pm-debug="on"></work-deploy></body></html>)
-    Nexus.Config.reload(html)
+  test "knobs are read from the .work deploy block (source of truth, not env)" do
+    src = ~s(# Deployment\n\ndeploy do\n  engine-place="cloud"\n  compile-concurrency="3" compile-cache="off" compile-cache-version="v7"\n  component-cache="r2://my-bucket/components" languages="rust zig" pm-debug="on"\nend\n)
+    Nexus.Config.reload(src)
     assert Nexus.Config.compile_concurrency() == 3
     assert Nexus.Config.compile_cache?() == false
     assert Nexus.Config.compile_cache_version() == "v7"

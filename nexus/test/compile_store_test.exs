@@ -17,9 +17,8 @@ defmodule Nexus.Compile.StoreTest do
   end
 
   test "an s3:// component-cache with no creds degrades to local (never errors a build)" do
-    html = ~s(<work-deploy component-cache="r2://bkt/components"
-      component-cache-endpoint="https://acct.r2.cloudflarestorage.com" component-cache-region="auto">)
-    Nexus.Config.reload(html)
+    src = ~s(deploy do\n  component-cache="r2://bkt/components"\n  component-cache-endpoint="https://acct.r2.cloudflarestorage.com" component-cache-region="auto"\nend)
+    Nexus.Config.reload(src)
     key = "storetest_#{System.unique_integer([:positive])}"
     src = Path.join(System.tmp_dir!(), "src2_#{key}.wasm")
     File.write!(src, "BLOB2")

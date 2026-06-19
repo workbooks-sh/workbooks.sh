@@ -40,7 +40,7 @@ defmodule Nexus.Compile do
   def unit(_), do: {:skip, :not_a_unit}
 
   # ── content-addressed compile cache ──────────────────────────────────────────────────────────
-  # Every knob below comes from `Nexus.Config` (the `<work-deploy>` config element), never env:
+  # Every knob below comes from `Nexus.Config` (the `deploy` config element), never env:
   # `compile_cache?` (on/off), `compile_cache_version` (the salt — bump to invalidate the store),
   # `component_cache` (the store location). Config-as-source, not an env sidecar.
 

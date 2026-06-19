@@ -103,7 +103,7 @@ defmodule Nexus.Agent.Bash do
         end)
 
       {:error, {:no_provider, :search}} ->
-        "search: no search provider configured (set <work-deploy search=…>)"
+        "search: no search provider configured (set deploy search=…)"
 
       {:error, reason} ->
         "search: failed (#{inspect(reason) |> String.slice(0, 80)})"

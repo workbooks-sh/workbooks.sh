@@ -5,7 +5,7 @@ defmodule Nexus.S3 do
   three ops a content-addressed blob store needs: `get/2`, `put/3`, `head/2`. No listing, no ACLs,
   no XML — blobs are immutable (keyed by content hash), so there's nothing to coordinate.
 
-  Location (`bucket`, `prefix`, `endpoint`, `region`) is CONFIG (from `<work-deploy>`); credentials
+  Location (`bucket`, `prefix`, `endpoint`, `region`) is CONFIG (from the `deploy` block); credentials
   are SECRETS (`WB_S3_ACCESS_KEY_ID` / `WB_S3_SECRET_ACCESS_KEY`, loaded into the nexus at deploy).
   Absent creds → `configured?/0` is false and the caller stays local-only.
   """
