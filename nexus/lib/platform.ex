@@ -61,7 +61,9 @@ defmodule Nexus.Platform do
 
   get "/me" do
     id = conn.assigns[:identity] || %{}
-    j(conn, 200, %{user: %{id: id[:user], name: ""}, active_org: org(conn), orgs: []})
+    user_id = id[:user]
+    orgs = if is_binary(user_id), do: Nexus.WorkOS.orgs_for_user(user_id), else: []
+    j(conn, 200, %{user: %{id: user_id, name: ""}, active_org: org(conn), orgs: orgs})
   end
 
   get "/storage" do
