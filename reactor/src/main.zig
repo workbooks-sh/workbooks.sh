@@ -136,7 +136,7 @@ const groups = [_]Group{
     } },
     .{ .name = "build", .blurb = "weave & run", .verbs = &.{
         .{ "weave <dir> <out>", "weave a tree into one self-contained html" },
-        .{ "graph <dir> <out>", "render the code graph as a work-* workbook" },
+        .{ "graph <dir> <out>", "render the code graph as a workbook" },
         .{ "dev <dir>", "watch & re-weave on change (+ nexus hot-swap)" },
     } },
     .{ .name = "deploy", .blurb = "stand up a runtime, local or cloud", .verbs = &.{

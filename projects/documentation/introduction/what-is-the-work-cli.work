@@ -1,3 +1,58 @@
 # What is the work CLI
 
-_Skeleton — content to be authored. Intent: weave/check/dev/deploy over the .work tree (TBD: grill content)_
+`work` is the one Workbooks command line — **author, build, run, deploy.** It
+operates on a [workbook](/introduction/what-is-a-workbook) folder: it reads the
+`.work` tree, folds it into something shippable, and stands up a
+[Nexus](/introduction/what-is-the-nexus) to run it. The same `work` binary runs
+natively on your machine *and* inside the wasm agent sandbox, so an agent has the
+exact tools you do.
+
+## The lifecycle
+
+Working on a workbook follows a simple arc, and each step is one command.
+
+You **author** — write `.work` files, then `work check` to make sure every
+reference resolves and every block only does what it's allowed to. `work structure`
+lists the units in the tree so you can see what you've got, and `work why`,
+`work near`, and `work wit` answer questions about how blocks depend on each other.
+
+You **build** — `work weave` folds the whole folder into one self-contained HTML
+artifact. While you're iterating, `work dev` watches the folder and re-weaves on
+every change (and hot-swaps into a running Nexus), so the page updates as you type.
+
+You **deploy** — `work deploy` stands up a runtime, local or cloud, from a
+declarative `<work-deploy>` description: scaffold it, validate it, apply it.
+
+That's the loop: author → build → deploy, all over the same folder.
+
+## Command reference
+
+The CLI groups its verbs the same way:
+
+**author** — read & verify `.work` trees, locally:
+
+- `work check [dir]` — resolve references + audit capabilities
+- `work structure [dir]` — list the units in the tree
+- `work why / near / wit :unit` — code-graph dependencies + the generated WIT world
+
+**build** — weave & run:
+
+- `work weave <dir> <out>` — weave a tree into one self-contained HTML
+- `work graph <dir> <out>` — render the code graph as a workbook
+- `work dev <dir>` — watch & re-weave on change (+ Nexus hot-swap)
+
+**deploy** — stand up a runtime, local or cloud:
+
+- `work deploy init | validate | apply` — scaffold · check · deploy the `<work-deploy>`
+- `work deploy verify | status | down` — health · inspect · teardown
+
+**platform** — identity, contexts, the control plane:
+
+- `work ctx · work nexus <url>` — manage targets · point at an engine
+- `work login · work whoami` — authenticate · show identity
+
+Every verb also accepts `--json` and `--no-color`. Run `work help` to see the live
+surface.
+
+For the deploy story end to end, see
+[Deploy: local and cloud](/deploy/deploy-local-and-cloud).
