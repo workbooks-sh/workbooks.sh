@@ -225,35 +225,108 @@ class ChatSessionStore {
       this.#reproject();
 
       this.#runAbort = new AbortController();
-      const res = await rcp.request<{
-        ok: boolean;
-        answer?: string;
-        error?: string;
-      }>("/api/run", {
-        method: "POST",
-        body: { task: t, system: undefined, timeout_ms: 300_000 },
-        timeoutMs: this.#RUN_TIMEOUT_MS,
-        signal: this.#runAbort.signal,
-      });
 
-      // session_started banner, then a finalized assistant message
-      // synthesized from the unary result, then session_completed.
+      // Streaming nexus run: SSE frames render token/turn-by-turn. We translate
+      // each nexus stream event into the existing #ingest render path by pushing
+      // synthetic BridgeEvents onto #raw — the same buffer #ingest feeds — so
+      // #reproject renders the live answer with no special-case render path.
+      //
+      // Frames: {type:"text",content} | {type:"tools",count,commands}
+      //       | {type:"final",answer} | {type:"error",error} | {type:"end"}
+      const body = { task: t, system: undefined, timeout_ms: 300_000 };
       this.#pushSynthetic(id, "session_started", {});
-      if (res.ok) {
-        this.#pushSynthetic(id, "llm_turn_stop", {
-          metadata: { content: res.answer ?? "", status: "ok" },
+      this.#reproject();
+
+      let sawError = false;
+      let turnOpen = false;
+      let streamed = false;
+      const ensureTurn = () => {
+        if (!turnOpen) {
+          this.#pushSynthetic(id, "llm_turn_start", {});
+          turnOpen = true;
+        }
+      };
+
+      const onEvent = (ev: unknown) => {
+        const e = (ev ?? {}) as { type?: string; content?: string; answer?: string; error?: string; count?: number; commands?: unknown };
+        switch (e.type) {
+          case "text": {
+            ensureTurn();
+            if (typeof e.content === "string" && e.content) {
+              this.#pushSynthetic(id, "llm_delta", { metadata: { content: e.content } });
+              streamed = true;
+            }
+            break;
+          }
+          case "tools": {
+            // A batch of tool commands — surface as a finalized tool card.
+            const count = typeof e.count === "number" ? e.count : Array.isArray(e.commands) ? e.commands.length : 0;
+            const cmds = Array.isArray(e.commands) ? (e.commands as unknown[]).map(String).join(", ") : "";
+            this.#pushSynthetic(id, "tool_call_stop", {
+              metadata: {
+                tool_name: cmds || `tools (${count})`,
+                status: "ok",
+                result_size: count,
+              },
+            });
+            break;
+          }
+          case "final": {
+            ensureTurn();
+            this.#pushSynthetic(id, "llm_turn_stop", {
+              metadata: { content: e.answer ?? "", status: "ok" },
+            });
+            turnOpen = false;
+            streamed = true;
+            break;
+          }
+          case "error": {
+            sawError = true;
+            ensureTurn();
+            this.#pushSynthetic(id, "llm_turn_stop", {
+              metadata: { content: e.error ?? "run failed", status: "error", error: e.error },
+            });
+            turnOpen = false;
+            break;
+          }
+          // "end" terminates the stream (handled by the client); nothing to render.
+        }
+        this.#reproject();
+      };
+
+      let usedFallback = false;
+      try {
+        await rcp.stream("/api/run/stream", { body, signal: this.#runAbort.signal }, onEvent);
+        // If the stream connected but never produced a turn (no text/final),
+        // finalize an empty turn so the message doesn't hang pending.
+        if (turnOpen) {
+          this.#pushSynthetic(id, "llm_turn_stop", { metadata: { content: "", status: "ok" } });
+        }
+      } catch (streamErr) {
+        if (this.#cancelled) throw streamErr;
+        // The runtime may not serve the stream route (older nexus) — fall back
+        // to the unary /api/run so a non-streaming runtime still works.
+        usedFallback = true;
+        const res = await rcp.request<{ ok: boolean; answer?: string; error?: string }>("/api/run", {
+          method: "POST",
+          body,
+          timeoutMs: this.#RUN_TIMEOUT_MS,
+          signal: this.#runAbort.signal,
         });
-      } else {
-        this.#pushSynthetic(id, "llm_turn_stop", {
-          metadata: {
-            content: res.error ?? "run failed",
-            status: "error",
-            error: res.error,
-          },
-        });
+        if (res.ok) {
+          this.#pushSynthetic(id, "llm_turn_stop", { metadata: { content: res.answer ?? "", status: "ok" } });
+        } else {
+          sawError = true;
+          this.#pushSynthetic(id, "llm_turn_stop", {
+            metadata: { content: res.error ?? "run failed", status: "error", error: res.error },
+          });
+        }
       }
+      void streamed;
+      void usedFallback;
+
       this.#pushSynthetic(id, "session_completed", {});
-      if (this.session) this.session.status = res.ok ? "completed" : "failed";
+      if (this.session) this.session.status = sawError ? "failed" : "completed";
       this.#reproject();
     } catch (e) {
       // A user cancel aborts the in-flight request, which throws — treat
