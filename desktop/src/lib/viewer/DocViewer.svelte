@@ -117,10 +117,16 @@
         ></div>
       {/if}
     {/each}
-  {:else if tabsStore.active}
-    <section class="pane" style="flex: 1 1 0;">
-      {@render docBody(tabsStore.active)}
-    </section>
+  {:else if tabsStore.tabs.length}
+    <!-- Keep-alive: every open tab stays MOUNTED; only the active one is shown.
+         Switching tabs is then a visibility toggle, not a remount — the iframe
+         never tears down + reloads, so there's no blank flash on a page/tab
+         change. (Cost: each open tab keeps its view live; fine at these counts.) -->
+    {#each tabsStore.tabs as tab (tab.id)}
+      <section class="pane" class:inactive={tab.id !== tabsStore.activeId} style="flex: 1 1 0;">
+        {@render docBody(tab)}
+      </section>
+    {/each}
   {:else}
     <div class="empty">
       <p>No document selected.</p>
@@ -162,6 +168,11 @@
   }
   .pane.focused {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand) 35%, transparent);
+  }
+  /* Keep-alive inactive tab: mounted but not shown. `display:none` (not
+     visibility) so it takes no space; the iframe keeps its loaded state. */
+  .pane.inactive {
+    display: none;
   }
   .divider {
     flex: 0 0 5px;

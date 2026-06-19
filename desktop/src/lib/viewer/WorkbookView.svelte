@@ -36,6 +36,9 @@
   let htmlText = $state<string | null>(null);
   let phase = $state<"loading" | "ready" | "error">("loading");
   let error = $state<string | null>(null);
+  /** Fades the iframe in once it has actually painted (its `load` fires), so a
+   *  first open is a clean fade on the page background — never a white flash. */
+  let revealed = $state(false);
 
   /** True once the workbook announced itself via `wb-theme-ready`.
    *  Theme posts before this flips are deferred — the workbook's
@@ -59,24 +62,27 @@
   let lastPostedActiveId: string | null = null;
 
   async function load(p: string) {
-    phase = "loading";
     error = null;
-    workbookReady = false;
-    lastPostedActiveId = null;
-    htmlText = null;
-    if (blobUrl) {
-      URL.revokeObjectURL(blobUrl);
-      blobUrl = null;
-    }
     try {
+      // Load-then-SWAP: fetch + build the new blob BEFORE tearing down the old
+      // one, so the previous content stays on screen until the replacement is
+      // ready (no blank gap during the read). The iframe then fades in on its
+      // own `load` (see `revealed`).
       const b64 = await invoke<string>("read_file_bytes_base64", { path: p });
       const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
       // Keep a text copy so WorkbookProvenance can run the verifier
       // on the bytes that actually shipped (no re-fetch from disk).
-      htmlText = new TextDecoder("utf-8").decode(bytes);
+      const text = new TextDecoder("utf-8").decode(bytes);
       const blob = new Blob([bytes], { type: "text/html" });
-      blobUrl = URL.createObjectURL(blob);
+      const nextUrl = URL.createObjectURL(blob);
+      const prevUrl = blobUrl;
+      workbookReady = false;
+      lastPostedActiveId = null;
+      revealed = false;
+      htmlText = text;
+      blobUrl = nextUrl;
       phase = "ready";
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
       phase = "error";
@@ -163,20 +169,22 @@
 </script>
 
 <div class="workbook-frame">
-  {#if phase === "loading"}
-    <div class="status">Loading workbook…</div>
-  {:else if phase === "error"}
+  {#if phase === "error"}
     <div class="status err">Failed to load: {error}</div>
   {:else if blobUrl && htmlText}
     <!-- wb-5fl.7 — banner-only: the everyday verified badge + Share
          moved to the tab context menu; only the modified-after-publish
          warning still interrupts the page (it's a security signal). -->
     <WorkbookProvenance html={htmlText} bannerOnly={true} />
+    <!-- No "Loading…" text: the frame sits on the page background and the
+         iframe fades in on its `load`, so there's no white flash. -->
     <iframe
       bind:this={iframeEl}
       src={blobUrl}
       sandbox="allow-scripts"
       title={path}
+      class:revealed
+      onload={() => (revealed = true)}
     ></iframe>
   {/if}
 </div>
@@ -187,6 +195,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    background: var(--color-page);
   }
   iframe {
     flex: 1 1 auto;
@@ -194,6 +203,11 @@
     width: 100%;
     height: 100%;
     background: var(--color-page);
+    opacity: 0;
+    transition: opacity 0.16s ease;
+  }
+  iframe.revealed {
+    opacity: 1;
   }
   .status {
     flex: 1 1 auto;
