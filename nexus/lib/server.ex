@@ -12,6 +12,9 @@ defmodule Nexus.Server do
   """
   use Plug.Router
 
+  # CORS first — the desktop webview / browser fetch nexus cross-origin; preflight OPTIONS is answered
+  # here (before auth), and Allow-Origin is attached to every response.
+  plug(Nexus.Cors)
   plug(:match)
   # Resolve + assign the request's tenant (Nexus.Auth adapter — None/Bearer/JWT). Everything below
   # is scoped to conn.assigns.tenant; the Store is partitioned, so isolation is automatic.
