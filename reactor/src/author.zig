@@ -8,12 +8,66 @@ const log = @import("log.zig");
 
 const Ref = struct { file: []const u8, label: []const u8 };
 
+// ── auth/route policy validation (wb-dshz) ─────────────────────────────────────────────────────
+// A malformed `protect`/`public`/`route` declaration should fail `work check` (and thus the weave/
+// deploy), not surface at runtime — the RFC's "a malformed policy fails the weave" (fail-closed).
+const PolicyErr = struct { file: []const u8, msg: []const u8 };
+const http_methods = [_][]const u8{ "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "ANY" };
+
+fn firstQuoted(line: []const u8) ?[]const u8 {
+    const a = std.mem.indexOfScalar(u8, line, '"') orelse return null;
+    const b = std.mem.indexOfScalarPos(u8, line, a + 1, '"') orelse return null;
+    return line[a + 1 .. b];
+}
+
+fn knownMethod(m: []const u8) bool {
+    for (http_methods) |k| if (std.ascii.eqlIgnoreCase(k, m)) return true;
+    return false;
+}
+
+// "METHOD /path" or "/path" — if there are two tokens the first must be a known HTTP method.
+fn validSpec(spec: []const u8) bool {
+    const s = std.mem.trim(u8, spec, " \t");
+    if (s.len == 0) return false;
+    var it = std.mem.splitScalar(u8, s, ' ');
+    const first = it.next() orelse return false;
+    if (it.next() != null) return knownMethod(first);
+    return true;
+}
+
+// Scan a unit body for `protect`/`public`/`route` lines and append a PolicyErr for each malformed one.
+fn validatePolicy(alloc: std.mem.Allocator, body: []const u8, file: []const u8, errs: *std.ArrayList(PolicyErr)) !void {
+    var lines = std.mem.splitScalar(u8, body, '\n');
+    while (lines.next()) |raw| {
+        const line = std.mem.trim(u8, raw, " \t\r");
+        const directive: []const u8 =
+            if (std.mem.startsWith(u8, line, "protect ")) "protect" else if (std.mem.startsWith(u8, line, "public ")) "public" else if (std.mem.startsWith(u8, line, "route ")) "route" else continue;
+
+        const q = firstQuoted(line) orelse {
+            try errs.append(alloc, .{ .file = file, .msg = try std.fmt.allocPrint(alloc, "`{s}` without a quoted spec", .{directive}) });
+            continue;
+        };
+
+        if (!validSpec(q))
+            try errs.append(alloc, .{ .file = file, .msg = try std.fmt.allocPrint(alloc, "`{s} \"{s}\"` — unknown HTTP method", .{ directive, q }) });
+
+        if (std.mem.eql(u8, directive, "route")) {
+            const open = std.mem.indexOfScalar(u8, line, '"') orelse 0;
+            const close = std.mem.indexOfScalarPos(u8, line, open + 1, '"') orelse line.len;
+            const after = if (close + 1 <= line.len) line[close + 1 ..] else "";
+            if (std.mem.indexOfScalar(u8, after, ':') == null)
+                try errs.append(alloc, .{ .file = file, .msg = try std.fmt.allocPrint(alloc, "`route \"{s}\"` without a :handler", .{q}) });
+        }
+    }
+}
+
 pub fn check(io: Io, alloc: std.mem.Allocator, dir: []const u8) !u8 {
     const files = try fs.workFiles(io, alloc, dir);
 
     var names: std.ArrayList([]const u8) = .empty;
     var titles: std.ArrayList([]const u8) = .empty;
     var refs: std.ArrayList(Ref) = .empty;
+    var perrs: std.ArrayList(PolicyErr) = .empty;
     var units: usize = 0;
 
     for (files) |f| {
@@ -26,6 +80,7 @@ pub fn check(io: Io, alloc: std.mem.Allocator, dir: []const u8) !u8 {
                     units += 1;
                 }
                 for (n.refs) |r| try refs.append(alloc, .{ .file = f, .label = r });
+                try validatePolicy(alloc, n.body, f, &perrs);
             },
             .heading => try titles.append(alloc, n.text),
             .prose => for (n.refs) |r| try refs.append(alloc, .{ .file = f, .label = r }),
@@ -39,14 +94,17 @@ pub fn check(io: Io, alloc: std.mem.Allocator, dir: []const u8) !u8 {
         dangling += 1;
     };
 
-    if (dangling == 0) {
-        log.ok(try std.fmt.allocPrint(alloc, "{d} units \u{b7} {d} refs \u{b7} references resolve", .{ units, refs.items.len }));
+    if (dangling == 0 and perrs.items.len == 0) {
+        log.ok(try std.fmt.allocPrint(alloc, "{d} units \u{b7} {d} refs \u{b7} references resolve \u{b7} auth/route policy valid", .{ units, refs.items.len }));
         return 0;
     } else {
-        log.err(try std.fmt.allocPrint(alloc, "{d} units \u{b7} {d} dangling ref(s)", .{ units, dangling }));
+        log.err(try std.fmt.allocPrint(alloc, "{d} units \u{b7} {d} dangling ref(s) \u{b7} {d} policy error(s)", .{ units, dangling, perrs.items.len }));
         for (refs.items) |r| if (!resolves(r.label, names.items, titles.items)) {
             log.step(try std.fmt.allocPrint(alloc, "dangling [[{s}]] in {s}", .{ r.label, std.fs.path.basename(r.file) }));
         };
+        for (perrs.items) |e| {
+            log.step(try std.fmt.allocPrint(alloc, "auth/route: {s} in {s}", .{ e.msg, std.fs.path.basename(e.file) }));
+        }
         return 1;
     }
 }
@@ -239,4 +297,23 @@ fn headerGrants(header: []const u8, cap: []const u8) bool {
     // a grant is present if `grant` appears and the cap word follows it somewhere in the header
     const g = std.mem.indexOf(u8, header, "grant") orelse return false;
     return std.mem.indexOfPos(u8, header, g, cap) != null;
+}
+
+test "auth/route policy validation: valid passes, malformed flagged" {
+    const alloc = std.testing.allocator;
+
+    var ok: std.ArrayList(PolicyErr) = .empty;
+    defer ok.deinit(alloc);
+    try validatePolicy(alloc,
+        "protect \"/admin/**\", role: \"admin\"\npublic \"/\", \"/pricing\"\nroute \"GET /api/x\", :list",
+        "ok.work", &ok);
+    try std.testing.expectEqual(@as(usize, 0), ok.items.len);
+
+    var bad: std.ArrayList(PolicyErr) = .empty;
+    defer bad.deinit(alloc);
+    try validatePolicy(alloc,
+        "route /noquote\nroute \"GET /x\"\nprotect \"BADVERB /y\"",
+        "bad.work", &bad);
+    // route-without-quote, route-without-:handler, bad-method → at least 3
+    try std.testing.expect(bad.items.len >= 3);
 }
