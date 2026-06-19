@@ -43,8 +43,8 @@ defmodule Nexus.Agent.Bash do
       # web access is HOST-BROKERED (wasm has no sockets) — `fetch <url>` and `scrape <url>` go
       # through Nexus.Dock.fetch (SSRF-safe: loopback/private blocked, https). curl-class.
       "fetch" -> web_fetch(List.first(args))
-      # scrape/render <url> → the page's rendered TEXT via in-wasm Blitz (CSS-aware, no JS),
-      # falling back to a naive tag-strip if the renderer is unavailable.
+      # scrape/render <url> → the page as MARKDOWN via the cheap no-wasm Floki extract (default),
+      # auto-escalating to the Blitz wasm render when the extract is thin / `--render` / `--js`.
       "scrape" -> web_render(args)
       "render" -> web_render(args)
       # in-wasm Blitz render: screenshot <url> [out.png] → a PNG in /work.
@@ -60,17 +60,22 @@ defmodule Nexus.Agent.Bash do
     end
   end
 
-  # `scrape [--js] <url>` — `--js` selects the greenfield engine (StarlingMonkey+linkedom runs the
-  # page's JS against a real DOM before render); default is the fast CSS-only render.
+  # `scrape [--render|--js] <url>` — DEFAULT: cheap Floki DOM-extract → markdown, pure BEAM, no wasm
+  # (most reads need text+links, not a CSS layout). A thin extract (JS shell) auto-escalates to Blitz;
+  # `--render` forces the CSS render, `--js` additionally runs the page's JavaScript.
   defp web_render(args) do
-    {opts, rest} = take_js_flag(args, :auto)
+    {js, rest} = take_js_flag(args, :auto)
+    force = "--render" in rest
+    rest = rest -- ["--render"]
+    opts = js ++ if(force or js != [], do: [render: true], else: [])
 
     case List.first(rest) do
-      nil -> "render: usage: render [--js] <url>"
+      nil -> "render: usage: scrape [--render|--js] <url>"
       url ->
-        case Nexus.Browse.render(url, opts) do
-          {:ok, text} when is_binary(text) and text != "" -> text
-          # fall back to the naive tag-strip if the in-wasm renderer is unavailable
+        case Nexus.Browse.read(url, opts) do
+          {:ok, %{markdown: md}} when is_binary(md) and md != "" -> md
+          {:ok, %{text: t}} when is_binary(t) and t != "" -> t
+          # last-resort tag-strip if even fetch+extract yielded nothing
           _ -> url |> web_fetch() |> html_to_text()
         end
     end

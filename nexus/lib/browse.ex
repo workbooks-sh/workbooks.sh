@@ -56,6 +56,31 @@ defmodule Nexus.Browse do
   @doc "Fetch + freeze + render a URL to readable text (in-wasm Blitz, CSS-aware, no JS)."
   def render(url, opts \\ []), do: route(:render, [url, opts])
 
+  @doc """
+  The default read rung: fetch + cheap Floki DOM-extract (text/markdown/links, pure BEAM, NO wasm).
+  Escalates to the Blitz wasm render only when the extract is thin (a client-rendered shell) or
+  `opts[:render]` forces it. Returns `{:ok, %{title, text, markdown, links, thin?, via}}` where
+  `via` is `:extract` (no wasm) or `:blitz` (escalated). The cheap path for hundreds of concurrent
+  scraping agents — it never touches the bounded render lane.
+  """
+  def read(url, opts \\ []) do
+    with {:ok, html} <- fetch(url, opts) do
+      ex = Nexus.Browse.Extract.read(html, url)
+
+      if opts[:render] || (ex.thin? && opts[:escalate] != false) do
+        case render(url, opts) do
+          {:ok, rendered} when byte_size(rendered) > byte_size(ex.text) ->
+            {:ok, Map.merge(ex, %{text: rendered, thin?: false, via: :blitz})}
+
+          _ ->
+            {:ok, Map.put(ex, :via, :extract)}
+        end
+      else
+        {:ok, Map.put(ex, :via, :extract)}
+      end
+    end
+  end
+
   @doc "Fetch + freeze + render a URL to a PNG screenshot (in-wasm Blitz)."
   def screenshot(url, opts \\ []), do: route(:screenshot, [url, opts])
 

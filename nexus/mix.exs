@@ -47,7 +47,10 @@ defmodule Nexus.MixProject do
       # the served-nexus HTTP tier: SSR the workbook + the /data API the client nexus.data falls to.
       {:bandit, "~> 1.5"},
       # JWT verification for the auth seam (HS256 secret + RS256/JWKS — WorkOS/Clerk/Auth0/own).
-      {:jose, "~> 1.11"}
+      {:jose, "~> 1.11"},
+      # pure-Elixir HTML parser (mochiweb backend, no NIF) — the cheap no-wasm read rung: extract
+      # text/links/markdown in the BEAM, escalating to the Blitz wasm render only when thin.
+      {:floki, "~> 0.36"}
     ]
   end
 end
