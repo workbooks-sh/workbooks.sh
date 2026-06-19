@@ -83,8 +83,8 @@ server :swarm do
   # Ludicrous — the showcase: ONE sweeping round of as many concurrent agents as the task supports
   # (dozens), to exhibit massive parallelism + speed.
   defp depth_profile("ludicrous") do
-    %{questions: 48, max_rounds: 1,
-      effort: "MAXIMUM PARALLELISM. Decompose the task into as many DISTINCT, specific facets as you can — aim for dozens — and investigate them ALL at once in a single sweeping round. Favor breadth and speed; do not hold questions back for later rounds."}
+    %{questions: 100, max_rounds: 1,
+      effort: "MAXIMUM PARALLELISM. Decompose the task into as many DISTINCT, specific facets as you can — aim for around 100 — and investigate them ALL at once in a single sweeping round. Favor breadth and speed; do not hold questions back for later rounds."}
   end
 
   # Turbo (default) — a fast, regular answer from a handful of agents.
@@ -184,8 +184,8 @@ server :swarm do
 
   # Coordinator: one LLM call decomposes the task into distinct sub-questions (effort guides count/depth).
   defp plan(task, max, effort, model, provider, emit) do
-    n = min(max, 60)
-    # generating dozens of one-line sub-questions needs real token headroom
+    n = min(max, 128)
+    # generating ~100 one-line sub-questions needs real token headroom
     budget = max(400, n * 28)
 
     prompt =
