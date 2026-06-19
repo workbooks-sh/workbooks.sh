@@ -186,3 +186,19 @@ THE LOCAL LIMIT IS CAPACITY, NOT THE LANE: the 8B curriculum was perfect (all fa
 revert cmd), but the 350m is too small to hold them all (2/4 — confabulates the rest). => train on a
 bigger base. Local PEFT fits ~1b/3b; 8B adapters train on a GPU (PEFT QLoRA) -> GGUF -> serve here.
 MLX kept only as a legacy converter note; not used. The 8B remains the serving brain + curriculum author.
+
+# ═══ LOCAL CAPACITY FINDING: small bases ≠ reliable fact-memorizers (2026-06-18) ═══
+After the all-GGUF pivot, swept the local small-base lane for exact-fact recall (self-learn -> PEFT ->
+GGUF -> serve), source = ops manual (VEGA-PRIME / Pixel-green-fox / 35ms / `constellation revert
+--to last-stable` / Steward+Cartographer):
+  - 350m, q/v LoRA r16, 8 pairs:            2/4 (VEGA-PRIME, Pixel; confabulates 35ms + cmd)
+  - 1b,   q/v LoRA r16, 8 pairs:            3/5 (+ Steward; "42ms", "stardust revert")
+  - 1b,   FULL-LINEAR r16:                  3/5, NUMBER now right (35) — full-linear > q/v for exact tokens
+  - 1b,   FULL-LINEAR r32, 18-pair rich:    3/5 but CROSS-CONTAMINATION (over-reinforced VEGA-PRIME bled
+                                            into other answers) — more data/rank can HURT.
+CONCLUSION (robust, not a tuning bug): small bases (≤1b) memorize short salient facts (names) but
+confabulate/cross-contaminate on numbers + long command strings from sparse self-generated data. The
+RELIABLE fact-learner is the 8B (proven 4/4 in the MLX run). Defaults settled: full-linear r16, ~10-pair
+curriculum. For reliable exact recall on the all-GGUF lane: train the 8B adapter on a GPU (PEFT QLoRA
+fits 8B easily) -> GGUF -> serve here. Local small-base adapters = good for STYLE/skill/behavior shaping,
+not arbitrary-string memorization. (8B PEFT doesn't fit 16GB locally; bitsandbytes 4-bit is CUDA-only.)

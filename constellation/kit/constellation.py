@@ -25,7 +25,7 @@ os.makedirs(ADAPTERS, exist_ok=True); os.makedirs(DATA, exist_ok=True)
 # sides. hf=None => serve-only locally; train its adapters on a GPU and drop the .gguf in adapters/.
 BASES = {
     "350m": {"hf": "spike/dflash/granite-4.0-350m", "gguf": "spike/models/granite-4.0-350m-Q4_K_M.gguf"},
-    "1b":   {"hf": None, "gguf": "spike/models/granite-4.0-1b-Q4_K_M.gguf"},
+    "1b":   {"hf": "spike/dflash/granite-4.0-1b", "gguf": "spike/models/granite-4.0-1b-Q4_K_M.gguf"},
     "3b":   {"hf": None, "gguf": "spike/models/granite-4.1-3b-Q4_K_M.gguf"},
     "8b":   {"hf": None, "gguf": "spike/models/granite-4.1-8b-Q5_K_M.gguf"},
 }
@@ -98,8 +98,10 @@ def train(name, data_dir, base="350m", steps=300, lr=2e-4):
     tok = AutoTokenizer.from_pretrained(hf)
     if tok.pad_token is None: tok.pad_token = tok.eos_token
     model = AutoModelForCausalLM.from_pretrained(hf, dtype=torch.float32).to(dev)
-    model = get_peft_model(model, LoraConfig(r=16, lora_alpha=32, lora_dropout=0.0,
-                           target_modules=["q_proj", "v_proj"], task_type="CAUSAL_LM"))
+    # target ALL linear layers (not just q/v) — far more capacity to memorize exact facts (numbers,
+    # command strings). q/v-only learns associations but confabulates rare tokens.
+    model = get_peft_model(model, LoraConfig(r=16, lora_alpha=32, lora_dropout=0.0, task_type="CAUSAL_LM",
+                           target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]))
     ex = [tok(f"Question: {q}\nAnswer: {a}{tok.eos_token}", return_tensors="pt").input_ids[0] for q, a in pairs]
     opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=lr)
     model.train(); t0 = time.time()
@@ -122,9 +124,10 @@ def self_learn(name, source_file, base="8b", train_base=None, steps=300):
     src = open(source_file).read()
     port = ensure_server(base)
     print(f"[self-learn] {base} studying {source_file} + generating curriculum…", flush=True)
-    prompt = (f"Read this document carefully:\n\n{src}\n\nNow write 8 diverse question-and-answer pairs "
-              "testing the key facts. Format each EXACTLY as:\nQ: <question>\nA: <answer>\n\nBegin:\n")
-    raw = _complete(port, prompt, n=600, temp=0.3); lines = raw.splitlines(); pairs = []
+    prompt = (f"Read this document carefully:\n\n{src}\n\nNow write 10 question-and-answer pairs that test "
+              "the key facts — one or two per fact, covering EVERY fact, quoting exact values (numbers, "
+              "names, command strings) verbatim. Format each EXACTLY as:\nQ: <question>\nA: <answer>\n\nBegin:\n")
+    raw = _complete(port, prompt, n=1100, temp=0.3); lines = raw.splitlines(); pairs = []
     for i, ln in enumerate(lines):
         if ln.strip().startswith("Q:") and i+1 < len(lines) and lines[i+1].strip().startswith("A:"):
             q = ln.split("Q:", 1)[1].strip(); a = lines[i+1].split("A:", 1)[1].strip()
