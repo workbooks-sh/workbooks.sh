@@ -170,3 +170,19 @@ POST /lora-adapters — the "kit of swappable skills" at the serving tier.
 ONE HONEST GAP (next): the 8B skill adapters are trained in MLX (QLoRA, fits 16GB); to serve them on the
 llama.cpp GGUF lane (CPU + live hot-swap) they need MLX-adapter -> GGUF conversion (or fuse+convert).
 The 350m proves the GGUF adapter lane end-to-end today; the 8B path = train-MLX/serve-MLX OR convert.
+
+# ═══ PIVOT: ALL-GGUF, DROP MLX (2026-06-18) ═══
+Decision (user): stop running MLX — go 100% llama.cpp/GGUF. WHY: cross-quant loss. A 4-bit-MLX-trained
+8B adapter served on Q5 GGUF kept strong facts (VEGA-PRIME) but dropped weak ones — because train-lane
+≠ serve-lane. Fix = train where you serve.
+NEW ONE LANE: train = PEFT (HuggingFace, Mac GPU/MPS) -> convert_lora_to_gguf -> GGUF adapter;
+serve = llama-server (matching GGUF base + adapter). Same arch both sides => clean transfer.
+  - llama-finetune (llama.cpp native) is NOT viable: full FP32 finetune, WIP, 1B needs 24GB, saves the
+    whole model (not an adapter). So PEFT is the trainer; llama.cpp is the server.
+  - Toolkit rewritten to this lane (kit/constellation.py): ask/train/self-learn/serve/kit, all GGUF.
+PROVEN clean same-lane (2026-06-18): self-learn -> 8B(GGUF) writes curriculum -> PEFT-trains a 350m
+adapter -> GGUF -> serve 350m GGUF -> recall. VEGA-PRIME + Pixel recalled cleanly (no cross-quant gap).
+THE LOCAL LIMIT IS CAPACITY, NOT THE LANE: the 8B curriculum was perfect (all facts incl "35ms" +
+revert cmd), but the 350m is too small to hold them all (2/4 — confabulates the rest). => train on a
+bigger base. Local PEFT fits ~1b/3b; 8B adapters train on a GPU (PEFT QLoRA) -> GGUF -> serve here.
+MLX kept only as a legacy converter note; not used. The 8B remains the serving brain + curriculum author.
