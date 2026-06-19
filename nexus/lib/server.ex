@@ -95,22 +95,33 @@ defmodule Nexus.Server do
   post "/api/run" do
     {:ok, body, conn} = read_body(conn)
 
-    case Jason.decode(body) do
-      {:ok, %{"task" => task} = m} when is_binary(task) and task != "" ->
-        opts =
-          [task: task, timeout_ms: run_timeout(m["timeout_ms"])]
-          |> then(fn o -> if is_binary(m["system"]) and m["system"] != "", do: [{:system, m["system"]} | o], else: o end)
+    # Accept the desktop's body shape forward-compatibly: `task` OR `prompt` (alias); extra keys the
+    # old Phoenix path sent (agent_slug/workdir/skills) are ignored, not rejected, so the desktop can
+    # cut over to this route before the agent contract grows to honor them.
+    with {:ok, m} when is_map(m) <- Jason.decode(body),
+         task when is_binary(task) and task != "" <- m["task"] || m["prompt"] do
+      opts =
+        [task: task, timeout_ms: run_timeout(m["timeout_ms"])]
+        |> then(fn o -> if is_binary(m["system"]) and m["system"] != "", do: [{:system, m["system"]} | o], else: o end)
 
-        payload =
+      # An agent run can raise (no LLM key, a tool crash) — never 500 the endpoint; surface it as
+      # {ok:false} so the client degrades gracefully.
+      payload =
+        try do
           case Nexus.Agent.run(opts) do
             {:ok, answer} -> %{ok: true, answer: to_string(answer)}
             {:error, reason} -> %{ok: false, error: inspect(reason)}
           end
+        rescue
+          e -> %{ok: false, error: Exception.message(e)}
+        catch
+          kind, reason -> %{ok: false, error: inspect({kind, reason})}
+        end
 
-        conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
-
+      conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(payload))
+    else
       _ ->
-        conn |> put_resp_content_type("application/json") |> send_resp(422, Jason.encode!(%{error: "task required"}))
+        conn |> put_resp_content_type("application/json") |> send_resp(422, Jason.encode!(%{error: "task or prompt required"}))
     end
   end
 
