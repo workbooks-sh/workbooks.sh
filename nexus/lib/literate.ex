@@ -84,9 +84,24 @@ defmodule Nexus.Literate do
     end
   end
 
-  # A top-level code block opens with a non-indented line ending in ` do`.
-  # (`do…end` is the code delimiter; prose never ends in " do".)
-  defp opener?(line), do: Regex.match?(~r/^[^\s#].*\sdo\s*$/, line)
+  # A top-level code block opens with a non-indented line ending in ` do` — BUT only
+  # when the line is actually a block HEADER, not prose that happens to end in the
+  # English word "do" (e.g. "…what each block may do"). A real header is a bare kind
+  # (`deploy do`), a kind with a `:name` (`server :x do`), or a CamelName declaration
+  # (`data Order do`). Without this guard a sentence ending in "do" swallows the rest
+  # of the page as a phantom block.
+  defp opener?(line) do
+    Regex.match?(~r/^[^\s#].*\sdo\s*$/, line) and header_shaped?(line)
+  end
+
+  defp header_shaped?(line) do
+    head = line |> String.replace(~r/\s+do\s*$/, "") |> String.trim()
+
+    head != "" and
+      (Regex.match?(~r/^[a-z]\w*$/, head) or
+         Regex.match?(~r/(^|\s):[a-z]\w/, head) or
+         Regex.match?(~r/^(data|resource|record|defmodule|type|enum)\s+[A-Z]\w*/, head))
+  end
 
   # A flat declaration starts (non-indented) with `@attr`, or a declaration word
   # FOLLOWED BY declaration-shaped content — not merely any prose line that happens to
