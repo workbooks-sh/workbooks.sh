@@ -19,28 +19,35 @@ reach through.
 ## What the Dock can offer
 
 The Dock exposes a small, fixed set of host functions. Guest code never gets the raw
-power — it gets a narrow, typed call that the host brokers:
+power — it gets a narrow, typed call that the host brokers. These are the live host
+functions a sandbox can call by name today:
 
-- **net** — an HTTP fetch the host performs on the guest's behalf. The host runs an
+- **`fetch`** — an HTTP GET the host performs on the guest's behalf. The host runs an
   SSRF gate first, so a sandbox can't reach loopback, private, or link-local
   addresses even if it asks.
-- **kv** — a tenant-scoped key/value store (`get` / `put`). Each tenant sees only
-  its own keys.
-- **secrets** — read a named secret by key. The *value* never appears in source; the
-  guest asks for `OPENROUTER_API_KEY` and the host resolves it (see
+- **`complete`** — a brokered LLM completion. The model key never appears in source;
+  the host resolves it and calls the provider (see
   [Secrets & configuration](/deploy/secrets-and-config)).
-- **fs** — read/write within the mounted work area, not the host filesystem.
-- **exec** — run a registered command. This is how [toolkits](/tooling/toolkits)
-  become callable from inside the box.
-- **llm** — a brokered model completion.
+- **`store` / `load`** — an in-memory key/value store (`store(key, val)` /
+  `load(key)`).
+- **`cache_get` / `cache_put` / `cache_delete`** — a tiered, durable cache. The guest
+  names only a key; the host binds the namespace.
+- **`now`** — the host clock; **`emit`** — write a line to the host log.
 
-Each capability is WIT-typed: the host declares the exact function signature the
-guest may import, and the weave generates that interface. There's no way to import a
-power that wasn't granted.
+Each host function is WIT-typed: the host declares the exact function signature the
+guest may import. There's no way to import a power that wasn't wired in.
+
+Behind these live calls sits a broader **capability catalog** — the named
+capabilities (`net`, `kv`, `secrets`, `fs`, `exec`, and the runtime caps `vfs`,
+`commands`, `llm`, `browse`, `parallel`) and the WIT interface each projects. The
+catalog is the vocabulary the toolchain reasons about; not every catalogued
+capability has a live guest entry point yet. `net` (via `fetch`) and the brokered LLM
+(via `complete`) are live today; `secrets`, `fs`, `exec`, and a tenant-scoped `kv`
+are catalogued WIT interfaces without a live guest call.
 
 ## Why broker instead of allow
 
-Every Dock function is the host *doing the work*, not the host *opening a hole*. `net`
+Every Dock function is the host *doing the work*, not the host *opening a hole*. `fetch`
 isn't "raw sockets, please be careful" — it's "ask the host to fetch this URL," and
 the host applies its own policy (the SSRF gate, allowlists) before it acts. That
 keeps the dangerous part on the trusted side of the membrane, where it can be audited
@@ -48,10 +55,11 @@ in exactly one place.
 
 ## You declare what it needs
 
-A sandbox names the capabilities it wants, and the weave checks them: `work check`
-audits every block against what it actually requests, so a sandbox that asks for
-`net` is visible at review time and a sandbox that asks for nothing can't surprise
-you. The grants are part of the source — see
+A sandbox names the host functions it wants, and the weave checks them: the capability
+audit runs at weave/build time, matching the host functions a block actually calls
+against what it grants, so a block that reaches `fetch` is visible at review time and
+a block that grants nothing can't surprise you. The grants are part of the source —
+see
 [Grants & capabilities](/capabilities/grants-and-capabilities).
 
 The point: untrusted code is still *useful* code. The Dock lets you run it, see

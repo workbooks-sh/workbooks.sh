@@ -17,7 +17,7 @@ data Order do
 end
 
 server place :submit do
-  def run(order), do: Store.insert(:orders, order)
+  def run(order), do: Store.create(Order, order)
 end
 
 The heading and the sentence are prose. `data Order do … end` is a declaration.
@@ -42,12 +42,14 @@ looks like. They get their own page: [Declarations](/language/declarations).
 A code block is something that **runs**. It opens with a header and ends with
 `end`, and the body is real code in a supported language:
 
-def total :sum do
+server place :sum do
   def run(items), do: Enum.sum(items)
 end
 
-A function, a server unit, a browser island — if it executes, it's in the code
-lane. The exact header shape is covered in [Block grammar](/language/block-grammar).
+A server unit, an agent, a browser island — if it executes, it's in the code
+lane. The `def`/`defp` functions you write live *inside* one of these units, not
+as a block of their own. The exact header shape is covered in
+[Block grammar](/language/block-grammar).
 
 ## Placement
 

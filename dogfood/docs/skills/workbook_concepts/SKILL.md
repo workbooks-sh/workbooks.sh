@@ -22,7 +22,7 @@ Load a reference below only when you need that depth.
 ### Foundations
 
 - [Literate Programming](references/literate-programming.work) — Most code is written for the machine first and the human second.
-- [Why WebAssembly](references/why-webassembly.work) — A literate document that can compile *any* language needs a common ground to run
+- [Why WebAssembly](references/why-webassembly.work) — A literate document that mixes languages needs a common ground to run the
 
 ### In practice
 

@@ -38,11 +38,10 @@ isolated processes inside one engine, **you scale by memory** — give the Nexus
 RAM and it holds more. That is dramatically cheaper than scaling out a fleet of
 services, and it's a single system to reason about instead of a maze.
 
-And it's multi-tenant from the start. What you prototype deploys as a real
-multi-tenant production app *immediately* — there's no "now make it
-production-grade" phase, because the thing you built on day one already runs the way
-it will run at scale. Building on the Nexus is a head start precisely because
-production behaves exactly like your prototype.
+And it's multi-tenant capable. By default the Nexus runs single-tenant, which is all
+most workbooks need; flip `tenancy-mode` to `multi` (with a Postgres database and
+real auth) and the *same engine* isolates tenants — no rewrite, no separate
+production stack. The thing you build on day one runs the way it will run at scale.
 
 This is [radical simplicity](/preface/literate-programming) applied to the
 runtime: one engine instead of a microservices maze.

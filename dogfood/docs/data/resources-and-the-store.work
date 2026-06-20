@@ -6,8 +6,8 @@ distinction right and the rest follows.
 
 ## Three shapes, one question
 
-- **`data`** — a typed table that **renders by default**. You write rows in the file;
-  the page shows them as a table. It's literal data that lives in the document. See
+- **`data`** — a typed table you render with **`show`**. You write rows in the file;
+  it's literal data that lives in the document. See
   [Declarations](/language/declarations).
 - **`record`** — a struct: a fixed set of named fields grouped into one value. It
   describes a shape you pass around in code. Nothing is stored; it's a type.
@@ -36,10 +36,12 @@ when the workbook runs.
 ## Reading and writing
 
 A [`server`](/language/placement-and-languages) unit is where rows come and go,
-because persistence is a server power. You insert and query through the store:
+because persistence is a server power. A `route` maps a method-and-path to a handler,
+and the handler writes through the store with `Store.create(Resource, attrs)`:
 
-server place :submit do
-  def run(order), do: Store.insert(:orders, order)
+server :orders do
+  route "POST /orders", :create
+  def create(req), do: Store.create(Order, req.body)
 end
 
 The data plane is part of what a runtime advertises over

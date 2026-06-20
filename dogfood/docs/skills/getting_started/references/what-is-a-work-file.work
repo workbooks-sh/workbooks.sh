@@ -27,7 +27,7 @@ It's your backend: logic, data access, anything that needs to happen on the engi
 Here it's Elixir:
 
 server orders :place do
-  def run(order), do: Store.insert(:orders, order)
+  def run(order), do: Store.create(Order, order)
 end
 
 This is where persistence and trusted work live — the server holds the powers a
@@ -35,13 +35,11 @@ browser shouldn't.
 
 ## client — runs in the browser
 
-A `client` block is a browser island. Its body is the interface; it ships as
-WebAssembly and runs in the page. This is the part people see and touch. Here it's a
-Svelte component:
+A `client` block is a browser island. Its body is the interface, rendered into the
+page and run in the browser. This is the part people see and touch:
 
-client svelte :counter do
-  <script> let n = 0 </script>
-  <button on:click={() => n++}>clicked {n}</button>
+client :counter do
+  <button onclick="this.textContent = 'clicked ' + (this._n = (this._n||0)+1)">clicked 0</button>
 end
 
 Same file, different home: the `server` above runs on the engine, this `client` runs
@@ -51,13 +49,11 @@ in the browser — and they sit side by side in one document.
 
 A `sandbox` block runs untrusted or risky code in a [capability-scoped box](/capabilities/sandboxing-and-the-dock):
 compiled to WebAssembly and given only the powers you grant it. Perfect for a scraper
-or a snippet an agent wrote. Here it's Python:
+or a snippet an agent wrote. You name each power in the header's `grant:` list:
 
-sandbox python :scrape do
-  // needs: net
-  import urllib.request
-  def run(url):
-      return fetch(url)        # the host brokers the call
+sandbox :scrape, grant: [fetch] do
+  extern char* fetch(const char* url);
+  char* run(const char* url){ return fetch(url); }   // the host brokers the call
 end
 
 The `sandbox` can compute and do exactly what it was [granted](/capabilities/grants-and-capabilities)
@@ -66,15 +62,15 @@ The `sandbox` can compute and do exactly what it was [granted](/capabilities/gra
 ## Any code can be a work block
 
 Those three are the placements you'll reach for most, but the bigger point is that a
-work block's body can be written in **any language the toolchain supports**, and the
-`work` toolchain compiles it:
+work block's body is written in a real programming language, not a new one. **Elixir**
+runs native on the Nexus (the BEAM). And these compile to WebAssembly today:
 
-`elixir` · `rust` · `zig` · `c` · `cpp` · `python` · `go` · `js` · `ts` · `svelte` ·
-`solid`
+`rust` · `c` · `cpp` · `zig` · `swift`
 
-A Rust function, a Zig routine, a Go service — drop it in a work block and it
-compiles. The literate document is the authoring surface; the code inside is whatever
-fits the job. You can make almost any code a work block.
+A Rust function, a Zig routine, a C++ kernel — drop it in a work block and it
+compiles. More languages are recognized but **not yet compiling** (`python` · `go` ·
+`js` · `ts` · `svelte` · `solid`). The literate document is the authoring surface; the
+code inside is whatever fits the job.
 
 ## It's a real tree, not text matching
 

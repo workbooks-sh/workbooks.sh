@@ -14,9 +14,10 @@ work deploy init local
 - `work deploy validate` — check the config is coherent (the same lockouts catch
   mistakes before they ship).
 - `work deploy apply` — stand the runtime up.
-- `work deploy verify` — health-check it.
-- `work deploy status` — inspect what's running.
-- `work deploy down` — tear it back down.
+
+To mount a workbook into a running Nexus, point `work deploy` at the folder:
+
+work deploy . --nexus my-nexus
 
 ## Config lives with your workbook
 
@@ -31,7 +32,7 @@ the settings; you edit them in place.
 The settings you declare:
 
 - `engine-place` — `local` or `cloud`.
-- `tenancy` — `single` or `multi`.
+- `tenancy-mode` — `single` or `multi`.
 - `storage` — `local-fs` or `s3`.
 - `database` — `sqlite` or `postgres`.
 - `auth` — `trusted`, `betterauth`, `clerk`, or `oidc`.

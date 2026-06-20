@@ -4,27 +4,14 @@ Workbooks is built to be driven by a coding agent — Claude Code, Codex, or wha
 you use. The whole format exists so an agent can read intent and write code in the
 same document. This page is the on-ramp for pointing your agent at Workbooks.
 
-## The agent has the same tools you do
+## You drive the CLI; the agent works inside the sandbox
 
-The [`work` CLI](/introduction/what-is-the-work-cli) runs natively *and* inside the
-wasm agent sandbox. That means your agent isn't working blind against a description
-of the tools — it has the real `work check`, `work weave`, and `work dev`, sandboxed
-and safe. It can author a workbook, weave it, and see the result, the same way you
-would.
-
-## These docs are agent-ready
-
-Everything here is built to hand straight to an agent:
-
-- **Copy as Markdown** — every page has a button that copies its source, ready to
-  paste into a chat.
-- **Copy as prompt** — wrap a page in a ready-made instruction ("using this
-  Workbooks doc, help me…") with one click.
-- **`/llms.txt` and `/llms-full.txt`** — a machine-readable index and a full-text
-  dump of the whole site, so an agent can ingest the entire documentation at once.
-
-Point your agent at `llms.txt` and it has the map; feed it `llms-full.txt` and it
-has the whole book.
+You run the [`work` CLI](/introduction/what-is-the-work-cli) to author, weave, and
+ship — `work check`, `work weave`, `work dev`. An [`agent`](/tooling/authoring-an-agent)
+you author runs server-side on the Nexus with its own surface: one `bash` tool over a
+sandboxed `/work` filesystem, with a coreutils base, built-in web access, and any
+[toolkits](/tooling/toolkits) you write. It computes real answers in the box instead
+of guessing.
 
 ## Install the skill
 

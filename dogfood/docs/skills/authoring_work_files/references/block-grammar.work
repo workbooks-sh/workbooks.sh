@@ -9,13 +9,13 @@ That one line of grammar covers all of it. Let's take the header apart.
 ## The header, token by token
 
 server place :submit do
-  def run(order), do: Store.insert(:orders, order)
+  def run(order), do: Store.create(Order, order)
 end
 
 Reading the header `server place :submit`:
 
 - **`kind`** is the first word — always. It says what the block is and where it
-  runs: `server`, `client`, `sandbox`, `data`, `def`, `agent`, `resource`, and
+  runs: `server`, `client`, `sandbox`, `data`, `agent`, `resource`, and
   others. The parser takes the first token as the kind, no exceptions.
 - **`lang`** is optional. If a token is one of the supported languages, it's read
   as the language of the body. Leave it out and the block uses its default.
@@ -24,19 +24,20 @@ Reading the header `server place :submit`:
 - Anything else on the line is the block's **arguments**, passed through to the
   body.
 
-So `sandbox python :scrape do` is kind `sandbox`, language `python`, name `scrape`.
-And `client svelte :widget do` is a Svelte browser island named `widget`.
+So `sandbox rust :scrape do` is kind `sandbox`, language `rust`, name `scrape`.
+And `client :widget do` is a browser island named `widget`.
 
 ## do … end is the delimiter
 
-A block opens with a non-indented line that ends in ` do`, and closes with a
-non-indented `end`. Everything between is the body — real code in the block's
+A block opens with a non-indented line that ends in ` do`, and closes with the
+first `end` at column 0. Everything between is the body — real code in the block's
 language. Plain prose never ends in ` do`, so there's no ambiguity about where a
 block begins.
 
-Blocks can nest: a `do` inside the body opens another level, and the parser tracks
-depth so the *matching* `end` closes the block. You don't have to think about it —
-write the language naturally and it just works.
+The body can have its own `do … end` pairs — an `if`, a `case`, a nested function.
+Keep those `end`s indented: the block closes at the **first non-indented `end`**, so
+the only `end` written hard against the left margin is the one that closes the
+block. Write the language naturally with normal indentation and it just works.
 
 ## A name without a colon
 

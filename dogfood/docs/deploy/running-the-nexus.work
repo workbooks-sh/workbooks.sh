@@ -6,9 +6,10 @@ The fastest way to see a workbook run is the **push-to-live loop**: point
 work dev .
 
 `work dev` weaves the workbook once, then watches the tree. Every time you save a
-`.work` file it re-weaves — and when a [Nexus](/introduction/what-is-the-nexus) is
-configured, it hot-swaps the change in for an instant reload. You write; the running
-page updates. That's the whole loop.
+`.work` file it re-weaves the output. You write; the woven artifact stays current.
+That's the whole loop. (Live hot-swap into a running
+[Nexus](/introduction/what-is-the-nexus) — an instant reload without re-applying —
+is not yet wired.)
 
 ## What "running" means here
 

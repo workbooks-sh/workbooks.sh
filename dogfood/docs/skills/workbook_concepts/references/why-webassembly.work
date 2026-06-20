@@ -1,22 +1,28 @@
 # Why WebAssembly
 
-A literate document that can compile *any* language needs a common ground to run
-them on — one target every language can reach. That target is **WebAssembly**. It's
-also the thing that lets us run many agents safely at once. Two properties, both
-load-bearing.
+A literate document that mixes languages needs a common ground to run the
+foreign-language blocks on — one target they can share. That target is
+**WebAssembly**. It's also the thing that lets us run many agents safely at once.
+Two properties, both load-bearing.
 
-## One target for every language
+## One target for foreign-language blocks
 
-If the promise is "write a block in Elixir, Rust, Zig, Python, Svelte — whatever
-fits — in one document," you need something built to integrate them all. WebAssembly
-is exactly that: a small, portable instruction format nearly every language can
-compile down to. So instead of gluing a dozen runtimes together, every block
-compiles to the *same* thing and runs in the *same* place.
+If the promise is "write a block in the language that fits, in one document," you
+need a common target the foreign-language blocks can share. WebAssembly is exactly
+that: a small, portable instruction format. Today **Rust, C, C++, Zig, and Swift**
+compile down to it. Instead of gluing a dozen runtimes together, those blocks compile
+to the *same* thing and run in the *same* place.
+
+Not everything goes through WASM, by design. **Elixir `server` units run natively on
+the BEAM** — they don't compile to wasm. And a **`client` block's body is emitted
+into the page as a browser island**, which is its own lane. WASM is the target for
+the foreign-language blocks; the BEAM and the browser-island lane handle the rest.
 
 **WASI** — the WebAssembly System Interface — extends that with a standard, portable
 way for those modules to touch the outside world: files, clocks, the network. One
-interface, every language. That's what makes the [`.work`](/introduction/what-is-a-work-file)
-promise of "any supported language" actually buildable.
+interface for the languages that compile to it. That's what makes the
+[`.work`](/introduction/what-is-a-work-file) promise of "the language that fits"
+actually buildable.
 
 ## Isolation is the other half
 
@@ -44,12 +50,13 @@ dynamically at run time — **cache** the result after the first run and reuse i
 practice you acknowledge what your users and agents actually do, pre-warm or cache
 those paths, and the first-run cost is paid once. The only real caveat is speed, and
 it's addressable: caching, a build queue, and languages that adopt WASM well. Zig
-has been the smoothest of the bunch — but every supported language works.
+has been the smoothest of the bunch.
 
 ## Standing on others' work
 
-We don't run our own engine — workbooks run on [wasmtime](https://wasmtime.dev),
-from the Bytecode Alliance. The portable system interface is [WASI](https://wasi.dev),
+We don't run our own engine — workbooks run on [wasmtime](https://wasmtime.dev)
+(via [wasmex](https://github.com/tessi/wasmex), its Elixir binding), from the
+Bytecode Alliance. The portable system interface is [WASI](https://wasi.dev),
 stewarded by the Bytecode Alliance and the W3C. And the wider ecosystem — the people
 behind WASIX at Wasmer, and the broader WebAssembly community — is what makes "every
 language, one interface" practical at all. Workbooks is an *integration* of that

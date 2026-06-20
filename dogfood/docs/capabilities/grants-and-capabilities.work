@@ -5,53 +5,60 @@ command. A grant is you handing one of those powers to a block. Together they ma
 the [sandbox](/capabilities/sandboxing-and-the-dock) model concrete — and they live
 in the source, so they're reviewable like any other code.
 
-## The capabilities
+## The host functions
 
-There is a small, fixed vocabulary of capabilities the [Dock](/capabilities/sandboxing-and-the-dock)
-can broker:
+There is a small, fixed set of host functions the [Dock](/capabilities/sandboxing-and-the-dock)
+brokers — the powers a block can actually call by name and must grant:
 
-- **`net`** — perform an HTTP fetch (host-mediated, SSRF-gated).
-- **`kv`** — read and write a tenant-scoped key/value store.
-- **`secrets`** — read a named secret value (never the literal, only by key).
-- **`fs`** — read and write inside the mounted work area.
-- **`exec`** — run a registered command, the seam [toolkits](/tooling/toolkits) use.
+- **`fetch`** — perform an HTTP GET (host-mediated, SSRF-gated).
+- **`complete`** — a brokered LLM completion (the model key stays on the host).
+- **`store` / `load`** — read and write an in-memory key/value store.
+- **`cache_get` / `cache_put` / `cache_delete`** — a tiered, durable cache.
+- **`now`** — the host clock; **`emit`** — write a line to the host log.
 
-Each one maps to a single WIT interface with a single, typed signature. A block that
-holds `net` can call `fetch`; it cannot suddenly also write files. Powers don't
-bleed.
+A block that grants `fetch` can call `fetch`; it cannot suddenly also reach another
+host function. Powers don't bleed.
+
+Beyond the live host functions, the [Dock](/capabilities/sandboxing-and-the-dock)
+maintains a broader **capability catalog** — named capabilities (`net`, `kv`,
+`secrets`, `fs`, `exec`) and the WIT interface each projects. The catalog is the
+vocabulary the toolchain reasons about; the host functions above are what a guest can
+call today.
 
 ## Granting a power
 
 A block requests only what it needs. The default is **nothing** — a `sandbox` with no
-grants can compute and return a value, and that's all. You add a capability by
-naming it, and the weave wires the matching host import into the compiled module:
+grants can compute and return a value, and that's all. You add a power by naming it in
+the block header's `grant:` list, and the weave wires the matching host import into
+the compiled module:
 
-sandbox python :scrape do
-  // needs: net
-  import urllib.request
-  def run(url):
-      return fetch(url)        # the host brokers the call
+sandbox :scrape, grant: [fetch] do
+  extern char* fetch(const char* url);
+  char* run(const char* url){ return fetch(url); }   // the host brokers the call
 end
 
-A block that never names `net` has no `fetch` in scope — the import isn't there to
-call. The grant *is* the wiring.
+A block that never grants `fetch` is flagged by the audit if it calls it — the grant
+is the contract. The grant token is the host-function name (`fetch`, `emit`, …), the
+exact name the audit matches against the block's body.
 
 ## The audit is the point
 
 Because grants are written down and the [one parser](/language/block-grammar) reads
-them off the tree, the toolchain can audit them:
+them off the tree, the toolchain can audit them. The **capability audit runs at
+weave/build time**: it matches every host function a block calls against the
+functions it grants, and an ungranted call is a hard error, not a silent capability.
 
-work check .        # resolve refs + audit every block's capabilities
+A reviewer (or an agent) sees at a glance that `:scrape` reaches the network and the
+report-renderer doesn't. There's no hidden `System.cmd`, no smuggled socket — if a
+block can touch the outside world, the grant says so, in the file, in the diff.
 
-`work check` walks the tree and reports what each block requests. A reviewer (or an
-agent) sees at a glance that `:scrape` reaches the network and the report-renderer
-doesn't. There's no hidden `System.cmd`, no smuggled socket — if a block can touch
-the outside world, the grant says so, in the file, in the diff.
+(`work check` is a separate, faster gate: it resolves `[[refs]]` and validates
+auth/route policy. The capability audit is the weave/build's job.)
 
 ## Least power, by default
 
-The model rewards asking for less. Grant `kv` instead of `fs` when you only need a
-value by key. Grant nothing when the block is pure. The narrower the grant, the
+The model rewards asking for less. Grant `load` when you only need to read a value by
+key, not the network. Grant nothing when the block is pure. The narrower the grant, the
 smaller the audit, and the easier the block is to trust — which is exactly the
 property you want when an agent is writing the code.
 

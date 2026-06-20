@@ -27,23 +27,26 @@ When you need a real HTTP endpoint — an API, a form handler, a webhook — dec
 **`route`** inside a [`server`](/language/placement-and-languages) unit. A route maps
 a method-and-path to a handler:
 
-server api :orders do
+server :orders do
   route "POST /orders", :create
   route "GET /orders/:id", :show
 
-  def create(req), do: Store.insert(:orders, req.body)
-  def show(req), do: Store.get(:orders, req.params.id)
+  def create(req), do: Store.create(Order, req.body)
+  def show(req), do: %{id: req.params["id"]}
 end
 
-The path can carry params (`:id`), and the verb is part of the declaration. The
-server unit holds both the routes and their handlers, side by side.
+The path can carry params (`:id`), and the verb is part of the declaration. A handler
+takes a request map `%{params, query, body, method, path, tenant}` — path captures
+arrive as string keys, so `req.params["id"]`. The server unit holds both the routes
+and their handlers, side by side.
 
 ## Guarding a route
 
 Routes default to whatever the workbook's access posture is; you mark the exceptions.
-A route can be made **`public`** (no auth) or **`protect`**ed (auth required), so the
-guard is visible in the source next to the route it covers rather than buried in
-middleware. The same guards apply whether a request arrives with a session cookie or
+Guards are declared in the workbook's `auth` policy block — `public` (no auth) or
+`protect` (auth required) — matched against requests by method and path, so the access
+posture lives in one readable policy rather than buried in middleware. The same guards
+apply whether a request arrives with a session cookie or
 a minted token — the token carries scopes and is subject to the same per-route check.
 
 ## One document, browser to endpoint
@@ -54,4 +57,4 @@ stores the rows behind it — all in the same tree, all read by the
 [one parser](/language/block-grammar). The site isn't a separate app wired to the
 workbook; the workbook *is* the site. See how one runtime hosts more than one of them
 in [One nexus, many sites](/blog/the-nexus-serves-many-sites), and how a site renders
-itself in [Site mode & llms.txt](/serving/site-mode-and-llms-txt).
+itself in [Site mode](/serving/site-mode-and-llms-txt).

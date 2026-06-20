@@ -25,13 +25,13 @@ command behind that name.
 
 ## Many languages, one shape
 
-The language is inferred from the body — C, Rust, and Zig compile to wasm commands
-today, each through its real toolchain. Whatever the language, the contract is the
-same: stdin in, stdout out. That uniform shape is why a toolkit composes with any
-other command and why an agent can use one without knowing how it was written.
+The language is inferred from the body — C and Rust compile to wasm commands today,
+each through its real toolchain. Whatever the language, the contract is the same:
+stdin in, stdout out. That uniform shape is why a toolkit composes with any other
+command and why an agent can use one without knowing how it was written.
 
-A compiled toolkit is content-addressed and cached, so the second build is instant
-and the same source always yields the same command.
+The same source always yields the same command — a `toolkit` block compiles to one
+deterministic wasm32-wasi module behind its name.
 
 ## Why wrap a CLI at all
 

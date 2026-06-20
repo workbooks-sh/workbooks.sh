@@ -32,6 +32,7 @@ The CLI groups its verbs the same way:
 **author** — read & verify `.work` trees, locally:
 
 - `work check [dir]` — resolve references + audit capabilities
+- `work lint [dir]` — lint the tree
 - `work structure [dir]` — list the units in the tree
 - `work why / near / wit :unit` — code-graph dependencies + the generated WIT world
 
@@ -44,15 +45,14 @@ The CLI groups its verbs the same way:
 **deploy** — stand up a runtime, local or cloud:
 
 - `work deploy init | validate | apply` — scaffold · check · deploy the config
-- `work deploy verify | status | down` — health · inspect · teardown
+- `work deploy <dir> --nexus <name>` — mount a workbook into a running Nexus
 
 **platform** — identity, contexts, the control plane:
 
 - `work ctx · work nexus <url>` — manage targets · point at an engine
 - `work login · work whoami` — authenticate · show identity
 
-Every verb also accepts `--json` and `--no-color`. Run `work help` to see the live
-surface.
+Run `work help` to see the live surface.
 
 For the deploy story end to end, see
 [Deploy: local and cloud](/deploy/deploy-local-and-cloud).
