@@ -50,6 +50,14 @@ defmodule Nexus.Literate do
 
   defp walk([{line, n} | rest], prose, nodes) do
     cond do
+      # A ``` fenced code block is consumed whole — INCLUDING blank lines — so a blank
+      # line inside a code listing doesn't split the fence (prose flushes on blanks).
+      fence?(line) ->
+        {flines, rest2} = take_fence(rest, [])
+        text = Enum.join([line | flines], "\n")
+        node = %{type: :prose, line: n, text: text, refs: []}
+        walk(rest2, [], [node | flush(prose, nodes)])
+
       blank?(line) ->
         walk(rest, [], flush(prose, nodes))
 
@@ -76,6 +84,18 @@ defmodule Nexus.Literate do
   # ── block recognition ─────────────────────────────────────────────────────
 
   defp blank?(line), do: String.trim(line) == ""
+
+  # ``` fenced code block: a line that (trimmed) starts a fence. take_fence consumes
+  # everything up to and INCLUDING the closing fence line, blanks and all.
+  defp fence?(line), do: String.starts_with?(String.trim(line), "```")
+
+  defp take_fence([], acc), do: {Enum.reverse(acc), []}
+
+  defp take_fence([{line, _n} | rest], acc) do
+    if String.starts_with?(String.trim(line), "```"),
+      do: {Enum.reverse([line | acc]), rest},
+      else: take_fence(rest, [line | acc])
+  end
 
   defp heading(line, n) do
     case Regex.run(~r/^(#+)\s+(.*)$/, line) do
