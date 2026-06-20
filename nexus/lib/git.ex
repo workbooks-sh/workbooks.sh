@@ -114,6 +114,18 @@ defmodule Nexus.Git do
                        "checkout", "-f", branch], stderr_to_stdout: true)
   end
 
+  @doc """
+  Configure a mirror remote (e.g. the org's GitHub) for a bare repo. After each push, the post-receive
+  mirrors all refs to it. Generic — `url` is any git remote (GitHub is just a URL with a token in it);
+  pass `nil`/"" to clear. The runtime carries the mechanism; the GitHub URL+token is the deployer's config.
+  """
+  def set_mirror(bare, url) when is_binary(url) and url != "" do
+    System.cmd("git", ["--git-dir=#{bare}", "config", "workbooks.mirror", url], stderr_to_stdout: true)
+    :ok
+  end
+
+  def set_mirror(bare, _), do: (System.cmd("git", ["--git-dir=#{bare}", "config", "--unset", "workbooks.mirror"], stderr_to_stdout: true); :ok)
+
   defp post_receive(bare, work_dir) do
     """
     #!/bin/sh
@@ -129,6 +141,11 @@ defmodule Nexus.Git do
           ;;
       esac
     done
+    # Mirror to the configured remote (e.g. the org's GitHub), if one is set. Best-effort.
+    mirror=$(git --git-dir="#{bare}" config --get workbooks.mirror 2>/dev/null)
+    if [ -n "$mirror" ]; then
+      git --git-dir="#{bare}" push --mirror "$mirror" && echo "workbooks: mirrored to $mirror" || echo "workbooks: mirror push failed"
+    fi
     """
   end
 end

@@ -55,4 +55,26 @@ defmodule Nexus.GitRemoteTest do
     assert File.read!(Path.join(work, "a.work")) == "x2"
     refute File.exists?(Path.join(work, "b.work")), "checkout -f should remove files deleted upstream"
   end
+
+  test "set_mirror makes a push mirror its refs to the configured remote", %{base: base} do
+    bare = Git.bare_path(Path.join(base, "repos"), "demo")
+    work = Path.join(base, "work/demo")
+    Git.provision_remote(bare, work)
+
+    # A second bare repo standing in for "the org's GitHub".
+    mirror = Path.join(base, "mirror.git")
+    System.cmd("git", ["init", "--bare", "-q", "-b", "main", mirror], stderr_to_stdout: true)
+    Git.set_mirror(bare, mirror)
+
+    client = Path.join(base, "client")
+    File.mkdir_p!(client)
+    src = fn args -> System.cmd("git", args, cd: client, stderr_to_stdout: true) end
+    src.(["init", "-q", "-b", "main"]); src.(["config", "user.name", "t"]); src.(["config", "user.email", "t@t"])
+    File.write!(Path.join(client, "m.work"), "mirror me")
+    src.(["add", "-A"]); src.(["commit", "-q", "-m", "mirror"]); src.(["push", "-q", bare, "main"])
+
+    # The mirror remote should now have the main ref.
+    {refs, 0} = System.cmd("git", ["--git-dir=#{mirror}", "for-each-ref", "--format=%(refname)"], stderr_to_stdout: true)
+    assert refs =~ "refs/heads/main"
+  end
 end
