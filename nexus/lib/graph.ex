@@ -61,7 +61,8 @@ defmodule Nexus.Graph do
   defp collect_dep_nodes(parsed, units) do
     for {_p, ns} <- parsed, n <- ns, n.type == :code, n.name, {label, kind} <- external_deps(n),
         not Map.has_key?(units, label), into: %{} do
-      {label, %{id: label, kind: "dep", lang: kind, file: nil, exports: [], facets: %{source: %{}}}}
+      {label, %{id: label, kind: "dep", lang: kind, file: nil, exports: [],
+                facets: %{source: %{kind: "dep", lang: kind}, interface: nil, artifact: nil, data: %{}, observed: nil}}}
     end
   end
 
