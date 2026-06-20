@@ -15,9 +15,10 @@ deploy do
   # Grounded in DeployKit/Fly cost (always-on shared-CPU machine + volume) at ~2.2–2.4x. Mirrored by
   # the lander's cloud-tiers section. (Enterprise is custom — not a fixed row.)
   tiers="
-    starter | Starter | 1024 25 20 no
-    team    | Team    | 4096 100 79 yes
-    scale   | Scale   | 8192 300 199 yes
+    solo   | Solo   | 512 10 12 no
+    studio | Studio | 2048 75 32 yes
+    team   | Team   | 4096 200 89 yes
+    scale  | Scale  | 8192 500 229 yes
   "
 
   reserved-hosts="workbooks.sh"                          # our domain of record — tenants can't bind under it
