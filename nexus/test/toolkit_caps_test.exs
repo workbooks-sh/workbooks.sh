@@ -49,19 +49,35 @@ defmodule Nexus.Toolkit.CapsTest do
     assert src =~ "store: __cap_store"
   end
 
-  test "imports/2 builds the Wasmex.Components import map (path-scoped, grant-filtered)" do
-    imports = Caps.imports({"acme", "app", "tk"}, [:store, :load])
-    assert Map.keys(imports) |> Enum.sort() == ["load", "store"]
-    assert {:fn, store_fn} = imports["store"]
+  test "imports/2 builds the interface-nested Wasmex.Components import map (kebab, grant-filtered)" do
+    %{} = imports = Caps.imports({"acme", "app", "tk"}, [:store, :load, :cache_get])
+    iface = imports[Nexus.JsEngine.caps_iface()]
+    assert Map.keys(iface) |> Enum.sort() == ["cache-get", "load", "store"]
+    assert {:fn, store_fn} = iface["store"]
     assert is_function(store_fn, 2)
-    assert {:fn, load_fn} = imports["load"]
-    assert is_function(load_fn, 1)
-    refute Map.has_key?(imports, "fetch")
+    refute Map.has_key?(iface, "fetch")
+  end
+
+  # End-to-end through the REAL cap-enabled StarlingMonkey eval-host (when the engine wasm is present):
+  # a cap toolkit invoked on two paths — path A's store must be invisible to path B.
+  @tag :js_engine
+  test "cap toolkit runs through the eval-host with path-scoped isolation" do
+    if Nexus.JsEngine.available?() do
+      src = "def save(k, v) do\n  store(k, v)\n  load(k)\nend\ndef get(k), do: load(k)"
+      Nexus.Toolkit.Js.register("kvtest", %{name: "kvtest", js: elem(Nexus.Toolkit.Js.runnable(src), 1), exports: []})
+      a = [path: {"t", "app", "a"}, grants: [:store, :load, :emit]]
+      b = [path: {"t", "app", "b"}, grants: [:store, :load, :emit]]
+
+      assert {:ok, "hi"} = Nexus.Toolkit.Js.invoke("kvtest", "save", ["a", "hi"], a)
+      assert {:ok, "hi"} = Nexus.Toolkit.Js.invoke("kvtest", "get", ["a"], a)
+      assert {:ok, ""} = Nexus.Toolkit.Js.invoke("kvtest", "get", ["a"], b)
+    end
   end
 
   test "imports are path-scoped through the built fns" do
-    a = Caps.imports({"globex", "app", "a"}, [:store, :load])
-    b = Caps.imports({"globex", "app", "b"}, [:store, :load])
+    iface = Nexus.JsEngine.caps_iface()
+    a = Caps.imports({"globex", "app", "a"}, [:store, :load])[iface]
+    b = Caps.imports({"globex", "app", "b"}, [:store, :load])[iface]
     {:fn, a_store} = a["store"]
     {:fn, a_load} = a["load"]
     {:fn, b_load} = b["load"]

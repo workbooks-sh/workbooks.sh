@@ -87,9 +87,12 @@ defmodule Nexus.Toolkit.Caps do
   the import names follow the eval-host's declared interface.)
   """
   def imports(path, grants) do
-    path
-    |> bind(grants)
-    |> Map.new(fn {cap, fun} -> {Atom.to_string(cap), {:fn, fun}} end)
+    iface =
+      path
+      |> bind(grants)
+      |> Map.new(fn {cap, fun} -> {String.replace(Atom.to_string(cap), "_", "-"), {:fn, fun}} end)
+
+    %{Nexus.JsEngine.caps_iface() => iface}
   end
 
   @doc "A stable string key for a partition path. `{op, app, comp}` → \"op/app/comp\"."

@@ -19,13 +19,18 @@ defmodule Nexus.JsEngine do
       impls here (only meaningful once the eval-host is rebuilt to declare the cap import interface;
       a plain eval-host ignores an empty map).
   """
+  # The cap interface the (cap-enabled) eval-host imports. Every function must be satisfied at
+  # instantiation, so we always supply stubs; the toolkit cap bridge overrides granted ones.
+  @caps_iface "work:evalhost/toolkit-caps"
+
+  @doc "The cap interface name the eval-host imports."
+  def caps_iface, do: @caps_iface
+
   def eval(src, opts \\ []) when is_binary(src) do
     timeout = Keyword.get(opts, :timeout, 15_000)
-    imports = Keyword.get(opts, :imports, %{})
+    imports = merge_caps(Keyword.get(opts, :imports, %{}))
 
-    cfg =
-      %{path: wasm(), wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}}
-      |> maybe_put_imports(imports)
+    cfg = %{path: wasm(), wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}, imports: imports}
 
     case Wasmex.Components.start_link(cfg) do
       {:ok, pid} ->
@@ -40,8 +45,25 @@ defmodule Nexus.JsEngine do
     end
   end
 
-  defp maybe_put_imports(cfg, imports) when map_size(imports) == 0, do: cfg
-  defp maybe_put_imports(cfg, imports), do: Map.put(cfg, :imports, imports)
+  # Default deny/no-op stubs for every cap fn (so the cap-importing engine always instantiates), with
+  # the caller's real impls (Nexus.Toolkit.Caps.imports/2) overlaid on the interface.
+  defp merge_caps(overrides) do
+    base = %{
+      @caps_iface => %{
+        "store" => {:fn, fn _k, _v -> nil end},
+        "load" => {:fn, fn _k -> "" end},
+        "emit" => {:fn, fn _m -> nil end},
+        "cache-get" => {:fn, fn _k -> "" end},
+        "cache-put" => {:fn, fn _k, _v, _t -> nil end},
+        "cache-delete" => {:fn, fn _k -> nil end},
+        "fetch" => {:fn, fn _u -> "" end},
+        "complete" => {:fn, fn _p -> "" end}
+      }
+    }
+
+    iface = Map.merge(base[@caps_iface], Map.get(overrides, @caps_iface, %{}))
+    overrides |> Map.merge(base) |> Map.put(@caps_iface, iface)
+  end
 
   @doc "Whether the StarlingMonkey engine wasm is present."
   def available?, do: File.exists?(wasm())
