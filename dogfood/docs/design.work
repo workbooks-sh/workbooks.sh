@@ -41,9 +41,22 @@ design :brand do
   .wb-sec:nth-child(7n+4){--sec:#f2ddb0} .wb-sec:nth-child(7n+5){--sec:#c8e0b0} .wb-sec:nth-child(7n+6){--sec:#9fc4e8}
   .wb-sec:nth-child(7n+7){--sec:#d9c5f0}
 
-  .wb-link{color:var(--ink);font-size:14.5px;padding:6px 9px;box-shadow:inset 0 0 0 0 var(--sec,#aee5c2)}
+  .wb-link{color:var(--ink);font-size:14.5px;padding:6px 9px}
   .wb-link:hover{background:var(--hover)}
-  .wb-link.on{background:var(--hover);font-weight:600;box-shadow:inset 3px 0 0 var(--sec,#aee5c2)}
+  .wb-link.on{font-weight:600}            /* no fill, no coloured left bar — the rail marker shows active */
+
+  /* left-edge nav rail: a gray dotted line up the whole nav, with one solid section-
+     coloured segment (8px wide, one item tall) that slides to the active page and
+     morphs to that section's pastel. Geometry (top/height/--wb-mark-color) is set by
+     the runtime's neutral marker hook; the look + motion live here. */
+  .wb-nav{position:relative}
+  .wb-nav::before{content:'';position:absolute;left:0;top:0;bottom:0;width:0;
+    border-left:8px dotted var(--line);opacity:.65;pointer-events:none;z-index:0}
+  .wb-active-mark{position:absolute;left:0;width:8px;border-radius:3px;z-index:1;pointer-events:none;
+    background:var(--wb-mark-color,var(--ink));
+    transition:top .26s cubic-bezier(.4,0,.2,1),height .26s cubic-bezier(.4,0,.2,1),background-color .26s ease}
+  .wb-active-mark[hidden]{display:none}
+  @media(prefers-reduced-motion:reduce){.wb-active-mark{transition:none}}
 
   /* content — let main fill the space beside the sidebar, then center a readable
      column inside it (the neutral skin caps .wb-main at 800px, which left it pinned
