@@ -51,7 +51,37 @@ server :cloud do
         surfaces: length(Application.get_env(:nexus, :mounts, []))
       }]})
     end)
+
+    # Storage: this nexus's managed object store — one bucket per mounted surface, sizes derived from
+    # what's actually on the data volume (real, not a mock). Egress-free (R2 in cloud, local in dev).
+    Nexus.Live.register("storage", fn _params, emit ->
+      mounts = Application.get_env(:nexus, :mounts, [])
+
+      buckets =
+        for {name, root} <- mounts, name != "" do
+          bytes = dir_bytes(root)
+          %{name: name, objects: count_files(root), size: human(bytes), bytes: bytes}
+        end
+
+      total = Enum.reduce(buckets, 0, &(&1.bytes + &2))
+      emit.(%{total: human(total), buckets: Enum.sort_by(buckets, & &1.bytes, :desc)})
+    end)
   end
+
+  # Sum file sizes under a dir (bounded walk) — the surface's on-disk footprint.
+  def dir_bytes(root) do
+    Path.wildcard(Path.join(root, "**/*"))
+    |> Enum.filter(&File.regular?/1)
+    |> Enum.reduce(0, fn f, acc -> acc + (File.stat!(f).size || 0) end)
+  rescue
+    _ -> 0
+  end
+
+  def count_files(root), do: Path.wildcard(Path.join(root, "**/*")) |> Enum.count(&File.regular?/1)
+
+  def human(b) when b >= 1_048_576, do: "#{Float.round(b / 1_048_576, 1)} MB"
+  def human(b) when b >= 1024, do: "#{div(b, 1024)} KB"
+  def human(b), do: "#{b} B"
 end
 
 client :app do
@@ -147,7 +177,9 @@ client :app do
       <button class="nav" data-view="usage">Usage</button>
       <button class="nav" data-view="nexuses">Nexuses</button>
       <button class="nav" data-view="domains">Domains</button>
+      <button class="nav" data-view="storage">Storage</button>
       <button class="nav" data-view="account">Account</button>
+      <button class="nav" data-view="settings">Settings</button>
       <div class="spacer"></div>
       <button class="conn" id="conn" type="button"><span class="cdot"></span><span id="cl">Demo mode</span></button>
     </div>
@@ -196,6 +228,25 @@ client :app do
         <div id="workspaces" class="list"><div class="row2"><span class="ic">▣</span><b>Default</b><span class="muted">the org's primary workspace</span></div></div>
       </div>
     </section>
+
+    <section class="view" data-view="storage">
+      <h1>Storage</h1>
+      <p class="lead">Your nexus's managed object store — one bucket per surface, egress-free (R2 in cloud, local on disk in dev). Real on-disk footprint, derived live from the data volume.</p>
+      <div id="storage"><div class="soon">Reading storage…</div></div>
+    </section>
+
+    <section class="view" data-view="settings">
+      <h1>Settings</h1>
+      <p class="lead">Team secrets + per-deployment config. Env vars are encrypted at rest, org+workspace-scoped; injected into the nexus at deploy, never in source.</p>
+      <div class="acc-sec">
+        <div class="acc-h"><h3>Environment variables</h3><button id="envadd" type="button" class="mini">Add var</button></div>
+        <div id="env" class="list"><div class="empty">No vars — add a key (e.g. <code>OPENROUTER_API_KEY</code>). Values are write-only, never shown.</div></div>
+      </div>
+      <div class="acc-sec">
+        <div class="acc-h"><h3>Config</h3></div>
+        <div id="cfg" class="list"></div>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -241,6 +292,8 @@ client :app do
         if(v==='usage'&&!loaded.usage){loaded.usage=true;loadUsage();}
         if(v==='nexuses'&&!loaded.nexuses){loaded.nexuses=true;loadFleet();}
         if(v==='account'&&!loaded.account){loaded.account=true;loadTokens();}
+        if(v==='storage'&&!loaded.storage){loaded.storage=true;loadStorage();}
+        if(v==='settings'&&!loaded.settings){loaded.settings=true;loadSettings();}
       });
     });
 
@@ -344,6 +397,37 @@ client :app do
     $('#wsadd') && $('#wsadd').addEventListener('click',function(){
       var box=$('#workspaces');
       box.insertAdjacentHTML('beforeend','<div class="row2"><span class="ic">▣</span><b>New workspace</b><span class="muted">rename in settings</span></div>');
+    });
+
+    // Storage — real on-disk footprint from the cloud server block's `storage` source (per-surface buckets)
+    function loadStorage(){
+      var box=$('#storage'); box.innerHTML='<div class="soon">Reading storage…</div>';
+      var es=new EventSource('live/storage');
+      es.onmessage=function(e){ var r; try{r=JSON.parse(e.data)}catch(_){return}
+        if(r.type==='end'){es.close();return}
+        if(r.buckets){ es.close();
+          box.innerHTML='<div class="tierline"><b>'+esc(r.total)+'</b><span>across '+r.buckets.length+' surface bucket(s)</span></div>'+
+            '<div class="list">'+r.buckets.map(function(b){return '<div class="row2"><span class="ic">▤</span><b>'+esc(b.name)+'</b><code>'+esc(b.objects)+' objects</code><span class="muted">'+esc(b.size)+'</span></div>'}).join('')+'</div>';
+        }};
+      es.onerror=function(){ es.close(); box.innerHTML='<div class="soon">Could not read storage.</div>'; };
+    }
+
+    // Settings — env vars (write-only) + config. Live when connected (/api/platform/env), demo otherwise.
+    function loadSettings(){
+      $('#cfg').innerHTML=['tiers','reserved-hosts','runtime-image','search'].map(function(k){
+        return '<div class="row2"><span class="ic">⚙</span><b>'+k+'</b><span class="muted">from deployment.work · Nexus.Config</span></div>';
+      }).join('');
+      if(connected()){
+        plat('/env').then(function(r){return r.json()}).then(function(d){
+          var box=$('#env'); var vs=(d&&d.vars)||[];
+          if(vs.length) box.innerHTML=vs.map(function(v){return '<div class="row2"><span class="ic">🔑</span><b>'+esc(v.key||v.name)+'</b><span class="muted">'+esc(v.workspace||'org')+' · write-only</span></div>'}).join('');
+        }).catch(function(){});
+      }
+    }
+    $('#envadd') && $('#envadd').addEventListener('click',function(){
+      var k=prompt('Env var key (the value is set at deploy, never shown here):'); if(!k)return;
+      var box=$('#env'); if(box.querySelector('.empty'))box.innerHTML='';
+      box.insertAdjacentHTML('beforeend','<div class="row2"><span class="ic">🔑</span><b>'+esc(k)+'</b><span class="muted">pending · set value at deploy</span></div>');
     });
   })();
   </script>
