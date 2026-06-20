@@ -60,8 +60,18 @@ ARG WASMTIME_VERSION=v45.0.1
 RUN curl -fsSL https://wasmtime.dev/install.sh | bash -s -- --version ${WASMTIME_VERSION} \
     && cp /root/.wasmtime/bin/wasmtime /usr/local/bin/wasmtime
 
+# Litestream — durability: streams the tenant SQLite WAL to the object store (R2/Tigris, egress-free)
+# + restores on boot. Generic mechanism (Nexus.Litestream); activates only when S3 secrets are
+# injected (see entrypoint), so a no-replica deployment runs SQLite-on-volume unchanged.
+ARG LITESTREAM_VERSION=v0.3.13
+RUN curl -fsSL "https://github.com/benbjohnson/litestream/releases/download/${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-$(dpkg --print-architecture).tar.gz" \
+    | tar -xz -C /usr/local/bin litestream && litestream version
+
 # The mix release → /app. The Machine boots /app/bin/nexus (WORKDIR /app).
 COPY --from=build /app/_build/prod/rel/nexus ./
+# Durability wrapper: restore-from-replica-if-empty → `litestream replicate -exec bin/nexus start`.
+COPY nexus/scripts/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # The in-sandbox compilers, from the standalone compilers LAYER (the `compilers` stage above) so CI
 # never rebuilds the hours-long provision chain. Nexus.Compilers.Shared.default_root/0 resolves
@@ -71,5 +81,6 @@ COPY --from=build /app/_build/prod/rel/nexus ./
 COPY --from=compilers /compilers ./compilers
 
 EXPOSE 4000
-# The Machine overrides this with `eval <boot-expr>`; `start` is the conventional default.
-CMD ["bin/nexus", "start"]
+# The entrypoint wraps `bin/nexus start` in litestream replication (restore-on-boot → replicate
+# -exec). The Machine can still override with `eval <boot-expr>` for one-shot pipeline boots.
+CMD ["/app/entrypoint.sh"]
