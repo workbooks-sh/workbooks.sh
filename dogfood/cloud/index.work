@@ -34,6 +34,13 @@ server :cloud do
   route "GET /cloud/agent/session", :agent_session
   route "POST /cloud/agent/chat", :agent_chat
 
+  # Workspace file tree — REAL files on the data volume. The mounts (deployed surfaces) are the
+  # top-level folders; `path` walks within one. Path-traversal guarded (resolved must stay under root).
+  route "GET /cloud/tree", :tree
+
+  # File search across all workspaces (mounts) — filename substring match over the real data volume.
+  route "GET /cloud/search", :search
+
   @agent_store {:cloud_agent_sessions}
 
   def mint_token(req) do
@@ -146,6 +153,69 @@ server :cloud do
   end
 
   def count_files(root), do: Path.wildcard(Path.join(root, "**/*")) |> Enum.count(&File.regular?/1)
+
+  # ── Workspace file tree ────────────────────────────────────────────────────────────────────────
+  # No `path` → the mounts as top-level folders. With `path` ("<mount>/<sub>…") → that directory's
+  # entries. Each entry: %{name, dir, path, size}. Hidden dotfiles + the weave index are skipped.
+  defp mounts, do: for({name, root} <- Application.get_env(:nexus, :mounts, []), name != "", do: {name, root})
+
+  def tree(req) do
+    case String.trim(req.query["path"] || "") do
+      "" ->
+        entries = for {name, root} <- mounts(), do: %{name: name, dir: true, path: name, size: dir_bytes(root)}
+        %{path: "", entries: Enum.sort_by(entries, & &1.name)}
+
+      path ->
+        [mount | rest] = String.split(path, "/", trim: true)
+
+        case List.keyfind(mounts(), mount, 0) do
+          nil ->
+            {404, %{error: "no such mount"}}
+
+          {_, root} ->
+            dir = Path.join([root | rest])
+            safe = Path.expand(dir)
+
+            cond do
+              not String.starts_with?(safe, Path.expand(root)) -> {403, %{error: "path escapes mount"}}
+              not File.dir?(safe) -> {404, %{error: "not a directory"}}
+              true -> %{path: path, entries: list_dir(safe, path)}
+            end
+        end
+    end
+  end
+
+  def search(req) do
+    q = String.downcase(String.trim(req.query["q"] || ""))
+
+    results =
+      if q == "" do
+        []
+      else
+        for {name, root} <- mounts(),
+            file <- Path.wildcard(Path.join(root, "**/*")),
+            File.regular?(file),
+            base = Path.basename(file),
+            String.contains?(String.downcase(base), q) do
+          rel = Path.relative_to(file, root)
+          %{name: base, path: name <> "/" <> rel, workspace: name}
+        end
+        |> Enum.take(40)
+      end
+
+    %{query: q, results: results}
+  end
+
+  defp list_dir(abs, rel) do
+    File.ls!(abs)
+    |> Enum.reject(&String.starts_with?(&1, "."))
+    |> Enum.map(fn name ->
+      full = Path.join(abs, name)
+      isdir = File.dir?(full)
+      %{name: name, dir: isdir, path: rel <> "/" <> name, size: (if isdir, do: 0, else: (File.stat!(full).size || 0))}
+    end)
+    |> Enum.sort_by(&{!&1.dir, &1.name})
+  end
 
   def human(b) when b >= 1_048_576, do: "#{Float.round(b / 1_048_576, 1)} MB"
   def human(b) when b >= 1024, do: "#{div(b, 1024)} KB"
@@ -469,6 +539,45 @@ tr:last-child td{ border:0; }
   opacity: 0; transform: translateY(6px); pointer-events: none; transition: opacity .15s ease, transform .15s ease; }
 .adminsec.open .admindrawer { opacity: 1; transform: translateY(0); pointer-events: auto; }
 .admindrawer .nxnav { margin: 0; }
+/* Workspace = folder: disclosure caret + lazy file tree (desktop-app style) */
+.wstoggle { flex: none; width: 20px; height: 28px; border: none; background: none; color: var(--dim); cursor: pointer; display: grid; place-items: center; padding: 0; }
+.wstoggle svg { width: 13px; height: 13px; transition: transform .15s ease; }
+.wsrow.wsopen .wstoggle svg { transform: rotate(90deg); }
+.wstree { display: flex; flex-direction: column; }
+.trow { display: flex; align-items: center; gap: 6px; min-height: 26px; border-radius: 7px; cursor: pointer; color: var(--dim); font: 500 12.5px var(--read); }
+.trow:hover { background: var(--line); color: var(--ink); }
+.trow .tchev { flex: none; display: grid; place-items: center; color: var(--dim); }
+.trow .tchev svg { width: 12px; height: 12px; transition: transform .15s ease; }
+.trow.dir.open .tchev svg { transform: rotate(90deg); }
+.trow .tname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trow.file .tname { color: var(--dim); }
+.tbm { flex: none; opacity: 0; border: none; background: none; color: var(--dim); cursor: pointer; font-size: 12px; padding: 2px 5px; border-radius: 5px; }
+.trow:hover .tbm, .sfrow:hover .tbm { opacity: .7; }
+.tbm:hover { opacity: 1 !important; color: var(--ink); }
+.tbm.on { opacity: 1; color: var(--peach, #f3c5a3); }
+.treemsg { color: var(--dim); font: 500 12px var(--read); padding: 5px 0; opacity: .7; }
+/* Bookmarks */
+.bmsec { margin-top: 6px; }
+.swlabel { font: 700 9.5px var(--read); letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); padding: 0 4px 4px; }
+.bmlist { display: flex; flex-direction: column; gap: 1px; }
+.bmrow { display: flex; align-items: center; gap: 7px; min-height: 28px; padding: 0 6px; border-radius: 7px; cursor: pointer; color: var(--ink); font: 500 13px var(--read); }
+.bmrow:hover { background: var(--line); }
+.bmstar { flex: none; color: var(--peach, #f3c5a3); font-size: 12px; }
+.bmrow .tname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bmx { flex: none; opacity: 0; border: none; background: none; color: var(--dim); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 5px; }
+.bmrow:hover .bmx { opacity: .6; }
+.bmx:hover { opacity: 1; color: var(--ink); }
+/* File search */
+.srchsec { margin-top: 6px; }
+.srchinput { width: 100%; box-sizing: border-box; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 7px 10px; font: 500 13px var(--read); }
+.srchinput:focus { outline: none; border-color: var(--stroke); }
+.srchinput::placeholder { color: var(--dim); }
+.srchresults { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-height: 30vh; overflow-y: auto; }
+.sfrow { display: flex; align-items: center; gap: 7px; min-height: 28px; padding: 0 6px; border-radius: 7px; cursor: pointer; color: var(--ink); font: 500 12.5px var(--read); }
+.sfrow:hover { background: var(--line); }
+.sfrow .tname { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sfrow .ssub { flex: none; color: var(--dim); font: 500 10.5px var(--mono); margin-left: auto; }
+.sfrow .tbm { margin-left: 4px; }
 /* group label (e.g. "Admin") above a nav group */
 .navgrp { font: 700 9.5px var(--read); letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); padding: 0 10px; margin: 8px 0 4px; }
 .wssec { margin-top: 6px; }
@@ -813,8 +922,68 @@ client :app do
     var MOON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>';
 
     // shell menu state
-    var st = { nxMenu: false, wsMenu: false, editingId: null, editName: '', editIcon: '', pickerOpen: false, nxEditing: false, nxEditName: '', adminOpen: false };
+    var st = { nxMenu: false, wsMenu: false, editingId: null, editName: '', editIcon: '', pickerOpen: false, nxEditing: false, nxEditName: '', adminOpen: false,
+      treeOpen: {}, treeData: {}, treeLoading: {}, bookmarks: [], search: '' };
     try { st.adminOpen = localStorage.getItem('wb-admin-drawer') === 'open'; } catch (e) {}
+    try { st.bookmarks = JSON.parse(localStorage.getItem('wb-bookmarks') || '[]'); } catch (e) { st.bookmarks = []; }
+    function saveBookmarks(){ try { localStorage.setItem('wb-bookmarks', JSON.stringify(st.bookmarks)); } catch (e) {} }
+    function toggleBookmark(path, label){
+      var i = st.bookmarks.findIndex(function(b){ return b.path === path; });
+      if (i >= 0) st.bookmarks.splice(i, 1); else st.bookmarks.push({ path: path, label: label || path.split('/').pop() });
+      saveBookmarks(); renderShell();
+    }
+    // Lazy-load a directory's entries from the REAL data volume (/cloud/tree), then re-render.
+    function loadTree(path){
+      if (st.treeData[path] || st.treeLoading[path]) return;
+      st.treeLoading[path] = true;
+      fetch('/cloud/tree' + (path ? '?path=' + encodeURIComponent(path) : ''), { credentials: 'same-origin' })
+        .then(function(r){ return r.json(); })
+        .then(function(d){ st.treeData[path] = (d && d.entries) || []; })
+        .catch(function(){ st.treeData[path] = []; })
+        .then(function(){ delete st.treeLoading[path]; renderShell(); });
+    }
+    function isBookmarked(path){ return st.bookmarks.some(function(b){ return b.path === path; }); }
+    // File search across workspaces — updates the results box IN PLACE (no shell re-render → keeps focus).
+    function runSearch(){
+      var q = (st.search || '').trim();
+      var box = document.getElementById('wbSearchResults');
+      if (!box) return;
+      if (!q){ box.innerHTML = ''; return; }
+      fetch('/cloud/search?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if ((st.search || '').trim() !== q) return;  // stale response
+          var rs = (d && d.results) || [];
+          if (!rs.length){ box.innerHTML = '<div class="treemsg" style="padding-left:12px">No matches</div>'; return; }
+          box.innerHTML = rs.map(function(r){
+            return '<div class="sfrow" data-tree-file="' + esc(r.path) + '">' +
+              '<span class="tname">' + esc(r.name) + '</span><span class="ssub">' + esc(r.workspace) + '</span>' +
+              '<button class="tbm' + (isBookmarked(r.path) ? ' on' : '') + '" data-bm="' + esc(r.path) + '" data-bml="' + esc(r.name) + '" title="Bookmark">★</button>' +
+            '</div>';
+          }).join('');
+        });
+    }
+    // Recursive file-tree HTML for an open folder at `path` (root mount name = workspace folder).
+    function treeHtml(path, depth){
+      if (st.treeLoading[path]) return '<div class="treemsg" style="padding-left:' + (depth * 14 + 12) + 'px">Loading…</div>';
+      var entries = st.treeData[path];
+      if (!entries) return '';
+      if (entries.length === 0) return '<div class="treemsg" style="padding-left:' + (depth * 14 + 12) + 'px">Empty</div>';
+      return entries.map(function(en){
+        var pad = depth * 14 + 12;
+        if (en.dir){
+          var open = !!st.treeOpen[en.path];
+          return '<div class="trow dir' + (open ? ' open' : '') + '" data-tree-toggle="' + esc(en.path) + '" style="padding-left:' + pad + 'px">' +
+              '<span class="tchev">' + ICO.chev + '</span><span class="tname">' + esc(en.name) + '</span>' +
+              '<button class="tbm' + (isBookmarked(en.path) ? ' on' : '') + '" data-bm="' + esc(en.path) + '" data-bml="' + esc(en.name) + '" title="Bookmark">★</button>' +
+            '</div>' + (open ? treeHtml(en.path, depth + 1) : '');
+        }
+        return '<div class="trow file" data-tree-file="' + esc(en.path) + '" style="padding-left:' + (pad + 16) + 'px">' +
+            '<span class="tname">' + esc(en.name) + '</span>' +
+            '<button class="tbm' + (isBookmarked(en.path) ? ' on' : '') + '" data-bm="' + esc(en.path) + '" data-bml="' + esc(en.name) + '" title="Bookmark">★</button>' +
+          '</div>';
+      }).join('');
+    }
     function inits(label){ return (label || '').split(/[\s-]+/).filter(Boolean).slice(0, 2).map(function (w) { return w[0].toUpperCase(); }).join('') || 'W'; }
 
     function renderShell(){
@@ -839,15 +1008,32 @@ client :app do
           navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) +
         '</nav></div></div>') : '';
 
+      // Each workspace is a FOLDER: a disclosure caret expands its real file tree (desktop-app style).
       var wslist = WB.ws.list.map(function (w) {
         if (st.editingId === w.id) return wsEditor(false);
         var on = onWorkspace && ws && ws.id === w.id;
-        return '<div class="wsrow' + (on ? ' on' : '') + '" data-ws="' + esc(w.id) + '">' +
+        var open = !!st.treeOpen[w.name];
+        return '<div class="wsrow' + (on ? ' on' : '') + (open ? ' wsopen' : '') + '" data-ws="' + esc(w.id) + '">' +
+          '<button class="wstoggle" data-tree-toggle="' + esc(w.name) + '" title="Show files" aria-label="Show files">' + ICO.chev + '</button>' +
           '<button class="wsmain" data-wsopen="' + esc(w.id) + '"><span class="av sm">' + esc(w.icon || (w.name[0] || 'W').toUpperCase()) + '</span><span class="omname">' + esc(w.name) + '</span></button>' +
-          '<button class="wsedit-btn" data-wsedit="' + esc(w.id) + '" title="Edit workspace" aria-label="Edit workspace">✎</button></div>';
+          '<button class="wsedit-btn" data-wsedit="' + esc(w.id) + '" title="Edit workspace" aria-label="Edit workspace">✎</button></div>' +
+          (open ? '<div class="wstree">' + treeHtml(w.name, 1) + '</div>' : '');
       }).join('');
       if (st.editingId === 'new') wslist += wsEditor(true);
       if (WB.ws.list.length === 0) wslist += '<div class="omempty">No workspaces yet</div>';
+
+      // Bookmarks — pinned files/folders (★), persisted per-browser. Sits ABOVE the workspaces explorer.
+      var bmlist = st.bookmarks.map(function (b) {
+        return '<div class="bmrow" data-tree-file="' + esc(b.path) + '"><span class="bmstar">★</span><span class="tname">' + esc(b.label) + '</span>' +
+          '<button class="bmx" data-bm="' + esc(b.path) + '" data-bml="' + esc(b.label) + '" title="Remove bookmark">×</button></div>';
+      }).join('');
+      var bmsec = st.bookmarks.length ? ('<div class="swrap bmsec"><div class="swlabel">Bookmarks</div><div class="bmlist">' + bmlist + '</div></div>') : '';
+
+      // File search across workspaces — sits below bookmarks. Results render in place (#wbSearchResults).
+      var searchsec = '<div class="swrap srchsec">' +
+        '<input id="wbFileSearch" class="srchinput" type="text" placeholder="Search files…" autocomplete="off" />' +
+        '<div id="wbSearchResults" class="srchresults"></div>' +
+      '</div>';
 
       var nxMenu = st.nxMenu ? nexusMenu(nx) : '';
 
@@ -863,8 +1049,10 @@ client :app do
             '</div>' + nxMenu +
           '</div>' +
           (WB.dev ? ('<nav class="nxnav nxprimary">' +
-            navlink('/studio', ICO.spark, 'Studio', p) + navlink('/apps', ICO.apps, 'Apps', p) +
+            navlink('/studio', ICO.spark, 'Studio', p) +
           '</nav>') : '') +
+          bmsec +
+          searchsec +
           '<div class="swrap wssec">' +
             '<div class="swlabel wshdr"><span>Workspaces</span><button class="wsadd" data-wsnew title="New workspace" aria-label="New workspace">+</button></div>' +
             '<div class="wslist">' + wslist + '</div>' +
@@ -885,6 +1073,8 @@ client :app do
       '</div>';
 
       if (st.pickerOpen) { var ph = root.querySelector('#wsPicker'); if (ph) WB.emojiPicker(ph, function (u) { st.editIcon = u; st.pickerOpen = false; renderShell(); renderView(); }); }
+      var si = document.getElementById('wbFileSearch');
+      if (si) { si.value = st.search; si.oninput = function(){ st.search = si.value; runSearch(); }; if (st.search) runSearch(); }
     }
     function navlink(href, ico, label, p){ return '<a class="nxlink' + (p === href ? ' on' : '') + '" data-nav="' + href + '" href="#' + href + '">' + ico + ' ' + label + '</a>'; }
     function wsEditor(isNew){ var tile = st.editIcon || ((st.editName.trim()[0] || 'W').toUpperCase());
@@ -945,6 +1135,9 @@ client :app do
       if (t.closest && t.closest('[data-nxsave]')) { saveNxEdit(); return; }
       if (t.closest && t.closest('[data-nxcreate]')) { st.nxMenu = false; renderShell(); openNewNexus(); return; }
       if (t.closest && t.closest('[data-wsnew]')) { st.editingId = 'new'; st.editName = ''; st.editIcon = ''; st.pickerOpen = false; renderShell(); return; }
+      var bmtog = t.closest && t.closest('[data-bm]'); if (bmtog) { e.stopPropagation(); toggleBookmark(bmtog.getAttribute('data-bm'), bmtog.getAttribute('data-bml')); return; }
+      var ttog = t.closest && t.closest('[data-tree-toggle]'); if (ttog) { var tp = ttog.getAttribute('data-tree-toggle'); if (st.treeOpen[tp]) delete st.treeOpen[tp]; else { st.treeOpen[tp] = true; loadTree(tp); } renderShell(); return; }
+      var tfile = t.closest && t.closest('[data-tree-file]'); if (tfile) { WB.toast('Open “' + tfile.getAttribute('data-tree-file') + '” — file view coming'); return; }
       var wsopen = t.closest && t.closest('[data-wsopen]'); if (wsopen) { WB.ws.setActive(wsopen.getAttribute('data-wsopen')); WB.nav('/workspace'); return; }
       var wsedit = t.closest && t.closest('[data-wsedit]'); if (wsedit) { var w = WB.ws.list.find(function (x) { return x.id === wsedit.getAttribute('data-wsedit'); }); st.editingId = w.id; st.editName = w.name; st.editIcon = w.icon || ''; st.pickerOpen = false; renderShell(); return; }
       if (t.closest && t.closest('[data-wspick]')) { syncEditName(); st.pickerOpen = !st.pickerOpen; renderShell(); return; }
