@@ -228,7 +228,7 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .search svg{ color:var(--dim); }
 .search input{ background:none; border:0; outline:none; color:var(--ink); font:500 13px var(--mono); width:100%; }
 .search input::placeholder{ color:var(--dim); }
-.wrap{ padding:30px 28px; max-width:1100px; }
+.wrap{ padding:22px 36px 52px; max-width:1560px; margin:0 auto; width:100%; }
 
 .row{ display:flex; align-items:center; gap:14px; padding:16px 18px; border:1px solid var(--line); border-radius:var(--r);
   margin-bottom:12px; background:var(--card); cursor:pointer; box-shadow:var(--soft-1);
@@ -763,7 +763,7 @@ client :app do
             '</a>' +
           '</div>' +
         '</aside>' +
-        '<div class="main"><div class="topbar"><div class="crumb">' + esc(crumbFor(p)) + '</div></div><div class="wrap" id="view"></div></div>' +
+        '<div class="main"><div class="wrap" id="view"></div></div>' +
       '</div>';
 
       if (st.pickerOpen) { var ph = root.querySelector('#wsPicker'); if (ph) WB.emojiPicker(ph, function (u) { st.editIcon = u; st.pickerOpen = false; renderShell(); renderView(); }); }
@@ -2937,34 +2937,32 @@ function mountHistory(host, scope) {
   <script>
 // routes/workspace/+page.svelte — the workspace STRUCTURE view (the /workspace index tab).
 //
-// The source's +page.js redirected /workspace → /workspace/members, which stranded this Structure
-// view (it never rendered). We make the tab live: the workspace's .work files visualized as a live
-// code-graph (every client / server / resource / data unit + how they connect), served straight from
-// the nexus (GET /:wb/graph — JSON summary + ?format=html for the interactive viz). The workspace's
-// surface id IS the mount the nexus serves it under. Header + tabs match the other workspace views.
+// The workspace's .work files as a live code-graph, served from the nexus (GET /:wb/graph → JSON).
+// Rendered NATIVELY in the page with Cytoscape.js (premium, customizable, no iframe, no D3-blob) —
+// nodes coloured by kind, sized by dependency count; click a node to inspect its facets. The surface
+// workspace's id IS the mount the nexus serves it under. Header + tabs match the other workspace views.
 WB.scopedStyles('/workspace', `
   /* ── +layout.svelte (header + tabs) ── */
-  .wshead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .wshead { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
   .wsav {
     width:40px; height:40px; border-radius:11px; flex:none; display:grid; place-items:center;
     background:var(--line); color:var(--ink);
     font:700 16px var(--read);
   }
   .wshead h2 { font-family:var(--display); font-weight:600; font-size:24px; line-height:1.1; color:var(--ink); }
-  .wshead p { font:400 13.5px var(--read); color:var(--prose); margin-top:3px; }
   .wstabs {
-    display:flex; gap:2px; margin-bottom:22px;
+    display:flex; gap:2px; margin-bottom:16px;
     border-bottom:1px solid var(--line);
   }
   .wstabs a {
-    padding:9px 14px; font:600 13px var(--read); color:var(--dim);
+    padding:7px 13px; font:600 13px var(--read); color:var(--dim);
     text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-1px;
     transition:color .1s;
   }
   .wstabs a:hover { color:var(--ink); }
   .wstabs a.on { color:var(--ink); border-bottom-color:var(--section); }
 
-  /* ── workspace/+page.svelte (structure) ── */
+  /* ── structure / graph (native Cytoscape) ── */
   .kinds { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center; }
   .kpill {
     display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border:1px solid var(--line);
@@ -2972,10 +2970,29 @@ WB.scopedStyles('/workspace', `
   }
   .kpill.total { background:var(--line); }
   .kpill .dot { width:9px; height:9px; border-radius:50%; flex:none; }
-  .vizwrap { border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--card); }
-  .vizwrap iframe { width:100%; height:62vh; min-height:420px; border:0; display:block; }
+
+  .graphwrap {
+    display:grid; grid-template-columns:1fr 300px; gap:0;
+    border:1px solid var(--line); border-radius:16px; overflow:hidden; background:var(--card);
+    height:66vh; min-height:480px;
+  }
+  .cyhost { width:100%; height:100%; min-width:0;
+    background:
+      radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, var(--section) 7%, transparent), transparent 60%),
+      var(--well); }
+  .cyaside { border-left:1px solid var(--line); padding:18px 20px; overflow-y:auto; }
+  .cyaside .empty { color:var(--dim); font:400 13px var(--read); }
+  .cyaside .nkind { display:inline-flex; align-items:center; gap:7px; font:700 10px var(--mono);
+    letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+  .cyaside .nkind .sw { width:10px; height:10px; border-radius:50%; }
+  .cyaside h3 { font-family:var(--display); font-weight:600; font-size:19px; margin:8px 0 4px; word-break:break-word; }
+  .cyaside .row { display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--line); font:400 13px var(--read); }
+  .cyaside .row:last-of-type { border:0; }
+  .cyaside .row .k { color:var(--dim); } .cyaside .row .v { font:500 12px var(--mono); color:var(--ink); text-align:right; word-break:break-all; }
+  .cyloading { display:grid; place-items:center; height:100%; color:var(--dim); font:400 13px var(--read); }
   .hint { margin-top:10px; font:400 12.5px var(--read); color:var(--dim); }
   .hint code { font:600 11.5px var(--mono); background:var(--line); padding:1px 5px; border-radius:4px; }
+  @media (max-width:920px) { .graphwrap { grid-template-columns:1fr; } .cyaside { display:none; } }
 `);
 
 WB.view('/workspace', {
@@ -3002,10 +3019,7 @@ WB.view('/workspace', {
 <section>
   <div class="wshead">
     <span class="wsav">${esc(wsIcon)}</span>
-    <div>
-      <h2>${esc(wsLayoutName)}</h2>
-      <p>Workspace governance — who's in it, what's shared, and everything that's changed.</p>
-    </div>
+    <div><h2>${esc(wsLayoutName)}</h2></div>
   </div>
   <nav class="wstabs">
     ${TABS.map((t) => `<a href="${t.href}"${isOn(t.href) ? ' class="on"' : ''} data-nav="${t.href}">${esc(t.label)}</a>`).join('')}
@@ -3019,34 +3033,98 @@ WB.view('/workspace', {
       return;
     }
 
-    // The workspace's served mount: a surface workspace's id IS its mount (lander/cloud/docs…).
     const mount = (ws.id || '').replace(/^ws_/, '');
-    // Same-origin (relative): the mount is served by this same nexus at /<mount> (through the proxy too).
-    const vizUrl = mount ? `/${mount}/graph?format=html` : null;
-    const KIND = { client: '#a8d4f0', server: '#aee5c2', resource: '#f3c5a3', data: '#d9c5f0', design: '#f2ddb0', agent: '#9fc4e8' };
+    // kind → colour (the DNA pastels); edge type → colour.
+    const KIND = { client: '#a8d4f0', server: '#aee5c2', resource: '#f3c5a3', data: '#d9c5f0', design: '#f2ddb0', agent: '#9fc4e8', sandbox: '#c8e0b0' };
+    const EDGE = { 'work-file': '#c2861f', 'native': '#37c873', 'wasm': '#b48cff', 'beam': '#37c873', 'wit': '#b48cff' };
 
-    const structure = (kinds) => `
-  <div class="kinds">${kinds}</div>
-  <div class="vizwrap">${vizUrl ? `<iframe title="Workspace structure graph" src="${vizUrl}" loading="lazy"></iframe>` : ''}</div>
-  <p class="hint">Each node is a <code>.work</code> unit — colour = kind (client / server / resource / data), badges = live utilization. Click a node to inspect its declared vs. real facets. Served live from your nexus.</p>`;
+    el.innerHTML = shell(`
+  <div class="kinds"><div class="faint" style="font-size:13px">Reading structure…</div></div>
+  <div class="graphwrap">
+    <div class="cyhost"><div class="cyloading" id="cyloading">Loading graph…</div></div>
+    <div class="cyaside" id="cyaside"><div class="empty">Click a node to inspect it.</div></div>
+  </div>
+  <p class="hint">Each node is a <code>.work</code> unit — colour = kind (client / server / resource / data / design), size = dependencies. Click a node to inspect its declared vs. real facets. Served live from your nexus.</p>`);
 
-    el.innerHTML = shell(structure(`<div class="faint" style="font-size:13px">Reading structure…</div>`));
+    const host = el.querySelector('.cyhost');
+    const aside = el.querySelector('#cyaside');
 
-    // Pull the kind summary (units + byKind) and fill the pills; the viz iframe loads on its own.
+    let summary;
     try {
       const r = await fetch(`/${mount}/graph`, { credentials: 'same-origin' });
       if (!r.ok) throw new Error('graph ' + r.status);
-      const summary = await r.json();
-      let pills = `<div class="kpill total"><b>${summary.units}</b> units</div>`;
-      pills += Object.entries(summary.byKind || {})
-        .map(([k, n]) => `<div class="kpill"><span class="dot" style="background:${KIND[k] || 'var(--dim)'}"></span><b>${n}</b> ${esc(k)}</div>`)
-        .join('');
-      const kindsEl = el.querySelector('.kinds');
-      if (kindsEl) kindsEl.innerHTML = pills;
+      summary = await r.json();
     } catch (e) {
-      const kindsEl = el.querySelector('.kinds');
-      if (kindsEl) kindsEl.innerHTML = `<div class="faint" style="font-size:13px">Couldn’t read the structure (the nexus may be waking — refresh in a moment).</div>`;
+      el.querySelector('.kinds').innerHTML = `<div class="faint" style="font-size:13px">Couldn’t read the structure (the nexus may be waking — refresh in a moment).</div>`;
+      host.innerHTML = '';
+      return;
     }
+
+    // kind pills
+    let pills = `<div class="kpill total"><b>${summary.units}</b> units</div>`;
+    pills += Object.entries(summary.byKind || {})
+      .map(([k, n]) => `<div class="kpill"><span class="dot" style="background:${KIND[k] || 'var(--dim)'}"></span><b>${n}</b> ${esc(k)}</div>`)
+      .join('');
+    el.querySelector('.kinds').innerHTML = pills;
+
+    // load Cytoscape (premium, native, vanilla — replaces the old D3 iframe)
+    let cytoscape;
+    try {
+      cytoscape = (await import('https://esm.sh/cytoscape@3.30.2')).default;
+    } catch (e) {
+      host.innerHTML = `<div class="cyloading">Couldn’t load the graph renderer.</div>`;
+      return;
+    }
+    // route may have changed while loading
+    if (!document.body.contains(host)) return;
+
+    const nodes = (summary.nodes || []).map((n) => ({ data: { id: n.id, kind: n.kind, lang: n.lang, file: n.file, deps: n.deps || 0, observed: n.observed } }));
+    const ids = new Set(nodes.map((n) => n.data.id));
+    const edges = (summary.edges || [])
+      .filter((e) => ids.has(e.from) && ids.has(e.to))
+      .map((e, i) => ({ data: { id: 'e' + i, source: e.from, target: e.to, type: e.type } }));
+
+    host.innerHTML = '';
+    const cy = cytoscape({
+      container: host,
+      elements: [...nodes, ...edges],
+      style: [
+        { selector: 'node', style: {
+          'background-color': (n) => KIND[n.data('kind')] || '#8c9189',
+          'label': 'data(id)', 'color': '#c9ccc2',
+          'font-family': 'Geist, system-ui, sans-serif', 'font-size': '11px', 'font-weight': 600,
+          'text-valign': 'bottom', 'text-halign': 'center', 'text-margin-y': 7,
+          'width': (n) => 26 + Math.min(n.data('deps') || 0, 8) * 5,
+          'height': (n) => 26 + Math.min(n.data('deps') || 0, 8) * 5,
+          'border-width': 1.5, 'border-color': 'rgba(255,255,255,.14)',
+          'overlay-opacity': 0
+        }},
+        { selector: 'node:selected', style: { 'border-color': '#ecebe5', 'border-width': 3 }},
+        { selector: 'edge', style: {
+          'width': 1.6, 'line-color': (e) => EDGE[e.data('type')] || '#3a3d42',
+          'curve-style': 'bezier', 'opacity': 0.55,
+          'target-arrow-shape': 'triangle-backcurve', 'target-arrow-color': (e) => EDGE[e.data('type')] || '#3a3d42',
+          'arrow-scale': 0.8
+        }}
+      ],
+      layout: edges.length
+        ? { name: 'cose', animate: true, animationDuration: 480, padding: 46, idealEdgeLength: 110, nodeRepulsion: 9000, fit: true }
+        : { name: 'concentric', padding: 60, minNodeSpacing: 50, concentric: (n) => (n.data('deps') || 0) + 1, levelWidth: () => 2 },
+      minZoom: 0.3, maxZoom: 2.5, wheelSensitivity: 0.25
+    });
+
+    function inspect(n) {
+      const k = n.data('kind');
+      aside.innerHTML = `
+        <span class="nkind"><span class="sw" style="background:${KIND[k] || 'var(--dim)'}"></span>${esc(k)}</span>
+        <h3>${esc(n.data('id'))}</h3>
+        <div class="row"><span class="k">Language</span><span class="v">${esc(n.data('lang') || '—')}</span></div>
+        <div class="row"><span class="k">Dependencies</span><span class="v">${n.data('deps') || 0}</span></div>
+        <div class="row"><span class="k">File</span><span class="v">${esc((n.data('file') || '').split('/').pop() || '—')}</span></div>
+        <div class="row"><span class="k">Utilization</span><span class="v">${n.data('observed') != null ? esc(String(n.data('observed'))) : '—'}</span></div>`;
+    }
+    cy.on('tap', 'node', (evt) => inspect(evt.target));
+    cy.on('tap', (evt) => { if (evt.target === cy) aside.innerHTML = `<div class="empty">Click a node to inspect it.</div>`; });
   }
 });
   </script>
@@ -3062,7 +3140,7 @@ WB.view('/workspace', {
 // posted to server actions (no client API) — wired to faithful UI behavior + toasts.
 WB.scopedStyles('/workspace/members', `
   /* ── +layout.svelte ── */
-  .wshead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .wshead { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
   .wsav {
     width:40px; height:40px; border-radius:11px; flex:none; display:grid; place-items:center;
     background:var(--line); color:var(--ink);
@@ -3072,11 +3150,11 @@ WB.scopedStyles('/workspace/members', `
   .wshead p { font:400 13.5px var(--read); color:var(--prose); margin-top:3px; }
 
   .wstabs {
-    display:flex; gap:2px; margin-bottom:22px;
+    display:flex; gap:2px; margin-bottom:16px;
     border-bottom:1px solid var(--line);
   }
   .wstabs a {
-    padding:9px 14px; font:600 13px var(--read); color:var(--dim);
+    padding:7px 13px; font:600 13px var(--read); color:var(--dim);
     text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-1px;
     transition:color .1s;
   }
@@ -3120,7 +3198,6 @@ WB.view('/workspace/members', {
     <span class="wsav">${esc(wsIcon)}</span>
     <div>
       <h2>${esc(wsLayoutName)}</h2>
-      <p>Workspace governance — who's in it, what's shared, and everything that's changed.</p>
     </div>
   </div>
   <nav class="wstabs">
@@ -3316,7 +3393,7 @@ WB.view('/workspace/members', {
 // routes/workspace/env/+page.svelte (Secrets) + +layout.svelte wrapper + Confirm.svelte inlined.
 WB.scopedStyles('/workspace/env', `
   /* ── +layout.svelte ── */
-  .wshead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .wshead { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
   .wsav {
     width:40px; height:40px; border-radius:11px; flex:none; display:grid; place-items:center;
     background:var(--line); color:var(--ink);
@@ -3326,11 +3403,11 @@ WB.scopedStyles('/workspace/env', `
   .wshead p { font:400 13.5px var(--read); color:var(--prose); margin-top:3px; }
 
   .wstabs {
-    display:flex; gap:2px; margin-bottom:22px;
+    display:flex; gap:2px; margin-bottom:16px;
     border-bottom:1px solid var(--line);
   }
   .wstabs a {
-    padding:9px 14px; font:600 13px var(--read); color:var(--dim);
+    padding:7px 13px; font:600 13px var(--read); color:var(--dim);
     text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-1px;
     transition:color .1s;
   }
@@ -3417,7 +3494,6 @@ WB.view('/workspace/env', {
     <span class="wsav">${esc(wsIcon)}</span>
     <div>
       <h2>${esc(wsLayoutName)}</h2>
-      <p>Workspace governance — who's in it, what's shared, and everything that's changed.</p>
     </div>
   </div>
   <nav class="wstabs">
@@ -3630,7 +3706,7 @@ WB.view('/workspace/env', {
 // routes/workspace/sharing/+page.svelte + +layout.svelte wrapper + Confirm.svelte inlined.
 WB.scopedStyles('/workspace/sharing', `
   /* ── +layout.svelte ── */
-  .wshead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .wshead { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
   .wsav {
     width:40px; height:40px; border-radius:11px; flex:none; display:grid; place-items:center;
     background:var(--line); color:var(--ink);
@@ -3640,11 +3716,11 @@ WB.scopedStyles('/workspace/sharing', `
   .wshead p { font:400 13.5px var(--read); color:var(--prose); margin-top:3px; }
 
   .wstabs {
-    display:flex; gap:2px; margin-bottom:22px;
+    display:flex; gap:2px; margin-bottom:16px;
     border-bottom:1px solid var(--line);
   }
   .wstabs a {
-    padding:9px 14px; font:600 13px var(--read); color:var(--dim);
+    padding:7px 13px; font:600 13px var(--read); color:var(--dim);
     text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-1px;
     transition:color .1s;
   }
@@ -3714,7 +3790,6 @@ WB.view('/workspace/sharing', {
     <span class="wsav">${esc(wsIcon)}</span>
     <div>
       <h2>${esc(wsLayoutName)}</h2>
-      <p>Workspace governance — who's in it, what's shared, and everything that's changed.</p>
     </div>
   </div>
   <nav class="wstabs">
@@ -3936,7 +4011,7 @@ WB.view('/workspace/sharing', {
 // routes/workspace/history/+page.svelte + +layout.svelte wrapper + History.svelte + Confirm.svelte inlined.
 WB.scopedStyles('/workspace/history', `
   /* ── +layout.svelte ── */
-  .wshead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .wshead { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
   .wsav {
     width:40px; height:40px; border-radius:11px; flex:none; display:grid; place-items:center;
     background:var(--line); color:var(--ink);
@@ -3946,11 +4021,11 @@ WB.scopedStyles('/workspace/history', `
   .wshead p { font:400 13.5px var(--read); color:var(--prose); margin-top:3px; }
 
   .wstabs {
-    display:flex; gap:2px; margin-bottom:22px;
+    display:flex; gap:2px; margin-bottom:16px;
     border-bottom:1px solid var(--line);
   }
   .wstabs a {
-    padding:9px 14px; font:600 13px var(--read); color:var(--dim);
+    padding:7px 13px; font:600 13px var(--read); color:var(--dim);
     text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-1px;
     transition:color .1s;
   }
@@ -4033,7 +4108,6 @@ WB.view('/workspace/history', {
     <span class="wsav">${esc(wsIcon)}</span>
     <div>
       <h2>${esc(wsLayoutName)}</h2>
-      <p>Workspace governance — who's in it, what's shared, and everything that's changed.</p>
     </div>
   </div>
   <nav class="wstabs">
