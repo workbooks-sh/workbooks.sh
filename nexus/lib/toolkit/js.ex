@@ -128,7 +128,13 @@ defmodule Nexus.Toolkit.Js do
 
   @doc "The full classic script (prelude + toolkit + host + a `JSON.stringify($out(fun(args)))` tail). Exposed for testing."
   def driver(js, fun, args, opts \\ []) do
-    host = Keyword.get(opts, :host, "var $host = { emit: function(_m){ return null; } };")
+    host =
+      cond do
+        h = opts[:host] -> h
+        grants = opts[:grants] -> Nexus.Toolkit.Caps.host_js(grants)
+        true -> "var $host = { emit: function(_m){ return null; } };"
+      end
+
     call = "#{fun}(#{Enum.map_join(args, ", ", &marshal/1)})"
     # assign then bare-reference $result: Nexus.JsEngine returns the LAST expression coerced to string.
     js <> "\n" <> host <> "\nvar $result = JSON.stringify($out(" <> call <> "));\n$result\n"
