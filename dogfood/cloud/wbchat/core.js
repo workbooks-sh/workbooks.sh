@@ -41,6 +41,38 @@ export const ICON = {
 };
 export function icon(name) { return el('span', { html: ICON[name] || '', class: 'wbc-ico' }); }
 
+// Inject a component's own CSS once (keyed by id) — so each component module is SELF-CONTAINED (JS +
+// its styles) and parallel components never edit a shared stylesheet. Convention for all add-on parts.
+export function injectStyle(id, css) {
+  if (document.getElementById('wbc-style-' + id)) return;
+  const s = document.createElement('style'); s.id = 'wbc-style-' + id; s.textContent = css; document.head.appendChild(s);
+}
+
+// Shared collapsible primitive — reused by reasoning / tool / sources / chain-of-thought components.
+// Returns { root, content, setOpen, isOpen }. Header shows `title` (+ optional right-side `aside`).
+export function collapsible({ title, open = false, aside } = {}) {
+  injectStyle('collapsible', `
+    .wbc-collapse { border: 1px solid var(--wbc-line); border-radius: var(--wbc-radius-sm); overflow: hidden; margin: 0 0 8px; }
+    .wbc-collapse-hd { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; cursor: pointer;
+      border: none; background: var(--wbc-code-bg); color: var(--wbc-ink); font: 600 12.5px var(--wbc-font); padding: 9px 12px; }
+    .wbc-collapse-hd:hover { background: var(--wbc-line); }
+    .wbc-collapse-chev { margin-left: auto; transition: transform .15s; color: var(--wbc-dim); display: grid; place-items: center; }
+    .wbc-collapse.open .wbc-collapse-chev { transform: rotate(90deg); }
+    .wbc-collapse-aside { color: var(--wbc-dim); font: 500 11.5px var(--wbc-mono); margin-left: auto; }
+    .wbc-collapse-body { display: none; padding: 12px; border-top: 1px solid var(--wbc-line); }
+    .wbc-collapse.open .wbc-collapse-body { display: block; }
+    .wbc-collapse.open .wbc-collapse-aside { margin-left: 0; }`);
+  const chev = el('span', { class: 'wbc-collapse-chev', html: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>' });
+  const asideEl = aside != null ? el('span', { class: 'wbc-collapse-aside' }, aside) : null;
+  const content = el('div', { class: 'wbc-collapse-body' });
+  const root = el('div', { class: 'wbc-collapse' + (open ? ' open' : '') });
+  const hd = el('button', { class: 'wbc-collapse-hd', onClick: () => setOpen(!root.classList.contains('open')) },
+    [el('span', null, title), asideEl, chev].filter(Boolean));
+  root.append(hd, content);
+  function setOpen(v) { root.classList.toggle('open', !!v); }
+  return { root, content, setOpen, isOpen: () => root.classList.contains('open') };
+}
+
 // markdown — loaded lazily; escaped fallback so the core never hard-depends on the network.
 let _md = (t) => '<p>' + esc(t).replace(/\n/g, '<br>') + '</p>';
 async function loadMarkdown() {
