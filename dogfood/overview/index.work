@@ -28,10 +28,24 @@ everyone else to.
 
 ## Status
 
-**Migration complete.** All surfaces serve on one nexus (`WB_SERVE=1 WB_DATA=dogfood`), every one a
-`.work` workbook; the live sources (waitlist capture, upsell, usage, fleet) work across surfaces.
-Tracked in beads under epic **wb-hkat**. The originals (`web/index.html`, `web/cloud-dashboard`) are
-retained until formally retired — their `.work` parity is verified here.
+**Migration complete — the whole site is a workbook.** Ten surfaces serve on **one nexus** (`WB_SERVE=1
+WB_DATA=dogfood`), every one a `.work` workbook, assets served from each mount: **lander · docs · blog ·
+toolkits · brand · cloud · marketing · waitlist · nexus · overview**. Live sources (waitlist capture,
+upsell, usage, fleet, storage) work across surfaces. No SvelteKit, no Python generators, no god-files.
+
+### `web/*` retirement manifest (superseded — ready to delete)
+
+Each is at verified `.work` parity in dogfood; retained only until you delete them:
+
+- `web/index.html` (+ `nav.js` `glyphs.js` `pillars.js` fonts/) → **dogfood/lander** (per-section)
+- `web/blog/` (+ `posts.json` `gen-blog-heroes.mjs`) → **dogfood/blog** (rebuilt — evergreen content)
+- `web/brand/` `web/logo-lockup.html` → **dogfood/brand** (reference kept; R&D variants dropped)
+- `web/toolkits/` (+ `catalog.json` `gen-marketplace.py` + 26 pages) → **dogfood/toolkits**
+- `web/docs/` → **dogfood/docs** · `web/cloud-dashboard/` (SvelteKit) → **dogfood/cloud** (7 views)
+
+**Not surfaces — deploy infra, not migrated:** `_worker.js` `_headers` `sitemap.xml` `robots.txt`
+`llms.txt` `404.html` `cli.sh` `embed.mjs` — these belong to the publish/CDN layer, generated/served at
+deploy, not authored as `.work`.
 
 ## Why this matters
 
