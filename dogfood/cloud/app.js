@@ -418,9 +418,8 @@
           '<div class="navspacer"></div>' +
           adminDrawer +
           '<div class="acct" style="display:flex;align-items:center;gap:4px">' +
-            '<a data-nav="/settings" href="#/settings" style="display:flex;align-items:center;gap:9px;flex:1;text-decoration:none;color:inherit;min-width:0">' +
+            '<a data-nav="/settings" href="#/settings" title="' + esc(user.name) + '" style="display:flex;align-items:center;flex:1;text-decoration:none;color:inherit;min-width:0">' +
               '<div class="av">' + esc(user.initial) + '</div>' +
-              '<div style="flex:1;min-width:0"><div class="nm">' + esc(user.name) + '</div><div class="em">' + esc(user.email) + '</div></div>' +
             '</a>' +
             '<a href="/auth/logout" title="Sign out" aria-label="Sign out" style="display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:8px;color:var(--dim)">' +
               '<svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M16 17v-2H9v-2h7V9l5 4-5 4ZM4 5h8V3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8v-2H4V5Z"/></svg>' +
