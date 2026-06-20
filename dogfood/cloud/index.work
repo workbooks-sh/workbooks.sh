@@ -459,6 +459,33 @@ client :app do
     WB._params = {};
     WB.view = function (route, def) { WB._views[route] = def; };
     WB.styles = function (css) { var s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); };
+    // Svelte scopes each component's <style>; our ports inject globally, so a view that redefines a
+    // shared class (.card/.row/.bar/.tag/.sub/.body) would bleed into every view. scopeCss restores
+    // that scoping: every selector is prefixed with the view's mount scope. @keyframes/@font-face stay
+    // global (names are global anyway); @media/@supports recurse. Modals use the GLOBAL design-block
+    // classes (.modal/.sheet) so they're unaffected.
+    function scopeCss(css, sel) {
+      css = css.replace(/\/\*[\s\S]*?\*\//g, '');
+      var out = '', i = 0, n = css.length;
+      while (i < n) {
+        var b = css.indexOf('{', i);
+        if (b === -1) { out += css.slice(i); break; }
+        var header = css.slice(i, b).trim();
+        var depth = 1, j = b + 1;
+        while (j < n && depth > 0) { var ch = css[j]; if (ch === '{') depth++; else if (ch === '}') depth--; j++; }
+        var body = css.slice(b + 1, j - 1);
+        if (/^@(keyframes|font-face|import|page|charset)/.test(header)) {
+          out += header + '{' + body + '}\n';
+        } else if (/^@(media|supports|container|layer)/.test(header)) {
+          out += header + '{' + scopeCss(body, sel) + '}\n';
+        } else {
+          out += header.split(',').map(function (s) { s = s.trim(); return s ? sel + ' ' + s : s; }).filter(Boolean).join(', ') + '{' + body + '}\n';
+        }
+        i = j;
+      }
+      return out;
+    }
+    WB.scopedStyles = function (scope, css) { WB.styles(scopeCss(css, '[data-view="' + scope + '"]')); };
     function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
     WB.esc = esc;
 
@@ -825,6 +852,7 @@ client :app do
       var def = WB._views[m.key] || WB._views['/'];
       var mount = def.bare ? document.getElementById('bareview') : document.getElementById('view');
       if (!mount) return;
+      mount.setAttribute('data-view', m.key);   // scope key for per-view styles (scopeCss)
       mount.innerHTML = '';
       try { await def.render(mount, { params: m.params }); } catch (e) { mount.innerHTML = '<div class="card">Something went wrong loading this view.</div>'; console.error(e); }
     }
@@ -833,7 +861,7 @@ client :app do
     window.addEventListener('hashchange', route);
 
     // ── home view ('/') — reproduced from routes/+page.svelte ────────────────────────────────────
-    WB.styles('.empty { text-align: center; color: var(--dim); }\n.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 4px 0 18px; }\n.metric { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }\n.mlabel { font: 700 10px var(--read); letter-spacing: 0.07em; text-transform: uppercase; color: var(--dim); }\n.mbig { font: 700 32px var(--read); color: var(--ink); margin: 6px 0 12px; letter-spacing: -0.02em; }\n.mbar { height: 7px; border-radius: 4px; background: var(--line); overflow: hidden; }\n.mbar i { display: block; height: 100%; background: var(--sky); border-radius: 4px; }\n.msub { font: 500 12px var(--read); color: var(--dim); margin-top: 9px; }\n.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }\n.dcard { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 13px; padding: 16px 18px; text-decoration: none; color: inherit; transition: border-color 0.12s, transform 0.08s; }\n.dcard:hover { border-color: var(--stroke); transform: translateY(-1px); }\n.ddot { display: inline-block; width: 10px; height: 10px; border-radius: 4px; margin-bottom: 10px; }\n.dt { font: 600 15px var(--read); color: var(--ink); }\n.ds { font: 500 12.5px var(--read); color: var(--dim); margin-top: 3px; }');
+    WB.scopedStyles('/', '.empty { text-align: center; color: var(--dim); }\n.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 4px 0 18px; }\n.metric { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }\n.mlabel { font: 700 10px var(--read); letter-spacing: 0.07em; text-transform: uppercase; color: var(--dim); }\n.mbig { font: 700 32px var(--read); color: var(--ink); margin: 6px 0 12px; letter-spacing: -0.02em; }\n.mbar { height: 7px; border-radius: 4px; background: var(--line); overflow: hidden; }\n.mbar i { display: block; height: 100%; background: var(--sky); border-radius: 4px; }\n.msub { font: 500 12px var(--read); color: var(--dim); margin-top: 9px; }\n.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }\n.dcard { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 13px; padding: 16px 18px; text-decoration: none; color: inherit; transition: border-color 0.12s, transform 0.08s; }\n.dcard:hover { border-color: var(--stroke); transform: translateY(-1px); }\n.ddot { display: inline-block; width: 10px; height: 10px; border-radius: 4px; margin-bottom: 10px; }\n.dt { font: 600 15px var(--read); color: var(--ink); }\n.ds { font: 500 12.5px var(--read); color: var(--dim); margin-top: 3px; }');
     WB.view('/', { title: 'Nexus', accent: 'var(--mint)', async render(el){
       var nx = WB.nexus.active;
       var storage, usage; try { storage = await WB.api.listBuckets(); } catch (e) {} try { usage = await WB.api.nexusUsage(); } catch (e) {}
@@ -874,7 +902,7 @@ client :app do
   </script>
 
   <script>
-WB.styles(`
+WB.scopedStyles('/usage', `
   .dial { padding:10px 0; border-bottom:1px solid var(--line-soft); }
   .dial:last-of-type { border:0; }
   .dial-top { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
@@ -1001,7 +1029,7 @@ WB.view('/usage', {
   </script>
 
   <script>
-WB.styles(``);
+WB.scopedStyles('/storage', ``);
 
 WB.view('/storage', {
   title: 'Storage',
@@ -1058,7 +1086,7 @@ WB.view('/storage', {
   </script>
 
   <script>
-WB.styles(``);
+WB.scopedStyles('/database', ``);
 
 WB.view('/database', {
   title: 'Database',
@@ -1090,7 +1118,7 @@ WB.view('/database', {
   </script>
 
   <script>
-WB.styles(`
+WB.scopedStyles('/team', `
   .mav { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; flex:none;
     font:700 11px var(--mono); color:var(--on-bloom); border:2px solid var(--stroke); }
   .sheet-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
@@ -1338,7 +1366,7 @@ ${modalHtml()}`;
   </script>
 
   <script>
-WB.styles(`
+WB.scopedStyles('/secrets', `
   .grphead { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin:0 0 14px; }
   .grp { font-size:13px; color:var(--dim); text-transform:uppercase; letter-spacing:.04em; margin:0; font-weight:700; }
   table.env { width:100%; border-collapse:collapse; font:400 13.5px var(--read); }
@@ -1600,7 +1628,7 @@ ${confirmHtml()}`;
   </script>
 
   <script>
-WB.styles(`
+WB.scopedStyles('/settings', `
   .avatar { width:44px; height:44px; border-radius:50%; display:grid; place-items:center; font:700 16px var(--sans);
     color:var(--on-bloom); background:linear-gradient(135deg,var(--peach),var(--blue)); border:2px solid var(--stroke); }
   .srow { display:flex; align-items:center; gap:14px; padding:9px 0; border-bottom:1px solid var(--line-soft); }
@@ -1948,7 +1976,7 @@ WB.view('/settings', {
   </script>
 
   <script>
-WB.styles(`
+WB.scopedStyles('/upgrade', `
   .hero { background:var(--card); border:1.5px solid var(--line); border-radius:18px; padding:28px 26px; margin-bottom:18px; }
   .hero.ai { border-color:var(--ink); box-shadow:0 8px 30px -16px color-mix(in srgb, var(--ink) 45%, transparent); }
   .hero h1 { font:700 26px var(--read); letter-spacing:-.02em; color:var(--ink); margin:0 0 6px; }
@@ -2142,7 +2170,7 @@ WB.view('/upgrade', {
   </script>
 
   <script>
-WB.styles(`
+WB.scopedStyles('/shared', `
   .grp { font-size:13px; color:var(--dim); text-transform:uppercase; letter-spacing:.04em; margin:0 0 10px; font-weight:700; }
   .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
   .fcard { display:flex; flex-direction:column; gap:14px; }
@@ -2360,7 +2388,7 @@ ${modalHtml()}`;
 
   <script>
 // ── styles: nexus detail uses shared dashboard styles; History + Drafts panels inline their <style> ──
-WB.styles(`
+WB.scopedStyles('/nexuses', `
   /* History.svelte */
   .hh { display:flex; align-items:center; justify-content:space-between; gap:12px;
     padding:14px 18px; border-bottom:2px solid var(--line); }
@@ -2912,7 +2940,7 @@ function mountHistory(host, scope) {
 // so this index ALWAYS lands on Members & access and the Structure content below never renders.
 // The component's styles + render are reproduced verbatim for exactness, but render() redirects
 // first (the loader runs before the page mounts), exactly as the source does.
-WB.styles(`
+WB.scopedStyles('/workspace', `
   .kinds { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center; }
   .kpill {
     display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border:1px solid var(--line);
@@ -3004,7 +3032,7 @@ WB.view('/workspace', {
 // loader's honest-empty branch (members:[], pending:[]) → the table shows the empty state,
 // exactly as the source does when WorkOS is unreachable. The invite/remove/revoke forms
 // posted to server actions (no client API) — wired to faithful UI behavior + toasts.
-WB.styles(`
+WB.scopedStyles('/workspace/members', `
   /* ── +layout.svelte ── */
   .wshead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
   .wsav {
@@ -3258,7 +3286,7 @@ WB.view('/workspace/members', {
 
   <script>
 // routes/workspace/env/+page.svelte (Secrets) + +layout.svelte wrapper + Confirm.svelte inlined.
-WB.styles(`
+WB.scopedStyles('/workspace/env', `
   /* ── +layout.svelte ── */
   .wshead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
   .wsav {
@@ -3572,7 +3600,7 @@ WB.view('/workspace/env', {
 
   <script>
 // routes/workspace/sharing/+page.svelte + +layout.svelte wrapper + Confirm.svelte inlined.
-WB.styles(`
+WB.scopedStyles('/workspace/sharing', `
   /* ── +layout.svelte ── */
   .wshead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
   .wsav {
@@ -3878,7 +3906,7 @@ WB.view('/workspace/sharing', {
 
   <script>
 // routes/workspace/history/+page.svelte + +layout.svelte wrapper + History.svelte + Confirm.svelte inlined.
-WB.styles(`
+WB.scopedStyles('/workspace/history', `
   /* ── +layout.svelte ── */
   .wshead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
   .wsav {
@@ -4184,7 +4212,7 @@ WB.view('/workspace/history', {
   </script>
 
   <script>
-WB.styles(`
+WB.scopedStyles('/welcome', `
   .ob-canvas { position:fixed; inset:0; display:grid; place-items:center; padding:24px; overflow:hidden;
     background:radial-gradient(120% 120% at 50% -20%, color-mix(in srgb, var(--mint) 22%, #fbfaf6), #fbfaf6 60%); }
   .ob-blobs { position:absolute; inset:0; pointer-events:none; }
@@ -4616,7 +4644,7 @@ ${body}
   </script>
 
   <script>
-WB.styles(`
+WB.scopedStyles('/authorize', `
   .authwrap {
     position: fixed;
     inset: 0;
@@ -4823,7 +4851,7 @@ WB.view('/authorize', {
   </script>
 
   <script>
-WB.styles(`
+WB.scopedStyles('/denied', `
   .wall { min-height:100dvh; display:grid; place-items:center; padding:24px; background:var(--paper); }
   .card { max-width:440px; text-align:center; background:var(--card); border:2px solid var(--stroke);
     border-radius:14px; box-shadow:3px 3px 0 var(--shadow); padding:40px 32px; }
