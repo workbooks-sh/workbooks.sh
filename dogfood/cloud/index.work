@@ -164,6 +164,31 @@ client :app do
       font:600 12px var(--mono);padding:9px 11px;border-radius:9px;cursor:pointer;margin-top:8px}
     .conn:hover{color:var(--ink)} .conn .cdot{width:8px;height:8px;border-radius:50%;background:#6c7080;flex:none}
     .conn.live{color:var(--mint)} .conn.live .cdot{background:var(--mint)}
+    /* integrations marketplace */
+    .grp-h{font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:24px 0 12px}
+    .grp-h:first-child{margin-top:0}
+    .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:14px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;display:flex;flex-direction:column}
+    .card .ch{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+    .card .logo{width:34px;height:34px;border-radius:9px;flex:none;display:grid;place-items:center;font:700 15px var(--mono);background:rgba(255,255,255,.06);color:var(--ink)}
+    .card .nm{font-weight:600;font-size:15.5px;flex:1;min-width:0}
+    .card .cnt{font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--mint);border:1px solid var(--line);border-radius:20px;padding:2px 8px}
+    .card .bl{color:var(--dim);font-size:13px;line-height:1.5;margin:0 0 14px;flex:1}
+    .card .accts{display:flex;flex-direction:column;gap:6px;margin:0 0 12px}
+    .acct-row{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:9px;padding:7px 10px;font-size:13px}
+    .acct-row .d{width:7px;height:7px;border-radius:50%;background:var(--mint);flex:none}
+    .acct-row b{font-weight:600} .acct-row .x{margin-left:auto;border:0;background:none;color:var(--dim);cursor:pointer;font-size:15px;line-height:1;padding:0 2px}
+    .acct-row .x:hover{color:#f0a0a0}
+    .card .add{border:1px solid var(--line);background:none;color:var(--ink);font:600 13px var(--sans);padding:8px 14px;border-radius:9px;cursor:pointer;align-self:flex-start}
+    .card .add:hover{background:rgba(255,255,255,.05)}
+    /* connect form (inline in card) */
+    .cform{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+    .cform input{background:var(--paper);border:1px solid var(--line);border-radius:8px;color:var(--ink);font:13px var(--sans);padding:8px 10px;width:100%}
+    .cform .hint{color:var(--dim);font:11px var(--mono)}
+    .cform .frow{display:flex;gap:8px}
+    .cform .frow button{flex:1;border:0;border-radius:8px;font:600 13px var(--sans);padding:8px;cursor:pointer}
+    .cform .save{background:var(--mint);color:#11231a} .cform .cancel{background:none;border:1px solid var(--line);color:var(--ink)}
+    .cform .err{color:#f0a0a0;font-size:12px}
   </style>
 
   <aside class="side">
@@ -178,6 +203,7 @@ client :app do
       <button class="nav" data-view="nexuses">Nexuses</button>
       <button class="nav" data-view="domains">Domains</button>
       <button class="nav" data-view="storage">Storage</button>
+      <button class="nav" data-view="integrations">Integrations</button>
       <button class="nav" data-view="account">Account</button>
       <button class="nav" data-view="settings">Settings</button>
       <div class="spacer"></div>
@@ -214,6 +240,12 @@ client :app do
         <button id="dadd" type="button">Add</button>
       </div>
       <div id="domains" class="list"><div class="empty">No domains yet — add one above.</div></div>
+    </section>
+
+    <section class="view" data-view="integrations">
+      <h1>Integrations</h1>
+      <p class="lead">Provision the platforms your agents operate — at their <em>highest</em> level. Each connection seals its credential in the encrypted secret store (<code>Nexus.ControlPlane.Env</code>) and is scoped to this nexus. A provider can hold more than one account (two GitHub orgs, two Google admins) — add as many as you run.</p>
+      <div id="integrations"><div class="soon">Reading integrations…</div></div>
     </section>
 
     <section class="view" data-view="account">
@@ -293,6 +325,7 @@ client :app do
         if(v==='nexuses'&&!loaded.nexuses){loaded.nexuses=true;loadFleet();}
         if(v==='account'&&!loaded.account){loaded.account=true;loadTokens();}
         if(v==='storage'&&!loaded.storage){loaded.storage=true;loadStorage();}
+        if(v==='integrations'&&!loaded.integrations){loaded.integrations=true;loadIntegrations();}
         if(v==='settings'&&!loaded.settings){loaded.settings=true;loadSettings();}
       });
     });
@@ -410,6 +443,126 @@ client :app do
             '<div class="list">'+r.buckets.map(function(b){return '<div class="row2"><span class="ic">▤</span><b>'+esc(b.name)+'</b><code>'+esc(b.objects)+' objects</code><span class="muted">'+esc(b.size)+'</span></div>'}).join('')+'</div>';
         }};
       es.onerror=function(){ es.close(); box.innerHTML='<div class="soon">Could not read storage.</div>'; };
+    }
+
+    // Integrations — a marketplace of outside platforms, provisioned at the nexus level. Connections
+    // are real: the credential is sealed in the encrypted secret store and only the redacted account
+    // (provider + label + status) ever comes back. A provider can hold several accounts.
+    function intLogo(p){ return esc((p.name[0]||'?').toUpperCase()); }
+    function renderIntegrations(providers){
+      var box=$('#integrations');
+      // group providers by their .group, preserving catalog order
+      var order=[], groups={};
+      providers.forEach(function(p){ if(!groups[p.group]){groups[p.group]=[];order.push(p.group);} groups[p.group].push(p); });
+      box.innerHTML=order.map(function(g){
+        return '<div class="grp-h">'+esc(g)+'</div><div class="cards">'+groups[g].map(card).join('')+'</div>';
+      }).join('');
+      wireIntegrations();
+    }
+    function card(p){
+      var accts=(p.accounts||[]).map(function(a){
+        return '<div class="acct-row"><span class="d"></span><b>'+esc(a.label)+'</b>'+
+          '<button class="x" data-remove="'+esc(a.id)+'" title="Disconnect">×</button></div>';
+      }).join('');
+      var cnt=(p.accounts&&p.accounts.length)?('<span class="cnt">'+p.accounts.length+'</span>'):'';
+      var oauth=p.mode==='oauth2';
+      var addLabel=accts?'Add another account':(oauth?'Connect with '+esc(p.name):'Connect');
+      // OAuth providers that lack app credentials can't connect until they're configured at deploy.
+      var blocked=oauth&&!p.configured;
+      var addBtn=blocked
+        ? '<button class="add" disabled title="Set '+esc(p.id.toUpperCase())+'_OAUTH_CLIENT_ID / _SECRET">Needs OAuth app setup</button>'
+        : '<button class="add" data-add="'+esc(p.id)+'" data-mode="'+esc(p.mode)+'">'+addLabel+'</button>';
+      // The inline credential form is only for API-key providers; OAuth uses the popup handshake.
+      var form=oauth?'':
+        '<div class="cform" id="cf-'+esc(p.id)+'" style="display:none">'+
+          '<input data-f="label" placeholder="account name (e.g. acme-prod)" />'+
+          '<input data-f="credential" placeholder="'+esc(p.field||'token')+'" />'+
+          '<div class="hint">'+esc(p.hint||'')+'</div>'+
+          '<div class="err" style="display:none"></div>'+
+          '<div class="frow"><button class="cancel" data-cancel="'+esc(p.id)+'">Cancel</button>'+
+            '<button class="save" data-save="'+esc(p.id)+'">Provision</button></div>'+
+        '</div>';
+      // OAuth providers want a name for the account before the popup; a tiny inline label prompt.
+      var oform=oauth?
+        '<div class="cform" id="of-'+esc(p.id)+'" style="display:none">'+
+          '<input data-f="olabel" placeholder="account name (e.g. acme-org)" />'+
+          '<div class="err" style="display:none"></div>'+
+          '<div class="frow"><button class="cancel" data-ocancel="'+esc(p.id)+'">Cancel</button>'+
+            '<button class="save" data-oauth="'+esc(p.id)+'">Open '+esc(p.name)+'</button></div>'+
+        '</div>':'';
+      return '<div class="card" data-prov="'+esc(p.id)+'">'+
+        '<div class="ch"><span class="logo">'+intLogo(p)+'</span><span class="nm">'+esc(p.name)+'</span>'+cnt+'</div>'+
+        '<p class="bl">'+esc(p.blurb)+'</p>'+
+        (accts?('<div class="accts">'+accts+'</div>'):'')+
+        addBtn+form+oform+'</div>';
+    }
+    function wireIntegrations(){
+      [].forEach.call(document.querySelectorAll('#integrations [data-add]'),function(b){
+        b.addEventListener('click',function(){
+          var id=b.dataset.add, oauth=b.dataset.mode==='oauth2';
+          var f=$(oauth?'#of-'+id:'#cf-'+id); f.style.display='flex'; b.style.display='none';
+          f.querySelector('input').focus();
+        });
+      });
+      [].forEach.call(document.querySelectorAll('#integrations [data-cancel]'),function(b){
+        b.addEventListener('click',function(){ var id=b.dataset.cancel; $('#cf-'+id).style.display='none';
+          var add=document.querySelector('#integrations [data-add="'+id+'"]'); if(add)add.style.display=''; });
+      });
+      [].forEach.call(document.querySelectorAll('#integrations [data-ocancel]'),function(b){
+        b.addEventListener('click',function(){ var id=b.dataset.ocancel; $('#of-'+id).style.display='none';
+          var add=document.querySelector('#integrations [data-add="'+id+'"]'); if(add)add.style.display=''; });
+      });
+      [].forEach.call(document.querySelectorAll('#integrations [data-save]'),function(b){
+        b.addEventListener('click',function(){ saveIntegration(b.dataset.save); });
+      });
+      [].forEach.call(document.querySelectorAll('#integrations [data-oauth]'),function(b){
+        b.addEventListener('click',function(){ startOAuth(b.dataset.oauth); });
+      });
+      [].forEach.call(document.querySelectorAll('#integrations [data-remove]'),function(b){
+        b.addEventListener('click',function(){ removeIntegration(b.dataset.remove); });
+      });
+    }
+    // OAuth handshake — ask the server for the authorize URL, open the popup, reload on success.
+    function startOAuth(prov){
+      var f=$('#of-'+prov), err=f.querySelector('.err');
+      var label=f.querySelector('[data-f=olabel]').value.trim();
+      err.style.display='none';
+      if(!label){ err.textContent='name this account first'; err.style.display='block'; return; }
+      var btn=f.querySelector('[data-oauth]'); btn.textContent='Opening…'; btn.disabled=true;
+      var qs='provider='+encodeURIComponent(prov)+'&label='+encodeURIComponent(label)+'&origin='+encodeURIComponent(location.origin);
+      fetch('/cloud/integrations/authorize?'+qs).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d}})})
+        .then(function(res){
+          btn.textContent='Open '+prov; btn.disabled=false;
+          if(!res.ok||!res.d.url){ err.textContent=res.d.error||'could not start'; err.style.display='block'; return; }
+          var pop=window.open(res.d.url,'wb-oauth','width=620,height=760');
+          var onmsg=function(e){ if(e.data==='wb-integration-connected'){ window.removeEventListener('message',onmsg); try{pop&&pop.close()}catch(_){}; loadIntegrations(); } };
+          window.addEventListener('message',onmsg);
+        }).catch(function(){ btn.textContent='Open '+prov; btn.disabled=false; err.textContent='request failed'; err.style.display='block'; });
+    }
+    function saveIntegration(prov){
+      var f=$('#cf-'+prov), err=f.querySelector('.err');
+      var label=f.querySelector('[data-f=label]').value.trim();
+      var credential=f.querySelector('[data-f=credential]').value.trim();
+      err.style.display='none';
+      var save=f.querySelector('[data-save]'); save.textContent='Provisioning…'; save.disabled=true;
+      fetch('/cloud/integrations',{method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({provider:prov,label:label,credential:credential})})
+        .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d}})})
+        .then(function(res){
+          if(!res.ok){ err.textContent=res.d.error||'could not connect'; err.style.display='block'; save.textContent='Provision'; save.disabled=false; return; }
+          loadIntegrations();
+        }).catch(function(){ err.textContent='request failed'; err.style.display='block'; save.textContent='Provision'; save.disabled=false; });
+    }
+    function removeIntegration(id){
+      if(!confirm('Disconnect this account? The sealed credential is destroyed.'))return;
+      fetch('/cloud/integrations/'+encodeURIComponent(id),{method:'DELETE'})
+        .then(function(){ loadIntegrations(); }).catch(function(){});
+    }
+    function loadIntegrations(){
+      var box=$('#integrations'); box.innerHTML='<div class="soon">Reading integrations…</div>';
+      fetch('/cloud/integrations').then(function(r){return r.json()}).then(function(d){
+        renderIntegrations((d&&d.providers)||[]);
+      }).catch(function(){ box.innerHTML='<div class="soon">Could not read integrations.</div>'; });
     }
 
     // Settings — env vars (write-only) + config. Live when connected (/api/platform/env), demo otherwise.

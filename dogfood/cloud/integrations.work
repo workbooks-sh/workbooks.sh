@@ -1,0 +1,361 @@
+# Integrations — our own OAuth connector
+
+A connection links this nexus to an outside platform **at the account level**, so our agents operate
+those platforms directly. We looked hard at Nango (Elastic-licensed) and chose to **build the seam
+ourselves** — the OAuth mechanics are public knowledge, and the credential-at-rest model is something
+we already have (`Nexus.ControlPlane.Env`, AES-256-GCM, fail-closed). What we borrowed from Nango is
+purely factual: the per-provider OAuth endpoints + scopes (their `providers.yaml` is a public catalog
+of facts, not code). This connector is therefore generic mechanism — any deployer wires their own
+providers through the catalog below, with **none of our keys baked in**.
+
+## Two layers, never confused
+
+- **Integration (this file)** = *auth*. Connect an account, hold its sealed tokens, refresh them.
+  One account can back many capabilities (one Google connection → gmail + gcloud + drive toolkits).
+- **Toolkit** = *capability*. The wasm-CLI an agent runs. A toolkit consumes a connection's token via
+  `Cloud.Integrations.fresh_token/2` — it never sees a client secret and never does the OAuth dance.
+
+So we start here (auth), and toolkits reference connections later. The dashboard's Integrations view
+is the marketplace; the credential plumbing is all below.
+
+## How a connection is made
+
+**OAuth2 providers** (GitHub, Google, Linear, Asana, Jira) use the popup handoff so a secret never
+touches the browser: the dashboard asks for an authorize URL, opens it in a popup, the provider
+redirects to our `/cloud/oauth/callback`, we exchange `code → tokens` **server-side**, seal the
+access + refresh tokens as two separate encrypted secrets, store the connection record, and the popup
+closes. **API-key providers** (Cloudflare, Composio) skip OAuth — you paste a scoped token, we seal it.
+
+Client app credentials (`<PROVIDER>_OAUTH_CLIENT_ID` / `_CLIENT_SECRET`) are read ONLY through
+`Nexus.Secrets` — injected at deploy, our actual app keys are our DeployKit config, never in source.
+
+server :integrations do
+  alias Nexus.ControlPlane, as: CP
+  alias Nexus.ControlPlane.Env
+
+  # Pending OAuth handshakes are keyed by a single-use random `state`, parked under a reserved system
+  # org so the callback (which has no tenant context of its own) can resolve the real tenant from it.
+  @oauth_org "_oauth"
+
+  route "GET /cloud/integrations", :list_integrations
+  route "POST /cloud/integrations", :connect_api_key
+  route "GET /cloud/integrations/authorize", :authorize
+  route "GET /cloud/oauth/callback", :callback
+  route "DELETE /cloud/integrations/:id", :remove_integration
+
+  # ── the catalog — central config, the only opinion in this file ───────────────────────────────
+  # OAuth endpoints + scopes are transcribed facts (public provider docs / Nango's providers.yaml).
+  # `mode`: :oauth2 (popup handshake) | :api_key (paste a token). Generic — swap in your own.
+  def catalog do
+    [
+      %{id: "composio", name: "Composio", group: "Automation", mode: :api_key,
+        blurb: "One integration to 250+ apps — provision any tool through Composio's MCP surface.",
+        field: "API key", hint: "comp_…"},
+      %{id: "github", name: "GitHub", group: "Source", mode: :oauth2,
+        blurb: "Org-level access: repos, actions, packages, members. One connection per GitHub org.",
+        authorize_url: "https://github.com/login/oauth/authorize",
+        token_url: "https://github.com/login/oauth/access_token",
+        scopes: "repo read:org workflow", scope_sep: " ", auth_params: %{}},
+      %{id: "google", name: "Google Workspace", group: "Workspace", mode: :oauth2,
+        blurb: "Admin-level Workspace + Google Cloud — drives the gcloud/GAM agent CLI toolkit.",
+        authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
+        token_url: "https://oauth2.googleapis.com/token",
+        scopes: "openid email https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/admin.directory.user",
+        scope_sep: " ", auth_params: %{"access_type" => "offline", "prompt" => "consent"}},
+      %{id: "clerk", name: "Clerk", group: "Auth", mode: :api_key,
+        blurb: "Drop-in auth — users, orgs, sessions. Provision instance keys at the secret level.",
+        field: "Secret key", hint: "sk_live_…"},
+      %{id: "workos", name: "WorkOS", group: "Auth", mode: :api_key,
+        blurb: "Enterprise auth — SSO, Directory Sync, Admin Portal. Provision an environment.",
+        field: "API key", hint: "sk_…"},
+      %{id: "cloudflare", name: "Cloudflare", group: "Infra", mode: :api_key,
+        blurb: "DNS, R2, Workers, Zero Trust — account-level token for the whole edge.",
+        field: "API token", hint: "scoped account token"},
+      %{id: "linear", name: "Linear", group: "Project", mode: :oauth2,
+        blurb: "Issues, projects, cycles. Provision a workspace key for the agent to plan + close.",
+        authorize_url: "https://linear.app/oauth/authorize",
+        token_url: "https://api.linear.app/oauth/token",
+        scopes: "read,write", scope_sep: ",", auth_params: %{"prompt" => "consent"}},
+      %{id: "asana", name: "Asana", group: "Project", mode: :oauth2,
+        blurb: "Tasks, projects, portfolios across the Asana workspace.",
+        authorize_url: "https://app.asana.com/-/oauth_authorize",
+        token_url: "https://app.asana.com/-/oauth_token",
+        scopes: "default", scope_sep: " ", auth_params: %{}},
+      %{id: "jira", name: "Jira", group: "Project", mode: :oauth2,
+        blurb: "Issues + boards across Jira sites. Pair the token with your site + email.",
+        authorize_url: "https://auth.atlassian.com/authorize",
+        token_url: "https://auth.atlassian.com/oauth/token",
+        scopes: "read:jira-work write:jira-work manage:jira-project offline_access",
+        scope_sep: " ", auth_params: %{"audience" => "api.atlassian.com", "prompt" => "consent"}}
+    ]
+  end
+
+  def spec(provider), do: Enum.find(catalog(), &(&1.id == provider))
+
+  # ── list — the marketplace state: every provider + the accounts wired up under it ──────────────
+  def list_integrations(req) do
+    conns = CP.list(req.tenant, :integration)
+
+    providers =
+      for p <- catalog() do
+        accounts =
+          conns
+          |> Enum.filter(&(&1[:provider] == p.id))
+          |> Enum.map(&%{id: &1[:id], label: &1[:label], status: &1[:status] || "connected"})
+
+        p
+        |> Map.take([:id, :name, :group, :blurb, :field, :hint])
+        |> Map.put(:mode, Atom.to_string(p.mode))
+        |> Map.put(:configured, configured?(p))
+        |> Map.put(:accounts, accounts)
+      end
+
+    %{providers: providers}
+  end
+
+  # API-key providers are always ready (you paste). OAuth providers need this nexus's app credentials.
+  defp configured?(%{mode: :api_key}), do: true
+  defp configured?(%{mode: :oauth2, id: id}), do: Nexus.Secrets.has?(client_id_secret(id))
+
+  # ── API-key connect — seal the pasted token, store the connection ──────────────────────────────
+  def connect_api_key(req) do
+    b = req.body || %{}
+    provider = b["provider"]
+    label = String.trim(to_string(b["label"] || ""))
+    credential = to_string(b["credential"] || "")
+    s = spec(provider)
+
+    cond do
+      is_nil(s) or s.mode != :api_key -> {400, %{error: "not an API-key provider"}}
+      label == "" -> {400, %{error: "name this account"}}
+      credential == "" -> {400, %{error: "a credential is required"}}
+      true ->
+        id = new_id()
+
+        case seal(req.tenant, id, "TOKEN", credential) do
+          {:ok, sid} ->
+            store_connection(req.tenant, id, provider, label, %{token_secret_id: sid})
+            {201, %{id: id, provider: provider, label: label, status: "connected"}}
+
+          {:error, reason} ->
+            {seal_status(reason), %{error: to_string(reason)}}
+        end
+    end
+  end
+
+  # ── OAuth: step 1 — mint state, hand back the provider authorize URL for the popup ─────────────
+  def authorize(req) do
+    provider = req.query["provider"]
+    label = String.trim(to_string(req.query["label"] || ""))
+    origin = to_string(req.query["origin"] || "")
+    s = spec(provider)
+
+    cond do
+      is_nil(s) or s.mode != :oauth2 -> {400, %{error: "not an OAuth provider"}}
+      label == "" -> {400, %{error: "name this account"}}
+      not configured?(s) -> {400, %{error: "#{s.name} OAuth app not configured (set #{client_id_secret(provider)} / #{client_secret_secret(provider)})"}}
+      origin == "" -> {400, %{error: "origin required"}}
+      true ->
+        state = new_state()
+        redirect_uri = origin <> "/cloud/oauth/callback"
+        # Park the handshake so the callback can resolve tenant + the exact redirect_uri used.
+        CP.put(@oauth_org, :oauth_state, state, %{
+          tenant: req.tenant, provider: provider, label: label, redirect_uri: redirect_uri
+        })
+
+        params =
+          Map.merge(s.auth_params, %{
+            "client_id" => Nexus.Secrets.get(client_id_secret(provider)),
+            "redirect_uri" => redirect_uri,
+            "response_type" => "code",
+            "scope" => s.scopes,
+            "state" => state
+          })
+
+        {200, %{url: s.authorize_url <> "?" <> URI.encode_query(params)}}
+    end
+  end
+
+  # ── OAuth: step 2 — provider redirects here; exchange the code server-side, seal the tokens ─────
+  def callback(req) do
+    code = req.query["code"]
+    state = req.query["state"]
+
+    with {:ok, pend} <- CP.get(@oauth_org, :oauth_state, state),
+         true <- is_binary(code) and code != "",
+         s when not is_nil(s) <- spec(pend.provider),
+         {:ok, tokens} <- exchange_code(s, code, pend.redirect_uri) do
+      CP.delete(@oauth_org, :oauth_state, state)
+      persist_oauth(pend.tenant, pend.provider, pend.label, tokens)
+      popup_done("Connected — you can close this window.")
+    else
+      _ ->
+        if state, do: CP.delete(@oauth_org, :oauth_state, state)
+        popup_done("Connection failed. Close this window and try again.")
+    end
+  end
+
+  # Seal access + refresh as TWO separate encrypted secrets; expiry (not sensitive) on the record.
+  defp persist_oauth(tenant, provider, label, tokens) do
+    id = new_id()
+    {:ok, asid} = seal(tenant, id, "ACCESS", tokens.access)
+    refresh_id = if tokens.refresh, do: with({:ok, rid} <- seal(tenant, id, "REFRESH", tokens.refresh), do: rid)
+
+    store_connection(tenant, id, provider, label, %{
+      access_secret_id: asid,
+      refresh_secret_id: refresh_id,
+      expires_at: tokens.expires_at
+    })
+  end
+
+  # ── refresh — the seam toolkits call. Returns a live access token, refreshing if expired. ───────
+  # `{:ok, token} | {:error, reason}`. Server-side only; never exposed as a plaintext-returning route.
+  def fresh_token(tenant, id) do
+    with {:ok, rec} <- CP.get(tenant, :integration, id) do
+      cond do
+        rec[:token_secret_id] -> Env.reveal(tenant, rec.token_secret_id)
+        expired?(rec) and rec[:refresh_secret_id] -> refresh(tenant, rec)
+        rec[:access_secret_id] -> Env.reveal(tenant, rec.access_secret_id)
+        true -> {:error, :no_token}
+      end
+    end
+  end
+
+  defp expired?(%{expires_at: at}) when is_integer(at), do: System.os_time(:second) >= at - 60
+  defp expired?(_), do: false
+
+  defp refresh(tenant, rec) do
+    s = spec(rec.provider)
+
+    with {:ok, refresh_tok} <- Env.reveal(tenant, rec.refresh_secret_id),
+         {:ok, tokens} <- refresh_code(s, refresh_tok) do
+      Env.update(tenant, rec.access_secret_id, %{value: tokens.access})
+      new_refresh_id = rec.refresh_secret_id
+
+      if tokens.refresh,
+        do: Env.update(tenant, rec.refresh_secret_id, %{value: tokens.refresh})
+
+      CP.update(tenant, :integration, rec.id, %{expires_at: tokens.expires_at, refresh_secret_id: new_refresh_id})
+      {:ok, tokens.access}
+    end
+  end
+
+  # ── disconnect — drop the sealed secrets, then the record ──────────────────────────────────────
+  def remove_integration(req) do
+    id = req.params["id"]
+
+    case CP.get(req.tenant, :integration, id) do
+      {:ok, rec} ->
+        for k <- [:token_secret_id, :access_secret_id, :refresh_secret_id],
+            sid = rec[k],
+            is_binary(sid),
+            do: Env.delete(req.tenant, sid)
+
+        CP.delete(req.tenant, :integration, id)
+        %{ok: true, id: id}
+
+      {:error, :not_found} ->
+        {404, %{error: "no such connection"}}
+    end
+  end
+
+  # ── token endpoints (HTTP) ─────────────────────────────────────────────────────────────────────
+  defp exchange_code(s, code, redirect_uri) do
+    form = %{
+      "grant_type" => "authorization_code",
+      "code" => code,
+      "redirect_uri" => redirect_uri,
+      "client_id" => Nexus.Secrets.get(client_id_secret(s.id)),
+      "client_secret" => Nexus.Secrets.get(client_secret_secret(s.id))
+    }
+
+    post_token(s.token_url, form)
+  end
+
+  defp refresh_code(s, refresh_tok) do
+    form = %{
+      "grant_type" => "refresh_token",
+      "refresh_token" => refresh_tok,
+      "client_id" => Nexus.Secrets.get(client_id_secret(s.id)),
+      "client_secret" => Nexus.Secrets.get(client_secret_secret(s.id))
+    }
+
+    post_token(s.token_url, form)
+  end
+
+  # POST the form to the provider's token endpoint and normalise the bundle. `Accept: application/json`
+  # makes GitHub answer JSON (it defaults to form-encoded); everyone else already does.
+  defp post_token(url, form) do
+    :inets.start()
+    :ssl.start()
+    body = URI.encode_query(form)
+
+    headers = [
+      {~c"accept", ~c"application/json"},
+      {~c"user-agent", ~c"workbooks-nexus"}
+    ]
+
+    req = {to_charlist(url), headers, ~c"application/x-www-form-urlencoded", body}
+
+    case :httpc.request(:post, req, [timeout: 15_000, ssl: [verify: :verify_none]], body_format: :binary) do
+      {:ok, {{_, code, _}, _h, resp}} when code in 200..299 ->
+        case Jason.decode(resp) do
+          {:ok, %{"access_token" => access} = m} ->
+            exp = m["expires_in"]
+            {:ok, %{
+              access: access,
+              refresh: m["refresh_token"],
+              expires_at: if(is_integer(exp), do: System.os_time(:second) + exp, else: nil)
+            }}
+
+          _ ->
+            {:error, :bad_token_response}
+        end
+
+      {:ok, {{_, code, _}, _h, _resp}} ->
+        {:error, {:token_http, code}}
+
+      {:error, e} ->
+        {:error, inspect(e)}
+    end
+  end
+
+  # ── shared helpers ─────────────────────────────────────────────────────────────────────────────
+  defp store_connection(tenant, id, provider, label, extra) do
+    attrs = Map.merge(%{provider: provider, label: label, status: "connected"}, extra)
+    {:ok, rec} = CP.put(tenant, :integration, id, attrs)
+    rec
+  end
+
+  # Seal one value into the encrypted Env store under a per-connection name; returns its secret id.
+  defp seal(tenant, conn_id, suffix, value) do
+    name = "#{String.upcase(conn_id)}__#{suffix}" |> String.replace(~r/[^A-Z0-9_]/, "_")
+
+    case Env.create(tenant, %{name: name, value: value, scope: "user"}) do
+      {:ok, env} -> {:ok, env[:id]}
+      err -> err
+    end
+  end
+
+  defp seal_status(:no_master_key), do: 503
+  defp seal_status(_), do: 400
+
+  defp client_id_secret(provider), do: "#{String.upcase(provider)}_OAUTH_CLIENT_ID"
+  defp client_secret_secret(provider), do: "#{String.upcase(provider)}_OAUTH_CLIENT_SECRET"
+
+  defp new_id, do: "intg_" <> rand()
+  defp new_state, do: "st_" <> rand()
+  defp rand, do: :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
+
+  defp popup_done(msg) do
+    html = """
+    <!doctype html><meta charset="utf-8"><title>Workbooks</title>
+    <body style="font:15px system-ui;background:#16171a;color:#ecebe5;display:grid;place-items:center;height:100vh;margin:0">
+    <p>#{msg}</p>
+    <script>try{window.opener&&window.opener.postMessage('wb-integration-connected','*')}catch(e){}; setTimeout(function(){window.close()},800);</script>
+    </body>
+    """
+
+    {200, "text/html; charset=utf-8", html}
+  end
+end
