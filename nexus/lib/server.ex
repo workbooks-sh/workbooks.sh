@@ -385,6 +385,51 @@ defmodule Nexus.Server do
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(files, escape: :html_safe))
   end
 
+  # A mounted workbook's STRUCTURE GRAPH — the literate code-graph (every client/server/resource/data
+  # unit + its dependency edges, classified work/native/wasm) joined with the live utilization overlay
+  # (telemetry runs/tokens/latency + DB schema + compiled artifact). This is the literate→infrastructure
+  # payoff made reachable over HTTP: SEE what a workbook is made of and how it's used. Default = JSON for
+  # a dashboard; `?format=html` returns the self-contained interactive force-directed viz.
+  get "/:wb/graph" do
+    case wb_root(wb) do
+      nil ->
+        conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"no such workbook"}))
+
+      root ->
+        g = Nexus.Graph.build_dir(root) |> Nexus.Graph.with_overlay(Nexus.Telemetry.overlay())
+
+        if conn.params["format"] == "html" do
+          conn |> put_resp_content_type("text/html") |> send_resp(200, Nexus.Graph.Viz.to_html(g))
+        else
+          conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(graph_summary(g), escape: :html_safe))
+        end
+    end
+  end
+
+  # Project the graph into a dashboard-friendly payload: the kind/lang breakdown (client vs server vs
+  # resource vs data …), per-unit utilization (the telemetry overlay), and the dependency edges.
+  defp graph_summary(%Nexus.Graph{nodes: nodes, edges: edges}) do
+    units = Map.values(nodes)
+
+    %{
+      units: length(units),
+      byKind: Enum.frequencies_by(units, & &1.kind),
+      byLang: Enum.frequencies_by(units, & &1.lang),
+      nodes:
+        Enum.map(units, fn n ->
+          %{
+            id: n.id,
+            kind: n.kind,
+            lang: n.lang,
+            file: n.file,
+            deps: Enum.count(edges, &(&1.from == n.id)),
+            observed: n.facets[:observed]
+          }
+        end),
+      edges: Enum.map(edges, fn e -> %{from: e.from, to: e.to, type: e.type, layer: e.layer} end)
+    }
+  end
+
   defp workbook_source(root) do
     (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
     |> Enum.uniq()
