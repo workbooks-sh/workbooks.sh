@@ -5,6 +5,12 @@ primary_region = "sjc"
 [env]
   WB_DATA = "/srv/dogfood"
   WB_NEXUS = "dogfood"
+  # This nexus is ALSO the control plane (the cloud platform): one nexus = site + control plane.
+  # Gates only /api/platform behind WorkOS JWT (org_id → tenant); the public surfaces stay public.
+  WB_CONTROL_PLANE = "1"
+  WB_FLY_ORG = "personal"
+  WB_OIDC_JWKS_URL = "https://api.workos.com/sso/jwks/client_01KS9XB6QEZTMHVHTFXZSZ65GY"
+  WB_OIDC_TENANT_CLAIM = "org_id"
 [http_service]
   internal_port = 4000
   force_https = true
