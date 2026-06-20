@@ -1,16 +1,15 @@
-// eval-host bootstrap: bind toolkit-caps WIT imports to __cap_* globals; run(input) evals and
-// awaits (StarlingMonkey drains the event loop) so async harnesses (js_dom) resolve before return.
-import { store, load, emit, cacheGet, cachePut, cacheDelete, fetch as capFetch, complete } from 'work:evalhost/toolkit-caps';
-globalThis.__cap_store = store;
-globalThis.__cap_load = load;
-globalThis.__cap_emit = emit;
-globalThis.__cap_cache_get = cacheGet;
-globalThis.__cap_cache_put = cachePut;
-globalThis.__cap_cache_delete = cacheDelete;
-globalThis.__cap_fetch = capFetch;
-globalThis.__cap_complete = complete;
-export async function run(input) {
-  let r = (0, eval)(input);
-  if (r && typeof r.then === "function") r = await r;
-  return String(r);
+// eval-host bootstrap — converged on the shared host-broker seam (wb:jseval/broker.host-call).
+// Bind the single synchronous host-call import to globalThis.__wbHostCall so RUNTIME-eval'd code
+// (toolkit $host shims, node-compat shims — all under classic eval, no ESM import) can reach it.
+// run(input) evals + awaits. Matches runtime/host/js_engine.ex so the staged engine is interchangeable.
+import { hostCall } from 'wb:jseval/broker';
+globalThis.__wbHostCall = hostCall;
+export async function run(src) {
+  try {
+    let r = (0, eval)(src);
+    if (r && typeof r.then === "function") r = await r;
+    if (r === undefined) return "undefined";
+    if (typeof r === "object" && r !== null) { try { return JSON.stringify(r); } catch (_) { return String(r); } }
+    return String(r);
+  } catch (e) { return "ERR: " + (e && e.message ? e.message : String(e)); }
 }

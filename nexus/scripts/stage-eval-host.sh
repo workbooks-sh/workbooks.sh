@@ -39,7 +39,7 @@ fi
 mkdir -p priv
 echo "[stage-eval-host] componentize $REC/evalhost.js -> $OUT"
 $RUN_JCO componentize "$REC/evalhost.js" \
-  --wit "$REC/evalhost.wit" --world-name evalhost \
+  --wit "$REC/evalhost.wit" --world-name workbook \
   -o "$OUT"
 
 echo "[stage-eval-host] staged $OUT ($(du -h "$OUT" | cut -f1))"

@@ -6,85 +6,58 @@ defmodule Nexus.Toolkit.CapsTest do
     assert Caps.path_key({"acme", "orders", "stripe"}) == "acme/orders/stripe"
   end
 
-  test "bind exposes ONLY granted caps (deny-by-default)" do
-    impls = Caps.bind({"acme", "app", "tk"}, [:store, :load, :emit])
-    assert Map.keys(impls) |> Enum.sort() == [:emit, :load, :store]
-    refute Map.has_key?(impls, :fetch)
-    refute Map.has_key?(impls, :complete)
+  test "dispatch denies ungranted ops (deny-by-default)" do
+    resp = Caps.dispatch(~s({"op":"fetch","url":"http://x"}), {"t", "a", "c"}, [:store, :load])
+    assert %{"ok" => false, "error" => err} = Jason.decode!(resp)
+    assert err =~ "not granted"
   end
 
-  test "store/load are PATH-SCOPED — one path cannot read another's data" do
-    a = Caps.bind({"acme", "app", "a"}, [:store, :load])
-    b = Caps.bind({"acme", "app", "b"}, [:store, :load])
-
-    a.store.("k", "value-a")
-    b.store.("k", "value-b")
-
-    assert a.load.("k") == "value-a"
-    assert b.load.("k") == "value-b"
-    # a different operator entirely is also isolated (unique path — global persistent_term store is
-    # shared across async tests, so each test uses its own path to avoid cross-test collisions)
-    c = Caps.bind({"bind-test-iso", "app", "a"}, [:store, :load])
-    assert c.load.("k") == ""
+  test "dispatch rejects unknown ops + bad requests" do
+    assert %{"ok" => false} = Jason.decode!(Caps.dispatch(~s({"op":"rm -rf"}), {"t", "a", "c"}, [:store]))
+    assert %{"ok" => false} = Jason.decode!(Caps.dispatch("not json", {"t", "a", "c"}, [:store]))
   end
 
-  test "host_js binds only granted caps to the engine import globals" do
+  test "store/load round-trip is PATH-SCOPED through dispatch" do
+    pa = {"caps-disp", "app", "a"}
+    pb = {"caps-disp", "app", "b"}
+    g = [:store, :load]
+
+    assert %{"ok" => true} = Jason.decode!(Caps.dispatch(~s({"op":"store","key":"k","val":"va"}), pa, g))
+    assert %{"ok" => true, "value" => "va"} = Jason.decode!(Caps.dispatch(~s({"op":"load","key":"k"}), pa, g))
+    # path b never wrote "k" — isolated
+    assert %{"ok" => true, "value" => ""} = Jason.decode!(Caps.dispatch(~s({"op":"load","key":"k"}), pb, g))
+  end
+
+  test "host_js binds only granted caps as wrappers over __wbHostCall" do
     js = Caps.host_js([:store, :emit])
-    assert js =~ "store: __cap_store"
-    assert js =~ "emit: __cap_emit"
+    assert js =~ "__wbHostCall"
+    assert js =~ "store: (k, v) =>"
+    assert js =~ "op:\"store\""
+    assert js =~ "emit: (m) =>"
     refute js =~ "fetch:"
     refute js =~ "complete:"
   end
 
-  test "wit emits the import interface for the granted caps (kebab-cased)" do
-    wit = Caps.wit([:cache_get, :store])
-    assert wit =~ "interface toolkit-caps {"
-    assert wit =~ "cache-get: func(key: string) -> string;"
-    assert wit =~ "store: func(key: string, val: string);"
+  test "broker/2 is a 1-arg host-call closure bound to path + grants" do
+    b = Caps.broker({"b2", "app", "c"}, [:store, :load])
+    assert is_function(b, 1)
+    assert %{"ok" => true} = Jason.decode!(b.(~s({"op":"store","key":"x","val":"1"})))
+    assert %{"ok" => true, "value" => "1"} = Jason.decode!(b.(~s({"op":"load","key":"x"})))
   end
 
-  test "driver uses the cap host binding when :grants is given" do
-    {:ok, js} = Nexus.Toolkit.Js.runnable("def f(x), do: x")
-    src = Nexus.Toolkit.Js.driver(js, "f", [1], grants: [:emit, :store])
-    assert src =~ "emit: __cap_emit"
-    assert src =~ "store: __cap_store"
-  end
-
-  test "imports/2 builds the interface-nested Wasmex.Components import map (kebab, grant-filtered)" do
-    %{} = imports = Caps.imports({"acme", "app", "tk"}, [:store, :load, :cache_get])
-    iface = imports[Nexus.JsEngine.caps_iface()]
-    assert Map.keys(iface) |> Enum.sort() == ["cache-get", "load", "store"]
-    assert {:fn, store_fn} = iface["store"]
-    assert is_function(store_fn, 2)
-    refute Map.has_key?(iface, "fetch")
-  end
-
-  # End-to-end through the REAL cap-enabled StarlingMonkey eval-host (when the engine wasm is present):
+  # End-to-end through the REAL StarlingMonkey eval-host over the shared host-call seam (when present):
   # a cap toolkit invoked on two paths — path A's store must be invisible to path B.
   @tag :js_engine
   test "cap toolkit runs through the eval-host with path-scoped isolation" do
     if Nexus.JsEngine.available?() do
       src = "def save(k, v) do\n  store(k, v)\n  load(k)\nend\ndef get(k), do: load(k)"
       Nexus.Toolkit.Js.register("kvtest", %{name: "kvtest", js: elem(Nexus.Toolkit.Js.runnable(src), 1), exports: []})
-      a = [path: {"t", "app", "a"}, grants: [:store, :load, :emit]]
-      b = [path: {"t", "app", "b"}, grants: [:store, :load, :emit]]
+      a = [path: {"e2e", "app", "a"}, grants: [:store, :load, :emit]]
+      b = [path: {"e2e", "app", "b"}, grants: [:store, :load, :emit]]
 
       assert {:ok, "hi"} = Nexus.Toolkit.Js.invoke("kvtest", "save", ["a", "hi"], a)
       assert {:ok, "hi"} = Nexus.Toolkit.Js.invoke("kvtest", "get", ["a"], a)
       assert {:ok, ""} = Nexus.Toolkit.Js.invoke("kvtest", "get", ["a"], b)
     end
-  end
-
-  test "imports are path-scoped through the built fns" do
-    iface = Nexus.JsEngine.caps_iface()
-    a = Caps.imports({"imports-test-iso", "app", "a"}, [:store, :load])[iface]
-    b = Caps.imports({"imports-test-iso", "app", "b"}, [:store, :load])[iface]
-    {:fn, a_store} = a["store"]
-    {:fn, a_load} = a["load"]
-    {:fn, b_load} = b["load"]
-
-    a_store.("k", "secret-a")
-    assert a_load.("k") == "secret-a"
-    assert b_load.("k") == ""
   end
 end

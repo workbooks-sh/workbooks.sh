@@ -10,25 +10,27 @@ defmodule Nexus.JsEngine do
   (~11MB, the componentize-js / StarlingMonkey eval-host) is staged in `priv/` (gitignored, rebuildable).
   """
 
+  # The single synchronous host-broker seam the eval-host imports (bound to globalThis.__wbHostCall).
+  # Matches the workbook WIT world: `package wb:jseval; interface broker { host-call: func(req)->string }`.
+  @broker_ns "wb:jseval/broker"
+  @broker_fn "host-call"
+
+  @doc "The host-broker import namespace + function the eval-host imports."
+  def broker_seam, do: {@broker_ns, @broker_fn}
+
   @doc """
   Evaluate `src` (modern JS) → `{:ok, string} | {:error, reason}`.
 
     * `opts[:timeout]` — ms (default 15s)
-    * `opts[:imports]` — host functions the eval-host's WIT world imports, in `Wasmex.Components`
-      shape (`%{"name" => {:fn, fun}}`). The toolkit capability bridge passes `Nexus.Toolkit.Caps`
-      impls here (only meaningful once the eval-host is rebuilt to declare the cap import interface;
-      a plain eval-host ignores an empty map).
+    * `opts[:broker]` — the `host-call` closure, a 1-arg `(req_json) -> resp_json` fn the eval-host's
+      `wb:jseval/broker.host-call` import resolves to (reachable from guest JS as `__wbHostCall`). The
+      toolkit lane passes `Nexus.Toolkit.Caps.broker/2` (path-scoped, grant-filtered). Default DENIES
+      every op, so a plain eval (e.g. js_dom) instantiates with no capability surface.
   """
-  # The cap interface the (cap-enabled) eval-host imports. Every function must be satisfied at
-  # instantiation, so we always supply stubs; the toolkit cap bridge overrides granted ones.
-  @caps_iface "work:evalhost/toolkit-caps"
-
-  @doc "The cap interface name the eval-host imports."
-  def caps_iface, do: @caps_iface
-
   def eval(src, opts \\ []) when is_binary(src) do
     timeout = Keyword.get(opts, :timeout, 15_000)
-    imports = merge_caps(Keyword.get(opts, :imports, %{}))
+    broker = Keyword.get(opts, :broker, &deny_broker/1)
+    imports = %{@broker_ns => %{@broker_fn => {:fn, broker}}}
 
     cfg = %{path: wasm(), wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}, imports: imports}
 
@@ -45,25 +47,8 @@ defmodule Nexus.JsEngine do
     end
   end
 
-  # Default deny/no-op stubs for every cap fn (so the cap-importing engine always instantiates), with
-  # the caller's real impls (Nexus.Toolkit.Caps.imports/2) overlaid on the interface.
-  defp merge_caps(overrides) do
-    base = %{
-      @caps_iface => %{
-        "store" => {:fn, fn _k, _v -> nil end},
-        "load" => {:fn, fn _k -> "" end},
-        "emit" => {:fn, fn _m -> nil end},
-        "cache-get" => {:fn, fn _k -> "" end},
-        "cache-put" => {:fn, fn _k, _v, _t -> nil end},
-        "cache-delete" => {:fn, fn _k -> nil end},
-        "fetch" => {:fn, fn _u -> "" end},
-        "complete" => {:fn, fn _p -> "" end}
-      }
-    }
-
-    iface = Map.merge(base[@caps_iface], Map.get(overrides, @caps_iface, %{}))
-    overrides |> Map.merge(base) |> Map.put(@caps_iface, iface)
-  end
+  # No capability granted on this eval (the wb-b9xv `grant == nil` semantics): every op default-denies.
+  defp deny_broker(_req_json), do: ~s({"ok":false,"error":"no capability granted"})
 
   @doc "Whether the StarlingMonkey engine wasm is present."
   def available?, do: File.exists?(wasm())

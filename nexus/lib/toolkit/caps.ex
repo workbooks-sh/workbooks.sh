@@ -1,99 +1,132 @@
 defmodule Nexus.Toolkit.Caps do
   @moduledoc """
-  The capability bridge for JS toolkits — **path-scoped** Dock caps + the `$host` JS binding.
+  The toolkit capability layer — **path-scoped ops on the shared host-broker seam**.
 
-  A toolkit runs as data in the shared StarlingMonkey eval-host (`Nexus.Toolkit.Js`). Its side-effects
-  go ONLY through granted capabilities, never ambient. This module is the one place the partition path
-  binds: every cap impl is bound to a `{operator, application, component}` path, so a toolkit can never
-  address another app's / tenant's data — it names only a key; the host prefixes the path.
+  Toolkits run as data in the StarlingMonkey eval-host (`Nexus.Toolkit.Js`), which imports the single
+  synchronous `wb:jseval/broker.host-call: func(req: string) -> string` (bound to `globalThis.__wbHostCall`).
+  Toolkit capabilities are **ops on that one seam** (`{"op":"store",…} -> {"ok":true,…}`), exactly like
+  the node-compat ops (exec/fs/creds). There is NO separate per-toolkit import interface — one engine,
+  one broker, a shared op vocabulary (unifies with `Workbooks.HostBroker` when that lands).
 
-  This fixes the long-standing `Nexus.Dock` TODO (a hardcoded `"dock"` cache namespace + a global kv):
-  here the namespace IS the path.
+  This module:
 
-  Two halves:
-
-    * `bind/2` → the HOST-side impls (`%{cap => fun}`) for the granted caps, bound to the path. These
-      are what the eval-host's WIT imports resolve to (passed via `Wasmex.Components` once the eval-host
-      declares the cap import interface — the build-machine step).
-    * `host_js/1` → the GUEST-side `$host = {…}` JS binding the toolkit sees, referencing the
-      engine-provided import globals (`__cap_*`). The contract the rebuilt eval-host satisfies.
-
-  Deny-by-default: only caps named in `grants` are bound or exposed. An ungranted cap simply isn't there.
+    * `dispatch/3` — the host-side op router for toolkit caps, **path-scoped** to a
+      `{operator, application, component}` partition + **grant-filtered** (deny-by-default). The fn
+      `JsEngine` wires to the `host-call` import for a toolkit invocation. Fixes the old hardcoded
+      `"dock"` cache namespace / global kv: the namespace IS the path.
+    * `host_js/1` — the guest-side `$host` binding: each granted cap is a JS wrapper over
+      `__wbHostCall` with its op envelope. Ungranted caps are absent (and double-denied host-side).
   """
 
   @caps ~w(emit store load cache_get cache_put cache_delete fetch complete)a
 
-  @doc "The full set of grantable cap names (atoms)."
+  @doc "The grantable cap names (atoms)."
   def caps, do: @caps
 
-  @doc """
-  Host-side cap implementations for the granted caps, bound to `path` ({operator, application,
-  component}). Returns `%{cap_atom => fun}`. Only granted caps are present (deny-by-default).
-  """
-  def bind(path, grants) when is_list(grants) do
-    ns = path_key(path)
-    granted = MapSet.new(Enum.map(grants, &normalize/1))
+  # ── host-side op dispatch (the broker fn for a toolkit invocation) ────────────────────────────
 
-    %{
-      emit: fn msg -> require(Logger) && Logger.info(["[toolkit ", ns, "] ", to_string(msg)]); nil end,
-      store: fn k, v -> :persistent_term.put({:nexus_tk_kv, ns, to_string(k)}, to_string(v)); nil end,
-      load: fn k -> :persistent_term.get({:nexus_tk_kv, ns, to_string(k)}, "") end,
-      cache_get: fn k -> with({:ok, v} <- Nexus.Cache.get(ns, to_string(k)), do: v, else: (_ -> "")) end,
-      cache_put: fn k, v, ttl -> Nexus.Cache.put(ns, to_string(k), to_string(v), ttl: ttl); nil end,
-      cache_delete: fn k -> Nexus.Cache.delete(ns, to_string(k)); nil end,
-      fetch: &Nexus.Dock.fetch/1,
-      complete: &Nexus.Dock.llm_complete/1
-    }
-    |> Map.take(Enum.filter(@caps, &MapSet.member?(granted, &1)))
+  @doc """
+  A `host-call` closure for `Nexus.JsEngine` bound to `path` + `grants`: a 1-arg `(req_json) -> resp_json`
+  fn that routes toolkit ops, path-scoped and grant-filtered. Pass as `opts[:broker]`.
+  """
+  def broker(path, grants), do: fn req_json -> dispatch(req_json, path, grants) end
+
+  @doc "Route one host-call request (JSON in, JSON out), path-scoped + grant-filtered."
+  def dispatch(req_json, path, grants) when is_binary(req_json) do
+    granted = MapSet.new(Enum.map(grants, &normalize/1))
+    ns = path_key(path)
+
+    case Jason.decode(req_json) do
+      {:ok, %{"op" => op} = req} -> do_op(op, req, ns, granted) |> Jason.encode!()
+      _ -> Jason.encode!(%{"ok" => false, "error" => "bad request"})
+    end
+  rescue
+    e -> Jason.encode!(%{"ok" => false, "error" => "host-call crash: #{Exception.message(e)}"})
   end
 
+  defp do_op(op, req, ns, granted) do
+    cap = op_cap(op)
+
+    cond do
+      cap == :__unknown__ -> %{"ok" => false, "error" => "unknown op: #{op}"}
+      not MapSet.member?(granted, cap) -> %{"ok" => false, "error" => "capability not granted: #{cap}"}
+      true -> run_op(op, req, ns)
+    end
+  end
+
+  # op name → cap atom (dotted ops for the namespaced caps, matching the broker convention)
+  defp op_cap("store"), do: :store
+  defp op_cap("load"), do: :load
+  defp op_cap("emit"), do: :emit
+  defp op_cap("cache.get"), do: :cache_get
+  defp op_cap("cache.put"), do: :cache_put
+  defp op_cap("cache.delete"), do: :cache_delete
+  defp op_cap("fetch"), do: :fetch
+  defp op_cap("complete"), do: :complete
+  defp op_cap(_), do: :__unknown__
+
+  defp run_op("store", %{"key" => k, "val" => v}, ns) do
+    :persistent_term.put({:nexus_tk_kv, ns, to_string(k)}, to_string(v))
+    %{"ok" => true}
+  end
+
+  defp run_op("load", %{"key" => k}, ns),
+    do: %{"ok" => true, "value" => :persistent_term.get({:nexus_tk_kv, ns, to_string(k)}, "")}
+
+  defp run_op("emit", %{"msg" => m}, ns) do
+    require Logger
+    Logger.info(["[toolkit ", ns, "] ", to_string(m)])
+    %{"ok" => true}
+  end
+
+  defp run_op("cache.get", %{"key" => k}, ns) do
+    val = with({:ok, v} <- Nexus.Cache.get(ns, to_string(k)), do: v, else: (_ -> ""))
+    %{"ok" => true, "value" => val}
+  end
+
+  defp run_op("cache.put", %{"key" => k, "val" => v} = req, ns) do
+    Nexus.Cache.put(ns, to_string(k), to_string(v), ttl: Map.get(req, "ttl", 0))
+    %{"ok" => true}
+  end
+
+  defp run_op("cache.delete", %{"key" => k}, ns) do
+    Nexus.Cache.delete(ns, to_string(k))
+    %{"ok" => true}
+  end
+
+  defp run_op("fetch", %{"url" => u}, _ns), do: %{"ok" => true, "body" => Nexus.Dock.fetch(to_string(u))}
+  defp run_op("complete", %{"prompt" => p}, _ns), do: %{"ok" => true, "text" => Nexus.Dock.llm_complete(to_string(p))}
+  defp run_op(_op, _req, _ns), do: %{"ok" => false, "error" => "bad op args"}
+
+  # ── guest-side $host binding (wrappers over __wbHostCall) ──────────────────────────────────────
+
   @doc """
-  The guest-side `$host` JS binding for the granted caps — referencing engine-provided import globals
-  (`__cap_<name>`). A `var $host = { … };` string the toolkit's transpiled JS calls. Ungranted caps
-  are absent (calling one is a JS TypeError, i.e. deny-by-default at the guest too).
+  The guest `$host` JS binding for the granted caps — each a wrapper over `__wbHostCall` with its op
+  envelope. Ungranted caps are absent (calling one is a JS TypeError — deny-by-default at the guest).
   """
-  def host_js(grants) when is_list(grants) do
+  def host_js(grants) do
     members =
       grants
       |> Enum.map(&normalize/1)
       |> Enum.filter(&(&1 in @caps))
       |> Enum.uniq()
-      |> Enum.map(fn cap -> "  #{cap}: __cap_#{cap}" end)
+      |> Enum.map(&"  #{wrapper(&1)}")
       |> Enum.join(",\n")
 
-    "var $host = {\n#{members}\n};"
+    "function $hc(o){return JSON.parse(__wbHostCall(JSON.stringify(o)));}\nvar $host = {\n#{members}\n};"
   end
 
-  @doc """
-  The WIT interface the eval-host must import to receive these caps (the contract for the build-machine
-  rebuild). Generated from the granted caps so the world is minimal.
-  """
-  def wit(grants) when is_list(grants) do
-    lines =
-      grants
-      |> Enum.map(&normalize/1)
-      |> Enum.filter(&(&1 in @caps))
-      |> Enum.uniq()
-      |> Enum.map(&"  #{String.replace(to_string(&1), "_", "-")}: #{sig(&1)};")
-      |> Enum.join("\n")
+  # per-cap JS wrapper: envelope in, value out
+  defp wrapper(:store), do: ~S[store: (k, v) => { $hc({op:"store", key:k, val:String(v)}); return null; }]
+  defp wrapper(:load), do: ~S[load: (k) => { var r = $hc({op:"load", key:k}); return r.ok ? r.value : ""; }]
+  defp wrapper(:emit), do: ~S[emit: (m) => { $hc({op:"emit", msg:String(m)}); return null; }]
+  defp wrapper(:cache_get), do: ~S[cache_get: (k) => { var r = $hc({op:"cache.get", key:k}); return r.ok ? r.value : ""; }]
+  defp wrapper(:cache_put), do: ~S[cache_put: (k, v, ttl) => { $hc({op:"cache.put", key:k, val:String(v), ttl:(ttl||0)}); return null; }]
+  defp wrapper(:cache_delete), do: ~S[cache_delete: (k) => { $hc({op:"cache.delete", key:k}); return null; }]
+  defp wrapper(:fetch), do: ~S[fetch: (u) => { var r = $hc({op:"fetch", url:u}); return r.ok ? r.body : ""; }]
+  defp wrapper(:complete), do: ~S[complete: (p) => { var r = $hc({op:"complete", prompt:p}); return r.ok ? r.text : ""; }]
 
-    "interface toolkit-caps {\n#{lines}\n}"
-  end
-
-  @doc """
-  The `Wasmex.Components` import map for the granted caps, bound to `path` — `%{"<cap>" => {:fn, fun}}`.
-  Passed as `opts[:imports]` to `Nexus.JsEngine.eval/2`; the rebuilt eval-host resolves its
-  `toolkit-caps` WIT import to these. (Exact key format is verified against the cap-enabled engine —
-  the import names follow the eval-host's declared interface.)
-  """
-  def imports(path, grants) do
-    iface =
-      path
-      |> bind(grants)
-      |> Map.new(fn {cap, fun} -> {String.replace(Atom.to_string(cap), "_", "-"), {:fn, fun}} end)
-
-    %{Nexus.JsEngine.caps_iface() => iface}
-  end
+  # ── helpers ───────────────────────────────────────────────────────────────────────────────────
 
   @doc "A stable string key for a partition path. `{op, app, comp}` → \"op/app/comp\"."
   def path_key({operator, application, component}),
@@ -101,17 +134,6 @@ defmodule Nexus.Toolkit.Caps do
 
   def path_key(other) when is_binary(other), do: other
 
-  # ── helpers ─────────────────────────────────────────────────────────────────────────────────
-
   defp normalize(c) when is_atom(c), do: c
   defp normalize(c) when is_binary(c), do: Enum.find(@caps, :__unknown__, &(to_string(&1) == c))
-
-  defp sig(:emit), do: "func(msg: string)"
-  defp sig(:store), do: "func(key: string, val: string)"
-  defp sig(:load), do: "func(key: string) -> string"
-  defp sig(:cache_get), do: "func(key: string) -> string"
-  defp sig(:cache_put), do: "func(key: string, val: string, ttl: u32)"
-  defp sig(:cache_delete), do: "func(key: string)"
-  defp sig(:fetch), do: "func(url: string) -> string"
-  defp sig(:complete), do: "func(prompt: string) -> string"
 end
