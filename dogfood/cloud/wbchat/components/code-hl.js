@@ -56,7 +56,7 @@ const CSS = `
 let _hljsPromise = null;
 function loadHljs() {
   if (_hljsPromise) return _hljsPromise;
-  _hljsPromise = import('https://esm.sh/highlight.js@11/lib/common')
+  _hljsPromise = import('https://esm.sh/highlight.js@11/lib/common?bundle')
     .then((m) => (m && (m.default || m)) || null)
     .catch(() => null);
   return _hljsPromise;

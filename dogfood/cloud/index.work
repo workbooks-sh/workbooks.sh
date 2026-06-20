@@ -286,7 +286,8 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .acct .nm{ font:600 13px var(--read); line-height:1.2; }
 .acct .em{ font:500 11px var(--mono); color:var(--dim); line-height:1.3; }
 
-.main{ overflow-y:auto; }
+.main{ overflow-y:auto; position:relative; }
+#view.fullbleed{ position:absolute; inset:0; overflow:hidden; }
 .topbar{ display:flex; align-items:center; gap:12px; padding:16px 28px; border-bottom:1px solid var(--line);
   position:sticky; top:0; background:var(--paper); z-index:5; }
 .crumb{ font:700 12px var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); flex:1; }
@@ -800,6 +801,7 @@ client :app do
     function renderShell(){
       var p = ROUTE.path, def = WB._views[matchRoute(p).key];
       var bare = def && def.bare;
+      var fb = def && def.fullbleed;   // keep the shell sidebar, but mount the view edge-to-edge in .main
       var root = document.getElementById('root');
       if (bare) { root.innerHTML = '<div id="bareview"></div>'; return; }
       var nx = WB.nexus.active, ws = WB.ws.active, user = WB.user;
@@ -836,7 +838,7 @@ client :app do
             '</div>' + nxMenu +
           '</div>' +
           (WB.dev ? ('<nav class="nxnav nxprimary">' +
-            navlink('/create', ICO.plus, 'Create', p) + navlink('/apps', ICO.apps, 'Apps', p) +
+            navlink('/studio', ICO.spark, 'Studio', p) + navlink('/apps', ICO.apps, 'Apps', p) +
           '</nav>') : '') + adminnav +
           '<div class="swrap wssec">' +
             '<div class="swlabel wshdr"><span>Workspaces</span><button class="wsadd" data-wsnew title="New workspace" aria-label="New workspace">+</button></div>' +
@@ -853,7 +855,7 @@ client :app do
             '</a>' +
           '</div>' +
         '</aside>' +
-        '<div class="main"><div class="wrap" id="view"></div></div>' +
+        '<div class="main">' + (fb ? '<div id="view" class="fullbleed"></div>' : '<div class="wrap" id="view"></div>') + '</div>' +
       '</div>';
 
       if (st.pickerOpen) { var ph = root.querySelector('#wsPicker'); if (ph) WB.emojiPicker(ph, function (u) { st.editIcon = u; st.pickerOpen = false; renderShell(); renderView(); }); }
@@ -1021,12 +1023,15 @@ WB.scopedStyles('/usage', `
 // SolidJS shell (session rail) + the wbchat library (dogfood/cloud/wbchat/*) for the conversation —
 // our framework-agnostic createChat() core, themed via --wbc-* vars. Session history
 // is scoped to the user (within the org) via /cloud/agent/* — "New chat" + a rail of past sessions.
-WB.view('/create', { title: 'Create', accent: 'var(--mint)', async render(el){
-  var S = await import('https://esm.sh/solid-js@1.9.5');
-  var W = await import('https://esm.sh/solid-js@1.9.5/web');
-  var html = (await import('https://esm.sh/solid-js@1.9.5/html')).default;
+// ═══════════════════════ Studio — full-bleed agent workspace (wbchat + floating rail) ═════════════
+// Full-bleed wbchat conversation with a FLOATING overlay icon rail on the left: + (new chat) and
+// Activity (toggle the collapsible activity/sessions drawer). Custom tooltips on hover. The rail is the
+// seam for future agent surfaces (issues an agent files, etc.). "Create" is the + (new chat) action here.
+WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, async render(el){
+  var S = await import('https://esm.sh/solid-js@1.9.5?bundle');
+  var W = await import('https://esm.sh/solid-js@1.9.5/web?bundle');
+  var html = (await import('https://esm.sh/solid-js@1.9.5/html?bundle')).default;
   var createSignal = S.createSignal, For = S.For, Show = S.Show;
-  // wbchat — our vanilla AI-chat library (the singular surface). Load core + theme once.
   var WBC = await import('./wbchat/core.js');
   await import('./wbchat/components/index.js');  // registers all parts + actions + composer add-ons
   var DEMO = await import('./wbchat/demo.js');   // dev-only seed (?cdemo=1) exercising every part type
@@ -1035,14 +1040,21 @@ WB.view('/create', { title: 'Create', accent: 'var(--mint)', async render(el){
 
   var U = (WB.user && WB.user.email) || 'anon';
   function api(path, opts){ return fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'content-type': 'application/json' } }, opts || {})).then(function(r){ return r.json(); }); }
+  var ICONS = {
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
+    activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>'
+  };
 
-  function Create(){
+  function Studio(){
     var ss = createSignal([]); var sessions = ss[0], setSessions = ss[1];
     var ci = createSignal(null); var curId = ci[0], setCurId = ci[1];
+    var saved; try { saved = localStorage.getItem('wb-studio-activity'); } catch (e) {}
+    var co = createSignal(saved === 'closed'); var collapsed = co[0], setCollapsedSig = co[1];
+    function setCollapsed(v){ setCollapsedSig(v); try { localStorage.setItem('wb-studio-activity', v ? 'closed' : 'open'); } catch (e) {} }
     var chat = null;
 
     function loadSessions(){ api('/cloud/agent/sessions?u=' + encodeURIComponent(U)).then(function(d){ setSessions((d && d.sessions) || []); }); }
-    function newChat(){ setCurId(null); if (chat) chat.clear(); }
+    function newChat(){ setCurId(null); if (chat) { chat.clear(); chat.focus(); } }
     function openSession(id){ api('/cloud/agent/session?u=' + encodeURIComponent(U) + '&id=' + encodeURIComponent(id)).then(function(d){ if (d && d.messages){ setCurId(d.id); if (chat) chat.setMessages(d.messages); } }); }
     loadSessions();
 
@@ -1061,43 +1073,65 @@ WB.view('/create', { title: 'Create', accent: 'var(--mint)', async render(el){
     }
 
     return html`
-      <div class="createwrap">
-        <aside class="chatrail">
-          <button class="newchat" onClick=${newChat}>+ New chat</button>
-          <div class="chsessions">
+      <div class=${function(){ return 'studio' + (collapsed() ? ' collapsed' : ''); }}>
+        <section class="studio-chat" ref=${mountChat}></section>
+        <aside class="studio-activity">
+          <div class="studio-activity-hd"><span>Activity</span><button class="studio-newchat" title="New chat" onClick=${newChat} innerHTML=${ICONS.plus}></button></div>
+          <div class="studio-sessions">
             <${For} each=${sessions}>${function(s){
-              return html`<button class=${function(){ return 'chsession' + (curId() === s.id ? ' on' : ''); }} onClick=${function(){ openSession(s.id); }} title=${s.title}>${s.title || 'Untitled'}</button>`;
+              return html`<button class=${function(){ return 'studio-session' + (curId() === s.id ? ' on' : ''); }} onClick=${function(){ openSession(s.id); }} title=${s.title}>${s.title || 'Untitled'}</button>`;
             }}<//>
-            <${Show} when=${function(){ return sessions().length === 0; }}><div class="chempty">No past chats yet.</div><//>
+            <${Show} when=${function(){ return sessions().length === 0; }}><div class="studio-empty">No activity yet.</div><//>
           </div>
         </aside>
-        <section class="chatmain" ref=${mountChat}></section>
+        <nav class="studio-rail">
+          <button class="studio-railbtn" data-tip="New chat" aria-label="New chat" onClick=${newChat} innerHTML=${ICONS.plus}></button>
+          <button class=${function(){ return 'studio-railbtn' + (collapsed() ? '' : ' on'); }} data-tip="Activity" aria-label="Activity" onClick=${function(){ setCollapsed(!collapsed()); }} innerHTML=${ICONS.activity}></button>
+        </nav>
       </div>`;
   }
   el.innerHTML = '';
-  W.render(Create, el);
+  W.render(Studio, el);
 }});
-WB.scopedStyles('/create', `
-.createwrap { display: flex; gap: 14px; height: calc(100vh - 132px); min-height: 440px; }
-.chatrail { width: 224px; flex: none; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 10px; }
-.newchat { flex: none; border: 1px solid var(--stroke); background: var(--bg); color: var(--ink); border-radius: 9px; padding: 9px 12px; font: 600 13px var(--read); cursor: pointer; text-align: left; }
-.newchat:hover { border-color: var(--ink); }
-.chsessions { display: flex; flex-direction: column; gap: 2px; overflow: auto; margin-top: 2px; }
-.chsession { text-align: left; border: none; background: none; color: var(--dim); border-radius: 8px; padding: 8px 10px; font: 500 13px var(--read); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.chsession:hover { background: var(--line); color: var(--ink); }
-.chsession.on { background: var(--line); color: var(--ink); font-weight: 600; }
-.chempty { color: var(--dim); font: 500 12.5px var(--read); padding: 12px 10px; }
-.chatmain { position: relative; flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--card); overflow: hidden; display: flex; }
-.chatmain > .wb-chat { flex: 1; min-width: 0; }
+// "Create" is now the + (new chat) inside Studio; keep the old route as a redirect.
+WB.view('/create', { title: 'Studio', render(el){ WB.nav('/studio'); } });
+WB.scopedStyles('/studio', `
+.studio { position: absolute; inset: 0; }
+/* full-bleed chat fills everything; the rail + drawer overlay it */
+.studio-chat { position: absolute; inset: 0; display: flex; }
+.studio-chat > .wb-chat { flex: 1; min-width: 0; }
+/* floating overlay icon rail */
+.studio-rail { position: absolute; left: 0; top: 0; bottom: 0; width: 52px; z-index: 30; display: flex; flex-direction: column;
+  align-items: center; gap: 6px; padding: 12px 0; background: color-mix(in srgb, var(--card) 72%, transparent); backdrop-filter: blur(8px); border-right: 1px solid var(--line); }
+.studio-railbtn { position: relative; width: 36px; height: 36px; border: none; background: none; color: var(--dim); cursor: pointer; border-radius: 9px; display: grid; place-items: center; }
+.studio-railbtn:hover { background: var(--line); color: var(--ink); }
+.studio-railbtn.on { background: var(--line); color: var(--ink); }
+.studio-railbtn svg { width: 19px; height: 19px; }
+.studio-railbtn[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
+  white-space: nowrap; background: var(--ink); color: var(--card); font: 600 11.5px var(--read); padding: 5px 9px; border-radius: 7px; pointer-events: none; z-index: 40; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+/* collapsible activity drawer (overlays the chat from behind the rail) */
+.studio-activity { position: absolute; left: 0; top: 0; bottom: 0; width: 300px; z-index: 20; box-sizing: border-box; padding-left: 52px;
+  display: flex; flex-direction: column; background: var(--card); border-right: 1px solid var(--line); box-shadow: 6px 0 22px rgba(0,0,0,.16);
+  transform: translateX(0); transition: transform .2s ease; }
+.studio.collapsed .studio-activity { transform: translateX(-100%); box-shadow: none; }
+.studio-activity-hd { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 8px; font: 700 11px var(--read); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.studio-newchat { width: 26px; height: 26px; border: 1px solid var(--line); background: none; color: var(--dim); border-radius: 7px; cursor: pointer; display: grid; place-items: center; }
+.studio-newchat:hover { color: var(--ink); border-color: var(--stroke); }
+.studio-newchat svg { width: 14px; height: 14px; }
+.studio-sessions { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; padding: 0 8px 12px; }
+.studio-session { text-align: left; border: none; background: none; color: var(--dim); border-radius: 8px; padding: 8px 10px; font: 500 13px var(--read); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-session:hover { background: var(--line); color: var(--ink); }
+.studio-session.on { background: var(--line); color: var(--ink); font-weight: 600; }
+.studio-empty { color: var(--dim); font: 500 12.5px var(--read); padding: 12px 10px; }
 `);
 
 // ═══════════════════════ Apps — SolidJS beachhead (no-build: solid-js/html via ESM) ═══════════════
 // Validates SolidJS inside the vanilla WB shell: fine-grained reactivity, no build lane. The app
 // catalog is mocked for now; this is the seed of the "open your apps" surface (web-container view).
 WB.view('/apps', { title: 'Apps', accent: 'var(--sky)', async render(el){
-  var S = await import('https://esm.sh/solid-js@1.9.5');
-  var W = await import('https://esm.sh/solid-js@1.9.5/web');
-  var html = (await import('https://esm.sh/solid-js@1.9.5/html')).default;
+  var S = await import('https://esm.sh/solid-js@1.9.5?bundle');
+  var W = await import('https://esm.sh/solid-js@1.9.5/web?bundle');
+  var html = (await import('https://esm.sh/solid-js@1.9.5/html?bundle')).default;
   var createSignal = S.createSignal, For = S.For, Show = S.Show;
 
   var APPS = [

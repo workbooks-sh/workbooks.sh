@@ -84,7 +84,7 @@ export function collapsible({ title, open = false, aside } = {}) {
 // markdown — loaded lazily; escaped fallback so the core never hard-depends on the network.
 let _md = (t) => '<p>' + esc(t).replace(/\n/g, '<br>') + '</p>';
 async function loadMarkdown() {
-  try { const m = await import('https://esm.sh/marked@13'); if (m && m.marked) _md = (t) => m.marked.parse(String(t || '')); } catch (_) {}
+  try { const m = await import('https://esm.sh/marked@13?bundle'); if (m && m.marked) _md = (t) => m.marked.parse(String(t || '')); } catch (_) {}
 }
 export function md(t) { return _md(t); }
 
