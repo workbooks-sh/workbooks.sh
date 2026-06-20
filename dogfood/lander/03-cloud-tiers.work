@@ -1,0 +1,79 @@
+# Cloud tiers — the offer
+
+The companion to the pricing comparison directly above: having shown *we don't bill per seat*, this
+section shows **what you actually choose** — how big a machine, and how much storage. Every tier is
+the whole product (every feature, unlimited people); the only thing that changes up the ladder is
+the size of the machine that's yours and the room it has for your data.
+
+There is **no free tier** — a nexus is an always-on machine, so the floor is the smallest real
+machine at **$20/mo**. The numbers are grounded in what the DeployKit provisions on Fly (an
+always-on shared-CPU machine + a volume) at a healthy margin; the canonical, enforced tiers live in
+`dogfood/nexus/deployment.work` (`Nexus.Config.tiers`), which the cloud control plane reads — this
+section is the marketing mirror of those same numbers. Accents rotate the DNA pastels (sky · mint ·
+peach · lilac), never the neon primary.
+
+client :tiers do
+  <section id="cloud-tiers">
+    <div class="ct-inner">
+      <p class="ct-kicker">one product · pick your machine</p>
+      <h2 class="ct-h">Choose a machine. Not a seat count.</h2>
+      <p class="ct-sub">Every plan is the whole product — every feature, unlimited people and workspaces. You're only choosing how much memory and storage you need.</p>
+
+      <div class="ct-grid">
+        <div class="ct-card" style="--accent:#a8d4f0">
+          <div class="ct-top"><span class="ct-name">Starter</span></div>
+          <div class="ct-price"><b>$20</b><span>/mo</span></div>
+          <div class="ct-spec"><span class="ct-mem">1 GB</span> memory · <span class="ct-mem">25 GB</span> storage</div>
+          <ul class="ct-feat">
+            <li>Unlimited people &amp; workspaces</li>
+            <li>A workbooks.sh address</li>
+            <li>Every feature included</li>
+          </ul>
+          <a class="ct-btn" href="https://app.workbooks.sh">Start building</a>
+          <p class="ct-note">You, or a small team — everything you build on one machine.</p>
+        </div>
+
+        <div class="ct-card pop" style="--accent:#aee5c2">
+          <div class="ct-top"><span class="ct-name">Team</span><span class="ct-tag">Most popular</span></div>
+          <div class="ct-price"><b>$79</b><span>/mo</span></div>
+          <div class="ct-spec"><span class="ct-mem">4 GB</span> memory · <span class="ct-mem">100 GB</span> storage</div>
+          <ul class="ct-feat">
+            <li>Unlimited people &amp; workspaces</li>
+            <li>Your own domain</li>
+            <li>A bigger machine — more running at once</li>
+          </ul>
+          <a class="ct-btn" href="https://app.workbooks.sh">Start building</a>
+          <p class="ct-note">Room for a whole team's workbooks, agents, and data.</p>
+        </div>
+
+        <div class="ct-card" style="--accent:#f3c5a3">
+          <div class="ct-top"><span class="ct-name">Scale</span></div>
+          <div class="ct-price"><b>$199</b><span>/mo</span></div>
+          <div class="ct-spec"><span class="ct-mem">8 GB</span> memory · <span class="ct-mem">300 GB</span> storage</div>
+          <ul class="ct-feat">
+            <li>Unlimited people &amp; workspaces</li>
+            <li>Your own domains</li>
+            <li>Priority support</li>
+          </ul>
+          <a class="ct-btn" href="https://app.workbooks.sh">Start building</a>
+          <p class="ct-note">Heavier workloads and a lot more to store.</p>
+        </div>
+
+        <div class="ct-card" style="--accent:#d9c5f0">
+          <div class="ct-top"><span class="ct-name">Enterprise</span></div>
+          <div class="ct-price"><b>Custom</b></div>
+          <div class="ct-spec"><span class="ct-mem">16 GB+</span> memory · <span class="ct-mem">1 TB+</span> storage</div>
+          <ul class="ct-feat">
+            <li>A dedicated machine</li>
+            <li>SSO &amp; SCIM</li>
+            <li>Multi-region · SLA · support</li>
+          </ul>
+          <a class="ct-btn" href="mailto:hello@workbooks.sh">Talk to us</a>
+          <p class="ct-note">Your own scale, your way.</p>
+        </div>
+      </div>
+
+      <p class="ct-foot">Outgrow a machine? Move up a tier in one click — the same nexus, more room. Never a seat charge, never a per-token meter.</p>
+    </div>
+  </section>
+end

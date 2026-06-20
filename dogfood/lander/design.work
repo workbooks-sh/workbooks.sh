@@ -279,6 +279,34 @@ design :lander do
       .cp-table .seat { display: none; }
       .cp-table .num { padding-left: 12px; }
     }
+
+    /* ── cloud tiers: the offer — four pastel-accented machine tiers (no free) ─────── */
+    #cloud-tiers { position: relative; z-index: 4; background: #0c0d10; color: #e9e7e1; padding: 8px 24px 96px; }
+    .ct-inner { max-width: 1080px; margin: 0 auto; text-align: center; }
+    .ct-kicker { font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #8a8f86; margin: 0 0 14px; }
+    .ct-h { font-size: clamp(24px, 3.4vw, 36px); line-height: 1.1; letter-spacing: -.025em; font-weight: 680; margin: 0 0 12px; color: #fff; }
+    .ct-sub { font-size: 15px; line-height: 1.55; color: #a8aca3; max-width: 520px; margin: 0 auto 40px; }
+    .ct-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; text-align: left; }
+    .ct-card { position: relative; background: #15171c; border: 1px solid rgba(255,255,255,.09); border-radius: 16px; padding: 22px 20px 24px; display: flex; flex-direction: column; }
+    .ct-card.pop { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 12px 40px -16px var(--accent); }
+    .ct-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .ct-name { display: inline-flex; align-items: center; gap: 8px; font: 700 13px var(--mono); letter-spacing: .04em; text-transform: uppercase; color: #fff; }
+    .ct-name::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); flex: none; }
+    .ct-tag { font: 700 9px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #11231a; background: var(--accent); padding: 4px 7px; border-radius: 20px; }
+    .ct-price { display: flex; align-items: baseline; gap: 3px; margin-bottom: 4px; }
+    .ct-price b { font-size: 30px; font-weight: 700; color: #fff; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+    .ct-price span { font: 600 13px var(--mono); color: #7e837a; }
+    .ct-spec { font: 600 12px var(--mono); color: #8a8f86; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .ct-spec .ct-mem { color: var(--accent); }
+    .ct-feat { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column; gap: 9px; flex: 1; }
+    .ct-feat li { position: relative; padding-left: 20px; font-size: 13px; line-height: 1.4; color: #cdd0c8; }
+    .ct-feat li::before { content: ""; position: absolute; left: 0; top: 5px; width: 11px; height: 6px; border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(-45deg); }
+    .ct-btn { display: block; text-align: center; font: 700 12px/1 var(--mono); letter-spacing: .05em; color: #11231a; background: var(--accent); padding: 12px; border-radius: 10px; text-decoration: none; transition: filter .12s, transform .12s; }
+    .ct-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+    .ct-note { font-size: 12px; line-height: 1.45; color: #6a6f68; margin: 14px 0 0; }
+    .ct-foot { font-size: 13.5px; line-height: 1.6; color: #8a8f86; max-width: 560px; margin: 36px auto 0; }
+    @media (max-width: 920px) { .ct-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px) { #cloud-tiers { padding: 0 16px 72px; } .ct-grid { grid-template-columns: 1fr; } }
   
     #s2 { position: relative; height: 100vh; background: var(--paper); overflow: hidden; }
     .sky-pin { position: relative; height: 100vh; overflow: hidden; }
