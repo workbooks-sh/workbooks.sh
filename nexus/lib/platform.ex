@@ -26,7 +26,16 @@ defmodule Nexus.Platform do
 
   # ── nexuses ─────────────────────────────────────────────────────────────────────────────────
   get "/nexuses" do
-    j(conn, 200, %{nexuses: Enum.map(CP.list(org(conn), :nexus), &nexus_view/1)})
+    # One nexus per org — "the nexus IS the org". If the org hasn't provisioned a separate machine, the
+    # nexus SERVING this request IS the org's nexus, so self-report it. Never an empty fleet for a real
+    # org: you're always looking at your own nexus. (A provisioned fleet takes precedence.)
+    nexuses =
+      case CP.list(org(conn), :nexus) do
+        [] -> [self_nexus(conn)]
+        list -> Enum.map(list, &nexus_view/1)
+      end
+
+    j(conn, 200, %{nexuses: nexuses})
   end
 
   # One nexus PER ORG — the nexus IS the org (a Fly machine / scale-group). You
@@ -47,8 +56,15 @@ defmodule Nexus.Platform do
 
   get "/nexuses/:id" do
     case CP.get(org(conn), :nexus, conn.params["id"]) do
-      {:ok, nx} -> j(conn, 200, nexus_view(nx))
-      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+      {:ok, nx} ->
+        j(conn, 200, nexus_view(nx))
+
+      {:error, :not_found} ->
+        # The self-reported serving nexus (empty registry) has no registry row — resolve it here so the
+        # detail view works for the org's own nexus.
+        if conn.params["id"] == self_nexus_id() and CP.list(org(conn), :nexus) == [],
+          do: j(conn, 200, self_nexus(conn)),
+          else: j(conn, 404, %{error: "not found"})
     end
   end
 
@@ -352,6 +368,25 @@ defmodule Nexus.Platform do
       url: nx[:url] || ""
     }
   end
+
+  # The nexus serving this request, as the org's own nexus (one-per-org model). Identity comes from
+  # the deploy's configured nexus name/friendly (set in Nexus.Server) — generic, nothing org-specific.
+  defp self_nexus(conn) do
+    name = Application.get_env(:nexus, :nexus_name, "")
+    friendly = Application.get_env(:nexus, :nexus_friendly, "")
+    id = if name == "", do: "nexus", else: name
+
+    %{
+      id: id,
+      name: if(friendly == "", do: id, else: friendly),
+      region: System.get_env("FLY_REGION") || System.get_env("WB_FLY_REGION") || "",
+      plan: Nexus.Pricing.default_tier().id,
+      state: "run",
+      url: conn.host
+    }
+  end
+
+  defp self_nexus_id, do: (n = Application.get_env(:nexus, :nexus_name, "")) == "" && "nexus" || n
 
   defp ws_view(ws), do: %{id: ws.id, name: ws[:name], icon: ws[:icon], nexus_id: ws[:nexus_id]}
 
