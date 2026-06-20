@@ -68,7 +68,7 @@
     '.nav .cta { font: 700 11.5px/1 var(--mono, "JetBrains Mono", monospace); letter-spacing: .05em;',
     '  text-transform: uppercase; text-decoration: none; padding: 9px 14px; border-radius: 8px;',
     '  border: 2px solid var(--ink, #121316); transition: transform .08s, box-shadow .08s, background .12s, color .12s; }',
-    '.nav .cta-1 { background: var(--ink, #121316); color: var(--paper, #f7f6f1); box-shadow: 3px 3px 0 var(--ink, #121316); }',
+    '.nav .cta-1 { background: var(--ink, #121316); color: var(--paper, #f7f6f1); box-shadow: 3px 3px 0 var(--ink, #121316); margin-left: -16px; }',
     '.nav .cta-1:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--ink, #121316); }',
     '.nav .cta-1:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink, #121316); }',
     '.nav .cta-2 { background: var(--paper, #f7f6f1); color: var(--ink, #121316); }',
@@ -223,9 +223,8 @@
     '<a class="lnk toolkits" href="' + root + 'toolkits/">Toolkits</a>' +
     '<a class="lnk" href="' + root + 'blog">Blog</a>' +
     '<button class="srch" aria-label="Search"><span class="i" aria-hidden="true">' + SEARCH + '</span><span class="srch-label" style="display:none">Search</span></button>' +
-    '<a class="lnk gh" href="' + REPO + '" aria-label="GitHub">' + GH + '</a>' +
-    '<a class="cta cta-1" href="' + CLOUD + '">Get started</a>' +
     '<a class="cta cta-2" href="' + CLOUD + '/login">Log in</a>' +
+    '<a class="cta cta-1" href="' + CLOUD + '">Get started</a>' +
     '<button class="burger" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>';
 
   var style = document.createElement("style");

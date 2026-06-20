@@ -43,7 +43,7 @@ client :platforms do
           <span class="plat-tag on"><span class="dot"></span>Live</span>
         </div>
         <h3>The cloud service</h3>
-        <p>Stand up a hosted nexus, deploy your workbooks, and run agents in the cloud — metered, scale-to-zero, on your own account. Sign in and ship in minutes.</p>
+        <p>Stand up a hosted nexus, deploy your workbooks, and run agents in the cloud — your own dedicated machine, always on, one flat price. Sign in and ship in minutes.</p>
         <a class="plat-btn primary" href="https://app.workbooks.sh">Get started <span aria-hidden="true">→</span></a>
       </article>
     </div>
