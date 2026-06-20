@@ -21,6 +21,7 @@ defmodule Nexus.Compile do
       kind == "record" -> {:shape, Nexus.Resource.fields(node)}
       kind == "server" -> {:beam, Nexus.Unit.compile(node)}
       kind == "agent" -> {:agent, Nexus.Agent.def_from_unit(node)}
+      kind == "hook" -> {:hook, Nexus.Hook.compile(node)}
       kind == "check" -> {:check, Nexus.Checks.parse(node)}
       kind == "toolkit" -> {:toolkit, Nexus.Toolkit.build(node)}
       # The wasm lanes shell heavy wasmtime compiler processes (~450–900MB, ~7–20s, near-constant

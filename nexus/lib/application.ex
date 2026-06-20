@@ -37,8 +37,13 @@ defmodule Nexus.Application do
     ether = if Nexus.Constellation.enabled?(), do: Nexus.Constellation.children(), else: []
     # Nexus.Wasm.Gate bounds concurrent wasm OS processes per lane (compile-concurrency /
     # render-concurrency) so a burst can't fork-bomb wasmtime into an OOM — backpressure instead.
+    # The reactive layer: the event bus (subscriber Registry + Task.Supervisor) + the generic built-in
+    # effects (emit/run/notify). Consumers register more effects on top (e.g. the cloud `log` effect).
+    Nexus.Effects.install_builtins()
+
     children =
       [Nexus.Telemetry, Nexus.ControlPlane.Store, Nexus.ControlPlane.Token, Nexus.Auth.Token] ++
+        Nexus.Events.child_specs() ++
         Nexus.Wasm.Gate.child_specs() ++ Nexus.Cache.child_specs() ++ ether ++ server_children()
     result = Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
 
