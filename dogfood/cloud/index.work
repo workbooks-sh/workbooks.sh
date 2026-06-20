@@ -674,7 +674,14 @@ client :app do
     // ── router + shell ──────────────────────────────────────────────────────────────────────────
     var ROUTE = { path: '/', params: {} };
     WB.route = ROUTE;
-    WB.nav = function (path) { if (path.charAt(0) !== '/') path = '/' + path; location.hash = '#' + path; };
+    WB.nav = function (path) {
+      if (path.charAt(0) !== '/') path = '/' + path;
+      var target = '#' + path;
+      // Already on this route (e.g. switching workspaces while on /workspace): the hash doesn't change
+      // so no `hashchange` fires — re-render manually so the view rebuilds for the new active state.
+      if (location.hash === target) route();
+      else location.hash = target;
+    };
 
     var ACCENT = { '/storage': 'var(--sky)', '/team': 'var(--peach)', '/shared': 'var(--cream)', '/usage': 'var(--sage)',
       '/settings': 'var(--violet)', '/workspace': 'var(--peach)', '/database': 'var(--mint)', '/upgrade': 'var(--mint)' };
