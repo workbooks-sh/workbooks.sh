@@ -20,4 +20,33 @@ defmodule Nexus.AgentUnitTest do
     n = unit("agent :helper do\n  Be terse.\nend\n")
     assert {:agent, %{name: "helper", system: "Be terse."}} = Nexus.Compile.unit(n)
   end
+
+  test "a structured agent block defines prompt + tools + grant + limit (the sandboxed function)" do
+    n =
+      unit("""
+      agent :coder do
+        prompt \"\"\"
+        You fix failing tests in /work.
+        \"\"\"
+        tools coreutils, git, rg
+        grant fs, exec
+        limit turns: 40, timeout: 180_000
+      end
+      """)
+
+    d = Nexus.Agent.def_from_unit(n)
+    assert d.name == "coder"
+    assert d.system =~ "You fix failing tests"
+    assert d.tools == ["coreutils", "git", "rg"]
+    assert d.grant == ["fs", "exec"]
+    assert d.limit == [turns: 40, timeout: 180_000]
+  end
+
+  test "Kits.summary/1 scopes the catalog to an agent's declared tools" do
+    Nexus.Agent.Kits.register("rg", "rg.wasm", summary: "search")
+    Nexus.Agent.Kits.register("git", "git.wasm", summary: "version control")
+    scoped = Nexus.Agent.Kits.summary(["rg"])
+    assert scoped =~ "rg"
+    refute scoped =~ "version control"
+  end
 end

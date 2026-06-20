@@ -75,6 +75,15 @@ defmodule Nexus.Agent.Kits do
     |> Enum.map_join("\n", fn {name, k} -> "  #{name} — #{k.summary}" end)
   end
 
+  @doc "Scoped catalog — only the named kits (an agent's declared `tools`). Least-privilege."
+  def summary(names) when is_list(names) do
+    want = MapSet.new(names)
+
+    all()
+    |> Enum.filter(fn {name, _} -> MapSet.member?(want, name) end)
+    |> Enum.map_join("\n", fn {name, k} -> "  #{name} — #{k.summary}" end)
+  end
+
   @doc "Level-2 progressive disclosure: a kit's command list / usage. `help <kit>` in bash calls this."
   def help(name) do
     case all()[name] do

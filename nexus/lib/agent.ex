@@ -45,12 +45,16 @@ defmodule Nexus.Agent do
       )
   """
   def run(opts) do
+    # Inline runs use the same field names as the `agent` block: `prompt`/`tools`. Normalize to the
+    # internal `system`/`kits` so `run(prompt:, tools:, grant:, limit:, task:)` matches the block.
+    opts = opts |> rename_opt(:prompt, :system) |> rename_opt(:tools, :kits)
     task = Keyword.fetch!(opts, :task)
     vfs = Vfs.new()
     for {path, contents} <- Keyword.get(opts, :seed, %{}), do: Vfs.put(vfs, path, contents)
 
     messages = [%{role: "system", content: system_prompt(opts)}, %{role: "user", content: task}]
-    deadline = now_ms() + Keyword.get(opts, :timeout_ms, @default_timeout)
+    timeout = Keyword.get(Keyword.get(opts, :limit, []), :timeout, Keyword.get(opts, :timeout_ms, @default_timeout))
+    deadline = now_ms() + timeout
     started = now_ms()
 
     try do
@@ -107,13 +111,71 @@ defmodule Nexus.Agent do
   Build a runnable agent def from a parsed `agent` unit node — an agent authored as a literate
   function in a `.work` file (`agent :name do <system prompt> end`). Returns `%{name, system}`.
   """
-  def def_from_unit(%{kind: "agent", name: name, body: body}),
-    do: %{name: name, system: String.trim(body || "")}
+  def def_from_unit(%{kind: "agent", name: name} = node) do
+    case structured(node[:ast]) do
+      {:ok, fields} -> Map.put(fields, :name, name)
+      :no -> %{name: name, system: String.trim(node[:body] || "")}
+    end
+  end
 
-  @doc "Run an `agent` unit node on `task`. The unit body is the agent's system prompt."
+  # A STRUCTURED agent block — `agent :x do prompt "…"; tools …; grant …; limit … end` — parses to a
+  # real AST we read fields off. `prompt` is the system prompt; `tools`/`grant` scope capabilities;
+  # `limit` sets guardrails (turns/timeout). Each field is composable Elixir (atoms, lists, or refs).
+  # A bare-prose body doesn't parse as Elixir (ast: nil) and falls back to body-as-prompt.
+  defp structured({:agent, _, args}) when is_list(args) do
+    with block when not is_nil(block) <- Enum.find_value(args, fn [{:do, b}] -> b; _ -> nil end),
+         fields when fields != %{} <- Enum.reduce(block_stmts(block), %{}, &collect_field/2) do
+      {:ok, Map.put_new(fields, :system, "")}
+    else
+      _ -> :no
+    end
+  end
+
+  defp structured(_), do: :no
+
+  defp block_stmts({:__block__, _, s}), do: s
+  defp block_stmts(nil), do: []
+  defp block_stmts(one), do: [one]
+
+  defp collect_field({:prompt, _, [p]}, acc) when is_binary(p), do: Map.put(acc, :system, String.trim(p))
+  defp collect_field({:tools, _, a}, acc), do: Map.put(acc, :tools, names(a))
+  defp collect_field({:grant, _, a}, acc), do: Map.put(acc, :grant, names(a))
+  defp collect_field({:limit, _, [kw]}, acc) when is_list(kw), do: Map.put(acc, :limit, kw)
+  defp collect_field(_, acc), do: acc
+
+  # Normalize a field's args to names: atoms (`:fs`), bare identifiers (`fs` → var AST), or a list
+  # literal (`[fs, exec]`). Anything else stringifies so composition/refs stay open.
+  defp names(args) do
+    args
+    |> Enum.flat_map(fn list when is_list(list) -> list; other -> [other] end)
+    |> Enum.map(fn
+      a when is_atom(a) -> Atom.to_string(a)
+      {id, _, ctx} when is_atom(id) and is_atom(ctx) -> Atom.to_string(id)
+      other -> Macro.to_string(other)
+    end)
+  end
+
+  @doc "Run an `agent` unit node on `task`. Threads the block's prompt + tools/grant/limit into run/1."
   def run_unit(node, task, opts \\ []) do
     d = def_from_unit(node)
-    run(Keyword.merge([system: d.system, task: task, unit: d.name], opts))
+
+    base =
+      [system: d.system, task: task, unit: d.name]
+      |> put_if(:kits, d[:tools])
+      |> put_if(:grant, d[:grant])
+      |> put_if(:limit, d[:limit])
+
+    run(Keyword.merge(base, opts))
+  end
+
+  defp put_if(kw, _key, nil), do: kw
+  defp put_if(kw, key, val), do: Keyword.put(kw, key, val)
+
+  defp rename_opt(kw, from, to) do
+    case Keyword.fetch(kw, from) do
+      {:ok, v} -> kw |> Keyword.delete(from) |> Keyword.put_new(to, v)
+      :error -> kw
+    end
   end
 
   defp loop(messages, vfs, opts, deadline, tel) do
@@ -122,11 +184,19 @@ defmodule Nexus.Agent do
     # carries map events keyed by :type and never changes loop's return value.
     stream = Keyword.get(opts, :emit, fn _ -> :ok end)
 
-    if now_ms() > deadline do
-      stream.(%{type: "error", error: inspect({:timeout, tel.turns})})
-      {{:error, {:timeout, tel.turns}}, tel}
-    else
-      case Nexus.Llm.complete(manage(messages, opts), Keyword.put(opts, :tools, [@bash_tool])) do
+    max_turns = Keyword.get(Keyword.get(opts, :limit, []), :turns)
+
+    cond do
+      now_ms() > deadline ->
+        stream.(%{type: "error", error: inspect({:timeout, tel.turns})})
+        {{:error, {:timeout, tel.turns}}, tel}
+
+      is_integer(max_turns) and tel.turns >= max_turns ->
+        stream.(%{type: "error", error: "turn limit #{max_turns} reached"})
+        {{:error, {:turn_limit, max_turns}}, tel}
+
+      true ->
+        case Nexus.Llm.complete(manage(messages, opts), Keyword.put(opts, :tools, [@bash_tool])) do
         {:ok, %{tool_calls: []} = turn} ->
           if reasoning?(turn.content), do: emit.({:answer, turn.content})
           stream.(%{type: "final", answer: turn.content})
@@ -196,14 +266,24 @@ defmodule Nexus.Agent do
   end
 
   defp system_prompt(opts) do
+    kits = Keyword.get(opts, :kits)
+    grant = Keyword.get(opts, :grant)
+    catalog = if kits, do: Kits.summary(kits), else: Kits.summary()
+    web = if web_granted?(grant), do: "\n\n" <> web_capability(), else: ""
+
     Keyword.get(opts, :system, "You are a capable agent.") <>
       "\n\nYou have ONE tool: `bash`. You accomplish everything by running command lines in it. " <>
       "Commands are kits (wasm CLIs) run in a sandbox against the /work filesystem. Available kits:\n" <>
-      Kits.summary() <>
-      "\n\n" <> web_capability() <>
+      catalog <> web <>
       "\n\nRun `help <kit>` to see a kit's commands before using it. When you have the answer, " <>
       "reply directly without calling bash."
   end
+
+  # The web is on unless the agent declared `grant`s that exclude it. No grant block → all powers
+  # (back-compat); a grant block → web only when `web`/`net`/`browse` is among the grants.
+  defp web_granted?(nil), do: true
+  defp web_granted?(grant) when is_list(grant), do: Enum.any?(~w(web net browse), &(&1 in grant))
+  defp web_granted?(_), do: true
 
   # The web is a CORE capability (not a kit to discover) — every agent can read AND operate the web.
   defp web_capability do
