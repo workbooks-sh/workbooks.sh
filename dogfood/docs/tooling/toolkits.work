@@ -1,0 +1,53 @@
+# Toolkits
+
+A toolkit is a command you wrap once and call everywhere — a small CLI, written in a
+real systems language, compiled to WebAssembly, and made available as a command that
+a [sandbox](/capabilities/sandboxing-and-the-dock) or an
+[agent](/tooling/authoring-an-agent) can run through `exec`. It's how you extend the
+box with tools of your own.
+
+## A toolkit is a wrapped CLI
+
+The body of a `toolkit` block is an ordinary command-line program — it reads stdin
+and writes stdout, the classic Unix shape. The platform compiles it to a
+wasm32-wasi command module and registers it under its name:
+
+toolkit :upper do
+  // summary: uppercase stdin
+  #include <stdio.h>
+  #include <ctype.h>
+  int main(void) { int c; while ((c = getchar()) != EOF) putchar(toupper(c)); return 0; }
+end
+
+Once registered, `upper` is a command. An agent told it has an `upper` tool can pipe
+text through it; a sandbox with `exec` can invoke it. The toolkit *is* the wasm
+command behind that name.
+
+## Many languages, one shape
+
+The language is inferred from the body — C, Rust, and Zig compile to wasm commands
+today, each through its real toolchain. Whatever the language, the contract is the
+same: stdin in, stdout out. That uniform shape is why a toolkit composes with any
+other command and why an agent can use one without knowing how it was written.
+
+A compiled toolkit is content-addressed and cached, so the second build is instant
+and the same source always yields the same command.
+
+## Why wrap a CLI at all
+
+Three reasons it's worth the block:
+
+- **Reuse** — write the command once; every agent and sandbox can call it. No
+  copy-pasted shell snippets drifting apart.
+- **Containment** — the command runs as wasm under the
+  [Dock](/capabilities/sandboxing-and-the-dock), with only the powers granted. A
+  toolkit is a safe way to give an agent real teeth.
+- **Legibility** — the tool's source sits in the document next to the agent that uses
+  it, parsed by the [one parser](/language/block-grammar) like everything else.
+
+## Toolkits and agents
+
+This is the seam that makes agents useful. An [agent](/tooling/authoring-an-agent)
+that "has a bash tool with a web kit" is really an agent granted `exec` over a set of
+registered toolkit commands. You build the kit, grant it, and the agent computes real
+answers with real tools — inside the wall, every time.

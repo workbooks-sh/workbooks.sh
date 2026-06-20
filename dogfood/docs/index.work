@@ -32,15 +32,38 @@ app :docs do
     page "language/elixir-in-markdown"
   end
 
+  section "Capabilities & sandboxing" do
+    page "capabilities/sandboxing-and-the-dock"
+    page "capabilities/grants-and-capabilities"
+    page "capabilities/the-three-walls"
+  end
+
+  section "Data & persistence" do
+    page "data/resources-and-the-store"
+  end
+
+  section "Serving & routing" do
+    page "serving/routes-and-pages"
+    page "serving/site-mode-and-llms-txt"
+  end
+
   section "Running & deploying" do
     page "deploy/running-the-nexus"
     page "deploy/deploy-local-and-cloud"
+    page "deploy/deploy-as-index-tree"
     page "deploy/secrets-and-config"
     page "deploy/workbooks-cloud"
   end
 
   section "Agents & tooling" do
     page "tooling/get-started-with-your-cli-agent"
+    page "tooling/authoring-an-agent"
+    page "tooling/toolkits"
+  end
+
+  section "Architecture" do
+    page "architecture/one-frontend-many-targets"
+    page "architecture/runtime-connect-rcp"
   end
 
   section "Examples" do

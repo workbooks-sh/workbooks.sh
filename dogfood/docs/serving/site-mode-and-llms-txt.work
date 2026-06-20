@@ -1,0 +1,48 @@
+# Site mode and llms.txt
+
+This documentation is a workbook. The sidebar, the routed URLs, the deep links you
+can reload — none of it is hand-written front-end code. It's **site mode**: the
+runtime reading an [`app`](/serving/routes-and-pages) composition and rendering the
+whole tree as a navigable site. The same machinery serves any docs-shaped workbook,
+including yours.
+
+## What the runtime renders
+
+You declare structure — sections and pages — and the platform's site mode does the
+rest:
+
+- a **sidebar** built from your `section` / `page` declarations,
+- clean, history-routed **URLs** (`/section/page`), reload-safe so a deep link works,
+- server-rendered **prose** for each page, with internal links via `[text](/section/page)`,
+- an interactive **examples** explorer and a **blog**, when you include them.
+
+The look is yours — it comes from a brand sheet in your composition root, never from
+the runtime. The [Nexus](/introduction/what-is-the-nexus) ships unopinionated
+plumbing; you supply the title and the theme.
+
+## Built to be read by agents
+
+A docs site is also a corpus an agent should be able to ingest whole. Site mode emits
+machine-readable surfaces alongside the human pages:
+
+- **`/llms.txt`** — a compact, machine-readable index of the site: the map.
+- **`/llms-full.txt`** — a full-text dump of every page: the whole book in one fetch.
+
+Point an agent at `llms.txt` for the structure, feed it `llms-full.txt` for the
+content. Each page also offers **copy-as-markdown** and **copy-as-prompt**, so a
+single page drops straight into a chat. The docs are agent-ready by construction —
+see [Get started with your CLI agent](/tooling/get-started-with-your-cli-agent).
+
+## Why render it server-side
+
+Server-rendering the prose means the site is fast, linkable, and indexable without
+shipping a front-end framework to do routing. The [`client`](/language/placement-and-languages)
+islands that *do* need to be interactive (the examples explorer) hydrate as wasm in
+the page; everything else is just rendered HTML. You get a real site without writing
+one.
+
+## The same shape, scaled
+
+Whether the runtime serves this one docs workbook or a dozen apps side by side, site
+mode is the same — [one nexus, many sites](/blog/the-nexus-serves-many-sites), each a
+tree the runtime renders. Declare the structure; the site follows.

@@ -1,0 +1,58 @@
+# Sandboxing and the Dock
+
+Some code you'd rather not trust with everything — a scraper, a third-party
+toolkit, a snippet an agent wrote. A [`sandbox`](/language/kinds-reference) block is
+how a workbook runs that code **with only the powers you grant it**. It compiles to
+WebAssembly and runs against a single, audited host surface called the **Dock**.
+
+## The membrane
+
+WebAssembly has no ambient authority: a wasm module can compute, but it can't open a
+socket, read a file, or call an API on its own. The only things it can do are the
+functions the host *imports into it*. The Dock is that host surface — the one place
+the [Nexus](/introduction/what-is-the-nexus) hands real powers to guest code.
+
+Nothing crosses the membrane that you didn't grant. That's the whole security model:
+not a list of rules the guest is asked to follow, but a wall it physically cannot
+reach through.
+
+## What the Dock can offer
+
+The Dock exposes a small, fixed set of host functions. Guest code never gets the raw
+power — it gets a narrow, typed call that the host brokers:
+
+- **net** — an HTTP fetch the host performs on the guest's behalf. The host runs an
+  SSRF gate first, so a sandbox can't reach loopback, private, or link-local
+  addresses even if it asks.
+- **kv** — a tenant-scoped key/value store (`get` / `put`). Each tenant sees only
+  its own keys.
+- **secrets** — read a named secret by key. The *value* never appears in source; the
+  guest asks for `OPENROUTER_API_KEY` and the host resolves it (see
+  [Secrets & configuration](/deploy/secrets-and-config)).
+- **fs** — read/write within the mounted work area, not the host filesystem.
+- **exec** — run a registered command. This is how [toolkits](/tooling/toolkits)
+  become callable from inside the box.
+- **llm** — a brokered model completion.
+
+Each capability is WIT-typed: the host declares the exact function signature the
+guest may import, and the weave generates that interface. There's no way to import a
+power that wasn't granted.
+
+## Why broker instead of allow
+
+Every Dock function is the host *doing the work*, not the host *opening a hole*. `net`
+isn't "raw sockets, please be careful" — it's "ask the host to fetch this URL," and
+the host applies its own policy (the SSRF gate, allowlists) before it acts. That
+keeps the dangerous part on the trusted side of the membrane, where it can be audited
+in exactly one place.
+
+## You declare what it needs
+
+A sandbox names the capabilities it wants, and the weave checks them: `work check`
+audits every block against what it actually requests, so a sandbox that asks for
+`net` is visible at review time and a sandbox that asks for nothing can't surprise
+you. The grants are part of the source — see
+[Grants & capabilities](/capabilities/grants-and-capabilities).
+
+The point: untrusted code is still *useful* code. The Dock lets you run it, see
+exactly what it can touch, and trust the wall instead of the author.

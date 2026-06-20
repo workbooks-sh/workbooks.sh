@@ -1,0 +1,52 @@
+# The three walls
+
+Some things a [sandbox](/capabilities/sandboxing-and-the-dock) cannot do, and won't
+ever do as described — not because we haven't built them, but because the
+architecture rules them out. We call these the three walls. Naming them is a
+feature: a wall you can see is more trustworthy than a gap left silent.
+
+## Why a wall is honest
+
+A capability model is only as good as its edges. If a system claims it can run
+*anything* safely, it's either lying or it has a hole. Workbooks would rather tell
+you exactly where the box ends. Each wall is a place where the safe answer is "no,
+and here's the seam you use instead."
+
+## Bedrock — no native execution in the guest
+
+Guest code runs as WebAssembly. It cannot fork a process, JIT new native code, or
+shell out to the host's machine. There is no "just run this binary" inside the box.
+
+The escape is not a hole in the wall — it's a **trusted host-service broker**. When a
+sandbox needs real execution, it asks the host through [`exec`](/capabilities/grants-and-capabilities),
+and the host runs a *registered* command (a [toolkit](/tooling/toolkits)) under its
+own policy. The dangerous part stays on the trusted side.
+
+## Bridge — no browser host inside the runtime
+
+A [`client`](/language/placement-and-languages) island is browser code; it expects a
+DOM, a window, the browser's JavaScript host. The [Nexus](/introduction/what-is-the-nexus)
+is the BEAM — there is no browser there. So you can't run browser-host code
+*server-side* by pretending the server is a browser.
+
+The seam is a real headless build on the BEAM when you genuinely need to render
+without a browser — not a fake `window` bolted onto the server. Client code runs
+where clients run: in the page, as wasm.
+
+## Forge — the compiler frontier
+
+A `.work` block compiles to wasm through a real toolchain, and that toolchain has
+edges. Some languages compile cleanly today; others are still being brought up. When
+a language's path to wasm isn't ready, that block doesn't ship — it's a forge wall,
+not a runtime promise that quietly fails.
+
+The honest move is to tell you which lane is solid and which is in progress, so you
+pick a language knowing where it stands rather than discovering the gap at deploy.
+
+## The shape of all three
+
+Each wall has the same shape: a thing that *looks* like it should work, a reason the
+architecture says no, and a real seam you use instead — a host broker, a proper
+headless build, a supported language. The walls aren't apologies. They're the reason
+you can trust what the box *does* let through. For what it does let through, see
+[Grants & capabilities](/capabilities/grants-and-capabilities).

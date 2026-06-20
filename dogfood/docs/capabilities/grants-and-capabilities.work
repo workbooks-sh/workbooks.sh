@@ -1,0 +1,59 @@
+# Grants and capabilities
+
+A capability is a named power: the ability to make a network call, read a key, run a
+command. A grant is you handing one of those powers to a block. Together they make
+the [sandbox](/capabilities/sandboxing-and-the-dock) model concrete — and they live
+in the source, so they're reviewable like any other code.
+
+## The capabilities
+
+There is a small, fixed vocabulary of capabilities the [Dock](/capabilities/sandboxing-and-the-dock)
+can broker:
+
+- **`net`** — perform an HTTP fetch (host-mediated, SSRF-gated).
+- **`kv`** — read and write a tenant-scoped key/value store.
+- **`secrets`** — read a named secret value (never the literal, only by key).
+- **`fs`** — read and write inside the mounted work area.
+- **`exec`** — run a registered command, the seam [toolkits](/tooling/toolkits) use.
+
+Each one maps to a single WIT interface with a single, typed signature. A block that
+holds `net` can call `fetch`; it cannot suddenly also write files. Powers don't
+bleed.
+
+## Granting a power
+
+A block requests only what it needs. The default is **nothing** — a `sandbox` with no
+grants can compute and return a value, and that's all. You add a capability by
+naming it, and the weave wires the matching host import into the compiled module:
+
+sandbox python :scrape do
+  // needs: net
+  import urllib.request
+  def run(url):
+      return fetch(url)        # the host brokers the call
+end
+
+A block that never names `net` has no `fetch` in scope — the import isn't there to
+call. The grant *is* the wiring.
+
+## The audit is the point
+
+Because grants are written down and the [one parser](/language/block-grammar) reads
+them off the tree, the toolchain can audit them:
+
+work check .        # resolve refs + audit every block's capabilities
+
+`work check` walks the tree and reports what each block requests. A reviewer (or an
+agent) sees at a glance that `:scrape` reaches the network and the report-renderer
+doesn't. There's no hidden `System.cmd`, no smuggled socket — if a block can touch
+the outside world, the grant says so, in the file, in the diff.
+
+## Least power, by default
+
+The model rewards asking for less. Grant `kv` instead of `fs` when you only need a
+value by key. Grant nothing when the block is pure. The narrower the grant, the
+smaller the audit, and the easier the block is to trust — which is exactly the
+property you want when an agent is writing the code.
+
+Next: the powers that are deliberately *not* on this list, and why —
+[The three walls](/capabilities/the-three-walls).

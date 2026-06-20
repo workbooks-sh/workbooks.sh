@@ -1,0 +1,57 @@
+# Routes and pages
+
+A workbook becomes a site when the [Nexus](/introduction/what-is-the-nexus) serves
+it. Most of the time you don't write routes at all — a docs-style app declares
+sections and pages and the runtime renders the navigation for you. When you need an
+HTTP endpoint of your own, you declare a **route**.
+
+## Pages come for free
+
+An `app` composition declares its structure, and the runtime turns that into a routed
+site — sidebar, clean URLs, deep links — with no front-end code:
+
+app :docs do
+  title "Workbooks"
+  section "Introduction" do
+    page "introduction/what-is-a-workbook"
+  end
+end
+
+Each `page` is a `.work` file of prose; the runtime server-renders it and wires the
+router. You link pages with `[text](/section/page)` and reload-safe deep links just
+work. This is the common case — declare the tree, get a site.
+
+## Routes for endpoints
+
+When you need a real HTTP endpoint — an API, a form handler, a webhook — declare a
+**`route`** inside a [`server`](/language/placement-and-languages) unit. A route maps
+a method-and-path to a handler:
+
+server api :orders do
+  route "POST /orders", :create
+  route "GET /orders/:id", :show
+
+  def create(req), do: Store.insert(:orders, req.body)
+  def show(req), do: Store.get(:orders, req.params.id)
+end
+
+The path can carry params (`:id`), and the verb is part of the declaration. The
+server unit holds both the routes and their handlers, side by side.
+
+## Guarding a route
+
+Routes default to whatever the workbook's access posture is; you mark the exceptions.
+A route can be made **`public`** (no auth) or **`protect`**ed (auth required), so the
+guard is visible in the source next to the route it covers rather than buried in
+middleware. The same guards apply whether a request arrives with a session cookie or
+a minted token — the token carries scopes and is subject to the same per-route check.
+
+## One document, browser to endpoint
+
+A page renders prose, a [`client`](/language/placement-and-languages) island runs in
+the browser, a `server` route answers HTTP, and a [resource](/data/resources-and-the-store)
+stores the rows behind it — all in the same tree, all read by the
+[one parser](/language/block-grammar). The site isn't a separate app wired to the
+workbook; the workbook *is* the site. See how one runtime hosts more than one of them
+in [One nexus, many sites](/blog/the-nexus-serves-many-sites), and how a site renders
+itself in [Site mode & llms.txt](/serving/site-mode-and-llms-txt).

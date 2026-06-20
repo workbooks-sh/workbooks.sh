@@ -1,0 +1,66 @@
+# Resources and the Store
+
+A workbook isn't just prose and logic — it stands on data. There are three ways to
+declare a shape, and they differ by one question: *does it persist?* Get that
+distinction right and the rest follows.
+
+## Three shapes, one question
+
+- **`data`** — a typed table that **renders by default**. You write rows in the file;
+  the page shows them as a table. It's literal data that lives in the document. See
+  [Declarations](/language/declarations).
+- **`record`** — a struct: a fixed set of named fields grouped into one value. It
+  describes a shape you pass around in code. Nothing is stored; it's a type.
+- **`resource`** — a **persisted, queryable table**. The Nexus stores its rows and
+  you query them back. This is your database, declared in the document.
+
+The line is persistence. `data` is in the file, `record` is in memory, `resource` is
+in the store.
+
+## Declaring a resource
+
+A resource names its fields with types, the same way a `data` block does — but it
+means *a table the Nexus keeps*:
+
+resource Product do
+  name :text
+  price :money
+  stock :int
+  status :draft | :live | :sold_out
+end
+
+That last field shows an inline enum: `status` is one of three atoms. The declaration
+is the schema; the [Nexus](/introduction/what-is-the-nexus) provisions storage for it
+when the workbook runs.
+
+## Reading and writing
+
+A [`server`](/language/placement-and-languages) unit is where rows come and go,
+because persistence is a server power. You insert and query through the store:
+
+server place :submit do
+  def run(order), do: Store.insert(:orders, order)
+end
+
+The data plane is part of what a runtime advertises over
+[RCP](/architecture/runtime-connect-rcp), so a connected client knows the workbook has
+queryable data without being told out of band.
+
+## Rendering it back
+
+Declaring a resource isn't the same as showing it. The **`show`** directive renders a
+resource as a table, taking its columns from the fields you declared:
+
+show Product
+
+One line turns the stored rows into a table on the page — no template, no field list
+to keep in sync, because the columns come straight from the schema. Change a field in
+the resource and the rendered table follows.
+
+## Why it's in the document
+
+A schema in a migrations folder, queries in a model file, and a table in a template
+are the same fact written three times, drifting apart. Here the `resource` is the
+schema, the `server` unit is the access, and `show` is the view — all in reading
+order, in one file, sharing the [one parse](/language/block-grammar). The data is as
+legible as the prose around it.
