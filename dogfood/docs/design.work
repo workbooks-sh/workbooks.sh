@@ -50,9 +50,10 @@ design :brand do
      morphs to that section's pastel. Geometry (top/height/--wb-mark-color) is set by
      the runtime's neutral marker hook; the look + motion live here. */
   .wb-nav{position:relative}
-  .wb-nav::before{content:'';position:absolute;left:0;top:0;bottom:0;width:0;
-    border-left:8px dotted var(--line);opacity:.65;pointer-events:none;z-index:0}
-  .wb-active-mark{position:absolute;left:0;width:8px;border-radius:3px;z-index:1;pointer-events:none;
+  .wb-nav::before{content:'';position:absolute;left:0;top:0;bottom:0;width:8px;
+    background:radial-gradient(circle,var(--line) 1px,transparent 1.6px) center/8px 5px repeat-y;
+    opacity:.7;pointer-events:none;z-index:0}
+  .wb-active-mark{position:absolute;left:0;width:8px;border-radius:0;z-index:1;pointer-events:none;
     background:var(--wb-mark-color,var(--ink));
     transition:top .26s cubic-bezier(.4,0,.2,1),height .26s cubic-bezier(.4,0,.2,1),background-color .26s ease}
   .wb-active-mark[hidden]{display:none}
