@@ -47,7 +47,7 @@ defmodule Nexus.JsEngine do
     end
   end
 
-  # No capability granted on this eval (the wb-b9xv `grant == nil` semantics): every op default-denies.
+  # No capability granted on this eval: every op default-denies (plain evals / js_dom get no surface).
   defp deny_broker(_req_json), do: ~s({"ok":false,"error":"no capability granted"})
 
   @doc "Whether the StarlingMonkey engine wasm is present."

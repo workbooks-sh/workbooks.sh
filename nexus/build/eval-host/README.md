@@ -13,8 +13,10 @@ bound to `globalThis.__wbHostCall`. EVERYTHING the guest needs from the host rid
 toolkit capability ops (store/load/cache.*/fetch/complete/emit). One engine, one import, one
 vocabulary — new caps need NO engine rebuild, just a new `op` handler + a guest wrapper.
 
-This matches `runtime/host/js_engine.ex` (the `Workbooks.HostBroker` work) verbatim, so the staged
-engine is interchangeable; toolkit ops unify into that dispatcher when it lands.
+The committed shims in `nexus/compilers/js/shims-sm` (child_process/fs/dock_auth) already call
+`globalThis.__wbHostCall`; this engine provides that seam, and `Nexus.Toolkit.Caps` is the live
+host-broker dispatcher. Node-compat ops (exec/fs/creds) join the same vocabulary here as that lane
+is built in `nexus/`.
 
 ## Files
 

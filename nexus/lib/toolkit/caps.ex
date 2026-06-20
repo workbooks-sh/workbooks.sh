@@ -5,8 +5,10 @@ defmodule Nexus.Toolkit.Caps do
   Toolkits run as data in the StarlingMonkey eval-host (`Nexus.Toolkit.Js`), which imports the single
   synchronous `wb:jseval/broker.host-call: func(req: string) -> string` (bound to `globalThis.__wbHostCall`).
   Toolkit capabilities are **ops on that one seam** (`{"op":"store",…} -> {"ok":true,…}`), exactly like
-  the node-compat ops (exec/fs/creds). There is NO separate per-toolkit import interface — one engine,
-  one broker, a shared op vocabulary (unifies with `Workbooks.HostBroker` when that lands).
+  the node-compat ops (exec/fs/creds) the committed `nexus/compilers/js/shims-sm` already speak. There
+  is NO separate per-toolkit import interface — one engine, one broker, one shared op vocabulary. This
+  module is the live Nexus host-broker dispatcher (toolkit ops today; node-compat ops join here in
+  `nexus/` as that lane is built).
 
   This module:
 
