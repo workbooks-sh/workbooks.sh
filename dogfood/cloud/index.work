@@ -2935,12 +2935,36 @@ function mountHistory(host, scope) {
   </script>
 
   <script>
-// routes/workspace/+page.svelte — the workspace index.
-// Faithful to the loader: routes/workspace/+page.js throws redirect(307, '/workspace/members'),
-// so this index ALWAYS lands on Members & access and the Structure content below never renders.
-// The component's styles + render are reproduced verbatim for exactness, but render() redirects
-// first (the loader runs before the page mounts), exactly as the source does.
+// routes/workspace/+page.svelte — the workspace STRUCTURE view (the /workspace index tab).
+//
+// The source's +page.js redirected /workspace → /workspace/members, which stranded this Structure
+// view (it never rendered). We make the tab live: the workspace's .work files visualized as a live
+// code-graph (every client / server / resource / data unit + how they connect), served straight from
+// the nexus (GET /:wb/graph — JSON summary + ?format=html for the interactive viz). The workspace's
+// surface id IS the mount the nexus serves it under. Header + tabs match the other workspace views.
 WB.scopedStyles('/workspace', `
+  /* ── +layout.svelte (header + tabs) ── */
+  .wshead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+  .wsav {
+    width:40px; height:40px; border-radius:11px; flex:none; display:grid; place-items:center;
+    background:var(--line); color:var(--ink);
+    font:700 16px var(--read);
+  }
+  .wshead h2 { font-family:var(--display); font-weight:600; font-size:24px; line-height:1.1; color:var(--ink); }
+  .wshead p { font:400 13.5px var(--read); color:var(--prose); margin-top:3px; }
+  .wstabs {
+    display:flex; gap:2px; margin-bottom:22px;
+    border-bottom:1px solid var(--line);
+  }
+  .wstabs a {
+    padding:9px 14px; font:600 13px var(--read); color:var(--dim);
+    text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-1px;
+    transition:color .1s;
+  }
+  .wstabs a:hover { color:var(--ink); }
+  .wstabs a.on { color:var(--ink); border-bottom-color:var(--section); }
+
+  /* ── workspace/+page.svelte (structure) ── */
   .kinds { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center; }
   .kpill {
     display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border:1px solid var(--line);
@@ -2958,66 +2982,70 @@ WB.view('/workspace', {
   title: 'Workspace',
   accent: 'var(--peach)',
   async render(el, ctx) {
-    // Loader: throw redirect(307, '/workspace/members'). The page never renders.
-    WB.nav('/workspace/members');
-    return;
-
-    // --- Unreachable (faithful reproduction of +page.svelte, kept for parity) ---
-    /* eslint-disable no-unreachable */
-    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-    // The workspace's STRUCTURE — its .work files visualized as a live code-graph.
-    const KIND = { client: '#a8d4f0', server: '#aee5c2', resource: '#f3c5a3', data: '#d9c5f0', design: '#f2ddb0', agent: '#9fc4e8' };
+    const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
     const ws = WB.ws.active;
-    const mount = (ws?.id || '').replace(/^ws_/, '');
-    const base = (WB.nexus.active?.url || 'https://workbooks.sh').replace(/\/$/, '');
-    const vizUrl = mount ? `${base}/${mount}/graph?format=html` : null;
+    const wsLayoutName = ws?.name || 'Workspace';
+    const wsIcon = ws?.icon || (wsLayoutName[0] || 'W').toUpperCase();
+    const here = '/workspace';
+    const TABS = [
+      { href: '/workspace', label: 'Structure' },
+      { href: '/workspace/members', label: 'Members & access' },
+      { href: '/workspace/sharing', label: 'Sharing' },
+      { href: '/workspace/history', label: 'History' },
+      { href: '/workspace/env', label: 'Secrets' }
+    ];
+    const isOn = (href) => (href === '/workspace' ? here === '/workspace' : here === href || here.startsWith(href + '/'));
 
-    let summary = null;
-    let err = false;
+    function shell(inner) {
+      return `
+<section>
+  <div class="wshead">
+    <span class="wsav">${esc(wsIcon)}</span>
+    <div>
+      <h2>${esc(wsLayoutName)}</h2>
+      <p>Workspace governance — who's in it, what's shared, and everything that's changed.</p>
+    </div>
+  </div>
+  <nav class="wstabs">
+    ${TABS.map((t) => `<a href="${t.href}"${isOn(t.href) ? ' class="on"' : ''} data-nav="${t.href}">${esc(t.label)}</a>`).join('')}
+  </nav>
+  ${inner}
+</section>`;
+    }
 
-    const paint = () => {
-      if (!ws) {
-        el.innerHTML = `<div class="card faint" style="text-align:center">Pick a workspace from the sidebar.</div>`;
-        return;
-      }
+    if (!ws) {
+      el.innerHTML = shell(`<div class="card faint" style="text-align:center">Pick a workspace from the sidebar.</div>`);
+      return;
+    }
 
-      let kinds;
-      if (summary) {
-        kinds =
-          `<div class="kpill total"><b>${esc(summary.units)}</b> units</div>` +
-          Object.entries(summary.byKind)
-            .map(
-              ([k, n]) =>
-                `<div class="kpill"><span class="dot" style="background:${esc(KIND[k] || 'var(--dim)')}"></span><b>${esc(n)}</b> ${esc(k)}</div>`
-            )
-            .join('');
-      } else if (err) {
-        kinds = `<div class="faint" style="font-size:13px">Couldn’t read the structure (the nexus may be waking — refresh in a moment).</div>`;
-      } else {
-        kinds = `<div class="faint" style="font-size:13px">Reading structure…</div>`;
-      }
+    // The workspace's served mount: a surface workspace's id IS its mount (lander/cloud/docs…).
+    const mount = (ws.id || '').replace(/^ws_/, '');
+    // Same-origin (relative): the mount is served by this same nexus at /<mount> (through the proxy too).
+    const vizUrl = mount ? `/${mount}/graph?format=html` : null;
+    const KIND = { client: '#a8d4f0', server: '#aee5c2', resource: '#f3c5a3', data: '#d9c5f0', design: '#f2ddb0', agent: '#9fc4e8' };
 
-      el.innerHTML =
-        `<div class="kinds">${kinds}</div>` +
-        `<div class="vizwrap">${vizUrl ? `<iframe title="Workspace structure graph" src="${esc(vizUrl)}" loading="lazy"></iframe>` : ''}</div>` +
-        `<p class="hint">Each node is a <code>.work</code> unit — colour = kind (client / server / resource / data), badges = live utilization. Click a node to inspect its declared vs. real facets. Served live from your nexus.</p>`;
-    };
+    const structure = (kinds) => `
+  <div class="kinds">${kinds}</div>
+  <div class="vizwrap">${vizUrl ? `<iframe title="Workspace structure graph" src="${vizUrl}" loading="lazy"></iframe>` : ''}</div>
+  <p class="hint">Each node is a <code>.work</code> unit — colour = kind (client / server / resource / data), badges = live utilization. Click a node to inspect its declared vs. real facets. Served live from your nexus.</p>`;
 
-    paint();
+    el.innerHTML = shell(structure(`<div class="faint" style="font-size:13px">Reading structure…</div>`));
 
-    if (mount) {
-      fetch(`${base}/${mount}/graph`)
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((d) => {
-          summary = d;
-          paint();
-        })
-        .catch(() => {
-          err = true;
-          paint();
-        });
+    // Pull the kind summary (units + byKind) and fill the pills; the viz iframe loads on its own.
+    try {
+      const r = await fetch(`/${mount}/graph`, { credentials: 'same-origin' });
+      if (!r.ok) throw new Error('graph ' + r.status);
+      const summary = await r.json();
+      let pills = `<div class="kpill total"><b>${summary.units}</b> units</div>`;
+      pills += Object.entries(summary.byKind || {})
+        .map(([k, n]) => `<div class="kpill"><span class="dot" style="background:${KIND[k] || 'var(--dim)'}"></span><b>${n}</b> ${esc(k)}</div>`)
+        .join('');
+      const kindsEl = el.querySelector('.kinds');
+      if (kindsEl) kindsEl.innerHTML = pills;
+    } catch (e) {
+      const kindsEl = el.querySelector('.kinds');
+      if (kindsEl) kindsEl.innerHTML = `<div class="faint" style="font-size:13px">Couldn’t read the structure (the nexus may be waking — refresh in a moment).</div>`;
     }
   }
 });
