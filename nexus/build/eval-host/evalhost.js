@@ -1,7 +1,7 @@
 // eval-host bootstrap — converged on the shared host-broker seam (wb:jseval/broker.host-call).
 // Bind the single synchronous host-call import to globalThis.__wbHostCall so RUNTIME-eval'd code
 // (toolkit $host shims, node-compat shims — all under classic eval, no ESM import) can reach it.
-// run(input) evals + awaits. Matches runtime/host/js_engine.ex so the staged engine is interchangeable.
+// run(input) evals + awaits. The single host-broker import is the Nexus eval-host contract.
 import { hostCall } from 'wb:jseval/broker';
 globalThis.__wbHostCall = hostCall;
 export async function run(src) {
