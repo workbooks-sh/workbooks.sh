@@ -19,6 +19,13 @@ const parts = {};
 export function registerPart(type, fn) { parts[type] = fn; }
 export function getParts() { return parts; }
 
+// message-action registry — fn(message, ctx) -> Node|null, appended to a message's action bar.
+const actions = [];
+export function registerAction(fn) { actions.push(fn); }
+// composer add-on registry — fn(ctx) -> Node|null, inserted in the composer toolbar (left of send).
+const composerButtons = [];
+export function registerComposerButton(fn) { composerButtons.push(fn); }
+
 // ── tiny DOM + helpers (shared primitives) ──────────────────────────────────────────────────────
 export function el(tag, attrs, kids) {
   const n = document.createElement(tag);
@@ -38,6 +45,7 @@ export const ICON = {
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
   refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>',
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
 };
 export function icon(name) { return el('span', { html: ICON[name] || '', class: 'wbc-ico' }); }
 
@@ -101,6 +109,8 @@ export function createChat(container, options = {}) {
   let messages = [];
   let status = 'idle'; // idle | pending | streaming
   let abort = null;
+  let attachedFiles = [];                                  // composer attachments (set via ctx.addFile)
+  let selectedModel = opts.model || (opts.models && opts.models[0]) || null; // composer model picker
 
   const root = el('div', { class: 'wb-chat' });
   if (opts.scheme) root.setAttribute('data-color-scheme', opts.scheme);
@@ -112,6 +122,7 @@ export function createChat(container, options = {}) {
   root.append(convo, scrollBtn, composer);
   container.innerHTML = '';
   container.append(root);
+  mountComposerButtons();
   loadMarkdown().then(render);
 
   function emit(evt, payload) { (listeners[evt] || []).forEach(f => { try { f(payload); } catch (_) {} }); }
@@ -124,15 +135,28 @@ export function createChat(container, options = {}) {
   function renderMessage(m) {
     const row = el('div', { class: 'wbc-msg ' + m.role });
     (m.parts || []).forEach(p => { const r = (parts[p.type] || parts.text); row.append(r(p, ctxFor(m.role))); });
-    if (m.role === 'assistant' && status === 'idle') row.append(messageActions(m));
+    if (status === 'idle') { const a = messageActions(m); if (a) row.append(a); }
     return row;
   }
   function messageActions(m) {
     const text = (m.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
+    const ctx = { message: m, text, copy, regenerate: () => regenerate(m), edit: () => beginEdit(m), controller, el, icon, md };
     const bar = el('div', { class: 'wbc-actions' });
-    bar.append(el('button', { class: 'wbc-act', title: 'Copy', html: ICON.copy, onClick: () => copy(text) }));
-    bar.append(el('button', { class: 'wbc-act', title: 'Regenerate', html: ICON.refresh, onClick: () => regenerate(m) }));
-    return bar;
+    if (m.role === 'assistant') {
+      bar.append(el('button', { class: 'wbc-act', title: 'Copy', html: ICON.copy, onClick: () => copy(text) }));
+      bar.append(el('button', { class: 'wbc-act', title: 'Regenerate', html: ICON.refresh, onClick: () => regenerate(m) }));
+    } else {
+      bar.append(el('button', { class: 'wbc-act', title: 'Edit', html: ICON.edit, onClick: () => beginEdit(m) }));
+    }
+    actions.forEach(fn => { try { const n = fn(m, ctx); if (n) bar.append(n); } catch (_) {} });
+    return bar.childNodes.length ? bar : null;
+  }
+  // Edit a user message: pull its text back into the composer and truncate from here (re-send to fork).
+  function beginEdit(m) {
+    const idx = messages.indexOf(m); if (idx < 0) return;
+    const text = (m.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
+    messages = messages.slice(0, idx); render();
+    composer._ta.value = text; composer._ta.focus(); composer._ta.dispatchEvent(new Event('input'));
   }
 
   function render() {
@@ -156,28 +180,54 @@ export function createChat(container, options = {}) {
 
   // ── composer ──
   function buildComposer() {
+    injectStyle('composer-x', `.wbc-tray{display:flex;flex-wrap:wrap;gap:6px;max-width:var(--wbc-content-max);margin:0 auto 8px}
+      .wbc-tray:empty{display:none} .wbc-chip-file{display:flex;align-items:center;gap:6px;border:1px solid var(--wbc-line);background:var(--wbc-panel);border-radius:8px;padding:4px 8px;font:500 12px var(--wbc-font);color:var(--wbc-ink)}
+      .wbc-chip-file button{border:none;background:none;color:var(--wbc-dim);cursor:pointer;padding:0 2px}
+      .wbc-tools{display:flex;align-items:center;gap:2px;flex:none}
+      .wbc-tool{border:none;background:none;color:var(--wbc-dim);cursor:pointer;width:30px;height:30px;border-radius:8px;display:grid;place-items:center}
+      .wbc-tool:hover{background:var(--wbc-line);color:var(--wbc-ink)} .wbc-tool svg{width:17px;height:17px}`);
     const wrap = el('div', { class: 'wbc-composer' });
+    const tray = el('div', { class: 'wbc-tray' });
     const inner = el('div', { class: 'wbc-composer-inner' });
+    const tools = el('div', { class: 'wbc-tools' });
     const ta = el('textarea', { class: 'wbc-textarea', rows: '1', placeholder: opts.placeholder });
     const send = el('button', { class: 'wbc-send', html: ICON.send, title: 'Send' });
     const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; };
     ta.addEventListener('input', grow);
     ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); fire(); } });
     send.addEventListener('click', fire);
-    function fire() { const v = ta.value.trim(); if (!v || status !== 'idle') return; ta.value = ''; grow(); submit(v); }
-    inner.append(ta, send);
-    wrap.append(inner);
-    wrap._ta = ta; wrap._send = send;
+    function fire() { const v = ta.value.trim(); if ((!v && !attachedFiles.length) || status !== 'idle') return; ta.value = ''; grow(); submit(v); }
+    inner.append(tools, ta, send);
+    wrap.append(tray, inner);
+    wrap._ta = ta; wrap._send = send; wrap._tray = tray; wrap._tools = tools;
     return wrap;
   }
+  function renderTray() {
+    const tray = composer._tray; tray.innerHTML = '';
+    attachedFiles.forEach((f, i) => tray.append(el('span', { class: 'wbc-chip-file' }, [
+      f.name || ('file ' + (i + 1)), el('button', { title: 'Remove', onClick: () => { attachedFiles.splice(i, 1); renderTray(); } }, '×')])));
+  }
+  // ctx handed to registered composer buttons (attachments, model selector, …)
+  const composerCtx = {
+    el, icon, controller,
+    addFile: (f) => { attachedFiles.push(f); renderTray(); },
+    files: () => attachedFiles.slice(),
+    models: opts.models || [],
+    model: () => selectedModel,
+    setModel: (m) => { selectedModel = m; },
+    submit: (t) => submit(t),
+  };
+  function mountComposerButtons() { composerButtons.forEach(fn => { try { const n = fn(composerCtx); if (n) composer._tools.append(n); } catch (_) {} }); }
   function setBusy(b) { composer._send.disabled = b; }
 
   // ── flow ──
   async function submit(text) {
     if (status !== 'idle') return;
-    const userMsg = { id: ++_seq, role: 'user', parts: [{ type: 'text', text }] };
+    const files = attachedFiles.slice(); attachedFiles = []; renderTray();
+    const userParts = [{ type: 'text', text }].concat(files.map(f => ({ type: 'file', name: f.name, mime: f.type })));
+    const userMsg = { id: ++_seq, role: 'user', parts: userParts };
     messages.push(userMsg);
-    emit('send', { text }); emit('change', { messages });
+    emit('send', { text, files }); emit('change', { messages });
     status = 'pending'; setBusy(true); render();
 
     const assistant = { id: ++_seq, role: 'assistant', parts: [{ type: 'text', text: '' }] };
@@ -188,7 +238,7 @@ export function createChat(container, options = {}) {
       assistant.parts[0].text += chunk; render();
     };
     try {
-      const ret = await (opts.send ? opts.send(text, { delta: onDelta, signal: abort.signal }) : Promise.resolve('(no adapter wired)'));
+      const ret = await (opts.send ? opts.send(text, { delta: onDelta, signal: abort.signal, files, model: selectedModel }) : Promise.resolve('(no adapter wired)'));
       if (!started && typeof ret === 'string') { assistant.parts[0].text = ret; messages.push(assistant); }
       else if (started && typeof ret === 'string' && ret) assistant.parts[0].text = ret;
     } catch (e) {
