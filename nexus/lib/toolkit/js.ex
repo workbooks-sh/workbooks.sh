@@ -36,6 +36,10 @@ defmodule Nexus.Toolkit.Js do
 
   @reg {__MODULE__, :registry}
 
+  # Reserved capability names — a call to one lowers to `$host.<name>(…)` (the cap bridge), not a
+  # toolkit-function call. Mirrors Nexus.Toolkit.Caps.caps/0.
+  @cap_names ~w(emit store load cache_get cache_put cache_delete fetch complete)a
+
   # ── public API ──────────────────────────────────────────────────────────────────────────────
 
   @doc "Transpile Elixir source (a set of `def`s) to JS function declarations. `{:ok, js} | {:error, _}`."
@@ -300,8 +304,10 @@ defmodule Nexus.Toolkit.Js do
   defp expr({{:., _, [{:__aliases__, _, [:String]}, :upcase]}, _, [a]}),
     do: "(#{expr(a)}).toUpperCase()"
 
-  # capability call: a bare 1-arg call to a known cap → host bridge ($host.<cap>)
-  defp expr({cap, _, [a]}) when cap in [:emit], do: "$host.#{cap}(#{expr(a)})"
+  # capability call: a bare call to a known cap name → host bridge ($host.<cap>(...)). The cap set is
+  # the grantable Dock caps (Nexus.Toolkit.Caps.caps); these names are reserved (not toolkit fns).
+  defp expr({cap, _, args}) when is_list(args) and cap in @cap_names,
+    do: "$host.#{cap}(#{Enum.map_join(args, ", ", &expr/1)})"
 
   # generic call (recursion / sibling defs)
   defp expr({name, _, a}) when is_atom(name) and is_list(a),
