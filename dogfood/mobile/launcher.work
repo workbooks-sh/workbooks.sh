@@ -72,15 +72,32 @@ end
 ## The look
 
 design :launcher do
-  #wb-home { font-family: -apple-system, "Geist", system-ui, sans-serif; color: #1a1b1e; background: #f7f6f1; min-height: 100vh; padding: env(safe-area-inset-top, 16px) 18px 24px; }
+/* Shares the cloud dashboard's type + token system (dogfood/cloud/index.work :theme) so the pocket
+   reads as the same product. Fonts cross-mount from /cloud/fonts; tokens mirror --paper/--ink/--dim/
+   --line/--r/--display/--read. The one deliberate divergence is the app-icon squircle radius
+   (--icon-r): iOS home-screen affordance, not the flat 12px card radius. */
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap");
+@font-face{ font-family:"Franie"; font-style:normal; font-weight:600; font-display:swap;
+  src:url("/cloud/fonts/Franie-SemiBold.woff2") format("woff2"); }
+@font-face{ font-family:"Franie"; font-style:normal; font-weight:700; font-display:swap;
+  src:url("/cloud/fonts/Franie-Bold.woff2") format("woff2"); }
+
+:root{
+  --paper:#f7f6f1; --card:#fff; --ink:#1a1b1e; --dim:#6a6f68; --line:#e7e5db;
+  --display:"Franie",-apple-system,system-ui,sans-serif;
+  --read:"Geist",-apple-system,system-ui,sans-serif;
+  --r:12px; --icon-r:20px;   /* --r: dashboard card radius; --icon-r: iOS app-icon squircle */
+  color-scheme:light;
+}
+  #wb-home { font-family: var(--read); color: var(--ink); background: var(--paper); min-height: 100vh; padding: env(safe-area-inset-top, 16px) 18px 24px; }
   .home-top { display: flex; align-items: flex-start; justify-content: space-between; margin: 8px 0 22px; }
-  .home-kicker { margin: 0; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: #8a8a82; }
-  .home-h { margin: 2px 0 0; font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
-  .home-nx { font-size: 13px; color: #5a5a52; background: #ece9df; border-radius: 999px; padding: 6px 12px; white-space: nowrap; }
+  .home-kicker { margin: 0; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+  .home-h { margin: 2px 0 0; font-family: var(--display); font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+  .home-nx { font-size: 13px; color: var(--dim); background: var(--line); border-radius: 999px; padding: 6px 12px; white-space: nowrap; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 18px 14px; }
   .tile { display: flex; flex-direction: column; align-items: center; gap: 9px; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .tile-ic { width: 68px; height: 68px; display: grid; place-items: center; font-size: 32px; background: #fff; border-radius: 20px; box-shadow: 0 2px 0 rgba(0,0,0,.06), 0 6px 18px rgba(0,0,0,.05); transition: transform .12s ease; }
+  .tile-ic { width: 68px; height: 68px; display: grid; place-items: center; font-size: 32px; background: var(--card); border: 1px solid var(--line); border-radius: var(--icon-r); transition: transform .12s ease; }
   .tile:active .tile-ic { transform: scale(.92); }
-  .tile-name { font-size: 12.5px; color: #3a3a34; text-align: center; line-height: 1.2; max-width: 88px; }
-  .home-empty { grid-column: 1 / -1; color: #8a8a82; font-size: 14px; text-align: center; padding: 40px 8px; }
+  .tile-name { font-size: 12.5px; color: var(--dim); text-align: center; line-height: 1.2; max-width: 88px; }
+  .home-empty { grid-column: 1 / -1; color: var(--dim); font-size: 14px; text-align: center; padding: 40px 8px; }
 end
