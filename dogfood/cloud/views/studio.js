@@ -45,18 +45,10 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   };
 
   function Studio(){
-    var ss = createSignal([]); var sessions = ss[0], setSessions = ss[1];
     var ci = createSignal(null); var curId = ci[0], setCurId = ci[1];
-    var saved; try { saved = localStorage.getItem('wb-studio-activity'); } catch (e) {}
-    // Activity is a toggleable panel that OVERLAYS the full-bleed chat — closed by default (open only if the user opened it before).
-    var co = createSignal(saved !== 'open'); var collapsed = co[0], setCollapsedSig = co[1];
-    function setCollapsed(v){ setCollapsedSig(v); try { localStorage.setItem('wb-studio-activity', v ? 'closed' : 'open'); } catch (e) {} }
     var chat = null;
 
-    function loadSessions(){ api('/cloud/agent/sessions?u=' + encodeURIComponent(U)).then(function(d){ setSessions((d && d.sessions) || []); }); }
     function newChat(){ setCurId(null); if (chat) { chat.clear(); chat.focus(); } }
-    function openSession(id){ api('/cloud/agent/session?u=' + encodeURIComponent(U) + '&id=' + encodeURIComponent(id)).then(function(d){ if (d && d.messages){ setCurId(d.id); if (chat) chat.setMessages(d.messages); } }); }
-    loadSessions();
 
     function mountChat(node){
       chat = WBC.createChat(node, {
@@ -66,27 +58,20 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
         models: ['auto', 'gpt-4o-mini', 'claude-sonnet-4'],
         send: function(text, ctx){
           return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({ u: U, id: curId(), message: text, model: ctx && ctx.model }) })
-            .then(function(d){ if (d && d.id){ if (!curId()) setCurId(d.id); loadSessions(); return d.reply || ''; } return '(no reply)'; });
+            .then(function(d){ if (d && d.id){ if (!curId()) setCurId(d.id); return d.reply || ''; } return '(no reply)'; });
         }
       });
       if (CDEMO && DEMO.demoMessages) chat.setMessages(DEMO.demoMessages());
     }
 
+    // Full-bleed chat + the floating rail. Activity is now its own page (the feed); the rail's
+    // Activity button navigates there. Create (+) starts a fresh chat.
     return html`
-      <div class=${function(){ return 'studio' + (collapsed() ? ' collapsed' : ''); }}>
+      <div class="studio">
         <section class="studio-chat" ref=${mountChat}></section>
-        <aside class="studio-activity">
-          <div class="studio-activity-hd"><span>Activity</span><button class="studio-newchat" title="New chat" onClick=${newChat} innerHTML=${ICONS.plus}></button></div>
-          <div class="studio-sessions">
-            <${For} each=${sessions}>${function(s){
-              return html`<button class=${function(){ return 'studio-session' + (curId() === s.id ? ' on' : ''); }} onClick=${function(){ openSession(s.id); }} title=${s.title}>${s.title || 'Untitled'}</button>`;
-            }}<//>
-            <${Show} when=${function(){ return sessions().length === 0; }}><div class="studio-empty">No activity yet.</div><//>
-          </div>
-        </aside>
         <nav class="studio-rail">
           <button class="studio-railbtn" data-tip="Create" aria-label="Create" onClick=${newChat} innerHTML=${ICONS.plus}></button>
-          <button class=${function(){ return 'studio-railbtn' + (collapsed() ? '' : ' on'); }} data-tip="Activity" aria-label="Activity" onClick=${function(){ setCollapsed(!collapsed()); }} innerHTML=${ICONS.activity}></button>
+          <button class="studio-railbtn" data-tip="Activity" aria-label="Activity" onClick=${function(){ WB.nav('/activity'); }} innerHTML=${ICONS.activity}></button>
         </nav>
       </div>`;
   }
@@ -97,7 +82,7 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
 WB.view('/create', { title: 'Studio', render(el){ WB.nav('/studio'); } });
 WB.scopedStyles('/studio', `
 .studio { position: absolute; inset: 0; }
-/* full-bleed chat fills everything; the rail + drawer overlay it */
+/* full-bleed chat fills everything; the floating rail overlays it */
 .studio-chat { position: absolute; inset: 0; display: flex; }
 .studio-chat > .wb-chat { flex: 1; min-width: 0; }
 /* FLOATING icon rail — a small detached pill in the top-left corner, only as tall as its items.
@@ -112,20 +97,6 @@ WB.scopedStyles('/studio', `
 .studio-railbtn svg { width: 19px; height: 19px; }
 .studio-railbtn[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
   white-space: nowrap; background: var(--ink); color: var(--card); font: 600 11.5px var(--read); padding: 5px 9px; border-radius: 7px; pointer-events: none; z-index: 40; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
-/* collapsible activity drawer — slides in from the left; its content starts below the floating rail */
-.studio-activity { position: absolute; left: 0; top: 0; bottom: 0; width: 290px; z-index: 20; box-sizing: border-box; padding-top: 60px;
-  display: flex; flex-direction: column; background: var(--card); border-right: 1px solid var(--line); box-shadow: 6px 0 22px rgba(0,0,0,.16);
-  transform: translateX(0); transition: transform .2s ease; }
-.studio.collapsed .studio-activity { transform: translateX(-100%); box-shadow: none; }
-.studio-activity-hd { display: flex; align-items: center; justify-content: space-between; padding: 4px 14px 8px; font: 700 11px var(--read); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
-.studio-newchat { width: 26px; height: 26px; border: 1px solid var(--line); background: none; color: var(--dim); border-radius: 7px; cursor: pointer; display: grid; place-items: center; }
-.studio-newchat:hover { color: var(--ink); border-color: var(--stroke); }
-.studio-newchat svg { width: 14px; height: 14px; }
-.studio-sessions { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; padding: 0 8px 12px; }
-.studio-session { text-align: left; border: none; background: none; color: var(--dim); border-radius: 8px; padding: 8px 10px; font: 500 13px var(--read); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.studio-session:hover { background: var(--line); color: var(--ink); }
-.studio-session.on { background: var(--line); color: var(--ink); font-weight: 600; }
-.studio-empty { color: var(--dim); font: 500 12.5px var(--read); padding: 12px 10px; }
 `);
 
 

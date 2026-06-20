@@ -41,6 +41,12 @@ server :cloud do
   # File search across all workspaces (mounts) — filename substring match over the real data volume.
   route "GET /cloud/search", :search
 
+  # Activity feed — our cloud product over the nexus reactive layer (THE LINE: the bus/hook/effect
+  # engine is the open standard; persisting + displaying events as a "feed" is OUR consumer). The
+  # `log` effect (registered in register/0) persists events to the durable `resource :Event`; this
+  # route reads them back for the Activity page.
+  route "GET /cloud/activity", :activity
+
   @agent_store {:cloud_agent_sessions}
 
   def mint_token(req) do
@@ -79,7 +85,31 @@ server :cloud do
     turns = session.messages ++ [%{role: "user", text: msg}, %{role: "assistant", text: reply}]
     session = %{session | messages: turns, updated: System.os_time(:second)}
     save_sessions(req.tenant, user, [session | rest])
+
+    # A real event onto the bus — hook :activity matches #event and the `log` effect persists it.
+    Nexus.Events.emit(
+      %{kind: "agent.chat", actor: user, title: session.title, target: session.id,
+        tags: ["event", "agent"], scope: "member"},
+      tenant: req.tenant
+    )
+
     %{id: session.id, title: session.title, reply: reply}
+  end
+
+  # Recent activity for this tenant, newest first. Members don't see admin-scoped events.
+  def activity(req) do
+    admin? = req.query["role"] == "admin"
+
+    events =
+      Event
+      |> Nexus.Store.all(req.tenant)
+      |> Enum.map(&Map.from_struct/1)
+      |> Enum.reject(&(not admin? and &1.scope == "admin"))
+      |> Enum.sort_by(& &1.at, :desc)
+      |> Enum.take(200)
+      |> Enum.map(fn e -> %{e | tags: String.split(e.tags || "", ",", trim: true)} end)
+
+    %{events: events}
   end
 
   defp user_key(req), do: (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
@@ -109,6 +139,20 @@ server :cloud do
   end
 
   def register do
+    # Our `log` effect — persist any matched event to the durable `resource :Event` (tenant-scoped).
+    # This is what makes the Activity page a durable feed; a bare nexus wouldn't register it.
+    Nexus.Effects.register("log", fn _args, ev, ctx ->
+      Nexus.Store.create(
+        Event,
+        %{kind: to_string(ev[:kind] || ""), actor: to_string(ev[:actor] || ""),
+          title: to_string(ev[:title] || ev[:kind] || ""), target: to_string(ev[:target] || ""),
+          tags: Enum.join(List.wrap(ev[:tags]), ","), scope: to_string(ev[:scope] || "member"),
+          at: ev[:at] || System.os_time(:second)},
+        ctx[:tenant] || ev[:tenant]
+      )
+      :ok
+    end)
+
     Nexus.Live.register("usage", fn params, emit ->
       # A representative running nexus on the current tier; Capacity derives the dials.
       nx = %{id: params["nx"] || "dogfood", plan: Nexus.Pricing.default_tier().id, state: "running"}
@@ -222,6 +266,25 @@ server :cloud do
   def human(b), do: "#{b} B"
 end
 
+# The durable event log — a normal resource (tenant-scoped SQLite). The `log` effect writes rows here;
+# the Activity page reads them. This is OUR cloud store, not part of the open standard.
+resource :Event do
+  field :kind, :string
+  field :actor, :string
+  field :title, :string
+  field :target, :string
+  field :tags, :string
+  field :scope, :string
+  field :at, :integer
+end
+
+# Persist every bus event to the log. The reactive primitives (hook kind, #event, effect engine) are
+# the open standard; this hook + the `log` effect are our cloud opting into a durable feed.
+hook :activity do
+  match tags: [:event]
+  log
+end
+
 client :app do
   <link rel="stylesheet" href="./app.css">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
@@ -232,6 +295,7 @@ client :app do
   <div class="toasts" id="toasts"></div>
 
   <script src="./app.js"></script>
+  <script src="./views/activity.js"></script>
 
   <script src="./views/studio.js"></script>
 
