@@ -27,30 +27,48 @@ That's the loop: author → build → deploy, all over the same folder.
 
 ## Command reference
 
-The CLI groups its verbs the same way:
+The CLI groups its verbs by what you're doing.
 
-**author** — read & verify `.work` trees, locally:
+### Author — read & verify a tree
 
-- `work check [dir]` — resolve references + audit capabilities
-- `work lint [dir]` — lint the tree
-- `work structure [dir]` — list the units in the tree
-- `work why / near / wit :unit` — code-graph dependencies + the generated WIT world
+| Verb | What it does |
+|------|--------------|
+| `work check [dir]` | resolve references + audit capabilities |
+| `work structure [dir]` | list the units in the tree |
+| `work lint [dir]` | lint the tree for problems |
+| `work why :unit` | what a unit depends on (code graph) |
+| `work near :unit` | units related to one in the graph |
+| `work wit :unit` | the generated WIT world for a unit |
 
-**build** — weave & run:
+### Build — weave & run
 
-- `work weave <dir> <out>` — weave a tree into one self-contained HTML
-- `work graph <dir> <out>` — render the code graph as a workbook
-- `work dev <dir>` — watch & re-weave on change (+ Nexus hot-swap)
+| Verb | What it does |
+|------|--------------|
+| `work new <template> [dest]` | scaffold a project you own and edit |
+| `work weave <dir> <out>` | weave the tree into one workbook |
+| `work graph <dir> <out>` | render the code graph as a workbook |
+| `work dev <dir>` | watch & re-weave as you edit |
 
-**deploy** — stand up a runtime, local or cloud:
+### Deploy — stand up a runtime
 
-- `work deploy init | validate | apply` — scaffold · check · deploy the config
-- `work deploy <dir> --nexus <name>` — mount a workbook into a running Nexus
+| Verb | What it does |
+|------|--------------|
+| `work deploy init` | scaffold the deploy config |
+| `work deploy validate` | check the deploy config |
+| `work deploy apply` | deploy the config, local or cloud |
+| `work deploy <dir> --nexus <name>` | mount a workbook into a running nexus |
+| `work secret set / get / delete <NAME>` | manage secrets (macOS Keychain) |
+| `work secret list / check / schema` | list declared secrets, emit a schema |
 
-**platform** — identity, contexts, the control plane:
+### Platform — identity & contexts
 
-- `work ctx · work nexus <url>` — manage targets · point at an engine
-- `work login · work whoami` — authenticate · show identity
+| Verb | What it does |
+|------|--------------|
+| `work ctx use / set <name>` | switch or save a target context |
+| `work nexus [<url>]` | list nexuses, or point at an engine |
+| `work login` | authenticate to the control plane |
+| `work whoami` | show your identity |
+| `work version` | show the CLI version |
 
 Run `work help` to see the live surface.
 

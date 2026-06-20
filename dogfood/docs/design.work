@@ -80,4 +80,12 @@ design :brand do
   .prose .demo-btn:hover{border-color:var(--pcd)}
   .prose .demo-btn:active{transform:translateY(1px)}
   .prose .demo-btn b{color:var(--pcd);font-weight:600;font-variant-numeric:tabular-nums}
+
+  /* tables (incl. the CLI verb reference) on the night theme */
+  .prose table.data{border-color:var(--line)}
+  .prose table.data th,.prose table.data td{border-color:var(--line)}
+  .prose table.data thead th{background:var(--card);color:var(--dim);font-family:var(--mono);
+    font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+  .prose table.wb-verbs td:first-child{white-space:nowrap;width:1%}
+  .prose table.wb-verbs code{background:none;padding:0;color:var(--pcd);font-family:var(--mono)}
 end
