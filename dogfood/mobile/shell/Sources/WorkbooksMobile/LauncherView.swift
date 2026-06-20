@@ -36,6 +36,15 @@ struct LauncherView: View {
             .background(Color(red: 0.97, green: 0.965, blue: 0.945))
             .navigationTitle("In your pocket")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if let first = account.connections.first {
+                        NavigationLink {
+                            AgentChatView(nexus: first)
+                        } label: {
+                            Image(systemName: "bubble.left.and.bubble.right")
+                        }
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         ForEach(account.connections) { c in

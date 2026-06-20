@@ -24,6 +24,10 @@ targets:
           - UIInterfaceOrientationPortrait
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        CFBundleURLTypes:
+          - CFBundleURLName: sh.workbooks.mobile.auth
+            CFBundleURLSchemes:
+              - workbooks-auth
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: sh.workbooks.mobile

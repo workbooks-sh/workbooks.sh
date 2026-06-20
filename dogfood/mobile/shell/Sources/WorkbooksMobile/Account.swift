@@ -53,6 +53,19 @@ final class Account: ObservableObject {
         save()
     }
 
+    /// Add a connection from a token already minted by the nexus (the SSO web flow hands one back via
+    /// `/mobile/connect`). No API call — the token + nexus identity come from the signed handoff.
+    func connect(baseURL: URL, token: String, deviceID: String, nexus: NexusView) {
+        let conn = NexusConnection(
+            id: nexus.id, name: nexus.name, emoji: nexus.emoji,
+            baseURL: baseURL, deviceID: deviceID
+        )
+        Keychain.set(token, account: conn.id)
+        connections.removeAll { $0.id == conn.id }
+        connections.append(conn)
+        save()
+    }
+
     func token(for conn: NexusConnection) -> String? { Keychain.get(account: conn.id) }
 
     func unpair(_ conn: NexusConnection) {

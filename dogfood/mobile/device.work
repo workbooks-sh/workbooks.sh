@@ -28,10 +28,25 @@ end
 ## The seam
 
 server :mobile do
+  route "GET /mobile/connect", :connect
+  route "GET /mobile/providers", :providers
   route "POST /mobile/pair", :pair
   route "GET /mobile/nexus", :nexus
   route "GET /mobile/apps", :apps
   route "POST /mobile/unpair", :unpair
+
+  @doc """
+  The native sign-in surface, dogfooding the nexus's OWN auth (the same `Nexus.Auth.Native` +
+  `Nexus.Auth.Provider` the cloud dashboard uses). Opened by the iOS shell in an
+  `ASWebAuthenticationSession` as `/mobile/connect?cb=<scheme>://callback`. The page logs the user in
+  (email/password or any configured OAuth provider), then mints a device token from the live session
+  (`/mobile/pair`, cookie-auth) and hands it back to the app via `cb#token=…`. No runtime change — it
+  rides the existing session + token primitives.
+  """
+  def connect(_req), do: {200, "text/html; charset=utf-8", connect_html()}
+
+  @doc "Configured OAuth providers (names only) — the page renders a button per provider, like the dashboard."
+  def providers(_req), do: %{providers: Map.keys(Nexus.Config.providers())}
 
   @doc """
   Pair a phone. Body: `name`, `platform` (e.g. "ios"). Mints a device token scoped `api`+`mobile`,
@@ -103,6 +118,135 @@ server :mobile do
   defp blank_to("", d), do: d
   defp blank_to(v, _d), do: v
   defp titleize(s), do: s |> String.replace(["-", "_"], " ") |> String.capitalize()
+
+  # The dogfooded sign-in page (served at /mobile/connect). Static HTML — ~S so no Elixir interp; the
+  # whole flow is the nexus's own /auth/* + /mobile/pair, same-origin cookies. Styled with the cloud
+  # design tokens (Geist/Franie from /cloud/fonts) so it reads as the same product as the dashboard.
+  defp connect_html do
+    ~S"""
+    <!doctype html><html lang="en"><head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Sign in · Workbooks</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap");
+      @font-face{font-family:"Franie";font-weight:700;font-display:swap;src:url("/cloud/fonts/Franie-Bold.woff2") format("woff2")}
+      :root{--paper:#f7f6f1;--card:#fff;--ink:#1a1b1e;--dim:#6a6f68;--line:#e7e5db;--bloom:#13d943;--on-bloom:#10120f;--r:12px}
+      *{box-sizing:border-box}
+      body{margin:0;font-family:"Geist",-apple-system,system-ui,sans-serif;color:var(--ink);background:var(--paper);
+        min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
+      .card{width:100%;max-width:380px}
+      h1{font-family:"Franie",system-ui,sans-serif;font-size:28px;letter-spacing:-.02em;margin:0 0 4px}
+      p.sub{margin:0 0 22px;color:var(--dim);font-size:14px}
+      label{display:block;font-size:12px;color:var(--dim);margin:14px 0 6px}
+      input{width:100%;padding:13px 14px;font-size:16px;font-family:inherit;color:var(--ink);background:var(--card);
+        border:1px solid var(--line);border-radius:var(--r);outline:none}
+      input:focus{border-color:#b9b6aa}
+      button{width:100%;margin-top:18px;padding:13px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;
+        border:0;border-radius:var(--r);background:var(--ink);color:#fff}
+      button:disabled{opacity:.5}
+      .prov{margin-top:10px;background:var(--card);color:var(--ink);border:1px solid var(--line)}
+      .row{display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:16px;font-size:13px}
+      .row a{color:var(--dim);text-decoration:none}
+      .err{margin-top:14px;color:#d9534f;font-size:13px;min-height:16px}
+      .or{margin:18px 0 4px;text-align:center;color:var(--dim);font-size:12px}
+      .hide{display:none}
+    </style></head><body>
+    <div class="card">
+      <h1>Workbooks</h1>
+      <p class="sub" id="sub">Sign in to put your apps in your pocket.</p>
+      <div id="providers"></div>
+      <div class="or hide" id="or">or</div>
+      <form id="form">
+        <div id="nameField" class="hide"><label>Name</label><input id="name" autocomplete="name"></div>
+        <label>Email</label><input id="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false">
+        <label>Password</label><input id="password" type="password" autocomplete="current-password">
+        <div class="err" id="err"></div>
+        <button id="submit" type="submit">Sign in</button>
+      </form>
+      <div class="row">
+        <a href="#" id="toggle">Create an account</a>
+      </div>
+    </div>
+    <script>
+    (function(){
+      var qs = new URLSearchParams(location.search);
+      var cb = qs.get("cb") || sessionStorage.getItem("wb_cb");
+      if (cb) sessionStorage.setItem("wb_cb", cb);   // survive the OAuth round-trip
+      var mode = "login";
+      var $ = function(id){ return document.getElementById(id); };
+
+      function api(path, body){
+        return fetch(path, { method:"POST", credentials:"same-origin",
+          headers:{ "content-type":"application/json" }, body: JSON.stringify(body||{}) });
+      }
+
+      // After a live session exists, mint a device token and hand it back to the native app.
+      function finish(){
+        api("/mobile/pair", { name:"iPhone", platform:"ios" })
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if (!d.token) throw new Error("pair failed");
+            var frag = "#token=" + encodeURIComponent(d.token)
+              + "&device_id=" + encodeURIComponent(d.device_id)
+              + "&nexus_id=" + encodeURIComponent(d.nexus.id)
+              + "&name=" + encodeURIComponent(d.nexus.name)
+              + "&emoji=" + encodeURIComponent(d.nexus.emoji);
+            if (cb) { sessionStorage.removeItem("wb_cb"); location.href = cb + frag; }
+            else { $("sub").textContent = "Signed in. You can return to the app."; }
+          })
+          .catch(function(){ $("err").textContent = "Couldn't complete sign-in."; });
+      }
+
+      // Already authenticated (e.g. returning from an OAuth provider)? Skip straight to handoff.
+      fetch("/mobile/nexus", { credentials:"same-origin" })
+        .then(function(r){ if (r.ok) finish(); });
+
+      // Render a button per configured OAuth provider — same providers the dashboard offers.
+      fetch("/mobile/providers", { credentials:"same-origin" })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var names = (d && d.providers) || [];
+          if (!names.length) return;
+          $("or").classList.remove("hide");
+          names.forEach(function(p){
+            var b = document.createElement("button");
+            b.type = "button"; b.className = "prov";
+            b.textContent = "Continue with " + p.charAt(0).toUpperCase() + p.slice(1);
+            b.onclick = function(){ location.href = "/auth/" + encodeURIComponent(p) + "/login"; };
+            $("providers").appendChild(b);
+          });
+        });
+
+      $("toggle").onclick = function(e){
+        e.preventDefault();
+        mode = mode === "login" ? "signup" : "login";
+        var signup = mode === "signup";
+        $("nameField").classList.toggle("hide", !signup);
+        $("submit").textContent = signup ? "Create account" : "Sign in";
+        $("toggle").textContent = signup ? "I already have an account" : "Create an account";
+        $("password").setAttribute("autocomplete", signup ? "new-password" : "current-password");
+      };
+
+      $("form").onsubmit = function(e){
+        e.preventDefault();
+        $("err").textContent = "";
+        $("submit").disabled = true;
+        var path = mode === "signup" ? "/auth/signup" : "/auth/login";
+        var body = { email: $("email").value.trim(), password: $("password").value };
+        if (mode === "signup") body.name = $("name").value.trim();
+        api(path, body)
+          .then(function(r){ return r.json().then(function(j){ return { ok:r.ok, j:j }; }); })
+          .then(function(res){
+            if (res.ok && res.j.ok) finish();
+            else { $("err").textContent = res.j.error || "Sign-in failed."; $("submit").disabled = false; }
+          })
+          .catch(function(){ $("err").textContent = "Network error."; $("submit").disabled = false; });
+      };
+    })();
+    </script>
+    </body></html>
+    """
+  end
 
   # Newest .work mtime under a surface — the shell shows "updated" so a re-published app is obvious.
   defp latest_mtime(root) do

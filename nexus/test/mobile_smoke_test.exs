@@ -38,6 +38,20 @@ defmodule Nexus.MobileSmokeTest do
   defp restore_env(k, nil), do: Application.delete_env(:nexus, k)
   defp restore_env(k, v), do: Application.put_env(:nexus, k, v)
 
+  test "the dogfooded sign-in page serves the nexus's own auth (email + configured OAuth providers)" do
+    Nexus.Config.put(:providers, %{"google" => %{}, "github" => %{}})
+
+    {200, ct, html} = Mobile.connect(%{})
+    assert ct =~ "text/html"
+    # It posts to the nexus's OWN native auth + mints via the existing session — no bespoke auth.
+    assert html =~ "/auth/login"
+    assert html =~ "/auth/signup"
+    assert html =~ "/mobile/pair"
+    # And it offers the configured OAuth providers, same as the dashboard.
+    assert %{providers: ps} = Mobile.providers(%{})
+    assert "google" in ps and "github" in ps
+  end
+
   test "the auth primitive the pairing flow relies on: a minted wbk_ token resolves to its org + scopes" do
     minted = Nexus.Auth.Token.mint(@org, name: "mobile:iPhone", scopes: ["api", "mobile"])
     assert "wbk_" <> _ = minted.token
