@@ -102,7 +102,7 @@ server :cloud do
 
     events =
       Event
-      |> Nexus.Store.all(req.tenant)
+      |> Nexus.Store.all(req.tenant || Nexus.Store.default_tenant())
       |> Enum.map(&Map.from_struct/1)
       |> Enum.reject(&(not admin? and &1.scope == "admin"))
       |> Enum.sort_by(& &1.at, :desc)
@@ -148,7 +148,7 @@ server :cloud do
           title: to_string(ev[:title] || ev[:kind] || ""), target: to_string(ev[:target] || ""),
           tags: Enum.join(List.wrap(ev[:tags]), ","), scope: to_string(ev[:scope] || "member"),
           at: ev[:at] || System.os_time(:second)},
-        ctx[:tenant] || ev[:tenant]
+        ctx[:tenant] || ev[:tenant] || Nexus.Store.default_tenant()
       )
       :ok
     end)
