@@ -31,9 +31,9 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   var W = await import('https://esm.sh/solid-js@1.9.5/web?bundle');
   var html = (await import('https://esm.sh/solid-js@1.9.5/html?bundle')).default;
   var createSignal = S.createSignal, For = S.For, Show = S.Show;
-  var WBC = await import('./wbchat/core.js');
-  await import('./wbchat/components/index.js');  // registers all parts + actions + composer add-ons
-  var DEMO = await import('./wbchat/demo.js');   // dev-only seed (?cdemo=1) exercising every part type
+  var WBC = await import('../wbchat/core.js');
+  await import('../wbchat/components/index.js');  // registers all parts + actions + composer add-ons
+  var DEMO = await import('../wbchat/demo.js');   // dev-only seed (?cdemo=1) exercising every part type
   (function(){ if (!document.getElementById('wbchat-theme')){ var l = document.createElement('link'); l.id = 'wbchat-theme'; l.rel = 'stylesheet'; l.href = './wbchat/theme.css'; document.head.appendChild(l); } })();
   var CDEMO = new URLSearchParams(location.search).get('cdemo') === '1';
 
@@ -85,7 +85,7 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
           </div>
         </aside>
         <nav class="studio-rail">
-          <button class="studio-railbtn" data-tip="New chat" aria-label="New chat" onClick=${newChat} innerHTML=${ICONS.plus}></button>
+          <button class="studio-railbtn" data-tip="Create" aria-label="Create" onClick=${newChat} innerHTML=${ICONS.plus}></button>
           <button class=${function(){ return 'studio-railbtn' + (collapsed() ? '' : ' on'); }} data-tip="Activity" aria-label="Activity" onClick=${function(){ setCollapsed(!collapsed()); }} innerHTML=${ICONS.activity}></button>
         </nav>
       </div>`;
@@ -100,21 +100,24 @@ WB.scopedStyles('/studio', `
 /* full-bleed chat fills everything; the rail + drawer overlay it */
 .studio-chat { position: absolute; inset: 0; display: flex; }
 .studio-chat > .wb-chat { flex: 1; min-width: 0; }
-/* floating overlay icon rail */
-.studio-rail { position: absolute; left: 0; top: 0; bottom: 0; width: 52px; z-index: 30; display: flex; flex-direction: column;
-  align-items: center; gap: 6px; padding: 12px 0; background: color-mix(in srgb, var(--card) 72%, transparent); backdrop-filter: blur(8px); border-right: 1px solid var(--line); }
-.studio-railbtn { position: relative; width: 36px; height: 36px; border: none; background: none; color: var(--dim); cursor: pointer; border-radius: 9px; display: grid; place-items: center; }
+/* FLOATING icon rail — a small detached pill in the top-left corner, only as tall as its items.
+   It floats over the chat; Studio pages must keep their top-left corner clear of it (~70px). */
+.studio-rail { position: absolute; left: 14px; top: 14px; z-index: 30; display: flex; flex-direction: column;
+  align-items: center; gap: 3px; padding: 5px; border-radius: 14px;
+  background: color-mix(in srgb, var(--card) 84%, transparent); backdrop-filter: blur(10px);
+  border: 1px solid var(--line); box-shadow: 0 6px 22px rgba(0,0,0,.18); }
+.studio-railbtn { position: relative; width: 36px; height: 36px; border: none; background: none; color: var(--dim); cursor: pointer; border-radius: 10px; display: grid; place-items: center; }
 .studio-railbtn:hover { background: var(--line); color: var(--ink); }
 .studio-railbtn.on { background: var(--line); color: var(--ink); }
 .studio-railbtn svg { width: 19px; height: 19px; }
 .studio-railbtn[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
   white-space: nowrap; background: var(--ink); color: var(--card); font: 600 11.5px var(--read); padding: 5px 9px; border-radius: 7px; pointer-events: none; z-index: 40; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
-/* collapsible activity drawer (overlays the chat from behind the rail) */
-.studio-activity { position: absolute; left: 0; top: 0; bottom: 0; width: 300px; z-index: 20; box-sizing: border-box; padding-left: 52px;
+/* collapsible activity drawer — slides in from the left; its content starts below the floating rail */
+.studio-activity { position: absolute; left: 0; top: 0; bottom: 0; width: 290px; z-index: 20; box-sizing: border-box; padding-top: 60px;
   display: flex; flex-direction: column; background: var(--card); border-right: 1px solid var(--line); box-shadow: 6px 0 22px rgba(0,0,0,.16);
   transform: translateX(0); transition: transform .2s ease; }
 .studio.collapsed .studio-activity { transform: translateX(-100%); box-shadow: none; }
-.studio-activity-hd { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 8px; font: 700 11px var(--read); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.studio-activity-hd { display: flex; align-items: center; justify-content: space-between; padding: 4px 14px 8px; font: 700 11px var(--read); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
 .studio-newchat { width: 26px; height: 26px; border: 1px solid var(--line); background: none; color: var(--dim); border-radius: 7px; cursor: pointer; display: grid; place-items: center; }
 .studio-newchat:hover { color: var(--ink); border-color: var(--stroke); }
 .studio-newchat svg { width: 14px; height: 14px; }

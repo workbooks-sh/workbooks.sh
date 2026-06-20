@@ -454,6 +454,21 @@ tr:last-child td{ border:0; }
 .swrap.nxtop { margin: 2px 0 12px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
 .swrap.nxtop .sw { padding: 7px 8px; }
 .nxnav.nxprimary { margin: 0 0 6px; }
+/* Admin — bottom-anchored OVERLAY drawer (above the avatar). Opens UPWARD, floating over the
+   workspaces list so a long sidebar still scrolls behind it. State persists (wb-admin-drawer). */
+.adminsec { position: relative; margin: 0 0 2px; }
+.adminbtn { display: flex; align-items: center; gap: 9px; width: 100%; box-sizing: border-box; padding: 7px 10px 7px 11px;
+  border: none; background: none; cursor: pointer; border-radius: 8px; font: 500 13px var(--read); color: var(--dim); }
+.adminbtn svg { flex: none; opacity: 0.85; }
+.adminbtn:hover { background: var(--line); color: var(--ink); }
+.adminsec.open .adminbtn { background: var(--line); color: var(--ink); font-weight: 600; }
+.adminchev { margin-left: auto; display: grid; place-items: center; color: var(--dim); transition: transform .18s ease; }
+.adminsec.open .adminchev { transform: rotate(-90deg); }
+.admindrawer { position: absolute; left: 0; right: 0; bottom: calc(100% + 4px); z-index: 25;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 5px; box-shadow: 0 -8px 26px rgba(0,0,0,.20);
+  opacity: 0; transform: translateY(6px); pointer-events: none; transition: opacity .15s ease, transform .15s ease; }
+.adminsec.open .admindrawer { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.admindrawer .nxnav { margin: 0; }
 /* group label (e.g. "Admin") above a nav group */
 .navgrp { font: 700 9.5px var(--read); letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); padding: 0 10px; margin: 8px 0 4px; }
 .wssec { margin-top: 6px; }
@@ -848,7 +863,7 @@ client :app do
             '</div>' + nxMenu +
           '</div>' +
           (WB.dev ? ('<nav class="nxnav nxprimary">' +
-            navlink('/studio', ICO.spark, 'Studio', p) + navlink('/activity', ICO.activity, 'Activity', p) + navlink('/apps', ICO.apps, 'Apps', p) +
+            navlink('/studio', ICO.spark, 'Studio', p) + navlink('/apps', ICO.apps, 'Apps', p) +
           '</nav>') : '') +
           '<div class="swrap wssec">' +
             '<div class="swlabel wshdr"><span>Workspaces</span><button class="wsadd" data-wsnew title="New workspace" aria-label="New workspace">+</button></div>' +
