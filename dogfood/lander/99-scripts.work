@@ -2,7 +2,7 @@
 
 All the lander's behavior, loaded after every section is in the DOM: the nav builder
 (`nav.js`), the real-color brand logos (`glyphs.js`), GSAP + ScrollTrigger, and the big
-inline script driving the lattice / DNA / tree canvases, the pricing slider, and the
+inline script driving the lattice / DNA / tree canvases, the brand-logo glyphs, and the
 notify-me modal. The modal's submit is wired to our own **waitlist workbook** (its
 `live/waitlist` source), not a third-party endpoint.
 
@@ -14,25 +14,10 @@ client :scripts do
     // real-color brand logos via the glyphs toolkit (curated → svgl full-color CDN)
     if (window.Glyphs) {
       document.querySelectorAll('#cloud-pricing .g[data-brand]').forEach(function (el) {
-        Glyphs.glyphAsync('brand:' + el.dataset.brand, { size: '18px' })
+        Glyphs.glyphAsync('brand:' + el.dataset.brand, { size: '20px' })
           .then(function (svg) { if (svg) el.innerHTML = svg; })
           .catch(function () {});
       });
-    }
-    // seat slider — the SaaS stack scales per head; Workbooks stays flat (storage + usage only)
-    var seats = document.getElementById('seats');
-    if (seats) {
-      var PER = 94, WB = 29, REF = 150 * PER; // stack bar reaches full ~150 seats
-      var fmt = function (n) { return '$' + Math.round(n).toLocaleString('en-US'); };
-      var upd = function () {
-        var n = +seats.value, stack = n * PER;
-        document.getElementById('seatN').textContent = n;
-        document.getElementById('stackCost').textContent = fmt(stack) + '/mo';
-        document.getElementById('saveAmt').textContent = fmt(Math.max(0, stack - WB));
-        document.getElementById('stackBar').style.width = Math.min(100, 8 + 92 * stack / REF) + '%';
-        document.getElementById('wbBar').style.width = '5%';
-      };
-      seats.addEventListener('input', upd); upd();
     }
   })();
   </script>

@@ -1,57 +1,34 @@
 # Cloud pricing
 
-Storage + usage, never seats — the slider where the stack scales but the bill is honest. The anti-seat-pricing stance made tangible.
+The anti-seat-pricing stance, made obvious in **one table** — no calculator, no slider, nothing
+else on screen. Everyone else bills per seat, so the bill grows with every hire; Workbooks is one
+flat price. The row that breaks the pattern is the whole argument: the same $20 whether you're 1
+person or 100. We deliberately stop at 100 — the $20 minimal tier is all most teams ever need.
 
 client :pricing do
   <section id="cloud-pricing">
     <div class="cp-inner">
       <p class="cp-kicker"><span class="dot"></span>the cloud · pricing</p>
-      <h2 class="cp-h">Pay for storage and usage.<br>Never for seats.</h2>
-      <p class="cp-sub">Most teams rent a stack of SaaS tools by the head. Workbooks is one nexus — add your whole company and the price doesn't move. Drag the slider.</p>
-  
-      <div class="cp-grid">
-        <table class="cp-table">
-          <thead><tr><th colspan="2">The usual stack</th><th class="num">/ user · mo</th></tr></thead>
-          <tbody>
-            <tr><td class="bc"><span class="g" data-brand="slack"></span>Slack</td><td class="mut">Chat</td><td class="num">$18</td></tr>
-            <tr><td class="bc"><span class="g" data-brand="notion"></span>Notion</td><td class="mut">Docs</td><td class="num">$20</td></tr>
-            <tr><td class="bc"><span class="g" data-brand="linear"></span>Linear</td><td class="mut">Project mgmt</td><td class="num">$16</td></tr>
-            <tr><td class="bc"><span class="g" data-brand="retool"></span>Retool</td><td class="mut">Internal tools</td><td class="num">$20</td></tr>
-            <tr><td class="bc"><span class="g" data-brand="vercel"></span>Vercel</td><td class="mut">Hosting</td><td class="num">$20</td></tr>
-          </tbody>
-          <tfoot><tr><td colspan="2">Per head, every head</td><td class="num">≈ $94</td></tr></tfoot>
-        </table>
-  
-        <div class="cp-calc">
-          <div class="cp-seats">
-            <label for="seats">Your team — <b id="seatN">25</b> people</label>
-            <input type="range" id="seats" min="1" max="500" value="25" step="1" aria-label="team size">
-            <div class="cp-seatscale"><span>1</span><span>500</span></div>
-          </div>
-          <div class="cp-bars">
-            <div class="cp-bar stack">
-              <div class="cp-bl"><span>The usual stack</span><span class="mut">scales per seat</span></div>
-              <div class="cp-track"><i id="stackBar"></i><b id="stackCost">$2,350/mo</b></div>
-            </div>
-            <div class="cp-bar wb">
-              <div class="cp-bl"><span>Workbooks</span><span class="mut">flat · every seat included</span></div>
-              <div class="cp-track"><i id="wbBar"></i><b>from $29<span>/mo</span></b></div>
-            </div>
-          </div>
-          <div class="cp-save">You save <b id="saveAmt">$2,321</b>/mo — the gap grows with every hire.</div>
-        </div>
-      </div>
-  
-      <table class="cp-tiers-table">
-        <thead><tr><th>Plan</th><th class="num">Per month</th><th class="num">Storage</th><th class="num">Seats</th><th class="r">Built for</th></tr></thead>
+      <h2 class="cp-h">Everyone bills per seat.<br>We bill one flat price.</h2>
+      <p class="cp-sub">Add your whole company to one nexus. Up to 100 people on the $20 plan — and the price never moves.</p>
+
+      <table class="cp-table cp-compare">
+        <thead><tr><th colspan="2">The usual stack</th><th class="num">Per seat · mo</th></tr></thead>
         <tbody>
-          <tr><td class="pn">Starter</td><td class="num">$29</td><td class="num">50 GB</td><td class="num inf">Unlimited</td><td class="r mut">A project or small team</td></tr>
-          <tr><td class="pn">Team</td><td class="num">$99</td><td class="num">250 GB</td><td class="num inf">Unlimited</td><td class="r mut">A growing team</td></tr>
-          <tr><td class="pn">Scale</td><td class="num">$249</td><td class="num">1 TB</td><td class="num inf">Unlimited</td><td class="r mut">Serious compute + storage</td></tr>
-          <tr><td class="pn">Enterprise</td><td class="num">Custom</td><td class="num">Custom</td><td class="num inf">Unlimited</td><td class="r mut">SSO · SCIM · dedicated</td></tr>
+          <tr><td class="bc"><span class="g" data-brand="slack"></span>Slack</td><td class="mut">Chat</td><td class="num">$18</td></tr>
+          <tr><td class="bc"><span class="g" data-brand="notion"></span>Notion</td><td class="mut">Docs</td><td class="num">$20</td></tr>
+          <tr><td class="bc"><span class="g" data-brand="linear"></span>Linear</td><td class="mut">Project mgmt</td><td class="num">$16</td></tr>
+          <tr><td class="bc"><span class="g" data-brand="retool"></span>Retool</td><td class="mut">Internal tools</td><td class="num">$20</td></tr>
+          <tr><td class="bc"><span class="g" data-brand="vercel"></span>Vercel</td><td class="mut">Hosting</td><td class="num">$20</td></tr>
+          <tr class="wbrow">
+            <td class="bc"><span class="g wbmark"><svg viewBox="0 0 113.444 65.6002" fill="none" aria-hidden="true"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg></span>Workbooks</td>
+            <td class="mut">Everything, one nexus</td>
+            <td class="num"><b class="big">$20</b> <span class="flat">flat · up&nbsp;to&nbsp;100</span></td>
+          </tr>
         </tbody>
       </table>
-      <p class="cp-foot">Every tier carries <b>unlimited users + workspaces</b> — you scale one nexus by memory and bandwidth, never by headcount. <a href="https://app.workbooks.sh">Start building →</a></p>
+
+      <p class="cp-foot"><b>$20 / month, flat</b> — unlimited workspaces, every seat included up to 100 people, no per-head math. <a href="https://app.workbooks.sh">Start building →</a></p>
     </div>
   </section>
 end
