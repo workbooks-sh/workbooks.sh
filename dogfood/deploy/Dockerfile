@@ -23,8 +23,9 @@ ARG LITESTREAM_VERSION=v0.3.13
 RUN curl -fsSL "https://github.com/benbjohnson/litestream/releases/download/${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-amd64.tar.gz" \
     | tar -xz -C /usr/local/bin litestream && litestream version
 COPY --from=build /app/_build/prod/rel/nexus ./
+# The deploy config lives in the deploy-root index.work (deploy-as-index-tree) — Nexus.Config reads
+# $WB_DATA/index.work (= /srv/dogfood/index.work), which rides in with the tree below. No sidecar.
 COPY dogfood /srv/dogfood
-COPY dogfood/nexus/deployment.work /app/deployment.work
 COPY nexus/scripts/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 EXPOSE 4000

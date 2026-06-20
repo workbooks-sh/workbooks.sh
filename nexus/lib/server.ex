@@ -51,14 +51,24 @@ defmodule Nexus.Server do
   # on this one nexus. (Whether you want them on one nexus or several — or local vs cloud — is a
   # deploy-target choice; the runtime hosts as many workbooks as you mount here.)
   defp discover_mounts(root) do
-    if Path.wildcard(Path.join(root, "*.work")) != [] do
-      [{"", root}]
-    else
+    root_works = Path.wildcard(Path.join(root, "*.work"))
+
+    subs =
       Path.wildcard(Path.join(root, "*"))
       |> Enum.filter(&File.dir?/1)
       |> Enum.filter(&(Path.wildcard(Path.join(&1, "*.work")) != []))
       |> Enum.map(&{Path.basename(&1), &1})
       |> Enum.sort()
+
+    # Root-level .work = a single-workbook deploy (mount the whole root) — EXCEPT when the only root
+    # .work is the deploy MANIFEST (`index.work`) and there are surface subfolders: then the subfolders
+    # are the mounts and `index.work` is the manifest, not a served surface (deploy-as-index-tree).
+    only_manifest? = root_works != [] and Enum.all?(root_works, &(Path.basename(&1) == "index.work"))
+
+    cond do
+      root_works != [] and not (only_manifest? and subs != []) -> [{"", root}]
+      subs != [] -> subs
+      true -> [{"", root}]
     end
   end
 

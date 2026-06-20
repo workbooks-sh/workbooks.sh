@@ -41,9 +41,10 @@ defmodule Nexus.Config do
   """
   @key {__MODULE__, :cfg}
 
-  # Conventional locations the deployed/dev nexus looks for its config, first hit wins. No env knob
-  # points here — it's convention, so there's no bootstrap env var to "configure the config".
-  @sources ["deployment.work", "/app/deployment.work", "/data/deployment.work"]
+  # The deploy block lives in the deploy-root `index.work` (deploy-as-index-tree — see
+  # docs/deploy-as-index-tree.md). `deployment.work` is a TRANSITIONAL fallback only, being retired.
+  # First hit wins; no env knob points here (convention, not a bootstrap env var).
+  @fallbacks ["deployment.work", "/app/deployment.work", "/data/deployment.work"]
 
   @doc "Eagerly load + cache the config (call once at app start, before the Gate reads its limit)."
   def boot, do: load(locate())
@@ -305,5 +306,10 @@ defmodule Nexus.Config do
   defp words(s, _default) when is_binary(s), do: String.split(s, ~r/\s+/, trim: true)
   defp words(list, _default) when is_list(list), do: list
 
-  defp locate, do: Enum.find_value(@sources, fn p -> if File.regular?(p), do: File.read!(p) end)
+  # The deploy root (the served tree) index.work first, then the transitional fallbacks.
+  defp locate do
+    root = System.get_env("WB_DATA") || File.cwd!()
+    [Path.join(root, "index.work") | @fallbacks]
+    |> Enum.find_value(fn p -> if File.regular?(p), do: File.read!(p) end)
+  end
 end

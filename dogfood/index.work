@@ -1,13 +1,16 @@
-# Our nexus — deployment config
+# Dogfood — our nexus deploy manifest
+
+This is the **deploy root's `index.work`** — the deploy-as-index-tree manifest (see
+`nexus/docs/deploy-as-index-tree.md`). The deploy block here configures this whole tree: it's read by
+`Nexus.Config` at boot (`$WB_DATA/index.work`), and it is the **only** place a `deploy` block takes
+effect — one per index, no sidecar, no magic filename. This index is the composition root + manifest,
+**not** a served surface (mount discovery skips it); the surfaces are the subfolders
+([[lander]], [[cloud]], [[docs]], …).
 
 This is the **our-cloud side of THE LINE**: the runtime ships neutral, and *our* values live here, as
-config. It's the `deployment.work` our control-plane nexus reads through `Nexus.Config` (a `deploy`
-block, never env vars, never constants in `lib/`). Dogfooding: we run our own nexus the exact way we
-ask everyone else to — a `.work` config declaration, read at boot.
-
-At deploy this file is placed where `Nexus.Config` looks (`/data/deployment.work`); here it is the
-tracked source of truth. Secrets are NOT here — those come through `Nexus.Secrets` from the encrypted
-control-plane store; this is only tunable config + our public business values.
+config — never env vars, never constants in `lib/`. Dogfooding: we run our own nexus the exact way we
+ask everyone else to — a `.work` config declaration in the deploy index, read at boot. Secrets are NOT
+here — those come through `Nexus.Secrets` from the encrypted control-plane store.
 
 deploy do
   # Our capacity tiers — the numbers the dashboard + the upsell read. `id | Name | ram_mb storage_gb price_usd domains(yes|no)`.
