@@ -67,6 +67,10 @@
   // ── nexus switcher: other nexuses (yours / shared / member orgs), rename (admin) ──
   // The active nexus shows in the header, so the menu lists only the OTHERS (no duplicate).
   const otherNexuses = $derived((nexusStore.list?.() || []).filter((n) => n.id !== activeNx?.id));
+  // One active item across the WHOLE sidebar — driven by the current page, not a persisted selection.
+  // A workspace row only reads "active" while you're actually on a workspace page (else a nexus page
+  // would light up both a nexus link AND a workspace at once).
+  const onWorkspace = $derived(page.url.pathname === '/workspace' || page.url.pathname.startsWith('/workspace/'));
   // Org-member can rename their nexus. (Role-gating refines this once WorkOS roles are surfaced.)
   const isAdmin = true;
   let nxEditing = $state(false);
@@ -295,7 +299,7 @@
           {#if editingId === w.id}
             {@render wsEditor(false)}
           {:else}
-            <div class="wsrow" class:on={activeWs?.id === w.id}>
+            <div class="wsrow" class:on={onWorkspace && activeWs?.id === w.id}>
               <button class="wsmain" onclick={() => { workspaceStore.setActive(w.id); goto('/workspace'); }}>
                 <span class="av sm">{w.icon || (w.name[0] || 'W').toUpperCase()}</span>
                 <span class="omname">{w.name}</span>
