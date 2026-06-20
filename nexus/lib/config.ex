@@ -115,6 +115,11 @@ defmodule Nexus.Config do
   def session_max_age, do: get(:session_max_age)
   def session_cookie, do: get(:session_cookie)
 
+  # The org's declared workspaces (curated folders, `deploy workspaces="folder | Name | emoji"`) and
+  # the nexus's own display emoji. Neutral defaults: [] / nil — deployers declare their own.
+  def workspaces, do: get(:workspaces)
+  def nexus_emoji, do: get(:nexus_emoji)
+
   # Login providers (Nexus.Auth.Provider). Declared as `auth-provider-<name>-<key>="…"` deploy attrs,
   # e.g. `auth-provider-workos-authorize-url`, `-token-url`, `-jwks-url`, `-client-id`, `-issuer`,
   # `-scope`, `-redirect-uri`, `-tenant-claim`. Secrets (client_secret) live in Nexus.Secrets, NEVER
@@ -156,9 +161,30 @@ defmodule Nexus.Config do
       session_secure: bool(attr(html, "session-secure"), true),
       session_max_age: int(attr(html, "session-max-age"), 86_400),
       session_cookie: attr(html, "session-cookie") || "wb_session",
+      # The org's WORKSPACES — curated folders of work, declared canonically here (the deploy-kit
+      # config), NOT auto-derived from every mount. Each line: `folder | Name | emoji`. Runtime ships
+      # NONE; a deployer brings their own. Plus the nexus's own display emoji.
+      nexus_emoji: attr(html, "nexus-emoji"),
+      workspaces: parse_workspaces(attr(html, "workspaces")),
       providers: parse_providers(html)
     }
   end
+
+  defp parse_workspaces(nil), do: []
+
+  defp parse_workspaces(src) do
+    src
+    |> String.split("\n", trim: true)
+    |> Enum.flat_map(fn line ->
+      case line |> String.trim() |> String.split("|") do
+        [folder, name, emoji] -> [%{id: String.trim(folder), name: String.trim(name), icon: nilify(emoji)}]
+        [folder, name] -> [%{id: String.trim(folder), name: String.trim(name), icon: nil}]
+        _ -> []
+      end
+    end)
+  end
+
+  defp nilify(s), do: (t = String.trim(s)) == "" && nil || t
 
   # Scan the deploy block for `auth-provider-<name>-<key>="value"` → %{name => %{key => value}}.
   defp parse_providers(html) do

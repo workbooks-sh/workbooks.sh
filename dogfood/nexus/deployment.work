@@ -21,6 +21,17 @@ deploy do
     scale  | Scale  | 8192 500 229 yes
   "
 
+  # Our nexus's display emoji + its WORKSPACES — curated folders of work, NOT every mount. Each line:
+  # `folder | Name | emoji`. The dashboard reads these; the UI emoji picker overrides an icon per-org.
+  nexus-emoji="🐕"
+  workspaces="
+    lander    | Lander    | 🪧
+    cloud     | Cloud     | ☁️
+    docs      | Docs      | 📖
+    marketing | Marketing | 📣
+    waitlist  | Waitlist  | 📋
+  "
+
   reserved-hosts="workbooks.sh"                          # our domain of record — tenants can't bind under it
   runtime-image="ghcr.io/workbooks-sh/runtime:latest"   # the image we provision per-tenant
 

@@ -249,15 +249,19 @@ defmodule Nexus.Platform do
 
   # ── workspaces (free, no compute — logical org divisions) ──────────────────────────────────────
   get "/workspaces" do
-    # The nexus's mounted surfaces ARE the org's workspaces — each deployed `.work` folder is a
-    # division of work. Surface them (named from the mount), then append any user-created workspaces.
-    surfaces =
-      for {name, _root} <- Application.get_env(:nexus, :mounts, []), name != "" do
-        %{id: name, name: titleize(name), icon: nil, nexus_id: self_nexus_id(), surface: true}
-      end
+    org = org(conn)
+    # Declared workspaces (curated folders, from the deploy config) + any per-org UI emoji/name
+    # overrides + user-created workspaces. Runtime ships none — the deployer declares them.
+    overrides = Map.new(CP.list(org, :ws_override), &{&1.id, &1})
 
-    created = Enum.map(CP.list(org(conn), :workspace), &ws_view/1)
-    j(conn, 200, %{workspaces: surfaces ++ created})
+    declared =
+      Enum.map(Nexus.Config.workspaces(), fn w ->
+        o = overrides[w.id] || %{}
+        %{id: w.id, name: o[:name] || w.name, icon: o[:icon] || w.icon, nexus_id: self_nexus_id(), surface: true}
+      end)
+
+    created = Enum.map(CP.list(org, :workspace), &ws_view/1)
+    j(conn, 200, %{workspaces: declared ++ created})
   end
 
   post "/workspaces" do
@@ -277,9 +281,25 @@ defmodule Nexus.Platform do
     org = org(conn)
     attrs = read(conn) |> decode() |> Map.take(["name", "icon"]) |> atomize()
 
-    case CP.update(org, :workspace, conn.params["id"], attrs) do
-      {:ok, ws} -> j(conn, 200, ws_view(ws))
-      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+    id = conn.params["id"]
+
+    case CP.update(org, :workspace, id, attrs) do
+      {:ok, ws} ->
+        j(conn, 200, ws_view(ws))
+
+      {:error, :not_found} ->
+        # A declared (deploy-config) workspace has no CP row — persist a per-org OVERRIDE (so the UI
+        # emoji picker / rename sticks), merged over the declared name/emoji.
+        case Enum.find(Nexus.Config.workspaces(), &(&1.id == id)) do
+          nil ->
+            j(conn, 404, %{error: "not found"})
+
+          decl ->
+            prev = case CP.get(org, :ws_override, id) do {:ok, o} -> o; _ -> %{} end
+            merged = prev |> Map.merge(attrs) |> Map.put(:id, id)
+            {:ok, o} = CP.put(org, :ws_override, id, merged)
+            j(conn, 200, %{id: id, name: o[:name] || decl.name, icon: o[:icon] || decl.icon, nexus_id: self_nexus_id(), surface: true})
+        end
     end
   end
 
@@ -411,6 +431,7 @@ defmodule Nexus.Platform do
     %{
       id: id,
       name: if(friendly == "", do: id, else: friendly),
+      icon: Nexus.Config.nexus_emoji(),
       region: System.get_env("FLY_REGION") || System.get_env("WB_FLY_REGION") || "",
       plan: self_tier_id(),
       state: "run",
@@ -425,11 +446,6 @@ defmodule Nexus.Platform do
   defp self_tier_id do
     total = Nexus.Capacity.machine_total_mb()
     (Enum.min_by(Nexus.Pricing.tiers(), fn t -> abs((t[:ram_mb] || 0) - total) end) || Nexus.Pricing.default_tier()).id
-  end
-
-  defp titleize(name) do
-    name |> to_string() |> String.split(~r/[-_\s]+/, trim: true)
-    |> Enum.map_join(" ", &String.capitalize/1)
   end
 
   # On-disk footprint of a mounted surface (bounded walk) — the same primitive the server :cloud
