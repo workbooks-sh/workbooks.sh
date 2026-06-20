@@ -19,7 +19,7 @@ ground:
   untrusted or risky work without handing it the keys to everything.
 
 client :counter do
-  <button onclick="count++">{count}</button>
+  <button onclick="this.textContent = 'clicked ' + (this._n = (this._n||0)+1)">clicked 0</button>
 end
 
 Same file, but `client` draws in the browser while `server` runs on the engine —
