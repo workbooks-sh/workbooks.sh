@@ -8,7 +8,6 @@ const std = @import("std");
 const Io = std.Io;
 const fs = @import("fs.zig");
 const context = @import("context.zig");
-const http = @import("cloud.zig");
 const log = @import("log.zig");
 
 const places = [_][]const u8{ "local", "cloud" };
@@ -149,21 +148,45 @@ pub fn deployWorkbook(io: Io, alloc: std.mem.Allocator, home: []const u8, cwd: [
 
     log.prompt(try std.fmt.allocPrint(alloc, "work deploy {s} \u{2192} {s}", .{ name, base }));
 
-    const body = try std.fmt.allocPrint(alloc, "{{\"name\":\"{s}\",\"path\":\"{s}\"}}", .{ name, abs });
-    const url = try std.fmt.allocPrint(alloc, "{s}/api/mount", .{base});
+    // The nexus IS a git remote: push the workbook's files to `<base>/git/<name>.git`. A post-receive
+    // checks them out into the workspace dir on the nexus (works for a REMOTE nexus, not just same-box).
+    // We use a reused local mirror git-dir (~/.work/repos/<name>.git) over the source work-tree, so the
+    // source dir is never touched and pushes are incremental.
+    const token = if (context.cred(io, alloc, home)) |c| c.token else "";
 
-    const res = http.request(io, alloc, .POST, url, "", body) catch {
-        log.err(try std.fmt.allocPrint(alloc, "couldn't reach the nexus at {s} \u{2014} is it running?", .{base}));
+    // Authed remote URL: scheme://x:<token>@host/git/<name>.git
+    const remote = blk: {
+        const sep = std.mem.indexOf(u8, base, "://") orelse break :blk try std.fmt.allocPrint(alloc, "{s}/git/{s}.git", .{ base, name });
+        const scheme = base[0 .. sep + 3];
+        const hostpart = base[sep + 3 ..];
+        break :blk if (token.len > 0)
+            try std.fmt.allocPrint(alloc, "{s}x:{s}@{s}/git/{s}.git", .{ scheme, token, hostpart, name })
+        else
+            try std.fmt.allocPrint(alloc, "{s}{s}/git/{s}.git", .{ scheme, hostpart, name });
+    };
+
+    const mirror = try std.fs.path.join(alloc, &.{ home, ".work", "repos", try std.fmt.allocPrint(alloc, "{s}.git", .{name}) });
+    Io.Dir.cwd().createDirPath(io, mirror) catch {};
+    const gd = try std.fmt.allocPrint(alloc, "--git-dir={s}", .{mirror});
+    const wt = try std.fmt.allocPrint(alloc, "--work-tree={s}", .{abs});
+
+    _ = std.process.run(alloc, io, .{ .argv = &.{ "git", gd, "init", "-q", "-b", "main" } }) catch {};
+    _ = std.process.run(alloc, io, .{ .argv = &.{ "git", gd, "config", "user.name", "work" } }) catch {};
+    _ = std.process.run(alloc, io, .{ .argv = &.{ "git", gd, "config", "user.email", "deploy@workbooks.local" } }) catch {};
+    _ = std.process.run(alloc, io, .{ .argv = &.{ "git", gd, wt, "add", "-A" } }) catch {};
+    _ = std.process.run(alloc, io, .{ .argv = &.{ "git", gd, wt, "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", "deploy" } }) catch {};
+
+    const push = std.process.run(alloc, io, .{ .argv = &.{ "git", gd, "push", "-f", remote, "HEAD:main" } }) catch {
+        log.err(try std.fmt.allocPrint(alloc, "git push failed \u{2014} is the nexus reachable at {s} and are you logged in?", .{base}));
         return 1;
     };
 
-    if (res.status == 200) {
-        const path = http.jsonField(res.body, "url") orelse "/";
-        log.ok(try std.fmt.allocPrint(alloc, "deployed \u{2192} {s}{s}", .{ base, path }));
+    if (push.term == .exited and push.term.exited == 0) {
+        log.ok(try std.fmt.allocPrint(alloc, "deployed \u{2192} {s}/{s}/", .{ base, name }));
         return 0;
     }
 
-    log.err(try std.fmt.allocPrint(alloc, "deploy failed ({d}): {s}", .{ res.status, res.body }));
+    log.err(try std.fmt.allocPrint(alloc, "deploy failed:\n{s}", .{push.stderr}));
     return 1;
 }
 
