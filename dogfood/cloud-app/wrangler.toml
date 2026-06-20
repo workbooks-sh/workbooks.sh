@@ -1,0 +1,17 @@
+name = "workbooks-cloud"
+# Account: 6d4b74aeb10f455fbf88141901e7595d (set via CLOUDFLARE_ACCOUNT_ID — Pages
+# config rejects account_id inline).
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".svelte-kit/cloudflare"
+
+# Short-lived desktop sign-in broker state (state ids + one-time codes) — see
+# $lib/desktopBroker. Stateless Pages Functions need KV for cross-request flow state.
+[[kv_namespaces]]
+binding = "AUTH_KV"
+id = "6e2c76cd89d14ba7ab10e4ceede1d352"
+
+# Secrets (set via `wrangler pages secret put …` or the CF dashboard — NEVER commit):
+#   WORKOS_API_KEY  WORKOS_CLIENT_ID  WORKOS_REDIRECT_URI  WORKOS_COOKIE_PASSWORD
+#   WB_ALLOWLIST (defaults to shane@shinyobjectz.com)
+#   POLAR_ACCESS_TOKEN  POLAR_PRODUCT_TEAM  POLAR_SERVER (sandbox|production)
