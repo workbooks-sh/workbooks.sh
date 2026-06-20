@@ -402,7 +402,11 @@ defmodule Nexus.Server do
         if format == "html" do
           conn |> put_resp_content_type("text/html") |> send_resp(200, Nexus.Graph.Viz.to_html(g))
         else
-          conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(graph_summary(g), escape: :html_safe))
+          # Public structure data — CORS-open so the cloud dashboard (a different origin) can read it.
+          conn
+          |> put_resp_header("access-control-allow-origin", "*")
+          |> put_resp_content_type("application/json")
+          |> send_resp(200, Jason.encode!(graph_summary(g), escape: :html_safe))
         end
     end
   end

@@ -13,13 +13,15 @@
   const wsIcon = $derived(ws?.icon || (wsName[0] || 'W').toUpperCase());
 
   const TABS = [
+    { href: '/workspace', label: 'Structure' },
     { href: '/workspace/members', label: 'Members & access' },
     { href: '/workspace/sharing', label: 'Sharing' },
     { href: '/workspace/history', label: 'History' },
-    { href: '/workspace/env', label: 'Env vars' }
+    { href: '/workspace/env', label: 'Secrets' }
   ];
   const here = $derived(page.url.pathname);
-  const isOn = (href) => here === href || here.startsWith(href + '/');
+  // '/workspace' is the Structure index — exact match so it isn't "on" for every sub-tab.
+  const isOn = (href) => href === '/workspace' ? here === '/workspace' : (here === href || here.startsWith(href + '/'));
 </script>
 
 <section>
@@ -44,7 +46,7 @@
   .wshead { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
   .wsav {
     width:40px; height:40px; border-radius:11px; flex:none; display:grid; place-items:center;
-    background:linear-gradient(135deg, var(--mint), var(--sky)); color:var(--ink);
+    background:var(--line); color:var(--ink);
     font:700 16px var(--read);
   }
   .wshead h2 { font-family:var(--display); font-weight:600; font-size:24px; line-height:1.1; color:var(--ink); }
