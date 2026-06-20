@@ -412,7 +412,7 @@ defmodule Nexus.Platform do
       id: id,
       name: if(friendly == "", do: id, else: friendly),
       region: System.get_env("FLY_REGION") || System.get_env("WB_FLY_REGION") || "",
-      plan: Nexus.Pricing.default_tier().id,
+      plan: self_tier_id(),
       state: "run",
       url: conn.host
     }
