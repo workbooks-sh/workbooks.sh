@@ -95,7 +95,9 @@ defmodule Nexus.Platform do
     id = conn.assigns[:identity] || %{}
     user_id = id[:user]
     orgs = if is_binary(user_id), do: Nexus.WorkOS.orgs_for_user(user_id), else: []
-    j(conn, 200, %{user: %{id: user_id, name: ""}, active_org: org(conn), orgs: orgs})
+    # Native session carries name/email (Nexus.Auth.Native.identity); surface them so the
+    # dashboard's account row shows the real signed-in user, not a blank.
+    j(conn, 200, %{user: %{id: user_id, name: id[:name] || "", email: id[:email] || ""}, active_org: org(conn), orgs: orgs})
   end
 
   get "/storage" do
