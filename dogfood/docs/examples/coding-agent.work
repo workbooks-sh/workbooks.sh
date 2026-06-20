@@ -1,39 +1,116 @@
 # A coding agent
 
-A coding agent — the kind that reads your repo, edits files, runs the tests, and
-iterates until they pass — is mostly *prompt and a sandbox*. In Workbooks the sandbox
-comes for free: an [`agent`](/tooling/authoring-an-agent) gets a `bash` tool over a
-`/work` area, compiled to WebAssembly, with only the powers you grant. So the whole
-agent is the brain you write:
+A coding agent is the loop you've watched tools like Claude Code or Pi run: read the
+repo, make one change, run the tests, look at the output, decide what to do next —
+repeat until green. Most of that loop is *plumbing*: a tool protocol, a sandbox to run
+commands in, a transcript, a budget. Workbooks ships all of it as a primitive, so the
+part you actually write is small.
+
+This lesson builds a working coding agent, gives it a task, puts a request endpoint on
+it, and then runs a fleet of them — each piece is a few lines of `.work`.
+
+## The brain
+
+An [`agent`](/tooling/authoring-an-agent) block is a unit whose **body is the system
+prompt**. The runtime gives it one tool — `bash` — running against a `/work` area that
+is compiled to WebAssembly and capability-scoped, so the agent can read, write, and run
+real commands without ever touching the host. The entire agent is the instructions:
 
 ```
-  agent :coder do
-    You are a coding agent working in /work. You have one tool — bash — and can read
-    files, write files, run the test suite, and install dependencies.
+agent :coder do
+  You are a coding agent working in /work — a checkout of the repository. Your one tool
+  is bash: use it to read files, write files, run the test suite, and install deps.
 
-    Work in small steps: inspect the code, make ONE change, run the tests, and read the
-    output before the next step. Never guess — run the command and look. When the task
-    is done and the tests pass, stop and summarize exactly what you changed.
+  Work the way a careful engineer does:
+    1. Look first. Read the relevant files and run the tests to see the current state.
+    2. Change one thing. Make the smallest edit that moves toward the goal.
+    3. Verify. Re-run the tests and READ the output — never assume a change worked.
+    4. Repeat, or stop. When the tests pass and the goal is met, stop and summarize
+       exactly what you changed and why.
+
+  Never guess a result you could check by running a command. Keep changes minimal and
+  reversible. If you get stuck twice on the same error, step back and re-read the code.
+end
+```
+
+That is the whole agent. There is no tool registry to maintain and no agent framework
+to wire — the prose *is* the program, and the [Dock](/capabilities/sandboxing-and-the-dock)
+is the wall that keeps `bash` inside `/work`.
+
+## What the runtime runs for you
+
+When this agent runs, the [Nexus](/introduction/what-is-the-nexus) drives the loop you'd
+otherwise hand-write:
+
+1. It sends your instructions + the task to the model, advertising the `bash` tool.
+2. If the model answers with tool calls, the runtime executes each command in the
+   `/work` sandbox and feeds the combined output back into the conversation.
+3. That repeats — think, run, read, think — until the model stops calling tools and
+   returns a final answer, or the wall-clock budget runs out.
+
+You never see the tool-call wiring, the transcript management, or the sandbox setup.
+That's the plumbing the primitive absorbs.
+
+## Giving it a task
+
+An `agent` block's body is simply its **system prompt** — so to run it on a concrete
+repo and capture the edits, call `Nexus.Agent.run/1` from a [`server`](/language/placement-and-languages)
+unit with that brain as `system`. It seeds files into `/work`, runs the loop, and returns
+the final answer — here behind an HTTP [route](/serving/routes-and-pages):
+
+```
+server :fix do
+  # @coder is the same instruction text as the :coder block above
+  @coder "You are a coding agent working in /work. Your one tool is bash … (as above)"
+
+  route "POST /fix", :run
+
+  def run(req) do
+    result =
+      Nexus.Agent.run(
+        system: @coder,
+        task: req.body["task"],           # "make the failing date test pass"
+        seed: req.body["files"],          # %{"lib/date.ex" => "…", "test/date_test.exs" => "…"}
+        timeout_ms: 180_000
+      )
+
+    case result do
+      {:ok, %{answer: summary, vfs_files: files}} -> %{summary: summary, files: files}
+      {:error, reason} -> {500, %{error: inspect(reason)}}
+    end
   end
+end
 ```
 
-That's the agent. No framework to wire, no tool registry to maintain — the prose *is*
-the program, and the [Dock](/capabilities/sandboxing-and-the-dock) is the wall that
-keeps `bash` inside `/work`.
+`seed` writes the repo into the sandbox; `vfs_files` hands back whatever the agent wrote,
+so you get the edited files out. The agent did the reading, editing, and test-running in
+between — you just supplied the task and got the diff.
 
 ## Running it at scale
 
-Because the brain is just a unit, the runtime can run one or a thousand of them — one
-per ticket, file, or repo — concurrently on the [Nexus](/introduction/what-is-the-nexus).
-You don't change the agent to scale it; you dispatch a list. The fan-out pattern is the
-same one shown in [Agents at scale](/examples/agents-at-scale): a `server` maps the work
-across `Task.async` and awaits them all.
+Because a run is an ordinary function call, doing a hundred is an ordinary `map`. Fan a
+coder out across every failing ticket and let the BEAM run them at once:
 
-The point is the split: the hard part — a sandboxed, tool-using brain — is a *primitive*,
-so the code you write is just the small part on top.
+```
+server :sweep do
+  def run(tickets) do
+    tickets
+    |> Enum.map(fn t ->
+      Task.async(fn -> Nexus.Agent.run(system: @coder, task: t.body, seed: t.repo) end)
+    end)
+    |> Task.await_many(:infinity)
+  end
+end
+```
+
+One agent or a thousand is the same code — only the list gets longer. The same fan-out
+shape powers the [agents-at-scale](/examples/agents-at-scale) example; swap the worker
+and you have a swarm.
 
 ## What to take away
 
-- **The agent is prose** — instructions, not plumbing. [Authoring an agent](/tooling/authoring-an-agent).
-- **The sandbox is given** — `bash` over `/work`, capability-scoped. [Sandboxing & the Dock](/capabilities/sandboxing-and-the-dock).
-- **Scale is a `map`** — fan agents out from a `server`; the runtime runs them in parallel.
+- **The agent is prose, not plumbing.** The body is the system prompt; the loop, tools,
+  and sandbox are the runtime's job. → [Authoring an agent](/tooling/authoring-an-agent)
+- **The sandbox is free and contained.** `bash` over `/work`, compiled to wasm, scoped
+  by grants. → [Sandboxing & the Dock](/capabilities/sandboxing-and-the-dock)
+- **Running it is a function call** — `Nexus.Agent.run/1` — so scaling it is a `map`.
