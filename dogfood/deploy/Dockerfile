@@ -16,9 +16,16 @@ RUN mix compile && mix release nexus
 FROM debian:bookworm-slim AS app
 ENV LANG=C.UTF-8 PORT=4000 WB_DATA=/srv/dogfood WB_NEXUS=dogfood
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 ca-certificates sqlite3 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 ca-certificates sqlite3 curl && rm -rf /var/lib/apt/lists/*
+# Litestream — streams the tenant SQLite WAL to R2 (egress-free) + restores on boot. Generic
+# durability mechanism; activates only when WB_S3_* secrets are injected (see entrypoint).
+ARG LITESTREAM_VERSION=v0.3.13
+RUN curl -fsSL "https://github.com/benbjohnson/litestream/releases/download/${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-amd64.tar.gz" \
+    | tar -xz -C /usr/local/bin litestream && litestream version
 COPY --from=build /app/_build/prod/rel/nexus ./
 COPY dogfood /srv/dogfood
 COPY dogfood/nexus/deployment.work /app/deployment.work
+COPY nexus/scripts/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 EXPOSE 4000
-CMD ["bin/nexus", "start"]
+CMD ["/app/entrypoint.sh"]

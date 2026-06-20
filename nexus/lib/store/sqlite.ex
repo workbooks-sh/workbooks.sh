@@ -56,7 +56,9 @@ defmodule Nexus.Store.Sqlite do
   end
 
   defp with_conn(fun) do
-    {:ok, conn} = Sqlite3.open(db_path())
+    path = db_path()
+    File.mkdir_p!(Path.dirname(path))
+    {:ok, conn} = Sqlite3.open(path)
     # WAL is REQUIRED for Litestream (it ships WAL frames off-box) and lets reads run concurrently
     # with the single writer. busy_timeout absorbs brief lock contention instead of erroring.
     Sqlite3.execute(conn, "PRAGMA journal_mode=WAL")
@@ -75,7 +77,7 @@ defmodule Nexus.Store.Sqlite do
 
   defp tbl(resource), do: "r_" <> (resource |> Module.split() |> Enum.join("_") |> String.downcase())
 
-  # Default to the durable volume DB (Litestream replicates this). An explicit `:sqlite_path` (dev
-  # per-workbook DB, tests) still wins. Falls back to a temp file only when no data dir is resolvable.
+  # Default to the durable volume DB under .nexus/ (Litestream replicates this). An explicit
+  # `:sqlite_path` (dev per-workbook DB, tests) still wins.
   defp db_path, do: Application.get_env(:nexus, :sqlite_path) || Nexus.Litestream.db_path()
 end

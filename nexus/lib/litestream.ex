@@ -20,8 +20,11 @@ defmodule Nexus.Litestream do
 
   @config_path "/etc/litestream.yml"
 
-  @doc "The durable SQLite database path on the mounted volume (`WB_DATA`)."
-  def db_path, do: Path.join(Config.data_dir(), "nexus.db")
+  @doc """
+  The durable SQLite database path — under a hidden `.nexus/` subdir of the mounted volume so it can
+  never be served by the static file tier (which lives at the same volume root for a tenant).
+  """
+  def db_path, do: Path.join([Config.data_dir(), ".nexus", "nexus.db"])
 
   @doc "The conventional litestream config path inside the deployed image."
   def config_path, do: @config_path

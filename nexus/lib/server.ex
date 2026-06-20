@@ -513,12 +513,23 @@ defmodule Nexus.Server do
       # containment guard — the resolved path must stay inside the mount (no `..` escape)
       full != root and not String.starts_with?(full, root <> "/") -> :skip
       Path.extname(full) == ".work" -> :skip
+      # never serve the durable store / hidden runtime data (.nexus/, *.db, WAL/SHM sidecars)
+      dotted_or_db?(rel) -> :skip
       File.regular?(full) ->
         {:served, conn |> put_resp_content_type(MIME.from_path(full)) |> send_file(200, full)}
 
       true ->
         :skip
     end
+  end
+
+  # True if any path segment is a dotfile/dir (e.g. `.nexus/`) or the file is a SQLite store file —
+  # these are runtime data, never servable assets.
+  defp dotted_or_db?(rel) do
+    segs = String.split(rel, "/", trim: true)
+    Enum.any?(segs, &String.starts_with?(&1, ".")) or
+      Path.extname(rel) in [".db", ".sqlite", ".sqlite3"] or
+      String.ends_with?(rel, "-wal") or String.ends_with?(rel, "-shm")
   end
 
   # Request bodies arrive as raw strings; decode JSON when it is JSON, else pass the raw string.
