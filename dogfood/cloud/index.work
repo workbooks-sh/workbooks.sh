@@ -1028,6 +1028,7 @@ WB.view('/create', { title: 'Create', accent: 'var(--mint)', async render(el){
   var createSignal = S.createSignal, For = S.For, Show = S.Show;
   // wbchat — our vanilla AI-chat library (the singular surface). Load core + theme once.
   var WBC = await import('./wbchat/core.js');
+  await import('./wbchat/components/index.js');  // registers the Tier-2 parts (reasoning/tool/sources/media/code)
   (function(){ if (!document.getElementById('wbchat-theme')){ var l = document.createElement('link'); l.id = 'wbchat-theme'; l.rel = 'stylesheet'; l.href = './wbchat/theme.css'; document.head.appendChild(l); } })();
 
   var U = (WB.user && WB.user.email) || 'anon';
