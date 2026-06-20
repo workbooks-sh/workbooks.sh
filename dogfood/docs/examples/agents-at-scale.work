@@ -34,8 +34,9 @@ server :swarm do
 end
 ```
 
-The list's length is the swarm's size. There is no separate "flow" to declare — the
-pipeline and `Enum.map` are the control flow.
+The list's length is the swarm's size. For an ad-hoc fan-out the pipeline and `Enum.map`
+are the control flow; a `flow` block is the declarative option when the steps are named
+and reusable.
 
 ## The worker: grounded, and capability-scoped
 

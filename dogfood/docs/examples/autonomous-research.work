@@ -44,8 +44,9 @@ home. The compile-and-run goes through its [kits](/tooling/toolkits) inside the 
 
 Around the experimenter sits the org: run N trials, and **keep an edit only when the
 metric actually improves** — otherwise discard it and carry the previous best forward.
-This is an ordinary Elixir `reduce` (there's no separate "flow" primitive — composition
-and recursion *are* the control flow). `Nexus.Agent.run/1` returns the final `answer`
+This loop is an ordinary Elixir `reduce` — for a fixed pipeline that's all you need (a
+`flow` block is the declarative option when you want named, reusable steps).
+`Nexus.Agent.run/1` returns the final `answer`
 (where the score was reported) and `vfs_files` (the code left behind), which is all the
 loop needs:
 
@@ -120,6 +121,7 @@ fan-out — and keep the best across all of them.
 - **You program the agent, not the code** — the instructions are the experiment design,
   the same role as autoresearch's `program.md`.
 - **"Keep what improves" is the whole engine** — a `reduce` that adopts `vfs_files` on a
-  better score and reverts otherwise. Loops are plain Elixir; there is no `flow` kind.
+  better score and reverts otherwise. Loops are plain Elixir; a `flow` block is the
+  declarative alternative when you want named, reusable steps.
 - **Unattended is safe** — real edits and runs, contained in a `/work` sandbox; heavy
   compute is brokered through a host capability, not run in-guest.

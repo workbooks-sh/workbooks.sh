@@ -15,9 +15,13 @@ These execute. Their [placement](/language/placement-and-languages) decides wher
   functions you write live inside it.
 - **`sandbox`** — guest code in a capability-scoped box, compiled to WebAssembly
   and given only the powers it's granted. For untrusted or risky work.
-- **`agent`** — a unit with an agent brain: a server-side block that can reason and
-  act, not just compute.
-- **`toolkit`** — a bundle of capabilities a workbook builds and exposes.
+- **`agent`** — a sandboxed function with a brain: a server-side block defined by its
+  `prompt`, `tools`, `grant`, and `limit`. It reasons and acts, not just computes.
+- **`toolkit`** — a wrapped CLI compiled to a wasm command; a capability an agent runs.
+- **`flow`** — an ordered, runnable sequence of `step`s (a pipeline / state machine)
+  that threads each step's result into the next, over the effect engine.
+- **`hook`** — a reactive binding: `match` events on the bus → run effects; the
+  composing partner of `flow`.
 
 ## Structure kinds
 
