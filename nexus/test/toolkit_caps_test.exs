@@ -22,8 +22,9 @@ defmodule Nexus.Toolkit.CapsTest do
 
     assert a.load.("k") == "value-a"
     assert b.load.("k") == "value-b"
-    # a different operator entirely is also isolated
-    c = Caps.bind({"globex", "app", "a"}, [:store, :load])
+    # a different operator entirely is also isolated (unique path — global persistent_term store is
+    # shared across async tests, so each test uses its own path to avoid cross-test collisions)
+    c = Caps.bind({"bind-test-iso", "app", "a"}, [:store, :load])
     assert c.load.("k") == ""
   end
 
@@ -76,8 +77,8 @@ defmodule Nexus.Toolkit.CapsTest do
 
   test "imports are path-scoped through the built fns" do
     iface = Nexus.JsEngine.caps_iface()
-    a = Caps.imports({"globex", "app", "a"}, [:store, :load])[iface]
-    b = Caps.imports({"globex", "app", "b"}, [:store, :load])[iface]
+    a = Caps.imports({"imports-test-iso", "app", "a"}, [:store, :load])[iface]
+    b = Caps.imports({"imports-test-iso", "app", "b"}, [:store, :load])[iface]
     {:fn, a_store} = a["store"]
     {:fn, a_load} = a["load"]
     {:fn, b_load} = b["load"]
