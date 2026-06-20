@@ -437,8 +437,10 @@ defmodule Nexus.SSR do
         group_blocks(rest2, [{:quote, q} | acc])
 
       String.starts_with?(line, "- ") ->
-        {items, rest2} = Enum.split_while([line | rest], &String.starts_with?(&1, "- "))
-        group_blocks(rest2, [{:ul, items} | acc])
+        # a list runs to the next blank line; soft-wrapped continuation lines (not
+        # starting with "- ") fold into the current item rather than splitting off.
+        {block, rest2} = Enum.split_while([line | rest], &(String.trim(&1) != ""))
+        group_blocks(rest2, [{:ul, list_items(block)} | acc])
 
       true ->
         {para, rest2} =
@@ -460,10 +462,24 @@ defmodule Nexus.SSR do
   end
 
   defp render_block({:ul, items}),
-    do: "  <ul>" <> Enum.map_join(items, "", fn "- " <> i -> "<li>#{inline(i)}</li>" end) <> "</ul>"
+    do: "  <ul>" <> Enum.map_join(items, "", &"<li>#{inline(&1)}</li>") <> "</ul>"
 
   defp render_block({:p, lines}),
     do: "  <p>#{inline(lines |> Enum.map_join(" ", &String.trim/1))}</p>"
+
+  # Fold a list block into item strings: each "- " starts an item; any following
+  # non-"- " line is a soft-wrapped continuation of the current item.
+  defp list_items(lines) do
+    lines
+    |> Enum.reduce([], fn line, acc ->
+      case line do
+        "- " <> item -> [String.trim(item) | acc]
+        cont when acc == [] -> [String.trim(cont)]
+        cont -> [hd(acc) <> " " <> String.trim(cont) | tl(acc)]
+      end
+    end)
+    |> Enum.reverse()
+  end
 
   # Compile the unit (any lane), run its no-arg `render` export on wasmex, bake the result.
   # An ungranted host cap is refused BEFORE running it (the weave is where the audit is enforced).

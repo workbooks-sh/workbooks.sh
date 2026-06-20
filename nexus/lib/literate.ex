@@ -60,7 +60,9 @@ defmodule Nexus.Literate do
         {body, after_block} = take_block(rest, [])
         walk(after_block, [], [code_node(line, n, body) | flush(prose, nodes)])
 
-      decl?(line) ->
+      # only START a declaration at a block boundary (prose flushed) — a decl keyword
+      # appearing mid-paragraph (a soft-wrapped continuation line) is prose, not a decl.
+      decl?(line) and prose == [] ->
         {lines, rest2} = take_decl([{line, n} | rest])
         text = lines |> Enum.map(&elem(&1, 0)) |> Enum.join("\n")
         node = %{type: :decl, line: n, text: text, refs: refs(text)}
@@ -86,10 +88,22 @@ defmodule Nexus.Literate do
   # (`do…end` is the code delimiter; prose never ends in " do".)
   defp opener?(line), do: Regex.match?(~r/^[^\s#].*\sdo\s*$/, line)
 
-  # A flat declaration starts (non-indented) with `@attr` or a declaration word.
+  # A flat declaration starts (non-indented) with `@attr`, or a declaration word
+  # FOLLOWED BY declaration-shaped content — not merely any prose line that happens to
+  # begin with one of these common words (e.g. "workbook, and a …", "show your work").
+  # A real decl's keyword is followed by an atom/string/CamelName/bracket/`:`/`=`, or the
+  # line ends in ` do`, or it's the bare keyword. Otherwise it's prose.
   defp decl?(line) do
     Regex.match?(~r/^@[a-z]/, line) or
-      Regex.match?(~r/^(#{Enum.join(@decl_kw, "|")})\b/, line)
+      (Regex.match?(~r/^(#{Enum.join(@decl_kw, "|")})\b/, line) and decl_shaped?(line))
+  end
+
+  defp decl_shaped?(line) do
+    rest = line |> String.replace(~r/^\w+/, "") |> String.trim_leading()
+    rest == "" or
+      Regex.match?(~r/^[:"\[\{A-Z=]/, rest) or
+      Regex.match?(~r/^[a-z_]\w*$/, rest) or
+      Regex.match?(~r/\sdo\s*$/, line)
   end
 
   # ── consuming a code block: top-level opener at col 0 closes at `^end` ──────
