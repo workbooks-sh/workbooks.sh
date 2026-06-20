@@ -133,8 +133,11 @@ export function createChat(container, options = {}) {
 
   function renderMessage(m) {
     const row = el('div', { class: 'wbc-msg ' + m.role });
-    (m.parts || []).forEach(p => { const r = (parts[p.type] || parts.text); row.append(r(p, ctxFor(m.role))); });
+    const all = m.parts || [];
+    // Suggested follow-ups render AFTER the action bar (subtle, trailing) — everything else inline.
+    all.filter(p => p.type !== 'suggestions').forEach(p => { const r = (parts[p.type] || parts.text); row.append(r(p, ctxFor(m.role))); });
     if (status === 'idle') { const a = messageActions(m); if (a) row.append(a); }
+    all.filter(p => p.type === 'suggestions').forEach(p => { const r = parts[p.type]; if (r) row.append(r(p, ctxFor(m.role))); });
     return row;
   }
   function messageActions(m) {

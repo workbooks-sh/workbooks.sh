@@ -7,6 +7,7 @@
 import { registerAction, el, injectStyle } from '../core.js';
 
 injectStyle('feedback', `
+  .wbc-fb-grp { display: inline-flex; align-items: center; gap: 2px; }
   .wbc-fb { border: none; background: none; color: var(--wbc-dim); cursor: pointer; padding: 4px;
     border-radius: 7px; display: grid; place-items: center; }
   .wbc-fb:hover { background: var(--wbc-line); color: var(--wbc-ink); }

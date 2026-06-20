@@ -1049,7 +1049,8 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
     var ss = createSignal([]); var sessions = ss[0], setSessions = ss[1];
     var ci = createSignal(null); var curId = ci[0], setCurId = ci[1];
     var saved; try { saved = localStorage.getItem('wb-studio-activity'); } catch (e) {}
-    var co = createSignal(saved === 'closed'); var collapsed = co[0], setCollapsedSig = co[1];
+    // Activity is a toggleable panel that OVERLAYS the full-bleed chat — closed by default (open only if the user opened it before).
+    var co = createSignal(saved !== 'open'); var collapsed = co[0], setCollapsedSig = co[1];
     function setCollapsed(v){ setCollapsedSig(v); try { localStorage.setItem('wb-studio-activity', v ? 'closed' : 'open'); } catch (e) {} }
     var chat = null;
 

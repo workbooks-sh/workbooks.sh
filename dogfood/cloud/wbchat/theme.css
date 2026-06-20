@@ -79,7 +79,8 @@
 .wbc-code-hd { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: var(--wbc-code-bg); font: 600 11px var(--wbc-mono); color: var(--wbc-dim); }
 .wbc-code-copy { border: none; background: none; color: var(--wbc-dim); cursor: pointer; font: 600 11px var(--wbc-mono); padding: 2px 6px; border-radius: 6px; }
 .wbc-code-copy:hover { color: var(--wbc-ink); background: var(--wbc-line); }
-.wbc-code pre { margin: 0; border: none; border-radius: 0; }
+.wbc-code pre { margin: 0; border: none; border-radius: 0; padding: 14px 16px; overflow-x: auto; line-height: 1.55; }
+.wbc-code pre code { font: 13px var(--wbc-mono); }
 
 /* message actions (copy / regenerate) */
 .wbc-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
