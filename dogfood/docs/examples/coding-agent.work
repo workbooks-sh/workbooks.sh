@@ -32,6 +32,13 @@ end
 
 There is no tool registry to wire and no agent framework — the prose *is* the program.
 
+**Why no quotes?** The body between `do` and `end` *is* the system prompt, verbatim. The
+block delimiter is the encapsulation — like a heredoc — so you never quote or escape the
+prompt, and it can contain quotes, code, markdown, or anything else freely. (A quoted
+string would break the moment the prompt contained the quote character; `do … end`
+doesn't.) When you need the same prompt as a string in Elixir code, use a `"""triple-quoted
+heredoc"""` — the equivalent encapsulation — as in the `server` below.
+
 ## Where it runs, and how it's contained
 
 This is the part that matters for trusting an agent with your repo:
@@ -83,13 +90,18 @@ transcript, or context-window management.
 ## Giving it a task
 
 An agent's body is just its `system` prompt, so you run it from a [`server`](/language/placement-and-languages)
-with `Nexus.Agent.run/1`: it seeds files into `/work`, runs the loop, and returns the
-final answer plus whatever the agent wrote. Behind a [route](/serving/routes-and-pages):
+with `Nexus.Agent.run/1`. Here the prompt lives in a `@coder` module attribute as a
+`"""heredoc"""` — the same text you'd put in the `agent` block, now safely encapsulated as
+a string. `run/1` seeds files into `/work`, runs the loop, and returns the final answer
+plus whatever the agent wrote:
 
 ```
 server :fix do
-  # @coder is the same instruction text as the :coder block above
-  @coder "You are a coding agent working in /work. Your one tool is bash … (as above)"
+  @coder """
+  You are a coding agent working in /work. Your one tool is bash. Work in small steps:
+  read the code, make ONE change, run the tests, READ the output, repeat — then stop and
+  summarize. Never guess a result you could get by running a command.
+  """
 
   route "POST /fix", :run
 
@@ -117,6 +129,10 @@ failing ticket; the BEAM runs thousands of lightweight processes, so they go at 
 
 ```
 server :sweep do
+  @coder """
+  You are a coding agent working in /work … (the same prompt as a heredoc).
+  """
+
   def run(tickets) do
     tickets
     |> Enum.map(fn t ->

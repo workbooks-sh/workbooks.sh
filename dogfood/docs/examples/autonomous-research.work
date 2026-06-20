@@ -52,7 +52,11 @@ loop needs:
 
 ```
 server :lab do
-  @researcher "…the :researcher instructions above, as a string…"
+  # the :researcher prompt as a heredoc — same text as the agent block, encapsulated
+  @researcher """
+  You run ONE optimization experiment in /work. Edit codec.c, run `bash bench.sh`, READ
+  the score, and report `score=<bytes>` on the last line. Change one thing at a time.
+  """
 
   # Run `rounds` trials; the best code + a log fall out the bottom.
   def run(files, rounds \\ 100) do
