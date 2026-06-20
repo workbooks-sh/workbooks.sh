@@ -37,6 +37,9 @@ defmodule Nexus.Auth do
   def call(%{request_path: p} = conn, _opts) when p in @public_paths, do: conn
   # Login/callback endpoints are inherently public — they're how a request BECOMES authenticated.
   def call(%{request_path: "/auth/" <> _} = conn, _opts), do: conn
+  # The git smart-HTTP endpoint does its OWN Basic-auth (PAT) inside Nexus.GitHttp (git clients speak
+  # Basic, not Bearer/JWT). Skip the generic adapter so git can authenticate its own way.
+  def call(%{request_path: "/git/" <> _} = conn, _opts), do: conn
 
   def call(conn, _opts) do
     # Workbook-declared public globs skip auth entirely (login pages, marketing, etc.). When no `auth`

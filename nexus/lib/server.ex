@@ -111,6 +111,13 @@ defmodule Nexus.Server do
 
   # Liveness probe — unauthenticated (see Nexus.Auth). Deploy/orchestrator health checks (Fly,
   # Docker, the desktop daemon) probe this; 200 = the server is up and answering.
+  # Git smart-HTTP — the nexus as a git remote. `git push https://x:<wbk_PAT>@host/git/<ws>.git main`.
+  # Self-authed (Basic PAT) inside Nexus.GitHttp; the Nexus.Auth plug skips /git/*. Covers info/refs +
+  # git-upload-pack + git-receive-pack for every workspace repo.
+  match "/git/*glob" do
+    Nexus.GitHttp.handle(conn, Enum.join(glob, "/"))
+  end
+
   get "/health" do
     vsn = to_string(Application.spec(:nexus, :vsn) || "dev")
     name = Application.get_env(:nexus, :nexus_name, "")
