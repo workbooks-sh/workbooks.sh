@@ -5,13 +5,11 @@ defmodule Nexus.Capacity do
   biggest stored objects. The nexus auto-scales within its ceiling; this is the
   signal the dashboard turns into "near capacity → scale up to continue".
 
-  This is the SHOWCASE backend: the per-nexus reading is derived deterministically
-  from the nexus id + run state (the control plane can't yet pull live tenant-VM
-  metrics — that Fly-grounded backend layers onto this same shape next). Numbers
-  are stable per nexus, so the dashboard never flickers, and the math (used vs the
-  `Nexus.Pricing` ceiling, the near/over thresholds) is the real production logic.
+  The local/self nexus is measured for REAL — RAM from `/proc/meminfo`, storage from the data dir's
+  on-disk footprint — against the `Nexus.Pricing` tier ceiling. A REMOTE tenant nexus reports 0 until
+  the usage-report channel lands (honest, not a fabricated number). The math (used vs ceiling, the
+  near/over thresholds) is the production logic.
   """
-  import Bitwise
   alias Nexus.Pricing
 
   @doc "The full usage + capacity report for an org's (single) nexus."
@@ -36,14 +34,22 @@ defmodule Nexus.Capacity do
     running? = nx[:state] == "running"
     seed = :erlang.phash2(nx[:id] || "nx")
 
-    ram_used = if running?, do: scaled(seed, tier.ram_mb, 0.55, 0.97), else: 0
+    # REAL measurement for the nexus we're running on (the self/local nexus — the common single-nexus
+    # case). The control plane can't yet pull a REMOTE tenant's live metrics (the usage-report channel
+    # is next), so a remote nexus reports 0 rather than a fabricated number — honest, not showcase.
+    local? = nx[:self] == true or remote_url(nx) in [nil, ""]
 
-    # Real metering when the tenant runtime reports measured bytes (Nexus.Storage);
-    # otherwise the deterministic showcase value, until the usage-report channel lands.
+    ram_used =
+      cond do
+        not running? -> 0
+        local? -> local_ram_mb()
+        true -> 0
+      end
+
     storage_used =
       case Keyword.get(opts, :storage_bytes) do
         b when is_integer(b) -> round(b / 1_000_000_000)
-        _ -> scaled(seed >>> 3, tier.storage_gb, 0.30, 0.95)
+        _ -> if running? and local?, do: local_storage_gb(), else: 0
       end
 
     ram_dial = dial(ram_used, tier.ram_mb, "MB")
@@ -64,10 +70,49 @@ defmodule Nexus.Capacity do
     }
   end
 
-  # A used reading in [lo, hi] of the ceiling, deterministic in the seed.
-  defp scaled(seed, ceiling, lo, hi) do
-    frac = lo + rem(seed, 1000) / 1000 * (hi - lo)
-    round(ceiling * frac)
+  defp remote_url(nx), do: nx[:url] || nx["url"]
+
+  # Real RAM pressure of the machine this nexus runs on: /proc/meminfo (Linux/Fly) → used = total −
+  # available; falls back to the BEAM's own footprint where /proc is absent (dev/mac).
+  defp local_ram_mb do
+    case File.read("/proc/meminfo") do
+      {:ok, c} ->
+        with t when is_integer(t) <- meminfo(c, "MemTotal"),
+             a when is_integer(a) <- meminfo(c, "MemAvailable") do
+          div(max(t - a, 0), 1024)
+        else
+          _ -> beam_mb()
+        end
+
+      _ ->
+        beam_mb()
+    end
+  end
+
+  defp beam_mb, do: div(:erlang.memory(:total), 1_000_000)
+
+  defp meminfo(c, key) do
+    case Regex.run(~r/#{key}:\s+(\d+) kB/, c) do
+      [_, n] -> String.to_integer(n)
+      _ -> nil
+    end
+  end
+
+  # Real durable footprint: total bytes under the data dir (the SQLite DB + served content + caches),
+  # in GB. Small nexuses honestly read ~0 GB — that's correct, not a placeholder.
+  defp local_storage_gb do
+    bytes = dir_bytes(Nexus.Config.data_dir())
+    round(bytes / 1_000_000_000)
+  end
+
+  defp dir_bytes(path) do
+    cond do
+      File.regular?(path) -> (File.stat(path) |> elem(1)).size
+      File.dir?(path) -> path |> File.ls!() |> Enum.reduce(0, fn e, a -> a + dir_bytes(Path.join(path, e)) end)
+      true -> 0
+    end
+  rescue
+    _ -> 0
   end
 
   defp dial(used, limit, unit) do
