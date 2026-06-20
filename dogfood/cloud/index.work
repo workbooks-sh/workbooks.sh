@@ -1523,6 +1523,25 @@ WB.view('/secrets', {
   </div>`;
     }
 
+    // Inlined <Confirm> component (danger). Renders only when deleteFor is set
+    // (open={!!deleteFor}). Mirrors Confirm.svelte exactly.
+    function confirmHtml() {
+      if (!deleteFor) return '';
+      const body = `“${deleteFor.name}” will be removed from ${nxName}. Anything relying on it will stop seeing it.`;
+      return `<div class="modal" data-confirm>
+    <div class="sheet" style="width:440px">
+      <h2>Delete this secret?</h2>
+      <p class="sub">${esc(body)}</p>
+      <div class="foot" style="justify-content:flex-end">
+        <div style="display:flex;gap:8px">
+          <button class="btn" data-cact="cancel">Cancel</button>
+          <button class="btn danger" data-cact="confirm">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+    }
+
     function paint() {
       el.innerHTML = `
 <div class="grphead">
@@ -1535,7 +1554,8 @@ WB.view('/secrets', {
   </button>
 </div>
 ${bodyHtml()}
-${modalHtml()}`;
+${modalHtml()}
+${confirmHtml()}`;
       wire();
     }
 
@@ -1549,7 +1569,7 @@ ${modalHtml()}`;
         else if (act === 'hide') btn.addEventListener('click', () => hide(id));
         else if (act === 'copy') btn.addEventListener('click', () => copy(id));
         else if (act === 'edit') btn.addEventListener('click', () => openEdit(list.find((x) => x.id === id)));
-        else if (act === 'del') btn.addEventListener('click', () => { deleteFor = list.find((x) => x.id === id); confirmDelete(); });
+        else if (act === 'del') btn.addEventListener('click', () => { deleteFor = list.find((x) => x.id === id); paint(); });
         else if (act === 'cancel') btn.addEventListener('click', () => { editOpen = false; paint(); });
         else if (act === 'save') btn.addEventListener('click', save);
       });
@@ -1563,18 +1583,14 @@ ${modalHtml()}`;
         if (nameI) nameI.addEventListener('input', (e) => { fName = e.target.value; });
         if (valI) valI.addEventListener('input', (e) => { fValue = e.target.value; });
       }
-    }
 
-    // Confirm before delete — mirrors the <Confirm> component (danger).
-    async function confirmDelete() {
-      const v = deleteFor;
-      const ok = await WB.confirm({
-        title: 'Delete this secret?',
-        body: v ? `“${v.name}” will be removed from ${nxName}. Anything relying on it will stop seeing it.` : '',
-        danger: true
-      });
-      if (ok) { await reallyDelete(); }
-      else { deleteFor = null; }
+      // inlined <Confirm> modal — backdrop close (oncancel), cancel, confirm
+      const conf = el.querySelector('[data-confirm]');
+      if (conf) {
+        conf.addEventListener('click', (e) => { if (e.target === e.currentTarget) { deleteFor = null; paint(); } });
+        conf.querySelector('[data-cact="cancel"]')?.addEventListener('click', () => { deleteFor = null; paint(); });
+        conf.querySelector('[data-cact="confirm"]')?.addEventListener('click', reallyDelete);
+      }
     }
 
     paint();
@@ -2323,7 +2339,8 @@ ${modalHtml()}`;
       const ok = await WB.confirm({
         title: 'Stop sharing this folder?',
         body: `${g.recipient} will lose access to “${g.folder}”. A copy they already added stays in their workspace as their own.`,
-        danger: true
+        danger: true,
+        confirm: 'Stop sharing'
       });
       revokeFor = null;
       if (!ok) return;
@@ -2352,6 +2369,7 @@ WB.styles(`
   .tl { list-style:none; margin:0; padding:6px 0; }
   .tl li { display:flex; gap:0; }
   .rail { position:relative; width:34px; flex:none; }
+  /* the connecting line */
   .rail::before { content:''; position:absolute; left:50%; top:0; bottom:0; width:2px;
     background:var(--line); transform:translateX(-50%); }
   .tl li:first-child .rail::before { top:18px; }
@@ -2393,12 +2411,20 @@ WB.styles(`
   /* Drafts.svelte */
   .dh { display:flex; align-items:center; justify-content:space-between; gap:12px;
     padding:14px 18px; border-bottom:2px solid var(--line); }
+  .empty { padding:24px 18px; text-align:center; color:var(--dim); font-size:13px; }
   .dl { list-style:none; margin:0; padding:6px 0; }
   .dl > li { border-bottom:1px solid var(--line); }
   .dl > li:last-child { border-bottom:0; }
+  .row { width:100%; display:flex; align-items:center; gap:11px; padding:12px 18px;
+    background:none; border:0; cursor:pointer; text-align:left; color:inherit; }
+  .row:hover { background:color-mix(in srgb, var(--ink) 4%, transparent); }
   .dot.draft { width:9px; height:9px; border-radius:50%; flex:none; background:var(--amber);
     box-shadow:0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent); }
+  .meta { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
   .dname { font-weight:600; font-size:13.5px; }
+  .sub { font-size:11.5px; color:var(--dim); }
+  .caret { font-size:18px; color:var(--dim); transition:transform .15s; }
+  .caret.up { transform:rotate(90deg); }
   .body { padding:2px 18px 16px 38px; }
   .files { list-style:none; margin:0 0 12px; padding:0; }
   .files li { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--line); }
@@ -2881,13 +2907,90 @@ function mountHistory(host, scope) {
   </script>
 
   <script>
-// routes/workspace/+page.js → redirect(307, '/workspace/members'); the index just lands there.
-// (+page.svelte Structure content is unreachable via the redirect, faithful to source.)
+// routes/workspace/+page.svelte — the workspace index.
+// Faithful to the loader: routes/workspace/+page.js throws redirect(307, '/workspace/members'),
+// so this index ALWAYS lands on Members & access and the Structure content below never renders.
+// The component's styles + render are reproduced verbatim for exactness, but render() redirects
+// first (the loader runs before the page mounts), exactly as the source does.
+WB.styles(`
+  .kinds { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center; }
+  .kpill {
+    display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border:1px solid var(--line);
+    border-radius:20px; font:500 12.5px var(--read); color:var(--ink); background:var(--card);
+  }
+  .kpill.total { background:var(--line); }
+  .kpill .dot { width:9px; height:9px; border-radius:50%; flex:none; }
+  .vizwrap { border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--card); }
+  .vizwrap iframe { width:100%; height:62vh; min-height:420px; border:0; display:block; }
+  .hint { margin-top:10px; font:400 12.5px var(--read); color:var(--dim); }
+  .hint code { font:600 11.5px var(--mono); background:var(--line); padding:1px 5px; border-radius:4px; }
+`);
+
 WB.view('/workspace', {
   title: 'Workspace',
   accent: 'var(--peach)',
   async render(el, ctx) {
+    // Loader: throw redirect(307, '/workspace/members'). The page never renders.
     WB.nav('/workspace/members');
+    return;
+
+    // --- Unreachable (faithful reproduction of +page.svelte, kept for parity) ---
+    /* eslint-disable no-unreachable */
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    // The workspace's STRUCTURE — its .work files visualized as a live code-graph.
+    const KIND = { client: '#a8d4f0', server: '#aee5c2', resource: '#f3c5a3', data: '#d9c5f0', design: '#f2ddb0', agent: '#9fc4e8' };
+
+    const ws = WB.ws.active;
+    const mount = (ws?.id || '').replace(/^ws_/, '');
+    const base = (WB.nexus.active?.url || 'https://workbooks.sh').replace(/\/$/, '');
+    const vizUrl = mount ? `${base}/${mount}/graph?format=html` : null;
+
+    let summary = null;
+    let err = false;
+
+    const paint = () => {
+      if (!ws) {
+        el.innerHTML = `<div class="card faint" style="text-align:center">Pick a workspace from the sidebar.</div>`;
+        return;
+      }
+
+      let kinds;
+      if (summary) {
+        kinds =
+          `<div class="kpill total"><b>${esc(summary.units)}</b> units</div>` +
+          Object.entries(summary.byKind)
+            .map(
+              ([k, n]) =>
+                `<div class="kpill"><span class="dot" style="background:${esc(KIND[k] || 'var(--dim)')}"></span><b>${esc(n)}</b> ${esc(k)}</div>`
+            )
+            .join('');
+      } else if (err) {
+        kinds = `<div class="faint" style="font-size:13px">Couldn’t read the structure (the nexus may be waking — refresh in a moment).</div>`;
+      } else {
+        kinds = `<div class="faint" style="font-size:13px">Reading structure…</div>`;
+      }
+
+      el.innerHTML =
+        `<div class="kinds">${kinds}</div>` +
+        `<div class="vizwrap">${vizUrl ? `<iframe title="Workspace structure graph" src="${esc(vizUrl)}" loading="lazy"></iframe>` : ''}</div>` +
+        `<p class="hint">Each node is a <code>.work</code> unit — colour = kind (client / server / resource / data), badges = live utilization. Click a node to inspect its declared vs. real facets. Served live from your nexus.</p>`;
+    };
+
+    paint();
+
+    if (mount) {
+      fetch(`${base}/${mount}/graph`)
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((d) => {
+          summary = d;
+          paint();
+        })
+        .catch(() => {
+          err = true;
+          paint();
+        });
+    }
   }
 });
   </script>
@@ -2911,6 +3014,7 @@ WB.styles(`
   }
   .wshead h2 { font-family:var(--display); font-weight:600; font-size:24px; line-height:1.1; color:var(--ink); }
   .wshead p { font:400 13.5px var(--read); color:var(--prose); margin-top:3px; }
+
   .wstabs {
     display:flex; gap:2px; margin-bottom:22px;
     border-bottom:1px solid var(--line);
@@ -3164,6 +3268,7 @@ WB.styles(`
   }
   .wshead h2 { font-family:var(--display); font-weight:600; font-size:24px; line-height:1.1; color:var(--ink); }
   .wshead p { font:400 13.5px var(--read); color:var(--prose); margin-top:3px; }
+
   .wstabs {
     display:flex; gap:2px; margin-bottom:22px;
     border-bottom:1px solid var(--line);
@@ -3477,6 +3582,7 @@ WB.styles(`
   }
   .wshead h2 { font-family:var(--display); font-weight:600; font-size:24px; line-height:1.1; color:var(--ink); }
   .wshead p { font:400 13.5px var(--read); color:var(--prose); margin-top:3px; }
+
   .wstabs {
     display:flex; gap:2px; margin-bottom:22px;
     border-bottom:1px solid var(--line);
@@ -3782,6 +3888,7 @@ WB.styles(`
   }
   .wshead h2 { font-family:var(--display); font-weight:600; font-size:24px; line-height:1.1; color:var(--ink); }
   .wshead p { font:400 13.5px var(--read); color:var(--prose); margin-top:3px; }
+
   .wstabs {
     display:flex; gap:2px; margin-bottom:22px;
     border-bottom:1px solid var(--line);
@@ -3802,6 +3909,7 @@ WB.styles(`
   .tl { list-style:none; margin:0; padding:6px 0; }
   .tl li { display:flex; gap:0; }
   .rail { position:relative; width:34px; flex:none; }
+  /* the connecting line */
   .rail::before { content:''; position:absolute; left:50%; top:0; bottom:0; width:2px;
     background:var(--line); transform:translateX(-50%); }
   .tl li:first-child .rail::before { top:18px; }
