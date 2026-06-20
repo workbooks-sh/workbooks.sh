@@ -63,6 +63,24 @@
     cancelEdit();
   }
 
+  // ── nexus switcher: other nexuses (yours / shared / member orgs), rename (admin) ──
+  // The active nexus shows in the header, so the menu lists only the OTHERS (no duplicate).
+  const otherNexuses = $derived((nexusStore.list?.() || []).filter((n) => n.id !== activeNx?.id));
+  // Org-member can rename their nexus. (Role-gating refines this once WorkOS roles are surfaced.)
+  const isAdmin = true;
+  let nxEditing = $state(false);
+  let nxEditName = $state('');
+  function startNxEdit() { nxEditing = true; nxEditName = activeNx?.name || ''; }
+  function cancelNxEdit() { nxEditing = false; nxEditName = ''; }
+  async function saveNxEdit() {
+    const n = nxEditName.trim();
+    if (!n || !activeNx) { cancelNxEdit(); return; }
+    try { await nexusStore.rename(activeNx.id, n); toast('Nexus renamed'); }
+    catch { toast('Couldn’t rename the nexus', 'bad'); }
+    cancelNxEdit();
+  }
+  function switchNexus(id) { nexusStore.setActive(id); nxMenuOpen = false; if (page.url.pathname !== '/') goto('/'); }
+
   // /welcome + /denied + /authorize render full-bleed, without the app chrome
   // (/authorize is the desktop device-consent takeover — centered, no sidebar).
   const bare = $derived(
@@ -209,16 +227,42 @@
       {#if nxMenuOpen}
         <div class="swmenu" role="menu">
           {#if activeNx}
-            <div class="omitem" style="cursor:default">
-              <span class="av sm">{(activeNx.name?.[0] || 'N').toUpperCase()}</span>
-              <span class="omname">{activeNx.name}</span>
-              <span class="omtick">●</span>
-            </div>
-            <div class="omdiv"></div>
+            <!-- other nexuses you're on (yours / shared / member orgs); the active one is the header, not duplicated -->
+            {#each otherNexuses as nx (nx.id)}
+              <button class="omitem" onclick={() => switchNexus(nx.id)}>
+                <span class="av sm">{(nx.icon || nx.name?.[0] || 'N').toUpperCase()}</span>
+                <span class="omname">{nx.name}</span>
+              </button>
+            {/each}
+            {#if otherNexuses.length}<div class="omdiv"></div>{/if}
+
+            <!-- rename the active nexus (admin) -->
+            {#if nxEditing}
+              <div class="omitem" style="cursor:default">
+                <span class="av sm plus">✎</span>
+                <!-- svelte-ignore a11y_autofocus -->
+                <input class="omedit" bind:value={nxEditName} autofocus placeholder="Nexus name"
+                  onkeydown={(e) => { if (e.key === 'Enter') saveNxEdit(); if (e.key === 'Escape') cancelNxEdit(); }} />
+                <button class="omtick btn" onclick={saveNxEdit} title="Save">✓</button>
+              </div>
+            {:else if isAdmin}
+              <button class="omitem" onclick={(e) => { e.stopPropagation(); startNxEdit(); }}>
+                <span class="av sm plus">✎</span><span class="omname">Rename nexus</span>
+              </button>
+            {/if}
+
             <a class="omitem" href="/upgrade" onclick={() => (nxMenuOpen = false)}>
               <span class="av sm plus">↑</span><span class="omname">Scale up</span>
             </a>
-            <a class="omitem" href="/settings" onclick={() => (nxMenuOpen = false)}>Nexus settings</a>
+            <a class="omitem" href="/settings" onclick={() => (nxMenuOpen = false)}>
+              <span class="av sm plus"><svg viewBox="0 0 24 24" width="13" height="13"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 4a7.9 7.9 0 0 0-.13-1.36l2.04-1.6-2-3.46-2.4.97a7.9 7.9 0 0 0-2.36-1.37L15.7 2h-3.4l-.39 2.78a7.9 7.9 0 0 0-2.36 1.37l-2.4-.97-2 3.46 2.04 1.6a8 8 0 0 0 0 2.72l-2.04 1.6 2 3.46 2.4-.97c.7.57 1.5 1.04 2.36 1.37L11.3 22h3.4l.39-2.78a7.9 7.9 0 0 0 2.36-1.37l2.4.97 2-3.46-2.04-1.6c.08-.45.13-.9.13-1.36z"/></svg></span>
+              <span class="omname">Nexus settings</span>
+            </a>
+            <div class="omdiv"></div>
+            <!-- a new nexus is a new machine in a new org → a new subscription -->
+            <button class="omitem" onclick={() => { modalOpen = true; nxMenuOpen = false; }}>
+              <span class="av sm plus">+</span><span class="omname">Create new nexus</span>
+            </button>
           {:else}
             <div class="omempty">No nexus yet</div>
             <button class="omitem" onclick={() => { modalOpen = true; nxMenuOpen = false; }}>
@@ -403,7 +447,15 @@
     display: grid; place-items: center; font: 700 9px var(--read); color: var(--ink);
   }
   .av.sm.plus { background: var(--line); color: var(--ink); font-size: 13px; }
+  .av.sm.plus svg { display: block; }
   .omempty { padding: 8px 9px; font: 500 12px var(--read); color: var(--dim); }
+  /* inline rename input in the nexus menu */
+  .omedit {
+    flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 4px 7px; font: 500 13px var(--read); color: var(--ink); outline: none;
+  }
+  .omedit:focus { border-color: var(--mint); }
+  .omtick.btn { background: none; border: 0; cursor: pointer; color: var(--run); font-size: 14px; padding: 0 4px; }
 
   /* workspace rows: switch (main) + edit (pencil, on hover) */
   .wsrow { display: flex; align-items: center; border-radius: 8px; }

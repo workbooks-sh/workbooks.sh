@@ -143,6 +143,9 @@ export async function createNexus(opts) {
 export async function deleteNexus(id) {
   return plat(`/nexuses/${id}`, { method: 'DELETE' });
 }
+export async function renameNexus(id, name) {
+  return plat(`/nexuses/${id}`, { method: 'PATCH', body: { name } });
+}
 export async function wakeNexus(id) {
   return plat(`/nexuses/${id}/wake`, { method: 'POST' });
 }

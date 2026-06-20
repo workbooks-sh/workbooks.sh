@@ -60,6 +60,17 @@ defmodule Nexus.Platform do
     end
   end
 
+  # Rename the org's nexus (admin action in the dashboard). Whitelisted to name/friendly — id, org,
+  # plan, Fly identity are never caller-mutable. Org-scoped, so a foreign nexus is a 404.
+  patch "/nexuses/:id" do
+    attrs = read(conn) |> decode() |> Map.take(["name", "friendly"]) |> atomize()
+
+    case CP.update(org(conn), :nexus, conn.params["id"], attrs) do
+      {:ok, nx} -> j(conn, 200, nexus_view(nx))
+      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+    end
+  end
+
   post "/nexuses/:id/wake", do: lifecycle(conn, &Nexus.Provisioner.wake/2)
   post "/nexuses/:id/sleep", do: lifecycle(conn, &Nexus.Provisioner.sleep/2)
 

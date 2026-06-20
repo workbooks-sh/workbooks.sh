@@ -6,7 +6,7 @@
 // responsive UI; wiring them to real provisioning is the next step (needs a connected
 // runtime + FLY_API_TOKEN).
 
-import { listNexuses, createNexus, deleteNexus, wakeNexus, sleepNexus } from '$lib/api.js';
+import { listNexuses, createNexus, deleteNexus, renameNexus, wakeNexus, sleepNexus } from '$lib/api.js';
 
 let nexuses = $state([]);
 let loaded = $state(false);
@@ -102,6 +102,13 @@ export const nexusStore = {
     try {
       await deleteNexus(id);
     } catch {}
+  },
+  /** Rename a nexus (admin) — optimistic, persisted via the platform API. */
+  async rename(id, name) {
+    const n = name.trim();
+    if (!n) return;
+    nexuses = nexuses.map((x) => (x.id === id ? { ...x, name: n } : x));
+    await renameNexus(id, n);
   },
   /** Lifecycle — optimistic state flip, real wake/sleep in the background. */
   async setState(id, state) {
