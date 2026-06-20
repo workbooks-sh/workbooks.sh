@@ -268,14 +268,14 @@ end
 
 # The durable event log — a normal resource (tenant-scoped SQLite). The `log` effect writes rows here;
 # the Activity page reads them. This is OUR cloud store, not part of the open standard.
-resource :Event do
-  field :kind, :string
-  field :actor, :string
-  field :title, :string
-  field :target, :string
-  field :tags, :string
-  field :scope, :string
-  field :at, :integer
+resource Event do
+  kind :string
+  actor :string
+  title :string
+  target :string
+  tags :string
+  scope :string
+  at :integer
 end
 
 # Persist every bus event to the log. The reactive primitives (hook kind, #event, effect engine) are
