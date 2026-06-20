@@ -85,6 +85,25 @@ WB.view('/workspace/members', {
     let inviteEmail = '';
     let inviteRole = 'member';
 
+    // ── Git remote (the nexus AS a git remote) ──
+    // The workspace's bare repo is pushable at <origin>/git/<id>.git; an optional GitHub mirror is
+    // pushed after each push. The id is the repo name (provisioned on workspace create).
+    const wsId = wsa?.id || '';
+    let git = null;          // { remote, push, mirror } from /cloud/workspace/git
+    let mirrorInput = '';
+    async function loadGit() {
+      if (!wsId) return;
+      try {
+        const r = await fetch('/cloud/workspace/git?ws=' + encodeURIComponent(wsId), { credentials: 'same-origin' });
+        if (!r.ok) return;
+        git = await r.json();
+        // Relative remote (no request host server-side) → prepend the browser origin.
+        if (git.remote && git.remote[0] === '/') git.remote = location.origin + git.remote;
+        if (git.push) git.push = 'git push ' + git.remote + ' main';
+        mirrorInput = git.mirror || '';
+      } catch (e) { /* leave git null → section shows nothing */ }
+    }
+
     const ROLE_STYLE = {
       owner: 'background:var(--cream);color:var(--on-bloom);border-color:var(--cream)',
       admin: 'background:var(--mint);color:var(--on-bloom);border-color:var(--mint)',
@@ -174,7 +193,9 @@ WB.view('/workspace/members', {
 
 <p class="faint" style="font-size:11.5px;margin-top:-8px">
   Roles and capabilities are managed at the nexus level — see <a href="/team" data-nav="/team" style="color:var(--dim)">Team</a>.
-</p>`;
+</p>
+
+${gitHtml()}`;
 
       if (inviteOpen) {
         html += `
@@ -201,6 +222,30 @@ WB.view('/workspace/members', {
       }
 
       return html;
+    }
+
+    function gitHtml() {
+      if (!wsId) return '';
+      const remote = git && git.remote ? git.remote : (location.origin + '/git/' + encodeURIComponent(wsId) + '.git');
+      const push = 'git push ' + remote + ' main';
+      return `
+<div class="card" style="padding:16px 18px;margin-top:14px">
+  <div style="display:flex;flex-direction:column;gap:1px;margin-bottom:12px">
+    <b style="font-size:13.5px">Git remote</b>
+    <span class="faint" style="font-size:11.5px">Push this workspace to the nexus — it checks the files out live. Use a <code class="mono">wbk_</code> token as the password.</span>
+  </div>
+  <div class="lab">Push URL</div>
+  <div style="display:flex;gap:8px;align-items:stretch">
+    <div class="field" style="flex:1"><input data-git-remote readonly value="${attrEsc(push)}" style="font:500 12px var(--mono)" /></div>
+    <button class="btn sm" data-git-copy type="button">Copy</button>
+  </div>
+  <div class="lab" style="margin-top:14px">GitHub remote URL (with token)</div>
+  <form data-mirror-form style="display:flex;gap:8px;align-items:stretch">
+    <div class="field" style="flex:1"><input name="url" data-mirror-input placeholder="https://&lt;user&gt;:&lt;token&gt;@github.com/org/repo.git" value="${attrEsc(mirrorInput)}" style="font:500 12px var(--mono)" /></div>
+    <button class="btn sm primary" type="submit">Save</button>
+  </form>
+  <span class="faint" style="font-size:11px;display:block;margin-top:6px">After each push the nexus mirrors all refs here. The URL may embed a token; leave blank to clear.</span>
+</div>`;
     }
 
     function paint() {
@@ -241,6 +286,31 @@ WB.view('/workspace/members', {
       });
       const ic = el.querySelector('[data-invite-cancel]');
       if (ic) ic.addEventListener('click', () => { inviteOpen = false; paint(); });
+      // git remote: copy + mirror save
+      const gc = el.querySelector('[data-git-copy]');
+      if (gc) gc.addEventListener('click', async () => {
+        const v = el.querySelector('[data-git-remote]')?.value || '';
+        try { await navigator.clipboard.writeText(v); WB.toast('Push command copied'); }
+        catch (e) { WB.toast('Copy failed — select and copy manually'); }
+      });
+      const mi = el.querySelector('[data-mirror-input]');
+      if (mi) mi.addEventListener('input', () => { mirrorInput = mi.value; });
+      const mf = el.querySelector('[data-mirror-form]');
+      if (mf) mf.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const r = await fetch('/cloud/workspace/mirror', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ ws: wsId, url: mirrorInput })
+          });
+          if (!r.ok) throw new Error('mirror ' + r.status);
+          const out = await r.json();
+          if (git) git.mirror = out.mirror || null;
+          WB.toast(mirrorInput ? 'GitHub mirror saved' : 'Mirror cleared');
+        } catch (err) { WB.toast('Couldn’t save the mirror'); }
+      });
+
       const iform = el.querySelector('[data-invite-form]');
       if (iform) iform.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -253,5 +323,7 @@ WB.view('/workspace/members', {
     }
 
     paint();
+    // Load the real git remote + current mirror, then repaint that section with live data.
+    loadGit().then(() => paint());
   }
 });

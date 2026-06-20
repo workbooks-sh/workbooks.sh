@@ -41,6 +41,12 @@ server :cloud do
   # File search across all workspaces (mounts) — filename substring match over the real data volume.
   route "GET /cloud/search", :search
 
+  # The nexus AS a git remote (wb): per-workspace push URL + the current GitHub mirror. The git
+  # mechanism (bare repo + post-receive + mirror) is the open standard (Nexus.Git / Nexus.GitHttp);
+  # surfacing the URL + binding a GitHub mirror in the dashboard is OUR product.
+  route "GET /cloud/workspace/git", :workspace_git
+  route "POST /cloud/workspace/mirror", :workspace_mirror
+
   # Activity feed — our cloud product over the nexus reactive layer (THE LINE: the bus/hook/effect
   # engine is the open standard; persisting + displaying events as a "feed" is OUR consumer). The
   # `log` effect (registered in register/0) persists events to the durable `resource :Event`; this
@@ -265,6 +271,63 @@ server :cloud do
       end
 
     %{query: q, results: results}
+  end
+
+  # ── Git remote per workspace ─────────────────────────────────────────────────────────────────────
+  # The push URL for a workspace's bare repo + its current GitHub mirror (if any). Base is derived from
+  # the request host/scheme when available; otherwise the client prepends location.origin to the
+  # relative `/git/<ws>.git`. `ws` is sanitized (no slashes / traversal) before it touches the disk.
+  def workspace_git(req) do
+    ws = git_ws(req.query["ws"])
+
+    if ws == "" do
+      {400, %{error: "ws required"}}
+    else
+      base =
+        case {req[:scheme], req[:host]} do
+          {s, h} when is_binary(s) and is_binary(h) and h != "" -> "#{s}://#{h}"
+          _ -> ""
+        end
+
+      remote = base <> "/git/" <> ws <> ".git"
+      mirror = current_mirror(ws)
+      %{remote: remote, push: "git push " <> remote <> " main", mirror: mirror}
+    end
+  end
+
+  # Bind (or clear, with an empty url) the GitHub mirror remote for a workspace's bare repo. The URL may
+  # embed a token (https://user:token@github.com/org/repo.git) — it lands in the bare repo's git config
+  # on the data volume (deployer config, not source). Nexus.Git carries the generic mechanism.
+  def workspace_mirror(req) do
+    ws = git_ws(is_map(req.body) && req.body["ws"])
+    url = (is_map(req.body) && req.body["url"]) || ""
+
+    if ws == "" do
+      {400, %{error: "ws required"}}
+    else
+      bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), ws)
+      {:ok, _} = Nexus.Git.provision_remote(bare, Nexus.GitHttp.work_dir(ws))
+      :ok = Nexus.Git.set_mirror(bare, url)
+      %{ok: true, mirror: (if String.trim(to_string(url)) == "", do: nil, else: url)}
+    end
+  end
+
+  # The mirror url currently configured on the bare repo (nil if none / not provisioned).
+  defp current_mirror(ws) do
+    bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), ws)
+
+    if Nexus.Git.bare?(bare) do
+      case System.cmd("git", ["--git-dir=#{bare}", "config", "--get", "workbooks.mirror"], stderr_to_stdout: true) do
+        {out, 0} -> (t = String.trim(out)) != "" && t || nil
+        _ -> nil
+      end
+    end
+  end
+
+  # Sanitize a workspace name for use as a repo path component — no traversal, no separators.
+  defp git_ws(name) do
+    n = name |> to_string() |> String.trim()
+    if n == "" or String.contains?(n, "..") or String.contains?(n, "/"), do: "", else: n
   end
 
   defp list_dir(abs, rel) do
