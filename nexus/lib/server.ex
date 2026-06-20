@@ -135,6 +135,15 @@ defmodule Nexus.Server do
     Nexus.Auth.Provider.callback(conn, provider)
   end
 
+  # Native email/password auth (our own — no external IdP). All public; a verified credential issues
+  # a Nexus.Auth.Session cookie. See Nexus.Auth.Native.
+  post("/auth/signup", do: Nexus.Auth.Native.signup(conn))
+  post("/auth/login", do: Nexus.Auth.Native.login(conn))
+  post("/auth/logout", do: Nexus.Auth.Native.logout(conn))
+  get("/auth/verify", do: Nexus.Auth.Native.verify(conn))
+  post("/auth/forgot", do: Nexus.Auth.Native.forgot(conn))
+  post("/auth/reset", do: Nexus.Auth.Native.reset(conn))
+
   get "/" do
     # Single workbook → the app. Many workbooks → an index of what's mounted on this nexus.
     if multi?() do
