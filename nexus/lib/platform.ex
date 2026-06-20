@@ -273,6 +273,7 @@ defmodule Nexus.Platform do
       true ->
         id = "ws_" <> rand()
         {:ok, ws} = CP.put(org, :workspace, id, %{name: name, icon: icon, nexus_id: nexus_id})
+        provision_workspace_repo(id)
         j(conn, 201, ws_view(ws))
     end
   end
@@ -485,6 +486,18 @@ defmodule Nexus.Platform do
 
   defp blank_to_nil(v) when v in [nil, ""], do: nil
   defp blank_to_nil(v), do: v
+
+  # Provision the workspace's bare git repo so it's immediately pushable (`git push <nexus>/git/<id>.git`).
+  # Best-effort: never fail the workspace create if git is unavailable. The repo also auto-provisions on
+  # first push (Nexus.GitHttp), so this just makes the remote exist eagerly.
+  defp provision_workspace_repo(id) do
+    bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), id)
+    Nexus.Git.provision_remote(bare, Nexus.GitHttp.work_dir(id))
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
+  end
 
   defp atomize(m), do: Map.new(m, fn {k, v} -> {String.to_existing_atom(k), v} end)
 

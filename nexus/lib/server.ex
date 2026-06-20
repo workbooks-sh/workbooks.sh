@@ -582,6 +582,8 @@ defmodule Nexus.Server do
           body: decode_body(body),
           method: conn.method,
           path: conn.request_path,
+          host: conn.host,
+          scheme: to_string(conn.scheme),
           tenant: Nexus.Auth.tenant(conn)
         }
 
