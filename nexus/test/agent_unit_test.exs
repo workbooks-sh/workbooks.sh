@@ -42,6 +42,31 @@ defmodule Nexus.AgentUnitTest do
     assert d.limit == [turns: 40, timeout: 180_000]
   end
 
+  test "the agent spec is open: any field is captured; grant is validated; limit is enforced-dims-only" do
+    n =
+      unit("""
+      agent :coder do
+        prompt \"\"\"
+        Fix it.
+        \"\"\"
+        grant fs, exec, boguscap
+        limit turns: 5, timeout: 1000, tokens: 99
+        model "anthropic/claude"
+        context window: 8000
+        safety stop: "STOP"
+        hooks on: "DONE", emit: "task.done"
+      end
+      """)
+
+    d = Nexus.Agent.def_from_unit(n)
+    assert d.grant == ["fs", "exec"]                       # boguscap dropped (not grantable)
+    assert d.limit == [turns: 5, timeout: 1000]            # tokens dropped (not an enforced dim)
+    assert d.model == "anthropic/claude"                   # forward-declared field, captured verbatim
+    assert d.context == [window: 8000]
+    assert d.safety == [stop: "STOP"]
+    assert d.hooks == [on: "DONE", emit: "task.done"]
+  end
+
   test "Kits.summary/1 scopes the catalog to an agent's declared tools" do
     Nexus.Agent.Kits.register("rg", "rg.wasm", summary: "search")
     Nexus.Agent.Kits.register("git", "git.wasm", summary: "version control")

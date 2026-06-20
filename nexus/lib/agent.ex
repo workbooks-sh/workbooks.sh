@@ -139,9 +139,23 @@ defmodule Nexus.Agent do
 
   defp collect_field({:prompt, _, [p]}, acc) when is_binary(p), do: Map.put(acc, :system, String.trim(p))
   defp collect_field({:tools, _, a}, acc), do: Map.put(acc, :tools, names(a))
-  defp collect_field({:grant, _, a}, acc), do: Map.put(acc, :grant, names(a))
-  defp collect_field({:limit, _, [kw]}, acc) when is_list(kw), do: Map.put(acc, :limit, kw)
+  # grants are validated against the real capability vocabulary — a typo/fake cap is dropped, not
+  # silently honored, so an agent's declared powers are exactly the ones the runtime can enforce.
+  defp collect_field({:grant, _, a}, acc),
+    do: Map.put(acc, :grant, names(a) |> Enum.filter(&Nexus.Capabilities.grantable?/1))
+
+  defp collect_field({:limit, _, [kw]}, acc) when is_list(kw),
+    do: Map.put(acc, :limit, Keyword.take(kw, [:turns, :timeout]))
+
+  # OPEN spec: any other declared field (context, safety, hooks, model, …) is captured generically,
+  # so the block can declare it today and the runtime honors each as it's wired. The agent definition
+  # surface isn't a fixed four fields — it's whatever the block states.
+  defp collect_field({key, _, args}, acc) when is_atom(key), do: Map.put(acc, key, field_value(args))
   defp collect_field(_, acc), do: acc
+
+  defp field_value([v]) when is_binary(v), do: v
+  defp field_value([kw]) when is_list(kw), do: kw
+  defp field_value(args), do: names(args)
 
   # Normalize a field's args to names: atoms (`:fs`), bare identifiers (`fs` → var AST), or a list
   # literal (`[fs, exec]`). Anything else stringifies so composition/refs stay open.
