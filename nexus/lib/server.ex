@@ -397,8 +397,9 @@ defmodule Nexus.Server do
 
       root ->
         g = Nexus.Graph.build_dir(root) |> Nexus.Graph.with_overlay(Nexus.Telemetry.overlay())
+        format = Plug.Conn.fetch_query_params(conn).query_params["format"]
 
-        if conn.params["format"] == "html" do
+        if format == "html" do
           conn |> put_resp_content_type("text/html") |> send_resp(200, Nexus.Graph.Viz.to_html(g))
         else
           conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(graph_summary(g), escape: :html_safe))
