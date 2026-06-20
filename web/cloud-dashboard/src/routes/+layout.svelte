@@ -273,42 +273,39 @@
       {/if}
     </div>
 
-    <!-- WORKSPACE switcher — free divisions inside the nexus -->
-    <div class="swrap">
-      <div class="swlabel">Workspace</div>
-      <div class="sw" onclick={() => { wsMenuOpen = !wsMenuOpen; nxMenuOpen = false; }} role="button" tabindex="0">
-        <span class="av sm">{activeWs?.icon || wsInitials}</span>
-        <span class="swname">{wsLabel}</span>
-        <svg class="ico ch" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+    <!-- NEXUS sub-pages — what you manage about the nexus itself -->
+    {#if activeNx}
+      <nav class="nxnav">
+        <a class="nxlink" class:on={page.url.pathname === '/usage'} href="/usage">Usage</a>
+        <a class="nxlink" class:on={page.url.pathname === '/storage'} href="/storage">Storage</a>
+        <a class="nxlink" class:on={page.url.pathname === '/team'} href="/team">Users</a>
+        <a class="nxlink" class:on={page.url.pathname === '/secrets'} href="/secrets">Secrets</a>
+      </nav>
+    {/if}
+
+    <!-- WORKSPACES — a section, not a dropdown: the full list of divisions inside the nexus -->
+    <div class="swrap wssec">
+      <div class="swlabel wshdr">
+        <span>Workspaces</span>
+        <button class="wsadd" onclick={startNew} title="New workspace" aria-label="New workspace">+</button>
       </div>
-      {#if wsMenuOpen}
-        <div class="swmenu" role="menu">
-          {#each workspaceStore.list as w (w.id)}
-            {#if editingId === w.id}
-              {@render wsEditor(false)}
-            {:else}
-              <div class="wsrow" class:on={activeWs?.id === w.id}>
-                <button class="wsmain" onclick={() => { workspaceStore.setActive(w.id); wsMenuOpen = false; }}>
-                  <span class="av sm">{w.icon || (w.name[0] || 'W').toUpperCase()}</span>
-                  <span class="omname">{w.name}</span>
-                  {#if activeWs?.id === w.id}<span class="omtick">✓</span>{/if}
-                </button>
-                <button class="wsedit-btn" onclick={() => startEdit(w)} title="Edit workspace" aria-label="Edit workspace">✎</button>
-              </div>
-            {/if}
-          {/each}
-          {#if workspaceStore.list.length === 0}<div class="omempty">No workspaces yet</div>{/if}
-          <div class="omdiv"></div>
-          {#if editingId === 'new'}
-            {@render wsEditor(true)}
+      <div class="wslist">
+        {#each workspaceStore.list as w (w.id)}
+          {#if editingId === w.id}
+            {@render wsEditor(false)}
           {:else}
-            <button class="omitem" onclick={startNew}>
-              <span class="av sm plus">+</span><span class="omname">New workspace</span><small>free</small>
-            </button>
+            <div class="wsrow" class:on={activeWs?.id === w.id}>
+              <button class="wsmain" onclick={() => { workspaceStore.setActive(w.id); goto('/workspace'); }}>
+                <span class="av sm">{w.icon || (w.name[0] || 'W').toUpperCase()}</span>
+                <span class="omname">{w.name}</span>
+              </button>
+              <button class="wsedit-btn" onclick={() => startEdit(w)} title="Edit workspace" aria-label="Edit workspace">✎</button>
+            </div>
           {/if}
-          <a class="omitem" href="/workspace" onclick={() => (wsMenuOpen = false)}>Workspace settings</a>
-        </div>
-      {/if}
+        {/each}
+        {#if editingId === 'new'}{@render wsEditor(true)}{/if}
+        {#if workspaceStore.list.length === 0}<div class="omempty">No workspaces yet</div>{/if}
+      </div>
     </div>
 
     <div class="navspacer"></div>
@@ -456,6 +453,25 @@
   }
   .omedit:focus { border-color: var(--mint); }
   .omtick.btn { background: none; border: 0; cursor: pointer; color: var(--run); font-size: 14px; padding: 0 4px; }
+
+  /* nexus sub-pages (Usage / Storage / Users / Secrets) */
+  .nxnav { display: flex; flex-direction: column; gap: 1px; margin: 4px 0 14px; }
+  .nxlink {
+    padding: 6px 10px 6px 14px; border-radius: 7px; text-decoration: none;
+    font: 500 13px var(--read); color: var(--dim);
+  }
+  .nxlink:hover { background: var(--line); color: var(--ink); }
+  .nxlink.on { background: var(--line); color: var(--ink); font-weight: 600; }
+
+  /* workspaces — a section with the full flat list */
+  .wssec { margin-top: 6px; }
+  .wshdr { display: flex; align-items: center; justify-content: space-between; }
+  .wsadd {
+    background: none; border: 0; cursor: pointer; color: var(--dim); font-size: 16px; line-height: 1;
+    padding: 0 4px; border-radius: 5px;
+  }
+  .wsadd:hover { background: var(--line); color: var(--ink); }
+  .wslist { display: flex; flex-direction: column; gap: 1px; max-height: 42vh; overflow-y: auto; }
 
   /* workspace rows: switch (main) + edit (pencil, on hover) */
   .wsrow { display: flex; align-items: center; border-radius: 8px; }
