@@ -119,9 +119,56 @@ defmodule Nexus.Graph do
     end
   end
 
-  # ── edges: imports (AST calls to a unit) + refs (literate :atom mentions) ──
+  # ── edges: imports (AST calls to a unit) + refs (literate :atom mentions) + composition ──
   defp collect_edges(parsed, nodes) do
-    for {_path, ns} <- parsed, n <- ns, n.type == :code, n.name, e <- node_edges(n, nodes), do: e
+    code_edges = for {_path, ns} <- parsed, n <- ns, n.type == :code, n.name, e <- node_edges(n, nodes), do: e
+    base = Enum.uniq(code_edges ++ composition_edges(parsed))
+    base ++ connect_isolated(base, parsed)
+  end
+
+  # A page's units belong together — link any unit still orphaned (e.g. a server in its own file) to the
+  # page's primary island so nothing floats disconnected. Honest fallback, not an all-pairs hairball.
+  defp connect_isolated(edges, parsed) do
+    endpoints = Enum.flat_map(edges, &[&1.from, &1.to])
+    connected = MapSet.new(endpoints)
+    names = (for {_p, ns} <- parsed, n <- ns, n.type == :code, n.name, do: n.name) |> Enum.uniq()
+    isolated = Enum.reject(names, &MapSet.member?(connected, &1))
+
+    if isolated == [] do
+      []
+    else
+      # Anchor on the MOST-connected unit (the page's hub) so orphans attach there; if there are no
+      # edges at all, fall back to the first unit (a star).
+      anchor =
+        endpoints |> Enum.frequencies() |> Enum.max_by(fn {_n, c} -> c end, fn -> {List.first(names), 0} end) |> elem(0)
+
+      for u <- isolated, u != anchor,
+        do: %{from: u, to: anchor, type: :compose, layer: :source, scope: :page, signature: nil}
+    end
+  end
+
+  # Composition edges — the page STRUCTURE the code-level extractors can't yet see (Foreign.extract is
+  # an admitted stopgap; our islands don't use `work://` imports). Two honest, structural relationships:
+  #   • co-location: units authored in the same `.work` file compose one page (`:compose`).
+  #   • styling: every rendered island (`client`/`app`) is styled by the page's `design` unit(s)
+  #     (`:style`) — the design block is hoisted into the page that renders every island.
+  defp composition_edges(parsed) do
+    units = for {_path, ns} <- parsed, n <- ns, n.type == :code, n.name, do: {n.name, n.kind}
+    designs = (for {name, "design"} <- units, do: name) |> Enum.uniq()
+    islands = (for {name, k} <- units, k in ["client", "app", "sandbox"], do: name) |> Enum.uniq()
+
+    coloc =
+      Enum.flat_map(parsed, fn {_path, ns} ->
+        names = ns |> Enum.filter(&(&1.type == :code and &1.name)) |> Enum.map(& &1.name) |> Enum.uniq() |> Enum.sort()
+        for a <- names, b <- names, a < b, do: %{from: a, to: b, type: :compose, layer: :source, scope: :file, signature: nil}
+      end)
+
+    # every rendered island is styled by the page's design unit(s) — the design block is hoisted into
+    # the page that renders every island. (Code-level island→server data edges await real fetch/route
+    # extraction; co-location already links same-file client+server.)
+    styled = for i <- islands, d <- designs, i != d, do: %{from: i, to: d, type: :style, layer: :source, scope: :page, signature: nil}
+
+    Enum.uniq(coloc ++ styled)
   end
 
   defp node_edges(n, nodes) do
