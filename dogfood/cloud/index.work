@@ -2938,9 +2938,9 @@ function mountHistory(host, scope) {
 // routes/workspace/+page.svelte — the workspace STRUCTURE view (the /workspace index tab).
 //
 // The workspace's .work files as a live code-graph, served from the nexus (GET /:wb/graph → JSON).
-// Rendered NATIVELY in the page with Cytoscape.js (premium, customizable, no iframe, no D3-blob) —
-// nodes coloured by kind, sized by dependency count; click a node to inspect its facets. The surface
-// workspace's id IS the mount the nexus serves it under. Header + tabs match the other workspace views.
+// Rendered NATIVELY with @antv/g6 v5 (premium, deep, customizable — no iframe, no D3-blob, not a
+// Svelte-Flow editor canvas). Nodes coloured by kind + sized by dependency count; click a node to
+// inspect its facets. The surface workspace's id IS the mount the nexus serves it under.
 WB.scopedStyles('/workspace', `
   /* ── +layout.svelte (header + tabs) ── */
   .wshead { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
@@ -2962,7 +2962,7 @@ WB.scopedStyles('/workspace', `
   .wstabs a:hover { color:var(--ink); }
   .wstabs a.on { color:var(--ink); border-bottom-color:var(--section); }
 
-  /* ── structure / graph (native Cytoscape) ── */
+  /* ── structure / graph (native G6) ── */
   .kinds { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center; }
   .kpill {
     display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border:1px solid var(--line);
@@ -2976,10 +2976,11 @@ WB.scopedStyles('/workspace', `
     border:1px solid var(--line); border-radius:16px; overflow:hidden; background:var(--card);
     height:66vh; min-height:480px;
   }
-  .cyhost { width:100%; height:100%; min-width:0;
+  .cyhost { width:100%; height:100%; min-width:0; position:relative;
     background:
       radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, var(--section) 7%, transparent), transparent 60%),
       var(--well); }
+  .cyhost canvas { display:block; }
   .cyaside { border-left:1px solid var(--line); padding:18px 20px; overflow-y:auto; }
   .cyaside .empty { color:var(--dim); font:400 13px var(--read); }
   .cyaside .nkind { display:inline-flex; align-items:center; gap:7px; font:700 10px var(--mono);
@@ -2989,7 +2990,7 @@ WB.scopedStyles('/workspace', `
   .cyaside .row { display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--line); font:400 13px var(--read); }
   .cyaside .row:last-of-type { border:0; }
   .cyaside .row .k { color:var(--dim); } .cyaside .row .v { font:500 12px var(--mono); color:var(--ink); text-align:right; word-break:break-all; }
-  .cyloading { display:grid; place-items:center; height:100%; color:var(--dim); font:400 13px var(--read); }
+  .cyloading { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); font:400 13px var(--read); pointer-events:none; }
   .hint { margin-top:10px; font:400 12.5px var(--read); color:var(--dim); }
   .hint code { font:600 11.5px var(--mono); background:var(--line); padding:1px 5px; border-radius:4px; }
   @media (max-width:920px) { .graphwrap { grid-template-columns:1fr; } .cyaside { display:none; } }
@@ -3033,8 +3034,14 @@ WB.view('/workspace', {
       return;
     }
 
+    // Only a SURFACE workspace (a deployed folder) has a served mount to visualize — a user-created
+    // workspace doesn't, so show an honest empty state rather than fetching a 404.
+    if (!ws.surface) {
+      el.innerHTML = shell(`<div class="card faint" style="text-align:center">This workspace has no deployed surface to visualize yet.</div>`);
+      return;
+    }
+
     const mount = (ws.id || '').replace(/^ws_/, '');
-    // kind → colour (the DNA pastels); edge type → colour.
     const KIND = { client: '#a8d4f0', server: '#aee5c2', resource: '#f3c5a3', data: '#d9c5f0', design: '#f2ddb0', agent: '#9fc4e8', sandbox: '#c8e0b0' };
     const EDGE = { 'work-file': '#c2861f', 'native': '#37c873', 'wasm': '#b48cff', 'beam': '#37c873', 'wit': '#b48cff' };
 
@@ -3067,64 +3074,74 @@ WB.view('/workspace', {
       .join('');
     el.querySelector('.kinds').innerHTML = pills;
 
-    // load Cytoscape (premium, native, vanilla — replaces the old D3 iframe)
-    let cytoscape;
+    // load G6 v5
+    let G6;
     try {
-      cytoscape = (await import('https://esm.sh/cytoscape@3.30.2')).default;
+      G6 = await import('https://esm.sh/@antv/g6@5.0.49');
     } catch (e) {
       host.innerHTML = `<div class="cyloading">Couldn’t load the graph renderer.</div>`;
       return;
     }
-    // route may have changed while loading
     if (!document.body.contains(host)) return;
 
-    const nodes = (summary.nodes || []).map((n) => ({ data: { id: n.id, kind: n.kind, lang: n.lang, file: n.file, deps: n.deps || 0, observed: n.observed } }));
-    const ids = new Set(nodes.map((n) => n.data.id));
+    const nodeIds = new Set((summary.nodes || []).map((n) => n.id));
+    const byId = {};
+    const nodes = (summary.nodes || []).map((n) => { byId[n.id] = n; return { id: n.id, data: { kind: n.kind, lang: n.lang, file: n.file, deps: n.deps || 0, observed: n.observed } }; });
     const edges = (summary.edges || [])
-      .filter((e) => ids.has(e.from) && ids.has(e.to))
-      .map((e, i) => ({ data: { id: 'e' + i, source: e.from, target: e.to, type: e.type } }));
+      .filter((e) => nodeIds.has(e.from) && nodeIds.has(e.to))
+      .map((e, i) => ({ id: 'e' + i, source: e.from, target: e.to, data: { type: e.type } }));
 
-    host.innerHTML = '';
-    const cy = cytoscape({
+    const sz = (d) => 28 + Math.min((d.data && d.data.deps) || 0, 8) * 6;
+    host.querySelector('#cyloading')?.remove();
+
+    const graph = new G6.Graph({
       container: host,
-      elements: [...nodes, ...edges],
-      style: [
-        { selector: 'node', style: {
-          'background-color': (n) => KIND[n.data('kind')] || '#8c9189',
-          'label': 'data(id)', 'color': '#c9ccc2',
-          'font-family': 'Geist, system-ui, sans-serif', 'font-size': '11px', 'font-weight': 600,
-          'text-valign': 'bottom', 'text-halign': 'center', 'text-margin-y': 7,
-          'width': (n) => 26 + Math.min(n.data('deps') || 0, 8) * 5,
-          'height': (n) => 26 + Math.min(n.data('deps') || 0, 8) * 5,
-          'border-width': 1.5, 'border-color': 'rgba(255,255,255,.14)',
-          'overlay-opacity': 0
-        }},
-        { selector: 'node:selected', style: { 'border-color': '#ecebe5', 'border-width': 3 }},
-        { selector: 'edge', style: {
-          'width': 1.6, 'line-color': (e) => EDGE[e.data('type')] || '#3a3d42',
-          'curve-style': 'bezier', 'opacity': 0.55,
-          'target-arrow-shape': 'triangle-backcurve', 'target-arrow-color': (e) => EDGE[e.data('type')] || '#3a3d42',
-          'arrow-scale': 0.8
-        }}
-      ],
+      autoResize: true,
+      data: { nodes, edges },
+      node: {
+        style: {
+          fill: (d) => KIND[d.data.kind] || '#8c9189',
+          size: sz,
+          stroke: 'rgba(255,255,255,.16)', lineWidth: 1.5,
+          labelText: (d) => d.id,
+          labelFill: '#c9ccc2', labelFontSize: 11, labelFontWeight: 600,
+          labelPlacement: 'bottom', labelOffsetY: 4, labelFontFamily: 'Geist, system-ui, sans-serif',
+          shadowColor: 'rgba(0,0,0,.35)', shadowBlur: 10
+        },
+        state: {
+          selected: { lineWidth: 3, stroke: '#ecebe5', halo: true, haloOpacity: 0.18 },
+          active: { lineWidth: 2.5, stroke: 'rgba(255,255,255,.4)' }
+        }
+      },
+      edge: {
+        style: {
+          stroke: (d) => EDGE[d.data.type] || '#3a3d42',
+          lineWidth: 1.6, opacity: 0.5,
+          endArrow: true, endArrowSize: 7
+        }
+      },
       layout: edges.length
-        ? { name: 'cose', animate: true, animationDuration: 480, padding: 46, idealEdgeLength: 110, nodeRepulsion: 9000, fit: true }
-        : { name: 'concentric', padding: 60, minNodeSpacing: 50, concentric: (n) => (n.data('deps') || 0) + 1, levelWidth: () => 2 },
-      minZoom: 0.3, maxZoom: 2.5, wheelSensitivity: 0.25
+        ? { type: 'd3-force', collide: { radius: 46 }, link: { distance: 120 }, manyBody: { strength: -260 } }
+        : { type: 'grid', cols: Math.ceil(Math.sqrt(Math.max(nodes.length, 1))) },
+      behaviors: ['zoom-canvas', 'drag-canvas', 'drag-element', 'click-select', 'hover-activate'],
+      autoFit: 'view',
+      padding: 40
     });
 
-    function inspect(n) {
-      const k = n.data('kind');
+    try { await graph.render(); } catch (e) { host.innerHTML = `<div class="cyloading">Couldn’t draw the graph.</div>`; return; }
+
+    function inspect(id) {
+      const n = byId[id]; if (!n) return;
       aside.innerHTML = `
-        <span class="nkind"><span class="sw" style="background:${KIND[k] || 'var(--dim)'}"></span>${esc(k)}</span>
-        <h3>${esc(n.data('id'))}</h3>
-        <div class="row"><span class="k">Language</span><span class="v">${esc(n.data('lang') || '—')}</span></div>
-        <div class="row"><span class="k">Dependencies</span><span class="v">${n.data('deps') || 0}</span></div>
-        <div class="row"><span class="k">File</span><span class="v">${esc((n.data('file') || '').split('/').pop() || '—')}</span></div>
-        <div class="row"><span class="k">Utilization</span><span class="v">${n.data('observed') != null ? esc(String(n.data('observed'))) : '—'}</span></div>`;
+        <span class="nkind"><span class="sw" style="background:${KIND[n.kind] || 'var(--dim)'}"></span>${esc(n.kind)}</span>
+        <h3>${esc(n.id)}</h3>
+        <div class="row"><span class="k">Language</span><span class="v">${esc(n.lang || '—')}</span></div>
+        <div class="row"><span class="k">Dependencies</span><span class="v">${n.deps || 0}</span></div>
+        <div class="row"><span class="k">File</span><span class="v">${esc((n.file || '').split('/').pop() || '—')}</span></div>
+        <div class="row"><span class="k">Utilization</span><span class="v">${n.observed != null ? esc(String(n.observed)) : '—'}</span></div>`;
     }
-    cy.on('tap', 'node', (evt) => inspect(evt.target));
-    cy.on('tap', (evt) => { if (evt.target === cy) aside.innerHTML = `<div class="empty">Click a node to inspect it.</div>`; });
+    graph.on('node:click', (e) => { const id = e.target && e.target.id; if (id) inspect(id); });
+    graph.on('canvas:click', () => { aside.innerHTML = `<div class="empty">Click a node to inspect it.</div>`; });
   }
 });
   </script>
