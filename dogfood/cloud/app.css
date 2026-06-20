@@ -432,3 +432,24 @@ tr:last-child td{ border:0; }
   --input-placeholder-color: var(--dim); --num-columns: 8; --outline-color: var(--ink); --emoji-size: 1.2rem;
   width: 100%; max-width: 100%; height: 320px; border: none; border-radius: 8px; }
 .picker-host .loading { color: var(--dim); font-size: 12px; padding: 1rem; text-align: center; }
+
+/* ── Studio shell — a full-bleed layout with a floating rail, shared by Studio (chat) + Activity
+   (feed). GLOBAL (not scoped) so the rail stays locked in across both surfaces. ── */
+.studio { position: absolute; inset: 0; }
+.studio-chat { position: absolute; inset: 0; display: flex; }
+.studio-chat > .wb-chat { flex: 1; min-width: 0; }
+/* a scrollable, CENTERED content area for non-chat shell surfaces (e.g. the Activity feed) */
+.studio-scroll { position: absolute; inset: 0; overflow-y: auto; }
+.studio-scroll > .actwrap { margin: 0 auto; padding: 30px 24px 48px; }
+/* FLOATING icon rail — a small detached pill in the top-left corner, only as tall as its items.
+   It floats over the content; shell surfaces keep their top-left corner clear of it (~70px). */
+.studio-rail { position: absolute; left: 14px; top: 14px; z-index: 30; display: flex; flex-direction: column;
+  align-items: center; gap: 3px; padding: 5px; border-radius: 14px;
+  background: color-mix(in srgb, var(--card) 84%, transparent); backdrop-filter: blur(10px);
+  border: 1px solid var(--line); box-shadow: 0 6px 22px rgba(0,0,0,.18); }
+.studio-railbtn { position: relative; width: 36px; height: 36px; border: none; background: none; color: var(--dim); cursor: pointer; border-radius: 10px; display: grid; place-items: center; }
+.studio-railbtn:hover { background: var(--line); color: var(--ink); }
+.studio-railbtn.on { background: var(--line); color: var(--ink); }
+.studio-railbtn svg { width: 19px; height: 19px; }
+.studio-railbtn[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
+  white-space: nowrap; background: var(--ink); color: var(--card); font: 600 11.5px var(--read); padding: 5px 9px; border-radius: 7px; pointer-events: none; z-index: 40; box-shadow: 0 4px 14px rgba(0,0,0,.25); }

@@ -3,8 +3,20 @@
 // feed (no social): a top tab bar filters the same event stream. Tabs are data-driven + extensible.
 // Backfill now; the websocket live-tail is the next layer (same endpoint shape).
 
-WB.view('/activity', { title: 'Activity', accent: 'var(--violet)', async render(el){
+WB.view('/activity', { title: 'Activity', accent: 'var(--violet)', fullbleed: true, async render(el){
   var esc = WB.esc;
+  // The floating studio rail (shared shell): Create -> Studio (fresh chat), Activity = here. data-nav
+  // is handled by the global click delegate in app.js, so plain markup is enough.
+  var RAIL_ICONS = {
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
+    activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>'
+  };
+  function rail(){
+    return '<nav class="studio-rail">' +
+      '<button class="studio-railbtn" data-tip="Create" aria-label="Create" data-nav="/studio">' + RAIL_ICONS.plus + '</button>' +
+      '<button class="studio-railbtn on" data-tip="Activity" aria-label="Activity" data-nav="/activity">' + RAIL_ICONS.activity + '</button>' +
+    '</nav>';
+  }
 
   // Extensible tab set: each tab is a label + a predicate over an event. Add a tab = add an entry.
   var TABS = [
@@ -45,21 +57,24 @@ WB.view('/activity', { title: 'Activity', accent: 'var(--violet)', async render(
     var tab = TABS.find(function(t){ return t.id === active; }) || TABS[0];
     var shown = events.filter(tab.match);
     el.innerHTML =
-      '<div class="actwrap">' +
-        '<div class="acthd"><h1 class="acttitleh">Activity</h1>' +
-          '<p class="actsub">A live feed of everything happening across your nexus.</p></div>' +
-        '<div class="acttabs">' + TABS.map(function(t){
-          return '<button class="acttab' + (t.id === active ? ' on' : '') + '" data-tab="' + t.id + '">' + esc(t.label) + '</button>';
-        }).join('') + '</div>' +
-        '<div class="actfeed">' + (shown.length ? shown.map(feedItem).join('') :
-          '<div class="actempty">Nothing here yet. As agents run, deploys ship, and your team acts, it shows up here.</div>') + '</div>' +
+      '<div class="studio">' +
+        '<div class="studio-scroll"><div class="actwrap">' +
+          '<div class="acthd"><h1 class="acttitleh">Activity</h1>' +
+            '<p class="actsub">A live feed of everything happening across your nexus.</p></div>' +
+          '<div class="acttabs">' + TABS.map(function(t){
+            return '<button class="acttab' + (t.id === active ? ' on' : '') + '" data-tab="' + t.id + '">' + esc(t.label) + '</button>';
+          }).join('') + '</div>' +
+          '<div class="actfeed">' + (shown.length ? shown.map(feedItem).join('') :
+            '<div class="actempty">Nothing here yet. As agents run, deploys ship, and your team acts, it shows up here.</div>') + '</div>' +
+        '</div></div>' +
+        rail() +
       '</div>';
     el.querySelectorAll('[data-tab]').forEach(function(b){
       b.onclick = function(){ active = b.getAttribute('data-tab'); paint(); };
     });
   }
 
-  el.innerHTML = '<div class="actwrap"><div class="actempty">Loading…</div></div>';
+  el.innerHTML = '<div class="studio"><div class="studio-scroll"><div class="actwrap"><div class="actempty">Loading…</div></div></div>' + rail() + '</div>';
   try {
     var r = await fetch('/cloud/activity', { credentials: 'same-origin' });
     var d = await r.json();

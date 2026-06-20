@@ -80,24 +80,8 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
 }});
 // "Create" is now the + (new chat) inside Studio; keep the old route as a redirect.
 WB.view('/create', { title: 'Studio', render(el){ WB.nav('/studio'); } });
-WB.scopedStyles('/studio', `
-.studio { position: absolute; inset: 0; }
-/* full-bleed chat fills everything; the floating rail overlays it */
-.studio-chat { position: absolute; inset: 0; display: flex; }
-.studio-chat > .wb-chat { flex: 1; min-width: 0; }
-/* FLOATING icon rail — a small detached pill in the top-left corner, only as tall as its items.
-   It floats over the chat; Studio pages must keep their top-left corner clear of it (~70px). */
-.studio-rail { position: absolute; left: 14px; top: 14px; z-index: 30; display: flex; flex-direction: column;
-  align-items: center; gap: 3px; padding: 5px; border-radius: 14px;
-  background: color-mix(in srgb, var(--card) 84%, transparent); backdrop-filter: blur(10px);
-  border: 1px solid var(--line); box-shadow: 0 6px 22px rgba(0,0,0,.18); }
-.studio-railbtn { position: relative; width: 36px; height: 36px; border: none; background: none; color: var(--dim); cursor: pointer; border-radius: 10px; display: grid; place-items: center; }
-.studio-railbtn:hover { background: var(--line); color: var(--ink); }
-.studio-railbtn.on { background: var(--line); color: var(--ink); }
-.studio-railbtn svg { width: 19px; height: 19px; }
-.studio-railbtn[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
-  white-space: nowrap; background: var(--ink); color: var(--card); font: 600 11.5px var(--read); padding: 5px 9px; border-radius: 7px; pointer-events: none; z-index: 40; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
-`);
+// The studio-shell CSS (.studio / .studio-rail / .studio-railbtn) is GLOBAL in app.css so it's shared
+// by every surface in the shell (Studio chat + Activity feed), keeping the floating rail locked in.
 
 
 WB.view('/usage', {
