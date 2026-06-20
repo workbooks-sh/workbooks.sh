@@ -395,6 +395,12 @@
 
       var nxMenu = st.nxMenu ? nexusMenu(nx) : '';
 
+      // Preserve the live view node across shell re-renders. A sidebar-only change (opening the nexus
+      // menu / admin drawer / a ws menu) calls renderShell() WITHOUT renderView() — without this the
+      // rebuilt #view would be empty and the page would blank. We move the existing (live, with its
+      // listeners) #view back into the new shell. On a real nav, renderView() runs after and refills it.
+      var prevView = document.getElementById('view');
+
       root.innerHTML =
       '<div id="app" style="--section:' + sectionAccent(p) + '">' +
         '<aside class="side">' +
@@ -428,6 +434,11 @@
         '</aside>' +
         '<div class="main">' + crumbs + (fb ? '<div id="view" class="fullbleed"></div>' : '<div class="wrap" id="view"></div>') + '</div>' +
       '</div>';
+
+      if (prevView && prevView.childNodes.length) {
+        var slot = root.querySelector('#view');
+        if (slot) { prevView.className = slot.className; slot.parentNode.replaceChild(prevView, slot); }
+      }
 
       if (st.pickerOpen) { var ph = root.querySelector('#wsPicker'); if (ph) WB.emojiPicker(ph, function (u) { st.editIcon = u; st.pickerOpen = false; renderShell(); renderView(); }); }
       var si = document.getElementById('wbFileSearch');
