@@ -264,7 +264,8 @@ defmodule Nexus.SSR do
     """
     <!doctype html>
     <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#{esc(title(pages))}</title>
-    <style>#{css(app?)}</style></head>
+    <style>#{css(app?)}</style>
+    #{design_css(pages)}</head>
     <body>
     #{nav(pages)}#{body}
     #{data_islands(res, ctx)}<script>#{js_shim(live)}</script>
@@ -396,10 +397,10 @@ defmodule Nexus.SSR do
   # that runs on the nexus, not shown in the rendered app.
   defp render_node(%{type: :code, kind: "client", body: b}, _res, _ctx), do: b
 
-  # A `design` block is the brand sheet — a living design document. Its CSS (tokens / classes) is
-  # tangled into the page as a <style>, loaded before the island so the UI reads `var(--…)`. Edit it
-  # to rebrand the app.
-  defp render_node(%{type: :code, kind: "design", body: b}, _res, _ctx), do: "<style>\n" <> b <> "\n</style>"
+  # A `design` block is the brand sheet — a living design document. Its CSS is hoisted into <head>
+  # by compose/compose_site (via design_css/1) so it loads BEFORE the body paints — emitting it here
+  # in body order would flash unstyled content (FOUC). So in-body it renders nothing.
+  defp render_node(%{type: :code, kind: "design"}, _res, _ctx), do: ""
 
   # Any other unit (server / sandbox / data / def / agent / resource …) renders as a labelled
   # source figure — the literate document shows its own code. Matches the canonical reactor weave.

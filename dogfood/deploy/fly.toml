@@ -1,7 +1,7 @@
 app = "wb-dogfood"
 primary_region = "sjc"
 [build]
-  dockerfile = "Dockerfile.dfrt"
+  dockerfile = "Dockerfile"
 [env]
   WB_DATA = "/srv/dogfood"
   WB_NEXUS = "dogfood"
