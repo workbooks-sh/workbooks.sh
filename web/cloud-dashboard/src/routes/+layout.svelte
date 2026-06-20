@@ -9,6 +9,7 @@
   import EmojiPicker from '$lib/EmojiPicker.svelte';
   import { toast } from '$lib/toastStore.svelte.js';
   import { goto } from '$app/navigation';
+  import { Gauge, Database, Users, KeyRound } from '@lucide/svelte';
 
   let { children, data } = $props();
   let modalOpen = $state(false);
@@ -276,10 +277,10 @@
     <!-- NEXUS sub-pages — what you manage about the nexus itself -->
     {#if activeNx}
       <nav class="nxnav">
-        <a class="nxlink" class:on={page.url.pathname === '/usage'} href="/usage">Usage</a>
-        <a class="nxlink" class:on={page.url.pathname === '/storage'} href="/storage">Storage</a>
-        <a class="nxlink" class:on={page.url.pathname === '/team'} href="/team">Users</a>
-        <a class="nxlink" class:on={page.url.pathname === '/secrets'} href="/secrets">Secrets</a>
+        <a class="nxlink" class:on={page.url.pathname === '/usage'} href="/usage"><Gauge size={15} strokeWidth={1.75} /> Usage</a>
+        <a class="nxlink" class:on={page.url.pathname === '/storage'} href="/storage"><Database size={15} strokeWidth={1.75} /> Storage</a>
+        <a class="nxlink" class:on={page.url.pathname === '/team'} href="/team"><Users size={15} strokeWidth={1.75} /> Users</a>
+        <a class="nxlink" class:on={page.url.pathname === '/secrets'} href="/secrets"><KeyRound size={15} strokeWidth={1.75} /> Secrets</a>
       </nav>
     {/if}
 
@@ -356,7 +357,7 @@
   .sw .ico.ch { width: 15px; height: 15px; color: var(--dim); flex: none; }
   .sw .av.sm {
     width: 22px; height: 22px; border-radius: 6px; flex: none; display: grid; place-items: center;
-    background: linear-gradient(135deg, var(--mint), var(--sky)); color: var(--ink); font: 700 10px var(--read);
+    background: var(--line); color: var(--ink); font: 700 10px var(--read);
   }
   .navspacer { flex: 1; }
 
@@ -401,7 +402,7 @@
     width: 20px;
     height: 20px;
     border-radius: 6px;
-    background: linear-gradient(135deg, var(--mint), var(--sky));
+    background: var(--line);
     display: grid;
     place-items: center;
     font: 700 9px var(--read);
@@ -440,7 +441,7 @@
   .omname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .omitem .av.sm {
     width: 20px; height: 20px; border-radius: 6px; flex: none;
-    background: linear-gradient(135deg, var(--mint), var(--sky));
+    background: var(--line);
     display: grid; place-items: center; font: 700 9px var(--read); color: var(--ink);
   }
   .av.sm.plus { background: var(--line); color: var(--ink); font-size: 13px; }
@@ -457,9 +458,11 @@
   /* nexus sub-pages (Usage / Storage / Users / Secrets) */
   .nxnav { display: flex; flex-direction: column; gap: 1px; margin: 4px 0 14px; }
   .nxlink {
-    padding: 6px 10px 6px 14px; border-radius: 7px; text-decoration: none;
+    display: flex; align-items: center; gap: 9px;
+    padding: 6px 10px 6px 11px; border-radius: 7px; text-decoration: none;
     font: 500 13px var(--read); color: var(--dim);
   }
+  .nxlink :global(svg) { flex: none; opacity: 0.85; }
   .nxlink:hover { background: var(--line); color: var(--ink); }
   .nxlink.on { background: var(--line); color: var(--ink); font-weight: 600; }
 
@@ -474,8 +477,11 @@
   .wslist { display: flex; flex-direction: column; gap: 1px; max-height: 42vh; overflow-y: auto; }
 
   /* workspace rows: switch (main) + edit (pencil, on hover) */
-  .wsrow { display: flex; align-items: center; border-radius: 8px; }
+  .wsrow { display: flex; align-items: center; border-radius: 8px; position: relative; }
   .wsrow:hover { background: var(--line); }
+  /* active workspace — visible selected state, like any other nav item */
+  .wsrow.on { background: var(--line); }
+  .wsrow.on::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2.5px; border-radius: 2px; background: var(--ink); }
   .wsrow.on .wsmain { font-weight: 600; }
   .wsmain {
     display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;

@@ -16,6 +16,7 @@
     "vite": "^5"
   },
   "dependencies": {
+    "@lucide/svelte": "^1.21.0",
     "@tanstack/react-query": "^5",
     "@workos-inc/node": "^10",
     "@workos-inc/widgets": "^1",
