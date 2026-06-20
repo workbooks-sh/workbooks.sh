@@ -34,7 +34,7 @@ mkdir -p "$DST"
 # Each lane's build.sh registers its CLI_BIN command at boot (CommandRegistry.build_and_register_script
 # + the compile-path self-heal). They SHORT-CIRCUIT when the prebuilt wasm is already present (which it
 # is, in this lean slice) — so this registers, it never rebuilds. Without build.sh: {:unknown_command}.
-for lane in rust clang zig go js c; do take "$lane/build.sh"; done
+for lane in rust clang zig go js c swift; do take "$lane/build.sh"; done
 
 # --- rust: the 3 mrustc wasm + 1.74 libstd link objects + the work runtime crate + std shims --------
 take rust/mrustc-root/mrustc_std.wasm
@@ -79,6 +79,14 @@ take js/manifest.org
 # --- c: the C4 single-file compiler (compiled on demand in-sandbox) -----------------------------
 take c/c4.c
 take c/manifest.org
+
+# --- swift: official Swift 6.2 toolchain + the Swift SDK for WebAssembly (WASI) ------------------
+# Provisioned by swift/build.sh (fetches the swift.org toolchain + wasm SDK; gitignored, hours-cold).
+# NOTE: swiftc is NATIVE (no wasm-hosted Swift compiler upstream yet) — host-side cross-compile; the
+# PRODUCED artifact is still a sandboxed wasm component. Nexus.Compilers.Swift resolves under swift-root.
+take swift/swift-root/usr
+take swift/swift-root/swift-wasi.sdk
+take swift/manifest.org
 
 # --- wasm-tools recipe (the wasm-tools.wasm itself ships under build/, already in the image) ----
 take wasm-tools/build.sh

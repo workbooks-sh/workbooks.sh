@@ -1,0 +1,115 @@
+# Device — pairing + the app catalog a phone receives
+
+The **server seam** the native shell ([[shell]]) calls. Two jobs, both on the platform's generic
+primitives so the runtime ships none of our opinion:
+
+1. **Pair** a phone to the account — mint a device-scoped token (`Nexus.Auth.Token`, hashed-at-rest,
+   audited), persist a `Device` row. The plaintext token is shown ONCE; the phone stores it in the
+   secure enclave and presents it as a Bearer on every later call.
+2. Serve the **catalog** — the apps this account can receive. An *app* is a mounted surface (a folder
+   of `.work` served by the nexus). We pool every surface, tag each with the workspace it belongs to
+   ([[index]] declares the workspace list + icons), and return launchable tiles. The shell renders
+   them; tapping a tile loads that surface's woven `client` island and points `runtime` caps at this
+   nexus.
+
+This nexus reports ITSELF as the one nexus for its org (see [[one-nexus-per-org]]). A phone that
+belongs to several orgs pairs once per nexus and the launcher pools across all of them client-side.
+
+## The pairing record
+
+resource Device do
+  token_id :text
+  name :text
+  platform :text
+  paired_at :int
+  last_seen :int
+end
+
+## The seam
+
+server :mobile do
+  route "POST /mobile/pair", :pair
+  route "GET /mobile/nexus", :nexus
+  route "GET /mobile/apps", :apps
+  route "POST /mobile/unpair", :unpair
+
+  @doc """
+  Pair a phone. Body: `name`, `platform` (e.g. "ios"). Mints a device token scoped `api`+`mobile`,
+  records the device, and returns the plaintext token ONCE plus this nexus's identity so the shell
+  can seed its runtime endpoint.
+  """
+  def pair(req) do
+    name = field(req, "name", "phone")
+    platform = field(req, "platform", "ios")
+    minted = Nexus.Auth.Token.mint(req.tenant, name: "mobile:#{name}", scopes: ["api", "mobile"])
+
+    Nexus.Store.create(Device, %{
+      token_id: minted.id,
+      name: name,
+      platform: platform,
+      paired_at: System.system_time(:second),
+      last_seen: System.system_time(:second)
+    })
+
+    {201, %{token: minted.token, device_id: minted.id, nexus: nexus_view()}}
+  end
+
+  @doc "This nexus's identity (one per org). The shell holds one runtime endpoint per nexus."
+  def nexus(_req), do: nexus_view()
+
+  @doc """
+  The app catalog: every mounted surface, tagged with its workspace (name + icon from the deploy
+  config) and the nexus it lives on. Each tile is launchable — `path` is the mount the shell loads
+  the woven `client` island from. Runtime ships nothing here; the deployer's mounts ARE the catalog.
+  """
+  def apps(_req) do
+    ws = Map.new(Nexus.Config.workspaces(), &{&1.id, &1})
+    nx = nexus_view()
+
+    apps =
+      for {mount, root} <- Application.get_env(:nexus, :mounts, []), mount != "" do
+        w = ws[mount]
+
+        %{
+          id: mount,
+          name: (w && w.name) || titleize(mount),
+          icon: (w && w.icon) || "📦",
+          path: "/" <> mount,
+          nexus: nx.id,
+          updated: latest_mtime(root)
+        }
+      end
+
+    %{nexus: nx, apps: Enum.sort_by(apps, & &1.name)}
+  end
+
+  @doc "Revoke this device's token (body: `device_id`)."
+  def unpair(req) do
+    id = field(req, "device_id", "")
+    if id != "", do: Nexus.Auth.Token.revoke(req.tenant, id)
+    %{ok: true}
+  end
+
+  # ── helpers ──────────────────────────────────────────────────────────────────────────────────
+  defp nexus_view do
+    %{
+      id: Application.get_env(:nexus, :nexus_name, "nexus"),
+      name: Application.get_env(:nexus, :nexus_friendly, "") |> blank_to("Nexus"),
+      emoji: Nexus.Config.nexus_emoji()
+    }
+  end
+
+  defp field(req, key, default), do: (is_map(req.body) && req.body[key]) || default
+  defp blank_to("", d), do: d
+  defp blank_to(v, _d), do: v
+  defp titleize(s), do: s |> String.replace(["-", "_"], " ") |> String.capitalize()
+
+  # Newest .work mtime under a surface — the shell shows "updated" so a re-published app is obvious.
+  defp latest_mtime(root) do
+    Path.wildcard(Path.join(root, "**/*.work"))
+    |> Enum.map(fn f -> File.stat!(f, time: :posix).mtime end)
+    |> Enum.max(fn -> 0 end)
+  rescue
+    _ -> 0
+  end
+end

@@ -1,0 +1,86 @@
+# Launcher — your pocket of apps
+
+The **home surface** (`client` island). It draws the tiles [[device]]'s `/mobile/apps` returns —
+every app published in a workspace you belong to, pooled across your nexus(es). Tap a tile and the
+shell loads that app's woven `client` island, routing its `runtime` caps back to the originating
+nexus.
+
+This island is render-target-agnostic: the native [[shell]] hosts it in a `WKWebView`, but it has no
+iOS dependency — it just reads `window.WB` (the Host bridge the shell injects: `base`, `token`,
+`open(app)`). With no bridge (e.g. opened in a plain browser for preview) it falls back to a relative
+`fetch` and `location.assign`, so the same source previews with `work dev`.
+
+client :launcher do
+  <main id="wb-home">
+    <header class="home-top">
+      <div>
+        <p class="home-kicker">workbooks</p>
+        <h1 class="home-h">In your pocket</h1>
+      </div>
+      <span class="home-nx" id="home-nx">—</span>
+    </header>
+    <section class="grid" id="home-grid" aria-busy="true">
+      <p class="home-empty" id="home-empty" hidden>No apps yet. Anything published to a workspace you're in lands here.</p>
+    </section>
+  </main>
+
+  <script>
+  (function () {
+    const WB = window.WB || {};
+    const base = WB.base || "";
+    const token = WB.token || "";
+    const open = WB.open || ((app) => location.assign(base + app.path));
+    const grid = document.getElementById("home-grid");
+    const empty = document.getElementById("home-empty");
+
+    async function load() {
+      try {
+        const r = await fetch(base + "/mobile/apps", {
+          headers: token ? { authorization: "Bearer " + token } : {},
+        });
+        const data = await r.json();
+        document.getElementById("home-nx").textContent =
+          (data.nexus && (data.nexus.emoji + " " + data.nexus.name)) || "";
+        render(data.apps || []);
+      } catch (e) {
+        empty.hidden = false;
+        empty.textContent = "Couldn't reach your nexus.";
+      }
+    }
+
+    function render(apps) {
+      grid.setAttribute("aria-busy", "false");
+      if (!apps.length) { empty.hidden = false; return; }
+      for (const app of apps) {
+        const tile = document.createElement("button");
+        tile.className = "tile";
+        tile.type = "button";
+        tile.innerHTML =
+          '<span class="tile-ic">' + (app.icon || "📦") + "</span>" +
+          '<span class="tile-name"></span>';
+        tile.querySelector(".tile-name").textContent = app.name;
+        tile.addEventListener("click", () => open(app));
+        grid.appendChild(tile);
+      }
+    }
+
+    load();
+  })();
+  </script>
+end
+
+## The look
+
+design :launcher do
+  #wb-home { font-family: -apple-system, "Geist", system-ui, sans-serif; color: #1a1b1e; background: #f7f6f1; min-height: 100vh; padding: env(safe-area-inset-top, 16px) 18px 24px; }
+  .home-top { display: flex; align-items: flex-start; justify-content: space-between; margin: 8px 0 22px; }
+  .home-kicker { margin: 0; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: #8a8a82; }
+  .home-h { margin: 2px 0 0; font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+  .home-nx { font-size: 13px; color: #5a5a52; background: #ece9df; border-radius: 999px; padding: 6px 12px; white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 18px 14px; }
+  .tile { display: flex; flex-direction: column; align-items: center; gap: 9px; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .tile-ic { width: 68px; height: 68px; display: grid; place-items: center; font-size: 32px; background: #fff; border-radius: 20px; box-shadow: 0 2px 0 rgba(0,0,0,.06), 0 6px 18px rgba(0,0,0,.05); transition: transform .12s ease; }
+  .tile:active .tile-ic { transform: scale(.92); }
+  .tile-name { font-size: 12.5px; color: #3a3a34; text-align: center; line-height: 1.2; max-width: 88px; }
+  .home-empty { grid-column: 1 / -1; color: #8a8a82; font-size: 14px; text-align: center; padding: 40px 8px; }
+end

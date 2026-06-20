@@ -33,6 +33,7 @@ deploy do
     docs      | Docs      | 📖
     marketing | Marketing | 📣
     waitlist  | Waitlist  | 📋
+    mobile    | Mobile    | 📱
   "
 
   reserved-hosts="workbooks.sh"                          # our domain of record — tenants can't bind under it

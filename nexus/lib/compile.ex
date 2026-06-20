@@ -12,7 +12,7 @@ defmodule Nexus.Compile do
   existing toolchain when we wire them in; this module just routes and orchestrates.
   """
 
-  @wasm_kinds ~w(client sandbox rust zig c cpp python svelte solid js ts)
+  @wasm_kinds ~w(client sandbox rust zig c cpp swift python svelte solid js ts)
 
   @doc "Compile one parsed `:code` unit to its artifact, tagged by lane."
   def unit(%{type: :code, kind: kind} = node) do
@@ -32,6 +32,7 @@ defmodule Nexus.Compile do
       kind == "rust" -> {:wasm, cached(node, fn -> rust_unit(node) end)}
       kind in ~w(c cpp) -> {:wasm, cached(node, fn -> c_unit(node) end)}
       kind == "zig" -> {:wasm, cached(node, fn -> zig_unit(node) end)}
+      kind == "swift" -> {:wasm, cached(node, fn -> swift_unit(node) end)}
       kind in @wasm_kinds -> {:wasm, {:todo, node.lang, node.name}}
       true -> {:skip, kind}
     end
@@ -235,6 +236,63 @@ defmodule Nexus.Compile do
     end
   end
 
+  # A `swift` unit: derive the WIT world from `@_expose(wasm)`d `public func` signatures, compile via
+  # the official Swift wasm SDK (swiftc → wasm core), then componentize. swift → wasm reactor.
+  defp swift_unit(%{name: name, body: body}) do
+    case swift_sigs(body) do
+      [] ->
+        {:error, :no_exported_fns}
+
+      exports ->
+        wname = wit_ident(name)
+        elines = Enum.map(exports, fn {f, ps, r} -> {wit_ident(f), "func(#{ps})#{r}"} end)
+        world = Nexus.Wit.world_from_sigs(name, [], elines)
+        src = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}.swift")
+        File.write!(src, body)
+
+        with {:ok, core} <- Nexus.Compilers.Swift.compile_to_wasm(src, exports: Enum.map(exports, &elem(&1, 0))) do
+          Nexus.Wit.componentize(core, world, wname)
+        end
+    end
+  end
+
+  @swift_wit %{
+    "Int8" => "s8", "Int16" => "s16", "Int32" => "s32", "Int64" => "s64", "Int" => "s32",
+    "UInt8" => "u8", "UInt16" => "u16", "UInt32" => "u32", "UInt64" => "u64", "UInt" => "u32",
+    "Float" => "f32", "Double" => "f64", "Bool" => "bool"
+  }
+  # `@_expose(wasm[, "name"]) public func f(_ x: Int32, y: Double) -> Int32 {` — the wasm-exposed entry.
+  defp swift_sigs(body) do
+    ~r/@_expose\([^)]*\)\s*public\s+func\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z0-9_]+))?\s*\{/
+    |> Regex.scan(body)
+    |> Enum.map(fn
+      [_, f, params, ret] -> {f, swift_params(params), swift_ret(ret)}
+      [_, f, params] -> {f, swift_params(params), ""}
+    end)
+    |> Enum.uniq()
+  end
+
+  defp swift_params(p) when p in ["", "_", "void"], do: ""
+
+  defp swift_params(params) do
+    params
+    |> String.split(",", trim: true)
+    |> Enum.map_join(", ", fn part ->
+      # Swift params are `[label] name: Type` (label may be `_`); take the binding name + type.
+      case String.split(part, ":", parts: 2) do
+        [decl, t] ->
+          nm = decl |> String.trim() |> String.split(~r/\s+/) |> List.last()
+          "#{wit_ident(nm)}: #{Map.get(@swift_wit, String.trim(t), "s32")}"
+
+        [t] ->
+          Map.get(@swift_wit, String.trim(t), "s32")
+      end
+    end)
+  end
+
+  defp swift_ret(r) when r in [nil, ""], do: ""
+  defp swift_ret(t), do: " -> #{Map.get(@swift_wit, t, "s32")}"
+
   @zig_wit %{
     "i8" => "s8", "i16" => "s16", "i32" => "s32", "i64" => "s64",
     "u8" => "u8", "u16" => "u16", "u32" => "u32", "u64" => "u64",
@@ -317,7 +375,7 @@ defmodule Nexus.Compile do
         {u.name, try_materialize(u)}
       end
 
-    wasm = Enum.flat_map(~w(rust c cpp zig), &Map.get(by_kind, &1, []))
+    wasm = Enum.flat_map(~w(rust c cpp zig swift), &Map.get(by_kind, &1, []))
 
     %{
       beam: try_beam(root),
@@ -341,7 +399,7 @@ defmodule Nexus.Compile do
     (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
     |> Enum.uniq()
     |> Enum.flat_map(fn f -> f |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
-    |> Enum.filter(&(&1.kind in ~w(rust c cpp zig) and (only == nil or &1.name in only)))
+    |> Enum.filter(&(&1.kind in ~w(rust c cpp zig swift) and (only == nil or &1.name in only)))
     |> Enum.reduce(Nexus.Overlay.new(), fn node, ov ->
       with {:wasm, {:ok, comp}} <- unit(node),
            {:ok, facet} <- Nexus.Artifact.facet(comp) do

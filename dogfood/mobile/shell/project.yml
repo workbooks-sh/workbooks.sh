@@ -1,0 +1,30 @@
+name: WorkbooksMobile
+options:
+  bundleIdPrefix: sh.workbooks
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  WorkbooksMobile:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    info:
+      path: Sources/WorkbooksMobile/Info.plist
+      properties:
+        CFBundleDisplayName: Workbooks
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: sh.workbooks.mobile
+        GENERATE_INFOPLIST_FILE: false

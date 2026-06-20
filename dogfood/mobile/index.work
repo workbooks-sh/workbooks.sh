@@ -1,0 +1,53 @@
+# Mobile — workbooks in your pocket
+
+The **mobile target**: a phone is just another place the *one* frontend renders. Not a second
+product, not a re-skin of [[cloud]] — a **receiver**. You sign into your workbooks account, the app
+discovers the nexus(es) you belong to, and every workbook **app** published in a workspace you're a
+member of shows up as a launchable tile in your pocket. Tap one, it runs.
+
+This folder is the **our-cloud side of THE LINE** (see [[index]]): the runtime ships the generic
+seams (pairing, app discovery, the Host/Dock capability surface); *this* workbook is our opinionated
+mobile experience built on top, exactly like a customer would. A stranger who deploys the nexus
+inherits the seams, none of our branding.
+
+## The target model — one frontend, many targets
+
+> *desktop / web / mobile are not code forks — they are routing configs behind one Host.*
+
+The UI talks to a single **Host capability surface** (the Dock membrane). Behind it a router fulfils
+each capability from a **provider**:
+
+- `local` — the OS (here: iOS, via the native Swift shell in [[shell]]) or browser-native APIs.
+- `runtime` — a nexus reached over **RCP** (HTTP + WS). Backs `server` units, agents, data, sync.
+
+A woven workbook's `client` islands are **wasm** — they run client-side on the phone (the native shell
+hosts the wasm), so an app *received* onto the device runs there with no kernel. The only thing the
+phone needs from the network is (a) the woven artifact for an app, and (b) the `runtime` provider for
+that app's `server` calls — both keyed to the nexus the app came from.
+
+A user may belong to **multiple nexuses** (one nexus per org — see [[one-nexus-per-org]]). The shell
+holds one `runtime` endpoint per nexus and the launcher pools every app across all of them.
+
+## What lives here
+
+- [[device]] — the **server seam**: pair a phone (mint a device-scoped token), then list the apps a
+  device can receive across the account's workspaces. This is the API the native shell calls.
+- [[launcher]] — the **home surface** (`client` island): the pocket-of-apps grid, rendered from the
+  app list `device` returns. The native shell can render this island directly, or draw a native grid
+  off the same JSON — same source of truth.
+- [[shell]] — the **native iOS app** (SwiftUI). Authenticates, discovers nexuses, fetches the
+  catalog, and hosts each received app's `client` island, routing Host caps to `local` (iOS) or
+  `runtime` (the originating nexus).
+
+## Why Swift — and Swift→wasm
+
+The shell is native **Swift/SwiftUI** because the local provider IS the OS: camera, secure enclave,
+notifications, share sheet. That is the honest way to dogfood "the phone is the `local` provider."
+
+Separately, Swift is now a real **sandbox compiler lane**: Swift 6.2 ships official WebAssembly SDKs
+(WASI) and a `WasmKit` runtime, two years in production at Goodnotes. So a workbook author can write a
+`swift` block and have it compile → a sandboxed wasm component like `rust`/`zig`/`c` do. (One honest
+caveat: Swift upstream ships only a *native* `swiftc` — no wasm-hosted compiler yet — so the compile
+step is host-side cross-compilation; the produced artifact still runs sandboxed.) The lane is
+registered in `Nexus.Compile` (`compilers/swift/`); see [[shell]]'s README for the toolchain note. This closes the
+loop: the device is Swift-native, and the apps it receives can themselves be authored in Swift.
