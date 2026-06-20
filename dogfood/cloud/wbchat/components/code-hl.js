@@ -51,11 +51,12 @@ const CSS = `
 .wbc-code .hljs-strong { font-weight: 700; }
 `;
 
-// Lazy, cached, fail-soft load of highlight.js (full common build).
+// Lazy, cached, fail-soft load of highlight.js. Use the BUNDLED `lib/common` build (one module,
+// ~40 common languages) — NOT the package root, which esm.sh fans out into 200+ per-language requests.
 let _hljsPromise = null;
 function loadHljs() {
   if (_hljsPromise) return _hljsPromise;
-  _hljsPromise = import('https://esm.sh/highlight.js@11')
+  _hljsPromise = import('https://esm.sh/highlight.js@11/lib/common')
     .then((m) => (m && (m.default || m)) || null)
     .catch(() => null);
   return _hljsPromise;
