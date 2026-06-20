@@ -847,7 +847,12 @@ client :app do
       try { await WB.nexus.rename(nx.id, n); WB.toast('Nexus renamed'); } catch (e) { WB.toast('Couldn’t rename the nexus', 'bad'); } st.nxEditing = false; renderShell(); }
 
     // ── view render ───────────────────────────────────────────────────────────────────────────
+    // A view may register teardown (e.g. destroy a graph instance) so its render loop + listeners
+    // don't keep running on an orphaned DOM node after you navigate away (that froze the page).
+    function runCleanup(){ if (WB._cleanup) { try { WB._cleanup(); } catch (e) {} WB._cleanup = null; } }
+
     async function renderView(){
+      runCleanup();
       var p = ROUTE.path, m = matchRoute(p); WB._params = m.params; ROUTE.params = m.params;
       var def = WB._views[m.key] || WB._views['/'];
       var mount = def.bare ? document.getElementById('bareview') : document.getElementById('view');
@@ -857,7 +862,7 @@ client :app do
       try { await def.render(mount, { params: m.params }); } catch (e) { mount.innerHTML = '<div class="card">Something went wrong loading this view.</div>'; console.error(e); }
     }
 
-    async function route(){ var h = location.hash.slice(1) || '/'; ROUTE.path = h; renderShell(); await renderView(); }
+    async function route(){ runCleanup(); var h = location.hash.slice(1) || '/'; ROUTE.path = h; renderShell(); await renderView(); }
     window.addEventListener('hashchange', route);
 
     // ── home view ('/') — reproduced from routes/+page.svelte ────────────────────────────────────
@@ -3142,6 +3147,10 @@ WB.view('/workspace', {
     }
     graph.on('node:click', (e) => { const id = e.target && e.target.id; if (id) inspect(id); });
     graph.on('canvas:click', () => { aside.innerHTML = `<div class="empty">Click a node to inspect it.</div>`; });
+
+    // Destroy the G6 instance when navigating away — otherwise its render loop, force simulation and
+    // global listeners keep running on the orphaned canvas and freeze the page. The router calls this.
+    WB._cleanup = () => { try { graph.destroy(); } catch (e) {} };
   }
 });
   </script>
