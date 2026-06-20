@@ -1,0 +1,63 @@
+# Deploy as an index tree
+
+How a workbook tree declares its own deployment. It's the same
+[composition-as-source](/introduction/what-is-the-work-cli) idea you already use for
+the app, extended to *how the app ships* — no sidecar file, no magic filename, no
+scatter of environment variables.
+
+## The one rule
+
+A `deploy` declaration is only meaningful in an **`index.work`**, and there is **one
+per index**. The index that holds it is a *deployable unit*; its config scopes to that
+index's subtree. Everything else follows from that single rule:
+
+- A `deploy` declaration in any **non-index** file is ignored, and `work check`
+  flags it. You cannot create drift by scattering deploy config around.
+- **Two** `deploy` declarations in **one** index is an error — genuinely ambiguous,
+  so the build refuses it rather than silently picking one.
+- `deploy` declarations in **different, nested** indexes are not drift — they are
+  *sub-deployments*. The index tree becomes a deploy pipeline.
+
+A deployment is never created by accident: you make an index and deliberately give it
+a `deploy` declaration, which means "this subtree ships as a unit." The structure is
+the source of truth, and there is nowhere for a stray config to hide and take effect.
+
+## The index tree is the deployment topology
+
+Index files nest, so deployments nest. A nested index with its own `deploy`
+declaration is a sub-deployment scoped to its subtree. Walking the index tree yields a
+deployment graph — your pipeline, expressed as the tree itself:
+
+    acme/
+      index.work        — defaults shared by everything below (image, tiers)
+      marketing/
+        index.work      — its own nexus, one region   (a sub-deployment)
+      app/
+        index.work      — its own nexus, another region (a sub-deployment)
+      build/
+        index.work      — a compile step the deploys above depend on
+
+That single structure expresses **multiple nexuses**, a **build/compile stage** as a
+node the others wait on, and **staging-vs-prod** as sibling indexes — with no extra
+files and nothing hidden.
+
+## Config cascades down the tree
+
+A child deployment inherits its parent's config and overrides only what differs. The
+root sets the shared defaults once (the image, the tiers); a sub-deployment specializes
+its own region or its own [workspaces](/deploy/secrets-and-config). Root is defaults,
+depth is specialization — no repetition, no conflicting copies.
+
+## The manifest index is not a page
+
+The deploy-root `index.work` is the composition root and the manifest. It is **not**
+served as a `/` page — surface discovery skips it — unless you deliberately give it a
+`client` or `server` block. It indexes the tree and carries config; the served surfaces
+are its subfolders.
+
+## The simple case
+
+Most workbooks are a single nexus: one root `index.work`, one `deploy` declaration, no
+children. That's the degenerate case of the same model — one node. The runtime reads
+its config straight from the deploy-root `index.work` at boot. The pipeline is just
+"what happens when there's more than one index with a deploy declaration."
