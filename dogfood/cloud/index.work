@@ -1017,23 +1017,18 @@ WB.scopedStyles('/usage', `
   .srow2 .mono { font-size:12px; }
 `);
 
-// ═══════════════════════ Create — agent chat (SolidJS + deep-chat) ════════════════════════════════
-// SolidJS shell (no-build) + the deep-chat web component for the agent conversation. Session history
+// ═══════════════════════ Create — agent chat (wbchat: our vanilla chat library) ═══════════════════
+// SolidJS shell (session rail) + the wbchat library (dogfood/cloud/wbchat/*) for the conversation —
+// our framework-agnostic createChat() core, themed via --wbc-* vars. Session history
 // is scoped to the user (within the org) via /cloud/agent/* — "New chat" + a rail of past sessions.
 WB.view('/create', { title: 'Create', accent: 'var(--mint)', async render(el){
   var S = await import('https://esm.sh/solid-js@1.9.5');
   var W = await import('https://esm.sh/solid-js@1.9.5/web');
   var html = (await import('https://esm.sh/solid-js@1.9.5/html')).default;
-  var createSignal = S.createSignal, For = S.For, Show = S.Show, createEffect = S.createEffect;
-  // deep-chat ships a self-registering web-component bundle; the esm.sh entry does NOT define the
-  // element. Load the official bundle, wait for the definition (with a timeout), and never let a load
-  // failure abort the view — the shell + a fallback still render.
-  var dcOk = true;
-  try {
-    await import('https://cdn.jsdelivr.net/npm/deep-chat@9.0.114/dist/deepChat.bundle.js');
-    if (!customElements.get('deep-chat')) await Promise.race([ customElements.whenDefined('deep-chat'), new Promise(function(r){ setTimeout(r, 5000); }) ]);
-    if (!customElements.get('deep-chat')) dcOk = false;
-  } catch (e) { dcOk = false; try { console.error('deep-chat failed to load', e); } catch (_) {} }
+  var createSignal = S.createSignal, For = S.For, Show = S.Show;
+  // wbchat — our vanilla AI-chat library (the singular surface). Load core + theme once.
+  var WBC = await import('./wbchat/core.js');
+  (function(){ if (!document.getElementById('wbchat-theme')){ var l = document.createElement('link'); l.id = 'wbchat-theme'; l.rel = 'stylesheet'; l.href = './wbchat/theme.css'; document.head.appendChild(l); } })();
 
   var U = (WB.user && WB.user.email) || 'anon';
   function api(path, opts){ return fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'content-type': 'application/json' } }, opts || {})).then(function(r){ return r.json(); }); }
@@ -1041,35 +1036,24 @@ WB.view('/create', { title: 'Create', accent: 'var(--mint)', async render(el){
   function Create(){
     var ss = createSignal([]); var sessions = ss[0], setSessions = ss[1];
     var ci = createSignal(null); var curId = ci[0], setCurId = ci[1];
-    var mk = createSignal(0); var mountKey = mk[0]; var bump = function(){ mk[1](mountKey() + 1); };
-    var histArr = [];        // plain var: rebuild is driven by mountKey, not by history reactivity
-    var holder = null;
+    var chat = null;
 
     function loadSessions(){ api('/cloud/agent/sessions?u=' + encodeURIComponent(U)).then(function(d){ setSessions((d && d.sessions) || []); }); }
-    function newChat(){ setCurId(null); histArr = []; bump(); }
-    function openSession(id){ api('/cloud/agent/session?u=' + encodeURIComponent(U) + '&id=' + encodeURIComponent(id)).then(function(d){ if (d && d.messages){ setCurId(d.id); histArr = d.messages; bump(); } }); }
+    function newChat(){ setCurId(null); if (chat) chat.clear(); }
+    function openSession(id){ api('/cloud/agent/session?u=' + encodeURIComponent(U) + '&id=' + encodeURIComponent(id)).then(function(d){ if (d && d.messages){ setCurId(d.id); if (chat) chat.setMessages(d.messages); } }); }
     loadSessions();
 
-    // (re)mount deep-chat whenever the mount key bumps (explicit new/open) — NOT on the silent id
-    // assignment after the first message (which would wipe the in-progress conversation).
-    createEffect(function(){
-      mountKey();
-      if (!holder) return;
-      holder.innerHTML = '';
-      if (!dcOk) { holder.innerHTML = '<div class="chatfallback">Couldn’t load the chat component (offline?). The agent backend is reachable — reload to retry.</div>'; return; }
-      var dc = document.createElement('deep-chat');
-      dc.style.cssText = 'width:100%;height:100%;border:none;background:transparent;';
-      dc.history = histArr.map(function(m){ return { role: m.role === 'assistant' ? 'ai' : 'user', text: m.text }; });
-      dc.textInput = { placeholder: { text: 'Message the agent…' } };
-      dc.introMessage = { text: 'Ask the agent to build, deploy, or change something on this nexus.' };
-      dc.connect = { handler: function(body, signals){
-        var msgs = body.messages || []; var last = msgs[msgs.length - 1] || {}; var text = last.text || '';
-        api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({ u: U, id: curId(), message: text }) })
-          .then(function(d){ if (d && d.id){ if (!curId()) setCurId(d.id); loadSessions(); signals.onResponse({ text: d.reply }); } else signals.onResponse({ error: 'no reply' }); })
-          .catch(function(){ signals.onResponse({ error: 'the agent run failed' }); });
-      } };
-      holder.appendChild(dc);
-    });
+    function mountChat(node){
+      chat = WBC.createChat(node, {
+        placeholder: 'Message the agent…',
+        greeting: { title: 'Build on your nexus', text: 'Ask the agent to build, deploy, or change something here.' },
+        suggestions: ['Scaffold a new app', 'Show my workspaces', 'Deploy the docs site'],
+        send: function(text){
+          return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({ u: U, id: curId(), message: text }) })
+            .then(function(d){ if (d && d.id){ if (!curId()) setCurId(d.id); loadSessions(); return d.reply || ''; } return '(no reply)'; });
+        }
+      });
+    }
 
     return html`
       <div class="createwrap">
@@ -1082,7 +1066,7 @@ WB.view('/create', { title: 'Create', accent: 'var(--mint)', async render(el){
             <${Show} when=${function(){ return sessions().length === 0; }}><div class="chempty">No past chats yet.</div><//>
           </div>
         </aside>
-        <section class="chatmain" ref=${function(node){ holder = node; bump(); }}></section>
+        <section class="chatmain" ref=${mountChat}></section>
       </div>`;
   }
   el.innerHTML = '';
@@ -1098,8 +1082,8 @@ WB.scopedStyles('/create', `
 .chsession:hover { background: var(--line); color: var(--ink); }
 .chsession.on { background: var(--line); color: var(--ink); font-weight: 600; }
 .chempty { color: var(--dim); font: 500 12.5px var(--read); padding: 12px 10px; }
-.chatmain { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--card); overflow: hidden; display: flex; }
-.chatfallback { margin: auto; max-width: 360px; text-align: center; color: var(--dim); font: 500 13.5px var(--read); padding: 24px; }
+.chatmain { position: relative; flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--card); overflow: hidden; display: flex; }
+.chatmain > .wb-chat { flex: 1; min-width: 0; }
 `);
 
 // ═══════════════════════ Apps — SolidJS beachhead (no-build: solid-js/html via ESM) ═══════════════
