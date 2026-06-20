@@ -71,9 +71,6 @@ defmodule Nexus.Deploy do
   # a deployable unit; nested indexes with deploy blocks are sub-deployments (a pipeline). Used by
   # `work check` and the weave gate so a stray/duplicate deploy block fails the build, not the runtime.
 
-  # A literate `deploy do … end` opener at the start of a line (optional indentation).
-  @deploy_re ~r/^[ \t]*deploy\s+do\b/m
-
   @doc """
   Validate the deploy-as-index-tree rules for the workbook tree at `root`. `:ok` or
   `{:error, problems}` where problems is a list of human-readable strings:
@@ -111,9 +108,11 @@ defmodule Nexus.Deploy do
     |> Enum.sort_by(&{length(Path.split(&1)), &1})
   end
 
+  # Count REAL `deploy` blocks via the AST-first parser (Nexus.Literate) — never a regex, so a doc that
+  # merely mentions `deploy` syntax in prose is not mistaken for a deploy block.
   defp deploy_count(path) do
     case File.read(path) do
-      {:ok, src} -> @deploy_re |> Regex.scan(src) |> length()
+      {:ok, src} -> src |> Nexus.Literate.parse() |> Enum.count(&(Map.get(&1, :kind) == "deploy"))
       _ -> 0
     end
   end
