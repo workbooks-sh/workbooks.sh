@@ -9,13 +9,19 @@
 # via LITESTREAM_* env and are never written to disk.
 set -e
 
-DB="${WB_DATA:-/data}/nexus.db"
+DB="${WB_DATA:-/data}/.nexus/nexus.db"
 CFG="/etc/litestream.yml"
 
-if [ -n "${WB_S3_BUCKET:-}" ] && [ -n "${WB_S3_ACCESS_KEY_ID:-}" ] && command -v litestream >/dev/null 2>&1; then
-  export LITESTREAM_ACCESS_KEY_ID="${WB_S3_ACCESS_KEY_ID}"
-  export LITESTREAM_SECRET_ACCESS_KEY="${WB_S3_SECRET_ACCESS_KEY}"
+# Accept our canonical WB_S3_* names OR the standard ones `fly storage create` (Tigris) sets.
+S3_BUCKET="${WB_S3_BUCKET:-${BUCKET_NAME:-}}"
+S3_AKID="${WB_S3_ACCESS_KEY_ID:-${AWS_ACCESS_KEY_ID:-}}"
+S3_SECRET="${WB_S3_SECRET_ACCESS_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
+
+if [ -n "$S3_BUCKET" ] && [ -n "$S3_AKID" ] && command -v litestream >/dev/null 2>&1; then
+  export LITESTREAM_ACCESS_KEY_ID="$S3_AKID"
+  export LITESTREAM_SECRET_ACCESS_KEY="$S3_SECRET"
   echo "[entrypoint] litestream enabled → generating config from injected secrets"
+  mkdir -p "$(dirname "$DB")"
   bin/nexus eval 'Nexus.Litestream.write_config()'
   echo "[entrypoint] restoring $DB from replica if the volume is empty"
   litestream restore -if-db-not-exists -if-replica-exists -config "$CFG" "$DB" || true

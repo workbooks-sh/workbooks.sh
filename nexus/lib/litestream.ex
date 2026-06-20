@@ -29,8 +29,26 @@ defmodule Nexus.Litestream do
   @doc "The conventional litestream config path inside the deployed image."
   def config_path, do: @config_path
 
-  @doc "True when an object-store replica is configured (S3/R2 secrets injected)."
-  def enabled?, do: Secrets.has?("WB_S3_BUCKET") and Secrets.has?("WB_S3_ACCESS_KEY_ID")
+  # Read a value under our canonical `WB_S3_*` name, falling back to the standard S3 env names that
+  # `fly storage create` (Tigris) and the AWS SDKs set — so provisioning via Fly "just works" with no
+  # manual secret mapping, while `WB_S3_*` stays the explicit override. All via Nexus.Secrets.
+  defp s3(canonical, standard), do: Secrets.get(canonical) || Secrets.get(standard)
+
+  defp bucket, do: s3("WB_S3_BUCKET", "BUCKET_NAME")
+  defp access_key_id, do: s3("WB_S3_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID")
+  defp secret_access_key, do: s3("WB_S3_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY")
+  defp endpoint, do: s3("WB_S3_ENDPOINT", "AWS_ENDPOINT_URL_S3")
+  defp region, do: s3("WB_S3_REGION", "AWS_REGION") || "auto"
+
+  @doc "True when an object-store replica is configured (bucket + access key present, either scheme)."
+  def enabled?, do: bucket() != nil and access_key_id() != nil
+
+  @doc "The access-key pair litestream reads from its env (LITESTREAM_*). Empty map when disabled."
+  def credential_env do
+    if enabled?(),
+      do: %{"LITESTREAM_ACCESS_KEY_ID" => access_key_id(), "LITESTREAM_SECRET_ACCESS_KEY" => secret_access_key()},
+      else: %{}
+  end
 
   @doc """
   The S3/R2 replica spec built from injected secrets, or `nil` when unconfigured. Object path is
@@ -43,10 +61,10 @@ defmodule Nexus.Litestream do
 
       %{
         type: "s3",
-        bucket: Secrets.get("WB_S3_BUCKET"),
+        bucket: bucket(),
         path: [prefix, "litestream", "nexus.db"] |> Path.join() |> String.trim_leading("/"),
-        endpoint: Secrets.get("WB_S3_ENDPOINT"),
-        region: Secrets.get("WB_S3_REGION", "auto")
+        endpoint: endpoint(),
+        region: region()
       }
     end
   end

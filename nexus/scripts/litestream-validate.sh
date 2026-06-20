@@ -13,20 +13,46 @@ N="${1:-5000}"
 command -v litestream >/dev/null || { echo "FAIL: litestream not installed"; exit 2; }
 command -v sqlite3 >/dev/null || { echo "FAIL: sqlite3 not installed"; exit 2; }
 
+# Accept our WB_S3_* names or the standard ones `fly storage create` (Tigris) sets.
+WB_S3_BUCKET="${WB_S3_BUCKET:-${BUCKET_NAME:-}}"
+WB_S3_ACCESS_KEY_ID="${WB_S3_ACCESS_KEY_ID:-${AWS_ACCESS_KEY_ID:-}}"
+WB_S3_SECRET_ACCESS_KEY="${WB_S3_SECRET_ACCESS_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
+WB_S3_ENDPOINT="${WB_S3_ENDPOINT:-${AWS_ENDPOINT_URL_S3:-}}"
+WB_S3_REGION="${WB_S3_REGION:-${AWS_REGION:-auto}}"
+
 TMP="$(mktemp -d)"
 DB="$TMP/nexus.db"
 REPLICA="$TMP/replica"
 CFG="$TMP/litestream.yml"
 trap '[ -n "${LS:-}" ] && kill "$LS" 2>/dev/null; rm -rf "$TMP"' EXIT
 
-# Config mirrors Nexus.Litestream.config_yaml/2 (file-replica form).
-cat > "$CFG" <<EOF
+# Config mirrors Nexus.Litestream.config_yaml/2. With WB_S3_* injected it validates against the REAL
+# object store (R2/Tigris/any S3) under a unique throwaway path; otherwise a local `file` replica.
+if [ -n "${WB_S3_BUCKET:-}" ] && [ -n "${WB_S3_ACCESS_KEY_ID:-}" ]; then
+  export LITESTREAM_ACCESS_KEY_ID="${WB_S3_ACCESS_KEY_ID}"
+  export LITESTREAM_SECRET_ACCESS_KEY="${WB_S3_SECRET_ACCESS_KEY}"
+  S3PATH="litestream-validate/$(date +%s)-$$/nexus.db"
+  cat > "$CFG" <<EOF
+dbs:
+  - path: $DB
+    replicas:
+      - type: s3
+        bucket: ${WB_S3_BUCKET}
+        path: ${S3PATH}
+        endpoint: ${WB_S3_ENDPOINT}
+        region: ${WB_S3_REGION:-auto}
+EOF
+  echo "→ replica mode: s3 → ${WB_S3_BUCKET}/${S3PATH} @ ${WB_S3_ENDPOINT}"
+else
+  cat > "$CFG" <<EOF
 dbs:
   - path: $DB
     replicas:
       - type: file
         path: $REPLICA
 EOF
+  echo "→ replica mode: file → $REPLICA"
+fi
 
 echo "→ seed DB (WAL) at $DB"
 sqlite3 "$DB" "PRAGMA journal_mode=WAL; CREATE TABLE t(id INTEGER PRIMARY KEY, v TEXT, ts TEXT);"
