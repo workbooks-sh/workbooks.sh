@@ -96,7 +96,16 @@ defmodule Nexus.Platform do
   # lives within the ceiling; crossing it is a paid scale-up. (Showcase backend —
   # the per-nexus reading is derived; the limits/thresholds/billing are real.)
   get "/usage" do
-    j(conn, 200, Nexus.Capacity.report(List.first(CP.list(org(conn), :nexus))))
+    # Real measurement of the serving nexus when the org has no separately-provisioned machine (the
+    # one-per-org case) — RAM/storage metered for real (Capacity reads /proc + the data dir), against
+    # the tier matching the actual machine size. Otherwise report the org's provisioned nexus.
+    nx =
+      case CP.list(org(conn), :nexus) do
+        [] -> %{id: self_nexus_id(), plan: self_tier_id(), state: "running", self: true}
+        [n | _] -> n
+      end
+
+    j(conn, 200, Nexus.Capacity.report(nx))
   end
 
   # The tier ladder (for the dashboard's scale-up UI) — limits + price + domains gate.
@@ -119,9 +128,24 @@ defmodule Nexus.Platform do
   end
 
   get "/storage" do
-    org = org(conn)
-    buckets = Enum.map(CP.list(org, :nexus), fn nx -> %{name: "#{nx.id}-storage", nexus: nx.id, objects: nil, size: "—", egress: "$0.00"} end)
-    j(conn, 200, %{totalBytes: 0, totalSize: "0 GB", buckets: buckets})
+    case CP.list(org(conn), :nexus) do
+      # No provisioned fleet → the serving nexus's REAL object store: one bucket per mounted surface,
+      # sizes from the on-disk footprint (the same primitive the server :cloud live source reports).
+      [] ->
+        buckets =
+          for {name, root} <- Application.get_env(:nexus, :mounts, []), name != "" do
+            bytes = dir_bytes(root)
+            %{name: name, nexus: self_nexus_id(), objects: count_files(root), size: human(bytes), egress: "$0.00", bytes: bytes}
+          end
+
+        total = Enum.reduce(buckets, 0, &(&1.bytes + &2))
+        j(conn, 200, %{totalBytes: total, totalSize: human(total),
+          buckets: buckets |> Enum.sort_by(& &1.bytes, :desc) |> Enum.map(&Map.delete(&1, :bytes))})
+
+      list ->
+        buckets = Enum.map(list, fn nx -> %{name: "#{nx.id}-storage", nexus: nx.id, objects: nil, size: "—", egress: "$0.00"} end)
+        j(conn, 200, %{totalBytes: 0, totalSize: "0 GB", buckets: buckets})
+    end
   end
 
   # ── CLI access tokens (minted for the org; the `work` CLI sends them as Bearer) ────────────────
@@ -225,7 +249,15 @@ defmodule Nexus.Platform do
 
   # ── workspaces (free, no compute — logical org divisions) ──────────────────────────────────────
   get "/workspaces" do
-    j(conn, 200, %{workspaces: Enum.map(CP.list(org(conn), :workspace), &ws_view/1)})
+    # The nexus's mounted surfaces ARE the org's workspaces — each deployed `.work` folder is a
+    # division of work. Surface them (named from the mount), then append any user-created workspaces.
+    surfaces =
+      for {name, _root} <- Application.get_env(:nexus, :mounts, []), name != "" do
+        %{id: name, name: titleize(name), icon: nil, nexus_id: self_nexus_id(), surface: true}
+      end
+
+    created = Enum.map(CP.list(org(conn), :workspace), &ws_view/1)
+    j(conn, 200, %{workspaces: surfaces ++ created})
   end
 
   post "/workspaces" do
@@ -387,6 +419,34 @@ defmodule Nexus.Platform do
   end
 
   defp self_nexus_id, do: (n = Application.get_env(:nexus, :nexus_name, "")) == "" && "nexus" || n
+
+  # The tier whose RAM ceiling matches the actual machine — the machine size IS the plan you're on
+  # (closest by RAM). No guessing a default: a 2 GB machine reads the 2 GB tier.
+  defp self_tier_id do
+    total = Nexus.Capacity.machine_total_mb()
+    (Enum.min_by(Nexus.Pricing.tiers(), fn t -> abs((t[:ram_mb] || 0) - total) end) || Nexus.Pricing.default_tier()).id
+  end
+
+  defp titleize(name) do
+    name |> to_string() |> String.split(~r/[-_\s]+/, trim: true)
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  # On-disk footprint of a mounted surface (bounded walk) — the same primitive the server :cloud
+  # live source uses; honest, derived from what's actually on the volume.
+  defp dir_bytes(root) do
+    Path.wildcard(Path.join(root, "**/*")) |> Enum.filter(&File.regular?/1)
+    |> Enum.reduce(0, fn f, acc -> acc + (File.stat!(f).size || 0) end)
+  rescue
+    _ -> 0
+  end
+
+  defp count_files(root), do: Path.wildcard(Path.join(root, "**/*")) |> Enum.count(&File.regular?/1)
+
+  defp human(b) when b >= 1_073_741_824, do: "#{Float.round(b / 1_073_741_824, 2)} GB"
+  defp human(b) when b >= 1_048_576, do: "#{Float.round(b / 1_048_576, 1)} MB"
+  defp human(b) when b >= 1024, do: "#{div(b, 1024)} KB"
+  defp human(b), do: "#{b} B"
 
   defp ws_view(ws), do: %{id: ws.id, name: ws[:name], icon: ws[:icon], nexus_id: ws[:nexus_id]}
 

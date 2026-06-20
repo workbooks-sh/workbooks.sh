@@ -72,6 +72,17 @@ defmodule Nexus.Capacity do
 
   defp remote_url(nx), do: nx[:url] || nx["url"]
 
+  @doc "Total RAM of the machine this nexus runs on, in MB (/proc/meminfo MemTotal; BEAM fallback)."
+  def machine_total_mb do
+    case File.read("/proc/meminfo") do
+      {:ok, c} -> case meminfo(c, "MemTotal") do
+        t when is_integer(t) -> div(t, 1024)
+        _ -> beam_mb()
+      end
+      _ -> beam_mb()
+    end
+  end
+
   # Real RAM pressure of the machine this nexus runs on: /proc/meminfo (Linux/Fly) → used = total −
   # available; falls back to the BEAM's own footprint where /proc is absent (dev/mac).
   defp local_ram_mb do
