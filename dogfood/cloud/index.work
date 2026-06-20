@@ -1017,157 +1017,6 @@ WB.scopedStyles('/usage', `
   .srow2 .mono { font-size:12px; }
 `);
 
-// ═══════════════════════ Create — agent chat (SolidJS + deep-chat) ════════════════════════════════
-// SolidJS shell (no-build) + the deep-chat web component for the agent conversation. Session history
-// is scoped to the user (within the org) via /cloud/agent/* — "New chat" + a rail of past sessions.
-WB.view('/create', { title: 'Create', accent: 'var(--mint)', async render(el){
-  var S = await import('https://esm.sh/solid-js@1.9.5');
-  var W = await import('https://esm.sh/solid-js@1.9.5/web');
-  var html = (await import('https://esm.sh/solid-js@1.9.5/html')).default;
-  var createSignal = S.createSignal, For = S.For, Show = S.Show, createEffect = S.createEffect;
-  // deep-chat ships a self-registering web-component bundle; the esm.sh entry does NOT define the
-  // element. Load the official bundle, wait for the definition (with a timeout), and never let a load
-  // failure abort the view — the shell + a fallback still render.
-  var dcOk = true;
-  try {
-    await import('https://cdn.jsdelivr.net/npm/deep-chat@9.0.114/dist/deepChat.bundle.js');
-    if (!customElements.get('deep-chat')) await Promise.race([ customElements.whenDefined('deep-chat'), new Promise(function(r){ setTimeout(r, 5000); }) ]);
-    if (!customElements.get('deep-chat')) dcOk = false;
-  } catch (e) { dcOk = false; try { console.error('deep-chat failed to load', e); } catch (_) {} }
-
-  var U = (WB.user && WB.user.email) || 'anon';
-  function api(path, opts){ return fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'content-type': 'application/json' } }, opts || {})).then(function(r){ return r.json(); }); }
-
-  function Create(){
-    var ss = createSignal([]); var sessions = ss[0], setSessions = ss[1];
-    var ci = createSignal(null); var curId = ci[0], setCurId = ci[1];
-    var mk = createSignal(0); var mountKey = mk[0]; var bump = function(){ mk[1](mountKey() + 1); };
-    var histArr = [];        // plain var: rebuild is driven by mountKey, not by history reactivity
-    var holder = null;
-
-    function loadSessions(){ api('/cloud/agent/sessions?u=' + encodeURIComponent(U)).then(function(d){ setSessions((d && d.sessions) || []); }); }
-    function newChat(){ setCurId(null); histArr = []; bump(); }
-    function openSession(id){ api('/cloud/agent/session?u=' + encodeURIComponent(U) + '&id=' + encodeURIComponent(id)).then(function(d){ if (d && d.messages){ setCurId(d.id); histArr = d.messages; bump(); } }); }
-    loadSessions();
-
-    // (re)mount deep-chat whenever the mount key bumps (explicit new/open) — NOT on the silent id
-    // assignment after the first message (which would wipe the in-progress conversation).
-    createEffect(function(){
-      mountKey();
-      if (!holder) return;
-      holder.innerHTML = '';
-      if (!dcOk) { holder.innerHTML = '<div class="chatfallback">Couldn’t load the chat component (offline?). The agent backend is reachable — reload to retry.</div>'; return; }
-      var dc = document.createElement('deep-chat');
-      dc.style.cssText = 'width:100%;height:100%;border:none;background:transparent;';
-      dc.history = histArr.map(function(m){ return { role: m.role === 'assistant' ? 'ai' : 'user', text: m.text }; });
-      dc.textInput = { placeholder: { text: 'Message the agent…' } };
-      dc.introMessage = { text: 'Ask the agent to build, deploy, or change something on this nexus.' };
-      dc.connect = { handler: function(body, signals){
-        var msgs = body.messages || []; var last = msgs[msgs.length - 1] || {}; var text = last.text || '';
-        api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({ u: U, id: curId(), message: text }) })
-          .then(function(d){ if (d && d.id){ if (!curId()) setCurId(d.id); loadSessions(); signals.onResponse({ text: d.reply }); } else signals.onResponse({ error: 'no reply' }); })
-          .catch(function(){ signals.onResponse({ error: 'the agent run failed' }); });
-      } };
-      holder.appendChild(dc);
-    });
-
-    return html`
-      <div class="createwrap">
-        <aside class="chatrail">
-          <button class="newchat" onClick=${newChat}>+ New chat</button>
-          <div class="chsessions">
-            <${For} each=${sessions}>${function(s){
-              return html`<button class=${function(){ return 'chsession' + (curId() === s.id ? ' on' : ''); }} onClick=${function(){ openSession(s.id); }} title=${s.title}>${s.title || 'Untitled'}</button>`;
-            }}<//>
-            <${Show} when=${function(){ return sessions().length === 0; }}><div class="chempty">No past chats yet.</div><//>
-          </div>
-        </aside>
-        <section class="chatmain" ref=${function(node){ holder = node; bump(); }}></section>
-      </div>`;
-  }
-  el.innerHTML = '';
-  W.render(Create, el);
-}});
-WB.scopedStyles('/create', `
-.createwrap { display: flex; gap: 14px; height: calc(100vh - 132px); min-height: 440px; }
-.chatrail { width: 224px; flex: none; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 10px; }
-.newchat { flex: none; border: 1px solid var(--stroke); background: var(--bg); color: var(--ink); border-radius: 9px; padding: 9px 12px; font: 600 13px var(--read); cursor: pointer; text-align: left; }
-.newchat:hover { border-color: var(--ink); }
-.chsessions { display: flex; flex-direction: column; gap: 2px; overflow: auto; margin-top: 2px; }
-.chsession { text-align: left; border: none; background: none; color: var(--dim); border-radius: 8px; padding: 8px 10px; font: 500 13px var(--read); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.chsession:hover { background: var(--line); color: var(--ink); }
-.chsession.on { background: var(--line); color: var(--ink); font-weight: 600; }
-.chempty { color: var(--dim); font: 500 12.5px var(--read); padding: 12px 10px; }
-.chatmain { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--card); overflow: hidden; display: flex; }
-.chatfallback { margin: auto; max-width: 360px; text-align: center; color: var(--dim); font: 500 13.5px var(--read); padding: 24px; }
-`);
-
-// ═══════════════════════ Apps — SolidJS beachhead (no-build: solid-js/html via ESM) ═══════════════
-// Validates SolidJS inside the vanilla WB shell: fine-grained reactivity, no build lane. The app
-// catalog is mocked for now; this is the seed of the "open your apps" surface (web-container view).
-WB.view('/apps', { title: 'Apps', accent: 'var(--sky)', async render(el){
-  var S = await import('https://esm.sh/solid-js@1.9.5');
-  var W = await import('https://esm.sh/solid-js@1.9.5/web');
-  var html = (await import('https://esm.sh/solid-js@1.9.5/html')).default;
-  var createSignal = S.createSignal, For = S.For, Show = S.Show;
-
-  var APPS = [
-    { name: 'Orders', blurb: 'Customer order pipeline + fulfillment', icon: '🧾', color: 'var(--sky)', tag: 'app', status: 'running' },
-    { name: 'Waitlist', blurb: 'Signup capture with live count', icon: '📋', color: 'var(--sage)', tag: 'app', status: 'running' },
-    { name: 'Docs', blurb: 'Your team documentation site', icon: '📚', color: 'var(--peach)', tag: 'site', status: 'running' },
-    { name: 'Analytics', blurb: 'Usage dashboards + funnels', icon: '📈', color: 'var(--violet)', tag: 'app', status: 'idle' },
-    { name: 'Inbox', blurb: 'Shared support inbox + triage', icon: '✉️', color: 'var(--mint)', tag: 'app', status: 'idle' },
-    { name: 'CRM', blurb: 'Contacts, deals, and notes', icon: '🤝', color: 'var(--cream)', tag: 'app', status: 'running' }
-  ];
-
-  function Apps(){
-    var sig = createSignal(''); var q = sig[0], setQ = sig[1];
-    var shown = function(){ var t = q().toLowerCase(); return APPS.filter(function(a){ return !t || a.name.toLowerCase().indexOf(t) >= 0 || a.blurb.toLowerCase().indexOf(t) >= 0; }); };
-    return html`
-      <div class="appswrap">
-        <div class="appshdr">
-          <div><h1 class="appstitle">Apps</h1><p class="appssub">Everything deployed on this nexus — open one in place.</p></div>
-          <button class="appsnew" onClick=${function(){ WB.nav('/create'); }}>+ New app</button>
-        </div>
-        <input class="appssearch" placeholder="Search apps…" value=${q()} onInput=${function(e){ setQ(e.target.value); }} />
-        <div class="appsgrid">
-          <${For} each=${shown}>${function(a){
-            return html`<button class="appcard" onClick=${function(){ WB.toast(a.name + ' — opening apps is coming (web-container view)'); }}>
-              <span class="appicon" style=${'background:' + a.color + '22;'}>${a.icon}</span>
-              <span class="appmeta"><span class="appname">${a.name}</span><span class="appblurb">${a.blurb}</span></span>
-              <span class=${'appdot ' + a.status} title=${a.status}></span>
-            </button>`;
-          }}<//>
-        </div>
-        <${Show} when=${function(){ return shown().length === 0; }}><div class="appsempty">No apps match “${q()}”.</div><//>
-      </div>`;
-  }
-  el.innerHTML = '';
-  W.render(Apps, el);
-}});
-WB.scopedStyles('/apps', `
-.appswrap { max-width: 980px; }
-.appshdr { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.appstitle { font: 700 26px var(--read); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
-.appssub { font: 500 13px var(--read); color: var(--dim); margin: 4px 0 0; }
-.appsnew { flex: none; border: 1px solid var(--stroke); background: var(--card); color: var(--ink); border-radius: 9px; padding: 8px 13px; font: 600 13px var(--read); cursor: pointer; }
-.appsnew:hover { border-color: var(--ink); }
-.appssearch { width: 100%; box-sizing: border-box; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 10px; padding: 10px 13px; font: 500 14px var(--read); margin-bottom: 16px; }
-.appssearch:focus { outline: none; border-color: var(--stroke); }
-.appsgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-.appcard { display: flex; align-items: center; gap: 12px; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; cursor: pointer; transition: border-color 0.12s, transform 0.08s; }
-.appcard:hover { border-color: var(--stroke); transform: translateY(-1px); }
-.appicon { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; font-size: 20px; flex: none; }
-.appmeta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.appname { font: 600 15px var(--read); color: var(--ink); }
-.appblurb { font: 500 12.5px var(--read); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.appdot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--dim); }
-.appdot.running { background: #34d399; }
-.appdot.idle { background: var(--dim); opacity: 0.5; }
-.appsempty { color: var(--dim); padding: 30px 4px; font: 500 14px var(--read); }
-`);
-
-
 WB.view('/usage', {
   title: 'Usage & billing',
   accent: 'var(--sage)',
@@ -3288,8 +3137,8 @@ WB.view('/workspace', {
     }
 
     const mount = (ws.id || '').replace(/^ws_/, '');
-    const KIND = { client: '#a8d4f0', server: '#aee5c2', resource: '#f3c5a3', data: '#d9c5f0', design: '#f2ddb0', agent: '#9fc4e8', sandbox: '#c8e0b0' };
-    const EDGE = { compose: '#5b6b8c', style: '#f3c5a3', data: '#aee5c2', import: '#a8d4f0', ref: '#d9c5f0', 'work-file': '#c2861f', native: '#37c873', wasm: '#b48cff' };
+    const KIND = { client: '#a8d4f0', server: '#aee5c2', resource: '#f3c5a3', data: '#d9c5f0', design: '#f2ddb0', agent: '#9fc4e8', sandbox: '#c8e0b0', dep: '#5b6b8c' };
+    const EDGE = { compose: '#5b6b8c', style: '#f3c5a3', calls: '#aee5c2', imports: '#a8d4f0', fetch: '#f3c5a3', data: '#aee5c2', import: '#a8d4f0', ref: '#d9c5f0', 'work-file': '#c2861f' };
 
     el.innerHTML = shell(`
   <div class="kinds"><div class="faint" style="font-size:13px">Reading structure…</div></div>
@@ -3337,7 +3186,7 @@ WB.view('/workspace', {
       .filter((e) => nodeIds.has(e.from) && nodeIds.has(e.to))
       .map((e, i) => ({ id: 'e' + i, source: e.from, target: e.to, data: { type: e.type } }));
 
-    const sz = (d) => 28 + Math.min((d.data && d.data.deps) || 0, 8) * 6;
+    const sz = (d) => (d.data && d.data.kind === 'dep') ? 16 : 28 + Math.min((d.data && d.data.deps) || 0, 8) * 6;
     host.querySelector('#cyloading')?.remove();
 
     const graph = new G6.Graph({

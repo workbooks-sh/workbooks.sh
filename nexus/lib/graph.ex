@@ -46,10 +46,75 @@ defmodule Nexus.Graph do
     end
   end
 
-  # ── nodes: one per named :code unit ──
+  # ── nodes: one per named :code unit, plus the external dependencies they wire to ──
   defp collect_nodes(parsed) do
-    for {path, nodes} <- parsed, n <- nodes, n.type == :code, n.name, into: %{} do
-      {n.name, node(n, path)}
+    units = for {path, nodes} <- parsed, n <- nodes, n.type == :code, n.name, into: %{}, do: {n.name, node(n, path)}
+    deps = collect_dep_nodes(parsed, units)
+    # units win if a dep shares a unit's name (it's the unit, not an external dep).
+    Map.merge(deps, units)
+  end
+
+  # External dependencies a unit wires to — read straight from the syntax: a JS island's `fetch()`
+  # endpoints + dynamic `import()` packages, an Elixir unit's meaningful module calls. Each becomes a
+  # lightweight `dep` node so the graph shows what every unit actually talks to (the connections the
+  # Foreign stopgap couldn't see). Returns `{node_map}` keyed by dep label.
+  defp collect_dep_nodes(parsed, units) do
+    for {_p, ns} <- parsed, n <- ns, n.type == :code, n.name, {label, kind} <- external_deps(n),
+        not Map.has_key?(units, label), into: %{} do
+      {label, %{id: label, kind: "dep", lang: kind, file: nil, exports: [], facets: %{source: %{}}}}
+    end
+  end
+
+  # Elixir stdlib + runtime-infra modules are plumbing, not dependencies worth drawing.
+  @stdlib ~w(Enum Map String System Base IO Kernel List Keyword Integer Float Process Task Agent
+             GenServer Regex Path File DateTime Date Time NaiveDateTime Stream MapSet Tuple Atom
+             Function Range Access Application Logger Jason Exqlite Sqlite3 Plug Conn URI URL Code
+             Module Macro Supervisor Registry ETS Ecto Phoenix Bitwise)
+
+  @doc false
+  def external_deps(n) do
+    facts = Extract.facts(n)
+
+    mods =
+      for {mod, _f, _a} <- facts.calls,
+          seg = mod |> Module.split() |> List.last(),
+          seg not in @stdlib,
+          do: {seg, "module"}
+
+    body = Map.get(n, :body) || ""
+    web? = Map.get(n, :kind) in ["client", "app"] or Map.get(n, :lang) in ["js", "ts", "svelte", "solid"]
+
+    web =
+      if web? do
+        endpoints = for [_, p] <- Regex.scan(~r/fetch\(\s*[`'"]([^`'"${)\s]+)/, body), e = dep_endpoint(p), e != nil, do: {e, "endpoint"}
+        pkgs = for [_, u] <- Regex.scan(~r/import\(\s*[`'"]([^`'"]+)/, body), p = dep_package(u), p != nil, do: {p, "package"}
+        endpoints ++ pkgs
+      else
+        []
+      end
+
+    Enum.uniq(mods ++ web)
+  end
+
+  # Normalise a fetch URL to a stable endpoint label: the first two path segments (`/api/platform`),
+  # dropping query/template tails. Too-short (`/`) or non-path fetches are ignored.
+  defp dep_endpoint(p) do
+    case String.split(p, "/", trim: true) do
+      [a, b | _] -> "/" <> a <> "/" <> b
+      [a] when byte_size(a) > 1 -> "/" <> a
+      _ -> nil
+    end
+  end
+
+  # An import specifier → the package name (`@scope/name` or `name`), from a bare name or a CDN URL.
+  defp dep_package(u) do
+    cond do
+      String.starts_with?(u, "work://") -> nil
+      true ->
+        case Regex.run(~r/(@[a-z0-9_.-]+\/[a-z0-9_.-]+|[a-z0-9_.-]+)(?:@[\d.]+)?(?:\/\+esm|\/[^"'`]*)?$/i, String.replace(u, ~r/^https?:\/\/[^\/]+\/(npm\/)?/, "")) do
+          [_, name | _] -> name
+          _ -> nil
+        end
     end
   end
 
@@ -122,9 +187,19 @@ defmodule Nexus.Graph do
   # ── edges: imports (AST calls to a unit) + refs (literate :atom mentions) + composition ──
   defp collect_edges(parsed, nodes) do
     code_edges = for {_path, ns} <- parsed, n <- ns, n.type == :code, n.name, e <- node_edges(n, nodes), do: e
-    base = Enum.uniq(code_edges ++ composition_edges(parsed))
+
+    dep_edges =
+      for {_p, ns} <- parsed, n <- ns, n.type == :code, n.name, {label, kind} <- external_deps(n), label != n.name,
+        do: %{from: n.name, to: label, type: dep_edge_type(kind), layer: :interface, scope: :dep, signature: nil}
+
+    base = Enum.uniq(code_edges ++ dep_edges ++ composition_edges(parsed))
     base ++ connect_isolated(base, parsed)
   end
+
+  defp dep_edge_type("module"), do: :calls
+  defp dep_edge_type("package"), do: :imports
+  defp dep_edge_type("endpoint"), do: :fetch
+  defp dep_edge_type(_), do: :dep
 
   # A page's units belong together — link any unit still orphaned (e.g. a server in its own file) to the
   # page's primary island so nothing floats disconnected. Honest fallback, not an all-pairs hairball.
