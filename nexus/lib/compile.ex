@@ -22,6 +22,7 @@ defmodule Nexus.Compile do
       kind == "server" -> {:beam, Nexus.Unit.compile(node)}
       kind == "agent" -> {:agent, Nexus.Agent.def_from_unit(node)}
       kind == "hook" -> {:hook, Nexus.Hook.compile(node)}
+      kind == "flow" -> {:flow, Nexus.Flow.compile(node)}
       kind == "check" -> {:check, Nexus.Checks.parse(node)}
       kind == "toolkit" -> {:toolkit, Nexus.Toolkit.build(node)}
       # The wasm lanes shell heavy wasmtime compiler processes (~450–900MB, ~7–20s, near-constant
@@ -382,6 +383,15 @@ defmodule Nexus.Compile do
         Nexus.Hook.compile(u)
       rescue
         e -> require Logger; Logger.warning("[compile] hook #{u.name} failed: #{Exception.message(e)}")
+      end
+    end
+
+    # Register declared flows (the composing half) so hooks/code can run them by name.
+    for u <- Map.get(by_kind, "flow", []) do
+      try do
+        Nexus.Flow.compile(u)
+      rescue
+        e -> require Logger; Logger.warning("[compile] flow #{u.name} failed: #{Exception.message(e)}")
       end
     end
 

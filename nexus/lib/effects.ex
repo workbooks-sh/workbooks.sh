@@ -60,8 +60,11 @@ defmodule Nexus.Effects do
 
     # `run` / `call` — invoke an agent or a unit function as a side effect (through the normal paths).
     # `args`: %{agent: "name", task: "..."} → Nexus.Agent.run; or %{mfa: {Mod, :fun, [args]}} → apply.
-    runner = fn args, event, _ctx ->
+    runner = fn args, event, ctx ->
       cond do
+        is_binary(args[:flow]) ->
+          Nexus.Flow.run(args[:flow], args[:input] || event[:title] || event[:kind] || "", ctx)
+
         is_binary(args[:agent]) ->
           task = args[:task] || event[:title] || event[:kind] || ""
           Nexus.Agent.run(task: task, unit: args[:agent])
