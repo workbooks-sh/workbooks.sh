@@ -263,8 +263,8 @@ defmodule Nexus.SSR do
 
     """
     <!doctype html>
-    <html lang="en"><head><meta charset="utf-8"><title>#{esc(title(pages))}</title>
-    <style>#{css()}</style></head>
+    <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#{esc(title(pages))}</title>
+    <style>#{css(app?)}</style></head>
     <body>
     #{nav(pages)}#{body}
     #{data_islands(res, ctx)}<script>#{js_shim(live)}</script>
@@ -532,9 +532,23 @@ defmodule Nexus.SSR do
     |> String.replace("\"", "&quot;")
   end
 
-  defp css do
+  # An app (client island) renders full-bleed — it owns its own layout via its `design` block. A
+  # document (prose) keeps the legible reading column. Either way the design block overrides this skin.
+  defp css(app? \\ false)
+  defp css(true) do
+    """
+    body{margin:0;font:16px/1.6 system-ui,sans-serif;color:#1a1a1a}
+    """ <> css_common()
+  end
+
+  defp css(false) do
     """
     body{max-width:46rem;margin:2rem auto;padding:0 1rem;font:16px/1.6 system-ui,sans-serif;color:#1a1a1a}
+    """ <> css_common()
+  end
+
+  defp css_common do
+    """
     h1,h2,h3{line-height:1.25;margin:1.6em 0 .5em} code{background:#f4f4f5;padding:.1em .3em;border-radius:3px;font-size:.9em}
     .unit{margin:1.2em 0;border:1px solid #e4e4e7;border-radius:8px;overflow:hidden}
     .unit figcaption{background:#fafafa;padding:.4em .8em;font-size:.85em;border-bottom:1px solid #e4e4e7}

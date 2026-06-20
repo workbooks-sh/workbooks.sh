@@ -44,7 +44,9 @@ design :lander do
     }
     * { box-sizing: border-box; margin: 0; }
     html, body { height: 100%; }
-    body { background: var(--paper); color: var(--ink); font-family: var(--mono); overflow-x: hidden; }
+    /* SSR's default page chrome is a 46rem reading column — a full-bleed lander overrides it. */
+    body { background: var(--paper); color: var(--ink); font-family: var(--mono); overflow-x: hidden;
+           max-width: none; margin: 0; padding: 0; }
   
     /* ── the house scrollbar — dotted track, solid 2px thumb, neutral ink.
        Standard across the whole site; the s3 terminal keeps its piece-accent
