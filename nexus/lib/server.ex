@@ -433,14 +433,18 @@ defmodule Nexus.Server do
   # Project the graph into a dashboard-friendly payload: the kind/lang breakdown (client vs server vs
   # resource vs data …), per-unit utilization (the telemetry overlay), and the dependency edges.
   defp graph_summary(%Nexus.Graph{nodes: nodes, edges: edges}) do
-    units = Map.values(nodes)
+    all = Map.values(nodes)
+    # `dep` nodes are external dependencies the units wire to (modules / packages / endpoints) — they
+    # render in the graph but aren't counted as workbook units in the headline / kind breakdown.
+    units = Enum.reject(all, &(&1.kind == "dep"))
 
     %{
       units: length(units),
       byKind: Enum.frequencies_by(units, & &1.kind),
       byLang: Enum.frequencies_by(units, & &1.lang),
+      deps: length(all) - length(units),
       nodes:
-        Enum.map(units, fn n ->
+        Enum.map(all, fn n ->
           %{
             id: n.id,
             kind: n.kind,

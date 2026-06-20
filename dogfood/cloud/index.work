@@ -3167,6 +3167,7 @@ WB.view('/workspace', {
     pills += Object.entries(summary.byKind || {})
       .map(([k, n]) => `<div class="kpill"><span class="dot" style="background:${KIND[k] || 'var(--dim)'}"></span><b>${n}</b> ${esc(k)}</div>`)
       .join('');
+    if (summary.deps) pills += `<div class="kpill"><span class="dot" style="background:#5b6b8c"></span><b>${summary.deps}</b> deps</div>`;
     el.querySelector('.kinds').innerHTML = pills;
 
     // load G6 v5
