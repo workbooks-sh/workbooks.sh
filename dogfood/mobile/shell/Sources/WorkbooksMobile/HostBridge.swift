@@ -43,7 +43,7 @@ final class HostBridge: NSObject, WKScriptMessageHandlerWithReply {
     func userContentController(
         _ controller: WKUserContentController,
         didReceive message: WKScriptMessage,
-        replyHandler: @escaping (Any?, String?) -> Void
+        replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void
     ) {
         guard let body = message.body as? [String: Any],
               let cap = body["cap"] as? String else {
