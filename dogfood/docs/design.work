@@ -45,9 +45,11 @@ design :brand do
   .wb-link:hover{background:var(--hover)}
   .wb-link.on{background:var(--hover);font-weight:600;box-shadow:inset 3px 0 0 var(--sec,#aee5c2)}
 
-  /* content — a centered reading column, not flush against the sidebar */
-  .wb-main{padding:56px 40px 140px}
-  .wb-main .prose{max-width:46rem;margin-inline:auto}
+  /* content — let main fill the space beside the sidebar, then center a readable
+     column inside it (the neutral skin caps .wb-main at 800px, which left it pinned
+     to the sidebar edge with empty space on the right). */
+  .wb-main{padding:56px 40px 140px;max-width:none}
+  .wb-main .prose{max-width:50rem;margin-inline:auto}
   .prose a{color:var(--pcd)}
   .prose code{background:rgba(127,127,127,.18);color:var(--ink)}
   .prose pre{background:var(--card)}
