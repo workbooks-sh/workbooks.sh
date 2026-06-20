@@ -6,3 +6,8 @@ import './tool.js';        // part: tool        (tool-call card)
 import './sources.js';     // part: sources     (citations list)
 import './media.js';       // parts: image, file
 import './code-hl.js';     // part: code        (syntax-highlight override)
+import './task.js';        // part: task        (checklist)
+import './followups.js';   // part: suggestions (follow-up chips)
+import './feedback.js';    // action: thumbs up/down (assistant)
+import './attachments.js'; // composer button: file picker
+import './model-selector.js'; // composer button: model dropdown

@@ -209,7 +209,7 @@ export function createChat(container, options = {}) {
   }
   // ctx handed to registered composer buttons (attachments, model selector, …)
   const composerCtx = {
-    el, icon, controller,
+    el, icon, get controller() { return controller; },
     addFile: (f) => { attachedFiles.push(f); renderTray(); },
     files: () => attachedFiles.slice(),
     models: opts.models || [],

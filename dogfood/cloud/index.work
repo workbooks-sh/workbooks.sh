@@ -1028,8 +1028,10 @@ WB.view('/create', { title: 'Create', accent: 'var(--mint)', async render(el){
   var createSignal = S.createSignal, For = S.For, Show = S.Show;
   // wbchat — our vanilla AI-chat library (the singular surface). Load core + theme once.
   var WBC = await import('./wbchat/core.js');
-  await import('./wbchat/components/index.js');  // registers the Tier-2 parts (reasoning/tool/sources/media/code)
+  await import('./wbchat/components/index.js');  // registers all parts + actions + composer add-ons
+  var DEMO = await import('./wbchat/demo.js');   // dev-only seed (?cdemo=1) exercising every part type
   (function(){ if (!document.getElementById('wbchat-theme')){ var l = document.createElement('link'); l.id = 'wbchat-theme'; l.rel = 'stylesheet'; l.href = './wbchat/theme.css'; document.head.appendChild(l); } })();
+  var CDEMO = new URLSearchParams(location.search).get('cdemo') === '1';
 
   var U = (WB.user && WB.user.email) || 'anon';
   function api(path, opts){ return fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'content-type': 'application/json' } }, opts || {})).then(function(r){ return r.json(); }); }
@@ -1049,11 +1051,13 @@ WB.view('/create', { title: 'Create', accent: 'var(--mint)', async render(el){
         placeholder: 'Message the agent…',
         greeting: { title: 'Build on your nexus', text: 'Ask the agent to build, deploy, or change something here.' },
         suggestions: ['Scaffold a new app', 'Show my workspaces', 'Deploy the docs site'],
-        send: function(text){
-          return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({ u: U, id: curId(), message: text }) })
+        models: ['auto', 'gpt-4o-mini', 'claude-sonnet-4'],
+        send: function(text, ctx){
+          return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({ u: U, id: curId(), message: text, model: ctx && ctx.model }) })
             .then(function(d){ if (d && d.id){ if (!curId()) setCurId(d.id); loadSessions(); return d.reply || ''; } return '(no reply)'; });
         }
       });
+      if (CDEMO && DEMO.demoMessages) chat.setMessages(DEMO.demoMessages());
     }
 
     return html`
