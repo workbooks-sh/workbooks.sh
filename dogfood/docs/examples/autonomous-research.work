@@ -1,106 +1,121 @@
 # Autonomous research
 
-Karpathy's *autoresearch* is a deceptively simple idea: give an agent a real (small) ML
-training setup and let it experiment overnight. It edits the training code, runs a
-fixed-budget experiment, checks whether the metric improved, keeps the change or reverts
-it, and repeats. You wake up to a log of experiments and, hopefully, a better model. The
-key move is that **you never touch the Python** — you write the *agent's instructions*
-and let it drive the code. You're programming the research org, not the model.
+Karpathy's *autoresearch* is a sharp idea: give an agent a real experiment, let it run
+overnight. It edits the code, runs a fixed-budget trial, checks whether the metric
+improved, keeps the change or reverts it, and repeats. You wake up to a log and, with
+luck, a better result. The move that makes it work: **you never touch the code — you
+write the agent's instructions and let it drive.** You program the research org, not the
+implementation.
 
-That's a precise fit for Workbooks: the experimenter is an [`agent`](/tooling/authoring-an-agent)
-(prose brain + `bash` over a `/work` sandbox), and "keep what improves, loop" is a tiny
-`server` around it. This lesson builds the whole loop.
+That's a precise fit for Workbooks. The experimenter is an [`agent`](/tooling/authoring-an-agent)
+— a [server-side](/language/placement-and-languages) brain whose `bash` runs and measures
+code inside a [`/work` sandbox](/capabilities/sandboxing-and-the-dock) — and "keep what
+improves, loop" is a tiny `server` around it. This lesson builds the whole loop and is
+honest about what the sandbox can and can't run.
 
 ## The experimenter
 
-The brain describes how to run *one* honest experiment — and nothing else. Its body is
-its system prompt:
+The brain describes how to run *one* honest experiment. Pick a task whose result the
+sandbox can actually measure — here, lowering the size of a compressor whose candidate is
+compiled and run in-sandbox (a real, attributable metric), in the spirit of autoresearch:
 
 ```
 agent :researcher do
-  You run ONE machine-learning experiment in /work. `train.py` is yours to edit — the
-  model, optimizer, hyperparameters, anything. `prepare.py` is fixed; do not change it.
-  The metric is val_bpb from a fixed-budget run — LOWER is better.
+  You run ONE optimization experiment in /work. `codec.c` is yours to edit. `bench.sh`
+  is fixed — it compiles codec.c and prints `score=<bytes>` for the test corpus. LOWER
+  is better.
 
   Procedure:
-    1. Form ONE clear hypothesis ("a wider MLP will lower val_bpb").
-    2. Make the smallest edit to train.py that tests it — change one thing only.
-    3. Run it with bash and read the real output. Do not estimate the result.
-    4. On the LAST line, report exactly: val_bpb=<number>
+    1. Form ONE hypothesis ("range-code the literals to shrink the output").
+    2. Make the smallest edit to codec.c that tests it — change one thing only.
+    3. Run `bash bench.sh` and READ the real output. Do not estimate the score.
+    4. On the LAST line, report exactly: score=<number>
 
-  Change one variable at a time so every delta is attributable. Be honest — report the
-  number you measured, never the number you hoped for.
+  Change one variable at a time so every delta is attributable. Report the number you
+  measured, never the number you hoped for. If a build breaks, fix it before scoring.
 end
 ```
 
-Notice what's *not* here: no training framework, no experiment tracker, no harness. The
-instructions are the experiment design — which is exactly the part a researcher should
-be iterating on.
+No experiment tracker, no harness — the instructions *are* the experiment design, which
+is exactly the part a researcher should iterate on. The compile-and-run happens through
+the agent's [kits](/tooling/toolkits) (a C→wasm command lane) inside the sandbox, so an
+unattended run can't escape `/work`.
 
 ## The loop
 
-Around the experimenter sits the org: run N experiments, and **keep an edit only when
-the metric actually improves** — otherwise discard it and carry the previous best code
-forward. `Nexus.Agent.run/1` returns the agent's final `answer` (where it reported the
-score) and `vfs_files` (the code it left behind), which is all the loop needs:
+Around the experimenter sits the org: run N trials, and **keep an edit only when the
+metric actually improves** — otherwise discard it and carry the previous best forward.
+This is an ordinary Elixir `reduce` (there's no separate "flow" primitive — composition
+and recursion *are* the control flow). `Nexus.Agent.run/1` returns the final `answer`
+(where the score was reported) and `vfs_files` (the code left behind), which is all the
+loop needs:
 
 ```
 server :lab do
   @researcher "…the :researcher instructions above, as a string…"
 
-  # Run `rounds` experiments; the best code + a log fall out the bottom.
-  def run(files, rounds \\ 50) do
-    init = %{files: files, best: 99.9, kept: 0, log: []}
+  # Run `rounds` trials; the best code + a log fall out the bottom.
+  def run(files, rounds \\ 100) do
+    init = %{files: files, best: 1.0e12, kept: 0, log: []}
 
     Enum.reduce(1..rounds, init, fn n, st ->
       {:ok, %{answer: a, vfs_files: edited}} =
         Nexus.Agent.run(
           system: @researcher,
-          task: "Experiment ##{n}. Current best val_bpb is #{st.best} — try to beat it.",
-          seed: st.files,
-          timeout_ms: 600_000
+          task: "Trial ##{n}. Current best score is #{st.best} — try to beat it.",
+          seed: st.files,                 # hand the current best code to this trial
+          timeout_ms: 300_000
         )
 
-      case parse_bpb(a) do
-        score when score < st.best ->
-          %{st | files: edited, best: score, kept: st.kept + 1,
-                 log: [%{n: n, kept: true, score: score} | st.log]}
+      case parse_score(a) do
+        s when s < st.best ->
+          %{st | files: edited, best: s, kept: st.kept + 1,
+                 log: [%{n: n, kept: true, score: s} | st.log]}
 
-        score ->
+        s ->
           # no improvement → revert: keep the previous best `files`, drop `edited`
-          %{st | log: [%{n: n, kept: false, score: score} | st.log]}
+          %{st | log: [%{n: n, kept: false, score: s} | st.log]}
       end
     end)
   end
 
-  defp parse_bpb(text) do
-    case Regex.run(~r/val_bpb=([\d.]+)/, text || "") do
+  defp parse_score(text) do
+    case Regex.run(~r/score=([\d.]+)/, text || "") do
       [_, v] -> String.to_float(v)
-      _ -> 99.9              # a run that didn't report a score never wins
+      _ -> 1.0e12                          # a trial that didn't report a score never wins
     end
   end
 end
 ```
 
 That's the entire research org. `seed: st.files` hands the current best code to each
-experiment; on success the loop adopts `edited`, on failure it simply doesn't — the
-revert is "don't update the accumulator." After `rounds` runs you have the best `files`,
-the best score, and a `log` of what was tried and what stuck.
+trial; on success the loop adopts `edited`, on failure it simply doesn't — the "revert"
+is just *not* updating the accumulator. After `rounds` runs you have the best `files`, the
+best score, and a `log` of what was tried and what stuck. Run it on a
+[schedule](/serving/routes-and-pages) and it researches while you sleep.
+
+## What runs where (be honest about the wall)
+
+The wasm sandbox runs what compiles to wasm — C/Rust/Zig benchmarks, data crunching,
+algorithms. It does **not** run a GPU training job; that's a host workload behind the
+*bedrock* [wall](/capabilities/the-three-walls). The pattern is identical either way —
+the difference is the experimenter reaches heavy compute through a host `exec`
+capability (a trusted broker) rather than running it in-guest. Pick the metric your
+substrate can actually measure, and the loop is the same.
 
 ## Tuning the org, not the code
 
-This is the payoff of programming the agent instead of the Python: to change the research
-*strategy*, you edit prose, not a framework. Want bolder hypotheses? Loosen the
-"smallest edit" rule. Want it to chase a specific axis? Say so in `:researcher`. Want a
-breadth-first sweep instead of a hill-climb? Run many experimenters from different seeds
-at once — the same fan-out as [agents at scale](/examples/agents-at-scale) — and keep the
-best across all of them.
+The payoff of programming the agent instead of the implementation: to change the research
+*strategy*, you edit prose. Want bolder hypotheses? Loosen the "smallest edit" rule. Want
+a specific axis chased? Say so in `:researcher`. Want breadth instead of a hill-climb?
+Run many experimenters from different seeds at once — the [agents-at-scale](/examples/agents-at-scale)
+fan-out — and keep the best across all of them.
 
 ## What to take away
 
-- **You program the agent, not the code.** The instructions *are* the experiment design —
+- **You program the agent, not the code** — the instructions are the experiment design,
   the same role as autoresearch's `program.md`.
-- **"Keep what improves" is the whole engine.** A `reduce` that adopts `vfs_files` on a
-  better score and reverts otherwise.
-- **The sandbox makes it safe to let it run unattended** — real edits, real runs, all
-  contained in `/work`. → [Sandboxing & the Dock](/capabilities/sandboxing-and-the-dock)
+- **"Keep what improves" is the whole engine** — a `reduce` that adopts `vfs_files` on a
+  better score and reverts otherwise. Loops are plain Elixir; there is no `flow` kind.
+- **Unattended is safe** — real edits and runs, contained in a `/work` sandbox; heavy
+  compute is brokered through a host capability, not run in-guest.

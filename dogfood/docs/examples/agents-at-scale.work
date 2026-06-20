@@ -1,19 +1,26 @@
 # Agents at scale
 
 A "swarm" is one move repeated: split a task into many pieces, run an agent on each piece
-*at the same time*, then synthesize the results. The intelligence is in the pieces; the
-hard engineering is usually the orchestration — a job queue, a worker pool, a result bus,
+*at the same time*, then synthesize. The intelligence is in the pieces; the hard
+engineering is usually the orchestration — a job queue, a worker pool, a result bus,
 backpressure, retries. On the [Nexus](/introduction/what-is-the-nexus) that machinery is
-the BEAM's day job, so the whole orchestration is a few lines in a `server` block, and
-"five agents" and "five hundred agents" are the same code.
+the BEAM's day job, so the whole thing is a few lines in a `server` block, and "five
+agents" and "five hundred agents" are the same code.
 
-This lesson builds a research swarm — the distilled core of our own Search Swarm — end
-to end: plan, fan out, ground each agent in real pages, synthesize, and account the cost.
+This lesson builds a research swarm — the distilled core of our own Search Swarm — and
+shows where it runs and what each agent is allowed to touch.
+
+## Where it runs
+
+This is a [`server`](/language/placement-and-languages) unit, so it runs on the nexus, on
+the BEAM. That placement is the whole reason it scales: the BEAM runs thousands of
+lightweight processes, so fanning out hundreds of concurrent agents needs no pool to size
+and no queue to configure — `Task.async` over a list *is* the scheduler.
 
 ## The shape
 
-Three steps: one LLM call decomposes the task into sub-questions, one agent runs per
-sub-question *concurrently*, and one call folds the findings into an answer.
+Three steps: one LLM call decomposes the task, one agent runs per sub-question
+*concurrently*, one call folds the findings into an answer.
 
 ```
 server :swarm do
@@ -27,13 +34,15 @@ server :swarm do
 end
 ```
 
-`Task.async` over a list and `Task.await_many` *is* the concurrency model — there is no
-queue to configure and no worker count to tune. The list's length is the swarm's size.
+The list's length is the swarm's size. There is no separate "flow" to declare — the
+pipeline and `Enum.map` are the control flow.
 
-## The worker: grounded, not guessed
+## The worker: grounded, and capability-scoped
 
-Each agent searches, pulls real pages with the built-in browser, and answers **only**
-from what it actually read — so the findings are grounded, not hallucinated:
+Each agent searches, pulls real pages, and answers **only** from what it read. Its powers
+are host **capabilities**, not raw access: `llm` (model completion) and `browse` (the
+runtime's headless browser) are brokered seams — the browser is SSRF-gated, so a worker
+can't be steered into the internal network, and every model call can be metered.
 
 ```
   defp plan(task) do
@@ -53,8 +62,10 @@ from what it actually read — so the findings are grounded, not hallucinated:
     pages =
       cites
       |> Enum.take(3)
-      |> Enum.map(fn c -> Nexus.Browse.read(c["url"]) end)
-      |> Enum.flat_map(fn {:ok, p} -> [p.text]; _ -> [] end)
+      |> Enum.flat_map(fn c -> case Nexus.Browse.read(c["url"]) do
+                                 {:ok, p} -> [p.text]
+                                 _ -> []
+                               end end)
 
     {:ok, %{content: finding}} =
       Nexus.Llm.complete([%{role: "user", content:
@@ -64,16 +75,14 @@ from what it actually read — so the findings are grounded, not hallucinated:
   end
 ```
 
-`Nexus.Llm.complete` (with `:online` for web search) and `Nexus.Browse.read` (the
-runtime's headless browser) are host primitives — the worker just calls them. The
-`annotations` are the real source URLs the model cited; the agent then reads those pages
-itself before writing a word.
+`Nexus.Llm.complete` (with `:online` for web search) and `Nexus.Browse.read` are the host
+primitives — the worker just calls them. The `annotations` are the real URLs the model
+cited; the agent then reads those pages itself before writing a word.
 
 ## Synthesize — and pay the real bill
 
-The last step merges the findings, and because every model call goes through one place,
-you can ask the provider for the **actual** cost and stream it out — what's shown is
-credits charged, not an estimate:
+Because every model call goes through one seam, you can ask the provider for the **actual**
+cost and surface it — credits charged, not an estimate:
 
 ```
   defp synthesize(findings, task) do
@@ -91,12 +100,12 @@ end
 ## Why it stays small
 
 - **No queue, no workers, no bus.** `Task.async` + the BEAM scheduler *is* the
-  infrastructure — the runtime runs thousands of lightweight processes.
-- **Real tools, brokered.** `Nexus.Llm.complete` and `Nexus.Browse.read` are host
-  primitives; SSRF-gated and cost-accounted. → [Sandboxing & the Dock](/capabilities/sandboxing-and-the-dock)
-- **One `server` unit** holds the whole orchestration. To stream it live to a browser as
-  it runs, register it as a [live source](/serving/routes-and-pages); to persist each run,
-  write a [`resource`](/data/resources-and-the-store).
+  infrastructure — server placement is what makes that free.
+- **Real tools, brokered and scoped.** `llm` and `browse` are host capabilities —
+  SSRF-gated, cost-accounted. → [Grants & capabilities](/capabilities/grants-and-capabilities)
+- **One `server` unit** holds the orchestration. Stream it live to a browser by
+  registering it as a [live source](/serving/routes-and-pages); persist each run with a
+  [`resource`](/data/resources-and-the-store).
 
 Swap the `worker` for whatever the job is — a [coding agent](/examples/coding-agent), an
 [experiment](/examples/autonomous-research) — and the same fan-out runs it at scale.
