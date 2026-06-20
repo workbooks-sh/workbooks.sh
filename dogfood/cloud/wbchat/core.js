@@ -122,7 +122,6 @@ export function createChat(container, options = {}) {
   root.append(convo, scrollBtn, composer);
   container.innerHTML = '';
   container.append(root);
-  mountComposerButtons();
   loadMarkdown().then(render);
 
   function emit(evt, payload) { (listeners[evt] || []).forEach(f => { try { f(payload); } catch (_) {} }); }
@@ -217,7 +216,7 @@ export function createChat(container, options = {}) {
     setModel: (m) => { selectedModel = m; },
     submit: (t) => submit(t),
   };
-  function mountComposerButtons() { composerButtons.forEach(fn => { try { const n = fn(composerCtx); if (n) composer._tools.append(n); } catch (_) {} }); }
+  function mountComposerButtons() { composerButtons.forEach(fn => { try { const n = fn(composerCtx); if (n) composer._tools.append(n); } catch (e) { try { console.error('[wbchat] composer button failed', e); } catch (_) {} } }); }
   function setBusy(b) { composer._send.disabled = b; }
 
   // ── flow ──
@@ -275,5 +274,6 @@ export function createChat(container, options = {}) {
     if (m.parts) return { id: m.id || ++_seq, role: m.role, parts: m.parts, meta: m.meta };
     return { id: m.id || ++_seq, role: m.role, parts: [{ type: 'text', text: m.text || '' }], meta: m.meta };
   }
+  mountComposerButtons(); // after composerCtx + controller exist (avoids TDZ)
   return controller;
 }
