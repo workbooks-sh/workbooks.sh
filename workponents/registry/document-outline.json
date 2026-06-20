@@ -1,0 +1,78 @@
+{
+  "$schema": "https://workbooks.sh/schema/registry-item.json",
+  "name": "document-outline",
+  "type": "registry:element",
+  "domain": "docs",
+  "className": "WbDocOutline",
+  "module": "src/elements/docs/wb-doc-outline.js",
+  "description": "Copy-in of <document-outline> and its transitive dependency set (core + tokens).",
+  "dependencies": {
+    "lit": "^3.2.0"
+  },
+  "peerDependencies": {},
+  "registryDependencies": [
+    "theme"
+  ],
+  "cssVars": [
+    "--work-border",
+    "--work-brand",
+    "--work-brand-soft",
+    "--work-dur",
+    "--work-ease",
+    "--work-fg",
+    "--work-fg-muted",
+    "--work-fg-subtle",
+    "--work-font",
+    "--work-font-mono",
+    "--work-radius-sm",
+    "--work-space-2",
+    "--work-space-3",
+    "--work-space-5",
+    "--work-space-px",
+    "--work-surface-soft",
+    "--work-text-sm"
+  ],
+  "tokens": [
+    "--work-border",
+    "--work-brand",
+    "--work-brand-soft",
+    "--work-dur",
+    "--work-ease",
+    "--work-fg",
+    "--work-fg-muted",
+    "--work-fg-subtle",
+    "--work-font",
+    "--work-font-mono",
+    "--work-radius-sm",
+    "--work-space-2",
+    "--work-space-3",
+    "--work-space-5",
+    "--work-space-px",
+    "--work-surface-soft",
+    "--work-text-sm"
+  ],
+  "attributes": [
+    "for"
+  ],
+  "events": [],
+  "files": [
+    {
+      "path": "src/elements/docs/wb-doc-outline.js",
+      "type": "registry:element",
+      "target": "workponents/elements/docs/wb-doc-outline.js",
+      "content": "// <document-outline> — a clickable heading tree for a document, auto-synced.\n//\n// Binds to a <document-view> by id (`for=\"my-doc\"`) or, with no `for`, to the nearest\n// preceding/containing <document-view>. It reads that doc's `.outline` and re-syncs on\n// the doc's `document-view:rendered` event — so editing the source (composition-as-\n// source) keeps the outline live with no manual wiring. Clicking a heading\n// scrolls it into view inside the doc's shadow root.\nimport { WbElement, html, css, define } from \"../../core/element.js\";\n\nexport class WbDocOutline extends WbElement {\n  static props = [\"for\"];\n\n  static styles = css`\n    :host { display: block; font-family: var(--work-font); }\n    nav { border-left: 2px solid var(--work-border); padding-left: var(--work-space-3); }\n    .label { font-family: var(--work-font-mono); font-size: 0.62rem; font-weight: 700;\n      letter-spacing: 0.18em; text-transform: uppercase; color: var(--work-fg-subtle);\n      margin: 0 0 var(--work-space-2); }\n    ol { list-style: none; margin: 0; padding: 0; }\n    li { margin: var(--work-space-px) 0; }\n    a { display: block; text-decoration: none; color: var(--work-fg-muted);\n      font-size: var(--work-text-sm); line-height: 1.5; padding: 3px var(--work-space-2);\n      border-radius: var(--work-radius-sm); cursor: pointer;\n      transition: color var(--work-dur) var(--work-ease), background var(--work-dur) var(--work-ease); }\n    a:hover { color: var(--work-fg); background: var(--work-surface-soft); }\n    a.active { color: var(--work-brand); background: var(--work-brand-soft); font-weight: 600; }\n    .l2 { padding-left: var(--work-space-3); }\n    .l3 { padding-left: var(--work-space-5); font-size: 0.95em; }\n    .l4, .l5, .l6 { padding-left: calc(var(--work-space-5) + var(--work-space-3)); font-size: 0.9em; }\n    .empty { color: var(--work-fg-subtle); font-size: var(--work-text-sm); }\n  `;\n\n  connectedCallback() {\n    super.connectedCallback();\n    this._bind();\n  }\n\n  disconnectedCallback() {\n    if (this._doc && this._onRender) this._doc.removeEventListener(\"document-view:rendered\", this._onRender);\n    super.disconnectedCallback();\n  }\n\n  _findDoc() {\n    const ref = this.attr(\"for\");\n    if (ref) {\n      const root = this.getRootNode();\n      return (root.getElementById && root.getElementById(ref)) || document.getElementById(ref);\n    }\n    // nearest document-view: a previous sibling, or anywhere in the document\n    let n = this.previousElementSibling;\n    while (n) { if (n.tagName === \"DOCUMENT-VIEW\") return n; n = n.previousElementSibling; }\n    return document.querySelector(\"document-view\");\n  }\n\n  _bind() {\n    const doc = this._findDoc();\n    if (!doc) { this._outline = []; this.requestUpdate(); return; }\n    this._doc = doc;\n    this._onRender = (e) => { this._outline = (e.detail && e.detail.outline) || doc.outline; this.requestUpdate(); };\n    doc.addEventListener(\"document-view:rendered\", this._onRender);\n    // doc may have already rendered before we bound — read it now if so\n    if (doc.outline && doc.outline.length) { this._outline = doc.outline; this.requestUpdate(); }\n    else if (doc._source == null) { /* will fire on load */ }\n    else { this._outline = doc.outline || []; this.requestUpdate(); }\n  }\n\n  _scrollTo(id) {\n    if (!this._doc) return;\n    const root = this._doc.shadowRoot || this._doc;\n    const target = root.getElementById ? root.getElementById(id) : root.querySelector(`#${CSS.escape(id)}`);\n    if (target) target.scrollIntoView({ behavior: \"smooth\", block: \"start\" });\n    this.shadowRoot.querySelectorAll(\"a\").forEach((a) => a.classList.toggle(\"active\", a.dataset.id === id));\n  }\n\n  render() {\n    const items = this._outline || [];\n    if (!items.length) return html`<nav><p class=\"label\">Outline</p><p class=\"empty\">No headings yet.</p></nav>`;\n    return html`<nav>\n      <p class=\"label\">Outline</p>\n      <ol>${items.map((h) => html`<li><a class=\"l${h.level}\" data-id=${h.id} href=\"#${h.id}\"\n        @click=${(e) => { e.preventDefault(); this._scrollTo(h.id); }}>${h.text}</a></li>`)}</ol>\n    </nav>`;\n  }\n}\n\ndefine(\"document-outline\", WbDocOutline);\n"
+    },
+    {
+      "path": "src/core/element.js",
+      "type": "registry:lib",
+      "target": "workponents/core/element.js",
+      "content": "// WbElement — the base for every <wb-*> element, re-based onto Lit.\n//\n// Lit is the FLOOR's engine now (the approved adoption pass): surgical template\n// updates instead of an innerHTML nuke, while every workponents convention is\n// preserved so the rest of the library migrates mechanically. Lit is loaded as a\n// bare specifier (\"lit\") — buildless via an import map in the demos, a peer dep\n// for SDK consumers (see README / demo/lit-foundation.html). No bundler, no\n// `bun install`.\n//\n// Conventions (unchanged — the whole library follows these):\n//   • Shadow DOM (open) for style isolation; --work-* tokens inherit through it.\n//   • `static styles` = the component CSS as a Lit `css``` CSSResult (was a\n//     string). Use ONLY var(--work-*). Variants targeted via :host([name=\"value\"]).\n//   • `render()` returns a Lit `html``` TemplateResult (was a string) — surgical\n//     updates, no innerHTML rewrite.\n//   • `static props` = reflected attributes that re-render on change (variants,\n//     state). They are mapped to Lit reactive properties automatically.\n//   • `static variants` defaults are reflected on connect (before first paint) so\n//     :host([name=\"value\"]) selectors always match.\n//   • Capability is reached through `this.host` (the Dock seam), never hardcoded.\n//   • Register with `define()` (idempotent — safe to load twice).\n//\n// `attr()` / `boolAttr()` helpers are preserved for elements that read attributes\n// directly in render(). Re-exports `html` + `css` so domain files import the whole\n// authoring surface from one place:\n//   import { WbElement, html, css, define } from \"../core/element.js\";\n\nimport { LitElement, html, css } from \"lit\";\nimport { getHost } from \"./host.js\";\n\nexport { html, css };\n\nexport class WbElement extends LitElement {\n  /** @type {import(\"lit\").CSSResult} component CSS — override with css``; use only var(--work-*) */\n  static styles = css``;\n\n  /** @type {string[]} reflected attributes that trigger a re-render */\n  static props = [];\n\n  // Register each subclass's `static props` as Lit reactive properties so an\n  // attribute change fires attributeChangedCallback + re-renders (the old\n  // observedAttributes contract). NOTE: a base-class `static get properties()` is\n  // NOT honored — Lit's finalize() only reads each class's OWN `properties`. So we\n  // hook finalize() and createProperty() per subclass instead. Reflect ONLY the\n  // short variant enums (so el.variant = \"soft\" still matches :host([variant]));\n  // never reflect data attributes like `rows`/`csv`/`query` (can be huge strings).\n  static finalize() {\n    super.finalize();\n    const variants = this.variants || {};\n    for (const name of this.props || []) {\n      const key = this._propKey(name);\n      // Skip names that already exist on the prototype as a method/getter (e.g. a\n      // `variant(name)` helper, an `open()` method). Creating a reactive accessor\n      // there THROWS in Lit dev mode (\"declared as a reactive property but it's\n      // actually declared as a value on the prototype\"). The attribute is still\n      // OBSERVED via observedAttributes below, so attribute changes still fire\n      // attributeChangedCallback → the element's reload/requestUpdate runs.\n      if (key in this.prototype) continue;\n      this.createProperty(key, {\n        type: String,\n        attribute: name,\n        reflect: Object.prototype.hasOwnProperty.call(variants, name),\n      });\n    }\n  }\n\n  // Guarantee every `static props` attribute is OBSERVED (the browser reads this\n  // at customElements.define() time). This is the bulletproof half: even if Lit's\n  // reactive-property finalize timing misses one, attribute changes still fire\n  // attributeChangedCallback → the element's reload/requestUpdate handler runs.\n  static get observedAttributes() {\n    const base = super.observedAttributes || [];\n    return Array.from(new Set([...base, ...(this.props || [])]));\n  }\n\n  // Attribute names may contain dashes; reactive-property keys must be identifiers.\n  static _propKey(name) {\n    return name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());\n  }\n\n  /** The Dock/Host capability seam — local | runtime (RCP) | kernel. */\n  get host() {\n    return getHost();\n  }\n\n  /** Read an attribute with a default. */\n  attr(name, fallback = null) {\n    return this.hasAttribute(name) ? this.getAttribute(name) : fallback;\n  }\n\n  /** Read a boolean attribute (present = true). */\n  boolAttr(name) {\n    return this.hasAttribute(name);\n  }\n\n  /** Override: return the template (Lit `html```). */\n  render() {\n    return html`<slot></slot>`;\n  }\n\n  connectedCallback() {\n    // Reflect default variants BEFORE Lit's first render so :host([name=\"value\"])\n    // selectors match the very first paint, even when the author sets only some\n    // (e.g. tone without variant).\n    const v = this.constructor.variants;\n    if (v) {\n      for (const [name, def] of Object.entries(v)) {\n        if (!this.hasAttribute(name)) this.setAttribute(name, def.default);\n      }\n    }\n    super.connectedCallback();\n  }\n}\n\n/** Idempotent custom-element registration (safe across double-loads). */\nexport function define(name, ctor) {\n  if (!customElements.get(name)) customElements.define(name, ctor);\n  return ctor;\n}\n"
+    },
+    {
+      "path": "src/core/host.js",
+      "type": "registry:lib",
+      "target": "workponents/core/host.js",
+      "content": "// The Host/Dock seam — one capability surface for every element.\n//\n// A workponent never hardcodes where a capability runs. It asks the Host, which\n// resolves `local` (in-WASM / browser-native), `runtime` (a Workbooks runtime\n// over RCP) per the platform-model — so the SAME element\n// (e.g. <wb-table>) runs in-WASM locally or on the runtime tier for huge data,\n// no code fork. Capability elements declare what they need; the Host provisions\n// it (the same grant model toolkits use) and reports availability so the element\n// degrades cleanly when a capability is absent (e.g. voice without a key).\n//\n// Phase 0: a minimal, portable seam (no Tauri/Svelte). When a runtime URL is\n// configured it routes over fetch/WebSocket (mirroring desktop/src/lib/rcp);\n// otherwise it serves local capabilities and reports the rest unavailable.\n\nlet _host = null;\n\nexport class WbHost {\n  /** @param {{ runtimeUrl?: string|null, tenant?: string }} [opts] */\n  constructor(opts = {}) {\n    this.runtimeUrl = opts.runtimeUrl || null;\n    this.tenant = opts.tenant || \"local\";\n    this._caps = new Set([\"local\"]); // in-WASM/browser caps are always present\n  }\n\n  /** Is a capability reachable here? (elements gate UI on this) */\n  available(cap) {\n    return this._caps.has(cap) || (this.runtimeUrl != null && cap !== \"voice\");\n  }\n\n  /** Unary capability call — routed to the runtime when present. */\n  async request(path, { method = \"POST\", body } = {}) {\n    if (!this.runtimeUrl) throw new Error(`wb-host: no runtime for ${path}`);\n    const res = await fetch(this.runtimeUrl.replace(/\\/$/, \"\") + path, {\n      method,\n      headers: { \"content-type\": \"application/json\", \"x-tenant\": this.tenant },\n      body: body != null ? JSON.stringify(body) : undefined,\n    });\n    if (!res.ok) throw new Error(`wb-host ${res.status} ${path}`);\n    return res.json();\n  }\n\n  /** Streaming capability — a WebSocket to the runtime. */\n  socket(path, { onMessage } = {}) {\n    if (!this.runtimeUrl) throw new Error(`wb-host: no runtime for ${path}`);\n    const url = this.runtimeUrl.replace(/^http/, \"ws\").replace(/\\/$/, \"\") + path;\n    const ws = new WebSocket(url);\n    if (onMessage) ws.addEventListener(\"message\", (e) => onMessage(e.data));\n    return ws;\n  }\n}\n\n/** Configure the shared Host (call once at app/workbook boot). */\nexport function configureHost(opts) {\n  _host = new WbHost(opts);\n  return _host;\n}\n\n/** The shared Host singleton (a local-only Host by default). */\nexport function getHost() {\n  if (!_host) {\n    // Honor a global hint (a workbook/desktop can set window.__WB_RUNTIME_URL__).\n    const url = typeof window !== \"undefined\" ? window.__WB_RUNTIME_URL__ : null;\n    _host = new WbHost({ runtimeUrl: url || null });\n  }\n  return _host;\n}\n"
+    }
+  ]
+}

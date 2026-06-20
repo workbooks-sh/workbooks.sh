@@ -1,0 +1,41 @@
+{
+  "element": "chart-metric",
+  "domain": "data-viz",
+  "gates": {
+    "tokens": true,
+    "scope": true,
+    "wasm": true,
+    "functional": true,
+    "visual": false
+  },
+  "pass": false,
+  "leaks": [
+    {
+      "gate": "visual",
+      "rule": "drift",
+      "name": "chart-metric-light-v0.png",
+      "status": "drift",
+      "diffRatio": 0.0918
+    },
+    {
+      "gate": "visual",
+      "rule": "drift",
+      "name": "chart-metric-dark-v0.png",
+      "status": "drift",
+      "diffRatio": 0.0934
+    },
+    {
+      "gate": "visual",
+      "rule": "drift",
+      "name": "chart-metric-signal-v0.png",
+      "status": "drift",
+      "diffRatio": 0.0893
+    }
+  ],
+  "notes": [
+    "tokens: paints (L=13 D=13), flip=true",
+    "pure-floor — static scan only",
+    "parity: no powered engine (floor is sole impl)",
+    "visual: 3 shots"
+  ]
+}

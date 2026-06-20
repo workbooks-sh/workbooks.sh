@@ -104,3 +104,10 @@ docs/
 
 # Runtime DETS state must never be tracked (token hashes, org records, waitlist emails)
 **/*.dets
+
+# model weights / large artifacts — never commit
+constellation/spike/dflash/granite-*/
+/tools/
+constellation/spike/dflash/*/
+*.gguf
+*.safetensors

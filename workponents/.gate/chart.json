@@ -1,0 +1,22 @@
+{
+  "element": "chart",
+  "domain": "data-viz",
+  "gates": {
+    "tokens": true,
+    "scope": false,
+    "wasm": true,
+    "functional": false,
+    "visual": false
+  },
+  "pass": false,
+  "leaks": [
+    {
+      "gate": "load",
+      "rule": "register",
+      "message": "element chart failed to register (module src/elements/data-viz/wb-chart.js) — runtime gates skipped"
+    }
+  ],
+  "notes": [
+    "element did not register — runtime gates (scope/flip/visual) skipped; static gates still applied; see summary.barrelLoadErrors"
+  ]
+}

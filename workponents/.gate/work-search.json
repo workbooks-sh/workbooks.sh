@@ -1,0 +1,19 @@
+{
+  "element": "work-search",
+  "domain": "search",
+  "gates": {
+    "tokens": true,
+    "scope": true,
+    "wasm": true,
+    "functional": true,
+    "visual": true
+  },
+  "pass": true,
+  "leaks": [],
+  "notes": [
+    "tokens: paints (L=64 D=64), flip=true",
+    "powered seam — floor-with-engine-blocked verified",
+    "parity: engine vs floor compared",
+    "visual: 3 shots"
+  ]
+}

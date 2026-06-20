@@ -1,9 +1,9 @@
 # What is the work CLI
 
 `work` is the one Workbooks command line — **author, build, run, deploy.** It
-operates on a [workbook](/introduction/what-is-a-workbook) folder: it reads the
-`.work` tree, folds it into something shippable, and stands up a
-[Nexus](/introduction/what-is-the-nexus) to run it. The same `work` binary runs
+operates on a folder of `.work` source: it reads the tree, **weaves** it into a
+[workbook](/introduction/what-is-a-workbook) — one shippable artifact — and stands up
+a [Nexus](/introduction/what-is-the-nexus) to run it. The same `work` binary runs
 natively on your machine *and* inside the wasm agent sandbox, so an agent has the
 exact tools you do.
 

@@ -1,0 +1,19 @@
+{
+  "element": "board-milestone",
+  "domain": "pm",
+  "gates": {
+    "tokens": true,
+    "scope": true,
+    "wasm": true,
+    "functional": true,
+    "visual": true
+  },
+  "pass": true,
+  "leaks": [],
+  "notes": [
+    "tokens: paints (L=30 D=30), flip=true",
+    "pure-floor — static scan only",
+    "parity: no powered engine (floor is sole impl)",
+    "visual: 3 shots"
+  ]
+}

@@ -127,9 +127,11 @@ def self_learn(name, source_file, base="8b", train_base=None, steps=300):
     src = open(source_file).read()
     port = ensure_server(base)
     print(f"[self-learn] {base} studying {source_file} + generating curriculum…", flush=True)
-    prompt = (f"Read this document carefully:\n\n{src}\n\nNow write 10 question-and-answer pairs that test "
-              "the key facts — one or two per fact, covering EVERY fact, quoting exact values (numbers, "
-              "names, command strings) verbatim. Format each EXACTLY as:\nQ: <question>\nA: <answer>\n\nBegin:\n")
+    prompt = (f"Read this document carefully:\n\n{src}\n\nNow write 12 question-and-answer pairs that test "
+              "the key facts — covering EVERY fact. Each ANSWER must be COMPLETE: include every qualifying "
+              "detail from the source (full name, shape, color, exact number WITH its unit, the full command "
+              "string) quoted verbatim — never split a fact's details across pairs. "
+              "Format each EXACTLY as:\nQ: <question>\nA: <answer>\n\nBegin:\n")
     raw = _complete(port, prompt, n=1100, temp=0.3); lines = raw.splitlines(); pairs = []
     for i, ln in enumerate(lines):
         if ln.strip().startswith("Q:") and i+1 < len(lines) and lines[i+1].strip().startswith("A:"):
@@ -139,6 +141,10 @@ def self_learn(name, source_file, base="8b", train_base=None, steps=300):
     for q, a in pairs: print(f"    Q: {q} | A: {a}", flush=True)
     if len(pairs) < 3: sys.exit("[self-learn] too few pairs parsed")
     d = write_data(name, pairs)
+    # free the teacher server's RAM before training the (possibly large) student base, so both fit 16GB
+    if train_base != base:
+        subprocess.run(["pkill", "-f", f"--port {PORTS[base]}"]); time.sleep(2)
+        print(f"[self-learn] freed teacher ({base}); training {train_base}…", flush=True)
     return train(name, d, base=train_base, steps=steps)
 
 def kit_list():

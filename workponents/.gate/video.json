@@ -1,0 +1,22 @@
+{
+  "element": "video",
+  "domain": "video",
+  "gates": {
+    "tokens": true,
+    "scope": false,
+    "wasm": true,
+    "functional": false,
+    "visual": false
+  },
+  "pass": false,
+  "leaks": [
+    {
+      "gate": "load",
+      "rule": "register",
+      "message": "element video failed to register (module src/elements/video/wb-video.js) — runtime gates skipped"
+    }
+  ],
+  "notes": [
+    "element did not register — runtime gates (scope/flip/visual) skipped; static gates still applied; see summary.barrelLoadErrors"
+  ]
+}

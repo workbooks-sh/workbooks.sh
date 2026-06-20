@@ -1,45 +1,25 @@
-# Build CONTEXT for nexus/Dockerfile is the repo root, but only nexus/ is COPYd into the image.
-# Exclude everything else + nexus's heavy SCRATCH so the context stays small and the daemon doesn't
-# ship gigabytes it never uses. The in-sandbox compilers come from the standalone compilers LAYER
-# (COPY --from=compilers), NOT the context — so nexus/compilers* is excluded here too.
-
-# --- repo dirs the nexus image doesn't need ---
+# Build context excludes for the dogfood deploy (copy to repo-root .dockerignore when building).
+# Without these the context is 3GB+ AND a stale local-arch wasmex.so gets baked → boot crash.
 .git
-.beads
-desktop
-web
-reactor      # the Zig CLI/reactor; its wasm is staged into nexus/priv before build, not COPYd from here
-docs
-ether
-scratch
-tools
-toolkits
-workponents
-skills
-ci
+.claude
 constellation
-**/node_modules
-**/erl_crash.dump
-
-# --- nexus/: rebuilt fresh in the image, so local copies / scratch are dead weight ---
+web
+desktop
+reactor
+ether
 nexus/_build
 nexus/deps
-nexus/.elixir_ls
-nexus/tmp
-
-# --- the ~7.2G provisioned compile-tool SCRATCH + the lean dist (both come via the compilers LAYER) ---
 nexus/compilers
 nexus/compilers-dist
-
-# --- runtime-generated WASM scratch (content-addressed; regenerated on demand). Keep the wasi adapter
-#     (build/tools) + named prebuilt externals; drop the build cache/commands scratch. ---
-nexus/build/build
-nexus/build/cache
-nexus/build/jsdom
-
-# cargo/rust build artifacts (wrong arch in-image; rebuilt) — esp. vendor/wasmex/native/*/target (~1.1G)
+nexus/wasm-video
+nexus/build
+nexus/kits
+nexus/erl_crash.dump
+nexus/.elixir_ls
+nexus/vendor/wasmex/priv/native
 **/target
-
-# stale prebuilt rustler NIF (host-arch .so) — force deps.compile to build the linux NIF
-**/priv/native/*.so
-nexus/build/components
+**/node_modules
+**/*.dets
+**/*.so
+**/*.dylib
+**/.DS_Store

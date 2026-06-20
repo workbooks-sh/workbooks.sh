@@ -1,0 +1,21 @@
+{
+  "when": "2026-06-17T14:17:22.910Z",
+  "elements": 2,
+  "passed": 2,
+  "failed": 0,
+  "totalLeaks": 0,
+  "pageErrors": [],
+  "barrelLoadErrors": [],
+  "results": [
+    {
+      "element": "work-flow",
+      "pass": true,
+      "leaks": 0
+    },
+    {
+      "element": "work-src",
+      "pass": true,
+      "leaks": 0
+    }
+  ]
+}

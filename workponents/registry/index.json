@@ -1,0 +1,1044 @@
+{
+  "$schema": "https://workbooks.sh/schema/registry-index.json",
+  "name": "@work.books/workponents",
+  "version": "0.0.0",
+  "homepage": "https://workbooks.sh",
+  "description": "shadcn-style copy-in registry of themed <work-*> custom elements. Copy a component + its deps + the theme into your project.",
+  "style": {
+    "name": "theme",
+    "type": "registry:style"
+  },
+  "libs": [
+    "data",
+    "validate"
+  ],
+  "totals": {
+    "components": 52,
+    "domains": 20
+  },
+  "domains": [
+    {
+      "domain": "3d",
+      "tagline": "",
+      "components": [
+        {
+          "name": "model-source",
+          "attributes": [
+            "src",
+            "code",
+            "manifold-src",
+            "type"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "model-view",
+          "attributes": [
+            "variant",
+            "size",
+            "tone",
+            "src",
+            "poster",
+            "alt",
+            "ar",
+            "auto-rotate",
+            "camera-controls",
+            "name",
+            "viewer-src"
+          ],
+          "events": [
+            "work-model-load",
+            "work-model-error"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "ai",
+      "tagline": "Conversational surfaces — thread, message, generative block, composer.",
+      "components": [
+        {
+          "name": "chat-composer",
+          "attributes": [
+            "state",
+            "placeholder",
+            "disabled"
+          ],
+          "events": [
+            "work-intent"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "chat-gen-block",
+          "attributes": [
+            "type",
+            "tone",
+            "title",
+            "label",
+            "href",
+            "action",
+            "target",
+            "done"
+          ],
+          "events": [
+            "work-intent"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "chat-message",
+          "attributes": [
+            "role",
+            "text",
+            "name"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "chat-thread",
+          "attributes": [
+            "title",
+            "max-width"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "auth",
+      "tagline": "Identity & access — sign-in, the current user, capability gates.",
+      "components": [
+        {
+          "name": "auth-gate",
+          "attributes": [
+            "when"
+          ],
+          "events": [
+            "work-gate-change"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "auth-panel",
+          "attributes": [
+            "mode",
+            "state",
+            "providers",
+            "heading"
+          ],
+          "events": [
+            "work-auth-intent",
+            "work-auth-changed",
+            "work-auth-error"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "auth-user",
+          "attributes": [
+            "variant",
+            "open"
+          ],
+          "events": [
+            "work-auth-changed"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "code",
+      "tagline": "Code surfaces — a themed editor and a sandboxed REPL.",
+      "components": [
+        {
+          "name": "code-editor",
+          "attributes": [
+            "variant",
+            "language",
+            "readonly",
+            "gutter",
+            "placeholder",
+            "engine"
+          ],
+          "events": [
+            "work-code-change"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "code-repl",
+          "attributes": [
+            "variant",
+            "language",
+            "gutter"
+          ],
+          "events": [
+            "work-run"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "core",
+      "tagline": "The base element + variant contract + the reference work-button.",
+      "components": [
+        {
+          "name": "work-button",
+          "attributes": [
+            "variant",
+            "size",
+            "tone",
+            "disabled"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "data",
+      "tagline": "",
+      "components": [
+        {
+          "name": "data-query",
+          "attributes": [
+            "name",
+            "db",
+            "sql",
+            "provider",
+            "debug"
+          ],
+          "events": [
+            "work-query-ready",
+            "work-query-error"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "data-viz",
+      "tagline": "A chart is a live view over a query — chart, spark, metric.",
+      "components": [
+        {
+          "name": "chart-metric",
+          "attributes": [
+            "size",
+            "variant",
+            "query",
+            "src-name",
+            "rows",
+            "csv",
+            "value-col",
+            "delta-col",
+            "label",
+            "format",
+            "trend",
+            "trend-y"
+          ],
+          "events": [
+            "work-metric-ready"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        },
+        {
+          "name": "chart-spark",
+          "attributes": [
+            "type",
+            "tone",
+            "src-name",
+            "query",
+            "rows",
+            "csv",
+            "y",
+            "width",
+            "height"
+          ],
+          "events": [
+            "work-spark-ready"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        },
+        {
+          "name": "chart-view",
+          "attributes": [
+            "type",
+            "size",
+            "variant",
+            "src-name",
+            "from",
+            "query",
+            "rows",
+            "csv",
+            "x",
+            "y",
+            "series",
+            "label",
+            "legend",
+            "format",
+            "title",
+            "engine"
+          ],
+          "events": [
+            "work-chart-ready",
+            "work-chart-query",
+            "work-chart-engine",
+            "work-point-select"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "docs",
+      "tagline": "Prose & document structure — doc, doc-cell, outline.",
+      "components": [
+        {
+          "name": "document-cell",
+          "attributes": [
+            "display",
+            "variant",
+            "lang",
+            "src",
+            "title",
+            "state"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "document-import",
+          "attributes": [
+            "for",
+            "label"
+          ],
+          "events": [
+            "document-import"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "document-outline",
+          "attributes": [
+            "for"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "document-view",
+          "attributes": [
+            "src",
+            "format"
+          ],
+          "events": [
+            "work-doc-export"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "files",
+      "tagline": "File surfaces — a drive, a file card, a dropzone.",
+      "components": [
+        {
+          "name": "file-card",
+          "attributes": [
+            "variant",
+            "density",
+            "name",
+            "type",
+            "src",
+            "text",
+            "path",
+            "hash",
+            "size",
+            "modified"
+          ],
+          "events": [
+            "work-file-open"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "file-drive",
+          "attributes": [
+            "view",
+            "variant",
+            "src-name",
+            "query",
+            "name-field",
+            "path-field",
+            "type-field",
+            "size-field",
+            "modified-field",
+            "hash-field",
+            "sort",
+            "dir",
+            "searchable",
+            "selected"
+          ],
+          "events": [
+            "work-drive-ready",
+            "work-file-select"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        },
+        {
+          "name": "file-dropzone",
+          "attributes": [
+            "variant",
+            "accept",
+            "multiple"
+          ],
+          "events": [
+            "work-file-add"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "flow",
+      "tagline": "Agentic structure — flow (sequenced steps + build edges) and loop (cron jobs).",
+      "components": [
+        {
+          "name": "work-flow",
+          "attributes": [
+            "title",
+            "in",
+            "out",
+            "deps"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "work-loop",
+          "attributes": [
+            "title",
+            "cron",
+            "status"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "forms",
+      "tagline": "Schema-driven forms — form, field, field-group (over src/validate).",
+      "components": [
+        {
+          "name": "form-field",
+          "attributes": [
+            "variant",
+            "size",
+            "name",
+            "type",
+            "label",
+            "help",
+            "placeholder",
+            "value",
+            "required",
+            "min",
+            "max",
+            "pattern",
+            "options",
+            "disabled",
+            "error"
+          ],
+          "events": [
+            "work-field-"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "form-field-group",
+          "attributes": [
+            "label",
+            "help"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "form-view",
+          "attributes": [
+            "schema",
+            "submit-label",
+            "novalidate",
+            "live"
+          ],
+          "events": [
+            "work-change",
+            "work-submit",
+            "work-invalid"
+          ],
+          "registryDependencies": [
+            "theme",
+            "validate"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "git",
+      "tagline": "Version surfaces — diff, history graph, restore, undo.",
+      "components": [
+        {
+          "name": "git-diff",
+          "attributes": [
+            "mode",
+            "diff",
+            "a",
+            "b"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "git-history-graph",
+          "attributes": [
+            "items",
+            "selected"
+          ],
+          "events": [
+            "selected"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "git-restore",
+          "attributes": [
+            "scope",
+            "to",
+            "label",
+            "disabled",
+            "busy"
+          ],
+          "events": [
+            "restore",
+            "restore-error"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "git-undo",
+          "attributes": [
+            "scope",
+            "label",
+            "disabled",
+            "busy"
+          ],
+          "events": [
+            "undo",
+            "undo-error"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "live",
+      "tagline": "Realtime presence — room, presence, live value.",
+      "components": [
+        {
+          "name": "live-presence",
+          "attributes": [
+            "variant",
+            "topic",
+            "max",
+            "self"
+          ],
+          "events": [
+            "work-presence-change"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "live-room",
+          "attributes": [
+            "topic",
+            "name",
+            "color",
+            "state"
+          ],
+          "events": [
+            "work-room-ready",
+            "work-room-state"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "live-value",
+          "attributes": [
+            "variant",
+            "topic",
+            "name",
+            "label",
+            "value"
+          ],
+          "events": [
+            "work-value-change"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "maps",
+      "tagline": "Geospatial — a map as a view over a spatial query.",
+      "components": [
+        {
+          "name": "map-view",
+          "attributes": [
+            "mode",
+            "variant",
+            "projection",
+            "rows",
+            "csv",
+            "src-name",
+            "query",
+            "lat",
+            "lon",
+            "value",
+            "label",
+            "key",
+            "geo-key",
+            "geojson",
+            "tiles",
+            "engine"
+          ],
+          "events": [
+            "work-map-ready",
+            "work-map-query",
+            "work-map-engine",
+            "work-feature-select"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "pm",
+      "tagline": "Project management — task, board, sprint, milestone.",
+      "components": [
+        {
+          "name": "board-milestone",
+          "attributes": [
+            "title",
+            "due",
+            "done"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "board-sprint",
+          "attributes": [
+            "title",
+            "start",
+            "end"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "board-task",
+          "attributes": [
+            "status",
+            "title",
+            "assignee",
+            "due",
+            "estimate",
+            "priority"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "board-view",
+          "attributes": [
+            "title",
+            "columns"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "presentation",
+      "tagline": "Slide decks — deck and slide.",
+      "components": [
+        {
+          "name": "deck-slide",
+          "attributes": [
+            "band",
+            "transition",
+            "align",
+            "active",
+            "prev",
+            "next",
+            "hold"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "deck-view",
+          "attributes": [
+            "variant",
+            "index",
+            "aspect",
+            "controls",
+            "loop",
+            "hold",
+            "transition",
+            "resolution"
+          ],
+          "events": [
+            "work-slide-change",
+            "work-export-start",
+            "work-export",
+            "work-deck-export",
+            "work-export-error",
+            "work-deck-import"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "records",
+      "tagline": "Structured records — record, record-list, field-value.",
+      "components": [
+        {
+          "name": "record-field-value",
+          "attributes": [
+            "display",
+            "value",
+            "type",
+            "format",
+            "empty"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "record-list",
+          "attributes": [
+            "layout",
+            "variant",
+            "src-name",
+            "from",
+            "query",
+            "key",
+            "title-field",
+            "subtitle-field",
+            "fields",
+            "formats",
+            "searchable",
+            "selected"
+          ],
+          "events": [
+            "work-record-list-ready",
+            "work-record-select"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        },
+        {
+          "name": "record-view",
+          "attributes": [
+            "layout",
+            "variant",
+            "src-name",
+            "query",
+            "where",
+            "key",
+            "value",
+            "id",
+            "fields",
+            "formats",
+            "editable",
+            "table",
+            "title-field"
+          ],
+          "events": [
+            "work-record-ready",
+            "work-record-save"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "search",
+      "tagline": "Search & command — search box, command palette, command item.",
+      "components": [
+        {
+          "name": "search-box",
+          "attributes": [
+            "variant",
+            "size",
+            "rows",
+            "csv",
+            "src-name",
+            "query",
+            "fields",
+            "placeholder",
+            "limit",
+            "open-on-focus",
+            "engine",
+            "value"
+          ],
+          "events": [
+            "work-search-query",
+            "work-search-input",
+            "work-search-select"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        },
+        {
+          "name": "search-command",
+          "attributes": [
+            "variant",
+            "src-name",
+            "query",
+            "fields",
+            "data-label",
+            "data-limit",
+            "placeholder",
+            "open",
+            "engine"
+          ],
+          "events": [
+            "work-command-open",
+            "work-command-close",
+            "work-command-query",
+            "work-command-select",
+            "select"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        },
+        {
+          "name": "search-command-item",
+          "attributes": [
+            "variant",
+            "src-name",
+            "query",
+            "fields",
+            "data-label",
+            "data-limit",
+            "placeholder",
+            "open",
+            "engine"
+          ],
+          "events": [
+            "work-command-open",
+            "work-command-close",
+            "work-command-query",
+            "work-command-select",
+            "select"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "tables",
+      "tagline": "Tabular data over the shared engine — table and column.",
+      "components": [
+        {
+          "name": "grid-column",
+          "attributes": [],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "grid-table",
+          "attributes": [
+            "variant",
+            "density",
+            "rows",
+            "csv",
+            "src-name",
+            "from",
+            "query",
+            "page-size",
+            "searchable"
+          ],
+          "events": [
+            "work-table-ready",
+            "work-table-query",
+            "work-row-click"
+          ],
+          "registryDependencies": [
+            "theme",
+            "data"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "video",
+      "tagline": "Video surfaces — video and video-source.",
+      "components": [
+        {
+          "name": "video-player",
+          "attributes": [
+            "variant",
+            "size",
+            "tone",
+            "fit",
+            "src",
+            "composition",
+            "poster",
+            "controls",
+            "autoplay",
+            "loop",
+            "runtime-src"
+          ],
+          "events": [
+            "work-play",
+            "work-pause",
+            "work-export-start",
+            "work-export",
+            "work-export-error",
+            "work-ended"
+          ],
+          "registryDependencies": [
+            "theme"
+          ]
+        },
+        {
+          "name": "video-source",
+          "attributes": [
+            "src",
+            "composition",
+            "type"
+          ],
+          "events": [],
+          "registryDependencies": [
+            "theme"
+          ]
+        }
+      ]
+    }
+  ]
+}

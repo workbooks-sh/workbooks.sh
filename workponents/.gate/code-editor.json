@@ -1,0 +1,19 @@
+{
+  "element": "code-editor",
+  "domain": "code",
+  "gates": {
+    "tokens": true,
+    "scope": true,
+    "wasm": true,
+    "functional": true,
+    "visual": true
+  },
+  "pass": true,
+  "leaks": [],
+  "notes": [
+    "tokens: paints (L=29 D=29), flip=true",
+    "pure-floor — static scan only",
+    "parity: no powered engine (floor is sole impl)",
+    "visual: 3 shots"
+  ]
+}

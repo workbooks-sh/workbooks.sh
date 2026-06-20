@@ -1,61 +1,99 @@
 # What is a .work file
 
-A `.work` file is a **literate document**: plain prose with runnable blocks mixed
-in. It is not a new programming language you have to learn. It's a way to write
-[literate programming](/preface/literate-programming) source that compiles the
-languages you already use.
+A `.work` file is a **literate document**: plain prose with runnable blocks mixed in.
+The prose explains; the blocks run. It is not a new programming language — it's a way
+to write [literate](/preface/literate-programming) source in the languages you already
+use, with the explanation living right next to the code.
 
-## Prose narrates, blocks run
+## Prose narrates, work blocks run
 
-Open any `.work` file and you'll see two things. Paragraphs — ordinary text that
-explains what's going on. And blocks — each one opens with a header and ends with
-`end`:
+Open any `.work` file and you'll see two things. **Prose** — ordinary paragraphs that
+explain what's going on, aimed at the reader. And **work blocks** — the runnable
+pieces. A work block opens with a header and ends with `end`:
 
 server greet :hello do
   def run(name), do: "hello, #{name}"
 end
 
-The prose is for the reader. The block runs. That's the whole format.
+That's the whole format: prose for the reader, work blocks for the machine. Every
+work block header reads the same way — **`<kind> [lang] :name … do … end`** — where
+the first word, the **kind**, says what the block is and *where it runs*. Three kinds
+carry most of the work, and each does something distinct.
 
-## The first word names the kind
+## server — runs on the Nexus
 
-Every block header reads the same way: **`<kind> [lang] :name … do … end`**.
+A `server` block runs on the [Nexus](/introduction/what-is-the-nexus), on the BEAM.
+It's your backend: logic, data access, anything that needs to happen on the engine.
+Here it's Elixir:
 
-- The **kind** comes first — it says what this block *is* and where it runs
-  (`server`, `client`, `sandbox`, `data`, `def`, `agent`, `resource`, and more).
-- The **language** is optional and names what the body is written in.
-- The **`:name`** is how other blocks and your prose refer to it.
+server orders :place do
+  def run(order), do: Store.insert(:orders, order)
+end
 
-So `sandbox python :scrape do … end` is a block named `scrape`, running Python,
-placed in a capability sandbox. The body inside is real Python.
+This is where persistence and trusted work live — the server holds the powers a
+browser shouldn't.
 
-## Any language we support
+## client — runs in the browser
 
-A block's body can be written in any of these — and the `work` toolchain compiles
-it:
+A `client` block is a browser island. Its body is the interface; it ships as
+WebAssembly and runs in the page. This is the part people see and touch. Here it's a
+Svelte component:
 
-`elixir` · `rust` · `zig` · `c` · `cpp` · `python` · `go` · `js` · `ts` ·
-`svelte` · `solid`
+client svelte :counter do
+  <script> let n = 0 </script>
+  <button on:click={() => n++}>clicked {n}</button>
+end
 
-This is the lesson that surprises people: you can write a Svelte component in a
-`.work` file. The literate document is the authoring surface; the languages inside
-are whatever fits the job.
+Same file, different home: the `server` above runs on the engine, this `client` runs
+in the browser — and they sit side by side in one document.
+
+## sandbox — runs in a capability box
+
+A `sandbox` block runs untrusted or risky code in a [capability-scoped box](/capabilities/sandboxing-and-the-dock):
+compiled to WebAssembly and given only the powers you grant it. Perfect for a scraper
+or a snippet an agent wrote. Here it's Python:
+
+sandbox python :scrape do
+  // needs: net
+  import urllib.request
+  def run(url):
+      return fetch(url)        # the host brokers the call
+end
+
+The `sandbox` can compute and do exactly what it was [granted](/capabilities/grants-and-capabilities)
+— nothing more. Three kinds, three places code can run, all written the same way.
+
+## Any code can be a work block
+
+Those three are the placements you'll reach for most, but the bigger point is that a
+work block's body can be written in **any language the toolchain supports**, and the
+`work` toolchain compiles it:
+
+`elixir` · `rust` · `zig` · `c` · `cpp` · `python` · `go` · `js` · `ts` · `svelte` ·
+`solid`
+
+A Rust function, a Zig routine, a Go service — drop it in a work block and it
+compiles. The literate document is the authoring surface; the code inside is whatever
+fits the job. You can make almost any code a work block.
 
 ## It's a real tree, not text matching
 
-One quiet but important detail: a `.work` file isn't parsed by guessing with
-regexes. The `do … end` block is the delimiter, and a block parses into a real
-syntax tree — kind, language, name, and body all come from the structure, not a
-pattern match. The same single parse is shared by everything that reads a workbook:
-the viewer that highlights it, the tool that maps dependencies between blocks, and
-the check that audits capabilities. One source of truth, read the same way every
-time.
+One quiet but important detail: a `.work` file isn't parsed by guessing with regexes.
+The `do … end` block is the delimiter, and each work block parses into a real syntax
+tree — kind, language, name, and body all read off the structure. That single parse is
+shared by everything that touches the source: the viewer that highlights it, the tool
+that maps dependencies, and the check that audits capabilities. One source of truth,
+read the same way every time. (More on the header in [Block grammar](/language/block-grammar).)
 
-## Links that hold a workbook together
+## index.work — it all compiles together
 
-Inside prose you can reference other things directly: `[[backlinks]]` to other
-blocks or pages, `:atoms` and `@types` you mention inline, `#tags`, and `work://`
-links across the workbook. These aren't decoration — they're how the document
-knits itself into a graph the tools can follow.
+A workbook is rarely one file. You write several `.work` files, and one of them —
+`index.work` — is the **composition root** that names the project and lists its pieces
+in order. The [weave](/introduction/what-is-a-workbook) reads from the index and folds
+the whole tree — every page, every work block, across every file — into one compiled
+[workbook](/introduction/what-is-a-workbook): the single artifact a Nexus runs or a
+browser opens.
 
-Next: see all four lanes laid out in [Anatomy of a .work file](/language/anatomy).
+So the arc is: write prose and work blocks in `.work` files, compose them in an
+`index.work`, and weave it all together into one workbook. Next, see the four lanes up
+close in [Anatomy of a .work file](/language/anatomy).

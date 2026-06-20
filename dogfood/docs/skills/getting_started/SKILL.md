@@ -21,8 +21,8 @@ Load a reference below only when you need that depth.
 
 ### The model
 
-- [What is a workbook](references/what-is-a-workbook.work) — A **workbook is a folder of `.work` files** (plus any assets they use).
-- [What is a .work file](references/what-is-a-work-file.work) — A `.work` file is a **literate document**: plain prose with runnable blocks mixed
+- [What is a workbook](references/what-is-a-workbook.work) — A **workbook is the woven artifact** — the single, self-contained thing you ship and
+- [What is a .work file](references/what-is-a-work-file.work) — A `.work` file is a **literate document**: plain prose with runnable blocks mixed in.
 
 ### The work CLI
 

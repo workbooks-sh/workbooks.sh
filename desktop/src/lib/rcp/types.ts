@@ -70,4 +70,7 @@ export interface RcpRequestOptions {
   bodyText?: string;
   contentType?: string;
   timeoutMs?: number;
+  /** Caller-owned cancellation. Aborting it aborts the in-flight fetch.
+   *  Composes with `timeoutMs` — whichever fires first wins. */
+  signal?: AbortSignal;
 }

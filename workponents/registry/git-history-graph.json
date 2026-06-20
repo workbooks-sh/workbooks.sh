@@ -1,0 +1,105 @@
+{
+  "$schema": "https://workbooks.sh/schema/registry-item.json",
+  "name": "git-history-graph",
+  "type": "registry:element",
+  "domain": "git",
+  "className": "WorkHistoryGraph",
+  "module": "src/elements/git/wb-history-graph.js",
+  "description": "Copy-in of <git-history-graph> and its transitive dependency set (core + tokens).",
+  "dependencies": {
+    "lit": "^3.2.0"
+  },
+  "peerDependencies": {},
+  "registryDependencies": [
+    "theme"
+  ],
+  "cssVars": [
+    "--work-border",
+    "--work-border-strong",
+    "--work-brand",
+    "--work-brand-ink",
+    "--work-brand-soft",
+    "--work-dur",
+    "--work-ease",
+    "--work-fg",
+    "--work-fg-muted",
+    "--work-fg-subtle",
+    "--work-font",
+    "--work-font-mono",
+    "--work-radius",
+    "--work-radius-pill",
+    "--work-radius-sm",
+    "--work-ring",
+    "--work-shadow-sm",
+    "--work-space-1",
+    "--work-space-2",
+    "--work-space-3",
+    "--work-space-4",
+    "--work-space-5",
+    "--work-space-5px",
+    "--work-space-px",
+    "--work-surface",
+    "--work-surface-soft",
+    "--work-text",
+    "--work-text-sm",
+    "--work-text-xs"
+  ],
+  "tokens": [
+    "--work-border",
+    "--work-border-strong",
+    "--work-brand",
+    "--work-brand-ink",
+    "--work-brand-soft",
+    "--work-dur",
+    "--work-ease",
+    "--work-fg",
+    "--work-fg-muted",
+    "--work-fg-subtle",
+    "--work-font",
+    "--work-font-mono",
+    "--work-radius",
+    "--work-radius-pill",
+    "--work-radius-sm",
+    "--work-ring",
+    "--work-shadow-sm",
+    "--work-space-1",
+    "--work-space-2",
+    "--work-space-3",
+    "--work-space-4",
+    "--work-space-5",
+    "--work-space-5px",
+    "--work-space-px",
+    "--work-surface",
+    "--work-surface-soft",
+    "--work-text",
+    "--work-text-sm",
+    "--work-text-xs"
+  ],
+  "attributes": [
+    "items",
+    "selected"
+  ],
+  "events": [
+    "selected"
+  ],
+  "files": [
+    {
+      "path": "src/elements/git/wb-history-graph.js",
+      "type": "registry:element",
+      "target": "workponents/elements/git/wb-history-graph.js",
+      "content": "// <git-history-graph> — the user-facing History timeline.\n//\n// The reinvention: version control's log without git's vocabulary. Nodes are\n// VERSIONS (never \"commits\"), each with an author/agent badge and a title; the\n// rail draws a Sapling-smartlog-legible spine with branch lanes. Selecting a\n// version emits a `selected` CustomEvent {detail:{id, version}} — the host wires\n// that to <git-diff>/<git-restore>. Data via `items` (JSON array) attr or property.\n//\n// Each version mirrors the History backend Change shape (history.ex):\n//   { id, when, author_type: \"human\"|\"agent\", author_name, title, parents? }\nimport { WbElement, html, css, define } from \"../../core/element.js\";\n\nfunction fmtWhen(w) {\n  if (w == null) return \"\";\n  const d = typeof w === \"number\" ? new Date(w < 1e12 ? w * 1000 : w) : new Date(w);\n  if (isNaN(d)) return String(w);\n  const diff = (Date.now() - d.getTime()) / 1000;\n  if (diff < 60) return \"just now\";\n  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;\n  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;\n  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;\n  return d.toLocaleDateString(undefined, { month: \"short\", day: \"numeric\" });\n}\n\nexport class WorkHistoryGraph extends WbElement {\n  static props = [\"items\", \"selected\"];\n\n  static styles = css`\n    :host { display: block; font-family: var(--work-font); font-size: var(--work-text); color: var(--work-fg); }\n    .frame { border: 1px solid var(--work-border); border-radius: var(--work-radius); background: var(--work-surface); box-shadow: var(--work-shadow-sm); overflow: hidden; }\n    .head { padding: var(--work-space-2) var(--work-space-3); border-bottom: 1px solid var(--work-border); background: var(--work-surface-soft); font: 700 10px var(--work-font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--work-fg-subtle); }\n    ul { list-style: none; margin: 0; padding: var(--work-space-2) 0; }\n    li { position: relative; display: grid; grid-template-columns: 36px 1fr; align-items: start; cursor: pointer; }\n    li:focus-visible { outline: none; }\n    li:focus-visible .body { box-shadow: 0 0 0 2px var(--work-ring); }\n\n    /* the rail: a vertical spine with a node per version */\n    .rail { position: relative; display: flex; justify-content: center; }\n    .rail::before { content: \"\"; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: var(--work-border-strong); }\n    li:first-child .rail::before { top: 14px; }\n    li:last-child  .rail::before { bottom: calc(100% - 14px); }\n    .node { position: relative; margin-top: 7px; width: 13px; height: 13px; border-radius: var(--work-radius-pill); background: var(--work-surface); border: 2.5px solid var(--work-border-strong); z-index: 1; transition: border-color var(--work-dur) var(--work-ease), background var(--work-dur) var(--work-ease), transform var(--work-dur) var(--work-ease); }\n    li[data-author=\"agent\"] .node { border-color: var(--work-brand); }\n    li.sel .node { background: var(--work-brand); border-color: var(--work-brand); transform: scale(1.18); box-shadow: 0 0 0 4px var(--work-brand-soft); }\n\n    .body { margin: 3px var(--work-space-3) 3px var(--work-space-1); padding: var(--work-space-2) var(--work-space-3); border-radius: var(--work-radius-sm); transition: background var(--work-dur) var(--work-ease); }\n    li:hover .body { background: var(--work-surface-soft); }\n    li.sel .body { background: var(--work-brand-soft); }\n    .title { font-weight: 600; line-height: 1.3; }\n    .meta { display: flex; align-items: center; gap: var(--work-space-2); margin-top: 3px; font-size: var(--work-text-sm); color: var(--work-fg-muted); }\n    .when { font-variant-numeric: tabular-nums; }\n    .id { font-family: var(--work-font-mono); font-size: var(--work-text-xs); color: var(--work-fg-subtle); }\n\n    .badge { display: inline-flex; align-items: center; gap: var(--work-space-5px); padding: var(--work-space-px) var(--work-space-2); border-radius: var(--work-radius-pill); font-size: var(--work-text-xs); font-weight: 600; }\n    .badge .dot { width: 6px; height: 6px; border-radius: var(--work-radius-pill); }\n    .badge.human { background: var(--work-surface-soft); color: var(--work-fg-muted); }\n    .badge.human .dot { background: var(--work-fg-subtle); }\n    .badge.agent { background: var(--work-brand-soft); color: var(--work-brand-ink, var(--work-brand)); }\n    .badge.agent .dot { background: var(--work-brand); }\n\n    .empty { padding: var(--work-space-5) var(--work-space-4); text-align: center; color: var(--work-fg-subtle); font-size: var(--work-text-sm); }\n  `;\n\n  // items can be a JSON attribute or an assigned property.\n  set items(v) { this._items = Array.isArray(v) ? v : null; this.requestUpdate(); }\n  get items() {\n    if (this._items) return this._items;\n    const raw = this.attr(\"items\");\n    if (!raw) return [];\n    try { return JSON.parse(raw); } catch { return []; }\n  }\n\n  _select(id) {\n    this.setAttribute(\"selected\", id);\n    const version = this.items.find((v) => String(v.id) === String(id));\n    this.dispatchEvent(new CustomEvent(\"selected\", { bubbles: true, composed: true, detail: { id, version } }));\n  }\n\n  _onKeydown(e, id) {\n    if (e.key === \"Enter\" || e.key === \" \") { e.preventDefault(); this._select(id); }\n  }\n\n  render() {\n    const items = this.items;\n    const sel = this.attr(\"selected\");\n    if (!items.length) return html`<div class=\"frame\"><div class=\"head\">history</div><div class=\"empty\">No versions yet.</div></div>`;\n    return html`<div class=\"frame\"><div class=\"head\">history</div><ul part=\"list\">${items.map((v) => {\n      const at = v.author_type === \"agent\" ? \"agent\" : \"human\";\n      const isSel = sel != null && String(v.id) === String(sel);\n      const id = v.id;\n      return html`\n        <li tabindex=\"0\" role=\"button\" data-id=${id} data-author=${at} class=${isSel ? \"sel\" : \"\"} aria-pressed=${String(isSel)}\n            @click=${() => this._select(id)} @keydown=${(e) => this._onKeydown(e, id)}>\n          <div class=\"rail\"><span class=\"node\"></span></div>\n          <div class=\"body\">\n            <div class=\"title\">${v.title || \"(untitled version)\"}</div>\n            <div class=\"meta\">\n              <span class=\"badge ${at}\"><span class=\"dot\"></span>${v.author_name || at}</span>\n              <span class=\"when\">${fmtWhen(v.when)}</span>\n              <span class=\"id\">${String(v.id).slice(0, 8)}</span>\n            </div>\n          </div>\n        </li>`;\n    })}</ul></div>`;\n  }\n}\n\ndefine(\"git-history-graph\", WorkHistoryGraph);\n"
+    },
+    {
+      "path": "src/core/element.js",
+      "type": "registry:lib",
+      "target": "workponents/core/element.js",
+      "content": "// WbElement — the base for every <wb-*> element, re-based onto Lit.\n//\n// Lit is the FLOOR's engine now (the approved adoption pass): surgical template\n// updates instead of an innerHTML nuke, while every workponents convention is\n// preserved so the rest of the library migrates mechanically. Lit is loaded as a\n// bare specifier (\"lit\") — buildless via an import map in the demos, a peer dep\n// for SDK consumers (see README / demo/lit-foundation.html). No bundler, no\n// `bun install`.\n//\n// Conventions (unchanged — the whole library follows these):\n//   • Shadow DOM (open) for style isolation; --work-* tokens inherit through it.\n//   • `static styles` = the component CSS as a Lit `css``` CSSResult (was a\n//     string). Use ONLY var(--work-*). Variants targeted via :host([name=\"value\"]).\n//   • `render()` returns a Lit `html``` TemplateResult (was a string) — surgical\n//     updates, no innerHTML rewrite.\n//   • `static props` = reflected attributes that re-render on change (variants,\n//     state). They are mapped to Lit reactive properties automatically.\n//   • `static variants` defaults are reflected on connect (before first paint) so\n//     :host([name=\"value\"]) selectors always match.\n//   • Capability is reached through `this.host` (the Dock seam), never hardcoded.\n//   • Register with `define()` (idempotent — safe to load twice).\n//\n// `attr()` / `boolAttr()` helpers are preserved for elements that read attributes\n// directly in render(). Re-exports `html` + `css` so domain files import the whole\n// authoring surface from one place:\n//   import { WbElement, html, css, define } from \"../core/element.js\";\n\nimport { LitElement, html, css } from \"lit\";\nimport { getHost } from \"./host.js\";\n\nexport { html, css };\n\nexport class WbElement extends LitElement {\n  /** @type {import(\"lit\").CSSResult} component CSS — override with css``; use only var(--work-*) */\n  static styles = css``;\n\n  /** @type {string[]} reflected attributes that trigger a re-render */\n  static props = [];\n\n  // Register each subclass's `static props` as Lit reactive properties so an\n  // attribute change fires attributeChangedCallback + re-renders (the old\n  // observedAttributes contract). NOTE: a base-class `static get properties()` is\n  // NOT honored — Lit's finalize() only reads each class's OWN `properties`. So we\n  // hook finalize() and createProperty() per subclass instead. Reflect ONLY the\n  // short variant enums (so el.variant = \"soft\" still matches :host([variant]));\n  // never reflect data attributes like `rows`/`csv`/`query` (can be huge strings).\n  static finalize() {\n    super.finalize();\n    const variants = this.variants || {};\n    for (const name of this.props || []) {\n      const key = this._propKey(name);\n      // Skip names that already exist on the prototype as a method/getter (e.g. a\n      // `variant(name)` helper, an `open()` method). Creating a reactive accessor\n      // there THROWS in Lit dev mode (\"declared as a reactive property but it's\n      // actually declared as a value on the prototype\"). The attribute is still\n      // OBSERVED via observedAttributes below, so attribute changes still fire\n      // attributeChangedCallback → the element's reload/requestUpdate runs.\n      if (key in this.prototype) continue;\n      this.createProperty(key, {\n        type: String,\n        attribute: name,\n        reflect: Object.prototype.hasOwnProperty.call(variants, name),\n      });\n    }\n  }\n\n  // Guarantee every `static props` attribute is OBSERVED (the browser reads this\n  // at customElements.define() time). This is the bulletproof half: even if Lit's\n  // reactive-property finalize timing misses one, attribute changes still fire\n  // attributeChangedCallback → the element's reload/requestUpdate handler runs.\n  static get observedAttributes() {\n    const base = super.observedAttributes || [];\n    return Array.from(new Set([...base, ...(this.props || [])]));\n  }\n\n  // Attribute names may contain dashes; reactive-property keys must be identifiers.\n  static _propKey(name) {\n    return name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());\n  }\n\n  /** The Dock/Host capability seam — local | runtime (RCP) | kernel. */\n  get host() {\n    return getHost();\n  }\n\n  /** Read an attribute with a default. */\n  attr(name, fallback = null) {\n    return this.hasAttribute(name) ? this.getAttribute(name) : fallback;\n  }\n\n  /** Read a boolean attribute (present = true). */\n  boolAttr(name) {\n    return this.hasAttribute(name);\n  }\n\n  /** Override: return the template (Lit `html```). */\n  render() {\n    return html`<slot></slot>`;\n  }\n\n  connectedCallback() {\n    // Reflect default variants BEFORE Lit's first render so :host([name=\"value\"])\n    // selectors match the very first paint, even when the author sets only some\n    // (e.g. tone without variant).\n    const v = this.constructor.variants;\n    if (v) {\n      for (const [name, def] of Object.entries(v)) {\n        if (!this.hasAttribute(name)) this.setAttribute(name, def.default);\n      }\n    }\n    super.connectedCallback();\n  }\n}\n\n/** Idempotent custom-element registration (safe across double-loads). */\nexport function define(name, ctor) {\n  if (!customElements.get(name)) customElements.define(name, ctor);\n  return ctor;\n}\n"
+    },
+    {
+      "path": "src/core/host.js",
+      "type": "registry:lib",
+      "target": "workponents/core/host.js",
+      "content": "// The Host/Dock seam — one capability surface for every element.\n//\n// A workponent never hardcodes where a capability runs. It asks the Host, which\n// resolves `local` (in-WASM / browser-native), `runtime` (a Workbooks runtime\n// over RCP) per the platform-model — so the SAME element\n// (e.g. <wb-table>) runs in-WASM locally or on the runtime tier for huge data,\n// no code fork. Capability elements declare what they need; the Host provisions\n// it (the same grant model toolkits use) and reports availability so the element\n// degrades cleanly when a capability is absent (e.g. voice without a key).\n//\n// Phase 0: a minimal, portable seam (no Tauri/Svelte). When a runtime URL is\n// configured it routes over fetch/WebSocket (mirroring desktop/src/lib/rcp);\n// otherwise it serves local capabilities and reports the rest unavailable.\n\nlet _host = null;\n\nexport class WbHost {\n  /** @param {{ runtimeUrl?: string|null, tenant?: string }} [opts] */\n  constructor(opts = {}) {\n    this.runtimeUrl = opts.runtimeUrl || null;\n    this.tenant = opts.tenant || \"local\";\n    this._caps = new Set([\"local\"]); // in-WASM/browser caps are always present\n  }\n\n  /** Is a capability reachable here? (elements gate UI on this) */\n  available(cap) {\n    return this._caps.has(cap) || (this.runtimeUrl != null && cap !== \"voice\");\n  }\n\n  /** Unary capability call — routed to the runtime when present. */\n  async request(path, { method = \"POST\", body } = {}) {\n    if (!this.runtimeUrl) throw new Error(`wb-host: no runtime for ${path}`);\n    const res = await fetch(this.runtimeUrl.replace(/\\/$/, \"\") + path, {\n      method,\n      headers: { \"content-type\": \"application/json\", \"x-tenant\": this.tenant },\n      body: body != null ? JSON.stringify(body) : undefined,\n    });\n    if (!res.ok) throw new Error(`wb-host ${res.status} ${path}`);\n    return res.json();\n  }\n\n  /** Streaming capability — a WebSocket to the runtime. */\n  socket(path, { onMessage } = {}) {\n    if (!this.runtimeUrl) throw new Error(`wb-host: no runtime for ${path}`);\n    const url = this.runtimeUrl.replace(/^http/, \"ws\").replace(/\\/$/, \"\") + path;\n    const ws = new WebSocket(url);\n    if (onMessage) ws.addEventListener(\"message\", (e) => onMessage(e.data));\n    return ws;\n  }\n}\n\n/** Configure the shared Host (call once at app/workbook boot). */\nexport function configureHost(opts) {\n  _host = new WbHost(opts);\n  return _host;\n}\n\n/** The shared Host singleton (a local-only Host by default). */\nexport function getHost() {\n  if (!_host) {\n    // Honor a global hint (a workbook/desktop can set window.__WB_RUNTIME_URL__).\n    const url = typeof window !== \"undefined\" ? window.__WB_RUNTIME_URL__ : null;\n    _host = new WbHost({ runtimeUrl: url || null });\n  }\n  return _host;\n}\n"
+    }
+  ]
+}

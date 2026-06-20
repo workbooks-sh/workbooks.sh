@@ -1,0 +1,19 @@
+{
+  "element": "work-chart",
+  "domain": "data-viz",
+  "gates": {
+    "tokens": true,
+    "scope": true,
+    "wasm": true,
+    "functional": true,
+    "visual": true
+  },
+  "pass": true,
+  "leaks": [],
+  "notes": [
+    "tokens: paints (L=111 D=111), flip=true",
+    "powered seam — floor-with-engine-blocked verified",
+    "parity: engine vs floor compared",
+    "visual: 6 shots"
+  ]
+}

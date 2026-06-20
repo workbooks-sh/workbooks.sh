@@ -1,0 +1,26 @@
+# Workbooks
+
+> Workbooks is a software ecosystem where people and AI build together — and what
+> they build runs anywhere, stays connected, and keeps getting better. The core
+> unit is a workbook: a single HTML file that carries a whole piece of software
+> (interface, code, data, history) and opens anywhere a browser does. The Nexus
+> is the engine you own that runs workbooks (laptop or cloud) and makes them
+> isolated, stateful, and agentic. Toolkits are real programs compiled to
+> WebAssembly wrapped in readable manuals that teach people and agents alike.
+
+The CLI is `work` (installed via https://workbooks.sh/install.sh). With a coding
+agent, install the skills: `npx skills add workbooks-sh/workbooks.sh`.
+
+## Docs
+Reference and guides at https://docs.workbooks.sh — full index:
+https://docs.workbooks.sh/llms.txt
+- [install](https://docs.workbooks.sh/start/install): Install the work CLI and the engine
+- [your-first-workbook](https://docs.workbooks.sh/start/your-first-workbook): Direct an agent to build your first workbook
+- [what-is-a-toolkit](https://docs.workbooks.sh/concepts/what-is-a-toolkit): What a toolkit is — wasm program + readable manual
+- [the-dock](https://docs.workbooks.sh/concepts/the-dock): The Dock & capabilities — the host membrane
+- [cli](https://docs.workbooks.sh/reference/cli): work CLI — every verb, mode, and flag
+- [cloud](https://docs.workbooks.sh/deploy/cloud): Deploy a workbook to the cloud
+- [maturity](https://docs.workbooks.sh/maturity): Capability matrix — the honest 'what works?' answer
+
+## Try
+- [Source](https://github.com/workbooks-sh/workbooks.sh): Apache-2.0, open forever
