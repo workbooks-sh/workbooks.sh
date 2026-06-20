@@ -74,6 +74,19 @@ defmodule Nexus.Server do
 
   defp mounts, do: Application.get_env(:nexus, :mounts, [{"", root()}])
   defp multi?, do: not match?([{"", _}], mounts())
+
+  @doc """
+  Re-discover the data volume's mounts and re-bring-up their units — called after a `git push` lands a
+  new/updated workspace so its server/client/resource units compile + serve without a restart. The
+  workspace's FILES are already live (read off disk); this refreshes the compiled tier. Idempotent.
+  """
+  def remount do
+    root = root()
+    found = discover_mounts(root)
+    Application.put_env(:nexus, :mounts, found)
+    Enum.each(found, fn {_name, wb} -> bringup(wb) end)
+    length(found)
+  end
   defp wb_root(name), do: Enum.find_value(mounts(), fn {n, r} -> if n == name, do: r end)
 
   # Compile the workbook's units and let each server unit register its live sources.

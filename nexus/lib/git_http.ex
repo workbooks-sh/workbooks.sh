@@ -55,7 +55,15 @@ defmodule Nexus.GitHttp do
 
         {:ok, body, conn} = read_body(conn, length: 200_000_000, read_length: 1_000_000)
         {out, _exit} = run_backend(body, cgi_env(conn, rest, ident, body))
-        relay(conn, out)
+        resp = relay(conn, out)
+
+        # After a push (receive-pack), refresh the compiled tier so pushed units serve — files are
+        # already live on disk via the post-receive checkout. Async: don't block the git response.
+        if String.contains?(rest, "git-receive-pack") and conn.method == "POST" do
+          Task.start(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
+        end
+
+        resp
     end
   end
 
