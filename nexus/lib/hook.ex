@@ -63,7 +63,9 @@ defmodule Nexus.Hook do
 
   defp tags_ok?(nil, _), do: true
   defp tags_ok?(want, event) do
-    have = event |> Map.get(:tags, []) |> Enum.map(&to_string/1) |> MapSet.new()
+    # `tags: nil` (key present, value nil) is common (an emitter passing through a missing source field);
+    # `Map.get(_, :tags, [])` only defaults on ABSENT keys, so coalesce nil here too.
+    have = (event[:tags] || []) |> Enum.map(&to_string/1) |> MapSet.new()
     Enum.any?(want, fn t -> MapSet.member?(have, to_string(t)) end)
   end
 

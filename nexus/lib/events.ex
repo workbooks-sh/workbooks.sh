@@ -61,7 +61,10 @@ defmodule Nexus.Events do
   # Run the effects of every hook whose match accepts this event — each effect in its own supervised
   # task (failure-isolated, non-blocking).
   defp dispatch_hooks(ev, ctx) do
-    for hook <- Nexus.Hook.matching(ev), effect <- hook.effects do
+    # Hook matching runs in the EMITTER's process — a bad hook/event must never crash the caller.
+    matched = try do Nexus.Hook.matching(ev) rescue e -> Logger.error("[events] hook matching crashed: #{Exception.message(e)}"); [] end
+
+    for hook <- matched, effect <- hook.effects do
       Task.Supervisor.start_child(@tasksup, fn ->
         try do
           Nexus.Effects.run(effect, ev, ctx)
