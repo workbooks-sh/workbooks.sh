@@ -88,4 +88,8 @@ design :brand do
     font-size:11px;letter-spacing:.04em;text-transform:uppercase}
   .prose table.wb-verbs td:first-child{white-space:nowrap;width:1%}
   .prose table.wb-verbs code{background:none;padding:0;color:var(--pcd);font-family:var(--mono)}
+
+  /* embedded example demos — each is a self-contained app in an isolated iframe */
+  .prose .demo-frame{display:block;width:100%;height:540px;border:1px solid var(--line);
+    border-radius:12px;background:var(--card);margin:1.4em 0;overflow:hidden}
 end

@@ -1,0 +1,367 @@
+# A stateful board
+
+An interactive board — drag-ordered columns, cards, state — running entirely in the page. State lives in the workbook, the view is a `client` island:
+
+client :stateful_boards do
+  <iframe class="demo-frame" title="A stateful board demo" loading="lazy" sandbox="allow-scripts" srcdoc="
+    <!doctype html>
+    <html lang=&quot;en&quot;>
+    <head>
+    <meta charset=&quot;utf-8&quot;>
+    <meta name=&quot;viewport&quot; content=&quot;width=1440, initial-scale=1&quot;>
+    <title>Product Sprint · Kanban</title>
+    <script id=&quot;workbook-spec&quot; type=&quot;application/json&quot;>
+    { &quot;name&quot;: &quot;Kanban&quot;, &quot;version&quot;: &quot;0.1.0&quot;, &quot;kind&quot;: &quot;app&quot;, &quot;columns&quot;: [&quot;Backlog&quot;, &quot;In Progress&quot;, &quot;Review&quot;, &quot;Done&quot;] }
+    </script>
+    <style>
+      :root{
+        --bg:#f6f7f9; --surface:#fff; --ink:#14161a; --muted:#6b7280; --hair:#e8eaee;
+        --shadow:0 1px 2px rgba(20,22,26,.06), 0 4px 12px rgba(20,22,26,.05);
+        --shadow-lift:0 8px 24px rgba(20,22,26,.12);
+        --radius:10px;
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;height:100%;overflow:hidden}
+      body{
+        width:1440px;height:900px;background:var(--bg);color:var(--ink);
+        font-family:ui-sans-serif,system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif;
+        -webkit-font-smoothing:antialiased;
+        display:flex;flex-direction:column;
+      }
+      .mono{font-family:ui-monospace,SFMono-Regular,&quot;SF Mono&quot;,Menlo,monospace}
+    
+      /* ---------- header ---------- */
+      header{
+        display:flex;align-items:center;justify-content:space-between;
+        padding:22px 36px 18px;flex:0 0 auto;
+      }
+      .h-left{display:flex;align-items:baseline;gap:16px}
+      .board-title{font-size:24px;font-weight:680;letter-spacing:-.02em}
+      .board-meta{font-size:13px;color:var(--muted);font-weight:500}
+      .board-meta b{color:var(--ink);font-weight:600}
+      .h-right{display:flex;align-items:center;gap:18px}
+    
+      .avatars{display:flex;align-items:center}
+      .avatars .av{
+        width:32px;height:32px;border-radius:50%;border:2px solid var(--bg);
+        margin-left:-9px;display:flex;align-items:center;justify-content:center;
+        font-size:12px;font-weight:650;color:#fff;letter-spacing:.01em;
+        box-shadow:0 1px 2px rgba(0,0,0,.12);
+      }
+      .avatars .av:first-child{margin-left:0}
+      .avatars .more{background:#eef0f3!important;color:var(--muted)!important}
+    
+      .live{
+        display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;
+        color:#11824a;background:#e9f7ef;border:1px solid #cdeeda;
+        padding:6px 11px 6px 9px;border-radius:999px;
+      }
+      .live .dot{width:8px;height:8px;border-radius:50%;background:#19c466;
+        box-shadow:0 0 0 0 rgba(25,196,102,.55);animation:pulse 2s infinite}
+      @keyframes pulse{
+        0%{box-shadow:0 0 0 0 rgba(25,196,102,.5)}
+        70%{box-shadow:0 0 0 7px rgba(25,196,102,0)}
+        100%{box-shadow:0 0 0 0 rgba(25,196,102,0)}
+      }
+    
+      /* ---------- board ---------- */
+      .board{
+        flex:1 1 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:18px;
+        padding:4px 36px 30px;min-height:0;
+      }
+      .col{
+        background:#f0f1f4;border-radius:14px;display:flex;flex-direction:column;
+        min-height:0;border:1px solid #eaebef;overflow:hidden;
+      }
+      .col-accent{height:3px;width:100%}
+      .col-head{
+        display:flex;align-items:center;gap:8px;padding:13px 15px 10px;flex:0 0 auto;
+      }
+      .col-name{font-size:13.5px;font-weight:650;letter-spacing:-.01em}
+      .count{
+        font-size:11.5px;font-weight:650;color:var(--muted);background:#e4e6ea;
+        min-width:21px;height:21px;padding:0 6px;border-radius:7px;
+        display:inline-flex;align-items:center;justify-content:center;
+        transition:transform .25s ease, background .25s ease, color .25s ease;
+      }
+      .count.bump{transform:scale(1.28);background:#14161a;color:#fff}
+    
+      .list{
+        flex:1 1 auto;overflow-y:auto;padding:4px 10px 12px;display:flex;
+        flex-direction:column;gap:10px;scrollbar-width:thin;scroll-behavior:smooth;
+      }
+      .list::-webkit-scrollbar{width:8px}
+      .list::-webkit-scrollbar-thumb{background:#d7d9de;border-radius:8px;border:2px solid #f0f1f4}
+    
+      /* ---------- card ---------- */
+      .card{
+        background:var(--surface);border:1px solid var(--hair);border-radius:var(--radius);
+        padding:12px 13px 11px;box-shadow:var(--shadow);cursor:grab;
+        transition:box-shadow .2s ease, transform .2s ease, opacity .2s ease;
+        will-change:transform;
+      }
+      .card:hover{box-shadow:var(--shadow-lift);transform:translateY(-1px)}
+      .card.dragging{opacity:.45;cursor:grabbing}
+      .card.flip{transition:transform .55s cubic-bezier(.22,.61,.36,1)}
+      .card.land{animation:land .9s ease}
+      @keyframes land{
+        0%{box-shadow:0 0 0 0 rgba(94,124,255,.0)}
+        18%{box-shadow:0 0 0 3px rgba(94,124,255,.55), var(--shadow-lift)}
+        100%{box-shadow:var(--shadow)}
+      }
+    
+      .tags{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+      .tag{
+        font-size:10.5px;font-weight:650;letter-spacing:.02em;padding:2.5px 7px;
+        border-radius:6px;line-height:1.3;
+      }
+      .t-design{background:#efe9ff;color:#6b3fd1}
+      .t-bug{background:#ffe6e3;color:#cd3a2c}
+      .t-api{background:#e2f0ff;color:#1f6fd6}
+      .t-infra{background:#e6f6ec;color:#178a4f}
+      .t-ux{background:#fff1dc;color:#b9711a}
+      .t-perf{background:#e9eefb;color:#3f55c2}
+    
+      .card-title{font-size:13.5px;font-weight:560;line-height:1.35;letter-spacing:-.005em;margin-bottom:11px}
+    
+      .card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+      .foot-left{display:flex;align-items:center;gap:10px;color:var(--muted)}
+      .prio{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+      .p-high{background:#ef4444}.p-med{background:#f59e0b}.p-low{background:#9aa3af}
+      .meta-i{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:550}
+      .meta-i svg{display:block}
+      .due{
+        font-size:10.5px;font-weight:600;color:#5a6270;background:#f0f1f4;
+        padding:2px 7px;border-radius:6px;
+      }
+      .due.soon{background:#fdeceb;color:#cd3a2c}
+    
+      .av-sm{
+        width:23px;height:23px;border-radius:50%;display:flex;align-items:center;
+        justify-content:center;font-size:10px;font-weight:650;color:#fff;flex:0 0 auto;
+      }
+    
+      .typing{display:inline-flex;align-items:center;gap:3px;margin-left:2px}
+      .typing span{width:4px;height:4px;border-radius:50%;background:#9aa3af;
+        animation:blink 1.2s infinite both}
+      .typing span:nth-child(2){animation-delay:.2s}
+      .typing span:nth-child(3){animation-delay:.4s}
+      @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+    
+      .list.dragover{outline:2px dashed #c3c9d4;outline-offset:-6px;border-radius:10px}
+    </style>
+    </head>
+    <body>
+      <header>
+        <div class=&quot;h-left&quot;>
+          <div class=&quot;board-title&quot;>Product Sprint</div>
+          <div class=&quot;board-meta&quot;>Sprint 14 · <b>6 days left</b> · 42 pts</div>
+        </div>
+        <div class=&quot;h-right&quot;>
+          <div class=&quot;avatars&quot; id=&quot;teamAvatars&quot;></div>
+          <div class=&quot;live&quot;><span class=&quot;dot&quot;></span>Live</div>
+        </div>
+      </header>
+    
+      <div class=&quot;board&quot; id=&quot;board&quot;></div>
+    
+    <script>
+    &quot;use strict&quot;;
+    
+    // ---- palette helpers ----------------------------------------------------
+    const PEOPLE = {
+      AL:{n:&quot;Ava L.&quot;,   c:&quot;#6b5bd6&quot;},
+      MK:{n:&quot;Mateo K.&quot;, c:&quot;#2f9e6e&quot;},
+      SR:{n:&quot;Sana R.&quot;,  c:&quot;#d6743f&quot;},
+      JP:{n:&quot;Jonah P.&quot;, c:&quot;#c2477f&quot;},
+      EN:{n:&quot;Elise N.&quot;, c:&quot;#2f74c2&quot;},
+    };
+    const TEAM = [&quot;AL&quot;,&quot;MK&quot;,&quot;SR&quot;,&quot;JP&quot;,&quot;EN&quot;];
+    
+    const COLS = [
+      {id:&quot;backlog&quot;,  name:&quot;Backlog&quot;,     accent:&quot;#9aa3af&quot;},
+      {id:&quot;progress&quot;, name:&quot;In Progress&quot;, accent:&quot;#3f7df6&quot;},
+      {id:&quot;review&quot;,   name:&quot;Review&quot;,      accent:&quot;#b07adb&quot;},
+      {id:&quot;done&quot;,     name:&quot;Done&quot;,        accent:&quot;#19c466&quot;},
+    ];
+    
+    // id -> next column for the auto-flow
+    const NEXT = {backlog:&quot;progress&quot;, progress:&quot;review&quot;, review:&quot;done&quot;};
+    
+    // ---- cards --------------------------------------------------------------
+    let uid = 0;
+    const CARDS = [
+      // Backlog
+      {col:&quot;backlog&quot;,  title:&quot;Wire up OAuth callback redirect&quot;,   tags:[[&quot;t-api&quot;,&quot;API&quot;]],                 who:&quot;EN&quot;, prio:&quot;p-high&quot;, c:3,  due:&quot;Jun 21&quot;},
+      {col:&quot;backlog&quot;,  title:&quot;Polish empty states across views&quot;,  tags:[[&quot;t-design&quot;,&quot;Design&quot;],[&quot;t-ux&quot;,&quot;UX&quot;]], who:&quot;AL&quot;, prio:&quot;p-low&quot;,  c:1,  due:&quot;Jun 24&quot;},
+      {col:&quot;backlog&quot;,  title:&quot;Audit bundle size on settings&quot;,     tags:[[&quot;t-perf&quot;,&quot;Perf&quot;]],               who:&quot;MK&quot;, prio:&quot;p-med&quot;,  c:0,  due:&quot;Jun 25&quot;},
+      // In Progress
+      {col:&quot;progress&quot;, title:&quot;Ship search drawer + shortcuts&quot;,    tags:[[&quot;t-design&quot;,&quot;Design&quot;],[&quot;t-api&quot;,&quot;API&quot;]], who:&quot;AL&quot;, prio:&quot;p-high&quot;, c:5,  due:&quot;Jun 19&quot;, soon:true, typing:true},
+      {col:&quot;progress&quot;, title:&quot;Migrate avatars to CDN cache&quot;,      tags:[[&quot;t-infra&quot;,&quot;Infra&quot;]],             who:&quot;MK&quot;, prio:&quot;p-med&quot;,  c:2,  due:&quot;Jun 20&quot;},
+      // Review
+      {col:&quot;review&quot;,   title:&quot;Fix drag race condition on drop&quot;,   tags:[[&quot;t-bug&quot;,&quot;Bug&quot;]],                 who:&quot;JP&quot;, prio:&quot;p-high&quot;, c:4,  due:&quot;Jun 18&quot;, soon:true},
+      {col:&quot;review&quot;,   title:&quot;Tighten board virtualization&quot;,      tags:[[&quot;t-perf&quot;,&quot;Perf&quot;],[&quot;t-infra&quot;,&quot;Infra&quot;]], who:&quot;EN&quot;, prio:&quot;p-med&quot;, c:2, due:&quot;Jun 22&quot;},
+      // Done
+      {col:&quot;done&quot;,     title:&quot;Add keyboard nav to columns&quot;,       tags:[[&quot;t-ux&quot;,&quot;UX&quot;]],                   who:&quot;SR&quot;, prio:&quot;p-low&quot;,  c:1,  due:&quot;Done&quot;},
+      {col:&quot;done&quot;,     title:&quot;Theme tokens + dark scaffold&quot;,      tags:[[&quot;t-design&quot;,&quot;Design&quot;]],           who:&quot;AL&quot;, prio:&quot;p-low&quot;,  c:0,  due:&quot;Done&quot;},
+      {col:&quot;done&quot;,     title:&quot;Set up E2E smoke harness&quot;,          tags:[[&quot;t-infra&quot;,&quot;Infra&quot;]],             who:&quot;MK&quot;, prio:&quot;p-med&quot;,  c:3,  due:&quot;Done&quot;},
+    ];
+    
+    // ---- icons --------------------------------------------------------------
+    const ICON_COMMENT = '<svg width=&quot;13&quot; height=&quot;13&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;><path d=&quot;M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z&quot;/></svg>';
+    const ICON_CHECK   = '<svg width=&quot;13&quot; height=&quot;13&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;><polyline points=&quot;9 11 12 14 22 4&quot;/><path d=&quot;M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11&quot;/></svg>';
+    
+    // ---- render -------------------------------------------------------------
+    const teamEl = document.getElementById(&quot;teamAvatars&quot;);
+    TEAM.forEach(k=>{
+      const d=document.createElement(&quot;div&quot;);
+      d.className=&quot;av&quot;; d.style.background=PEOPLE[k].c; d.textContent=k; d.title=PEOPLE[k].n;
+      teamEl.appendChild(d);
+    });
+    const more=document.createElement(&quot;div&quot;); more.className=&quot;av more&quot;; more.textContent=&quot;+3&quot;; teamEl.appendChild(more);
+    
+    const board=document.getElementById(&quot;board&quot;);
+    const listEls={};
+    COLS.forEach(col=>{
+      const wrap=document.createElement(&quot;div&quot;); wrap.className=&quot;col&quot;;
+      const acc=document.createElement(&quot;div&quot;); acc.className=&quot;col-accent&quot;; acc.style.background=col.accent;
+      const head=document.createElement(&quot;div&quot;); head.className=&quot;col-head&quot;;
+      head.innerHTML=`<span class=&quot;col-name&quot;>${col.name}</span><span class=&quot;count&quot; id=&quot;count-${col.id}&quot;>0</span>`;
+      const list=document.createElement(&quot;div&quot;); list.className=&quot;list&quot;; list.id=&quot;list-&quot;+col.id; list.dataset.col=col.id;
+      wrap.append(acc,head,list); board.appendChild(wrap);
+      listEls[col.id]=list;
+      // drop target
+      list.addEventListener(&quot;dragover&quot;,e=>{e.preventDefault();list.classList.add(&quot;dragover&quot;)});
+      list.addEventListener(&quot;dragleave&quot;,()=>list.classList.remove(&quot;dragover&quot;));
+      list.addEventListener(&quot;drop&quot;,e=>{
+        e.preventDefault();list.classList.remove(&quot;dragover&quot;);
+        if(!dragEl)return; list.appendChild(dragEl); dragEl.dataset.col=col.id; updateCounts();
+      });
+    });
+    
+    let dragEl=null;
+    function makeCard(d){
+      const el=document.createElement(&quot;div&quot;);
+      el.className=&quot;card&quot;; el.draggable=true; el.dataset.col=d.col; el.dataset.id=&quot;c&quot;+(uid++);
+      const tagsHtml=d.tags.map(t=>`<span class=&quot;tag ${t[0]}&quot;>${t[1]}</span>`).join(&quot;&quot;);
+      const typing=d.typing?'<span class=&quot;typing&quot;><span></span><span></span><span></span></span>':&quot;&quot;;
+      const dueCls=d.soon?&quot;due soon&quot;:&quot;due&quot;;
+      el.innerHTML=`
+        <div class=&quot;tags&quot;>${tagsHtml}</div>
+        <div class=&quot;card-title&quot;>${d.title}</div>
+        <div class=&quot;card-foot&quot;>
+          <div class=&quot;foot-left&quot;>
+            <span class=&quot;prio ${d.prio}&quot; title=&quot;priority&quot;></span>
+            <span class=&quot;meta-i&quot;>${ICON_COMMENT}${d.c}</span>
+            <span class=&quot;meta-i&quot;>${ICON_CHECK}${typing||&quot;&quot;}</span>
+          </div>
+          <div class=&quot;av-sm&quot; style=&quot;background:${PEOPLE[d.who].c}&quot; title=&quot;${PEOPLE[d.who].n}&quot;>${d.who}</div>
+        </div>`;
+      // due chip appended into foot-left
+      const due=document.createElement(&quot;span&quot;); due.className=dueCls; due.textContent=d.due;
+      el.querySelector(&quot;.foot-left&quot;).appendChild(due);
+    
+      el.addEventListener(&quot;dragstart&quot;,()=>{dragEl=el;el.classList.add(&quot;dragging&quot;)});
+      el.addEventListener(&quot;dragend&quot;,()=>{el.classList.remove(&quot;dragging&quot;);dragEl=null;updateCounts()});
+      return el;
+    }
+    CARDS.forEach(d=>listEls[d.col].appendChild(makeCard(d)));
+    
+    function updateCounts(){
+      COLS.forEach(c=>{
+        document.getElementById(&quot;count-&quot;+c.id).textContent=listEls[c.id].children.length;
+      });
+    }
+    updateCounts();
+    
+    // ---- auto-flow (FLIP move one card to next column) ----------------------
+    function bumpCount(colId){
+      const el=document.getElementById(&quot;count-&quot;+colId);
+      el.classList.add(&quot;bump&quot;); setTimeout(()=>el.classList.remove(&quot;bump&quot;),300);
+    }
+    
+    function moveOne(){
+      // pick a source column that still feeds forward &amp; has a card
+      const order=[&quot;progress&quot;,&quot;backlog&quot;,&quot;review&quot;]; // priority of who moves
+      let card=null, fromCol=null;
+      for(const c of order){
+        const list=listEls[c];
+        if(list.children.length>0){ card=list.children[0]; fromCol=c; break; }
+      }
+      if(!card)return;
+      const toCol=NEXT[fromCol];
+      if(!toCol)return;
+      const destList=listEls[toCol];
+    
+      // FLIP: capture first
+      const first=card.getBoundingClientRect();
+      destList.appendChild(card);
+      card.dataset.col=toCol;
+      const last=card.getBoundingClientRect();
+      const dx=first.left-last.left, dy=first.top-last.top;
+    
+      // invert
+      card.classList.remove(&quot;flip&quot;,&quot;land&quot;);
+      card.style.transform=`translate(${dx}px,${dy}px)`;
+      card.style.zIndex=&quot;50&quot;;
+      card.style.boxShadow=&quot;var(--shadow-lift)&quot;;
+    
+      requestAnimationFrame(()=>{
+        card.classList.add(&quot;flip&quot;);
+        card.style.transform=&quot;translate(0,0)&quot;;
+      });
+      // counts shift immediately
+      bumpCount(fromCol); bumpCount(toCol); updateCounts();
+    
+      setTimeout(()=>{
+        card.classList.remove(&quot;flip&quot;);
+        card.style.transform=&quot;&quot;; card.style.zIndex=&quot;&quot;; card.style.boxShadow=&quot;&quot;;
+        card.classList.add(&quot;land&quot;);
+        if(toCol===&quot;done&quot;){
+          const dueEl=card.querySelector(&quot;.due&quot;); if(dueEl){dueEl.textContent=&quot;Done&quot;;dueEl.className=&quot;due&quot;}
+          const t=card.querySelector(&quot;.typing&quot;); if(t)t.remove();
+        }
+        setTimeout(()=>card.classList.remove(&quot;land&quot;),900);
+      },560);
+    }
+    
+    // occasionally toggle a &quot;typing/active&quot; indicator on an in-progress card
+    function flickerActivity(){
+      const list=listEls[&quot;progress&quot;];
+      if(!list.children.length)return;
+      const card=list.children[Math.floor(Math.random()*list.children.length)];
+      const slot=card.querySelectorAll(&quot;.meta-i&quot;)[1];
+      if(!slot||slot.querySelector(&quot;.typing&quot;))return;
+      const t=document.createElement(&quot;span&quot;);
+      t.className=&quot;typing&quot;;t.innerHTML=&quot;<span></span><span></span><span></span>&quot;;
+      slot.appendChild(t);
+      setTimeout(()=>{if(t.parentNode)t.remove()},4200);
+    }
+    
+    // drive the loop with slight jitter so it feels organic
+    function schedule(){
+      const delay=2500+Math.random()*1000;
+      setTimeout(()=>{
+        moveOne();
+        if(Math.random()<0.6) flickerActivity();
+        schedule();
+      },delay);
+    }
+    setTimeout(schedule,1400);
+    setTimeout(flickerActivity,2600);
+    </script>
+    </body>
+    </html>
+    
+  "></iframe>
+end
+
+**What to notice**
+
+- Columns and cards as a real interactive app
+- All state handled in-page, client-side
+- The same file could persist to a `resource`
+
+Every example here is a real, self-contained demo running in the page — the same shape
+you'd weave and ship. Browse the [templates](/introduction/what-is-the-work-cli) the
+`work new` command scaffolds to start from one.

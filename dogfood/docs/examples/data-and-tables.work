@@ -1,0 +1,311 @@
+# Data, tables & money
+
+A finance ledger: typed rows, money formatting, totals. The shape is a `resource`; the table renders from it — declarative data, no spreadsheet glue:
+
+client :data_and_tables do
+  <iframe class="demo-frame" title="Data, tables & money demo" loading="lazy" sandbox="allow-scripts" srcdoc="
+    <!doctype html>
+    <html lang=&quot;en&quot;>
+    <head>
+    <meta charset=&quot;utf-8&quot; />
+    <meta name=&quot;viewport&quot; content=&quot;width=1440, initial-scale=1&quot; />
+    <title>Ledger</title>
+    <script id=&quot;workbook-spec&quot; type=&quot;application/json&quot;>
+    { &quot;name&quot;: &quot;Ledger&quot;, &quot;version&quot;: &quot;0.1.0&quot;, &quot;kind&quot;: &quot;app&quot; }
+    </script>
+    <style>
+      :root{
+        --bg:#f7f8fa; --surface:#ffffff; --ink:#14161a; --muted:#6b7280;
+        --line:#e8eaee; --pos:#12a150; --neg:#e5484d;
+        --sans:ui-sans-serif, system-ui, -apple-system, &quot;SF Pro&quot;, sans-serif;
+        --mono:ui-monospace, &quot;SF Mono&quot;, Menlo, monospace;
+        --shadow:0 1px 2px rgba(0,0,0,.04);
+      }
+      *{box-sizing:border-box;margin:0;padding:0}
+      html,body{width:100%;height:100%;overflow:hidden}
+      body{
+        background:var(--bg);color:var(--ink);font-family:var(--sans);
+        font-size:14px;line-height:1.4;-webkit-font-smoothing:antialiased;
+      }
+      .app{padding:28px 36px;height:100%;display:flex;flex-direction:column;gap:22px}
+    
+      /* top bar */
+      .top{display:flex;align-items:center;gap:18px}
+      .brand{display:flex;align-items:center;gap:10px;font-weight:650;font-size:20px;letter-spacing:-.01em}
+      .brand .glyph{width:30px;height:30px;border-radius:9px;background:var(--ink);
+        display:flex;align-items:center;justify-content:center}
+      .pills{display:flex;gap:4px;margin-left:14px;background:#eef0f3;padding:4px;border-radius:11px}
+      .pill{padding:6px 16px;border-radius:8px;font-size:13px;font-weight:550;color:var(--muted);cursor:default}
+      .pill.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+      .top .spacer{flex:1}
+      .updated{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:13px}
+      .dotlive{width:7px;height:7px;border-radius:50%;background:var(--pos);box-shadow:0 0 0 0 rgba(18,161,80,.5);animation:pulse 2.6s ease-out infinite}
+      @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(18,161,80,.45)}70%{box-shadow:0 0 0 6px rgba(18,161,80,0)}100%{box-shadow:0 0 0 0 rgba(18,161,80,0)}}
+    
+      .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+      .card-pad{padding:22px 24px}
+      .lbl{font-size:12.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+    
+      /* hero row */
+      .hero{display:grid;grid-template-columns:380px 1fr;gap:22px}
+      .net .fig{font-family:var(--mono);font-size:46px;font-weight:600;letter-spacing:-.02em;margin-top:14px;font-variant-numeric:tabular-nums}
+      .net .cents{font-size:30px;color:var(--muted)}
+      .chip{display:inline-flex;align-items:center;gap:6px;margin-top:16px;padding:5px 11px;border-radius:999px;
+        background:rgba(18,161,80,.1);color:var(--pos);font-weight:600;font-size:13px}
+      .chip svg{width:13px;height:13px}
+      .net .sub{margin-top:auto;color:var(--muted);font-size:13px}
+      .net{display:flex;flex-direction:column}
+    
+      .chartcard{display:flex;flex-direction:column}
+      .chartcard .head{display:flex;align-items:baseline;justify-content:space-between}
+      .chartcard .big{font-family:var(--mono);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+      .chartwrap{margin-top:14px}
+    
+      /* kpi row */
+      .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+      .kpi .row{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+      .kpi .val{font-family:var(--mono);font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+      .kpi .delta{display:flex;align-items:center;gap:4px;font-weight:600;font-size:13px}
+      .kpi .delta.up{color:var(--pos)}.kpi .delta.down{color:var(--neg)}
+      .kpi .delta svg{width:12px;height:12px}
+    
+      /* lower */
+      .lower{display:grid;grid-template-columns:1fr 1fr;gap:22px;flex:1;min-height:0}
+      .cardtitle{font-size:16px;font-weight:650;letter-spacing:-.01em}
+      .cardsub{color:var(--muted);font-size:12.5px;margin-top:2px}
+    
+      .bars{margin-top:20px;display:flex;flex-direction:column;gap:17px}
+      .bar .meta{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+      .bar .name{font-weight:550;font-size:13.5px}
+      .bar .amt{font-family:var(--mono);font-size:13.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+      .track{height:10px;border-radius:6px;background:#f0f1f4;overflow:hidden}
+      .fill{height:100%;width:0;border-radius:6px;transition:width 1s cubic-bezier(.22,1,.36,1)}
+      .bar .pct{font-weight:600;color:var(--ink)}
+    
+      .txns{margin-top:14px;display:flex;flex-direction:column}
+      .txn{display:flex;align-items:center;gap:13px;padding:12px 2px;border-bottom:1px solid var(--line)}
+      .txn:last-child{border-bottom:0}
+      .cdot{width:9px;height:9px;border-radius:50%;flex:none}
+      .txn .m{font-weight:550;font-size:14px}
+      .txn .d{color:var(--muted);font-size:12.5px;margin-top:1px}
+      .txn .grow{flex:1}
+      .txn .a{font-family:var(--mono);font-size:14.5px;font-weight:600;font-variant-numeric:tabular-nums}
+      .txn .a.pos{color:var(--pos)}
+      .txn .a.neg{color:var(--ink)}
+      .txn .ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none;font-weight:650;font-size:13px;color:#fff}
+    </style>
+    </head>
+    <body>
+    <div class=&quot;app&quot;>
+    
+      <!-- TOP BAR -->
+      <div class=&quot;top&quot;>
+        <div class=&quot;brand&quot;>
+          <span class=&quot;glyph&quot;>
+            <svg width=&quot;17&quot; height=&quot;17&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;>
+              <path d=&quot;M3 7.5C3 6.12 4.12 5 5.5 5H17a2 2 0 0 1 2 2v0H5.5&quot; stroke=&quot;#fff&quot; stroke-width=&quot;1.7&quot; stroke-linecap=&quot;round&quot;/>
+              <rect x=&quot;3&quot; y=&quot;7&quot; width=&quot;18&quot; height=&quot;12&quot; rx=&quot;2.5&quot; stroke=&quot;#fff&quot; stroke-width=&quot;1.7&quot;/>
+              <circle cx=&quot;16.5&quot; cy=&quot;13&quot; r=&quot;1.6&quot; fill=&quot;#fff&quot;/>
+            </svg>
+          </span>
+          Ledger
+        </div>
+        <div class=&quot;pills&quot;>
+          <div class=&quot;pill&quot;>Week</div>
+          <div class=&quot;pill active&quot;>Month</div>
+          <div class=&quot;pill&quot;>Quarter</div>
+        </div>
+        <div class=&quot;spacer&quot;></div>
+        <div class=&quot;updated&quot;><span class=&quot;dotlive&quot;></span> Updated just now</div>
+      </div>
+    
+      <!-- HERO ROW -->
+      <div class=&quot;hero&quot;>
+        <div class=&quot;card card-pad net&quot;>
+          <div class=&quot;lbl&quot;>Net balance</div>
+          <div class=&quot;fig&quot;><span class=&quot;cnt&quot; data-to=&quot;248310&quot; data-prefix=&quot;$&quot;>$0</span><span class=&quot;cents&quot;>.42</span></div>
+          <div class=&quot;chip&quot;>
+            <svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;><path d=&quot;M5 14l5-5 4 4 5-6&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.4&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;/><path d=&quot;M16 7h3v3&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.4&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;/></svg>
+            +6.4% this month
+          </div>
+          <div class=&quot;sub&quot;>Across 3 accounts &amp;middot; reconciled through Jun 17</div>
+        </div>
+    
+        <div class=&quot;card card-pad chartcard&quot;>
+          <div class=&quot;head&quot;>
+            <div>
+              <div class=&quot;lbl&quot;>Cashflow</div>
+              <div class=&quot;big&quot;><span class=&quot;cnt&quot; data-to=&quot;32480&quot; data-prefix=&quot;+$&quot;>+$0</span> net inflow</div>
+            </div>
+            <div style=&quot;color:var(--muted);font-size:12.5px&quot;>Last 30 days</div>
+          </div>
+          <div class=&quot;chartwrap&quot; style=&quot;height:150px;width:100%;position:relative&quot;>
+            <canvas id=&quot;cashflow&quot;></canvas>
+          </div>
+        </div>
+      </div>
+    
+      <!-- KPI ROW -->
+      <div class=&quot;kpis&quot;>
+        <div class=&quot;card card-pad kpi&quot;>
+          <div class=&quot;lbl&quot;>Income</div>
+          <div class=&quot;row&quot;>
+            <div class=&quot;val&quot;><span class=&quot;cnt&quot; data-to=&quot;86200&quot; data-prefix=&quot;$&quot;>$0</span></div>
+            <div class=&quot;delta up&quot;><svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;><path d=&quot;M12 19V6M6 12l6-6 6 6&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.4&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;/></svg>8.1%</div>
+          </div>
+        </div>
+        <div class=&quot;card card-pad kpi&quot;>
+          <div class=&quot;lbl&quot;>Expenses</div>
+          <div class=&quot;row&quot;>
+            <div class=&quot;val&quot;><span class=&quot;cnt&quot; data-to=&quot;61540&quot; data-prefix=&quot;$&quot;>$0</span></div>
+            <div class=&quot;delta down&quot;><svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;><path d=&quot;M12 5v13M6 12l6 6 6-6&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2.4&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;/></svg>3.2%</div>
+          </div>
+        </div>
+        <div class=&quot;card card-pad kpi&quot;>
+          <div class=&quot;lbl&quot;>Runway</div>
+          <div class=&quot;row&quot;>
+            <div class=&quot;val&quot;><span class=&quot;cnt&quot; data-to=&quot;14&quot; data-suffix=&quot; mo&quot;>0 mo</span></div>
+            <div class=&quot;delta up&quot; style=&quot;color:var(--muted)&quot;>stable</div>
+          </div>
+        </div>
+      </div>
+    
+      <!-- LOWER -->
+      <div class=&quot;lower&quot;>
+        <div class=&quot;card card-pad&quot; style=&quot;display:flex;flex-direction:column&quot;>
+          <div class=&quot;cardtitle&quot;>Spending by category</div>
+          <div class=&quot;cardsub&quot;>June &amp;middot; $61,540 total outflow</div>
+          <div class=&quot;bars&quot; id=&quot;bars&quot;>
+            <!-- name, amount, pct, color -->
+          </div>
+        </div>
+    
+        <div class=&quot;card card-pad&quot; style=&quot;display:flex;flex-direction:column&quot;>
+          <div class=&quot;cardtitle&quot;>Recent transactions</div>
+          <div class=&quot;cardsub&quot;>Live feed &amp;middot; 3 accounts</div>
+          <div class=&quot;txns&quot; id=&quot;txns&quot;></div>
+        </div>
+      </div>
+    </div>
+    
+    <script src=&quot;https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js&quot;></script>
+    <script>
+    (function(){
+      // ---- bars ----
+      var cats=[
+        {n:&quot;Payroll&quot;,   a:28400, p:46, c:&quot;#12a150&quot;},
+        {n:&quot;Software&quot;,  a:12200, p:20, c:&quot;#3b82f6&quot;},
+        {n:&quot;Marketing&quot;, a:9800,  p:16, c:&quot;#8b5cf6&quot;},
+        {n:&quot;Office&quot;,    a:6940,  p:11, c:&quot;#f59e0b&quot;},
+        {n:&quot;Travel&quot;,    a:4200,  p:7,  c:&quot;#ec4899&quot;}
+      ];
+      var bw=document.getElementById('bars');
+      cats.forEach(function(c){
+        var el=document.createElement('div');el.className='bar';
+        el.innerHTML='<div class=&quot;meta&quot;><span class=&quot;name&quot;>'+c.n+'</span>'+
+          '<span class=&quot;amt&quot;>$'+c.a.toLocaleString()+' &amp;middot; <span class=&quot;pct&quot;>'+c.p+'%</span></span></div>'+
+          '<div class=&quot;track&quot;><div class=&quot;fill&quot; style=&quot;background:'+c.c+'&quot;></div></div>';
+        el.querySelector('.fill').dataset.w=c.p;
+        bw.appendChild(el);
+      });
+    
+      // ---- txns ----
+      var tx=[
+        {m:&quot;Stripe payout&quot;,  d:&quot;Jun 17 &amp;middot; Operating&quot;, a:18420.00, pos:true,  c:&quot;#635bff&quot;, ic:&quot;S&quot;},
+        {m:&quot;Gusto payroll&quot;,  d:&quot;Jun 16 &amp;middot; Payroll&quot;,   a:-28400.00,pos:false, c:&quot;#f45d48&quot;, ic:&quot;G&quot;},
+        {m:&quot;AWS&quot;,            d:&quot;Jun 15 &amp;middot; Software&quot;,  a:-4310.22, pos:false, c:&quot;#ff9900&quot;, ic:&quot;A&quot;},
+        {m:&quot;Figma&quot;,          d:&quot;Jun 14 &amp;middot; Software&quot;,  a:-540.00,  pos:false, c:&quot;#a259ff&quot;, ic:&quot;F&quot;},
+        {m:&quot;Notion&quot;,         d:&quot;Jun 13 &amp;middot; Software&quot;,  a:-192.00,  pos:false, c:&quot;#111111&quot;, ic:&quot;N&quot;},
+        {m:&quot;Delta Air Lines&quot;,d:&quot;Jun 12 &amp;middot; Travel&quot;,    a:-1284.40, pos:false, c:&quot;#003366&quot;, ic:&quot;D&quot;}
+      ];
+      var tw=document.getElementById('txns');
+      tx.forEach(function(t){
+        var sign=t.a<0?'-':'+';
+        var amt=Math.abs(t.a).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+        var el=document.createElement('div');el.className='txn';
+        el.innerHTML='<div class=&quot;ic&quot; style=&quot;background:'+t.c+'&quot;>'+t.ic+'</div>'+
+          '<span class=&quot;cdot&quot; style=&quot;background:'+t.c+'&quot;></span>'+
+          '<div><div class=&quot;m&quot;>'+t.m+'</div><div class=&quot;d&quot;>'+t.d+'</div></div>'+
+          '<div class=&quot;grow&quot;></div>'+
+          '<div class=&quot;a '+(t.pos?'pos':'neg')+'&quot;>'+sign+'$'+amt+'</div>';
+        tw.appendChild(el);
+      });
+    
+      // ---- count up ----
+      function easeOut(t){return 1-Math.pow(1-t,3);}
+      function countEls(){
+        document.querySelectorAll('.cnt').forEach(function(el){
+          var to=+el.dataset.to, pre=el.dataset.prefix||'', suf=el.dataset.suffix||'';
+          var start=null,dur=900;
+          function step(ts){
+            if(!start)start=ts;
+            var t=Math.min(1,(ts-start)/dur), v=Math.round(easeOut(t)*to);
+            el.textContent=pre+v.toLocaleString()+suf;
+            if(t<1)requestAnimationFrame(step);
+          }
+          requestAnimationFrame(step);
+        });
+      }
+    
+      // ---- cashflow chart (Chart.js) ----
+      function drawChart(){
+        if(typeof Chart==='undefined')return;
+        var cv=document.getElementById('cashflow');
+        var ctx=cv.getContext('2d');
+        var labels=['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
+        var vals=[12400,15200,13800,18600,16900,21300,19800,24100,22600,27400,25900,32480];
+        var grad=ctx.createLinearGradient(0,0,0,150);
+        grad.addColorStop(0,'rgba(18,161,80,0.20)');
+        grad.addColorStop(1,'rgba(18,161,80,0)');
+        new Chart(ctx,{
+          type:'line',
+          data:{labels:labels,datasets:[{
+            data:vals,borderColor:'#12a150',borderWidth:2,
+            backgroundColor:grad,fill:true,tension:0.4,
+            pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:'#12a150',
+            pointHoverBorderColor:'#fff',pointHoverBorderWidth:2
+          }]},
+          options:{
+            responsive:true,maintainAspectRatio:false,
+            animation:{duration:900,easing:'easeOutCubic'},
+            plugins:{legend:{display:false},tooltip:{
+              backgroundColor:'#14161a',padding:10,cornerRadius:8,displayColors:false,
+              callbacks:{label:function(c){return '$'+c.parsed.y.toLocaleString();}}
+            }},
+            interaction:{intersect:false,mode:'index'},
+            scales:{
+              x:{grid:{display:false},border:{display:false},
+                 ticks:{color:'#9aa0aa',font:{size:11},maxRotation:0,autoSkipPadding:14}},
+              y:{display:false,grid:{display:false},beginAtZero:true}
+            }
+          }
+        });
+      }
+    
+      // ---- bars grow ----
+      function growBars(){
+        setTimeout(function(){
+          document.querySelectorAll('.fill').forEach(function(f){f.style.width=f.dataset.w+'%';});
+        },120);
+      }
+    
+      function go(){countEls();drawChart();growBars();}
+      if(document.readyState!=='loading')go();
+      else document.addEventListener('DOMContentLoaded',go);
+    })();
+    </script>
+    </body>
+    </html>
+    
+  "></iframe>
+end
+
+**What to notice**
+
+- Typed rows with money + date formatting
+- Totals and balances computed in the view
+- Backed by a `resource` you query and `show`
+
+Every example here is a real, self-contained demo running in the page — the same shape
+you'd weave and ship. Browse the [templates](/introduction/what-is-the-work-cli) the
+`work new` command scaffolds to start from one.

@@ -67,7 +67,11 @@ app :docs do
   end
 
   section "Examples" do
-    page "examples/learn-by-example"
+    page "examples/agent-orchestration"
+    page "examples/live-dashboards"
+    page "examples/stateful-boards"
+    page "examples/data-and-tables"
+    page "examples/interactive-canvas"
   end
 
   section "Blog" do
