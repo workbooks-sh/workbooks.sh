@@ -201,7 +201,24 @@ server :cloud do
   # ── Workspace file tree ────────────────────────────────────────────────────────────────────────
   # No `path` → the mounts as top-level folders. With `path` ("<mount>/<sub>…") → that directory's
   # entries. Each entry: %{name, dir, path, size}. Hidden dotfiles + the weave index are skipped.
-  defp mounts, do: for({name, root} <- Application.get_env(:nexus, :mounts, []), name != "", do: {name, root})
+  # Workspace folders = the real top-level dirs on the data volume (excludes the nexus's own .nexus/db
+  # + cache + dotfiles). Read from the FILESYSTEM (not the boot-time mounts list) so a freshly
+  # git-pushed workspace shows up in the tree immediately, without waiting for a re-mount.
+  defp mounts do
+    root = Nexus.Config.data_dir()
+
+    case File.ls(root) do
+      {:ok, names} ->
+        for n <- Enum.sort(names),
+            n not in ~w(.nexus cache),
+            not String.starts_with?(n, "."),
+            File.dir?(Path.join(root, n)),
+            do: {n, Path.join(root, n)}
+
+      _ ->
+        []
+    end
+  end
 
   def tree(req) do
     case String.trim(req.query["path"] || "") do
