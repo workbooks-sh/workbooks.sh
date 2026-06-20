@@ -21,25 +21,24 @@ compiled and run in-sandbox (a real, attributable metric), in the spirit of auto
 
 ```
 agent :researcher do
-  You run ONE optimization experiment in /work. `codec.c` is yours to edit. `bench.sh`
-  is fixed — it compiles codec.c and prints `score=<bytes>` for the test corpus. LOWER
-  is better.
+  prompt """
+  You run ONE optimization experiment in /work. `codec.c` is yours to edit. `bench.sh` is
+  fixed — it compiles codec.c and prints `score=<bytes>` for the test corpus. LOWER is
+  better. Form ONE hypothesis, make the smallest edit that tests it, run `bash bench.sh`,
+  READ the real score, and report it on the LAST line as `score=<number>`. One variable at
+  a time so every delta is attributable; report the number you measured, not hoped for.
+  """
 
-  Procedure:
-    1. Form ONE hypothesis ("range-code the literals to shrink the output").
-    2. Make the smallest edit to codec.c that tests it — change one thing only.
-    3. Run `bash bench.sh` and READ the real output. Do not estimate the score.
-    4. On the LAST line, report exactly: score=<number>
-
-  Change one variable at a time so every delta is attributable. Report the number you
-  measured, never the number you hoped for. If a build breaks, fix it before scoring.
+  tools coreutils, cc                 # capabilities: edit files + the C→wasm compiler
+  grant fs                            # permissions: files only — no network for a trial
+  limit turns: 30, timeout: 300_000   # guardrails per trial
 end
 ```
 
-No experiment tracker, no harness — the instructions *are* the experiment design, which
-is exactly the part a researcher should iterate on. The compile-and-run happens through
-the agent's [kits](/tooling/toolkits) (a C→wasm command lane) inside the sandbox, so an
-unattended run can't escape `/work`.
+The agent is fully defined by the block — instructions, the capabilities it may use, the
+permission boundary, and its stop conditions. Note `grant fs` with **no** `net`: a trial
+can read and write `/work` but can't reach the network, so an unattended run can't phone
+home. The compile-and-run goes through its [kits](/tooling/toolkits) inside the sandbox.
 
 ## The loop
 
@@ -52,11 +51,14 @@ loop needs:
 
 ```
 server :lab do
-  # the :researcher prompt as a heredoc — same text as the agent block, encapsulated
-  @researcher """
-  You run ONE optimization experiment in /work. Edit codec.c, run `bash bench.sh`, READ
-  the score, and report `score=<bytes>` on the last line. Change one thing at a time.
-  """
+  # the experimenter, defined inline with the same fields as the agent block
+  @researcher [
+    prompt: "You run ONE optimization experiment in /work. Edit codec.c, run `bash bench.sh`, " <>
+            "READ the score, report `score=<bytes>` on the last line. One change at a time.",
+    tools: [:coreutils, :cc],
+    grant: [:fs],
+    limit: [turns: 30, timeout: 300_000]
+  ]
 
   # Run `rounds` trials; the best code + a log fall out the bottom.
   def run(files, rounds \\ 100) do
@@ -65,10 +67,8 @@ server :lab do
     Enum.reduce(1..rounds, init, fn n, st ->
       {:ok, %{answer: a, vfs_files: edited}} =
         Nexus.Agent.run(
-          system: @researcher,
-          task: "Trial ##{n}. Current best score is #{st.best} — try to beat it.",
-          seed: st.files,                 # hand the current best code to this trial
-          timeout_ms: 300_000
+          [task: "Trial ##{n}. Current best score is #{st.best} — try to beat it.",
+           seed: st.files] ++ @researcher    # hand the current best code to this trial
         )
 
       case parse_score(a) do

@@ -9,35 +9,35 @@ runs, how it's contained, how you give it new powers, and how you run a fleet.
 
 ## The brain
 
-An [`agent`](/tooling/authoring-an-agent) block is a unit whose **body is its system
-prompt**. The runtime gives it exactly one tool — `bash` — and the agent does everything
-by running commands in it:
+An [`agent`](/tooling/authoring-an-agent) is a **sandboxed function**: the block defines it
+completely — what it knows, what it can do, what it may touch, and where it stops. Four
+fields, nothing outside the block needed:
 
 ```
 agent :coder do
-  You are a coding agent working in /work — a checkout of the repository. Your one tool
-  is bash. Run `kits` to see what's available and `help <kit>` for a kit's commands.
+  prompt """
+  You are a coding agent working in /work — a checkout of the repository. Your one tool is
+  bash. Work like a careful engineer: read first, change ONE thing, run the tests and READ
+  the output, repeat — then stop and summarize. Never guess a result you could run for.
+  """
 
-  Work like a careful engineer:
-    1. Look first — read the relevant files and run the tests to see the current state.
-    2. Change one thing — the smallest edit that moves toward the goal.
-    3. Verify — re-run the tests and READ the output. Never assume a change worked.
-    4. Repeat, or stop — when the tests pass and the goal is met, summarize what you
-       changed and why.
-
-  Never guess a result you could get by running a command. Keep edits minimal and
-  reversible. Stuck twice on the same error? Step back and re-read the code.
+  tools coreutils, git, rg            # capabilities — the kits it may run
+  grant fs, exec                      # permissions — the host powers it may use
+  limit turns: 40, timeout: 180_000   # guardrails — when it must stop
 end
 ```
 
-There is no tool registry to wire and no agent framework — the prose *is* the program.
+- **`prompt`** — the instructions, a `"""heredoc"""` so nothing escapes (it can contain
+  quotes, code, markdown). This is the only part that's *prose*.
+- **`tools`** — its [capabilities](/tooling/toolkits): the kits (`coreutils`, a `toolkit`
+  you wrote, …) it's allowed to run in `bash`. Declared, not global.
+- **`grant`** — its permissions: the host powers (`fs`, `exec`, `net`, …) it may use. This
+  is what makes it a *sandbox* — the boundary is in the definition. → [Grants & capabilities](/capabilities/grants-and-capabilities)
+- **`limit`** — guardrails (max turns, wall-clock) so an autonomous run can't run away.
 
-**Why no quotes?** The body between `do` and `end` *is* the system prompt, verbatim. The
-block delimiter is the encapsulation — like a heredoc — so you never quote or escape the
-prompt, and it can contain quotes, code, markdown, or anything else freely. (A quoted
-string would break the moment the prompt contained the quote character; `do … end`
-doesn't.) When you need the same prompt as a string in Elixir code, use a `"""triple-quoted
-heredoc"""` — the equivalent encapsulation — as in the `server` below.
+`tools`/`grant`/`limit` are composable Elixir — a value, a list, or a reference to
+something defined elsewhere. That's the whole agent; you don't define it twice. (Shorthand:
+`agent :x do …prose… end` with no fields is just a prompt — fine for a quick brain.)
 
 ## Where it runs, and how it's contained
 
@@ -89,28 +89,24 @@ transcript, or context-window management.
 
 ## Giving it a task
 
-An agent's body is just its `system` prompt, so you run it from a [`server`](/language/placement-and-languages)
-with `Nexus.Agent.run/1`. Here the prompt lives in a `@coder` module attribute as a
-`"""heredoc"""` — the same text you'd put in the `agent` block, now safely encapsulated as
-a string. `run/1` seeds files into `/work`, runs the loop, and returns the final answer
-plus whatever the agent wrote:
+The `agent :coder` block above *is* the agent; the runtime runs declared agents for you. To
+drive one from your own code — seeding a repo into `/work` and capturing the edits — call
+`Nexus.Agent.run/1` from a [`server`](/language/placement-and-languages). It takes the **same
+fields as the block** (`prompt`, `tools`, `grant`, `limit`), runs the loop, and returns the
+final answer plus whatever the agent wrote:
 
 ```
 server :fix do
-  @coder """
-  You are a coding agent working in /work. Your one tool is bash. Work in small steps:
-  read the code, make ONE change, run the tests, READ the output, repeat — then stop and
-  summarize. Never guess a result you could get by running a command.
-  """
-
   route "POST /fix", :run
 
   def run(req) do
     case Nexus.Agent.run(
-           system: @coder,
-           task: req.body["task"],        # "make the failing date test pass"
-           seed: req.body["files"],       # %{"lib/date.ex" => "…", "test/date_test.exs" => "…"}
-           timeout_ms: 180_000
+           prompt: "You fix failing tests in /work. Read, change one thing, run the tests, repeat.",
+           tools: [:coreutils, :git, :rg],
+           grant: [:fs, :exec],
+           limit: [turns: 40, timeout: 180_000],
+           task: req.body["task"],         # "make the failing date test pass"
+           seed: req.body["files"]         # %{"lib/date.ex" => "…", "test/date_test.exs" => "…"}
          ) do
       {:ok, %{answer: summary, vfs_files: files}} -> %{summary: summary, files: files}
       {:error, reason} -> {500, %{error: inspect(reason)}}
@@ -119,8 +115,9 @@ server :fix do
 end
 ```
 
-`seed` writes the repo into the sandbox; `vfs_files` hands back the edited files — the
-diff. The agent did the reading, editing, and test-running in between.
+Same vocabulary either way: declare a reusable agent with the `agent` block, or define one
+inline here for a one-off — `prompt`/`tools`/`grant`/`limit` mean the same thing in both.
+`seed` writes the repo into the sandbox; `vfs_files` hands back the edited files — the diff.
 
 ## Running a fleet
 
@@ -129,15 +126,15 @@ failing ticket; the BEAM runs thousands of lightweight processes, so they go at 
 
 ```
 server :sweep do
-  @coder """
-  You are a coding agent working in /work … (the same prompt as a heredoc).
-  """
+  @coder [
+    prompt: "You fix failing tests in /work. Read, change one thing, run the tests, repeat.",
+    tools: [:coreutils, :git, :rg],
+    grant: [:fs, :exec]
+  ]
 
   def run(tickets) do
     tickets
-    |> Enum.map(fn t ->
-      Task.async(fn -> Nexus.Agent.run(system: @coder, task: t.body, seed: t.repo) end)
-    end)
+    |> Enum.map(fn t -> Task.async(fn -> Nexus.Agent.run([task: t.body, seed: t.repo] ++ @coder) end) end)
     |> Task.await_many(:infinity)
   end
 end
@@ -148,8 +145,9 @@ One agent or a thousand is the same code — only the list gets longer. That fan
 
 ## What to take away
 
-- **The agent is prose**; the loop, tools, and sandbox are the runtime's job.
-- **It runs server-side, sandboxed** — `bash` = wasm kits over a `/work` VFS, web brokered.
-- **Capabilities are kits** — add one by authoring a [`toolkit`](/tooling/toolkits), no
-  agent change.
-- **Running it is `Nexus.Agent.run/1`**, so scaling it is a `Task.async` map.
+- **An agent is a sandboxed function** — `prompt` + `tools` + `grant` + `limit`, the whole
+  definition in one block. Nothing outside it.
+- **It runs server-side, sandboxed** — `bash` = wasm kits over a `/work` VFS, web brokered;
+  `grant` is the boundary, `limit` the stop.
+- **Capabilities are kits** declared in `tools` — add a new one with a [`toolkit`](/tooling/toolkits).
+- **Run it with `Nexus.Agent.run/1`** (same fields as the block), so scaling is a `Task.async` map.

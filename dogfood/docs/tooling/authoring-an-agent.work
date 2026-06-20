@@ -1,52 +1,76 @@
 # Authoring an agent
 
-An [`agent`](/language/kinds-reference) is a unit with a brain: a server-side block
-that can reason and act, not just compute. Where a [`server`](/language/placement-and-languages)
-unit runs a function, an agent reads a goal, decides what to do, and uses tools to do
-it — all declared in the same `.work` file as everything else.
+An [`agent`](/language/kinds-reference) is a **sandboxed function**: a server-side unit
+whose whole definition lives in one block. Where a [`server`](/language/placement-and-languages)
+unit runs code you wrote, an agent reads a goal and acts — it reasons, runs tools, reads
+the results, and loops until it's done. You define *what it knows, what it can do, what it
+may touch, and when it stops* — and nothing outside the block is needed.
 
-## The brain is prose
+## The four fields
 
-An agent's body is its instructions, written as plain prose. You describe who it is
-and how it should behave; that *is* the program:
-
+```
 agent :analyst do
-  You are a terse data analyst. You have one tool, bash, with a coreutils kit
-  (sort, uniq, cut, wc) and built-in web access (search, scrape). Always COMPUTE
-  with bash against /work — never guess a number. When you have the answer, reply
-  with exactly the requested format, nothing else.
+  prompt """
+  You are a terse data analyst. COMPUTE every number with bash against /work — never
+  guess one. When you have the answer, reply in exactly the requested format.
+  """
+
+  tools coreutils, web              # capabilities — the kits it may run
+  grant fs                          # permissions — the host powers it may use
+  limit turns: 20, timeout: 120_000 # guardrails — when it must stop
 end
+```
 
-There's no separate prompt file and no framework glue. The brain lives where you can
-read it next to the data and logic it works over — the same legibility the whole
-format is built on.
+- **`prompt`** — the instructions, a `"""heredoc"""` (the encapsulation; nothing escapes,
+  so it can contain quotes, code, markdown). This is the only *prose* field.
+- **`tools`** — its capabilities: the [kits](/tooling/toolkits) it's allowed to run in
+  `bash` (`coreutils`, `web`, any `toolkit` you authored). Declared, not global.
+- **`grant`** — its permissions: the host powers (`fs`, `net`, `exec`, …) it may use. This
+  is the sandbox boundary, written into the definition. → [Grants & capabilities](/capabilities/grants-and-capabilities)
+- **`limit`** — guardrails (`turns`, `timeout`) so an autonomous run can't run away.
 
-## Tools are capabilities
+`tools`/`grant`/`limit` are composable Elixir — a value, a list, or a reference to
+something defined elsewhere. **Shorthand:** if all you need is a prompt, write the prose
+straight in the body — `agent :x do …instructions… end` — and the runtime treats the whole
+body as the prompt. The four-field form is the canonical one; the shorthand is for a quick
+brain with default capabilities.
 
-An agent acts through tools, and tools are just brokered powers — the same
-[capabilities](/capabilities/grants-and-capabilities) any sandboxed block uses. The
-key tool is **bash**: the agent runs commands in a capability-scoped box, against a
-mounted work area (`/work`), with [toolkits](/tooling/toolkits) as the available
-commands. It computes real answers instead of hallucinating them, because the box
-gives it real tools.
+## How it's contained
 
-Every agent has a coreutils base and built-in web access (search, scrape, operate a
-site); the toolkits you write add commands on top. The
-[Dock](/capabilities/sandboxing-and-the-dock) is the wall here — the agent only ever
-runs commands inside the sandbox, against `/work`, never the host. An agent is
-powerful *and* contained.
+Everything the agent does, it does through `bash` — and `bash` is not a host shell. Each
+command is a **wasm kit run in wasmtime against a `/work` virtual filesystem**, so the
+agent reads and writes only inside `/work` and runs only the kits in its `tools`. It can't
+reach the host filesystem, spawn host processes, or open a raw socket; web access is a
+brokered, SSRF-gated capability. `grant` sets the boundary, `limit` sets the stop — the
+blast radius of an autonomous agent is its own sandbox. → [Sandboxing & the Dock](/capabilities/sandboxing-and-the-dock)
 
-## It runs on the Nexus
+## Running it
 
-Agents are server-placed: they run on the [Nexus](/introduction/what-is-the-nexus),
-on the BEAM, with access to the runtime's brokered model completion and the tools you
-declare. That's why the brain is a `server`-side kind — reasoning and tool use are
-host powers, mediated like any other.
+`agent` is a server-side kind — it runs on the [Nexus](/introduction/what-is-the-nexus),
+on the BEAM, where the model and tools live. The runtime drives the loop for you: call the
+model with `bash` available → run any command in the sandbox → feed the output back →
+repeat → stop on a final answer or a `limit`. To run one from your own code (seeding files,
+capturing edits), call `Nexus.Agent.run/1` with the **same fields** as the block:
 
-## The same review loop
+```
+Nexus.Agent.run(
+  prompt: "You are a terse data analyst …",
+  tools:  [:coreutils, :web],
+  grant:  [:fs],
+  task:   "How many unique users are in users.csv?",
+  seed:   %{"users.csv" => csv}
+)
+# => {:ok, %{answer: "…", vfs_files: %{…}}}
+```
 
-Because the agent's instructions are prose and its commands are the toolkits in the
-workbook, you review an agent the way you review any block: read what it's told to do,
-see which toolkits it can run. No hidden system prompt, no opaque tool registry — the
-agent is as auditable as the rest of the workbook. To give it commands of your own,
-write a [toolkit](/tooling/toolkits).
+Declare a reusable agent with the block; define one inline here for a one-off — the field
+names mean the same thing in both. See it built end to end in [A coding agent](/examples/coding-agent)
+and fanned out in [Agents at scale](/examples/agents-at-scale).
+
+## It's auditable
+
+Because the agent's powers are *declared* — `tools`, `grant`, `limit` — you review it the
+way you review any block: read the prompt, see exactly which kits it can run and which host
+powers it holds. No hidden system prompt, no opaque tool registry, no ambient access. The
+capability audit checks an agent against its grants, just like a [sandbox](/capabilities/grants-and-capabilities).
+To give it a new command, write a [toolkit](/tooling/toolkits) and add it to `tools`.
