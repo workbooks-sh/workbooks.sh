@@ -456,12 +456,16 @@ defmodule Nexus.SSR do
         {block, rest2} = Enum.split_while([line | rest], &(String.trim(&1) != ""))
         group_blocks(rest2, [{:ul, list_items(block)} | acc])
 
+      String.starts_with?(String.trim(line), "|") ->
+        {rows, rest2} = Enum.split_while([line | rest], &String.starts_with?(String.trim(&1), "|"))
+        group_blocks(rest2, [{:table, rows} | acc])
+
       true ->
         {para, rest2} =
           Enum.split_while([line | rest], fn l ->
             tl = String.trim(l)
             tl != "" and not String.starts_with?(tl, "- ") and not String.starts_with?(tl, ">") and
-              not String.starts_with?(l, "```")
+              not String.starts_with?(tl, "|") and not String.starts_with?(l, "```")
           end)
 
         group_blocks(rest2, [{:p, para} | acc])
@@ -480,6 +484,24 @@ defmodule Nexus.SSR do
 
   defp render_block({:p, lines}),
     do: "  <p>#{inline(lines |> Enum.map_join(" ", &String.trim/1))}</p>"
+
+  # GFM-style pipe table: first row is the header, an optional `|---|---|` separator row
+  # is dropped, the rest are body rows. Cells get inline formatting.
+  defp render_block({:table, rows}) do
+    cells = fn r -> r |> String.trim() |> String.trim("|") |> String.split("|") |> Enum.map(&String.trim/1) end
+    sep? = fn r -> String.contains?(r, "-") and Enum.all?(cells.(r), &Regex.match?(~r/^:?-{2,}:?$/, &1)) end
+    rows = rows |> Enum.reject(&(String.trim(&1) == ""))
+
+    {head, body} =
+      case rows do
+        [h | t] -> {cells.(h), t |> Enum.reject(sep?) |> Enum.map(cells)}
+        [] -> {[], []}
+      end
+
+    th = "<thead><tr>" <> Enum.map_join(head, "", &"<th>#{inline(&1)}</th>") <> "</tr></thead>"
+    tb = "<tbody>" <> Enum.map_join(body, "", fn r -> "<tr>" <> Enum.map_join(r, "", &"<td>#{inline(&1)}</td>") <> "</tr>" end) <> "</tbody>"
+    "  <table class=\"data wb-verbs\">#{th}#{tb}</table>"
+  end
 
   # Fold a list block into item strings: each "- " starts an item; any following
   # non-"- " line is a soft-wrapped continuation of the current item.
