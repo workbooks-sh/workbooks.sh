@@ -94,7 +94,7 @@ defmodule Nexus.SSR do
     #{design_css(pages)}</head>
     <body>
     <div class="wb-site">
-      <aside class="wb-side"><div class="wb-brand">#{esc(meta.title)}</div><nav class="wb-nav">#{nav}</nav></aside>
+      <aside class="wb-side"><div class="wb-brand">#{esc(meta.title)}</div><nav class="wb-nav">#{nav}<i class="wb-active-mark" aria-hidden="true" hidden></i></nav></aside>
       <main class="wb-main">#{articles}</main>
     </div>
     <script>#{site_router()}</script>
@@ -166,8 +166,22 @@ defmodule Nexus.SSR do
         arts.forEach(function(a){var on=a.dataset.route===k;a.hidden=!on;if(on)hit=true;});
         if(!hit&&arts[0]){arts[0].hidden=false;k=arts[0].dataset.route;}
         document.querySelectorAll('.wb-link').forEach(function(l){l.classList.toggle('on',l.dataset.route===k);});
+        mark();
         window.scrollTo(0,0);
       }
+      // Neutral active-position indicator: expose the active link's geometry + accent on a
+      // marker element. All appearance (visibility, colour, motion) is the brand sheet's call.
+      function mark(){
+        var act=document.querySelector('.wb-link.on'),mk=document.querySelector('.wb-active-mark');
+        if(!act||!mk)return;
+        var nv=act.closest('.wb-nav'),ar=act.getBoundingClientRect(),nr=nv.getBoundingClientRect();
+        mk.style.top=(ar.top-nr.top)+'px';
+        mk.style.height=ar.height+'px';
+        var c=getComputedStyle(act).getPropertyValue('--sec');
+        if(c)mk.style.setProperty('--wb-mark-color',c.trim());
+        mk.hidden=false;
+      }
+      window.addEventListener('resize',mark);
       function go(k){history.pushState({},'',base+k);show(k);}
       document.addEventListener('click',function(e){
         var a=e.target.closest('a[data-route],a[href^="/"]');if(!a)return;
