@@ -30,7 +30,11 @@ defmodule Nexus.Toolkit.Js do
   class $NonEmpty extends $List { constructor(head, tail) { super(); this.head = head; this.tail = tail; } }
   function $toList(arr) { let l = new $Empty(); for (let i = arr.length - 1; i >= 0; i--) l = new $NonEmpty(arr[i], l); return l; }
   function $prepend(x, l) { return new $NonEmpty(x, l); }
+  function $toArray(l) { let a = []; while (l instanceof $NonEmpty) { a.push(l.head instanceof $List ? $toArray(l.head) : l.head); l = l.tail; } return a; }
+  function $out(r) { return r instanceof $List ? $toArray(r) : r; }
   """
+
+  @reg {__MODULE__, :registry}
 
   # ── public API ──────────────────────────────────────────────────────────────────────────────
 
@@ -65,6 +69,92 @@ defmodule Nexus.Toolkit.Js do
 
   @doc "The minimal cons-cell + helpers prelude (classic JS, globals)."
   def prelude, do: @prelude
+
+  @doc "Exported functions of a toolkit source as `[{name, arity}]`. `{:ok, list} | {:error, _}`."
+  def exports(source) when is_binary(source) do
+    case Code.string_to_quoted(source) do
+      {:ok, ast} -> {:ok, ast |> collect_defs() |> Enum.map(fn {n, a, _, _} -> {n, a} end) |> Enum.uniq()}
+      {:error, e} -> {:error, {:parse, e}}
+    end
+  end
+
+  # ── registry + build (the `toolkit` lane for Elixir-authored toolkits) ─────────────────────────
+
+  @doc """
+  Build an Elixir-authored `toolkit` node: transpile to runnable JS, register it, return `{:ok, name}`.
+  Routed here from `Nexus.Toolkit.build/1` when the toolkit's language is Elixir.
+  """
+  def build(%{name: name, body: body}) do
+    with {:ok, js} <- runnable(body),
+         {:ok, exs} <- exports(body) do
+      register(name, %{name: name, js: js, exports: exs})
+      {:ok, name}
+    end
+  end
+
+  @doc "Register a built JS toolkit under `name`."
+  def register(name, entry) do
+    :persistent_term.put(@reg, Map.put(registry(), to_string(name), entry))
+    :ok
+  end
+
+  @doc "Look up a registered JS toolkit. `nil` if absent."
+  def lookup(name), do: Map.get(registry(), to_string(name))
+
+  @doc "Clear the JS-toolkit registry (test helper)."
+  def clear, do: :persistent_term.put(@reg, %{})
+
+  defp registry, do: :persistent_term.get(@reg, %{})
+
+  # ── invocation (eval a toolkit function in the shared StarlingMonkey eval-host) ────────────────
+
+  @doc """
+  Invoke `fun` of a registered toolkit `name` (or pass a `{:js, src}` tuple for ad-hoc JS) with
+  `args` (Elixir terms; lists become cons-lists, scalars pass through). Returns `{:ok, term} | {:error, _}`.
+
+  `opts[:host]` — a JS snippet defining `$host` (the capability bridge). Defaults to a no-op stub;
+  real path-scoped caps are wired by the eval-host (see the cap-bridge work).
+  """
+  def invoke(name_or_src, fun, args \\ [], opts \\ []) do
+    with {:ok, js} <- resolve_js(name_or_src) do
+      src = driver(js, fun, args, opts)
+
+      case Nexus.JsEngine.eval(src, opts) do
+        {:ok, out} -> decode(out)
+        {:error, r} -> {:error, {:eval, r}}
+      end
+    end
+  end
+
+  @doc "The full classic script (prelude + toolkit + host + a `JSON.stringify($out(fun(args)))` tail). Exposed for testing."
+  def driver(js, fun, args, opts \\ []) do
+    host = Keyword.get(opts, :host, "var $host = { emit: function(_m){ return null; } };")
+    call = "#{fun}(#{Enum.map_join(args, ", ", &marshal/1)})"
+    # assign then bare-reference $result: Nexus.JsEngine returns the LAST expression coerced to string.
+    js <> "\n" <> host <> "\nvar $result = JSON.stringify($out(" <> call <> "));\n$result\n"
+  end
+
+  defp resolve_js({:js, src}) when is_binary(src), do: {:ok, src}
+  defp resolve_js(name) do
+    case lookup(name) do
+      %{js: js} -> {:ok, js}
+      nil -> {:error, {:unknown_toolkit, name}}
+    end
+  end
+
+  # Elixir term → JS literal for an argument. Lists → cons-list; scalars via JSON.
+  defp marshal(arg) when is_list(arg), do: "$toList(#{Jason.encode!(arg)})"
+  defp marshal(arg) when is_integer(arg) or is_float(arg) or is_binary(arg) or is_boolean(arg),
+    do: Jason.encode!(arg)
+  defp marshal(arg) when is_atom(arg), do: Jason.encode!(Atom.to_string(arg))
+
+  defp decode(""), do: {:ok, nil}
+  defp decode(out) do
+    case Jason.decode(out) do
+      {:ok, v} -> {:ok, v}
+      {:error, _} -> {:ok, out}
+    end
+  end
 
   # ── collection / grouping ─────────────────────────────────────────────────────────────────────
 

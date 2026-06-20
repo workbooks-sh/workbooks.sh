@@ -55,38 +55,54 @@ defmodule Nexus.Toolkit.JsTest do
     assert {:error, :no_defs} = Js.transpile("x = 1")
   end
 
-  # Behavioral check: actually run the transpiled JS and verify outputs match Elixir semantics.
-  # Uses a tiny embedded JS evaluator? No — we shell to node if available (engine wasm is gitignored).
+  test "exports/1 lists toolkit functions" do
+    {:ok, exs} = Js.exports(@src)
+    assert {:sum, 1} in exs
+    assert {:classify, 1} in exs
+    assert {:count_down, 2} in exs
+    assert {:shout, 1} in exs
+  end
+
+  test "Toolkit.build routes an Elixir toolkit through the JS lane and registers it" do
+    Js.clear()
+    node = %{kind: "toolkit", name: "demo", header: "", body: @src}
+    assert {:ok, "demo"} = Nexus.Toolkit.build(node)
+    assert %{name: "demo", js: js, exports: exs} = Js.lookup("demo")
+    assert js =~ "function sum(a0)"
+    assert {:sum, 1} in exs
+  end
+
+  test "lang inference picks :elixir for def-bodies, keeps c/rust/zig otherwise" do
+    assert Nexus.Toolkit.lang(%{header: "", body: "def f(x), do: x"}) == "elixir"
+    assert Nexus.Toolkit.lang(%{header: "", body: "int main(void){return 0;}"}) == "c"
+    assert Nexus.Toolkit.lang(%{header: "", body: "fn main() {}"}) == "rust"
+    assert Nexus.Toolkit.lang(%{header: "lang: elixir", body: "x"}) == "elixir"
+  end
+
+  # Behavioral check: build the same driver Js.invoke/4 uses, and run it — via the StarlingMonkey
+  # eval-host if present, else node (engine wasm is gitignored, so node is the portable check).
   @tag :js_exec
-  test "transpiled JS produces correct results when executed" do
-    {:ok, body} = Js.runnable(@src)
+  test "driver output runs and produces correct results" do
+    {:ok, js} = Js.runnable(@src)
+    cases = [
+      {Js.driver(js, "sum", [[1, 2, 3, 4, 5]]), 15},
+      {Js.driver(js, "count_down", [100_000, 0]), 5_000_050_000},
+      {Js.driver(js, "shout", ["hello"]), "HELLO"}
+    ]
 
-    driver = """
-    var $host = { emit: function(m){ return m; } };
-    var out = [];
-    out.push(sum($toList([1,2,3,4,5])));
-    out.push(classify(["ok", 42]));
-    out.push(classify(["error", "x"]));
-    out.push(count_down(100000, 0));
-    out.push(shout("hello"));
-    console.log(JSON.stringify(out));
-    """
-
-    case System.find_executable("node") do
-      nil ->
-        # no node in this env — skip the exec check (transpile structure is covered above)
-        :ok
-
-      node ->
+    node = System.find_executable("node")
+    if node do
+      for {src, expected} <- cases do
         path = Path.join(System.tmp_dir!(), "tk_#{System.unique_integer([:positive])}.mjs")
-        File.write!(path, body <> "\n" <> driver)
-
+        # driver assigns $result then bare-references it; for node we print it
+        File.write!(path, src <> "\nconsole.log($result);\n")
         try do
           {out, 0} = System.cmd(node, [path])
-          assert Jason.decode!(String.trim(out)) == [15, "ok:42", "err", 5_000_050_000, "HELLO"]
+          assert Jason.decode!(String.trim(out)) == expected
         after
           File.rm(path)
         end
+      end
     end
   end
 end

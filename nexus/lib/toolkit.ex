@@ -21,8 +21,15 @@ defmodule Nexus.Toolkit do
   """
 
   @doc "Compile + register a `toolkit` unit. Returns `{:ok, name} | {:error, reason}`."
-  def build(%{kind: "toolkit", name: name, body: body} = node) do
-    with {:ok, wasm} <- compile(lang(node), body) do
+  def build(%{kind: "toolkit"} = node) do
+    case lang(node) do
+      "elixir" -> Nexus.Toolkit.Js.build(node)
+      lang -> build_cli(lang, node)
+    end
+  end
+
+  defp build_cli(lang, %{name: name, body: body}) do
+    with {:ok, wasm} <- compile(lang, body) do
       Nexus.Agent.Kits.register(name, wasm, summary: summary(body, name), commands: [name])
       {:ok, name}
     end
@@ -45,6 +52,9 @@ defmodule Nexus.Toolkit do
     cond do
       body =~ ~r/\bpub\s+fn\s+main\b/ -> "zig"
       body =~ ~r/\bfn\s+main\b/ -> "rust"
+      # Elixir-authored toolkit: `def …` (C/Rust/Zig use `fn`, not `def`). Transpiled → JS, run in the
+      # StarlingMonkey eval-host (Nexus.Toolkit.Js) rather than compiled to a wasm CLI.
+      body =~ ~r/\bdef\s+\w/ -> "elixir"
       true -> "c"
     end
   end
