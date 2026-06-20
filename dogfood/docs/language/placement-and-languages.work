@@ -19,16 +19,7 @@ ground:
   untrusted or risky work without handing it the keys to everything.
 
 A `client` block is the clearest to *see*, because its body renders right where you
-read it. Here's a live one — click it:
-
-client :counter do
-  <button class="demo-btn" onclick="this._n=(this._n||0)+1;this.querySelector('b').textContent=this._n">
-    Clicks <b>0</b>
-  </button>
-end
-
-That button *is* the block above — emitted straight into this page, running
-client-side. Here's the `.work` that produced it:
+read it. Here's one written in a `.work` file:
 
 ```
   client :counter do
@@ -38,6 +29,14 @@ client-side. Here's the `.work` that produced it:
     </button>
   end
 ```
+
+And here is that exact block running, emitted straight into this page — click it:
+
+client :counter do
+  <button class="demo-btn" onclick="this._n=(this._n||0)+1;this.querySelector('b').textContent=this._n">
+    Clicks <b>0</b>
+  </button>
+end
 
 Same file, but `client` draws in the browser while `server` runs on the engine —
 which is how one document describes the whole application.

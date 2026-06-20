@@ -36,17 +36,8 @@ browser shouldn't.
 ## client — runs in the browser
 
 A `client` block is a browser island. Its body is the interface, rendered into the
-page and run in the browser. This is the part people see and touch — here's a real
-one, running right now:
-
-client :counter do
-  <button class="demo-btn" onclick="this._n=(this._n||0)+1;this.querySelector('b').textContent=this._n">
-    Clicks <b>0</b>
-  </button>
-end
-
-And that button *is* the source above — no build step you wrote, no separate file.
-Here is the `.work` that produced it:
+page and run in the browser. This is the part people see and touch. Here's one in a
+`.work` file:
 
 ```
   client :counter do
@@ -56,6 +47,15 @@ Here is the `.work` that produced it:
     </button>
   end
 ```
+
+And here is that same block running — emitted into this page, no build step you wrote,
+no separate file. Click it:
+
+client :counter do
+  <button class="demo-btn" onclick="this._n=(this._n||0)+1;this.querySelector('b').textContent=this._n">
+    Clicks <b>0</b>
+  </button>
+end
 
 Same file, different home: the `server` above runs on the engine, this `client` runs
 in the browser — and they sit side by side in one document.
