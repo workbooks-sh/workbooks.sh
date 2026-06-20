@@ -376,6 +376,15 @@ defmodule Nexus.Compile do
         {u.name, try_materialize(u)}
       end
 
+    # Register declared hooks (the reactive layer) so the event bus can dispatch to them at runtime.
+    for u <- Map.get(by_kind, "hook", []) do
+      try do
+        Nexus.Hook.compile(u)
+      rescue
+        e -> require Logger; Logger.warning("[compile] hook #{u.name} failed: #{Exception.message(e)}")
+      end
+    end
+
     wasm = Enum.flat_map(~w(rust c cpp zig swift), &Map.get(by_kind, &1, []))
 
     %{
