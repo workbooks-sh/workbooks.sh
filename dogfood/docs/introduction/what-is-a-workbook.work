@@ -25,9 +25,11 @@ is the weave, and its output is the workbook.
 
 You never assemble a workbook by hand — the CLI does it from the source folder:
 
+```
 work weave <dir> <out>   # fold the .work tree into one workbook
 work check <dir>         # resolve refs + audit what each block may do
 work dev <dir>           # watch the folder and re-weave as you edit
+```
 
 `work weave` reads the whole tree, resolves the links between files, and emits a
 single artifact. `work dev` does the same continuously, re-weaving on every save and

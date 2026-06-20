@@ -72,4 +72,12 @@ design :brand do
   .prose figure.unit figcaption{border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--dim)}
   .prose figure.unit .kind{background:var(--ink);color:var(--paper);padding:.1em .5em;border-radius:5px;text-transform:uppercase;font-size:10.5px;letter-spacing:.05em}
   .prose figure.unit pre{background:transparent}
+
+  /* live demo button used by the `client :counter` examples */
+  .prose .demo-btn{font:inherit;display:inline-flex;align-items:center;gap:.5em;
+    padding:.55em 1em;border:1px solid var(--line);border-radius:9px;background:var(--card);
+    color:var(--ink);cursor:pointer;transition:border-color .15s ease,transform .05s ease}
+  .prose .demo-btn:hover{border-color:var(--pcd)}
+  .prose .demo-btn:active{transform:translateY(1px)}
+  .prose .demo-btn b{color:var(--pcd);font-weight:600;font-variant-numeric:tabular-nums}
 end

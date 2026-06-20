@@ -19,7 +19,9 @@ ground:
   untrusted or risky work without handing it the keys to everything.
 
 client :counter do
-  <button onclick="this.textContent = 'clicked ' + (this._n = (this._n||0)+1)">clicked 0</button>
+  <button class="demo-btn" onclick="this._n=(this._n||0)+1;this.querySelector('b').textContent=this._n">
+    Clicks <b>0</b>
+  </button>
 end
 
 Same file, but `client` draws in the browser while `server` runs on the engine —
