@@ -94,10 +94,12 @@ defmodule Nexus.Platform do
   get "/me" do
     id = conn.assigns[:identity] || %{}
     user_id = id[:user]
-    orgs = if is_binary(user_id), do: Nexus.WorkOS.orgs_for_user(user_id), else: []
+    # One org per user (native auth). Drop the WorkOS lookup — orgs is the user's own org.
+    o = org(conn)
+    orgs = if is_binary(o), do: [%{id: o, name: org_name(o)}], else: []
     # Native session carries name/email (Nexus.Auth.Native.identity); surface them so the
     # dashboard's account row shows the real signed-in user, not a blank.
-    j(conn, 200, %{user: %{id: user_id, name: id[:name] || "", email: id[:email] || ""}, active_org: org(conn), orgs: orgs})
+    j(conn, 200, %{user: %{id: user_id, name: id[:name] || "", email: id[:email] || ""}, active_org: o, orgs: orgs})
   end
 
   get "/storage" do
@@ -121,6 +123,51 @@ defmodule Nexus.Platform do
   delete "/tokens/:id" do
     Nexus.ControlPlane.Token.revoke(org(conn), conn.params["id"])
     j(conn, 200, %{ok: true})
+  end
+
+  # ── org members + invitations (native auth — Nexus.Auth.Accounts, no third-party IdP) ──────────
+  # The org roster is the org's users; invitations are pending until the invitee signs up (then they
+  # join THIS org with the invited role). Generic runtime mechanism — any deployer's org gets it.
+  get "/members" do
+    o = org(conn)
+
+    members =
+      Enum.map(Nexus.Auth.Accounts.list_org(o), fn m ->
+        name = if m.name == "", do: o |> to_string() |> then(fn _ -> hd(String.split(m.email, "@")) end), else: m.name
+        %{id: m.id, name: name, email: m.email, role: m.role, lastActive: nil}
+      end)
+
+    pending = Enum.map(Nexus.Auth.Accounts.list_invites(o), &%{id: &1.id, email: &1.email})
+    j(conn, 200, %{workspace: org_name(o), members: members, pending: pending})
+  end
+
+  post "/members/invite" do
+    body = read(conn)
+    email = body |> Map.get("email", "") |> to_string() |> String.trim()
+    role = body |> Map.get("role", "member") |> to_string()
+
+    if email == "" do
+      j(conn, 400, %{error: "Email is required"})
+    else
+      case Nexus.Auth.Accounts.invite(org(conn), email, role, (conn.assigns[:identity] || %{})[:user]) do
+        {:ok, _inv} -> j(conn, 200, %{invited: email})
+        {:error, :bad_email} -> j(conn, 400, %{error: "Enter a valid email"})
+        _ -> j(conn, 400, %{error: "Invite failed"})
+      end
+    end
+  end
+
+  delete "/members/:id" do
+    case Nexus.Auth.Accounts.remove_member(org(conn), conn.params["id"]) do
+      :ok -> j(conn, 200, %{removed: true})
+      {:error, :last_owner} -> j(conn, 400, %{error: "Can't remove the org's only owner"})
+      _ -> j(conn, 400, %{error: "Remove failed"})
+    end
+  end
+
+  post "/invitations/:id/revoke" do
+    Nexus.Auth.Accounts.revoke_invite(org(conn), conn.params["id"])
+    j(conn, 200, %{revoked: true})
   end
 
   # ── custom domains (paid-tier, owner-verified — share from your domain, not ours) ──────────────
@@ -260,6 +307,9 @@ defmodule Nexus.Platform do
 
   # ── helpers ──────────────────────────────────────────────────────────────────────────────────
   defp org(conn), do: conn.assigns[:tenant]
+  # Display name for an org — set by onboarding (next increment); nil ⇒ the dashboard falls back to
+  # a generic "your workspace" label, exactly as the source does on an unnamed org.
+  defp org_name(_o), do: nil
 
   defp lifecycle(conn, fun) do
     case fun.(conn.params["id"], org(conn)) do

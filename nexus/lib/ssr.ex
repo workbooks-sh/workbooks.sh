@@ -267,7 +267,7 @@ defmodule Nexus.SSR do
     <style>#{css(app?)}</style>
     #{design_css(pages)}</head>
     <body>
-    #{nav(pages)}#{body}
+    #{if app?, do: "", else: nav(pages)}#{body}
     #{data_islands(res, ctx)}<script>#{js_shim(live)}</script>
     </body></html>
     """

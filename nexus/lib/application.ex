@@ -16,6 +16,13 @@ defmodule Nexus.Application do
     # Load runtime config from the deployment's `deploy` block (the .work source of truth) into
     # :persistent_term BEFORE the Gate reads its concurrency limit. No env vars for tunable config.
     Nexus.Config.boot()
+    # The server HTML cache (rendered workbooks). Create it here so the LONG-LIVED application process
+    # owns it. Otherwise the first REQUEST process to render creates+owns it, and ETS deletes the table
+    # when that request ends — so the next concurrent insert throws ArgumentError (intermittent 500s
+    # under load / right after a cold start). :public so any request process can read/write.
+    if :ets.whereis(:nexus_server_cache) == :undefined do
+      :ets.new(:nexus_server_cache, [:named_table, :public, :set, read_concurrency: true, write_concurrency: true])
+    end
     # A serving nexus persists to durable SQLite on the mounted volume (Litestream ships it off-box;
     # see Nexus.Litestream). Dev/test set their own adapter explicitly, so only adopt SQLite when the
     # adapter is still the in-memory default — never clobber a deliberate choice.

@@ -12,8 +12,13 @@ defmodule Nexus.Auth.Native do
   def signup(conn) do
     p = body(conn)
 
-    case Accounts.create(p["email"], to_string(p["password"]), name: p["name"]) do
+    # A pending invite places the new user in THAT org (with its role) instead of a fresh one.
+    invite = Accounts.invite_for_email(to_string(p["email"]))
+    opts = [name: p["name"]] ++ if(invite, do: [org: invite.org, role: invite.role], else: [])
+
+    case Accounts.create(p["email"], to_string(p["password"]), opts) do
       {:ok, user} ->
+        if invite, do: Accounts.consume_invite(user.email)
         send_verification(user)
         conn |> Session.issue(identity(user)) |> json(200, %{ok: true, user: pub(user)})
 

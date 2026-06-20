@@ -34,12 +34,15 @@ defmodule Nexus.Auth.Accounts do
         ensure()
         id = "usr_" <> rand(8)
         org = opts[:org] || ("org_" <> rand(12))
+        # The creator of a NEW org is its owner; someone joining an existing org (an invite) gets the
+        # invited role (default member).
+        role = to_string(opts[:role] || if(opts[:org], do: "member", else: "owner"))
         now = System.system_time(:second)
 
-        exec("INSERT INTO users(id,email,pw_hash,org,name,verified,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7)",
-          [id, email, hash_password(password), org, to_string(opts[:name] || ""), bool(opts[:verified]), now])
+        exec("INSERT INTO users(id,email,pw_hash,org,name,verified,created_at,role) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+          [id, email, hash_password(password), org, to_string(opts[:name] || ""), bool(opts[:verified]), now, role])
 
-        {:ok, %{id: id, email: email, org: org, name: to_string(opts[:name] || ""), verified: !!opts[:verified], created_at: now}}
+        {:ok, %{id: id, email: email, org: org, name: to_string(opts[:name] || ""), role: role, verified: !!opts[:verified], created_at: now}}
     end
   end
 
@@ -65,6 +68,69 @@ defmodule Nexus.Auth.Accounts do
 
   def mark_verified(id), do: exec("UPDATE users SET verified=1 WHERE id=?1", [id])
   def set_password(id, password), do: exec("UPDATE users SET pw_hash=?1 WHERE id=?2", [hash_password(password), id])
+
+  # ── org members ─────────────────────────────────────────────────────────────────────────────────
+  @doc "Everyone in `org` — the org roster. `[%{id, name, email, role, created_at}]`, owners first."
+  def list_org(org) do
+    ensure()
+    rows("SELECT id,email,name,role,created_at FROM users WHERE org=?1", [org])
+    |> Enum.map(fn [id, em, name, role, created] ->
+      %{id: id, email: em, name: to_string(name), role: role || "member", created_at: created}
+    end)
+    |> Enum.sort_by(fn m -> {if(m.role == "owner", do: 0, else: 1), String.downcase(m.name)} end)
+  end
+
+  @doc "Remove a member from `org` (no-op if they're not in it, or are the org's last owner)."
+  def remove_member(org, id) do
+    case row("SELECT role FROM users WHERE id=?1 AND org=?2", [id, org]) do
+      ["owner"] ->
+        # never strand an org with zero owners
+        case rows("SELECT id FROM users WHERE org=?1 AND role='owner'", [org]) do
+          [_only] -> {:error, :last_owner}
+          _ -> exec("DELETE FROM users WHERE id=?1 AND org=?2", [id, org])
+        end
+
+      nil -> {:error, :not_found}
+      _ -> exec("DELETE FROM users WHERE id=?1 AND org=?2", [id, org])
+    end
+  end
+
+  # ── invitations ─────────────────────────────────────────────────────────────────────────────────
+  @doc "Invite `email` to `org` with `role`. Returns the pending invite. Re-inviting refreshes it."
+  def invite(org, email, role \\ "member", invited_by \\ nil) do
+    ensure()
+    email = norm_email(email)
+    if not valid_email?(email), do: {:error, :bad_email}, else: invite_put(org, email, role, invited_by)
+  end
+
+  defp invite_put(org, email, role, invited_by) do
+    exec("DELETE FROM org_invites WHERE org=?1 AND email=?2", [org, email])
+    id = "inv_" <> rand(8)
+    exec("INSERT INTO org_invites(id,org,email,role,invited_by,created_at) VALUES(?1,?2,?3,?4,?5,?6)",
+      [id, org, email, to_string(role || "member"), invited_by, System.system_time(:second)])
+    {:ok, %{id: id, org: org, email: email, role: to_string(role || "member")}}
+  end
+
+  @doc "Pending invites for `org`. `[%{id, email, role}]`."
+  def list_invites(org) do
+    ensure()
+    rows("SELECT id,email,role FROM org_invites WHERE org=?1 ORDER BY created_at DESC", [org])
+    |> Enum.map(fn [id, em, role] -> %{id: id, email: em, role: role || "member"} end)
+  end
+
+  @doc "Revoke a pending invite (scoped to its org)."
+  def revoke_invite(org, id), do: exec("DELETE FROM org_invites WHERE id=?1 AND org=?2", [id, org])
+
+  @doc "A pending invite for `email`, or nil — consulted at signup so an invitee joins their org."
+  def invite_for_email(email) do
+    case row("SELECT org,role FROM org_invites WHERE email=?1 ORDER BY created_at DESC LIMIT 1", [norm_email(email)]) do
+      [org, role] -> %{org: org, role: role || "member"}
+      _ -> nil
+    end
+  end
+
+  @doc "Consume (delete) any invite for `email` — called once the invitee has signed up."
+  def consume_invite(email), do: exec("DELETE FROM org_invites WHERE email=?1", [norm_email(email)])
 
   defp user_view([id, em, _ph, org, name, ver, created]), do: %{id: id, email: em, org: org, name: name, verified: ver == 1, created_at: created}
   defp user_view(_), do: nil
@@ -135,8 +201,13 @@ defmodule Nexus.Auth.Accounts do
     {:ok, c} = Sqlite3.open(path)
     Sqlite3.execute(c, "PRAGMA journal_mode=WAL")
     Sqlite3.execute(c, "PRAGMA busy_timeout=5000")
-    Sqlite3.execute(c, "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE, pw_hash TEXT, org TEXT, name TEXT, verified INTEGER DEFAULT 0, created_at INTEGER)")
+    Sqlite3.execute(c, "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE, pw_hash TEXT, org TEXT, name TEXT, verified INTEGER DEFAULT 0, created_at INTEGER, role TEXT DEFAULT 'owner')")
+    # Existing dbs predate the role column — add it idempotently (ignores "duplicate column").
+    Sqlite3.execute(c, "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'owner'")
     Sqlite3.execute(c, "CREATE TABLE IF NOT EXISTS auth_tokens_otp (hash TEXT PRIMARY KEY, user_id TEXT, kind TEXT, expires_at INTEGER)")
+    # Org invitations — a teammate is invited by email; on signup the invite places them in the org
+    # (with its role) instead of a fresh org. Pending until accepted or revoked.
+    Sqlite3.execute(c, "CREATE TABLE IF NOT EXISTS org_invites (id TEXT PRIMARY KEY, org TEXT, email TEXT, role TEXT, invited_by TEXT, created_at INTEGER)")
 
     try do
       fun.(c)
@@ -166,6 +237,16 @@ defmodule Nexus.Auth.Accounts do
       end
       Sqlite3.release(c, s)
       r
+    end)
+  end
+
+  defp rows(sql, binds) do
+    with_conn(fn c ->
+      {:ok, s} = Sqlite3.prepare(c, sql)
+      :ok = Sqlite3.bind(s, binds)
+      {:ok, all} = Sqlite3.fetch_all(c, s)
+      Sqlite3.release(c, s)
+      all
     end)
   end
 end
