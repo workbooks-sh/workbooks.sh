@@ -73,4 +73,62 @@ defmodule Nexus.Git do
   end
 
   defp git(dir, args), do: System.cmd("git", args, cd: dir, stderr_to_stdout: true)
+
+  # ── Remote: the nexus AS a git remote (push-to-deploy a workspace) ───────────────────────────────
+  # A workspace is a BARE repo on the nexus that you `git push` to. A `post-receive` hook checks the
+  # pushed default branch out into the workspace's working dir (`work_dir`), so the files land on the
+  # volume — `/cloud/tree` (which reads disk live) shows them immediately. Recompiling changed units
+  # (re-mount) is a separate, additive step layered on top. Auth + the smart-HTTP transport sit above
+  # this; this is the local substrate.
+
+  @doc "Path of a workspace's bare repo under `repos_root` (e.g. WB_DATA/.nexus/repos/<name>.git)."
+  def bare_path(repos_root, name), do: Path.join(repos_root, name <> ".git")
+
+  @doc "Is `bare` an initialized bare repo?"
+  def bare?(bare), do: File.regular?(Path.join(bare, "HEAD")) and File.dir?(Path.join(bare, "objects"))
+
+  @doc """
+  Provision (idempotently) a bare repo at `bare` whose `post-receive` hook checks the pushed default
+  branch out into `work_dir`. Creates both dirs. Returns `{:ok, bare}`.
+  """
+  def provision_remote(bare, work_dir) do
+    File.mkdir_p!(bare)
+    File.mkdir_p!(work_dir)
+    unless bare?(bare), do: System.cmd("git", ["init", "--bare", "-q", "-b", "main", bare], stderr_to_stdout: true)
+
+    hooks = Path.join(bare, "hooks")
+    # A global `core.hooksPath` (this project sets one) would shadow the bare repo's own hooks — pin it
+    # to this repo's hooks dir so post-receive actually fires.
+    System.cmd("git", ["--git-dir=#{bare}", "config", "core.hooksPath", hooks], stderr_to_stdout: true)
+
+    hook = Path.join(hooks, "post-receive")
+    File.write!(hook, post_receive(bare, work_dir))
+    File.chmod!(hook, 0o755)
+    {:ok, bare}
+  end
+
+  @doc "Check the current default branch of a bare repo out into `work_dir` (used after a push / on boot)."
+  def checkout_into(bare, work_dir, branch \\ "main") do
+    File.mkdir_p!(work_dir)
+    System.cmd("git", ["--git-dir=#{bare}", "--work-tree=#{work_dir}", "-c", "core.bare=false",
+                       "checkout", "-f", branch], stderr_to_stdout: true)
+  end
+
+  defp post_receive(bare, work_dir) do
+    """
+    #!/bin/sh
+    # Workbooks push-to-deploy: check the pushed default branch out into the workspace working tree.
+    # Clear the git env the push injects (GIT_DIR / quarantine / index) so our checkout isn't polluted.
+    unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_QUARANTINE_PATH GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+    while read _old _new ref; do
+      case "$ref" in
+        refs/heads/main|refs/heads/master)
+          branch="${ref#refs/heads/}"
+          git --git-dir="#{bare}" --work-tree="#{work_dir}" -c core.bare=false checkout -f "$branch"
+          echo "workbooks: checked out $branch into #{work_dir}"
+          ;;
+      esac
+    done
+    """
+  end
 end
