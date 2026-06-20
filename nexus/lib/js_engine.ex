@@ -10,11 +10,24 @@ defmodule Nexus.JsEngine do
   (~11MB, the componentize-js / StarlingMonkey eval-host) is staged in `priv/` (gitignored, rebuildable).
   """
 
-  @doc "Evaluate `src` (modern JS) → `{:ok, string} | {:error, reason}`. `opts[:timeout]` ms (default 15s)."
+  @doc """
+  Evaluate `src` (modern JS) → `{:ok, string} | {:error, reason}`.
+
+    * `opts[:timeout]` — ms (default 15s)
+    * `opts[:imports]` — host functions the eval-host's WIT world imports, in `Wasmex.Components`
+      shape (`%{"name" => {:fn, fun}}`). The toolkit capability bridge passes `Nexus.Toolkit.Caps`
+      impls here (only meaningful once the eval-host is rebuilt to declare the cap import interface;
+      a plain eval-host ignores an empty map).
+  """
   def eval(src, opts \\ []) when is_binary(src) do
     timeout = Keyword.get(opts, :timeout, 15_000)
+    imports = Keyword.get(opts, :imports, %{})
 
-    case Wasmex.Components.start_link(%{path: wasm(), wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}}) do
+    cfg =
+      %{path: wasm(), wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}}
+      |> maybe_put_imports(imports)
+
+    case Wasmex.Components.start_link(cfg) do
       {:ok, pid} ->
         try do
           Wasmex.Components.call_function(pid, "run", [src], timeout)
@@ -26,6 +39,9 @@ defmodule Nexus.JsEngine do
         {:error, {:instantiate_failed, reason}}
     end
   end
+
+  defp maybe_put_imports(cfg, imports) when map_size(imports) == 0, do: cfg
+  defp maybe_put_imports(cfg, imports), do: Map.put(cfg, :imports, imports)
 
   @doc "Whether the StarlingMonkey engine wasm is present."
   def available?, do: File.exists?(wasm())

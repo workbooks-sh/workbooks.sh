@@ -1,0 +1,15 @@
+package work:evalhost;
+interface toolkit-caps {
+  store: func(key: string, val: string);
+  load: func(key: string) -> string;
+  emit: func(msg: string);
+  cache-get: func(key: string) -> string;
+  cache-put: func(key: string, val: string, ttl: u32);
+  cache-delete: func(key: string);
+  fetch: func(url: string) -> string;
+  complete: func(prompt: string) -> string;
+}
+world evalhost {
+  import toolkit-caps;
+  export run: func(input: string) -> string;
+}

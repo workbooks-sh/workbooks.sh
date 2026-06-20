@@ -80,6 +80,18 @@ defmodule Nexus.Toolkit.Caps do
     "interface toolkit-caps {\n#{lines}\n}"
   end
 
+  @doc """
+  The `Wasmex.Components` import map for the granted caps, bound to `path` — `%{"<cap>" => {:fn, fun}}`.
+  Passed as `opts[:imports]` to `Nexus.JsEngine.eval/2`; the rebuilt eval-host resolves its
+  `toolkit-caps` WIT import to these. (Exact key format is verified against the cap-enabled engine —
+  the import names follow the eval-host's declared interface.)
+  """
+  def imports(path, grants) do
+    path
+    |> bind(grants)
+    |> Map.new(fn {cap, fun} -> {Atom.to_string(cap), {:fn, fun}} end)
+  end
+
   @doc "A stable string key for a partition path. `{op, app, comp}` → \"op/app/comp\"."
   def path_key({operator, application, component}),
     do: Enum.map_join([operator, application, component], "/", &to_string/1)

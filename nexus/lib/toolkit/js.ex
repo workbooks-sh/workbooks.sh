@@ -122,8 +122,17 @@ defmodule Nexus.Toolkit.Js do
   def invoke(name_or_src, fun, args \\ [], opts \\ []) do
     with {:ok, js} <- resolve_js(name_or_src) do
       src = driver(js, fun, args, opts)
+      # path-scoped cap impls become the eval-host's WIT imports (deny-by-default via grants)
+      eval_opts =
+        case {opts[:path], opts[:grants]} do
+          {path, grants} when not is_nil(path) and is_list(grants) ->
+            Keyword.put(opts, :imports, Nexus.Toolkit.Caps.imports(path, grants))
 
-      case Nexus.JsEngine.eval(src, opts) do
+          _ ->
+            opts
+        end
+
+      case Nexus.JsEngine.eval(src, eval_opts) do
         {:ok, out} -> decode(out)
         {:error, r} -> {:error, {:eval, r}}
       end

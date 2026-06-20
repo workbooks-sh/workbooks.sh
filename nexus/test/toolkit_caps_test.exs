@@ -48,4 +48,26 @@ defmodule Nexus.Toolkit.CapsTest do
     assert src =~ "emit: __cap_emit"
     assert src =~ "store: __cap_store"
   end
+
+  test "imports/2 builds the Wasmex.Components import map (path-scoped, grant-filtered)" do
+    imports = Caps.imports({"acme", "app", "tk"}, [:store, :load])
+    assert Map.keys(imports) |> Enum.sort() == ["load", "store"]
+    assert {:fn, store_fn} = imports["store"]
+    assert is_function(store_fn, 2)
+    assert {:fn, load_fn} = imports["load"]
+    assert is_function(load_fn, 1)
+    refute Map.has_key?(imports, "fetch")
+  end
+
+  test "imports are path-scoped through the built fns" do
+    a = Caps.imports({"globex", "app", "a"}, [:store, :load])
+    b = Caps.imports({"globex", "app", "b"}, [:store, :load])
+    {:fn, a_store} = a["store"]
+    {:fn, a_load} = a["load"]
+    {:fn, b_load} = b["load"]
+
+    a_store.("k", "secret-a")
+    assert a_load.("k") == "secret-a"
+    assert b_load.("k") == ""
+  end
 end
