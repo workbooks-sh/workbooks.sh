@@ -50,22 +50,19 @@ defmodule Nexus.ControlPlane do
   # ── registry (tenant-partitioned, durable DETS) ────────────────────────────────────────────────
   # Key is always {org, kind, id} so a lookup is physically impossible to satisfy with another org's
   # row — isolation is structural, not a WHERE clause we might forget. The table is owned by
-  # Nexus.ControlPlane.Store (a long-lived GenServer); rows persist across restarts.
-  defp table, do: Nexus.ControlPlane.Store.table()
+  # Nexus.ControlPlane.Store (SQLite, in the litestream-replicated nexus.db); rows survive restarts.
+  alias Nexus.ControlPlane.Store
 
   @doc "List an org's records of a kind (`:nexus` | `:workspace`). Only ever this org's rows."
   def list(org, kind) when is_binary(org) do
-    table()
-    |> :dets.match_object({{org, kind, :_}, :_})
-    |> Enum.map(fn {_k, rec} -> rec end)
-    |> Enum.sort_by(& &1[:created_at])
+    Store.list(org, kind) |> Enum.sort_by(& &1[:created_at])
   end
 
   @doc "Get one record by id, scoped to `org`. `{:ok, rec} | {:error, :not_found}`."
   def get(org, kind, id) when is_binary(org) do
-    case :dets.lookup(table(), {org, kind, id}) do
-      [{_k, rec}] -> {:ok, rec}
-      [] -> {:error, :not_found}
+    case Store.get(org, kind, id) do
+      {:ok, rec} -> {:ok, rec}
+      :error -> {:error, :not_found}
     end
   end
 
@@ -73,11 +70,8 @@ defmodule Nexus.ControlPlane do
   def put(org, kind, id, attrs) when is_binary(org) and is_binary(id) do
     rec = Map.merge(attrs, %{id: id, org: org, kind: kind})
     rec = Map.put_new(rec, :created_at, System.os_time(:millisecond))
-
-    case :dets.insert(table(), {{org, kind, id}, rec}) do
-      :ok -> {:ok, rec}
-      {:error, reason} -> {:error, reason}
-    end
+    :ok = Store.put(org, kind, id, rec)
+    {:ok, rec}
   end
 
   @doc "Patch a record's `attrs` (only the given keys), scoped to `org`. Never crosses orgs."
@@ -85,7 +79,7 @@ defmodule Nexus.ControlPlane do
     case get(org, kind, id) do
       {:ok, rec} ->
         merged = Map.merge(rec, attrs)
-        :dets.insert(table(), {{org, kind, id}, merged})
+        :ok = Store.put(org, kind, id, merged)
         {:ok, merged}
 
       err ->
@@ -94,12 +88,9 @@ defmodule Nexus.ControlPlane do
   end
 
   @doc "Delete a record scoped to `org`. A foreign org's delete is a silent no-op (returns :ok)."
-  def delete(org, kind, id) when is_binary(org) do
-    :dets.delete(table(), {org, kind, id})
-    :ok
-  end
+  def delete(org, kind, id) when is_binary(org), do: Store.delete(org, kind, id)
 
   @doc false
   # Test helper — wipe the whole registry for a clean slate.
-  def reset, do: :dets.delete_all_objects(table())
+  def reset, do: Store.delete_all()
 end

@@ -146,9 +146,8 @@ defmodule Nexus.ControlPlane.Domain do
   # read in the control plane, and it leaks nothing but taken/free.
   defp check_unique(_org, host) do
     taken? =
-      Store.table()
-      |> :dets.match_object({{:_, :domain, :_}, :_})
-      |> Enum.any?(fn {_k, rec} -> rec[:host] == host end)
+      Store.list_kind(:domain)
+      |> Enum.any?(fn rec -> rec[:host] == host end)
 
     if taken?, do: {:error, :host_taken}, else: :ok
   end
