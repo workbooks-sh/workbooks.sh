@@ -16,6 +16,10 @@ defmodule Nexus.Application do
     # Load runtime config from the deployment's `deploy` block (the .work source of truth) into
     # :persistent_term BEFORE the Gate reads its concurrency limit. No env vars for tunable config.
     Nexus.Config.boot()
+    # A serving nexus persists to durable SQLite on the mounted volume (Litestream ships it off-box;
+    # see Nexus.Litestream). Dev/test set their own adapter explicitly, so only adopt SQLite when the
+    # adapter is still the in-memory default — never clobber a deliberate choice.
+    configure_store()
     # Register the selected `:search` provider behind the Nexus.Browse seam. Default = keyless
     # metasearch (pure-BEAM, local/dev); `deploy search="brave"` swaps in the keyed cloud API.
     register_search_provider()
@@ -46,6 +50,15 @@ defmodule Nexus.Application do
 
   defp server_children do
     if serve?(), do: [{Nexus.Server, root: root(), port: port()}], else: []
+  end
+
+  # Durable SQLite on the volume for a serving nexus, unless an adapter was chosen deliberately
+  # (dev per-workbook DB / tests / an explicit cloud adapter). Litestream (if S3/R2 secrets are
+  # injected) replicates this file off-box; without secrets it's still durable on the volume.
+  defp configure_store do
+    if serve?() and Application.get_env(:nexus, :store_adapter, Nexus.Store.Ets) == Nexus.Store.Ets do
+      Application.put_env(:nexus, :store_adapter, Nexus.Store.Sqlite)
+    end
   end
 
   # PORT + WB_DATA are deploy injection (the orchestrator sets the port + the volume mount), like
