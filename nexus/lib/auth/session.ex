@@ -27,7 +27,7 @@ defmodule Nexus.Auth.Session do
 
     claims =
       identity
-      |> Map.take([:tenant, :user, :roles, :scopes])
+      |> Map.take([:tenant, :user, :roles, :scopes, :email, :name])
       |> Map.put(:iat, now())
 
     token = Plug.Crypto.sign(secret(), @salt, claims)
@@ -51,7 +51,7 @@ defmodule Nexus.Auth.Session do
     with token when is_binary(token) <- cookie_value(conn),
          {:ok, %{tenant: t} = claims} when is_binary(t) and t != "" <-
            Plug.Crypto.verify(secret(), @salt, token, max_age: max_age) do
-      identity = Map.take(claims, [:tenant, :user, :roles, :scopes])
+      identity = Map.take(claims, [:tenant, :user, :roles, :scopes, :email, :name])
       if now() - (claims[:iat] || now()) > div(max_age, 2), do: {:ok, identity, :renew}, else: {:ok, identity}
     else
       _ -> :error
