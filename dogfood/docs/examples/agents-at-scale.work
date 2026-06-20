@@ -1,0 +1,52 @@
+# Agents at scale
+
+The thing a "swarm" really is: decompose a task into many pieces, run an agent on each
+piece *at the same time*, then synthesize the results. The hard part is usually the
+plumbing — a job queue, workers, a result bus. On the [Nexus](/introduction/what-is-the-nexus)
+that's the BEAM's day job, so the orchestration is a few lines in a `server` block.
+
+Here is the whole fan-out — plan, dispatch a worker per sub-task concurrently, synthesize:
+
+```
+  server :swarm do
+    def run(task) do
+      task
+      |> plan()                                   # 1 LLM call → N focused sub-tasks
+      |> Enum.map(fn q -> Task.async(fn -> worker(q) end) end)
+      |> Task.await_many(:infinity)               # all agents run in parallel
+      |> synthesize(task)                          # fold findings into one answer
+    end
+
+    defp plan(task) do
+      {:ok, %{content: c}} =
+        Nexus.Llm.complete([%{role: "user",
+          content: "Break this into distinct sub-questions, one per line:\n#{task}"}], [])
+      c |> String.split("\n") |> Enum.reject(&(&1 == ""))
+    end
+
+    defp worker(q) do
+      {:ok, page} = Nexus.Browse.read(top_result(q))   # the built-in browser
+      {:ok, %{content: finding}} =
+        Nexus.Llm.complete([%{role: "user",
+          content: "Answer from this page only:\n#{q}\n\n#{page.text}"}], [])
+      %{q: q, finding: finding}
+    end
+  end
+```
+
+`Task.async` over a list and `Task.await_many` is the entire concurrency model — five
+agents or five hundred is the same code, only the list is longer. Each `worker` pulls a
+real page with the built-in browser and grounds its answer in what it read; the runtime
+accounts the true LLM cost on every call.
+
+## Why it stays small
+
+- **No queue, no workers, no bus** — `Task.async` + the BEAM *is* the scheduler.
+- **Real tools, brokered** — `Nexus.Llm.complete` and `Nexus.Browse.read` are host
+  primitives; the agent code just calls them.
+- **One server unit** holds the whole orchestration — the same shape powers our own
+  search swarm, distilled here to its core.
+
+This is the pattern the [coding agent](/examples/coding-agent) and
+[autonomous research](/examples/autonomous-research) examples fan out with — swap the
+`worker` for whatever the job is.

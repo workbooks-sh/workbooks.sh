@@ -16,7 +16,7 @@ no front-matter database, no `_sidebar.yml`.
 ## Every page is just prose
 
 Each page is a sibling `.work` file. The first heading is its title; the rest is Markdown. Because a
-page is a *real* workbook, when one needs to be interactive — like the [Examples](/examples/learn-by-example)
+page is a *real* workbook, when one needs to be interactive — like the [Examples](/examples/coding-agent)
 explorer, which reads live source out of running apps — you drop a `client` island in between two
 paragraphs. The same document is both prose and program.
 

@@ -4,7 +4,7 @@ The **full Workbooks documentation site**, authored entirely in `.work` — and 
 scaffold for your own. A composition-root `index.work` declares an `app :docs` (title, theme, and the
 ordered sections → pages of the sidebar); every page and blog post is a sibling `.work` file of prose.
 The platform's site-mode weave (`Nexus.Docs`) renders the whole tree as a navigable SPA: sidebar,
-clean history-routed URLs, reload-safe deep links, an interactive [Examples](/examples/learn-by-example)
+clean history-routed URLs, reload-safe deep links, an interactive [Examples](/examples/coding-agent)
 explorer, and a [Blog](/blog/why-we-author-docs-as-a-workbook) — with no front-end code to write.
 
 Scaffold it with `work new documentation <your-docs>`. For a minimal, empty starting point instead,

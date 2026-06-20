@@ -1,0 +1,42 @@
+# Autonomous research
+
+Karpathy's *autoresearch* makes a sharp point: to automate research you don't edit the
+training code — you write the **agent's instructions** and let it edit the code, run a
+fixed-budget experiment, keep the result if a metric improved, and loop overnight. The
+human programs the *org*, not the Python.
+
+That maps exactly onto an [`agent`](/tooling/authoring-an-agent): the brain is prose,
+the `bash` tool over `/work` lets it edit and run real code in a
+[sandbox](/capabilities/sandboxing-and-the-dock), and the loop is just another
+instruction. The whole research org is the thing you write:
+
+```
+  agent :researcher do
+    You run autonomous ML experiments in /work. `train.py` is yours to edit — model,
+    optimizer, hyperparameters, all fair game. `prepare.py` is fixed; don't touch it.
+    The metric is val_bpb from a fixed 5-minute run — lower is better.
+
+    Loop: form ONE hypothesis, make the smallest edit that tests it, run the experiment
+    with bash, read val_bpb. If it improved, keep the change and log why; if not, revert
+    and log what you learned. Then start the next experiment. Never run two changes at
+    once — you must be able to attribute every delta. Keep going until you're told to stop.
+  end
+```
+
+You tune the *instructions* — add agents, change the strategy, sharpen the scoring rule —
+and re-run. The Python never leaves the agent's hands; you're programming the researcher,
+not the model. That's the same idea as autoresearch's `program.md`, except the agent,
+its sandbox, and its tool already exist as platform primitives.
+
+## Many researchers, one org
+
+One instruction set, many runners: dispatch a fleet of researchers — each on a different
+hypothesis or seed — from a `server`, the same fan-out used in
+[Agents at scale](/examples/agents-at-scale). An overnight research org is a list of
+tasks and a brain you can read in one screen.
+
+## What to take away
+
+- **You program the agent, not the code** — the instructions are the experiment design.
+- **The sandbox makes it safe to let it run** — real edits + real runs, contained in `/work`.
+- **The loop is prose** — "form a hypothesis, test it, keep what wins" is the whole engine.

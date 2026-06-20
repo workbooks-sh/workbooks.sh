@@ -1,0 +1,39 @@
+# A coding agent
+
+A coding agent — the kind that reads your repo, edits files, runs the tests, and
+iterates until they pass — is mostly *prompt and a sandbox*. In Workbooks the sandbox
+comes for free: an [`agent`](/tooling/authoring-an-agent) gets a `bash` tool over a
+`/work` area, compiled to WebAssembly, with only the powers you grant. So the whole
+agent is the brain you write:
+
+```
+  agent :coder do
+    You are a coding agent working in /work. You have one tool — bash — and can read
+    files, write files, run the test suite, and install dependencies.
+
+    Work in small steps: inspect the code, make ONE change, run the tests, and read the
+    output before the next step. Never guess — run the command and look. When the task
+    is done and the tests pass, stop and summarize exactly what you changed.
+  end
+```
+
+That's the agent. No framework to wire, no tool registry to maintain — the prose *is*
+the program, and the [Dock](/capabilities/sandboxing-and-the-dock) is the wall that
+keeps `bash` inside `/work`.
+
+## Running it at scale
+
+Because the brain is just a unit, the runtime can run one or a thousand of them — one
+per ticket, file, or repo — concurrently on the [Nexus](/introduction/what-is-the-nexus).
+You don't change the agent to scale it; you dispatch a list. The fan-out pattern is the
+same one shown in [Agents at scale](/examples/agents-at-scale): a `server` maps the work
+across `Task.async` and awaits them all.
+
+The point is the split: the hard part — a sandboxed, tool-using brain — is a *primitive*,
+so the code you write is just the small part on top.
+
+## What to take away
+
+- **The agent is prose** — instructions, not plumbing. [Authoring an agent](/tooling/authoring-an-agent).
+- **The sandbox is given** — `bash` over `/work`, capability-scoped. [Sandboxing & the Dock](/capabilities/sandboxing-and-the-dock).
+- **Scale is a `map`** — fan agents out from a `server`; the runtime runs them in parallel.
