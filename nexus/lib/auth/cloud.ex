@@ -23,12 +23,19 @@ defmodule Nexus.Auth.Cloud do
   @impl true
   def authenticate(%{request_path: path} = conn) do
     case bearer(conn) do
-      # No credential: gate the org-data API (401), but leave the public surfaces open as the default
-      # tenant — so one nexus serves its public website AND the control plane.
+      # No bearer: try our OWN native session cookie (Nexus.Auth.Session, set by /auth/login). The
+      # browser dashboard authenticates this way. Falling back: gate the org-data API (401), but leave
+      # the public surfaces open as the default tenant — one nexus serves its website AND control plane.
       "" ->
-        if String.starts_with?(path, @gated),
-          do: {:error, :unauthorized},
-          else: {:ok, %{tenant: Nexus.Store.default_tenant(), user: nil}}
+        case session_identity(conn) do
+          {:ok, identity} ->
+            {:ok, identity}
+
+          :none ->
+            if String.starts_with?(path, @gated),
+              do: {:error, :unauthorized},
+              else: {:ok, %{tenant: Nexus.Store.default_tenant(), user: nil}}
+        end
 
       # A presented credential resolves to its org on ANY path (CLI + dashboard both authenticate here).
       "wbk_" <> _ = token ->
@@ -37,8 +44,19 @@ defmodule Nexus.Auth.Cloud do
           :error -> {:error, :unauthorized}
         end
 
+      # A non-PAT bearer is a WorkOS JWT (legacy transition path — removed once native login is the only
+      # way in).
       _ ->
         Nexus.Auth.Jwt.authenticate(conn)
+    end
+  end
+
+  # The native session cookie → its identity (which carries `:tenant`), or `:none` if absent/invalid.
+  defp session_identity(conn) do
+    case Nexus.Auth.Session.verify(Plug.Conn.fetch_cookies(conn)) do
+      {:ok, %{tenant: t} = id} when is_binary(t) and t != "" -> {:ok, id}
+      {:ok, %{tenant: t} = id, :renew} when is_binary(t) and t != "" -> {:ok, id}
+      _ -> :none
     end
   end
 

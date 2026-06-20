@@ -62,6 +62,8 @@ defmodule Nexus.ControlPlane.Store do
     {:ok, conn} = Sqlite3.open(path)
     Sqlite3.execute(conn, "PRAGMA journal_mode=WAL")
     Sqlite3.execute(conn, "PRAGMA busy_timeout=5000")
+    # Create the table idempotently here too (not just in the GenServer's init) so any query is safe.
+    Sqlite3.execute(conn, "CREATE TABLE IF NOT EXISTS cp (org TEXT, kind TEXT, id TEXT, data BLOB, PRIMARY KEY(org,kind,id))")
 
     try do
       fun.(conn)
