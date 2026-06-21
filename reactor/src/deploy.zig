@@ -59,7 +59,12 @@ pub fn scaffold(alloc: std.mem.Allocator, place: []const u8) ![]const u8 {
 
 /// Read a `name="value"` setting from the `deploy do … end` block of a `.work` source.
 pub fn attr(src: []const u8, name: []const u8, default: []const u8) []const u8 {
-    const blk = std.mem.indexOf(u8, src, "deploy do") orelse return default;
+    return blockAttr(src, "deploy do", name, default);
+}
+
+/// Read `name="value"` from a named `<block> … end` region of a `.work` source.
+pub fn blockAttr(src: []const u8, block: []const u8, name: []const u8, default: []const u8) []const u8 {
+    const blk = std.mem.indexOf(u8, src, block) orelse return default;
     const end = std.mem.indexOfPos(u8, src, blk, "\nend") orelse src.len;
     const region = src[blk..@min(end, src.len)];
     var pat: [64]u8 = undefined;
@@ -68,6 +73,72 @@ pub fn attr(src: []const u8, name: []const u8, default: []const u8) []const u8 {
     const vs = at + p.len;
     const ve = std.mem.indexOfScalarPos(u8, region, vs, '"') orelse return default;
     return region[vs..ve];
+}
+
+// The provisioned-target record. State lives in `.work/runtime.state` as a `.work` block (blocks
+// are the source of truth — NOT JSON), so verify/status/down can find what `apply` stood up.
+const STATE_PATH = ".work/runtime.state";
+
+fn writeState(io: Io, alloc: std.mem.Allocator, target: []const u8, id: []const u8, url: []const u8, machine: []const u8) !void {
+    Io.Dir.cwd().createDirPath(io, ".work") catch {};
+    const body = try std.fmt.allocPrint(alloc,
+        \\# Provisioned runtime (written by `work deploy apply`)
+        \\
+        \\runtime do
+        \\  target="{s}"
+        \\  id="{s}"
+        \\  url="{s}"
+        \\  machine="{s}"
+        \\end
+        \\
+    , .{ target, id, url, machine });
+    try fs.writeFile(io, STATE_PATH, body);
+}
+
+fn readState(io: Io, alloc: std.mem.Allocator) ?[]const u8 {
+    return fs.readFile(io, alloc, STATE_PATH) catch null;
+}
+
+/// `work deploy down` — tear down what `apply` stood up (cloud: DELETE the nexus via the control
+/// plane; local: stop+remove the krunvm microVM via the deploy bridge), then clear the state.
+pub fn down(io: Io, alloc: std.mem.Allocator, home: []const u8) !u8 {
+    log.prompt("work deploy down");
+    const state = readState(io, alloc) orelse {
+        log.err("nothing to tear down — no .work/runtime.state (run `work deploy apply` first)");
+        return 1;
+    };
+    const target = blockAttr(state, "runtime do", "target", "");
+
+    if (eql(target, "cloud")) {
+        const c = context.cred(io, alloc, home) orelse {
+            log.err("cloud teardown needs a control-plane login — run `work login`");
+            return 1;
+        };
+        const id = blockAttr(state, "runtime do", "id", "");
+        const url = try std.fmt.allocPrint(alloc, "{s}/api/platform/nexuses/{s}", .{ c.url, id });
+        const res = cloudapi.request(io, alloc, .DELETE, url, c.token, null) catch |e| {
+            log.err(try std.fmt.allocPrint(alloc, "control plane unreachable ({s})", .{@errorName(e)}));
+            return 1;
+        };
+        if (res.status != 200 and res.status != 204) {
+            log.err(try std.fmt.allocPrint(alloc, "teardown failed (HTTP {d}): {s}", .{ res.status, res.body }));
+            return 1;
+        }
+        log.ok(try std.fmt.allocPrint(alloc, "nexus {s} torn down", .{id}));
+    } else {
+        const r = std.process.run(alloc, io, .{ .argv = &.{ "mix", "nexus.deploy.down" } }) catch |e| {
+            log.err(try std.fmt.allocPrint(alloc, "could not invoke the deploy bridge ({s})", .{@errorName(e)}));
+            return 1;
+        };
+        if (!(r.term == .exited and r.term.exited == 0)) {
+            log.err(try std.fmt.allocPrint(alloc, "local teardown failed:\n{s}{s}", .{ r.stdout, r.stderr }));
+            return 1;
+        }
+        log.ok("local nexus stopped + removed");
+    }
+
+    fs.writeFile(io, STATE_PATH, "# torn down\n") catch {};
+    return 0;
 }
 
 /// Validate a parsed config → list of issue strings ([] means coherent).
@@ -211,7 +282,7 @@ pub fn validateVerb(io: Io, alloc: std.mem.Allocator, file: []const u8) !u8 {
     return 1;
 }
 
-pub fn apply(io: Io, alloc: std.mem.Allocator, file: []const u8) !u8 {
+pub fn apply(io: Io, alloc: std.mem.Allocator, home: []const u8, file: []const u8) !u8 {
     log.prompt(try std.fmt.allocPrint(alloc, "work deploy apply {s}", .{file}));
     const src = fs.readFile(io, alloc, file) catch {
         log.err("no deployment.work — run `work deploy init` first");
@@ -223,15 +294,72 @@ pub fn apply(io: Io, alloc: std.mem.Allocator, file: []const u8) !u8 {
         for (issues) |i| log.step(i);
         return 1;
     }
+
     const place = attr(src, "engine-place", "local");
-    if (eql(place, "local")) {
-        log.ok("local target — runs the one OCI image in a krunvm/container");
-        log.step("image build + boot lands with the nexus image recipe");
-    } else {
-        log.ok(try std.fmt.allocPrint(alloc, "cloud target: {s} \u{b7} {s}", .{ attr(src, "provider", "fly"), attr(src, "app", "(no app)") }));
-        log.step("cloud apply provisions via the control plane (`work login`)");
+    if (eql(place, "cloud")) return applyCloud(io, alloc, home, src);
+    return applyLocal(io, alloc, src);
+}
+
+// Cloud apply: POST the runtime config to the control plane's provisioner (Fly app+machine + CP
+// registry — all server-side). The CLI only carries the request + the login token. Records the
+// provisioned nexus in .work/runtime.state so verify/status/down can find it.
+fn applyCloud(io: Io, alloc: std.mem.Allocator, home: []const u8, src: []const u8) !u8 {
+    const c = context.cred(io, alloc, home) orelse {
+        log.err("cloud apply needs a control-plane login — run `work login` first");
+        return 1;
+    };
+
+    const name = attr(src, "app", "");
+    const region = attr(src, "region", "");
+    const plan = attr(src, "plan", "");
+    const body = try std.fmt.allocPrint(alloc,
+        \\{{"name":"{s}","region":"{s}","plan":"{s}"}}
+    , .{ name, region, plan });
+
+    const url = try std.fmt.allocPrint(alloc, "{s}/api/platform/nexuses", .{c.url});
+    log.step(try std.fmt.allocPrint(alloc, "provisioning via {s}", .{c.url}));
+
+    const res = cloudapi.request(io, alloc, .POST, url, c.token, body) catch |e| {
+        log.err(try std.fmt.allocPrint(alloc, "control plane unreachable ({s})", .{@errorName(e)}));
+        return 1;
+    };
+
+    if (res.status != 200 and res.status != 201) {
+        log.err(try std.fmt.allocPrint(alloc, "provision failed (HTTP {d}): {s}", .{ res.status, res.body }));
+        return 1;
     }
+
+    const id = cloudapi.jsonField(res.body, "id") orelse "";
+    const nx_url = cloudapi.jsonField(res.body, "url") orelse "";
+    const machine = cloudapi.jsonField(res.body, "fly_machine") orelse "";
+    try writeState(io, alloc, "cloud", id, nx_url, machine);
+    log.ok(try std.fmt.allocPrint(alloc, "nexus provisioned \u{b7} {s} \u{b7} {s}", .{ id, nx_url }));
+    log.step("`work deploy verify` to health-check it");
     return 0;
+}
+
+// Local apply: boot the one OCI runtime image in a krunvm microVM. The boot contract lives in the
+// nexus (Nexus.Deploy.local → Nexus.Deploy.Machine, ONE source of truth); the CLI invokes it through
+// the runtime's deploy entrypoint rather than reimplementing krunvm here.
+fn applyLocal(io: Io, alloc: std.mem.Allocator, src: []const u8) !u8 {
+    const image = attr(src, "image", "");
+    log.step("local target — booting the nexus OCI image in a krunvm microVM");
+
+    const argv: []const []const u8 = if (image.len > 0)
+        &.{ "mix", "nexus.deploy.local", image }
+    else
+        &.{ "mix", "nexus.deploy.local" };
+
+    const r = std.process.run(alloc, io, .{ .argv = argv }) catch |e| {
+        log.err(try std.fmt.allocPrint(alloc, "could not invoke the deploy bridge ({s}) — run from the runtime, or `work deploy init` a cloud target", .{@errorName(e)}));
+        return 1;
+    };
+    if (r.term == .exited and r.term.exited == 0) {
+        log.print("{s}", .{r.stdout});
+        return 0;
+    }
+    log.err(try std.fmt.allocPrint(alloc, "local boot failed:\n{s}{s}", .{ r.stdout, r.stderr }));
+    return 1;
 }
 
 /// `work deploy verify [--nexus <name>]` — health-probe a running nexus. Resolves the target nexus
