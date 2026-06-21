@@ -50,8 +50,9 @@ export async function createEditor(mount, opts = {}) {
     finally { saving = false; }
   }
 
-  // A read/write compartment so setReadOnly can reconfigure without rebuilding the editor.
+  // Compartments so we can reconfigure live (read/write) without rebuilding the editor.
   const editableComp = new state.Compartment();
+  const liveComp = new state.Compartment();          // the Live (WYSIWYG) decoration layer (P4)
 
   const exts = [
     view.lineNumbers(),
@@ -67,6 +68,7 @@ export async function createEditor(mount, opts = {}) {
     }),
     EditorView.theme({ '&': { height: '100%', fontSize: '12.5px' } }),
     editableComp.of(EditorView.editable.of(!opts.readOnly)),
+    liveComp.of([]),
   ];
 
   // The `.work` layers: syntax highlight (P1), autocomplete (kinds + do/end snippets), and lint
@@ -100,7 +102,22 @@ export async function createEditor(mount, opts = {}) {
   const editor = new EditorView({ doc: opts.doc || '', extensions: exts, parent: mount });
   function getDoc() { return editor.state.doc.toString(); }
 
-  return {
+  // Live (WYSIWYG) layer — only meaningful for .work; loaded lazily on first enable.
+  let mode = 'source';
+  let _liveExts = null;
+  async function setMode(m) {
+    const next = m === 'live' && isWork(opts.path) ? 'live' : 'source';
+    if (next === mode) return mode;
+    if (next === 'live' && !_liveExts) {
+      try { const lv = await import(rv('./live.js')); _liveExts = lv.workLiveFromView(view); }
+      catch (e) { try { console.warn('[workedit] live mode unavailable', e); } catch (_) {} return mode; }
+    }
+    editor.dispatch({ effects: liveComp.reconfigure(next === 'live' ? _liveExts : []) });
+    mode = next;
+    return mode;
+  }
+
+  const controller = {
     view: editor,
     getDoc,
     setDoc(s) { editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: s || '' } }); setDirty(false); },
@@ -108,7 +125,11 @@ export async function createEditor(mount, opts = {}) {
     markSaved: () => setDirty(false),
     save,
     setReadOnly(b) { editor.dispatch({ effects: editableComp.reconfigure(EditorView.editable.of(!b)) }); },
+    getMode: () => mode,
+    setMode,
     focus() { editor.focus(); },
     destroy() { editor.destroy(); },
   };
+  if (opts.mode === 'live') setMode('live');
+  return controller;
 }

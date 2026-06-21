@@ -124,8 +124,19 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
     }
   }
 
+  // Remember the last Source/Live choice across files (the toggle defaults to Source).
+  function modePref(){ try { return localStorage.getItem('wb-workedit-mode') || 'source'; } catch (e) { return 'source'; } }
+  function setModePref(m){ try { localStorage.setItem('wb-workedit-mode', m); } catch (e) {} }
+
   async function renderCode(host, content, path, meta){
-    host.innerHTML = '<div class="wxsavebar"><span class="wxsavepath">' + esc(path) + '</span>' +
+    var isWork = /\.work$/i.test(path);
+    var toggle = isWork
+      ? '<div class="wxmode" role="tablist">' +
+          '<button class="wxmodebtn" data-mode="source">Source</button>' +
+          '<button class="wxmodebtn" data-mode="live">Live</button>' +
+        '</div>'
+      : '';
+    host.innerHTML = '<div class="wxsavebar"><span class="wxsavepath">' + esc(path) + '</span>' + toggle +
       '<button class="wxsave" data-save disabled>Saved</button></div>' +
       '<div id="wxcm" class="wxcm"></div>' + truncNote(meta);
     var mount = host.querySelector('#wxcm');
@@ -134,9 +145,11 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
     state.editor = null; setDirty(false);
     try {
       var WE = await workedit();
+      var initialMode = isWork ? modePref() : 'source';
       state.editor = await WE.createEditor(mount, {
         doc: content, path: path,
         resolveModule: WB.vurl,
+        mode: initialMode,
         onDirtyChange: setDirty,
         onSave: persist,
         // .work lint: the nexus parses the buffer (Nexus.Literate + per-block Elixir check).
@@ -146,6 +159,16 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
             .then(function(r){ return r.json(); }).then(function(d){ return (d && d.diagnostics) || []; });
         },
       });
+      if (isWork){
+        var syncToggle = function(){
+          var cur = state.editor.getMode();
+          host.querySelectorAll('.wxmodebtn').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-mode') === cur); });
+        };
+        host.querySelectorAll('.wxmodebtn').forEach(function(b){
+          b.onclick = async function(){ var m = await state.editor.setMode(b.getAttribute('data-mode')); setModePref(m); syncToggle(); };
+        });
+        syncToggle();
+      }
     } catch (e) {
       mount.innerHTML = '<pre class="wxpre">' + esc(content) + '</pre>';
     }
@@ -263,6 +286,11 @@ WB.scopedStyles('/workspaces', `
 .wxsavepath { flex: 1; min-width: 0; font: 500 11.5px var(--mono); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wxsave { flex: none; border: 1px solid var(--line); background: var(--card); color: var(--dim); border-radius: 7px; padding: 4px 12px; font: 600 12px var(--read); cursor: default; }
 .wxsave.on { background: var(--ink); color: var(--paper); border-color: var(--ink); cursor: pointer; }
+.wxmode { flex: none; display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.wxmode .wxmodebtn { border: none; background: var(--card); color: var(--dim); padding: 4px 11px; font: 600 11.5px var(--read); cursor: pointer; }
+.wxmode .wxmodebtn + .wxmodebtn { border-left: 1px solid var(--line); }
+.wxmode .wxmodebtn:hover { color: var(--ink); }
+.wxmode .wxmodebtn.on { background: var(--ink); color: var(--paper); }
 .wxcm { height: calc(100% - 37px); }
 .wxcm .cm-editor { height: 100%; background: var(--paper); }
 .wxcm .cm-editor.cm-focused { outline: none; }
