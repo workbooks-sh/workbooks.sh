@@ -27,9 +27,47 @@ defmodule Nexus.Agent.Bash do
   grant, is refused — so `tools`/`grant` actually CONSTRAIN the agent, not just describe it.
   """
   def run(vfs, line, perms) when is_binary(line) do
-    line
-    |> split_pipes()
-    |> Enum.reduce("", fn segment, stdin -> run_segment(vfs, segment, stdin, perms) end)
+    {pipeline, redirect} = extract_redirect(line)
+
+    out =
+      pipeline
+      |> split_pipes()
+      |> Enum.reduce("", fn segment, stdin -> run_segment(vfs, segment, stdin, perms) end)
+
+    case redirect do
+      nil ->
+        out
+
+      {mode, file} ->
+        # Output redirection `> file` / `>> file` — write the pipeline's stdout to a real file in the
+        # agent's /work (the workspace worktree). The shell only does pipes natively; this makes the
+        # write idiom LLMs reach for ("echo … > f.work") actually create files, so agents can author.
+        rel = redirect_rel(file)
+        body = if mode == :append, do: (Nexus.Agent.Vfs.get(vfs, rel) || "") <> out, else: out
+        Nexus.Agent.Vfs.put(vfs, rel, body)
+        ""
+    end
+  end
+
+  # Split a trailing `> file` / `>> file` (top-level, not inside quotes) off the line. Returns
+  # `{pipeline_line, {:write|:append, file} | nil}`. Only the LAST redirect is honored (the common case).
+  defp extract_redirect(line) do
+    case Regex.run(~r/^(.*?)\s*(>>?)\s*([^\s>|"']+)\s*$/, line) do
+      [_, pipeline, ">>", file] -> {pipeline, {:append, file}}
+      [_, pipeline, ">", file] -> {pipeline, {:write, file}}
+      _ -> {line, nil}
+    end
+  end
+
+  # Normalize a redirect target to a safe rel path under /work: drop a leading `/work/` or `/`, and any
+  # `..` traversal, so a write can never escape the agent's sandbox dir.
+  defp redirect_rel(file) do
+    file
+    |> String.replace_prefix("/work/", "")
+    |> String.replace_prefix("/", "")
+    |> Path.split()
+    |> Enum.reject(&(&1 in ["..", "."]))
+    |> Path.join()
   end
 
   defp cmd_timeout_ms,

@@ -8,17 +8,24 @@ defmodule Nexus.Agent.Vfs do
   A Vfs is just a path + helpers to create/seed/read/destroy it. One per agent run, cleaned up after.
   """
 
-  defstruct [:dir]
-  @type t :: %__MODULE__{dir: String.t()}
+  defstruct [:dir, owned: true]
+  @type t :: %__MODULE__{dir: String.t(), owned: boolean()}
 
   @guest "/work"
 
-  @doc "Create a fresh workspace dir for an agent run."
+  @doc "Create a fresh (throwaway) workspace dir for an ephemeral agent run."
   def new do
     dir = Path.join(System.tmp_dir!(), "nexus_vfs_#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
     %__MODULE__{dir: dir}
   end
+
+  @doc """
+  Wrap an EXISTING directory as the agent's /work — used for a workspace-scoped run whose `/work` is a
+  real jj worktree of the workspace branch (the agent edits real files; jj commits them after). Unlike
+  `new/0`, `attach/1` neither creates nor (on `destroy/1`) removes the dir; the caller owns its lifecycle.
+  """
+  def attach(dir) when is_binary(dir), do: %__MODULE__{dir: dir, owned: false}
 
   @doc "The guest mount point bash sees (`/work`)."
   def guest_root, do: @guest
@@ -49,6 +56,7 @@ defmodule Nexus.Agent.Vfs do
     |> Enum.map(&Path.relative_to(&1, dir))
   end
 
-  @doc "Destroy the workspace."
+  @doc "Destroy the workspace (only if this Vfs owns its dir — `attach/1`ed dirs are left for the caller)."
+  def destroy(%__MODULE__{owned: false}), do: :ok
   def destroy(%__MODULE__{dir: dir}), do: File.rm_rf(dir)
 end

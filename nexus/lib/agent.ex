@@ -72,7 +72,7 @@ defmodule Nexus.Agent do
     # internal `system`/`kits` so `run(prompt:, tools:, grant:, limit:, task:)` matches the block.
     opts = opts |> rename_opt(:prompt, :system) |> rename_opt(:tools, :kits)
     task = Keyword.fetch!(opts, :task)
-    vfs = Vfs.new()
+    {vfs, finalize} = setup_vfs(opts, task)
     for {path, contents} <- Keyword.get(opts, :seed, %{}), do: Vfs.put(vfs, path, contents)
 
     messages = [%{role: "system", content: system_prompt(opts)}, %{role: "user", content: task}]
@@ -83,9 +83,40 @@ defmodule Nexus.Agent do
     try do
       {result, tel} = loop(messages, vfs, opts, deadline, %{turns: 0, prompt: 0, completion: 0, total: 0, tools: []})
       record_run(opts[:unit], result, tel, started)
-      result
+      finalize.(result)
     after
       Vfs.destroy(vfs)
+    end
+  end
+
+  # Choose the agent's /work. A WORKSPACE-SCOPED run (opts[:workspace] = %{bare, work_dir, name, ...})
+  # runs in a real jj WORKTREE of the workspace branch — the wasm sandbox preopens it, the agent edits
+  # real files, and on success we seal them as an attributed commit on the agent's branch. An ephemeral
+  # run (no workspace, or jj unavailable) uses a throwaway scratch dir, exactly as before. Returns
+  # `{vfs, finalize_fn}` where finalize runs AFTER the loop with the run result.
+  defp setup_vfs(opts, task) do
+    with %{bare: bare, work_dir: work_dir, name: name} = ws <- Keyword.get(opts, :workspace),
+         uniq <- System.unique_integer([:positive]),
+         wsname <- "agent-#{name}-#{uniq}",
+         dest <- Path.join(System.tmp_dir!(), "nexus_wt_#{name}_#{uniq}"),
+         {:ok, _} <- Nexus.JJ.workspace_add(bare, work_dir, wsname, dest) do
+      branch = Map.get(ws, :branch, "agent/#{name}")
+      author = Map.get(ws, :author, "#{name} <#{name}>")
+      message = Map.get(ws, :message, "#{name}: #{String.slice(task, 0, 80)}")
+
+      finalize = fn result ->
+        case result do
+          {:ok, _} -> Nexus.JJ.workspace_commit(dest, message, author, branch)
+          _ -> :ok
+        end
+
+        Nexus.JJ.workspace_forget(work_dir, wsname, dest)
+        result
+      end
+
+      {Vfs.attach(dest), finalize}
+    else
+      _ -> {Vfs.new(), fn result -> result end}
     end
   end
 
