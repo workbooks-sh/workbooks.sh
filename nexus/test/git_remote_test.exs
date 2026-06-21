@@ -77,4 +77,33 @@ defmodule Nexus.GitRemoteTest do
     {refs, 0} = System.cmd("git", ["--git-dir=#{mirror}", "for-each-ref", "--format=%(refname)"], stderr_to_stdout: true)
     assert refs =~ "refs/heads/main"
   end
+
+  test "commit_file saves a working-tree edit into the bare repo (and mirrors)", %{base: base} do
+    bare = Git.bare_path(Path.join(base, "repos"), "demo")
+    work = Path.join(base, "work/demo")
+    Git.provision_remote(bare, work)
+
+    # Seed the repo with an initial push so HEAD/main exists.
+    client = Path.join(base, "client"); File.mkdir_p!(client)
+    src = fn args -> System.cmd("git", args, cd: client, stderr_to_stdout: true) end
+    src.(["init", "-q", "-b", "main"]); src.(["config", "user.name", "t"]); src.(["config", "user.email", "t@t"])
+    File.write!(Path.join(client, "a.work"), "v1"); src.(["add", "-A"]); src.(["commit", "-q", "-m", "init"]); src.(["push", "-q", bare, "main"])
+
+    # A mirror, configured.
+    mirror = Path.join(base, "mirror.git"); System.cmd("git", ["init", "--bare", "-q", "-b", "main", mirror], stderr_to_stdout: true)
+    Git.set_mirror(bare, mirror)
+
+    # The dashboard edits the working file, then saves it as a commit.
+    File.write!(Path.join(work, "a.work"), "v2-edited")
+    assert {:ok, _sha} = Git.commit_file(bare, work, "a.work", "edit via dashboard")
+
+    # History advanced in the bare repo, and the mirror received it.
+    {log, 0} = System.cmd("git", ["--git-dir=#{bare}", "log", "--format=%s", "-n", "1"], stderr_to_stdout: true)
+    assert log =~ "edit via dashboard"
+    {mlog, 0} = System.cmd("git", ["--git-dir=#{mirror}", "log", "--format=%s", "-n", "1"], stderr_to_stdout: true)
+    assert mlog =~ "edit via dashboard"
+
+    # No-op commit when nothing changed.
+    assert :nochange = Git.commit_file(bare, work, "a.work", "noop")
+  end
 end

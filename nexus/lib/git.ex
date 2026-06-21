@@ -107,6 +107,38 @@ defmodule Nexus.Git do
     {:ok, bare}
   end
 
+  @doc """
+  Commit a working-tree edit into a bare repo (the dashboard edits a file directly on the volume, then
+  saves it as a commit — no external push). Stages `rel_path` from `work_dir` against `bare` and commits;
+  if a `workbooks.mirror` remote is set, mirrors after (post-receive only fires on receive-pack, not on
+  a server-side commit, so we mirror here too). `{:ok, short_sha}` | `:nochange` | `{:error, output}`.
+  """
+  def commit_file(bare, work_dir, rel_path, message) when is_binary(message) do
+    base = ["--git-dir=#{bare}", "--work-tree=#{work_dir}", "-c", "core.bare=false"]
+    System.cmd("git", base ++ ["add", "--", rel_path], stderr_to_stdout: true)
+
+    case System.cmd("git", base ++ ["-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", message], stderr_to_stdout: true) do
+      {_, 0} ->
+        {sha, _} = System.cmd("git", ["--git-dir=#{bare}", "rev-parse", "--short", "HEAD"], stderr_to_stdout: true)
+        mirror_if_configured(bare)
+        {:ok, String.trim(sha)}
+
+      {out, _} ->
+        if String.contains?(out, "nothing to commit"), do: :nochange, else: {:error, out}
+    end
+  end
+
+  defp mirror_if_configured(bare) do
+    case System.cmd("git", ["--git-dir=#{bare}", "config", "--get", "workbooks.mirror"], stderr_to_stdout: true) do
+      {url, 0} when byte_size(url) > 1 ->
+        System.cmd("git", ["--git-dir=#{bare}", "push", "--mirror", String.trim(url)], stderr_to_stdout: true)
+        :ok
+
+      _ ->
+        :ok
+    end
+  end
+
   @doc "Check the current default branch of a bare repo out into `work_dir` (used after a push / on boot)."
   def checkout_into(bare, work_dir, branch \\ "main") do
     File.mkdir_p!(work_dir)
