@@ -23,7 +23,12 @@ Four lanes live in every file:
   (nexus, native BEAM), plus an optional `sandbox :name` for capabilities (the Dock seam
   compiles guest code → WASM).
 
-- **Organisation** = folders of `.work` files (+ assets).
+- **Organisation** = folders of `.work` files (+ assets). A nexus deploy is a **monorepo**: the root
+  `index.work` is the **manifest** (deploy block only, not served); a folder with `index.work` is a
+  **surface**, mounted at its path relative to root (`site/lander` → `/site/lander`, URL = folder path,
+  WYSIWYG, no remap layer). A **workspace is a declared subtree** (`workspaces="<subtree>|Name|emoji"`),
+  whose `id` IS its on-disk folder path (== git remote `/git/<id>.git` == dashboard tree key — never
+  drift them). Nesting is natural (subtree-in-subtree). **Canon: `nexus/docs/deploy-as-index-tree.md`.**
 - **Shipping** = the **`work` CLI** (the Zig *reactor*) operates on the tree: `work weave
   <dir> <out>` folds it into one shippable artifact; `check` resolves refs + audits
   capabilities; `why`/`near`/`wit` give the code-graph deps + the generated WIT world;

@@ -53,6 +53,21 @@ defmodule Nexus.Server do
   defp discover_mounts(root) do
     root_works = Path.wildcard(Path.join(root, "*.work"))
 
+    # A folder containing `index.work` is a WORKBOOK ROOT (a served surface). For the deploy-as-index-tree
+    # layout the root's own index.work is the deploy MANIFEST, not a surface — every OTHER folder with an
+    # index.work (at any depth) is a surface, mounted at its path RELATIVE to root. This is what lets a
+    # workspace be a subtree (`site/lander` → mounted "site/lander", served at /site/lander) instead of
+    # forcing every surface to be a single top-level folder. See nexus/docs/deploy-as-index-tree.md.
+    surfaces =
+      (Path.wildcard(Path.join(root, "**/index.work")) ++ root_works)
+      |> Enum.filter(&(Path.basename(&1) == "index.work"))
+      |> Enum.map(&Path.dirname/1)
+      |> Enum.uniq()
+      |> Enum.reject(&(&1 == root))
+      |> Enum.map(&{Path.relative_to(&1, root), &1})
+      |> Enum.sort()
+
+    # Legacy fallback: workbooks that don't carry an index.work — immediate subdirs with any *.work.
     subs =
       Path.wildcard(Path.join(root, "*"))
       |> Enum.filter(&File.dir?/1)
@@ -60,13 +75,14 @@ defmodule Nexus.Server do
       |> Enum.map(&{Path.basename(&1), &1})
       |> Enum.sort()
 
-    # Root-level .work = a single-workbook deploy (mount the whole root) — EXCEPT when the only root
-    # .work is the deploy MANIFEST (`index.work`) and there are surface subfolders: then the subfolders
-    # are the mounts and `index.work` is the manifest, not a served surface (deploy-as-index-tree).
     only_manifest? = root_works != [] and Enum.all?(root_works, &(Path.basename(&1) == "index.work"))
 
     cond do
+      # Manifest root + nested surfaces → the monorepo/subtree layout (mounts are relative paths).
+      only_manifest? and surfaces != [] -> surfaces
+      # A real root workbook (root .work that isn't only the manifest) → single workbook at "/".
       root_works != [] and not (only_manifest? and subs != []) -> [{"", root}]
+      surfaces != [] -> surfaces
       subs != [] -> subs
       true -> [{"", root}]
     end
@@ -87,7 +103,6 @@ defmodule Nexus.Server do
     Enum.each(found, fn {_name, wb} -> bringup(wb) end)
     length(found)
   end
-  defp wb_root(name), do: Enum.find_value(mounts(), fn {n, r} -> if n == name, do: r end)
 
   # Compile the workbook's units and let each server unit register its live sources.
   defp bringup(root) do
@@ -412,41 +427,77 @@ defmodule Nexus.Server do
     if MapSet.member?(taken, cand), do: dedupe(name, taken, n + 1), else: cand
   end
 
+  # Resolve a request's path segments to the deepest mounted workbook (LONGEST mount-name prefix), so a
+  # nested surface like "site/lander" wins over a shallower "site". Returns {name, root, tail_segments}
+  # or nil. This is what makes subtree mounts (deploy-as-index-tree) routable.
+  defp resolve_mount(segments) do
+    mounts()
+    |> Enum.reduce(nil, fn {name, root}, best ->
+      nseg = if name == "", do: [], else: String.split(name, "/")
+
+      if prefix?(nseg, segments) and (best == nil or length(nseg) > length(elem(best, 0))) do
+        {nseg, name, root}
+      else
+        best
+      end
+    end)
+    |> case do
+      nil -> nil
+      {nseg, name, root} -> {name, root, Enum.drop(segments, length(nseg))}
+    end
+  end
+
+  defp prefix?([], _), do: true
+  defp prefix?([h | t1], [h | t2]), do: prefix?(t1, t2)
+  defp prefix?(_, _), do: false
+
+  # One entry point for any mounted-workbook path: resolve the mount, then dispatch the tail to the
+  # workbook's app / source / graph / data / live / static asset (handles flat AND nested mounts).
+  defp handle_mount(conn, segments) do
+    case resolve_mount(segments) do
+      nil -> route_or_404(conn)
+      {name, root, tail} -> dispatch_mount(conn, name, root, tail)
+    end
+  end
+
+  defp dispatch_mount(conn, name, root, tail) do
+    case tail do
+      [] -> serve_workbook(conn, root, name)
+      ["source"] -> mount_source(conn, root)
+      ["graph"] -> mount_graph(conn, root)
+      ["data", resource] -> mount_data(conn, root, resource)
+      ["live", source] -> mount_live(conn, source)
+      rest ->
+        with :skip <- serve_static(conn, root, Enum.join(rest, "/")),
+             :skip <- try_route(conn) do
+          serve_workbook(conn, root, name)
+        else
+          {:served, c} -> c
+        end
+    end
+  end
+
   # A mounted workbook's SOURCE — its `.work` files (name + content), ordered index → design → ui →
   # rest. Read-only; powers the templates explorer (look at the literate source behind an app).
-  get "/:wb/source" do
-    files =
-      case wb_root(wb) do
-        nil -> []
-        r -> workbook_source(r)
-      end
-
-    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(files, escape: :html_safe))
+  defp mount_source(conn, root) do
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(workbook_source(root), escape: :html_safe))
   end
 
   # A mounted workbook's STRUCTURE GRAPH — the literate code-graph (every client/server/resource/data
   # unit + its dependency edges, classified work/native/wasm) joined with the live utilization overlay
-  # (telemetry runs/tokens/latency + DB schema + compiled artifact). This is the literate→infrastructure
-  # payoff made reachable over HTTP: SEE what a workbook is made of and how it's used. Default = JSON for
-  # a dashboard; `?format=html` returns the self-contained interactive force-directed viz.
-  get "/:wb/graph" do
-    case wb_root(wb) do
-      nil ->
-        conn |> put_resp_content_type("application/json") |> send_resp(404, ~s({"error":"no such workbook"}))
+  # (telemetry runs/tokens/latency + DB schema + compiled artifact). Default = JSON; `?format=html` →
+  # the self-contained interactive force-directed viz.
+  defp mount_graph(conn, root) do
+    g = Nexus.Graph.build_dir(root) |> Nexus.Graph.with_overlay(Nexus.Telemetry.overlay())
+    format = Plug.Conn.fetch_query_params(conn).query_params["format"]
 
-      root ->
-        g = Nexus.Graph.build_dir(root) |> Nexus.Graph.with_overlay(Nexus.Telemetry.overlay())
-        format = Plug.Conn.fetch_query_params(conn).query_params["format"]
-
-        if format == "html" do
-          conn |> put_resp_content_type("text/html") |> send_resp(200, Nexus.Graph.Viz.to_html(g))
-        else
-          # Public structure data — CORS-open so the cloud dashboard (a different origin) can read it.
-          conn
-          |> put_resp_header("access-control-allow-origin", "*")
-          |> put_resp_content_type("application/json")
-          |> send_resp(200, Jason.encode!(graph_summary(g), escape: :html_safe))
-        end
+    if format == "html" do
+      conn |> put_resp_content_type("text/html") |> send_resp(200, Nexus.Graph.Viz.to_html(g))
+    else
+      conn
+      |> put_resp_header("access-control-allow-origin", "*")
+      |> put_resp_content_type("application/json")
+      |> send_resp(200, Jason.encode!(graph_summary(g), escape: :html_safe))
     end
   end
 
@@ -489,18 +540,12 @@ defmodule Nexus.Server do
   end
 
   # ── one nexus, many workbooks: a mounted workbook's app + its live source + its data ──────────
-  get "/:wb/data/:resource" do
-    rows =
-      case wb_root(wb) do
-        nil -> []
-        r -> Map.get(Nexus.SSR.data(r, Nexus.Auth.tenant(conn)), resource, [])
-      end
-
+  defp mount_data(conn, root, resource) do
+    rows = Map.get(Nexus.SSR.data(root, Nexus.Auth.tenant(conn)), resource, [])
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(rows, escape: :html_safe))
   end
 
-  get "/:wb/live/:source" do
-    _ = wb
+  defp mount_live(conn, source) do
     # Source names are globally unique across mounted workbooks, so the name resolves the source.
     conn = Plug.Conn.fetch_query_params(conn)
     params = conn.query_params
@@ -521,10 +566,7 @@ defmodule Nexus.Server do
   end
 
   get "/:wb" do
-    case wb_root(wb) do
-      nil -> route_or_404(conn)
-      r -> serve_workbook(conn, r, wb)
-    end
+    handle_mount(conn, [wb])
   end
 
   # Deep paths under a mounted workbook (`/documentation/introduction/what-is-the-nexus`) are the
@@ -532,19 +574,7 @@ defmodule Nexus.Server do
   # sub-path; the in-page router reads `location.pathname` and shows the matching page. (Real
   # sub-resources — source/data/live — are matched by the explicit routes above, so they win.)
   get "/:wb/*rest" do
-    case wb_root(wb) do
-      nil ->
-        route_or_404(conn)
-
-      r ->
-        # Precedence under a mount path: real static file → explicit declared `route` → SPA shell.
-        with :skip <- serve_static(conn, r, Enum.join(rest, "/")),
-             :skip <- try_route(conn) do
-          serve_workbook(conn, r, wb)
-        else
-          {:served, c} -> c
-        end
-    end
+    handle_mount(conn, [wb | rest])
   end
 
   # Explicit workbook routes (Nexus.Router) are tried wherever a built-in route would otherwise 404 —
