@@ -43,22 +43,11 @@ defmodule Nexus.Compile do
       # that language's real lane; grant enforcement rides through the lane (c_unit/rust_unit read
       # the unit's `grant:` via Nexus.Audit) + instantiation (Nexus.Sandbox wires only granted Dock
       # imports). This is what makes "guest code → WASM with only granted powers" real.
-      kind == "sandbox" -> {:wasm, cached(node, fn -> sandbox_unit(node) end)}
-      kind == "rust" -> {:wasm, cached(node, fn -> rust_unit(node) end)}
-      kind in ~w(c cpp) -> {:wasm, cached(node, fn -> c_unit(node) end)}
-      kind == "zig" -> {:wasm, cached(node, fn -> zig_unit(node) end)}
-      kind == "swift" -> {:wasm, cached(node, fn -> swift_unit(node) end)}
-      kind == "js" -> {:wasm, cached(node, fn -> js_unit(node) end)}
-      kind == "ts" -> {:wasm, cached(node, fn -> ts_unit(node) end)}
-      kind == "python" -> {:wasm, cached(node, fn -> python_unit(node) end)}
-      # svelte/solid are CLIENT UI frameworks: their compile is a TRANSPILE to browser JS (the
-      # component imports a framework runtime + needs a DOM — it's not a server command module). So
-      # they're render-target lanes like `client`, but with a compile step. Emit {:client, js}.
-      kind == "svelte" -> svelte_client(node)
-      kind == "solid" -> solid_client(node)
+      kind == "sandbox" -> lane(node.lang, node)
+      kind in ~w(rust c cpp zig swift js ts python svelte solid) -> lane(kind, node)
 
       # Any remaining wasm kind has no wired lane — surface a LOUD, explicit error (never a silent
-      # tuple that masquerades as an artifact). When a lane is wired, add its `kind == …` arm above.
+      # tuple that masquerades as an artifact). When a lane is wired, add its arm to `lane/2`.
       kind in @wasm_kinds ->
         require Logger
         Logger.error("[compile] lane not built: #{kind}:#{node.name} (#{node.lang}) — no compiler wired")
@@ -71,21 +60,22 @@ defmodule Nexus.Compile do
 
   def unit(_), do: {:skip, :not_a_unit}
 
-  # `sandbox <lang> :name` → compile the inner language. The wrapper exists to name capability
-  # grants; the inner lane does the build (and, for c/rust, injects the granted Dock host imports).
-  defp sandbox_unit(%{lang: lang} = node) do
-    case lang do
-      "rust" -> rust_unit(node)
-      l when l in ~w(c cpp) -> c_unit(node)
-      "zig" -> zig_unit(node)
-      "swift" -> swift_unit(node)
-      "js" -> js_unit(node)
-      "ts" -> ts_unit(node)
-      "python" -> python_unit(node)
-      # svelte/solid are client UI frameworks, not sandboxable server lanes.
-      _ -> {:error, {:sandbox_unknown_lang, lang, node.name}}
-    end
-  end
+  # Route a language to its artifact, TAGGED by execution shape so the run path knows how to invoke it:
+  #   {:wasm, _}    — a typed wasm COMPONENT (rust/c/zig/swift) → Nexus.Sandbox.start + call(export)
+  #   {:command, _} — a WASI COMMAND module (js/ts/python; stdin→stdout) → Nexus.Sandbox.run_command
+  #   {:client, _}  — browser JS (svelte/solid; needs a DOM) → emitted as a client island, not run server-side
+  defp lane("rust", node), do: {:wasm, cached(node, fn -> rust_unit(node) end)}
+  defp lane(l, node) when l in ~w(c cpp), do: {:wasm, cached(node, fn -> c_unit(node) end)}
+  defp lane("zig", node), do: {:wasm, cached(node, fn -> zig_unit(node) end)}
+  defp lane("swift", node), do: {:wasm, cached(node, fn -> swift_unit(node) end)}
+  defp lane("js", node), do: {:command, cached(node, fn -> js_unit(node) end)}
+  defp lane("ts", node), do: {:command, cached(node, fn -> ts_unit(node) end)}
+  # python's artifact is the shared interpreter + the unit's (dedented) source — NOT a per-unit build,
+  # so it skips the wasm cache; the spec carries the source for the run path to mount.
+  defp lane("python", node), do: {:command, python_unit(node)}
+  defp lane("svelte", node), do: svelte_client(node)
+  defp lane("solid", node), do: solid_client(node)
+  defp lane(other, node), do: {:error, {:sandbox_unknown_lang, other, node.name}}
 
   # ── content-addressed compile cache ──────────────────────────────────────────────────────────
   # Every knob below comes from `Nexus.Config` (the `deploy` config element), never env:
@@ -316,7 +306,30 @@ defmodule Nexus.Compile do
     end
   end
 
-  defp python_unit(%{body: body} = node), do: Nexus.Compilers.Python.python_compile_to_wasm(body, dock: granted?(node))
+  # python's artifact = the interpreter + the unit's source (dedented; `.work` block bodies carry the
+  # block indentation and python is indent-sensitive). The run path mounts the source + runs the interp.
+  defp python_unit(%{body: body}) do
+    case Nexus.Compilers.Python.python_compile_to_wasm(body) do
+      {:ok, interp} -> {:ok, {:interp, interp, dedent(body)}}
+      err -> err
+    end
+  end
+
+  # Strip the common leading-whitespace prefix from every non-blank line (a `.work` block body is
+  # uniformly indented under its `do`). Indent-sensitive languages (python) need this before running.
+  defp dedent(body) do
+    lines = String.split(body, "\n")
+
+    min_indent =
+      lines
+      |> Enum.reject(&(String.trim(&1) == ""))
+      |> Enum.map(&(String.length(&1) - String.length(String.trim_leading(&1))))
+      |> Enum.min(fn -> 0 end)
+
+    Enum.map_join(lines, "\n", fn line ->
+      if String.length(line) >= min_indent, do: String.slice(line, min_indent..-1//1), else: line
+    end)
+  end
 
   # svelte/solid → transpile to browser JS, emitted as a client island. Errors propagate as
   # {:error, _} (loud), never a silent empty island.

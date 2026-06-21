@@ -13,13 +13,6 @@ defmodule Nexus.CompileLanesTest do
     System.find_executable("wasmtime") && File.regular?(Path.join([root, "js", "harness.o"]))
   end
 
-  defp run_wasm(wasm, stdin) do
-    sin = Path.join(System.tmp_dir!(), "lanein_#{System.unique_integer([:positive])}")
-    File.write!(sin, stdin)
-    {out, code} = System.cmd("sh", ["-c", "wasmtime run #{wasm} < #{sin}"], stderr_to_stdout: true)
-    File.rm(sin)
-    {out, code}
-  end
 
   test "client is a render passthrough, never an unbuilt-lane error" do
     n = unit("client :ui do\n  <h1>hello</h1>\nend\n")
@@ -34,9 +27,8 @@ defmodule Nexus.CompileLanesTest do
     assert n.lang == "zig"
     # Prove the sandbox arm is wired without the slow zig compile: an unsupported inner lang takes
     # the only fast error path (:sandbox_unknown_lang), NOT the {:unbuilt_lane} misclassification.
-    # (cached/2 wraps the lane result, hence the {:wasm, {:error, ...}} envelope.)
     bogus = %{n | lang: "cobol"}
-    assert {:wasm, {:error, {:sandbox_unknown_lang, "cobol", "encode"}}} = Nexus.Compile.unit(bogus)
+    assert {:error, {:sandbox_unknown_lang, "cobol", "encode"}} = Nexus.Compile.unit(bogus)
   end
 
   @tag :compiler
@@ -50,8 +42,9 @@ defmodule Nexus.CompileLanesTest do
   console.log(new TextDecoder().decode(b.subarray(0,k)).trim().toUpperCase());
 end|)
 
-      assert {:wasm, {:ok, wasm}} = Nexus.Compile.unit(n)
-      assert {out, 0} = run_wasm(wasm, "hello\n")
+      # js is a COMMAND-module lane (stdin→stdout); run it through the unified run path
+      assert {:command, {:ok, spec}} = Nexus.Compile.unit(n)
+      assert {:ok, out} = Nexus.Sandbox.run_command(spec, "hello\n")
       assert out =~ "HELLO"
     end
   end
@@ -68,8 +61,8 @@ end|)
   console.log(up(new TextDecoder().decode(b.subarray(0,k)).trim()));
 end|)
 
-      assert {:wasm, {:ok, wasm}} = Nexus.Compile.unit(n)
-      assert {out, 0} = run_wasm(wasm, "hi\n")
+      assert {:command, {:ok, spec}} = Nexus.Compile.unit(n)
+      assert {:ok, out} = Nexus.Sandbox.run_command(spec, "hi\n")
       assert out =~ "HI"
     end
   end
@@ -96,18 +89,13 @@ end|)
     if !File.regular?(interp) || !System.find_executable("wasmtime") do
       :ok
     else
+      # python compiles to a {:command, {:interp, …}} spec carrying the dedented source; the unified
+      # run path mounts it + runs the interpreter (the source's indentation is dedented by compile.ex).
       n = unit("python :up do\n  import sys\n  print(sys.stdin.read().strip().upper())\nend\n")
       assert n.kind == "python"
-      assert {:wasm, {:ok, wasm}} = Nexus.Compile.unit(n)
-
-      d = Path.join(System.tmp_dir!(), "pyt_#{System.unique_integer([:positive])}")
-      File.mkdir_p!(d)
-      # .work block bodies carry the block's indentation; python is indent-sensitive, so the run-path
-      # dedents (strip the common leading whitespace). Here we strip the uniform 2-space block indent.
-      py = n.body |> String.split("\n") |> Enum.map_join("\n", &String.replace_prefix(&1, "  ", ""))
-      File.write!(Path.join(d, "main.py"), py)
-      sin = Path.join(d, "in"); File.write!(sin, "hi\n")
-      {out, 0} = System.cmd("sh", ["-c", "wasmtime run --dir #{d}::/w #{wasm} /w/main.py < #{sin}"], stderr_to_stdout: true)
+      assert {:command, {:ok, {:interp, _interp, src} = spec}} = Nexus.Compile.unit(n)
+      assert src == "import sys\nprint(sys.stdin.read().strip().upper())"
+      assert {:ok, out} = Nexus.Sandbox.run_command(spec, "hi\n")
       assert out =~ "HI"
     end
   end
@@ -141,8 +129,9 @@ end|)
 end|)
 
       assert n.kind == "sandbox" and n.lang == "js"
-      assert {:wasm, {:ok, wasm}} = Nexus.Compile.unit(n)
-      assert {out, 0} = run_wasm(wasm, "sandboxed\n")
+      # sandbox routes to the inner js lane → a command module
+      assert {:command, {:ok, spec}} = Nexus.Compile.unit(n)
+      assert {:ok, out} = Nexus.Sandbox.run_command(spec, "sandboxed\n")
       assert out =~ "sandboxed"
     end
   end

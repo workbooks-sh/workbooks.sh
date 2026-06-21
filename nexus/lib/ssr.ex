@@ -517,23 +517,40 @@ defmodule Nexus.SSR do
     |> Enum.reverse()
   end
 
-  # Compile the unit (any lane), run its no-arg `render` export on wasmex, bake the result.
-  # An ungranted host cap is refused BEFORE running it (the weave is where the audit is enforced).
+  # Compile the unit and run it — dispatching on the lane's execution shape. An ungranted host cap is
+  # refused BEFORE running it (the weave is where the audit is enforced).
+  #   {:wasm, _}    — a typed COMPONENT: instantiate + call its no-arg `render` export (rust/c/zig/swift).
+  #   {:command, _} — a WASI COMMAND module (js/ts/python): run it, its STDOUT is the output.
+  #   {:client, js} — browser JS (svelte/solid/client): emitted as a client island, run in the browser.
   defp render_unit(name, node) do
     case Nexus.Audit.unit(node) do
-      [] ->
-        with {:wasm, {:ok, comp}} <- Nexus.Compile.unit(node),
-             {:ok, p} <- Nexus.Sandbox.start(comp, []),
-             {:ok, val} <- Nexus.Sandbox.call(p, "render", []) do
-          ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
-        else
-          _ -> ~s(  <div class="data-missing">#{esc(name)}.render unavailable</div>)
-        end
-
+      [] -> render_artifact(name, Nexus.Compile.unit(node))
       ungranted ->
         ~s(  <div class="data-missing">#{esc(name)} blocked: ungranted caps #{esc(Enum.join(ungranted, ", "))}</div>)
     end
   end
+
+  defp render_artifact(name, {:wasm, {:ok, comp}}) do
+    with {:ok, p} <- Nexus.Sandbox.start(comp, []),
+         {:ok, val} <- Nexus.Sandbox.call(p, "render", []) do
+      ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
+    else
+      _ -> ~s(  <div class="data-missing">#{esc(name)}.render unavailable</div>)
+    end
+  end
+
+  defp render_artifact(name, {:command, {:ok, spec}}) do
+    case Nexus.Sandbox.run_command(spec, "") do
+      {:ok, out} -> ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(String.trim(out))}</div>)
+      _ -> ~s(  <div class="data-missing">#{esc(name)} command run failed</div>)
+    end
+  end
+
+  defp render_artifact(name, {:client, js}) do
+    ~s(  <div class="unit-island" data-unit="#{esc(name)}"><script type="module">#{js}</script></div>)
+  end
+
+  defp render_artifact(name, _), do: ~s(  <div class="data-missing">#{esc(name)} unavailable</div>)
 
   defp render_show(name, nil, _ctx),
     do: ~s(  <div class="data-missing">unknown resource <code>#{esc(name)}</code></div>)

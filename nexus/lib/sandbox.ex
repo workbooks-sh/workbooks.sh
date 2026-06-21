@@ -28,6 +28,61 @@ defmodule Nexus.Sandbox do
     Wasmex.Components.call_function(pid, fun, args, timeout)
   end
 
+  @cmd_timeout_ms 30_000
+
+  @doc """
+  Run a WASI **command module** (`main()`, stdin→stdout — the js/ts/python lanes, and toolkits) and
+  capture stdout. `spec` is either a `.wasm` path (a self-contained command, e.g. an embedded-JS
+  module), or `{:interp, interp_path, source}` for an interpreter lane (python): the source is mounted
+  and run by the interpreter. `stdin` is the program's input. Returns `{:ok, stdout} | {:error, _}`.
+
+  Mirrors the agent's kit runner (`Nexus.Agent.Bash`): the host only does the `< stdin` redirect + a
+  SIGKILL watchdog; the executed program is the sandboxed wasm.
+  """
+  def run_command(spec, stdin \\ "")
+
+  def run_command(wasm, stdin) when is_binary(wasm), do: exec_command(wasm, [], [], stdin)
+
+  def run_command({:interp, interp, source}, stdin) do
+    dir = Path.join(System.tmp_dir!(), "nxcmd_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    File.write!(Path.join(dir, "main"), source)
+
+    try do
+      exec_command(interp, ["--dir", "#{dir}::/w"], ["/w/main"], stdin)
+    after
+      File.rm_rf(dir)
+    end
+  end
+
+  # wasmtime run [aot flags] [extra mounts] <wasm> [argv] < stdinfile, with a kill-after-budget watchdog.
+  defp exec_command(wasm, extra_flags, argv, stdin) do
+    {flags, exec} = Nexus.Wasm.Aot.resolve(wasm)
+    stdin_file = Path.join(System.tmp_dir!(), "nxcmd_in_#{System.unique_integer([:positive])}")
+    File.write!(stdin_file, stdin)
+
+    inner =
+      (["wasmtime", "run"] ++ flags ++ extra_flags ++ [exec | argv]) |> Enum.map_join(" ", &shq/1)
+
+    secs = max(1, div(@cmd_timeout_ms, 1000))
+
+    guarded =
+      "#{inner} < #{shq(stdin_file)} & cmd=$!; " <>
+        "{ sleep #{secs}; kill -9 $cmd 2>/dev/null; pkill -9 -P $cmd 2>/dev/null; } >/dev/null 2>&1 & w=$!; " <>
+        "wait $cmd; rc=$?; kill $w 2>/dev/null; wait $w 2>/dev/null; exit $rc"
+
+    {out, code} = System.cmd("sh", ["-c", guarded], stderr_to_stdout: true)
+    File.rm(stdin_file)
+
+    cond do
+      code == 0 -> {:ok, out}
+      code == 137 -> {:error, {:command_timeout, secs}}
+      true -> {:error, {:command_failed, code, out}}
+    end
+  end
+
+  defp shq(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
+
   # The Dock supplies the host implementations (the one place this layer holds real code —
   # everything else is wasmex). A component only calls the imports it declares, so handing it the
   # full Dock set is safe.
