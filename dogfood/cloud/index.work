@@ -54,6 +54,10 @@ server :cloud do
   # deeper, file-level view. Apps inherit a declared workspace's name+emoji where one exists.
   route "GET /cloud/apps", :apps
 
+  # Agents defined across the mounted workbooks — the Studio "Agents" tab lists these. Read from the
+  # live registry (Nexus.Agent.all, populated at bringup from each workbook's `agent` blocks).
+  route "GET /cloud/agents", :agents_list
+
   # Read a single file's TEXT content for the Workspace explorer (ship 3 — read-only IDE). `path` is
   # `<mount>/<rel>`. Same mount + traversal guard as :tree. Caps at 2MB; flags binary so the client
   # falls back to /cloud/raw (images/pdf streamed with the right Content-Type).
@@ -374,6 +378,18 @@ server :cloud do
 
   defp humanize(name), do: name |> String.split(~r{[-/_]}, trim: true) |> Enum.map_join(" ", &String.capitalize/1)
 
+  # Agents from the live registry. Each: %{name, file}. Studio lists them in the Agents tab.
+  def agents_list(_req) do
+    agents =
+      Nexus.Agent.all()
+      |> Enum.map(fn n -> %{name: to_string(Map.get(n, :name)), file: Map.get(n, :file)} end)
+      |> Enum.reject(&(&1.name in [nil, "", "nil"]))
+      |> Enum.uniq_by(& &1.name)
+      |> Enum.sort_by(& &1.name)
+
+    %{agents: agents}
+  end
+
   # An app is GATED (lock) when its workbook declares an `auth` block — our auth guardian
   # (Nexus.Auth.Guard) protects it. No auth block ⇒ public (globe), an open hosted surface. Only the
   # mount's root-level .work is checked (where index/auth live), so it stays cheap.
@@ -581,7 +597,7 @@ client :app do
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
-  <link rel="stylesheet" href="./app.css?v=20260621f">
+  <link rel="stylesheet" href="./app.css?v=20260621g">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
@@ -613,5 +629,5 @@ client :app do
   <!-- ?v= is the cache-bust token. BUMP IT ON EVERY DEPLOY that changes JS/CSS. app.js reads its own
        ?v= and re-applies it to every lazily-loaded asset (views, wbchat) so a deploy = all-new URLs =
        guaranteed cache miss (hard-refresh can't re-fetch lazy import()s; only a new URL can). -->
-  <script src="./app.js?v=20260621f"></script>
+  <script src="./app.js?v=20260621g"></script>
 end
