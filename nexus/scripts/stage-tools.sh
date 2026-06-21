@@ -72,8 +72,15 @@ take js/qjs-root
 take js/harness.o
 take js/harness_dock.o   # JsDock harness (env.* host caps → Javy.Net/Javy.VFS) — wb-e1x
 take js/bundle           # the in-sandbox npm bundler (bundlejob.js) — without it bundle_dir fails
+# The JS-family lane bundles (svelte compiler, solid babel transform, python interpreter) are
+# gitignored — produce them on-demand via each lane's build.sh (fetch + bun/esbuild; no-op when
+# already built), then stage. CI (.github/workflows/compilers-js.yml) runs the SAME scripts on a
+# clean runner, so the bundles are present whether staged on a provisioned machine or in CI.
+for lane in svelte solid python; do
+  [ -f "$SRC/$lane/build.sh" ] && bash "$SRC/$lane/build.sh" >/dev/null 2>&1 || true
+done
 take svelte               # the in-sandbox Svelte lane (svelte_compile.js + vendor/compiler.cjs)
-take solid                # the in-sandbox Solid lane (solid_compile.js + vendor/babel.js — @babel/standalone + babel-preset-solid)
+take solid                # the Solid lane (solid_compile.js removed; vendor/babel.js runs on StarlingMonkey)
 take python/pythonrun.wasm # the Python lane interpreter (CPython 3.12 wasm32-wasi) — yaegi-style interpreter-in-wasm
 take js/shims            # Node core + dock shims (events/buffer/fs/http/crypto/…) — wb-spy/wb-e1x
 take js/manifest.org
