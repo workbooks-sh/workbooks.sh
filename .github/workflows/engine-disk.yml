@@ -39,7 +39,7 @@ env:
 jobs:
   build:
     # workflow_run fires on failure too — only build on a successful publish.
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04-arm # native arm64 — docker pull + mke2fs, no QEMU
     permissions:
       contents: read
