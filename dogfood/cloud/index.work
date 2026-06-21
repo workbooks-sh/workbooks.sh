@@ -130,7 +130,21 @@ server :cloud do
     end
   end
 
-  def models(_req), do: %{models: Nexus.Llm.models()}
+  # The provider model catalog. Nexus.Llm.models/0 does a LIVE OpenRouter fetch every call, and the
+  # Studio hit this on first paint — a slow external round-trip in the critical path. Cache it (10-min
+  # TTL) so only the first load pays for it; subsequent loads are instant.
+  def models(_req), do: %{models: cached_models()}
+
+  defp cached_models do
+    now = System.os_time(:second)
+    case :persistent_term.get({:cloud_models_cache}, nil) do
+      {ts, list} when now - ts < 600 -> list
+      _ ->
+        list = Nexus.Llm.models()
+        :persistent_term.put({:cloud_models_cache}, {now, list})
+        list
+    end
+  end
 
   # Known block kinds (generous superset) — anything else opening a do…end block is flagged.
   @work_kinds ~w(data def defp server client flow sandbox agent record resource hook check toolkit
@@ -1032,7 +1046,7 @@ client :app do
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
-  <link rel="stylesheet" href="./app.css?v=20260621m">
+  <link rel="stylesheet" href="./app.css?v=20260621n">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
@@ -1064,5 +1078,5 @@ client :app do
   <!-- ?v= is the cache-bust token. BUMP IT ON EVERY DEPLOY that changes JS/CSS. app.js reads its own
        ?v= and re-applies it to every lazily-loaded asset (views, wbchat) so a deploy = all-new URLs =
        guaranteed cache miss (hard-refresh can't re-fetch lazy import()s; only a new URL can). -->
-  <script src="./app.js?v=20260621m"></script>
+  <script src="./app.js?v=20260621n"></script>
 end

@@ -30,14 +30,23 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   // NOTE: no ?bundle — that inlines a SEPARATE solid-js core per import, so signals from one aren't
   // reactive in another's templates (For/class bindings silently never update). Plain imports let
   // esm.sh share ONE solid-js core across core/web/html, restoring reactivity.
-  var S = await import('https://esm.sh/solid-js@1.9.5');
-  var W = await import('https://esm.sh/solid-js@1.9.5/web');
-  var html = (await import('https://esm.sh/solid-js@1.9.5/html')).default;
-  var createSignal = S.createSignal, For = S.For, Show = S.Show;
+  // Load EVERYTHING the Studio needs in PARALLEL. This was a 7-deep serial await waterfall — each
+  // esm.sh / wbchat import AND the /cloud/models call blocked the next, so first paint waited on their
+  // SUM (the main reason Studio felt slow on cold load). One Promise.all → total ≈ the slowest single
+  // fetch. esm.sh is URL-keyed, so the three solid-js entry points still share ONE core (the reason we
+  // avoid ?bundle); firing the requests in parallel doesn't change that. `api` is hoisted (below).
   var vurl = WB.vurl || function (u) { return u; };
-  var WBC = await import(vurl('../wbchat/core.js'));
-  await import(vurl('../wbchat/components/index.js'));  // registers all parts + actions + composer add-ons
-  var DEMO = await import(vurl('../wbchat/demo.js'));   // dev-only seed (?cdemo=1) exercising every part type
+  var _p = await Promise.all([
+    import('https://esm.sh/solid-js@1.9.5'),
+    import('https://esm.sh/solid-js@1.9.5/web'),
+    import('https://esm.sh/solid-js@1.9.5/html'),
+    import(vurl('../wbchat/core.js')),
+    import(vurl('../wbchat/components/index.js')),  // registers all parts + actions + composer add-ons
+    import(vurl('../wbchat/demo.js')),              // dev-only seed (?cdemo=1) exercising every part type
+    api('/cloud/models').catch(function(){ return { models: [] }; })  // overlaps the imports, no longer serial
+  ]);
+  var S = _p[0], W = _p[1], html = _p[2].default, WBC = _p[3], DEMO = _p[5], _mr = _p[6];
+  var createSignal = S.createSignal, For = S.For, Show = S.Show;
   (function(){ if (!document.getElementById('wbchat-theme')){ var l = document.createElement('link'); l.id = 'wbchat-theme'; l.rel = 'stylesheet'; l.href = vurl('./wbchat/theme.css'); document.head.appendChild(l); } })();
   var CDEMO = new URLSearchParams(location.search).get('cdemo') === '1';
 
@@ -51,8 +60,7 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   // The models you can route the run through (the composer dropdown). Live from the nexus —
   // /cloud/models returns the provider's (OpenRouter) catalog, with a curated fallback. The selected
   // model id is passed to the agent run. (Agent selection moved out of the composer; this is models.)
-  var MODELS = [];
-  try { var mr = await api('/cloud/models'); MODELS = (mr && mr.models) || []; } catch (e) {}
+  var MODELS = (_mr && _mr.models) || [];  // already fetched in the parallel batch above
 
   function Studio(){
     var ao = createSignal(false); var agentsOpen = ao[0], setAgentsOpen = ao[1];
