@@ -70,8 +70,13 @@ export function token(stream, state) {
   const w = stream.match(/[A-Za-z_]\w*[?!]?/);
   if (w) {
     const word = w[0];
-    // A nested opener inside a block deepens the `do…end` count so the wrong `end` can't close it.
-    if (word === 'do') { if (state.pendingOpen) { state.inBlock = true; state.pendingOpen = false; } state.depth += 1; return 'keyword'; }
+    // `do:` is keyword-list shorthand (`def f, do: x`), NOT a block opener — don't open a block.
+    if (word === 'do') {
+      if (stream.peek() === ':') return 'keyword';
+      // A nested opener inside a block deepens the `do…end` count so the wrong `end` can't close it.
+      if (state.pendingOpen) { state.inBlock = true; state.pendingOpen = false; }
+      state.depth += 1; return 'keyword';
+    }
     if (word === 'end') { state.depth -= 1; if (state.depth <= 0) { state.inBlock = false; state.depth = 0; } return 'keyword'; }
     if (KINDS.has(word) || KW.has(word)) return 'keyword';
     if (BOOLS.has(word)) return 'bool';

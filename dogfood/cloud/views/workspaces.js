@@ -36,40 +36,34 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
   // Hook so the shared sidebar's file click opens the file here when this view is mounted.
   WB.openInExplorer = function(path){ WB._pendingFile = null; openFile(path); };
 
-  // ── editing: edit in CodeMirror → ⌘S → commit/push via the git remote ─────────────────────────
-  function setDirty(b){
-    state.dirty = b;
+  // ── editing: the workedit island owns the CodeMirror surface; this view supplies the save bar +
+  //    the onSave (commit/push via the git remote). ⌘S is bound inside the island. ───────────────
+  function setSaveBtn(label, on, disabled){
     var btn = el.querySelector('[data-save]');
-    if (btn){ btn.disabled = !b; btn.textContent = b ? 'Save' : 'Saved'; btn.classList.toggle('on', b); }
+    if (btn){ btn.disabled = !!disabled; btn.textContent = label; btn.classList.toggle('on', !!on); }
   }
-  async function save(){
-    if (!state.editor || !state.active || !state.dirty) return;
-    var path = state.active, content = state.editor.state.doc.toString();
-    var btn = el.querySelector('[data-save]'); if (btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
+  function setDirty(b){ state.dirty = b; setSaveBtn(b ? 'Save' : 'Saved', b, !b); }
+  // The island calls this with the current text; return false on failure (island stays dirty).
+  async function persist(content){
+    if (!state.active) return false;
+    setSaveBtn('Saving…', true, true);
     try {
       var r = await fetch('/cloud/file/save', { method: 'POST', credentials: 'same-origin',
-        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: path, content: content }) });
+        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: state.active, content: content }) });
       var d = await r.json();
-      if (d && d.ok){ setDirty(false); WB.toast('Saved' + (d.sha ? ' · ' + d.sha : '')); }
-      else { WB.toast((d && d.error) || 'Save failed', 'bad'); if (btn){ btn.disabled = false; btn.textContent = 'Save'; } }
-    } catch (e) { WB.toast('Save failed', 'bad'); if (btn){ btn.disabled = false; btn.textContent = 'Save'; } }
+      if (d && d.ok){ WB.toast('Saved' + (d.sha ? ' · ' + d.sha : '')); return true; }
+      WB.toast((d && d.error) || 'Save failed', 'bad'); setSaveBtn('Save', true, false); return false;
+    } catch (e) { WB.toast('Save failed', 'bad'); setSaveBtn('Save', true, false); return false; }
   }
+  function save(){ if (state.editor) state.editor.save(); }
 
   // ── viewers (lazy esm imports, cached across the session) ───────────────────────────────────
-  var _cm = null, _pdf = null, _marked = null;
-  async function cm(){
-    if (_cm) return _cm;
-    // Assemble from the component packages — esm.sh's `codemirror?bundle` collapses to a single default
-    // (no named EditorView/basicSetup), so we import the pieces directly.
-    _cm = Promise.all([
-      import('https://esm.sh/@codemirror/view@6'),
-      import('https://esm.sh/@codemirror/state@6'),
-      import('https://esm.sh/@codemirror/commands@6')
-    ]).then(function(mods){
-      var view = mods[0], st = mods[1], cmds = mods[2];
-      return { view: view, EditorView: view.EditorView, EditorState: st.EditorState, cmds: cmds };
-    });
-    return _cm;
+  var _pdf = null, _marked = null, _workedit = null;
+  // The editor surface is the workedit island (loads CodeMirror itself).
+  function workedit(){
+    if (_workedit) return _workedit;
+    _workedit = import((WB.vurl || function(u){ return u; })('../workedit/core.js'));
+    return _workedit;
   }
   async function pdfjs(){
     if (_pdf) return _pdf;
@@ -136,23 +130,16 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
       '<div id="wxcm" class="wxcm"></div>' + truncNote(meta);
     var mount = host.querySelector('#wxcm');
     var sb = host.querySelector('[data-save]'); if (sb) sb.onclick = save;
+    if (state.editor && state.editor.destroy) { try { state.editor.destroy(); } catch (e) {} }
     state.editor = null; setDirty(false);
     try {
-      var m = await cm();
-      var ext6 = [
-        m.view.lineNumbers(),
-        m.view.highlightActiveLine(),
-        m.cmds.history(),
-        m.view.keymap.of(m.cmds.defaultKeymap.concat(m.cmds.historyKeymap)),
-        m.EditorView.updateListener.of(function(u){ if (u.docChanged) setDirty(true); }),
-        m.EditorView.theme({ '&': { height: '100%', fontSize: '12.5px' } })
-      ];
-      // .work files get the workedit syntax highlighter (P1 — StreamLanguage; degrades silently).
-      if (/\.work$/i.test(path)) {
-        try { var wurl = (WB.vurl || function(u){ return u; })('../workedit/lang-stream.js'); var wk = await import(wurl); ext6 = ext6.concat(wk.workHighlightFromView(m.view)); }
-        catch (e) { try { console.warn('[workedit] highlight unavailable', e); } catch (_) {} }
-      }
-      state.editor = new m.EditorView({ doc: content, extensions: ext6, parent: mount });
+      var WE = await workedit();
+      state.editor = await WE.createEditor(mount, {
+        doc: content, path: path,
+        resolveModule: WB.vurl,
+        onDirtyChange: setDirty,
+        onSave: persist,
+      });
     } catch (e) {
       mount.innerHTML = '<pre class="wxpre">' + esc(content) + '</pre>';
     }
