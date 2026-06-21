@@ -56,12 +56,14 @@ author multi-line `.work` files.
 - **Video** ⬜ — BLOCKED: the wasm-video package isn't a compiled agent kit yet (only
   `coreutils`+`web` are). Needs wasm-video wired as a kit + a render-job path. (bd: wb-luce)
 
-## Stage 3 — Git-backed store + the Studio surfaces  · needs 1
+## Stage 3 — Git-backed store + the Studio surfaces  · needs 1 · IN PROGRESS
 
-- Move **tasks/issues to git-backed `.work`** at `<ws>/.nexus/{tasks,issues}/<id>.work`
-  (source of truth, jj-covered), SQLite as the derived index (write-through + rebuild).
-  (bd: wb-xxks)
-- **Studio buildout**: Schedules panel + Issues panel (we have the backends); fold
+- **Git-backed `.work` store** ✅ — tasks/issues write-through to a committed
+  `<home-ws>/.nexus/{tasks,issues}/<tid>.work` (source of truth, jj-covered, attributed);
+  SQLite stays the fast read index. Render+parse round-trip verified. Gated on
+  jj-substrate, best-effort. (Full SQLite-is-derived inversion + rebuild-on-boot =
+  follow-up.) (bd: wb-xxks)
+- **Studio buildout** ⬜ — Schedules panel + Issues panel (backends exist); fold
   schedule into the Tasks board; durable agent sessions; sub-agent runs collapsed under
   the parent. (bd: wb-980e + Schedules-UI)
 
