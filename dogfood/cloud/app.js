@@ -323,6 +323,35 @@
       gear: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
     };
     var WMARK = WB.WMARK = '<svg viewBox="0 0 113.444 65.6002" fill="none"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>';
+
+    // ── File/folder icons — the VS Code Material Icon Theme, served from CDN (no-build). Mirrors the
+    // desktop's materialIcon.ts resolution (fileNames > fileExtensions > default; folders likewise).
+    // `.work` gets OUR branded logo tile. Manifest is loaded once at boot (WB.loadIcons) so WB.fileIcon
+    // is synchronous afterward. ──
+    var MIT = 'https://cdn.jsdelivr.net/npm/material-icon-theme';
+    WB._micon = null;
+    WB.loadIcons = async function(){
+      if (WB._micon) return WB._micon;
+      try { WB._micon = await fetch(MIT + '/dist/material-icons.json').then(function(r){ return r.json(); }); }
+      catch (e) { WB._micon = {}; }
+      return WB._micon;
+    };
+    WB.iconUrl = function(def){ return MIT + '/icons/' + def + '.svg'; };
+    WB.fileIcon = function(name, opts){
+      opts = opts || {};
+      var lower = String(name || '').toLowerCase();
+      if (/\.work$/.test(lower)) return '<span class="micon work">' + WMARK + '</span>';
+      var m = WB._micon || {}, def;
+      if (opts.dir) {
+        var fm = opts.open ? (m.folderNamesExpanded || {}) : (m.folderNames || {});
+        def = fm[lower] || (opts.open ? (m.folderExpanded || 'folder-open') : (m.folder || 'folder'));
+      } else {
+        def = (m.fileNames || {})[lower];
+        if (!def) { var p = lower.split('.'); for (var i = 1; i < p.length && !def; i++) def = (m.fileExtensions || {})[p.slice(i).join('.')]; }
+        def = def || (m.file || 'file');
+      }
+      return '<img class="micon" src="' + WB.iconUrl(def) + '" alt="" loading="lazy">';
+    };
     var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
     var MOON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>';
 
@@ -450,7 +479,7 @@
         (st.bookmarks.length
           ? st.bookmarks.map(function (b) {
               return '<div class="pinrow" data-pin-open="' + esc(b.path) + '" title="' + esc(b.path) + '">' +
-                '<span class="pinico">' + ICO.pin + '</span><span class="lbl">' + esc(b.label) + '</span>' +
+                '<span class="pinico">' + WB.fileIcon(b.label || b.path) + '</span><span class="lbl">' + esc(b.label) + '</span>' +
                 '<button class="pinx" data-pin-x="' + esc(b.path) + '" title="Unpin">×</button></div>';
             }).join('')
           : '<div class="pinempty lbl">Pin files from a workspace to launch them here.</div>') +
@@ -662,6 +691,7 @@
     // ── boot ──────────────────────────────────────────────────────────────────────────────────
     WB.start = async function () {
       await loadIdentity();
+      try { await WB.loadIcons(); } catch (e) {}   // material file/folder icons (CDN), ready before first render
       try { await WB.nexus.load(); } catch (e) {}
       var defaultWs = (WB.profile && WB.profile.orgName) || (WB.user.email ? WB.user.email.split('@')[0] : '') || 'Workspace';
       try { await WB.ws.load(defaultWs); } catch (e) {}

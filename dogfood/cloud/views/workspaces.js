@@ -56,6 +56,8 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
     return 'text';
   }
   function fileIcon(p){
+    // VS Code Material Icon Theme via the framework (WB.fileIcon, CDN). `.work` → our branded tile.
+    if (WB.fileIcon) return WB.fileIcon(p);
     var e = ext(p);
     if (e === 'work') return '<span class="wkico">' + (WB.WMARK || '') + '</span>';
     var def = EXT[e];
@@ -281,7 +283,7 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
       if (en.dir){
         var open = !!state.treeOpen[en.path];
         return '<div class="wxrow dir' + (open ? ' open' : '') + '" data-wxtoggle="' + esc(en.path) + '" style="padding-left:' + pad + 'px">' +
-            '<span class="wxchev">▸</span><span class="wxfolder"></span><span class="wxname">' + esc(en.name) + '</span>' +
+            '<span class="wxchev">▸</span>' + (WB.fileIcon ? WB.fileIcon(en.name, { dir: true, open: open }) : '<span class="wxfolder"></span>') + '<span class="wxname">' + esc(en.name) + '</span>' +
           '</div>' + (open ? treeHtml(en.path, depth + 1) : '');
       }
       return '<div class="wxrow file' + (state.active === en.path ? ' on' : '') + '" data-wxfile="' + esc(en.path) + '" data-wxlabel="' + esc(en.name) + '" style="padding-left:' + (pad + 16) + 'px">' +
