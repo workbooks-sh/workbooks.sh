@@ -136,6 +136,9 @@ defmodule Nexus.S3 do
   end
 
   defp hex(bin), do: Base.encode16(bin, case: :lower)
-  defp access_key, do: Nexus.Secrets.get("WB_S3_ACCESS_KEY_ID")
-  defp secret_key, do: Nexus.Secrets.get("WB_S3_SECRET_ACCESS_KEY")
+  # Honor BOTH our canonical names AND the standard AWS_* names that `fly storage create` (Tigris)
+  # injects — Litestream + the entrypoint already accept this fallback, so the Elixir S3 client must too,
+  # else object storage (blobs/cold/compile) silently stays local on a stock Tigris machine.
+  defp access_key, do: Nexus.Secrets.get("WB_S3_ACCESS_KEY_ID") || Nexus.Secrets.get("AWS_ACCESS_KEY_ID")
+  defp secret_key, do: Nexus.Secrets.get("WB_S3_SECRET_ACCESS_KEY") || Nexus.Secrets.get("AWS_SECRET_ACCESS_KEY")
 end

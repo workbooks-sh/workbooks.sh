@@ -95,7 +95,12 @@ defmodule Nexus.Litestream do
       "        bucket: #{r.bucket}",
       "        path: #{r.path}",
       "        endpoint: #{r.endpoint}",
-      "        region: #{r.region}"
+      "        region: #{r.region}",
+      # Bounded history: snapshot daily, keep 7 days. WITHOUT these, Litestream proliferates generations
+      # unboundedly (the incident had ~12) and never reclaims them — which both costs storage and made
+      # the empty-generation cascade harder to see. Explicit retention keeps the replica legible.
+      "        snapshot-interval: 24h",
+      "        retention: 168h"
     ]
   end
 
