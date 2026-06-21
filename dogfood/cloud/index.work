@@ -41,6 +41,12 @@ server :cloud do
   # File search across all workspaces (mounts) — filename substring match over the real data volume.
   route "GET /cloud/search", :search
 
+  # Read a single file's TEXT content for the Workspace explorer (ship 3 — read-only IDE). `path` is
+  # `<mount>/<rel>`. Same mount + traversal guard as :tree. Caps at 2MB; flags binary so the client
+  # falls back to /cloud/raw (images/pdf streamed with the right Content-Type).
+  route "GET /cloud/file", :file_read
+  route "GET /cloud/raw", :file_raw
+
   # The nexus AS a git remote (wb): per-workspace push URL + the current GitHub mirror. The git
   # mechanism (bare repo + post-receive + mirror) is the open standard (Nexus.Git / Nexus.GitHttp);
   # surfacing the URL + binding a GitHub mirror in the dashboard is OUR product.
@@ -273,6 +279,73 @@ server :cloud do
     %{query: q, results: results}
   end
 
+  # Resolve a `<mount>/<rel>` request path to a real absolute file under data_dir, with the same
+  # mount + traversal guard as :tree. Returns {:ok, abs} | {:error, status, msg}.
+  defp resolve_file(path) do
+    case String.split(String.trim(path || ""), "/", trim: true) do
+      [] ->
+        {:error, 400, "path required"}
+
+      [mount | rest] ->
+        case List.keyfind(mounts(), mount, 0) do
+          nil ->
+            {:error, 404, "no such mount"}
+
+          {_, root} ->
+            abs = Path.expand(Path.join([root | rest]))
+
+            cond do
+              not String.starts_with?(abs, Path.expand(root)) -> {:error, 403, "path escapes mount"}
+              not File.regular?(abs) -> {:error, 404, "not a file"}
+              true -> {:ok, abs}
+            end
+        end
+    end
+  end
+
+  @max_text_bytes 2_097_152
+
+  # Text content for code/.work/markdown viewers. Binary files (by MIME) get `binary: true` so the
+  # client fetches bytes from /cloud/raw instead.
+  def file_read(req) do
+    case resolve_file(req.query["path"]) do
+      {:error, status, msg} ->
+        {status, %{error: msg}}
+
+      {:ok, abs} ->
+        ct = MIME.from_path(abs)
+        size = (File.stat!(abs).size || 0)
+        is_text = String.starts_with?(ct, "text/") or ct in ~w(application/json application/javascript application/xml image/svg+xml) or text_ext?(abs)
+
+        cond do
+          not is_text -> %{path: req.query["path"], binary: true, content_type: ct, size: size}
+          size > @max_text_bytes -> %{path: req.query["path"], binary: false, truncated: true, size: size, content: binary_part(File.read!(abs), 0, @max_text_bytes)}
+          true -> %{path: req.query["path"], binary: false, size: size, content: File.read!(abs)}
+        end
+    end
+  end
+
+  # Raw bytes with the right Content-Type — for <img> and pdf.js.
+  def file_raw(req) do
+    case resolve_file(req.query["path"]) do
+      {:error, status, msg} -> {status, %{error: msg}}
+      {:ok, abs} -> {200, raw_ct(abs), File.read!(abs)}
+    end
+  end
+
+  # MIME.from_path returns application/octet-stream for unknown; treat known dev-text extensions as text.
+  defp text_ext?(abs) do
+    ext = abs |> Path.extname() |> String.downcase()
+    ext in ~w(.work .ex .exs .md .txt .js .ts .jsx .tsx .css .html .htm .json .yaml .yml .toml .sh .zig .rs .go .py .rb .sql .org .csv .gitignore .env .lock .heex .eex)
+  end
+
+  defp raw_ct(abs) do
+    case MIME.from_path(abs) do
+      "application/octet-stream" -> "application/octet-stream"
+      ct -> ct
+    end
+  end
+
   # ── Git remote per workspace ─────────────────────────────────────────────────────────────────────
   # The push URL for a workspace's bare repo + its current GitHub mirror (if any). Base is derived from
   # the request host/scheme when available; otherwise the client prepends location.origin to the
@@ -396,6 +469,8 @@ client :app do
   <script src="./views/nexuses.js"></script>
 
   <script src="./views/workspace.js"></script>
+
+  <script src="./views/workspaces.js"></script>
 
   <script src="./views/workspace-members.js"></script>
 
