@@ -133,7 +133,7 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .sidetree{ flex:1; min-height:0; overflow-y:auto; }
 
 .side{ border-right:1px solid var(--line); background:var(--paper); display:flex; flex-direction:column;
-  padding:22px 14px 24px; overflow-y:auto; z-index:30; }
+  padding:22px 14px 24px; overflow:hidden; z-index:30; }
 .topdna{ margin:-22px -14px 16px; height:8px; overflow:hidden; flex:0 0 auto; }
 .brand{ display:flex; align-items:center; gap:9px; padding:4px 8px 16px; }
 .brand svg{ width:24px; height:auto; color:var(--ink); flex:0 0 auto; }
@@ -297,7 +297,8 @@ tr:last-child td{ border:0; }
 .sw .ico.ch { width: 15px; height: 15px; color: var(--dim); flex: none; }
 .sw .av.sm { width: 22px; height: 22px; border-radius: 6px; flex: none; display: grid; place-items: center;
   background: var(--line); color: var(--ink); font: 700 10px var(--read); }
-.navspacer { flex: 1; }
+/* obsolete: .wsgroups now flexes to fill + scrolls; a flexing spacer would steal its height */
+.navspacer { flex: 0 0 0; height: 0; }
 .swmenu, .orgmenu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 35;
   background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 6px; animation: org-in 0.12s ease; }
 .orgwrap { position: relative; }
