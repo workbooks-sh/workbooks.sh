@@ -1,0 +1,92 @@
+Agent service — design decisions #agents #cloud #design
+
+The cloud Nexus **agent service**: Waldo plus the specialist agents, the runtime
+that runs them on a user's nexus, and the Studio that manages them. This file is
+the settled design, captured from a voice grill-me session (`scratch/grill-waldo`,
+22 decisions). It is **our cloud product** — dogfood workbooks deployed via the
+DeployKit, NOT baked into the open-standard nexus image. See [[the-line]].
+
+## Runtime — how an agent runs
+
+- **Unit of execution** — one-shot **function call** from the user's view (a clean
+  start/finish), optionally fired by automation (cron). Not a user-managed daemon.
+- **Where it runs** — **BEAM by default** (Elixir scheduler does orchestration +
+  scheduling). **WASM** only for specific tool/capability logic that wants
+  sandboxing or is untrusted/heavy. Agent ≈ [[agent-is-a-sandboxed-function]].
+- **Concurrency** — each run is a **separate, supervised BEAM process**; one run
+  crashing never takes down another run or the nexus. One nexus per org
+  ([[one-nexus-per-org]]); a second wholly-separate nexus is the scale-out unit.
+- **Visibility** — runs **stream tokens + lifecycle events onto the #event bus**;
+  Studio (and any hook) watches reactively. This is the run-visibility interface.
+- **Failure model** — **no blind auto-restart.** An agent validates within its
+  `flow`; on a problem it **files an issue** (git/.work model) for later repair by
+  a human or another agent. Failure is proactive + declarative, not OTP-restart.
+
+## The agent file — one `.work` `agent` block
+
+- **One block, complete contract** — `prompt + tools + grant + limit + flow`. **No
+  separate `server` brain block.** Self-contained identity → logic → caps.
+- **Flow** — technically optional (a trivial reactive agent can omit it) but
+  **strongly discouraged to omit**: `flow` is the perceive→plan→act loop +
+  validation + task management that makes real agency work.
+- **Tools** — declared as capability atoms in a **`grant` list**, resolved against
+  the **Effects registry** ([[hooks-events-effects-architecture]]) and enforced at
+  call time.
+- **Limit** — caps **tokens, wall-clock, sub-agent depth, and cost** — but applied
+  **sparingly / carefully**: over-tight limits kill legitimate long runs.
+- **Default agents** — live in **`dogfood/cloud/agents/`** as `.work` files,
+  **seeded into every new nexus**. Users fully own/modify them on disk.
+- **Customisation** — users **fork & edit** default agents; **git merge** handles
+  upstream updates. No template/instance abstraction.
+
+## Waldo — the manager
+
+- **Remit** — the **expert on the Nexus framework itself**: orchestrator +
+  delegator, AND agent-writer + diagnostician + default **workhorse**. He both
+  routes work and does it.
+- **Singleton** per nexus. **Session memory** lives in a **notes table** in the
+  tenant DB (persistent cross-session context).
+- **Handoffs** — Waldo **brokers** handoffs between specialists; data passes as
+  **ephemeral handoff documents** = `.work` files with file references. Waldo
+  stays in control of the orchestration flow.
+
+## Scheduling
+
+- Agents schedule future work via a **`hook` `trigger`** (cron / at / every),
+  reusing **Nexus.Scheduler** ([[time-scheduling-lane]]). The **nexus owns** the
+  tasks; an agent may schedule for **itself, another agent (with permission), or an
+  app**. Ownership is viewable in Studio.
+- **Wake behaviour** — overdue tasks generally **fire on wake**, BUT after extended
+  downtime do **not** flood the nexus with a backlog. *(Open: define "extended" +
+  the backlog policy.)*
+
+## Sub-agents
+
+- **Results are structured** — returned as **`.work`** response/handoff documents,
+  not free text. Predictable, robust passing.
+- **Studio view** — sub-agent runs are **collapsed under the parent** by default;
+  full depth preserved for debugging.
+
+## Issues
+
+- Agent-filed and human-filed issues are **stored the same way** (the .work/git
+  model), but the **Studio separates + triages** them with dedicated views. (Note:
+  this is the *nexus* issue store — NOT bd, which is local-only/git-ignored.)
+  *(Open: exact physical home of the issue store — git-indexed .work vs DB.)*
+
+## Studio — managing it all
+
+- **Starting a task** — both **chat with Waldo** (he delegates) AND **pick a
+  specialist directly**. Cater to orchestration-first and know-what-I-want users.
+- **HITL approvals** — surface in an **inbox of pending approvals**, asynchronous,
+  rather than interrupting the active run. *(Open: whether the inbox grows into a
+  full notifications center across approvals / delegated-task status / issues.)*
+
+## Still open (carried into build issues)
+
+- DeckAgent / VideoAgent / ResearchAgent specifics (input contract, output home,
+  research-repo organising scheme, pipelines) — not yet grilled.
+- Capabilities/cost metering + spend caps + grant-escalation approval.
+- Bootstrap: how DeployKit seeds the default agents on a new org's nexus.
+- The four agent-added questions (issue-store home, cross-agent scheduling perms,
+  backlog policy, notifications center).
