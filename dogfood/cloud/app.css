@@ -107,7 +107,7 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 /* Collapse the sidebar into an ICON RAIL (not hidden): nav icons only, no labels/tree. */
 #app.rail{ grid-template-columns:56px 58px 1fr; }
 #app.rail .side{ padding:14px 8px 18px; }
-#app.rail .lbl, #app.rail .kbd, #app.rail .sidetree, #app.rail .wsgroups, #app.rail .appsgrid, #app.rail .modetabs, #app.rail .sidetree-hd, #app.rail .adminchev{ display:none; }
+#app.rail .lbl, #app.rail .kbd, #app.rail .sidetree, #app.rail .wsgroups, #app.rail .appsgrid, #app.rail .modebar, #app.rail .sidetree-hd, #app.rail .adminchev{ display:none; }
 #app.rail .nxsearch, #app.rail .nxlink, #app.rail .adminbtn{ justify-content:center; padding:9px 0; }
 #app.rail .sidetop{ justify-content:center; }
 
@@ -402,14 +402,30 @@ tr:last-child td{ border:0; }
   padding: 0 5px; border-radius: 5px; }
 .wsadd:hover { background: var(--line); color: var(--ink); }
 .wsgroups { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
-/* Apps | Files two-part toggle (above the workspaces body) */
-.modetabs { display: flex; gap: 3px; padding: 2px; margin: 2px 4px 6px; background: var(--card); border: 1px solid var(--line); border-radius: 9px; }
-.modetab { flex: 1; border: none; background: none; color: var(--dim); cursor: pointer; border-radius: 7px; padding: 6px 0; font: 600 12px var(--read); }
+/* Apps | Files toggle (IS the section header now — no "Workspaces"/＋) + a context filter funnel */
+.modebar { display: flex; align-items: center; gap: 6px; margin: 2px 4px 8px; }
+.modetabs { display: flex; gap: 3px; padding: 2px; flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 9px; }
+.modetab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; border: none; background: none; color: var(--dim); cursor: pointer; border-radius: 7px; padding: 6px 0; font: 600 12px var(--read); }
+.modetab svg { width: 13px; height: 13px; }
 .modetab:hover { color: var(--ink); }
 .modetab.on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.filterwrap { position: relative; flex: none; }
+.filterbtn { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--line); background: var(--card); color: var(--dim); border-radius: 8px; cursor: pointer; }
+.filterbtn:hover { color: var(--ink); border-color: var(--dim); }
+.filterbtn.on { color: var(--ink); border-color: var(--ink); }
+.filtermenu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 40; min-width: 184px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 5px; box-shadow: 0 8px 26px rgba(0,0,0,.22); }
+.filterhd { font: 700 9.5px var(--read); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); padding: 5px 8px 4px; }
+.filteropt { width: 100%; display: flex; align-items: center; gap: 8px; border: none; background: none; color: var(--ink); cursor: pointer; border-radius: 7px; padding: 7px 8px; font: 500 13px var(--read); text-align: left; }
+.filteropt:hover, .filteropt.on { background: var(--line); }
+.fopti { width: 15px; display: inline-grid; place-items: center; color: var(--dim); }
+.fopti svg { width: 14px; height: 14px; }
+.fcheck { margin-left: auto; color: var(--mint); font-size: 12px; }
 /* Apps grid — launchable workbook-app tiles */
 .appsgrid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 2px 2px 4px; align-content: start; }
-.appcard { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 14px 8px 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink); text-decoration: none; text-align: center; }
+.appcard { position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 14px 8px 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink); text-decoration: none; text-align: center; }
+.appbadge { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; color: var(--dim); opacity: .65; }
+.appbadge svg { width: 13px; height: 13px; }
+.appbadge.priv { color: var(--peach, #f3c5a3); opacity: 1; }
 .appcard:hover { border-color: var(--dim); background: color-mix(in srgb, var(--mint) 12%, var(--card)); }
 .appemoji, .appinit { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 16px; line-height: 1; }
 .appinit { background: var(--mint); color: #1a1b1e; font: 700 13px var(--read); }

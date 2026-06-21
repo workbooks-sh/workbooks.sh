@@ -379,6 +379,11 @@
       activity: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
       admin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',
       chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+      files: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>',
+      grid: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>',
+      filter: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18M6 12h12M10 20h4"/></svg>',
+      globe: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></svg>',
+      lock: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
       search: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
       rail: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>',
       pin: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
@@ -426,6 +431,10 @@
     // Apps-vs-Files sidebar preference — Apps is primary (most users just launch apps). Persisted so it
     // sticks per user/device. ('wb-sidemode' = 'apps' | 'files')
     try { st.sideMode = localStorage.getItem('wb-sidemode') || 'apps'; } catch (e) {}
+    // Context-dependent filters (the funnel by the tabs). Apps: visibility; Files: file type. Persisted.
+    st.filterOpen = false;
+    try { st.appFilter = localStorage.getItem('wb-appfilter') || 'all'; } catch (e) { st.appFilter = 'all'; }   // all | public | private
+    try { st.fileFilter = localStorage.getItem('wb-filefilter') || 'all'; } catch (e) { st.fileFilter = 'all'; } // all | work | assets
     st.acctMenu = false;
     try { st.bookmarks = JSON.parse(localStorage.getItem('wb-bookmarks') || '[]'); } catch (e) { st.bookmarks = []; }
     function saveBookmarks(){ try { localStorage.setItem('wb-bookmarks', JSON.stringify(st.bookmarks)); } catch (e) {} }
@@ -462,13 +471,19 @@
       if (!document.getElementById('appsGrid')) return;
       WB.swr('apps', function(){ return fetch('/cloud/apps', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
         var g = document.getElementById('appsGrid'); if (!g) return;
-        var apps = (d && d.apps) || [];
-        if (!apps.length) { g.innerHTML = '<div class="treemsg" style="padding:8px 4px">No apps yet</div>'; return; }
+        var apps = ((d && d.apps) || []).filter(function(a){
+          if (st.appFilter === 'public') return !a.gated;
+          if (st.appFilter === 'private') return !!a.gated;
+          return true;
+        });
+        if (!apps.length) { g.innerHTML = '<div class="treemsg" style="padding:8px 4px">No ' + (st.appFilter !== 'all' ? st.appFilter + ' ' : '') + 'apps</div>'; return; }
         g.innerHTML = apps.map(function(a){
           var ic = a.icon ? '<span class="appemoji">' + esc(a.icon) + '</span>'
                           : '<span class="appinit">' + esc((a.label[0] || 'A').toUpperCase()) + '</span>';
+          // globe = public/open · lock = gated by our auth guardian
+          var badge = '<span class="appbadge' + (a.gated ? ' priv' : '') + '" title="' + (a.gated ? 'Private — gated by auth' : 'Public — open') + '">' + (a.gated ? ICO.lock : ICO.globe) + '</span>';
           return '<a class="appcard" href="' + esc(a.url) + '" target="_blank" rel="noopener" title="' + esc(a.label) + '">' +
-            ic + '<span class="appname">' + esc(a.label) + '</span></a>';
+            badge + ic + '<span class="appname">' + esc(a.label) + '</span></a>';
         }).join('');
       });
     }
@@ -498,6 +513,14 @@
       if (st.treeLoading[path]) return '<div class="treemsg" style="padding-left:' + (depth * 14 + 12) + 'px">Loading…</div>';
       var entries = st.treeData[path];
       if (!entries) return '';
+      // File-type filter (the funnel in Files mode). Folders always show so nested matches stay reachable.
+      if (st.fileFilter && st.fileFilter !== 'all') {
+        entries = entries.filter(function(en){
+          if (en.dir) return true;
+          var isWork = /\.work$/i.test(en.name);
+          return st.fileFilter === 'work' ? isWork : !isWork;
+        });
+      }
       if (entries.length === 0) return '<div class="treemsg" style="padding-left:' + (depth * 14 + 12) + 'px">Empty</div>';
       return entries.map(function(en){
         var pad = depth * 14 + 12;
@@ -632,10 +655,15 @@
             navlink('/studio', ICO.spark, 'Studio', p) +
             navlink('/activity', ICO.activity, 'Activity', p) +
           '</nav>' +
-          '<div class="sidetree-hd wsh">Workspaces<button class="wsadd" data-wsnew title="New workspace" aria-label="New workspace">+</button></div>' +
-          '<div class="modetabs" role="tablist">' +
-            '<button class="modetab' + (st.sideMode !== 'files' ? ' on' : '') + '" data-sidemode="apps" role="tab">Apps</button>' +
-            '<button class="modetab' + (st.sideMode === 'files' ? ' on' : '') + '" data-sidemode="files" role="tab">Files</button>' +
+          '<div class="modebar">' +
+            '<div class="modetabs" role="tablist">' +
+              '<button class="modetab' + (st.sideMode !== 'files' ? ' on' : '') + '" data-sidemode="apps" role="tab">' + ICO.grid + '<span>Apps</span></button>' +
+              '<button class="modetab' + (st.sideMode === 'files' ? ' on' : '') + '" data-sidemode="files" role="tab">' + ICO.files + '<span>Files</span></button>' +
+            '</div>' +
+            '<div class="filterwrap">' +
+              '<button class="filterbtn' + (filterActive() ? ' on' : '') + '" data-filter-toggle title="Filter" aria-label="Filter">' + ICO.filter + '</button>' +
+              (st.filterOpen ? filterMenu() : '') +
+            '</div>' +
           '</div>' +
           (st.sideMode === 'files'
             ? '<div class="wsgroups">' + wslist + '</div>'
@@ -659,6 +687,25 @@
     // Let other views (the workspace explorer) refresh the sidebar after a pin/unpin so Pinned updates live.
     WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };
     function navlink(href, ico, label, p){ return '<a class="nxlink' + (p === href ? ' on' : '') + '" data-nav="' + href + '" href="#' + href + '" title="' + esc(label) + '">' + ico + '<span class="lbl">' + esc(label) + '</span></a>'; }
+    // The funnel shows a dot when a non-default filter is active for the CURRENT tab.
+    function filterActive(){ return st.sideMode === 'files' ? st.fileFilter !== 'all' : st.appFilter !== 'all'; }
+    // Context-dependent filter popover — Apps → visibility (public/private), Files → file type.
+    function fopt(kind, val, label, ico){
+      var cur = kind === 'app' ? st.appFilter : st.fileFilter;
+      return '<button class="filteropt' + (cur === val ? ' on' : '') + '" data-' + kind + 'filter="' + val + '">' +
+        (ico ? '<span class="fopti">' + ico + '</span>' : '<span class="fopti"></span>') +
+        '<span>' + esc(label) + '</span>' + (cur === val ? '<span class="fcheck">✓</span>' : '') + '</button>';
+    }
+    function filterMenu(){
+      if (st.sideMode === 'files') {
+        return '<div class="filtermenu" role="menu"><div class="filterhd">Files</div>' +
+          fopt('file', 'all', 'All files') + fopt('file', 'work', 'Workbooks (.work)') + fopt('file', 'assets', 'Assets') +
+        '</div>';
+      }
+      return '<div class="filtermenu" role="menu"><div class="filterhd">Apps</div>' +
+        fopt('app', 'all', 'All') + fopt('app', 'public', 'Public', ICO.globe) + fopt('app', 'private', 'Private', ICO.lock) +
+      '</div>';
+    }
     function wsEditor(isNew){ var tile = st.editIcon || ((st.editName.trim()[0] || 'W').toUpperCase());
       return '<div class="wsedit"><div class="wsiconrow">' +
         '<button class="wstile' + (st.pickerOpen ? ' on' : '') + '" data-wspick title="Change icon" aria-label="Change icon">' + esc(tile) + '</button>' +
@@ -712,7 +759,10 @@
       if (t.closest && t.closest('[data-crumb-back]')) { var ret = WB.settingsReturn; WB.settingsReturn = null; WB.nav((ret && ret.path) || '/'); return; }
       if (t.closest && t.closest('[data-theme-toggle]')) { var cur = document.documentElement.getAttribute('data-theme') || 'dark'; var nt = cur === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', nt); try { localStorage.setItem('wb-theme', nt); } catch (er) {} renderShell(); renderView(); return; }
       if (t.closest && t.closest('[data-rail-toggle]')) { st.rail = !st.rail; try { localStorage.setItem('wb-rail', st.rail ? '1' : '0'); } catch (er) {} renderShell(); return; }
-      var smt = t.closest && t.closest('[data-sidemode]'); if (smt) { st.sideMode = smt.getAttribute('data-sidemode'); try { localStorage.setItem('wb-sidemode', st.sideMode); } catch (er) {} renderShell(); return; }
+      var smt = t.closest && t.closest('[data-sidemode]'); if (smt) { st.sideMode = smt.getAttribute('data-sidemode'); st.filterOpen = false; try { localStorage.setItem('wb-sidemode', st.sideMode); } catch (er) {} renderShell(); return; }
+      if (t.closest && t.closest('[data-filter-toggle]')) { st.filterOpen = !st.filterOpen; renderShell(); return; }
+      var afl = t.closest && t.closest('[data-appfilter]'); if (afl) { st.appFilter = afl.getAttribute('data-appfilter'); try { localStorage.setItem('wb-appfilter', st.appFilter); } catch (er) {} st.filterOpen = false; renderShell(); return; }
+      var ffl = t.closest && t.closest('[data-filefilter]'); if (ffl) { st.fileFilter = ffl.getAttribute('data-filefilter'); try { localStorage.setItem('wb-filefilter', st.fileFilter); } catch (er) {} st.filterOpen = false; renderShell(); return; }
       if (t.closest && t.closest('[data-palette]')) { WB.palette(); return; }
       var pinx = t.closest && t.closest('[data-pin-x]'); if (pinx) { e.stopPropagation(); toggleBookmark(pinx.getAttribute('data-pin-x')); return; }
       var pino = t.closest && t.closest('[data-pin-open]'); if (pino) { WB._pendingFile = pino.getAttribute('data-pin-open'); WB.nav('/workspaces'); return; }
@@ -746,6 +796,7 @@
       if (t.closest && t.closest('[data-wssave]')) { saveEdit(); return; }
       if (t.closest && t.closest('[data-wsdel]')) { deleteWs(); return; }
       if (st.wsMenuFor) { st.wsMenuFor = null; renderShell(); return; }   // outside click closes the ⋯ menu
+      if (st.filterOpen) { st.filterOpen = false; renderShell(); return; } // outside click closes the filter popover
       if (st.acctMenu) { st.acctMenu = false; renderShell(); }            // outside click closes the avatar menu
     });
     document.addEventListener('input', function (e) { if (e.target.id === 'wsName') st.editName = e.target.value; if (e.target.id === 'nxEditName') st.nxEditName = e.target.value; });
