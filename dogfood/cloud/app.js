@@ -384,6 +384,7 @@
       filter: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18M6 12h12M10 20h4"/></svg>',
       globe: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></svg>',
       lock: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+      draft: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
       search: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
       rail: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>',
       pin: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
@@ -471,20 +472,26 @@
       if (!document.getElementById('appsGrid')) return;
       WB.swr('apps', function(){ return fetch('/cloud/apps', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
         var g = document.getElementById('appsGrid'); if (!g) return;
-        var apps = ((d && d.apps) || []).filter(function(a){
-          if (st.appFilter === 'public') return !a.gated;
-          if (st.appFilter === 'private') return !!a.gated;
-          return true;
-        });
-        if (!apps.length) { g.innerHTML = '<div class="treemsg" style="padding:8px 4px">No ' + (st.appFilter !== 'all' ? st.appFilter + ' ' : '') + 'apps</div>'; return; }
-        g.innerHTML = apps.map(function(a){
+        function visOf(a){ return a.visibility || (a.gated ? 'private' : 'public'); }
+        var apps = ((d && d.apps) || []).filter(function(a){ return st.appFilter === 'all' || visOf(a) === st.appFilter; });
+        // globe = public/open · lock = gated by our auth guardian · pencil = draft (WIP)
+        var BADGE = { draft: { ic: ICO.draft, cls: ' draft', t: 'Draft — work in progress' }, private: { ic: ICO.lock, cls: ' priv', t: 'Private — gated by auth' }, public: { ic: ICO.globe, cls: '', t: 'Public — open' } };
+        var cards = apps.map(function(a){
+          var vis = visOf(a), b = BADGE[vis] || BADGE.public;
           var ic = a.icon ? '<span class="appemoji">' + esc(a.icon) + '</span>'
                           : '<span class="appinit">' + esc((a.label[0] || 'A').toUpperCase()) + '</span>';
-          // globe = public/open · lock = gated by our auth guardian
-          var badge = '<span class="appbadge' + (a.gated ? ' priv' : '') + '" title="' + (a.gated ? 'Private — gated by auth' : 'Public — open') + '">' + (a.gated ? ICO.lock : ICO.globe) + '</span>';
+          var badge = '<span class="appbadge' + b.cls + '" title="' + b.t + '">' + b.ic + '</span>';
+          // Drafts open IN-APP (split view, when built); others launch the hosted URL in a new tab.
+          if (vis === 'draft') {
+            return '<a class="appcard draft" href="' + esc(a.url) + '" target="_blank" rel="noopener" data-draft="' + esc(a.name) + '" title="' + esc(a.label) + '">' +
+              badge + ic + '<span class="appname">' + esc(a.label) + '</span></a>';
+          }
           return '<a class="appcard" href="' + esc(a.url) + '" target="_blank" rel="noopener" title="' + esc(a.label) + '">' +
             badge + ic + '<span class="appname">' + esc(a.label) + '</span></a>';
         }).join('');
+        // "New app" tile — creates a draft (Phase 4 will replace the prompt with the context modal).
+        cards += '<button class="appcard newapp" data-newapp title="New app"><span class="newappplus">+</span><span class="appname">New app</span></button>';
+        g.innerHTML = cards || '<div class="treemsg" style="padding:8px 4px">No ' + (st.appFilter !== 'all' ? st.appFilter + ' ' : '') + 'apps</div>';
       });
     }
     function isBookmarked(path){ return st.bookmarks.some(function(b){ return b.path === path; }); }
@@ -703,7 +710,7 @@
         '</div>';
       }
       return '<div class="filtermenu" role="menu"><div class="filterhd">Apps</div>' +
-        fopt('app', 'all', 'All') + fopt('app', 'public', 'Public', ICO.globe) + fopt('app', 'private', 'Private', ICO.lock) +
+        fopt('app', 'all', 'All') + fopt('app', 'public', 'Public', ICO.globe) + fopt('app', 'private', 'Private', ICO.lock) + fopt('app', 'draft', 'Drafts', ICO.draft) +
       '</div>';
     }
     function wsEditor(isNew){ var tile = st.editIcon || ((st.editName.trim()[0] || 'W').toUpperCase());
@@ -763,6 +770,15 @@
       if (t.closest && t.closest('[data-filter-toggle]')) { st.filterOpen = !st.filterOpen; renderShell(); return; }
       var afl = t.closest && t.closest('[data-appfilter]'); if (afl) { st.appFilter = afl.getAttribute('data-appfilter'); try { localStorage.setItem('wb-appfilter', st.appFilter); } catch (er) {} st.filterOpen = false; renderShell(); return; }
       var ffl = t.closest && t.closest('[data-filefilter]'); if (ffl) { st.fileFilter = ffl.getAttribute('data-filefilter'); try { localStorage.setItem('wb-filefilter', st.fileFilter); } catch (er) {} st.filterOpen = false; renderShell(); return; }
+      if (t.closest && t.closest('[data-newapp]')) {
+        var nm = (window.prompt && window.prompt('Name your new app (a draft):', '')) || '';
+        nm = nm.trim(); if (!nm) return;
+        fetch('/cloud/draft', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: nm }) })
+          .then(function(r){ return r.json(); })
+          .then(function(d){ if (d && d.ok) { WB.toast('Draft “' + nm + '” created'); setTimeout(function(){ WB.cache.set('apps', null); paintApps(); }, 900); } else { WB.toast((d && d.error) || 'Couldn’t create draft', 'bad'); } })
+          .catch(function(){ WB.toast('Couldn’t create draft', 'bad'); });
+        return;
+      }
       if (t.closest && t.closest('[data-palette]')) { WB.palette(); return; }
       var pinx = t.closest && t.closest('[data-pin-x]'); if (pinx) { e.stopPropagation(); toggleBookmark(pinx.getAttribute('data-pin-x')); return; }
       var pino = t.closest && t.closest('[data-pin-open]'); if (pino) { WB._pendingFile = pino.getAttribute('data-pin-open'); WB.nav('/workspaces'); return; }

@@ -426,6 +426,11 @@ tr:last-child td{ border:0; }
 .appbadge { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; color: var(--dim); opacity: .65; }
 .appbadge svg { width: 13px; height: 13px; }
 .appbadge.priv { color: var(--peach, #f3c5a3); opacity: 1; }
+.appbadge.draft { color: var(--sky, #a8d4f0); opacity: 1; }
+.appcard.draft { border-style: dashed; }
+.appcard.newapp { cursor: pointer; border-style: dashed; color: var(--dim); gap: 6px; justify-content: center; }
+.appcard.newapp:hover { color: var(--ink); border-color: var(--dim); background: var(--card); }
+.newappplus { font-size: 22px; line-height: 1; }
 .appcard:hover { border-color: var(--dim); background: color-mix(in srgb, var(--mint) 12%, var(--card)); }
 .appemoji, .appinit { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 16px; line-height: 1; }
 .appinit { background: var(--mint); color: #1a1b1e; font: 700 13px var(--read); }

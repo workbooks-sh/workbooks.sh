@@ -370,17 +370,90 @@ server :cloud do
 
   # Hosted apps = the served workbook surfaces on THIS nexus (the live mounts). Each tile launches the
   # app at its URL. A surface that matches a declared workspace inherits that workspace's name + emoji.
-  def apps(_req) do
+  def apps(req) do
+    org = req.tenant || Nexus.Store.default_tenant()
     declared = Map.new(Nexus.Config.workspaces(), fn w -> {w.id, w} end)
 
     apps =
       for {name, root} <- (Application.get_env(:nexus, :mounts) || []), name != "" do
         w = declared[name]
+        vis = visibility_of(org, name, root)
         %{name: name, label: (w && w.name) || humanize(name), icon: (w && w.icon) || "",
-          url: "/" <> name <> "/", gated: mount_gated?(root)}
+          url: "/" <> name <> "/", visibility: vis, gated: vis == "private"}
       end
 
     %{apps: Enum.sort_by(apps, & &1.label)}
+  end
+
+  # A surface's visibility: an explicit per-folder permission (control plane) wins; otherwise derive —
+  # an `auth` block ⇒ private (lock), else public (globe). "draft" only ever comes from the CP record.
+  defp visibility_of(org, name, root) do
+    case Nexus.ControlPlane.get(org, :visibility, name) do
+      {:ok, rec} -> rec[:state] || rec["state"] || derived_vis(root)
+      _ -> derived_vis(root)
+    end
+  end
+
+  defp derived_vis(root), do: if(mount_gated?(root), do: "private", else: "public")
+
+  # Create a draft = a real nexus folder scaffolded with an index.work, committed so it's a live
+  # surface, and flagged `draft` in the control plane. Promote later via /cloud/visibility.
+  def draft_create(req) do
+    org = req.tenant || Nexus.Store.default_tenant()
+    name = String.trim((is_map(req.body) && req.body["name"]) || "") |> then(&if(&1 == "", do: "Untitled draft", else: &1))
+    slug = draft_slug(name)
+    root = Path.join(Nexus.Config.data_dir(), slug)
+    File.mkdir_p!(root)
+    idx = Path.join(root, "index.work")
+    unless File.exists?(idx), do: File.write!(idx, draft_scaffold(name))
+
+    bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), slug)
+    Nexus.Git.provision_remote(bare, root)
+    Nexus.Git.commit_file(bare, root, "index.work", "create draft #{name}")
+    Nexus.ControlPlane.put(org, :visibility, slug, %{id: slug, state: "draft", name: name})
+    spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
+
+    %{ok: true, id: slug, name: name, url: "/" <> slug <> "/"}
+  end
+
+  # Set a surface's visibility (draft → private/public, the "promote", or back).
+  def set_visibility(req) do
+    org = req.tenant || Nexus.Store.default_tenant()
+    id = is_map(req.body) && req.body["id"]
+    state = is_map(req.body) && req.body["state"]
+
+    cond do
+      id in [nil, ""] -> {400, %{error: "id required"}}
+      state not in ["draft", "private", "public"] -> {400, %{error: "state must be draft|private|public"}}
+      true ->
+        Nexus.ControlPlane.put(org, :visibility, id, %{id: id, state: state})
+        %{ok: true, id: id, state: state}
+    end
+  end
+
+  # Unique-ish slug for a new draft folder (no traversal/separators; suffix if the folder already exists).
+  defp draft_slug(name) do
+    base = name |> String.downcase() |> String.replace(~r{[^a-z0-9]+}, "-") |> String.trim("-")
+    base = if base == "", do: "draft", else: base
+    root = Nexus.Config.data_dir()
+    if File.dir?(Path.join(root, base)), do: base <> "-" <> Integer.to_string(System.os_time(:second), 36), else: base
+  end
+
+  defp draft_scaffold(name) do
+    """
+    # #{name}
+
+    A new draft app — build it with the agent on the left; this preview updates as it takes shape.
+
+    client :app do
+      <div style="min-height:100vh;display:grid;place-items:center;font:16px system-ui;color:#555">
+        <div style="text-align:center">
+          <div style="font-size:40px">✦</div>
+          <p>#{name} — your draft starts here.</p>
+        </div>
+      </div>
+    end
+    """
   end
 
   defp humanize(name), do: name |> String.split(~r{[-/_]}, trim: true) |> Enum.map_join(" ", &String.capitalize/1)
@@ -604,7 +677,7 @@ client :app do
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
-  <link rel="stylesheet" href="./app.css?v=20260621h">
+  <link rel="stylesheet" href="./app.css?v=20260621i">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
