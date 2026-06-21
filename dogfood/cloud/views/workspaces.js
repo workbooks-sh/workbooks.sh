@@ -24,7 +24,7 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
   function toggleBm(p, label){
     var i = state.bm.findIndex(function(b){ return b.path === p; });
     if (i >= 0) state.bm.splice(i, 1); else state.bm.push({ path: p, label: label || p.split('/').pop() });
-    saveBm(); paintNav();
+    saveBm(); paintNav(); if (WB.refreshSidebar) WB.refreshSidebar();
   }
 
   // ── file-type icons (Material-style, curated inline SVG per common extension) ────────────────
@@ -294,17 +294,10 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
   function paintNav(){
     var nav = el.querySelector('#wxNav');
     if (!nav) return;
-    var pinned = state.bm.length
-      ? state.bm.map(function(b){
-          return '<div class="wxrow file pinned' + (state.active === b.path ? ' on' : '') + '" data-wxfile="' + esc(b.path) + '" data-wxlabel="' + esc(b.label) + '">' +
-            fileIcon(b.path) + '<span class="wxname">' + esc(b.label) + '</span>' +
-            '<button class="wxpin on" data-wxbm="' + esc(b.path) + '" data-wxbml="' + esc(b.label) + '" title="Unpin">★</button>' +
-          '</div>';
-        }).join('')
-      : '<div class="wxmsg">No pinned files. Click ★ on a file to pin it.</div>';
-
+    // Pinned now lives in the app sidebar (below Workspaces); the explorer is just the file tree. The ★
+    // on a file still pins it (→ sidebar). Refresh state.bm so ★ states reflect sidebar changes.
+    state.bm = loadBm();
     nav.innerHTML =
-      '<div class="wxsection"><div class="wxsechd">Pinned</div>' + pinned + '</div>' +
       '<div class="wxsection"><div class="wxsechd">Files</div>' + treeHtml('', 0) + '</div>';
 
     nav.querySelectorAll('[data-wxtoggle]').forEach(function(r){

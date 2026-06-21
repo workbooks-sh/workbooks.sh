@@ -317,7 +317,10 @@
       admin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',
       chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
       search: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
-      rail: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>'
+      rail: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>',
+      pin: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
+      logout: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
+      gear: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
     };
     var WMARK = WB.WMARK = '<svg viewBox="0 0 113.444 65.6002" fill="none"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>';
     var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
@@ -328,6 +331,7 @@
       treeOpen: {}, treeData: {}, treeLoading: {}, bookmarks: [], search: '', wsMenuFor: null, rail: false };
     try { st.adminOpen = localStorage.getItem('wb-admin-drawer') === 'open'; } catch (e) {}
     try { st.rail = localStorage.getItem('wb-rail') === '1'; } catch (e) {}
+    st.acctMenu = false;
     try { st.bookmarks = JSON.parse(localStorage.getItem('wb-bookmarks') || '[]'); } catch (e) { st.bookmarks = []; }
     function saveBookmarks(){ try { localStorage.setItem('wb-bookmarks', JSON.stringify(st.bookmarks)); } catch (e) {} }
     function toggleBookmark(path, label){
@@ -408,13 +412,15 @@
 
       // Admin is a bottom-anchored OVERLAY drawer (above the avatar): toggled open, state persists, and it
       // floats over the workspaces list so a long sidebar still scrolls behind it.
-      var adminDrawer = nx ? ('<div class="adminsec' + (st.adminOpen ? ' open' : '') + '">' +
-        '<button class="adminbtn" data-admin-toggle>' + ICO.admin + '<span>Admin</span>' +
+      // Admin lives at the BOTTOM (above the account row) as an overlay drawer. Always shown so the
+      // power-tools are reachable; the pages handle their own no-nexus states.
+      var adminDrawer = '<div class="adminsec' + (st.adminOpen ? ' open' : '') + '">' +
+        '<button class="adminbtn" data-admin-toggle title="Admin"><span class="aico">' + ICO.admin + '</span><span class="lbl">Admin</span>' +
         '<span class="adminchev">' + ICO.chev + '</span></button>' +
         '<div class="admindrawer"><nav class="nxnav">' +
           navlink('/usage', ICO.gauge, 'Usage', p) + navlink('/storage', ICO.database, 'Storage', p) +
           navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) +
-        '</nav></div></div>') : '';
+        '</nav></div></div>';
 
       // Each workspace is a FOLDER: a disclosure caret expands its real file tree (desktop-app style).
       var wslist = WB.ws.list.map(function (w) {
@@ -436,12 +442,19 @@
       if (st.editingId === 'new') wslist += wsEditor(true);
       if (WB.ws.list.length === 0) wslist += '<div class="omempty">No workspaces yet</div>';
 
-      // Bookmarks — pinned files/folders (★), persisted per-browser. Sits ABOVE the workspaces explorer.
-      var bmlist = st.bookmarks.map(function (b) {
-        return '<div class="bmrow" data-tree-file="' + esc(b.path) + '"><span class="bmstar">★</span><span class="tname">' + esc(b.label) + '</span>' +
-          '<button class="bmx" data-bm="' + esc(b.path) + '" data-bml="' + esc(b.label) + '" title="Remove bookmark">×</button></div>';
-      }).join('');
-      var bmsec = st.bookmarks.length ? ('<div class="swrap bmsec"><div class="swlabel">Bookmarks</div><div class="bmlist">' + bmlist + '</div></div>') : '';
+      // Pinned — quick-launch shortcuts below Workspaces (after a divider). Pin from the workspace
+      // explorer (★); clicking opens the item in the Workspaces page. Re-read each render so explorer
+      // pins reflect live; rail mode shows just the icon.
+      try { st.bookmarks = JSON.parse(localStorage.getItem('wb-bookmarks') || '[]'); } catch (e) {}
+      var pinsec = '<div class="pinsec"><div class="pindiv"></div>' +
+        (st.bookmarks.length
+          ? st.bookmarks.map(function (b) {
+              return '<div class="pinrow" data-pin-open="' + esc(b.path) + '" title="' + esc(b.path) + '">' +
+                '<span class="pinico">' + ICO.pin + '</span><span class="lbl">' + esc(b.label) + '</span>' +
+                '<button class="pinx" data-pin-x="' + esc(b.path) + '" title="Unpin">×</button></div>';
+            }).join('')
+          : '<div class="pinempty lbl">Pin files from a workspace to launch them here.</div>') +
+      '</div>';
 
       // File search across workspaces — sits below bookmarks. Results render in place (#wbSearchResults).
       var searchsec = '<div class="swrap srchsec">' +
@@ -474,16 +487,19 @@
             navlink('/activity', ICO.activity, 'Activity', p) +
             navlink('/workspaces', ICO.apps, 'Workspaces', p) +
           '</nav>' +
+          pinsec +
           '<div class="navspacer"></div>' +
-          '<button class="railtoggle" data-rail-toggle aria-label="Collapse sidebar">' + ICO.rail + '</button>' +
           adminDrawer +
-          '<div class="acct" style="display:flex;align-items:center;gap:4px">' +
-            '<a data-nav="/settings" href="#/settings" title="' + esc(user.name) + '" style="display:flex;align-items:center;flex:1;text-decoration:none;color:inherit;min-width:0">' +
-              '<div class="av">' + esc(user.initial) + '</div>' +
-            '</a>' +
-            '<a href="/auth/logout" title="Sign out" aria-label="Sign out" style="display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:8px;color:var(--dim)">' +
-              '<svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M16 17v-2H9v-2h7V9l5 4-5 4ZM4 5h8V3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8v-2H4V5Z"/></svg>' +
-            '</a>' +
+          // Account row: avatar (→ menu with Settings + Sign out) on the left, collapse toggle bottom-right.
+          '<div class="acct">' +
+            '<div class="acctav" data-acct-menu title="' + esc(user.name) + '"><div class="av">' + esc(user.initial) + '</div>' +
+              (st.acctMenu ? ('<div class="acctmenu">' +
+                '<a class="acctitem" data-nav="/settings" href="#/settings">' + ICO.gear + '<span>Settings</span></a>' +
+                '<a class="acctitem" href="/auth/logout">' + ICO.logout + '<span>Sign out</span></a>' +
+              '</div>') : '') +
+            '</div>' +
+            '<span class="acctgrow"></span>' +
+            '<button class="railtoggle" data-rail-toggle aria-label="Collapse sidebar" title="Collapse">' + ICO.rail + '</button>' +
           '</div>' +
         '</aside>' +
         '<div class="main">' + crumbs + (fb ? '<div id="view" class="fullbleed"></div>' : '<div class="wrap" id="view"></div>') + '</div>' +
@@ -498,6 +514,8 @@
       var si = document.getElementById('wbFileSearch');
       if (si) { si.value = st.search; si.oninput = function(){ st.search = si.value; runSearch(); }; if (st.search) runSearch(); }
     }
+    // Let other views (the workspace explorer) refresh the sidebar after a pin/unpin so Pinned updates live.
+    WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };
     function navlink(href, ico, label, p){ return '<a class="nxlink' + (p === href ? ' on' : '') + '" data-nav="' + href + '" href="#' + href + '" title="' + esc(label) + '">' + ico + '<span class="lbl">' + esc(label) + '</span></a>'; }
     function wsEditor(isNew){ var tile = st.editIcon || ((st.editName.trim()[0] || 'W').toUpperCase());
       return '<div class="wsedit"><div class="wsiconrow">' +
@@ -553,6 +571,9 @@
       if (t.closest && t.closest('[data-theme-toggle]')) { var cur = document.documentElement.getAttribute('data-theme') || 'dark'; var nt = cur === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', nt); try { localStorage.setItem('wb-theme', nt); } catch (er) {} renderShell(); renderView(); return; }
       if (t.closest && t.closest('[data-rail-toggle]')) { st.rail = !st.rail; try { localStorage.setItem('wb-rail', st.rail ? '1' : '0'); } catch (er) {} renderShell(); return; }
       if (t.closest && t.closest('[data-palette]')) { WB.palette(); return; }
+      var pinx = t.closest && t.closest('[data-pin-x]'); if (pinx) { e.stopPropagation(); toggleBookmark(pinx.getAttribute('data-pin-x')); return; }
+      var pino = t.closest && t.closest('[data-pin-open]'); if (pino) { WB._pendingFile = pino.getAttribute('data-pin-open'); WB.nav('/workspaces'); return; }
+      if (t.closest && t.closest('[data-acct-menu]')) { st.acctMenu = !st.acctMenu; renderShell(); return; }
       if (t.closest && t.closest('[data-admin-toggle]')) { st.adminOpen = !st.adminOpen; try { localStorage.setItem('wb-admin-drawer', st.adminOpen ? 'open' : 'closed'); } catch (er) {} renderShell(); return; }
       if (t.closest && t.closest('[data-nxmenu]')) { st.nxMenu = !st.nxMenu; st.wsMenu = false; renderShell(); return; }
       var nxsw = t.closest && t.closest('[data-nxswitch]'); if (nxsw) { WB.nexus.setActive(nxsw.getAttribute('data-nxswitch')); st.nxMenu = false; renderShell(); if (ROUTE.path !== '/') WB.nav('/'); else renderView(); return; }
@@ -572,7 +593,8 @@
       if (t.closest && t.closest('[data-wscancel]')) { st.editingId = null; st.pickerOpen = false; renderShell(); return; }
       if (t.closest && t.closest('[data-wssave]')) { saveEdit(); return; }
       if (t.closest && t.closest('[data-wsdel]')) { deleteWs(); return; }
-      if (st.wsMenuFor) { st.wsMenuFor = null; renderShell(); }   // outside click closes the ⋯ menu
+      if (st.wsMenuFor) { st.wsMenuFor = null; renderShell(); return; }   // outside click closes the ⋯ menu
+      if (st.acctMenu) { st.acctMenu = false; renderShell(); }            // outside click closes the avatar menu
     });
     document.addEventListener('input', function (e) { if (e.target.id === 'wsName') st.editName = e.target.value; if (e.target.id === 'nxEditName') st.nxEditName = e.target.value; });
     function syncEditName(){ var i = document.getElementById('wsName'); if (i) st.editName = i.value; }
