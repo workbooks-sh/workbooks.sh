@@ -329,6 +329,15 @@
     var ACCENT = { '/storage': 'var(--sky)', '/team': 'var(--peach)', '/shared': 'var(--cream)', '/usage': 'var(--sage)',
       '/settings': 'var(--violet)', '/workspace': 'var(--peach)', '/database': 'var(--mint)', '/upgrade': 'var(--mint)' };
     function sectionAccent(p){ for (var k in ACCENT) { if (p.indexOf(k) === 0) return ACCENT[k]; } return 'var(--mint)'; }
+    // Which RAIL section a route belongs to — drives the active rail tab + which per-surface sidebar shows.
+    var ADMIN_ROUTES = ['/usage', '/storage', '/team', '/secrets', '/integrations', '/settings', '/database', '/upgrade'];
+    function sectionFor(p){
+      if (p.indexOf('/studio') === 0 || p.indexOf('/create') === 0) return 'studio';
+      if (p.indexOf('/activity') === 0 || p.indexOf('/runs') === 0 || p.indexOf('/tasks') === 0 || p.indexOf('/issues') === 0) return 'activity';
+      if (p.indexOf('/workspace') === 0) return 'files';
+      for (var i = 0; i < ADMIN_ROUTES.length; i++) if (p.indexOf(ADMIN_ROUTES[i]) === 0) return 'admin';
+      return 'apps'; // home '/' and anything else default to the Apps surface
+    }
     function crumbFor(p){ var v = WB._views[matchRoute(p).key]; var t = v && v.title;
       if (t) return t; if (p.indexOf('/nexuses') === 0) return 'Nexus'; return 'Nexus'; }
 
@@ -633,53 +642,68 @@
       // listeners) #view back into the new shell. On a real nav, renderView() runs after and refills it.
       var prevView = document.getElementById('view');
 
-      // Nexus rail — your orgs/nexuses (one nexus = one org), Slack-style. Switch with a tile; + adds one;
-      // avatar pinned at the bottom (→ Settings/Sign out menu). The sidebar-collapse toggle lives at the top.
-      var nexuses = (WB.nexus.list && WB.nexus.list()) || [];
-      var orgtiles = nexuses.length
-        ? nexuses.map(function (n) {
-            return '<button class="orgtile' + (nx && n.id === nx.id ? ' on' : '') + '" data-nxswitch="' + esc(n.id) + '" title="' + esc(n.name) + '">' + esc((n.icon || (n.name[0] || 'N')).toUpperCase()) + '</button>';
-          }).join('')
-        : '<button class="orgtile on" data-nxmenu title="' + esc(nxLabel) + '">' + esc(inits(nxLabel)) + '</button>';
+      // ── Slack-style RAIL: nexus selector (top) → Studio/Apps/Activity/Files (icon-above-text) →
+      // Admin + You grouped at the bottom. The nexus tile opens the switch menu (switch/rename/create).
+      var section = sectionFor(p);
+      var nexTile = '<button class="nextile' + (st.nxMenu ? ' on' : '') + '" data-nxmenu title="' + esc(nxLabel) + '">' +
+          '<span class="nexinit">' + esc(inits(nxLabel)) + '</span><span class="nexcar">' + ICO.chev + '</span></button>' +
+        (st.nxMenu ? nexusMenu(nx) : '');
+      var RAIL_SECS = [
+        { id: 'studio', ico: ICO.spark, label: 'Studio', go: '/studio' },
+        { id: 'apps', ico: ICO.grid, label: 'Apps', go: '/' },
+        { id: 'activity', ico: ICO.activity, label: 'Activity', go: '/activity' },
+        { id: 'files', ico: ICO.files, label: 'Files', go: '/workspaces' }
+      ];
+      var railsecs = RAIL_SECS.map(function (s) {
+        return '<a class="railsec' + (section === s.id ? ' on' : '') + '" data-nav="' + s.go + '" href="#' + s.go +
+          '" title="' + s.label + '"><span class="rsico">' + s.ico + '</span><span class="rslbl">' + s.label + '</span></a>';
+      }).join('');
 
       var acctMenuHtml = st.acctMenu ? ('<div class="acctmenu rail">' +
         '<a class="acctitem" data-nav="/settings" href="#/settings">' + ICO.gear + '<span>Settings</span></a>' +
         '<a class="acctitem" href="/auth/logout">' + ICO.logout + '<span>Sign out</span></a>' +
       '</div>') : '';
 
+      // ── per-surface SIDEBAR body — swaps with the active rail section ──
+      var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Activity', files: 'Files', admin: 'Admin' };
+      var isBrowse = section === 'apps' || section === 'files';   // apps/files get the filter funnel + search + pins
+      if (isBrowse) st.sideMode = section;   // keep the filter funnel (filterMenu/filterActive) keyed to the active surface
+      var sideBody;
+      if (section === 'files') sideBody = '<div class="wsgroups">' + wslist + '</div>';
+      else if (section === 'apps') sideBody = '<div class="appsgrid" id="appsGrid"><div class="treemsg" style="padding:8px 4px">Loading apps…</div></div>';
+      else if (section === 'studio') sideBody = '<nav class="nxnav"><a class="nxlink" data-nav="/studio" href="#/studio">' + ICO.spark + '<span class="lbl">New session</span></a></nav>';
+      else if (section === 'activity') sideBody = '<nav class="nxnav">' +
+          navlink('/activity', ICO.activity, 'All activity', p) + navlink('/runs', ICO.gauge, 'Runs', p) +
+          navlink('/tasks', ICO.files, 'Tasks', p) + navlink('/issues', ICO.draft, 'Issues', p) + '</nav>';
+      else if (section === 'admin') sideBody = '<nav class="nxnav">' +
+          navlink('/usage', ICO.gauge, 'Usage & billing', p) + navlink('/storage', ICO.database, 'Storage', p) +
+          navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) +
+          navlink('/integrations', ICO.apps, 'Integrations', p) + navlink('/settings', ICO.gear, 'Nexus settings', p) + '</nav>';
+      else sideBody = '';
+
       root.innerHTML =
       '<div id="app" class="' + (st.rail ? 'rail' : '') + '" style="--section:' + sectionAccent(p) + '">' +
         '<div class="topdna">' + WB.dna(11, 8) + '</div>' +
         '<div class="nexrail">' +
-          '<button class="nexrail-toggle" data-rail-toggle title="Toggle sidebar" aria-label="Toggle sidebar">' + ICO.rail + '</button>' +
-          '<div class="orgtiles">' + orgtiles + '</div>' +
-          '<button class="orgadd" data-nxcreate title="Add nexus" aria-label="Add nexus">+</button>' +
+          '<div class="nextilewrap">' + nexTile + '</div>' +
+          '<div class="raildiv"></div>' +
+          '<nav class="railsecs">' + railsecs + '</nav>' +
           '<div class="nexrail-grow"></div>' +
-          '<div class="orgavatar" data-acct-menu title="' + esc(user.name) + '"><div class="av">' + esc(user.initial) + '</div>' + acctMenuHtml + '</div>' +
+          '<div class="railbottom">' +
+            '<a class="railsec' + (section === 'admin' ? ' on' : '') + '" data-nav="/usage" href="#/usage" title="Admin"><span class="rsico">' + ICO.admin + '</span><span class="rslbl">Admin</span></a>' +
+            '<button class="railsec railavbtn" data-acct-menu title="' + esc(user.name) + '"><span class="railav">' + esc(user.initial) + '</span><span class="rslbl">You</span></button>' +
+            acctMenuHtml +
+          '</div>' +
         '</div>' +
         '<aside class="side">' +
-          '<div class="sidetop">' +
-            '<button class="nxlink nxsearch" data-palette aria-label="Search (Cmd-K)" title="Search">' + ICO.search + '<span class="lbl">Search</span><span class="kbd">⌘K</span></button>' +
+          '<div class="sidehd">' +
+            '<span class="sidehd-t">' + (SECTITLE[section] || '') + '</span>' +
+            '<button class="sidehd-ic" data-palette title="Search (⌘K)" aria-label="Search">' + ICO.search + '</button>' +
+            (isBrowse ? '<div class="filterwrap"><button class="sidehd-ic' + (filterActive() ? ' on' : '') + '" data-filter-toggle title="Filter" aria-label="Filter">' + ICO.filter + '</button>' + (st.filterOpen ? filterMenu() : '') + '</div>' : '') +
+            '<button class="sidehd-ic" data-rail-toggle title="Collapse sidebar" aria-label="Collapse sidebar">' + ICO.rail + '</button>' +
           '</div>' +
-          '<nav class="nxnav nxprimary">' +
-            navlink('/studio', ICO.spark, 'Studio', p) +
-            navlink('/activity', ICO.activity, 'Activity', p) +
-          '</nav>' +
-          '<div class="modebar">' +
-            '<div class="modetabs" role="tablist">' +
-              '<button class="modetab' + (st.sideMode !== 'files' ? ' on' : '') + '" data-sidemode="apps" role="tab">' + ICO.grid + '<span>Apps</span></button>' +
-              '<button class="modetab' + (st.sideMode === 'files' ? ' on' : '') + '" data-sidemode="files" role="tab">' + ICO.files + '<span>Files</span></button>' +
-            '</div>' +
-            '<div class="filterwrap">' +
-              '<button class="filterbtn' + (filterActive() ? ' on' : '') + '" data-filter-toggle title="Filter" aria-label="Filter">' + ICO.filter + '</button>' +
-              (st.filterOpen ? filterMenu() : '') +
-            '</div>' +
-          '</div>' +
-          (st.sideMode === 'files'
-            ? '<div class="wsgroups">' + wslist + '</div>'
-            : '<div class="appsgrid" id="appsGrid"><div class="treemsg" style="padding:8px 4px">Loading apps…</div></div>') +
-          '<div class="navspacer"></div>' +
-          adminDrawer +
+          sideBody +
+          (isBrowse ? ('<div class="navspacer"></div>' + pinsec + searchsec) : '') +
         '</aside>' +
         '<div class="main">' + crumbs + (fb ? '<div id="view" class="fullbleed"></div>' : '<div class="wrap" id="view"></div>') + '</div>' +
       '</div>';
@@ -692,7 +716,7 @@
       if (st.pickerOpen) { var ph = root.querySelector('#wsPicker'); if (ph) WB.emojiPicker(ph, function (u) { st.editIcon = u; st.pickerOpen = false; renderShell(); renderView(); }); }
       var si = document.getElementById('wbFileSearch');
       if (si) { si.value = st.search; si.oninput = function(){ st.search = si.value; runSearch(); }; if (st.search) runSearch(); }
-      if (st.sideMode !== 'files') paintApps();   // Apps tab → load the apps grid
+      if (section === 'apps') paintApps();   // Apps surface → load the apps grid
     }
     // Let other views (the workspace explorer) refresh the sidebar after a pin/unpin so Pinned updates live.
     WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };

@@ -87,7 +87,7 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
 @media (prefers-reduced-motion:reduce){ .dot.run,.dot.build{ animation:none; } }
 
-#app{ display:grid; grid-template-columns:56px 250px 1fr; grid-template-rows:8px 1fr; height:100vh; }
+#app{ display:grid; grid-template-columns:70px 264px 1fr; grid-template-rows:8px 1fr; height:100vh; }
 #app > .topdna{ grid-column:1 / 3; grid-row:1; height:8px; margin:0; overflow:hidden;
   /* fallback gradient for the SSR first paint (before app.js paints the real DNA bars) */
   background:linear-gradient(90deg,#f3c5a3,#aee5c2,#a8d4f0,#9fc4e8,#f2ddb0,#f3c5a3); }
@@ -105,11 +105,43 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 #app > .side{ grid-column:2; grid-row:2; }
 #app > .main{ grid-column:3; grid-row:1 / 3; }
 /* Collapse the sidebar into an ICON RAIL (not hidden): nav icons only, no labels/tree. */
-#app.rail{ grid-template-columns:56px 58px 1fr; }
-#app.rail .side{ padding:14px 8px 18px; }
-#app.rail .lbl, #app.rail .kbd, #app.rail .sidetree, #app.rail .wsgroups, #app.rail .appsgrid, #app.rail .modebar, #app.rail .sidetree-hd, #app.rail .adminchev{ display:none; }
-#app.rail .nxsearch, #app.rail .nxlink, #app.rail .adminbtn{ justify-content:center; padding:9px 0; }
-#app.rail .sidetop{ justify-content:center; }
+#app.rail{ grid-template-columns:70px 0 1fr; }
+#app.rail .side{ overflow:hidden; padding:0; border-right:0; }
+
+/* ── Slack rail: nexus selector + section tabs (icon-above-text) + Admin/You bottom group ── */
+.nextilewrap{ position:relative; padding:2px 0 4px; }
+.nextile{ position:relative; width:46px; height:46px; border-radius:14px; cursor:pointer; border:1px solid var(--line);
+  background:linear-gradient(135deg,var(--violet),var(--sky)); color:var(--on-bloom); display:grid; place-items:center; transition:transform .08s; }
+.nextile:hover{ transform:translateY(-1px); }
+.nextile.on{ box-shadow:0 0 0 2px var(--ink); }
+.nextile .nexinit{ font:800 15px var(--display); }
+.nextile .nexcar{ position:absolute; right:-3px; bottom:-3px; width:16px; height:16px; border-radius:50%; background:var(--paper);
+  border:1px solid var(--line); display:grid; place-items:center; color:var(--dim); }
+.nextile .nexcar svg{ width:10px; height:10px; transform:rotate(90deg); }
+.raildiv{ width:26px; height:1px; background:var(--line); margin:2px 0 4px; }
+.railsecs{ display:flex; flex-direction:column; gap:3px; width:100%; align-items:center; }
+.railsec{ display:flex; flex-direction:column; align-items:center; gap:4px; width:58px; padding:7px 2px; border-radius:12px;
+  color:var(--dim); cursor:pointer; text-decoration:none; transition:.12s; position:relative; }
+.railsec:hover{ color:var(--ink); }
+.railsec .rsico{ width:46px; height:30px; border-radius:11px; display:grid; place-items:center; transition:.12s; }
+.railsec:hover .rsico{ background:var(--hover); }
+.railsec .rsico svg{ width:20px; height:20px; }
+.railsec .rslbl{ font:600 11px var(--read); letter-spacing:.005em; }
+.railsec.on{ color:var(--ink); }
+.railsec.on .rsico{ background:var(--ink); color:var(--paper); }
+.railbottom{ display:flex; flex-direction:column; gap:3px; align-items:center; width:100%; padding-top:8px; border-top:1px solid var(--line); position:relative; }
+.railavbtn{ background:none; border:0; font:inherit; }
+.railav{ width:30px; height:30px; border-radius:9px; background:linear-gradient(135deg,var(--peach),var(--blue));
+  display:grid; place-items:center; font:700 12px var(--mono); color:var(--on-bloom); border:1px solid var(--line); }
+.acctmenu.rail{ left:calc(100% + 10px); bottom:0; }
+
+/* ── per-surface sidebar header ── */
+.sidehd{ display:flex; align-items:center; gap:4px; padding:0 6px 0 14px; height:46px; flex:none; }
+.sidehd-t{ font:600 17px var(--display); letter-spacing:-.01em; flex:1; color:var(--ink); }
+.sidehd-ic{ width:30px; height:30px; border-radius:8px; display:grid; place-items:center; color:var(--dim); cursor:pointer; border:0; background:none; }
+.sidehd-ic:hover, .sidehd-ic.on{ background:var(--hover); color:var(--ink); }
+.sidehd-ic svg{ width:16px; height:16px; }
+.sidehd .filterwrap{ position:relative; display:flex; }
 
 /* ── Nexus rail (orgs/nexuses, Slack-style) ── */
 .nexrail{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px 0 12px; background:var(--paper); border-right:1px solid var(--line); overflow:hidden; }
@@ -133,7 +165,9 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .sidetree{ flex:1; min-height:0; overflow-y:auto; }
 
 .side{ border-right:1px solid var(--line); background:var(--paper); display:flex; flex-direction:column;
-  padding:22px 14px 24px; overflow:hidden; z-index:30; }
+  padding:10px 10px 18px; overflow:hidden; z-index:30; }
+/* the per-surface scrollable body fills under the fixed sidehd */
+.side > .wsgroups, .side > .appsgrid, .side > .nxnav{ flex:0 1 auto; min-height:0; overflow-y:auto; }
 .topdna{ margin:-22px -14px 16px; height:8px; overflow:hidden; flex:0 0 auto; }
 .brand{ display:flex; align-items:center; gap:9px; padding:4px 8px 16px; }
 .brand svg{ width:24px; height:auto; color:var(--ink); flex:0 0 auto; }
