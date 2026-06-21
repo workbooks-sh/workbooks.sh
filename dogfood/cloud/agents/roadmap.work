@@ -17,7 +17,14 @@ cron/interval, re-armed on boot); **jj substrate** (Option B, gitlink-colocate o
 bare) + **attribution** + the **change-log in Activity**; the **per-agent worktree
 primitive** (`Nexus.JJ.workspace_add/commit/forget` — isolated real FS, validated).
 
-## Stage 1 — Agents write to the workspace (THE LINCHPIN)  · unlocks 2,3,4
+## Stage 1 — Agents write to the workspace (THE LINCHPIN) ✅ DONE  · unlocked 2,3,4
+
+DONE + verified e2e: a workspace-scoped run mounts a jj worktree as the agent's real-FS
+`/work`; bash gained `>`/`>>` redirection so agents author files naturally; on success the
+edits seal as an attributed commit on `agent/<name>`; worktree forgotten, commits persist.
+Proven: `Cloud.agent_run(workspace=myws, deck, 'echo … > pitch.work')` → `pitch.work`
+committed to `agent/deck`. Gated by `jj-substrate` (off = ephemeral scratch). Commits:
+`4bb1fc1c` (runtime) + `a9ebd513` (cloud).
 
 Wire the validated worktree primitive into the run loop so a dispatched agent produces
 **real, committed, attributed file changes** — the jj-FIFO + undo default, end to end.
