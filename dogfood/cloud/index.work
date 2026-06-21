@@ -481,7 +481,26 @@ client :app do
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
 
-  <div id="root"></div>
+  <!-- SSR shell skeleton: the nexus renders this painted 3-column chrome on the FIRST byte
+       (Nexus.SSR emits the client block verbatim), so there's no blank flash while app.js boots.
+       app.js's renderShell() replaces #root with the live shell — same grid, so zero layout shift. -->
+  <div id="root"><div id="app" class="ssr-skel">
+    <div class="topdna"></div>
+    <div class="nexrail">
+      <div class="nexrail-toggle skel"></div>
+      <div class="orgtiles"><div class="orgtile skel"></div></div>
+      <div class="nexrail-grow"></div>
+      <div class="orgavatar"><div class="av skel"></div></div>
+    </div>
+    <aside class="side">
+      <div class="sidetop"><div class="skelrow w70"></div></div>
+      <nav class="nxnav nxprimary"><div class="skelrow"></div><div class="skelrow"></div></nav>
+      <div class="sidetree-hd">Workspaces</div>
+      <div class="wsgroups"><div class="skelrow"></div><div class="skelrow"></div><div class="skelrow"></div></div>
+      <div class="navspacer"></div>
+    </aside>
+    <div class="main"><div class="wrap"><div class="ssr-spin"></div></div></div>
+  </div></div>
   <div class="toasts" id="toasts"></div>
 
   <!-- Views are lazy-loaded on demand by app.js (ensureView → ./views/<route>.js).
