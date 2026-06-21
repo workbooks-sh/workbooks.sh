@@ -87,14 +87,21 @@ jobs:
           echo "## did it crash with the Task error?"; grep -c "Task.start_link/3" /tmp/boot.log || true
           echo "## the FIRST error/abort line:"; grep -nE "error|Error|abort|undefined|crash|terminating|Kernel pid terminated" /tmp/boot.log | head -5
 
-      - name: "FORENSIC 5 — embedded: probe Task at the acceptor moment (custom -eval)"
-        working-directory: nexus
+      - name: "FORENSIC 6 — THE REAL ARTIFACT: build dogfood/deploy/Dockerfile + boot it"
         run: |
-          # Run the release VM in embedded mode WITHOUT the full app, and check whether Task is loaded.
-          REL=_build/prod/rel/nexus
-          ERTS=$(ls -d $REL/erts-*/bin)
-          BOOT=$(ls $REL/releases/*/start | head -1 | sed 's/\.script$//;s/\.boot$//')
-          echo "## erts=$ERTS boot=$BOOT"
-          "$ERTS/erl" -boot "$REL/releases/0.1.0/start" -mode embedded -noshell \
-            -eval 'io:format("get_mode=~p~n",[code:get_mode()]), io:format("task_loaded=~p~n",[code:is_loaded(\x27Elixir.Task\x27)]), io:format("exported3=~p~n",[erlang:function_exported(\x27Elixir.Task\x27, start_link, 3)]), erlang:halt()' \
-            -sname dbg 2>&1 | head -20 || true
+          set -e
+          cp -f dogfood/deploy/dockerignore .dockerignore
+          echo "## building the EXACT image Fly runs (base elixir:1.19-otp-27 → debian:bookworm-slim):"
+          docker build -f dogfood/deploy/Dockerfile -t wb-repro:head . 2>&1 | tail -25
+          echo "## erts/otp inside the built image:"
+          docker run --rm --entrypoint sh wb-repro:head -c 'cat releases/start_erl.data; echo; ls erts-*/bin >/dev/null 2>&1 && ls -d erts-* || ls -d /app/erts-* 2>/dev/null'
+          echo "=================== BOOT THE REAL IMAGE (embedded, as on Fly) ==================="
+          set +e
+          docker run --rm --name wbrepro -e WB_CONTROL_PLANE=1 -e WB_DATA=/tmp/d -e PORT=4055 \
+            wb-repro:head > /tmp/img.log 2>&1 &
+          sleep 25
+          docker rm -f wbrepro 2>/dev/null
+          cat /tmp/img.log
+          echo "================================================================================"
+          echo "## crashed with Task.start_link/3?"; grep -c "Task.start_link/3" /tmp/img.log || true
+          echo "## any UndefinedFunctionError / terminating?"; grep -nE "UndefinedFunctionError|terminating|Kernel pid terminated|abort" /tmp/img.log | head -5 || echo "NONE — booted clean"
