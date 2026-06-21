@@ -305,6 +305,35 @@
       return { key: '/', params: {} };
     }
 
+    // ── Lazy view loading ──────────────────────────────────────────────────────────────────────
+    // Each route lives in its own ./views/<file>.js that self-registers via WB.view(). Instead of
+    // <script>-tagging all 20 upfront (~260KB, 20 requests on every cold load), we inject only the
+    // ACTIVE view's script on demand. The home '/' view ships inline in app.js (no entry here).
+    var VIEW_FILES = {
+      '/activity': 'activity', '/authorize': 'authorize', '/database': 'database', '/denied': 'denied',
+      '/integrations': 'integrations', '/nexuses': 'nexuses', '/secrets': 'secrets', '/settings': 'settings',
+      '/shared': 'shared', '/storage': 'storage', '/studio': 'studio', '/create': 'studio', '/usage': 'studio',
+      '/team': 'team', '/upgrade': 'upgrade', '/welcome': 'welcome', '/workspace/env': 'workspace-env',
+      '/workspace/history': 'workspace-history', '/workspace/members': 'workspace-members',
+      '/workspace/sharing': 'workspace-sharing', '/workspace': 'workspace', '/workspaces': 'workspaces'
+    };
+    function fileForPath(path){
+      if (VIEW_FILES[path]) return VIEW_FILES[path];
+      var best = null; for (var k in VIEW_FILES){ if (path.indexOf(k) === 0 && (!best || k.length > best.length)) best = k; }
+      return best ? VIEW_FILES[best] : null;
+    }
+    var _viewLoaded = {};
+    function ensureView(path){
+      return new Promise(function(resolve){
+        var file = fileForPath(path);
+        if (!file || _viewLoaded[file]) return resolve();
+        _viewLoaded[file] = true;
+        var s = document.createElement('script'); s.src = './views/' + file + '.js';
+        s.onload = function(){ resolve(); }; s.onerror = function(){ resolve(); };
+        document.head.appendChild(s);
+      });
+    }
+
     // SVG icons (lucide, matching +layout.svelte: Gauge/Database/Users/KeyRound)
     var ICO = {
       gauge: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>',
@@ -670,7 +699,7 @@
       try { await def.render(mount, { params: m.params }); } catch (e) { mount.innerHTML = '<div class="card">Something went wrong loading this view.</div>'; console.error(e); }
     }
 
-    async function route(){ runCleanup(); var h = location.hash.slice(1) || '/'; ROUTE.path = h; renderShell(); await renderView(); }
+    async function route(){ runCleanup(); var h = location.hash.slice(1) || '/'; ROUTE.path = h; await ensureView(h); renderShell(); await renderView(); }
     window.addEventListener('hashchange', route);
 
     // ── home view ('/') — reproduced from routes/+page.svelte ────────────────────────────────────

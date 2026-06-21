@@ -484,43 +484,7 @@ client :app do
   <div id="root"></div>
   <div class="toasts" id="toasts"></div>
 
+  <!-- Views are lazy-loaded on demand by app.js (ensureView → ./views/<route>.js).
+       Only the active route's script is fetched, not all 20 upfront. -->
   <script src="./app.js"></script>
-  <script src="./views/activity.js"></script>
-  <script src="./views/integrations.js"></script>
-
-  <script src="./views/studio.js"></script>
-
-  <script src="./views/storage.js"></script>
-
-  <script src="./views/database.js"></script>
-
-  <script src="./views/team.js"></script>
-
-  <script src="./views/secrets.js"></script>
-
-  <script src="./views/settings.js"></script>
-
-  <script src="./views/upgrade.js"></script>
-
-  <script src="./views/shared.js"></script>
-
-  <script src="./views/nexuses.js"></script>
-
-  <script src="./views/workspace.js"></script>
-
-  <script src="./views/workspaces.js"></script>
-
-  <script src="./views/workspace-members.js"></script>
-
-  <script src="./views/workspace-env.js"></script>
-
-  <script src="./views/workspace-sharing.js"></script>
-
-  <script src="./views/workspace-history.js"></script>
-
-  <script src="./views/welcome.js"></script>
-
-  <script src="./views/authorize.js"></script>
-
-  <script src="./views/denied.js"></script>
 end
