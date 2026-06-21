@@ -40,13 +40,13 @@ contain other surfaces, as deep as you like.
 
 A **workspace** is an organizational subtree, declared in the manifest's `deploy` block:
 
-deploy do
-  workspaces="
-    site    | Site    | 🪧
-    product | Product | ☁️
-    docs    | Docs    | 📖
-  "
-end
+    deploy do
+      workspaces="
+        site    | Site    | 🪧
+        product | Product | ☁️
+        docs    | Docs    | 📖
+      "
+    end
 
 A workspace may *be* a single surface (`docs`) or *contain* several (`site/lander`,
 `site/marketing`). Workspaces are **declared**, not auto-derived from top-level folders —
