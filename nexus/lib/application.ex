@@ -71,7 +71,7 @@ defmodule Nexus.Application do
   end
 
   # Durable SQLite on the volume for a serving nexus, unless an adapter was chosen deliberately
-  # (dev per-workbook DB / tests / an explicit cloud adapter). Litestream (if S3/R2 secrets are
+  # (dev per-workbook DB / tests / an explicit cloud adapter). Litestream (if S3 secrets are
   # injected) replicates this file off-box; without secrets it's still durable on the volume.
   defp configure_store do
     if serve?() and Application.get_env(:nexus, :store_adapter, Nexus.Store.Ets) == Nexus.Store.Ets do

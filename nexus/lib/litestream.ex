@@ -1,7 +1,7 @@
 defmodule Nexus.Litestream do
   @moduledoc """
   Litestream durability for the nexus's local SQLite store — continuous WAL replication to an
-  egress-free object store (R2 / any S3-compatible), plus restore-on-boot.
+  egress-free, S3-compatible object store, plus restore-on-boot.
 
   **Why this shape.** One nexus = one machine = one BEAM writer, so the database is **local SQLite on
   the mounted volume** — single-writer is exactly SQLite's sweet spot (microsecond reads, no network
@@ -51,7 +51,7 @@ defmodule Nexus.Litestream do
   end
 
   @doc """
-  The S3/R2 replica spec built from injected secrets, or `nil` when unconfigured. Object path is
+  The S3 replica spec built from injected secrets, or `nil` when unconfigured. Object path is
   namespaced under the deployment's `WB_S3_PREFIX` (if any) + `litestream/` so it never collides
   with the object store's data objects.
   """
@@ -70,7 +70,7 @@ defmodule Nexus.Litestream do
   end
 
   @doc """
-  Litestream config YAML for `replica` (default: the S3/R2 replica from secrets) and `db` (default:
+  Litestream config YAML for `replica` (default: the S3 replica from secrets) and `db` (default:
   the volume DB path). Keys are intentionally omitted — litestream reads them from `LITESTREAM_*`
   env so no secret is ever written to disk. The `file` replica form is used by the validation
   harness to exercise the full cycle offline.

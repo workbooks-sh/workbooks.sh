@@ -11,7 +11,7 @@ defmodule Nexus.Cache do
       (`cache-hot-max-mb`, default 64). Deliberately small so on a 1GB host it never competes with
       agents for RAM.
     * **cold** — `Nexus.Cache.Cold`, a seam that abstracts over the deploy target: the local
-      data-volume route (`Local`, default) or the egress-free R2 object store (`R2`, cloud), picked
+      data-volume route (`Local`, default) or the egress-free S3 object store (`S3`, cloud), picked
       from the `cache-cold` config the way the compile store switches on `component-cache`. On
       hot-evict of a still-live entry it is **demoted** to cold; on a hot miss the cold tier is
       checked and a live entry **promoted** back into hot.

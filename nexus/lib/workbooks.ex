@@ -3,16 +3,16 @@ defmodule Nexus.Workbooks do
   The local workbook library — `~/.workbooks/` — and the dev faked-backend that stands in for the
   production data stores so a workbook persists with **zero infra** locally.
 
-  A workbook declares *methods* for its data: `postgres` (structured rows), `r2`/s3 (objects), or
-  `sqlite` (data shipped WITH the workbook — demo/VFS/cold, never the prod store). Those same
-  declarations resolve to **real** Neon + R2 in production (picked by injected secrets), and to a
-  faked local backend in dev:
+  A workbook declares *methods* for its data: `postgres` (structured rows), `s3` (objects), or
+  `sqlite` (data shipped WITH the workbook — demo/VFS/cold, never the prod
+  store). Those same declarations resolve to **real** Postgres + an S3-compatible store in production
+  (picked by injected secrets), and to a faked local backend in dev:
 
       ~/.workbooks/
         registry.db        — the managed workbook ↔ UUID map (assigned on first run)
         dev/
           db/<uuid>/store.db — faked Postgres   (a SQLite stand-in, per workbook)
-          s3/<uuid>/         — faked R2 bucket   (a folder, per workbook)
+          s3/<uuid>/         — faked S3 bucket   (a folder, per workbook)
 
   Each workbook that runs through the nexus is assigned a stable UUID, recorded in the registry, so
   its db + bucket are heavily managed and dev/demo data can never reach a production store. Override
@@ -69,7 +69,7 @@ defmodule Nexus.Workbooks do
     Path.join(dir, "store.db")
   end
 
-  @doc "The dev faked-R2 bucket directory for a workbook UUID (created)."
+  @doc "The dev faked-S3 bucket directory for a workbook UUID (created)."
   def dev_s3_dir(uuid) do
     dir = Path.join([home(), "dev", "s3", uuid])
     File.mkdir_p!(dir)

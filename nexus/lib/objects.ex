@@ -1,11 +1,11 @@
 defmodule Nexus.Objects do
   @moduledoc """
-  The workbook-facing **object store** seam — what a workbook's `r2`/S3 data method resolves to, the
+  The workbook-facing **object store** seam — what a workbook's `s3` data method resolves to, the
   blob counterpart of `Nexus.Store` (rows). One bucket per workbook: `put/get/head/list/delete` over
   opaque byte blobs keyed by string paths.
 
   Routing mirrors the data store: with production secrets injected (`Nexus.S3.configured?/0`) it
-  speaks to the real R2/S3 bucket from config; otherwise it writes to the workbook's faked local
+  speaks to the real S3 bucket from config; otherwise it writes to the workbook's faked local
   bucket — the `~/.workbooks/dev/s3/<uuid>/` folder (`:s3_local_dir`, installed on serve by
   `Nexus.Workbooks`). Same calls work in dev and prod; dev blobs live only under `~/.workbooks/dev`.
 

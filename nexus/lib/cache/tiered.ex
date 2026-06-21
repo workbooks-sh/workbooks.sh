@@ -18,7 +18,7 @@ defmodule Nexus.Cache.Tiered do
 
   ## Cold tier — demote / promote
 
-  On a hot miss we ask `Nexus.Cache.Cold` (Local by default, R2 on the cloud route; in tests, Local
+  On a hot miss we ask `Nexus.Cache.Cold` (Local by default, S3 on the cloud route; in tests, Local
   pointed at a tmp dir). A present,
   unexpired cold entry is **promoted** back into hot and returned; an expired one is a `:miss` (lazy
   expiry). Expiry is checked on read in both tiers, so a stale value is never served.

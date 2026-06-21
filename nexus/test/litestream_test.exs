@@ -29,14 +29,14 @@ defmodule Nexus.LitestreamTest do
     System.put_env("WB_S3_BUCKET", "my-bucket")
     System.put_env("WB_S3_ACCESS_KEY_ID", "AKID")
     System.put_env("WB_S3_SECRET_ACCESS_KEY", "secret")
-    System.put_env("WB_S3_ENDPOINT", "https://acct.r2.cloudflarestorage.com")
+    System.put_env("WB_S3_ENDPOINT", "https://s3.example.com")
     System.put_env("WB_S3_PREFIX", "tenant42")
 
     assert Litestream.enabled?()
     rep = Litestream.replica()
     assert rep.type == "s3"
     assert rep.bucket == "my-bucket"
-    assert rep.endpoint == "https://acct.r2.cloudflarestorage.com"
+    assert rep.endpoint == "https://s3.example.com"
     assert rep.region == "auto"
     # object path namespaced under prefix + litestream/, no leading slash
     assert rep.path == "tenant42/litestream/nexus.db"

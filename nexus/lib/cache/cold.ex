@@ -12,11 +12,11 @@ defmodule Nexus.Cache.Cold do
 
     * `Nexus.Cache.Cold.Local` (DEFAULT) — object files under `Nexus.Config.data_dir()` (the mounted
       `WB_DATA` volume, e.g. `/data` in the libkrun microVM / Fly machine). Durable across machine
-      restarts. The **local route**, and the safe default when no R2 is configured.
-    * `Nexus.Cache.Cold.R2` — the egress-free S3-compatible object store, reusing the compile store's
+      restarts. The **local route**, and the safe default when no S3 store is configured.
+    * `Nexus.Cache.Cold.S3` — the egress-free S3-compatible object store, reusing the compile store's
       `Nexus.S3` client/config. The **cloud route** (Fly).
 
-  Selection: `cache-cold` is a local path (→ Local) or an `r2://`/`s3://` URI (→ R2). The operator
+  Selection: `cache-cold` is a local path (→ Local) or an `s3://` URI (→ S3). The operator
   picks cloud-vs-local once in the deploy HTML; the same cache code runs either way. This also makes
   tests trivial — `Cold.Local` pointed at a tmp dir IS the cold double, no network and no mock.
 
@@ -34,7 +34,8 @@ defmodule Nexus.Cache.Cold do
   @doc """
   The configured cold-tier provider. An explicit `config :nexus, :cache_cold, Module` override wins
   (an embedder may force a provider); otherwise it's resolved from the `cache-cold` the `deploy` block
-  knob — an `r2://`/`s3://` URI → `Nexus.Cache.Cold.R2`, any other (filesystem path) → `…Local`.
+  knob — an `s3://` URI (or the deprecated `r2://` alias) → `Nexus.Cache.Cold.S3`, any other
+  (filesystem path) → `…Local`.
   """
   def provider do
     case Application.get_env(:nexus, :cache_cold) do
@@ -43,8 +44,9 @@ defmodule Nexus.Cache.Cold do
 
       nil ->
         case Nexus.Config.cache_cold() do
-          "r2://" <> _ -> Nexus.Cache.Cold.R2
-          "s3://" <> _ -> Nexus.Cache.Cold.R2
+          "s3://" <> _ -> Nexus.Cache.Cold.S3
+          # deprecated alias of s3://
+          "r2://" <> _ -> Nexus.Cache.Cold.S3
           _ -> Nexus.Cache.Cold.Local
         end
     end

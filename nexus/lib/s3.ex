@@ -1,7 +1,7 @@
 defmodule Nexus.S3 do
   @moduledoc """
   A minimal, dependency-free S3 client — AWS Signature V4 over `:httpc`/`:crypto`, path-style
-  addressing so it speaks to ANY S3-compatible endpoint (R2, MinIO, Backblaze B2, AWS, …). Just the
+  addressing so it speaks to ANY S3-compatible endpoint (MinIO, Backblaze B2, AWS, …). Just the
   three ops a content-addressed blob store needs: `get/2`, `put/3`, `head/2`. No listing, no ACLs,
   no XML — blobs are immutable (keyed by content hash), so there's nothing to coordinate.
 

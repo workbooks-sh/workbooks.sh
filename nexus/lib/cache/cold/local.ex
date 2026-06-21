@@ -1,8 +1,8 @@
 defmodule Nexus.Cache.Cold.Local do
   @moduledoc """
   Filesystem `Nexus.Cache.Cold` provider — the default when `cache-cold` is a plain path (not an
-  `r2://`/`s3://` URI). One file per cache entry under `<cache-cold>/<object_path>`, where
-  `object_path` is the SAME tenant-scoped path the R2 provider uses — so the tenant-isolation property
+  `s3://` URI). One file per cache entry under `<cache-cold>/<object_path>`, where
+  `object_path` is the SAME tenant-scoped path the S3 provider uses — so the tenant-isolation property
   (a tenant's keyspace is a directory it alone addresses) is identical in both backends.
 
   Durable across machine restarts when the path is on the mounted data volume (the `Nexus.Config`

@@ -7,7 +7,7 @@ defmodule Nexus.CacheTest do
 
   setup do
     # Default config (cache-hot-max-mb=64, cache-default-ttl=3600), but point the cold tier at a fresh
-    # tmp dir → Nexus.Cache.Cold.Local IS the cold double: no network, no R2 creds, no mock, and it
+    # tmp dir → Nexus.Cache.Cold.Local IS the cold double: no network, no S3 creds, no mock, and it
     # exercises the real tenant-scoped object path / isolation that ships.
     Nexus.Config.reload(nil)
     cold_dir = Path.join(System.tmp_dir!(), "cachetest_#{System.unique_integer([:positive])}")

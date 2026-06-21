@@ -1,8 +1,9 @@
-defmodule Nexus.Cache.Cold.R2 do
+defmodule Nexus.Cache.Cold.S3 do
   @moduledoc """
-  R2/S3 `Nexus.Cache.Cold` provider — the egress-free object store, riding the SAME `Nexus.S3` client
-  the compile store uses. Its `bucket/prefix` come from the `cache-cold` the `deploy` block knob (an
-  `r2://bucket/prefix` or `s3://…` URI). One object per cache entry at the tenant-scoped path from
+  S3 `Nexus.Cache.Cold` provider — the S3-compatible, egress-free object store, riding the SAME
+  `Nexus.S3` client the compile store uses. Its `bucket/prefix` come from the `cache-cold` the
+  `deploy` block knob (an `s3://bucket/prefix` URI; `r2://…` is accepted as a deprecated alias).
+  One object per cache entry at the tenant-scoped path from
   `Nexus.Cache.Cold.object_path/3`.
 
   With no S3 creds (`Nexus.S3.configured?/0` false) or a local-only `component-cache`, the cold tier
@@ -43,7 +44,7 @@ defmodule Nexus.Cache.Cold.R2 do
     put(tenant, ns, key, {"", 0})
   end
 
-  # ── remote spec (mirrors Nexus.Compile.Store.spec/0, R2/S3 + creds required) ─────────────────────
+  # ── remote spec (mirrors Nexus.Compile.Store.spec/0, S3 endpoint + creds required) ───────────────
   defp remote do
     case spec() do
       {:remote, loc} -> if Nexus.S3.configured?(), do: {:ok, loc}, else: :none
@@ -58,6 +59,7 @@ defmodule Nexus.Cache.Cold.R2 do
   defp spec do
     case Nexus.Config.cache_cold() do
       "s3://" <> rest -> remote_loc(rest)
+      # deprecated alias of s3:// — kept for back-compat with existing configs
       "r2://" <> rest -> remote_loc(rest)
       _ -> {:local, nil}
     end

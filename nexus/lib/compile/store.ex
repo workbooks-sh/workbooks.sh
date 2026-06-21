@@ -4,7 +4,7 @@ defmodule Nexus.Compile.Store do
 
     * **local** (always): a hot directory of `.component.wasm` blobs. Fast hits, survives within a
       machine. This is the floor; with no remote configured the store is local-only.
-    * **remote** (optional): any S3-compatible, **egress-free** object store (R2, MinIO, Backblaze, …)
+    * **remote** (optional): any S3-compatible, **egress-free** object store (MinIO, Backblaze, …)
       behind `Nexus.S3`. Durable + shared across every machine/tenant, so "compile once" is
       fleet-wide, not per-box — and survives scale-to-zero machine churn.
 
@@ -13,8 +13,8 @@ defmodule Nexus.Compile.Store do
   `component-cache` (in `deploy`) selects the mode:
 
       component-cache="build/components"           # local dir → local-only
-      component-cache="s3://my-bucket/components"   # remote (s3://|r2:// both fine) + local hot tier
-        component-cache-endpoint="https://<acct>.r2.cloudflarestorage.com"
+      component-cache="s3://my-bucket/components"   # remote (s3://; r2:// is a deprecated alias) + local hot tier
+        component-cache-endpoint="https://<your-s3-endpoint>"
         component-cache-region="auto"
 
   fetch order: local → remote (pull into local) → :miss. put: local + (best-effort) remote push.
@@ -93,6 +93,7 @@ defmodule Nexus.Compile.Store do
   defp spec do
     case Nexus.Config.component_cache() do
       "s3://" <> rest -> remote(rest)
+      # deprecated alias of s3:// — kept for back-compat with existing configs
       "r2://" <> rest -> remote(rest)
       dir -> {:local, dir}
     end

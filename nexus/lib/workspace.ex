@@ -6,8 +6,8 @@ defmodule Nexus.Workspace do
   A workspace's durable backup is a **git bundle** (the whole history in one file).
   It's stored as a **no-expiry entry in the tenant-scoped cold store**
   (`Nexus.Cache.Cold`, namespace `"workspaces"`): the local tier lives on the data
-  volume, and it routes to the R2/S3 remote automatically when `cache-cold` is an
-  `r2://`/`s3://` URI — the *same* two-tier, tenant-isolated backend the cache and
+  volume, and it routes to the S3 remote automatically when `cache-cold` is an
+  `s3://` URI — the *same* two-tier, tenant-isolated backend the cache and
   the compile store already use.
 
   `backup/3` returns the bundle's byte size for quota metering — cold-storage bytes

@@ -10,7 +10,7 @@ defmodule Nexus.Storage do
   Runs **where the data lives** (the tenant's runtime / data volume) — a real `du`,
   not a mock. The control-plane dashboard (`Nexus.Capacity`) consumes a measured
   value via its `:storage_bytes` option; the runtime→control-plane reporting channel
-  (and an R2-list sum for the remote tier) layer on top of this primitive.
+  (and an S3-list sum for the remote tier) layer on top of this primitive.
   """
 
   @doc "Total cold-storage bytes a tenant uses on the local tier (real, from disk)."

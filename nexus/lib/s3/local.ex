@@ -1,6 +1,6 @@
 defmodule Nexus.S3.Local do
   @moduledoc """
-  A filesystem object store that fakes an S3/R2 bucket for dev — the local stand-in behind the
+  A filesystem object store that fakes an S3 bucket for dev — the local stand-in behind the
   `Nexus.Objects` seam. Objects are plain files under a base directory (the workbook's
   `~/.workbooks/dev/s3/<uuid>/` folder, `:s3_local_dir`); keys map straight to relative paths, so
   the faked bucket is just a folder you can open in Finder.

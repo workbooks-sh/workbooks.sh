@@ -33,7 +33,7 @@ defmodule Nexus.Paths do
   @doc "A workspace's working checkout. EPHEMERAL — re-derived from its bare repo on boot (Nexus.Server.rehydrate_checkouts)."
   def work_dir(name), do: Path.join(data_dir(), name)
 
-  @doc "Cold cache + workspace backups. Durable on the volume by default (or off-box when `cache-cold` is an r2:// URI)."
+  @doc "Cold cache + workspace backups. Durable on the volume by default (or off-box when `cache-cold` is an s3:// URI)."
   def cold_dir, do: Path.join(durable_dir(), "cache")
 
   @doc "Compiled wasm artifacts. EPHEMERAL by design — rebuilt by recompiling, so they must NOT consume the volume."

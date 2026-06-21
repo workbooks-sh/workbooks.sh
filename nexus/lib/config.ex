@@ -19,11 +19,11 @@ defmodule Nexus.Config do
         compile-concurrency="8"        # bound on concurrent wasm compiles (default: cores)
         compile-cache="on"             # content-addressed result cache (default: on)
         compile-cache-version="wbc1"   # bump to invalidate the whole store
-        component-cache="build/components"   # store location (path or r2://bucket/prefix)
+        component-cache="build/components"   # store location (path or s3://bucket/prefix)
         languages="rust zig c"         # toolchains this deployment enables/pre-warms
         cache-hot-max-mb="64"          # Nexus.Cache hot-tier ETS byte budget (LRU-bounded)
         cache-default-ttl="3600"       # Nexus.Cache cold-tier shelf-life, seconds
-        cache-cold="cache"             # cold-tier backend: a local path (→ Local) OR r2://bucket/prefix (→ R2)
+        cache-cold="cache"             # cold-tier backend: a local path (→ Local) OR s3://bucket/prefix (→ S3)
         search="metasearch"            # :search provider: metasearch (keyless, local/dev) | brave (keyed, cloud)
         search-engines="ddg mojeek startpage"  # which keyless engines metasearch fans out to
         pm-debug="off"
@@ -83,8 +83,8 @@ defmodule Nexus.Config do
   # deliberately small (default 64MB) so on a 1GB host it never competes with agents for RAM.
   def cache_hot_max_mb, do: get(:cache_hot_max_mb)
   def cache_default_ttl, do: get(:cache_default_ttl)
-  # Cold-tier backend spec — a local filesystem path (→ Nexus.Cache.Cold.Local) OR an `r2://`/`s3://`
-  # bucket URI (→ Nexus.Cache.Cold.R2). Mirrors `component-cache`: the operator picks cloud-vs-local
+  # Cold-tier backend spec — a local filesystem path (→ Nexus.Cache.Cold.Local) OR an `s3://` bucket
+  # URI (→ Nexus.Cache.Cold.S3; `r2://` is a deprecated alias). Mirrors `component-cache`: the operator picks cloud-vs-local
   # ONCE in deploy, and the same tier logic runs either way. Default: "cache" under data_dir.
   def cache_cold, do: get(:cache_cold)
   # Web-search provider: "metasearch" (keyless default) | "brave" | "exa" | "tavily" | "searxng".
