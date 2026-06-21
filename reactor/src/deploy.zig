@@ -343,7 +343,7 @@ fn applyCloud(io: Io, alloc: std.mem.Allocator, home: []const u8, src: []const u
 // the runtime's deploy entrypoint rather than reimplementing krunvm here.
 fn applyLocal(io: Io, alloc: std.mem.Allocator, src: []const u8) !u8 {
     const image = attr(src, "image", "");
-    log.step("local target — booting the nexus OCI image in a krunvm microVM");
+    log.step("local target — booting the nexus runtime in a vfkit microVM (real virtio-net NIC)");
 
     const argv: []const []const u8 = if (image.len > 0)
         &.{ "mix", "nexus.deploy.local", image }
@@ -356,19 +356,41 @@ fn applyLocal(io: Io, alloc: std.mem.Allocator, src: []const u8) !u8 {
     };
     if (r.term == .exited and r.term.exited == 0) {
         log.print("{s}", .{r.stdout});
+        // vfkit NAT gives the guest its own IP, so the nexus is at http://<guestIP>:4000 (not
+        // localhost). Capture the URL the bridge printed so verify/status/down target the right host.
+        const url = firstUrl(r.stdout) orelse "";
+        try writeState(io, alloc, "local", "", url, "vfkit");
+        if (url.len > 0) log.ok(try std.fmt.allocPrint(alloc, "running at {s} — `work deploy verify`", .{url}));
         return 0;
     }
     log.err(try std.fmt.allocPrint(alloc, "local boot failed:\n{s}{s}", .{ r.stdout, r.stderr }));
     return 1;
 }
 
+// Pull the first `http://…`/`https://…` token out of text (the booted nexus URL the bridge prints).
+fn firstUrl(text: []const u8) ?[]const u8 {
+    const at = std.mem.indexOf(u8, text, "http") orelse return null;
+    var end = at;
+    while (end < text.len and text[end] != ' ' and text[end] != '\n' and text[end] != '\r' and text[end] != '\t') end += 1;
+    return if (end > at + 7) text[at..end] else null;
+}
+
 /// `work deploy verify [--nexus <name>]` — health-probe a running nexus. Resolves the target nexus
 /// (by name, else the active context), GETs `<base>/health`, and reports. Real, no scaffolding.
+// Resolve which nexus to probe: an explicit `--nexus <name>` wins; otherwise prefer the URL `apply`
+// recorded in .work/runtime.state (e.g. a vfkit local nexus at its NAT guest IP, not localhost);
+// otherwise the active context's nexus.
+fn resolveBase(io: Io, alloc: std.mem.Allocator, home: []const u8, nexus_name: []const u8) ![]const u8 {
+    if (nexus_name.len > 0) return context.nexusByName(io, alloc, home, nexus_name);
+    if (readState(io, alloc)) |state| {
+        const url = blockAttr(state, "runtime do", "url", "");
+        if (url.len > 0) return url;
+    }
+    return context.nexusUrl(io, alloc, home);
+}
+
 pub fn verify(io: Io, alloc: std.mem.Allocator, home: []const u8, nexus_name: []const u8) !u8 {
-    const base = if (nexus_name.len > 0)
-        try context.nexusByName(io, alloc, home, nexus_name)
-    else
-        try context.nexusUrl(io, alloc, home);
+    const base = try resolveBase(io, alloc, home, nexus_name);
 
     log.prompt(try std.fmt.allocPrint(alloc, "work deploy verify {s}", .{base}));
     const token = if (context.cred(io, alloc, home)) |c| c.token else "";
@@ -390,10 +412,7 @@ pub fn verify(io: Io, alloc: std.mem.Allocator, home: []const u8, nexus_name: []
 /// `work deploy status [--nexus <name>]` — inspect the target: the resolved nexus, its health, and
 /// the local `deployment.work` engine-place (if present). Read-only.
 pub fn status(io: Io, alloc: std.mem.Allocator, home: []const u8, nexus_name: []const u8) !u8 {
-    const base = if (nexus_name.len > 0)
-        try context.nexusByName(io, alloc, home, nexus_name)
-    else
-        try context.nexusUrl(io, alloc, home);
+    const base = try resolveBase(io, alloc, home, nexus_name);
 
     log.prompt("work deploy status");
     log.step(try std.fmt.allocPrint(alloc, "nexus {s}", .{base}));
