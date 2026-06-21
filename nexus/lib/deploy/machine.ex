@@ -106,7 +106,7 @@ defmodule Nexus.Deploy.Machine do
       _ -> File.cp!(golden_disk(), disk)
     end
 
-    vm = %{mac: gen_mac(), disk: disk, data_dir: data, ctrl_port: free_ctrl_port()}
+    vm = %{mac: stable_mac(), disk: disk, data_dir: data, ctrl_port: free_ctrl_port()}
     write_ctx(vm)
     {:ok, vm}
   end
@@ -309,6 +309,17 @@ defmodule Nexus.Deploy.Machine do
       end
     end)
   end
+
+  # A STABLE per-box MAC (persisted on first use), so the NAT guest IP stays the same across boots —
+  # the dev can bookmark `http://<ip>:4000`. Regenerate on demand by deleting the `mac` file.
+  defp stable_mac do
+    case File.read(mac_file()) do
+      {:ok, m} when byte_size(m) >= 17 -> String.trim(m)
+      _ -> m = gen_mac(); File.mkdir_p!(engine_dir()); File.write!(mac_file(), m); m
+    end
+  end
+
+  defp mac_file, do: Path.join(engine_dir(), "mac")
 
   # A locally-administered, unicast MAC with every octet >= 0x11 — `/var/db/dhcpd_leases` strips
   # leading-zero nibbles, which would break the substring match, so we keep all octets two-nibble.
