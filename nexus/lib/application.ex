@@ -30,8 +30,13 @@ defmodule Nexus.Application do
     # Register the selected `:search` provider behind the Nexus.Browse seam. Default = keyless
     # metasearch (pure-BEAM, local/dev); `deploy search="brave"` swaps in the keyed cloud API.
     register_search_provider()
+    # A user-workbook nexus runs in the AUTH MODE its `deploy do auth=… end` block declares, so a
+    # workbook's identity/tenant behavior is IDENTICAL local (vfkit) and cloud (Fly) — the keystone of
+    # deploy parity. Default (no block / auth="trusted") = Nexus.Auth.None (open, single-tenant).
+    configure_runtime_auth()
     # In the control-plane role, gate /api/platform behind our own native session / PAT
     # (Nexus.Auth.Cloud) — every caller carries a real org identity (fail-closed; see Nexus.ControlPlane).
+    # This OVERRIDES the deploy-block auth above for our dashboard role only.
     Nexus.ControlPlane.configure_auth()
     # Empty by default; Constellation's local-inference lanes opt in via `config :nexus, Nexus.Constellation, enabled: true`.
     ether = if Nexus.Constellation.enabled?(), do: Nexus.Constellation.children(), else: []
@@ -43,6 +48,7 @@ defmodule Nexus.Application do
 
     children =
       [Nexus.Telemetry, Nexus.ControlPlane.Store, Nexus.ControlPlane.Token, Nexus.Auth.Token] ++
+        Nexus.Writer.Lock.child_specs() ++
         Nexus.Events.child_specs() ++ Nexus.Scheduler.child_specs() ++
         Nexus.Wasm.Gate.child_specs() ++ Nexus.Cache.child_specs() ++ ether ++ server_children()
     result = Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
@@ -69,8 +75,39 @@ defmodule Nexus.Application do
   # injected) replicates this file off-box; without secrets it's still durable on the volume.
   defp configure_store do
     if serve?() and Application.get_env(:nexus, :store_adapter, Nexus.Store.Ets) == Nexus.Store.Ets do
-      Application.put_env(:nexus, :store_adapter, Nexus.Store.Sqlite)
+      adapter =
+        case Nexus.Config.store_adapter() do
+          :postgres_unimplemented ->
+            require Logger
+            Logger.error(~s([deploy] database="postgres" declared but no Postgres adapter yet — using SQLite))
+            Nexus.Store.Sqlite
+
+          mod ->
+            mod
+        end
+
+      Application.put_env(:nexus, :store_adapter, adapter)
     end
+  end
+
+  # The deploy-block auth mode → the request-auth adapter (Nexus.Config.auth_adapter). Only in a
+  # serving context; `mix test`/pure pipelines keep the default. The CP role overrides this next.
+  defp configure_runtime_auth do
+    if serve?(), do: Application.put_env(:nexus, :auth, Nexus.Config.auth_adapter())
+  end
+
+  @doc """
+  Re-read the deploy block and re-apply the deploy MODE (store + auth adapter). Called by
+  `Nexus.Server.remount` after a `git push` lands a workbook, so its declared `auth=…`/`database=…`
+  takes effect without a reboot — keeping a freshly-pushed local workbook in the same mode it'd run in
+  cloud. The CP-role auth override is preserved.
+  """
+  def apply_deploy_mode do
+    Nexus.Config.boot()
+    configure_store()
+    configure_runtime_auth()
+    Nexus.ControlPlane.configure_auth()
+    :ok
   end
 
   # PORT + WB_DATA are deploy injection (the orchestrator sets the port + the volume mount), like

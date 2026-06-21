@@ -96,6 +96,39 @@ defmodule Nexus.Config do
   # Embedding backend for the semantic reranker: "hashed" (keyless default) | model-swap names.
   def embed, do: get(:embed)
 
+  # ── deploy MODE (the keystone of local↔cloud parity) ──────────────────────────────────────────
+  # The declared mode strings, and the adapter modules the runtime selects from them. Same on every
+  # target → a workbook behaves identically local + cloud.
+  def auth, do: get(:auth)
+  def database, do: get(:database)
+  def storage, do: get(:storage)
+  def tenancy_mode, do: get(:tenancy_mode)
+  def cpus, do: get(:cpus)
+  def memory, do: get(:memory)
+
+  @doc "The request-auth adapter the declared `auth` mode selects (default `Nexus.Auth.None` = trusted)."
+  def auth_adapter do
+    case auth() do
+      "trusted" -> Nexus.Auth.None
+      "bearer" -> Nexus.Auth.Bearer
+      m when m in ~w(betterauth clerk oidc jwt auth0) -> Nexus.Auth.Jwt
+      _ -> Nexus.Auth.None
+    end
+  end
+
+  @doc """
+  The store adapter the declared `database` mode selects. `sqlite` → `Nexus.Store.Sqlite` (the durable
+  default, replicated by Litestream when storage secrets are present). `postgres` has no adapter yet —
+  it returns `:postgres_unimplemented` so the caller can fail LOUD rather than silently use SQLite.
+  """
+  def store_adapter do
+    case database() do
+      "sqlite" -> Nexus.Store.Sqlite
+      "postgres" -> :postgres_unimplemented
+      _ -> Nexus.Store.Sqlite
+    end
+  end
+
   # Org capacity TIERS — a config-driven primitive. THE LINE: the runtime ships a NEUTRAL default
   # (one unbounded free tier, no imposed ceiling, domains allowed); an operator supplies their OWN
   # tiers + prices via this deploy config, never hardcoded in `lib/`. Each `tiers` line is
@@ -155,6 +188,18 @@ defmodule Nexus.Config do
       # Embedding backend for the local semantic reranker. Default "hashed" (deterministic, keyless,
       # zero-dep); swap to a real GGUF/Bumblebee model name at Nexus.Embed's model-swap point.
       embed: attr(html, "embed") || "hashed",
+      # ── deploy MODE: the same knobs `work deploy` scaffolds/validates, now read by the runtime so a
+      # workbook runs in its DECLARED mode on EVERY target (local vfkit == cloud Fly) — no divergence.
+      # `auth` selects the request-auth adapter; `database`/`storage`/`tenancy-mode` are the data
+      # posture. Neutral defaults match today's behavior (trusted/single/sqlite/local-fs).
+      auth: attr(html, "auth") || "trusted",
+      database: attr(html, "database") || "sqlite",
+      storage: attr(html, "storage") || "local-fs",
+      tenancy_mode: attr(html, "tenancy-mode") || "single",
+      # Machine shape for a LOCAL deploy — defaults match the cloud tier (1cpu/1024MB) so local doesn't
+      # mask OOM/concurrency a cloud machine would hit. Overridable from the block for tier-faithful tests.
+      cpus: int(attr(html, "cpus"), 1),
+      memory: int(attr(html, "memory"), 1024),
       # Capacity tiers (operator-supplied; neutral single-tier default — see `tiers/0`).
       tiers: parse_tiers(attr(html, "tiers")),
       runtime_image: attr(html, "runtime-image") || "ghcr.io/workbooks-sh/runtime:latest",

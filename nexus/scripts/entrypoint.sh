@@ -56,6 +56,14 @@ if [ -n "$S3_BUCKET" ] && [ -n "$S3_AKID" ] && command -v litestream >/dev/null 
     exit 1
   fi
 
+  # Single-writer gate (BEFORE litestream replicate — Litestream is the parent, so this is the only
+  # place we can stop a second machine from replicating over the shared bucket + split-braining SQLite).
+  echo "[entrypoint] single-writer gate"
+  if ! bin/nexus eval 'System.halt(if(Nexus.Writer.Lock.acquire(), do: 0, else: 1))'; then
+    echo "[entrypoint] FATAL: another machine holds the writer lease — refusing to start a second writer (would corrupt the replica)." >&2
+    exit 1
+  fi
+
   echo "[entrypoint] starting nexus under continuous replication"
   exec litestream replicate -config "$CFG" -exec "bin/nexus start"
 else
