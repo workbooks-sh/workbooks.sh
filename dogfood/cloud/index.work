@@ -483,6 +483,7 @@ client :app do
 
   <script src="./app.js"></script>
   <script src="./views/activity.js"></script>
+  <script src="./views/integrations.js"></script>
 
   <script src="./views/studio.js"></script>
 

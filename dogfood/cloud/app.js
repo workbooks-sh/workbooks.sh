@@ -245,6 +245,7 @@
       { label: 'Storage', icon: '▤', go: '/storage' },
       { label: 'Team', icon: '👥', go: '/team' },
       { label: 'Secrets', icon: '🔑', go: '/secrets' },
+      { label: 'Integrations', icon: '🔌', go: '/integrations' },
       { label: 'Settings', icon: '⚙', go: '/settings' }
     ];
     WB.palette = function () {
@@ -449,6 +450,7 @@
         '<div class="admindrawer"><nav class="nxnav">' +
           navlink('/usage', ICO.gauge, 'Usage', p) + navlink('/storage', ICO.database, 'Storage', p) +
           navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) +
+          navlink('/integrations', ICO.apps, 'Integrations', p) +
         '</nav></div></div>';
 
       // Each workspace is a FOLDER: a disclosure caret expands its real file tree (desktop-app style).
