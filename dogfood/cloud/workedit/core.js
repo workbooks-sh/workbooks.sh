@@ -109,7 +109,7 @@ export async function createEditor(mount, opts = {}) {
     const next = m === 'live' && isWork(opts.path) ? 'live' : 'source';
     if (next === mode) return mode;
     if (next === 'live' && !_liveExts) {
-      try { const lv = await import(rv('./live.js')); _liveExts = lv.workLiveFromView(view); }
+      try { const lv = await import(rv('./live.js')); _liveExts = lv.workLiveFromView(view, state); }
       catch (e) { try { console.warn('[workedit] live mode unavailable', e); } catch (_) {} return mode; }
     }
     editor.dispatch({ effects: liveComp.reconfigure(next === 'live' ? _liveExts : []) });

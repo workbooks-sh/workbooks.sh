@@ -11,13 +11,18 @@ const LIVE_CSS = `
 .wke-h3{font-size:1.18em;font-weight:700}
 .wke-h4{font-size:1.06em;font-weight:700}
 .wke-h5,.wke-h6{font-weight:700}
-.wke-chip{display:inline-flex;align-items:center;border-radius:999px;padding:0 8px;margin:0 1px;
-  font:600 .85em var(--read,system-ui);line-height:1.7;cursor:default;vertical-align:baseline;
-  border:1px solid transparent}
+/* Chips: inline-block + vertical-align:middle gives a consistent baseline across a row
+   (inline-flex synthesizes an inconsistent baseline, so chips drifted up/down). Fixed line-height
+   + box-sizing keeps every chip the same height regardless of its text. */
+.wke-chip{display:inline-block;box-sizing:border-box;height:1.5em;line-height:calc(1.5em - 2px);
+  border-radius:999px;padding:0 8px;margin:0 1px;vertical-align:middle;white-space:nowrap;
+  font:600 .82em var(--read,system-ui);cursor:default;border:1px solid transparent}
 .wke-chip-link{color:var(--wke-link,#2f6fa8);background:color-mix(in srgb, var(--wke-link,#2f6fa8) 12%, transparent)}
 .wke-chip-tag{color:var(--wke-meta,#2f6fa8);background:color-mix(in srgb, var(--wke-meta,#2f6fa8) 12%, transparent)}
 .wke-chip-work{color:var(--wke-lang,#9a6a3a);background:color-mix(in srgb, var(--wke-lang,#9a6a3a) 12%, transparent)}
 .wke-chip::before{content:attr(data-pre);opacity:.5;margin-right:2px;font-weight:500}
+/* Blank the line number on a live-rendered heading line (revealed again when the cursor's on it). */
+.cm-lineNumbers .wke-gutter-blank{color:transparent}
 `;
 function injectLiveStyle() {
   if (document.getElementById('wke-style-live')) return;
@@ -31,9 +36,14 @@ const REFS = [
   { re: /(^|[^\w&])#([a-z][\w-]*)/g, kind: 'tag', pre: '#', label: (m) => m[2], at: (m) => m.index + m[1].length },
 ];
 
-export function workLiveFromView(view) {
+export function workLiveFromView(view, state) {
   injectLiveStyle();
-  const { Decoration, ViewPlugin, WidgetType, EditorView } = view;
+  const { Decoration, ViewPlugin, WidgetType, EditorView, GutterMarker, gutterLineClass } = view;
+  const RangeSet = state.RangeSet;
+
+  // A gutter marker that blanks the line number (CSS .wke-gutter-blank) — used on live headings.
+  const blankGutter = new (class extends GutterMarker { })();
+  blankGutter.elementClass = 'wke-gutter-blank';
 
   class Chip extends WidgetType {
     constructor(label, kind, pre) { super(); this.label = label; this.kind = kind; this.pre = pre; }
@@ -50,6 +60,7 @@ export function workLiveFromView(view) {
 
   function build(v) {
     const decos = [];
+    const gutters = [];
     const sel = v.state.selection.main;
     const touches = (from, to) => sel.from <= to && sel.to >= from;
     const doc = v.state.doc;
@@ -61,12 +72,14 @@ export function workLiveFromView(view) {
         const line = doc.line(lineNo);
         const text = line.text;
 
-        // Heading: style the line; hide the leading `#`s unless the cursor is on the line.
+        // Heading: style the line; when rendered live (cursor not on it) hide the leading `#`s AND
+        // blank its line number (cleaner). Both revert when the cursor is on the line.
         const h = /^(#{1,6})\s/.exec(text);
         if (h) {
           decos.push(Decoration.line({ class: 'wke-h' + h[1].length }).range(line.from));
           if (!touches(line.from, line.to)) {
             decos.push(Decoration.replace({}).range(line.from, line.from + h[1].length + 1));
+            gutters.push(blankGutter.range(line.from));
           }
           continue; // don't chip inside a heading line
         }
@@ -88,18 +101,22 @@ export function workLiveFromView(view) {
       }
     }
     // Decoration.set sorts; line decos and inline replaces can share a position safely.
-    return Decoration.set(decos, true);
+    return { decorations: Decoration.set(decos, true), gutter: RangeSet.of(gutters, true) };
   }
 
   const plugin = ViewPlugin.fromClass(
     class {
-      constructor(v) { this.decorations = build(v); }
-      update(u) { if (u.docChanged || u.viewportChanged || u.selectionSet) this.decorations = build(u.view); }
+      constructor(v) { const b = build(v); this.decorations = b.decorations; this.gutter = b.gutter; }
+      update(u) { if (u.docChanged || u.viewportChanged || u.selectionSet) { const b = build(u.view); this.decorations = b.decorations; this.gutter = b.gutter; } }
     },
     {
       decorations: (v) => v.decorations,
-      // Make chips behave as atomic units so the caret steps over them instead of into them.
-      provide: (p) => EditorView.atomicRanges.of((v) => v.plugin(p)?.decorations || Decoration.none),
+      provide: (p) => [
+        // Make chips behave as atomic units so the caret steps over them instead of into them.
+        EditorView.atomicRanges.of((v) => v.plugin(p)?.decorations || Decoration.none),
+        // Blank the line number on live-rendered heading lines.
+        gutterLineClass.of((v) => v.plugin(p)?.gutter || RangeSet.empty),
+      ],
     },
   );
   return [plugin];
