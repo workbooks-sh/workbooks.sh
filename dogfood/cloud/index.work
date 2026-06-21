@@ -67,6 +67,9 @@ server :cloud do
   # against GITHUB_WEBHOOK_SECRET, then emit a `github.<event>` #event onto the bus so the workflow layer
   # (reviewer/merger agent hook, fetch-back) reacts. Generic plumbing (Nexus.GitHub); policy is ours.
   route "POST /cloud/github/webhook", :github_webhook
+  # Sanity-check the GitHub App wiring in production: is it configured, does the App JWT sign, and which
+  # installations does GitHub report? Hit this after injecting the secrets to confirm everything's live.
+  route "GET /cloud/github/status", :github_status
   # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
   # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
   route "GET /cloud/models", :models
@@ -730,6 +733,27 @@ server :cloud do
       %{ok: true}
     else
       {401, %{error: "invalid signature"}}
+    end
+  end
+
+  # GitHub App wiring check (production sanity). Reports configured? + whether the App JWT signs + the
+  # installations GitHub reports (proves the App id + private key are valid and the App is installed).
+  def github_status(_req) do
+    if Nexus.GitHub.configured?() do
+      jwt_ok = match?({:ok, _}, Nexus.GitHub.app_jwt())
+
+      installs =
+        case Nexus.GitHub.installations() do
+          {:ok, list} -> list
+          {:error, e} -> %{error: inspect(e)}
+        end
+
+      %{configured: true, app_jwt: jwt_ok, installations: installs,
+        webhook_secret: Nexus.Secrets.has?("GITHUB_WEBHOOK_SECRET")}
+    else
+      %{configured: false,
+        need: ["GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY", "GITHUB_APP_CLIENT_ID",
+               "GITHUB_APP_CLIENT_SECRET", "GITHUB_WEBHOOK_SECRET"]}
     end
   end
 

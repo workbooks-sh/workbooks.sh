@@ -34,7 +34,7 @@ defmodule Nexus.GitHub do
   def app_jwt do
     with true <- configured?(),
          id when is_binary(id) <- Nexus.Secrets.get("GITHUB_APP_ID"),
-         pem when is_binary(pem) <- Nexus.Secrets.get("GITHUB_APP_PRIVATE_KEY") do
+         pem when is_binary(pem) <- private_key() do
       now = System.os_time(:second)
       jwk = JOSE.JWK.from_pem(pem)
       claims = %{"iat" => now - 60, "exp" => now + 540, "iss" => to_string(id)}
@@ -46,6 +46,34 @@ defmodule Nexus.GitHub do
     end
   rescue
     e -> {:error, Exception.message(e)}
+  end
+
+  # The App private key, tolerant of how it was injected: a raw multi-line PEM, OR a base64-encoded PEM
+  # (the safe way to put a multi-line key in a single env var — `base64 < key.pem`). We decode if it
+  # isn't already a PEM block.
+  defp private_key do
+    case Nexus.Secrets.get("GITHUB_APP_PRIVATE_KEY") do
+      nil -> nil
+      raw ->
+        if String.contains?(raw, "BEGIN"),
+          do: raw,
+          else: (case Base.decode64(String.trim(raw)) do
+                   {:ok, pem} -> pem
+                   _ -> raw
+                 end)
+    end
+  end
+
+  @doc "List the App's installations (where customers installed it): `{:ok, [%{id, account, repos}]} | {:error,_}`."
+  def installations do
+    with {:ok, jwt} <- app_jwt(),
+         {:ok, list} when is_list(list) <- api_get("/app/installations", jwt) do
+      {:ok, Enum.map(list, fn i ->
+         %{id: i["id"], account: get_in(i, ["account", "login"]), repos: i["repository_selection"]}
+       end)}
+    else
+      other -> {:error, other}
+    end
   end
 
   @doc """
