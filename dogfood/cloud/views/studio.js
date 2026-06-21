@@ -34,10 +34,11 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   var W = await import('https://esm.sh/solid-js@1.9.5/web');
   var html = (await import('https://esm.sh/solid-js@1.9.5/html')).default;
   var createSignal = S.createSignal, For = S.For, Show = S.Show;
-  var WBC = await import('../wbchat/core.js');
-  await import('../wbchat/components/index.js');  // registers all parts + actions + composer add-ons
-  var DEMO = await import('../wbchat/demo.js');   // dev-only seed (?cdemo=1) exercising every part type
-  (function(){ if (!document.getElementById('wbchat-theme')){ var l = document.createElement('link'); l.id = 'wbchat-theme'; l.rel = 'stylesheet'; l.href = './wbchat/theme.css'; document.head.appendChild(l); } })();
+  var vurl = WB.vurl || function (u) { return u; };
+  var WBC = await import(vurl('../wbchat/core.js'));
+  await import(vurl('../wbchat/components/index.js'));  // registers all parts + actions + composer add-ons
+  var DEMO = await import(vurl('../wbchat/demo.js'));   // dev-only seed (?cdemo=1) exercising every part type
+  (function(){ if (!document.getElementById('wbchat-theme')){ var l = document.createElement('link'); l.id = 'wbchat-theme'; l.rel = 'stylesheet'; l.href = vurl('./wbchat/theme.css'); document.head.appendChild(l); } })();
   var CDEMO = new URLSearchParams(location.search).get('cdemo') === '1';
 
   var U = (WB.user && WB.user.email) || 'anon';

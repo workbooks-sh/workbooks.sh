@@ -1,6 +1,14 @@
   // ═══════════════════════ WB runtime — ports api.js + the stores + helpers ═══════════════════════
   (function () {
     var WB = (window.WB = window.WB || {});
+    // Cache-busting version — read from THIS script's own ?v= (set in index.work). Lazily-loaded
+    // assets (view scripts, wbchat modules) carry the same token so a deploy = new URLs = guaranteed
+    // cache miss. (Hard-refresh does NOT re-fetch lazy import()/injected <script> — only a new URL does.)
+    WB.V = (function () {
+      try { var m = ((document.currentScript && document.currentScript.src) || '').match(/[?&]v=([^&]+)/); return m ? m[1] : ''; }
+      catch (e) { return ''; }
+    })();
+    WB.vurl = function (u) { return WB.V ? u + (u.indexOf('?') < 0 ? '?' : '&') + 'v=' + WB.V : u; };
     WB._views = {};
     WB._params = {};
     WB.view = function (route, def) { WB._views[route] = def; };
@@ -328,7 +336,7 @@
         var file = fileForPath(path);
         if (!file || _viewLoaded[file]) return resolve();
         _viewLoaded[file] = true;
-        var s = document.createElement('script'); s.src = './views/' + file + '.js';
+        var s = document.createElement('script'); s.src = WB.vurl('./views/' + file + '.js');
         s.onload = function(){ resolve(); }; s.onerror = function(){ resolve(); };
         document.head.appendChild(s);
       });
