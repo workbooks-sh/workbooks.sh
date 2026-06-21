@@ -55,6 +55,13 @@ server :cloud do
   # re-dispatch (assign + run a fix) or resolve. Issues ARE tasks, so update/dispatch reuse the above.
   route "GET /cloud/issues", :issues_list
   route "POST /cloud/issues", :issue_file
+
+  # Scheduling — the time arm. Schedule a named agent to run on a brief at an interval/cron/time, fired
+  # by Nexus.Scheduler (durable, re-armed on boot). Schedules live in resource Schedule; firing persists
+  # a Run + an activity event, exactly like a manual run. Completes the tasks/runs/issues/schedules fabric.
+  route "GET /cloud/schedules", :schedules_list
+  route "POST /cloud/schedules", :schedule_create
+  route "POST /cloud/schedule/cancel", :schedule_cancel
   # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
   # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
   route "GET /cloud/models", :models
@@ -529,6 +536,77 @@ server :cloud do
     end)
   end
 
+  # ── Scheduling ───────────────────────────────────────────────────────────────────────────────────
+  @sched_modes ~w(every cron at after)
+
+  defp current_schedules(tenant) do
+    Schedule
+    |> Nexus.Store.all(tenant)
+    |> Enum.map(&Map.from_struct/1)
+    |> Enum.group_by(& &1.sid)
+    |> Enum.map(fn {_sid, vs} -> Enum.max_by(vs, & &1.created) end)
+    |> Enum.filter(&(&1.enabled == 1))
+  end
+
+  def schedules_list(req) do
+    %{schedules: current_schedules(req.tenant || Nexus.Store.default_tenant()) |> Enum.sort_by(&(-(&1.created || 0)))}
+  end
+
+  def schedule_create(req) do
+    b = req.body || %{}
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    agent = to_string(b["agent"] || "")
+    task = to_string(b["task"] || "")
+    mode = to_string(b["mode"] || "")
+    spec = to_string(b["spec"] || "")
+
+    cond do
+      agent == "" or task == "" or spec == "" -> {400, %{error: "agent, task and spec are required"}}
+      mode not in @sched_modes -> {400, %{error: "mode must be one of: #{Enum.join(@sched_modes, ", ")}"}}
+      is_nil(Nexus.Agent.get(agent)) -> {404, %{error: "no such agent: #{agent}"}}
+      true ->
+        sched = %{sid: gen_id(), agent: agent, task: task, mode: mode, spec: spec,
+                  owner: user_key(req), created: System.os_time(:second), enabled: 1}
+        Nexus.Store.create(Schedule, sched, tenant)
+        case arm_schedule(tenant, sched) do
+          :ok -> %{schedule: sched}
+          {:error, e} -> {400, %{error: "bad time spec: #{inspect(e)}"}}
+        end
+    end
+  end
+
+  def schedule_cancel(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    sid = (req.body || %{})["sid"] || ""
+    case Enum.find(current_schedules(tenant), &(&1.sid == sid)) do
+      nil -> {404, %{error: "no such schedule"}}
+      s ->
+        Nexus.Scheduler.disarm("sched:#{sid}", tenant: tenant)
+        Nexus.Store.create(Schedule, %{s | enabled: 0, created: System.os_time(:second)}, tenant)
+        %{ok: true}
+    end
+  end
+
+  # Arm one schedule into Nexus.Scheduler. The fired effect (scheduled_run, registered in register/0)
+  # runs the agent + persists a Run. Returns :ok | {:error, reason}.
+  defp arm_schedule(tenant, %{sid: sid, agent: agent, task: task, mode: mode, spec: spec}) do
+    mode_atom = case mode do
+      "every" -> :every
+      "cron" -> :cron
+      "at" -> :at
+      "after" -> :after
+      _ -> :every
+    end
+    time = [{mode_atom, spec}]
+    effects = [%{name: "scheduled_run", args: %{"agent" => agent, "task" => task, "sid" => sid}}]
+    case Nexus.Scheduler.arm("sched:#{sid}", time, effects, tenant: tenant) do
+      {:error, e} -> {:error, e}
+      _ -> :ok
+    end
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
   defp user_key(req), do: (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
   defp sessions_for(tenant, user), do: Map.get(:persistent_term.get(@agent_store, %{}), {tenant, user}, [])
 
@@ -572,6 +650,25 @@ server :cloud do
       )
       :ok
     end)
+
+    # Scheduled agent runs — the effect a Schedule fires (via Nexus.Scheduler). Runs the named agent on
+    # the brief and persists a Run, exactly like a manual run; the schedule's tenant flows through ctx.
+    Nexus.Effects.register("scheduled_run", fn args, _event, ctx ->
+      tenant = ctx[:tenant] || Nexus.Store.default_tenant()
+      agent = to_string(args["agent"] || "")
+      task = to_string(args["task"] || "")
+      if agent != "" and task != "" and not is_nil(Nexus.Agent.get(agent)) do
+        do_run(agent, task, tenant, "scheduler", fn _ -> :ok end)
+      end
+      :ok
+    end)
+
+    # Re-arm persisted schedules on boot (durable: the Schedule rows are the source of truth; the armed
+    # timers live only in memory, so they must be rebuilt). v1 re-arms the default tenant (one nexus per
+    # org); multi-tenant fan-out is a follow-up when tenant enumeration lands.
+    for s <- current_schedules(Nexus.Store.default_tenant()) do
+      arm_schedule(Nexus.Store.default_tenant(), s)
+    end
 
     # Live agent runs — the Studio opens EventSource('/live/agent_run?agent=…&task=…&u=…') and the
     # loop's typed events (text/tools/final) stream straight through. do_run also persists the Run row.
@@ -1046,6 +1143,21 @@ resource Task do
   run :string        # the rid of the dispatched run (a task) or the FAILING run (an issue)
   created :integer   # unix seconds
   updated :integer   # unix seconds
+end
+
+# Scheduled agent runs — the time arm of the orchestration fabric. A schedule fires a named agent on a
+# brief via Nexus.Scheduler (the durable OTP scheduler, same fire path as hook triggers). Append-only,
+# folded by sid (latest wins) like Task; re-armed on boot. THE LINE: the scheduler is the open standard;
+# persisting + managing these schedules is our cloud product.
+resource Schedule do
+  sid :string        # stable schedule id
+  agent :string      # the named agent to run
+  task :string       # the brief
+  mode :string       # every | cron | at | after
+  spec :string       # the value for the mode: "15m" | "0 9 * * 1" | "14:00"
+  owner :string      # who created it
+  created :integer   # unix seconds
+  enabled :integer   # 1 armed, 0 cancelled
 end
 
 # Persist every bus event to the log. The reactive primitives (hook kind, #event, effect engine) are
