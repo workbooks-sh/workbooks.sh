@@ -100,6 +100,7 @@ defmodule Nexus.Server do
     root = root()
     found = discover_mounts(root)
     Application.put_env(:nexus, :mounts, found)
+    :persistent_term.put({__MODULE__, :assetver}, %{})   # new files → recompute asset versions
     Enum.each(found, fn {_name, wb} -> bringup(wb) end)
     length(found)
   end
@@ -198,13 +199,49 @@ defmodule Nexus.Server do
     end
   end
 
-  # Serve a workbook's woven app. `base` (the mount name) injects a `<base href="/<name>/">` so the
-  # island's RELATIVE urls (`live/<source>`, `data/<Resource>`) route to this mount.
+  # Serve a workbook's woven app. `base` (the mount name) injects a `<base href="/<name>/_v/<ver>/">`.
+  # The mount path routes the island's RELATIVE urls to this mount; the `_v/<ver>/` segment is an
+  # asset-version stamp (hash of the mount's files) so EVERY relative asset URL — including nested ES
+  # module imports, which resolve against their importer's URL — changes on each deploy. That is a
+  # content-addressed cache bust with no manual token and full nested-graph coverage. The serve side
+  # strips `_v/<ver>/` (see dispatch_mount); the site-mode router ignores it (see Nexus.SSR).
   defp serve_workbook(conn, wb_root, base) do
     demo = Path.join(wb_root, "demo.html")
     html = if File.exists?(demo), do: File.read!(demo), else: cached_html(wb_root, Nexus.Auth.tenant(conn))
-    html = if base, do: String.replace(html, "<head>", ~s(<head><base href="/#{base}/">), global: false), else: html
+    html = if base, do: String.replace(html, "<head>", ~s(<head><base href="/#{base}/_v/#{asset_version(wb_root)}/">), global: false), else: html
     conn |> put_resp_content_type("text/html") |> send_resp(200, html)
+  end
+
+  # A short content version for a mount's assets — phash2 over every file's {relpath, mtime, size}.
+  # Memoized per root (cleared on remount), so it's computed once per deploy, not per request.
+  defp asset_version(root) do
+    cache = :persistent_term.get({__MODULE__, :assetver}, %{})
+
+    case cache do
+      %{^root => v} ->
+        v
+
+      _ ->
+        v = compute_asset_version(root)
+        :persistent_term.put({__MODULE__, :assetver}, Map.put(cache, root, v))
+        v
+    end
+  end
+
+  defp compute_asset_version(root) do
+    sig =
+      Path.wildcard(Path.join(root, "**/*"))
+      |> Enum.reject(&String.contains?(&1, "/node_modules/"))
+      |> Enum.filter(&File.regular?/1)
+      |> Enum.sort()
+      |> Enum.map(fn f ->
+        case File.stat(f) do
+          {:ok, s} -> {Path.relative_to(f, root), s.mtime, s.size}
+          _ -> {f, 0, 0}
+        end
+      end)
+
+    Integer.to_string(:erlang.phash2(sig), 32)
   end
 
   # The nexus index — the workbooks mounted here, each a link. A seed for the template explorer.
@@ -461,6 +498,13 @@ defmodule Nexus.Server do
   end
 
   defp dispatch_mount(conn, name, root, tail) do
+    # Strip the asset-version segment (`_v/<ver>/…`) injected into <base href> — it's purely a cache
+    # key; the real file is at the un-versioned path. Any version value maps to the current files.
+    tail = case tail do
+      ["_v", _ver | rest] -> rest
+      _ -> tail
+    end
+
     case tail do
       [] -> serve_workbook(conn, root, name)
       ["source"] -> mount_source(conn, root)

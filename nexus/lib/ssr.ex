@@ -159,7 +159,9 @@ defmodule Nexus.SSR do
   defp site_router do
     ~S"""
     (function(){
-      var base=new URL(document.baseURI).pathname;
+      // <base href> carries an asset-version segment (/_v/<ver>/) for cache-busting; strip it so the
+      // router base is the clean mount path (users navigate clean URLs, no _v segment).
+      var base=new URL(document.baseURI).pathname.replace(/_v\/[^/]+\/$/,'');
       function key(p){return p.indexOf(base)===0?p.slice(base.length):p.replace(/^\//,'');}
       function show(k){
         var arts=document.querySelectorAll('.wb-page'),hit=false;
