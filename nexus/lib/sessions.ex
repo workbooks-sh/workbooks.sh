@@ -69,7 +69,12 @@ defmodule Nexus.Sessions do
       Sqlite3.close(conn)
     end
   rescue
-    _ -> nil
+    # Sessions are best-effort history — never crash a fleet run on a session write. But LOG it (don't
+    # swallow silently) so a real failure (e.g. SQLITE_FULL — a full volume) is visible, not invisible.
+    e ->
+      require Logger
+      Logger.warning("[sessions] db op failed (non-fatal): #{Exception.message(e)}")
+      nil
   end
 
   # Sessions live in the ONE durable DB (Nexus.Paths.db_path → volume + Litestream), as their own
