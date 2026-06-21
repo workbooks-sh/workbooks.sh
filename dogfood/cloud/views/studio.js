@@ -47,9 +47,11 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
     projects: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>',
     agent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg>'
   };
-  // The agents you can talk to in Studio (the composer dropdown). v1: a curated set; real per-workspace
-  // agents wire in later. Selecting one is passed to the run as the agent.
-  var AGENTS = ['Builder', 'Researcher', 'Ops'];
+  // The models you can route the run through (the composer dropdown). Live from the nexus —
+  // /cloud/models returns the provider's (OpenRouter) catalog, with a curated fallback. The selected
+  // model id is passed to the agent run. (Agent selection moved out of the composer; this is models.)
+  var MODELS = [];
+  try { var mr = await api('/cloud/models'); MODELS = (mr && mr.models) || []; } catch (e) {}
 
   // Projects = draft / private workspaces — a purgatory for ideas you work on with the agent before
   // promoting them to a real workspace. v1: persisted client-side (wb-projects); promote → WB.ws.create.
@@ -97,12 +99,12 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
 
     function mountChat(node){
       chat = WBC.createChat(node, {
-        placeholder: 'Message the agent… (⏎ to send, ⇧⏎ for a new line)',
-        greeting: { title: 'Build on your nexus', text: 'Describe what you want to make. Work it out here, then promote it to a workspace.' },
+        splash: true,
+        placeholder: 'What do you want to build?',
         suggestions: ['Scaffold a new app', 'Draft a data model', 'Wire up an integration'],
-        models: AGENTS,
+        models: MODELS,
         send: function(text, ctx){
-          return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({ u: U, id: curProj(), message: text, agent: ctx && ctx.model }) })
+          return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({ u: U, id: curProj(), message: text, model: ctx && ctx.model }) })
             .then(function(d){ var reply = (d && d.reply) || '(no reply)'; recordTurn(text, reply); return reply; });
         }
       });

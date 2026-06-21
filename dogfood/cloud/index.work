@@ -33,6 +33,9 @@ server :cloud do
   route "GET /cloud/agent/sessions", :agent_sessions
   route "GET /cloud/agent/session", :agent_session
   route "POST /cloud/agent/chat", :agent_chat
+  # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
+  # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
+  route "GET /cloud/models", :models
 
   # Workspace file tree — REAL files on the data volume. The mounts (deployed surfaces) are the
   # top-level folders; `path` walks within one. Path-traversal guarded (resolved must stay under root).
@@ -84,11 +87,14 @@ server :cloud do
     end
   end
 
+  def models(_req), do: %{models: Nexus.Llm.models()}
+
   def agent_chat(req) do
     user = user_key(req)
     msg = (is_map(req.body) && req.body["message"]) || ""
     id = is_map(req.body) && req.body["id"]
-    reply = run_agent(msg)
+    model = is_map(req.body) && req.body["model"]
+    reply = run_agent(msg, model)
     sessions = sessions_for(req.tenant, user)
     {match, rest} = Enum.split_with(sessions, &(&1.id == id))
 
@@ -139,9 +145,12 @@ server :cloud do
   defp gen_id, do: Base.url_encode64(:crypto.strong_rand_bytes(9), padding: false)
   defp title_from(msg), do: msg |> String.trim() |> String.slice(0, 48) |> then(&if(&1 == "", do: "New chat", else: &1))
 
-  defp run_agent(msg) do
+  defp run_agent(msg, model \\ nil) do
+    run_opts = [task: msg, timeout_ms: 60_000]
+    run_opts = if is_binary(model) and model != "", do: Keyword.put(run_opts, :model, model), else: run_opts
+
     try do
-      case Nexus.Agent.run(task: msg, timeout_ms: 60_000) do
+      case Nexus.Agent.run(run_opts) do
         {:ok, %{answer: a}} when is_binary(a) -> a
         {:ok, a} when is_binary(a) -> a
         {:error, _} -> "I couldn't reach the agent runtime just now — try again in a moment."

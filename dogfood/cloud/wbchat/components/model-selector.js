@@ -46,7 +46,7 @@ registerComposerButton((ctx) => {
   const root = el('div', { class: 'wbc-modelsel' });
   const lbl = el('span', { class: 'wbc-modelsel-lbl' });
   const btn = el('button', {
-    class: 'wbc-modelsel-btn', type: 'button', title: 'Select agent',
+    class: 'wbc-modelsel-btn', type: 'button', title: 'Select model',
     onClick: (e) => { e.stopPropagation(); toggle(); },
   }, [lbl, el('span', { class: 'wbc-modelsel-chev', html: CHEV })]);
   const menu = el('div', { class: 'wbc-modelsel-menu' });

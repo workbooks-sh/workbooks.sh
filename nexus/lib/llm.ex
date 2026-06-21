@@ -23,6 +23,69 @@ defmodule Nexus.Llm do
   def model(opts \\ []), do: opts[:model] || cfg(:model, @default_model)
 
   @doc """
+  List models available from the configured provider. For OpenRouter (the default) this is a live
+  `GET /models`; any OpenAI-compatible proxy exposing `/models` works too. Returns a list of
+  `%{id, label}` (the configured default first). Falls back to a small curated set when no key is
+  configured or the call fails — the model dropdown always has something to show.
+  """
+  def models(opts \\ []) do
+    base = opts[:base_url] || cfg(:base_url, @default_url)
+    key = api_key(opts)
+
+    fetched =
+      with k when k not in [nil, ""] <- key,
+           {:ok, list} <- fetch_models(models_url(base), k) do
+        list
+      else
+        _ -> default_models()
+      end
+
+    # Pin the configured default to the top so it's the pre-selected option.
+    default = model(opts)
+    {head, rest} = Enum.split_with(fetched, &(&1.id == default))
+    head ++ rest
+  end
+
+  # Derive the `/models` URL from a chat/completions base_url (same host/version).
+  defp models_url(base), do: String.replace(base, ~r{/chat/completions/?$}, "/models")
+
+  defp fetch_models(url, key) do
+    :inets.start()
+    :ssl.start()
+    headers = [{~c"authorization", ~c"Bearer #{key}"}]
+    req = {String.to_charlist(url), headers}
+
+    case :httpc.request(:get, req, [timeout: 15_000], body_format: :binary) do
+      {:ok, {{_, 200, _}, _, resp}} ->
+        case Jason.decode(resp) do
+          {:ok, %{"data" => data}} when is_list(data) -> {:ok, normalize_models(data)}
+          _ -> {:error, :bad_body}
+        end
+
+      _ ->
+        {:error, :unavailable}
+    end
+  end
+
+  defp normalize_models(data) do
+    data
+    |> Enum.map(fn m -> %{id: m["id"], label: m["name"] || m["id"]} end)
+    |> Enum.filter(&(is_binary(&1.id) and &1.id != ""))
+  end
+
+  # Neutral fallback set (common OpenRouter ids) when the provider can't be reached.
+  defp default_models do
+    [
+      %{id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4"},
+      %{id: "anthropic/claude-3.5-haiku", label: "Claude 3.5 Haiku"},
+      %{id: "openai/gpt-4o", label: "GPT-4o"},
+      %{id: "openai/gpt-4o-mini", label: "GPT-4o mini"},
+      %{id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash"},
+      %{id: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B"}
+    ]
+  end
+
+  @doc """
   One completion turn. `messages` = `[%{role, content}]` (+ tool messages); `opts[:tools]` = a list
   of OpenAI tool specs (or []). Returns `{:ok, %{content, tool_calls, finish, usage}} | {:error, _}`.
   """

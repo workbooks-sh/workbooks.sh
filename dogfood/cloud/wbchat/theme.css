@@ -113,3 +113,14 @@
   background: var(--wbc-accent); color: #11140f; display: grid; place-items: center; transition: opacity .12s; }
 .wbc-send:disabled { opacity: .4; cursor: default; }
 .wbc-send svg { width: 17px; height: 17px; }
+
+/* ── splash mode ───────────────────────────────────────────────────────────────────────────────
+   Empty conversation → center the composer (big, no headings) like a create page. The composer is
+   ordered above the (heading-less) empty state, both vertically centered in the chat. */
+.wb-chat.wbc-splash { justify-content: center; }
+.wb-chat.wbc-splash .wbc-convo { flex: 0 0 auto; overflow: visible; padding-bottom: 4px; }
+.wb-chat.wbc-splash .wbc-empty { padding: 0 10px; max-width: var(--wbc-content-max); }
+.wb-chat.wbc-splash .wbc-composer { order: -1; padding: 0 16px 10px; }
+.wb-chat.wbc-splash .wbc-composer-inner { padding: 12px 12px 12px 18px; border-radius: calc(var(--wbc-radius) + 4px); box-shadow: 0 6px 28px rgba(0,0,0,.10); }
+.wb-chat.wbc-splash .wbc-textarea { min-height: 88px; font-size: 16px; }
+.wb-chat.wbc-splash .wbc-suggest { margin-top: 18px; }

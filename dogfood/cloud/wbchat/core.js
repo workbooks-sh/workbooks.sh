@@ -104,7 +104,7 @@ registerPart('code', (part) => {
 // ── createChat ────────────────────────────────────────────────────────────────────────────────
 let _seq = 0;
 export function createChat(container, options = {}) {
-  const opts = Object.assign({ placeholder: 'Message the agent…', suggestions: [], greeting: null, scheme: null }, options);
+  const opts = Object.assign({ placeholder: 'Message the agent…', suggestions: [], greeting: null, scheme: null, splash: false }, options);
   const listeners = {};
   let messages = [];
   let status = 'idle'; // idle | pending | streaming
@@ -162,6 +162,8 @@ export function createChat(container, options = {}) {
   }
 
   function render() {
+    // Splash mode: an empty conversation centers the composer (big, no headings) like a create page.
+    if (opts.splash) root.classList.toggle('wbc-splash', messages.length === 0 && status === 'idle');
     convoInner.innerHTML = '';
     if (messages.length === 0) { convoInner.append(emptyState()); return; }
     messages.forEach(m => convoInner.append(renderMessage(m)));
@@ -171,7 +173,8 @@ export function createChat(container, options = {}) {
   function typing() { return el('div', { class: 'wbc-typing' }, [el('i'), el('i'), el('i')]); }
   function emptyState() {
     const wrap = el('div', { class: 'wbc-empty' });
-    if (opts.greeting) wrap.append(el('h3', null, opts.greeting.title || 'Start a chat'), el('p', null, opts.greeting.text || ''));
+    // Splash mode shows no heading/subheading — just the centered composer (+ optional suggestion chips).
+    if (opts.greeting && !opts.splash) wrap.append(el('h3', null, opts.greeting.title || 'Start a chat'), el('p', null, opts.greeting.text || ''));
     if (opts.suggestions && opts.suggestions.length) {
       const s = el('div', { class: 'wbc-suggest' });
       opts.suggestions.forEach(t => s.append(el('button', { class: 'wbc-chip', onClick: () => submit(t) }, t)));
@@ -214,6 +217,8 @@ export function createChat(container, options = {}) {
     el, icon, get controller() { return controller; },
     addFile: (f) => { attachedFiles.push(f); renderTray(); },
     files: () => attachedFiles.slice(),
+    // Append text into the composer (used by the mic/transcription add-on); keeps a space between chunks.
+    insertText: (t) => { const ta = composer._ta; if (!ta || !t) return; ta.value = (ta.value && !/\s$/.test(ta.value) ? ta.value + ' ' : ta.value) + t; ta.dispatchEvent(new Event('input')); ta.focus(); },
     models: opts.models || [],
     model: () => selectedModel,
     setModel: (m) => { selectedModel = m; },
