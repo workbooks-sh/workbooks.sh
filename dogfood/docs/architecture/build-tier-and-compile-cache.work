@@ -1,0 +1,182 @@
+# The elastic build tier + the compile cache
+
+How a nexus runs **heavy build work off its serving path** — compiling packages to
+wasm, running per-tenant CI/CD — on ephemeral Fly Firecracker workers, and how a
+**content-addressed compile cache** turns "compile on every deploy" into "compile once,
+fetch forever." This is the design; it is not built yet. Tracking: see the build-tier epic.
+
+## The gap this fills
+
+A nexus already runs wasm sandboxes — but it also has to *produce* them. Today the
+[compile lanes](/capabilities/compile-lanes) (rust/c/zig/js → wasm component) run
+**inside the serving nexus**: a single 450–900 MB wasmtime compiler process, ~7–20 s,
+shelled on the same box that serves pages and runs agents. On a 1 GB Starter machine
+that compile competes with everything else for RAM, and a cold package is recompiled
+from scratch every time anyone needs it. Two problems — *placement* (heavy work on the
+serving box) and *waste* (recompiling identical inputs) — and both have the same fix:
+move the work out, and never do it twice.
+
+## The fourth compute mode: a `job`
+
+The runtime already has three compute modes. The build tier adds a fourth.
+
+| Mode | What it is | Where it runs |
+| --- | --- | --- |
+| `server` | native BEAM units | the serving nexus |
+| `sandbox` | in-nexus wasm with capability grants | the serving nexus process |
+| `agent` | an ephemeral *LLM* sandboxed function | dispatched, short-lived |
+| **`job`** *(new)* | an ephemeral *build-class* unit — compile, test, pipeline step | **a Firecracker worker, off the serving path** |
+
+A `job` is one isolated unit of heavy work that runs on an ephemeral Fly Firecracker
+microVM the nexus dispatches, returns an artifact + logs, and disappears. It is
+**per-tenant**, **billed per-second**, and **scales to zero**. It is distinct from
+`sandbox` precisely because `sandbox` must stay light and live — a `job` is allowed to
+be heavy and slow because it never touches a request.
+
+You do not hand-write a `job` block in the common case — the compile lane emits one
+automatically when a compile is heavy or a cache miss needs filling. You *do* write
+jobs explicitly for CI/CD pipelines (below).
+
+## Two workloads, metered separately
+
+The tier carries two workloads whose costs differ by ~600×. They must never share one
+"build-minutes" bucket.
+
+- **(a) Compile offload** — short, bursty. Shape: `shared-cpu-2x` / 2 GB, ~15 s active.
+  **~$0.0001 per compile** (compute-seconds dominate once the image isn't re-pulled).
+- **(b) In-nexus CI/CD** — longer pipelines (build → test → publish). Shape:
+  `performance-4x` / 8 GB, ~10 min. **~$0.05 per run** (compute + modest egress).
+
+This is *GitHub Actions, but native to the nexus and per-tenant*: the workflow lives in
+`.work`, runs on your fleet, and publishes wasm components / images back into the nexus.
+Per-second Fly billing beats GitHub Actions' per-minute rounding badly for short
+compiles (a 15 s compile on GHA bills a 1-minute minimum, 60× our cost), and a 10-min
+CI run on `performance-4x` is both cheaper *and* beefier than a GHA 2-core runner.
+
+## The orchestration already exists
+
+The trigger layer is the [reactive + time layer](/capabilities/hooks-and-time) we
+already shipped. Nothing new is needed to *fire* a build:
+
+- a `#event` on the bus, a `git push` (the [nexus is a git remote](/serving/git-remote)),
+  or a `hook`'s `trigger` (`cron`/`every`/org-timestamp) →
+- runs a `flow` whose steps are `job`s on workers →
+- which publish artifacts (wasm components, images) the serving nexus consumes.
+
+So "rebuild my wasm library on every push to this subtree" or "recompile nightly" are
+just a `hook` + a `flow` over `job`s — no new authoring surface.
+
+## The compile cache — "compile once per nexus, then fetch forever"
+
+This is the lever that makes the whole tier cheap. **wasm compilation is
+deterministic**: the same source + the same toolchain version + the same flags always
+produce the same artifact. So it is naturally **content-addressable** — and a
+content-addressed artifact is *tamper-evident by construction* (the key IS the hash of
+the bytes; a corrupted or substituted artifact fails its own hash). This is the Nix
+binary-cache / Bazel remote-cache idea, applied to wasm.
+
+### The key
+
+```
+key = blake3( normalized_source ⊕ lane ⊕ toolchain_version ⊕ flags )
+```
+
+A compile request computes the key first. **Hit** → fetch the prebuilt `.wasm` from
+storage (~$0, just egress, no worker spun). **Miss** → dispatch a compile `job`, store
+the result under the key, then serve it. Most "compiles" become a fetch.
+
+### Two scopes — the security boundary
+
+The cache has two distinct namespaces, and the boundary between them is the whole
+security model:
+
+- **Shared package cache (public, global).** Public dependencies — an npm package, a
+  crate, a Go module compiled to wasm — are the *same artifact for everyone* on the same
+  version. The **first** tenant who needs `some-lib@3.1 → wasm` pays the one compile;
+  **every other nexus, forever, gets a cache hit.** This is a wasm equivalent of a
+  package registry's prebuilt-binary cache. Safe to share *because* it's
+  content-addressed: you can only ever read back the exact bytes whose hash you asked
+  for. Artifacts are signed for provenance on top of the hash.
+- **Private tenant cache (per-nexus).** A tenant's *own* source compiles to artifacts
+  that are theirs alone. These live in a tenant-scoped namespace, never the shared one,
+  encrypted at rest, reachable only by that tenant's nexus. A tenant's input hash can
+  *never* promote an artifact into the public cache — the scope is decided by the
+  *source's* origin (declared public dependency vs. tenant subtree), not by the key.
+
+### "Cold wasm storage" = the backing store
+
+Both scopes are backed by object storage — R2/S3, the same store the nexus already uses
+for [Litestream and tenant DBs](/serving/tenant-db). This is the "cold wasm storage"
+layer: artifacts sit there cheaply ($0.15/GB/mo, free or cheap egress on R2), pulled on
+demand. A small hot index (key → object) lets a hit skip the store round-trip entirely.
+**No JSON sidecar** — the index is nexus state, the cache config is a `.work` `deploy`
+block read via `Nexus.Config`.
+
+### What the cache does to the economics
+
+The per-compile cost in the pricing model is the cost of a **miss**. With a healthy
+shared-cache hit rate, the *fleet* only ever compiles the long tail of genuinely-new
+inputs; the common packages are compiled once across the entire customer base and
+fetched thereafter. The compile tier's real cost tracks *cache misses*, not *compile
+requests* — which is what makes including a generous compile allowance in even the free
+tier viable.
+
+## The fleet — cheapest viable shape
+
+- **Baked compiler machine image, not per-job pull.** The compiler toolchain is ~7.2 GB.
+  Pulling it per job dwarfs a 15 s compile (~10×) — fatal. Instead bake it into the
+  worker's rootfs once; a **stopped** worker holds it for **$0.15/GB/mo (~$1.08/mo)** and
+  **resumes in ~1–5 s** with no pull.
+- **Scale to zero, resume on demand.** `auto_stop_machines` + `min_machines_running: 0`
+  (already how `Nexus.Provisioner` builds machine config) — a worker costs only its
+  stopped rootfs when idle.
+- **Right shape per workload.** `shared-cpu-2x` for compiles, `performance-4x` for CI.
+  Never one shared size.
+- **Pin CI artifact output to R2**, never push large image layers back out through Fly
+  egress ($0.02/GB) — egress can rival compute for image-publishing pipelines.
+- **Reuse the existing seam.** Workers are provisioned through the same
+  `Nexus.Provisioner` / `Nexus.Fly` machine-create path that already provisions tenant
+  nexuses — not a second control plane.
+
+## Tier mapping
+
+Meter two units — `compile-jobs` and `ci-minutes` — as `.work` `deploy`-block knobs read
+via `Nexus.Config`, neutral defaults in the runtime, our real numbers in our DeployKit
+config (the same THE-LINE discipline as `tiers`). Indicative allowances against our
+current tiers (Starter $0 / Team $49 / Scale $199):
+
+| Tier | Included compiles/mo | Included CI | Cost to us | Notes |
+| --- | --- | --- | --- | --- |
+| Starter | ~3,000 | — | ~$1.38 | loss-leader; it's the OOM-relief that makes a 1 GB box usable |
+| Team | ~60,000 | ~300 min | ~$7.50 | ~$41 gross headroom |
+| Scale | ~600,000 | ~3,000 min | ~$75 | ~$124 gross headroom |
+
+Overage (keep ~3–4× margin): compiles **~$1 / 5,000**, CI **~$0.015/min** (still under
+GHA on stronger hardware). These numbers *assume cache misses are the minority* — the
+shared cache is what keeps cost-to-us this low.
+
+## The one cost risk
+
+**Idle rootfs × tenant fan-out.** $1.08/mo per stopped baked worker is trivial per
+tenant but **linear in tenant count** — 1,000 tenants each holding a 7.2 GB worker is
+~$1,080/mo of pure idle storage. Mitigations, in order: (1) **share one compile-worker
+app per N tenants** with per-tenant sandboxing rather than one image each; (2)
+**garbage-collect** workers idle > X days, eat one cold re-bake on the next compile; (3)
+**thin the baked image per-language** — pull only the toolchains a tenant's declared
+`languages=` needs. Watch this line as tenant count grows; it's the only cost that
+scales without usage. The compile cache makes (1) easy: a shared worker pool is fine
+*because* the cache, not the worker, holds the valuable state.
+
+## Build order
+
+1. **Compile cache, shared scope first** — content-addressed key + R2 store + hit/miss
+   in the compile lane. This alone removes most recompiles with **zero** new compute
+   infra (misses still compile in-process for now). Biggest win per unit of work.
+2. **`job` primitive + Fly worker** — baked compiler image, scale-to-zero, dispatched on
+   a cache miss. Moves the heavy compile off the serving box.
+3. **Private tenant scope + signing** — the security boundary, encrypted-at-rest.
+4. **CI/CD jobs** — `flow`-over-`job` wired to `hook`/push/cron triggers; R2 artifact
+   output; the two metered units in `Nexus.Config`.
+
+Step 1 is independently valuable and ships first; the fleet (step 2) only pays off once
+the cache is deciding what actually needs compiling.
