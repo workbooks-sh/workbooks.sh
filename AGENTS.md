@@ -27,7 +27,33 @@ Four lanes live in every file:
 - **Shipping** = the **`work` CLI** (the Zig *reactor*) operates on the tree: `work weave
   <dir> <out>` folds it into one shippable artifact; `check` resolves refs + audits
   capabilities; `why`/`near`/`wit` give the code-graph deps + the generated WIT world;
-  `graph`, `dev` (watch + re-weave), `deploy` round it out.
+  `graph`, `dev` (watch + re-weave), `deploy` round it out. (Also implemented:
+  `structure`, `lint`, `new`, `secret`, `ctx`/`nexus`/`login`/`whoami`.)
+
+### More kinds (all live, routed by `Nexus.Compile`)
+
+Beyond the foundational kinds above, these are real and shipping: `hook` (reactive binding —
+`match` on the event bus → effects), `flow` (ordered runnable step pipeline), `check`
+(self-validating units), `toolkit` (composable wasm CLI kits), `test`, `design`, `app`
+(composition root), `auth`. Flat declarations: `task user type deps checks theme show query
+workbook nexus grant route`.
+
+### The reactive + time layer
+
+`#event` tags emit onto the bus; a `hook`'s `match` fires effects from the open
+`Nexus.Effects` registry (`run`/`call`/`emit`/`notify`, plus consumer-registered ones). The
+**time** counterpart is `Nexus.Time` (the one time vocabulary) + `Nexus.Scheduler`:
+
+- A `hook` may carry a **`trigger`** (time-driven, independent of `match`):
+  `trigger every: "15m"` · `trigger cron: "0 9 * * 1"` · `trigger at: "14:00"` ·
+  `trigger "<2026-06-21 09:00 +1w>"` (org-style timestamp with repeaters/spans). It arms a
+  schedule that fires the hook's effects.
+- A `flow` step may be **time-gated**: `step :x, after: "10m", run: "agent"`, or a bare
+  `wait "5m"` delay step.
+- `Nexus.Time` parses durations (`15m`/`1d30m`), cron (5-field), `every`/`after`/`at`, and
+  org timestamps (`SCHEDULED:`/`DEADLINE:`, `+1w`/`.+1d`/`++1m` repeaters, `hh:mm-hh:mm`
+  spans). Schedules live in `.work` (blocks = source of truth, NO JSON sidecar) and re-arm
+  on boot via the compile pipeline.
 
 There is **NO HTML authoring, no `work-*` component library as the authoring surface, no
 org-mode, no OQL, no kernel** — those are **dead strategies** (git history keeps them; if

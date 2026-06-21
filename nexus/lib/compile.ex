@@ -35,8 +35,17 @@ defmodule Nexus.Compile do
       kind in ~w(c cpp) -> {:wasm, cached(node, fn -> c_unit(node) end)}
       kind == "zig" -> {:wasm, cached(node, fn -> zig_unit(node) end)}
       kind == "swift" -> {:wasm, cached(node, fn -> swift_unit(node) end)}
-      kind in @wasm_kinds -> {:wasm, {:todo, node.lang, node.name}}
-      true -> {:skip, kind}
+      # These wasm lanes (client/sandbox/python/svelte/solid/js/ts) are NOT yet wired to their
+      # compilers. Do not hand back a silent `:todo` tuple that masquerades as an artifact — surface
+      # a LOUD, explicit error so a caller can't ship an un-built unit thinking it succeeded. Tracked
+      # in bd (per-lane wiring). When a lane is wired, add its `kind == …` arm above.
+      kind in @wasm_kinds ->
+        require Logger
+        Logger.error("[compile] lane not built: #{kind}:#{node.name} (#{node.lang}) — no compiler wired")
+        {:error, {:unbuilt_lane, kind, node.name}}
+
+      true ->
+        {:skip, kind}
     end
   end
 

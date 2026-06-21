@@ -5,7 +5,7 @@ Copilot at your project and it learns Workbooks straight from these `SKILL.md` f
 
 **These skills are GENERATED from the documentation — never hand-edited.** The docs are the single
 source of truth: a skill is authored once as an `app` composition in
-`templates/documentation/skills/*.work`, and `work weave` tangles it into a `SKILL.md` bundle
+`dogfood/docs/skills/*.work`, and `work weave` tangles it into a `SKILL.md` bundle
 (frontmatter + overview + a reference index linking each composed doc page as an on-demand
 `references/*.work` file). Edit the docs; re-weave; the skills update. Each generated `SKILL.md`
 carries a `<!-- GENERATED -->` banner. To change a skill, change the `.work` it composes.
@@ -51,10 +51,10 @@ After installing, open the **`getting_started`** skill before doing anything els
 
 ## How it's laid out
 
-- **Source of truth:** `templates/documentation/skills/*.work` — the `app` compositions.
-- **Generated bundles:** `templates/documentation/skills/<name>/{SKILL.md, references/*.work}` — emitted by
+- **Source of truth:** `dogfood/docs/skills/*.work` — the `app` compositions.
+- **Generated bundles:** `dogfood/docs/skills/<name>/{SKILL.md, references/*.work}` — emitted by
   `work weave` (a sidecar, like `llms.txt`). Never hand-edit.
 - **This folder (`skills/`):** symlinks to the generated bundles — flat, public, what `npx skills` reads.
 - **`.claude/skills/`:** per-skill symlinks back into here, so there is one edit site and zero copy drift.
 
-To regenerate: `work weave templates/documentation <out>` (or `work dev` to watch).
+To regenerate: `work weave dogfood/docs <out>` (or `work dev` to watch).

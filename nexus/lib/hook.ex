@@ -23,7 +23,7 @@ defmodule Nexus.Hook do
   """
   @reg {__MODULE__, :hooks}
 
-  @non_effect ~w(match visible_to title)a
+  @non_effect ~w(match trigger visible_to title)a
 
   @doc "Compile a parsed `hook` node into a spec and register it. Returns the spec."
   def compile(%{kind: "hook", name: name} = node) do
@@ -32,12 +32,14 @@ defmodule Nexus.Hook do
     spec = %{
       name: to_string(name),
       match: Enum.reduce(stmts, %{}, &match_clause/2),
+      trigger: Enum.find_value(stmts, &trigger_clause/1),
       visible_to: Enum.find_value(stmts, fn {:visible_to, _, [r]} -> r; _ -> nil end),
       title: Enum.find_value(stmts, fn {:title, _, [t]} -> t; _ -> nil end) || to_string(name),
       effects: Enum.flat_map(stmts, &effect/1)
     }
 
     register(spec)
+    arm_trigger(spec)
     spec
   end
 
@@ -80,6 +82,26 @@ defmodule Nexus.Hook do
   end
 
   defp match_clause(_, acc), do: acc
+
+  # `trigger every: "1d"` / `trigger cron: "0 9 * * 1"` / `trigger at: "14:00"` — a TIME binding.
+  # A hook may have both a `match` (event-driven) and a `trigger` (time-driven); they're independent.
+  defp trigger_clause({:trigger, _meta, [opts]}) when is_list(opts), do: opts
+  defp trigger_clause({:trigger, _meta, [val]}), do: [val]
+  defp trigger_clause(_), do: nil
+
+  # Arm a time-triggered hook into Nexus.Scheduler — fires the hook's effects on the schedule.
+  # Resilient: if the scheduler isn't up yet (early-boot compile), skip; it re-arms on recompile.
+  defp arm_trigger(%{trigger: nil}), do: :ok
+
+  defp arm_trigger(%{trigger: time, name: name, effects: effects}) do
+    if Process.whereis(Nexus.Scheduler) do
+      Nexus.Scheduler.arm(name, time, effects)
+    else
+      :ok
+    end
+  rescue
+    _ -> :ok
+  end
 
   defp normalize_match(v) when is_list(v), do: v
   defp normalize_match(v), do: [v]

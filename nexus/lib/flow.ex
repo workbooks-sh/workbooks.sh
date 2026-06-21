@@ -61,11 +61,17 @@ defmodule Nexus.Flow do
     end
   end
 
-  # a step runs one effect; the threaded value is offered as the input/task.
-  defp run_step(%{effect: %{name: ename, args: args}}, acc, ctx) do
+  # a step runs one effect; the threaded value is offered as the input/task. A step may be TIME-GATED
+  # by `after:`/`wait:` (delay before running) — the flow pipeline pauses, then proceeds.
+  defp run_step(%{effect: %{name: ename, args: args}} = step, acc, ctx) do
+    gate(step[:after_ms])
     args = Map.put_new(args, :task, to_text(acc))
     Nexus.Effects.run(%{name: ename, args: args}, %{input: acc, title: to_text(acc)}, ctx)
   end
+
+  defp gate(nil), do: :ok
+  defp gate(ms) when is_integer(ms) and ms > 0, do: Process.sleep(ms)
+  defp gate(_), do: :ok
 
   # thread the step's result forward when it's a usable value; else keep the accumulator.
   defp thread(_acc, {:ok, %{answer: a}}) when is_binary(a), do: a
@@ -73,13 +79,31 @@ defmodule Nexus.Flow do
   defp thread(acc, _out), do: acc
 
   defp step({:step, _, [sname, kw]}) when is_list(kw) do
-    case kw do
-      [{ename, val} | _] -> [%{name: to_string(sname), effect: effect_for(ename, val)}]
-      _ -> []
+    {time, rest} = Keyword.split(kw, [:after, :wait, :deadline])
+
+    case rest do
+      [{ename, val} | _] ->
+        [%{name: to_string(sname), effect: effect_for(ename, val), after_ms: after_ms(time)}]
+
+      _ ->
+        []
     end
   end
 
+  # a bare `wait "5m"` step: a delay-only step (no effect), useful between two effectful steps.
+  defp step({:wait, _, [dur]}) do
+    [%{name: "wait", effect: %{name: "notify", args: %{title: "wait #{inspect(dur)}"}}, after_ms: after_ms(after: dur)}]
+  end
+
   defp step(_), do: []
+
+  # `after:`/`wait:` → milliseconds via the one time vocabulary; nil if absent/unparsable.
+  defp after_ms(time) do
+    case time[:after] || time[:wait] do
+      nil -> nil
+      v -> case Nexus.Time.duration_ms(v), do: ({:ok, ms} -> ms; :error -> nil)
+    end
+  end
 
   defp effect_for(:run, val), do: %{name: "run", args: run_args(val)}
   defp effect_for(:call, val), do: %{name: "call", args: run_args(val)}
