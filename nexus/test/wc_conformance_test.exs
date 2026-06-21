@@ -18,4 +18,16 @@ defmodule Nexus.ConformanceTest do
     want = @corpus |> Path.join("units.golden") |> File.read!() |> String.trim_trailing("\n")
     assert got == want
   end
+
+  test "Elixir ref extraction conforms to the shared refs golden (matches the Zig CLI @ref_re)" do
+    got =
+      (Path.wildcard(Path.join(@corpus, "*.work")) |> Enum.sort())
+      |> Enum.flat_map(fn p -> Nexus.Literate.parse(File.read!(p)) end)
+      |> Enum.flat_map(&Map.get(&1, :refs, []))
+      |> Enum.sort()
+      |> Enum.join("\n")
+
+    want = @corpus |> Path.join("refs.golden") |> File.read!() |> String.trim_trailing("\n")
+    assert got == want
+  end
 end

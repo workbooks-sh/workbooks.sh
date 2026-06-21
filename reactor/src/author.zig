@@ -79,11 +79,13 @@ pub fn check(io: Io, alloc: std.mem.Allocator, dir: []const u8) !u8 {
                     try names.append(alloc, n.name);
                     units += 1;
                 }
-                for (n.refs) |r| try refs.append(alloc, .{ .file = f, .label = r });
+                // Only [[backlinks]] are resolvable references; :atom/@type/#tag/work:// are other
+                // ref classes the parser captures (parity w/ the nexus) but `check` does not resolve.
+                for (n.refs) |r| if (work.backlinkLabel(r)) |label| try refs.append(alloc, .{ .file = f, .label = label });
                 try validatePolicy(alloc, n.body, f, &perrs);
             },
             .heading => try titles.append(alloc, n.text),
-            .prose => for (n.refs) |r| try refs.append(alloc, .{ .file = f, .label = r }),
+            .prose => for (n.refs) |r| if (work.backlinkLabel(r)) |label| try refs.append(alloc, .{ .file = f, .label = label }),
         };
     }
 
@@ -234,7 +236,8 @@ fn edges(io: Io, alloc: std.mem.Allocator, dir: []const u8) ![]Edge {
         const src = fs.readFile(io, alloc, f) catch continue;
         const nodes = try work.parse(alloc, src);
         for (nodes) |n| if (n.type == .code and n.name.len > 0) {
-            for (n.refs) |r| try list.append(alloc, .{ .from = n.name, .to = r });
+            // edges are [[backlink]] dependencies only (the resolvable code-graph refs).
+            for (n.refs) |r| if (work.backlinkLabel(r)) |label| try list.append(alloc, .{ .from = n.name, .to = label });
         };
     }
     return list.toOwnedSlice(alloc);

@@ -1,0 +1,9 @@
+# Refs corpus
+
+This page exercises every inline reference kind for the parser-parity gate.
+
+A [[backlink]] resolves to a unit; see also [[pricing]]. An atom mention :coder
+and :ok ride along, a type @user and @session too. Tags #deploy and #file-edit
+are events, and a link work://docs/intro#start points out.
+
+Inline `:not_a_ref` and `[[also_not]]` are code examples, skipped.

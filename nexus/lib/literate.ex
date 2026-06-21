@@ -17,7 +17,7 @@ defmodule Nexus.Literate do
   (the `[[backlinks]]`, `:atoms`, `@types`, `#tags`, and `work://` links found).
   """
 
-  @langs ~w(elixir rust zig python svelte solid js ts c go wit)
+  @langs ~w(elixir rust zig python svelte solid js ts c cpp go wit)
   @decl_kw ~w(data task user type deps checks theme show query workbook nexus grant route)
 
   @ref_re ~r/\[\[[^\]\n]+\]\]|work:\/\/[^\s)]*[a-zA-Z0-9_\/#-]|(?<![\w:]):[a-z]\w*|(?<![\w])@[a-z]\w*|(?<![\w])#[a-z][\w-]*/

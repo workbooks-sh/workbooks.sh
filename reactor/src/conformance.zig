@@ -10,8 +10,10 @@ const corpus = [_][]const u8{
     @embedFile("corpus/langs.work"),
     @embedFile("corpus/nested.work"),
     @embedFile("corpus/store.work"),
+    @embedFile("corpus/refs.work"),
 };
 const golden = @embedFile("corpus/units.golden");
+const refs_golden = @embedFile("corpus/refs.golden");
 
 test "parser conforms to the .work golden (matches work_core)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -31,6 +33,26 @@ test "parser conforms to the .work golden (matches work_core)" {
 
     std.testing.expectEqualStrings(want, got) catch |e| {
         std.debug.print("\n--- GOLDEN ---\n{s}\n--- ZIG ---\n{s}\n", .{ want, got });
+        return e;
+    };
+}
+
+test "ref extraction conforms to the .work refs golden (matches work_core @ref_re)" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var refs: std.ArrayList([]const u8) = .empty;
+    for (corpus) |src| {
+        const nodes = try work.parse(a, src);
+        for (nodes) |n| for (n.refs) |r| try refs.append(a, r);
+    }
+    std.mem.sort([]const u8, refs.items, {}, lessThan);
+    const got = try std.mem.join(a, "\n", refs.items);
+    const want = std.mem.trimEnd(u8, refs_golden, "\n");
+
+    std.testing.expectEqualStrings(want, got) catch |e| {
+        std.debug.print("\n--- REFS GOLDEN ---\n{s}\n--- ZIG ---\n{s}\n", .{ want, got });
         return e;
     };
 }

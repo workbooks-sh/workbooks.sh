@@ -18,7 +18,8 @@ pub const Node = struct {
     refs: []const []const u8 = &.{},
 };
 
-const langs = [_][]const u8{ "elixir", "rust", "zig", "c", "cpp", "js", "ts", "python", "go", "svelte", "solid" };
+// MUST match the nexus `Nexus.Literate` @langs set exactly (zero parser drift).
+const langs = [_][]const u8{ "elixir", "rust", "zig", "c", "cpp", "js", "ts", "python", "go", "svelte", "solid", "wit" };
 
 pub fn parse(alloc: std.mem.Allocator, src: []const u8) ![]Node {
     var nodes: std.ArrayList(Node) = .empty;
@@ -131,28 +132,104 @@ fn flushProse(alloc: std.mem.Allocator, prose: *std.ArrayList([]const u8), nodes
     prose.clearRetainingCapacity();
 }
 
-// [[backlink]] tokens (skipping inline `code` is a later refinement).
+// Inline-reference extraction. MUST stay in lockstep with the Elixir reference parser's `@ref_re`
+// (nexus `Nexus.Literate`): the SAME five token classes, as FULL-MATCH strings, so the cross-language
+// conformance golden (corpus/refs.golden) matches both. Tokens inside `inline code` are syntax
+// examples, not refs, and are skipped. The five kinds:
+//   [[backlink]]   — `\[\[[^\]\n]+\]\]`                       (kept with brackets)
+//   work://url     — `work:\/\/[^\s)]*[a-zA-Z0-9_\/#-]`       (must end on a url char)
+//   :atom          — `(?<![\w:]):[a-z]\w*`                    (`:` not after word-char or `:`)
+//   @type          — `(?<![\w])@[a-z]\w*`
+//   #tag           — `(?<![\w])#[a-z][\w-]*`
 pub fn extractRefs(alloc: std.mem.Allocator, text: []const u8) ![]const []const u8 {
     var refs: std.ArrayList([]const u8) = .empty;
     var i: usize = 0;
     while (i < text.len) {
-        if (text[i] == '`') {
+        const c = text[i];
+        const prev: ?u8 = if (i > 0) text[i - 1] else null;
+
+        if (c == '`') {
             // inline `code` is a syntax EXAMPLE, not a real reference — skip the span.
             i = (std.mem.indexOfPos(u8, text, i + 1, "`") orelse text.len - 1) + 1;
             continue;
         }
-        if (i + 1 < text.len and text[i] == '[' and text[i + 1] == '[') {
-            const close = std.mem.indexOfPos(u8, text, i + 2, "]]") orelse break;
-            const label = text[i + 2 .. close];
-            if (std.mem.indexOfScalar(u8, label, '\n') == null and label.len > 0) {
-                try refs.append(alloc, label);
+
+        // [[backlink]] — full match incl brackets, no `]` or newline inside.
+        if (c == '[' and i + 1 < text.len and text[i + 1] == '[') {
+            if (std.mem.indexOfPos(u8, text, i + 2, "]]")) |close| {
+                const inner = text[i + 2 .. close];
+                if (inner.len > 0 and std.mem.indexOfScalar(u8, inner, '\n') == null and std.mem.indexOfScalar(u8, inner, ']') == null) {
+                    try refs.append(alloc, text[i .. close + 2]);
+                    i = close + 2;
+                    continue;
+                }
             }
-            i = close + 2;
+        }
+
+        // work://… — ends on the last [a-zA-Z0-9_/#-] before whitespace/`)`.
+        if (c == 'w' and std.mem.startsWith(u8, text[i..], "work://")) {
+            var j = i + "work://".len;
+            while (j < text.len and text[j] != ' ' and text[j] != '\t' and text[j] != '\n' and text[j] != '\r' and text[j] != ')') j += 1;
+            while (j > i + "work://".len and !isUrlEnd(text[j - 1])) j -= 1;
+            if (j > i + "work://".len) {
+                try refs.append(alloc, text[i..j]);
+                i = j;
+                continue;
+            }
+        }
+
+        // :atom — `:` not preceded by a word char or another `:`, then [a-z]\w*
+        if (c == ':' and notWord(prev) and prev != ':' and i + 1 < text.len and isLowerAlpha(text[i + 1])) {
+            var j = i + 1;
+            while (j < text.len and isWord(text[j])) j += 1;
+            try refs.append(alloc, text[i..j]);
+            i = j;
             continue;
         }
+
+        // @type — `@` not preceded by a word char, then [a-z]\w*
+        if (c == '@' and notWord(prev) and i + 1 < text.len and isLowerAlpha(text[i + 1])) {
+            var j = i + 1;
+            while (j < text.len and isWord(text[j])) j += 1;
+            try refs.append(alloc, text[i..j]);
+            i = j;
+            continue;
+        }
+
+        // #tag — `#` not preceded by a word char, then [a-z][\w-]*
+        if (c == '#' and notWord(prev) and i + 1 < text.len and isLowerAlpha(text[i + 1])) {
+            var j = i + 1;
+            while (j < text.len and (isWord(text[j]) or text[j] == '-')) j += 1;
+            try refs.append(alloc, text[i..j]);
+            i = j;
+            continue;
+        }
+
         i += 1;
     }
     return refs.toOwnedSlice(alloc);
+}
+
+inline fn isWord(c: u8) bool {
+    return (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '_';
+}
+inline fn notWord(c: ?u8) bool {
+    return if (c) |ch| !isWord(ch) else true;
+}
+inline fn isLowerAlpha(c: u8) bool {
+    return c >= 'a' and c <= 'z';
+}
+inline fn isUrlEnd(c: u8) bool {
+    return isWord(c) or c == '/' or c == '#' or c == '-';
+}
+
+/// The inner label of a `[[backlink]]` token, or null for any other ref kind. Code-graph edges and
+/// `check` resolution use ONLY backlinks (the resolvable references); :atom/@type/#tag/work:// are
+/// other ref classes the parser still captures (parity with the nexus) but check does not resolve.
+pub fn backlinkLabel(ref: []const u8) ?[]const u8 {
+    if (ref.len >= 4 and std.mem.startsWith(u8, ref, "[[") and std.mem.endsWith(u8, ref, "]]"))
+        return ref[2 .. ref.len - 2];
+    return null;
 }
 
 test "parses headings, units (kind/lang/name), prose + refs" {
@@ -174,7 +251,8 @@ test "parses headings, units (kind/lang/name), prose + refs" {
     try std.testing.expectEqualStrings("Store", nodes[0].text);
     try std.testing.expectEqual(NodeType.prose, nodes[1].type);
     try std.testing.expectEqual(@as(usize, 1), nodes[1].refs.len);
-    try std.testing.expectEqualStrings("pricing", nodes[1].refs[0]);
+    try std.testing.expectEqualStrings("[[pricing]]", nodes[1].refs[0]); // full match, parity w/ nexus
+    try std.testing.expectEqualStrings("pricing", backlinkLabel(nodes[1].refs[0]).?);
     try std.testing.expectEqual(NodeType.code, nodes[2].type);
     try std.testing.expectEqualStrings("sandbox", nodes[2].kind);
     try std.testing.expectEqualStrings("rust", nodes[2].lang);
