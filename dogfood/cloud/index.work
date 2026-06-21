@@ -33,6 +33,13 @@ server :cloud do
   route "GET /cloud/agent/sessions", :agent_sessions
   route "GET /cloud/agent/session", :agent_session
   route "POST /cloud/agent/chat", :agent_chat
+
+  # Launch a NAMED agent on a brief and persist a durable Run record. Non-streaming (returns the
+  # final answer + run id); the Studio prefers the live SSE source `agent_run` (GET /live/agent_run)
+  # for token-by-token visibility, but this is the simple fire-and-get path + what tests hit.
+  route "POST /cloud/agent/run", :agent_run
+  # The durable run ledger for the Studio Runs view — most-recent agent runs for this tenant.
+  route "GET /cloud/runs", :runs_list
   # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
   # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
   route "GET /cloud/models", :models
@@ -210,6 +217,89 @@ server :cloud do
     %{events: events}
   end
 
+  # Run a named agent (deck/research/waldo/…) on a brief; persist a durable Run; return the answer.
+  def agent_run(req) do
+    agent = (is_map(req.body) && req.body["agent"]) || ""
+    task = (is_map(req.body) && req.body["task"]) || ""
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    user = user_key(req)
+
+    cond do
+      agent == "" or task == "" ->
+        {400, %{error: "agent and task are required"}}
+
+      is_nil(Nexus.Agent.get(agent)) ->
+        {404, %{error: "no such agent: #{agent}"}}
+
+      true ->
+        {rid, status, turns, answer} = do_run(agent, task, tenant, user, fn _ -> :ok end)
+        %{run: rid, agent: agent, status: status, turns: turns, answer: answer}
+    end
+  end
+
+  # The durable run ledger for this tenant, newest first.
+  def runs_list(req) do
+    runs =
+      Run
+      |> Nexus.Store.all(req.tenant || Nexus.Store.default_tenant())
+      |> Enum.map(&Map.from_struct/1)
+      |> Enum.sort_by(& &1.started, :desc)
+      |> Enum.take(100)
+
+    %{runs: runs}
+  end
+
+  # Shared run driver: streams the loop's typed events through `emit`, persists a Run row, returns a
+  # summary tuple. Used by both the SSE live source (real-time) and POST /cloud/agent/run (blocking).
+  defp do_run(agent, task, tenant, user, emit) do
+    rid = gen_id()
+    started = System.os_time(:second)
+    emit.(%{type: "start", run: rid, agent: agent, task: task})
+
+    result =
+      try do
+        Nexus.Agent.run_named(agent, task, emit: emit)
+      rescue
+        e -> {:error, e}
+      catch
+        _, e -> {:error, e}
+      end
+
+    {status, turns, answer} =
+      case result do
+        {:ok, %{answer: a, turns: t}} -> {"ok", t, to_string(a)}
+        {:error, {:timeout, t}} -> {"timeout", t, ""}
+        {:error, reason} -> {"error", 0, "run failed: #{inspect(reason)}"}
+        _ -> {"error", 0, ""}
+      end
+
+    tokens =
+      case Nexus.Telemetry.runs(agent) do
+        [%{tokens: %{total: n}} | _] -> n
+        _ -> 0
+      end
+
+    ended = System.os_time(:second)
+
+    Nexus.Store.create(
+      Run,
+      %{rid: rid, agent: agent, user: user, task: String.slice(task, 0, 500), status: status,
+        turns: turns, tokens: tokens, answer: String.slice(answer, 0, 2000),
+        started: started, ended: ended},
+      tenant
+    )
+
+    # Surface the run on the activity bus too (Studio Activity + any hook can react).
+    Nexus.Events.emit(
+      %{kind: "agent.run", actor: user, title: "#{agent}: #{title_from(task)}", target: rid,
+        tags: ["event", "agent"], scope: "member"},
+      tenant: tenant
+    )
+
+    emit.(%{type: "done", run: rid, status: status, turns: turns, tokens: tokens})
+    {rid, status, turns, answer}
+  end
+
   defp user_key(req), do: (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
   defp sessions_for(tenant, user), do: Map.get(:persistent_term.get(@agent_store, %{}), {tenant, user}, [])
 
@@ -251,6 +341,23 @@ server :cloud do
           at: ev[:at] || System.os_time(:second)},
         ctx[:tenant] || ev[:tenant] || Nexus.Store.default_tenant()
       )
+      :ok
+    end)
+
+    # Live agent runs — the Studio opens EventSource('/live/agent_run?agent=…&task=…&u=…') and the
+    # loop's typed events (text/tools/final) stream straight through. do_run also persists the Run row.
+    Nexus.Live.register("agent_run", fn params, emit ->
+      agent = params["agent"] || ""
+      task = params["task"] || ""
+      tenant = params["tenant"] || Nexus.Store.default_tenant()
+      user = params["u"] || "anon"
+
+      cond do
+        agent == "" or task == "" -> emit.(%{type: "error", error: "agent and task are required"})
+        is_nil(Nexus.Agent.get(agent)) -> emit.(%{type: "error", error: "no such agent: #{agent}"})
+        true -> do_run(agent, task, tenant, user, emit)
+      end
+
       :ok
     end)
 
@@ -664,6 +771,21 @@ resource Event do
   tags :string
   scope :string
   at :integer
+end
+
+# A durable agent-run record — one row per agent run (tenant-scoped SQLite). Written when a run
+# finishes (streamed live over the `agent_run` Live source); read back by the Studio Runs view.
+resource Run do
+  rid :string       # run id (stable handle, distinct from the storage row id)
+  agent :string     # which named agent ran
+  user :string      # who launched it
+  task :string      # the brief
+  status :string    # ok | error | timeout
+  turns :integer    # LLM turns taken
+  tokens :integer   # total tokens (from telemetry)
+  answer :string    # final answer (truncated for the list view)
+  started :integer  # unix seconds
+  ended :integer    # unix seconds
 end
 
 # Persist every bus event to the log. The reactive primitives (hook kind, #event, effect engine) are
