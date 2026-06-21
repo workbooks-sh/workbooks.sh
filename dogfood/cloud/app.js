@@ -420,9 +420,12 @@
 
     // shell menu state
     var st = { nxMenu: false, wsMenu: false, editingId: null, editName: '', editIcon: '', pickerOpen: false, nxEditing: false, nxEditName: '', adminOpen: false,
-      treeOpen: {}, treeData: {}, treeLoading: {}, bookmarks: [], search: '', wsMenuFor: null, rail: false };
+      treeOpen: {}, treeData: {}, treeLoading: {}, bookmarks: [], search: '', wsMenuFor: null, rail: false, sideMode: 'apps' };
     try { st.adminOpen = localStorage.getItem('wb-admin-drawer') === 'open'; } catch (e) {}
     try { st.rail = localStorage.getItem('wb-rail') === '1'; } catch (e) {}
+    // Apps-vs-Files sidebar preference — Apps is primary (most users just launch apps). Persisted so it
+    // sticks per user/device. ('wb-sidemode' = 'apps' | 'files')
+    try { st.sideMode = localStorage.getItem('wb-sidemode') || 'apps'; } catch (e) {}
     st.acctMenu = false;
     try { st.bookmarks = JSON.parse(localStorage.getItem('wb-bookmarks') || '[]'); } catch (e) { st.bookmarks = []; }
     function saveBookmarks(){ try { localStorage.setItem('wb-bookmarks', JSON.stringify(st.bookmarks)); } catch (e) {} }
@@ -451,6 +454,22 @@
         var sel = (window.CSS && CSS.escape) ? CSS.escape(w.id) : w.id;
         var wt = document.querySelector('[data-ws-tree="' + sel + '"]');
         if (wt) wt.innerHTML = treeHtml(w.id, 1);
+      });
+    }
+    // Apps grid (the sidebar's Apps tab) — the hosted workbook surfaces on this nexus. Stale-while-
+    // revalidate so it paints last-known instantly; each tile launches the app at its URL.
+    function paintApps(){
+      if (!document.getElementById('appsGrid')) return;
+      WB.swr('apps', function(){ return fetch('/cloud/apps', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
+        var g = document.getElementById('appsGrid'); if (!g) return;
+        var apps = (d && d.apps) || [];
+        if (!apps.length) { g.innerHTML = '<div class="treemsg" style="padding:8px 4px">No apps yet</div>'; return; }
+        g.innerHTML = apps.map(function(a){
+          var ic = a.icon ? '<span class="appemoji">' + esc(a.icon) + '</span>'
+                          : '<span class="appinit">' + esc((a.label[0] || 'A').toUpperCase()) + '</span>';
+          return '<a class="appcard" href="' + esc(a.url) + '" target="_blank" rel="noopener" title="' + esc(a.label) + '">' +
+            ic + '<span class="appname">' + esc(a.label) + '</span></a>';
+        }).join('');
       });
     }
     function isBookmarked(path){ return st.bookmarks.some(function(b){ return b.path === path; }); }
@@ -614,7 +633,13 @@
             navlink('/activity', ICO.activity, 'Activity', p) +
           '</nav>' +
           '<div class="sidetree-hd wsh">Workspaces<button class="wsadd" data-wsnew title="New workspace" aria-label="New workspace">+</button></div>' +
-          '<div class="wsgroups">' + wslist + '</div>' +
+          '<div class="modetabs" role="tablist">' +
+            '<button class="modetab' + (st.sideMode !== 'files' ? ' on' : '') + '" data-sidemode="apps" role="tab">Apps</button>' +
+            '<button class="modetab' + (st.sideMode === 'files' ? ' on' : '') + '" data-sidemode="files" role="tab">Files</button>' +
+          '</div>' +
+          (st.sideMode === 'files'
+            ? '<div class="wsgroups">' + wslist + '</div>'
+            : '<div class="appsgrid" id="appsGrid"><div class="treemsg" style="padding:8px 4px">Loading apps…</div></div>') +
           '<div class="navspacer"></div>' +
           adminDrawer +
         '</aside>' +
@@ -629,6 +654,7 @@
       if (st.pickerOpen) { var ph = root.querySelector('#wsPicker'); if (ph) WB.emojiPicker(ph, function (u) { st.editIcon = u; st.pickerOpen = false; renderShell(); renderView(); }); }
       var si = document.getElementById('wbFileSearch');
       if (si) { si.value = st.search; si.oninput = function(){ st.search = si.value; runSearch(); }; if (st.search) runSearch(); }
+      if (st.sideMode !== 'files') paintApps();   // Apps tab → load the apps grid
     }
     // Let other views (the workspace explorer) refresh the sidebar after a pin/unpin so Pinned updates live.
     WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };
@@ -686,6 +712,7 @@
       if (t.closest && t.closest('[data-crumb-back]')) { var ret = WB.settingsReturn; WB.settingsReturn = null; WB.nav((ret && ret.path) || '/'); return; }
       if (t.closest && t.closest('[data-theme-toggle]')) { var cur = document.documentElement.getAttribute('data-theme') || 'dark'; var nt = cur === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', nt); try { localStorage.setItem('wb-theme', nt); } catch (er) {} renderShell(); renderView(); return; }
       if (t.closest && t.closest('[data-rail-toggle]')) { st.rail = !st.rail; try { localStorage.setItem('wb-rail', st.rail ? '1' : '0'); } catch (er) {} renderShell(); return; }
+      var smt = t.closest && t.closest('[data-sidemode]'); if (smt) { st.sideMode = smt.getAttribute('data-sidemode'); try { localStorage.setItem('wb-sidemode', st.sideMode); } catch (er) {} renderShell(); return; }
       if (t.closest && t.closest('[data-palette]')) { WB.palette(); return; }
       var pinx = t.closest && t.closest('[data-pin-x]'); if (pinx) { e.stopPropagation(); toggleBookmark(pinx.getAttribute('data-pin-x')); return; }
       var pino = t.closest && t.closest('[data-pin-open]'); if (pino) { WB._pendingFile = pino.getAttribute('data-pin-open'); WB.nav('/workspaces'); return; }

@@ -50,15 +50,16 @@ WB.view('/secrets', {
       .replace(/"/g, '&quot;');
 
     async function loadList() {
+      if (!scope) { list = []; loading = false; paint(); return; }
       loading = true;
       paint();
-      if (scope) {
-        try { list = await WB.api.listEnv(scope); } catch { list = []; }
-      } else {
-        list = [];
-      }
-      loading = false;
-      paint();
+      // Stale-while-revalidate: show last-known env list (names/metadata only — never plaintext values)
+      // instantly, refresh in the background. Same instant-load behavior as the other admin pages.
+      await WB.swr('secrets:' + scope, () => WB.api.listEnv(scope), (fresh) => {
+        list = fresh || [];
+        loading = false;
+        paint();
+      });
     }
 
     // ── reveal / hide / copy ──

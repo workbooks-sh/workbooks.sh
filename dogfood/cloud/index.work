@@ -49,6 +49,11 @@ server :cloud do
   # File search across all workspaces (mounts) — filename substring match over the real data volume.
   route "GET /cloud/search", :search
 
+  # Hosted apps — the workbook surfaces served by THIS nexus (org-level access: a user who's in the
+  # org/nexus can launch any). The Apps tab in the sidebar renders these as a grid; Files is the
+  # deeper, file-level view. Apps inherit a declared workspace's name+emoji where one exists.
+  route "GET /cloud/apps", :apps
+
   # Read a single file's TEXT content for the Workspace explorer (ship 3 — read-only IDE). `path` is
   # `<mount>/<rel>`. Same mount + traversal guard as :tree. Caps at 2MB; flags binary so the client
   # falls back to /cloud/raw (images/pdf streamed with the right Content-Type).
@@ -352,6 +357,22 @@ server :cloud do
     %{query: q, results: results}
   end
 
+  # Hosted apps = the served workbook surfaces on THIS nexus (the live mounts). Each tile launches the
+  # app at its URL. A surface that matches a declared workspace inherits that workspace's name + emoji.
+  def apps(_req) do
+    declared = Map.new(Nexus.Config.workspaces(), fn w -> {w.id, w} end)
+
+    apps =
+      for {name, _root} <- (Application.get_env(:nexus, :mounts) || []), name != "" do
+        w = declared[name]
+        %{name: name, label: (w && w.name) || humanize(name), icon: (w && w.icon) || "", url: "/" <> name <> "/"}
+      end
+
+    %{apps: Enum.sort_by(apps, & &1.label)}
+  end
+
+  defp humanize(name), do: name |> String.split(~r{[-/_]}, trim: true) |> Enum.map_join(" ", &String.capitalize/1)
+
   # Resolve a `<mount>/<rel>` request path to a real absolute file under data_dir, with the same
   # mount + traversal guard as :tree. Returns {:ok, abs} | {:error, status, msg}.
   defp resolve_file(path) do
@@ -545,7 +566,7 @@ client :app do
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
-  <link rel="stylesheet" href="./app.css?v=20260621d">
+  <link rel="stylesheet" href="./app.css?v=20260621e">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
@@ -577,5 +598,5 @@ client :app do
   <!-- ?v= is the cache-bust token. BUMP IT ON EVERY DEPLOY that changes JS/CSS. app.js reads its own
        ?v= and re-applies it to every lazily-loaded asset (views, wbchat) so a deploy = all-new URLs =
        guaranteed cache miss (hard-refresh can't re-fetch lazy import()s; only a new URL can). -->
-  <script src="./app.js?v=20260621d"></script>
+  <script src="./app.js?v=20260621e"></script>
 end
