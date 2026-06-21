@@ -6,8 +6,23 @@ WB.view('/storage', {
   async render(el, ctx) {
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-    // +page.js loader: return await listBuckets()
-    const data = await WB.api.listBuckets();
+    // Paint-first (the load-time rule): the page shell + a skeleton render IMMEDIATELY, then the data
+    // fetch fills it in — no blank screen blocking on the API.
+    el.innerHTML = `
+<section>
+  <div class="sechead">
+    <div>
+      <h2>Storage</h2>
+      <p>Object storage for your nexus — images &amp; files, served with zero egress.</p>
+    </div>
+    <div class="dim mono" style="font-size:13px" id="sttotal">…</div>
+  </div>
+  <div id="stbody"><div class="card faint" style="text-align:center;color:var(--dim)">Loading storage…</div></div>
+  <div class="note">Storage lives outside the nexus container — it survives sleep/restart and never bloats the runtime image. Egress is $0 because blobs are served directly, so reads are free.</div>
+</section>`;
+
+    let data;
+    try { data = await WB.api.listBuckets(); } catch (e) { data = {}; }
     const buckets = data.buckets || [];
     const totalSize = data.totalSize || '0 GB';
 
@@ -38,17 +53,7 @@ WB.view('/storage', {
     </div>`;
     }
 
-    el.innerHTML = `
-<section>
-  <div class="sechead">
-    <div>
-      <h2>Storage</h2>
-      <p>Object storage for your nexus — images &amp; files, served with zero egress.</p>
-    </div>
-    <div class="dim mono" style="font-size:13px">${esc(totalSize)} total</div>
-  </div>
-  ${body}
-  <div class="note">Storage lives outside the nexus container — it survives sleep/restart and never bloats the runtime image. Egress is $0 because blobs are served directly, so reads are free.</div>
-</section>`;
+    const slot = el.querySelector('#stbody'); if (slot) slot.innerHTML = body;
+    const tot = el.querySelector('#sttotal'); if (tot) tot.textContent = totalSize + ' total';
   }
 });

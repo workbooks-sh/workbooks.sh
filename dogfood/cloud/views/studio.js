@@ -168,6 +168,10 @@ WB.view('/usage', {
   async render(el, ctx) {
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+    // Paint-first (the load-time rule): show the header + a skeleton immediately, then fill after fetch.
+    el.innerHTML = `<section><div class="sechead"><div><h2>Usage &amp; billing</h2><p class="dim">Loading…</p></div></div>` +
+      `<div class="card faint" style="text-align:center;color:var(--dim)">Loading usage…</div></section>`;
+
     // +page.js loader: { usage: await nexusUsage() }
     const u = await WB.api.nexusUsage();
     const s = u.summary;
