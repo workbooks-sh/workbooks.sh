@@ -27,9 +27,12 @@ WB.scopedStyles('/usage', `
 // Activity (toggle the collapsible activity/sessions drawer). Custom tooltips on hover. The rail is the
 // seam for future agent surfaces (issues an agent files, etc.). "Create" is the + (new chat) action here.
 WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, async render(el){
-  var S = await import('https://esm.sh/solid-js@1.9.5?bundle');
-  var W = await import('https://esm.sh/solid-js@1.9.5/web?bundle');
-  var html = (await import('https://esm.sh/solid-js@1.9.5/html?bundle')).default;
+  // NOTE: no ?bundle — that inlines a SEPARATE solid-js core per import, so signals from one aren't
+  // reactive in another's templates (For/class bindings silently never update). Plain imports let
+  // esm.sh share ONE solid-js core across core/web/html, restoring reactivity.
+  var S = await import('https://esm.sh/solid-js@1.9.5');
+  var W = await import('https://esm.sh/solid-js@1.9.5/web');
+  var html = (await import('https://esm.sh/solid-js@1.9.5/html')).default;
   var createSignal = S.createSignal, For = S.For, Show = S.Show;
   var WBC = await import('../wbchat/core.js');
   await import('../wbchat/components/index.js');  // registers all parts + actions + composer add-ons
@@ -41,35 +44,91 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   function api(path, opts){ return fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'content-type': 'application/json' } }, opts || {})).then(function(r){ return r.json(); }); }
   var ICONS = {
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
-    activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>'
+    projects: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>',
+    agent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg>'
   };
+  // The agents you can talk to in Studio (the composer dropdown). v1: a curated set; real per-workspace
+  // agents wire in later. Selecting one is passed to the run as the agent.
+  var AGENTS = ['Builder', 'Researcher', 'Ops'];
+
+  // Projects = draft / private workspaces — a purgatory for ideas you work on with the agent before
+  // promoting them to a real workspace. v1: persisted client-side (wb-projects); promote → WB.ws.create.
+  function loadProjects(){ try { return JSON.parse(localStorage.getItem('wb-projects') || '[]'); } catch (e) { return []; } }
+  function saveProjects(p){ try { localStorage.setItem('wb-projects', JSON.stringify(p)); } catch (e) {} }
+  function gid(){ return 'p' + Math.random().toString(36).slice(2, 9); }
 
   function Studio(){
-    var ci = createSignal(null); var curId = ci[0], setCurId = ci[1];
+    var ps = createSignal(loadProjects()); var projects = ps[0], setProjects = ps[1];
+    var cp = createSignal(null); var curProj = cp[0], setCurProj = cp[1];
+    var po = createSignal(false); var projOpen = po[0], setProjOpen = po[1];
     var chat = null;
 
-    function newChat(){ setCurId(null); if (chat) { chat.clear(); chat.focus(); } }
+    function persist(list){ setProjects(list.slice()); saveProjects(list); }
+    function current(){ return projects().find(function(p){ return p.id === curProj(); }); }
+
+    function newProject(){
+      var p = { id: gid(), name: 'Untitled project', messages: [], updated: Date.now() };
+      var list = projects().concat([p]); persist(list); setCurProj(p.id); setProjOpen(false);
+      if (chat) { chat.clear(); chat.focus(); }
+    }
+    function openProject(id){
+      setCurProj(id); setProjOpen(false);
+      var p = projects().find(function(x){ return x.id === id; });
+      if (chat && p) chat.setMessages(p.messages || []);
+    }
+    async function promote(id){
+      var p = projects().find(function(x){ return x.id === id; }); if (!p) return;
+      try { var ws = await WB.ws.create(p.name); WB.toast('Promoted “' + p.name + '” to a workspace'); }
+      catch (e) { WB.toast('Couldn’t promote — ' + (e && e.message || 'try again'), 'bad'); return; }
+      persist(projects().filter(function(x){ return x.id !== id; }));
+      if (curProj() === id) setCurProj(null);
+    }
+    function recordTurn(userText, reply){
+      var p = current(); if (!p) { newProject(); p = current(); }
+      p.messages = (p.messages || []).concat([{ role: 'user', text: userText }, { role: 'assistant', text: reply }]);
+      if (p.name === 'Untitled project' && userText) p.name = userText.slice(0, 40);
+      p.updated = Date.now(); persist(projects());
+    }
+    function editAgent(){
+      // Open the project/workspace's agent file in the Workspaces editor (a .work file you can edit + ⌘S).
+      var ws = (WB.ws.active && (WB.ws.active.folder || WB.ws.active.id || WB.ws.active.name)) || 'workspace';
+      WB._pendingFile = ws + '/agent.work'; WB.nav('/workspaces');
+    }
 
     function mountChat(node){
       chat = WBC.createChat(node, {
-        placeholder: 'Message the agent…',
-        greeting: { title: 'Build on your nexus', text: 'Ask the agent to build, deploy, or change something here.' },
-        suggestions: ['Scaffold a new app', 'Show my workspaces', 'Deploy the docs site'],
-        models: ['auto', 'gpt-4o-mini', 'claude-sonnet-4'],
+        placeholder: 'Message the agent… (⏎ to send, ⇧⏎ for a new line)',
+        greeting: { title: 'Build on your nexus', text: 'Describe what you want to make. Work it out here, then promote it to a workspace.' },
+        suggestions: ['Scaffold a new app', 'Draft a data model', 'Wire up an integration'],
+        models: AGENTS,
         send: function(text, ctx){
-          return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({ u: U, id: curId(), message: text, model: ctx && ctx.model }) })
-            .then(function(d){ if (d && d.id){ if (!curId()) setCurId(d.id); return d.reply || ''; } return '(no reply)'; });
+          return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({ u: U, id: curProj(), message: text, agent: ctx && ctx.model }) })
+            .then(function(d){ var reply = (d && d.reply) || '(no reply)'; recordTurn(text, reply); return reply; });
         }
       });
       if (CDEMO && DEMO.demoMessages) chat.setMessages(DEMO.demoMessages());
     }
 
-    // Full-bleed chat + the floating rail. Activity is now its own page (the feed); the rail's
-    // Activity button navigates there. Create (+) starts a fresh chat.
-    // The floating studio rail is retired — New chat + Activity are sidebar items now. Studio = pure chat.
     return html`
-      <div class="studio">
+      <div class=${function(){ return 'studio' + (projOpen() ? ' projopen' : ''); }}>
         <section class="studio-chat" ref=${mountChat}></section>
+        <aside class="studio-projects">
+          <div class="studio-projects-hd"><span>Projects</span><button class="studio-pnew" title="New project" onClick=${newProject} innerHTML=${ICONS.plus}></button></div>
+          <div class="studio-plist">
+            <${For} each=${projects}>${function(p){
+              return html`<div class=${function(){ return 'studio-prow' + (curProj() === p.id ? ' on' : ''); }}>
+                <button class="studio-popen" onClick=${function(){ openProject(p.id); }} title=${p.name}>${p.name || 'Untitled'}</button>
+                <button class="studio-ppromote" title="Promote to workspace" onClick=${function(){ promote(p.id); }}>↗</button>
+              </div>`;
+            }}<//>
+            <${Show} when=${function(){ return projects().length === 0; }}><div class="studio-pempty">No projects yet. Start one with the agent, then promote it.</div><//>
+          </div>
+        </aside>
+        <nav class="studio-rail">
+          <button class="studio-railbtn" data-tip="New" aria-label="New" onClick=${newProject} innerHTML=${ICONS.plus}></button>
+          <button class=${function(){ return 'studio-railbtn' + (projOpen() ? ' on' : ''); }} data-tip="Projects" aria-label="Projects" onClick=${function(){ setProjOpen(!projOpen()); }} innerHTML=${ICONS.projects}></button>
+          <button class="studio-railbtn" data-tip="Edit agent" aria-label="Edit agent" onClick=${editAgent} innerHTML=${ICONS.agent}></button>
+        </nav>
       </div>`;
   }
   el.innerHTML = '';
@@ -79,6 +138,25 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
 WB.view('/create', { title: 'Studio', render(el){ WB.nav('/studio'); } });
 // The studio-shell CSS (.studio / .studio-rail / .studio-railbtn) is GLOBAL in app.css so it's shared
 // by every surface in the shell (Studio chat + Activity feed), keeping the floating rail locked in.
+WB.scopedStyles('/studio', `
+/* Projects drawer — slides in from the left (behind the floating rail), toggled by the rail. */
+.studio-projects { position: absolute; left: 0; top: 0; bottom: 0; width: 300px; z-index: 20; box-sizing: border-box; padding: 12px 0 0 58px;
+  display: flex; flex-direction: column; background: var(--card); border-right: 1px solid var(--line); box-shadow: 6px 0 22px rgba(0,0,0,.16);
+  transform: translateX(-100%); transition: transform .2s ease; }
+.studio.projopen .studio-projects { transform: translateX(0); }
+.studio-projects-hd { display: flex; align-items: center; justify-content: space-between; padding: 4px 14px 8px; font: 700 11px var(--read); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.studio-pnew { width: 26px; height: 26px; border: 1px solid var(--line); background: none; color: var(--dim); border-radius: 7px; cursor: pointer; display: grid; place-items: center; }
+.studio-pnew:hover { color: var(--ink); border-color: var(--stroke); }
+.studio-pnew svg { width: 14px; height: 14px; }
+.studio-plist { display: flex; flex-direction: column; gap: 1px; overflow-y: auto; padding: 0 8px 12px; }
+.studio-prow { display: flex; align-items: center; border-radius: 8px; }
+.studio-prow:hover, .studio-prow.on { background: var(--line); }
+.studio-popen { flex: 1; min-width: 0; text-align: left; border: none; background: none; color: var(--ink); border-radius: 8px; padding: 8px 10px; font: 500 13px var(--read); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-ppromote { flex: none; width: 26px; height: 28px; border: none; background: none; color: var(--dim); cursor: pointer; opacity: 0; font-size: 14px; }
+.studio-prow:hover .studio-ppromote { opacity: .7; }
+.studio-ppromote:hover { opacity: 1; color: var(--ink); }
+.studio-pempty { color: var(--dim); font: 500 12.5px var(--read); padding: 12px 10px; }
+`);
 
 
 WB.view('/usage', {

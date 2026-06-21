@@ -238,7 +238,7 @@
 
     // ── Command palette (⌘K) — search files + workspaces + jump to nav. Replaces the in-sidebar search. ──
     var NAV_CMDS = [
-      { label: 'New chat', icon: '+', go: '/studio' },
+      { label: 'Studio', icon: '+', go: '/studio' },
       { label: 'Activity', icon: '∿', go: '/activity' },
       { label: 'Workspaces', icon: '▦', go: '/workspaces' },
       { label: 'Usage & billing', icon: '◷', go: '/usage' },
@@ -512,7 +512,7 @@
           '</div>' +
           '<nav class="nxnav nxprimary">' +
             '<button class="nxlink nxsearch" data-palette aria-label="Search (Cmd-K)" title="Search">' + ICO.search + '<span class="lbl">Search</span><span class="kbd">⌘K</span></button>' +
-            navlink('/studio', ICO.spark, 'New chat', p) +
+            navlink('/studio', ICO.spark, 'Studio', p) +
             navlink('/activity', ICO.activity, 'Activity', p) +
             navlink('/workspaces', ICO.apps, 'Workspaces', p) +
           '</nav>' +

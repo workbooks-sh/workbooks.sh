@@ -107,7 +107,7 @@
   border: 1px solid var(--wbc-line); background: var(--wbc-panel); border-radius: var(--wbc-radius); padding: 8px 8px 8px 14px; }
 .wbc-composer-inner:focus-within { border-color: var(--wbc-stroke); box-shadow: 0 0 0 3px var(--wbc-focus); }
 .wbc-textarea { flex: 1; resize: none; border: none; background: none; color: var(--wbc-ink); font: 500 14.5px var(--wbc-font);
-  line-height: 1.5; max-height: 200px; padding: 6px 0; outline: none; }
+  line-height: 1.5; min-height: 58px; max-height: 240px; padding: 6px 0; outline: none; }
 .wbc-textarea::placeholder { color: var(--wbc-dim); }
 .wbc-send { flex: none; width: 34px; height: 34px; border-radius: var(--wbc-radius-sm); border: none; cursor: pointer;
   background: var(--wbc-accent); color: #11140f; display: grid; place-items: center; transition: opacity .12s; }
