@@ -377,8 +377,11 @@
         .then(function(r){ return r.json(); })
         .then(function(d){ st.treeData[path] = (d && d.entries) || []; })
         .catch(function(){ st.treeData[path] = []; })
-        .then(function(){ delete st.treeLoading[path]; renderShell(); });
+        .then(function(){ delete st.treeLoading[path]; paintTree(); });
     }
+    // Refresh ONLY the sidebar file tree in place — never rebuild the shell here (that would race the
+    // async view mount and detach the page content).
+    function paintTree(){ var t = document.querySelector('.sidetree'); if (t) t.innerHTML = treeHtml('', 0); }
     function isBookmarked(path){ return st.bookmarks.some(function(b){ return b.path === path; }); }
     // File search across workspaces — updates the results box IN PLACE (no shell re-render → keeps focus).
     function runSearch(){
@@ -501,37 +504,42 @@
       // listeners) #view back into the new shell. On a real nav, renderView() runs after and refills it.
       var prevView = document.getElementById('view');
 
+      // Nexus rail — your orgs/nexuses (one nexus = one org), Slack-style. Switch with a tile; + adds one;
+      // avatar pinned at the bottom (→ Settings/Sign out menu). The sidebar-collapse toggle lives at the top.
+      var nexuses = (WB.nexus.list && WB.nexus.list()) || [];
+      var orgtiles = nexuses.length
+        ? nexuses.map(function (n) {
+            return '<button class="orgtile' + (nx && n.id === nx.id ? ' on' : '') + '" data-nxswitch="' + esc(n.id) + '" title="' + esc(n.name) + '">' + esc((n.icon || (n.name[0] || 'N')).toUpperCase()) + '</button>';
+          }).join('')
+        : '<button class="orgtile on" data-nxmenu title="' + esc(nxLabel) + '">' + esc(inits(nxLabel)) + '</button>';
+
+      var acctMenuHtml = st.acctMenu ? ('<div class="acctmenu rail">' +
+        '<a class="acctitem" data-nav="/settings" href="#/settings">' + ICO.gear + '<span>Settings</span></a>' +
+        '<a class="acctitem" href="/auth/logout">' + ICO.logout + '<span>Sign out</span></a>' +
+      '</div>') : '';
+
       root.innerHTML =
       '<div id="app" class="' + (st.rail ? 'rail' : '') + '" style="--section:' + sectionAccent(p) + '">' +
+        '<div class="nexrail">' +
+          '<button class="nexrail-toggle" data-rail-toggle title="Toggle sidebar" aria-label="Toggle sidebar">' + ICO.rail + '</button>' +
+          '<div class="orgtiles">' + orgtiles + '</div>' +
+          '<button class="orgadd" data-nxcreate title="Add nexus" aria-label="Add nexus">+</button>' +
+          '<div class="nexrail-grow"></div>' +
+          '<div class="orgavatar" data-acct-menu title="' + esc(user.name) + '"><div class="av">' + esc(user.initial) + '</div>' + acctMenuHtml + '</div>' +
+        '</div>' +
         '<aside class="side">' +
           '<div class="topdna">' + WB.dna(7, 8) + '</div>' +
-          '<div class="swrap nxtop">' +
-            '<div class="sw" data-nxmenu role="button" tabindex="0">' +
-              '<span class="av sm">' + esc((nx && nx.icon) || inits(nxLabel)) + '</span>' +
-              '<span class="swname">' + esc(nxLabel) + '</span>' +
-              '<svg class="ico ch" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>' +
-            '</div>' + nxMenu +
+          '<div class="sidetop">' +
+            '<button class="nxlink nxsearch" data-palette aria-label="Search (Cmd-K)" title="Search">' + ICO.search + '<span class="lbl">Search</span><span class="kbd">⌘K</span></button>' +
           '</div>' +
           '<nav class="nxnav nxprimary">' +
-            '<button class="nxlink nxsearch" data-palette aria-label="Search (Cmd-K)" title="Search">' + ICO.search + '<span class="lbl">Search</span><span class="kbd">⌘K</span></button>' +
             navlink('/studio', ICO.spark, 'Studio', p) +
             navlink('/activity', ICO.activity, 'Activity', p) +
-            navlink('/workspaces', ICO.apps, 'Workspaces', p) +
           '</nav>' +
-          pinsec +
+          '<div class="sidetree-hd">Files</div>' +
+          '<div class="sidetree">' + treeHtml('', 0) + '</div>' +
           '<div class="navspacer"></div>' +
           adminDrawer +
-          // Account row: avatar (→ menu with Settings + Sign out) on the left, collapse toggle bottom-right.
-          '<div class="acct">' +
-            '<div class="acctav" data-acct-menu title="' + esc(user.name) + '"><div class="av">' + esc(user.initial) + '</div>' +
-              (st.acctMenu ? ('<div class="acctmenu">' +
-                '<a class="acctitem" data-nav="/settings" href="#/settings">' + ICO.gear + '<span>Settings</span></a>' +
-                '<a class="acctitem" href="/auth/logout">' + ICO.logout + '<span>Sign out</span></a>' +
-              '</div>') : '') +
-            '</div>' +
-            '<span class="acctgrow"></span>' +
-            '<button class="railtoggle" data-rail-toggle aria-label="Collapse sidebar" title="Collapse">' + ICO.rail + '</button>' +
-          '</div>' +
         '</aside>' +
         '<div class="main">' + crumbs + (fb ? '<div id="view" class="fullbleed"></div>' : '<div class="wrap" id="view"></div>') + '</div>' +
       '</div>';
@@ -544,6 +552,7 @@
       if (st.pickerOpen) { var ph = root.querySelector('#wsPicker'); if (ph) WB.emojiPicker(ph, function (u) { st.editIcon = u; st.pickerOpen = false; renderShell(); renderView(); }); }
       var si = document.getElementById('wbFileSearch');
       if (si) { si.value = st.search; si.oninput = function(){ st.search = si.value; runSearch(); }; if (st.search) runSearch(); }
+      loadTree('');   // populate the sidebar nexus file tree (re-renders when loaded)
     }
     // Let other views (the workspace explorer) refresh the sidebar after a pin/unpin so Pinned updates live.
     WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };
@@ -613,7 +622,7 @@
       if (t.closest && t.closest('[data-nxcreate]')) { st.nxMenu = false; renderShell(); openNewNexus(); return; }
       if (t.closest && t.closest('[data-wsnew]')) { st.editingId = 'new'; st.editName = ''; st.editIcon = ''; st.pickerOpen = false; renderShell(); return; }
       var bmtog = t.closest && t.closest('[data-bm]'); if (bmtog) { e.stopPropagation(); toggleBookmark(bmtog.getAttribute('data-bm'), bmtog.getAttribute('data-bml')); return; }
-      var ttog = t.closest && t.closest('[data-tree-toggle]'); if (ttog) { var tp = ttog.getAttribute('data-tree-toggle'); if (st.treeOpen[tp]) delete st.treeOpen[tp]; else { st.treeOpen[tp] = true; loadTree(tp); } renderShell(); return; }
+      var ttog = t.closest && t.closest('[data-tree-toggle]'); if (ttog) { var tp = ttog.getAttribute('data-tree-toggle'); if (st.treeOpen[tp]) delete st.treeOpen[tp]; else { st.treeOpen[tp] = true; loadTree(tp); } paintTree(); return; }
       var tfile = t.closest && t.closest('[data-tree-file]'); if (tfile) { var fp = tfile.getAttribute('data-tree-file'); WB._pendingFile = fp; if (WB.openInExplorer && ROUTE.path === '/workspaces') WB.openInExplorer(fp); else WB.nav('/workspaces'); return; }
       var wsmore = t.closest && t.closest('[data-wsmore]'); if (wsmore) { e.stopPropagation(); var mid = wsmore.getAttribute('data-wsmore'); st.wsMenuFor = st.wsMenuFor === mid ? null : mid; renderShell(); return; }
       var wsset = t.closest && t.closest('[data-wssettings]'); if (wsset) { WB.ws.setActive(wsset.getAttribute('data-wssettings')); st.wsMenuFor = null; openWsSettings(); return; }

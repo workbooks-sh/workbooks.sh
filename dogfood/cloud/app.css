@@ -87,7 +87,30 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
 @media (prefers-reduced-motion:reduce){ .dot.run,.dot.build{ animation:none; } }
 
-#app{ display:grid; grid-template-columns:248px 1fr; height:100vh; }
+#app{ display:grid; grid-template-columns:56px 250px 1fr; height:100vh; }
+#app.rail{ grid-template-columns:56px 0 1fr; }
+#app.rail .side{ display:none; }
+
+/* ── Nexus rail (orgs/nexuses, Slack-style) ── */
+.nexrail{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px 0 12px; background:var(--paper); border-right:1px solid var(--line); overflow:hidden; }
+.nexrail-toggle{ width:34px; height:34px; border:none; background:none; color:var(--dim); cursor:pointer; border-radius:9px; display:grid; place-items:center; margin-bottom:2px; }
+.nexrail-toggle:hover{ background:var(--hover); color:var(--ink); }
+.nexrail-toggle svg{ width:17px; height:17px; }
+.orgtiles{ display:flex; flex-direction:column; gap:8px; }
+.orgtile{ position:relative; width:40px; height:40px; border-radius:13px; border:1px solid var(--line); background:var(--card); color:var(--ink); font:700 15px var(--read); display:grid; place-items:center; cursor:pointer; transition:transform .08s; }
+.orgtile:hover{ transform:translateY(-1px); border-color:var(--stroke); }
+.orgtile.on{ border-color:var(--ink); box-shadow:0 0 0 2px var(--paper), 0 0 0 3px var(--ink); }
+.orgadd{ width:40px; height:40px; border-radius:13px; border:1px dashed var(--stroke); background:none; color:var(--dim); font:300 22px var(--read); line-height:1; cursor:pointer; display:grid; place-items:center; }
+.orgadd:hover{ color:var(--ink); border-color:var(--ink); }
+.nexrail-grow{ flex:1; }
+.orgavatar{ position:relative; cursor:pointer; }
+.orgavatar .av{ width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--peach),var(--blue)); display:grid; place-items:center; font:700 13px var(--mono); color:var(--on-bloom); border:1px solid var(--line); }
+.acctmenu.rail{ left:calc(100% + 10px); bottom:0; }
+
+/* ── Sidebar top (search) + nexus file tree ── */
+.sidetop{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.sidetree-hd{ font:700 9.5px var(--read); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); padding:8px 10px 4px; }
+.sidetree{ flex:1; min-height:0; overflow-y:auto; }
 
 .side{ border-right:1px solid var(--line); background:var(--paper); display:flex; flex-direction:column;
   padding:22px 14px 24px; overflow-y:auto; z-index:30; }
