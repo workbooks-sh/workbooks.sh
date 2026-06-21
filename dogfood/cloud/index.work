@@ -62,6 +62,11 @@ server :cloud do
   route "GET /cloud/schedules", :schedules_list
   route "POST /cloud/schedules", :schedule_create
   route "POST /cloud/schedule/cancel", :schedule_cancel
+
+  # GitHub App webhook — GitHub POSTs pull_request/push/issues events here. We HMAC-verify the raw body
+  # against GITHUB_WEBHOOK_SECRET, then emit a `github.<event>` #event onto the bus so the workflow layer
+  # (reviewer/merger agent hook, fetch-back) reacts. Generic plumbing (Nexus.GitHub); policy is ours.
+  route "POST /cloud/github/webhook", :github_webhook
   # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
   # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
   route "GET /cloud/models", :models
@@ -701,6 +706,31 @@ server :cloud do
     end
   rescue
     e -> {:error, Exception.message(e)}
+  end
+
+  # GitHub App webhook receiver. HMAC-verify the raw body, then surface the event on the bus + activity
+  # feed. The reactive layer (a `pr.opened` hook → reviewer/merger agent) + fetch-back consume these.
+  def github_webhook(req) do
+    sig = (req[:headers] || %{})["x-hub-signature-256"]
+    raw = req[:raw_body] || ""
+
+    if Nexus.GitHub.verify_webhook(raw, sig) do
+      event = (req[:headers] || %{})["x-github-event"] || "unknown"
+      payload = (is_map(req.body) && req.body) || %{}
+      repo = get_in(payload, ["repository", "full_name"]) || ""
+      actor = get_in(payload, ["sender", "login"]) || "github"
+      action = payload["action"] || ""
+
+      Nexus.Events.emit(
+        %{kind: "github.#{event}", actor: actor, title: String.trim("#{event} #{action} #{repo}"),
+          target: repo, tags: ["event", "github"], scope: "member"},
+        tenant: req.tenant || Nexus.Store.default_tenant()
+      )
+
+      %{ok: true}
+    else
+      {401, %{error: "invalid signature"}}
+    end
   end
 
   defp user_key(req), do: (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"

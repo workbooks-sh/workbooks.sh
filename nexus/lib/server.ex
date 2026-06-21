@@ -703,6 +703,10 @@ defmodule Nexus.Server do
           params: params,
           query: conn.query_params,
           body: decode_body(body),
+          # The RAW body + request headers — needed by webhook handlers that must HMAC-verify the exact
+          # bytes a provider signed (e.g. GitHub's X-Hub-Signature-256). Generic: any route can read them.
+          raw_body: body,
+          headers: Map.new(conn.req_headers),
           method: conn.method,
           path: conn.request_path,
           host: conn.host,
