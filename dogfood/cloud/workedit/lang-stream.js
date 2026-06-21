@@ -29,8 +29,12 @@ const LANGS = new Set(['elixir', 'rust', 'zig', 'python', 'svelte', 'solid', 'js
 // Exported for tests (and reuse by P5's grammar work) — not part of the host-facing surface.
 export function startState() { return { inBlock: false, depth: 0, pendingOpen: false, lineStart: false }; }
 
-// A line that opens a `do` block: starts with a word and ends with `do` (optional trailing comment).
-const OPENER = /^[A-Za-z_]\w*\b.*\bdo\s*(#.*)?$/;
+// A line opens a `do` block only if its FIRST WORD is a known kind AND it ends with `do` — so prose
+// that happens to end in "do" ("…what to do") is NOT a false opener. Shared by nested.js/live.js.
+export function isBlockOpener(text) {
+  const m = /^([a-z]\w*)\b[^\n]*\bdo\s*(#.*)?$/.exec(text);
+  return !!(m && KINDS.has(m[1]) && !/\bdo:/.test(text));
+}
 
 export function token(stream, state) {
   if (stream.sol()) state.lineStart = true;
@@ -42,7 +46,7 @@ export function token(stream, state) {
     const rest = stream.string.slice(stream.pos);
     // Heading (prose lane) — whole line.
     if (/^#{1,6}\s/.test(rest)) { stream.skipToEnd(); state.lineStart = false; return 'heading'; }
-    if (OPENER.test(rest)) state.pendingOpen = true;
+    if (isBlockOpener(rest)) state.pendingOpen = true;
   }
   state.lineStart = false;
 

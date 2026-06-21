@@ -137,6 +137,8 @@ export async function createEditor(mount, opts = {}) {
     focus() { editor.focus(); },
     destroy() { editor.destroy(); },
   };
-  if (opts.mode === 'live') setMode('live');
+  // Await the initial mode so the controller's getMode() is correct the moment it's returned (else the
+  // host's toggle reads 'source' before the async live load flips it).
+  if (opts.mode === 'live') await setMode('live');
   return controller;
 }

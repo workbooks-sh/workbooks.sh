@@ -8,7 +8,7 @@
 // (only when a block of that language is visible) and trigger a redraw when ready.
 
 import { highlightTree, classHighlighter } from 'https://esm.sh/@lezer/highlight@1';
-import { token, startState, Stream } from './lang-stream.js';
+import { token, startState, Stream, isBlockOpener } from './lang-stream.js';
 
 // Registry: language key → loader returning its Lezer parser. Wrapped so a missing/renamed export or a
 // 404 just disables that language (its bodies fall back to the approximate tokenizer).
@@ -63,7 +63,7 @@ function scanBlocks(doc) {
   for (let i = 1; i <= doc.lines; i++) {
     const line = doc.line(i), t = line.text;
     if (open === null) {
-      if (/^[a-z]\w*\b.*\bdo\s*(#.*)?$/.test(t) && !/\bdo:/.test(t)) { open = line; lang = langOf(t); }
+      if (isBlockOpener(t)) { open = line; lang = langOf(t); }
     } else if (/^end\b/.test(t)) {
       if (line.from > open.to + 1) blocks.push({ from: open.to + 1, to: line.from, lang });
       open = null; lang = null;

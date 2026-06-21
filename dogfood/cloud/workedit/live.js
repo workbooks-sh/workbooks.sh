@@ -1,3 +1,4 @@
+import { isBlockOpener } from './lang-stream.js';
 // workedit/live — the Live (WYSIWYG) layer (P4). NOT a second editor: a decoration layer over the
 // SAME CodeMirror surface (Obsidian "Live Preview" model). It styles headings and renders inline refs
 // ([[backlinks]], #tags, work:// links) as chips, while REVEALING the raw syntax on whatever line the
@@ -66,7 +67,7 @@ function blockLines(doc) {
   for (let i = 1; i <= doc.lines; i++) {
     const t = doc.line(i).text;
     if (!open) {
-      if (/^[a-z]\w*\b.*\bdo\s*(#.*)?$/.test(t) && !/\bdo:/.test(t)) { open = i; set.add(i); }
+      if (isBlockOpener(t)) { open = i; set.add(i); }
     } else {
       set.add(i);
       if (/^end\b/.test(t)) open = 0;
