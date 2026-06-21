@@ -343,7 +343,7 @@
     // <script>-tagging all 20 upfront (~260KB, 20 requests on every cold load), we inject only the
     // ACTIVE view's script on demand. The home '/' view ships inline in app.js (no entry here).
     var VIEW_FILES = {
-      '/activity': 'activity', '/authorize': 'authorize', '/database': 'database', '/denied': 'denied',
+      '/activity': 'activity', '/database': 'database', '/denied': 'denied',
       '/integrations': 'integrations', '/nexuses': 'nexuses', '/secrets': 'secrets', '/settings': 'settings',
       '/shared': 'shared', '/storage': 'storage', '/studio': 'studio', '/create': 'studio', '/usage': 'studio',
       '/team': 'team', '/upgrade': 'upgrade', '/welcome': 'welcome', '/workspace/env': 'workspace-env',

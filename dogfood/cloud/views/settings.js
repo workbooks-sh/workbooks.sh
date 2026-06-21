@@ -52,7 +52,6 @@ WB.view('/settings', {
     const AUTH_PROVIDERS = [
       { id: 'builtin', name: 'Built-in', blurb: "Workbooks' own end-user auth — nothing to configure." },
       { id: 'clerk', name: 'Clerk', blurb: "Use Clerk for your app's users." },
-      { id: 'workos', name: 'WorkOS', blurb: "Use WorkOS AuthKit for your app's users." },
       { id: 'auth0', name: 'Auth0', blurb: "Use Auth0 for your app's users." }
     ];
     let authProvider = 'builtin';

@@ -1,11 +1,8 @@
 // routes/workspace/members/+page.svelte + +page.server.js loader + +layout.svelte wrapper.
 //
-// ASSUMPTION: the source loads members via a SvelteKit server loader (+page.server.js)
-// that calls WorkOS server-side; on any error it returns honest-empty {members:[], pending:[]}.
-// There is NO WB.api.* client equivalent for org memberships, so this port reproduces the
-// loader's honest-empty branch (members:[], pending:[]) → the table shows the empty state,
-// exactly as the source does when WorkOS is unreachable. The invite/remove/revoke forms
-// posted to server actions (no client API) — wired to faithful UI behavior + toasts.
+// Org memberships come from our own control plane (Nexus.Auth.Accounts org roster). There is not yet a
+// WB.api.* client surface for it, so this view renders honest-empty {members:[], pending:[]} (the empty
+// state) until that endpoint is wired; the invite/remove/revoke forms are faithful UI + toasts.
 WB.scopedStyles('/workspace/members', `
   /* ── +layout.svelte ── */
   .wshead { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
@@ -77,7 +74,7 @@ WB.view('/workspace/members', {
 
     const wsName = WB.ws.active?.name || 'this workspace';
 
-    // ── loader (honest-empty; no client WorkOS) ──
+    // ── loader (honest-empty until the org-roster endpoint is wired) ──
     const data = { members: [], pending: [] };
 
     // page state
