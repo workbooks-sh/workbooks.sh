@@ -58,9 +58,21 @@ export function workLiveFromView(view, state) {
     ignoreEvent() { return true; }
   }
 
+  // Heading lines rendered live (cursor off them) get their gutter number blanked. Computed from state
+  // (not the view) so it's a valid gutterLineClass RangeSet value — provided via .compute below.
+  function buildGutter(st) {
+    const doc = st.doc, sel = st.selection.main, marks = [];
+    for (let i = 1; i <= doc.lines; i++) {
+      const line = doc.line(i);
+      if (/^#{1,6}\s/.test(line.text) && !(sel.from <= line.to && sel.to >= line.from)) {
+        marks.push(blankGutter.range(line.from));
+      }
+    }
+    return RangeSet.of(marks, true);
+  }
+
   function build(v) {
     const decos = [];
-    const gutters = [];
     const sel = v.state.selection.main;
     const touches = (from, to) => sel.from <= to && sel.to >= from;
     const doc = v.state.doc;
@@ -79,7 +91,6 @@ export function workLiveFromView(view, state) {
           decos.push(Decoration.line({ class: 'wke-h' + h[1].length }).range(line.from));
           if (!touches(line.from, line.to)) {
             decos.push(Decoration.replace({}).range(line.from, line.from + h[1].length + 1));
-            gutters.push(blankGutter.range(line.from));
           }
           continue; // don't chip inside a heading line
         }
@@ -101,23 +112,20 @@ export function workLiveFromView(view, state) {
       }
     }
     // Decoration.set sorts; line decos and inline replaces can share a position safely.
-    return { decorations: Decoration.set(decos, true), gutter: RangeSet.of(gutters, true) };
+    return Decoration.set(decos, true);
   }
 
   const plugin = ViewPlugin.fromClass(
     class {
-      constructor(v) { const b = build(v); this.decorations = b.decorations; this.gutter = b.gutter; }
-      update(u) { if (u.docChanged || u.viewportChanged || u.selectionSet) { const b = build(u.view); this.decorations = b.decorations; this.gutter = b.gutter; } }
+      constructor(v) { this.decorations = build(v); }
+      update(u) { if (u.docChanged || u.viewportChanged || u.selectionSet) this.decorations = build(u.view); }
     },
     {
       decorations: (v) => v.decorations,
-      provide: (p) => [
-        // Make chips behave as atomic units so the caret steps over them instead of into them.
-        EditorView.atomicRanges.of((v) => v.plugin(p)?.decorations || Decoration.none),
-        // Blank the line number on live-rendered heading lines.
-        gutterLineClass.of((v) => v.plugin(p)?.gutter || RangeSet.empty),
-      ],
+      // Make chips behave as atomic units so the caret steps over them instead of into them.
+      provide: (p) => EditorView.atomicRanges.of((v) => v.plugin(p)?.decorations || Decoration.none),
     },
   );
-  return [plugin];
+  // gutterLineClass wants a RangeSet VALUE (not a fn) — compute it from state, reactive to doc/selection.
+  return [plugin, gutterLineClass.compute(['doc', 'selection'], buildGutter)];
 }
