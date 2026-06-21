@@ -31,14 +31,23 @@ defmodule Nexus.GitHttp do
     end
   end
 
+  # Git push follows the deploy block's AUTH MODE (Part A). When auth is TRUSTED (`Nexus.Auth.None` —
+  # the default / a `deploy do auth="trusted" end` workbook, incl. the local vfkit dev nexus), a push
+  # needs no PAT and is scoped to the default tenant — so `work deploy <dir> --nexus local` just works.
+  # When the workbook declares a real auth mode (bearer/jwt), a valid `wbk_` token is still required, so
+  # auth-gated behavior is tested faithfully against what cloud enforces.
   defp authed(conn) do
-    with ["Basic " <> b64] <- get_req_header(conn, "authorization"),
-         {:ok, decoded} <- Base.decode64(b64),
-         [_user, pass] <- String.split(decoded, ":", parts: 2),
-         {:ok, ident} <- Nexus.Auth.Token.verify(pass) do
-      {:ok, ident}
+    if Nexus.Auth.adapter() == Nexus.Auth.None do
+      {:ok, %{tenant: Nexus.Store.default_tenant(), user: "local", scopes: [], roles: []}}
     else
-      _ -> :error
+      with ["Basic " <> b64] <- get_req_header(conn, "authorization"),
+           {:ok, decoded} <- Base.decode64(b64),
+           [_user, pass] <- String.split(decoded, ":", parts: 2),
+           {:ok, ident} <- Nexus.Auth.Token.verify(pass) do
+        {:ok, ident}
+      else
+        _ -> :error
+      end
     end
   end
 

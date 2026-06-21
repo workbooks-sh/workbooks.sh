@@ -135,6 +135,9 @@ defmodule Nexus.Server do
   """
   def remount do
     root = root()
+    # A pushed workbook may declare a new deploy MODE (auth/database) in its index.work — re-apply it
+    # so the just-landed workbook runs in the same mode locally as it would in cloud (no reboot needed).
+    Nexus.Application.apply_deploy_mode()
     found = discover_mounts(root)
     Application.put_env(:nexus, :mounts, found)
     :persistent_term.put({__MODULE__, :assetver}, %{})   # new files → recompute asset versions

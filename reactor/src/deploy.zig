@@ -202,10 +202,19 @@ pub fn init(io: Io, alloc: std.mem.Allocator, place_in: []const u8, dir: []const
 /// nexus BY NAME (a context target), resolved to its URL; default = the active context (local). One
 /// nexus hosts many workbooks, each at /<name> — like one host serving many sites.
 pub fn deployWorkbook(io: Io, alloc: std.mem.Allocator, home: []const u8, cwd: []const u8, dir: []const u8, nexus_name: []const u8) !u8 {
-    const base = if (nexus_name.len > 0)
+    // `--nexus local` targets the running vfkit nexus at the guest URL `apply` recorded in
+    // .work/runtime.state (its NAT IP, not localhost) — so the edit→push→serve dev loop works locally.
+    const base = if (std.mem.eql(u8, nexus_name, "local"))
+        (if (readState(io, alloc)) |s| blockAttr(s, "runtime do", "url", "") else "")
+    else if (nexus_name.len > 0)
         try context.nexusByName(io, alloc, home, nexus_name)
     else
         try context.nexusUrl(io, alloc, home);
+
+    if (base.len == 0) {
+        log.err("no local nexus running — `work deploy apply` (local) first, or pass a --nexus <name>");
+        return 1;
+    }
 
     // Absolute path (the nexus mounts from it, same machine). Resolve against $PWD if relative.
     const abs = if (std.fs.path.isAbsolute(dir)) try alloc.dupe(u8, dir) else try std.fs.path.resolve(alloc, &.{ cwd, dir });
