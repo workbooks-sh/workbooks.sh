@@ -34,6 +34,12 @@ defmodule Nexus.Writer.Lock do
         write_lease(machine_id())
         true
     end
+  rescue
+    # NEVER block boot on a lease error — a flaky object store must not brick the legitimate single
+    # writer. Any failure here ⇒ fail OPEN (proceed). The lease only ever PREVENTS an accidental second.
+    e ->
+      Logger.warning("[writer-lock] lease check errored — proceeding (fail-open): #{Exception.message(e)}")
+      true
   end
 
   # ── heartbeat GenServer (keeps our lease fresh while we run) ──────────────────────────────────────
