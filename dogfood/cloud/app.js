@@ -414,10 +414,10 @@
       // Repaint each OPEN workspace group's nested file tree in place (handles async folder loads and
       // nested dir toggles) — never rebuild the shell here (that would race the async view mount).
       (WB.ws.list || []).forEach(function (w) {
-        if (!st.treeOpen[w.name]) return;
-        var sel = (window.CSS && CSS.escape) ? CSS.escape(w.name) : w.name;
+        if (!st.treeOpen[w.id]) return;
+        var sel = (window.CSS && CSS.escape) ? CSS.escape(w.id) : w.id;
         var wt = document.querySelector('[data-ws-tree="' + sel + '"]');
-        if (wt) wt.innerHTML = treeHtml(w.name, 1);
+        if (wt) wt.innerHTML = treeHtml(w.id, 1);
       });
     }
     function isBookmarked(path){ return st.bookmarks.some(function(b){ return b.path === path; }); }
@@ -499,9 +499,11 @@
       // disclosure caret on the RIGHT; expanding reveals that workspace's real file tree nested under it.
       var wslist = WB.ws.list.map(function (w) {
         if (st.editingId === w.id) return wsEditor(false);
-        var open = !!st.treeOpen[w.name];
+        // The folder on the nexus volume is named by the workspace ID (work_dir(id)), NOT its display
+        // name — so the tree is keyed by w.id. (Declared workspaces have a clean slug id, e.g. "marketing".)
+        var open = !!st.treeOpen[w.id];
         return '<div class="wsgroup' + (open ? ' open' : '') + '">' +
-          '<div class="wshdr" data-tree-toggle="' + esc(w.name) + '" role="button" tabindex="0" title="' + esc(w.name) + '">' +
+          '<div class="wshdr" data-tree-toggle="' + esc(w.id) + '" role="button" tabindex="0" title="' + esc(w.name) + '">' +
             '<span class="wsemoji">' + esc(w.icon || '📁') + '</span>' +
             '<span class="wsname">' + esc(w.name) + '</span>' +
             '<button class="wsmore-btn" data-wsmore="' + esc(w.id) + '" title="More" aria-label="More">⋯</button>' +
@@ -512,7 +514,7 @@
             '<button data-wsedit="' + esc(w.id) + '">Edit</button>' +
             '<button data-wssettings="' + esc(w.id) + '">Settings</button>' +
           '</div>') : '') +
-          (open ? '<div class="wstree" data-ws-tree="' + esc(w.name) + '">' + treeHtml(w.name, 1) + '</div>' : '') +
+          (open ? '<div class="wstree" data-ws-tree="' + esc(w.id) + '">' + treeHtml(w.id, 1) + '</div>' : '') +
         '</div>';
       }).join('');
       if (st.editingId === 'new') wslist += wsEditor(true);
@@ -666,7 +668,7 @@
       var ttog = t.closest && t.closest('[data-tree-toggle]');
       if (ttog && !(t.closest && t.closest('[data-wsmore]'))) {   // ⋯ inside a group header opens the menu, not the group
         var tp = ttog.getAttribute('data-tree-toggle');
-        var isWs = (WB.ws.list || []).some(function (w) { return w.name === tp; });
+        var isWs = (WB.ws.list || []).some(function (w) { return w.id === tp; });
         if (st.treeOpen[tp]) delete st.treeOpen[tp]; else { st.treeOpen[tp] = true; loadTree(tp); }
         // A workspace GROUP toggle adds/removes its .wstree → needs a shell re-render (view is preserved);
         // a dir toggle INSIDE an open tree only repaints that tree in place.
