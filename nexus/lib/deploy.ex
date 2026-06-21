@@ -1,25 +1,31 @@
 defmodule Nexus.Deploy do
   @moduledoc """
-  Run a nexus locally. The local target is a **krunvm** microVM on macOS (`Nexus.Deploy.Machine`),
-  the mac arm of a cross-platform seam — podman/docker/WSL2 and a cloud machine slot in behind the
-  same contract: **preflight → create → run → status → down**. One OCI image, run the same way
-  locally or in the cloud (the canonical two-target model the runtime established).
+  Run a nexus locally. The local target is a **vfkit** microVM on macOS (`Nexus.Deploy.Machine`) —
+  Apple Virtualization.framework with a real `virtio-net` NIC (the krunvm/libkrun-TSI path deadlocked
+  the in-guest HTTP server — bd wb-pqf4). One runtime image, the same two-target model: local
+  (vfkit) or cloud (Fly). Contract: **preflight → ensure-disk → create → run → status → down**.
 
-  `local/2` boots the nexus image in a local microVM; `down/0` stops it. NOTE: this needs the nexus
-  OCI image built (a `mix release` + a Dockerfile bundling wasmtime/the compilers) — the run logic
-  is here and proven; the image recipe is the remaining piece.
+  `local/2` boots the engine-disk under vfkit and returns its reachable URL; `down/0` stops it. The
+  cloud target is Fly (`cloud/1`) — no microVM, no libkrun, unaffected by the local networking.
   """
   alias Nexus.Deploy.Machine
 
-  @doc "Boot the nexus OCI `image` in a local microVM. `{:ok, %{url, host_port, …}} | {:error, _}`."
-  def local(image, opts \\ []) do
+  @doc """
+  Boot the nexus locally under vfkit and wait until it serves. `image` is informational (the local
+  boot uses the published engine-disk artifact, the runtime image as a bootable disk). Returns
+  `{:ok, %{url, ip, data_dir}}` with `url = http://<guestIP>:4000`, or `{:error, _}`.
+  """
+  def local(_image \\ nil, opts \\ []) do
     with :ok <- Machine.preflight(),
-         :ok <- Machine.ensure_apfs_volume(),
-         {:ok, info} <- Machine.create(image, opts),
-         {:ok, _} <- Machine.spawn_direct(Keyword.get(opts, :env, %{})) do
-      {:ok, info}
+         {:ok, _golden} <- Machine.ensure_engine_disk(),
+         {:ok, vm} <- Machine.create(opts),
+         {:ok, _} <- Machine.spawn_direct(vm),
+         {:ok, ip} <- Machine.await_ip(vm),
+         :ok <- Machine.await_health(ip) do
+      {:ok, %{url: "http://#{ip}:4000", ip: ip, data_dir: vm.data_dir}}
     else
       {:error, reason, hint} -> {:error, {reason, hint}}
+      :error -> {:error, :boot_timeout}
       other -> other
     end
   end

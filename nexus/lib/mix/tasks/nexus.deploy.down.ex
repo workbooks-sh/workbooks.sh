@@ -1,8 +1,8 @@
 defmodule Mix.Tasks.Nexus.Deploy.Down do
   @moduledoc """
   Stop + remove the local nexus microVM — the teardown bridge `work deploy down` (local target)
-  invokes. Delegates to `Nexus.Deploy.down/0` → `Nexus.Deploy.Machine.down/0` (kill + krunvm delete);
-  the APFS volume + image store are left intact so it can be re-applied.
+  invokes. Delegates to `Nexus.Deploy.down/0` → `Nexus.Deploy.Machine.down/0` (SIGKILL the vfkit pid
+  + drop the per-VM disk clone); the cached golden engine-disk is left intact so it can be re-applied.
 
       mix nexus.deploy.down
   """

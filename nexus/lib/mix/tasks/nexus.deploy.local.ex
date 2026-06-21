@@ -1,8 +1,8 @@
 defmodule Mix.Tasks.Nexus.Deploy.Local do
   @moduledoc """
-  Boot the nexus OCI runtime image in a local krunvm microVM — the deploy bridge the `work` CLI
+  Boot the nexus OCI runtime image in a local vfkit microVM (real virtio-net NIC) — the deploy bridge the `work` CLI
   (`work deploy apply`, local target) invokes. ONE source of truth for the boot contract:
-  `Nexus.Deploy.local/2` → `Nexus.Deploy.Machine` (krunvm create + spawn).
+  `Nexus.Deploy.local/2` → `Nexus.Deploy.Machine` (vfkit boot of the engine-disk).
 
       mix nexus.deploy.local                 # image from Nexus.Config / WB_IMAGE
       mix nexus.deploy.local ghcr.io/…/runtime:latest
@@ -10,7 +10,7 @@ defmodule Mix.Tasks.Nexus.Deploy.Local do
   Prints the booted nexus URL on success; surfaces Machine's real error otherwise (e.g. no image
   built/pulled yet — see Nexus.Deploy.Machine).
   """
-  @shortdoc "Boot the nexus runtime image locally (krunvm) — `work deploy apply` bridge"
+  @shortdoc "Boot the nexus runtime image locally (vfkit) — `work deploy apply` bridge"
   use Mix.Task
 
   @impl true
