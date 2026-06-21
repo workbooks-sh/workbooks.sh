@@ -103,6 +103,7 @@ defmodule Nexus.Config do
   def database, do: get(:database)
   def storage, do: get(:storage)
   def tenancy_mode, do: get(:tenancy_mode)
+  def jj_substrate?, do: get(:jj_substrate)
   def cpus, do: get(:cpus)
   def memory, do: get(:memory)
 
@@ -196,6 +197,9 @@ defmodule Nexus.Config do
       database: attr(html, "database") || "sqlite",
       storage: attr(html, "storage") || "local-fs",
       tenancy_mode: attr(html, "tenancy-mode") || "single",
+      # jj-as-substrate: route internal commits through Jujutsu (op-log + `jj undo`) over the workspace
+      # git repo. No-op-safe (off ⇒ pure git; jj absent ⇒ pure git). Default off until proven on a deploy.
+      jj_substrate: bool(attr(html, "jj-substrate"), false),
       # Machine shape for a LOCAL deploy — defaults match the cloud tier (1cpu/1024MB) so local doesn't
       # mask OOM/concurrency a cloud machine would hit. Overridable from the block for tier-faithful tests.
       cpus: int(attr(html, "cpus"), 1),

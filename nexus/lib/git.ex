@@ -114,6 +114,21 @@ defmodule Nexus.Git do
   a server-side commit, so we mirror here too). `{:ok, short_sha}` | `:nochange` | `{:error, output}`.
   """
   def commit_file(bare, work_dir, rel_path, message) when is_binary(message) do
+    # jj-as-substrate: when enabled (deploy flag + jj installed), route the commit through jj so it lands
+    # in the op-log and is `jj undo`-able; jj exports the new ref into the bare so it stays canonical.
+    # No-op-safe: off / jj-absent / any jj error falls through to the raw-git path (unchanged behavior).
+    with true <- Nexus.JJ.substrate?(),
+         {:ok, sha} <- Nexus.JJ.commit_change(bare, work_dir, message) do
+      mirror_if_configured(bare)
+      {:ok, sha}
+    else
+      _ -> commit_file_git(bare, work_dir, rel_path, message)
+    end
+  end
+
+  # The raw-git internal-commit path (bare + --work-tree): the original mechanism, also the fallback when
+  # jj-as-substrate is off or unavailable.
+  defp commit_file_git(bare, work_dir, rel_path, message) do
     base = ["--git-dir=#{bare}", "--work-tree=#{work_dir}", "-c", "core.bare=false"]
     System.cmd("git", base ++ ["add", "--", rel_path], stderr_to_stdout: true)
 
