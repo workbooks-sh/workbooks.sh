@@ -46,6 +46,11 @@ export function token(stream, state) {
     const rest = stream.string.slice(stream.pos);
     // Heading (prose lane) — whole line.
     if (/^#{1,6}\s/.test(rest)) { stream.skipToEnd(); state.lineStart = false; return 'heading'; }
+    // Horizontal rule — a line of only --- / *** / ___.
+    if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(rest)) { stream.skipToEnd(); state.lineStart = false; return 'marker'; }
+    // Blockquote / list markers — colour the marker; the rest of the line tokenizes as prose.
+    if (stream.match(/>+\s?/)) { state.lineStart = false; return 'marker'; }
+    if (stream.match(/([-+*]|\d+[.)])\s/)) { state.lineStart = false; return 'marker'; }
     if (isBlockOpener(rest)) state.pendingOpen = true;
   }
   state.lineStart = false;
@@ -112,6 +117,7 @@ const TOKEN_CSS = {
   strong: 'font-weight:700', em: 'font-style:italic', strike: 'text-decoration:line-through;opacity:.8',
   mdcode: 'font-family:var(--mono,ui-monospace,monospace);background:color-mix(in srgb,var(--wke-op,#6a6f68) 12%,transparent);border-radius:4px',
   mdlink: 'color:var(--wke-link);text-decoration:underline',
+  marker: 'color:var(--wke-op);opacity:.7', // list/blockquote/hr markers
 };
 const CSS = `
 :root{

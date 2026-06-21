@@ -28,6 +28,10 @@ const LIVE_CSS = `
 .wke-md-strike{text-decoration:line-through;opacity:.75}
 .wke-md-code{font-family:var(--mono,ui-monospace,monospace);font-size:.92em;background:color-mix(in srgb,var(--wke-op,#6a6f68) 13%,transparent);border-radius:4px;padding:0 4px}
 .wke-md-link{color:var(--wke-link,#2f6fa8);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+/* Block-level: bullets, blockquote bar, horizontal rule. */
+.wke-bullet{color:var(--wke-op,#6a6f68);font-weight:700}
+.wke-bq{border-left:3px solid color-mix(in srgb,var(--wke-op,#6a6f68) 55%,transparent);padding-left:10px;color:var(--wke-comment,#8a8f88)}
+.wke-hr{display:inline-block;width:96%;border:0;border-top:2px solid color-mix(in srgb,var(--wke-op,#6a6f68) 45%,transparent);vertical-align:middle}
 /* Blank the line number on a live-rendered heading line (revealed again when the cursor's on it). */
 .cm-lineNumbers .wke-gutter-blank{color:transparent}
 `;
@@ -111,6 +115,17 @@ export function workLiveFromView(view, state) {
     ignoreEvent() { return true; }
   }
 
+  // A list bullet glyph (replaces the raw -/*/+ marker) and a horizontal rule.
+  class BulletW extends WidgetType {
+    eq() { return true; }
+    toDOM() { const s = document.createElement('span'); s.className = 'wke-bullet'; s.textContent = '•'; return s; }
+  }
+  class HrW extends WidgetType {
+    eq() { return true; }
+    toDOM() { const s = document.createElement('span'); s.className = 'wke-hr'; return s; }
+    ignoreEvent() { return true; }
+  }
+
   // Reusable marks/hides for inline markdown.
   const hide = Decoration.replace({});
   const markCache = {};
@@ -175,7 +190,30 @@ export function workLiveFromView(view, state) {
           continue; // don't run inline markdown inside a heading line
         }
 
-        // Inline markdown + refs → rendered, revealed (left raw) when the selection touches the token.
+        const onLine = touches(line.from, line.to);
+
+        // Horizontal rule — a line of only --- / *** / ___ → render an <hr>.
+        if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(text)) {
+          if (!onLine && line.to > line.from) decos.push(Decoration.replace({ widget: new HrW() }).range(line.from, line.to));
+          continue;
+        }
+
+        // Blockquote — `> ` (one or more). Keep a left bar always; hide the marker when not editing.
+        const bq = /^(\s*)(>+)(\s?)/.exec(text);
+        if (bq) {
+          decos.push(Decoration.line({ class: 'wke-bq' }).range(line.from));
+          if (!onLine) decos.push(Decoration.replace({}).range(line.from + bq[1].length, line.from + bq[0].length));
+        } else {
+          // Unordered list — replace the -/*/+ marker with a bullet glyph (ordered lists keep their number).
+          const ul = /^(\s*)([-+*])(\s+)/.exec(text);
+          if (ul && !onLine) {
+            const mStart = line.from + ul[1].length;
+            decos.push(Decoration.replace({ widget: new BulletW() }).range(mStart, mStart + 1));
+          }
+        }
+
+        // Inline markdown + refs (markers like -/>/digits aren't matched by scanInline, so a full
+        // scan is safe for list/quote lines too). Revealed when the selection touches the token.
         for (const sp of scanInline(text)) {
           const start = line.from + sp.s, end = line.from + sp.e;
           if (touches(start, end)) continue; // cursor here → show raw syntax
