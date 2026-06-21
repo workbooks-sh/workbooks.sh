@@ -147,6 +147,11 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
         m.EditorView.updateListener.of(function(u){ if (u.docChanged) setDirty(true); }),
         m.EditorView.theme({ '&': { height: '100%', fontSize: '12.5px' } })
       ];
+      // .work files get the workedit syntax highlighter (P1 — StreamLanguage; degrades silently).
+      if (/\.work$/i.test(path)) {
+        try { var wurl = (WB.vurl || function(u){ return u; })('../workedit/lang-stream.js'); var wk = await import(wurl); ext6 = ext6.concat(wk.workHighlightFromView(m.view)); }
+        catch (e) { try { console.warn('[workedit] highlight unavailable', e); } catch (_) {} }
+      }
       state.editor = new m.EditorView({ doc: content, extensions: ext6, parent: mount });
     } catch (e) {
       mount.innerHTML = '<pre class="wxpre">' + esc(content) + '</pre>';
