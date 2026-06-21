@@ -14,9 +14,9 @@ defmodule Nexus.GitHttp do
   import Plug.Conn
   require Logger
 
-  @doc "Repos live under WB_DATA/.nexus/repos/<name>.git; their working trees at WB_DATA/<name>."
-  def repos_root, do: Path.join(Nexus.Config.data_dir(), ".nexus/repos")
-  def work_dir(name), do: Path.join(Nexus.Config.data_dir(), name)
+  @doc "Bare repos live on the volume (`Nexus.Paths.repos_root/0`); working trees at `Nexus.Paths.work_dir/1`."
+  defdelegate repos_root, to: Nexus.Paths
+  defdelegate work_dir(name), to: Nexus.Paths
 
   @doc "Handle a `/git/<rest>` request. `rest` is the path AFTER `/git/` (e.g. `demo.git/info/refs`)."
   def handle(conn, rest) do

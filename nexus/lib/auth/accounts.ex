@@ -193,7 +193,7 @@ defmodule Nexus.Auth.Accounts do
   defp bool(true), do: 1
   defp bool(_), do: 0
 
-  defp db_path, do: Application.get_env(:nexus, :cp_sqlite_path) || Nexus.Litestream.db_path()
+  defp db_path, do: Nexus.Paths.db_path()
 
   defp with_conn(fun) do
     path = db_path()

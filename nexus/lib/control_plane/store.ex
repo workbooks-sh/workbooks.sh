@@ -54,7 +54,7 @@ defmodule Nexus.ControlPlane.Store do
 
   # ── SQLite plumbing ──────────────────────────────────────────────────────────────────────────────
 
-  defp db_path, do: Application.get_env(:nexus, :cp_sqlite_path) || Nexus.Litestream.db_path()
+  defp db_path, do: Nexus.Paths.db_path()
 
   defp with_conn(fun) do
     path = db_path()

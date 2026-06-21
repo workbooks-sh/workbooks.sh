@@ -72,5 +72,7 @@ defmodule Nexus.Sessions do
     _ -> nil
   end
 
-  defp db_path, do: Path.join(Nexus.Config.data_dir(), "sessions.db")
+  # Sessions live in the ONE durable DB (Nexus.Paths.db_path → volume + Litestream), as their own
+  # table — not a separate `sessions.db`, which sat on ephemeral storage and was lost on every restart.
+  defp db_path, do: Nexus.Paths.db_path()
 end

@@ -79,5 +79,5 @@ defmodule Nexus.Store.Sqlite do
 
   # Default to the durable volume DB under .nexus/ (Litestream replicates this). An explicit
   # `:sqlite_path` (dev per-workbook DB, tests) still wins.
-  defp db_path, do: Application.get_env(:nexus, :sqlite_path) || Nexus.Litestream.db_path()
+  defp db_path, do: Application.get_env(:nexus, :sqlite_path) || Nexus.Paths.db_path()
 end

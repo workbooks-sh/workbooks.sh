@@ -246,13 +246,14 @@ defmodule Nexus.Config do
   `NEXUS_TENANT`. The local cache tier lives UNDER this so it survives restarts; the container rootfs
   would be wiped on every machine churn.
   """
-  def data_dir, do: System.get_env("WB_DATA") || File.cwd!()
+  defdelegate data_dir, to: Nexus.Paths
 
-  defp default_cache_dir, do: Path.join([data_dir(), "build", "components"])
+  # Compiled wasm artifacts — EPHEMERAL by design (rebuilt by recompiling), so off the durable volume.
+  defp default_cache_dir, do: Nexus.Paths.component_cache_dir()
 
-  # Cold-tier default: a `cache` dir on the persistent data volume → Nexus.Cache.Cold.Local. Durable
-  # across machine restarts and the safe default when no R2 is configured (the local/libkrun route).
-  defp default_cold_dir, do: Path.join(data_dir(), "cache")
+  # Cold-tier default: on the persistent volume (`Nexus.Paths.cold_dir/0`) → durable across machine
+  # churn. (Previously `<data_dir>/cache`, which was OUTSIDE the volume mount = silently ephemeral.)
+  defp default_cold_dir, do: Nexus.Paths.cold_dir()
 
   # ≈1 render slot per 100MB of host RAM (each post-AOT render ≈47MB; the /100 leaves headroom for
   # the BEAM + page working sets), within [2, 64]. Reads MemTotal on the Linux deploy target; on a
