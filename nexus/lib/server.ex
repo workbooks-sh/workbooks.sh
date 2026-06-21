@@ -611,10 +611,27 @@ defmodule Nexus.Server do
       # never serve the durable store / hidden runtime data (.nexus/, *.db, WAL/SHM sidecars)
       dotted_or_db?(rel) -> :skip
       File.regular?(full) ->
-        {:served, conn |> put_resp_content_type(MIME.from_path(full)) |> send_file(200, full)}
+        {:served, serve_file_cached(conn, full)}
 
       true ->
         :skip
+    end
+  end
+
+  # Native static caching: a strong ETag (size+mtime) + a short max-age. Repeat loads send
+  # If-None-Match → we answer 304 (no body) instead of re-shipping the asset, so a warm dashboard
+  # reload pays only revalidation, not the full JS/CSS/font payload. max-age keeps it out of the
+  # network entirely for a minute; the ETag makes a deploy visible on the next revalidate.
+  defp serve_file_cached(conn, full) do
+    stat = File.stat!(full)
+    msecs = :calendar.datetime_to_gregorian_seconds(stat.mtime)
+    etag = ~s("#{Integer.to_string(stat.size, 16)}-#{Integer.to_string(msecs, 16)}")
+    conn = conn |> put_resp_header("etag", etag) |> put_resp_header("cache-control", "public, max-age=60")
+
+    if etag in get_req_header(conn, "if-none-match") do
+      send_resp(conn, 304, "")
+    else
+      conn |> put_resp_content_type(MIME.from_path(full)) |> send_file(200, full)
     end
   end
 
