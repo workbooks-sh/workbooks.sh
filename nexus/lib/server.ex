@@ -25,6 +25,10 @@ defmodule Nexus.Server do
   def start_link(opts) do
     root = Keyword.fetch!(opts, :root)
     port = Keyword.get(opts, :port, 4000)
+    # Re-derive ephemeral working checkouts from the DURABLE bare repos (on the .nexus volume) before
+    # discovering mounts — so a restart never serves an empty pushed-workspace whose checkout lived on
+    # ephemeral storage. The bare repo (volume) is the source of truth; the checkout is reconstructible.
+    rehydrate_checkouts(root)
     mounts = discover_mounts(root)
     # This nexus's memorable name: a stable adjective-animal codename + an optional friendly name the
     # user/team gave it (WB_NEXUS). You reference a nexus by either — it's a handle, not a credential.
@@ -90,6 +94,39 @@ defmodule Nexus.Server do
 
   defp mounts, do: Application.get_env(:nexus, :mounts, [{"", root()}])
   defp multi?, do: not match?([{"", _}], mounts())
+
+  # Re-check-out each durable bare repo (`.nexus/repos/<name>.git`, on the persistent volume) into its
+  # working dir (`<data_dir>/<name>`, ephemeral) when that checkout is missing/empty. Idempotent: a
+  # populated checkout is left alone. Best-effort — a failure for one repo never blocks boot.
+  defp rehydrate_checkouts(root) do
+    repos = Nexus.GitHttp.repos_root()
+
+    case File.ls(repos) do
+      {:ok, names} ->
+        for n <- names, String.ends_with?(n, ".git") do
+          ws = String.replace_suffix(n, ".git", "")
+          bare = Path.join(repos, n)
+          work = Path.join(root, ws)
+
+          empty? =
+            case File.ls(work) do
+              {:ok, []} -> true
+              {:error, _} -> true
+              _ -> false
+            end
+
+          if Nexus.Git.bare?(bare) and empty? do
+            File.mkdir_p!(work)
+            Nexus.Git.checkout_into(bare, work)
+          end
+        end
+
+      _ ->
+        :ok
+    end
+  rescue
+    _ -> :ok
+  end
 
   @doc """
   Re-discover the data volume's mounts and re-bring-up their units — called after a `git push` lands a

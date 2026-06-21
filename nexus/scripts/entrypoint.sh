@@ -25,6 +25,28 @@ if [ -n "$S3_BUCKET" ] && [ -n "$S3_AKID" ] && command -v litestream >/dev/null 
   bin/nexus eval 'Nexus.Litestream.write_config()'
   echo "[entrypoint] restoring $DB from replica if the volume is empty"
   litestream restore -if-db-not-exists -if-replica-exists -config "$CFG" "$DB" || true
+
+  # ── Durability guard ──────────────────────────────────────────────────────────────────────────
+  # Never serve (and then replicate) an EMPTY db OVER good backups. Litestream restores the LATEST
+  # generation, but a prior cascade can leave the latest empty while older generations still hold the
+  # data. Compare backup SNAPSHOT sizes (generic — no table knowledge): if the latest generation's
+  # snapshot is dramatically smaller than the historical peak, the data was lost — restore the biggest
+  # generation instead. This is the safety net for the empty-generation cascade that wiped the DB once.
+  SNAPS=$(litestream snapshots -config "$CFG" "$DB" 2>/dev/null || true)
+  if [ -n "$SNAPS" ]; then
+    BIG=$(echo "$SNAPS" | awk 'NR>1{print $4+0}' | sort -n | tail -1)
+    LATEST_SIZE=$(echo "$SNAPS" | awk 'NR>1{print $5" "($4+0)}' | sort | tail -1 | awk '{print $2+0}')
+    BIG=${BIG:-0}; LATEST_SIZE=${LATEST_SIZE:-0}
+    if [ "$BIG" -gt 0 ] && [ "$LATEST_SIZE" -lt $((BIG/2)) ]; then
+      GEN=$(echo "$SNAPS" | awk 'NR>1{print ($4+0)" "$2}' | sort -n | tail -1 | awk '{print $2}')
+      if [ -n "$GEN" ]; then
+        echo "[entrypoint] GUARD: latest backup ${LATEST_SIZE}B << peak ${BIG}B — data shrank; restoring gen $GEN"
+        rm -f "$DB" "$DB-wal" "$DB-shm"
+        litestream restore -generation "$GEN" -if-replica-exists -config "$CFG" "$DB" || true
+      fi
+    fi
+  fi
+
   echo "[entrypoint] starting nexus under continuous replication"
   exec litestream replicate -config "$CFG" -exec "bin/nexus start"
 else
