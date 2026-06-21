@@ -40,6 +40,15 @@ server :cloud do
   route "POST /cloud/agent/run", :agent_run
   # The durable run ledger for the Studio Runs view — most-recent agent runs for this tenant.
   route "GET /cloud/runs", :runs_list
+
+  # Task management + planning (the orchestration backbone). Tasks live in resource Task; a plan is a
+  # parent task + subtasks. Dispatch launches a Run (reuses do_run) and links it. Plan asks Waldo to
+  # decompose a goal into assigned subtasks. THE LINE: the store + board are ours, the bus is standard.
+  route "GET /cloud/tasks", :tasks_list
+  route "POST /cloud/tasks", :task_create
+  route "POST /cloud/task/update", :task_update
+  route "POST /cloud/task/dispatch", :task_dispatch
+  route "POST /cloud/plan", :plan_create
   # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
   # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
   route "GET /cloud/models", :models
@@ -298,6 +307,157 @@ server :cloud do
 
     emit.(%{type: "done", run: rid, status: status, turns: turns, tokens: tokens})
     {rid, status, turns, answer}
+  end
+
+  # ── Task management + planning ───────────────────────────────────────────────────────────────────
+  # Tasks are stored append-only (resource Task has no in-place update); the CURRENT state of a task is
+  # the row with its tid and the newest `updated`. current_tasks/1 folds the log to live state.
+  defp current_tasks(tenant) do
+    Task
+    |> Nexus.Store.all(tenant)
+    |> Enum.map(&Map.from_struct/1)
+    |> Enum.group_by(& &1.tid)
+    |> Enum.map(fn {_tid, versions} -> Enum.max_by(versions, & &1.updated) end)
+    |> Enum.reject(&(&1.status == "cancelled"))
+  end
+
+  defp latest_task(tenant, tid), do: Enum.find(current_tasks(tenant), &(&1.tid == tid))
+
+  # Persist a task version (create or fold-update). Always writes a NEW row; the fold picks the newest
+  # by `updated`. `updated` is microseconds (monotone within a second) and is FORCED fresh here so a
+  # fold-update of an existing row (which already carries an older :updated) can't keep the stale one.
+  defp put_task(tenant, attrs) do
+    now = System.os_time(:microsecond)
+    attrs = Map.put(attrs, :updated, now)
+    Nexus.Store.create(Task, attrs, tenant)
+    Nexus.Events.emit(
+      %{kind: "task.#{attrs[:status] || "update"}", actor: to_string(attrs[:created_by] || "system"),
+        title: to_string(attrs[:title] || attrs[:tid]), target: to_string(attrs[:tid]),
+        tags: ["event", "task"], scope: "member"},
+      tenant: tenant
+    )
+    attrs
+  end
+
+  def tasks_list(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    tasks = current_tasks(tenant) |> Enum.sort_by(&{&1.priority || 2, -(&1.updated || 0)})
+    %{tasks: tasks}
+  end
+
+  def task_create(req) do
+    b = req.body || %{}
+    title = b["title"] || ""
+    if title == "" do
+      {400, %{error: "title is required"}}
+    else
+      now = System.os_time(:second)
+      task = put_task(req.tenant || Nexus.Store.default_tenant(), %{
+        tid: gen_id(), title: String.slice(title, 0, 160), detail: to_string(b["detail"] || ""),
+        status: "open", agent: to_string(b["agent"] || ""), parent: to_string(b["parent"] || ""),
+        priority: b["priority"] || 2, created_by: user_key(req), run: "", created: now
+      })
+      %{task: task}
+    end
+  end
+
+  def task_update(req) do
+    b = req.body || %{}
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    case latest_task(tenant, b["tid"] || "") do
+      nil -> {404, %{error: "no such task"}}
+      cur ->
+        merged = cur
+          |> maybe_put(:status, b["status"])
+          |> maybe_put(:agent, b["agent"])
+          |> maybe_put(:priority, b["priority"])
+          |> maybe_put(:title, b["title"])
+          |> maybe_put(:detail, b["detail"])
+        %{task: put_task(tenant, merged)}
+    end
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, val), do: Map.put(map, key, val)
+
+  # Dispatch a task: launch its assignee agent on the brief (reusing do_run), link the run, set status.
+  def task_dispatch(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    case latest_task(tenant, (req.body || %{})["tid"] || "") do
+      nil -> {404, %{error: "no such task"}}
+      cur ->
+        agent = cur.agent
+        cond do
+          agent == "" -> {400, %{error: "task has no assignee — assign an agent first"}}
+          is_nil(Nexus.Agent.get(agent)) -> {400, %{error: "assignee '#{agent}' is not a known agent"}}
+          true ->
+            put_task(tenant, Map.merge(cur, %{status: "in_progress"}))
+            brief = if(cur.detail != "", do: "#{cur.title}\n\n#{cur.detail}", else: cur.title)
+            {rid, status, _turns, _answer} = do_run(agent, brief, tenant, user_key(req), fn _ -> :ok end)
+            final = if status == "ok", do: "done", else: "blocked"
+            task = put_task(tenant, Map.merge(cur, %{status: final, run: rid}))
+            %{task: task, run: rid, run_status: status}
+        end
+    end
+  end
+
+  # Plan-with-Waldo: decompose a goal into a parent task + assigned subtasks. Waldo emits strict lines
+  # we parse; the assignees are constrained to the registered agents.
+  def plan_create(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    goal = (req.body || %{})["goal"] || ""
+    if goal == "" do
+      {400, %{error: "goal is required"}}
+    else
+      agents = Nexus.Agent.all() |> Enum.map(&Nexus.Agent.def_from_unit(&1).name)
+      list = Enum.join(agents, ", ")
+      prompt = """
+      Decompose this goal into 3 to 7 concrete subtasks. Assign each to the best agent.
+      Output ONLY one line per subtask, EXACTLY in this format and nothing else:
+      TASK | <assignee> | <title>
+      where <assignee> is one of: #{list}.
+
+      GOAL: #{goal}
+      """
+
+      subtasks =
+        case Nexus.Agent.run_named("waldo", prompt) do
+          {:ok, %{answer: a}} when is_binary(a) -> parse_plan(a, agents)
+          _ -> []
+        end
+
+      now = System.os_time(:second)
+      pid = gen_id()
+      parent = put_task(tenant, %{tid: pid, title: String.slice(goal, 0, 160), detail: "Plan",
+        status: "open", agent: "waldo", parent: "", priority: 1, created_by: user_key(req), run: "", created: now})
+
+      children =
+        Enum.map(subtasks, fn {assignee, title} ->
+          put_task(tenant, %{tid: gen_id(), title: title, detail: "", status: "open", agent: assignee,
+            parent: pid, priority: 2, created_by: "waldo", run: "", created: now})
+        end)
+
+      %{plan: parent, subtasks: children}
+    end
+  end
+
+  # Parse Waldo's plan lines: `TASK | <assignee> | <title>`. Assignee must be a known agent.
+  defp parse_plan(text, agents) do
+    text
+    |> String.split("\n", trim: true)
+    |> Enum.flat_map(fn line ->
+      case String.split(line, "|") do
+        [tag, who, title | _] ->
+          if String.contains?(tag, "TASK") do
+            a = who |> String.trim() |> String.downcase()
+            a = if(a in agents, do: a, else: "waldo")
+            [{a, String.trim(title) |> String.slice(0, 160)}]
+          else
+            []
+          end
+        _ -> []
+      end
+    end)
   end
 
   defp user_key(req), do: (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
@@ -788,6 +948,23 @@ resource Run do
   ended :integer    # unix seconds
 end
 
+# The task/plan store — the orchestration backbone. A task is a unit of work; a plan is a parent
+# task with child subtasks (parent = parent's tid). Dispatching a task launches a Run and links its
+# rid. THE LINE: the bus + `task` effect are generic; this store + the Studio board are our cloud.
+resource Task do
+  tid :string        # stable task id
+  title :string      # short summary
+  detail :string     # the brief / acceptance
+  status :string     # open | in_progress | blocked | done | cancelled
+  agent :string      # assignee (a named agent), or "" if unassigned
+  parent :string     # parent task tid for plan decomposition, or "" for a root task
+  priority :integer  # 0 (top) .. 4 (backlog)
+  created_by :string # who/what filed it (a user, or an agent name)
+  run :string        # the rid of the dispatched run, once dispatched
+  created :integer   # unix seconds
+  updated :integer   # unix seconds
+end
+
 # Persist every bus event to the log. The reactive primitives (hook kind, #event, effect engine) are
 # the open standard; this hook + the `log` effect are our cloud opting into a durable feed.
 hook :activity do
@@ -799,7 +976,7 @@ client :app do
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
-  <link rel="stylesheet" href="./app.css?v=20260621k">
+  <link rel="stylesheet" href="./app.css?v=20260621l">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
@@ -831,5 +1008,5 @@ client :app do
   <!-- ?v= is the cache-bust token. BUMP IT ON EVERY DEPLOY that changes JS/CSS. app.js reads its own
        ?v= and re-applies it to every lazily-loaded asset (views, wbchat) so a deploy = all-new URLs =
        guaranteed cache miss (hard-refresh can't re-fetch lazy import()s; only a new URL can). -->
-  <script src="./app.js?v=20260621k"></script>
+  <script src="./app.js?v=20260621l"></script>
 end

@@ -149,6 +149,29 @@ steer differently.
   runtime + agent-file contract + issue-filing in place. The other two specialists
   + full scheduling/sub-agent UI follow once that spine is proven.
 
+## Task management & planning (the orchestration backbone)
+
+The heart of orchestration: Waldo and the specialists don't just answer — they
+**plan work, decompose it, file tasks, assign them, and dispatch them as runs.**
+
+- **`resource Task`** (tenant SQLite, our cloud store): `tid, title, detail, status
+  (open/in_progress/blocked/done/cancelled), agent (assignee), parent (plan tree),
+  priority, created_by, run (the rid once dispatched), created, updated`.
+- **Plan = a parent task + child subtasks** (`parent` link). Decomposition is just
+  creating a parent and its children — no separate "plan" entity.
+- **Plan-with-Waldo** — give a goal; Waldo (who knows the specialists) decomposes it
+  into assigned subtasks. AI planning without re-plumbing the runtime.
+- **Dispatch** — assigning a task to an agent launches a **Run** (reuses the Phase-1
+  `do_run` engine), links the `rid` onto the task, and tracks status
+  (open→in_progress→done/blocked). The run ledger and the task board share one spine.
+- **Generic mechanism vs our product** (THE LINE): a generic **`task` effect** + a
+  **`tasks` hook** persist task events to the store — exactly the Event/`log`
+  pattern. The bus + effect engine are the open standard; the Task store + Studio
+  **Tasks board** (kanban by status) are our cloud product.
+- **Scheduling ties in** — a task can carry a `hook trigger` to run on a schedule
+  (Phase-2 scheduling, wb-ps2x), and a failed run files an **issue** (wb-35ma) that
+  is itself a task. Tasks, runs, schedules, and issues are one connected fabric.
+
 ## Still open (genuinely undecided — flag for next pass)
 
 - Issue-store physical home: git-indexed `.work` vs DB table (`wb-35ma`).
