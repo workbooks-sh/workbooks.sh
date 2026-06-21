@@ -1,0 +1,62 @@
+name: compilers-js bundles
+
+# Build + validate the JS-family compiler bundles that the svelte/solid/python lanes ship in the
+# compilers package: the svelte single-file compiler, the solid babel transform bundle (run on
+# StarlingMonkey), and the CPython-wasi interpreter. These are LIGHT (fetch + bun/esbuild, seconds) —
+# unlike the rust/clang/zig toolchains they DON'T need a provisioned machine, so CI reproduces them.
+# The result uploads as an artifact the compilers-package publish consumes (the heavy lanes still
+# publish manually per CLAUDE.md; this just removes the hand-build for the JS lanes).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "nexus/compilers/svelte/**"
+      - "nexus/compilers/solid/**"
+      - "nexus/compilers/python/build.sh"
+      - ".github/workflows/compilers-js.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nexus/compilers
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build svelte compiler bundle
+        run: bash svelte/build.sh
+
+      - name: Build solid transform bundle (esbuild, node:assert aliased)
+        run: bash solid/build.sh
+
+      - name: Fetch CPython-wasi interpreter
+        run: bash python/build.sh
+
+      - name: Validate outputs exist and are non-trivial
+        run: |
+          set -euo pipefail
+          check() { local f="$1" min="$2"; local sz; sz=$(wc -c < "$f"); \
+            [ "$sz" -ge "$min" ] && echo "ok $f ($sz bytes)" || { echo "FAIL $f too small ($sz < $min)"; exit 1; }; }
+          check svelte/vendor/compiler.cjs 500000
+          check solid/vendor/babel.js 2000000
+          check python/pythonrun.wasm 10000000
+          # the solid bundle must expose the transform entry (loaded by Nexus.Compilers.Js on StarlingMonkey)
+          grep -q "solidTransform" solid/vendor/babel.js && echo "ok solidTransform present" || { echo "FAIL solidTransform missing"; exit 1; }
+
+      - name: Upload JS compiler bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: compilers-js-bundles
+          path: |
+            nexus/compilers/svelte/vendor/compiler.cjs
+            nexus/compilers/solid/vendor/babel.js
+            nexus/compilers/python/pythonrun.wasm
+          retention-days: 14
+          if-no-files-found: error

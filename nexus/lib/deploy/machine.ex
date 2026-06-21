@@ -12,8 +12,10 @@ defmodule Nexus.Deploy.Machine do
     * `krunvm delete N` / `krunvm list`
 
   Ported faithfully from the runtime's `Workbooks.Deploy.Machine` (the run logic we keep). It runs
-  `/app/bin/nexus` from a nexus release; building that OCI image (mix release + Dockerfile) is the
-  remaining piece before `local/1` has an image to boot.
+  `/app/bin/nexus` from a nexus release. The OCI image is built + published by CI
+  (`.github/workflows/nexus-image.yml` → `ghcr.io/workbooks-sh/runtime:latest`, pullable), so
+  `local/1` has an image to boot; `mix nexus.deploy.local` defaults to it (the `work deploy apply`
+  local bridge).
   """
   @vm "nexus-runtime"
   @guest_port 4000

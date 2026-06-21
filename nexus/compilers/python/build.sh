@@ -11,4 +11,11 @@
 # Driver: Nexus.Compilers.Python.python_compile_to_wasm/2 returns this interpreter; the runner mounts
 # the unit's source + feeds its stdin.
 set -euo pipefail
-echo "[python] pythonrun.wasm is a prebuilt CPython-wasi interpreter (see header). Nothing to compile."
+cd "$(dirname "$0")"
+PY_URL="${PY_URL:-https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/python%2F3.12.0%2B20231211-040d5a6/python-3.12.0.wasm}"
+if [ -f pythonrun.wasm ]; then
+  echo "[python] pythonrun.wasm present ($(wc -c < pythonrun.wasm) bytes)"
+else
+  echo "[python] fetch CPython-wasi interpreter"
+  curl -fsSL "$PY_URL" -o pythonrun.wasm
+fi
