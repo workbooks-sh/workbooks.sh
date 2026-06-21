@@ -95,7 +95,8 @@ defmodule Nexus.Agent do
   # run (no workspace, or jj unavailable) uses a throwaway scratch dir, exactly as before. Returns
   # `{vfs, finalize_fn}` where finalize runs AFTER the loop with the run result.
   defp setup_vfs(opts, task) do
-    with %{bare: bare, work_dir: work_dir, name: name} = ws <- Keyword.get(opts, :workspace),
+    with true <- Nexus.JJ.substrate?(),
+         %{bare: bare, work_dir: work_dir, name: name} = ws <- Keyword.get(opts, :workspace),
          uniq <- System.unique_integer([:positive]),
          wsname <- "agent-#{name}-#{uniq}",
          dest <- Path.join(System.tmp_dir!(), "nexus_wt_#{name}_#{uniq}"),

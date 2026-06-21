@@ -268,7 +268,8 @@ server :cloud do
         {404, %{error: "no such agent: #{agent}"}}
 
       true ->
-        {rid, status, turns, answer} = do_run(agent, task, tenant, user, fn _ -> :ok end)
+        ws = (is_map(req.body) && req.body["workspace"]) || nil
+        {rid, status, turns, answer} = do_run(agent, task, tenant, user, fn _ -> :ok end, workspace: ws)
         %{run: rid, agent: agent, status: status, turns: turns, answer: answer}
     end
   end
@@ -285,6 +286,23 @@ server :cloud do
     %{runs: runs}
   end
 
+  # Resolve a workspace (mount) name into the jj-worktree run opts the agent loop expects, or nil if no
+  # workspace given / the mount is unknown. The agent's edits then commit to `agent/<agent>`, attributed.
+  defp workspace_run_opts(nil, _agent, _user), do: nil
+  defp workspace_run_opts("", _agent, _user), do: nil
+
+  defp workspace_run_opts(mount, agent, _user) do
+    case List.keyfind(mounts(), mount, 0) do
+      {_, root} ->
+        bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
+        Nexus.Git.provision_remote(bare, root)
+        %{bare: bare, work_dir: root, name: agent, author: "#{agent} <#{agent}>", branch: "agent/#{agent}"}
+
+      _ ->
+        nil
+    end
+  end
+
   # Shared run driver: streams the loop's typed events through `emit`, persists a Run row, returns a
   # summary tuple. Used by both the SSE live source (real-time) and POST /cloud/agent/run (blocking).
   defp do_run(agent, task, tenant, user, emit, opts \\ []) do
@@ -292,9 +310,17 @@ server :cloud do
     started = System.os_time(:second)
     emit.(%{type: "start", run: rid, agent: agent, task: task})
 
+    # Workspace-scoped run: if opts[:workspace] names a mount, run the agent in a jj worktree of that
+    # workspace (real FS) so its file edits commit to the agent's branch, attributed. Else ephemeral.
+    run_opts =
+      case workspace_run_opts(opts[:workspace], agent, user) do
+        nil -> [emit: emit]
+        ws -> [emit: emit, workspace: ws]
+      end
+
     result =
       try do
-        Nexus.Agent.run_named(agent, task, emit: emit)
+        Nexus.Agent.run_named(agent, task, run_opts)
       rescue
         e -> {:error, e}
       catch
@@ -681,7 +707,7 @@ server :cloud do
       cond do
         agent == "" or task == "" -> emit.(%{type: "error", error: "agent and task are required"})
         is_nil(Nexus.Agent.get(agent)) -> emit.(%{type: "error", error: "no such agent: #{agent}"})
-        true -> do_run(agent, task, tenant, user, emit)
+        true -> do_run(agent, task, tenant, user, emit, workspace: params["workspace"])
       end
 
       :ok
