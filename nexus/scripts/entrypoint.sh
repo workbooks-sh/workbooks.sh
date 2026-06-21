@@ -47,6 +47,15 @@ if [ -n "$S3_BUCKET" ] && [ -n "$S3_AKID" ] && command -v litestream >/dev/null 
     fi
   fi
 
+  # Fail-closed interlock: if backups hold real data but we have NO local db (restore was expected but
+  # produced nothing — e.g. fresh volume + Litestream outage/bad-creds), do NOT boot. Booting empty
+  # would replicate empty OVER the good generations — the exact cascade that wiped the accounts DB. A
+  # genuinely fresh deploy has no snapshots ($SNAPS empty), so this never blocks a legitimate first boot.
+  if [ -n "$SNAPS" ] && [ "${BIG:-0}" -gt 4096 ] && [ ! -f "$DB" ]; then
+    echo "[entrypoint] FATAL: backups hold data (peak ${BIG}B) but restore produced no DB — refusing to boot empty over good backups. Investigate Litestream/Tigris and restore manually." >&2
+    exit 1
+  fi
+
   echo "[entrypoint] starting nexus under continuous replication"
   exec litestream replicate -config "$CFG" -exec "bin/nexus start"
 else
