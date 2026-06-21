@@ -96,7 +96,7 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 /* Collapse the sidebar into an ICON RAIL (not hidden): nav icons only, no labels/tree. */
 #app.rail{ grid-template-columns:56px 58px 1fr; }
 #app.rail .side{ padding:14px 8px 18px; }
-#app.rail .lbl, #app.rail .kbd, #app.rail .sidetree, #app.rail .sidetree-hd, #app.rail .adminchev{ display:none; }
+#app.rail .lbl, #app.rail .kbd, #app.rail .sidetree, #app.rail .wsgroups, #app.rail .sidetree-hd, #app.rail .adminchev{ display:none; }
 #app.rail .nxsearch, #app.rail .nxlink, #app.rail .adminbtn{ justify-content:center; padding:9px 0; }
 #app.rail .sidetop{ justify-content:center; }
 
@@ -346,11 +346,8 @@ tr:last-child td{ border:0; }
   opacity: 0; transform: translateY(6px); pointer-events: none; transition: opacity .15s ease, transform .15s ease; }
 .adminsec.open .admindrawer { opacity: 1; transform: translateY(0); pointer-events: auto; }
 .admindrawer .nxnav { margin: 0; }
-/* Workspace = folder: disclosure caret + lazy file tree (desktop-app style) */
-.wstoggle { flex: none; width: 20px; height: 28px; border: none; background: none; color: var(--dim); cursor: pointer; display: grid; place-items: center; padding: 0; }
-.wstoggle svg { width: 13px; height: 13px; transition: transform .15s ease; }
-.wsrow.wsopen .wstoggle svg { transform: rotate(90deg); }
-.wstree { display: flex; flex-direction: column; }
+/* Workspace = Slack-style collapsible GROUP: emoji-squircle + name header, caret on the RIGHT, nested tree */
+.wstree { display: flex; flex-direction: column; margin: 1px 0 4px; }
 .trow { display: flex; align-items: center; gap: 6px; min-height: 26px; border-radius: 7px; cursor: pointer; color: var(--dim); font: 500 12.5px var(--read); }
 .trow:hover { background: var(--line); color: var(--ink); }
 .trow .tchev { flex: none; display: grid; place-items: center; color: var(--dim); }
@@ -387,30 +384,27 @@ tr:last-child td{ border:0; }
 .sfrow .tbm { margin-left: 4px; }
 /* group label (e.g. "Admin") above a nav group */
 .navgrp { font: 700 9.5px var(--read); letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); padding: 0 10px; margin: 8px 0 4px; }
-.wssec { margin-top: 6px; }
-.wshdr { display: flex; align-items: center; justify-content: space-between; }
+/* Workspaces section header ("Workspaces" + add) */
+.sidetree-hd.wsh { display: flex; align-items: center; justify-content: space-between; }
 .wsadd { background: none; border: 0; cursor: pointer; color: var(--dim); font-size: 16px; line-height: 1;
-  padding: 0 4px; border-radius: 5px; }
+  padding: 0 5px; border-radius: 5px; }
 .wsadd:hover { background: var(--line); color: var(--ink); }
-.wslist { display: flex; flex-direction: column; gap: 1px; max-height: 42vh; overflow-y: auto; }
-.wsrow { display: flex; align-items: center; border-radius: 8px; position: relative; }
-.wsrow:hover { background: var(--line); }
-.wsrow.on { background: var(--line); }
-.wsrow.on::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2.5px; border-radius: 2px; background: var(--ink); }
-.wsrow.on .wsmain { font-weight: 600; }
-.wsmain { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; padding: 8px 9px; border: none; background: none;
-  color: var(--ink); font: 500 13px var(--read); cursor: pointer; text-align: left; }
-.wsmain .av.sm { font-size: 12px; }
-.wsedit-btn { flex: none; width: 26px; height: 26px; margin-right: 5px; border: none; border-radius: 6px;
-  background: none; color: var(--dim); cursor: pointer; opacity: 0; font-size: 12px; }
-.wsrow:hover .wsedit-btn { opacity: 1; }
-.wsedit-btn:hover { background: var(--card); color: var(--ink); }
-/* ⋯ more menu (Edit / Settings) per workspace */
-.wsmore { position: relative; flex: none; margin-right: 5px; }
-.wsmore-btn { width: 26px; height: 26px; border: none; border-radius: 6px; background: none; color: var(--dim); cursor: pointer; opacity: 0; font-size: 15px; line-height: 1; }
-.wsrow:hover .wsmore-btn, .wsmore-btn:focus-visible { opacity: 1; }
-.wsmore-btn:hover { background: var(--card); color: var(--ink); }
-.wsmoremenu { position: absolute; right: 0; top: calc(100% + 3px); z-index: 30; min-width: 132px; display: flex; flex-direction: column;
+.wsgroups { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+/* a workspace group (rung) */
+.wsgroup { position: relative; }
+.wshdr { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 4px 8px 4px 7px; border-radius: 8px; cursor: pointer; user-select: none; }
+.wshdr:hover { background: var(--line); }
+.wsgroup.open > .wshdr { background: var(--line); }
+.wsemoji { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
+  background: var(--card); border: 1px solid var(--line); font-size: 13px; line-height: 1; }
+.wsname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 600 13px var(--read); color: var(--ink); }
+.wschev { flex: none; display: grid; place-items: center; color: var(--dim); transition: transform .15s ease; }
+.wschev svg { width: 14px; height: 14px; }
+.wsgroup.open > .wshdr .wschev { transform: rotate(90deg); }
+.wshdr .wsmore-btn { flex: none; width: 24px; height: 24px; border: none; border-radius: 6px; background: none; color: var(--dim); cursor: pointer; opacity: 0; font-size: 15px; line-height: 1; }
+.wshdr:hover .wsmore-btn, .wsmore-btn:focus-visible { opacity: 1; }
+.wshdr .wsmore-btn:hover { background: var(--card); color: var(--ink); }
+.wsmoremenu { position: absolute; right: 6px; top: 32px; z-index: 30; min-width: 150px; display: flex; flex-direction: column;
   background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.22); }
 .wsmoremenu button { text-align: left; border: none; background: none; color: var(--ink); cursor: pointer; border-radius: 6px; padding: 7px 10px; font: 500 13px var(--read); }
 .wsmoremenu button:hover { background: var(--line); }

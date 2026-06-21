@@ -410,7 +410,16 @@
     }
     // Refresh ONLY the sidebar file tree in place — never rebuild the shell here (that would race the
     // async view mount and detach the page content).
-    function paintTree(){ var t = document.querySelector('.sidetree'); if (t) t.innerHTML = treeHtml('', 0); }
+    function paintTree(){
+      // Repaint each OPEN workspace group's nested file tree in place (handles async folder loads and
+      // nested dir toggles) — never rebuild the shell here (that would race the async view mount).
+      (WB.ws.list || []).forEach(function (w) {
+        if (!st.treeOpen[w.name]) return;
+        var sel = (window.CSS && CSS.escape) ? CSS.escape(w.name) : w.name;
+        var wt = document.querySelector('[data-ws-tree="' + sel + '"]');
+        if (wt) wt.innerHTML = treeHtml(w.name, 1);
+      });
+    }
     function isBookmarked(path){ return st.bookmarks.some(function(b){ return b.path === path; }); }
     // File search across workspaces — updates the results box IN PLACE (no shell re-render → keeps focus).
     function runSearch(){
@@ -486,22 +495,25 @@
           navlink('/integrations', ICO.apps, 'Integrations', p) +
         '</nav></div></div>';
 
-      // Each workspace is a FOLDER: a disclosure caret expands its real file tree (desktop-app style).
+      // Workspaces are Slack-style collapsible GROUPS (rungs): an emoji-squircle + name header with a
+      // disclosure caret on the RIGHT; expanding reveals that workspace's real file tree nested under it.
       var wslist = WB.ws.list.map(function (w) {
         if (st.editingId === w.id) return wsEditor(false);
-        var on = onWorkspace && ws && ws.id === w.id;
         var open = !!st.treeOpen[w.name];
-        return '<div class="wsrow' + (on ? ' on' : '') + (open ? ' wsopen' : '') + '" data-ws="' + esc(w.id) + '">' +
-          '<button class="wstoggle" data-tree-toggle="' + esc(w.name) + '" title="Show files" aria-label="Show files">' + ICO.chev + '</button>' +
-          '<button class="wsmain" data-wsopen="' + esc(w.id) + '"><span class="av sm">' + esc(w.icon || (w.name[0] || 'W').toUpperCase()) + '</span><span class="omname">' + esc(w.name) + '</span></button>' +
-          '<div class="wsmore">' +
+        return '<div class="wsgroup' + (open ? ' open' : '') + '">' +
+          '<div class="wshdr" data-tree-toggle="' + esc(w.name) + '" role="button" tabindex="0" title="' + esc(w.name) + '">' +
+            '<span class="wsemoji">' + esc(w.icon || '📁') + '</span>' +
+            '<span class="wsname">' + esc(w.name) + '</span>' +
             '<button class="wsmore-btn" data-wsmore="' + esc(w.id) + '" title="More" aria-label="More">⋯</button>' +
-            (st.wsMenuFor === w.id ? ('<div class="wsmoremenu" role="menu">' +
-              '<button data-wsedit="' + esc(w.id) + '">Edit</button>' +
-              '<button data-wssettings="' + esc(w.id) + '">Settings</button>' +
-            '</div>') : '') +
-          '</div></div>' +
-          (open ? '<div class="wstree">' + treeHtml(w.name, 1) + '</div>' : '');
+            '<span class="wschev">' + ICO.chev + '</span>' +
+          '</div>' +
+          (st.wsMenuFor === w.id ? ('<div class="wsmoremenu" role="menu">' +
+            '<button data-wsopen="' + esc(w.id) + '">Open explorer</button>' +
+            '<button data-wsedit="' + esc(w.id) + '">Edit</button>' +
+            '<button data-wssettings="' + esc(w.id) + '">Settings</button>' +
+          '</div>') : '') +
+          (open ? '<div class="wstree" data-ws-tree="' + esc(w.name) + '">' + treeHtml(w.name, 1) + '</div>' : '') +
+        '</div>';
       }).join('');
       if (st.editingId === 'new') wslist += wsEditor(true);
       if (WB.ws.list.length === 0) wslist += '<div class="omempty">No workspaces yet</div>';
@@ -566,8 +578,8 @@
             navlink('/studio', ICO.spark, 'Studio', p) +
             navlink('/activity', ICO.activity, 'Activity', p) +
           '</nav>' +
-          '<div class="sidetree-hd">Files</div>' +
-          '<div class="sidetree">' + treeHtml('', 0) + '</div>' +
+          '<div class="sidetree-hd wsh">Workspaces<button class="wsadd" data-wsnew title="New workspace" aria-label="New workspace">+</button></div>' +
+          '<div class="wsgroups">' + wslist + '</div>' +
           '<div class="navspacer"></div>' +
           adminDrawer +
         '</aside>' +
@@ -582,7 +594,6 @@
       if (st.pickerOpen) { var ph = root.querySelector('#wsPicker'); if (ph) WB.emojiPicker(ph, function (u) { st.editIcon = u; st.pickerOpen = false; renderShell(); renderView(); }); }
       var si = document.getElementById('wbFileSearch');
       if (si) { si.value = st.search; si.oninput = function(){ st.search = si.value; runSearch(); }; if (st.search) runSearch(); }
-      loadTree('');   // populate the sidebar nexus file tree (re-renders when loaded)
     }
     // Let other views (the workspace explorer) refresh the sidebar after a pin/unpin so Pinned updates live.
     WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };
@@ -652,7 +663,16 @@
       if (t.closest && t.closest('[data-nxcreate]')) { st.nxMenu = false; renderShell(); openNewNexus(); return; }
       if (t.closest && t.closest('[data-wsnew]')) { st.editingId = 'new'; st.editName = ''; st.editIcon = ''; st.pickerOpen = false; renderShell(); return; }
       var bmtog = t.closest && t.closest('[data-bm]'); if (bmtog) { e.stopPropagation(); toggleBookmark(bmtog.getAttribute('data-bm'), bmtog.getAttribute('data-bml')); return; }
-      var ttog = t.closest && t.closest('[data-tree-toggle]'); if (ttog) { var tp = ttog.getAttribute('data-tree-toggle'); if (st.treeOpen[tp]) delete st.treeOpen[tp]; else { st.treeOpen[tp] = true; loadTree(tp); } paintTree(); return; }
+      var ttog = t.closest && t.closest('[data-tree-toggle]');
+      if (ttog && !(t.closest && t.closest('[data-wsmore]'))) {   // ⋯ inside a group header opens the menu, not the group
+        var tp = ttog.getAttribute('data-tree-toggle');
+        var isWs = (WB.ws.list || []).some(function (w) { return w.name === tp; });
+        if (st.treeOpen[tp]) delete st.treeOpen[tp]; else { st.treeOpen[tp] = true; loadTree(tp); }
+        // A workspace GROUP toggle adds/removes its .wstree → needs a shell re-render (view is preserved);
+        // a dir toggle INSIDE an open tree only repaints that tree in place.
+        if (isWs) renderShell(); else paintTree();
+        return;
+      }
       var tfile = t.closest && t.closest('[data-tree-file]'); if (tfile) { var fp = tfile.getAttribute('data-tree-file'); WB._pendingFile = fp; if (WB.openInExplorer && ROUTE.path === '/workspaces') WB.openInExplorer(fp); else WB.nav('/workspaces'); return; }
       var wsmore = t.closest && t.closest('[data-wsmore]'); if (wsmore) { e.stopPropagation(); var mid = wsmore.getAttribute('data-wsmore'); st.wsMenuFor = st.wsMenuFor === mid ? null : mid; renderShell(); return; }
       var wsset = t.closest && t.closest('[data-wssettings]'); if (wsset) { WB.ws.setActive(wsset.getAttribute('data-wssettings')); st.wsMenuFor = null; openWsSettings(); return; }
