@@ -122,7 +122,7 @@ defmodule Nexus.Config do
   def nexus_emoji, do: get(:nexus_emoji)
 
   # Login providers (Nexus.Auth.Provider). Declared as `auth-provider-<name>-<key>="…"` deploy attrs,
-  # e.g. `auth-provider-workos-authorize-url`, `-token-url`, `-jwks-url`, `-client-id`, `-issuer`,
+  # e.g. `auth-provider-google-authorize-url`, `-token-url`, `-jwks-url`, `-client-id`, `-issuer`,
   # `-scope`, `-redirect-uri`, `-tenant-claim`. Secrets (client_secret) live in Nexus.Secrets, NEVER
   # here. `provider/1` → the whole map; `provider/3` → one key.
   def providers, do: get(:providers)

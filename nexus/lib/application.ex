@@ -30,8 +30,8 @@ defmodule Nexus.Application do
     # Register the selected `:search` provider behind the Nexus.Browse seam. Default = keyless
     # metasearch (pure-BEAM, local/dev); `deploy search="brave"` swaps in the keyed cloud API.
     register_search_provider()
-    # In the control-plane role, force WorkOS-JWT auth (org_id → tenant) from the deploy env — every
-    # /api/platform caller must carry a real org identity (fail-closed; see Nexus.ControlPlane).
+    # In the control-plane role, gate /api/platform behind our own native session / PAT
+    # (Nexus.Auth.Cloud) — every caller carries a real org identity (fail-closed; see Nexus.ControlPlane).
     Nexus.ControlPlane.configure_auth()
     # Empty by default; Constellation's local-inference lanes opt in via `config :nexus, Nexus.Constellation, enabled: true`.
     ether = if Nexus.Constellation.enabled?(), do: Nexus.Constellation.children(), else: []

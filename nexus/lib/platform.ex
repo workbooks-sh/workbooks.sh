@@ -5,8 +5,8 @@ defmodule Nexus.Platform do
   via `forward "/api/platform"`, but ONLY answers when this nexus runs in the control-plane role
   (`WB_CONTROL_PLANE`) — otherwise 404, indistinguishable from a tenant runtime.
 
-  **Security:** `org = conn.assigns[:tenant]`, set upstream by `Nexus.Auth` from the WorkOS JWT's
-  `org_id`. `require_org` REFUSES to serve under `Nexus.Auth.None` (no real identity → no platform
+  **Security:** `org = conn.assigns[:tenant]`, set upstream by `Nexus.Auth.Cloud` from the caller's
+  native session / PAT. `require_org` REFUSES to serve under `Nexus.Auth.None` (no real identity → no platform
   access), and every handler scopes to `org` through `Nexus.ControlPlane`, whose `{org, kind, id}`
   keying makes cross-org reads structurally impossible. Body input is whitelisted (name/region/plan,
   name/icon/nexus_id) — org, secrets, image, and the Fly org are pinned server-side, never caller
@@ -149,7 +149,7 @@ defmodule Nexus.Platform do
   end
 
   # ── CLI access tokens (minted for the org; the `work` CLI sends them as Bearer) ────────────────
-  # The dashboard (WorkOS JWT) mints these; the headless CLI then authenticates
+  # The dashboard (native session) mints these; the headless CLI then authenticates
   # with one via Nexus.Auth.Cloud — no browser session needed.
   post "/tokens/mint" do
     name = read(conn)["name"] || "cli"

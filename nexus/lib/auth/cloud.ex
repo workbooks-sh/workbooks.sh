@@ -1,13 +1,9 @@
 defmodule Nexus.Auth.Cloud do
   @moduledoc """
-  Control-plane auth adapter: accept EITHER a CLI personal-access token
-  (`Authorization: Bearer wbk_…`, resolved by `Nexus.ControlPlane.Token`) OR a
-  WorkOS JWT (delegated to `Nexus.Auth.Jwt`). The dashboard logs in with a JWT;
-  the `work` CLI uses a minted PAT. Both resolve to the same `org` tenant, so
-  `/api/platform` is identical for browser and CLI.
-
-  The control plane selects this adapter (see `Nexus.ControlPlane.configure/0`),
-  which still configures `Nexus.Auth.Jwt` underneath so the JWT path keeps working.
+  Control-plane auth adapter — OUR OWN identity, no third-party IdP. Accept EITHER our native session
+  cookie (`Nexus.Auth.Session`, set by `/auth/login`; the browser dashboard) OR a CLI personal-access
+  token (`Authorization: Bearer wbk_…`, resolved by `Nexus.ControlPlane.Token`). Both resolve to the
+  same `org` tenant, so `/api/platform` is identical for browser and CLI.
 
   **Scoped gate.** A control-plane nexus is ALSO an ordinary nexus serving its own (often public)
   website. Only the org-data API (`/api/platform`) requires an org identity; every other path — the
@@ -37,17 +33,18 @@ defmodule Nexus.Auth.Cloud do
               else: {:ok, %{tenant: Nexus.Store.default_tenant(), user: nil}}
         end
 
-      # A presented credential resolves to its org on ANY path (CLI + dashboard both authenticate here).
+      # A CLI personal-access token resolves to its org on ANY path.
       "wbk_" <> _ = token ->
         case Nexus.ControlPlane.Token.resolve(token) do
           {:ok, org} -> {:ok, %{tenant: org, user: "cli"}}
           :error -> {:error, :unauthorized}
         end
 
-      # A non-PAT bearer is a WorkOS JWT (legacy transition path — removed once native login is the only
-      # way in).
+      # Any other bearer is not a credential we issue → reject the gated API, public elsewhere.
       _ ->
-        Nexus.Auth.Jwt.authenticate(conn)
+        if String.starts_with?(path, @gated),
+          do: {:error, :unauthorized},
+          else: {:ok, %{tenant: Nexus.Store.default_tenant(), user: nil}}
     end
   end
 

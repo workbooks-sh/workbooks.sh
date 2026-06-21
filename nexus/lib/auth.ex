@@ -10,8 +10,8 @@ defmodule Nexus.Auth do
     * `Nexus.Auth.None`   — DEFAULT. No auth; everyone is tenant `"default"` (local / single-tenant).
     * `Nexus.Auth.Bearer` — a shared `NEXUS_DATA_TOKEN` → a fixed `NEXUS_TENANT` (single-tenant lock).
     * `Nexus.Auth.Jwt`    — verify a Bearer JWT (HS256 secret OR RS256 via a JWKS url) and take the
-      tenant from a configured claim. **One adapter for WorkOS / Clerk / Auth0 / BetterAuth / your
-      own** — they all issue JWTs; you configure the `jwks_url`/`secret` + which claim is the tenant.
+      tenant from a configured claim. **One adapter for Clerk / Auth0 / your own IdP** — they all
+      issue JWTs; you configure the `jwks_url`/`secret` + which claim is the tenant.
 
   An adapter just implements `authenticate/1`. Bring your own provider behind the same contract.
   """

@@ -4,8 +4,8 @@ defmodule Nexus.ControlPlane do
   (nexus fleet, workspaces, usage, storage). A nexus runs in this role only when **enabled** (the
   `WB_CONTROL_PLANE` deploy flag); a tenant runtime never does.
 
-  **Security model (the whole point of this module):** every record is owned by an `org` — the
-  WorkOS-issued JWT's `org_id`, surfaced as `conn.assigns[:tenant]` by `Nexus.Auth.Jwt`. Every read
+  **Security model (the whole point of this module):** every record is owned by an `org` — the caller's
+  org from their native session / PAT, surfaced as `conn.assigns[:tenant]` by `Nexus.Auth.Cloud`. Every read
   and write is org-scoped at the DATA layer (`list/get/update/delete` all take `org` and filter on
   it), so a caller can only ever see or touch its OWN records. Ownership IDOR is closed here, not
   re-checked per route. The registry below is the in-memory tier (ETS, tenant-partitioned) that the
@@ -17,29 +17,13 @@ defmodule Nexus.ControlPlane do
   def enabled?, do: System.get_env("WB_CONTROL_PLANE") in ~w(1 true)
 
   @doc """
-  Wire the auth adapter for the control-plane role (called at boot). When enabled, the control-plane
-  MUST authenticate every caller via the WorkOS-issued JWT (`org_id` → tenant), so we force
-  `Nexus.Auth.Jwt` and configure it from the deploy env (the OIDC provider this role trusts — public
-  config, not a secret):
-
-      WB_OIDC_JWKS_URL     the IdP JWKS endpoint (https; required — without it auth fails CLOSED)
-      WB_OIDC_TENANT_CLAIM the claim carrying the org/tenant (default "org_id")
-      WB_OIDC_ISS          expected issuer (optional but recommended)
-
-  Fail-closed: a missing JWKS URL leaves `jwks_url: nil`, so every token 401s — the control-plane is
-  inert, never wide-open. Returns `:ok | :skip`.
+  Wire the auth adapter for the control-plane role (called at boot). The control-plane authenticates
+  via OUR OWN identity — a native session cookie (`Nexus.Auth.Session`, set by `/auth/login`) for the
+  dashboard, or a `wbk_` personal-access token for the `work` CLI — both resolved by `Nexus.Auth.Cloud`,
+  both mapping to the caller's `org` tenant. No third-party IdP. Returns `:ok | :skip`.
   """
   def configure_auth do
     if enabled?() do
-      cfg =
-        [
-          jwks_url: System.get_env("WB_OIDC_JWKS_URL"),
-          tenant_claim: System.get_env("WB_OIDC_TENANT_CLAIM") || "org_id"
-        ] ++ if((iss = System.get_env("WB_OIDC_ISS")), do: [iss: iss], else: [])
-
-      Application.put_env(:nexus, Nexus.Auth.Jwt, cfg)
-      # Cloud adapter = CLI personal-access token (wbk_…) OR the WorkOS JWT it
-      # wraps, so the `work` CLI and the dashboard both authenticate here.
       Application.put_env(:nexus, :auth, Nexus.Auth.Cloud)
       :ok
     else

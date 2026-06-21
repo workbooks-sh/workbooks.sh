@@ -1,9 +1,9 @@
 # Platform Control Plane (PCP) — the hosted-nexus dashboard's backend.
 #
 # The SAME nexus image as a tenant runtime, but in the CONTROL-PLANE role (WB_CONTROL_PLANE=1):
-# always-on, multi-tenant, authenticated by WorkOS JWT. The dashboard forwards the user's WorkOS
-# access token; Nexus.Auth.Jwt verifies it via the IdP JWKS and maps its `org_id` claim → tenant.
-# It owns the nexus registry and (next) drives the Fly Machines API to provision per-tenant nexuses.
+# always-on, multi-tenant, authenticated by OUR OWN native session cookie / CLI PAT (Nexus.Auth.Cloud)
+# — no third-party IdP. It owns the nexus registry and drives the Fly Machines API to provision
+# per-tenant nexuses.
 #
 # Deploy (image-based, no local build):
 #   fly apps create wb-nexus-cp --org personal
@@ -30,9 +30,6 @@ primary_region = "sjc"
   WB_SERVE = "1"
   PORT = "4000"
   WB_CONTROL_PLANE = "1"
-  # WorkOS AuthKit access-token verification (public config; the verifier needs no secret).
-  WB_OIDC_JWKS_URL = "https://api.workos.com/sso/jwks/client_01KS9XB6QEZTMHVHTFXZSZ65GY"
-  WB_OIDC_TENANT_CLAIM = "org_id"
   # The persistent volume (the nexus registry's durable home — see the registry-durability TODO;
   # the in-memory ETS registry must move to exqlite on /data before this is production-durable).
   WB_DATA = "/data"
