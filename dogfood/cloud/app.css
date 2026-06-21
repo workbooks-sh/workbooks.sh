@@ -88,7 +88,11 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 @media (prefers-reduced-motion:reduce){ .dot.run,.dot.build{ animation:none; } }
 
 #app{ display:grid; grid-template-columns:56px 250px 1fr; grid-template-rows:8px 1fr; height:100vh; }
-#app > .topdna{ grid-column:1 / -1; grid-row:1; height:8px; margin:0; overflow:hidden; }
+#app > .topdna{ grid-column:1 / 3; grid-row:1; height:8px; margin:0; overflow:hidden; }
+/* DNA bar caps the rail+sidebar only; main content fills its full column height (both rows). */
+#app > .nexrail{ grid-column:1; grid-row:2; }
+#app > .side{ grid-column:2; grid-row:2; }
+#app > .main{ grid-column:3; grid-row:1 / 3; }
 /* Collapse the sidebar into an ICON RAIL (not hidden): nav icons only, no labels/tree. */
 #app.rail{ grid-template-columns:56px 58px 1fr; }
 #app.rail .side{ padding:14px 8px 18px; }
