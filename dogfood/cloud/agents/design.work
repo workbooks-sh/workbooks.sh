@@ -193,6 +193,28 @@ Decided (the jj discussion): tasks and issues are **committed `.work` files**, t
   jj-wiring tracked in bd.)
 - **josh** (subtree proxy) is NOT in the repo — not a current integration point.
 
+## josh — investigated, RESOLVED: don't adopt now (use native `git subtree`)
+
+Two deep investigations (incl. the wasm-sandbox angle) settled this:
+
+- **josh cannot run in our wasm sandboxes.** josh-core hard-depends on `git2`
+  (vendored libgit2, **C**) + `sled` (mmap/atomics embedded DB) — neither builds on
+  our `wasm32-wasi` Rust lane (mrustc + libstd, no C build scripts), and our sandbox
+  ABI deliberately exposes no git-object-store capability to guests. "Compile the
+  concept to wasm" = a multi-month fork off libgit2 onto an unfinished gitoxide-wasm
+  target + replacing sled — exactly the tech-debt to avoid. josh's real (only) home
+  is a **native sidecar** on the bare repos, never a wasm guest.
+- **Subtree composition survives** — josh's `:/`, `:prefix=`, `:[…]`, `:workspace=`
+  are bidirectional/reversible and nest; `:workspace=` literally mirrors our
+  `workspaces="<subtree>|Name|emoji"`. So the concern ("only vital if composition
+  survives") is satisfied — but only in the sidecar form.
+- **We already have** IDE-sync + GitHub-monorepo mirror from `Nexus.Git`/`GitHttp`.
+  The only gap josh closes is **bidirectional subtree views across workspaces**.
+- **Decision:** close that gap with the **native `git` we already shell to** —
+  incremental cached `git subtree split` for read views + subtree push-back — NOT a
+  new Rust sidecar. Adopt **josh-as-native-sidecar only if** `git subtree` measurably
+  falls short at real volume. **Never** pursue josh→wasm.
+
 ## Still open (genuinely undecided — flag for next pass)
 
 - Issue-store physical home: git-indexed `.work` vs DB table (`wb-35ma`).

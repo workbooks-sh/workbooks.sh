@@ -69,7 +69,11 @@ defmodule Nexus.GitHttp do
         # After a push (receive-pack), refresh the compiled tier so pushed units serve — files are
         # already live on disk via the post-receive checkout. Async: don't block the git response.
         if String.contains?(rest, "git-receive-pack") and conn.method == "POST" do
-          Task.start(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
+          Task.start(fn ->
+            if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount()
+            # jj-as-substrate: fold the externally-pushed commits into the op-log (no-op unless on).
+            if Nexus.JJ.substrate?(), do: Nexus.JJ.import_refs(bare, work_dir(ws))
+          end)
         end
 
         resp

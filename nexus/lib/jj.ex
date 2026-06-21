@@ -195,6 +195,21 @@ defmodule Nexus.JJ do
     end
   end
 
+  @doc """
+  Import git refs into jj after an EXTERNAL `git push` so the pushed commits show up in the op-log too
+  (otherwise only internal jj-routed edits are recorded). Best-effort, no-op-safe. `:ok | {:skip,_} | {:error,_}`.
+  """
+  def import_refs(bare, work_dir) do
+    with :ok <- ensure_colocated(bare, work_dir),
+         {_, 0} <- jj(work_dir, ["git", "import"]) do
+      :ok
+    else
+      {:skip, r} -> {:skip, r}
+      {out, _} when is_binary(out) -> {:error, out}
+      other -> {:error, inspect(other)}
+    end
+  end
+
   # jj short op ids are lowercase hex — a tight allowlist for the read-only op-log.
   defp valid_op_id?(id), do: is_binary(id) and id =~ ~r/\A[0-9a-f]{4,}\z/
 
