@@ -43,10 +43,7 @@ defmodule Nexus.Server do
     # Register this nexus in the machine's nexus registry so the CLI can reach it by name.
     Nexus.Identity.register(name, friendly, "http://localhost:#{port}")
     IO.puts("⬡ nexus #{name}#{if(friendly != "", do: " (#{friendly})", else: "")} · :#{port} · #{length(mounts)} workbook(s)")
-    # Use the polling-accept transport: under libkrun TSI (the local `work deploy` microVM) a parked
-    # blocking accept deadlocks the listener at boot; a short-timeout poll fixes it and is harmless
-    # everywhere else (see Nexus.Server.PollingTransport).
-    Bandit.start_link(plug: __MODULE__, port: port, thousand_island_options: [transport_module: Nexus.Server.PollingTransport])
+    Bandit.start_link(plug: __MODULE__, port: port)
   end
 
   # ONE nexus, MANY workbooks. A root with `.work` files directly = a single workbook, served at `/`.
