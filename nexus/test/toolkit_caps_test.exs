@@ -1,5 +1,7 @@
 defmodule Nexus.Toolkit.CapsTest do
-  use ExUnit.Case, async: true
+  # async: false — registers toolkits in the shared global kit registry that another sync test's
+  # on_exit (toolkit_test) clears; running serially avoids the cross-test registry race.
+  use ExUnit.Case, async: false
   alias Nexus.Toolkit.Caps
 
   test "path_key composes the partition path" do
