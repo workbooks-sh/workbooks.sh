@@ -66,13 +66,10 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
 
     // Full-bleed chat + the floating rail. Activity is now its own page (the feed); the rail's
     // Activity button navigates there. Create (+) starts a fresh chat.
+    // The floating studio rail is retired — New chat + Activity are sidebar items now. Studio = pure chat.
     return html`
       <div class="studio">
         <section class="studio-chat" ref=${mountChat}></section>
-        <nav class="studio-rail">
-          <button class="studio-railbtn" data-tip="Create" aria-label="Create" onClick=${newChat} innerHTML=${ICONS.plus}></button>
-          <button class="studio-railbtn" data-tip="Activity" aria-label="Activity" onClick=${function(){ WB.nav('/activity'); }} innerHTML=${ICONS.activity}></button>
-        </nav>
       </div>`;
   }
   el.innerHTML = '';

@@ -67,14 +67,13 @@ WB.view('/activity', { title: 'Activity', accent: 'var(--violet)', fullbleed: tr
           '<div class="actfeed">' + (shown.length ? shown.map(feedItem).join('') :
             '<div class="actempty">Nothing here yet. As agents run, deploys ship, and your team acts, it shows up here.</div>') + '</div>' +
         '</div></div>' +
-        rail() +
       '</div>';
     el.querySelectorAll('[data-tab]').forEach(function(b){
       b.onclick = function(){ active = b.getAttribute('data-tab'); paint(); };
     });
   }
 
-  el.innerHTML = '<div class="studio"><div class="studio-scroll"><div class="actwrap"><div class="actempty">Loading…</div></div></div>' + rail() + '</div>';
+  el.innerHTML = '<div class="studio"><div class="studio-scroll"><div class="actwrap"><div class="actempty">Loading…</div></div></div></div>';
   try {
     var r = await fetch('/cloud/activity', { credentials: 'same-origin' });
     var d = await r.json();

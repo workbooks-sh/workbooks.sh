@@ -236,6 +236,59 @@
       else location.hash = target;
     };
 
+    // ── Command palette (⌘K) — search files + workspaces + jump to nav. Replaces the in-sidebar search. ──
+    var NAV_CMDS = [
+      { label: 'New chat', icon: '+', go: '/studio' },
+      { label: 'Activity', icon: '∿', go: '/activity' },
+      { label: 'Workspaces', icon: '▦', go: '/workspace' },
+      { label: 'Usage & billing', icon: '◷', go: '/usage' },
+      { label: 'Storage', icon: '▤', go: '/storage' },
+      { label: 'Team', icon: '👥', go: '/team' },
+      { label: 'Secrets', icon: '🔑', go: '/secrets' },
+      { label: 'Settings', icon: '⚙', go: '/settings' }
+    ];
+    WB.palette = function () {
+      if (document.getElementById('wbPalette')) return;
+      var ov = document.createElement('div'); ov.id = 'wbPalette'; ov.className = 'palette-ov';
+      ov.innerHTML = '<div class="palette"><input class="palette-in" placeholder="Search files, workspaces, commands…" autocomplete="off" /><div class="palette-res"></div></div>';
+      document.body.appendChild(ov);
+      var input = ov.querySelector('.palette-in'), res = ov.querySelector('.palette-res');
+      var items = [], sel = 0;
+      function close(){ ov.remove(); }
+      function go(it){ close(); if (it.go) WB.nav(it.go); else if (it.ws) { WB.ws.setActive(it.ws); WB.nav('/workspace'); } else if (it.file) WB.nav('/workspace'); }
+      function render(){
+        res.innerHTML = items.length ? items.map(function(it, i){
+          return '<div class="palette-item' + (i === sel ? ' on' : '') + '" data-i="' + i + '"><span class="palette-ic">' + esc(it.icon || '›') + '</span><span class="palette-lb">' + esc(it.label) + '</span>' + (it.sub ? '<span class="palette-sub">' + esc(it.sub) + '</span>' : '') + '</div>';
+        }).join('') : '<div class="palette-empty">No matches</div>';
+        res.querySelectorAll('[data-i]').forEach(function(el){ el.onclick = function(){ go(items[+el.getAttribute('data-i')]); }; });
+      }
+      function refresh(){
+        var q = input.value.trim().toLowerCase();
+        var navm = NAV_CMDS.filter(function(c){ return !q || c.label.toLowerCase().indexOf(q) >= 0; });
+        var wsm = (WB.ws.list || []).filter(function(w){ return !q || w.name.toLowerCase().indexOf(q) >= 0; })
+          .map(function(w){ return { icon: w.icon || '▦', label: w.name, sub: 'workspace', ws: w.id }; });
+        items = navm.concat(wsm); sel = 0; render();
+        if (q) fetch('/cloud/search?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+          .then(function(r){ return r.json(); }).then(function(d){
+            if (input.value.trim().toLowerCase() !== q) return;
+            var files = ((d && d.results) || []).slice(0, 12).map(function(f){ return { icon: '📄', label: f.name, sub: f.workspace, file: f.path }; });
+            items = navm.concat(wsm, files); render();
+          });
+      }
+      input.addEventListener('input', refresh);
+      input.addEventListener('keydown', function(e){
+        if (e.key === 'Escape') return close();
+        if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, items.length - 1); render(); e.preventDefault(); }
+        if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); render(); e.preventDefault(); }
+        if (e.key === 'Enter' && items[sel]) { go(items[sel]); e.preventDefault(); }
+      });
+      ov.addEventListener('click', function(e){ if (e.target === ov) close(); });
+      refresh(); input.focus();
+    };
+    window.addEventListener('keydown', function(e){
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); WB.palette(); }
+    });
+
     var ACCENT = { '/storage': 'var(--sky)', '/team': 'var(--peach)', '/shared': 'var(--cream)', '/usage': 'var(--sage)',
       '/settings': 'var(--violet)', '/workspace': 'var(--peach)', '/database': 'var(--mint)', '/upgrade': 'var(--mint)' };
     function sectionAccent(p){ for (var k in ACCENT) { if (p.indexOf(k) === 0) return ACCENT[k]; } return 'var(--mint)'; }
@@ -262,7 +315,9 @@
       spark: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>',
       activity: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
       admin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',
-      chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>'
+      chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+      search: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+      rail: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>'
     };
     var WMARK = '<svg viewBox="0 0 113.444 65.6002" fill="none"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>';
     var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
@@ -270,8 +325,9 @@
 
     // shell menu state
     var st = { nxMenu: false, wsMenu: false, editingId: null, editName: '', editIcon: '', pickerOpen: false, nxEditing: false, nxEditName: '', adminOpen: false,
-      treeOpen: {}, treeData: {}, treeLoading: {}, bookmarks: [], search: '', wsMenuFor: null };
+      treeOpen: {}, treeData: {}, treeLoading: {}, bookmarks: [], search: '', wsMenuFor: null, rail: false };
     try { st.adminOpen = localStorage.getItem('wb-admin-drawer') === 'open'; } catch (e) {}
+    try { st.rail = localStorage.getItem('wb-rail') === '1'; } catch (e) {}
     try { st.bookmarks = JSON.parse(localStorage.getItem('wb-bookmarks') || '[]'); } catch (e) { st.bookmarks = []; }
     function saveBookmarks(){ try { localStorage.setItem('wb-bookmarks', JSON.stringify(st.bookmarks)); } catch (e) {} }
     function toggleBookmark(path, label){
@@ -402,7 +458,7 @@
       var prevView = document.getElementById('view');
 
       root.innerHTML =
-      '<div id="app" style="--section:' + sectionAccent(p) + '">' +
+      '<div id="app" class="' + (st.rail ? 'rail' : '') + '" style="--section:' + sectionAccent(p) + '">' +
         '<aside class="side">' +
           '<div class="topdna">' + WB.dna(7, 8) + '</div>' +
           '<div class="swrap nxtop">' +
@@ -412,16 +468,14 @@
               '<svg class="ico ch" viewBox="0 0 24 24"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>' +
             '</div>' + nxMenu +
           '</div>' +
-          (WB.dev ? ('<nav class="nxnav nxprimary">' +
-            navlink('/studio', ICO.spark, 'Studio', p) +
-          '</nav>') : '') +
-          bmsec +
-          searchsec +
-          '<div class="swrap wssec">' +
-            '<div class="swlabel wshdr"><span>Workspaces</span><button class="wsadd" data-wsnew title="New workspace" aria-label="New workspace">+</button></div>' +
-            '<div class="wslist">' + wslist + '</div>' +
-          '</div>' +
+          '<nav class="nxnav nxprimary">' +
+            '<button class="nxlink nxsearch" data-palette aria-label="Search (Cmd-K)" title="Search">' + ICO.search + '<span class="lbl">Search</span><span class="kbd">⌘K</span></button>' +
+            navlink('/studio', ICO.spark, 'New chat', p) +
+            navlink('/activity', ICO.activity, 'Activity', p) +
+            navlink('/workspace', ICO.apps, 'Workspaces', p) +
+          '</nav>' +
           '<div class="navspacer"></div>' +
+          '<button class="railtoggle" data-rail-toggle aria-label="Collapse sidebar">' + ICO.rail + '</button>' +
           adminDrawer +
           '<div class="acct" style="display:flex;align-items:center;gap:4px">' +
             '<a data-nav="/settings" href="#/settings" title="' + esc(user.name) + '" style="display:flex;align-items:center;flex:1;text-decoration:none;color:inherit;min-width:0">' +
@@ -444,7 +498,7 @@
       var si = document.getElementById('wbFileSearch');
       if (si) { si.value = st.search; si.oninput = function(){ st.search = si.value; runSearch(); }; if (st.search) runSearch(); }
     }
-    function navlink(href, ico, label, p){ return '<a class="nxlink' + (p === href ? ' on' : '') + '" data-nav="' + href + '" href="#' + href + '">' + ico + ' ' + label + '</a>'; }
+    function navlink(href, ico, label, p){ return '<a class="nxlink' + (p === href ? ' on' : '') + '" data-nav="' + href + '" href="#' + href + '" title="' + esc(label) + '">' + ico + '<span class="lbl">' + esc(label) + '</span></a>'; }
     function wsEditor(isNew){ var tile = st.editIcon || ((st.editName.trim()[0] || 'W').toUpperCase());
       return '<div class="wsedit"><div class="wsiconrow">' +
         '<button class="wstile' + (st.pickerOpen ? ' on' : '') + '" data-wspick title="Change icon" aria-label="Change icon">' + esc(tile) + '</button>' +
@@ -497,6 +551,8 @@
       var navEl = t.closest && t.closest('[data-nav]'); if (navEl) { e.preventDefault(); WB.nav(navEl.getAttribute('data-nav')); return; }
       if (t.closest && t.closest('[data-crumb-back]')) { var ret = WB.settingsReturn; WB.settingsReturn = null; WB.nav((ret && ret.path) || '/'); return; }
       if (t.closest && t.closest('[data-theme-toggle]')) { var cur = document.documentElement.getAttribute('data-theme') || 'dark'; var nt = cur === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', nt); try { localStorage.setItem('wb-theme', nt); } catch (er) {} renderShell(); renderView(); return; }
+      if (t.closest && t.closest('[data-rail-toggle]')) { st.rail = !st.rail; try { localStorage.setItem('wb-rail', st.rail ? '1' : '0'); } catch (er) {} renderShell(); return; }
+      if (t.closest && t.closest('[data-palette]')) { WB.palette(); return; }
       if (t.closest && t.closest('[data-admin-toggle]')) { st.adminOpen = !st.adminOpen; try { localStorage.setItem('wb-admin-drawer', st.adminOpen ? 'open' : 'closed'); } catch (er) {} renderShell(); return; }
       if (t.closest && t.closest('[data-nxmenu]')) { st.nxMenu = !st.nxMenu; st.wsMenu = false; renderShell(); return; }
       var nxsw = t.closest && t.closest('[data-nxswitch]'); if (nxsw) { WB.nexus.setActive(nxsw.getAttribute('data-nxswitch')); st.nxMenu = false; renderShell(); if (ROUTE.path !== '/') WB.nav('/'); else renderView(); return; }
