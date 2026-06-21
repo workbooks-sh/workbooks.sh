@@ -172,6 +172,27 @@ The heart of orchestration: Waldo and the specialists don't just answer — they
   (Phase-2 scheduling, wb-ps2x), and a failed run files an **issue** (wb-35ma) that
   is itself a task. Tasks, runs, schedules, and issues are one connected fabric.
 
+## Issue/task storage — RESOLVED: git-backed `.work` + derived index
+
+Decided (the jj discussion): tasks and issues are **committed `.work` files**, the
+**source of truth lives in git**, and the SQLite store becomes a **derived index**.
+
+- **On disk:** `<workspace>/.nexus/tasks/<tid>.work` and `<workspace>/.nexus/issues/<tid>.work`
+  — **per-workspace**, so each task/issue travels + versions with the workspace it's
+  about (clone, diff in PRs, any git tooling).
+- **Truth = git** via the existing `Nexus.Git.commit_file` (bare-repo) path — the same
+  mechanism `file_save` uses. The Phase-2 SQLite `resource Task` is kept as a
+  **write-through derived index** (fast board reads), rebuildable from disk. This is
+  the doc's own pattern: `.work` is truth, indexes are derived accelerators.
+- **jj is the intent, but currently DORMANT.** `Nexus.JJ` (colocate + op-log + undo)
+  is built + tested but **not wired into any commit path** — and its colocated-`.git`
+  model conflicts with the bare-repo topology. So tasks-in-git ships first (proven
+  path); **wiring jj into the commit path is a separate piece** (jj is dormant for
+  ALL commits, not just tasks). Once jj is live, every workspace + task/issue edit is
+  in the op-log → `jj undo` over agent operations. (Issues: git-backed refactor +
+  jj-wiring tracked in bd.)
+- **josh** (subtree proxy) is NOT in the repo — not a current integration point.
+
 ## Still open (genuinely undecided — flag for next pass)
 
 - Issue-store physical home: git-indexed `.work` vs DB table (`wb-35ma`).
