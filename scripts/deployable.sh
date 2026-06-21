@@ -17,10 +17,10 @@ quiet=${1:-}
 run_json=$(gh run list --workflow=dogfood-deploy.yml --branch=main -L 1 \
   --json status,conclusion,headSha,displayTitle,url 2>/dev/null || true)
 
-verdict=$(printf '%s' "$run_json" | python3 - <<'PY'
-import sys, json
+verdict=$(RUN_JSON="$run_json" python3 <<'PY'
+import os, json
 try:
-    runs = json.load(sys.stdin)
+    runs = json.loads(os.environ.get("RUN_JSON") or "[]")
 except Exception:
     runs = []
 if not runs:
