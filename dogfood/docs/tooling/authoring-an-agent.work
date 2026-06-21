@@ -67,10 +67,20 @@ Declare a reusable agent with the block; define one inline here for a one-off �
 names mean the same thing in both. See it built end to end in [A coding agent](/examples/coding-agent)
 and fanned out in [Agents at scale](/examples/agents-at-scale).
 
-## It's auditable
+## Declared *and* enforced
 
-Because the agent's powers are *declared* — `tools`, `grant`, `limit` — you review it the
-way you review any block: read the prompt, see exactly which kits it can run and which host
-powers it holds. No hidden system prompt, no opaque tool registry, no ambient access. The
-capability audit checks an agent against its grants, just like a [sandbox](/capabilities/grants-and-capabilities).
-To give it a new command, write a [toolkit](/tooling/toolkits) and add it to `tools`.
+The agent's powers aren't just documentation — they're enforced at runtime. `tools` scopes
+what its `bash` may run: a command whose kit isn't in `tools` is refused. `grant` gates the
+host powers — a web command with no `web`/`net` grant is refused. `limit` stops a runaway
+run at its turn or wall-clock budget. So you review an agent by reading the block — which
+kits, which host powers — with no hidden prompt, tool registry, or ambient access, and the
+[capability audit](/capabilities/grants-and-capabilities) checks it just like a `sandbox`.
+To add a power, write a [toolkit](/tooling/toolkits) and list it in `tools`.
+
+## Reacting to a run
+
+Tag an agent `#event` and each run emits an event onto the bus, carrying the agent's other
+`#tags`. A [`hook`](/language/kinds-reference) then matches those events and fires effects —
+notify, run another agent, or kick off a [`flow`](/language/kinds-reference). That's the
+reactive loop: an agent *acts*, a hook *reacts*, a flow *sequences* — all declared, all in
+the workbook.
