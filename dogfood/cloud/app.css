@@ -87,9 +87,14 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
 @media (prefers-reduced-motion:reduce){ .dot.run,.dot.build{ animation:none; } }
 
-#app{ display:grid; grid-template-columns:56px 250px 1fr; height:100vh; }
-#app.rail{ grid-template-columns:56px 0 1fr; }
-#app.rail .side{ display:none; }
+#app{ display:grid; grid-template-columns:56px 250px 1fr; grid-template-rows:8px 1fr; height:100vh; }
+#app > .topdna{ grid-column:1 / -1; grid-row:1; height:8px; margin:0; overflow:hidden; }
+/* Collapse the sidebar into an ICON RAIL (not hidden): nav icons only, no labels/tree. */
+#app.rail{ grid-template-columns:56px 58px 1fr; }
+#app.rail .side{ padding:14px 8px 18px; }
+#app.rail .lbl, #app.rail .kbd, #app.rail .sidetree, #app.rail .sidetree-hd, #app.rail .adminchev{ display:none; }
+#app.rail .nxsearch, #app.rail .nxlink, #app.rail .adminbtn{ justify-content:center; padding:9px 0; }
+#app.rail .sidetop{ justify-content:center; }
 
 /* ── Nexus rail (orgs/nexuses, Slack-style) ── */
 .nexrail{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px 0 12px; background:var(--paper); border-right:1px solid var(--line); overflow:hidden; }
@@ -99,12 +104,12 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .orgtiles{ display:flex; flex-direction:column; gap:8px; }
 .orgtile{ position:relative; width:40px; height:40px; border-radius:13px; border:1px solid var(--line); background:var(--card); color:var(--ink); font:700 15px var(--read); display:grid; place-items:center; cursor:pointer; transition:transform .08s; }
 .orgtile:hover{ transform:translateY(-1px); border-color:var(--stroke); }
-.orgtile.on{ border-color:var(--ink); box-shadow:0 0 0 2px var(--paper), 0 0 0 3px var(--ink); }
+.orgtile.on{ border-color:transparent; box-shadow:inset 0 0 0 2px var(--ink); }
 .orgadd{ width:40px; height:40px; border-radius:13px; border:1px dashed var(--stroke); background:none; color:var(--dim); font:300 22px var(--read); line-height:1; cursor:pointer; display:grid; place-items:center; }
 .orgadd:hover{ color:var(--ink); border-color:var(--ink); }
 .nexrail-grow{ flex:1; }
 .orgavatar{ position:relative; cursor:pointer; }
-.orgavatar .av{ width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--peach),var(--blue)); display:grid; place-items:center; font:700 13px var(--mono); color:var(--on-bloom); border:1px solid var(--line); }
+.orgavatar .av{ width:36px; height:36px; border-radius:11px; background:linear-gradient(135deg,var(--peach),var(--blue)); display:grid; place-items:center; font:700 13px var(--mono); color:var(--on-bloom); border:1px solid var(--line); }
 .acctmenu.rail{ left:calc(100% + 10px); bottom:0; }
 
 /* ── Sidebar top (search) + nexus file tree ── */
@@ -485,17 +490,7 @@ tr:last-child td{ border:0; }
 .railtoggle { width: 30px; height: 30px; margin: 0 0 6px 2px; border: none; background: none; color: var(--dim); cursor: pointer; border-radius: 8px; display: grid; place-items: center; }
 .railtoggle:hover { background: var(--line); color: var(--ink); }
 
-/* ── Rail mode: collapse the sidebar to icons only (persisted, all pages) ── */
-#app.rail { grid-template-columns: 60px 1fr; }
-#app.rail .side { padding: 22px 8px 24px; align-items: stretch; }
-#app.rail .nxlink { justify-content: center; padding: 9px 0; }
-#app.rail .lbl, #app.rail .kbd, #app.rail .swname, #app.rail .sw .ch,
-#app.rail .adminbtn span, #app.rail .adminchev, #app.rail .acct .nm, #app.rail .acct .em { display: none; }
-#app.rail .swrap.nxtop { padding: 4px 2px; }
-#app.rail .sw { justify-content: center; padding: 7px 0; }
-#app.rail .adminbtn { justify-content: center; padding: 7px 0; }
-#app.rail .acct { justify-content: center; }
-#app.rail .railtoggle { margin-left: auto; margin-right: auto; }
+/* (rail-mode collapse rules live with the 3-column grid near the top of this file) */
 
 /* ── Command palette (⌘K) ── */
 .palette-ov { position: fixed; inset: 0; z-index: 200; background: var(--scrim-q); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; }

@@ -521,6 +521,7 @@
 
       root.innerHTML =
       '<div id="app" class="' + (st.rail ? 'rail' : '') + '" style="--section:' + sectionAccent(p) + '">' +
+        '<div class="topdna">' + WB.dna(11, 8) + '</div>' +
         '<div class="nexrail">' +
           '<button class="nexrail-toggle" data-rail-toggle title="Toggle sidebar" aria-label="Toggle sidebar">' + ICO.rail + '</button>' +
           '<div class="orgtiles">' + orgtiles + '</div>' +
@@ -529,7 +530,6 @@
           '<div class="orgavatar" data-acct-menu title="' + esc(user.name) + '"><div class="av">' + esc(user.initial) + '</div>' + acctMenuHtml + '</div>' +
         '</div>' +
         '<aside class="side">' +
-          '<div class="topdna">' + WB.dna(7, 8) + '</div>' +
           '<div class="sidetop">' +
             '<button class="nxlink nxsearch" data-palette aria-label="Search (Cmd-K)" title="Search">' + ICO.search + '<span class="lbl">Search</span><span class="kbd">⌘K</span></button>' +
           '</div>' +
