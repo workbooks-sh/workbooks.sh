@@ -38,21 +38,27 @@ defmodule Nexus.Objects do
     if cloud?(), do: {:error, :not_supported}, else: Nexus.S3.Local.delete(local_dir(), key)
   end
 
-  defp cloud?, do: Nexus.S3.configured?()
+  # Cloud only when creds AND a dedicated blob bucket are configured. We do NOT fall back to BUCKET_NAME
+  # (that's the Litestream DB bucket) — co-mingling user blobs with the DB replica is a blast-radius
+  # hazard. No blob bucket ⇒ the DURABLE local store on the volume.
+  defp cloud?, do: Nexus.S3.configured?() and loc().bucket not in [nil, ""]
 
-  # The faked local bucket — installed per workbook on serve; falls back to a default under the home.
+  # Local bucket — per-workbook dir set on serve, else a DURABLE default UNDER THE VOLUME (Nexus.Paths),
+  # so uploaded blobs survive a restart even when no object-store bucket is configured. (Was
+  # ~/.workbooks/dev/s3 — ephemeral container home — which silently lost blobs on churn.)
   defp local_dir do
-    Application.get_env(:nexus, :s3_local_dir) || Path.join([Nexus.Workbooks.home(), "dev", "s3", "default"])
+    Application.get_env(:nexus, :s3_local_dir) || Path.join([Nexus.Paths.durable_dir(), "blobs", "default"])
   end
 
-  # The production R2/S3 location (endpoint/bucket/prefix/region) from config — the workbook's prefix
-  # scopes its objects within the shared bucket.
+  # The production object-store location — resolved through the ONE audited seam (Nexus.Secrets), with
+  # the standard AWS_* fallbacks, exactly like Nexus.S3/Litestream. `WB_S3_PREFIX` is the per-tenant
+  # prefix the provisioner injects (`tenants/<org>/`), so blobs are tenant-isolated within the bucket.
   defp loc do
     %{
-      endpoint: System.get_env("WB_S3_ENDPOINT"),
-      bucket: System.get_env("WB_S3_BUCKET"),
-      prefix: Application.get_env(:nexus, :s3_prefix, ""),
-      region: System.get_env("WB_S3_REGION") || "auto"
+      endpoint: Nexus.Secrets.get("WB_S3_ENDPOINT") || Nexus.Secrets.get("AWS_ENDPOINT_URL_S3"),
+      bucket: Nexus.Secrets.get("WB_S3_BUCKET"),
+      prefix: Nexus.Secrets.get("WB_S3_PREFIX") || "",
+      region: Nexus.Secrets.get("WB_S3_REGION") || Nexus.Secrets.get("AWS_REGION") || "auto"
     }
   end
 end

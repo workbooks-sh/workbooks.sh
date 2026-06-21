@@ -24,8 +24,17 @@ defmodule Nexus.Workbooks do
   @doc "The workbook library root (`$WB_HOME`, default `~/.workbooks`)."
   def home, do: System.get_env("WB_HOME") || Path.expand("~/.workbooks")
 
-  @doc "True when production data-store secrets are injected — dev faked-backend is bypassed."
-  def prod?, do: present?(System.get_env("WB_DATABASE_URL")) or present?(System.get_env("WB_S3_BUCKET"))
+  @doc """
+  True for any non-local-dev runtime — the dev faked per-workbook backend is bypassed in favor of the
+  managed durable one (resources → the volume `nexus.db`, blobs → the durable object store). A deployed
+  **release** (RELEASE_NAME) always counts, not just when cloud secrets happen to be present — otherwise
+  a serving nexus silently writes resources/blobs to ephemeral `~/.workbooks/dev/*` and loses them on
+  restart (the same ephemeral-vs-durable drift that wiped the accounts DB).
+  """
+  def prod?,
+    do:
+      present?(System.get_env("RELEASE_NAME")) or present?(System.get_env("WB_DATABASE_URL")) or
+        present?(System.get_env("WB_S3_BUCKET"))
 
   @doc "True in the test environment (where each test owns its data backend explicitly)."
   def test?, do: function_exported?(Mix, :env, 0) and Mix.env() == :test
