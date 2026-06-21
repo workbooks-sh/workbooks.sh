@@ -20,6 +20,15 @@ primary_region = "sjc"
   auto_stop_machines = "suspend"
   auto_start_machines = true
   min_machines_running = 0
+# Persistent volume for the DB ONLY — mounted at the .nexus dir so the workbook tree (baked into the
+# image at /srv/dogfood) is untouched while accounts/orgs/workspaces (/.nexus/nexus.db) survive
+# restarts. Without this, WB_DATA was ephemeral and the control-plane DB relied entirely on Litestream
+# restore — a single empty generation wiped everyone. The volume is the durable floor; Litestream stays
+# as off-box backup.
+[mounts]
+  source = "wb_dogfood_nexus"
+  destination = "/srv/dogfood/.nexus"
+
 [[vm]]
   memory = "2048"
   cpu_kind = "shared"
