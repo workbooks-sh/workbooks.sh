@@ -884,12 +884,25 @@ server :cloud do
 
         bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
         Nexus.Git.provision_remote(bare, root)
-        result = Nexus.Git.commit_file(bare, root, rel, "edit #{rel} via dashboard")
+        # Attribute the commit to the signed-in user (jj/git author) — the basis for the attributed
+        # change-log and multi-user/tenant scoping. (Agent edits will pass the agent name here later.)
+        who = user_key(req)
+        result = Nexus.Git.commit_file(bare, root, rel, "edit #{rel} via dashboard", author: "#{who} <#{who}>")
 
         spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
 
         case result do
-          {:ok, sha} -> %{ok: true, sha: sha}
+          {:ok, sha} ->
+            # Record the change in the durable, attributed log (the Activity feed): a #event → the `log`
+            # effect persists it to resource Event. THIS is the "git-log in Activity" — who changed what,
+            # where, with the sha — tenant-scoped, not a per-workspace jj op-log you have to go digging for.
+            Nexus.Events.emit(
+              %{kind: "workspace.change", actor: who, title: "edited #{rel} in #{mount}",
+                target: sha, tags: ["event", "change"], scope: "member"},
+              tenant: req.tenant
+            )
+            %{ok: true, sha: sha}
+
           :nochange -> %{ok: true, nochange: true}
           {:error, out} -> {500, %{error: out}}
         end
@@ -1046,7 +1059,7 @@ client :app do
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
-  <link rel="stylesheet" href="./app.css?v=20260621n">
+  <link rel="stylesheet" href="./app.css?v=20260621o">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
@@ -1078,5 +1091,5 @@ client :app do
   <!-- ?v= is the cache-bust token. BUMP IT ON EVERY DEPLOY that changes JS/CSS. app.js reads its own
        ?v= and re-applies it to every lazily-loaded asset (views, wbchat) so a deploy = all-new URLs =
        guaranteed cache miss (hard-refresh can't re-fetch lazy import()s; only a new URL can). -->
-  <script src="./app.js?v=20260621n"></script>
+  <script src="./app.js?v=20260621o"></script>
 end

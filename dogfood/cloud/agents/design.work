@@ -215,6 +215,32 @@ Two deep investigations (incl. the wasm-sandbox angle) settled this:
   new Rust sidecar. Adopt **josh-as-native-sidecar only if** `git subtree` measurably
   falls short at real volume. **Never** pursue josh→wasm.
 
+## jj attribution + multi-user/tenant undo (the recorded log, not a button)
+
+The point of jj-as-substrate isn't an Undo button — it's a **recorded, attributed
+log of changes** (like git log), surfaced where people already look: **Activity**.
+
+- **Attribution.** Every internal commit stamps the AUTHOR (the user or agent who
+  made the change) distinct from the committer (the engine). `commit_change`/
+  `commit_file` take `author: "name <email>"`; the dashboard passes the signed-in
+  user, agent edits will pass the agent name. So both the git log and the jj op-log
+  answer "who did this" — the prerequisite for any multi-user scoping.
+- **The log lives in Activity.** Each internal commit emits a `workspace.change`
+  `#event` (actor, target=sha, tag `change`) → the `log` effect persists it to
+  `resource Event` → the Activity feed's new **Changes** tab. This is the
+  tenant-scoped, attributed change-log — you don't go spelunking a per-workspace jj
+  op-log to see what happened. (The jj op-log stays the per-workspace *undo* ledger;
+  Activity is the cross-workspace *record*.)
+- **Multi-tenant.** Workspaces are per-tenant (one nexus per org), so both the op-log
+  (per working dir on WB_DATA) and the Activity Event rows (tenant-scoped) are
+  naturally isolated — a tenant never sees another's changes.
+- **Multi-user undo semantics.** Undo is **scoped by attribution**: you may undo
+  operations authored by *you or your agents*, not other users'. Mechanically: the
+  op-log is filtered by author; `jj undo` (latest op) is the easy case. Undoing a
+  *non-latest* op (someone else committed after you) is a `jj op restore`/revert and
+  can conflict — that's the v2 hard case, surfaced as a conflict to resolve, never a
+  silent clobber of a teammate's later work. v1: attributed log + latest-op undo.
+
 ## Still open (genuinely undecided — flag for next pass)
 
 - Issue-store physical home: git-indexed `.work` vs DB table (`wb-35ma`).

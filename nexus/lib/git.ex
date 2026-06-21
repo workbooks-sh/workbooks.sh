@@ -125,26 +125,33 @@ defmodule Nexus.Git do
   if a `workbooks.mirror` remote is set, mirrors after (post-receive only fires on receive-pack, not on
   a server-side commit, so we mirror here too). `{:ok, short_sha}` | `:nochange` | `{:error, output}`.
   """
-  def commit_file(bare, work_dir, rel_path, message) when is_binary(message) do
+  def commit_file(bare, work_dir, rel_path, message, opts \\ []) when is_binary(message) do
     # jj-as-substrate: when enabled (deploy flag + jj installed), route the commit through jj so it lands
     # in the op-log and is `jj undo`-able; jj exports the new ref into the bare so it stays canonical.
     # No-op-safe: off / jj-absent / any jj error falls through to the raw-git path (unchanged behavior).
+    # `opts[:author]` ("Name <email>") attributes the commit to the user/agent who made the change.
     with true <- Nexus.JJ.substrate?(),
-         {:ok, sha} <- Nexus.JJ.commit_change(bare, work_dir, message) do
+         {:ok, sha} <- Nexus.JJ.commit_change(bare, work_dir, message, opts) do
       mirror_if_configured(bare)
       {:ok, sha}
     else
-      _ -> commit_file_git(bare, work_dir, rel_path, message)
+      _ -> commit_file_git(bare, work_dir, rel_path, message, opts)
     end
   end
 
   # The raw-git internal-commit path (bare + --work-tree): the original mechanism, also the fallback when
-  # jj-as-substrate is off or unavailable.
-  defp commit_file_git(bare, work_dir, rel_path, message) do
+  # jj-as-substrate is off or unavailable. Honors `opts[:author]` so attribution holds either way.
+  defp commit_file_git(bare, work_dir, rel_path, message, opts) do
     base = ["--git-dir=#{bare}", "--work-tree=#{work_dir}", "-c", "core.bare=false"]
     System.cmd("git", base ++ ["add", "--", rel_path], stderr_to_stdout: true)
 
-    case System.cmd("git", base ++ ["-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", message], stderr_to_stdout: true) do
+    author_args =
+      case Keyword.get(opts, :author) do
+        a when is_binary(a) and a != "" -> ["--author", a]
+        _ -> []
+      end
+
+    case System.cmd("git", base ++ ["-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", message] ++ author_args, stderr_to_stdout: true) do
       {_, 0} ->
         {sha, _} = System.cmd("git", ["--git-dir=#{bare}", "rev-parse", "--short", "HEAD"], stderr_to_stdout: true)
         mirror_if_configured(bare)

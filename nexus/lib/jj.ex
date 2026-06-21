@@ -163,9 +163,19 @@ defmodule Nexus.JJ do
   canonical `bare`, and return `{:ok, short_sha} | {:skip, reason} | {:error, out}`. This is the seam that
   makes every internal edit `jj undo`-able. `branch` defaults to "main".
   """
-  def commit_change(bare, work_dir, message, branch \\ "main") do
+  def commit_change(bare, work_dir, message, opts \\ []) do
+    branch = Keyword.get(opts, :branch, "main")
+    # Attribution: stamp the AUTHOR (the user or agent who made the change) onto the commit, distinct
+    # from the committer (the engine). This is what makes the op-log + git log answer "who did this",
+    # the basis for multi-user/tenant scoping (you can see/undo your own & your agents' ops).
+    author_args =
+      case Keyword.get(opts, :author) do
+        a when is_binary(a) and a != "" -> ["--author", a]
+        _ -> []
+      end
+
     with :ok <- ensure_colocated(bare, work_dir),
-         {_, 0} <- jj(work_dir, ["describe", "-m", message]),
+         {_, 0} <- jj(work_dir, ["describe", "-m", message] ++ author_args),
          {_, 0} <- jj(work_dir, ["bookmark", "set", branch, "-r", "@", "--allow-backwards"]),
          {_, 0} <- jj(work_dir, ["new"]),
          {_, 0} <- jj(work_dir, ["git", "export"]),

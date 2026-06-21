@@ -21,6 +21,7 @@ WB.view('/activity', { title: 'Activity', accent: 'var(--violet)', fullbleed: tr
   // Extensible tab set: each tab is a label + a predicate over an event. Add a tab = add an entry.
   var TABS = [
     { id: 'all',    label: 'All',    match: function(){ return true; } },
+    { id: 'changes',label: 'Changes',match: function(e){ return has(e, 'change'); } },
     { id: 'agents', label: 'Agents', match: function(e){ return has(e, 'agent'); } },
     { id: 'team',   label: 'Team',   match: function(e){ return has(e, 'member') || has(e, 'role'); } },
     { id: 'deploys',label: 'Deploys',match: function(e){ return has(e, 'deploy'); } }
