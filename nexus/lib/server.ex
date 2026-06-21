@@ -631,7 +631,29 @@ defmodule Nexus.Server do
     if etag in get_req_header(conn, "if-none-match") do
       send_resp(conn, 304, "")
     else
-      conn |> put_resp_content_type(MIME.from_path(full)) |> send_file(200, full)
+      ct = MIME.from_path(full)
+      conn = put_resp_content_type(conn, ct)
+
+      # gzip compressible text assets on the fly (JS/CSS/SVG/JSON/HTML) — Bandit doesn't auto-compress,
+      # so without this every asset ships raw (~4x larger). Binary (fonts/images) is already compressed.
+      if compressible?(ct) and gzip_accepted?(conn) do
+        body = :zlib.gzip(File.read!(full))
+        conn |> put_resp_header("content-encoding", "gzip") |> put_resp_header("vary", "accept-encoding") |> send_resp(200, body)
+      else
+        send_file(conn, 200, full)
+      end
+    end
+  end
+
+  defp compressible?(ct) do
+    String.starts_with?(ct, "text/") or
+      ct in ~w(application/javascript text/javascript application/json image/svg+xml application/xml application/wasm)
+  end
+
+  defp gzip_accepted?(conn) do
+    case get_req_header(conn, "accept-encoding") do
+      [ae | _] -> String.contains?(ae, "gzip")
+      _ -> false
     end
   end
 
