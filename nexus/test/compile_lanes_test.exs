@@ -113,6 +113,23 @@ end|)
   end
 
   @tag :compiler
+  test "solid unit transpiles to a client island via StarlingMonkey" do
+    root = Nexus.Compilers.Shared.default_root()
+    bundle = Path.join([root, "solid", "vendor", "babel.js"])
+    evalhost = Path.expand("priv/eval-host.wasm", File.cwd!())
+
+    if !File.regular?(bundle) || !File.regular?(evalhost) do
+      :ok
+    else
+      n = unit("solid :counter do\n  const App = () => { const [c,setC]=createSignal(0); return <button onClick={()=>setC(c()+1)}>n {c()}</button>; };\nend\n")
+      assert n.kind == "solid"
+      assert {:client, js} = Nexus.Compile.unit(n)
+      # dom-expressions output — the proof the Solid transform actually ran
+      assert js =~ "_$template" or js =~ "_tmpl$"
+    end
+  end
+
+  @tag :compiler
   test "sandbox js :name compiles through the inner JS lane" do
     if !toolchain?() do
       :ok

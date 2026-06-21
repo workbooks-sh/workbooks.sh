@@ -1,16 +1,29 @@
 #!/usr/bin/env bash
-# work solid lane — vendor a single-file @babel/standalone bundle with babel-preset-solid registered,
-# loadable inside qjs-run.wasm (zero native execution at compile time). Mirrors the svelte lane: the
-# Solid JSX compiler is babel + a preset, so we bundle them into one IIFE that sets globalThis.Babel.
+# work solid lane — bundle @babel/standalone + babel-preset-solid into one IIFE that exposes
+# globalThis.solidTransform(code, filename) -> compiled Solid JS. The bundle runs on StarlingMonkey
+# (Nexus.JsEngine, SpiderMonkey→wasm) — ~1.2s, vs ~80s on QuickJS which can't parse a multi-MB babel.
 #
-# Reproduce (needs bun or npm + a bundler) from this dir:
-#   mkdir -p vendor && cd /tmp && rm -rf solidbuild && mkdir solidbuild && cd solidbuild
-#   printf 'import * as Babel from "@babel/standalone";\nimport p from "babel-preset-solid";\nBabel.registerPreset("solid", p);\nglobalThis.Babel = Babel;\n' > entry.js
+# Two gotchas baked into the recipe:
+#   * babel-preset-solid (dom-expressions) imports node:assert — a browser bundler stubs it to an
+#     empty object → "_assert is not a function". We --alias it to a real assert shim.
+#   * StarlingMonkey has no Node globals; the Elixir lane (Nexus.Compilers.Js.transpile/3) prepends a
+#     `process` shim before this bundle at eval time.
+#
+# Reproduce (needs bun + esbuild via bunx) from this dir:
 #   bun add @babel/standalone babel-preset-solid
-#   bun build entry.js --outfile=babel.js --target=browser --format=iife
-#   cp babel.js <this-dir>/vendor/babel.js
+#   bunx esbuild entry.js --bundle --outfile=vendor/babel.js --format=iife --platform=browser \
+#     --alias:assert="$PWD/assert-shim.js" --alias:node:assert="$PWD/assert-shim.js" \
+#     --define:process.env.NODE_ENV='"production"'
 #
-# The driver solid_compile.js (this dir) loads vendor/babel.js from the hoisted node_modules path in
-# the files-map and runs Babel.transform(src, {presets:['solid']}) on each .jsx/.tsx entry.
+# entry.js registers the preset + defines solidTransform; assert-shim.js is the node:assert polyfill.
+# Both live in this dir; vendor/babel.js is the gitignored output shipped via the compilers package.
 set -euo pipefail
-echo "[solid] vendor/babel.js is prebuilt (see header). Nothing to compile at stage time."
+cd "$(dirname "$0")"
+[ -f vendor/babel.js ] && echo "[solid] vendor/babel.js present ($(wc -c < vendor/babel.js) bytes)" || {
+  echo "[solid] building vendor/babel.js …"
+  bun add @babel/standalone babel-preset-solid
+  mkdir -p vendor
+  bunx esbuild entry.js --bundle --outfile=vendor/babel.js --format=iife --platform=browser \
+    --alias:assert="$PWD/assert-shim.js" --alias:node:assert="$PWD/assert-shim.js" \
+    --define:process.env.NODE_ENV='"production"'
+}

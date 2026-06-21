@@ -1,14 +1,15 @@
 <work-toolkit
   id="solid"
-  cli="qjs"
+  cli="starlingmonkey"
   data-kind="transpile"
   data-build="build.sh"
-  data-source="Solid JSX compiler run IN-SANDBOX. solid_compile.js (this dir) is fed to qjs-run.wasm">
+  data-source="Solid JSX compiler (@babel/standalone + babel-preset-solid) run on StarlingMonkey.">
   <work-doc>
-    via the Javy.IO stdin→stdout files-map contract (same as the svelte lane). It loads the vendored
-    @babel/standalone bundle (vendor/babel.js, with babel-preset-solid registered as "solid") and runs
-    Babel.transform(src, {presets:['solid']}) on each .jsx/.tsx source → client JS. Zero native
-    execution. Driver: Nexus.Compilers.Js.transpile(:solid, _). A `solid` unit is a CLIENT island
-    (the compiled JS imports solid-js + needs a DOM), emitted as {:client, js} by Nexus.Compile.
+    The Solid transform is a multi-MB babel bundle — too heavy for QuickJS (~80s) so it runs on
+    StarlingMonkey (Nexus.JsEngine, SpiderMonkey→wasm) in ~1.2s. vendor/babel.js exposes
+    globalThis.solidTransform(code, filename) → compiled Solid JS (dom-expressions: _$template /
+    createComponent). Built by build.sh (esbuild, node:assert aliased to a real shim). Driver:
+    Nexus.Compilers.Js.transpile(:solid, _). A `solid` unit is a CLIENT island (compiled JS imports
+    solid-js/web + needs a DOM), emitted as {:client, js} by Nexus.Compile. STATUS: WORKING.
   </work-doc>
 </work-toolkit>

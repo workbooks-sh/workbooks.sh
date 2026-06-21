@@ -110,21 +110,35 @@ defmodule Nexus.Compilers.Js do
     end
   end
 
+  # Solid's transform is @babel/standalone + babel-preset-solid — a multi-MB bundle QuickJS can't
+  # parse practically (~80s). It runs on StarlingMonkey (`Nexus.JsEngine`, SpiderMonkey→wasm) in
+  # ~1.2s instead. The bundle exposes `globalThis.solidTransform(code, filename)`; we prepend a
+  # `process` shim (SM has no Node globals) and eval `solidTransform(<source>)`.
   def transpile(:solid, source, root) do
-    cdir = Path.expand(root)
-    qjs = Path.join([cdir, "js", "qjs-run.wasm"])
-    job = Path.join([cdir, "solid", "solid_compile.js"])
-    babel = Path.join([cdir, "solid", "vendor", "babel.js"])
+    bundle_path = Path.join([Path.expand(root), "solid", "vendor", "babel.js"])
 
-    cond do
-      not File.regular?(qjs) -> {:error, {:js_toolchain_missing, qjs}}
-      not File.regular?(job) -> {:error, {:transpiler_missing, job}}
-      not File.regular?(babel) -> {:error, {:solid_compiler_missing, babel}}
-      true -> filemap_compile(qjs, cdir, "/c/solid/solid_compile.js", "in.jsx", source, "node_modules/@babel/standalone/babel.js", File.read!(babel))
+    if not File.regular?(bundle_path) do
+      {:error, {:solid_compiler_missing, bundle_path}}
+    else
+      prog = solid_prelude() <> File.read!(bundle_path) <> "\n;solidTransform(" <> Jason.encode!(source) <> ", \"in.jsx\")"
+
+      case Nexus.JsEngine.eval(prog, timeout: 60_000) do
+        # the eval-host returns a JS throw as an "ERR: …" string — treat that as a failure.
+        {:ok, "ERR:" <> msg} -> {:error, {:transpile_failed, String.trim(msg)}}
+        {:ok, code} when is_binary(code) -> {:ok, code}
+        {:error, _} = err -> err
+      end
     end
   end
 
   def transpile(other, _source, _root), do: {:error, {:unknown_transpiler, other}}
+
+  # Minimal Node-global shim StarlingMonkey lacks; babel reads process.env / versions at module init.
+  defp solid_prelude do
+    "globalThis.process=globalThis.process||{env:{NODE_ENV:\"production\"},platform:\"browser\"," <>
+      "version:\"v18.0.0\",versions:{node:\"18.0.0\"},cwd:function(){return\"/\";},argv:[]," <>
+      "nextTick:function(f){Promise.resolve().then(f);},on:function(){},emitWarning:function(){}};\n"
+  end
 
   # files-map contract: send {files:{entry, <compiler pkg path>}}, the job compiles each source entry
   # in place and writes {files} back; pull the compiled `entry` out.
