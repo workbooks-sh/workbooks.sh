@@ -82,11 +82,76 @@ DeployKit, NOT baked into the open-standard nexus image. See [[the-line]].
   rather than interrupting the active run. *(Open: whether the inbox grows into a
   full notifications center across approvals / delegated-task status / issues.)*
 
-## Still open (carried into build issues)
+## Specialist agents
 
-- DeckAgent / VideoAgent / ResearchAgent specifics (input contract, output home,
-  research-repo organising scheme, pipelines) — not yet grilled.
-- Capabilities/cost metering + spend caps + grant-escalation approval.
-- Bootstrap: how DeployKit seeds the default agents on a new org's nexus.
-- The four agent-added questions (issue-store home, cross-agent scheduling perms,
-  backlog policy, notifications center).
+The voice interview degraded before this round, so these are **recommended
+decisions** (grounded in repo canon), not yet founder-ratified — flag any you'd
+steer differently.
+
+### DeckAgent — presentations via wasm Reveal.js
+
+- **Output** — a **`.work` surface** that renders the deck (a folder with
+  `index.work` → mounted at its path, WYSIWYG), **not** a standalone artifact.
+  The deck IS a workbook; Reveal.js is the render target of its `client` island.
+- **Input** — a **prose brief** (most natural), optionally a structured `design`
+  block for tight control. **Iterative** by default: it drafts, you react, it
+  revises — same chat-with-preview loop as the Studio split-view.
+- **Home** — lands in the active workspace tree (e.g. `<ws>/decks/<name>/`),
+  **versioned + committed** like any workspace file (nexus = git remote).
+
+### VideoAgent — via the wasm-video package
+
+- **Job** — **render from a script/storyboard** first (assemble clips + captions +
+  audio into a timeline); editing existing footage is a later mode. Input is a
+  `.work` storyboard the agent authors/edits.
+- **Execution** — rendering is heavy, so it runs as a **scheduled job** (a `flow`
+  step), **not** inline in the request. Progress streams onto the **#event bus**
+  (Studio shows a progress meter); the finished file lands in the tree + a
+  `#event` fires on completion (notify the user).
+
+### ResearchAgent — organized findings, not a doc dump
+
+- **Organising scheme** — by the **active ask / project** (the scope you're working
+  in), with a **topic taxonomy inside it** — folders of `.work` notes, cross-linked
+  by `[[backlinks]]` + `#tags`. The repo structure mirrors the project, not a flat
+  pile.
+- **Integrations (v1)** — **web search** + **a small set of MCP tools** (the
+  integrations OAuth lane). Arbitrary data sources are post-v1. Keep v1 scope tight:
+  search → fetch → organize.
+- **Pipelines** — yes: a **scheduled recurring `flow` + `trigger`** (gather →
+  dedupe → organize) reusing Nexus.Scheduler — the "research pipeline."
+- **Queryability** — primary is **well-named `.work` files + backlinks/tags** (the
+  source of truth); an **embedding index is a derived accelerator** layered on top,
+  never the store itself. (Pinecone-style index is an optional derived cache.)
+
+## Capabilities, cost, limits
+
+- **Default deny-all** — an agent gets only the grants it declares; resolved vs the
+  Effects registry. **Grant escalation requires approval** — surfaces in the same
+  Studio approvals inbox as HITL.
+- **Cost** — metered **per run, attributed up to per-agent and per-org**. Hitting a
+  budget **pauses** the agent (resumable, lands in the approvals inbox) rather than
+  hard-failing — matches the "limits applied sparingly" decision.
+- **External spend** — agents CAN spend on external APIs (model tokens, search)
+  under a **per-org spend cap**, surfaced as an **upsell knob** ([[upsells]]) —
+  config-driven via `Nexus.Config`, neutral defaults in the runtime ([[the-line]]).
+
+## Bootstrap & the line
+
+- **Our cloud product, NOT the open standard** — Waldo + the specialists are
+  **dogfood workbooks deployed via the DeployKit**, exactly like a customer. The
+  open nexus image ships **none** of them. ([[the-line]])
+- **Seeding** — when a new org's nexus comes up, the **DeployKit seeds**
+  `dogfood/cloud/agents/*.work` into the tree (committed, so they're forkable);
+  the dashboard does not special-case them.
+- **v1 'done' bar** — **Waldo + ONE specialist (DeckAgent) running a real task
+  end-to-end** through the Studio (start → stream → result in tree), with the
+  runtime + agent-file contract + issue-filing in place. The other two specialists
+  + full scheduling/sub-agent UI follow once that spine is proven.
+
+## Still open (genuinely undecided — flag for next pass)
+
+- Issue-store physical home: git-indexed `.work` vs DB table (`wb-35ma`).
+- Wake backlog policy after extended downtime (define "extended").
+- Whether the approvals inbox grows into a full notifications center.
+- Cross-agent scheduling permission model details.
