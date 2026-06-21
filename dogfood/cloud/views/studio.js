@@ -172,8 +172,9 @@ WB.view('/usage', {
     el.innerHTML = `<section><div class="sechead"><div><h2>Usage &amp; billing</h2><p class="dim">Loading…</p></div></div>` +
       `<div class="card faint" style="text-align:center;color:var(--dim)">Loading usage…</div></section>`;
 
-    // +page.js loader: { usage: await nexusUsage() }
-    const u = await WB.api.nexusUsage();
+    // Stale-while-revalidate: paint cached usage instantly, refresh in the background.
+    await WB.swr('usage', () => WB.api.nexusUsage(), (u) => {
+    if (!u) return;
     const s = u.summary;
     const cap = u.capacity;   // {tier, next, ram, storage, topRam, topObjects}
     const hot = cap && (cap.ram.status !== 'ok' || cap.storage.status !== 'ok');
@@ -267,6 +268,7 @@ WB.view('/usage', {
   </div>
 </section>`;
 
-    el.querySelector('[data-invoice]').addEventListener('click', () => WB.toast('Invoice downloading…'));
+    var inv = el.querySelector('[data-invoice]'); if (inv) inv.addEventListener('click', () => WB.toast('Invoice downloading…'));
+    });
   }
 });

@@ -37,6 +37,11 @@ server :cloud do
   # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
   route "GET /cloud/models", :models
 
+  # Lint diagnostics for the workedit editor (P3): parse a .work buffer with the ONE shared parser
+  # (Nexus.Literate) + a per-block Elixir syntax check, return line-keyed diagnostics. The editor's
+  # lint source POSTs the buffer here; the parser is the open standard, the dashboard lint UI is ours.
+  route "POST /cloud/parse", :parse
+
   # Workspace file tree — REAL files on the data volume. The mounts (deployed surfaces) are the
   # top-level folders; `path` walks within one. Path-traversal guarded (resolved must stay under root).
   route "GET /cloud/tree", :tree
@@ -88,6 +93,61 @@ server :cloud do
   end
 
   def models(_req), do: %{models: Nexus.Llm.models()}
+
+  # Known block kinds (generous superset) — anything else opening a do…end block is flagged.
+  @work_kinds ~w(data def defp server client flow sandbox agent record resource hook check toolkit
+                 test design app auth task user type deps checks theme show query workbook nexus
+                 grant route trigger step match wait module schema component view)
+
+  def parse(req) do
+    content = (is_map(req.body) && req.body["content"]) || ""
+    %{diagnostics: workedit_diagnostics(content)}
+  end
+
+  defp workedit_diagnostics(content) do
+    nodes = try do
+      Nexus.Literate.parse(content)
+    rescue
+      _ -> []
+    end
+
+    Enum.flat_map(List.wrap(nodes), fn
+      %{type: :code} = n -> kind_diag(n) ++ syntax_diag(n)
+      _ -> []
+    end)
+  end
+
+  defp kind_diag(%{kind: kind, line: line}) when is_binary(kind) do
+    if kind in @work_kinds, do: [], else: [%{line: line, severity: "warning", message: "Unknown block kind: #{kind}"}]
+  end
+
+  defp kind_diag(_), do: []
+
+  # Per-block Elixir syntax check — body starts on the line AFTER the opener, so add n.line to the
+  # error's in-body line. Tolerant of Elixir version differences in the error tuple shape.
+  defp syntax_diag(%{lang: lang, body: body, line: base}) when lang in [nil, "elixir"] and is_binary(body) do
+    case Code.string_to_quoted(body, columns: true) do
+      {:ok, _} ->
+        []
+
+      {:error, {loc, msg, _token}} ->
+        {l, c} = error_loc(loc)
+        [%{line: base + l, col: c, severity: "error", message: error_msg(msg)}]
+
+      _ ->
+        []
+    end
+  end
+
+  defp syntax_diag(_), do: []
+
+  defp error_loc(loc) when is_list(loc), do: {Keyword.get(loc, :line, 1), Keyword.get(loc, :column, 1)}
+  defp error_loc(line) when is_integer(line), do: {line, 1}
+  defp error_loc(_), do: {1, 1}
+
+  defp error_msg({a, b}), do: to_string(a) <> to_string(b)
+  defp error_msg(m) when is_binary(m), do: m
+  defp error_msg(m), do: inspect(m)
 
   def agent_chat(req) do
     user = user_key(req)
@@ -485,7 +545,7 @@ client :app do
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
-  <link rel="stylesheet" href="./app.css?v=20260621c">
+  <link rel="stylesheet" href="./app.css?v=20260621d">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
@@ -517,5 +577,5 @@ client :app do
   <!-- ?v= is the cache-bust token. BUMP IT ON EVERY DEPLOY that changes JS/CSS. app.js reads its own
        ?v= and re-applies it to every lazily-loaded asset (views, wbchat) so a deploy = all-new URLs =
        guaranteed cache miss (hard-refresh can't re-fetch lazy import()s; only a new URL can). -->
-  <script src="./app.js?v=20260621c"></script>
+  <script src="./app.js?v=20260621d"></script>
 end

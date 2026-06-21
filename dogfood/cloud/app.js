@@ -9,6 +9,31 @@
       catch (e) { return ''; }
     })();
     WB.vurl = function (u) { return WB.V ? u + (u.indexOf('?') < 0 ? '?' : '&') + 'v=' + WB.V : u; };
+
+    // ── stale-while-revalidate cache ────────────────────────────────────────────────────────────
+    // Admin/data pages render the LAST-KNOWN result instantly (from localStorage), then refresh in the
+    // background — so a suspended/cold nexus never blocks the UI and re-navigations are instant. Keyed
+    // per-tenant so one org never sees another's cached data.
+    WB.cache = {
+      _k: function (key) { var t = (WB.nexus && WB.nexus.active && WB.nexus.active.id) || (WB.user && WB.user.email) || '_'; return 'wbc:' + t + ':' + key; },
+      get: function (key) { try { return JSON.parse(localStorage.getItem(this._k(key))); } catch (e) { return null; } },
+      set: function (key, data) { try { localStorage.setItem(this._k(key), JSON.stringify(data)); } catch (e) {} }
+    };
+    // render(data, isStale) is called up to twice: once with cached data (if any, isStale=true) for an
+    // instant paint, then once with fresh data (isStale=false). Returns the fresh result.
+    WB.swr = async function (key, fetcher, render) {
+      var cached = WB.cache.get(key);
+      if (cached != null) { try { render(cached, true); } catch (e) {} }
+      try {
+        var fresh = await fetcher();
+        WB.cache.set(key, fresh);
+        try { render(fresh, false); } catch (e) {}
+        return fresh;
+      } catch (e) {
+        if (cached == null) { try { render(null, false); } catch (_) {} }
+        return cached;
+      }
+    };
     WB._views = {};
     WB._params = {};
     WB.view = function (route, def) { WB._views[route] = def; };

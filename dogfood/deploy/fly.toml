@@ -14,12 +14,12 @@ primary_region = "sjc"
 [http_service]
   internal_port = 4000
   force_https = true
-  # Keep ONE machine always warm: this nexus is our interactive dashboard + control plane, so a
-  # suspend/resume on the first request after idle is exactly the "data loads slow" pain. Extra
-  # machines still scale to zero; the last one stays up. (Our cloud's config — not the open standard.)
+  # Auto-stop when idle (we WANT scale-to-zero). The dashboard stays snappy via client-side caching
+  # (stale-while-revalidate) — admin pages render last-known data instantly and refresh in the
+  # background, so a suspended machine never blocks the UI.
   auto_stop_machines = "suspend"
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
 [[vm]]
   memory = "2048"
   cpu_kind = "shared"

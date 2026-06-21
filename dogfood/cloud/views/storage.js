@@ -21,19 +21,20 @@ WB.view('/storage', {
   <div class="note">Storage lives outside the nexus container — it survives sleep/restart and never bloats the runtime image. Egress is $0 because blobs are served directly, so reads are free.</div>
 </section>`;
 
-    let data;
-    try { data = await WB.api.listBuckets(); } catch (e) { data = {}; }
-    const buckets = data.buckets || [];
-    const totalSize = data.totalSize || '0 GB';
+    // Stale-while-revalidate: paint cached data instantly, refresh in the background.
+    await WB.swr('storage', () => WB.api.listBuckets(), (data) => {
+      data = data || {};
+      const buckets = data.buckets || [];
+      const totalSize = data.totalSize || '0 GB';
 
-    let body;
-    if (buckets.length === 0) {
-      body = `
+      let body;
+      if (buckets.length === 0) {
+        body = `
     <div class="card faint" style="text-align:center;color:var(--dim)">
       No storage yet. Your nexus gets a bucket — create your nexus to get started.
     </div>`;
-    } else {
-      body = `
+      } else {
+        body = `
     <div class="card" style="padding:0;overflow:hidden">
       <table>
         <thead>
@@ -51,9 +52,10 @@ WB.view('/storage', {
         </tbody>
       </table>
     </div>`;
-    }
+      }
 
-    const slot = el.querySelector('#stbody'); if (slot) slot.innerHTML = body;
-    const tot = el.querySelector('#sttotal'); if (tot) tot.textContent = totalSize + ' total';
+      const slot = el.querySelector('#stbody'); if (slot) slot.innerHTML = body;
+      const tot = el.querySelector('#sttotal'); if (tot) tot.textContent = totalSize + ' total';
+    });
   }
 });
