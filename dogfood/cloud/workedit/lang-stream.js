@@ -53,11 +53,17 @@ export function token(stream, state) {
   if (stream.match(/:[a-zA-Z_]\w*[?!]?/)) return 'atom';                      // :atom / :name
   if (stream.match(/@[a-z]\w*/)) return 'typeName';                          // @type / @attr
 
-  // Prose-only refs + the `#` ambiguity (comment in code, #tag in prose).
+  // Prose-only refs + markdown (markers kept in Source mode; Live mode hides them). The `#` is a
+  // comment in code, a #tag in prose.
   if (!code) {
     if (stream.match(/\[\[[^\]\n]+\]\]/)) return 'link';                       // [[backlink]]
+    if (stream.match(/\[[^\]\n]+\]\([^)\s]+\)/)) return 'mdlink';              // [text](url)
     if (stream.match(/work:\/\/[^\s)]*[A-Za-z0-9_/#-]/)) return 'link';        // work:// link
     if (stream.match(/#[a-z][\w-]*/)) return 'meta';                          // #tag
+    if (stream.match(/`[^`\n]+`/)) return 'mdcode';                           // `inline code`
+    if (stream.match(/(\*\*|__)(?=\S)[\s\S]+?\S\1/)) return 'strong';         // **bold**
+    if (stream.match(/~~(?=\S)[\s\S]+?\S~~/)) return 'strike';                // ~~strike~~
+    if (stream.match(/(\*|_)(?=\S)[^*_\n]+?\S?\1/)) return 'em';              // *italic*
     stream.next();                                                            // plain prose — no styling
     return null;
   }
@@ -98,6 +104,10 @@ const TOKEN_CSS = {
   link: 'color:var(--wke-link);text-decoration:underline', meta: 'color:var(--wke-meta)',
   heading: 'color:var(--wke-heading);font-weight:700', operator: 'color:var(--wke-op)',
   lang: 'color:var(--wke-lang)',
+  // markdown emphasis (Source mode keeps the markers, just styles the run)
+  strong: 'font-weight:700', em: 'font-style:italic', strike: 'text-decoration:line-through;opacity:.8',
+  mdcode: 'font-family:var(--mono,ui-monospace,monospace);background:color-mix(in srgb,var(--wke-op,#6a6f68) 12%,transparent);border-radius:4px',
+  mdlink: 'color:var(--wke-link);text-decoration:underline',
 };
 const CSS = `
 :root{

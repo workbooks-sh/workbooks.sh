@@ -21,6 +21,12 @@ const LIVE_CSS = `
 .wke-chip-tag{color:var(--wke-meta,#2f6fa8);background:color-mix(in srgb, var(--wke-meta,#2f6fa8) 12%, transparent)}
 .wke-chip-work{color:var(--wke-lang,#9a6a3a);background:color-mix(in srgb, var(--wke-lang,#9a6a3a) 12%, transparent)}
 .wke-chip::before{content:attr(data-pre);opacity:.5;margin-right:2px;font-weight:500}
+/* Inline markdown rendered live (markers hidden). */
+.wke-md-bold{font-weight:700}
+.wke-md-italic{font-style:italic}
+.wke-md-strike{text-decoration:line-through;opacity:.75}
+.wke-md-code{font-family:var(--mono,ui-monospace,monospace);font-size:.92em;background:color-mix(in srgb,var(--wke-op,#6a6f68) 13%,transparent);border-radius:4px;padding:0 4px}
+.wke-md-link{color:var(--wke-link,#2f6fa8);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 /* Blank the line number on a live-rendered heading line (revealed again when the cursor's on it). */
 .cm-lineNumbers .wke-gutter-blank{color:transparent}
 `;
@@ -29,12 +35,45 @@ function injectLiveStyle() {
   const s = document.createElement('style'); s.id = 'wke-style-live'; s.textContent = LIVE_CSS; document.head.appendChild(s);
 }
 
-// Inline ref patterns → chip kind + the "marker" prefix shown faintly on the chip.
-const REFS = [
-  { re: /\[\[([^\]\n]+)\]\]/g, kind: 'link', pre: '', label: (m) => m[1] },
-  { re: /\bwork:\/\/[^\s)]*[A-Za-z0-9_/#-]/g, kind: 'work', pre: '', label: (m) => m[0] },
-  { re: /(^|[^\w&])#([a-z][\w-]*)/g, kind: 'tag', pre: '#', label: (m) => m[2], at: (m) => m.index + m[1].length },
-];
+// Scan one PROSE line into inline tokens (refs + markdown), left to right, non-overlapping. Each token:
+// { s, e, kind, ... }. `ml` = marker length to hide on each side (bold/italic/code/strike). Higher-
+// priority constructs (code, links, refs) are matched before emphasis so e.g. a URL isn't italicized.
+function scanInline(text) {
+  const out = [];
+  const n = text.length;
+  let i = 0;
+  while (i < n) {
+    const rest = text.slice(i);
+    let m;
+    if ((m = /^`([^`\n]+)`/.exec(rest))) { out.push({ s: i, e: i + m[0].length, kind: 'code', ml: 1 }); i += m[0].length; continue; }
+    if ((m = /^\[\[([^\]\n]+)\]\]/.exec(rest))) { out.push({ s: i, e: i + m[0].length, kind: 'reflink', label: m[1] }); i += m[0].length; continue; }
+    if ((m = /^\[([^\]\n]+)\]\(([^)\s]+)\)/.exec(rest))) { out.push({ s: i, e: i + m[0].length, kind: 'link', label: m[1], url: m[2] }); i += m[0].length; continue; }
+    if ((m = /^work:\/\/[^\s)]*[A-Za-z0-9_/#-]/.exec(rest))) { out.push({ s: i, e: i + m[0].length, kind: 'work', label: m[0] }); i += m[0].length; continue; }
+    if ((i === 0 || !/\w/.test(text[i - 1])) && (m = /^#([a-z][\w-]*)/.exec(rest))) { out.push({ s: i, e: i + m[0].length, kind: 'tag', label: m[1] }); i += m[0].length; continue; }
+    if ((m = /^(\*\*|__)(?=\S)([\s\S]+?\S)\1/.exec(rest))) { out.push({ s: i, e: i + m[0].length, kind: 'bold', ml: 2 }); i += m[0].length; continue; }
+    if ((m = /^~~(?=\S)([\s\S]+?\S)~~/.exec(rest))) { out.push({ s: i, e: i + m[0].length, kind: 'strike', ml: 2 }); i += m[0].length; continue; }
+    if ((m = /^(\*|_)(?=\S)([^*_\n]+?\S?)\1/.exec(rest))) { out.push({ s: i, e: i + m[0].length, kind: 'italic', ml: 1 }); i += m[0].length; continue; }
+    i++;
+  }
+  return out;
+}
+
+// Line numbers (1-based) that are part of a top-level `do…end` block (opener, body, end) — bodies are
+// highlighted by nested.js, NOT treated as markdown prose. Openers/closers sit at column 0.
+function blockLines(doc) {
+  const set = new Set();
+  let open = 0;
+  for (let i = 1; i <= doc.lines; i++) {
+    const t = doc.line(i).text;
+    if (!open) {
+      if (/^[a-z]\w*\b.*\bdo\s*(#.*)?$/.test(t) && !/\bdo:/.test(t)) { open = i; set.add(i); }
+    } else {
+      set.add(i);
+      if (/^end\b/.test(t)) open = 0;
+    }
+  }
+  return set;
+}
 
 export function workLiveFromView(view, state) {
   injectLiveStyle();
@@ -58,6 +97,44 @@ export function workLiveFromView(view, state) {
     ignoreEvent() { return true; }
   }
 
+  // A real anchor for [text](url) — clickable, opens in a new tab.
+  class LinkW extends WidgetType {
+    constructor(label, url) { super(); this.label = label; this.url = url; }
+    eq(o) { return o.label === this.label && o.url === this.url; }
+    toDOM() {
+      const a = document.createElement('a');
+      a.className = 'wke-md-link'; a.textContent = this.label; a.href = this.url;
+      a.target = '_blank'; a.rel = 'noopener noreferrer'; a.title = this.url;
+      return a;
+    }
+    ignoreEvent() { return true; }
+  }
+
+  // Reusable marks/hides for inline markdown.
+  const hide = Decoration.replace({});
+  const markCache = {};
+  const styleMark = (cls) => markCache[cls] || (markCache[cls] = Decoration.mark({ class: cls }));
+
+  // Emit decorations for one inline token (already known not to be touched by the selection).
+  function emitInline(sp, base, decos) {
+    const s = base + sp.s, e = base + sp.e;
+    switch (sp.kind) {
+      case 'reflink': decos.push(Decoration.replace({ widget: new Chip(sp.label, 'link', '') }).range(s, e)); break;
+      case 'tag': decos.push(Decoration.replace({ widget: new Chip(sp.label, 'tag', '#') }).range(s, e)); break;
+      case 'work': decos.push(Decoration.replace({ widget: new Chip(sp.label, 'work', '') }).range(s, e)); break;
+      case 'link': decos.push(Decoration.replace({ widget: new LinkW(sp.label, sp.url) }).range(s, e)); break;
+      default: { // code / bold / italic / strike — hide the markers, style the inner text
+        const cls = sp.kind === 'code' ? 'wke-md-code' : sp.kind === 'bold' ? 'wke-md-bold' : sp.kind === 'italic' ? 'wke-md-italic' : 'wke-md-strike';
+        const ml = sp.ml;
+        if (e - ml > s + ml) {
+          decos.push(hide.range(s, s + ml));
+          decos.push(styleMark(cls).range(s + ml, e - ml));
+          decos.push(hide.range(e - ml, e));
+        }
+      }
+    }
+  }
+
   // Heading lines rendered live (cursor off them) get their gutter number blanked. Computed from state
   // (not the view) so it's a valid gutterLineClass RangeSet value — provided via .compute below.
   function buildGutter(st) {
@@ -76,11 +153,13 @@ export function workLiveFromView(view, state) {
     const sel = v.state.selection.main;
     const touches = (from, to) => sel.from <= to && sel.to >= from;
     const doc = v.state.doc;
+    const inBlock = blockLines(doc); // lines inside a do…end block — not prose, skip markdown there
 
     for (const { from, to } of v.visibleRanges) {
       let lineNo = doc.lineAt(from).number;
       const lastLine = doc.lineAt(to).number;
       for (; lineNo <= lastLine; lineNo++) {
+        if (inBlock.has(lineNo)) continue;
         const line = doc.line(lineNo);
         const text = line.text;
 
@@ -92,22 +171,14 @@ export function workLiveFromView(view, state) {
           if (!touches(line.from, line.to)) {
             decos.push(Decoration.replace({}).range(line.from, line.from + h[1].length + 1));
           }
-          continue; // don't chip inside a heading line
+          continue; // don't run inline markdown inside a heading line
         }
 
-        // Inline refs → chips, revealed (left raw) when the selection touches them.
-        for (const spec of REFS) {
-          spec.re.lastIndex = 0;
-          let m;
-          while ((m = spec.re.exec(text)) !== null) {
-            const start = line.from + (spec.at ? spec.at(m) : m.index);
-            const full = spec.label(m);
-            const matched = spec.at ? m[0].slice(m[1].length) : m[0];
-            const end = start + matched.length;
-            if (end <= start) continue;
-            if (touches(start, end)) continue; // cursor here → show raw syntax
-            decos.push(Decoration.replace({ widget: new Chip(full, spec.kind, spec.pre) }).range(start, end));
-          }
+        // Inline markdown + refs → rendered, revealed (left raw) when the selection touches the token.
+        for (const sp of scanInline(text)) {
+          const start = line.from + sp.s, end = line.from + sp.e;
+          if (touches(start, end)) continue; // cursor here → show raw syntax
+          emitInline(sp, line.from, decos);
         }
       }
     }
