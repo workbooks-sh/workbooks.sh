@@ -119,7 +119,8 @@ function injectStyle() {
 
 // Minimal CM6-compatible StringStream — the subset our tokenizer uses. Lets the highlighter run
 // without @codemirror/language (whose facets need a state instance we can't guarantee matches the host).
-class Stream {
+// Exported so nested.js can reuse it for the approximate body fallback (langs with no real parser).
+export class Stream {
   constructor(line) { this.string = line; this.pos = 0; }
   sol() { return this.pos === 0; }
   eol() { return this.pos >= this.string.length; }
@@ -139,8 +140,9 @@ class Stream {
 // Build the `.work` highlighter as a ViewPlugin over the HOST's @codemirror/view namespace — uses the
 // host's single state/view instance (no cross-package singleton mismatch). `view` = the @codemirror/view
 // module. Block state (do…end) is tracked from doc start so nested blocks colour correctly.
-export function workHighlightFromView(view) {
+export function workHighlightFromView(view, opts = {}) {
   injectStyle();
+  const bodies = opts.bodies !== false;   // false ⇒ outer-only (nested.js colours block bodies)
   const { Decoration, ViewPlugin } = view;
   const marks = {};
   const markFor = (name) => marks[name] || (marks[name] = Decoration.mark({ class: 'wke-t-' + name }));
@@ -152,13 +154,19 @@ export function workHighlightFromView(view) {
     const last = doc.lines;
     for (let i = 1; i <= last; i++) {
       const line = doc.line(i);
+      // When bodies are delegated to nested.js, skip a line that STARTS inside a block — except the
+      // structural do/end keywords — so the outer highlighter only colours openers/prose/headings.
+      const inBlockStart = st.inBlock;
       const s = new Stream(line.text);
       let guard = 0;
       while (!s.eol() && guard++ < 5000) {
         const before = s.pos;
         const tok = token(s, st);
         if (s.pos === before) { s.next(); continue; }
-        if (tok && TOKEN_CSS[tok]) decos.push(markFor(tok).range(line.from + before, line.from + s.pos));
+        if (!tok || !TOKEN_CSS[tok]) continue;
+        const text = line.text.slice(before, s.pos);
+        const emit = bodies || !inBlockStart || text === 'do' || text === 'end';
+        if (emit) decos.push(markFor(tok).range(line.from + before, line.from + s.pos));
       }
     }
     return Decoration.set(decos, true);

@@ -74,8 +74,15 @@ export async function createEditor(mount, opts = {}) {
   // The `.work` layers: syntax highlight (P1), autocomplete (kinds + do/end snippets), and lint
   // (diagnostics from the host-supplied lintSource — the nexus parser via /cloud/parse).
   if (isWork(opts.path)) {
-    try { const wk = await import(rv('./lang-stream.js')); exts.push(...wk.workHighlightFromView(view)); }
-    catch (e) { try { console.warn('[workedit] .work highlight unavailable', e); } catch (_) {} }
+    try {
+      const wk = await import(rv('./lang-stream.js'));
+      // Real inner-language highlighting (P5) colours block bodies; the outer highlighter then does
+      // structure/prose only. If nested fails to load, the outer highlighter covers bodies too.
+      let nested = null;
+      try { nested = await import(rv('./nested.js')); } catch (_) {}
+      exts.push(...wk.workHighlightFromView(view, { bodies: !nested }));
+      if (nested) exts.push(...nested.workNestedFromView(view, state));
+    } catch (e) { try { console.warn('[workedit] .work highlight unavailable', e); } catch (_) {} }
     try { const comp = await import(rv('./complete.js')); exts.push(comp.workCompletion(ac)); }
     catch (e) { try { console.warn('[workedit] .work completion unavailable', e); } catch (_) {} }
     if (typeof opts.lintSource === 'function') {
