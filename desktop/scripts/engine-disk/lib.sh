@@ -172,7 +172,9 @@ if [ -f /disco/secrets.env ]; then set -a; . /disco/secrets.env 2>/dev/null; set
 
 cd /app
 echo "wb-init: starting runtime ($(date))"
-exec bin/workbooks start
+# The mix release is `nexus` (mix.exs app: :nexus) → /app/bin/nexus. (`bin/workbooks` does NOT exist;
+# exec'ing it killed PID 1 → kernel panic. The old published disk used bin/nexus and booted fine.)
+exec bin/nexus start
 EOF
   chmod 755 "$ROOTFS/sbin/wb-init"
 }

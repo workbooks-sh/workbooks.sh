@@ -17,6 +17,13 @@ on:
     # the published disk (what `work deploy local` boots) never auto-rebuilt. Keep these in lockstep.
     workflows: [nexus-image]
     types: [completed]
+  # The boot recipe (kernel/initramfs glue + wb-init) lives here — a change to it must rebuild the
+  # disk directly, without waiting for a runtime-image publish.
+  push:
+    branches: [main]
+    paths:
+      - "desktop/scripts/engine-disk/**"
+      - ".github/workflows/engine-disk.yml"
   workflow_dispatch:
 
 concurrency:

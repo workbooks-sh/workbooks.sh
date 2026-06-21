@@ -56,6 +56,10 @@ defmodule Nexus.Deploy.Machine do
   end
 
   defp pull_engine_disk do
+    # Clear the prior layers first so `oras pull` can't land a stale/partial blob alongside the new
+    # descriptor (a caching race seen in testing). Forces a clean fetch of the current :latest.
+    for f <- ~w(disk.img.zst disk.img kernel-image initramfs-wb), do: File.rm(Path.join(engine_dir(), f))
+
     with {:ok, _} <- sh_in(engine_dir(), "oras", ["pull", @artifact]),
          {:ok, _} <- sh_in(engine_dir(), "zstd", ["-d", "-f", "disk.img.zst", "-o", "disk.img"]) do
       _ = record_digest()
