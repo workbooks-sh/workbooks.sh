@@ -128,15 +128,18 @@ WB.scopedStyles('/studio', `
 /* Studio = horizontal top nav (New task | Agents | Sessions) over the chat. Overrides the global
    .studio/.studio-chat (which were absolute-inset) so the nav stacks above a flex chat. */
 .studio { display: flex; flex-direction: column; }
-.studio-topnav { flex: none; display: flex; align-items: center; gap: 4px; padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--paper); }
-.studio-tab { display: inline-flex; align-items: center; gap: 7px; border: none; background: none; color: var(--dim); cursor: pointer; border-radius: 9px; padding: 7px 12px; font: 600 13px var(--read); }
+/* Centered FLOATING toolbar over the chat (not a full-width bar). */
+.studio-topnav { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 15;
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 22px rgba(0,0,0,.16); }
+.studio-tab { display: inline-flex; align-items: center; gap: 7px; border: none; background: none; color: var(--dim); cursor: pointer; border-radius: 10px; padding: 7px 14px; font: 600 13px var(--read); }
 .studio-tab:hover { background: var(--line); color: var(--ink); }
 .studio-tab.on { background: var(--line); color: var(--ink); }
 .studio-tab .ti { display: grid; place-items: center; }
 .studio-tab .ti svg { width: 16px; height: 16px; }
 .studio-chat { position: relative; inset: auto; flex: 1; min-height: 0; }
 /* Agents/Sessions side panel — slides over from the right. */
-.studio-side { position: absolute; right: 0; top: 51px; bottom: 0; width: 300px; z-index: 20; box-sizing: border-box;
+.studio-side { position: absolute; right: 0; top: 0; bottom: 0; width: 300px; z-index: 20; box-sizing: border-box;
   display: flex; flex-direction: column; background: var(--card); border-left: 1px solid var(--line); box-shadow: -6px 0 22px rgba(0,0,0,.16); }
 .studio-side-hd { padding: 12px 16px 8px; font: 700 11px var(--read); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
 .studio-side-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 1px; }
