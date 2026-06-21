@@ -220,6 +220,54 @@ defmodule Nexus.JJ do
     end
   end
 
+  # ── Per-agent worktrees (isolated real filesystems for the wasm sandbox) ───────────────────────
+  # A workspace-scoped agent run gets its OWN jj workspace (worktree) of the colocated repo: a real,
+  # isolated working dir the wasm sandbox preopens as /work (`wasmtime --dir <dir>::/work`). Guest kits
+  # do direct file writes; jj records the run's `@` change in the SHARED repo/op-log, attributed to the
+  # agent. Concurrent agents = isolated worktrees merged by jj (the CRDT default). No-op-safe.
+
+  @doc """
+  Create an isolated jj worktree (workspace) named `name` at `dest`, off the repo colocated over
+  `work_dir`. Returns `{:ok, dest} | {:skip, reason} | {:error, out}`. `dest` becomes the agent's /work.
+  """
+  def workspace_add(bare, work_dir, name, dest) do
+    with :ok <- ensure_colocated(bare, work_dir),
+         {_, 0} <- jj(work_dir, ["workspace", "add", "--name", name, dest]) do
+      {:ok, dest}
+    else
+      {:skip, r} -> {:skip, r}
+      {out, _} when is_binary(out) -> {:error, out}
+      other -> {:error, inspect(other)}
+    end
+  end
+
+  @doc """
+  Seal the agent's edits in worktree `dest` as a committed change on `branch`, attributed to `author`,
+  and export to the canonical bare. `{:ok, short_sha} | {:skip,_} | {:error,_}`. Call before forget.
+  """
+  def workspace_commit(dest, message, author, branch \\ "main") do
+    author_args = if is_binary(author) and author != "", do: ["--author", author], else: []
+
+    with {_, 0} <- jj(dest, ["describe", "-m", message] ++ author_args),
+         {_, 0} <- jj(dest, ["bookmark", "set", branch, "-r", "@", "--allow-backwards"]),
+         {_, 0} <- jj(dest, ["new"]),
+         {_, 0} <- jj(dest, ["git", "export"]),
+         {sha, 0} <- jj(dest, ["log", "--no-graph", "-r", "@-", "-T", "commit_id.short()"]) do
+      {:ok, String.trim(sha)}
+    else
+      other -> {:error, inspect(other)}
+    end
+  end
+
+  @doc "Tear down an agent worktree after its run. The COMMITS persist in the shared repo; only the working copy is removed."
+  def workspace_forget(work_dir, name, dest) do
+    jj(work_dir, ["workspace", "forget", name])
+    File.rm_rf(dest)
+    :ok
+  rescue
+    _ -> :ok
+  end
+
   # jj short op ids are lowercase hex — a tight allowlist for the read-only op-log.
   defp valid_op_id?(id), do: is_binary(id) and id =~ ~r/\A[0-9a-f]{4,}\z/
 

@@ -286,6 +286,30 @@ the `#event` bus (PR opened → hook) · integrations GitHub token (API + fetch-
 forming it); branch-policy declaration syntax; whether the reviewer is a default agent
 (a "merger") shipped with Waldo/deck/research or purely user-configured.
 
+## Agents write to the workspace — real FS in the wasm sandbox (the prereq)
+
+The sandbox is **already a true filesystem, not a ledger**: `/work` is a WASI
+**preopen of a real host directory** (`wasmtime --dir <dir>::/work` — `agent/bash.ex`),
+so guest kits do direct `open/read/write` on actual files (`Nexus.Agent.Vfs` makes a
+real dir). The only gap: that dir is a **throwaway scratch temp** (`tmp/nexus_vfs_*`,
+`rm_rf`'d after the run), so writes never reach the workspace.
+
+**Fix — preopen a per-agent jj worktree of the branch:**
+1. `jj workspace add --name <agent> <dir>` → a real, isolated working copy of the
+   workspace branch on WB_DATA (spike-validated: two agents, isolated worktrees, one
+   shared **attributed** op-log — the CRDT-between-agents default).
+2. wasmtime preopens THAT dir as `/work` (same mechanism, real target) → kit writes
+   hit the real workspace files directly.
+3. After the run, the agent's `@` change is sealed — `jj describe -m … --author <agent>`
+   → lands on the branch in the shared repo + op-log (attribution already built).
+4. Cleanup `jj workspace forget` + remove the worktree dir; the **commits persist**
+   (vs today's `rm_rf` of everything). Security line intact: guest still sees only `/work`.
+5. Concurrent agents = isolated worktrees merged by jj (CRDT); `jj undo` is the net.
+
+This needs: `Nexus.JJ.workspace_add/forget` (the worktree primitive); thread
+workspace+tenant+branch through `do_run`/`run_named`; mount the worktree as the run's
+VFS; seal+attribute the change after. Foundation for the whole agent-git workflow.
+
 ## Still open (genuinely undecided — flag for next pass)
 
 - Issue-store physical home: git-indexed `.work` vs DB table (`wb-35ma`).
