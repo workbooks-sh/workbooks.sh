@@ -395,6 +395,7 @@ server :cloud do
     now = System.os_time(:microsecond)
     attrs = Map.put(attrs, :updated, now)
     Nexus.Store.create(Task, attrs, tenant)
+    persist_task_file(attrs)
     Nexus.Events.emit(
       %{kind: "task.#{attrs[:status] || "update"}", actor: to_string(attrs[:created_by] || "system"),
         title: to_string(attrs[:title] || attrs[:tid]), target: to_string(attrs[:tid]),
@@ -402,6 +403,75 @@ server :cloud do
       tenant: tenant
     )
     attrs
+  end
+
+  # Git-backed store (wb-xxks): the SOURCE OF TRUTH for a task/issue is a committed `.work` file at
+  # `<home-workspace>/.nexus/{tasks,issues}/<tid>.work` — versioned, jj-covered, diffable. The SQLite
+  # rows stay the fast READ index (write-through). Gated on jj-substrate + best-effort: off / no mount /
+  # any error → SQLite-only (the board never breaks). Commit attributed to whoever filed it.
+  defp persist_task_file(attrs) do
+    with true <- Nexus.JJ.substrate?(),
+         {mount, root} when is_binary(mount) <- home_ws() do
+      sub = if attrs[:kind] == "issue", do: "issues", else: "tasks"
+      rel = ".nexus/#{sub}/#{attrs[:tid]}.work"
+      abs = Path.join(root, rel)
+      File.mkdir_p!(Path.dirname(abs))
+      File.write!(abs, task_to_work(attrs))
+      bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
+      Nexus.Git.provision_remote(bare, root)
+      who = to_string(attrs[:created_by] || "system")
+      Nexus.Git.commit_file(bare, root, rel, "#{sub}/#{attrs[:tid]}: #{attrs[:status]}", author: "#{who} <#{who}>")
+    else
+      _ -> :skip
+    end
+  rescue
+    _ -> :skip
+  end
+
+  # The home workspace tasks/issues live under (first mount). nil if none mounted.
+  defp home_ws, do: List.first(mounts())
+
+  # Render a task/issue to its `.work` source of truth — prose (title + detail) + a `task` block of the
+  # structured fields. The block is the canonical record; the SQLite index is rebuildable from it.
+  defp task_to_work(t) do
+    title = (t[:title] || t[:tid] || "") |> to_string() |> String.replace("\n", " ")
+    """
+    # #{title} ##{t[:kind] || "task"}
+
+    #{t[:detail] || ""}
+
+    task :#{t[:tid]} do
+      kind "#{t[:kind] || "task"}"
+      status "#{t[:status]}"
+      agent "#{t[:agent] || ""}"
+      parent "#{t[:parent] || ""}"
+      priority #{t[:priority] || 2}
+      created_by "#{t[:created_by] || ""}"
+      run "#{t[:run] || ""}"
+      created #{t[:created] || 0}
+    end
+    """
+  end
+
+  # Parse a task `.work` file back to a field map (for index rebuild / round-trip). Reads the `task`
+  # block's `field "value"` / `field 123` lines.
+  defp work_to_task(content) do
+    case Nexus.Literate.parse(content) |> Enum.find(&(&1.type == :code)) do
+      %{name: tid, body: body} ->
+        fields =
+          Regex.scan(~r/^\s*([a-z_]+)\s+(?:"([^"]*)"|(\d+))\s*$/m, body)
+          |> Map.new(fn
+            # scan trims the trailing empty group: quoted → [_, k, s]; number → [_, k, "", n].
+            [_, k, s] -> {String.to_atom(k), s}
+            [_, k, s, ""] -> {String.to_atom(k), s}
+            [_, k, "", n] -> {String.to_atom(k), String.to_integer(n)}
+          end)
+
+        Map.put(fields, :tid, to_string(tid))
+
+      _ ->
+        nil
+    end
   end
 
   def tasks_list(req) do
