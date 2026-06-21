@@ -34,7 +34,35 @@ defmodule Nexus.Store do
   @default "default"
 
   @doc "Validate `attrs` against the resource's shape and persist a row for `tenant`."
-  def create(resource, attrs, tenant \\ @default), do: adapter().create(resource, attrs, tenant)
+  def create(resource, attrs, tenant \\ @default) do
+    out = adapter().create(resource, attrs, tenant)
+    instrument(resource, tenant)
+    out
+  end
+
+  @tagreg {__MODULE__, :tags}
+
+  @doc "Register a resource module's #tags (set at compile; keeps the struct minimal). Used for #event."
+  def register_tags(module, tags) when is_atom(module) and is_list(tags) do
+    :persistent_term.put(@tagreg, Map.put(tags_map(), module, tags))
+    :ok
+  end
+
+  defp tags_map, do: :persistent_term.get(@tagreg, %{})
+
+  # #event auto-instrument: a #event-tagged resource emits a write event (its other #tags ride along).
+  defp instrument(resource, tenant) do
+    tags = Map.get(tags_map(), resource, [])
+
+    if "event" in tags do
+      Nexus.Events.instrument(
+        %{kind: "resource", name: resource, refs: Enum.map(tags, &("#" <> &1))},
+        %{kind: "resource.create", title: inspect(resource), tenant: tenant}
+      )
+    end
+  rescue
+    _ -> :ok
+  end
 
   @doc "All rows of a resource visible to `tenant`."
   def all(resource, tenant \\ @default), do: adapter().all(resource, tenant)

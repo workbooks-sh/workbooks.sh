@@ -84,6 +84,17 @@ defmodule Nexus.Resource do
       end
 
     [{module, _bin} | _] = Code.compile_quoted(quoted)
+
+    # The struct stays MINIMAL (client/AtomVM-safe — only __struct__ + __fields__). The unit's #tags
+    # are kept OUT of the struct, in a side registry, so Nexus.Store can #event-instrument writes.
+    tags =
+      node
+      |> Map.get(:refs, [])
+      |> Enum.filter(&String.starts_with?(&1, "#"))
+      |> Enum.map(&String.trim_leading(&1, "#"))
+
+    if tags != [], do: Nexus.Store.register_tags(module, tags)
+
     module
   end
 

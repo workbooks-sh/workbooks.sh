@@ -102,6 +102,28 @@ defmodule Nexus.Router do
 
   @doc "Apply a matched handler to a request map; normalize its return into `{status, headers, body}`."
   def dispatch(module, fun, req) do
+    result = do_dispatch(module, fun, req)
+    instrument(module, fun, req)
+    result
+  end
+
+  # #event auto-instrument: if the server unit carries #event, emit a route event (its other #tags ride along).
+  defp instrument(module, fun, req) do
+    if function_exported?(module, :__nexus_tags__, 0) do
+      tags = module.__nexus_tags__()
+
+      if "event" in tags do
+        Nexus.Events.instrument(
+          %{kind: "route", name: fun, refs: Enum.map(tags, &("#" <> &1))},
+          %{kind: "route.#{fun}", title: req[:path] || req["path"], actor: to_string(fun), tenant: req[:tenant]}
+        )
+      end
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp do_dispatch(module, fun, req) do
     case apply(module, fun, [req]) do
       {status, ct, body} when is_integer(status) and is_binary(ct) and is_binary(body) ->
         {status, ct, body}

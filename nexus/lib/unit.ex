@@ -13,7 +13,7 @@ defmodule Nexus.Unit do
   Compile a parsed `:code` unit into a BEAM module. Returns `{:ok, module}` or
   `{:error, reason}`. The unit's `do…end` body becomes the module body verbatim.
   """
-  def compile(%{name: name, ast: ast}) when is_binary(name) and not is_nil(ast) do
+  def compile(%{name: name, ast: ast} = node) when is_binary(name) and not is_nil(ast) do
     case do_body(ast) do
       nil ->
         {:error, :no_body}
@@ -21,10 +21,18 @@ defmodule Nexus.Unit do
       body ->
         mod = Module.concat([Nexus.Units, Nexus.Uid.camel(name) <> suffix()])
 
+        # carry the unit's #tags into the module so the router can #event auto-instrument it.
+        tags =
+          node
+          |> Map.get(:refs, [])
+          |> Enum.filter(&String.starts_with?(&1, "#"))
+          |> Enum.map(&String.trim_leading(&1, "#"))
+
         quoted =
           quote do
             defmodule unquote(mod) do
               use Nexus.Router
+              def __nexus_tags__, do: unquote(tags)
               unquote(body)
             end
           end
