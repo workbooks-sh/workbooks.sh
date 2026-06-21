@@ -36,6 +36,28 @@ defmodule Nexus.Events do
     * `:tenant` — tenant scope, threaded into effect ctx
   Fans out to matching hooks (async) and live subscribers. Returns the stamped event.
   """
+  @doc """
+  Auto-instrument: if a parsed unit `node` carries the `#event` tag, emit an event for this invocation
+  — carrying the node's OTHER `#tags` (so a `hook` can `match tags:`). `extra` overrides/adds fields
+  (`:actor`, `:title`, `:kind`, `:tenant`, …). No `#event` tag → `:noop`. This is the tag-driven wrap
+  the reactive layer is built on; seams (agent/route/store) call it on a unit they invoke.
+  """
+  def instrument(node, extra \\ %{}) when is_map(node) do
+    tags = node |> Map.get(:refs, []) |> Enum.filter(&String.starts_with?(&1, "#")) |> Enum.map(&String.trim_leading(&1, "#"))
+
+    if "event" in tags do
+      base = %{
+        kind: extra[:kind] || "#{node[:kind]}.#{node[:name]}",
+        title: extra[:title] || to_string(node[:name]),
+        tags: tags -- ["event"]
+      }
+
+      emit(Map.merge(base, extra), tenant: extra[:tenant])
+    else
+      :noop
+    end
+  end
+
   def emit(event, opts \\ []) when is_map(event) do
     depth = Keyword.get(opts, :depth, Map.get(event, :depth, 0))
     tenant = Keyword.get(opts, :tenant, Map.get(event, :tenant))

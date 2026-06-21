@@ -202,7 +202,13 @@ defmodule Nexus.Agent do
       |> put_if(:grant, d[:grant])
       |> put_if(:limit, d[:limit])
 
-    run(Keyword.merge(base, opts))
+    result = run(Keyword.merge(base, opts))
+
+    # #event auto-instrument: a #event-tagged agent emits an event on each run (agent → event → hook).
+    answer = with {:ok, %{answer: a}} <- result, do: a, else: (_ -> nil)
+    Nexus.Events.instrument(node, %{kind: "agent.#{d.name}", actor: to_string(d.name), title: task, result: answer})
+
+    result
   end
 
   defp put_if(kw, _key, nil), do: kw
