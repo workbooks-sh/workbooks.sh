@@ -42,16 +42,19 @@ Wire the validated worktree primitive into the run loop so a dispatched agent pr
    attributed, `jj undo`-able. Files touched: `agent.ex`, `agent/bash.ex`/`vfs.ex`,
    cloud `do_run`. (bd: agent→workspace-branch-write PREREQ)
 
-## Stage 2 — Specialists do their real jobs (THE ORIGINAL ASK)  · needs 1
+## Stage 2 — Specialists do their real jobs (THE ORIGINAL ASK)  · needs 1 · IN PROGRESS
 
-Now that agents can write the tree, make the three specialists produce real artifacts:
-- **Deck** → a real `.work` deck surface that renders via Reveal.js, committed to the
-  workspace; iterate loop in the Studio.
-- **Research** → the organized `.work` repository (topic notes + `[[backlinks]]` +
-  `#tags` + `index.work`), scoped to the ask; recurring gather→organize as a `flow` +
-  `trigger` (reuses scheduling).
-- **Video** → render via the wasm-video package as a background job, progress on the
-  bus, result committed. (bd: wb-luce)
+Now that agents can write the tree (Stage 1), make the specialists produce real artifacts.
+Prereq landed: **heredoc** support in the agent shell (`cat > f <<EOF … EOF`) so agents
+author multi-line `.work` files.
+- **Deck** ✅ — real `.work` deck surface (Reveal.js `client` island + `<section>` slides),
+  committed to `decks/<slug>/`. Verified e2e: a 4-slide investor deck committed to
+  `agent/deck` with the island + reveal.js wired.
+- **Research** ✅ (refined) — organized `research/<slug>/` repo: one `.work` note per
+  sub-topic with `[[backlinks]]` + `#tags` + an `index.work` map; same proven
+  heredoc-authoring path as Deck. (Recurring gather→organize as `flow`+`trigger` = later.)
+- **Video** ⬜ — BLOCKED: the wasm-video package isn't a compiled agent kit yet (only
+  `coreutils`+`web` are). Needs wasm-video wired as a kit + a render-job path. (bd: wb-luce)
 
 ## Stage 3 — Git-backed store + the Studio surfaces  · needs 1
 
