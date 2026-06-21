@@ -73,7 +73,9 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
     treeData: {},                                          // path -> entries
     treeLoading: {},
     cache: {},                                             // path -> {kind, content?, src?}
-    dragFrom: null
+    dragFrom: null,
+    editor: null,                                          // current CodeMirror EditorView (editable)
+    dirty: false                                           // unsaved edits in the active editor
   };
 
   function root(){ var w = WB.ws.active; return (w && (w.folder || w.slug || w.name)) || (w && w.id) || ''; }
@@ -112,11 +114,41 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
   // Hook so the shared sidebar's file click opens a file here when this view is mounted.
   WB.openInExplorer = function(path){ WB._pendingFile = null; openFile(path); };
 
+  // ── editing (ship 4): edit in CodeMirror → ⌘S → commit/push via the git remote ───────────────
+  function setDirty(b){
+    state.dirty = b;
+    var btn = el.querySelector('[data-save]');
+    if (btn){ btn.disabled = !b; btn.textContent = b ? 'Save' : 'Saved'; btn.classList.toggle('on', b); }
+    paintTabs();  // refresh the dirty dot on the active tab
+  }
+  async function save(){
+    if (!state.editor || !state.active || !state.dirty) return;
+    var path = state.active, content = state.editor.state.doc.toString();
+    var btn = el.querySelector('[data-save]'); if (btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
+    try {
+      var r = await fetch('/cloud/file/save', { method: 'POST', credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: path, content: content }) });
+      var d = await r.json();
+      if (d && d.ok){ setDirty(false); WB.toast('Saved' + (d.sha ? ' · ' + d.sha : '')); }
+      else { WB.toast((d && d.error) || 'Save failed', 'bad'); if (btn){ btn.disabled = false; btn.textContent = 'Save'; } }
+    } catch (e) { WB.toast('Save failed', 'bad'); if (btn){ btn.disabled = false; btn.textContent = 'Save'; } }
+  }
+
   // ── viewers (lazy esm imports, cached across the session) ───────────────────────────────────
   var _cm = null, _pdf = null, _marked = null;
   async function cm(){
     if (_cm) return _cm;
-    _cm = import('https://esm.sh/codemirror@6?bundle').then(function(m){ return m; });
+    // Assemble from the component packages — esm.sh's `codemirror?bundle` collapses to a single default
+    // (no named EditorView/basicSetup), so we import the pieces directly: view (EditorView/lineNumbers/
+    // keymap), state, commands (history + keymaps). Editable editor with line numbers + undo/redo.
+    _cm = Promise.all([
+      import('https://esm.sh/@codemirror/view@6'),
+      import('https://esm.sh/@codemirror/state@6'),
+      import('https://esm.sh/@codemirror/commands@6')
+    ]).then(function(mods){
+      var view = mods[0], state = mods[1], cmds = mods[2];
+      return { view: view, EditorView: view.EditorView, EditorState: state.EditorState, cmds: cmds };
+    });
     return _cm;
   }
   async function pdfjs(){
@@ -180,21 +212,25 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
   }
 
   async function renderCode(host, content, path, meta){
-    host.innerHTML = '<div id="wxcm" class="wxcm"></div>' + truncNote(meta);
+    host.innerHTML = '<div class="wxsavebar"><span class="wxsavepath">' + esc(path) + '</span>' +
+      '<button class="wxsave" data-save disabled>Saved</button></div>' +
+      '<div id="wxcm" class="wxcm"></div>' + truncNote(meta);
     var mount = host.querySelector('#wxcm');
+    var sb = host.querySelector('[data-save]'); if (sb) sb.onclick = save;
+    state.editor = null; setDirty(false);
     try {
       var m = await cm();
       var ext6 = [
-        m.lineNumbers(),
-        m.EditorState.readOnly.of(true),
-        m.EditorView.editable.of(false),
-        m.highlightSpecialChars(),
-        m.drawSelection ? m.drawSelection() : [],
+        m.view.lineNumbers(),
+        m.view.highlightActiveLine(),
+        m.cmds.history(),
+        m.view.keymap.of(m.cmds.defaultKeymap.concat(m.cmds.historyKeymap)),
+        m.EditorView.updateListener.of(function(u){ if (u.docChanged) setDirty(true); }),
         m.EditorView.theme({ '&': { height: '100%', fontSize: '12.5px' } })
       ];
-      new m.EditorView({ doc: content, extensions: ext6, parent: mount });
+      state.editor = new m.EditorView({ doc: content, extensions: ext6, parent: mount });
     } catch (e) {
-      // basic fallback: a <pre> with the source (still read-only, still useful)
+      // basic fallback: a read-only <pre> (editing needs CodeMirror)
       mount.innerHTML = '<pre class="wxpre">' + esc(content) + '</pre>';
     }
   }
@@ -296,8 +332,10 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
     if (!bar) return;
     if (!state.tabs.length) { bar.innerHTML = '<div class="wxnotabs">No open files</div>'; return; }
     bar.innerHTML = state.tabs.map(function(t, i){
-      return '<div class="wxtab' + (state.active === t.path ? ' on' : '') + '" draggable="true" data-tab="' + esc(t.path) + '" data-i="' + i + '" title="' + esc(t.path) + '">' +
+      var isDirty = state.active === t.path && state.dirty;
+      return '<div class="wxtab' + (state.active === t.path ? ' on' : '') + (isDirty ? ' dirty' : '') + '" draggable="true" data-tab="' + esc(t.path) + '" data-i="' + i + '" title="' + esc(t.path) + '">' +
         fileIcon(t.path) + '<span class="wxtablbl">' + esc(t.label) + '</span>' +
+        (isDirty ? '<span class="wxtabdot" title="Unsaved">●</span>' : '') +
         '<button class="wxtabx" data-tabx="' + esc(t.path) + '" title="Close" aria-label="Close">×</button>' +
       '</div>';
     }).join('');
@@ -363,6 +401,12 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
   paintTabs();
   loadTree('');
 
+  // ⌘S / Ctrl-S saves the active editor (the listener lives on el, which is recreated each render,
+  // so it always closes over the current state). CodeMirror doesn't bind ⌘S, so it bubbles up here.
+  el.addEventListener('keydown', function(e){
+    if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); save(); }
+  });
+
   // pick up a pending file from the sidebar (when this view wasn't mounted yet) + restore active
   if (WB._pendingFile) { var pf = WB._pendingFile; WB._pendingFile = null; openFile(pf); }
   else showActive();
@@ -426,7 +470,7 @@ WB.scopedStyles('/workspaces', `
 .wxemptymk svg { width: 100%; height: 100%; }
 .wxempty p { font: 500 13.5px var(--read); margin: 0; }
 
-.wxcm { height: 100%; }
+.wxcm { height: calc(100% - 37px); }   /* leave room for the save bar */
 .wxcm .cm-editor { height: 100%; background: var(--paper); }
 .wxcm .cm-editor.cm-focused { outline: none; }
 .wxcm .cm-scroller { font-family: var(--mono); color: var(--ink); }
@@ -453,4 +497,10 @@ WB.scopedStyles('/workspaces', `
 
 .wxtrunc { padding: 10px 16px; color: var(--dim); font: 500 12.5px var(--read); border-top: 1px solid var(--line); }
 .wxtrunc a { color: var(--pcd); }
+/* edit save bar (ship 4) */
+.wxsavebar { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--card); }
+.wxsavepath { flex: 1; min-width: 0; font: 500 11.5px var(--mono); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wxsave { flex: none; border: 1px solid var(--line); background: var(--card); color: var(--dim); border-radius: 7px; padding: 4px 12px; font: 600 12px var(--read); cursor: default; }
+.wxsave.on { background: var(--ink); color: var(--paper); border-color: var(--ink); cursor: pointer; }
+.wxtabdot { color: var(--peach, #f3c5a3); font-size: 10px; margin: 0 2px; }
 `);

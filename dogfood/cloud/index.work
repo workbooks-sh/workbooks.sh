@@ -46,6 +46,10 @@ server :cloud do
   # falls back to /cloud/raw (images/pdf streamed with the right Content-Type).
   route "GET /cloud/file", :file_read
   route "GET /cloud/raw", :file_raw
+  # Save an edit (ship 4): write the file on the volume + commit it into the workspace's repo (mirrors
+  # to GitHub if configured) + recompile changed units. The git mechanism is the open standard; saving
+  # from the dashboard is our product.
+  route "POST /cloud/file/save", :file_save
 
   # The nexus AS a git remote (wb): per-workspace push URL + the current GitHub mirror. The git
   # mechanism (bare repo + post-receive + mirror) is the open standard (Nexus.Git / Nexus.GitHttp);
@@ -321,6 +325,36 @@ server :cloud do
           not is_text -> %{path: req.query["path"], binary: true, content_type: ct, size: size}
           size > @max_text_bytes -> %{path: req.query["path"], binary: false, truncated: true, size: size, content: binary_part(File.read!(abs), 0, @max_text_bytes)}
           true -> %{path: req.query["path"], binary: false, size: size, content: File.read!(abs)}
+        end
+    end
+  end
+
+  # Save an edited file: write to the volume, commit into the workspace repo (provisioning it if needed),
+  # then recompile. Body: %{path: "<ws>/<rel>", content: "…"}.
+  def file_save(req) do
+    path = (is_map(req.body) && req.body["path"]) || req.query["path"]
+    content = (is_map(req.body) && req.body["content"]) || ""
+
+    case resolve_file(path) do
+      {:error, status, msg} ->
+        {status, %{error: msg}}
+
+      {:ok, abs} ->
+        [mount | rest] = String.split(String.trim(path), "/", trim: true)
+        {_, root} = List.keyfind(mounts(), mount, 0)
+        rel = Enum.join(rest, "/")
+        File.write!(abs, content)
+
+        bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
+        Nexus.Git.provision_remote(bare, root)
+        result = Nexus.Git.commit_file(bare, root, rel, "edit #{rel} via dashboard")
+
+        spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
+
+        case result do
+          {:ok, sha} -> %{ok: true, sha: sha}
+          :nochange -> %{ok: true, nochange: true}
+          {:error, out} -> {500, %{error: out}}
         end
     end
   end
