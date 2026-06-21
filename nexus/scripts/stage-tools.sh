@@ -72,7 +72,9 @@ take js/qjs-root
 take js/harness.o
 take js/harness_dock.o   # JsDock harness (env.* host caps → Javy.Net/Javy.VFS) — wb-e1x
 take js/bundle           # the in-sandbox npm bundler (bundlejob.js) — without it bundle_dir fails
-take svelte               # the in-sandbox Svelte lane (sveltejob.js pre-bundle hook) — wb-2ku.5
+take svelte               # the in-sandbox Svelte lane (svelte_compile.js + vendor/compiler.cjs)
+take solid                # the in-sandbox Solid lane (solid_compile.js + vendor/babel.js — @babel/standalone + babel-preset-solid)
+take python/pythonrun.wasm # the Python lane interpreter (CPython 3.12 wasm32-wasi) — yaegi-style interpreter-in-wasm
 take js/shims            # Node core + dock shims (events/buffer/fs/http/crypto/…) — wb-spy/wb-e1x
 take js/manifest.org
 

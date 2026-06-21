@@ -1,0 +1,13 @@
+<work-toolkit
+  id="python"
+  cli="pythonrun"
+  data-kind="interpreter"
+  data-build="build.sh"
+  data-source="CPython 3.12 compiled to wasm32-wasi (VMware webassembly-language-runtimes).">
+  <work-doc>
+    The interpreter-in-wasm lane (the Go/yaegi pattern): pythonrun.wasm runs a user `.py` and talks
+    stdin→stdout, the same command shape as the JS lane. The interpreter IS the artifact — the unit's
+    source is supplied at run time (mounted), so there is nothing per-program to compile. Driver:
+    Nexus.Compilers.Python.python_compile_to_wasm/2. STATUS: WORKING (CPython 3.12, runs print/stdin).
+  </work-doc>
+</work-toolkit>

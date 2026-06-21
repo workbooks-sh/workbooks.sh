@@ -1,0 +1,14 @@
+<work-toolkit
+  id="solid"
+  cli="qjs"
+  data-kind="transpile"
+  data-build="build.sh"
+  data-source="Solid JSX compiler run IN-SANDBOX. solid_compile.js (this dir) is fed to qjs-run.wasm">
+  <work-doc>
+    via the Javy.IO stdin→stdout files-map contract (same as the svelte lane). It loads the vendored
+    @babel/standalone bundle (vendor/babel.js, with babel-preset-solid registered as "solid") and runs
+    Babel.transform(src, {presets:['solid']}) on each .jsx/.tsx source → client JS. Zero native
+    execution. Driver: Nexus.Compilers.Js.transpile(:solid, _). A `solid` unit is a CLIENT island
+    (the compiled JS imports solid-js + needs a DOM), emitted as {:client, js} by Nexus.Compile.
+  </work-doc>
+</work-toolkit>

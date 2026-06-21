@@ -75,6 +75,44 @@ end|)
   end
 
   @tag :compiler
+  test "svelte unit transpiles to a client island (not a server command module)" do
+    root = Nexus.Compilers.Shared.default_root()
+
+    if !File.regular?(Path.join([root, "svelte", "vendor", "compiler.cjs"])) do
+      :ok
+    else
+      n = unit("svelte :greeting do\n  <script>export let name = \"world\";</script>\n  <h1>Hi {name}</h1>\nend\n")
+      assert n.kind == "svelte"
+      assert {:client, js} = Nexus.Compile.unit(n)
+      assert is_binary(js) and byte_size(js) > 0
+    end
+  end
+
+  @tag :compiler
+  test "python unit yields a runnable interpreter that executes the program" do
+    root = Nexus.Compilers.Shared.default_root()
+    interp = Path.join([root, "python", "pythonrun.wasm"])
+
+    if !File.regular?(interp) || !System.find_executable("wasmtime") do
+      :ok
+    else
+      n = unit("python :up do\n  import sys\n  print(sys.stdin.read().strip().upper())\nend\n")
+      assert n.kind == "python"
+      assert {:wasm, {:ok, wasm}} = Nexus.Compile.unit(n)
+
+      d = Path.join(System.tmp_dir!(), "pyt_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(d)
+      # .work block bodies carry the block's indentation; python is indent-sensitive, so the run-path
+      # dedents (strip the common leading whitespace). Here we strip the uniform 2-space block indent.
+      py = n.body |> String.split("\n") |> Enum.map_join("\n", &String.replace_prefix(&1, "  ", ""))
+      File.write!(Path.join(d, "main.py"), py)
+      sin = Path.join(d, "in"); File.write!(sin, "hi\n")
+      {out, 0} = System.cmd("sh", ["-c", "wasmtime run --dir #{d}::/w #{wasm} /w/main.py < #{sin}"], stderr_to_stdout: true)
+      assert out =~ "HI"
+    end
+  end
+
+  @tag :compiler
   test "sandbox js :name compiles through the inner JS lane" do
     if !toolchain?() do
       :ok

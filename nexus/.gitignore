@@ -16,6 +16,11 @@ build/tools/*.wasm
 /priv/*.wasm
 /kits/*.wasm
 
+# vendored compiler bundles (fetched/built by each lane's build.sh, shipped via the compilers
+# package — NOT committed to git): svelte compiler, solid babel bundle, python interpreter.
+/compilers/*/vendor/
+/compilers/python/*.wasm
+
 # swarm demo session history (SQLite, generated)
 examples/swarm/sessions.db
 sessions.db

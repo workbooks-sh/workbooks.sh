@@ -16,7 +16,7 @@ defmodule Nexus.Compile do
   # render target (its body is emitted into the page verbatim by the weave/SSR, not compiled).
   # `sandbox` is NOT here either — it's a placement WRAPPER that names capability grants around an
   # INNER language (`sandbox c :name` → kind="sandbox", lang="c"); it routes to the inner lane.
-  @wasm_kinds ~w(rust zig c cpp swift python svelte solid js ts)
+  @wasm_kinds ~w(rust zig c cpp swift python js ts)
 
   @doc "Compile one parsed `:code` unit to its artifact, tagged by lane."
   def unit(%{type: :code, kind: kind} = node) do
@@ -50,9 +50,12 @@ defmodule Nexus.Compile do
       kind == "swift" -> {:wasm, cached(node, fn -> swift_unit(node) end)}
       kind == "js" -> {:wasm, cached(node, fn -> js_unit(node) end)}
       kind == "ts" -> {:wasm, cached(node, fn -> ts_unit(node) end)}
-      kind == "svelte" -> {:wasm, cached(node, fn -> svelte_unit(node) end)}
-      kind == "solid" -> {:wasm, cached(node, fn -> solid_unit(node) end)}
       kind == "python" -> {:wasm, cached(node, fn -> python_unit(node) end)}
+      # svelte/solid are CLIENT UI frameworks: their compile is a TRANSPILE to browser JS (the
+      # component imports a framework runtime + needs a DOM — it's not a server command module). So
+      # they're render-target lanes like `client`, but with a compile step. Emit {:client, js}.
+      kind == "svelte" -> svelte_client(node)
+      kind == "solid" -> solid_client(node)
 
       # Any remaining wasm kind has no wired lane — surface a LOUD, explicit error (never a silent
       # tuple that masquerades as an artifact). When a lane is wired, add its `kind == …` arm above.
@@ -78,9 +81,8 @@ defmodule Nexus.Compile do
       "swift" -> swift_unit(node)
       "js" -> js_unit(node)
       "ts" -> ts_unit(node)
-      "svelte" -> svelte_unit(node)
-      "solid" -> solid_unit(node)
       "python" -> python_unit(node)
+      # svelte/solid are client UI frameworks, not sandboxable server lanes.
       _ -> {:error, {:sandbox_unknown_lang, lang, node.name}}
     end
   end
@@ -314,19 +316,23 @@ defmodule Nexus.Compile do
     end
   end
 
-  defp svelte_unit(%{body: body} = node) do
-    with {:ok, js} <- Nexus.Compilers.Js.transpile(:svelte, body) do
-      Nexus.Compilers.Js.js_compile_to_wasm(js, dock: granted?(node))
-    end
-  end
-
-  defp solid_unit(%{body: body} = node) do
-    with {:ok, js} <- Nexus.Compilers.Js.transpile(:solid, body) do
-      Nexus.Compilers.Js.js_compile_to_wasm(js, dock: granted?(node))
-    end
-  end
-
   defp python_unit(%{body: body} = node), do: Nexus.Compilers.Python.python_compile_to_wasm(body, dock: granted?(node))
+
+  # svelte/solid → transpile to browser JS, emitted as a client island. Errors propagate as
+  # {:error, _} (loud), never a silent empty island.
+  defp svelte_client(%{body: body}) do
+    case Nexus.Compilers.Js.transpile(:svelte, body) do
+      {:ok, js} -> {:client, js}
+      err -> err
+    end
+  end
+
+  defp solid_client(%{body: body}) do
+    case Nexus.Compilers.Js.transpile(:solid, body) do
+      {:ok, js} -> {:client, js}
+      err -> err
+    end
+  end
 
   defp granted?(node), do: Nexus.Audit.granted(node) != []
 

@@ -3,8 +3,15 @@ defmodule Nexus.Auth.TokenTest do
   alias Nexus.Auth.Token
   import Plug.Test
 
-  # The token store is durable DETS shared across runs — use a unique tenant per test for isolation.
-  defp org, do: "org_#{System.unique_integer([:positive])}"
+  # The token store is durable DETS that PERSISTS ACROSS test-suite runs. `System.unique_integer`
+  # resets per VM, so a bare counter collides with a prior run's org and leaks its tokens (the
+  # flaky `["a", "token"]`, wb-bgod). Mix in `os_time` for GLOBAL uniqueness, and revoke this test's
+  # tokens on exit so the DETS file doesn't accumulate — mirrors cp_token_test's cleanup.
+  defp org do
+    o = "org_#{System.os_time(:nanosecond)}_#{System.unique_integer([:positive])}"
+    on_exit(fn -> for t <- Token.list(o), do: Token.revoke(o, t.id) end)
+    o
+  end
 
   test "mint → verify round-trips tenant + roles + scopes" do
     t_org = org()
