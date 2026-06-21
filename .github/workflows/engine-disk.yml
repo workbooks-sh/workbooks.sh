@@ -12,7 +12,10 @@ name: engine-disk
 
 on:
   workflow_run:
-    workflows: [runtime-image]
+    # MUST match the runtime-image workflow's `name:`. It was renamed runtime-image → nexus-image
+    # (9b5c5074); the stale name here meant engine-disk was SKIPPED on every run since 2026-06-16, so
+    # the published disk (what `work deploy local` boots) never auto-rebuilt. Keep these in lockstep.
+    workflows: [nexus-image]
     types: [completed]
   workflow_dispatch:
 
