@@ -23,6 +23,37 @@ served as a `/` page — surface discovery skips it — unless you deliberately 
 `client` or `server` block. It indexes the tree and carries config; the served surfaces
 are its subfolders.
 
+## Surfaces are subtrees — a monorepo
+
+A nexus deploy is a **monorepo**. Any folder that contains an `index.work` is a
+**surface** — a served workbook — and it is mounted at its path **relative to the deploy
+root**. A surface at `site/lander/` serves at `/site/lander`; one at `docs/` serves at
+`/docs`. The **URL follows the folder path** (WYSIWYG) — there is no remap layer that
+makes the served path differ from where the file lives. Move the folder and the URL
+moves with it.
+
+Routing resolves a request to the **deepest** matching surface (longest path prefix), so
+`site/lander` wins over a shallower `site`. Nesting is therefore natural: a folder may
+contain other surfaces, as deep as you like.
+
+## Workspaces are declared subtrees
+
+A **workspace** is an organizational subtree, declared in the manifest's `deploy` block:
+
+deploy do
+  workspaces="
+    site    | Site    | 🪧
+    product | Product | ☁️
+    docs    | Docs    | 📖
+  "
+end
+
+A workspace may *be* a single surface (`docs`) or *contain* several (`site/lander`,
+`site/marketing`). Workspaces are **declared**, not auto-derived from top-level folders —
+organization is your call, not a side effect of the directory layout. A workspace's id is
+its subtree path on the volume, and that *same* id is its git remote (`/git/<id>.git`) and
+its dashboard file-tree key — one identity, never drifted.
+
 ## The simple case
 
 Most workbooks are a single nexus: one root `index.work` with one `deploy` declaration.

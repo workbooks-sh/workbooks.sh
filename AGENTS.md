@@ -28,7 +28,7 @@ Four lanes live in every file:
   **surface**, mounted at its path relative to root (`site/lander` → `/site/lander`, URL = folder path,
   WYSIWYG, no remap layer). A **workspace is a declared subtree** (`workspaces="<subtree>|Name|emoji"`),
   whose `id` IS its on-disk folder path (== git remote `/git/<id>.git` == dashboard tree key — never
-  drift them). Nesting is natural (subtree-in-subtree). **Canon: `nexus/docs/deploy-as-index-tree.md`.**
+  drift them). Nesting is natural (subtree-in-subtree). **Canon: `dogfood/docs/deploy/deploy-as-index-tree.work`.**
 - **Shipping** = the **`work` CLI** (the Zig *reactor*) operates on the tree: `work weave
   <dir> <out>` folds it into one shippable artifact; `check` resolves refs + audits
   capabilities; `why`/`near`/`wit` give the code-graph deps + the generated WIT world;
