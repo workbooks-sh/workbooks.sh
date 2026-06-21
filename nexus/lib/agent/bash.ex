@@ -27,12 +27,16 @@ defmodule Nexus.Agent.Bash do
   grant, is refused — so `tools`/`grant` actually CONSTRAIN the agent, not just describe it.
   """
   def run(vfs, line, perms) when is_binary(line) do
+    # Heredoc first (`cmd <<EOF … EOF`) — the standard way to feed multi-line content to a command. The
+    # body becomes the pipeline's initial stdin; combined with `> file` it's how agents author files
+    # (`cat > deck.work <<EOF … EOF`). Then strip a trailing `> file` redirect off the command line.
+    {line, heredoc} = extract_heredoc(line)
     {pipeline, redirect} = extract_redirect(line)
 
     out =
       pipeline
       |> split_pipes()
-      |> Enum.reduce("", fn segment, stdin -> run_segment(vfs, segment, stdin, perms) end)
+      |> Enum.reduce(heredoc || "", fn segment, stdin -> run_segment(vfs, segment, stdin, perms) end)
 
     case redirect do
       nil ->
@@ -46,6 +50,16 @@ defmodule Nexus.Agent.Bash do
         body = if mode == :append, do: (Nexus.Agent.Vfs.get(vfs, rel) || "") <> out, else: out
         Nexus.Agent.Vfs.put(vfs, rel, body)
         ""
+    end
+  end
+
+  # Pull a heredoc off the command: `cmd [args] <<[-]['"]?DELIM['"]? \n body \n DELIM`. Returns
+  # `{command_line_without_heredoc, body | nil}`. The body is fed as the pipeline's stdin (so `cat`
+  # echoes it, `tee`/`>` write it). Handles the quoted (`<<'EOF'`) and bare forms.
+  defp extract_heredoc(line) do
+    case Regex.run(~r/\A(.*?)<<-?\s*['"]?([A-Za-z_]\w*)['"]?[ \t]*\n(.*?)\n[ \t]*\2[ \t]*\n?\z/s, line) do
+      [_, cmd, _delim, body] -> {String.trim(cmd), body}
+      _ -> {line, nil}
     end
   end
 
