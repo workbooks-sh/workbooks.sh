@@ -1,6 +1,8 @@
 # Slim dogfood-runtime: current nexus release (serve_static + auth + SSR) serving dogfood/.
 # No wasm compilers — the dogfood surfaces compile no wasm.
-FROM elixir:1.19-otp-27 AS build
+# OTP 28 (erts-16), NOT otp-27 (erts-15): thousand_island 1.5.0's acceptor (Task.start_link/3)
+# crash-loops the BEAM on OTP 27 but runs clean on OTP 28 — which is what dev/:4010 (erts-16) proves. (bd wb-wi1b)
+FROM elixir:1.19-otp-28 AS build
 ENV MIX_ENV=prod LANG=C.UTF-8
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git curl && rm -rf /var/lib/apt/lists/*
