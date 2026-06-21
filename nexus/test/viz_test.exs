@@ -6,7 +6,7 @@ defmodule Nexus.Graph.VizTest do
 
   setup do
     File.rm_rf!(@tmp); File.mkdir_p!(@tmp)
-    File.write!(Path.join(@tmp, "o.work"), "# O\n\n```elixir\nresource :order do\n  id :text\nend\n```\n")
+    File.write!(Path.join(@tmp, "o.work"), "# O\n\nresource :order do\n  id :text\nend\n")
     on_exit(fn -> File.rm_rf!(@tmp) end)
     {:ok, g: Graph.build_dir(@tmp)}
   end

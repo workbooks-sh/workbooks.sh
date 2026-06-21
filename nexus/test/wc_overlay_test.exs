@@ -7,8 +7,8 @@ defmodule Nexus.OverlayTest do
   setup do
     File.rm_rf!(@tmp)
     File.mkdir_p!(@tmp)
-    File.write!(Path.join(@tmp, "order.work"), "# Order\n\n```elixir\nresource :order do\n  defstruct id: \"\", total: 0\nend\n```\n")
-    File.write!(Path.join(@tmp, "agent.work"), "# Agent\n\n```elixir\nserver :agent, grant: [net: \"x\"] do\n  def go, do: :ok\nend\n```\n")
+    File.write!(Path.join(@tmp, "order.work"), "# Order\n\nresource :order do\n  defstruct id: \"\", total: 0\nend\n")
+    File.write!(Path.join(@tmp, "agent.work"), "# Agent\n\nserver :agent, grant: [net: \"x\"] do\n  def go, do: :ok\nend\n")
     on_exit(fn -> File.rm_rf!(@tmp) end)
     {:ok, g: Graph.build_dir(@tmp)}
   end

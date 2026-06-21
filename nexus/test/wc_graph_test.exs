@@ -15,27 +15,23 @@ defmodule Nexus.GraphTest do
 
   describe "query API + dogfood render" do
     setup do
-      write("chart.work", "# Chart\n\n```svelte\nclient svelte :chart do\n  export function Chart() {}\nend\n```\n")
+      write("chart.work", "# Chart\nsvelte\nclient svelte :chart do\n  export function Chart() {}\nend\n")
 
       write("panel.work", """
       # Panel
 
-      ```svelte
       client solid :panel do
         import { chart } from "work://chart"
         export function Panel() {}
       end
-      ```
       """)
 
       write("svc.work", """
       # Service
 
-      ```elixir
       server :svc, grant: [net: "api.example.com"] do
         def go, do: :ok
       end
-      ```
       """)
 
       {:ok, g: Nexus.Graph.build_dir(@tmp)}
@@ -80,11 +76,9 @@ defmodule Nexus.GraphTest do
     write("orders.work", """
     # Orders
 
-    ```elixir
     resource :order do
       defstruct id: "", total: 0
     end
-    ```
     """)
 
     g = Graph.build_dir(@tmp)
@@ -111,11 +105,9 @@ defmodule Nexus.GraphTest do
     write("svc.work", """
     # Service
 
-    ```elixir
     server :svc, grant: [net: "api.example.com"] do
       def go, do: :ok
     end
-    ```
     """)
 
     g = Graph.build_dir(@tmp)
@@ -133,21 +125,17 @@ defmodule Nexus.GraphTest do
     write("types.work", """
     # Types
 
-    ```elixir
     defmodule Lead do
       defstruct name: "", score: 0
     end
-    ```
     """)
 
     write("enrich.work", """
     # Enrich
 
-    ```elixir
     server :enrich do
       def run(%Lead{} = lead), do: lead
     end
-    ```
     """)
 
     g = Nexus.Graph.build_dir(@tmp)
@@ -173,11 +161,9 @@ defmodule Nexus.GraphTest do
     write("svc.work", """
     # Service
 
-    ```elixir
     server :svc, grant: [net: "api.example.com"] do
       def go, do: :ok
     end
-    ```
     """)
 
     g = Graph.build_dir(@tmp)

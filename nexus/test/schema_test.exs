@@ -10,12 +10,10 @@ defmodule Nexus.SchemaTest do
     File.write!(Path.join(@tmp, "order.work"), """
     # Order
 
-    ```elixir
     resource :order do
       id :text
       total :int
     end
-    ```
     """)
     on_exit(fn -> File.rm_rf!(@tmp) end)
     :ok

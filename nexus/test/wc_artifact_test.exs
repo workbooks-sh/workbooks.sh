@@ -56,7 +56,7 @@ defmodule Nexus.ArtifactTest do
   end
 
   test "artifact overlay joins onto the graph node's facets.artifact" do
-    File.write!(Path.join(@tmp, "svc.work"), "# Svc\n\n```elixir\nserver :svc do\n  def go, do: :ok\nend\n```\n")
+    File.write!(Path.join(@tmp, "svc.work"), "# Svc\n\nserver :svc do\n  def go, do: :ok\nend\n")
     g = Graph.build_dir(@tmp)
     assert g.nodes["svc"].facets.artifact == nil
 

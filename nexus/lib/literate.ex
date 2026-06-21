@@ -119,7 +119,7 @@ defmodule Nexus.Literate do
 
     head != "" and
       (Regex.match?(~r/^[a-z]\w*$/, head) or
-         Regex.match?(~r/(^|\s):[a-z]\w/, head) or
+         Regex.match?(~r/(^|\s):[a-z]/, head) or
          Regex.match?(~r/^(data|resource|record|defmodule|type|enum)\s+[A-Z]\w*/, head))
   end
 

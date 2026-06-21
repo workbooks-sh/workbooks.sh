@@ -32,7 +32,7 @@ defmodule Nexus.TelemetryTest do
   test "overlay projects the ledger onto the graph; observed vs declared caps is computable" do
     tmp = Path.join(System.tmp_dir!(), "nx_tel_#{System.unique_integer([:positive])}")
     File.mkdir_p!(tmp)
-    File.write!(Path.join(tmp, "worker.work"), "# Worker\n\n```elixir\nserver :worker, grant: [net: \"x\"] do\n  def go, do: :ok\nend\n```\n")
+    File.write!(Path.join(tmp, "worker.work"), "# Worker\n\nserver :worker, grant: [net: \"x\"] do\n  def go, do: :ok\nend\n")
     on_exit(fn -> File.rm_rf!(tmp) end)
 
     g = Graph.build_dir(tmp)
