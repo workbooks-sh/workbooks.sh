@@ -411,15 +411,16 @@
       if (entries.length === 0) return '<div class="treemsg" style="padding-left:' + (depth * 14 + 12) + 'px">Empty</div>';
       return entries.map(function(en){
         var pad = depth * 14 + 12;
+        var ficon = WB.fileIcon ? WB.fileIcon(en.name, { dir: en.dir, open: !!st.treeOpen[en.path] }) : '';
         if (en.dir){
           var open = !!st.treeOpen[en.path];
           return '<div class="trow dir' + (open ? ' open' : '') + '" data-tree-toggle="' + esc(en.path) + '" style="padding-left:' + pad + 'px">' +
-              '<span class="tchev">' + ICO.chev + '</span><span class="tname">' + esc(en.name) + '</span>' +
+              '<span class="tchev">' + ICO.chev + '</span>' + ficon + '<span class="tname">' + esc(en.name) + '</span>' +
               '<button class="tbm' + (isBookmarked(en.path) ? ' on' : '') + '" data-bm="' + esc(en.path) + '" data-bml="' + esc(en.name) + '" title="Bookmark">★</button>' +
             '</div>' + (open ? treeHtml(en.path, depth + 1) : '');
         }
-        return '<div class="trow file" data-tree-file="' + esc(en.path) + '" style="padding-left:' + (pad + 16) + 'px">' +
-            '<span class="tname">' + esc(en.name) + '</span>' +
+        return '<div class="trow file" data-tree-file="' + esc(en.path) + '" style="padding-left:' + (pad + 4) + 'px">' +
+            ficon + '<span class="tname">' + esc(en.name) + '</span>' +
             '<button class="tbm' + (isBookmarked(en.path) ? ' on' : '') + '" data-bm="' + esc(en.path) + '" data-bml="' + esc(en.name) + '" title="Bookmark">★</button>' +
           '</div>';
       }).join('');
@@ -702,7 +703,9 @@
     // ── boot ──────────────────────────────────────────────────────────────────────────────────
     WB.start = async function () {
       await loadIdentity();
-      try { await WB.loadIcons(); } catch (e) {}   // material file/folder icons (CDN), ready before first render
+      // Material icons load in the BACKGROUND (don't block first paint); generic file/folder glyphs
+      // show immediately, refined when the manifest arrives → refresh the tree.
+      WB.loadIcons().then(function(){ try { paintTree(); } catch (e) {} });
       try { await WB.nexus.load(); } catch (e) {}
       var defaultWs = (WB.profile && WB.profile.orgName) || (WB.user.email ? WB.user.email.split('@')[0] : '') || 'Workspace';
       try { await WB.ws.load(defaultWs); } catch (e) {}
