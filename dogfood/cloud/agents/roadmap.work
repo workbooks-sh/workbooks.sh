@@ -1,0 +1,83 @@
+Agent service — the one roadmap #agents #plan
+
+The single sequenced plan to finish the cloud Nexus **agent service**. The destination
+is the ORIGINAL goal: **Waldo + the specialists (deck/video/research) doing real work
+on your nexus — planning, scheduling, orchestrating sub-agents, filing issues, all
+managed in the Studio.** Everything below is sequenced so each stage *unlocks* the next;
+the infra prereqs exist only to make the agentic features real. Decisions live in
+[[design]]; this is the execution order. We follow it stage by stage, top to bottom.
+
+## Stage 0 — DONE (the spine, so we don't re-walk it)
+
+Built + verified this run: default agents (`waldo`/`deck`/`research`) register + run by
+name; durable **Runs** + SSE streaming + Studio Runs view; **task management + planning**
+(Plan-with-Waldo → assigned subtasks → dispatch→run); **issue store + failure model**
+(failed run auto-files an attributed issue); **scheduling** backend (agent runs on
+cron/interval, re-armed on boot); **jj substrate** (Option B, gitlink-colocate over the
+bare) + **attribution** + the **change-log in Activity**; the **per-agent worktree
+primitive** (`Nexus.JJ.workspace_add/commit/forget` — isolated real FS, validated).
+
+## Stage 1 — Agents write to the workspace (THE LINCHPIN)  · unlocks 2,3,4
+
+Wire the validated worktree primitive into the run loop so a dispatched agent produces
+**real, committed, attributed file changes** — the jj-FIFO + undo default, end to end.
+
+1. Thread `workspace` (+ tenant, branch) through `Nexus.Agent.run_named`/`run` and the
+   cloud `do_run`/dispatch path (today the run is workspace-blind).
+2. For a workspace-scoped run, mount a `jj workspace add` worktree as the run's VFS
+   (point `Nexus.Agent.Vfs`/the wasmtime `--dir` preopen at the real worktree, not the
+   scratch temp). Guest sees only `/work`; writes hit real files.
+3. After the run, `workspace_commit` (author = the agent) → the agent's branch
+   (`agent/<name>` for the PR path, or `main` for the simple FIFO default).
+4. `workspace_forget` cleanup (commits persist). Surface the change in Activity (the
+   `workspace.change` event already exists).
+5. Verify e2e: dispatch deck on a real workspace → a committed `.work` file appears,
+   attributed, `jj undo`-able. Files touched: `agent.ex`, `agent/bash.ex`/`vfs.ex`,
+   cloud `do_run`. (bd: agent→workspace-branch-write PREREQ)
+
+## Stage 2 — Specialists do their real jobs (THE ORIGINAL ASK)  · needs 1
+
+Now that agents can write the tree, make the three specialists produce real artifacts:
+- **Deck** → a real `.work` deck surface that renders via Reveal.js, committed to the
+  workspace; iterate loop in the Studio.
+- **Research** → the organized `.work` repository (topic notes + `[[backlinks]]` +
+  `#tags` + `index.work`), scoped to the ask; recurring gather→organize as a `flow` +
+  `trigger` (reuses scheduling).
+- **Video** → render via the wasm-video package as a background job, progress on the
+  bus, result committed. (bd: wb-luce)
+
+## Stage 3 — Git-backed store + the Studio surfaces  · needs 1
+
+- Move **tasks/issues to git-backed `.work`** at `<ws>/.nexus/{tasks,issues}/<id>.work`
+  (source of truth, jj-covered), SQLite as the derived index (write-through + rebuild).
+  (bd: wb-xxks)
+- **Studio buildout**: Schedules panel + Issues panel (we have the backends); fold
+  schedule into the Tasks board; durable agent sessions; sub-agent runs collapsed under
+  the parent. (bd: wb-980e + Schedules-UI)
+
+## Stage 4 — Workflow config + PRs/GitHub  · needs 1,3
+
+- **Per-subtree workflow config** (`.work`-declared): default = jj FIFO + undo (CRDT);
+  opt-in review policy (a reviewer/**merger** agent on a `pr.opened` hook, routed
+  agent-PR vs human-PR), branch policy (prod vs dev gate), validation (`flow`/`check`
+  before merge). (bd: workflow-config-layer)
+- **GitHub PR/issue API + fetch-back**: open a PR for an agent branch (link the nexus
+  issue); opt-in promote a task to a GitHub Issue with status sync; pull merged PRs back
+  (the bidirectional half). Uses the integrations GitHub token + native `git subtree`
+  (the [[josh]] decision — no josh). (bd: github-pr-api)
+
+## Stage 5 — Orchestration depth + production hardening  · needs 1,2
+
+- **Sub-agent orchestration**: depth cap, grant narrowing, structured `.work` handoff
+  docs, Studio sub-run tree. (The original "orchestrate + manage sub-agents".)
+- **Cost/spend** metering + per-org caps (budget pause, upsell knob via `Nexus.Config`).
+- **jj flag-flip** on the dogfood deploy (confirm jj is in the runtime image) + Undo/op
+  surfacing; multi-tenant schedule re-arm fan-out; fix the agent `model`-field bug
+  (bd: wb-bg5z).
+
+## The through-line (don't lose the forest)
+
+Stage 1 is the one linchpin; 2 is the original goal made real; 3–4 make it
+collaborative + production-safe; 5 is depth. Tasks → runs → issues → schedules → changes
+are already **one fabric**; Stage 1 connects agents' actual file work into that fabric,
+and the rest is surfacing + policy. We execute top-to-bottom, committing each stage green.
