@@ -1,6 +1,6 @@
 # Slim dogfood-runtime: current nexus release (serve_static + auth + SSR) serving dogfood/.
 # No wasm compilers — the dogfood surfaces compile no wasm.
-FROM elixir:1.18-otp-27 AS build
+FROM elixir:1.19-otp-27 AS build
 ENV MIX_ENV=prod LANG=C.UTF-8
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git curl && rm -rf /var/lib/apt/lists/*

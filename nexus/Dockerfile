@@ -23,7 +23,7 @@ ARG COMPILERS_REF=compilers:local
 FROM ${COMPILERS_REF} AS compilers
 
 # --- build: the Elixir release ----------------------------------------------
-FROM elixir:1.18-otp-27 AS build
+FROM elixir:1.19-otp-27 AS build
 ENV MIX_ENV=prod LANG=C.UTF-8
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git curl \
