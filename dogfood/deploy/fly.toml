@@ -18,6 +18,17 @@ primary_region = "sjc"
   auto_stop_machines = "suspend"
   auto_start_machines = true
   min_machines_running = 0
+
+  # Deploy-time health gate: a release must answer GET /health 200 before fly cuts traffic to the new
+  # machine. A crash-looping boot (e.g. the wb-o5ng Task.start_link/3 acceptor crash) never becomes
+  # healthy → fly aborts the release and leaves the prior working version serving, instead of outaging
+  # prod. Last-resort guard; CI's build+boot smoke (dogfood-deploy.yml) catches it earlier, pre-deploy.
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "45s"
+    method = "GET"
+    path = "/health"
 # Persistent volume for the DB ONLY — mounted at the .nexus dir so the workbook tree (baked into the
 # image at /srv/dogfood) is untouched while accounts/orgs/workspaces (/.nexus/nexus.db) survive
 # restarts. Without this, WB_DATA was ephemeral and the control-plane DB relied entirely on Litestream
