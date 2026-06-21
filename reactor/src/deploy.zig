@@ -8,6 +8,7 @@ const std = @import("std");
 const Io = std.Io;
 const fs = @import("fs.zig");
 const context = @import("context.zig");
+const cloudapi = @import("cloud.zig");
 const log = @import("log.zig");
 
 const places = [_][]const u8{ "local", "cloud" };
@@ -230,6 +231,58 @@ pub fn apply(io: Io, alloc: std.mem.Allocator, file: []const u8) !u8 {
         log.ok(try std.fmt.allocPrint(alloc, "cloud target: {s} \u{b7} {s}", .{ attr(src, "provider", "fly"), attr(src, "app", "(no app)") }));
         log.step("cloud apply provisions via the control plane (`work login`)");
     }
+    return 0;
+}
+
+/// `work deploy verify [--nexus <name>]` — health-probe a running nexus. Resolves the target nexus
+/// (by name, else the active context), GETs `<base>/health`, and reports. Real, no scaffolding.
+pub fn verify(io: Io, alloc: std.mem.Allocator, home: []const u8, nexus_name: []const u8) !u8 {
+    const base = if (nexus_name.len > 0)
+        try context.nexusByName(io, alloc, home, nexus_name)
+    else
+        try context.nexusUrl(io, alloc, home);
+
+    log.prompt(try std.fmt.allocPrint(alloc, "work deploy verify {s}", .{base}));
+    const token = if (context.cred(io, alloc, home)) |c| c.token else "";
+    const url = try std.fmt.allocPrint(alloc, "{s}/health", .{base});
+
+    if (cloudapi.request(io, alloc, .GET, url, token, null)) |res| {
+        if (res.status == 200) {
+            log.ok(try std.fmt.allocPrint(alloc, "healthy \u{b7} {s} (HTTP 200)", .{base}));
+            return 0;
+        }
+        log.err(try std.fmt.allocPrint(alloc, "unhealthy \u{b7} {s} returned HTTP {d}", .{ base, res.status }));
+        return 1;
+    } else |e| {
+        log.err(try std.fmt.allocPrint(alloc, "unreachable \u{b7} {s} ({s}) \u{2014} is the nexus up?", .{ base, @errorName(e) }));
+        return 1;
+    }
+}
+
+/// `work deploy status [--nexus <name>]` — inspect the target: the resolved nexus, its health, and
+/// the local `deployment.work` engine-place (if present). Read-only.
+pub fn status(io: Io, alloc: std.mem.Allocator, home: []const u8, nexus_name: []const u8) !u8 {
+    const base = if (nexus_name.len > 0)
+        try context.nexusByName(io, alloc, home, nexus_name)
+    else
+        try context.nexusUrl(io, alloc, home);
+
+    log.prompt("work deploy status");
+    log.step(try std.fmt.allocPrint(alloc, "nexus {s}", .{base}));
+
+    if (fs.readFile(io, alloc, "deployment.work")) |src| {
+        log.step(try std.fmt.allocPrint(alloc, "config \u{b7} engine-place={s} \u{b7} tenancy={s} \u{b7} database={s}", .{
+            attr(src, "engine-place", "local"),
+            attr(src, "tenancy-mode", "single"),
+            attr(src, "database", "sqlite"),
+        }));
+    } else |_| log.step("no local deployment.work (run `work deploy init`)");
+
+    const token = if (context.cred(io, alloc, home)) |c| c.token else "";
+    const url = try std.fmt.allocPrint(alloc, "{s}/health", .{base});
+    if (cloudapi.request(io, alloc, .GET, url, token, null)) |res| {
+        if (res.status == 200) log.ok("health 200 \u{b7} up") else log.step(try std.fmt.allocPrint(alloc, "health HTTP {d}", .{res.status}));
+    } else |_| log.step("health unreachable \u{b7} down");
     return 0;
 }
 

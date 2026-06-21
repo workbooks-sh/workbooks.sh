@@ -69,13 +69,19 @@ pub fn main(init: std.process.Init) !void {
             std.process.exit(try deploy.validateVerb(io, alloc, it.next() orelse "deployment.work"));
         } else if (eql(sub, "apply")) {
             std.process.exit(try deploy.apply(io, alloc, it.next() orelse "deployment.work"));
+        } else if (eql(sub, "verify")) {
+            const f = flags(alloc, &it);
+            std.process.exit(try deploy.verify(io, alloc, home, f.nexus));
+        } else if (eql(sub, "status")) {
+            const f = flags(alloc, &it);
+            std.process.exit(try deploy.status(io, alloc, home, f.nexus));
         } else if (sub.len > 0) {
             // `work deploy <dir> [--nexus <name>]` — mount a workbook into a (named) running nexus.
             const cwd = init.environ_map.get("PWD") orelse ".";
             const f = flags(alloc, &it);
             std.process.exit(try deploy.deployWorkbook(io, alloc, home, cwd, sub, f.nexus));
         } else {
-            log.err("usage: work deploy <dir> [--nexus <name>]  ·  deploy init|validate|apply");
+            log.err("usage: work deploy <dir> [--nexus <name>]  ·  deploy init|validate|apply|verify|status");
             std.process.exit(1);
         }
     } else if (eql(verb, "secret")) {
@@ -161,7 +167,7 @@ const groups = [_]Group{
     } },
     .{ .name = "deploy", .blurb = "stand up a runtime, local or cloud", .verbs = &.{
         .{ "deploy init|validate|apply", "scaffold · check · deploy the .work config" },
-        .{ "deploy verify|status|down", "health · inspect · teardown" },
+        .{ "deploy verify|status", "health-probe · inspect a running nexus" },
         .{ "secret set|get|list", "secrets in the OS keychain (never in source)" },
     } },
     .{ .name = "platform", .blurb = "identity, contexts, the control plane", .verbs = &.{
