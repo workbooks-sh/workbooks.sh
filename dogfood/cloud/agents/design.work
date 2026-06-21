@@ -310,6 +310,34 @@ This needs: `Nexus.JJ.workspace_add/forget` (the worktree primitive); thread
 workspace+tenant+branch through `do_run`/`run_named`; mount the worktree as the run's
 VFS; seal+attribute the change after. Foundation for the whole agent-git workflow.
 
+## GitHub integration — DECIDED: a GitHub App (not just OAuth)
+
+GitHub does two jobs for us; separate them: **sign-in** (user OAuth, the later auth task)
+vs **the nexus acting on repos** (push agent branches, open PRs, sync issues, receive
+webhooks — Stage 4). A **GitHub App** does both and is required for the repo work:
+
+- **Webhooks** (first-class) — `pull_request`/`push` events fire the reviewer/merger agent
+  hook + the fetch-back on merge. OAuth Apps don't get webhooks.
+- **Fine-grained per-repo install** — a customer installs Workbooks on chosen repos with
+  only Contents/PRs/Issues; OAuth `repo` scope is all-or-nothing across every repo.
+- **Bot identity** (`workbooks[bot]`) + **short-lived installation tokens** (1 hr) — better
+  security + attribution than a long-lived user token; higher rate limits.
+- Its user-authorization flow also covers sign-in, so ONE App serves both.
+
+**Built (no-op-safe, dark until secrets land):** `Nexus.GitHub` — App JWT (RS256 via
+JOSE), installation-token exchange, `open_pr`, `create_issue`/`update_issue`, HMAC
+`verify_webhook`. Verified: JWT signs (alg RS256), webhook HMAC good/bad. Secrets via
+`Nexus.Secrets` (deploy-injected, never in source): `GITHUB_APP_ID`,
+`GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`,
+`GITHUB_WEBHOOK_SECRET`.
+
+**Flow:** App JWT → installation token for the owner → push the agent's branch + `open_pr`
+(body links the nexus issue). A webhook (`POST /cloud/github/webhook`, HMAC-verified) emits
+`github.pr.opened`/`push` `#event`s → the per-subtree workflow config decides what reacts
+(reviewer/merger agent, validation flow, branch gate). Opt-in `create_issue` promotes a
+task; `update_issue` closes it on resolve. Remaining wiring: the webhook route (needs raw
+body for HMAC), PR-creation on agent-branch seal, and the workflow-config schema.
+
 ## Still open (genuinely undecided — flag for next pass)
 
 - Issue-store physical home: git-indexed `.work` vs DB table (`wb-35ma`).
