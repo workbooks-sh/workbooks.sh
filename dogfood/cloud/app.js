@@ -330,11 +330,12 @@
       '/settings': 'var(--violet)', '/workspace': 'var(--peach)', '/database': 'var(--mint)', '/upgrade': 'var(--mint)' };
     function sectionAccent(p){ for (var k in ACCENT) { if (p.indexOf(k) === 0) return ACCENT[k]; } return 'var(--mint)'; }
     // Which RAIL section a route belongs to — drives the active rail tab + which per-surface sidebar shows.
-    var ADMIN_ROUTES = ['/usage', '/storage', '/team', '/secrets', '/integrations', '/settings', '/database', '/upgrade'];
+    var ADMIN_ROUTES = ['/usage', '/storage', '/team', '/secrets', '/integrations', '/database', '/upgrade'];
     function sectionFor(p){
       if (p.indexOf('/studio') === 0 || p.indexOf('/create') === 0) return 'studio';
       if (p.indexOf('/activity') === 0 || p.indexOf('/runs') === 0 || p.indexOf('/tasks') === 0 || p.indexOf('/issues') === 0) return 'activity';
       if (p.indexOf('/workspace') === 0) return 'files';
+      if (p.indexOf('/settings') === 0) return 'account';   // personal settings = the "You" surface
       for (var i = 0; i < ADMIN_ROUTES.length; i++) if (p.indexOf(ADMIN_ROUTES[i]) === 0) return 'admin';
       return 'apps'; // home '/' and anything else default to the Apps surface
     }
@@ -437,9 +438,8 @@
     var MOON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>';
 
     // shell menu state
-    var st = { nxMenu: false, wsMenu: false, editingId: null, editName: '', editIcon: '', pickerOpen: false, nxEditing: false, nxEditName: '', adminOpen: false,
+    var st = { nxMenu: false, wsMenu: false, editingId: null, editName: '', editIcon: '', pickerOpen: false, nxEditing: false, nxEditName: '',
       treeOpen: {}, treeData: {}, treeLoading: {}, bookmarks: [], search: '', wsMenuFor: null, rail: false, sideMode: 'apps' };
-    try { st.adminOpen = localStorage.getItem('wb-admin-drawer') === 'open'; } catch (e) {}
     try { st.rail = localStorage.getItem('wb-rail') === '1'; } catch (e) {}
     // Apps-vs-Files sidebar preference — Apps is primary (most users just launch apps). Persisted so it
     // sticks per user/device. ('wb-sidemode' = 'apps' | 'files')
@@ -448,7 +448,6 @@
     st.filterOpen = false;
     try { st.appFilter = localStorage.getItem('wb-appfilter') || 'all'; } catch (e) { st.appFilter = 'all'; }   // all | public | private
     try { st.fileFilter = localStorage.getItem('wb-filefilter') || 'all'; } catch (e) { st.fileFilter = 'all'; } // all | work | assets
-    st.acctMenu = false;
     try { st.bookmarks = JSON.parse(localStorage.getItem('wb-bookmarks') || '[]'); } catch (e) { st.bookmarks = []; }
     function saveBookmarks(){ try { localStorage.setItem('wb-bookmarks', JSON.stringify(st.bookmarks)); } catch (e) {} }
     function toggleBookmark(path, label){
@@ -504,6 +503,49 @@
         // "New app" tile — creates a draft (Phase 4 will replace the prompt with the context modal).
         cards += '<button class="appcard newapp" data-newapp title="New app"><span class="newappplus">+</span><span class="appname">New app</span></button>';
         g.innerHTML = cards || '<div class="treemsg" style="padding:8px 4px">No ' + (st.appFilter !== 'all' ? st.appFilter + ' ' : '') + 'apps</div>';
+      });
+    }
+    // Studio sidebar — recent sessions (GET /cloud/agent/sessions) + draft projects (drafts from /cloud/apps).
+    // Lazy + stale-while-revalidate, painted in place so opening Studio doesn't block on the fetch.
+    function paintStudio(){
+      var box = document.getElementById('studioSide'); if (!box) return;
+      WB.swr('agent-sessions', function(){ return fetch('/cloud/agent/sessions', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
+        var el = document.getElementById('studioSide'); if (!el) return;
+        var sessions = (d && d.sessions) || [];
+        var recent = sessions.length
+          ? sessions.map(function(s){ return '<a class="srow" data-nav="/studio" href="#/studio" data-session="' + esc(s.id) + '" title="' + esc(s.title || 'Session') + '"><span class="semoji">💬</span><span class="sname">' + esc(s.title || 'Untitled session') + '</span></a>'; }).join('')
+          : '<div class="treemsg" style="padding:6px 10px">No sessions yet</div>';
+        el.innerHTML = '<div class="sgrp">Recent</div>' + recent + '<div id="studioDrafts"></div>';
+      });
+      // Draft projects — the apps feed's draft entries are your unpromoted Studio work.
+      WB.swr('apps', function(){ return fetch('/cloud/apps', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
+        var dd = document.getElementById('studioDrafts'); if (!dd) return;
+        var draftApps = ((d && d.apps) || []).filter(function(a){ return (a.visibility || (a.gated ? 'private' : 'public')) === 'draft'; });
+        dd.innerHTML = draftApps.length
+          ? '<div class="sgrp">Drafts</div>' + draftApps.map(function(a){ return '<a class="srow" href="' + esc(a.url) + '" target="_blank" rel="noopener"><span class="semoji">📄</span><span class="sname">' + esc(a.label) + '</span><span class="draftpill">DRAFT</span></a>'; }).join('')
+          : '';
+      });
+    }
+    // Activity inbox — the event feed, in the sidebar. Click an item → the /activity page shows its
+    // context (WB._activityFocus drives the view's selected event). Reuses GET /cloud/activity.
+    function paintActivity(){
+      var box = document.getElementById('activityInbox'); if (!box) return;
+      WB.swr('activity', function(){ return fetch('/cloud/activity', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
+        var el = document.getElementById('activityInbox'); if (!el) return;
+        var events = (d && d.events) || [];
+        WB._activityEvents = events;   // shared with the /activity view's context pane
+        if (!events.length) { el.innerHTML = '<div class="treemsg" style="padding:8px 10px">No activity yet</div>'; return; }
+        var now = Math.floor(Date.now() / 1000);
+        function ago(sec){ if (!sec) return ''; var x = now - sec; return x < 60 ? x + 's' : x < 3600 ? Math.floor(x/60) + 'm' : x < 86400 ? Math.floor(x/3600) + 'h' : Math.floor(x/86400) + 'd'; }
+        var foc = (WB._activityFocus != null ? WB._activityFocus : 0);
+        el.innerHTML = events.map(function(e, i){
+          var title = e.title || e.kind || 'Event';
+          var sub = e.target || e.actor || '';
+          return '<button class="ibrow' + (i === foc ? ' on' : '') + '" data-act-focus="' + i + '">' +
+            '<span class="ibic">' + esc((e.actor || '?').trim()[0].toUpperCase()) + '</span>' +
+            '<span class="ibmeta"><span class="ibt">' + esc(title) + '</span>' + (sub ? '<span class="ibs">' + esc(sub) + '</span>' : '') + '</span>' +
+            '<span class="ibw">' + esc(ago(e.at)) + '</span></button>';
+        }).join('');
       });
     }
     function isBookmarked(path){ return st.bookmarks.some(function(b){ return b.path === path; }); }
@@ -576,18 +618,7 @@
         '<span class="crumbsep">/</span><span class="crumbhere">' + esc((ws && ws.name) || 'Workspace') + ' settings</span>' +
       '</div>') : '';
 
-      // Admin is a bottom-anchored OVERLAY drawer (above the avatar): toggled open, state persists, and it
-      // floats over the workspaces list so a long sidebar still scrolls behind it.
-      // Admin lives at the BOTTOM (above the account row) as an overlay drawer. Always shown so the
-      // power-tools are reachable; the pages handle their own no-nexus states.
-      var adminDrawer = '<div class="adminsec' + (st.adminOpen ? ' open' : '') + '">' +
-        '<button class="adminbtn" data-admin-toggle title="Admin"><span class="aico">' + ICO.admin + '</span><span class="lbl">Admin</span>' +
-        '<span class="adminchev">' + ICO.chev + '</span></button>' +
-        '<div class="admindrawer"><nav class="nxnav">' +
-          navlink('/usage', ICO.gauge, 'Usage', p) + navlink('/storage', ICO.database, 'Storage', p) +
-          navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) +
-          navlink('/integrations', ICO.apps, 'Integrations', p) +
-        '</nav></div></div>';
+      // (Admin is now a first-class RAIL section with its own sidebar — the old bottom drawer is gone.)
 
       // Workspaces are Slack-style collapsible GROUPS (rungs): an emoji-squircle + name header with a
       // disclosure caret on the RIGHT; expanding reveals that workspace's real file tree nested under it.
@@ -659,26 +690,29 @@
           '" title="' + s.label + '"><span class="rsico">' + s.ico + '</span><span class="rslbl">' + s.label + '</span></a>';
       }).join('');
 
-      var acctMenuHtml = st.acctMenu ? ('<div class="acctmenu rail">' +
-        '<a class="acctitem" data-nav="/settings" href="#/settings">' + ICO.gear + '<span>Settings</span></a>' +
-        '<a class="acctitem" href="/auth/logout">' + ICO.logout + '<span>Sign out</span></a>' +
-      '</div>') : '';
-
       // ── per-surface SIDEBAR body — swaps with the active rail section ──
-      var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Activity', files: 'Files', admin: 'Admin' };
+      var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Activity', files: 'Files', admin: 'Admin', account: 'You' };
       var isBrowse = section === 'apps' || section === 'files';   // apps/files get the filter funnel + search + pins
       if (isBrowse) st.sideMode = section;   // keep the filter funnel (filterMenu/filterActive) keyed to the active surface
       var sideBody;
       if (section === 'files') sideBody = '<div class="wsgroups">' + wslist + '</div>';
       else if (section === 'apps') sideBody = '<div class="appsgrid" id="appsGrid"><div class="treemsg" style="padding:8px 4px">Loading apps…</div></div>';
-      else if (section === 'studio') sideBody = '<nav class="nxnav"><a class="nxlink" data-nav="/studio" href="#/studio">' + ICO.spark + '<span class="lbl">New session</span></a></nav>';
-      else if (section === 'activity') sideBody = '<nav class="nxnav">' +
-          navlink('/activity', ICO.activity, 'All activity', p) + navlink('/runs', ICO.gauge, 'Runs', p) +
-          navlink('/tasks', ICO.files, 'Tasks', p) + navlink('/issues', ICO.draft, 'Issues', p) + '</nav>';
+      // Studio — ChatGPT-style: New session + recent sessions + draft projects (lazy-painted into #studioSide).
+      else if (section === 'studio') sideBody =
+          '<button class="newsess" data-nav="/studio"><span class="nsico">' + ICO.plus + '</span>New session</button>' +
+          '<div id="studioSide"><div class="treemsg" style="padding:8px 4px">Loading sessions…</div></div>';
+      // Activity — the inbox lives in the sidebar; the page shows the selected event's context (lazy → #activityInbox).
+      else if (section === 'activity') sideBody = '<div id="activityInbox"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
       else if (section === 'admin') sideBody = '<nav class="nxnav">' +
           navlink('/usage', ICO.gauge, 'Usage & billing', p) + navlink('/storage', ICO.database, 'Storage', p) +
           navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) +
-          navlink('/integrations', ICO.apps, 'Integrations', p) + navlink('/settings', ICO.gear, 'Nexus settings', p) + '</nav>';
+          navlink('/integrations', ICO.apps, 'Integrations', p) + '</nav>';
+      // You — personal account surface (folds the old avatar popover into a full sidebar).
+      else if (section === 'account') sideBody = '<nav class="nxnav">' +
+          navlink('/settings', ICO.gear, 'Profile', p) +
+          '<button class="nxlink" data-theme-toggle>' + ICO.spark + '<span class="lbl">Appearance</span></button>' +
+          navlink('/settings', ICO.activity, 'Notifications', p) + navlink('/secrets', ICO.key, 'API tokens', p) +
+          '<a class="nxlink" href="/auth/logout">' + ICO.logout + '<span class="lbl">Sign out</span></a></nav>';
       else sideBody = '';
 
       root.innerHTML =
@@ -691,8 +725,7 @@
           '<div class="nexrail-grow"></div>' +
           '<div class="railbottom">' +
             '<a class="railsec' + (section === 'admin' ? ' on' : '') + '" data-nav="/usage" href="#/usage" title="Admin"><span class="rsico">' + ICO.admin + '</span><span class="rslbl">Admin</span></a>' +
-            '<button class="railsec railavbtn" data-acct-menu title="' + esc(user.name) + '"><span class="railav">' + esc(user.initial) + '</span><span class="rslbl">You</span></button>' +
-            acctMenuHtml +
+            '<a class="railsec railavbtn' + (section === 'account' ? ' on' : '') + '" data-nav="/settings" href="#/settings" title="' + esc(user.name) + '"><span class="railav">' + esc(user.initial) + '</span><span class="rslbl">You</span></a>' +
           '</div>' +
         '</div>' +
         '<aside class="side">' +
@@ -716,7 +749,9 @@
       if (st.pickerOpen) { var ph = root.querySelector('#wsPicker'); if (ph) WB.emojiPicker(ph, function (u) { st.editIcon = u; st.pickerOpen = false; renderShell(); renderView(); }); }
       var si = document.getElementById('wbFileSearch');
       if (si) { si.value = st.search; si.oninput = function(){ st.search = si.value; runSearch(); }; if (st.search) runSearch(); }
-      if (section === 'apps') paintApps();   // Apps surface → load the apps grid
+      if (section === 'apps') paintApps();        // Apps surface → load the apps grid
+      else if (section === 'studio') paintStudio();
+      else if (section === 'activity') paintActivity();
     }
     // Let other views (the workspace explorer) refresh the sidebar after a pin/unpin so Pinned updates live.
     WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };
@@ -793,7 +828,6 @@
       if (t.closest && t.closest('[data-crumb-back]')) { var ret = WB.settingsReturn; WB.settingsReturn = null; WB.nav((ret && ret.path) || '/'); return; }
       if (t.closest && t.closest('[data-theme-toggle]')) { var cur = document.documentElement.getAttribute('data-theme') || 'dark'; var nt = cur === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', nt); try { localStorage.setItem('wb-theme', nt); } catch (er) {} renderShell(); renderView(); return; }
       if (t.closest && t.closest('[data-rail-toggle]')) { st.rail = !st.rail; try { localStorage.setItem('wb-rail', st.rail ? '1' : '0'); } catch (er) {} renderShell(); return; }
-      var smt = t.closest && t.closest('[data-sidemode]'); if (smt) { st.sideMode = smt.getAttribute('data-sidemode'); st.filterOpen = false; try { localStorage.setItem('wb-sidemode', st.sideMode); } catch (er) {} renderShell(); return; }
       if (t.closest && t.closest('[data-filter-toggle]')) { st.filterOpen = !st.filterOpen; renderShell(); return; }
       var afl = t.closest && t.closest('[data-appfilter]'); if (afl) { st.appFilter = afl.getAttribute('data-appfilter'); try { localStorage.setItem('wb-appfilter', st.appFilter); } catch (er) {} st.filterOpen = false; renderShell(); return; }
       var ffl = t.closest && t.closest('[data-filefilter]'); if (ffl) { st.fileFilter = ffl.getAttribute('data-filefilter'); try { localStorage.setItem('wb-filefilter', st.fileFilter); } catch (er) {} st.filterOpen = false; renderShell(); return; }
@@ -807,10 +841,17 @@
         return;
       }
       if (t.closest && t.closest('[data-palette]')) { WB.palette(); return; }
+      // Activity inbox row → focus that event; the /activity view renders its context in the page.
+      var actf = t.closest && t.closest('[data-act-focus]');
+      if (actf) { WB._activityFocus = +actf.getAttribute('data-act-focus');
+        document.querySelectorAll('.ibrow').forEach(function(r){ r.classList.toggle('on', r === actf); });
+        if (WB._activityRender) WB._activityRender(WB._activityFocus); else WB.nav('/activity');
+        return; }
+      // Studio session row → remember which session to open, then let data-nav route to /studio.
+      var sess = t.closest && t.closest('[data-session]');
+      if (sess) { WB._pendingSession = sess.getAttribute('data-session'); }   // fall through to data-nav
       var pinx = t.closest && t.closest('[data-pin-x]'); if (pinx) { e.stopPropagation(); toggleBookmark(pinx.getAttribute('data-pin-x')); return; }
       var pino = t.closest && t.closest('[data-pin-open]'); if (pino) { WB._pendingFile = pino.getAttribute('data-pin-open'); WB.nav('/workspaces'); return; }
-      if (t.closest && t.closest('[data-acct-menu]')) { st.acctMenu = !st.acctMenu; renderShell(); return; }
-      if (t.closest && t.closest('[data-admin-toggle]')) { st.adminOpen = !st.adminOpen; try { localStorage.setItem('wb-admin-drawer', st.adminOpen ? 'open' : 'closed'); } catch (er) {} renderShell(); return; }
       if (t.closest && t.closest('[data-nxmenu]')) { st.nxMenu = !st.nxMenu; st.wsMenu = false; renderShell(); return; }
       var nxsw = t.closest && t.closest('[data-nxswitch]'); if (nxsw) { WB.nexus.setActive(nxsw.getAttribute('data-nxswitch')); st.nxMenu = false; renderShell(); if (ROUTE.path !== '/') WB.nav('/'); else renderView(); return; }
       if (t.closest && t.closest('[data-nxedit]')) { e.stopPropagation(); st.nxEditing = true; st.nxEditName = (WB.nexus.active && WB.nexus.active.name) || ''; renderShell(); return; }
@@ -840,7 +881,6 @@
       if (t.closest && t.closest('[data-wsdel]')) { deleteWs(); return; }
       if (st.wsMenuFor) { st.wsMenuFor = null; renderShell(); return; }   // outside click closes the ⋯ menu
       if (st.filterOpen) { st.filterOpen = false; renderShell(); return; } // outside click closes the filter popover
-      if (st.acctMenu) { st.acctMenu = false; renderShell(); }            // outside click closes the avatar menu
     });
     document.addEventListener('input', function (e) { if (e.target.id === 'wsName') st.editName = e.target.value; if (e.target.id === 'nxEditName') st.nxEditName = e.target.value; });
     function syncEditName(){ var i = document.getElementById('wsName'); if (i) st.editName = i.value; }

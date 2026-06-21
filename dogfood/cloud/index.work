@@ -1197,7 +1197,7 @@ client :app do
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
-  <link rel="stylesheet" href="./app.css?v=20260621o">
+  <link rel="stylesheet" href="./app.css?v=20260621p">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
@@ -1208,15 +1208,14 @@ client :app do
   <div id="root"><div id="app" class="ssr-skel">
     <div class="topdna"></div>
     <div class="nexrail">
-      <div class="nexrail-toggle skel"></div>
-      <div class="orgtiles"><div class="orgtile skel"></div></div>
+      <div class="nextilewrap"><div class="nextile skel"></div></div>
+      <div class="raildiv"></div>
+      <nav class="railsecs"><div class="railsec skel"></div><div class="railsec skel"></div><div class="railsec skel"></div><div class="railsec skel"></div></nav>
       <div class="nexrail-grow"></div>
-      <div class="orgavatar"><div class="av skel"></div></div>
+      <div class="railbottom"><div class="railsec skel"></div><div class="railsec skel"></div></div>
     </div>
     <aside class="side">
-      <div class="sidetop"><div class="skelrow w70"></div></div>
-      <nav class="nxnav nxprimary"><div class="skelrow"></div><div class="skelrow"></div></nav>
-      <div class="sidetree-hd">Workspaces</div>
+      <div class="sidehd"><div class="skelrow w70"></div></div>
       <div class="wsgroups"><div class="skelrow"></div><div class="skelrow"></div><div class="skelrow"></div></div>
       <div class="navspacer"></div>
     </aside>
@@ -1229,5 +1228,5 @@ client :app do
   <!-- ?v= is the cache-bust token. BUMP IT ON EVERY DEPLOY that changes JS/CSS. app.js reads its own
        ?v= and re-applies it to every lazily-loaded asset (views, wbchat) so a deploy = all-new URLs =
        guaranteed cache miss (hard-refresh can't re-fetch lazy import()s; only a new URL can). -->
-  <script src="./app.js?v=20260621o"></script>
+  <script src="./app.js?v=20260621p"></script>
 end
