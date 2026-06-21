@@ -241,6 +241,51 @@ log of changes** (like git log), surfaced where people already look: **Activity*
   can conflict — that's the v2 hard case, surfaced as a conflict to resolve, never a
   silent clobber of a teammate's later work. v1: attributed log + latest-op undo.
 
+## Agent git workflow — configurable, jj-FIFO default (the GitHub/PR story)
+
+How agent work becomes commits/PRs and round-trips with GitHub. **Decided** + framed.
+
+### Issues ↔ GitHub (DECIDED)
+- **PRs are the external artifact**; nexus issues stay **internal** orchestration/triage
+  by default (so the failure-model's auto-filed issues never spam GitHub). A task can
+  **opt-in to "promote to GitHub Issue"** with bidirectional status sync when it's real
+  external work. We already have the GitHub OAuth token (integrations lane) + a one-way
+  code mirror; the PR/issue **API client + fetch-back** are the pieces to build.
+
+### The default is the easiest thing: jj FIFO + undo (CRDT-like)
+The simplest model — and the recommended default — is **no PR gate at all**: agents
+just run, their edits serialize through **jj** first-in-first-out, and the **op-log /
+`jj undo` to a point in time** is the safety net. Concurrent agents become jj's
+conflict-tolerant merge model — effectively a **CRDT between agents**, which is easier
+to manage than locks/gates. This is mostly buildable on what exists (jj substrate +
+attribution + undo); the one missing prerequisite is **agents writing to a workspace
+branch** (today they run in a VFS sandbox and don't commit to the tree — close this
+first; it's the foundation for everything below).
+
+### The configuration layer (per-subtree, declared in `.work`)
+On top of the simple default sits an **opt-in workflow config**, declared **per
+monorepo subtree/workspace** (this is the monorepo payoff: git semantics per part are
+well understood, so policy is per part). Knobs, each built from existing primitives:
+- **Review policy** — a reviewer/merger **agent on a PR `hook`**: fire on `pr.opened`,
+  route by author (agent-PR → a "merger" reviewer agent; human-PR → a different rule;
+  or "Waldo fields all PRs"). The bus + hook + agent run already exist.
+- **Branch policy** — e.g. a **prod vs dev** branch per subtree: agents write to `dev`
+  by default; writing to `prod` requires explicit design (a gate), so you can't have
+  agents constantly pushing production unless you opted in.
+- **Validation** — `flow` + `check` units run as CI/CD **before merge**, per subtree.
+- Spectrum: from "just jj FIFO + undo, move fast" → "PR + reviewer-agent + prod gate +
+  validation flows" for production, chosen per workspace. Same config mechanism either
+  end; you dial it up only where you need it.
+
+### Built on (no new engines)
+`hook` (PR event → reviewer agent) · `flow`/`check` (validation) · jj (substrate /
+undo / CRDT default) · native `git subtree` per-part config (the [[josh]] decision) ·
+the `#event` bus (PR opened → hook) · integrations GitHub token (API + fetch-back).
+
+**Open / to decide later:** the exact review-gate config schema (the founder is still
+forming it); branch-policy declaration syntax; whether the reviewer is a default agent
+(a "merger") shipped with Waldo/deck/research or purely user-configured.
+
 ## Still open (genuinely undecided — flag for next pass)
 
 - Issue-store physical home: git-indexed `.work` vs DB table (`wb-35ma`).
