@@ -12,7 +12,11 @@ defmodule Nexus.Compile do
   existing toolchain when we wire them in; this module just routes and orchestrates.
   """
 
-  @wasm_kinds ~w(client sandbox rust zig c cpp swift python svelte solid js ts)
+  # The real wasm COMPILE lanes (a language → wasm component). `client` is NOT here — it's a
+  # render target (its body is emitted into the page verbatim by the weave/SSR, not compiled).
+  # `sandbox` is NOT here either — it's a placement WRAPPER that names capability grants around an
+  # INNER language (`sandbox c :name` → kind="sandbox", lang="c"); it routes to the inner lane.
+  @wasm_kinds ~w(rust zig c cpp swift python svelte solid js ts)
 
   @doc "Compile one parsed `:code` unit to its artifact, tagged by lane."
   def unit(%{type: :code, kind: kind} = node) do
@@ -31,14 +35,27 @@ defmodule Nexus.Compile do
       # MISS runs the real build (gated by compile-concurrency). A hit is a hash lookup → the same
       # `.wasm` is served to every tenant/request, fleet-wide, forever. This is what makes the
       # multi-tenant server cheap: pay the gigabyte ONCE per unique program, not per call.
+      # `client` — a browser island: its body IS the interface, emitted client-side by the weave
+      # (reactor render.zig) / SSR verbatim. Not a wasm compile lane; the compile pipeline passes
+      # it through so a `client` unit is never (mis)reported as an unbuilt artifact.
+      kind == "client" -> {:client, node.body}
+      # `sandbox` — a capability-scoped wrapper around an INNER language. Route by `node.lang` to
+      # that language's real lane; grant enforcement rides through the lane (c_unit/rust_unit read
+      # the unit's `grant:` via Nexus.Audit) + instantiation (Nexus.Sandbox wires only granted Dock
+      # imports). This is what makes "guest code → WASM with only granted powers" real.
+      kind == "sandbox" -> {:wasm, cached(node, fn -> sandbox_unit(node) end)}
       kind == "rust" -> {:wasm, cached(node, fn -> rust_unit(node) end)}
       kind in ~w(c cpp) -> {:wasm, cached(node, fn -> c_unit(node) end)}
       kind == "zig" -> {:wasm, cached(node, fn -> zig_unit(node) end)}
       kind == "swift" -> {:wasm, cached(node, fn -> swift_unit(node) end)}
-      # These wasm lanes (client/sandbox/python/svelte/solid/js/ts) are NOT yet wired to their
-      # compilers. Do not hand back a silent `:todo` tuple that masquerades as an artifact — surface
-      # a LOUD, explicit error so a caller can't ship an un-built unit thinking it succeeded. Tracked
-      # in bd (per-lane wiring). When a lane is wired, add its `kind == …` arm above.
+      kind == "js" -> {:wasm, cached(node, fn -> js_unit(node) end)}
+      kind == "ts" -> {:wasm, cached(node, fn -> ts_unit(node) end)}
+      kind == "svelte" -> {:wasm, cached(node, fn -> svelte_unit(node) end)}
+      kind == "solid" -> {:wasm, cached(node, fn -> solid_unit(node) end)}
+      kind == "python" -> {:wasm, cached(node, fn -> python_unit(node) end)}
+
+      # Any remaining wasm kind has no wired lane — surface a LOUD, explicit error (never a silent
+      # tuple that masquerades as an artifact). When a lane is wired, add its `kind == …` arm above.
       kind in @wasm_kinds ->
         require Logger
         Logger.error("[compile] lane not built: #{kind}:#{node.name} (#{node.lang}) — no compiler wired")
@@ -50,6 +67,23 @@ defmodule Nexus.Compile do
   end
 
   def unit(_), do: {:skip, :not_a_unit}
+
+  # `sandbox <lang> :name` → compile the inner language. The wrapper exists to name capability
+  # grants; the inner lane does the build (and, for c/rust, injects the granted Dock host imports).
+  defp sandbox_unit(%{lang: lang} = node) do
+    case lang do
+      "rust" -> rust_unit(node)
+      l when l in ~w(c cpp) -> c_unit(node)
+      "zig" -> zig_unit(node)
+      "swift" -> swift_unit(node)
+      "js" -> js_unit(node)
+      "ts" -> ts_unit(node)
+      "svelte" -> svelte_unit(node)
+      "solid" -> solid_unit(node)
+      "python" -> python_unit(node)
+      _ -> {:error, {:sandbox_unknown_lang, lang, node.name}}
+    end
+  end
 
   # ── content-addressed compile cache ──────────────────────────────────────────────────────────
   # Every knob below comes from `Nexus.Config` (the `deploy` config element), never env:
@@ -266,6 +300,35 @@ defmodule Nexus.Compile do
         end
     end
   end
+
+  # ── the JS family — QuickJS-ng command modules (stdin→stdout), the toolkit shape ──────────────
+  # `js`/`ts`/`svelte`/`solid`/`python` are INTERPRETER lanes: the source is embedded into a wasm
+  # command module that evals it. ts/svelte/solid transpile to JS in-sandbox, then reuse the JS lane.
+  # `harness_dock.o` (caps) is selected when the unit grants capabilities.
+
+  defp js_unit(%{body: body} = node), do: Nexus.Compilers.Js.js_compile_to_wasm(body, dock: granted?(node))
+
+  defp ts_unit(%{body: body} = node) do
+    with {:ok, js} <- Nexus.Compilers.Js.transpile(:ts, body) do
+      Nexus.Compilers.Js.js_compile_to_wasm(js, dock: granted?(node))
+    end
+  end
+
+  defp svelte_unit(%{body: body} = node) do
+    with {:ok, js} <- Nexus.Compilers.Js.transpile(:svelte, body) do
+      Nexus.Compilers.Js.js_compile_to_wasm(js, dock: granted?(node))
+    end
+  end
+
+  defp solid_unit(%{body: body} = node) do
+    with {:ok, js} <- Nexus.Compilers.Js.transpile(:solid, body) do
+      Nexus.Compilers.Js.js_compile_to_wasm(js, dock: granted?(node))
+    end
+  end
+
+  defp python_unit(%{body: body} = node), do: Nexus.Compilers.Python.python_compile_to_wasm(body, dock: granted?(node))
+
+  defp granted?(node), do: Nexus.Audit.granted(node) != []
 
   @swift_wit %{
     "Int8" => "s8", "Int16" => "s16", "Int32" => "s32", "Int64" => "s64", "Int" => "s32",
