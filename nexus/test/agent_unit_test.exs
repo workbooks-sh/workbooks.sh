@@ -67,6 +67,14 @@ defmodule Nexus.AgentUnitTest do
     assert d.hooks == [on: "DONE", emit: "task.done"]
   end
 
+  test "agents register for run-by-name; unknown name errors cleanly" do
+    n = unit("agent :coder do\n  prompt \"\"\"\n  Fix it.\n  \"\"\"\n  tools coreutils\nend\n")
+    Nexus.Agent.register(n)
+    assert Nexus.Agent.get("coder") == n
+    assert Nexus.Agent.get("coder") |> Nexus.Agent.def_from_unit() |> Map.get(:tools) == ["coreutils"]
+    assert {:error, {:no_agent, "ghost"}} = Nexus.Agent.run_named("ghost", "x")
+  end
+
   test "Kits.summary/1 scopes the catalog to an agent's declared tools" do
     Nexus.Agent.Kits.register("rg", "rg.wasm", summary: "search")
     Nexus.Agent.Kits.register("git", "git.wasm", summary: "version control")

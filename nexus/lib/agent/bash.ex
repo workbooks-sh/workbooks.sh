@@ -15,11 +15,21 @@ defmodule Nexus.Agent.Bash do
   # `config :nexus, Nexus.Agent.Bash, cmd_timeout_ms: …`.
   @cmd_timeout_ms 30_000
 
-  @doc "Run a command line against `vfs`. Returns combined stdout (stderr appended on error)."
-  def run(vfs, line) when is_binary(line) do
+  # The host-brokered web commands (not wasm kits) — gated by a `web`/`net`/`browse` grant.
+  @web_cmds ~w(fetch scrape render screenshot search navigate links forms click fill submit)
+
+  @doc "Run a command line against `vfs` (unrestricted). Returns combined stdout."
+  def run(vfs, line) when is_binary(line), do: run(vfs, line, nil)
+
+  @doc """
+  Run a command line under an agent's permissions. `perms` is `%{tools: [kit], grant: [cap]}` (or nil
+  = unrestricted, back-compat). A command whose kit isn't in `tools`, or a web command without a web
+  grant, is refused — so `tools`/`grant` actually CONSTRAIN the agent, not just describe it.
+  """
+  def run(vfs, line, perms) when is_binary(line) do
     line
     |> split_pipes()
-    |> Enum.reduce("", fn segment, stdin -> run_segment(vfs, segment, stdin) end)
+    |> Enum.reduce("", fn segment, stdin -> run_segment(vfs, segment, stdin, perms) end)
   end
 
   defp cmd_timeout_ms,
@@ -34,9 +44,43 @@ defmodule Nexus.Agent.Bash do
     |> Enum.map(&Enum.reject(&1, fn t -> t == :pipe end))
   end
 
-  defp run_segment(_vfs, [], stdin), do: stdin
+  defp run_segment(_vfs, [], stdin, _perms), do: stdin
 
-  defp run_segment(vfs, [cmd | args], stdin) do
+  defp run_segment(vfs, [cmd | args], stdin, perms) do
+    case permit(cmd, perms) do
+      :ok -> dispatch(vfs, cmd, args, stdin)
+      {:deny, msg} -> msg
+    end
+  end
+
+  # Permission gate. nil perms = unrestricted. Builtins (kits/help) always allowed. Web commands need
+  # a web/net/browse grant. Any other command's KIT must be in the agent's tools.
+  defp permit(_cmd, nil), do: :ok
+
+  defp permit(cmd, %{tools: tools, grant: grant}) do
+    cond do
+      cmd in ~w(kits help) ->
+        :ok
+
+      cmd in @web_cmds ->
+        if web_granted?(grant), do: :ok, else: {:deny, "bash: '#{cmd}' needs web access, not granted to this agent"}
+
+      is_nil(tools) ->
+        :ok
+
+      Nexus.Agent.Kits.kit_for(cmd) in tools ->
+        :ok
+
+      true ->
+        {:deny, "bash: '#{cmd}' is not in this agent's tools (#{Enum.join(tools, ", ")})"}
+    end
+  end
+
+  defp web_granted?(nil), do: true
+  defp web_granted?(grant) when is_list(grant), do: Enum.any?(~w(web net browse), &(&1 in grant))
+  defp web_granted?(_), do: true
+
+  defp dispatch(vfs, cmd, args, stdin) do
     case cmd do
       "kits" -> Nexus.Agent.Kits.summary()
       "help" -> Nexus.Agent.Kits.help(List.first(args) || "")

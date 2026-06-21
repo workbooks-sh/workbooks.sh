@@ -17,6 +17,29 @@ defmodule Nexus.Agent do
   alias Nexus.Agent.{Bash, Context, Kits, Vfs}
 
   @default_timeout 120_000
+  @reg {__MODULE__, :agents}
+
+  @doc "Register a declared `agent` unit by name (called at workbook bringup) for run-by-name."
+  def register(%{kind: "agent", name: name} = node) do
+    :persistent_term.put(@reg, Map.put(agents(), to_string(name), node))
+    :ok
+  end
+
+  @doc "A registered agent node by name, or nil."
+  def get(name), do: Map.get(agents(), to_string(name))
+
+  @doc "All registered agent nodes."
+  def all, do: agents() |> Map.values()
+
+  defp agents, do: :persistent_term.get(@reg, %{})
+
+  @doc "Run a DECLARED agent by name (resolves its prompt/tools/grant/limit). `{:error, {:no_agent, n}}` if unknown."
+  def run_named(name, task, opts \\ []) do
+    case get(name) do
+      nil -> {:error, {:no_agent, to_string(name)}}
+      node -> run_unit(node, task, opts)
+    end
+  end
 
   @bash_tool %{
     type: "function",
@@ -225,9 +248,11 @@ defmodule Nexus.Agent do
           tel = tally(tel, turn, calls)
           assistant = %{role: "assistant", content: turn.content || "", tool_calls: raw_calls(calls)}
 
+          perms = %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant)}
+
           results =
             Enum.map(calls, fn c ->
-              r = run_bash(c, vfs)
+              r = run_bash(c, vfs, perms)
               emit.({:result, command_of(c), r.content})
               r
             end)
@@ -265,12 +290,12 @@ defmodule Nexus.Agent do
     end
   end
 
-  defp run_bash(%{id: id, name: "bash", args: %{"command" => command}}, vfs) do
-    output = vfs |> Bash.run(command) |> Context.truncate()
+  defp run_bash(%{id: id, name: "bash", args: %{"command" => command}}, vfs, perms) do
+    output = Bash.run(vfs, command, perms) |> Context.truncate()
     %{role: "tool", tool_call_id: id, content: output}
   end
 
-  defp run_bash(%{id: id}, _vfs),
+  defp run_bash(%{id: id}, _vfs, _perms),
     do: %{role: "tool", tool_call_id: id, content: "bash: malformed call (expected {command})"}
 
   defp raw_calls(calls) do

@@ -75,6 +75,16 @@ defmodule Nexus.Agent.Kits do
     |> Enum.map_join("\n", fn {name, k} -> "  #{name} — #{k.summary}" end)
   end
 
+  @doc "Which kit a command belongs to — coreutils applet → \"coreutils\", web verb → \"web\", a kit's own command → that kit. Used to enforce an agent's `tools`."
+  def kit_for(cmd) do
+    cond do
+      cmd in @coreutils -> "coreutils"
+      cmd in ~w(fetch scrape render screenshot search navigate links forms click fill submit) -> "web"
+      Map.has_key?(all(), cmd) -> cmd
+      true -> Enum.find_value(all(), fn {n, k} -> if cmd in (k.commands || []), do: n end) || cmd
+    end
+  end
+
   @doc "Scoped catalog — only the named kits (an agent's declared `tools`). Least-privilege."
   def summary(names) when is_list(names) do
     want = MapSet.new(names)

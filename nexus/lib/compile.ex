@@ -395,6 +395,9 @@ defmodule Nexus.Compile do
       end
     end
 
+    # Register declared agents so they can be run BY NAME (server code, effects, flow steps).
+    for u <- Map.get(by_kind, "agent", []), do: Nexus.Agent.register(u)
+
     wasm = Enum.flat_map(~w(rust c cpp zig swift), &Map.get(by_kind, &1, []))
 
     %{

@@ -9,6 +9,19 @@ defmodule Nexus.AgentBashTest do
 
   # ---- deterministic, no network, no wasm ----
 
+  test "tools/grant ENFORCE: a kit outside tools is refused; a web cmd needs a web grant", %{vfs: vfs} do
+    Nexus.Agent.Kits.register("rg", "rg.wasm", summary: "search")
+    perms = %{tools: ["coreutils"], grant: []}
+
+    assert Nexus.Agent.Bash.run(vfs, "rg foo", perms) =~ "not in this agent's tools"
+    assert Nexus.Agent.Bash.run(vfs, "fetch http://example.com", perms) =~ "needs web access"
+
+    refute Nexus.Agent.Bash.run(vfs, "fetch http://example.com", %{tools: ["coreutils"], grant: ["web"]}) =~
+             "needs web access"
+
+    refute Nexus.Agent.Bash.run(vfs, "rg foo", nil) =~ "not in this agent's tools"
+  end
+
   test "the `kits` builtin lists the catalog incl. the web kit", %{vfs: vfs} do
     out = Nexus.Agent.Bash.run(vfs, "kits")
     assert out =~ "coreutils"

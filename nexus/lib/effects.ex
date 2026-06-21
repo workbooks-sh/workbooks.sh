@@ -67,7 +67,11 @@ defmodule Nexus.Effects do
 
         is_binary(args[:agent]) ->
           task = args[:task] || event[:title] || event[:kind] || ""
-          Nexus.Agent.run(task: task, unit: args[:agent])
+          # resolve a DECLARED agent (its prompt/tools/grant/limit); fall back to an ad-hoc run.
+          case Nexus.Agent.get(args[:agent]) do
+            nil -> Nexus.Agent.run(task: task, unit: args[:agent])
+            node -> Nexus.Agent.run_unit(node, task)
+          end
 
         match?({m, f, a} when is_atom(m) and is_atom(f) and is_list(a), args[:mfa]) ->
           {m, f, a} = args[:mfa]
