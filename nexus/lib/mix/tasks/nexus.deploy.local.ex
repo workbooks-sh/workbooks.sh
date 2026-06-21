@@ -16,9 +16,12 @@ defmodule Mix.Tasks.Nexus.Deploy.Local do
   @impl true
   def run(args) do
     Mix.Task.run("app.start")
-    image = List.first(args) || default_image()
+    # `--update` force-repulls the engine-disk (otherwise it auto-refreshes only when the published
+    # disk's digest has drifted past the cached golden). The first positional arg is the (informational) image.
+    {update?, rest} = {Enum.member?(args, "--update"), Enum.reject(args, &(&1 == "--update"))}
+    image = List.first(rest) || default_image()
 
-    case Nexus.Deploy.local(image) do
+    case Nexus.Deploy.local(image, update: update?) do
       {:ok, info} ->
         Mix.shell().info("nexus booted · #{Map.get(info, :url, "http://127.0.0.1:4000")}")
 

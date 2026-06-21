@@ -43,19 +43,47 @@ defmodule Nexus.Deploy.Machine do
   def ensure_engine_disk(opts \\ []) do
     File.mkdir_p!(engine_dir())
     golden = golden_disk()
+    have = File.regular?(golden) and File.regular?(kernel_path()) and File.regular?(initrd_path())
 
-    if File.regular?(golden) and File.regular?(kernel_path()) and File.regular?(initrd_path()) and not opts[:force] do
-      {:ok, golden}
-    else
-      with {:ok, _} <- sh_in(engine_dir(), "oras", ["pull", @artifact]),
-           {:ok, _} <- sh_in(engine_dir(), "zstd", ["-d", "-f", "disk.img.zst", "-o", "disk.img"]) do
-        {:ok, golden}
-      else
-        {:error, out} -> {:error, "engine-disk fetch failed: #{out}"}
-        :error -> {:error, "oras/zstd not runnable"}
-      end
+    cond do
+      opts[:force] -> pull_engine_disk()
+      not have -> pull_engine_disk()
+      # Re-pull when the published engine-disk has moved past our cached golden, so local runs the SAME
+      # runtime as cloud (best-effort: if the registry is unreachable, keep the cached disk).
+      drifted?() -> pull_engine_disk()
+      true -> {:ok, golden}
     end
   end
+
+  defp pull_engine_disk do
+    with {:ok, _} <- sh_in(engine_dir(), "oras", ["pull", @artifact]),
+         {:ok, _} <- sh_in(engine_dir(), "zstd", ["-d", "-f", "disk.img.zst", "-o", "disk.img"]) do
+      _ = record_digest()
+      {:ok, golden_disk()}
+    else
+      {:error, out} -> {:error, "engine-disk fetch failed: #{out}"}
+      :error -> {:error, "oras/zstd not runnable"}
+    end
+  end
+
+  # Has the remote engine-disk digest moved past the one we cached? nil/error → not drifted (offline-safe).
+  defp drifted? do
+    case remote_digest() do
+      nil -> false
+      remote -> remote != cached_digest()
+    end
+  end
+
+  defp remote_digest do
+    case sh("oras", ["manifest", "fetch", @artifact, "--descriptor"]) do
+      {:ok, out} -> (Regex.run(~r/"digest"\s*:\s*"([^"]+)"/, out) || []) |> List.last()
+      _ -> nil
+    end
+  end
+
+  defp record_digest, do: with(d when is_binary(d) <- remote_digest(), do: File.write(digest_file(), d))
+  defp cached_digest, do: case(File.read(digest_file()), do: ({:ok, d} -> String.trim(d); _ -> ""))
+  defp digest_file, do: Path.join(engine_dir(), "digest")
 
   # ── create / boot ───────────────────────────────────────────────────────────────────────────
 
@@ -89,6 +117,7 @@ defmodule Nexus.Deploy.Machine do
   """
   def spawn_direct(vm \\ read_ctx()) do
     File.mkdir_p!(log_dir())
+    write_secrets_env(vm.data_dir)
     argv = vfkit_argv(vm)
     cmd = argv |> Enum.map(&shquote/1) |> Enum.join(" ")
     out = Path.join(log_dir(), "runtime.out.log")
@@ -102,12 +131,43 @@ defmodule Nexus.Deploy.Machine do
     end
   end
 
+  # Deploy SECRETS to inject into the local guest, mirroring cloud's machine env (Provisioner.build_env)
+  # so a secret-gated workbook (LLM/API key) runs the same locally as in cloud. We pass through genuine
+  # deploy secrets the dev has in their host env (the legitimate deploy-injection seam) + anything under
+  # the WB_SECRET_ prefix. Written to the /disco share as secrets.env (0600); wb-init sources it.
+  @secret_keys ~w(OPENROUTER_API_KEY ANTHROPIC_API_KEY OPENAI_API_KEY BRAVE_API_KEY EXA_API_KEY
+                  TAVILY_API_KEY WB_DATABASE_URL WB_S3_ACCESS_KEY_ID WB_S3_SECRET_ACCESS_KEY
+                  WB_S3_ENDPOINT WB_S3_BUCKET WB_ENV_MASTER_KEY)
+
+  defp write_secrets_env(data_dir) do
+    File.mkdir_p!(data_dir)
+
+    pairs =
+      (@secret_keys ++ wb_secret_prefixed())
+      |> Enum.uniq()
+      |> Enum.flat_map(fn k -> case System.get_env(k), do: (nil -> []; "" -> []; v -> [{k, v}]) end)
+
+    path = Path.join(data_dir, "secrets.env")
+
+    if pairs == [] do
+      File.rm(path)
+    else
+      body = Enum.map_join(pairs, "\n", fn {k, v} -> "#{k}=#{v}" end) <> "\n"
+      File.write!(path, body)
+      File.chmod(path, 0o600)
+    end
+  end
+
+  defp wb_secret_prefixed, do: System.get_env() |> Map.keys() |> Enum.filter(&String.starts_with?(&1, "WB_SECRET_"))
+
   @doc "The vfkit argv that boots `vm` (engine-disk root + virtio-net NAT + the host data share)."
   def vfkit_argv(vm) do
     [
       vfkit_bin(),
-      "--cpus", "2",
-      "--memory", "2048",
+      # Match the CLOUD tier by default (1cpu/1024MB, from the deploy block via Nexus.Config) so a
+      # local run doesn't mask OOM/concurrency a cloud machine would hit — faithful-tier testing.
+      "--cpus", to_string(Nexus.Config.cpus()),
+      "--memory", to_string(Nexus.Config.memory()),
       "--kernel", kernel_path(),
       "--initrd", initrd_path(),
       "--kernel-cmdline", @kernel_cmdline,

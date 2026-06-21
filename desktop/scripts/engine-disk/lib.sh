@@ -159,7 +159,16 @@ $BB ip addr show eth0 | grep 'inet '
 
 export LANG=C.UTF-8 HOME=/root RELEASE_TMP=/tmp
 export WB_WEB=1 PORT=4000 WB_MODELS_DIR=/opt/models
-export WB_DESKTOP=1 WB_DESKTOP_DIR=/disco WB_DATA=/data WB_EMBED=local
+# WB_DATA on the PERSISTED host share (/disco is a virtio-fs mount of the host dir) so the tenant
+# SQLite, pushed-workbook git repos + checkouts survive `down`/reboot — local↔cloud data parity. The
+# in-disk /data is the per-boot clone (ephemeral); /disco/data persists on the host. mkdir is safe.
+$BB mkdir -p /disco/data 2>/dev/null || mkdir -p /disco/data 2>/dev/null
+export WB_DESKTOP=1 WB_DESKTOP_DIR=/disco WB_DATA=/disco/data WB_EMBED=local
+
+# Deploy SECRETS — Nexus.Deploy.Machine writes /disco/secrets.env (the genuine deploy-injection seam,
+# mirroring the cloud machine env), so a secret-gated workbook (LLM/API key) runs the same locally as
+# in cloud. Source it into the release env (the values reach Nexus.Secrets via the process env).
+if [ -f /disco/secrets.env ]; then set -a; . /disco/secrets.env 2>/dev/null; set +a; fi
 
 cd /app
 echo "wb-init: starting runtime ($(date))"

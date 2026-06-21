@@ -17,7 +17,7 @@ defmodule Nexus.Deploy do
   """
   def local(_image \\ nil, opts \\ []) do
     with :ok <- Machine.preflight(),
-         {:ok, _golden} <- Machine.ensure_engine_disk(),
+         {:ok, _golden} <- Machine.ensure_engine_disk(force: opts[:update] || false),
          {:ok, vm} <- Machine.create(opts),
          {:ok, _} <- Machine.spawn_direct(vm),
          {:ok, ip} <- Machine.await_ip(vm),
