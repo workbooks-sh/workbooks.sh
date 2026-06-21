@@ -139,6 +139,12 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
         resolveModule: WB.vurl,
         onDirtyChange: setDirty,
         onSave: persist,
+        // .work lint: the nexus parses the buffer (Nexus.Literate + per-block Elixir check).
+        lintSource: function(text){
+          return fetch('/cloud/parse', { method: 'POST', credentials: 'same-origin',
+            headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: path, content: text }) })
+            .then(function(r){ return r.json(); }).then(function(d){ return (d && d.diagnostics) || []; });
+        },
       });
     } catch (e) {
       mount.innerHTML = '<pre class="wxpre">' + esc(content) + '</pre>';

@@ -19,19 +19,22 @@
 let _cm = null;
 function loadCM() {
   if (_cm) return _cm;
-  // esm.sh shares one @codemirror/state + view across these sibling imports (same bare specifiers).
+  // esm.sh shares one @codemirror/state + view across these sibling imports (same bare specifiers) —
+  // verified: lint + autocomplete facets apply against the host view (no duplicate-state trap).
   _cm = Promise.all([
     import('https://esm.sh/@codemirror/view@6'),
     import('https://esm.sh/@codemirror/state@6'),
     import('https://esm.sh/@codemirror/commands@6'),
-  ]).then(function (mods) { return { view: mods[0], state: mods[1], cmds: mods[2] }; });
+    import('https://esm.sh/@codemirror/autocomplete@6'),
+    import('https://esm.sh/@codemirror/lint@6'),
+  ]).then(function (mods) { return { view: mods[0], state: mods[1], cmds: mods[2], ac: mods[3], lint: mods[4] }; });
   return _cm;
 }
 
 const isWork = (p) => /\.work$/i.test(p || '');
 
 export async function createEditor(mount, opts = {}) {
-  const { view, state, cmds } = await loadCM();
+  const { view, state, cmds, ac, lint } = await loadCM();
   const EditorView = view.EditorView;
   const rv = opts.resolveModule || ((u) => u);
 
@@ -56,7 +59,7 @@ export async function createEditor(mount, opts = {}) {
     cmds.history(),
     // ⌘S lives in the editor (CM6 doesn't bind it) so it works when the editor has focus.
     view.keymap.of([{ key: 'Mod-s', preventDefault: true, run: () => { save(); return true; } }]
-      .concat(cmds.defaultKeymap, cmds.historyKeymap)),
+      .concat(cmds.defaultKeymap, cmds.historyKeymap, ac.completionKeymap, lint.lintKeymap)),
     EditorView.updateListener.of((u) => {
       if (!u.docChanged) return;
       setDirty(true);
@@ -66,10 +69,32 @@ export async function createEditor(mount, opts = {}) {
     editableComp.of(EditorView.editable.of(!opts.readOnly)),
   ];
 
-  // The `.work` syntax layer (P1) — a ViewPlugin over THIS view's namespace (one state instance).
+  // The `.work` layers: syntax highlight (P1), autocomplete (kinds + do/end snippets), and lint
+  // (diagnostics from the host-supplied lintSource — the nexus parser via /cloud/parse).
   if (isWork(opts.path)) {
     try { const wk = await import(rv('./lang-stream.js')); exts.push(...wk.workHighlightFromView(view)); }
     catch (e) { try { console.warn('[workedit] .work highlight unavailable', e); } catch (_) {} }
+    try { const comp = await import(rv('./complete.js')); exts.push(comp.workCompletion(ac)); }
+    catch (e) { try { console.warn('[workedit] .work completion unavailable', e); } catch (_) {} }
+    if (typeof opts.lintSource === 'function') {
+      const toDiags = (raw, doc) => (raw || []).map((d) => {
+        const line = Math.max(1, Math.min(doc.lines, d.line || 1));
+        const ln = doc.line(line);
+        const from = ln.from + Math.max(0, (d.col || 1) - 1);
+        const endLn = d.endLine ? doc.line(Math.max(1, Math.min(doc.lines, d.endLine))) : ln;
+        let to = d.endCol ? endLn.from + (d.endCol - 1) : ln.to;
+        if (to <= from) to = Math.min(doc.length, from + 1);
+        return { from, to, severity: d.severity || 'warning', message: d.message || '' };
+      });
+      exts.push(
+        lint.linter(async (v) => {
+          let raw = [];
+          try { raw = await opts.lintSource(v.state.doc.toString()); } catch (_) {}
+          return toDiags(raw, v.state.doc);
+        }, { delay: 400 }),
+        lint.lintGutter(),
+      );
+    }
   }
 
   const editor = new EditorView({ doc: opts.doc || '', extensions: exts, parent: mount });
