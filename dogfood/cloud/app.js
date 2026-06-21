@@ -274,6 +274,7 @@
       { label: 'Studio', icon: '+', go: '/studio' },
       { label: 'Tasks', icon: '☰', go: '/tasks' },
       { label: 'Runs', icon: '▸', go: '/runs' },
+      { label: 'Issues', icon: '⚑', go: '/issues' },
       { label: 'Activity', icon: '∿', go: '/activity' },
       { label: 'Workspaces', icon: '▦', go: '/workspaces' },
       { label: 'Usage & billing', icon: '◷', go: '/usage' },
@@ -345,7 +346,7 @@
     // <script>-tagging all 20 upfront (~260KB, 20 requests on every cold load), we inject only the
     // ACTIVE view's script on demand. The home '/' view ships inline in app.js (no entry here).
     var VIEW_FILES = {
-      '/activity': 'activity', '/runs': 'runs', '/tasks': 'tasks', '/database': 'database', '/denied': 'denied',
+      '/activity': 'activity', '/runs': 'runs', '/tasks': 'tasks', '/issues': 'issues', '/database': 'database', '/denied': 'denied',
       '/integrations': 'integrations', '/nexuses': 'nexuses', '/secrets': 'secrets', '/settings': 'settings',
       '/shared': 'shared', '/storage': 'storage', '/studio': 'studio', '/create': 'studio', '/usage': 'studio',
       '/team': 'team', '/upgrade': 'upgrade', '/welcome': 'welcome', '/workspace/env': 'workspace-env',

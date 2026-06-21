@@ -49,6 +49,12 @@ server :cloud do
   route "POST /cloud/task/update", :task_update
   route "POST /cloud/task/dispatch", :task_dispatch
   route "POST /cloud/plan", :plan_create
+
+  # Issues — the failure-model queue. A failed run auto-files an issue (kind="issue" Task); agents or
+  # humans can file one explicitly; the triage view separates agent- from human-filed and lets you
+  # re-dispatch (assign + run a fix) or resolve. Issues ARE tasks, so update/dispatch reuse the above.
+  route "GET /cloud/issues", :issues_list
+  route "POST /cloud/issues", :issue_file
   # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
   # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
   route "GET /cloud/models", :models
@@ -260,7 +266,7 @@ server :cloud do
 
   # Shared run driver: streams the loop's typed events through `emit`, persists a Run row, returns a
   # summary tuple. Used by both the SSE live source (real-time) and POST /cloud/agent/run (blocking).
-  defp do_run(agent, task, tenant, user, emit) do
+  defp do_run(agent, task, tenant, user, emit, opts \\ []) do
     rid = gen_id()
     started = System.os_time(:second)
     emit.(%{type: "start", run: rid, agent: agent, task: task})
@@ -305,6 +311,17 @@ server :cloud do
       tenant: tenant
     )
 
+    # The failure model: instead of crashing or blindly retrying, a failed run FILES AN ISSUE that a
+    # human or another agent can pick up. `file_issue: false` (dispatch path) opts out — there the task
+    # itself already tracks the failure (set to blocked), so a second issue would be redundant noise.
+    if status != "ok" and Keyword.get(opts, :file_issue, true) do
+      file_issue(tenant, %{
+        title: "Run failed: #{agent} — #{title_from(task)}",
+        detail: "Agent #{agent} could not complete the task.\n\nTask: #{String.slice(task, 0, 400)}\n\nOutcome (#{status}): #{String.slice(answer, 0, 600)}",
+        agent: agent, run: rid, created_by: agent
+      })
+    end
+
     emit.(%{type: "done", run: rid, status: status, turns: turns, tokens: tokens})
     {rid, status, turns, answer}
   end
@@ -319,6 +336,7 @@ server :cloud do
     |> Enum.group_by(& &1.tid)
     |> Enum.map(fn {_tid, versions} -> Enum.max_by(versions, & &1.updated) end)
     |> Enum.reject(&(&1.status == "cancelled"))
+    |> Enum.map(fn t -> Map.put(t, :kind, t.kind || "task") end)
   end
 
   defp latest_task(tenant, tid), do: Enum.find(current_tasks(tenant), &(&1.tid == tid))
@@ -341,8 +359,45 @@ server :cloud do
 
   def tasks_list(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
-    tasks = current_tasks(tenant) |> Enum.sort_by(&{&1.priority || 2, -(&1.updated || 0)})
+    tasks = current_tasks(tenant) |> Enum.reject(&(&1.kind == "issue"))
+      |> Enum.sort_by(&{&1.priority || 2, -(&1.updated || 0)})
     %{tasks: tasks}
+  end
+
+  # The issue queue — tasks of kind "issue" (filed by a failed run or explicitly by an agent/human).
+  # Newest first; the triage view separates agent-filed from human-filed by created_by.
+  def issues_list(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    agents = Nexus.Agent.all() |> Enum.map(&Nexus.Agent.def_from_unit(&1).name) |> MapSet.new()
+    issues =
+      current_tasks(tenant)
+      |> Enum.filter(&(&1.kind == "issue"))
+      |> Enum.sort_by(&(-(&1.updated || 0)))
+      |> Enum.map(fn i -> Map.put(i, :by, if(MapSet.member?(agents, i.created_by), do: "agent", else: "human")) end)
+    %{issues: issues}
+  end
+
+  # File an issue (a kind="issue" Task). Used by the failure model (auto-filed on a failed run) and
+  # available as an explicit endpoint. `run` links the failing/relevant run.
+  def issue_file(req) do
+    b = req.body || %{}
+    if to_string(b["title"] || "") == "" do
+      {400, %{error: "title is required"}}
+    else
+      issue = file_issue(req.tenant || Nexus.Store.default_tenant(), %{
+        title: String.slice(to_string(b["title"]), 0, 160), detail: to_string(b["detail"] || ""),
+        agent: to_string(b["agent"] || ""), run: to_string(b["run"] || ""), created_by: user_key(req)
+      })
+      %{issue: issue}
+    end
+  end
+
+  defp file_issue(tenant, attrs) do
+    now = System.os_time(:second)
+    put_task(tenant, Map.merge(%{
+      tid: gen_id(), kind: "issue", status: "open", agent: "", parent: "", priority: 1,
+      run: "", created: now, title: "", detail: "", created_by: "system"
+    }, attrs))
   end
 
   def task_create(req) do
@@ -353,7 +408,7 @@ server :cloud do
     else
       now = System.os_time(:second)
       task = put_task(req.tenant || Nexus.Store.default_tenant(), %{
-        tid: gen_id(), title: String.slice(title, 0, 160), detail: to_string(b["detail"] || ""),
+        tid: gen_id(), kind: "task", title: String.slice(title, 0, 160), detail: to_string(b["detail"] || ""),
         status: "open", agent: to_string(b["agent"] || ""), parent: to_string(b["parent"] || ""),
         priority: b["priority"] || 2, created_by: user_key(req), run: "", created: now
       })
@@ -393,7 +448,7 @@ server :cloud do
           true ->
             put_task(tenant, Map.merge(cur, %{status: "in_progress"}))
             brief = if(cur.detail != "", do: "#{cur.title}\n\n#{cur.detail}", else: cur.title)
-            {rid, status, _turns, _answer} = do_run(agent, brief, tenant, user_key(req), fn _ -> :ok end)
+            {rid, status, _turns, _answer} = do_run(agent, brief, tenant, user_key(req), fn _ -> :ok end, file_issue: false)
             final = if status == "ok", do: "done", else: "blocked"
             task = put_task(tenant, Map.merge(cur, %{status: final, run: rid}))
             %{task: task, run: rid, run_status: status}
@@ -953,14 +1008,15 @@ end
 # rid. THE LINE: the bus + `task` effect are generic; this store + the Studio board are our cloud.
 resource Task do
   tid :string        # stable task id
+  kind :string       # "task" (work to do) | "issue" (a problem an agent/human filed) — one fabric
   title :string      # short summary
-  detail :string     # the brief / acceptance
+  detail :string     # the brief / acceptance (for an issue: the failure context + proposed fix)
   status :string     # open | in_progress | blocked | done | cancelled
   agent :string      # assignee (a named agent), or "" if unassigned
   parent :string     # parent task tid for plan decomposition, or "" for a root task
   priority :integer  # 0 (top) .. 4 (backlog)
   created_by :string # who/what filed it (a user, or an agent name)
-  run :string        # the rid of the dispatched run, once dispatched
+  run :string        # the rid of the dispatched run (a task) or the FAILING run (an issue)
   created :integer   # unix seconds
   updated :integer   # unix seconds
 end
@@ -976,7 +1032,7 @@ client :app do
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
-  <link rel="stylesheet" href="./app.css?v=20260621l">
+  <link rel="stylesheet" href="./app.css?v=20260621m">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
@@ -1008,5 +1064,5 @@ client :app do
   <!-- ?v= is the cache-bust token. BUMP IT ON EVERY DEPLOY that changes JS/CSS. app.js reads its own
        ?v= and re-applies it to every lazily-loaded asset (views, wbchat) so a deploy = all-new URLs =
        guaranteed cache miss (hard-refresh can't re-fetch lazy import()s; only a new URL can). -->
-  <script src="./app.js?v=20260621l"></script>
+  <script src="./app.js?v=20260621m"></script>
 end
