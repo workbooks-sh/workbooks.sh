@@ -115,9 +115,18 @@ defmodule Nexus.Server do
               _ -> false
             end
 
-          if Nexus.Git.bare?(bare) and empty? do
-            File.mkdir_p!(work)
-            Nexus.Git.checkout_into(bare, work)
+          cond do
+            Nexus.Git.bare?(bare) and empty? ->
+              File.mkdir_p!(work)
+              Nexus.Git.checkout_into(bare, work)
+
+            Nexus.Git.bare?(bare) ->
+              # Already-populated checkout: still attach jj (best-effort, no-op unless substrate is on)
+              # so existing workspaces gain an op-log on boot without a re-checkout.
+              Nexus.Git.maybe_colocate(bare, work)
+
+            true ->
+              :ok
           end
         end
 

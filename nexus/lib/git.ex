@@ -104,7 +104,19 @@ defmodule Nexus.Git do
     hook = Path.join(hooks, "post-receive")
     File.write!(hook, post_receive(bare, work_dir))
     File.chmod!(hook, 0o755)
+    maybe_colocate(bare, work_dir)
     {:ok, bare}
+  end
+
+  @doc """
+  Best-effort jj colocation for a workspace when jj-as-substrate is enabled (deploy flag + jj installed).
+  No-op (`:skip`) otherwise. Called at every point the working tree comes into existence (provision,
+  checkout, boot rehydrate) so each workspace carries a jj op-log + `jj undo`. Never raises.
+  """
+  def maybe_colocate(bare, work_dir) do
+    if Nexus.JJ.substrate?(), do: Nexus.JJ.ensure_colocated(bare, work_dir), else: :skip
+  rescue
+    _ -> :skip
   end
 
   @doc """
@@ -157,8 +169,10 @@ defmodule Nexus.Git do
   @doc "Check the current default branch of a bare repo out into `work_dir` (used after a push / on boot)."
   def checkout_into(bare, work_dir, branch \\ "main") do
     File.mkdir_p!(work_dir)
-    System.cmd("git", ["--git-dir=#{bare}", "--work-tree=#{work_dir}", "-c", "core.bare=false",
+    out = System.cmd("git", ["--git-dir=#{bare}", "--work-tree=#{work_dir}", "-c", "core.bare=false",
                        "checkout", "-f", branch], stderr_to_stdout: true)
+    maybe_colocate(bare, work_dir)
+    out
   end
 
   @doc """
