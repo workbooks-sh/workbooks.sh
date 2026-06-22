@@ -313,7 +313,9 @@ defmodule Nexus.Platform do
   end
 
   delete "/workspaces/:id" do
-    :ok = CP.delete(org(conn), :workspace, conn.params["id"])
+    # Full cascade: remove the working tree + bare repo + CP record + unmount — not just the CP row.
+    # (A CP-only delete left the on-disk workspace serving — the leftover-`marketing` pollution.)
+    Nexus.Workspaces.deprovision(conn.params["id"], org(conn))
     j(conn, 200, %{ok: true})
   end
 
