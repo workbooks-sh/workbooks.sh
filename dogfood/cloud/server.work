@@ -282,7 +282,10 @@ server :cloud do
     sel = (is_map(req.body) && req.body["capabilities"]) || []
     sel = if is_list(sel), do: sel, else: []
     caps = Nexus.Agent.admitted(Nexus.Agent.get(agent_name), sel)
-    brief = if caps == [], do: msg, else: "Active capabilities for this run: #{Enum.join(caps, ", ")} — use them where they fit.\n\n" <> msg
+    # Attached context (files / workspaces / spaces from the composer) resolved + inlined into the brief so
+    # the agent actually SEES it. Files get their (capped) contents; workspaces/spaces a scope reference.
+    ctx_items = (is_map(req.body) && req.body["context"]) || []
+    brief = capability_prefix(caps) <> context_brief(ctx_items) <> msg
     reply = run_agent(brief, eff_model, agent_name)
 
     turns = session.messages ++ [%{role: "user", text: msg}, %{role: "assistant", text: reply}]
@@ -375,13 +378,10 @@ server :cloud do
   defp do_run(agent, task, tenant, user, emit, opts \\ []) do
     rid = gen_id()
     started = System.os_time(:second)
-    # Active capabilities (already admission-clamped) are surfaced to the agent in the brief so it leans
-    # on them — the structured injection of capability workflows/sub-agents is the next step (bd wb-…).
+    # Active capabilities (already admission-clamped) + any attached context are surfaced to the agent in
+    # the brief so it leans on them — the structured injection of capability workflows is a later step.
     caps = opts[:capabilities] || []
-    task =
-      if caps == [],
-        do: task,
-        else: "Active capabilities for this run: #{Enum.join(caps, ", ")} — use them where they fit.\n\n" <> task
+    task = capability_prefix(caps) <> context_brief(opts[:context] || []) <> task
 
     emit.(%{type: "start", run: rid, agent: agent, task: task})
 
@@ -863,6 +863,81 @@ server :cloud do
       _ -> "The agent isn't available on this nexus yet (no model key configured)."
     catch
       _, _ -> "The agent run failed unexpectedly."
+    end
+  end
+
+  # ── brief composition: capabilities + attached context are prepended to the user's message so the agent
+  # actually sees them (textual injection — the established pattern; structured tool wiring is a later step).
+  defp capability_prefix(caps) when is_list(caps) and caps != [],
+    do: "Active capabilities for this run: #{Enum.join(caps, ", ")} — use them where they fit.\n\n"
+
+  defp capability_prefix(_), do: ""
+
+  # Resolve composer context items ({type, name, ref}) into a brief block. Files are inlined (capped, text
+  # only); workspaces/spaces become a scope reference. Caps total volume so a brief never blows up.
+  @context_file_cap 6_000
+  @context_total_cap 40_000
+  @context_max_items 12
+
+  defp context_brief(items) when is_list(items) and items != [] do
+    blocks =
+      items
+      |> Enum.take(@context_max_items)
+      |> Enum.map(&context_block/1)
+      |> Enum.reject(&(&1 in [nil, ""]))
+      |> cap_total(@context_total_cap)
+
+    if blocks == [], do: "", else: "Context the user attached for this run:\n\n" <> Enum.join(blocks, "\n\n") <> "\n\n"
+  end
+
+  defp context_brief(_), do: ""
+
+  # Keep prepending blocks until the running total would exceed the cap; drop the rest.
+  defp cap_total(blocks, cap) do
+    {kept, _} =
+      Enum.reduce(blocks, {[], 0}, fn b, {acc, n} ->
+        len = String.length(b)
+        if n + len > cap, do: {acc, n}, else: {[b | acc], n + len}
+      end)
+
+    Enum.reverse(kept)
+  end
+
+  defp context_block(it) when is_map(it) do
+    type = to_string(Map.get(it, "type") || Map.get(it, :type) || "file")
+    name = to_string(Map.get(it, "name") || Map.get(it, :name) || "")
+    ref = to_string(Map.get(it, "ref") || Map.get(it, :ref) || name)
+
+    case type do
+      "file" -> file_context_block(name, ref)
+      "workspace" -> "- Workspace in scope: **#{name}** (`#{ref}`)."
+      "space" -> "- Related space: **#{name}**."
+      _ -> if name == "", do: "", else: "- #{name}"
+    end
+  end
+
+  defp context_block(_), do: ""
+
+  defp file_context_block(name, ref) do
+    label = if name == "", do: ref, else: name
+
+    case resolve_file(ref) do
+      {:ok, abs} ->
+        case File.read(abs) do
+          {:ok, bin} ->
+            if String.valid?(bin) do
+              "File `#{ref}`:\n```\n#{String.slice(bin, 0, @context_file_cap)}\n```"
+            else
+              "- File: #{label} (`#{ref}`) — binary, not inlined."
+            end
+
+          _ ->
+            "- File: #{label} (`#{ref}`)"
+        end
+
+      _ ->
+        # Unresolvable ref (e.g. a dropped local upload or a stale path) — still name it as context.
+        "- Attached: #{label}"
     end
   end
 
