@@ -87,8 +87,10 @@ defmodule Nexus.Ledger do
 
   @doc false
   def decode(text) when is_binary(text) do
-    {meta, body} =
-      text |> String.split("\n") |> Enum.split_with(&String.starts_with?(&1, "@"))
+    # POSITIONAL framing: encode/1 always emits exactly the @did then @sig line first (did is base58 +
+    # sig is hex — neither contains \n), so the first two lines are the header and the REST is the body.
+    # (Sniffing by "@"-prefix dropped a field whose KEY began with @ — a legit-record-breaking bug.)
+    {meta, body} = text |> String.split("\n") |> Enum.split(2)
 
     # The body is a Nexus.Canon kv block — unescape it back to the exact signed field map (round-trips
     # Attest.preimage, so a value containing \n/= survives instead of being silently re-split).

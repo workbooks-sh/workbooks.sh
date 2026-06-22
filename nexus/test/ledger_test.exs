@@ -21,6 +21,15 @@ defmodule Nexus.LedgerTest do
     assert Nexus.Attest.verify(decoded, att.did)
   end
 
+  test "encode/decode survives field keys/values that look like headers or contain delimiters", _ do
+    kp = Keyring.generate()
+    # @-prefixed keys must NOT be sniffed into the header; values with \n/= must survive.
+    att = Nexus.Attest.sign(kp, %{"@did" => "spoof", "note" => "x\ntokens=999", "ok" => "1"})
+    decoded = Ledger.decode(Ledger.encode(att))
+    assert decoded.fields == att.fields
+    assert Nexus.Attest.verify(decoded, att.did)
+  end
+
   test "write_meter then read_meters returns a verified record", %{dir: dir, sha: sha} do
     runtime = Keyring.generate()
     {:ok, _att} = Ledger.write_meter(dir, sha, %{run: "r1", agent: "workhorse", tokens_in: 10, tokens_out: 90}, runtime)

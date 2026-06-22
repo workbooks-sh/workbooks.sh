@@ -695,19 +695,22 @@ server :cloud do
         _, e -> {:error, e}
       end
 
-    {status, turns, answer} =
+    {status, turns, answer, run_tokens} =
       case result do
-        {:ok, %{answer: a, turns: t}} -> {"ok", t, to_string(a)}
-        {:error, {:timeout, t}} -> {"timeout", t, ""}
-        {:error, reason} -> {"error", 0, "run failed: #{inspect(reason)}"}
-        _ -> {"error", 0, ""}
+        {:ok, %{answer: a, turns: t} = r} -> {"ok", t, to_string(a), Map.get(r, :tokens)}
+        {:error, {:timeout, t}} -> {"timeout", t, "", nil}
+        {:error, reason} -> {"error", 0, "run failed: #{inspect(reason)}", nil}
+        _ -> {"error", 0, "", nil}
       end
 
+    # Prefer THIS run's correlated token total (fix wb-r0zy) — the agent loop returns it per-run. Only
+    # fall back to the agent-keyed telemetry head when absent (e.g. an error before any completion).
     tokens =
-      case Nexus.Telemetry.runs(agent) do
-        [%{tokens: %{total: n}} | _] -> n
-        _ -> 0
-      end
+      run_tokens ||
+        case Nexus.Telemetry.runs(agent) do
+          [%{tokens: %{total: n}} | _] -> n
+          _ -> 0
+        end
 
     ended = System.os_time(:second)
 
