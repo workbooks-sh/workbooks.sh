@@ -65,11 +65,13 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   var tkOn = {}; TK.forEach(function(t){ if (t && t.kind === 'standalone') tkOn[t.id] = t.enabled !== false; });
   var AGENTS = AG.filter(function(a){ return !a.toolkit || tkOn[a.toolkit] !== false; });
 
-  // Session/space state (the sidebar sets WB._pending* before routing here). Agent + space are pinned
-  // for a session's life — captured on the first turn, sent with every turn so the server stores them.
+  // Session/workspace state (the sidebar sets WB._pending* before routing here). Agent + workspace are
+  // pinned for a session's life — captured on the first turn, sent with every turn so the server stores
+  // them. Workspaces are the declared subtrees (WB.ws.list); '' / "General" = system-level (no workspace).
   var curSession = WB._pendingSession || null;
-  var curSpace = WB._pendingSpace || null;
-  WB._pendingSession = null; WB._pendingSpace = null;
+  var curWorkspace = WB._pendingWorkspace || null;
+  WB._pendingSession = null; WB._pendingWorkspace = null;
+  var WORKSPACES = [{ id: '', name: 'General' }].concat(((WB.ws && WB.ws.list) || []).map(function(w){ return { id: w.id, name: w.name }; }));
 
   function agentName(a){ return a && (a.name || a) || null; }
 
@@ -92,14 +94,19 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
       if (a && a.capabilities != null) return a.capabilities;   // "all" | "none" | [ids]
       return name === 'autopilot' ? 'none' : 'all';
     },
-    // "Add context" (the composer paperclip) opens the searchable multi-select picker (files / workspaces
-    // / spaces, plus drop-to-attach). Chosen items become context chips and ride along with the turn.
+    // The workspace this session runs in (composer selector, left of attachments). '' = General. Pinned
+    // once the session has messages (you don't move a session out of its workspace).
+    workspaces: WORKSPACES,
+    workspace: (curWorkspace || ''),
+    onWorkspace: function(id){ curWorkspace = id || null; },
+    // "Add context" (the composer paperclip) opens the searchable multi-select picker (files / workspaces,
+    // plus drop-to-attach). Chosen items become context chips and ride along with the turn.
     onAttach: function(){ return (WB.contextPicker ? WB.contextPicker() : Promise.resolve([])); },
     send: function(text, ctx){
       var context = ((ctx && ctx.files) || []).map(function(f){ return { name: f.name, type: f.type || 'file', ref: f.ref || f.path || f.id || f.name }; });
       return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({
         u: U, id: curSession, message: text,
-        model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), space: curSpace, context: context,
+        model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), workspace: curWorkspace, context: context,
         capabilities: (ctx && ctx.capabilities) || []
       }) }).then(function(d){
         if (d && d.id) { curSession = d.id; if (WB._paintStudio) { WB.cache.set('agent-sessions', null); WB._paintStudio(); } }
@@ -109,21 +116,22 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   });
   if (CDEMO && DEMO.demoMessages) chat.setMessages(DEMO.demoMessages());
 
-  // Open an existing session — load its messages and pin its saved agent + space (the composer locks
-  // the agent once messages are present, so it stays fixed).
+  // Open an existing session — load its messages and pin its saved agent + workspace (the composer locks
+  // both once messages are present, so they stay fixed).
   async function openSession(id){
     try {
       var d = await api('/cloud/agent/session?u=' + encodeURIComponent(U) + '&id=' + encodeURIComponent(id));
       if (!d || d.error) return;
-      curSession = id; curSpace = d.space || null;
+      curSession = id; curWorkspace = d.workspace || null;
       if (d.agent && chat.setAgent) chat.setAgent(d.agent);
+      if (chat.setWorkspace) chat.setWorkspace(d.workspace || '');
       chat.setMessages(d.messages || []);
       chat.focus();
     } catch (e) {}
   }
   // Hooks the sidebar calls when we're ALREADY on /studio (a re-nav wouldn't re-render the view).
   WB._studioOpen = function(id){ openSession(id); };
-  WB._studioNew = function(space){ curSession = null; curSpace = space || null; chat.clear(); chat.focus(); };
+  WB._studioNew = function(workspace){ curSession = null; curWorkspace = workspace || null; if (chat.setWorkspace) chat.setWorkspace(workspace || ''); chat.clear(); chat.focus(); };
 
   if (curSession) openSession(curSession);
 }});

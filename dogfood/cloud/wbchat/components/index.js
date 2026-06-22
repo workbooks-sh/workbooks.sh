@@ -9,6 +9,8 @@ import './code-hl.js';     // part: code        (syntax-highlight override)
 import './task.js';        // part: task        (checklist)
 import './followups.js';   // part: suggestions (follow-up chips)
 import './feedback.js';    // action: thumbs up/down (assistant)
+import './workspace-selector.js'; // composer button (right group): workspace dropdown — registered before
+                                  // attachments so it lands to the LEFT of the paperclip
 import './attachments.js'; // composer button: file picker
 import './transcribe.js';  // composer button: mic (speech-to-text)
 import './agent-selector.js'; // composer button: agent dropdown (Studio, locked once session has messages)

@@ -12,10 +12,9 @@ server :cloud do
   route "GET /cloud/agent/sessions", :agent_sessions
   route "GET /cloud/agent/session", :agent_session
   route "POST /cloud/agent/chat", :agent_chat
-  # Spaces — a named bucket the user groups Studio sessions under (a session with no space lands in
-  # "General"). Per-{tenant,user}, in-process alongside sessions. The sidebar renders spaces as folders.
-  route "GET /cloud/agent/spaces", :agent_spaces
-  route "POST /cloud/agent/spaces", :agent_space_create
+  # Studio sessions are grouped by WORKSPACE (the declared subtrees) — no separate spaces store; the
+  # workspace list comes from the deploy manifest (client reads WB.ws.list). A session carries a
+  # `workspace` id (or none = the "General" / system-level group).
 
   # Launch a NAMED agent on a brief and persist a durable Run record. Non-streaming (returns the
   # final answer + run id); the Studio prefers the live SSE source `agent_run` (GET /live/agent_run)
@@ -85,6 +84,17 @@ server :cloud do
   # generic platform endpoint so it shows the true amount.
   route "GET /cloud/storage", :storage
 
+  # ── Data page ────────────────────────────────────────────────────────────────────────────────────
+  # The Data explorer: every `resource` ("table") declared across the deploy, tenant-scoped — see
+  # [[data-unit-is-resource]]. List → grouped resources + counts + tier badges. Rows → a real PAGED,
+  # filtered, sorted slice (Nexus.Store.page; SQLite serves it natively). Health → the storage overview
+  # (durable DB size, cold/Litestream replication, totals). Assets → media files on the volume + upload.
+  route "GET /cloud/data", :data_list
+  route "GET /cloud/data/rows", :data_rows
+  route "GET /cloud/data/health", :data_health
+  route "GET /cloud/assets", :assets_list
+  route "POST /cloud/asset/upload", :asset_upload
+
   # Injected / deploy-time secrets (Fly secrets → Nexus.Secrets) — the Secrets page lists their NAMES +
   # whether each is set (present), NEVER values. Read-only, admin-only. Complements the editable
   # control-plane env store (/api/platform/env).
@@ -152,7 +162,6 @@ server :cloud do
   route "GET /cloud/activity", :activity
 
   @agent_store {:cloud_agent_sessions}
-  @spaces_store {:cloud_agent_spaces}
 
   def mint_token(req) do
     name = (is_map(req.body) && req.body["name"]) || "cli"
@@ -165,42 +174,15 @@ server :cloud do
     sessions =
       sessions_for(req.tenant, user_key(req))
       |> Enum.map(fn s -> %{id: s.id, title: s.title, updated: s.updated,
-                            space: Map.get(s, :space), agent: Map.get(s, :agent)} end)
+                            workspace: Map.get(s, :workspace), agent: Map.get(s, :agent)} end)
 
     %{sessions: sessions}
-  end
-
-  # List the user's spaces (newest first). The sidebar groups sessions under these folders.
-  def agent_spaces(req) do
-    %{spaces: spaces_for(req.tenant, user_key(req))}
-  end
-
-  # Create a named space (idempotent on name, case-insensitive). Returns the space record.
-  def agent_space_create(req) do
-    name = String.trim((is_map(req.body) && req.body["name"]) || "")
-
-    if name == "" do
-      {400, %{error: "name required"}}
-    else
-      user = user_key(req)
-      list = spaces_for(req.tenant, user)
-
-      case Enum.find(list, &(String.downcase(&1.name) == String.downcase(name))) do
-        nil ->
-          proj = %{id: gen_id(), name: name, created: System.os_time(:second)}
-          save_spaces(req.tenant, user, [proj | list])
-          %{space: proj}
-
-        existing ->
-          %{space: existing}
-      end
-    end
   end
 
   def agent_session(req) do
     case Enum.find(sessions_for(req.tenant, user_key(req)), &(&1.id == (req.query["id"] || ""))) do
       nil -> {404, %{error: "not found"}}
-      s -> %{id: s.id, title: s.title, messages: s.messages, space: Map.get(s, :space), agent: Map.get(s, :agent)}
+      s -> %{id: s.id, title: s.title, messages: s.messages, workspace: Map.get(s, :workspace), agent: Map.get(s, :agent)}
     end
   end
 
@@ -281,16 +263,16 @@ server :cloud do
     id = is_map(req.body) && req.body["id"]
     model = is_map(req.body) && req.body["model"]
     agent = is_map(req.body) && req.body["agent"]
-    space = is_map(req.body) && req.body["space"]
+    workspace = is_map(req.body) && req.body["workspace"]
     sessions = sessions_for(req.tenant, user)
     {match, rest} = Enum.split_with(sessions, &(&1.id == id))
 
     session =
       case match do
         [s] -> s
-        # New session: capture the chosen agent + space — both are fixed for the session's life
-        # (the composer locks the agent selector once a session has any messages).
-        _ -> %{id: gen_id(), title: title_from(msg), messages: [], updated: 0, agent: agent, space: space}
+        # New session: capture the chosen agent + workspace — both fixed for the session's life
+        # (the composer locks both selectors once a session has any messages).
+        _ -> %{id: gen_id(), title: title_from(msg), messages: [], updated: 0, agent: agent, workspace: workspace}
       end
 
     # Run via the session's pinned agent (existing session) or the just-chosen one (new session). Model
@@ -855,12 +837,6 @@ server :cloud do
     :persistent_term.put(@agent_store, Map.put(all, {tenant, user}, Enum.sort_by(list, & &1.updated, :desc)))
   end
 
-  defp spaces_for(tenant, user), do: Map.get(:persistent_term.get(@spaces_store, %{}), {tenant, user}, [])
-
-  defp save_spaces(tenant, user, list) do
-    all = :persistent_term.get(@spaces_store, %{})
-    :persistent_term.put(@spaces_store, Map.put(all, {tenant, user}, Enum.sort_by(list, & &1.created, :desc)))
-  end
 
   defp gen_id, do: Base.url_encode64(:crypto.strong_rand_bytes(9), padding: false)
   defp title_from(msg), do: msg |> String.trim() |> String.slice(0, 48) |> then(&if(&1 == "", do: "New chat", else: &1))
@@ -1059,6 +1035,195 @@ server :cloud do
     total = Enum.reduce(buckets, 0, &(&1.bytes + &2))
     %{totalSize: human(total), buckets: Enum.sort_by(buckets, & &1.bytes, :desc)}
   end
+
+  # ── Data page handlers ───────────────────────────────────────────────────────────────────────────
+  # Every resource ("table") for the current tenant, grouped-friendly (carries `workspace`). Tier
+  # badges (durable/replicated) are GLOBAL facts of the backend, not per-resource (one Store adapter,
+  # one Litestream replica) — surfaced honestly rather than faked into per-table tiers.
+  def data_list(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    durable = Nexus.Store.adapter() == Nexus.Store.Sqlite
+    replicated = durable and litestream_on?()
+
+    resources =
+      Nexus.Resources.list(Nexus.Config.data_dir(), tenant)
+      |> Enum.map(fn r ->
+        %{name: r.name, workspace: r.workspace, file: r.file, files: r.files,
+          count: r.count, live: r.count > 0, durable: durable, replicated: replicated,
+          fields: Enum.map(r.fields, &field_meta/1)}
+      end)
+
+    %{resources: resources, backend: backend_label(), durable: durable, replicated: replicated}
+  end
+
+  # A real page of a resource's rows. Query: name, offset, limit, sort (field), dir (asc|desc), q.
+  # Returns {fields, rows, total, offset, limit} — total is the count AFTER any `q` filter, so the UI
+  # paginates the full table (not a capped peek). Tenant-scoped via Nexus.Store.page.
+  def data_rows(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    name = req.query["name"] || ""
+
+    case Nexus.Resources.fetch(name, Nexus.Config.data_dir(), tenant) do
+      :error ->
+        {404, %{error: "no such resource"}}
+
+      {:ok, entry} ->
+        offset = to_int(req.query["offset"], 0)
+        limit = to_int(req.query["limit"], 50)
+        sort_field = String.trim(req.query["sort"] || "")
+        sort = if sort_field == "", do: nil, else: {sort_field, req.query["dir"] || "asc"}
+
+        {rows, total} =
+          Nexus.Store.page(entry.module, tenant,
+            offset: offset, limit: limit, sort: sort, q: req.query["q"])
+
+        %{name: entry.name, fields: Enum.map(entry.fields, &field_meta/1),
+          rows: Enum.map(rows, &row_map/1), total: total, offset: offset, limit: limit}
+    end
+  end
+
+  # Storage health overview — the "is my data live / am I backed up" page. Real numbers: the durable DB
+  # size on the volume, the configured backend, cold-replica (Litestream) status, and tenant totals.
+  def data_health(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    resources = Nexus.Resources.list(Nexus.Config.data_dir(), tenant)
+    rows = Enum.reduce(resources, 0, &(&1.count + &2))
+    db_bytes = db_size_bytes()
+    durable = Nexus.Store.adapter() == Nexus.Store.Sqlite
+
+    %{backend: backend_label(), durable: durable,
+      db_size: human(db_bytes), db_bytes: db_bytes,
+      resources: length(resources), rows: rows,
+      cold: cold_status()}
+  end
+
+  # Asset repository — media files on the data volume across all workspaces, for the Drive-style grid.
+  # Reuses the same mounts as the file tree; serve/preview via /cloud/raw. Capped (with `truncated`).
+  @asset_cap 500
+  def assets_list(req) do
+    want = String.trim(req.query["type"] || "")
+
+    all =
+      for {mount, root} <- mounts(),
+          file <- Path.wildcard(Path.join(root, "**/*")),
+          File.regular?(file),
+          kind = asset_kind(file),
+          not is_nil(kind),
+          want == "" or want == kind do
+        rel = Path.relative_to(file, root)
+        path = mount <> "/" <> rel
+        %{name: Path.basename(file), path: path, workspace: mount, type: kind,
+          size: (File.stat!(file).size || 0), url: "/cloud/raw?path=" <> URI.encode(path)}
+      end
+
+    %{assets: Enum.take(all, @asset_cap), truncated: length(all) > @asset_cap, total: length(all)}
+  end
+
+  # Upload an asset into a workspace. Body: %{path: "<mount>/<rel>", content: "<base64>"} (a data: URL
+  # prefix is tolerated). Writes the bytes to the volume and commits into the workspace repo, exactly
+  # like the file-mutation verbs (attributed, remounted, logged).
+  def asset_upload(req) do
+    path = is_map(req.body) && req.body["path"]
+    raw = (is_map(req.body) && req.body["content"]) || ""
+
+    with {:ok, abs, mount, root, rel} <- resolve_target(path),
+         true <- rel != "" or {:error, 400, "path required"},
+         {:ok, bytes} <- decode_b64(raw) do
+      File.mkdir_p!(Path.dirname(abs))
+      File.write!(abs, bytes)
+      commit_tree_change(req, mount, root, "upload #{rel} via dashboard", "uploaded #{rel} to #{mount}")
+    else
+      {:error, status, msg} -> {status, %{error: msg}}
+      {:error, msg} -> {400, %{error: msg}}
+      false -> {400, %{error: "path required"}}
+      _ -> {400, %{error: "upload failed"}}
+    end
+  end
+
+  # ── Data helpers ─────────────────────────────────────────────────────────────────────────────────
+  defp field_meta({name, type}), do: %{name: to_string(name), type: field_type_label(type)}
+
+  defp field_type_label({:scalar, t}), do: to_string(t)
+  defp field_type_label({:enum, vals}), do: Enum.map_join(vals, " | ", &to_string/1)
+  defp field_type_label({:list, inner}), do: "[" <> field_type_label(inner) <> "]"
+  defp field_type_label(other), do: inspect(other)
+
+  # Resource struct → a JSON-safe row map (just its declared fields; Jason renders enum atoms as strings).
+  defp row_map(%_{} = row), do: Map.from_struct(row)
+  defp row_map(row) when is_map(row), do: row
+
+  defp backend_label do
+    case Nexus.Store.adapter() do
+      Nexus.Store.Sqlite -> "SQLite (durable)"
+      Nexus.Store.Ets -> "ETS (in-memory)"
+      other -> inspect(other)
+    end
+  end
+
+  defp litestream_on? do
+    Nexus.Litestream.enabled?()
+  rescue
+    _ -> false
+  end
+
+  defp cold_status do
+    if litestream_on?() do
+      replica = (try do Nexus.Litestream.replica() rescue _ -> nil end)
+      %{enabled: true, target: replica_label(replica)}
+    else
+      %{enabled: false, target: nil}
+    end
+  end
+
+  defp replica_label(%{} = r), do: r[:url] || r["url"] || r[:bucket] || r["bucket"] || "object store"
+  defp replica_label(_), do: "object store"
+
+  defp db_size_bytes do
+    case File.stat(Nexus.Paths.db_path()) do
+      {:ok, %{size: s}} -> s || 0
+      _ -> 0
+    end
+  rescue
+    _ -> 0
+  end
+
+  defp to_int(nil, d), do: d
+  defp to_int(s, d) when is_binary(s), do: (case Integer.parse(s) do {i, _} -> i; _ -> d end)
+  defp to_int(i, _) when is_integer(i), do: i
+  defp to_int(_, d), do: d
+
+  # Media classification by extension — what the asset grid groups + previews.
+  @img ~w(.png .jpg .jpeg .gif .webp .svg .avif .bmp .ico)
+  @vid ~w(.mp4 .mov .webm .mkv .avi .m4v)
+  @aud ~w(.mp3 .wav .ogg .flac .m4a .aac)
+  @doc_ext ~w(.pdf)
+  @arch ~w(.zip .tar .gz .tgz .7z .rar)
+  defp asset_kind(file) do
+    ext = file |> Path.extname() |> String.downcase()
+
+    cond do
+      ext in @img -> "image"
+      ext in @vid -> "video"
+      ext in @aud -> "audio"
+      ext in @doc_ext -> "pdf"
+      ext in @arch -> "archive"
+      true -> nil
+    end
+  end
+
+  # Accept raw base64 or a data: URL; cap size defensively.
+  @max_asset_bytes 33_554_432
+  defp decode_b64(s) when is_binary(s) do
+    payload = case String.split(s, "base64,", parts: 2) do [_, b] -> b; [b] -> b end
+
+    case Base.decode64(String.trim(payload)) do
+      {:ok, bytes} when byte_size(bytes) <= @max_asset_bytes -> {:ok, bytes}
+      {:ok, _} -> {:error, "file too large"}
+      :error -> {:error, "invalid base64 content"}
+    end
+  end
+
+  defp decode_b64(_), do: {:error, "content required"}
 
   # The platform secrets this nexus reads via Nexus.Secrets — injected at deploy (Fly secrets / encrypted
   # control-plane env). We expose only the NAME + whether it's set, never the value, and only to an admin.

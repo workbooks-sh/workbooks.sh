@@ -141,6 +141,9 @@ export function createChat(container, options = {}) {
   // conversation has any messages, the selector locks (agentLocked()), matching "pick the agent only when
   // starting a new session". idOf-style values may be strings or { name, label, ... } records.
   let selectedAgent = opts.agent || (opts.agents && opts.agents[0]) || null;
+  // Workspace the session runs in (composer workspace selector). Pinned for the session's life like the
+  // agent. Value is a workspace id string ('' = General / system-level).
+  let selectedWorkspace = (opts.workspace != null) ? opts.workspace : ((opts.workspaces && opts.workspaces[0] && opts.workspaces[0].id) || '');
   let selectedCapabilities = (opts.capabilities && opts.capabilities.slice()) || []; // composer capability multi-select
 
   const root = el('div', { class: 'wb-chat' });
@@ -270,6 +273,12 @@ export function createChat(container, options = {}) {
     agent: () => selectedAgent,
     setAgent: (a) => { selectedAgent = a; if (opts.onAgent) try { opts.onAgent(a); } catch (e) {} },
     agentLocked: () => messages.length > 0,
+    // Workspace selector hooks (consumed by the workspace-selector add-on). Locked once the session has
+    // messages — you don't move a session out of its workspace.
+    workspaces: opts.workspaces || [],
+    workspace: () => selectedWorkspace,
+    setWorkspace: (w) => { selectedWorkspace = w; if (opts.onWorkspace) try { opts.onWorkspace(w); } catch (e) {} },
+    workspaceLocked: () => messages.length > 0,
     // Capability multi-select hooks (consumed by the capabilities-selector add-on). The catalog is the
     // toolkit list; admission(agentName) → 'all' | 'none' | [ids] gates what's selectable per driver.
     capabilityCatalog: opts.capabilityCatalog || [],
@@ -348,6 +357,8 @@ export function createChat(container, options = {}) {
     // Agent the run routes through — read/set externally (e.g. opening a session pins its saved agent).
     get agent() { return selectedAgent; },
     setAgent(a) { selectedAgent = a; emit('change', { messages }); return controller; },
+    get workspace() { return selectedWorkspace; },
+    setWorkspace(w) { selectedWorkspace = w; emit('change', { messages }); return controller; },
     on(evt, fn) { (listeners[evt] = listeners[evt] || []).push(fn); return controller; },
     destroy() { container.innerHTML = ''; },
     el, render,

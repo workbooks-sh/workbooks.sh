@@ -394,7 +394,7 @@
         document.body.appendChild(ov);
         var box = ov.querySelector('.palette'), input = ov.querySelector('.palette-in'), res = ov.querySelector('.palette-res');
         var count = ov.querySelector('.ctxcount');
-        var items = [], sel = 0, picked = {}, spaces = [];
+        var items = [], sel = 0, picked = {};
         function key(it){ return it.type + ':' + (it.ref || it.name); }
         function done(arr){ ov.remove(); resolve(arr || []); }
         function updFoot(){ var n = Object.keys(picked).length; count.textContent = n ? (n + ' selected') : 'Nothing selected'; }
@@ -410,11 +410,8 @@
           res.querySelectorAll('[data-i]').forEach(function(el){ el.onclick = function(){ toggle(items[+el.getAttribute('data-i')]); }; });
         }
         function base(q){
-          var ws = (WB.ws.list || []).filter(function(w){ return !q || w.name.toLowerCase().indexOf(q) >= 0; })
-            .map(function(w){ return { type: 'workspace', name: w.name, ref: w.id, icon: w.icon || '▦', sub: 'workspace' }; });
-          var sp = spaces.filter(function(s){ return !q || (s.name || '').toLowerCase().indexOf(q) >= 0; })
-            .map(function(s){ return { type: 'space', name: s.name, ref: s.id || s.name, icon: '📁', sub: 'space' }; });
-          return ws.concat(sp);
+          return (WB.ws.list || []).filter(function(w){ return !q || w.name.toLowerCase().indexOf(q) >= 0; })
+            .map(function(w){ return { type: 'workspace', name: w.name, ref: w.id, icon: '▦', sub: 'workspace' }; });
         }
         function refresh(){
           var q = input.value.trim().toLowerCase();
@@ -447,9 +444,6 @@
           if (e.target.closest('[data-cancel]')) return done([]);
           if (e.target.closest('[data-add]')) return done(Object.keys(picked).map(function(k){ return picked[k]; }));
         });
-        // Load spaces (for the search) then paint.
-        fetch('/cloud/agent/spaces', { credentials: 'same-origin' }).then(function(r){ return r.json(); })
-          .then(function(d){ spaces = (d && d.spaces) || []; refresh(); }).catch(function(){ refresh(); });
         refresh(); input.focus();
       });
     };
@@ -685,6 +679,7 @@
     try { st.appView = localStorage.getItem('wb-appview') || 'all'; } catch (e) { st.appView = 'all'; }          // all (flat) | workspace (grouped)
     try { st.appSort = localStorage.getItem('wb-appsort') || 'name'; } catch (e) { st.appSort = 'name'; }        // name | updated
     try { st.appGroupsCollapsed = JSON.parse(localStorage.getItem('wb-appgroups') || '{}'); } catch (e) { st.appGroupsCollapsed = {}; }
+    try { st.studioWsCollapsed = JSON.parse(localStorage.getItem('wb-studiows') || '{}'); } catch (e) { st.studioWsCollapsed = {}; }
     try { st.bookmarks = JSON.parse(localStorage.getItem('wb-bookmarks') || '[]'); } catch (e) { st.bookmarks = []; }
     function saveBookmarks(){ try { localStorage.setItem('wb-bookmarks', JSON.stringify(st.bookmarks)); } catch (e) {} }
     function toggleBookmark(path, label){
@@ -925,45 +920,46 @@
         }
       });
     }
-    // Studio sidebar — sessions GROUPED BY SPACE (folders) under a "General" group (space-less
-    // sessions). Each session row carries its agent's pastel dot. Lazy + stale-while-revalidate, painted
-    // in place so opening Studio doesn't block on the fetch. New-session-in-space is the + on a folder.
+    // Studio sidebar — sessions GROUPED BY WORKSPACE (the declared subtrees in WB.ws.list), plus a
+    // "General" group for workspace-less (system-level) sessions. EVERY workspace shows as a collapsible
+    // group even with no sessions (empty state inside). The + on a group starts a session IN that
+    // workspace. Each session row carries its agent's pastel dot.
     function studioSessRow(s){
       var th = (WB.AGENT_THEME && s.agent) ? WB.AGENT_THEME[s.agent] : null;
       var dot = th ? '<span class="sdot" style="background:' + th.color + '" title="' + esc(s.agent) + '"></span>' : '<span class="semoji">💬</span>';
-      return '<a class="srow" data-ctx="session" data-nav="/studio" href="#/studio" data-session="' + esc(s.id) + '" data-space="' + esc(s.space || '') + '" title="' + esc(s.title || 'Session') + '">' +
+      return '<a class="srow" data-ctx="session" data-nav="/studio" href="#/studio" data-session="' + esc(s.id) + '" data-workspace="' + esc(s.workspace || '') + '" title="' + esc(s.title || 'Session') + '">' +
         dot + '<span class="sname">' + esc(s.title || 'Untitled session') + '</span></a>';
     }
-    // group: spaceName === null → the General (space-less) group, no folder chrome; else a folder.
-    function studioSessGroup(name, list, spaceName){
-      if (spaceName === null && (!list || list.length === 0)) return '';   // hide an empty General group
-      var head = '<div class="sgrp' + (spaceName !== null ? ' sgrpf' : '') + '">' +
-        (spaceName !== null ? '<span class="sgrpic">' + ICO.folder + '</span>' : '') +
-        '<span class="sgrptt">' + esc(name) + '</span>' +
-        (spaceName !== null ? '<button class="sgrpadd" data-newsession data-space="' + esc(spaceName) + '" title="New session in ' + esc(name) + '">' + ICO.plus + '</button>' : '') +
+    // A collapsible workspace group. id='' is the General (system-level) group.
+    function studioWsGroup(id, name, list){
+      var key = id || '_general';
+      var collapsed = !!st.studioWsCollapsed[key];
+      var head = '<div class="swsgrp' + (collapsed ? ' collapsed' : '') + '" data-studiows="' + esc(key) + '">' +
+        '<span class="swschev">' + ICO.chev + '</span>' +
+        '<span class="swsic">' + ICO.hash + '</span>' +
+        '<span class="swstt">' + esc(name) + '</span>' +
+        '<span class="swsct">' + (list.length || '') + '</span>' +
+        '<button class="swsadd" data-newsession data-workspace="' + esc(id) + '" title="New session in ' + esc(name) + '">' + ICO.plus + '</button>' +
         '</div>';
-      var rows = (list && list.length) ? list.map(studioSessRow).join('')
-        : (spaceName !== null ? '<div class="treemsg" style="padding:2px 10px 6px 26px">No sessions yet</div>' : '');
-      return head + rows;
+      var body = collapsed ? ''
+        : (list.length ? list.map(studioSessRow).join('') : '<div class="treemsg" style="padding:2px 10px 8px 30px">No sessions yet</div>');
+      return '<div class="swsblock">' + head + body + '</div>';
     }
     function paintStudioSide(){
       var el = document.getElementById('studioSide'); if (!el) return;
       var sessions = WB._studioSessions || [];
-      var spaces = WB._studioSpaces || [];
-      var bySpace = {}; sessions.forEach(function(s){ var k = s.space || ''; (bySpace[k] = bySpace[k] || []).push(s); });
-      var html = studioSessGroup('General', bySpace[''] || [], null);
-      spaces.forEach(function(p){ html += studioSessGroup(p.name, bySpace[p.name] || [], p.name); });
-      // a session tagged to a space no longer in the list still gets a folder so nothing's lost
-      Object.keys(bySpace).forEach(function(k){ if (k && !spaces.some(function(p){ return p.name === k; })) html += studioSessGroup(k, bySpace[k], k); });
-      el.innerHTML = html || '<div class="treemsg" style="padding:6px 10px">No sessions yet</div>';
+      var workspaces = (WB.ws && WB.ws.list) || [];
+      var byWs = {}; sessions.forEach(function(s){ var k = s.workspace || ''; (byWs[k] = byWs[k] || []).push(s); });
+      var html = studioWsGroup('', 'General', byWs[''] || []);   // always shown (system level)
+      workspaces.forEach(function(w){ html += studioWsGroup(w.id, w.name, byWs[w.id] || []); });
+      // a session tied to a workspace that's no longer declared still gets its own group
+      Object.keys(byWs).forEach(function(k){ if (k && !workspaces.some(function(w){ return w.id === k; })) html += studioWsGroup(k, k, byWs[k]); });
+      el.innerHTML = html;
     }
     function paintStudio(){
       if (!document.getElementById('studioSide')) return;
       WB.swr('agent-sessions', function(){ return fetch('/cloud/agent/sessions', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
         WB._studioSessions = (d && d.sessions) || []; paintStudioSide();
-      });
-      WB.swr('agent-spaces', function(){ return fetch('/cloud/agent/spaces', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
-        WB._studioSpaces = (d && d.spaces) || []; paintStudioSide();
       });
     }
     WB._paintStudio = paintStudio;
@@ -1137,11 +1133,11 @@
       var sideBody;
       if (section === 'files') sideBody = '<div class="wsgroups">' + wslist + '</div>';
       else if (section === 'apps') sideBody = '<div class="appsgrid" id="appsGrid"><div class="treemsg" style="padding:8px 4px">Loading apps…</div></div>';
-      // Studio — New session + New space, then sessions grouped by space (lazy-painted into #studioSide).
+      // Studio — New session + New workspace, then sessions grouped by workspace (lazy → #studioSide).
       else if (section === 'studio') sideBody =
           '<div class="studioacts">' +
             '<button class="newsess" data-newsession><span class="nsico">' + ICO.plus + '</span>New session</button>' +
-            '<button class="newspace" data-newspace title="New space"><span class="nsico">' + ICO.newfolderplus + '</span>New space</button>' +
+            '<button class="newspace" data-newworkspace title="New workspace"><span class="nsico">' + ICO.newfolderplus + '</span>New workspace</button>' +
           '</div>' +
           '<div id="studioSide"><div class="treemsg" style="padding:8px 4px">Loading sessions…</div></div>';
       // Activity — the inbox lives in the sidebar; the page shows the selected event's context (lazy → #activityInbox).
@@ -1288,23 +1284,28 @@
       var openApp = t.closest && t.closest('[data-open-app]');
       if (openApp) { e.preventDefault(); var an = openApp.getAttribute('data-open-app');
         WB._app = (WB._appReg && WB._appReg[an]) || null; WB.nav('/app/' + encodeURIComponent(an)); return; }
-      // ── Studio sidebar: set pending session/space, then route. When already on /studio the view's
+      // ── Studio sidebar: set pending session/workspace, then route. When already on /studio the view's
       // hooks (WB._studioOpen / WB._studioNew) apply it in place (a data-nav re-nav wouldn't re-render).
       var onStudio = (location.hash || '').indexOf('/studio') >= 0;   // hooks are only live while mounted
+      // Collapse/expand a Studio workspace group (header click, not the + or a row).
+      var wsTog = t.closest && t.closest('[data-studiows]');
+      if (wsTog && !(t.closest && (t.closest('[data-newsession]') || t.closest('[data-session]')))) {
+        var wk = wsTog.getAttribute('data-studiows'); st.studioWsCollapsed[wk] = !st.studioWsCollapsed[wk];
+        try { localStorage.setItem('wb-studiows', JSON.stringify(st.studioWsCollapsed)); } catch (er) {}
+        if (WB._paintStudio) WB._paintStudio(); return;
+      }
       var ssRow = t.closest && t.closest('[data-session]');
-      if (ssRow) { e.preventDefault(); WB._pendingSession = ssRow.getAttribute('data-session'); WB._pendingSpace = ssRow.getAttribute('data-space') || null;
+      if (ssRow) { e.preventDefault(); WB._pendingSession = ssRow.getAttribute('data-session'); WB._pendingWorkspace = ssRow.getAttribute('data-workspace') || null;
         if (onStudio && WB._studioOpen) WB._studioOpen(WB._pendingSession); else WB.nav('/studio'); return; }
       var nsBtn = t.closest && t.closest('[data-newsession]');
-      if (nsBtn) { e.preventDefault(); WB._pendingSession = null; WB._pendingSpace = nsBtn.getAttribute('data-space') || null;
-        if (onStudio && WB._studioNew) WB._studioNew(WB._pendingSpace); else WB.nav('/studio'); return; }
-      var npBtn = t.closest && t.closest('[data-newspace]');
+      if (nsBtn) { e.preventDefault(); WB._pendingSession = null; WB._pendingWorkspace = nsBtn.getAttribute('data-workspace') || null;
+        if (onStudio && WB._studioNew) WB._studioNew(WB._pendingWorkspace); else WB.nav('/studio'); return; }
+      var npBtn = t.closest && t.closest('[data-newworkspace]');
       if (npBtn) { e.preventDefault();
-        Promise.resolve(WB.prompt({ title: 'New space', placeholder: 'Space name', confirm: 'Create' })).then(function(nm){
-          nm = (nm || '').trim(); if (!nm) return;
-          fetch('/cloud/agent/spaces', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: nm }) })
-            .then(function(r){ return r.json(); })
-            .then(function(d){ if (d && d.space) { WB.toast('Space “' + nm + '” created'); WB.cache.set('agent-spaces', null); if (WB._paintStudio) WB._paintStudio(); } else WB.toast((d && d.error) || 'Couldn’t create space', 'bad'); })
-            .catch(function(){ WB.toast('Couldn’t create space', 'bad'); });
+        Promise.resolve(WB.prompt({ title: 'New workspace', placeholder: 'Workspace name', confirm: 'Create' })).then(function(nm){
+          nm = (nm || '').trim(); if (!nm || !WB.ws || !WB.ws.create) return;
+          Promise.resolve(WB.ws.create(nm)).then(function(ws){ WB.toast('Created “' + ((ws && ws.name) || nm) + '”'); renderShell(); if (WB._paintStudio) WB._paintStudio(); })
+            .catch(function(){ WB.toast('Couldn’t create workspace', 'bad'); });
         });
         return;
       }
