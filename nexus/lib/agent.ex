@@ -450,6 +450,10 @@ defmodule Nexus.Agent do
   # it. Inline runs (no registered unit — checks/tests) fall back to the run's static opts.
   defp current_perms(opts) do
     depth = Keyword.get(opts, :depth, 0)
+    # The run's active capabilities (composer selection) + tenant ride along so host-brokered commands
+    # (e.g. the generator commands) can gate on / scope by them.
+    caps = Keyword.get(opts, :capabilities, [])
+    tenant = Keyword.get(opts, :tenant)
 
     case opts[:unit] && get(opts[:unit]) do
       %{} = node ->
@@ -461,10 +465,10 @@ defmodule Nexus.Agent do
           |> effective_grant(ceiling, Keyword.get(opts, :grant_ceiling))
           |> with_leases(d.name)
 
-        %{tools: d[:tools] || Keyword.get(opts, :kits), grant: grant, depth: depth}
+        %{tools: d[:tools] || Keyword.get(opts, :kits), grant: grant, depth: depth, caps: caps, tenant: tenant}
 
       _ ->
-        %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant), depth: depth}
+        %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant), depth: depth, caps: caps, tenant: tenant}
     end
   end
 

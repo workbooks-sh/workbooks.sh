@@ -18,6 +18,13 @@ defmodule Nexus.Agent.Bash do
   # The host-brokered web commands (not wasm kits) — gated by a `web`/`net`/`browse` grant.
   @web_cmds ~w(fetch scrape render screenshot search navigate links forms click fill submit)
 
+  # Host-brokered GENERATOR commands (not wasm kits) — text → image/video/audio via a gateway model
+  # (`Nexus.Generator`). Each is gated on the matching generator toolkit being an ACTIVE capability for
+  # the run (the composer's capability selection), so generation only happens when the user enabled it.
+  @gen_cmds ~w(image video speak)
+  @gen_modality %{"image" => "image", "video" => "video", "speak" => "audio"}
+  @gen_toolkit %{"image" => "image-generation", "video" => "video-generation", "speak" => "speech"}
+
   @doc "Run a command line against `vfs` (unrestricted). Returns combined stdout."
   def run(vfs, line) when is_binary(line), do: run(vfs, line, nil)
 
@@ -110,6 +117,11 @@ defmodule Nexus.Agent.Bash do
   # longer rationale via stdin if needed (treated as untrusted `why`).
   defp run_segment(_vfs, ["request" | rest], stdin, _perms), do: run_request(rest, stdin)
 
+  # `image|video|speak <prompt…>` — generate an asset (host-brokered, like web/agent). The prompt comes
+  # from the args, or stdin when piped. `--model <id>` overrides the default model for the modality.
+  defp run_segment(_vfs, [cmd | rest], stdin, perms) when cmd in @gen_cmds,
+    do: run_generate(cmd, rest, stdin, perms)
+
   defp run_segment(vfs, [cmd | args], stdin, perms) do
     case permit(cmd, perms) do
       :ok -> dispatch(vfs, cmd, args, stdin)
@@ -163,6 +175,58 @@ defmodule Nexus.Agent.Bash do
 
       {:error, msg} ->
         "request: #{msg}"
+    end
+  end
+
+  # `image|video|speak` — run a generator model and return the asset as markdown the chat can render.
+  # Gated on the matching generator toolkit being active for this run (perms.caps). `--model <id>` and
+  # `--lang <code>` pass through; the rest of the args (or stdin) is the prompt.
+  defp run_generate(cmd, args, stdin, perms) do
+    toolkit = @gen_toolkit[cmd]
+    modality = @gen_modality[cmd]
+
+    cond do
+      not gen_granted?(perms, toolkit) ->
+        "#{cmd}: the '#{toolkit}' capability isn't active for this run — enable it to generate #{modality}"
+
+      true ->
+        {model, rest} = take_flag(args, "--model")
+        prompt = case Enum.join(rest, " ") |> String.trim() do
+                   "" -> String.trim(stdin || "")
+                   p -> p
+                 end
+        tenant = (is_map(perms) && perms[:tenant]) || "default"
+        opts = if model, do: [model: model], else: []
+
+        case Nexus.Generator.run(modality, prompt, tenant, opts) do
+          {:ok, %{url: url, model: m}} ->
+            label = "generated #{modality} (#{m})"
+            case modality do
+              "image" -> "#{cmd}: done → ![#{label}](#{url})\n#{url}"
+              _ -> "#{cmd}: done → [#{label}](#{url})\n#{url}"
+            end
+
+          {:error, reason} ->
+            "#{cmd}: generation failed — #{reason}"
+        end
+    end
+  end
+
+  # A generator command is permitted when perms is unrestricted (nil) OR the toolkit is in the run's
+  # active capabilities. (Capability selection is surfaced into perms by the agent loop.)
+  defp gen_granted?(nil, _toolkit), do: true
+  defp gen_granted?(perms, toolkit) when is_map(perms) do
+    case perms[:caps] do
+      caps when is_list(caps) -> toolkit in caps
+      _ -> false
+    end
+  end
+
+  # Pull `--flag <value>` out of an arg list; returns `{value | nil, remaining_args}`.
+  defp take_flag(args, flag) do
+    case Enum.split_while(args, &(&1 != flag)) do
+      {before, [^flag, value | rest]} -> {value, before ++ rest}
+      _ -> {nil, args}
     end
   end
 

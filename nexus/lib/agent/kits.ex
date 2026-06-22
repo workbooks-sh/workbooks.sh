@@ -76,6 +76,14 @@ defmodule Nexus.Agent.Kits do
         wasm: nil,
         summary: "web: fetch/scrape (text), screenshot (png), navigate/links/click/fill/submit (operate a site)",
         commands: ["fetch", "scrape", "render", "screenshot", "navigate", "links", "forms", "click", "fill", "submit"]
+      },
+      # host-brokered media generation (not a wasm CLI) — text → image/video/audio via a gateway model,
+      # gated on the matching generator capability. `image <prompt>` / `video <prompt>` / `speak <text>`
+      # ([--model <id>]); returns an asset URL.
+      "generate" => %{
+        wasm: nil,
+        summary: "generate: image/video/speak — text → image/video/audio via a gateway model (returns an asset URL)",
+        commands: ["image", "video", "speak"]
       }
     }
 

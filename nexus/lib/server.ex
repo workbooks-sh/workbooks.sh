@@ -528,6 +528,27 @@ defmodule Nexus.Server do
     end
   end
 
+  # Generated assets (`Nexus.Assets`) — read-only serve of bytes an agent produced (image/video/audio),
+  # at `/assets/<tenant>/<file>`. Long-cache immutable (ids are random + content-addressed by name).
+  get "/assets/*path" do
+    case path do
+      [tenant, name] ->
+        case Nexus.Assets.read(tenant, name) do
+          {:ok, bytes, ct} ->
+            conn
+            |> put_resp_content_type(ct)
+            |> put_resp_header("cache-control", "public, max-age=31536000, immutable")
+            |> send_resp(200, bytes)
+
+          _ ->
+            send_resp(conn, 404, "not found")
+        end
+
+      _ ->
+        send_resp(conn, 404, "not found")
+    end
+  end
+
   # The hosted control-plane API (only answers when WB_CONTROL_PLANE — else Nexus.Platform 404s, so a
   # tenant runtime is indistinguishable). Auth (the plug above) has already resolved the org tenant.
   forward("/api/platform", to: Nexus.Platform)
