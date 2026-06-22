@@ -163,6 +163,12 @@ defmodule Nexus.Config do
   def provider(name), do: Map.get(providers(), to_string(name), %{})
   def provider(name, key, default \\ nil), do: Map.get(provider(name), to_string(key), default)
 
+  # Cloudflare-for-SaaS custom-hostname config. `cf_saas_zone` = the CF zone id that owns the fallback
+  # origin; `cf_custom_hostname_origin` = the CNAME target customers point their domain at. Both nil ⇒
+  # the feature is off and Nexus.ControlPlane.Domain stays on the Fly-cert path.
+  def cf_saas_zone, do: get(:cf_saas_zone)
+  def cf_custom_hostname_origin, do: get(:cf_custom_hostname_origin)
+
   # ── parse ─────────────────────────────────────────────────────────────────────────────────────
   defp parse(html) do
     %{
@@ -216,7 +222,13 @@ defmodule Nexus.Config do
       # NONE; a deployer brings their own. Plus the nexus's own display emoji.
       nexus_emoji: attr(html, "nexus-emoji"),
       workspaces: parse_workspaces(attr(html, "workspaces")),
-      providers: parse_providers(html)
+      providers: parse_providers(html),
+      # Cloudflare-for-SaaS custom hostnames (the cheap, scale path for customer domains — TLS terminated
+      # at CF's edge, one CNAME per customer → our fallback origin → the tenant's Fly app). Both keys are
+      # neutral/nil by default: with no SaaS zone configured the runtime stays on the per-app Fly-cert
+      # path (Nexus.ControlPlane.Domain). The CF API TOKEN is a SECRET (Nexus.Secrets), never config.
+      cf_saas_zone: attr(html, "cf-saas-zone"),
+      cf_custom_hostname_origin: attr(html, "cf-custom-hostname-origin")
     }
   end
 

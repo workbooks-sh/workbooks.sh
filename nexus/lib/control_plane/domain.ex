@@ -94,10 +94,18 @@ defmodule Nexus.ControlPlane.Domain do
   @doc "Remove a custom domain — drops the Fly cert, then the record."
   def remove(org, id, opts \\ []) do
     fly = Keyword.get(opts, :fly, Nexus.Fly)
+    cf = Keyword.get(opts, :cloudflare, Nexus.Cloudflare)
 
     case CP.get(org, :domain, id) do
       {:ok, rec} ->
-        if rec[:status] == "active", do: fly.remove_certificate(rec.fly_app, rec.host, opts)
+        if rec[:status] == "active" do
+          # Undo whichever cert provider issued it (default fly for legacy records w/o a provider tag).
+          case rec[:provider] do
+            "cloudflare" -> if rec[:cf_hostname_id], do: cf.delete_custom_hostname(rec.cf_hostname_id, opts)
+            _ -> fly.remove_certificate(rec.fly_app, rec.host, opts)
+          end
+        end
+
         :ok = CP.delete(org, :domain, id)
         :ok
 
@@ -107,11 +115,33 @@ defmodule Nexus.ControlPlane.Domain do
   end
 
   # ── internals ────────────────────────────────────────────────────────────────────────────────
+  # Issue the cert for a verified host. PREFER Cloudflare-for-SaaS custom hostnames when configured (the
+  # cheap, no-Fly-cert, edge-TLS path); otherwise fall back to a per-app Fly LetsEncrypt cert. The choice
+  # is recorded as `provider` so removal undoes the right one.
   defp request_cert(fly, rec, opts) do
+    cf = Keyword.get(opts, :cloudflare, Nexus.Cloudflare)
+
+    if cf.saas_ready?(opts) do
+      case cf.create_custom_hostname(rec.host, opts) do
+        {:ok, ch} ->
+          %{provider: "cloudflare", cf_hostname_id: ch["id"], cert_status: get_in(ch, ["ssl", "status"])}
+
+        {:skip, _} ->
+          request_fly_cert(fly, rec, opts)
+
+        {:error, reason} ->
+          %{status: "verified", cert_error: inspect(reason)}
+      end
+    else
+      request_fly_cert(fly, rec, opts)
+    end
+  end
+
+  defp request_fly_cert(fly, rec, opts) do
     case fly.add_certificate(rec.fly_app, rec.host, opts) do
       {:ok, body} ->
         cert = get_in(body, ["data", "addCertificate", "certificate"]) || %{}
-        %{dns_validation: %{target: cert["dnsValidationTarget"], hostname: cert["dnsValidationHostname"]}}
+        %{provider: "fly", dns_validation: %{target: cert["dnsValidationTarget"], hostname: cert["dnsValidationHostname"]}}
 
       {:error, reason} ->
         # Verification succeeded but Fly couldn't issue — keep it verified, surface the cert error.
@@ -130,8 +160,13 @@ defmodule Nexus.ControlPlane.Domain do
     end
   end
 
-  # CNAME the owner points their host at — the tenant's Fly app on our domain of record.
-  defp target(nx), do: "#{nx[:fly_app] || "nexus-" <> nx.id}.fly.dev"
+  # CNAME the owner points their host at. With Cloudflare-for-SaaS configured this is the single shared
+  # fallback origin (CF terminates TLS at its edge → our Fly origin); otherwise it's the tenant's Fly app
+  # on our domain of record.
+  defp target(nx) do
+    Nexus.Config.cf_custom_hostname_origin() ||
+      "#{nx[:fly_app] || "nexus-" <> nx.id}.fly.dev"
+  end
 
   defp check_host(host) do
     cond do
@@ -173,6 +208,8 @@ defmodule Nexus.ControlPlane.Domain do
       status: rec[:status] || "pending",
       verify: %{type: "TXT", name: @challenge_prefix <> rec.host, value: rec[:verify_token]},
       cname: %{name: rec.host, target: rec[:dns_target]},
+      provider: rec[:provider],
+      cert_status: rec[:cert_status],
       dns_validation: rec[:dns_validation],
       cert_error: rec[:cert_error],
       created_at: rec[:created_at],

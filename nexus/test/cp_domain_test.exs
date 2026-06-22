@@ -88,4 +88,28 @@ defmodule Nexus.ControlPlane.DomainTest do
     assert active.verified_at
     assert active.dns_validation.target == "apps.acme.com.fly.dev"
   end
+
+  defmodule FakeCF do
+    def saas_ready?(_opts), do: true
+    def create_custom_hostname(host, _opts), do: {:ok, %{"id" => "ch_#{host}", "ssl" => %{"status" => "pending_validation"}}}
+    def delete_custom_hostname(_id, _opts), do: {:ok, %{}}
+  end
+
+  test "Cloudflare-for-SaaS path: when configured, CNAME → fallback origin + cert via CF custom hostname", %{org: org} do
+    Nexus.Config.put(:cf_custom_hostname_origin, "customers.workbooks.sh")
+    seed_nexus(org, "team")
+
+    {:ok, v} = Domain.add(org, "apps.acme.com")
+    assert v.cname.target == "customers.workbooks.sh"
+    token = v.verify.value
+
+    assert {:ok, active} =
+             Domain.verify(org, v.id, resolver: fn _ -> [token] end, fly: FakeFly, cloudflare: FakeCF)
+
+    assert active.status == "active"
+    assert active.provider == "cloudflare"
+    assert active.cert_status == "pending_validation"
+
+    assert :ok = Domain.remove(org, v.id, fly: FakeFly, cloudflare: FakeCF)
+  end
 end
