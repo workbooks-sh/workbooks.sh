@@ -37,6 +37,7 @@ server :integrations do
   # org so the callback (which has no tenant context of its own) can resolve the real tenant from it.
   @oauth_org "_oauth"
 
+  route "GET /cloud/toolkits", :toolkits
   route "GET /cloud/integrations", :list_integrations
   route "POST /cloud/integrations", :connect_api_key
   route "GET /cloud/integrations/authorize", :authorize
@@ -53,46 +54,89 @@ server :integrations do
   # `mode`: :oauth2 (popup handshake) | :api_key (paste a token). Generic — swap in your own.
   def catalog do
     [
-      %{id: "composio", name: "Composio", group: "Automation", mode: :api_key,
-        blurb: "One integration to 250+ apps — provision any tool through Composio's MCP surface.",
-        field: "API key", hint: "comp_…"},
       %{id: "github", name: "GitHub", group: "Source", mode: :oauth2,
-        blurb: "Org-level access: repos, actions, packages, members. One connection per GitHub org.",
+        blurb: "The git nexus integration — repos, actions, packages, members through our app on the control plane.",
         authorize_url: "https://github.com/login/oauth/authorize",
         token_url: "https://github.com/login/oauth/access_token",
         scopes: "repo read:org workflow", scope_sep: " ", auth_params: %{}},
       %{id: "google", name: "Google Workspace", group: "Workspace", mode: :oauth2,
-        blurb: "Admin-level Workspace + Google Cloud — drives the gcloud/GAM agent CLI toolkit.",
+        blurb: "Workspace + Cloud — Drive, Gmail, Admin SDK, gcloud. Connect everything under one account.",
         authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
         token_url: "https://oauth2.googleapis.com/token",
         scopes: "openid email https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/admin.directory.user",
         scope_sep: " ", auth_params: %{"access_type" => "offline", "prompt" => "consent"}},
-      %{id: "clerk", name: "Clerk", group: "Auth", mode: :api_key,
-        blurb: "Drop-in auth — users, orgs, sessions. Provision instance keys at the secret level.",
-        field: "Secret key", hint: "sk_live_…"},
-      %{id: "cloudflare", name: "Cloudflare", group: "Infra", mode: :api_key,
-        blurb: "DNS, R2, Workers, Zero Trust — account-level token for the whole edge.",
-        field: "API token", hint: "scoped account token"},
-      %{id: "linear", name: "Linear", group: "Project", mode: :oauth2,
-        blurb: "Issues, projects, cycles. Provision a workspace key for the agent to plan + close.",
-        authorize_url: "https://linear.app/oauth/authorize",
-        token_url: "https://api.linear.app/oauth/token",
-        scopes: "read,write", scope_sep: ",", auth_params: %{"prompt" => "consent"}},
-      %{id: "asana", name: "Asana", group: "Project", mode: :oauth2,
-        blurb: "Tasks, projects, portfolios across the Asana workspace.",
-        authorize_url: "https://app.asana.com/-/oauth_authorize",
-        token_url: "https://app.asana.com/-/oauth_token",
-        scopes: "default", scope_sep: " ", auth_params: %{}},
-      %{id: "jira", name: "Jira", group: "Project", mode: :oauth2,
-        blurb: "Issues + boards across Jira sites. Pair the token with your site + email.",
-        authorize_url: "https://auth.atlassian.com/authorize",
-        token_url: "https://auth.atlassian.com/oauth/token",
-        scopes: "read:jira-work write:jira-work manage:jira-project offline_access",
-        scope_sep: " ", auth_params: %{"audience" => "api.atlassian.com", "prompt" => "consent"}}
+      %{id: "slack", name: "Slack", group: "Messaging", mode: :oauth2,
+        blurb: "Workspace messaging — post, read channels, react, and respond as an agent.",
+        authorize_url: "https://slack.com/oauth/v2/authorize",
+        token_url: "https://slack.com/api/oauth.v2.access",
+        scopes: "channels:read chat:write users:read", scope_sep: ",", auth_params: %{}},
+      %{id: "fal", name: "fal.ai", group: "AI", mode: :api_key,
+        blurb: "Image, video & audio generation on serverless GPUs.",
+        field: "API key", hint: "key_id:key_secret"},
+      %{id: "openrouter", name: "OpenRouter", group: "AI", mode: :api_key,
+        blurb: "One API across 300+ LLMs — routing, fallbacks, and price/perf control.",
+        field: "API key", hint: "sk-or-…"}
     ]
   end
 
   def spec(provider), do: Enum.find(catalog(), &(&1.id == provider))
+
+  # ── the STANDALONE toolkit catalog — toolkits that need no external account (the other KIND). Curated
+  # from the audited toolkit set: only the genuinely-good core, the rest marked "soon" so nobody is
+  # misled. `status`: "ready" (available to your agents) | "soon" (curated, cloud wiring in progress).
+  def standalone_catalog do
+    [
+      %{id: "git", name: "Git", category: "Dev", status: "ready",
+        blurb: "Version control — branch, rebase, recover, inspect history. Sandboxed, no native exec.",
+        caps: ["fs"]},
+      %{id: "sandbox", name: "Sandbox", category: "Dev", status: "ready",
+        blurb: "A WASI command palette — Python, Rust, JS, crypto, fonts and more, fully sandboxed.",
+        caps: ["fs"]},
+      %{id: "ffmpeg", name: "FFmpeg", category: "Media", status: "ready",
+        blurb: "Media processing — convert, trim, scale, and compose image / video / audio.",
+        caps: ["fs"]},
+      %{id: "wraith", name: "Wraith", category: "Dev", status: "soon",
+        blurb: "Codebase health — find dead code, unused deps, and complexity hot-spots.",
+        caps: ["fs"]},
+      %{id: "wavelet", name: "Wavelet", category: "Media", status: "soon",
+        blurb: "In-nexus HTML → video rendering for motion graphics. No external tooling.",
+        caps: ["fs"]},
+      %{id: "presentation", name: "Presentation", category: "Design", status: "soon",
+        blurb: "Build reveal.js decks straight from your content.",
+        caps: ["fs"]}
+    ]
+  end
+
+  # ── unified toolkit library — the one feed behind the dashboard's Toolkits page. A toolkit comes in
+  # two KINDS: a PROVIDER toolkit wraps an external service (the integrations above — connect an account),
+  # a STANDALONE toolkit needs none. `status` is "ready" | "soon" so the UI can mark unfinished work.
+  def toolkits(req) do
+    conns = CP.list(req.tenant, :integration)
+
+    providers =
+      for p <- catalog() do
+        accounts =
+          conns
+          |> Enum.filter(&(&1[:provider] == p.id))
+          |> Enum.map(&%{id: &1[:id], label: &1[:label], status: &1[:status] || "connected"})
+
+        ready = configured?(p)
+
+        p
+        |> Map.take([:id, :name, :group, :blurb, :field, :hint])
+        |> Map.merge(%{
+          kind: "provider",
+          mode: Atom.to_string(p.mode),
+          configured: ready,
+          status: if(ready, do: "ready", else: "soon"),
+          accounts: accounts
+        })
+      end
+
+    standalone = Enum.map(standalone_catalog(), &Map.put(&1, :kind, "standalone"))
+
+    %{toolkits: providers ++ standalone}
+  end
 
   # ── list — the marketplace state: every provider + the accounts wired up under it ──────────────
   def list_integrations(req) do

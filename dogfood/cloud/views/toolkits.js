@@ -1,18 +1,14 @@
-// Integrations — connected services for the nexus, wired to the real backend (server :integrations in
-// integrations.work). The catalog + connection state come from GET /cloud/integrations; connecting runs
-// the genuine flow per mode: OAuth2 = popup handshake, API-key = sealed paste, Google = domain-wide
-// delegation (the cheapest broad-Workspace path — admin authorizes our service account once). Secrets
-// themselves live under Admin → Secrets; this view never sees a client secret.
+// Toolkits — the unified library. A toolkit is the unit; it comes in two KINDS:
+//   • PROVIDER toolkit — wraps an external service (GitHub, Google, Slack, fal, OpenRouter). Connect an
+//     account; OAuth secrets seal as control-plane secrets, nothing here exposes a client secret.
+//   • STANDALONE toolkit — needs no account (git, sandbox, ffmpeg, …).
+// One feed: GET /cloud/toolkits (provider + standalone, each tagged kind + status). Connect/disconnect
+// still hit the real /cloud/integrations/* routes. "Integrations" is gone as a page — it's just this kind.
 
-// Toolkits — capabilities your agents and apps use. A toolkit is the unit; it comes in two KINDS:
-// a PROVIDER toolkit wraps an external service (connect an account → credentials seal as secrets), and
-// a STANDALONE toolkit needs no account (video, BYOD, …). The provider catalog is wired to the real
-// /cloud/integrations backend below. Registered at /toolkits (canonical) with /integrations as alias.
-var TOOLKITS_VIEW = { title: 'Toolkits', accent: 'var(--sky)', async render(el){
+WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el){
   var esc = WB.esc;
   // Brand → simpleicons slug (logo CDN). Falls back to a hidden img on miss.
-  var SLUG = { github:'github', google:'google', composio:'composio', clerk:'clerk',
-    cloudflare:'cloudflare', linear:'linear', asana:'asana', jira:'jira' };
+  var SLUG = { github:'github', google:'google', slack:'slack', fal:'fallout', openrouter:'openrouter' };
   function logo(id){ return 'https://cdn.simpleicons.org/' + (SLUG[id] || id); }
 
   function getJSON(url){ return fetch(url, { credentials:'same-origin' }).then(function(r){ return r.json(); }); }
@@ -24,11 +20,11 @@ var TOOLKITS_VIEW = { title: 'Toolkits', accent: 'var(--sky)', async render(el){
 
   async function load(){
     var data = {};
-    try { data = await getJSON('/cloud/integrations'); } catch (e) {}
-    return data.providers || [];
+    try { data = await getJSON('/cloud/toolkits'); } catch (e) {}
+    return data.toolkits || [];
   }
 
-  // ── connect flows ───────────────────────────────────────────────────────────────────────────
+  // ── connect flows (provider toolkits) ─────────────────────────────────────────────────────────
   async function connectApiKey(p){
     var label = await WB.prompt({ title:'Connect ' + p.name, placeholder:'Name this account', confirm:'Next' });
     if (!label) return false;
@@ -117,31 +113,49 @@ var TOOLKITS_VIEW = { title: 'Toolkits', accent: 'var(--sky)', async render(el){
   }
 
   // ── render ──────────────────────────────────────────────────────────────────────────────────
+  // A provider toolkit card: logo, name, status, blurb, connected accounts + connect button (or a
+  // "Coming soon" pill when the nexus hasn't configured its OAuth app yet).
+  function providerCard(p){
+    var accs = p.accounts || [];
+    var on = accs.length > 0;
+    var soon = p.status !== 'ready';
+    return '<div class="tkcard' + (on ? ' on' : '') + (soon ? ' soon' : '') + '">' +
+      '<div class="tktop"><img class="tklogo" src="' + esc(logo(p.id)) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' +
+        '<span class="tkname">' + esc(p.name) + '</span>' +
+        (soon ? '<span class="tkpill soon">Coming soon</span>' : (on ? '<span class="tkdot" title="Connected"></span>' : '')) + '</div>' +
+      '<p class="tkblurb">' + esc(p.blurb || '') + '</p>' +
+      (on ? '<div class="tkaccs">' + accs.map(function(a){
+        return '<div class="tkacc"><span class="tkacclbl">' + esc(a.label || a.id) + '</span>' +
+          '<button class="tkx" data-disc="' + esc(p.id) + '|' + esc(a.id) + '" title="Disconnect">✕</button></div>';
+      }).join('') + '</div>' : '') +
+      (soon ? '' : '<button class="tkbtn' + (on ? ' add' : '') + '" data-conn="' + esc(p.id) + '">' + (on ? '+ Add account' : 'Connect') + '</button>') +
+    '</div>';
+  }
+
+  // A standalone toolkit card: no account; just availability. "ready" = usable by your agents now.
+  function standaloneCard(t){
+    var soon = t.status !== 'ready';
+    return '<div class="tkcard' + (soon ? ' soon' : ' on') + '">' +
+      '<div class="tktop"><span class="tkglyph">' + (WB.ICO_TOOLBOX || '') + '</span>' +
+        '<span class="tkname">' + esc(t.name) + '</span>' +
+        '<span class="tkpill ' + (soon ? 'soon' : 'ready') + '">' + (soon ? 'Coming soon' : 'Available') + '</span></div>' +
+      '<p class="tkblurb">' + esc(t.blurb || '') + '</p>' +
+      (t.category ? '<div class="tkmeta">' + esc(t.category) + '</div>' : '') +
+    '</div>';
+  }
+
   async function paint(){
-    var providers = await load();
+    var all = await load();
+    var providers = all.filter(function(t){ return t.kind === 'provider'; });
+    var standalone = all.filter(function(t){ return t.kind === 'standalone'; });
     el.innerHTML =
-      '<section class="intg">' +
-        '<div class="intghd"><h1 class="intgtitle">Toolkits</h1>' +
-          '<p class="intgsub">Capabilities your agents and apps can use. <b>Provider toolkits</b> wrap an external service — connect an account and its credentials seal as secrets (nothing here exposes a client secret). <b>Standalone toolkits</b> need no account.</p></div>' +
-        '<div class="intggroup"><span class="intggrouptt">Provider toolkits</span><span class="intggroupct">' + providers.length + '</span></div>' +
-        '<div class="intggrid">' + providers.map(function(p){
-          var accs = p.accounts || [];
-          var on = accs.length > 0;
-          return '<div class="intgcard' + (on ? ' on' : '') + '">' +
-            '<div class="intgtop"><img class="intglogo" src="' + esc(logo(p.id)) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' +
-              '<span class="intgname">' + esc(p.name) + '</span>' +
-              (p.configured === false && p.mode !== 'api_key' && p.id !== 'google' ? '<span class="intgwarn" title="OAuth app not configured on this nexus">needs setup</span>' : '') +
-              (on ? '<span class="intgdot" title="Connected"></span>' : '') + '</div>' +
-            '<p class="intgblurb">' + esc(p.blurb || '') + '</p>' +
-            (on ? '<div class="intgaccs">' + accs.map(function(a){
-              return '<div class="intgacc"><span class="intgacclbl">' + esc(a.label || a.id) + '</span>' +
-                '<button class="intgx" data-disc="' + esc(p.id) + '|' + esc(a.id) + '" title="Disconnect">✕</button></div>';
-            }).join('') + '</div>' : '') +
-            '<button class="intgbtn' + (on ? ' add' : '') + '" data-conn="' + esc(p.id) + '">' + (on ? '+ Add account' : 'Connect') + '</button>' +
-          '</div>';
-        }).join('') + '</div>' +
-        '<div class="intggroup"><span class="intggrouptt">Standalone toolkits</span></div>' +
-        '<div class="intgempty">No-account toolkits (video, BYOD, capacitor, …) live in your workspace today. Bringing the full standalone library into this cloud view is in progress.</div>' +
+      '<section class="tk">' +
+        '<div class="tkhd"><h1 class="tktitle">Toolkits</h1>' +
+          '<p class="tksub">Capabilities your agents and apps use. <b>Provider toolkits</b> wrap an external service — connect an account and its credentials seal as secrets. <b>Standalone toolkits</b> need no account.</p></div>' +
+        '<div class="tkgroup"><span class="tkgrouptt">Provider toolkits</span><span class="tkgroupct">' + providers.length + '</span></div>' +
+        '<div class="tkgrid">' + providers.map(providerCard).join('') + '</div>' +
+        '<div class="tkgroup"><span class="tkgrouptt">Standalone toolkits</span><span class="tkgroupct">' + standalone.length + '</span></div>' +
+        '<div class="tkgrid">' + standalone.map(standaloneCard).join('') + '</div>' +
       '</section>';
 
     var byId = {}; providers.forEach(function(p){ byId[p.id] = p; });
@@ -152,69 +166,42 @@ var TOOLKITS_VIEW = { title: 'Toolkits', accent: 'var(--sky)', async render(el){
     }; });
   }
   paint();
-}};
-WB.view('/toolkits', TOOLKITS_VIEW);
-WB.view('/integrations', TOOLKITS_VIEW);   // alias — provider toolkits used to live here
+}});
+
+// A small toolbox glyph for standalone toolkit cards (matches the rail icon).
+WB.ICO_TOOLBOX = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13h20v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M2.5 13 4.6 7.8A2 2 0 0 1 6.45 6.5h11.1a2 2 0 0 1 1.85 1.3L21.5 13"/><path d="M9 6.5V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1.5"/><path d="M2 13h6v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2h6"/></svg>';
 
 WB.scopedStyles('/toolkits', `
-.intg { max-width: 920px; }
-.intghd { margin-bottom: 18px; }
-.intgtitle { font: 700 26px var(--read); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
-.intgsub { font: 500 13px var(--read); color: var(--dim); margin: 4px 0 0; max-width: 620px; line-height: 1.5; }
-.intggroup { display: flex; align-items: center; gap: 8px; margin: 20px 0 10px; }
-.intggrouptt { font: 700 11px var(--read); letter-spacing: .07em; text-transform: uppercase; color: var(--dim); }
-.intggroupct { font: 600 11px var(--mono, monospace); color: var(--dim); background: var(--line); border-radius: 20px; padding: 1px 8px; }
-.intgempty { font: 500 12.5px var(--read); color: var(--dim); background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 16px; max-width: 620px; }
-.intggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-.intgcard { display: flex; flex-direction: column; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; transition: border-color .12s; }
-.intgcard:hover { border-color: var(--stroke); }
-.intgcard.on { border-color: color-mix(in srgb, var(--live) 50%, var(--line)); }
-.intgtop { display: flex; align-items: center; gap: 10px; }
-.intglogo { width: 22px; height: 22px; object-fit: contain; flex: none; }
-.intgname { font: 600 15px var(--read); color: var(--ink); }
-.intgwarn { margin-left: auto; font: 600 10.5px var(--read); color: var(--gold, #b8860b); text-transform: uppercase; letter-spacing: .04em; }
-.intgdot { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--live); flex: none; }
-.intgblurb { font: 500 12.5px var(--read); color: var(--dim); line-height: 1.4; flex: 1; }
-.intgaccs { display: flex; flex-direction: column; gap: 4px; }
-.intgacc { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
-.intgacclbl { font: 600 12px var(--read); color: var(--ink); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.intgx { border: none; background: none; color: var(--dim); cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 5px; }
-.intgx:hover { color: var(--bad, #d33); background: var(--card); }
-.intgbtn { border: 1px solid var(--stroke); background: var(--card); color: var(--ink); border-radius: 9px; padding: 8px 0; font: 600 13px var(--read); cursor: pointer; }
-.intgbtn:hover { border-color: var(--ink); }
-.intgbtn.add { background: none; border-style: dashed; color: var(--dim); }
-.gwlbl { display: flex; align-items: center; gap: 8px; font: 600 12px var(--read); color: var(--dim); margin: 12px 0 4px; }
-.gwcopy { margin-left: auto; border: 1px solid var(--stroke); background: var(--card); color: var(--ink); border-radius: 6px; padding: 2px 8px; font: 600 11px var(--read); cursor: pointer; }
-.gwro { width: 100%; resize: none; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: 500 12px var(--mono, monospace); color: var(--ink); box-sizing: border-box; }
-`);
-
-WB.scopedStyles('/integrations', `
-.intg { max-width: 920px; }
-.intghd { margin-bottom: 18px; }
-.intgtitle { font: 700 26px var(--read); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
-.intgsub { font: 500 13px var(--read); color: var(--dim); margin: 4px 0 0; max-width: 620px; line-height: 1.5; }
-.intggroup { display: flex; align-items: center; gap: 8px; margin: 20px 0 10px; }
-.intggrouptt { font: 700 11px var(--read); letter-spacing: .07em; text-transform: uppercase; color: var(--dim); }
-.intggroupct { font: 600 11px var(--mono, monospace); color: var(--dim); background: var(--line); border-radius: 20px; padding: 1px 8px; }
-.intgempty { font: 500 12.5px var(--read); color: var(--dim); background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 16px; max-width: 620px; }
-.intggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-.intgcard { display: flex; flex-direction: column; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; transition: border-color .12s; }
-.intgcard:hover { border-color: var(--stroke); }
-.intgcard.on { border-color: color-mix(in srgb, var(--live) 50%, var(--line)); }
-.intgtop { display: flex; align-items: center; gap: 10px; }
-.intglogo { width: 22px; height: 22px; object-fit: contain; flex: none; }
-.intgname { font: 600 15px var(--read); color: var(--ink); }
-.intgwarn { margin-left: auto; font: 600 10.5px var(--read); color: var(--gold, #b8860b); text-transform: uppercase; letter-spacing: .04em; }
-.intgdot { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--live); flex: none; }
-.intgblurb { font: 500 12.5px var(--read); color: var(--dim); line-height: 1.4; flex: 1; }
-.intgaccs { display: flex; flex-direction: column; gap: 4px; }
-.intgacc { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
-.intgacclbl { font: 600 12px var(--read); color: var(--ink); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.intgx { border: none; background: none; color: var(--dim); cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 5px; }
-.intgx:hover { color: var(--bad, #d33); background: var(--card); }
-.intgbtn { border: 1px solid var(--stroke); background: var(--card); color: var(--ink); border-radius: 9px; padding: 8px 0; font: 600 13px var(--read); cursor: pointer; }
-.intgbtn:hover { border-color: var(--ink); }
-.intgbtn.add { background: none; border-style: dashed; color: var(--dim); }
+.tk { max-width: 920px; }
+.tkhd { margin-bottom: 18px; }
+.tktitle { font: 700 26px var(--read); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
+.tksub { font: 500 13px var(--read); color: var(--dim); margin: 4px 0 0; max-width: 620px; line-height: 1.5; }
+.tkgroup { display: flex; align-items: center; gap: 8px; margin: 22px 0 10px; }
+.tkgrouptt { font: 700 11px var(--read); letter-spacing: .07em; text-transform: uppercase; color: var(--dim); }
+.tkgroupct { font: 600 11px var(--mono, monospace); color: var(--dim); background: var(--line); border-radius: 20px; padding: 1px 8px; }
+.tkgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.tkcard { display: flex; flex-direction: column; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; transition: border-color .12s; }
+.tkcard:hover { border-color: var(--stroke); }
+.tkcard.on { border-color: color-mix(in srgb, var(--live) 50%, var(--line)); }
+.tkcard.soon { opacity: .72; }
+.tktop { display: flex; align-items: center; gap: 10px; }
+.tklogo { width: 22px; height: 22px; object-fit: contain; flex: none; }
+.tkglyph { width: 22px; height: 22px; display: grid; place-items: center; color: var(--dim); flex: none; }
+.tkname { font: 600 15px var(--read); color: var(--ink); }
+.tkpill { margin-left: auto; font: 600 10px var(--read); text-transform: uppercase; letter-spacing: .04em; border-radius: 20px; padding: 2px 8px; }
+.tkpill.soon { color: var(--dim); background: var(--line); }
+.tkpill.ready { color: var(--live, #2e9e5b); background: color-mix(in srgb, var(--live, #2e9e5b) 14%, transparent); }
+.tkdot { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--live); flex: none; }
+.tkblurb { font: 500 12.5px var(--read); color: var(--dim); line-height: 1.4; flex: 1; }
+.tkmeta { font: 600 10.5px var(--mono, monospace); color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
+.tkaccs { display: flex; flex-direction: column; gap: 4px; }
+.tkacc { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+.tkacclbl { font: 600 12px var(--read); color: var(--ink); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tkx { border: none; background: none; color: var(--dim); cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 5px; }
+.tkx:hover { color: var(--bad, #d33); background: var(--card); }
+.tkbtn { border: 1px solid var(--stroke); background: var(--card); color: var(--ink); border-radius: 9px; padding: 8px 0; font: 600 13px var(--read); cursor: pointer; }
+.tkbtn:hover { border-color: var(--ink); }
+.tkbtn.add { background: none; border-style: dashed; color: var(--dim); }
 .gwlbl { display: flex; align-items: center; gap: 8px; font: 600 12px var(--read); color: var(--dim); margin: 12px 0 4px; }
 .gwcopy { margin-left: auto; border: 1px solid var(--stroke); background: var(--card); color: var(--ink); border-radius: 6px; padding: 2px 8px; font: 600 11px var(--read); cursor: pointer; }
 .gwro { width: 100%; resize: none; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: 500 12px var(--mono, monospace); color: var(--ink); box-sizing: border-box; }

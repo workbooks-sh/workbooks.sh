@@ -483,7 +483,7 @@
     var VIEW_FILES = {
       '/app': 'app',
       '/activity': 'activity', '/runs': 'runs', '/tasks': 'tasks', '/issues': 'issues', '/database': 'database', '/denied': 'denied', '/autopoet': 'autopoet',
-      '/toolkits': 'integrations', '/integrations': 'integrations', '/nexuses': 'nexuses', '/secrets': 'secrets', '/settings': 'settings',
+      '/toolkits': 'toolkits', '/nexuses': 'nexuses', '/secrets': 'secrets', '/settings': 'settings',
       '/shared': 'shared', '/storage': 'storage', '/studio': 'studio', '/create': 'studio', '/usage': 'studio',
       '/team': 'team', '/upgrade': 'upgrade', '/welcome': 'welcome', '/workspace/env': 'workspace-env',
       '/workspace/history': 'workspace-history', '/workspace/members': 'workspace-members',
