@@ -85,6 +85,25 @@ resource Schedule do
   enabled :integer   # 1 armed, 0 cancelled
 end
 
+# The personal profile store — who a person IS on this nexus, decoupled from auth. One folded row per
+# user (latest by `updated` wins, same fold pattern as Todo). Identity (name/email/role) still comes
+# from the session /me; THIS holds the editable, expressive layer: avatar, tagline, bio, links, accent.
+# Nexus-agnostic — the same person carries a fresh profile per nexus they join. THE LINE: the store is
+# generic mechanism (any deployer's users get a profile); the "You" surface that renders it is our cloud.
+resource Profile do
+  description "Personal profiles — the editable identity layer (avatar, bio, links) per user, per nexus."
+  tags ["system", "account"]
+  uid :string      # stable user key (the signed-in email) — the fold key
+  display :string  # chosen display name (overrides the session name when set)
+  tagline :string  # one-line headline shown under the name
+  bio :string      # a short paragraph about themselves
+  avatar :string   # avatar image (a data: URL or an uploaded asset path); "" = initial glyph
+  accent :string   # a DNA pastel var name for their initial glyph, e.g. "peach" | "blue" | "mint"
+  location :string # free-text locale ("San Francisco", a timezone, …)
+  links :string    # newline-delimited "label|url" pairs (NO json — blocks are the source of truth)
+  updated :integer # unix microseconds — the fold picks newest
+end
+
 # Persist every bus event to the log. The reactive primitives (hook kind, #event, effect engine) are
 # the open standard; this hook + the `log` effect are our cloud opting into a durable feed.
 hook :activity do

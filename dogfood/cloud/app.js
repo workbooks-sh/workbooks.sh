@@ -340,7 +340,7 @@
       { label: 'Team', icon: '👥', go: '/team' },
       { label: 'Secrets', icon: '🔑', go: '/secrets' },
       { label: 'Toolkits', icon: '🧰', go: '/toolkits' },
-      { label: 'Settings', icon: '⚙', go: '/settings' }
+      { label: 'You — profile', icon: '◐', go: '/profile' }
     ];
     WB.palette = function () {
       if (document.getElementById('wbPalette')) return;
@@ -533,7 +533,7 @@
     })();
 
     var ACCENT = { '/storage': 'var(--sky)', '/team': 'var(--peach)', '/shared': 'var(--cream)', '/usage': 'var(--sage)',
-      '/settings': 'var(--violet)', '/autopoet': 'var(--violet)', '/workspace': 'var(--peach)', '/database': 'var(--mint)', '/upgrade': 'var(--mint)',
+      '/profile': 'var(--peach)', '/settings': 'var(--peach)', '/autopoet': 'var(--violet)', '/workspace': 'var(--peach)', '/database': 'var(--mint)', '/upgrade': 'var(--mint)',
       '/inference': 'var(--violet)', '/agent': 'var(--mint)', '/data': 'var(--sky)' };
     function sectionAccent(p){ for (var k in ACCENT) { if (p.indexOf(k) === 0) return ACCENT[k]; } return 'var(--mint)'; }
     // Which RAIL section a route belongs to — drives the active rail tab + which per-surface sidebar shows.
@@ -546,7 +546,7 @@
       if (p.indexOf('/studio') === 0 || p.indexOf('/create') === 0 || p.indexOf('/agent') === 0) return 'studio';
       if (p.indexOf('/activity') === 0 || p.indexOf('/runs') === 0 || p.indexOf('/tasks') === 0 || p.indexOf('/issues') === 0) return 'activity';
       if (p.indexOf('/workspace') === 0) return 'files';
-      if (p.indexOf('/settings') === 0) return 'account';   // personal settings = the "You" surface
+      if (p.indexOf('/profile') === 0 || p.indexOf('/settings') === 0) return 'account';   // the "You" surface
       for (var i = 0; i < ADMIN_ROUTES.length; i++) if (p.indexOf(ADMIN_ROUTES[i]) === 0) return 'admin';
       return 'apps'; // home '/' and anything else default to the Apps surface
     }
@@ -569,7 +569,7 @@
     var VIEW_FILES = {
       '/app': 'app',
       '/activity': 'activity', '/runs': 'runs', '/tasks': 'tasks', '/issues': 'issues', '/data': 'data', '/database': 'database', '/denied': 'denied', '/autopoet': 'autopoet',
-      '/toolkits': 'toolkits', '/nexuses': 'nexuses', '/secrets': 'secrets', '/settings': 'settings',
+      '/toolkits': 'toolkits', '/nexuses': 'nexuses', '/secrets': 'secrets', '/profile': 'profile', '/settings': 'profile',
       '/shared': 'shared', '/storage': 'storage', '/studio': 'studio', '/create': 'studio', '/usage': 'studio',
       '/team': 'team', '/upgrade': 'upgrade', '/welcome': 'welcome', '/workspace/env': 'workspace-env',
       '/workspace/history': 'workspace-history', '/workspace/members': 'workspace-members',
@@ -827,7 +827,7 @@
         { label: 'Overview', icon: ICO.grid, on: function(){ WB.nav('/overview'); } },
         { label: 'Rename nexus…', icon: ICO.edit, need: 'nexus.manage', on: function(){ st.nxMenu = true; st.nxEditing = true; st.nxEditName = nx.name || ''; renderShell(); } },
         { label: 'Scale up', icon: ICO.activity, need: 'nexus.manage', on: function(){ WB.nav('/upgrade'); } },
-        { label: 'Nexus settings', icon: ICO.gear, need: 'nexus.manage', on: function(){ WB.nav('/settings'); } },
+        { label: 'Nexus settings', icon: ICO.gear, need: 'nexus.manage', on: function(){ WB.nav('/usage'); } },
         { sep: true },
         { label: 'Switch / create…', icon: ICO.chev, on: function(){ st.nxMenu = true; renderShell(); } }
       ];
@@ -1215,12 +1215,20 @@
           navlink('/storage', ICO.database, 'Storage', p) +
           navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) +
           (WB.can('autopoet.manage') ? navlink('/autopoet', ICO.quill, 'Autopoet', p) : '') + '</nav>';
-      // You — personal account surface (folds the old avatar popover into a full sidebar).
-      else if (section === 'account') sideBody = '<nav class="nxnav">' +
-          navlink('/settings', ICO.gear, 'Profile', p) +
-          '<button class="nxlink" data-theme-toggle>' + ICO.spark + '<span class="lbl">Appearance</span></button>' +
-          navlink('/settings', ICO.activity, 'Notifications', p) + navlink('/secrets', ICO.key, 'API tokens', p) +
+      // You — the personal surface as ONE cohesive unit: the profile page with in-page section anchors.
+      // Each link scrolls /profile to its section (no scattering across admin/secrets pages). Sign out
+      // stays at the foot. Auth method, 2FA, custom domains, backup-repo are NOT "you" — they moved out.
+      else if (section === 'account') {
+        var pfsec = function(id, ico, label){ return '<a class="nxlink" data-pfsec="' + id + '" href="#/profile" title="' + esc(label) + '">' + ico + '<span class="lbl">' + esc(label) + '</span></a>'; };
+        sideBody = '<nav class="nxnav">' +
+          pfsec('', ICO.grid, 'Profile') +
+          pfsec('contributions', ICO.activity, 'Contributions') +
+          pfsec('usage', ICO.gauge, 'Usage') +
+          pfsec('cli', ICO.key, 'CLI access') +
+          pfsec('prefs', ICO.gear, 'Preferences') +
+          '<div class="raildiv" style="margin:8px 0"></div>' +
           '<a class="nxlink" href="/login/" onclick="return WB.logout()">' + ICO.logout + '<span class="lbl">Sign out</span></a></nav>';
+      }
       else sideBody = '';
 
       root.innerHTML =
@@ -1234,7 +1242,7 @@
           '<div class="railbottom">' +
             '<a class="railsec' + (section === 'toolkits' ? ' on' : '') + '" data-nav="/toolkits" href="#/toolkits" title="Toolkits"><span class="rsico">' + ICO.toolbox + '</span><span class="rslbl">Toolkits</span></a>' +
             '<a class="railsec' + (section === 'admin' ? ' on' : '') + '" data-nav="/usage" href="#/usage" title="Admin"><span class="rsico">' + ICO.admin + '</span><span class="rslbl">Admin</span></a>' +
-            '<a class="railsec railavbtn' + (section === 'account' ? ' on' : '') + '" data-nav="/settings" href="#/settings" title="' + esc(user.name) + '"><span class="railav">' + esc(user.initial) + '</span><span class="rslbl">You</span></a>' +
+            '<a class="railsec railavbtn' + (section === 'account' ? ' on' : '') + '" data-nav="/profile" href="#/profile" title="' + esc(user.name) + '">' + railAvatar(user) + '<span class="rslbl">You</span></a>' +
           '</div>' +
         '</div>' +
         // Collapsed → a slim blank second rail with just the expand button at the top (never fully gone,
@@ -1269,6 +1277,11 @@
     // Let other views (the workspace explorer) refresh the sidebar after a pin/unpin so Pinned updates live.
     WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };
     function navlink(href, ico, label, p){ return '<a class="nxlink' + (p === href ? ' on' : '') + '" data-nav="' + href + '" href="#' + href + '" title="' + esc(label) + '">' + ico + '<span class="lbl">' + esc(label) + '</span></a>'; }
+    // The rail "You" tile shows the profile photo when one is set (mirrored to WB.profile.avatar by the
+    // profile view), otherwise the initial glyph — same surface, richer when personalized.
+    function railAvatar(user){ var av = WB.profile && WB.profile.avatar;
+      return av ? '<span class="railav" style="background-image:url(' + JSON.stringify(av) + ');background-size:cover;background-position:center"></span>'
+                : '<span class="railav">' + esc(user.initial) + '</span>'; }
     // The funnel shows a dot when a non-default filter is active for the CURRENT tab.
     function filterActive(){
       if (st.sideMode === 'files') return st.fileFilter !== 'all';
@@ -1333,7 +1346,7 @@
         else h += '<button class="omitem" data-nxedit><span class="av sm plus">✎</span><span class="omname">Rename nexus</span></button>';
         h += '<a class="omitem" data-nav="/overview" href="#/overview"><span class="av sm plus">▦</span><span class="omname">Nexus overview</span></a>';
         h += '<a class="omitem" data-nav="/upgrade" href="#/upgrade"><span class="av sm plus">↑</span><span class="omname">Scale up</span></a>';
-        h += '<a class="omitem" data-nav="/settings" href="#/settings"><span class="av sm plus">⚙</span><span class="omname">Nexus settings</span></a>';
+        h += '<a class="omitem" data-nav="/usage" href="#/usage"><span class="av sm plus">⚙</span><span class="omname">Nexus settings</span></a>';
         h += '<div class="omdiv"></div><button class="omitem" data-nxcreate><span class="av sm plus">+</span><span class="omname">Create new nexus</span></button>';
       } else {
         h += '<div class="omempty">No nexus yet</div><button class="omitem" data-nxcreate><span class="av sm plus">+</span><span class="omname">Create your nexus</span></button>';
@@ -1400,6 +1413,13 @@
         });
         return;
       }
+      // "You" sidebar → scroll the profile page to a section anchor (navigating to /profile first if needed).
+      var pfEl = t.closest && t.closest('[data-pfsec]');
+      if (pfEl) { e.preventDefault(); WB._profileSection = pfEl.getAttribute('data-pfsec') || '';
+        if (ROUTE.path !== '/profile') WB.nav('/profile');
+        else { var n = WB._profileSection ? document.getElementById(WB._profileSection) : document.querySelector('#view section');
+          if (n) n.scrollIntoView({ behavior: 'smooth', block: 'start' }); WB._profileSection = null; }
+        renderShell(); return; }
       var navEl = t.closest && t.closest('[data-nav]'); if (navEl) { e.preventDefault(); WB.nav(navEl.getAttribute('data-nav')); return; }
       if (t.closest && t.closest('[data-crumb-back]')) { var ret = WB.settingsReturn; WB.settingsReturn = null; WB.nav((ret && ret.path) || '/'); return; }
       if (t.closest && t.closest('[data-theme-toggle]')) { var cur = document.documentElement.getAttribute('data-theme') || 'dark'; var nt = cur === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', nt); try { localStorage.setItem('wb-theme', nt); } catch (er) {} renderShell(); renderView(); return; }
