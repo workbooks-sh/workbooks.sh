@@ -41,6 +41,8 @@ server :integrations do
   route "POST /cloud/integrations", :connect_api_key
   route "GET /cloud/integrations/authorize", :authorize
   route "GET /cloud/oauth/callback", :callback
+  route "GET /cloud/integrations/google/delegation", :google_delegation
+  route "POST /cloud/integrations/google/delegation", :connect_google_dwd
   route "DELETE /cloud/integrations/:id", :remove_integration
 
   # ── the catalog — central config, the only opinion in this file ───────────────────────────────
@@ -317,6 +319,75 @@ server :integrations do
     end
   end
 
+  # ── Google Workspace via domain-wide delegation ────────────────────────────────────────────────
+  # The cheapest/fastest broad-access path: ONE service account (ours), the customer's super-admin
+  # authorizes its client id + these scopes once in their Admin console, and the agent then impersonates
+  # any user in the domain (create mailboxes, manage aliases, drive Admin SDK/Gmail). No per-user OAuth,
+  # no Marketplace listing required. Tokens are minted on demand by `Nexus.Google` — nothing to seal.
+  # Scope minimisation (cheapest = no CASA): drive.file not full drive, gmail.modify/settings not
+  # mail.google.com/. admin.directory.* + cloud-platform are "sensitive" (verification, no CASA).
+  @dwd_scopes [
+    "openid",
+    "email",
+    "https://www.googleapis.com/auth/admin.directory.user",
+    "https://www.googleapis.com/auth/admin.directory.user.alias",
+    "https://www.googleapis.com/auth/admin.directory.domain",
+    "https://www.googleapis.com/auth/admin.directory.group",
+    "https://www.googleapis.com/auth/gmail.settings.basic",
+    "https://www.googleapis.com/auth/gmail.settings.sharing",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/cloud-platform"
+  ]
+
+  @doc "What the dashboard shows so a customer's admin can wire delegation: the SA client id + scopes."
+  def google_delegation(_req) do
+    %{
+      configured: Nexus.Google.configured?(),
+      client_id: Nexus.Google.client_id(),
+      scopes: @dwd_scopes,
+      scopes_csv: Enum.join(@dwd_scopes, ","),
+      admin_console_url: "https://admin.google.com/ac/owl/domainwidedelegation"
+    }
+  end
+
+  # Record a delegation connection: the only per-tenant facts are the domain + the admin user we
+  # impersonate for Admin SDK calls. No tokens stored — `google_token/3` mints them on demand.
+  def connect_google_dwd(req) do
+    b = req.body || %{}
+    domain = String.trim(to_string(b["domain"] || "")) |> String.downcase()
+    admin = String.trim(to_string(b["admin_email"] || "")) |> String.downcase()
+
+    cond do
+      not Nexus.Google.configured?() -> {503, %{error: "delegation service account not configured on this nexus"}}
+      domain == "" -> {400, %{error: "your Workspace domain is required"}}
+      not String.contains?(admin, "@") -> {400, %{error: "a super-admin email to impersonate is required"}}
+      true ->
+        id = new_id()
+        store_connection(req.tenant, id, "google", domain, %{mode: "dwd", admin_email: admin})
+        {201, %{id: id, provider: "google", label: domain, status: "connected", mode: "dwd"}}
+    end
+  end
+
+  @doc """
+  Server-side seam toolkits call to act on a Google connection. Mints an impersonated access token for
+  `scopes`, acting as `sub` (defaults to the stored admin for domain ops). `{:ok, token} | {:error, _}`.
+  """
+  def google_token(tenant, conn_id, scopes, sub \\ nil) do
+    with {:ok, rec} <- CP.get(tenant, :integration, conn_id),
+         "dwd" <- rec[:mode] || "dwd",
+         impersonate when is_binary(impersonate) <- sub || rec[:admin_email] do
+      case Nexus.Google.access_token(impersonate, scopes) do
+        {:ok, %{access: token}} -> {:ok, token}
+        {:skip, reason} -> {:error, reason}
+        err -> err
+      end
+    else
+      {:error, _} = err -> err
+      _ -> {:error, :not_a_delegation_connection}
+    end
+  end
+
   # ── shared helpers ─────────────────────────────────────────────────────────────────────────────
   defp store_connection(tenant, id, provider, label, extra) do
     attrs = Map.merge(%{provider: provider, label: label, status: "connected"}, extra)
@@ -337,8 +408,30 @@ server :integrations do
   defp seal_status(:no_master_key), do: 503
   defp seal_status(_), do: 400
 
-  defp client_id_secret(provider), do: "#{String.upcase(provider)}_OAUTH_CLIENT_ID"
-  defp client_secret_secret(provider), do: "#{String.upcase(provider)}_OAUTH_CLIENT_SECRET"
+  # The deploy-injected secret name holding this provider's OAuth client id / secret. We prefer the
+  # dedicated `<PROVIDER>_OAUTH_*` name, but fall back to any provider-specific alias so an operator who
+  # already injected credentials for a sibling feature need not register a second app. GitHub is the
+  # case in point: a GitHub *App* (for repo mirroring) already ships `GITHUB_APP_CLIENT_ID/_SECRET`, and
+  # its user-to-server OAuth uses the very same authorize/token endpoints — so the marketplace "Connect"
+  # button reuses those creds with no extra registration. (App OAuth ignores the `scope` param and grants
+  # the App's installed permissions instead, which is exactly what we want here.)
+  @oauth_id_aliases %{"github" => ["GITHUB_OAUTH_CLIENT_ID", "GITHUB_APP_CLIENT_ID"]}
+  @oauth_secret_aliases %{"github" => ["GITHUB_OAUTH_CLIENT_SECRET", "GITHUB_APP_CLIENT_SECRET"]}
+
+  defp client_id_secret(provider),
+    do: resolve_secret_name(provider, @oauth_id_aliases, "#{String.upcase(provider)}_OAUTH_CLIENT_ID")
+
+  defp client_secret_secret(provider),
+    do: resolve_secret_name(provider, @oauth_secret_aliases, "#{String.upcase(provider)}_OAUTH_CLIENT_SECRET")
+
+  # First candidate name that's actually present wins; otherwise the canonical name (so error messages and
+  # `configured?/1` report the name an operator is expected to set).
+  defp resolve_secret_name(provider, aliases, default) do
+    case aliases[provider] do
+      names when is_list(names) -> Enum.find(names, default, &Nexus.Secrets.has?/1)
+      _ -> default
+    end
+  end
 
   defp new_id, do: "intg_" <> rand()
   defp new_state, do: "st_" <> rand()
