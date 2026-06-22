@@ -186,6 +186,7 @@ WB.scopedStyles('/inference', `
 .modbadges .modglyph { display: grid; place-items: center; } .modbadges .modglyph svg { width: 14px; height: 14px; }
 .modbadges .modprice { font: 600 10.5px var(--mono); color: var(--dim); }
 .modbadges .modctx { font: 600 10.5px var(--mono); color: var(--dim); opacity: .8; }
+.modbadges .modarrow { font: 700 12px var(--read); color: var(--dim); opacity: .7; margin: 0 -1px; }
 .infrow { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .infrow label { width: 64px; font: 600 13px var(--read); color: var(--ink); }
 .infin { display: flex; align-items: center; gap: 6px; flex: 1; }

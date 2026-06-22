@@ -38,6 +38,7 @@ const STYLE = `
   .modbadges .modglyph { display: grid; place-items: center; } .modbadges .modglyph svg { width: 13px; height: 13px; }
   .modbadges .modprice { font: 600 10px var(--wbc-font); color: var(--wbc-dim); }
   .modbadges .modctx { font: 600 10px var(--wbc-font); color: var(--wbc-dim); opacity: .8; }
+  .modbadges .modarrow { font: 700 11px var(--wbc-font); color: var(--wbc-dim); opacity: .7; margin: 0 -2px; }
 `;
 
 const CHEV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';

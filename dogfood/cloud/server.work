@@ -1878,8 +1878,9 @@ server :cloud do
     merge_enrichment(base)
   end
 
-  # Background-crawled per-model facts, merged onto the base by id. For a text-generation model that the
-  # crawl reports as vision-capable, "image" joins its input modalities (so it survives a vision filter).
+  # Per-model facts (from models.dev, with a CF page-crawl fallback) merged onto the base by id. The
+  # overlay's precise input/output modalities win when present; the CF-task-derived modalities stand in
+  # otherwise (e.g. generators models.dev doesn't list). Cost/context/tool/reasoning come along too.
   defp merge_enrichment(base) do
     ex = enrichment_cache()
 
@@ -1889,12 +1890,21 @@ server :cloud do
           m
 
         meta ->
+          # models.dev meta carries explicit modalities; the CF-crawl fallback carries only a `vision`
+          # flag (image input) — fold that into the task-derived base.
           modal_in =
-            if Map.get(meta, :vision) and "text" in (m[:modal_out] || []),
-              do: Enum.uniq((m[:modal_in] || []) ++ ["image"]),
-              else: m[:modal_in] || []
+            cond do
+              meta[:modal_in] -> meta[:modal_in]
+              Map.get(meta, :vision) and "text" in (m[:modal_out] || []) -> Enum.uniq((m[:modal_in] || []) ++ ["image"])
+              true -> m[:modal_in]
+            end
 
-          m |> Map.merge(meta) |> Map.put(:modal_in, modal_in)
+          modal_out = meta[:modal_out] || m[:modal_out]
+
+          m
+          |> Map.merge(Map.drop(meta, [:modal_in, :modal_out, :vision]))
+          |> Map.put(:modal_in, modal_in)
+          |> Map.put(:modal_out, modal_out)
       end
     end)
   end
@@ -1906,9 +1916,11 @@ server :cloud do
     end
   end
 
-  # Kick off a single bounded crawl of every model's page when the enrichment cache is cold and no crawl
-  # is already in flight. Progressive enhancement: the catalog serves task-derived modalities immediately
-  # and gains vision/pricing/context a few seconds later when the crawl lands.
+  # Kick off a single bounded enrichment pass when the cache is cold and none is in flight. Primary source
+  # is models.dev (one structured JSON — a genuine data payload at a network boundary, the allowed JSON
+  # exception); matched by normalized model id (CF writes "claude-opus-4.8", models.dev "claude-opus-4-8",
+  # plus -preview/date suffixes). The handful models.dev lacks (legacy @cf Workers-AI) fall back to a crawl
+  # of that model's CF page. Progressive: task-derived modalities serve immediately, the rest land in ~secs.
   defp ensure_cf_enrichment(base) do
     fresh? =
       case :persistent_term.get({:cf_enrich_cache}, nil) do
@@ -1922,9 +1934,11 @@ server :cloud do
 
       spawn(fn ->
         try do
+          md = fetch_models_dev()
+
           map =
             ids
-            |> Task.async_stream(fn id -> {id, crawl_cf_model(id)} end,
+            |> Task.async_stream(fn id -> {id, resolve_model_meta(id, md)} end,
               max_concurrency: 10, timeout: 15_000, on_timeout: :kill_task)
             |> Enum.flat_map(fn
               {:ok, {id, meta}} when is_map(meta) -> [{id, meta}]
@@ -1942,6 +1956,73 @@ server :cloud do
 
     :ok
   end
+
+  # models.dev first; only the legacy @cf Workers-AI models it lacks fall back to a CF page crawl.
+  defp resolve_model_meta(id, md_index) do
+    case md_lookup(md_index, id) do
+      meta when is_map(meta) -> meta
+      _ -> if String.contains?(id, "@cf/"), do: crawl_cf_model(id), else: nil
+    end
+  end
+
+  # Fetch the whole models.dev catalog and flatten it to a normalized-tail → meta index across every
+  # provider (modalities, $/M cost, context, function-calling, reasoning). One request, cached implicitly
+  # by the enrichment cache TTL. Returns %{} on any failure (callers degrade to the CF crawl / task data).
+  defp fetch_models_dev do
+    url = "https://models.dev/api.json"
+    headers = [{~c"user-agent", ~c"workbooks-nexus"}, {~c"accept", ~c"application/json"}]
+
+    with {:ok, {{_, code, _}, _h, body}} when code in 200..299 <-
+           :httpc.request(:get, {to_charlist(url), headers},
+             [timeout: 30_000, autoredirect: true, ssl: [verify: :verify_none]], body_format: :binary),
+         {:ok, json} <- Jason.decode(body) do
+      for {_prov, p} <- json, is_map(p), {mid, m} <- (p["models"] || %{}), is_map(m), into: %{} do
+        {norm_id(mid), models_dev_meta(m)}
+      end
+    else
+      _ -> %{}
+    end
+  rescue
+    _ -> %{}
+  catch
+    _, _ -> %{}
+  end
+
+  defp models_dev_meta(m) do
+    mod = m["modalities"] || %{}
+
+    %{
+      modal_in: (mod["input"] || ["text"]) |> Enum.map(&to_string/1),
+      modal_out: (mod["output"] || ["text"]) |> Enum.map(&to_string/1),
+      price_in: get_in(m, ["cost", "input"]),
+      price_out: get_in(m, ["cost", "output"]),
+      context: get_in(m, ["limit", "context"]),
+      tools: m["tool_call"] == true,
+      reasoning: m["reasoning"] == true
+    }
+  end
+
+  # Match a routable id against the models.dev index by its model tail, ignoring provider + . - _ casing,
+  # then by prefix (handles models.dev's -preview / -<date> suffixes vs CF's bare id).
+  defp md_lookup(index, _id) when map_size(index) == 0, do: nil
+
+  defp md_lookup(index, id) do
+    tail = id |> String.split("/") |> List.last()
+    nt = norm_id(tail)
+
+    case Map.get(index, nt) do
+      m when is_map(m) ->
+        m
+
+      _ ->
+        case Enum.find(index, fn {k, _} -> String.starts_with?(k, nt) or String.starts_with?(nt, k) end) do
+          {_, m} -> m
+          _ -> nil
+        end
+    end
+  end
+
+  defp norm_id(s), do: s |> to_string() |> String.downcase() |> String.replace(~r/[.\-_ ]/, "")
 
   # Fetch one model's public page (markdown) and pull its Model Info table: context window, function
   # calling, vision, and unit pricing ($/M input & output tokens). Returns a meta map or nil.
