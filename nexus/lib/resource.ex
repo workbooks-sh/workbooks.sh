@@ -28,6 +28,48 @@ defmodule Nexus.Resource do
 
   def fields(_), do: []
 
+  @doc ~S'''
+  A human description of what a resource is for — `description "Sign-ups from the marketing site"`
+  inside the block. Surfaced in the Data explorer so a table self-explains. `nil` when absent.
+  '''
+  def description(%{ast: ast}) when not is_nil(ast) do
+    case do_body(ast) do
+      nil -> nil
+      body -> body |> statements() |> Enum.find_value(fn {:description, _m, [t]} when is_binary(t) -> t; _ -> nil end)
+    end
+  end
+
+  def description(_), do: nil
+
+  @doc ~S'''
+  A resource's tags for categorisation in the Data explorer — the union of an explicit
+  `tags ["crm", "ours"]` (or `tag :crm`) statement and any `#hashtag` refs on the block. Lower-cased,
+  de-duplicated, declaration order. Lets you label what a table is (e.g. our orchestration vs app data).
+  '''
+  def tags(node) do
+    explicit =
+      case node do
+        %{ast: ast} when not is_nil(ast) ->
+          case do_body(ast) do
+            nil -> []
+            body ->
+              body |> statements() |> Enum.flat_map(fn
+                {:tags, _m, [list]} when is_list(list) -> Enum.filter(list, &is_binary/1)
+                {:tag, _m, [t]} when is_binary(t) -> [t]
+                _ -> []
+              end)
+          end
+
+        _ -> []
+      end
+
+    refs =
+      node |> Map.get(:refs, []) |> List.wrap()
+      |> Enum.filter(&String.starts_with?(&1, "#")) |> Enum.map(&String.trim_leading(&1, "#"))
+
+    (explicit ++ refs) |> Enum.map(&String.downcase/1) |> Enum.uniq()
+  end
+
   @doc """
   The declared operations of a resource: `[{:query, name, opts} | {:mutation, name, body}]`.
   `query :hot, where: …` is a named read; `mutation :enrich do … end` a transactional write.
@@ -160,12 +202,20 @@ defmodule Nexus.Resource do
   defp statements({:__block__, _meta, stmts}), do: stmts
   defp statements(single), do: [single]
 
-  # `name :text` parses as a call `name(:text)`; skip the operations/seed calls.
+  # `name :text` parses as a call `name(:text)`; skip the operations/seed calls. A field's arg is a
+  # TYPE (an atom, a `[type]` list, or an `a | b` enum) — never a string. `description "..."` and
+  # `tags ["a","b"]` carry STRING args, so they're metadata (see description/1, tags/1), not fields:
+  # this lets `description`/`tags` double as field names (`description :text`, `tags [:text]`) without
+  # collision — the arg type alone disambiguates.
   defp field({name, _meta, [type]}) when is_atom(name) and name not in @non_field do
-    [{name, normalize(type)}]
+    if metadata_arg?(type), do: [], else: [{name, normalize(type)}]
   end
 
   defp field(_), do: []
+
+  defp metadata_arg?(a) when is_binary(a), do: true
+  defp metadata_arg?(l) when is_list(l), do: l != [] and Enum.all?(l, &is_binary/1)
+  defp metadata_arg?(_), do: false
 
   # ── domain type → normalized type ──
 

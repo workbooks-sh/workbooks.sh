@@ -45,6 +45,9 @@ table.dtable { border-collapse: collapse; width: 100%; font: 500 13px var(--read
 .dasset .as { font: 500 11px var(--read); color: var(--dim); margin-top: 2px; }
 .duploadbar { display: flex; align-items: center; gap: 10px; margin: 4px 0 6px; flex-wrap: wrap; }
 .dmsg { color: var(--dim); font: 500 13px var(--read); padding: 16px 4px; }
+.dtags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.dtag { font: 600 10.5px var(--mono, monospace); color: var(--dim); background: var(--line); border-radius: 20px; padding: 2px 8px; }
+.demptyrow td { padding: 28px 14px !important; }
 `);
 
 WB.view('/data', {
@@ -86,11 +89,14 @@ WB.view('/data', {
           <div class="dmetric"><div class="dmlabel">Status</div><div class="dmbig" style="font-size:18px">${(h.rows || 0) > 0 ? 'Live' : 'Empty'}</div><div class="dmsub"><span class="dpill ${h.durable ? 'ok' : 'off'}">${h.durable ? 'durable' : 'ephemeral'}</span> ${cold.enabled ? '<span class="dpill ok">replicated</span>' : ''}</div></div>
         </div>`;
       const cards = resources.length
-        ? `<div class="dcards">` + resources.map((r) => `
+        ? `<div class="dcards">` + resources.map((r) => {
+            const tags = (r.tags || []);
+            return `
             <a class="dcard" href="#/data?r=${encodeURIComponent(r.name)}">
               <div class="dt"><span class="ddot2" style="background:${r.live ? 'var(--live,#3fb950)' : 'var(--line)'}"></span>${esc(r.name)}<span class="dcount">${r.count}</span></div>
-              <div class="ds">${esc(r.workspace || 'General')} · ${(r.fields || []).length} field${(r.fields || []).length === 1 ? '' : 's'}</div>
-            </a>`).join('') + `</div>`
+              <div class="ds">${r.description ? esc(r.description) : esc(r.workspace || 'General') + ' · ' + (r.fields || []).length + ' field' + ((r.fields || []).length === 1 ? '' : 's')}</div>
+              ${tags.length ? `<div class="dtags">` + tags.map((t) => `<span class="dtag">#${esc(t)}</span>`).join('') + `</div>` : ''}
+            </a>`; }).join('') + `</div>`
         : `<div class="dmsg">No resources yet. Declare a <code>resource</code> block in any workbook and it appears here.</div>`;
       el.innerHTML = `<section class="dwrap"><div class="sechead"><div><h2>Data</h2><p>Every table on your nexus, your storage health, and your assets — all current-tenant.</p></div></div>${metrics}<h3 style="margin:6px 0 12px">Tables</h3>${cards}</section>`;
     }
@@ -99,7 +105,7 @@ WB.view('/data', {
     async function renderResource(name) {
       const state = { offset: 0, limit: 50, sort: '', dir: 'asc', q: '' };
       el.innerHTML = `<section class="dwrap">
-        <div class="sechead"><div><h2>${esc(name)}</h2><p>Rows for the current tenant. Search, sort and page through the full table.</p></div></div>
+        <div class="sechead"><div><h2>${esc(name)}</h2><p id="dsub">Rows for the current tenant. Search, sort and page through the full table.</p><div id="dmeta"></div></div></div>
         <div class="dtoolbar">
           <input class="dsearch" id="dq" placeholder="Search rows…" />
         </div>
@@ -108,7 +114,10 @@ WB.view('/data', {
       </section>`;
       const tableEl = el.querySelector('#dtable');
       const pagerEl = el.querySelector('#dpager');
+      const subEl = el.querySelector('#dsub');
+      const metaEl = el.querySelector('#dmeta');
       const search = el.querySelector('#dq');
+      let metaPainted = false;
 
       let debounce;
       search.addEventListener('input', () => {
@@ -125,8 +134,18 @@ WB.view('/data', {
         if (d && d.error) { tableEl.innerHTML = `<div class="dmsg">${esc(d.error)}</div>`; return; }
         const fields = (d && d.fields) || [];
         const rows = (d && d.rows) || [];
-        if (!rows.length) {
-          tableEl.innerHTML = `<div class="dmsg">${state.q ? 'No rows match “' + esc(state.q) + '”.' : 'This table is empty.'}</div>`;
+
+        // Header meta (description + tags) — painted once from the first response.
+        if (!metaPainted && d) {
+          metaPainted = true;
+          if (d.description) subEl.textContent = d.description;
+          const tags = d.tags || [];
+          metaEl.innerHTML = tags.length ? `<div class="dtags">` + tags.map((t) => `<span class="dtag">#${esc(t)}</span>`).join('') + `</div>` : '';
+        }
+
+        // Always render the columns (the schema) — an empty table shows its shape, with a blank state row.
+        if (!fields.length) {
+          tableEl.innerHTML = `<div class="dmsg">This resource declares no fields.</div>`;
           pagerEl.innerHTML = `${d ? d.total : 0} row${(d && d.total) === 1 ? '' : 's'}`;
           return;
         }
@@ -135,12 +154,14 @@ WB.view('/data', {
           const caret = active ? (state.dir === 'asc' ? '▲' : '▼') : '↕';
           return `<th data-sort="${esc(f.name)}">${esc(f.name)}<span class="dtype">${esc(f.type)}</span><span class="sortcaret">${caret}</span></th>`;
         }).join('');
-        const body = rows.map((row) => `<tr>` + fields.map((f) => {
-          let v = row[f.name];
-          if (v == null) v = '';
-          else if (typeof v === 'object') v = JSON.stringify(v);
-          return `<td title="${esc(v)}">${esc(v)}</td>`;
-        }).join('') + `</tr>`).join('');
+        const body = rows.length
+          ? rows.map((row) => `<tr>` + fields.map((f) => {
+              let v = row[f.name];
+              if (v == null) v = '';
+              else if (typeof v === 'object') v = JSON.stringify(v);
+              return `<td title="${esc(v)}">${esc(v)}</td>`;
+            }).join('') + `</tr>`).join('')
+          : `<tr class="demptyrow"><td colspan="${fields.length}"><div class="dmsg" style="text-align:center">${state.q ? 'No rows match “' + esc(state.q) + '”.' : 'This table is empty — no rows yet.'}</div></td></tr>`;
         tableEl.innerHTML = `<div class="dtablewrap"><table class="dtable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
         tableEl.querySelectorAll('th[data-sort]').forEach((th) => {
           th.onclick = () => {

@@ -29,6 +29,8 @@ defmodule Nexus.Resources do
         file: file,
         workspace: workspace_of(file, workspaces),
         fields: safe_fields(node),
+        description: safe(fn -> Nexus.Resource.description(node) end, nil),
+        tags: safe(fn -> Nexus.Resource.tags(node) end, []),
         count: safe_count(mod, tenant)
       }
     end
@@ -82,6 +84,12 @@ defmodule Nexus.Resources do
     |> Enum.map(& &1.id)
     |> Enum.filter(fn id -> file == id or String.starts_with?(file, id <> "/") end)
     |> Enum.max_by(&String.length/1, fn -> nil end)
+  end
+
+  defp safe(fun, default) do
+    fun.()
+  rescue
+    _ -> default
   end
 
   defp safe_compile(node) do

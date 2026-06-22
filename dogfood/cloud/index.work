@@ -20,6 +20,8 @@ The dashboard reads the platform's own primitives via `/api/platform/*` (the hos
 backed by `Nexus.Capacity` for the dogfood nexus serving it, and mints real CLI tokens.
 
 resource Event do
+  description "The activity feed — every bus #event the dashboard persists (who did what, where, when)."
+  tags ["system", "activity"]
   kind :string
   actor :string
   title :string
@@ -32,6 +34,8 @@ end
 # A durable agent-run record — one row per agent run (tenant-scoped SQLite). Written when a run
 # finishes (streamed live over the `agent_run` Live source); read back by the Studio Runs view.
 resource Run do
+  description "Agent run history — one row per agent run (who launched it, the brief, status, tokens)."
+  tags ["system", "agents"]
   rid :string       # run id (stable handle, distinct from the storage row id)
   agent :string     # which named agent ran
   user :string      # who launched it
@@ -48,6 +52,8 @@ end
 # task with child subtasks (parent = parent's tid). Dispatching a task launches a Run and links its
 # rid. THE LINE: the bus + `task` effect are generic; this store + the Studio board are our cloud.
 resource Todo do
+  description "The task & issue board — units of work and filed problems the orchestration dispatches."
+  tags ["system", "orchestration"]
   tid :string        # stable task id
   kind :string       # "task" (work to do) | "issue" (a problem an agent/human filed) — one fabric
   title :string      # short summary
@@ -67,6 +73,8 @@ end
 # folded by sid (latest wins) like Todo; re-armed on boot. THE LINE: the scheduler is the open standard;
 # persisting + managing these schedules is our cloud product.
 resource Schedule do
+  description "Scheduled agent runs — the time arm of orchestration (cron/every/at), re-armed on boot."
+  tags ["system", "orchestration"]
   sid :string        # stable schedule id
   agent :string      # the named agent to run
   task :string       # the brief

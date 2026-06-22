@@ -1050,6 +1050,7 @@ server :cloud do
       |> Enum.map(fn r ->
         %{name: r.name, workspace: r.workspace, file: r.file, files: r.files,
           count: r.count, live: r.count > 0, durable: durable, replicated: replicated,
+          description: r.description, tags: r.tags,
           fields: Enum.map(r.fields, &field_meta/1)}
       end)
 
@@ -1078,7 +1079,8 @@ server :cloud do
           Nexus.Store.page(entry.module, tenant,
             offset: o.offset, limit: o.limit, sort: sort, q: req.query["q"])
 
-        %{name: entry.name, fields: Enum.map(entry.fields, &field_meta/1),
+        %{name: entry.name, description: entry.description, tags: entry.tags,
+          fields: Enum.map(entry.fields, &field_meta/1),
           rows: Enum.map(rows, &row_map/1), total: total, offset: o.offset, limit: o.limit}
     end
   end

@@ -17,7 +17,11 @@ defmodule Nexus.ResourcesTest do
     """)
 
     File.write!(Path.join(root, "studio/sub/more.work"), """
+    A note resource. #crm #ours
+
     resource Note do
+      description "Free-text notes captured in Studio"
+      tags ["crm", "ours"]
       body :text
     end
     """)
@@ -46,6 +50,16 @@ defmodule Nexus.ResourcesTest do
 
     assert Nexus.Resources.fetch("Ticket", root, "default") |> elem(1) |> Map.get(:count) == 0
     assert Nexus.Resources.fetch("Ticket", root, "acme") |> elem(1) |> Map.get(:count) == 1
+  end
+
+  test "resources carry description + tags (statement tags ∪ #refs, deduped)", %{root: root} do
+    {:ok, note} = Nexus.Resources.fetch("Note", root, "default")
+    assert note.description == "Free-text notes captured in Studio"
+    assert note.tags == ["crm", "ours"]
+    # A resource with neither: nil description, empty tags.
+    {:ok, ticket} = Nexus.Resources.fetch("Ticket", root, "default")
+    assert ticket.description == nil
+    assert ticket.tags == []
   end
 
   test "fetch resolves by name; unknown name is :error", %{root: root} do
