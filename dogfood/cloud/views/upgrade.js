@@ -137,7 +137,7 @@ WB.view('/upgrade', {
         let cta;
         if (current) cta = `<button class="btn sm" disabled>You're on ${esc(t.name)}</button>`;
         else if (below) cta = `<span class="dim" style="font-size:12px">Included below your plan</span>`;
-        else cta = `<a class="btn sm primary" href="/billing/checkout?plan=${esc(t.id)}">Scale to ${esc(t.name)}</a>`;
+        else cta = `<button class="btn sm primary" data-checkout="${esc(t.id)}">Scale to ${esc(t.name)}</button>`;
         return `
       <div class="${cls}">
         <div class="thead">
@@ -182,6 +182,24 @@ WB.view('/upgrade', {
 
       const rebtn = el.querySelector('.repersonalize');
       if (rebtn) rebtn.onclick = personalize;
+
+      // Subscription upgrade → Polar checkout (card on file reused; external_customer_id = org server-side).
+      el.querySelectorAll('[data-checkout]').forEach((b) => { b.onclick = () => startCheckout(b); });
+    }
+
+    async function startCheckout(btn) {
+      const tier = btn.getAttribute('data-checkout');
+      const label = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Starting checkout…';
+      try {
+        const r = await fetch('/cloud/billing/checkout', {
+          method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ tier, success_url: location.origin + '/cloud/' })
+        }).then((x) => x.json());
+        if (r && r.url) { location.href = r.url; return; }
+        (WB.toast || alert)((r && (r.message || r.error)) || 'Could not start checkout.');
+      } catch (e) { (WB.toast || alert)('Could not start checkout.'); }
+      btn.disabled = false; btn.textContent = label;
     }
 
     paint();

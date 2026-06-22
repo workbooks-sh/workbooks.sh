@@ -1,7 +1,8 @@
 // Admin → AI — Workbooks Inference. Our default LLM provider over the Cloudflare AI Gateway, surfaced as
 // "Workbooks Inference" (no provider keys to bring). One wide page: balance + top-off, a searchable model
 // browser (command-palette style) that sets the org default, spend caps, and transparent pricing
-// (5% Cloudflare + 0.5% Workbooks on top-ups). Gateway routing + Stripe settlement are the runtime pieces.
+// (5% Cloudflare + 0.5% Workbooks on top-ups). Top-ups settle through Polar (card on file reused);
+// gateway routing is the remaining runtime piece.
 
 WB.view('/inference', { title: 'AI', accent: 'var(--violet)', async render(el){
   var esc = WB.esc;
@@ -110,7 +111,12 @@ WB.view('/inference', { title: 'AI', accent: 'var(--violet)', async render(el){
   el.querySelector('[data-topup]').onclick = async function(){
     var amt = await WB.prompt({ title:'Top off inference credit', placeholder:'Amount in USD, e.g. 25', confirm:'Continue' });
     amt = parseFloat(amt); if (!amt || amt <= 0) return;
-    try { var r = await api('/cloud/inference/topup', { method:'POST', body: JSON.stringify({ amount: amt }) }); WB.toast((r && r.message) || 'Top-up requested'); }
+    try {
+      var r = await api('/cloud/inference/topup', { method:'POST', body: JSON.stringify({ amount: amt, success_url: location.origin + location.pathname + '#/inference' }) });
+      if (r && r.url) { WB.toast('Redirecting to checkout…'); location.href = r.url; return; }
+      if (r && r.error) { WB.toast(r.error, 'bad'); return; }
+      WB.toast((r && r.message) || 'Top-up requested');
+    }
     catch (e) { WB.toast('Could not start top-up', 'bad'); }
   };
   wireRows();

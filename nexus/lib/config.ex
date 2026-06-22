@@ -169,6 +169,17 @@ defmodule Nexus.Config do
   def cf_saas_zone, do: get(:cf_saas_zone)
   def cf_custom_hostname_origin, do: get(:cf_custom_hostname_origin)
 
+  # ── Polar billing (OUR cloud's config; another operator brings their own) ──────────────────────
+  # The Polar server the runtime talks to: "sandbox" (default — isolated test env) | "production".
+  # The access token + webhook secret are SECRETS (Nexus.Secrets), never config. `polar_product/1`
+  # maps a subscription tier id → its Polar product UUID (`deploy polar-product-<tier>="uuid"`);
+  # `polar_credit_product/0` is the one-time custom-amount product for inference credit top-ups
+  # (`deploy polar-credit-product="uuid"`). All nil by default — billing stays off until configured.
+  def polar_server, do: get(:polar_server)
+  def polar_products, do: get(:polar_products)
+  def polar_product(tier), do: Map.get(polar_products(), to_string(tier))
+  def polar_credit_product, do: get(:polar_credit_product)
+
   # ── parse ─────────────────────────────────────────────────────────────────────────────────────
   defp parse(html) do
     %{
@@ -228,8 +239,26 @@ defmodule Nexus.Config do
       # neutral/nil by default: with no SaaS zone configured the runtime stays on the per-app Fly-cert
       # path (Nexus.ControlPlane.Domain). The CF API TOKEN is a SECRET (Nexus.Secrets), never config.
       cf_saas_zone: attr(html, "cf-saas-zone"),
-      cf_custom_hostname_origin: attr(html, "cf-custom-hostname-origin")
+      cf_custom_hostname_origin: attr(html, "cf-custom-hostname-origin"),
+      # Polar billing: server selection + product UUIDs (our cloud's config — see `polar_server/0`).
+      polar_server: attr(html, "polar-server") || "sandbox",
+      polar_products: parse_polar_products(html),
+      polar_credit_product: attr(html, "polar-credit-product")
     }
+  end
+
+  # Scan the deploy block for `polar-product-<tier>="uuid"` → %{"<tier>" => "uuid"}. Neutral default: {}.
+  defp parse_polar_products(html) do
+    block =
+      with src when is_binary(src) <- html,
+           [_, b] <- Regex.run(~r/deploy\s+do\b(.*?)\n\s*end\b/s, src) do
+        b
+      else
+        _ -> ""
+      end
+
+    Regex.scan(~r/polar-product-([a-z0-9]+)="([^"]*)"/i, block)
+    |> Enum.reduce(%{}, fn [_, tier, uuid], acc -> Map.put(acc, String.downcase(tier), String.trim(uuid)) end)
   end
 
   defp parse_workspaces(nil), do: []

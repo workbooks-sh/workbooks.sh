@@ -47,4 +47,15 @@ deploy do
 
   search="brave"                                         # cloud web-search: keyed Brave (reliable from datacenter IPs)
   compile-cache="on"
+
+  # Polar billing (merchant-of-record). Server is sandbox until we go live; the access token + webhook
+  # secret are SECRETS (POLAR_ACCESS_TOKEN / POLAR_WEBHOOK_SECRET, injected — never here). The product
+  # UUIDs below map onboarding/upgrade tiers → Polar subscription products, plus the one-time
+  # custom-amount product for Workbooks Inference credit top-ups (the card on file from the first
+  # purchase is reused). Fill these from the Polar dashboard (sandbox now, prod when we flip the server).
+  polar-server="sandbox"                                 # "production" when we go live
+  # polar-product-starter="<sandbox product uuid>"
+  # polar-product-team="<sandbox product uuid>"
+  # polar-product-scale="<sandbox product uuid>"
+  # polar-credit-product="<sandbox custom-amount product uuid>"
 end

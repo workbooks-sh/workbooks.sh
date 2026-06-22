@@ -96,6 +96,15 @@ server :cloud do
   route "POST /cloud/inference/config", :inference_config_save
   route "POST /cloud/inference/topup", :inference_topup
 
+  # Billing — Polar (merchant-of-record). Onboarding subscription checkout (tier → Polar subscription
+  # product) and the Polar webhook that SETTLES purchases (credits the org inference ledger / activates
+  # the subscription). The inference credit top-up shares the same webhook via product metadata. THE LINE:
+  # Polar token + webhook secret are SECRETS; server + product UUIDs are OUR cloud config — the mechanism
+  # (Nexus.Polar) is generic. Webhook is HMAC-verified (Standard Webhooks) and emits a billing #event.
+  route "GET /cloud/billing", :billing_status
+  route "POST /cloud/billing/checkout", :billing_checkout
+  route "POST /cloud/polar/webhook", :polar_webhook
+
   # Drafts + visibility (Phase 2). A draft is a REAL nexus folder gated `draft` (a per-folder permission
   # in the control plane) until promoted to `private`/`public`. Create scaffolds the folder + commits it
   # so it's a live surface; visibility sets the permission. THE LINE: folders + git are the standard; the
@@ -1396,10 +1405,16 @@ server :cloud do
     {200, %{ok: true, config: upd}}
   end
 
-  # Top-off intent. Stripe settlement + the org credit ledger are the deferred runtime piece (wb-lze1);
-  # until that's wired we record the intent and return a pending status — never a fake success.
+  # Inference credit top-off → a real Polar checkout for a one-time custom-amount product. The checkout is
+  # bound to the org via `external_customer_id` so Polar reuses the CARD ON FILE from the customer's first
+  # purchase (the onboarding subscription) — top-ups are one click. Settlement happens on the Polar webhook
+  # (`order.paid`), which credits the org ledger via `credit_inference/2`. The 5% CF + 0.5% WB fee rides on
+  # top, so the customer pays `amount * 1.055` and receives `amount` of credit. When Polar isn't configured
+  # we record the intent and return pending — never a fake success.
   def inference_topup(req) do
-    amount = inf_num((is_map(req.body) && req.body["amount"]) || nil)
+    b = (is_map(req.body) && req.body) || %{}
+    amount = inf_num(b["amount"])
+    tenant = req.tenant || Nexus.Store.default_tenant()
 
     cond do
       is_nil(amount) or amount <= 0 ->
@@ -1407,10 +1422,141 @@ server :cloud do
 
       true ->
         total = Float.round(amount * 1.055, 2)
-        {200, %{pending: true, amount: amount, total: total,
-          message: "Checkout for Workbooks Inference credit is being wired up — your $#{:erlang.float_to_binary(amount / 1, decimals: 2)} top-up (≈ $#{:erlang.float_to_binary(total / 1, decimals: 2)} with fees) is noted."}}
+        product = Nexus.Config.polar_credit_product()
+
+        cond do
+          not Nexus.Polar.configured?() or is_nil(product) ->
+            {200, %{pending: true, amount: amount, total: total,
+              message: "Top-up of $#{usd(amount)} (≈ $#{usd(total)} with fees) is noted — billing is not configured on this nexus yet."}}
+
+          true ->
+            opts = [
+              products: [product],
+              external_customer_id: tenant,
+              customer_email: b["email"],
+              success_url: b["success_url"],
+              # amount in cents; the credit the customer receives is `amount` (metadata), fee rides on top.
+              amount: round(total * 100),
+              metadata: %{tenant: tenant, purpose: "inference_credit", credit: amount}
+            ]
+
+            case Nexus.Polar.create_checkout(opts) do
+              {:ok, %{url: url, id: id}} ->
+                {200, %{url: url, checkout_id: id, amount: amount, total: total}}
+
+              {:error, reason} ->
+                {502, %{error: "could not start checkout", detail: inspect(reason)}}
+            end
+        end
     end
   end
+
+  # Onboarding (and upgrade) subscription checkout — tier → Polar subscription product. Binds the checkout
+  # to the org via `external_customer_id` so the card is stored for later inference top-ups. The onboarding
+  # `profile` (account type, name, usecases) rides as metadata so the webhook can finish provisioning.
+  def billing_checkout(req) do
+    b = (is_map(req.body) && req.body) || %{}
+    tier = to_string(b["tier"] || b["plan"] || "")
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    product = tier != "" && Nexus.Config.polar_product(tier)
+
+    cond do
+      tier == "" ->
+        {400, %{error: "tier is required"}}
+
+      not Nexus.Polar.configured?() or is_nil(product) or product == false ->
+        {200, %{pending: true, tier: tier,
+          message: "Checkout for the #{tier} plan is not configured on this nexus yet."}}
+
+      true ->
+        opts = [
+          products: [product],
+          external_customer_id: tenant,
+          customer_email: b["email"],
+          customer_name: b["name"],
+          success_url: b["success_url"],
+          metadata: %{tenant: tenant, purpose: "subscription", tier: tier,
+            profile: (is_binary(b["profile"]) && String.slice(b["profile"], 0, 500)) || ""}
+        ]
+
+        case Nexus.Polar.create_checkout(opts) do
+          {:ok, %{url: url, id: id}} -> {200, %{url: url, checkout_id: id, tier: tier}}
+          {:error, reason} -> {502, %{error: "could not start checkout", detail: inspect(reason)}}
+        end
+    end
+  end
+
+  # Billing status for the dashboard — whether Polar is live + the org's current subscription (tier set by
+  # the webhook on `subscription.active`). Balance lives on the inference config (see `inference_status`).
+  def billing_status(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    sub =
+      case Nexus.ControlPlane.get(tenant, :billing, "subscription") do
+        {:ok, s} when is_map(s) -> s
+        _ -> nil
+      end
+
+    %{configured: Nexus.Polar.configured?(), server: Nexus.Config.polar_server(), subscription: sub}
+  end
+
+  # Polar webhook — Standard-Webhooks HMAC-verified, then SETTLES the purchase. Credit top-ups
+  # (`purpose: "inference_credit"`) add to the org ledger; subscriptions set the org's active tier. Surfaces
+  # a `billing.<type>` #event on the bus for the Activity feed. Fail closed on a bad signature.
+  def polar_webhook(req) do
+    raw = req[:raw_body] || ""
+    headers = req[:headers] || %{}
+
+    if Nexus.Polar.verify_webhook(raw, headers) do
+      payload = (is_map(req.body) && req.body) || %{}
+      type = payload["type"] || "unknown"
+      data = payload["data"] || %{}
+      meta = data["metadata"] || %{}
+      tenant = meta["tenant"] || req.tenant || Nexus.Store.default_tenant()
+
+      settle_polar(type, tenant, meta, data)
+
+      Nexus.Events.emit(
+        %{kind: "billing.#{type}", actor: "polar", title: "Polar #{type}",
+          target: tenant, tags: ["event", "billing"], scope: "owner"},
+        tenant: tenant
+      )
+
+      %{ok: true}
+    else
+      {401, %{error: "invalid signature"}}
+    end
+  end
+
+  # Apply a verified Polar event. `order.paid` (one-time) → credit the inference ledger by the metadata
+  # `credit` amount. Subscription lifecycle → record/clear the org's active tier. Other events are noted
+  # via the #event only.
+  defp settle_polar(type, tenant, meta, data) do
+    cond do
+      type in ["order.paid", "order.updated"] and meta["purpose"] == "inference_credit" ->
+        credit = inf_num(meta["credit"]) || 0.0
+        if credit > 0, do: credit_inference(tenant, credit)
+
+      type in ["subscription.active", "subscription.created", "subscription.updated"] ->
+        Nexus.ControlPlane.put(tenant, :billing, "subscription",
+          %{tier: meta["tier"], status: "active", polar_id: data["id"]})
+
+      type in ["subscription.canceled", "subscription.revoked"] ->
+        Nexus.ControlPlane.put(tenant, :billing, "subscription",
+          %{tier: meta["tier"], status: "canceled", polar_id: data["id"]})
+
+      true ->
+        :ok
+    end
+  end
+
+  # Add `amount` USD of inference credit to the org ledger (the balance read by `inference_status`).
+  defp credit_inference(tenant, amount) do
+    cfg = inference_config(tenant)
+    bal = (Map.get(cfg, :balance) || 0.0) + amount
+    Nexus.ControlPlane.put(tenant, :inference, "config", Map.put(cfg, :balance, Float.round(bal / 1, 2)))
+  end
+
+  defp usd(n), do: :erlang.float_to_binary(n / 1, decimals: 2)
 
   defp inf_num(nil), do: nil
   defp inf_num(n) when is_number(n), do: n / 1

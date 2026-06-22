@@ -342,15 +342,11 @@ WB.view('/welcome', {
         <div class="srow"><b>${esc(st.name)}</b><b>$${st.price}<small>/mo</small></b></div>
         <div class="sfeat">Unlimited users · ${esc(st.storage)} · DB + egress-free object storage · hosted in ${esc(REGION)}</div>
       </div>
-      <form method="POST" action="?/pay">
-        <input type="hidden" name="tier" value="${esc(st.id)}" />
-        <input type="hidden" name="profile" value="${esc(profileJSON())}" />
-        <div class="foot">
-          <button class="btn" type="button" data-act="back">Back</button>
-          <button class="btn primary big" type="submit">Continue to payment →</button>
-        </div>
-      </form>
-      <form method="POST" action="?/finish"><input type="hidden" name="profile" value="${esc(profileJSON())}" /><button class="skip" type="submit">I’ll set up billing later</button></form>`;
+      <div class="foot">
+        <button class="btn" data-act="back">Back</button>
+        <button class="btn primary big" data-act="pay">Continue to payment →</button>
+      </div>
+      <button class="skip" data-act="finish">I’ll set up billing later</button>`;
 
       } else if (stepKey === 'local') {
         body = `
@@ -361,7 +357,7 @@ WB.view('/welcome', {
         <button class="btn" data-act="back">Back</button>
         <a class="btn primary" href="https://workbooks.sh" target="_blank" rel="noreferrer">Download the desktop app ↗</a>
       </div>
-      <form method="POST" action="?/finish"><input type="hidden" name="profile" value="${esc(profileJSON())}" /><button class="skip" type="submit">Continue to the dashboard anyway</button></form>`;
+      <button class="skip" data-act="finish">Continue to the dashboard anyway</button>`;
       }
 
       el.innerHTML = `
@@ -388,6 +384,8 @@ ${body}
         if (!b.disabled) b.addEventListener('click', next);
       });
       el.querySelectorAll('[data-act="back"]').forEach((b) => b.addEventListener('click', back));
+      el.querySelectorAll('[data-act="finish"]').forEach((b) => b.addEventListener('click', () => { location.href = '/cloud/'; }));
+      el.querySelectorAll('[data-act="pay"]').forEach((b) => b.addEventListener('click', () => startCheckout(b)));
 
       el.querySelectorAll('[data-set]').forEach((b) => b.addEventListener('click', () => {
         const k = b.getAttribute('data-set');
@@ -422,6 +420,27 @@ ${body}
           }
         });
       }
+    }
+
+    // Create a Polar subscription checkout for the chosen tier and hand off to Polar. The onboarding
+    // profile rides as metadata so the webhook can finish provisioning; external_customer_id (the org) is
+    // set server-side so the card is stored for later inference top-ups. If billing isn't configured yet
+    // the server returns a pending message and we drop the user into the dashboard.
+    async function startCheckout(btn) {
+      const st = selTier();
+      const label = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Starting checkout…';
+      try {
+        const r = await fetch('/cloud/billing/checkout', {
+          method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ tier: st.id, profile: profileJSON(), name: (WB.user && WB.user.name) || '',
+            success_url: location.origin + '/cloud/' })
+        }).then((x) => x.json());
+        if (r && r.url) { location.href = r.url; return; }
+        if (r && r.pending) { (WB.toast || alert)(r.message || 'Billing not configured yet.'); location.href = '/cloud/'; return; }
+        (WB.toast || alert)((r && r.error) || 'Could not start checkout.');
+      } catch (e) { (WB.toast || alert)('Could not start checkout.'); }
+      btn.disabled = false; btn.textContent = label;
     }
 
     rerender();
