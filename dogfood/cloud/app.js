@@ -531,12 +531,14 @@
 
     var ACCENT = { '/storage': 'var(--sky)', '/team': 'var(--peach)', '/shared': 'var(--cream)', '/usage': 'var(--sage)',
       '/settings': 'var(--violet)', '/autopoet': 'var(--violet)', '/workspace': 'var(--peach)', '/database': 'var(--mint)', '/upgrade': 'var(--mint)',
-      '/inference': 'var(--violet)', '/agent': 'var(--mint)' };
+      '/inference': 'var(--violet)', '/agent': 'var(--mint)', '/data': 'var(--sky)' };
     function sectionAccent(p){ for (var k in ACCENT) { if (p.indexOf(k) === 0) return ACCENT[k]; } return 'var(--mint)'; }
     // Which RAIL section a route belongs to — drives the active rail tab + which per-surface sidebar shows.
     var ADMIN_ROUTES = ['/autopoet', '/usage', '/storage', '/team', '/secrets', '/database', '/upgrade', '/inference'];
     function sectionFor(p){
       if (p.indexOf('/toolkits') === 0) return 'toolkits';   // own rail section — providers + standalone toolkits
+      // Data explorer — its own rail section. Precise match so it never swallows /database (the PG addon).
+      if (p === '/data' || p.indexOf('/data/') === 0 || p.indexOf('/data?') === 0) return 'data';
       // /agent/<name> is the agent editor, launched from the Studio composer — keep the Studio surface.
       if (p.indexOf('/studio') === 0 || p.indexOf('/create') === 0 || p.indexOf('/agent') === 0) return 'studio';
       if (p.indexOf('/activity') === 0 || p.indexOf('/runs') === 0 || p.indexOf('/tasks') === 0 || p.indexOf('/issues') === 0) return 'activity';
@@ -563,7 +565,7 @@
     // ACTIVE view's script on demand. The home '/' view ships inline in app.js (no entry here).
     var VIEW_FILES = {
       '/app': 'app',
-      '/activity': 'activity', '/runs': 'runs', '/tasks': 'tasks', '/issues': 'issues', '/database': 'database', '/denied': 'denied', '/autopoet': 'autopoet',
+      '/activity': 'activity', '/runs': 'runs', '/tasks': 'tasks', '/issues': 'issues', '/data': 'data', '/database': 'database', '/denied': 'denied', '/autopoet': 'autopoet',
       '/toolkits': 'toolkits', '/nexuses': 'nexuses', '/secrets': 'secrets', '/settings': 'settings',
       '/shared': 'shared', '/storage': 'storage', '/studio': 'studio', '/create': 'studio', '/usage': 'studio',
       '/team': 'team', '/upgrade': 'upgrade', '/welcome': 'welcome', '/workspace/env': 'workspace-env',
@@ -1015,6 +1017,53 @@
         el.querySelectorAll('[data-tkoff]').forEach(function(b){ b.onclick = function(){ tkSideToggle(b.getAttribute('data-tkoff')); }; });
       });
     }
+    // Data sidebar — Overview + Assets links, then every resource ("table") grouped by workspace.
+    // Reuses GET /cloud/data (tenant-scoped). SWR for an instant paint, then refresh. Resource rows
+    // navigate to #/data?r=<name>; the active row is derived from the current hash.
+    function paintDataSide(){
+      var box = document.getElementById('dataSide'); if (!box) return;
+      WB.swr('data:list', function(){ return fetch('/cloud/data', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
+        var el = document.getElementById('dataSide'); if (!el) return;
+        var resources = (d && d.resources) || [];
+        var hash = location.hash.slice(1) || '/data';
+        var curR = (hash.match(/[?&]r=([^&]+)/) || [])[1]; if (curR) curR = decodeURIComponent(curR);
+        var onAssets = /[?&]assets=/.test(hash);
+        var onOverview = (hash === '/data' || hash.indexOf('/data?') === 0) && !curR && !onAssets;
+
+        function navrow(active, href, ico, label, badge){
+          return '<a class="srow' + (active ? ' on' : '') + '" data-nav="' + href + '" href="#' + href + '">' +
+            '<span class="semoji">' + ico + '</span><span class="sname">' + esc(label) + '</span>' +
+            (badge != null ? '<span class="dcount">' + badge + '</span>' : '') + '</a>';
+        }
+
+        // Group resources by workspace (declared id, "General" for the workspace-less).
+        var groups = {}; var order = [];
+        resources.forEach(function(r){
+          var k = r.workspace || '_general';
+          if (!groups[k]) { groups[k] = []; order.push(k); }
+          groups[k].push(r);
+        });
+        order.sort(function(a, b){ return a === '_general' ? 1 : b === '_general' ? -1 : a.localeCompare(b); });
+
+        var wsName = {}; (WB.ws && WB.ws.list || []).forEach(function(w){ wsName[w.id] = w.name || w.id; });
+
+        var tree = order.map(function(k){
+          var label = k === '_general' ? 'General' : (wsName[k] || k);
+          var rows = groups[k].slice().sort(function(a, b){ return a.name.localeCompare(b.name); }).map(function(r){
+            var live = r.count > 0;
+            var dot = '<span class="ddot2" style="background:' + (live ? 'var(--live, #3fb950)' : 'var(--line)') + '" title="' + (live ? 'live' : 'empty') + '"></span>';
+            return '<a class="srow drow' + (curR === r.name ? ' on' : '') + '" data-nav="/data?r=' + encodeURIComponent(r.name) + '" href="#/data?r=' + encodeURIComponent(r.name) + '" title="' + esc(r.name) + '">' +
+              dot + '<span class="sname">' + esc(r.name) + '</span><span class="dcount">' + r.count + '</span></a>';
+          }).join('');
+          return '<div class="sgrp sgrpf"><span class="sgrpic">' + ICO.hash + '</span><span class="sgrptt">' + esc(label) + '</span></div>' + rows;
+        }).join('');
+
+        el.innerHTML =
+          navrow(onOverview, '/data', ICO.gauge, 'Overview', null) +
+          navrow(onAssets, '/data?assets=1', ICO.files, 'Assets', null) +
+          (resources.length ? tree : '<div class="treemsg" style="padding:8px 10px">No resources yet. A <code>resource</code> block in any workbook shows up here.</div>');
+      });
+    }
     async function tkSideDisconnect(id){
       var ok = await WB.confirm({ title: 'Disconnect this account?', body: 'Its sealed credentials will be deleted.', confirm: 'Disconnect', danger: true });
       if (!ok) return;
@@ -1119,7 +1168,8 @@
         { id: 'studio', ico: ICO.spark, label: 'Studio', go: '/studio' },
         { id: 'apps', ico: ICO.grid, label: 'Apps', go: '/' },
         { id: 'activity', ico: ICO.activity, label: 'Activity', go: '/activity' },
-        { id: 'files', ico: ICO.files, label: 'Files', go: '/workspaces' }
+        { id: 'files', ico: ICO.files, label: 'Files', go: '/workspaces' },
+        { id: 'data', ico: ICO.database, label: 'Data', go: '/data' }
       ];
       var railsecs = RAIL_SECS.map(function (s) {
         return '<a class="railsec' + (section === s.id ? ' on' : '') + '" data-nav="' + s.go + '" href="#' + s.go +
@@ -1127,7 +1177,7 @@
       }).join('');
 
       // ── per-surface SIDEBAR body — swaps with the active rail section ──
-      var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Activity', files: 'Files', toolkits: 'Toolkits', admin: 'Admin', account: 'You' };
+      var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Activity', files: 'Files', data: 'Data', toolkits: 'Toolkits', admin: 'Admin', account: 'You' };
       var isBrowse = section === 'apps' || section === 'files';   // apps/files get the filter funnel + search + pins
       if (isBrowse) st.sideMode = section;   // keep the filter funnel (filterMenu/filterActive) keyed to the active surface
       var sideBody;
@@ -1142,6 +1192,8 @@
           '<div id="studioSide"><div class="treemsg" style="padding:8px 4px">Loading sessions…</div></div>';
       // Activity — the inbox lives in the sidebar; the page shows the selected event's context (lazy → #activityInbox).
       else if (section === 'activity') sideBody = '<div id="activityInbox"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
+      // Data — Overview + Assets links, then resources grouped by workspace (lazy → #dataSide).
+      else if (section === 'data') sideBody = '<div id="dataSide"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
       // Toolkits — the sidebar lists what's ACTIVE: connected accounts + enabled built-in toolkits, each
       // with an inline disable. The page is the marketplace; this is the "what's on" view (lazy → #toolkitsSide).
       else if (section === 'toolkits') sideBody = '<div id="toolkitsSide"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
@@ -1199,6 +1251,7 @@
       else if (section === 'studio') paintStudio();
       else if (section === 'activity') paintActivity();
       else if (section === 'toolkits') paintToolkits();
+      else if (section === 'data') paintDataSide();
     }
     // Let other views (the workspace explorer) refresh the sidebar after a pin/unpin so Pinned updates live.
     WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };
