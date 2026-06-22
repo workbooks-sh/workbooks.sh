@@ -176,4 +176,15 @@ defmodule Nexus.Authorship do
   def decide(false, :off), do: :accept
   def decide(false, :soft), do: :accept_unverified
   def decide(false, :hard), do: :reject
+
+  @doc """
+  May `admin_role` RECOVER a locked-out member (fix wb-13gz) by re-attesting a NEW device key under
+  `target_uid`? True only when the caller is admin+ (`Nexus.Authz.may?(:manage)`) AND the new key proves
+  possession bound to the target (`verify_registration/3`). So recovery takes BOTH an admin's authority
+  and the new device's proof — neither alone suffices. (Rotation needs nothing new: register a new key
+  then revoke the old; `fold_device_keys/1` makes the revoke terminal.)
+  """
+  @spec recover_ok?(String.t() | nil, String.t(), String.t(), String.t()) :: boolean()
+  def recover_ok?(admin_role, target_uid, did, sig),
+    do: Nexus.Authz.may?(admin_role, :manage) and verify_registration(target_uid, did, sig)
 end

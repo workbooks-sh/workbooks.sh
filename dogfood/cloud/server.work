@@ -35,6 +35,8 @@ server :cloud do
   route "GET /cloud/keys", :keys_list
   route "POST /cloud/keys", :key_register
   route "POST /cloud/keys/revoke", :key_revoke
+  # Recovery (wb-13gz): an ADMIN re-attests a new device key for a locked-out member (lost all keys).
+  route "POST /cloud/keys/recover", :key_recover
 
   # Task management + planning (the orchestration backbone). Tasks live in resource Todo; a plan is a
   # parent task + subtasks. Dispatch launches a Run (reuses do_run) and links it. Plan asks Workhorse to
@@ -517,6 +519,37 @@ server :cloud do
     end
     else
       :error -> {401, %{error: "authentication required"}}
+    end
+  end
+
+  # Recover a locked-out member (wb-13gz): an ADMIN re-attests a NEW device key under the member's uid.
+  # Takes BOTH the admin's authority AND proof-of-possession of the new key bound to the target — neither
+  # alone suffices (Nexus.Authorship.recover_ok?). The new key then signs as that member; old keys stay
+  # revoked. (Rotation = key_register a new key + key_revoke the old; no separate path needed.)
+  def key_recover(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    b = if is_map(req.body), do: req.body, else: %{}
+    target = b["uid"] |> to_string() |> String.downcase()
+    did = to_string(b["did"] || "")
+    sig = to_string(b["sig"] || "")
+
+    cond do
+      target == "" or did == "" ->
+        {400, %{error: "uid and did required"}}
+
+      not Nexus.Authorship.recover_ok?(Map.get(req, :role, "viewer"), target, did, sig) ->
+        forbidden()
+
+      true ->
+        Nexus.Store.create(
+          DeviceKey,
+          %{uid: target, did: did, label: to_string(b["label"] || "recovered"),
+            surface: "recovery", registered: System.os_time(:second), revoked: 0},
+          tenant
+        )
+
+        rebuild_allowed_signers(tenant)
+        %{ok: true, uid: target, did: did}
     end
   end
 
