@@ -26,6 +26,29 @@ WB.AGENT_CATALOG = [
   { name:'waldo',     label:'Waldo',           toolkit:null,           blurb:'The everyday manager — plans, dispatches, gets things done.' },
   { name:'autopilot', label:'Autopilot',       toolkit:null,           blurb:'Runs your work on a schedule and keeps it moving on its own.' }
 ];
+// LLM provider metadata (for Workbooks Inference) — name + brand accent. Real logos come from the
+// inlined brand glyphs where we have them (google, cloudflare→workers-ai); the rest render as a clean
+// brand-accent lettermark (more provider SVGs can be inlined into BRAND_GLYPHS later, like the others).
+WB.PROVIDER_META = {
+  openai:       { name:'OpenAI',     accent:'#10a37f' },
+  anthropic:    { name:'Anthropic',  accent:'#d97757' },
+  google:       { name:'Google',     accent:'#4285f4' },
+  grok:         { name:'xAI',        accent:'#8a8f98' },
+  xai:          { name:'xAI',        accent:'#8a8f98' },
+  'workers-ai': { name:'Workers AI', accent:'#f6821f' },
+  meta:         { name:'Meta',       accent:'#1d65c1' },
+  mistral:      { name:'Mistral',    accent:'#fa5310' },
+  deepseek:     { name:'DeepSeek',   accent:'#4d6bfe' }
+};
+WB.providerOf = function(modelId){ return String(modelId || '').split('/')[0]; };
+WB.providerName = function(p){ var m = WB.PROVIDER_META[p]; return m ? m.name : String(p || ''); };
+// Provider chip glyph — an inlined brand SVG when we have one, else a brand-accent lettermark tile.
+WB.providerIcon = function(p){
+  var g = WB.brandGlyph && WB.brandGlyph(p === 'workers-ai' ? 'cloudflare' : p);
+  if (g) return '<span class="provglyph">' + g + '</span>';
+  var m = WB.PROVIDER_META[p] || { name:String(p || '?'), accent:'var(--dim)' };
+  return '<span class="provinit" style="background:color-mix(in srgb,' + m.accent + ' 16%,transparent);color:' + m.accent + '">' + m.name.slice(0,1).toUpperCase() + '</span>';
+};
 // Theme-aware brand SVG resolver (mono brands carry {l,d}). Returns an SVG string or null.
 WB.brandGlyph = function(id){
   var A = { gmail: 'google' };

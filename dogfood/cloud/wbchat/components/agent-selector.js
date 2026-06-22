@@ -36,10 +36,16 @@ const STYLE = `
   .wbc-agentsel-check { flex: none; width: 14px; display: grid; place-items: center; color: var(--wbc-accent); opacity: 0; }
   .wbc-agentsel-item.on .wbc-agentsel-check { opacity: 1; }
   .wbc-agentsel-check svg { width: 14px; height: 14px; }
+  .wbc-agentsel-more { flex: none; width: 22px; height: 22px; border: none; background: none; color: var(--wbc-dim);
+    cursor: pointer; border-radius: 6px; display: grid; place-items: center; opacity: 0; }
+  .wbc-agentsel-item:hover .wbc-agentsel-more { opacity: 1; }
+  .wbc-agentsel-more:hover { background: var(--wbc-panel); color: var(--wbc-ink); }
+  .wbc-agentsel-more svg { width: 15px; height: 15px; }
 `;
 
 const CHEV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
 const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const DOTS = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>';
 
 const nameOf = (a) => (a && typeof a === 'object') ? a.name : a;
 const labelOf = (a) => (a && typeof a === 'object') ? (a.label || a.name) : a;
@@ -84,6 +90,13 @@ registerComposerButton((ctx) => {
       const th = themeOf(a);
       const ic = el('span', { class: 'wbc-agentsel-ic', html: th.icon || '' });
       ic.style.background = th.bg; ic.style.color = th.color;
+      // ⋯ opens the agent editor (swap model / edit prompt). Shown on row hover; stops the row's select.
+      const more = el('button', {
+        class: 'wbc-agentsel-more', type: 'button', title: 'Edit ' + labelOf(a), html: DOTS,
+        onClick: (e) => { e.stopPropagation(); close();
+          const W = (typeof window !== 'undefined') ? window.WB : null;
+          if (W && W.nav) W.nav('/agent/' + encodeURIComponent(nm)); },
+      });
       const item = el('button', {
         class: 'wbc-agentsel-item' + (nm === cur ? ' on' : ''), type: 'button',
         onClick: (e) => { e.stopPropagation(); ctx.setAgent(nm); syncLabel(); close(); },
@@ -93,6 +106,7 @@ registerComposerButton((ctx) => {
           el('div', { class: 'wbc-agentsel-itemlbl' }, labelOf(a)),
           (a && a.blurb) ? el('div', { class: 'wbc-agentsel-itemsub' }, a.blurb) : null,
         ].filter(Boolean)),
+        more,
         el('span', { class: 'wbc-agentsel-check', html: CHECK }),
       ]);
       menu.append(item);

@@ -170,6 +170,10 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .sgrp.sgrpf:hover .sgrpadd{ opacity:1; } .sgrpadd:hover{ color:var(--ink); background:var(--hover); }
 /* Agent pastel dot on a session row (replaces the 💬 when the session is pinned to an agent). */
 .srow .sdot{ width:8px; height:8px; border-radius:50%; flex:none; margin:0 5px; }
+/* LLM provider chips (Workbooks Inference) — an inlined brand glyph on a light tile, or a lettermark. */
+.provglyph{ display:inline-grid; place-items:center; width:22px; height:22px; border-radius:6px; background:color-mix(in srgb,var(--ink) 7%,transparent); }
+.provglyph svg{ width:15px; height:15px; display:block; }
+.provinit{ display:inline-grid; place-items:center; width:22px; height:22px; border-radius:6px; font:700 11px var(--read); }
 .srow{ display:flex; align-items:center; gap:9px; padding:7px 10px; border-radius:8px; cursor:pointer; color:var(--li-ink);
   font:550 13.5px var(--read); text-decoration:none; }
 .srow:hover{ background:var(--hover); color:var(--ink); }

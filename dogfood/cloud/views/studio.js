@@ -42,11 +42,15 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
     import('../wbchat/core.js'),
     import('../wbchat/components/index.js'),  // registers all parts + actions + composer add-ons
     import('../wbchat/demo.js'),              // dev-only seed (?cdemo=1) exercising every part type
-    api('/cloud/models').catch(function(){ return { models: [] }; }),
+    api('/cloud/inference/models').catch(function(){ return { models: [] }; }),
     api('/cloud/agents').catch(function(){ return { agents: [] }; }),
-    api('/cloud/toolkits').catch(function(){ return { toolkits: [] }; })
+    api('/cloud/toolkits').catch(function(){ return { toolkits: [] }; }),
+    api('/cloud/models').catch(function(){ return { models: [] }; })
   ]);
-  var WBC = _p[0], DEMO = _p[2], MODELS = (_p[3] && _p[3].models) || [];
+  var WBC = _p[0], DEMO = _p[2];
+  // Prefer the Workbooks Inference catalog (provider/model ids over our gateway); fall back to the raw
+  // provider catalog (/cloud/models) if inference isn't available yet.
+  var MODELS = (_p[3] && _p[3].models && _p[3].models.length) ? _p[3].models : ((_p[6] && _p[6].models) || []);
   (function(){ if (!document.getElementById('wbchat-theme')){ var l = document.createElement('link'); l.id = 'wbchat-theme'; l.rel = 'stylesheet'; l.href = vurl('./wbchat/theme.css'); document.head.appendChild(l); } })();
   var CDEMO = new URLSearchParams(location.search).get('cdemo') === '1';
   var U = (WB.user && WB.user.email) || 'anon';

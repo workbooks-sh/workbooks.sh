@@ -83,6 +83,18 @@ server :cloud do
   # Agents defined across the mounted workbooks — the Studio "Agents" tab lists these. Read from the
   # live registry (Nexus.Agent.all, populated at bringup from each workbook's `agent` blocks).
   route "GET /cloud/agents", :agents_list
+  # Per-org agent overrides (model + prompt) — the agent editor reads/writes these. The shipped agent
+  # block is the default; an override layers on top (applied at run time). OUR cloud product, not the std.
+  route "GET /cloud/agent/config", :agent_config_get
+  route "POST /cloud/agent/config", :agent_config_save
+
+  # Workbooks Inference — our default LLM provider (Cloudflare AI Gateway, branded "Workbooks Inference").
+  # Catalog of routable provider/model ids; per-org balance + default-model + caps; top-off intent.
+  # THE LINE: gateway account, pricing (5% CF + 0.5% WB), and branding are OUR cloud product, not the std.
+  route "GET /cloud/inference/models", :inference_models
+  route "GET /cloud/inference", :inference_status
+  route "POST /cloud/inference/config", :inference_config_save
+  route "POST /cloud/inference/topup", :inference_topup
 
   # Drafts + visibility (Phase 2). A draft is a REAL nexus folder gated `draft` (a per-folder permission
   # in the control plane) until promoted to `private`/`public`. Create scaffolds the folder + commits it
@@ -262,8 +274,11 @@ server :cloud do
         _ -> %{id: gen_id(), title: title_from(msg), messages: [], updated: 0, agent: agent, project: project}
       end
 
-    # Run via the session's pinned agent (existing session) or the just-chosen one (new session).
-    reply = run_agent(msg, model, Map.get(session, :agent) || agent)
+    # Run via the session's pinned agent (existing session) or the just-chosen one (new session). Model
+    # precedence: the composer's explicit pick > the agent's per-org override > nil (runtime default).
+    agent_name = Map.get(session, :agent) || agent
+    eff_model = (is_binary(model) and model != "" and model) || Map.get(agent_override(req.tenant, agent_name), :model)
+    reply = run_agent(msg, eff_model, agent_name)
 
     turns = session.messages ++ [%{role: "user", text: msg}, %{role: "assistant", text: reply}]
     session = %{session | messages: turns, updated: System.os_time(:second)}
@@ -1135,6 +1150,138 @@ server :cloud do
 
     %{agents: agents}
   end
+
+  # ── Agent overrides (model + prompt) — the agent editor. The shipped agent block is the default; an
+  # override layers on top per org (stored in the control plane), applied at run time.
+  defp agent_override(tenant, name) do
+    case Nexus.ControlPlane.get(tenant, :agent_override, name) do
+      {:ok, o} when is_map(o) -> o
+      _ -> %{}
+    end
+  end
+
+  # The shipped agent's default prompt (from the live registry), so the editor shows what it's overriding.
+  defp agent_default_prompt(name) do
+    try do
+      case Nexus.Agent.get(name) do
+        %{} = a -> to_string(Map.get(a, :prompt) || "")
+        _ -> ""
+      end
+    rescue
+      _ -> ""
+    end
+  end
+
+  def agent_config_get(req) do
+    name = req.query["name"] || ""
+    base = Enum.find(agent_catalog(), &(&1.name == name)) || %{name: name, label: name, toolkit: nil}
+    ov = agent_override(req.tenant, name)
+
+    %{name: name, label: Map.get(base, :label) || name, toolkit: Map.get(base, :toolkit),
+      default_prompt: agent_default_prompt(name),
+      prompt: Map.get(ov, :prompt), model: Map.get(ov, :model)}
+  end
+
+  def agent_config_save(req) do
+    b = (is_map(req.body) && req.body) || %{}
+    name = b["name"] || ""
+
+    if name == "" do
+      {400, %{error: "name required"}}
+    else
+      upd =
+        agent_override(req.tenant, name)
+        |> maybe_put(:prompt, b["prompt"])
+        |> maybe_put(:model, b["model"])
+
+      Nexus.ControlPlane.put(req.tenant, :agent_override, name, upd)
+      {200, %{ok: true, name: name, model: upd[:model], prompt: upd[:prompt]}}
+    end
+  end
+
+  # ── Workbooks Inference — our default LLM provider over the Cloudflare AI Gateway. The catalog is the
+  # routable `provider/model` ids; the runtime gateway provider (deferred) routes them with our cf-aig
+  # token. Branded "Workbooks Inference"; the gateway account/pricing are OUR product, not the standard.
+  @inference_default_model "anthropic/claude-4-5-sonnet"
+
+  def model_catalog do
+    [
+      %{id: "openai/gpt-5.2", label: "GPT-5.2", provider: "openai", tier: "frontier"},
+      %{id: "openai/gpt-5.2-mini", label: "GPT-5.2 Mini", provider: "openai", tier: "fast"},
+      %{id: "anthropic/claude-4-5-sonnet", label: "Claude 4.5 Sonnet", provider: "anthropic", tier: "frontier"},
+      %{id: "anthropic/claude-4-5-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", tier: "fast"},
+      %{id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "google", tier: "frontier"},
+      %{id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "google", tier: "fast"},
+      %{id: "grok/grok-4", label: "Grok 4", provider: "grok", tier: "frontier"},
+      %{id: "workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast", label: "Llama 3.3 70B", provider: "workers-ai", tier: "open"}
+    ]
+  end
+
+  def inference_models(_req), do: %{models: model_catalog(), provider: "Workbooks Inference", default_model: @inference_default_model}
+
+  defp inference_config(tenant) do
+    case Nexus.ControlPlane.get(tenant, :inference, "config") do
+      {:ok, c} when is_map(c) -> c
+      _ -> %{}
+    end
+  end
+
+  def inference_status(req) do
+    cfg = inference_config(req.tenant)
+
+    %{
+      provider: "Workbooks Inference",
+      balance: Map.get(cfg, :balance) || 0.0,
+      spent_mtd: Map.get(cfg, :spent_mtd) || 0.0,
+      default_model: Map.get(cfg, :default_model) || @inference_default_model,
+      monthly_cap: Map.get(cfg, :monthly_cap),
+      per_run_cap: Map.get(cfg, :per_run_cap),
+      models: model_catalog(),
+      # Transparent pricing: Cloudflare passes provider rates through (no per-token markup); the 5% is on
+      # top-ups. Workbooks adds 0.5%. Shown to the customer as an itemized footnote.
+      pricing: %{cloudflare_pct: 5.0, workbooks_pct: 0.5,
+        note: "Inference is billed at provider rates with no per-token markup. Top-ups carry a 5% Cloudflare fee + a 0.5% Workbooks fee."}
+    }
+  end
+
+  def inference_config_save(req) do
+    b = (is_map(req.body) && req.body) || %{}
+
+    upd =
+      inference_config(req.tenant)
+      |> maybe_put(:default_model, b["default_model"])
+      |> maybe_put(:monthly_cap, inf_num(b["monthly_cap"]))
+      |> maybe_put(:per_run_cap, inf_num(b["per_run_cap"]))
+
+    Nexus.ControlPlane.put(req.tenant, :inference, "config", upd)
+    {200, %{ok: true, config: upd}}
+  end
+
+  # Top-off intent. Stripe settlement + the org credit ledger are the deferred runtime piece (wb-lze1);
+  # until that's wired we record the intent and return a pending status — never a fake success.
+  def inference_topup(req) do
+    amount = inf_num((is_map(req.body) && req.body["amount"]) || nil)
+
+    cond do
+      is_nil(amount) or amount <= 0 ->
+        {400, %{error: "amount must be a positive number"}}
+
+      true ->
+        total = Float.round(amount * 1.055, 2)
+        {200, %{pending: true, amount: amount, total: total,
+          message: "Checkout for Workbooks Inference credit is being wired up — your $#{:erlang.float_to_binary(amount / 1, decimals: 2)} top-up (≈ $#{:erlang.float_to_binary(total / 1, decimals: 2)} with fees) is noted."}}
+    end
+  end
+
+  defp inf_num(nil), do: nil
+  defp inf_num(n) when is_number(n), do: n / 1
+  defp inf_num(s) when is_binary(s) do
+    case Float.parse(String.trim(s)) do
+      {f, _} -> f
+      _ -> nil
+    end
+  end
+  defp inf_num(_), do: nil
 
   # An app is GATED (lock) when its workbook declares an `auth` block — our auth guardian
   # (Nexus.Auth.Guard) protects it. No auth block ⇒ public (globe), an open hosted surface. Only the
