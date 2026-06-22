@@ -137,7 +137,11 @@ defmodule Nexus.Agent do
       description:
         "Run a command line in the agent's sandboxed shell. Commands are wasm CLI kits run in " <>
           "wasmtime against the /work VFS. Supports pipes (|). Builtins: `kits` (list available " <>
-          "kits), `help <kit>` (a kit's commands). Returns combined stdout/stderr.",
+          "kits), `help <kit>` (a kit's commands), and `work <verb>` — your own CLI for `.work` " <>
+          "tasks (`work check` to compile-check + resolve refs, `work structure`, `work graph`, " <>
+          "`work why <unit>`, `work near <unit>`, `work parse <file>`; `work help` for all). After " <>
+          "authoring/editing .work files, run `work check` to confirm they compile before finishing. " <>
+          "Returns combined stdout/stderr.",
       parameters: %{
         type: "object",
         properties: %{command: %{type: "string", description: "the command line to run"}},

@@ -33,6 +33,9 @@ defmodule Nexus.Agent.Vfs do
   @doc "The wasmtime `--dir` mapping for this vfs (`<host>::/work`)."
   def mount(%__MODULE__{dir: dir}), do: "#{dir}::#{@guest}"
 
+  @doc "The host directory backing this vfs (for in-process tooling that walks the tree, e.g. `work`)."
+  def dir(%__MODULE__{dir: dir}), do: dir
+
   @doc "Write a file into the workspace (path relative to /work)."
   def put(%__MODULE__{dir: dir}, rel, contents) do
     path = Path.join(dir, rel)

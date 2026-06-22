@@ -117,6 +117,12 @@ defmodule Nexus.Agent.Bash do
   # longer rationale via stdin if needed (treated as untrusted `why`).
   defp run_segment(_vfs, ["request" | rest], stdin, _perms), do: run_request(rest, stdin)
 
+  # `work <verb> …` — the agent's own CLI, IN-PROCESS (not wasm, not a subprocess): the SAME
+  # `Nexus.Compile`/`Nexus.Graph` logic the runtime + reactor use, run against the agent's /work tree.
+  # This is how an agent does compilations + workbook tasks (author files → `work check` → fix). Gated on
+  # an `exec`/`commands`/`work` grant; analysis-only verbs that never reach outside /work.
+  defp run_segment(vfs, ["work" | rest], _stdin, perms), do: run_work(vfs, rest, perms)
+
   # `image|video|speak <prompt…>` — generate an asset (host-brokered, like web/agent). The prompt comes
   # from the args, or stdin when piped. `--model <id>` overrides the default model for the modality.
   defp run_segment(_vfs, [cmd | rest], stdin, perms) when cmd in @gen_cmds,
@@ -175,6 +181,126 @@ defmodule Nexus.Agent.Bash do
 
       {:error, msg} ->
         "request: #{msg}"
+    end
+  end
+
+  # ── `work` — the agent's own CLI, in-process ────────────────────────────────────────────────────
+  # Verbs operate on the agent's /work tree (its VFS host dir). check = compile + ref resolution (the
+  # one the runtime gates pushes with); graph/why/near/structure = the code-graph; parse = a file's
+  # units. No weave/deploy/login/secret here — those touch the network/creds and aren't an in-sandbox op.
+  @work_verbs ~w(check graph structure why near parse help)
+
+  defp run_work(_vfs, [], _perms), do: work_help()
+
+  defp run_work(vfs, [verb | args], perms) do
+    cond do
+      verb == "help" -> work_help()
+      not work_granted?(perms) ->
+        "work: '#{verb}' needs an 'exec' or 'commands' grant, not granted to this agent"
+      verb not in @work_verbs ->
+        "work: unknown verb '#{verb}' — try: #{Enum.join(@work_verbs, ", ")}"
+      true ->
+        root = Nexus.Agent.Vfs.dir(vfs)
+        case verb do
+          "check" -> work_check(root)
+          "graph" -> work_graph(root)
+          "structure" -> work_structure(root)
+          "why" -> work_graph_q(root, args, :why)
+          "near" -> work_graph_q(root, args, :near)
+          "parse" -> work_parse(root, args)
+        end
+    end
+  rescue
+    e -> "work: error — #{Exception.message(e)}"
+  end
+
+  # `work` is a code/compile capability over the agent's own tree — gate it like exec, not fs-read.
+  defp work_granted?(nil), do: true
+  defp work_granted?(%{grant: grant}) when is_list(grant), do: Enum.any?(~w(exec commands work), &(&1 in grant))
+  defp work_granted?(_), do: true
+
+  defp work_help do
+    """
+    work — compile + analyze the .work tree in /work (in-process):
+      work check            compile-check every unit + resolve all [[refs]]/imports (what the push gate runs)
+      work graph            the code graph: unit count, edges, dangling refs
+      work structure        the units in /work, grouped by kind
+      work why <name>       who depends on <name> (reverse deps)
+      work near <name>      <name>'s immediate edges (in + out)
+      work parse <file>     the parsed units of one .work file
+    """
+  end
+
+  # `work check` — the real compile gate: Nexus.Compile.check (beam/syntax/unit compile) + Nexus.Graph.check
+  # (dangling backlinks/edges). The SAME logic that gates a git push, so an agent can self-check before it ships.
+  defp work_check(root) do
+    c = Nexus.Compile.check(root)
+    g = Nexus.Graph.build_dir(root) |> Nexus.Graph.check()
+
+    errs =
+      Enum.map(c.errors, fn e -> "  ✗ #{e.kind} #{e.name || "?"} — #{e.reason}" end) ++
+        Enum.map(g.dangling_backlinks, fn {path, l} -> "  ✗ dangling [[#{l}]] in #{Path.relative_to(path, root)}" end) ++
+        Enum.map(g.dangling_edges, fn e -> "  ✗ unresolved ref #{e.from} → #{e.to}" end)
+
+    ok? = c.ok? and g.ok
+    head = if ok?, do: "work check: OK", else: "work check: #{length(errs)} problem(s)"
+    skipped = if c.skipped == [], do: "", else: "\n  (#{length(c.skipped)} wasm/client unit(s) checked at build, not here)"
+    "#{head} — #{g.nodes} unit(s), #{g.edges} edge(s)" <> skipped <>
+      if(errs == [], do: "", else: "\n" <> Enum.join(errs, "\n"))
+  end
+
+  defp work_graph(root) do
+    g = Nexus.Graph.build_dir(root)
+    chk = Nexus.Graph.check(g)
+    "work graph: #{map_size(g.nodes)} unit(s), #{length(g.edges)} edge(s), " <>
+      "#{length(chk.dangling_backlinks) + length(chk.dangling_edges)} dangling ref(s)"
+  end
+
+  defp work_structure(root) do
+    g = Nexus.Graph.build_dir(root)
+
+    # g.nodes is keyed BY name (name => node); the name is the map key, not a field on the node.
+    g.nodes
+    |> Enum.group_by(fn {_name, n} -> Map.get(n, :kind) || "?" end, fn {name, _n} -> name end)
+    |> Enum.sort()
+    |> Enum.map_join("\n", fn {kind, names} ->
+      "#{kind} (#{length(names)}): #{names |> Enum.sort() |> Enum.join(", ")}"
+    end)
+    |> case do
+      "" -> "work structure: no units in /work"
+      s -> s
+    end
+  end
+
+  defp work_graph_q(_root, [], q), do: "work #{q}: usage: work #{q} <unit-name>"
+
+  defp work_graph_q(root, [name | _], :why) do
+    case Nexus.Graph.build_dir(root) |> Nexus.Graph.why(name) do
+      [] -> "work why #{name}: nothing depends on it (or no such unit)"
+      deps -> "work why #{name}: #{Enum.join(deps, ", ")}"
+    end
+  end
+
+  defp work_graph_q(root, [name | _], :near) do
+    case Nexus.Graph.build_dir(root) |> Nexus.Graph.near(name) do
+      [] -> "work near #{name}: no edges (or no such unit)"
+      edges -> "work near #{name}:\n" <> Enum.map_join(edges, "\n", fn e -> "  #{e.from} → #{e.to}" end)
+    end
+  end
+
+  defp work_parse(_root, []), do: "work parse: usage: work parse <file.work>"
+
+  defp work_parse(root, [file | _]) do
+    path = Path.join(root, redirect_rel(file))
+
+    if File.exists?(path) do
+      units = path |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code))
+      case units do
+        [] -> "work parse #{file}: no code units (prose-only)"
+        _ -> "work parse #{file}: " <> Enum.map_join(units, ", ", fn u -> "#{u.kind} #{u.name}" end)
+      end
+    else
+      "work parse: no such file: #{file}"
     end
   end
 
