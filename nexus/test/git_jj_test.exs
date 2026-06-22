@@ -41,4 +41,31 @@ defmodule Nexus.GitJJTest do
       assert Nexus.JJ.op_entries(dir) == []
     end
   end
+
+  @tag :jj
+  test "Nexus.JJ snapshot/restore: reverts the working copy to the snapshot op" do
+    dir = tmp()
+    File.write!(Path.join(dir, "a.work"), "# A\n")
+    Nexus.Git.commit(dir, "init")
+
+    # A bad op id is rejected without touching the repo, jj or no jj.
+    assert {:error, :bad_op_id} = Nexus.JJ.restore(dir, "nothex!")
+
+    if Nexus.JJ.available?() do
+      assert Nexus.JJ.ensure(dir) == :ok
+      assert {:ok, snap} = Nexus.JJ.snapshot(dir)
+      assert snap =~ ~r/\A[0-9a-f]{4,}\z/
+
+      # Mutate, then force jj to record a working-copy op, then restore to the snapshot.
+      File.write!(Path.join(dir, "b.work"), "# B\n")
+      Nexus.JJ.status(dir)
+      assert File.exists?(Path.join(dir, "b.work"))
+
+      assert Nexus.JJ.restore(dir, snap) == :ok
+      refute File.exists?(Path.join(dir, "b.work"))
+      assert File.exists?(Path.join(dir, "a.work"))
+    else
+      assert {:skip, _} = Nexus.JJ.snapshot(dir)
+    end
+  end
 end

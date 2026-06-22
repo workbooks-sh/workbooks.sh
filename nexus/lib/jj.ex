@@ -206,6 +206,45 @@ defmodule Nexus.JJ do
   end
 
   @doc """
+  Snapshot the current op-log head — an opaque op-id token to `restore/2` the WHOLE repo state to
+  later. The foundation for dev-mode / eval isolation: snapshot before a run, restore after, so the
+  run's mutations don't persist. `{:ok, op_id} | {:skip, reason} | {:error, reason}`.
+  """
+  def snapshot(dir) do
+    with :ok <- ensure(dir),
+         {out, 0} <- jj(dir, ["op", "log", "--no-graph", "--limit", "1", "-T", ~s|id.short() ++ "\n"|]) do
+      id = out |> String.split("\n", trim: true) |> List.first("") |> String.trim()
+      if valid_op_id?(id), do: {:ok, id}, else: {:error, :no_op_id}
+    else
+      {:skip, r} -> {:skip, r}
+      {out, _} when is_binary(out) -> {:error, out}
+      other -> {:error, inspect(other)}
+    end
+  end
+
+  @doc """
+  Restore the repo to a `snapshot/1` op-id (`jj op restore <op_id>`) — reverts the working copy +
+  bookmarks to that operation, discarding everything since, then re-exports refs so the bare repo +
+  on-disk checkout match. `op_id` is re-validated (only a short hex op hash ever reaches the shell).
+  For eval isolation / undo-to-baseline. `:ok | {:skip,_} | {:error,_}`.
+  """
+  def restore(dir, op_id) do
+    if valid_op_id?(op_id) do
+      with :ok <- ensure(dir),
+           {_, 0} <- jj(dir, ["op", "restore", op_id]),
+           {_, 0} <- jj(dir, ["git", "export"]) do
+        :ok
+      else
+        {:skip, r} -> {:skip, r}
+        {out, _} when is_binary(out) -> {:error, out}
+        other -> {:error, inspect(other)}
+      end
+    else
+      {:error, :bad_op_id}
+    end
+  end
+
+  @doc """
   Import git refs into jj after an EXTERNAL `git push` so the pushed commits show up in the op-log too
   (otherwise only internal jj-routed edits are recorded). Best-effort, no-op-safe. `:ok | {:skip,_} | {:error,_}`.
   """
