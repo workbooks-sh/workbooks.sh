@@ -64,6 +64,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Hole 1 belt: a CLIENT-side check the slim nexus can't do (it has no JS toolchain, so client
+      # blocks/views are render-passthrough). `node --check` parses every .js in the workspace — catches
+      # a broken dashboard view that would otherwise only fail in the browser. Cheap, no toolchain.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: JS syntax check (${{ matrix.ws }})
+        run: |
+          set -euo pipefail
+          n=0
+          while IFS= read -r f; do
+            node --check "$f" || { echo "::error::JS syntax error in $f"; exit 1; }
+            n=$((n+1))
+          done < <(find "dogfood/${{ matrix.ws }}" -name '*.js' -not -path '*/node_modules/*')
+          echo "✓ $n .js file(s) parse cleanly"
+
       - name: Push ${{ matrix.ws }} → nexus (hot-reload, no image build)
         env:
           TOKEN: ${{ secrets.WB_DOGFOOD_PUSH_TOKEN }}
@@ -93,19 +109,27 @@ jobs:
       # serving (e.g. a pushed .work failed bringup). The nexus stays up + other surfaces serve; recover
       # by `jj undo` on that workspace (the op-log we made real) or pushing a fix. Reactive, not
       # preventive — the preventive gate is a pre-push `work check` (see the runtime TODO).
-      - name: Smoke ${{ matrix.ws }} surface (GET → 200)
+      # Hole 5a: probe a REAL endpoint, not just the SSR shell — a broken server block drops its routes
+      # while the shell still serves 200, so the shell is a false-pass. lander/docs are static surfaces
+      # (the shell IS the content → 200). cloud is probed at a server-block route (/cloud/inference): if
+      # the cloud server unit didn't compile/install, that route is 404, not 200. (The pre-receive gate
+      # already rejects non-compiling pushes; this is the backstop for served-but-broken / gate-unavailable.)
+      - name: Smoke ${{ matrix.ws }} (real endpoint)
         run: |
           set -euo pipefail
           case "${{ matrix.ws }}" in
-            lander) path="/";; cloud) path="/cloud/";; docs) path="/docs/";; *) path="/${{ matrix.ws }}/";;
+            lander) path="/";              want="200" ;;
+            docs)   path="/docs/";         want="200" ;;
+            cloud)  path="/cloud/inference"; want="200" ;;   # a cloud server-block GET route → 404 if the unit didn't install
+            *)      path="/${{ matrix.ws }}/"; want="200" ;;
           esac
           ok=
           for i in $(seq 1 20); do
             code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://workbooks.sh${path}" || true)"
-            if [ "$code" = "200" ]; then ok=1; echo "✅ ${path} serving 200 after push"; break; fi
-            echo "… ${path} → ${code} (waiting for hot-reload, attempt $i)"; sleep 3
+            if [ "$code" = "$want" ]; then ok=1; echo "✅ ${path} → ${code} after push"; break; fi
+            echo "… ${path} → ${code} (want ${want}; waiting for hot-reload, attempt $i)"; sleep 3
           done
           if [ -z "$ok" ]; then
-            echo "::error::${{ matrix.ws }} surface (${path}) is NOT serving 200 after push — the pushed content likely broke bringup. Roll back: jj undo on that workspace, or push a fix. The nexus + other surfaces are unaffected."
+            echo "::error::${{ matrix.ws }} (${path}) did not return ${want} after push — the pushed content likely broke bringup. Roll back with 'jj undo' on that workspace or push a fix; the nexus + sibling surfaces are unaffected."
             exit 1
           fi
