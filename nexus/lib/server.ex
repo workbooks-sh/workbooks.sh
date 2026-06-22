@@ -551,6 +551,51 @@ defmodule Nexus.Server do
   end
 
   defp dispatch_mount(conn, name, root, tail) do
+    # Visibility gate (generic surface-access mechanism; neutral default = public): a surface explicitly
+    # marked `private` or `draft` in the control-plane registry is NOT publicly served — only a request
+    # carrying a real authenticated user may reach it. No record ⇒ public ⇒ unchanged behavior. This is
+    # how an owner takes a live site down from public → private/draft at any time. (Auth-block protection
+    # is handled separately by Nexus.Auth.Guard; this is the per-surface visibility override.)
+    if surface_hidden?(conn, name) do
+      surface_unavailable(conn)
+    else
+      dispatch_mount_serve(conn, name, root, tail)
+    end
+  end
+
+  # Whether a request must NOT be served because the surface is private/draft and the caller isn't a
+  # real authenticated user. On a trusted (no-auth) nexus there are no users, so private/draft = fully
+  # offline (404 to all direct hits) — exactly "take the site down". On an auth-enabled nexus, signed-in
+  # users still reach it. Empty/root mount is never gated.
+  defp surface_hidden?(_conn, ""), do: false
+  defp surface_hidden?(conn, name) do
+    tenant = conn.assigns[:tenant] || Nexus.Store.default_tenant()
+
+    case Nexus.ControlPlane.get(tenant, :visibility, name) do
+      {:ok, rec} -> (rec[:state] || rec["state"]) in ["private", "draft"] and not real_user?(conn)
+      _ -> false
+    end
+  rescue
+    _ -> false
+  end
+
+  defp real_user?(conn) do
+    case conn.assigns[:identity] do
+      %{user: u} when is_binary(u) and u != "" -> true
+      _ -> false
+    end
+  end
+
+  defp surface_unavailable(conn) do
+    conn
+    |> put_resp_content_type("text/html")
+    |> send_resp(404, "<!doctype html><meta charset=\"utf-8\"><title>Not available</title>" <>
+      "<body style=\"font:15px/1.5 system-ui,sans-serif;color:#555;max-width:30rem;margin:18vh auto;padding:0 1.5rem\">" <>
+      "<h1 style=\"font-size:1.15rem;color:#222\">This page isn’t available</h1>" <>
+      "<p>It may be private or still a draft.</p></body>")
+  end
+
+  defp dispatch_mount_serve(conn, name, root, tail) do
     # Strip the asset-version segment (`_v/<ver>/…`) injected into <base href> — it's purely a cache
     # key; the real file is at the un-versioned path. Any version value maps to the current files.
     tail = case tail do
