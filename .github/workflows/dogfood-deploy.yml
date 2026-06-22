@@ -7,8 +7,22 @@
 # red in CI instead of in production. Agents stop deploying from laptops; they merge to main and read
 # this run's status (see scripts/deployable.sh).
 #
-# FLOW (one serialized job): build image → run it → poll /health → (main only, if green) deploy the
-# EXACT smoked image to wb-dogfood. fly.toml's [[http_service.checks]] is the final cutover guard.
+# FLOW (two jobs):
+#   build-smoke → buildx-build (GHA LAYER CACHE) → boot → poll /health → (main) push the EXACT image to
+#                 the fly registry by sha.
+#   deploy      → flyctl deploy that pushed image (no rebuild → no drift). fly.toml's
+#                 [[http_service.checks]] is the final cutover guard.
+#
+# SPEED (the two reasons this used to take ~6 min every push, now fixed):
+#   1) LAYER CACHE — `docker buildx … --cache-to/--cache-from type=gha`. The Dockerfile compiles the
+#      Elixir release BEFORE `COPY dogfood /srv/dogfood`, so a DOGFOOD-ONLY change (a cloud-dashboard
+#      .js view, lander copy — the common edit) hits cache on the whole release and only re-runs the
+#      final content layer → ~1 min instead of ~6. A nexus/ change still recompiles (cache only saves
+#      rustup + deps), which is unavoidable in this slim image.
+#   3) CANCEL SUPERSEDED BUILDS, NEVER A DEPLOY — build-smoke is cancel-in-progress (a newer push kills
+#      an older build so bursts don't stack into a long serial queue), while deploy has its OWN
+#      cancel-in-progress:false group so an in-flight Fly deploy is never interrupted. Superseded
+#      commits simply never reach deploy (their build was cancelled); the newest commit wins.
 #
 # THE LINE: this is OUR cloud ops (wb-dogfood = our workbook deployed like a customer), not the open
 # standard. Generic mechanism only; nothing customer-specific leaks into the runtime.
@@ -23,27 +37,37 @@ on:
     paths: ["dogfood/**", "nexus/**", ".github/workflows/dogfood-deploy.yml"]
   workflow_dispatch: {}
 
-# Serialize: never let two deploys race the single wb-dogfood machine. Queue, don't cancel.
-concurrency:
-  group: dogfood-deploy
-  cancel-in-progress: false
-
 env:
   IMAGE: registry.fly.io/wb-dogfood
   FLY_APP: wb-dogfood
 
 jobs:
-  build-smoke-deploy:
+  build-smoke:
     runs-on: ubuntu-latest
+    # Cancel a superseded build the moment a newer commit arrives — bursts don't stack into a serial
+    # queue. Per-ref so PR builds and main builds don't cancel each other.
+    concurrency:
+      group: dogfood-build-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       # No submodules: the dogfood release vendors what it needs (nexus/vendor/wasmex is tracked); the
       # only submodule (nexus/wasm-video → wavelet) is not a build dep. Keeps checkout lean + can't fail
       # on a submodule clone.
       - uses: actions/checkout@v4
 
-      # 1 · Build the real release image (same Dockerfile prod deploys).
-      - name: Build image
-        run: docker build -t dogfood-ci:${{ github.sha }} -f dogfood/deploy/Dockerfile .
+      - uses: docker/setup-buildx-action@v3
+
+      # 1 · Build the real release image WITH a persistent layer cache (same Dockerfile prod deploys).
+      #     --load puts the single-arch image into the local docker daemon so smoke + push use it as-is.
+      #     mode=max caches the multi-stage build layers (deps/_build), not just the final stage.
+      - name: Build image (cached)
+        run: |
+          docker buildx build \
+            --cache-from type=gha,scope=dogfood \
+            --cache-to type=gha,mode=max,scope=dogfood \
+            --load \
+            -t dogfood-ci:${{ github.sha }} \
+            -f dogfood/deploy/Dockerfile .
 
       # 2 · SMOKE — boot the release and require GET /health 200. This is the gate that catches
       #     release-only boot crashes (the acceptor crash) that `mix test` cannot see.
@@ -70,9 +94,9 @@ jobs:
           echo "✅ /health OK — release boots clean"
           docker rm -f smoke >/dev/null 2>&1 || true
 
-      # 3 · DEPLOY — main only, and only because the smoke above passed. Push the EXACT smoked image and
-      #     release it (no rebuild → no drift). fly.toml's /health check guards the cutover as backstop.
-      - name: Deploy to wb-dogfood (main, green only)
+      # 3 · PUSH the EXACT smoked image to the fly registry (main only). The deploy job releases this by
+      #     sha — no rebuild, no drift. Pushing only after smoke passes keeps a broken image off the registry.
+      - name: Push smoked image (main, green only)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_DOGFOOD_TOKEN }}
@@ -87,5 +111,26 @@ jobs:
           flyctl auth docker
           docker tag dogfood-ci:${{ github.sha }} "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:${{ github.sha }}"
+          echo "📦 pushed $IMAGE:${{ github.sha }}"
+
+  # Deploy is its OWN concurrency group with cancel-in-progress:false — an in-flight Fly deploy is NEVER
+  # interrupted, and two green commits deploy in order (newest last → wins) instead of racing the single
+  # machine. Superseded commits never get here: their build-smoke was cancelled above.
+  deploy:
+    needs: build-smoke
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: dogfood-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4 # for dogfood/deploy/fly.toml
+      - name: Deploy to wb-dogfood
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_DOGFOOD_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -fsSL https://fly.io/install.sh | sh
+          export PATH="$HOME/.fly/bin:$PATH"
           flyctl deploy -a "$FLY_APP" -c dogfood/deploy/fly.toml -i "$IMAGE:${{ github.sha }}" --ha=false
           echo "🚀 deployed $IMAGE:${{ github.sha }} to $FLY_APP"
