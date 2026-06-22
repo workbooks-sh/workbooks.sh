@@ -1742,13 +1742,19 @@ server :cloud do
     Nexus.Live.register("agent_run", fn params, emit ->
       agent = params["agent"] || ""
       task = params["task"] || ""
+      # tenant/u are SERVER-INJECTED by the /ws + /live transports (Nexus.Auth), never the client's word.
       tenant = params["tenant"] || Nexus.Store.default_tenant()
       user = params["u"] || "anon"
+      sel = if(is_list(params["capabilities"]), do: params["capabilities"], else: [])
+      caps = if(agent != "" and Nexus.Agent.get(agent), do: Nexus.Agent.admitted(Nexus.Agent.get(agent), sel), else: [])
 
       cond do
         agent == "" or task == "" -> emit.(%{type: "error", error: "agent and task are required"})
         is_nil(Nexus.Agent.get(agent)) -> emit.(%{type: "error", error: "no such agent: #{agent}"})
-        true -> do_run(agent, task, tenant, user, emit, workspace: params["workspace"])
+        true ->
+          do_run(agent, task, tenant, user, emit,
+            workspace: params["workspace"], model: params["model"],
+            isolate: params["isolate"] == true, capabilities: caps)
       end
 
       :ok

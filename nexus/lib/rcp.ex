@@ -22,7 +22,8 @@ defmodule Nexus.Rcp do
         issuer: jwt[:iss],
         jwks_url: jwt[:jwks_url]
       },
-      transports: %{http: true, ws: false},
+      # ws: the duplex live channel at GET /ws (Nexus.Ws) — run streaming + bidirectional steering.
+      transports: %{http: true, ws: true},
       capabilities: caps()
     }
   end

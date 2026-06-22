@@ -431,13 +431,24 @@ defmodule Nexus.Server do
     |> send_resp(200, Jason.encode!(rows, escape: :html_safe))
   end
 
+  # ── Live channel — WebSocket transport (the duplex upgrade of /live; RCP `transports.ws`) ─────────
+  # GET /ws — upgrade to a WebSocket carrying the SERVER-DERIVED identity; the client subscribes to any
+  # registered Nexus.Live source and (next) steers it. Bidirectional, so one socket serves run output +
+  # mid-run input. Auth runs in the plug above (the handshake GET carries the PAT/cookie), so the socket
+  # is already tenant-scoped. See Nexus.Ws.
+  get "/ws" do
+    state = %{tenant: Nexus.Auth.tenant(conn), user: Nexus.Auth.user(conn)}
+    Plug.Conn.upgrade_adapter(conn, :websocket, {Nexus.Ws, state, []})
+  end
+
   # ── Live channel (the Dock seam for workbook `view` units) ────────────────────────────────────
   # GET /live/:source?<params> — subscribe to a registered Nexus.Live source as SSE. A woven `view`
   # template opens an EventSource here; the source (e.g. a `fleet` unit) streams events. Generic:
-  # any streaming capability registers in Nexus.Live and any workbook view can bind to it.
+  # any streaming capability registers in Nexus.Live and any workbook view can bind to it. The
+  # authenticated identity is injected server-side (never trusted from query params).
   get "/live/:source" do
     conn = Plug.Conn.fetch_query_params(conn)
-    params = conn.query_params
+    params = Map.merge(conn.query_params, %{"tenant" => Nexus.Auth.tenant(conn), "u" => Nexus.Auth.user(conn) || "anon"})
 
     conn =
       conn
