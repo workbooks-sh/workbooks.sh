@@ -111,6 +111,13 @@ server :cloud do
   # to GitHub if configured) + recompile changed units. The git mechanism is the open standard; saving
   # from the dashboard is our product.
   route "POST /cloud/file/save", :file_save
+  # File-tree mutations from the right-click context menu (our product). Each writes the volume + commits
+  # into the workspace repo (attributed, mirrored) like :file_save. Path(s) are `<mount>/<rel>`, mount +
+  # traversal guarded. The git mechanism stays the open standard; these dashboard verbs are ours.
+  route "POST /cloud/file/new", :file_new
+  route "POST /cloud/file/mkdir", :file_mkdir
+  route "POST /cloud/file/rename", :file_rename
+  route "POST /cloud/file/delete", :file_delete
 
   # The nexus AS a git remote (wb): per-workspace push URL + the current GitHub mirror. The git
   # mechanism (bare repo + post-receive + mirror) is the open standard (Nexus.Git / Nexus.GitHttp);
@@ -1160,6 +1167,109 @@ server :cloud do
     end
   end
 
+  # Resolve a `<mount>/<rel>` to {abs, mount, root, rel} WITHOUT requiring it to exist (create/rename
+  # destinations don't yet). Mount + traversal guarded exactly like resolve_file.
+  defp resolve_target(path) do
+    case String.split(String.trim(path || ""), "/", trim: true) do
+      [] -> {:error, 400, "path required"}
+      [mount | rest] ->
+        case List.keyfind(mounts(), mount, 0) do
+          nil -> {:error, 404, "no such mount"}
+          {_, root} ->
+            abs = Path.expand(Path.join([root | rest]))
+            if String.starts_with?(abs, Path.expand(root)),
+              do: {:ok, abs, mount, root, Enum.join(rest, "/")},
+              else: {:error, 403, "path escapes mount"}
+        end
+    end
+  end
+
+  # Commit a tree change (delete/rename/new) into the workspace's bare repo, attributed to the user,
+  # then remount + log an Activity event. Shared tail for the file-mutation verbs below.
+  defp commit_tree_change(req, mount, root, msg, event_title) do
+    bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
+    Nexus.Git.provision_remote(bare, root)
+    who = user_key(req)
+    result = Nexus.Git.commit_paths(bare, root, msg, author: "#{who} <#{who}>")
+    spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
+
+    case result do
+      {:ok, sha} ->
+        Nexus.Events.emit(
+          %{kind: "workspace.change", actor: who, title: event_title, target: sha,
+            tags: ["event", "change"], scope: "member"}, tenant: req.tenant)
+        %{ok: true, sha: sha}
+
+      :nochange -> %{ok: true, nochange: true}
+      {:error, out} -> {500, %{error: out}}
+    end
+  end
+
+  # Create a new (empty) file. Body: %{path: "<mount>/<rel>"}. 409 if it already exists.
+  def file_new(req) do
+    case resolve_target(is_map(req.body) && req.body["path"]) do
+      {:error, status, msg} -> {status, %{error: msg}}
+      {:ok, abs, mount, root, rel} ->
+        cond do
+          rel == "" -> {400, %{error: "path required"}}
+          File.exists?(abs) -> {409, %{error: "already exists"}}
+          true ->
+            File.mkdir_p!(Path.dirname(abs)); File.write!(abs, "")
+            commit_tree_change(req, mount, root, "create #{rel} via dashboard", "created #{rel} in #{mount}")
+        end
+    end
+  end
+
+  # Create a new folder (with a .gitkeep so the empty dir survives the git round-trip). Body: %{path}.
+  def file_mkdir(req) do
+    case resolve_target(is_map(req.body) && req.body["path"]) do
+      {:error, status, msg} -> {status, %{error: msg}}
+      {:ok, abs, mount, root, rel} ->
+        cond do
+          rel == "" -> {400, %{error: "path required"}}
+          File.exists?(abs) -> {409, %{error: "already exists"}}
+          true ->
+            File.mkdir_p!(abs); File.write!(Path.join(abs, ".gitkeep"), "")
+            commit_tree_change(req, mount, root, "mkdir #{rel} via dashboard", "created folder #{rel} in #{mount}")
+        end
+    end
+  end
+
+  # Rename/move a file or folder. Body: %{from: "<mount>/<rel>", to: "<mount>/<rel>"} (same mount).
+  def file_rename(req) do
+    from = is_map(req.body) && req.body["from"]
+    to = is_map(req.body) && req.body["to"]
+    with {:ok, fabs, fmount, root, frel} <- resolve_target(from),
+         {:ok, tabs, tmount, _r, trel} <- resolve_target(to) do
+      cond do
+        frel == "" or trel == "" -> {400, %{error: "from and to required"}}
+        fmount != tmount -> {400, %{error: "cross-workspace move not supported"}}
+        not File.exists?(fabs) -> {404, %{error: "source not found"}}
+        File.exists?(tabs) -> {409, %{error: "destination exists"}}
+        true ->
+          File.mkdir_p!(Path.dirname(tabs)); File.rename!(fabs, tabs)
+          commit_tree_change(req, fmount, root, "rename #{frel} → #{trel} via dashboard", "renamed #{frel} to #{trel} in #{fmount}")
+      end
+    else
+      {:error, status, msg} -> {status, %{error: msg}}
+    end
+  end
+
+  # Delete a file or folder (recursive). Body: %{path: "<mount>/<rel>"}.
+  def file_delete(req) do
+    case resolve_target(is_map(req.body) && req.body["path"]) do
+      {:error, status, msg} -> {status, %{error: msg}}
+      {:ok, abs, mount, root, rel} ->
+        cond do
+          rel == "" -> {400, %{error: "refusing to delete a workspace root"}}
+          not File.exists?(abs) -> {404, %{error: "not found"}}
+          true ->
+            File.rm_rf!(abs)
+            commit_tree_change(req, mount, root, "delete #{rel} via dashboard", "deleted #{rel} in #{mount}")
+        end
+    end
+  end
+
   # Raw bytes with the right Content-Type — for <img> and pdf.js.
   def file_raw(req) do
     case resolve_file(req.query["path"]) do
@@ -1325,7 +1435,7 @@ client :app do
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
-  <link rel="stylesheet" href="./app.css?v=20260621s">
+  <link rel="stylesheet" href="./app.css?v=20260621t">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
@@ -1356,5 +1466,5 @@ client :app do
   <!-- ?v= is the cache-bust token. BUMP IT ON EVERY DEPLOY that changes JS/CSS. app.js reads its own
        ?v= and re-applies it to every lazily-loaded asset (views, wbchat) so a deploy = all-new URLs =
        guaranteed cache miss (hard-refresh can't re-fetch lazy import()s; only a new URL can). -->
-  <script src="./app.js?v=20260621s"></script>
+  <script src="./app.js?v=20260621t"></script>
 end

@@ -42,7 +42,7 @@ WB.view('/storage', {
         </thead>
         <tbody>
           ${buckets.map((b) => `
-            <tr>
+            <tr data-ctx="bucket" data-bucket="${esc(b.name)}">
               <td class="mono">${esc(b.name)}</td>
               <td class="dim">${esc(b.nexus)}</td>
               <td class="num">${b.objects == null ? '—' : esc(b.objects.toLocaleString())}</td>

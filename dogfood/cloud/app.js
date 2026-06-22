@@ -241,9 +241,53 @@
         var x = e.target.closest('[data-x]'); if (x) done(x.getAttribute('data-x') === '1'); });
       document.body.appendChild(modal); }); };
 
+    // A single-field prompt modal (rename / new file name). Resolves the trimmed value, or null on cancel.
+    WB.prompt = function (o) { o = o || {}; return new Promise(function (resolve) {
+      var modal = document.createElement('div'); modal.className = 'modal';
+      modal.innerHTML = '<div class="sheet" style="width:420px"><h2>' + esc(o.title || 'Enter a value') + '</h2>' +
+        (o.body ? '<p class="sub">' + esc(o.body) + '</p>' : '') +
+        '<input class="winput" id="wbPromptIn" autocomplete="off" spellcheck="false" placeholder="' + esc(o.placeholder || '') + '" />' +
+        '<div class="foot"><span></span><div style="display:flex;gap:8px">' +
+        '<button class="btn" data-x="0">Cancel</button><button class="btn primary" data-x="1">' + esc(o.confirm || 'OK') + '</button></div></div></div>';
+      function done(v){ modal.remove(); resolve(v); }
+      var inp = modal.querySelector('#wbPromptIn');
+      modal.addEventListener('click', function (e) { if (e.target === modal) done(null);
+        var x = e.target.closest('[data-x]'); if (x) done(x.getAttribute('data-x') === '1' ? (inp.value.trim() || null) : null); });
+      modal.addEventListener('keydown', function (e) { if (e.key === 'Enter'){ e.preventDefault(); done(inp.value.trim() || null); } if (e.key === 'Escape') done(null); });
+      document.body.appendChild(modal); inp.value = o.value || ''; inp.focus(); inp.select(); }); };
+
+    // Copy text to the clipboard with a toast. Falls back to a hidden textarea where the async API is unavailable.
+    WB.copy = function (text, label) { text = String(text == null ? '' : text);
+      function ok(){ WB.toast((label || 'Copied') + ' to clipboard'); }
+      try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(ok, fb); return; } } catch (e) {}
+      fb();
+      function fb(){ try { var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); ok(); } catch (e2) { WB.toast('Couldn’t copy', 'bad'); } } };
+
     // ── identity ──────────────────────────────────────────────────────────────────────────────
     WB.user = { name: 'Account', email: '', initial: 'A' };
     WB.profile = {};
+    // The signed-in user's role in this nexus, mirrored from /me (server routes are the real authority).
+    // Context-menu actions are gated on it via WB.can — items the role can't perform are HIDDEN. Default
+    // 'owner' so a server that hasn't yet surfaced a role (or local dev) shows the full menu; cloud
+    // sessions always carry the real role. Ranked viewer < member < admin < owner.
+    WB.role = 'owner';
+    var ROLE_RANK = { viewer: 1, member: 2, admin: 3, owner: 4 };
+    // Capability → minimum role. A missing capability ⇒ allowed (read-only/universal actions).
+    var CAP_MIN = {
+      'app.create': 'member', 'app.edit': 'member',
+      'file.write': 'member',
+      'workspace.manage': 'admin',
+      'member.manage': 'admin',
+      'secret.manage': 'admin',
+      'nexus.manage': 'admin',
+      'billing.manage': 'owner'
+    };
+    WB.can = function (cap) {
+      if (!cap) return true;
+      var need = CAP_MIN[cap]; if (!need) return true;
+      return (ROLE_RANK[WB.role] || 0) >= (ROLE_RANK[need] || 99);
+    };
     // Dev flag — gates in-development surfaces (Create / Apps) so they stay DARK for everyone by
     // default. Flip per-browser with ?dev=1 (and ?dev=0 to clear); persisted in localStorage. "Just
     // for us in development" — no deploy/runtime change, customers never see it until we promote it.
@@ -255,6 +299,7 @@
       var u = me.user || {}; var name = u.name || (u.email ? u.email.split('@')[0] : '') || 'Account';
       WB.user = { name: name, email: u.email || '', initial: (name[0] || 'A').toUpperCase() };
       WB.profile = me.profile || {}; if (!WB.profile.orgName && me.active_org) WB.profile.orgName = me.profile && me.profile.orgName;
+      if (me.role) WB.role = me.role;
     } catch (e) {} }
 
     // ── router + shell ──────────────────────────────────────────────────────────────────────────
@@ -326,12 +371,91 @@
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); WB.palette(); }
     });
 
+    // ── Context-menu engine ───────────────────────────────────────────────────────────────────────
+    // ONE floating-menu primitive for the whole app. Objects opt into right-click by carrying
+    // data-ctx="<kind>"; a registered builder returns an items[] for that kind. The same engine also
+    // backs click-driven ⋯ menus (WB.ctx.openFrom), so the legacy popovers converge here.
+    //   item = { label, icon, on, need:<capability>, danger, disabled, sep, header, submenu:[items] }
+    // Items whose `need` the current role can't satisfy are HIDDEN (WB.can). on() runs after the menu
+    // closes. A `submenu` opens a child menu to the side on hover.
+    WB.ctx = (function(){
+      var reg = {}, openMenus = [];
+      function register(kind, fn){ reg[kind] = fn; }
+      function closeAll(){ openMenus.forEach(function(m){ if (m.parentNode) m.parentNode.removeChild(m); }); openMenus = []; unbind(); }
+      function closeFrom(depth){ while (openMenus.length > depth){ var m = openMenus.pop(); if (m.parentNode) m.parentNode.removeChild(m); } if (!openMenus.length) unbind(); }
+      function onKey(e){ if (e.key === 'Escape'){ e.preventDefault(); closeAll(); } }
+      function onDown(e){ if (!e.target.closest || !e.target.closest('.ctxmenu')) closeAll(); }
+      function onScroll(e){ if (!e.target.closest || !e.target.closest('.ctxmenu')) closeAll(); }
+      var bound = false;
+      function bind(){ if (bound) return; bound = true;
+        document.addEventListener('keydown', onKey, true);
+        document.addEventListener('mousedown', onDown, true);
+        document.addEventListener('scroll', onScroll, true);
+        window.addEventListener('blur', closeAll); window.addEventListener('resize', closeAll); }
+      function unbind(){ if (!bound) return; bound = false;
+        document.removeEventListener('keydown', onKey, true);
+        document.removeEventListener('mousedown', onDown, true);
+        document.removeEventListener('scroll', onScroll, true);
+        window.removeEventListener('blur', closeAll); window.removeEventListener('resize', closeAll); }
+
+      // Drop items the role can't use, then collapse separators (no leading/trailing/double dividers).
+      function visible(items){
+        var out = (items || []).filter(function(it){ return it && (it.sep || it.header || !it.need || WB.can(it.need)); });
+        var res = [], prevSep = true;
+        out.forEach(function(it){ if (it.sep){ if (!prevSep) { res.push(it); prevSep = true; } } else { res.push(it); prevSep = false; } });
+        while (res.length && (res[res.length - 1].sep || res[res.length - 1].header)) res.pop();
+        return res;
+      }
+      function build(items, depth){
+        var menu = document.createElement('div'); menu.className = 'ctxmenu';
+        items.forEach(function(it){
+          if (it.sep){ var d = document.createElement('div'); d.className = 'ctxsep'; menu.appendChild(d); return; }
+          if (it.header){ var h = document.createElement('div'); h.className = 'ctxhdr'; h.textContent = it.header; menu.appendChild(h); return; }
+          var b = document.createElement('button');
+          b.className = 'ctxitem' + (it.danger ? ' danger' : '') + (it.submenu ? ' has-sub' : '');
+          b.disabled = !!it.disabled;
+          b.innerHTML = '<span class="ctxico">' + (it.icon || '') + '</span><span class="ctxlbl">' + esc(it.label) + '</span>' +
+            (it.submenu ? '<span class="ctxarrow">' + ICO.chev + '</span>' : '');
+          if (it.submenu){
+            b.addEventListener('mouseenter', function(){ closeFrom(depth + 1); var sub = visible(typeof it.submenu === 'function' ? it.submenu() : it.submenu);
+              if (sub.length){ var r = b.getBoundingClientRect(); spawn(sub, r.right - 4, r.top - 4, depth + 1); } });
+          } else {
+            b.addEventListener('mouseenter', function(){ closeFrom(depth + 1); });
+            b.addEventListener('click', function(e){ e.preventDefault(); if (it.disabled) return; closeAll(); if (it.on) it.on(); });
+          }
+          menu.appendChild(b);
+        });
+        return menu;
+      }
+      function place(menu, x, y){
+        menu.style.visibility = 'hidden'; document.body.appendChild(menu);
+        var r = menu.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+        var px = (x + r.width > vw - 8) ? Math.max(8, x - r.width) : x;
+        var py = (y + r.height > vh - 8) ? Math.max(8, vh - r.height - 8) : y;
+        menu.style.left = Math.max(8, px) + 'px'; menu.style.top = Math.max(8, py) + 'px'; menu.style.visibility = '';
+      }
+      function spawn(items, x, y, depth){ var menu = build(items, depth); place(menu, x, y); openMenus[depth] = menu; openMenus.length = depth + 1; bind(); return menu; }
+      function show(items, x, y){ closeAll(); var vis = visible(items); if (!vis.length) return; spawn(vis, x, y, 0); }
+      // Open a menu anchored under an element (for click-driven ⋯ buttons).
+      function openFrom(el, items){ var r = el.getBoundingClientRect(); show(items, r.left, r.bottom + 4); }
+
+      document.addEventListener('contextmenu', function(e){
+        var host = e.target.closest && e.target.closest('[data-ctx]');
+        if (!host) { closeAll(); return; }
+        var fn = reg[host.getAttribute('data-ctx')]; if (!fn) return;
+        var items = fn(host, e) || []; var vis = visible(items); if (!vis.length) return;
+        e.preventDefault(); closeAll(); spawn(vis, e.clientX, e.clientY, 0);
+      });
+      return { register: register, show: show, openFrom: openFrom, close: closeAll };
+    })();
+
     var ACCENT = { '/storage': 'var(--sky)', '/team': 'var(--peach)', '/shared': 'var(--cream)', '/usage': 'var(--sage)',
       '/settings': 'var(--violet)', '/workspace': 'var(--peach)', '/database': 'var(--mint)', '/upgrade': 'var(--mint)' };
     function sectionAccent(p){ for (var k in ACCENT) { if (p.indexOf(k) === 0) return ACCENT[k]; } return 'var(--mint)'; }
     // Which RAIL section a route belongs to — drives the active rail tab + which per-surface sidebar shows.
-    var ADMIN_ROUTES = ['/usage', '/storage', '/team', '/secrets', '/integrations', '/database', '/upgrade'];
+    var ADMIN_ROUTES = ['/usage', '/storage', '/team', '/secrets', '/database', '/upgrade'];
     function sectionFor(p){
+      if (p.indexOf('/integrations') === 0) return 'integrations';   // own rail section — not admin-gated
       if (p.indexOf('/studio') === 0 || p.indexOf('/create') === 0) return 'studio';
       if (p.indexOf('/activity') === 0 || p.indexOf('/runs') === 0 || p.indexOf('/tasks') === 0 || p.indexOf('/issues') === 0) return 'activity';
       if (p.indexOf('/workspace') === 0) return 'files';
@@ -393,6 +517,7 @@
       activity: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
       admin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',
       chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+      plug: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg>',
       files: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>',
       grid: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>',
       filter: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18M6 12h12M10 20h4"/></svg>',
@@ -403,7 +528,16 @@
       rail: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>',
       pin: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
       logout: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
-      gear: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
+      gear: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+      edit: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+      trash: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>',
+      copy: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
+      link: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+      download: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>',
+      external: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+      newfile: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5M12 11v6M9 14h6"/></svg>',
+      newfolder: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><path d="M12 11v6M9 14h6"/></svg>',
+      file: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/></svg>'
     };
     var WMARK = WB.WMARK = '<svg viewBox="0 0 113.444 65.6002" fill="none"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>';
 
@@ -440,7 +574,7 @@
 
     // shell menu state
     var st = { nxMenu: false, wsMenu: false, editingId: null, editName: '', editIcon: '', pickerOpen: false, nxEditing: false, nxEditName: '',
-      treeOpen: {}, treeData: {}, treeLoading: {}, bookmarks: [], search: '', wsMenuFor: null, rail: false, sideMode: 'apps' };
+      treeOpen: {}, treeData: {}, treeLoading: {}, bookmarks: [], search: '', rail: false, sideMode: 'apps' };
     try { st.rail = localStorage.getItem('wb-rail') === '1'; } catch (e) {}
     // Apps-vs-Files sidebar preference — Apps is primary (most users just launch apps). Persisted so it
     // sticks per user/device. ('wb-sidemode' = 'apps' | 'files')
@@ -478,6 +612,149 @@
         if (wt) wt.innerHTML = treeHtml(w.id, 1);
       });
     }
+    // ── File operations (right-click menu → /cloud/file/* verbs) ────────────────────────────────
+    function treeParent(path){ var p = (path || '').split('/'); p.pop(); return p.join('/'); }
+    function refreshAfter(path){ delete st.treeData[path]; st.treeLoading[path] = false; loadTree(path); paintTree();
+      if (WB.refreshExplorer) try { WB.refreshExplorer(); } catch (e) {} }
+    async function fileMutate(url, body, refreshPath, okMsg){
+      try {
+        var r = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+        var d = await r.json();
+        if (d && d.ok){ WB.toast(okMsg + (d.sha ? ' · ' + d.sha : '')); refreshAfter(refreshPath); return true; }
+        WB.toast((d && d.error) || 'Failed', 'bad'); return false;
+      } catch (e){ WB.toast('Failed', 'bad'); return false; }
+    }
+    WB.fileOps = {
+      open: function(path){ WB._pendingFile = path; if (WB.openInExplorer && ROUTE.path === '/workspaces') WB.openInExplorer(path); else WB.nav('/workspaces'); },
+      download: function(path){ window.open('/cloud/raw?path=' + encodeURIComponent(path), '_blank'); },
+      newFile: async function(dir){ var nm = await WB.prompt({ title: 'New file', placeholder: 'name.work', confirm: 'Create' }); if (!nm) return;
+        st.treeOpen[dir] = true; await fileMutate('/cloud/file/new', { path: dir + '/' + nm }, dir, 'Created ' + nm); },
+      newFolder: async function(dir){ var nm = await WB.prompt({ title: 'New folder', placeholder: 'folder', confirm: 'Create' }); if (!nm) return;
+        st.treeOpen[dir] = true; await fileMutate('/cloud/file/mkdir', { path: dir + '/' + nm }, dir, 'Created folder ' + nm); },
+      rename: async function(path){ var base = path.split('/').pop();
+        var nm = await WB.prompt({ title: 'Rename', value: base, confirm: 'Rename' }); if (!nm || nm === base) return;
+        await fileMutate('/cloud/file/rename', { from: path, to: treeParent(path) + '/' + nm }, treeParent(path), 'Renamed to ' + nm); },
+      del: async function(path, isDir){ var base = path.split('/').pop();
+        var ok = await WB.confirm({ title: 'Delete ' + (isDir ? 'folder' : 'file') + '?', body: '“' + base + '” will be removed and the change committed.', confirm: 'Delete', danger: true }); if (!ok) return;
+        await fileMutate('/cloud/file/delete', { path: path }, treeParent(path), 'Deleted ' + base); }
+    };
+    function setVisibility(id, state){
+      fetch('/cloud/visibility', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: id, state: state }) })
+        .then(function(r){ return r.json(); })
+        .then(function(d){ if (d && d.ok){ WB.toast('Set to ' + state); WB.cache.set('apps', null); paintApps(); } else WB.toast((d && d.error) || 'Failed', 'bad'); })
+        .catch(function(){ WB.toast('Failed', 'bad'); });
+    }
+
+    // ── Context-menu registrations — one place wiring every surface's right-click actions ──────────
+    WB.ctx.register('file', function(el){
+      var path = el.getAttribute('data-tree-file') || el.getAttribute('data-path');
+      var pinned = isBookmarked(path);
+      return [
+        { label: 'Open', icon: ICO.file, on: function(){ WB.fileOps.open(path); } },
+        { label: 'Rename…', icon: ICO.edit, need: 'file.write', on: function(){ WB.fileOps.rename(path); } },
+        { label: pinned ? 'Unpin' : 'Pin', icon: ICO.pin, on: function(){ toggleBookmark(path); } },
+        { sep: true },
+        { label: 'Copy path', icon: ICO.copy, on: function(){ WB.copy(path, 'Path'); } },
+        { label: 'Download', icon: ICO.download, on: function(){ WB.fileOps.download(path); } },
+        { sep: true },
+        { label: 'Delete', icon: ICO.trash, danger: true, need: 'file.write', on: function(){ WB.fileOps.del(path, false); } }
+      ];
+    });
+    WB.ctx.register('folder', function(el){
+      var path = el.getAttribute('data-tree-toggle') || el.getAttribute('data-path');
+      return [
+        { label: 'New file…', icon: ICO.newfile, need: 'file.write', on: function(){ WB.fileOps.newFile(path); } },
+        { label: 'New folder…', icon: ICO.newfolder, need: 'file.write', on: function(){ WB.fileOps.newFolder(path); } },
+        { sep: true },
+        { label: 'Rename…', icon: ICO.edit, need: 'file.write', on: function(){ WB.fileOps.rename(path); } },
+        { label: 'Copy path', icon: ICO.copy, on: function(){ WB.copy(path, 'Path'); } },
+        { sep: true },
+        { label: 'Delete', icon: ICO.trash, danger: true, need: 'file.write', on: function(){ WB.fileOps.del(path, true); } }
+      ];
+    });
+    function wsCtxItems(id){
+      var w = (WB.ws.list || []).filter(function(x){ return x.id === id; })[0] || { id: id, name: id };
+      return [
+        { label: 'New file…', icon: ICO.newfile, need: 'file.write', on: function(){ st.treeOpen[id] = true; loadTree(id); WB.fileOps.newFile(id); } },
+        { label: 'New folder…', icon: ICO.newfolder, need: 'file.write', on: function(){ st.treeOpen[id] = true; loadTree(id); WB.fileOps.newFolder(id); } },
+        { sep: true },
+        { label: 'Open explorer', icon: ICO.files, on: function(){ WB.ws.setActive(id); WB.nav('/workspaces'); } },
+        { label: 'Rename…', icon: ICO.edit, need: 'workspace.manage', on: function(){ st.editingId = id; st.editName = w.name; st.editIcon = w.icon || ''; renderShell(); } },
+        { label: 'Settings', icon: ICO.gear, need: 'workspace.manage', on: function(){ WB.ws.setActive(id); openWsSettings(); } },
+        { label: 'Sharing', icon: ICO.globe, need: 'workspace.manage', on: function(){ WB.ws.setActive(id); WB.nav('/workspace/sharing'); } },
+        { sep: true },
+        { label: 'Delete workspace', icon: ICO.trash, danger: true, need: 'workspace.manage', on: async function(){
+            var ok = await WB.confirm({ title: 'Delete workspace?', body: '“' + w.name + '” and its files will be removed.', confirm: 'Delete', danger: true }); if (!ok) return;
+            var done = await WB.ws.remove(id); if (done === false) { WB.toast('Can’t delete your only workspace', 'bad'); return; }
+            WB.toast('Workspace deleted'); renderShell(); } }
+      ];
+    }
+    WB.ctx.register('workspace', function(el){ return wsCtxItems(el.getAttribute('data-tree-toggle') || el.getAttribute('data-ws-id')); });
+    WB.ctx.register('app', function(el){
+      var name = el.getAttribute('data-open-app'); var a = (WB._appReg && WB._appReg[name]) || { name: name };
+      var vis = a.visibility || (a.gated ? 'private' : 'public');
+      var items = [
+        { label: 'Open', icon: ICO.grid, on: function(){ WB._app = a; WB.nav('/app/' + encodeURIComponent(name)); } },
+        { label: 'Open in new tab', icon: ICO.external, on: function(){ if (a.url) window.open(a.url, '_blank'); } },
+        { label: 'Copy link', icon: ICO.link, on: function(){ WB.copy(a.url || (location.origin + '/' + name), 'Link'); } },
+        { sep: true },
+        { header: 'Visibility' }
+      ];
+      ['public', 'private', 'draft'].forEach(function(s){ if (s !== vis) items.push({ label: 'Make ' + s, icon: (s === 'public' ? ICO.globe : s === 'private' ? ICO.lock : ICO.draft), need: 'app.edit', on: function(){ setVisibility(name, s); } }); });
+      return items;
+    });
+    WB.ctx.register('nexus', function(){
+      var nx = WB.nexus.active || {};
+      return [
+        { label: 'Overview', icon: ICO.grid, on: function(){ WB.nav('/overview'); } },
+        { label: 'Rename nexus…', icon: ICO.edit, need: 'nexus.manage', on: function(){ st.nxMenu = true; st.nxEditing = true; st.nxEditName = nx.name || ''; renderShell(); } },
+        { label: 'Scale up', icon: ICO.activity, need: 'nexus.manage', on: function(){ WB.nav('/upgrade'); } },
+        { label: 'Nexus settings', icon: ICO.gear, need: 'nexus.manage', on: function(){ WB.nav('/settings'); } },
+        { sep: true },
+        { label: 'Switch / create…', icon: ICO.chev, on: function(){ st.nxMenu = true; renderShell(); } }
+      ];
+    });
+    WB.ctx.register('event', function(el){
+      var i = +el.getAttribute('data-act-focus'); var e = (WB._activityEvents || [])[i] || {};
+      var items = [{ label: 'Open in Activity', icon: ICO.activity, on: function(){ WB._activityFocus = i; WB.nav('/activity'); } }];
+      if (e.target) items.push({ label: 'Copy reference', icon: ICO.copy, on: function(){ WB.copy(e.target, 'Reference'); } });
+      return items;
+    });
+    WB.ctx.register('session', function(el){
+      var id = el.getAttribute('data-session');
+      return [
+        { label: 'Open session', icon: ICO.spark, on: function(){ WB._pendingSession = id; WB.nav('/studio'); } },
+        { label: 'Copy session id', icon: ICO.copy, on: function(){ WB.copy(id, 'Session id'); } }
+      ];
+    });
+    // Rows owned by lazily-loaded views (Secrets, Team, Storage): the right-click menu surfaces the SAME
+    // actions already wired as inline buttons — we synthesize items that click those controls, so the
+    // view stays the single owner of the behavior. A `clicker` helper finds a control inside the row.
+    function rowClick(el, sel){ var b = el.querySelector(sel); if (b) b.click(); }
+    WB.ctx.register('secret', function(el){
+      var revealed = !!el.querySelector('[data-act="hide"]');
+      return [
+        { label: revealed ? 'Hide' : 'Reveal', icon: ICO.key, need: 'secret.manage', on: function(){ rowClick(el, revealed ? '[data-act="hide"]' : '[data-act="reveal"]'); } },
+        { label: 'Copy value', icon: ICO.copy, need: 'secret.manage', on: function(){ rowClick(el, '[data-act="copy"]'); } },
+        { sep: true },
+        { label: 'Edit…', icon: ICO.edit, need: 'secret.manage', on: function(){ rowClick(el, '[data-act="edit"]'); } },
+        { label: 'Delete', icon: ICO.trash, danger: true, need: 'secret.manage', on: function(){ rowClick(el, '[data-act="del"]'); } }
+      ];
+    });
+    WB.ctx.register('member', function(el){
+      var email = el.getAttribute('data-email') || '';
+      var pending = el.getAttribute('data-pending') === '1';
+      var items = [];
+      if (email) items.push({ label: 'Copy email', icon: ICO.copy, on: function(){ WB.copy(email, 'Email'); } });
+      if (pending) items.push({ label: 'Revoke invite', icon: ICO.trash, danger: true, need: 'member.manage', on: function(){ rowClick(el, '[data-form="revoke"]'); } });
+      else items.push({ label: 'Remove from nexus', icon: ICO.trash, danger: true, need: 'member.manage', on: function(){ rowClick(el, '[data-form="remove"]'); } });
+      return items;
+    });
+    WB.ctx.register('bucket', function(el){
+      var name = el.getAttribute('data-bucket') || '';
+      return [{ label: 'Copy bucket name', icon: ICO.copy, on: function(){ WB.copy(name, 'Bucket'); } }];
+    });
+
     // Apps grid (the sidebar's Apps tab) — the hosted workbook surfaces on this nexus. Stale-while-
     // revalidate so it paints last-known instantly; each tile launches the app at its URL.
     function paintApps(){
@@ -496,7 +773,7 @@
                           : '<span class="appinit">' + esc((a.label[0] || 'A').toUpperCase()) + '</span>';
           var badge = '<span class="appbadge' + b.cls + '" title="' + b.t + '">' + b.ic + '</span>';
           // Everything opens IN-APP, in the content area's browser chrome (/app/<name>) — never a new tab.
-          return '<a class="appcard' + (vis === 'draft' ? ' draft' : '') + '" data-open-app="' + esc(a.name) + '" href="#/app/' + esc(encodeURIComponent(a.name)) + '" title="' + esc(a.label) + '">' +
+          return '<a class="appcard' + (vis === 'draft' ? ' draft' : '') + '" data-ctx="app" data-open-app="' + esc(a.name) + '" href="#/app/' + esc(encodeURIComponent(a.name)) + '" title="' + esc(a.label) + '">' +
             badge + ic + '<span class="appname">' + esc(a.label) + '</span></a>';
         }).join('');
         // "New app" tile — creates a draft (Phase 4 will replace the prompt with the context modal).
@@ -512,7 +789,7 @@
         var el = document.getElementById('studioSide'); if (!el) return;
         var sessions = (d && d.sessions) || [];
         var recent = sessions.length
-          ? sessions.map(function(s){ return '<a class="srow" data-nav="/studio" href="#/studio" data-session="' + esc(s.id) + '" title="' + esc(s.title || 'Session') + '"><span class="semoji">💬</span><span class="sname">' + esc(s.title || 'Untitled session') + '</span></a>'; }).join('')
+          ? sessions.map(function(s){ return '<a class="srow" data-ctx="session" data-nav="/studio" href="#/studio" data-session="' + esc(s.id) + '" title="' + esc(s.title || 'Session') + '"><span class="semoji">💬</span><span class="sname">' + esc(s.title || 'Untitled session') + '</span></a>'; }).join('')
           : '<div class="treemsg" style="padding:6px 10px">No sessions yet</div>';
         el.innerHTML = '<div class="sgrp">Recent</div>' + recent + '<div id="studioDrafts"></div>';
       });
@@ -540,7 +817,7 @@
         el.innerHTML = events.map(function(e, i){
           var title = e.title || e.kind || 'Event';
           var sub = e.target || e.actor || '';
-          return '<button class="ibrow' + (i === foc ? ' on' : '') + '" data-act-focus="' + i + '">' +
+          return '<button class="ibrow' + (i === foc ? ' on' : '') + '" data-ctx="event" data-act-focus="' + i + '">' +
             '<span class="ibic">' + esc((e.actor || '?').trim()[0].toUpperCase()) + '</span>' +
             '<span class="ibmeta"><span class="ibt">' + esc(title) + '</span>' + (sub ? '<span class="ibs">' + esc(sub) + '</span>' : '') + '</span>' +
             '<span class="ibw">' + esc(ago(e.at)) + '</span></button>';
@@ -568,12 +845,12 @@
         var ficon = WB.fileIcon ? WB.fileIcon(en.name, { dir: en.dir, open: !!st.treeOpen[en.path] }) : '';
         if (en.dir){
           var open = !!st.treeOpen[en.path];
-          return '<div class="trow dir' + (open ? ' open' : '') + '" data-tree-toggle="' + esc(en.path) + '" style="padding-left:' + pad + 'px">' +
+          return '<div class="trow dir' + (open ? ' open' : '') + '" data-ctx="folder" data-tree-toggle="' + esc(en.path) + '" style="padding-left:' + pad + 'px">' +
               '<span class="tchev">' + ICO.chev + '</span>' + ficon + '<span class="tname">' + esc(en.name) + '</span>' +
               '<button class="tbm' + (isBookmarked(en.path) ? ' on' : '') + '" data-bm="' + esc(en.path) + '" data-bml="' + esc(en.name) + '" title="Bookmark">★</button>' +
             '</div>' + (open ? treeHtml(en.path, depth + 1) : '');
         }
-        return '<div class="trow file" data-tree-file="' + esc(en.path) + '" style="padding-left:' + (pad + 4) + 'px">' +
+        return '<div class="trow file" data-ctx="file" data-tree-file="' + esc(en.path) + '" style="padding-left:' + (pad + 4) + 'px">' +
             ficon + '<span class="tname">' + esc(en.name) + '</span>' +
             '<button class="tbm' + (isBookmarked(en.path) ? ' on' : '') + '" data-bm="' + esc(en.path) + '" data-bml="' + esc(en.name) + '" title="Bookmark">★</button>' +
           '</div>';
@@ -608,17 +885,12 @@
         // name — so the tree is keyed by w.id. (Declared workspaces have a clean slug id, e.g. "marketing".)
         var open = !!st.treeOpen[w.id];
         return '<div class="wsgroup' + (open ? ' open' : '') + '">' +
-          '<div class="wshdr" data-tree-toggle="' + esc(w.id) + '" role="button" tabindex="0" title="' + esc(w.name) + '">' +
+          '<div class="wshdr" data-ctx="workspace" data-tree-toggle="' + esc(w.id) + '" role="button" tabindex="0" title="' + esc(w.name) + '">' +
             '<span class="wsemoji">' + esc(w.icon || '📁') + '</span>' +
             '<span class="wsname">' + esc(w.name) + '</span>' +
             '<button class="wsmore-btn" data-wsmore="' + esc(w.id) + '" title="More" aria-label="More">⋯</button>' +
             '<span class="wschev">' + ICO.chev + '</span>' +
           '</div>' +
-          (st.wsMenuFor === w.id ? ('<div class="wsmoremenu" role="menu">' +
-            '<button data-wsopen="' + esc(w.id) + '">Open explorer</button>' +
-            '<button data-wsedit="' + esc(w.id) + '">Edit</button>' +
-            '<button data-wssettings="' + esc(w.id) + '">Settings</button>' +
-          '</div>') : '') +
           (open ? '<div class="wstree" data-ws-tree="' + esc(w.id) + '">' + treeHtml(w.id, 1) + '</div>' : '') +
         '</div>';
       }).join('');
@@ -639,7 +911,7 @@
       // ── Slack-style RAIL: nexus selector (top) → Studio/Apps/Activity/Files (icon-above-text) →
       // Admin + You grouped at the bottom. The nexus tile opens the switch menu (switch/rename/create).
       var section = sectionFor(p);
-      var nexTile = '<button class="nextile' + (st.nxMenu ? ' on' : '') + '" data-nxmenu title="' + esc(nxLabel) + '">' +
+      var nexTile = '<button class="nextile' + (st.nxMenu ? ' on' : '') + '" data-ctx="nexus" data-nxmenu title="' + esc(nxLabel) + '">' +
           '<span class="nexinit' + ((nx && nx.icon) ? ' emoji' : '') + '">' + ((nx && nx.icon) ? esc(nx.icon) : esc(inits(nxLabel))) + '</span><span class="nexcar">' + ICO.chev + '</span></button>' +
         (st.nxMenu ? nexusMenu(nx) : '');
       var RAIL_SECS = [
@@ -654,7 +926,7 @@
       }).join('');
 
       // ── per-surface SIDEBAR body — swaps with the active rail section ──
-      var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Activity', files: 'Files', admin: 'Admin', account: 'You' };
+      var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Activity', files: 'Files', integrations: 'Integrations', admin: 'Admin', account: 'You' };
       var isBrowse = section === 'apps' || section === 'files';   // apps/files get the filter funnel + search + pins
       if (isBrowse) st.sideMode = section;   // keep the filter funnel (filterMenu/filterActive) keyed to the active surface
       var sideBody;
@@ -668,8 +940,7 @@
       else if (section === 'activity') sideBody = '<div id="activityInbox"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
       else if (section === 'admin') sideBody = '<nav class="nxnav">' +
           navlink('/usage', ICO.gauge, 'Usage & billing', p) + navlink('/storage', ICO.database, 'Storage', p) +
-          navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) +
-          navlink('/integrations', ICO.apps, 'Integrations', p) + '</nav>';
+          navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) + '</nav>';
       // You — personal account surface (folds the old avatar popover into a full sidebar).
       else if (section === 'account') sideBody = '<nav class="nxnav">' +
           navlink('/settings', ICO.gear, 'Profile', p) +
@@ -687,6 +958,7 @@
           '<nav class="railsecs">' + railsecs + '</nav>' +
           '<div class="nexrail-grow"></div>' +
           '<div class="railbottom">' +
+            '<a class="railsec' + (section === 'integrations' ? ' on' : '') + '" data-nav="/integrations" href="#/integrations" title="Integrations"><span class="rsico">' + ICO.plug + '</span><span class="rslbl">Integrations</span></a>' +
             '<a class="railsec' + (section === 'admin' ? ' on' : '') + '" data-nav="/usage" href="#/usage" title="Admin"><span class="rsico">' + ICO.admin + '</span><span class="rslbl">Admin</span></a>' +
             '<a class="railsec railavbtn' + (section === 'account' ? ' on' : '') + '" data-nav="/settings" href="#/settings" title="' + esc(user.name) + '"><span class="railav">' + esc(user.initial) + '</span><span class="rslbl">You</span></a>' +
           '</div>' +
@@ -834,16 +1106,13 @@
         return;
       }
       var tfile = t.closest && t.closest('[data-tree-file]'); if (tfile) { var fp = tfile.getAttribute('data-tree-file'); WB._pendingFile = fp; if (WB.openInExplorer && ROUTE.path === '/workspaces') WB.openInExplorer(fp); else WB.nav('/workspaces'); return; }
-      var wsmore = t.closest && t.closest('[data-wsmore]'); if (wsmore) { e.stopPropagation(); var mid = wsmore.getAttribute('data-wsmore'); st.wsMenuFor = st.wsMenuFor === mid ? null : mid; renderShell(); return; }
-      var wsset = t.closest && t.closest('[data-wssettings]'); if (wsset) { WB.ws.setActive(wsset.getAttribute('data-wssettings')); st.wsMenuFor = null; openWsSettings(); return; }
-      var wsopen = t.closest && t.closest('[data-wsopen]'); if (wsopen) { WB.ws.setActive(wsopen.getAttribute('data-wsopen')); WB.nav('/workspaces'); return; }
-      var wsedit = t.closest && t.closest('[data-wsedit]'); if (wsedit) { var w = WB.ws.list.find(function (x) { return x.id === wsedit.getAttribute('data-wsedit'); }); st.editingId = w.id; st.editName = w.name; st.editIcon = w.icon || ''; st.pickerOpen = false; st.wsMenuFor = null; renderShell(); return; }
+      // The ⋯ button opens the SAME menu as right-clicking the workspace — converged onto the WB.ctx engine.
+      var wsmore = t.closest && t.closest('[data-wsmore]'); if (wsmore) { e.stopPropagation(); WB.ctx.openFrom(wsmore, wsCtxItems(wsmore.getAttribute('data-wsmore'))); return; }
       if (t.closest && t.closest('[data-wspick]')) { syncEditName(); st.pickerOpen = !st.pickerOpen; renderShell(); return; }
       if (t.closest && t.closest('[data-wsinitials]')) { st.editIcon = ''; st.pickerOpen = false; renderShell(); return; }
       if (t.closest && t.closest('[data-wscancel]')) { st.editingId = null; st.pickerOpen = false; renderShell(); return; }
       if (t.closest && t.closest('[data-wssave]')) { saveEdit(); return; }
       if (t.closest && t.closest('[data-wsdel]')) { deleteWs(); return; }
-      if (st.wsMenuFor) { st.wsMenuFor = null; renderShell(); return; }   // outside click closes the ⋯ menu
       if (st.filterOpen) { st.filterOpen = false; renderShell(); return; } // outside click closes the filter popover
     });
     document.addEventListener('input', function (e) { if (e.target.id === 'wsName') st.editName = e.target.value; if (e.target.id === 'nxEditName') st.nxEditName = e.target.value; });

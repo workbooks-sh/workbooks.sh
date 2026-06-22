@@ -35,6 +35,9 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
   }
   // Hook so the shared sidebar's file click opens the file here when this view is mounted.
   WB.openInExplorer = function(path){ WB._pendingFile = null; openFile(path); };
+  // Let context-menu file ops (rename/delete/new) repaint the explorer in place after a mutation. If the
+  // open file was the one removed/renamed, fall back to the explore grid.
+  WB.refreshExplorer = function(){ if ((WB.route && WB.route.path) !== '/workspaces') return; if (state.active) showActive(); else showExplore(); };
 
   // ── editing: the workedit island owns the CodeMirror surface; this view supplies the save bar +
   //    the onSave (commit/push via the git remote). ⌘S is bound inside the island. ───────────────
@@ -227,7 +230,7 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
       if (!grid) return;
       if (!ents.length){ grid.innerHTML = '<div class="wxmsg">This workspace is empty.</div>'; return; }
       grid.innerHTML = ents.map(function(en){
-        return '<button class="wxcard" data-xopen="' + esc(en.path) + '" data-xdir="' + (en.dir ? '1' : '') + '">' +
+        return '<button class="wxcard" data-ctx="' + (en.dir ? 'folder' : 'file') + '" data-path="' + esc(en.path) + '" data-xopen="' + esc(en.path) + '" data-xdir="' + (en.dir ? '1' : '') + '">' +
           '<span class="wxcardico">' + fileIcon(en.name, { dir: en.dir }) + '</span>' +
           '<span class="wxcardname">' + esc(en.name) + '</span></button>';
       }).join('');

@@ -460,10 +460,24 @@ tr:last-child td{ border:0; }
 .wshdr .wsmore-btn { flex: none; width: 24px; height: 24px; border: none; border-radius: 6px; background: none; color: var(--dim); cursor: pointer; opacity: 0; font-size: 15px; line-height: 1; }
 .wshdr:hover .wsmore-btn, .wsmore-btn:focus-visible { opacity: 1; }
 .wshdr .wsmore-btn:hover { background: var(--card); color: var(--ink); }
-.wsmoremenu { position: absolute; right: 6px; top: 32px; z-index: 30; min-width: 150px; display: flex; flex-direction: column;
-  background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.22); }
-.wsmoremenu button { text-align: left; border: none; background: none; color: var(--ink); cursor: pointer; border-radius: 6px; padding: 7px 10px; font: 500 13px var(--read); }
-.wsmoremenu button:hover { background: var(--line); }
+/* ── Right-click context menu (the WB.ctx floating-menu primitive) ── */
+.ctxmenu { position: fixed; z-index: 200; min-width: 192px; max-width: 320px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 11px; padding: 5px; box-shadow: 0 12px 34px rgba(0,0,0,.30);
+  display: flex; flex-direction: column; gap: 1px; animation: ctxin .09s ease-out; }
+@keyframes ctxin { from { opacity: 0; transform: translateY(-3px) scale(.98); } to { opacity: 1; transform: none; } }
+.ctxitem { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: none; background: none;
+  color: var(--ink); cursor: pointer; border-radius: 7px; padding: 7px 10px; font: 500 13px var(--read); }
+.ctxitem:hover:not(:disabled) { background: var(--hover); }
+.ctxitem:disabled { color: var(--dim); cursor: default; }
+.ctxitem.danger { color: var(--bad); }
+.ctxitem.danger:hover:not(:disabled) { background: var(--bad-fill); }
+.ctxico { flex: none; width: 16px; height: 16px; display: grid; place-items: center; color: var(--dim); }
+.ctxitem.danger .ctxico { color: inherit; }
+.ctxlbl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctxarrow { flex: none; color: var(--dim); display: grid; place-items: center; }
+.ctxsep { height: 1px; background: var(--line); margin: 4px 6px; }
+.ctxhdr { font: 700 9.5px var(--read); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); padding: 6px 10px 3px; }
+
 /* breadcrumb on workspace settings */
 .crumbs { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font: 500 13px var(--read); }
 .crumbback { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--card); color: var(--ink);

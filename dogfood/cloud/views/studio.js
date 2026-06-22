@@ -115,7 +115,7 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
           <aside class="studio-side">
             <div class="studio-side-hd">Sessions</div>
             <div class="studio-side-list">
-              <${For} each=${sessions}>${function(s){ return html`<button class=${function(){ return 'studio-sess' + (curSession() === s.id ? ' on' : ''); }} onClick=${function(){ openSession(s.id); }}>
+              <${For} each=${sessions}>${function(s){ return html`<button data-ctx="session" data-session=${s.id} class=${function(){ return 'studio-sess' + (curSession() === s.id ? ' on' : ''); }} onClick=${function(){ openSession(s.id); }}>
                 <span class="studio-sess-nm">${s.title || 'Untitled'}</span>
                 <span class="studio-sess-meta"><span class="studio-sess-ctx">free-form</span><span class="studio-sess-when">${fmtWhen(s.updated)}</span></span>
               </button>`; }}<//>

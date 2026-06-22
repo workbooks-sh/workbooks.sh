@@ -135,7 +135,7 @@ WB.view('/secrets', {
           : `<span class="mono masked">${esc(v.masked)}</span>
                 <span class="faint" style="font-size:11px">${esc(v.length)} chars</span>
                 <button class="lk" data-act="reveal" data-id="${esc(v.id)}"${revealBusy === v.id ? ' disabled' : ''}>${revealBusy === v.id ? 'Revealing…' : 'Reveal'}</button>`;
-        return `<tr>
+        return `<tr data-ctx="secret">
             <td class="mono nm">${esc(v.name)}</td>
             <td class="val">${valCell}</td>
             <td class="faint" style="font-size:12px;white-space:nowrap">${esc(v.created_at)}</td>

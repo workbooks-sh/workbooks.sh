@@ -68,7 +68,7 @@ WB.view('/team', {
     function memberRows() {
       return data.members.map((m) => {
         const p = pair(m.name);
-        return `<tr>
+        return `<tr data-ctx="member" data-email="${esc(m.email)}">
             <td>
               <div style="display:flex;align-items:center;gap:11px">
                 <span class="mav" style="background:linear-gradient(135deg,var(${p[0]}),var(${p[1]}))">${esc(initials(m.name))}</span>
@@ -88,7 +88,7 @@ WB.view('/team', {
     }
 
     function pendingRows() {
-      return data.pending.map((p) => `<tr style="opacity:.7">
+      return data.pending.map((p) => `<tr style="opacity:.7" data-ctx="member" data-email="${esc(p.email)}" data-pending="1">
             <td>
               <div style="display:flex;align-items:center;gap:11px">
                 <span class="mav" style="background:var(--panel-2);color:var(--dim)">${esc((p.email[0] || '?').toUpperCase())}</span>
