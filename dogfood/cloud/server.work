@@ -348,6 +348,8 @@ server :cloud do
     tenant = req.tenant || Nexus.Store.default_tenant()
     user = user_key(req)
 
+    ws = (is_map(req.body) && req.body["workspace"]) || nil
+
     cond do
       agent == "" or task == "" ->
         {400, %{error: "agent and task are required"}}
@@ -355,8 +357,12 @@ server :cloud do
       is_nil(Nexus.Agent.get(agent)) ->
         {404, %{error: "no such agent: #{agent}"}}
 
+      # Per-workspace write ACL (fix wb-913c) — an agent run that targets a workspace honors its
+      # draft/private ACL, exactly like file_save and the SSE twin. Role was already gated by gate(:write).
+      not workspace_write_ok?(req, ws) ->
+        forbidden()
+
       true ->
-        ws = (is_map(req.body) && req.body["workspace"]) || nil
         model = (is_map(req.body) && req.body["model"]) || nil
         # Eval/dev isolation: snapshot the workspace tree before, restore after — the run leaves no trace.
         isolate = (is_map(req.body) && req.body["isolate"]) == true
@@ -2249,22 +2255,27 @@ server :cloud do
   defp may_write_workspace?(req, mount, root), do: may_workspace?(req, mount, root, :write)
   defp may_read_workspace?(req, mount, root), do: may_workspace?(req, mount, root, :read)
 
+  # The ONE per-workspace write authorizer for an AGENT RUN (fix wb-913c) — used by the HTTP agent_run/
+  # agent_chat handlers AND the SSE/WS live source, so all three honor the same draft/private ACL. A run
+  # targeting a workspace must pass may_write_workspace? for it; an ephemeral/unknown mount has no ACL.
+  defp workspace_write_ok?(req, ws) do
+    case ws do
+      w when is_binary(w) and w != "" ->
+        case List.keyfind(mounts(), w, 0) do
+          {_, root} -> may_write_workspace?(req, w, root)
+          _ -> true
+        end
+
+      _ ->
+        true
+    end
+  end
+
   # Authorize a write-capable Live/SSE/WS source (fix wb-swpm): the socket injects role server-side, so
   # apply the SAME :write role gate + per-workspace ACL the HTTP route enforces. params has role/u/tenant.
   defp live_write_ok?(params) do
     req = %{role: params["role"] || "viewer", user: params["u"], tenant: params["tenant"] || Nexus.Store.default_tenant(), body: nil, query: %{}}
-
-    gate(req, :write) and
-      case params["workspace"] do
-        ws when is_binary(ws) and ws != "" ->
-          case List.keyfind(mounts(), ws, 0) do
-            {_, root} -> may_write_workspace?(req, ws, root)
-            _ -> true
-          end
-
-        _ ->
-          true
-      end
+    gate(req, :write) and workspace_write_ok?(req, params["workspace"])
   end
 
   # The mounts the caller may READ — the ONE place every list/enumerate route walks (wb-ate4/wb-59uk),
