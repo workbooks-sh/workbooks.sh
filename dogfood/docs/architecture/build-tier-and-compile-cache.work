@@ -121,6 +121,93 @@ fetched thereafter. The compile tier's real cost tracks *cache misses*, not *com
 requests* — which is what makes including a generous compile allowance in even the free
 tier viable.
 
+## Security & isolation — the cache must not leak or be poisoned
+
+Two attacks define the whole design: **confidentiality** (does a shared cache leak one
+tenant's private code to another?) and **integrity** (can an attacker poison the cache
+so a victim runs malicious bytes?). Both have clean answers, learned partly from how
+other build caches failed.
+
+### Confidentiality — you can only fetch what you can already name
+
+A content-addressed artifact is addressed by `hash(content)`. To *request* an artifact
+you must present its key, and to know the key you must know the content. **So you can
+only ever retrieve an artifact whose source you already possess** — the cache hands back
+nothing you didn't already hold. A tenant requesting a public package addresses it by
+the **public registry's published integrity hash** (from their own lockfile); they
+literally cannot *name* a private artifact whose source they don't have.
+
+We do not rely on that argument alone. A **provenance gate at write time** decides the
+namespace:
+
+- **Shared/public** admission requires the source to have been fetched from a **public
+  registry** *and* its integrity hash to **match what that registry published**. Nothing
+  else qualifies.
+- **Everything else** — a scoped/private package, a private registry, a git dependency,
+  the tenant's own subtree source — goes to the **tenant-private** namespace only:
+  encrypted at rest, ACL'd to that one tenant, and **never cross-tenant deduplicated**
+  even when bytes match (so there is no "is anyone else compiling this proprietary lib?"
+  existence oracle). The shared pool therefore only ever contains
+  already-public-registry content.
+
+Crucially, **nothing is ever keyed or admitted by package *name***. A malicious public
+`@acme/utils@1.0` cannot shadow a private one of the same name — the requester addresses
+by *their lockfile's integrity hash*, and admission verifies that hash against the
+registry the source actually came from. That closes the **dependency-confusion** class
+behind recent npm supply-chain attacks.
+
+### Integrity — only trusted builders write the shared cache
+
+The instructive failure is **CREEP** (CVE-2025-36852, severity 9.4): bucket-backed build
+caches (S3/GCS/R2) poisoned by a *first-to-cache-wins* race — an attacker produces
+malicious *output* from the same *input* and uploads it first. The lesson is sharp:
+**input-based cache keys cannot prevent this**, because the poisoning happens at build
+time, before any hashing — "correct and poisoned artifacts are identical from a
+validation perspective." Nix's binary-cache history says the same: a content hash alone
+is not a trust anchor — artifacts must be **signed**.
+
+So our write path is gated, not open:
+
+- **Tenants never write the shared cache.** They *trigger* a compile; **our** trusted
+  Firecracker worker, running our **pinned, version-stamped toolchain**, performs the
+  build and **signs** the artifact with the fleet key. There is no tenant-supplied-output
+  upload path into the shared pool — so "first-to-cache-wins" is impossible; an attacker
+  cannot write at all.
+- **Readers verify the signature**, not just the hash. An unsigned or wrong-signed
+  artifact is rejected and recompiled.
+- **Untrusted CI contexts are scoped.** A PR / draft / preview build writes only to an
+  **isolated, context-scoped** cache, never the shared production one — CREEP's
+  "hierarchical write-access" mitigation applied to in-nexus CI/CD: protected refs write
+  the shared cache, untrusted refs write their own branch-scoped cache.
+- **Determinism audit (defense in depth).** Because the toolchain is pinned and wasm
+  compiles are deterministic, a background rebuilder re-compiles a sample of shared
+  artifacts on an independent worker and compares hashes; a mismatch raises a poisoning /
+  non-determinism alarm (the reproducible-builds rebuilder pattern).
+
+## Usage, billing & abuse — airtight by construction
+
+Billing must be admission-controlled, not just metered after the fact, or a tenant can
+run unbilled or runaway compute.
+
+- **Admission control before dispatch.** A compile/CI request checks the tenant's
+  remaining allowance (`Nexus.Config` quota) **before** a worker is spawned. At zero:
+  queue, degrade to the slow in-process path, or reject — **never** a silent unbilled
+  run.
+- **Hard per-job caps.** Firecracker enforces a wallclock, memory and CPU ceiling per
+  job; a runaway is killed. A single compile can't exceed its bounded shape.
+- **Per-tenant concurrency cap.** At most N concurrent workers per tenant — anti
+  fork-bomb.
+- **Single-flight dedup.** 100 concurrent requests for the same cache-miss key spawn
+  **one** worker, not 100 — both a cost control and an abuse control.
+- **Submission rate limit + egress cap** (the CI artifact-egress line).
+- **The cache is the primary abuse mitigation.** Hits are ~free; only *misses* cost; and
+  misses are capped + single-flighted. The one pathological case — a tenant forcing
+  endless *unique* misses (randomized source) — is bounded by the quota backstop and a
+  per-tenant miss-rate alarm.
+- **Reconciled, idempotent ledger.** Metering is nexus state, reconciled against Fly's
+  actual machine-seconds, so we bill *reality* and never drift over or under. No JSON
+  sidecar — the ledger is runtime state, the quotas are `.work` `deploy` knobs.
+
 ## The fleet — cheapest viable shape
 
 - **Baked compiler machine image, not per-job pull.** The compiler toolchain is ~7.2 GB.

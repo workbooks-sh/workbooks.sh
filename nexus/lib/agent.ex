@@ -104,11 +104,14 @@ defmodule Nexus.Agent do
       branch = Map.get(ws, :branch, "agent/#{name}")
       author = Map.get(ws, :author, "#{name} <#{name}>")
       message = Map.get(ws, :message, "#{name}: #{String.slice(task, 0, 80)}")
+      # Workflow mode: "fifo" (default) auto-integrates the sealed branch into main (jj-FIFO + undo);
+      # "review" leaves the branch for a PR / reviewer agent (the per-subtree workflow config picks).
+      mode = Map.get(ws, :mode, "fifo")
 
       finalize = fn result ->
-        case result do
-          {:ok, _} -> Nexus.JJ.workspace_commit(dest, message, author, branch)
-          _ -> :ok
+        with {:ok, _} <- result,
+             {:ok, _sha} <- Nexus.JJ.workspace_commit(dest, message, author, branch) do
+          if mode == "fifo", do: Nexus.JJ.integrate(bare, work_dir, branch, "main")
         end
 
         Nexus.JJ.workspace_forget(work_dir, wsname, dest)

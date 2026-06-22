@@ -259,6 +259,42 @@ defmodule Nexus.JJ do
     end
   end
 
+  @doc """
+  Integrate an agent `branch` into `base` (the jj-FIFO default) and export to the bare. Fast-forwards
+  when `base` hasn't moved; otherwise rebases the branch onto `base` then advances it. On a rebase
+  CONFLICT, leaves the branch untouched and returns `{:conflict, out}` so the workflow layer can open a
+  PR / ask for review instead of clobbering. `{:ok, :fast_forward|:rebased} | {:conflict,_} | {:error,_}`.
+  """
+  def integrate(bare, work_dir, branch, base \\ "main") do
+    with :ok <- ensure_colocated(bare, work_dir) do
+      # base ⊆ ancestors(branch) ⇒ fast-forwardable (base hasn't diverged).
+      {anc, _} = jj(work_dir, ["log", "--no-graph", "-r", "#{base} & ::#{branch}", "-T", "change_id.short()"])
+
+      if String.trim(anc) != "" do
+        advance(work_dir, base, branch)
+      else
+        case jj(work_dir, ["rebase", "-b", branch, "-d", base]) do
+          {out, 0} ->
+            if String.contains?(out, "conflict"), do: {:conflict, out}, else: advance(work_dir, base, branch)
+
+          {out, _} ->
+            {:conflict, out}
+        end
+      end
+    else
+      other -> other
+    end
+  end
+
+  defp advance(work_dir, base, branch) do
+    with {_, 0} <- jj(work_dir, ["bookmark", "set", base, "-r", branch, "--allow-backwards"]),
+         {_, 0} <- jj(work_dir, ["git", "export"]) do
+      {:ok, :fast_forward}
+    else
+      other -> {:error, inspect(other)}
+    end
+  end
+
   @doc "Tear down an agent worktree after its run. The COMMITS persist in the shared repo; only the working copy is removed."
   def workspace_forget(work_dir, name, dest) do
     jj(work_dir, ["workspace", "forget", name])
