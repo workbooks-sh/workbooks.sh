@@ -2164,6 +2164,25 @@ server :cloud do
 
   defp derived_vis(root), do: if(mount_gated?(root), do: "private", else: "public")
 
+  # The per-workspace ACL inputs (wb-afvq): {visibility, owner} for a surface. Owner is "" unless a CP
+  # visibility record set it (drafts). The cloud write path gates on these via Nexus.Authz.may_access?.
+  defp workspace_acl(org, name, root) do
+    case Nexus.ControlPlane.get(org, :visibility, name) do
+      {:ok, rec} -> {rec[:state] || rec["state"] || derived_vis(root), rec[:owner] || rec["owner"] || ""}
+      _ -> {derived_vis(root), ""}
+    end
+  end
+
+  # May this request WRITE to workspace `mount`? Single-tenant/dev → yes; multi-tenant enforces the
+  # workspace's visibility ACL (draft = owner/admin, private/public = member+) via Nexus.Authz.
+  defp may_write_workspace?(req, mount, root) do
+    not Nexus.Auth.multi?() or
+      (
+        {vis, owner} = workspace_acl(req.tenant || Nexus.Store.default_tenant(), mount, root)
+        Nexus.Authz.may_access?(%{role: Map.get(req, :role, "viewer"), user: user_key(req)}, vis, owner, :write)
+      )
+  end
+
   # Create a draft = a real nexus folder scaffolded with an index.work, committed so it's a live
   # surface, and flagged `draft` in the control plane. Promote later via /cloud/visibility.
   def draft_create(req), do: if(gate(req, :write), do: do_draft_create(req), else: forbidden())
@@ -2179,7 +2198,8 @@ server :cloud do
     bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), slug)
     Nexus.Git.provision_remote(bare, root)
     Nexus.Git.commit_file(bare, root, "index.work", "create draft #{name}")
-    Nexus.ControlPlane.put(org, :visibility, slug, %{id: slug, state: "draft", name: name})
+    # Record the draft's OWNER (wb-afvq) — a draft is writable only by its owner (or admin+).
+    Nexus.ControlPlane.put(org, :visibility, slug, %{id: slug, state: "draft", name: name, owner: user_key(req)})
     spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
 
     %{ok: true, id: slug, name: name, url: "/" <> slug <> "/"}
@@ -2196,7 +2216,12 @@ server :cloud do
       id in [nil, ""] -> {400, %{error: "id required"}}
       state not in ["draft", "private", "public"] -> {400, %{error: "state must be draft|private|public"}}
       true ->
-        Nexus.ControlPlane.put(org, :visibility, id, %{id: id, state: state})
+        # Preserve the existing owner (wb-afvq) so promoting a draft doesn't drop its ACL anchor.
+        owner = case Nexus.ControlPlane.get(org, :visibility, id) do
+          {:ok, rec} -> rec[:owner] || rec["owner"] || ""
+          _ -> ""
+        end
+        Nexus.ControlPlane.put(org, :visibility, id, %{id: id, state: state, owner: owner})
         %{ok: true, id: id, state: state}
     end
   end
@@ -3006,6 +3031,12 @@ server :cloud do
         [mount | rest] = String.split(String.trim(path), "/", trim: true)
         {_, root} = List.keyfind(mounts(), mount, 0)
         rel = Enum.join(rest, "/")
+
+        # Per-workspace ACL (wb-afvq): a draft is writable only by its owner/admin; private/public by
+        # a member+. Multi-tenant only; dev is trusted. Pairs with the authorship gate below.
+        if not may_write_workspace?(req, mount, root) do
+          forbidden()
+        else
         File.write!(abs, content)
 
         bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
@@ -3034,6 +3065,7 @@ server :cloud do
               :nochange -> %{ok: true, nochange: true}
               {:error, out} -> {500, %{error: out}}
             end
+        end
         end
     end
   end
@@ -3087,9 +3119,10 @@ server :cloud do
     bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
     Nexus.Git.provision_remote(bare, root)
 
-    # Same authorship chokepoint as file_save — a tree change (new/rename/delete) is signed over its
+    # Per-workspace ACL (wb-afvq) then the authorship chokepoint — a tree change is signed over its
     # message (no single file body); under :hard an unsigned change is rejected.
-    with {:ok, who} <- gate_or_reject(req, mount, msg, user_key(req)) do
+    with true <- may_write_workspace?(req, mount, root),
+         {:ok, who} <- gate_or_reject(req, mount, msg, user_key(req)) do
     result = Nexus.Git.commit_paths(bare, root, msg, author: "#{who} <#{who}>")
     spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
 
@@ -3104,6 +3137,7 @@ server :cloud do
       {:error, out} -> {500, %{error: out}}
     end
     else
+      false -> forbidden()
       {:reject, resp} -> resp
     end
   end
