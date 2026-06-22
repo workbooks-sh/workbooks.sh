@@ -100,6 +100,10 @@ defmodule Nexus.Git do
     # A global `core.hooksPath` (this project sets one) would shadow the bare repo's own hooks — pin it
     # to this repo's hooks dir so post-receive actually fires.
     System.cmd("git", ["--git-dir=#{bare}", "config", "core.hooksPath", hooks], stderr_to_stdout: true)
+    # Allow PUSH over smart-HTTP. `git http-backend` serves fetch via GIT_HTTP_EXPORT_ALL but REFUSES
+    # receive-pack (push) unless the repo opts in — without this a `git push` to the nexus fails with
+    # "repository not found". Re-applied every provision (idempotent) so existing repos gain it too.
+    System.cmd("git", ["--git-dir=#{bare}", "config", "http.receivepack", "true"], stderr_to_stdout: true)
 
     hook = Path.join(hooks, "post-receive")
     File.write!(hook, post_receive(bare, work_dir))

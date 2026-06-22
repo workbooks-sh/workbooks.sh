@@ -15,6 +15,10 @@ defmodule Nexus.GitRemoteTest do
     {:ok, ^bare} = Git.provision_remote(bare, work)
     assert Git.bare?(bare)
     assert File.regular?(Path.join([bare, "hooks", "post-receive"]))
+    # Push over smart-HTTP must be enabled, else `git http-backend` refuses receive-pack ("repository
+    # not found") and no customer can push to their nexus.
+    {rp, 0} = System.cmd("git", ["--git-dir=#{bare}", "config", "--get", "http.receivepack"], stderr_to_stdout: true)
+    assert String.trim(rp) == "true"
 
     # A client repo that pushes a .work file to the bare remote.
     client = Path.join(base, "client")
