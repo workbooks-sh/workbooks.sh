@@ -53,4 +53,10 @@ defmodule Nexus.AgentWorkCliTest do
     assert Bash.run(vfs, "work help", %{grant: ["fs"]}) =~ "compile + analyze"
     assert Bash.run(vfs, "work bogus", %{grant: ["exec"]}) =~ "unknown verb"
   end
+
+  test "writing via `>` auto-creates parent dirs; permit tolerates a perms map without :tools", %{vfs: vfs, dir: dir} do
+    # A perms map missing :tools must not crash permit/2 (real-run regression).
+    assert Bash.run(vfs, ~s|printf "hi" > marketing/index.work|, %{grant: ["fs"]}) == ""
+    assert File.read!(Path.join(dir, "marketing/index.work")) == "hi"
+  end
 end

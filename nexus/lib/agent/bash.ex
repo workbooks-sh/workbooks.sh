@@ -360,7 +360,10 @@ defmodule Nexus.Agent.Bash do
   # a web/net/browse grant. Any other command's KIT must be in the agent's tools.
   defp permit(_cmd, nil), do: :ok
 
-  defp permit(cmd, %{tools: tools, grant: grant}) do
+  defp permit(cmd, perms) when is_map(perms) do
+    tools = Map.get(perms, :tools)
+    grant = Map.get(perms, :grant, [])
+
     cond do
       cmd in ~w(kits help) ->
         :ok

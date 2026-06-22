@@ -141,6 +141,9 @@ defmodule Nexus.Agent do
           "tasks (`work check` to compile-check + resolve refs, `work structure`, `work graph`, " <>
           "`work why <unit>`, `work near <unit>`, `work parse <file>`; `work help` for all). After " <>
           "authoring/editing .work files, run `work check` to confirm they compile before finishing. " <>
+          "To WRITE a file, use output redirection — `printf '…' > path/to/file.work` (or a heredoc: " <>
+          "`cat > f.work <<EOF … EOF`). The `>` auto-creates parent directories, so you do NOT need " <>
+          "`mkdir` (it isn't available); `tee` and other writers can't create missing dirs — prefer `>`. " <>
           "Returns combined stdout/stderr.",
       parameters: %{
         type: "object",
