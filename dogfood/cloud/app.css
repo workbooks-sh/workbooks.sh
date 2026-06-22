@@ -519,13 +519,15 @@ tr:last-child td{ border:0; }
 /* Subtle # glyph (matches the Apps workspace groups) — replaces the per-workspace emoji squircle. */
 .wshash { flex: none; display: grid; place-items: center; color: var(--dim); opacity: .85; }
 .wshash svg { width: 14px; height: 14px; }
-.wsname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 600 13px var(--read); color: var(--ink); }
+.wsname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 600 13px var(--read); color: var(--li-ink); }
 .wschev { flex: none; display: grid; place-items: center; color: var(--dim); transition: transform .15s ease; }
 .wschev svg { width: 14px; height: 14px; }
 .wsgroup.open > .wshdr .wschev { transform: rotate(90deg); }
 .wshdr .wsmore-btn { flex: none; width: 24px; height: 24px; border: none; border-radius: 6px; background: none; color: var(--dim); cursor: pointer; opacity: 0; font-size: 15px; line-height: 1; }
 .wshdr:hover .wsmore-btn, .wsmore-btn:focus-visible { opacity: 1; }
 .wshdr .wsmore-btn:hover { background: var(--card); color: var(--ink); }
+/* Bodies supplied by consumers of WB.wsGroups: the Apps grid renders inside a group (no own scroll). */
+.wsgroup .appsgrid { overflow: visible; padding-bottom: 6px; }
 /* ── Right-click context menu (the WB.ctx floating-menu primitive) ── */
 .ctxmenu { position: fixed; z-index: 200; min-width: 192px; max-width: 320px; background: var(--card);
   border: 1px solid var(--line); border-radius: 11px; padding: 5px; box-shadow: 0 12px 34px rgba(0,0,0,.30);

@@ -594,6 +594,8 @@
     var ICO = {
       gauge: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4L12 8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 8L6.5 10.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M17.5 10.5L20 8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 17H6" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 17L13 11" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 17H21" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 20.001H4C2.74418 18.3295 2 16.2516 2 14C2 8.47715 6.47715 4 12 4C17.5228 4 22 8.47715 22 14C22 16.2516 21.2558 18.3295 20 20.001L15.5 20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 23C13.6569 23 15 21.6569 15 20C15 18.3431 13.6569 17 12 17C10.3431 17 9 18.3431 9 20C9 21.6569 10.3431 23 12 23Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       database: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12V18C5 18 5 21 12 21C19 21 19 18 19 18V12" stroke="currentColor" stroke-width="1.5"/><path d="M5 6V12C5 12 5 15 12 15C19 15 19 12 19 12V6" stroke="currentColor" stroke-width="1.5"/><path d="M12 3C19 3 19 6 19 6C19 6 19 9 12 9C5 9 5 6 5 6C5 6 5 3 12 3Z" stroke="currentColor" stroke-width="1.5"/></svg>',
+      // Spreadsheet/table — the Data surface (distinct from the admin "database" cylinder).
+      sheet: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9H21"/><path d="M3 15H21"/><path d="M9 3V21"/><path d="M15 3V21"/></svg>',
       users: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M1 20V19C1 15.134 4.13401 12 8 12V12C11.866 12 15 15.134 15 19V20" stroke="currentColor" stroke-linecap="round"/><path d="M13 14V14C13 11.2386 15.2386 9 18 9V9C20.7614 9 23 11.2386 23 14V14.5" stroke="currentColor" stroke-linecap="round"/><path d="M8 12C10.2091 12 12 10.2091 12 8C12 5.79086 10.2091 4 8 4C5.79086 4 4 5.79086 4 8C4 10.2091 5.79086 12 8 12Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 9C19.6569 9 21 7.65685 21 6C21 4.34315 19.6569 3 18 3C16.3431 3 15 4.34315 15 6C15 7.65685 16.3431 9 18 9Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       key: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12C10 14.2091 8.20914 16 6 16C3.79086 16 2 14.2091 2 12C2 9.79086 3.79086 8 6 8C8.20914 8 10 9.79086 10 12ZM10 12H22V15" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 12V15" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       plus: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12H12M18 12H12M12 12V6M12 12V18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -682,6 +684,7 @@
     try { st.appSort = localStorage.getItem('wb-appsort') || 'name'; } catch (e) { st.appSort = 'name'; }        // name | updated
     try { st.appGroupsCollapsed = JSON.parse(localStorage.getItem('wb-appgroups') || '{}'); } catch (e) { st.appGroupsCollapsed = {}; }
     try { st.studioWsCollapsed = JSON.parse(localStorage.getItem('wb-studiows') || '{}'); } catch (e) { st.studioWsCollapsed = {}; }
+    try { st.dataGroupsCollapsed = JSON.parse(localStorage.getItem('wb-datagroups') || '{}'); } catch (e) { st.dataGroupsCollapsed = {}; }
     try { st.bookmarks = JSON.parse(localStorage.getItem('wb-bookmarks') || '[]'); } catch (e) { st.bookmarks = []; }
     function saveBookmarks(){ try { localStorage.setItem('wb-bookmarks', JSON.stringify(st.bookmarks)); } catch (e) {} }
     function toggleBookmark(path, label){
@@ -896,26 +899,13 @@
         g.classList.toggle('grouped', st.appView === 'workspace');   // grouped → container stacks groups (block)
 
         if (st.appView === 'workspace') {
-          // Group by workspace. Order = declared workspace order, then "Other". Header = # icon + name
-          // (no emoji), gray, with a collapse chevron. Empty groups are dropped.
-          var wsList = (WB.ws && WB.ws.list) || [];
-          var order = wsList.map(function(w){ return w.id; });
-          var nameOf = {}; wsList.forEach(function(w){ nameOf[w.id] = w.name; });
-          var groups = {}; apps.forEach(function(a){ var k = a.workspace || '_other'; (groups[k] = groups[k] || []).push(a); });
-          var keys = order.filter(function(k){ return groups[k]; });
-          Object.keys(groups).forEach(function(k){ if (k !== '_other' && keys.indexOf(k) < 0) keys.push(k); });
-          if (groups._other) keys.push('_other');
-          var html = keys.map(function(k){
-            var collapsed = !!st.appGroupsCollapsed[k];
-            var title = k === '_other' ? 'Other' : (nameOf[k] || k);
-            return '<div class="appgroup">' +
-              '<button class="appgrouphd' + (collapsed ? ' collapsed' : '') + '" data-appgroup="' + esc(k) + '">' +
-                '<span class="agchev">' + ICO.chev + '</span><span class="aghash">' + ICO.hash + '</span>' +
-                '<span class="agname">' + esc(title) + '</span><span class="agct">' + groups[k].length + '</span></button>' +
-              (collapsed ? '' : '<div class="appsgrid">' + groups[k].map(appCard).join('') + '</div>') +
-            '</div>';
-          }).join('');
-          g.innerHTML = (html || '<div class="treemsg" style="padding:8px 4px">No apps</div>');
+          // Grouped by workspace via the SHARED component (same header as Files/Studio/Data); body is the
+          // app-card grid. Ungrouped apps fall under "General", every declared workspace shows as a group.
+          g.innerHTML = WB.wsGroups({
+            items: apps, ws: function(a){ return a.workspace || ''; },
+            key: 'wb-appgroups', store: st.appGroupsCollapsed, repaint: paintApps, empty: 'No apps',
+            body: function(id, list){ return '<div class="appsgrid">' + list.map(appCard).join('') + '</div>'; }
+          });
         } else {
           var cards = apps.map(appCard).join('');
           g.innerHTML = cards || '<div class="treemsg" style="padding:8px 4px">No ' + (st.appFilter !== 'all' ? st.appFilter + ' ' : '') + 'apps</div>';
@@ -926,37 +916,59 @@
     // "General" group for workspace-less (system-level) sessions. EVERY workspace shows as a collapsible
     // group even with no sessions (empty state inside). The + on a group starts a session IN that
     // workspace. Each session row carries its agent's pastel dot.
+    // ── Standard collapsible workspace-grouped list ─────────────────────────────────────────────
+    // ONE component for every sidebar that groups rows by workspace (Studio sessions, Data resources,
+    // …): a "General" group (system-level / workspace-less) first, then each declared workspace, then
+    // any orphan workspace still referenced by an item. Collapse state persists per consumer.
+    //   opts.items   — array of items
+    //   opts.ws(it)  — the item's workspace id ('' → General)
+    //   opts.row(it) — row HTML for an item
+    //   opts.key     — unique id for this list's collapse store (also the localStorage key)
+    //   opts.store   — the st.* object holding collapse booleans (keyed by ws id / '_general')
+    //   opts.repaint — fn() to re-render this list after a toggle
+    //   opts.add     — optional { attrs(id,name) → string, title(name) → string } for a per-group + button
+    //   opts.empty   — text for an empty group (default "Empty")
+    WB._wsGroupStores = WB._wsGroupStores || {};
+    WB.wsGroups = function (opts) {
+      var defaultOpen = opts.defaultOpen !== false;
+      WB._wsGroupStores[opts.key] = { store: opts.store, lsKey: opts.key, repaint: opts.repaint, defaultOpen: defaultOpen };
+      var workspaces = (WB.ws && WB.ws.list) || [];
+      var byWs = {}; (opts.items || []).forEach(function (it) { var k = opts.ws(it) || ''; (byWs[k] = byWs[k] || []).push(it); });
+      function group(id, name, list) {
+        var gkey = id || '_general';
+        var open = (gkey in opts.store) ? !!opts.store[gkey] : defaultOpen;
+        var extra = opts.add ? '<button class="wsmore-btn" ' + opts.add.attrs(id, name) + ' title="' + esc(opts.add.title(name)) + '">' + (opts.add.glyph || '+') + '</button>' : '';
+        // Canonical workspace-group header — the Files design (hash · name · count · action · caret-right).
+        var head = '<div class="wshdr" data-wsgroup="' + esc(opts.key) + '" data-wskey="' + esc(gkey) + '" role="button" tabindex="0" title="' + esc(name) + '">' +
+          '<span class="wshash">' + ICO.hash + '</span>' +
+          '<span class="wsname">' + esc(name) + '</span>' +
+          '<span class="swsct">' + (list.length || '') + '</span>' + extra +
+          '<span class="wschev">' + ICO.chev + '</span></div>';
+        var body = '';
+        if (open) body = opts.body ? opts.body(id, list) : (list.length ? list.map(opts.row).join('') : '<div class="treemsg" style="padding:2px 10px 8px 30px">' + (opts.empty || 'Empty') + '</div>');
+        return '<div class="wsgroup' + (open ? ' open' : '') + '">' + head + body + '</div>';
+      }
+      var html = (opts.general === false) ? '' : group('', 'General', byWs[''] || []);
+      workspaces.forEach(function (w) { html += group(w.id, w.name || w.id, byWs[w.id] || []); });
+      Object.keys(byWs).forEach(function (k) { if (k && !workspaces.some(function (w) { return w.id === k; })) html += group(k, k, byWs[k]); });
+      return html;
+    };
     function studioSessRow(s){
       var th = (WB.AGENT_THEME && s.agent) ? WB.AGENT_THEME[s.agent] : null;
       var dot = th ? '<span class="sdot" style="background:' + th.color + '" title="' + esc(s.agent) + '"></span>' : '<span class="semoji">💬</span>';
       return '<a class="srow" data-ctx="session" data-nav="/studio" href="#/studio" data-session="' + esc(s.id) + '" data-workspace="' + esc(s.workspace || '') + '" title="' + esc(s.title || 'Session') + '">' +
         dot + '<span class="sname">' + esc(s.title || 'Untitled session') + '</span></a>';
     }
-    // A collapsible workspace group. id='' is the General (system-level) group.
-    function studioWsGroup(id, name, list){
-      var key = id || '_general';
-      var collapsed = !!st.studioWsCollapsed[key];
-      var head = '<div class="swsgrp' + (collapsed ? ' collapsed' : '') + '" data-studiows="' + esc(key) + '">' +
-        '<span class="swschev">' + ICO.chev + '</span>' +
-        '<span class="swsic">' + ICO.hash + '</span>' +
-        '<span class="swstt">' + esc(name) + '</span>' +
-        '<span class="swsct">' + (list.length || '') + '</span>' +
-        '<button class="swsadd" data-newsession data-workspace="' + esc(id) + '" title="New session in ' + esc(name) + '">' + ICO.plus + '</button>' +
-        '</div>';
-      var body = collapsed ? ''
-        : (list.length ? list.map(studioSessRow).join('') : '<div class="treemsg" style="padding:2px 10px 8px 30px">No sessions yet</div>');
-      return '<div class="swsblock">' + head + body + '</div>';
-    }
     function paintStudioSide(){
       var el = document.getElementById('studioSide'); if (!el) return;
-      var sessions = WB._studioSessions || [];
-      var workspaces = (WB.ws && WB.ws.list) || [];
-      var byWs = {}; sessions.forEach(function(s){ var k = s.workspace || ''; (byWs[k] = byWs[k] || []).push(s); });
-      var html = studioWsGroup('', 'General', byWs[''] || []);   // always shown (system level)
-      workspaces.forEach(function(w){ html += studioWsGroup(w.id, w.name, byWs[w.id] || []); });
-      // a session tied to a workspace that's no longer declared still gets its own group
-      Object.keys(byWs).forEach(function(k){ if (k && !workspaces.some(function(w){ return w.id === k; })) html += studioWsGroup(k, k, byWs[k]); });
-      el.innerHTML = html;
+      el.innerHTML = WB.wsGroups({
+        items: WB._studioSessions || [],
+        ws: function(s){ return s.workspace || ''; },
+        row: studioSessRow,
+        key: 'wb-studiows', store: st.studioWsCollapsed, repaint: paintStudioSide,
+        empty: 'No sessions yet',
+        add: { attrs: function(id){ return 'data-newsession data-workspace="' + esc(id) + '"'; }, title: function(name){ return 'New session in ' + name; } }
+      });
     }
     function paintStudio(){
       if (!document.getElementById('studioSide')) return;
@@ -1030,38 +1042,26 @@
         var onAssets = /[?&]assets=/.test(hash);
         var onOverview = (hash === '/data' || hash.indexOf('/data?') === 0) && !curR && !onAssets;
 
-        function navrow(active, href, ico, label, badge){
+        function navrow(active, href, ico, label){
           return '<a class="srow' + (active ? ' on' : '') + '" data-nav="' + href + '" href="#' + href + '">' +
-            '<span class="semoji">' + ico + '</span><span class="sname">' + esc(label) + '</span>' +
-            (badge != null ? '<span class="dcount">' + badge + '</span>' : '') + '</a>';
+            '<span class="semoji">' + ico + '</span><span class="sname">' + esc(label) + '</span></a>';
+        }
+        function resourceRow(r){
+          var live = r.count > 0;
+          // Self-styled (the sidebar renders outside the view's scoped styles): inline the live/empty dot,
+          // reuse the global .srow row + .swsct count classes shared with the Studio group component.
+          var dot = '<span title="' + (live ? 'live' : 'empty') + '" style="display:inline-block;width:8px;height:8px;border-radius:3px;flex:0 0 auto;background:' + (live ? 'var(--live, #3fb950)' : 'var(--stroke)') + '"></span>';
+          return '<a class="srow' + (curR === r.name ? ' on' : '') + '" data-nav="/data?r=' + encodeURIComponent(r.name) + '" href="#/data?r=' + encodeURIComponent(r.name) + '" title="' + esc(r.name) + '">' +
+            dot + '<span class="sname">' + esc(r.name) + '</span><span class="swsct">' + r.count + '</span></a>';
         }
 
-        // Group resources by workspace (declared id, "General" for the workspace-less).
-        var groups = {}; var order = [];
-        resources.forEach(function(r){
-          var k = r.workspace || '_general';
-          if (!groups[k]) { groups[k] = []; order.push(k); }
-          groups[k].push(r);
-        });
-        order.sort(function(a, b){ return a === '_general' ? 1 : b === '_general' ? -1 : a.localeCompare(b); });
-
-        var wsName = {}; (WB.ws && WB.ws.list || []).forEach(function(w){ wsName[w.id] = w.name || w.id; });
-
-        var tree = order.map(function(k){
-          var label = k === '_general' ? 'General' : (wsName[k] || k);
-          var rows = groups[k].slice().sort(function(a, b){ return a.name.localeCompare(b.name); }).map(function(r){
-            var live = r.count > 0;
-            var dot = '<span class="ddot2" style="background:' + (live ? 'var(--live, #3fb950)' : 'var(--line)') + '" title="' + (live ? 'live' : 'empty') + '"></span>';
-            return '<a class="srow drow' + (curR === r.name ? ' on' : '') + '" data-nav="/data?r=' + encodeURIComponent(r.name) + '" href="#/data?r=' + encodeURIComponent(r.name) + '" title="' + esc(r.name) + '">' +
-              dot + '<span class="sname">' + esc(r.name) + '</span><span class="dcount">' + r.count + '</span></a>';
-          }).join('');
-          return '<div class="sgrp sgrpf"><span class="sgrpic">' + ICO.hash + '</span><span class="sgrptt">' + esc(label) + '</span></div>' + rows;
-        }).join('');
-
         el.innerHTML =
-          navrow(onOverview, '/data', ICO.gauge, 'Overview', null) +
-          navrow(onAssets, '/data?assets=1', ICO.files, 'Assets', null) +
-          (resources.length ? tree : '<div class="treemsg" style="padding:8px 10px">No resources yet. A <code>resource</code> block in any workbook shows up here.</div>');
+          navrow(onOverview, '/data', ICO.gauge, 'Overview') +
+          navrow(onAssets, '/data?assets=1', ICO.files, 'Assets') +
+          (resources.length
+            ? WB.wsGroups({ items: resources, ws: function(r){ return r.workspace || ''; }, row: resourceRow,
+                key: 'wb-datagroups', store: st.dataGroupsCollapsed, repaint: paintDataSide, empty: 'No tables' })
+            : '<div class="treemsg" style="padding:8px 10px">No resources yet. A <code>resource</code> block in any workbook shows up here.</div>');
       });
     }
     async function tkSideDisconnect(id){
@@ -1169,7 +1169,7 @@
         { id: 'apps', ico: ICO.grid, label: 'Apps', go: '/' },
         { id: 'activity', ico: ICO.activity, label: 'Activity', go: '/activity' },
         { id: 'files', ico: ICO.files, label: 'Files', go: '/workspaces' },
-        { id: 'data', ico: ICO.database, label: 'Data', go: '/data' }
+        { id: 'data', ico: ICO.sheet, label: 'Data', go: '/data' }
       ];
       var railsecs = RAIL_SECS.map(function (s) {
         return '<a class="railsec' + (section === s.id ? ' on' : '') + '" data-nav="' + s.go + '" href="#' + s.go +
@@ -1340,12 +1340,17 @@
       // ── Studio sidebar: set pending session/workspace, then route. When already on /studio the view's
       // hooks (WB._studioOpen / WB._studioNew) apply it in place (a data-nav re-nav wouldn't re-render).
       var onStudio = (location.hash || '').indexOf('/studio') >= 0;   // hooks are only live while mounted
-      // Collapse/expand a Studio workspace group (header click, not the + or a row).
-      var wsTog = t.closest && t.closest('[data-studiows]');
-      if (wsTog && !(t.closest && (t.closest('[data-newsession]') || t.closest('[data-session]')))) {
-        var wk = wsTog.getAttribute('data-studiows'); st.studioWsCollapsed[wk] = !st.studioWsCollapsed[wk];
-        try { localStorage.setItem('wb-studiows', JSON.stringify(st.studioWsCollapsed)); } catch (er) {}
-        if (WB._paintStudio) WB._paintStudio(); return;
+      // Collapse/expand a workspace group — the ONE handler for every WB.wsGroups list (Studio, Data, …).
+      // Header click only, not the + button or a clickable row inside it.
+      var wsTog = t.closest && t.closest('[data-wsgroup]');
+      if (wsTog && !(t.closest && (t.closest('[data-newsession]') || t.closest('[data-session]') || t.closest('[data-wsmore]')))) {
+        var sk = wsTog.getAttribute('data-wsgroup'), reg = WB._wsGroupStores[sk];
+        if (reg) { var wk = wsTog.getAttribute('data-wskey');
+          var wasOpen = (wk in reg.store) ? !!reg.store[wk] : reg.defaultOpen;
+          reg.store[wk] = !wasOpen;
+          try { localStorage.setItem(reg.lsKey, JSON.stringify(reg.store)); } catch (er) {}
+          if (reg.repaint) reg.repaint(); }
+        return;
       }
       var ssRow = t.closest && t.closest('[data-session]');
       if (ssRow) { e.preventDefault(); WB._pendingSession = ssRow.getAttribute('data-session'); WB._pendingWorkspace = ssRow.getAttribute('data-workspace') || null;
@@ -1371,7 +1376,6 @@
       var ffl = t.closest && t.closest('[data-filefilter]'); if (ffl) { st.fileFilter = ffl.getAttribute('data-filefilter'); try { localStorage.setItem('wb-filefilter', st.fileFilter); } catch (er) {} st.filterOpen = false; renderShell(); return; }
       var avw = t.closest && t.closest('[data-appview]'); if (avw) { st.appView = avw.getAttribute('data-appview'); try { localStorage.setItem('wb-appview', st.appView); } catch (er) {} st.filterOpen = false; renderShell(); paintApps(); return; }
       var aso = t.closest && t.closest('[data-appsort]'); if (aso) { st.appSort = aso.getAttribute('data-appsort'); try { localStorage.setItem('wb-appsort', st.appSort); } catch (er) {} st.filterOpen = false; renderShell(); paintApps(); return; }
-      var agp = t.closest && t.closest('[data-appgroup]'); if (agp) { var gk = agp.getAttribute('data-appgroup'); st.appGroupsCollapsed[gk] = !st.appGroupsCollapsed[gk]; try { localStorage.setItem('wb-appgroups', JSON.stringify(st.appGroupsCollapsed)); } catch (er) {} paintApps(); return; }
       if (t.closest && t.closest('[data-palette]')) { WB.palette(); return; }
       // Activity inbox row → focus that event; the /activity view renders its context in the page.
       var actf = t.closest && t.closest('[data-act-focus]');
