@@ -1,0 +1,35 @@
+# dogfood-base — the RUNTIME layer of the dogfood image: the Elixir release + litestream, WITHOUT the
+# dogfood content tree. Rebuilt ONLY when nexus/ (the runtime) changes (see dogfood-deploy.yml). The
+# deployed image is then `FROM dogfood-base + COPY dogfood` (dogfood/deploy/Dockerfile), so a
+# content-only change (cloud .js views, lander copy, deploy config) rebuilds just the content layer in
+# seconds instead of recompiling the whole BEAM release. No wasm compilers — the dogfood surfaces
+# compile no wasm.
+FROM elixir:1.19-otp-27 AS build
+ENV MIX_ENV=prod LANG=C.UTF-8
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential git curl && rm -rf /var/lib/apt/lists/*
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable --profile minimal
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN mix local.hex --force && mix local.rebar --force
+COPY nexus/mix.exs nexus/mix.lock ./
+COPY nexus/vendor/wasmex /app/vendor/wasmex
+RUN mix deps.get --only prod && mix deps.compile
+COPY nexus/ .
+RUN mix compile && mix release nexus
+
+FROM debian:bookworm-slim AS app
+ENV LANG=C.UTF-8 PORT=4000 WB_DATA=/srv/dogfood WB_NEXUS=dogfood
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 ca-certificates sqlite3 curl && rm -rf /var/lib/apt/lists/*
+# Litestream — streams the tenant SQLite WAL to R2 (egress-free) + restores on boot. Generic
+# durability mechanism; activates only when WB_S3_* secrets are injected (see entrypoint).
+ARG LITESTREAM_VERSION=v0.3.13
+RUN curl -fsSL "https://github.com/benbjohnson/litestream/releases/download/${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-amd64.tar.gz" \
+    | tar -xz -C /usr/local/bin litestream && litestream version
+COPY --from=build /app/_build/prod/rel/nexus ./
+COPY nexus/scripts/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+EXPOSE 4000
+# CMD lives in the base so the thin image only adds content. The deploy config + workbook tree are
+# COPY'd in by the thin image at /srv/dogfood (Nexus.Config reads $WB_DATA/index.work there).
+CMD ["/app/entrypoint.sh"]
