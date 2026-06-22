@@ -790,11 +790,14 @@ server :cloud do
         run_opts
       )
 
+    # Attribute the run to the AGENT's signing identity (wb-kxfa) — a stable, self-verifying did:key
+    # (Nexus.AgentId.of?(author, agent) re-derives it), so agent authorship is a cryptographic fact,
+    # not an anonymous string. Distinct from `user` (who launched it) and the runtime-signed `attest`.
     Nexus.Store.create(
       Run,
       %{rid: rid, agent: agent, user: user, task: String.slice(task, 0, 500), status: status,
         turns: turns, tokens: tokens, answer: String.slice(answer, 0, 2000),
-        started: started, ended: ended, attest: attest, author: ""},
+        started: started, ended: ended, attest: attest, author: Nexus.AgentId.did(agent)},
       tenant
     )
 
