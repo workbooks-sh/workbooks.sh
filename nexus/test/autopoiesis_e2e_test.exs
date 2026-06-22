@@ -96,3 +96,23 @@ defmodule Nexus.AutopoiesisE2ETest do
     assert Enum.any?(Telemetry.concerns(), fn {k, _s, r} -> k == Nexus.Uid.key("doomed") and :no_success in r end)
   end
 end
+
+defmodule Nexus.AutopoiesisBootTest do
+  @moduledoc "Local-nexus boot tier of wb-a6u3.16: the running nexus (THIS code) wires the autopoiesis runtime."
+  use ExUnit.Case, async: false
+
+  test "the booted nexus has the autopoiesis runtime supervised and alive" do
+    # the app is started for the test run (the same supervision tree a local nexus boots)
+    assert is_pid(Process.whereis(Nexus.Telemetry))
+    assert is_pid(Process.whereis(Nexus.Autopoet.Lease))
+    assert is_pid(Process.whereis(Nexus.Analytics))
+  end
+
+  test "the autopoet modules are loaded and callable in the booted node" do
+    assert function_exported?(Nexus.Autopoet.Worker, :cycle, 1)
+    assert function_exported?(Nexus.Autopoet.Gate, :classify, 3)
+    assert function_exported?(Nexus.Index, :effective_ceiling, 2)
+    # a live call through the supervised tree
+    assert Nexus.Analytics.summary("boot-check").total == 0
+  end
+end
