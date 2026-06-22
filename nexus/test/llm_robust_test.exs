@@ -50,5 +50,14 @@ defmodule Nexus.LlmRobustTest do
       assert {:error, :no_api_key} =
                Llm.complete([%{role: "user", content: "hi"}], model: "openai/gpt-4o-mini", api_key: "")
     end
+
+    test "model-id normalization matches the gateway vs direct endpoints" do
+      # AI Gateway compat wants `workers-ai/@cf/…` (verified live: bare @cf/… → 'Invalid provider').
+      assert Llm.gateway_model("@cf/meta/llama-3.1-8b-instruct-fast") == "workers-ai/@cf/meta/llama-3.1-8b-instruct-fast"
+      assert Llm.gateway_model("workers-ai/@cf/meta/llama-3.1-8b-instruct-fast") == "workers-ai/@cf/meta/llama-3.1-8b-instruct-fast"
+      # Direct Workers AI endpoint wants the native `@cf/…` id (no provider prefix).
+      assert Llm.cf_native("workers-ai/@cf/meta/llama-3.1-8b-instruct-fast") == "@cf/meta/llama-3.1-8b-instruct-fast"
+      assert Llm.cf_native("@cf/meta/llama-3.1-8b-instruct-fast") == "@cf/meta/llama-3.1-8b-instruct-fast"
+    end
   end
 end
