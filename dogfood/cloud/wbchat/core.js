@@ -111,6 +111,10 @@ export function createChat(container, options = {}) {
   let abort = null;
   let attachedFiles = [];                                  // composer attachments (set via ctx.addFile)
   let selectedModel = opts.model || (opts.models && opts.models[0]) || null; // composer model picker
+  // Agent the run is routed through (the composer's agent selector). Pinned for a session's life: once the
+  // conversation has any messages, the selector locks (agentLocked()), matching "pick the agent only when
+  // starting a new session". idOf-style values may be strings or { name, label, ... } records.
+  let selectedAgent = opts.agent || (opts.agents && opts.agents[0]) || null;
 
   const root = el('div', { class: 'wb-chat' });
   if (opts.scheme) root.setAttribute('data-color-scheme', opts.scheme);
@@ -222,6 +226,12 @@ export function createChat(container, options = {}) {
     models: opts.models || [],
     model: () => selectedModel,
     setModel: (m) => { selectedModel = m; },
+    // Agent selector hooks (consumed by the agent-selector composer add-on).
+    agents: opts.agents || [],
+    agent: () => selectedAgent,
+    setAgent: (a) => { selectedAgent = a; if (opts.onAgent) try { opts.onAgent(a); } catch (e) {} },
+    agentLocked: () => messages.length > 0,
+    onChange: (fn) => { (listeners['change'] = listeners['change'] || []).push(fn); },
     submit: (t) => submit(t),
   };
   function mountComposerButtons() { composerButtons.forEach(fn => { try { const n = fn(composerCtx); if (n) composer._tools.append(n); } catch (e) { try { console.error('[wbchat] composer button failed', e); } catch (_) {} } }); }
@@ -245,7 +255,7 @@ export function createChat(container, options = {}) {
       assistant.parts[0].text += chunk; render();
     };
     try {
-      const ret = await (opts.send ? opts.send(text, { delta: onDelta, signal: abort.signal, files, model: selectedModel }) : Promise.resolve('(no adapter wired)'));
+      const ret = await (opts.send ? opts.send(text, { delta: onDelta, signal: abort.signal, files, model: selectedModel, agent: selectedAgent }) : Promise.resolve('(no adapter wired)'));
       if (!started && typeof ret === 'string') { assistant.parts[0].text = ret; messages.push(assistant); }
       else if (started && typeof ret === 'string' && ret) assistant.parts[0].text = ret;
     } catch (e) {
@@ -268,12 +278,15 @@ export function createChat(container, options = {}) {
   const controller = {
     get messages() { return messages; },
     get status() { return status; },
-    addMessage(m) { messages.push(normalize(m)); render(); return controller; },
-    setMessages(list) { messages = (list || []).map(normalize); render(); return controller; },
-    clear() { messages = []; render(); return controller; },
+    addMessage(m) { messages.push(normalize(m)); render(); emit('change', { messages }); return controller; },
+    setMessages(list) { messages = (list || []).map(normalize); render(); emit('change', { messages }); return controller; },
+    clear() { messages = []; render(); emit('change', { messages }); return controller; },
     submit(text) { submit(text); return controller; },
     stop() { if (abort) abort.abort(); status = 'idle'; setBusy(false); render(); return controller; },
     focus() { composer._ta.focus(); return controller; },
+    // Agent the run routes through — read/set externally (e.g. opening a session pins its saved agent).
+    get agent() { return selectedAgent; },
+    setAgent(a) { selectedAgent = a; emit('change', { messages }); return controller; },
     on(evt, fn) { (listeners[evt] = listeners[evt] || []).push(fn); return controller; },
     destroy() { container.innerHTML = ''; },
     el, render,

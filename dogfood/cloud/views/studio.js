@@ -27,106 +27,80 @@ WB.scopedStyles('/usage', `
 // Activity (toggle the collapsible activity/sessions drawer). Custom tooltips on hover. The rail is the
 // seam for future agent surfaces (issues an agent files, etc.). "Create" is the + (new chat) action here.
 WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, async render(el){
-  // NOTE: no ?bundle — that inlines a SEPARATE solid-js core per import, so signals from one aren't
-  // reactive in another's templates (For/class bindings silently never update). Plain imports let
-  // esm.sh share ONE solid-js core across core/web/html, restoring reactivity.
-  // Load EVERYTHING the Studio needs in PARALLEL. This was a 7-deep serial await waterfall — each
-  // esm.sh / wbchat import AND the /cloud/models call blocked the next, so first paint waited on their
-  // SUM (the main reason Studio felt slow on cold load). One Promise.all → total ≈ the slowest single
-  // fetch. esm.sh is URL-keyed, so the three solid-js entry points still share ONE core (the reason we
-  // avoid ?bundle); firing the requests in parallel doesn't change that. `api` is hoisted (below).
+  // The Studio is now JUST the full-bleed chat — sessions + projects live in the left SIDEBAR (app.js),
+  // and the agent is chosen from the composer's agent selector (only at the start of a new session).
+  // The old top nav (New task | Agents | Sessions) is gone — the sidebar already owns all of it. No
+  // solid-js needed anymore (no reactive nav/panels), so we drop those imports too.
   var vurl = WB.vurl || function (u) { return u; };
+  function api(path, opts){ return fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'content-type': 'application/json' } }, opts || {})).then(function(r){ return r.json(); }); }
   var _p = await Promise.all([
-    import('https://esm.sh/solid-js@1.9.5'),
-    import('https://esm.sh/solid-js@1.9.5/web'),
-    import('https://esm.sh/solid-js@1.9.5/html'),
     import(vurl('../wbchat/core.js')),
     import(vurl('../wbchat/components/index.js')),  // registers all parts + actions + composer add-ons
     import(vurl('../wbchat/demo.js')),              // dev-only seed (?cdemo=1) exercising every part type
-    api('/cloud/models').catch(function(){ return { models: [] }; })  // overlaps the imports, no longer serial
+    api('/cloud/models').catch(function(){ return { models: [] }; }),
+    api('/cloud/agents').catch(function(){ return { agents: [] }; }),
+    api('/cloud/toolkits').catch(function(){ return { toolkits: [] }; })
   ]);
-  var S = _p[0], W = _p[1], html = _p[2].default, WBC = _p[3], DEMO = _p[5], _mr = _p[6];
-  var createSignal = S.createSignal, For = S.For, Show = S.Show;
+  var WBC = _p[0], DEMO = _p[2], MODELS = (_p[3] && _p[3].models) || [];
   (function(){ if (!document.getElementById('wbchat-theme')){ var l = document.createElement('link'); l.id = 'wbchat-theme'; l.rel = 'stylesheet'; l.href = vurl('./wbchat/theme.css'); document.head.appendChild(l); } })();
   var CDEMO = new URLSearchParams(location.search).get('cdemo') === '1';
-
   var U = (WB.user && WB.user.email) || 'anon';
-  function api(path, opts){ return fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'content-type': 'application/json' } }, opts || {})).then(function(r){ return r.json(); }); }
-  var ICONS = {
-    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
-    agent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg>',
-    sessions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>'
-  };
-  // The models you can route the run through (the composer dropdown). Live from the nexus —
-  // /cloud/models returns the provider's (OpenRouter) catalog, with a curated fallback. The selected
-  // model id is passed to the agent run. (Agent selection moved out of the composer; this is models.)
-  var MODELS = (_mr && _mr.models) || [];  // already fetched in the parallel batch above
 
-  function Studio(){
-    var ao = createSignal(false); var agentsOpen = ao[0], setAgentsOpen = ao[1];
-    var so = createSignal(false); var sessOpen = so[0], setSessOpen = so[1];
-    var ss = createSignal([]); var sessions = ss[0], setSessions = ss[1];
-    var ag = createSignal([]); var agents = ag[0], setAgents = ag[1];
-    var cs = createSignal(null); var curSession = cs[0], setCurSession = cs[1];
-    var chat = null;
+  // The Studio agent roster — our toolkit-bound catalog (GET /cloud/agents), FILTERED to those whose
+  // toolkit is enabled (disable a toolkit on the Toolkits page and its agent disappears here). Agents with
+  // no toolkit (Waldo, Autopilot) are always available.
+  var AG = (_p[4] && _p[4].agents) || [];
+  var TK = (_p[5] && _p[5].toolkits) || [];
+  var tkOn = {}; TK.forEach(function(t){ if (t && t.kind === 'standalone') tkOn[t.id] = t.enabled !== false; });
+  var AGENTS = AG.filter(function(a){ return !a.toolkit || tkOn[a.toolkit] !== false; });
 
-    // New task = a fresh free-form session (clears the composer). Sessions link to drafts later (Phase 2).
-    function newTask(){ setCurSession(null); setAgentsOpen(false); setSessOpen(false); if (chat) { chat.clear(); chat.focus(); } }
-    async function toggleAgents(){ setSessOpen(false); var open = !agentsOpen(); setAgentsOpen(open);
-      if (open) { try { var d = await api('/cloud/agents'); setAgents((d && d.agents) || []); } catch (e) {} } }
-    async function toggleSessions(){ setAgentsOpen(false); var open = !sessOpen(); setSessOpen(open);
-      if (open) { try { var d = await api('/cloud/agent/sessions?u=' + encodeURIComponent(U)); setSessions((d && d.sessions) || []); } catch (e) {} } }
-    async function openSession(id){ try { var d = await api('/cloud/agent/session?u=' + encodeURIComponent(U) + '&id=' + encodeURIComponent(id));
-      if (chat && d && d.messages) chat.setMessages(d.messages); setCurSession(id); setSessOpen(false); } catch (e) {} }
-    function fmtWhen(t){ if (!t) return ''; try { return new Date(t * 1000).toLocaleDateString(); } catch (e) { return ''; } }
+  // Session/project state (the sidebar sets WB._pending* before routing here). Agent + project are pinned
+  // for a session's life — captured on the first turn, sent with every turn so the server stores them.
+  var curSession = WB._pendingSession || null;
+  var curProject = WB._pendingProject || null;
+  WB._pendingSession = null; WB._pendingProject = null;
 
-    function mountChat(node){
-      chat = WBC.createChat(node, {
-        splash: true,
-        placeholder: 'What do you want to build?',
-        suggestions: ['Scaffold a new app', 'Draft a data model', 'Wire up an integration'],
-        models: MODELS,
-        send: function(text, ctx){
-          return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({ u: U, id: curSession(), message: text, model: ctx && ctx.model }) })
-            .then(function(d){ if (d && d.id) setCurSession(d.id); return (d && d.reply) || '(no reply)'; });
-        }
+  function agentName(a){ return a && (a.name || a) || null; }
+
+  var node = document.createElement('section');
+  node.className = 'studio-chat';
+  el.innerHTML = ''; el.appendChild(node);
+
+  var chat = WBC.createChat(node, {
+    splash: true,
+    placeholder: 'What do you want to build?',
+    suggestions: ['Scaffold a new app', 'Draft a data model', 'Wire up an integration'],
+    models: MODELS,
+    agents: AGENTS,
+    send: function(text, ctx){
+      return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({
+        u: U, id: curSession, message: text,
+        model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), project: curProject
+      }) }).then(function(d){
+        if (d && d.id) { curSession = d.id; if (WB._paintStudio) { WB.cache.set('agent-sessions', null); WB._paintStudio(); } }
+        return (d && d.reply) || '(no reply)';
       });
-      if (CDEMO && DEMO.demoMessages) chat.setMessages(DEMO.demoMessages());
     }
+  });
+  if (CDEMO && DEMO.demoMessages) chat.setMessages(DEMO.demoMessages());
 
-    return html`
-      <div class="studio">
-        <nav class="studio-topnav">
-          <button class="studio-tab" onClick=${newTask}><span class="ti" innerHTML=${ICONS.plus}></span><span>New task</span></button>
-          <button class=${function(){ return 'studio-tab' + (agentsOpen() ? ' on' : ''); }} onClick=${toggleAgents}><span class="ti" innerHTML=${ICONS.agent}></span><span>Agents</span></button>
-          <button class=${function(){ return 'studio-tab' + (sessOpen() ? ' on' : ''); }} onClick=${toggleSessions}><span class="ti" innerHTML=${ICONS.sessions}></span><span>Sessions</span></button>
-        </nav>
-        <section class="studio-chat" ref=${mountChat}></section>
-        <${Show} when=${agentsOpen}>
-          <aside class="studio-side">
-            <div class="studio-side-hd">Agents</div>
-            <div class="studio-side-list">
-              <${For} each=${agents}>${function(a){ return html`<div class="studio-agent"><span class="studio-agent-ic" innerHTML=${ICONS.agent}></span><span class="studio-agent-nm">${a.name}</span></div>`; }}<//>
-              <${Show} when=${function(){ return agents().length === 0; }}><div class="studio-side-empty">No agents defined yet.</div><//>
-            </div>
-          </aside>
-        <//>
-        <${Show} when=${sessOpen}>
-          <aside class="studio-side">
-            <div class="studio-side-hd">Sessions</div>
-            <div class="studio-side-list">
-              <${For} each=${sessions}>${function(s){ return html`<button data-ctx="session" data-session=${s.id} class=${function(){ return 'studio-sess' + (curSession() === s.id ? ' on' : ''); }} onClick=${function(){ openSession(s.id); }}>
-                <span class="studio-sess-nm">${s.title || 'Untitled'}</span>
-                <span class="studio-sess-meta"><span class="studio-sess-ctx">free-form</span><span class="studio-sess-when">${fmtWhen(s.updated)}</span></span>
-              </button>`; }}<//>
-              <${Show} when=${function(){ return sessions().length === 0; }}><div class="studio-side-empty">No sessions yet — start one with New task.</div><//>
-            </div>
-          </aside>
-        <//>
-      </div>`;
+  // Open an existing session — load its messages and pin its saved agent + project (the composer locks
+  // the agent once messages are present, so it stays fixed).
+  async function openSession(id){
+    try {
+      var d = await api('/cloud/agent/session?u=' + encodeURIComponent(U) + '&id=' + encodeURIComponent(id));
+      if (!d || d.error) return;
+      curSession = id; curProject = d.project || null;
+      if (d.agent && chat.setAgent) chat.setAgent(d.agent);
+      chat.setMessages(d.messages || []);
+      chat.focus();
+    } catch (e) {}
   }
-  el.innerHTML = '';
-  W.render(Studio, el);
+  // Hooks the sidebar calls when we're ALREADY on /studio (a re-nav wouldn't re-render the view).
+  WB._studioOpen = function(id){ openSession(id); };
+  WB._studioNew = function(project){ curSession = null; curProject = project || null; chat.clear(); chat.focus(); };
+
+  if (curSession) openSession(curSession);
 }});
 // "Create" is now the + (new chat) inside Studio; keep the old route as a redirect.
 WB.view('/create', { title: 'Studio', render(el){ WB.nav('/studio'); } });

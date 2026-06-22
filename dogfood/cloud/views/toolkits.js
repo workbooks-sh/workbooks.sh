@@ -152,7 +152,8 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
     catch (e) { WB.toast(String(e)); }
   }
 
-  function tkTheme(id){ return (window.WB && WB.TOOLKIT_GLYPHS && WB.TOOLKIT_GLYPHS[id]) || { color:'var(--dim)', bg:'var(--line)', icon: WB.ICO_TOOLBOX || '' }; }
+  // Shared with the Studio composer's agent selector — defined once in app.js (WB.TK_THEME).
+  function tkTheme(id){ return (window.WB && WB.TK_THEME && WB.TK_THEME[id]) || { color:'var(--dim)', bg:'var(--line)', icon: WB.ICO_TOOLBOX || '' }; }
 
   // ── render ──────────────────────────────────────────────────────────────────────────────────
   // The chip (logo for an integration, themed pastel glyph for a built-in toolkit). Shared by card + modal.

@@ -123,7 +123,10 @@ server :integrations do
         detail: "Ask an agent for a presentation and get a real reveal.js deck — arrow-key nav, fullscreen, per-slide URLs — not a scroll page. Authored from a deck spec or an Org workbook; ships as one self-contained HTML."},
       %{id: "video", name: "Video", status: "ready", default: true,
         blurb: "In-nexus HTML → video rendering for motion graphics. No external tooling.",
-        detail: "Ask for a video and get HyperFrames — author a scene (onReady/onTick on a fixed canvas) and the nexus renders it to a clip. No external tooling or accounts."}
+        detail: "Ask for a video and get HyperFrames — author a scene (onReady/onTick on a fixed canvas) and the nexus renders it to a clip. No external tooling or accounts."},
+      %{id: "research", name: "Research", status: "ready", default: true,
+        blurb: "Multi-source web research → organized, cited findings. No external tooling.",
+        detail: "Ask a question and get a structured, cited brief — the Deep Researcher agent fans out searches, reads sources, and synthesizes findings into an organized answer, not a doc dump. Ships its own agent."}
     ]
   end
 
