@@ -87,8 +87,12 @@ defmodule Nexus.GitHttp do
 
   def workspace_from_path(_), do: :error
 
-  @doc "This nexus's OWN org (machine identity — NEXUS_TENANT), or the default tenant when unset (local/dev)."
-  def nexus_org, do: System.get_env("NEXUS_TENANT") || Nexus.Store.default_tenant()
+  @doc """
+  This nexus's OWN org (machine identity) — the CANONICAL `Nexus.Auth.nexus_org/0`: `NEXUS_TENANT` pin,
+  else the founding owner's org, else default. (Was `NEXUS_TENANT || default`; with NEXUS_TENANT unset
+  that's `"default"`, which no real-org PAT matches, so the gate 403'd EVERY content push — wb-5wsg.)
+  """
+  def nexus_org, do: Nexus.Auth.nexus_org()
 
   @doc """
   May `ident` touch THIS nexus's repos? (fix wb-d3vh) On a multi-tenant nexus a token may only act on

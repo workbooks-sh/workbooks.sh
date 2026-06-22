@@ -114,6 +114,29 @@ defmodule Nexus.Auth do
   Server-derived ONLY — a handler must prefer this over any client-supplied `u` (fix wb-q7w5).
   """
   def user(conn), do: (conn.assigns[:identity] || %{})[:user]
+
+  @doc """
+  This nexus's CANONICAL org (machine identity, one nexus per org). The explicit `NEXUS_TENANT` deploy
+  pin wins; else the founding owner's org (`Nexus.Auth.Accounts.nexus_org/0`); else the default tenant.
+
+  The ONE definition `Nexus.Secrets` (the secret seam) and `Nexus.GitHttp` (the git-ingress push gate)
+  MUST share — the gate compares a real-org token's tenant against it. When they disagreed (the gate
+  used `NEXUS_TENANT || "default"` while real PATs carry the owner's org), every content push 403'd.
+  """
+  def nexus_org do
+    case System.get_env("NEXUS_TENANT") do
+      t when is_binary(t) and t != "" -> t
+      _ -> owner_org() || Nexus.Store.default_tenant()
+    end
+  end
+
+  defp owner_org do
+    Nexus.Auth.Accounts.nexus_org()
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
+  end
 end
 
 defmodule Nexus.Auth.None do
