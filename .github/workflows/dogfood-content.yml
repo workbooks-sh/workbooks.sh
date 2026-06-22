@@ -87,3 +87,25 @@ jobs:
           git commit -q -m "deploy ${WS} @ ${GITHUB_SHA::7}"
           git push -f "https://x:${TOKEN}@workbooks.sh/git/${WS}.git" main
           echo "✅ pushed ${WS} to the nexus — hot-reload triggered (no image rebuild)"
+
+      # Post-push LIVE SMOKE — the content equivalent of the image path's GET /health gate. The push
+      # already landed (remount is async), so we poll the surface and fail the run RED if it stopped
+      # serving (e.g. a pushed .work failed bringup). The nexus stays up + other surfaces serve; recover
+      # by `jj undo` on that workspace (the op-log we made real) or pushing a fix. Reactive, not
+      # preventive — the preventive gate is a pre-push `work check` (see the runtime TODO).
+      - name: Smoke ${{ matrix.ws }} surface (GET → 200)
+        run: |
+          set -euo pipefail
+          case "${{ matrix.ws }}" in
+            lander) path="/";; cloud) path="/cloud/";; docs) path="/docs/";; *) path="/${{ matrix.ws }}/";;
+          esac
+          ok=
+          for i in $(seq 1 20); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://workbooks.sh${path}" || true)"
+            if [ "$code" = "200" ]; then ok=1; echo "✅ ${path} serving 200 after push"; break; fi
+            echo "… ${path} → ${code} (waiting for hot-reload, attempt $i)"; sleep 3
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::${{ matrix.ws }} surface (${path}) is NOT serving 200 after push — the pushed content likely broke bringup. Roll back: jj undo on that workspace, or push a fix. The nexus + other surfaces are unaffected."
+            exit 1
+          fi
