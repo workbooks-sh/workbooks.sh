@@ -98,7 +98,10 @@ defmodule Nexus.Auth.Guard do
   # ── internals ──
   defp enforce(nil, identity), do: if(authenticated?(identity), do: :allow, else: :unauthenticated)
   defp enforce(:authenticated, identity), do: if(authenticated?(identity), do: :allow, else: :unauthenticated)
-  defp enforce({:role, r}, identity), do: if(authenticated?(identity) and r in roles(identity), do: :allow, else: deny(identity))
+  # RANK-based (fix wb-i04g): a higher role satisfies a lower requirement (owner ⊇ admin ⊇ member ⊇
+  # viewer), consistent with Nexus.Authz/role_at_least? — not exact-string membership.
+  defp enforce({:role, r}, identity),
+    do: if(authenticated?(identity) and Enum.any?(roles(identity), &Nexus.Auth.role_at_least?(&1, r)), do: :allow, else: deny(identity))
   defp enforce({:scope, sc}, identity), do: if(authenticated?(identity) and sc in scopes(identity), do: :allow, else: deny(identity))
 
   # Unauthenticated → needs login (401); authenticated but lacking the claim → forbidden (403).
