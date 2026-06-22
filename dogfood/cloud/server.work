@@ -51,6 +51,16 @@ server :cloud do
   route "GET /cloud/issues", :issues_list
   route "POST /cloud/issues", :issue_file
 
+  # Inbox — the email-style unified feed. /cloud/inbox joins Event + Todo(issue) into semantic THREADS
+  # (one subject = a run/session/issue, its events as a timeline), each carrying a server-classified
+  # {semantic, severity, blame, friendly title + snippet} so the client renders meaning, never raw
+  # codes. Per-user read/archive state + saved filter views back the inbox-as-mailbox feel.
+  route "GET /cloud/inbox", :inbox
+  route "POST /cloud/inbox/state", :inbox_state_set
+  route "GET /cloud/inbox/views", :inbox_views_list
+  route "POST /cloud/inbox/views", :inbox_view_save
+  route "POST /cloud/inbox/views/delete", :inbox_view_delete
+
   # Autopoet management — ADMIN ONLY. The autopoet is secluded under admin: its heartbeat (on/off +
   # cadence), what it can access (managed/frozen agents, ceilings, leases), and its logs.
   route "GET /cloud/autopoet", :autopoet_status
@@ -473,6 +483,7 @@ server :cloud do
           tenant
         )
 
+        rebuild_allowed_signers(tenant)
         %{ok: true, did: did}
     end
     else
@@ -499,11 +510,26 @@ server :cloud do
           tenant
         )
 
+        rebuild_allowed_signers(tenant)
         %{ok: true}
     end
     else
       :error -> {401, %{error: "authentication required"}}
     end
+  end
+
+  # Rebuild the deploy's allowed-signers file from EVERY live device key in the org (fix wb-i2c8): the
+  # git pre-receive sig-gate verifies pushed commits against it. Best-effort — a write failure never
+  # blocks key management. THE LINE: Nexus.GitSign is generic; we supply our registry's dids.
+  defp rebuild_allowed_signers(tenant) do
+    events =
+      DeviceKey
+      |> Nexus.Store.all(tenant)
+      |> Enum.map(&Map.from_struct/1)
+      |> Enum.map(fn r -> %{did: r.did, op: (if r.revoked == 1, do: :revoke, else: :register), ts: r.registered} end)
+
+    dids = Nexus.Authorship.fold_device_keys(events) |> Enum.map(& &1.did)
+    try do Nexus.GitSign.write_allowed_signers(dids) rescue _ -> :ok catch _, _ -> :ok end
   end
 
   # This user's device keys, folded by did (latest `registered` wins).

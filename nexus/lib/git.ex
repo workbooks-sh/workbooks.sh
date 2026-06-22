@@ -284,6 +284,33 @@ defmodule Nexus.Git do
   # ref updates, so a non-zero exit here rejects the push and the `remote:` lines surface in the client's
   # `git push` output. The check runs in a throwaway `bin/nexus eval` node — never the live serving node
   # (which would redefine live modules). Fail-OPEN when the bin is missing so the gate can't wedge pushes.
+  @doc """
+  Authorship gate for the git push ingress (fix wb-i2c8). Under the `:hard` authorship policy, every
+  commit a push introduces (`old..new`) must be SSH-signed by a registered device key (verified against
+  the deploy's allowed-signers file via `Nexus.GitSign`). `:off`/`:soft` → always `:ok` (no breakage
+  until contributors sign). Returns `:ok | :reject`.
+  """
+  def sig_gate(bare, old, new) do
+    if Nexus.Config.authorship_policy() == :hard do
+      f = Nexus.GitSign.allowed_signers_path()
+      if File.exists?(f) and Nexus.GitSign.verify_push_file(bare, old, new, f), do: :ok, else: :reject
+    else
+      :ok
+    end
+  end
+
+  @doc "Hook entry point: `:ok` returns normally (push allowed); `:reject` prints + halts 1 (push rejected)."
+  def sig_gate!(bare, old, new) do
+    case sig_gate(bare, old, new) do
+      :ok ->
+        :ok
+
+      :reject ->
+        IO.puts("remote: ✗ push rejected — every commit must be signed by a registered device key (authorship policy: hard)")
+        System.halt(1)
+    end
+  end
+
   defp pre_receive(bare) do
     """
     #!/bin/sh
@@ -320,6 +347,9 @@ defmodule Nexus.Git do
             exit 1
           fi
           echo "remote: ✓ compile check passed"
+          # Authorship gate (fix wb-i2c8): under the :hard policy every pushed commit must be signed by
+          # a registered device key. No-op under :off/:soft. Reads the quarantined objects via inherited env.
+          "$NEXUS_BIN" eval "Nexus.Git.sig_gate!(\\"#{bare}\\", \\"$_old\\", \\"$new\\")" || exit 1
           ;;
       esac
     done

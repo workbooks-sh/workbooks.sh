@@ -106,5 +106,49 @@ defmodule Nexus.GitSign do
     end
   end
 
+  @doc "The deploy-maintained allowed-signers file (the cloud rebuilds it from its device-key registry)."
+  @spec allowed_signers_path() :: Path.t()
+  def allowed_signers_path, do: Path.join(Nexus.Paths.durable_dir(), "allowed_signers")
+
+  @doc "Write the allowed-signers file from a set of `did:key`s. Returns the path. Malformed dids are skipped."
+  @spec write_allowed_signers([String.t()], String.t()) :: Path.t()
+  def write_allowed_signers(dids, principal \\ "member") do
+    lines =
+      dids
+      |> Enum.flat_map(fn d ->
+        case did_to_ssh_line(d) do
+          {:ok, line} -> [~s(#{principal} namespaces="git" #{line})]
+          :error -> []
+        end
+      end)
+
+    path = allowed_signers_path()
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, Enum.join(lines, "\n") <> "\n")
+    path
+  end
+
+  @doc "Like `verify_push/5` but against an EXISTING allowed-signers `file` (the deploy's registry)."
+  @spec verify_push_file(Path.t(), String.t(), String.t(), Path.t()) :: boolean()
+  def verify_push_file(repo, old, new, file) do
+    range = if old in [@zero, "", nil], do: new, else: "#{old}..#{new}"
+
+    case System.cmd("git", ["-C", repo, "rev-list", range], stderr_to_stdout: true) do
+      {out, 0} ->
+        out
+        |> String.split("\n", trim: true)
+        |> Enum.all?(fn sha ->
+          {_, code} =
+            System.cmd("git", ["-C", repo, "-c", "gpg.ssh.allowedSignersFile=#{file}", "verify-commit", sha],
+              stderr_to_stdout: true)
+
+          code == 0
+        end)
+
+      _ ->
+        false
+    end
+  end
+
   defp ssh_str(s), do: <<byte_size(s)::32>> <> s
 end
