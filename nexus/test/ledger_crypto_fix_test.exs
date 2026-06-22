@@ -32,7 +32,7 @@ defmodule Nexus.LedgerCryptoFixTest do
     att = Attest.sign(kp, %{"run" => "r1", "note" => "x\ntokens=999"})
 
     dec = Ledger.decode(Ledger.encode(att))
-    assert Attest.verify(dec)
+    assert Attest.verify(dec, dec.did)
   end
 
   test "plain attestations still round-trip losslessly" do
@@ -41,6 +41,6 @@ defmodule Nexus.LedgerCryptoFixTest do
 
     dec = Ledger.decode(Ledger.encode(att))
     assert dec.fields == att.fields
-    assert Attest.verify(dec)
+    assert Attest.verify(dec, dec.did)
   end
 end

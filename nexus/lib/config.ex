@@ -113,6 +113,9 @@ defmodule Nexus.Config do
     end
   end
 
+  @doc "The pinned/published ledger trust anchor did:key (fix wb-8hax), or nil if the deploy hasn't pinned one."
+  def ledger_did, do: get(:ledger_did)
+
   def cpus, do: get(:cpus)
   def memory, do: get(:memory)
 
@@ -237,6 +240,12 @@ defmodule Nexus.Config do
       # verified flag, never reject (the safe, non-breaking default); "hard" = reject any commit not
       # signed by a registered device key. Generic mechanism — any deployer picks their posture.
       authorship_policy: attr(html, "authorship-policy") || "soft",
+      # The PINNED/published runtime trust anchor (epic wb-kodp, fix wb-8hax): the did:key whose
+      # signatures count as authoritative metering. Verification anchors to THIS, never the live running
+      # key (which an attacker-run nexus could mint + self-trust). Neutral default nil ⇒ a deploy that
+      # hasn't pinned an anchor reads all metering as UNVERIFIED (fail closed). NO-JSON: a .work deploy
+      # attr, not an env read.
+      ledger_did: attr(html, "ledger-did"),
       # Machine shape for a LOCAL deploy — defaults match the cloud tier (1cpu/1024MB) so local doesn't
       # mask OOM/concurrency a cloud machine would hit. Overridable from the block for tier-faithful tests.
       cpus: int(attr(html, "cpus"), 1),

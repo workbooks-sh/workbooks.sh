@@ -49,16 +49,32 @@ defmodule Nexus.Ledger do
   end
 
   @doc """
-  Read every meter attestation in `repo`, each as `{commit_sha, attestation, verified?}`. When
-  `expected_did` is given (e.g. our published runtime DID), a record is `verified?` only if signed by
-  exactly that key — so a forged note from an unknown key reads as unverified.
+  The PINNED trust anchor for verifying meter notes (fix wb-8hax): an explicit DID wins, else the
+  published `Nexus.Config.ledger_did/0`. `nil` when a deploy hasn't pinned one — and a nil anchor makes
+  every record read UNVERIFIED (fail closed), never "trust the live key".
+  """
+  @spec expected_did(String.t() | nil) :: String.t() | nil
+  def expected_did(explicit \\ nil), do: explicit || safe_config_did()
+
+  defp safe_config_did do
+    Nexus.Config.ledger_did()
+  rescue
+    _ -> nil
+  end
+
+  @doc """
+  Read every meter attestation in `repo`, each as `{commit_sha, attestation, verified?}`. A record is
+  `verified?` ONLY if signed by exactly the pinned anchor (`expected_did/1`) — a forged note, or any
+  note on a deploy with no pinned anchor, reads as unverified (fail closed, not fail open).
   """
   @spec read_meters(Path.t(), String.t() | nil) :: [{String.t(), Attest.t(), boolean()}]
   def read_meters(repo, expected_did \\ nil) do
+    anchor = expected_did(expected_did)
+
     Git.notes(repo, @ref)
     |> Enum.map(fn {commit, body} ->
       att = decode(body)
-      {commit, att, Attest.verify(att, expected_did)}
+      {commit, att, Attest.verify(att, anchor)}
     end)
   end
 

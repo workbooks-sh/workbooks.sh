@@ -38,20 +38,33 @@ defmodule Nexus.Attest do
   end
 
   @doc """
-  Verify an attestation against its own embedded DID. `true` only if the signature is valid AND, when
-  `expected_did` is given, the signer matches it (so you can demand "this must be the runtime key").
+  Is the attestation's signer the expected one? Exact DID match, INJECTIVE — there is NO accept-all
+  branch (fix wb-2ctu): a nil/blank `expected_did` is `false`, so an unanchored verify FAILS CLOSED
+  instead of trusting any self-consistent attacker keypair.
+  """
+  @spec signer_ok?(String.t() | nil, String.t() | nil) :: boolean()
+  def signer_ok?(did, expected_did)
+      when is_binary(did) and is_binary(expected_did) and expected_did != "",
+      do: did == expected_did
+
+  def signer_ok?(_, _), do: false
+
+  @doc """
+  Verify an attestation. `true` only if the signer matches `expected_did` (REQUIRED — fail closed when
+  absent) AND the signature is valid. TOTAL over hostile input — a malformed DID/sig returns `false`,
+  never raises.
   """
   @spec verify(t(), String.t() | nil) :: boolean()
   def verify(attestation, expected_did \\ nil)
 
   def verify(%{did: did, sig: sig, fields: fields}, expected_did) do
-    with true <- expected_did == nil or expected_did == did,
-         {:ok, pub} <- Keyring.public_from_did(did),
-         {:ok, raw} <- Base.decode16(sig, case: :lower) do
-      Keyring.verify(pub, preimage(fields), raw)
-    else
-      _ -> false
-    end
+    signer_ok?(did, expected_did) and
+      (with {:ok, pub} <- Keyring.public_from_did(did),
+            {:ok, raw} <- Base.decode16(to_string(sig), case: :lower) do
+         Keyring.verify(pub, preimage(fields), raw)
+       else
+         _ -> false
+       end)
   end
 
   def verify(_, _), do: false

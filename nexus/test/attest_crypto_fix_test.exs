@@ -53,7 +53,7 @@ defmodule Nexus.AttestCryptoFixTest do
       fields = %{"run" => "r1", "note" => "tokens=5\nfoo=bar"}
       att = Attest.sign(kp, fields)
 
-      assert Attest.verify(att)
+      assert Attest.verify(att, att.did)
       assert att.fields == fields
     end
   end

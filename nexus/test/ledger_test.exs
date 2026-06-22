@@ -17,8 +17,8 @@ defmodule Nexus.LedgerTest do
     decoded = Ledger.decode(Ledger.encode(att))
     assert decoded.did == att.did
     assert decoded.sig == att.sig
-    # verifies after the round-trip (canonical preimage is stable across atom/string keys)
-    assert Nexus.Attest.verify(decoded)
+    # verifies after the round-trip against its signer (fail-closed: must name the expected DID)
+    assert Nexus.Attest.verify(decoded, att.did)
   end
 
   test "write_meter then read_meters returns a verified record", %{dir: dir, sha: sha} do
@@ -37,8 +37,8 @@ defmodule Nexus.LedgerTest do
     {:ok, _} = Ledger.write_meter(dir, sha, %{run: "r1", tokens_out: 5}, impostor)
 
     assert [{_commit, _att, false}] = Ledger.read_meters(dir, Keyring.did(runtime.public))
-    # ...but it's self-consistent if we don't pin the signer
-    assert [{_commit, _att, true}] = Ledger.read_meters(dir, nil)
+    # fail-closed (wb-2ctu/wb-8hax): with no pinned anchor, a self-consistent note is still UNVERIFIED
+    assert [{_commit, _att, false}] = Ledger.read_meters(dir, nil)
   end
 
   test "read_meters is empty for a repo with no ledger", %{dir: dir} do

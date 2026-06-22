@@ -13,7 +13,9 @@ defmodule Nexus.AttestTest do
     kp = Keyring.generate()
     att = Attest.sign(kp, %{run: "r1", agent: "workhorse", tokens_in: 10, tokens_out: 90})
     assert att.did == Keyring.did(kp.public)
-    assert Attest.verify(att)
+    # fail-closed (wb-2ctu): verify requires the expected signer; an unanchored verify is false
+    assert Attest.verify(att, Keyring.did(kp.public))
+    refute Attest.verify(att)
   end
 
   test "tampering with fields breaks verification" do
