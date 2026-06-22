@@ -34,9 +34,14 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   var vurl = WB.vurl || function (u) { return u; };
   function api(path, opts){ return fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'content-type': 'application/json' } }, opts || {})).then(function(r){ return r.json(); }); }
   var _p = await Promise.all([
-    import(vurl('../wbchat/core.js')),
-    import(vurl('../wbchat/components/index.js')),  // registers all parts + actions + composer add-ons
-    import(vurl('../wbchat/demo.js')),              // dev-only seed (?cdemo=1) exercising every part type
+    // NOTE: import the wbchat modules WITHOUT vurl. The component files statically import '../core.js'
+    // (bare), so if Studio loaded core via a ?v= URL it'd get a SEPARATE module instance — and the
+    // composer add-ons (model + agent selectors) would register into an instance Studio never uses, so
+    // none would appear. Bare keeps ONE shared instance. Assets are served must-revalidate, so no stale
+    // cache. (theme.css below can stay versioned — it's a stylesheet, not a module graph.)
+    import('../wbchat/core.js'),
+    import('../wbchat/components/index.js'),  // registers all parts + actions + composer add-ons
+    import('../wbchat/demo.js'),              // dev-only seed (?cdemo=1) exercising every part type
     api('/cloud/models').catch(function(){ return { models: [] }; }),
     api('/cloud/agents').catch(function(){ return { agents: [] }; }),
     api('/cloud/toolkits').catch(function(){ return { toolkits: [] }; })
@@ -49,7 +54,9 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   // The Studio agent roster — our toolkit-bound catalog (GET /cloud/agents), FILTERED to those whose
   // toolkit is enabled (disable a toolkit on the Toolkits page and its agent disappears here). Agents with
   // no toolkit (Waldo, Autopilot) are always available.
-  var AG = (_p[4] && _p[4].agents) || [];
+  // Roster comes from /cloud/agents; fall back to the canonical client catalog so the selector always
+  // renders (e.g. before the nexus has recompiled the route, or on a cold/odd response).
+  var AG = (_p[4] && _p[4].agents && _p[4].agents.length) ? _p[4].agents : (WB.AGENT_CATALOG || []);
   var TK = (_p[5] && _p[5].toolkits) || [];
   var tkOn = {}; TK.forEach(function(t){ if (t && t.kind === 'standalone') tkOn[t.id] = t.enabled !== false; });
   var AGENTS = AG.filter(function(a){ return !a.toolkit || tkOn[a.toolkit] !== false; });

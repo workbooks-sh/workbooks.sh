@@ -16,6 +16,16 @@ WB.AGENT_THEME = {
   waldo:     { color:'#5b9bd5', bg:'rgba(91,155,213,.14)', icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.13a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.13 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.13a.5.5 0 0 1-.96 0z"/></svg>' },
   autopilot: { color:'#6cae8e', bg:'rgba(108,174,142,.14)', icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/></svg>' }
 };
+// Canonical Studio agent roster — our toolkit-bound catalog. The server (/cloud/agents) returns this too,
+// but defining it here makes the composer's agent selector + the agent editor work without depending on a
+// live round-trip (and is the single source for labels/blurbs/toolkit bindings). toolkit:null = always on.
+WB.AGENT_CATALOG = [
+  { name:'deck',      label:'Deck Builder',    toolkit:'presentation', blurb:'Turns a brief into a real, rendering reveal.js deck.' },
+  { name:'video',     label:'Video Editor',    toolkit:'video',        blurb:'Authors HyperFrames scenes the nexus renders to a clip.' },
+  { name:'research',  label:'Deep Researcher', toolkit:'research',     blurb:'Fans out searches and synthesizes organized, cited findings.' },
+  { name:'waldo',     label:'Waldo',           toolkit:null,           blurb:'The everyday manager — plans, dispatches, gets things done.' },
+  { name:'autopilot', label:'Autopilot',       toolkit:null,           blurb:'Runs your work on a schedule and keeps it moving on its own.' }
+];
 // Theme-aware brand SVG resolver (mono brands carry {l,d}). Returns an SVG string or null.
 WB.brandGlyph = function(id){
   var A = { gmail: 'google' };
