@@ -23,6 +23,13 @@ server :cloud do
   # The durable run ledger for the Studio Runs view — most-recent agent runs for this tenant.
   route "GET /cloud/runs", :runs_list
 
+  # The personal "You" surface — the signed-in user's editable profile (resource Profile) plus their
+  # REAL contribution stats, derived live from the same primitives the rest of the dashboard reads:
+  # tokens burned + runs launched (resource Run), and work shipped/open (resource Todo, by author).
+  # GET returns {profile, stats, contributions}; POST upserts the editable fields. Keyed by `u` (email).
+  route "GET /cloud/profile", :profile_get
+  route "POST /cloud/profile", :profile_save
+
   # Task management + planning (the orchestration backbone). Tasks live in resource Todo; a plan is a
   # parent task + subtasks. Dispatch launches a Run (reuses do_run) and links it. Plan asks Workhorse to
   # decompose a goal into assigned subtasks. THE LINE: the store + board are ours, the bus is standard.
@@ -348,6 +355,102 @@ server :cloud do
       |> Enum.take(100)
 
     %{runs: runs}
+  end
+
+  # ── The "You" surface — profile + live contribution stats ──────────────────────────────────────
+  # Read the folded Profile row for this user (latest by :updated), then attach REAL stats computed from
+  # the durable Run + Todo stores. Nothing is faked: tokens/runs come from the agent-run ledger this very
+  # person launched; "shipped" is the work they authored that reached `done`. Empty profile → sane blanks
+  # the client merges over the session /me identity.
+  def profile_get(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    uid = profile_uid(req)
+
+    %{
+      profile: latest_profile(tenant, uid) || %{uid: uid},
+      stats: profile_stats(tenant, uid),
+      contributions: profile_contributions(tenant, uid)
+    }
+  end
+
+  # Upsert the editable identity layer. Append-only (write a fresh row; the fold keeps newest), matching
+  # how Todo persists. Only the expressive fields are writable — name/email/role stay owned by /me.
+  def profile_save(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    uid = profile_uid(req)
+    b = if is_map(req.body), do: req.body, else: %{}
+
+    attrs = %{
+      uid: uid,
+      display: to_string(b["display"] || ""),
+      tagline: to_string(b["tagline"] || ""),
+      bio: to_string(b["bio"] || ""),
+      avatar: to_string(b["avatar"] || ""),
+      accent: to_string(b["accent"] || ""),
+      location: to_string(b["location"] || ""),
+      links: to_string(b["links"] || ""),
+      updated: System.os_time(:microsecond)
+    }
+
+    Nexus.Store.create(Profile, attrs, tenant)
+    %{ok: true, profile: attrs}
+  end
+
+  # The profile fold key: the signed-in email (passed as `u`, same convention as user_key), lower-cased.
+  defp profile_uid(req) do
+    raw = (is_map(req.body) && req.body["u"]) || req.query["u"] || user_key(req)
+    raw |> to_string() |> String.downcase()
+  end
+
+  defp latest_profile(tenant, uid) do
+    Profile
+    |> Nexus.Store.all(tenant)
+    |> Enum.map(&Map.from_struct/1)
+    |> Enum.filter(&(String.downcase(to_string(&1.uid)) == uid))
+    |> case do
+      [] -> nil
+      rows -> rows |> Enum.max_by(& &1.updated) |> Map.delete(:id)
+    end
+  end
+
+  # Does this run/task belong to the person? The author fields historically hold a loose key ("me",
+  # a name, or an email), so match generously: exact email, its local-part, or the literal "me".
+  defp mine?(value, uid) do
+    v = value |> to_string() |> String.downcase()
+    local = uid |> String.split("@") |> List.first()
+    v != "" and (v == uid or v == local or v == "me")
+  end
+
+  defp profile_stats(tenant, uid) do
+    runs =
+      Run |> Nexus.Store.all(tenant) |> Enum.map(&Map.from_struct/1)
+      |> Enum.filter(&mine?(&1.user, uid))
+
+    tasks = current_tasks(tenant) |> Enum.filter(&mine?(&1.created_by, uid))
+    {done, open} = Enum.split_with(tasks, &(&1.status == "done"))
+
+    %{
+      tokens: Enum.reduce(runs, 0, &((&1.tokens || 0) + &2)),
+      runs: length(runs),
+      runs_ok: Enum.count(runs, &(&1.status == "ok")),
+      agents: runs |> Enum.map(& &1.agent) |> Enum.uniq() |> length(),
+      shipped: length(done),
+      open: length(open),
+      first_run: runs |> Enum.map(& &1.started) |> Enum.reject(&is_nil/1) |> Enum.min(fn -> nil end)
+    }
+  end
+
+  # The work this person authored, newest first — each tagged shipped|open so the client can render the
+  # "systems you authored that got implemented" list directly.
+  defp profile_contributions(tenant, uid) do
+    current_tasks(tenant)
+    |> Enum.filter(&mine?(&1.created_by, uid))
+    |> Enum.sort_by(& &1.updated, :desc)
+    |> Enum.take(20)
+    |> Enum.map(fn t ->
+      %{tid: t.tid, kind: t.kind || "task", title: t.title, status: t.status,
+        agent: t.agent || "", run: t.run || "", updated: t.updated}
+    end)
   end
 
   # Resolve a workspace (mount) name into the jj-worktree run opts the agent loop expects, or nil if no
@@ -1256,9 +1359,10 @@ server :cloud do
   defp platform_secret_catalog do
     [
       %{name: "OPENROUTER_API_KEY", label: "OpenRouter", group: "Inference"},
-      %{name: "CLOUDFLARE_API_TOKEN", label: "Cloudflare — API token (Workers AI)", group: "Inference"},
-      %{name: "CLOUDFLARE_ACCOUNT_ID", label: "Cloudflare — account id (Workers AI)", group: "Inference"},
-      %{name: "CF_AIG_TOKEN", label: "Cloudflare AI Gateway", group: "Inference"},
+      %{name: "CF_AIG_URL", label: "Cloudflare AI Gateway — compat URL (…/compat/chat/completions)", group: "Inference"},
+      %{name: "CF_AIG_TOKEN", label: "Cloudflare AI Gateway — token", group: "Inference"},
+      %{name: "CLOUDFLARE_API_TOKEN", label: "Cloudflare — API token (direct Workers AI fallback)", group: "Inference"},
+      %{name: "CLOUDFLARE_ACCOUNT_ID", label: "Cloudflare — account id (direct Workers AI fallback)", group: "Inference"},
       %{name: "BRAVE_API_KEY", label: "Brave Search", group: "Inference"},
       %{name: "WB_DATABASE_URL", label: "Database URL", group: "Storage & data"},
       %{name: "WB_S3_ACCESS_KEY_ID", label: "Object store — access key", group: "Storage & data"},
