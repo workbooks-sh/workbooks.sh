@@ -202,8 +202,12 @@ defmodule Nexus.Browse.Extract do
   defp b(x) when is_atom(x), do: Atom.to_string(x)
   defp b(_), do: ""
 
+  # Coerce first: `title` reaches here as an IOLIST (st.title/og_title accumulate iodata), unlike
+  # text/md which are already IO.iodata_to_binary'd. String.replace needs a binary subject, so a raw
+  # iolist crashed `scrape`/`render` (FunctionClauseError String.replace/4). `b/1` flattens it.
   defp tidy(s) do
     s
+    |> b()
     |> String.replace(~r/[ \t]+/, " ")
     |> String.replace(~r/\n{3,}/, "\n\n")
     |> String.trim()
