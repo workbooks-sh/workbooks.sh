@@ -47,16 +47,16 @@ WB.scopedStyles('/profile', `
   .cal-tab:hover { border-color:var(--ink); color:var(--ink); }
   .cal-tab.on { color:var(--ink); border-color:var(--mtacc); background:color-mix(in srgb, var(--mtacc) 14%, transparent); }
   .cal-tab .swt { width:9px; height:9px; border-radius:2.5px; background:var(--mtacc); }
-  .cal-scroll { overflow-x:auto; padding-bottom:4px; }
-  .cal-grid-wrap { display:inline-grid; grid-template-columns:auto 1fr; gap:5px; --cell:12px; --gap:3px; }
-  .cal-months { grid-column:2; grid-row:1; display:grid; grid-auto-flow:column; grid-auto-columns:calc(var(--cell) + var(--gap)); font-size:10px; color:var(--dim); }
+  .cal-scroll { width:100%; }
+  .cal-grid-wrap { display:grid; grid-template-columns:auto 1fr; column-gap:9px; width:100%; --gap:4px; }
+  .cal-months { grid-column:2; grid-row:1; display:grid; grid-auto-flow:column; grid-auto-columns:1fr; column-gap:var(--gap); font-size:10.5px; color:var(--dim); margin-bottom:6px; }
   .cal-months span { white-space:nowrap; }
-  .cal-dows { grid-column:1; grid-row:2; display:grid; grid-template-rows:repeat(7, var(--cell)); gap:var(--gap); font-size:9.5px; color:var(--dim); align-content:start; padding-right:4px; }
-  .cal-dows span { height:var(--cell); line-height:var(--cell); }
-  .cal-grid { grid-column:2; grid-row:2; display:grid; grid-template-rows:repeat(7, var(--cell)); grid-auto-flow:column; grid-auto-columns:var(--cell); gap:var(--gap); }
-  .cal-cell { width:var(--cell); height:var(--cell); border-radius:2.5px; background:var(--pf-empty); }
+  .cal-dows { grid-column:1; grid-row:2; display:grid; grid-template-rows:repeat(7,1fr); gap:var(--gap); font-size:10px; color:var(--dim); padding-right:2px; }
+  .cal-dows span { display:flex; align-items:center; }
+  .cal-grid { grid-column:2; grid-row:2; display:grid; grid-auto-flow:column; grid-auto-columns:1fr; grid-template-rows:repeat(7,1fr); gap:var(--gap); }
+  .cal-cell { width:100%; height:100%; border-radius:3px; background:var(--pf-empty); }
   .cal-legend { display:flex; align-items:center; gap:6px; justify-content:flex-end; font-size:10.5px; color:var(--dim); margin-top:12px; }
-  .cal-legend i { width:var(--cell); height:var(--cell); border-radius:2.5px; display:inline-block; }
+  .cal-legend i { width:13px; height:13px; border-radius:3px; display:inline-block; }
   [data-theme="dark"] .cal-card { --pf-empty:rgba(255,255,255,.05); }
   [data-theme="light"] .cal-card, .cal-card { --pf-empty:rgba(0,0,0,.05); }
 
@@ -319,7 +319,7 @@ WB.scopedStyles('/profile', `
             <div class="cal-grid-wrap">
               <div class="cal-months">${months.join('')}</div>
               <div class="cal-dows">${dows}</div>
-              <div class="cal-grid">${cells}</div>
+              <div class="cal-grid" style="aspect-ratio:${weeks} / 7">${cells}</div>
             </div>
           </div>
           <div class="cal-legend">Less ${legend} More</div>
