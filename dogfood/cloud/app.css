@@ -410,17 +410,6 @@ tr:last-child td{ border:0; }
 .bmx { flex: none; opacity: 0; border: none; background: none; color: var(--dim); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 5px; }
 .bmrow:hover .bmx { opacity: .6; }
 .bmx:hover { opacity: 1; color: var(--ink); }
-/* File search */
-.srchsec { margin-top: 6px; }
-.srchinput { width: 100%; box-sizing: border-box; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 7px 10px; font: 500 13px var(--read); }
-.srchinput:focus { outline: none; border-color: var(--stroke); }
-.srchinput::placeholder { color: var(--dim); }
-.srchresults { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-height: 30vh; overflow-y: auto; }
-.sfrow { display: flex; align-items: center; gap: 7px; min-height: 28px; padding: 0 6px; border-radius: 7px; cursor: pointer; color: var(--ink); font: 500 12.5px var(--read); }
-.sfrow:hover { background: var(--line); }
-.sfrow .tname { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sfrow .ssub { flex: none; color: var(--dim); font: 500 10.5px var(--mono); margin-left: auto; }
-.sfrow .tbm { margin-left: 4px; }
 /* group label (e.g. "Admin") above a nav group */
 .navgrp { font: 700 9.5px var(--read); letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); padding: 0 10px; margin: 8px 0 4px; }
 /* Workspaces section header ("Workspaces" + add) */
@@ -569,21 +558,6 @@ tr:last-child td{ border:0; }
 .palette-sub { margin-left: auto; color: var(--dim); font: 500 11.5px var(--mono); }
 .palette-empty { color: var(--dim); padding: 18px; text-align: center; font: 500 13.5px var(--read); }
 
-/* ── Pinned shortcuts in the sidebar (below Workspaces, after a divider) ── */
-.pinsec { display: flex; flex-direction: column; gap: 1px; }
-.pindiv { height: 1px; background: var(--line); margin: 8px 6px; }
-.pinrow { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 8px; cursor: pointer; color: var(--li-ink); font: 500 13px var(--read); }
-.pinrow:hover { background: var(--hover); color: var(--ink); }
-.pinico { flex: none; display: grid; place-items: center; color: var(--dim); }
-.pinrow .lbl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pinx { flex: none; opacity: 0; border: none; background: none; color: var(--dim); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 5px; border-radius: 5px; }
-.pinrow:hover .pinx { opacity: .55; }
-.pinx:hover { opacity: 1; color: var(--ink); }
-.pinempty { padding: 5px 10px; color: var(--dim); font: 500 11.5px var(--read); opacity: .8; }
-#app.rail .pinx, #app.rail .pinempty { display: none; }
-#app.rail .pinrow { justify-content: center; padding: 8px 0; }
-#app.rail .pindiv { margin: 8px 4px; }
-
 /* ── Account row: avatar (→ menu) left, collapse toggle bottom-right ── */
 .acct { display: flex; align-items: center; gap: 6px; padding: 10px 8px; border-top: 1px solid var(--line); margin-top: 8px; position: relative; }
 .acctav { position: relative; cursor: pointer; border-radius: 8px; display: grid; place-items: center; }
@@ -593,4 +567,3 @@ tr:last-child td{ border:0; }
 img.micon { display: inline-block; object-fit: contain; vertical-align: -3px; }
 .micon.work { display: inline-grid; place-items: center; box-sizing: border-box; border-radius: 5px; background: var(--ink); color: var(--paper); padding: 3px; vertical-align: -3px; }
 .micon.work svg { width: 100%; height: 100%; }
-.pinico .micon, .pinico img.micon { width: 17px; height: 17px; }

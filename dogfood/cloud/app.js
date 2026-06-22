@@ -550,25 +550,6 @@
     }
     function isBookmarked(path){ return st.bookmarks.some(function(b){ return b.path === path; }); }
     // File search across workspaces — updates the results box IN PLACE (no shell re-render → keeps focus).
-    function runSearch(){
-      var q = (st.search || '').trim();
-      var box = document.getElementById('wbSearchResults');
-      if (!box) return;
-      if (!q){ box.innerHTML = ''; return; }
-      fetch('/cloud/search?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
-        .then(function(r){ return r.json(); })
-        .then(function(d){
-          if ((st.search || '').trim() !== q) return;  // stale response
-          var rs = (d && d.results) || [];
-          if (!rs.length){ box.innerHTML = '<div class="treemsg" style="padding-left:12px">No matches</div>'; return; }
-          box.innerHTML = rs.map(function(r){
-            return '<div class="sfrow" data-tree-file="' + esc(r.path) + '">' +
-              '<span class="tname">' + esc(r.name) + '</span><span class="ssub">' + esc(r.workspace) + '</span>' +
-              '<button class="tbm' + (isBookmarked(r.path) ? ' on' : '') + '" data-bm="' + esc(r.path) + '" data-bml="' + esc(r.name) + '" title="Bookmark">★</button>' +
-            '</div>';
-          }).join('');
-        });
-    }
     // Recursive file-tree HTML for an open folder at `path` (root mount name = workspace folder).
     function treeHtml(path, depth){
       if (st.treeLoading[path]) return '<div class="treemsg" style="padding-left:' + (depth * 14 + 12) + 'px">Loading…</div>';
@@ -648,23 +629,6 @@
       // Pinned — quick-launch shortcuts below Workspaces (after a divider). Pin from the workspace
       // explorer (★); clicking opens the item in the Workspaces page. Re-read each render so explorer
       // pins reflect live; rail mode shows just the icon.
-      try { st.bookmarks = JSON.parse(localStorage.getItem('wb-bookmarks') || '[]'); } catch (e) {}
-      var pinsec = '<div class="pinsec"><div class="pindiv"></div>' +
-        (st.bookmarks.length
-          ? st.bookmarks.map(function (b) {
-              return '<div class="pinrow" data-pin-open="' + esc(b.path) + '" title="' + esc(b.path) + '">' +
-                '<span class="pinico">' + WB.fileIcon(b.label || b.path) + '</span><span class="lbl">' + esc(b.label) + '</span>' +
-                '<button class="pinx" data-pin-x="' + esc(b.path) + '" title="Unpin">×</button></div>';
-            }).join('')
-          : '<div class="pinempty lbl">Pin files from a workspace to launch them here.</div>') +
-      '</div>';
-
-      // File search across workspaces — sits below bookmarks. Results render in place (#wbSearchResults).
-      var searchsec = '<div class="swrap srchsec">' +
-        '<input id="wbFileSearch" class="srchinput" type="text" placeholder="Search files…" autocomplete="off" />' +
-        '<div id="wbSearchResults" class="srchresults"></div>' +
-      '</div>';
-
       var nxMenu = st.nxMenu ? nexusMenu(nx) : '';
 
       // Preserve the live view node across shell re-renders. A sidebar-only change (opening the nexus
@@ -677,7 +641,7 @@
       // Admin + You grouped at the bottom. The nexus tile opens the switch menu (switch/rename/create).
       var section = sectionFor(p);
       var nexTile = '<button class="nextile' + (st.nxMenu ? ' on' : '') + '" data-nxmenu title="' + esc(nxLabel) + '">' +
-          '<span class="nexinit">' + esc(inits(nxLabel)) + '</span><span class="nexcar">' + ICO.chev + '</span></button>' +
+          '<span class="nexinit">' + ((nx && nx.icon) ? esc(nx.icon) : esc(inits(nxLabel))) + '</span><span class="nexcar">' + ICO.chev + '</span></button>' +
         (st.nxMenu ? nexusMenu(nx) : '');
       var RAIL_SECS = [
         { id: 'studio', ico: ICO.spark, label: 'Studio', go: '/studio' },
@@ -736,7 +700,6 @@
             '<button class="sidehd-ic" data-rail-toggle title="Collapse sidebar" aria-label="Collapse sidebar">' + ICO.rail + '</button>' +
           '</div>' +
           sideBody +
-          (isBrowse ? ('<div class="navspacer"></div>' + pinsec + searchsec) : '') +
         '</aside>' +
         '<div class="main">' + crumbs + (fb ? '<div id="view" class="fullbleed"></div>' : '<div class="wrap" id="view"></div>') + '</div>' +
       '</div>';
@@ -747,8 +710,6 @@
       }
 
       if (st.pickerOpen) { var ph = root.querySelector('#wsPicker'); if (ph) WB.emojiPicker(ph, function (u) { st.editIcon = u; st.pickerOpen = false; renderShell(); renderView(); }); }
-      var si = document.getElementById('wbFileSearch');
-      if (si) { si.value = st.search; si.oninput = function(){ st.search = si.value; runSearch(); }; if (st.search) runSearch(); }
       if (section === 'apps') paintApps();        // Apps surface → load the apps grid
       else if (section === 'studio') paintStudio();
       else if (section === 'activity') paintActivity();
