@@ -10,7 +10,7 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
   // Brand → real domain. We render the provider's actual full-color logo via the favicon service (every
   // brand has one, always full-color) on a light chip — simpleicons was monochrome-in-brand-color, so
   // dark brands (GitHub, Slack) disappeared on the dark card and some (fal) had no icon at all.
-  var DOMAIN = { github:'github.com', google:'google.com', slack:'slack.com', fal:'fal.ai', openrouter:'openrouter.ai' };
+  var DOMAIN = { github:'github.com', google:'google.com', gmail:'gmail.com', slack:'slack.com', fal:'fal.ai', openrouter:'openrouter.ai' };
   function logo(id){ return 'https://www.google.com/s2/favicons?domain=' + (DOMAIN[id] || (id + '.com')) + '&sz=128'; }
 
   function getJSON(url){ return fetch(url, { credentials:'same-origin' }).then(function(r){ return r.json(); }); }

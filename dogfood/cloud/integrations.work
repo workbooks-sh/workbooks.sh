@@ -65,6 +65,12 @@ server :integrations do
         token_url: "https://oauth2.googleapis.com/token",
         scopes: "openid email https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/admin.directory.user",
         scope_sep: " ", auth_params: %{"access_type" => "offline", "prompt" => "consent"}},
+      %{id: "gmail", name: "Google (personal)", group: "Workspace", mode: :oauth2,
+        blurb: "Connect your own Gmail & Drive — the agent acts as you, no admin needed.",
+        authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
+        token_url: "https://oauth2.googleapis.com/token",
+        scopes: "openid email profile https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/drive.file",
+        scope_sep: " ", auth_params: %{"access_type" => "offline", "prompt" => "consent"}},
       %{id: "slack", name: "Slack", group: "Messaging", mode: :oauth2,
         blurb: "Workspace messaging — post, read channels, react, and respond as an agent.",
         authorize_url: "https://slack.com/oauth/v2/authorize",
@@ -527,8 +533,15 @@ server :integrations do
   # its user-to-server OAuth uses the very same authorize/token endpoints — so the marketplace "Connect"
   # button reuses those creds with no extra registration. (App OAuth ignores the `scope` param and grants
   # the App's installed permissions instead, which is exactly what we want here.)
-  @oauth_id_aliases %{"github" => ["GITHUB_OAUTH_CLIENT_ID", "GITHUB_APP_CLIENT_ID"]}
-  @oauth_secret_aliases %{"github" => ["GITHUB_OAUTH_CLIENT_SECRET", "GITHUB_APP_CLIENT_SECRET"]}
+  # "gmail" is the personal (3-legged) Google connect — it shares the GOOGLE_OAUTH_* web-client creds.
+  @oauth_id_aliases %{
+    "github" => ["GITHUB_OAUTH_CLIENT_ID", "GITHUB_APP_CLIENT_ID"],
+    "gmail" => ["GOOGLE_OAUTH_CLIENT_ID"]
+  }
+  @oauth_secret_aliases %{
+    "github" => ["GITHUB_OAUTH_CLIENT_SECRET", "GITHUB_APP_CLIENT_SECRET"],
+    "gmail" => ["GOOGLE_OAUTH_CLIENT_SECRET"]
+  }
 
   defp client_id_secret(provider),
     do: resolve_secret_name(provider, @oauth_id_aliases, "#{String.upcase(provider)}_OAUTH_CLIENT_ID")
