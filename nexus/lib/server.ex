@@ -760,7 +760,10 @@ defmodule Nexus.Server do
           path: conn.request_path,
           host: conn.host,
           scheme: to_string(conn.scheme),
-          tenant: Nexus.Auth.tenant(conn)
+          tenant: Nexus.Auth.tenant(conn),
+          # SERVER-DERIVED role from the authenticated session — the real authority a handler gates
+          # sensitive actions on (never the client's claimed role). Defaults to least privilege.
+          role: Nexus.Auth.role(conn)
         }
 
         {status, ctype, out} = Nexus.Router.dispatch(mod, fun, req)

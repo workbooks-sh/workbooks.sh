@@ -71,6 +71,24 @@ defmodule Nexus.Auth do
   @doc "The request's tenant after the plug, or the default."
   def tenant(conn), do: conn.assigns[:tenant] || Nexus.Store.default_tenant()
 
+  @role_rank %{"viewer" => 1, "member" => 2, "admin" => 3, "owner" => 4}
+
+  @doc """
+  The session's effective role, SERVER-DERIVED from the authenticated identity (`conn.assigns.identity`)
+  — never the client's word. Returns the highest-ranked role the user holds, defaulting to the least
+  privilege (`"viewer"`) when there is no authenticated identity. This is the authority a handler must
+  gate sensitive actions on (e.g. autopoet management is admin-only).
+  """
+  def role(conn) do
+    (get_in(conn.assigns, [:identity, :roles]) || [])
+    |> Enum.map(&to_string/1)
+    |> Enum.max_by(&Map.get(@role_rank, &1, 0), fn -> "viewer" end)
+  end
+
+  @doc "Does `role_name` meet or exceed `needed` in the role ranking (viewer<member<admin<owner)?"
+  def role_at_least?(role_name, needed),
+    do: Map.get(@role_rank, to_string(role_name), 0) >= Map.get(@role_rank, to_string(needed), 99)
+
   @doc "Whether this deployment is multi-tenant (any adapter but None)."
   def multi?, do: adapter() != Nexus.Auth.None
 end

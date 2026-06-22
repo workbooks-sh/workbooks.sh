@@ -1381,7 +1381,9 @@ server :cloud do
     if autopoet_admin?(req), do: autopoet_report(Nexus.Autopoet.Worker.run_once()), else: {403, %{error: "admin only"}}
   end
 
-  defp autopoet_admin?(req), do: req.query["role"] == "admin" or (is_map(req.body) and req.body["role"] == "admin")
+  # SERVER-DERIVED authority — gated on the authenticated session role (req.role, set by the runtime
+  # from the session), NEVER the client's claimed role. Admin or owner only.
+  defp autopoet_admin?(req), do: Nexus.Auth.role_at_least?(Map.get(req, :role, "viewer"), "admin")
 
   defp spec_every(%{every: e}), do: e
   defp spec_every(_), do: nil
