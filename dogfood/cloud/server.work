@@ -1828,11 +1828,9 @@ server :cloud do
 
   # Real storage for the Storage admin page — one bucket per mounted surface, sizes off the data volume
   # (the same computation as the `storage` Live dial). Shape matches the page: {totalSize, buckets:[…]}.
-  def storage(_req) do
-    mounts = Application.get_env(:nexus, :mounts, [])
-
+  def storage(req) do
     buckets =
-      for {name, root} <- mounts, name != "" do
+      for {name, root} <- readable_mounts(req), name != "" do
         bytes = dir_bytes(root)
         %{name: name, nexus: name, objects: count_files(root), size: human(bytes), egress: "$0.00", bytes: bytes}
       end
@@ -1922,7 +1920,7 @@ server :cloud do
     want = String.trim(req.query["type"] || "")
 
     all =
-      for {mount, root} <- mounts(),
+      for {mount, root} <- readable_mounts(req),
           file <- Path.wildcard(Path.join(root, "**/*")),
           File.regular?(file),
           kind = asset_kind(file),
@@ -2134,7 +2132,7 @@ server :cloud do
     case String.trim(req.query["path"] || "") do
       "" ->
         # Read-side ACL (wb-ate4): only list workspaces the caller may read.
-        entries = for {name, root} <- mounts(), may_read_workspace?(req, name, root), do: %{name: name, dir: true, path: name, size: dir_bytes(root)}
+        entries = for {name, root} <- readable_mounts(req), do: %{name: name, dir: true, path: name, size: dir_bytes(root)}
         %{path: "", entries: Enum.sort_by(entries, & &1.name)}
 
       path ->
@@ -2165,8 +2163,7 @@ server :cloud do
       if q == "" do
         []
       else
-        for {name, root} <- mounts(),
-            may_read_workspace?(req, name, root),
+        for {name, root} <- readable_mounts(req),
             file <- Path.wildcard(Path.join(root, "**/*")),
             File.regular?(file),
             base = Path.basename(file),
@@ -2246,6 +2243,10 @@ server :cloud do
 
   defp may_write_workspace?(req, mount, root), do: may_workspace?(req, mount, root, :write)
   defp may_read_workspace?(req, mount, root), do: may_workspace?(req, mount, root, :read)
+
+  # The mounts the caller may READ — the ONE place every list/enumerate route walks (wb-ate4/wb-59uk),
+  # so a new route can't forget the read ACL and leak draft/private workspace metadata.
+  defp readable_mounts(req), do: Enum.filter(mounts(), fn {name, root} -> may_read_workspace?(req, name, root) end)
 
   # Create a draft = a real nexus folder scaffolded with an index.work, committed so it's a live
   # surface, and flagged `draft` in the control plane. Promote later via /cloud/visibility.
