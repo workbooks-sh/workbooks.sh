@@ -55,6 +55,29 @@ defmodule Nexus.PlatformHttpTest do
     assert call(:get, "/nexuses", nil).status == 403
   end
 
+  test "tokens: mint → list → revoke round-trips for the org (regression: decode the JSON body)" do
+    # Regression for the 500 that broke the dashboard's 'Generate token': the handler indexed the RAW
+    # body string (`read(conn)["name"]`) instead of the decoded map → Access.get on a string crashed.
+    minted = call(:post, "/tokens/mint", "org_tok", %{name: "ci-push"})
+    assert minted.status == 201
+    body = Jason.decode!(minted.resp_body)
+    assert String.starts_with?(body["token"], "wbk_")
+    assert body["name"] == "ci-push"
+
+    listed = call(:get, "/tokens", "org_tok") |> then(&Jason.decode!(&1.resp_body))
+    assert Enum.any?(listed["tokens"], &(&1["id"] == body["id"]))
+    # the plaintext is shown once on mint, never on list
+    refute Enum.any?(listed["tokens"], &Map.has_key?(&1, "token"))
+
+    assert call(:delete, "/tokens/#{body["id"]}", "org_tok").status == 200
+    after_list = call(:get, "/tokens", "org_tok") |> then(&Jason.decode!(&1.resp_body))
+    refute Enum.any?(after_list["tokens"], &(&1["id"] == body["id"]))
+  end
+
+  test "tokens/mint with no body defaults the name (no crash)" do
+    assert call(:post, "/tokens/mint", "org_tok2").status == 201
+  end
+
   test "a nexus created by org A is invisible + untouchable to org B over HTTP" do
     created = call(:post, "/nexuses", "org_http_a", %{name: "A-prod"})
     assert created.status == 201

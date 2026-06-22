@@ -43,11 +43,27 @@ defmodule Nexus.GitHttp do
       with ["Basic " <> b64] <- get_req_header(conn, "authorization"),
            {:ok, decoded} <- Base.decode64(b64),
            [_user, pass] <- String.split(decoded, ":", parts: 2),
-           {:ok, ident} <- Nexus.Auth.Token.verify(pass) do
+           {:ok, ident} <- resolve_pat(pass) do
         {:ok, ident}
       else
         _ -> :error
       end
+    end
+  end
+
+  # Resolve a `wbk_` personal-access token to an identity, accepting BOTH token systems so the SAME token
+  # a user mints in the dashboard (`Nexus.ControlPlane.Token`, also what `Nexus.Auth.Cloud` accepts as the
+  # CLI Bearer on /api/platform) authenticates a git push here — one credential for the whole customer
+  # protocol (mint in dashboard → `work`/git push → hot-reload). Falls back to `Nexus.Auth.Token` for the
+  # runtime's own tenant-scoped tokens. Order: control-plane (the user-facing mint) first.
+  @doc false
+  # Test seam — the PAT→identity resolution that gates a git push (accepts both token systems).
+  def resolve_pat_for_test(pass), do: resolve_pat(pass)
+
+  defp resolve_pat(pass) do
+    case Nexus.ControlPlane.Token.resolve(pass) do
+      {:ok, org} -> {:ok, %{tenant: org, user: "cli", scopes: ["api"], roles: []}}
+      _ -> Nexus.Auth.Token.verify(pass)
     end
   end
 

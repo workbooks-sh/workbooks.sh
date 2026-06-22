@@ -93,6 +93,21 @@ defmodule Nexus.GitRemoteTest do
     assert File.read!(Path.join(root, "login/index.work")) =~ "BAKED login", "never-pushed surface keeps its baked copy"
   end
 
+  test "git push accepts a DASHBOARD-minted control-plane token (one credential, mint→push)" do
+    # The customer protocol: a token minted in the dashboard (Nexus.ControlPlane.Token) must
+    # authenticate a git push (Nexus.GitHttp), not just the internal Auth.Token. resolve_pat unifies both.
+    %{token: cp_token} = Nexus.ControlPlane.Token.mint("org_push", "ci")
+    assert {:ok, %{tenant: "org_push"}} = Nexus.GitHttp.resolve_pat_for_test(cp_token)
+
+    # An Auth.Token (mobile device tokens) still works via the fallback.
+    %{token: auth_token} = Nexus.Auth.Token.mint("tenant_z", name: "mobile", scopes: ["api"])
+    assert {:ok, %{tenant: "tenant_z"}} = Nexus.GitHttp.resolve_pat_for_test(auth_token)
+
+    # Garbage / unknown tokens are rejected (fail closed).
+    assert :error = Nexus.GitHttp.resolve_pat_for_test("wbk_not_a_real_token")
+    assert :error = Nexus.GitHttp.resolve_pat_for_test("garbage")
+  end
+
   test "set_mirror makes a push mirror its refs to the configured remote", %{base: base} do
     bare = Git.bare_path(Path.join(base, "repos"), "demo")
     work = Path.join(base, "work/demo")

@@ -158,7 +158,7 @@ defmodule Nexus.Platform do
   # The dashboard (native session) mints these; the headless CLI then authenticates
   # with one via Nexus.Auth.Cloud — no browser session needed.
   post "/tokens/mint" do
-    name = read(conn)["name"] || "cli"
+    name = decode(read(conn))["name"] || "cli"
     j(conn, 201, Nexus.ControlPlane.Token.mint(org(conn), name))
   end
 
@@ -188,7 +188,7 @@ defmodule Nexus.Platform do
   end
 
   post "/members/invite" do
-    body = read(conn)
+    body = decode(read(conn))
     email = body |> Map.get("email", "") |> to_string() |> String.trim()
     role = body |> Map.get("role", "member") |> to_string()
 

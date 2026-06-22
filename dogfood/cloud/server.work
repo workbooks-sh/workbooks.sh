@@ -1,9 +1,9 @@
 server :cloud do
-  # Native-auth adoption (wb-ajvy): real CLI tokens minted by Nexus.Auth.Token (hashed-at-rest,
-  # tenant-scoped, audited) — not a demo. Exposed with the routing primitive; the Account view calls
-  # them. The token carries scopes, so it's subject to the same per-route guards as a session.
-  route "POST /cloud/token", :mint_token
-  route "GET /cloud/tokens", :list_tokens
+  # CLI access tokens are minted through the AUTHENTICATED control-plane API (`/api/platform/tokens`,
+  # Nexus.ControlPlane.Token) — the dashboard Settings page calls that, and git-push + the CLI Bearer
+  # both accept it (one credential, Nexus.Auth.Cloud + Nexus.GitHttp). The old `/cloud/token` route
+  # minted an Auth.Token with NO auth (default tenant) — an open token-mint hole — and was unused by the
+  # dashboard, so it's removed. (Mobile device tokens still mint Auth.Token directly in dogfood/mobile.)
 
   # Agent chat + session history. Sessions are scoped to {tenant (org), user} — the user key comes from
   # the client's /me identity for now (req carries only tenant; threading server-derived identity into
@@ -162,13 +162,6 @@ server :cloud do
   route "GET /cloud/activity", :activity
 
   @agent_store {:cloud_agent_sessions}
-
-  def mint_token(req) do
-    name = (is_map(req.body) && req.body["name"]) || "cli"
-    {201, Nexus.Auth.Token.mint(req.tenant, name: name, scopes: ["api"])}
-  end
-
-  def list_tokens(req), do: %{tokens: Nexus.Auth.Token.list(req.tenant)}
 
   def agent_sessions(req) do
     sessions =
