@@ -43,6 +43,9 @@ server :integrations do
   route "GET /cloud/oauth/callback", :callback
   route "GET /cloud/integrations/google/delegation", :google_delegation
   route "POST /cloud/integrations/google/delegation", :connect_google_dwd
+  route "POST /cloud/integrations/google/:id/mailbox", :google_create_mailbox
+  route "POST /cloud/integrations/google/:id/alias", :google_add_alias
+  route "POST /cloud/integrations/google/:id/sendas", :google_add_sendas
   route "DELETE /cloud/integrations/:id", :remove_integration
 
   # ── the catalog — central config, the only opinion in this file ───────────────────────────────
@@ -366,6 +369,68 @@ server :integrations do
         id = new_id()
         store_connection(req.tenant, id, "google", domain, %{mode: "dwd", admin_email: admin})
         {201, %{id: id, provider: "google", label: domain, status: "connected", mode: "dwd"}}
+    end
+  end
+
+  # Create a dedicated agent mailbox on the connected domain. Impersonates the stored super-admin for the
+  # Admin SDK call. WARNS the caller this consumes a paid Workspace seat (billed to the customer).
+  def google_create_mailbox(req) do
+    b = req.body || %{}
+    email = String.trim(to_string(b["email"] || ""))
+
+    cond do
+      email == "" -> {400, %{error: "an email for the mailbox is required"}}
+      true ->
+        with {:ok, token} <- google_token(req.tenant, req.params["id"], "https://www.googleapis.com/auth/admin.directory.user") do
+          attrs = %{primary_email: email, given_name: b["given_name"] || "Workbooks", family_name: b["family_name"] || "Agent"}
+
+          case Nexus.Google.Admin.create_user(token, attrs) do
+            {:ok, user} -> {201, %{ok: true, user: user, note: "this mailbox consumes a paid Workspace seat"}}
+            {:error, reason} -> {502, %{error: inspect(reason)}}
+          end
+        else
+          {:error, reason} -> {502, %{error: inspect(reason)}}
+        end
+    end
+  end
+
+  # Add a free proxy alias to an existing user on the connected domain.
+  def google_add_alias(req) do
+    b = req.body || %{}
+    user = String.trim(to_string(b["user"] || ""))
+    alias_email = String.trim(to_string(b["alias"] || ""))
+
+    cond do
+      user == "" or alias_email == "" -> {400, %{error: "user + alias are required"}}
+      true ->
+        with {:ok, token} <- google_token(req.tenant, req.params["id"], "https://www.googleapis.com/auth/admin.directory.user.alias") do
+          case Nexus.Google.Admin.add_alias(token, user, alias_email) do
+            {:ok, _} -> {201, %{ok: true, user: user, alias: alias_email}}
+            {:error, reason} -> {502, %{error: inspect(reason)}}
+          end
+        else
+          {:error, reason} -> {502, %{error: inspect(reason)}}
+        end
+    end
+  end
+
+  # Grant a mailbox the ability to send as another address (impersonates that mailbox, not the admin).
+  def google_add_sendas(req) do
+    b = req.body || %{}
+    user = String.trim(to_string(b["user"] || ""))
+    send_as = String.trim(to_string(b["send_as"] || ""))
+
+    cond do
+      user == "" or send_as == "" -> {400, %{error: "user + send_as are required"}}
+      true ->
+        with {:ok, token} <- google_token(req.tenant, req.params["id"], "https://www.googleapis.com/auth/gmail.settings.sharing", user) do
+          case Nexus.Google.Admin.add_send_as(token, user, send_as) do
+            {:ok, _} -> {201, %{ok: true, user: user, send_as: send_as}}
+            {:error, reason} -> {502, %{error: inspect(reason)}}
+          end
+        else
+          {:error, reason} -> {502, %{error: inspect(reason)}}
+        end
     end
   end
 
