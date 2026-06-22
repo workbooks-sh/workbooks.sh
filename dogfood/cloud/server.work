@@ -388,10 +388,12 @@ server :cloud do
     }
   end
 
-  # The runtime DID, resolved defensively (the ledger never blocks the profile from rendering).
+  # The PINNED trust anchor used to verify metering (fix wb-8hax) — the published Config ledger_did,
+  # NOT the live running key (which an attacker-run nexus could mint + self-trust). nil ⇒ fail closed
+  # (everything reads unverified). Resolved defensively so the ledger never blocks the profile rendering.
   defp runtime_did_safe do
     try do
-      Nexus.Ledger.runtime_did()
+      Nexus.Ledger.expected_did()
     rescue
       _ -> nil
     catch
@@ -490,10 +492,23 @@ server :cloud do
 
   # This user's device keys, folded by did (latest `registered` wins).
   defp device_keys(tenant, uid) do
-    DeviceKey
-    |> Nexus.Store.all(tenant)
-    |> Enum.map(&Map.from_struct/1)
-    |> Enum.filter(&(String.downcase(to_string(&1.uid)) == uid))
+    rows =
+      DeviceKey
+      |> Nexus.Store.all(tenant)
+      |> Enum.map(&Map.from_struct/1)
+      |> Enum.filter(&(String.downcase(to_string(&1.uid)) == uid))
+
+    # Terminal revocation (fix wb-9mid): fold the rows as an event log where a revoke kills a did for
+    # good — a re-register after revoke can NOT resurrect it. Then re-attach each live did's latest row
+    # (label/surface) for display.
+    live =
+      rows
+      |> Enum.map(fn r -> %{did: r.did, op: (if r.revoked == 1, do: :revoke, else: :register), ts: r.registered} end)
+      |> Nexus.Authorship.fold_device_keys()
+      |> MapSet.new(& &1.did)
+
+    rows
+    |> Enum.filter(&MapSet.member?(live, &1.did))
     |> Enum.group_by(& &1.did)
     |> Enum.map(fn {_did, versions} -> Enum.max_by(versions, & &1.registered) end)
     |> Enum.sort_by(& &1.registered, :desc)
@@ -501,8 +516,18 @@ server :cloud do
   end
 
   # The profile fold key: the signed-in email (passed as `u`, same convention as user_key), lower-cased.
+  # The authenticated person key. The SERVER-DERIVED uid (req.user, set by Nexus.Auth) WINS — a client
+  # `u` is only a fallback for public/dev (auth=None) with no session identity. Fix wb-q7w5: an
+  # authenticated caller can no longer act as another user by passing u=victim.
+  defp server_uid(req) do
+    case Map.get(req, :user) do
+      u when is_binary(u) and u != "" -> u
+      _ -> nil
+    end
+  end
+
   defp profile_uid(req) do
-    raw = (is_map(req.body) && req.body["u"]) || req.query["u"] || user_key(req)
+    raw = server_uid(req) || (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
     raw |> to_string() |> String.downcase()
   end
 
@@ -517,13 +542,10 @@ server :cloud do
     end
   end
 
-  # Does this run/task belong to the person? The author fields historically hold a loose key ("me",
-  # a name, or an email), so match generously: exact email, its local-part, or the literal "me".
-  defp mine?(value, uid) do
-    v = value |> to_string() |> String.downcase()
-    local = uid |> String.split("@") |> List.first()
-    v != "" and (v == uid or v == local or v == "me")
-  end
+  # Does this run/task belong to the person? EXACT uid equality only (fix wb-nw7e via Nexus.Authorship.mine?)
+  # — the old loose match (local-part / literal "me") let one user claim another's contributions.
+  defp mine?(value, uid),
+    do: Nexus.Authorship.mine?(value |> to_string() |> String.downcase(), to_string(uid))
 
   defp profile_stats(tenant, uid, rdid) do
     runs =
@@ -1131,7 +1153,7 @@ server :cloud do
     end
   end
 
-  defp user_key(req), do: (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
+  defp user_key(req), do: server_uid(req) || (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
   defp sessions_for(tenant, user), do: Map.get(:persistent_term.get(@agent_store, %{}), {tenant, user}, [])
 
   defp save_sessions(tenant, user, list) do

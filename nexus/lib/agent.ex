@@ -416,7 +416,9 @@ defmodule Nexus.Agent do
           if reasoning?(turn.content), do: emit.({:answer, turn.content})
           stream.(%{type: "final", answer: turn.content})
           tel = tally(tel, turn, [])
-          {{:ok, %{answer: turn.content, turns: tel.turns, vfs_files: Vfs.ls(vfs)}}, tel}
+          # tokens = THIS run's accumulator total (fix wb-r0zy) — not Telemetry.runs(agent)|>hd, which is
+          # agent-keyed and cross-attributes concurrent runs of the same agent.
+          {{:ok, %{answer: turn.content, turns: tel.turns, tokens: tel.total, vfs_files: Vfs.ls(vfs)}}, tel}
 
         {:ok, %{tool_calls: calls} = turn} ->
           if reasoning?(turn.content), do: emit.({:think, turn.content})

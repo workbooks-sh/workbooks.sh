@@ -107,6 +107,13 @@ defmodule Nexus.Auth do
 
   @doc "Whether this deployment is multi-tenant (any adapter but None)."
   def multi?, do: adapter() != Nexus.Auth.None
+
+  @doc """
+  The authenticated user's stable id (`uid`) from the server-set identity — the canonical person key
+  (`Nexus.Authorship`: one uid, many device keys), mirror of `role/1`/`tenant/1`. `nil` when public.
+  Server-derived ONLY — a handler must prefer this over any client-supplied `u` (fix wb-q7w5).
+  """
+  def user(conn), do: (conn.assigns[:identity] || %{})[:user]
 end
 
 defmodule Nexus.Auth.None do

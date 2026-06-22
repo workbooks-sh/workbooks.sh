@@ -75,7 +75,60 @@ defmodule Nexus.Authorship do
   defp truthy(""), do: false
   defp truthy(_), do: true
 
+  @doc """
+  Does a contribution's `author` field belong to `uid`? EXACT equality only (fix wb-nw7e) — the old
+  loose match (email local-part, or the literal `"me"`) let one user claim another's work. Blank/nil → false.
+  """
+  @spec mine?(term(), term()) :: boolean()
+  def mine?(author, uid)
+      when is_binary(author) and is_binary(uid) and author != "" and uid != "",
+      do: author == uid
+
+  def mine?(_, _), do: false
+
+  @doc """
+  Fold an append-only device-key event log to the currently-LIVE keys. A `:revoke` is TERMINAL for a did
+  (fix wb-9mid): once any revoke event exists for a did, it is gone for good — a later `:register` can't
+  resurrect it. Events: `%{did:, op: :register | :revoke, ts:}` (ts µs). Returns `[%{did:, registered:}]`
+  (revoked dids absent), sorted by `registered` for deterministic output.
+  """
+  @spec fold_device_keys([map()]) :: [map()]
+  def fold_device_keys(events) when is_list(events) do
+    revoked = for %{op: :revoke, did: d} <- events, into: MapSet.new(), do: d
+
+    events
+    |> Enum.filter(&(&1[:op] == :register and not MapSet.member?(revoked, &1[:did])))
+    |> Enum.group_by(& &1[:did])
+    |> Enum.map(fn {did, evs} -> %{did: did, registered: evs |> Enum.map(& &1[:ts]) |> Enum.max()} end)
+    |> Enum.sort_by(& &1.registered)
+  end
+
   # ── the contribution gate (cloud-API ingress) ───────────────────────────────────────────────────
+
+  @doc """
+  The ONE chokepoint the cloud commit path calls before writing a contribution (fix wb-i2c8). Hashes the
+  bytes, verifies the author proof carried in `req` (`%{author: %{uid, did, sig}, device_keys: [...]}`)
+  via `verify_contribution/6`, then routes the result through `decide/2` with the active policy:
+
+    * `{:accept, did}`           — verified: caller commits with `author = did`.
+    * `{:accept_unverified, ""}` — soft/off + unverified: caller commits with `author = ""`.
+    * `{:reject, reason}`        — hard + unverified: caller returns 403, no commit.
+  """
+  @spec gate_contribution(map(), String.t(), iodata()) ::
+          {:accept, String.t()} | {:accept_unverified, String.t()} | {:reject, atom()}
+  def gate_contribution(req, target, bytes) do
+    a = req[:author] || %{}
+    keys = req[:device_keys] || []
+    verified? = verify_contribution(a[:uid], a[:did], a[:sig], target, content_hash(bytes), keys)
+
+    case decide(verified?, Nexus.Config.authorship_policy()) do
+      :reject -> {:reject, :unverified}
+      # decide says allow — but only record an author DID when the proof actually verified; an allowed-
+      # but-unverified commit (off/soft) is authorless, never credited to the claimed (unproven) did.
+      _allow when verified? -> {:accept, a[:did]}
+      _allow -> {:accept_unverified, ""}
+    end
+  end
 
   @doc """
   The canonical message a device signs to authorize one contribution: it binds the author (`uid`+`did`)

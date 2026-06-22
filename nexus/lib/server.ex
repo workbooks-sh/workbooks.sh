@@ -843,7 +843,11 @@ defmodule Nexus.Server do
           tenant: Nexus.Auth.tenant(conn),
           # SERVER-DERIVED role from the authenticated session — the real authority a handler gates
           # sensitive actions on (never the client's claimed role). Defaults to least privilege.
-          role: Nexus.Auth.role(conn)
+          role: Nexus.Auth.role(conn),
+          # SERVER-DERIVED user id (the canonical uid, not a client `u` param) — so a handler attributes
+          # work to the REAL authenticated person across browser (cookie) + CLI (PAT). nil when public.
+          # Fix wb-q7w5: profile/keys/run handlers must prefer this over the spoofable body/query `u`.
+          user: Nexus.Auth.user(conn)
         }
 
         {status, ctype, out} = Nexus.Router.dispatch(mod, fun, req)

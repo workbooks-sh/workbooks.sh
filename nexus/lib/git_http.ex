@@ -67,14 +67,32 @@ defmodule Nexus.GitHttp do
     end
   end
 
-  defp serve(conn, rest, ident) do
-    ws = rest |> String.split("/", parts: 2) |> hd() |> String.replace_suffix(".git", "")
+  @doc """
+  Parse the workspace id out of a `/git/<rest>` path. The id IS the on-disk folder path AND the git
+  remote, so NESTED ids must survive (e.g. `site/lander.git/info/refs` → `"site/lander"`, not the
+  first segment). Fails closed (`:error`) on traversal / empty / leading-slash / dot segments.
+  """
+  @spec workspace_from_path(String.t()) :: {:ok, String.t()} | :error
+  def workspace_from_path(rest) when is_binary(rest) do
+    ws = rest |> String.split(".git", parts: 2) |> hd()
+    segs = String.split(ws, "/")
 
     cond do
-      ws == "" or String.contains?(ws, "..") or String.contains?(ws, "/") ->
+      ws == "" -> :error
+      String.starts_with?(ws, "/") -> :error
+      Enum.any?(segs, &(&1 in ["", ".", ".."])) -> :error
+      true -> {:ok, ws}
+    end
+  end
+
+  def workspace_from_path(_), do: :error
+
+  defp serve(conn, rest, ident) do
+    case workspace_from_path(rest) do
+      :error ->
         send_resp(conn, 400, "bad workspace name")
 
-      true ->
+      {:ok, ws} ->
         bare = Nexus.Git.bare_path(repos_root(), ws)
         {:ok, _} = Nexus.Git.provision_remote(bare, work_dir(ws))
 
