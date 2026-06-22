@@ -122,15 +122,19 @@ server :integrations do
   def standalone_catalog do
     [
       %{id: "presentation", name: "Presentation", status: "ready", default: true,
+        cap_kind: "skill", requires: [], recommends: nil,
         blurb: "Build reveal.js decks straight from your content.",
         detail: "Ask for a presentation, get reveal.js — slide nav, fullscreen, per-slide URLs. The capability is \"presentation\"; the impl is reveal.js, swappable."},
       %{id: "video", name: "Video", status: "ready", default: true,
+        cap_kind: "skill", requires: ["vision"], recommends: nil,
         blurb: "In-nexus HTML → video rendering. No external tooling.",
         detail: "Ask for a video, get HyperFrames — author a wavelet scene (onReady/onTick, fixed canvas), wavelet renders it to a clip. The capability is \"video\"; the impl is hyperframes, swappable."},
       %{id: "research", name: "Research", status: "ready", default: true,
+        cap_kind: "agent-led", requires: [], recommends: nil,
         blurb: "Multi-source web research → organized, cited findings.",
         detail: "Ask a question, get a structured cited brief — the Deep Researcher fans out searches, reads sources, and synthesizes findings into an organized answer, not a doc dump. Ships its own agent, no account."},
       %{id: "toolkit-forge", name: "Toolkit Forge", status: "ready", default: true,
+        cap_kind: "skill", requires: [], recommends: nil,
         blurb: "Forge a new toolkit from an npm package, GitHub URL, or a need.",
         detail: "Forge a new toolkit from a target — npm name / GitHub URL / semantic need — by research → study real surface → author deep skills + manifest to the toolkits/AUTHORING.md standard."}
     ]

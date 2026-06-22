@@ -198,8 +198,18 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
         '<span class="tkname">' + esc(it.name) + '</span>' +
         (soon ? '<span class="tkpill soon">Coming soon</span>' : (on ? '<span class="tkdot" title="Active"></span>' : '')) + '</div>' +
       '<p class="tkblurb">' + esc(it.blurb || '') + '</p>' +
+      capMeta(it) +
       actionBtn(it) +
     '</div>';
+  }
+
+  // Small capability meta line: agent-led badge + model requirements (e.g. "Needs vision").
+  function capMeta(it){
+    if (it.kind !== 'standalone') return '';
+    var bits = [];
+    if (it.cap_kind === 'agent-led') bits.push('<span class="capbadge agent">Agent-led</span>');
+    if (it.requires && it.requires.length) bits.push('<span class="capbadge req">Needs ' + esc(it.requires.join(', ')) + '</span>');
+    return bits.length ? '<div class="capmeta">' + bits.join('') + '</div>' : '';
   }
 
   async function toggleToolkit(id){
@@ -222,9 +232,14 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
       '<div class="sheet tkinfo" style="width:520px">' +
         '<div class="tkinfohd">' + chipHTML(it, true) +
           '<div><h2 style="margin:0">' + esc(it.name) + '</h2>' +
-            '<div class="tkinfosub">' + (it.kind === 'standalone' ? 'Built-in toolkit' : 'Integration') +
+            '<div class="tkinfosub">' + (it.kind === 'standalone' ? ((it.cap_kind === 'agent-led' ? 'Agent-led' : 'Skill') + ' toolkit') : 'Integration') +
               (soon ? ' · Coming soon' : '') + '</div></div></div>' +
         '<p class="tkinfobody">' + esc(it.detail || it.blurb || '') + '</p>' +
+        ((it.requires && it.requires.length) || it.recommends
+          ? '<div class="tkreq">' +
+              ((it.requires && it.requires.length) ? '<div><span class="tkreqk">Requires</span> ' + esc(it.requires.join(', ')) + '</div>' : '') +
+              (it.recommends ? '<div><span class="tkreqk">Recommended model</span> ' + esc(it.recommends) + '</div>' : '') +
+            '</div>' : '') +
         '<div class="foot"><span></span><div style="display:flex;gap:8px">' +
           '<button class="btn" data-x="0">Close</button>' +
           (soon ? '<button class="btn" disabled>Coming soon</button>'
@@ -286,6 +301,10 @@ WB.scopedStyles('/toolkits', `
 .tkpill.ready { color: var(--live, #2e9e5b); background: color-mix(in srgb, var(--live, #2e9e5b) 14%, transparent); }
 .tkdot { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--live); flex: none; }
 .tkblurb { font: 500 12.5px var(--read); color: var(--dim); line-height: 1.4; flex: 1; }
+.capmeta { display: flex; flex-wrap: wrap; gap: 5px; }
+.capbadge { font: 600 10px var(--read); text-transform: uppercase; letter-spacing: .04em; border-radius: 20px; padding: 2px 8px; }
+.capbadge.agent { color: var(--sky, #4a90d9); background: color-mix(in srgb, var(--sky, #4a90d9) 16%, transparent); }
+.capbadge.req { color: var(--dim); background: var(--line); }
 .tkmeta { font: 600 10.5px var(--mono, monospace); color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
 .tkaccs { display: flex; flex-direction: column; gap: 4px; }
 .tkacc { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
@@ -315,6 +334,8 @@ WB.styles(`
 .tkinfohd { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .tkinfosub { font: 600 11px var(--read); text-transform: uppercase; letter-spacing: .05em; color: var(--dim); margin-top: 3px; }
 .tkinfobody { font: 500 14px var(--read); color: var(--prose, var(--ink)); line-height: 1.55; margin: 0; }
+.tkreq { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; font: 500 13px var(--read); color: var(--ink); }
+.tkreq .tkreqk { font: 600 11px var(--read); text-transform: uppercase; letter-spacing: .04em; color: var(--dim); margin-right: 6px; }
 .sheet.gw { max-height: 88vh; overflow: auto; }
 .sheet.gw .sub { margin-bottom: 6px; }
 .gwstep { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }

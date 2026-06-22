@@ -22,15 +22,23 @@ for p in glob.glob('toolkits/*/manifest.html'):
     dash = attr(tag, 'data-dashboard')
     if not dash: continue
     entries.append({'id': tid, 'name': (attr(tag, 'name') or tid).replace('-', ' ').title(),
-                    'blurb': dash, 'detail': attr(tag, 'tagline') or dash})
+                    'blurb': dash, 'detail': attr(tag, 'tagline') or dash,
+                    'kind': attr(tag, 'data-kind') or 'skill',
+                    'requires': [c for c in (attr(tag, 'data-requires') or '').split() if c],
+                    'recommends': attr(tag, 'data-recommends')})
 
 order = ['presentation', 'video', 'research', 'toolkit-forge']
 entries.sort(key=lambda e: (order.index(e['id']) if e['id'] in order else 99, e['name']))
 
 esc = lambda x: x.replace('\\', '\\\\').replace('"', '\\"')
-rows = ',\n'.join(
-    '      %%{id: "%s", name: "%s", status: "ready", default: true,\n        blurb: "%s",\n        detail: "%s"}'
-    % (e['id'], esc(e['name']), esc(e['blurb']), esc(e['detail'])) for e in entries)
+def row(e):
+    reqs = '[' + ', '.join('"%s"' % r for r in e['requires']) + ']'
+    rec = '"%s"' % esc(e['recommends']) if e['recommends'] else 'nil'
+    return ('      %%{id: "%s", name: "%s", status: "ready", default: true,\n'
+            '        cap_kind: "%s", requires: %s, recommends: %s,\n'
+            '        blurb: "%s",\n        detail: "%s"}'
+            % (e['id'], esc(e['name']), e['kind'], reqs, rec, esc(e['blurb']), esc(e['detail'])))
+rows = ',\n'.join(row(e) for e in entries)
 block = ('  # >>> GENERATED toolkit registry — DO NOT EDIT BY HAND.\n'
          '  # Source of truth: toolkits/*/manifest.html with a `data-dashboard="<blurb>"` attr.\n'
          '  # Regenerate: python3 toolkits/gen_dashboard_registry.py\n'
