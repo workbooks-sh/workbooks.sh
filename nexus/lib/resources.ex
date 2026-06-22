@@ -44,6 +44,20 @@ defmodule Nexus.Resources do
     |> Enum.sort_by(&{&1.workspace || "", &1.name})
   end
 
+  @doc """
+  Is this an ACCOUNT resource — per-user identity data (profiles, device keys) tagged `"account"`?
+  Such resources hold one person's private rows and have their own gated surfaces, so the generic data
+  explorer must NOT expose them across users (fix wb-90sp). Tag-driven so new account resources are
+  protected automatically.
+  """
+  @spec account?(map()) :: boolean()
+  def account?(%{tags: tags}), do: "account" in (tags || [])
+  def account?(_), do: false
+
+  @doc "Resources safe for the generic data explorer — everything except per-user `account` resources."
+  @spec explorable(list()) :: list()
+  def explorable(entries), do: Enum.reject(entries, &account?/1)
+
   @doc "Resolve a resource by its declared name, scoped to a tenant — `{:ok, entry} | :error`."
   def fetch(name, root \\ Nexus.Config.data_dir(), tenant \\ Nexus.Store.default_tenant()) do
     name = to_string(name)

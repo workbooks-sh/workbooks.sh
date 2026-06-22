@@ -1777,6 +1777,9 @@ server :cloud do
 
     resources =
       Nexus.Resources.list(Nexus.Config.data_dir(), tenant)
+      # Hide per-user `account` resources (Profile/DeviceKey) from the generic explorer — they hold one
+      # person's private rows and have their own gated surfaces (fix wb-90sp).
+      |> Nexus.Resources.explorable()
       |> Enum.map(fn r ->
         %{name: r.name, workspace: r.workspace, file: r.file, files: r.files,
           count: r.count, live: r.count > 0, durable: durable, replicated: replicated,
@@ -1798,20 +1801,27 @@ server :cloud do
       :error ->
         {404, %{error: "no such resource"}}
 
+      # Per-user identity resources (Profile/DeviceKey) are NOT browsable here (fix wb-90sp) — exposing
+      # their rows would leak every user's data across the org. Treat as not-found so the generic
+      # explorer can neither read nor enumerate them; they have their own gated surfaces.
       {:ok, entry} ->
-        sort_field = String.trim(req.query["sort"] || "")
-        sort = if sort_field == "", do: nil, else: {sort_field, req.query["dir"] || "asc"}
-        # Clamp once (Store.Page applies the same bounds internally) so the echoed offset/limit match
-        # what was actually served — the UI's "showing X of Y" math stays correct on extreme inputs.
-        o = Nexus.Store.Page.opts(offset: to_int(req.query["offset"], 0), limit: to_int(req.query["limit"], 50))
+        if Nexus.Resources.account?(entry) do
+          {404, %{error: "no such resource"}}
+        else
+          sort_field = String.trim(req.query["sort"] || "")
+          sort = if sort_field == "", do: nil, else: {sort_field, req.query["dir"] || "asc"}
+          # Clamp once (Store.Page applies the same bounds internally) so the echoed offset/limit match
+          # what was actually served — the UI's "showing X of Y" math stays correct on extreme inputs.
+          o = Nexus.Store.Page.opts(offset: to_int(req.query["offset"], 0), limit: to_int(req.query["limit"], 50))
 
-        {rows, total} =
-          Nexus.Store.page(entry.module, tenant,
-            offset: o.offset, limit: o.limit, sort: sort, q: req.query["q"])
+          {rows, total} =
+            Nexus.Store.page(entry.module, tenant,
+              offset: o.offset, limit: o.limit, sort: sort, q: req.query["q"])
 
-        %{name: entry.name, description: entry.description, tags: entry.tags,
-          fields: Enum.map(entry.fields, &field_meta/1),
-          rows: Enum.map(rows, &row_map/1), total: total, offset: o.offset, limit: o.limit}
+          %{name: entry.name, description: entry.description, tags: entry.tags,
+            fields: Enum.map(entry.fields, &field_meta/1),
+            rows: Enum.map(rows, &row_map/1), total: total, offset: o.offset, limit: o.limit}
+        end
     end
   end
 
