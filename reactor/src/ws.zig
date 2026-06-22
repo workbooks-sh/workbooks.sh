@@ -108,10 +108,26 @@ pub fn streamAgentRun(io: Io, alloc: std.mem.Allocator, url: []const u8, token: 
     var client: std.http.Client = .{ .io = io, .allocator = alloc };
     defer client.deinit();
 
+    // TLS needs the CA bundle + a "now" for cert validity — `fetch` sets these, but the low-level
+    // `connect` does not, so replicate it (otherwise connect panics on client.now.?).
+    const now = std.Io.Clock.real.now(io);
+    client.ca_bundle.rescan(alloc, io, now) catch {
+        log.err("could not load the system CA bundle");
+        return 1;
+    };
+    client.now = now;
+
     const conn = client.connect(host, hp.port, .tls) catch |e| {
         log.err(try std.fmt.allocPrint(alloc, "ws connect failed ({s})", .{@errorName(e)}));
         return 1;
     };
+    // Release the (hijacked-for-WS) connection before client.deinit, marked closing so it's destroyed
+    // (not pooled for reuse — it's a WebSocket now, not a clean HTTP conn). Runs before the outer
+    // client.deinit (LIFO), so deinit's "no active requests" assert holds.
+    defer {
+        conn.closing = true;
+        client.connection_pool.release(conn, io);
+    }
 
     // Handshake: a bare upgrade GET (the bearer authenticates the socket; the nexus tenant-scopes it).
     var keyb: [16]u8 = undefined;
