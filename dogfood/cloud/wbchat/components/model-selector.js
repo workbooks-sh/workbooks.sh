@@ -17,8 +17,8 @@ const STYLE = `
   .wbc-modelsel.open .wbc-modelsel-chev { transform: rotate(180deg); }
   .wbc-modelsel-chev svg { width: 13px; height: 13px; }
 
-  .wbc-modelsel-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; min-width: 260px;
-    max-width: 320px; max-height: 360px; overflow: hidden; border: 1px solid var(--wbc-line);
+  .wbc-modelsel-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; min-width: 380px;
+    max-width: 540px; max-height: 380px; overflow: hidden; border: 1px solid var(--wbc-line);
     background: var(--wbc-panel); border-radius: var(--wbc-radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,.22);
     display: none; }
   .wbc-modelsel.open .wbc-modelsel-menu { display: flex; }
