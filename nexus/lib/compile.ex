@@ -24,6 +24,7 @@ defmodule Nexus.Compile do
       kind == "resource" -> {:resource, Nexus.Resource.compile(node)}
       kind == "record" -> {:shape, Nexus.Resource.fields(node)}
       kind == "server" -> {:beam, Nexus.Unit.compile(node)}
+      kind == "worker" -> {:worker, Nexus.Worker.compile(node)}
       kind == "agent" -> {:agent, Nexus.Agent.def_from_unit(node)}
       kind == "hook" -> {:hook, Nexus.Hook.compile(node)}
       kind == "flow" -> {:flow, Nexus.Flow.compile(node)}
@@ -488,6 +489,17 @@ defmodule Nexus.Compile do
 
     # Register declared agents so they can be run BY NAME (server code, effects, flow steps).
     for u <- Map.get(by_kind, "agent", []), do: Nexus.Agent.register(u)
+
+    # Compile declared workers (long-lived supervised processes) into modules + registered specs.
+    # This does NOT start them — the serving bringup calls Nexus.Worker.start_all/0; a pure compile
+    # or `mix test` only registers, so it never spawns background loops.
+    for u <- Map.get(by_kind, "worker", []) do
+      try do
+        Nexus.Worker.compile(u)
+      rescue
+        e -> require Logger; Logger.warning("[compile] worker #{u.name} failed: #{Exception.message(e)}")
+      end
+    end
 
     wasm = Enum.flat_map(~w(rust c cpp zig swift), &Map.get(by_kind, &1, []))
 

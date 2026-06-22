@@ -49,7 +49,7 @@ defmodule Nexus.Application do
     children =
       [Nexus.Telemetry, Nexus.ControlPlane.Store, Nexus.ControlPlane.Token, Nexus.Auth.Token] ++
         Nexus.Writer.Lock.child_specs() ++
-        Nexus.Events.child_specs() ++ Nexus.Scheduler.child_specs() ++
+        Nexus.Events.child_specs() ++ Nexus.Scheduler.child_specs() ++ Nexus.Worker.child_specs() ++
         Nexus.Wasm.Gate.child_specs() ++ Nexus.Cache.child_specs() ++ ether ++ server_children()
     result = Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
 

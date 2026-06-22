@@ -44,6 +44,10 @@ defmodule Nexus.Server do
     # Bring up every mounted workbook's server tier: compile its `server`/`resource` units to live
     # BEAM modules, then call `register/0` on any that exports it (self-registering live sources).
     Enum.each(mounts, fn {_name, wb} -> bringup(wb) end)
+    # Every mounted workbook is now compiled + its `worker` specs registered — start them all under
+    # supervision (Nexus.Worker.Supervisor). Serving-only: a pure compile/`mix test` never reaches here,
+    # so background loops only run on a live nexus. Re-runs replace same-named workers (remount-safe).
+    Nexus.Worker.start_all()
     # Register this nexus in the machine's nexus registry so the CLI can reach it by name.
     Nexus.Identity.register(name, friendly, "http://localhost:#{port}")
     IO.puts("⬡ nexus #{name}#{if(friendly != "", do: " (#{friendly})", else: "")} · :#{port} · #{length(mounts)} workbook(s)")

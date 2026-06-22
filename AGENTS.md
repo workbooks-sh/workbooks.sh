@@ -38,10 +38,12 @@ Four lanes live in every file:
 ### More kinds (all live, routed by `Nexus.Compile`)
 
 Beyond the foundational kinds above, these are real and shipping: `hook` (reactive binding —
-`match` on the event bus → effects), `flow` (ordered runnable step pipeline), `check`
-(self-validating units), `toolkit` (composable wasm CLI kits), `test`, `design`, `app`
-(composition root), `auth`. Flat declarations: `task user type deps checks theme show query
-workbook nexus grant route`.
+`match` on the event bus → effects), `flow` (ordered runnable step pipeline, with a `parallel do …
+end` group that fans steps out concurrently on the BEAM), `worker` (a long-lived SUPERVISED stateful
+process — the GenServer concept as `.work`: author writes `init/0` + `tick/1` with `every:`/`restart:`,
+runtime owns the OTP under `Nexus.Worker.Supervisor`), `check` (self-validating units), `toolkit`
+(composable wasm CLI kits), `test`, `design`, `app` (composition root), `auth`. Flat declarations:
+`task user type deps checks theme show query workbook nexus grant route`.
 
 ### The reactive + time layer
 
