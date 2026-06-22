@@ -55,6 +55,43 @@ defmodule Nexus.Telemetry do
     end
   end
 
+  @doc """
+  Every unit's aggregated summary, keyed by unit identity — the autopoet's SENSE input (Autopoiesis v2
+  — wb-a6u3.11). A pure read of the execution-reality ledger; the heartbeat scans this for drift.
+  """
+  def ledger do
+    ensure()
+    GenServer.call(__MODULE__, :all)
+    |> Map.new(fn {key, rs} -> {key, aggregate(rs)} end)
+  end
+
+  @doc """
+  Units the autopoet should look at — drift/inefficiency signals derived from the ledger. Each entry is
+  `{unit_key, summary, [reason]}`, e.g. `{:error_rate, 0.6}` (failing too often) or `:no_success` (never
+  once succeeded). Only units with enough runs to be meaningful are considered. Pure read, no effects —
+  this is what a heartbeat tick turns into candidate self-improvement work (the founding web_search case:
+  a unit burning most of its steps on a tool that returns nothing).
+  """
+  def concerns(opts \\ []) do
+    err_rate = Keyword.get(opts, :error_rate, 0.3)
+    min_runs = Keyword.get(opts, :min_runs, 3)
+
+    for {key, s} <- ledger(), s.runs >= min_runs, reasons = concern_reasons(s, err_rate), reasons != [] do
+      {key, s, reasons}
+    end
+  end
+
+  defp concern_reasons(s, err_rate) do
+    rate = s.errors / max(s.runs, 1)
+
+    []
+    |> add_if(rate >= err_rate, {:error_rate, Float.round(rate, 2)})
+    |> add_if(Map.get(s.statuses, :ok, 0) == 0, :no_success)
+  end
+
+  defp add_if(list, true, item), do: [item | list]
+  defp add_if(list, false, _item), do: list
+
   @doc "Project the whole ledger into a reality overlay for `Graph.with_overlay/2`."
   def overlay do
     ensure()
