@@ -2,7 +2,7 @@ client :app do
   <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
-  <link rel="stylesheet" href="./app.css?v=20260623r">
+  <link rel="stylesheet" href="./app.css?v=20260623s">
   <script>/* no-flash theme: set the attribute before first paint (default dark) */
   (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
   document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
@@ -34,6 +34,6 @@ client :app do
        ?v= and re-applies it to every lazily-loaded asset (views, wbchat) so a deploy = all-new URLs =
        guaranteed cache miss (hard-refresh can't re-fetch lazy import()s; only a new URL can). -->
   <!-- Brand glyphs (inlined svgl SVGs) loaded globally so any view can resolve WB.BRAND_GLYPHS. -->
-  <script src="./glyphs.js?v=20260623r"></script>
-  <script src="./app.js?v=20260623r"></script>
+  <script src="./glyphs.js?v=20260623s"></script>
+  <script src="./app.js?v=20260623s"></script>
 end

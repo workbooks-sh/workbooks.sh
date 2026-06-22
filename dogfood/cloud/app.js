@@ -303,6 +303,9 @@
       var u = me.user || {}; var name = u.name || (u.email ? u.email.split('@')[0] : '') || 'Account';
       WB.user = { name: name, email: u.email || '', initial: (name[0] || 'A').toUpperCase() };
       WB.profile = me.profile || {}; if (!WB.profile.orgName && me.active_org) WB.profile.orgName = me.profile && me.profile.orgName;
+      // Avatar lives in resource Profile (not /me); hydrate the rail tile from the local cache the
+      // profile view writes, so the photo shows on every page without re-fetching the profile.
+      try { var av = localStorage.getItem('wb-avatar:' + (WB.user.email || 'me').toLowerCase()); if (av) WB.profile.avatar = av; } catch (e) {}
       if (me.role) WB.role = me.role;
     } catch (e) {} }
 
@@ -1280,7 +1283,9 @@
     // The rail "You" tile shows the profile photo when one is set (mirrored to WB.profile.avatar by the
     // profile view), otherwise the initial glyph — same surface, richer when personalized.
     function railAvatar(user){ var av = WB.profile && WB.profile.avatar;
-      return av ? '<span class="railav" style="background-image:url(' + JSON.stringify(av) + ');background-size:cover;background-position:center"></span>'
+      // Single-quote the url() — the style attr is double-quoted, so a data: URL must not introduce a
+      // double quote (that would close the attribute early and drop the background).
+      return av ? '<span class="railav" style="background-image:url(\'' + av + '\');background-size:cover;background-position:center"></span>'
                 : '<span class="railav">' + esc(user.initial) + '</span>'; }
     // The funnel shows a dot when a non-default filter is active for the CURRENT tab.
     function filterActive(){

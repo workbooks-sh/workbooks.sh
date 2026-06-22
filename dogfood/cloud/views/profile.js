@@ -123,8 +123,9 @@ WB.scopedStyles('/profile', `
           const r = await (await api('/cloud/profile?u=' + encodeURIComponent(uid))).json();
           profile = r.profile || {}; stats = r.stats || stats; contributions = r.contributions || [];
           if (r.activity) activity = Object.assign(activity, r.activity);
-          // mirror avatar to the shell so the rail "You" tile shows the photo
-          try { WB.profile = WB.profile || {}; WB.profile.avatar = profile.avatar || ''; } catch (e2) {}
+          // mirror avatar to the shell so the rail "You" tile shows the photo (+ cache it for cold loads)
+          try { WB.profile = WB.profile || {}; WB.profile.avatar = profile.avatar || '';
+            if (profile.avatar) localStorage.setItem('wb-avatar:' + uid, profile.avatar); else localStorage.removeItem('wb-avatar:' + uid); } catch (e2) {}
         } catch (e) {}
         try { tokens = await WB.api.listTokens(); } catch (e) { tokens = []; }
       }
@@ -167,7 +168,9 @@ WB.scopedStyles('/profile', `
           if (r && r.profile) profile = r.profile;
           editing = false; toast('Profile saved');
           // reflect the new avatar/initial in the shell rail immediately
-          try { WB.profile = WB.profile || {}; WB.profile.avatar = profile.avatar || ''; WB.refreshSidebar && WB.refreshSidebar(); } catch (e) {}
+          try { WB.profile = WB.profile || {}; WB.profile.avatar = profile.avatar || '';
+            if (profile.avatar) localStorage.setItem('wb-avatar:' + uid, profile.avatar); else localStorage.removeItem('wb-avatar:' + uid);
+            WB.refreshSidebar && WB.refreshSidebar(); } catch (e) {}
         } catch (e) { toast('Could not save'); }
         saving = false; paint();
       }
