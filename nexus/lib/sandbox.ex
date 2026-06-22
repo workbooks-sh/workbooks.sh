@@ -1,18 +1,35 @@
 defmodule Nexus.Sandbox do
   @moduledoc """
-  Run a wasm component on **wasmex** — and that's the whole sandbox.
+  Run a wasm component on **wasmex** (wasmtime + the component model). Every unit (rust/zig/c/js/python)
+  is compiled to wasm by OUR compilers and runs *here* — nothing executes natively; wasmex runs the
+  wasm, the Dock mediates every host call.
 
-  We do NOT reinvent isolation, memory/CPU limits, a virtual filesystem, or a capability VM:
-  wasmtime (via wasmex) already does all of that *inherently*. So this module is intentionally
-  tiny — instantiate a component against its generated WIT world, hand it the host imports the
-  `Nexus.Dock` grants, call it. wasmex marshals Elixir ↔ WIT across the boundary.
+  ## Isolation strength — read this before hosting untrusted code
 
-  The "no native code" system: every unit (rust/zig/c/js/python) is compiled to wasm by OUR
-  compilers (the moat — `Nexus.Compile` brings them in) and runs *here*. Nothing executes
-  natively; wasmex runs the wasm, the Dock mediates every host call. That's the entire model.
+  wasmtime's sandbox is **software fault isolation** (SFI): bounds-checked linear memory + control-flow
+  integrity + capability-only I/O, enforced by the *compiler* (Cranelift). It is NOT a hardware/MMU
+  boundary — a sandbox escape requires a codegen bug, and that class of CVE recurs and is fixed in
+  wasmtime point releases (keep the vendored wasmex pinned current). So the **real trust boundary for
+  mutually-distrusting tenants is the machine** (the Fly Firecracker microVM / one nexus per
+  trust-domain); the in-process controls below are **defense-in-depth**, not a substitute.
 
-  (wasmex lands as a dep when we first run real wasm — the remote calls below compile as
-  warnings until then, keeping `nexus` green while the shape is real.)
+  wasmtime does NOT do any of this "inherently" — the runtime ships safe DEFAULTS only because this
+  module wires them on every instantiation (the wb-atsl hardening):
+
+    * **Capability grant** — `imports_for/2` wires ONLY the caps a unit granted; an ungranted import is
+      omitted, so the guest can't reach a capability it didn't declare (wb-ynlx).
+    * **Tenant partition** — every stateful host cap is bound to the caller's `tenant` at instantiation,
+      never guest-supplied, so no guest can address another tenant's data (wb-ynlx).
+    * **Resource limits** — a populated `StoreLimits` (per-guest memory/table/instance caps) so a
+      `memory.grow` loop traps instead of OOM-killing the shared BEAM; a per-call epoch deadline so a
+      spinning guest traps and frees its thread (wb-9jqy). Values are neutral safe defaults from
+      `Nexus.Config`; a single-trust-domain deployer can raise them.
+    * **Concurrency** — the component lane runs under `Nexus.Wasm.Gate` (per-tenant fair) so one tenant
+      can't fan out past the memory wall or starve others (wb-whvy).
+    * **Egress** — host `fetch` is SSRF-guarded through the one `Nexus.Net.Ssrf` guard (wb-y4md).
+
+  The command-module lane (`run_command/2`, js/python/toolkits) adds the same posture at the OS-process
+  layer: wasmtime memory caps, a scrubbed (secret-free) subprocess env, read-only sysroot mounts.
   """
 
   @doc """
