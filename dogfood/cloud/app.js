@@ -1228,6 +1228,7 @@
           pfsec('contributions', ICO.activity, 'Contributions') +
           pfsec('usage', ICO.gauge, 'Usage') +
           pfsec('cli', ICO.key, 'CLI access') +
+          pfsec('devices', ICO.lock, 'Devices & keys') +
           pfsec('prefs', ICO.gear, 'Preferences') +
           '<div class="raildiv" style="margin:8px 0"></div>' +
           '<a class="nxlink" href="/login/" onclick="return WB.logout()">' + ICO.logout + '<span class="lbl">Sign out</span></a></nav>';

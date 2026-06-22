@@ -30,6 +30,12 @@ server :cloud do
   route "GET /cloud/profile", :profile_get
   route "POST /cloud/profile", :profile_save
 
+  # Author device keys (epic wb-kodp, slice 2). One identity, many device keys — the browser, the CLI,
+  # an editor, a nexus agent each register their own signing key under the user via proof-of-possession.
+  route "GET /cloud/keys", :keys_list
+  route "POST /cloud/keys", :key_register
+  route "POST /cloud/keys/revoke", :key_revoke
+
   # Task management + planning (the orchestration backbone). Tasks live in resource Todo; a plan is a
   # parent task + subtasks. Dispatch launches a Run (reuses do_run) and links it. Plan asks Workhorse to
   # decompose a goal into assigned subtasks. THE LINE: the store + board are ours, the bus is standard.
@@ -375,7 +381,9 @@ server :cloud do
       activity: profile_activity(tenant, uid, rdid),
       contributions: profile_contributions(tenant, uid),
       # The nexus's published runtime DID — the key the client expects to have counter-signed metering.
-      runtime_did: rdid
+      runtime_did: rdid,
+      # The user's registered device keys (slice 2) — browser/CLI/editor/agent, each a signer under them.
+      keys: device_keys(tenant, uid)
     }
   end
 
@@ -417,6 +425,78 @@ server :cloud do
 
     Nexus.Store.create(Profile, attrs, tenant)
     %{ok: true, profile: attrs}
+  end
+
+  # ── Author device keys (slice 2) ────────────────────────────────────────────────────────────────
+  # List this user's registered device keys (folded by did, newest wins; revoked rows supersede active).
+  def keys_list(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    %{keys: device_keys(tenant, profile_uid(req))}
+  end
+
+  # Register a device key under the user, gated by proof-of-possession: the client must have signed
+  # Nexus.Authorship.registration_message(uid, did) with the key's private half. The session/PAT fixes
+  # the uid, so a key can only be bound to the authenticated user.
+  def key_register(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    uid = profile_uid(req)
+    b = if is_map(req.body), do: req.body, else: %{}
+    did = to_string(b["did"] || "")
+    sig = to_string(b["sig"] || "")
+
+    cond do
+      did == "" ->
+        {400, %{error: "did required"}}
+
+      not Nexus.Authorship.verify_registration(uid, did, sig) ->
+        {400, %{error: "invalid key proof"}}
+
+      true ->
+        Nexus.Store.create(
+          DeviceKey,
+          %{uid: uid, did: did, label: to_string(b["label"] || ""),
+            surface: to_string(b["surface"] || "browser"),
+            registered: System.os_time(:second), revoked: 0},
+          tenant
+        )
+
+        %{ok: true, did: did}
+    end
+  end
+
+  # Revoke a device key (append a revoked row; the fold by did makes it win). Only over the user's own keys.
+  def key_revoke(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    uid = profile_uid(req)
+    b = if is_map(req.body), do: req.body, else: %{}
+    did = to_string(b["did"] || "")
+
+    case Enum.find(device_keys(tenant, uid), &(&1.did == did)) do
+      nil ->
+        {404, %{error: "no such key"}}
+
+      k ->
+        Nexus.Store.create(
+          DeviceKey,
+          %{uid: uid, did: did, label: k.label, surface: k.surface,
+            registered: System.os_time(:second), revoked: 1},
+          tenant
+        )
+
+        %{ok: true}
+    end
+  end
+
+  # This user's device keys, folded by did (latest `registered` wins).
+  defp device_keys(tenant, uid) do
+    DeviceKey
+    |> Nexus.Store.all(tenant)
+    |> Enum.map(&Map.from_struct/1)
+    |> Enum.filter(&(String.downcase(to_string(&1.uid)) == uid))
+    |> Enum.group_by(& &1.did)
+    |> Enum.map(fn {_did, versions} -> Enum.max_by(versions, & &1.registered) end)
+    |> Enum.sort_by(& &1.registered, :desc)
+    |> Enum.map(&Map.delete(&1, :id))
   end
 
   # The profile fold key: the signed-in email (passed as `u`, same convention as user_key), lower-cased.

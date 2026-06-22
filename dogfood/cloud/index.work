@@ -109,6 +109,22 @@ resource Profile do
   updated :integer # unix microseconds — the fold picks newest
 end
 
+# Author device keys (epic wb-kodp, slice 2): one identity, many device keys. Each surface a person
+# signs from — browser (WebCrypto), CLI/editor/Claude Code (bound to the wbk_ PAT), nexus agents — holds
+# its own Ed25519 device key, registered here under the user via proof-of-possession (Nexus.Authorship).
+# An edit signed by ANY non-revoked device key of a user is provably theirs. Append-only, folded by did
+# (latest by `registered` wins, so a revoked row supersedes the active one).
+resource DeviceKey do
+  description "Author device keys — the per-surface signing keys registered under each user's identity."
+  tags ["system", "account"]
+  uid :string        # the owning user (signed-in email), lower-cased
+  did :string        # the device's did:key (its public key, self-certifying) — the fold key
+  label :string      # human label ("Shane's laptop", "Chrome on macOS")
+  surface :string    # browser | cli | editor | agent
+  registered :integer # unix seconds (fold picks newest)
+  revoked :integer   # 0 active, 1 revoked
+end
+
 # Persist every bus event to the log. The reactive primitives (hook kind, #event, effect engine) are
 # the open standard; this hook + the `log` effect are our cloud opting into a durable feed.
 hook :activity do

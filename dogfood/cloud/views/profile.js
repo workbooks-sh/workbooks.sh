@@ -117,6 +117,8 @@ WB.scopedStyles('/profile', `
       let draft = {};                   // staged edits while `editing`
       let tokens = [];                  // CLI PATs
       let tokName = '', minting = false, minted = null;
+      let keys = [];                    // registered author device keys
+      let thisDeviceDid = null;         // this browser's device key DID (if generated)
       let theme = (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme')) || 'dark';
 
       // ── data ──
@@ -127,11 +129,81 @@ WB.scopedStyles('/profile', `
           profile = r.profile || {}; stats = r.stats || stats; contributions = r.contributions || [];
           if (r.activity) activity = Object.assign(activity, r.activity);
           runtimeDid = r.runtime_did || null;
+          keys = r.keys || [];
           // mirror avatar to the shell so the rail "You" tile shows the photo (+ cache it for cold loads)
           try { WB.profile = WB.profile || {}; WB.profile.avatar = profile.avatar || '';
             if (profile.avatar) localStorage.setItem('wb-avatar:' + uid, profile.avatar); else localStorage.removeItem('wb-avatar:' + uid); } catch (e2) {}
         } catch (e) {}
         try { tokens = await WB.api.listTokens(); } catch (e) { tokens = []; }
+      }
+
+      // ── device keys (slice 2): this browser is one device under the user's identity ──
+      // Generate a non-extractable Ed25519 key in WebCrypto, persist it in IndexedDB, and register its
+      // did:key under the user via proof-of-possession. Best-effort + feature-detected — a browser
+      // without Ed25519 simply has no browser device key (the CLI/editor key still covers those edits).
+      const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+      function base58(bytes) {
+        let zeros = 0; while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
+        const digits = [0];
+        for (let i = zeros; i < bytes.length; i++) {
+          let carry = bytes[i];
+          for (let j = 0; j < digits.length; j++) { carry += digits[j] << 8; digits[j] = carry % 58; carry = (carry / 58) | 0; }
+          while (carry) { digits.push(carry % 58); carry = (carry / 58) | 0; }
+        }
+        let out = '1'.repeat(zeros);
+        for (let k = digits.length - 1; k >= 0; k--) out += B58[digits[k]];
+        return out;
+      }
+      const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+      function idbOpen() {
+        return new Promise((res, rej) => { const r = indexedDB.open('wb-keys', 1);
+          r.onupgradeneeded = () => r.result.createObjectStore('k'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+      }
+      async function idbGet(key) { const db = await idbOpen();
+        return new Promise((res, rej) => { const t = db.transaction('k').objectStore('k').get(key); t.onsuccess = () => res(t.result); t.onerror = () => rej(t.error); }); }
+      async function idbSet(key, val) { const db = await idbOpen();
+        return new Promise((res, rej) => { const t = db.transaction('k', 'readwrite'); t.objectStore('k').put(val, key); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); }
+
+      async function ensureDeviceKey() {
+        if (!(window.crypto && crypto.subtle && window.indexedDB)) return null;
+        try {
+          const slot = 'dev:' + uid;
+          let rec = await idbGet(slot);
+          if (!rec || !rec.priv) {
+            const kp = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+            const rawPub = new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey));
+            // re-import the private as NON-extractable, then drop the plaintext copy
+            const pkcs8 = await crypto.subtle.exportKey('pkcs8', kp.privateKey);
+            const priv = await crypto.subtle.importKey('pkcs8', pkcs8, { name: 'Ed25519' }, false, ['sign']);
+            const did = 'did:key:z' + base58(Uint8Array.from([0xed, 0x01, ...rawPub]));
+            rec = { did, priv };
+            await idbSet(slot, rec);
+          }
+          return rec;
+        } catch (e) { return null; }
+      }
+
+      async function registerThisDevice() {
+        const rec = await ensureDeviceKey();
+        if (!rec) return;
+        thisDeviceDid = rec.did;
+        if (keys.some((k) => k.did === rec.did && !k.revoked)) return;   // already registered
+        try {
+          const msg = 'wb-author-key\nuid=' + uid + '\ndid=' + rec.did;
+          const sig = await crypto.subtle.sign({ name: 'Ed25519' }, rec.priv, new TextEncoder().encode(msg));
+          await api('/cloud/keys', { method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ u: uid, did: rec.did, sig: hex(sig), label: (navigator.platform || 'Browser'), surface: 'browser' }) });
+          keys = ((await (await api('/cloud/keys?u=' + encodeURIComponent(uid))).json()).keys) || keys;
+        } catch (e) {}
+      }
+
+      async function revokeKey(did) {
+        try {
+          await api('/cloud/keys/revoke', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ u: uid, did }) });
+          keys = ((await (await api('/cloud/keys?u=' + encodeURIComponent(uid))).json()).keys) || keys;
+          toast('Device key revoked'); paint();
+        } catch (e) { toast('Could not revoke'); }
       }
 
       // ── derived ──
@@ -399,6 +471,30 @@ WB.scopedStyles('/profile', `
         </div>`;
       }
 
+      function devicesSection() {
+        const SURF = { browser: '🌐 Browser', cli: '⌨️ CLI', editor: '🧩 Editor', agent: '🤖 Agent' };
+        const fmtDate = (s) => s ? new Date(s * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+        const active = keys.filter((k) => !k.revoked);
+        const rows = active.length ? active.map((k) => {
+          const here = k.did === thisDeviceDid;
+          return `
+          <div class="contrib">
+            <span class="dot done"></span>
+            <div class="ct">
+              <div class="t">${esc(SURF[k.surface] || k.surface || 'Device')}${k.label ? ' · ' + esc(k.label) : ''}${here ? ' <span class="pf-rolebadge" style="border-color:var(--live);color:var(--live)">this device</span>' : ''}</div>
+              <div class="m mono" style="font-size:11px">${esc(k.did)}${k.registered ? ' · added ' + esc(fmtDate(k.registered)) : ''}</div>
+            </div>
+            <button class="btn sm" data-revokekey="${esc(k.did)}">Revoke</button>
+          </div>`;
+        }).join('') : `<div class="faint" style="padding:12px 0;font-size:13px">No device keys yet. This browser registers one automatically; the CLI registers its own when you <code class="mono">work login</code>.</div>`;
+        return `
+        <div class="card pf-sec" id="devices">
+          <h3>Devices &amp; keys</h3>
+          <p class="sub">One identity, many signing keys — your browser, CLI, editor, and agents each hold their own. Edits signed by any of them are provably yours. Revoke a device without touching your identity.</p>
+          ${rows}
+        </div>`;
+      }
+
       function prefsSection() {
         return `
         <div class="card pf-sec" id="prefs">
@@ -426,6 +522,7 @@ WB.scopedStyles('/profile', `
   ${contribSection()}
   ${usageSection()}
   ${cliSection()}
+  ${devicesSection()}
   ${prefsSection()}
 </section>`;
         wire();
@@ -441,6 +538,7 @@ WB.scopedStyles('/profile', `
         el.querySelectorAll('[data-accent]').forEach((s) => s.onclick = () => { draft.accent = s.getAttribute('data-accent'); paint(); });
         el.querySelectorAll('[data-theme]').forEach((b) => b.onclick = () => setTheme(b.getAttribute('data-theme')));
         el.querySelectorAll('[data-revoke]').forEach((b) => b.onclick = () => revoke(b.getAttribute('data-revoke')));
+        el.querySelectorAll('[data-revokekey]').forEach((b) => b.onclick = () => revokeKey(b.getAttribute('data-revokekey')));
 
         const acts = {
           edit: startEdit, cancel: cancelEdit, save, avatar: pickAvatar, mint,
@@ -460,6 +558,9 @@ WB.scopedStyles('/profile', `
       await load();
       paint();
       scrollPending();
+      // Register this browser as a device under the user's identity (best-effort), then refresh.
+      await registerThisDevice();
+      paint();
     }
   };
 
