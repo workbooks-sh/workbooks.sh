@@ -556,6 +556,17 @@ defmodule Nexus.Compile do
         f |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code)) |> Enum.map(&Map.put(&1, :src, f))
       end)
 
+    # Trust gate (wb-rh95): drop native-BEAM units (worker/hook/def/test/auth) authored in an UNTRUSTED
+    # subtree before they're compiled/armed — native Elixir can't be sandboxed in-process. (server units
+    # are gated equivalently in Nexus.Unit.compile_workbook / try_beam.) Trusted (default) = unchanged.
+    {units, refused} =
+      Nexus.Trust.partition(Enum.map(units, &{&1, Path.relative_to(&1.src, root)}))
+
+    for {_u, path, {:untrusted_native_kind, kind, _}} <- refused do
+      require Logger
+      Logger.warning("[trust] refused native `#{kind}` unit in untrusted workspace #{path} (wb-rh95)")
+    end
+
     by_kind = Enum.group_by(units, & &1.kind)
 
     resources =

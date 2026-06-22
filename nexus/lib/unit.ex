@@ -57,11 +57,24 @@ defmodule Nexus.Unit do
   `agent` units are skipped — wasm lanes / DSL macros, not plain BEAM Elixir.)
   """
   def compile_workbook(root) do
-    nodes =
+    # Keep each node's source path so the trust gate (wb-rh95) can reject native-BEAM units authored in
+    # an UNTRUSTED subtree — they must never compile to native Elixir on the host.
+    node_paths =
       (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
       |> Enum.uniq()
-      |> Enum.flat_map(fn p -> Nexus.Literate.parse(File.read!(p)) end)
+      |> Enum.flat_map(fn p ->
+        rel = Path.relative_to(p, root)
+        Enum.map(Nexus.Literate.parse(File.read!(p)), &{&1, rel})
+      end)
 
+    {allowed, rejected} = Nexus.Trust.partition(node_paths)
+
+    for {_node, path, {:untrusted_native_kind, kind, _}} <- rejected do
+      require Logger
+      Logger.warning("[trust] refused native `#{kind}` unit in untrusted workspace #{path} (wb-rh95)")
+    end
+
+    nodes = allowed
     code = Enum.filter(nodes, &(&1.type == :code and &1.ast != nil))
 
     # every `defmodule` ANYWHERE — top-level or nested inside any unit (e.g. Money in
