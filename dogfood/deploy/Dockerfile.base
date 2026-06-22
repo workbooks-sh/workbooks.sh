@@ -20,7 +20,10 @@ RUN mix compile && mix release nexus
 FROM debian:bookworm-slim AS app
 ENV LANG=C.UTF-8 PORT=4000 WB_DATA=/srv/dogfood WB_NEXUS=dogfood
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 ca-certificates sqlite3 curl && rm -rf /var/lib/apt/lists/*
+# git is REQUIRED at runtime: the nexus is a git remote — it shells to `git` to init bare repos, run
+# http-backend (push/fetch), and check workspaces out (Nexus.Git / Nexus.GitHttp). Without it, the first
+# push 500s with :enoent. (Tests passed only because dev hosts already have git.)
+RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 openssl libncurses6 ca-certificates sqlite3 curl git && rm -rf /var/lib/apt/lists/*
 # Litestream — streams the tenant SQLite WAL to R2 (egress-free) + restores on boot. Generic
 # durability mechanism; activates only when WB_S3_* secrets are injected (see entrypoint).
 ARG LITESTREAM_VERSION=v0.3.13
