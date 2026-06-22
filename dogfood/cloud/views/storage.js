@@ -21,8 +21,9 @@ WB.view('/storage', {
   <div class="note">Storage lives outside the nexus container — it survives sleep/restart and never bloats the runtime image. Egress is $0 because blobs are served directly, so reads are free.</div>
 </section>`;
 
-    // Stale-while-revalidate: paint cached data instantly, refresh in the background.
-    await WB.swr('storage', () => WB.api.listBuckets(), (data) => {
+    // Stale-while-revalidate: paint cached data instantly, refresh in the background. Reads /cloud/storage
+    // — the REAL per-surface object-store sizes computed off this nexus's data volume.
+    await WB.swr('storage', () => fetch('/cloud/storage', { credentials: 'same-origin' }).then((r) => r.json()).catch(() => ({ buckets: [], totalSize: '0 B' })), (data) => {
       data = data || {};
       const buckets = data.buckets || [];
       const totalSize = data.totalSize || '0 GB';

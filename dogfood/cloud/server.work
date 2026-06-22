@@ -80,6 +80,11 @@ server :cloud do
   # deeper, file-level view. Apps inherit a declared workspace's name+emoji where one exists.
   route "GET /cloud/apps", :apps
 
+  # Real object-store sizes for THIS nexus — one bucket per mounted surface, bytes summed off the data
+  # volume (same source as the `storage` Live dial). The Storage admin page reads this instead of the
+  # generic platform endpoint so it shows the true amount.
+  route "GET /cloud/storage", :storage
+
   # Agents defined across the mounted workbooks — the Studio "Agents" tab lists these. Read from the
   # live registry (Nexus.Agent.all, populated at bringup from each workbook's `agent` blocks).
   route "GET /cloud/agents", :agents_list
@@ -1035,6 +1040,21 @@ server :cloud do
     end)
   end
 
+  # Real storage for the Storage admin page — one bucket per mounted surface, sizes off the data volume
+  # (the same computation as the `storage` Live dial). Shape matches the page: {totalSize, buckets:[…]}.
+  def storage(_req) do
+    mounts = Application.get_env(:nexus, :mounts, [])
+
+    buckets =
+      for {name, root} <- mounts, name != "" do
+        bytes = dir_bytes(root)
+        %{name: name, nexus: name, objects: count_files(root), size: human(bytes), egress: "$0.00", bytes: bytes}
+      end
+
+    total = Enum.reduce(buckets, 0, &(&1.bytes + &2))
+    %{totalSize: human(total), buckets: Enum.sort_by(buckets, & &1.bytes, :desc)}
+  end
+
   # Sum file sizes under a dir (bounded walk) — the surface's on-disk footprint.
   def dir_bytes(root) do
     Path.wildcard(Path.join(root, "**/*"))
@@ -1320,10 +1340,109 @@ server :cloud do
   # routable `provider/model` ids; the runtime gateway provider (deferred) routes them with our cf-aig
   # token. Branded "Workbooks Inference"; the gateway account/pricing are OUR product, not the standard.
   @inference_default_model "anthropic/claude-4-5-sonnet"
+  # Our gateway coordinates (NOT secret — they appear in request URLs). The cf-aig TOKEN is the secret,
+  # read only via Nexus.Secrets and injected at deploy — never in source. THE LINE: this account/gateway
+  # is OUR cloud product. Customer nexuses never hold this token; they ask OUR control plane for the list.
+  @cf_account "6d4b74aeb10f455fbf88141901e7595d"
+  @cf_gateway "workbooks"
 
-  # Curated catalog of routable `provider/model` ids over the Cloudflare AI Gateway. A LIVE sync against
-  # the gateway's `/compat/models` (auth'd with the cf-aig token) is the runtime step (wb-5p57) — until
-  # then this comprehensive default set powers the picker. tier: frontier | fast | reasoning | open.
+  # The effective model list — LIVE from the Cloudflare gateway when our cf-aig token is configured (the
+  # network call happens HERE, server-side; clients only ever see /cloud/inference/models), else the
+  # curated fallback. Cached so we hit Cloudflare at most once per TTL.
+  def inference_model_list, do: cached_inference_models()
+
+  defp cached_inference_models do
+    now = System.os_time(:second)
+
+    case :persistent_term.get({:cf_models_cache}, nil) do
+      {ts, list, ttl} when now - ts < ttl ->
+        list
+
+      _ ->
+        case fetch_cf_models() do
+          live when is_list(live) and live != [] ->
+            :persistent_term.put({:cf_models_cache}, {now, live, 3600})
+            live
+
+          _ ->
+            # No token / unreachable / empty → curated fallback, cached briefly so a freshly-injected
+            # token is picked up soon (a deploy also clears persistent_term).
+            :persistent_term.put({:cf_models_cache}, {now, model_catalog(), 300})
+            model_catalog()
+        end
+    end
+  end
+
+  defp cf_aig_token do
+    if Nexus.Secrets.has?("CF_AIG_TOKEN"), do: Nexus.Secrets.get("CF_AIG_TOKEN"), else: nil
+  end
+
+  # GET the gateway's OpenAI-compatible /compat/models with our cf-aig token. Returns a list in OUR shape
+  # (known ids keep their curated label/tier; new ids get a derived label/provider/tier), or nil on any
+  # failure (no token, non-2xx, unparseable) so the caller falls back to the curated catalog.
+  defp fetch_cf_models do
+    token = cf_aig_token()
+
+    if is_binary(token) and token != "" do
+      :inets.start()
+      :ssl.start()
+      url = "https://gateway.ai.cloudflare.com/v1/#{@cf_account}/#{@cf_gateway}/compat/models"
+
+      headers = [
+        {~c"cf-aig-authorization", to_charlist("Bearer " <> token)},
+        {~c"accept", ~c"application/json"},
+        {~c"user-agent", ~c"workbooks-nexus"}
+      ]
+
+      case :httpc.request(:get, {to_charlist(url), headers}, [timeout: 10_000, ssl: [verify: :verify_none]], body_format: :binary) do
+        {:ok, {{_, code, _}, _h, resp}} when code in 200..299 ->
+          case Jason.decode(resp) do
+            {:ok, %{"data" => data}} when is_list(data) ->
+              ids = data |> Enum.map(&Map.get(&1, "id")) |> Enum.filter(&is_binary/1) |> Enum.uniq()
+              if ids == [], do: nil, else: merge_cf_models(ids)
+
+            _ ->
+              nil
+          end
+
+        _ ->
+          nil
+      end
+    else
+      nil
+    end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
+  end
+
+  # Known ids keep their curated label + tier; unknown live ids get derived metadata.
+  defp merge_cf_models(ids) do
+    curated = Map.new(model_catalog(), &{&1.id, &1})
+    Enum.map(ids, fn id -> curated[id] || %{id: id, label: cf_label(id), provider: cf_provider(id), tier: cf_tier(id)} end)
+  end
+
+  defp cf_provider(id), do: id |> String.split("/") |> List.first()
+
+  defp cf_label(id) do
+    id |> String.split("/") |> List.last() |> String.replace(["-", "_"], " ")
+    |> String.split() |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  defp cf_tier(id) do
+    s = String.downcase(id)
+
+    cond do
+      String.contains?(s, ["o1", "o3", "o4", "reason", "-r1", "thinking"]) -> "reasoning"
+      String.contains?(s, ["mini", "flash", "haiku", "small", "lite", "8b", "-fast"]) -> "fast"
+      String.contains?(s, ["llama", "mistral", "qwen", "gemma", "deepseek-chat", "workers-ai"]) -> "open"
+      true -> "frontier"
+    end
+  end
+
+  # Curated catalog of routable `provider/model` ids over the Cloudflare AI Gateway — the FALLBACK when the
+  # live gateway list isn't available (no token yet / unreachable). tier: frontier | fast | reasoning | open.
   def model_catalog do
     [
       # OpenAI
@@ -1365,7 +1484,7 @@ server :cloud do
     ]
   end
 
-  def inference_models(_req), do: %{models: model_catalog(), provider: "Workbooks Inference", default_model: @inference_default_model}
+  def inference_models(_req), do: %{models: inference_model_list(), provider: "Workbooks Inference", default_model: @inference_default_model}
 
   defp inference_config(tenant) do
     case Nexus.ControlPlane.get(tenant, :inference, "config") do
@@ -1384,7 +1503,7 @@ server :cloud do
       default_model: Map.get(cfg, :default_model) || @inference_default_model,
       monthly_cap: Map.get(cfg, :monthly_cap),
       per_run_cap: Map.get(cfg, :per_run_cap),
-      models: model_catalog(),
+      models: inference_model_list(),
       # Transparent pricing: Cloudflare passes provider rates through (no per-token markup); the 5% is on
       # top-ups. Workbooks adds 0.5%. Shown to the customer as an itemized footnote.
       pricing: %{cloudflare_pct: 5.0, workbooks_pct: 0.5,
