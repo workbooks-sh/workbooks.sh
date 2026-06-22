@@ -39,6 +39,13 @@ deploy do
   reserved-hosts="workbooks.sh"                          # our domain of record — tenants can't bind under it
   runtime-image="ghcr.io/workbooks-sh/runtime:latest"   # the image we provision per-tenant
 
+  # Cloudflare-for-SaaS custom hostnames — the cheap, edge-TLS path for customer domains. When set, a
+  # custom-domain bind issues a CF per-hostname cert (first 100 free) instead of a per-app Fly cert; the
+  # owner points one CNAME at the fallback origin below. The CLOUDFLARE_API_TOKEN is a SECRET (injected),
+  # never config. Empty ⇒ Nexus.ControlPlane.Domain stays on the Fly-cert path.
+  cf-saas-zone="6db3a52031b1b90111e8d77b6fbaed36"        # workbooks.sh zone id
+  cf-custom-hostname-origin="customers.workbooks.sh"     # CNAME target customers point their domain at
+
   search="brave"                                         # cloud web-search: keyed Brave (reliable from datacenter IPs)
   compile-cache="on"
 end
