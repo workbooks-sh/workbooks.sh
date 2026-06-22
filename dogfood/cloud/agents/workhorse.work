@@ -39,4 +39,5 @@ agent :workhorse do
   grant fs, exec, browse, commands
   capabilities :all                      # base builder — admits every toolkit capability
   limit turns: 60, timeout: 300_000
+  model "z-ai/glm-5.2"                    # default brain (OpenRouter; needs OPENROUTER_API_KEY)
 end
