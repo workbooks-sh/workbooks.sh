@@ -28,6 +28,13 @@ defmodule Nexus.JsEngine do
       every op, so a plain eval (e.g. js_dom) instantiates with no capability surface.
   """
   def eval(src, opts \\ []) when is_binary(src) do
+    tenant = Keyword.get(opts, :tenant, :shared)
+    # Bound the in-process eval lane the same way the render lane is bounded (wb-whvy): a burst of
+    # evals shares the render slots fairly per tenant instead of fanning out past the memory wall.
+    Nexus.Wasm.Gate.with_slot(:render, tenant, fn -> do_eval(src, opts) end)
+  end
+
+  defp do_eval(src, opts) do
     timeout = Keyword.get(opts, :timeout, 15_000)
     broker = Keyword.get(opts, :broker, &deny_broker/1)
     imports = %{@broker_ns => %{@broker_fn => {:fn, broker}}}

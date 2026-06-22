@@ -586,12 +586,17 @@ defmodule Nexus.SSR do
   end
 
   defp render_artifact(name, {:wasm, {:ok, comp}}, grants, tenant) do
-    with {:ok, p} <- Nexus.Sandbox.start(comp, grants, tenant),
-         {:ok, val} <- Nexus.Sandbox.call(p, "render", []) do
-      ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
-    else
-      _ -> ~s(  <div class="data-missing">#{esc(name)}.render unavailable</div>)
-    end
+    # Hold a render slot for the duration: the in-process component lane is now bounded + tenant-fair
+    # (wb-whvy) so a burst of renders can't fan out past the memory wall or let one tenant starve others.
+    Nexus.Wasm.Gate.with_slot(:render, tenant, fn ->
+      with {:ok, p} <- Nexus.Sandbox.start(comp, grants, tenant),
+           {:ok, val} <- Nexus.Sandbox.call(p, "render", []) do
+        if Process.alive?(p), do: Process.exit(p, :normal)
+        ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
+      else
+        _ -> ~s(  <div class="data-missing">#{esc(name)}.render unavailable</div>)
+      end
+    end)
   end
 
   defp render_artifact(name, {:command, {:ok, spec}}, _grants, _tenant) do
