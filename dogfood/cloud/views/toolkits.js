@@ -10,16 +10,8 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
   // Brand → real domain. We render the provider's actual full-color logo via the favicon service (every
   // brand has one, always full-color) on a light chip — simpleicons was monochrome-in-brand-color, so
   // dark brands (GitHub, Slack) disappeared on the dark card and some (fal) had no icon at all.
-  // Real brand SVG (inlined from the glyphs toolkit / svgl), theme-aware for the mono brands. Some ids
-  // map onto a shared brand glyph (gmail → google). Returns an SVG string, or null when we have none.
-  var BRAND_ALIAS = { gmail: 'google' };
-  function brandGlyph(id){
-    var g = (window.WB && WB.BRAND_GLYPHS) ? WB.BRAND_GLYPHS[BRAND_ALIAS[id] || id] : null;
-    if (!g) return null;
-    if (typeof g === 'string') return g;
-    var dark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
-    return dark ? g.d : g.l;   // svgl _dark variant = light logo for dark backgrounds
-  }
+  // Brand SVG + toolkit glyph resolvers live globally (glyphs.js) so the sidebar shares them.
+  function brandGlyph(id){ return (window.WB && WB.brandGlyph) ? WB.brandGlyph(id) : null; }
 
   function getJSON(url){ return fetch(url, { credentials:'same-origin' }).then(function(r){ return r.json(); }); }
   function send(url, method, body){
@@ -160,13 +152,7 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
     catch (e) { WB.toast(String(e)); }
   }
 
-  // Built-in toolkit icon + pastel theme (per the brand DNA pastels, not the neon green). Each gets its
-  // own glyph, icon color, and soft tinted chip background.
-  var TK_THEME = {
-    presentation: { color:'#7c6cf0', bg:'rgba(124,108,240,.14)', icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg>' },
-    video: { color:'#e8794b', bg:'rgba(232,121,75,.14)', icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>' }
-  };
-  function tkTheme(id){ return TK_THEME[id] || { color:'var(--dim)', bg:'var(--line)', icon: WB.ICO_TOOLBOX || '' }; }
+  function tkTheme(id){ return (window.WB && WB.TOOLKIT_GLYPHS && WB.TOOLKIT_GLYPHS[id]) || { color:'var(--dim)', bg:'var(--line)', icon: WB.ICO_TOOLBOX || '' }; }
 
   // ── render ──────────────────────────────────────────────────────────────────────────────────
   // The chip (logo for an integration, themed pastel glyph for a built-in toolkit). Shared by card + modal.
@@ -314,15 +300,16 @@ WB.scopedStyles('/toolkits', `
 // styles MUST be global (scopedStyles would prefix them with [data-view="/toolkits"] and never match).
 WB.styles(`
 /* Chip styles are GLOBAL — used on cards (inside the view) AND in the Learn-more modal (on body). */
-.tkchip { width: 32px; height: 32px; border-radius: 8px; flex: none; display: grid; place-items: center;
+.tkchip { width: 32px; height: 32px; border-radius: 8px; flex: none; display: flex; align-items: center; justify-content: center;
   background: var(--line); border: 1px solid transparent; font: 700 14px var(--read); color: var(--ink); overflow: hidden; }
 .tkchip.glyph { background: var(--line); border-color: transparent; color: var(--dim); }
 .tkchip.tint { border-color: transparent; }
 /* Brand chip: a neutral theme-adaptive tile holding the inlined full-color (or theme-picked mono) SVG. */
 .tkchip.brand { background: color-mix(in srgb, var(--ink) 7%, transparent); border-color: var(--line); }
-.tkchip svg { width: 20px; height: 20px; display: block; }
+/* Aspect-preserving + centered: cap both dimensions, let the SVG keep its ratio (xMidYMid centers it). */
+.tkchip svg { max-width: 20px; max-height: 20px; width: auto; height: auto; display: block; }
 .tkchip.big { width: 44px; height: 44px; border-radius: 11px; }
-.tkchip.big svg { width: 26px; height: 26px; }
+.tkchip.big svg { max-width: 26px; max-height: 26px; }
 /* Learn-more modal */
 .tkinfohd { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .tkinfosub { font: 600 11px var(--read); text-transform: uppercase; letter-spacing: .05em; color: var(--dim); margin-top: 3px; }

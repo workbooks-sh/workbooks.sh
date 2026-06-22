@@ -856,20 +856,23 @@
       WB.swr('toolkits', function(){ return fetch('/cloud/toolkits', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
         var el = document.getElementById('toolkitsSide'); if (!el) return;
         var tk = (d && d.toolkits) || [];
+        // Icon for a row: the brand SVG for a connection (theme-aware), the pastel glyph for a toolkit.
+        function connIcon(pid){ var g = WB.brandGlyph && WB.brandGlyph(pid); return '<span class="semoji tkglyph">' + (g || '🔌') + '</span>'; }
+        function tkIcon(id){ var th = (WB.TOOLKIT_GLYPHS && WB.TOOLKIT_GLYPHS[id]); return th ? '<span class="semoji tkglyph" style="color:' + th.color + '">' + th.icon + '</span>' : '<span class="semoji">🧰</span>'; }
         var conns = [];
         tk.filter(function(t){ return t.kind === 'provider'; }).forEach(function(p){
-          (p.accounts || []).forEach(function(a){ conns.push({ id: a.id, label: a.label || a.id, prov: p.name }); });
+          (p.accounts || []).forEach(function(a){ conns.push({ id: a.id, pid: p.id, label: a.label || a.id, prov: p.name }); });
         });
         var active = tk.filter(function(t){ return t.kind === 'standalone' && t.enabled !== false && t.status === 'ready'; });
         el.innerHTML =
           '<div class="sgrp">Connections</div>' +
           (conns.length ? conns.map(function(c){
-            return '<div class="srow tkside"><span class="semoji">🔌</span><span class="sname" title="' + esc(c.prov) + '">' + esc(c.label) + '</span>' +
+            return '<div class="srow tkside">' + connIcon(c.pid) + '<span class="sname" title="' + esc(c.prov) + '">' + esc(c.label) + '</span>' +
               '<button class="tksidex" data-tkdisc="' + esc(c.id) + '" title="Disconnect">✕</button></div>';
           }).join('') : '<div class="treemsg" style="padding:6px 10px">No connections yet</div>') +
           '<div class="sgrp">Toolkits</div>' +
           (active.length ? active.map(function(t){
-            return '<div class="srow tkside"><span class="semoji">🧰</span><span class="sname">' + esc(t.name) + '</span>' +
+            return '<div class="srow tkside">' + tkIcon(t.id) + '<span class="sname">' + esc(t.name) + '</span>' +
               '<button class="tksidex" data-tkoff="' + esc(t.id) + '" title="Disable">✕</button></div>';
           }).join('') : '<div class="treemsg" style="padding:6px 10px">None enabled</div>');
         el.querySelectorAll('[data-tkdisc]').forEach(function(b){ b.onclick = function(){ tkSideDisconnect(b.getAttribute('data-tkdisc')); }; });

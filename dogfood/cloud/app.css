@@ -159,8 +159,10 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .srow .semoji{ width:18px; text-align:center; flex:none; }
 .srow .sname{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .srow .draftpill{ font:700 9px var(--mono); letter-spacing:.06em; color:var(--bloomd); background:color-mix(in srgb,var(--bloom) 16%,transparent); border-radius:5px; padding:2px 5px; }
-/* Toolkits sidebar rows: the inline disable ✕ (revealed on row hover). */
+/* Toolkits sidebar rows: brand/toolkit glyph + the inline disable ✕ (revealed on row hover). */
 .srow.tkside{ cursor:default; }
+.srow .tkglyph{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; }
+.srow .tkglyph svg{ max-width:16px; max-height:16px; width:auto; height:auto; }
 .tksidex{ margin-left:auto; flex:none; border:0; background:none; color:var(--dim); cursor:pointer; font-size:12px; padding:2px 5px; border-radius:5px; opacity:0; transition:opacity .12s; }
 .srow.tkside:hover .tksidex{ opacity:1; }
 .tksidex:hover{ color:var(--bad,#d33); background:var(--card); }
