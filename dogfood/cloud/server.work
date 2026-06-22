@@ -35,6 +35,12 @@ server :cloud do
   route "GET /cloud/issues", :issues_list
   route "POST /cloud/issues", :issue_file
 
+  # Autopoet management — ADMIN ONLY. The autopoet is secluded under admin: its heartbeat (on/off +
+  # cadence), what it can access (managed/frozen agents, ceilings, leases), and its logs.
+  route "GET /cloud/autopoet", :autopoet_status
+  route "POST /cloud/autopoet/heartbeat", :autopoet_heartbeat
+  route "POST /cloud/autopoet/run", :autopoet_run
+
   # Scheduling — the time arm. Schedule a named agent to run on a brief at an interval/cron/time, fired
   # by Nexus.Scheduler (durable, re-armed on boot). Schedules live in resource Schedule; firing persists
   # a Run + an activity event, exactly like a manual run. Completes the tasks/runs/issues/schedules fabric.
@@ -1341,6 +1347,74 @@ server :cloud do
   def human(b) when b >= 1_048_576, do: "#{Float.round(b / 1_048_576, 1)} MB"
   def human(b) when b >= 1024, do: "#{div(b, 1024)} KB"
   def human(b), do: "#{b} B"
+
+  # ── Autopoet management (ADMIN ONLY) ─────────────────────────────────────────
+  # The autopoet is managed only by admin. These wrap Nexus.Autopoet.Worker into JSON-safe snapshots
+  # (the runtime carries the mechanism; this is our cloud dashboard reading it).
+  def autopoet_status(req) do
+    if autopoet_admin?(req) do
+      hb = Nexus.Autopoet.Worker.status()
+
+      %{
+        heartbeat: %{armed: hb.armed, every: spec_every(hb.spec), next_ms: hb.next_ms, last: autopoet_report(hb.last)},
+        access: autopoet_access(),
+        log: Nexus.Autopoet.Knowledge.recall("autopoet") |> Enum.reverse() |> Enum.take(50)
+      }
+    else
+      {403, %{error: "admin only"}}
+    end
+  end
+
+  def autopoet_heartbeat(req) do
+    if autopoet_admin?(req) do
+      on = is_map(req.body) and req.body["on"] == true
+      every = (is_map(req.body) && req.body["every"]) || "15m"
+      if on, do: Nexus.Autopoet.Worker.arm(every), else: Nexus.Autopoet.Worker.disarm()
+      hb = Nexus.Autopoet.Worker.status()
+      %{armed: hb.armed, every: spec_every(hb.spec), next_ms: hb.next_ms}
+    else
+      {403, %{error: "admin only"}}
+    end
+  end
+
+  def autopoet_run(req) do
+    if autopoet_admin?(req), do: autopoet_report(Nexus.Autopoet.Worker.run_once()), else: {403, %{error: "admin only"}}
+  end
+
+  defp autopoet_admin?(req), do: req.query["role"] == "admin" or (is_map(req.body) and req.body["role"] == "admin")
+
+  defp spec_every(%{every: e}), do: e
+  defp spec_every(_), do: nil
+
+  defp autopoet_report(nil), do: nil
+
+  defp autopoet_report(r) do
+    %{
+      sensed: r.sensed,
+      at: Map.get(r, :at),
+      results:
+        Enum.map(r.results || [], fn x ->
+          %{target: x.target, kind: to_string(x.kind), action: to_string(x.action), reasons: Enum.map(x.reasons || [], &inspect/1)}
+        end)
+    }
+  end
+
+  defp autopoet_access do
+    a = Nexus.Autopoet.Worker.access()
+
+    %{
+      managed: a.managed,
+      proposed: a.proposed,
+      frozen: a.frozen,
+      agents: Enum.map(a.agents, fn ag -> %{name: ag.name, management: ag.management, ceiling: ceiling_str(ag.ceiling)} end),
+      leases: a.leases,
+      impure_indexes: a.impure_indexes
+    }
+  end
+
+  defp ceiling_str(:unbounded), do: "unbounded"
+  defp ceiling_str(list) when is_list(list), do: Enum.join(list, ", ")
+  defp ceiling_str(_), do: "unbounded"
 end
 
 # The durable event log — a normal resource (tenant-scoped SQLite). The `log` effect writes rows here;

@@ -84,6 +84,12 @@ defmodule Nexus.Autopoet.Request do
   end
 
   defp get(attrs, key), do: Map.get(attrs, key) || Map.get(attrs, to_string(key))
-  defp opt(attrs, key), do: case get(attrs, key), do: (v when is_binary(v) -> String.trim(v); _ -> nil)
+
+  defp opt(attrs, key) do
+    case get(attrs, key) do
+      v when is_binary(v) -> String.trim(v)
+      _ -> nil
+    end
+  end
   defp normalize(c), do: c |> String.downcase() |> String.replace(~r/\s+/, " ") |> String.trim()
 end
