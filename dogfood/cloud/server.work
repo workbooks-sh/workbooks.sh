@@ -563,14 +563,23 @@ server :cloud do
   # git pre-receive sig-gate verifies pushed commits against it. Best-effort — a write failure never
   # blocks key management. THE LINE: Nexus.GitSign is generic; we supply our registry's dids.
   defp rebuild_allowed_signers(tenant) do
-    events =
-      DeviceKey
-      |> Nexus.Store.all(tenant)
-      |> Enum.map(&Map.from_struct/1)
-      |> Enum.map(fn r -> %{did: r.did, op: (if r.revoked == 1, do: :revoke, else: :register), ts: r.registered} end)
+    rows = DeviceKey |> Nexus.Store.all(tenant) |> Enum.map(&Map.from_struct/1)
 
-    dids = Nexus.Authorship.fold_device_keys(events) |> Enum.map(& &1.did)
-    try do Nexus.GitSign.write_allowed_signers(dids) rescue _ -> :ok catch _, _ -> :ok end
+    live =
+      rows
+      |> Enum.map(fn r -> %{did: r.did, op: (if r.revoked == 1, do: :revoke, else: :register), ts: r.registered} end)
+      |> Nexus.Authorship.fold_device_keys()
+      |> MapSet.new(& &1.did)
+
+    # {owner_uid, did} per live key (fix wb-3e2y) — the allowed-signers principal is the key's owner, so
+    # the git ingress binds a commit's committer to THAT owner's key, not just any registered org key.
+    entries =
+      rows
+      |> Enum.filter(&MapSet.member?(live, &1.did))
+      |> Enum.uniq_by(& &1.did)
+      |> Enum.map(fn r -> {String.downcase(to_string(r.uid)), r.did} end)
+
+    try do Nexus.GitSign.write_allowed_signers(entries) rescue _ -> :ok catch _, _ -> :ok end
   end
 
   # This user's device keys, folded by did (latest `registered` wins).

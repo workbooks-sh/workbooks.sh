@@ -69,15 +69,7 @@ defmodule Nexus.GitSign do
 
       try do
         File.write!(f, Enum.join(lines, "\n") <> "\n")
-
-        {out, code} =
-          System.cmd(
-            "git",
-            ["-C", repo, "-c", "gpg.ssh.allowedSignersFile=#{f}", "verify-commit", sha],
-            stderr_to_stdout: true
-          )
-
-        good_signature?(out, code)
+        verify_one(repo, sha, f)
       rescue
         _ -> false
       after
@@ -86,11 +78,24 @@ defmodule Nexus.GitSign do
     end
   end
 
-  # git verify-commit exits 0 even when the signing key is present but its principal does NOT match the
-  # committer ("No principal matched") — so the exit code alone proves only key-SET membership, not that
-  # THIS author signed it (fix wb-3e2y). Require a "Good" signature AND a matched principal.
-  defp good_signature?(out, code),
-    do: code == 0 and String.contains?(out, "Good") and not String.contains?(out, "No principal matched")
+  # PER-AUTHOR binding (fix wb-3e2y). `git verify-commit` reports "Good signature for <the key's
+  # allowed-signers label>" and exits 0 whenever the signing key is present — it does NOT bind to the
+  # committer. So we bind it ourselves: require the reported principal to equal the commit's OWN
+  # committer email. Since the allowed-signers file maps owner_uid → key, this means "the committer is
+  # signed by a key registered to that very committer" — not merely by some org key.
+  defp verify_one(repo, sha, signers_file) do
+    committer =
+      case System.cmd("git", ["-C", repo, "show", "-s", "--format=%ce", sha], stderr_to_stdout: true) do
+        {c, 0} -> String.trim(c)
+        _ -> ""
+      end
+
+    {out, code} =
+      System.cmd("git", ["-C", repo, "-c", "gpg.ssh.allowedSignersFile=#{signers_file}", "verify-commit", sha],
+        stderr_to_stdout: true)
+
+    code == 0 and committer != "" and String.contains?(out, ~s(Good "git" signature for #{committer}))
+  end
 
   @doc """
   Verify EVERY commit a push introduces (`old..new`, or all of `new` for a new ref) is signed by one of
@@ -145,13 +150,7 @@ defmodule Nexus.GitSign do
       {out, 0} ->
         out
         |> String.split("\n", trim: true)
-        |> Enum.all?(fn sha ->
-          {out, code} =
-            System.cmd("git", ["-C", repo, "-c", "gpg.ssh.allowedSignersFile=#{file}", "verify-commit", sha],
-              stderr_to_stdout: true)
-
-          good_signature?(out, code)
-        end)
+        |> Enum.all?(&verify_one(repo, &1, file))
 
       _ ->
         false

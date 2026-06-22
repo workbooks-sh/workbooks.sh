@@ -51,7 +51,7 @@ defmodule Nexus.GitPushGateTest do
       key = Path.join(base, "id")
       {_, 0} = System.cmd("ssh-keygen", ["-t", "ed25519", "-f", key, "-N", "", "-q"], stderr_to_stdout: true)
       {:ok, pub} = GitSign.pub_from_ssh_line(File.read!(key <> ".pub"))
-      GitSign.write_allowed_signers([Keyring.did(pub)])
+      GitSign.write_allowed_signers([{"dev@example.com", Keyring.did(pub)}])
 
       # Provision the bare repo (installs the real pre-receive/post-receive hooks).
       bare = Nexus.Git.bare_path(Nexus.Paths.repos_root(), "pushgate")

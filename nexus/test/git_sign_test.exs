@@ -49,10 +49,11 @@ defmodule Nexus.GitSignTest do
     refute GitSign.verify_commit(dir, sha, "dev@example.com", [other])
   end
 
-  test "verification is KEY-based: the registered device key is the trust anchor, not the (spoofable) email principal", %{dir: dir, sha: sha, did: did} do
-    # git verify-commit validates against the allowed-signers KEY SET; the principal label is
-    # informational. Security comes from the key being registered to the user, not the committer email.
-    assert GitSign.verify_commit(dir, sha, "any-label@example.com", [did])
+  test "per-author binding: verifies ONLY under the committer's matching principal (wb-3e2y)", %{dir: dir, sha: sha, did: did} do
+    # The commit's committer is dev@example.com. A non-matching principal must NOT verify even though the
+    # signing key is valid and present — 'No principal matched' is a rejection, not a pass.
+    refute GitSign.verify_commit(dir, sha, "someone-else@example.com", [did])
+    assert GitSign.verify_commit(dir, sha, "dev@example.com", [did])
   end
 
   test "verify_commit with no/malformed dids is false (no raise)", %{dir: dir, sha: sha} do
