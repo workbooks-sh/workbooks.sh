@@ -935,6 +935,7 @@
       var workspaces = (WB.ws && WB.ws.list) || [];
       var byWs = {}; (opts.items || []).forEach(function (it) { var k = opts.ws(it) || ''; (byWs[k] = byWs[k] || []).push(it); });
       function group(id, name, list) {
+        if (opts.hideEmpty && !list.length) return '';   // under a filter, don't show empty groups
         var gkey = id || '_general';
         var open = (gkey in opts.store) ? !!opts.store[gkey] : defaultOpen;
         var extra = opts.add ? '<button class="wsmore-btn" ' + opts.add.attrs(id, name) + ' title="' + esc(opts.add.title(name)) + '">' + (opts.add.glyph || '+') + '</button>' : '';
@@ -1055,13 +1056,31 @@
             dot + '<span class="sname">' + esc(r.name) + '</span><span class="swsct">' + r.count + '</span></a>';
         }
 
+        // Tag filter — chips of every tag across resources; selecting one narrows the list.
+        var tagFilter = st.dataTagFilter || '';
+        var allTags = [];
+        resources.forEach(function(r){ (r.tags || []).forEach(function(t){ if (allTags.indexOf(t) < 0) allTags.push(t); }); });
+        allTags.sort();
+        if (tagFilter && allTags.indexOf(tagFilter) < 0) tagFilter = '';   // stale filter (tag gone) → reset
+        var shown = tagFilter ? resources.filter(function(r){ return (r.tags || []).indexOf(tagFilter) >= 0; }) : resources;
+        var chips = allTags.length
+          ? '<div class="dtagbar"><button class="dtagchip' + (tagFilter === '' ? ' on' : '') + '" data-tagf="">All</button>' +
+            allTags.map(function(t){ return '<button class="dtagchip' + (tagFilter === t ? ' on' : '') + '" data-tagf="' + esc(t) + '">#' + esc(t) + '</button>'; }).join('') + '</div>'
+          : '';
+
         el.innerHTML =
           navrow(onOverview, '/data', ICO.gauge, 'Overview') +
           navrow(onAssets, '/data?assets=1', ICO.files, 'Assets') +
+          chips +
           (resources.length
-            ? WB.wsGroups({ items: resources, ws: function(r){ return r.workspace || ''; }, row: resourceRow,
-                key: 'wb-datagroups', store: st.dataGroupsCollapsed, repaint: paintDataSide, empty: 'No tables' })
+            ? WB.wsGroups({ items: shown, ws: function(r){ return r.workspace || ''; }, row: resourceRow,
+                key: 'wb-datagroups', store: st.dataGroupsCollapsed, repaint: paintDataSide,
+                hideEmpty: !!tagFilter, empty: 'No tables' })
             : '<div class="treemsg" style="padding:8px 10px">No resources yet. A <code>resource</code> block in any workbook shows up here.</div>');
+
+        el.querySelectorAll('[data-tagf]').forEach(function(b){
+          b.onclick = function(){ st.dataTagFilter = b.getAttribute('data-tagf'); paintDataSide(); };
+        });
       });
     }
     async function tkSideDisconnect(id){
