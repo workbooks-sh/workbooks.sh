@@ -105,10 +105,25 @@ security model:
 
 ### "Cold wasm storage" = the backing store
 
-Both scopes are backed by object storage — R2/S3, the same store the nexus already uses
-for [Litestream and tenant DBs](/serving/tenant-db). This is the "cold wasm storage"
-layer: artifacts sit there cheaply ($0.15/GB/mo, free or cheap egress on R2), pulled on
-demand. A small hot index (key → object) lets a hit skip the store round-trip entirely.
+The cache uses **two distinct storage homes**, and the doc is explicit about which is
+which because they are different products with different shapes:
+
+- **Tigris** — the artifact store ("cold wasm storage"). Tigris is a **separate company**
+  (Tigris Data) offering globally-distributed, S3-compatible **object** storage, available
+  **through Fly as a storage partner** (`fly storage create`) — it is *not* Fly's own
+  service. We use it because it fits a *global* shared cache: low-latency access from Fly
+  machines, and objects auto-replicate near where they're pulled, so a package compiled
+  once is cached close to every nexus that later requests it. The content-addressed
+  artifacts (both scopes) live here as S3 objects, keyed by their hash.
+- **Fly Volumes** — Fly's *own* persistent **block** storage, a volume attached to a
+  single machine in a single region. This is where **per-machine local state** lives: the
+  serving nexus's tenant SQLite / `WB_DATA` mount (the same store used for
+  [Litestream and tenant DBs](/serving/tenant-db)), and a build worker's **baked compiler
+  rootfs**. Volumes are region-pinned and machine-local — the right home for hot, local,
+  per-instance state, and the wrong home for a global artifact cache (hence Tigris for
+  that).
+
+A small hot index (key → object) lets a hit skip the Tigris round-trip entirely. A small hot index (key → object) lets a hit skip the store round-trip entirely.
 **No JSON sidecar** — the index is nexus state, the cache config is a `.work` `deploy`
 block read via `Nexus.Config`.
 
@@ -183,6 +198,42 @@ So our write path is gated, not open:
   compiles are deterministic, a background rebuilder re-compiles a sample of shared
   artifacts on an independent worker and compares hashes; a mismatch raises a poisoning /
   non-determinism alarm (the reproducible-builds rebuilder pattern).
+
+## Verifiable provenance — signatures over a transparency log (Radicle-pattern)
+
+The integrity model above trusts *our* fleet signing key. We can do better and make every
+artifact and every build **cryptographically verifiable by anyone**, with no central
+authority to trust — the [Radicle](https://radicle.dev/) philosophy (self-certifying,
+every action signed, trust from cryptography not from where data lives). Radicle itself
+is **not** a blockchain, and neither is this — the same guarantees come from signed
+records over a hash-linked log, at a fraction of the cost. Three layers:
+
+- **Signed build attestations (artifact layer).** Every shared-cache artifact carries a
+  signed statement — `{source_integrity_hash, lane, toolchain_version+digest,
+  builder_pubkey, output_hash}` — signed by the builder key. This is the SLSA-provenance /
+  in-toto attestation shape: *Radicle for build outputs.* A reader verifies the signature
+  chains to a trusted builder root before accepting the artifact. **This is what actually
+  defeats CREEP** — a poisoned artifact has no valid attestation from a trusted builder,
+  regardless of matching input hashes.
+- **A transparency log, not a blockchain (the record).** An append-only, hash-linked
+  (Merkle) log of every attestation: tamper-evident, publicly/tenant-verifiable,
+  history-immutable — the guarantees people mean by "on chain," without a chain
+  (Certificate-Transparency / Sigstore-Rekor, and effectively how Radicle's signed
+  history works). **This log is the same structure as the billing/provenance ledger
+  below** — one append-only signed record serves both audit and metering, making billing
+  non-repudiable.
+- **Capability tokens for invocation (identity).** Each build runs under a signed, scoped
+  capability token (biscuit/macaroon-style, extending the existing `wbk_` PAT /
+  `Nexus.Auth`); the attestation records *who* invoked it, binding cost to a key rather
+  than an IP. You cannot repudiate a build you signed for.
+
+**The store is untrusted by design.** Trust lives in signatures + content hashes, so R2's
+location or operator is irrelevant — a swapped or tampered artifact fails verification no
+matter who controls the bucket. The nexus accepts only artifacts whose attestation is
+signed by a builder key in its own trust root, so the store can inject nothing a builder
+did not authorize. (Distinct surface, same philosophy: the *repo/git* side — the nexus is
+already a git remote — is where the Radicle **protocol** itself fits, via self-certifying
+signed repos; an interop target as native auth matures.)
 
 ## Usage, billing & abuse — airtight by construction
 
