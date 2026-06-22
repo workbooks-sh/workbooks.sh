@@ -1068,17 +1068,18 @@ server :cloud do
         {404, %{error: "no such resource"}}
 
       {:ok, entry} ->
-        offset = to_int(req.query["offset"], 0)
-        limit = to_int(req.query["limit"], 50)
         sort_field = String.trim(req.query["sort"] || "")
         sort = if sort_field == "", do: nil, else: {sort_field, req.query["dir"] || "asc"}
+        # Clamp once (Store.Page applies the same bounds internally) so the echoed offset/limit match
+        # what was actually served — the UI's "showing X of Y" math stays correct on extreme inputs.
+        o = Nexus.Store.Page.opts(offset: to_int(req.query["offset"], 0), limit: to_int(req.query["limit"], 50))
 
         {rows, total} =
           Nexus.Store.page(entry.module, tenant,
-            offset: offset, limit: limit, sort: sort, q: req.query["q"])
+            offset: o.offset, limit: o.limit, sort: sort, q: req.query["q"])
 
         %{name: entry.name, fields: Enum.map(entry.fields, &field_meta/1),
-          rows: Enum.map(rows, &row_map/1), total: total, offset: offset, limit: limit}
+          rows: Enum.map(rows, &row_map/1), total: total, offset: o.offset, limit: o.limit}
     end
   end
 
@@ -1113,7 +1114,7 @@ server :cloud do
         rel = Path.relative_to(file, root)
         path = mount <> "/" <> rel
         %{name: Path.basename(file), path: path, workspace: mount, type: kind,
-          size: (File.stat!(file).size || 0), url: "/cloud/raw?path=" <> URI.encode(path)}
+          size: file_size(file), url: "/cloud/raw?path=" <> URI.encode(path)}
       end
 
     %{assets: Enum.take(all, @asset_cap), truncated: length(all) > @asset_cap, total: length(all)}
@@ -1185,6 +1186,14 @@ server :cloud do
     end
   rescue
     _ -> 0
+  end
+
+  # TOCTOU-safe size: a file that passes File.regular? but vanishes before stat shouldn't kill the grid.
+  defp file_size(file) do
+    case File.stat(file) do
+      {:ok, %{size: s}} -> s || 0
+      _ -> 0
+    end
   end
 
   defp to_int(nil, d), do: d
@@ -1318,7 +1327,7 @@ server :cloud do
             safe = Path.expand(dir)
 
             cond do
-              not String.starts_with?(safe, Path.expand(root)) -> {403, %{error: "path escapes mount"}}
+              not within_mount?(safe, root) -> {403, %{error: "path escapes mount"}}
               not File.dir?(safe) -> {404, %{error: "not a directory"}}
               true -> %{path: path, entries: list_dir(safe, path)}
             end
@@ -1905,7 +1914,7 @@ server :cloud do
             abs = Path.expand(Path.join([root | rest]))
 
             cond do
-              not String.starts_with?(abs, Path.expand(root)) -> {:error, 403, "path escapes mount"}
+              not within_mount?(abs, root) -> {:error, 403, "path escapes mount"}
               not File.regular?(abs) -> {:error, 404, "not a file"}
               true -> {:ok, abs}
             end
@@ -1988,11 +1997,19 @@ server :cloud do
           nil -> {:error, 404, "no such mount"}
           {_, root} ->
             abs = Path.expand(Path.join([root | rest]))
-            if String.starts_with?(abs, Path.expand(root)),
+            if within_mount?(abs, root),
               do: {:ok, abs, mount, root, Enum.join(rest, "/")},
               else: {:error, 403, "path escapes mount"}
         end
     end
+  end
+
+  # A resolved absolute path is inside a mount iff it IS the root or sits strictly below it. A raw
+  # prefix test (no trailing separator) would let a sibling like `studioSECRET` pass for mount
+  # `studio` — a `..` escape into a prefix-sharing sibling. Require the separator to close that hole.
+  defp within_mount?(abs, root) do
+    r = Path.expand(root)
+    abs == r or String.starts_with?(abs, r <> "/")
   end
 
   # Commit a tree change (delete/rename/new) into the workspace's bare repo, attributed to the user,
