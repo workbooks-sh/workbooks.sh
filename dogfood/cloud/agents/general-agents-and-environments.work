@@ -102,11 +102,16 @@ overlay model already in `Nexus.Server` + jj). No extra deployments. See [[one-n
 
 ## 7 — Phased build + status
 
-1. **jj snapshot/restore** — ✅ DONE (wb-m52l P1, committed).
-2. **General-agent scope tier** — tree-root `/work` + auto-register + enforcement (wb-m52l P2). NEXT.
-3. **Tree-level eval snapshot/restore** + the eval harness (wb-hqu5), incl. the marketing eval.
-4. **Environments** — env selector + serve-which-ref + PR/promote UX (wb-bhyk), built on 1–3.
-5. **Agent UX** — workhorse auto-switch-to-dev + HITL promote; autopoet headless PR.
+1. **jj snapshot/restore** — ✅ DONE (wb-m52l P1).
+2. **General-agent scope tier** — ✅ BUILT (wb-0fbq): `scope general` (workhorse/autopilot); a general
+   run mounts `/work` = isolated staging COPY of the whole workspace tree (never `.nexus`); on success
+   new top-level dirs auto-register as workspaces (`Nexus.Workspaces.sync_back`); `:general` forced from
+   the declared scope (no caller escalation). `Nexus.Workspaces` (list/provision/deprovision/stage/
+   sync_back/snapshot/restore) unit-tested. Pending: live verification on the deployed nexus.
+3. **Snapshot-isolated evals** — ✅ WIRED (wb-hsrj): `do_run`/`agent_run` `--isolate` snapshots the tree
+   before + restores after; `work agent run --isolate`. Pending: run the marketing eval live + score.
+4. **Environments** — env selector + serve-which-ref + PR/promote UX (wb-bhyk), built on 1–3. TODO.
+5. **Agent UX** — workhorse auto-switch-to-dev + HITL promote; autopoet headless PR. TODO.
 
 ## 8 — Eval findings already banked (the loop is working)
 
