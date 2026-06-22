@@ -281,6 +281,7 @@
       'member.manage': 'admin',
       'secret.manage': 'admin',
       'nexus.manage': 'admin',
+      'autopoet.manage': 'admin',
       'billing.manage': 'owner'
     };
     WB.can = function (cap) {
@@ -450,12 +451,12 @@
     })();
 
     var ACCENT = { '/storage': 'var(--sky)', '/team': 'var(--peach)', '/shared': 'var(--cream)', '/usage': 'var(--sage)',
-      '/settings': 'var(--violet)', '/workspace': 'var(--peach)', '/database': 'var(--mint)', '/upgrade': 'var(--mint)' };
+      '/settings': 'var(--violet)', '/autopoet': 'var(--violet)', '/workspace': 'var(--peach)', '/database': 'var(--mint)', '/upgrade': 'var(--mint)' };
     function sectionAccent(p){ for (var k in ACCENT) { if (p.indexOf(k) === 0) return ACCENT[k]; } return 'var(--mint)'; }
     // Which RAIL section a route belongs to — drives the active rail tab + which per-surface sidebar shows.
-    var ADMIN_ROUTES = ['/usage', '/storage', '/team', '/secrets', '/database', '/upgrade'];
+    var ADMIN_ROUTES = ['/autopoet', '/usage', '/storage', '/team', '/secrets', '/database', '/upgrade'];
     function sectionFor(p){
-      if (p.indexOf('/toolkits') === 0 || p.indexOf('/integrations') === 0) return 'toolkits';   // own rail section (integrations = provider toolkits) — not admin-gated
+      if (p.indexOf('/toolkits') === 0) return 'toolkits';   // own rail section — providers + standalone toolkits
       if (p.indexOf('/studio') === 0 || p.indexOf('/create') === 0) return 'studio';
       if (p.indexOf('/activity') === 0 || p.indexOf('/runs') === 0 || p.indexOf('/tasks') === 0 || p.indexOf('/issues') === 0) return 'activity';
       if (p.indexOf('/workspace') === 0) return 'files';
@@ -481,7 +482,7 @@
     // ACTIVE view's script on demand. The home '/' view ships inline in app.js (no entry here).
     var VIEW_FILES = {
       '/app': 'app',
-      '/activity': 'activity', '/runs': 'runs', '/tasks': 'tasks', '/issues': 'issues', '/database': 'database', '/denied': 'denied',
+      '/activity': 'activity', '/runs': 'runs', '/tasks': 'tasks', '/issues': 'issues', '/database': 'database', '/denied': 'denied', '/autopoet': 'autopoet',
       '/toolkits': 'integrations', '/integrations': 'integrations', '/nexuses': 'nexuses', '/secrets': 'secrets', '/settings': 'settings',
       '/shared': 'shared', '/storage': 'storage', '/studio': 'studio', '/create': 'studio', '/usage': 'studio',
       '/team': 'team', '/upgrade': 'upgrade', '/welcome': 'welcome', '/workspace/env': 'workspace-env',
@@ -530,6 +531,7 @@
       pin: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
       logout: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
       gear: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+      quill: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 3c-5 0-9 2.5-12 6.5C5.5 13 5 17 5 19c2 0 6-.5 9.5-3C18.5 13 20 8 20 3z"/><path d="M5 19 11 13"/><path d="M3 21c1-2 2.5-3.5 4.5-4.5"/></svg>',
       edit: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
       trash: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>',
       copy: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
@@ -954,7 +956,8 @@
       else if (section === 'activity') sideBody = '<div id="activityInbox"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
       else if (section === 'admin') sideBody = '<nav class="nxnav">' +
           navlink('/usage', ICO.gauge, 'Usage & billing', p) + navlink('/storage', ICO.database, 'Storage', p) +
-          navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) + '</nav>';
+          navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) +
+          (WB.can('autopoet.manage') ? navlink('/autopoet', ICO.quill, 'Autopoet', p) : '') + '</nav>';
       // You — personal account surface (folds the old avatar popover into a full sidebar).
       else if (section === 'account') sideBody = '<nav class="nxnav">' +
           navlink('/settings', ICO.gear, 'Profile', p) +
