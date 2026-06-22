@@ -849,6 +849,43 @@
         }).join('');
       });
     }
+    // Toolkits sidebar — what's ACTIVE: connected accounts (per integration) + enabled built-in toolkits,
+    // each with an inline disable. Reuses GET /cloud/toolkits; SWR so it paints instantly then refreshes.
+    function paintToolkits(){
+      var box = document.getElementById('toolkitsSide'); if (!box) return;
+      WB.swr('toolkits', function(){ return fetch('/cloud/toolkits', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
+        var el = document.getElementById('toolkitsSide'); if (!el) return;
+        var tk = (d && d.toolkits) || [];
+        var conns = [];
+        tk.filter(function(t){ return t.kind === 'provider'; }).forEach(function(p){
+          (p.accounts || []).forEach(function(a){ conns.push({ id: a.id, label: a.label || a.id, prov: p.name }); });
+        });
+        var active = tk.filter(function(t){ return t.kind === 'standalone' && t.enabled !== false && t.status === 'ready'; });
+        el.innerHTML =
+          '<div class="sgrp">Connections</div>' +
+          (conns.length ? conns.map(function(c){
+            return '<div class="srow tkside"><span class="semoji">🔌</span><span class="sname" title="' + esc(c.prov) + '">' + esc(c.label) + '</span>' +
+              '<button class="tksidex" data-tkdisc="' + esc(c.id) + '" title="Disconnect">✕</button></div>';
+          }).join('') : '<div class="treemsg" style="padding:6px 10px">No connections yet</div>') +
+          '<div class="sgrp">Toolkits</div>' +
+          (active.length ? active.map(function(t){
+            return '<div class="srow tkside"><span class="semoji">🧰</span><span class="sname">' + esc(t.name) + '</span>' +
+              '<button class="tksidex" data-tkoff="' + esc(t.id) + '" title="Disable">✕</button></div>';
+          }).join('') : '<div class="treemsg" style="padding:6px 10px">None enabled</div>');
+        el.querySelectorAll('[data-tkdisc]').forEach(function(b){ b.onclick = function(){ tkSideDisconnect(b.getAttribute('data-tkdisc')); }; });
+        el.querySelectorAll('[data-tkoff]').forEach(function(b){ b.onclick = function(){ tkSideToggle(b.getAttribute('data-tkoff')); }; });
+      });
+    }
+    async function tkSideDisconnect(id){
+      var ok = await WB.confirm({ title: 'Disconnect this account?', body: 'Its sealed credentials will be deleted.', confirm: 'Disconnect', danger: true });
+      if (!ok) return;
+      try { await fetch('/cloud/integrations/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' }); WB.cache.set('toolkits', null); WB.toast('Disconnected'); paintToolkits(); }
+      catch (e) { WB.toast('Failed', 'bad'); }
+    }
+    async function tkSideToggle(id){
+      try { await fetch('/cloud/toolkits/' + encodeURIComponent(id) + '/toggle', { method: 'POST', credentials: 'same-origin' }); WB.cache.set('toolkits', null); WB.toast('Disabled'); paintToolkits(); }
+      catch (e) { WB.toast('Failed', 'bad'); }
+    }
     function isBookmarked(path){ return st.bookmarks.some(function(b){ return b.path === path; }); }
     // File search across workspaces — updates the results box IN PLACE (no shell re-render → keeps focus).
     // Recursive file-tree HTML for an open folder at `path` (root mount name = workspace folder).
@@ -963,6 +1000,9 @@
           '<div id="studioSide"><div class="treemsg" style="padding:8px 4px">Loading sessions…</div></div>';
       // Activity — the inbox lives in the sidebar; the page shows the selected event's context (lazy → #activityInbox).
       else if (section === 'activity') sideBody = '<div id="activityInbox"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
+      // Toolkits — the sidebar lists what's ACTIVE: connected accounts + enabled built-in toolkits, each
+      // with an inline disable. The page is the marketplace; this is the "what's on" view (lazy → #toolkitsSide).
+      else if (section === 'toolkits') sideBody = '<div id="toolkitsSide"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
       else if (section === 'admin') sideBody = '<nav class="nxnav">' +
           navlink('/usage', ICO.gauge, 'Usage & billing', p) + navlink('/storage', ICO.database, 'Storage', p) +
           navlink('/team', ICO.users, 'Users', p) + navlink('/secrets', ICO.key, 'Secrets', p) +
@@ -1015,6 +1055,7 @@
       if (section === 'apps') paintApps();        // Apps surface → load the apps grid
       else if (section === 'studio') paintStudio();
       else if (section === 'activity') paintActivity();
+      else if (section === 'toolkits') paintToolkits();
     }
     // Let other views (the workspace explorer) refresh the sidebar after a pin/unpin so Pinned updates live.
     WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };
