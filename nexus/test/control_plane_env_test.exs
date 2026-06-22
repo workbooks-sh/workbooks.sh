@@ -144,4 +144,37 @@ defmodule Nexus.ControlPlaneEnvTest do
     refute before.ciphertext == aft.ciphertext, "value change did not re-encrypt!"
     assert body(call(:get, "/env/#{v["id"]}/reveal", "org_env_u"))["value"] == "new-value"
   end
+
+  test "scope=nexus filters the list to nexus-scoped secrets" do
+    create("org_env_s", "NX", "a", %{scope: "nexus"})
+    create("org_env_s", "WS", "b", %{scope: "workspace", workspace_id: "ws_a"})
+
+    only_nx = call(:get, "/env?scope=nexus", "org_env_s") |> body()
+    assert Enum.map(only_nx["env"], & &1["name"]) == ["NX"]
+  end
+
+  test "Env.value resolves a nexus-scoped secret by name and decrypts it" do
+    create("org_env_val", "OPENROUTER_API_KEY", "sk-or-123", %{scope: "nexus"})
+    # a workspace-scoped secret of the SAME name must NOT shadow the nexus lookup
+    create("org_env_val", "OPENROUTER_API_KEY", "ws-decoy", %{scope: "workspace", workspace_id: "ws_x"})
+
+    assert Nexus.ControlPlane.Env.value("org_env_val", "OPENROUTER_API_KEY") == {:ok, "sk-or-123"}
+    assert Nexus.ControlPlane.Env.value("org_env_val", "NOPE") == {:error, :not_found}
+  end
+
+  test "Nexus.Secrets is store-first with an env fallback" do
+    org = "org_secrets_seam"
+    System.put_env("NEXUS_TENANT", org)
+    System.put_env("SOME_ENV_ONLY", "from-env")
+    System.put_env("OVERRIDE_ME", "env-loses")
+    on_exit(fn -> Enum.each(~w(NEXUS_TENANT SOME_ENV_ONLY OVERRIDE_ME), &System.delete_env/1) end)
+
+    create(org, "STORE_ONLY", "from-store", %{scope: "nexus"})
+    create(org, "OVERRIDE_ME", "store-wins", %{scope: "nexus"})
+
+    assert Nexus.Secrets.get("STORE_ONLY") == "from-store"   # store
+    assert Nexus.Secrets.get("SOME_ENV_ONLY") == "from-env"  # env fallback (no store record)
+    assert Nexus.Secrets.get("OVERRIDE_ME") == "store-wins"  # store-first beats env
+    assert Nexus.Secrets.get("TOTALLY_UNSET") == nil
+  end
 end

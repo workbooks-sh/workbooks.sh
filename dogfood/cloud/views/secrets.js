@@ -34,10 +34,10 @@ WB.view('/secrets', {
   title: 'Secrets',
   accent: 'var(--mint)',
   async render(el, ctx) {
-    // NEXUS-level secrets — global pool for this nexus. Scoped by reserved "nexus:<id>"
-    // key so it never collides with a workspace's vars.
+    // NEXUS-level secrets — the editable store the runtime reads (scope "nexus"). One store:
+    // these power Nexus.Secrets (store-first, env fallback), so a value set here takes effect.
     const active = WB.nexus.active;
-    const scope = active ? `nexus:${active.id}` : null;
+    const cacheKey = active ? `secrets:nexus:${active.id}` : 'secrets:nexus';
     const nxName = (active && active.name) || 'this nexus';
 
     // ── transient state (mirrors envStore + the page's local runes) ──
@@ -70,12 +70,11 @@ WB.view('/secrets', {
       .replace(/"/g, '&quot;');
 
     async function loadList() {
-      if (!scope) { list = []; loading = false; paint(); return; }
       loading = true;
       paint();
       // Stale-while-revalidate: show last-known env list (names/metadata only — never plaintext values)
       // instantly, refresh in the background. Same instant-load behavior as the other admin pages.
-      await WB.swr('secrets:' + scope, () => WB.api.listEnv(scope), (fresh) => {
+      await WB.swr(cacheKey, () => WB.api.listNexusEnv(), (fresh) => {
         list = fresh || [];
         loading = false;
         paint();
@@ -111,8 +110,8 @@ WB.view('/secrets', {
     // ── create / edit ──
     function openCreate() { editing = null; fName = ''; fValue = ''; lockName = false; editOpen = true; paint(); }
     function openEdit(v) { editing = v; fName = v.name; fValue = ''; lockName = false; editOpen = true; paint(); }
-    // Set a known PLATFORM secret — same write path as a normal secret, but the name is fixed to the
-    // canonical key. (You can set/replace the value; you still can't read it back.)
+    // Set a recognized key — same write path as any secret (scope "nexus"), name fixed to the canonical
+    // key. It joins the list above and the runtime reads it via Nexus.Secrets.
     function openSet(name) { editing = null; fName = name; fValue = ''; lockName = true; editOpen = true; paint(); }
     async function save() {
       if (!fName.trim()) { WB.toast('Give the secret a name'); return; }
@@ -127,7 +126,7 @@ WB.view('/secrets', {
           WB.toast(`Updated ${fName.trim()}`);
         } else {
           if (!fValue) { saving = false; WB.toast('Give the secret a value'); paint(); return; }
-          const v = await WB.api.createEnv(scope, { name: fName.trim(), value: fValue });
+          const v = await WB.api.createNexusEnv({ name: fName.trim(), value: fValue });
           list = [...list, v];
           WB.toast(`Saved ${fName.trim()}`);
         }
@@ -190,8 +189,9 @@ WB.view('/secrets', {
   </div>`;
     }
 
-    // Read-only platform secrets — injected at deploy (Fly secrets → Nexus.Secrets). Names + a set/not-set
-    // badge only; you can't reveal or edit them here (they're managed at deploy, not in the nexus pool).
+    // Recognized keys — names the built-in integrations look for. Just a checklist: name + set/not-set
+    // (present = saved in the nexus store OR injected at deploy). "Set" writes to the SAME nexus store
+    // as the list above, so a value set here feeds the runtime via Nexus.Secrets (store-first).
     function platformHtml() {
       if (injected === null) {
         return `<div class="card faint" style="text-align:center;color:var(--dim)">Loading platform secrets…</div>`;
@@ -216,7 +216,7 @@ WB.view('/secrets', {
       return `<div class="modal" data-modal>
     <div class="sheet" style="width:460px">
       <h2>${lockName ? 'Set ' + esc(fName) : editing ? 'Edit secret' : 'Add secret'}</h2>
-      <p class="sub">${lockName ? 'A service key the platform reads at runtime. You can set or replace its value here; you can’t read it back.' : 'Encrypted at rest. Shown masked everywhere — reveal one explicitly when you need it.'}</p>
+      <p class="sub">${lockName ? 'A key a built-in integration looks for. Save it and the platform uses it right away — it joins your secrets, encrypted at rest.' : 'Encrypted at rest. Shown masked everywhere — reveal one explicitly when you need it.'}</p>
       <div class="lab">Name</div>
       <div class="field"><input type="text" class="mono" placeholder="OPENROUTER_API_KEY" data-f="name" value="${esc(fName)}"${lockName ? ' readonly' : ''} /></div>
       <div class="lab">Value</div>
@@ -265,8 +265,8 @@ ${bodyHtml()}
 
 <div class="grphead" style="margin-top:26px">
   <div>
-    <h3 class="grp">Service keys</h3>
-    <p class="faint" style="margin:4px 0 0;font-size:12.5px">The keys this platform needs to run — inference, storage, integrations. Set when you deploy, so you can see what’s configured here but can’t read the values back.</p>
+    <h3 class="grp">Keys the platform recognizes</h3>
+    <p class="faint" style="margin:4px 0 0;font-size:12.5px">Names the built-in integrations look for — inference, storage, OAuth. Set one and it joins your secrets above; the platform uses it right away. “Set” means it’s present (saved here, or injected at deploy).</p>
   </div>
 </div>
 ${platformHtml()}

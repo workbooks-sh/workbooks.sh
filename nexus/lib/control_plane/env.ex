@@ -18,7 +18,7 @@ defmodule Nexus.ControlPlane.Env do
   alias Nexus.ControlPlane, as: CP
 
   @kind :env
-  @scopes ~w(user workspace package)
+  @scopes ~w(user workspace package nexus)
   @name_re ~r/^[A-Za-z_][A-Za-z0-9_]*$/
 
   @doc "List an org's env records, optionally filtered to a workspace, as REDACTED views (no value)."
@@ -57,6 +57,20 @@ defmodule Nexus.ControlPlane.Env do
 
       {:ok, rec} = CP.put(org, @kind, id, rec)
       {:ok, redacted(rec)}
+    end
+  end
+
+  @doc """
+  Resolve a `nexus`-scoped secret by NAME for `org` and decrypt it — the seam `Nexus.Secrets` reads
+  so a value set in the dashboard actually reaches the runtime. `{:ok, value} | {:error, :not_found}`
+  (or a crypto/`:no_master_key` error from `unseal`).
+  """
+  def value(org, name) when is_binary(org) and is_binary(name) do
+    CP.list(org, @kind)
+    |> Enum.find(fn r -> r[:scope] == "nexus" and r[:name] == name end)
+    |> case do
+      nil -> {:error, :not_found}
+      rec -> unseal(rec)
     end
   end
 

@@ -136,6 +136,9 @@
       deleteWorkspace(id){ return plat('/workspaces/' + id, { method: 'DELETE' }); },
       async listEnv(workspace){ try { return (await plat('/env?workspace=' + encodeURIComponent(workspace))).env; } catch (e) { return []; } },
       createEnv(workspace, o){ return plat('/env', { method: 'POST', body: { name: o.name, value: o.value, scope: 'workspace', workspace_id: workspace } }); },
+      // Nexus-wide secrets — the editable store Nexus.Secrets reads (store-first, env fallback).
+      async listNexusEnv(){ try { return (await plat('/env?scope=nexus')).env; } catch (e) { return []; } },
+      createNexusEnv(o){ return plat('/env', { method: 'POST', body: { name: o.name, value: o.value, scope: 'nexus' } }); },
       async revealEnv(id){ return (await plat('/env/' + id + '/reveal')).value; },
       updateEnv(id, attrs){ return plat('/env/' + id, { method: 'PATCH', body: attrs }); },
       deleteEnv(id){ return plat('/env/' + id, { method: 'DELETE' }); },

@@ -320,8 +320,11 @@ defmodule Nexus.Platform do
   # REDACTED — the plaintext only ever leaves via the explicit /reveal action. A missing master key
   # fails closed → 503 (values are never stored unencrypted), surfaced by `env_fail`.
   get "/env" do
-    ws = fetch_query_params(conn).query_params["workspace"]
-    j(conn, 200, %{env: Env.list(org(conn), blank_to_nil(ws))})
+    q = fetch_query_params(conn).query_params
+    scope = blank_to_nil(q["scope"])
+    env = Env.list(org(conn), blank_to_nil(q["workspace"]))
+    env = if scope, do: Enum.filter(env, &(&1.scope == scope)), else: env
+    j(conn, 200, %{env: env})
   end
 
   post "/env" do
