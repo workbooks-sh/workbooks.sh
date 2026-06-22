@@ -89,6 +89,26 @@ overlay model already in `Nexus.Server` + jj). No extra deployments. See [[one-n
 - **autopoet (headless)** — works on a dev overlay, opens a **PR with a diff**; you review in
   chat/Studio and promote. Never auto-touches prod.
 
+## 5b — Live transport: SSE today, WebSockets next (wb-a4sw)
+
+The runtime ALREADY anticipates this — `Nexus.Rcp` advertises `transports: %{http: true, ws: false}`,
+a wired-in slot to flip on. So WebSockets are the planned next transport on the existing `Nexus.Live`
+channel, not a rewrite.
+
+- **Where WS wins (build it):** the CLIENT↔nexus live channel. SSE already streams run output one-way;
+  WS adds the BIDIRECTIONAL half — mid-run **steering/interrupt**, **HITL approve-in-stream**, presence,
+  multi-stage progress, and the live view of agents/sub-agents working. This subsumes wb-scmk (stream
+  runs over the WS channel; CLI + Studio both consume it). The "correct synchronous run" becomes a live
+  WS session that blocks until done and can be steered.
+- **Where WS is NOT the answer:** (a) agent↔agent WITHIN one nexus = BEAM processes + `Nexus.Events`
+  (faster than a socket, already there); WS is the NETWORK-boundary transport (client↔nexus, nexus↔nexus).
+  (b) nexus↔MODEL — keep HTTP completions. **DECISION (wb-a9qa):** don't adopt OpenAI's WebSocket
+  Realtime API for the text brain — it's voice-oriented + OpenAI-only, and CF-AI-Gateway compat is
+  questionable; our agents run GLM via the gateway (HTTP). Revisit Realtime only for VOICE agents.
+- **Sub-agents on a shared workspace (wb-7dbx):** the same jj substrate — each sub-agent its own
+  worktree (`workspace_add`), snapshot/tag baselines, merge via `integrate` (CRDT) — with the human
+  watching live over the WS channel. Intra-workspace concurrency = eval-isolation primitives reused.
+
 ## 6 — Open questions (do NOT lose these)
 
 - Tree-level snapshot/restore shape (per-workspace op-ids + workspace-set diff) — §2 open.
