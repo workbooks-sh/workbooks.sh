@@ -1192,7 +1192,15 @@ server :cloud do
     end
   end
 
-  defp user_key(req), do: server_uid(req) || (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
+  # Attribution key for runs/tasks/schedules. The SERVER-derived uid wins; in a multi-tenant deploy the
+  # client `u` fallback is DROPPED (fix wb-q7w5) so an unauthenticated caller is "anon", never a claimed
+  # victim — no run/task can be attributed to someone else. Single-tenant/dev keeps `u` for convenience.
+  defp user_key(req) do
+    server_uid(req) ||
+      if Nexus.Auth.multi?(),
+        do: "anon",
+        else: (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
+  end
   defp sessions_for(tenant, user), do: Map.get(:persistent_term.get(@agent_store, %{}), {tenant, user}, [])
 
   defp save_sessions(tenant, user, list) do
