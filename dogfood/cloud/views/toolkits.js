@@ -161,37 +161,85 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
   function tkTheme(id){ return TK_THEME[id] || { color:'var(--dim)', bg:'var(--line)', icon: WB.ICO_TOOLBOX || '' }; }
 
   // ── render ──────────────────────────────────────────────────────────────────────────────────
-  // An INTEGRATION card: logo, name, blurb. Connected = green dot + "Add account"; the connected
-  // accounts themselves live in the sidebar (not listed inline here). "needs setup" when no OAuth app.
-  function providerCard(p){
-    var on = (p.accounts || []).length > 0;
-    var soon = p.status !== 'ready';
-    return '<div class="tkcard' + (on ? ' on' : '') + (soon ? ' soon' : '') + '">' +
-      '<div class="tktop"><span class="tkchip"><img class="tklogo" src="' + esc(logo(p.id)) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.textContent=this.parentNode.getAttribute(\'data-i\')" data-i="' + esc((p.name || '?').slice(0,1).toUpperCase()) + '"></span>' +
-        '<span class="tkname">' + esc(p.name) + '</span>' +
-        (soon ? '<span class="tkpill soon">Coming soon</span>' : (on ? '<span class="tkdot" title="Connected"></span>' : '')) + '</div>' +
-      '<p class="tkblurb">' + esc(p.blurb || '') + '</p>' +
-      (soon ? '' : '<button class="tkbtn' + (on ? ' add' : '') + '" data-conn="' + esc(p.id) + '">' + (on ? '+ Add account' : 'Connect') + '</button>') +
-    '</div>';
+  // The chip (logo for an integration, themed pastel glyph for a built-in toolkit). Shared by card + modal.
+  function chipHTML(it, big){
+    var cls = 'tkchip' + (big ? ' big' : '');
+    if (it.kind === 'standalone'){
+      var th = tkTheme(it.id);
+      return '<span class="' + cls + ' tint" style="background:' + th.bg + ';color:' + th.color + '">' + th.icon + '</span>';
+    }
+    return '<span class="' + cls + '"><img class="tklogo" src="' + esc(logo(it.id)) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.textContent=this.parentNode.getAttribute(\'data-i\')" data-i="' + esc((it.name || '?').slice(0,1).toUpperCase()) + '"></span>';
   }
 
-  // A built-in TOOLKIT card: pastel themed icon, name, blurb, and an enable/disable toggle (default-added).
-  function toolkitCard(t){
-    var soon = t.status !== 'ready';
-    var on = t.enabled !== false;
-    var th = tkTheme(t.id);
-    return '<div class="tkcard' + (on && !soon ? ' on' : '') + (soon ? ' soon' : '') + '">' +
-      '<div class="tktop"><span class="tkchip tint" style="background:' + th.bg + ';color:' + th.color + '">' + th.icon + '</span>' +
-        '<span class="tkname">' + esc(t.name) + '</span>' +
-        (soon ? '<span class="tkpill soon">Coming soon</span>' : (on ? '<span class="tkdot" title="Enabled"></span>' : '')) + '</div>' +
-      '<p class="tkblurb">' + esc(t.blurb || '') + '</p>' +
-      (soon ? '' : '<button class="tkbtn' + (on ? ' add' : '') + '" data-toggle="' + esc(t.id) + '">' + (on ? 'Disable' : 'Add') + '</button>') +
+  // The label + dataset for an item's primary action, by kind/state.
+  function actionFor(it){
+    var soon = it.status !== 'ready';
+    if (soon) return { soon: true };
+    if (it.kind === 'standalone'){
+      var on = it.enabled !== false;
+      return { kind: 'toggle', id: it.id, label: on ? 'Disable' : 'Add', add: on };
+    }
+    var has = (it.accounts || []).length > 0;
+    return { kind: 'conn', id: it.id, label: has ? '+ Add account' : 'Connect', add: has };
+  }
+
+  function actionBtn(it){
+    var a = actionFor(it);
+    if (a.soon) return '';
+    var ds = a.kind === 'toggle' ? 'data-toggle="' + esc(a.id) + '"' : 'data-conn="' + esc(a.id) + '"';
+    return '<button class="tkbtn' + (a.add ? ' add' : '') + '" ' + ds + '>' + a.label + '</button>';
+  }
+
+  // A card (integration or toolkit). The whole card is clickable → Learn-more modal; the action button
+  // acts directly (stops propagation).
+  function card(it){
+    var soon = it.status !== 'ready';
+    var on = it.kind === 'standalone' ? (it.enabled !== false && !soon) : ((it.accounts || []).length > 0);
+    return '<div class="tkcard clickable' + (on ? ' on' : '') + (soon ? ' soon' : '') + '" data-info="' + esc(it.id) + '">' +
+      '<div class="tktop">' + chipHTML(it) +
+        '<span class="tkname">' + esc(it.name) + '</span>' +
+        (soon ? '<span class="tkpill soon">Coming soon</span>' : (on ? '<span class="tkdot" title="Active"></span>' : '')) + '</div>' +
+      '<p class="tkblurb">' + esc(it.blurb || '') + '</p>' +
+      actionBtn(it) +
     '</div>';
   }
 
   async function toggleToolkit(id){
     try { await send('/cloud/toolkits/' + encodeURIComponent(id) + '/toggle', 'POST'); paint(); }
     catch (e) { WB.toast(String(e)); }
+  }
+
+  function act(it){
+    var a = actionFor(it);
+    if (a.kind === 'toggle') return toggleToolkit(a.id);
+    if (a.kind === 'conn') return connect(it);
+  }
+
+  // Learn-more modal — bigger chip, full description, status, and the same primary action.
+  function infoModal(it){
+    var soon = it.status !== 'ready';
+    var a = actionFor(it);
+    var modal = document.createElement('div'); modal.className = 'modal';
+    modal.innerHTML =
+      '<div class="sheet tkinfo" style="width:520px">' +
+        '<div class="tkinfohd">' + chipHTML(it, true) +
+          '<div><h2 style="margin:0">' + esc(it.name) + '</h2>' +
+            '<div class="tkinfosub">' + (it.kind === 'standalone' ? 'Built-in toolkit' : 'Integration') +
+              (soon ? ' · Coming soon' : '') + '</div></div></div>' +
+        '<p class="tkinfobody">' + esc(it.detail || it.blurb || '') + '</p>' +
+        '<div class="foot"><span></span><div style="display:flex;gap:8px">' +
+          '<button class="btn" data-x="0">Close</button>' +
+          (soon ? '<button class="btn" disabled>Coming soon</button>'
+                : '<button class="btn primary" data-act="1">' + esc(a.label.replace(/^\+ /, '')) + '</button>') +
+        '</div></div>' +
+      '</div>';
+    function done(){ modal.remove(); }
+    modal.addEventListener('click', function(e){
+      if (e.target === modal) return done();
+      if (e.target.closest('[data-x]')) return done();
+      if (e.target.closest('[data-act]')){ done(); act(it); }
+    });
+    document.body.appendChild(modal);
   }
 
   async function paint(){
@@ -203,14 +251,15 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
         '<div class="tkhd"><h1 class="tktitle">Toolkits</h1>' +
           '<p class="tksub">Capabilities your agents and apps use. <b>Integrations</b> connect an external account (credentials seal as secrets). <b>Toolkits</b> are built-in — no account needed.</p></div>' +
         '<div class="tkgroup"><span class="tkgrouptt">Integrations</span><span class="tkgroupct">' + providers.length + '</span></div>' +
-        '<div class="tkgrid">' + providers.map(providerCard).join('') + '</div>' +
+        '<div class="tkgrid">' + providers.map(card).join('') + '</div>' +
         '<div class="tkgroup"><span class="tkgrouptt">Toolkits</span><span class="tkgroupct">' + standalone.length + '</span></div>' +
-        '<div class="tkgrid">' + standalone.map(toolkitCard).join('') + '</div>' +
+        '<div class="tkgrid">' + standalone.map(card).join('') + '</div>' +
       '</section>';
 
-    var byId = {}; providers.forEach(function(p){ byId[p.id] = p; });
-    el.querySelectorAll('[data-conn]').forEach(function(b){ b.onclick = function(){ connect(byId[b.getAttribute('data-conn')]); }; });
-    el.querySelectorAll('[data-toggle]').forEach(function(b){ b.onclick = function(){ toggleToolkit(b.getAttribute('data-toggle')); }; });
+    var byId = {}; all.forEach(function(it){ byId[it.id] = it; });
+    el.querySelectorAll('[data-conn]').forEach(function(b){ b.onclick = function(e){ e.stopPropagation(); connect(byId[b.getAttribute('data-conn')]); }; });
+    el.querySelectorAll('[data-toggle]').forEach(function(b){ b.onclick = function(e){ e.stopPropagation(); toggleToolkit(b.getAttribute('data-toggle')); }; });
+    el.querySelectorAll('[data-info]').forEach(function(c){ c.onclick = function(){ infoModal(byId[c.getAttribute('data-info')]); }; });
   }
   paint();
 }});
@@ -219,27 +268,20 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
 WB.ICO_TOOLBOX = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13h20v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M2.5 13 4.6 7.8A2 2 0 0 1 6.45 6.5h11.1a2 2 0 0 1 1.85 1.3L21.5 13"/><path d="M9 6.5V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1.5"/><path d="M2 13h6v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2h6"/></svg>';
 
 WB.scopedStyles('/toolkits', `
-.tk { max-width: 920px; }
+.tk { max-width: 1120px; }
 .tkhd { margin-bottom: 18px; }
 .tktitle { font: 700 26px var(--read); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
-.tksub { font: 500 13px var(--read); color: var(--dim); margin: 4px 0 0; max-width: 620px; line-height: 1.5; }
-.tkgroup { display: flex; align-items: center; gap: 8px; margin: 22px 0 10px; }
+.tksub { font: 500 13px var(--read); color: var(--dim); margin: 4px 0 0; max-width: 640px; line-height: 1.5; }
+.tkgroup { display: flex; align-items: center; gap: 8px; margin: 26px 0 12px; }
 .tkgrouptt { font: 700 11px var(--read); letter-spacing: .07em; text-transform: uppercase; color: var(--dim); }
 .tkgroupct { font: 600 11px var(--mono, monospace); color: var(--dim); background: var(--line); border-radius: 20px; padding: 1px 8px; }
-.tkgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-.tkcard { display: flex; flex-direction: column; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; transition: border-color .12s; }
-.tkcard:hover { border-color: var(--stroke); }
+.tkgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(264px, 1fr)); gap: 14px; }
+.tkcard { display: flex; flex-direction: column; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; transition: border-color .12s, transform .08s, box-shadow .12s; }
+.tkcard.clickable { cursor: pointer; }
+.tkcard.clickable:hover { border-color: var(--stroke); transform: translateY(-2px); box-shadow: var(--soft-1, 0 4px 14px rgba(0,0,0,.18)); }
 .tkcard.on { border-color: color-mix(in srgb, var(--live) 50%, var(--line)); }
 .tkcard.soon { opacity: .72; }
 .tktop { display: flex; align-items: center; gap: 10px; }
-/* App-icon chip: a light rounded tile behind every logo so real brand colors (even dark ones) pop on
-   the dark card. Provider chips hold the full-color logo; standalone chips hold the toolbox glyph. */
-.tkchip { width: 32px; height: 32px; border-radius: 8px; flex: none; display: grid; place-items: center;
-  background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0,0,0,.18);
-  font: 700 14px var(--read); color: #333; overflow: hidden; }
-.tkchip.glyph { background: var(--line); border-color: transparent; color: var(--dim); box-shadow: none; }
-.tkchip.tint { border-color: transparent; box-shadow: none; }
-.tklogo { width: 20px; height: 20px; object-fit: contain; }
 .tkname { font: 600 15px var(--read); color: var(--ink); }
 .tkpill { margin-left: auto; font: 600 10px var(--read); text-transform: uppercase; letter-spacing: .04em; border-radius: 20px; padding: 2px 8px; }
 .tkpill.soon { color: var(--dim); background: var(--line); }
@@ -260,6 +302,19 @@ WB.scopedStyles('/toolkits', `
 // The Google connect modal mounts on document.body — OUTSIDE the route's [data-view] scope — so its
 // styles MUST be global (scopedStyles would prefix them with [data-view="/toolkits"] and never match).
 WB.styles(`
+/* Chip styles are GLOBAL — used on cards (inside the view) AND in the Learn-more modal (on body). */
+.tkchip { width: 32px; height: 32px; border-radius: 8px; flex: none; display: grid; place-items: center;
+  background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0,0,0,.18); font: 700 14px var(--read); color: #333; overflow: hidden; }
+.tkchip.glyph { background: var(--line); border-color: transparent; color: var(--dim); box-shadow: none; }
+.tkchip.tint { border-color: transparent; box-shadow: none; }
+.tkchip.big { width: 44px; height: 44px; border-radius: 11px; }
+.tkchip.big .tklogo { width: 26px; height: 26px; }
+.tkchip.big svg { width: 24px; height: 24px; }
+.tklogo { width: 20px; height: 20px; object-fit: contain; }
+/* Learn-more modal */
+.tkinfohd { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.tkinfosub { font: 600 11px var(--read); text-transform: uppercase; letter-spacing: .05em; color: var(--dim); margin-top: 3px; }
+.tkinfobody { font: 500 14px var(--read); color: var(--prose, var(--ink)); line-height: 1.55; margin: 0; }
 .sheet.gw { max-height: 88vh; overflow: auto; }
 .sheet.gw .sub { margin-bottom: 6px; }
 .gwstep { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }

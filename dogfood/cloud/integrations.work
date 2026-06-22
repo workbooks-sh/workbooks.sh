@@ -82,7 +82,24 @@ server :integrations do
         field: "API key", hint: "key_id:key_secret"},
       %{id: "openrouter", name: "OpenRouter", group: "AI", mode: :api_key,
         blurb: "One API across 300+ LLMs — routing, fallbacks, and price/perf control.",
-        field: "API key", hint: "sk-or-…"}
+        field: "API key", hint: "sk-or-…"},
+      # Roadmap integrations — shown as "Coming soon" until their capability is wired (soon: true).
+      %{id: "asana", name: "Asana", group: "Project", mode: :oauth2, soon: true,
+        blurb: "Mirror an Asana project into the nexus — query tasks and (gated) write back.",
+        detail: "Federates Asana tasks into the nexus as first-class task nodes: agents query the project, plan against it, and write updates back behind an approval gate. One connection per Asana workspace.",
+        authorize_url: "https://app.asana.com/-/oauth_authorize",
+        token_url: "https://app.asana.com/-/oauth_token",
+        scopes: "default", scope_sep: " ", auth_params: %{}},
+      %{id: "linear", name: "Linear", group: "Project", mode: :oauth2, soon: true,
+        blurb: "Mirror a Linear project into the nexus — query issues and (gated) write back.",
+        detail: "Federates Linear issues into the nexus: agents read cycles + issues, plan against them, and post updates back behind an approval gate. Connect a Linear workspace.",
+        authorize_url: "https://linear.app/oauth/authorize",
+        token_url: "https://api.linear.app/oauth/token",
+        scopes: "read,write", scope_sep: ",", auth_params: %{"prompt" => "consent"}},
+      %{id: "cloudflare", name: "Cloudflare", group: "Infra", mode: :api_key, soon: true,
+        blurb: "Deploy to Cloudflare — D1, Workers AI, Pages — on your own account (includes Wrangler).",
+        detail: "An all-Cloudflare backend for a forged workbook: D1 database, Workers AI, and Pages hosting on the customer's own account. Bundles the Wrangler CLI for deploys. Connect with a scoped API token.",
+        field: "API token", hint: "scoped account token"}
     ]
   end
 
@@ -94,9 +111,11 @@ server :integrations do
   def standalone_catalog do
     [
       %{id: "presentation", name: "Presentation", status: "ready", default: true,
-        blurb: "Build reveal.js decks straight from your content."},
+        blurb: "Build reveal.js decks straight from your content.",
+        detail: "Ask an agent for a presentation and get a real reveal.js deck — arrow-key nav, fullscreen, per-slide URLs — not a scroll page. Authored from a deck spec or an Org workbook; ships as one self-contained HTML."},
       %{id: "video", name: "Video", status: "ready", default: true,
-        blurb: "In-nexus HTML → video rendering for motion graphics. No external tooling."}
+        blurb: "In-nexus HTML → video rendering for motion graphics. No external tooling.",
+        detail: "Ask for a video and get HyperFrames — author a scene (onReady/onTick on a fixed canvas) and the nexus renders it to a clip. No external tooling or accounts."}
     ]
   end
 
@@ -135,14 +154,14 @@ server :integrations do
           |> Enum.filter(&(&1[:provider] == p.id))
           |> Enum.map(&%{id: &1[:id], label: &1[:label], status: &1[:status] || "connected"})
 
-        ready = configured?(p)
+        ready = configured?(p) and not Map.get(p, :soon, false)
 
         p
-        |> Map.take([:id, :name, :group, :blurb, :field, :hint])
+        |> Map.take([:id, :name, :group, :blurb, :detail, :field, :hint])
         |> Map.merge(%{
           kind: "provider",
           mode: Atom.to_string(p.mode),
-          configured: ready,
+          configured: configured?(p),
           status: if(ready, do: "ready", else: "soon"),
           accounts: accounts
         })
