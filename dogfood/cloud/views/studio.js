@@ -27,7 +27,7 @@ WB.scopedStyles('/usage', `
 // Activity (toggle the collapsible activity/sessions drawer). Custom tooltips on hover. The rail is the
 // seam for future agent surfaces (issues an agent files, etc.). "Create" is the + (new chat) action here.
 WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, async render(el){
-  // The Studio is now JUST the full-bleed chat — sessions + projects live in the left SIDEBAR (app.js),
+  // The Studio is now JUST the full-bleed chat — sessions + spaces live in the left SIDEBAR (app.js),
   // and the agent is chosen from the composer's agent selector (only at the start of a new session).
   // The old top nav (New task | Agents | Sessions) is gone — the sidebar already owns all of it. No
   // solid-js needed anymore (no reactive nav/panels), so we drop those imports too.
@@ -65,11 +65,11 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   var tkOn = {}; TK.forEach(function(t){ if (t && t.kind === 'standalone') tkOn[t.id] = t.enabled !== false; });
   var AGENTS = AG.filter(function(a){ return !a.toolkit || tkOn[a.toolkit] !== false; });
 
-  // Session/project state (the sidebar sets WB._pending* before routing here). Agent + project are pinned
+  // Session/space state (the sidebar sets WB._pending* before routing here). Agent + space are pinned
   // for a session's life — captured on the first turn, sent with every turn so the server stores them.
   var curSession = WB._pendingSession || null;
-  var curProject = WB._pendingProject || null;
-  WB._pendingSession = null; WB._pendingProject = null;
+  var curSpace = WB._pendingSpace || null;
+  WB._pendingSession = null; WB._pendingSpace = null;
 
   function agentName(a){ return a && (a.name || a) || null; }
 
@@ -86,7 +86,7 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
     send: function(text, ctx){
       return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({
         u: U, id: curSession, message: text,
-        model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), project: curProject
+        model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), space: curSpace
       }) }).then(function(d){
         if (d && d.id) { curSession = d.id; if (WB._paintStudio) { WB.cache.set('agent-sessions', null); WB._paintStudio(); } }
         return (d && d.reply) || '(no reply)';
@@ -95,13 +95,13 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   });
   if (CDEMO && DEMO.demoMessages) chat.setMessages(DEMO.demoMessages());
 
-  // Open an existing session — load its messages and pin its saved agent + project (the composer locks
+  // Open an existing session — load its messages and pin its saved agent + space (the composer locks
   // the agent once messages are present, so it stays fixed).
   async function openSession(id){
     try {
       var d = await api('/cloud/agent/session?u=' + encodeURIComponent(U) + '&id=' + encodeURIComponent(id));
       if (!d || d.error) return;
-      curSession = id; curProject = d.project || null;
+      curSession = id; curSpace = d.space || null;
       if (d.agent && chat.setAgent) chat.setAgent(d.agent);
       chat.setMessages(d.messages || []);
       chat.focus();
@@ -109,7 +109,7 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   }
   // Hooks the sidebar calls when we're ALREADY on /studio (a re-nav wouldn't re-render the view).
   WB._studioOpen = function(id){ openSession(id); };
-  WB._studioNew = function(project){ curSession = null; curProject = project || null; chat.clear(); chat.focus(); };
+  WB._studioNew = function(space){ curSession = null; curSpace = space || null; chat.clear(); chat.focus(); };
 
   if (curSession) openSession(curSession);
 }});
@@ -117,7 +117,7 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
 WB.view('/create', { title: 'Studio', render(el){ WB.nav('/studio'); } });
 // The studio-shell CSS (.studio / .studio-rail / .studio-railbtn) is GLOBAL in app.css so it's shared
 // by every surface in the shell (Studio chat + Activity feed), keeping the floating rail locked in.
-// Studio is now just the full-bleed chat — sessions/projects + the agent picker live elsewhere (the
+// Studio is now just the full-bleed chat — sessions/spaces + the agent picker live elsewhere (the
 // sidebar + the composer). `.studio-chat` (absolute-inset flex holding the .wb-chat) is GLOBAL in
 // app.css, so no per-view styles are needed here anymore.
 

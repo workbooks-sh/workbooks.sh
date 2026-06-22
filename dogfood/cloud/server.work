@@ -12,10 +12,10 @@ server :cloud do
   route "GET /cloud/agent/sessions", :agent_sessions
   route "GET /cloud/agent/session", :agent_session
   route "POST /cloud/agent/chat", :agent_chat
-  # Projects — a named bucket the user groups Studio sessions under (a session with no project lands in
-  # "General"). Per-{tenant,user}, in-process alongside sessions. The sidebar renders projects as folders.
-  route "GET /cloud/agent/projects", :agent_projects
-  route "POST /cloud/agent/projects", :agent_project_create
+  # Spaces — a named bucket the user groups Studio sessions under (a session with no space lands in
+  # "General"). Per-{tenant,user}, in-process alongside sessions. The sidebar renders spaces as folders.
+  route "GET /cloud/agent/spaces", :agent_spaces
+  route "POST /cloud/agent/spaces", :agent_space_create
 
   # Launch a NAMED agent on a brief and persist a durable Run record. Non-streaming (returns the
   # final answer + run id); the Studio prefers the live SSE source `agent_run` (GET /live/agent_run)
@@ -133,7 +133,7 @@ server :cloud do
   route "GET /cloud/activity", :activity
 
   @agent_store {:cloud_agent_sessions}
-  @projects_store {:cloud_agent_projects}
+  @spaces_store {:cloud_agent_spaces}
 
   def mint_token(req) do
     name = (is_map(req.body) && req.body["name"]) || "cli"
@@ -146,34 +146,34 @@ server :cloud do
     sessions =
       sessions_for(req.tenant, user_key(req))
       |> Enum.map(fn s -> %{id: s.id, title: s.title, updated: s.updated,
-                            project: Map.get(s, :project), agent: Map.get(s, :agent)} end)
+                            space: Map.get(s, :space), agent: Map.get(s, :agent)} end)
 
     %{sessions: sessions}
   end
 
-  # List the user's projects (newest first). The sidebar groups sessions under these folders.
-  def agent_projects(req) do
-    %{projects: projects_for(req.tenant, user_key(req))}
+  # List the user's spaces (newest first). The sidebar groups sessions under these folders.
+  def agent_spaces(req) do
+    %{spaces: spaces_for(req.tenant, user_key(req))}
   end
 
-  # Create a named project (idempotent on name, case-insensitive). Returns the project record.
-  def agent_project_create(req) do
+  # Create a named space (idempotent on name, case-insensitive). Returns the space record.
+  def agent_space_create(req) do
     name = String.trim((is_map(req.body) && req.body["name"]) || "")
 
     if name == "" do
       {400, %{error: "name required"}}
     else
       user = user_key(req)
-      list = projects_for(req.tenant, user)
+      list = spaces_for(req.tenant, user)
 
       case Enum.find(list, &(String.downcase(&1.name) == String.downcase(name))) do
         nil ->
           proj = %{id: gen_id(), name: name, created: System.os_time(:second)}
-          save_projects(req.tenant, user, [proj | list])
-          %{project: proj}
+          save_spaces(req.tenant, user, [proj | list])
+          %{space: proj}
 
         existing ->
-          %{project: existing}
+          %{space: existing}
       end
     end
   end
@@ -181,7 +181,7 @@ server :cloud do
   def agent_session(req) do
     case Enum.find(sessions_for(req.tenant, user_key(req)), &(&1.id == (req.query["id"] || ""))) do
       nil -> {404, %{error: "not found"}}
-      s -> %{id: s.id, title: s.title, messages: s.messages, project: Map.get(s, :project), agent: Map.get(s, :agent)}
+      s -> %{id: s.id, title: s.title, messages: s.messages, space: Map.get(s, :space), agent: Map.get(s, :agent)}
     end
   end
 
@@ -262,16 +262,16 @@ server :cloud do
     id = is_map(req.body) && req.body["id"]
     model = is_map(req.body) && req.body["model"]
     agent = is_map(req.body) && req.body["agent"]
-    project = is_map(req.body) && req.body["project"]
+    space = is_map(req.body) && req.body["space"]
     sessions = sessions_for(req.tenant, user)
     {match, rest} = Enum.split_with(sessions, &(&1.id == id))
 
     session =
       case match do
         [s] -> s
-        # New session: capture the chosen agent + project — both are fixed for the session's life
+        # New session: capture the chosen agent + space — both are fixed for the session's life
         # (the composer locks the agent selector once a session has any messages).
-        _ -> %{id: gen_id(), title: title_from(msg), messages: [], updated: 0, agent: agent, project: project}
+        _ -> %{id: gen_id(), title: title_from(msg), messages: [], updated: 0, agent: agent, space: space}
       end
 
     # Run via the session's pinned agent (existing session) or the just-chosen one (new session). Model
@@ -819,11 +819,11 @@ server :cloud do
     :persistent_term.put(@agent_store, Map.put(all, {tenant, user}, Enum.sort_by(list, & &1.updated, :desc)))
   end
 
-  defp projects_for(tenant, user), do: Map.get(:persistent_term.get(@projects_store, %{}), {tenant, user}, [])
+  defp spaces_for(tenant, user), do: Map.get(:persistent_term.get(@spaces_store, %{}), {tenant, user}, [])
 
-  defp save_projects(tenant, user, list) do
-    all = :persistent_term.get(@projects_store, %{})
-    :persistent_term.put(@projects_store, Map.put(all, {tenant, user}, Enum.sort_by(list, & &1.created, :desc)))
+  defp save_spaces(tenant, user, list) do
+    all = :persistent_term.get(@spaces_store, %{})
+    :persistent_term.put(@spaces_store, Map.put(all, {tenant, user}, Enum.sort_by(list, & &1.created, :desc)))
   end
 
   defp gen_id, do: Base.url_encode64(:crypto.strong_rand_bytes(9), padding: false)

@@ -153,15 +153,15 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
   border:1px solid var(--line); background:var(--card); color:var(--ink); font:600 13.5px var(--read); cursor:pointer; }
 .newsess:hover{ border-color:var(--stroke); }
 .newsess .nsico{ display:grid; place-items:center; } .newsess .nsico svg{ width:15px; height:15px; }
-/* New session + New project — stacked, full-width, IDENTICAL primary buttons at the top of the sidebar. */
+/* New session + New space — stacked, full-width, IDENTICAL primary buttons at the top of the sidebar. */
 .studioacts{ display:flex; flex-direction:column; gap:6px; margin:2px 4px 8px; }
-.studioacts .newsess, .studioacts .newproj{ margin:0; width:100%; justify-content:center; gap:8px; }
-/* New project inherits the exact New session look (solid primary), just a different icon. */
-.newproj{ display:flex; align-items:center; padding:9px 11px; border-radius:10px;
+.studioacts .newsess, .studioacts .newspace{ margin:0; width:100%; justify-content:center; gap:8px; }
+/* New space inherits the exact New session look (solid primary), just a different icon. */
+.newspace{ display:flex; align-items:center; padding:9px 11px; border-radius:10px;
   border:1px solid var(--line); background:var(--card); color:var(--ink); font:600 13.5px var(--read); cursor:pointer; white-space:nowrap; }
-.newproj:hover{ border-color:var(--stroke); }
-.newproj .nsico{ display:grid; place-items:center; } .newproj .nsico svg{ width:15px; height:15px; }
-/* Project folder group header — folder icon + name + inline "new session here" (+). */
+.newspace:hover{ border-color:var(--stroke); }
+.newspace .nsico{ display:grid; place-items:center; } .newspace .nsico svg{ width:15px; height:15px; }
+/* Space folder group header — folder icon + name + inline "new session here" (+). */
 .sgrp.sgrpf{ display:flex; align-items:center; gap:7px; padding:10px 8px 5px; text-transform:none; letter-spacing:0; font:700 11.5px var(--read); color:var(--ink); }
 .sgrp.sgrpf .sgrpic{ display:grid; place-items:center; color:var(--dim); } .sgrp.sgrpf .sgrpic svg{ width:14px; height:14px; }
 .sgrp.sgrpf .sgrptt{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

@@ -850,36 +850,36 @@
         }
       });
     }
-    // Studio sidebar — sessions GROUPED BY PROJECT (folders) under a "General" group (project-less
+    // Studio sidebar — sessions GROUPED BY SPACE (folders) under a "General" group (space-less
     // sessions). Each session row carries its agent's pastel dot. Lazy + stale-while-revalidate, painted
-    // in place so opening Studio doesn't block on the fetch. New-session-in-project is the + on a folder.
+    // in place so opening Studio doesn't block on the fetch. New-session-in-space is the + on a folder.
     function studioSessRow(s){
       var th = (WB.AGENT_THEME && s.agent) ? WB.AGENT_THEME[s.agent] : null;
       var dot = th ? '<span class="sdot" style="background:' + th.color + '" title="' + esc(s.agent) + '"></span>' : '<span class="semoji">💬</span>';
-      return '<a class="srow" data-ctx="session" data-nav="/studio" href="#/studio" data-session="' + esc(s.id) + '" data-project="' + esc(s.project || '') + '" title="' + esc(s.title || 'Session') + '">' +
+      return '<a class="srow" data-ctx="session" data-nav="/studio" href="#/studio" data-session="' + esc(s.id) + '" data-space="' + esc(s.space || '') + '" title="' + esc(s.title || 'Session') + '">' +
         dot + '<span class="sname">' + esc(s.title || 'Untitled session') + '</span></a>';
     }
-    // group: projectName === null → the General (project-less) group, no folder chrome; else a folder.
-    function studioSessGroup(name, list, projectName){
-      if (projectName === null && (!list || list.length === 0)) return '';   // hide an empty General group
-      var head = '<div class="sgrp' + (projectName !== null ? ' sgrpf' : '') + '">' +
-        (projectName !== null ? '<span class="sgrpic">' + ICO.folder + '</span>' : '') +
+    // group: spaceName === null → the General (space-less) group, no folder chrome; else a folder.
+    function studioSessGroup(name, list, spaceName){
+      if (spaceName === null && (!list || list.length === 0)) return '';   // hide an empty General group
+      var head = '<div class="sgrp' + (spaceName !== null ? ' sgrpf' : '') + '">' +
+        (spaceName !== null ? '<span class="sgrpic">' + ICO.folder + '</span>' : '') +
         '<span class="sgrptt">' + esc(name) + '</span>' +
-        (projectName !== null ? '<button class="sgrpadd" data-newsession data-project="' + esc(projectName) + '" title="New session in ' + esc(name) + '">' + ICO.plus + '</button>' : '') +
+        (spaceName !== null ? '<button class="sgrpadd" data-newsession data-space="' + esc(spaceName) + '" title="New session in ' + esc(name) + '">' + ICO.plus + '</button>' : '') +
         '</div>';
       var rows = (list && list.length) ? list.map(studioSessRow).join('')
-        : (projectName !== null ? '<div class="treemsg" style="padding:2px 10px 6px 26px">No sessions yet</div>' : '');
+        : (spaceName !== null ? '<div class="treemsg" style="padding:2px 10px 6px 26px">No sessions yet</div>' : '');
       return head + rows;
     }
     function paintStudioSide(){
       var el = document.getElementById('studioSide'); if (!el) return;
       var sessions = WB._studioSessions || [];
-      var projects = WB._studioProjects || [];
-      var byProj = {}; sessions.forEach(function(s){ var k = s.project || ''; (byProj[k] = byProj[k] || []).push(s); });
-      var html = studioSessGroup('General', byProj[''] || [], null);
-      projects.forEach(function(p){ html += studioSessGroup(p.name, byProj[p.name] || [], p.name); });
-      // a session tagged to a project no longer in the list still gets a folder so nothing's lost
-      Object.keys(byProj).forEach(function(k){ if (k && !projects.some(function(p){ return p.name === k; })) html += studioSessGroup(k, byProj[k], k); });
+      var spaces = WB._studioSpaces || [];
+      var bySpace = {}; sessions.forEach(function(s){ var k = s.space || ''; (bySpace[k] = bySpace[k] || []).push(s); });
+      var html = studioSessGroup('General', bySpace[''] || [], null);
+      spaces.forEach(function(p){ html += studioSessGroup(p.name, bySpace[p.name] || [], p.name); });
+      // a session tagged to a space no longer in the list still gets a folder so nothing's lost
+      Object.keys(bySpace).forEach(function(k){ if (k && !spaces.some(function(p){ return p.name === k; })) html += studioSessGroup(k, bySpace[k], k); });
       el.innerHTML = html || '<div class="treemsg" style="padding:6px 10px">No sessions yet</div>';
     }
     function paintStudio(){
@@ -887,8 +887,8 @@
       WB.swr('agent-sessions', function(){ return fetch('/cloud/agent/sessions', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
         WB._studioSessions = (d && d.sessions) || []; paintStudioSide();
       });
-      WB.swr('agent-projects', function(){ return fetch('/cloud/agent/projects', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
-        WB._studioProjects = (d && d.projects) || []; paintStudioSide();
+      WB.swr('agent-spaces', function(){ return fetch('/cloud/agent/spaces', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
+        WB._studioSpaces = (d && d.spaces) || []; paintStudioSide();
       });
     }
     WB._paintStudio = paintStudio;
@@ -1062,11 +1062,11 @@
       var sideBody;
       if (section === 'files') sideBody = '<div class="wsgroups">' + wslist + '</div>';
       else if (section === 'apps') sideBody = '<div class="appsgrid" id="appsGrid"><div class="treemsg" style="padding:8px 4px">Loading apps…</div></div>';
-      // Studio — New session + New project, then sessions grouped by project (lazy-painted into #studioSide).
+      // Studio — New session + New space, then sessions grouped by space (lazy-painted into #studioSide).
       else if (section === 'studio') sideBody =
           '<div class="studioacts">' +
             '<button class="newsess" data-newsession><span class="nsico">' + ICO.plus + '</span>New session</button>' +
-            '<button class="newproj" data-newproject title="New project"><span class="nsico">' + ICO.newfolderplus + '</span>New project</button>' +
+            '<button class="newspace" data-newspace title="New space"><span class="nsico">' + ICO.newfolderplus + '</span>New space</button>' +
           '</div>' +
           '<div id="studioSide"><div class="treemsg" style="padding:8px 4px">Loading sessions…</div></div>';
       // Activity — the inbox lives in the sidebar; the page shows the selected event's context (lazy → #activityInbox).
@@ -1213,23 +1213,23 @@
       var openApp = t.closest && t.closest('[data-open-app]');
       if (openApp) { e.preventDefault(); var an = openApp.getAttribute('data-open-app');
         WB._app = (WB._appReg && WB._appReg[an]) || null; WB.nav('/app/' + encodeURIComponent(an)); return; }
-      // ── Studio sidebar: set pending session/project, then route. When already on /studio the view's
+      // ── Studio sidebar: set pending session/space, then route. When already on /studio the view's
       // hooks (WB._studioOpen / WB._studioNew) apply it in place (a data-nav re-nav wouldn't re-render).
       var onStudio = (location.hash || '').indexOf('/studio') >= 0;   // hooks are only live while mounted
       var ssRow = t.closest && t.closest('[data-session]');
-      if (ssRow) { e.preventDefault(); WB._pendingSession = ssRow.getAttribute('data-session'); WB._pendingProject = ssRow.getAttribute('data-project') || null;
+      if (ssRow) { e.preventDefault(); WB._pendingSession = ssRow.getAttribute('data-session'); WB._pendingSpace = ssRow.getAttribute('data-space') || null;
         if (onStudio && WB._studioOpen) WB._studioOpen(WB._pendingSession); else WB.nav('/studio'); return; }
       var nsBtn = t.closest && t.closest('[data-newsession]');
-      if (nsBtn) { e.preventDefault(); WB._pendingSession = null; WB._pendingProject = nsBtn.getAttribute('data-project') || null;
-        if (onStudio && WB._studioNew) WB._studioNew(WB._pendingProject); else WB.nav('/studio'); return; }
-      var npBtn = t.closest && t.closest('[data-newproject]');
+      if (nsBtn) { e.preventDefault(); WB._pendingSession = null; WB._pendingSpace = nsBtn.getAttribute('data-space') || null;
+        if (onStudio && WB._studioNew) WB._studioNew(WB._pendingSpace); else WB.nav('/studio'); return; }
+      var npBtn = t.closest && t.closest('[data-newspace]');
       if (npBtn) { e.preventDefault();
-        Promise.resolve(WB.prompt({ title: 'New project', placeholder: 'Project name', confirm: 'Create' })).then(function(nm){
+        Promise.resolve(WB.prompt({ title: 'New space', placeholder: 'Space name', confirm: 'Create' })).then(function(nm){
           nm = (nm || '').trim(); if (!nm) return;
-          fetch('/cloud/agent/projects', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: nm }) })
+          fetch('/cloud/agent/spaces', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: nm }) })
             .then(function(r){ return r.json(); })
-            .then(function(d){ if (d && d.project) { WB.toast('Project “' + nm + '” created'); WB.cache.set('agent-projects', null); if (WB._paintStudio) WB._paintStudio(); } else WB.toast((d && d.error) || 'Couldn’t create project', 'bad'); })
-            .catch(function(){ WB.toast('Couldn’t create project', 'bad'); });
+            .then(function(d){ if (d && d.space) { WB.toast('Space “' + nm + '” created'); WB.cache.set('agent-spaces', null); if (WB._paintStudio) WB._paintStudio(); } else WB.toast((d && d.error) || 'Couldn’t create space', 'bad'); })
+            .catch(function(){ WB.toast('Couldn’t create space', 'bad'); });
         });
         return;
       }
