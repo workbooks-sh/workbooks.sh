@@ -12,4 +12,5 @@ import './feedback.js';    // action: thumbs up/down (assistant)
 import './attachments.js'; // composer button: file picker
 import './transcribe.js';  // composer button: mic (speech-to-text)
 import './agent-selector.js'; // composer button: agent dropdown (Studio, locked once session has messages)
+import './capabilities-selector.js'; // composer button: capabilities multi-select (gated by agent admission)
 import './model-selector.js'; // composer button: model dropdown

@@ -278,7 +278,12 @@ server :cloud do
     # precedence: the composer's explicit pick > the agent's per-org override > nil (runtime default).
     agent_name = Map.get(session, :agent) || agent
     eff_model = (is_binary(model) and model != "" and model) || Map.get(agent_override(req.tenant, agent_name), :model)
-    reply = run_agent(msg, eff_model, agent_name)
+    # Selected capabilities, clamped to what this agent admits, surfaced to the run (original msg is stored).
+    sel = (is_map(req.body) && req.body["capabilities"]) || []
+    sel = if is_list(sel), do: sel, else: []
+    caps = Nexus.Agent.admitted(Nexus.Agent.get(agent_name), sel)
+    brief = if caps == [], do: msg, else: "Active capabilities for this run: #{Enum.join(caps, ", ")} — use them where they fit.\n\n" <> msg
+    reply = run_agent(brief, eff_model, agent_name)
 
     turns = session.messages ++ [%{role: "user", text: msg}, %{role: "assistant", text: reply}]
     session = %{session | messages: turns, updated: System.os_time(:second)}
@@ -1158,9 +1163,25 @@ server :cloud do
 
     agents =
       agent_catalog()
-      |> Enum.map(fn a -> Map.put(a, :defined, MapSet.member?(defined, a.name)) end)
+      |> Enum.map(fn a ->
+        a
+        |> Map.put(:defined, MapSet.member?(defined, a.name))
+        |> Map.put(:capabilities, admission_of(a.name))
+      end)
 
     %{agents: agents}
+  end
+
+  # An agent's capability admission policy, serialized for the composer: "all" | "none" | [ids].
+  defp admission_of(name) do
+    case Nexus.Agent.get(name) do
+      nil -> "all"
+      node -> case Nexus.Agent.capabilities(node) do
+                :all -> "all"
+                :none -> "none"
+                list when is_list(list) -> list
+              end
+    end
   end
 
   # ── Agent overrides (model + prompt) — the agent editor. The shipped agent block is the default; an

@@ -83,6 +83,15 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
     suggestions: ['Scaffold a new app', 'Draft a data model', 'Wire up an integration'],
     models: MODELS,
     agents: AGENTS,
+    // Capabilities the composer can plug into the driver agent (toolkits-as-capabilities). Gated by each
+    // agent's admission: Waldo (:all) → everything; Autopilot/Autopoet (:none) → disabled. Admission comes
+    // from the /cloud/agents feed (a.capabilities) with a safe fallback.
+    capabilityCatalog: TK,
+    capabilityAdmission: function(name){
+      var a = AGENTS.filter(function(x){ return agentName(x) === name; })[0];
+      if (a && a.capabilities != null) return a.capabilities;   // "all" | "none" | [ids]
+      return name === 'autopilot' ? 'none' : 'all';
+    },
     // "Add context" (the composer paperclip) opens the searchable multi-select picker (files / workspaces
     // / spaces, plus drop-to-attach). Chosen items become context chips and ride along with the turn.
     onAttach: function(){ return (WB.contextPicker ? WB.contextPicker() : Promise.resolve([])); },
@@ -90,7 +99,8 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
       var context = ((ctx && ctx.files) || []).map(function(f){ return { name: f.name, type: f.type || 'file', ref: f.ref || f.path || f.id || f.name }; });
       return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({
         u: U, id: curSession, message: text,
-        model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), space: curSpace, context: context
+        model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), space: curSpace, context: context,
+        capabilities: (ctx && ctx.capabilities) || []
       }) }).then(function(d){
         if (d && d.id) { curSession = d.id; if (WB._paintStudio) { WB.cache.set('agent-sessions', null); WB._paintStudio(); } }
         return (d && d.reply) || '(no reply)';
