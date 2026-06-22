@@ -8,7 +8,12 @@
 
 WB.scopedStyles('/autopoet', `
   .ap { max-width:1280px; }
-  .apgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:16px; align-items:start; }
+  /* Left column (Heartbeat + Access stacked) + a wider right column that's the Logs explorer. */
+  .apgrid { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.3fr); gap:16px; align-items:start; }
+  @media (max-width:920px){ .apgrid { grid-template-columns:1fr; } }
+  .apcol { display:flex; flex-direction:column; gap:16px; min-width:0; }
+  .aplogs { display:flex; flex-direction:column; min-height:520px; }
+  .aplogs > ul.aplog { flex:1; overflow-y:auto; margin-top:6px; }
   .apbadge { font:700 11px var(--mono); letter-spacing:.04em; padding:4px 11px; border-radius:999px; }
   .apbadge.on { background:var(--mint); color:#0b3d22; }
   .apbadge.off { background:var(--line); color:var(--dim); }
@@ -109,32 +114,33 @@ WB.view('/autopoet', {
 
         '<div class="apgrid">' +
 
-          // ── Heartbeat controls ──
-          '<div class="card">' +
-            '<h3>Heartbeat</h3>' +
-            '<div class="aprow">' +
-              '<select class="apsel" data-cadence>' + opt('5m', 'every 5m') + opt('15m', 'every 15m') + opt('1h', 'every 1h') + opt('6h', 'every 6h') + '</select>' +
-              '<span class="apmut" style="font-size:12.5px">' + (hb.armed ? 'next beat in ' + esc(fmtNext(hb.next_ms)) : 'paused') + '</span>' +
-              '<span style="flex:1"></span>' +
-              '<button class="btn sm" data-act="run">Run once now</button>' +
+          // ── LEFT column: Heartbeat controls, then Access stacked beneath it ──
+          '<div class="apcol">' +
+            '<div class="card">' +
+              '<h3>Heartbeat</h3>' +
+              '<div class="aprow">' +
+                '<select class="apsel" data-cadence>' + opt('5m', 'every 5m') + opt('15m', 'every 15m') + opt('1h', 'every 1h') + opt('6h', 'every 6h') + '</select>' +
+                '<span class="apmut" style="font-size:12.5px">' + (hb.armed ? 'next beat in ' + esc(fmtNext(hb.next_ms)) : 'paused') + '</span>' +
+                '<span style="flex:1"></span>' +
+                '<button class="btn sm" data-act="run">Run once now</button>' +
+              '</div>' +
+              '<p class="note" style="margin-top:14px">Last cycle: ' + esc(lastSummary) + '</p>' +
             '</div>' +
-            '<p class="note" style="margin-top:14px">Last cycle: ' + esc(lastSummary) + '</p>' +
+
+            '<div class="card">' +
+              '<h3>Access</h3>' +
+              '<p class="note">What the autopoet may edit. Frozen agents and impure indexes are off-limits.</p>' +
+              (impure.length ? '<div class="apwarn">⚠ ' + impure.length + ' impure index(es) — not autonomously editable: ' + esc(impure.join(', ')) + '</div>' : '') +
+              '<table style="margin-top:14px"><thead><tr><th>Agent</th><th>Management</th><th>Ceiling</th></tr></thead><tbody>' + agents + '</tbody></table>' +
+              '<h3 style="margin:20px 0 10px;font-size:14px">Active leases</h3>' +
+              '<ul class="aplog">' + leases + '</ul>' +
+            '</div>' +
           '</div>' +
 
-          // ── Logs & learning ──
-          '<div class="card">' +
+          // ── RIGHT: Logs & learning — the wide explorer ──
+          '<div class="card aplogs">' +
             '<h3>Logs &amp; learning</h3>' +
             '<ul class="aplog">' + lessons + '</ul>' +
-          '</div>' +
-
-          // ── Access (full-width-ish: agents + leases) ──
-          '<div class="card" style="grid-column:1 / -1">' +
-            '<h3>Access</h3>' +
-            '<p class="note">What the autopoet may edit. Frozen agents and impure indexes are off-limits.</p>' +
-            (impure.length ? '<div class="apwarn">⚠ ' + impure.length + ' impure index(es) — not autonomously editable: ' + esc(impure.join(', ')) + '</div>' : '') +
-            '<table style="margin-top:14px"><thead><tr><th>Agent</th><th>Management</th><th>Ceiling</th></tr></thead><tbody>' + agents + '</tbody></table>' +
-            '<h3 style="margin:20px 0 10px;font-size:14px">Active leases</h3>' +
-            '<ul class="aplog">' + leases + '</ul>' +
           '</div>' +
 
         '</div>' +
