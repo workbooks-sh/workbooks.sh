@@ -66,9 +66,13 @@ jobs:
     permissions:
       contents: read
       packages: write
+    # QUEUE (don't cancel): the base must always land. Under sustained concurrent nexus/ pushes,
+    # cancel-in-progress STARVES the base build — each new commit kills the prior, so a runtime change
+    # can never deploy. Queueing serializes them (each completes; newest deploys last). The layer cache
+    # keeps each build fast, and build-smoke below still cancels for fast feedback.
     concurrency:
-      group: dogfood-base-${{ github.ref }}
-      cancel-in-progress: true
+      group: dogfood-base
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
