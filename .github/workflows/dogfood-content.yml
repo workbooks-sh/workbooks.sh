@@ -1,0 +1,54 @@
+# dogfood-content — push CONTENT updates to the live nexus the way a CUSTOMER would: a `git push` to
+# the nexus's own git remote (`/git/<workspace>.git`), which checks the files out + hot-reloads
+# (Nexus.Server.remount). NO image rebuild — content is decoupled from the runtime image (the image's
+# baked copy is just the safety-net fallback; a pushed workspace overlays it and survives redeploys —
+# see Nexus.Server.rehydrate_checkouts). This is the dogfooding rule: we update our own cloud the exact
+# way we ask customers to update their apps. (The runtime IMAGE still ships via dogfood-deploy.yml — that
+# instantiates the network and is the one legitimate CI/GitHub path.)
+#
+# PILOT: lander only. Once proven, the same job pattern extends to cloud/docs.
+#
+# AUTH: a `wbk_` access token minted in the dashboard (Nexus.ControlPlane.Token), stored as the repo
+# secret WB_DOGFOOD_PUSH_TOKEN, sent as the git Basic-auth password — exactly a customer's credential.
+
+name: dogfood-content
+
+on:
+  push:
+    branches: [main]
+    paths: ["dogfood/lander/**"]
+  workflow_dispatch: {}
+
+# Newer content supersedes an in-flight push (the latest tree is all that matters).
+concurrency:
+  group: dogfood-content-lander
+  cancel-in-progress: true
+
+jobs:
+  push-lander:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Push lander → nexus (hot-reload, no image build)
+        env:
+          TOKEN: ${{ secrets.WB_DOGFOOD_PUSH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN:-}" ]; then
+            echo "::error::WB_DOGFOOD_PUSH_TOKEN not set — mint one in the dashboard (Settings) and add it as a repo secret."
+            exit 1
+          fi
+          # Snapshot the lander workspace into a fresh single commit and force-push it to the nexus. The
+          # nexus's post-receive checks it out into the lander workspace + remounts → live in seconds.
+          # (Snapshot, not subtree history — matches the nexus's jj/snapshot model; git-subtree isn't needed.)
+          tmp="$(mktemp -d)"
+          cp -a dogfood/lander/. "$tmp"/
+          cd "$tmp"
+          git init -q -b main
+          git config user.email "ci@workbooks.sh"
+          git config user.name "workbooks-ci"
+          git add -A
+          git commit -q -m "deploy lander @ ${GITHUB_SHA::7}"
+          git push -f "https://x:${TOKEN}@workbooks.sh/git/lander.git" main
+          echo "✅ pushed lander to the nexus — hot-reload triggered (no image rebuild)"

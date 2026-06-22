@@ -23,9 +23,11 @@ name: dogfood-deploy
 on:
   push:
     branches: [main]
-    paths: ["dogfood/**", "nexus/**", ".github/workflows/dogfood-deploy.yml"]
+    # lander is deployed via push-to-nexus (dogfood-content.yml), NOT an image rebuild — exclude it so a
+    # lander edit doesn't trigger the slow image path. Everything else in dogfood/ + the runtime still does.
+    paths: ["dogfood/**", "!dogfood/lander/**", "nexus/**", ".github/workflows/dogfood-deploy.yml"]
   pull_request:
-    paths: ["dogfood/**", "nexus/**", ".github/workflows/dogfood-deploy.yml"]
+    paths: ["dogfood/**", "!dogfood/lander/**", "nexus/**", ".github/workflows/dogfood-deploy.yml"]
   workflow_dispatch:
     inputs:
       rebuild_base:
