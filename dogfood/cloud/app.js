@@ -981,6 +981,9 @@
         '<div class="nexrail">' +
           '<div class="nextilewrap">' + nexTile + '</div>' +
           '<div class="raildiv"></div>' +
+          // When the sidebar is collapsed, the in-sidebar collapse button is hidden — so surface an
+          // always-visible expand button here in the rail (uses the same data-rail-toggle handler).
+          (st.rail ? '<button class="railsec railexpand" data-rail-toggle title="Open sidebar" aria-label="Open sidebar"><span class="rsico">' + ICO.rail + '</span><span class="rslbl">Open</span></button>' : '') +
           '<nav class="railsecs">' + railsecs + '</nav>' +
           '<div class="nexrail-grow"></div>' +
           '<div class="railbottom">' +
