@@ -7,9 +7,11 @@
 
 WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el){
   var esc = WB.esc;
-  // Brand → simpleicons slug (logo CDN). Falls back to a hidden img on miss.
-  var SLUG = { github:'github', google:'google', slack:'slack', fal:'fallout', openrouter:'openrouter' };
-  function logo(id){ return 'https://cdn.simpleicons.org/' + (SLUG[id] || id); }
+  // Brand → real domain. We render the provider's actual full-color logo via the favicon service (every
+  // brand has one, always full-color) on a light chip — simpleicons was monochrome-in-brand-color, so
+  // dark brands (GitHub, Slack) disappeared on the dark card and some (fal) had no icon at all.
+  var DOMAIN = { github:'github.com', google:'google.com', slack:'slack.com', fal:'fal.ai', openrouter:'openrouter.ai' };
+  function logo(id){ return 'https://www.google.com/s2/favicons?domain=' + (DOMAIN[id] || (id + '.com')) + '&sz=128'; }
 
   function getJSON(url){ return fetch(url, { credentials:'same-origin' }).then(function(r){ return r.json(); }); }
   function send(url, method, body){
@@ -120,7 +122,7 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
     var on = accs.length > 0;
     var soon = p.status !== 'ready';
     return '<div class="tkcard' + (on ? ' on' : '') + (soon ? ' soon' : '') + '">' +
-      '<div class="tktop"><img class="tklogo" src="' + esc(logo(p.id)) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' +
+      '<div class="tktop"><span class="tkchip"><img class="tklogo" src="' + esc(logo(p.id)) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.textContent=this.parentNode.getAttribute(\'data-i\')" data-i="' + esc((p.name || '?').slice(0,1).toUpperCase()) + '"></span>' +
         '<span class="tkname">' + esc(p.name) + '</span>' +
         (soon ? '<span class="tkpill soon">Coming soon</span>' : (on ? '<span class="tkdot" title="Connected"></span>' : '')) + '</div>' +
       '<p class="tkblurb">' + esc(p.blurb || '') + '</p>' +
@@ -136,7 +138,7 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
   function standaloneCard(t){
     var soon = t.status !== 'ready';
     return '<div class="tkcard' + (soon ? ' soon' : ' on') + '">' +
-      '<div class="tktop"><span class="tkglyph">' + (WB.ICO_TOOLBOX || '') + '</span>' +
+      '<div class="tktop"><span class="tkchip glyph">' + (WB.ICO_TOOLBOX || '') + '</span>' +
         '<span class="tkname">' + esc(t.name) + '</span>' +
         '<span class="tkpill ' + (soon ? 'soon' : 'ready') + '">' + (soon ? 'Coming soon' : 'Available') + '</span></div>' +
       '<p class="tkblurb">' + esc(t.blurb || '') + '</p>' +
@@ -185,8 +187,13 @@ WB.scopedStyles('/toolkits', `
 .tkcard.on { border-color: color-mix(in srgb, var(--live) 50%, var(--line)); }
 .tkcard.soon { opacity: .72; }
 .tktop { display: flex; align-items: center; gap: 10px; }
-.tklogo { width: 22px; height: 22px; object-fit: contain; flex: none; }
-.tkglyph { width: 22px; height: 22px; display: grid; place-items: center; color: var(--dim); flex: none; }
+/* App-icon chip: a light rounded tile behind every logo so real brand colors (even dark ones) pop on
+   the dark card. Provider chips hold the full-color logo; standalone chips hold the toolbox glyph. */
+.tkchip { width: 32px; height: 32px; border-radius: 8px; flex: none; display: grid; place-items: center;
+  background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0,0,0,.18);
+  font: 700 14px var(--read); color: #333; overflow: hidden; }
+.tkchip.glyph { background: var(--line); border-color: transparent; color: var(--dim); box-shadow: none; }
+.tklogo { width: 20px; height: 20px; object-fit: contain; }
 .tkname { font: 600 15px var(--read); color: var(--ink); }
 .tkpill { margin-left: auto; font: 600 10px var(--read); text-transform: uppercase; letter-spacing: .04em; border-radius: 20px; padding: 2px 8px; }
 .tkpill.soon { color: var(--dim); background: var(--line); }
