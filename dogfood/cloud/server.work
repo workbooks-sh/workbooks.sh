@@ -367,13 +367,34 @@ server :cloud do
     tenant = req.tenant || Nexus.Store.default_tenant()
     uid = profile_uid(req)
 
+    rdid = runtime_did_safe()
+
     %{
       profile: latest_profile(tenant, uid) || %{uid: uid},
-      stats: profile_stats(tenant, uid),
-      activity: profile_activity(tenant, uid),
-      contributions: profile_contributions(tenant, uid)
+      stats: profile_stats(tenant, uid, rdid),
+      activity: profile_activity(tenant, uid, rdid),
+      contributions: profile_contributions(tenant, uid),
+      # The nexus's published runtime DID — the key the client expects to have counter-signed metering.
+      runtime_did: rdid
     }
   end
+
+  # The runtime DID, resolved defensively (the ledger never blocks the profile from rendering).
+  defp runtime_did_safe do
+    try do
+      Nexus.Ledger.runtime_did()
+    rescue
+      _ -> nil
+    catch
+      _, _ -> nil
+    end
+  end
+
+  # Is this run's stored metering attestation valid AND signed by our runtime key?
+  defp verified_run?(%{attest: a}, rdid) when is_binary(a) and a != "" and is_binary(rdid),
+    do: Nexus.Attest.verify(Nexus.Ledger.decode(a), rdid)
+
+  defp verified_run?(_, _), do: false
 
   # Upsert the editable identity layer. Append-only (write a fresh row; the fold keeps newest), matching
   # how Todo persists. Only the expressive fields are writable — name/email/role stay owned by /me.
@@ -423,10 +444,12 @@ server :cloud do
     v != "" and (v == uid or v == local or v == "me")
   end
 
-  defp profile_stats(tenant, uid) do
+  defp profile_stats(tenant, uid, rdid) do
     runs =
       Run |> Nexus.Store.all(tenant) |> Enum.map(&Map.from_struct/1)
       |> Enum.filter(&mine?(&1.user, uid))
+
+    verified = Enum.filter(runs, &verified_run?(&1, rdid))
 
     tasks = current_tasks(tenant) |> Enum.filter(&mine?(&1.created_by, uid))
     {done, open} = Enum.split_with(tasks, &(&1.status == "done"))
@@ -438,6 +461,9 @@ server :cloud do
       agents: runs |> Enum.map(& &1.agent) |> Enum.uniq() |> length(),
       shipped: length(done),
       open: length(open),
+      # Verified slice — runs whose metering our runtime key counter-signed (the trustworthy subset).
+      verified_runs: length(verified),
+      verified_tokens: Enum.reduce(verified, 0, &((&1.tokens || 0) + &2)),
       first_run: runs |> Enum.map(& &1.started) |> Enum.reject(&is_nil/1) |> Enum.min(fn -> nil end)
     }
   end
@@ -446,10 +472,12 @@ server :cloud do
   # The client renders a year-long heatmap and lets you switch which metric drives the colour: tokens
   # burned & runs launched (resource Run, by start day), work shipped (resource Todo done, by update
   # day), and distinct agents driven that day. Real counts only — empty days simply don't appear.
-  defp profile_activity(tenant, uid) do
+  defp profile_activity(tenant, uid, rdid) do
     runs =
       Run |> Nexus.Store.all(tenant) |> Enum.map(&Map.from_struct/1)
       |> Enum.filter(&mine?(&1.user, uid))
+
+    verified = Enum.filter(runs, &verified_run?(&1, rdid))
 
     done =
       current_tasks(tenant)
@@ -459,12 +487,21 @@ server :cloud do
       tokens: day_sum(runs, fn r -> {day_key(r.started), r.tokens || 0} end),
       runs: day_sum(runs, fn r -> {day_key(r.started), 1} end),
       shipped: day_sum(done, fn t -> {t.updated && day_key(div(t.updated, 1_000_000)), 1} end),
-      agents:
-        runs
-        |> Enum.group_by(fn r -> day_key(r.started) end)
-        |> Enum.reject(fn {d, _} -> is_nil(d) end)
-        |> Map.new(fn {d, rs} -> {d, rs |> Enum.map(& &1.agent) |> Enum.uniq() |> length()} end)
+      agents: agents_by_day(runs),
+      # Per-day VERIFIED overlay for the run-derived metrics — the client marks these days as attested.
+      verified: %{
+        tokens: day_sum(verified, fn r -> {day_key(r.started), r.tokens || 0} end),
+        runs: day_sum(verified, fn r -> {day_key(r.started), 1} end),
+        agents: agents_by_day(verified)
+      }
     }
+  end
+
+  defp agents_by_day(runs) do
+    runs
+    |> Enum.group_by(fn r -> day_key(r.started) end)
+    |> Enum.reject(fn {d, _} -> is_nil(d) end)
+    |> Map.new(fn {d, rs} -> {d, rs |> Enum.map(& &1.agent) |> Enum.uniq() |> length()} end)
   end
 
   # Fold a list into %{"YYYY-MM-DD" => summed_value}, dropping anything with no resolvable day.
@@ -567,11 +604,22 @@ server :cloud do
 
     ended = System.os_time(:second)
 
+    # ── Ownership ledger (epic wb-kodp): the runtime counter-signs this run's metering so the analytics
+    # are verifiable, not self-reported. The attestation is stored on the Run row (verifiable anywhere);
+    # when the run produced a workspace commit, it's ALSO attached as a git note keyed by that commit —
+    # the content-addressed, Radicle-native anchor.
+    attest =
+      sign_run_meter(
+        %{run: rid, agent: agent, user: user, model: to_string(opts[:model] || ""),
+          tokens: tokens, turns: turns, status: status, started: started, ended: ended},
+        run_opts
+      )
+
     Nexus.Store.create(
       Run,
       %{rid: rid, agent: agent, user: user, task: String.slice(task, 0, 500), status: status,
         turns: turns, tokens: tokens, answer: String.slice(answer, 0, 2000),
-        started: started, ended: ended},
+        started: started, ended: ended, attest: attest, author: ""},
       tenant
     )
 
@@ -595,6 +643,27 @@ server :cloud do
 
     emit.(%{type: "done", run: rid, status: status, turns: turns, tokens: tokens})
     {rid, status, turns, answer}
+  end
+
+  # Counter-sign a run's metering with the nexus runtime key and return the encoded attestation (or "").
+  # Best-effort: any failure (no key, git absent) degrades to "" — a run is never blocked by the ledger.
+  # When the run had a workspace, also anchor the attestation as a git note on the branch's new HEAD.
+  defp sign_run_meter(fields, run_opts) do
+    try do
+      {:ok, att} = {:ok, Nexus.Attest.sign(Nexus.Ledger.runtime_key(), fields)}
+      encoded = Nexus.Ledger.encode(att)
+
+      with %{bare: bare, branch: branch} <- run_opts[:workspace],
+           {sha, 0} <- System.cmd("git", ["--git-dir=#{bare}", "rev-parse", branch], stderr_to_stdout: true) do
+        Nexus.Git.add_note(bare, String.trim(sha), encoded)
+      end
+
+      encoded
+    rescue
+      _ -> ""
+    catch
+      _, _ -> ""
+    end
   end
 
   # ── Task management + planning ───────────────────────────────────────────────────────────────────

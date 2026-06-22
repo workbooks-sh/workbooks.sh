@@ -41,6 +41,8 @@ WB.scopedStyles('/profile', `
   .cal-head { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
   .cal-total { font-size:13.5px; color:var(--ink); }
   .cal-total b { font-weight:700; }
+  .cal-verified { margin-left:8px; font-size:11.5px; color:var(--live); border:1.5px solid var(--live);
+    border-radius:999px; padding:2px 9px; white-space:nowrap; cursor:default; }
   .cal-tabs { display:flex; gap:6px; flex-wrap:wrap; }
   .cal-tab { display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border:1.5px solid var(--line); border-radius:999px;
     background:var(--card); color:var(--dim); font:600 12px var(--sans); cursor:pointer; }
@@ -106,7 +108,8 @@ WB.scopedStyles('/profile', `
       // ── state ──
       let profile = {};                 // editable layer (resource Profile)
       let stats = { tokens: 0, runs: 0, runs_ok: 0, agents: 0, shipped: 0, open: 0, first_run: null };
-      let activity = { tokens: {}, runs: {}, shipped: {}, agents: {} };
+      let activity = { tokens: {}, runs: {}, shipped: {}, agents: {}, verified: {} };
+      let runtimeDid = null;          // the nexus runtime DID that counter-signs metering
       let metric = 'runs';            // which series drives the heatmap
       let contributions = [];
       let editing = false;
@@ -123,6 +126,7 @@ WB.scopedStyles('/profile', `
           const r = await (await api('/cloud/profile?u=' + encodeURIComponent(uid))).json();
           profile = r.profile || {}; stats = r.stats || stats; contributions = r.contributions || [];
           if (r.activity) activity = Object.assign(activity, r.activity);
+          runtimeDid = r.runtime_did || null;
           // mirror avatar to the shell so the rail "You" tile shows the photo (+ cache it for cold loads)
           try { WB.profile = WB.profile || {}; WB.profile.avatar = profile.avatar || '';
             if (profile.avatar) localStorage.setItem('wb-avatar:' + uid, profile.avatar); else localStorage.removeItem('wb-avatar:' + uid); } catch (e2) {}
@@ -281,18 +285,24 @@ WB.scopedStyles('/profile', `
       function activityChart() {
         const m = METRICS.find((x) => x.key === metric) || METRICS[0];
         const series = activity[metric] || {};
+        const vser = (activity.verified && activity.verified[metric]) || null;   // verified overlay (run metrics only)
         const vals = Object.values(series);
         const max = Math.max(1, ...vals);
         const total = vals.reduce((a, b) => a + b, 0);
+        const vtotal = vser ? Object.values(vser).reduce((a, b) => a + b, 0) : 0;
         const days = calDays();
 
         const cells = days.map((d) => {
           const key = isoDay(d);
           const v = series[key] || 0;
           const lvl = levelOf(v, max);
+          const vc = vser ? (vser[key] || 0) : 0;
+          // a day with attested activity gets an inner ring (cryptographically counter-signed metering)
+          const ring = vc > 0 ? ';box-shadow:inset 0 0 0 1.5px var(--ink)' : '';
           const human = m.sum ? `${v.toLocaleString()} ${m.noun}` : `${v} ${v === 1 ? m.noun.replace(/s$/, '') : m.noun}`;
+          const vtag = vser && v > 0 ? (vc >= v ? ' · ✓ verified' : (vc > 0 ? ' · partly verified' : ' · unverified')) : '';
           const date = MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
-          return `<span class="cal-cell" style="background:${cellColor(lvl, m.acc)}" title="${esc(human)} on ${esc(date)}"></span>`;
+          return `<span class="cal-cell" style="background:${cellColor(lvl, m.acc)}${ring}" title="${esc(human + vtag)} on ${esc(date)}"></span>`;
         }).join('');
 
         // month labels — one grid track per week, label where the month rolls over
@@ -315,7 +325,7 @@ WB.scopedStyles('/profile', `
         return `
         <div class="card cal-card">
           <div class="cal-head">
-            <div class="cal-total"><b>${esc(totalTxt)}</b> ${esc(m.noun)} in the last year</div>
+            <div class="cal-total"><b>${esc(totalTxt)}</b> ${esc(m.noun)} in the last year${vser && total > 0 ? ` <span class="cal-verified" title="Metering counter-signed by this nexus${runtimeDid ? ' (' + esc(runtimeDid.slice(0, 24)) + '…)' : ''}">🔒 ${esc(String(vtotal))} verified</span>` : ''}</div>
             <div class="cal-tabs">${tabs}</div>
           </div>
           <div class="cal-scroll">
@@ -361,6 +371,8 @@ WB.scopedStyles('/profile', `
           <div class="kv"><span class="k">Runs launched</span><span class="v">${esc(String(stats.runs))} (${esc(String(stats.runs_ok))} ok)</span></div>
           <div class="kv"><span class="k">Avg tokens / run</span><span class="v">${esc(stats.runs ? Math.round(stats.tokens / stats.runs).toLocaleString() : '—')}</span></div>
           <div class="kv"><span class="k">Agents driven</span><span class="v">${esc(String(stats.agents))}</span></div>
+          <div class="kv"><span class="k">🔒 Verified metering</span><span class="v">${esc(String(stats.verified_runs || 0))} of ${esc(String(stats.runs))} runs · ${esc((stats.verified_tokens || 0).toLocaleString())} tokens counter-signed</span></div>
+          ${runtimeDid ? `<div class="kv"><span class="k">Attested by</span><span class="v mono" style="font-size:11px">${esc(runtimeDid)}</span></div>` : ''}
         </div>`;
       }
 

@@ -46,6 +46,11 @@ resource Run do
   answer :string    # final answer (truncated for the list view)
   started :integer  # unix seconds
   ended :integer    # unix seconds
+  # The ownership ledger (epic wb-kodp): a runtime-counter-signed metering attestation (Nexus.Ledger
+  # encode form) anchoring the tokens/model spend so analytics can be VERIFIED, not self-reported. When
+  # the run produced a workspace commit, the same attestation is also a git note keyed by that commit.
+  attest :string    # encoded signed metering attestation (Nexus.Ledger.encode), or "" if unsigned
+  author :string    # the author's did:key, when the run was signed by a per-user key (slice 2); else ""
 end
 
 # The task/plan store — the orchestration backbone. A task is a unit of work; a plan is a parent

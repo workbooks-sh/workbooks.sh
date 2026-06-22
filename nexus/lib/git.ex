@@ -74,6 +74,41 @@ defmodule Nexus.Git do
 
   defp git(dir, args), do: System.cmd("git", args, cd: dir, stderr_to_stdout: true)
 
+  # ── git notes — the attestation carrier for the ownership ledger ─────────────────────────────────
+  # A note attaches signed, out-of-band metadata to a commit WITHOUT touching its hash or history. The
+  # ownership ledger stores a runtime-counter-signed metering attestation here, keyed by the commit the
+  # run produced (Nexus.Ledger encodes/decodes the body). `dir` may be a working tree OR a bare repo —
+  # `cd:` into a bare dir uses it as the git dir, so both work.
+  @doc "Attach `body` as a note (under `refs/notes/<ref>`) to commit `sha`, replacing any existing one."
+  def add_note(dir, sha, body, ref \\ "wb-meter") when is_binary(body) do
+    case git(dir, ["notes", "--ref", ref, "add", "-f", "-m", body, sha]) do
+      {_, 0} -> :ok
+      {out, _} -> {:error, String.trim(out)}
+    end
+  end
+
+  @doc "List `{commit_sha, note_body}` pairs under `refs/notes/<ref>`, or `[]` if none/no repo."
+  def notes(dir, ref \\ "wb-meter") do
+    case git(dir, ["notes", "--ref", ref, "list"]) do
+      {out, 0} ->
+        out
+        |> String.split("\n", trim: true)
+        |> Enum.flat_map(fn line ->
+          case line |> String.split() |> List.last() do
+            nil -> []
+            commit ->
+              case git(dir, ["notes", "--ref", ref, "show", commit]) do
+                {body, 0} -> [{commit, String.trim_trailing(body)}]
+                _ -> []
+              end
+          end
+        end)
+
+      _ ->
+        []
+    end
+  end
+
   # ── Remote: the nexus AS a git remote (push-to-deploy a workspace) ───────────────────────────────
   # A workspace is a BARE repo on the nexus that you `git push` to. A `post-receive` hook checks the
   # pushed default branch out into the workspace's working dir (`work_dir`), so the files land on the
