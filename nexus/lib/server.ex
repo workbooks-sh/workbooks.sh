@@ -437,7 +437,7 @@ defmodule Nexus.Server do
   # mid-run input. Auth runs in the plug above (the handshake GET carries the PAT/cookie), so the socket
   # is already tenant-scoped. See Nexus.Ws.
   get "/ws" do
-    state = %{tenant: Nexus.Auth.tenant(conn), user: Nexus.Auth.user(conn)}
+    state = %{tenant: Nexus.Auth.tenant(conn), user: Nexus.Auth.user(conn), role: Nexus.Auth.role(conn)}
     Plug.Conn.upgrade_adapter(conn, :websocket, {Nexus.Ws, state, []})
   end
 
@@ -448,7 +448,7 @@ defmodule Nexus.Server do
   # authenticated identity is injected server-side (never trusted from query params).
   get "/live/:source" do
     conn = Plug.Conn.fetch_query_params(conn)
-    params = Map.merge(conn.query_params, %{"tenant" => Nexus.Auth.tenant(conn), "u" => Nexus.Auth.user(conn) || "anon"})
+    params = Map.merge(conn.query_params, %{"tenant" => Nexus.Auth.tenant(conn), "u" => Nexus.Auth.user(conn) || "anon", "role" => Nexus.Auth.role(conn)})
 
     conn =
       conn

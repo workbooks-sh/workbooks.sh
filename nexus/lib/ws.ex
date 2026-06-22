@@ -27,7 +27,7 @@ defmodule Nexus.Ws do
         # here, NOT from anything the client sent.
         params =
           (msg["params"] || %{})
-          |> Map.merge(%{"tenant" => state.tenant, "u" => state.user || "anon"})
+          |> Map.merge(%{"tenant" => state.tenant, "u" => state.user || "anon", "role" => state[:role]})
 
         me = self()
         emit = fn ev -> send(me, {:ws_event, ev}) end

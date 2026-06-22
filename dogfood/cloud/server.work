@@ -1766,6 +1766,9 @@ server :cloud do
       cond do
         agent == "" or task == "" -> emit.(%{type: "error", error: "agent and task are required"})
         is_nil(Nexus.Agent.get(agent)) -> emit.(%{type: "error", error: "no such agent: #{agent}"})
+        # The SSE/WS transport must enforce the SAME authz as the HTTP route (fix wb-swpm): a viewer
+        # can't run agents, and a run targeting a workspace honors its write ACL. role is server-injected.
+        not live_write_ok?(params) -> emit.(%{type: "error", error: "forbidden — insufficient role for this workspace"})
         true ->
           do_run(agent, task, tenant, user, emit,
             workspace: params["workspace"], model: params["model"],
@@ -1795,11 +1798,12 @@ server :cloud do
 
     # Storage: this nexus's managed object store — one bucket per mounted surface, sizes derived from
     # what's actually on the data volume (real, not a mock). Egress-free (R2 in cloud, local in dev).
-    Nexus.Live.register("storage", fn _params, emit ->
-      mounts = Application.get_env(:nexus, :mounts, [])
+    Nexus.Live.register("storage", fn params, emit ->
+      # Read-side ACL on the SSE twin (fix wb-swpm) — only surfaces the caller may read, like /cloud/storage.
+      req = %{role: params["role"] || "viewer", user: params["u"], tenant: params["tenant"] || Nexus.Store.default_tenant(), body: nil, query: %{}}
 
       buckets =
-        for {name, root} <- mounts, name != "" do
+        for {name, root} <- readable_mounts(req), name != "" do
           bytes = dir_bytes(root)
           %{name: name, objects: count_files(root), size: human(bytes), bytes: bytes}
         end
@@ -2244,6 +2248,24 @@ server :cloud do
 
   defp may_write_workspace?(req, mount, root), do: may_workspace?(req, mount, root, :write)
   defp may_read_workspace?(req, mount, root), do: may_workspace?(req, mount, root, :read)
+
+  # Authorize a write-capable Live/SSE/WS source (fix wb-swpm): the socket injects role server-side, so
+  # apply the SAME :write role gate + per-workspace ACL the HTTP route enforces. params has role/u/tenant.
+  defp live_write_ok?(params) do
+    req = %{role: params["role"] || "viewer", user: params["u"], tenant: params["tenant"] || Nexus.Store.default_tenant(), body: nil, query: %{}}
+
+    gate(req, :write) and
+      case params["workspace"] do
+        ws when is_binary(ws) and ws != "" ->
+          case List.keyfind(mounts(), ws, 0) do
+            {_, root} -> may_write_workspace?(req, ws, root)
+            _ -> true
+          end
+
+        _ ->
+          true
+      end
+  end
 
   # The mounts the caller may READ — the ONE place every list/enumerate route walks (wb-ate4/wb-59uk),
   # so a new route can't forget the read ACL and leak draft/private workspace metadata.
