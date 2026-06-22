@@ -54,35 +54,73 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
     });
   }
 
-  // Google Workspace via domain-wide delegation — the cheapest full-Workspace path. A purpose-built
-  // modal: copyable client-id + scopes for the admin-console paste, then domain + admin inputs.
+  // Human-readable names for the delegation scopes (the raw URLs are what Google needs pasted, but a
+  // person shouldn't have to read a wall of them). Unknown scopes fall back to their short tail.
+  var SCOPE_LABELS = {
+    'openid': 'Verify identity',
+    'email': 'Email address',
+    'https://www.googleapis.com/auth/admin.directory.user': 'Create & manage users',
+    'https://www.googleapis.com/auth/admin.directory.user.alias': 'Manage user aliases',
+    'https://www.googleapis.com/auth/admin.directory.domain': 'Manage domains',
+    'https://www.googleapis.com/auth/admin.directory.group': 'Manage groups',
+    'https://www.googleapis.com/auth/gmail.settings.basic': 'Gmail settings',
+    'https://www.googleapis.com/auth/gmail.settings.sharing': 'Gmail send-as & forwarding',
+    'https://www.googleapis.com/auth/gmail.modify': 'Read & send mail',
+    'https://www.googleapis.com/auth/drive.file': 'Drive files it creates',
+    'https://www.googleapis.com/auth/cloud-platform': 'Google Cloud'
+  };
+  function scopeName(u){ return SCOPE_LABELS[u] || u.replace('https://www.googleapis.com/auth/', ''); }
+
+  // Google Workspace via domain-wide delegation — a guided two-step flow: (1) authorize our service
+  // account in Google Admin (copy client id + scopes, open the console), (2) name the domain + admin.
   function googleModal(d){
     return new Promise(function(resolve){
+      var scopes = d.scopes || [];
+      var scopeList = scopes.map(function(s){ return '<li>' + esc(scopeName(s)) + '</li>'; }).join('');
       var modal = document.createElement('div'); modal.className = 'modal';
       modal.innerHTML =
-        '<div class="sheet" style="width:560px"><h2>Connect Google Workspace</h2>' +
-        '<p class="sub">A Workspace super-admin authorizes our service account once, in ' +
-          '<a href="' + esc(d.admin_console_url) + '" target="_blank" rel="noopener">Admin console → Security → API controls → Domain-wide delegation</a> → Add new.</p>' +
-        '<label class="gwlbl">Client ID <button class="gwcopy" data-copy="cid">Copy</button></label>' +
-        '<textarea class="gwro" id="gwCid" readonly rows="1">' + esc(d.client_id || '') + '</textarea>' +
-        '<label class="gwlbl">OAuth scopes (comma-separated) <button class="gwcopy" data-copy="scopes">Copy</button></label>' +
-        '<textarea class="gwro" id="gwScopes" readonly rows="3">' + esc(d.scopes_csv || '') + '</textarea>' +
-        '<label class="gwlbl">Your Workspace domain</label>' +
-        '<input class="winput" id="gwDomain" placeholder="example.com" autocomplete="off" spellcheck="false" />' +
-        '<label class="gwlbl">Super-admin email to impersonate</label>' +
-        '<input class="winput" id="gwAdmin" placeholder="admin@example.com" autocomplete="off" spellcheck="false" />' +
-        '<div class="foot"><span></span><div style="display:flex;gap:8px">' +
-        '<button class="btn" data-x="0">Cancel</button><button class="btn primary" data-x="1">Connect</button></div></div></div>';
+        '<div class="sheet gw" style="width:600px">' +
+          '<h2>Connect Google Workspace</h2>' +
+          '<p class="sub">Give your agents access to your Workspace — users, email, Drive, Cloud. A super-admin authorizes this once.</p>' +
+
+          '<div class="gwstep">' +
+            '<div class="gwnum">1</div>' +
+            '<div class="gwsbody">' +
+              '<div class="gwsh">Authorize in Google Admin</div>' +
+              '<p class="gwhint">Open Domain-wide delegation, click <b>Add new</b>, then paste the Client ID and scopes below.</p>' +
+              '<a class="gwopen" href="' + esc(d.admin_console_url) + '" target="_blank" rel="noopener">Open Google Admin console ↗</a>' +
+              '<div class="gwfield"><span class="gwk">Client ID</span><code class="gwv">' + esc(d.client_id || '') + '</code>' +
+                '<button class="gwcopy" data-copy="cid">Copy</button></div>' +
+              '<div class="gwfield col"><div class="gwfhead"><span class="gwk">Scopes <em>' + scopes.length + '</em></span>' +
+                '<button class="gwcopy" data-copy="scopes">Copy all</button></div>' +
+                '<ul class="gwscopes">' + scopeList + '</ul></div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="gwstep">' +
+            '<div class="gwnum">2</div>' +
+            '<div class="gwsbody">' +
+              '<div class="gwsh">Confirm your Workspace</div>' +
+              '<input class="winput" id="gwDomain" placeholder="Your domain — e.g. acme.com" autocomplete="off" spellcheck="false" />' +
+              '<input class="winput" id="gwAdmin" placeholder="Super-admin email — e.g. admin@acme.com" autocomplete="off" spellcheck="false" />' +
+              '<p class="gwhint">The admin the agent acts as for directory operations.</p>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="foot"><span></span><div style="display:flex;gap:8px">' +
+            '<button class="btn" data-x="0">Cancel</button><button class="btn primary" data-x="1">Connect</button></div></div>' +
+        '</div>';
       function done(v){ modal.remove(); resolve(v); }
       modal.addEventListener('click', function(e){
         if (e.target === modal) return done(null);
         var cp = e.target.closest('[data-copy]');
-        if (cp){ WB.copy(cp.getAttribute('data-copy') === 'cid' ? d.client_id : d.scopes_csv, cp.getAttribute('data-copy') === 'cid' ? 'Client ID' : 'Scopes'); return; }
+        if (cp){ var which = cp.getAttribute('data-copy');
+          WB.copy(which === 'cid' ? d.client_id : d.scopes_csv, which === 'cid' ? 'Client ID' : 'Scopes'); return; }
         var x = e.target.closest('[data-x]');
         if (x){ if (x.getAttribute('data-x') !== '1') return done(null);
-          var domain = (modal.querySelector('#gwDomain').value || '').trim();
+          var domain = (modal.querySelector('#gwDomain').value || '').trim().replace(/^@/, '');
           var admin = (modal.querySelector('#gwAdmin').value || '').trim();
-          if (!domain || admin.indexOf('@') < 0){ WB.toast('Domain + super-admin email required'); return; }
+          if (!domain || admin.indexOf('@') < 0){ WB.toast('Enter your domain and a super-admin email'); return; }
           done({ domain:domain, admin_email:admin }); }
       });
       document.body.appendChild(modal); modal.querySelector('#gwDomain').focus();
@@ -209,7 +247,30 @@ WB.scopedStyles('/toolkits', `
 .tkbtn { border: 1px solid var(--stroke); background: var(--card); color: var(--ink); border-radius: 9px; padding: 8px 0; font: 600 13px var(--read); cursor: pointer; }
 .tkbtn:hover { border-color: var(--ink); }
 .tkbtn.add { background: none; border-style: dashed; color: var(--dim); }
-.gwlbl { display: flex; align-items: center; gap: 8px; font: 600 12px var(--read); color: var(--dim); margin: 12px 0 4px; }
-.gwcopy { margin-left: auto; border: 1px solid var(--stroke); background: var(--card); color: var(--ink); border-radius: 6px; padding: 2px 8px; font: 600 11px var(--read); cursor: pointer; }
-.gwro { width: 100%; resize: none; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: 500 12px var(--mono, monospace); color: var(--ink); box-sizing: border-box; }
+/* Google delegation — guided two-step flow */
+.sheet.gw .sub { margin-bottom: 6px; }
+.gwstep { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+.gwstep:first-of-type { border-top: none; }
+.gwnum { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--sky, #4a90d9); color: #fff; font: 700 12px var(--read); margin-top: 1px; }
+.gwsbody { flex: 1; min-width: 0; }
+.gwsh { font: 700 14px var(--read); color: var(--ink); margin-bottom: 3px; }
+.gwhint { font: 500 12px var(--read); color: var(--dim); line-height: 1.45; margin: 0 0 10px; }
+.gwopen { display: inline-block; margin-bottom: 12px; font: 600 12.5px var(--read); color: var(--sky, #4a90d9); text-decoration: none; }
+.gwopen:hover { text-decoration: underline; }
+.gwfield { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.gwfield.col { flex-direction: column; align-items: stretch; gap: 8px; }
+.gwfhead { display: flex; align-items: center; }
+.gwk { font: 600 11px var(--read); text-transform: uppercase; letter-spacing: .04em; color: var(--dim); }
+.gwk em { font-style: normal; margin-left: 6px; background: var(--line); border-radius: 20px; padding: 0 6px; font-size: 10px; }
+.gwv { flex: 1; min-width: 0; font: 500 12.5px var(--mono, monospace); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gwcopy { margin-left: auto; flex: none; border: 1px solid var(--stroke); background: var(--card); color: var(--ink);
+  border-radius: 6px; padding: 3px 10px; font: 600 11px var(--read); cursor: pointer; }
+.gwcopy:hover { border-color: var(--ink); }
+.gwscopes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px;
+  max-height: 150px; overflow: auto; }
+.gwscopes li { font: 500 12px var(--read); color: var(--ink); position: relative; padding-left: 16px; line-height: 1.5; }
+.gwscopes li::before { content: "✓"; position: absolute; left: 0; color: var(--live, #2e9e5b); font-size: 11px; }
+.sheet.gw .winput { margin-bottom: 8px; }
 `);
