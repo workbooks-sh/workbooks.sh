@@ -54,10 +54,10 @@ WB.view('/activity', { title: 'Inbox', accent: 'var(--violet)', fullbleed: true,
     var nu = threads.filter(function(t){ return t.needs_you; }).length;
     document.querySelectorAll('[data-ibxcount="Needs you"]').forEach(function(s){ s.textContent = nu ? nu : ''; });
     document.querySelectorAll('[data-ibxcount="Inbox"]').forEach(function(s){ var n = threads.filter(function(t){return !t.archived;}).length; s.textContent = n ? n : ''; });
-    // The rail badge = needs-you count only.
-    var badge = document.querySelector('[data-nav="/activity"] .railbadge');
-    var rail = document.querySelector('[data-nav="/activity"]');
-    if (rail){ if (!badge && nu){ badge = document.createElement('span'); badge.className = 'railbadge'; rail.appendChild(badge); }
+    // The rail badge = needs-you count only (a corner bubble on the Inbox rail icon).
+    var rail = document.querySelector('.railsec[data-nav="/activity"]');
+    if (rail){ var badge = rail.querySelector('.railbadge');
+      if (!badge && nu){ badge = document.createElement('span'); badge.className = 'railbadge'; rail.appendChild(badge); }
       if (badge){ badge.textContent = nu || ''; badge.style.display = nu ? '' : 'none'; } }
   };
 
@@ -225,18 +225,4 @@ WB.scopedStyles('/activity', `
 .ibpeekrow { display:flex; align-items:center; gap:9px; padding:6px 0; font:500 12.5px var(--read); color:var(--dim); }
 .ibpeekrow span:nth-child(2) { flex:1; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ibpeekw { font:500 11px var(--mono); }
-
-/* The funnel (left shell sidebar) */
-.ibxfunnel { padding:6px 6px; }
-.ibxsearch { display:flex; align-items:center; gap:7px; padding:6px 9px; margin:2px 4px 8px; background:var(--card); border:1px solid var(--line); border-radius:9px; }
-.ibxsico { color:var(--dim); display:flex; }
-.ibxsearch input { flex:1; background:transparent; border:0; outline:0; font:inherit; font-size:13px; color:var(--ink); }
-.ibxview { display:flex; align-items:center; gap:9px; width:100%; text-align:left; background:transparent; border:0; border-radius:8px;
-  padding:7px 10px; cursor:pointer; font:550 13px var(--read); color:var(--ink); }
-.ibxview:hover { background:var(--hover,rgba(127,127,127,.06)); }
-.ibxview.on { background:var(--sel,rgba(127,127,127,.10)); font-weight:650; }
-.ibxvemoji { width:18px; text-align:center; } .ibxvname { flex:1; }
-.ibxvn { font:600 11px var(--mono); color:var(--dim); min-width:14px; text-align:right; }
-.railbadge { display:inline-grid; place-items:center; min-width:16px; height:16px; padding:0 4px; border-radius:9px;
-  background:var(--rose,#f4b8c4); color:#3a0f1a; font:700 10px var(--mono); margin-left:6px; }
 `);

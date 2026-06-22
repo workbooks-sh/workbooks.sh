@@ -1218,11 +1218,7 @@
       // Inbox — the LEFT sidebar is the filter funnel (saved views + search). The page is the list+pane
       // mailbox. Clicking a view sets WB._inboxFilter and re-renders the page (lazy → #inboxFunnel).
       else if (section === 'activity') sideBody =
-          '<div class="ibxfunnel">' +
-            '<div class="ibxsearch"><span class="ibxsico">' + ICO.filter + '</span>' +
-              '<input id="inboxSearch" placeholder="Filter inbox…" autocomplete="off"></div>' +
-            '<div id="inboxFunnel"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>' +
-          '</div>';
+          '<div class="ibxfunnel"><div id="inboxFunnel"><div class="treemsg" style="padding:8px 4px">Loading…</div></div></div>';
       // Data — Overview + Assets links, then resources grouped by workspace (lazy → #dataSide).
       else if (section === 'data') sideBody = '<div id="dataSide"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
       // Toolkits — the sidebar lists what's ACTIVE: connected accounts + enabled built-in toolkits, each
@@ -1269,12 +1265,21 @@
         '<aside class="side' + (st.rail ? ' railed' : '') + '">' +
           (st.rail
             ? '<button class="sidehd-ic railexpand" data-rail-toggle title="Open sidebar" aria-label="Open sidebar">' + ICO.rail + '</button>'
-            : ('<div class="sidehd">' +
-                '<span class="sidehd-t">' + (SECTITLE[section] || '') + '</span>' +
-                '<button class="sidehd-ic" data-palette title="Search (⌘K)" aria-label="Search">' + ICO.search + '</button>' +
-                (isBrowse ? '<div class="filterwrap"><button class="sidehd-ic' + (filterActive() ? ' on' : '') + '" data-filter-toggle title="Filter" aria-label="Filter">' + ICO.filter + '</button>' + (st.filterOpen ? filterMenu() : '') + '</div>' : '') +
-                '<button class="sidehd-ic" data-rail-toggle title="Collapse sidebar" aria-label="Collapse sidebar">' + ICO.rail + '</button>' +
-              '</div>' +
+            : ((section === 'activity'
+                // Inbox — the filter input shares the header row with the search and collapse buttons.
+                ? ('<div class="sidehd">' +
+                    '<span class="sidehd-t ibxhd-t">' + (SECTITLE[section] || '') + '</span>' +
+                    '<button class="sidehd-ic" data-palette title="Search (⌘K)" aria-label="Search">' + ICO.search + '</button>' +
+                    '<div class="ibxhdsearch"><span class="ibxsico">' + ICO.filter + '</span>' +
+                      '<input id="inboxSearch" placeholder="Filter…" autocomplete="off"></div>' +
+                    '<button class="sidehd-ic" data-rail-toggle title="Collapse sidebar" aria-label="Collapse sidebar">' + ICO.rail + '</button>' +
+                  '</div>')
+                : ('<div class="sidehd">' +
+                    '<span class="sidehd-t">' + (SECTITLE[section] || '') + '</span>' +
+                    '<button class="sidehd-ic" data-palette title="Search (⌘K)" aria-label="Search">' + ICO.search + '</button>' +
+                    (isBrowse ? '<div class="filterwrap"><button class="sidehd-ic' + (filterActive() ? ' on' : '') + '" data-filter-toggle title="Filter" aria-label="Filter">' + ICO.filter + '</button>' + (st.filterOpen ? filterMenu() : '') + '</div>' : '') +
+                    '<button class="sidehd-ic" data-rail-toggle title="Collapse sidebar" aria-label="Collapse sidebar">' + ICO.rail + '</button>' +
+                  '</div>')) +
               sideBody)
           ) +
         '</aside>' +
@@ -1452,12 +1457,6 @@
       var avw = t.closest && t.closest('[data-appview]'); if (avw) { st.appView = avw.getAttribute('data-appview'); try { localStorage.setItem('wb-appview', st.appView); } catch (er) {} st.filterOpen = false; renderShell(); paintApps(); return; }
       var aso = t.closest && t.closest('[data-appsort]'); if (aso) { st.appSort = aso.getAttribute('data-appsort'); try { localStorage.setItem('wb-appsort', st.appSort); } catch (er) {} st.filterOpen = false; renderShell(); paintApps(); return; }
       if (t.closest && t.closest('[data-palette]')) { WB.palette(); return; }
-      // Activity inbox row → focus that event; the /activity view renders its context in the page.
-      var actf = t.closest && t.closest('[data-act-focus]');
-      if (actf) { WB._activityFocus = +actf.getAttribute('data-act-focus');
-        document.querySelectorAll('.ibrow').forEach(function(r){ r.classList.toggle('on', r === actf); });
-        if (WB._activityRender) WB._activityRender(WB._activityFocus); else WB.nav('/activity');
-        return; }
       // (Studio session-row handling moved above, before the data-nav catch, so pending state is set.)
       var pinx = t.closest && t.closest('[data-pin-x]'); if (pinx) { e.stopPropagation(); toggleBookmark(pinx.getAttribute('data-pin-x')); return; }
       var pino = t.closest && t.closest('[data-pin-open]'); if (pino) { WB._pendingFile = pino.getAttribute('data-pin-open'); WB.nav('/workspaces'); return; }
