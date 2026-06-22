@@ -447,8 +447,7 @@ defmodule Nexus.Server do
   # any streaming capability registers in Nexus.Live and any workbook view can bind to it. The
   # authenticated identity is injected server-side (never trusted from query params).
   get "/live/:source" do
-    conn = Plug.Conn.fetch_query_params(conn)
-    params = Map.merge(conn.query_params, %{"tenant" => Nexus.Auth.tenant(conn), "u" => Nexus.Auth.user(conn) || "anon", "role" => Nexus.Auth.role(conn)})
+    params = live_params(conn)
 
     conn =
       conn
@@ -798,6 +797,18 @@ defmodule Nexus.Server do
   end
 
   # ── one nexus, many workbooks: a mounted workbook's app + its live source + its data ──────────
+  # SSE params with SERVER-DERIVED identity merged OVER the client's query (fix wb-swpm/wb-lqqx). The ONE
+  # place both /live entry points (top-level + per-workbook mount) build params, so they can't drift —
+  # a client can never forge tenant/u/role into a Live source.
+  defp live_params(conn) do
+    conn = Plug.Conn.fetch_query_params(conn)
+    Map.merge(conn.query_params, %{
+      "tenant" => Nexus.Auth.tenant(conn),
+      "u" => Nexus.Auth.user(conn) || "anon",
+      "role" => Nexus.Auth.role(conn)
+    })
+  end
+
   defp mount_data(conn, root, resource) do
     rows = Map.get(Nexus.SSR.data(root, Nexus.Auth.tenant(conn)), resource, [])
     conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(rows, escape: :html_safe))
@@ -805,8 +816,8 @@ defmodule Nexus.Server do
 
   defp mount_live(conn, source) do
     # Source names are globally unique across mounted workbooks, so the name resolves the source.
-    conn = Plug.Conn.fetch_query_params(conn)
-    params = conn.query_params
+    # Identity is injected server-side via the SHARED live_params (fix wb-lqqx) — never raw client params.
+    params = live_params(conn)
 
     conn =
       conn
