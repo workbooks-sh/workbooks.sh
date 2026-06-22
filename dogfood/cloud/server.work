@@ -369,6 +369,7 @@ server :cloud do
     %{
       profile: latest_profile(tenant, uid) || %{uid: uid},
       stats: profile_stats(tenant, uid),
+      activity: profile_activity(tenant, uid),
       contributions: profile_contributions(tenant, uid)
     }
   end
@@ -439,6 +440,52 @@ server :cloud do
       first_run: runs |> Enum.map(& &1.started) |> Enum.reject(&is_nil/1) |> Enum.min(fn -> nil end)
     }
   end
+
+  # The GitHub-style daily activity series — one bucket per calendar day (ISO "YYYY-MM-DD"), per metric.
+  # The client renders a year-long heatmap and lets you switch which metric drives the colour: tokens
+  # burned & runs launched (resource Run, by start day), work shipped (resource Todo done, by update
+  # day), and distinct agents driven that day. Real counts only — empty days simply don't appear.
+  defp profile_activity(tenant, uid) do
+    runs =
+      Run |> Nexus.Store.all(tenant) |> Enum.map(&Map.from_struct/1)
+      |> Enum.filter(&mine?(&1.user, uid))
+
+    done =
+      current_tasks(tenant)
+      |> Enum.filter(&(mine?(&1.created_by, uid) and &1.status == "done"))
+
+    %{
+      tokens: day_sum(runs, fn r -> {day_key(r.started), r.tokens || 0} end),
+      runs: day_sum(runs, fn r -> {day_key(r.started), 1} end),
+      shipped: day_sum(done, fn t -> {t.updated && day_key(div(t.updated, 1_000_000)), 1} end),
+      agents:
+        runs
+        |> Enum.group_by(fn r -> day_key(r.started) end)
+        |> Enum.reject(fn {d, _} -> is_nil(d) end)
+        |> Map.new(fn {d, rs} -> {d, rs |> Enum.map(& &1.agent) |> Enum.uniq() |> length()} end)
+    }
+  end
+
+  # Fold a list into %{"YYYY-MM-DD" => summed_value}, dropping anything with no resolvable day.
+  defp day_sum(items, mapper) do
+    Enum.reduce(items, %{}, fn it, acc ->
+      case mapper.(it) do
+        {nil, _} -> acc
+        {k, v} -> Map.update(acc, k, v, &(&1 + v))
+      end
+    end)
+  end
+
+  defp day_key(nil), do: nil
+
+  defp day_key(unix_sec) when is_integer(unix_sec) do
+    case DateTime.from_unix(unix_sec) do
+      {:ok, dt} -> dt |> DateTime.to_date() |> Date.to_iso8601()
+      _ -> nil
+    end
+  end
+
+  defp day_key(_), do: nil
 
   # The work this person authored, newest first — each tagged shipped|open so the client can render the
   # "systems you authored that got implemented" list directly.

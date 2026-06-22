@@ -36,6 +36,30 @@ WB.scopedStyles('/profile', `
   .pf-stat .spark { display:flex; align-items:flex-end; gap:3px; height:26px; margin-top:10px; }
   .pf-stat .spark i { flex:1; background:var(--accent,var(--mint)); border-radius:2px 2px 0 0; min-height:2px; opacity:.55; }
 
+  /* ── GitHub-style contribution heatmap ── */
+  .cal-card { margin:16px 0; }
+  .cal-head { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+  .cal-total { font-size:13.5px; color:var(--ink); }
+  .cal-total b { font-weight:700; }
+  .cal-tabs { display:flex; gap:6px; flex-wrap:wrap; }
+  .cal-tab { display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border:1.5px solid var(--line); border-radius:999px;
+    background:var(--card); color:var(--dim); font:600 12px var(--sans); cursor:pointer; }
+  .cal-tab:hover { border-color:var(--ink); color:var(--ink); }
+  .cal-tab.on { color:var(--ink); border-color:var(--mtacc); background:color-mix(in srgb, var(--mtacc) 14%, transparent); }
+  .cal-tab .swt { width:9px; height:9px; border-radius:2.5px; background:var(--mtacc); }
+  .cal-scroll { overflow-x:auto; padding-bottom:4px; }
+  .cal-grid-wrap { display:inline-grid; grid-template-columns:auto 1fr; gap:5px; --cell:12px; --gap:3px; }
+  .cal-months { grid-column:2; grid-row:1; display:grid; grid-auto-flow:column; grid-auto-columns:calc(var(--cell) + var(--gap)); font-size:10px; color:var(--dim); }
+  .cal-months span { white-space:nowrap; }
+  .cal-dows { grid-column:1; grid-row:2; display:grid; grid-template-rows:repeat(7, var(--cell)); gap:var(--gap); font-size:9.5px; color:var(--dim); align-content:start; padding-right:4px; }
+  .cal-dows span { height:var(--cell); line-height:var(--cell); }
+  .cal-grid { grid-column:2; grid-row:2; display:grid; grid-template-rows:repeat(7, var(--cell)); grid-auto-flow:column; grid-auto-columns:var(--cell); gap:var(--gap); }
+  .cal-cell { width:var(--cell); height:var(--cell); border-radius:2.5px; background:var(--pf-empty); }
+  .cal-legend { display:flex; align-items:center; gap:6px; justify-content:flex-end; font-size:10.5px; color:var(--dim); margin-top:12px; }
+  .cal-legend i { width:var(--cell); height:var(--cell); border-radius:2.5px; display:inline-block; }
+  [data-theme="dark"] .cal-card { --pf-empty:rgba(255,255,255,.05); }
+  [data-theme="light"] .cal-card, .cal-card { --pf-empty:rgba(0,0,0,.05); }
+
   .pf-sec { scroll-margin-top:20px; }
   .pf-sec h3 { margin:0 0 4px; }
   .pf-sec .sub { color:var(--dim); font-size:12.5px; margin:0 0 14px; }
@@ -82,6 +106,8 @@ WB.scopedStyles('/profile', `
       // ── state ──
       let profile = {};                 // editable layer (resource Profile)
       let stats = { tokens: 0, runs: 0, runs_ok: 0, agents: 0, shipped: 0, open: 0, first_run: null };
+      let activity = { tokens: {}, runs: {}, shipped: {}, agents: {} };
+      let metric = 'runs';            // which series drives the heatmap
       let contributions = [];
       let editing = false;
       let saving = false;
@@ -96,6 +122,7 @@ WB.scopedStyles('/profile', `
         try {
           const r = await (await api('/cloud/profile?u=' + encodeURIComponent(uid))).json();
           profile = r.profile || {}; stats = r.stats || stats; contributions = r.contributions || [];
+          if (r.activity) activity = Object.assign(activity, r.activity);
           // mirror avatar to the shell so the rail "You" tile shows the photo
           try { WB.profile = WB.profile || {}; WB.profile.avatar = profile.avatar || ''; } catch (e2) {}
         } catch (e) {}
@@ -224,24 +251,79 @@ WB.scopedStyles('/profile', `
         </div>`;
       }
 
-      function spark(seed) {
-        // a tiny deterministic shape so each stat reads as "alive" without faking precise history
-        const bars = [];
-        for (let i = 0; i < 9; i++) { const h = 20 + ((seed * 7 + i * i * 13) % 80); bars.push(`<i style="height:${h}%"></i>`); }
-        return `<div class="spark">${bars.join('')}</div>`;
+      // ── GitHub-style contribution heatmap ──
+      const METRICS = [
+        { key: 'tokens', label: 'Tokens used', acc: 'var(--violet)', noun: 'tokens', sum: true },
+        { key: 'runs', label: 'Runs launched', acc: 'var(--mint)', noun: 'runs', sum: false },
+        { key: 'shipped', label: 'Contributions shipped', acc: 'var(--peach)', noun: 'shipped', sum: false },
+        { key: 'agents', label: 'Agents driven', acc: 'var(--sky)', noun: 'agent-days', sum: false }
+      ];
+      const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      function isoDay(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+      function calDays() {
+        const end = new Date(); end.setHours(0, 0, 0, 0);
+        const start = new Date(end); start.setDate(start.getDate() - 363);
+        start.setDate(start.getDate() - start.getDay());   // back up to the Sunday → aligned week columns
+        const days = []; const d = new Date(start);
+        while (d <= end) { days.push(new Date(d)); d.setDate(d.getDate() + 1); }
+        return days;
       }
-      function statsGrid() {
-        const cards = [
-          { n: fmtNum(stats.tokens), l: 'Tokens used', s: stats.runs ? `across ${stats.runs} run${stats.runs === 1 ? '' : 's'}` : 'no runs yet', acc: 'var(--violet)', sp: stats.tokens },
-          { n: String(stats.runs), l: 'Runs launched', s: `${stats.runs_ok} succeeded`, acc: 'var(--mint)', sp: stats.runs },
-          { n: String(stats.shipped), l: 'Contributions shipped', s: stats.open ? `${stats.open} in flight` : 'authored & done', acc: 'var(--peach)', sp: stats.shipped },
-          { n: String(stats.agents), l: 'Agents driven', s: 'distinct agents you ran', acc: 'var(--sky)', sp: stats.agents }
-        ];
-        return `<div class="pf-stats">${cards.map((c, i) => `
-          <div class="pf-stat" style="--accent:${c.acc}">
-            <div class="n">${esc(c.n)}</div><div class="l">${esc(c.l)}</div><div class="s faint">${esc(c.s)}</div>
-            ${spark(c.sp + i + 1)}
-          </div>`).join('')}</div>`;
+      function levelOf(v, max) { if (!v) return 0; const q = Math.ceil((v / max) * 4); return Math.max(1, Math.min(4, q)); }
+      function cellColor(level, acc) {
+        if (!level) return 'var(--pf-empty)';
+        return `color-mix(in srgb, ${acc} ${[35, 60, 82, 100][level - 1]}%, transparent)`;
+      }
+
+      function activityChart() {
+        const m = METRICS.find((x) => x.key === metric) || METRICS[0];
+        const series = activity[metric] || {};
+        const vals = Object.values(series);
+        const max = Math.max(1, ...vals);
+        const total = vals.reduce((a, b) => a + b, 0);
+        const days = calDays();
+
+        const cells = days.map((d) => {
+          const key = isoDay(d);
+          const v = series[key] || 0;
+          const lvl = levelOf(v, max);
+          const human = m.sum ? `${v.toLocaleString()} ${m.noun}` : `${v} ${v === 1 ? m.noun.replace(/s$/, '') : m.noun}`;
+          const date = MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+          return `<span class="cal-cell" style="background:${cellColor(lvl, m.acc)}" title="${esc(human)} on ${esc(date)}"></span>`;
+        }).join('');
+
+        // month labels — one grid track per week, label where the month rolls over
+        const weeks = Math.ceil(days.length / 7);
+        let lastMonth = -1;
+        const months = [];
+        for (let w = 0; w < weeks; w++) {
+          const first = days[w * 7];
+          if (first && first.getMonth() !== lastMonth) { lastMonth = first.getMonth(); months.push(`<span>${MONTHS[lastMonth]}</span>`); }
+          else months.push('<span></span>');
+        }
+
+        const dows = ['', 'Mon', '', 'Wed', '', 'Fri', ''].map((l) => `<span>${l}</span>`).join('');
+        const tabs = METRICS.map((x) => `
+          <button class="cal-tab${x.key === metric ? ' on' : ''}" data-metric="${x.key}" style="--mtacc:${x.acc}">
+            <span class="swt"></span>${esc(x.label)}</button>`).join('');
+        const legend = [0, 1, 2, 3, 4].map((l) => `<i style="background:${cellColor(l, m.acc)}"></i>`).join('');
+        const totalTxt = m.sum ? total.toLocaleString() : String(total);
+
+        return `
+        <div class="card cal-card">
+          <div class="cal-head">
+            <div class="cal-total"><b>${esc(totalTxt)}</b> ${esc(m.noun)} in the last year</div>
+            <div class="cal-tabs">${tabs}</div>
+          </div>
+          <div class="cal-scroll">
+            <div class="cal-grid-wrap">
+              <div class="cal-months">${months.join('')}</div>
+              <div class="cal-dows">${dows}</div>
+              <div class="cal-grid">${cells}</div>
+            </div>
+          </div>
+          <div class="cal-legend">Less ${legend} More</div>
+        </div>`;
       }
 
       function contribSection() {
@@ -325,7 +407,7 @@ WB.scopedStyles('/profile', `
 <section>
   <div class="sechead"><div><h2>You</h2><p>Your profile &amp; what you've built on this nexus</p></div></div>
   ${hero()}
-  ${statsGrid()}
+  ${activityChart()}
   ${contribSection()}
   ${usageSection()}
   ${cliSection()}
@@ -340,6 +422,7 @@ WB.scopedStyles('/profile', `
         bind('d_display', 'display'); bind('d_tag', 'tagline'); bind('d_bio', 'bio'); bind('d_loc', 'location'); bind('d_links', 'links');
         const tn = el.querySelector('#tokname'); if (tn) tn.oninput = (e) => { tokName = e.target.value; };
 
+        el.querySelectorAll('[data-metric]').forEach((b) => b.onclick = () => { metric = b.getAttribute('data-metric'); paint(); });
         el.querySelectorAll('[data-accent]').forEach((s) => s.onclick = () => { draft.accent = s.getAttribute('data-accent'); paint(); });
         el.querySelectorAll('[data-theme]').forEach((b) => b.onclick = () => setTheme(b.getAttribute('data-theme')));
         el.querySelectorAll('[data-revoke]').forEach((b) => b.onclick = () => revoke(b.getAttribute('data-revoke')));
