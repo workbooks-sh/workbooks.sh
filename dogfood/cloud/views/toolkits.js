@@ -38,11 +38,11 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
 
   function connectOauth(p){
     return new Promise(async function(resolve){
-      var label = await WB.prompt({ title:'Connect ' + p.name, placeholder:'Name this account', confirm:'Authorize' });
-      if (!label) return resolve(false);
+      // No "name this account" step — go straight to OAuth; the connection is auto-labeled from the
+      // authorized identity (GitHub login, Google email, …) server-side. New or existing, same flow.
       var info;
       try { info = await getJSON('/cloud/integrations/authorize?provider=' + encodeURIComponent(p.id) +
-        '&label=' + encodeURIComponent(label) + '&origin=' + encodeURIComponent(location.origin)); }
+        '&origin=' + encodeURIComponent(location.origin)); }
       catch (e) { WB.toast('Could not start authorization'); return resolve(false); }
       if (!info || !info.url) { WB.toast(info && info.error ? info.error : 'Not configured'); return resolve(false); }
       var popup = window.open(info.url, 'wb-oauth', 'width=520,height=680');

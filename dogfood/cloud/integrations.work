@@ -207,7 +207,6 @@ server :integrations do
 
     cond do
       is_nil(s) or s.mode != :oauth2 -> {400, %{error: "not an OAuth provider"}}
-      label == "" -> {400, %{error: "name this account"}}
       not configured?(s) -> {400, %{error: "#{s.name} OAuth app not configured (set #{client_id_secret(provider)} / #{client_secret_secret(provider)})"}}
       origin == "" -> {400, %{error: "origin required"}}
       true ->
@@ -256,11 +255,53 @@ server :integrations do
     {:ok, asid} = seal(tenant, id, "ACCESS", tokens.access)
     refresh_id = if tokens.refresh, do: with({:ok, rid} <- seal(tenant, id, "REFRESH", tokens.refresh), do: rid)
 
-    store_connection(tenant, id, provider, label, %{
+    store_connection(tenant, id, provider, account_label(provider, label, tokens.access), %{
       access_secret_id: asid,
       refresh_secret_id: refresh_id,
       expires_at: tokens.expires_at
     })
+  end
+
+  # The connection's display name. If the popup supplied one, keep it; otherwise derive it from the
+  # authorized identity (GitHub login, Google email) so connecting is just Connect → OAuth, no naming.
+  defp account_label(provider, label, access) do
+    case String.trim(to_string(label)) do
+      "" -> derive_label(provider, access) || String.capitalize(provider)
+      l -> l
+    end
+  end
+
+  defp derive_label("github", token),
+    do: identity_field("https://api.github.com/user", token, "login")
+
+  defp derive_label("gmail", token),
+    do: identity_field("https://www.googleapis.com/oauth2/v2/userinfo", token, "email")
+
+  defp derive_label(_provider, _token), do: nil
+
+  # GET a provider identity endpoint with the fresh access token and pull one field for the label.
+  defp identity_field(url, token, key) do
+    :inets.start()
+    :ssl.start()
+
+    headers = [
+      {~c"authorization", ~c"Bearer " ++ to_charlist(token)},
+      {~c"accept", ~c"application/json"},
+      {~c"user-agent", ~c"workbooks-nexus"}
+    ]
+
+    case :httpc.request(:get, {to_charlist(url), headers}, [timeout: 10_000, ssl: [verify: :verify_none]], body_format: :binary) do
+      {:ok, {{_, code, _}, _h, body}} when code in 200..299 ->
+        case Jason.decode(body) do
+          {:ok, m} when is_map(m) -> m[key]
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  rescue
+    _ -> nil
   end
 
   # ── refresh — the seam toolkits call. Returns a live access token, refreshing if expired. ───────
