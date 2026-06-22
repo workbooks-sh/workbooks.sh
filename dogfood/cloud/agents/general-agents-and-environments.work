@@ -1,0 +1,125 @@
+General agents, snapshot-isolated evals & environments — the formal plan #agents #evals #environments #design #plan
+
+The settled (and still-open) design for three intertwined things that turned out to be
+**one mechanism**: a permission tier for **general agents**, **snapshot-isolated evals**, and
+**dev/staging/production environments**. Captured so no detail is lost as we build. This is
+**our cloud product** (dogfood workbooks via the DeployKit), NOT the open-standard nexus image —
+see [[the-line]]. Companion to [[design]] (the agent service). Tracking: bd `wb-m52l` (foundation),
+`wb-bhyk` (environments), `wb-hqu5` (eval harness).
+
+## The unifying insight
+
+An **eval**, a per-user **dev tree**, and a **safe agent run** are the SAME primitive: a
+**snapshot-isolated overlay** of the workspace tree that you then either **discard** (restore the
+snapshot) or **promote** (integrate forward). Build that primitive once and all three fall out.
+We are NOT building three separate apps or three subsystems — one nexus, branch/overlays of one
+tree, jj for the merges, a human gate before anything reaches production.
+
+## 1 — The agent permission model (four independent axes)
+
+An agent block declares capability along four ORTHOGONAL axes. Three exist today; the fourth
+(**scope**) is the new tier this plan adds.
+
+- **`capabilities`** — toolkit admission: `:all` (workhorse) · `:none` (autopoet) · `[ids]`.
+  (Built — `Nexus.Agent.capabilities/admits?/admitted`.)
+- **`grant`** — host capabilities the run gets: `fs`, `exec`, `browse`, `commands`. (Built.)
+- **`ceiling`** — the subtree edit boundary the autopoet may autonomously edit within. (Built —
+  the structural triad grant/ceiling/management.)
+- **`scope`** — NEW. WHICH workspaces the agent operates over:
+  - **workspace-scoped** (default) — the run is a jj worktree of ONE workspace; confined to `/work`.
+  - **general** — operates over the WHOLE workspace tree (root of all workspaces, **NOT** the host
+    filesystem root). Can create / edit / delete / manage **any** workspace. **workhorse** and
+    **autopoet** are general; **must be declared explicitly** (a deliberate, server-enforced grant).
+    Adding another general agent is allowed but always explicit. See [[general-vs-workspace-agents]].
+
+A "**general** workspace" = the root level across all workspaces (what a general run sees as `/work`).
+
+## 2 — jj snapshot / restore (BUILT — wb-m52l phase 1)
+
+`Nexus.JJ.snapshot(dir)` captures the current op-log head (a short hex op-id);
+`Nexus.JJ.restore(dir, op_id)` runs `jj op restore <op_id>` + re-export, reverting the working
+copy + bookmarks to that op and discarding everything since (op-id re-validated). Verified with
+jj 0.39. This is the per-repo isolation primitive. (`nexus/lib/jj.ex`; test `git_jj_test.exs`.)
+
+**Open:** a workspace is its OWN repo, so a TREE-level snapshot (for a general run that creates a
+NEW workspace) must capture {set of workspaces, per-workspace op-id}. Restore = delete workspaces
+created since + `restore/2` each pre-existing one. Build as `Nexus.Eval`/tree-snapshot on top of
+`snapshot/2`. (Phase 3 below.)
+
+## 3 — General-agent run model (DECIDED: tree-root + auto-register) — wb-m52l phase 2
+
+- A **general** run mounts `/work` = the **workspace-tree root** (all workspaces as subdirs), not a
+  single worktree, not the host fs root.
+- The agent makes a new top-level dir + files → on **finalize**, the runtime **registers any new
+  top-level dir as a real workspace** (CP record + bare repo at `/git/<id>.git` + working tree +
+  mount — reuse `Nexus.Git.provision_remote` / the platform create path). Removed top-level dirs
+  **deprovision** (and clean up the repos — fixes the known cascade-delete gap at `platform.ex:315`).
+- **Enforcement:** only `scope: general` agents get tree-root `/work`; a workspace-scoped agent can
+  never reach it. Gate server-side in the run path (`Nexus.Agent.setup_vfs`).
+- Likely also expose an explicit lifecycle action (a `workspace` kit verb) later for auditability;
+  start with auto-register (the decided mechanism).
+
+## 4 — Snapshot-isolated evals — wb-hqu5
+
+An eval run = snapshot the tree → run the (general) agent → score → **restore** the snapshot.
+Re-runnable from an identical baseline; **zero production pollution**. "Dev mode" for an agent is the
+same thing without the auto-restore (you keep the overlay to review/promote). The marketing-workspace
+eval ("workhorse, create a `marketing` workspace + skeleton") runs here.
+
+## 5 — Environments: dev / staging / production (NOT three apps) — wb-bhyk
+
+Environments are **refs/overlays over the ONE workspace tree on the ONE nexus** (the push-to-deploy
+overlay model already in `Nexus.Server` + jj). No extra deployments. See [[one-nexus-per-org]].
+
+- **dev** — per-user, MANY, cheap. Your own overlay/branch off prod (a snapshot-isolated workspace
+  tree). The nexus serves it **to you**. You maintain your own dev tree.
+- **staging** — exactly ONE, shared (multi-user). A PR target ("we agree this is next"). Managing PRs
+  from many dev trees → one staging.
+- **production** — the ONE served default (what everyone gets).
+- **Promotion** = PR / `Nexus.JJ.integrate` dev → staging → prod (jj CRDT merges).
+- **Switching** = a selector in user settings; the nexus serves you whichever ref. Using an agent MAY
+  auto-switch your view to your dev overlay so you see changes live.
+
+### Agents in the environment model (the "don't go nuclear" guarantee)
+
+- General agents (workhorse/autopoet) **never edit production directly** — they work on a **dev
+  overlay**, snapshot-isolated. Worst case: restore the snapshot, as if nothing happened.
+- **workhorse (interactive)** — running it auto-switches your Studio view to your dev overlay; you
+  watch changes land live; a **HITL "promote"** step opens the PR to staging/prod.
+- **autopoet (headless)** — works on a dev overlay, opens a **PR with a diff**; you review in
+  chat/Studio and promote. Never auto-touches prod.
+
+## 6 — Open questions (do NOT lose these)
+
+- Tree-level snapshot/restore shape (per-workspace op-ids + workspace-set diff) — §2 open.
+- Does using an agent **auto-switch** the user's visual environment to their dev overlay, or is it
+  headless with review-in-chat / HITL? (Leaning: workhorse auto-switch + watch; autopoet headless PR.)
+- Where the env selector lives (user settings) + how a session pins its env.
+- staging: is it a single shared branch with PR queue, or per-feature? (Leaning: one staging, PR queue.)
+- Is staging == production sometimes (small orgs)? (Possibly collapse to dev+prod.)
+- Deprovision/cleanup semantics on workspace delete (cascade repos + CP + mount).
+- How `work` CLI selects env (`--env dev|staging|prod`) for headless agent/eval runs.
+
+## 7 — Phased build + status
+
+1. **jj snapshot/restore** — ✅ DONE (wb-m52l P1, committed).
+2. **General-agent scope tier** — tree-root `/work` + auto-register + enforcement (wb-m52l P2). NEXT.
+3. **Tree-level eval snapshot/restore** + the eval harness (wb-hqu5), incl. the marketing eval.
+4. **Environments** — env selector + serve-which-ref + PR/promote UX (wb-bhyk), built on 1–3.
+5. **Agent UX** — workhorse auto-switch-to-dev + HITL promote; autopoet headless PR.
+
+## 8 — Eval findings already banked (the loop is working)
+
+- ✅ **Kit substrate** (wb-gx3y) — deployed agents had no wasmtime + no kit wasm; FIXED + verified
+  live (workhorse runs real coreutils on GLM 5.2 via the CF AI Gateway).
+- ✅ **scrape/render crash** (wb-dwsi) — `Extract.tidy/1` got an iolist title → `String.replace/4`
+  crash; FIXED + regression test.
+- ✅ **Sandbox is tight** (security verified) — a run is confined to a single WASI pre-opened `/work`;
+  can't escape, read host env/secrets, or write outside its workspace.
+- 📋 bash isn't POSIX (no `>`/`;`/`2>&1`, only pipes + `tee`); the `web` kit summary misleads the
+  agent into `web fetch` (command is `fetch`); `do_run` swallows run stacktraces (log `__STACKTRACE__`).
+
+## 9 — Foundations this rides on
+
+[[general-vs-workspace-agents]] · [[agents-and-capabilities-model]] · [[agent-is-a-sandboxed-function]] ·
+[[nexus-is-a-git-remote]] · [[one-nexus-per-org]] · [[cli-agent-ops-dogfood-epic]] · [[secrets-one-env-and-org-fix]]
