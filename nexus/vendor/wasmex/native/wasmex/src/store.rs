@@ -909,6 +909,7 @@ pub fn component_store_new(
     limits: Option<ExStoreLimits>,
     engine_resource: ResourceArc<EngineResource>,
 ) -> Result<ResourceArc<ComponentStoreResource>, rustler::Error> {
+    let use_epoch = engine_resource.epoch;
     let engine = unwrap_engine(engine_resource)?;
     let limits = if let Some(limits) = limits {
         limits.to_wasmtime()
@@ -928,6 +929,12 @@ pub fn component_store_new(
         },
     );
     store.limiter(|state| &mut state.limits);
+    // wb-9jqy: on an epoch engine, arm a generous initial deadline so instantiation (which runs the
+    // component's init/`allocate_stack`) doesn't trap on the default-0 deadline. A per-call
+    // set_epoch_deadline tightens it to the real compute budget.
+    if use_epoch {
+        store.set_epoch_deadline(1_000_000_000);
+    }
     let resource: ResourceArc<ComponentStoreResource> = ResourceArc::new(ComponentStoreResource {
         inner: Mutex::new(store),
     });
@@ -1008,6 +1015,7 @@ pub fn component_store_new_wasi(
             });
     }
 
+    let use_epoch = engine_resource.epoch;
     let engine = unwrap_engine(engine_resource)?;
     let limits = if let Some(limits) = limits {
         limits.to_wasmtime()
@@ -1034,6 +1042,10 @@ pub fn component_store_new_wasi(
         },
     );
     store.limiter(|state| &mut state.limits);
+    // wb-9jqy: arm a generous initial epoch deadline so instantiation doesn't trap (see component_store_new).
+    if use_epoch {
+        store.set_epoch_deadline(1_000_000_000);
+    }
     let resource: ResourceArc<ComponentStoreResource> = ResourceArc::new(ComponentStoreResource {
         inner: Mutex::new(store),
     });

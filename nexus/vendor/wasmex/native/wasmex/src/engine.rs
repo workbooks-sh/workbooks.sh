@@ -38,6 +38,10 @@ impl Resource for EngineResource {}
 
 pub struct EngineResource {
     pub inner: Mutex<Engine>,
+    // wb-9jqy: whether this engine was built with epoch_interruption. A store on such an engine MUST
+    // be given an epoch deadline before any wasm runs (default deadline 0 traps immediately, even at
+    // instantiation), so component_store_new arms a generous initial deadline when this is true.
+    pub epoch: bool,
 }
 
 #[rustler::nif(name = "engine_new")]
@@ -69,6 +73,7 @@ pub fn new(
 
     let resource = ResourceArc::new(EngineResource {
         inner: Mutex::new(engine),
+        epoch,
     });
 
     Ok(resource)
