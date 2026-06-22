@@ -116,19 +116,26 @@ server :integrations do
   # ── the built-in TOOLKIT catalog — capabilities that need no external account (the other KIND). Only
   # genuinely-shipping ones; sandbox/git/ffmpeg are core nexus infrastructure, not add-ons, so they're
   # not listed here. These are default-added (enabled) and can be disabled per tenant.
+  # >>> GENERATED toolkit registry — DO NOT EDIT BY HAND.
+  # Source of truth: toolkits/*/manifest.html with a `data-dashboard="<blurb>"` attr.
+  # Regenerate: python3 toolkits/gen_dashboard_registry.py
   def standalone_catalog do
     [
       %{id: "presentation", name: "Presentation", status: "ready", default: true,
         blurb: "Build reveal.js decks straight from your content.",
-        detail: "Ask an agent for a presentation and get a real reveal.js deck — arrow-key nav, fullscreen, per-slide URLs — not a scroll page. Authored from a deck spec or an Org workbook; ships as one self-contained HTML."},
+        detail: "Ask for a presentation, get reveal.js — slide nav, fullscreen, per-slide URLs. The capability is \"presentation\"; the impl is reveal.js, swappable."},
       %{id: "video", name: "Video", status: "ready", default: true,
-        blurb: "In-nexus HTML → video rendering for motion graphics. No external tooling.",
-        detail: "Ask for a video and get HyperFrames — author a scene (onReady/onTick on a fixed canvas) and the nexus renders it to a clip. No external tooling or accounts."},
+        blurb: "In-nexus HTML → video rendering. No external tooling.",
+        detail: "Ask for a video, get HyperFrames — author a wavelet scene (onReady/onTick, fixed canvas), wavelet renders it to a clip. The capability is \"video\"; the impl is hyperframes, swappable."},
       %{id: "research", name: "Research", status: "ready", default: true,
-        blurb: "Multi-source web research → organized, cited findings. No external tooling.",
-        detail: "Ask a question and get a structured, cited brief — the Deep Researcher agent fans out searches, reads sources, and synthesizes findings into an organized answer, not a doc dump. Ships its own agent."}
+        blurb: "Multi-source web research → organized, cited findings.",
+        detail: "Ask a question, get a structured cited brief — the Deep Researcher fans out searches, reads sources, and synthesizes findings into an organized answer, not a doc dump. Ships its own agent, no account."},
+      %{id: "toolkit-forge", name: "Toolkit Forge", status: "ready", default: true,
+        blurb: "Forge a new toolkit from an npm package, GitHub URL, or a need.",
+        detail: "Forge a new toolkit from a target — npm name / GitHub URL / semantic need — by research → study real surface → author deep skills + manifest to the toolkits/AUTHORING.md standard."}
     ]
   end
+  # <<< GENERATED
 
   # Built-in toolkits are default-added; a tenant can disable one (stored as a :toolkit record with
   # enabled:false). `enabled?/2` resolves the effective state.
