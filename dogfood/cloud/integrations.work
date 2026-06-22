@@ -136,7 +136,19 @@ server :integrations do
       %{id: "toolkit-forge", name: "Toolkit Forge", status: "ready", default: true,
         cap_kind: "skill", requires: [], recommends: nil,
         blurb: "Forge a new toolkit from an npm package, GitHub URL, or a need.",
-        detail: "Forge a new toolkit from a target — npm name / GitHub URL / semantic need — by research → study real surface → author deep skills + manifest to the toolkits/AUTHORING.md standard."}
+        detail: "Forge a new toolkit from a target — npm name / GitHub URL / semantic need — by research → study real surface → author deep skills + manifest to the toolkits/AUTHORING.md standard."},
+      %{id: "image-generation", name: "Image Generation", status: "ready", default: true,
+        cap_kind: "agent-led", requires: [], recommends: nil,
+        blurb: "Generate images from a prompt — routes to the right image model.",
+        detail: "Ask for an image, get one — this capability routes a text prompt to a text-to-image model on the gateway (Flux, SDXL, Ideogram, …), chosen by quality + cost, and returns the asset. The model roster is the live text-to-image set; per-model skill context improves over time."},
+      %{id: "speech", name: "Speech", status: "ready", default: true,
+        cap_kind: "agent-led", requires: [], recommends: nil,
+        blurb: "Turn text into spoken audio — routes to the right voice model.",
+        detail: "Ask for narration / a voiceover / spoken audio, get a clip — this capability routes text to a text-to-speech model on the gateway (Aura, MeloTTS, …), chosen by voice + cost, and returns the audio. Live roster, improvable skill context."},
+      %{id: "video-generation", name: "Video Generation", status: "ready", default: true,
+        cap_kind: "agent-led", requires: [], recommends: nil,
+        blurb: "Generate video from a prompt or image — routes to the right video model.",
+        detail: "Ask for a generated clip, get one — this capability routes a prompt (or a still) to a text-to-video / image-to-video model on the gateway (Runway, Kling, Krea, …), chosen by length + cost, and returns the clip. Distinct from the HyperFrames `video` toolkit, which authors deterministic motion graphics; this one is generative AI video. Live roster, improvable skill context."}
     ]
   end
   # <<< GENERATED

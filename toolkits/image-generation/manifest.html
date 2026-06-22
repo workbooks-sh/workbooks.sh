@@ -1,0 +1,20 @@
+<work-ref data-kind="agent-led" rel="kit" name="image-generation" prefix="imagegen" version="0.1.0" status="beta" skill-dir="skills/" data-dashboard="Generate images from a prompt — routes to the right image model." tagline="Ask for an image, get one — this capability routes a text prompt to a text-to-image model on the gateway (Flux, SDXL, Ideogram, …), chosen by quality + cost, and returns the asset. The model roster is the live text-to-image set; per-model skill context improves over time." data-impl="cf-gateway" data-output="image"/>
+  <work-doc title="image-generation — text → image router">
+    When the user asks for an *image*, *picture*, *logo*, *illustration*, *icon*, or
+    *art*, reach for this capability. It is a ROUTER over the gateway's text-to-image
+    (and image-to-image) models: you call it with a prompt (+ optional size / style /
+    reference image) and it dispatches to a concrete model, returning the asset.
+
+    Picking a model — read the live roster (GET /cloud/generators → "image"):
+    | Want                         | Reach for                                  |
+    |------------------------------+--------------------------------------------|
+    | Photoreal / high fidelity    | a large frontier model (Flux.1, SDXL)      |
+    | Fast drafts / iteration      | a fast/turbo model (lcm, *-lightning)      |
+    | Legible text inside the image | a text-aware model (Ideogram-class)        |
+    | Edit / vary an existing image | an image-to-image model (pass the source)  |
+
+    Favor the cheapest model that meets the brief — cost + latency live in the model
+    metadata. The roster is LIVE (every gateway model whose OUTPUT modality is
+    "image"); this toolkit carries only the routing skill + per-model notes, so new
+    gateway models appear automatically without an edit here.
+  </work-doc>

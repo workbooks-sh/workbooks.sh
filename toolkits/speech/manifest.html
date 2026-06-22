@@ -1,0 +1,16 @@
+<work-ref data-kind="agent-led" rel="kit" name="speech" prefix="speech" version="0.1.0" status="beta" skill-dir="skills/" data-dashboard="Turn text into spoken audio — routes to the right voice model." tagline="Ask for narration / a voiceover / spoken audio, get a clip — this capability routes text to a text-to-speech model on the gateway (Aura, MeloTTS, …), chosen by voice + cost, and returns the audio. Live roster, improvable skill context." data-impl="cf-gateway" data-output="audio"/>
+  <work-doc title="speech — text → audio router">
+    When the user asks for *narration*, a *voiceover*, *spoken audio*, or to *read
+    something aloud*, reach for this capability. It is a ROUTER over the gateway's
+    text-to-speech models: call it with text (+ optional voice / language) and it
+    dispatches to a concrete model, returning the audio clip.
+
+    Picking a model — read the live roster (GET /cloud/generators → "audio"): prefer
+    natural/expressive voices for narration, fast/cheap models for short cues or
+    drafts, and multilingual models when the text isn't English. Cost lives in the
+    model metadata. The roster is LIVE (every gateway model whose OUTPUT modality is
+    "audio"); new voice models appear automatically.
+
+    (Speech-to-text / transcription is the inverse task — that's an
+    Automatic-Speech-Recognition model, not this capability.)
+  </work-doc>

@@ -125,6 +125,7 @@ server :cloud do
   # Catalog of routable provider/model ids; per-org balance + default-model + caps; top-off intent.
   # THE LINE: gateway account, pricing (5% CF + 0.5% WB), and branding are OUR cloud product, not the std.
   route "GET /cloud/inference/models", :inference_models
+  route "GET /cloud/generators", :generators
   route "GET /cloud/inference", :inference_status
   route "POST /cloud/inference/config", :inference_config_save
   route "POST /cloud/inference/topup", :inference_topup
@@ -2245,6 +2246,22 @@ server :cloud do
   end
 
   def inference_models(_req), do: %{models: inference_model_list(), provider: "Workbooks Inference", default_model: @inference_default_model}
+
+  # The generator-model roster behind the image/video/speech toolkits — every catalog model whose OUTPUT is
+  # a non-text modality, grouped by that modality (image | video | audio | …). The generator toolkits are
+  # ROUTERS over this LIVE set: the .work manifest/skill carries the routing context, the model list is
+  # never hardcoded, so new gateway generators surface automatically. Map toolkit → modality keeps the two
+  # in sync (image-generation→image, video-generation→video, speech→audio).
+  @generator_toolkits %{"image" => "image-generation", "video" => "video-generation", "audio" => "speech"}
+
+  def generators(_req) do
+    grouped =
+      inference_model_list()
+      |> Enum.filter(&(&1[:role] == "generator"))
+      |> Enum.group_by(fn m -> List.first(m[:modal_out] || ["text"]) end)
+
+    %{generators: grouped, toolkits: @generator_toolkits}
+  end
 
   defp inference_config(tenant) do
     case Nexus.ControlPlane.get(tenant, :inference, "config") do

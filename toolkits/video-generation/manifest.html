@@ -1,0 +1,19 @@
+<work-ref data-kind="agent-led" rel="kit" name="video-generation" prefix="videogen" version="0.1.0" status="beta" skill-dir="skills/" data-dashboard="Generate video from a prompt or image — routes to the right video model." tagline="Ask for a generated clip, get one — this capability routes a prompt (or a still) to a text-to-video / image-to-video model on the gateway (Runway, Kling, Krea, …), chosen by length + cost, and returns the clip. Distinct from the HyperFrames `video` toolkit, which authors deterministic motion graphics; this one is generative AI video. Live roster, improvable skill context." data-impl="cf-gateway" data-output="video"/>
+  <work-doc title="video-generation — text/image → video router">
+    When the user asks for a *generated video*, *AI clip*, *b-roll*, or wants to
+    *animate a still*, reach for this capability. It is a ROUTER over the gateway's
+    text-to-video and image-to-video models: call it with a prompt (and optionally a
+    source image) and it dispatches to a concrete model, returning the clip.
+
+    Distinguish the two video capabilities:
+    - `video-generation` (this) — GENERATIVE AI video from a prompt/still (Runway,
+      Kling, Krea, Pruna). Non-deterministic, model-driven.
+    - `video` (HyperFrames) — AUTHORED, deterministic motion graphics / title cards /
+      data-driven animation rendered to a clip. Use that for exact, repeatable motion.
+
+    Picking a model — read the live roster (GET /cloud/generators → "video"): prefer
+    higher-fidelity models for hero shots, faster/cheaper ones for drafts; use an
+    image-to-video model when the user supplies a starting frame. Cost + max clip
+    length live in the model metadata. The roster is LIVE (every gateway model whose
+    OUTPUT modality is "video"); new models appear automatically.
+  </work-doc>
