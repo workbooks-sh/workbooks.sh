@@ -65,9 +65,17 @@ defmodule Nexus.Effects do
       :ok
     end)
 
-    # `run` / `call` — invoke an agent or a unit function as a side effect (through the normal paths).
-    # `args`: %{agent: "name", task: "..."} → Nexus.Agent.run; or %{mfa: {Mod, :fun, [args]}} → apply.
+    # `run` / `call` — invoke an agent or a flow as a side effect (through the normal, capability-gated
+    # paths). `args`: %{agent: "name", task: "..."} → Nexus.Agent.run; %{flow: "name"} → Nexus.Flow.run.
+    #
+    # SECURITY (wb-v9yp): there is deliberately NO raw `mfa: {Mod,Fun,Args}` branch. A hook compiles
+    # from any authored `.work`, so an `mfa` escape hatch let a hook author run `apply(System,:cmd,…)`
+    # — arbitrary native Elixir on the host BEAM, outside every sandbox/tenant/grant (host RCE). Effects
+    # may only invoke the named, capability-gated runtimes (agents/flows), never an arbitrary MFA. The
+    # firing event's `tenant` is threaded through so the run is scoped to that tenant (wb-j05s).
     runner = fn args, event, ctx ->
+      tenant = ctx[:tenant]
+
       cond do
         is_binary(args[:flow]) ->
           Nexus.Flow.run(args[:flow], args[:input] || event[:title] || event[:kind] || "", ctx)
@@ -76,16 +84,12 @@ defmodule Nexus.Effects do
           task = args[:task] || event[:title] || event[:kind] || ""
           # resolve a DECLARED agent (its prompt/tools/grant/limit); fall back to an ad-hoc run.
           case Nexus.Agent.get(args[:agent]) do
-            nil -> Nexus.Agent.run(task: task, unit: args[:agent])
-            node -> Nexus.Agent.run_unit(node, task)
+            nil -> Nexus.Agent.run(task: task, unit: args[:agent], tenant: tenant)
+            node -> Nexus.Agent.run_unit(node, task, tenant: tenant)
           end
 
-        match?({m, f, a} when is_atom(m) and is_atom(f) and is_list(a), args[:mfa]) ->
-          {m, f, a} = args[:mfa]
-          apply(m, f, a)
-
         true ->
-          {:error, :run_needs_agent_or_mfa}
+          {:error, :run_needs_agent_or_flow}
       end
     end
 

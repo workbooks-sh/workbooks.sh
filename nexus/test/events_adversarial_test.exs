@@ -364,26 +364,21 @@ defmodule Nexus.EventsAdversarialTest do
 
   # ── 7. Builtins ─────────────────────────────────────────────────────────────
 
-  test "P7a: run with valid mfa applies it" do
+  # wb-v9yp: the raw `mfa` escape hatch is REMOVED — a hook author must never be able to apply an
+  # arbitrary MFA (that was host RCE outside every sandbox/tenant/grant). `run` accepts only the
+  # named, capability-gated runtimes (agent/flow); any `mfa` arg is ignored and rejected.
+  test "P7a: run REFUSES a raw mfa (no host RCE)" do
     handler = Effects.handlers()["run"]
-    assert handler.(%{mfa: {Kernel, :+, [40, 2]}}, %{}, %{}) == 42
+    # a hostile mfa that would run a shell — must NOT be applied; rejected like any unknown arg.
+    assert handler.(%{mfa: {System, :cmd, ["sh", ["-c", "echo pwned"]]}}, %{}, %{}) ==
+             {:error, :run_needs_agent_or_flow}
+
+    assert handler.(%{mfa: {Kernel, :+, [40, 2]}}, %{}, %{}) == {:error, :run_needs_agent_or_flow}
   end
 
-  test "P7b: run with invalid module returns error tuple or raises (documented)" do
+  test "P7c: run with neither agent nor flow returns error" do
     handler = Effects.handlers()["run"]
-    result = try do
-      handler.(%{mfa: {NoSuchModule, :nope, []}}, %{}, %{})
-    rescue
-      e -> {:raised, e}
-    end
-    # apply on missing module raises UndefinedFunctionError — caught by bus try/rescue at dispatch.
-    assert match?({:raised, _}, result) or match?({:error, _}, result),
-           "got #{inspect(result)}"
-  end
-
-  test "P7c: run with neither agent nor mfa returns error" do
-    handler = Effects.handlers()["run"]
-    assert handler.(%{}, %{}, %{}) == {:error, :run_needs_agent_or_mfa}
+    assert handler.(%{}, %{}, %{}) == {:error, :run_needs_agent_or_flow}
   end
 
   test "P7d: notify with and without title returns :ok" do
