@@ -162,6 +162,39 @@ defmodule Nexus.Git do
     end
   end
 
+  @doc """
+  Commit ALL pending changes in the work-tree (add/modify/delete/rename) and return `{:ok, sha}`.
+  Unlike `commit_file/5` (single pathspec), this stages the whole tree — for moves/deletes where more
+  than one path changes. Same jj-substrate routing + author attribution + mirror push as `commit_file`.
+  """
+  def commit_paths(bare, work_dir, message, opts \\ []) when is_binary(message) do
+    with true <- Nexus.JJ.substrate?(),
+         {:ok, sha} <- Nexus.JJ.commit_change(bare, work_dir, message, opts) do
+      mirror_if_configured(bare)
+      {:ok, sha}
+    else
+      _ ->
+        base = ["--git-dir=#{bare}", "--work-tree=#{work_dir}", "-c", "core.bare=false"]
+        System.cmd("git", base ++ ["add", "-A"], cd: work_dir, stderr_to_stdout: true)
+
+        author_args =
+          case Keyword.get(opts, :author) do
+            a when is_binary(a) and a != "" -> ["--author", a]
+            _ -> []
+          end
+
+        case System.cmd("git", base ++ ["-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", message] ++ author_args, cd: work_dir, stderr_to_stdout: true) do
+          {_, 0} ->
+            {sha, _} = System.cmd("git", ["--git-dir=#{bare}", "rev-parse", "--short", "HEAD"], stderr_to_stdout: true)
+            mirror_if_configured(bare)
+            {:ok, String.trim(sha)}
+
+          {out, _} ->
+            if String.contains?(out, "nothing to commit"), do: :nochange, else: {:error, out}
+        end
+    end
+  end
+
   defp mirror_if_configured(bare) do
     case System.cmd("git", ["--git-dir=#{bare}", "config", "--get", "workbooks.mirror"], stderr_to_stdout: true) do
       {url, 0} when byte_size(url) > 1 ->

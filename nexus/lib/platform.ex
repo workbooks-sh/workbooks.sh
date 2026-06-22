@@ -122,9 +122,15 @@ defmodule Nexus.Platform do
     # One org per user (native auth). Drop the WorkOS lookup — orgs is the user's own org.
     o = org(conn)
     orgs = if is_binary(o), do: [%{id: o, name: org_name(o)}], else: []
+    # The signed-in user's role(s) in this org (owner|admin|member|viewer). The dashboard gates its
+    # context-menu actions on this via WB.can — hiding what the role can't do. Server routes remain the
+    # real authority (Nexus.Auth.Guard); this is the UX mirror of it.
+    roles = id[:roles] || []
+    role = List.first(roles) || "owner"
     # Native session carries name/email (Nexus.Auth.Native.identity); surface them so the
     # dashboard's account row shows the real signed-in user, not a blank.
-    j(conn, 200, %{user: %{id: user_id, name: id[:name] || "", email: id[:email] || ""}, active_org: o, orgs: orgs})
+    j(conn, 200, %{user: %{id: user_id, name: id[:name] || "", email: id[:email] || ""},
+                   active_org: o, orgs: orgs, role: role, roles: roles})
   end
 
   get "/storage" do
