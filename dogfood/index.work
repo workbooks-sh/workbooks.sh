@@ -27,6 +27,10 @@ deploy do
   # Our nexus's display emoji + its WORKSPACES — curated folders of work, NOT every mount. Each line:
   # `folder | Name | emoji`. The dashboard reads these; the UI emoji picker overrides an icon per-org.
   nexus-emoji="🐕"
+  # jj (Jujutsu) as the working substrate: every workspace gets an op-log + `jj undo`, colocated over
+  # its git repo. This is how agents/users edit (snapshots), with git as the storage/transport beneath.
+  # Requires the jj binary in the runtime image (dogfood/deploy/Dockerfile.base).
+  jj-substrate="on"
   # The front door: the lander subtree serves at `/` (and its blog at `/blog`), so workbooks.sh/ is the
   # landing page. The other surfaces keep their paths (cloud → /cloud, docs → /docs).
   home="lander"
