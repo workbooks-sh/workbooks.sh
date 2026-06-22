@@ -940,10 +940,11 @@
         var open = (gkey in opts.store) ? !!opts.store[gkey] : defaultOpen;
         var extra = opts.add ? '<button class="wsmore-btn" ' + opts.add.attrs(id, name) + ' title="' + esc(opts.add.title(name)) + '">' + (opts.add.glyph || '+') + '</button>' : '';
         // Canonical workspace-group header — the Files design (hash · name · count · action · caret-right).
+        var ct = opts.count === false ? '' : '<span class="swsct">' + (list.length || '') + '</span>';
         var head = '<div class="wshdr" data-wsgroup="' + esc(opts.key) + '" data-wskey="' + esc(gkey) + '" role="button" tabindex="0" title="' + esc(name) + '">' +
           '<span class="wshash">' + ICO.hash + '</span>' +
           '<span class="wsname">' + esc(name) + '</span>' +
-          '<span class="swsct">' + (list.length || '') + '</span>' + extra +
+          ct + extra +
           '<span class="wschev">' + ICO.chev + '</span></div>';
         var body = '';
         if (open) body = opts.body ? opts.body(id, list) : (list.length ? list.map(opts.row).join('') : '<div class="treemsg" style="padding:2px 10px 8px 30px">' + (opts.empty || 'Empty') + '</div>');
@@ -1049,11 +1050,11 @@
         }
         function resourceRow(r){
           var live = r.count > 0;
-          // Self-styled (the sidebar renders outside the view's scoped styles): inline the live/empty dot,
-          // reuse the global .srow row + .swsct count classes shared with the Studio group component.
+          // Self-styled (the sidebar renders outside the view's scoped styles): inline the live/empty dot.
+          // Indented under the workspace header; no record count (just whether the table exists/live).
           var dot = '<span title="' + (live ? 'live' : 'empty') + '" style="display:inline-block;width:8px;height:8px;border-radius:3px;flex:0 0 auto;background:' + (live ? 'var(--live, #3fb950)' : 'var(--stroke)') + '"></span>';
-          return '<a class="srow' + (curR === r.name ? ' on' : '') + '" data-nav="/data?r=' + encodeURIComponent(r.name) + '" href="#/data?r=' + encodeURIComponent(r.name) + '" title="' + esc(r.name) + '">' +
-            dot + '<span class="sname">' + esc(r.name) + '</span><span class="swsct">' + r.count + '</span></a>';
+          return '<a class="srow' + (curR === r.name ? ' on' : '') + '" style="padding-left:28px" data-nav="/data?r=' + encodeURIComponent(r.name) + '" href="#/data?r=' + encodeURIComponent(r.name) + '" title="' + esc(r.name) + '">' +
+            dot + '<span class="sname">' + esc(r.name) + '</span></a>';
         }
 
         // Tag filter lives in the header funnel (filterMenu, st.dataTagFilter) — same as Apps/Files.
@@ -1068,7 +1069,7 @@
           (resources.length
             ? WB.wsGroups({ items: shown, ws: function(r){ return r.workspace || ''; }, row: resourceRow,
                 key: 'wb-datagroups', store: st.dataGroupsCollapsed, repaint: paintDataSide,
-                hideEmpty: !!tagFilter, empty: 'No tables' })
+                hideEmpty: !!tagFilter, count: false, empty: 'No tables' })
             : '<div class="treemsg" style="padding:8px 10px">No resources yet. A <code>resource</code> block in any workbook shows up here.</div>');
       });
     }
