@@ -104,6 +104,12 @@ defmodule Nexus.Agent.Bash do
   # the args, or stdin when piped (`echo "do X" | agent research`).
   defp run_segment(_vfs, ["agent" | rest], stdin, perms), do: run_subagent(rest, stdin, perms)
 
+  # `request <self|agent> <typed change…>` — file a typed self-edit REQUEST to the autopoet (Autopoiesis
+  # v2). Fire-and-forget: it emits a to-do onto the bus and returns immediately — the agent NEVER awaits
+  # the autopoet, it degrades/continues. The change is the typed delta the autopoet acts on; pipe a
+  # longer rationale via stdin if needed (treated as untrusted `why`).
+  defp run_segment(_vfs, ["request" | rest], stdin, _perms), do: run_request(rest, stdin)
+
   defp run_segment(vfs, [cmd | args], stdin, perms) do
     case permit(cmd, perms) do
       :ok -> dispatch(vfs, cmd, args, stdin)
@@ -136,6 +142,27 @@ defmodule Nexus.Agent.Bash do
           {:error, e} -> "agent: sub-agent run failed: #{inspect(e)}"
           _ -> "agent: (no answer)"
         end
+    end
+  end
+
+  defp run_request([], _stdin), do: "request: usage: request <self|agent> <typed change>  (e.g. request self 'grant +net')"
+
+  defp run_request([target | change_args], stdin) do
+    change =
+      case Enum.join(change_args, " ") |> String.trim() do
+        "" -> String.trim(stdin || "")
+        c -> c
+      end
+
+    why = if change_args != [] and is_binary(stdin), do: String.trim(stdin), else: nil
+
+    case Nexus.Autopoet.Request.new(%{target: target, change: change, why: why}) do
+      {:ok, req} ->
+        Nexus.Autopoet.Request.file(req)
+        "request: filed (#{req.target}: #{req.change}) — continue working, the autopoet handles it async (no need to wait)"
+
+      {:error, msg} ->
+        "request: #{msg}"
     end
   end
 
