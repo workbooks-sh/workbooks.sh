@@ -302,9 +302,11 @@ WB.scopedStyles('/toolkits', `
 .tkdot { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--live); flex: none; }
 .tkblurb { font: 500 12.5px var(--read); color: var(--dim); line-height: 1.4; flex: 1; }
 .capmeta { display: flex; flex-wrap: wrap; gap: 5px; }
-.capbadge { font: 600 10px var(--read); text-transform: uppercase; letter-spacing: .04em; border-radius: 20px; padding: 2px 8px; }
-.capbadge.agent { color: var(--sky, #4a90d9); background: color-mix(in srgb, var(--sky, #4a90d9) 16%, transparent); }
-.capbadge.req { color: var(--dim); background: var(--line); }
+/* Saturated mid-tone text on a low-alpha tint of the SAME hue — readable in BOTH light + dark (the prior
+   pale-pastel-on-faint-tint washed out in light mode). Mirrors the inference tier-badge fix. */
+.capbadge { font: 700 9.5px var(--read); text-transform: uppercase; letter-spacing: .04em; border-radius: 6px; padding: 2px 7px; }
+.capbadge.agent { color: #3b7dc4; background: color-mix(in srgb, #3b7dc4 18%, transparent); }
+.capbadge.req { color: #b06a2c; background: color-mix(in srgb, #b06a2c 18%, transparent); }
 .tkmeta { font: 600 10.5px var(--mono, monospace); color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
 .tkaccs { display: flex; flex-direction: column; gap: 4px; }
 .tkacc { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
