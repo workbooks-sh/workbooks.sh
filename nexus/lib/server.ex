@@ -11,6 +11,7 @@ defmodule Nexus.Server do
   the served nexus share one render + one client API; only the data backend differs.
   """
   use Plug.Router
+  require Logger
 
   # CORS first — the desktop webview / browser fetch nexus cross-origin; preflight OPTIONS is answered
   # here (before auth), and Allow-Origin is attached to every response.
@@ -186,8 +187,20 @@ defmodule Nexus.Server do
   defp bringup(root) do
     mods =
       case Nexus.Compile.workbook(root) do
-        %{beam: %{compiled: compiled}} -> compiled
-        _ -> []
+        %{beam: %{compiled: compiled, failed: failed}} ->
+          # Hole 5b: never swallow a compile failure. A pushed/redeployed unit that fails to compile
+          # used to vanish silently (the surface then 500s with no clue). Log each, loudly.
+          for {name, reason} <- failed,
+            do: Logger.error("[bringup] #{Path.basename(root)}: server :#{name} failed to compile — #{inspect(reason)}")
+
+          compiled
+
+        %{beam: {:error, msg}} ->
+          Logger.error("[bringup] #{Path.basename(root)}: beam compile failed — #{msg}")
+          []
+
+        _ ->
+          []
       end
 
     Enum.each(mods, fn m ->
@@ -202,7 +215,7 @@ defmodule Nexus.Server do
         n.type == :code and n.kind == "auth",
         do: Nexus.Auth.Guard.load(n.ast)
   rescue
-    _ -> :ok
+    e -> Logger.error("[bringup] #{Path.basename(root)} crashed: #{Exception.message(e)}")
   end
 
   defp parse_workbook(root) do

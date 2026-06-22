@@ -454,6 +454,98 @@ defmodule Nexus.Compile do
   enumerated as compile-on-demand (each is a real, slow toolchain build via `unit/1`). Returns
   `%{beam, resources, wasm_units}`.
   """
+  @doc """
+  COMPILE-CHECK a workbook tree without mounting it — the deploy gate (`work check`/the nexus
+  pre-receive hook run this before a push goes live). Compiles every IN-PROCESS unit kind the nexus
+  brings up — `server`/`defmodule` (beam, via the dependency-fixpoint compile), plus `resource`,
+  `hook`, `flow`, `worker`, `agent`, `check`, `toolkit` — and AGGREGATES every failure (these are
+  individually `rescue`d to warnings in `workbook/1`; here they are errors). Returns:
+
+      %{ok?: boolean,
+        errors:  [%{kind, name, reason}],   # anything that would fail bringup → reject the deploy
+        skipped: [%{kind, name, reason}]}    # wasm/client lanes NOT gated here (no in-image toolchain
+                                             # or render-passthrough) — REPORTED, never silently passed
+
+  Defines/registers modules as a side effect (it really compiles), so run it in an ISOLATED node
+  (`bin/nexus eval`), never against the live serving node — `eval` is a throwaway process.
+  """
+  @doc """
+  CLI/hook entrypoint for the compile gate — runs `check/1`, prints a human report, and `System.halt(1)`
+  on failure so a caller (`bin/nexus eval Nexus.Compile.gate(dir)` in the pre-receive hook) sees a
+  non-zero exit and REJECTS the push. On success returns `:ok`.
+  """
+  def gate(dir) do
+    r = check(dir)
+    for s <- r.skipped, do: IO.puts("· not gated: #{s.kind} :#{s.name} — #{s.reason}")
+
+    if r.ok? do
+      IO.puts("✓ compile check passed")
+      :ok
+    else
+      IO.puts("✗ compile check FAILED — push rejected:")
+      for e <- r.errors, do: IO.puts("  ✗ #{e.kind} :#{e.name} — #{e.reason}")
+      System.halt(1)
+    end
+  end
+
+  def check(root) do
+    nodes =
+      (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
+      |> Enum.uniq()
+      |> Enum.flat_map(fn p -> File.read!(p) |> Nexus.Literate.parse() |> Enum.map(&Map.put(&1, :src, p)) end)
+      |> Enum.filter(&(&1.type == :code))
+
+    # Beam (server + every nested defmodule) compiles as ONE fixpoint so cross-unit struct deps resolve
+    # in any order — use the workbook compiler and read its `failed`, rather than compiling each in isolation.
+    beam_errors =
+      case (try do Nexus.Unit.compile_workbook(root) rescue e -> {:error, Exception.message(e)} end) do
+        %{failed: failed} -> Enum.map(failed, fn {name, r} -> %{kind: "server", name: name, reason: check_reason(r)} end)
+        {:error, msg} -> [%{kind: "server", name: nil, reason: msg}]
+        _ -> []
+      end
+
+    # SYNTAX errors: the literate parser is lenient — a unit whose body fails to parse gets `ast: nil`
+    # and is silently dropped by the compilers. For an Elixir-lane kind, nil ast == a syntax error, so
+    # flag it explicitly (these never reach beam_errors/check_unit). client/wasm bodies are non-Elixir,
+    # so their nil ast is normal and excluded here.
+    elixir_kinds = ~w(server resource hook flow worker agent)
+
+    syntax_errors =
+      for n <- nodes, n.kind in elixir_kinds, n.ast == nil,
+        do: %{kind: n.kind, name: n.name, reason: "syntax error — unit body did not parse as Elixir"}
+
+    # The other in-process kinds (with a parsed body): compile each individually, capturing a raise OR
+    # an {:error, _}. nil-ast ones are already covered by syntax_errors above (skip to avoid double-count).
+    gateable = ~w(resource hook flow worker agent check toolkit)
+
+    other_errors =
+      for n <- nodes, n.kind in gateable, n.ast != nil, err = check_unit(n), err != nil, do: err
+
+    # wasm compile lanes (slow toolchain builds) + client/sandbox passthrough are NOT gated in-process:
+    # report them honestly so a pass never *looks* like full coverage it didn't do.
+    skipped =
+      for n <- nodes, n.kind in (@wasm_kinds ++ ~w(client sandbox)) do
+        %{kind: n.kind, name: n.name,
+          reason: "wasm/client lane — checked at build/browser, not by this gate (no in-image toolchain or render-passthrough)"}
+      end
+
+    errors = beam_errors ++ syntax_errors ++ other_errors
+    %{ok?: errors == [], errors: errors, skipped: skipped}
+  end
+
+  # Compile one non-beam in-process unit; nil if it's fine, %{kind,name,reason} if it fails (raise or
+  # {:error, _}). Wrapped so one bad unit can't crash the whole check.
+  defp check_unit(node) do
+    case (try do unit(node) rescue e -> {:__raised__, Exception.message(e)} end) do
+      {:__raised__, msg} -> %{kind: node.kind, name: node.name, reason: msg}
+      {_lane, {:error, reason}} -> %{kind: node.kind, name: node.name, reason: check_reason(reason)}
+      _ -> nil
+    end
+  end
+
+  defp check_reason(r) when is_binary(r), do: r
+  defp check_reason(r), do: inspect(r)
+
   def workbook(root) do
     units =
       (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))

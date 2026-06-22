@@ -23,6 +23,13 @@ defmodule Nexus.GitRemoteTest do
     # "branch is currently checked out".
     {dcb, 0} = System.cmd("git", ["--git-dir=#{bare}", "config", "--get", "receive.denyCurrentBranch"], stderr_to_stdout: true)
     assert String.trim(dcb) == "ignore"
+    # The pre-receive COMPILE GATE hook is installed, executable, and invokes the gate. It keeps the
+    # quarantine env (must read incoming objects) and fails OPEN if the nexus bin is absent.
+    pre = Path.join([bare, "hooks", "pre-receive"])
+    assert File.regular?(pre)
+    src = File.read!(pre)
+    assert src =~ "Nexus.Compile.gate"
+    refute src =~ ~r/^\s*unset\b.*GIT_QUARANTINE/m, "pre-receive must NOT unset the quarantine — it needs it to read the pushed tree"
 
     # A client repo that pushes a .work file to the bare remote.
     client = Path.join(base, "client")

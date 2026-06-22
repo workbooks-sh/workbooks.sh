@@ -113,6 +113,15 @@ defmodule Nexus.Git do
     hook = Path.join(hooks, "post-receive")
     File.write!(hook, post_receive(bare, work_dir))
     File.chmod!(hook, 0o755)
+
+    # pre-receive COMPILE GATE: reject a push whose units won't compile, BEFORE the ref updates — the
+    # error is shown inline in the developer's `git push` output (same UX for us + customers). Runs the
+    # check in an ISOLATED `bin/nexus eval` node (never the live one). Fail-OPEN if the nexus bin is
+    # absent (e.g. dev/test without a release) so the gate's unavailability can't block pushes.
+    pre = Path.join(hooks, "pre-receive")
+    File.write!(pre, pre_receive(bare))
+    File.chmod!(pre, 0o755)
+
     maybe_colocate(bare, work_dir)
     {:ok, bare}
   end
@@ -235,6 +244,46 @@ defmodule Nexus.Git do
   end
 
   def set_mirror(bare, _), do: (System.cmd("git", ["--git-dir=#{bare}", "config", "--unset", "workbooks.mirror"], stderr_to_stdout: true); :ok)
+
+  # pre-receive: compile-check the INCOMING tree; reject the push if it won't compile. Runs before the
+  # ref updates, so a non-zero exit here rejects the push and the `remote:` lines surface in the client's
+  # `git push` output. The check runs in a throwaway `bin/nexus eval` node — never the live serving node
+  # (which would redefine live modules). Fail-OPEN when the bin is missing so the gate can't wedge pushes.
+  defp pre_receive(bare) do
+    """
+    #!/bin/sh
+    NEXUS_BIN="${WB_NEXUS_BIN:-/app/bin/nexus}"
+    [ -x "$NEXUS_BIN" ] || command -v "$NEXUS_BIN" >/dev/null 2>&1 || exit 0   # gate unavailable → allow
+    # NB: do NOT unset GIT_QUARANTINE_PATH/GIT_OBJECT_DIRECTORY here — in PRE-receive the pushed objects
+    # live in the quarantine (migrated into the bare only AFTER this hook passes), so we need that env to
+    # read the incoming tree. (post-receive unsets them; pre-receive must keep them.)
+    while read _old new ref; do
+      case "$ref" in
+        refs/heads/main|refs/heads/master)
+          case "$new" in 0000000000000000000000000000000000000000) continue ;; esac
+          tmp=$(mktemp -d)
+          # Extract the INCOMING tree (uses the hook's inherited env incl. the quarantine to find $new).
+          git archive "$new" 2>/dev/null | tar -x -C "$tmp" 2>/dev/null
+          # Fail-OPEN only on an extraction INFRA failure (empty tree). A real push always has files;
+          # an empty extract means we couldn't read it, not that the code is fine — so don't gate on
+          # nothing, but don't block either; bringup logging + the post-push probe are the backstop.
+          if [ -z "$(ls -A "$tmp" 2>/dev/null)" ]; then
+            rm -rf "$tmp"; echo "remote: pre-receive: could not read pushed tree (skipping compile gate)"; continue
+          fi
+          out=$("$NEXUS_BIN" eval "Nexus.Compile.gate(\\"$tmp\\")" 2>&1); code=$?
+          rm -rf "$tmp"
+          if [ "$code" != "0" ]; then
+            echo "$out" | sed 's/^/remote: /'
+            echo "remote: ✗ push rejected — the workspace did not compile. Fix the errors above and push again."
+            exit 1
+          fi
+          echo "remote: ✓ compile check passed"
+          ;;
+      esac
+    done
+    exit 0
+    """
+  end
 
   defp post_receive(bare, work_dir) do
     """
