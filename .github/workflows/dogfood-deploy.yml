@@ -23,11 +23,12 @@ name: dogfood-deploy
 on:
   push:
     branches: [main]
-    # lander is deployed via push-to-nexus (dogfood-content.yml), NOT an image rebuild — exclude it so a
-    # lander edit doesn't trigger the slow image path. Everything else in dogfood/ + the runtime still does.
-    paths: ["dogfood/**", "!dogfood/lander/**", "nexus/**", ".github/workflows/dogfood-deploy.yml"]
+    # The workspace surfaces (lander/cloud/docs) deploy via push-to-nexus (dogfood-content.yml), NOT an
+    # image rebuild — exclude them so a content edit takes the fast push path. Everything else in dogfood/
+    # (manifest, mobile, login, deploy/) + the runtime (nexus/) still goes through the image.
+    paths: ["dogfood/**", "!dogfood/lander/**", "!dogfood/cloud/**", "!dogfood/docs/**", "nexus/**", ".github/workflows/dogfood-deploy.yml"]
   pull_request:
-    paths: ["dogfood/**", "!dogfood/lander/**", "nexus/**", ".github/workflows/dogfood-deploy.yml"]
+    paths: ["dogfood/**", "!dogfood/lander/**", "!dogfood/cloud/**", "!dogfood/docs/**", "nexus/**", ".github/workflows/dogfood-deploy.yml"]
   workflow_dispatch:
     inputs:
       rebuild_base:
