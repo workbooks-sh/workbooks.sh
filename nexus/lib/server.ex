@@ -267,6 +267,9 @@ defmodule Nexus.Server do
   # a Nexus.Auth.Session cookie. See Nexus.Auth.Native.
   post("/auth/signup", do: Nexus.Auth.Native.signup(conn))
   post("/auth/login", do: Nexus.Auth.Native.login(conn))
+  # Headless credential→PAT exchange for the `work` CLI: same email/password, but returns a minted
+  # personal-access token (no browser, no cookie) — see Nexus.Auth.Native.token.
+  post("/auth/token", do: Nexus.Auth.Native.token(conn))
   post("/auth/logout", do: Nexus.Auth.Native.logout(conn))
   get("/auth/verify", do: Nexus.Auth.Native.verify(conn))
   post("/auth/forgot", do: Nexus.Auth.Native.forgot(conn))

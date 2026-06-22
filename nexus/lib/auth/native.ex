@@ -37,6 +37,31 @@ defmodule Nexus.Auth.Native do
     end
   end
 
+  # POST /auth/token {email, password, name?} — the headless equivalent of /auth/login for the `work`
+  # CLI: verify the same credential, then mint a personal-access token (carrying the user's org, role,
+  # and id) instead of issuing a cookie. The CLI stores it and sends it as `Authorization: Bearer wbk_…`.
+  # Only a control-plane nexus issues these (the PAT system lives there); otherwise it's a 404-equivalent.
+  def token(conn) do
+    p = body(conn)
+
+    cond do
+      not Nexus.ControlPlane.enabled?() ->
+        json(conn, 404, %{error: "This nexus does not issue CLI tokens."})
+
+      true ->
+        case Accounts.authenticate(to_string(p["email"]), to_string(p["password"])) do
+          {:ok, user} ->
+            role = to_string(Map.get(user, :role) || Accounts.role(user.id) || "member")
+            name = (is_binary(p["name"]) and p["name"] != "" and p["name"]) || "work-cli"
+            minted = Nexus.ControlPlane.Token.mint(user.org, name, role: role, user: user.id)
+            json(conn, 200, %{ok: true, token: minted.token, org: user.org, user: pub(user)})
+
+          :error ->
+            json(conn, 401, %{error: "Invalid email or password"})
+        end
+    end
+  end
+
   # POST /auth/logout
   def logout(conn), do: conn |> Session.clear() |> json(200, %{ok: true})
 
