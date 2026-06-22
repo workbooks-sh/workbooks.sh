@@ -204,6 +204,43 @@ defmodule Nexus.SSR do
     end)
   end
 
+  # SEO/social head tags. <title> already carries the title; here we add the meta description + Open
+  # Graph tags so a workbook's homepage previews well in search + social. Generic mechanism — the title
+  # is the leading file's first heading, the description its first prose paragraph (the natural place a
+  # workbook states what it is). Both emit only when present; nothing brand-specific is baked in.
+  defp seo_meta(title, desc) do
+    og_title = ~s(<meta property="og:title" content="#{esc(title)}"><meta property="og:type" content="website">)
+
+    if desc == "" do
+      og_title
+    else
+      og_title <>
+        ~s(<meta name="description" content="#{esc(desc)}"><meta property="og:description" content="#{esc(desc)}">)
+    end
+  end
+
+  # The leading file's first real prose paragraph, stripped of light markdown + collapsed to one line,
+  # capped at 160 chars (search-snippet length). "" when there's no prose.
+  defp description(pages) do
+    Enum.find_value(pages, "", fn {_f, nodes} ->
+      Enum.find_value(nodes, fn
+        %{type: :prose, text: t} -> (d = clean_desc(t)) != "" && d || nil
+        _ -> nil
+      end)
+    end)
+  end
+
+  defp clean_desc(t) do
+    s =
+      t
+      |> String.replace(~r/[*_`#>\[\]]/, "")
+      |> String.replace(~r/\s+/, " ")
+      |> String.trim()
+
+    # ≤160 (search-snippet length); when longer, cut on a WORD boundary so it never ends mid-word.
+    if String.length(s) <= 160, do: s, else: s |> String.slice(0, 160) |> String.replace(~r/\s+\S*$/, "")
+  end
+
   # index.work is the composition root — it leads; the rest follow alphabetically.
   @doc """
   A tenant's resource data as `name => [row maps]` — the payload the served `/data/:resource` API
@@ -295,6 +332,7 @@ defmodule Nexus.SSR do
     """
     <!doctype html>
     <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#{esc(title(pages))}</title>
+    #{seo_meta(title(pages), description(pages))}
     <style>#{css(app?)}</style>
     #{design_css(pages)}</head>
     <body>

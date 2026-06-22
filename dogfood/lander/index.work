@@ -1,12 +1,19 @@
-# Lander — our marketing site, as a workbook
+# Workbooks — build, run & host your whole software stack
 
-Our public landing page, migrated from the old `web/index.html` god-file into a **folder of `.work`
-sections** — each its own file with the reasoning in prose and the UI in a `client` block. The nexus
-composes them into one page; the shared look lives in `design.work`; the behavior in `99-scripts.work`;
-the brand assets (fonts, icons) travel with the workbook and are served as static files.
+Workbooks is your whole software stack in one place — build apps, run AI agents, and host sites with your team. No servers to wire up, no per-seat billing.
 
-The site *is* a workbook now — no SvelteKit, no build pipeline, no god-file. Each section reads on its
-own, and the whole thing is one mount on our nexus, alongside docs/cloud/waitlist/marketing.
+The heading above is the page `<title>` and this first paragraph is the meta/Open Graph description
+(set by `Nexus.SSR.seo_meta`) — keep both as SEO-friendly product copy, since they're what search and
+social previews show. The lander renders in app mode (its sections are `client` islands), so none of
+this prose appears on the page itself; it exists to set the document head and to document the site.
+
+## How the lander is built (dev notes — not rendered)
+
+Our public landing page is a **folder of `.work` sections** — each its own file with the reasoning in
+prose and the UI in a `client` block. The nexus composes them into one page; the shared look lives in
+`design.work`; the behavior in `99-scripts.work`; brand assets (fonts, icons) travel with the workbook
+as static files. It's one surface on our nexus, served at `/` via the deploy `home="lander"` knob,
+alongside docs/cloud/waitlist/marketing.
 
 ## The sections
 
