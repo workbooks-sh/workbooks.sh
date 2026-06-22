@@ -62,7 +62,7 @@ defmodule Nexus.GitHttp do
 
   defp resolve_pat(pass) do
     case Nexus.ControlPlane.Token.resolve(pass) do
-      {:ok, org} -> {:ok, %{tenant: org, user: "cli", scopes: ["api"], roles: []}}
+      {:ok, %{org: org} = rec} -> {:ok, %{tenant: org, user: rec.user || "cli", scopes: ["api"], roles: List.wrap(rec.role)}}
       _ -> Nexus.Auth.Token.verify(pass)
     end
   end

@@ -159,7 +159,9 @@ defmodule Nexus.Platform do
   # with one via Nexus.Auth.Cloud — no browser session needed.
   post "/tokens/mint" do
     name = decode(read(conn))["name"] || "cli"
-    j(conn, 201, Nexus.ControlPlane.Token.mint(org(conn), name))
+    id = conn.assigns[:identity] || %{}
+    # The PAT inherits the minter's server-derived role (and id) so the CLI acts with real authority.
+    j(conn, 201, Nexus.ControlPlane.Token.mint(org(conn), name, role: Nexus.Auth.role(conn), user: id[:user]))
   end
 
   get "/tokens" do

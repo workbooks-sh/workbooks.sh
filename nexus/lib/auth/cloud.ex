@@ -37,11 +37,15 @@ defmodule Nexus.Auth.Cloud do
               else: {:ok, %{tenant: Nexus.Store.default_tenant(), user: nil}}
         end
 
-      # A CLI personal-access token resolves to its org on ANY path.
+      # A CLI personal-access token resolves to its org on ANY path. It carries the
+      # minting user's role + id so the headless CLI acts with real authority (not viewer).
       "wbk_" <> _ = token ->
         case Nexus.ControlPlane.Token.resolve(token) do
-          {:ok, org} -> {:ok, %{tenant: org, user: "cli"}}
-          :error -> {:error, :unauthorized}
+          {:ok, %{org: org} = rec} ->
+            {:ok, %{tenant: org, user: rec.user || "cli", roles: List.wrap(rec.role)}}
+
+          :error ->
+            {:error, :unauthorized}
         end
 
       # Any other bearer is not a credential we issue → reject the gated API, public elsewhere.
