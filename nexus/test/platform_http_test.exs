@@ -115,5 +115,11 @@ defmodule Nexus.PlatformHttpTest do
     assert member.(:get, "/env/anything/reveal").status == 403
     assert member.(:post, "/members/invite").status == 403
     assert member.(:delete, "/domains/x").status == 403
+    # default-deny plug closes the routes the per-route pass missed (wb-k5i0), incl. the destructive one
+    assert member.(:delete, "/workspaces/x").status == 403
+    assert member.(:patch, "/nexuses/x").status == 403
+    assert member.(:post, "/workspaces").status == 403
+    # ...but a member may still mint their own CLI PAT (allowlisted; inherits their role)
+    assert member.(:post, "/tokens/mint").status != 403
   end
 end

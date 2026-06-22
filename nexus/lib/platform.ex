@@ -22,6 +22,10 @@ defmodule Nexus.Platform do
   plug(:require_control_plane)
   plug(:match)
   plug(:require_org)
+  # DEFAULT-DENY every control-plane write at admin+ (fix wb-k5i0/wb-qfvt) — one central gate so a new
+  # mutating route can't silently ship role-blind. Reads (GET, except /env/:id/reveal which carries its
+  # own admin gate) and the member allowlist below pass through.
+  plug(:require_admin_writes)
   plug(:dispatch)
 
   # ── nexuses ─────────────────────────────────────────────────────────────────────────────────
@@ -406,6 +410,19 @@ defmodule Nexus.Platform do
       conn
     else
       conn |> put_resp_content_type("application/json") |> send_resp(403, Jason.encode!(%{error: "forbidden"})) |> halt()
+    end
+  end
+
+  # Mutations any org MEMBER may perform (not admin-only): minting a CLI PAT — it inherits the minter's
+  # OWN server-derived role, so no escalation. Everything else that writes requires admin.
+  @member_writes [["tokens", "mint"]]
+
+  defp require_admin_writes(conn, _) do
+    cond do
+      conn.method not in ["POST", "PUT", "PATCH", "DELETE"] -> conn
+      conn.path_info in @member_writes -> conn
+      admin?(conn) -> conn
+      true -> conn |> put_resp_content_type("application/json") |> send_resp(403, Jason.encode!(%{error: "admin required"})) |> halt()
     end
   end
 
