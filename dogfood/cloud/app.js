@@ -895,7 +895,7 @@
           return '<a class="appcard' + (vis === 'draft' ? ' draft' : '') + '" data-ctx="app" data-open-app="' + esc(a.name) + '" href="#/app/' + esc(encodeURIComponent(a.name)) + '" title="' + esc(a.label) + '">' +
             badge + ic + '<span class="appname">' + esc(a.label) + '</span></a>';
         }
-        var newTile = '<button class="appcard newapp" data-newapp title="New app"><span class="newappplus">+</span><span class="appname">New app</span></button>';
+        // No "New app" tile — apps are created through the Studio, not a blank scaffold here.
         g.classList.toggle('grouped', st.appView === 'workspace');   // grouped → container stacks groups (block)
 
         if (st.appView === 'workspace') {
@@ -918,10 +918,9 @@
               (collapsed ? '' : '<div class="appsgrid">' + groups[k].map(appCard).join('') + '</div>') +
             '</div>';
           }).join('');
-          g.innerHTML = (html || '<div class="treemsg" style="padding:8px 4px">No apps</div>') +
-            '<div class="appsgrid" style="margin-top:10px">' + newTile + '</div>';
+          g.innerHTML = (html || '<div class="treemsg" style="padding:8px 4px">No apps</div>');
         } else {
-          var cards = apps.map(appCard).join('') + newTile;
+          var cards = apps.map(appCard).join('');
           g.innerHTML = cards || '<div class="treemsg" style="padding:8px 4px">No ' + (st.appFilter !== 'all' ? st.appFilter + ' ' : '') + 'apps</div>';
         }
       });
@@ -1092,7 +1091,7 @@
         var open = !!st.treeOpen[w.id];
         return '<div class="wsgroup' + (open ? ' open' : '') + '">' +
           '<div class="wshdr" data-ctx="workspace" data-tree-toggle="' + esc(w.id) + '" role="button" tabindex="0" title="' + esc(w.name) + '">' +
-            '<span class="wsemoji">' + esc(w.icon || '📁') + '</span>' +
+            '<span class="wshash">' + ICO.hash + '</span>' +
             '<span class="wsname">' + esc(w.name) + '</span>' +
             '<button class="wsmore-btn" data-wsmore="' + esc(w.id) + '" title="More" aria-label="More">⋯</button>' +
             '<span class="wschev">' + ICO.chev + '</span>' +
@@ -1319,15 +1318,6 @@
       var avw = t.closest && t.closest('[data-appview]'); if (avw) { st.appView = avw.getAttribute('data-appview'); try { localStorage.setItem('wb-appview', st.appView); } catch (er) {} st.filterOpen = false; renderShell(); paintApps(); return; }
       var aso = t.closest && t.closest('[data-appsort]'); if (aso) { st.appSort = aso.getAttribute('data-appsort'); try { localStorage.setItem('wb-appsort', st.appSort); } catch (er) {} st.filterOpen = false; renderShell(); paintApps(); return; }
       var agp = t.closest && t.closest('[data-appgroup]'); if (agp) { var gk = agp.getAttribute('data-appgroup'); st.appGroupsCollapsed[gk] = !st.appGroupsCollapsed[gk]; try { localStorage.setItem('wb-appgroups', JSON.stringify(st.appGroupsCollapsed)); } catch (er) {} paintApps(); return; }
-      if (t.closest && t.closest('[data-newapp]')) {
-        var nm = (window.prompt && window.prompt('Name your new app (a draft):', '')) || '';
-        nm = nm.trim(); if (!nm) return;
-        fetch('/cloud/draft', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: nm }) })
-          .then(function(r){ return r.json(); })
-          .then(function(d){ if (d && d.ok) { WB.toast('Draft “' + nm + '” created'); setTimeout(function(){ WB.cache.set('apps', null); paintApps(); }, 900); } else { WB.toast((d && d.error) || 'Couldn’t create draft', 'bad'); } })
-          .catch(function(){ WB.toast('Couldn’t create draft', 'bad'); });
-        return;
-      }
       if (t.closest && t.closest('[data-palette]')) { WB.palette(); return; }
       // Activity inbox row → focus that event; the /activity view renders its context in the page.
       var actf = t.closest && t.closest('[data-act-focus]');

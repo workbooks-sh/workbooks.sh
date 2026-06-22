@@ -326,10 +326,12 @@ WB.styles(`
 .tkchip.tint { border-color: transparent; }
 /* Brand chip: a neutral theme-adaptive tile holding the inlined full-color (or theme-picked mono) SVG. */
 .tkchip.brand { background: color-mix(in srgb, var(--ink) 7%, transparent); border-color: var(--line); }
-/* Aspect-preserving + centered: cap both dimensions, let the SVG keep its ratio (xMidYMid centers it). */
-.tkchip svg { max-width: 20px; max-height: 20px; width: auto; height: auto; display: block; }
+/* Fixed square box + the SVG's own preserveAspectRatio (xMidYMid meet) fits + CENTERS the logo. The
+   prior max-height/height:auto combo let tall logos overflow (browsers ignore max-height when height is
+   auto), so they clipped at the top. A fixed height keeps them vertically centered. */
+.tkchip svg { width: 20px; height: 20px; display: block; }
 .tkchip.big { width: 44px; height: 44px; border-radius: 11px; }
-.tkchip.big svg { max-width: 26px; max-height: 26px; }
+.tkchip.big svg { width: 26px; height: 26px; }
 /* Learn-more modal */
 .tkinfohd { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .tkinfosub { font: 600 11px var(--read); text-transform: uppercase; letter-spacing: .05em; color: var(--dim); margin-top: 3px; }

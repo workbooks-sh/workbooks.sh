@@ -506,6 +506,9 @@ tr:last-child td{ border:0; }
 .wsgroup.open > .wshdr { background: var(--line); }
 .wsemoji { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
   background: var(--card); border: 1px solid var(--line); font-size: 13px; line-height: 1; }
+/* Subtle # glyph (matches the Apps workspace groups) — replaces the per-workspace emoji squircle. */
+.wshash { flex: none; display: grid; place-items: center; color: var(--dim); opacity: .85; }
+.wshash svg { width: 14px; height: 14px; }
 .wsname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 600 13px var(--read); color: var(--ink); }
 .wschev { flex: none; display: grid; place-items: center; color: var(--dim); transition: transform .15s ease; }
 .wschev svg { width: 14px; height: 14px; }
