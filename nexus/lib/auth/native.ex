@@ -84,7 +84,9 @@ defmodule Nexus.Auth.Native do
   defp send_verification(user),
     do: Email.send_verification(user.email, link("/auth/verify?token=" <> Accounts.mint_token(user.id, :verify)))
 
-  defp identity(u), do: %{tenant: u.org, user: u.id, email: u.email, name: u.name}
+  # The session identity carries `:roles` so server-side authority (Nexus.Auth.role/1) needs no DB hit.
+  # `u` from create/invite already has `:role`; `u` from a login lookup doesn't, so fall back to the DB.
+  defp identity(u), do: %{tenant: u.org, user: u.id, email: u.email, name: u.name, roles: List.wrap(Map.get(u, :role) || Accounts.role(u.id))}
   defp pub(u), do: %{id: u.id, email: u.email, name: u.name, verified: u.verified, org: u.org}
 
   defp error_msg(:email_taken), do: "That email is already registered."

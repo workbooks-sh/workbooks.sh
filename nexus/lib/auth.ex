@@ -80,9 +80,17 @@ defmodule Nexus.Auth do
   gate sensitive actions on (e.g. autopoet management is admin-only).
   """
   def role(conn) do
-    (get_in(conn.assigns, [:identity, :roles]) || [])
-    |> Enum.map(&to_string/1)
-    |> Enum.max_by(&Map.get(@role_rank, &1, 0), fn -> "viewer" end)
+    identity = conn.assigns[:identity] || %{}
+    session_roles = (identity[:roles] || []) |> Enum.map(&to_string/1)
+
+    cond do
+      # Sessions issued with roles (the fast path) — no DB hit.
+      session_roles != [] -> Enum.max_by(session_roles, &Map.get(@role_rank, &1, 0), fn -> "viewer" end)
+      # Sessions issued before roles were stored: derive from the DB by the session's user id, so an
+      # existing login still resolves the right authority without forcing a re-login.
+      is_binary(identity[:user]) -> Nexus.Auth.Accounts.role(identity[:user]) || "viewer"
+      true -> "viewer"
+    end
   end
 
   @doc "Does `role_name` meet or exceed `needed` in the role ranking (viewer<member<admin<owner)?"

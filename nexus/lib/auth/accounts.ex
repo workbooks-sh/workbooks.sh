@@ -66,6 +66,16 @@ defmodule Nexus.Auth.Accounts do
   def get_by_email(email), do: user_view(row("SELECT id,email,pw_hash,org,name,verified,created_at FROM users WHERE email=?1", [norm_email(email)]))
   def get(id), do: user_view(row("SELECT id,email,pw_hash,org,name,verified,created_at FROM users WHERE id=?1", [id]))
 
+  @doc "A user's role by id (owner/admin/member/viewer), or nil if unknown."
+  def role(id) do
+    ensure()
+
+    case row("SELECT role FROM users WHERE id=?1", [id]) do
+      [r] when is_binary(r) and r != "" -> r
+      _ -> nil
+    end
+  end
+
   def mark_verified(id), do: exec("UPDATE users SET verified=1 WHERE id=?1", [id])
   def set_password(id, password), do: exec("UPDATE users SET pw_hash=?1 WHERE id=?2", [hash_password(password), id])
 
