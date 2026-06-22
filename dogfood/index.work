@@ -27,6 +27,9 @@ deploy do
   # Our nexus's display emoji + its WORKSPACES — curated folders of work, NOT every mount. Each line:
   # `folder | Name | emoji`. The dashboard reads these; the UI emoji picker overrides an icon per-org.
   nexus-emoji="🐕"
+  # The front door: the lander subtree serves at `/` (and its blog at `/blog`), so workbooks.sh/ is the
+  # landing page. The other surfaces keep their paths (cloud → /cloud, docs → /docs).
+  home="lander"
   # Three workspaces; surfaces nest under them (cloud/overview, lander/blog, …). The workspace id IS its
   # on-disk folder; an app's workspace = its path's first segment. (login stays top-level — auth URL.)
   workspaces="
