@@ -41,4 +41,99 @@ defmodule Nexus.Index do
     |> Enum.reject(fn {_f, v} -> v == [] end)
     |> Map.new()
   end
+
+  # ── The ceiling (Autopoiesis v2 — ceiling-in-index) ────────────────────────
+  #
+  # An index declares its subtree's capability CEILING:
+  #
+  #     ceiling do
+  #       grant net, llm, vfs
+  #     end
+  #
+  # The ceiling is the MAX set of capabilities any agent under this subtree may hold. Nested indexes
+  # nest ceilings; the EFFECTIVE ceiling at any path is the INTERSECTION of every ancestor index's
+  # ceiling from the root down — so a deeper index can only ever NARROW, never widen. Widening requires
+  # editing an ancestor index, which sits above an agent's workspace write-scope = structurally
+  # unreachable. That is what makes escalation impossible by construction.
+
+  @doc """
+  The capability ceiling declared by a single `index.work` — a sorted list of grantable caps, or
+  `:unbounded` when the index has no `ceiling` block (it imposes no constraint of its own).
+  """
+  def ceiling(path) when is_binary(path) do
+    path
+    |> File.read!()
+    |> Nexus.Literate.parse()
+    |> Enum.find(&(&1.type == :code and &1.kind == "ceiling"))
+    |> ceiling_caps()
+  end
+
+  defp ceiling_caps(nil), do: :unbounded
+
+  defp ceiling_caps(%{ast: {:ceiling, _, args}}) do
+    with block when not is_nil(block) <- Enum.find_value(args, fn [{:do, b}] -> b; _ -> nil end),
+         {:grant, _, gargs} <- find_grant(block) do
+      cap_names(gargs) |> Enum.filter(&Nexus.Capabilities.grantable?/1) |> Enum.uniq() |> Enum.sort()
+    else
+      # a `ceiling` block with no `grant` line grants nothing — the tightest possible ceiling.
+      _ -> []
+    end
+  end
+
+  defp ceiling_caps(_), do: :unbounded
+
+  defp find_grant({:__block__, _, stmts}), do: Enum.find(stmts, &match?({:grant, _, _}, &1))
+  defp find_grant({:grant, _, _} = g), do: g
+  defp find_grant(_), do: nil
+
+  # Bare identifiers / atoms → cap name strings (same normalization agent.ex uses for `grant`).
+  defp cap_names(args) do
+    args
+    |> Enum.flat_map(fn list when is_list(list) -> list; other -> [other] end)
+    |> Enum.map(fn
+      a when is_atom(a) -> Atom.to_string(a)
+      {id, _, ctx} when is_atom(id) and is_atom(ctx) -> Atom.to_string(id)
+      other -> Macro.to_string(other)
+    end)
+  end
+
+  @doc """
+  The EFFECTIVE capability ceiling governing `path` — the intersection of every ancestor `index.work`
+  ceiling from `root` down to the directory containing `path`. `:unbounded` if no ancestor declares a
+  ceiling; otherwise the caps allowed by ALL declaring ancestors (deeper indexes can only narrow).
+  """
+  def effective_ceiling(root, path) do
+    ancestor_indexes(root, path)
+    |> Enum.map(&ceiling/1)
+    |> Enum.reject(&(&1 == :unbounded))
+    |> case do
+      [] -> :unbounded
+      [first | rest] -> Enum.reduce(rest, first, fn caps, acc -> Enum.filter(acc, &(&1 in caps)) end)
+    end
+  end
+
+  @doc """
+  Clamp a `declared` grant list to the effective ceiling governing `path` — `declared ∩ ceiling`. This
+  is the one comparison every agent run uses (Autopoiesis v2): editing a declared grant up can only
+  ever be a no-op, because the result is intersected back down to what the ceiling allows.
+  """
+  def clamp_grant(declared, root, path) when is_list(declared) do
+    case effective_ceiling(root, path) do
+      :unbounded -> declared
+      ceiling -> Enum.filter(declared, &(&1 in ceiling))
+    end
+  end
+
+  # Every `index.work` from `root` down to the directory of `path`, root-first (the ancestor chain).
+  defp ancestor_indexes(root, path) do
+    dir = if File.dir?(path), do: path, else: Path.dirname(path)
+    rel = Path.relative_to(dir, root)
+    segs = if rel in [".", ""], do: [], else: Path.split(rel)
+
+    segs
+    |> Enum.scan(root, fn seg, acc -> Path.join(acc, seg) end)
+    |> then(&[root | &1])
+    |> Enum.map(&Path.join(&1, "index.work"))
+    |> Enum.filter(&File.exists?/1)
+  end
 end
