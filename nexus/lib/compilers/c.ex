@@ -29,7 +29,7 @@ defmodule Nexus.Compilers.C do
     cflags = Keyword.get(opts, :cflags, [])
 
     cl = fn args ->
-      wasmtime(["--dir", "#{csys}::/usr", "--dir", "#{work}::/work", "--dir", "#{work}/t::/tmp"] ++ extra_mounts ++ ["--env", "TMPDIR=/tmp", clang | args])
+      wasmtime(["--dir", "#{csys}::/usr::ro", "--dir", "#{work}::/work", "--dir", "#{work}/t::/tmp"] ++ extra_mounts ++ ["--env", "TMPDIR=/tmp", clang | args])
     end
 
     cl.(["clang", "--target=wasm32-wasip1", "--sysroot=/usr", "-O1", "-w"] ++ cflags ++ ["-c", "/work/u.c", "-o", "/work/u.o"])

@@ -136,7 +136,7 @@ defmodule Nexus.Compilers.Rust do
 
     cl = fn args ->
       wasmtime(
-        ["-W", "exceptions=y", "--dir", "#{csys}::/usr", "--dir", "#{mrdir}::/work",
+        ["-W", "exceptions=y", "--dir", "#{csys}::/usr::ro", "--dir", "#{mrdir}::/work",
          "--dir", "#{mrdir}/.cctmp::/tmp", "--env", "TMPDIR=/tmp", clang | args]
       )
     end
@@ -325,7 +325,7 @@ defmodule Nexus.Compilers.Rust do
 
     cl = fn args ->
       wasmtime(
-        ["-W", "exceptions=y", "--dir", "#{csys}::/usr", "--dir", "#{mrdir}::/work",
+        ["-W", "exceptions=y", "--dir", "#{csys}::/usr::ro", "--dir", "#{mrdir}::/work",
          "--dir", "#{mrdir}/.cctmp::/tmp", "--env", "TMPDIR=/tmp", clang | args]
       )
     end

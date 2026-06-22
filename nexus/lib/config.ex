@@ -84,6 +84,7 @@ defmodule Nexus.Config do
   def sandbox_epoch_secs, do: get(:sandbox_epoch_secs)
   def sandbox_table_elements, do: get(:sandbox_table_elements)
   def sandbox_max_instances, do: get(:sandbox_max_instances)
+  def sandbox_proc_memory_mb, do: get(:sandbox_proc_memory_mb)
   # Tenant-aware cache (Nexus.Cache): hot ETS byte budget + cold-tier shelf-life. The hot tier is
   # deliberately small (default 64MB) so on a 1GB host it never competes with agents for RAM.
   def cache_hot_max_mb, do: get(:cache_hot_max_mb)
@@ -249,6 +250,10 @@ defmodule Nexus.Config do
       # OOM lever is the per-memory `sandbox-memory-mb` cap; per-tenant concurrency (wb-whvy) is the
       # complementary fan-out bound across stores.
       sandbox_max_instances: int(attr(html, "sandbox-max-instances"), 32),
+      # Command-lane (external `wasmtime run`) per-guest linear-memory cap (MiB) — toolkits/js/python
+      # command modules. Generous default (covers an interpreter working set) but bounded so a runaway
+      # grow traps instead of exhausting host RAM.
+      sandbox_proc_memory_mb: int(attr(html, "sandbox-proc-memory-mb"), 512),
       # jj-as-substrate: route internal commits through Jujutsu (op-log + `jj undo`) over the workspace
       # git repo. No-op-safe (off ⇒ pure git; jj absent ⇒ pure git). Default off until proven on a deploy.
       jj_substrate: bool(attr(html, "jj-substrate"), false),

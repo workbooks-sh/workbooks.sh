@@ -110,23 +110,43 @@ defmodule Nexus.Sandbox do
     end
   end
 
-  # wasmtime run [aot flags] [extra mounts] <wasm> [argv] < stdinfile, with a kill-after-budget watchdog.
+  # wasmtime run [hardening] [aot flags] [extra mounts] <wasm> [argv] < stdinfile.
+  #
+  # Hardening (wb-od4a): a guest command module is UNTRUSTED, so it runs with wasmtime's own resource
+  # caps — `-W timeout` (self-trapping wall-clock bound, so a spin can't run forever), a per-guest
+  # `-W max-memory-size` (so a memory.grow loop traps instead of exhausting host RAM), and
+  # `-W trap-on-grow-failure=y` (clean trap, not a silent -1). The subprocess env is SCRUBBED to a
+  # tiny allowlist so neither the wrapper shell nor wasmtime carries WB_*/OPENROUTER_API_KEY secrets.
   defp exec_command(wasm, extra_flags, argv, stdin) do
     {flags, exec} = Nexus.Wasm.Aot.resolve(wasm)
     stdin_file = Path.join(System.tmp_dir!(), "nxcmd_in_#{System.unique_integer([:positive])}")
+    # 0600 before the content lands: the guest's stdin is plaintext in a shared tmp dir — keep it
+    # readable only by the nexus user.
+    File.write!(stdin_file, "")
+    File.chmod!(stdin_file, 0o600)
     File.write!(stdin_file, stdin)
 
-    inner =
-      (["wasmtime", "run"] ++ flags ++ extra_flags ++ [exec | argv]) |> Enum.map_join(" ", &shq/1)
-
     secs = max(1, div(@cmd_timeout_ms, 1000))
+    mem = Nexus.Config.sandbox_proc_memory_mb() * 1024 * 1024
+
+    # Memory hardening only — `-W max-memory-size` + `trap-on-grow-failure` need no epoch interruption,
+    # so they stay compatible with the AOT `.cwasm` cache (precompiled without epoch). The wall-clock
+    # CPU bound is the SIGKILL watchdog below (portable, epoch-free). A memory.grow loop now traps
+    # instead of exhausting host RAM.
+    hardening = ["-W", "max-memory-size=#{mem}", "-W", "trap-on-grow-failure=y"]
+
+    inner =
+      (["wasmtime", "run"] ++ hardening ++ flags ++ extra_flags ++ [exec | argv])
+      |> Enum.map_join(" ", &shq/1)
 
     guarded =
       "#{inner} < #{shq(stdin_file)} & cmd=$!; " <>
         "{ sleep #{secs}; kill -9 $cmd 2>/dev/null; pkill -9 -P $cmd 2>/dev/null; } >/dev/null 2>&1 & w=$!; " <>
         "wait $cmd; rc=$?; kill $w 2>/dev/null; wait $w 2>/dev/null; exit $rc"
 
-    {out, code} = System.cmd("sh", ["-c", guarded], stderr_to_stdout: true)
+    # env is SCRUBBED (subprocess_env/0) so neither this wrapper shell nor wasmtime carries
+    # WB_*/OPENROUTER_API_KEY secrets; every interpolated token is host-controlled + shq-escaped.
+    {out, code} = System.cmd("sh", ["-c", guarded], env: subprocess_env(), stderr_to_stdout: true)
     File.rm(stdin_file)
 
     cond do
@@ -137,6 +157,17 @@ defmodule Nexus.Sandbox do
   end
 
   defp shq(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
+
+  @doc """
+  The SCRUBBED environment for an untrusted wasmtime subprocess (command lane + compiler lane). Every
+  inherited var is unset (`{k, false}`) except a tiny operational allowlist — so a guest's host
+  process can't read injected secrets (`OPENROUTER_API_KEY`, `WB_*`, tokens) via `getenv`, and neither
+  can a wrapper shell. Guest-visible env is passed separately as explicit `--env NAME=VAL` flags.
+  """
+  @env_allow ~w(PATH HOME TMPDIR LANG LC_ALL LC_CTYPE USER SHELL TERM)
+  def subprocess_env do
+    for {k, _v} <- System.get_env(), k not in @env_allow, do: {k, nil}
+  end
 
   # The Dock supplies the host implementations (the one place this layer holds real code —
   # everything else is wasmex). The import map is tenant-bound and filtered to the unit's grants:

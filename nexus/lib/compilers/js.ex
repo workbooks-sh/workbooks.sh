@@ -44,7 +44,7 @@ defmodule Nexus.Compilers.Js do
 
     cl = fn args ->
       wasmtime([
-        "--dir", "#{csys}::/usr", "--dir", "#{work}::/work", "--dir", "#{work}/t::/tmp",
+        "--dir", "#{csys}::/usr::ro", "--dir", "#{work}::/work", "--dir", "#{work}/t::/tmp",
         "--dir", "#{jsdir}::/js", "--env", "TMPDIR=/tmp", clang | args
       ])
     end

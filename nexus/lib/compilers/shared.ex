@@ -19,9 +19,18 @@ defmodule Nexus.Compilers.Shared do
       "compilers"
   end
 
-  @doc "Run `wasmtime run <args>` and return its combined output (the sandbox executor)."
+  @doc """
+  Run `wasmtime run <args>` and return its combined output (the sandbox executor). The subprocess env
+  is SCRUBBED (wb-od4a) so a malicious source compiled here can't read injected secrets (WB_*,
+  OPENROUTER_API_KEY) from the wasmtime host process — guest env is the explicit `--env` flags only.
+  """
   def wasmtime(args) do
-    {out, _} = System.cmd("wasmtime", ["run"] ++ Nexus.Wasm.Aot.resolve_args(args), stderr_to_stdout: true)
+    {out, _} =
+      System.cmd("wasmtime", ["run"] ++ Nexus.Wasm.Aot.resolve_args(args),
+        env: Nexus.Sandbox.subprocess_env(),
+        stderr_to_stdout: true
+      )
+
     out
   end
 
