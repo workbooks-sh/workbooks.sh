@@ -723,11 +723,6 @@ server :cloud do
 
     emit.(%{type: "start", run: rid, agent: agent, task: task})
 
-    # Eval/dev isolation: snapshot the whole workspace tree before an isolated run, restore it after, so
-    # the run leaves NO trace (re-runnable from an identical baseline). For general-agent evals like
-    # "create a marketing workspace". `Nexus.Workspaces.{snapshot,restore}`.
-    snap = if opts[:isolate] == true, do: Nexus.Workspaces.snapshot(), else: nil
-
     # Workspace-scoped run: if opts[:workspace] names a mount, run the agent in a jj worktree of that
     # workspace (real FS) so its file edits commit to the agent's branch, attributed. Else ephemeral.
     run_opts =
@@ -735,6 +730,10 @@ server :cloud do
         nil -> [emit: emit]
         ws -> [emit: emit, workspace: ws]
       end
+
+    # Eval/dev isolation for a GENERAL run: work only in the staging copy, never sync back to prod (so
+    # production is touched zero times — no provision, no remount). Threaded to Nexus.Agent.setup_vfs.
+    run_opts = Keyword.put(run_opts, :isolate, opts[:isolate] == true)
 
     # Optional per-run model override (e.g. `work agent run --model workers-ai/@cf/…`); nil ⇒ the agent's
     # declared model / configured default.
@@ -752,10 +751,6 @@ server :cloud do
       catch
         _, e -> {:error, e}
       end
-
-    # Isolated run → roll the workspace tree back to the pre-run snapshot (delete workspaces created in
-    # the run, revert edits). The Run row still records that the eval happened.
-    if snap, do: Nexus.Workspaces.restore(snap)
 
     {status, turns, answer, run_tokens} =
       case result do
@@ -984,6 +979,270 @@ server :cloud do
       tid: gen_id(), kind: "issue", status: "open", agent: "", parent: "", priority: 1,
       run: "", created: now, title: "", detail: "", created_by: "system"
     }, attrs))
+  end
+
+  # ── Inbox — the email-style unified feed ─────────────────────────────────────────────────────────
+  # /cloud/inbox folds the raw Event log + the issue queue into semantic THREADS. A thread is one
+  # SUBJECT (a run / a chat session / an issue) with its events as a timeline; the server CLASSIFIES it
+  # into {semantic, severity, blame, friendly title + snippet} so the client renders meaning, never the
+  # raw run-id / FunctionClauseError / task-prompt that used to leak to the top. Per-user read/archive
+  # state (resource InboxState) makes it behave like a mailbox. Members never see admin-scoped threads.
+  def inbox(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    uid = user_key(req)
+    admin? = Nexus.Auth.role_at_least?(Map.get(req, :role, "viewer"), "admin")
+
+    events =
+      Event
+      |> Nexus.Store.all(tenant)
+      |> Enum.map(&Map.from_struct/1)
+      |> Enum.reject(&(not admin? and &1.scope == "admin"))
+
+    issues = current_tasks(tenant) |> Enum.filter(&(&1.kind == "issue"))
+    issue_by_tid = Map.new(issues, &{&1.tid, &1})
+    state = inbox_state_for(tenant, uid)
+
+    ev_groups = Enum.group_by(events, &event_subject(&1, issue_by_tid))
+    iss_groups = Enum.group_by(issues, &issue_subject/1)
+    subjects = (Map.keys(ev_groups) ++ Map.keys(iss_groups)) |> Enum.uniq()
+
+    threads =
+      subjects
+      |> Enum.map(fn subj ->
+        evs = Map.get(ev_groups, subj, []) |> Enum.sort_by(& &1.at)
+        iss = case Map.get(iss_groups, subj, []) do
+          [] -> nil
+          list -> Enum.max_by(list, &(&1.updated || 0))
+        end
+        build_thread(subj, evs, iss, Map.get(state, subj, %{}))
+      end)
+      |> Enum.reject(&(&1.archived and not &1.needs_you))
+      |> Enum.sort_by(&{(if &1.needs_you, do: 0, else: 1), -&1.at})
+
+    %{threads: threads, views: inbox_views_for(tenant, uid)}
+  end
+
+  defp build_thread(subject, evs, iss, st) do
+    last = List.last(evs) || %{}
+    iss_at = if iss, do: (iss.updated && div(iss.updated, 1_000_000)) || iss.created || 0, else: 0
+    at = max(last[:at] || 0, iss_at)
+    c = classify_thread(evs, iss)
+    timeline = Enum.map(evs, fn e -> %{kind: e.kind, actor: e.actor, at: e.at, label: timeline_label(e)} end)
+    needs_you = c.needs_you and st[:cleared] != 1
+
+    %{
+      subject: subject, semantic: c.semantic, severity: c.severity, blame: c.blame,
+      title: c.title, snippet: c.snippet, actor: c.actor, at: at,
+      needs_you: needs_you, read: st[:read] == 1, archived: st[:archived] == 1,
+      timeline: timeline,
+      tech: %{run: (iss && iss.run) || subject_run(subject), detail: iss && iss.detail,
+              tid: iss && iss.tid, status: iss && iss.status}
+    }
+  end
+
+  # The semantic classifier — raw kinds + outcomes → operator-facing meaning. Pure + deterministic (no
+  # model on the hot path); the friendly copy lives here so the CLI/mobile can reuse it later.
+  defp classify_thread(evs, iss) do
+    last = List.last(evs) || %{}
+    actor = (iss && iss.created_by) || last[:actor] || "system"
+
+    cond do
+      iss && iss.status != "done" ->
+        blame = blame_of(iss.detail)
+        %{semantic: "needs_you", blame: blame, actor: actor, needs_you: true,
+          severity: (if blame == "task", do: "med", else: "high"),
+          title: fail_title(iss.agent, blame), snippet: fail_snippet(blame)}
+
+      iss && iss.status == "done" ->
+        %{semantic: "resolved", blame: blame_of(iss.detail), actor: actor, needs_you: false,
+          severity: "low", title: "Resolved — #{agent_name(iss.agent)}",
+          snippet: "This was handled. Nothing needed from you."}
+
+      true ->
+        kind = last[:kind] || "event"
+        base = %{blame: nil, actor: actor, needs_you: false, severity: "low"}
+        info =
+          cond do
+            String.starts_with?(kind, "agent.run") ->
+              %{semantic: "run_done", title: "#{agent_name(last[:actor])} finished a task",
+                snippet: clean_subject(last[:title])}
+            String.starts_with?(kind, "agent.chat") ->
+              %{semantic: "chat", title: "Chat — #{clean_subject(last[:title])}",
+                snippet: "A conversation with your agent."}
+            String.starts_with?(kind, "task.") ->
+              %{semantic: "task", title: clean_subject(last[:title]), snippet: "A task on the board moved."}
+            String.starts_with?(kind, "workspace.") ->
+              %{semantic: "change", title: "#{actor} edited files", snippet: "Workspace changes were saved."}
+            String.starts_with?(kind, "github.") ->
+              %{semantic: "connected", title: "GitHub — #{clean_subject(last[:title])}",
+                snippet: "An update from a connected repository."}
+            String.starts_with?(kind, "billing.") ->
+              %{semantic: "billing", title: "Billing — #{clean_subject(last[:title])}",
+                snippet: "A change to your plan or usage."}
+            true ->
+              %{semantic: "event", title: clean_subject(last[:title] || kind), snippet: ""}
+          end
+        Map.merge(base, info)
+    end
+  end
+
+  # Whose fault was the failure? internal = our platform bug (an Elixir exception leaked), input = the
+  # agent waits on a human, task = the agent genuinely couldn't complete. Drives copy + severity.
+  defp blame_of(detail) do
+    d = to_string(detail)
+    cond do
+      d =~ ~r/needs (your|human) (input|decision)/i -> "input"
+      d =~ ~r/\(timeout\)/i -> "task"
+      d =~ ~r/(%\w*Error\{|\*\* \(|FunctionClauseError|no function clause|ArgumentError|KeyError)/ -> "internal"
+      true -> "task"
+    end
+  end
+
+  defp fail_title(agent, "internal"), do: "We hit a glitch running #{agent_name(agent)}"
+  defp fail_title(agent, "input"), do: "#{agent_name(agent)} needs your input"
+  defp fail_title(agent, _), do: "#{agent_name(agent)} couldn’t finish a task"
+
+  defp fail_snippet("internal"), do: "Something on our end interrupted the run. Re-dispatch to try again."
+  defp fail_snippet("input"), do: "The agent is waiting on a decision from you."
+  defp fail_snippet(_), do: "The agent stopped before finishing. Re-dispatch to retry, or resolve."
+
+  defp agent_name(""), do: "An agent"
+  defp agent_name(nil), do: "An agent"
+  defp agent_name(a), do: to_string(a)
+
+  defp clean_subject(t) do
+    to_string(t || "")
+    |> String.replace(~r/^Run failed:\s*\S+\s*—\s*/u, "")
+    |> String.replace(~r/^\S+:\s*/u, "")
+    |> String.trim()
+    |> String.slice(0, 80)
+  end
+
+  defp timeline_label(e) do
+    k = to_string(e[:kind] || "")
+    cond do
+      String.starts_with?(k, "agent.run") -> "ran"
+      String.starts_with?(k, "agent.chat") -> "chatted"
+      k == "task.open" -> "filed"
+      k == "task.done" -> "resolved"
+      String.starts_with?(k, "task.") -> "updated"
+      String.starts_with?(k, "workspace.") -> "edited files"
+      true -> clean_subject(e[:title]) |> String.slice(0, 40)
+    end
+  end
+
+  # Subject correlation — a run's filed issue, the run event, and the run share ONE subject (the rid), so
+  # they collapse into a single thread. Task events on an issue map to that issue's subject.
+  defp event_subject(e, issue_by_tid) do
+    t = to_string(e.target || "")
+    cond do
+      Map.has_key?(issue_by_tid, t) -> issue_subject(issue_by_tid[t])
+      t != "" -> t
+      true -> "kind:" <> to_string(e.kind || "event")
+    end
+  end
+
+  defp issue_subject(iss), do: (if to_string(iss.run || "") != "", do: to_string(iss.run), else: to_string(iss.tid))
+  defp subject_run("kind:" <> _), do: nil
+  defp subject_run(s), do: s
+
+  # Fold InboxState to live per-user state: %{subject => %{read, archived, cleared}}.
+  defp inbox_state_for(tenant, uid) do
+    InboxState
+    |> Nexus.Store.all(tenant)
+    |> Enum.map(&Map.from_struct/1)
+    |> Enum.filter(&(&1.uid == uid))
+    |> Enum.group_by(& &1.subject)
+    |> Map.new(fn {subj, rows} ->
+      r = Enum.max_by(rows, &(&1.updated || 0))
+      {subj, %{read: r.read, archived: r.archived, cleared: r.cleared}}
+    end)
+  end
+
+  def inbox_state_set(req) do
+    b = req.body || %{}
+    subject = to_string(b["subject"] || "")
+    if subject == "" do
+      {400, %{error: "subject is required"}}
+    else
+      tenant = req.tenant || Nexus.Store.default_tenant()
+      uid = user_key(req)
+      cur = Map.get(inbox_state_for(tenant, uid), subject, %{read: 0, archived: 0, cleared: 0})
+      Nexus.Store.create(InboxState, %{
+        uid: uid, subject: subject,
+        read: bit(b["read"], cur[:read]),
+        archived: bit(b["archived"], cur[:archived]),
+        cleared: bit(b["cleared"], cur[:cleared]),
+        updated: System.os_time(:microsecond)
+      }, tenant)
+      %{ok: true}
+    end
+  end
+
+  defp bit(nil, prev), do: prev || 0
+  defp bit(true, _), do: 1
+  defp bit(false, _), do: 0
+  defp bit(1, _), do: 1
+  defp bit(0, _), do: 0
+  defp bit(_, prev), do: prev || 0
+
+  # ── Saved views — the funnel presets. Ships defaults in code; a user's own views override by name. ──
+  defp default_views do
+    [
+      %{name: "Needs you", emoji: "★", filters: "status=needs_you", position: 0, builtin: true},
+      %{name: "Sessions", emoji: "◷", filters: "semantic=run_done,chat", position: 1, builtin: true},
+      %{name: "Changes & deploys", emoji: "✎", filters: "semantic=change", position: 2, builtin: true},
+      %{name: "Customer & billing", emoji: "❡", filters: "semantic=billing,connected", position: 3, builtin: true}
+    ]
+  end
+
+  defp inbox_views_for(tenant, uid) do
+    saved =
+      SavedView
+      |> Nexus.Store.all(tenant)
+      |> Enum.map(&Map.from_struct/1)
+      |> Enum.filter(&(&1.uid == uid))
+      |> Enum.group_by(& &1.name)
+      |> Enum.map(fn {_n, rows} -> Enum.max_by(rows, &(&1.updated || 0)) end)
+      |> Enum.reject(&(to_string(&1.filters) == "__deleted__"))
+      |> Enum.map(&%{name: &1.name, emoji: &1.emoji, filters: &1.filters, position: &1.position, builtin: false})
+
+    names = MapSet.new(saved, & &1.name)
+    (Enum.reject(default_views(), &MapSet.member?(names, &1.name)) ++ saved)
+    |> Enum.sort_by(&(&1.position || 99))
+  end
+
+  def inbox_views_list(req) do
+    %{views: inbox_views_for(req.tenant || Nexus.Store.default_tenant(), user_key(req))}
+  end
+
+  def inbox_view_save(req) do
+    b = req.body || %{}
+    name = String.slice(to_string(b["name"] || ""), 0, 60)
+    if name == "" do
+      {400, %{error: "name is required"}}
+    else
+      tenant = req.tenant || Nexus.Store.default_tenant()
+      Nexus.Store.create(SavedView, %{
+        uid: user_key(req), name: name, emoji: to_string(b["emoji"] || "▦"),
+        filters: to_string(b["filters"] || ""), position: b["position"] || 10,
+        updated: System.os_time(:microsecond)
+      }, tenant)
+      %{views: inbox_views_for(tenant, user_key(req))}
+    end
+  end
+
+  def inbox_view_delete(req) do
+    b = req.body || %{}
+    name = to_string(b["name"] || "")
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    if name != "" do
+      Nexus.Store.create(SavedView, %{
+        uid: user_key(req), name: name, emoji: "", filters: "__deleted__",
+        position: 99, updated: System.os_time(:microsecond)
+      }, tenant)
+    end
+    %{views: inbox_views_for(tenant, user_key(req))}
   end
 
   def task_create(req) do

@@ -184,20 +184,29 @@ defmodule Nexus.Agent do
   # run (no workspace, or jj unavailable) uses a throwaway scratch dir, exactly as before. Returns
   # `{vfs, finalize_fn}` where finalize runs AFTER the loop with the run result.
   defp setup_vfs(opts, task) do
-    if Keyword.get(opts, :general), do: setup_general_vfs(), else: setup_workspace_vfs(opts, task)
+    if Keyword.get(opts, :general),
+      do: setup_general_vfs(Keyword.get(opts, :isolate, false)),
+      else: setup_workspace_vfs(opts, task)
   end
 
-  # GENERAL run (workhorse/autopoet): /work = an isolated staging COPY of the WHOLE workspace tree
-  # (every workspace's working files, NEVER .nexus/.git/.jj). The agent reads/edits across all
-  # workspaces and can create new top-level dirs; on success we sync the staging tree back to WB_DATA —
-  # new top-level dirs auto-register as real workspaces (Nexus.Workspaces.sync_back). The copy is the
-  # isolation boundary: a failed run touches nothing, and the staging dir is always cleaned up.
-  defp setup_general_vfs do
+  # GENERAL run (workhorse/autopoet): /work = a staging COPY of the WHOLE workspace tree (every
+  # workspace's working files, NEVER .nexus/.git/.jj). The agent reads/edits across all workspaces and
+  # can create new top-level dirs. The copy is the isolation boundary; the staging dir is always removed.
+  #
+  #   * `isolate: true` (eval/dev) — the run NEVER syncs back. It works entirely in the staging copy,
+  #     so production is touched ZERO times (no provision, no remount). The result is the agent's answer;
+  #     re-running is trivially clean. This is the cheap, safe default for evals.
+  #   * `isolate: false` (persist) — on success, sync the staging tree back to WB_DATA; new top-level
+  #     dirs auto-register as real workspaces (Nexus.Workspaces.sync_back, which remounts ONCE).
+  defp setup_general_vfs(isolate) do
     staging = Path.join(System.tmp_dir!(), "nexus_general_#{System.unique_integer([:positive])}")
     before = Nexus.Workspaces.stage(staging)
 
     finalize = fn result ->
-      with {:ok, _} <- result, do: Nexus.Workspaces.sync_back(staging, before)
+      unless isolate do
+        with {:ok, _} <- result, do: Nexus.Workspaces.sync_back(staging, before)
+      end
+
       File.rm_rf(staging)
       result
     end
