@@ -19,6 +19,33 @@ defmodule Nexus.Agent do
   @default_timeout 120_000
   @reg {__MODULE__, :agents}
 
+  # The autopoet-management postures (Autopoiesis v2 — wb-a6u3.3). Default `managed`.
+  @management_levels ~w(managed proposed frozen)
+  @default_management "managed"
+
+  # The human-gated STRUCTURAL TRIAD — fields the autopoet may never autonomously change (the merge
+  # gate, wb-a6u3.4, enforces this). Capability (`grant`), the subtree boundary (`ceiling`, declared in
+  # `index.work`), and the management posture itself. Everything else about a `managed` agent is fair
+  # game for autonomous, within-ceiling editing.
+  @structural_triad ~w(grant ceiling management)a
+
+  @doc "The autopoet-management postures: managed | proposed | frozen."
+  def management_levels, do: @management_levels
+
+  @doc "The human-gated structural-triad field names (grant, ceiling, management)."
+  def structural_triad, do: @structural_triad
+
+  @doc "An agent node's management posture — `managed` (default) | `proposed` | `frozen`."
+  def management(node) do
+    case def_from_unit(node) do
+      %{management: m} -> m
+      _ -> @default_management
+    end
+  end
+
+  @doc "May the autopoet edit this agent AUTONOMOUSLY (within ceiling)? Only `managed` agents."
+  def autopoet_managed?(node), do: management(node) == "managed"
+
   @doc "Register a declared `agent` unit by name (called at workbook bringup) for run-by-name."
   def register(%{kind: "agent", name: name} = node) do
     :persistent_term.put(@reg, Map.put(agents(), to_string(name), node))
@@ -204,6 +231,19 @@ defmodule Nexus.Agent do
 
   defp collect_field({:limit, _, [kw]}, acc) when is_list(kw),
     do: Map.put(acc, :limit, Keyword.take(kw, [:turns, :timeout]))
+
+  # `management managed|proposed|frozen` — the autopoet-management posture of THIS agent (Autopoiesis
+  # v2). `managed` = the autopoet may edit it autonomously within ceiling; `proposed` = the autopoet
+  # proposes, a human merges; `frozen` = the autopoet may not touch it (injection-exposed/high-trust;
+  # the autopoet carries `frozen` on itself). Unknown/absent → the safe-to-improve default `managed`.
+  # The tag itself is part of the human-gated structural triad — an agent can never autonomously flip
+  # it (enforced by the merge gate), so it can't promote itself into the autopoet's reach.
+  defp collect_field({:management, _, a}, acc) do
+    case names(a) do
+      [lvl | _] when lvl in @management_levels -> Map.put(acc, :management, lvl)
+      _ -> Map.put(acc, :management, @default_management)
+    end
+  end
 
   # OPEN spec: any other declared field (context, safety, hooks, model, …) is captured generically,
   # so the block can declare it today and the runtime honors each as it's wired. The agent definition
