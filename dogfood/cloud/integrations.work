@@ -161,6 +161,9 @@ server :integrations do
 
   # API-key providers are always ready (you paste). OAuth providers need this nexus's app credentials.
   defp configured?(%{mode: :api_key}), do: true
+  # Google connects via domain-wide delegation (a service account), NOT a 3-legged OAuth client — so its
+  # readiness is the DWD seam, not GOOGLE_OAUTH_CLIENT_ID.
+  defp configured?(%{id: "google"}), do: Nexus.Google.configured?()
   defp configured?(%{mode: :oauth2, id: id}), do: Nexus.Secrets.has?(client_id_secret(id))
 
   # ── API-key connect — seal the pasted token, store the connection ──────────────────────────────
