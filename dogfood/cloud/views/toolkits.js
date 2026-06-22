@@ -10,8 +10,16 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
   // Brand → real domain. We render the provider's actual full-color logo via the favicon service (every
   // brand has one, always full-color) on a light chip — simpleicons was monochrome-in-brand-color, so
   // dark brands (GitHub, Slack) disappeared on the dark card and some (fal) had no icon at all.
-  var DOMAIN = { github:'github.com', google:'google.com', gmail:'gmail.com', slack:'slack.com', fal:'fal.ai', openrouter:'openrouter.ai' };
-  function logo(id){ return 'https://www.google.com/s2/favicons?domain=' + (DOMAIN[id] || (id + '.com')) + '&sz=128'; }
+  // Real brand SVG (inlined from the glyphs toolkit / svgl), theme-aware for the mono brands. Some ids
+  // map onto a shared brand glyph (gmail → google). Returns an SVG string, or null when we have none.
+  var BRAND_ALIAS = { gmail: 'google' };
+  function brandGlyph(id){
+    var g = (window.WB && WB.BRAND_GLYPHS) ? WB.BRAND_GLYPHS[BRAND_ALIAS[id] || id] : null;
+    if (!g) return null;
+    if (typeof g === 'string') return g;
+    var dark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+    return dark ? g.d : g.l;   // svgl _dark variant = light logo for dark backgrounds
+  }
 
   function getJSON(url){ return fetch(url, { credentials:'same-origin' }).then(function(r){ return r.json(); }); }
   function send(url, method, body){
@@ -168,7 +176,10 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
       var th = tkTheme(it.id);
       return '<span class="' + cls + ' tint" style="background:' + th.bg + ';color:' + th.color + '">' + th.icon + '</span>';
     }
-    return '<span class="' + cls + '"><img class="tklogo" src="' + esc(logo(it.id)) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.textContent=this.parentNode.getAttribute(\'data-i\')" data-i="' + esc((it.name || '?').slice(0,1).toUpperCase()) + '"></span>';
+    var svg = brandGlyph(it.id);
+    if (svg) return '<span class="' + cls + ' brand">' + svg + '</span>';
+    // No curated glyph (e.g. fal) → a clean lettermark on the neutral chip.
+    return '<span class="' + cls + ' brand letter">' + esc((it.name || '?').slice(0, 1).toUpperCase()) + '</span>';
   }
 
   // The label + dataset for an item's primary action, by kind/state.
@@ -304,13 +315,14 @@ WB.scopedStyles('/toolkits', `
 WB.styles(`
 /* Chip styles are GLOBAL — used on cards (inside the view) AND in the Learn-more modal (on body). */
 .tkchip { width: 32px; height: 32px; border-radius: 8px; flex: none; display: grid; place-items: center;
-  background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0,0,0,.18); font: 700 14px var(--read); color: #333; overflow: hidden; }
-.tkchip.glyph { background: var(--line); border-color: transparent; color: var(--dim); box-shadow: none; }
-.tkchip.tint { border-color: transparent; box-shadow: none; }
+  background: var(--line); border: 1px solid transparent; font: 700 14px var(--read); color: var(--ink); overflow: hidden; }
+.tkchip.glyph { background: var(--line); border-color: transparent; color: var(--dim); }
+.tkchip.tint { border-color: transparent; }
+/* Brand chip: a neutral theme-adaptive tile holding the inlined full-color (or theme-picked mono) SVG. */
+.tkchip.brand { background: color-mix(in srgb, var(--ink) 7%, transparent); border-color: var(--line); }
+.tkchip svg { width: 20px; height: 20px; display: block; }
 .tkchip.big { width: 44px; height: 44px; border-radius: 11px; }
-.tkchip.big .tklogo { width: 26px; height: 26px; }
-.tkchip.big svg { width: 24px; height: 24px; }
-.tklogo { width: 20px; height: 20px; object-fit: contain; }
+.tkchip.big svg { width: 26px; height: 26px; }
 /* Learn-more modal */
 .tkinfohd { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .tkinfosub { font: 600 11px var(--read); text-transform: uppercase; letter-spacing: .05em; color: var(--dim); margin-top: 3px; }
