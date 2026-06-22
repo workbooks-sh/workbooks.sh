@@ -336,7 +336,7 @@
       { label: 'Tasks', icon: '☰', go: '/tasks' },
       { label: 'Runs', icon: '▸', go: '/runs' },
       { label: 'Issues', icon: '⚑', go: '/issues' },
-      { label: 'Activity', icon: '∿', go: '/activity' },
+      { label: 'Inbox', icon: '✉', go: '/activity' },
       { label: 'Workspaces', icon: '▦', go: '/workspaces' },
       { label: 'Usage & billing', icon: '◷', go: '/usage' },
       { label: 'Storage', icon: '▤', go: '/storage' },
@@ -607,7 +607,7 @@
       plus: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12H12M18 12H12M12 12V6M12 12V18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       apps: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 20.4V14.6C14 14.2686 14.2686 14 14.6 14H20.4C20.7314 14 21 14.2686 21 14.6V20.4C21 20.7314 20.7314 21 20.4 21H14.6C14.2686 21 14 20.7314 14 20.4Z" stroke="currentColor" stroke-width="1.5"/><path d="M3 20.4V14.6C3 14.2686 3.26863 14 3.6 14H9.4C9.73137 14 10 14.2686 10 14.6V20.4C10 20.7314 9.73137 21 9.4 21H3.6C3.26863 21 3 20.7314 3 20.4Z" stroke="currentColor" stroke-width="1.5"/><path d="M14 9.4V3.6C14 3.26863 14.2686 3 14.6 3H20.4C20.7314 3 21 3.26863 21 3.6V9.4C21 9.73137 20.7314 10 20.4 10H14.6C14.2686 10 14 9.73137 14 9.4Z" stroke="currentColor" stroke-width="1.5"/><path d="M3 9.4V3.6C3 3.26863 3.26863 3 3.6 3H9.4C9.73137 3 10 3.26863 10 3.6V9.4C10 9.73137 9.73137 10 9.4 10H3.6C3.26863 10 3 9.73137 3 9.4Z" stroke="currentColor" stroke-width="1.5"/></svg>',
       spark: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 15C12.8747 15 15 12.949 15 8C15 12.949 17.1104 15 22 15C17.1104 15 15 17.1104 15 22C15 17.1104 12.8747 15 8 15Z" stroke="currentColor" stroke-linejoin="round"/><path d="M2 6.5C5.13376 6.5 6.5 5.18153 6.5 2C6.5 5.18153 7.85669 6.5 11 6.5C7.85669 6.5 6.5 7.85669 6.5 11C6.5 7.85669 5.13376 6.5 2 6.5Z" stroke="currentColor" stroke-linejoin="round"/></svg>',
-      activity: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12H6L9 3L15 21L18 12H21" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      activity: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M3.2 7L12 13L20.8 7"/></svg>',
       admin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.57143 8C3.39038 6.73263 3.23403 5.63823 3.13088 4.91614C3.05698 4.39885 3.39389 3.91247 3.90398 3.79912L11.5661 2.09641C11.8519 2.03291 12.1481 2.03291 12.4339 2.09641L20.096 3.79912C20.6061 3.91247 20.943 4.39885 20.8691 4.91614C20.766 5.63823 20.6096 6.73263 20.4286 8M3.57143 8H20.4286M3.57143 8C3.87997 10.1598 4.26028 12.822 4.57143 15M20.4286 8C20.12 10.1598 19.7397 12.822 19.4286 15M19.4286 15C19.2567 16.2032 19.1059 17.2586 19 18C18.9293 18.495 18.5 21.5 12 21.5C5.5 21.5 5.07071 18.495 5 18C4.89409 17.2586 4.74331 16.2032 4.57143 15M19.4286 15H4.57143" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6L15 12L9 18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       hash: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L6 21" stroke="currentColor" stroke-linecap="round"/><path d="M20.5 16H2.5" stroke="currentColor" stroke-linecap="round"/><path d="M22 7H4" stroke="currentColor" stroke-linecap="round"/><path d="M18 3L14 21" stroke="currentColor" stroke-linecap="round"/></svg>',
@@ -985,28 +985,37 @@
       });
     }
     WB._paintStudio = paintStudio;
-    // Activity inbox — the event feed, in the sidebar. Click an item → the /activity page shows its
-    // context (WB._activityFocus drives the view's selected event). Reuses GET /cloud/activity.
-    function paintActivity(){
-      var box = document.getElementById('activityInbox'); if (!box) return;
-      WB.swr('activity', function(){ return fetch('/cloud/activity', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
-        var el = document.getElementById('activityInbox'); if (!el) return;
-        var events = (d && d.events) || [];
-        WB._activityEvents = events;   // shared with the /activity view's context pane
-        if (!events.length) { el.innerHTML = '<div class="treemsg" style="padding:8px 10px">No activity yet</div>'; return; }
-        var now = Math.floor(Date.now() / 1000);
-        function ago(sec){ if (!sec) return ''; var x = now - sec; return x < 60 ? x + 's' : x < 3600 ? Math.floor(x/60) + 'm' : x < 86400 ? Math.floor(x/3600) + 'h' : Math.floor(x/86400) + 'd'; }
-        var foc = WB._activityFocus;   // null until a row is clicked → the page shows its empty state
-        el.innerHTML = events.map(function(e, i){
-          var title = e.title || e.kind || 'Event';
-          var sub = e.target || e.actor || '';
-          return '<button class="ibrow' + (i === foc ? ' on' : '') + '" data-ctx="event" data-act-focus="' + i + '">' +
-            '<span class="ibic">' + esc((e.actor || '?').trim()[0].toUpperCase()) + '</span>' +
-            '<span class="ibmeta"><span class="ibt">' + esc(title) + '</span>' + (sub ? '<span class="ibs">' + esc(sub) + '</span>' : '') + '</span>' +
-            '<span class="ibw">' + esc(ago(e.at)) + '</span></button>';
+    // Inbox funnel — the LEFT sidebar: saved filter views (email-style). Clicking one sets the active
+    // filter the page reads (WB._inboxFilter) and re-renders. Search box narrows by text. Views come
+    // from GET /cloud/inbox/views (defaults + the user's own). The page (views/activity.js) owns the list.
+    function paintInboxFunnel(){
+      var box = document.getElementById('inboxFunnel'); if (!box) return;
+      WB._inboxFilter = WB._inboxFilter || { view: 'Inbox', filters: '', q: '' };
+      WB.swr('inbox-views', function(){ return fetch('/cloud/inbox/views', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
+        var el = document.getElementById('inboxFunnel'); if (!el) return;
+        var views = (d && d.views) || [];
+        WB._inboxViews = views;
+        // "Inbox" (all, unfiltered) sits above the presets; needs-you is the first preset.
+        var rows = [{ name: 'Inbox', emoji: '✉', filters: '', builtin: true }].concat(views);
+        el.innerHTML = rows.map(function(v){
+          var on = (WB._inboxFilter.view === v.name);
+          return '<button class="ibxview' + (on ? ' on' : '') + '" data-ibxview="' + esc(v.name) + '" data-ibxf="' + esc(v.filters || '') + '">' +
+            '<span class="ibxvemoji">' + esc(v.emoji || '▦') + '</span>' +
+            '<span class="ibxvname">' + esc(v.name) + '</span>' +
+            '<span class="ibxvn" data-ibxcount="' + esc(v.name) + '"></span></button>';
         }).join('');
+        el.querySelectorAll('.ibxview').forEach(function(b){ b.onclick = function(){
+          WB._inboxFilter = { view: b.getAttribute('data-ibxview'), filters: b.getAttribute('data-ibxf') || '', q: WB._inboxFilter.q || '' };
+          paintInboxFunnel();
+          if (WB._inboxRender) WB._inboxRender();
+        }; });
+        var s = document.getElementById('inboxSearch');
+        if (s && !s._wired){ s._wired = true; s.value = WB._inboxFilter.q || '';
+          s.oninput = function(){ WB._inboxFilter.q = s.value; if (WB._inboxRender) WB._inboxRender(); }; }
+        if (WB._inboxCounts) WB._inboxCounts();   // page fills the per-view counts when its data lands
       });
     }
+    WB._paintInboxFunnel = paintInboxFunnel;
     // Toolkits sidebar — what's ACTIVE: connected accounts (per integration) + enabled built-in toolkits,
     // each with an inline disable. Reuses GET /cloud/toolkits; SWR so it paints instantly then refreshes.
     function paintToolkits(){
@@ -1182,7 +1191,7 @@
       var RAIL_SECS = [
         { id: 'studio', ico: ICO.spark, label: 'Studio', go: '/studio' },
         { id: 'apps', ico: ICO.grid, label: 'Apps', go: '/' },
-        { id: 'activity', ico: ICO.activity, label: 'Activity', go: '/activity' },
+        { id: 'activity', ico: ICO.activity, label: 'Inbox', go: '/activity' },
         { id: 'files', ico: ICO.files, label: 'Files', go: '/workspaces' },
         { id: 'data', ico: ICO.sheet, label: 'Data', go: '/data' }
       ];
@@ -1192,7 +1201,7 @@
       }).join('');
 
       // ── per-surface SIDEBAR body — swaps with the active rail section ──
-      var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Activity', files: 'Files', data: 'Data', toolkits: 'Toolkits', admin: 'Admin', account: 'You' };
+      var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Inbox', files: 'Files', data: 'Data', toolkits: 'Toolkits', admin: 'Admin', account: 'You' };
       var isBrowse = section === 'apps' || section === 'files' || section === 'data';   // these get the header filter funnel
       if (isBrowse) st.sideMode = section;   // keep the filter funnel (filterMenu/filterActive) keyed to the active surface
       var sideBody;
@@ -1206,8 +1215,14 @@
           '<div class="swshead"><span class="swsheadtt">Workspaces</span>' +
             '<button class="swsheadadd" data-newworkspace title="New workspace">' + ICO.plus + '</button></div>' +
           '<div id="studioSide"><div class="treemsg" style="padding:8px 4px">Loading sessions…</div></div>';
-      // Activity — the inbox lives in the sidebar; the page shows the selected event's context (lazy → #activityInbox).
-      else if (section === 'activity') sideBody = '<div id="activityInbox"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
+      // Inbox — the LEFT sidebar is the filter funnel (saved views + search). The page is the list+pane
+      // mailbox. Clicking a view sets WB._inboxFilter and re-renders the page (lazy → #inboxFunnel).
+      else if (section === 'activity') sideBody =
+          '<div class="ibxfunnel">' +
+            '<div class="ibxsearch"><span class="ibxsico">' + ICO.filter + '</span>' +
+              '<input id="inboxSearch" placeholder="Filter inbox…" autocomplete="off"></div>' +
+            '<div id="inboxFunnel"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>' +
+          '</div>';
       // Data — Overview + Assets links, then resources grouped by workspace (lazy → #dataSide).
       else if (section === 'data') sideBody = '<div id="dataSide"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
       // Toolkits — the sidebar lists what's ACTIVE: connected accounts + enabled built-in toolkits, each
@@ -1274,7 +1289,7 @@
       if (st.pickerOpen) { var ph = root.querySelector('#wsPicker'); if (ph) WB.emojiPicker(ph, function (u) { st.editIcon = u; st.pickerOpen = false; renderShell(); renderView(); }); }
       if (section === 'apps') paintApps();        // Apps surface → load the apps grid
       else if (section === 'studio') paintStudio();
-      else if (section === 'activity') paintActivity();
+      else if (section === 'activity') paintInboxFunnel();
       else if (section === 'toolkits') paintToolkits();
       else if (section === 'data') paintDataSide();
     }

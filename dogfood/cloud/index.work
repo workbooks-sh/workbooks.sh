@@ -125,6 +125,35 @@ resource DeviceKey do
   revoked :integer   # 0 active, 1 revoked
 end
 
+# The Inbox saved-views store — a user's filter presets in the Inbox funnel (the email-style filter
+# next to search). One folded row per (uid, name); newest by `updated` wins (same fold as Todo). NO
+# JSON: the filter spec is a compact "key=val;key=val" string of dimensions (kind/actor/status/
+# workspace/tags), parsed on read. Per-user, tenant-scoped; the default presets ship in code.
+resource SavedView do
+  description "Inbox saved views — a user's filter presets (kind/actor/status/workspace/tags)."
+  tags ["system", "activity"]
+  uid :string      # owning user (signed-in email) — part of the fold key
+  name :string     # the view's display name (the other part of the fold key)
+  emoji :string    # a leading glyph for the funnel entry
+  filters :string  # compact "kind=failed,needs_you;actor=workhorse;status=open" spec (NO json)
+  position :integer # sort order in the funnel
+  updated :integer # unix microseconds — the fold picks newest
+end
+
+# Per-user inbox read-state — the email layer over the shared activity feed. One folded row per
+# (uid, subject); `subject` is the thread key (a run id / session id / task id) the Inbox groups by.
+# Holds read/unread, archived, and a cleared-needs-you flag. Append-only, folded by {uid,subject}.
+resource InboxState do
+  description "Per-user inbox state — read / archived / cleared flags keyed by thread subject."
+  tags ["system", "activity"]
+  uid :string      # the user this state belongs to
+  subject :string  # the thread key (run id / session id / task id)
+  read :integer    # 1 = the user has opened this thread
+  archived :integer # 1 = archived out of the default Inbox (a new event un-archives it)
+  cleared :integer # 1 = the needs-you flag was explicitly resolved/cleared
+  updated :integer # unix microseconds — the fold picks newest
+end
+
 # Persist every bus event to the log. The reactive primitives (hook kind, #event, effect engine) are
 # the open standard; this hook + the `log` effect are our cloud opting into a durable feed.
 hook :activity do

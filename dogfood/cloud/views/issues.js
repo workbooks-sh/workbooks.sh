@@ -65,7 +65,7 @@ WB.scopedStyles('/issues', `
   .iss-tab.on { background:var(--rose,#f4b8c4); color:#3a0f1a; border-color:transparent; font-weight:650; }
   .iss-list { flex:1; overflow:auto; padding:18px 20px; display:flex; flex-direction:column; gap:12px; max-width:880px; }
   .iss-empty { color:var(--dim,#9aa0ad); padding:30px 0; }
-  .i-card { background:var(--panel,#16181f); border:1px solid var(--line); border-left:3px solid var(--rose,#f4b8c4); border-radius:10px; padding:13px 15px; }
+  .i-card { background:var(--card); border:1px solid var(--line); border-left:3px solid var(--rose,#f4b8c4); border-radius:10px; padding:13px 15px; color:var(--ink); }
   .i-card.done { border-left-color:var(--ok,#9ee6a8); opacity:.7; }
   .i-top { display:flex; align-items:center; gap:9px; font-size:12px; color:var(--dim,#9aa0ad); }
   .i-by { font-size:10px; text-transform:uppercase; letter-spacing:.07em; padding:2px 7px; border-radius:999px; font-weight:650; }
@@ -73,9 +73,10 @@ WB.scopedStyles('/issues', `
   .i-by.human { background:rgba(184,166,240,.16); color:var(--violet,#b8a6f0); }
   .i-run { color:var(--mint,#8ad6c8); } .i-time { margin-left:auto; }
   .i-title { font-size:14.5px; font-weight:600; margin-top:7px; }
-  .i-detail { font-size:12px; color:var(--dim,#9aa0ad); white-space:pre-wrap; background:#12141b; border:1px solid var(--line); border-radius:7px; padding:9px 11px; margin:8px 0 0; max-height:160px; overflow:auto; font-family:ui-monospace,monospace; }
+  .i-detail { font-size:12px; color:var(--dim,#9aa0ad); white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:7px; padding:9px 11px; margin:8px 0 0; max-height:160px; overflow:auto; font-family:ui-monospace,monospace; }
+  .i-title { color:var(--ink); }
   .i-foot { display:flex; align-items:center; gap:8px; margin-top:11px; }
-  .i-assign { font:inherit; font-size:12px; background:#12141b; color:inherit; border:1px solid var(--line); border-radius:6px; padding:4px 7px; }
+  .i-assign { font:inherit; font-size:12px; background:var(--bg); color:inherit; border:1px solid var(--line); border-radius:6px; padding:4px 7px; }
   .i-fix { font:inherit; font-size:12px; background:var(--mint,#8ad6c8); color:#04221c; border:0; border-radius:6px; padding:5px 11px; cursor:pointer; font-weight:600; }
   .i-resolve { font:inherit; font-size:12px; background:transparent; color:var(--dim,#9aa0ad); border:1px solid var(--line); border-radius:6px; padding:5px 11px; cursor:pointer; }
   .i-resolved { font-size:12px; color:var(--ok,#9ee6a8); } .i-from { font-weight:500; }
