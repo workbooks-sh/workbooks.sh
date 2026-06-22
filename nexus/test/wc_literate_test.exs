@@ -61,7 +61,7 @@ defmodule Nexus.LiterateTest do
 
   test "a multi-line flat declaration is held together by bracket balance" do
     src = """
-    data :leads, of: Lead, from: values([
+    query :leads, of: Lead, from: values([
       %Lead{name: "Acme", score: 70},
       %Lead{name: "Globex", score: 41}
     ])
@@ -71,7 +71,7 @@ defmodule Nexus.LiterateTest do
 
     nodes = Literate.parse(src)
     [decl] = by_type(nodes, :decl)
-    assert decl.text =~ "data :leads"
+    assert decl.text =~ "query :leads"
     assert decl.text =~ "Globex"
     assert decl.text =~ "])"
     # the following sentence is its own prose node, not swallowed into the decl

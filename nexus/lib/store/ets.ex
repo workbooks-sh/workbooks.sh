@@ -31,6 +31,10 @@ defmodule Nexus.Store.Ets do
   @impl true
   def count(resource, tenant), do: :ets.select_count(table(resource), [{{:_, tenant, :_}, [], [true]}])
 
+  # In-memory: there's nothing to push down, so decode-filter-sort-slice the tenant's rows.
+  @impl true
+  def page(resource, tenant, opts), do: Nexus.Store.Page.apply(all(resource, tenant), opts)
+
   @impl true
   def clear(resource, tenant) do
     :ets.match_delete(table(resource), {:_, tenant, :_})

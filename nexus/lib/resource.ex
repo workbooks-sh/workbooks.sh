@@ -1,6 +1,6 @@
 defmodule Nexus.Resource do
   @moduledoc """
-  The shape layer for the `resource` / `record` vocabulary — the foundation of the data
+  The shape layer for the `resource` vocabulary — the foundation of the data
   model (see `docs/DATA-LAYER-DECISION.md`). It reads a unit's **declared** domain-typed
   fields (`name :text`, `revenue :money`, `status :new | :scored`, `tags [:text]`) and
   derives sound WIT — *no inference from defaults*, so the contract never lies.

@@ -3,7 +3,6 @@ defmodule Nexus.Compile do
   Route a parsed unit to its artifact — the one place placement becomes execution:
 
       resource         → a typed struct           (the shape; persisted via `Nexus.Store`)
-      record           → a value shape             (`Nexus.Resource`)
       server           → a native BEAM module      (`Nexus.Unit`)
       client / foreign → a wasm component          (the compilers → `Nexus.Sandbox`)
 
@@ -22,7 +21,6 @@ defmodule Nexus.Compile do
   def unit(%{type: :code, kind: kind} = node) do
     cond do
       kind == "resource" -> {:resource, Nexus.Resource.compile(node)}
-      kind == "record" -> {:shape, Nexus.Resource.fields(node)}
       kind == "server" -> {:beam, Nexus.Unit.compile(node)}
       kind == "worker" -> {:worker, Nexus.Worker.compile(node)}
       kind == "agent" -> {:agent, Nexus.Agent.def_from_unit(node)}

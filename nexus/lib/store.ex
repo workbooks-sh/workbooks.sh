@@ -29,7 +29,12 @@ defmodule Nexus.Store do
   # against the declared `__fields__` (data drift). Row-blob backends (ETS/SQLite) omit
   # it — they faithfully store the declared struct, so there are no columns to drift.
   @callback columns(resource :: module, tenant) :: [String.t()]
-  @optional_callbacks columns: 2
+
+  # Optional native pagination. A backend that can page/filter/sort more efficiently than
+  # "load all → slice" (e.g. SQLite `LIMIT/OFFSET` for the default browse case) implements this.
+  # Backends that omit it get the generic `Nexus.Store.Page` fallback over `all/2`.
+  @callback page(resource :: module, tenant, opts :: keyword) :: {[struct], non_neg_integer}
+  @optional_callbacks columns: 2, page: 3
 
   @default "default"
 
@@ -69,6 +74,22 @@ defmodule Nexus.Store do
 
   @doc "How many rows a resource has for `tenant`."
   def count(resource, tenant \\ @default), do: adapter().count(resource, tenant)
+
+  @doc """
+  A page of a resource's rows for `tenant`. Returns `{rows, total}` where `total` is the count
+  AFTER any `:q` filter. Opts: `:offset` (>=0), `:limit` (1..500, default 50), `:sort`
+  (`{field, :asc|:desc}` or a field name; defaults to insertion order), `:q` (substring search
+  across decoded fields). Uses the backend's native `page/3` when available, else slices `all/2`.
+  """
+  def page(resource, tenant \\ @default, opts \\ []) do
+    a = adapter()
+
+    if function_exported?(a, :page, 3) do
+      a.page(resource, tenant, opts)
+    else
+      Nexus.Store.Page.apply(a.all(resource, tenant), opts)
+    end
+  end
 
   @doc "Drop a resource's rows for `tenant` (never touches other tenants)."
   def clear(resource, tenant \\ @default), do: adapter().clear(resource, tenant)

@@ -62,8 +62,8 @@ defmodule Nexus.ResourceTest do
     assert v.tags == []
   end
 
-  test "a pure value record works the same" do
-    wit = unit("record Money do\n  cents :int\n  currency :usd | :eur | :gbp\nend\n") |> Resource.wit()
+  test "a pure value resource works the same" do
+    wit = unit("resource Money do\n  cents :int\n  currency :usd | :eur | :gbp\nend\n") |> Resource.wit()
     assert wit =~ "record money {"
     assert wit =~ "cents: s32,"
     assert wit =~ "currency: currency,"

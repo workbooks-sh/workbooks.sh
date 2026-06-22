@@ -41,7 +41,47 @@ defmodule Nexus.Store.Sqlite do
   end
 
   @impl true
-  def count(resource, tenant), do: length(all(resource, tenant))
+  def count(resource, tenant) do
+    with_conn(fn conn ->
+      ensure_table(conn, resource)
+      count_sql(conn, resource, tenant)
+    end)
+  end
+
+  # Native pagination. Default browse (no filter, insertion-order sort) pages at the DB with
+  # `LIMIT/OFFSET` + a `COUNT(*)` total — O(page), so a 100k-row table doesn't load into memory.
+  # A `:q` filter or a field-sort can't be expressed over the opaque term blob, so those fall back
+  # to the shared in-memory slicer (correct, not yet index-accelerated — column-mapping is wb-4d2e).
+  @impl true
+  def page(resource, tenant, opts) do
+    o = Nexus.Store.Page.opts(opts)
+
+    if Nexus.Store.Page.native_ok?(o) do
+      with_conn(fn conn ->
+        ensure_table(conn, resource)
+        total = count_sql(conn, resource, tenant)
+
+        {:ok, stmt} =
+          Sqlite3.prepare(
+            conn,
+            "SELECT data FROM #{tbl(resource)} WHERE tenant = ?1 ORDER BY id LIMIT ?2 OFFSET ?3"
+          )
+
+        :ok = Sqlite3.bind(stmt, [tenant, o.limit, o.offset])
+        {:ok, rows} = Sqlite3.fetch_all(conn, stmt)
+        {Enum.map(rows, fn [blob] -> :erlang.binary_to_term(blob) end), total}
+      end)
+    else
+      Nexus.Store.Page.apply(all(resource, tenant), opts)
+    end
+  end
+
+  defp count_sql(conn, resource, tenant) do
+    {:ok, stmt} = Sqlite3.prepare(conn, "SELECT COUNT(*) FROM #{tbl(resource)} WHERE tenant = ?1")
+    :ok = Sqlite3.bind(stmt, [tenant])
+    {:ok, [[n]]} = Sqlite3.fetch_all(conn, stmt)
+    n
+  end
 
   @impl true
   def clear(resource, tenant) do

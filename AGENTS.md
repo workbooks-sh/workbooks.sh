@@ -6,8 +6,8 @@ The single, tool-agnostic instruction file for any AI coding agent on this proje
 
 A **workbook is a folder of `.work` files** — plain-text **literate** documents. Prose
 narrates; `do … end` blocks run. There is **no HTML wrapper and no code fences**: a block
-is self-delimiting, and the **first word names the kind** (`data`, `def`, `server`,
-`client`, `flow`, `sandbox`, `agent`, `record`, `resource`, …). The format is **AST-first**
+is self-delimiting, and the **first word names the kind** (`def`, `server`,
+`client`, `flow`, `sandbox`, `agent`, `resource`, …). The format is **AST-first**
 — a `<kind> :name … do … end` block parses to a real Elixir macro-call tuple, so
 kind/name/args come from the tree, never a regex. `Nexus.Literate` is the ONE parse the
 whole system shares (viewer highlighting, the code-graph extractor, the weave gate).
@@ -16,8 +16,10 @@ Four lanes live in every file:
 
 - **Prose** — rich text that explains, carrying live refs: `[[backlinks]]`, `#tags`,
   `work://` links, inline `:atom` / `@type` mentions.
-- **Declaration** — structure with no body: a `defstruct` is a record, a list of atoms is
-  an enum, a `data` block is a typed table that renders by default.
+- **Declaration** — structure with no body: a `resource :name do field … end` is a typed
+  table (the one persistent data unit; rows written no-SQL via `Nexus.Store.create`, read
+  via `Nexus.Store.all` — tenant-partitioned term blobs in SQLite), a list of atoms is an
+  enum. (`data`/`record` were dead kinds — parsed, never compiled — and are removed.)
 - **Code** — a runnable block: a `def`, a `client` island, a `server` unit.
 - **Placement** — the first word says WHERE it runs: `client` (browser, wasm) or `server`
   (nexus, native BEAM), plus an optional `sandbox :name` for capabilities (the Dock seam

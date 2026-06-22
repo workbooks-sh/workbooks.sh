@@ -217,7 +217,12 @@ defmodule Nexus.SSR do
     end
   end
 
-  defp files(root) do
+  @doc """
+  The `.work` files that belong to the surface rooted at `root`, in composition order
+  (index.work first). Prunes nested surfaces (subdirs with their own index.work) and the
+  TEMPLATE.work manifest. Shared with `Nexus.Resources` so tree-walking lives in one place.
+  """
+  def files(root) do
     # Nested surfaces (subdirs with their OWN index.work) are SEPARATE mounts — their .work files belong
     # to that surface, not this one. Prune those subtrees so a parent surface's weave stops at each child
     # surface's boundary (otherwise a home surface like `lander` swallows its `lander/blog` surface — its

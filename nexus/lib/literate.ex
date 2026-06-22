@@ -10,7 +10,7 @@ defmodule Nexus.Literate do
 
     * `:heading`  — a markdown `#`…`######` line
     * `:code`     — a `<kind> [lang] :name … do … end` block (header parsed out)
-    * `:decl`     — a flat declaration (`@attr`, `data :x, …`), bracket-balanced
+    * `:decl`     — a flat declaration (`@attr`, `type :x, …`), bracket-balanced
     * `:prose`    — everything else: a markdown paragraph, with inline refs
 
   Each node carries `:line` (1-based start) and, where it has text, `:refs`
@@ -18,7 +18,7 @@ defmodule Nexus.Literate do
   """
 
   @langs ~w(elixir rust zig python svelte solid js ts c cpp go wit)
-  @decl_kw ~w(data task user type deps checks theme show query workbook nexus grant route)
+  @decl_kw ~w(task user type deps checks theme show query workbook nexus grant route)
 
   @ref_re ~r/\[\[[^\]\n]+\]\]|work:\/\/[^\s)]*[a-zA-Z0-9_\/#-]|(?<![\w:]):[a-z]\w*|(?<![\w])@[a-z]\w*|(?<![\w])#[a-z][\w-]*/
 
@@ -108,7 +108,7 @@ defmodule Nexus.Literate do
   # when the line is actually a block HEADER, not prose that happens to end in the
   # English word "do" (e.g. "…what each block may do"). A real header is a bare kind
   # (`deploy do`), a kind with a `:name` (`server :x do`), or a CamelName declaration
-  # (`data Order do`). Without this guard a sentence ending in "do" swallows the rest
+  # (`resource Order do`). Without this guard a sentence ending in "do" swallows the rest
   # of the page as a phantom block.
   defp opener?(line) do
     Regex.match?(~r/^[^\s#].*\sdo\s*$/, line) and header_shaped?(line)
@@ -120,7 +120,7 @@ defmodule Nexus.Literate do
     head != "" and
       (Regex.match?(~r/^[a-z]\w*$/, head) or
          Regex.match?(~r/(^|\s):[a-z]/, head) or
-         Regex.match?(~r/^(data|resource|record|defmodule|type|enum)\s+[A-Z]\w*/, head))
+         Regex.match?(~r/^(resource|defmodule|type|enum)\s+[A-Z]\w*/, head))
   end
 
   # A flat declaration starts (non-indented) with `@attr`, or a declaration word

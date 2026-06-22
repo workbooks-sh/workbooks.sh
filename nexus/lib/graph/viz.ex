@@ -12,7 +12,6 @@ defmodule Nexus.Graph.Viz do
 
   @kind %{
     "resource" => {"#a8d4f0", "resource"},
-    "record" => {"#a8d4f0", "record"},
     "server" => {"#aee5c2", "server"},
     "agent" => {"#f3c5a3", "agent"},
     "rust" => {"#f2ddb0", "wasm"},
