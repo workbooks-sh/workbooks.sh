@@ -25,4 +25,4 @@ alongside docs/cloud/waitlist/marketing.
 - **05-s3** — the closing build.
 - **06-modal** — notify-me, captured into our waitlist workbook.
 
-The original `web/index.html` stays until this is verified at full parity.
+This workbook IS the live homepage (served at `/` via `home="lander"`); the old `web/index.html` god-file is retired.
