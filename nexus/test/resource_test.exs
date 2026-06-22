@@ -50,8 +50,9 @@ defmodule Nexus.ResourceTest do
     mod = @lead |> unit() |> Resource.compile()
 
     v = struct(mod, [])
-    # plain struct, AtomVM-safe — only __struct__ + a literal-returning __fields__/0, no runtime deps
-    assert mod.__info__(:functions) == [__fields__: 0, __struct__: 0, __struct__: 1]
+    # plain struct, AtomVM-safe — only __struct__, a literal-returning __fields__/0, and the
+    # __nexus_unit__/0 marker (lets Nexus.Uid.guard/1 allow recompiles); no runtime deps
+    assert mod.__info__(:functions) == [__fields__: 0, __nexus_unit__: 0, __struct__: 0, __struct__: 1]
     assert is_map(v) and Map.has_key?(v, :__struct__)
 
     # defaults follow the DECLARED type: text→"", int→0, enum→first case, list→[]
@@ -67,5 +68,30 @@ defmodule Nexus.ResourceTest do
     assert wit =~ "cents: s32,"
     assert wit =~ "currency: currency,"
     assert wit =~ "enum currency {"
+  end
+
+  # Regression for wb-o5ng: `resource Task` compiled to top-level `Elixir.Task`, clobbering the
+  # stdlib concurrency module the web server's acceptors spawn through, and killed nexus boot.
+  test "a resource name that would shadow a runtime module is refused — and the stdlib module survives" do
+    refused = unit("resource Task do\n  tid :string\nend\n")
+
+    assert_raise RuntimeError, ~r/would shadow the runtime module Task/, fn ->
+      Resource.compile(refused)
+    end
+
+    # the real stdlib Task is untouched — the function the web server depends on still exists
+    assert function_exported?(Task, :start_link, 3)
+  end
+
+  test "a non-colliding resource name compiles, carries the unit marker, and recompiles cleanly" do
+    todo = unit("resource Todo do\n  tid :string\nend\n")
+
+    mod = Resource.compile(todo)
+    assert function_exported?(mod, :__nexus_unit__, 0)
+    assert mod.__nexus_unit__()
+
+    # recompiling the SAME unit is allowed even though the module is now loaded (the marker proves
+    # it's ours, not a runtime module being clobbered)
+    assert Resource.compile(todo) == mod
   end
 end

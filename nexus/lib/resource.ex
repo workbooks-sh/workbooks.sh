@@ -71,6 +71,13 @@ defmodule Nexus.Resource do
   pluggable seam (`Nexus.Store`) — the struct doesn't know or care which backend holds it.
   """
   def compile(%{name: name} = node) do
+    # Never let a resource name clobber a runtime-critical module (e.g. `resource Task` over
+    # Elixir's stdlib `Task`, which killed nexus boot). Fail loud at compile, not at runtime.
+    case Nexus.Uid.guard(name) do
+      :ok -> :ok
+      {:error, msg} -> raise msg
+    end
+
     mod = Nexus.Uid.module(name)
     defaults = struct_fields(node)
     specs = fields(node)
@@ -80,6 +87,10 @@ defmodule Nexus.Resource do
         defmodule unquote(mod) do
           defstruct unquote(Macro.escape(defaults))
           def __fields__, do: unquote(Macro.escape(specs))
+          # Marker: identifies this as a compiled workbook unit so Nexus.Uid.guard/1 allows a
+          # *recompile* of the same resource (it's already loaded) while still refusing a name
+          # that would shadow a non-workbook runtime module. Pure 0-arity — AtomVM/client-safe.
+          def __nexus_unit__, do: true
         end
       end
 

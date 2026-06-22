@@ -134,9 +134,24 @@ defmodule Nexus.Unit do
         {:error, :no_body}
 
       body ->
+        # Refuse a server name that would shadow a runtime-critical module (same hazard as
+        # `resource Task` clobbering Elixir's stdlib `Task`). Fail at compile, not at boot.
+        case Nexus.Uid.guard(name) do
+          :ok -> :ok
+          {:error, msg} -> raise msg
+        end
+
         mod = Nexus.Uid.module(name)
-        # Inject the routing primitive: `route "GET /path", :fun` is available in every server unit.
-        quoted = quote do: (defmodule unquote(mod) do (use Nexus.Router); unquote(body) end)
+        # Inject the routing primitive (`route "GET /path", :fun`) + the workbook-unit marker
+        # (lets Nexus.Uid.guard/1 allow a recompile of this same unit).
+        quoted =
+          quote do
+            defmodule unquote(mod) do
+              use Nexus.Router
+              def __nexus_unit__, do: true
+              unquote(body)
+            end
+          end
 
         try do
           {:ok, quoted |> Code.compile_quoted() |> Enum.map(&elem(&1, 0))}

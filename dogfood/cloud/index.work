@@ -41,7 +41,7 @@ server :cloud do
   # The durable run ledger for the Studio Runs view — most-recent agent runs for this tenant.
   route "GET /cloud/runs", :runs_list
 
-  # Task management + planning (the orchestration backbone). Tasks live in resource Task; a plan is a
+  # Task management + planning (the orchestration backbone). Tasks live in resource Todo; a plan is a
   # parent task + subtasks. Dispatch launches a Run (reuses do_run) and links it. Plan asks Waldo to
   # decompose a goal into assigned subtasks. THE LINE: the store + board are ours, the bus is standard.
   route "GET /cloud/tasks", :tasks_list
@@ -50,7 +50,7 @@ server :cloud do
   route "POST /cloud/task/dispatch", :task_dispatch
   route "POST /cloud/plan", :plan_create
 
-  # Issues — the failure-model queue. A failed run auto-files an issue (kind="issue" Task); agents or
+  # Issues — the failure-model queue. A failed run auto-files an issue (kind="issue" Todo); agents or
   # humans can file one explicitly; the triage view separates agent- from human-filed and lets you
   # re-dispatch (assign + run a fix) or resolve. Issues ARE tasks, so update/dispatch reuse the above.
   route "GET /cloud/issues", :issues_list
@@ -382,10 +382,14 @@ server :cloud do
   end
 
   # ── Task management + planning ───────────────────────────────────────────────────────────────────
-  # Tasks are stored append-only (resource Task has no in-place update); the CURRENT state of a task is
+  # Tasks are stored append-only (resource Todo has no in-place update); the CURRENT state of a task is
   # the row with its tid and the newest `updated`. current_tasks/1 folds the log to live state.
+  # NOTE: the resource is `Todo`, NOT `Task` — `Task` is Elixir's stdlib concurrency module (the web
+  # server's socket acceptors spawn through `Task.start_link/3`); a workbook resource named `Task`
+  # compiled to `Elixir.Task` and clobbered it, killing nexus boot. `Nexus.Uid.guard/1` now refuses
+  # any unit name that would shadow a runtime-critical module.
   defp current_tasks(tenant) do
-    Task
+    Todo
     |> Nexus.Store.all(tenant)
     |> Enum.map(&Map.from_struct/1)
     |> Enum.group_by(& &1.tid)
@@ -402,7 +406,7 @@ server :cloud do
   defp put_task(tenant, attrs) do
     now = System.os_time(:microsecond)
     attrs = Map.put(attrs, :updated, now)
-    Nexus.Store.create(Task, attrs, tenant)
+    Nexus.Store.create(Todo, attrs, tenant)
     persist_task_file(attrs)
     Nexus.Events.emit(
       %{kind: "task.#{attrs[:status] || "update"}", actor: to_string(attrs[:created_by] || "system"),
@@ -502,7 +506,7 @@ server :cloud do
     %{issues: issues}
   end
 
-  # File an issue (a kind="issue" Task). Used by the failure model (auto-filed on a failed run) and
+  # File an issue (a kind="issue" Todo). Used by the failure model (auto-filed on a failed run) and
   # available as an explicit endpoint. `run` links the failing/relevant run.
   def issue_file(req) do
     b = req.body || %{}
@@ -1280,7 +1284,7 @@ end
 # The task/plan store — the orchestration backbone. A task is a unit of work; a plan is a parent
 # task with child subtasks (parent = parent's tid). Dispatching a task launches a Run and links its
 # rid. THE LINE: the bus + `task` effect are generic; this store + the Studio board are our cloud.
-resource Task do
+resource Todo do
   tid :string        # stable task id
   kind :string       # "task" (work to do) | "issue" (a problem an agent/human filed) — one fabric
   title :string      # short summary
@@ -1297,7 +1301,7 @@ end
 
 # Scheduled agent runs — the time arm of the orchestration fabric. A schedule fires a named agent on a
 # brief via Nexus.Scheduler (the durable OTP scheduler, same fire path as hook triggers). Append-only,
-# folded by sid (latest wins) like Task; re-armed on boot. THE LINE: the scheduler is the open standard;
+# folded by sid (latest wins) like Todo; re-armed on boot. THE LINE: the scheduler is the open standard;
 # persisting + managing these schedules is our cloud product.
 resource Schedule do
   sid :string        # stable schedule id

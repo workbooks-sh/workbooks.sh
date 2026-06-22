@@ -57,6 +57,33 @@ defmodule Nexus.Uid do
   def module(name, base), do: Module.concat([base, camel(name)])
 
   @doc """
+  Guard a unit name against clobbering a runtime-critical module.
+
+  A `resource`/`server` unit compiles (via `module/1`) to a **top-level** BEAM module of
+  the camelized name. A unit named `Task`/`Map`/`Enum`/`Process` therefore *overwrites*
+  Elixir's stdlib module of that name — e.g. `resource Task` redefined `Elixir.Task`,
+  erasing `Task.start_link/3`, the function the web server's socket acceptors spawn through;
+  the nexus then died on boot. (See the dogfood `Todo` rename + wb-o5ng.)
+
+  Discriminator: at workbook-compile time a runtime module is already **loaded**, whereas a
+  fresh author name (`Todo`, `Lead`) is not. We refuse any name whose module is loaded and is
+  NOT itself a previously-compiled workbook unit (those carry `__nexus_unit__/0`, so a *recompile*
+  of a real unit still passes). Returns `:ok` or `{:error, message}`.
+  """
+  def guard(name) do
+    mod = module(name)
+
+    cond do
+      not match?({:module, _}, Code.ensure_loaded(mod)) -> :ok
+      function_exported?(mod, :__nexus_unit__, 0) -> :ok
+      true ->
+        {:error,
+         "unit name #{inspect(name)} would shadow the runtime module #{inspect(mod)} that the " <>
+           "nexus depends on — pick a non-colliding name (e.g. `Task` → `Todo`, `Map` → `Mapping`)."}
+    end
+  end
+
+  @doc """
   Normalize a free-text label (a `[[backlink]]`, a prose mention) to a graph key:
   strip wiki brackets, lowercase, and drop the `the …`/`… agent`/`… kit` affixes
   the literate refs (§0.1) carry so a mention resolves to a unit key.
