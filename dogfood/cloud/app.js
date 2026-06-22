@@ -556,23 +556,8 @@
     };
     var WMARK = WB.WMARK = '<svg viewBox="0 0 113.444 65.6002" fill="none"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>';
 
-    // ── Shared pastel themes (brand DNA pastels, never the neon green) for the built-in TOOLKITS and the
-    // toolkit-bound Studio AGENTS. Defined once here (app.js is always loaded) so the Toolkits page AND the
-    // Studio composer's agent selector resolve the SAME color/glyph for a given toolkit. DRY across both.
-    var TK_THEME = WB.TK_THEME = {
-      presentation: { color: '#7c6cf0', bg: 'rgba(124,108,240,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg>' },
-      video:        { color: '#e8794b', bg: 'rgba(232,121,75,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>' },
-      research:     { color: '#2fa3a3', bg: 'rgba(47,163,163,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>' }
-    };
-    // Agent → theme. Toolkit-bound agents inherit their toolkit's theme; Waldo + Autopilot (no toolkit)
-    // carry their own distinct pastels. Used by the composer selector and the sidebar session rows.
-    var AGENT_THEME = WB.AGENT_THEME = {
-      deck:      TK_THEME.presentation,
-      video:     TK_THEME.video,
-      research:  TK_THEME.research,
-      waldo:     { color: '#5b9bd5', bg: 'rgba(91,155,213,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.13a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.13 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.13a.5.5 0 0 1-.96 0z"/></svg>' },
-      autopilot: { color: '#6cae8e', bg: 'rgba(108,174,142,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/></svg>' }
-    };
+    // Toolkit + agent pastel themes live in glyphs.js (WB.TOOLKIT_GLYPHS / WB.AGENT_THEME), loaded before
+    // app.js — one home, shared by the Toolkits page, the sidebar session dots, and the composer selector.
 
     // ── File/folder icons — the VS Code Material Icon Theme, served from CDN (no-build). Mirrors the
     // desktop's materialIcon.ts resolution (fileNames > fileExtensions > default; folders likewise).
