@@ -24,20 +24,11 @@ defmodule Nexus.Attest do
   @doc """
   The canonical signing preimage for a field map: `"key=value"` lines, keys sorted, `\\n`-joined.
 
-  Deterministic across machines/orders so a signature is stable. (This is a signing preimage, NOT a
-  config/state surface — it never gets parsed back as authored data.)
+  Deterministic and INJECTIVE (via `Nexus.Canon` field escaping), so a signature over one field set can't
+  be lifted onto a different set that smuggles an extra field through an unescaped `\\n`/`=` (fix wb-talp).
   """
   @spec preimage(map()) :: String.t()
-  def preimage(fields) when is_map(fields) do
-    fields
-    |> Enum.map(fn {k, v} -> {to_string(k), stringify(v)} end)
-    |> Enum.sort_by(&elem(&1, 0))
-    |> Enum.map(fn {k, v} -> k <> "=" <> v end)
-    |> Enum.join("\n")
-  end
-
-  defp stringify(v) when is_binary(v), do: v
-  defp stringify(v), do: to_string(v)
+  def preimage(fields) when is_map(fields), do: Nexus.Canon.kv(fields)
 
   @doc "Sign a field map with a keypair, returning a self-describing attestation `%{did, sig, fields}`."
   @spec sign(Keyring.keypair(), map()) :: t()

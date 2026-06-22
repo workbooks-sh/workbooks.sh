@@ -37,7 +37,7 @@ defmodule Nexus.Keyring do
   @spec public_from_did(String.t()) :: {:ok, binary()} | :error
   def public_from_did("did:key:z" <> rest) do
     case base58_decode(rest) do
-      <<0xED, 0x01, pub::binary-size(32)>> -> {:ok, pub}
+      {:ok, <<0xED, 0x01, pub::binary-size(32)>>} -> {:ok, pub}
       _ -> :error
     end
   end
@@ -54,10 +54,16 @@ defmodule Nexus.Keyring do
   def sign(private, message) when is_binary(private),
     do: :crypto.sign(:eddsa, :none, message, [private, :ed25519])
 
-  @doc "Verify an Ed25519 `signature` over `message` against a public key."
+  @doc """
+  Verify an Ed25519 `signature` over `message` against a public key. TOTAL — any malformed input
+  (wrong-length key/sig included) returns `false`; it never raises, so an attacker-supplied DID/sig
+  on the verify path can't crash the reader (fix wb-qbq8).
+  """
   @spec verify(binary(), iodata(), binary()) :: boolean()
-  def verify(public, message, signature) when is_binary(public) and is_binary(signature),
-    do: :crypto.verify(:eddsa, :none, message, signature, [public, :ed25519])
+  def verify(public, message, signature)
+      when is_binary(public) and byte_size(public) == 32 and
+             is_binary(signature) and byte_size(signature) == 64,
+      do: :crypto.verify(:eddsa, :none, message, signature, [public, :ed25519])
 
   def verify(_, _, _), do: false
 
@@ -104,12 +110,30 @@ defmodule Nexus.Keyring do
   defp enc_int(0, acc), do: acc
   defp enc_int(n, acc), do: enc_int(div(n, 58), [elem(@b58_tuple, rem(n, 58)) | acc])
 
-  @doc false
+  @doc "Decode base58btc. TOTAL: `{:ok, binary} | :error` — any non-alphabet char yields `:error`, never raises (fix wb-qbq8)."
+  @spec base58_decode(String.t()) :: {:ok, binary()} | :error
   def base58_decode(str) when is_binary(str) do
     chars = String.to_charlist(str)
     zeros = chars |> Enum.take_while(&(&1 == ?1)) |> length()
-    int = Enum.reduce(chars, 0, fn c, acc -> acc * 58 + Map.fetch!(@b58_index, c) end)
-    body = if int == 0, do: <<>>, else: :binary.encode_unsigned(int)
-    :binary.copy(<<0>>, zeros) <> body
+
+    Enum.reduce_while(chars, 0, fn c, acc ->
+      case Map.get(@b58_index, c) do
+        nil -> {:halt, :error}
+        d -> {:cont, acc * 58 + d}
+      end
+    end)
+    |> case do
+      :error -> :error
+      int -> {:ok, :binary.copy(<<0>>, zeros) <> if(int == 0, do: <<>>, else: :binary.encode_unsigned(int))}
+    end
+  end
+
+  @doc "Decode base58btc to a raw binary, raising on invalid input (internal/round-trip callers)."
+  @spec base58_decode!(String.t()) :: binary()
+  def base58_decode!(str) do
+    case base58_decode(str) do
+      {:ok, bin} -> bin
+      :error -> raise ArgumentError, "invalid base58: #{inspect(str)}"
+    end
   end
 end

@@ -30,7 +30,7 @@ defmodule Nexus.KeyringTest do
   test "did:key is the W3C/Radicle multicodec form (0xed01 prefix)" do
     kp = Keyring.generate()
     "did:key:z" <> b58 = Keyring.did(kp.public)
-    assert <<0xED, 0x01, pub::binary-size(32)>> = Keyring.base58_decode(b58)
+    assert {:ok, <<0xED, 0x01, pub::binary-size(32)>>} = Keyring.base58_decode(b58)
     assert pub == kp.public
   end
 
@@ -41,7 +41,7 @@ defmodule Nexus.KeyringTest do
 
   test "base58 round-trips arbitrary bytes incl. leading zeros" do
     for bin <- [<<0>>, <<0, 0, 1, 2, 3>>, :crypto.strong_rand_bytes(33), <<>>] do
-      assert Keyring.base58_decode(Keyring.base58_encode(bin)) == bin
+      assert Keyring.base58_decode(Keyring.base58_encode(bin)) == {:ok, bin}
     end
   end
 

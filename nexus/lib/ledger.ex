@@ -74,15 +74,9 @@ defmodule Nexus.Ledger do
     {meta, body} =
       text |> String.split("\n") |> Enum.split_with(&String.starts_with?(&1, "@"))
 
-    fields =
-      body
-      |> Enum.reject(&(&1 == ""))
-      |> Map.new(fn line ->
-        case String.split(line, "=", parts: 2) do
-          [k, v] -> {k, v}
-          [k] -> {k, ""}
-        end
-      end)
+    # The body is a Nexus.Canon kv block — unescape it back to the exact signed field map (round-trips
+    # Attest.preimage, so a value containing \n/= survives instead of being silently re-split).
+    fields = body |> Enum.join("\n") |> Nexus.Canon.parse_kv()
 
     %{did: header(meta, "@did "), sig: header(meta, "@sig "), fields: fields}
   end

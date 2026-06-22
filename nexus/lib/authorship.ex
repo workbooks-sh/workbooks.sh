@@ -35,7 +35,9 @@ defmodule Nexus.Authorship do
   @doc "The canonical message a device signs to register its key under `uid`."
   @spec registration_message(String.t(), String.t()) :: String.t()
   def registration_message(uid, did) when is_binary(uid) and is_binary(did),
-    do: "wb-author-key\nuid=" <> String.downcase(uid) <> "\ndid=" <> did
+    do:
+      "wb-author-key\nuid=" <> Nexus.Canon.escape(String.downcase(uid)) <>
+        "\ndid=" <> Nexus.Canon.escape(did)
 
   @doc """
   Verify a registration proof: the holder of `did`'s private key signed `registration_message(uid, did)`.
@@ -82,9 +84,11 @@ defmodule Nexus.Authorship do
   """
   @spec contribution_message(String.t(), String.t(), String.t(), String.t()) :: String.t()
   def contribution_message(uid, did, target, content_hash) do
-    "wb-contribution\nuid=" <> String.downcase(to_string(uid)) <>
-      "\ndid=" <> to_string(did) <> "\ntarget=" <> to_string(target) <>
-      "\nhash=" <> to_string(content_hash)
+    e = &Nexus.Canon.escape/1
+
+    "wb-contribution\nuid=" <> e.(String.downcase(to_string(uid))) <>
+      "\ndid=" <> e.(did) <> "\ntarget=" <> e.(target) <>
+      "\nhash=" <> e.(content_hash)
   end
 
   @doc """
