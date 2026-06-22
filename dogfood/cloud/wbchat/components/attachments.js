@@ -28,4 +28,4 @@ registerComposerButton((ctx) => {
     html: PAPERCLIP, onClick: () => input.click(),
   });
   return el('span', { class: 'wbc-attach' }, [btn, input]);
-});
+}, { side: 'right' });

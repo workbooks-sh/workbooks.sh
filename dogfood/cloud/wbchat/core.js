@@ -22,9 +22,11 @@ export function getParts() { return parts; }
 // message-action registry — fn(message, ctx) -> Node|null, appended to a message's action bar.
 const actions = [];
 export function registerAction(fn) { actions.push(fn); }
-// composer add-on registry — fn(ctx) -> Node|null, inserted in the composer toolbar (left of send).
+// composer add-on registry — fn(ctx) -> Node|null, inserted in the composer toolbar's bottom row.
+// opts.side ('left' | 'right', default 'left') picks which group: selectors (agent/model) go left, the
+// file/mic actions go right next to the send button.
 const composerButtons = [];
-export function registerComposerButton(fn) { composerButtons.push(fn); }
+export function registerComposerButton(fn, opts) { composerButtons.push({ fn: fn, side: (opts && opts.side) || 'left' }); }
 
 // ── tiny DOM + helpers (shared primitives) ──────────────────────────────────────────────────────
 export function el(tag, attrs, kids) {
@@ -188,27 +190,39 @@ export function createChat(container, options = {}) {
   }
 
   // ── composer ──
+  // Layout: the bordered box (.wbc-composer-inner) is a COLUMN — the textarea is its own full-width row
+  // on top, then a toolbar row (.wbc-composer-bar) underneath with a LEFT group (agent + model selectors)
+  // and a RIGHT group (file/mic actions + the send button). This keeps the textarea full width instead of
+  // being squished between side-by-side columns.
   function buildComposer() {
     injectStyle('composer-x', `.wbc-tray{display:flex;flex-wrap:wrap;gap:6px;max-width:var(--wbc-content-max);margin:0 auto 8px}
       .wbc-tray:empty{display:none} .wbc-chip-file{display:flex;align-items:center;gap:6px;border:1px solid var(--wbc-line);background:var(--wbc-panel);border-radius:8px;padding:4px 8px;font:500 12px var(--wbc-font);color:var(--wbc-ink)}
       .wbc-chip-file button{border:none;background:none;color:var(--wbc-dim);cursor:pointer;padding:0 2px}
-      .wbc-tools{display:flex;align-items:center;gap:2px;flex:none}
+      .wbc-composer-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+      .wbc-tools{display:flex;align-items:center;gap:2px;min-width:0}
+      .wbc-tools-right{flex:none}
       .wbc-tool{border:none;background:none;color:var(--wbc-dim);cursor:pointer;width:30px;height:30px;border-radius:8px;display:grid;place-items:center}
       .wbc-tool:hover{background:var(--wbc-line);color:var(--wbc-ink)} .wbc-tool svg{width:17px;height:17px}`);
     const wrap = el('div', { class: 'wbc-composer' });
     const tray = el('div', { class: 'wbc-tray' });
     const inner = el('div', { class: 'wbc-composer-inner' });
-    const tools = el('div', { class: 'wbc-tools' });
     const ta = el('textarea', { class: 'wbc-textarea', rows: '1', placeholder: opts.placeholder });
+    const bar = el('div', { class: 'wbc-composer-bar' });
+    const toolsLeft = el('div', { class: 'wbc-tools wbc-tools-left' });
+    const toolsRight = el('div', { class: 'wbc-tools wbc-tools-right' });
     const send = el('button', { class: 'wbc-send', html: ICON.send, title: 'Send' });
     const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; };
     ta.addEventListener('input', grow);
     ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); fire(); } });
     send.addEventListener('click', fire);
     function fire() { const v = ta.value.trim(); if ((!v && !attachedFiles.length) || status !== 'idle') return; ta.value = ''; grow(); submit(v); }
-    inner.append(tools, ta, send);
+    // file/mic actions sit to the LEFT of send, inside the right group.
+    toolsRight.append(send);
+    bar.append(toolsLeft, toolsRight);
+    inner.append(ta, bar);
     wrap.append(tray, inner);
-    wrap._ta = ta; wrap._send = send; wrap._tray = tray; wrap._tools = tools;
+    // _tools (left) is the default mount target; _toolsRight receives side:'right' add-ons (before send).
+    wrap._ta = ta; wrap._send = send; wrap._tray = tray; wrap._tools = toolsLeft; wrap._toolsRight = toolsRight;
     return wrap;
   }
   function renderTray() {
@@ -234,7 +248,15 @@ export function createChat(container, options = {}) {
     onChange: (fn) => { (listeners['change'] = listeners['change'] || []).push(fn); },
     submit: (t) => submit(t),
   };
-  function mountComposerButtons() { composerButtons.forEach(fn => { try { const n = fn(composerCtx); if (n) composer._tools.append(n); } catch (e) { try { console.error('[wbchat] composer button failed', e); } catch (_) {} } }); }
+  function mountComposerButtons() {
+    composerButtons.forEach(b => {
+      try {
+        const n = b.fn(composerCtx); if (!n) return;
+        if (b.side === 'right') composer._toolsRight.insertBefore(n, composer._send);  // left of send
+        else composer._tools.append(n);
+      } catch (e) { try { console.error('[wbchat] composer button failed', e); } catch (_) {} }
+    });
+  }
   function setBusy(b) { composer._send.disabled = b; }
 
   // ── flow ──

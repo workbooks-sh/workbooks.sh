@@ -50,4 +50,4 @@ registerComposerButton((ctx) => {
 
   btn.addEventListener('click', () => { rec ? stop() : start(); });
   return btn;
-});
+}, { side: 'right' });
