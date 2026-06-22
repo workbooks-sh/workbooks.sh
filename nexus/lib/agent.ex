@@ -377,7 +377,7 @@ defmodule Nexus.Agent do
           tel = tally(tel, turn, calls)
           assistant = %{role: "assistant", content: turn.content || "", tool_calls: raw_calls(calls)}
 
-          perms = %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant), depth: Keyword.get(opts, :depth, 0)}
+          perms = current_perms(opts)
 
           results =
             Enum.map(calls, fn c ->
@@ -392,6 +392,30 @@ defmodule Nexus.Agent do
           stream.(%{type: "error", error: inspect(reason)})
           {{:error, reason}, tel}
       end
+    end
+  end
+
+  # Re-resolve effective perms EACH TURN (Autopoiesis v2 — wb-a6u3.7): push, not poll. For a NAMED agent
+  # we re-read the live registered node, so a hot-swapped definition's grant/tools take effect at the
+  # next turn, and a lease granted mid-run is picked up — the agent never polls, the change appears under
+  # it. Inline runs (no registered unit — checks/tests) fall back to the run's static opts.
+  defp current_perms(opts) do
+    depth = Keyword.get(opts, :depth, 0)
+
+    case opts[:unit] && get(opts[:unit]) do
+      %{} = node ->
+        d = def_from_unit(node)
+        ceiling = Keyword.get(opts, :ceiling) || Map.get(node, :ceiling) || :unbounded
+
+        grant =
+          d[:grant]
+          |> effective_grant(ceiling, Keyword.get(opts, :grant_ceiling))
+          |> with_leases(d.name)
+
+        %{tools: d[:tools] || Keyword.get(opts, :kits), grant: grant, depth: depth}
+
+      _ ->
+        %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant), depth: depth}
     end
   end
 
