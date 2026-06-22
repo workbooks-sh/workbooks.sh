@@ -96,19 +96,27 @@ pub fn check(io: Io, alloc: std.mem.Allocator, dir: []const u8) !u8 {
         dangling += 1;
     };
 
-    if (dangling == 0 and perrs.items.len == 0) {
-        log.ok(try std.fmt.allocPrint(alloc, "{d} units \u{b7} {d} refs \u{b7} references resolve \u{b7} auth/route policy valid", .{ units, refs.items.len }));
-        return 0;
-    } else {
-        log.err(try std.fmt.allocPrint(alloc, "{d} units \u{b7} {d} dangling ref(s) \u{b7} {d} policy error(s)", .{ units, dangling, perrs.items.len }));
+    // Dangling [[backlinks]] are ADVISORY — often intentional cross-surface prose refs (e.g. [[the-line]]),
+    // they never break a deploy. Report as a warning; do NOT fail.
+    if (dangling > 0) {
+        log.warn(try std.fmt.allocPrint(alloc, "{d} dangling ref(s) (advisory)", .{dangling}));
         for (refs.items) |r| if (!resolves(r.label, names.items, titles.items)) {
             log.step(try std.fmt.allocPrint(alloc, "dangling [[{s}]] in {s}", .{ r.label, std.fs.path.basename(r.file) }));
         };
+    }
+
+    // POLICY errors (auth/route) are FATAL — they break the deploy. Parse errors already fail earlier
+    // (work.parse propagates). This makes `work check` a usable PRE-PUSH gate: exit 0 ⇒ safe to deploy.
+    if (perrs.items.len > 0) {
+        log.err(try std.fmt.allocPrint(alloc, "{d} unit(s) \u{b7} {d} policy error(s)", .{ units, perrs.items.len }));
         for (perrs.items) |e| {
             log.step(try std.fmt.allocPrint(alloc, "auth/route: {s} in {s}", .{ e.msg, std.fs.path.basename(e.file) }));
         }
         return 1;
     }
+
+    log.ok(try std.fmt.allocPrint(alloc, "{d} units \u{b7} {d} refs \u{b7} auth/route policy valid", .{ units, refs.items.len }));
+    return 0;
 }
 
 pub fn structure(io: Io, alloc: std.mem.Allocator, dir: []const u8) !u8 {
