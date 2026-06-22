@@ -100,25 +100,11 @@ defmodule Nexus.Dock do
   @doc """
   The SSRF gate, exposed so any host-side fetch escalation (e.g. the curl-impersonate fallback in
   `Nexus.Compilers.Shared.http_get/1`) re-guards itself before egress — never an unguarded path.
+  Delegates to the ONE guard (`Nexus.Net.Ssrf`, wb-y4md) — resolve-then-check-every-IP, shared with
+  the keyed-search `get/2` path; the old literal-hostname check that let a public name resolving to an
+  internal IP through is gone.
   """
-  def net_allowed?(url) do
-    uri = URI.parse(url)
-    host = uri.host || ""
-
-    cond do
-      uri.scheme not in ["http", "https"] -> false
-      private_host?(host) -> false
-      allowlist() == [] -> true
-      true -> host in allowlist()
-    end
-  end
-
-  defp allowlist do
-    case System.get_env("NEXUS_NET_ALLOW") do
-      v when v in [nil, ""] -> []
-      v -> v |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
-    end
-  end
+  def net_allowed?(url), do: Nexus.Net.Ssrf.allowed?(url)
 
   @doc """
   SSRF-guarded HTTPS GET with custom request `headers` (e.g. an `X-Subscription-Token` for a keyed
@@ -149,14 +135,6 @@ defmodule Nexus.Dock do
     else
       {:error, :blocked}
     end
-  end
-
-  # Loopback / private / link-local — the SSRF danger zone a unit must never reach.
-  defp private_host?(h) do
-    h in ["localhost", "127.0.0.1", "0.0.0.0", "::1", ""] or
-      String.starts_with?(h, "127.") or String.starts_with?(h, "10.") or
-      String.starts_with?(h, "192.168.") or String.starts_with?(h, "169.254.") or
-      String.match?(h, ~r/^172\.(1[6-9]|2\d|3[01])\./)
   end
 
   @doc false
