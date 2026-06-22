@@ -18,46 +18,42 @@ WB.scopedStyles('/secrets', `
   .lk.danger:hover { color:var(--bad, #c0392b); }
   .lk:disabled { opacity:.5; cursor:default; }
   .sheet-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
-  /* Platform (injected) secrets — read-only name + set/not-set badge, grouped. */
-  .pgrp { font:700 10.5px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim); padding:14px 4px 6px; }
-  .pgrp:first-child { padding-top:2px; }
-  .prow { display:flex; align-items:center; gap:12px; padding:9px 4px; border-bottom:1px solid var(--line); }
-  .prow:last-child { border-bottom:none; }
-  .pname { font:600 13px var(--mono); color:var(--ink); }
-  .plabel { flex:1; min-width:0; font:500 12.5px var(--read); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .pbadge { flex:none; font:700 10px var(--read); letter-spacing:.04em; text-transform:uppercase; border-radius:6px; padding:3px 8px; }
-  .pbadge.on { color:var(--bloomd); background:color-mix(in srgb, var(--bloom) 16%, transparent); }
-  .pbadge.off { color:var(--dim); background:var(--line); }
+  /* Source tag — where a value comes from (the store you edit, or deploy injection). */
+  .src { font:700 9.5px var(--read); letter-spacing:.04em; text-transform:uppercase; border-radius:6px; padding:2px 7px; }
+  .src.deploy { color:var(--dim); background:var(--line); }
 `);
 
 WB.view('/secrets', {
   title: 'Secrets',
   accent: 'var(--mint)',
   async render(el, ctx) {
-    // NEXUS-level secrets — the editable store the runtime reads (scope "nexus"). One store:
-    // these power Nexus.Secrets (store-first, env fallback), so a value set here takes effect.
+    // ONE env. Every secret this nexus has — the editable encrypted store (what you add here) PLUS the
+    // ones injected at deploy — in a single list. The runtime reads them all through Nexus.Secrets
+    // (store-first, env fallback), so a value you set here overrides a deploy-injected one of the same
+    // name. We only ever show secrets that are ACTUALLY set; recognized names are offered as
+    // suggestions when you add one (no "not set" rows to wade through).
     const active = WB.nexus.active;
     const cacheKey = active ? `secrets:nexus:${active.id}` : 'secrets:nexus';
     const nxName = (active && active.name) || 'this nexus';
 
-    // ── transient state (mirrors envStore + the page's local runes) ──
-    let list = [];
+    let list = [];              // editable store secrets (id, name, masked, length, created_at)
+    let injected = [];          // deploy-injected catalog rows: { name, label, group, present }
     let loading = true;
-    const revealed = {};       // { [id]: plaintext }
+    const revealed = {};        // { [id]: plaintext }
     let revealBusy = null;
     const timers = {};
 
     let editOpen = false;
-    let editing = null;
+    let editing = null;         // a store row being edited, or null for a new/replace
     let fName = '';
     let fValue = '';
     let saving = false;
-
     let deleteFor = null;
-    let injected = null;       // platform/injected secrets (names + present) — null = loading
-    let lockName = false;      // when setting a platform secret, lock the name field to the known key
 
-    // (Re)load the platform/injected secrets (names + present status) into `injected`, then repaint.
+    const esc = (s) => String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
     function loadInjected() {
       return fetch('/cloud/secrets/injected', { credentials: 'same-origin' })
         .then((r) => (r.ok ? r.json() : { secrets: [] }))
@@ -65,15 +61,9 @@ WB.view('/secrets', {
         .catch(() => { injected = []; paint(); });
     }
 
-    const esc = (s) => String(s == null ? '' : s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-
     async function loadList() {
       loading = true;
       paint();
-      // Stale-while-revalidate: show last-known env list (names/metadata only — never plaintext values)
-      // instantly, refresh in the background. Same instant-load behavior as the other admin pages.
       await WB.swr(cacheKey, () => WB.api.listNexusEnv(), (fresh) => {
         list = fresh || [];
         loading = false;
@@ -81,7 +71,16 @@ WB.view('/secrets', {
       });
     }
 
-    // ── reveal / hide / copy ──
+    // The deploy-injected secrets that are present AND not shadowed by a store entry of the same name —
+    // these round out the one env list (shown read-mostly; "Replace" writes a store override).
+    function deployRows() {
+      const owned = new Set(list.map((v) => v.name));
+      return injected.filter((s) => s.present && !owned.has(s.name));
+    }
+    // Recognized names to suggest when adding a secret (the full catalog, set or not).
+    function knownNames() { return injected.map((s) => s.name); }
+
+    // ── reveal / hide / copy (store secrets only) ──
     async function reveal(id) {
       if (revealed[id] !== undefined) return hide(id);
       revealBusy = id;
@@ -95,11 +94,7 @@ WB.view('/secrets', {
       revealBusy = null;
       paint();
     }
-    function hide(id) {
-      clearTimeout(timers[id]);
-      delete revealed[id];
-      paint();
-    }
+    function hide(id) { clearTimeout(timers[id]); delete revealed[id]; paint(); }
     async function copy(id) {
       const v = revealed[id];
       if (v === undefined) return;
@@ -107,12 +102,9 @@ WB.view('/secrets', {
       catch { WB.toast('Could not copy', 'bad'); }
     }
 
-    // ── create / edit ──
-    function openCreate() { editing = null; fName = ''; fValue = ''; lockName = false; editOpen = true; paint(); }
-    function openEdit(v) { editing = v; fName = v.name; fValue = ''; lockName = false; editOpen = true; paint(); }
-    // Set a recognized key — same write path as any secret (scope "nexus"), name fixed to the canonical
-    // key. It joins the list above and the runtime reads it via Nexus.Secrets.
-    function openSet(name) { editing = null; fName = name; fValue = ''; lockName = true; editOpen = true; paint(); }
+    // ── create / edit / replace ──
+    function openCreate(name) { editing = null; fName = name || ''; fValue = ''; editOpen = true; paint(); }
+    function openEdit(v) { editing = v; fName = v.name; fValue = ''; editOpen = true; paint(); }
     async function save() {
       if (!fName.trim()) { WB.toast('Give the secret a name'); return; }
       saving = true;
@@ -127,19 +119,17 @@ WB.view('/secrets', {
         } else {
           if (!fValue) { saving = false; WB.toast('Give the secret a value'); paint(); return; }
           const v = await WB.api.createNexusEnv({ name: fName.trim(), value: fValue });
-          list = [...list, v];
+          // A new value may shadow a deploy-injected one — replace any same-name store row, else append.
+          list = [...list.filter((x) => x.name !== v.name), v];
           WB.toast(`Saved ${fName.trim()}`);
         }
         editOpen = false;
-        // If we just set a platform key, refresh its Set/Not-set badge from the secrets seam.
-        if (lockName) loadInjected();
+        loadInjected();   // refresh present/shadowing
       } catch { WB.toast('Could not save', 'bad'); }
       saving = false;
-      lockName = false;
       paint();
     }
 
-    // ── delete ──
     async function reallyDelete() {
       const v = deleteFor;
       deleteFor = null;
@@ -147,78 +137,70 @@ WB.view('/secrets', {
       list = list.filter((x) => x.id !== v.id);
       paint();
       try { await WB.api.deleteEnv(v.id); } catch {}
+      loadInjected();
       WB.toast(`Removed ${v.name}`, 'bad');
     }
 
-    function rowsHtml() {
-      return list.map((v) => {
-        const r = revealed[v.id];
-        const valCell = r !== undefined
-          ? `<span class="mono plain">${esc(r)}</span>
-                <button class="lk" data-act="copy" data-id="${esc(v.id)}">Copy</button>
-                <button class="lk" data-act="hide" data-id="${esc(v.id)}">Hide</button>`
-          : `<span class="mono masked">${esc(v.masked)}</span>
-                <span class="faint" style="font-size:11px">${esc(v.length)} chars</span>
-                <button class="lk" data-act="reveal" data-id="${esc(v.id)}"${revealBusy === v.id ? ' disabled' : ''}>${revealBusy === v.id ? 'Revealing…' : 'Reveal'}</button>`;
-        return `<tr data-ctx="secret">
-            <td class="mono nm">${esc(v.name)}</td>
-            <td class="val">${valCell}</td>
-            <td class="faint" style="font-size:12px;white-space:nowrap">${esc(v.created_at)}</td>
-            <td class="acts">
-              <button class="lk" data-act="edit" data-id="${esc(v.id)}">Edit</button>
-              <button class="lk danger" data-act="del" data-id="${esc(v.id)}">Delete</button>
-            </td>
-          </tr>`;
-      }).join('');
+    function storeRowHtml(v) {
+      const r = revealed[v.id];
+      const valCell = r !== undefined
+        ? `<span class="mono plain">${esc(r)}</span>
+              <button class="lk" data-act="copy" data-id="${esc(v.id)}">Copy</button>
+              <button class="lk" data-act="hide" data-id="${esc(v.id)}">Hide</button>`
+        : `<span class="mono masked">${esc(v.masked)}</span>
+              <span class="faint" style="font-size:11px">${esc(v.length)} chars</span>
+              <button class="lk" data-act="reveal" data-id="${esc(v.id)}"${revealBusy === v.id ? ' disabled' : ''}>${revealBusy === v.id ? 'Revealing…' : 'Reveal'}</button>`;
+      return `<tr data-ctx="secret">
+          <td class="mono nm">${esc(v.name)}</td>
+          <td class="val">${valCell}</td>
+          <td class="faint" style="font-size:12px;white-space:nowrap">${esc(v.created_at)}</td>
+          <td class="acts">
+            <button class="lk" data-act="edit" data-id="${esc(v.id)}">Edit</button>
+            <button class="lk danger" data-act="del" data-id="${esc(v.id)}">Delete</button>
+          </td>
+        </tr>`;
+    }
+
+    function deployRowHtml(s) {
+      return `<tr>
+          <td class="mono nm">${esc(s.name)}</td>
+          <td class="val"><span class="mono masked">••••••••</span><span class="src deploy">deploy</span></td>
+          <td class="faint" style="font-size:12px">${esc(s.label || '')}</td>
+          <td class="acts">
+            <button class="lk" data-replace="${esc(s.name)}">Replace</button>
+          </td>
+        </tr>`;
     }
 
     function bodyHtml() {
-      if (loading) {
-        return `<div class="card" style="color:var(--dim);text-align:center">Loading…</div>`;
-      }
-      if (list.length === 0) {
+      if (loading) return `<div class="card" style="color:var(--dim);text-align:center">Loading…</div>`;
+      const dep = deployRows();
+      if (list.length === 0 && dep.length === 0) {
         return `<div class="card faint" style="text-align:center">
-    No secrets yet. Add a shared key (an API token, a connection string) and every workspace on ${esc(nxName)} can use it.
+    No secrets yet. Add an API token or connection string and every workspace on ${esc(nxName)} can use it.
   </div>`;
       }
+      const rows = list.map(storeRowHtml).join('') + dep.map(deployRowHtml).join('');
       return `<div class="card" style="padding:0;overflow:hidden">
     <table class="env">
-      <thead><tr><th>Name</th><th>Value</th><th>Created</th><th></th></tr></thead>
-      <tbody>${rowsHtml()}</tbody>
+      <thead><tr><th>Name</th><th>Value</th><th>Source</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
     </table>
   </div>`;
     }
 
-    // Recognized keys — names the built-in integrations look for. Just a checklist: name + set/not-set
-    // (present = saved in the nexus store OR injected at deploy). "Set" writes to the SAME nexus store
-    // as the list above, so a value set here feeds the runtime via Nexus.Secrets (store-first).
-    function platformHtml() {
-      if (injected === null) {
-        return `<div class="card faint" style="text-align:center;color:var(--dim)">Loading platform secrets…</div>`;
-      }
-      if (!injected.length) return '';
-      const groups = {};
-      injected.forEach((s) => { (groups[s.group] = groups[s.group] || []).push(s); });
-      const sections = Object.keys(groups).map((g) => `
-    <div class="pgrp">${esc(g)}</div>
-    ${groups[g].map((s) => `
-      <div class="prow">
-        <span class="pname mono">${esc(s.name)}</span>
-        <span class="plabel faint">${esc(s.label)}</span>
-        <span class="pbadge ${s.present ? 'on' : 'off'}">${s.present ? 'Set' : 'Not set'}</span>
-        <button class="lk" data-setname="${esc(s.name)}">${s.present ? 'Replace' : 'Set'}</button>
-      </div>`).join('')}`).join('');
-      return `<div class="card" style="margin-top:14px">${sections}</div>`;
-    }
-
     function modalHtml() {
       if (!editOpen) return '';
+      const opts = knownNames().map((n) => `<option value="${esc(n)}"></option>`).join('');
       return `<div class="modal" data-modal>
     <div class="sheet" style="width:460px">
-      <h2>${lockName ? 'Set ' + esc(fName) : editing ? 'Edit secret' : 'Add secret'}</h2>
-      <p class="sub">${lockName ? 'A key a built-in integration looks for. Save it and the platform uses it right away — it joins your secrets, encrypted at rest.' : 'Encrypted at rest. Shown masked everywhere — reveal one explicitly when you need it.'}</p>
+      <h2>${editing ? 'Edit ' + esc(fName) : 'Add secret'}</h2>
+      <p class="sub">Encrypted at rest. Shown masked everywhere — reveal one explicitly when you need it. A value you set here overrides a deploy-injected one of the same name.</p>
       <div class="lab">Name</div>
-      <div class="field"><input type="text" class="mono" placeholder="OPENROUTER_API_KEY" data-f="name" value="${esc(fName)}"${lockName ? ' readonly' : ''} /></div>
+      <div class="field">
+        <input type="text" class="mono" list="known-keys" placeholder="OPENROUTER_API_KEY" data-f="name" value="${esc(fName)}"${editing ? ' readonly' : ''} />
+        <datalist id="known-keys">${opts}</datalist>
+      </div>
       <div class="lab">Value</div>
       <div class="field">
         <input type="text" class="mono" placeholder="${editing ? 'leave blank to keep current value' : 'secret value'}" data-f="value" value="${esc(fValue)}" />
@@ -231,8 +213,6 @@ WB.view('/secrets', {
   </div>`;
     }
 
-    // Inlined <Confirm> component (danger). Renders only when deleteFor is set
-    // (open={!!deleteFor}). Mirrors Confirm.svelte exactly.
     function confirmHtml() {
       if (!deleteFor) return '';
       const body = `“${deleteFor.name}” will be removed from ${nxName}. Anything relying on it will stop seeing it.`;
@@ -254,30 +234,22 @@ WB.view('/secrets', {
       el.innerHTML = `
 <div class="grphead">
   <div>
-    <h3 class="grp">Your secrets</h3>
-    <p class="faint" style="margin:4px 0 0;font-size:12.5px">Keys you add and control — shared across every workspace on ${esc(nxName)}, encrypted at rest. Add, edit, or reveal them anytime.</p>
+    <h3 class="grp">Secrets</h3>
+    <p class="faint" style="margin:4px 0 0;font-size:12.5px">One env for ${esc(nxName)} — API tokens, connection strings, keys the built-in integrations look for. Edit or replace any of them; values are encrypted at rest and shared across every workspace.</p>
   </div>
   <button class="btn sm primary" data-act="create">
     <svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/></svg> Add secret
   </button>
 </div>
 ${bodyHtml()}
-
-<div class="grphead" style="margin-top:26px">
-  <div>
-    <h3 class="grp">Keys the platform recognizes</h3>
-    <p class="faint" style="margin:4px 0 0;font-size:12.5px">Names the built-in integrations look for — inference, storage, OAuth. Set one and it joins your secrets above; the platform uses it right away. “Set” means it’s present (saved here, or injected at deploy).</p>
-  </div>
-</div>
-${platformHtml()}
 ${modalHtml()}
 ${confirmHtml()}`;
       wire();
     }
 
     function wire() {
-      el.querySelector('[data-act="create"]')?.addEventListener('click', openCreate);
-      el.querySelectorAll('[data-setname]').forEach((b) => b.addEventListener('click', () => openSet(b.getAttribute('data-setname'))));
+      el.querySelector('[data-act="create"]')?.addEventListener('click', () => openCreate());
+      el.querySelectorAll('[data-replace]').forEach((b) => b.addEventListener('click', () => openCreate(b.getAttribute('data-replace'))));
 
       el.querySelectorAll('[data-act]').forEach((btn) => {
         const act = btn.getAttribute('data-act');
@@ -291,7 +263,6 @@ ${confirmHtml()}`;
         else if (act === 'save') btn.addEventListener('click', save);
       });
 
-      // modal backdrop close
       const modal = el.querySelector('[data-modal]');
       if (modal) {
         modal.addEventListener('click', (e) => { if (e.target === e.currentTarget) { editOpen = false; paint(); } });
@@ -301,7 +272,6 @@ ${confirmHtml()}`;
         if (valI) valI.addEventListener('input', (e) => { fValue = e.target.value; });
       }
 
-      // inlined <Confirm> modal — backdrop close (oncancel), cancel, confirm
       const conf = el.querySelector('[data-confirm]');
       if (conf) {
         conf.addEventListener('click', (e) => { if (e.target === e.currentTarget) { deleteFor = null; paint(); } });
@@ -310,9 +280,7 @@ ${confirmHtml()}`;
       }
     }
 
-    // Load the injected/platform secrets (names + present status) once, in the background.
     loadInjected();
-
     paint();
     await loadList();
   }

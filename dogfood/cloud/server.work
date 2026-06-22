@@ -1249,8 +1249,10 @@ server :cloud do
     _, _ -> false
   end
 
-  # The known deploy-injected secrets the platform uses. Names only — an operator sets these as Fly
-  # secrets / control-plane env; the page shows which are configured. (Not the editable per-nexus pool.)
+  # The recognized secret names the built-in integrations look for. Used two ways by the (single) env
+  # list: any that are PRESENT-via-deploy (not in the editable store) round out the list, and ALL of
+  # them are offered as name suggestions when adding one. Manageable keys only — bootstrap/identity env
+  # (WB_ENV_MASTER_KEY, WB_DATA, NEXUS_TENANT, PORT) is deliberately excluded: it isn't user-editable.
   defp platform_secret_catalog do
     [
       %{name: "OPENROUTER_API_KEY", label: "OpenRouter", group: "Inference"},
@@ -1267,8 +1269,7 @@ server :cloud do
       %{name: "GOOGLE_OAUTH_CLIENT_ID", label: "Google OAuth — client id", group: "Integrations"},
       %{name: "GOOGLE_OAUTH_CLIENT_SECRET", label: "Google OAuth — client secret", group: "Integrations"},
       %{name: "SLACK_OAUTH_CLIENT_ID", label: "Slack OAuth — client id", group: "Integrations"},
-      %{name: "SLACK_OAUTH_CLIENT_SECRET", label: "Slack OAuth — client secret", group: "Integrations"},
-      %{name: "WB_ENV_MASTER_KEY", label: "Env master key", group: "Platform"}
+      %{name: "SLACK_OAUTH_CLIENT_SECRET", label: "Slack OAuth — client secret", group: "Integrations"}
     ]
   end
 
