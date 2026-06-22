@@ -1336,19 +1336,17 @@ server :cloud do
     end
   end
 
-  # ── Workbooks Inference — our default LLM provider over the Cloudflare AI Gateway. The catalog is the
-  # routable `provider/model` ids; the runtime gateway provider (deferred) routes them with our cf-aig
-  # token. Branded "Workbooks Inference"; the gateway account/pricing are OUR product, not the standard.
-  @inference_default_model "anthropic/claude-4-5-sonnet"
-  # Our gateway coordinates (NOT secret — they appear in request URLs). The cf-aig TOKEN is the secret,
-  # read only via Nexus.Secrets and injected at deploy — never in source. THE LINE: this account/gateway
-  # is OUR cloud product. Customer nexuses never hold this token; they ask OUR control plane for the list.
-  @cf_account "6d4b74aeb10f455fbf88141901e7595d"
-  @cf_gateway "workbooks"
+  # ── Workbooks Inference — our default LLM provider over the Cloudflare AI Gateway. Branded "Workbooks
+  # Inference"; the gateway account/pricing/token are OUR product, not the open standard.
+  @inference_default_model "anthropic/claude-opus-4.8"
+  # Cloudflare publishes the full catalog (no JSON /models endpoint on the gateway) as a PUBLIC markdown
+  # page; the routable id lives in each entry's link URL (e.g. `anthropic/claude-opus-4.8`,
+  # `@cf/openai/gpt-oss-120b`). We fetch + parse it server-side (no token needed — it's public docs) and
+  # serve it to every nexus. Clients only ever see /cloud/inference/models — never Cloudflare directly.
+  @cf_models_url "https://developers.cloudflare.com/ai/models/index.md"
 
-  # The effective model list — LIVE from the Cloudflare gateway when our cf-aig token is configured (the
-  # network call happens HERE, server-side; clients only ever see /cloud/inference/models), else the
-  # curated fallback. Cached so we hit Cloudflare at most once per TTL.
+  # The effective model list — LIVE from Cloudflare's catalog, cached (1h), with the curated set as the
+  # fallback when the fetch fails (offline / parse yields too few).
   def inference_model_list, do: cached_inference_models()
 
   defp cached_inference_models do
@@ -1365,51 +1363,24 @@ server :cloud do
             live
 
           _ ->
-            # No token / unreachable / empty → curated fallback, cached briefly so a freshly-injected
-            # token is picked up soon (a deploy also clears persistent_term).
+            # Unreachable / parse too small → curated fallback, cached briefly so we retry soon.
             :persistent_term.put({:cf_models_cache}, {now, model_catalog(), 300})
             model_catalog()
         end
     end
   end
 
-  defp cf_aig_token do
-    if Nexus.Secrets.has?("CF_AIG_TOKEN"), do: Nexus.Secrets.get("CF_AIG_TOKEN"), else: nil
-  end
-
-  # GET the gateway's OpenAI-compatible /compat/models with our cf-aig token. Returns a list in OUR shape
-  # (known ids keep their curated label/tier; new ids get a derived label/provider/tier), or nil on any
-  # failure (no token, non-2xx, unparseable) so the caller falls back to the curated catalog.
+  # GET Cloudflare's public models markdown and parse it. Returns our model shape (text-generation only)
+  # or nil on any failure so the caller falls back to the curated catalog.
   defp fetch_cf_models do
-    token = cf_aig_token()
+    :inets.start()
+    :ssl.start()
+    headers = [{~c"accept", ~c"text/markdown"}, {~c"user-agent", ~c"workbooks-nexus"}]
 
-    if is_binary(token) and token != "" do
-      :inets.start()
-      :ssl.start()
-      url = "https://gateway.ai.cloudflare.com/v1/#{@cf_account}/#{@cf_gateway}/compat/models"
-
-      headers = [
-        {~c"cf-aig-authorization", to_charlist("Bearer " <> token)},
-        {~c"accept", ~c"application/json"},
-        {~c"user-agent", ~c"workbooks-nexus"}
-      ]
-
-      case :httpc.request(:get, {to_charlist(url), headers}, [timeout: 10_000, ssl: [verify: :verify_none]], body_format: :binary) do
-        {:ok, {{_, code, _}, _h, resp}} when code in 200..299 ->
-          case Jason.decode(resp) do
-            {:ok, %{"data" => data}} when is_list(data) ->
-              ids = data |> Enum.map(&Map.get(&1, "id")) |> Enum.filter(&is_binary/1) |> Enum.uniq()
-              if ids == [], do: nil, else: merge_cf_models(ids)
-
-            _ ->
-              nil
-          end
-
-        _ ->
-          nil
-      end
-    else
-      nil
+    case :httpc.request(:get, {to_charlist(@cf_models_url), headers},
+           [timeout: 12_000, autoredirect: true, ssl: [verify: :verify_none]], body_format: :binary) do
+      {:ok, {{_, code, _}, _h, body}} when code in 200..299 -> parse_cf_models(body)
+      _ -> nil
     end
   rescue
     _ -> nil
@@ -1417,18 +1388,23 @@ server :cloud do
     _, _ -> nil
   end
 
-  # Known ids keep their curated label + tier; unknown live ids get derived metadata.
-  defp merge_cf_models(ids) do
-    curated = Map.new(model_catalog(), &{&1.id, &1})
-    Enum.map(ids, fn id -> curated[id] || %{id: id, label: cf_label(id), provider: cf_provider(id), tier: cf_tier(id)} end)
+  # Each entry is a markdown link `[<logo><name><Task> • <Provider>…](<…/ai/models/{id}/>)`; the routable
+  # id is the URL path. Keep "Text Generation" models only; the label is the id's last segment.
+  @cf_entry_re ~r/\[\s*(?:📌)?\s*(?:!\[[^\]]*\]\([^)]*\))?([^\[\]]+?)\]\((https:\/\/developers\.cloudflare\.com\/ai\/models\/[^)\s]+?)\/?\)/u
+
+  defp parse_cf_models(md) do
+    models =
+      for [_, text, url] <- Regex.scan(@cf_entry_re, md), String.contains?(text, "Text Generation") do
+        id = String.replace_prefix(url, "https://developers.cloudflare.com/ai/models/", "")
+        %{id: id, label: id |> String.split("/") |> List.last(), provider: cf_provider(id), tier: cf_tier(id)}
+      end
+      |> Enum.uniq_by(& &1.id)
+
+    if length(models) >= 10, do: models, else: nil
   end
 
-  defp cf_provider(id), do: id |> String.split("/") |> List.first()
-
-  defp cf_label(id) do
-    id |> String.split("/") |> List.last() |> String.replace(["-", "_"], " ")
-    |> String.split() |> Enum.map_join(" ", &String.capitalize/1)
-  end
+  # Provider slug for grouping/icons — strip the `@cf/` (Workers-AI) prefix, take the author segment.
+  defp cf_provider(id), do: id |> String.replace_prefix("@cf/", "") |> String.split("/") |> List.first()
 
   defp cf_tier(id) do
     s = String.downcase(id)
