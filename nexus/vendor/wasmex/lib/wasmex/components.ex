@@ -247,10 +247,10 @@ defmodule Wasmex.Components do
 
   @type function_name_or_path :: String.t() | list(String.t()) | tuple() | atom() | list(atom())
 
-  @spec call_function(pid(), function_name_or_path(), list(number()), pos_integer()) ::
+  @spec call_function(pid(), function_name_or_path(), list(number()), pos_integer(), non_neg_integer()) ::
           {:ok, list(number())} | {:error, any()}
-  def call_function(pid, name_or_path, params, timeout \\ 5000) do
-    GenServer.call(pid, {:call_function, name_or_path, params}, timeout)
+  def call_function(pid, name_or_path, params, timeout \\ 5000, epoch_deadline_secs \\ 0) do
+    GenServer.call(pid, {:call_function, name_or_path, params, epoch_deadline_secs}, timeout)
   end
 
   @doc """
@@ -274,11 +274,11 @@ defmodule Wasmex.Components do
 
   @impl true
   def handle_call(
-        {:call_function, name, params},
+        {:call_function, name, params, epoch_deadline_secs},
         from,
         %{instance: instance} = state
       ) do
-    :ok = Wasmex.Components.Instance.call_function(instance, name, params, from)
+    :ok = Wasmex.Components.Instance.call_function(instance, name, params, from, epoch_deadline_secs)
     {:noreply, state}
   end
 

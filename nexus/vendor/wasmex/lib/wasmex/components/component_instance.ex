@@ -37,7 +37,8 @@ defmodule Wasmex.Components.Instance do
         %__MODULE__{store_resource: store_resource, instance_resource: instance_resource},
         function_or_path,
         args,
-        from
+        from,
+        epoch_deadline_secs \\ 0
       ) do
     function_path = parse_function_path(function_or_path)
 
@@ -46,6 +47,7 @@ defmodule Wasmex.Components.Instance do
       instance_resource,
       function_path,
       args,
+      epoch_deadline_secs,
       from
     )
   end

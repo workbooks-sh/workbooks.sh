@@ -32,18 +32,29 @@ defmodule Nexus.JsEngine do
     broker = Keyword.get(opts, :broker, &deny_broker/1)
     imports = %{@broker_ns => %{@broker_fn => {:fn, broker}}}
 
-    cfg = %{path: wasm(), wasi: %Wasmex.Wasi.WasiP2Options{allow_http: true}, imports: imports}
+    # Same untrusted-guest protections as Nexus.Sandbox: a per-guest memory ceiling (so a runaway
+    # eval can't OOM the nexus) and a per-call epoch deadline (so a spinning eval traps and frees its
+    # thread) — the store is built on the shared epoch engine with StoreLimits applied.
+    wasi = %Wasmex.Wasi.WasiP2Options{allow_http: true}
+    epoch_secs = Nexus.Config.sandbox_epoch_secs()
 
-    case Wasmex.Components.start_link(cfg) do
-      {:ok, pid} ->
-        try do
-          Wasmex.Components.call_function(pid, "run", [src], timeout)
-        after
-          if Process.alive?(pid), do: Process.exit(pid, :normal)
-        end
+    with {:ok, store} <-
+           Wasmex.Components.Store.new_wasi(wasi, Nexus.Sandbox.store_limits(), Nexus.Sandbox.epoch_engine()) do
+      cfg = %{path: wasm(), imports: imports, store: store}
 
-      {:error, reason} ->
-        {:error, {:instantiate_failed, reason}}
+      case Wasmex.Components.start_link(cfg) do
+        {:ok, pid} ->
+          try do
+            Wasmex.Components.call_function(pid, "run", [src], timeout, epoch_secs)
+          after
+            if Process.alive?(pid), do: Process.exit(pid, :normal)
+          end
+
+        {:error, reason} ->
+          {:error, {:instantiate_failed, reason}}
+      end
+    else
+      {:error, reason} -> {:error, {:store_failed, reason}}
     end
   end
 

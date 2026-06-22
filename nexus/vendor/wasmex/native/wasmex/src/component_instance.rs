@@ -191,6 +191,11 @@ pub fn call_exported_function(
     instance_resource: ResourceArc<ComponentInstanceResource>,
     function_name_path: Vec<String>,
     given_params: Term,
+    // wb-9jqy (compute-DoS): a per-call wall-clock budget. >0 traps a guest spinning in the export at
+    // ~N seconds (epoch interruption), freeing this blocking thread instead of pinning it forever.
+    // Requires the store to be on an epoch_interruption engine (else set_epoch_deadline panics); 0
+    // disables (back-compat / trusted callers on a non-epoch engine).
+    epoch_deadline_secs: u64,
     from: Term,
 ) -> rustler::Atom {
     // create erlang environment for the thread
@@ -213,6 +218,7 @@ pub fn call_exported_function(
             instance_resource,
             function_name_path,
             function_params,
+            epoch_deadline_secs,
         );
 
         // Send result directly to the caller
@@ -634,10 +640,16 @@ fn component_execute_function(
     instance_resource: ResourceArc<ComponentInstanceResource>,
     function_name_path: Vec<String>,
     function_params: SavedTerm,
+    epoch_deadline_secs: u64,
 ) -> SavedTerm {
     let result = thread_env.run(|env| {
         let component_store: &mut Store<ComponentStoreData> =
             &mut (component_store_resource.inner.lock().unwrap());
+        // wb-9jqy: arm the per-call compute budget. The epoch ticker (engine.rs, 1s) advances the
+        // epoch; the guest traps once `epoch_deadline_secs` ticks elapse. No-op when 0 / non-epoch engine.
+        if epoch_deadline_secs > 0 {
+            component_store.set_epoch_deadline(epoch_deadline_secs);
+        }
         let instance = &mut instance_resource.inner.lock().unwrap();
 
         let given_params = match function_params.load(env).decode::<Vec<Term>>() {

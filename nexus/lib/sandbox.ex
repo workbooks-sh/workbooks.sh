@@ -22,11 +22,34 @@ defmodule Nexus.Sandbox do
   a capability it didn't grant. Defaults are conservative: no extra caps, the default tenant.
   """
   def start(component_path, caps \\ [], tenant \\ Nexus.Store.default_tenant()) do
-    Wasmex.Components.start_link(%{
-      path: component_path,
-      imports: imports_for(caps, tenant),
-      store_limits: store_limits()
-    })
+    with {:ok, store} <- Wasmex.Components.Store.new(store_limits(), epoch_engine()) do
+      Wasmex.Components.start_link(%{
+        path: component_path,
+        imports: imports_for(caps, tenant),
+        store: store
+      })
+    end
+  end
+
+  # A single process-wide epoch-interruption engine (its 1s ticker advances the epoch). Built once
+  # and memoized — every sandbox store shares it so a per-call `set_epoch_deadline` can trap a
+  # runaway guest. Without an epoch engine the deadline is a no-op, so this is what makes the CPU
+  # bound real.
+  def epoch_engine do
+    case :persistent_term.get({__MODULE__, :epoch_engine}, nil) do
+      nil ->
+        engine =
+          case Wasmex.Engine.new(%Wasmex.EngineConfig{epoch_interruption: true}) do
+            {:ok, e} -> e
+            e -> e
+          end
+
+        :persistent_term.put({__MODULE__, :epoch_engine}, engine)
+        engine
+
+      engine ->
+        engine
+    end
   end
 
   @doc """
@@ -37,18 +60,27 @@ defmodule Nexus.Sandbox do
   and one table, so those are pinned to 1.
   """
   def store_limits do
+    max = Nexus.Config.sandbox_max_instances()
+
     %Wasmex.StoreLimits{
       memory_size: Nexus.Config.sandbox_memory_mb() * 1024 * 1024,
       table_elements: Nexus.Config.sandbox_table_elements(),
-      instances: 1,
-      tables: 1,
-      memories: 1
+      instances: max,
+      tables: max,
+      memories: max
     }
   end
 
-  @doc "Call an exported function on a running component — wasmex marshals the typed values."
-  def call(pid, fun, args, timeout \\ 5_000) do
-    Wasmex.Components.call_function(pid, fun, args, timeout)
+  @doc """
+  Call an exported function on a running component — wasmex marshals the typed values. The call
+  carries a wall-clock epoch deadline (`Nexus.Config.sandbox_epoch_secs`): a guest that spins past it
+  TRAPS and frees its worker thread, instead of the GenServer timeout returning while the wasm keeps
+  running detached. `timeout` stays slightly above the deadline so the trap is what fires first.
+  """
+  def call(pid, fun, args, timeout \\ nil) do
+    secs = Nexus.Config.sandbox_epoch_secs()
+    timeout = timeout || (secs + 2) * 1000
+    Wasmex.Components.call_function(pid, fun, args, timeout, secs)
   end
 
   @cmd_timeout_ms 30_000

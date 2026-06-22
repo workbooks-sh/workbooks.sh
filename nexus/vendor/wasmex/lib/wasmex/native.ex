@@ -95,7 +95,8 @@ defmodule Wasmex.Native do
 
   def component_new(_store, _component_bytes), do: error()
   def component_instance_new(_store, _component, _imports), do: error()
-  def component_call_function(_store, _instance, _function_name_path, _params, _from), do: error()
+  def component_call_function(_store, _instance, _function_name_path, _params, _epoch_deadline_secs, _from),
+    do: error()
 
   # wb-broker (wb-py4k): drive a guest's wasi:http/incoming-handler with a synthesized request, returning
   # {status, headers, body}. The inbound standard-component seam.
