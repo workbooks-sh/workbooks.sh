@@ -1254,6 +1254,8 @@ server :cloud do
   defp platform_secret_catalog do
     [
       %{name: "OPENROUTER_API_KEY", label: "OpenRouter", group: "Inference"},
+      %{name: "CLOUDFLARE_API_TOKEN", label: "Cloudflare — API token (Workers AI)", group: "Inference"},
+      %{name: "CLOUDFLARE_ACCOUNT_ID", label: "Cloudflare — account id (Workers AI)", group: "Inference"},
       %{name: "CF_AIG_TOKEN", label: "Cloudflare AI Gateway", group: "Inference"},
       %{name: "BRAVE_API_KEY", label: "Brave Search", group: "Inference"},
       %{name: "WB_DATABASE_URL", label: "Database URL", group: "Storage & data"},
@@ -1266,7 +1268,6 @@ server :cloud do
       %{name: "GOOGLE_OAUTH_CLIENT_SECRET", label: "Google OAuth — client secret", group: "Integrations"},
       %{name: "SLACK_OAUTH_CLIENT_ID", label: "Slack OAuth — client id", group: "Integrations"},
       %{name: "SLACK_OAUTH_CLIENT_SECRET", label: "Slack OAuth — client secret", group: "Integrations"},
-      %{name: "CLOUDFLARE_API_TOKEN", label: "Cloudflare API token", group: "Platform"},
       %{name: "WB_ENV_MASTER_KEY", label: "Env master key", group: "Platform"}
     ]
   end
