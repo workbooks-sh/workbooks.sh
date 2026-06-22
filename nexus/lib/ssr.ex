@@ -454,7 +454,7 @@ defmodule Nexus.SSR do
 
     case Map.get(res, name) do
       {:resource, mod} -> render_show(name, mod, ctx)
-      {:unit, node} -> render_unit(name, node)
+      {:unit, node} -> render_unit(name, node, ctx)
       _ -> render_show(name, nil, ctx)
     end
   end
@@ -577,9 +577,9 @@ defmodule Nexus.SSR do
   #   {:wasm, _}    — a typed COMPONENT: instantiate + call its no-arg `render` export (rust/c/zig/swift).
   #   {:command, _} — a WASI COMMAND module (js/ts/python): run it, its STDOUT is the output.
   #   {:client, js} — browser JS (svelte/solid/client): emitted as a client island, run in the browser.
-  defp render_unit(name, node) do
+  defp render_unit(name, node, ctx) do
     case Nexus.Audit.unit(node) do
-      [] -> render_artifact(name, Nexus.Compile.unit(node), Nexus.Capabilities.grants(node), render_tenant())
+      [] -> render_artifact(name, Nexus.Compile.unit(node), Nexus.Capabilities.grants(node), ctx.tenant)
       ungranted ->
         ~s(  <div class="data-missing">#{esc(name)} blocked: ungranted caps #{esc(Enum.join(ungranted, ", "))}</div>)
     end
@@ -611,10 +611,6 @@ defmodule Nexus.SSR do
   end
 
   defp render_artifact(name, _, _grants, _tenant), do: ~s(  <div class="data-missing">#{esc(name)} unavailable</div>)
-
-  # The tenant a server-side render binds its host caps to. SSR has no per-request conn here yet, so
-  # it uses the deploy's default tenant; the binding point is correct (host-supplied, never guest).
-  defp render_tenant, do: Nexus.Store.default_tenant()
 
   defp render_show(name, nil, _ctx),
     do: ~s(  <div class="data-missing">unknown resource <code>#{esc(name)}</code></div>)
