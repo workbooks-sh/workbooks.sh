@@ -161,4 +161,18 @@ if [ "${STAGE_PRUNE:-0}" = "1" ]; then
   fi
 fi
 
+# --- agent kits: the in-sandbox TOOL wasm the agent's bash runs via wasmtime (coreutils multicall +
+# any kits/*.wasm). NOT the compile toolchain, but shipped in the SAME artifact so a deployed nexus
+# has the agent's tools too — Nexus.Agent.Kits.root resolves kits to <compilers_root>/kits. Sourced
+# from the repo's kits/ dir (gitignored build artifacts, exactly like the rest of this slice).
+if [ -d kits ]; then
+  shopt -s nullglob
+  mkdir -p "$DST/kits"
+  for w in kits/*.wasm; do
+    cp -a "$w" "$DST/kits/"
+    echo "  + $w ($(du -sh "$DST/kits/$(basename "$w")" | cut -f1))" >&2
+  done
+  shopt -u nullglob
+fi
+
 echo "stage-tools: done — $(du -sh "$DST" | cut -f1) total" >&2

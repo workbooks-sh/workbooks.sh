@@ -1,0 +1,45 @@
+# compilers-image — publish the agent KITS onto the compilers package (ghcr.io/workbooks-sh/compilers).
+#
+# The FULL compilers image (the in-sandbox compile toolchain) is published MANUALLY from a provisioned
+# machine (FROM scratch + nexus/compilers-dist; CI can't reproduce the 7G chain). This workflow does the
+# ONE thing CI can: layer the agent's kit wasm (nexus/kits/*.wasm) onto that published image at
+# /compilers/kits, so deployed runtimes (nexus/Dockerfile + dogfood) get the agent's tools by COPYing
+# from the compilers package. Run it after the kits change; then redeploy the runtime/dogfood images.
+name: compilers-image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["nexus/kits/**", "ci/Dockerfile.compilers-kits"]
+
+concurrency:
+  group: compilers-image
+  cancel-in-progress: false
+
+env:
+  COMPILERS_IMAGE: ghcr.io/workbooks-sh/compilers
+
+jobs:
+  layer-kits:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Layer agent kits onto the compilers image
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg "BASE=${COMPILERS_IMAGE}:latest" \
+            --push \
+            -t "${COMPILERS_IMAGE}:latest" \
+            -t "${COMPILERS_IMAGE}:kits-${{ github.sha }}" \
+            -f ci/Dockerfile.compilers-kits .

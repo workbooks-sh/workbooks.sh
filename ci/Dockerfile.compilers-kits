@@ -1,0 +1,10 @@
+# Layer the agent KIT wasm onto the published compilers image, so the compilers package the runtime +
+# dogfood images COPY from also carries the agent's in-sandbox tools at /compilers/kits. The FULL
+# compilers package (FROM scratch + nexus/compilers-dist) is published manually from a provisioned
+# machine — CI can't reproduce the 7G provision chain — so this just ADDS the kits on top, sourcing
+# them from the committed nexus/kits/*.wasm. Re-runnable; platform-agnostic wasm (multi-arch).
+#
+# Context = repo root, constrained to nexus/kits by ci/Dockerfile.compilers-kits.dockerignore.
+ARG BASE=ghcr.io/workbooks-sh/compilers:latest
+FROM ${BASE}
+COPY nexus/kits/*.wasm /compilers/kits/

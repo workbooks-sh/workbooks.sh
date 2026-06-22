@@ -39,6 +39,9 @@ on:
 env:
   FLY_IMAGE: registry.fly.io/wb-dogfood
   BASE_IMAGE: ghcr.io/workbooks-sh/dogfood-base
+  # The standalone compilers + agent-kits layer the base COPYs from (so deployed agents can run kits +
+  # compile). Published manually when the toolchain/kits change (FROM scratch + nexus/compilers-dist).
+  COMPILERS_REF: ghcr.io/workbooks-sh/compilers:latest
   FLY_APP: wb-dogfood
 
 jobs:
@@ -86,6 +89,7 @@ jobs:
           docker buildx build \
             --cache-from type=gha,scope=dogfood-base \
             --cache-to type=gha,mode=max,scope=dogfood-base \
+            --build-arg "COMPILERS_REF=${COMPILERS_REF}" \
             --push \
             -t "${BASE_IMAGE}:${{ github.sha }}" \
             -t "${BASE_IMAGE}:latest" \

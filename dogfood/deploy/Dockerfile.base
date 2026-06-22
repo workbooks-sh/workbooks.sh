@@ -2,8 +2,14 @@
 # dogfood content tree. Rebuilt ONLY when nexus/ (the runtime) changes (see dogfood-deploy.yml). The
 # deployed image is then `FROM dogfood-base + COPY dogfood` (dogfood/deploy/Dockerfile), so a
 # content-only change (cloud .js views, lander copy, deploy config) rebuilds just the content layer in
-# seconds instead of recompiling the whole BEAM release. No wasm compilers — the dogfood surfaces
-# compile no wasm.
+# seconds instead of recompiling the whole BEAM release.
+#
+# The in-sandbox compilers + agent kits ride in from the standalone compilers layer (same mechanism as
+# nexus/Dockerfile) so agents RUNNING on this nexus can execute their tools — the coreutils/web kits are
+# wasm CLIs run via wasmtime — and compile. `compilers:local` for a local build; the ghcr ref in CI.
+ARG COMPILERS_REF=compilers:local
+FROM ${COMPILERS_REF} AS compilers
+
 FROM elixir:1.19-otp-27 AS build
 ENV MIX_ENV=prod LANG=C.UTF-8
 WORKDIR /app
@@ -39,7 +45,17 @@ ARG JJ_VERSION=v0.41.0
 # not `jj` — extract that exact path into /usr/local/bin.
 RUN curl -fsSL "https://github.com/jj-vcs/jj/releases/download/${JJ_VERSION}/jj-${JJ_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
     | tar -xz -C /usr/local/bin ./jj && jj --version
+# wasmtime — the WASI runtime the agent sandbox shells to: Nexus.Sandbox runs `wasmtime run <kit>.wasm`
+# for the agent's coreutils/web kits, and the compile lanes use it too. Must be on PATH. Same pin as
+# nexus/Dockerfile. (The lean base previously omitted it, so deployed agents couldn't execute any kit.)
+ARG WASMTIME_VERSION=v45.0.1
+RUN curl -fsSL https://wasmtime.dev/install.sh | bash -s -- --version ${WASMTIME_VERSION} \
+    && cp /root/.wasmtime/bin/wasmtime /usr/local/bin/wasmtime && wasmtime --version
 COPY --from=build /app/_build/prod/rel/nexus ./
+# The agent KIT wasm, from the compilers layer (the compilers-image workflow stages nexus/kits/*.wasm
+# into /compilers/kits). Copy ONLY the kits subdir — the dogfood surfaces don't compile, so the full
+# ~600M toolchain stays out; Nexus.Agent.Kits.root resolves "compilers/kits" at the app CWD.
+COPY --from=compilers /compilers/kits ./compilers/kits
 COPY nexus/scripts/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 EXPOSE 4000

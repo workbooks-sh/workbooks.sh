@@ -20,8 +20,21 @@ defmodule Nexus.Agent.Kits do
     pr printenv printf ptx pwd readlink realpath rm rmdir seq sha1sum sha256sum shuf sleep sort
     split sum tac tail tee test touch tr true truncate tsort unexpand uniq unlink wc yes)
 
-  @doc "The kits dir (config `:kits_root`, default `nexus/kits`)."
-  def root, do: Application.get_env(:nexus, :kits_root, Path.join(File.cwd!(), "kits"))
+  @doc """
+  The kits dir. `:kits_root` config wins; else the kits shipped alongside the compilers package
+  (`<compilers_root>/kits` — where `stage-tools.sh` stages them, baked into the deployed image via
+  `COPY --from=compilers`); else `<cwd>/kits` (dev, where the build drops `nexus/kits/*.wasm`).
+  """
+  def root do
+    case Application.get_env(:nexus, :kits_root) do
+      dir when is_binary(dir) and dir != "" ->
+        dir
+
+      _ ->
+        compiled = Path.join(Nexus.Compilers.Shared.default_root(), "kits")
+        if File.dir?(compiled), do: compiled, else: Path.join(File.cwd!(), "kits")
+    end
+  end
 
   @reg {:nexus_kits, :registered}
 

@@ -1,0 +1,5 @@
+# Layering the kits onto the compilers image needs ONLY the kit wasm in context. Exclude everything
+# else (this file takes precedence over .dockerignore for `-f ci/Dockerfile.compilers-kits` builds).
+*
+!nexus/kits
+!nexus/kits/**
