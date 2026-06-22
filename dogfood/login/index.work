@@ -43,6 +43,12 @@ design :login do
   .row{display:flex;justify-content:space-between;align-items:center;margin:0 0 18px}
   .lk{background:none;border:0;color:var(--dim);font:600 12.5px var(--sans);cursor:pointer;padding:0}
   .lk:hover{color:var(--ink)}
+  /* divider + GitHub OAuth button */
+  .oauth-sep{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--dim);font-size:12px}
+  .oauth-sep::before,.oauth-sep::after{content:"";flex:1;height:1px;background:var(--line)}
+  .ghbtn{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--ink);color:var(--paper);
+    text-decoration:none}
+  .ghbtn:hover{opacity:.92}
   .toggle{text-align:center;font-size:13px;color:var(--dim);margin:18px 0 0}
   .toggle button{background:none;border:0;color:var(--ink);font-weight:700;cursor:pointer;padding:0}
   .msg{font-size:13px;border-radius:10px;padding:9px 12px;margin:0 0 16px;display:none}

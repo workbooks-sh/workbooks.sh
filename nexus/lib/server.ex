@@ -224,6 +224,11 @@ defmodule Nexus.Server do
   end
 
   # Native auth: begin a provider login (state/nonce CSRF + redirect to the provider). Public.
+  # GitHub sign-in (OAuth2, not OIDC) — its own handler using the GitHub App's user-auth creds. MUST
+  # precede the generic `/auth/:provider/*` routes below (router matches in order).
+  get("/auth/github/login", do: Nexus.Auth.Github.login(conn))
+  get("/auth/github/callback", do: Nexus.Auth.Github.callback(conn))
+
   # The matching `/auth/:provider/callback` lands with the callback slice (bd wb-ahr6).
   get "/auth/:provider/login" do
     Nexus.Auth.Provider.login(conn, provider)
