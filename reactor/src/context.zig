@@ -213,18 +213,53 @@ fn credPath(alloc: std.mem.Allocator, home: []const u8) ![]const u8 {
     return std.fs.path.join(alloc, &.{ home, ".work", "credentials" });
 }
 
-pub fn login(io: Io, alloc: std.mem.Allocator, home: []const u8, url_in: []const u8, token: []const u8) !u8 {
+pub fn login(io: Io, alloc: std.mem.Allocator, home: []const u8, url_in: []const u8, token: []const u8, email: []const u8, password: []const u8) !u8 {
     const url = if (url_in.len > 0) url_in else "https://api.workbooks.sh";
     log.prompt(try std.fmt.allocPrint(alloc, "work login {s}", .{url}));
 
-    if (token.len > 0) {
-        Io.Dir.cwd().createDirPath(io, try std.fs.path.join(alloc, &.{ home, ".work" })) catch {};
-        try fs.writeFilePrivate(io, try credPath(alloc, home), try std.fmt.allocPrint(alloc, "{s}\t{s}\n", .{ url, token }));
-        log.ok(try std.fmt.allocPrint(alloc, "logged in \u{b7} {s}", .{url}));
-        return 0;
-    }
-    log.step(try std.fmt.allocPrint(alloc, "visit {s}/device to authorize, then re-run with --token <t>", .{url}));
+    // An explicit token (minted in the dashboard) is stored verbatim.
+    if (token.len > 0) return store(io, alloc, home, url, token);
+    // Email + password → exchange for a PAT at the nexus's headless /auth/token endpoint.
+    if (email.len > 0 and password.len > 0) return passwordLogin(io, alloc, home, url, email, password);
+
+    log.step("log in with your account:");
+    log.step("  work login <url> --email you@example.com --password <pw>");
+    log.step("  (or set WORK_EMAIL / WORK_PASSWORD to avoid argv)  \u{b7}  or --token <wbk_\u{2026}>");
     return 1;
+}
+
+// Exchange email/password for a minted PAT (the headless equivalent of the dashboard login), then store it.
+fn passwordLogin(io: Io, alloc: std.mem.Allocator, home: []const u8, url: []const u8, email: []const u8, password: []const u8) !u8 {
+    const endpoint = try std.fmt.allocPrint(alloc, "{s}/auth/token", .{url});
+    const payload = try std.fmt.allocPrint(
+        alloc,
+        "{{\"email\":\"{s}\",\"password\":\"{s}\",\"name\":\"work-cli\"}}",
+        .{ try cloud.jsonEscape(alloc, email), try cloud.jsonEscape(alloc, password) },
+    );
+
+    const res = cloud.request(io, alloc, .POST, endpoint, "", payload) catch |e| {
+        log.err(try std.fmt.allocPrint(alloc, "nexus unreachable at {s} ({s})", .{ url, @errorName(e) }));
+        return 1;
+    };
+
+    if (res.status != 200) {
+        const msg = cloud.jsonField(res.body, "error") orelse "login failed";
+        log.err(try std.fmt.allocPrint(alloc, "{s} (HTTP {d})", .{ msg, res.status }));
+        return 1;
+    }
+
+    const tok = cloud.jsonField(res.body, "token") orelse {
+        log.err("no token in response");
+        return 1;
+    };
+    return store(io, alloc, home, url, tok);
+}
+
+fn store(io: Io, alloc: std.mem.Allocator, home: []const u8, url: []const u8, token: []const u8) !u8 {
+    Io.Dir.cwd().createDirPath(io, try std.fs.path.join(alloc, &.{ home, ".work" })) catch {};
+    try fs.writeFilePrivate(io, try credPath(alloc, home), try std.fmt.allocPrint(alloc, "{s}\t{s}\n", .{ url, token }));
+    log.ok(try std.fmt.allocPrint(alloc, "logged in \u{b7} {s}", .{url}));
+    return 0;
 }
 
 pub fn identity(io: Io, alloc: std.mem.Allocator, home: []const u8) ?[]const u8 {
