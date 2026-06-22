@@ -18,7 +18,7 @@ defmodule Nexus.Auth.CliTokenTest do
   defp resp(conn), do: Jason.decode!(conn.resp_body)
 
   test "valid credentials → a minted PAT carrying the user's org + role" do
-    email = "cli_#{System.unique_integer([:positive])}@example.com"
+    email = "cli_#{Base.encode16(:crypto.strong_rand_bytes(6))}@example.com"
     {:ok, user} = Accounts.create(email, "supersecret", name: "Tester", org: "org_cli", role: "admin")
 
     conn = Native.token(post(%{email: email, password: "supersecret", name: "my-laptop"}))
@@ -33,7 +33,7 @@ defmodule Nexus.Auth.CliTokenTest do
   end
 
   test "wrong password → 401, no token" do
-    email = "cli_#{System.unique_integer([:positive])}@example.com"
+    email = "cli_#{Base.encode16(:crypto.strong_rand_bytes(6))}@example.com"
     {:ok, _} = Accounts.create(email, "supersecret", org: "org_cli2")
 
     conn = Native.token(post(%{email: email, password: "nope"}))

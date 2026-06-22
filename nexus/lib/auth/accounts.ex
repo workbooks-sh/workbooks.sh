@@ -79,6 +79,20 @@ defmodule Nexus.Auth.Accounts do
   def mark_verified(id), do: exec("UPDATE users SET verified=1 WHERE id=?1", [id])
   def set_password(id, password), do: exec("UPDATE users SET pw_hash=?1 WHERE id=?2", [hash_password(password), id])
 
+  @doc """
+  This nexus's canonical org — the founding owner's org (one nexus per org). The first user to sign up
+  with no invite becomes the `owner` of a fresh org; that org IS the nexus. Used by `Nexus.Secrets` to
+  read nexus-scoped secrets from the SAME org the dashboard writes them to. `nil` before anyone signs up.
+  """
+  def nexus_org do
+    ensure()
+
+    case row("SELECT org FROM users WHERE role='owner' ORDER BY created_at ASC LIMIT 1", []) do
+      [org] when is_binary(org) and org != "" -> org
+      _ -> nil
+    end
+  end
+
   # ── org members ─────────────────────────────────────────────────────────────────────────────────
   @doc "Everyone in `org` — the org roster. `[%{id, name, email, role, created_at}]`, owners first."
   def list_org(org) do

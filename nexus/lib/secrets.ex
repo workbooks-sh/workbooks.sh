@@ -60,8 +60,24 @@ defmodule Nexus.Secrets do
     _, _ -> nil
   end
 
-  # The org that owns this nexus (one nexus per org). Context-free: the tenant injected at provision.
-  defp secrets_org, do: System.get_env("NEXUS_TENANT") || Nexus.Store.default_tenant()
+  # The org that owns this nexus (one nexus per org). Must match the org the dashboard WRITES secrets
+  # under (the logged-in owner's org) or a value set in the UI never reaches the runtime. Resolution:
+  # an explicit `NEXUS_TENANT` deploy pin wins; otherwise the founding owner's org (the nexus IS that
+  # org); otherwise the default tenant. Context-free — there is no request here.
+  defp secrets_org do
+    case System.get_env("NEXUS_TENANT") do
+      t when is_binary(t) and t != "" -> t
+      _ -> owner_org() || Nexus.Store.default_tenant()
+    end
+  end
+
+  defp owner_org do
+    Nexus.Auth.Accounts.nexus_org()
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
+  end
 
   @doc "The secret's value or a default when unset/blank."
   def get(name, default), do: get(name) || default
