@@ -660,6 +660,10 @@ server :cloud do
     # declared model / configured default.
     run_opts = if opts[:model] in [nil, ""], do: run_opts, else: Keyword.put(run_opts, :model, opts[:model])
 
+    # Surface the active capabilities + tenant to the run so host-brokered capability commands (e.g. the
+    # image/video/speak generators) can gate on / scope by them — not just the prose brief above.
+    run_opts = run_opts |> Keyword.put(:capabilities, caps) |> Keyword.put(:tenant, tenant)
+
     result =
       try do
         Nexus.Agent.run_named(agent, task, run_opts)
@@ -1160,9 +1164,24 @@ server :cloud do
   end
 
   # ── brief composition: capabilities + attached context are prepended to the user's message so the agent
-  # actually sees them (textual injection — the established pattern; structured tool wiring is a later step).
-  defp capability_prefix(caps) when is_list(caps) and caps != [],
-    do: "Active capabilities for this run: #{Enum.join(caps, ", ")} — use them where they fit.\n\n"
+  # actually sees them. Generator capabilities also name their bash command so the agent knows HOW to use
+  # them (image/video/speak are host-brokered commands gated on the capability being active).
+  @capability_commands %{
+    "image-generation" => "`image <prompt>` to generate an image",
+    "video-generation" => "`video <prompt>` to generate a video",
+    "speech" => "`speak <text>` to generate spoken audio"
+  }
+
+  defp capability_prefix(caps) when is_list(caps) and caps != [] do
+    hints =
+      caps
+      |> Enum.map(&Map.get(@capability_commands, &1))
+      |> Enum.reject(&is_nil/1)
+
+    base = "Active capabilities for this run: #{Enum.join(caps, ", ")} — use them where they fit."
+    extra = if hints == [], do: "", else: " Run " <> Enum.join(hints, "; ") <> "."
+    base <> extra <> "\n\n"
+  end
 
   defp capability_prefix(_), do: ""
 
