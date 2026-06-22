@@ -125,8 +125,19 @@ defmodule Nexus.Server do
   defp multi?, do: not match?([{"", _}], mounts())
 
   # Re-check-out each durable bare repo (`.nexus/repos/<name>.git`, on the persistent volume) into its
-  # working dir (`<data_dir>/<name>`, ephemeral) when that checkout is missing/empty. Idempotent: a
-  # populated checkout is left alone. Best-effort — a failure for one repo never blocks boot.
+  # working dir (`<data_dir>/<name>`, ephemeral) on boot.
+  #
+  # OVERLAY MODEL (push-to-deploy): a pushed workspace is the durable source of truth and OVERLAYS the
+  # image's baked copy — we force-checkout the bare repo's HEAD over the working dir EVERY boot, so
+  # PUSHED content always wins after a redeploy (the fresh image's baked files are overwritten). A
+  # workspace with NO bare repo keeps its baked copy as-is — the safety-net fallback, so a surface that's
+  # never been pushed still ships with the image. This is what lets a cloud/lander edit go live via
+  # `git push` + hot-reload (Nexus.Server.remount) with no image rebuild, while a clean deploy still
+  # serves everything from the bake. Best-effort — a failure for one repo never blocks boot.
+  @doc false
+  # Test seam — exercises the boot overlay (durable bare repos → working dirs) without booting the server.
+  def rehydrate_checkouts_for_test(root), do: rehydrate_checkouts(root)
+
   defp rehydrate_checkouts(root) do
     repos = Nexus.GitHttp.repos_root()
 
@@ -137,25 +148,13 @@ defmodule Nexus.Server do
           bare = Path.join(repos, n)
           work = Path.join(root, ws)
 
-          empty? =
-            case File.ls(work) do
-              {:ok, []} -> true
-              {:error, _} -> true
-              _ -> false
-            end
-
-          cond do
-            Nexus.Git.bare?(bare) and empty? ->
-              File.mkdir_p!(work)
-              Nexus.Git.checkout_into(bare, work)
-
-            Nexus.Git.bare?(bare) ->
-              # Already-populated checkout: still attach jj (best-effort, no-op unless substrate is on)
-              # so existing workspaces gain an op-log on boot without a re-checkout.
-              Nexus.Git.maybe_colocate(bare, work)
-
-            true ->
-              :ok
+          if Nexus.Git.bare?(bare) do
+            # Wipe the ephemeral working dir before checkout so the overlay is EXACT — the pushed HEAD,
+            # nothing else. (`checkout -f` overwrites tracked files but leaves never-tracked baked
+            # orphans; clearing first means a redeploy can't serve a stale image file the push removed.)
+            File.rm_rf(work)
+            File.mkdir_p!(work)
+            Nexus.Git.checkout_into(bare, work)
           end
         end
 
