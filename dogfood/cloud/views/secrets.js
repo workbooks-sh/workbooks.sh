@@ -18,6 +18,16 @@ WB.scopedStyles('/secrets', `
   .lk.danger:hover { color:var(--bad, #c0392b); }
   .lk:disabled { opacity:.5; cursor:default; }
   .sheet-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
+  /* Platform (injected) secrets — read-only name + set/not-set badge, grouped. */
+  .pgrp { font:700 10.5px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim); padding:14px 4px 6px; }
+  .pgrp:first-child { padding-top:2px; }
+  .prow { display:flex; align-items:center; gap:12px; padding:9px 4px; border-bottom:1px solid var(--line); }
+  .prow:last-child { border-bottom:none; }
+  .pname { font:600 13px var(--mono); color:var(--ink); }
+  .plabel { flex:1; min-width:0; font:500 12.5px var(--read); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pbadge { flex:none; font:700 10px var(--read); letter-spacing:.04em; text-transform:uppercase; border-radius:6px; padding:3px 8px; }
+  .pbadge.on { color:var(--bloomd); background:color-mix(in srgb, var(--bloom) 16%, transparent); }
+  .pbadge.off { color:var(--dim); background:var(--line); }
 `);
 
 WB.view('/secrets', {
@@ -44,6 +54,7 @@ WB.view('/secrets', {
     let saving = false;
 
     let deleteFor = null;
+    let injected = null;       // platform/injected secrets (names + present), read-only — null = loading
 
     const esc = (s) => String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -164,6 +175,26 @@ WB.view('/secrets', {
   </div>`;
     }
 
+    // Read-only platform secrets — injected at deploy (Fly secrets → Nexus.Secrets). Names + a set/not-set
+    // badge only; you can't reveal or edit them here (they're managed at deploy, not in the nexus pool).
+    function platformHtml() {
+      if (injected === null) {
+        return `<div class="card faint" style="text-align:center;color:var(--dim)">Loading platform secrets…</div>`;
+      }
+      if (!injected.length) return '';
+      const groups = {};
+      injected.forEach((s) => { (groups[s.group] = groups[s.group] || []).push(s); });
+      const sections = Object.keys(groups).map((g) => `
+    <div class="pgrp">${esc(g)}</div>
+    ${groups[g].map((s) => `
+      <div class="prow">
+        <span class="pname mono">${esc(s.name)}</span>
+        <span class="plabel faint">${esc(s.label)}</span>
+        <span class="pbadge ${s.present ? 'on' : 'off'}">${s.present ? 'Set' : 'Not set'}</span>
+      </div>`).join('')}`).join('');
+      return `<div class="card" style="margin-top:14px">${sections}</div>`;
+    }
+
     function modalHtml() {
       if (!editOpen) return '';
       return `<div class="modal" data-modal>
@@ -215,6 +246,14 @@ WB.view('/secrets', {
   </button>
 </div>
 ${bodyHtml()}
+
+<div class="grphead" style="margin-top:26px">
+  <div>
+    <h3 class="grp">Platform secrets · injected</h3>
+    <p class="faint" style="margin:4px 0 0;font-size:12.5px">Set at deploy (Fly secrets) and read through <span class="mono">Nexus.Secrets</span>. Names only — values are never exposed, and these are managed at deploy, not edited here.</p>
+  </div>
+</div>
+${platformHtml()}
 ${modalHtml()}
 ${confirmHtml()}`;
       wire();
@@ -253,6 +292,12 @@ ${confirmHtml()}`;
         conf.querySelector('[data-cact="confirm"]')?.addEventListener('click', reallyDelete);
       }
     }
+
+    // Load the injected/platform secrets (names + present status) once, in the background.
+    fetch('/cloud/secrets/injected', { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : { secrets: [] }))
+      .then((d) => { injected = (d && d.secrets) || []; paint(); })
+      .catch(() => { injected = []; paint(); });
 
     paint();
     await loadList();

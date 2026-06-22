@@ -85,6 +85,11 @@ server :cloud do
   # generic platform endpoint so it shows the true amount.
   route "GET /cloud/storage", :storage
 
+  # Injected / deploy-time secrets (Fly secrets → Nexus.Secrets) — the Secrets page lists their NAMES +
+  # whether each is set (present), NEVER values. Read-only, admin-only. Complements the editable
+  # control-plane env store (/api/platform/env).
+  route "GET /cloud/secrets/injected", :injected_secrets
+
   # Agents defined across the mounted workbooks — the Studio "Agents" tab lists these. Read from the
   # live registry (Nexus.Agent.all, populated at bringup from each workbook's `agent` blocks).
   route "GET /cloud/agents", :agents_list
@@ -1053,6 +1058,48 @@ server :cloud do
 
     total = Enum.reduce(buckets, 0, &(&1.bytes + &2))
     %{totalSize: human(total), buckets: Enum.sort_by(buckets, & &1.bytes, :desc)}
+  end
+
+  # The platform secrets this nexus reads via Nexus.Secrets — injected at deploy (Fly secrets / encrypted
+  # control-plane env). We expose only the NAME + whether it's set, never the value, and only to an admin.
+  # This is the read-only counterpart to the editable control-plane env store the page already shows.
+  def injected_secrets(req) do
+    if Nexus.Auth.role_at_least?(Map.get(req, :role, "viewer"), "admin") do
+      items = Enum.map(platform_secret_catalog(), fn s -> Map.put(s, :present, secret_present?(s.name)) end)
+      %{secrets: items}
+    else
+      {403, %{error: "admin only"}}
+    end
+  end
+
+  defp secret_present?(name) do
+    Nexus.Secrets.has?(name)
+  rescue
+    _ -> false
+  catch
+    _, _ -> false
+  end
+
+  # The known deploy-injected secrets the platform uses. Names only — an operator sets these as Fly
+  # secrets / control-plane env; the page shows which are configured. (Not the editable per-nexus pool.)
+  defp platform_secret_catalog do
+    [
+      %{name: "OPENROUTER_API_KEY", label: "OpenRouter", group: "Inference"},
+      %{name: "CF_AIG_TOKEN", label: "Cloudflare AI Gateway", group: "Inference"},
+      %{name: "BRAVE_API_KEY", label: "Brave Search", group: "Inference"},
+      %{name: "WB_DATABASE_URL", label: "Database URL", group: "Storage & data"},
+      %{name: "WB_S3_ACCESS_KEY_ID", label: "Object store — access key", group: "Storage & data"},
+      %{name: "WB_S3_SECRET_ACCESS_KEY", label: "Object store — secret key", group: "Storage & data"},
+      %{name: "GITHUB_OAUTH_CLIENT_ID", label: "GitHub OAuth — client id", group: "Integrations"},
+      %{name: "GITHUB_OAUTH_CLIENT_SECRET", label: "GitHub OAuth — client secret", group: "Integrations"},
+      %{name: "GITHUB_WEBHOOK_SECRET", label: "GitHub webhook secret", group: "Integrations"},
+      %{name: "GOOGLE_OAUTH_CLIENT_ID", label: "Google OAuth — client id", group: "Integrations"},
+      %{name: "GOOGLE_OAUTH_CLIENT_SECRET", label: "Google OAuth — client secret", group: "Integrations"},
+      %{name: "SLACK_OAUTH_CLIENT_ID", label: "Slack OAuth — client id", group: "Integrations"},
+      %{name: "SLACK_OAUTH_CLIENT_SECRET", label: "Slack OAuth — client secret", group: "Integrations"},
+      %{name: "CLOUDFLARE_API_TOKEN", label: "Cloudflare API token", group: "Platform"},
+      %{name: "WB_ENV_MASTER_KEY", label: "Env master key", group: "Platform"}
+    ]
   end
 
   # Sum file sizes under a dir (bounded walk) — the surface's on-disk footprint.
