@@ -22,7 +22,28 @@ defmodule Nexus.Sandbox do
   a capability it didn't grant. Defaults are conservative: no extra caps, the default tenant.
   """
   def start(component_path, caps \\ [], tenant \\ Nexus.Store.default_tenant()) do
-    Wasmex.Components.start_link(%{path: component_path, imports: imports_for(caps, tenant)})
+    Wasmex.Components.start_link(%{
+      path: component_path,
+      imports: imports_for(caps, tenant),
+      store_limits: store_limits()
+    })
+  end
+
+  @doc """
+  The per-guest resource ceiling wasmtime enforces on every sandboxed component — a guest that
+  exceeds it traps (its `memory.grow`/`table.grow` fails / instantiation is refused) instead of
+  growing until the BEAM OS process OOM-kills every co-resident tenant. Values come from the deploy
+  block via `Nexus.Config` (neutral safe defaults); a single guest is one instance with one memory
+  and one table, so those are pinned to 1.
+  """
+  def store_limits do
+    %Wasmex.StoreLimits{
+      memory_size: Nexus.Config.sandbox_memory_mb() * 1024 * 1024,
+      table_elements: Nexus.Config.sandbox_table_elements(),
+      instances: 1,
+      tables: 1,
+      memories: 1
+    }
   end
 
   @doc "Call an exported function on a running component — wasmex marshals the typed values."

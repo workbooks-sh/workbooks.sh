@@ -79,6 +79,10 @@ defmodule Nexus.Config do
   def component_cache_region, do: get(:component_cache_region)
   def languages, do: get(:languages)
   def pm_debug?, do: get(:pm_debug)
+  # Untrusted-guest sandbox limits (wb-9jqy). Neutral safe defaults; deployer dials via deploy block.
+  def sandbox_memory_mb, do: get(:sandbox_memory_mb)
+  def sandbox_epoch_secs, do: get(:sandbox_epoch_secs)
+  def sandbox_table_elements, do: get(:sandbox_table_elements)
   # Tenant-aware cache (Nexus.Cache): hot ETS byte budget + cold-tier shelf-life. The hot tier is
   # deliberately small (default 64MB) so on a 1GB host it never competes with agents for RAM.
   def cache_hot_max_mb, do: get(:cache_hot_max_mb)
@@ -232,6 +236,13 @@ defmodule Nexus.Config do
       database: attr(html, "database") || "sqlite",
       storage: attr(html, "storage") || "local-fs",
       tenancy_mode: attr(html, "tenancy-mode") || "single",
+      # ── untrusted-guest sandbox limits (wb-9jqy). Neutral SAFE defaults so a deployer hosting
+      # untrusted multi-tenant WASM is bounded out of the box; a deployer running only its own
+      # (trusted) code can raise them. Per-guest linear-memory cap (MiB), per-call wall-clock CPU
+      # deadline (seconds, via epoch interruption), and per-table element cap.
+      sandbox_memory_mb: int(attr(html, "sandbox-memory-mb"), 256),
+      sandbox_epoch_secs: int(attr(html, "sandbox-epoch-secs"), 5),
+      sandbox_table_elements: int(attr(html, "sandbox-table-elements"), 100_000),
       # jj-as-substrate: route internal commits through Jujutsu (op-log + `jj undo`) over the workspace
       # git repo. No-op-safe (off ⇒ pure git; jj absent ⇒ pure git). Default off until proven on a deploy.
       jj_substrate: bool(attr(html, "jj-substrate"), false),
