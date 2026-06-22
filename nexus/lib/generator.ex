@@ -45,16 +45,20 @@ defmodule Nexus.Generator do
     end
   end
 
-  # POST to the Cloudflare account-scoped AI run endpoint. Workers-AI generators return either the raw
-  # binary (content-type image/*, audio/*, video/*) or a JSON envelope `{"result": {"image"|"audio"|
-  # "video": "<base64>"}}` — handle both.
+  # POST to the Cloudflare AI run endpoint. Workers-AI generators return either the raw binary
+  # (content-type image/*, audio/*, video/*) or a JSON envelope `{"result": {"image"|"audio"|"video":
+  # "<base64>"}}` — handle both. Account id + token come from the SAME secrets the text-inference path
+  # uses (the account is parsed out of CF_AIG_URL when CLOUDFLARE_ACCOUNT_ID isn't set separately).
   defp invoke(model, modality, prompt) do
-    account = Nexus.Secrets.get("CLOUDFLARE_ACCOUNT_ID")
+    account = account_id()
     token = Nexus.Secrets.get("CLOUDFLARE_API_TOKEN") || Nexus.Secrets.get("CF_AIG_TOKEN")
 
     cond do
-      account in [nil, ""] or token in [nil, ""] ->
-        {:error, "Cloudflare not configured (need CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN)"}
+      account in [nil, ""] ->
+        {:error, "Cloudflare account not resolvable (set CLOUDFLARE_ACCOUNT_ID or CF_AIG_URL)"}
+
+      token in [nil, ""] ->
+        {:error, "Cloudflare token not configured (CLOUDFLARE_API_TOKEN or CF_AIG_TOKEN)"}
 
       true ->
         :inets.start()
@@ -74,6 +78,27 @@ defmodule Nexus.Generator do
     e -> {:error, Exception.message(e)}
   catch
     _, e -> {:error, inspect(e)}
+  end
+
+  # The CF account id — explicit secret if set, else parsed from the AI Gateway URL, which embeds it as
+  # `…/v1/{account}/{gateway}/…` (so a configured gateway means no separate account-id secret is needed).
+  defp account_id do
+    case Nexus.Secrets.get("CLOUDFLARE_ACCOUNT_ID") do
+      a when is_binary(a) and a != "" ->
+        a
+
+      _ ->
+        case Nexus.Secrets.get("CF_AIG_URL") do
+          u when is_binary(u) ->
+            case Regex.run(~r{/v1/([^/]+)/}, u) do
+              [_, acct] -> acct
+              _ -> nil
+            end
+
+          _ ->
+            nil
+        end
+    end
   end
 
   defp decode_asset(modality, headers, resp) do
