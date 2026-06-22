@@ -95,6 +95,12 @@ The runtime ALREADY anticipates this — `Nexus.Rcp` advertises `transports: %{h
 a wired-in slot to flip on. So WebSockets are the planned next transport on the existing `Nexus.Live`
 channel, not a rewrite.
 
+**STATUS:** server foundation ✅ BUILT (commit 4660c41f) — `Nexus.Ws` duplex handler over `Nexus.Live`,
+`GET /ws` (auth + Bandit upgrade), server-injected identity (also fixed the `/live` SSE tenant-from-query
+hole), RCP `transports.ws=true`, `agent_run` threads model/isolate/capabilities. Browser/Studio can
+consume now. Remaining: Zig CLI WS client (`work agent run` over /ws), live integration test, mid-run
+steer/cancel, Studio Runs → /ws.
+
 - **Where WS wins (build it):** the CLIENT↔nexus live channel. SSE already streams run output one-way;
   WS adds the BIDIRECTIONAL half — mid-run **steering/interrupt**, **HITL approve-in-stream**, presence,
   multi-stage progress, and the live view of agents/sub-agents working. This subsumes wb-scmk (stream
