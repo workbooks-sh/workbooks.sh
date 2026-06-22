@@ -38,6 +38,7 @@ agent :workhorse do
   tools coreutils, web
   grant fs, exec, browse, commands
   capabilities :all                      # base builder — admits every toolkit capability
+  scope general                          # operates ACROSS all workspaces (the workspace-tree root), can create/manage workspaces
   limit turns: 60, timeout: 300_000
   model "workers-ai/@cf/zai-org/glm-5.2"  # default brain — GLM 5.2 on Workers AI via the CF AI Gateway
 end

@@ -84,6 +84,22 @@ defmodule Nexus.Agent do
     end
   end
 
+  @doc """
+  Is `agent` a GENERAL agent — the workspace-scope tier (`scope general` in its block)? A general agent
+  (workhorse, autopoet) operates over the WHOLE workspace tree (all workspaces), not one; a default
+  agent is confined to its workspace. Server-derived from the declared block — the run path forces it
+  from the def so a caller can't escalate. See the general-agents plan / [[general-vs-workspace-agents]].
+  """
+  def general?(agent) do
+    raw = agent[:scope] || (is_map(agent) && agent[:ast] && def_from_unit_safe(agent)[:scope]) || []
+
+    case raw do
+      l when is_list(l) -> "general" in Enum.map(l, &to_string/1)
+      s when is_binary(s) -> s == "general"
+      _ -> false
+    end
+  end
+
   # An agent value here may be a parsed def map (has :capabilities) or a raw unit node (has :ast). For a
   # raw node, resolve fields via def_from_unit; swallow any parse miss so admission never crashes a run.
   defp def_from_unit_safe(node) do
@@ -168,6 +184,28 @@ defmodule Nexus.Agent do
   # run (no workspace, or jj unavailable) uses a throwaway scratch dir, exactly as before. Returns
   # `{vfs, finalize_fn}` where finalize runs AFTER the loop with the run result.
   defp setup_vfs(opts, task) do
+    if Keyword.get(opts, :general), do: setup_general_vfs(), else: setup_workspace_vfs(opts, task)
+  end
+
+  # GENERAL run (workhorse/autopoet): /work = an isolated staging COPY of the WHOLE workspace tree
+  # (every workspace's working files, NEVER .nexus/.git/.jj). The agent reads/edits across all
+  # workspaces and can create new top-level dirs; on success we sync the staging tree back to WB_DATA —
+  # new top-level dirs auto-register as real workspaces (Nexus.Workspaces.sync_back). The copy is the
+  # isolation boundary: a failed run touches nothing, and the staging dir is always cleaned up.
+  defp setup_general_vfs do
+    staging = Path.join(System.tmp_dir!(), "nexus_general_#{System.unique_integer([:positive])}")
+    before = Nexus.Workspaces.stage(staging)
+
+    finalize = fn result ->
+      with {:ok, _} <- result, do: Nexus.Workspaces.sync_back(staging, before)
+      File.rm_rf(staging)
+      result
+    end
+
+    {Vfs.attach(staging), finalize}
+  end
+
+  defp setup_workspace_vfs(opts, task) do
     with true <- Nexus.JJ.substrate?(),
          %{bare: bare, work_dir: work_dir, name: name} = ws <- Keyword.get(opts, :workspace),
          uniq <- System.unique_integer([:positive]),
@@ -340,7 +378,14 @@ defmodule Nexus.Agent do
       # (e.g. `work agent run --model …`) overrides it via the merge below (opts wins over base).
       |> put_if(:model, d[:model])
 
-    result = run(Keyword.merge(base, opts) |> Keyword.drop([:grant_ceiling, :ceiling]))
+    # `:general` is forced from the DECLARED scope (server-derived) AFTER the merge, so a caller can
+    # never escalate a workspace-scoped agent into tree-wide access. See general?/1.
+    result =
+      run(
+        Keyword.merge(base, opts)
+        |> Keyword.drop([:grant_ceiling, :ceiling])
+        |> Keyword.put(:general, general?(d))
+      )
 
     # #event auto-instrument: a #event-tagged agent emits an event on each run (agent → event → hook).
     answer = with {:ok, %{answer: a}} <- result, do: a, else: (_ -> nil)

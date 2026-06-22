@@ -33,4 +33,21 @@ defmodule Nexus.AgentCapabilitiesTest do
     d = Nexus.Agent.def_from_unit(node)
     assert Nexus.Agent.capabilities(d) == :all
   end
+
+  test "general?/1 — the workspace-scope tier" do
+    assert Nexus.Agent.general?(%{scope: ["general"]})
+    refute Nexus.Agent.general?(%{scope: ["workspace"]})
+    refute Nexus.Agent.general?(%{})
+    refute Nexus.Agent.general?(%{capabilities: ["all"]})
+  end
+
+  test "scope general parses off a real agent block; a plain agent is not general" do
+    src = ~s|agent :w do\n  prompt "x"\n  capabilities :all\n  scope general\nend\n|
+    [node] = Nexus.Literate.parse(src) |> then(&if(is_tuple(&1), do: elem(&1, 0), else: &1)) |> Enum.filter(&(is_map(&1) and &1[:kind] == "agent"))
+    assert Nexus.Agent.general?(Nexus.Agent.def_from_unit(node))
+
+    plain = ~s|agent :p do\n  prompt "x"\nend\n|
+    [pn] = Nexus.Literate.parse(plain) |> then(&if(is_tuple(&1), do: elem(&1, 0), else: &1)) |> Enum.filter(&(is_map(&1) and &1[:kind] == "agent"))
+    refute Nexus.Agent.general?(Nexus.Agent.def_from_unit(pn))
+  end
 end

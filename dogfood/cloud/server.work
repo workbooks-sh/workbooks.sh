@@ -344,11 +344,13 @@ server :cloud do
       true ->
         ws = (is_map(req.body) && req.body["workspace"]) || nil
         model = (is_map(req.body) && req.body["model"]) || nil
+        # Eval/dev isolation: snapshot the workspace tree before, restore after — the run leaves no trace.
+        isolate = (is_map(req.body) && req.body["isolate"]) == true
         # Selected toolkit capabilities, clamped to what THIS agent admits (Workhorse :all, Autopoet :none).
         selected = (is_map(req.body) && req.body["capabilities"]) || []
         selected = if is_list(selected), do: selected, else: []
         caps = Nexus.Agent.admitted(Nexus.Agent.get(agent), selected)
-        {rid, status, turns, answer} = do_run(agent, task, tenant, user, fn _ -> :ok end, workspace: ws, capabilities: caps, model: model)
+        {rid, status, turns, answer} = do_run(agent, task, tenant, user, fn _ -> :ok end, workspace: ws, capabilities: caps, model: model, isolate: isolate)
         %{run: rid, agent: agent, status: status, turns: turns, answer: answer, capabilities: caps}
     end
   end
@@ -695,6 +697,11 @@ server :cloud do
 
     emit.(%{type: "start", run: rid, agent: agent, task: task})
 
+    # Eval/dev isolation: snapshot the whole workspace tree before an isolated run, restore it after, so
+    # the run leaves NO trace (re-runnable from an identical baseline). For general-agent evals like
+    # "create a marketing workspace". `Nexus.Workspaces.{snapshot,restore}`.
+    snap = if opts[:isolate] == true, do: Nexus.Workspaces.snapshot(), else: nil
+
     # Workspace-scoped run: if opts[:workspace] names a mount, run the agent in a jj worktree of that
     # workspace (real FS) so its file edits commit to the agent's branch, attributed. Else ephemeral.
     run_opts =
@@ -719,6 +726,10 @@ server :cloud do
       catch
         _, e -> {:error, e}
       end
+
+    # Isolated run → roll the workspace tree back to the pre-run snapshot (delete workspaces created in
+    # the run, revert edits). The Run row still records that the eval happened.
+    if snap, do: Nexus.Workspaces.restore(snap)
 
     {status, turns, answer, run_tokens} =
       case result do
