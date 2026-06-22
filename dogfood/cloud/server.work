@@ -274,7 +274,8 @@ server :cloud do
   defp error_msg(m) when is_binary(m), do: m
   defp error_msg(m), do: inspect(m)
 
-  def agent_chat(req) do
+  def agent_chat(req), do: if(gate(req, :write), do: do_agent_chat(req), else: forbidden())
+  defp do_agent_chat(req) do
     user = user_key(req)
     msg = (is_map(req.body) && req.body["message"]) || ""
     id = is_map(req.body) && req.body["id"]
@@ -338,7 +339,8 @@ server :cloud do
   end
 
   # Run a named agent (deck/research/workhorse/…) on a brief; persist a durable Run; return the answer.
-  def agent_run(req) do
+  def agent_run(req), do: if(gate(req, :write), do: do_agent_run(req), else: forbidden())
+  defp do_agent_run(req) do
     agent = (is_map(req.body) && req.body["agent"]) || ""
     task = (is_map(req.body) && req.body["task"]) || ""
     tenant = req.tenant || Nexus.Store.default_tenant()
@@ -572,6 +574,12 @@ server :cloud do
     raw = server_uid(req) || (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
     raw |> to_string() |> String.downcase()
   end
+
+  # Authorization gate for mutating routes (wb-b0ti). Single-tenant/dev (auth=None) is trusted → allow;
+  # a multi-tenant deploy enforces the action's role minimum via Nexus.Authz. Pairs with auth_uid (WHO):
+  # this is WHAT a role may do. A gated handler reads `def h(req), do: gate(req, :write) && do_h(req) || ...`.
+  defp gate(req, action), do: not Nexus.Auth.multi?() or Nexus.Authz.may?(Map.get(req, :role, "viewer"), action)
+  defp forbidden, do: {403, %{error: "forbidden — insufficient role for this action"}}
 
   # Identity-scoped routes (profile, device keys) MUST act as the authenticated person — the wb-q7w5
   # deploy fix. In a multi-tenant deploy (Nexus.Auth adapter != None) a request with NO server-derived
@@ -965,7 +973,8 @@ server :cloud do
 
   # File an issue (a kind="issue" Todo). Used by the failure model (auto-filed on a failed run) and
   # available as an explicit endpoint. `run` links the failing/relevant run.
-  def issue_file(req) do
+  def issue_file(req), do: if(gate(req, :write), do: do_issue_file(req), else: forbidden())
+  defp do_issue_file(req) do
     b = req.body || %{}
     if to_string(b["title"] || "") == "" do
       {400, %{error: "title is required"}}
@@ -1201,7 +1210,8 @@ server :cloud do
     end)
   end
 
-  def inbox_state_set(req) do
+  def inbox_state_set(req), do: if(gate(req, :write), do: do_inbox_state_set(req), else: forbidden())
+  defp do_inbox_state_set(req) do
     b = req.body || %{}
     subject = to_string(b["subject"] || "")
     if subject == "" do
@@ -1258,7 +1268,8 @@ server :cloud do
     %{views: inbox_views_for(req.tenant || Nexus.Store.default_tenant(), user_key(req))}
   end
 
-  def inbox_view_save(req) do
+  def inbox_view_save(req), do: if(gate(req, :write), do: do_inbox_view_save(req), else: forbidden())
+  defp do_inbox_view_save(req) do
     b = req.body || %{}
     name = String.slice(to_string(b["name"] || ""), 0, 60)
     if name == "" do
@@ -1274,7 +1285,8 @@ server :cloud do
     end
   end
 
-  def inbox_view_delete(req) do
+  def inbox_view_delete(req), do: if(gate(req, :write), do: do_inbox_view_delete(req), else: forbidden())
+  defp do_inbox_view_delete(req) do
     b = req.body || %{}
     name = to_string(b["name"] || "")
     tenant = req.tenant || Nexus.Store.default_tenant()
@@ -1287,7 +1299,8 @@ server :cloud do
     %{views: inbox_views_for(tenant, user_key(req))}
   end
 
-  def task_create(req) do
+  def task_create(req), do: if(gate(req, :write), do: do_task_create(req), else: forbidden())
+  defp do_task_create(req) do
     b = req.body || %{}
     title = b["title"] || ""
     if title == "" do
@@ -1303,7 +1316,8 @@ server :cloud do
     end
   end
 
-  def task_update(req) do
+  def task_update(req), do: if(gate(req, :write), do: do_task_update(req), else: forbidden())
+  defp do_task_update(req) do
     b = req.body || %{}
     tenant = req.tenant || Nexus.Store.default_tenant()
     case latest_task(tenant, b["tid"] || "") do
@@ -1323,7 +1337,8 @@ server :cloud do
   defp maybe_put(map, key, val), do: Map.put(map, key, val)
 
   # Dispatch a task: launch its assignee agent on the brief (reusing do_run), link the run, set status.
-  def task_dispatch(req) do
+  def task_dispatch(req), do: if(gate(req, :write), do: do_task_dispatch(req), else: forbidden())
+  defp do_task_dispatch(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
     case latest_task(tenant, (req.body || %{})["tid"] || "") do
       nil -> {404, %{error: "no such task"}}
@@ -1345,7 +1360,8 @@ server :cloud do
 
   # Plan-with-Workhorse: decompose a goal into a parent task + assigned subtasks. Workhorse emits strict lines
   # we parse; the assignees are constrained to the registered agents.
-  def plan_create(req) do
+  def plan_create(req), do: if(gate(req, :write), do: do_plan_create(req), else: forbidden())
+  defp do_plan_create(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
     goal = (req.body || %{})["goal"] || ""
     if goal == "" do
@@ -1418,7 +1434,8 @@ server :cloud do
     %{schedules: current_schedules(req.tenant || Nexus.Store.default_tenant()) |> Enum.sort_by(&(-(&1.created || 0)))}
   end
 
-  def schedule_create(req) do
+  def schedule_create(req), do: if(gate(req, :write), do: do_schedule_create(req), else: forbidden())
+  defp do_schedule_create(req) do
     b = req.body || %{}
     tenant = req.tenant || Nexus.Store.default_tenant()
     agent = to_string(b["agent"] || "")
@@ -1441,7 +1458,8 @@ server :cloud do
     end
   end
 
-  def schedule_cancel(req) do
+  def schedule_cancel(req), do: if(gate(req, :write), do: do_schedule_cancel(req), else: forbidden())
+  defp do_schedule_cancel(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
     sid = (req.body || %{})["sid"] || ""
     case Enum.find(current_schedules(tenant), &(&1.sid == sid)) do
@@ -1865,7 +1883,8 @@ server :cloud do
   # Upload an asset into a workspace. Body: %{path: "<mount>/<rel>", content: "<base64>"} (a data: URL
   # prefix is tolerated). Writes the bytes to the volume and commits into the workspace repo, exactly
   # like the file-mutation verbs (attributed, remounted, logged).
-  def asset_upload(req) do
+  def asset_upload(req), do: if(gate(req, :write), do: do_asset_upload(req), else: forbidden())
+  defp do_asset_upload(req) do
     path = is_map(req.body) && req.body["path"]
     raw = (is_map(req.body) && req.body["content"]) || ""
 
@@ -2147,7 +2166,8 @@ server :cloud do
 
   # Create a draft = a real nexus folder scaffolded with an index.work, committed so it's a live
   # surface, and flagged `draft` in the control plane. Promote later via /cloud/visibility.
-  def draft_create(req) do
+  def draft_create(req), do: if(gate(req, :write), do: do_draft_create(req), else: forbidden())
+  defp do_draft_create(req) do
     org = req.tenant || Nexus.Store.default_tenant()
     name = String.trim((is_map(req.body) && req.body["name"]) || "") |> then(&if(&1 == "", do: "Untitled draft", else: &1))
     slug = draft_slug(name)
@@ -2166,7 +2186,8 @@ server :cloud do
   end
 
   # Set a surface's visibility (draft → private/public, the "promote", or back).
-  def set_visibility(req) do
+  def set_visibility(req), do: if(gate(req, :write), do: do_set_visibility(req), else: forbidden())
+  defp do_set_visibility(req) do
     org = req.tenant || Nexus.Store.default_tenant()
     id = is_map(req.body) && req.body["id"]
     state = is_map(req.body) && req.body["state"]
@@ -2285,7 +2306,8 @@ server :cloud do
       prompt: Map.get(ov, :prompt), model: Map.get(ov, :model)}
   end
 
-  def agent_config_save(req) do
+  def agent_config_save(req), do: if(gate(req, :manage), do: do_agent_config_save(req), else: forbidden())
+  defp do_agent_config_save(req) do
     b = (is_map(req.body) && req.body) || %{}
     name = b["name"] || ""
 
@@ -2730,7 +2752,8 @@ server :cloud do
     }
   end
 
-  def inference_config_save(req) do
+  def inference_config_save(req), do: if(gate(req, :manage), do: do_inference_config_save(req), else: forbidden())
+  defp do_inference_config_save(req) do
     b = (is_map(req.body) && req.body) || %{}
 
     upd =
@@ -2749,7 +2772,8 @@ server :cloud do
   # (`order.paid`), which credits the org ledger via `credit_inference/2`. The 5% CF + 0.5% WB fee rides on
   # top, so the customer pays `amount * 1.055` and receives `amount` of credit. When Polar isn't configured
   # we record the intent and return pending — never a fake success.
-  def inference_topup(req) do
+  def inference_topup(req), do: if(gate(req, :manage), do: do_inference_topup(req), else: forbidden())
+  defp do_inference_topup(req) do
     b = (is_map(req.body) && req.body) || %{}
     amount = inf_num(b["amount"])
     tenant = req.tenant || Nexus.Store.default_tenant()
@@ -2792,7 +2816,8 @@ server :cloud do
   # Onboarding (and upgrade) subscription checkout — tier → Polar subscription product. Binds the checkout
   # to the org via `external_customer_id` so the card is stored for later inference top-ups. The onboarding
   # `profile` (account type, name, usecases) rides as metadata so the webhook can finish provisioning.
-  def billing_checkout(req) do
+  def billing_checkout(req), do: if(gate(req, :manage), do: do_billing_checkout(req), else: forbidden())
+  defp do_billing_checkout(req) do
     b = (is_map(req.body) && req.body) || %{}
     tier = to_string(b["tier"] || b["plan"] || "")
     tenant = req.tenant || Nexus.Store.default_tenant()
@@ -2968,7 +2993,8 @@ server :cloud do
 
   # Save an edited file: write to the volume, commit into the workspace repo (provisioning it if needed),
   # then recompile. Body: %{path: "<ws>/<rel>", content: "…"}.
-  def file_save(req) do
+  def file_save(req), do: if(gate(req, :write), do: do_file_save(req), else: forbidden())
+  defp do_file_save(req) do
     path = (is_map(req.body) && req.body["path"]) || req.query["path"]
     content = (is_map(req.body) && req.body["content"]) || ""
 
@@ -3083,7 +3109,8 @@ server :cloud do
   end
 
   # Create a new (empty) file. Body: %{path: "<mount>/<rel>"}. 409 if it already exists.
-  def file_new(req) do
+  def file_new(req), do: if(gate(req, :write), do: do_file_new(req), else: forbidden())
+  defp do_file_new(req) do
     case resolve_target(is_map(req.body) && req.body["path"]) do
       {:error, status, msg} -> {status, %{error: msg}}
       {:ok, abs, mount, root, rel} ->
@@ -3098,7 +3125,8 @@ server :cloud do
   end
 
   # Create a new folder (with a .gitkeep so the empty dir survives the git round-trip). Body: %{path}.
-  def file_mkdir(req) do
+  def file_mkdir(req), do: if(gate(req, :write), do: do_file_mkdir(req), else: forbidden())
+  defp do_file_mkdir(req) do
     case resolve_target(is_map(req.body) && req.body["path"]) do
       {:error, status, msg} -> {status, %{error: msg}}
       {:ok, abs, mount, root, rel} ->
@@ -3113,7 +3141,8 @@ server :cloud do
   end
 
   # Rename/move a file or folder. Body: %{from: "<mount>/<rel>", to: "<mount>/<rel>"} (same mount).
-  def file_rename(req) do
+  def file_rename(req), do: if(gate(req, :write), do: do_file_rename(req), else: forbidden())
+  defp do_file_rename(req) do
     from = is_map(req.body) && req.body["from"]
     to = is_map(req.body) && req.body["to"]
     with {:ok, fabs, fmount, root, frel} <- resolve_target(from),
@@ -3133,7 +3162,8 @@ server :cloud do
   end
 
   # Delete a file or folder (recursive). Body: %{path: "<mount>/<rel>"}.
-  def file_delete(req) do
+  def file_delete(req), do: if(gate(req, :write), do: do_file_delete(req), else: forbidden())
+  defp do_file_delete(req) do
     case resolve_target(is_map(req.body) && req.body["path"]) do
       {:error, status, msg} -> {status, %{error: msg}}
       {:ok, abs, mount, root, rel} ->
@@ -3193,7 +3223,8 @@ server :cloud do
   # Bind (or clear, with an empty url) the GitHub mirror remote for a workspace's bare repo. The URL may
   # embed a token (https://user:token@github.com/org/repo.git) — it lands in the bare repo's git config
   # on the data volume (deployer config, not source). Nexus.Git carries the generic mechanism.
-  def workspace_mirror(req) do
+  def workspace_mirror(req), do: if(gate(req, :manage), do: do_workspace_mirror(req), else: forbidden())
+  defp do_workspace_mirror(req) do
     ws = git_ws(is_map(req.body) && req.body["ws"])
     url = (is_map(req.body) && req.body["url"]) || ""
 
