@@ -183,6 +183,31 @@ defmodule Nexus.Server do
     length(found)
   end
 
+  @doc """
+  INCREMENTAL mount — add a single new workspace by re-discovering the mount list (cheap) and compiling
+  ONLY that workbook, instead of recompiling the whole tree (`remount/0`, which is ~seconds×N). Use when
+  one workspace is created (e.g. a general agent's auto-register). Idempotent; no-op if the dir is gone.
+  """
+  def mount_one(name) do
+    found = discover_mounts(root())
+    Application.put_env(:nexus, :mounts, found)
+    :persistent_term.put({__MODULE__, :assetver}, %{})
+
+    case Enum.find(found, fn {n, _} -> n == name end) do
+      {_, wb} -> bringup(wb)
+      nil -> :ok
+    end
+
+    :ok
+  end
+
+  @doc "Refresh the mount list after a workspace was REMOVED — re-discover + publish, no compile needed."
+  def unmount_one(_name) do
+    Application.put_env(:nexus, :mounts, discover_mounts(root()))
+    :persistent_term.put({__MODULE__, :assetver}, %{})
+    :ok
+  end
+
   # Compile the workbook's units and let each server unit register its live sources.
   defp bringup(root) do
     mods =

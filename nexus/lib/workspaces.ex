@@ -59,7 +59,7 @@ defmodule Nexus.Workspaces do
         if Nexus.ControlPlane.enabled?() do
           Nexus.ControlPlane.put(org || secrets_org(), :workspace, name, %{name: name, nexus_id: nexus_id()})
         end
-        remount()
+        mount_one(name)
         {:ok, name}
     end
   end
@@ -74,7 +74,7 @@ defmodule Nexus.Workspaces do
       File.rm_rf(work_dir(name))
       File.rm_rf(bare(name))
       if Nexus.ControlPlane.enabled?(), do: Nexus.ControlPlane.delete(org || secrets_org(), :workspace, name)
-      remount()
+      unmount(name)
       :ok
     else
       {:error, :bad_name}
@@ -190,10 +190,16 @@ defmodule Nexus.Workspaces do
     end
   end
 
-  # Remount so a new/removed workspace serves — but ONLY when this nexus is actually serving (mounts
-  # populated). A pure compile/test never booted the server, so skip the (slow) recompile there.
-  defp remount do
-    if Application.get_env(:nexus, :mounts), do: Nexus.Server.remount()
+  # Make a workspace serve — but only when this nexus is actually serving (mounts populated); a pure
+  # compile/test never booted the server, so these are no-ops there. INCREMENTAL: compile just the one
+  # new workspace (mount_one) / re-publish the list on removal (unmount_one) — never recompile the whole
+  # tree. The full remount/0 stays for restore's batch rollback. All best-effort (never crash a run).
+  defp mount_one(name), do: serving(fn -> Nexus.Server.mount_one(name) end)
+  defp unmount(name), do: serving(fn -> Nexus.Server.unmount_one(name) end)
+  defp remount, do: serving(fn -> Nexus.Server.remount() end)
+
+  defp serving(fun) do
+    if Application.get_env(:nexus, :mounts), do: fun.()
   rescue
     _ -> :ok
   catch
