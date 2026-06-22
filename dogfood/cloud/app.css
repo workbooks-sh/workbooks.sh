@@ -161,6 +161,12 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
   border:1px solid var(--line); background:var(--card); color:var(--ink); font:600 13.5px var(--read); cursor:pointer; white-space:nowrap; }
 .newspace:hover{ border-color:var(--stroke); }
 .newspace .nsico{ display:grid; place-items:center; } .newspace .nsico svg{ width:15px; height:15px; }
+/* "Workspaces" section header in the Studio sidebar — a small label + a + on the right to add one. */
+.swshead{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px 4px; margin-top:2px; }
+.swsheadtt{ font:700 10px var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim); }
+.swsheadadd{ flex:none; width:22px; height:22px; border:0; background:none; color:var(--dim); cursor:pointer; border-radius:6px; display:grid; place-items:center; }
+.swsheadadd svg{ width:15px; height:15px; }
+.swsheadadd:hover{ color:var(--ink); background:var(--hover); }
 /* Studio workspace group — a collapsible header (chevron + # + name + count + a "new session here" +).
    Every workspace shows even with no sessions (empty state inside). */
 .swsblock{ margin-bottom:2px; }

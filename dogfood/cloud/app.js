@@ -1202,12 +1202,13 @@
       var sideBody;
       if (section === 'files') sideBody = '<div class="wsgroups">' + wslist + '</div>';
       else if (section === 'apps') sideBody = '<div class="appsgrid" id="appsGrid"><div class="treemsg" style="padding:8px 4px">Loading apps…</div></div>';
-      // Studio — New session + New workspace, then sessions grouped by workspace (lazy → #studioSide).
+      // Studio — New session, then a "Workspaces" header (with a + to add one) over the workspace groups.
       else if (section === 'studio') sideBody =
           '<div class="studioacts">' +
             '<button class="newsess" data-newsession><span class="nsico">' + ICO.plus + '</span>New session</button>' +
-            '<button class="newspace" data-newworkspace title="New workspace"><span class="nsico">' + ICO.newfolderplus + '</span>New workspace</button>' +
           '</div>' +
+          '<div class="swshead"><span class="swsheadtt">Workspaces</span>' +
+            '<button class="swsheadadd" data-newworkspace title="New workspace">' + ICO.plus + '</button></div>' +
           '<div id="studioSide"><div class="treemsg" style="padding:8px 4px">Loading sessions…</div></div>';
       // Activity — the inbox lives in the sidebar; the page shows the selected event's context (lazy → #activityInbox).
       else if (section === 'activity') sideBody = '<div id="activityInbox"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
