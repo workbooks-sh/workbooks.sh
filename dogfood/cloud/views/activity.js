@@ -151,8 +151,22 @@ WB.view('/activity', { title: 'Inbox', accent: 'var(--violet)', fullbleed: true,
     paint();
   }
 
+  // Live push — subscribe to the event bus over SSE (the same /live/:source transport the Studio runs
+  // use). Any bus #event pings us; we debounce-refetch the scoped threads. The ping carries no data, so
+  // the refresh is always the server-scoped /cloud/inbox. Reconnect is automatic (EventSource builtin).
+  var reloadT = null;
+  function scheduleReload(){ if (reloadT) return; reloadT = setTimeout(function(){ reloadT = null; if (document.body.contains(el)) reload(); }, 400); }
+  function subscribe(){
+    if (WB._inboxES){ try { WB._inboxES.close(); } catch(e){} }
+    try {
+      var es = new EventSource('/live/inbox'); WB._inboxES = es;
+      es.onmessage = function(m){ var ev; try { ev = JSON.parse(m.data); } catch(e){ return; } if (ev && ev.type === 'event') scheduleReload(); };
+    } catch(e){ /* SSE unavailable → the page still works, just not live */ }
+  }
+
   el.innerHTML = '<div class="ibx"><div class="ibxlist"><div class="ibempty">Loading…</div></div><div class="ibxdetail"></div></div>';
   await reload();
+  subscribe();
 }});
 
 var ENVELOPE = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M3.2 7L12 13L20.8 7"/></svg>';

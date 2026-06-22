@@ -797,18 +797,23 @@ server :cloud do
       tenant: tenant
     )
 
+    # Close the run stream FIRST — the failure-model issue (and its cheap-model title summary, which can
+    # take a second) must never delay the client's `done`.
+    emit.(%{type: "done", run: rid, status: status, turns: turns, tokens: tokens})
+
     # The failure model: instead of crashing or blindly retrying, a failed run FILES AN ISSUE that a
     # human or another agent can pick up. `file_issue: false` (dispatch path) opts out — there the task
     # itself already tracks the failure (set to blocked), so a second issue would be redundant noise.
     if status != "ok" and Keyword.get(opts, :file_issue, true) do
+      # Store a clean cheap-model subject as the title (falls back to a template if CF is unreachable);
+      # the Inbox then shows "We hit a glitch…" as the headline and this gist as the preview line.
       file_issue(tenant, %{
-        title: "Run failed: #{agent} — #{title_from(task)}",
+        title: summarize_title(task) || title_from(task),
         detail: "Agent #{agent} could not complete the task.\n\nTask: #{String.slice(task, 0, 400)}\n\nOutcome (#{status}): #{String.slice(answer, 0, 600)}",
         agent: agent, run: rid, created_by: agent
       })
     end
 
-    emit.(%{type: "done", run: rid, status: status, turns: turns, tokens: tokens})
     {rid, status, turns, answer}
   end
 
@@ -1051,7 +1056,7 @@ server :cloud do
         blame = blame_of(iss.detail)
         %{semantic: "needs_you", blame: blame, actor: actor, needs_you: true,
           severity: (if blame == "task", do: "med", else: "high"),
-          title: fail_title(iss.agent, blame), snippet: fail_snippet(blame)}
+          title: fail_title(iss.agent, blame), snippet: (issue_gist(iss) || fail_snippet(blame))}
 
       iss && iss.status == "done" ->
         %{semantic: "resolved", blame: blame_of(iss.detail), actor: actor, needs_you: false,
@@ -1105,6 +1110,43 @@ server :cloud do
   defp fail_snippet("internal"), do: "Something on our end interrupted the run. Re-dispatch to try again."
   defp fail_snippet("input"), do: "The agent is waiting on a decision from you."
   defp fail_snippet(_), do: "The agent stopped before finishing. Re-dispatch to retry, or resolve."
+
+  # The clean task gist stored on a freshly-filed issue (the cheap-model subject). nil for legacy issues
+  # whose title is still our raw "Run failed: …" string, so the caller falls back to the generic snippet.
+  defp issue_gist(iss) do
+    t = to_string(iss.title || "")
+    cond do
+      t == "" -> nil
+      String.starts_with?(t, "Run failed:") -> nil
+      true -> clean_subject(t)
+    end
+  end
+
+  # A short, plain inbox subject for a task, via a cheap Workers AI model (Cloudflare AI Gateway — the
+  # prod-ready CF path). Best-effort: any failure (CF secret absent, timeout, empty) returns nil and the
+  # caller uses the deterministic template, so the feed never depends on the model being reachable.
+  defp summarize_title(text) do
+    txt = String.slice(to_string(text), 0, 600)
+    if String.trim(txt) == "" do
+      nil
+    else
+      case Nexus.Llm.complete(
+        [%{role: "system", content: "Rewrite the user's task as a short, plain inbox subject line of at most 8 words. No quotes, no trailing period, no preamble — output only the subject."},
+         %{role: "user", content: txt}],
+        model: cheap_model(), timeout: 8_000, retries: 0, max_tokens: 24
+      ) do
+        {:ok, %{content: c}} when is_binary(c) and c != "" ->
+          c |> String.trim() |> String.replace(~r/\A["']+|["'.]+\z/u, "") |> String.slice(0, 80)
+        _ -> nil
+      end
+    end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
+  end
+
+  defp cheap_model, do: "workers-ai/@cf/meta/llama-3.1-8b-instruct-fast"
 
   defp agent_name(""), do: "An agent"
   defp agent_name(nil), do: "An agent"
@@ -1690,6 +1732,23 @@ server :cloud do
       total = Enum.reduce(buckets, 0, &(&1.bytes + &2))
       emit.(%{total: human(total), buckets: Enum.sort_by(buckets, & &1.bytes, :desc)})
     end)
+
+    # Inbox live-push — subscribe this SSE connection to the event bus; every bus #event pings the
+    # browser so the Inbox refetches its (tenant+role-scoped) threads. The ping carries only the kind,
+    # never data — the scoped /cloud/inbox fetch is the source of truth, so there's no cross-tenant leak.
+    Nexus.Live.register("inbox", fn _params, emit ->
+      Nexus.Events.subscribe(fn ev -> "event" in List.wrap(ev[:tags]) end)
+      emit.(%{type: "ready"})
+      inbox_live_loop(emit)
+    end)
+  end
+
+  defp inbox_live_loop(emit) do
+    receive do
+      {:event, ev} ->
+        emit.(%{type: "event", kind: to_string(ev[:kind] || "")})
+        inbox_live_loop(emit)
+    end
   end
 
   # Real storage for the Storage admin page — one bucket per mounted surface, sizes off the data volume
