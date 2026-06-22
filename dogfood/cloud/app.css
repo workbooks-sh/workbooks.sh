@@ -609,28 +609,30 @@ tr:last-child td{ border:0; }
 /* Fill via absolute inset rather than the flex height:100% chain — guarantees .wb-chat has a definite
    full height so wbchat's splash mode (justify-content:center) actually centers the composer vertically. */
 .studio-chat > .wb-chat { position: absolute; inset: 0; flex: 1; min-width: 0; }
-/* Subtle multicolor pastel wash behind the Studio CREATE/composer (splash) screen — the brand DNA
-   pastels as soft corner blooms fading to the page in the centre (where the composer sits). Only in the
-   empty/create state; a gentle fade-in. Light is a touch stronger; dark is dimmed so it just glows. */
+/* Subtle SHADER-like pastel wash behind the Studio CREATE/composer (splash) screen — overlapping soft
+   blobs of the brand DNA pastels, melted together with a heavy blur into a smooth mesh gradient (not
+   discrete bubbles). The layer extends past the edges (negative inset) so the blur never hard-clips.
+   Only on the empty/create state; gentle fade-in. Dark is much dimmer — just a faint glow. */
 .studio-chat > .wb-chat::before {
-  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0;
-  transition: opacity .6s ease;
+  content: ""; position: absolute; inset: -25%; z-index: 0; pointer-events: none; opacity: 0;
+  transition: opacity .8s ease; filter: blur(80px) saturate(1.05);
   background:
-    radial-gradient(42% 40% at 8% 4%,  color-mix(in srgb, var(--violet) 50%, transparent), transparent 68%),
-    radial-gradient(42% 38% at 92% 8%, color-mix(in srgb, var(--sky)    48%, transparent), transparent 68%),
-    radial-gradient(48% 44% at 90% 96%,color-mix(in srgb, var(--peach)  46%, transparent), transparent 68%),
-    radial-gradient(46% 42% at 6% 92%, color-mix(in srgb, var(--mint)   46%, transparent), transparent 68%);
+    radial-gradient(40% 48% at 22% 26%, color-mix(in srgb, var(--violet) 55%, transparent), transparent 72%),
+    radial-gradient(42% 50% at 76% 30%, color-mix(in srgb, var(--sky)    52%, transparent), transparent 72%),
+    radial-gradient(48% 54% at 70% 78%, color-mix(in srgb, var(--peach)  48%, transparent), transparent 74%),
+    radial-gradient(46% 52% at 28% 76%, color-mix(in srgb, var(--mint)   48%, transparent), transparent 74%);
 }
-.studio-chat > .wb-chat.wbc-splash::before { opacity: .85; }
+.studio-chat > .wb-chat.wbc-splash::before { opacity: .8; }
 .studio-chat > .wb-chat > * { position: relative; z-index: 1; }   /* keep convo + composer above the wash */
 [data-theme="dark"] .studio-chat > .wb-chat::before {
+  filter: blur(90px) saturate(1.1);
   background:
-    radial-gradient(42% 40% at 8% 4%,  color-mix(in srgb, var(--violet) 26%, transparent), transparent 66%),
-    radial-gradient(42% 38% at 92% 8%, color-mix(in srgb, var(--sky)    24%, transparent), transparent 66%),
-    radial-gradient(48% 44% at 90% 96%,color-mix(in srgb, var(--peach)  22%, transparent), transparent 66%),
-    radial-gradient(46% 42% at 6% 92%, color-mix(in srgb, var(--mint)   24%, transparent), transparent 66%);
+    radial-gradient(40% 48% at 22% 26%, color-mix(in srgb, var(--violet) 20%, transparent), transparent 72%),
+    radial-gradient(42% 50% at 76% 30%, color-mix(in srgb, var(--sky)    18%, transparent), transparent 72%),
+    radial-gradient(48% 54% at 70% 78%, color-mix(in srgb, var(--peach)  16%, transparent), transparent 74%),
+    radial-gradient(46% 52% at 28% 76%, color-mix(in srgb, var(--mint)   18%, transparent), transparent 74%);
 }
-[data-theme="dark"] .studio-chat > .wb-chat.wbc-splash::before { opacity: .6; }
+[data-theme="dark"] .studio-chat > .wb-chat.wbc-splash::before { opacity: .4; }
 /* a scrollable, CENTERED content area for non-chat shell surfaces (e.g. the Activity feed) */
 .studio-scroll { position: absolute; inset: 0; overflow-y: auto; }
 .studio-scroll > .actwrap { margin: 0 auto; padding: 30px 24px 48px; }
