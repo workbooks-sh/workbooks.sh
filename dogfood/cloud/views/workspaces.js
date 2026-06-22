@@ -250,12 +250,10 @@ WB.view('/workspaces', { title: 'Workspaces', accent: 'var(--peach)', fullbleed:
     if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); save(); }
   });
 
-  // Open a pending file from the sidebar; else restore the last file opened in this workspace; else explore.
+  // Open a pending file from the sidebar; otherwise start on the explore grid (the empty state) —
+  // we no longer auto-reopen the last file, so Files always opens to a clean "nothing selected" view.
   if (WB._pendingFile) { var pf = WB._pendingFile; WB._pendingFile = null; openFile(pf); }
-  else {
-    var last = null; try { last = localStorage.getItem(lastKey()); } catch (e) {}
-    if (last) openFile(last); else showActive();
-  }
+  else showActive();
 }});
 
 WB.scopedStyles('/workspaces', `

@@ -356,6 +356,7 @@
     // <script>-tagging all 20 upfront (~260KB, 20 requests on every cold load), we inject only the
     // ACTIVE view's script on demand. The home '/' view ships inline in app.js (no entry here).
     var VIEW_FILES = {
+      '/app': 'app',
       '/activity': 'activity', '/runs': 'runs', '/tasks': 'tasks', '/issues': 'issues', '/database': 'database', '/denied': 'denied',
       '/integrations': 'integrations', '/nexuses': 'nexuses', '/secrets': 'secrets', '/settings': 'settings',
       '/shared': 'shared', '/storage': 'storage', '/studio': 'studio', '/create': 'studio', '/usage': 'studio',
@@ -487,17 +488,15 @@
         var apps = ((d && d.apps) || []).filter(function(a){ return st.appFilter === 'all' || visOf(a) === st.appFilter; });
         // globe = public/open · lock = gated by our auth guardian · pencil = draft (WIP)
         var BADGE = { draft: { ic: ICO.draft, cls: ' draft', t: 'Draft — work in progress' }, private: { ic: ICO.lock, cls: ' priv', t: 'Private — gated by auth' }, public: { ic: ICO.globe, cls: '', t: 'Public — open' } };
+        // Registry the in-app browser (/app view) reads to resolve name → {url,label,...} without a refetch.
+        WB._appReg = {}; apps.forEach(function(a){ WB._appReg[a.name] = a; });
         var cards = apps.map(function(a){
           var vis = visOf(a), b = BADGE[vis] || BADGE.public;
           var ic = a.icon ? '<span class="appemoji">' + esc(a.icon) + '</span>'
                           : '<span class="appinit">' + esc((a.label[0] || 'A').toUpperCase()) + '</span>';
           var badge = '<span class="appbadge' + b.cls + '" title="' + b.t + '">' + b.ic + '</span>';
-          // Drafts open IN-APP (split view, when built); others launch the hosted URL in a new tab.
-          if (vis === 'draft') {
-            return '<a class="appcard draft" href="' + esc(a.url) + '" target="_blank" rel="noopener" data-draft="' + esc(a.name) + '" title="' + esc(a.label) + '">' +
-              badge + ic + '<span class="appname">' + esc(a.label) + '</span></a>';
-          }
-          return '<a class="appcard" href="' + esc(a.url) + '" target="_blank" rel="noopener" title="' + esc(a.label) + '">' +
+          // Everything opens IN-APP, in the content area's browser chrome (/app/<name>) — never a new tab.
+          return '<a class="appcard' + (vis === 'draft' ? ' draft' : '') + '" data-open-app="' + esc(a.name) + '" href="#/app/' + esc(encodeURIComponent(a.name)) + '" title="' + esc(a.label) + '">' +
             badge + ic + '<span class="appname">' + esc(a.label) + '</span></a>';
         }).join('');
         // "New app" tile — creates a draft (Phase 4 will replace the prompt with the context modal).
@@ -537,7 +536,7 @@
         if (!events.length) { el.innerHTML = '<div class="treemsg" style="padding:8px 10px">No activity yet</div>'; return; }
         var now = Math.floor(Date.now() / 1000);
         function ago(sec){ if (!sec) return ''; var x = now - sec; return x < 60 ? x + 's' : x < 3600 ? Math.floor(x/60) + 'm' : x < 86400 ? Math.floor(x/3600) + 'h' : Math.floor(x/86400) + 'd'; }
-        var foc = (WB._activityFocus != null ? WB._activityFocus : 0);
+        var foc = WB._activityFocus;   // null until a row is clicked → the page shows its empty state
         el.innerHTML = events.map(function(e, i){
           var title = e.title || e.kind || 'Event';
           var sub = e.target || e.actor || '';
@@ -750,6 +749,7 @@
         if (others.length) h += '<div class="omdiv"></div>';
         if (st.nxEditing) h += '<div class="omitem" style="cursor:default"><span class="av sm plus">✎</span><input class="omedit" id="nxEditName" value="' + esc(st.nxEditName) + '" autofocus placeholder="Nexus name"><button class="omtick btn" data-nxsave title="Save">✓</button></div>';
         else h += '<button class="omitem" data-nxedit><span class="av sm plus">✎</span><span class="omname">Rename nexus</span></button>';
+        h += '<a class="omitem" data-nav="/overview" href="#/overview"><span class="av sm plus">▦</span><span class="omname">Nexus overview</span></a>';
         h += '<a class="omitem" data-nav="/upgrade" href="#/upgrade"><span class="av sm plus">↑</span><span class="omname">Scale up</span></a>';
         h += '<a class="omitem" data-nav="/settings" href="#/settings"><span class="av sm plus">⚙</span><span class="omname">Nexus settings</span></a>';
         h += '<div class="omdiv"></div><button class="omitem" data-nxcreate><span class="av sm plus">+</span><span class="omname">Create new nexus</span></button>';
@@ -785,6 +785,9 @@
     // shell event delegation
     document.addEventListener('click', function (e) {
       var t = e.target;
+      var openApp = t.closest && t.closest('[data-open-app]');
+      if (openApp) { e.preventDefault(); var an = openApp.getAttribute('data-open-app');
+        WB._app = (WB._appReg && WB._appReg[an]) || null; WB.nav('/app/' + encodeURIComponent(an)); return; }
       var navEl = t.closest && t.closest('[data-nav]'); if (navEl) { e.preventDefault(); WB.nav(navEl.getAttribute('data-nav')); return; }
       if (t.closest && t.closest('[data-crumb-back]')) { var ret = WB.settingsReturn; WB.settingsReturn = null; WB.nav((ret && ret.path) || '/'); return; }
       if (t.closest && t.closest('[data-theme-toggle]')) { var cur = document.documentElement.getAttribute('data-theme') || 'dark'; var nt = cur === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', nt); try { localStorage.setItem('wb-theme', nt); } catch (er) {} renderShell(); renderView(); return; }
@@ -880,8 +883,17 @@
     window.addEventListener('hashchange', route);
 
     // ── home view ('/') — reproduced from routes/+page.svelte ────────────────────────────────────
-    WB.scopedStyles('/', '.empty { text-align: center; color: var(--dim); }\n.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 4px 0 18px; }\n.metric { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }\n.mlabel { font: 700 10px var(--read); letter-spacing: 0.07em; text-transform: uppercase; color: var(--dim); }\n.mbig { font: 700 32px var(--read); color: var(--ink); margin: 6px 0 12px; letter-spacing: -0.02em; }\n.mbar { height: 7px; border-radius: 4px; background: var(--line); overflow: hidden; }\n.mbar i { display: block; height: 100%; background: var(--sky); border-radius: 4px; }\n.msub { font: 500 12px var(--read); color: var(--dim); margin-top: 9px; }\n.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }\n.dcard { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 13px; padding: 16px 18px; text-decoration: none; color: inherit; transition: border-color 0.12s, transform 0.08s; }\n.dcard:hover { border-color: var(--stroke); transform: translateY(-1px); }\n.ddot { display: inline-block; width: 10px; height: 10px; border-radius: 4px; margin-bottom: 10px; }\n.dt { font: 600 15px var(--read); color: var(--ink); }\n.ds { font: 500 12.5px var(--read); color: var(--dim); margin-top: 3px; }');
-    WB.view('/', { title: 'Nexus', accent: 'var(--mint)', async render(el){
+    WB.scopedStyles('/overview', '.empty { text-align: center; color: var(--dim); }\n.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 4px 0 18px; }\n.metric { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }\n.mlabel { font: 700 10px var(--read); letter-spacing: 0.07em; text-transform: uppercase; color: var(--dim); }\n.mbig { font: 700 32px var(--read); color: var(--ink); margin: 6px 0 12px; letter-spacing: -0.02em; }\n.mbar { height: 7px; border-radius: 4px; background: var(--line); overflow: hidden; }\n.mbar i { display: block; height: 100%; background: var(--sky); border-radius: 4px; }\n.msub { font: 500 12px var(--read); color: var(--dim); margin-top: 9px; }\n.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }\n.dcard { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 13px; padding: 16px 18px; text-decoration: none; color: inherit; transition: border-color 0.12s, transform 0.08s; }\n.dcard:hover { border-color: var(--stroke); transform: translateY(-1px); }\n.ddot { display: inline-block; width: 10px; height: 10px; border-radius: 4px; margin-bottom: 10px; }\n.dt { font: 600 15px var(--read); color: var(--ink); }\n.ds { font: 500 12.5px var(--read); color: var(--dim); margin-top: 3px; }');
+    // Apps landing ('/') — a clean empty state. The sidebar lists your apps; pick one and it opens
+    // in the content-area browser (/app). The nexus overview (storage/load) moved to '/overview'.
+    WB.view('/', { title: 'Apps', accent: 'var(--mint)', async render(el){
+      el.innerHTML = '<div class="appsempty"><div class="appsempty-ic">' + ICO.grid + '</div>' +
+        '<div class="appsempty-t">Open an app</div>' +
+        '<div class="appsempty-s">Pick an app from the sidebar to open it here. New here? Use <b>New app</b> in the sidebar to start one.</div></div>';
+    } });
+    WB.scopedStyles('/', '.appsempty { height: 100%; min-height: 56vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; color: var(--dim); }\n.appsempty-ic { color: var(--stroke); transform: scale(2.2); margin-bottom: 8px; }\n.appsempty-t { font: 600 20px var(--read); color: var(--ink); }\n.appsempty-s { font: 500 13.5px var(--read); color: var(--dim); max-width: 360px; line-height: 1.5; }');
+
+    WB.view('/overview', { title: 'Nexus', accent: 'var(--mint)', async render(el){
       var nx = WB.nexus.active;
       var storage, usage; try { storage = await WB.api.listBuckets(); } catch (e) {} try { usage = await WB.api.nexusUsage(); } catch (e) {}
       var status = nx && (nx.state === 'run' ? 'Active' : nx.state === 'sleep' ? 'Idle' : 'Starting');

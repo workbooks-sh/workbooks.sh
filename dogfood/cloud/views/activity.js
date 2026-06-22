@@ -18,7 +18,15 @@ WB.view('/activity', { title: 'Activity', accent: 'var(--violet)', async render(
   WB._activityRender = function(focus){
     var events = WB._activityEvents || [];
     if (!events.length) {
-      el.innerHTML = '<div class="actx-empty">Nothing here yet. As agents run, deploys ship, and your team acts, it shows up here.</div>';
+      el.innerHTML = '<div class="actx-empty"><div class="actx-empty-ic">' + ACT_GLYPH + '</div>' +
+        '<div class="actx-empty-t">No activity yet</div>' +
+        '<div class="actx-empty-s">As agents run, deploys ship, and your team acts, it shows up here.</div></div>';
+      return;
+    }
+    if (focus == null) {
+      el.innerHTML = '<div class="actx-empty"><div class="actx-empty-ic">' + ACT_GLYPH + '</div>' +
+        '<div class="actx-empty-t">Select an event</div>' +
+        '<div class="actx-empty-s">Choose an item from the inbox on the left to see its full context.</div></div>';
       return;
     }
     var i = Math.max(0, Math.min(focus || 0, events.length - 1));
@@ -43,8 +51,10 @@ WB.view('/activity', { title: 'Activity', accent: 'var(--violet)', async render(
   await WB.swr('activity', function(){ return fetch('/cloud/activity', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
     WB._activityEvents = (d && d.events) || [];
   });
-  WB._activityRender(WB._activityFocus || 0);
+  WB._activityRender(WB._activityFocus);
 }});
+
+var ACT_GLYPH = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>';
 
 WB.scopedStyles('/activity', `
 .actx { max-width: 640px; }
@@ -59,5 +69,8 @@ WB.scopedStyles('/activity', `
 .actx-target { font: 500 14px var(--mono); color: var(--ink); }
 .actx-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
 .actx-tag { font: 600 11px var(--mono); color: var(--dim); background: var(--line); border-radius: 6px; padding: 3px 8px; }
-.actx-empty { color: var(--dim); font: 500 14px var(--read); padding: 50px 4px; text-align: center; max-width: 640px; }
+.actx-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 11px; min-height: 56vh; text-align: center; padding: 40px; color: var(--dim); }
+.actx-empty-ic { color: var(--stroke); }
+.actx-empty-t { font: 600 20px var(--read); color: var(--ink); }
+.actx-empty-s { font: 500 13.5px var(--read); color: var(--dim); max-width: 360px; line-height: 1.5; }
 `);
