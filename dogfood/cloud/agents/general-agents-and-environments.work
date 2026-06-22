@@ -108,8 +108,16 @@ overlay model already in `Nexus.Server` + jj). No extra deployments. See [[one-n
    new top-level dirs auto-register as workspaces (`Nexus.Workspaces.sync_back`); `:general` forced from
    the declared scope (no caller escalation). `Nexus.Workspaces` (list/provision/deprovision/stage/
    sync_back/snapshot/restore) unit-tested. Pending: live verification on the deployed nexus.
-3. **Snapshot-isolated evals** — ✅ WIRED (wb-hsrj): `do_run`/`agent_run` `--isolate` snapshots the tree
-   before + restores after; `work agent run --isolate`. Pending: run the marketing eval live + score.
+3. **Snapshot-isolated evals** — ✅ VERIFIED LIVE (wb-hsrj). `--isolate` = the general run works ONLY in
+   its staging copy, never syncs back → production touched zero times (no provision, no remount). The
+   marketing eval ran on wb-dogfood in 44s synchronously: workhorse created marketing/index.work +
+   campaigns/content/assets, production stayed cloud/lander/docs (no leak), run logged. Incremental mount
+   (`Nexus.Server.mount_one`) replaces the recompile-all remount for the persist path; `DELETE
+   /workspaces` now cascades (dir+repo+CP) via `Nexus.Workspaces.deprovision`.
+   - LEARNED: a blocking POST can't survive a long run (proxy timeout) — short evals fit, long runs need
+     STREAMING (wb-scmk): server already streams via `/live/agent_run` SSE (Studio uses it); the CLI must
+     consume it. That's the "correct synchronous run." Also the persist path (visible workspace) needs it
+     for long runs even with incremental mount.
 4. **Environments** — env selector + serve-which-ref + PR/promote UX (wb-bhyk), built on 1–3. TODO.
 5. **Agent UX** — workhorse auto-switch-to-dev + HITL promote; autopoet headless PR. TODO.
 
