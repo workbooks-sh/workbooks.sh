@@ -40,9 +40,69 @@ defmodule Nexus.Autopoet.Worker do
     %{sensed: length(items), results: results}
   end
 
-  @doc "Arm the heartbeat on `Nexus.Scheduler` (OPT-IN). `every` is a duration like \"15m\"."
+  @heartbeat "autopoet.heartbeat"
+  @last_key {__MODULE__, :last_cycle}
+
+  @doc "Arm the heartbeat on `Nexus.Scheduler` (OPT-IN, admin-controlled). `every` is a duration like \"15m\"."
   def arm(every \\ "15m") do
-    Nexus.Scheduler.arm("autopoet.heartbeat", %{every: every}, [%{"run" => "autopoet.cycle"}])
+    Nexus.Scheduler.arm(@heartbeat, [every: every], [%{name: "autopoet.cycle", args: %{}}])
+  end
+
+  @doc "Disarm the heartbeat — the autopoet stops its autonomous beat. Always `:ok`."
+  def disarm, do: Nexus.Scheduler.disarm(@heartbeat)
+
+  @doc """
+  The autopoet's control/status snapshot for the admin surface: whether the heartbeat is armed, its
+  cadence + ms-until-next-fire, and the last cycle report.
+  """
+  def status do
+    entry = Nexus.Scheduler.list() |> Enum.find(&(&1.name == @heartbeat))
+
+    %{
+      armed: entry != nil,
+      spec: entry && entry.spec,
+      next_ms: entry && safe_ms_until(entry.spec),
+      last: :persistent_term.get(@last_key, nil)
+    }
+  end
+
+  @doc "Run one cycle now (manual/heartbeat) and remember it as the last report."
+  def run_once(opts \\ []) do
+    report = cycle(opts) |> Map.put(:at, System.os_time(:second))
+    :persistent_term.put(@last_key, report)
+    report
+  end
+
+  @doc """
+  What the autopoet can and cannot touch — the admin ACCESS panel: every agent with its management
+  posture + resolved ceiling, the managed/frozen tallies, active leases, and any impure index (which
+  it may not autonomously edit). A pure read.
+  """
+  def access(opts \\ []) do
+    root = Keyword.get(opts, :root) || Nexus.Paths.data_dir()
+
+    agents =
+      Nexus.Agent.all()
+      |> Enum.map(fn n ->
+        %{name: to_string(n.name), management: Nexus.Agent.management(n), ceiling: Map.get(n, :ceiling, :unbounded)}
+      end)
+      |> Enum.sort_by(& &1.name)
+
+    %{
+      agents: agents,
+      managed: Enum.count(agents, &(&1.management == "managed")),
+      proposed: Enum.count(agents, &(&1.management == "proposed")),
+      frozen: Enum.count(agents, &(&1.management == "frozen")),
+      leases: Nexus.Autopoet.Lease.all(),
+      impure_indexes: Nexus.Index.purity_tree(root) |> Map.keys()
+    }
+  end
+
+  defp safe_ms_until(spec) do
+    case Nexus.Time.ms_until(spec) do
+      ms when is_integer(ms) -> ms
+      _ -> nil
+    end
   end
 
   # ── SENSE ──

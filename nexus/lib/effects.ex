@@ -58,6 +58,13 @@ defmodule Nexus.Effects do
       :ok
     end)
 
+    # `autopoet.cycle` — the autopoet heartbeat effect: the scheduled beat runs one SENSE→DECIDE→ACT→
+    # LEARN cycle. Armed/disarmed by admin via Nexus.Autopoet.Worker (opt-in; never on by default).
+    register("autopoet.cycle", fn _args, _event, _ctx ->
+      Nexus.Autopoet.Worker.run_once()
+      :ok
+    end)
+
     # `run` / `call` — invoke an agent or a unit function as a side effect (through the normal paths).
     # `args`: %{agent: "name", task: "..."} → Nexus.Agent.run; or %{mfa: {Mod, :fun, [args]}} → apply.
     runner = fn args, event, ctx ->
