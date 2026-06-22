@@ -53,8 +53,7 @@ jobs:
           filters: |
             runtime:
               - 'nexus/**'
-              - 'dogfood/deploy/**'
-              - '.github/workflows/dogfood-deploy.yml'
+              - 'dogfood/deploy/Dockerfile.base'
 
   # Rebuild + push the runtime base ONLY when the runtime changed (or a manual force). Slow, rare.
   base:
@@ -169,7 +168,10 @@ jobs:
   # two green commits deploy in order (newest last → wins) instead of racing the single machine.
   deploy:
     needs: build-smoke
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Explicit gate: run when build-smoke SUCCEEDED on a main push. Must include always() +
+    # needs.build-smoke.result so a SKIPPED base job upstream doesn't trip GitHub's implicit success()
+    # check and silently skip the deploy.
+    if: ${{ always() && needs.build-smoke.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     concurrency:
       group: dogfood-deploy
