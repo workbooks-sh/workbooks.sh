@@ -135,12 +135,17 @@ defmodule Nexus.GitHttp do
     collect(port, [])
   end
 
+  # Generous timeout: the pre-receive COMPILE GATE boots an isolated `bin/nexus eval` to compile-check
+  # the pushed tree, which legitimately takes longer than a plain push. Too short → a real push
+  # false-fails by timeout. 180s covers a cold eval + compile; a genuinely hung backend still bails.
+  @backend_timeout 180_000
+
   defp collect(port, acc) do
     receive do
       {^port, {:data, d}} -> collect(port, [acc | d])
       {^port, {:exit_status, s}} -> {IO.iodata_to_binary(acc), s}
     after
-      30_000 ->
+      @backend_timeout ->
         try do Port.close(port) catch _, _ -> :ok end
         {IO.iodata_to_binary(acc), 1}
     end
