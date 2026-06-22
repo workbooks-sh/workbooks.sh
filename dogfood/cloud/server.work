@@ -2267,18 +2267,30 @@ server :cloud do
     id = is_map(req.body) && req.body["id"]
     state = is_map(req.body) && req.body["state"]
 
+    owner = case Nexus.ControlPlane.get(org, :visibility, id) do
+      {:ok, rec} -> rec[:owner] || rec["owner"] || ""
+      _ -> ""
+    end
+
     cond do
       id in [nil, ""] -> {400, %{error: "id required"}}
       state not in ["draft", "private", "public"] -> {400, %{error: "state must be draft|private|public"}}
+      # Only the workspace OWNER or an admin may change its visibility (wb-5voh) — not any member. An
+      # ownerless surface is admin-only. Multi-tenant only; dev trusted.
+      not vis_manage_ok?(req, owner) -> forbidden()
       true ->
         # Preserve the existing owner (wb-afvq) so promoting a draft doesn't drop its ACL anchor.
-        owner = case Nexus.ControlPlane.get(org, :visibility, id) do
-          {:ok, rec} -> rec[:owner] || rec["owner"] || ""
-          _ -> ""
-        end
         Nexus.ControlPlane.put(org, :visibility, id, %{id: id, state: state, owner: owner})
         %{ok: true, id: id, state: state}
     end
+  end
+
+  # May this request change a surface's visibility? Owner-or-admin (dev trusted). Owner match is
+  # case-insensitive on the uid; an ownerless surface ("") is admin-only.
+  defp vis_manage_ok?(req, owner) do
+    not Nexus.Auth.multi?() or
+      Nexus.Auth.role_at_least?(Map.get(req, :role, "viewer"), "admin") or
+      (owner != "" and String.downcase(owner) == String.downcase(to_string(user_key(req))))
   end
 
   # Unique-ish slug for a new draft folder (no traversal/separators; suffix if the folder already exists).
@@ -3213,6 +3225,7 @@ server :cloud do
       {:error, status, msg} -> {status, %{error: msg}}
       {:ok, abs, mount, root, rel} ->
         cond do
+          not may_write_workspace?(req, mount, root) -> forbidden()  # gate BEFORE disk (wb-66do)
           rel == "" -> {400, %{error: "path required"}}
           File.exists?(abs) -> {409, %{error: "already exists"}}
           true ->
@@ -3229,6 +3242,7 @@ server :cloud do
       {:error, status, msg} -> {status, %{error: msg}}
       {:ok, abs, mount, root, rel} ->
         cond do
+          not may_write_workspace?(req, mount, root) -> forbidden()  # gate BEFORE disk (wb-66do)
           rel == "" -> {400, %{error: "path required"}}
           File.exists?(abs) -> {409, %{error: "already exists"}}
           true ->
@@ -3246,6 +3260,7 @@ server :cloud do
     with {:ok, fabs, fmount, root, frel} <- resolve_target(from),
          {:ok, tabs, tmount, _r, trel} <- resolve_target(to) do
       cond do
+        not may_write_workspace?(req, fmount, root) -> forbidden()  # gate BEFORE disk (wb-66do)
         frel == "" or trel == "" -> {400, %{error: "from and to required"}}
         fmount != tmount -> {400, %{error: "cross-workspace move not supported"}}
         not File.exists?(fabs) -> {404, %{error: "source not found"}}
@@ -3266,6 +3281,7 @@ server :cloud do
       {:error, status, msg} -> {status, %{error: msg}}
       {:ok, abs, mount, root, rel} ->
         cond do
+          not may_write_workspace?(req, mount, root) -> forbidden()  # gate BEFORE disk (wb-66do)
           rel == "" -> {400, %{error: "refusing to delete a workspace root"}}
           not File.exists?(abs) -> {404, %{error: "not found"}}
           true ->
