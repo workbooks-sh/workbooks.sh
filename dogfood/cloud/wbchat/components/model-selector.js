@@ -34,6 +34,10 @@ const STYLE = `
   .wbc-modelsel-item.on .wbc-modelsel-check { opacity: 1; }
   .wbc-modelsel-check svg { width: 14px; height: 14px; }
   .wbc-modelsel-empty { padding: 12px 10px; font: 500 12px var(--wbc-font); color: var(--wbc-dim); }
+  .modbadges { display: inline-flex; align-items: center; gap: 5px; flex: none; color: var(--wbc-dim); }
+  .modbadges .modglyph { display: grid; place-items: center; } .modbadges .modglyph svg { width: 13px; height: 13px; }
+  .modbadges .modprice { font: 600 10px var(--wbc-font); color: var(--wbc-dim); }
+  .modbadges .modctx { font: 600 10px var(--wbc-font); color: var(--wbc-dim); opacity: .8; }
 `;
 
 const CHEV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
@@ -41,11 +45,32 @@ const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 
 const idOf = (m) => (m && typeof m === 'object') ? m.id : m;
 const labelOf = (m) => (m && typeof m === 'object') ? (m.label || m.id) : m;
+// A capability's `requires` token → the input modality a model must accept to satisfy it.
+const REQ_MODAL = { vision: 'image', image: 'image', audio: 'audio', video: 'video' };
+// A model can drive an agent only if it emits text (role "agent"); generators are tools, not brains.
+const agentEligible = (m) => (m && m.role) ? m.role === 'agent' : true;
 
 registerComposerButton((ctx) => {
-  const models = ctx.models || [];
+  const models = (ctx.models || []).filter(agentEligible);
   if (models.length === 0) return null;
   injectStyle('model-selector', STYLE);
+
+  const W = (typeof window !== 'undefined') ? window.WB : null;
+  const badges = (m) => (W && W.modelBadges) ? W.modelBadges(m) : '';
+
+  // Input modalities the current capability selection demands (e.g. "vision" → the model must accept images).
+  function requiredIn() {
+    const sel = (ctx.capabilities && ctx.capabilities()) || [];
+    const cat = ctx.capabilityCatalog || [];
+    const need = {};
+    sel.forEach(id => {
+      const c = cat.filter(x => x.id === id)[0];
+      ((c && c.requires) || []).forEach(r => { const mod = REQ_MODAL[r]; if (mod) need[mod] = 1; });
+    });
+    return Object.keys(need);
+  }
+  const modelOk = (m) => { const need = requiredIn(); const hin = (m && m.modal_in) || ['text']; return need.every(k => hin.indexOf(k) >= 0); };
+  const available = () => models.filter(modelOk);
 
   const root = el('div', { class: 'wbc-modelsel' });
   const lbl = el('span', { class: 'wbc-modelsel-lbl' });
@@ -58,23 +83,34 @@ registerComposerButton((ctx) => {
   // Scrollable list + fixed bottom search (shared shell). Items scroll above the pinned search.
   const shell = ctx.buildMenuShell(menu, { placeholder: 'Search models…', onQuery: () => buildMenu() });
 
-  const W = (typeof window !== 'undefined') ? window.WB : null;
   const provName = (p) => (W && W.providerName) ? W.providerName(p) : (p || '');
   const provIcon = (p) => (W && W.providerIcon) ? W.providerIcon(p) : '';
 
   function currentLabel() {
     const cur = ctx.model();
     const found = models.find(m => idOf(m) === cur);
-    return found != null ? labelOf(found) : labelOf(models[0]);
+    return found != null ? labelOf(found) : labelOf(available()[0] || models[0]);
   }
   function syncLabel() { lbl.textContent = currentLabel(); }
+
+  // When the capability selection changes, the active model may no longer satisfy the required input
+  // modalities — fall back to the first model that does so the composer never sits on an invalid brain.
+  function sync() {
+    const cur = ctx.model();
+    const found = models.find(m => idOf(m) === cur);
+    if ((!found || !modelOk(found))) {
+      const next = available()[0];
+      if (next && idOf(next) !== cur) ctx.setModel(idOf(next));
+    }
+    syncLabel();
+  }
 
   function buildMenu() {
     shell.list.innerHTML = '';
     const cur = ctx.model();
     const q = (shell.input.value || '').trim().toLowerCase();
-    const ms = models.filter(m => !q || (labelOf(m) + ' ' + idOf(m) + ' ' + provName(m && m.provider)).toLowerCase().indexOf(q) >= 0);
-    if (!ms.length) { shell.list.append(el('div', { class: 'wbc-modelsel-empty' }, 'No models match.')); return; }
+    const ms = available().filter(m => !q || (labelOf(m) + ' ' + idOf(m) + ' ' + provName(m && m.provider)).toLowerCase().indexOf(q) >= 0);
+    if (!ms.length) { shell.list.append(el('div', { class: 'wbc-modelsel-empty' }, requiredIn().length ? 'No model satisfies the selected capabilities.' : 'No models match.')); return; }
     // Group by provider when the models carry one; otherwise a flat list.
     const groups = {}; const order = [];
     ms.forEach(m => { const p = (m && m.provider) || ''; if (!groups[p]) { groups[p] = []; order.push(p); } groups[p].push(m); });
@@ -87,6 +123,7 @@ registerComposerButton((ctx) => {
           onClick: (e) => { e.stopPropagation(); ctx.setModel(id); syncLabel(); close(); },
         }, [
           el('span', { class: 'wbc-modelsel-itemlbl' }, labelOf(m)),
+          el('span', { class: 'wbc-modelsel-badges', html: badges(m) }),
           el('span', { class: 'wbc-modelsel-check', html: CHECK }),
         ]));
       });
@@ -109,6 +146,8 @@ registerComposerButton((ctx) => {
   }
   function toggle() { root.classList.contains('open') ? close() : open(); }
 
-  syncLabel();
+  if (ctx.onChange) ctx.onChange(() => sync());
+  if (ctx.onCapabilities) ctx.onCapabilities(() => { sync(); if (root.classList.contains('open')) buildMenu(); });
+  sync();
   return root;
 });

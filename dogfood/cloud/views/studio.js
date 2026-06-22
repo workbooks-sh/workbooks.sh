@@ -103,7 +103,17 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
     // plus drop-to-attach). Chosen items become context chips and ride along with the turn.
     onAttach: function(){ return (WB.contextPicker ? WB.contextPicker() : Promise.resolve([])); },
     send: function(text, ctx){
-      var context = ((ctx && ctx.files) || []).map(function(f){ return { name: f.name, type: f.type || 'file', ref: f.ref || f.path || f.id || f.name }; });
+      // Attachment gating: if the chosen brain can't see images, drop image attachments (it can't read
+      // them) and tell the user, rather than silently shipping bytes the model ignores.
+      var curModel = MODELS.filter(function(m){ return (m.id || m) === (ctx && ctx.model); })[0];
+      var canSee = !curModel || !curModel.modal_in || curModel.modal_in.indexOf('image') >= 0;
+      var isImage = function(f){ return (f.type === 'image') || /\.(png|jpe?g|gif|webp|bmp|svg|heic)$/i.test(f.name || ''); };
+      var files = (ctx && ctx.files) || [];
+      if (!canSee && files.some(isImage)) {
+        files = files.filter(function(f){ return !isImage(f); });
+        WB.toast((curModel.label || 'This model') + " can't see images — image attachments were skipped", 'bad');
+      }
+      var context = files.map(function(f){ return { name: f.name, type: f.type || 'file', ref: f.ref || f.path || f.id || f.name }; });
       return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({
         u: U, id: curSession, message: text,
         model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), workspace: curWorkspace, context: context,

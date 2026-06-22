@@ -1869,8 +1869,139 @@ server :cloud do
   @cf_models_url "https://developers.cloudflare.com/ai/models/index.md"
 
   # The effective model list — LIVE from Cloudflare's catalog, cached (1h), with the curated set as the
-  # fallback when the fetch fails (offline / parse yields too few).
-  def inference_model_list, do: cached_inference_models()
+  # fallback when the fetch fails (offline / parse yields too few). The base carries task + derived
+  # modalities + role (agent vs generator); a background crawl of each model's page enriches it with
+  # vision/function-calling/context/unit-pricing (CF only exposes those on per-model pages), cached 24h.
+  def inference_model_list do
+    base = cached_inference_models()
+    ensure_cf_enrichment(base)
+    merge_enrichment(base)
+  end
+
+  # Background-crawled per-model facts, merged onto the base by id. For a text-generation model that the
+  # crawl reports as vision-capable, "image" joins its input modalities (so it survives a vision filter).
+  defp merge_enrichment(base) do
+    ex = enrichment_cache()
+
+    Enum.map(base, fn m ->
+      case Map.get(ex, m.id) do
+        nil ->
+          m
+
+        meta ->
+          modal_in =
+            if Map.get(meta, :vision) and "text" in (m[:modal_out] || []),
+              do: Enum.uniq((m[:modal_in] || []) ++ ["image"]),
+              else: m[:modal_in] || []
+
+          m |> Map.merge(meta) |> Map.put(:modal_in, modal_in)
+      end
+    end)
+  end
+
+  defp enrichment_cache do
+    case :persistent_term.get({:cf_enrich_cache}, nil) do
+      {ts, map, ttl} -> if System.os_time(:second) - ts < ttl, do: map, else: %{}
+      _ -> %{}
+    end
+  end
+
+  # Kick off a single bounded crawl of every model's page when the enrichment cache is cold and no crawl
+  # is already in flight. Progressive enhancement: the catalog serves task-derived modalities immediately
+  # and gains vision/pricing/context a few seconds later when the crawl lands.
+  defp ensure_cf_enrichment(base) do
+    fresh? =
+      case :persistent_term.get({:cf_enrich_cache}, nil) do
+        {ts, _m, ttl} -> System.os_time(:second) - ts < ttl
+        _ -> false
+      end
+
+    if not fresh? and not :persistent_term.get({:cf_enrich_running}, false) do
+      :persistent_term.put({:cf_enrich_running}, true)
+      ids = Enum.map(base, & &1.id)
+
+      spawn(fn ->
+        try do
+          map =
+            ids
+            |> Task.async_stream(fn id -> {id, crawl_cf_model(id)} end,
+              max_concurrency: 10, timeout: 15_000, on_timeout: :kill_task)
+            |> Enum.flat_map(fn
+              {:ok, {id, meta}} when is_map(meta) -> [{id, meta}]
+              _ -> []
+            end)
+            |> Map.new()
+
+          if map_size(map) > 0,
+            do: :persistent_term.put({:cf_enrich_cache}, {System.os_time(:second), map, 86_400})
+        after
+          :persistent_term.put({:cf_enrich_running}, false)
+        end
+      end)
+    end
+
+    :ok
+  end
+
+  # Fetch one model's public page (markdown) and pull its Model Info table: context window, function
+  # calling, vision, and unit pricing ($/M input & output tokens). Returns a meta map or nil.
+  defp crawl_cf_model(id) do
+    url = "https://developers.cloudflare.com/ai/models/#{id}/index.md"
+    headers = [{~c"accept", ~c"text/markdown"}, {~c"user-agent", ~c"workbooks-nexus"}]
+
+    case :httpc.request(:get, {to_charlist(url), headers},
+           [timeout: 12_000, autoredirect: true, ssl: [verify: :verify_none]], body_format: :binary) do
+      {:ok, {{_, code, _}, _h, body}} when code in 200..299 -> parse_cf_model_info(body)
+      _ -> nil
+    end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
+  end
+
+  defp parse_cf_model_info(body) do
+    md = String.replace(body, ~r/<[^>]*>/, " ")
+
+    meta = %{
+      context: cf_int(md, ~r/Context Window[^\n]*?\|\s*([\d,]+)\s*tokens/i),
+      tools: cf_row_yes?(md, "Function calling"),
+      vision: cf_row_yes?(md, "Vision"),
+      price_in: cf_price(md, "input"),
+      price_out: cf_price(md, "output")
+    }
+
+    # Only return when we actually learned something — keeps junk pages out of the cache.
+    if meta.context || meta.price_in || meta.tools || meta.vision, do: meta, else: nil
+  end
+
+  defp cf_row_yes?(md, label), do: Regex.match?(~r/#{Regex.escape(label)}[^\n|]*\|\s*Yes/i, md)
+
+  defp cf_int(md, re) do
+    case Regex.run(re, md) do
+      [_, n] ->
+        case n |> String.replace(",", "") |> Integer.parse() do
+          {i, _} -> i
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp cf_price(md, dir) do
+    case Regex.run(~r/\$\s*([\d.]+)\s*per\s*M\s*#{dir}/i, md) do
+      [_, n] ->
+        case Float.parse(n) do
+          {f, _} -> f
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
 
   defp cached_inference_models do
     now = System.os_time(:second)
@@ -1912,18 +2043,60 @@ server :cloud do
   end
 
   # Each entry is a markdown link `[<logo><name><Task> • <Provider>…](<…/ai/models/{id}/>)`; the routable
-  # id is the URL path. Keep "Text Generation" models only; the label is the id's last segment.
+  # id is the URL path and the Task sits inside the bracket text. We keep EVERY model (text + generators),
+  # deriving each entry's task + modalities + role from that text; the label is the id's last segment.
   @cf_entry_re ~r/\[\s*(?:📌)?\s*(?:!\[[^\]]*\]\([^)]*\))?([^\[\]]+?)\]\((https:\/\/developers\.cloudflare\.com\/ai\/models\/[^)\s]+?)\/?\)/u
+
+  # CF task vocabulary (used both to recognise a real model entry and to derive modalities).
+  @cf_tasks [
+    "Text Generation", "Text-to-Image", "Image-to-Image", "Text-to-Video", "Image-to-Video",
+    "Text-to-Speech", "Automatic Speech Recognition", "Text Embeddings", "Text Classification",
+    "Image Classification", "Object Detection", "Image-to-Text", "Translation", "Summarization"
+  ]
 
   defp parse_cf_models(md) do
     models =
-      for [_, text, url] <- Regex.scan(@cf_entry_re, md), String.contains?(text, "Text Generation") do
+      for [_, text, url] <- Regex.scan(@cf_entry_re, md), task = cf_task(text), task != nil do
         id = String.replace_prefix(url, "https://developers.cloudflare.com/ai/models/", "")
-        %{id: id, label: id |> String.split("/") |> List.last(), provider: cf_provider(id), tier: cf_tier(id)}
+        {modal_in, modal_out, role} = cf_modality(task)
+
+        %{
+          id: id, label: id |> String.split("/") |> List.last(),
+          provider: cf_provider(id), tier: cf_tier(id),
+          task: task, modal_in: modal_in, modal_out: modal_out, role: role
+        }
       end
       |> Enum.uniq_by(& &1.id)
 
     if length(models) >= 10, do: models, else: nil
+  end
+
+  # The first known task name contained in the entry text (case-insensitive), or nil for a non-model link.
+  defp cf_task(text) do
+    t = String.downcase(text)
+    Enum.find(@cf_tasks, fn task -> String.contains?(t, String.downcase(task)) end)
+  end
+
+  # Map a task to {input modalities, output modalities, role}. role "agent" = text-out brain candidate;
+  # "generator" = a tool/toolkit backend (image/video/audio/embedding/classification output).
+  defp cf_modality(task) do
+    case task do
+      "Text Generation" -> {["text"], ["text"], "agent"}
+      "Summarization" -> {["text"], ["text"], "generator"}
+      "Translation" -> {["text"], ["text"], "generator"}
+      "Text Embeddings" -> {["text"], ["embedding"], "generator"}
+      "Text Classification" -> {["text"], ["label"], "generator"}
+      "Text-to-Image" -> {["text"], ["image"], "generator"}
+      "Image-to-Image" -> {["image"], ["image"], "generator"}
+      "Text-to-Video" -> {["text"], ["video"], "generator"}
+      "Image-to-Video" -> {["image"], ["video"], "generator"}
+      "Text-to-Speech" -> {["text"], ["audio"], "generator"}
+      "Automatic Speech Recognition" -> {["audio"], ["text"], "generator"}
+      "Image-to-Text" -> {["image"], ["text"], "generator"}
+      "Image Classification" -> {["image"], ["label"], "generator"}
+      "Object Detection" -> {["image"], ["label"], "generator"}
+      _ -> {["text"], ["text"], "generator"}
+    end
   end
 
   # Provider slug for grouping/icons — strip the `@cf/` (Workers-AI) prefix, take the author segment.
@@ -1942,7 +2115,14 @@ server :cloud do
 
   # Curated catalog of routable `provider/model` ids over the Cloudflare AI Gateway — the FALLBACK when the
   # live gateway list isn't available (no token yet / unreachable). tier: frontier | fast | reasoning | open.
+  # All curated entries are chat brains, so they carry text→text modalities + the "agent" role.
   def model_catalog do
+    Enum.map(curated_models(), fn m ->
+      Map.merge(%{task: "Text Generation", modal_in: ["text"], modal_out: ["text"], role: "agent"}, m)
+    end)
+  end
+
+  defp curated_models do
     [
       # OpenAI
       %{id: "openai/gpt-5.2", label: "GPT-5.2", provider: "openai", tier: "frontier"},

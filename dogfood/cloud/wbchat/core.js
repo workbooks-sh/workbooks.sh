@@ -287,9 +287,12 @@ export function createChat(container, options = {}) {
     capabilityAdmission: opts.capabilityAdmission || (() => 'all'),
     capabilities: () => selectedCapabilities.slice(),
     // NOTE: do NOT emit 'change' here — the capabilities selector's own onChange handler calls
-    // setCapabilities (to drop un-admitted ids), which would re-enter and loop.
-    setCapabilities: (ids) => { selectedCapabilities = (ids || []).slice(); },
+    // setCapabilities (to drop un-admitted ids), which would re-enter and loop. We emit a DISTINCT
+    // 'capabilities' event instead (the model selector listens to it to re-pare its list by required
+    // input modalities), which the capabilities selector itself does not subscribe to — so no loop.
+    setCapabilities: (ids) => { selectedCapabilities = (ids || []).slice(); emit('capabilities', { capabilities: selectedCapabilities.slice() }); },
     onChange: (fn) => { (listeners['change'] = listeners['change'] || []).push(fn); },
+    onCapabilities: (fn) => { (listeners['capabilities'] = listeners['capabilities'] || []).push(fn); },
     // Host-provided context picker (e.g. the cloud command-palette search). Returns Promise<item[]>; the
     // attachments add-on calls it instead of the native file dialog when present. null = native file input.
     pickContext: opts.onAttach || null,

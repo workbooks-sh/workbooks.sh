@@ -26,20 +26,30 @@ WB.view('/inference', { title: 'AI', accent: 'var(--violet)', async render(el){
   };
   function tierBadge(t){ var x = TIER[t]; return x ? '<span class="inftier ' + x.cls + '">' + x.label + '</span>' : ''; }
 
-  // One model row in the browser — provider chip, label, id, tier, and a selected check.
+  // Generators (image/video/audio/embedding output) are tools, not brains — only a text-out "agent"
+  // model can be the org default. We surface both, but block selecting a generator as the default.
+  var isBrain = function(m){ return m.role ? m.role === 'agent' : true; };
+  var roleFilter = 'all';  // all | agent | generator
+
+  // One model row — provider chip, label, id, modality/price badges, tier, selected check.
   function modelRow(m){
-    var on = m.id === defModel;
-    return '<button class="infrow2' + (on ? ' on' : '') + '" data-model="' + esc(m.id) + '">' +
+    var on = m.id === defModel, brain = isBrain(m);
+    return '<button class="infrow2' + (on ? ' on' : '') + (brain ? '' : ' gen') + '" data-model="' + esc(m.id) + '" data-brain="' + (brain ? '1' : '0') + '">' +
       '<span class="infrow2-ic">' + WB.providerIcon(m.provider) + '</span>' +
       '<span class="infrow2-tt"><span class="infrow2-lbl">' + esc(m.label) + '</span>' +
         '<span class="infrow2-id">' + esc(m.id) + '</span></span>' +
+      (WB.modelBadges ? WB.modelBadges(m) : '') +
       tierBadge(m.tier) +
       '<span class="infrow2-chk">' + (on ? '✓' : '') + '</span></button>';
   }
   // Group rows by provider, with a provider header — the "browse all" experience.
   function modelList(filter){
     var q = (filter || '').trim().toLowerCase();
-    var ms = models.filter(function(m){ return !q || (m.label + ' ' + m.id + ' ' + WB.providerName(m.provider)).toLowerCase().indexOf(q) >= 0; });
+    var ms = models.filter(function(m){
+      if (roleFilter === 'agent' && !isBrain(m)) return false;
+      if (roleFilter === 'generator' && isBrain(m)) return false;
+      return !q || (m.label + ' ' + m.id + ' ' + WB.providerName(m.provider)).toLowerCase().indexOf(q) >= 0;
+    });
     if (!ms.length) return '<div class="infempty">No models match “' + esc(filter) + '”.</div>';
     var byProv = {}; ms.forEach(function(m){ (byProv[m.provider] = byProv[m.provider] || []).push(m); });
     return Object.keys(byProv).map(function(pv){
@@ -63,7 +73,12 @@ WB.view('/inference', { title: 'AI', accent: 'var(--violet)', async render(el){
       '<div class="infgrid">' +
         // LEFT — the model browser (command-palette style search over every model).
         '<div class="card infmodels">' +
-          '<div class="infmhd"><h3>Models</h3><span class="dim" style="font-size:12.5px">Click one to make it your default</span></div>' +
+          '<div class="infmhd"><h3>Models</h3><span class="dim" style="font-size:12.5px">Click a brain to make it your default</span></div>' +
+          '<div class="infseg" id="infSeg">' +
+            '<button class="infseg-b on" data-role="all">All</button>' +
+            '<button class="infseg-b" data-role="agent">Brains</button>' +
+            '<button class="infseg-b" data-role="generator">Generators</button>' +
+          '</div>' +
           '<input class="winput infsearch" id="infSearch" placeholder="Search ' + esc(models.length) + ' models — provider, name, or id…" autocomplete="off">' +
           '<div class="infmlist" id="infMList">' + modelList('') + '</div>' +
         '</div>' +
@@ -90,8 +105,16 @@ WB.view('/inference', { title: 'AI', accent: 'var(--violet)', async render(el){
   var listEl = el.querySelector('#infMList');
   function repaintList(){ listEl.innerHTML = modelList(el.querySelector('#infSearch').value); wireRows(); }
   function wireRows(){
-    listEl.querySelectorAll('[data-model]').forEach(function(b){ b.onclick = function(){ setDefault(b.getAttribute('data-model')); }; });
+    listEl.querySelectorAll('[data-model]').forEach(function(b){ b.onclick = function(){
+      if (b.getAttribute('data-brain') === '0') { WB.toast('Generators are tools, not chat brains — pick a text-output model as your default', 'bad'); return; }
+      setDefault(b.getAttribute('data-model'));
+    }; });
   }
+  el.querySelectorAll('#infSeg .infseg-b').forEach(function(b){ b.onclick = function(){
+    roleFilter = b.getAttribute('data-role');
+    el.querySelectorAll('#infSeg .infseg-b').forEach(function(x){ x.classList.toggle('on', x === b); });
+    repaintList();
+  }; });
   async function setDefault(id){
     defModel = id;
     repaintList();
@@ -154,6 +177,15 @@ WB.scopedStyles('/inference', `
 .inftier.fast { color: var(--bloomd); background: color-mix(in srgb, var(--bloom) 18%, transparent); }
 .inftier.open { color: #e0b34a; background: color-mix(in srgb, #e0b34a 20%, transparent); }
 .infempty { color: var(--dim); padding: 24px 8px; text-align: center; font: 500 13px var(--read); }
+.infseg { display: inline-flex; gap: 2px; padding: 2px; background: var(--line); border-radius: 9px; margin-bottom: 10px; }
+.infseg-b { border: none; background: none; cursor: pointer; border-radius: 7px; padding: 5px 12px; font: 600 12px var(--read); color: var(--dim); }
+.infseg-b.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.infrow2.gen { opacity: .82; }
+.infrow2.gen:hover { opacity: 1; }
+.modbadges { display: inline-flex; align-items: center; gap: 6px; flex: none; color: var(--dim); }
+.modbadges .modglyph { display: grid; place-items: center; } .modbadges .modglyph svg { width: 14px; height: 14px; }
+.modbadges .modprice { font: 600 10.5px var(--mono); color: var(--dim); }
+.modbadges .modctx { font: 600 10.5px var(--mono); color: var(--dim); opacity: .8; }
 .infrow { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .infrow label { width: 64px; font: 600 13px var(--read); color: var(--ink); }
 .infin { display: flex; align-items: center; gap: 6px; flex: 1; }

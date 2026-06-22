@@ -40,6 +40,36 @@ WB.PROVIDER_META = {
   mistral:      { name:'Mistral',    accent:'#fa5310' },
   deepseek:     { name:'DeepSeek',   accent:'#4d6bfe' }
 };
+// Modality glyphs — input/output kinds a model speaks (text/image/audio/video/embedding/label), plus
+// the function-calling (tools) marker. ONE home, shared by the composer model picker + the admin AI page.
+WB.MODALITY_GLYPHS = {
+  text:      { name:'Text',      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2M9 5v14M7 19h4"/></svg>' },
+  image:     { name:'Image',     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m21 15-5-5L5 21"/></svg>' },
+  audio:     { name:'Audio',     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>' },
+  video:     { name:'Video',     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>' },
+  embedding: { name:'Embeddings',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h8M6 8v8M18 8v8M8 18h8"/></svg>' },
+  label:     { name:'Labels',    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v5l8 8 7-7-8-8H3z"/><circle cx="7" cy="11" r="1.4"/></svg>' },
+  tools:     { name:'Function calling', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-6 6 2 2 6-6a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2z"/></svg>' }
+};
+// One modality chip (svg in a themed span). kind ∈ MODALITY_GLYPHS keys.
+WB.modalIcon = function(kind, title){
+  var g = WB.MODALITY_GLYPHS[kind]; if (!g) return '';
+  return '<span class="modglyph" title="' + (title || g.name) + '">' + g.icon + '</span>';
+};
+// Compact context-window label (131000 → "131K", 1000000 → "1M").
+WB.fmtContext = function(n){ n = +n || 0; if (!n) return ''; return n >= 1e6 ? (n/1e6).toFixed(n%1e6?1:0)+'M' : n >= 1e3 ? Math.round(n/1e3)+'K' : String(n); };
+// Model metadata badges (output modalities + tools marker + $in/$out per-M + context) for a catalog row.
+// Pure HTML string so it drops into both the composer menu and the admin AI list.
+WB.modelBadges = function(m){
+  m = m || {};
+  var out = (m.modal_out || []).map(function(k){ return WB.modalIcon(k, 'Outputs ' + (WB.MODALITY_GLYPHS[k] ? WB.MODALITY_GLYPHS[k].name.toLowerCase() : k)); }).join('');
+  var imgIn = (m.modal_in || []).indexOf('image') >= 0 ? WB.modalIcon('image', 'Accepts images (vision)') : '';
+  var tools = m.tools ? WB.modalIcon('tools', 'Function calling') : '';
+  var price = (m.price_in != null || m.price_out != null)
+    ? '<span class="modprice" title="USD per million tokens (in / out)">$' + (+m.price_in||0) + '/' + (+m.price_out||0) + '</span>' : '';
+  var ctx = m.context ? '<span class="modctx" title="Context window">' + WB.fmtContext(m.context) + '</span>' : '';
+  return '<span class="modbadges">' + imgIn + out + tools + ctx + price + '</span>';
+};
 WB.providerOf = function(modelId){ return String(modelId || '').split('/')[0]; };
 WB.providerName = function(p){ var m = WB.PROVIDER_META[p]; return m ? m.name : String(p || ''); };
 // Provider chip glyph — an inlined brand SVG when we have one, else a brand-accent lettermark tile.
