@@ -179,7 +179,7 @@ WB.view('/secrets', {
       }
       if (list.length === 0) {
         return `<div class="card faint" style="text-align:center">
-    No nexus secrets yet. Add shared keys (API tokens, connection strings) here and every workspace on ${esc(nxName)} can use them.
+    No secrets yet. Add a shared key (an API token, a connection string) and every workspace on ${esc(nxName)} can use it.
   </div>`;
       }
       return `<div class="card" style="padding:0;overflow:hidden">
@@ -216,7 +216,7 @@ WB.view('/secrets', {
       return `<div class="modal" data-modal>
     <div class="sheet" style="width:460px">
       <h2>${lockName ? 'Set ' + esc(fName) : editing ? 'Edit secret' : 'Add secret'}</h2>
-      <p class="sub">${lockName ? 'A platform secret — encrypted at rest and read by the nexus via Nexus.Secrets. You can set or replace its value; you can’t read it back.' : 'Encrypted at rest. Shown masked everywhere — reveal one explicitly when you need it.'}</p>
+      <p class="sub">${lockName ? 'A service key the platform reads at runtime. You can set or replace its value here; you can’t read it back.' : 'Encrypted at rest. Shown masked everywhere — reveal one explicitly when you need it.'}</p>
       <div class="lab">Name</div>
       <div class="field"><input type="text" class="mono" placeholder="OPENROUTER_API_KEY" data-f="name" value="${esc(fName)}"${lockName ? ' readonly' : ''} /></div>
       <div class="lab">Value</div>
@@ -254,8 +254,8 @@ WB.view('/secrets', {
       el.innerHTML = `
 <div class="grphead">
   <div>
-    <h3 class="grp">Nexus secrets · ${esc(nxName)}</h3>
-    <p class="faint" style="margin:4px 0 0;font-size:12.5px">The shared pool for this nexus — encrypted at rest, available to every workspace. Workspaces can add their own on top.</p>
+    <h3 class="grp">Your secrets</h3>
+    <p class="faint" style="margin:4px 0 0;font-size:12.5px">Keys you add and control — shared across every workspace on ${esc(nxName)}, encrypted at rest. Add, edit, or reveal them anytime.</p>
   </div>
   <button class="btn sm primary" data-act="create">
     <svg class="ico" viewBox="0 0 24 24"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/></svg> Add secret
@@ -265,8 +265,8 @@ ${bodyHtml()}
 
 <div class="grphead" style="margin-top:26px">
   <div>
-    <h3 class="grp">Platform secrets · injected</h3>
-    <p class="faint" style="margin:4px 0 0;font-size:12.5px">Set at deploy (Fly secrets) and read through <span class="mono">Nexus.Secrets</span>. Names only — values are never exposed, and these are managed at deploy, not edited here.</p>
+    <h3 class="grp">Service keys</h3>
+    <p class="faint" style="margin:4px 0 0;font-size:12.5px">The keys this platform needs to run — inference, storage, integrations. Set when you deploy, so you can see what’s configured here but can’t read the values back.</p>
   </div>
 </div>
 ${platformHtml()}
