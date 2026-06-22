@@ -1,5 +1,5 @@
 // Tasks — the orchestration board. Tasks live in resource Task (GET/POST /cloud/tasks); a plan is a
-// parent task + subtasks. "Plan with Waldo" (POST /cloud/plan) decomposes a goal into assigned
+// parent task + subtasks. "Plan with Workhorse" (POST /cloud/plan) decomposes a goal into assigned
 // subtasks. Dispatch (POST /cloud/task/dispatch) launches the assignee agent as a Run and tracks
 // status. Kanban by status. This is the Studio task-management surface (Phase 2, wb-ab25).
 
@@ -62,8 +62,8 @@ WB.view('/tasks', { title: 'Tasks', accent: 'var(--violet)', fullbleed: true, as
             agents.map(function(a){ return '<option value="'+esc(a)+'">'+esc(a)+'</option>'; }).join('') + '</select>' +
           '<button id="t-add" class="t-btn">Add task</button>' +
           '<div class="tasks-bar-sp"></div>' +
-          '<input id="t-goal" class="t-input t-goal" placeholder="Goal to plan with Waldo…" />' +
-          '<button id="t-plan" class="t-btn t-btn-accent">✦ Plan with Waldo</button>' +
+          '<input id="t-goal" class="t-input t-goal" placeholder="Goal to plan with Workhorse…" />' +
+          '<button id="t-plan" class="t-btn t-btn-accent">✦ Plan with Workhorse</button>' +
         '</div>' +
         '<div class="tasks-board">' + COLS.map(column).join('') + '</div>' +
       '</div>';

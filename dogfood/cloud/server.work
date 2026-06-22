@@ -24,7 +24,7 @@ server :cloud do
   route "GET /cloud/runs", :runs_list
 
   # Task management + planning (the orchestration backbone). Tasks live in resource Todo; a plan is a
-  # parent task + subtasks. Dispatch launches a Run (reuses do_run) and links it. Plan asks Waldo to
+  # parent task + subtasks. Dispatch launches a Run (reuses do_run) and links it. Plan asks Workhorse to
   # decompose a goal into assigned subtasks. THE LINE: the store + board are ours, the bus is standard.
   route "GET /cloud/tasks", :tasks_list
   route "POST /cloud/tasks", :task_create
@@ -313,7 +313,7 @@ server :cloud do
     %{events: events}
   end
 
-  # Run a named agent (deck/research/waldo/…) on a brief; persist a durable Run; return the answer.
+  # Run a named agent (deck/research/workhorse/…) on a brief; persist a durable Run; return the answer.
   def agent_run(req) do
     agent = (is_map(req.body) && req.body["agent"]) || ""
     task = (is_map(req.body) && req.body["task"]) || ""
@@ -329,7 +329,7 @@ server :cloud do
 
       true ->
         ws = (is_map(req.body) && req.body["workspace"]) || nil
-        # Selected toolkit capabilities, clamped to what THIS agent admits (Waldo :all, Autopoet :none).
+        # Selected toolkit capabilities, clamped to what THIS agent admits (Workhorse :all, Autopoet :none).
         selected = (is_map(req.body) && req.body["capabilities"]) || []
         selected = if is_list(selected), do: selected, else: []
         caps = Nexus.Agent.admitted(Nexus.Agent.get(agent), selected)
@@ -646,7 +646,7 @@ server :cloud do
     end
   end
 
-  # Plan-with-Waldo: decompose a goal into a parent task + assigned subtasks. Waldo emits strict lines
+  # Plan-with-Workhorse: decompose a goal into a parent task + assigned subtasks. Workhorse emits strict lines
   # we parse; the assignees are constrained to the registered agents.
   def plan_create(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
@@ -666,7 +666,7 @@ server :cloud do
       """
 
       subtasks =
-        case Nexus.Agent.run_named("waldo", prompt) do
+        case Nexus.Agent.run_named("workhorse", prompt) do
           {:ok, %{answer: a}} when is_binary(a) -> parse_plan(a, agents)
           _ -> []
         end
@@ -674,19 +674,19 @@ server :cloud do
       now = System.os_time(:second)
       pid = gen_id()
       parent = put_task(tenant, %{tid: pid, title: String.slice(goal, 0, 160), detail: "Plan",
-        status: "open", agent: "waldo", parent: "", priority: 1, created_by: user_key(req), run: "", created: now})
+        status: "open", agent: "workhorse", parent: "", priority: 1, created_by: user_key(req), run: "", created: now})
 
       children =
         Enum.map(subtasks, fn {assignee, title} ->
           put_task(tenant, %{tid: gen_id(), title: title, detail: "", status: "open", agent: assignee,
-            parent: pid, priority: 2, created_by: "waldo", run: "", created: now})
+            parent: pid, priority: 2, created_by: "workhorse", run: "", created: now})
         end)
 
       %{plan: parent, subtasks: children}
     end
   end
 
-  # Parse Waldo's plan lines: `TASK | <assignee> | <title>`. Assignee must be a known agent.
+  # Parse Workhorse's plan lines: `TASK | <assignee> | <title>`. Assignee must be a known agent.
   defp parse_plan(text, agents) do
     text
     |> String.split("\n", trim: true)
@@ -695,7 +695,7 @@ server :cloud do
         [tag, who, title | _] ->
           if String.contains?(tag, "TASK") do
             a = who |> String.trim() |> String.downcase()
-            a = if(a in agents, do: a, else: "waldo")
+            a = if(a in agents, do: a, else: "workhorse")
             [{a, String.trim(title) |> String.slice(0, 160)}]
           else
             []
@@ -1460,19 +1460,19 @@ server :cloud do
   # Agents from the live registry. Each: %{name, file}. Studio lists them in the Agents tab.
   # The Studio agent roster — our curated, toolkit-bound catalog. Each agent is named after its
   # MODALITY and is PROVIDED BY a toolkit: disable the toolkit and the agent disappears from the composer
-  # (the client filters against /cloud/toolkits). Waldo (everyday) + Autopilot have no toolkit — always on.
+  # (the client filters against /cloud/toolkits). Workhorse (everyday) + Autopilot have no toolkit — always on.
   # The pastel theme/icon is resolved client-side (WB.AGENT_THEME) so it matches the Toolkits page. THE
   # LINE: the agent BLOCKS are standard `.work`; this roster + its toolkit bindings are our cloud product.
   def agent_catalog do
     [
+      %{name: "workhorse", label: "Workhorse", toolkit: nil,
+        blurb: "The everyday generalist — plans, dispatches, gets things done."},
       %{name: "deck", label: "Deck Builder", toolkit: "presentation",
         blurb: "Turns a brief into a real, rendering reveal.js deck."},
       %{name: "video", label: "Video Editor", toolkit: "video",
         blurb: "Authors HyperFrames scenes the nexus renders to a clip."},
       %{name: "research", label: "Deep Researcher", toolkit: "research",
         blurb: "Fans out searches and synthesizes organized, cited findings."},
-      %{name: "waldo", label: "Waldo", toolkit: nil,
-        blurb: "The everyday manager — plans, dispatches, gets things done."},
       %{name: "autopilot", label: "Autopilot", toolkit: nil,
         blurb: "Runs your work on a schedule and keeps it moving on its own."}
     ]

@@ -1,6 +1,6 @@
 // wbchat/components/capabilities-selector — composer Capabilities multi-select (Studio).
 // Toolkits-as-capabilities plug into the chosen driver agent (per the agents-and-capabilities model).
-// Multi-select, gated by the agent's admission: Waldo (:all) → everything selectable; Autopoet (:none) →
+// Multi-select, gated by the agent's admission: Workhorse (:all) → everything selectable; Autopoet (:none) →
 // disabled; a list → only those ids. Selected ids thread into the run via ctx.setCapabilities → onSend.
 
 import { registerComposerButton, el, injectStyle } from '../core.js';

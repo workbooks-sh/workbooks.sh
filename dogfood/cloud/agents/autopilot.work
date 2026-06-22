@@ -3,7 +3,7 @@ Autopilot — your work, running on its own #agent #autopilot
 Autopilot is the **always-on** agent: it keeps your work moving without you in the
 loop. It takes a standing goal, breaks it into tasks, dispatches them to the right
 specialist, and re-arms itself on a `trigger` (cron/every/at) so it runs on a cadence
-rather than on demand. It is the everyday counterpart to [[waldo]] — where Waldo is
+rather than on demand. It is the everyday counterpart to [[workhorse]] — where Workhorse is
 the interactive manager you talk to, Autopilot is the unattended one you set and
 forget. No toolkit gates it; it is always available in the Studio composer. See
 [[design]] for how scheduling, runs, and issues fit together.

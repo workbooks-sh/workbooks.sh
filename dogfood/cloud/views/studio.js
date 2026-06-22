@@ -57,7 +57,7 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
 
   // The Studio agent roster — our toolkit-bound catalog (GET /cloud/agents), FILTERED to those whose
   // toolkit is enabled (disable a toolkit on the Toolkits page and its agent disappears here). Agents with
-  // no toolkit (Waldo, Autopilot) are always available.
+  // no toolkit (Workhorse, Autopilot) are always available.
   // Roster comes from /cloud/agents; fall back to the canonical client catalog so the selector always
   // renders (e.g. before the nexus has recompiled the route, or on a cold/odd response).
   var AG = (_p[4] && _p[4].agents && _p[4].agents.length) ? _p[4].agents : (WB.AGENT_CATALOG || []);
@@ -86,7 +86,7 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
     models: MODELS,
     agents: AGENTS,
     // Capabilities the composer can plug into the driver agent (toolkits-as-capabilities). Gated by each
-    // agent's admission: Waldo (:all) → everything; Autopilot/Autopoet (:none) → disabled. Admission comes
+    // agent's admission: Workhorse (:all) → everything; Autopilot/Autopoet (:none) → disabled. Admission comes
     // from the /cloud/agents feed (a.capabilities) with a safe fallback.
     capabilityCatalog: TK,
     capabilityAdmission: function(name){

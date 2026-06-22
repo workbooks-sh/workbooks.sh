@@ -1,6 +1,6 @@
 Agent service — design decisions #agents #cloud #design
 
-The cloud Nexus **agent service**: Waldo plus the specialist agents, the runtime
+The cloud Nexus **agent service**: Workhorse plus the specialist agents, the runtime
 that runs them on a user's nexus, and the Studio that manages them. This file is
 the settled design, captured from a voice grill-me session (`scratch/grill-waldo`,
 22 decisions). It is **our cloud product** — dogfood workbooks deployed via the
@@ -39,15 +39,15 @@ DeployKit, NOT baked into the open-standard nexus image. See [[the-line]].
 - **Customisation** — users **fork & edit** default agents; **git merge** handles
   upstream updates. No template/instance abstraction.
 
-## Waldo — the manager
+## Workhorse — the manager
 
 - **Remit** — the **expert on the Nexus framework itself**: orchestrator +
   delegator, AND agent-writer + diagnostician + default **workhorse**. He both
   routes work and does it.
 - **Singleton** per nexus. **Session memory** lives in a **notes table** in the
   tenant DB (persistent cross-session context).
-- **Handoffs** — Waldo **brokers** handoffs between specialists; data passes as
-  **ephemeral handoff documents** = `.work` files with file references. Waldo
+- **Handoffs** — Workhorse **brokers** handoffs between specialists; data passes as
+  **ephemeral handoff documents** = `.work` files with file references. Workhorse
   stays in control of the orchestration flow.
 
 ## Scheduling
@@ -76,7 +76,7 @@ DeployKit, NOT baked into the open-standard nexus image. See [[the-line]].
 
 ## Studio — managing it all
 
-- **Starting a task** — both **chat with Waldo** (he delegates) AND **pick a
+- **Starting a task** — both **chat with Workhorse** (he delegates) AND **pick a
   specialist directly**. Cater to orchestration-first and know-what-I-want users.
 - **HITL approvals** — surface in an **inbox of pending approvals**, asynchronous,
   rather than interrupting the active run. *(Open: whether the inbox grows into a
@@ -138,20 +138,20 @@ steer differently.
 
 ## Bootstrap & the line
 
-- **Our cloud product, NOT the open standard** — Waldo + the specialists are
+- **Our cloud product, NOT the open standard** — Workhorse + the specialists are
   **dogfood workbooks deployed via the DeployKit**, exactly like a customer. The
   open nexus image ships **none** of them. ([[the-line]])
 - **Seeding** — when a new org's nexus comes up, the **DeployKit seeds**
   `dogfood/cloud/agents/*.work` into the tree (committed, so they're forkable);
   the dashboard does not special-case them.
-- **v1 'done' bar** — **Waldo + ONE specialist (DeckAgent) running a real task
+- **v1 'done' bar** — **Workhorse + ONE specialist (DeckAgent) running a real task
   end-to-end** through the Studio (start → stream → result in tree), with the
   runtime + agent-file contract + issue-filing in place. The other two specialists
   + full scheduling/sub-agent UI follow once that spine is proven.
 
 ## Task management & planning (the orchestration backbone)
 
-The heart of orchestration: Waldo and the specialists don't just answer — they
+The heart of orchestration: Workhorse and the specialists don't just answer — they
 **plan work, decompose it, file tasks, assign them, and dispatch them as runs.**
 
 - **`resource Task`** (tenant SQLite, our cloud store): `tid, title, detail, status
@@ -159,7 +159,7 @@ The heart of orchestration: Waldo and the specialists don't just answer — they
   priority, created_by, run (the rid once dispatched), created, updated`.
 - **Plan = a parent task + child subtasks** (`parent` link). Decomposition is just
   creating a parent and its children — no separate "plan" entity.
-- **Plan-with-Waldo** — give a goal; Waldo (who knows the specialists) decomposes it
+- **Plan-with-Workhorse** — give a goal; Workhorse (who knows the specialists) decomposes it
   into assigned subtasks. AI planning without re-plumbing the runtime.
 - **Dispatch** — assigning a task to an agent launches a **Run** (reuses the Phase-1
   `do_run` engine), links the `rid` onto the task, and tracks status
@@ -268,7 +268,7 @@ monorepo subtree/workspace** (this is the monorepo payoff: git semantics per par
 well understood, so policy is per part). Knobs, each built from existing primitives:
 - **Review policy** — a reviewer/merger **agent on a PR `hook`**: fire on `pr.opened`,
   route by author (agent-PR → a "merger" reviewer agent; human-PR → a different rule;
-  or "Waldo fields all PRs"). The bus + hook + agent run already exist.
+  or "Workhorse fields all PRs"). The bus + hook + agent run already exist.
 - **Branch policy** — e.g. a **prod vs dev** branch per subtree: agents write to `dev`
   by default; writing to `prod` requires explicit design (a gate), so you can't have
   agents constantly pushing production unless you opted in.
@@ -284,7 +284,7 @@ the `#event` bus (PR opened → hook) · integrations GitHub token (API + fetch-
 
 **Open / to decide later:** the exact review-gate config schema (the founder is still
 forming it); branch-policy declaration syntax; whether the reviewer is a default agent
-(a "merger") shipped with Waldo/deck/research or purely user-configured.
+(a "merger") shipped with Workhorse/deck/research or purely user-configured.
 
 ## Agents write to the workspace — real FS in the wasm sandbox (the prereq)
 

@@ -1,7 +1,7 @@
 Agent service — the one roadmap #agents #plan
 
 The single sequenced plan to finish the cloud Nexus **agent service**. The destination
-is the ORIGINAL goal: **Waldo + the specialists (deck/video/research) doing real work
+is the ORIGINAL goal: **Workhorse + the specialists (deck/video/research) doing real work
 on your nexus — planning, scheduling, orchestrating sub-agents, filing issues, all
 managed in the Studio.** Everything below is sequenced so each stage *unlocks* the next;
 the infra prereqs exist only to make the agentic features real. Decisions live in
@@ -9,9 +9,9 @@ the infra prereqs exist only to make the agentic features real. Decisions live i
 
 ## Stage 0 — DONE (the spine, so we don't re-walk it)
 
-Built + verified this run: default agents (`waldo`/`deck`/`research`) register + run by
+Built + verified this run: default agents (`workhorse`/`deck`/`research`) register + run by
 name; durable **Runs** + SSE streaming + Studio Runs view; **task management + planning**
-(Plan-with-Waldo → assigned subtasks → dispatch→run); **issue store + failure model**
+(Plan-with-Workhorse → assigned subtasks → dispatch→run); **issue store + failure model**
 (failed run auto-files an attributed issue); **scheduling** backend (agent runs on
 cron/interval, re-armed on boot); **jj substrate** (Option B, gitlink-colocate over the
 bare) + **attribution** + the **change-log in Activity**; the **per-agent worktree
