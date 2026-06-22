@@ -236,8 +236,8 @@
     // ── Confirm port ──────────────────────────────────────────────────────────────────────────
     WB.confirm = function (o) { o = o || {}; return new Promise(function (resolve) {
       var modal = document.createElement('div'); modal.className = 'modal';
-      modal.innerHTML = '<div class="sheet" style="width:420px"><h2>' + esc(o.title || 'Are you sure?') + '</h2>' +
-        '<p class="sub">' + esc(o.body || '') + '</p><div class="foot"><span></span><div style="display:flex;gap:8px">' +
+      modal.innerHTML = '<div class="sheet ask"><h2>' + esc(o.title || 'Are you sure?') + '</h2>' +
+        (o.body ? '<p class="sub">' + esc(o.body) + '</p>' : '') + '<div class="foot"><span></span><div style="display:flex;gap:10px">' +
         '<button class="btn" data-x="0">Cancel</button><button class="btn ' + (o.danger ? 'danger' : 'primary') + '" data-x="1">' + esc(o.confirm || 'Confirm') + '</button></div></div></div>';
       function done(v){ modal.remove(); resolve(v); }
       modal.addEventListener('click', function (e) { if (e.target === modal) done(false);
@@ -247,10 +247,10 @@
     // A single-field prompt modal (rename / new file name). Resolves the trimmed value, or null on cancel.
     WB.prompt = function (o) { o = o || {}; return new Promise(function (resolve) {
       var modal = document.createElement('div'); modal.className = 'modal';
-      modal.innerHTML = '<div class="sheet" style="width:420px"><h2>' + esc(o.title || 'Enter a value') + '</h2>' +
+      modal.innerHTML = '<div class="sheet ask"><h2>' + esc(o.title || 'Enter a value') + '</h2>' +
         (o.body ? '<p class="sub">' + esc(o.body) + '</p>' : '') +
         '<input class="winput" id="wbPromptIn" autocomplete="off" spellcheck="false" placeholder="' + esc(o.placeholder || '') + '" />' +
-        '<div class="foot"><span></span><div style="display:flex;gap:8px">' +
+        '<div class="foot"><span></span><div style="display:flex;gap:10px">' +
         '<button class="btn" data-x="0">Cancel</button><button class="btn primary" data-x="1">' + esc(o.confirm || 'OK') + '</button></div></div></div>';
       function done(v){ modal.remove(); resolve(v); }
       var inp = modal.querySelector('#wbPromptIn');

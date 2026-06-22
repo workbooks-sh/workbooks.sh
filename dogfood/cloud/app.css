@@ -339,7 +339,9 @@ tr:last-child td{ border:0; }
 
 .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
 
-.modal{ position:fixed; inset:0; background:var(--scrim-q); display:grid; place-items:center; z-index:40; }
+.modal{ position:fixed; inset:0; background:var(--scrim-q); display:grid; place-items:center; z-index:40;
+  padding:24px; backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); animation:modalin .14s ease; }
+@keyframes modalin{ from{ opacity:0; } to{ opacity:1; } }
 .sheet{ width:560px; max-width:94vw; max-height:90vh; overflow-y:auto; background:var(--card);
   border:1px solid var(--line); border-radius:16px; padding:26px; box-shadow:var(--soft-2); }
 .sheet h2{ font-family:var(--display); font-weight:600; font-size:22px; margin-bottom:6px; }
@@ -386,6 +388,19 @@ tr:last-child td{ border:0; }
 .sheet .est{ font:400 14px var(--read); color:var(--prose); } .sheet .est b{ color:var(--ink); font-family:var(--mono); font-weight:700; }
 .note{ font:400 12.5px var(--read); color:var(--prose); background:var(--well); border:1px solid var(--line); border-radius:9px;
   padding:11px 13px; margin-top:14px; line-height:1.5; }
+
+/* ── Ask modal — the sleek standard for simple prompt/confirm dialogs (WB.prompt / WB.confirm) ──
+   A roomy flex column with consistent gaps and a light, border-free footer. Bigger title + input,
+   generous padding, buttons right-aligned. Bigger modals (provision/connect) keep the base .sheet. */
+.sheet.ask{ width:440px; padding:30px 30px 24px; border-radius:20px; display:flex; flex-direction:column;
+  box-shadow:0 24px 60px -18px var(--scrim-q), var(--soft-2); animation:asklift .16s cubic-bezier(.2,.8,.2,1); }
+@keyframes asklift{ from{ opacity:0; transform:translateY(8px) scale(.98); } to{ opacity:1; transform:none; } }
+.sheet.ask h2{ font:600 21px var(--display); letter-spacing:-.01em; margin:0; }
+.sheet.ask .sub{ font:400 14.5px var(--read); color:var(--prose); line-height:1.55; margin:10px 0 0; }
+.sheet.ask .winput{ height:46px; padding:0 15px; border-radius:11px; font:500 15px var(--read); margin-top:22px; }
+.sheet.ask .foot{ margin-top:28px; padding-top:0; border-top:0; gap:10px; }
+.sheet.ask .foot > div{ gap:10px !important; }
+.sheet.ask .foot .btn{ height:40px; padding:0 18px; border-radius:10px; }
 
 /* ── +layout.svelte <style> — VERBATIM (sidebar switchers / nav / workspaces) ── */
 .swrap { position: relative; margin: 0 0 4px; }
