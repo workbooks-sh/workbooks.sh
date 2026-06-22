@@ -39,9 +39,9 @@ on:
 env:
   FLY_IMAGE: registry.fly.io/wb-dogfood
   BASE_IMAGE: ghcr.io/workbooks-sh/dogfood-base
-  # The standalone compilers + agent-kits layer the base COPYs from (so deployed agents can run kits +
-  # compile). Published manually when the toolchain/kits change (FROM scratch + nexus/compilers-dist).
-  COMPILERS_REF: ghcr.io/workbooks-sh/compilers:latest
+  # The compilers+kits layer the base COPYs the agent kit wasm from (/compilers/kits). Published by
+  # compilers-image.yml (compilers package + nexus/kits/*.wasm) to a CI-owned package.
+  COMPILERS_REF: ghcr.io/workbooks-sh/compilers-kits:latest
   FLY_APP: wb-dogfood
 
 jobs:

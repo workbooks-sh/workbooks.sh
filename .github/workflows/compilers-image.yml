@@ -18,7 +18,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  COMPILERS_IMAGE: ghcr.io/workbooks-sh/compilers
+  # Source (read): the manually-published full compilers package. Target (write): a CI-OWNED package
+  # this repo's GITHUB_TOKEN can push to (the manual `compilers` package isn't linked to this repo's
+  # Actions, so a direct push is denied). compilers-kits = compilers + the agent kit wasm.
+  COMPILERS_BASE: ghcr.io/workbooks-sh/compilers
+  COMPILERS_IMAGE: ghcr.io/workbooks-sh/compilers-kits
 
 jobs:
   layer-kits:
@@ -38,7 +42,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            --build-arg "BASE=${COMPILERS_IMAGE}:latest" \
+            --build-arg "BASE=${COMPILERS_BASE}:latest" \
             --push \
             -t "${COMPILERS_IMAGE}:latest" \
             -t "${COMPILERS_IMAGE}:kits-${{ github.sha }}" \
