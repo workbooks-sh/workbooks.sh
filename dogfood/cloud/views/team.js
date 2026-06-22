@@ -10,12 +10,14 @@ WB.view('/team', {
   title: 'Team',
   accent: 'var(--peach)',
   async render(el, ctx) {
-    // ── loader data (team/+page.server.js) — sourced from the org. No team API on the
-    // WB seam yet, so honest-empty (members/pending) with the workspace label from the
-    // active workspace, exactly like the dashboard's other no-runtime views. ──
+    // ── members — seeded from the signed-in identity (/me → WB.user + WB.role) so you always appear with
+    // your real role. A full org-members API (list every user) is a backend follow-up (bd); until then we
+    // show the authenticated user truthfully rather than an empty table. ──
+    const me = WB.user || {};
+    const meRow = me.email ? [{ id: 'me', name: me.name || me.email, email: me.email, role: WB.role || 'owner', you: true }] : [];
     const data = {
       workspace: (WB.ws.active && WB.ws.active.name) || null,
-      members: [],
+      members: meRow,
       pending: []
     };
 
@@ -72,16 +74,16 @@ WB.view('/team', {
             <td>
               <div style="display:flex;align-items:center;gap:11px">
                 <span class="mav" style="background:linear-gradient(135deg,var(${p[0]}),var(${p[1]}))">${esc(initials(m.name))}</span>
-                <div><div style="font-weight:600">${esc(m.name)}</div><div class="faint mono" style="font-size:11px">${esc(m.email)}</div></div>
+                <div><div style="font-weight:600">${esc(m.name)}${m.you ? ' <span class="dim mono" style="font-weight:400;font-size:11px">· you</span>' : ''}</div><div class="faint mono" style="font-size:11px">${esc(m.email)}</div></div>
               </div>
             </td>
             <td><span class="tag" style="${esc(roleStyle(m.role))}">${esc(m.role)}</span></td>
             <td class="dim">${esc(ago(m.lastActive))}</td>
             <td class="num">
-              <form data-form="remove" data-id="${esc(m.id)}">
+              ${m.you ? '' : `<form data-form="remove" data-id="${esc(m.id)}">
                 <input type="hidden" name="id" value="${esc(m.id)}" />
                 <button class="btn sm" type="submit">Remove</button>
-              </form>
+              </form>`}
             </td>
           </tr>`;
       }).join('');

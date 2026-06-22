@@ -1312,16 +1312,47 @@ server :cloud do
   # token. Branded "Workbooks Inference"; the gateway account/pricing are OUR product, not the standard.
   @inference_default_model "anthropic/claude-4-5-sonnet"
 
+  # Curated catalog of routable `provider/model` ids over the Cloudflare AI Gateway. A LIVE sync against
+  # the gateway's `/compat/models` (auth'd with the cf-aig token) is the runtime step (wb-5p57) — until
+  # then this comprehensive default set powers the picker. tier: frontier | fast | reasoning | open.
   def model_catalog do
     [
+      # OpenAI
       %{id: "openai/gpt-5.2", label: "GPT-5.2", provider: "openai", tier: "frontier"},
       %{id: "openai/gpt-5.2-mini", label: "GPT-5.2 Mini", provider: "openai", tier: "fast"},
+      %{id: "openai/gpt-5.1", label: "GPT-5.1", provider: "openai", tier: "frontier"},
+      %{id: "openai/gpt-4.1", label: "GPT-4.1", provider: "openai", tier: "frontier"},
+      %{id: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", provider: "openai", tier: "fast"},
+      %{id: "openai/gpt-4o", label: "GPT-4o", provider: "openai", tier: "frontier"},
+      %{id: "openai/gpt-4o-mini", label: "GPT-4o Mini", provider: "openai", tier: "fast"},
+      %{id: "openai/o4", label: "o4", provider: "openai", tier: "reasoning"},
+      %{id: "openai/o4-mini", label: "o4-mini", provider: "openai", tier: "reasoning"},
+      # Anthropic
+      %{id: "anthropic/claude-opus-4-5", label: "Claude Opus 4.5", provider: "anthropic", tier: "frontier"},
       %{id: "anthropic/claude-4-5-sonnet", label: "Claude 4.5 Sonnet", provider: "anthropic", tier: "frontier"},
       %{id: "anthropic/claude-4-5-haiku", label: "Claude 4.5 Haiku", provider: "anthropic", tier: "fast"},
+      %{id: "anthropic/claude-3-7-sonnet", label: "Claude 3.7 Sonnet", provider: "anthropic", tier: "frontier"},
+      %{id: "anthropic/claude-3-5-haiku", label: "Claude 3.5 Haiku", provider: "anthropic", tier: "fast"},
+      # Google
       %{id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "google", tier: "frontier"},
       %{id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "google", tier: "fast"},
+      %{id: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite", provider: "google", tier: "fast"},
+      %{id: "google/gemini-2.0-flash", label: "Gemini 2.0 Flash", provider: "google", tier: "fast"},
+      # xAI
       %{id: "grok/grok-4", label: "Grok 4", provider: "grok", tier: "frontier"},
-      %{id: "workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast", label: "Llama 3.3 70B", provider: "workers-ai", tier: "open"}
+      %{id: "grok/grok-4-mini", label: "Grok 4 Mini", provider: "grok", tier: "fast"},
+      %{id: "grok/grok-3", label: "Grok 3", provider: "grok", tier: "frontier"},
+      # Mistral
+      %{id: "mistral/mistral-large-latest", label: "Mistral Large", provider: "mistral", tier: "frontier"},
+      %{id: "mistral/mistral-small-latest", label: "Mistral Small", provider: "mistral", tier: "fast"},
+      %{id: "mistral/codestral-latest", label: "Codestral", provider: "mistral", tier: "fast"},
+      # DeepSeek
+      %{id: "deepseek/deepseek-chat", label: "DeepSeek V3", provider: "deepseek", tier: "frontier"},
+      %{id: "deepseek/deepseek-reasoner", label: "DeepSeek R1", provider: "deepseek", tier: "reasoning"},
+      # Meta / Workers AI (no per-token billing — Workers AI pricing)
+      %{id: "workers-ai/@cf/meta/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout", provider: "workers-ai", tier: "open"},
+      %{id: "workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast", label: "Llama 3.3 70B", provider: "workers-ai", tier: "open"},
+      %{id: "workers-ai/@cf/meta/llama-3.1-8b-instruct-fast", label: "Llama 3.1 8B", provider: "workers-ai", tier: "open"}
     ]
   end
 

@@ -275,12 +275,16 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .spark{ width:84px; height:30px; flex:none; }
 .tag{ font:700 11px var(--mono); padding:3px 8px; border-radius:6px; border:1px solid var(--line); color:var(--dim); }
 
-.sechead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
-.sechead h2{ font-family:var(--display); font-weight:600; font-size:24px; line-height:1.1;
-  display:inline-flex; align-items:center; gap:11px; }
-.sechead h2::before{ content:""; width:11px; height:18px; border-radius:5px; background:var(--section);
-  flex:none; box-shadow:var(--soft-1); }
-.sechead p{ font:400 14px var(--read); color:var(--prose); margin-top:4px; }
+/* Compact single-row page header (unified across admin/settings): title + inline subtitle on one line,
+   actions on the right, a thin rule beneath — instead of a tall masthead per page. */
+.sechead{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  margin-bottom:22px; padding-bottom:14px; border-bottom:1px solid var(--line); }
+.sechead > div:first-child{ display:flex; align-items:baseline; gap:11px; min-width:0; flex-wrap:wrap; }
+.sechead h2{ font-family:var(--display); font-weight:600; font-size:19px; line-height:1.2;
+  display:inline-flex; align-items:center; gap:9px; }
+.sechead h2::before{ content:""; width:7px; height:7px; border-radius:50%; background:var(--section);
+  flex:none; align-self:center; }
+.sechead p{ font:400 13px var(--read); color:var(--dim); margin:0; }
 
 .stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
 .stat{ border:1px solid var(--line); border-radius:var(--r); padding:16px; background:var(--card);
