@@ -10,6 +10,17 @@ defmodule Nexus.GitHttp do
   checks the files out into `WB_DATA/<workspace>` so `/cloud/tree` shows them live.
 
   Generic mechanism: any consumer with our CLI (or plain git) can push; no Workbooks business here.
+
+  ## Authorization boundary (intentional — wb-inqj)
+
+  The git transport enforces ORG-level access, not per-workspace visibility:
+    * cross-org is impossible (`authorize/3` — a token may only touch its own org's repos, fix wb-d3vh);
+    * commit signatures bind authorship at push (`Nexus.Git.sig_gate` under the `:hard` policy, wb-i2c8);
+    * BUT an authenticated org member may `git clone` ANY of the org's repos — the per-workspace
+      draft/private visibility (`Nexus.Authz.may_access?`) is enforced at the CLOUD layer
+      (`/cloud/tree`, `file_read`), NOT here. This is the one-nexus-per-org read model: members read org
+      repos. Honoring per-workspace visibility on the git read path would require the cloud to supply a
+      visibility map to this GENERIC transport (THE LINE) — deferred unless a deployment needs it.
   """
   import Plug.Conn
   require Logger
