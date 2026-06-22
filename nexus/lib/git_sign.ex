@@ -70,14 +70,14 @@ defmodule Nexus.GitSign do
       try do
         File.write!(f, Enum.join(lines, "\n") <> "\n")
 
-        {_, code} =
+        {out, code} =
           System.cmd(
             "git",
             ["-C", repo, "-c", "gpg.ssh.allowedSignersFile=#{f}", "verify-commit", sha],
             stderr_to_stdout: true
           )
 
-        code == 0
+        good_signature?(out, code)
       rescue
         _ -> false
       after
@@ -85,6 +85,12 @@ defmodule Nexus.GitSign do
       end
     end
   end
+
+  # git verify-commit exits 0 even when the signing key is present but its principal does NOT match the
+  # committer ("No principal matched") — so the exit code alone proves only key-SET membership, not that
+  # THIS author signed it (fix wb-3e2y). Require a "Good" signature AND a matched principal.
+  defp good_signature?(out, code),
+    do: code == 0 and String.contains?(out, "Good") and not String.contains?(out, "No principal matched")
 
   @doc """
   Verify EVERY commit a push introduces (`old..new`, or all of `new` for a new ref) is signed by one of
@@ -110,13 +116,15 @@ defmodule Nexus.GitSign do
   @spec allowed_signers_path() :: Path.t()
   def allowed_signers_path, do: Path.join(Nexus.Paths.durable_dir(), "allowed_signers")
 
-  @doc "Write the allowed-signers file from a set of `did:key`s. Returns the path. Malformed dids are skipped."
-  @spec write_allowed_signers([String.t()], String.t()) :: Path.t()
-  def write_allowed_signers(dids, principal \\ "member") do
+  @doc "Write the allowed-signers file from `{owner_uid, did}` entries. Returns the path. Malformed dids skipped."
+  @spec write_allowed_signers([{String.t(), String.t()}]) :: Path.t()
+  def write_allowed_signers(entries) do
     lines =
-      dids
-      |> Enum.flat_map(fn d ->
-        case did_to_ssh_line(d) do
+      entries
+      |> Enum.flat_map(fn {principal, did} ->
+        case did_to_ssh_line(did) do
+          # The PRINCIPAL is the key's owner uid (fix wb-3e2y) so git binds the committer email to that
+          # owner's key — a commit attributed to A must be signed by A's key, not just any org key.
           {:ok, line} -> [~s(#{principal} namespaces="git" #{line})]
           :error -> []
         end
@@ -138,11 +146,11 @@ defmodule Nexus.GitSign do
         out
         |> String.split("\n", trim: true)
         |> Enum.all?(fn sha ->
-          {_, code} =
+          {out, code} =
             System.cmd("git", ["-C", repo, "-c", "gpg.ssh.allowedSignersFile=#{file}", "verify-commit", sha],
               stderr_to_stdout: true)
 
-          code == 0
+          good_signature?(out, code)
         end)
 
       _ ->

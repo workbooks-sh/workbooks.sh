@@ -13,25 +13,34 @@ defmodule Nexus.Dock do
   Host functions a unit can call by name → `{wit_signature, impl}`. The signature is the WIT the
   unit's import is typed with; the impl is what runs on the host.
   """
-  def host_fns do
+  def host_fns, do: host_fns(Nexus.Store.default_tenant())
+
+  @doc """
+  Host functions **bound to a tenant**. Every stateful cap (`store`/`load`/`cache_*`) closes over
+  `tenant` at instantiation, so the guest names only a key — the partition is host-supplied and a
+  guest can NEVER address another tenant's data (the tenant is captured here, never read from guest
+  arguments). `tenant` is the caller's request tenant (`Nexus.Auth`/`Nexus.Sandbox.start`).
+  """
+  def host_fns(tenant) do
     %{
       "now" => {"func() -> s64", fn -> System.os_time(:second) end},
       # `emit`, not `log` — `log` collides with libm's math `log`.
       "emit" => {"func(msg: string)", fn msg -> require(Logger) && Logger.info(["[unit] ", msg]); nil end},
-      # a real string-RETURNING cap: an in-memory kv (proves the canonical-ABI return path).
-      "store" => {"func(key: string, val: string)", fn k, v -> :persistent_term.put({:nexus_kv, k}, v); nil end},
-      "load" => {"func(key: string) -> string", fn k -> :persistent_term.get({:nexus_kv, k}, "") end},
+      # tenant-partitioned in-memory kv (proves the canonical-ABI return path). The key is
+      # {:nexus_kv, tenant, k} — tenant A and tenant B sharing key "x" hold DISTINCT cells.
+      "store" => {"func(key: string, val: string)", fn k, v -> :persistent_term.put({:nexus_kv, tenant, k}, v); nil end},
+      "load" => {"func(key: string) -> string", fn k -> :persistent_term.get({:nexus_kv, tenant, k}, "") end},
       # the real, tiered, tenant-scoped cache (Nexus.Cache) — the durable counterpart to store/load.
-      # The guest names only a key; the host binds the tenant (Nexus.Cache.default_tenant — wired to
-      # Nexus.Auth's request tenant once threaded through) so a guest can never address another tenant.
+      # The guest names only a key; the host binds `tenant` so a guest can never read/poison another
+      # tenant's cache.
       "cache_get" =>
         {"func(key: string) -> string",
-         fn k -> with({:ok, v} <- Nexus.Cache.get(cache_ns(), k), do: v, else: (_ -> "")) end},
+         fn k -> with({:ok, v} <- Nexus.Cache.get(tenant, cache_ns(), k), do: v, else: (_ -> "")) end},
       "cache_put" =>
         {"func(key: string, val: string, ttl: u32)",
-         fn k, v, ttl -> Nexus.Cache.put(cache_ns(), k, v, ttl: ttl); nil end},
+         fn k, v, ttl -> Nexus.Cache.put(tenant, cache_ns(), k, v, ttl: ttl); nil end},
       "cache_delete" =>
-        {"func(key: string)", fn k -> Nexus.Cache.delete(cache_ns(), k); nil end},
+        {"func(key: string)", fn k -> Nexus.Cache.delete(tenant, cache_ns(), k); nil end},
       # net: a TLS-verified HTTP GET, SSRF-brokered (see fetch/1).
       "fetch" => {"func(url: string) -> string", &__MODULE__.fetch/1},
       # llm: a chat completion (OpenRouter). Returns "" if no key is configured.
@@ -39,9 +48,30 @@ defmodule Nexus.Dock do
     }
   end
 
-  # The cache namespace the guest's cache_* caps write under (the unit's caps share one namespace;
-  # the tenant is the host's default until Nexus.Auth's request tenant is threaded through the seam).
+  # The cache namespace the guest's cache_* caps write under (tenant is the partition; namespace
+  # groups the dock kv within a tenant).
   defp cache_ns, do: "dock"
+
+  # ── capability grant gating ──────────────────────────────────────────────────────────────────
+  # Host import name → the grant word(s) that unlock it. A name absent here is AMBIENT (always
+  # wired: `now`/`emit` are pure time + log, harmless). A guest gets ONLY the imports its unit
+  # granted; an ungranted import is omitted, so instantiation fails if the guest declares it.
+  @cap_grants %{
+    "store" => ["kv"],
+    "load" => ["kv"],
+    "cache_get" => ["kv"],
+    "cache_put" => ["kv"],
+    "cache_delete" => ["kv"],
+    "fetch" => ["net", "browse"],
+    "complete" => ["llm"]
+  }
+
+  @doc "The grant word(s) that unlock a host import, or `[]` if it's ambient (always available)."
+  def grant_for(name), do: Map.get(@cap_grants, name, [])
+
+  defp granted?(name, _caps) when not is_map_key(@cap_grants, name), do: true
+  defp granted?(_name, :all), do: true
+  defp granted?(name, caps), do: Enum.any?(@cap_grants[name], &(&1 in caps))
 
   @doc """
   SSRF-brokered HTTP GET for the `fetch` cap. ALWAYS blocks loopback/private/link-local hosts and
@@ -170,9 +200,18 @@ defmodule Nexus.Dock do
 
   @doc """
   Host implementations the Dock supplies to a sandboxed component, as the wasmex import map
-  (`%{"name" => {:fn, impl}}`).
+  (`%{"name" => {:fn, impl}}`), **tenant-bound and grant-filtered**.
+
+  `tenant` partitions every stateful cap. `caps` is the unit's granted capability words (from
+  `Nexus.Capabilities.grants/1`); only ambient imports + imports whose grant is in `caps` are wired,
+  so a guest cannot reach a capability it never granted. `caps: :all` wires the full surface (the
+  default — used by trusted/in-tree callers and tests; the untrusted seam passes real grants).
   """
-  def impls, do: Map.new(host_fns(), fn {n, {_sig, f}} -> {n, {:fn, f}} end)
+  def impls(tenant \\ Nexus.Store.default_tenant(), caps \\ :all) do
+    host_fns(tenant)
+    |> Enum.filter(fn {n, _} -> granted?(n, caps) end)
+    |> Map.new(fn {n, {_sig, f}} -> {n, {:fn, f}} end)
+  end
 
   # ── capability catalog — the source of truth is Nexus.Capabilities; delegate so existing
   #    Nexus.Dock.<catalog> callers (and the runtime seam) keep one vocabulary. ───────────────────

@@ -579,14 +579,14 @@ defmodule Nexus.SSR do
   #   {:client, js} — browser JS (svelte/solid/client): emitted as a client island, run in the browser.
   defp render_unit(name, node) do
     case Nexus.Audit.unit(node) do
-      [] -> render_artifact(name, Nexus.Compile.unit(node))
+      [] -> render_artifact(name, Nexus.Compile.unit(node), Nexus.Capabilities.grants(node), render_tenant())
       ungranted ->
         ~s(  <div class="data-missing">#{esc(name)} blocked: ungranted caps #{esc(Enum.join(ungranted, ", "))}</div>)
     end
   end
 
-  defp render_artifact(name, {:wasm, {:ok, comp}}) do
-    with {:ok, p} <- Nexus.Sandbox.start(comp, []),
+  defp render_artifact(name, {:wasm, {:ok, comp}}, grants, tenant) do
+    with {:ok, p} <- Nexus.Sandbox.start(comp, grants, tenant),
          {:ok, val} <- Nexus.Sandbox.call(p, "render", []) do
       ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
     else
@@ -594,18 +594,22 @@ defmodule Nexus.SSR do
     end
   end
 
-  defp render_artifact(name, {:command, {:ok, spec}}) do
+  defp render_artifact(name, {:command, {:ok, spec}}, _grants, _tenant) do
     case Nexus.Sandbox.run_command(spec, "") do
       {:ok, out} -> ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(String.trim(out))}</div>)
       _ -> ~s(  <div class="data-missing">#{esc(name)} command run failed</div>)
     end
   end
 
-  defp render_artifact(name, {:client, js}) do
+  defp render_artifact(name, {:client, js}, _grants, _tenant) do
     ~s(  <div class="unit-island" data-unit="#{esc(name)}"><script type="module">#{js}</script></div>)
   end
 
-  defp render_artifact(name, _), do: ~s(  <div class="data-missing">#{esc(name)} unavailable</div>)
+  defp render_artifact(name, _, _grants, _tenant), do: ~s(  <div class="data-missing">#{esc(name)} unavailable</div>)
+
+  # The tenant a server-side render binds its host caps to. SSR has no per-request conn here yet, so
+  # it uses the deploy's default tenant; the binding point is correct (host-supplied, never guest).
+  defp render_tenant, do: Nexus.Store.default_tenant()
 
   defp render_show(name, nil, _ctx),
     do: ~s(  <div class="data-missing">unknown resource <code>#{esc(name)}</code></div>)

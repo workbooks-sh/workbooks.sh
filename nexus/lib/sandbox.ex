@@ -16,11 +16,13 @@ defmodule Nexus.Sandbox do
   """
 
   @doc """
-  Instantiate a wasm component, wiring the granted capabilities as host imports.
-  `caps` is the unit's grants (from `Nexus.Dock`); each becomes a typed host import wasmex calls.
+  Instantiate a wasm component, wiring ONLY the granted capabilities as host imports, each bound to
+  `tenant`. `caps` is the unit's grant words (from `Nexus.Capabilities.grants/1`); `tenant` is the
+  caller's request tenant, captured here so a guest can never address another tenant's data nor reach
+  a capability it didn't grant. Defaults are conservative: no extra caps, the default tenant.
   """
-  def start(component_path, caps \\ []) do
-    Wasmex.Components.start_link(%{path: component_path, imports: imports_for(caps)})
+  def start(component_path, caps \\ [], tenant \\ Nexus.Store.default_tenant()) do
+    Wasmex.Components.start_link(%{path: component_path, imports: imports_for(caps, tenant)})
   end
 
   @doc "Call an exported function on a running component — wasmex marshals the typed values."
@@ -84,7 +86,8 @@ defmodule Nexus.Sandbox do
   defp shq(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
 
   # The Dock supplies the host implementations (the one place this layer holds real code —
-  # everything else is wasmex). A component only calls the imports it declares, so handing it the
-  # full Dock set is safe.
-  defp imports_for(_caps), do: Nexus.Dock.impls()
+  # everything else is wasmex). The import map is tenant-bound and filtered to the unit's grants:
+  # an ungranted import is omitted (instantiation fails if the guest declares it), and every
+  # stateful cap is partitioned by `tenant` so no guest can reach another tenant's data.
+  defp imports_for(caps, tenant), do: Nexus.Dock.impls(tenant, caps)
 end
