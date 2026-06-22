@@ -150,5 +150,52 @@ defmodule Nexus.GitSign do
     end
   end
 
+  # ── signing side (wb-knqr) — the shared helper the CLI/editor AND agents use ─────────────────────
+
+  @doc """
+  Encode a `Nexus.Keyring` keypair as an OpenSSH ed25519 PRIVATE key (PEM). This is what lets git
+  SSH-sign commits with a device/agent key (`git -c user.signingkey=<file> commit -S`); the resulting
+  signature verifies via `verify_commit/4` against the same key's `did:key`. Unencrypted (`none` cipher).
+  """
+  @spec openssh_private_key(Nexus.Keyring.keypair()) :: String.t()
+  def openssh_private_key(%{public: pub, private: seed}) when byte_size(pub) == 32 and byte_size(seed) == 32 do
+    pubblob = ssh_str("ssh-ed25519") <> ssh_str(pub)
+    check = :crypto.strong_rand_bytes(4)
+    # OpenSSH stores the ed25519 private as seed(32) ++ public(32).
+    priv_section = check <> check <> ssh_str("ssh-ed25519") <> ssh_str(pub) <> ssh_str(seed <> pub) <> ssh_str("wb")
+    priv_section = priv_section <> pad(byte_size(priv_section))
+
+    body =
+      "openssh-key-v1" <>
+        <<0>> <>
+        ssh_str("none") <> ssh_str("none") <> ssh_str("") <>
+        <<1::32>> <> ssh_str(pubblob) <> ssh_str(priv_section)
+
+    "-----BEGIN OPENSSH PRIVATE KEY-----\n" <> wrap64(body) <> "\n-----END OPENSSH PRIVATE KEY-----\n"
+  end
+
+  @doc "Write a keypair's OpenSSH private key to a `0600` file under `dir`; returns the path."
+  @spec write_signing_key(Nexus.Keyring.keypair(), Path.t()) :: Path.t()
+  def write_signing_key(keypair, dir) do
+    path = Path.join(dir, "wb-signing-#{System.unique_integer([:positive])}.key")
+    File.write!(path, openssh_private_key(keypair))
+    _ = File.chmod(path, 0o600)
+    path
+  end
+
+  @doc "The `git -c …` args to SSH-sign a commit with the key at `keyfile`."
+  @spec sign_args(Path.t()) :: [String.t()]
+  def sign_args(keyfile),
+    do: ["-c", "gpg.format=ssh", "-c", "user.signingkey=#{keyfile}", "-c", "commit.gpgsign=true"]
+
+  defp pad(n) do
+    p = rem(8 - rem(n, 8), 8)
+    if p == 0, do: <<>>, else: (for i <- 1..p, into: <<>>, do: <<i>>)
+  end
+
+  defp wrap64(bin) do
+    bin |> Base.encode64() |> String.to_charlist() |> Enum.chunk_every(70) |> Enum.map_join("\n", &to_string/1)
+  end
+
   defp ssh_str(s), do: <<byte_size(s)::32>> <> s
 end
