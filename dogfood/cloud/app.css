@@ -534,11 +534,6 @@ tr:last-child td{ border:0; }
 .wshdr .wsmore-btn:hover { background: var(--card); color: var(--ink); }
 /* Bodies supplied by consumers of WB.wsGroups: the Apps grid renders inside a group (no own scroll). */
 .wsgroup .appsgrid { overflow: visible; padding-bottom: 6px; }
-/* Data sidebar tag filter — chips that narrow the resource list by tag. */
-.dtagbar { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 8px 8px; }
-.dtagchip { font: 600 11px var(--mono, monospace); color: var(--dim); background: var(--line); border: 1px solid transparent; border-radius: 20px; padding: 3px 9px; cursor: pointer; }
-.dtagchip:hover { color: var(--ink); }
-.dtagchip.on { color: var(--ink); background: var(--card); border-color: var(--stroke); }
 /* ── Right-click context menu (the WB.ctx floating-menu primitive) ── */
 .ctxmenu { position: fixed; z-index: 200; min-width: 192px; max-width: 320px; background: var(--card);
   border: 1px solid var(--line); border-radius: 11px; padding: 5px; box-shadow: 0 12px 34px rgba(0,0,0,.30);

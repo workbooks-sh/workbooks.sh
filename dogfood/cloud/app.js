@@ -1056,31 +1056,20 @@
             dot + '<span class="sname">' + esc(r.name) + '</span><span class="swsct">' + r.count + '</span></a>';
         }
 
-        // Tag filter — chips of every tag across resources; selecting one narrows the list.
+        // Tag filter lives in the header funnel (filterMenu, st.dataTagFilter) — same as Apps/Files.
         var tagFilter = st.dataTagFilter || '';
-        var allTags = [];
-        resources.forEach(function(r){ (r.tags || []).forEach(function(t){ if (allTags.indexOf(t) < 0) allTags.push(t); }); });
-        allTags.sort();
-        if (tagFilter && allTags.indexOf(tagFilter) < 0) tagFilter = '';   // stale filter (tag gone) → reset
+        var hasTag = resources.some(function(r){ return (r.tags || []).indexOf(tagFilter) >= 0; });
+        if (tagFilter && !hasTag) tagFilter = '';   // stale filter (tag gone) → reset
         var shown = tagFilter ? resources.filter(function(r){ return (r.tags || []).indexOf(tagFilter) >= 0; }) : resources;
-        var chips = allTags.length
-          ? '<div class="dtagbar"><button class="dtagchip' + (tagFilter === '' ? ' on' : '') + '" data-tagf="">All</button>' +
-            allTags.map(function(t){ return '<button class="dtagchip' + (tagFilter === t ? ' on' : '') + '" data-tagf="' + esc(t) + '">#' + esc(t) + '</button>'; }).join('') + '</div>'
-          : '';
 
         el.innerHTML =
           navrow(onOverview, '/data', ICO.gauge, 'Overview') +
           navrow(onAssets, '/data?assets=1', ICO.files, 'Assets') +
-          chips +
           (resources.length
             ? WB.wsGroups({ items: shown, ws: function(r){ return r.workspace || ''; }, row: resourceRow,
                 key: 'wb-datagroups', store: st.dataGroupsCollapsed, repaint: paintDataSide,
                 hideEmpty: !!tagFilter, empty: 'No tables' })
             : '<div class="treemsg" style="padding:8px 10px">No resources yet. A <code>resource</code> block in any workbook shows up here.</div>');
-
-        el.querySelectorAll('[data-tagf]').forEach(function(b){
-          b.onclick = function(){ st.dataTagFilter = b.getAttribute('data-tagf'); paintDataSide(); };
-        });
       });
     }
     async function tkSideDisconnect(id){
@@ -1197,7 +1186,7 @@
 
       // ── per-surface SIDEBAR body — swaps with the active rail section ──
       var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Activity', files: 'Files', data: 'Data', toolkits: 'Toolkits', admin: 'Admin', account: 'You' };
-      var isBrowse = section === 'apps' || section === 'files';   // apps/files get the filter funnel + search + pins
+      var isBrowse = section === 'apps' || section === 'files' || section === 'data';   // these get the header filter funnel
       if (isBrowse) st.sideMode = section;   // keep the filter funnel (filterMenu/filterActive) keyed to the active surface
       var sideBody;
       if (section === 'files') sideBody = '<div class="wsgroups">' + wslist + '</div>';
@@ -1277,7 +1266,11 @@
     WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };
     function navlink(href, ico, label, p){ return '<a class="nxlink' + (p === href ? ' on' : '') + '" data-nav="' + href + '" href="#' + href + '" title="' + esc(label) + '">' + ico + '<span class="lbl">' + esc(label) + '</span></a>'; }
     // The funnel shows a dot when a non-default filter is active for the CURRENT tab.
-    function filterActive(){ return st.sideMode === 'files' ? st.fileFilter !== 'all' : (st.appFilter !== 'all' || st.appView !== 'all' || st.appSort !== 'name'); }
+    function filterActive(){
+      if (st.sideMode === 'files') return st.fileFilter !== 'all';
+      if (st.sideMode === 'data') return !!st.dataTagFilter;
+      return st.appFilter !== 'all' || st.appView !== 'all' || st.appSort !== 'name';
+    }
     // Context-dependent filter popover — Apps → visibility (public/private), Files → file type.
     function fopt(kind, val, label, ico){
       var cur = kind === 'app' ? st.appFilter : st.fileFilter;
@@ -1286,6 +1279,22 @@
         '<span>' + esc(label) + '</span>' + (cur === val ? '<span class="fcheck">✓</span>' : '') + '</button>';
     }
     function filterMenu(){
+      if (st.sideMode === 'data') {
+        // Tags come from the cached resource list (paintDataSide's SWR key); the menu is built sync.
+        var cached = WB.cache.get('data:list');
+        var tags = [];
+        ((cached && cached.resources) || []).forEach(function(r){ (r.tags || []).forEach(function(t){ if (tags.indexOf(t) < 0) tags.push(t); }); });
+        tags.sort();
+        var cur = st.dataTagFilter || '';
+        function dtopt(val, label){
+          return '<button class="filteropt' + (cur === val ? ' on' : '') + '" data-datatagfilter="' + esc(val) + '">' +
+            '<span class="fopti"></span><span>' + esc(label) + '</span>' + (cur === val ? '<span class="fcheck">✓</span>' : '') + '</button>';
+        }
+        return '<div class="filtermenu" role="menu"><div class="filterhd">Tags</div>' +
+          dtopt('', 'All tables') +
+          (tags.length ? tags.map(function(t){ return dtopt(t, '#' + t); }).join('') : '<div class="filterhd" style="opacity:.55;font-weight:500">No tags yet</div>') +
+        '</div>';
+      }
       if (st.sideMode === 'files') {
         return '<div class="filtermenu" role="menu"><div class="filterhd">Files</div>' +
           fopt('file', 'all', 'All files') + fopt('file', 'work', 'Workbooks (.work)') + fopt('file', 'assets', 'Assets') +
@@ -1394,6 +1403,7 @@
       if (t.closest && t.closest('[data-filter-toggle]')) { st.filterOpen = !st.filterOpen; renderShell(); return; }
       var afl = t.closest && t.closest('[data-appfilter]'); if (afl) { st.appFilter = afl.getAttribute('data-appfilter'); try { localStorage.setItem('wb-appfilter', st.appFilter); } catch (er) {} st.filterOpen = false; renderShell(); return; }
       var ffl = t.closest && t.closest('[data-filefilter]'); if (ffl) { st.fileFilter = ffl.getAttribute('data-filefilter'); try { localStorage.setItem('wb-filefilter', st.fileFilter); } catch (er) {} st.filterOpen = false; renderShell(); return; }
+      var dtf = t.closest && t.closest('[data-datatagfilter]'); if (dtf) { st.dataTagFilter = dtf.getAttribute('data-datatagfilter'); st.filterOpen = false; renderShell(); paintDataSide(); return; }
       var avw = t.closest && t.closest('[data-appview]'); if (avw) { st.appView = avw.getAttribute('data-appview'); try { localStorage.setItem('wb-appview', st.appView); } catch (er) {} st.filterOpen = false; renderShell(); paintApps(); return; }
       var aso = t.closest && t.closest('[data-appsort]'); if (aso) { st.appSort = aso.getAttribute('data-appsort'); try { localStorage.setItem('wb-appsort', st.appSort); } catch (er) {} st.filterOpen = false; renderShell(); paintApps(); return; }
       if (t.closest && t.closest('[data-palette]')) { WB.palette(); return; }
