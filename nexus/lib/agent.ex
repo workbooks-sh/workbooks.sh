@@ -280,7 +280,10 @@ defmodule Nexus.Agent do
     #     parent's grants.
     # So editing a declared grant UP is a no-op: it is intersected back down to what the ceiling allows.
     index_ceiling = Keyword.get(opts, :ceiling) || Map.get(node, :ceiling) || :unbounded
-    grant = effective_grant(d[:grant], index_ceiling, Keyword.get(opts, :grant_ceiling))
+    grant =
+      d[:grant]
+      |> effective_grant(index_ceiling, Keyword.get(opts, :grant_ceiling))
+      |> with_leases(d.name)
 
     base =
       [system: d.system, task: task, unit: d.name]
@@ -311,6 +314,25 @@ defmodule Nexus.Agent do
     do: Enum.filter(declared, &(&1 in ceiling))
 
   defp clamp(declared, _ceiling), do: declared
+
+  # Union a principal's active LEASES on top of its ceiling-clamped grant (Autopoiesis v2 — wb-a6u3.5).
+  # A lease is the sanctioned, time-boxed way to EXCEED the normal ceiling, so it's added after the
+  # clamp. Leases are keyed by principal (the agent name) → a sub-agent (different name) never inherits.
+  # A `nil` declared grant (no grant block = all powers) is left as-is.
+  defp with_leases(nil, _principal), do: nil
+
+  defp with_leases(grant, principal) when is_list(grant) do
+    case safe_leases(principal) do
+      [] -> grant
+      leased -> Enum.uniq(grant ++ leased)
+    end
+  end
+
+  defp safe_leases(principal) do
+    Nexus.Autopoet.Lease.active(principal)
+  rescue
+    _ -> []
+  end
 
   defp put_if(kw, _key, nil), do: kw
   defp put_if(kw, key, val), do: Keyword.put(kw, key, val)
