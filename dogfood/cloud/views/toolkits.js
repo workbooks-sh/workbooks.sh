@@ -152,36 +152,46 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
     catch (e) { WB.toast(String(e)); }
   }
 
+  // Built-in toolkit icon + pastel theme (per the brand DNA pastels, not the neon green). Each gets its
+  // own glyph, icon color, and soft tinted chip background.
+  var TK_THEME = {
+    presentation: { color:'#7c6cf0', bg:'rgba(124,108,240,.14)', icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg>' },
+    video: { color:'#e8794b', bg:'rgba(232,121,75,.14)', icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>' }
+  };
+  function tkTheme(id){ return TK_THEME[id] || { color:'var(--dim)', bg:'var(--line)', icon: WB.ICO_TOOLBOX || '' }; }
+
   // ── render ──────────────────────────────────────────────────────────────────────────────────
-  // A provider toolkit card: logo, name, status, blurb, connected accounts + connect button (or a
-  // "Coming soon" pill when the nexus hasn't configured its OAuth app yet).
+  // An INTEGRATION card: logo, name, blurb. Connected = green dot + "Add account"; the connected
+  // accounts themselves live in the sidebar (not listed inline here). "needs setup" when no OAuth app.
   function providerCard(p){
-    var accs = p.accounts || [];
-    var on = accs.length > 0;
+    var on = (p.accounts || []).length > 0;
     var soon = p.status !== 'ready';
     return '<div class="tkcard' + (on ? ' on' : '') + (soon ? ' soon' : '') + '">' +
       '<div class="tktop"><span class="tkchip"><img class="tklogo" src="' + esc(logo(p.id)) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.textContent=this.parentNode.getAttribute(\'data-i\')" data-i="' + esc((p.name || '?').slice(0,1).toUpperCase()) + '"></span>' +
         '<span class="tkname">' + esc(p.name) + '</span>' +
         (soon ? '<span class="tkpill soon">Coming soon</span>' : (on ? '<span class="tkdot" title="Connected"></span>' : '')) + '</div>' +
       '<p class="tkblurb">' + esc(p.blurb || '') + '</p>' +
-      (on ? '<div class="tkaccs">' + accs.map(function(a){
-        return '<div class="tkacc"><span class="tkacclbl">' + esc(a.label || a.id) + '</span>' +
-          '<button class="tkx" data-disc="' + esc(p.id) + '|' + esc(a.id) + '" title="Disconnect">✕</button></div>';
-      }).join('') + '</div>' : '') +
       (soon ? '' : '<button class="tkbtn' + (on ? ' add' : '') + '" data-conn="' + esc(p.id) + '">' + (on ? '+ Add account' : 'Connect') + '</button>') +
     '</div>';
   }
 
-  // A standalone toolkit card: no account; just availability. "ready" = usable by your agents now.
-  function standaloneCard(t){
+  // A built-in TOOLKIT card: pastel themed icon, name, blurb, and an enable/disable toggle (default-added).
+  function toolkitCard(t){
     var soon = t.status !== 'ready';
-    return '<div class="tkcard' + (soon ? ' soon' : ' on') + '">' +
-      '<div class="tktop"><span class="tkchip glyph">' + (WB.ICO_TOOLBOX || '') + '</span>' +
+    var on = t.enabled !== false;
+    var th = tkTheme(t.id);
+    return '<div class="tkcard' + (on && !soon ? ' on' : '') + (soon ? ' soon' : '') + '">' +
+      '<div class="tktop"><span class="tkchip tint" style="background:' + th.bg + ';color:' + th.color + '">' + th.icon + '</span>' +
         '<span class="tkname">' + esc(t.name) + '</span>' +
-        '<span class="tkpill ' + (soon ? 'soon' : 'ready') + '">' + (soon ? 'Coming soon' : 'Available') + '</span></div>' +
+        (soon ? '<span class="tkpill soon">Coming soon</span>' : (on ? '<span class="tkdot" title="Enabled"></span>' : '')) + '</div>' +
       '<p class="tkblurb">' + esc(t.blurb || '') + '</p>' +
-      (t.category ? '<div class="tkmeta">' + esc(t.category) + '</div>' : '') +
+      (soon ? '' : '<button class="tkbtn' + (on ? ' add' : '') + '" data-toggle="' + esc(t.id) + '">' + (on ? 'Disable' : 'Add') + '</button>') +
     '</div>';
+  }
+
+  async function toggleToolkit(id){
+    try { await send('/cloud/toolkits/' + encodeURIComponent(id) + '/toggle', 'POST'); paint(); }
+    catch (e) { WB.toast(String(e)); }
   }
 
   async function paint(){
@@ -191,19 +201,16 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
     el.innerHTML =
       '<section class="tk">' +
         '<div class="tkhd"><h1 class="tktitle">Toolkits</h1>' +
-          '<p class="tksub">Capabilities your agents and apps use. <b>Provider toolkits</b> wrap an external service — connect an account and its credentials seal as secrets. <b>Standalone toolkits</b> need no account.</p></div>' +
-        '<div class="tkgroup"><span class="tkgrouptt">Provider toolkits</span><span class="tkgroupct">' + providers.length + '</span></div>' +
+          '<p class="tksub">Capabilities your agents and apps use. <b>Integrations</b> connect an external account (credentials seal as secrets). <b>Toolkits</b> are built-in — no account needed.</p></div>' +
+        '<div class="tkgroup"><span class="tkgrouptt">Integrations</span><span class="tkgroupct">' + providers.length + '</span></div>' +
         '<div class="tkgrid">' + providers.map(providerCard).join('') + '</div>' +
-        '<div class="tkgroup"><span class="tkgrouptt">Standalone toolkits</span><span class="tkgroupct">' + standalone.length + '</span></div>' +
-        '<div class="tkgrid">' + standalone.map(standaloneCard).join('') + '</div>' +
+        '<div class="tkgroup"><span class="tkgrouptt">Toolkits</span><span class="tkgroupct">' + standalone.length + '</span></div>' +
+        '<div class="tkgrid">' + standalone.map(toolkitCard).join('') + '</div>' +
       '</section>';
 
     var byId = {}; providers.forEach(function(p){ byId[p.id] = p; });
     el.querySelectorAll('[data-conn]').forEach(function(b){ b.onclick = function(){ connect(byId[b.getAttribute('data-conn')]); }; });
-    el.querySelectorAll('[data-disc]').forEach(function(b){ b.onclick = function(){
-      var parts = b.getAttribute('data-disc').split('|'); var p = byId[parts[0]];
-      disconnect(p, (p.accounts || []).find(function(a){ return a.id === parts[1]; }) || { id: parts[1] });
-    }; });
+    el.querySelectorAll('[data-toggle]').forEach(function(b){ b.onclick = function(){ toggleToolkit(b.getAttribute('data-toggle')); }; });
   }
   paint();
 }});
@@ -231,6 +238,7 @@ WB.scopedStyles('/toolkits', `
   background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0,0,0,.18);
   font: 700 14px var(--read); color: #333; overflow: hidden; }
 .tkchip.glyph { background: var(--line); border-color: transparent; color: var(--dim); box-shadow: none; }
+.tkchip.tint { border-color: transparent; box-shadow: none; }
 .tklogo { width: 20px; height: 20px; object-fit: contain; }
 .tkname { font: 600 15px var(--read); color: var(--ink); }
 .tkpill { margin-left: auto; font: 600 10px var(--read); text-transform: uppercase; letter-spacing: .04em; border-radius: 20px; padding: 2px 8px; }

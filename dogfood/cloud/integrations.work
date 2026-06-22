@@ -38,6 +38,7 @@ server :integrations do
   @oauth_org "_oauth"
 
   route "GET /cloud/toolkits", :toolkits
+  route "POST /cloud/toolkits/:id/toggle", :toggle_toolkit
   route "GET /cloud/integrations", :list_integrations
   route "POST /cloud/integrations", :connect_api_key
   route "GET /cloud/integrations/authorize", :authorize
@@ -87,30 +88,38 @@ server :integrations do
 
   def spec(provider), do: Enum.find(catalog(), &(&1.id == provider))
 
-  # ── the STANDALONE toolkit catalog — toolkits that need no external account (the other KIND). Curated
-  # from the audited toolkit set: only the genuinely-good core, the rest marked "soon" so nobody is
-  # misled. `status`: "ready" (available to your agents) | "soon" (curated, cloud wiring in progress).
+  # ── the built-in TOOLKIT catalog — capabilities that need no external account (the other KIND). Only
+  # genuinely-shipping ones; sandbox/git/ffmpeg are core nexus infrastructure, not add-ons, so they're
+  # not listed here. These are default-added (enabled) and can be disabled per tenant.
   def standalone_catalog do
     [
-      %{id: "git", name: "Git", category: "Dev", status: "ready",
-        blurb: "Version control — branch, rebase, recover, inspect history. Sandboxed, no native exec.",
-        caps: ["fs"]},
-      %{id: "sandbox", name: "Sandbox", category: "Dev", status: "ready",
-        blurb: "A WASI command palette — Python, Rust, JS, crypto, fonts and more, fully sandboxed.",
-        caps: ["fs"]},
-      %{id: "ffmpeg", name: "FFmpeg", category: "Media", status: "ready",
-        blurb: "Media processing — convert, trim, scale, and compose image / video / audio.",
-        caps: ["fs"]},
-      %{id: "wraith", name: "Wraith", category: "Dev", status: "soon",
-        blurb: "Codebase health — find dead code, unused deps, and complexity hot-spots.",
-        caps: ["fs"]},
-      %{id: "wavelet", name: "Wavelet", category: "Media", status: "soon",
-        blurb: "In-nexus HTML → video rendering for motion graphics. No external tooling.",
-        caps: ["fs"]},
-      %{id: "presentation", name: "Presentation", category: "Design", status: "soon",
-        blurb: "Build reveal.js decks straight from your content.",
-        caps: ["fs"]}
+      %{id: "presentation", name: "Presentation", status: "ready", default: true,
+        blurb: "Build reveal.js decks straight from your content."},
+      %{id: "video", name: "Video", status: "ready", default: true,
+        blurb: "In-nexus HTML → video rendering for motion graphics. No external tooling."}
     ]
+  end
+
+  # Built-in toolkits are default-added; a tenant can disable one (stored as a :toolkit record with
+  # enabled:false). `enabled?/2` resolves the effective state.
+  defp toolkit_enabled?(tenant, id) do
+    case CP.get(tenant, :toolkit, id) do
+      {:ok, rec} -> rec[:enabled] != false
+      _ -> true
+    end
+  end
+
+  @doc "Toggle a built-in toolkit on/off for this tenant. `{200, %{id, enabled}}`."
+  def toggle_toolkit(req) do
+    id = req.params["id"]
+
+    if Enum.any?(standalone_catalog(), &(&1.id == id)) do
+      now = !toolkit_enabled?(req.tenant, id)
+      CP.put(req.tenant, :toolkit, id, %{enabled: now})
+      {200, %{id: id, enabled: now}}
+    else
+      {404, %{error: "no such toolkit"}}
+    end
   end
 
   # ── unified toolkit library — the one feed behind the dashboard's Toolkits page. A toolkit comes in
@@ -139,7 +148,10 @@ server :integrations do
         })
       end
 
-    standalone = Enum.map(standalone_catalog(), &Map.put(&1, :kind, "standalone"))
+    standalone =
+      Enum.map(standalone_catalog(), fn t ->
+        t |> Map.put(:kind, "standalone") |> Map.put(:enabled, toolkit_enabled?(req.tenant, t.id))
+      end)
 
     %{toolkits: providers ++ standalone}
   end
