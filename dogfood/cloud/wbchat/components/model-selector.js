@@ -17,11 +17,14 @@ const STYLE = `
   .wbc-modelsel.open .wbc-modelsel-chev { transform: rotate(180deg); }
   .wbc-modelsel-chev svg { width: 13px; height: 13px; }
 
-  .wbc-modelsel-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; min-width: 180px;
-    max-width: 280px; max-height: 280px; overflow-y: auto; padding: 4px; border: 1px solid var(--wbc-line);
+  .wbc-modelsel-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; min-width: 260px;
+    max-width: 320px; max-height: 360px; overflow: hidden; border: 1px solid var(--wbc-line);
     background: var(--wbc-panel); border-radius: var(--wbc-radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,.22);
     display: none; }
-  .wbc-modelsel.open .wbc-modelsel-menu { display: block; }
+  .wbc-modelsel.open .wbc-modelsel-menu { display: flex; }
+  .wbc-modelsel-grp { display: flex; align-items: center; gap: 7px; font: 700 10px var(--wbc-font); letter-spacing: .05em;
+    text-transform: uppercase; color: var(--wbc-dim); padding: 10px 9px 4px; }
+  .wbc-modelsel-grp .prov { display: grid; place-items: center; } .wbc-modelsel-grp .prov svg, .wbc-modelsel-grp .prov img { width: 14px; height: 14px; }
   .wbc-modelsel-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
     border: none; background: none; color: var(--wbc-ink); cursor: pointer; border-radius: 7px;
     padding: 7px 9px; font: 500 13px var(--wbc-font); }
@@ -30,6 +33,7 @@ const STYLE = `
   .wbc-modelsel-check { flex: none; width: 14px; display: grid; place-items: center; color: var(--wbc-accent); opacity: 0; }
   .wbc-modelsel-item.on .wbc-modelsel-check { opacity: 1; }
   .wbc-modelsel-check svg { width: 14px; height: 14px; }
+  .wbc-modelsel-empty { padding: 12px 10px; font: 500 12px var(--wbc-font); color: var(--wbc-dim); }
 `;
 
 const CHEV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
@@ -51,6 +55,12 @@ registerComposerButton((ctx) => {
   }, [lbl, el('span', { class: 'wbc-modelsel-chev', html: CHEV })]);
   const menu = el('div', { class: 'wbc-modelsel-menu' });
   root.append(btn, menu);
+  // Scrollable list + fixed bottom search (shared shell). Items scroll above the pinned search.
+  const shell = ctx.buildMenuShell(menu, { placeholder: 'Search models…', onQuery: () => buildMenu() });
+
+  const W = (typeof window !== 'undefined') ? window.WB : null;
+  const provName = (p) => (W && W.providerName) ? W.providerName(p) : (p || '');
+  const provIcon = (p) => (W && W.providerIcon) ? W.providerIcon(p) : '';
 
   function currentLabel() {
     const cur = ctx.model();
@@ -60,30 +70,41 @@ registerComposerButton((ctx) => {
   function syncLabel() { lbl.textContent = currentLabel(); }
 
   function buildMenu() {
-    menu.innerHTML = '';
+    shell.list.innerHTML = '';
     const cur = ctx.model();
-    models.forEach(m => {
-      const id = idOf(m);
-      const item = el('button', {
-        class: 'wbc-modelsel-item' + (id === cur ? ' on' : ''), type: 'button',
-        onClick: (e) => { e.stopPropagation(); ctx.setModel(id); syncLabel(); close(); },
-      }, [
-        el('span', { class: 'wbc-modelsel-itemlbl' }, labelOf(m)),
-        el('span', { class: 'wbc-modelsel-check', html: CHECK }),
-      ]);
-      menu.append(item);
+    const q = (shell.input.value || '').trim().toLowerCase();
+    const ms = models.filter(m => !q || (labelOf(m) + ' ' + idOf(m) + ' ' + provName(m && m.provider)).toLowerCase().indexOf(q) >= 0);
+    if (!ms.length) { shell.list.append(el('div', { class: 'wbc-modelsel-empty' }, 'No models match.')); return; }
+    // Group by provider when the models carry one; otherwise a flat list.
+    const groups = {}; const order = [];
+    ms.forEach(m => { const p = (m && m.provider) || ''; if (!groups[p]) { groups[p] = []; order.push(p); } groups[p].push(m); });
+    order.forEach(p => {
+      if (p) shell.list.append(el('div', { class: 'wbc-modelsel-grp' }, [el('span', { class: 'prov', html: provIcon(p) }), provName(p)]));
+      groups[p].forEach(m => {
+        const id = idOf(m);
+        shell.list.append(el('button', {
+          class: 'wbc-modelsel-item' + (id === cur ? ' on' : ''), type: 'button',
+          onClick: (e) => { e.stopPropagation(); ctx.setModel(id); syncLabel(); close(); },
+        }, [
+          el('span', { class: 'wbc-modelsel-itemlbl' }, labelOf(m)),
+          el('span', { class: 'wbc-modelsel-check', html: CHECK }),
+        ]));
+      });
     });
   }
 
   let onDoc = null;
   function open() {
-    buildMenu();
+    shell.input.value = ''; buildMenu();
     root.classList.add('open');
+    ctx.menuOpen(close);
+    setTimeout(() => shell.input.focus(), 0);
     onDoc = (e) => { if (!root.contains(e.target)) close(); };
     document.addEventListener('click', onDoc);
   }
   function close() {
     root.classList.remove('open');
+    ctx.menuClose(close);
     if (onDoc) { document.removeEventListener('click', onDoc); onDoc = null; }
   }
   function toggle() { root.classList.contains('open') ? close() : open(); }

@@ -22,11 +22,12 @@ const STYLE = `
   .wbc-agentsel.locked .wbc-agentsel-chev { display: none; }
   .wbc-agentsel-chev svg { width: 12px; height: 12px; }
 
-  .wbc-agentsel-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; min-width: 230px;
-    max-width: 300px; max-height: 320px; overflow-y: auto; padding: 4px; border: 1px solid var(--wbc-line);
+  .wbc-agentsel-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; min-width: 250px;
+    max-width: 320px; max-height: 360px; overflow: hidden; border: 1px solid var(--wbc-line);
     background: var(--wbc-panel); border-radius: var(--wbc-radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,.22);
     display: none; }
-  .wbc-agentsel.open .wbc-agentsel-menu { display: block; }
+  .wbc-agentsel.open .wbc-agentsel-menu { display: flex; }
+  .wbc-agentsel-empty { padding: 12px 10px; font: 500 12px var(--wbc-font); color: var(--wbc-dim); }
   .wbc-agentsel-item { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
     border: none; background: none; color: var(--wbc-ink); cursor: pointer; border-radius: 8px; padding: 8px 9px; }
   .wbc-agentsel-item:hover { background: var(--wbc-line); }
@@ -68,6 +69,8 @@ registerComposerButton((ctx) => {
   }, [icd, lbl, el('span', { class: 'wbc-agentsel-chev', html: CHEV })]);
   const menu = el('div', { class: 'wbc-agentsel-menu' });
   root.append(btn, menu);
+  // Scrollable list + fixed bottom search (shared shell). Items scroll above the pinned search.
+  const shell = ctx.buildMenuShell(menu, { placeholder: 'Search agents…', onQuery: () => buildMenu() });
 
   function current() {
     const cur = nameOf(ctx.agent());
@@ -83,9 +86,12 @@ registerComposerButton((ctx) => {
   }
 
   function buildMenu() {
-    menu.innerHTML = '';
+    shell.list.innerHTML = '';
     const cur = nameOf(ctx.agent());
-    agents.forEach(a => {
+    const q = (shell.input.value || '').trim().toLowerCase();
+    const list = agents.filter(a => !q || (labelOf(a) + ' ' + nameOf(a) + ' ' + ((a && a.blurb) || '')).toLowerCase().indexOf(q) >= 0);
+    if (!list.length) { shell.list.append(el('div', { class: 'wbc-agentsel-empty' }, 'No agents match.')); return; }
+    list.forEach(a => {
       const nm = nameOf(a);
       const th = themeOf(a);
       const ic = el('span', { class: 'wbc-agentsel-ic', html: th.icon || '' });
@@ -109,13 +115,13 @@ registerComposerButton((ctx) => {
         more,
         el('span', { class: 'wbc-agentsel-check', html: CHECK }),
       ]);
-      menu.append(item);
+      shell.list.append(item);
     });
   }
 
   let onDoc = null;
-  function open() { buildMenu(); root.classList.add('open'); onDoc = (e) => { if (!root.contains(e.target)) close(); }; document.addEventListener('click', onDoc); }
-  function close() { root.classList.remove('open'); if (onDoc) { document.removeEventListener('click', onDoc); onDoc = null; } }
+  function open() { shell.input.value = ''; buildMenu(); root.classList.add('open'); ctx.menuOpen(close); setTimeout(() => shell.input.focus(), 0); onDoc = (e) => { if (!root.contains(e.target)) close(); }; document.addEventListener('click', onDoc); }
+  function close() { root.classList.remove('open'); ctx.menuClose(close); if (onDoc) { document.removeEventListener('click', onDoc); onDoc = null; } }
   function toggle() { root.classList.contains('open') ? close() : open(); }
 
   // Re-sync the lock state + label whenever the conversation changes (first message pins the agent).

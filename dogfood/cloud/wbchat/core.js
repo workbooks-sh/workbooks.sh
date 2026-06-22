@@ -83,6 +83,29 @@ export function collapsible({ title, open = false, aside } = {}) {
   return { root, content, setOpen, isOpen: () => root.classList.contains('open') };
 }
 
+// Shared composer-popover scaffold — turns a menu element into a [scrollable list][fixed bottom search]
+// column. The search sits at the BOTTOM (nearest the composer, since popovers open upward); items scroll
+// above it, with a small gap below. Returns { list, input } — append items to `list`, read `input.value`.
+// Used by the agent / model / capabilities selectors so they share one search UX.
+export function buildMenuShell(menu, { placeholder = 'Search…', onQuery } = {}) {
+  injectStyle('menushell', `
+    .wbc-menushell { flex-direction: column; }
+    .wbc-menushell .wbc-menulist { overflow-y: auto; flex: 1 1 auto; min-height: 0; padding: 4px; }
+    .wbc-menushell .wbc-menusearch { flex: none; border-top: 1px solid var(--wbc-line); padding: 8px 8px 10px; }
+    .wbc-menushell .wbc-menusearch input { width: 100%; box-sizing: border-box; border: 1px solid var(--wbc-line);
+      border-radius: 8px; background: var(--wbc-bg); color: var(--wbc-ink); font: 500 12.5px var(--wbc-font);
+      padding: 7px 9px; outline: none; }
+    .wbc-menushell .wbc-menusearch input:focus { border-color: var(--wbc-accent); }`);
+  menu.classList.add('wbc-menushell');
+  const list = el('div', { class: 'wbc-menulist' });
+  const input = el('input', { type: 'text', placeholder: placeholder, autocomplete: 'off', spellcheck: 'false' });
+  input.addEventListener('input', () => { if (onQuery) onQuery(input.value); });
+  input.addEventListener('click', (e) => e.stopPropagation());
+  input.addEventListener('keydown', (e) => e.stopPropagation());
+  menu.append(list, el('div', { class: 'wbc-menusearch' }, [input]));   // list on top, search at the BOTTOM
+  return { list: list, input: input };
+}
+
 // markdown — loaded lazily; escaped fallback so the core never hard-depends on the network.
 let _md = (t) => '<p>' + esc(t).replace(/\n/g, '<br>') + '</p>';
 async function loadMarkdown() {
@@ -112,6 +135,7 @@ export function createChat(container, options = {}) {
   let status = 'idle'; // idle | pending | streaming
   let abort = null;
   let attachedFiles = [];                                  // composer attachments (set via ctx.addFile)
+  let openComposerMenu = null;                             // the currently-open composer popover's close fn
   let selectedModel = opts.model || (opts.models && opts.models[0]) || null; // composer model picker
   // Agent the run is routed through (the composer's agent selector). Pinned for a session's life: once the
   // conversation has any messages, the selector locks (agentLocked()), matching "pick the agent only when
@@ -256,6 +280,11 @@ export function createChat(container, options = {}) {
     // Host-provided context picker (e.g. the cloud command-palette search). Returns Promise<item[]>; the
     // attachments add-on calls it instead of the native file dialog when present. null = native file input.
     pickContext: opts.onAttach || null,
+    // Mutual exclusivity for the composer popovers (agent / model / capabilities): opening one closes the
+    // previously-open one — only one is ever open at a time. Selectors call menuOpen(close)/menuClose(close).
+    menuOpen: (closeFn) => { if (openComposerMenu && openComposerMenu !== closeFn) { try { openComposerMenu(); } catch (e) {} } openComposerMenu = closeFn; },
+    menuClose: (closeFn) => { if (openComposerMenu === closeFn) openComposerMenu = null; },
+    buildMenuShell: buildMenuShell,
     submit: (t) => submit(t),
   };
   function mountComposerButtons() {

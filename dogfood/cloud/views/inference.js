@@ -140,11 +140,13 @@ WB.scopedStyles('/inference', `
 .infrow2-lbl { font: 600 13.5px var(--read); color: var(--ink); }
 .infrow2-id { font: 500 11px var(--mono); color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .infrow2-chk { flex: none; width: 16px; text-align: center; color: var(--violet); font-weight: 700; }
+/* Saturated text on a low-alpha tint of the SAME hue — readable in both light + dark (the prior
+   semi-transparent pastel backgrounds washed the text out, esp. Frontier). */
 .inftier { flex: none; font: 700 9.5px var(--read); letter-spacing: .04em; text-transform: uppercase; border-radius: 5px; padding: 2px 6px; }
-.inftier.frontier { color: var(--pcd, #2f6fa8); background: color-mix(in srgb, var(--sky) 40%, transparent); }
-.inftier.reasoning { color: var(--pause, #7c63cf); background: color-mix(in srgb, var(--violet) 45%, transparent); }
-.inftier.fast { color: var(--bloomd); background: color-mix(in srgb, var(--bloom) 16%, transparent); }
-.inftier.open { color: var(--amber); background: color-mix(in srgb, var(--cream) 50%, transparent); }
+.inftier.frontier { color: #5b9bd5; background: color-mix(in srgb, #5b9bd5 20%, transparent); }
+.inftier.reasoning { color: #b48cff; background: color-mix(in srgb, #b48cff 20%, transparent); }
+.inftier.fast { color: var(--bloomd); background: color-mix(in srgb, var(--bloom) 18%, transparent); }
+.inftier.open { color: #e0b34a; background: color-mix(in srgb, #e0b34a 20%, transparent); }
 .infempty { color: var(--dim); padding: 24px 8px; text-align: center; font: 500 13px var(--read); }
 .infrow { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .infrow label { width: 64px; font: 600 13px var(--read); color: var(--ink); }

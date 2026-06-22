@@ -17,10 +17,10 @@ const STYLE = `
   .wbc-capsel-chev { display: grid; place-items: center; color: var(--wbc-dim); transition: transform .15s; }
   .wbc-capsel.open .wbc-capsel-chev { transform: rotate(180deg); }
   .wbc-capsel-chev svg { width: 12px; height: 12px; }
-  .wbc-capsel-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; min-width: 250px;
-    max-width: 320px; max-height: 340px; overflow-y: auto; padding: 4px; border: 1px solid var(--wbc-line);
+  .wbc-capsel-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; min-width: 260px;
+    max-width: 320px; max-height: 360px; overflow: hidden; border: 1px solid var(--wbc-line);
     background: var(--wbc-panel); border-radius: var(--wbc-radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,.22); display: none; }
-  .wbc-capsel.open .wbc-capsel-menu { display: block; }
+  .wbc-capsel.open .wbc-capsel-menu { display: flex; }
   .wbc-capsel-hd { font: 700 10px var(--wbc-font); letter-spacing: .06em; text-transform: uppercase; color: var(--wbc-dim); padding: 8px 9px 4px; }
   .wbc-capsel-item { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; border: none;
     background: none; color: var(--wbc-ink); cursor: pointer; border-radius: 8px; padding: 8px 9px; }
@@ -56,6 +56,8 @@ registerComposerButton((ctx) => {
       el('span', { class: 'wbc-capsel-chev', html: CHEV })]);
   const menu = el('div', { class: 'wbc-capsel-menu' });
   root.append(btn, menu);
+  // Scrollable list + fixed bottom search (shared shell). Items scroll above the pinned search.
+  const shell = ctx.buildMenuShell(menu, { placeholder: 'Search capabilities…', onQuery: () => buildMenu() });
 
   function admission() {
     try { return ctx.capabilityAdmission(nameOf(ctx.agent())); } catch (e) { return 'all'; }
@@ -74,11 +76,13 @@ registerComposerButton((ctx) => {
     btn.title = admission() === 'none' ? 'This agent admits no capabilities' : 'Capabilities';
   }
   function buildMenu() {
-    menu.innerHTML = '';
+    shell.list.innerHTML = '';
     const sel = ctx.capabilities();
-    if (admission() === 'none') { menu.append(el('div', { class: 'wbc-capsel-empty' }, 'This agent runs sealed — no capabilities.')); return; }
-    menu.append(el('div', { class: 'wbc-capsel-hd' }, 'Capabilities'));
-    catalog.forEach(c => {
+    if (admission() === 'none') { shell.list.append(el('div', { class: 'wbc-capsel-empty' }, 'This agent runs sealed — no capabilities.')); return; }
+    const q = (shell.input.value || '').trim().toLowerCase();
+    const list = catalog.filter(c => !q || ((c.name || '') + ' ' + (c.id || '') + ' ' + (c.blurb || '')).toLowerCase().indexOf(q) >= 0);
+    if (!list.length) { shell.list.append(el('div', { class: 'wbc-capsel-empty' }, 'No capabilities match.')); return; }
+    list.forEach(c => {
       const ok = admits(c.id), on = sel.indexOf(c.id) >= 0;
       const item = el('button', {
         class: 'wbc-capsel-item' + (on ? ' on' : '') + (ok ? '' : ' off'), type: 'button',
@@ -95,13 +99,13 @@ registerComposerButton((ctx) => {
             (c.blurb ? el('div', { class: 'wbc-capsel-sub' }, c.blurb) : null),
         ].filter(Boolean)),
       ]);
-      menu.append(item);
+      shell.list.append(item);
     });
   }
 
   let onDoc = null;
-  function open() { buildMenu(); root.classList.add('open'); onDoc = (e) => { if (!root.contains(e.target)) close(); }; document.addEventListener('click', onDoc); }
-  function close() { root.classList.remove('open'); if (onDoc) { document.removeEventListener('click', onDoc); onDoc = null; } }
+  function open() { shell.input.value = ''; buildMenu(); root.classList.add('open'); ctx.menuOpen(close); setTimeout(() => shell.input.focus(), 0); onDoc = (e) => { if (!root.contains(e.target)) close(); }; document.addEventListener('click', onDoc); }
+  function close() { root.classList.remove('open'); ctx.menuClose(close); if (onDoc) { document.removeEventListener('click', onDoc); onDoc = null; } }
   function toggle() { root.classList.contains('open') ? close() : open(); }
 
   if (ctx.onChange) ctx.onChange(() => sync());
