@@ -4,7 +4,11 @@
 // delegation (the cheapest broad-Workspace path — admin authorizes our service account once). Secrets
 // themselves live under Admin → Secrets; this view never sees a client secret.
 
-WB.view('/integrations', { title: 'Integrations', accent: 'var(--sky)', async render(el){
+// Toolkits — capabilities your agents and apps use. A toolkit is the unit; it comes in two KINDS:
+// a PROVIDER toolkit wraps an external service (connect an account → credentials seal as secrets), and
+// a STANDALONE toolkit needs no account (video, BYOD, …). The provider catalog is wired to the real
+// /cloud/integrations backend below. Registered at /toolkits (canonical) with /integrations as alias.
+var TOOLKITS_VIEW = { title: 'Toolkits', accent: 'var(--sky)', async render(el){
   var esc = WB.esc;
   // Brand → simpleicons slug (logo CDN). Falls back to a hidden img on miss.
   var SLUG = { github:'github', google:'google', composio:'composio', clerk:'clerk',
@@ -117,8 +121,9 @@ WB.view('/integrations', { title: 'Integrations', accent: 'var(--sky)', async re
     var providers = await load();
     el.innerHTML =
       '<section class="intg">' +
-        '<div class="intghd"><h1 class="intgtitle">Integrations</h1>' +
-          '<p class="intgsub">Connect services your agents and apps can use. Credentials are sealed as secrets; nothing here exposes a client secret.</p></div>' +
+        '<div class="intghd"><h1 class="intgtitle">Toolkits</h1>' +
+          '<p class="intgsub">Capabilities your agents and apps can use. <b>Provider toolkits</b> wrap an external service — connect an account and its credentials seal as secrets (nothing here exposes a client secret). <b>Standalone toolkits</b> need no account.</p></div>' +
+        '<div class="intggroup"><span class="intggrouptt">Provider toolkits</span><span class="intggroupct">' + providers.length + '</span></div>' +
         '<div class="intggrid">' + providers.map(function(p){
           var accs = p.accounts || [];
           var on = accs.length > 0;
@@ -135,6 +140,8 @@ WB.view('/integrations', { title: 'Integrations', accent: 'var(--sky)', async re
             '<button class="intgbtn' + (on ? ' add' : '') + '" data-conn="' + esc(p.id) + '">' + (on ? '+ Add account' : 'Connect') + '</button>' +
           '</div>';
         }).join('') + '</div>' +
+        '<div class="intggroup"><span class="intggrouptt">Standalone toolkits</span></div>' +
+        '<div class="intgempty">No-account toolkits (video, BYOD, capacitor, …) live in your workspace today. Bringing the full standalone library into this cloud view is in progress.</div>' +
       '</section>';
 
     var byId = {}; providers.forEach(function(p){ byId[p.id] = p; });
@@ -145,13 +152,51 @@ WB.view('/integrations', { title: 'Integrations', accent: 'var(--sky)', async re
     }; });
   }
   paint();
-}});
+}};
+WB.view('/toolkits', TOOLKITS_VIEW);
+WB.view('/integrations', TOOLKITS_VIEW);   // alias — provider toolkits used to live here
+
+WB.scopedStyles('/toolkits', `
+.intg { max-width: 920px; }
+.intghd { margin-bottom: 18px; }
+.intgtitle { font: 700 26px var(--read); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
+.intgsub { font: 500 13px var(--read); color: var(--dim); margin: 4px 0 0; max-width: 620px; line-height: 1.5; }
+.intggroup { display: flex; align-items: center; gap: 8px; margin: 20px 0 10px; }
+.intggrouptt { font: 700 11px var(--read); letter-spacing: .07em; text-transform: uppercase; color: var(--dim); }
+.intggroupct { font: 600 11px var(--mono, monospace); color: var(--dim); background: var(--line); border-radius: 20px; padding: 1px 8px; }
+.intgempty { font: 500 12.5px var(--read); color: var(--dim); background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 16px; max-width: 620px; }
+.intggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.intgcard { display: flex; flex-direction: column; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; transition: border-color .12s; }
+.intgcard:hover { border-color: var(--stroke); }
+.intgcard.on { border-color: color-mix(in srgb, var(--live) 50%, var(--line)); }
+.intgtop { display: flex; align-items: center; gap: 10px; }
+.intglogo { width: 22px; height: 22px; object-fit: contain; flex: none; }
+.intgname { font: 600 15px var(--read); color: var(--ink); }
+.intgwarn { margin-left: auto; font: 600 10.5px var(--read); color: var(--gold, #b8860b); text-transform: uppercase; letter-spacing: .04em; }
+.intgdot { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--live); flex: none; }
+.intgblurb { font: 500 12.5px var(--read); color: var(--dim); line-height: 1.4; flex: 1; }
+.intgaccs { display: flex; flex-direction: column; gap: 4px; }
+.intgacc { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+.intgacclbl { font: 600 12px var(--read); color: var(--ink); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.intgx { border: none; background: none; color: var(--dim); cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 5px; }
+.intgx:hover { color: var(--bad, #d33); background: var(--card); }
+.intgbtn { border: 1px solid var(--stroke); background: var(--card); color: var(--ink); border-radius: 9px; padding: 8px 0; font: 600 13px var(--read); cursor: pointer; }
+.intgbtn:hover { border-color: var(--ink); }
+.intgbtn.add { background: none; border-style: dashed; color: var(--dim); }
+.gwlbl { display: flex; align-items: center; gap: 8px; font: 600 12px var(--read); color: var(--dim); margin: 12px 0 4px; }
+.gwcopy { margin-left: auto; border: 1px solid var(--stroke); background: var(--card); color: var(--ink); border-radius: 6px; padding: 2px 8px; font: 600 11px var(--read); cursor: pointer; }
+.gwro { width: 100%; resize: none; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: 500 12px var(--mono, monospace); color: var(--ink); box-sizing: border-box; }
+`);
 
 WB.scopedStyles('/integrations', `
 .intg { max-width: 920px; }
 .intghd { margin-bottom: 18px; }
 .intgtitle { font: 700 26px var(--read); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
-.intgsub { font: 500 13px var(--read); color: var(--dim); margin: 4px 0 0; max-width: 560px; }
+.intgsub { font: 500 13px var(--read); color: var(--dim); margin: 4px 0 0; max-width: 620px; line-height: 1.5; }
+.intggroup { display: flex; align-items: center; gap: 8px; margin: 20px 0 10px; }
+.intggrouptt { font: 700 11px var(--read); letter-spacing: .07em; text-transform: uppercase; color: var(--dim); }
+.intggroupct { font: 600 11px var(--mono, monospace); color: var(--dim); background: var(--line); border-radius: 20px; padding: 1px 8px; }
+.intgempty { font: 500 12.5px var(--read); color: var(--dim); background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 16px; max-width: 620px; }
 .intggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .intgcard { display: flex; flex-direction: column; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; transition: border-color .12s; }
 .intgcard:hover { border-color: var(--stroke); }

@@ -326,7 +326,7 @@
       { label: 'Storage', icon: '▤', go: '/storage' },
       { label: 'Team', icon: '👥', go: '/team' },
       { label: 'Secrets', icon: '🔑', go: '/secrets' },
-      { label: 'Integrations', icon: '🔌', go: '/integrations' },
+      { label: 'Toolkits', icon: '🧰', go: '/toolkits' },
       { label: 'Settings', icon: '⚙', go: '/settings' }
     ];
     WB.palette = function () {
@@ -455,7 +455,7 @@
     // Which RAIL section a route belongs to — drives the active rail tab + which per-surface sidebar shows.
     var ADMIN_ROUTES = ['/usage', '/storage', '/team', '/secrets', '/database', '/upgrade'];
     function sectionFor(p){
-      if (p.indexOf('/integrations') === 0) return 'integrations';   // own rail section — not admin-gated
+      if (p.indexOf('/toolkits') === 0 || p.indexOf('/integrations') === 0) return 'toolkits';   // own rail section (integrations = provider toolkits) — not admin-gated
       if (p.indexOf('/studio') === 0 || p.indexOf('/create') === 0) return 'studio';
       if (p.indexOf('/activity') === 0 || p.indexOf('/runs') === 0 || p.indexOf('/tasks') === 0 || p.indexOf('/issues') === 0) return 'activity';
       if (p.indexOf('/workspace') === 0) return 'files';
@@ -482,7 +482,7 @@
     var VIEW_FILES = {
       '/app': 'app',
       '/activity': 'activity', '/runs': 'runs', '/tasks': 'tasks', '/issues': 'issues', '/database': 'database', '/denied': 'denied',
-      '/integrations': 'integrations', '/nexuses': 'nexuses', '/secrets': 'secrets', '/settings': 'settings',
+      '/toolkits': 'integrations', '/integrations': 'integrations', '/nexuses': 'nexuses', '/secrets': 'secrets', '/settings': 'settings',
       '/shared': 'shared', '/storage': 'storage', '/studio': 'studio', '/create': 'studio', '/usage': 'studio',
       '/team': 'team', '/upgrade': 'upgrade', '/welcome': 'welcome', '/workspace/env': 'workspace-env',
       '/workspace/history': 'workspace-history', '/workspace/members': 'workspace-members',
@@ -518,6 +518,7 @@
       admin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',
       chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
       plug: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg>',
+      toolbox: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13h20v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M2.5 13 4.6 7.8A2 2 0 0 1 6.45 6.5h11.1a2 2 0 0 1 1.85 1.3L21.5 13"/><path d="M9 6.5V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1.5"/><path d="M2 13h6v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2h6"/></svg>',
       files: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>',
       grid: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>',
       filter: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18M6 12h12M10 20h4"/></svg>',
@@ -939,7 +940,7 @@
       }).join('');
 
       // ── per-surface SIDEBAR body — swaps with the active rail section ──
-      var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Activity', files: 'Files', integrations: 'Integrations', admin: 'Admin', account: 'You' };
+      var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Activity', files: 'Files', toolkits: 'Toolkits', admin: 'Admin', account: 'You' };
       var isBrowse = section === 'apps' || section === 'files';   // apps/files get the filter funnel + search + pins
       if (isBrowse) st.sideMode = section;   // keep the filter funnel (filterMenu/filterActive) keyed to the active surface
       var sideBody;
@@ -971,7 +972,7 @@
           '<nav class="railsecs">' + railsecs + '</nav>' +
           '<div class="nexrail-grow"></div>' +
           '<div class="railbottom">' +
-            '<a class="railsec' + (section === 'integrations' ? ' on' : '') + '" data-nav="/integrations" href="#/integrations" title="Integrations"><span class="rsico">' + ICO.plug + '</span><span class="rslbl">Integrations</span></a>' +
+            '<a class="railsec' + (section === 'toolkits' ? ' on' : '') + '" data-nav="/toolkits" href="#/toolkits" title="Toolkits"><span class="rsico">' + ICO.toolbox + '</span><span class="rslbl">Toolkits</span></a>' +
             '<a class="railsec' + (section === 'admin' ? ' on' : '') + '" data-nav="/usage" href="#/usage" title="Admin"><span class="rsico">' + ICO.admin + '</span><span class="rslbl">Admin</span></a>' +
             '<a class="railsec railavbtn' + (section === 'account' ? ' on' : '') + '" data-nav="/settings" href="#/settings" title="' + esc(user.name) + '"><span class="railav">' + esc(user.initial) + '</span><span class="rslbl">You</span></a>' +
           '</div>' +
