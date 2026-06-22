@@ -7,6 +7,7 @@ const Io = std.Io;
 const cloud = @import("cloud.zig");
 const context = @import("context.zig");
 const log = @import("log.zig");
+const ws = @import("ws.zig");
 
 const Cred = struct { url: []const u8, token: []const u8 };
 
@@ -60,6 +61,9 @@ pub fn run(io: Io, alloc: std.mem.Allocator, home: []const u8, name: []const u8,
     }
     log.prompt(try std.fmt.allocPrint(alloc, "work agent run {s}{s}", .{ name, if (isolate) " (isolated)" else "" }));
 
+    // Stream the run over the WebSocket live channel (/ws → Nexus.Live agent_run): the socket stays
+    // alive as events flow, so a long run never hits the proxy timeout, and progress prints live. The
+    // nexus injects the tenant/user server-side from the bearer, so we don't send identity in params.
     const ws_field = if (workspace.len > 0)
         try std.fmt.allocPrint(alloc, ",\"workspace\":\"{s}\"", .{try cloud.jsonEscape(alloc, workspace)})
     else
@@ -69,32 +73,13 @@ pub fn run(io: Io, alloc: std.mem.Allocator, home: []const u8, name: []const u8,
     else
         "";
     const isolate_field = if (isolate) ",\"isolate\":true" else "";
-    const payload = try std.fmt.allocPrint(
+    const sub = try std.fmt.allocPrint(
         alloc,
-        "{{\"agent\":\"{s}\",\"task\":\"{s}\",\"u\":\"work-cli\"{s}{s}{s}}}",
+        "{{\"op\":\"subscribe\",\"source\":\"agent_run\",\"params\":{{\"agent\":\"{s}\",\"task\":\"{s}\"{s}{s}{s}}}}}",
         .{ try cloud.jsonEscape(alloc, name), try cloud.jsonEscape(alloc, task), ws_field, model_field, isolate_field },
     );
 
-    const url = try std.fmt.allocPrint(alloc, "{s}/cloud/agent/run", .{c.url});
-    // Agent runs can take a while; the underlying client carries its own timeout.
-    const res = cloud.request(io, alloc, .POST, url, c.token, payload) catch |e| {
-        log.err(try std.fmt.allocPrint(alloc, "nexus unreachable ({s})", .{@errorName(e)}));
-        return 1;
-    };
-    if (res.status != 200) return httpErr(alloc, res.status, res.body);
-
-    const rid = cloud.jsonField(res.body, "run") orelse "?";
-    const status = cloud.jsonField(res.body, "status") orelse "?";
-    const turns = cloud.jsonField(res.body, "turns") orelse "";
-    _ = turns;
-    log.ok(try std.fmt.allocPrint(alloc, "run {s} \u{b7} {s}", .{ rid, status }));
-    const answer = cloud.jsonString(alloc, res.body, "answer") orelse "";
-    if (answer.len > 0) {
-        log.out("\n");
-        log.out(answer);
-        log.out("\n");
-    }
-    return 0;
+    return ws.streamAgentRun(io, alloc, c.url, c.token, sub);
 }
 
 /// `work runs` — the durable run ledger on the active nexus (the dashboard's Runs view, headless).
