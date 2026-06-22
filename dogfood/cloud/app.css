@@ -115,6 +115,7 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .nextile:hover{ transform:translateY(-1px); }
 .nextile.on{ box-shadow:0 0 0 2px var(--ink); }
 .nextile .nexinit{ font:800 15px var(--display); }
+.nextile .nexinit.emoji{ font-size:26px; line-height:1; }
 .nextile .nexcar{ position:absolute; right:-3px; bottom:-3px; width:16px; height:16px; border-radius:50%; background:var(--paper);
   border:1px solid var(--line); display:grid; place-items:center; color:var(--dim); }
 .nextile .nexcar svg{ width:10px; height:10px; transform:rotate(90deg); }

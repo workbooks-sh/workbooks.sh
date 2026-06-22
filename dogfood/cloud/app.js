@@ -640,7 +640,7 @@
       // Admin + You grouped at the bottom. The nexus tile opens the switch menu (switch/rename/create).
       var section = sectionFor(p);
       var nexTile = '<button class="nextile' + (st.nxMenu ? ' on' : '') + '" data-nxmenu title="' + esc(nxLabel) + '">' +
-          '<span class="nexinit">' + ((nx && nx.icon) ? esc(nx.icon) : esc(inits(nxLabel))) + '</span><span class="nexcar">' + ICO.chev + '</span></button>' +
+          '<span class="nexinit' + ((nx && nx.icon) ? ' emoji' : '') + '">' + ((nx && nx.icon) ? esc(nx.icon) : esc(inits(nxLabel))) + '</span><span class="nexcar">' + ICO.chev + '</span></button>' +
         (st.nxMenu ? nexusMenu(nx) : '');
       var RAIL_SECS = [
         { id: 'studio', ico: ICO.spark, label: 'Studio', go: '/studio' },
