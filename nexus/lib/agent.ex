@@ -336,6 +336,9 @@ defmodule Nexus.Agent do
       |> put_if(:kits, d[:tools])
       |> put_if(:grant, grant)
       |> put_if(:limit, d[:limit])
+      # The agent's declared `model "…"` (OPEN-spec field) flows to Nexus.Llm; a caller `opts[:model]`
+      # (e.g. `work agent run --model …`) overrides it via the merge below (opts wins over base).
+      |> put_if(:model, d[:model])
 
     result = run(Keyword.merge(base, opts) |> Keyword.drop([:grant_ceiling, :ceiling]))
 

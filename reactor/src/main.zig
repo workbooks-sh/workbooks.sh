@@ -117,7 +117,7 @@ pub fn main(init: std.process.Init) !void {
             const name = it.next() orelse "";
             const task = it.next() orelse "";
             const f = flags(alloc, &it);
-            std.process.exit(try agentcmd.run(io, alloc, home, name, task, f.workspace));
+            std.process.exit(try agentcmd.run(io, alloc, home, name, task, f.workspace, f.model));
         } else {
             log.err("usage: work agent ls  ·  work agent run <name> \"<task>\" [--workspace <ws>]");
             std.process.exit(1);
@@ -164,7 +164,7 @@ fn stripColon(s: []const u8) []const u8 {
     return if (s.len > 0 and s[0] == ':') s[1..] else s;
 }
 
-const Flags = struct { nexus: []const u8 = "", org: []const u8 = "", workspace: []const u8 = "" };
+const Flags = struct { nexus: []const u8 = "", org: []const u8 = "", workspace: []const u8 = "", model: []const u8 = "" };
 
 fn flags(alloc: std.mem.Allocator, it: anytype) Flags {
     _ = alloc;
@@ -173,7 +173,8 @@ fn flags(alloc: std.mem.Allocator, it: anytype) Flags {
         const val = it.next() orelse break;
         if (eql(tok, "--nexus")) f.nexus = val
         else if (eql(tok, "--org")) f.org = val
-        else if (eql(tok, "--workspace")) f.workspace = val;
+        else if (eql(tok, "--workspace")) f.workspace = val
+        else if (eql(tok, "--model")) f.model = val;
     }
     return f;
 }

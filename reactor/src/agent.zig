@@ -50,11 +50,11 @@ pub fn list(io: Io, alloc: std.mem.Allocator, home: []const u8) !u8 {
     return 0;
 }
 
-/// `work agent run <name> "<task>" [--workspace <ws>]` — run an agent on a brief, print the answer.
-pub fn run(io: Io, alloc: std.mem.Allocator, home: []const u8, name: []const u8, task: []const u8, workspace: []const u8) !u8 {
+/// `work agent run <name> "<task>" [--workspace <ws>] [--model <m>]` — run an agent, print the answer.
+pub fn run(io: Io, alloc: std.mem.Allocator, home: []const u8, name: []const u8, task: []const u8, workspace: []const u8, model: []const u8) !u8 {
     const c = cred(io, alloc, home) orelse return notLoggedIn();
     if (name.len == 0 or task.len == 0) {
-        log.err("usage: work agent run <name> \"<task>\" [--workspace <ws>]");
+        log.err("usage: work agent run <name> \"<task>\" [--workspace <ws>] [--model <m>]");
         return 1;
     }
     log.prompt(try std.fmt.allocPrint(alloc, "work agent run {s}", .{name}));
@@ -63,10 +63,14 @@ pub fn run(io: Io, alloc: std.mem.Allocator, home: []const u8, name: []const u8,
         try std.fmt.allocPrint(alloc, ",\"workspace\":\"{s}\"", .{try cloud.jsonEscape(alloc, workspace)})
     else
         "";
+    const model_field = if (model.len > 0)
+        try std.fmt.allocPrint(alloc, ",\"model\":\"{s}\"", .{try cloud.jsonEscape(alloc, model)})
+    else
+        "";
     const payload = try std.fmt.allocPrint(
         alloc,
-        "{{\"agent\":\"{s}\",\"task\":\"{s}\",\"u\":\"work-cli\"{s}}}",
-        .{ try cloud.jsonEscape(alloc, name), try cloud.jsonEscape(alloc, task), ws_field },
+        "{{\"agent\":\"{s}\",\"task\":\"{s}\",\"u\":\"work-cli\"{s}{s}}}",
+        .{ try cloud.jsonEscape(alloc, name), try cloud.jsonEscape(alloc, task), ws_field, model_field },
     );
 
     const url = try std.fmt.allocPrint(alloc, "{s}/cloud/agent/run", .{c.url});
