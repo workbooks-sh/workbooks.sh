@@ -178,18 +178,8 @@ defmodule Nexus.Browse.Session do
     end)
   end
 
-  # SSRF guard (mirror Nexus.Dock): block non-http(s) + loopback/private hosts.
-  defp allowed?(url) do
-    uri = URI.parse(url)
-    host = uri.host || ""
-
-    uri.scheme in ["http", "https"] and not private?(host)
-  end
-
-  defp private?(h) do
-    h in ["localhost", "127.0.0.1", "0.0.0.0", "::1", ""] or
-      String.starts_with?(h, "127.") or String.starts_with?(h, "10.") or
-      String.starts_with?(h, "192.168.") or String.starts_with?(h, "169.254.") or
-      String.match?(h, ~r/^172\.(1[6-9]|2\d|3[01])\./)
-  end
+  # SSRF guard — the ONE shared guard (wb-y4md/wb-ety5). This URL is guest/LLM-chosen (NAVIGATE), so
+  # the old literal-host check let a public name resolving to 169.254.169.254/loopback through; route
+  # it through Nexus.Net.Ssrf (resolve-then-check-every-IP) like every other host-side egress.
+  defp allowed?(url), do: Nexus.Net.Ssrf.allowed?(url)
 end

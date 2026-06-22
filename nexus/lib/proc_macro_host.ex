@@ -123,7 +123,7 @@ defmodule Nexus.ProcMacroHost do
       # watchdog: run in bg, kill -9 after `secs`, propagate the real exit code.
       cmd = "#{run} & pid=$!; ( sleep #{secs}; kill -9 $pid 2>/dev/null ) & wd=$!; wait $pid; rc=$?; kill $wd 2>/dev/null; exit $rc"
 
-      case System.cmd("sh", ["-c", cmd], stderr_to_stdout: false) do
+      case System.cmd("sh", ["-c", cmd], env: Nexus.Sandbox.subprocess_env(), stderr_to_stdout: false) do
         {output, 0} -> {:ok, output}
         {_output, 137} -> {:error, {:server_timeout, secs}}
         {output, code} -> {:error, {:server_exit, code, String.slice(output, 0, 300)}}
@@ -151,7 +151,7 @@ defmodule Nexus.ProcMacroHost do
 
     run = parts |> Enum.map(&shq/1) |> Enum.join(" ")
     cmd = "#{run} & pid=$!; ( sleep #{secs}; kill -9 $pid 2>/dev/null ) & wd=$!; wait $pid; rc=$?; kill $wd 2>/dev/null; exit $rc"
-    System.cmd("sh", ["-c", cmd], stderr_to_stdout: false)
+    System.cmd("sh", ["-c", cmd], env: Nexus.Sandbox.subprocess_env(), stderr_to_stdout: false)
   end
 
   defp shq(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"

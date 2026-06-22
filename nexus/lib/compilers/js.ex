@@ -167,7 +167,11 @@ defmodule Nexus.Compilers.Js do
       (["wasmtime", "run"] ++ flags ++ ["--dir", "#{cdir}::/c", exec, guest_job])
       |> Enum.map_join(" ", &shq/1)
 
-    {out, code} = System.cmd("sh", ["-c", "#{inner} < #{shq(stdin_file)}"], stderr_to_stdout: true)
+    {out, code} =
+      System.cmd("sh", ["-c", "#{inner} < #{shq(stdin_file)}"],
+        env: Nexus.Sandbox.subprocess_env(),
+        stderr_to_stdout: true
+      )
     File.rm(stdin_file)
 
     if code == 0, do: {:ok, out}, else: {:error, {:transpile_failed, code, String.slice(out, 0, 400)}}
