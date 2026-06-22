@@ -19,9 +19,14 @@ These execute. Their [placement](/language/placement-and-languages) decides wher
   `prompt`, `tools`, `grant`, and `limit`. It reasons and acts, not just computes.
 - **`toolkit`** — a wrapped CLI compiled to a wasm command; a capability an agent runs.
 - **`flow`** — an ordered, runnable sequence of `step`s (a pipeline / state machine)
-  that threads each step's result into the next, over the effect engine.
+  that threads each step's result into the next, over the effect engine. A `parallel
+  do … end` group fans steps out [concurrently](/language/concurrency-and-workers).
+- **`worker`** — a long-lived, supervised, stateful background process: the GenServer
+  concept as a kind. You write `init/0` + `tick/1` with `every:`/`restart:`; the
+  runtime owns the process and its supervision. See
+  [Concurrency & background work](/language/concurrency-and-workers).
 - **`hook`** — a reactive binding: `match` events on the bus → run effects; the
-  composing partner of `flow`.
+  composing partner of `flow`. A `trigger` fires it on a schedule instead.
 
 ## Structure kinds
 

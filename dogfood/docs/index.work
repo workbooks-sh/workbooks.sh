@@ -35,6 +35,7 @@ app :docs do
     page "language/declarations"
     page "language/placement-and-languages"
     page "language/kinds-reference"
+    page "language/concurrency-and-workers"
     page "language/elixir-in-markdown"
   end
 

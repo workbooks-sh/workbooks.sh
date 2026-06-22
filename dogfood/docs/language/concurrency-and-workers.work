@@ -1,0 +1,89 @@
+# Concurrency & background work
+
+The [Nexus](/introduction/what-is-the-nexus) runs on the BEAM, where concurrency
+is the native model — every request, every process, runs on its own lightweight
+scheduler. You don't have to reach into that machinery by hand. The `.work`
+language surfaces it as **vocabulary**: you declare *what should run concurrently*
+or *what should run in the background*, and the runtime owns the processes,
+supervision, and restarts underneath. You never write `Task.start_link`,
+`GenServer`, or a supervisor.
+
+There are three shapes, by lifetime:
+
+- **Transient fan-out** — do several things at once, gather the results, move on.
+  That's a `parallel` group inside a [`flow`](/language/kinds-reference).
+- **Always-on, stateful** — a long-lived process that holds state and keeps
+  working. That's a **`worker`**.
+- **On a clock** — fire on a schedule. That's a `hook` with a `trigger` (covered
+  with the reactive layer).
+
+## Parallel steps in a flow
+
+A [`flow`](/language/kinds-reference) runs its `step`s in order, threading each
+result into the next. Sometimes the next few steps don't depend on each other —
+they just all need the same input. Wrap them in a `parallel do … end` group and
+they run **at the same time**, on the same threaded value; the flow gathers their
+results into a list (in the order you wrote them) and threads that list onward:
+
+flow :research do
+  step :scope, run: "scoper"          # runs first; threads its result forward
+  parallel do                         # all three run concurrently on scope's result
+    step :web,  run: "web_researcher"
+    step :docs, run: "doc_researcher"
+    step :code, run: "code_researcher"
+  end
+  step :merge, run: "synthesizer"     # receives the list [web, docs, code]
+end
+
+Three researchers that each take a few seconds now finish in the time of the
+slowest one, not their sum. The runtime spawns the BEAM tasks (bounded and ordered)
+and collects them; you only declared the shape. A `parallel` group can also be
+time-gated like any step — `parallel after: "1m" do … end` delays the whole group.
+
+## Workers — long-lived, supervised, stateful
+
+A `parallel` group is *transient*: it spawns, gathers, and is gone. When you need a
+process that **stays alive** — a poller, a queue drainer, a cache that refreshes
+itself, anything holding state across time — declare a `worker`. It's the
+GenServer concept as a kind. You write only the lifecycle:
+
+worker :indexer, every: "30s", restart: :permanent do
+  def init do
+    %{indexed: 0}                     # the worker's initial state
+  end
+
+  def tick(state) do
+    # …do the periodic work here…
+    %{state | indexed: state.indexed + 1}   # return the next state
+  end
+end
+
+- **`init/0`** seeds the in-process state, once, when the worker starts.
+- **`tick/1`** is called every `every:` interval; whatever it returns becomes the
+  new state, threaded into the next tick. A worker with no `every:` just holds its
+  state (a daemon you message yourself).
+- **`every:`** accepts the same [durations](/language/kinds-reference) as the rest
+  of the time vocabulary — `"30s"`, `"15m"`, `"1h"`.
+- **`restart:`** is the OTP restart policy — `:permanent` (the default; always
+  restart), `:transient`, or `:temporary`.
+
+The runtime starts every declared worker under a supervisor in the nexus tree when
+the workbook boots. If a worker process dies, OTP restarts it per its `restart:`
+policy. A single failing `tick` doesn't tear the worker down — the error is logged
+and the worker keeps its prior state, so one bad poll can't kill a daemon (or trip
+a restart storm). Compiling a workbook only *registers* the workers; they start on a
+live, serving nexus — not during a plain check or test run.
+
+## Which one do I reach for?
+
+| You want to… | Use |
+| --- | --- |
+| run N independent things at once inside a pipeline | `parallel` in a `flow` |
+| keep a process alive that holds state and works over time | `worker` |
+| fire effects on a schedule (cron / every / at a time) | `hook` with a `trigger` |
+| react to an event on the bus | `hook` with a `match` |
+
+All four are the same idea from different angles: **you declare intent in `.work`;
+the BEAM runs it.** No process bookkeeping leaks into the document.
+
+Next: the [reactive layer](/language/kinds-reference) — hooks, events, and effects.
