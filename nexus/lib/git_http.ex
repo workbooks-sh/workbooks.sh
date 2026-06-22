@@ -88,11 +88,19 @@ defmodule Nexus.GitHttp do
   def workspace_from_path(_), do: :error
 
   defp serve(conn, rest, ident) do
-    case workspace_from_path(rest) do
-      :error ->
+    cond do
+      match?(:error, workspace_from_path(rest)) ->
         send_resp(conn, 400, "bad workspace name")
 
-      {:ok, ws} ->
+      # Fix wb-d3vh: a WRITE (receive-pack) to a multi-tenant nexus must carry a real org identity —
+      # never the public/default fallback. (Reads/clone stay open as the served-site surface.) Binds the
+      # push to ident instead of trusting only the URL. NOTE: repos are not yet tenant-partitioned on
+      # disk (one-nexus-per-org) — cross-org isolation by namespacing repos_root by tenant is tracked.
+      is_push?(rest) and Nexus.Auth.multi?() and not real_org?(ident) ->
+        send_resp(conn, 403, "git push requires an authenticated org token")
+
+      true ->
+        {:ok, ws} = workspace_from_path(rest)
         bare = Nexus.Git.bare_path(repos_root(), ws)
         {:ok, _} = Nexus.Git.provision_remote(bare, work_dir(ws))
 
@@ -112,6 +120,16 @@ defmodule Nexus.GitHttp do
 
         resp
     end
+  end
+
+  # A write to the repo (receive-pack advertise or the push itself), vs a read/clone (upload-pack).
+  defp is_push?(rest), do: String.contains?(rest, "git-receive-pack")
+
+  # A real org identity (a resolved PAT), not the public/default fallback.
+  defp real_org?(ident) do
+    t = ident[:tenant]
+    is_binary(ident[:user]) and ident[:user] != "" and
+      is_binary(t) and t != "" and t != Nexus.Store.default_tenant()
   end
 
   defp cgi_env(conn, rest, ident, body) do

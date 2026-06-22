@@ -294,6 +294,13 @@ defmodule Nexus.Git do
     # read the incoming tree. (post-receive unsets them; pre-receive must keep them.)
     while read _old new ref; do
       case "$ref" in
+        refs/notes/*)
+          # The ownership ledger's meter notes (refs/notes/wb-meter) are written SERVER-SIDE by the
+          # runtime key only (fix wb-2ctu). A client must never push/overwrite notes, or it could forge
+          # or destroy the counter-signed metering. Reject all client note pushes.
+          echo "remote: ✗ pushing refs/notes/* is not allowed (meter notes are runtime-written)."
+          exit 1
+          ;;
         refs/heads/main|refs/heads/master)
           case "$new" in 0000000000000000000000000000000000000000) continue ;; esac
           tmp=$(mktemp -d)
