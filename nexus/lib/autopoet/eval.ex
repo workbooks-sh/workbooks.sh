@@ -87,20 +87,35 @@ defmodule Nexus.Autopoet.Eval do
     _ -> true
   end
 
-  # Aggregate the gate's per-change authority: if ANY change needs a human, the whole set does.
+  # Aggregate authority across the change set: the per-change Gate triad check (grant/ceiling/management
+  # on the change itself) PLUS the SUBTREE management posture from the index hierarchy (wb-a6u3.15 — an
+  # app/agent under a frozen/proposed subtree is not autonomously editable, even for a benign edit). If
+  # ANY change needs a human, the whole set does.
   defp authority(root, changes) do
     reasons =
       Enum.flat_map(changes, fn {rel, new_src} ->
         old_src = read_old(root, rel)
 
-        case Gate.classify(rel, old_src, new_src) do
-          {:autonomous, []} -> []
-          {:human_gated, rs} -> rs
-        end
+        gate =
+          case Gate.classify(rel, old_src, new_src) do
+            {:autonomous, []} -> []
+            {:human_gated, rs} -> rs
+          end
+
+        gate ++ subtree_reasons(root, rel)
       end)
       |> Enum.uniq()
 
     if reasons == [], do: {:autonomous, []}, else: {:human_gated, reasons}
+  end
+
+  defp subtree_reasons(root, rel) do
+    dir = Path.dirname(Path.join(root, rel))
+
+    case Nexus.Index.effective_management(root, dir) do
+      "managed" -> []
+      posture -> [{:subtree_management, posture}]
+    end
   end
 
   defp read_old(root, rel) do

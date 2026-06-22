@@ -115,6 +115,36 @@ defmodule Nexus.Index do
     end
   end
 
+  # ── Subtree management (Autopoiesis v2 — wb-a6u3.15) ───────────────────────
+  #
+  # An index may declare a management posture for its whole subtree — `management frozen` makes every
+  # app/agent under it untouchable by the autopoet, `management proposed` routes its edits to a human.
+  # This is how an app/surface (not just an agent) is brought in or out of the autopoet's reach: the
+  # posture lives in the same `index.work` that carries the ceiling. The effective posture at a path is
+  # the MOST RESTRICTIVE among its ancestor indexes (frozen > proposed > managed).
+
+  @management_rank %{"managed" => 0, "proposed" => 1, "frozen" => 2}
+
+  @doc "The management posture declared by a single index.work source — managed (default) | proposed | frozen."
+  def management_source(src) when is_binary(src) do
+    case Regex.run(~r/^\s*management\s+(managed|proposed|frozen)\b/m, src, capture: :all_but_first) do
+      [level] -> level
+      _ -> "managed"
+    end
+  end
+
+  @doc "The management posture declared by an index.work file (default managed)."
+  def management(path) when is_binary(path) do
+    if File.exists?(path), do: path |> File.read!() |> management_source(), else: "managed"
+  end
+
+  @doc "The effective management posture governing `path` — the most restrictive ancestor index posture."
+  def effective_management(root, path) do
+    ancestor_indexes(root, path)
+    |> Enum.map(&management/1)
+    |> Enum.max_by(&Map.get(@management_rank, &1, 0), fn -> "managed" end)
+  end
+
   @doc """
   Clamp a `declared` grant list to the effective ceiling governing `path` — `declared ∩ ceiling`. This
   is the one comparison every agent run uses (Autopoiesis v2): editing a declared grant up can only
