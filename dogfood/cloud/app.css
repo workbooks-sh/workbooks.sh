@@ -623,6 +623,15 @@ tr:last-child td{ border:0; }
 .palette-lb { color: var(--ink); font: 500 14px var(--read); }
 .palette-sub { margin-left: auto; color: var(--dim); font: 500 11.5px var(--mono); }
 .palette-empty { color: var(--dim); padding: 18px; text-align: center; font: 500 13.5px var(--read); }
+/* Context picker — the multi-select variant (composer "Add context"). */
+.palette.ctxpick.drop { outline: 2px dashed var(--stroke); outline-offset: -6px; }
+.ctxitem .palette-sub { margin-left: auto; }
+.ctxitem .ctxcheck { width: 16px; flex: none; text-align: center; color: var(--bloomd); font-weight: 700; margin-left: 8px; }
+.ctxitem.sel { background: color-mix(in srgb, var(--bloom) 12%, transparent); }
+.ctxitem.sel:hover, .ctxitem.sel.on { background: color-mix(in srgb, var(--bloom) 18%, transparent); }
+.ctxfoot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line); }
+.ctxcount { font: 600 12px var(--read); color: var(--dim); }
+.ctxbtns { display: flex; gap: 8px; }
 
 /* ── Account row: avatar (→ menu) left, collapse toggle bottom-right ── */
 .acct { display: flex; align-items: center; gap: 6px; padding: 10px 8px; border-top: 1px solid var(--line); margin-top: 8px; position: relative; }

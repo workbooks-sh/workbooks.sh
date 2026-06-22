@@ -83,10 +83,14 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
     suggestions: ['Scaffold a new app', 'Draft a data model', 'Wire up an integration'],
     models: MODELS,
     agents: AGENTS,
+    // "Add context" (the composer paperclip) opens the searchable multi-select picker (files / workspaces
+    // / spaces, plus drop-to-attach). Chosen items become context chips and ride along with the turn.
+    onAttach: function(){ return (WB.contextPicker ? WB.contextPicker() : Promise.resolve([])); },
     send: function(text, ctx){
+      var context = ((ctx && ctx.files) || []).map(function(f){ return { name: f.name, type: f.type || 'file', ref: f.ref || f.path || f.id || f.name }; });
       return api('/cloud/agent/chat', { method: 'POST', body: JSON.stringify({
         u: U, id: curSession, message: text,
-        model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), space: curSpace
+        model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), space: curSpace, context: context
       }) }).then(function(d){
         if (d && d.id) { curSession = d.id; if (WB._paintStudio) { WB.cache.set('agent-sessions', null); WB._paintStudio(); } }
         return (d && d.reply) || '(no reply)';

@@ -377,6 +377,82 @@
       ov.addEventListener('click', function(e){ if (e.target === ov) close(); });
       refresh(); input.focus();
     };
+
+    // Context picker — a MULTI-SELECT cousin of the palette, used by the composer's "Add context" button.
+    // Searchable over workspaces, spaces, and files (/cloud/search); also a drop target for files. Resolves
+    // to an array of chosen items ({ type, name, ref, icon, sub }) that become composer context chips.
+    WB.contextPicker = function(){
+      return new Promise(function(resolve){
+        if (document.getElementById('wbCtxPick')) return resolve([]);
+        var ov = document.createElement('div'); ov.id = 'wbCtxPick'; ov.className = 'palette-ov';
+        ov.innerHTML = '<div class="palette ctxpick">' +
+          '<input class="palette-in" placeholder="Search files, workspaces, spaces — or drop files here…" autocomplete="off" />' +
+          '<div class="palette-res"></div>' +
+          '<div class="ctxfoot"><span class="ctxcount">Nothing selected</span>' +
+            '<div class="ctxbtns"><button class="btn sm" data-cancel>Cancel</button><button class="btn sm primary" data-add>Add</button></div></div>' +
+          '</div>';
+        document.body.appendChild(ov);
+        var box = ov.querySelector('.palette'), input = ov.querySelector('.palette-in'), res = ov.querySelector('.palette-res');
+        var count = ov.querySelector('.ctxcount');
+        var items = [], sel = 0, picked = {}, spaces = [];
+        function key(it){ return it.type + ':' + (it.ref || it.name); }
+        function done(arr){ ov.remove(); resolve(arr || []); }
+        function updFoot(){ var n = Object.keys(picked).length; count.textContent = n ? (n + ' selected') : 'Nothing selected'; }
+        function toggle(it){ var k = key(it); if (picked[k]) delete picked[k]; else picked[k] = it; updFoot(); render(); }
+        function render(){
+          res.innerHTML = items.length ? items.map(function(it, i){
+            var on = !!picked[key(it)];
+            return '<div class="palette-item ctxitem' + (i === sel ? ' on' : '') + (on ? ' sel' : '') + '" data-i="' + i + '">' +
+              '<span class="palette-ic">' + esc(it.icon || '›') + '</span><span class="palette-lb">' + esc(it.name) + '</span>' +
+              (it.sub ? '<span class="palette-sub">' + esc(it.sub) + '</span>' : '') +
+              '<span class="ctxcheck">' + (on ? '✓' : '') + '</span></div>';
+          }).join('') : '<div class="palette-empty">No matches</div>';
+          res.querySelectorAll('[data-i]').forEach(function(el){ el.onclick = function(){ toggle(items[+el.getAttribute('data-i')]); }; });
+        }
+        function base(q){
+          var ws = (WB.ws.list || []).filter(function(w){ return !q || w.name.toLowerCase().indexOf(q) >= 0; })
+            .map(function(w){ return { type: 'workspace', name: w.name, ref: w.id, icon: w.icon || '▦', sub: 'workspace' }; });
+          var sp = spaces.filter(function(s){ return !q || (s.name || '').toLowerCase().indexOf(q) >= 0; })
+            .map(function(s){ return { type: 'space', name: s.name, ref: s.id || s.name, icon: '📁', sub: 'space' }; });
+          return ws.concat(sp);
+        }
+        function refresh(){
+          var q = input.value.trim().toLowerCase();
+          items = base(q); sel = 0; render();
+          if (q) fetch('/cloud/search?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+            .then(function(r){ return r.json(); }).then(function(d){
+              if (input.value.trim().toLowerCase() !== q) return;
+              var files = ((d && d.results) || []).slice(0, 12).map(function(f){ return { type: 'file', name: f.name, ref: f.path, icon: '📄', sub: f.workspace }; });
+              items = base(q).concat(files); render();
+            }).catch(function(){});
+        }
+        input.addEventListener('input', refresh);
+        input.addEventListener('keydown', function(e){
+          if (e.key === 'Escape') return done([]);
+          if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, items.length - 1); render(); e.preventDefault(); }
+          if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); render(); e.preventDefault(); }
+          if (e.key === 'Enter') { e.preventDefault();
+            if ((e.metaKey || e.ctrlKey)) return done(Object.keys(picked).map(function(k){ return picked[k]; }));
+            if (items[sel]) toggle(items[sel]); }
+        });
+        // Drag-and-drop files straight onto the picker → added as file context.
+        box.addEventListener('dragover', function(e){ e.preventDefault(); box.classList.add('drop'); });
+        box.addEventListener('dragleave', function(e){ if (e.target === box) box.classList.remove('drop'); });
+        box.addEventListener('drop', function(e){ e.preventDefault(); box.classList.remove('drop');
+          Array.from((e.dataTransfer && e.dataTransfer.files) || []).forEach(function(f){
+            picked['file:' + f.name] = { type: 'file', name: f.name, ref: f.name, icon: '📄', sub: 'upload', file: f }; });
+          updFoot(); render(); });
+        ov.addEventListener('click', function(e){
+          if (e.target === ov) return done([]);
+          if (e.target.closest('[data-cancel]')) return done([]);
+          if (e.target.closest('[data-add]')) return done(Object.keys(picked).map(function(k){ return picked[k]; }));
+        });
+        // Load spaces (for the search) then paint.
+        fetch('/cloud/agent/spaces', { credentials: 'same-origin' }).then(function(r){ return r.json(); })
+          .then(function(d){ spaces = (d && d.spaces) || []; refresh(); }).catch(function(){ refresh(); });
+        refresh(); input.focus();
+      });
+    };
     window.addEventListener('keydown', function(e){
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); WB.palette(); }
     });

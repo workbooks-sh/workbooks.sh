@@ -117,6 +117,7 @@ export function createChat(container, options = {}) {
   // conversation has any messages, the selector locks (agentLocked()), matching "pick the agent only when
   // starting a new session". idOf-style values may be strings or { name, label, ... } records.
   let selectedAgent = opts.agent || (opts.agents && opts.agents[0]) || null;
+  let selectedCapabilities = (opts.capabilities && opts.capabilities.slice()) || []; // composer capability multi-select
 
   const root = el('div', { class: 'wb-chat' });
   if (opts.scheme) root.setAttribute('data-color-scheme', opts.scheme);
@@ -245,7 +246,16 @@ export function createChat(container, options = {}) {
     agent: () => selectedAgent,
     setAgent: (a) => { selectedAgent = a; if (opts.onAgent) try { opts.onAgent(a); } catch (e) {} },
     agentLocked: () => messages.length > 0,
+    // Capability multi-select hooks (consumed by the capabilities-selector add-on). The catalog is the
+    // toolkit list; admission(agentName) → 'all' | 'none' | [ids] gates what's selectable per driver.
+    capabilityCatalog: opts.capabilityCatalog || [],
+    capabilityAdmission: opts.capabilityAdmission || (() => 'all'),
+    capabilities: () => selectedCapabilities.slice(),
+    setCapabilities: (ids) => { selectedCapabilities = (ids || []).slice(); },
     onChange: (fn) => { (listeners['change'] = listeners['change'] || []).push(fn); },
+    // Host-provided context picker (e.g. the cloud command-palette search). Returns Promise<item[]>; the
+    // attachments add-on calls it instead of the native file dialog when present. null = native file input.
+    pickContext: opts.onAttach || null,
     submit: (t) => submit(t),
   };
   function mountComposerButtons() {
@@ -277,7 +287,7 @@ export function createChat(container, options = {}) {
       assistant.parts[0].text += chunk; render();
     };
     try {
-      const ret = await (opts.send ? opts.send(text, { delta: onDelta, signal: abort.signal, files, model: selectedModel, agent: selectedAgent }) : Promise.resolve('(no adapter wired)'));
+      const ret = await (opts.send ? opts.send(text, { delta: onDelta, signal: abort.signal, files, model: selectedModel, agent: selectedAgent, capabilities: selectedCapabilities.slice() }) : Promise.resolve('(no adapter wired)'));
       if (!started && typeof ret === 'string') { assistant.parts[0].text = ret; messages.push(assistant); }
       else if (started && typeof ret === 'string' && ret) assistant.parts[0].text = ret;
     } catch (e) {

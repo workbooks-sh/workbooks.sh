@@ -24,8 +24,19 @@ registerComposerButton((ctx) => {
     },
   });
   const btn = el('button', {
-    type: 'button', class: 'wbc-tool', title: 'Attach files', 'aria-label': 'Attach files',
-    html: PAPERCLIP, onClick: () => input.click(),
+    type: 'button', class: 'wbc-tool', title: 'Add context', 'aria-label': 'Add context',
+    html: PAPERCLIP,
+    // Prefer the host's context picker (searchable multi-select over files / workspaces / spaces); fall
+    // back to the native file dialog when no host picker is wired.
+    onClick: () => {
+      if (ctx.pickContext) {
+        try {
+          Promise.resolve(ctx.pickContext()).then(items => { (items || []).forEach(it => ctx.addFile(it)); });
+          return;
+        } catch (e) { /* fall through to native */ }
+      }
+      input.click();
+    },
   });
   return el('span', { class: 'wbc-attach' }, [btn, input]);
 }, { side: 'right' });
