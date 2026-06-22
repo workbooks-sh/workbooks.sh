@@ -1,0 +1,54 @@
+# The architecture diagram island
+
+A reusable browser island that renders an architecture diagram inline. Each diagram
+has two committed forms in this folder:
+
+- a **`.drawio` file** — mxGraph XML, the **editable source of truth**, opened in
+  [diagrams.net](https://app.diagrams.net) or the VS Code draw.io extension;
+- a **`.svg` export** of that same source — what renders in the woven docs site, so a
+  diagram always shows even with no network and no JS.
+
+A page embeds a diagram with a small `client` block: the inline SVG export wrapped in
+a `<figure class="wb-diagram" data-drawio="…/foo.drawio">`. Because each architecture
+page is woven as its own document, every page inlines the guarded upgrade script below
+(it no-ops after the first run via `window.__wbDrawio`). When the draw.io viewer
+script loads and the browser is online, it fetches the `.drawio` XML and upgrades the
+figure into a live, pan/zoom diagram; offline or with the CDN blocked, the inline SVG
+stays. The XML is never authored into the page — it is fetched from its own file, so
+editing the `.drawio` updates the live viewer (and the SVG on re-export). The
+`data-mxgraph` payload is the draw.io viewer's own runtime wire format, built in JS at
+load time — not an authored config sidecar.
+
+client :drawio_viewer do
+  <script>
+  (function () {
+    if (window.__wbDrawio) return;
+    window.__wbDrawio = true;
+    function upgrade() {
+      if (!window.GraphViewer) return;
+      document.querySelectorAll('figure.wb-diagram[data-drawio]').forEach(function (fig) {
+        if (fig.dataset.wbDone) return;
+        fig.dataset.wbDone = '1';
+        fetch(fig.dataset.drawio).then(function (r) { return r.text(); }).then(function (xml) {
+          var host = document.createElement('div');
+          host.className = 'mxgraph';
+          host.style.maxWidth = '100%';
+          host.setAttribute('data-mxgraph', JSON.stringify({
+            highlight: '#0066cc', lightbox: true, nav: true, resize: true,
+            toolbar: 'zoom layers lightbox', xml: xml
+          }));
+          var img = fig.querySelector('img');
+          if (img) img.style.display = 'none';
+          fig.insertBefore(host, fig.firstChild);
+          try { window.GraphViewer.processElements(); } catch (e) {}
+        }).catch(function () {});
+      });
+    }
+    var s = document.createElement('script');
+    s.src = 'https://viewer.diagrams.net/js/viewer-static.min.js';
+    s.async = true;
+    s.onload = upgrade;
+    document.head.appendChild(s);
+  })();
+  </script>
+end

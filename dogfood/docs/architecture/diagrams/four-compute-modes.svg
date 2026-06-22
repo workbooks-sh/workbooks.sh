@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" font-family="system-ui,sans-serif" font-size="13">
+  <style>.b{rx:8;stroke-width:1.5}.t{text-anchor:middle}.lbl{fill:#555;font-size:11px}</style>
+  <rect class="b" x="30" y="30" width="500" height="420" fill="#E3F2FD" stroke="#42A5F5" fill-opacity="0.35"/>
+  <text x="280" y="52" text-anchor="middle" font-weight="bold">The serving nexus (on the request path)</text>
+  <g class="t">
+    <rect class="b" x="70" y="80" width="200" height="64" fill="#E8F5E9" stroke="#66BB6A"/><text x="170" y="108">server</text><text x="170" y="126" class="lbl">native BEAM units</text>
+    <rect class="b" x="300" y="80" width="200" height="64" fill="#E8F5E9" stroke="#66BB6A"/><text x="400" y="104">sandbox</text><text x="400" y="120" class="lbl">in-nexus wasm · grants</text><text x="400" y="135" class="lbl">light + live</text>
+    <rect class="b" x="70" y="190" width="430" height="64" fill="#E8F5E9" stroke="#66BB6A"/><text x="285" y="214">agent</text><text x="285" y="232" class="lbl">ephemeral LLM sandboxed function (prompt + tools + grant)</text>
+    <rect x="70" y="300" width="430" height="120" rx="8" fill="none" stroke="#42A5F5" stroke-dasharray="5 4"/><text x="285" y="322" class="lbl">dispatch — off the serving path</text>
+    <rect class="b" x="610" y="170" width="250" height="150" fill="#FFF3E0" stroke="#FFA726"/><text x="735" y="200" font-weight="bold">job  (new)</text><text x="735" y="222" class="lbl">ephemeral build-class unit</text><text x="735" y="240" class="lbl">compile · test · pipeline step</text><text x="735" y="262" class="lbl">Fly Firecracker microVM</text><text x="735" y="282" class="lbl">per-tenant · per-second</text><text x="735" y="300" class="lbl">scale-to-zero</text>
+    <text x="735" y="360" class="lbl">returns artifact + logs, then disappears</text>
+  </g>
+  <path d="M500 350 L610 245" fill="none" stroke="#FFA726"/><text x="600" y="300" class="lbl" text-anchor="middle">dispatches a job</text>
+  <path d="M610 300 C 420 470, 420 470, 285 410" fill="none" stroke="#FFA726" stroke-dasharray="5 4"/><text x="430" y="455" class="lbl" text-anchor="middle">artifact</text>
+</svg>

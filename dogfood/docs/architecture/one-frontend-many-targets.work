@@ -1,50 +1,86 @@
 # One frontend, many targets
 
-Workbooks runs on the desktop, in the browser, and on mobile — but there isn't a
-desktop app, a web app, and a mobile app. There's **one** frontend that talks to a
-single capability surface, and a *target* is just a choice of how that surface is
+Workbooks runs on desktop, in the browser, and on mobile. There is no separate
+desktop app, web app, and mobile app — there is **one** frontend that talks to a
+single capability surface. A *target* is just a choice of how that surface is
 fulfilled. No code fork per platform.
+
+client :diagram_one_frontend do
+  <figure class="wb-diagram" data-drawio="diagrams/one-frontend-many-targets.drawio" style="margin:1.5rem 0;text-align:center">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="system-ui,sans-serif" font-size="13" style="max-width:100%;height:auto">
+      <style>.b{rx:8;stroke-width:1.5}.t{text-anchor:middle}.lbl{fill:#555;font-size:11px}</style>
+      <g class="t">
+        <rect class="b" x="40" y="30" width="160" height="46" fill="#E3F2FD" stroke="#90CAF9"/><text x="120" y="50">desktop</text><text x="120" y="66" class="lbl">routing config</text>
+        <rect class="b" x="370" y="30" width="160" height="46" fill="#E3F2FD" stroke="#90CAF9"/><text x="450" y="50">web</text><text x="450" y="66" class="lbl">routing config</text>
+        <rect class="b" x="700" y="30" width="160" height="46" fill="#E3F2FD" stroke="#90CAF9"/><text x="780" y="50">mobile</text><text x="780" y="66" class="lbl">routing config</text>
+        <rect class="b" x="330" y="140" width="240" height="50" fill="#FFF3E0" stroke="#FFB74D"/><text x="450" y="170" font-weight="bold">One frontend (the UI)</text>
+        <polygon points="450,250 580,310 450,370 320,310" fill="#F3E5F5" stroke="#BA68C8"/><text x="450" y="305" font-weight="bold">Host / Dock seam</text><text x="450" y="322" class="lbl">single membrane · invoke</text>
+        <rect class="b" x="60" y="430" width="300" height="70" fill="#E8F5E9" stroke="#66BB6A"/><text x="210" y="455">provider: local</text><text x="210" y="473" class="lbl">Tauri / OS · browser-native APIs</text><text x="210" y="490" class="lbl">file · dialog · on-device</text>
+        <rect class="b" x="540" y="430" width="320" height="70" fill="#E8F5E9" stroke="#66BB6A"/><text x="700" y="455">provider: runtime</text><text x="700" y="473" class="lbl">the nexus over RCP</text><text x="700" y="490" class="lbl">server units · data · sync · compile/weave</text>
+      </g>
+      <g fill="none" stroke="#90CAF9" stroke-dasharray="4 3"><path d="M120 76 L300 140"/><path d="M450 76 L450 140"/><path d="M780 76 L600 140"/></g>
+      <path d="M450 190 L450 250" fill="none" stroke="#FFB74D"/><text x="540" y="225" class="lbl">asks for a capability</text>
+      <path d="M380 360 L210 430" fill="none" stroke="#BA68C8"/><path d="M520 360 L700 430" fill="none" stroke="#BA68C8"/>
+      <text x="290" y="405" class="lbl">router fulfills</text><text x="640" y="405" class="lbl">router fulfills</text>
+    </svg>
+  </figure>
+  <script>
+  (function(){if(window.__wbDrawio)return;window.__wbDrawio=true;
+   function up(){if(!window.GraphViewer)return;
+    document.querySelectorAll('figure.wb-diagram[data-drawio]').forEach(function(f){
+     if(f.dataset.wbDone)return;f.dataset.wbDone='1';
+     fetch(f.dataset.drawio).then(function(r){return r.text();}).then(function(xml){
+      var h=document.createElement('div');h.className='mxgraph';h.style.maxWidth='100%';
+      h.setAttribute('data-mxgraph',JSON.stringify({highlight:'#0066cc',lightbox:true,nav:true,resize:true,toolbar:'zoom layers lightbox',xml:xml}));
+      var img=f.querySelector('svg');if(img)img.style.display='none';
+      f.insertBefore(h,f.firstChild);try{window.GraphViewer.processElements();}catch(e){}
+     }).catch(function(){});});}
+   var s=document.createElement('script');s.src='https://viewer.diagrams.net/js/viewer-static.min.js';
+   s.async=true;s.onload=up;document.head.appendChild(s);})();
+  </script>
+end
 
 ## The single seam
 
 The UI never calls the operating system, the network, or the runtime directly. It
-calls one set of named capabilities — open a file, fetch a URL, run a unit — through
-a single membrane. Behind that membrane, a router decides *who* fulfills each call.
-That's the whole architecture: the app asks for a capability; something provides it.
+calls one set of named capabilities — open a file, fetch a URL, run a unit — through a
+single membrane: the **Host (the Dock seam)**. Behind the membrane a router decides
+*who* fulfills each call. That is the whole architecture: the app asks for a
+capability; a provider supplies it.
 
 ## Providers fulfill capabilities
 
-Each capability is satisfied by a **provider**, and there are two kinds:
+Every capability is satisfied by a **provider**. There are two kinds:
 
-- **local** — the capability is served on the device: the OS through a native shell,
-  or the browser's own APIs. Reading a file locally, showing a native dialog.
-- **runtime** — the capability is served by a shared [Nexus](/introduction/what-is-the-nexus)
-  over the wire, via [RCP](/architecture/runtime-connect-rcp). Server units, data,
-  sync, the compile-and-weave lane.
+- **local** — served on the device: the OS through a native shell, or the browser's
+  own APIs. Reading a local file, showing a native dialog.
+- **runtime** — served by a shared [nexus](/introduction/what-is-the-nexus) over the
+  wire, via [RCP](/architecture/runtime-connect-rcp). Server units, data, sync, the
+  compile-and-weave lane.
 
 A target — desktop, web, or mobile — is a **routing config**: which capabilities go
 local, which go to a runtime, and which runtime endpoint to use. Swap the config and
-the *same* frontend runs somewhere new. You don't recompile the UI for a platform;
-you re-point it.
+the *same* frontend runs somewhere new. The UI is never recompiled for a platform; it
+is re-pointed.
 
 ## Where the lanes run
 
-This mirrors the [placement](/language/placement-and-languages) model you already
-know:
+This mirrors the [placement](/language/placement-and-languages) model:
 
-- a [`client`](/language/kinds-reference) island renders **client-side** — wasm in
-  the browser, so it runs on every target with no special engine,
-- a [`server`](/language/kinds-reference) unit, agents, [data](/data/resources-and-the-store),
-  and the compiler lane are backed by the **runtime** provider.
+- a [`client`](/language/kinds-reference) island renders **client-side** — wasm in the
+  browser, so it runs on every target with no special engine;
+- a [`server`](/language/kinds-reference) unit, agents,
+  [data](/data/resources-and-the-store), and the compiler lane are backed by the
+  **runtime** provider.
 
-The browser is a render target, not a second runtime contract for the UI to juggle.
-There's one Host surface; targets just route it differently.
+The browser is a render target, not a second runtime contract the UI has to manage.
+There is one Host surface; targets route it differently.
 
 ## Why one seam matters
 
-The trap every cross-platform tool falls into is a second "contract" — the UI ends up
+The trap every cross-platform tool falls into is a second contract: the UI ends up
 knowing about both an OS API and a server API and managing the difference. Here the UI
-knows exactly one thing: the capability membrane. Local versus runtime is the router's
-problem, not the app's. That's how desktop, web, and mobile stay one codebase instead
-of three that drift. The handshake that lets a client discover and connect to a
-runtime is [Runtime connect (RCP)](/architecture/runtime-connect-rcp).
+knows exactly one thing — the capability membrane. Local versus runtime is the
+router's problem, not the app's. That is how desktop, web, and mobile stay one
+codebase instead of three that drift apart. The handshake that lets a client discover
+and connect to a runtime is [Runtime connect (RCP)](/architecture/runtime-connect-rcp).

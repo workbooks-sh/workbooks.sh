@@ -1,0 +1,23 @@
+<mxfile host="docs.workbooks.sh" type="device">
+  <diagram name="One frontend, many targets" id="frontend-targets">
+    <mxGraphModel dx="800" dy="600" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t-desktop" value="desktop&#10;(routing config)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#90CAF9;" vertex="1" parent="1"><mxGeometry x="40" y="40" width="160" height="50" as="geometry"/></mxCell>
+        <mxCell id="t-web" value="web&#10;(routing config)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#90CAF9;" vertex="1" parent="1"><mxGeometry x="370" y="40" width="160" height="50" as="geometry"/></mxCell>
+        <mxCell id="t-mobile" value="mobile&#10;(routing config)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#90CAF9;" vertex="1" parent="1"><mxGeometry x="700" y="40" width="160" height="50" as="geometry"/></mxCell>
+        <mxCell id="ui" value="One frontend (the UI)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#FFB74D;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="330" y="150" width="240" height="56" as="geometry"/></mxCell>
+        <mxCell id="seam" value="Host / Dock capability seam&#10;(the single membrane — invoke)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#BA68C8;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="320" y="260" width="260" height="90" as="geometry"/></mxCell>
+        <mxCell id="local" value="provider: local&#10;Tauri / OS · browser-native APIs&#10;(file, dialog, on-device)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#66BB6A;" vertex="1" parent="1"><mxGeometry x="80" y="420" width="280" height="80" as="geometry"/></mxCell>
+        <mxCell id="runtime" value="provider: runtime&#10;the nexus over RCP&#10;(server units · data · sync · compile/weave)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#66BB6A;" vertex="1" parent="1"><mxGeometry x="540" y="420" width="300" height="80" as="geometry"/></mxCell>
+        <mxCell id="e1" style="endArrow=block;html=1;dashed=1;strokeColor=#90CAF9;" edge="1" parent="1" source="t-desktop" target="ui"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="endArrow=block;html=1;dashed=1;strokeColor=#90CAF9;" edge="1" parent="1" source="t-web" target="ui"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" style="endArrow=block;html=1;dashed=1;strokeColor=#90CAF9;" edge="1" parent="1" source="t-mobile" target="ui"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="asks for a capability" style="endArrow=block;html=1;strokeColor=#FFB74D;" edge="1" parent="1" source="ui" target="seam"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="router fulfills" style="endArrow=block;html=1;strokeColor=#BA68C8;" edge="1" parent="1" source="seam" target="local"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="router fulfills" style="endArrow=block;html=1;strokeColor=#BA68C8;" edge="1" parent="1" source="seam" target="runtime"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,30 @@
+<mxfile host="docs.workbooks.sh" type="device">
+  <diagram name="Compile cache flow" id="compile-cache">
+    <mxGraphModel dx="900" dy="640" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="960" pageHeight="620" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="req" value="compile request" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#42A5F5;" vertex="1" parent="1"><mxGeometry x="40" y="60" width="150" height="50" as="geometry"/></mxCell>
+        <mxCell id="key" value="hash key&#10;blake3(source ⊕ lane ⊕&#10;toolchain ⊕ flags)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#FFA726;" vertex="1" parent="1"><mxGeometry x="250" y="50" width="190" height="70" as="geometry"/></mxCell>
+        <mxCell id="dec" value="in cache?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#BA68C8;" vertex="1" parent="1"><mxGeometry x="510" y="45" width="130" height="80" as="geometry"/></mxCell>
+        <mxCell id="hit" value="HIT&#10;fetch .wasm (egress only,&#10;no worker spun)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#66BB6A;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="720" y="40" width="200" height="80" as="geometry"/></mxCell>
+        <mxCell id="miss" value="MISS&#10;dispatch compile job&#10;→ build → store + sign" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#EC407A;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="510" y="200" width="200" height="80" as="geometry"/></mxCell>
+        <mxCell id="gate" value="provenance gate (write time)&#10;decides namespace by SOURCE ORIGIN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#BA68C8;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="470" y="340" width="290" height="60" as="geometry"/></mxCell>
+        <mxCell id="shared" value="Shared package cache&#10;(public, global)&#10;public-registry source + hash match" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#66BB6A;" vertex="1" parent="1"><mxGeometry x="300" y="450" width="220" height="80" as="geometry"/></mxCell>
+        <mxCell id="private" value="Private tenant cache&#10;(per-nexus)&#10;encrypted, never cross-tenant dedup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#FFA726;" vertex="1" parent="1"><mxGeometry x="560" y="450" width="220" height="80" as="geometry"/></mxCell>
+        <mxCell id="tigris" value="Tigris — object storage&#10;(S3-compatible, global)&#10;content-addressed wasm artifacts&#10;= &quot;cold wasm storage&quot;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#E1F5FE;strokeColor=#039BE5;" vertex="1" parent="1"><mxGeometry x="800" y="430" width="140" height="120" as="geometry"/></mxCell>
+        <mxCell id="vol" value="Fly Volumes — block storage&#10;(region-pinned, machine-local)&#10;tenant SQLite / WB_DATA · baked compiler rootfs" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#EDE7F6;strokeColor=#7E57C2;" vertex="1" parent="1"><mxGeometry x="40" y="200" width="320" height="90" as="geometry"/></mxCell>
+        <mxCell id="ea" style="endArrow=block;html=1;" edge="1" parent="1" source="req" target="key"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eb" style="endArrow=block;html=1;" edge="1" parent="1" source="key" target="dec"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ec" value="yes" style="endArrow=block;html=1;strokeColor=#66BB6A;" edge="1" parent="1" source="dec" target="hit"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ed" value="no" style="endArrow=block;html=1;strokeColor=#EC407A;" edge="1" parent="1" source="dec" target="miss"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ee" style="endArrow=block;html=1;" edge="1" parent="1" source="miss" target="gate"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ef" style="endArrow=block;html=1;strokeColor=#66BB6A;" edge="1" parent="1" source="gate" target="shared"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eg" style="endArrow=block;html=1;strokeColor=#FFA726;" edge="1" parent="1" source="gate" target="private"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eh" value="objects" style="endArrow=block;html=1;dashed=1;strokeColor=#039BE5;" edge="1" parent="1" source="shared" target="tigris"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ei" value="objects" style="endArrow=block;html=1;dashed=1;strokeColor=#039BE5;" edge="1" parent="1" source="private" target="tigris"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ehit" value="serve fetched .wasm from Tigris" style="endArrow=block;html=1;dashed=1;strokeColor=#039BE5;" edge="1" parent="1" source="tigris" target="hit"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

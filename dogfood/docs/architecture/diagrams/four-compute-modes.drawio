@@ -1,0 +1,19 @@
+<mxfile host="docs.workbooks.sh" type="device">
+  <diagram name="Four compute modes + the build tier" id="compute-modes">
+    <mxGraphModel dx="800" dy="600" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="nexus" value="The serving nexus (on the request path)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#42A5F5;fontStyle=1;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="40" y="40" width="500" height="420" as="geometry"/></mxCell>
+        <mxCell id="server" value="server&#10;native BEAM units" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#66BB6A;" vertex="1" parent="1"><mxGeometry x="80" y="100" width="200" height="70" as="geometry"/></mxCell>
+        <mxCell id="sandbox" value="sandbox&#10;in-nexus wasm,&#10;capability grants (light + live)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#66BB6A;" vertex="1" parent="1"><mxGeometry x="300" y="100" width="200" height="70" as="geometry"/></mxCell>
+        <mxCell id="agent" value="agent&#10;ephemeral LLM sandboxed function&#10;(prompt + tools + grant)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#66BB6A;" vertex="1" parent="1"><mxGeometry x="80" y="230" width="420" height="70" as="geometry"/></mxCell>
+        <mxCell id="dispatch" value="dispatch (off the serving path)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#42A5F5;dashed=1;" vertex="1" parent="1"><mxGeometry x="80" y="360" width="420" height="60" as="geometry"/></mxCell>
+        <mxCell id="job" value="job  (new)&#10;ephemeral build-class unit&#10;compile · test · pipeline step&#10;Fly Firecracker microVM&#10;per-tenant · per-second · scale-to-zero" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#FFA726;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="620" y="200" width="240" height="130" as="geometry"/></mxCell>
+        <mxCell id="ret" value="returns artifact + logs, then disappears" style="text;html=1;align=center;fillColor=none;strokeColor=none;" vertex="1" parent="1"><mxGeometry x="600" y="340" width="280" height="30" as="geometry"/></mxCell>
+        <mxCell id="ej" value="dispatches a job" style="endArrow=block;html=1;strokeColor=#FFA726;" edge="1" parent="1" source="dispatch" target="job"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eback" value="artifact" style="endArrow=block;html=1;dashed=1;strokeColor=#FFA726;" edge="1" parent="1" source="job" target="dispatch"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="740" y="450"/><mxPoint x="290" y="450"/></Array></mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

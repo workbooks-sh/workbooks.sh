@@ -1,51 +1,51 @@
 # Runtime connect (RCP)
 
-When a client — desktop, web, or mobile — wants to use a [Nexus](/introduction/what-is-the-nexus)
-as its [runtime provider](/architecture/one-frontend-many-targets), it has to learn
-what that runtime *is* before it can talk to it: which protocol, how to authenticate,
-what it can do. RCP is that handshake — a small, public description a runtime serves
-about itself.
+When a client — desktop, web, or mobile — uses a [nexus](/introduction/what-is-the-nexus)
+as its [runtime provider](/architecture/one-frontend-many-targets), it first has to
+learn what that runtime *is*: which protocol it speaks, how to authenticate, what it
+can do. RCP is that handshake — a small, public description a runtime serves about
+itself.
 
 ## A self-describing runtime
 
-Every Nexus answers a well-known discovery endpoint with a compact description of
+Every nexus answers a well-known discovery endpoint with a compact description of
 itself. A client fetches it once and knows how to connect — no out-of-band config, no
 guessing. The response covers:
 
-- **protocol version** — which RCP revision the runtime speaks,
-- **runtime version** — what build is running,
-- **tenancy** — whether this runtime is single- or multi-tenant,
-- **auth** — how to authenticate (a trusted rung for a local runtime, or OIDC/JWT
-  with an issuer and key set for a shared one),
-- **transports** — which wire protocols are available (HTTP, and websockets when
-  offered),
-- **capabilities** — what planes this runtime exposes.
+- **protocol version** — which RCP revision the runtime speaks;
+- **runtime version** — what build is running;
+- **tenancy** — single- or multi-tenant;
+- **auth** — how to authenticate: a trusted rung for a local runtime, or OIDC/JWT with
+  an issuer and key set for a shared one;
+- **transports** — which wire protocols are available (HTTP, plus websockets when
+  offered);
+- **capabilities** — which planes this runtime exposes.
 
 ## The capability planes
 
-A runtime advertises *what it offers*, so a client only attempts what's actually
-there:
+A runtime advertises what it offers, so a client only attempts what is actually there:
 
 - **data** — the workbook data plane: serving workbooks, their
   [resources](/data/resources-and-the-store), and routes. Every runtime has this.
-- **platform** — the control-plane fleet API, present only when a runtime is running
-  as a control plane. A plain single-workbook runtime won't advertise it, and a
-  client won't try to use it.
+- **platform** — the control-plane fleet API, present only when a runtime runs as a
+  control plane. A plain single-workbook runtime does not advertise it, and a client
+  does not try to use it.
 
-Because the runtime declares its planes, the [one frontend](/architecture/one-frontend-many-targets)
-adapts to what it connected to instead of assuming a fixed server shape.
+Because the runtime declares its planes, the
+[one frontend](/architecture/one-frontend-many-targets) adapts to whatever it
+connected to instead of assuming a fixed server shape.
 
 ## Names, not URLs
 
-You generally don't paste an RCP endpoint around by hand. You point at a runtime by
-**name** — `work nexus <url>` to target an engine, `work login` to authenticate
-against it — and the tooling does the discovery. The name resolves to a runtime your
-account owns; RCP fills in the rest. (See [What is the work CLI](/introduction/what-is-the-work-cli).)
+You point at a runtime by **name**, not by pasting an RCP endpoint: `work nexus <url>`
+targets an engine, `work login` authenticates against it, and the tooling runs
+discovery. The name resolves to a runtime your account owns; RCP fills in the rest.
+(See [What is the work CLI](/introduction/what-is-the-work-cli).)
 
 ## Why a handshake at all
 
 A client that hard-codes its server's shape breaks the moment the server changes, and
-can't tell a local runtime from a cloud one. RCP makes the runtime the source of
+cannot tell a local runtime from a cloud one. RCP makes the runtime the source of
 truth about itself: auth rung, tenancy, and planes are *discovered*, not assumed. That
-single property is what lets the same client connect to your laptop's runtime today
-and a cloud Nexus tomorrow without a code change.
+is what lets the same client connect to your laptop's runtime today and a cloud nexus
+tomorrow with no code change.

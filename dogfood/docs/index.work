@@ -22,6 +22,12 @@ app :docs do
     page "introduction/what-is-workbooks-cloud"
   end
 
+  section "Architecture" do
+    page "architecture/one-frontend-many-targets"
+    page "architecture/runtime-connect-rcp"
+    page "architecture/build-tier-and-compile-cache"
+  end
+
   section "The .work language" do
     page "language/anatomy"
     page "language/block-grammar"
@@ -59,11 +65,6 @@ app :docs do
     page "tooling/get-started-with-your-cli-agent"
     page "tooling/authoring-an-agent"
     page "tooling/toolkits"
-  end
-
-  section "Architecture" do
-    page "architecture/one-frontend-many-targets"
-    page "architecture/runtime-connect-rcp"
   end
 
   section "Examples" do

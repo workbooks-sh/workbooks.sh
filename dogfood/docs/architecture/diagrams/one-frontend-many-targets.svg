@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="system-ui,sans-serif" font-size="13">
+  <style>.b{rx:8;stroke-width:1.5}.t{text-anchor:middle}.lbl{fill:#555;font-size:11px}</style>
+  <g class="t">
+    <rect class="b" x="40" y="30" width="160" height="46" fill="#E3F2FD" stroke="#90CAF9"/><text x="120" y="50">desktop</text><text x="120" y="66" class="lbl">routing config</text>
+    <rect class="b" x="370" y="30" width="160" height="46" fill="#E3F2FD" stroke="#90CAF9"/><text x="450" y="50">web</text><text x="450" y="66" class="lbl">routing config</text>
+    <rect class="b" x="700" y="30" width="160" height="46" fill="#E3F2FD" stroke="#90CAF9"/><text x="780" y="50">mobile</text><text x="780" y="66" class="lbl">routing config</text>
+    <rect class="b" x="330" y="140" width="240" height="50" fill="#FFF3E0" stroke="#FFB74D"/><text x="450" y="170" font-weight="bold">One frontend (the UI)</text>
+    <polygon points="450,250 580,310 450,370 320,310" fill="#F3E5F5" stroke="#BA68C8"/><text x="450" y="305" font-weight="bold">Host / Dock seam</text><text x="450" y="322" class="lbl">single membrane · invoke</text>
+    <rect class="b" x="60" y="430" width="300" height="70" fill="#E8F5E9" stroke="#66BB6A"/><text x="210" y="455">provider: local</text><text x="210" y="473" class="lbl">Tauri / OS · browser-native APIs</text><text x="210" y="490" class="lbl">file · dialog · on-device</text>
+    <rect class="b" x="540" y="430" width="320" height="70" fill="#E8F5E9" stroke="#66BB6A"/><text x="700" y="455">provider: runtime</text><text x="700" y="473" class="lbl">the nexus over RCP</text><text x="700" y="490" class="lbl">server units · data · sync · compile/weave</text>
+  </g>
+  <g fill="none" stroke="#90CAF9" stroke-dasharray="4 3"><path d="M120 76 L300 140"/><path d="M450 76 L450 140"/><path d="M780 76 L600 140"/></g>
+  <path d="M450 190 L450 250" fill="none" stroke="#FFB74D"/><text x="540" y="225" class="lbl">asks for a capability</text>
+  <path d="M380 360 L210 430" fill="none" stroke="#BA68C8"/><path d="M520 360 L700 430" fill="none" stroke="#BA68C8"/>
+  <text x="290" y="405" class="lbl">router fulfills</text><text x="640" y="405" class="lbl">router fulfills</text>
+</svg>

@@ -1,0 +1,23 @@
+<mxfile host="docs.workbooks.sh" type="device">
+  <diagram name="Trust / verifiable provenance" id="trust-provenance">
+    <mxGraphModel dx="900" dy="640" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="960" pageHeight="600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="tenant" value="tenant&#10;triggers a compile" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#42A5F5;" vertex="1" parent="1"><mxGeometry x="40" y="60" width="160" height="60" as="geometry"/></mxCell>
+        <mxCell id="cap" value="capability token&#10;(signed, scoped — biscuit/macaroon)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#FFA726;" vertex="1" parent="1"><mxGeometry x="260" y="55" width="220" height="70" as="geometry"/></mxCell>
+        <mxCell id="worker" value="trusted builder&#10;pinned, version-stamped toolchain&#10;builds + SIGNS the artifact" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#66BB6A;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="540" y="45" width="240" height="90" as="geometry"/></mxCell>
+        <mxCell id="att" value="signed attestation&#10;{source_hash, lane, toolchain+digest,&#10;builder_pubkey, output_hash}&#10;(SLSA / in-toto shape)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#BA68C8;" vertex="1" parent="1"><mxGeometry x="540" y="200" width="240" height="100" as="geometry"/></mxCell>
+        <mxCell id="log" value="transparency log&#10;append-only, hash-linked (Merkle)&#10;tamper-evident — NOT a blockchain&#10;(CT / Sigstore-Rekor; also the billing ledger)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#EDE7F6;strokeColor=#7E57C2;" vertex="1" parent="1"><mxGeometry x="540" y="360" width="280" height="130" as="geometry"/></mxCell>
+        <mxCell id="reader" value="reader / nexus&#10;verifies signature chains to a&#10;TRUSTED ROOT before accepting&#10;(defeats CREEP: no valid attestation = rejected)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5FE;strokeColor=#039BE5;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="80" y="370" width="320" height="110" as="geometry"/></mxCell>
+        <mxCell id="ci" value="untrusted CI context (PR / draft / preview)&#10;writes ONLY a branch-scoped cache&#10;— never the shared production pool" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#E53935;dashed=1;" vertex="1" parent="1"><mxGeometry x="80" y="180" width="320" height="100" as="geometry"/></mxCell>
+        <mxCell id="e1" style="endArrow=block;html=1;" edge="1" parent="1" source="tenant" target="cap"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="under token" style="endArrow=block;html=1;strokeColor=#FFA726;" edge="1" parent="1" source="cap" target="worker"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="emits" style="endArrow=block;html=1;strokeColor=#66BB6A;" edge="1" parent="1" source="worker" target="att"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="appended" style="endArrow=block;html=1;strokeColor=#7E57C2;" edge="1" parent="1" source="att" target="log"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="verify signature + log inclusion" style="endArrow=block;html=1;strokeColor=#039BE5;" edge="1" parent="1" source="log" target="reader"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="scoped away" style="endArrow=block;html=1;dashed=1;strokeColor=#E53935;" edge="1" parent="1" source="tenant" target="ci"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" font-family="system-ui,sans-serif" font-size="12">
+  <style>.b{rx:8;stroke-width:1.5}.t{text-anchor:middle}.lbl{fill:#555;font-size:10px}</style>
+  <g class="t">
+    <rect class="b" x="30" y="55" width="160" height="56" fill="#E3F2FD" stroke="#42A5F5"/><text x="110" y="80">tenant</text><text x="110" y="98" class="lbl">triggers a compile</text>
+    <rect class="b" x="250" y="50" width="220" height="66" fill="#FFF3E0" stroke="#FFA726"/><text x="360" y="76">capability token</text><text x="360" y="94" class="lbl">signed, scoped</text><text x="360" y="108" class="lbl">biscuit / macaroon</text>
+    <rect class="b" x="540" y="45" width="240" height="80" fill="#E8F5E9" stroke="#66BB6A"/><text x="660" y="70" font-weight="bold">trusted builder</text><text x="660" y="88" class="lbl">pinned, version-stamped toolchain</text><text x="660" y="104" class="lbl">builds + SIGNS the artifact</text>
+    <rect class="b" x="540" y="190" width="240" height="92" fill="#F3E5F5" stroke="#BA68C8"/><text x="660" y="212">signed attestation</text><text x="660" y="230" class="lbl">{source_hash, lane, toolchain+digest,</text><text x="660" y="244" class="lbl">builder_pubkey, output_hash}</text><text x="660" y="262" class="lbl">SLSA / in-toto shape</text>
+  </g>
+  <g class="t">
+    <path d="M540 470 a70 18 0 0 0 280 0 v-110 a70 18 0 0 0 -280 0 z" fill="#EDE7F6" stroke="#7E57C2"/><path d="M540 360 a70 18 0 0 0 280 0" fill="none" stroke="#7E57C2"/>
+    <text x="680" y="390">transparency log</text><text x="680" y="408" class="lbl">append-only, hash-linked (Merkle)</text><text x="680" y="424" class="lbl">tamper-evident — NOT a blockchain</text><text x="680" y="440" class="lbl">CT / Sigstore-Rekor · = billing ledger</text>
+  </g>
+  <g class="t">
+    <rect class="b" x="60" y="360" width="320" height="100" fill="#E1F5FE" stroke="#039BE5"/><text x="220" y="384" font-weight="bold">reader / nexus</text><text x="220" y="404" class="lbl">verifies signature chains to a TRUSTED ROOT</text><text x="220" y="420" class="lbl">before accepting the artifact</text><text x="220" y="440" class="lbl">defeats CREEP: no valid attestation = rejected</text>
+    <rect x="60" y="175" width="320" height="92" rx="8" fill="#FFEBEE" stroke="#E53935" stroke-dasharray="5 4"/><text x="220" y="200">untrusted CI context (PR / draft / preview)</text><text x="220" y="220" class="lbl">writes ONLY a branch-scoped cache</text><text x="220" y="238" class="lbl">never the shared production pool</text>
+  </g>
+  <g fill="none">
+    <path d="M190 83 L250 83" stroke="#555"/><path d="M470 83 L540 85" stroke="#FFA726"/><text x="505" y="72" class="lbl" text-anchor="middle">under token</text>
+    <path d="M660 125 L660 190" stroke="#66BB6A"/><text x="690" y="160" class="lbl">emits</text>
+    <path d="M660 282 L680 360" stroke="#7E57C2"/><text x="710" y="320" class="lbl">appended</text>
+    <path d="M540 410 L380 410" stroke="#039BE5"/><text x="460" y="400" class="lbl" text-anchor="middle">verify sig + inclusion</text>
+    <path d="M150 111 C 120 140, 150 160, 200 175" stroke="#E53935" stroke-dasharray="5 4"/><text x="120" y="150" class="lbl">scoped away</text>
+  </g>
+</svg>

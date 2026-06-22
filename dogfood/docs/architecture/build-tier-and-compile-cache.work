@@ -1,13 +1,14 @@
 # The elastic build tier + the compile cache
 
-How a nexus runs **heavy build work off its serving path** — compiling packages to
-wasm, running per-tenant CI/CD — on ephemeral Fly Firecracker workers, and how a
-**content-addressed compile cache** turns "compile on every deploy" into "compile once,
-fetch forever." This is the design; it is not built yet. Tracking: see the build-tier epic.
+A nexus runs heavy build work — compiling packages to wasm, running per-tenant CI/CD —
+**off its serving path**, on ephemeral Fly Firecracker workers. A
+**content-addressed compile cache** turns "compile on every deploy" into "compile
+once, fetch forever." This is the design; it is not built yet. Tracking: the
+build-tier epic.
 
 ## The gap this fills
 
-A nexus already runs wasm sandboxes — but it also has to *produce* them. Today the
+A nexus already runs wasm sandboxes, but it also has to *produce* them. Today the
 [compile lanes](/capabilities/compile-lanes) (rust/c/zig/js → wasm component) run
 **inside the serving nexus**: a single 450–900 MB wasmtime compiler process, ~7–20 s,
 shelled on the same box that serves pages and runs agents. On a 1 GB Starter machine
@@ -18,7 +19,44 @@ move the work out, and never do it twice.
 
 ## The fourth compute mode: a `job`
 
-The runtime already has three compute modes. The build tier adds a fourth.
+The runtime has three compute modes. The build tier adds a fourth.
+
+client :diagram_compute_modes do
+  <figure class="wb-diagram" data-drawio="diagrams/four-compute-modes.drawio" style="margin:1.5rem 0;text-align:center">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" font-family="system-ui,sans-serif" font-size="13" style="max-width:100%;height:auto">
+      <style>.b{rx:8;stroke-width:1.5}.t{text-anchor:middle}.lbl{fill:#555;font-size:11px}</style>
+      <rect class="b" x="30" y="30" width="500" height="420" fill="#E3F2FD" stroke="#42A5F5" fill-opacity="0.35"/>
+      <text x="280" y="52" text-anchor="middle" font-weight="bold">The serving nexus (on the request path)</text>
+      <g class="t">
+        <rect class="b" x="70" y="80" width="200" height="64" fill="#E8F5E9" stroke="#66BB6A"/><text x="170" y="108">server</text><text x="170" y="126" class="lbl">native BEAM units</text>
+        <rect class="b" x="300" y="80" width="200" height="64" fill="#E8F5E9" stroke="#66BB6A"/><text x="400" y="104">sandbox</text><text x="400" y="120" class="lbl">in-nexus wasm · grants</text><text x="400" y="135" class="lbl">light + live</text>
+        <rect class="b" x="70" y="190" width="430" height="64" fill="#E8F5E9" stroke="#66BB6A"/><text x="285" y="214">agent</text><text x="285" y="232" class="lbl">ephemeral LLM sandboxed function (prompt + tools + grant)</text>
+        <rect x="70" y="300" width="430" height="120" rx="8" fill="none" stroke="#42A5F5" stroke-dasharray="5 4"/><text x="285" y="322" class="lbl">dispatch — off the serving path</text>
+        <rect class="b" x="610" y="170" width="250" height="150" fill="#FFF3E0" stroke="#FFA726"/><text x="735" y="200" font-weight="bold">job  (new)</text><text x="735" y="222" class="lbl">ephemeral build-class unit</text><text x="735" y="240" class="lbl">compile · test · pipeline step</text><text x="735" y="262" class="lbl">Fly Firecracker microVM</text><text x="735" y="282" class="lbl">per-tenant · per-second</text><text x="735" y="300" class="lbl">scale-to-zero</text>
+        <text x="735" y="360" class="lbl">returns artifact + logs, then disappears</text>
+      </g>
+      <path d="M500 350 L610 245" fill="none" stroke="#FFA726"/><text x="600" y="300" class="lbl" text-anchor="middle">dispatches a job</text>
+      <path d="M610 300 C 420 470, 420 470, 285 410" fill="none" stroke="#FFA726" stroke-dasharray="5 4"/><text x="430" y="455" class="lbl" text-anchor="middle">artifact</text>
+    </svg>
+  </figure>
+  <script>
+  (function(){
+   function up(){if(!window.GraphViewer)return;
+    document.querySelectorAll('figure.wb-diagram[data-drawio]').forEach(function(f){
+     if(f.dataset.wbDone)return;f.dataset.wbDone='1';
+     fetch(f.dataset.drawio).then(function(r){return r.text();}).then(function(xml){
+      var h=document.createElement('div');h.className='mxgraph';h.style.maxWidth='100%';
+      h.setAttribute('data-mxgraph',JSON.stringify({highlight:'#0066cc',lightbox:true,nav:true,resize:true,toolbar:'zoom layers lightbox',xml:xml}));
+      var img=f.querySelector('svg');if(img)img.style.display='none';
+      f.insertBefore(h,f.firstChild);try{window.GraphViewer.processElements();}catch(e){}
+     }).catch(function(){});});}
+   window.__wbDrawioUp=up;
+   if(!window.__wbDrawio){window.__wbDrawio=true;
+    var s=document.createElement('script');s.src='https://viewer.diagrams.net/js/viewer-static.min.js';
+    s.async=true;s.onload=up;document.head.appendChild(s);}
+   else if(window.GraphViewer){up();}})();
+  </script>
+end
 
 | Mode | What it is | Where it runs |
 | --- | --- | --- |
@@ -27,13 +65,13 @@ The runtime already has three compute modes. The build tier adds a fourth.
 | `agent` | an ephemeral *LLM* sandboxed function | dispatched, short-lived |
 | **`job`** *(new)* | an ephemeral *build-class* unit — compile, test, pipeline step | **a Firecracker worker, off the serving path** |
 
-A `job` is one isolated unit of heavy work that runs on an ephemeral Fly Firecracker
-microVM the nexus dispatches, returns an artifact + logs, and disappears. It is
-**per-tenant**, **billed per-second**, and **scales to zero**. It is distinct from
+A `job` is one isolated unit of heavy work: it runs on an ephemeral Fly Firecracker
+microVM the nexus dispatches, returns an artifact plus logs, and disappears. It is
+**per-tenant**, **billed per-second**, and **scales to zero**. It differs from
 `sandbox` precisely because `sandbox` must stay light and live — a `job` is allowed to
 be heavy and slow because it never touches a request.
 
-You do not hand-write a `job` block in the common case — the compile lane emits one
+You do not hand-write a `job` block in the common case: the compile lane emits one
 automatically when a compile is heavy or a cache miss needs filling. You *do* write
 jobs explicitly for CI/CD pipelines (below).
 
@@ -45,17 +83,18 @@ The tier carries two workloads whose costs differ by ~600×. They must never sha
 - **(a) Compile offload** — short, bursty. Shape: `shared-cpu-2x` / 2 GB, ~15 s active.
   **~$0.0001 per compile** (compute-seconds dominate once the image isn't re-pulled).
 - **(b) In-nexus CI/CD** — longer pipelines (build → test → publish). Shape:
-  `performance-4x` / 8 GB, ~10 min. **~$0.05 per run** (compute + modest egress).
+  `performance-4x` / 8 GB, ~10 min. **~$0.05 per run** (compute plus modest egress).
 
-This is *GitHub Actions, but native to the nexus and per-tenant*: the workflow lives in
-`.work`, runs on your fleet, and publishes wasm components / images back into the nexus.
-Per-second Fly billing beats GitHub Actions' per-minute rounding badly for short
-compiles (a 15 s compile on GHA bills a 1-minute minimum, 60× our cost), and a 10-min
-CI run on `performance-4x` is both cheaper *and* beefier than a GHA 2-core runner.
+This is *GitHub Actions, native to the nexus and per-tenant*: the workflow lives in
+`.work`, runs on your fleet, and publishes wasm components / images back into the
+nexus. Per-second Fly billing beats GitHub Actions' per-minute rounding badly for
+short compiles (a 15 s compile on GHA bills a 1-minute minimum, 60× our cost), and a
+10-min CI run on `performance-4x` is both cheaper *and* beefier than a GHA 2-core
+runner.
 
 ## The orchestration already exists
 
-The trigger layer is the [reactive + time layer](/capabilities/hooks-and-time) we
+The trigger layer is the [reactive + time layer](/capabilities/hooks-and-time)
 already shipped. Nothing new is needed to *fire* a build:
 
 - a `#event` on the bus, a `git push` (the [nexus is a git remote](/serving/git-remote)),
@@ -63,17 +102,51 @@ already shipped. Nothing new is needed to *fire* a build:
 - runs a `flow` whose steps are `job`s on workers →
 - which publish artifacts (wasm components, images) the serving nexus consumes.
 
-So "rebuild my wasm library on every push to this subtree" or "recompile nightly" are
-just a `hook` + a `flow` over `job`s — no new authoring surface.
+"Rebuild my wasm library on every push to this subtree" or "recompile nightly" are
+just a `hook` plus a `flow` over `job`s — no new authoring surface.
 
 ## The compile cache — "compile once per nexus, then fetch forever"
 
 This is the lever that makes the whole tier cheap. **wasm compilation is
-deterministic**: the same source + the same toolchain version + the same flags always
-produce the same artifact. So it is naturally **content-addressable** — and a
-content-addressed artifact is *tamper-evident by construction* (the key IS the hash of
-the bytes; a corrupted or substituted artifact fails its own hash). This is the Nix
-binary-cache / Bazel remote-cache idea, applied to wasm.
+deterministic**: the same source, toolchain version, and flags always produce the same
+artifact. So it is naturally **content-addressable** — and a content-addressed
+artifact is *tamper-evident by construction*: the key IS the hash of the bytes, so a
+corrupted or substituted artifact fails its own hash. This is the Nix binary-cache /
+Bazel remote-cache idea, applied to wasm.
+
+client :diagram_compile_cache do
+  <figure class="wb-diagram" data-drawio="diagrams/compile-cache-flow.drawio" style="margin:1.5rem 0;text-align:center">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 580" font-family="system-ui,sans-serif" font-size="12" style="max-width:100%;height:auto">
+      <style>.b{rx:8;stroke-width:1.5}.t{text-anchor:middle}.lbl{fill:#555;font-size:10px}</style>
+      <g class="t">
+        <rect class="b" x="30" y="50" width="150" height="46" fill="#E3F2FD" stroke="#42A5F5"/><text x="105" y="78">compile request</text>
+        <rect class="b" x="240" y="40" width="190" height="66" fill="#FFF3E0" stroke="#FFA726"/><text x="335" y="64">hash key</text><text x="335" y="80" class="lbl">blake3(source ⊕ lane ⊕</text><text x="335" y="94" class="lbl">toolchain ⊕ flags)</text>
+        <polygon points="565,40 645,83 565,126 485,83" fill="#F3E5F5" stroke="#BA68C8"/><text x="565" y="87">in cache?</text>
+        <rect class="b" x="710" y="40" width="210" height="72" fill="#E8F5E9" stroke="#66BB6A"/><text x="815" y="66" font-weight="bold">HIT</text><text x="815" y="84" class="lbl">fetch .wasm (egress only,</text><text x="815" y="98" class="lbl">no worker spun)</text>
+        <rect class="b" x="490" y="180" width="200" height="72" fill="#FCE4EC" stroke="#EC407A"/><text x="590" y="204" font-weight="bold">MISS</text><text x="590" y="222" class="lbl">dispatch compile job</text><text x="590" y="238" class="lbl">→ build → store + sign</text>
+        <rect class="b" x="450" y="300" width="290" height="56" fill="#F3E5F5" stroke="#BA68C8"/><text x="595" y="322" font-weight="bold">provenance gate (write time)</text><text x="595" y="340" class="lbl">decides namespace by SOURCE ORIGIN</text>
+        <rect class="b" x="290" y="400" width="220" height="74" fill="#E8F5E9" stroke="#66BB6A"/><text x="400" y="424">Shared package cache</text><text x="400" y="440" class="lbl">public, global</text><text x="400" y="456" class="lbl">public-registry src + hash match</text>
+        <rect class="b" x="540" y="400" width="220" height="74" fill="#FFF3E0" stroke="#FFA726"/><text x="650" y="424">Private tenant cache</text><text x="650" y="440" class="lbl">per-nexus · encrypted</text><text x="650" y="456" class="lbl">never cross-tenant dedup</text>
+      </g>
+      <g class="t">
+        <path d="M790 420 a55 18 0 0 0 110 0 v-90 a55 18 0 0 0 -110 0 z" fill="#E1F5FE" stroke="#039BE5"/><path d="M790 330 a55 18 0 0 0 110 0" fill="none" stroke="#039BE5"/>
+        <text x="845" y="370">Tigris</text><text x="845" y="386" class="lbl">object storage</text><text x="845" y="400" class="lbl">S3, global</text><text x="845" y="414" class="lbl">cold wasm</text>
+        <path d="M40 200 a25 14 0 0 0 320 0 v-50 a25 14 0 0 0 -320 0 z" fill="#EDE7F6" stroke="#7E57C2"/><path d="M40 150 a25 14 0 0 0 320 0" fill="none" stroke="#7E57C2"/>
+        <text x="200" y="172">Fly Volumes — block storage (region-pinned, machine-local)</text><text x="200" y="190" class="lbl">tenant SQLite / WB_DATA · baked compiler rootfs</text>
+      </g>
+      <g fill="none">
+        <path d="M180 73 L240 73" stroke="#555"/><path d="M430 73 L485 83" stroke="#555"/>
+        <path d="M645 76 L710 76" stroke="#66BB6A"/><text x="676" y="62" class="lbl" text-anchor="middle">yes</text>
+        <path d="M565 126 L590 180" stroke="#EC407A"/><text x="600" y="160" class="lbl">no</text>
+        <path d="M590 252 L595 300" stroke="#555"/>
+        <path d="M540 356 L420 400" stroke="#66BB6A"/><path d="M650 356 L650 400" stroke="#FFA726"/>
+        <path d="M510 437 L790 400" stroke="#039BE5" stroke-dasharray="4 3"/><path d="M760 437 L800 410" stroke="#039BE5" stroke-dasharray="4 3"/>
+        <path d="M845 330 C 845 200, 880 120, 920 112" stroke="#039BE5" stroke-dasharray="4 3"/>
+      </g>
+    </svg>
+  </figure>
+  <script>if(window.__wbDrawioUp)window.__wbDrawioUp();</script>
+end
 
 ### The key
 
@@ -87,14 +160,14 @@ the result under the key, then serve it. Most "compiles" become a fetch.
 
 ### Two scopes — the security boundary
 
-The cache has two distinct namespaces, and the boundary between them is the whole
-security model:
+The cache has two namespaces, and the boundary between them is the whole security
+model:
 
 - **Shared package cache (public, global).** Public dependencies — an npm package, a
-  crate, a Go module compiled to wasm — are the *same artifact for everyone* on the same
-  version. The **first** tenant who needs `some-lib@3.1 → wasm` pays the one compile;
-  **every other nexus, forever, gets a cache hit.** This is a wasm equivalent of a
-  package registry's prebuilt-binary cache. Safe to share *because* it's
+  crate, a Go module compiled to wasm — are the *same artifact for everyone* on the
+  same version. The **first** tenant who needs `some-lib@3.1 → wasm` pays the one
+  compile; **every other nexus, forever, gets a cache hit.** This is a wasm equivalent
+  of a package registry's prebuilt-binary cache. Safe to share *because* it is
   content-addressed: you can only ever read back the exact bytes whose hash you asked
   for. Artifacts are signed for provenance on top of the hash.
 - **Private tenant cache (per-nexus).** A tenant's *own* source compiles to artifacts
@@ -103,42 +176,41 @@ security model:
   *never* promote an artifact into the public cache — the scope is decided by the
   *source's* origin (declared public dependency vs. tenant subtree), not by the key.
 
-### "Cold wasm storage" = the backing store
+### The backing store: Tigris (objects) and Fly Volumes (blocks)
 
-The cache uses **two distinct storage homes**, and the doc is explicit about which is
-which because they are different products with different shapes:
+The cache uses two distinct storage homes. They are different products with different
+shapes and different jobs:
 
-- **Tigris** — the artifact store ("cold wasm storage"). Tigris is a **separate company**
-  (Tigris Data) offering globally-distributed, S3-compatible **object** storage, available
-  **through Fly as a storage partner** (`fly storage create`) — it is *not* Fly's own
-  service. We use it because it fits a *global* shared cache: low-latency access from Fly
-  machines, and objects auto-replicate near where they're pulled, so a package compiled
-  once is cached close to every nexus that later requests it. The content-addressed
-  artifacts (both scopes) live here as S3 objects, keyed by their hash.
-- **Fly Volumes** — Fly's *own* persistent **block** storage, a volume attached to a
-  single machine in a single region. This is where **per-machine local state** lives: the
-  serving nexus's tenant SQLite / `WB_DATA` mount (the same store used for
-  [Litestream and tenant DBs](/serving/tenant-db)), and a build worker's **baked compiler
-  rootfs**. Volumes are region-pinned and machine-local — the right home for hot, local,
-  per-instance state, and the wrong home for a global artifact cache (hence Tigris for
-  that).
+- **Tigris** is the artifact store — the "cold wasm storage." Tigris is a **separate
+  company**, Tigris Data, providing globally-distributed, S3-compatible **object**
+  storage. It is offered **through Fly as a storage partner** (`fly storage create`) —
+  it is **not** Fly's own product. It fits a *global* shared cache: low-latency access
+  from Fly machines, with objects auto-replicating near where they are pulled, so a
+  package compiled once is cached close to every nexus that later requests it. The
+  content-addressed artifacts (both scopes) live here as S3 objects, keyed by their
+  hash.
+- **Fly Volumes** are Fly's **own** region-pinned **block** storage — a volume
+  attached to a single machine in a single region. This is where **per-machine local
+  state** lives: the serving nexus's tenant SQLite / `WB_DATA` mount (the same store
+  used for [Litestream and tenant DBs](/serving/tenant-db)), and a build worker's
+  **baked compiler rootfs**. Volumes are machine-local, the right home for hot
+  per-instance state and the wrong home for a global artifact cache.
 
-A small hot index (key → object) lets a hit skip the Tigris round-trip entirely. A small hot index (key → object) lets a hit skip the store round-trip entirely.
-**No JSON sidecar** — the index is nexus state, the cache config is a `.work` `deploy`
-block read via `Nexus.Config`.
+A small hot index (key → object) lets a hit skip the Tigris round-trip entirely. The
+index is nexus state and the cache config is a `.work` `deploy` block read via
+`Nexus.Config` — no JSON sidecar.
 
 ### What the cache does to the economics
 
 The per-compile cost in the pricing model is the cost of a **miss**. With a healthy
 shared-cache hit rate, the *fleet* only ever compiles the long tail of genuinely-new
-inputs; the common packages are compiled once across the entire customer base and
-fetched thereafter. The compile tier's real cost tracks *cache misses*, not *compile
-requests* — which is what makes including a generous compile allowance in even the free
-tier viable.
+inputs; common packages are compiled once across the entire customer base and fetched
+thereafter. The compile tier's real cost tracks *cache misses*, not *compile requests*
+— which is what makes a generous compile allowance in even the free tier viable.
 
 ## Security & isolation — the cache must not leak or be poisoned
 
-Two attacks define the whole design: **confidentiality** (does a shared cache leak one
+Two attacks define the design: **confidentiality** (does a shared cache leak one
 tenant's private code to another?) and **integrity** (can an attacker poison the cache
 so a victim runs malicious bytes?). Both have clean answers, learned partly from how
 other build caches failed.
@@ -147,93 +219,125 @@ other build caches failed.
 
 A content-addressed artifact is addressed by `hash(content)`. To *request* an artifact
 you must present its key, and to know the key you must know the content. **So you can
-only ever retrieve an artifact whose source you already possess** — the cache hands back
-nothing you didn't already hold. A tenant requesting a public package addresses it by
-the **public registry's published integrity hash** (from their own lockfile); they
-literally cannot *name* a private artifact whose source they don't have.
+only ever retrieve an artifact whose source you already possess** — the cache hands
+back nothing you did not already hold. A tenant requesting a public package addresses
+it by the **public registry's published integrity hash** (from their own lockfile);
+they literally cannot *name* a private artifact whose source they do not have.
 
-We do not rely on that argument alone. A **provenance gate at write time** decides the
+That argument does not stand alone. A **provenance gate at write time** decides the
 namespace:
 
 - **Shared/public** admission requires the source to have been fetched from a **public
-  registry** *and* its integrity hash to **match what that registry published**. Nothing
-  else qualifies.
-- **Everything else** — a scoped/private package, a private registry, a git dependency,
-  the tenant's own subtree source — goes to the **tenant-private** namespace only:
-  encrypted at rest, ACL'd to that one tenant, and **never cross-tenant deduplicated**
-  even when bytes match (so there is no "is anyone else compiling this proprietary lib?"
-  existence oracle). The shared pool therefore only ever contains
+  registry** *and* its integrity hash to **match what that registry published**.
+  Nothing else qualifies.
+- **Everything else** — a scoped/private package, a private registry, a git
+  dependency, the tenant's own subtree source — goes to the **tenant-private**
+  namespace only: encrypted at rest, ACL'd to that one tenant, and **never cross-tenant
+  deduplicated** even when bytes match (so there is no "is anyone else compiling this
+  proprietary lib?" existence oracle). The shared pool therefore only ever contains
   already-public-registry content.
 
-Crucially, **nothing is ever keyed or admitted by package *name***. A malicious public
-`@acme/utils@1.0` cannot shadow a private one of the same name — the requester addresses
-by *their lockfile's integrity hash*, and admission verifies that hash against the
-registry the source actually came from. That closes the **dependency-confusion** class
-behind recent npm supply-chain attacks.
+**Nothing is ever keyed or admitted by package *name***. A malicious public
+`@acme/utils@1.0` cannot shadow a private one of the same name — the requester
+addresses by *their lockfile's integrity hash*, and admission verifies that hash
+against the registry the source actually came from. That closes the
+**dependency-confusion** class behind recent npm supply-chain attacks.
 
 ### Integrity — only trusted builders write the shared cache
 
-The instructive failure is **CREEP** (CVE-2025-36852, severity 9.4): bucket-backed build
-caches (S3/GCS/R2) poisoned by a *first-to-cache-wins* race — an attacker produces
-malicious *output* from the same *input* and uploads it first. The lesson is sharp:
-**input-based cache keys cannot prevent this**, because the poisoning happens at build
-time, before any hashing — "correct and poisoned artifacts are identical from a
+The instructive failure is **CREEP** (CVE-2025-36852, severity 9.4): bucket-backed
+build caches (S3/GCS/R2) poisoned by a *first-to-cache-wins* race — an attacker
+produces malicious *output* from the same *input* and uploads it first. The lesson is
+sharp: **input-based cache keys cannot prevent this**, because the poisoning happens at
+build time, before any hashing — "correct and poisoned artifacts are identical from a
 validation perspective." Nix's binary-cache history says the same: a content hash alone
 is not a trust anchor — artifacts must be **signed**.
 
-So our write path is gated, not open:
+So the write path is gated, not open:
+
+client :diagram_trust do
+  <figure class="wb-diagram" data-drawio="diagrams/trust-provenance.drawio" style="margin:1.5rem 0;text-align:center">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" font-family="system-ui,sans-serif" font-size="12" style="max-width:100%;height:auto">
+      <style>.b{rx:8;stroke-width:1.5}.t{text-anchor:middle}.lbl{fill:#555;font-size:10px}</style>
+      <g class="t">
+        <rect class="b" x="30" y="55" width="160" height="56" fill="#E3F2FD" stroke="#42A5F5"/><text x="110" y="80">tenant</text><text x="110" y="98" class="lbl">triggers a compile</text>
+        <rect class="b" x="250" y="50" width="220" height="66" fill="#FFF3E0" stroke="#FFA726"/><text x="360" y="76">capability token</text><text x="360" y="94" class="lbl">signed, scoped</text><text x="360" y="108" class="lbl">biscuit / macaroon</text>
+        <rect class="b" x="540" y="45" width="240" height="80" fill="#E8F5E9" stroke="#66BB6A"/><text x="660" y="70" font-weight="bold">trusted builder</text><text x="660" y="88" class="lbl">pinned, version-stamped toolchain</text><text x="660" y="104" class="lbl">builds + SIGNS the artifact</text>
+        <rect class="b" x="540" y="190" width="240" height="92" fill="#F3E5F5" stroke="#BA68C8"/><text x="660" y="212">signed attestation</text><text x="660" y="230" class="lbl">{source_hash, lane, toolchain+digest,</text><text x="660" y="244" class="lbl">builder_pubkey, output_hash}</text><text x="660" y="262" class="lbl">SLSA / in-toto shape</text>
+      </g>
+      <g class="t">
+        <path d="M540 470 a70 18 0 0 0 280 0 v-110 a70 18 0 0 0 -280 0 z" fill="#EDE7F6" stroke="#7E57C2"/><path d="M540 360 a70 18 0 0 0 280 0" fill="none" stroke="#7E57C2"/>
+        <text x="680" y="390">transparency log</text><text x="680" y="408" class="lbl">append-only, hash-linked (Merkle)</text><text x="680" y="424" class="lbl">tamper-evident — NOT a blockchain</text><text x="680" y="440" class="lbl">CT / Sigstore-Rekor · = billing ledger</text>
+      </g>
+      <g class="t">
+        <rect class="b" x="60" y="360" width="320" height="100" fill="#E1F5FE" stroke="#039BE5"/><text x="220" y="384" font-weight="bold">reader / nexus</text><text x="220" y="404" class="lbl">verifies signature chains to a TRUSTED ROOT</text><text x="220" y="420" class="lbl">before accepting the artifact</text><text x="220" y="440" class="lbl">defeats CREEP: no valid attestation = rejected</text>
+        <rect x="60" y="175" width="320" height="92" rx="8" fill="#FFEBEE" stroke="#E53935" stroke-dasharray="5 4"/><text x="220" y="200">untrusted CI context (PR / draft / preview)</text><text x="220" y="220" class="lbl">writes ONLY a branch-scoped cache</text><text x="220" y="238" class="lbl">never the shared production pool</text>
+      </g>
+      <g fill="none">
+        <path d="M190 83 L250 83" stroke="#555"/><path d="M470 83 L540 85" stroke="#FFA726"/><text x="505" y="72" class="lbl" text-anchor="middle">under token</text>
+        <path d="M660 125 L660 190" stroke="#66BB6A"/><text x="690" y="160" class="lbl">emits</text>
+        <path d="M660 282 L680 360" stroke="#7E57C2"/><text x="710" y="320" class="lbl">appended</text>
+        <path d="M540 410 L380 410" stroke="#039BE5"/><text x="460" y="400" class="lbl" text-anchor="middle">verify sig + inclusion</text>
+        <path d="M150 111 C 120 140, 150 160, 200 175" stroke="#E53935" stroke-dasharray="5 4"/><text x="120" y="150" class="lbl">scoped away</text>
+      </g>
+    </svg>
+  </figure>
+  <script>if(window.__wbDrawioUp)window.__wbDrawioUp();</script>
+end
 
 - **Tenants never write the shared cache.** They *trigger* a compile; **our** trusted
   Firecracker worker, running our **pinned, version-stamped toolchain**, performs the
-  build and **signs** the artifact with the fleet key. There is no tenant-supplied-output
-  upload path into the shared pool — so "first-to-cache-wins" is impossible; an attacker
-  cannot write at all.
+  build and **signs** the artifact with the fleet key. There is no
+  tenant-supplied-output upload path into the shared pool, so "first-to-cache-wins" is
+  impossible — an attacker cannot write at all.
 - **Readers verify the signature**, not just the hash. An unsigned or wrong-signed
   artifact is rejected and recompiled.
 - **Untrusted CI contexts are scoped.** A PR / draft / preview build writes only to an
   **isolated, context-scoped** cache, never the shared production one — CREEP's
-  "hierarchical write-access" mitigation applied to in-nexus CI/CD: protected refs write
-  the shared cache, untrusted refs write their own branch-scoped cache.
+  "hierarchical write-access" mitigation applied to in-nexus CI/CD: protected refs
+  write the shared cache, untrusted refs write their own branch-scoped cache.
 - **Determinism audit (defense in depth).** Because the toolchain is pinned and wasm
   compiles are deterministic, a background rebuilder re-compiles a sample of shared
-  artifacts on an independent worker and compares hashes; a mismatch raises a poisoning /
-  non-determinism alarm (the reproducible-builds rebuilder pattern).
+  artifacts on an independent worker and compares hashes; a mismatch raises a poisoning
+  / non-determinism alarm (the reproducible-builds rebuilder pattern).
 
 ## Verifiable provenance — signatures over a transparency log (Radicle-pattern)
 
-The integrity model above trusts *our* fleet signing key. We can do better and make every
-artifact and every build **cryptographically verifiable by anyone**, with no central
-authority to trust — the [Radicle](https://radicle.dev/) philosophy (self-certifying,
-every action signed, trust from cryptography not from where data lives). Radicle itself
-is **not** a blockchain, and neither is this — the same guarantees come from signed
-records over a hash-linked log, at a fraction of the cost. Three layers:
+The integrity model above trusts *our* fleet signing key. We can do better and make
+every artifact and every build **cryptographically verifiable by anyone**, with no
+central authority to trust — the [Radicle](https://radicle.dev/) philosophy
+(self-certifying, every action signed, trust from cryptography not from where data
+lives). Radicle itself is **not** a blockchain, and neither is this: the same
+guarantees come from signed records over a hash-linked log, at a fraction of the cost.
+Three layers:
 
-- **Signed build attestations (artifact layer).** Every shared-cache artifact carries a
-  signed statement — `{source_integrity_hash, lane, toolchain_version+digest,
-  builder_pubkey, output_hash}` — signed by the builder key. This is the SLSA-provenance /
-  in-toto attestation shape: *Radicle for build outputs.* A reader verifies the signature
-  chains to a trusted builder root before accepting the artifact. **This is what actually
-  defeats CREEP** — a poisoned artifact has no valid attestation from a trusted builder,
-  regardless of matching input hashes.
+- **Signed build attestations (artifact layer).** Every shared-cache artifact carries
+  a signed statement — `{source_integrity_hash, lane, toolchain_version+digest,
+  builder_pubkey, output_hash}` — signed by the builder key. This is the
+  SLSA-provenance / in-toto attestation shape: *Radicle for build outputs.* A reader
+  verifies the signature chains to a trusted builder root before accepting the
+  artifact. **This is what actually defeats CREEP** — a poisoned artifact has no valid
+  attestation from a trusted builder, regardless of matching input hashes.
 - **A transparency log, not a blockchain (the record).** An append-only, hash-linked
   (Merkle) log of every attestation: tamper-evident, publicly/tenant-verifiable,
   history-immutable — the guarantees people mean by "on chain," without a chain
   (Certificate-Transparency / Sigstore-Rekor, and effectively how Radicle's signed
   history works). **This log is the same structure as the billing/provenance ledger
-  below** — one append-only signed record serves both audit and metering, making billing
-  non-repudiable.
-- **Capability tokens for invocation (identity).** Each build runs under a signed, scoped
-  capability token (biscuit/macaroon-style, extending the existing `wbk_` PAT /
+  below** — one append-only signed record serves both audit and metering, making
+  billing non-repudiable.
+- **Capability tokens for invocation (identity).** Each build runs under a signed,
+  scoped capability token (biscuit/macaroon-style, extending the existing `wbk_` PAT /
   `Nexus.Auth`); the attestation records *who* invoked it, binding cost to a key rather
   than an IP. You cannot repudiate a build you signed for.
 
-**The store is untrusted by design.** Trust lives in signatures + content hashes, so R2's
-location or operator is irrelevant — a swapped or tampered artifact fails verification no
-matter who controls the bucket. The nexus accepts only artifacts whose attestation is
-signed by a builder key in its own trust root, so the store can inject nothing a builder
-did not authorize. (Distinct surface, same philosophy: the *repo/git* side — the nexus is
-already a git remote — is where the Radicle **protocol** itself fits, via self-certifying
-signed repos; an interop target as native auth matures.)
+**The store is untrusted by design.** Trust lives in signatures plus content hashes,
+so the bucket's location or operator is irrelevant — a swapped or tampered artifact
+fails verification no matter who controls the store. The nexus accepts only artifacts
+whose attestation is signed by a builder key in its own trust root, so the store can
+inject nothing a builder did not authorize. (Distinct surface, same philosophy: the
+*repo/git* side — the nexus is already a git remote — is where the Radicle **protocol**
+itself fits, via self-certifying signed repos; an interop target as native auth
+matures.)
 
 ## Usage, billing & abuse — airtight by construction
 
@@ -245,47 +349,48 @@ run unbilled or runaway compute.
   queue, degrade to the slow in-process path, or reject — **never** a silent unbilled
   run.
 - **Hard per-job caps.** Firecracker enforces a wallclock, memory and CPU ceiling per
-  job; a runaway is killed. A single compile can't exceed its bounded shape.
+  job; a runaway is killed. A single compile cannot exceed its bounded shape.
 - **Per-tenant concurrency cap.** At most N concurrent workers per tenant — anti
   fork-bomb.
 - **Single-flight dedup.** 100 concurrent requests for the same cache-miss key spawn
   **one** worker, not 100 — both a cost control and an abuse control.
 - **Submission rate limit + egress cap** (the CI artifact-egress line).
-- **The cache is the primary abuse mitigation.** Hits are ~free; only *misses* cost; and
-  misses are capped + single-flighted. The one pathological case — a tenant forcing
+- **The cache is the primary abuse mitigation.** Hits are ~free; only *misses* cost;
+  and misses are capped + single-flighted. The one pathological case — a tenant forcing
   endless *unique* misses (randomized source) — is bounded by the quota backstop and a
   per-tenant miss-rate alarm.
 - **Reconciled, idempotent ledger.** Metering is nexus state, reconciled against Fly's
-  actual machine-seconds, so we bill *reality* and never drift over or under. No JSON
-  sidecar — the ledger is runtime state, the quotas are `.work` `deploy` knobs.
+  actual machine-seconds, so we bill *reality* and never drift over or under. The
+  ledger is runtime state and the quotas are `.work` `deploy` knobs — no JSON sidecar.
 
 ## The fleet — cheapest viable shape
 
-- **Baked compiler machine image, not per-job pull.** The compiler toolchain is ~7.2 GB.
-  Pulling it per job dwarfs a 15 s compile (~10×) — fatal. Instead bake it into the
-  worker's rootfs once; a **stopped** worker holds it for **$0.15/GB/mo (~$1.08/mo)** and
-  **resumes in ~1–5 s** with no pull.
+- **Baked compiler machine image, not per-job pull.** The compiler toolchain is
+  ~7.2 GB. Pulling it per job dwarfs a 15 s compile (~10×) — fatal. Instead bake it
+  into the worker's rootfs once; a **stopped** worker holds it for **$0.15/GB/mo
+  (~$1.08/mo)** and **resumes in ~1–5 s** with no pull.
 - **Scale to zero, resume on demand.** `auto_stop_machines` + `min_machines_running: 0`
   (already how `Nexus.Provisioner` builds machine config) — a worker costs only its
   stopped rootfs when idle.
 - **Right shape per workload.** `shared-cpu-2x` for compiles, `performance-4x` for CI.
   Never one shared size.
-- **Pin CI artifact output to R2**, never push large image layers back out through Fly
-  egress ($0.02/GB) — egress can rival compute for image-publishing pipelines.
+- **Pin CI artifact output to object storage**, never push large image layers back out
+  through Fly egress ($0.02/GB) — egress can rival compute for image-publishing
+  pipelines.
 - **Reuse the existing seam.** Workers are provisioned through the same
   `Nexus.Provisioner` / `Nexus.Fly` machine-create path that already provisions tenant
   nexuses — not a second control plane.
 
 ## Tier mapping
 
-Meter two units — `compile-jobs` and `ci-minutes` — as `.work` `deploy`-block knobs read
-via `Nexus.Config`, neutral defaults in the runtime, our real numbers in our DeployKit
-config (the same THE-LINE discipline as `tiers`). Indicative allowances against our
-current tiers (Starter $0 / Team $49 / Scale $199):
+Meter two units — `compile-jobs` and `ci-minutes` — as `.work` `deploy`-block knobs
+read via `Nexus.Config`, neutral defaults in the runtime, our real numbers in our
+DeployKit config (the same THE-LINE discipline as `tiers`). Indicative allowances
+against our current tiers (Starter $0 / Team $49 / Scale $199):
 
 | Tier | Included compiles/mo | Included CI | Cost to us | Notes |
 | --- | --- | --- | --- | --- |
-| Starter | ~3,000 | — | ~$1.38 | loss-leader; it's the OOM-relief that makes a 1 GB box usable |
+| Starter | ~3,000 | — | ~$1.38 | loss-leader; the OOM-relief that makes a 1 GB box usable |
 | Team | ~60,000 | ~300 min | ~$7.50 | ~$41 gross headroom |
 | Scale | ~600,000 | ~3,000 min | ~$75 | ~$124 gross headroom |
 
@@ -299,22 +404,23 @@ shared cache is what keeps cost-to-us this low.
 tenant but **linear in tenant count** — 1,000 tenants each holding a 7.2 GB worker is
 ~$1,080/mo of pure idle storage. Mitigations, in order: (1) **share one compile-worker
 app per N tenants** with per-tenant sandboxing rather than one image each; (2)
-**garbage-collect** workers idle > X days, eat one cold re-bake on the next compile; (3)
-**thin the baked image per-language** — pull only the toolchains a tenant's declared
-`languages=` needs. Watch this line as tenant count grows; it's the only cost that
-scales without usage. The compile cache makes (1) easy: a shared worker pool is fine
-*because* the cache, not the worker, holds the valuable state.
+**garbage-collect** workers idle > X days, eat one cold re-bake on the next compile;
+(3) **thin the baked image per-language** — pull only the toolchains a tenant's
+declared `languages=` needs. Watch this line as tenant count grows; it is the only cost
+that scales without usage. The compile cache makes (1) easy: a shared worker pool is
+fine *because* the cache, not the worker, holds the valuable state.
 
 ## Build order
 
-1. **Compile cache, shared scope first** — content-addressed key + R2 store + hit/miss
-   in the compile lane. This alone removes most recompiles with **zero** new compute
-   infra (misses still compile in-process for now). Biggest win per unit of work.
-2. **`job` primitive + Fly worker** — baked compiler image, scale-to-zero, dispatched on
-   a cache miss. Moves the heavy compile off the serving box.
+1. **Compile cache, shared scope first** — content-addressed key + object store +
+   hit/miss in the compile lane. This alone removes most recompiles with **zero** new
+   compute infra (misses still compile in-process for now). Biggest win per unit of
+   work.
+2. **`job` primitive + Fly worker** — baked compiler image, scale-to-zero, dispatched
+   on a cache miss. Moves the heavy compile off the serving box.
 3. **Private tenant scope + signing** — the security boundary, encrypted-at-rest.
-4. **CI/CD jobs** — `flow`-over-`job` wired to `hook`/push/cron triggers; R2 artifact
-   output; the two metered units in `Nexus.Config`.
+4. **CI/CD jobs** — `flow`-over-`job` wired to `hook`/push/cron triggers; object-store
+   artifact output; the two metered units in `Nexus.Config`.
 
 Step 1 is independently valuable and ships first; the fleet (step 2) only pays off once
 the cache is deciding what actually needs compiling.
