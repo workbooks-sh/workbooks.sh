@@ -644,6 +644,19 @@
         .then(function(d){ if (d && d.ok){ WB.toast('Set to ' + state); WB.cache.set('apps', null); paintApps(); } else WB.toast((d && d.error) || 'Failed', 'bad'); })
         .catch(function(){ WB.toast('Failed', 'bad'); });
     }
+    // Going private/draft TAKES A LIVE SITE DOWN from public — a real, server-enforced access change, so
+    // confirm it. Publishing (→ public) is non-destructive and applies immediately without a prompt.
+    async function changeVisibility(id, state, label){
+      var who = '“' + (label || id) + '”';
+      if (state === 'private') {
+        if (!await WB.confirm({ title: 'Make private?', danger: true, confirm: 'Make private',
+          body: who + ' will be taken down from public. Visitors get a “not available” page — only signed-in members can reach it.' })) return;
+      } else if (state === 'draft') {
+        if (!await WB.confirm({ title: 'Move to draft?', danger: true, confirm: 'Move to draft',
+          body: who + ' will go offline as a draft — not publicly accessible until you publish it again.' })) return;
+      }
+      setVisibility(id, state);
+    }
 
     // ── Context-menu registrations — one place wiring every surface's right-click actions ──────────
     WB.ctx.register('file', function(el){
@@ -700,7 +713,7 @@
         { sep: true },
         { header: 'Visibility' }
       ];
-      ['public', 'private', 'draft'].forEach(function(s){ if (s !== vis) items.push({ label: 'Make ' + s, icon: (s === 'public' ? ICO.globe : s === 'private' ? ICO.lock : ICO.draft), need: 'app.edit', on: function(){ setVisibility(name, s); } }); });
+      ['public', 'private', 'draft'].forEach(function(s){ if (s !== vis) items.push({ label: (s === 'public' ? 'Publish (make public)' : 'Make ' + s), icon: (s === 'public' ? ICO.globe : s === 'private' ? ICO.lock : ICO.draft), danger: s !== 'public', need: 'app.edit', on: function(){ changeVisibility(name, s, a.label); } }); });
       return items;
     });
     WB.ctx.register('nexus', function(){
