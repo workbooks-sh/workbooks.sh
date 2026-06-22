@@ -125,28 +125,41 @@ WB.view('/data', {
         debounce = setTimeout(() => { state.q = search.value; state.offset = 0; load(); }, 220);
       });
 
+      // The resource's schema (fields + description + tags) from the cached resource list — always
+      // available, so we can render COLUMNS even before/without the rows fetch (empty or failed).
+      const schemaOf = () => {
+        const cached = WB.cache.get('data:list');
+        return ((cached && cached.resources) || []).find((r) => r.name === name) || null;
+      };
+
+      function paintMeta(d, schema) {
+        if (metaPainted) return;
+        const description = (d && d.description) || (schema && schema.description);
+        const tags = (d && d.tags && d.tags.length ? d.tags : (schema && schema.tags)) || [];
+        if (!description && !tags.length) return;   // nothing to show yet — try again next load
+        metaPainted = true;
+        if (description) subEl.textContent = description;
+        metaEl.innerHTML = tags.length ? `<div class="dtags">` + tags.map((t) => `<span class="dtag">#${esc(t)}</span>`).join('') + `</div>` : '';
+      }
+
       async function load() {
         const url = `/cloud/data/rows?name=${encodeURIComponent(name)}&offset=${state.offset}&limit=${state.limit}`
           + (state.sort ? `&sort=${encodeURIComponent(state.sort)}&dir=${state.dir}` : '')
           + (state.q ? `&q=${encodeURIComponent(state.q)}` : '');
-        let d;
-        try { d = await getJSON(url); } catch (e) { tableEl.innerHTML = `<div class="dmsg">Failed to load.</div>`; return; }
-        if (d && d.error) { tableEl.innerHTML = `<div class="dmsg">${esc(d.error)}</div>`; return; }
-        const fields = (d && d.fields) || [];
+        let d = null;
+        try { d = await getJSON(url); } catch (e) { d = null; }
+        if (d && d.error) { d = null; }
+
+        // Fields come from the rows response when available, else the cached schema — so columns ALWAYS
+        // render (an empty table, or a failed rows fetch, still shows its shape).
+        const schema = schemaOf();
+        const fields = (d && d.fields && d.fields.length ? d.fields : null) || (schema && schema.fields) || [];
         const rows = (d && d.rows) || [];
+        paintMeta(d, schema);
 
-        // Header meta (description + tags) — painted once from the first response.
-        if (!metaPainted && d) {
-          metaPainted = true;
-          if (d.description) subEl.textContent = d.description;
-          const tags = d.tags || [];
-          metaEl.innerHTML = tags.length ? `<div class="dtags">` + tags.map((t) => `<span class="dtag">#${esc(t)}</span>`).join('') + `</div>` : '';
-        }
-
-        // Always render the columns (the schema) — an empty table shows its shape, with a blank state row.
         if (!fields.length) {
           tableEl.innerHTML = `<div class="dmsg">This resource declares no fields.</div>`;
-          pagerEl.innerHTML = `${d ? d.total : 0} row${(d && d.total) === 1 ? '' : 's'}`;
+          pagerEl.innerHTML = '';
           return;
         }
         const head = fields.map((f) => {
@@ -154,6 +167,9 @@ WB.view('/data', {
           const caret = active ? (state.dir === 'asc' ? '▲' : '▼') : '↕';
           return `<th data-sort="${esc(f.name)}">${esc(f.name)}<span class="dtype">${esc(f.type)}</span><span class="sortcaret">${caret}</span></th>`;
         }).join('');
+        const emptyMsg = !d ? 'Couldn’t load rows — showing the columns.'
+          : state.q ? 'No rows match “' + esc(state.q) + '”.'
+          : 'This table is empty — no rows yet.';
         const body = rows.length
           ? rows.map((row) => `<tr>` + fields.map((f) => {
               let v = row[f.name];
@@ -161,7 +177,7 @@ WB.view('/data', {
               else if (typeof v === 'object') v = JSON.stringify(v);
               return `<td title="${esc(v)}">${esc(v)}</td>`;
             }).join('') + `</tr>`).join('')
-          : `<tr class="demptyrow"><td colspan="${fields.length}"><div class="dmsg" style="text-align:center">${state.q ? 'No rows match “' + esc(state.q) + '”.' : 'This table is empty — no rows yet.'}</div></td></tr>`;
+          : `<tr class="demptyrow"><td colspan="${fields.length}"><div class="dmsg" style="text-align:center">${emptyMsg}</div></td></tr>`;
         tableEl.innerHTML = `<div class="dtablewrap"><table class="dtable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
         tableEl.querySelectorAll('th[data-sort]').forEach((th) => {
           th.onclick = () => {
@@ -171,7 +187,8 @@ WB.view('/data', {
             state.offset = 0; load();
           };
         });
-        const from = d.offset + 1, to = Math.min(d.offset + d.limit, d.total);
+        if (!d) { pagerEl.innerHTML = ''; return; }   // rows fetch failed — columns shown, no pager
+        const from = d.total ? d.offset + 1 : 0, to = Math.min(d.offset + d.limit, d.total);
         pagerEl.innerHTML =
           `<span>${from}–${to} of ${d.total}</span>`
           + `<button class="dbtn" id="dprev" ${d.offset <= 0 ? 'disabled' : ''}>Prev</button>`
