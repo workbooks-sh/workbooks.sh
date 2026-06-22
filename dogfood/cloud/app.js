@@ -981,9 +981,6 @@
         '<div class="nexrail">' +
           '<div class="nextilewrap">' + nexTile + '</div>' +
           '<div class="raildiv"></div>' +
-          // When the sidebar is collapsed, the in-sidebar collapse button is hidden — so surface an
-          // always-visible expand button here in the rail (uses the same data-rail-toggle handler).
-          (st.rail ? '<button class="railsec railexpand" data-rail-toggle title="Open sidebar" aria-label="Open sidebar"><span class="rsico">' + ICO.rail + '</span><span class="rslbl">Open</span></button>' : '') +
           '<nav class="railsecs">' + railsecs + '</nav>' +
           '<div class="nexrail-grow"></div>' +
           '<div class="railbottom">' +
@@ -992,14 +989,19 @@
             '<a class="railsec railavbtn' + (section === 'account' ? ' on' : '') + '" data-nav="/settings" href="#/settings" title="' + esc(user.name) + '"><span class="railav">' + esc(user.initial) + '</span><span class="rslbl">You</span></a>' +
           '</div>' +
         '</div>' +
-        '<aside class="side">' +
-          '<div class="sidehd">' +
-            '<span class="sidehd-t">' + (SECTITLE[section] || '') + '</span>' +
-            '<button class="sidehd-ic" data-palette title="Search (⌘K)" aria-label="Search">' + ICO.search + '</button>' +
-            (isBrowse ? '<div class="filterwrap"><button class="sidehd-ic' + (filterActive() ? ' on' : '') + '" data-filter-toggle title="Filter" aria-label="Filter">' + ICO.filter + '</button>' + (st.filterOpen ? filterMenu() : '') + '</div>' : '') +
-            '<button class="sidehd-ic" data-rail-toggle title="Collapse sidebar" aria-label="Collapse sidebar">' + ICO.rail + '</button>' +
-          '</div>' +
-          sideBody +
+        // Collapsed → a slim blank second rail with just the expand button at the top (never fully gone,
+        // so it's always re-openable). Expanded → the full per-surface sidebar.
+        '<aside class="side' + (st.rail ? ' railed' : '') + '">' +
+          (st.rail
+            ? '<button class="sidehd-ic railexpand" data-rail-toggle title="Open sidebar" aria-label="Open sidebar">' + ICO.rail + '</button>'
+            : ('<div class="sidehd">' +
+                '<span class="sidehd-t">' + (SECTITLE[section] || '') + '</span>' +
+                '<button class="sidehd-ic" data-palette title="Search (⌘K)" aria-label="Search">' + ICO.search + '</button>' +
+                (isBrowse ? '<div class="filterwrap"><button class="sidehd-ic' + (filterActive() ? ' on' : '') + '" data-filter-toggle title="Filter" aria-label="Filter">' + ICO.filter + '</button>' + (st.filterOpen ? filterMenu() : '') + '</div>' : '') +
+                '<button class="sidehd-ic" data-rail-toggle title="Collapse sidebar" aria-label="Collapse sidebar">' + ICO.rail + '</button>' +
+              '</div>' +
+              sideBody)
+          ) +
         '</aside>' +
         '<div class="main">' + crumbs + (fb ? '<div id="view" class="fullbleed"></div>' : '<div class="wrap" id="view"></div>') + '</div>' +
       '</div>';

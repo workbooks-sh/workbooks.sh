@@ -105,8 +105,11 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 #app > .side{ grid-column:2; grid-row:2; }
 #app > .main{ grid-column:3; grid-row:1 / 3; }
 /* Collapse the sidebar into an ICON RAIL (not hidden): nav icons only, no labels/tree. */
-#app.rail{ grid-template-columns:70px 0 1fr; }
-#app.rail .side{ overflow:hidden; padding:0; border-right:0; }
+/* Collapsed sidebar → a slim blank second rail (not 0-width) holding just the expand button at top, so
+   it's always re-openable. Surfaces can later replace this with an explicit second-rail (apps/studio). */
+#app.rail{ grid-template-columns:70px 46px 1fr; }
+#app.rail .side.railed{ padding:10px 0; align-items:center; overflow:hidden; }
+.side.railed .railexpand{ margin:0; }
 
 /* ── Slack rail: nexus selector + section tabs (icon-above-text) + Admin/You bottom group ── */
 .nextilewrap{ position:relative; padding:2px 0 4px; }
