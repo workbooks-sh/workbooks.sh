@@ -300,7 +300,12 @@ defmodule Nexus.Server do
   defp serve_workbook(conn, wb_root, base) do
     demo = Path.join(wb_root, "demo.html")
     html = if File.exists?(demo), do: File.read!(demo), else: cached_html(wb_root, Nexus.Auth.tenant(conn))
-    html = if base, do: String.replace(html, "<head>", ~s(<head><base href="/#{base}/_v/#{asset_version(wb_root)}/">), global: false), else: html
+    # A non-empty mount name gets a `<base href="/<name>/_v/<ver>/">` so relative assets route to this
+    # mount + cache-bust. The ROOT (home) mount has name "" → NO base (a `//_v/…` href is protocol-
+    # relative — the browser reads `_v` as a HOST and every relative asset 404s); its assets resolve at /.
+    html = if is_binary(base) and base != "",
+             do: String.replace(html, "<head>", ~s(<head><base href="/#{base}/_v/#{asset_version(wb_root)}/">), global: false),
+             else: html
     conn |> put_resp_content_type("text/html") |> send_resp(200, html)
   end
 

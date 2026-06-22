@@ -36,6 +36,20 @@ defmodule Nexus.HomeSurfaceTest do
     assert Path.basename(home_dir) == "lander"
   end
 
+  test "a surface's SSR weave excludes nested child surfaces (no title/content leak)", %{dir: dir} do
+    # lander/index.work declares its own title; blog (a nested surface) declares another. Rendering the
+    # lander must NOT pull in the blog's files — its title/content stay the blog's own.
+    # Real-lander shape: prose sections, no app block (so the weave renders the prose directly).
+    File.write!(Path.join([dir, "lander", "index.work"]), "# Landing\n\nThe hero pitch goes here.\n")
+    File.write!(Path.join([dir, "lander", "01-hero.work"]), "# Hero\n\nBuild your whole stack.\n")
+    File.write!(Path.join([dir, "lander", "blog", "index.work"]), "# Workbooks Blog\n\nThe latest blog posts.\n")
+
+    html = Nexus.SSR.render(Path.join(dir, "lander"), live: false)
+    assert html =~ "The hero pitch goes here."
+    refute html =~ "Workbooks Blog"
+    refute html =~ "latest blog posts"
+  end
+
   test "home naming a missing surface is a safe no-op", %{dir: dir} do
     Nexus.Config.reload(~s(deploy do\n  home="nope"\nend))
     names = Nexus.Server.discover_mounts_for_test(dir) |> Enum.map(&elem(&1, 0)) |> Enum.sort()

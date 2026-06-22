@@ -218,8 +218,18 @@ defmodule Nexus.SSR do
   end
 
   defp files(root) do
+    # Nested surfaces (subdirs with their OWN index.work) are SEPARATE mounts — their .work files belong
+    # to that surface, not this one. Prune those subtrees so a parent surface's weave stops at each child
+    # surface's boundary (otherwise a home surface like `lander` swallows its `lander/blog` surface — its
+    # title, its content, the lot). Latent until nested surfaces existed; exposed by the workspace reorg.
+    nested =
+      Path.wildcard(Path.join(root, "**/index.work"))
+      |> Enum.map(&Path.dirname/1)
+      |> Enum.reject(&(&1 == root))
+
     (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
     |> Enum.uniq()
+    |> Enum.reject(fn p -> Enum.any?(nested, &String.starts_with?(p, &1 <> "/")) end)
     # TEMPLATE.work is the template manifest (metadata for the CLI / explorer), not app content.
     |> Enum.reject(&(Path.basename(&1) == "TEMPLATE.work"))
     |> Enum.sort_by(fn p -> {Path.basename(p) != "index.work", p} end)
