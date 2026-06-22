@@ -27,6 +27,10 @@ defmodule Nexus.Auth.Cloud do
           {:ok, identity} ->
             {:ok, identity}
 
+          # Past half-life — tell the plug to re-issue (slide) the cookie so an active user stays in.
+          {:renew, identity} ->
+            {:ok, identity, :renew}
+
           :none ->
             if String.starts_with?(path, @gated),
               do: {:error, :unauthorized},
@@ -52,7 +56,7 @@ defmodule Nexus.Auth.Cloud do
   defp session_identity(conn) do
     case Nexus.Auth.Session.verify(Plug.Conn.fetch_cookies(conn)) do
       {:ok, %{tenant: t} = id} when is_binary(t) and t != "" -> {:ok, id}
-      {:ok, %{tenant: t} = id, :renew} when is_binary(t) and t != "" -> {:ok, id}
+      {:ok, %{tenant: t} = id, :renew} when is_binary(t) and t != "" -> {:renew, id}
       _ -> :none
     end
   end

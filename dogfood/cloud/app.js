@@ -306,6 +306,15 @@
     // ── router + shell ──────────────────────────────────────────────────────────────────────────
     var ROUTE = { path: '/', params: {} };
     WB.route = ROUTE;
+    // Sign out — POST to /auth/logout (the handler is POST-only and clears the session cookie), then
+    // hard-redirect to the login page. A GET <a href> never hit the handler, so the cookie survived and
+    // a refresh "logged you back in" — this does the real POST and only leaves once the cookie is cleared.
+    WB.logout = function () {
+      fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' })
+        .catch(function () {})
+        .then(function () { location.assign('/login/'); });
+      return false;
+    };
     WB.nav = function (path) {
       if (path.charAt(0) !== '/') path = '/' + path;
       var target = '#' + path;
@@ -963,7 +972,7 @@
           navlink('/settings', ICO.gear, 'Profile', p) +
           '<button class="nxlink" data-theme-toggle>' + ICO.spark + '<span class="lbl">Appearance</span></button>' +
           navlink('/settings', ICO.activity, 'Notifications', p) + navlink('/secrets', ICO.key, 'API tokens', p) +
-          '<a class="nxlink" href="/auth/logout">' + ICO.logout + '<span class="lbl">Sign out</span></a></nav>';
+          '<a class="nxlink" href="/login/" onclick="return WB.logout()">' + ICO.logout + '<span class="lbl">Sign out</span></a></nav>';
       else sideBody = '';
 
       root.innerHTML =

@@ -48,20 +48,28 @@ defmodule Nexus.Auth do
       conn
     else
       case adapter().authenticate(conn) do
-        {:ok, %{tenant: tenant} = id} when is_binary(tenant) and tenant != "" ->
-          conn = conn |> assign(:tenant, tenant) |> assign(:identity, id)
+        # Valid session past its half-life → SLIDE it: re-issue the cookie so an active user is never
+        # logged out mid-use, then proceed. (verify/3 flags this as :renew.)
+        {:ok, %{tenant: tenant} = id, :renew} when is_binary(tenant) and tenant != "" ->
+          conn |> Nexus.Auth.Session.issue(id) |> proceed(id)
 
-          # Per-route guard: :allow (default when no policy declared), 403 (wrong role/scope), or
-          # 401 (the guard demands more than the adapter proved). Fail-closed by construction.
-          case Nexus.Auth.Guard.decide(conn.method, conn.request_path, id) do
-            :allow -> conn
-            :forbidden -> conn |> send_resp(403, "forbidden") |> halt()
-            :unauthenticated -> conn |> send_resp(401, "unauthorized") |> halt()
-          end
+        {:ok, %{tenant: tenant} = id} when is_binary(tenant) and tenant != "" ->
+          proceed(conn, id)
 
         _ ->
           conn |> send_resp(401, "unauthorized") |> halt()
       end
+    end
+  end
+
+  # Assign the identity + per-route guard. :allow → continue; 403/401 fail-closed.
+  defp proceed(conn, %{tenant: tenant} = id) do
+    conn = conn |> assign(:tenant, tenant) |> assign(:identity, id)
+
+    case Nexus.Auth.Guard.decide(conn.method, conn.request_path, id) do
+      :allow -> conn
+      :forbidden -> conn |> send_resp(403, "forbidden") |> halt()
+      :unauthenticated -> conn |> send_resp(401, "unauthorized") |> halt()
     end
   end
 
