@@ -104,6 +104,11 @@ defmodule Nexus.Git do
     # receive-pack (push) unless the repo opts in — without this a `git push` to the nexus fails with
     # "repository not found". Re-applied every provision (idempotent) so existing repos gain it too.
     System.cmd("git", ["--git-dir=#{bare}", "config", "http.receivepack", "true"], stderr_to_stdout: true)
+    # Accept a push to the checked-out branch. With jj-substrate on, ensure_colocated sets core.bare=false
+    # + core.worktree, so git's default `denyCurrentBranch` would reject `git push … main` with "branch is
+    # currently checked out". `ignore` lets the ref update; our post-receive hook does the explicit
+    # checkout + jj import, so the worktree + op-log stay correct. (Harmless on a still-bare repo.)
+    System.cmd("git", ["--git-dir=#{bare}", "config", "receive.denyCurrentBranch", "ignore"], stderr_to_stdout: true)
 
     hook = Path.join(hooks, "post-receive")
     File.write!(hook, post_receive(bare, work_dir))

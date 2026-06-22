@@ -19,6 +19,10 @@ defmodule Nexus.GitRemoteTest do
     # not found") and no customer can push to their nexus.
     {rp, 0} = System.cmd("git", ["--git-dir=#{bare}", "config", "--get", "http.receivepack"], stderr_to_stdout: true)
     assert String.trim(rp) == "true"
+    # And pushes to the checked-out branch are accepted (jj colocation makes the repo non-bare) — else
+    # "branch is currently checked out".
+    {dcb, 0} = System.cmd("git", ["--git-dir=#{bare}", "config", "--get", "receive.denyCurrentBranch"], stderr_to_stdout: true)
+    assert String.trim(dcb) == "ignore"
 
     # A client repo that pushes a .work file to the bare remote.
     client = Path.join(base, "client")
