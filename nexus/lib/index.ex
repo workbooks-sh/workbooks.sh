@@ -60,9 +60,12 @@ defmodule Nexus.Index do
   The capability ceiling declared by a single `index.work` — a sorted list of grantable caps, or
   `:unbounded` when the index has no `ceiling` block (it imposes no constraint of its own).
   """
-  def ceiling(path) when is_binary(path) do
-    path
-    |> File.read!()
+  def ceiling(path) when is_binary(path), do: path |> File.read!() |> ceiling_source()
+
+  @doc "Like `ceiling/1` but reads the `ceiling` block straight from a `.work` SOURCE string (used by
+  the merge gate, which diffs proposed source before it is ever written to disk)."
+  def ceiling_source(src) when is_binary(src) do
+    src
     |> Nexus.Literate.parse()
     |> Enum.find(&(&1.type == :code and &1.kind == "ceiling"))
     |> ceiling_caps()
