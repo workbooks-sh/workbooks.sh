@@ -12,6 +12,7 @@ const newcmd = @import("new.zig");
 const secretcmd = @import("secret.zig");
 const context = @import("context.zig");
 const agentcmd = @import("agent.zig");
+const envcmd = @import("env.zig");
 const conformance = @import("conformance.zig");
 test {
     _ = work;
@@ -123,6 +124,11 @@ pub fn main(init: std.process.Init) !void {
         }
     } else if (eql(verb, "runs")) {
         std.process.exit(try agentcmd.runs(io, alloc, home));
+    } else if (eql(verb, "env")) {
+        const sub = it.next() orelse "";
+        const name = it.next() orelse "";
+        const value = it.next() orelse (init.environ_map.get("WORK_ENV_VALUE") orelse "");
+        std.process.exit(try envcmd.env(io, alloc, home, sub, name, value));
     } else if (eql(verb, "whoami")) {
         std.process.exit(try context.whoami(io, alloc, home));
     } else if (eql(verb, "login")) {
@@ -195,6 +201,7 @@ const groups = [_]Group{
         .{ "agent ls", "list the agent roster on the active nexus" },
         .{ "agent run <name> \"<task>\"", "run an agent on a brief, print the answer" },
         .{ "runs", "the durable run ledger (the dashboard's Runs view)" },
+        .{ "env ls|set|rm", "manage the nexus env/secret store (the dashboard's Secrets)" },
     } },
     .{ .name = "platform", .blurb = "identity, contexts, the control plane", .verbs = &.{
         .{ "ctx · nexus <url>", "manage targets · point at an engine" },
