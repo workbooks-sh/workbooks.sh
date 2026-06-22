@@ -106,37 +106,9 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
 WB.view('/create', { title: 'Studio', render(el){ WB.nav('/studio'); } });
 // The studio-shell CSS (.studio / .studio-rail / .studio-railbtn) is GLOBAL in app.css so it's shared
 // by every surface in the shell (Studio chat + Activity feed), keeping the floating rail locked in.
-WB.scopedStyles('/studio', `
-/* Studio = horizontal top nav (New task | Agents | Sessions) over the chat. Overrides the global
-   .studio/.studio-chat (which were absolute-inset) so the nav stacks above a flex chat. */
-.studio { display: flex; flex-direction: column; }
-/* Centered FLOATING toolbar over the chat (not a full-width bar). */
-.studio-topnav { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 15;
-  display: flex; align-items: center; gap: 10px; padding: 6px 8px; background: var(--card);
-  border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 22px rgba(0,0,0,.16); }
-.studio-tab { display: inline-flex; align-items: center; gap: 7px; border: none; background: none; color: var(--dim); cursor: pointer; border-radius: 10px; padding: 7px 14px; font: 600 13px var(--read); }
-.studio-tab:hover { background: var(--line); color: var(--ink); }
-.studio-tab.on { background: var(--line); color: var(--ink); }
-.studio-tab .ti { display: grid; place-items: center; }
-.studio-tab .ti svg { width: 16px; height: 16px; }
-.studio-chat { position: relative; inset: auto; flex: 1; min-height: 0; }
-/* Agents/Sessions side panel — slides over from the right. */
-.studio-side { position: absolute; right: 0; top: 0; bottom: 0; width: 300px; z-index: 20; box-sizing: border-box;
-  display: flex; flex-direction: column; background: var(--card); border-left: 1px solid var(--line); box-shadow: -6px 0 22px rgba(0,0,0,.16); }
-.studio-side-hd { padding: 12px 16px 8px; font: 700 11px var(--read); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
-.studio-side-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 1px; }
-.studio-side-empty { color: var(--dim); font: 500 12.5px var(--read); padding: 8px 10px; }
-.studio-agent { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px; color: var(--ink); font: 500 13px var(--read); }
-.studio-agent:hover { background: var(--line); }
-.studio-agent-ic { display: grid; place-items: center; color: var(--dim); }
-.studio-agent-ic svg { width: 16px; height: 16px; }
-.studio-sess { display: flex; flex-direction: column; gap: 4px; text-align: left; border: none; background: none; color: var(--ink); cursor: pointer; border-radius: 8px; padding: 9px 10px; }
-.studio-sess:hover, .studio-sess.on { background: var(--line); }
-.studio-sess-nm { font: 500 13px var(--read); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.studio-sess-meta { display: flex; align-items: center; gap: 8px; }
-.studio-sess-ctx { font: 600 9px var(--read); letter-spacing: .04em; text-transform: uppercase; color: var(--dim); background: var(--paper); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
-.studio-sess-when { font: 500 11px var(--mono); color: var(--dim); }
-`);
+// Studio is now just the full-bleed chat — sessions/projects + the agent picker live elsewhere (the
+// sidebar + the composer). `.studio-chat` (absolute-inset flex holding the .wb-chat) is GLOBAL in
+// app.css, so no per-view styles are needed here anymore.
 
 
 WB.view('/usage', {

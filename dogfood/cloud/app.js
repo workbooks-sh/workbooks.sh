@@ -573,7 +573,6 @@
       waldo:     { color: '#5b9bd5', bg: 'rgba(91,155,213,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.13a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.13 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.13a.5.5 0 0 1-.96 0z"/></svg>' },
       autopilot: { color: '#6cae8e', bg: 'rgba(108,174,142,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/></svg>' }
     };
-    function agentTheme(name){ return AGENT_THEME[name] || { color: 'var(--dim)', bg: 'var(--line)', icon: ICO.spark }; }
 
     // ── File/folder icons — the VS Code Material Icon Theme, served from CDN (no-build). Mirrors the
     // desktop's materialIcon.ts resolution (fileNames > fileExtensions > default; folders likewise).
@@ -1225,12 +1224,13 @@
         WB._app = (WB._appReg && WB._appReg[an]) || null; WB.nav('/app/' + encodeURIComponent(an)); return; }
       // ── Studio sidebar: set pending session/project, then route. When already on /studio the view's
       // hooks (WB._studioOpen / WB._studioNew) apply it in place (a data-nav re-nav wouldn't re-render).
+      var onStudio = (location.hash || '').indexOf('/studio') >= 0;   // hooks are only live while mounted
       var ssRow = t.closest && t.closest('[data-session]');
       if (ssRow) { e.preventDefault(); WB._pendingSession = ssRow.getAttribute('data-session'); WB._pendingProject = ssRow.getAttribute('data-project') || null;
-        if (WB._studioOpen) WB._studioOpen(WB._pendingSession); else WB.nav('/studio'); return; }
+        if (onStudio && WB._studioOpen) WB._studioOpen(WB._pendingSession); else WB.nav('/studio'); return; }
       var nsBtn = t.closest && t.closest('[data-newsession]');
       if (nsBtn) { e.preventDefault(); WB._pendingSession = null; WB._pendingProject = nsBtn.getAttribute('data-project') || null;
-        if (WB._studioNew) WB._studioNew(WB._pendingProject); else WB.nav('/studio'); return; }
+        if (onStudio && WB._studioNew) WB._studioNew(WB._pendingProject); else WB.nav('/studio'); return; }
       var npBtn = t.closest && t.closest('[data-newproject]');
       if (npBtn) { e.preventDefault();
         Promise.resolve(WB.prompt({ title: 'New project', placeholder: 'Project name', confirm: 'Create' })).then(function(nm){
@@ -1268,9 +1268,7 @@
         document.querySelectorAll('.ibrow').forEach(function(r){ r.classList.toggle('on', r === actf); });
         if (WB._activityRender) WB._activityRender(WB._activityFocus); else WB.nav('/activity');
         return; }
-      // Studio session row → remember which session to open, then let data-nav route to /studio.
-      var sess = t.closest && t.closest('[data-session]');
-      if (sess) { WB._pendingSession = sess.getAttribute('data-session'); }   // fall through to data-nav
+      // (Studio session-row handling moved above, before the data-nav catch, so pending state is set.)
       var pinx = t.closest && t.closest('[data-pin-x]'); if (pinx) { e.stopPropagation(); toggleBookmark(pinx.getAttribute('data-pin-x')); return; }
       var pino = t.closest && t.closest('[data-pin-open]'); if (pino) { WB._pendingFile = pino.getAttribute('data-pin-open'); WB.nav('/workspaces'); return; }
       if (t.closest && t.closest('[data-nxmenu]')) { st.nxMenu = !st.nxMenu; st.wsMenu = false; renderShell(); return; }

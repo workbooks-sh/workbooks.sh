@@ -169,7 +169,7 @@ server :cloud do
   def agent_session(req) do
     case Enum.find(sessions_for(req.tenant, user_key(req)), &(&1.id == (req.query["id"] || ""))) do
       nil -> {404, %{error: "not found"}}
-      s -> %{id: s.id, title: s.title, messages: s.messages}
+      s -> %{id: s.id, title: s.title, messages: s.messages, project: Map.get(s, :project), agent: Map.get(s, :agent)}
     end
   end
 
