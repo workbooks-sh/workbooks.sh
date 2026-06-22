@@ -22,31 +22,3 @@ end
 normalizes it, and persists a `Signup` — plain Elixir in a `.work` file. A maintainer reads the list
 with `Nexus.Store.all(Signup)` (an auth-gated surface, not exposed here).
 
-server :waitlist do
-  def register do
-    Nexus.Live.register("waitlist", fn params, emit ->
-      emit.(add(params["email"], params["interest"] || ""))
-    end)
-  end
-
-  @doc "Validate + persist one signup. Returns %{ok: true} | %{ok: false, error: …}."
-  def add(email, interest) when is_binary(email) do
-    email = email |> String.trim() |> String.downcase()
-    interest = interest |> to_string() |> String.slice(0, 80)
-
-    if valid_email?(email) do
-      Nexus.Store.create(Signup, %{email: email, interest: interest, at: System.system_time(:second)})
-      %{ok: true}
-    else
-      %{ok: false, error: "that doesn't look like an email"}
-    end
-  end
-
-  def add(_, _), do: %{ok: false, error: "email required"}
-
-  @doc "All signups, newest first (maintainer read)."
-  def list, do: Nexus.Store.all(Signup) |> Enum.sort_by(& &1.at, :desc)
-
-  # Deliberately-loose RFC-ish check: one @, a dot in the domain, no spaces.
-  defp valid_email?(e), do: Regex.match?(~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/, e)
-end

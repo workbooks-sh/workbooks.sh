@@ -1,0 +1,1347 @@
+server :cloud do
+  # Native-auth adoption (wb-ajvy): real CLI tokens minted by Nexus.Auth.Token (hashed-at-rest,
+  # tenant-scoped, audited) — not a demo. Exposed with the routing primitive; the Account view calls
+  # them. The token carries scopes, so it's subject to the same per-route guards as a session.
+  route "POST /cloud/token", :mint_token
+  route "GET /cloud/tokens", :list_tokens
+
+  # Agent chat + session history. Sessions are scoped to {tenant (org), user} — the user key comes from
+  # the client's /me identity for now (req carries only tenant; threading server-derived identity into
+  # req is a follow-up, after which `u` is ignored). Store is in-process (beachhead); move to a durable
+  # resource for cross-restart history.
+  route "GET /cloud/agent/sessions", :agent_sessions
+  route "GET /cloud/agent/session", :agent_session
+  route "POST /cloud/agent/chat", :agent_chat
+
+  # Launch a NAMED agent on a brief and persist a durable Run record. Non-streaming (returns the
+  # final answer + run id); the Studio prefers the live SSE source `agent_run` (GET /live/agent_run)
+  # for token-by-token visibility, but this is the simple fire-and-get path + what tests hit.
+  route "POST /cloud/agent/run", :agent_run
+  # The durable run ledger for the Studio Runs view — most-recent agent runs for this tenant.
+  route "GET /cloud/runs", :runs_list
+
+  # Task management + planning (the orchestration backbone). Tasks live in resource Todo; a plan is a
+  # parent task + subtasks. Dispatch launches a Run (reuses do_run) and links it. Plan asks Waldo to
+  # decompose a goal into assigned subtasks. THE LINE: the store + board are ours, the bus is standard.
+  route "GET /cloud/tasks", :tasks_list
+  route "POST /cloud/tasks", :task_create
+  route "POST /cloud/task/update", :task_update
+  route "POST /cloud/task/dispatch", :task_dispatch
+  route "POST /cloud/plan", :plan_create
+
+  # Issues — the failure-model queue. A failed run auto-files an issue (kind="issue" Todo); agents or
+  # humans can file one explicitly; the triage view separates agent- from human-filed and lets you
+  # re-dispatch (assign + run a fix) or resolve. Issues ARE tasks, so update/dispatch reuse the above.
+  route "GET /cloud/issues", :issues_list
+  route "POST /cloud/issues", :issue_file
+
+  # Scheduling — the time arm. Schedule a named agent to run on a brief at an interval/cron/time, fired
+  # by Nexus.Scheduler (durable, re-armed on boot). Schedules live in resource Schedule; firing persists
+  # a Run + an activity event, exactly like a manual run. Completes the tasks/runs/issues/schedules fabric.
+  route "GET /cloud/schedules", :schedules_list
+  route "POST /cloud/schedules", :schedule_create
+  route "POST /cloud/schedule/cancel", :schedule_cancel
+
+  # GitHub App webhook — GitHub POSTs pull_request/push/issues events here. We HMAC-verify the raw body
+  # against GITHUB_WEBHOOK_SECRET, then emit a `github.<event>` #event onto the bus so the workflow layer
+  # (reviewer/merger agent hook, fetch-back) reacts. Generic plumbing (Nexus.GitHub); policy is ours.
+  route "POST /cloud/github/webhook", :github_webhook
+  # Sanity-check the GitHub App wiring in production: is it configured, does the App JWT sign, and which
+  # installations does GitHub report? Hit this after injecting the secrets to confirm everything's live.
+  route "GET /cloud/github/status", :github_status
+  # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
+  # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
+  route "GET /cloud/models", :models
+
+  # Lint diagnostics for the workedit editor (P3): parse a .work buffer with the ONE shared parser
+  # (Nexus.Literate) + a per-block Elixir syntax check, return line-keyed diagnostics. The editor's
+  # lint source POSTs the buffer here; the parser is the open standard, the dashboard lint UI is ours.
+  route "POST /cloud/parse", :parse
+
+  # Workspace file tree — REAL files on the data volume. The mounts (deployed surfaces) are the
+  # top-level folders; `path` walks within one. Path-traversal guarded (resolved must stay under root).
+  route "GET /cloud/tree", :tree
+
+  # File search across all workspaces (mounts) — filename substring match over the real data volume.
+  route "GET /cloud/search", :search
+
+  # Hosted apps — the workbook surfaces served by THIS nexus (org-level access: a user who's in the
+  # org/nexus can launch any). The Apps tab in the sidebar renders these as a grid; Files is the
+  # deeper, file-level view. Apps inherit a declared workspace's name+emoji where one exists.
+  route "GET /cloud/apps", :apps
+
+  # Agents defined across the mounted workbooks — the Studio "Agents" tab lists these. Read from the
+  # live registry (Nexus.Agent.all, populated at bringup from each workbook's `agent` blocks).
+  route "GET /cloud/agents", :agents_list
+
+  # Drafts + visibility (Phase 2). A draft is a REAL nexus folder gated `draft` (a per-folder permission
+  # in the control plane) until promoted to `private`/`public`. Create scaffolds the folder + commits it
+  # so it's a live surface; visibility sets the permission. THE LINE: folders + git are the standard; the
+  # draft/visibility permission overlay is OUR product.
+  route "POST /cloud/draft", :draft_create
+  route "POST /cloud/visibility", :set_visibility
+
+  # Read a single file's TEXT content for the Workspace explorer (ship 3 — read-only IDE). `path` is
+  # `<mount>/<rel>`. Same mount + traversal guard as :tree. Caps at 2MB; flags binary so the client
+  # falls back to /cloud/raw (images/pdf streamed with the right Content-Type).
+  route "GET /cloud/file", :file_read
+  route "GET /cloud/raw", :file_raw
+  # Save an edit (ship 4): write the file on the volume + commit it into the workspace's repo (mirrors
+  # to GitHub if configured) + recompile changed units. The git mechanism is the open standard; saving
+  # from the dashboard is our product.
+  route "POST /cloud/file/save", :file_save
+  # File-tree mutations from the right-click context menu (our product). Each writes the volume + commits
+  # into the workspace repo (attributed, mirrored) like :file_save. Path(s) are `<mount>/<rel>`, mount +
+  # traversal guarded. The git mechanism stays the open standard; these dashboard verbs are ours.
+  route "POST /cloud/file/new", :file_new
+  route "POST /cloud/file/mkdir", :file_mkdir
+  route "POST /cloud/file/rename", :file_rename
+  route "POST /cloud/file/delete", :file_delete
+
+  # The nexus AS a git remote (wb): per-workspace push URL + the current GitHub mirror. The git
+  # mechanism (bare repo + post-receive + mirror) is the open standard (Nexus.Git / Nexus.GitHttp);
+  # surfacing the URL + binding a GitHub mirror in the dashboard is OUR product.
+  route "GET /cloud/workspace/git", :workspace_git
+  route "POST /cloud/workspace/mirror", :workspace_mirror
+
+  # Activity feed — our cloud product over the nexus reactive layer (THE LINE: the bus/hook/effect
+  # engine is the open standard; persisting + displaying events as a "feed" is OUR consumer). The
+  # `log` effect (registered in register/0) persists events to the durable `resource :Event`; this
+  # route reads them back for the Activity page.
+  route "GET /cloud/activity", :activity
+
+  @agent_store {:cloud_agent_sessions}
+
+  def mint_token(req) do
+    name = (is_map(req.body) && req.body["name"]) || "cli"
+    {201, Nexus.Auth.Token.mint(req.tenant, name: name, scopes: ["api"])}
+  end
+
+  def list_tokens(req), do: %{tokens: Nexus.Auth.Token.list(req.tenant)}
+
+  def agent_sessions(req) do
+    sessions = sessions_for(req.tenant, user_key(req)) |> Enum.map(fn s -> %{id: s.id, title: s.title, updated: s.updated} end)
+    %{sessions: sessions}
+  end
+
+  def agent_session(req) do
+    case Enum.find(sessions_for(req.tenant, user_key(req)), &(&1.id == (req.query["id"] || ""))) do
+      nil -> {404, %{error: "not found"}}
+      s -> %{id: s.id, title: s.title, messages: s.messages}
+    end
+  end
+
+  # The provider model catalog. Nexus.Llm.models/0 does a LIVE OpenRouter fetch every call, and the
+  # Studio hit this on first paint — a slow external round-trip in the critical path. Cache it (10-min
+  # TTL) so only the first load pays for it; subsequent loads are instant.
+  def models(_req), do: %{models: cached_models()}
+
+  defp cached_models do
+    now = System.os_time(:second)
+    case :persistent_term.get({:cloud_models_cache}, nil) do
+      {ts, list} when now - ts < 600 -> list
+      _ ->
+        list = Nexus.Llm.models()
+        :persistent_term.put({:cloud_models_cache}, {now, list})
+        list
+    end
+  end
+
+  # Known block kinds (generous superset) — anything else opening a do…end block is flagged.
+  @work_kinds ~w(data def defp server client flow sandbox agent record resource hook check toolkit
+                 test design app auth task user type deps checks theme show query workbook nexus
+                 grant route trigger step match wait module schema component view)
+
+  def parse(req) do
+    content = (is_map(req.body) && req.body["content"]) || ""
+    %{diagnostics: workedit_diagnostics(content)}
+  end
+
+  defp workedit_diagnostics(content) do
+    nodes = try do
+      Nexus.Literate.parse(content)
+    rescue
+      _ -> []
+    end
+
+    Enum.flat_map(List.wrap(nodes), fn
+      %{type: :code} = n -> kind_diag(n) ++ syntax_diag(n)
+      _ -> []
+    end)
+  end
+
+  defp kind_diag(%{kind: kind, line: line}) when is_binary(kind) do
+    if kind in @work_kinds, do: [], else: [%{line: line, severity: "warning", message: "Unknown block kind: #{kind}"}]
+  end
+
+  defp kind_diag(_), do: []
+
+  # Per-block Elixir syntax check — body starts on the line AFTER the opener, so add n.line to the
+  # error's in-body line. Tolerant of Elixir version differences in the error tuple shape.
+  defp syntax_diag(%{lang: lang, body: body, line: base}) when lang in [nil, "elixir"] and is_binary(body) do
+    case Code.string_to_quoted(body, columns: true) do
+      {:ok, _} ->
+        []
+
+      {:error, {loc, msg, _token}} ->
+        {l, c} = error_loc(loc)
+        [%{line: base + l, col: c, severity: "error", message: error_msg(msg)}]
+
+      _ ->
+        []
+    end
+  end
+
+  defp syntax_diag(_), do: []
+
+  defp error_loc(loc) when is_list(loc), do: {Keyword.get(loc, :line, 1), Keyword.get(loc, :column, 1)}
+  defp error_loc(line) when is_integer(line), do: {line, 1}
+  defp error_loc(_), do: {1, 1}
+
+  defp error_msg({a, b}), do: to_string(a) <> to_string(b)
+  defp error_msg(m) when is_binary(m), do: m
+  defp error_msg(m), do: inspect(m)
+
+  def agent_chat(req) do
+    user = user_key(req)
+    msg = (is_map(req.body) && req.body["message"]) || ""
+    id = is_map(req.body) && req.body["id"]
+    model = is_map(req.body) && req.body["model"]
+    reply = run_agent(msg, model)
+    sessions = sessions_for(req.tenant, user)
+    {match, rest} = Enum.split_with(sessions, &(&1.id == id))
+
+    session =
+      case match do
+        [s] -> s
+        _ -> %{id: gen_id(), title: title_from(msg), messages: [], updated: 0}
+      end
+
+    turns = session.messages ++ [%{role: "user", text: msg}, %{role: "assistant", text: reply}]
+    session = %{session | messages: turns, updated: System.os_time(:second)}
+    save_sessions(req.tenant, user, [session | rest])
+
+    # A real event onto the bus — hook :activity matches #event and the `log` effect persists it.
+    Nexus.Events.emit(
+      %{kind: "agent.chat", actor: user, title: session.title, target: session.id,
+        tags: ["event", "agent"], scope: "member"},
+      tenant: req.tenant
+    )
+
+    %{id: session.id, title: session.title, reply: reply}
+  end
+
+  # Recent activity for this tenant, newest first. Members don't see admin-scoped events.
+  def activity(req) do
+    admin? = req.query["role"] == "admin"
+
+    events =
+      Event
+      |> Nexus.Store.all(req.tenant || Nexus.Store.default_tenant())
+      |> Enum.map(&Map.from_struct/1)
+      |> Enum.reject(&(not admin? and &1.scope == "admin"))
+      |> Enum.sort_by(& &1.at, :desc)
+      |> Enum.take(200)
+      |> Enum.map(fn e -> %{e | tags: String.split(e.tags || "", ",", trim: true)} end)
+
+    %{events: events}
+  end
+
+  # Run a named agent (deck/research/waldo/…) on a brief; persist a durable Run; return the answer.
+  def agent_run(req) do
+    agent = (is_map(req.body) && req.body["agent"]) || ""
+    task = (is_map(req.body) && req.body["task"]) || ""
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    user = user_key(req)
+
+    cond do
+      agent == "" or task == "" ->
+        {400, %{error: "agent and task are required"}}
+
+      is_nil(Nexus.Agent.get(agent)) ->
+        {404, %{error: "no such agent: #{agent}"}}
+
+      true ->
+        ws = (is_map(req.body) && req.body["workspace"]) || nil
+        {rid, status, turns, answer} = do_run(agent, task, tenant, user, fn _ -> :ok end, workspace: ws)
+        %{run: rid, agent: agent, status: status, turns: turns, answer: answer}
+    end
+  end
+
+  # The durable run ledger for this tenant, newest first.
+  def runs_list(req) do
+    runs =
+      Run
+      |> Nexus.Store.all(req.tenant || Nexus.Store.default_tenant())
+      |> Enum.map(&Map.from_struct/1)
+      |> Enum.sort_by(& &1.started, :desc)
+      |> Enum.take(100)
+
+    %{runs: runs}
+  end
+
+  # Resolve a workspace (mount) name into the jj-worktree run opts the agent loop expects, or nil if no
+  # workspace given / the mount is unknown. The agent's edits then commit to `agent/<agent>`, attributed.
+  defp workspace_run_opts(nil, _agent, _user), do: nil
+  defp workspace_run_opts("", _agent, _user), do: nil
+
+  defp workspace_run_opts(mount, agent, _user) do
+    case List.keyfind(mounts(), mount, 0) do
+      {_, root} ->
+        bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
+        Nexus.Git.provision_remote(bare, root)
+        %{bare: bare, work_dir: root, name: agent, author: "#{agent} <#{agent}>", branch: "agent/#{agent}"}
+
+      _ ->
+        nil
+    end
+  end
+
+  # Shared run driver: streams the loop's typed events through `emit`, persists a Run row, returns a
+  # summary tuple. Used by both the SSE live source (real-time) and POST /cloud/agent/run (blocking).
+  defp do_run(agent, task, tenant, user, emit, opts \\ []) do
+    rid = gen_id()
+    started = System.os_time(:second)
+    emit.(%{type: "start", run: rid, agent: agent, task: task})
+
+    # Workspace-scoped run: if opts[:workspace] names a mount, run the agent in a jj worktree of that
+    # workspace (real FS) so its file edits commit to the agent's branch, attributed. Else ephemeral.
+    run_opts =
+      case workspace_run_opts(opts[:workspace], agent, user) do
+        nil -> [emit: emit]
+        ws -> [emit: emit, workspace: ws]
+      end
+
+    result =
+      try do
+        Nexus.Agent.run_named(agent, task, run_opts)
+      rescue
+        e -> {:error, e}
+      catch
+        _, e -> {:error, e}
+      end
+
+    {status, turns, answer} =
+      case result do
+        {:ok, %{answer: a, turns: t}} -> {"ok", t, to_string(a)}
+        {:error, {:timeout, t}} -> {"timeout", t, ""}
+        {:error, reason} -> {"error", 0, "run failed: #{inspect(reason)}"}
+        _ -> {"error", 0, ""}
+      end
+
+    tokens =
+      case Nexus.Telemetry.runs(agent) do
+        [%{tokens: %{total: n}} | _] -> n
+        _ -> 0
+      end
+
+    ended = System.os_time(:second)
+
+    Nexus.Store.create(
+      Run,
+      %{rid: rid, agent: agent, user: user, task: String.slice(task, 0, 500), status: status,
+        turns: turns, tokens: tokens, answer: String.slice(answer, 0, 2000),
+        started: started, ended: ended},
+      tenant
+    )
+
+    # Surface the run on the activity bus too (Studio Activity + any hook can react).
+    Nexus.Events.emit(
+      %{kind: "agent.run", actor: user, title: "#{agent}: #{title_from(task)}", target: rid,
+        tags: ["event", "agent"], scope: "member"},
+      tenant: tenant
+    )
+
+    # The failure model: instead of crashing or blindly retrying, a failed run FILES AN ISSUE that a
+    # human or another agent can pick up. `file_issue: false` (dispatch path) opts out — there the task
+    # itself already tracks the failure (set to blocked), so a second issue would be redundant noise.
+    if status != "ok" and Keyword.get(opts, :file_issue, true) do
+      file_issue(tenant, %{
+        title: "Run failed: #{agent} — #{title_from(task)}",
+        detail: "Agent #{agent} could not complete the task.\n\nTask: #{String.slice(task, 0, 400)}\n\nOutcome (#{status}): #{String.slice(answer, 0, 600)}",
+        agent: agent, run: rid, created_by: agent
+      })
+    end
+
+    emit.(%{type: "done", run: rid, status: status, turns: turns, tokens: tokens})
+    {rid, status, turns, answer}
+  end
+
+  # ── Task management + planning ───────────────────────────────────────────────────────────────────
+  # Tasks are stored append-only (resource Todo has no in-place update); the CURRENT state of a task is
+  # the row with its tid and the newest `updated`. current_tasks/1 folds the log to live state.
+  # NOTE: the resource is `Todo`, NOT `Task` — `Task` is Elixir's stdlib concurrency module (the web
+  # server's socket acceptors spawn through `Task.start_link/3`); a workbook resource named `Task`
+  # compiled to `Elixir.Task` and clobbered it, killing nexus boot. `Nexus.Uid.guard/1` now refuses
+  # any unit name that would shadow a runtime-critical module.
+  defp current_tasks(tenant) do
+    Todo
+    |> Nexus.Store.all(tenant)
+    |> Enum.map(&Map.from_struct/1)
+    |> Enum.group_by(& &1.tid)
+    |> Enum.map(fn {_tid, versions} -> Enum.max_by(versions, & &1.updated) end)
+    |> Enum.reject(&(&1.status == "cancelled"))
+    |> Enum.map(fn t -> Map.put(t, :kind, t.kind || "task") end)
+  end
+
+  defp latest_task(tenant, tid), do: Enum.find(current_tasks(tenant), &(&1.tid == tid))
+
+  # Persist a task version (create or fold-update). Always writes a NEW row; the fold picks the newest
+  # by `updated`. `updated` is microseconds (monotone within a second) and is FORCED fresh here so a
+  # fold-update of an existing row (which already carries an older :updated) can't keep the stale one.
+  defp put_task(tenant, attrs) do
+    now = System.os_time(:microsecond)
+    attrs = Map.put(attrs, :updated, now)
+    Nexus.Store.create(Todo, attrs, tenant)
+    persist_task_file(attrs)
+    Nexus.Events.emit(
+      %{kind: "task.#{attrs[:status] || "update"}", actor: to_string(attrs[:created_by] || "system"),
+        title: to_string(attrs[:title] || attrs[:tid]), target: to_string(attrs[:tid]),
+        tags: ["event", "task"], scope: "member"},
+      tenant: tenant
+    )
+    attrs
+  end
+
+  # Git-backed store (wb-xxks): the SOURCE OF TRUTH for a task/issue is a committed `.work` file at
+  # `<home-workspace>/.nexus/{tasks,issues}/<tid>.work` — versioned, jj-covered, diffable. The SQLite
+  # rows stay the fast READ index (write-through). Gated on jj-substrate + best-effort: off / no mount /
+  # any error → SQLite-only (the board never breaks). Commit attributed to whoever filed it.
+  defp persist_task_file(attrs) do
+    with true <- Nexus.JJ.substrate?(),
+         {mount, root} when is_binary(mount) <- home_ws() do
+      sub = if attrs[:kind] == "issue", do: "issues", else: "tasks"
+      rel = ".nexus/#{sub}/#{attrs[:tid]}.work"
+      abs = Path.join(root, rel)
+      File.mkdir_p!(Path.dirname(abs))
+      File.write!(abs, task_to_work(attrs))
+      bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
+      Nexus.Git.provision_remote(bare, root)
+      who = to_string(attrs[:created_by] || "system")
+      Nexus.Git.commit_file(bare, root, rel, "#{sub}/#{attrs[:tid]}: #{attrs[:status]}", author: "#{who} <#{who}>")
+    else
+      _ -> :skip
+    end
+  rescue
+    _ -> :skip
+  end
+
+  # The home workspace tasks/issues live under (first mount). nil if none mounted.
+  defp home_ws, do: List.first(mounts())
+
+  # Render a task/issue to its `.work` source of truth — prose (title + detail) + a `task` block of the
+  # structured fields. The block is the canonical record; the SQLite index is rebuildable from it.
+  defp task_to_work(t) do
+    title = (t[:title] || t[:tid] || "") |> to_string() |> String.replace("\n", " ")
+    """
+    # #{title} ##{t[:kind] || "task"}
+
+    #{t[:detail] || ""}
+
+    task :#{t[:tid]} do
+      kind "#{t[:kind] || "task"}"
+      status "#{t[:status]}"
+      agent "#{t[:agent] || ""}"
+      parent "#{t[:parent] || ""}"
+      priority #{t[:priority] || 2}
+      created_by "#{t[:created_by] || ""}"
+      run "#{t[:run] || ""}"
+      created #{t[:created] || 0}
+    end
+    """
+  end
+
+  # Parse a task `.work` file back to a field map (for index rebuild / round-trip). Reads the `task`
+  # block's `field "value"` / `field 123` lines.
+  defp work_to_task(content) do
+    case Nexus.Literate.parse(content) |> Enum.find(&(&1.type == :code)) do
+      %{name: tid, body: body} ->
+        fields =
+          Regex.scan(~r/^\s*([a-z_]+)\s+(?:"([^"]*)"|(\d+))\s*$/m, body)
+          |> Map.new(fn
+            # scan trims the trailing empty group: quoted → [_, k, s]; number → [_, k, "", n].
+            [_, k, s] -> {String.to_atom(k), s}
+            [_, k, s, ""] -> {String.to_atom(k), s}
+            [_, k, "", n] -> {String.to_atom(k), String.to_integer(n)}
+          end)
+
+        Map.put(fields, :tid, to_string(tid))
+
+      _ ->
+        nil
+    end
+  end
+
+  def tasks_list(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    tasks = current_tasks(tenant) |> Enum.reject(&(&1.kind == "issue"))
+      |> Enum.sort_by(&{&1.priority || 2, -(&1.updated || 0)})
+    %{tasks: tasks}
+  end
+
+  # The issue queue — tasks of kind "issue" (filed by a failed run or explicitly by an agent/human).
+  # Newest first; the triage view separates agent-filed from human-filed by created_by.
+  def issues_list(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    agents = Nexus.Agent.all() |> Enum.map(&Nexus.Agent.def_from_unit(&1).name) |> MapSet.new()
+    issues =
+      current_tasks(tenant)
+      |> Enum.filter(&(&1.kind == "issue"))
+      |> Enum.sort_by(&(-(&1.updated || 0)))
+      |> Enum.map(fn i -> Map.put(i, :by, if(MapSet.member?(agents, i.created_by), do: "agent", else: "human")) end)
+    %{issues: issues}
+  end
+
+  # File an issue (a kind="issue" Todo). Used by the failure model (auto-filed on a failed run) and
+  # available as an explicit endpoint. `run` links the failing/relevant run.
+  def issue_file(req) do
+    b = req.body || %{}
+    if to_string(b["title"] || "") == "" do
+      {400, %{error: "title is required"}}
+    else
+      issue = file_issue(req.tenant || Nexus.Store.default_tenant(), %{
+        title: String.slice(to_string(b["title"]), 0, 160), detail: to_string(b["detail"] || ""),
+        agent: to_string(b["agent"] || ""), run: to_string(b["run"] || ""), created_by: user_key(req)
+      })
+      %{issue: issue}
+    end
+  end
+
+  defp file_issue(tenant, attrs) do
+    now = System.os_time(:second)
+    put_task(tenant, Map.merge(%{
+      tid: gen_id(), kind: "issue", status: "open", agent: "", parent: "", priority: 1,
+      run: "", created: now, title: "", detail: "", created_by: "system"
+    }, attrs))
+  end
+
+  def task_create(req) do
+    b = req.body || %{}
+    title = b["title"] || ""
+    if title == "" do
+      {400, %{error: "title is required"}}
+    else
+      now = System.os_time(:second)
+      task = put_task(req.tenant || Nexus.Store.default_tenant(), %{
+        tid: gen_id(), kind: "task", title: String.slice(title, 0, 160), detail: to_string(b["detail"] || ""),
+        status: "open", agent: to_string(b["agent"] || ""), parent: to_string(b["parent"] || ""),
+        priority: b["priority"] || 2, created_by: user_key(req), run: "", created: now
+      })
+      %{task: task}
+    end
+  end
+
+  def task_update(req) do
+    b = req.body || %{}
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    case latest_task(tenant, b["tid"] || "") do
+      nil -> {404, %{error: "no such task"}}
+      cur ->
+        merged = cur
+          |> maybe_put(:status, b["status"])
+          |> maybe_put(:agent, b["agent"])
+          |> maybe_put(:priority, b["priority"])
+          |> maybe_put(:title, b["title"])
+          |> maybe_put(:detail, b["detail"])
+        %{task: put_task(tenant, merged)}
+    end
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, val), do: Map.put(map, key, val)
+
+  # Dispatch a task: launch its assignee agent on the brief (reusing do_run), link the run, set status.
+  def task_dispatch(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    case latest_task(tenant, (req.body || %{})["tid"] || "") do
+      nil -> {404, %{error: "no such task"}}
+      cur ->
+        agent = cur.agent
+        cond do
+          agent == "" -> {400, %{error: "task has no assignee — assign an agent first"}}
+          is_nil(Nexus.Agent.get(agent)) -> {400, %{error: "assignee '#{agent}' is not a known agent"}}
+          true ->
+            put_task(tenant, Map.merge(cur, %{status: "in_progress"}))
+            brief = if(cur.detail != "", do: "#{cur.title}\n\n#{cur.detail}", else: cur.title)
+            {rid, status, _turns, _answer} = do_run(agent, brief, tenant, user_key(req), fn _ -> :ok end, file_issue: false)
+            final = if status == "ok", do: "done", else: "blocked"
+            task = put_task(tenant, Map.merge(cur, %{status: final, run: rid}))
+            %{task: task, run: rid, run_status: status}
+        end
+    end
+  end
+
+  # Plan-with-Waldo: decompose a goal into a parent task + assigned subtasks. Waldo emits strict lines
+  # we parse; the assignees are constrained to the registered agents.
+  def plan_create(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    goal = (req.body || %{})["goal"] || ""
+    if goal == "" do
+      {400, %{error: "goal is required"}}
+    else
+      agents = Nexus.Agent.all() |> Enum.map(&Nexus.Agent.def_from_unit(&1).name)
+      list = Enum.join(agents, ", ")
+      prompt = """
+      Decompose this goal into 3 to 7 concrete subtasks. Assign each to the best agent.
+      Output ONLY one line per subtask, EXACTLY in this format and nothing else:
+      TASK | <assignee> | <title>
+      where <assignee> is one of: #{list}.
+
+      GOAL: #{goal}
+      """
+
+      subtasks =
+        case Nexus.Agent.run_named("waldo", prompt) do
+          {:ok, %{answer: a}} when is_binary(a) -> parse_plan(a, agents)
+          _ -> []
+        end
+
+      now = System.os_time(:second)
+      pid = gen_id()
+      parent = put_task(tenant, %{tid: pid, title: String.slice(goal, 0, 160), detail: "Plan",
+        status: "open", agent: "waldo", parent: "", priority: 1, created_by: user_key(req), run: "", created: now})
+
+      children =
+        Enum.map(subtasks, fn {assignee, title} ->
+          put_task(tenant, %{tid: gen_id(), title: title, detail: "", status: "open", agent: assignee,
+            parent: pid, priority: 2, created_by: "waldo", run: "", created: now})
+        end)
+
+      %{plan: parent, subtasks: children}
+    end
+  end
+
+  # Parse Waldo's plan lines: `TASK | <assignee> | <title>`. Assignee must be a known agent.
+  defp parse_plan(text, agents) do
+    text
+    |> String.split("\n", trim: true)
+    |> Enum.flat_map(fn line ->
+      case String.split(line, "|") do
+        [tag, who, title | _] ->
+          if String.contains?(tag, "TASK") do
+            a = who |> String.trim() |> String.downcase()
+            a = if(a in agents, do: a, else: "waldo")
+            [{a, String.trim(title) |> String.slice(0, 160)}]
+          else
+            []
+          end
+        _ -> []
+      end
+    end)
+  end
+
+  # ── Scheduling ───────────────────────────────────────────────────────────────────────────────────
+  @sched_modes ~w(every cron at after)
+
+  defp current_schedules(tenant) do
+    Schedule
+    |> Nexus.Store.all(tenant)
+    |> Enum.map(&Map.from_struct/1)
+    |> Enum.group_by(& &1.sid)
+    |> Enum.map(fn {_sid, vs} -> Enum.max_by(vs, & &1.created) end)
+    |> Enum.filter(&(&1.enabled == 1))
+  end
+
+  def schedules_list(req) do
+    %{schedules: current_schedules(req.tenant || Nexus.Store.default_tenant()) |> Enum.sort_by(&(-(&1.created || 0)))}
+  end
+
+  def schedule_create(req) do
+    b = req.body || %{}
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    agent = to_string(b["agent"] || "")
+    task = to_string(b["task"] || "")
+    mode = to_string(b["mode"] || "")
+    spec = to_string(b["spec"] || "")
+
+    cond do
+      agent == "" or task == "" or spec == "" -> {400, %{error: "agent, task and spec are required"}}
+      mode not in @sched_modes -> {400, %{error: "mode must be one of: #{Enum.join(@sched_modes, ", ")}"}}
+      is_nil(Nexus.Agent.get(agent)) -> {404, %{error: "no such agent: #{agent}"}}
+      true ->
+        sched = %{sid: gen_id(), agent: agent, task: task, mode: mode, spec: spec,
+                  owner: user_key(req), created: System.os_time(:second), enabled: 1}
+        Nexus.Store.create(Schedule, sched, tenant)
+        case arm_schedule(tenant, sched) do
+          :ok -> %{schedule: sched}
+          {:error, e} -> {400, %{error: "bad time spec: #{inspect(e)}"}}
+        end
+    end
+  end
+
+  def schedule_cancel(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    sid = (req.body || %{})["sid"] || ""
+    case Enum.find(current_schedules(tenant), &(&1.sid == sid)) do
+      nil -> {404, %{error: "no such schedule"}}
+      s ->
+        Nexus.Scheduler.disarm("sched:#{sid}", tenant: tenant)
+        Nexus.Store.create(Schedule, %{s | enabled: 0, created: System.os_time(:second)}, tenant)
+        %{ok: true}
+    end
+  end
+
+  # Arm one schedule into Nexus.Scheduler. The fired effect (scheduled_run, registered in register/0)
+  # runs the agent + persists a Run. Returns :ok | {:error, reason}.
+  defp arm_schedule(tenant, %{sid: sid, agent: agent, task: task, mode: mode, spec: spec}) do
+    mode_atom = case mode do
+      "every" -> :every
+      "cron" -> :cron
+      "at" -> :at
+      "after" -> :after
+      _ -> :every
+    end
+    time = [{mode_atom, spec}]
+    effects = [%{name: "scheduled_run", args: %{"agent" => agent, "task" => task, "sid" => sid}}]
+    case Nexus.Scheduler.arm("sched:#{sid}", time, effects, tenant: tenant) do
+      {:error, e} -> {:error, e}
+      _ -> :ok
+    end
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
+  # GitHub App webhook receiver. HMAC-verify the raw body, then surface the event on the bus + activity
+  # feed. The reactive layer (a `pr.opened` hook → reviewer/merger agent) + fetch-back consume these.
+  def github_webhook(req) do
+    sig = (req[:headers] || %{})["x-hub-signature-256"]
+    raw = req[:raw_body] || ""
+
+    if Nexus.GitHub.verify_webhook(raw, sig) do
+      event = (req[:headers] || %{})["x-github-event"] || "unknown"
+      payload = (is_map(req.body) && req.body) || %{}
+      repo = get_in(payload, ["repository", "full_name"]) || ""
+      actor = get_in(payload, ["sender", "login"]) || "github"
+      action = payload["action"] || ""
+
+      Nexus.Events.emit(
+        %{kind: "github.#{event}", actor: actor, title: String.trim("#{event} #{action} #{repo}"),
+          target: repo, tags: ["event", "github"], scope: "member"},
+        tenant: req.tenant || Nexus.Store.default_tenant()
+      )
+
+      %{ok: true}
+    else
+      {401, %{error: "invalid signature"}}
+    end
+  end
+
+  # GitHub App wiring check (production sanity). Reports configured? + whether the App JWT signs + the
+  # installations GitHub reports (proves the App id + private key are valid and the App is installed).
+  def github_status(_req) do
+    if Nexus.GitHub.configured?() do
+      jwt_ok = match?({:ok, _}, Nexus.GitHub.app_jwt())
+
+      installs =
+        case Nexus.GitHub.installations() do
+          {:ok, list} -> list
+          {:error, e} -> %{error: inspect(e)}
+        end
+
+      %{configured: true, app_jwt: jwt_ok, installations: installs,
+        webhook_secret: Nexus.Secrets.has?("GITHUB_WEBHOOK_SECRET")}
+    else
+      %{configured: false,
+        need: ["GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY", "GITHUB_APP_CLIENT_ID",
+               "GITHUB_APP_CLIENT_SECRET", "GITHUB_WEBHOOK_SECRET"]}
+    end
+  end
+
+  defp user_key(req), do: (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
+  defp sessions_for(tenant, user), do: Map.get(:persistent_term.get(@agent_store, %{}), {tenant, user}, [])
+
+  defp save_sessions(tenant, user, list) do
+    all = :persistent_term.get(@agent_store, %{})
+    :persistent_term.put(@agent_store, Map.put(all, {tenant, user}, Enum.sort_by(list, & &1.updated, :desc)))
+  end
+
+  defp gen_id, do: Base.url_encode64(:crypto.strong_rand_bytes(9), padding: false)
+  defp title_from(msg), do: msg |> String.trim() |> String.slice(0, 48) |> then(&if(&1 == "", do: "New chat", else: &1))
+
+  defp run_agent(msg, model \\ nil) do
+    run_opts = [task: msg, timeout_ms: 60_000]
+    run_opts = if is_binary(model) and model != "", do: Keyword.put(run_opts, :model, model), else: run_opts
+
+    try do
+      case Nexus.Agent.run(run_opts) do
+        {:ok, %{answer: a}} when is_binary(a) -> a
+        {:ok, a} when is_binary(a) -> a
+        {:error, _} -> "I couldn't reach the agent runtime just now — try again in a moment."
+        _ -> "(no answer)"
+      end
+    rescue
+      _ -> "The agent isn't available on this nexus yet (no model key configured)."
+    catch
+      _, _ -> "The agent run failed unexpectedly."
+    end
+  end
+
+  def register do
+    # Our `log` effect — persist any matched event to the durable `resource :Event` (tenant-scoped).
+    # This is what makes the Activity page a durable feed; a bare nexus wouldn't register it.
+    Nexus.Effects.register("log", fn _args, ev, ctx ->
+      Nexus.Store.create(
+        Event,
+        %{kind: to_string(ev[:kind] || ""), actor: to_string(ev[:actor] || ""),
+          title: to_string(ev[:title] || ev[:kind] || ""), target: to_string(ev[:target] || ""),
+          tags: Enum.join(List.wrap(ev[:tags]), ","), scope: to_string(ev[:scope] || "member"),
+          at: ev[:at] || System.os_time(:second)},
+        ctx[:tenant] || ev[:tenant] || Nexus.Store.default_tenant()
+      )
+      :ok
+    end)
+
+    # Scheduled agent runs — the effect a Schedule fires (via Nexus.Scheduler). Runs the named agent on
+    # the brief and persists a Run, exactly like a manual run; the schedule's tenant flows through ctx.
+    Nexus.Effects.register("scheduled_run", fn args, _event, ctx ->
+      tenant = ctx[:tenant] || Nexus.Store.default_tenant()
+      agent = to_string(args["agent"] || "")
+      task = to_string(args["task"] || "")
+      if agent != "" and task != "" and not is_nil(Nexus.Agent.get(agent)) do
+        do_run(agent, task, tenant, "scheduler", fn _ -> :ok end)
+      end
+      :ok
+    end)
+
+    # Re-arm persisted schedules on boot (durable: the Schedule rows are the source of truth; the armed
+    # timers live only in memory, so they must be rebuilt). v1 re-arms the default tenant (one nexus per
+    # org); multi-tenant fan-out is a follow-up when tenant enumeration lands.
+    for s <- current_schedules(Nexus.Store.default_tenant()) do
+      arm_schedule(Nexus.Store.default_tenant(), s)
+    end
+
+    # Live agent runs — the Studio opens EventSource('/live/agent_run?agent=…&task=…&u=…') and the
+    # loop's typed events (text/tools/final) stream straight through. do_run also persists the Run row.
+    Nexus.Live.register("agent_run", fn params, emit ->
+      agent = params["agent"] || ""
+      task = params["task"] || ""
+      tenant = params["tenant"] || Nexus.Store.default_tenant()
+      user = params["u"] || "anon"
+
+      cond do
+        agent == "" or task == "" -> emit.(%{type: "error", error: "agent and task are required"})
+        is_nil(Nexus.Agent.get(agent)) -> emit.(%{type: "error", error: "no such agent: #{agent}"})
+        true -> do_run(agent, task, tenant, user, emit, workspace: params["workspace"])
+      end
+
+      :ok
+    end)
+
+    Nexus.Live.register("usage", fn params, emit ->
+      # A representative running nexus on the current tier; Capacity derives the dials.
+      nx = %{id: params["nx"] || "dogfood", plan: Nexus.Pricing.default_tier().id, state: "running"}
+      emit.(Nexus.Capacity.report(nx))
+    end)
+
+    # The fleet: ONE nexus per org. We report THIS running nexus — its own identity + what it serves.
+    Nexus.Live.register("fleet", fn _params, emit ->
+      tier = Nexus.Pricing.default_tier()
+      emit.(%{nexuses: [%{
+        name: Application.get_env(:nexus, :nexus_name, "nexus"),
+        friendly: Application.get_env(:nexus, :nexus_friendly, ""),
+        state: "running",
+        tier: tier.name,
+        surfaces: length(Application.get_env(:nexus, :mounts, []))
+      }]})
+    end)
+
+    # Storage: this nexus's managed object store — one bucket per mounted surface, sizes derived from
+    # what's actually on the data volume (real, not a mock). Egress-free (R2 in cloud, local in dev).
+    Nexus.Live.register("storage", fn _params, emit ->
+      mounts = Application.get_env(:nexus, :mounts, [])
+
+      buckets =
+        for {name, root} <- mounts, name != "" do
+          bytes = dir_bytes(root)
+          %{name: name, objects: count_files(root), size: human(bytes), bytes: bytes}
+        end
+
+      total = Enum.reduce(buckets, 0, &(&1.bytes + &2))
+      emit.(%{total: human(total), buckets: Enum.sort_by(buckets, & &1.bytes, :desc)})
+    end)
+  end
+
+  # Sum file sizes under a dir (bounded walk) — the surface's on-disk footprint.
+  def dir_bytes(root) do
+    Path.wildcard(Path.join(root, "**/*"))
+    |> Enum.filter(&File.regular?/1)
+    |> Enum.reduce(0, fn f, acc -> acc + (File.stat!(f).size || 0) end)
+  rescue
+    _ -> 0
+  end
+
+  def count_files(root), do: Path.wildcard(Path.join(root, "**/*")) |> Enum.count(&File.regular?/1)
+
+  # ── Workspace file tree ────────────────────────────────────────────────────────────────────────
+  # No `path` → the mounts as top-level folders. With `path` ("<mount>/<sub>…") → that directory's
+  # entries. Each entry: %{name, dir, path, size}. Hidden dotfiles + the weave index are skipped.
+  # Workspace folders = the real top-level dirs on the data volume (excludes the nexus's own .nexus/db
+  # + cache + dotfiles). Read from the FILESYSTEM (not the boot-time mounts list) so a freshly
+  # git-pushed workspace shows up in the tree immediately, without waiting for a re-mount.
+  defp mounts do
+    root = Nexus.Config.data_dir()
+
+    case File.ls(root) do
+      {:ok, names} ->
+        for n <- Enum.sort(names),
+            n not in ~w(.nexus cache),
+            not String.starts_with?(n, "."),
+            File.dir?(Path.join(root, n)),
+            do: {n, Path.join(root, n)}
+
+      _ ->
+        []
+    end
+  end
+
+  def tree(req) do
+    case String.trim(req.query["path"] || "") do
+      "" ->
+        entries = for {name, root} <- mounts(), do: %{name: name, dir: true, path: name, size: dir_bytes(root)}
+        %{path: "", entries: Enum.sort_by(entries, & &1.name)}
+
+      path ->
+        [mount | rest] = String.split(path, "/", trim: true)
+
+        case List.keyfind(mounts(), mount, 0) do
+          nil ->
+            {404, %{error: "no such mount"}}
+
+          {_, root} ->
+            dir = Path.join([root | rest])
+            safe = Path.expand(dir)
+
+            cond do
+              not String.starts_with?(safe, Path.expand(root)) -> {403, %{error: "path escapes mount"}}
+              not File.dir?(safe) -> {404, %{error: "not a directory"}}
+              true -> %{path: path, entries: list_dir(safe, path)}
+            end
+        end
+    end
+  end
+
+  def search(req) do
+    q = String.downcase(String.trim(req.query["q"] || ""))
+
+    results =
+      if q == "" do
+        []
+      else
+        for {name, root} <- mounts(),
+            file <- Path.wildcard(Path.join(root, "**/*")),
+            File.regular?(file),
+            base = Path.basename(file),
+            String.contains?(String.downcase(base), q) do
+          rel = Path.relative_to(file, root)
+          %{name: base, path: name <> "/" <> rel, workspace: name}
+        end
+        |> Enum.take(40)
+      end
+
+    %{query: q, results: results}
+  end
+
+  # Hosted apps = the served workbook surfaces on THIS nexus (the live mounts). Each tile launches the
+  # app at its URL. A surface that matches a declared workspace inherits that workspace's name + emoji.
+  def apps(req) do
+    org = req.tenant || Nexus.Store.default_tenant()
+    declared = Map.new(Nexus.Config.workspaces(), fn w -> {w.id, w} end)
+
+    apps =
+      for {name, root} <- (Application.get_env(:nexus, :mounts) || []), name != "" do
+        w = declared[name]
+        vis = visibility_of(org, name, root)
+        %{name: name, label: (w && w.name) || humanize(name), icon: (w && w.icon) || "",
+          url: "/" <> name <> "/", visibility: vis, gated: vis == "private"}
+      end
+
+    %{apps: Enum.sort_by(apps, & &1.label)}
+  end
+
+  # A surface's visibility: an explicit per-folder permission (control plane) wins; otherwise derive —
+  # an `auth` block ⇒ private (lock), else public (globe). "draft" only ever comes from the CP record.
+  defp visibility_of(org, name, root) do
+    case Nexus.ControlPlane.get(org, :visibility, name) do
+      {:ok, rec} -> rec[:state] || rec["state"] || derived_vis(root)
+      _ -> derived_vis(root)
+    end
+  end
+
+  defp derived_vis(root), do: if(mount_gated?(root), do: "private", else: "public")
+
+  # Create a draft = a real nexus folder scaffolded with an index.work, committed so it's a live
+  # surface, and flagged `draft` in the control plane. Promote later via /cloud/visibility.
+  def draft_create(req) do
+    org = req.tenant || Nexus.Store.default_tenant()
+    name = String.trim((is_map(req.body) && req.body["name"]) || "") |> then(&if(&1 == "", do: "Untitled draft", else: &1))
+    slug = draft_slug(name)
+    root = Path.join(Nexus.Config.data_dir(), slug)
+    File.mkdir_p!(root)
+    idx = Path.join(root, "index.work")
+    unless File.exists?(idx), do: File.write!(idx, draft_scaffold(name))
+
+    bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), slug)
+    Nexus.Git.provision_remote(bare, root)
+    Nexus.Git.commit_file(bare, root, "index.work", "create draft #{name}")
+    Nexus.ControlPlane.put(org, :visibility, slug, %{id: slug, state: "draft", name: name})
+    spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
+
+    %{ok: true, id: slug, name: name, url: "/" <> slug <> "/"}
+  end
+
+  # Set a surface's visibility (draft → private/public, the "promote", or back).
+  def set_visibility(req) do
+    org = req.tenant || Nexus.Store.default_tenant()
+    id = is_map(req.body) && req.body["id"]
+    state = is_map(req.body) && req.body["state"]
+
+    cond do
+      id in [nil, ""] -> {400, %{error: "id required"}}
+      state not in ["draft", "private", "public"] -> {400, %{error: "state must be draft|private|public"}}
+      true ->
+        Nexus.ControlPlane.put(org, :visibility, id, %{id: id, state: state})
+        %{ok: true, id: id, state: state}
+    end
+  end
+
+  # Unique-ish slug for a new draft folder (no traversal/separators; suffix if the folder already exists).
+  defp draft_slug(name) do
+    base = name |> String.downcase() |> String.replace(~r{[^a-z0-9]+}, "-") |> String.trim("-")
+    base = if base == "", do: "draft", else: base
+    root = Nexus.Config.data_dir()
+    if File.dir?(Path.join(root, base)), do: base <> "-" <> Integer.to_string(System.os_time(:second), 36), else: base
+  end
+
+  defp draft_scaffold(name) do
+    """
+    # #{name}
+
+    A new draft app — build it with the agent on the left; this preview updates as it takes shape.
+
+    client :app do
+      <div style="min-height:100vh;display:grid;place-items:center;font:16px system-ui;color:#555">
+        <div style="text-align:center">
+          <div style="font-size:40px">✦</div>
+          <p>#{name} — your draft starts here.</p>
+        </div>
+      </div>
+    end
+    """
+  end
+
+  defp humanize(name), do: name |> String.split(~r{[-/_]}, trim: true) |> Enum.map_join(" ", &String.capitalize/1)
+
+  # Agents from the live registry. Each: %{name, file}. Studio lists them in the Agents tab.
+  def agents_list(_req) do
+    agents =
+      Nexus.Agent.all()
+      |> Enum.map(fn n -> %{name: to_string(Map.get(n, :name)), file: Map.get(n, :file)} end)
+      |> Enum.reject(&(&1.name in [nil, "", "nil"]))
+      |> Enum.uniq_by(& &1.name)
+      |> Enum.sort_by(& &1.name)
+
+    %{agents: agents}
+  end
+
+  # An app is GATED (lock) when its workbook declares an `auth` block — our auth guardian
+  # (Nexus.Auth.Guard) protects it. No auth block ⇒ public (globe), an open hosted surface. Only the
+  # mount's root-level .work is checked (where index/auth live), so it stays cheap.
+  defp mount_gated?(root) do
+    Path.wildcard(Path.join(root, "*.work"))
+    |> Enum.any?(fn f ->
+      try do
+        File.read!(f) |> Nexus.Literate.parse() |> Enum.any?(&(&1.type == :code and &1.kind == "auth"))
+      rescue
+        _ -> false
+      end
+    end)
+  end
+
+  # Resolve a `<mount>/<rel>` request path to a real absolute file under data_dir, with the same
+  # mount + traversal guard as :tree. Returns {:ok, abs} | {:error, status, msg}.
+  defp resolve_file(path) do
+    case String.split(String.trim(path || ""), "/", trim: true) do
+      [] ->
+        {:error, 400, "path required"}
+
+      [mount | rest] ->
+        case List.keyfind(mounts(), mount, 0) do
+          nil ->
+            {:error, 404, "no such mount"}
+
+          {_, root} ->
+            abs = Path.expand(Path.join([root | rest]))
+
+            cond do
+              not String.starts_with?(abs, Path.expand(root)) -> {:error, 403, "path escapes mount"}
+              not File.regular?(abs) -> {:error, 404, "not a file"}
+              true -> {:ok, abs}
+            end
+        end
+    end
+  end
+
+  @max_text_bytes 2_097_152
+
+  # Text content for code/.work/markdown viewers. Binary files (by MIME) get `binary: true` so the
+  # client fetches bytes from /cloud/raw instead.
+  def file_read(req) do
+    case resolve_file(req.query["path"]) do
+      {:error, status, msg} ->
+        {status, %{error: msg}}
+
+      {:ok, abs} ->
+        ct = MIME.from_path(abs)
+        size = (File.stat!(abs).size || 0)
+        is_text = String.starts_with?(ct, "text/") or ct in ~w(application/json application/javascript application/xml image/svg+xml) or text_ext?(abs)
+
+        cond do
+          not is_text -> %{path: req.query["path"], binary: true, content_type: ct, size: size}
+          size > @max_text_bytes -> %{path: req.query["path"], binary: false, truncated: true, size: size, content: binary_part(File.read!(abs), 0, @max_text_bytes)}
+          true -> %{path: req.query["path"], binary: false, size: size, content: File.read!(abs)}
+        end
+    end
+  end
+
+  # Save an edited file: write to the volume, commit into the workspace repo (provisioning it if needed),
+  # then recompile. Body: %{path: "<ws>/<rel>", content: "…"}.
+  def file_save(req) do
+    path = (is_map(req.body) && req.body["path"]) || req.query["path"]
+    content = (is_map(req.body) && req.body["content"]) || ""
+
+    case resolve_file(path) do
+      {:error, status, msg} ->
+        {status, %{error: msg}}
+
+      {:ok, abs} ->
+        [mount | rest] = String.split(String.trim(path), "/", trim: true)
+        {_, root} = List.keyfind(mounts(), mount, 0)
+        rel = Enum.join(rest, "/")
+        File.write!(abs, content)
+
+        bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
+        Nexus.Git.provision_remote(bare, root)
+        # Attribute the commit to the signed-in user (jj/git author) — the basis for the attributed
+        # change-log and multi-user/tenant scoping. (Agent edits will pass the agent name here later.)
+        who = user_key(req)
+        result = Nexus.Git.commit_file(bare, root, rel, "edit #{rel} via dashboard", author: "#{who} <#{who}>")
+
+        spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
+
+        case result do
+          {:ok, sha} ->
+            # Record the change in the durable, attributed log (the Activity feed): a #event → the `log`
+            # effect persists it to resource Event. THIS is the "git-log in Activity" — who changed what,
+            # where, with the sha — tenant-scoped, not a per-workspace jj op-log you have to go digging for.
+            Nexus.Events.emit(
+              %{kind: "workspace.change", actor: who, title: "edited #{rel} in #{mount}",
+                target: sha, tags: ["event", "change"], scope: "member"},
+              tenant: req.tenant
+            )
+            %{ok: true, sha: sha}
+
+          :nochange -> %{ok: true, nochange: true}
+          {:error, out} -> {500, %{error: out}}
+        end
+    end
+  end
+
+  # Resolve a `<mount>/<rel>` to {abs, mount, root, rel} WITHOUT requiring it to exist (create/rename
+  # destinations don't yet). Mount + traversal guarded exactly like resolve_file.
+  defp resolve_target(path) do
+    case String.split(String.trim(path || ""), "/", trim: true) do
+      [] -> {:error, 400, "path required"}
+      [mount | rest] ->
+        case List.keyfind(mounts(), mount, 0) do
+          nil -> {:error, 404, "no such mount"}
+          {_, root} ->
+            abs = Path.expand(Path.join([root | rest]))
+            if String.starts_with?(abs, Path.expand(root)),
+              do: {:ok, abs, mount, root, Enum.join(rest, "/")},
+              else: {:error, 403, "path escapes mount"}
+        end
+    end
+  end
+
+  # Commit a tree change (delete/rename/new) into the workspace's bare repo, attributed to the user,
+  # then remount + log an Activity event. Shared tail for the file-mutation verbs below.
+  defp commit_tree_change(req, mount, root, msg, event_title) do
+    bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
+    Nexus.Git.provision_remote(bare, root)
+    who = user_key(req)
+    result = Nexus.Git.commit_paths(bare, root, msg, author: "#{who} <#{who}>")
+    spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
+
+    case result do
+      {:ok, sha} ->
+        Nexus.Events.emit(
+          %{kind: "workspace.change", actor: who, title: event_title, target: sha,
+            tags: ["event", "change"], scope: "member"}, tenant: req.tenant)
+        %{ok: true, sha: sha}
+
+      :nochange -> %{ok: true, nochange: true}
+      {:error, out} -> {500, %{error: out}}
+    end
+  end
+
+  # Create a new (empty) file. Body: %{path: "<mount>/<rel>"}. 409 if it already exists.
+  def file_new(req) do
+    case resolve_target(is_map(req.body) && req.body["path"]) do
+      {:error, status, msg} -> {status, %{error: msg}}
+      {:ok, abs, mount, root, rel} ->
+        cond do
+          rel == "" -> {400, %{error: "path required"}}
+          File.exists?(abs) -> {409, %{error: "already exists"}}
+          true ->
+            File.mkdir_p!(Path.dirname(abs)); File.write!(abs, "")
+            commit_tree_change(req, mount, root, "create #{rel} via dashboard", "created #{rel} in #{mount}")
+        end
+    end
+  end
+
+  # Create a new folder (with a .gitkeep so the empty dir survives the git round-trip). Body: %{path}.
+  def file_mkdir(req) do
+    case resolve_target(is_map(req.body) && req.body["path"]) do
+      {:error, status, msg} -> {status, %{error: msg}}
+      {:ok, abs, mount, root, rel} ->
+        cond do
+          rel == "" -> {400, %{error: "path required"}}
+          File.exists?(abs) -> {409, %{error: "already exists"}}
+          true ->
+            File.mkdir_p!(abs); File.write!(Path.join(abs, ".gitkeep"), "")
+            commit_tree_change(req, mount, root, "mkdir #{rel} via dashboard", "created folder #{rel} in #{mount}")
+        end
+    end
+  end
+
+  # Rename/move a file or folder. Body: %{from: "<mount>/<rel>", to: "<mount>/<rel>"} (same mount).
+  def file_rename(req) do
+    from = is_map(req.body) && req.body["from"]
+    to = is_map(req.body) && req.body["to"]
+    with {:ok, fabs, fmount, root, frel} <- resolve_target(from),
+         {:ok, tabs, tmount, _r, trel} <- resolve_target(to) do
+      cond do
+        frel == "" or trel == "" -> {400, %{error: "from and to required"}}
+        fmount != tmount -> {400, %{error: "cross-workspace move not supported"}}
+        not File.exists?(fabs) -> {404, %{error: "source not found"}}
+        File.exists?(tabs) -> {409, %{error: "destination exists"}}
+        true ->
+          File.mkdir_p!(Path.dirname(tabs)); File.rename!(fabs, tabs)
+          commit_tree_change(req, fmount, root, "rename #{frel} → #{trel} via dashboard", "renamed #{frel} to #{trel} in #{fmount}")
+      end
+    else
+      {:error, status, msg} -> {status, %{error: msg}}
+    end
+  end
+
+  # Delete a file or folder (recursive). Body: %{path: "<mount>/<rel>"}.
+  def file_delete(req) do
+    case resolve_target(is_map(req.body) && req.body["path"]) do
+      {:error, status, msg} -> {status, %{error: msg}}
+      {:ok, abs, mount, root, rel} ->
+        cond do
+          rel == "" -> {400, %{error: "refusing to delete a workspace root"}}
+          not File.exists?(abs) -> {404, %{error: "not found"}}
+          true ->
+            File.rm_rf!(abs)
+            commit_tree_change(req, mount, root, "delete #{rel} via dashboard", "deleted #{rel} in #{mount}")
+        end
+    end
+  end
+
+  # Raw bytes with the right Content-Type — for <img> and pdf.js.
+  def file_raw(req) do
+    case resolve_file(req.query["path"]) do
+      {:error, status, msg} -> {status, %{error: msg}}
+      {:ok, abs} -> {200, raw_ct(abs), File.read!(abs)}
+    end
+  end
+
+  # MIME.from_path returns application/octet-stream for unknown; treat known dev-text extensions as text.
+  defp text_ext?(abs) do
+    ext = abs |> Path.extname() |> String.downcase()
+    ext in ~w(.work .ex .exs .md .txt .js .ts .jsx .tsx .css .html .htm .json .yaml .yml .toml .sh .zig .rs .go .py .rb .sql .org .csv .gitignore .env .lock .heex .eex)
+  end
+
+  defp raw_ct(abs) do
+    case MIME.from_path(abs) do
+      "application/octet-stream" -> "application/octet-stream"
+      ct -> ct
+    end
+  end
+
+  # ── Git remote per workspace ─────────────────────────────────────────────────────────────────────
+  # The push URL for a workspace's bare repo + its current GitHub mirror (if any). Base is derived from
+  # the request host/scheme when available; otherwise the client prepends location.origin to the
+  # relative `/git/<ws>.git`. `ws` is sanitized (no slashes / traversal) before it touches the disk.
+  def workspace_git(req) do
+    ws = git_ws(req.query["ws"])
+
+    if ws == "" do
+      {400, %{error: "ws required"}}
+    else
+      base =
+        case {req[:scheme], req[:host]} do
+          {s, h} when is_binary(s) and is_binary(h) and h != "" -> "#{s}://#{h}"
+          _ -> ""
+        end
+
+      remote = base <> "/git/" <> ws <> ".git"
+      mirror = current_mirror(ws)
+      %{remote: remote, push: "git push " <> remote <> " main", mirror: mirror}
+    end
+  end
+
+  # Bind (or clear, with an empty url) the GitHub mirror remote for a workspace's bare repo. The URL may
+  # embed a token (https://user:token@github.com/org/repo.git) — it lands in the bare repo's git config
+  # on the data volume (deployer config, not source). Nexus.Git carries the generic mechanism.
+  def workspace_mirror(req) do
+    ws = git_ws(is_map(req.body) && req.body["ws"])
+    url = (is_map(req.body) && req.body["url"]) || ""
+
+    if ws == "" do
+      {400, %{error: "ws required"}}
+    else
+      bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), ws)
+      {:ok, _} = Nexus.Git.provision_remote(bare, Nexus.GitHttp.work_dir(ws))
+      :ok = Nexus.Git.set_mirror(bare, url)
+      %{ok: true, mirror: (if String.trim(to_string(url)) == "", do: nil, else: url)}
+    end
+  end
+
+  # The mirror url currently configured on the bare repo (nil if none / not provisioned).
+  defp current_mirror(ws) do
+    bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), ws)
+
+    if Nexus.Git.bare?(bare) do
+      case System.cmd("git", ["--git-dir=#{bare}", "config", "--get", "workbooks.mirror"], stderr_to_stdout: true) do
+        {out, 0} -> (t = String.trim(out)) != "" && t || nil
+        _ -> nil
+      end
+    end
+  end
+
+  # Sanitize a workspace name for use as a repo path component — no traversal, no separators.
+  defp git_ws(name) do
+    n = name |> to_string() |> String.trim()
+    if n == "" or String.contains?(n, "..") or String.contains?(n, "/"), do: "", else: n
+  end
+
+  defp list_dir(abs, rel) do
+    File.ls!(abs)
+    |> Enum.reject(&String.starts_with?(&1, "."))
+    |> Enum.map(fn name ->
+      full = Path.join(abs, name)
+      isdir = File.dir?(full)
+      %{name: name, dir: isdir, path: rel <> "/" <> name, size: (if isdir, do: 0, else: (File.stat!(full).size || 0))}
+    end)
+    |> Enum.sort_by(&{!&1.dir, &1.name})
+  end
+
+  def human(b) when b >= 1_048_576, do: "#{Float.round(b / 1_048_576, 1)} MB"
+  def human(b) when b >= 1024, do: "#{div(b, 1024)} KB"
+  def human(b), do: "#{b} B"
+end
+
+# The durable event log — a normal resource (tenant-scoped SQLite). The `log` effect writes rows here;
+# the Activity page reads them. This is OUR cloud store, not part of the open standard.
