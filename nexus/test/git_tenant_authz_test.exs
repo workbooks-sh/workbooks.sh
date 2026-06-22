@@ -25,14 +25,17 @@ defmodule Nexus.GitTenantAuthzTest do
     assert GitHttp.authorize(%{tenant: "anything"}, false, Nexus.Store.default_tenant())
   end
 
-  test "nexus_org/0 reads NEXUS_TENANT, else the default tenant" do
+  test "nexus_org/0 honors the NEXUS_TENANT pin and delegates to the canonical Nexus.Auth.nexus_org" do
     prev = System.get_env("NEXUS_TENANT")
 
+    # The explicit deploy pin always wins (the property GitHttp.authorize relies on).
     System.put_env("NEXUS_TENANT", "org-z")
     assert GitHttp.nexus_org() == "org-z"
 
+    # Unset: it's the canonical Nexus.Auth.nexus_org (NEXUS_TENANT → founding owner's org → default) —
+    # GitHttp must NOT diverge from the seam Nexus.Secrets + the push gate share (wb-5wsg).
     System.delete_env("NEXUS_TENANT")
-    assert GitHttp.nexus_org() == Nexus.Store.default_tenant()
+    assert GitHttp.nexus_org() == Nexus.Auth.nexus_org()
 
     if prev, do: System.put_env("NEXUS_TENANT", prev)
   end
