@@ -449,6 +449,18 @@ tr:last-child td{ border:0; }
 .fcheck { margin-left: auto; color: var(--mint); font-size: 12px; }
 /* Apps grid — launchable workbook-app tiles */
 .appsgrid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 2px 2px 4px; align-content: start; }
+/* Grouped-by-workspace: the container stacks groups (block); each group keeps its own 2-col grid. */
+.appsgrid.grouped { display: block; }
+.appgroup { margin-bottom: 6px; }
+.appgroup .appsgrid { overflow: visible; }
+.appgrouphd { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; cursor: pointer;
+  color: var(--dim); padding: 8px 6px 6px; font: 700 11px var(--read); letter-spacing: .04em; }
+.appgrouphd:hover { color: var(--ink); }
+.appgrouphd .agchev { display: inline-flex; transition: transform .12s; transform: rotate(90deg); }
+.appgrouphd.collapsed .agchev { transform: rotate(0deg); }
+.appgrouphd .aghash { display: inline-flex; opacity: .8; }
+.appgrouphd .agname { text-transform: none; font-weight: 600; font-size: 13px; }
+.appgrouphd .agct { margin-left: auto; font: 600 10px var(--mono, monospace); background: var(--line); border-radius: 20px; padding: 1px 7px; }
 .appcard { position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 14px 8px 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink); text-decoration: none; text-align: center; }
 .appbadge { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; color: var(--dim); opacity: .65; }
 .appbadge svg { width: 13px; height: 13px; }

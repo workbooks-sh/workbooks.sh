@@ -527,6 +527,7 @@
       activity: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
       admin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',
       chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+      hash: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg>',
       plug: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg>',
       toolbox: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13h20v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M2.5 13 4.6 7.8A2 2 0 0 1 6.45 6.5h11.1a2 2 0 0 1 1.85 1.3L21.5 13"/><path d="M9 6.5V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1.5"/><path d="M2 13h6v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2h6"/></svg>',
       files: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>',
@@ -549,9 +550,30 @@
       external: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
       newfile: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5M12 11v6M9 14h6"/></svg>',
       newfolder: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><path d="M12 11v6M9 14h6"/></svg>',
-      file: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/></svg>'
+      file: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/></svg>',
+      folder: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>',
+      newfolderplus: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><path d="M12 10v6M9 13h6"/></svg>'
     };
     var WMARK = WB.WMARK = '<svg viewBox="0 0 113.444 65.6002" fill="none"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>';
+
+    // ── Shared pastel themes (brand DNA pastels, never the neon green) for the built-in TOOLKITS and the
+    // toolkit-bound Studio AGENTS. Defined once here (app.js is always loaded) so the Toolkits page AND the
+    // Studio composer's agent selector resolve the SAME color/glyph for a given toolkit. DRY across both.
+    var TK_THEME = WB.TK_THEME = {
+      presentation: { color: '#7c6cf0', bg: 'rgba(124,108,240,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg>' },
+      video:        { color: '#e8794b', bg: 'rgba(232,121,75,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>' },
+      research:     { color: '#2fa3a3', bg: 'rgba(47,163,163,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>' }
+    };
+    // Agent → theme. Toolkit-bound agents inherit their toolkit's theme; Waldo + Autopilot (no toolkit)
+    // carry their own distinct pastels. Used by the composer selector and the sidebar session rows.
+    var AGENT_THEME = WB.AGENT_THEME = {
+      deck:      TK_THEME.presentation,
+      video:     TK_THEME.video,
+      research:  TK_THEME.research,
+      waldo:     { color: '#5b9bd5', bg: 'rgba(91,155,213,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.13a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.13 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.13a.5.5 0 0 1-.96 0z"/></svg>' },
+      autopilot: { color: '#6cae8e', bg: 'rgba(108,174,142,.14)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/></svg>' }
+    };
+    function agentTheme(name){ return AGENT_THEME[name] || { color: 'var(--dim)', bg: 'var(--line)', icon: ICO.spark }; }
 
     // ── File/folder icons — the VS Code Material Icon Theme, served from CDN (no-build). Mirrors the
     // desktop's materialIcon.ts resolution (fileNames > fileExtensions > default; folders likewise).
@@ -595,6 +617,9 @@
     st.filterOpen = false;
     try { st.appFilter = localStorage.getItem('wb-appfilter') || 'all'; } catch (e) { st.appFilter = 'all'; }   // all | public | private
     try { st.fileFilter = localStorage.getItem('wb-filefilter') || 'all'; } catch (e) { st.fileFilter = 'all'; } // all | work | assets
+    try { st.appView = localStorage.getItem('wb-appview') || 'all'; } catch (e) { st.appView = 'all'; }          // all (flat) | workspace (grouped)
+    try { st.appSort = localStorage.getItem('wb-appsort') || 'name'; } catch (e) { st.appSort = 'name'; }        // name | updated
+    try { st.appGroupsCollapsed = JSON.parse(localStorage.getItem('wb-appgroups') || '{}'); } catch (e) { st.appGroupsCollapsed = {}; }
     try { st.bookmarks = JSON.parse(localStorage.getItem('wb-bookmarks') || '[]'); } catch (e) { st.bookmarks = []; }
     function saveBookmarks(){ try { localStorage.setItem('wb-bookmarks', JSON.stringify(st.bookmarks)); } catch (e) {} }
     function toggleBookmark(path, label){
@@ -788,11 +813,15 @@
         var g = document.getElementById('appsGrid'); if (!g) return;
         function visOf(a){ return a.visibility || (a.gated ? 'private' : 'public'); }
         var apps = ((d && d.apps) || []).filter(function(a){ return st.appFilter === 'all' || visOf(a) === st.appFilter; });
+        // Sort: name (label A→Z) or recently updated (newest first).
+        apps.sort(st.appSort === 'updated'
+          ? function(a, b){ return (b.updated || 0) - (a.updated || 0); }
+          : function(a, b){ return (a.label || '').localeCompare(b.label || ''); });
         // globe = public/open · lock = gated by our auth guardian · pencil = draft (WIP)
         var BADGE = { draft: { ic: ICO.draft, cls: ' draft', t: 'Draft — work in progress' }, private: { ic: ICO.lock, cls: ' priv', t: 'Private — gated by auth' }, public: { ic: ICO.globe, cls: '', t: 'Public — open' } };
         // Registry the in-app browser (/app view) reads to resolve name → {url,label,...} without a refetch.
         WB._appReg = {}; apps.forEach(function(a){ WB._appReg[a.name] = a; });
-        var cards = apps.map(function(a){
+        function appCard(a){
           var vis = visOf(a), b = BADGE[vis] || BADGE.public;
           var ic = a.icon ? '<span class="appemoji">' + esc(a.icon) + '</span>'
                           : '<span class="appinit">' + esc((a.label[0] || 'A').toUpperCase()) + '</span>';
@@ -800,10 +829,36 @@
           // Everything opens IN-APP, in the content area's browser chrome (/app/<name>) — never a new tab.
           return '<a class="appcard' + (vis === 'draft' ? ' draft' : '') + '" data-ctx="app" data-open-app="' + esc(a.name) + '" href="#/app/' + esc(encodeURIComponent(a.name)) + '" title="' + esc(a.label) + '">' +
             badge + ic + '<span class="appname">' + esc(a.label) + '</span></a>';
-        }).join('');
-        // "New app" tile — creates a draft (Phase 4 will replace the prompt with the context modal).
-        cards += '<button class="appcard newapp" data-newapp title="New app"><span class="newappplus">+</span><span class="appname">New app</span></button>';
-        g.innerHTML = cards || '<div class="treemsg" style="padding:8px 4px">No ' + (st.appFilter !== 'all' ? st.appFilter + ' ' : '') + 'apps</div>';
+        }
+        var newTile = '<button class="appcard newapp" data-newapp title="New app"><span class="newappplus">+</span><span class="appname">New app</span></button>';
+        g.classList.toggle('grouped', st.appView === 'workspace');   // grouped → container stacks groups (block)
+
+        if (st.appView === 'workspace') {
+          // Group by workspace. Order = declared workspace order, then "Other". Header = # icon + name
+          // (no emoji), gray, with a collapse chevron. Empty groups are dropped.
+          var wsList = (WB.ws && WB.ws.list) || [];
+          var order = wsList.map(function(w){ return w.id; });
+          var nameOf = {}; wsList.forEach(function(w){ nameOf[w.id] = w.name; });
+          var groups = {}; apps.forEach(function(a){ var k = a.workspace || '_other'; (groups[k] = groups[k] || []).push(a); });
+          var keys = order.filter(function(k){ return groups[k]; });
+          Object.keys(groups).forEach(function(k){ if (k !== '_other' && keys.indexOf(k) < 0) keys.push(k); });
+          if (groups._other) keys.push('_other');
+          var html = keys.map(function(k){
+            var collapsed = !!st.appGroupsCollapsed[k];
+            var title = k === '_other' ? 'Other' : (nameOf[k] || k);
+            return '<div class="appgroup">' +
+              '<button class="appgrouphd' + (collapsed ? ' collapsed' : '') + '" data-appgroup="' + esc(k) + '">' +
+                '<span class="agchev">' + ICO.chev + '</span><span class="aghash">' + ICO.hash + '</span>' +
+                '<span class="agname">' + esc(title) + '</span><span class="agct">' + groups[k].length + '</span></button>' +
+              (collapsed ? '' : '<div class="appsgrid">' + groups[k].map(appCard).join('') + '</div>') +
+            '</div>';
+          }).join('');
+          g.innerHTML = (html || '<div class="treemsg" style="padding:8px 4px">No apps</div>') +
+            '<div class="appsgrid" style="margin-top:10px">' + newTile + '</div>';
+        } else {
+          var cards = apps.map(appCard).join('') + newTile;
+          g.innerHTML = cards || '<div class="treemsg" style="padding:8px 4px">No ' + (st.appFilter !== 'all' ? st.appFilter + ' ' : '') + 'apps</div>';
+        }
       });
     }
     // Studio sidebar — recent sessions (GET /cloud/agent/sessions) + draft projects (drafts from /cloud/apps).
@@ -1064,7 +1119,7 @@
     WB.refreshSidebar = function(){ try { renderShell(); } catch (e) {} };
     function navlink(href, ico, label, p){ return '<a class="nxlink' + (p === href ? ' on' : '') + '" data-nav="' + href + '" href="#' + href + '" title="' + esc(label) + '">' + ico + '<span class="lbl">' + esc(label) + '</span></a>'; }
     // The funnel shows a dot when a non-default filter is active for the CURRENT tab.
-    function filterActive(){ return st.sideMode === 'files' ? st.fileFilter !== 'all' : st.appFilter !== 'all'; }
+    function filterActive(){ return st.sideMode === 'files' ? st.fileFilter !== 'all' : (st.appFilter !== 'all' || st.appView !== 'all' || st.appSort !== 'name'); }
     // Context-dependent filter popover — Apps → visibility (public/private), Files → file type.
     function fopt(kind, val, label, ico){
       var cur = kind === 'app' ? st.appFilter : st.fileFilter;
@@ -1078,9 +1133,18 @@
           fopt('file', 'all', 'All files') + fopt('file', 'work', 'Workbooks (.work)') + fopt('file', 'assets', 'Assets') +
         '</div>';
       }
-      return '<div class="filtermenu" role="menu"><div class="filterhd">Apps</div>' +
+      return '<div class="filtermenu" role="menu">' +
+        '<div class="filterhd">Show</div>' +
         fopt('app', 'all', 'All') + fopt('app', 'public', 'Public', ICO.globe) + fopt('app', 'private', 'Private', ICO.lock) + fopt('app', 'draft', 'Drafts', ICO.draft) +
+        '<div class="filterhd">Group</div>' + vopt('view', 'all', 'Everything') + vopt('view', 'workspace', 'By workspace') +
+        '<div class="filterhd">Sort</div>' + vopt('sort', 'name', 'Name') + vopt('sort', 'updated', 'Recently updated') +
       '</div>';
+    }
+    // View/sort options in the Apps filter popover (data-appview / data-appsort).
+    function vopt(kind, val, label){
+      var cur = kind === 'view' ? st.appView : st.appSort;
+      return '<button class="filteropt' + (cur === val ? ' on' : '') + '" data-app' + kind + '="' + val + '">' +
+        '<span class="fopti"></span><span>' + esc(label) + '</span>' + (cur === val ? '<span class="fcheck">✓</span>' : '') + '</button>';
     }
     function wsEditor(isNew){ var tile = st.editIcon || ((st.editName.trim()[0] || 'W').toUpperCase());
       return '<div class="wsedit"><div class="wsiconrow">' +
@@ -1142,6 +1206,9 @@
       if (t.closest && t.closest('[data-filter-toggle]')) { st.filterOpen = !st.filterOpen; renderShell(); return; }
       var afl = t.closest && t.closest('[data-appfilter]'); if (afl) { st.appFilter = afl.getAttribute('data-appfilter'); try { localStorage.setItem('wb-appfilter', st.appFilter); } catch (er) {} st.filterOpen = false; renderShell(); return; }
       var ffl = t.closest && t.closest('[data-filefilter]'); if (ffl) { st.fileFilter = ffl.getAttribute('data-filefilter'); try { localStorage.setItem('wb-filefilter', st.fileFilter); } catch (er) {} st.filterOpen = false; renderShell(); return; }
+      var avw = t.closest && t.closest('[data-appview]'); if (avw) { st.appView = avw.getAttribute('data-appview'); try { localStorage.setItem('wb-appview', st.appView); } catch (er) {} st.filterOpen = false; renderShell(); paintApps(); return; }
+      var aso = t.closest && t.closest('[data-appsort]'); if (aso) { st.appSort = aso.getAttribute('data-appsort'); try { localStorage.setItem('wb-appsort', st.appSort); } catch (er) {} st.filterOpen = false; renderShell(); paintApps(); return; }
+      var agp = t.closest && t.closest('[data-appgroup]'); if (agp) { var gk = agp.getAttribute('data-appgroup'); st.appGroupsCollapsed[gk] = !st.appGroupsCollapsed[gk]; try { localStorage.setItem('wb-appgroups', JSON.stringify(st.appGroupsCollapsed)); } catch (er) {} paintApps(); return; }
       if (t.closest && t.closest('[data-newapp]')) {
         var nm = (window.prompt && window.prompt('Name your new app (a draft):', '')) || '';
         nm = nm.trim(); if (!nm) return;

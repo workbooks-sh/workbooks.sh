@@ -12,6 +12,10 @@ server :cloud do
   route "GET /cloud/agent/sessions", :agent_sessions
   route "GET /cloud/agent/session", :agent_session
   route "POST /cloud/agent/chat", :agent_chat
+  # Projects — a named bucket the user groups Studio sessions under (a session with no project lands in
+  # "General"). Per-{tenant,user}, in-process alongside sessions. The sidebar renders projects as folders.
+  route "GET /cloud/agent/projects", :agent_projects
+  route "POST /cloud/agent/projects", :agent_project_create
 
   # Launch a NAMED agent on a brief and persist a durable Run record. Non-streaming (returns the
   # final answer + run id); the Studio prefers the live SSE source `agent_run` (GET /live/agent_run)
@@ -117,6 +121,7 @@ server :cloud do
   route "GET /cloud/activity", :activity
 
   @agent_store {:cloud_agent_sessions}
+  @projects_store {:cloud_agent_projects}
 
   def mint_token(req) do
     name = (is_map(req.body) && req.body["name"]) || "cli"
@@ -126,8 +131,39 @@ server :cloud do
   def list_tokens(req), do: %{tokens: Nexus.Auth.Token.list(req.tenant)}
 
   def agent_sessions(req) do
-    sessions = sessions_for(req.tenant, user_key(req)) |> Enum.map(fn s -> %{id: s.id, title: s.title, updated: s.updated} end)
+    sessions =
+      sessions_for(req.tenant, user_key(req))
+      |> Enum.map(fn s -> %{id: s.id, title: s.title, updated: s.updated,
+                            project: Map.get(s, :project), agent: Map.get(s, :agent)} end)
+
     %{sessions: sessions}
+  end
+
+  # List the user's projects (newest first). The sidebar groups sessions under these folders.
+  def agent_projects(req) do
+    %{projects: projects_for(req.tenant, user_key(req))}
+  end
+
+  # Create a named project (idempotent on name, case-insensitive). Returns the project record.
+  def agent_project_create(req) do
+    name = String.trim((is_map(req.body) && req.body["name"]) || "")
+
+    if name == "" do
+      {400, %{error: "name required"}}
+    else
+      user = user_key(req)
+      list = projects_for(req.tenant, user)
+
+      case Enum.find(list, &(String.downcase(&1.name) == String.downcase(name))) do
+        nil ->
+          proj = %{id: gen_id(), name: name, created: System.os_time(:second)}
+          save_projects(req.tenant, user, [proj | list])
+          %{project: proj}
+
+        existing ->
+          %{project: existing}
+      end
+    end
   end
 
   def agent_session(req) do
@@ -213,15 +249,21 @@ server :cloud do
     msg = (is_map(req.body) && req.body["message"]) || ""
     id = is_map(req.body) && req.body["id"]
     model = is_map(req.body) && req.body["model"]
-    reply = run_agent(msg, model)
+    agent = is_map(req.body) && req.body["agent"]
+    project = is_map(req.body) && req.body["project"]
     sessions = sessions_for(req.tenant, user)
     {match, rest} = Enum.split_with(sessions, &(&1.id == id))
 
     session =
       case match do
         [s] -> s
-        _ -> %{id: gen_id(), title: title_from(msg), messages: [], updated: 0}
+        # New session: capture the chosen agent + project — both are fixed for the session's life
+        # (the composer locks the agent selector once a session has any messages).
+        _ -> %{id: gen_id(), title: title_from(msg), messages: [], updated: 0, agent: agent, project: project}
       end
+
+    # Run via the session's pinned agent (existing session) or the just-chosen one (new session).
+    reply = run_agent(msg, model, Map.get(session, :agent) || agent)
 
     turns = session.messages ++ [%{role: "user", text: msg}, %{role: "assistant", text: reply}]
     session = %{session | messages: turns, updated: System.os_time(:second)}
@@ -762,12 +804,21 @@ server :cloud do
     :persistent_term.put(@agent_store, Map.put(all, {tenant, user}, Enum.sort_by(list, & &1.updated, :desc)))
   end
 
+  defp projects_for(tenant, user), do: Map.get(:persistent_term.get(@projects_store, %{}), {tenant, user}, [])
+
+  defp save_projects(tenant, user, list) do
+    all = :persistent_term.get(@projects_store, %{})
+    :persistent_term.put(@projects_store, Map.put(all, {tenant, user}, Enum.sort_by(list, & &1.created, :desc)))
+  end
+
   defp gen_id, do: Base.url_encode64(:crypto.strong_rand_bytes(9), padding: false)
   defp title_from(msg), do: msg |> String.trim() |> String.slice(0, 48) |> then(&if(&1 == "", do: "New chat", else: &1))
 
-  defp run_agent(msg, model \\ nil) do
+  defp run_agent(msg, model \\ nil, agent \\ nil) do
     run_opts = [task: msg, timeout_ms: 60_000]
     run_opts = if is_binary(model) and model != "", do: Keyword.put(run_opts, :model, model), else: run_opts
+    # Route the turn through the named agent when one is pinned to the session (else the default brain).
+    run_opts = if is_binary(agent) and agent != "", do: Keyword.put(run_opts, :agent, agent), else: run_opts
 
     try do
       case Nexus.Agent.run(run_opts) do
@@ -958,11 +1009,27 @@ server :cloud do
       for {name, root} <- (Application.get_env(:nexus, :mounts) || []), name != "" do
         w = declared[name]
         vis = visibility_of(org, name, root)
+        # An app's workspace = the declared workspace its path sits under (first segment). Flat top-level
+        # mounts group under themselves when they ARE a declared workspace, else nil (→ "Other" in the UI).
+        ws = name |> String.split("/") |> List.first()
         %{name: name, label: (w && w.name) || humanize(name), icon: (w && w.icon) || "",
-          url: "/" <> name <> "/", visibility: vis, gated: vis == "private"}
+          url: "/" <> name <> "/", visibility: vis, gated: vis == "private",
+          workspace: if(Map.has_key?(declared, ws), do: ws, else: nil),
+          updated: mtime_unix(root)}
       end
 
     %{apps: Enum.sort_by(apps, & &1.label)}
+  end
+
+  # Newest mtime of the app's folder (its index.work, else the dir) as a unix int — for "recently updated".
+  defp mtime_unix(root) do
+    path = Path.join(root, "index.work")
+    path = if File.exists?(path), do: path, else: root
+
+    case File.stat(path, time: :posix) do
+      {:ok, %{mtime: m}} -> m
+      _ -> 0
+    end
   end
 
   # A surface's visibility: an explicit per-folder permission (control plane) wins; otherwise derive —
@@ -1039,13 +1106,32 @@ server :cloud do
   defp humanize(name), do: name |> String.split(~r{[-/_]}, trim: true) |> Enum.map_join(" ", &String.capitalize/1)
 
   # Agents from the live registry. Each: %{name, file}. Studio lists them in the Agents tab.
+  # The Studio agent roster — our curated, toolkit-bound catalog. Each agent is named after its
+  # MODALITY and is PROVIDED BY a toolkit: disable the toolkit and the agent disappears from the composer
+  # (the client filters against /cloud/toolkits). Waldo (everyday) + Autopilot have no toolkit — always on.
+  # The pastel theme/icon is resolved client-side (WB.AGENT_THEME) so it matches the Toolkits page. THE
+  # LINE: the agent BLOCKS are standard `.work`; this roster + its toolkit bindings are our cloud product.
+  def agent_catalog do
+    [
+      %{name: "deck", label: "Deck Builder", toolkit: "presentation",
+        blurb: "Turns a brief into a real, rendering reveal.js deck."},
+      %{name: "video", label: "Video Editor", toolkit: "video",
+        blurb: "Authors HyperFrames scenes the nexus renders to a clip."},
+      %{name: "research", label: "Deep Researcher", toolkit: "research",
+        blurb: "Fans out searches and synthesizes organized, cited findings."},
+      %{name: "waldo", label: "Waldo", toolkit: nil,
+        blurb: "The everyday manager — plans, dispatches, gets things done."},
+      %{name: "autopilot", label: "Autopilot", toolkit: nil,
+        blurb: "Runs your work on a schedule and keeps it moving on its own."}
+    ]
+  end
+
   def agents_list(_req) do
+    defined = Nexus.Agent.all() |> Enum.map(&to_string(Map.get(&1, :name))) |> MapSet.new()
+
     agents =
-      Nexus.Agent.all()
-      |> Enum.map(fn n -> %{name: to_string(Map.get(n, :name)), file: Map.get(n, :file)} end)
-      |> Enum.reject(&(&1.name in [nil, "", "nil"]))
-      |> Enum.uniq_by(& &1.name)
-      |> Enum.sort_by(& &1.name)
+      agent_catalog()
+      |> Enum.map(fn a -> Map.put(a, :defined, MapSet.member?(defined, a.name)) end)
 
     %{agents: agents}
   end
