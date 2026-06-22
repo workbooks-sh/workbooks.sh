@@ -27,3 +27,33 @@ defmodule Nexus.Auth.GithubTest do
     assert setcookie =~ "max-age=0"
   end
 end
+
+defmodule Nexus.Auth.GithubProxyTest do
+  # Pins the proxy-scheme fix: behind a TLS-terminating proxy the redirect_uri MUST be https, or GitHub
+  # rejects it. async: false because it sets process-wide env.
+  use ExUnit.Case, async: false
+  import Plug.Test
+  import Plug.Conn, only: [put_req_header: 3]
+  alias Nexus.Auth.Github
+
+  setup do
+    System.put_env("GITHUB_APP_CLIENT_ID", "Iv_test")
+    System.put_env("GITHUB_APP_CLIENT_SECRET", "shh")
+    on_exit(fn -> System.delete_env("GITHUB_APP_CLIENT_ID"); System.delete_env("GITHUB_APP_CLIENT_SECRET") end)
+    :ok
+  end
+
+  test "x-forwarded-proto=https → the redirect_uri is https (not the proxy-local http)" do
+    assert Github.configured?()
+
+    loc =
+      conn(:get, "/auth/github/login")
+      |> put_req_header("x-forwarded-proto", "https")
+      |> put_req_header("x-forwarded-host", "wb-dogfood.fly.dev")
+      |> Github.login()
+      |> then(fn out -> Enum.find_value(out.resp_headers, fn {k, v} -> if k == "location", do: v end) end)
+
+    assert loc =~ "redirect_uri=https%3A%2F%2Fwb-dogfood.fly.dev%2Fauth%2Fgithub%2Fcallback"
+    refute loc =~ "redirect_uri=http%3A%2F"
+  end
+end
