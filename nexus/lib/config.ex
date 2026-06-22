@@ -155,6 +155,12 @@ defmodule Nexus.Config do
   def workspaces, do: get(:workspaces)
   def nexus_emoji, do: get(:nexus_emoji)
 
+  # The HOME surface — the subtree mounted at `/` (the nexus homepage). Its descendants rebase too
+  # (`home="lander"` ⇒ surface `lander` serves at `/`, `lander/blog` at `/blog`). nil ⇒ no home surface;
+  # `/` then shows the mounted-workbooks index. This is the deploy choice of "which surface is the front
+  # door" — config, not a magic folder name.
+  def home, do: get(:home)
+
   # Login providers (Nexus.Auth.Provider). Declared as `auth-provider-<name>-<key>="…"` deploy attrs,
   # e.g. `auth-provider-google-authorize-url`, `-token-url`, `-jwks-url`, `-client-id`, `-issuer`,
   # `-scope`, `-redirect-uri`, `-tenant-claim`. Secrets (client_secret) live in Nexus.Secrets, NEVER
@@ -232,6 +238,7 @@ defmodule Nexus.Config do
       # config), NOT auto-derived from every mount. Each line: `folder | Name | emoji`. Runtime ships
       # NONE; a deployer brings their own. Plus the nexus's own display emoji.
       nexus_emoji: attr(html, "nexus-emoji"),
+      home: attr(html, "home"),
       workspaces: parse_workspaces(attr(html, "workspaces")),
       providers: parse_providers(html),
       # Cloudflare-for-SaaS custom hostnames (the cheap, scale path for customer domains — TLS terminated

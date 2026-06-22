@@ -58,6 +58,10 @@ defmodule Nexus.Server do
   # A root whose subdirectories each hold `.work` files = many workbooks, each mounted at `/<name>/`
   # on this one nexus. (Whether you want them on one nexus or several — or local vs cloud — is a
   # deploy-target choice; the runtime hosts as many workbooks as you mount here.)
+  @doc false
+  # Test seam — exercises the mount discovery (incl. the home rebase) without booting the server.
+  def discover_mounts_for_test(root), do: discover_mounts(root)
+
   defp discover_mounts(root) do
     root_works = Path.wildcard(Path.join(root, "*.work"))
 
@@ -87,12 +91,33 @@ defmodule Nexus.Server do
 
     cond do
       # Manifest root + nested surfaces → the monorepo/subtree layout (mounts are relative paths).
-      only_manifest? and surfaces != [] -> surfaces
+      only_manifest? and surfaces != [] -> rebase_home(surfaces)
       # A real root workbook (root .work that isn't only the manifest) → single workbook at "/".
       root_works != [] and not (only_manifest? and subs != []) -> [{"", root}]
-      surfaces != [] -> surfaces
+      surfaces != [] -> rebase_home(surfaces)
       subs != [] -> subs
       true -> [{"", root}]
+    end
+  end
+
+  # If the deploy names a HOME surface (`deploy home="lander"`), rebase it AND its descendants to root:
+  # `lander` → "" (served at `/`), `lander/blog` → "blog" (served at `/blog`). This is what makes the
+  # nexus front door an ordinary surface — no special-casing in the serve path; the "" mount matches every
+  # path at lowest priority (resolve_mount), so deeper surfaces (cloud/docs) still win. No home ⇒ no-op.
+  defp rebase_home(surfaces) do
+    case Nexus.Config.home() do
+      h when is_binary(h) and h != "" ->
+        if Enum.any?(surfaces, fn {n, _} -> n == h end) do
+          Enum.map(surfaces, fn
+            {^h, dir} -> {"", dir}
+            {n, dir} -> {(String.starts_with?(n, h <> "/") && String.replace_prefix(n, h <> "/", "")) || n, dir}
+          end)
+        else
+          surfaces
+        end
+
+      _ ->
+        surfaces
     end
   end
 
@@ -249,11 +274,20 @@ defmodule Nexus.Server do
   post("/auth/reset", do: Nexus.Auth.Native.reset(conn))
 
   get "/" do
-    # Single workbook → the app. Many workbooks → an index of what's mounted on this nexus.
-    if multi?() do
-      conn |> put_resp_content_type("text/html") |> send_resp(200, index_html())
-    else
-      serve_workbook(conn, root(), nil)
+    # A HOME surface mounted at "" (deploy `home=…`) is the front door → serve it. Otherwise: single
+    # workbook → the app; many workbooks → the index of what's mounted on this nexus.
+    home = if multi?(), do: Enum.find(mounts(), fn {n, _} -> n == "" end), else: nil
+
+    case home do
+      {_, dir} ->
+        serve_workbook(conn, dir, nil)
+
+      nil ->
+        if multi?() do
+          conn |> put_resp_content_type("text/html") |> send_resp(200, index_html())
+        else
+          serve_workbook(conn, root(), nil)
+        end
     end
   end
 
