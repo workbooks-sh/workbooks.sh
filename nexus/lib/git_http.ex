@@ -87,17 +87,25 @@ defmodule Nexus.GitHttp do
 
   def workspace_from_path(_), do: :error
 
+  @doc "This nexus's OWN org (machine identity — NEXUS_TENANT), or the default tenant when unset (local/dev)."
+  def nexus_org, do: System.get_env("NEXUS_TENANT") || Nexus.Store.default_tenant()
+
+  @doc """
+  May `ident` touch THIS nexus's repos? (fix wb-d3vh) On a multi-tenant nexus a token may only act on
+  its OWN org's repos — its `tenant` must equal `nexus_org`; a foreign-org (or public/default) token is
+  rejected. Single-tenant/local (auth=None, `multi?`=false) is always allowed (one default tenant).
+  """
+  def authorize(ident, multi?, nexus_org), do: not multi? or ident[:tenant] == nexus_org
+
   defp serve(conn, rest, ident) do
     cond do
       match?(:error, workspace_from_path(rest)) ->
         send_resp(conn, 400, "bad workspace name")
 
-      # Fix wb-d3vh: a WRITE (receive-pack) to a multi-tenant nexus must carry a real org identity —
-      # never the public/default fallback. (Reads/clone stay open as the served-site surface.) Binds the
-      # push to ident instead of trusting only the URL. NOTE: repos are not yet tenant-partitioned on
-      # disk (one-nexus-per-org) — cross-org isolation by namespacing repos_root by tenant is tracked.
-      is_push?(rest) and Nexus.Auth.multi?() and not real_org?(ident) ->
-        send_resp(conn, 403, "git push requires an authenticated org token")
+      # Bind the request to this nexus's org (fix wb-d3vh): a foreign-org token can never reach our repos
+      # — the tenant comes from the resolved PAT, not the URL, so cross-org read/write is impossible.
+      not authorize(ident, Nexus.Auth.multi?(), nexus_org()) ->
+        send_resp(conn, 403, "not authorized for this nexus's organization")
 
       true ->
         {:ok, ws} = workspace_from_path(rest)
@@ -120,16 +128,6 @@ defmodule Nexus.GitHttp do
 
         resp
     end
-  end
-
-  # A write to the repo (receive-pack advertise or the push itself), vs a read/clone (upload-pack).
-  defp is_push?(rest), do: String.contains?(rest, "git-receive-pack")
-
-  # A real org identity (a resolved PAT), not the public/default fallback.
-  defp real_org?(ident) do
-    t = ident[:tenant]
-    is_binary(ident[:user]) and ident[:user] != "" and
-      is_binary(t) and t != "" and t != Nexus.Store.default_tenant()
   end
 
   defp cgi_env(conn, rest, ident, body) do
