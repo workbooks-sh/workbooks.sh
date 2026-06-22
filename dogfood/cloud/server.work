@@ -371,8 +371,8 @@ server :cloud do
   # person launched; "shipped" is the work they authored that reached `done`. Empty profile → sane blanks
   # the client merges over the session /me identity.
   def profile_get(req) do
+    with {:ok, uid} <- auth_uid(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
-    uid = profile_uid(req)
 
     rdid = runtime_did_safe()
 
@@ -386,6 +386,9 @@ server :cloud do
       # The user's registered device keys (slice 2) — browser/CLI/editor/agent, each a signer under them.
       keys: device_keys(tenant, uid)
     }
+    else
+      :error -> {401, %{error: "authentication required"}}
+    end
   end
 
   # The PINNED trust anchor used to verify metering (fix wb-8hax) — the published Config ledger_did,
@@ -410,8 +413,8 @@ server :cloud do
   # Upsert the editable identity layer. Append-only (write a fresh row; the fold keeps newest), matching
   # how Todo persists. Only the expressive fields are writable — name/email/role stay owned by /me.
   def profile_save(req) do
+    with {:ok, uid} <- auth_uid(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
-    uid = profile_uid(req)
     b = if is_map(req.body), do: req.body, else: %{}
 
     attrs = %{
@@ -428,21 +431,26 @@ server :cloud do
 
     Nexus.Store.create(Profile, attrs, tenant)
     %{ok: true, profile: attrs}
+    else
+      :error -> {401, %{error: "authentication required"}}
+    end
   end
 
   # ── Author device keys (slice 2) ────────────────────────────────────────────────────────────────
   # List this user's registered device keys (folded by did, newest wins; revoked rows supersede active).
   def keys_list(req) do
-    tenant = req.tenant || Nexus.Store.default_tenant()
-    %{keys: device_keys(tenant, profile_uid(req))}
+    case auth_uid(req) do
+      :error -> {401, %{error: "authentication required"}}
+      {:ok, uid} -> %{keys: device_keys(req.tenant || Nexus.Store.default_tenant(), uid)}
+    end
   end
 
   # Register a device key under the user, gated by proof-of-possession: the client must have signed
   # Nexus.Authorship.registration_message(uid, did) with the key's private half. The session/PAT fixes
   # the uid, so a key can only be bound to the authenticated user.
   def key_register(req) do
+    with {:ok, uid} <- auth_uid(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
-    uid = profile_uid(req)
     b = if is_map(req.body), do: req.body, else: %{}
     did = to_string(b["did"] || "")
     sig = to_string(b["sig"] || "")
@@ -465,12 +473,15 @@ server :cloud do
 
         %{ok: true, did: did}
     end
+    else
+      :error -> {401, %{error: "authentication required"}}
+    end
   end
 
   # Revoke a device key (append a revoked row; the fold by did makes it win). Only over the user's own keys.
   def key_revoke(req) do
+    with {:ok, uid} <- auth_uid(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
-    uid = profile_uid(req)
     b = if is_map(req.body), do: req.body, else: %{}
     did = to_string(b["did"] || "")
 
@@ -487,6 +498,9 @@ server :cloud do
         )
 
         %{ok: true}
+    end
+    else
+      :error -> {401, %{error: "authentication required"}}
     end
   end
 
@@ -529,6 +543,17 @@ server :cloud do
   defp profile_uid(req) do
     raw = server_uid(req) || (is_map(req.body) && req.body["u"]) || req.query["u"] || "anon"
     raw |> to_string() |> String.downcase()
+  end
+
+  # Identity-scoped routes (profile, device keys) MUST act as the authenticated person — the wb-q7w5
+  # deploy fix. In a multi-tenant deploy (Nexus.Auth adapter != None) a request with NO server-derived
+  # user is rejected (`:error` → the handler returns 401), so a client `u=victim` can never act for
+  # another user. Single-tenant/dev (auth=None, no real users) keeps the public uid so local just works.
+  defp auth_uid(req) do
+    case server_uid(req) do
+      u when is_binary(u) and u != "" -> {:ok, String.downcase(u)}
+      _ -> if Nexus.Auth.multi?(), do: :error, else: {:ok, profile_uid(req)}
+    end
   end
 
   defp latest_profile(tenant, uid) do
@@ -2586,28 +2611,49 @@ server :cloud do
 
         bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
         Nexus.Git.provision_remote(bare, root)
+
         # Attribute the commit to the signed-in user (jj/git author) — the basis for the attributed
-        # change-log and multi-user/tenant scoping. (Agent edits will pass the agent name here later.)
-        who = user_key(req)
-        result = Nexus.Git.commit_file(bare, root, rel, "edit #{rel} via dashboard", author: "#{who} <#{who}>")
+        # change-log and multi-user/tenant scoping. The authorship gate verifies any device-key proof
+        # and (under the :hard policy) rejects an unsigned edit; the returned author is who to credit.
+        case gate_or_reject(req, path, content, user_key(req)) do
+          {:reject, resp} -> resp
+          {:ok, who} ->
+            result = Nexus.Git.commit_file(bare, root, rel, "edit #{rel} via dashboard", author: "#{who} <#{who}>")
+            spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
 
-        spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
+            case result do
+              {:ok, sha} ->
+                # Record the change in the durable, attributed log (the Activity feed): a #event → the
+                # `log` effect persists it to resource Event — who changed what, where, with the sha.
+                Nexus.Events.emit(
+                  %{kind: "workspace.change", actor: who, title: "edited #{rel} in #{mount}",
+                    target: sha, tags: ["event", "change"], scope: "member"},
+                  tenant: req.tenant
+                )
+                %{ok: true, sha: sha}
 
-        case result do
-          {:ok, sha} ->
-            # Record the change in the durable, attributed log (the Activity feed): a #event → the `log`
-            # effect persists it to resource Event. THIS is the "git-log in Activity" — who changed what,
-            # where, with the sha — tenant-scoped, not a per-workspace jj op-log you have to go digging for.
-            Nexus.Events.emit(
-              %{kind: "workspace.change", actor: who, title: "edited #{rel} in #{mount}",
-                target: sha, tags: ["event", "change"], scope: "member"},
-              tenant: req.tenant
-            )
-            %{ok: true, sha: sha}
-
-          :nochange -> %{ok: true, nochange: true}
-          {:error, out} -> {500, %{error: out}}
+              :nochange -> %{ok: true, nochange: true}
+              {:error, out} -> {500, %{error: out}}
+            end
         end
+    end
+  end
+
+  # The cloud-commit chokepoint (fix wb-i2c8): run a contribution through Nexus.Authorship.gate_contribution
+  # BEFORE it is committed. The client may carry a device-key proof in `body["author"]` (%{did, sig});
+  # the signed uid is FORCED to the authenticated user (never the client's claim). Returns the author
+  # string to attribute the commit to, or `{:reject, resp}` (403 under the :hard policy when unsigned).
+  defp gate_or_reject(req, target, bytes, who) do
+    ca = (is_map(req.body) && req.body["author"]) || %{}
+    proof = %{
+      author: %{uid: String.downcase(to_string(who)), did: ca["did"], sig: ca["sig"]},
+      device_keys: device_keys(req.tenant || Nexus.Store.default_tenant(), String.downcase(to_string(who)))
+    }
+
+    case Nexus.Authorship.gate_contribution(proof, target, bytes) do
+      {:reject, _} -> {:reject, {403, %{error: "unsigned contribution rejected (authorship policy is 'hard')"}}}
+      {:accept, did} -> {:ok, did}
+      {:accept_unverified, _} -> {:ok, to_string(who)}
     end
   end
 
@@ -2641,7 +2687,10 @@ server :cloud do
   defp commit_tree_change(req, mount, root, msg, event_title) do
     bare = Nexus.Git.bare_path(Nexus.GitHttp.repos_root(), mount)
     Nexus.Git.provision_remote(bare, root)
-    who = user_key(req)
+
+    # Same authorship chokepoint as file_save — a tree change (new/rename/delete) is signed over its
+    # message (no single file body); under :hard an unsigned change is rejected.
+    with {:ok, who} <- gate_or_reject(req, mount, msg, user_key(req)) do
     result = Nexus.Git.commit_paths(bare, root, msg, author: "#{who} <#{who}>")
     spawn(fn -> if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount() end)
 
@@ -2654,6 +2703,9 @@ server :cloud do
 
       :nochange -> %{ok: true, nochange: true}
       {:error, out} -> {500, %{error: out}}
+    end
+    else
+      {:reject, resp} -> resp
     end
   end
 
