@@ -231,13 +231,24 @@ defmodule Nexus.Agent do
   def run_unit(node, task, opts \\ []) do
     d = def_from_unit(node)
 
+    # Effective grant = declared ∩ ceiling, on EVERY run (Autopoiesis v2 — wb-a6u3.2). Two ceilings
+    # compose, and each can only ever DROP capability, never add:
+    #   • the INDEX ceiling governing the agent's subtree — resolved at bringup into `node[:ceiling]`
+    #     from the `index.work` hierarchy (the durable, out-of-reach boundary; `:unbounded` when the
+    #     agent's location isn't known to this run);
+    #   • the parent's spawn ceiling (`:grant_ceiling`) — a delegated sub-agent can never exceed its
+    #     parent's grants.
+    # So editing a declared grant UP is a no-op: it is intersected back down to what the ceiling allows.
+    index_ceiling = Keyword.get(opts, :ceiling) || Map.get(node, :ceiling) || :unbounded
+    grant = effective_grant(d[:grant], index_ceiling, Keyword.get(opts, :grant_ceiling))
+
     base =
       [system: d.system, task: task, unit: d.name]
       |> put_if(:kits, d[:tools])
-      |> put_if(:grant, d[:grant])
+      |> put_if(:grant, grant)
       |> put_if(:limit, d[:limit])
 
-    result = run(Keyword.merge(base, opts))
+    result = run(Keyword.merge(base, opts) |> Keyword.drop([:grant_ceiling, :ceiling]))
 
     # #event auto-instrument: a #event-tagged agent emits an event on each run (agent → event → hook).
     answer = with {:ok, %{answer: a}} <- result, do: a, else: (_ -> nil)
@@ -245,6 +256,21 @@ defmodule Nexus.Agent do
 
     result
   end
+
+  @doc """
+  A declared grant clamped to the index ceiling and the parent spawn ceiling — `declared ∩ each`. A
+  `nil`/`:unbounded` ceiling imposes no constraint; a `nil` declared grant stays `nil` (no grant block
+  = all powers, back-compat). This is the one comparison the whole ceiling model rests on: capability
+  only ever flows DOWN, so no self-edit (or sub-agent spawn) can escalate.
+  """
+  def effective_grant(declared, index_ceiling, parent_ceiling) do
+    declared |> clamp(index_ceiling) |> clamp(parent_ceiling)
+  end
+
+  defp clamp(declared, ceiling) when is_list(declared) and is_list(ceiling),
+    do: Enum.filter(declared, &(&1 in ceiling))
+
+  defp clamp(declared, _ceiling), do: declared
 
   defp put_if(kw, _key, nil), do: kw
   defp put_if(kw, key, val), do: Keyword.put(kw, key, val)
@@ -289,7 +315,7 @@ defmodule Nexus.Agent do
           tel = tally(tel, turn, calls)
           assistant = %{role: "assistant", content: turn.content || "", tool_calls: raw_calls(calls)}
 
-          perms = %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant)}
+          perms = %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant), depth: Keyword.get(opts, :depth, 0)}
 
           results =
             Enum.map(calls, fn c ->

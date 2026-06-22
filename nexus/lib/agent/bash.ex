@@ -98,10 +98,44 @@ defmodule Nexus.Agent.Bash do
 
   defp run_segment(_vfs, [], stdin, _perms), do: stdin
 
+  # `agent <name> <task…>` — delegate to a SUB-AGENT (orchestration). Host-brokered (not a wasm kit),
+  # like the web commands. The sub-agent runs as a function returning text to the parent: depth-capped
+  # (no runaway fan-out) and grant-NARROWED (it can't exceed the parent's capabilities). Task comes from
+  # the args, or stdin when piped (`echo "do X" | agent research`).
+  defp run_segment(_vfs, ["agent" | rest], stdin, perms), do: run_subagent(rest, stdin, perms)
+
   defp run_segment(vfs, [cmd | args], stdin, perms) do
     case permit(cmd, perms) do
       :ok -> dispatch(vfs, cmd, args, stdin)
       {:deny, msg} -> msg
+    end
+  end
+
+  @max_depth 3
+
+  defp run_subagent([], _stdin, _perms), do: "agent: usage: agent <name> <task>  (or pipe the task via stdin)"
+
+  defp run_subagent([name | task_args], stdin, perms) do
+    depth = (is_map(perms) && perms[:depth]) || 0
+    task = case Enum.join(task_args, " ") |> String.trim() do
+             "" -> String.trim(stdin || "")
+             t -> t
+           end
+
+    cond do
+      depth >= @max_depth ->
+        "agent: max sub-agent depth (#{@max_depth}) reached — cannot delegate further"
+
+      task == "" ->
+        "agent: no task given (pass as args or pipe via stdin)"
+
+      true ->
+        case Nexus.Agent.run_named(name, task, depth: depth + 1, grant_ceiling: is_map(perms) && perms[:grant]) do
+          {:ok, %{answer: a}} when is_binary(a) -> a
+          {:error, {:no_agent, n}} -> "agent: no such agent: #{n}"
+          {:error, e} -> "agent: sub-agent run failed: #{inspect(e)}"
+          _ -> "agent: (no answer)"
+        end
     end
   end
 

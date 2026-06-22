@@ -460,7 +460,11 @@ defmodule Nexus.Compile do
     units =
       (Path.wildcard(Path.join(root, "*.work")) ++ Path.wildcard(Path.join(root, "**/*.work")))
       |> Enum.uniq()
-      |> Enum.flat_map(fn f -> f |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code)) end)
+      |> Enum.flat_map(fn f ->
+        # Stamp each unit with its source file so bringup can resolve the `index.work` ceiling
+        # governing it (Autopoiesis v2 — ceiling-in-index).
+        f |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code)) |> Enum.map(&Map.put(&1, :src, f))
+      end)
 
     by_kind = Enum.group_by(units, & &1.kind)
 
@@ -487,8 +491,18 @@ defmodule Nexus.Compile do
       end
     end
 
-    # Register declared agents so they can be run BY NAME (server code, effects, flow steps).
-    for u <- Map.get(by_kind, "agent", []), do: Nexus.Agent.register(u)
+    # Register declared agents so they can be run BY NAME (server code, effects, flow steps). Resolve
+    # each agent's governing capability CEILING now (root + tree known) and stamp it onto the node, so
+    # `run_unit` clamps `declared ∩ ceiling` on every run. Re-resolves on recompile/hot-reload — exactly
+    # when an `index.work` ceiling could have changed.
+    for u <- Map.get(by_kind, "agent", []) do
+      dir = case Map.get(u, :src) do
+        p when is_binary(p) -> Path.dirname(p)
+        _ -> root
+      end
+
+      Nexus.Agent.register(Map.put(u, :ceiling, Nexus.Index.effective_ceiling(root, dir)))
+    end
 
     # Compile declared workers (long-lived supervised processes) into modules + registered specs.
     # This does NOT start them — the serving bringup calls Nexus.Worker.start_all/0; a pure compile
