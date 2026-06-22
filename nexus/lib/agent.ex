@@ -46,6 +46,52 @@ defmodule Nexus.Agent do
   @doc "May the autopoet edit this agent AUTONOMOUSLY (within ceiling)? Only `managed` agents."
   def autopoet_managed?(node), do: management(node) == "managed"
 
+  # ── capabilities admission ─────────────────────────────────────────────────────────────────────
+  # An agent declares which toolkit CAPABILITIES it admits via a `capabilities` field in its block:
+  #   `capabilities :all`  → admits every capability (Waldo, the base builder)
+  #   `capabilities :none` → admits none (Autopoet — sealed, needs no plug-ins)
+  #   `capabilities [:research, :video]` → admits only those ids
+  # The field parses generically (open spec) to a list of strings off the agent def/node.
+
+  @doc "An agent's capability admission policy: `:all` | `:none` | a list of capability id strings."
+  def capabilities(agent) do
+    raw = agent[:capabilities] || (is_map(agent) && agent[:ast] && def_from_unit_safe(agent)[:capabilities]) || []
+    raw = List.wrap(raw)
+
+    cond do
+      "all" in raw -> :all
+      "none" in raw -> :none
+      raw == [] -> :none
+      true -> raw
+    end
+  end
+
+  @doc "Does `agent` admit the capability `id`? Waldo (`:all`) yes; Autopoet (`:none`) no; else membership."
+  def admits?(agent, id) do
+    case capabilities(agent) do
+      :all -> true
+      :none -> false
+      list -> to_string(id) in list
+    end
+  end
+
+  @doc "Filter `selected` capability ids to those `agent` admits (selected ∩ admitted)."
+  def admitted(agent, selected) do
+    case capabilities(agent) do
+      :all -> Enum.map(selected, &to_string/1)
+      :none -> []
+      list -> Enum.filter(Enum.map(selected, &to_string/1), &(&1 in list))
+    end
+  end
+
+  # An agent value here may be a parsed def map (has :capabilities) or a raw unit node (has :ast). For a
+  # raw node, resolve fields via def_from_unit; swallow any parse miss so admission never crashes a run.
+  defp def_from_unit_safe(node) do
+    def_from_unit(node)
+  rescue
+    _ -> %{}
+  end
+
   @doc "Register a declared `agent` unit by name (called at workbook bringup) for run-by-name."
   def register(%{kind: "agent", name: name} = node) do
     :persistent_term.put(@reg, Map.put(agents(), to_string(name), node))

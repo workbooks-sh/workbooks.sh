@@ -327,8 +327,12 @@ server :cloud do
 
       true ->
         ws = (is_map(req.body) && req.body["workspace"]) || nil
-        {rid, status, turns, answer} = do_run(agent, task, tenant, user, fn _ -> :ok end, workspace: ws)
-        %{run: rid, agent: agent, status: status, turns: turns, answer: answer}
+        # Selected toolkit capabilities, clamped to what THIS agent admits (Waldo :all, Autopoet :none).
+        selected = (is_map(req.body) && req.body["capabilities"]) || []
+        selected = if is_list(selected), do: selected, else: []
+        caps = Nexus.Agent.admitted(Nexus.Agent.get(agent), selected)
+        {rid, status, turns, answer} = do_run(agent, task, tenant, user, fn _ -> :ok end, workspace: ws, capabilities: caps)
+        %{run: rid, agent: agent, status: status, turns: turns, answer: answer, capabilities: caps}
     end
   end
 
@@ -366,6 +370,14 @@ server :cloud do
   defp do_run(agent, task, tenant, user, emit, opts \\ []) do
     rid = gen_id()
     started = System.os_time(:second)
+    # Active capabilities (already admission-clamped) are surfaced to the agent in the brief so it leans
+    # on them — the structured injection of capability workflows/sub-agents is the next step (bd wb-…).
+    caps = opts[:capabilities] || []
+    task =
+      if caps == [],
+        do: task,
+        else: "Active capabilities for this run: #{Enum.join(caps, ", ")} — use them where they fit.\n\n" <> task
+
     emit.(%{type: "start", run: rid, agent: agent, task: task})
 
     # Workspace-scoped run: if opts[:workspace] names a mount, run the agent in a jj worktree of that

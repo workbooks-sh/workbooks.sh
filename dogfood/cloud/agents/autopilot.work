@@ -30,5 +30,6 @@ agent :autopilot do
   """
   tools coreutils, web
   grant fs, exec, browse, commands
+  capabilities :none                     # sealed — admits no plug-in capabilities
   limit turns: 80, timeout: 600_000
 end
