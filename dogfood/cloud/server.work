@@ -237,9 +237,10 @@ server :cloud do
     %{id: session.id, title: session.title, reply: reply}
   end
 
-  # Recent activity for this tenant, newest first. Members don't see admin-scoped events.
+  # Recent activity for this tenant, newest first. Members don't see admin-scoped events. Gated on the
+  # SERVER-DERIVED session role (req.role), never the client's claim.
   def activity(req) do
-    admin? = req.query["role"] == "admin"
+    admin? = Nexus.Auth.role_at_least?(Map.get(req, :role, "viewer"), "admin")
 
     events =
       Event
