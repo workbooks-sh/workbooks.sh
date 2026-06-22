@@ -160,11 +160,24 @@ defmodule Nexus.Auth.Github do
 
   defp redirect_uri(conn), do: origin(conn) <> "/auth/github/callback"
 
+  # The public origin — proxy-aware. Behind Fly's TLS-terminating proxy `conn.scheme` is `http`, so we
+  # honor `x-forwarded-proto` (and `-host`); otherwise GitHub gets an http redirect_uri it rejects, and
+  # the login/callback URIs wouldn't match. Falls back to the conn when there's no proxy (local dev).
   defp origin(conn) do
-    scheme = to_string(conn.scheme)
-    port = conn.port
-    host = if port in [80, 443, nil], do: conn.host, else: "#{conn.host}:#{port}"
+    scheme = forwarded(conn, "x-forwarded-proto") || to_string(conn.scheme)
+    host = forwarded(conn, "x-forwarded-host") || host_with_port(conn)
     "#{scheme}://#{host}"
+  end
+
+  defp host_with_port(conn) do
+    if conn.port in [80, 443, nil], do: conn.host, else: "#{conn.host}:#{conn.port}"
+  end
+
+  defp forwarded(conn, header) do
+    case get_req_header(conn, header) do
+      [v | _] when is_binary(v) and v != "" -> v |> String.split(",") |> hd() |> String.trim()
+      _ -> nil
+    end
   end
 
   defp gh_get(path, token) do
