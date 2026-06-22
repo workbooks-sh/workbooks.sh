@@ -247,7 +247,12 @@ WB.scopedStyles('/toolkits', `
 .tkbtn { border: 1px solid var(--stroke); background: var(--card); color: var(--ink); border-radius: 9px; padding: 8px 0; font: 600 13px var(--read); cursor: pointer; }
 .tkbtn:hover { border-color: var(--ink); }
 .tkbtn.add { background: none; border-style: dashed; color: var(--dim); }
-/* Google delegation — guided two-step flow */
+`);
+
+// The Google connect modal mounts on document.body — OUTSIDE the route's [data-view] scope — so its
+// styles MUST be global (scopedStyles would prefix them with [data-view="/toolkits"] and never match).
+WB.styles(`
+.sheet.gw { max-height: 88vh; overflow: auto; }
 .sheet.gw .sub { margin-bottom: 6px; }
 .gwstep { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
 .gwstep:first-of-type { border-top: none; }
