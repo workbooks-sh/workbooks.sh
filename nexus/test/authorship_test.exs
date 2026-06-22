@@ -43,4 +43,30 @@ defmodule Nexus.AuthorshipTest do
     refute Authorship.verified_author?("", keys)
     refute Authorship.verified_author?(nil, keys)
   end
+
+  test "verify_contribution requires a valid sig over the exact edit AND a registered key" do
+    kp = Keyring.generate()
+    did = Keyring.did(kp.public)
+    keys = [%{did: did, revoked: 0}]
+    target = "site/lander/index.work"
+    h = Authorship.content_hash("the new bytes")
+
+    sig = Keyring.sign(kp.private, Authorship.contribution_message("u@x", did, target, h)) |> Base.encode16(case: :lower)
+    assert Authorship.verify_contribution("u@x", did, sig, target, h, keys)
+
+    # signature is bound to the content — a swapped edit fails
+    refute Authorship.verify_contribution("u@x", did, sig, target, Authorship.content_hash("tampered"), keys)
+    # ...and to the path
+    refute Authorship.verify_contribution("u@x", did, sig, "other/path.work", h, keys)
+    # ...and the key must be registered
+    refute Authorship.verify_contribution("u@x", did, sig, target, h, [])
+  end
+
+  test "decide/2 is the one policy ladder, identical for every ingress" do
+    assert Authorship.decide(true, :off) == :accept
+    assert Authorship.decide(true, :hard) == :accept
+    assert Authorship.decide(false, :off) == :accept
+    assert Authorship.decide(false, :soft) == :accept_unverified
+    assert Authorship.decide(false, :hard) == :reject
+  end
 end

@@ -14,6 +14,20 @@ defmodule Nexus.Authorship do
 
   Verified authorship = a contribution's `author` DID is one of that user's registered, non-revoked
   device keys. THE LINE: keys + proofs are generic mechanism; the dashboard reading them is our cloud.
+
+  ## The single chokepoint
+
+  Every contribution — from any entry point — converges at the nexus commit boundary, because the nexus
+  IS a git remote: CLI/editor/local arrive as a `git push` (receive hook), browser/dashboard edits as a
+  cloud commit call, agents commit in-process. So enforcement lives in ONE place, server-side, not
+  scattered across surfaces (which would each be a thing to forget or bypass). Edge surfaces *sign*; the
+  nexus *verifies* — every time. Each ingress computes `verified?` its own way (cloud API →
+  `verify_contribution/6`; git → `git verify-commit` + `verified_author?/2`) and then routes through the
+  SAME `decide/2`, so the policy ladder can't drift between entry points:
+
+    * `:off`  — no checks.
+    * `:soft` — verify + record the flag; never reject (safe, non-breaking default).
+    * `:hard` — reject any contribution not signed by a registered device key.
   """
 
   alias Nexus.Keyring
@@ -58,4 +72,51 @@ defmodule Nexus.Authorship do
   defp truthy(false), do: false
   defp truthy(""), do: false
   defp truthy(_), do: true
+
+  # ── the contribution gate (cloud-API ingress) ───────────────────────────────────────────────────
+
+  @doc """
+  The canonical message a device signs to authorize one contribution: it binds the author (`uid`+`did`)
+  to exactly what is being committed (`target` path + `content_hash`), so a signature can't be lifted
+  onto a different edit. Used by the cloud commit path; the git-push path uses commit signatures instead.
+  """
+  @spec contribution_message(String.t(), String.t(), String.t(), String.t()) :: String.t()
+  def contribution_message(uid, did, target, content_hash) do
+    "wb-contribution\nuid=" <> String.downcase(to_string(uid)) <>
+      "\ndid=" <> to_string(did) <> "\ntarget=" <> to_string(target) <>
+      "\nhash=" <> to_string(content_hash)
+  end
+
+  @doc """
+  Verify a cloud-API contribution: the holder of `did`'s key signed `contribution_message/4` AND `did`
+  is one of the user's registered, non-revoked device keys. `sig` is lower-case hex.
+  """
+  @spec verify_contribution(String.t(), String.t(), String.t(), String.t(), String.t(), [map()]) :: boolean()
+  def verify_contribution(uid, did, sig, target, content_hash, device_keys) do
+    verified_author?(did, device_keys) and
+      (with {:ok, pub} <- Keyring.public_from_did(did),
+            {:ok, raw} <- Base.decode16(to_string(sig), case: :lower) do
+         Keyring.verify(pub, contribution_message(uid, did, target, content_hash), raw)
+       else
+         _ -> false
+       end)
+  end
+
+  @doc "Hash a contribution's bytes — the `content_hash` half of the signed message (sha-256 hex)."
+  @spec content_hash(iodata()) :: String.t()
+  def content_hash(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+
+  @doc """
+  The ONE policy decision every ingress routes through — given whether the contribution verified and the
+  active `policy`, return the verdict so the gate behaves identically at every entry point:
+
+    * `:accept`            — verified (or policy `:off`): commit + record verified.
+    * `:accept_unverified` — `:soft` + unverified: commit, but mark it unverified.
+    * `:reject`            — `:hard` + unverified: refuse the commit.
+  """
+  @spec decide(boolean(), :off | :soft | :hard) :: :accept | :accept_unverified | :reject
+  def decide(true, _policy), do: :accept
+  def decide(false, :off), do: :accept
+  def decide(false, :soft), do: :accept_unverified
+  def decide(false, :hard), do: :reject
 end
