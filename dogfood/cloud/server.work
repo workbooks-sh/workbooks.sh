@@ -2184,7 +2184,8 @@ server :cloud do
     declared = Map.new(Nexus.Config.workspaces(), fn w -> {w.id, w} end)
 
     apps =
-      for {name, root} <- (Application.get_env(:nexus, :mounts) || []), name != "" do
+      # Only surfaces the caller may read (wb-hpnm) — don't leak private/draft surface names/URLs.
+      for {name, root} <- readable_mounts(req), name != "" do
         w = declared[name]
         vis = visibility_of(org, name, root)
         # An app's workspace = the declared workspace its path sits under (first segment). Flat top-level

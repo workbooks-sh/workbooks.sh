@@ -13,7 +13,9 @@ defmodule Nexus.PlatformHttpTest do
         conn(method, path)
       end
 
-    c = if org, do: assign(c, :tenant, org), else: c
+    # Assign a full identity (owner role) so these org-scoping tests exercise cross-org isolation, not
+    # the separate admin role-gate (wb-qfvt) — an owner of org B still gets 404 on org A's nexus.
+    c = if org, do: c |> assign(:tenant, org) |> assign(:identity, %{tenant: org, user: org <> "@t", roles: ["owner"]}), else: c
     Nexus.Platform.call(c, @opts)
   end
 
@@ -99,5 +101,19 @@ defmodule Nexus.PlatformHttpTest do
     assert c.status == 201
     list = call(:get, "/workspaces", "org_ws_a") |> then(& Jason.decode!(&1.resp_body))
     assert Enum.any?(list["workspaces"], &(&1["name"] == "Design"))
+  end
+
+  # wb-qfvt: sensitive control-plane mutations require admin+, not any org member.
+  test "a member (non-admin) is 403'd from sensitive platform mutations" do
+    member = fn method, path ->
+      conn(method, path)
+      |> assign(:tenant, "org_q")
+      |> assign(:identity, %{tenant: "org_q", user: "m@t", roles: ["member"]})
+      |> Nexus.Platform.call(@opts)
+    end
+
+    assert member.(:get, "/env/anything/reveal").status == 403
+    assert member.(:post, "/members/invite").status == 403
+    assert member.(:delete, "/domains/x").status == 403
   end
 end

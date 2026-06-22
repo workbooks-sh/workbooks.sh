@@ -69,11 +69,13 @@ defmodule Nexus.Platform do
   end
 
   delete "/nexuses/:id" do
-    case Nexus.Provisioner.teardown(conn.params["id"], org(conn)) do
-      {:ok, _} -> j(conn, 200, %{ok: true})
-      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
-      {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
-    end
+    admin_only(conn, fn ->
+      case Nexus.Provisioner.teardown(conn.params["id"], org(conn)) do
+        {:ok, _} -> j(conn, 200, %{ok: true})
+        {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+        {:error, reason} -> j(conn, 422, %{error: reason_str(reason)})
+      end
+    end)
   end
 
   # Rename the org's nexus (admin action in the dashboard). Whitelisted to name/friendly — id, org,
@@ -190,32 +192,38 @@ defmodule Nexus.Platform do
   end
 
   post "/members/invite" do
-    body = decode(read(conn))
-    email = body |> Map.get("email", "") |> to_string() |> String.trim()
-    role = body |> Map.get("role", "member") |> to_string()
+    admin_only(conn, fn ->
+      body = decode(read(conn))
+      email = body |> Map.get("email", "") |> to_string() |> String.trim()
+      role = body |> Map.get("role", "member") |> to_string()
 
-    if email == "" do
-      j(conn, 400, %{error: "Email is required"})
-    else
-      case Nexus.Auth.Accounts.invite(org(conn), email, role, (conn.assigns[:identity] || %{})[:user]) do
-        {:ok, _inv} -> j(conn, 200, %{invited: email})
-        {:error, :bad_email} -> j(conn, 400, %{error: "Enter a valid email"})
-        _ -> j(conn, 400, %{error: "Invite failed"})
+      if email == "" do
+        j(conn, 400, %{error: "Email is required"})
+      else
+        case Nexus.Auth.Accounts.invite(org(conn), email, role, (conn.assigns[:identity] || %{})[:user]) do
+          {:ok, _inv} -> j(conn, 200, %{invited: email})
+          {:error, :bad_email} -> j(conn, 400, %{error: "Enter a valid email"})
+          _ -> j(conn, 400, %{error: "Invite failed"})
+        end
       end
-    end
+    end)
   end
 
   delete "/members/:id" do
-    case Nexus.Auth.Accounts.remove_member(org(conn), conn.params["id"]) do
-      :ok -> j(conn, 200, %{removed: true})
-      {:error, :last_owner} -> j(conn, 400, %{error: "Can't remove the org's only owner"})
-      _ -> j(conn, 400, %{error: "Remove failed"})
-    end
+    admin_only(conn, fn ->
+      case Nexus.Auth.Accounts.remove_member(org(conn), conn.params["id"]) do
+        :ok -> j(conn, 200, %{removed: true})
+        {:error, :last_owner} -> j(conn, 400, %{error: "Can't remove the org's only owner"})
+        _ -> j(conn, 400, %{error: "Remove failed"})
+      end
+    end)
   end
 
   post "/invitations/:id/revoke" do
-    Nexus.Auth.Accounts.revoke_invite(org(conn), conn.params["id"])
-    j(conn, 200, %{revoked: true})
+    admin_only(conn, fn ->
+      Nexus.Auth.Accounts.revoke_invite(org(conn), conn.params["id"])
+      j(conn, 200, %{revoked: true})
+    end)
   end
 
   # ── custom domains (paid-tier, owner-verified — share from your domain, not ours) ──────────────
@@ -226,10 +234,12 @@ defmodule Nexus.Platform do
   end
 
   post "/domains" do
-    case Nexus.ControlPlane.Domain.add(org(conn), decode(read(conn))["host"]) do
-      {:ok, view} -> j(conn, 201, view)
-      {:error, reason} -> j(conn, domain_status(reason), %{error: domain_error(reason)})
-    end
+    admin_only(conn, fn ->
+      case Nexus.ControlPlane.Domain.add(org(conn), decode(read(conn))["host"]) do
+        {:ok, view} -> j(conn, 201, view)
+        {:error, reason} -> j(conn, domain_status(reason), %{error: domain_error(reason)})
+      end
+    end)
   end
 
   get "/domains/:id" do
@@ -240,19 +250,23 @@ defmodule Nexus.Platform do
   end
 
   post "/domains/:id/verify" do
-    case Nexus.ControlPlane.Domain.verify(org(conn), conn.params["id"]) do
-      {:ok, view} -> j(conn, 200, view)
-      {:error, :txt_not_found} -> j(conn, 422, %{error: "TXT challenge not found — add the record and allow DNS to propagate, then retry"})
-      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
-      {:error, reason} -> j(conn, 422, %{error: domain_error(reason)})
-    end
+    admin_only(conn, fn ->
+      case Nexus.ControlPlane.Domain.verify(org(conn), conn.params["id"]) do
+        {:ok, view} -> j(conn, 200, view)
+        {:error, :txt_not_found} -> j(conn, 422, %{error: "TXT challenge not found — add the record and allow DNS to propagate, then retry"})
+        {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+        {:error, reason} -> j(conn, 422, %{error: domain_error(reason)})
+      end
+    end)
   end
 
   delete "/domains/:id" do
-    case Nexus.ControlPlane.Domain.remove(org(conn), conn.params["id"]) do
-      :ok -> j(conn, 200, %{ok: true})
-      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
-    end
+    admin_only(conn, fn ->
+      case Nexus.ControlPlane.Domain.remove(org(conn), conn.params["id"]) do
+        :ok -> j(conn, 200, %{ok: true})
+        {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+      end
+    end)
   end
 
   # ── workspaces (free, no compute — logical org divisions) ──────────────────────────────────────
@@ -332,40 +346,48 @@ defmodule Nexus.Platform do
   end
 
   post "/env" do
-    m = decode(read(conn))
-    attrs = %{
-      name: m["name"], value: m["value"], scope: m["scope"],
-      workspace_id: m["workspace_id"], package_name: m["package_name"]
-    }
+    admin_only(conn, fn ->
+      m = decode(read(conn))
+      attrs = %{
+        name: m["name"], value: m["value"], scope: m["scope"],
+        workspace_id: m["workspace_id"], package_name: m["package_name"]
+      }
 
-    case Env.create(org(conn), attrs) do
-      {:ok, view} -> j(conn, 201, view)
-      {:error, reason} -> env_fail(conn, reason)
-    end
+      case Env.create(org(conn), attrs) do
+        {:ok, view} -> j(conn, 201, view)
+        {:error, reason} -> env_fail(conn, reason)
+      end
+    end)
   end
 
   get "/env/:id/reveal" do
-    case Env.reveal(org(conn), conn.params["id"]) do
-      {:ok, value} -> j(conn, 200, %{value: value})
-      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
-      {:error, reason} -> env_fail(conn, reason)
-    end
+    admin_only(conn, fn ->
+      case Env.reveal(org(conn), conn.params["id"]) do
+        {:ok, value} -> j(conn, 200, %{value: value})
+        {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+        {:error, reason} -> env_fail(conn, reason)
+      end
+    end)
   end
 
   patch "/env/:id" do
-    m = decode(read(conn))
-    attrs = %{name: m["name"], value: m["value"]}
+    admin_only(conn, fn ->
+      m = decode(read(conn))
+      attrs = %{name: m["name"], value: m["value"]}
 
-    case Env.update(org(conn), conn.params["id"], attrs) do
-      {:ok, view} -> j(conn, 200, view)
-      {:error, :not_found} -> j(conn, 404, %{error: "not found"})
-      {:error, reason} -> env_fail(conn, reason)
-    end
+      case Env.update(org(conn), conn.params["id"], attrs) do
+        {:ok, view} -> j(conn, 200, view)
+        {:error, :not_found} -> j(conn, 404, %{error: "not found"})
+        {:error, reason} -> env_fail(conn, reason)
+      end
+    end)
   end
 
   delete "/env/:id" do
-    :ok = Env.delete(org(conn), conn.params["id"])
-    j(conn, 200, %{ok: true})
+    admin_only(conn, fn ->
+      :ok = Env.delete(org(conn), conn.params["id"])
+      j(conn, 200, %{ok: true})
+    end)
   end
 
   match _ do
@@ -389,6 +411,11 @@ defmodule Nexus.Platform do
 
   # ── helpers ──────────────────────────────────────────────────────────────────────────────────
   defp org(conn), do: conn.assigns[:tenant]
+
+  # Sensitive control-plane mutations (secrets, members, domains, nexus delete) require admin+ — not any
+  # org member (fix wb-qfvt). require_org proves you're IN the org; this proves you may ADMINISTER it.
+  defp admin?(conn), do: Nexus.Auth.role_at_least?(Nexus.Auth.role(conn), "admin")
+  defp admin_only(conn, fun), do: if(admin?(conn), do: fun.(), else: j(conn, 403, %{error: "admin required"}))
   # Display name for an org — set by onboarding (next increment); nil ⇒ the dashboard falls back to
   # a generic "your workspace" label, exactly as the source does on an unnamed org.
   defp org_name(_o), do: nil
