@@ -54,7 +54,16 @@ WB.view('/secrets', {
     let saving = false;
 
     let deleteFor = null;
-    let injected = null;       // platform/injected secrets (names + present), read-only — null = loading
+    let injected = null;       // platform/injected secrets (names + present) — null = loading
+    let lockName = false;      // when setting a platform secret, lock the name field to the known key
+
+    // (Re)load the platform/injected secrets (names + present status) into `injected`, then repaint.
+    function loadInjected() {
+      return fetch('/cloud/secrets/injected', { credentials: 'same-origin' })
+        .then((r) => (r.ok ? r.json() : { secrets: [] }))
+        .then((d) => { injected = (d && d.secrets) || []; paint(); })
+        .catch(() => { injected = []; paint(); });
+    }
 
     const esc = (s) => String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -100,8 +109,11 @@ WB.view('/secrets', {
     }
 
     // ── create / edit ──
-    function openCreate() { editing = null; fName = ''; fValue = ''; editOpen = true; paint(); }
-    function openEdit(v) { editing = v; fName = v.name; fValue = ''; editOpen = true; paint(); }
+    function openCreate() { editing = null; fName = ''; fValue = ''; lockName = false; editOpen = true; paint(); }
+    function openEdit(v) { editing = v; fName = v.name; fValue = ''; lockName = false; editOpen = true; paint(); }
+    // Set a known PLATFORM secret — same write path as a normal secret, but the name is fixed to the
+    // canonical key. (You can set/replace the value; you still can't read it back.)
+    function openSet(name) { editing = null; fName = name; fValue = ''; lockName = true; editOpen = true; paint(); }
     async function save() {
       if (!fName.trim()) { WB.toast('Give the secret a name'); return; }
       saving = true;
@@ -117,11 +129,14 @@ WB.view('/secrets', {
           if (!fValue) { saving = false; WB.toast('Give the secret a value'); paint(); return; }
           const v = await WB.api.createEnv(scope, { name: fName.trim(), value: fValue });
           list = [...list, v];
-          WB.toast(`Added ${fName.trim()}`);
+          WB.toast(`Saved ${fName.trim()}`);
         }
         editOpen = false;
+        // If we just set a platform key, refresh its Set/Not-set badge from the secrets seam.
+        if (lockName) loadInjected();
       } catch { WB.toast('Could not save', 'bad'); }
       saving = false;
+      lockName = false;
       paint();
     }
 
@@ -191,6 +206,7 @@ WB.view('/secrets', {
         <span class="pname mono">${esc(s.name)}</span>
         <span class="plabel faint">${esc(s.label)}</span>
         <span class="pbadge ${s.present ? 'on' : 'off'}">${s.present ? 'Set' : 'Not set'}</span>
+        <button class="lk" data-setname="${esc(s.name)}">${s.present ? 'Replace' : 'Set'}</button>
       </div>`).join('')}`).join('');
       return `<div class="card" style="margin-top:14px">${sections}</div>`;
     }
@@ -199,10 +215,10 @@ WB.view('/secrets', {
       if (!editOpen) return '';
       return `<div class="modal" data-modal>
     <div class="sheet" style="width:460px">
-      <h2>${editing ? 'Edit secret' : 'Add secret'}</h2>
-      <p class="sub">Encrypted at rest. Shown masked everywhere — reveal one explicitly when you need it.</p>
+      <h2>${lockName ? 'Set ' + esc(fName) : editing ? 'Edit secret' : 'Add secret'}</h2>
+      <p class="sub">${lockName ? 'A platform secret — encrypted at rest and read by the nexus via Nexus.Secrets. You can set or replace its value; you can’t read it back.' : 'Encrypted at rest. Shown masked everywhere — reveal one explicitly when you need it.'}</p>
       <div class="lab">Name</div>
-      <div class="field"><input type="text" class="mono" placeholder="OPENROUTER_API_KEY" data-f="name" value="${esc(fName)}" /></div>
+      <div class="field"><input type="text" class="mono" placeholder="OPENROUTER_API_KEY" data-f="name" value="${esc(fName)}"${lockName ? ' readonly' : ''} /></div>
       <div class="lab">Value</div>
       <div class="field">
         <input type="text" class="mono" placeholder="${editing ? 'leave blank to keep current value' : 'secret value'}" data-f="value" value="${esc(fValue)}" />
@@ -261,6 +277,7 @@ ${confirmHtml()}`;
 
     function wire() {
       el.querySelector('[data-act="create"]')?.addEventListener('click', openCreate);
+      el.querySelectorAll('[data-setname]').forEach((b) => b.addEventListener('click', () => openSet(b.getAttribute('data-setname'))));
 
       el.querySelectorAll('[data-act]').forEach((btn) => {
         const act = btn.getAttribute('data-act');
@@ -294,10 +311,7 @@ ${confirmHtml()}`;
     }
 
     // Load the injected/platform secrets (names + present status) once, in the background.
-    fetch('/cloud/secrets/injected', { credentials: 'same-origin' })
-      .then((r) => (r.ok ? r.json() : { secrets: [] }))
-      .then((d) => { injected = (d && d.secrets) || []; paint(); })
-      .catch(() => { injected = []; paint(); });
+    loadInjected();
 
     paint();
     await loadList();
