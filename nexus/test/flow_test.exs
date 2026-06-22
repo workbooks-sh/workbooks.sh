@@ -40,4 +40,53 @@ defmodule Nexus.FlowTest do
     out = Nexus.Effects.run(%{name: "run", args: %{flow: "pipe", input: "hey"}}, %{}, %{})
     assert {:ok, %{result: "HEY"}} = out
   end
+
+  test "a `parallel do … end` group fans out on the threaded value and gathers results in order" do
+    # a second deterministic effect so we can prove substep ORDER is preserved
+    Nexus.Effects.register("rev", fn args, _e, _c -> String.reverse(args[:task] || "") end)
+
+    n =
+      unit("""
+      flow :fan do
+        step :prep, shout: "_"
+        parallel do
+          step :a, shout: "_"
+          step :b, rev: "_"
+        end
+      end
+      """)
+
+    spec = Nexus.Flow.compile(n)
+    assert Enum.map(spec.steps, & &1.name) == ["prep", "parallel"]
+
+    # input "ab" → prep upcases to "AB"; the group runs both substeps on "AB" concurrently,
+    # gathering [shout("AB"), rev("AB")] = ["AB", "BA"] in declaration order
+    assert {:ok, %{result: result}} = Nexus.Flow.run("fan", "ab")
+    assert result == ["AB", "BA"]
+  end
+
+  test "parallel substeps actually run concurrently, not sequentially" do
+    Nexus.Effects.register("slow", fn args, _e, _c ->
+      Process.sleep(200)
+      String.upcase(args[:task] || "")
+    end)
+
+    Nexus.Flow.compile(
+      unit("""
+      flow :slowfan do
+        parallel do
+          step :a, slow: "_"
+          step :b, slow: "_"
+          step :c, slow: "_"
+        end
+      end
+      """)
+    )
+
+    {micros, {:ok, %{result: result}}} = :timer.tc(fn -> Nexus.Flow.run("slowfan", "x") end)
+
+    assert result == ["X", "X", "X"]
+    # three 200ms steps run concurrently finish well under the 600ms a sequential run would take
+    assert micros < 450_000
+  end
 end

@@ -14,6 +14,25 @@ defmodule Nexus.Flow do
   a consumer registers). `Nexus.Flow.run(name, input)` runs the steps in order and returns the final
   result + a per-step trace. A flow is itself runnable as an effect (`run flow: "onboard"`), so a `hook`
   can trigger one. Generic mechanism only — no Workbooks business here.
+
+  ## Parallel steps — BEAM concurrency as vocabulary, not `Task.start_link`
+
+  A `parallel do … end` group fans its inner steps out CONCURRENTLY on the same threaded value, gathers
+  their results (in declaration order) into a list, and threads that list to the next step:
+
+      flow :research do
+        step :prep,   run: "scoper"          # sequential — threads its result forward
+        parallel do                          # all three run at once, each on `prep`'s result
+          step :web,  run: "web_researcher"
+          step :docs, run: "doc_researcher"
+          step :code, run: "code_researcher"
+        end
+        step :merge,  run: "synthesizer"     # receives the list [web, docs, code]
+      end
+
+  Authors never touch `Task.start_link` — the runtime spawns the BEAM tasks (via `Task.async_stream`,
+  bounded + ordered) underneath. This is the same OTP family as `Nexus.Scheduler`: BEAM concurrency
+  surfaced as `.work` declaration.
   """
   @reg {__MODULE__, :flows}
 
@@ -61,6 +80,24 @@ defmodule Nexus.Flow do
     end
   end
 
+  # a parallel group fans its substeps out concurrently on the SAME threaded value, then gathers their
+  # threaded results into a list (declaration order) and threads that forward. The runtime owns the BEAM
+  # tasks — bounded + ordered via Task.async_stream — so the author never writes Task.start_link.
+  defp run_step(%{parallel: subs} = step, acc, ctx) do
+    gate(step[:after_ms])
+
+    subs
+    |> Task.async_stream(fn s -> thread(acc, run_step(s, acc, ctx)) end,
+      ordered: true,
+      timeout: :timer.minutes(5),
+      on_timeout: :kill_task
+    )
+    |> Enum.map(fn
+      {:ok, value} -> value
+      {:exit, reason} -> {:error, reason}
+    end)
+  end
+
   # a step runs one effect; the threaded value is offered as the input/task. A step may be TIME-GATED
   # by `after:`/`wait:` (delay before running) — the flow pipeline pauses, then proceeds.
   defp run_step(%{effect: %{name: ename, args: args}} = step, acc, ctx) do
@@ -76,7 +113,24 @@ defmodule Nexus.Flow do
   # thread the step's result forward when it's a usable value; else keep the accumulator.
   defp thread(_acc, {:ok, %{answer: a}}) when is_binary(a), do: a
   defp thread(_acc, out) when is_binary(out), do: out
+  defp thread(_acc, outs) when is_list(outs), do: outs   # a parallel group's gathered results pass through
   defp thread(acc, _out), do: acc
+
+  # a `parallel do … end` group — its inner steps fan out concurrently. Optional time-gate opts
+  # (`parallel after: "1m" do …`) delay the whole group. Parses to a step carrying its substeps.
+  defp step({:parallel, _, args}) do
+    {opts, body} =
+      case args do
+        [[{:do, b}]] -> {[], b}
+        [kw, [{:do, b}]] when is_list(kw) -> {kw, b}
+        _ -> {[], nil}
+      end
+
+    case body |> statements() |> Enum.flat_map(&step/1) do
+      [] -> []
+      subs -> [%{name: "parallel", parallel: subs, after_ms: after_ms(opts)}]
+    end
+  end
 
   defp step({:step, _, [sname, kw]}) when is_list(kw) do
     {time, rest} = Keyword.split(kw, [:after, :wait, :deadline])
