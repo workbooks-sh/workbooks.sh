@@ -30,4 +30,25 @@ defmodule Nexus.LlmRobustTest do
     assert Enum.at(args, 3) == %{}
     assert Enum.at(turn.tool_calls, 2).name == nil
   end
+
+  describe "Cloudflare Workers AI routing" do
+    test "workers_ai? recognizes our convention and raw @cf ids, rejects others" do
+      assert Llm.workers_ai?("workers-ai/meta/llama-3.1-8b-instruct")
+      assert Llm.workers_ai?("@cf/meta/llama-3.1-8b-instruct")
+      refute Llm.workers_ai?("openai/gpt-4o-mini")
+      refute Llm.workers_ai?(nil)
+    end
+
+    test "a CF model without a configured account id fails loud (no bad URL hit)" do
+      # No CLOUDFLARE_ACCOUNT_ID in the test env → endpoint refuses rather than POSTing a broken URL.
+      assert {:error, :no_cf_account} =
+               Llm.complete([%{role: "user", content: "hi"}],
+                 model: "workers-ai/meta/llama-3.1-8b-instruct", api_key: "cf-token")
+    end
+
+    test "a non-CF model with no key is the usual :no_api_key, unaffected by the CF path" do
+      assert {:error, :no_api_key} =
+               Llm.complete([%{role: "user", content: "hi"}], model: "openai/gpt-4o-mini", api_key: "")
+    end
+  end
 end

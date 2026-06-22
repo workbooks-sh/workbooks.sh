@@ -14,6 +14,13 @@ defmodule Nexus.Llm do
         api_key_env: "OPENROUTER_API_KEY"   # which env var holds the key (LITELLM_API_KEY, etc.)
 
   The key lives host-side (env), never in a workbook/agent. Built-in `:httpc`, retry on transient errors.
+
+  **Cloudflare Workers AI** is wired natively (no proxy): a model id starting with `workers-ai/` or
+  `@cf/` routes to Cloudflare's OpenAI-compatible endpoint
+  (`/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/v1/chat/completions`), authed by the
+  `CLOUDFLARE_API_TOKEN` secret. Both are read through `Nexus.Secrets` — never `System.get_env`. So
+  `agent :x do model "workers-ai/meta/llama-3.3-70b-instruct-fp8-fast" end` runs on Cloudflare while
+  everything else still flows through the configured OpenAI-compatible base_url (OpenRouter default).
   """
 
   @default_url "https://openrouter.ai/api/v1/chat/completions"
@@ -40,10 +47,23 @@ defmodule Nexus.Llm do
         _ -> default_models()
       end
 
+    # When a Cloudflare token is configured, offer a curated set of Workers AI models too — they route
+    # natively (no proxy), so they belong in the dropdown alongside the configured provider's list.
+    fetched = if Nexus.Secrets.has?("CLOUDFLARE_API_TOKEN"), do: fetched ++ cf_models(), else: fetched
+
     # Pin the configured default to the top so it's the pre-selected option.
     default = model(opts)
     {head, rest} = Enum.split_with(fetched, &(&1.id == default))
     head ++ rest
+  end
+
+  # Curated Workers AI ids (our `workers-ai/…` convention; `Nexus.Llm` maps them to Cloudflare's `@cf/…`).
+  defp cf_models do
+    [
+      %{id: "workers-ai/meta/llama-3.3-70b-instruct-fp8-fast", label: "Llama 3.3 70B · Workers AI"},
+      %{id: "workers-ai/meta/llama-3.1-8b-instruct", label: "Llama 3.1 8B · Workers AI"},
+      %{id: "workers-ai/qwen/qwen2.5-coder-32b-instruct", label: "Qwen2.5 Coder 32B · Workers AI"}
+    ]
   end
 
   # Derive the `/models` URL from a chat/completions base_url (same host/version).
@@ -90,19 +110,24 @@ defmodule Nexus.Llm do
   of OpenAI tool specs (or []). Returns `{:ok, %{content, tool_calls, finish, usage}} | {:error, _}`.
   """
   def complete(messages, opts \\ []) do
-    url = opts[:base_url] || cfg(:base_url, @default_url)
+    {url, raw_key, mdl, account_ok?} = endpoint(opts)
     # Local llama-server (Constellation lanes) needs no key; a dummy bearer keeps the header well-formed.
     key =
-      case api_key(opts) do
+      case raw_key do
         blank when blank in [nil, ""] -> if local?(url), do: "local"
         present -> present
       end
 
-    if key in [nil, ""] do
-      {:error, :no_api_key}
-    else
+    cond do
+      not account_ok? ->
+        {:error, :no_cf_account}
+
+      key in [nil, ""] ->
+        {:error, :no_api_key}
+
+      true ->
       body =
-        %{model: model(opts), messages: messages}
+        %{model: mdl, messages: messages}
         |> maybe_put(:tools, opts[:tools])
         |> maybe_put(:temperature, opts[:temperature])
         |> maybe_put(:max_tokens, opts[:max_tokens])
@@ -191,4 +216,28 @@ defmodule Nexus.Llm do
   defp local?(url), do: String.contains?(url, "127.0.0.1") or String.contains?(url, "localhost")
   defp api_key(opts), do: opts[:api_key] || Nexus.Secrets.get(cfg(:api_key_env, "OPENROUTER_API_KEY"))
   defp cfg(key, default), do: Keyword.get(Application.get_env(:nexus, __MODULE__, []), key, default)
+
+  # Resolve the request endpoint: `{url, key, model, account_ok?}`. A `workers-ai/` or `@cf/` model id
+  # routes to Cloudflare's OpenAI-compatible Workers AI endpoint (token + account via Nexus.Secrets);
+  # everything else uses the configured base_url + key. `account_ok?` is false only when a CF model was
+  # requested but no CLOUDFLARE_ACCOUNT_ID is set, so the caller fails loud instead of hitting a bad URL.
+  defp endpoint(opts) do
+    m = model(opts)
+
+    if workers_ai?(m) do
+      account = Nexus.Secrets.get("CLOUDFLARE_ACCOUNT_ID")
+      url = "https://api.cloudflare.com/client/v4/accounts/#{account}/ai/v1/chat/completions"
+      key = opts[:api_key] || Nexus.Secrets.get("CLOUDFLARE_API_TOKEN")
+      {url, key, cf_model(m), account not in [nil, ""]}
+    else
+      {opts[:base_url] || cfg(:base_url, @default_url), api_key(opts), m, true}
+    end
+  end
+
+  @doc "Is this a Cloudflare Workers AI model id? (`workers-ai/…` our convention, or a raw `@cf/…`)"
+  def workers_ai?(model),
+    do: is_binary(model) and (String.starts_with?(model, "workers-ai/") or String.starts_with?(model, "@cf/"))
+
+  # Our `workers-ai/<vendor>/<model>` convention → Cloudflare's native `@cf/<vendor>/<model>` id.
+  defp cf_model(m), do: String.replace_prefix(m, "workers-ai/", "@cf/")
 end
