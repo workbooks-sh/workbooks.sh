@@ -267,23 +267,27 @@ export function createChat(container, options = {}) {
     insertText: (t) => { const ta = composer._ta; if (!ta || !t) return; ta.value = (ta.value && !/\s$/.test(ta.value) ? ta.value + ' ' : ta.value) + t; ta.dispatchEvent(new Event('input')); ta.focus(); },
     models: opts.models || [],
     model: () => selectedModel,
-    setModel: (m) => { selectedModel = m; },
+    setModel: (m) => { selectedModel = m; emit('change', { messages }); },
     // Agent selector hooks (consumed by the agent-selector composer add-on).
     agents: opts.agents || [],
     agent: () => selectedAgent,
-    setAgent: (a) => { selectedAgent = a; if (opts.onAgent) try { opts.onAgent(a); } catch (e) {} },
+    // Emit 'change' so dependent add-ons re-sync (e.g. the capabilities selector's enabled/disabled state
+    // tracks the chosen agent's admission). Without this, picking an agent left the capabilities cursor stale.
+    setAgent: (a) => { selectedAgent = a; if (opts.onAgent) try { opts.onAgent(a); } catch (e) {} emit('change', { messages }); },
     agentLocked: () => messages.length > 0,
     // Workspace selector hooks (consumed by the workspace-selector add-on). Locked once the session has
     // messages — you don't move a session out of its workspace.
     workspaces: opts.workspaces || [],
     workspace: () => selectedWorkspace,
-    setWorkspace: (w) => { selectedWorkspace = w; if (opts.onWorkspace) try { opts.onWorkspace(w); } catch (e) {} },
+    setWorkspace: (w) => { selectedWorkspace = w; if (opts.onWorkspace) try { opts.onWorkspace(w); } catch (e) {} emit('change', { messages }); },
     workspaceLocked: () => messages.length > 0,
     // Capability multi-select hooks (consumed by the capabilities-selector add-on). The catalog is the
     // toolkit list; admission(agentName) → 'all' | 'none' | [ids] gates what's selectable per driver.
     capabilityCatalog: opts.capabilityCatalog || [],
     capabilityAdmission: opts.capabilityAdmission || (() => 'all'),
     capabilities: () => selectedCapabilities.slice(),
+    // NOTE: do NOT emit 'change' here — the capabilities selector's own onChange handler calls
+    // setCapabilities (to drop un-admitted ids), which would re-enter and loop.
     setCapabilities: (ids) => { selectedCapabilities = (ids || []).slice(); },
     onChange: (fn) => { (listeners['change'] = listeners['change'] || []).push(fn); },
     // Host-provided context picker (e.g. the cloud command-palette search). Returns Promise<item[]>; the
