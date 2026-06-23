@@ -1,0 +1,67 @@
+:doc #washy #security
+
+# Washy threat model (Phase A — [[wb-yre2]])
+
+How untrusted wasm is **contained**. The substrate is the BEAM: a guest is ordinary BEAM code in a
+process, so the platform already gives memory isolation (own heap), crash isolation (trap = caught
+exception), preemptive fairness (reduction counting), and OTP supervision. Phase A adds the *resource
+bounds* the BEAM doesn't impose on its own. Every untrusted run goes through `Nexus.Washy.Sandbox.run/4`.
+
+## Attacker model
+
+The adversary controls the **wasm module bytes** and its **stdin / argv / fs inputs**. They cannot
+control the host process, the interpreter, or the deploy config. Goal of the defense: no attacker input
+can crash the VM, escape to host code, exhaust shared resources, or read another tenant's data.
+
+## Attack classes → containment
+
+resource :threat do
+  field :class, :text
+  field :vector, :text
+  field :containment, :text
+end
+
+- **CPU — infinite loop / pathological work.**
+  `loop { br 0 }`, billion-iteration kernels. → **Fuel**: `run/4` charges one unit per instruction
+  (atomics counter); exhaustion traps `:out_of_fuel`. Bounds total work regardless of wall time.
+- **Time — slow but finite, or fuel set high.**
+  → **Wall-clock**: the sandbox runs the guest in a `Task`; past `:timeout_ms` it is `:brutal_kill`ed →
+  `{:timeout}`. The killed process's memory/atomics are reclaimed by the BEAM.
+- **Stack — unbounded recursion.**
+  `func f = call f`. → **Call-depth cap**: `invoke` increments an atomics depth counter; past
+  `:max_depth` it traps `:stack_exhausted` before the BEAM process stack blows.
+- **Memory — giant allocation / OOM.**
+  `memory.grow 1_000_000`. → **Memory cap**: grow beyond the allocation returns `-1` (wasm contract);
+  the guest never gets host memory it didn't pay for. (Phase B makes the cap configurable + lazy.)
+- **Memory safety — out-of-bounds read/write.**
+  store/load past `memory.size`. → **Bounds check**: guest accesses are checked against logical memory
+  size → trap `:out_of_bounds`. Linear memory is a private `:atomics` array; there is no host pointer to
+  corrupt. The guest's view never overlaps host or another guest.
+- **Output flood — unbounded stdout.**
+  → **Output cap**: captured stdout truncated at `:max_output` (`truncated?: true`); also bounded
+  indirectly by fuel (each `fd_write` costs instructions) and wall-clock.
+- **Filesystem — path traversal / cross-tenant read.**
+  `open("../../etc/passwd")`. → **Virtual FS**: a guest path is a *string key in its own tenant
+  partition* (`Nexus.Washy.VFS` `{:store, tenant}`), never a host path — nothing to traverse out of.
+  Tenant binding is host-side and fails closed. (See [[washy-production-plan]].)
+- **Malformed module — decoder/interp crash.**
+  Truncated/garbage bytes, bad opcodes. → Decode returns `{:error, _}`; an unhandled opcode raises,
+  caught by the sandbox as `{:error, _}` / a trap. (Phase C adds full **validation** so malformed
+  modules are rejected *before* run, not mid-execution.)
+- **Host escape.**
+  There is no native execution and no FFI: host imports are an explicit, finite allow-list of Elixir
+  functions (the WASI seam). A guest can only call what the seam exposes; everything else is
+  unreachable. No `dlopen`, no syscalls, no `fork`/`exec` of host binaries.
+
+## Known gaps (tracked, not yet closed)
+
+- The `:transpile` backend does not yet charge fuel/depth — it is NOT on the untrusted prod path yet;
+  Phase F ([[wb-7ik3]]) lowers fuel into generated code (reduction-based) before it carries untrusted work.
+- Memory cap is a fixed allocation, not yet the module's declared `max` or a deploy-config value
+  (Phase B, [[wb-afsq]]).
+- No pre-run validation pass yet (Phase C, [[wb-6tgv]]).
+
+## Gate
+
+The red-team suite (`test/washy_redteam_test.exs`) asserts every class above is contained: no VM crash,
+no host escape, the caller and VM survive each hostile module. ✅ green.

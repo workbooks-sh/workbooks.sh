@@ -325,19 +325,35 @@ defmodule Nexus.Washy do
   fresh runtime: a per-call **linear memory** as an `:atomics` array (mutable, NIF-free, BEAM-native — the
   primitive that lets wasm's mutable byte memory live inside an isolated BEAM process).
   """
-  def call(%__MODULE__{} = mod, name, args) when is_list(args) do
-    {result, _io} = call_io(mod, name, args)
+  # Default instruction FUEL: a generous-but-FINITE work budget so a runaway guest traps
+  # (`:out_of_fuel`) instead of spinning forever. Wall-clock is bounded separately by
+  # `Nexus.Washy.Sandbox`. Override per run with `call(mod, name, args, fuel: N)`.
+  @default_fuel 2_000_000_000
+  # Max wasm CALL depth (recursive calls grow the BEAM process stack). Bounds it to a clean
+  # `:stack_exhausted` trap instead of an opaque process crash. Block/loop nesting is statically
+  # finite and not counted here.
+  @default_max_depth 10_000
+
+  def call(%__MODULE__{} = mod, name, args, opts \\ []) when is_list(args) do
+    {result, _io} = call_io(mod, name, args, opts)
     result
   end
 
-  @doc "Like `call/3`, but also returns captured stdout (what the guest wrote via WASI `fd_write`)."
-  def call_io(%__MODULE__{} = mod, name, args) when is_list(args) do
+  @doc """
+  Like `call/4`, but also returns captured stdout (what the guest wrote via WASI `fd_write`).
+  Opts: `:fuel` (instruction budget, default #{@default_fuel}).
+  """
+  def call_io(%__MODULE__{} = mod, name, args, opts \\ []) when is_list(args) do
     prev = Process.get(:washy_out)
     Process.put(:washy_out, [])
     globals = new_globals(mod.globals)
     {mem, mem_pages} = new_mem(mod.mem)
     init_data(mem, globals, mod.data)
-    rt = %{mod: mod, mem: mem, mem_pages: mem_pages, globals: globals, table: new_table(mod.elements, globals)}
+    fuel = :atomics.new(1, signed: true)
+    :atomics.put(fuel, 1, Keyword.get(opts, :fuel, @default_fuel))
+    depth = :atomics.new(1, signed: true)
+    max_depth = Keyword.get(opts, :max_depth, @default_max_depth)
+    rt = %{mod: mod, mem: mem, mem_pages: mem_pages, globals: globals, table: new_table(mod.elements, globals), fuel: fuel, depth: depth, max_depth: max_depth}
     result = call_fn(rt, Map.fetch!(mod.exports, name), args)
     out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
     if prev == nil, do: Process.delete(:washy_out), else: Process.put(:washy_out, prev)
@@ -363,7 +379,7 @@ defmodule Nexus.Washy do
 
   defp new_globals(globals) do
     ref = :atomics.new(length(globals), signed: false)
-    stub = %{mod: nil, mem: nil, globals: nil}
+    stub = %{mod: nil, mem: nil, globals: nil, fuel: cfuel()}
 
     globals
     |> Enum.with_index(1)
@@ -379,7 +395,7 @@ defmodule Nexus.Washy do
   defp new_table([], _globals), do: %{}
 
   defp new_table(elements, globals) do
-    stub = %{mod: nil, mem: nil, globals: globals, table: %{}}
+    stub = %{mod: nil, mem: nil, globals: globals, table: %{}, fuel: cfuel()}
 
     Enum.reduce(elements, %{}, fn {offset, funcs}, acc ->
       {_sig, [base | _], _l} = run(offset, [], {}, stub)
@@ -391,7 +407,7 @@ defmodule Nexus.Washy do
   defp init_data(_mem, _globals, []), do: :ok
 
   defp init_data(mem, globals, data) do
-    stub = %{mod: nil, mem: nil, globals: globals}
+    stub = %{mod: nil, mem: nil, globals: globals, fuel: cfuel()}
 
     Enum.each(data, fn
       {:passive, _bytes} ->
@@ -413,9 +429,12 @@ defmodule Nexus.Washy do
 
   # Invoke LOCAL function `local_idx`: zero-extend declared locals after the args, run the structured body.
   defp invoke(rt, local_idx, args) do
+    if :atomics.add_get(rt.depth, 1, 1) > rt.max_depth, do: trap!(:stack_exhausted)
     {nlocals, instrs} = Enum.at(rt.mod.code, local_idx)
     locals = (args ++ List.duplicate(0, nlocals)) |> List.to_tuple()
     {_sig, stack, _l} = run(instrs, [], locals, rt)
+    :atomics.sub(rt.depth, 1, 1)
+
     case stack do
       [top | _] -> top
       [] -> nil
@@ -702,6 +721,10 @@ defmodule Nexus.Washy do
   defp run([], stack, l, _rt), do: {:next, stack, l}
 
   defp run([instr | rest], stack, l, rt) do
+    # charge one unit of fuel per instruction; a guest that exhausts its budget traps (bounds runaway
+    # work). `sub_get` is atomic + allocation-free — the safety tax on the hot path is one atomics op.
+    if :atomics.sub_get(rt.fuel, 1, 1) < 0, do: trap!(:out_of_fuel)
+
     case step(instr, stack, l, rt) do
       {:next, stack, l} -> run(rest, stack, l, rt)
       other -> other
@@ -1034,6 +1057,14 @@ defmodule Nexus.Washy do
   defp store(mem, addr, val, n) do
     for i <- 0..(n - 1), do: :atomics.put(mem, addr + i + 1, (val >>> (i * 8)) &&& 0xFF)
     :ok
+  end
+
+  # a small bounded fuel counter for const-expression evaluation (global init / element offsets) —
+  # these are tiny + trusted, but still flow through the fuel-charging `run/4`.
+  defp cfuel do
+    f = :atomics.new(1, signed: true)
+    :atomics.put(f, 1, 1_000_000)
+    f
   end
 
   # ── traps ───────────────────────────────────────────────────────────────────────────────────────
