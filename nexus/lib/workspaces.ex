@@ -171,15 +171,20 @@ defmodule Nexus.Workspaces do
   end
 
   # ── helpers ──
-  # Recursively copy a workspace's WORKING files, skipping VCS internals (.git/.jj) — the agent operates
-  # on working files; the nexus owns version control. (cp_r of a git dir also dies on read-only objects.)
-  @vcs ~w(.git .jj)
+  # Recursively copy a workspace's WORKING files, skipping VCS internals + runtime/build artifacts — the
+  # agent operates on working files; the nexus owns version control. (cp_r of a git dir also dies on
+  # read-only objects.) The build/toolchain dirs (compilers, _build, deps, node_modules) are never
+  # workspace content; skipping them is a defensive guard so a misresolved tree root can't copy GBs.
+  @skip ~w(.git .jj .nexus compilers compilers-dist _build deps node_modules)
+  @doc false
+  # Test seam — the staging copy that must skip VCS/build internals (so a misresolved root can't copy GBs).
+  def copy_clean_for_test(src, dst), do: copy_clean(src, dst)
   defp copy_clean(src, dst) do
     File.mkdir_p!(dst)
 
     case File.ls(src) do
       {:ok, entries} ->
-        for e <- entries, e not in @vcs do
+        for e <- entries, e not in @skip do
           s = Path.join(src, e)
           d = Path.join(dst, e)
           if File.dir?(s), do: copy_clean(s, d), else: File.cp!(s, d)

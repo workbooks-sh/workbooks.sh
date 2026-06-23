@@ -193,9 +193,14 @@ defmodule Nexus.Agent do
   # run (no workspace, or jj unavailable) uses a throwaway scratch dir, exactly as before. Returns
   # `{vfs, finalize_fn}` where finalize runs AFTER the loop with the run result.
   defp setup_vfs(opts, task) do
-    if Keyword.get(opts, :general),
-      do: setup_general_vfs(Keyword.get(opts, :isolate, false)),
-      else: setup_workspace_vfs(opts, task)
+    cond do
+      # A DELEGATED sub-agent (`depth > 0`) runs as a function returning TEXT — its own throwaway VFS, no
+      # shared filesystem. So it must NOT stage the whole workspace tree even when its target is
+      # general-scoped: that copy is pure waste (and on a tree with heavy dirs, a real cost) per delegation.
+      Keyword.get(opts, :depth, 0) > 0 -> setup_workspace_vfs(opts, task)
+      Keyword.get(opts, :general) -> setup_general_vfs(Keyword.get(opts, :isolate, false))
+      true -> setup_workspace_vfs(opts, task)
+    end
   end
 
   # GENERAL run (workhorse/autopoet): /work = a staging COPY of the WHOLE workspace tree (every
