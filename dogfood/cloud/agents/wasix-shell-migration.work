@@ -4,6 +4,26 @@ like two engines. That vertical-integration moat is a prioritized, tracked threa
 unified Membrane's wasmer transport, not a one-off. Phase 6 (persistent session) feeds the density moat
 (thousands of sub-MB cells on 1GB). Treat the kernel epic as part of THIS goal, not a follow-up.
 
+## STATUS (2026-06-23) — Phase 1 DONE in prod; Phase 2 partial (pin done, offline upstream-blocked)
+
+- **Phase 1 PROVEN in prod (wb-dogfood):** merged to main; fixed a pre-existing CI bug (the smoke step
+  never set WB_SESSION_SECRET, the wb-nz88 boot gate, so EVERY deploy silently died at /health). CI then
+  built the wasmer base, smoke-passed, deployed to Fly. Verified on the live machine via RPC: `wasmer
+  7.1.0` runs; real bash wrote `/work/proof.txt` read back from the host dir (real-FS write); a host-only
+  secret outside /work is unreadable in the guest + no leak (sandbox boundary holds).
+- **Phase 2 — pin DONE, true-offline UPSTREAM-BLOCKED (#wb-hhhp):** versions are pinned
+  (bash@1.0.18, python@3.12.10-beta.2) and pre-warmed into the image's wasmer cache (cold-start COMPILE
+  cache, confirmed in prod). But FULL airgapped offline is NOT achievable with prebuilt packages: wasmer
+  7.1 has NO offline mode (only --cache-dir/--disable-cache), and sharrattj/bash declares a registry dep
+  on wasmer/coreutils that resolution always re-fetches — even a local bash.webc + `--use` local coreutils
+  still queries the registry for bash's declared dep. The robust fix (one self-contained bash+coreutils
+  webc with no external deps, referenced by local path) is tracked as #wb-hhhp. So Phase 2 is: pin ✓,
+  cold-start cache ✓, airgap ✗-until-bundle.
+- **Phase 8 (partial):** stale wasmtime-era moduledocs corrected (Nexus.Agent, Nexus.Agent.Vfs,
+  Nexus.Agent.Kits — now describe the wasmer `--volume /work` mount + per-applet argv0 dispatch); dead
+  `Vfs.mount/1` (wasmtime `::` --dir format) removed; dev harnesses (eval_local/round4_*) verified
+  consistent with the new API (no deleted-module refs; `:kits` still a live agent context option).
+
 ## P0-robust — clean-package REBUILD recipe (VALIDATED toolchain, autonomous spike)
 
 Confirmed the rebuild path end-to-end (components all present; the user's "use our clang" call is right —

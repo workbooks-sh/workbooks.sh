@@ -124,9 +124,9 @@ defmodule Nexus.Agent.Kits do
   end
 
   @doc """
-  Resolve a command name (argv[0]) to `{wasm_path, leading_args}`. The command name is passed to
-  wasmtime as `--argv0`, so multicall binaries (coreutils) dispatch correctly without a leading
-  applet arg. `nil` if no kit provides the command.
+  Resolve a command name (argv[0]) to `{wasm_path, leading_args}`. On Wasmer each applet is packaged as
+  its own command, so bash's exec sets `argv[0]=<applet>` and the multicall binary (coreutils) dispatches
+  on it — no leading applet arg needed. `nil` if no kit provides the command.
   """
   def resolve(cmd) do
     kits = all()

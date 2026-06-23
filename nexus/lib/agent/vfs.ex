@@ -1,9 +1,9 @@
 defmodule Nexus.Agent.Vfs do
   @moduledoc """
-  The agent's virtual filesystem — a real workspace directory mounted into wasmtime as a preopened
-  dir (`--dir <host>::/work`). Bash commands run against `/work`; that's the agent's whole world.
-  No host filesystem reach beyond this dir (wasmtime grants only the preopen), so the agent is
-  sandboxed by construction.
+  The agent's virtual filesystem — a real workspace directory mounted into wasmer as `/work`
+  (`Nexus.Wasmer` passes `--volume <host>:/work`). Bash commands run against `/work`; that's the
+  agent's whole world. No host filesystem reach beyond this dir (the volume is the only mount), so the
+  agent is sandboxed by construction.
 
   A Vfs is just a path + helpers to create/seed/read/destroy it. One per agent run, cleaned up after.
   """
@@ -29,9 +29,6 @@ defmodule Nexus.Agent.Vfs do
 
   @doc "The guest mount point bash sees (`/work`)."
   def guest_root, do: @guest
-
-  @doc "The wasmtime `--dir` mapping for this vfs (`<host>::/work`)."
-  def mount(%__MODULE__{dir: dir}), do: "#{dir}::#{@guest}"
 
   @doc "The host directory backing this vfs (for in-process tooling that walks the tree, e.g. `work`)."
   def dir(%__MODULE__{dir: dir}), do: dir
