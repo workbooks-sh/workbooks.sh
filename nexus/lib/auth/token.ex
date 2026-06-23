@@ -80,7 +80,8 @@ defmodule Nexus.Auth.Token do
             :error
 
           true ->
-            TokenStore.put(@store, h, rec.tenant, rec.id, %{rec | last_used_at: now})
+            # row-guarded write-back: a concurrent revoke (DELETE) wins, never resurrected (wb-m6oz)
+            TokenStore.touch(@store, h, %{rec | last_used_at: now})
             {:ok, %{tenant: rec.tenant, user: rec.id, roles: rec.roles, scopes: rec.scopes}}
         end
 

@@ -70,7 +70,8 @@ defmodule Nexus.ControlPlane.Token do
             :error
 
           true ->
-            TokenStore.put(@store, h, org, rec.id, %{rec | last_used_at: now})
+            # row-guarded write-back: a concurrent revoke (DELETE) wins, never resurrected (wb-m6oz)
+            TokenStore.touch(@store, h, %{rec | last_used_at: now})
             {:ok, %{org: org, role: Map.get(rec, :role, "member"), user: Map.get(rec, :user)}}
         end
 
