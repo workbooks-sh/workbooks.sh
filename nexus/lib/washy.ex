@@ -15,7 +15,7 @@ defmodule Nexus.Washy do
   """
   import Bitwise
 
-  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: []
+  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: []
 
   @typedoc "A decoded module."
   @type t :: %__MODULE__{}
@@ -85,10 +85,23 @@ defmodule Nexus.Washy do
     %{mod | globals: globals}
   end
 
+  # 9 = element: vec of segments that initialize the function TABLE (for call_indirect / function ptrs).
+  defp section(9, content, mod) do
+    {elements, _} = vec(content, &element_entry/1)
+    %{mod | elements: elements}
+  end
+
   # 11 = data: vec of segments that initialize memory with constant bytes (string literals etc.).
   defp section(11, content, mod) do
     {data, _} = vec(content, &data_entry/1)
     %{mod | data: data}
+  end
+
+  # element flag 0 = active table 0: (offset-const-expr, vec funcidx). (Other flag variants: minimal handling.)
+  defp element_entry(<<0, rest::binary>>) do
+    {offset, :end, rest} = parse_instrs(rest)
+    {funcs, rest} = vec(rest, &uleb/1)
+    {{offset, funcs}, rest}
   end
 
   # sections we don't need yet (table/element/custom/…) are skipped
@@ -193,6 +206,7 @@ defmodule Nexus.Washy do
   defp parse_op(0x21, rest), do: ({i, r} = uleb(rest); {{:local_set, i}, r})
   defp parse_op(0x22, rest), do: ({i, r} = uleb(rest); {{:local_tee, i}, r})
   defp parse_op(0x10, rest), do: ({f, r} = uleb(rest); {{:call, f}, r})
+  defp parse_op(0x11, rest), do: ({tidx, r} = uleb(rest); {_tbl, r} = uleb(r); {{:call_indirect, tidx}, r})
   defp parse_op(0x0C, rest), do: ({n, r} = uleb(rest); {{:br, n}, r})
   defp parse_op(0x0D, rest), do: ({n, r} = uleb(rest); {{:br_if, n}, r})
   defp parse_op(0x0F, rest), do: {{:return}, rest}
@@ -209,6 +223,13 @@ defmodule Nexus.Washy do
   defp parse_op(0x3B, rest), do: ({o, r} = memarg(rest); {{:i32_store16, o}, r})
   defp parse_op(0x3F, <<_, rest::binary>>), do: {{:memory_size}, rest}
   defp parse_op(0x40, <<_, rest::binary>>), do: {{:memory_grow}, rest}
+  # floats: const literals (raw IEEE-754) + loads/stores
+  defp parse_op(0x43, <<v::float-32-little, rest::binary>>), do: {{:fconst, v}, rest}
+  defp parse_op(0x44, <<v::float-64-little, rest::binary>>), do: {{:fconst, v}, rest}
+  defp parse_op(0x2A, rest), do: ({o, r} = memarg(rest); {{:f32_load, o}, r})
+  defp parse_op(0x2B, rest), do: ({o, r} = memarg(rest); {{:f64_load, o}, r})
+  defp parse_op(0x38, rest), do: ({o, r} = memarg(rest); {{:f32_store, o}, r})
+  defp parse_op(0x39, rest), do: ({o, r} = memarg(rest); {{:f64_store, o}, r})
   # everything else (arithmetic + comparisons, no immediate) is a pure stack op, dispatched by opcode
   defp parse_op(op, rest), do: {{:op, op}, rest}
 
@@ -266,7 +287,7 @@ defmodule Nexus.Washy do
     globals = new_globals(mod.globals)
     mem = new_mem(mod.mem)
     init_data(mem, globals, mod.data)
-    rt = %{mod: mod, mem: mem, globals: globals}
+    rt = %{mod: mod, mem: mem, globals: globals, table: new_table(mod.elements, globals)}
     result = call_fn(rt, Map.fetch!(mod.exports, name), args)
     out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
     if prev == nil, do: Process.delete(:washy_out), else: Process.put(:washy_out, prev)
@@ -292,6 +313,18 @@ defmodule Nexus.Washy do
     end)
 
     ref
+  end
+
+  # Build the function table (idx => global func index) from active element segments — for call_indirect.
+  defp new_table([], _globals), do: %{}
+
+  defp new_table(elements, globals) do
+    stub = %{mod: nil, mem: nil, globals: globals, table: %{}}
+
+    Enum.reduce(elements, %{}, fn {offset, funcs}, acc ->
+      {_sig, [base | _], _l} = run(offset, [], {}, stub)
+      funcs |> Enum.with_index() |> Enum.reduce(acc, fn {f, i}, a -> Map.put(a, base + i, f) end)
+    end)
   end
 
   # Copy each ACTIVE data segment's bytes into linear memory at its (const-expr) offset.
@@ -431,6 +464,13 @@ defmodule Nexus.Washy do
     {:next, if(result == nil, do: stack, else: [result | stack]), l}
   end
 
+  defp step({:call_indirect, _typeidx}, [i | stack], l, rt) do
+    f = Map.fetch!(rt.table, i)
+    {args, stack} = Enum.split(stack, func_arity(rt.mod, f))
+    result = call_fn(rt, f, Enum.reverse(args))
+    {:next, if(result == nil, do: stack, else: [result | stack]), l}
+  end
+
   defp step({:i32_load, o}, [a | s], l, rt), do: {:next, [load(rt.mem, a + o, 4) | s], l}
   defp step({:i32_load8u, o}, [a | s], l, rt), do: {:next, [load(rt.mem, a + o, 1) | s], l}
   defp step({:i32_load8s, o}, [a | s], l, rt), do: {:next, [sext(load(rt.mem, a + o, 1), 8) | s], l}
@@ -441,6 +481,13 @@ defmodule Nexus.Washy do
   defp step({:i32_store16, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 2); {:next, s, l})
   defp step({:memory_size}, stack, l, rt), do: {:next, [div(:atomics.info(rt.mem).size, 65536) | stack], l}
   defp step({:memory_grow}, [_n | s], l, _rt), do: {:next, [-1 &&& @mask32 | s], l}   # TODO real grow
+
+  # floats live on the stack as BEAM floats (heterogeneous w/ ints — validation keeps types correct).
+  defp step({:fconst, v}, stack, l, _rt), do: {:next, [v | stack], l}
+  defp step({:f32_load, o}, [a | s], l, rt), do: {:next, [fload(rt.mem, a + o, 4) | s], l}
+  defp step({:f64_load, o}, [a | s], l, rt), do: {:next, [fload(rt.mem, a + o, 8) | s], l}
+  defp step({:f32_store, o}, [v, a | s], l, rt), do: (fstore(rt.mem, a + o, v, 4); {:next, s, l})
+  defp step({:f64_store, o}, [v, a | s], l, rt), do: (fstore(rt.mem, a + o, v, 8); {:next, s, l})
 
   defp step({:op, op}, stack, l, _rt), do: {:next, binop(op, stack), l}
 
@@ -475,7 +522,69 @@ defmodule Nexus.Washy do
   defp binop(0x4D, [b, a | s]), do: [bool(a <= b) | s]                              # i32.le_u
   defp binop(0x4E, [b, a | s]), do: [bool(s32(a) >= s32(b)) | s]                    # i32.ge_s
   defp binop(0x4F, [b, a | s]), do: [bool(a >= b) | s]                              # i32.ge_u
+  # ── f32 (round results to single precision) ──
+  defp binop(0x8B, [a | s]), do: [abs(a) | s]                                       # f32.abs
+  defp binop(0x8C, [a | s]), do: [-a | s]                                           # f32.neg
+  defp binop(0x91, [a | s]), do: [f32r(:math.sqrt(a)) | s]                          # f32.sqrt
+  defp binop(0x92, [b, a | s]), do: [f32r(a + b) | s]                               # f32.add
+  defp binop(0x93, [b, a | s]), do: [f32r(a - b) | s]                               # f32.sub
+  defp binop(0x94, [b, a | s]), do: [f32r(a * b) | s]                               # f32.mul
+  defp binop(0x95, [b, a | s]), do: [f32r(a / b) | s]                               # f32.div
+  defp binop(0x96, [b, a | s]), do: [min(a, b) | s]                                 # f32.min
+  defp binop(0x97, [b, a | s]), do: [max(a, b) | s]                                 # f32.max
+  defp binop(0x5B, [b, a | s]), do: [bool(a == b) | s]                              # f32.eq
+  defp binop(0x5C, [b, a | s]), do: [bool(a != b) | s]                              # f32.ne
+  defp binop(0x5D, [b, a | s]), do: [bool(a < b) | s]                               # f32.lt
+  defp binop(0x5E, [b, a | s]), do: [bool(a > b) | s]                               # f32.gt
+  defp binop(0x5F, [b, a | s]), do: [bool(a <= b) | s]                              # f32.le
+  defp binop(0x60, [b, a | s]), do: [bool(a >= b) | s]                              # f32.ge
+  # ── f64 ──
+  defp binop(0x99, [a | s]), do: [abs(a) | s]                                       # f64.abs
+  defp binop(0x9A, [a | s]), do: [-a | s]                                           # f64.neg
+  defp binop(0x9F, [a | s]), do: [:math.sqrt(a) | s]                                # f64.sqrt
+  defp binop(0xA0, [b, a | s]), do: [a + b | s]                                     # f64.add
+  defp binop(0xA1, [b, a | s]), do: [a - b | s]                                     # f64.sub
+  defp binop(0xA2, [b, a | s]), do: [a * b | s]                                     # f64.mul
+  defp binop(0xA3, [b, a | s]), do: [a / b | s]                                     # f64.div
+  defp binop(0xA4, [b, a | s]), do: [min(a, b) | s]                                 # f64.min
+  defp binop(0xA5, [b, a | s]), do: [max(a, b) | s]                                 # f64.max
+  defp binop(0x61, [b, a | s]), do: [bool(a == b) | s]                              # f64.eq
+  defp binop(0x62, [b, a | s]), do: [bool(a != b) | s]                              # f64.ne
+  defp binop(0x63, [b, a | s]), do: [bool(a < b) | s]                               # f64.lt
+  defp binop(0x64, [b, a | s]), do: [bool(a > b) | s]                               # f64.gt
+  defp binop(0x65, [b, a | s]), do: [bool(a <= b) | s]                              # f64.le
+  defp binop(0x66, [b, a | s]), do: [bool(a >= b) | s]                              # f64.ge
+  # ── conversions (i32 ⇄ f32/f64) ──
+  defp binop(0xA8, [a | s]), do: [trunc(a) &&& @mask32 | s]                         # i32.trunc_f32_s
+  defp binop(0xA9, [a | s]), do: [trunc(a) &&& @mask32 | s]                         # i32.trunc_f32_u
+  defp binop(0xAA, [a | s]), do: [trunc(a) &&& @mask32 | s]                         # i32.trunc_f64_s
+  defp binop(0xAB, [a | s]), do: [trunc(a) &&& @mask32 | s]                         # i32.trunc_f64_u
+  defp binop(0xB2, [a | s]), do: [f32r(s32(a) * 1.0) | s]                           # f32.convert_i32_s
+  defp binop(0xB3, [a | s]), do: [f32r(a * 1.0) | s]                                # f32.convert_i32_u
+  defp binop(0xB6, [a | s]), do: [f32r(a) | s]                                      # f32.demote_f64
+  defp binop(0xB7, [a | s]), do: [s32(a) * 1.0 | s]                                 # f64.convert_i32_s
+  defp binop(0xB8, [a | s]), do: [a * 1.0 | s]                                      # f64.convert_i32_u
+  defp binop(0xBB, [a | s]), do: [a * 1.0 | s]                                      # f64.promote_f32
+  defp binop(0xBC, [a | s]), do: [(<<i::32-little>> = <<a::float-32-little>>; i) | s]  # i32.reinterpret_f32
+  defp binop(0xBE, [a | s]), do: [(<<f::float-32-little>> = <<a::32-little>>; f) | s]  # f32.reinterpret_i32
+
   defp binop(op, _), do: raise("washy: unimplemented stack op 0x#{Integer.to_string(op, 16)}")
+
+  # round a double to f32 precision (pack→unpack as 32-bit IEEE-754). NB: raises on NaN/Inf (refine later).
+  defp f32r(x), do: (<<v::float-32-little>> = <<x::float-32-little>>; v)
+
+  defp fload(mem, addr, n) do
+    bin = for(i <- 0..(n - 1)//1, do: :atomics.get(mem, addr + i + 1)) |> :erlang.list_to_binary()
+    case n do
+      4 -> <<v::float-32-little>> = bin; v
+      8 -> <<v::float-64-little>> = bin; v
+    end
+  end
+
+  defp fstore(mem, addr, v, n) do
+    bin = if n == 4, do: <<v::float-32-little>>, else: <<v::float-64-little>>
+    bin |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> :atomics.put(mem, addr + i + 1, b) end)
+  end
 
   defp bool(true), do: 1
   defp bool(false), do: 0

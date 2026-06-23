@@ -43,4 +43,28 @@ defmodule Nexus.WashyRealTest do
       :ok
     end
   end
+
+  @tag timeout: 240_000
+  test "real C with FUNCTION POINTERS (call_indirect) + FLOATS computes correctly on Washy" do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) do
+      src = """
+      #include <unistd.h>
+      static int add(int a,int b){return a+b;}
+      static int sub(int a,int b){return a-b;}
+      int main(void){
+        int (*ops[2])(int,int) = {add, sub};
+        double d = 3.5 * 2.0;
+        int r = ops[0](10,5) + ops[1](10,5) + (int)d;   // 15 + 5 + 7 = 27
+        char buf[2]; buf[0]='0'+(r/10); buf[1]='0'+(r%10);
+        write(1, buf, 2);
+        return 0;
+      }
+      """
+      {code, out} = run(compile(src))
+      assert out == "27"
+      assert code == 0
+    else
+      :ok
+    end
+  end
 end
