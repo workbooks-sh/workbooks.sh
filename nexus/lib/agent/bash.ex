@@ -1,11 +1,13 @@
 defmodule Nexus.Agent.Bash do
   @moduledoc """
-  `bash` — the agent's ONE tool. The agent does everything by running a command line here. We no longer
-  EMULATE a shell: a shell command runs as REAL bash + full coreutils on **Wasmer** (`Nexus.Wasmer`),
-  sandboxed to the agent's `/work` directory (real filesystem). HOST CAPABILITIES — `agent` (delegate),
-  `request` (autopoiesis), `work` (the in-process .work CLI), `image|video|speak` (generate), and the
-  web commands — are dispatched in Elixir instead (the BEAM owns orchestration; a sandboxed wasm guest
-  can't call host functions). The `/work` mount is the trust boundary.
+  `bash` — the agent's ONE tool. The agent does everything by running a command line here. A shell
+  command runs on **Washy** (`Nexus.Shell` / `Nexus.Washy`) — our featured shell (grammar: for/if/
+  while/vars) compiled to wasm and run IN-PROCESS on the pure-Elixir interpreter (BEAM-isolated,
+  bounded), with the full coreutils tool set provided by `host_exec` (the thesis's fork/exec
+  emulation). Dense — no wasmer subprocess. HOST CAPABILITIES — `agent` (delegate), `request`
+  (autopoiesis), `work` (the in-process .work CLI), `image|video|speak` (generate), and the web
+  commands — are dispatched in Elixir (the BEAM owns orchestration; they also compose mid-pipe via a
+  host_exec hook). The `/work` mount is the trust boundary.
   """
 
   # The host-brokered web commands (not wasm kits) — gated by a `web`/`net`/`browse` grant.
@@ -23,9 +25,9 @@ defmodule Nexus.Agent.Bash do
 
   @doc """
   Run the agent's command line. HOST CAPABILITIES (`agent`/`request`/`work`/`image|video|speak`/web)
-  run in Elixir — the BEAM owns orchestration. EVERYTHING ELSE is a REAL program (bash + coreutils +
-  python + …) executed on **Wasmer** (`Nexus.Wasmer`) over the agent's `/work`. No shell emulation —
-  bash does its own parsing. `perms` (`%{grant: […]}`) gates web + scopes the run.
+  run in Elixir — the BEAM owns orchestration. EVERYTHING ELSE runs on the Washy shell over the agent's
+  `/work` (grammar + coreutils via host_exec), in-process + BEAM-isolated + bounded. `perms`
+  (`%{grant: […]}`) gates web + scopes the run; a `:session` pid routes to a stateful Washy session.
   """
   def run(vfs, line, perms) when is_binary(line) do
     case tokenize(line) do
@@ -109,16 +111,6 @@ defmodule Nexus.Agent.Bash do
   defp tokenize(line) do
     Regex.scan(~r/'[^']*'|"[^"]*"|\S+/, line)
     |> Enum.map(fn [t] -> t |> String.trim("\"") |> String.trim("'") end)
-  end
-
-  defp wasmer_opts(perms) do
-    grant = is_map(perms) && perms[:grant]
-    net = if is_list(grant) and Enum.any?(~w(net web browse), &(&1 in grant)), do: [net: true], else: []
-    # When the run carries a Membrane socket, pass it through so host caps compose mid-pipe via the shim.
-    case is_map(perms) && perms[:membrane] do
-      %{} = mem -> [{:membrane, mem} | net]
-      _ -> net
-    end
   end
 
   @max_depth 3
