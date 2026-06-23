@@ -3360,9 +3360,9 @@ server :cloud do
     end
   end
 
-  # Bind (or clear, with an empty url) the GitHub mirror remote for a workspace's bare repo. The URL may
-  # embed a token (https://user:token@github.com/org/repo.git) — it lands in the bare repo's git config
-  # on the data volume (deployer config, not source). Nexus.Git carries the generic mechanism.
+  # Bind (or clear, with an empty url) the GitHub mirror remote for a workspace's bare repo. Any token
+  # embedded in the URL is STRIPPED before storage (wb-7a2s) — only the credential-free remote lands in
+  # git config; the github.com push credential is minted fresh (scoped 1h App token) at push time.
   def workspace_mirror(req) do
     ws = git_ws(is_map(req.body) && req.body["ws"])
     url = (is_map(req.body) && req.body["url"]) || ""
