@@ -135,8 +135,9 @@ defmodule Nexus.Agent do
     function: %{
       name: "bash",
       description:
-        "Your one tool: a sandboxed shell against /work (pipes work). WRITE files with a heredoc — " <>
-          "`cat > path/file.work <<'EOF'\\n…\\nEOF` (preferred for multi-line; `>` auto-creates dirs, so no " <>
+        "Your one tool: a sandboxed bash shell against /work — chain with `;` `&&` `||`, pipe with `|`. " <>
+          "WRITE files with a heredoc — `cat > path/file.work <<'EOF'\\n…\\nEOF` (preferred for multi-line; " <>
+          "chain `… && work check` to write+verify in one call; `>` auto-creates dirs, so no " <>
           "mkdir). DISCOVER on demand instead of guessing: `kits` (list kits), `help <kit>` (its commands), " <>
           "`work help` (your .work CLI: check/syntax/structure/graph/why/near/parse). DELEGATE with " <>
           "`agent <name> <task>` (returns text; issue several at once to run them in parallel). Returns stdout+stderr.",
@@ -618,11 +619,11 @@ defmodule Nexus.Agent do
       "You have ONE tool, `bash`: a sandbox over /work. Don't over-explore or guess — discover details " <>
       "ON DEMAND (`help <kit>`, `work syntax`) rather than hunting through files. Kits available:\n" <>
       catalog <> web <>
-      "\n\nRun ONE command per call — the shell has NO `;`, `&&`, or newline chaining (only pipes `|`). " <>
-      "So do one step per turn.\n" <>
-      "• Author/fix a .work file: (1) `work syntax` once for the valid forms; (2) WRITE it in a single " <>
-      "heredoc call — `cat > path/file.work <<'EOF'\\n…\\nEOF` (multi-line, clean; `>` makes dirs, no mkdir) " <>
-      "and put NOTHING after the closing EOF; (3) then `work check` in the next call, and fix until OK.\n" <>
+      "\n\nThe shell is real bash: chain with `;` `&&` `||` and pipe with `|`, so batch related steps into " <>
+      "ONE call.\n" <>
+      "• Author/fix a .work file: `work syntax` once for the valid forms, then in a single call write it " <>
+      "with a heredoc AND check it — `cat > path/file.work <<'EOF'\\n…\\nEOF\\nwork check` (or `… && work " <>
+      "check`). The `>` makes parent dirs (no mkdir). Fix until `work check` reports OK.\n" <>
       "• Delegate with `agent <name> <task>` — issue several in one turn to run them in parallel.\n" <>
       "• Stop as soon as the task is done: when you have the answer, reply directly without calling bash."
   end

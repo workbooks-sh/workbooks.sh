@@ -34,29 +34,112 @@ defmodule Nexus.Agent.Bash do
   grant, is refused — so `tools`/`grant` actually CONSTRAIN the agent, not just describe it.
   """
   def run(vfs, line, perms) when is_binary(line) do
-    # Heredoc first (`cmd <<EOF … EOF`) — the standard way to feed multi-line content to a command. The
-    # body becomes the pipeline's initial stdin; combined with `> file` it's how agents author files
-    # (`cat > deck.work <<EOF … EOF`). Then strip a trailing `> file` redirect off the command line.
+    # A command LIST: `a ; b && c || d` — agents write real bash, so honor sequencing + short-circuit.
+    # `;`/newline = run next regardless; `&&` = run next only if prev SUCCEEDED; `||` = only if prev FAILED.
+    # The split is heredoc- and quote-aware (operators inside a `<<EOF … EOF` body or quotes don't split).
+    {out, _ok} = exec_list(vfs, split_command_list(line), perms)
+    out
+  end
+
+  # Run a connected command list, threading exit status for short-circuit operators. Returns {output, ok?}.
+  defp exec_list(vfs, commands, perms) do
+    Enum.reduce(commands, {"", true}, fn {connector, cmd}, {acc, prev_ok} ->
+      run? =
+        case connector do
+          :and -> prev_ok
+          :or -> not prev_ok
+          _ -> true
+        end
+
+      if run? do
+        {out, ok} = run_command(vfs, cmd, perms)
+        {acc <> out, ok}
+      else
+        {acc, prev_ok}
+      end
+    end)
+  end
+
+  # One command = optional heredoc + a pipeline + optional `> file` redirect. Returns {output, ok?}.
+  defp run_command(vfs, line, perms) do
     {line, heredoc} = extract_heredoc(line)
     {pipeline, redirect} = extract_redirect(line)
 
-    out =
+    {out, ok} =
       pipeline
       |> split_pipes()
-      |> Enum.reduce(heredoc || "", fn segment, stdin -> run_segment(vfs, segment, stdin, perms) end)
+      |> Enum.reduce({heredoc || "", true}, fn segment, {stdin, _ok} -> run_segment(vfs, segment, stdin, perms) end)
 
     case redirect do
       nil ->
-        out
+        {out, ok}
 
       {mode, file} ->
         # Output redirection `> file` / `>> file` — write the pipeline's stdout to a real file in the
-        # agent's /work (the workspace worktree). The shell only does pipes natively; this makes the
-        # write idiom LLMs reach for ("echo … > f.work") actually create files, so agents can author.
+        # agent's /work (the workspace worktree). The write idiom LLMs reach for ("echo … > f.work")
+        # actually creates files; `>` auto-creates parent dirs (no mkdir needed).
         rel = redirect_rel(file)
         body = if mode == :append, do: (Nexus.Agent.Vfs.get(vfs, rel) || "") <> out, else: out
         Nexus.Agent.Vfs.put(vfs, rel, body)
-        ""
+        {"", ok}
+    end
+  end
+
+  @doc false
+  # Test seam — split a line into the connected command list (heredoc/quote-aware).
+  def split_command_list_for_test(line), do: split_command_list(line)
+
+  # Split a line into `[{connector, command}]` where connector ∈ :first | :seq | :and | :or — the operator
+  # that PRECEDED the command. `;` and a top-level newline are :seq; `&&` :and; `||` :or. Quotes and heredoc
+  # bodies are OPAQUE (operators inside `"…"`, `'…'`, or `<<EOF … EOF` never split). A small real-bash list
+  # parser: scan(rest, current, results, connector_for_current).
+  defp split_command_list(line) do
+    line
+    |> scan("", [], :first)
+    |> Enum.map(fn {op, c} -> {op, String.trim(c)} end)
+    |> Enum.reject(fn {_op, c} -> c == "" end)
+  end
+
+  defp scan("", cur, acc, conn), do: Enum.reverse([{conn, cur} | acc])
+  defp scan("&&" <> rest, cur, acc, conn), do: scan(rest, "", [{conn, cur} | acc], :and)
+  defp scan("||" <> rest, cur, acc, conn), do: scan(rest, "", [{conn, cur} | acc], :or)
+  defp scan(";" <> rest, cur, acc, conn), do: scan(rest, "", [{conn, cur} | acc], :seq)
+  defp scan("\n" <> rest, cur, acc, conn), do: scan(rest, "", [{conn, cur} | acc], :seq)
+
+  # A heredoc: keep the ENTIRE `<<DELIM … DELIM` (incl. body) as opaque text in this command, so operators
+  # inside the body never split and operators AFTER the closing delimiter still do. run_command re-parses it.
+  defp scan("<<" <> rest, cur, acc, conn) do
+    case Regex.run(~r/\A(-?[ \t]*['"]?)([A-Za-z_]\w*)['"]?/, rest) do
+      [decl, _pre, delim] ->
+        after_decl = binary_part(rest, byte_size(decl), byte_size(rest) - byte_size(decl))
+
+        case Regex.run(~r/\A(.*?\n[ \t]*#{Regex.escape(delim)}[ \t]*)(\n|\z)/s, after_decl) do
+          [_, body_and_delim, _nl] ->
+            # Consume the body up to & incl. the closing delimiter, but LEAVE the trailing newline so it
+            # acts as a `;` separator — `<<EOF … EOF\nwork check` becomes two commands, not one.
+            consumed = byte_size(body_and_delim)
+            tail = binary_part(after_decl, consumed, byte_size(after_decl) - consumed)
+            scan(tail, cur <> "<<" <> decl <> body_and_delim, acc, conn)
+
+          _ ->
+            scan(after_decl, cur <> "<<" <> decl, acc, conn)
+        end
+
+      _ ->
+        scan(rest, cur <> "<<", acc, conn)
+    end
+  end
+
+  # Quoted spans are opaque (a `;`/`&&` inside quotes is literal).
+  defp scan("\"" <> rest, cur, acc, conn), do: consume_quote(rest, "\"", cur, acc, conn)
+  defp scan("'" <> rest, cur, acc, conn), do: consume_quote(rest, "'", cur, acc, conn)
+
+  defp scan(<<c::utf8, rest::binary>>, cur, acc, conn), do: scan(rest, cur <> <<c::utf8>>, acc, conn)
+
+  defp consume_quote(rest, q, cur, acc, conn) do
+    case String.split(rest, q, parts: 2) do
+      [inside, after_q] -> scan(after_q, cur <> q <> inside <> q, acc, conn)
+      [only] -> scan("", cur <> q <> only, acc, conn)
     end
   end
 
@@ -103,35 +186,35 @@ defmodule Nexus.Agent.Bash do
     |> Enum.map(&Enum.reject(&1, fn t -> t == :pipe end))
   end
 
-  defp run_segment(_vfs, [], stdin, _perms), do: stdin
+  # Each clause returns {output, ok?} so the command list can short-circuit `&&`/`||` on exit status.
+  # Host-brokered builtins succeed by default (ok=true); wasm kits report their real exit code.
+  @builtins (~w(kits help) ++ @web_cmds)
 
-  # `agent <name> <task…>` — delegate to a SUB-AGENT (orchestration). Host-brokered (not a wasm kit),
-  # like the web commands. The sub-agent runs as a function returning text to the parent: depth-capped
-  # (no runaway fan-out) and grant-NARROWED (it can't exceed the parent's capabilities). Task comes from
-  # the args, or stdin when piped (`echo "do X" | agent research`).
-  defp run_segment(_vfs, ["agent" | rest], stdin, perms), do: run_subagent(rest, stdin, perms)
+  defp run_segment(_vfs, [], stdin, _perms), do: {stdin, true}
 
-  # `request <self|agent> <typed change…>` — file a typed self-edit REQUEST to the autopoet (Autopoiesis
-  # v2). Fire-and-forget: it emits a to-do onto the bus and returns immediately — the agent NEVER awaits
-  # the autopoet, it degrades/continues. The change is the typed delta the autopoet acts on; pipe a
-  # longer rationale via stdin if needed (treated as untrusted `why`).
-  defp run_segment(_vfs, ["request" | rest], stdin, _perms), do: run_request(rest, stdin)
+  # `agent <name> <task…>` — delegate to a SUB-AGENT (orchestration). Host-brokered (not a wasm kit).
+  # The sub-agent runs as a function returning text: depth-capped + grant-narrowed. Task from args or stdin.
+  defp run_segment(_vfs, ["agent" | rest], stdin, perms), do: {run_subagent(rest, stdin, perms), true}
 
-  # `work <verb> …` — the agent's own CLI, IN-PROCESS (not wasm, not a subprocess): the SAME
-  # `Nexus.Compile`/`Nexus.Graph` logic the runtime + reactor use, run against the agent's /work tree.
-  # This is how an agent does compilations + workbook tasks (author files → `work check` → fix). Gated on
-  # an `exec`/`commands`/`work` grant; analysis-only verbs that never reach outside /work.
-  defp run_segment(vfs, ["work" | rest], _stdin, perms), do: run_work(vfs, rest, perms)
+  # `request <self|agent> <typed change…>` — file a typed self-edit REQUEST to the autopoet (fire-and-forget).
+  defp run_segment(_vfs, ["request" | rest], stdin, _perms), do: {run_request(rest, stdin), true}
 
-  # `image|video|speak <prompt…>` — generate an asset (host-brokered, like web/agent). The prompt comes
-  # from the args, or stdin when piped. `--model <id>` overrides the default model for the modality.
+  # `work <verb> …` — the agent's own in-process CLI (Nexus.Compile/Nexus.Graph over /work). `work check`
+  # reports its own ok-ness, so `work check && …` short-circuits correctly; other verbs succeed.
+  defp run_segment(vfs, ["work" | rest], _stdin, perms) do
+    out = run_work(vfs, rest, perms)
+    {out, not (String.contains?(out, "problem(s)") or String.starts_with?(out, "work: "))}
+  end
+
+  # `image|video|speak <prompt…>` — generate an asset (host-brokered).
   defp run_segment(_vfs, [cmd | rest], stdin, perms) when cmd in @gen_cmds,
-    do: run_generate(cmd, rest, stdin, perms)
+    do: {run_generate(cmd, rest, stdin, perms), true}
 
   defp run_segment(vfs, [cmd | args], stdin, perms) do
     case permit(cmd, perms) do
-      :ok -> dispatch(vfs, cmd, args, stdin)
-      {:deny, msg} -> msg
+      # Builtins return strings (always ok); a wasm kit returns its real {out, exit==0} so `&&` works.
+      :ok -> if cmd in @builtins, do: {dispatch(vfs, cmd, args, stdin), true}, else: exec(vfs, cmd, args, stdin)
+      {:deny, msg} -> {msg, false}
     end
   end
 
@@ -483,7 +566,8 @@ defmodule Nexus.Agent.Bash do
       "click" -> nav_result(Nexus.Browse.Session.click(List.first(args) || ""))
       "fill" -> fill_result(args)
       "submit" -> nav_result(Nexus.Browse.Session.submit(submit_index(args)))
-      _ -> exec(vfs, cmd, args, stdin)
+      # Only @builtins reach dispatch (run_segment routes kit commands straight to exec/2); unreachable.
+      _ -> "bash: #{cmd}: command not found"
     end
   end
 
@@ -642,10 +726,11 @@ defmodule Nexus.Agent.Bash do
   defp decode_entities(s),
     do: Enum.reduce(@entities, s, fn {e, c}, acc -> String.replace(acc, e, c) end)
 
+  # Returns {output, ok?} — ok from the wasm exit code, so `kit && next` short-circuits like bash.
   defp exec(vfs, cmd, args, stdin) do
     case Nexus.Agent.Kits.resolve(cmd) do
       nil ->
-        "bash: #{cmd}: command not found (try `kits` to list, `help <kit>` for usage)"
+        {"bash: #{cmd}: command not found (try `kits` to list, `help <kit>` for usage)", false}
 
       {wasm, leading} ->
         run_wasm(vfs, wasm, cmd, leading ++ args, stdin)
@@ -682,9 +767,9 @@ defmodule Nexus.Agent.Bash do
     File.rm(stdin_file)
 
     cond do
-      code == 0 -> out
-      code == 137 -> out <> "\nbash: #{List.first(argv) || "command"}: killed (exceeded #{secs}s time budget)"
-      true -> out <> "\n(exit #{code})"
+      code == 0 -> {out, true}
+      code == 137 -> {out <> "\nbash: #{List.first(argv) || "command"}: killed (exceeded #{secs}s time budget)", false}
+      true -> {out <> "\n(exit #{code})", false}
     end
   end
 
