@@ -43,6 +43,7 @@ defmodule Nexus.ControlPlane.Env do
     ws = blank_to_nil(attrs[:workspace_id])
 
     with :ok <- validate(name, value, scope, ws),
+         :ok <- ensure_unique(org, scope, name),
          {:ok, sealed} <- seal(value) do
       id = "env_" <> rand()
 
@@ -86,11 +87,36 @@ defmodule Nexus.ControlPlane.Env do
   `attrs` keys: `name`, `value`. Returns the redacted view. Cross-org ⇒ `:not_found`.
   """
   def update(org, id, attrs) when is_binary(org) do
-    with {:ok, _rec} <- CP.get(org, @kind, id),
+    with {:ok, rec} <- CP.get(org, @kind, id),
+         :ok <- ensure_no_name_collision(org, rec, attrs[:name]),
          {:ok, patch} <- update_patch(attrs) do
+      # `patch` never carries `scope` — a record's scope is immutable here, so a user/workspace record
+      # can't be re-scoped to collide with a `nexus` secret name. Combined with the collision guard
+      # above, `Env.value/2`'s "first nexus record by name" lookup can't be shadowed/ambiguated by a
+      # rename (red-team wb-4fy3).
       {:ok, rec} = CP.update(org, @kind, id, patch)
       {:ok, redacted(rec)}
     end
+  end
+
+  # Reject a rename that would duplicate an existing record's (scope, name) in this org — otherwise two
+  # records share a name within a scope and `value/2`'s Enum.find becomes order-dependent.
+  defp ensure_no_name_collision(_org, _rec, nil), do: :ok
+
+  defp ensure_no_name_collision(org, rec, new_name) do
+    if name_taken?(org, rec[:scope], new_name, rec[:id]),
+      do: {:error, :name_taken},
+      else: :ok
+  end
+
+  # No two records may share (scope, name) in one org — keeps `value/2`'s lookup unambiguous (wb-4fy3).
+  defp ensure_unique(org, scope, name) do
+    if name_taken?(org, scope, name, nil), do: {:error, :name_taken}, else: :ok
+  end
+
+  defp name_taken?(org, scope, name, except_id) do
+    CP.list(org, @kind)
+    |> Enum.any?(fn r -> r[:id] != except_id and r[:scope] == scope and r[:name] == name end)
   end
 
   # Build the patch — only touch name/value, validating each; value-change re-seals + updates length.
