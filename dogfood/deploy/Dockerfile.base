@@ -63,6 +63,21 @@ RUN curl -fsSL https://wasmtime.dev/install.sh | bash -s -- --version ${WASMTIME
 # (+ our coreutils + python) over /work, giving a real wasm-linux sandbox. (Dual-runtime during the
 # migration: wasmtime still backs the compiler lane; wasmer backs the agent shell.) Must be on PATH.
 RUN curl -fsSL https://get.wasmer.io | sh && cp /root/.wasmer/bin/wasmer /usr/local/bin/wasmer && wasmer --version
+# PRE-WARM the pinned agent-shell packages into the wasmer cache (Phase 2 — offline resilience). Without
+# this, the FIRST agent run on a cold/offline Fly machine round-trips the wasmer registry for bash+python
+# (latency + a hard dependency on registry reachability). These PINS must match Nexus.Wasmer's
+# @bash_pkg/@python_pkg — bump them together. The cache lands in /root/.wasmer/cache, which ships in the
+# layer. (coreutils is built from the bundled coreutils.wasm, so it needs no pre-warm.)
+# bash's prebuilt 1.0.18 exits nonzero on a known WASIX teardown crash ('indirect call type mismatch')
+# AFTER the command runs — harmless, and the run still populates the cache (checkouts + compiled module),
+# so `|| true` it. python warms cleanly (strict). Then assert the cache is non-empty so a silent
+# registry/network failure fails the BUILD, not the first prod agent run.
+ENV WB_BASH_PKG=sharrattj/bash@1.0.18 WB_PYTHON_PKG=wasmer/python@3.12.10-beta.2
+RUN (wasmer run "${WB_BASH_PKG}" -- -c 'true' || true) \
+    && wasmer run "${WB_PYTHON_PKG}" -- -c 'pass' \
+    && test -d /root/.wasmer/cache/checkouts \
+    && test -n "$(ls -A /root/.wasmer/cache/checkouts)" \
+    && echo "pre-warmed ${WB_BASH_PKG} + ${WB_PYTHON_PKG} into wasmer cache"
 COPY --from=build /app/rel ./
 # The agent KIT wasm, from the compilers layer (the compilers-image workflow stages nexus/kits/*.wasm
 # into /compilers/kits). Copy ONLY the kits subdir — the dogfood surfaces don't compile, so the full

@@ -17,6 +17,19 @@ defmodule Nexus.Wasmer do
   @guest "/work"
   @default_timeout_ms 30_000
 
+  # PINNED registry packages (Phase 2 — don't float `latest` in prod). These exact versions are what the
+  # image PRE-WARMS into the wasmer cache at build (dogfood/deploy/Dockerfile.base), so a cold/offline
+  # Fly machine never round-trips the registry on first agent run. Bump deliberately, in lockstep with a
+  # re-warm of the image. Overridable via `config :nexus, Nexus.Wasmer, bash_pkg:/python_pkg:`.
+  @bash_pkg "sharrattj/bash@1.0.18"
+  @python_pkg "wasmer/python@3.12.10-beta.2"
+
+  @doc "The pinned bash package (overridable via config `:bash_pkg`)."
+  def bash_pkg, do: Keyword.get(Application.get_env(:nexus, __MODULE__, []), :bash_pkg, @bash_pkg)
+
+  @doc "The pinned python package (overridable via config `:python_pkg`)."
+  def python_pkg, do: Keyword.get(Application.get_env(:nexus, __MODULE__, []), :python_pkg, @python_pkg)
+
   @doc "The wasmer binary: config `:wasmer_bin`, else `~/.wasmer/bin/wasmer`, else `wasmer` on PATH."
   def bin do
     cfg = Application.get_env(:nexus, __MODULE__, [])
@@ -68,7 +81,7 @@ defmodule Nexus.Wasmer do
   agent's shell. Returns `{output, ok?}`.
   """
   def bash(line, host_dir, opts \\ []) when is_binary(line) do
-    run("sharrattj/bash", ["-c", "cd #{@guest} 2>/dev/null; " <> line], host_dir, Keyword.put_new(opts, :use, env()))
+    run(bash_pkg(), ["-c", "cd #{@guest} 2>/dev/null; " <> line], host_dir, Keyword.put_new(opts, :use, env()))
   end
 
   # All 74 uutils applets — packaged each as its own command so bash's exec sets argv[0]=<applet>, which
@@ -86,7 +99,7 @@ defmodule Nexus.Wasmer do
   registered custom TOOLKITS (compiled wasm CLIs). So a toolkit works in a pipe (`cat x | rev`) just like
   a native command. nils (e.g. no toolkits) are dropped.
   """
-  def env, do: Enum.reject([coreutils(), "wasmer/python", toolkits()], &is_nil/1)
+  def env, do: Enum.reject([coreutils(), python_pkg(), toolkits()], &is_nil/1)
 
   @doc """
   A Wasmer package of all registered custom toolkits (each compiled wasm CLI as a command), so the agent's
