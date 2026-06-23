@@ -115,6 +115,15 @@ defmodule Nexus.Sandbox do
 
   def run_command(wasm, stdin) when is_binary(wasm), do: exec_command(wasm, [], [], stdin)
 
+  @doc """
+  Run a command module with `host_dir` mounted read-write at `/work` (the agent-shell lane — our
+  in-house `Nexus.Shell` runs here so `cat /work/x`, redirects, etc. hit the agent's real tree). Same
+  hardened AOT runner (mem cap + wall-clock watchdog + scrubbed env) as `run_command/2`.
+  """
+  def run_command(wasm, stdin, host_dir) when is_binary(wasm) and is_binary(host_dir) do
+    exec_command(wasm, ["--dir", "#{host_dir}::/work"], [], stdin)
+  end
+
   def run_command({:interp, interp, source}, stdin) do
     dir = Path.join(System.tmp_dir!(), "nxcmd_#{System.unique_integer([:positive])}")
     # owner-only: the guest source must not be world-readable in the shared /tmp (red-team wb-xmld)
