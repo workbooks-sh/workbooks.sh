@@ -269,15 +269,31 @@ defmodule Nexus.JJ do
   Create an isolated jj worktree (workspace) named `name` at `dest`, off the repo colocated over
   `work_dir`. Returns `{:ok, dest} | {:skip, reason} | {:error, out}`. `dest` becomes the agent's /work.
   """
-  def workspace_add(bare, work_dir, name, dest) do
-    with :ok <- ensure_colocated(bare, work_dir),
-         {_, 0} <- jj(work_dir, ["workspace", "add", "--name", name, dest]) do
-      {:ok, dest}
-    else
-      {:skip, r} -> {:skip, r}
-      {out, _} when is_binary(out) -> {:error, out}
-      other -> {:error, inspect(other)}
+  @doc """
+  Serialize shared-repo mutations per bare repo. Multiple agents WORK in their own worktrees in parallel,
+  but the brief mutations of the SHARED repo (registering a worktree, moving the `main` bookmark) must not
+  interleave: concurrent `jj workspace add` + `bookmark set` against one repo race and corrupt `main`
+  (proven — 5 concurrent merges → 0 landed; serialized → 5/5). Per-bare, so distinct workspaces never
+  block each other. Returns `fun`'s value. Falls back to running `fun` directly if the lock is unavailable.
+  """
+  def with_repo_lock(bare, fun) when is_function(fun, 0) do
+    case :global.trans({{:wb_jj_repo, bare}, self()}, fun, [node()], :infinity) do
+      :aborted -> fun.()
+      result -> result
     end
+  end
+
+  def workspace_add(bare, work_dir, name, dest) do
+    with_repo_lock(bare, fn ->
+      with :ok <- ensure_colocated(bare, work_dir),
+           {_, 0} <- jj(work_dir, ["workspace", "add", "--name", name, dest]) do
+        {:ok, dest}
+      else
+        {:skip, r} -> {:skip, r}
+        {out, _} when is_binary(out) -> {:error, out}
+        other -> {:error, inspect(other)}
+      end
+    end)
   end
 
   @doc """
@@ -305,6 +321,9 @@ defmodule Nexus.JJ do
   PR / ask for review instead of clobbering. `{:ok, :fast_forward|:rebased} | {:conflict,_} | {:error,_}`.
   """
   def integrate(bare, work_dir, branch, base \\ "main") do
+    # Serialized per-repo: this reads `base`, then moves the `base` bookmark — concurrent integrations into
+    # the same `main` would interleave (read-stale → clobber) and lose merges. The lock makes it true FIFO.
+    with_repo_lock(bare, fn ->
     with :ok <- ensure_colocated(bare, work_dir) do
       # base ⊆ ancestors(branch) ⇒ fast-forwardable (base hasn't diverged).
       {anc, _} = jj(work_dir, ["log", "--no-graph", "-r", "#{base} & ::#{branch}", "-T", "change_id.short()"])
@@ -323,6 +342,7 @@ defmodule Nexus.JJ do
     else
       other -> other
     end
+    end)
   end
 
   defp advance(work_dir, base, branch) do
