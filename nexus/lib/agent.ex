@@ -466,9 +466,12 @@ defmodule Nexus.Agent do
 
   defp loop(messages, vfs, opts, deadline, tel) do
     emit = Keyword.get(opts, :on_event, fn _ -> :ok end)
-    # Generic typed side-channel (default no-op) — feeds the SSE streaming endpoint. Additive: it
-    # carries map events keyed by :type and never changes loop's return value.
-    stream = Keyword.get(opts, :emit, fn _ -> :ok end)
+    # Generic typed side-channel (default no-op) — feeds the SSE/WS streaming endpoint. Additive: it
+    # carries map events keyed by :type and never changes loop's return value. Every event is auto-tagged
+    # with the emitting agent + its delegation depth, so a live UI can NEST sub-agent progress under its
+    # orchestrator (a forwarded sub-agent's events already carry its own name/depth; merge keeps those).
+    raw_stream = Keyword.get(opts, :emit, fn _ -> :ok end)
+    stream = fn ev -> raw_stream.(Map.merge(%{agent: opts[:unit], depth: opts[:depth] || 0}, ev)) end
 
     max_turns = Keyword.get(Keyword.get(opts, :limit, []), :turns)
 
@@ -562,10 +565,10 @@ defmodule Nexus.Agent do
           |> effective_grant(ceiling, Keyword.get(opts, :grant_ceiling))
           |> with_leases(d.name)
 
-        %{tools: d[:tools] || Keyword.get(opts, :kits), grant: grant, depth: depth, caps: caps, tenant: tenant, workspace: Keyword.get(opts, :workspace)}
+        %{tools: d[:tools] || Keyword.get(opts, :kits), grant: grant, depth: depth, caps: caps, tenant: tenant, workspace: Keyword.get(opts, :workspace), stream: Keyword.get(opts, :emit)}
 
       _ ->
-        %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant), depth: depth, caps: caps, tenant: tenant, workspace: Keyword.get(opts, :workspace)}
+        %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant), depth: depth, caps: caps, tenant: tenant, workspace: Keyword.get(opts, :workspace), stream: Keyword.get(opts, :emit)}
     end
   end
 

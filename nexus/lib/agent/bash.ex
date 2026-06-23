@@ -154,7 +154,23 @@ defmodule Nexus.Agent.Bash do
         "agent: no task given (pass as args or pipe via stdin)"
 
       true ->
-        case Nexus.Agent.run_named(name, task, sub_opts(name, task, depth, perms)) do
+        # Forward the sub-agent's LIVE events (tokens/tools/final, already self-tagged with its name +
+        # depth) onto the parent's stream, bracketed by agent_start/agent_end — so a UI shows nested,
+        # real-time progress of every delegated agent (incl. parallel fan-out).
+        ps = is_map(perms) && perms[:stream]
+        opts = sub_opts(name, task, depth, perms)
+        {opts, notify} =
+          if is_function(ps, 1) do
+            ps.(%{type: "agent_start", agent: name, task: task, depth: depth + 1})
+            {Keyword.put(opts, :emit, ps), fn ok -> ps.(%{type: "agent_end", agent: name, depth: depth + 1, ok: ok}) end}
+          else
+            {opts, fn _ -> :ok end}
+          end
+
+        result = Nexus.Agent.run_named(name, task, opts)
+        notify.(match?({:ok, _}, result))
+
+        case result do
           {:ok, %{answer: a}} when is_binary(a) -> a
           {:error, {:no_agent, n}} -> "agent: no such agent: #{n}"
           {:error, e} -> "agent: sub-agent run failed: #{inspect(e)}"
