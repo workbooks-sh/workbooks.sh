@@ -299,18 +299,28 @@ defmodule Nexus.Washy do
     prev = Process.get(:washy_out)
     Process.put(:washy_out, [])
     globals = new_globals(mod.globals)
-    mem = new_mem(mod.mem)
+    {mem, mem_pages} = new_mem(mod.mem)
     init_data(mem, globals, mod.data)
-    rt = %{mod: mod, mem: mem, globals: globals, table: new_table(mod.elements, globals)}
+    rt = %{mod: mod, mem: mem, mem_pages: mem_pages, globals: globals, table: new_table(mod.elements, globals)}
     result = call_fn(rt, Map.fetch!(mod.exports, name), args)
     out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
     if prev == nil, do: Process.delete(:washy_out), else: Process.put(:washy_out, prev)
     {result, out}
   end
 
-  # one `:atomics` slot per byte (simple + correct; pack-to-words is a later optimization). nil = no memory.
-  defp new_mem(nil), do: nil
-  defp new_mem({min, _max}), do: :atomics.new(max(1, min) * 65536, signed: false)
+  # Linear memory: one `:atomics` slot per byte (pack-to-words is a later optimization). We pre-allocate a
+  # generous CAP so `memory.grow` works (grow just raises the logical page count, tracked in a 1-slot
+  # atomics). Returns `{backing, pages_ref}`. nil = no memory.
+  @cap_pages 64
+  defp new_mem(nil), do: {nil, nil}
+
+  defp new_mem({min, _max}) do
+    cap = max(min, @cap_pages)
+    backing = :atomics.new(cap * 65536, signed: false)
+    pages = :atomics.new(1, signed: false)
+    :atomics.put(pages, 1, max(1, min))
+    {backing, pages}
+  end
 
   # mutable globals as an `:atomics` array; initial values come from each global's const init expression.
   defp new_globals([]), do: nil
@@ -503,8 +513,14 @@ defmodule Nexus.Washy do
   defp step({:i32_store, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 4); {:next, s, l})
   defp step({:i32_store8, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 1); {:next, s, l})
   defp step({:i32_store16, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 2); {:next, s, l})
-  defp step({:memory_size}, stack, l, rt), do: {:next, [div(:atomics.info(rt.mem).size, 65536) | stack], l}
-  defp step({:memory_grow}, [_n | s], l, _rt), do: {:next, [-1 &&& @mask32 | s], l}   # TODO real grow
+  defp step({:memory_size}, stack, l, rt), do: {:next, [:atomics.get(rt.mem_pages, 1) | stack], l}
+
+  defp step({:memory_grow}, [n | s], l, rt) do
+    old = :atomics.get(rt.mem_pages, 1)
+    cap = div(:atomics.info(rt.mem).size, 65536)
+    result = if old + n <= cap, do: (:atomics.put(rt.mem_pages, 1, old + n); old), else: -1 &&& @mask32
+    {:next, [result | s], l}
+  end
 
   # floats live on the stack as BEAM floats (heterogeneous w/ ints — validation keeps types correct).
   defp step({:fconst, v}, stack, l, _rt), do: {:next, [v | stack], l}
