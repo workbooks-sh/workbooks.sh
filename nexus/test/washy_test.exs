@@ -52,6 +52,39 @@ defmodule Nexus.WashyTest do
     assert Nexus.Washy.call(mod, "memtest", []) == 42
   end
 
+  # sumto(n) = n + (n-1) + ... + 1, via block/loop/br_if/br + i32.eqz/add/sub (a real loop)
+  @loopmod <<
+    0, 97, 115, 109, 1, 0, 0, 0,
+    1, 6, 1, 96, 1, 127, 1, 127,
+    3, 2, 1, 0,
+    7, 9, 1, 5, 115, 117, 109, 116, 111, 0, 0,
+    10, 35, 1, 33, 1, 1, 127,
+    2, 64, 3, 64, 32, 0, 69, 13, 1, 32, 1, 32, 0, 106, 33, 1, 32, 0, 65, 1, 107, 33, 0, 12, 0, 11, 11, 32, 1, 11
+  >>
+
+  test "control flow: a real loop (block/loop/br_if/br + comparison) computes 1..n" do
+    {:ok, mod} = Nexus.Washy.decode(@loopmod)
+    assert Nexus.Washy.call(mod, "sumto", [5]) == 15
+    assert Nexus.Washy.call(mod, "sumto", [10]) == 55
+    assert Nexus.Washy.call(mod, "sumto", [0]) == 0
+    assert Nexus.Washy.call(mod, "sumto", [100]) == 5050
+  end
+
+  # pick(c) = 100 if c else 200 (if/else)
+  @ifmod <<
+    0, 97, 115, 109, 1, 0, 0, 0,
+    1, 6, 1, 96, 1, 127, 1, 127,
+    3, 2, 1, 0,
+    7, 8, 1, 4, 112, 105, 99, 107, 0, 0,
+    10, 16, 1, 14, 0, 32, 0, 4, 127, 65, 228, 0, 5, 65, 200, 1, 11, 11
+  >>
+
+  test "control flow: if/else picks a branch" do
+    {:ok, mod} = Nexus.Washy.decode(@ifmod)
+    assert Nexus.Washy.call(mod, "pick", [1]) == 100
+    assert Nexus.Washy.call(mod, "pick", [0]) == 200
+  end
+
   test "BEAM isolation: a trap is a caught exception in ONE process, not a VM crash" do
     # a body with an unimplemented opcode raises — but the test VM keeps running, proving fault isolation.
     bad = <<0, 97, 115, 109, 1, 0, 0, 0,
@@ -65,7 +98,7 @@ defmodule Nexus.WashyTest do
     pid = spawn(fn -> send(parent, {:result, (try do Nexus.Washy.call(mod, "bad", []) rescue e -> {:trapped, Exception.message(e)} end)}) end)
     ref = Process.monitor(pid)
     assert_receive {:result, {:trapped, msg}}, 1000
-    assert msg =~ "unimplemented opcode"
+    assert msg =~ "unimplemented"
     assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1000
     # the test process is alive and well — the trap did not take down the VM
     assert Process.alive?(self())

@@ -102,8 +102,53 @@ defmodule Nexus.Washy do
     <<body::binary-size(size), rest2::binary>> = rest
     {locals, code} = vec(body, fn b -> {n, b} = uleb(b); {t, b} = valtype(b); {{n, t}, b} end)
     nlocals = Enum.reduce(locals, 0, fn {n, _}, acc -> acc + n end)
-    {{nlocals, code}, rest2}
+    {instrs, :end, _} = parse_instrs(code)
+    {{nlocals, instrs}, rest2}
   end
+
+  # ── parse a function body's bytes into a STRUCTURED instruction list ─────────────────────────────
+  # Reads until the matching `end` (0x0B) / `else` (0x05); block/loop/if recurse so each carries its own
+  # inner instruction list. This is what makes structured control flow (br targets) tractable.
+  defp parse_instrs(bin, acc \\ [])
+  defp parse_instrs(<<0x0B, rest::binary>>, acc), do: {Enum.reverse(acc), :end, rest}
+  defp parse_instrs(<<0x05, rest::binary>>, acc), do: {Enum.reverse(acc), :else, rest}
+
+  defp parse_instrs(<<op, rest::binary>>, acc) do
+    {instr, rest} = parse_op(op, rest)
+    parse_instrs(rest, [instr | acc])
+  end
+
+  defp parse_op(0x02, rest), do: ({_bt, r} = blocktype(rest); {body, :end, r} = parse_instrs(r); {{:block, body}, r})
+  defp parse_op(0x03, rest), do: ({_bt, r} = blocktype(rest); {body, :end, r} = parse_instrs(r); {{:loop, body}, r})
+
+  defp parse_op(0x04, rest) do
+    {_bt, r} = blocktype(rest)
+    {then_b, term, r} = parse_instrs(r)
+    {else_b, r} = if term == :else, do: (fn -> {e, :end, r2} = parse_instrs(r); {e, r2} end).(), else: {[], r}
+    {{:if, then_b, else_b}, r}
+  end
+
+  defp parse_op(0x41, rest), do: ({v, r} = sleb(rest); {{:i32_const, v}, r})
+  defp parse_op(0x20, rest), do: ({i, r} = uleb(rest); {{:local_get, i}, r})
+  defp parse_op(0x21, rest), do: ({i, r} = uleb(rest); {{:local_set, i}, r})
+  defp parse_op(0x22, rest), do: ({i, r} = uleb(rest); {{:local_tee, i}, r})
+  defp parse_op(0x10, rest), do: ({f, r} = uleb(rest); {{:call, f}, r})
+  defp parse_op(0x0C, rest), do: ({n, r} = uleb(rest); {{:br, n}, r})
+  defp parse_op(0x0D, rest), do: ({n, r} = uleb(rest); {{:br_if, n}, r})
+  defp parse_op(0x0F, rest), do: {{:return}, rest}
+  defp parse_op(0x1A, rest), do: {{:drop}, rest}
+  defp parse_op(0x00, rest), do: {{:unreachable}, rest}
+  defp parse_op(0x01, rest), do: {{:nop}, rest}
+  defp parse_op(0x28, rest), do: ({o, r} = memarg(rest); {{:i32_load, o}, r})
+  defp parse_op(0x2D, rest), do: ({o, r} = memarg(rest); {{:i32_load8u, o}, r})
+  defp parse_op(0x36, rest), do: ({o, r} = memarg(rest); {{:i32_store, o}, r})
+  defp parse_op(0x3A, rest), do: ({o, r} = memarg(rest); {{:i32_store8, o}, r})
+  defp parse_op(0x3F, <<_, rest::binary>>), do: {{:memory_size}, rest}
+  # everything else (arithmetic + comparisons, no immediate) is a pure stack op, dispatched by opcode
+  defp parse_op(op, rest), do: {{:op, op}, rest}
+
+  # blocktype is one byte for the common cases (0x40 empty / a valtype); we don't need its value to run.
+  defp blocktype(<<_b, rest::binary>>), do: {nil, rest}
 
   defp name(content) do
     {len, rest} = uleb(content)
@@ -153,94 +198,112 @@ defmodule Nexus.Washy do
   defp new_mem(nil), do: nil
   defp new_mem({min, _max}), do: :atomics.new(max(1, min) * 65536, signed: false)
 
-  # Invoke local function `fidx`: zero-extend declared locals after the args, run the body.
+  # Invoke local function `fidx`: zero-extend declared locals after the args, run the structured body.
   defp invoke(rt, fidx, args) do
-    {nlocals, body} = Enum.at(rt.mod.code, fidx)
+    {nlocals, instrs} = Enum.at(rt.mod.code, fidx)
     locals = (args ++ List.duplicate(0, nlocals)) |> List.to_tuple()
-    {stack, _} = exec(body, [], locals, rt)
+    {_sig, stack, _l} = run(instrs, [], locals, rt)
     case stack do
       [top | _] -> top
       [] -> nil
     end
   end
 
-  # The stack machine. `exec(code, operand_stack, locals_tuple, runtime) -> {stack, leftover_code}`.
-  defp exec(<<>>, stack, _l, _rt), do: {stack, <<>>}
-  defp exec(<<0x0B, rest::binary>>, stack, _l, _rt), do: {stack, rest}        # end
-  defp exec(<<0x0F, _::binary>>, stack, _l, _rt), do: {stack, <<>>}           # return
+  # Run an instruction list, threading the operand stack + locals. Returns a SIGNAL so structured control
+  # flow works: `{:next, stack, l}` (fell through), `{:br, n, stack, l}` (branch out n labels), or
+  # `{:return, stack, l}`. A br/return stops the list and propagates up to the enclosing block/loop.
+  defp run([], stack, l, _rt), do: {:next, stack, l}
 
-  defp exec(<<0x1A, rest::binary>>, [_ | stack], l, rt), do: exec(rest, stack, l, rt)   # drop
-
-  defp exec(<<0x20, rest::binary>>, stack, l, rt) do                          # local.get
-    {i, rest} = uleb(rest)
-    exec(rest, [elem(l, i) | stack], l, rt)
+  defp run([instr | rest], stack, l, rt) do
+    case step(instr, stack, l, rt) do
+      {:next, stack, l} -> run(rest, stack, l, rt)
+      other -> other
+    end
   end
 
-  defp exec(<<0x21, rest::binary>>, [v | stack], l, rt) do                    # local.set
-    {i, rest} = uleb(rest)
-    exec(rest, stack, put_elem(l, i, v), rt)
+  # block: a `br 0` exits to AFTER the block; deeper br decrements and propagates.
+  defp step({:block, body}, stack, l, rt) do
+    case run(body, stack, l, rt) do
+      {:next, s, l} -> {:next, s, l}
+      {:br, 0, s, l} -> {:next, s, l}
+      {:br, n, s, l} -> {:br, n - 1, s, l}
+      {:return, s, l} -> {:return, s, l}
+    end
   end
 
-  defp exec(<<0x22, rest::binary>>, [v | _] = stack, l, rt) do                # local.tee
-    {i, rest} = uleb(rest)
-    exec(rest, stack, put_elem(l, i, v), rt)
+  # loop: a `br 0` jumps to the START (re-run the loop); falling through exits.
+  defp step({:loop, body} = loop, stack, l, rt) do
+    case run(body, stack, l, rt) do
+      {:next, s, l} -> {:next, s, l}
+      {:br, 0, s, l} -> step(loop, s, l, rt)
+      {:br, n, s, l} -> {:br, n - 1, s, l}
+      {:return, s, l} -> {:return, s, l}
+    end
   end
 
-  defp exec(<<0x41, rest::binary>>, stack, l, rt) do                          # i32.const
-    {v, rest} = sleb(rest)
-    exec(rest, [v &&& @mask32 | stack], l, rt)
+  defp step({:if, then_b, else_b}, [c | stack], l, rt) do
+    case run(if(c != 0, do: then_b, else: else_b), stack, l, rt) do
+      {:next, s, l} -> {:next, s, l}
+      {:br, 0, s, l} -> {:next, s, l}
+      {:br, n, s, l} -> {:br, n - 1, s, l}
+      {:return, s, l} -> {:return, s, l}
+    end
   end
 
-  defp exec(<<0x10, rest::binary>>, stack, l, rt) do                          # call
-    {fidx, rest} = uleb(rest)
-    {nparams, _} = Enum.at(rt.mod.types, Enum.at(rt.mod.funcs, fidx))
-    n = length(nparams)
-    {args, stack} = Enum.split(stack, n)
-    result = invoke(rt, fidx, Enum.reverse(args))
-    exec(rest, [result | stack], l, rt)
+  defp step({:br, n}, stack, l, _rt), do: {:br, n, stack, l}
+  defp step({:br_if, n}, [c | stack], l, _rt), do: if(c != 0, do: {:br, n, stack, l}, else: {:next, stack, l})
+  defp step({:return}, stack, l, _rt), do: {:return, stack, l}
+  defp step({:unreachable}, _stack, _l, _rt), do: raise("washy: unreachable")
+  defp step({:nop}, stack, l, _rt), do: {:next, stack, l}
+  defp step({:drop}, [_ | stack], l, _rt), do: {:next, stack, l}
+
+  defp step({:i32_const, v}, stack, l, _rt), do: {:next, [v &&& @mask32 | stack], l}
+  defp step({:local_get, i}, stack, l, _rt), do: {:next, [elem(l, i) | stack], l}
+  defp step({:local_set, i}, [v | stack], l, _rt), do: {:next, stack, put_elem(l, i, v)}
+  defp step({:local_tee, i}, [v | _] = stack, l, _rt), do: {:next, stack, put_elem(l, i, v)}
+
+  defp step({:call, f}, stack, l, rt) do
+    {params, _} = Enum.at(rt.mod.types, Enum.at(rt.mod.funcs, f))
+    {args, stack} = Enum.split(stack, length(params))
+    {:next, [invoke(rt, f, Enum.reverse(args)) | stack], l}
   end
 
-  # ── linear memory (little-endian) ── effective address = popped addr + the memarg `offset` immediate
-  defp exec(<<0x28, rest::binary>>, [addr | stack], l, rt) do                 # i32.load
-    {off, rest} = memarg(rest)
-    exec(rest, [load(rt.mem, addr + off, 4) | stack], l, rt)
-  end
+  defp step({:i32_load, o}, [a | s], l, rt), do: {:next, [load(rt.mem, a + o, 4) | s], l}
+  defp step({:i32_load8u, o}, [a | s], l, rt), do: {:next, [load(rt.mem, a + o, 1) | s], l}
+  defp step({:i32_store, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 4); {:next, s, l})
+  defp step({:i32_store8, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 1); {:next, s, l})
+  defp step({:memory_size}, stack, l, rt), do: {:next, [div(:atomics.info(rt.mem).size, 65536) | stack], l}
 
-  defp exec(<<0x2D, rest::binary>>, [addr | stack], l, rt) do                 # i32.load8_u
-    {off, rest} = memarg(rest)
-    exec(rest, [load(rt.mem, addr + off, 1) | stack], l, rt)
-  end
+  defp step({:op, op}, stack, l, _rt), do: {:next, binop(op, stack), l}
 
-  defp exec(<<0x36, rest::binary>>, [val, addr | stack], l, rt) do            # i32.store
-    {off, rest} = memarg(rest)
-    store(rt.mem, addr + off, val, 4)
-    exec(rest, stack, l, rt)
-  end
+  # ── pure stack ops: arithmetic + comparisons. `[b, a | s]` — a pushed first, b on top. ──
+  defp binop(0x6A, [b, a | s]), do: [(a + b) &&& @mask32 | s]                       # i32.add
+  defp binop(0x6B, [b, a | s]), do: [(a - b) &&& @mask32 | s]                       # i32.sub
+  defp binop(0x6C, [b, a | s]), do: [(a * b) &&& @mask32 | s]                       # i32.mul
+  defp binop(0x6E, [b, a | s]), do: [div(a, b) &&& @mask32 | s]                     # i32.div_u
+  defp binop(0x70, [b, a | s]), do: [rem(a, b) &&& @mask32 | s]                     # i32.rem_u
+  defp binop(0x71, [b, a | s]), do: [a &&& b | s]                                   # i32.and
+  defp binop(0x72, [b, a | s]), do: [a ||| b | s]                                   # i32.or
+  defp binop(0x73, [b, a | s]), do: [bxor(a, b) | s]                                # i32.xor
+  defp binop(0x74, [b, a | s]), do: [(a <<< (b &&& 31)) &&& @mask32 | s]            # i32.shl
+  defp binop(0x76, [b, a | s]), do: [a >>> (b &&& 31) | s]                          # i32.shr_u
+  defp binop(0x45, [a | s]), do: [bool(a == 0) | s]                                 # i32.eqz
+  defp binop(0x46, [b, a | s]), do: [bool(a == b) | s]                              # i32.eq
+  defp binop(0x47, [b, a | s]), do: [bool(a != b) | s]                              # i32.ne
+  defp binop(0x48, [b, a | s]), do: [bool(s32(a) < s32(b)) | s]                     # i32.lt_s
+  defp binop(0x49, [b, a | s]), do: [bool(a < b) | s]                               # i32.lt_u
+  defp binop(0x4A, [b, a | s]), do: [bool(s32(a) > s32(b)) | s]                     # i32.gt_s
+  defp binop(0x4B, [b, a | s]), do: [bool(a > b) | s]                               # i32.gt_u
+  defp binop(0x4C, [b, a | s]), do: [bool(s32(a) <= s32(b)) | s]                    # i32.le_s
+  defp binop(0x4D, [b, a | s]), do: [bool(a <= b) | s]                              # i32.le_u
+  defp binop(0x4E, [b, a | s]), do: [bool(s32(a) >= s32(b)) | s]                    # i32.ge_s
+  defp binop(0x4F, [b, a | s]), do: [bool(a >= b) | s]                              # i32.ge_u
+  defp binop(op, _), do: raise("washy: unimplemented stack op 0x#{Integer.to_string(op, 16)}")
 
-  defp exec(<<0x3A, rest::binary>>, [val, addr | stack], l, rt) do            # i32.store8
-    {off, rest} = memarg(rest)
-    store(rt.mem, addr + off, val, 1)
-    exec(rest, stack, l, rt)
-  end
-
-  defp exec(<<0x3F, rest::binary>>, stack, l, rt) do                          # memory.size (pages)
-    <<_reserved, rest::binary>> = rest
-    pages = div(:atomics.info(rt.mem).size, 65536)
-    exec(rest, [pages | stack], l, rt)
-  end
-
-  # binary i32 ops: pop b, a (a was pushed first), push f(a,b)
-  for {op, fun} <- [{0x6A, :+}, {0x6B, :-}, {0x6C, :*}] do
-    defp exec(<<unquote(op), rest::binary>>, [b, a | stack], l, rt),
-      do: exec(rest, [(Kernel.unquote(fun)(a, b)) &&& @mask32 | stack], l, rt)
-  end
-
-  defp exec(<<0x71, rest::binary>>, [b, a | stack], l, rt), do: exec(rest, [a &&& b | stack], l, rt)  # i32.and
-  defp exec(<<0x72, rest::binary>>, [b, a | stack], l, rt), do: exec(rest, [a ||| b | stack], l, rt)  # i32.or
-  defp exec(<<0x73, rest::binary>>, [b, a | stack], l, rt), do: exec(rest, [bxor(a, b) | stack], l, rt) # i32.xor
-
-  # unknown opcode — surface it loudly so we know exactly what to implement next
-  defp exec(<<op, _::binary>>, _stack, _l, _rt), do: raise("washy: unimplemented opcode 0x#{Integer.to_string(op, 16)}")
+  defp bool(true), do: 1
+  defp bool(false), do: 0
+  defp s32(x) when x >= 0x80000000, do: x - 0x100000000
+  defp s32(x), do: x
 
   # memarg = align (uleb) + offset (uleb); we only need offset (alignment is a hint).
   defp memarg(bin) do
