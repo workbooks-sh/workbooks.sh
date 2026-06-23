@@ -376,7 +376,8 @@ server :cloud do
   end
 
   # The durable run ledger for this tenant, newest first.
-  def runs_list(req) do
+  def runs_list(req), do: if(org_read_ok?(req), do: do_runs_list(req), else: forbidden())
+  defp do_runs_list(req) do
     # Read-side scoping (wb-ate4): a member sees only their OWN runs; admins (and single-tenant dev) see
     # all. The prior version returned every user's run history (prompts/metering) to any caller.
     all_runs? = not Nexus.Auth.multi?() or Nexus.Auth.role_at_least?(Map.get(req, :role, "viewer"), "admin")
@@ -634,6 +635,12 @@ server :cloud do
   # this is WHAT a role may do. A gated handler reads `def h(req), do: gate(req, :write) && do_h(req) || ...`.
   defp gate(req, action), do: not Nexus.Auth.multi?() or Nexus.Authz.may?(Map.get(req, :role, "viewer"), action)
   defp forbidden, do: {403, %{error: "forbidden — insufficient role for this action"}}
+
+  # Org-internal collection reads (data rows, storage stats, search, issues/tasks/schedules/runs) must NOT
+  # be world-readable (wb-hkv4): a public-website visitor has no authenticated user, so the JSON API is
+  # gated like the dashboard UI it backs. Single-tenant/dev (auth=None) is trusted → allow. Public-surface
+  # reads (tree/file_read) stay open — they're already filtered by the per-workspace visibility ACL.
+  defp org_read_ok?(req), do: not Nexus.Auth.multi?() or Nexus.Authz.authenticated?(%{user: server_uid(req)})
 
   # Identity-scoped routes (profile, device keys) MUST act as the authenticated person — the wb-q7w5
   # deploy fix. In a multi-tenant deploy (Nexus.Auth adapter != None) a request with NO server-derived
@@ -1008,7 +1015,8 @@ server :cloud do
     end
   end
 
-  def tasks_list(req) do
+  def tasks_list(req), do: if(org_read_ok?(req), do: do_tasks_list(req), else: forbidden())
+  defp do_tasks_list(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
     tasks = current_tasks(tenant) |> Enum.reject(&(&1.kind == "issue"))
       |> Enum.sort_by(&{&1.priority || 2, -(&1.updated || 0)})
@@ -1017,7 +1025,8 @@ server :cloud do
 
   # The issue queue — tasks of kind "issue" (filed by a failed run or explicitly by an agent/human).
   # Newest first; the triage view separates agent-filed from human-filed by created_by.
-  def issues_list(req) do
+  def issues_list(req), do: if(org_read_ok?(req), do: do_issues_list(req), else: forbidden())
+  defp do_issues_list(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
     agents = Nexus.Agent.all() |> Enum.map(&Nexus.Agent.def_from_unit(&1).name) |> MapSet.new()
     issues =
@@ -1487,7 +1496,8 @@ server :cloud do
     |> Enum.filter(&(&1.enabled == 1))
   end
 
-  def schedules_list(req) do
+  def schedules_list(req), do: if(org_read_ok?(req), do: do_schedules_list(req), else: forbidden())
+  defp do_schedules_list(req) do
     %{schedules: current_schedules(req.tenant || Nexus.Store.default_tenant()) |> Enum.sort_by(&(-(&1.created || 0)))}
   end
 
@@ -1838,7 +1848,8 @@ server :cloud do
 
   # Real storage for the Storage admin page — one bucket per mounted surface, sizes off the data volume
   # (the same computation as the `storage` Live dial). Shape matches the page: {totalSize, buckets:[…]}.
-  def storage(req) do
+  def storage(req), do: if(org_read_ok?(req), do: do_storage(req), else: forbidden())
+  defp do_storage(req) do
     buckets =
       for {name, root} <- readable_mounts(req), name != "" do
         bytes = dir_bytes(root)
@@ -1853,7 +1864,8 @@ server :cloud do
   # Every resource ("table") for the current tenant, grouped-friendly (carries `workspace`). Tier
   # badges (durable/replicated) are GLOBAL facts of the backend, not per-resource (one Store adapter,
   # one Litestream replica) — surfaced honestly rather than faked into per-table tiers.
-  def data_list(req) do
+  def data_list(req), do: if(org_read_ok?(req), do: do_data_list(req), else: forbidden())
+  defp do_data_list(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
     durable = Nexus.Store.adapter() == Nexus.Store.Sqlite
     replicated = durable and litestream_on?()
@@ -1876,7 +1888,8 @@ server :cloud do
   # A real page of a resource's rows. Query: name, offset, limit, sort (field), dir (asc|desc), q.
   # Returns {fields, rows, total, offset, limit} — total is the count AFTER any `q` filter, so the UI
   # paginates the full table (not a capped peek). Tenant-scoped via Nexus.Store.page.
-  def data_rows(req) do
+  def data_rows(req), do: if(org_read_ok?(req), do: do_data_rows(req), else: forbidden())
+  defp do_data_rows(req) do
     tenant = req.tenant || Nexus.Store.default_tenant()
     name = req.query["name"] || ""
 
@@ -2166,7 +2179,8 @@ server :cloud do
     end
   end
 
-  def search(req) do
+  def search(req), do: if(org_read_ok?(req), do: do_search(req), else: forbidden())
+  defp do_search(req) do
     q = String.downcase(String.trim(req.query["q"] || ""))
 
     results =

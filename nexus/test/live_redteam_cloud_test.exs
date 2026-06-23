@@ -139,5 +139,25 @@ defmodule Nexus.LiveRedteamCloudTest do
     assert String.contains?(own_tree, ~s("#{ctx.target}")), "owner could not see their own draft"
   end
 
+  test "anon cannot read org-internal collection APIs; an authenticated member can (wb-hkv4)", ctx do
+    skipping?(ctx) && throw(:skip)
+
+    for path <- ["/cloud/data", "/cloud/storage", "/cloud/search?q=key", "/cloud/runs",
+                 "/cloud/issues", "/cloud/tasks", "/cloud/schedules"] do
+      {anon_status, _} = anon_get(path)
+      assert anon_status == 403, "anon read org-internal #{path} (got #{anon_status})"
+
+      {mem_status, _} = req(:get, path, ctx.member)
+      assert mem_status == 200, "authenticated member blocked from #{path} (got #{mem_status})"
+    end
+  end
+
+  defp anon_get(path) do
+    {:ok, {{_, status, _}, _h, resp}} =
+      :httpc.request(:get, {@base ++ String.to_charlist(path), []}, [{:timeout, 30_000}], [{:body_format, :binary}])
+
+    {status, resp}
+  end
+
   defp skipping?(ctx), do: ctx[:skip] == true
 end
