@@ -78,4 +78,34 @@ defmodule Nexus.Secrets do
 
   @doc "True when the secret is present and non-blank."
   def has?(name) when is_binary(name), do: get(name) != nil
+
+  # The high-value env vars that must NEVER be visible to a subprocess that evaluates untrusted,
+  # wire-originated code (the git pre-receive compile gate runs attacker `.work` macros). Scrubbing
+  # these at the OS env layer — before the gate BEAM boots — severs the kill-chain's RCE→KEK→Fly-token
+  # link even if compile-time code execution happens: there is no master key to decrypt the org secret
+  # store, no infra token to reach other machines, no provider keys to exfiltrate. (Red-team wb-10lz /
+  # wb-onui / wb-qmp8 / wb-7zsr.) Includes both the static high-value names and any `WB_SECRET_*` /
+  # `LITESTREAM_*` currently present in this process's env, so the scrub list is complete for the host
+  # the hook will run on.
+  @privileged_static ~w(
+    WB_ENV_MASTER_KEY FLY_API_TOKEN
+    OPENROUTER_API_KEY ANTHROPIC_API_KEY OPENAI_API_KEY BRAVE_API_KEY EXA_API_KEY TAVILY_API_KEY
+    WB_DATABASE_URL WB_S3_ACCESS_KEY_ID WB_S3_SECRET_ACCESS_KEY WB_S3_ENDPOINT WB_S3_BUCKET
+    LITESTREAM_ACCESS_KEY_ID LITESTREAM_SECRET_ACCESS_KEY
+    WB_SESSION_SECRET WB_PUBLIC_BEARER
+  )
+
+  @doc """
+  The list of env-var names to strip from any subprocess that evaluates untrusted code. Combines the
+  static high-value set with every `WB_SECRET_*` / `LITESTREAM_*` var present in the current env.
+  """
+  @spec privileged_env_names() :: [String.t()]
+  def privileged_env_names do
+    dynamic =
+      System.get_env()
+      |> Map.keys()
+      |> Enum.filter(&(String.starts_with?(&1, "WB_SECRET_") or String.starts_with?(&1, "LITESTREAM_")))
+
+    (@privileged_static ++ dynamic) |> Enum.uniq()
+  end
 end

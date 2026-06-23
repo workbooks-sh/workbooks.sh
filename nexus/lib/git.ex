@@ -299,6 +299,24 @@ defmodule Nexus.Git do
     end
   end
 
+  @doc """
+  Env-driven authorship gate — reads `WB_GATE_BARE`/`WB_GATE_OLD`/`WB_GATE_NEW` instead of having the
+  hook splice push-controlled ref values into an `eval` source string (red-team wb-livx). Fixed,
+  data-free eval; fails closed on a missing bare path.
+  """
+  def sig_gate_env! do
+    bare = System.get_env("WB_GATE_BARE")
+    old = System.get_env("WB_GATE_OLD") || ""
+    new = System.get_env("WB_GATE_NEW") || ""
+
+    if is_binary(bare) and bare != "" do
+      sig_gate!(bare, old, new)
+    else
+      IO.puts("remote: ✗ authorship gate: WB_GATE_BARE unset")
+      System.halt(1)
+    end
+  end
+
   @doc "Hook entry point: `:ok` returns normally (push allowed); `:reject` prints + halts 1 (push rejected)."
   def sig_gate!(bare, old, new) do
     case sig_gate(bare, old, new) do
@@ -309,6 +327,15 @@ defmodule Nexus.Git do
         IO.puts("remote: ✗ push rejected — every commit must be signed by a registered device key (authorship policy: hard)")
         System.halt(1)
     end
+  end
+
+  # `env -u VAR -u VAR …` flags that strip every high-value secret from the compile-gate subprocess.
+  # Computed at hook-write time from the host's current env, so the list is complete for the machine the
+  # hook runs on. Var names are `[A-Z0-9_]+` by construction (System env keys) — safe to interpolate.
+  defp scrub_flags do
+    Nexus.Secrets.privileged_env_names()
+    |> Enum.filter(&Regex.match?(~r/\A[A-Z0-9_]+\z/, &1))
+    |> Enum.map_join(" ", &"-u #{&1}")
   end
 
   defp pre_receive(bare) do
@@ -330,6 +357,14 @@ defmodule Nexus.Git do
           ;;
         refs/heads/main|refs/heads/master)
           case "$new" in 0000000000000000000000000000000000000000) continue ;; esac
+          # AUTHORSHIP GATE FIRST (red-team wb-10lz ordering): under the :hard policy every pushed
+          # commit must be signed by a registered device key. Running it BEFORE the compile gate means
+          # an unsigned/forged push is rejected before any of its code is compiled/macro-expanded. No-op
+          # under :off/:soft. Push-controlled refs are passed via env (WB_GATE_*), never spliced into the
+          # eval source (red-team wb-livx). This eval is trusted runtime code (verifies signatures), so it
+          # keeps the normal env.
+          WB_GATE_BARE="#{bare}" WB_GATE_OLD="$_old" WB_GATE_NEW="$new" \\
+            "$NEXUS_BIN" eval "Nexus.Git.sig_gate_env!()" || exit 1
           tmp=$(mktemp -d)
           # Extract the INCOMING tree (uses the hook's inherited env incl. the quarantine to find $new).
           git archive "$new" 2>/dev/null | tar -x -C "$tmp" 2>/dev/null
@@ -339,7 +374,13 @@ defmodule Nexus.Git do
           if [ -z "$(ls -A "$tmp" 2>/dev/null)" ]; then
             rm -rf "$tmp"; echo "remote: pre-receive: could not read pushed tree (skipping compile gate)"; continue
           fi
-          out=$("$NEXUS_BIN" eval "Nexus.Compile.gate(\\"$tmp\\")" 2>&1); code=$?
+          # COMPILE GATE in a SECRET-SCRUBBED env (red-team wb-10lz/wb-onui/wb-qmp8): Compile.gate compiles
+          # the attacker-pushed `.work` tree, and Code.compile_quoted executes module bodies + macros at
+          # compile time. We can't yet move that into a separate sandboxed node, but we CAN ensure that even
+          # if compile-time code runs, the high-value secrets are not in its environment — `env -u` strips
+          # the KEK, the Fly token, and every provider/infra key before the gate BEAM boots, severing the
+          # RCE→KEK→Fly-token→all-orgs chain at this entry. Tree path via env, never spliced into source.
+          out=$(env #{scrub_flags()} WB_GATE_TREE="$tmp" "$NEXUS_BIN" eval "Nexus.Compile.gate_from_env()" 2>&1); code=$?
           rm -rf "$tmp"
           if [ "$code" != "0" ]; then
             echo "$out" | sed 's/^/remote: /'
@@ -347,9 +388,6 @@ defmodule Nexus.Git do
             exit 1
           fi
           echo "remote: ✓ compile check passed"
-          # Authorship gate (fix wb-i2c8): under the :hard policy every pushed commit must be signed by
-          # a registered device key. No-op under :off/:soft. Reads the quarantined objects via inherited env.
-          "$NEXUS_BIN" eval "Nexus.Git.sig_gate!(\\"#{bare}\\", \\"$_old\\", \\"$new\\")" || exit 1
           ;;
       esac
     done

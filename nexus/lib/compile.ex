@@ -496,6 +496,19 @@ defmodule Nexus.Compile do
   on failure so a caller (`bin/nexus eval Nexus.Compile.gate(dir)` in the pre-receive hook) sees a
   non-zero exit and REJECTS the push. On success returns `:ok`.
   """
+  @doc """
+  Env-driven gate entrypoint — reads the tree path from `WB_GATE_TREE` instead of having the caller
+  splice it into an `eval` source string. The pre-receive hook sets the env var and calls a fixed,
+  data-free eval, so push-controlled bytes (`$tmp`, refs) never enter an Elixir source string (red-team
+  wb-livx). Fails closed: a missing/empty `WB_GATE_TREE` rejects the push.
+  """
+  def gate_from_env do
+    case System.get_env("WB_GATE_TREE") do
+      dir when is_binary(dir) and dir != "" -> gate(dir)
+      _ -> IO.puts("✗ compile gate: WB_GATE_TREE unset"); System.halt(1)
+    end
+  end
+
   def gate(dir) do
     r = check(dir)
     for s <- r.skipped, do: IO.puts("· not gated: #{s.kind} :#{s.name} — #{s.reason}")

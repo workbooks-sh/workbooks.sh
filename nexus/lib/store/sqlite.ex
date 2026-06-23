@@ -115,7 +115,15 @@ defmodule Nexus.Store.Sqlite do
     Sqlite3.execute(conn, "CREATE TABLE IF NOT EXISTS #{tbl(resource)} (id INTEGER PRIMARY KEY, tenant TEXT, data BLOB)")
   end
 
-  defp tbl(resource), do: "r_" <> (resource |> Module.split() |> Enum.join("_") |> String.downcase())
+  # Table name is derived from the resource MODULE name (server-defined, not attacker input today). It is
+  # string-interpolated into SQL, so guard the identifier against `[a-z0-9_]+` as defense-in-depth: if a
+  # resource module name ever becomes attacker-influenceable (dynamic compile of guest `.work`), an
+  # injection attempt raises instead of reaching the query (red-team wb-iqyc).
+  defp tbl(resource) do
+    name = "r_" <> (resource |> Module.split() |> Enum.join("_") |> String.downcase())
+    unless Regex.match?(~r/\A[a-z0-9_]+\z/, name), do: raise(ArgumentError, "unsafe table identifier: #{inspect(name)}")
+    name
+  end
 
   # Default to the durable volume DB under .nexus/ (Litestream replicates this). An explicit
   # `:sqlite_path` (dev per-workbook DB, tests) still wins.
