@@ -568,15 +568,24 @@ defmodule Nexus.Server do
   get "/assets/*path" do
     case path do
       [tenant, name] ->
-        case Nexus.Assets.read(tenant, name) do
-          {:ok, bytes, ct} ->
-            conn
-            |> put_resp_content_type(ct)
-            |> put_resp_header("cache-control", "public, max-age=31536000, immutable")
-            |> send_resp(200, bytes)
-
-          _ ->
+        # Scope to the authenticated tenant: on a multi-tenant nexus, /assets/<other-tenant>/… is a
+        # cross-tenant read (the tenant comes from the URL, not the session) → 404, don't leak existence.
+        # A single-tenant nexus has one tenant, so this is a no-op there. (red-team wb-0w41)
+        cond do
+          not Nexus.Assets.may_serve?(Nexus.Auth.tenant(conn), tenant, Nexus.Auth.multi?()) ->
             send_resp(conn, 404, "not found")
+
+          true ->
+            case Nexus.Assets.read(tenant, name) do
+              {:ok, bytes, ct} ->
+                conn
+                |> put_resp_content_type(ct)
+                |> put_resp_header("cache-control", "public, max-age=31536000, immutable")
+                |> send_resp(200, bytes)
+
+              _ ->
+                send_resp(conn, 404, "not found")
+            end
         end
 
       _ ->
