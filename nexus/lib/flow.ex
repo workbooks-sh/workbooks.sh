@@ -70,15 +70,38 @@ defmodule Nexus.Flow do
         {:error, {:no_flow, to_string(name)}}
 
       %{steps: steps} ->
+        n = length(steps)
+        emit_flow(ctx, %{type: "flow_start", flow: to_string(name), steps: n})
+
         {result, trace} =
-          Enum.reduce(steps, {input, []}, fn s, {acc, tr} ->
+          steps
+          |> Enum.with_index(1)
+          |> Enum.reduce({input, []}, fn {s, i}, {acc, tr} ->
+            label = step_label(s)
+            emit_flow(ctx, %{type: "step_start", flow: to_string(name), step: label, index: i, of: n})
             out = run_step(s, acc, ctx)
+            emit_flow(ctx, %{type: "step_end", flow: to_string(name), step: label, index: i, of: n})
             {thread(acc, out), [%{step: s.name, out: out} | tr]}
           end)
 
+        emit_flow(ctx, %{type: "flow_end", flow: to_string(name)})
         {:ok, %{result: result, trace: Enum.reverse(trace)}}
     end
   end
+
+  # Live step progress: when the caller threads an `:emit` fn in ctx, fire flow/step events so a UI can
+  # watch a flow advance through its steps in real time (same channel as agent token/tool events).
+  defp emit_flow(ctx, ev) do
+    case is_map(ctx) && ctx[:emit] do
+      f when is_function(f, 1) -> f.(ev)
+      _ -> :ok
+    end
+  end
+
+  # A readable label for a step (a `parallel do … end` group fans out, so name it as such).
+  defp step_label(%{parallel: subs, name: name}) when is_list(subs), do: "#{name} (parallel ×#{length(subs)})"
+  defp step_label(%{name: name}), do: to_string(name)
+  defp step_label(_), do: "step"
 
   # a parallel group fans its substeps out concurrently on the SAME threaded value, then gathers their
   # threaded results into a list (declaration order) and threads that forward. The runtime owns the BEAM

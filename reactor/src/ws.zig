@@ -176,20 +176,51 @@ pub fn streamAgentRun(io: Io, alloc: std.mem.Allocator, url: []const u8, token: 
     }
 }
 
+// Indentation for a nested (sub-)agent event, from its `depth` field (4 spaces per level, capped).
+fn indentFor(payload: []const u8) []const u8 {
+    const pad = "                    "; // 20 spaces = 5 levels
+    const d = cloud.jsonField(payload, "depth") orelse return "";
+    const n = std.fmt.parseInt(usize, d, 10) catch 0;
+    const w = @min(n * 4, pad.len);
+    return pad[0..w];
+}
+
 // Print one streamed run event. Returns false to stop (done/error). Event shapes mirror the agent loop:
-// start | text{content} | tools{commands} | final{answer} | error{error} | done{status,turns}.
+// token{content} | text{content} | tools{commands} | agent_start{agent,task} | agent_end{agent,ok} |
+// final{answer} | error{error} | done{status,turns}. Events carry agent+depth for nesting.
 fn handleEvent(alloc: std.mem.Allocator, payload: []const u8) bool {
     const t = cloud.jsonField(payload, "type") orelse return true;
 
-    if (eql(t, "text")) {
+    if (eql(t, "token")) {
+        // Streamed LLM delta — print inline as it arrives (this is the live token stream).
+        if (cloud.jsonString(alloc, payload, "content")) |c| log.print("{s}", .{c});
+    } else if (eql(t, "text")) {
         if (cloud.jsonString(alloc, payload, "content")) |c| {
             log.print("{s}{s}{s}", .{ log.dim_c, c, log.reset });
         }
+    } else if (eql(t, "agent_start")) {
+        const a = cloud.jsonField(payload, "agent") orelse "agent";
+        log.print("\n{s}{s}\u{250C}\u{2500} {s}{s}\n", .{ indentFor(payload), log.path_c, a, log.reset });
+    } else if (eql(t, "agent_end")) {
+        const a = cloud.jsonField(payload, "agent") orelse "agent";
+        const ok = cloud.jsonField(payload, "ok") orelse "true";
+        log.print("{s}{s}\u{2514}\u{2500} {s} ({s}){s}\n", .{ indentFor(payload), log.dim_c, a, ok, log.reset });
+    } else if (eql(t, "flow_start")) {
+        const f = cloud.jsonField(payload, "flow") orelse "flow";
+        const n = cloud.jsonField(payload, "steps") orelse "?";
+        log.print("\n{s}\u{25C6} flow {s} ({s} steps){s}\n", .{ log.path_c, f, n, log.reset });
+    } else if (eql(t, "step_start")) {
+        const s = cloud.jsonField(payload, "step") orelse "step";
+        const i = cloud.jsonField(payload, "index") orelse "?";
+        const of = cloud.jsonField(payload, "of") orelse "?";
+        log.print("  {s}[{s}/{s}] {s}{s}\n", .{ log.dim_c, i, of, s, log.reset });
+    } else if (eql(t, "flow_end") or eql(t, "step_end")) {
+        // lifecycle close — no extra line (kept quiet; the next start/final shows progress)
     } else if (eql(t, "tools")) {
         if (cloud.jsonString(alloc, payload, "commands")) |c| {
-            log.print("  {s}\u{21B3} {s}{s}\n", .{ log.path_c, c, log.reset });
+            log.print("{s}  {s}\u{21B3} {s}{s}\n", .{ indentFor(payload), log.path_c, c, log.reset });
         } else {
-            log.out("  \u{21B3} (running tools)\n");
+            log.print("{s}  \u{21B3} (running tools)\n", .{indentFor(payload)});
         }
     } else if (eql(t, "final")) {
         if (cloud.jsonString(alloc, payload, "answer")) |a| {
