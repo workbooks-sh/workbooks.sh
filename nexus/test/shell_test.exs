@@ -68,6 +68,25 @@ defmodule Nexus.ShellTest do
     end
   end
 
+  test "store backend: diskless, tenant-scoped writes persist across runs + isolate", %{} = ctx do
+    cond do
+      ctx[:skip] -> :ok
+      not File.exists?("kits/coreutils.wasm") -> IO.puts("\n[skip] coreutils.wasm absent")
+      true ->
+        Nexus.Store.clear(Nexus.Washy.FileRow, "acme")
+        Nexus.Store.clear(Nexus.Washy.FileRow, "other")
+        # write in tenant "acme" (no disk — SQLite), read it back on a SEPARATE run
+        Nexus.Shell.run("echo persisted > /work/n.txt", ctx.dir, backend: {:store, "acme"})
+        {out, _} = Nexus.Shell.run("cat /work/n.txt | upper", ctx.dir, backend: {:store, "acme"})
+        assert out == "PERSISTED\n"
+        # nothing hit the host dir (diskless)
+        refute File.exists?(Path.join(ctx.dir, "n.txt"))
+        # tenant "other" cannot see acme's bytes — same path, disjoint store
+        {out2, _} = Nexus.Shell.run("cat /work/n.txt", ctx.dir, backend: {:store, "other"})
+        refute out2 =~ "persisted"
+    end
+  end
+
   test "grammar engine: for / if / while / variables", %{} = ctx do
     if ctx[:skip], do: IO.puts("\n[skip] C wasm lane not built"), else: (
       run = fn line -> Nexus.Shell.run(line, ctx.dir) |> elem(0) end

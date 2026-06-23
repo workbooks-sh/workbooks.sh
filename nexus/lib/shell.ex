@@ -48,16 +48,19 @@ defmodule Nexus.Shell do
 
   defp run_washy(wasm_path, line, host_dir, opts) do
     {:ok, mod} = Nexus.Washy.decode_cached(File.read!(wasm_path))
-    vfs0 = load_dir(host_dir)
     opts = limits(opts)
     timeout = Keyword.get(opts, :timeout_ms, 30_000)
+    # FS backend: default :map bridged to `host_dir` on disk (local/desktop); `{:store, tenant}` runs
+    # diskless against the tenant-partitioned SQLite VFS (prod multi-tenant) — no host_dir load/flush.
+    backend = Keyword.get(opts, :backend, :map)
+    vfs0 = if backend == :map, do: load_dir(host_dir), else: %{}
 
     progs = programs()
     dispatch = Process.get(:washy_host_dispatch)   # carry an optional host-cap hook into the Task
 
     task =
       Task.async(fn ->
-        Process.put(:washy_backend, :map)
+        Process.put(:washy_backend, backend)
         Process.put(:washy_vfs, vfs0)
         Process.put(:washy_stdin, line)
         Process.put(:washy_argv, ["sh"])
@@ -81,7 +84,9 @@ defmodule Nexus.Shell do
     max_out = Keyword.get(opts, :max_output, 16 * 1024 * 1024)
 
     case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
-      {:ok, {code, out, vfs}} -> flush_dir(host_dir, vfs, vfs0); {clip(out, max_out), code == 0}
+      {:ok, {code, out, vfs}} ->
+        if backend == :map, do: flush_dir(host_dir, vfs, vfs0)   # store backend persists in SQLite, no disk flush
+        {clip(out, max_out), code == 0}
       {:ok, other} -> {"shell: #{inspect(other)}", false}
       {:exit, reason} -> {"shell: crashed (#{inspect(reason)})", false}
       nil -> {"shell: killed (>#{timeout}ms)", false}
