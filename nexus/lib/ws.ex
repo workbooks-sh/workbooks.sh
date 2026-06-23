@@ -50,6 +50,11 @@ defmodule Nexus.Ws do
           (msg["params"] || %{})
           |> Map.merge(%{"tenant" => state.tenant, "u" => state.user || "anon", "role" => state[:role]})
 
+        # Kill any in-flight runner before starting a new one — a re-`subscribe` on the same socket
+        # otherwise overwrites state.runner and orphans the prior linked process (it keeps running, no
+        # longer tracked, so terminate/2 can't reap it): unbounded spawns per socket (red-team wb-e0dp).
+        kill_runner(state[:runner])
+
         me = self()
         emit = fn ev -> send(me, {:ws_event, ev}) end
         runner = spawn_link(fn ->
@@ -90,8 +95,21 @@ defmodule Nexus.Ws do
 
   @impl true
   def terminate(_reason, state) do
-    r = state[:runner]
-    if is_pid(r) and Process.alive?(r), do: Process.exit(r, :kill)
+    kill_runner(state[:runner])
     :ok
   end
+
+  # Unlink BEFORE killing: the runner is spawn_link'd (so a socket close reaps it), but when we kill the
+  # PRIOR runner on re-subscribe we must not let the `:killed` exit propagate back through the link and
+  # take down the socket itself. Unlink severs that, then the targeted kill stops just the old runner.
+  defp kill_runner(r) when is_pid(r) do
+    if Process.alive?(r) do
+      Process.unlink(r)
+      Process.exit(r, :kill)
+    end
+
+    :ok
+  end
+
+  defp kill_runner(_), do: :ok
 end

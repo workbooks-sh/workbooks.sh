@@ -124,9 +124,12 @@ defmodule Nexus.Compilers.Shared do
   end
 
   defp impersonate_get(bin, url, orig) do
-    # `curl_chrome*` wrappers preset the Chrome JA3/JA4 + h2 fingerprint; we add follow-redirects,
-    # gzip decode, a timeout, and fail-on-non-2xx so a challenge page doesn't masquerade as success.
-    args = ["-sSL", "--compressed", "--max-time", "30", "--fail", url]
+    # `curl_chrome*` wrappers preset the Chrome JA3/JA4 + h2 fingerprint; we add gzip decode, a timeout,
+    # and fail-on-non-2xx. We DO NOT follow redirects (`--max-redirs 0`, no `-L`): curl following a 3xx
+    # in-binary would bypass the per-hop SSRF re-guard the Elixir path enforces, letting a public host
+    # redirect us to 169.254.169.254 / an internal IP (red-team wb-jsng). A legit redirect is re-fetched
+    # by the SSRF-guarded Elixir request path, not here.
+    args = ["-sS", "--max-redirs", "0", "--compressed", "--max-time", "30", "--fail", url]
 
     case System.cmd(bin, args, stderr_to_stdout: false) do
       {body, 0} when byte_size(body) > 0 ->
