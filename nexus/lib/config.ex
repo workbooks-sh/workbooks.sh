@@ -87,6 +87,14 @@ defmodule Nexus.Config do
   def sandbox_max_instances, do: get(:sandbox_max_instances)
   def sandbox_proc_memory_mb, do: get(:sandbox_proc_memory_mb)
   def sandbox_compile_memory_mb, do: get(:sandbox_compile_memory_mb)
+  # Washy in-process interpreter per-run bounds (deploy-tunable; neutral defaults).
+  def washy_fuel, do: get(:washy_fuel)
+  def washy_timeout_ms, do: get(:washy_timeout_ms)
+  def washy_max_output, do: get(:washy_max_output_mb) * 1024 * 1024
+  def washy_max_depth, do: get(:washy_max_depth)
+  def washy_max_pages, do: get(:washy_max_pages)
+  @doc "Washy per-run bounds as an opts keyword list (fuel/timeout_ms/max_output/max_depth/max_pages)."
+  def washy_limits, do: [fuel: washy_fuel(), timeout_ms: washy_timeout_ms(), max_output: washy_max_output(), max_depth: washy_max_depth(), max_pages: washy_max_pages()]
   def net_allow, do: get(:net_allow)
   def llm_calls_per_min, do: get(:llm_calls_per_min)
   def fetch_calls_per_min, do: get(:fetch_calls_per_min)
@@ -270,6 +278,15 @@ defmodule Nexus.Config do
       # a much larger working set than a command module (libstd builds reach ~GBs), so it gets its own
       # generous default. Still bounded so a memory.grow loop in a build script can't exhaust host RAM.
       sandbox_compile_memory_mb: int(attr(html, "sandbox-compile-memory-mb"), 3072),
+      # Washy (in-process wasm interpreter) per-run bounds — the dense BEAM lane that runs the agent
+      # shell + host_exec'd programs. Neutral safe defaults; a deployer dials them via the deploy block.
+      # fuel = instruction budget (runaway-work bound); the rest are wall-clock / output / recursion /
+      # linear-memory ceilings. All enforced as catchable traps, never a host fault.
+      washy_fuel: int(attr(html, "washy-fuel"), 2_000_000_000),
+      washy_timeout_ms: int(attr(html, "washy-timeout-ms"), 30_000),
+      washy_max_output_mb: int(attr(html, "washy-max-output-mb"), 16),
+      washy_max_depth: int(attr(html, "washy-max-depth"), 10_000),
+      washy_max_pages: int(attr(html, "washy-max-pages"), 4096),
       # Concurrent heavy wasmtime subprocesses spawned from inside a compile (proc-macro servers, build
       # scripts) — bounds their fan-out so a malicious crate's N build scripts can't exhaust host RAM.
       subproc_concurrency: int(attr(html, "subproc-concurrency"), System.schedulers_online()),

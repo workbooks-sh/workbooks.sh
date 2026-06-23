@@ -27,7 +27,6 @@ defmodule Nexus.Shell do
   No wasmtime subprocess, no fork: this is the dense lane (thousands of cells/GB). `host_dir` is bridged
   to Washy's virtual FS (load in, flush writes back); the prod path uses the tenant-scoped SQLite VFS.
   """
-  @timeout_ms 30_000
   def run(line, host_dir, opts \\ []) when is_binary(line) and is_binary(host_dir) do
     case wasm() do
       nil -> {"shell: unavailable (wasm C lane not built)", false}
@@ -35,10 +34,23 @@ defmodule Nexus.Shell do
     end
   end
 
+  # Per-run bounds come from the deploy block (Nexus.Config.washy_limits) — neutral defaults if config
+  # isn't loaded (tests/dev). Caller opts override.
+  defp limits(opts) do
+    base = try do
+      Nexus.Config.washy_limits()
+    rescue
+      _ -> [fuel: 2_000_000_000, timeout_ms: 30_000, max_output: 16 * 1024 * 1024, max_depth: 10_000, max_pages: 4096]
+    end
+
+    Keyword.merge(base, opts)
+  end
+
   defp run_washy(wasm_path, line, host_dir, opts) do
     {:ok, mod} = Nexus.Washy.decode_cached(File.read!(wasm_path))
     vfs0 = load_dir(host_dir)
-    timeout = Keyword.get(opts, :timeout_ms, @timeout_ms)
+    opts = limits(opts)
+    timeout = Keyword.get(opts, :timeout_ms, 30_000)
 
     progs = programs()
     dispatch = Process.get(:washy_host_dispatch)   # carry an optional host-cap hook into the Task
@@ -66,13 +78,18 @@ defmodule Nexus.Shell do
         {code, out, Process.get(:washy_vfs, vfs0)}
       end)
 
+    max_out = Keyword.get(opts, :max_output, 16 * 1024 * 1024)
+
     case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
-      {:ok, {code, out, vfs}} -> flush_dir(host_dir, vfs, vfs0); {out, code == 0}
+      {:ok, {code, out, vfs}} -> flush_dir(host_dir, vfs, vfs0); {clip(out, max_out), code == 0}
       {:ok, other} -> {"shell: #{inspect(other)}", false}
       {:exit, reason} -> {"shell: crashed (#{inspect(reason)})", false}
       nil -> {"shell: killed (>#{timeout}ms)", false}
     end
   end
+
+  defp clip(bin, max) when byte_size(bin) <= max, do: bin
+  defp clip(bin, max), do: binary_part(bin, 0, max)
 
   # The program registry host_exec resolves against: coreutils as the multicall `:default`, so any
   # non-builtin command the shell hits (seq, printf, cut, basename, …) runs the real tool. Memoized

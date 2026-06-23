@@ -1,6 +1,23 @@
 defmodule Nexus.ConfigTest do
   use ExUnit.Case, async: false
 
+  test "washy per-run bounds: neutral defaults, deploy-tunable" do
+    Nexus.Config.reload(nil)
+    assert Nexus.Config.washy_fuel() == 2_000_000_000
+    assert Nexus.Config.washy_timeout_ms() == 30_000
+    assert Nexus.Config.washy_max_output() == 16 * 1024 * 1024
+    assert Keyword.fetch!(Nexus.Config.washy_limits(), :max_depth) == 10_000
+
+    src = ~s(deploy do\n  washy-fuel="5000000" washy-timeout-ms="8000" washy-max-output-mb="4" washy-max-pages="256"\nend\n)
+    Nexus.Config.reload(src)
+    assert Nexus.Config.washy_fuel() == 5_000_000
+    assert Nexus.Config.washy_timeout_ms() == 8_000
+    assert Nexus.Config.washy_max_output() == 4 * 1024 * 1024
+    assert Nexus.Config.washy_max_pages() == 256
+  after
+    Nexus.Config.reload(nil)
+  end
+
   test "defaults when there is no deploy config" do
     Nexus.Config.reload(nil)
     assert Nexus.Config.compile_concurrency() == System.schedulers_online()
