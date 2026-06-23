@@ -51,4 +51,16 @@ defmodule Nexus.Wasmer.SessionTest do
       Session.stop(s)
     )
   end
+
+  test "Bash.run routes through a session in perms — cwd persists across agent commands", %{} = ctx do
+    if ctx[:skip], do: :ok, else: (
+      vfs = Nexus.Agent.Vfs.attach(ctx.dir)
+      {:ok, s} = Session.start_link(ctx.dir)
+      perms = %{grant: ["fs", "exec"], session: s}
+      Nexus.Agent.Bash.run(vfs, "mkdir -p /work/d && cd /work/d", perms)
+      out = Nexus.Agent.Bash.run(vfs, "pwd", perms) |> String.trim()
+      assert out == "/work/d"
+      Session.stop(s)
+    )
+  end
 end

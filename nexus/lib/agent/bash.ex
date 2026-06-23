@@ -38,10 +38,22 @@ defmodule Nexus.Agent.Bash do
             out
 
           :not_host ->
-            {out, _ok} = Nexus.Wasmer.bash(line, Nexus.Agent.Vfs.dir(vfs), wasmer_opts(perms))
-            out
+            shell(line, vfs, perms)
         end
     end
+  end
+
+  # A shell command runs either in a LONG-LIVED session (Phase 6 — `perms[:session]` carries a
+  # `Nexus.Wasmer.Session` pid, so cwd/env persist across the agent's commands) or, by default, as a
+  # fresh one-shot wasmer subprocess. Host caps never reach here (they resolved on the Membrane above).
+  defp shell(line, _vfs, %{session: session} = _perms) when is_pid(session) do
+    {out, _code} = Nexus.Wasmer.Session.run(session, line)
+    out
+  end
+
+  defp shell(line, vfs, perms) do
+    {out, _ok} = Nexus.Wasmer.bash(line, Nexus.Agent.Vfs.dir(vfs), wasmer_opts(perms))
+    out
   end
 
   # ── The Membrane seam (wb-g5w3) ─────────────────────────────────────────────────────────────────
