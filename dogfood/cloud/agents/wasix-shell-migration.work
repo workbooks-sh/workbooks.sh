@@ -41,3 +41,28 @@ the compiler isn't the blocker, the WASIX sysroot was). Findings:
 
 - Then P1-image (vendor wasmer + busybox.wasm into the runtime image, BRANCH only — don't bloat main),
   P4 host-builtin WASIX-socket bridge, P5 persistent session, P6 security re-prove on wasmer.
+
+## P0-robust UPDATE — toolchain VALIDATED (no-fork) + the fork wall (autonomous build session)
+
+Built a working C→WASIX cross-compile with HOST tools (no in-image clang needed):
+- clang `/opt/homebrew/opt/llvm/bin/clang` `--target=wasm32-wasip1 --sysroot=$WASIX -resource-dir=$RD`
+- $WASIX = wasix-org/wasix-libc `sysroot.tar.gz` (v2026-06-03.1). Bridge the triple-dir naming:
+  `ln -s wasm32-wasi $WASIX/lib/wasm32-wasip1`. $RD = clang's real resource-dir `include` + the sysroot's
+  `libclang_rt.builtins-wasm32.a` copied to `$RD/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a`.
+- thread/fork flags: `-matomics -mbulk-memory -mmutable-globals -pthread` + emulated libs
+  (`-D_WASI_EMULATED_PROCESS_CLOCKS -lwasi-emulated-process-clocks -D_WASI_EMULATED_GETPID -lwasi-emulated-getpid`)
+  + `-Wl,--shared-memory,--max-memory=4294967296`.
+- RESULT: a no-fork C program (hello, filters) compiles → `wasmer run ./x.wasm` runs CLEAN (no teardown
+  crash — the prebuilt-package bug is a PACKAGE artifact, gone in fresh builds). This unblocks building
+  grep/sed/awk (single-process, NO fork) with this exact toolchain to fill the coreutils gap.
+
+THE FORK WALL: a fork()-using C module compiles + imports `wasix_32v1.proc_fork` + futex/threads + shared
+memory correctly, but at runtime `fork()` → exit 79 (no child/parent, no -1) on `wasmer run` (bare module
+AND as a package). plain `wasm-opt --asyncify` did NOT fix it. WASIX proc_fork needs wasmer's exact build-
+pipeline instrumentation (likely asyncify with `--pass-arg=asyncify-imports@wasix_32v1.*` or the newer
+stack-switching + specific link) that cargo-wasix/the wasix-libc build encapsulate. The PREBUILT
+sharrattj/bash forks fine (pipes produce output), so this only blocks a 100%-from-source bash. DECISION:
+use prebuilt bash+coreutils (real bash, fork works) for the shell; build grep/sed/awk no-fork with the
+toolchain above; treat from-source-bash (cracking proc_fork) as a later perfection track. Next recipe step
+for that track: replicate cargo-wasix's exact post-processing (build a forking Rust prog via cargo-wasix,
+diff its wasm vs ours for the missing asyncify/section).
