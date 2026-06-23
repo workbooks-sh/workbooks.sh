@@ -50,11 +50,19 @@ defmodule Nexus.Application do
     Nexus.Effects.install_builtins()
 
     children =
-      [Nexus.Telemetry, Nexus.Autopoet.Lease, Nexus.Analytics, Nexus.ControlPlane.Store, Nexus.ControlPlane.Token, Nexus.Auth.Token] ++
+      # Nexus.Broker FIRST — the credential trust boundary holds the KEK + Fly token; everything that
+      # decrypts the secret store or calls Fly is a thin client of it, so it must be up before them.
+      [Nexus.Broker, Nexus.Telemetry, Nexus.Autopoet.Lease, Nexus.Analytics, Nexus.ControlPlane.Store, Nexus.ControlPlane.Token, Nexus.Auth.Token] ++
         Nexus.Writer.Lock.child_specs() ++
         Nexus.Events.child_specs() ++ Nexus.Scheduler.child_specs() ++ Nexus.Worker.child_specs() ++
         Nexus.Wasm.Gate.child_specs() ++ Nexus.Cache.child_specs() ++ ether ++ server_children()
     result = Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
+
+    # On a real serving nexus, lock down the credential broker: the KEK + Fly token are now captured in
+    # Nexus.Broker's state, so scrub them from the shared OS process env — a compile-time RCE or tenant
+    # `.work` can no longer `System.get_env` them (red-team wb-qmp8 / wb-7zsr). Skipped under `mix test`
+    # (serve? == false) so tests can set the key dynamically.
+    if serve?(), do: Nexus.Broker.lockdown()
 
     # Once the server is up, publish the desktop discovery file (no-op unless WB_DESKTOP_DIR is set).
     if serve?(), do: Nexus.Desktop.write_discovery(port())

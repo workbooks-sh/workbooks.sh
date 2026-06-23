@@ -135,43 +135,11 @@ defmodule Nexus.ControlPlane.Env do
   end
 
   # ── crypto (AES-256-GCM) ─────────────────────────────────────────────────────────────────────
-  # Seal → %{iv, ciphertext, tag} (binaries). Fresh random IV per call ⇒ same plaintext, different
-  # ciphertext. Fails closed when the master key is absent — never an ephemeral/derived fallback.
-  defp seal(value) when is_binary(value) do
-    case master_key() do
-      {:ok, key} ->
-        iv = :crypto.strong_rand_bytes(12)
-        {ct, tag} = :crypto.crypto_one_time_aead(:aes_256_gcm, key, iv, value, <<>>, true)
-        {:ok, %{iv: iv, ciphertext: ct, tag: tag}}
-
-      err ->
-        err
-    end
-  end
-
-  defp unseal(%{iv: iv, ciphertext: ct, tag: tag}) do
-    case master_key() do
-      {:ok, key} ->
-        case :crypto.crypto_one_time_aead(:aes_256_gcm, key, iv, ct, <<>>, tag, false) do
-          :error -> {:error, :decrypt_failed}
-          value when is_binary(value) -> {:ok, value}
-        end
-
-      err ->
-        err
-    end
-  end
-
-  # 32-byte key from the base64 WB_ENV_MASTER_KEY deploy secret; anything else ⇒ fail closed.
-  defp master_key do
-    with raw when is_binary(raw) <- System.get_env("WB_ENV_MASTER_KEY"),
-         {:ok, key} <- Base.decode64(raw),
-         32 <- byte_size(key) do
-      {:ok, key}
-    else
-      _ -> {:error, :no_master_key}
-    end
-  end
+  # The KEK lives ONLY in Nexus.Broker (the credential trust boundary) — this module never reads the
+  # raw `WB_ENV_MASTER_KEY`. seal/unseal delegate to the Broker, which holds the key in its own process
+  # state (and scrubs it from the OS env after boot). Still fail-closed: no key → {:error, :no_master_key}.
+  defp seal(value) when is_binary(value), do: Nexus.Broker.seal(value)
+  defp unseal(%{iv: _, ciphertext: _, tag: _} = rec), do: Nexus.Broker.unseal(rec)
 
   # ── views / helpers ──────────────────────────────────────────────────────────────────────────
   # Redacted view: never includes iv/ciphertext/tag or the plaintext — just a fixed 8-bullet mask.
