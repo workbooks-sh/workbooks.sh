@@ -35,6 +35,29 @@ defmodule Nexus.Washy do
 
   def decode(_), do: {:error, :not_a_wasm_module}
 
+  @doc """
+  Decode with a **content-addressed cache**: the immutable module struct is decoded ONCE per unique
+  binary and stored in `:persistent_term` keyed by its SHA-256. Every cell then SHARES that one struct
+  with no per-read copy (this is what `persistent_term` gives that ETS does not) — so instantiating the
+  Nth cell of a program costs only its fresh mutable state (memory + counters), never re-decoding the
+  9.6 MB coreutils module. Assumes a low-cardinality module set (the fleet's compilers/programs); each
+  `put` does a global scan, amortized over many reads.
+  """
+  def decode_cached(bytes) when is_binary(bytes) do
+    key = {:washy_mod_cache, :crypto.hash(:sha256, bytes)}
+
+    case :persistent_term.get(key, nil) do
+      nil ->
+        case decode(bytes) do
+          {:ok, mod} -> :persistent_term.put(key, mod); {:ok, mod}
+          err -> err
+        end
+
+      mod ->
+        {:ok, mod}
+    end
+  end
+
   defp decode_sections(<<>>, mod), do: mod
 
   defp decode_sections(<<id, rest::binary>>, mod) do
@@ -333,6 +356,9 @@ defmodule Nexus.Washy do
   # `:stack_exhausted` trap instead of an opaque process crash. Block/loop nesting is statically
   # finite and not counted here.
   @default_max_depth 10_000
+  # Hard ceiling on memory growth (pages) — replaces the old implicit 64-page cap. A guest cannot
+  # grow past this, so `memory.grow` can never OOM the host. 4096 pages = 256 MB. Override per run.
+  @default_max_pages 4096
 
   def call(%__MODULE__{} = mod, name, args, opts \\ []) when is_list(args) do
     {result, _io} = call_io(mod, name, args, opts)
@@ -345,33 +371,40 @@ defmodule Nexus.Washy do
   """
   def call_io(%__MODULE__{} = mod, name, args, opts \\ []) when is_list(args) do
     prev = Process.get(:washy_out)
+    prev_mem = Process.get(:washy_mem)
     Process.put(:washy_out, [])
     globals = new_globals(mod.globals)
-    {mem, mem_pages} = new_mem(mod.mem)
-    init_data(mem, globals, mod.data)
+    mem_pages = new_mem(mod.mem)
+    init_data(globals, mod.data)
     fuel = :atomics.new(1, signed: true)
     :atomics.put(fuel, 1, Keyword.get(opts, :fuel, @default_fuel))
     depth = :atomics.new(1, signed: true)
     max_depth = Keyword.get(opts, :max_depth, @default_max_depth)
-    rt = %{mod: mod, mem: mem, mem_pages: mem_pages, globals: globals, table: new_table(mod.elements, globals), fuel: fuel, depth: depth, max_depth: max_depth}
+    max_pages = Keyword.get(opts, :max_pages, @default_max_pages)
+    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: new_table(mod.elements, globals), fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages}
     result = call_fn(rt, Map.fetch!(mod.exports, name), args)
     out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
     if prev == nil, do: Process.delete(:washy_out), else: Process.put(:washy_out, prev)
+    if prev_mem == nil, do: Process.delete(:washy_mem), else: Process.put(:washy_mem, prev_mem)
     {result, out}
   end
 
-  # Linear memory: one `:atomics` slot per byte (pack-to-words is a later optimization). We pre-allocate a
-  # generous CAP so `memory.grow` works (grow just raises the logical page count, tracked in a 1-slot
-  # atomics). Returns `{backing, pages_ref}`. nil = no memory.
-  @cap_pages 64
-  defp new_mem(nil), do: {nil, nil}
+  # Linear memory is PACKED + RIGHT-SIZED for density: the backing `:atomics` is sized to the module's
+  # `min` pages (NOT a 64-page cap) with 8 bytes per slot, and lives in the process dict (`:washy_mem`)
+  # so `memory.grow` can REALLOCATE it (atomics can't grow in place) and every reader sees the new
+  # backing. One guest = one process, so the dict is the right mutable cell. `mem_pages` (logical page
+  # count) is a stable 1-slot atomics. `wmem/0` is the current backing.
+  @page_words 8192
+  defp wmem, do: Process.get(:washy_mem)
+
+  defp new_mem(nil), do: (Process.delete(:washy_mem); nil)
 
   defp new_mem({min, _max}) do
-    cap = max(min, @cap_pages)
-    backing = :atomics.new(cap * 65536, signed: false)
-    pages = :atomics.new(1, signed: false)
-    :atomics.put(pages, 1, max(1, min))
-    {backing, pages}
+    pages = max(1, min)
+    Process.put(:washy_mem, :atomics.new(pages * @page_words, signed: false))
+    pref = :atomics.new(1, signed: false)
+    :atomics.put(pref, 1, pages)
+    pref
   end
 
   # mutable globals as an `:atomics` array; initial values come from each global's const init expression.
@@ -404,9 +437,9 @@ defmodule Nexus.Washy do
   end
 
   # Copy each ACTIVE data segment's bytes into linear memory at its (const-expr) offset.
-  defp init_data(_mem, _globals, []), do: :ok
+  defp init_data(_globals, []), do: :ok
 
-  defp init_data(mem, globals, data) do
+  defp init_data(globals, data) do
     stub = %{mod: nil, mem: nil, globals: globals, fuel: cfuel()}
 
     Enum.each(data, fn
@@ -415,7 +448,7 @@ defmodule Nexus.Washy do
 
       {:active, offset_expr, bytes} ->
         {_sig, [addr | _], _l} = run(offset_expr, [], {}, stub)
-        bytes |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> store(mem, addr + i, b, 1) end)
+        bytes |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> store(wmem(), addr + i, b, 1) end)
     end)
   end
 
@@ -445,13 +478,13 @@ defmodule Nexus.Washy do
   # WASI `fd_write(fd, iovs, iovs_len, nwritten_ptr)`: gather the iovec byte ranges from memory, capture
   # writes to stdout/stderr, store the byte count, return errno 0.
   defp call_host(rt, {_m, "fd_write", _t}, [fd, iovs, iovs_len, nwritten]) do
-    data = gather_iovs(rt.mem, iovs, iovs_len)
+    data = gather_iovs(wmem(), iovs, iovs_len)
     cond do
       fd in [1, 2] -> Process.put(:washy_out, [data | Process.get(:washy_out, [])])
       true -> file_write(fd, data)
     end
 
-    store(rt.mem, nwritten, byte_size(data), 4)
+    store(wmem(), nwritten, byte_size(data), 4)
     0
   end
 
@@ -460,17 +493,17 @@ defmodule Nexus.Washy do
   # WASI args (argv): argc < 2 so the shell reads its command line from stdin.
   defp call_host(rt, {_m, "args_sizes_get", _t}, [argc_ptr, bufsize_ptr]) do
     argv = Process.get(:washy_argv, ["sh"])
-    store(rt.mem, argc_ptr, length(argv), 4)
-    store(rt.mem, bufsize_ptr, Enum.reduce(argv, 0, fn a, acc -> acc + byte_size(a) + 1 end), 4)
+    store(wmem(), argc_ptr, length(argv), 4)
+    store(wmem(), bufsize_ptr, Enum.reduce(argv, 0, fn a, acc -> acc + byte_size(a) + 1 end), 4)
     0
   end
 
   defp call_host(rt, {_m, "args_get", _t}, [argv_ptr, buf_ptr]) do
     Process.get(:washy_argv, ["sh"])
     |> Enum.reduce({argv_ptr, buf_ptr}, fn a, {pp, bp} ->
-      store(rt.mem, pp, bp, 4)
-      write_bytes(rt.mem, bp, a)
-      store(rt.mem, bp + byte_size(a), 0, 1)
+      store(wmem(), pp, bp, 4)
+      write_bytes(wmem(), bp, a)
+      store(wmem(), bp + byte_size(a), 0, 1)
       {pp + 4, bp + byte_size(a) + 1}
     end)
 
@@ -479,23 +512,23 @@ defmodule Nexus.Washy do
 
   # WASI read: fd 0 = stdin (command line); a file fd = the virtual filesystem; else EOF.
   defp call_host(rt, {_m, "fd_read", _t}, [fd, iovs, iovs_len, nread_ptr]) do
-    cap = iov_capacity(rt.mem, iovs, iovs_len)
+    cap = iov_capacity(wmem(), iovs, iovs_len)
     data = if fd == 0, do: stdin_take(cap), else: file_read(fd, cap)
-    store(rt.mem, nread_ptr, scatter_iovs(rt.mem, iovs, iovs_len, data), 4)
+    store(wmem(), nread_ptr, scatter_iovs(wmem(), iovs, iovs_len, data), 4)
     0
   end
 
   # fd metadata: a file fd is a regular file (4); stdin/out/err are character devices (2).
   defp call_host(rt, {_m, "fd_fdstat_get", _t}, [fd, ptr]) do
     ft = if Map.has_key?(Process.get(:washy_fds, %{}), fd), do: 4, else: 2
-    store(rt.mem, ptr, ft, 1)
+    store(wmem(), ptr, ft, 1)
     0
   end
 
   # ONE preopened dir at fd 3 = the virtual /work, so the shell resolves /work/<path> against it.
   defp call_host(rt, {_m, "fd_prestat_get", _t}, [3, ptr]) do
-    store(rt.mem, ptr, 0, 1)
-    store(rt.mem, ptr + 4, byte_size(preopen_name()), 4)
+    store(wmem(), ptr, 0, 1)
+    store(wmem(), ptr + 4, byte_size(preopen_name()), 4)
     0
   end
 
@@ -503,7 +536,7 @@ defmodule Nexus.Washy do
 
   defp call_host(rt, {_m, "fd_prestat_dir_name", _t}, [3, ptr, len]) do
     name = preopen_name()
-    write_bytes(rt.mem, ptr, binary_part(name, 0, min(len, byte_size(name))))
+    write_bytes(wmem(), ptr, binary_part(name, 0, min(len, byte_size(name))))
     0
   end
 
@@ -511,7 +544,7 @@ defmodule Nexus.Washy do
 
   # open a path (relative to the /work preopen) in the virtual FS — create/truncate per oflags.
   defp call_host(rt, {_m, "path_open", _t}, [_dirfd, _df, path_ptr, path_len, oflags, _rb, _ri, _ff, ofd_ptr]) do
-    rel = read_bytes(rt.mem, path_ptr, path_len)
+    rel = read_bytes(wmem(), path_ptr, path_len)
     exists = Nexus.Washy.VFS.has?(rel)
     creat = (oflags &&& 1) != 0
     trunc = (oflags &&& 8) != 0
@@ -523,7 +556,7 @@ defmodule Nexus.Washy do
       fd = Process.get(:washy_nextfd, 4)
       Process.put(:washy_nextfd, fd + 1)
       Process.put(:washy_fds, Map.put(Process.get(:washy_fds, %{}), fd, {rel, 0}))
-      store(rt.mem, ofd_ptr, fd, 4)
+      store(wmem(), ofd_ptr, fd, 4)
       0
     end
   end
@@ -547,7 +580,7 @@ defmodule Nexus.Washy do
         end
         noff = base + s64(offset)
         Process.put(:washy_fds, Map.put(fds, fd, {path, noff}))
-        store(rt.mem, ofs_ptr, noff, 8)
+        store(wmem(), ofs_ptr, noff, 8)
         0
 
       _ ->
@@ -556,10 +589,10 @@ defmodule Nexus.Washy do
   end
 
   # environment (empty), clock, randomness, scheduling — host-mediated, pure Elixir.
-  defp call_host(rt, {_m, "environ_sizes_get", _t}, [c_ptr, b_ptr]), do: (store(rt.mem, c_ptr, 0, 4); store(rt.mem, b_ptr, 0, 4); 0)
+  defp call_host(rt, {_m, "environ_sizes_get", _t}, [c_ptr, b_ptr]), do: (store(wmem(), c_ptr, 0, 4); store(wmem(), b_ptr, 0, 4); 0)
   defp call_host(_rt, {_m, "environ_get", _t}, _args), do: 0
-  defp call_host(rt, {_m, "clock_time_get", _t}, [_id, _prec, time_ptr]), do: (store(rt.mem, time_ptr, Process.get(:washy_clock, 0), 8); 0)
-  defp call_host(rt, {_m, "random_get", _t}, [buf, len]), do: (write_bytes(rt.mem, buf, :binary.copy(<<0>>, len)); 0)
+  defp call_host(rt, {_m, "clock_time_get", _t}, [_id, _prec, time_ptr]), do: (store(wmem(), time_ptr, Process.get(:washy_clock, 0), 8); 0)
+  defp call_host(rt, {_m, "random_get", _t}, [buf, len]), do: (write_bytes(wmem(), buf, :binary.copy(<<0>>, len)); 0)
   defp call_host(_rt, {_m, "sched_yield", _t}, _args), do: 0
   defp call_host(_rt, {_m, "fd_sync", _t}, _args), do: 0
   defp call_host(_rt, {_m, "fd_datasync", _t}, _args), do: 0
@@ -571,16 +604,16 @@ defmodule Nexus.Washy do
       _ -> 0
     end
     # filestat: dev(8) ino(8) filetype(1) +pad(7) nlink(8) size(8) atim(8) mtim(8) ctim(8)
-    store(rt.mem, ptr + 16, 4, 1)
-    store(rt.mem, ptr + 32, size, 8)
+    store(wmem(), ptr + 16, 4, 1)
+    store(wmem(), ptr + 32, size, 8)
     0
   end
 
   defp call_host(rt, {_m, "path_filestat_get", _t}, [_dirfd, _flags, path_ptr, path_len, ptr | _]) do
-    rel = read_bytes(rt.mem, path_ptr, path_len)
+    rel = read_bytes(wmem(), path_ptr, path_len)
     case Nexus.Washy.VFS.get(rel) do
       nil -> 44
-      content -> (store(rt.mem, ptr + 16, 4, 1); store(rt.mem, ptr + 32, byte_size(content), 8); 0)
+      content -> (store(wmem(), ptr + 16, 4, 1); store(wmem(), ptr + 32, byte_size(content), 8); 0)
     end
   end
 
@@ -589,7 +622,7 @@ defmodule Nexus.Washy do
       {_path, o} -> o
       _ -> 0
     end
-    store(rt.mem, ptr, off, 8)
+    store(wmem(), ptr, off, 8)
     0
   end
 
@@ -682,10 +715,18 @@ defmodule Nexus.Washy do
   defp pad_to(bin, n), do: bin <> :binary.copy(<<0>>, n - byte_size(bin))
 
   # v128 load/store: 16 bytes <-> a 16-byte binary
-  defp vload(mem, addr), do: for(i <- 0..15, do: :atomics.get(mem, addr + i + 1)) |> :erlang.list_to_binary()
-  defp vstore(mem, addr, <<bytes::binary-size(16)>>), do: bytes |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> :atomics.put(mem, addr + i + 1, b) end)
+  defp vload(mem, addr), do: for(i <- 0..15, do: mget(mem, addr + i)) |> :erlang.list_to_binary()
+  defp vstore(mem, addr, <<bytes::binary-size(16)>>), do: bytes |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> mput(mem, addr + i, b) end)
 
   # Type-driven arity for a global function index (import or local).
+  @doc """
+  Packed `:atomics` slot count a fresh instance allocates for linear memory — `max(1, min) * 8192`
+  (8 bytes/slot). Pure function of the module's declared `min` pages; the per-cell memory footprint
+  is `mem_slots(mod) * 8` bytes. Used by density introspection / the ops gauge. `0` if no memory.
+  """
+  def mem_slots(%__MODULE__{mem: nil}), do: 0
+  def mem_slots(%__MODULE__{mem: {min, _max}}), do: max(1, min) * @page_words
+
   @doc """
   Resolve an exported LOCAL function to `{arity, nlocals, instrs}` — the same structured body the
   interpreter runs, for the transpiler / static analysis to consume. Raises if `name` is an import.
@@ -815,14 +856,27 @@ defmodule Nexus.Washy do
 
   defp step({:memory_grow}, [n | s], l, rt) do
     old = :atomics.get(rt.mem_pages, 1)
-    cap = div(:atomics.info(rt.mem).size, 65536)
-    result = if old + n <= cap, do: (:atomics.put(rt.mem_pages, 1, old + n); old), else: -1 &&& @mask32
+    new = old + n
+    # grow by REALLOCATING a larger packed backing + copying live words, then swap it into the dict.
+    # Bounded by the per-run max_pages ceiling so a guest can never OOM the host.
+    result =
+      if n >= 0 and new <= rt.max_pages do
+        oldmem = wmem()
+        newmem = :atomics.new(new * @page_words, signed: false)
+        for i <- 1..(old * @page_words)//1, do: :atomics.put(newmem, i, :atomics.get(oldmem, i))
+        Process.put(:washy_mem, newmem)
+        :atomics.put(rt.mem_pages, 1, new)
+        old
+      else
+        -1 &&& @mask32
+      end
+
     {:next, [result | s], l}
   end
 
   # bulk memory: copy n bytes src->dst (overlap-safe); fill n bytes at dst with a byte value
-  defp step({:memory_copy}, [n, src, dst | s], l, rt), do: (if n > 0, do: (bounds!(rt, dst, n); bounds!(rt, src, n); mem_copy(rt.mem, dst, src, n)); {:next, s, l})
-  defp step({:memory_fill}, [n, val, dst | s], l, rt), do: (if n > 0, do: bounds!(rt, dst, n); for(i <- 0..(n - 1)//1, do: store(rt.mem, dst + i, val, 1)); {:next, s, l})
+  defp step({:memory_copy}, [n, src, dst | s], l, rt), do: (if n > 0, do: (bounds!(rt, dst, n); bounds!(rt, src, n); mem_copy(wmem(), dst, src, n)); {:next, s, l})
+  defp step({:memory_fill}, [n, val, dst | s], l, rt), do: (if n > 0, do: bounds!(rt, dst, n); for(i <- 0..(n - 1)//1, do: store(wmem(), dst + i, val, 1)); {:next, s, l})
   defp step({:data_drop}, stack, l, _rt), do: {:next, stack, l}
   defp step({:trunc_sat, n}, [a | s], l, _rt) when n in 0..3, do: {:next, [trunc_sat(a) &&& @mask32 | s], l}
   defp step({:trunc_sat, _n}, [a | s], l, _rt), do: {:next, [trunc_sat(a) &&& @mask64 | s], l}
@@ -989,7 +1043,7 @@ defmodule Nexus.Washy do
   end
 
   defp fload(mem, addr, n) do
-    bin = for(i <- 0..(n - 1)//1, do: :atomics.get(mem, addr + i + 1)) |> :erlang.list_to_binary()
+    bin = for(i <- 0..(n - 1)//1, do: mget(mem, addr + i)) |> :erlang.list_to_binary()
     case n do
       4 -> <<v::float-32-little>> = bin; v
       8 -> <<v::float-64-little>> = bin; v
@@ -998,15 +1052,15 @@ defmodule Nexus.Washy do
 
   defp fstore(mem, addr, v, n) do
     bin = if n == 4, do: <<v::float-32-little>>, else: <<v::float-64-little>>
-    bin |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> :atomics.put(mem, addr + i + 1, b) end)
+    bin |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> mput(mem, addr + i, b) end)
   end
 
   # copy n bytes within memory, src->dst, overlap-safe (forward when dst<=src, else backward)
   defp mem_copy(mem, dst, src, n) when dst <= src,
-    do: for(i <- 0..(n - 1)//1, do: :atomics.put(mem, dst + i + 1, :atomics.get(mem, src + i + 1)))
+    do: for(i <- 0..(n - 1)//1, do: mput(mem, dst + i, mget(mem, src + i)))
 
   defp mem_copy(mem, dst, src, n),
-    do: for(i <- (n - 1)..0//-1, do: :atomics.put(mem, dst + i + 1, :atomics.get(mem, src + i + 1)))
+    do: for(i <- (n - 1)..0//-1, do: mput(mem, dst + i, mget(mem, src + i)))
 
   # saturating float→int truncation: NaN→0, else truncate (simple; clamp edges refined later)
   defp trunc_sat(a) when is_float(a), do: trunc(a)
@@ -1051,12 +1105,28 @@ defmodule Nexus.Washy do
 
   # byte-addressed load/store over the `:atomics` memory (1-indexed). Little-endian, `n` bytes.
   defp load(mem, addr, n) do
-    Enum.reduce(0..(n - 1), 0, fn i, acc -> acc ||| (:atomics.get(mem, addr + i + 1) <<< (i * 8)) end)
+    Enum.reduce(0..(n - 1), 0, fn i, acc -> acc ||| (mget(mem, addr + i) <<< (i * 8)) end)
   end
 
   defp store(mem, addr, val, n) do
-    for i <- 0..(n - 1), do: :atomics.put(mem, addr + i + 1, (val >>> (i * 8)) &&& 0xFF)
+    for i <- 0..(n - 1), do: mput(mem, addr + i, (val >>> (i * 8)) &&& 0xFF)
     :ok
+  end
+
+  # Linear memory is PACKED: one 64-bit `:atomics` slot holds 8 consecutive bytes (little-endian
+  # within the word), so the backing is 8x smaller than one-slot-per-byte. Byte access is a
+  # read-modify-write of the containing word — safe without atomicity since one guest = one process.
+  defp mget(mem, addr) do
+    w = :atomics.get(mem, (addr >>> 3) + 1)
+    (w >>> ((addr &&& 7) * 8)) &&& 0xFF
+  end
+
+  defp mput(mem, addr, byte) do
+    idx = (addr >>> 3) + 1
+    sh = (addr &&& 7) * 8
+    w = :atomics.get(mem, idx)
+    w = ((w &&& bnot(0xFF <<< sh)) ||| ((byte &&& 0xFF) <<< sh)) &&& @mask64
+    :atomics.put(mem, idx, w)
   end
 
   # a small bounded fuel counter for const-expression evaluation (global init / element offsets) —
@@ -1090,10 +1160,10 @@ defmodule Nexus.Washy do
     if addr < 0 or addr + n > limit, do: trap!(:out_of_bounds)
   end
 
-  defp gload(rt, addr, n), do: (bounds!(rt, addr, n); load(rt.mem, addr, n))
-  defp gstore(rt, addr, v, n), do: (bounds!(rt, addr, n); store(rt.mem, addr, v, n))
-  defp gfload(rt, addr, n), do: (bounds!(rt, addr, n); fload(rt.mem, addr, n))
-  defp gfstore(rt, addr, v, n), do: (bounds!(rt, addr, n); fstore(rt.mem, addr, v, n))
-  defp gvload(rt, addr), do: (bounds!(rt, addr, 16); vload(rt.mem, addr))
-  defp gvstore(rt, addr, v), do: (bounds!(rt, addr, 16); vstore(rt.mem, addr, v))
+  defp gload(rt, addr, n), do: (bounds!(rt, addr, n); load(wmem(), addr, n))
+  defp gstore(rt, addr, v, n), do: (bounds!(rt, addr, n); store(wmem(), addr, v, n))
+  defp gfload(rt, addr, n), do: (bounds!(rt, addr, n); fload(wmem(), addr, n))
+  defp gfstore(rt, addr, v, n), do: (bounds!(rt, addr, n); fstore(wmem(), addr, v, n))
+  defp gvload(rt, addr), do: (bounds!(rt, addr, 16); vload(wmem(), addr))
+  defp gvstore(rt, addr, v), do: (bounds!(rt, addr, 16); vstore(wmem(), addr, v))
 end
