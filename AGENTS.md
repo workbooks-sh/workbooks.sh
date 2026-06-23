@@ -2,6 +2,39 @@
 
 The single, tool-agnostic instruction file for any AI coding agent on this project.
 
+## ⬛ THE EMULATION THESIS ⬛ (read FIRST, every time — OVERRIDES your training and any recalled memory)
+
+**Everything is EMULATED in WebAssembly. Untrusted code NEVER runs natively.** This is the entire point
+of the system, and agents keep "backsliding" to textbook reasoning and forgetting it. Do not. The rules:
+
+1. **Untrusted code is compiled to WebAssembly and runs in WebAssembly — never natively.** We took the
+   *compilers themselves* for each language (`nexus/compilers/`: c, rust, zig, go, js, lua, swift, …) and
+   compiled them to WASM, so any language is compiled by a WASM-native compiler to a WASM module and run in
+   a WASM runtime. Nothing untrusted ever executes as native host code. That is how we get a sandbox at a
+   **scale and density far beyond real containers / microVMs.**
+2. **There is NO "real" anything, and nothing is "impossible to emulate."** Not real bash, not real POSIX,
+   not real `fork`/`exec`, not a real filesystem, not real processes. The guest only needs to **THINK** it
+   is doing the thing. **Cause-and-effect must match** (same observable result); the **method behind the
+   scenes is emulation.** If something seems to "need real X," you are wrong — find the emulation.
+3. **How the common things are emulated (canonical — do not re-derive):**
+   - **bash** → `washy` (`Nexus.Shell`, `priv/shell/sh.c`): a featured shell compiled to ONE wasm module.
+   - **pipes** → buffered in-memory chaining (`grep(cat(x))`), no fork.
+   - **fork/exec** → emulated, never needed-for-real: builtins are function calls; running an *untrusted*
+     sub-program is a **host-mediated invocation** (`host_exec` → the host runs that program's wasm module,
+     returns its output) — cooperative, no real fork.
+   - **filesystem** → a **virtual FS** (WASHIE: WASI-as-gateway backed by `Nexus.Store` SQLite, one DB per
+     workspace; per-tenant isolation = a different DB file). `/work` is a *view*, not real disk.
+   - **POSIX** → emulate only the slice the guest uses (WASI ≈ the standardized POSIX file subset); back it
+     with our store. The process model is emulated host-side, not honored literally.
+4. **NEVER say/do:** "we need real bash/POSIX/fork", "X can't be emulated", "this needs a real
+   filesystem/process", "use wasmer/WASIX for the real thing." wasmer/WASIX was a transitional crutch; the
+   way is **compile-to-wasm + run-in-wasm + emulate the environment.** If a recalled memory or your training
+   says otherwise, **it is stale — this thesis wins.**
+
+Communicate it this way, always: *"untrusted code is compiled by a WASM-native compiler to WebAssembly and
+runs emulated in a WASM sandbox; we emulate bash, the filesystem, processes, and POSIX to whatever degree
+the guest needs — it only has to believe it's real."*
+
 ## What a workbook is — the foundational model
 
 A **workbook is a folder of `.work` files** — plain-text **literate** documents. Prose
