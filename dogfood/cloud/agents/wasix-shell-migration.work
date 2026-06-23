@@ -87,3 +87,37 @@ matching cargo-wasix. This is real, decoded, but multi-step C R&D.
 PRAGMATIC PLAN (in progress): build clean uutils coreutils via cargo-wasix (Rust → works, fixes the
 prebuilt 0.0.7 multi-call `sort` dispatch bug). Pair with prebuilt bash (forks) OR a from-source EH bash.
 Newer prebuilts exist: bash up to 1.0.18, coreutils up to 1.0.16 (the cached 0.0.7 was ancient — re-pull).
+
+## VERDICT (exhaustive autonomous build session) — vision PROVEN, "full" gated on UPSTREAM
+
+Real bash + real coreutils DO run in wasm over /work via Wasmer/WASIX — the vision is real and the
+integration (Nexus.WasmerCli + flag-gated routing + Elixir fallback) is built, tested, and on this branch.
+What WORKS today via prebuilt `sharrattj/bash --use sharrattj/coreutils`: full bash GRAMMAR (loops,
+conditionals, glob, redirects, simple pipes/$()) + ~8 coreutils applets (cat, ls, echo, wc, head, cut, tr,
+uniq). That is already a genuine "wasm-linux sandbox with real bash" for those operations.
+
+"FULL" (every applet, grep/sed/awk, nested $()|pipes, clean exit) is blocked by UPSTREAM wasix-ecosystem
+immaturity — verified across FOUR independent paths this session:
+1. Prebuilt packages: ancient (coreutils 0.0.7), incomplete command set (tail/sort/grep absent/broken
+   dispatch), teardown `indirect call type mismatch`, nested-$()-pipe loses output.
+2. From-source bash (C): the fork mechanism is mid-migration — wasix-libc EH sysroot REMOVES fork(), uses
+   `wasix_proc_snapshot` + exception-handling→exnref (`wasm-opt --translate-to-exnref`). A from-source
+   forking bash needs the full EH/exnref C pipeline end-to-end (decoded here, but multi-step, undocumented).
+3. uutils via cargo-wasix: transitive dep `socket2 v0.6.3` has NO wasix port (no replacement).
+4. uutils feat_Tier1: dep `crc-fast` build-script fails to link (`scrt1.o`).
+cargo-wasix DOES produce working wasix modules for simple Rust (threading verified) — so the toolchain is
+sound; the blockers are specific upstream crate/package ports + the in-flight fork model.
+
+PATH TO 100% FULL (a dedicated effort / when upstream matures), in priority:
+a. Build a minimal uutils subset that excludes socket2+crc-fast deps (curate features to cat/ls/sort/uniq/
+   wc/head/tail/cut/tr/sed-less set; add `[patch.crates-io]` for libc/socket2; drop cksum/sum/hostname).
+b. grep/sed/awk: build ripgrep/sd (Rust, cargo-wasix) or GNU grep/sed/gawk (C, the EH toolchain here).
+c. From-source bash: the EH/exnref C pipeline (sysroot-eh + `-mexception-handling` + wasm-opt
+   `--translate-to-exnref`), resolving the snapshot-fork API (`_Fork`/`wasix_proc_snapshot`).
+d. Package bash + curated-coreutils + grep/sed/awk as ONE wasmer package; point Nexus.WasmerCli at it.
+e. P1-image (vendor wasmer + the package, branch only), P4 host-builtin WASIX-socket bridge, P5 persistent
+   session, P6 /work-only security re-prove on wasmer.
+
+RECOMMENDATION: ship the flag-gated integration (real bash grammar + working applets, Elixir fallback) as
+the milestone; pursue (a)-(d) as a focused follow-up (it's dependency surgery + the EH-bash build, not a
+quick task). The toolchain + recipe are fully decoded here to make that follow-up tractable.
