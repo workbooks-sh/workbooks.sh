@@ -482,7 +482,20 @@ defmodule Nexus.Agent do
         {{:error, {:turn_limit, max_turns}}, tel}
 
       true ->
-        case Nexus.Llm.complete(manage(messages, opts), Keyword.put(opts, :tools, [@bash_tool])) do
+        # Stream tokens to the live channel as they're generated — only when a real consumer is attached
+        # (opts[:emit]); otherwise stay non-streaming (checks/tests/inline runs don't need it).
+        llm_opts =
+          Keyword.put(opts, :tools, [@bash_tool])
+          |> then(fn o ->
+            if Keyword.has_key?(opts, :emit) do
+              tag = opts[:unit]
+              Keyword.put(o, :on_token, fn delta -> stream.(%{type: "token", content: delta, agent: tag}) end)
+            else
+              o
+            end
+          end)
+
+        case Nexus.Llm.complete(manage(messages, opts), llm_opts) do
         {:ok, %{tool_calls: []} = turn} ->
           if reasoning?(turn.content), do: emit.({:answer, turn.content})
           stream.(%{type: "final", answer: turn.content})

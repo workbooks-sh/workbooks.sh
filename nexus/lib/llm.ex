@@ -130,8 +130,13 @@ defmodule Nexus.Llm do
         {:error, :no_api_key}
 
       true ->
+      # Stream tokens when the caller supplies `on_token` (a 1-arg fn called with each content delta) —
+      # the live channel uses it to surface the model's text as it's generated, not only at turn end.
+      stream? = is_function(opts[:on_token], 1)
+
       body =
         %{model: mdl, messages: messages}
+        |> maybe_put(:stream, stream? && true)
         |> maybe_put(:tools, opts[:tools])
         |> maybe_put(:temperature, opts[:temperature])
         |> maybe_put(:max_tokens, opts[:max_tokens])
@@ -147,8 +152,126 @@ defmodule Nexus.Llm do
 
       # Long-running deep-research turns (thinking models + web plugin) can exceed the 2min default;
       # callers raise it via opts[:timeout] (ms).
-      post(url, body, opts[:retries] || 2, key, opts[:timeout] || 120_000)
+      timeout = opts[:timeout] || 120_000
+
+      if stream?,
+        do: post_stream(url, body, key, timeout, opts[:on_token]),
+        else: post(url, body, opts[:retries] || 2, key, timeout)
     end
+  end
+
+  @doc false
+  # Test seam — drive the SSE→turn assembler over a list of raw chunks (split anywhere, incl. mid-event)
+  # without a network call. Returns the assembled turn; `on_token` receives each content delta in order.
+  def stream_assemble_for_test(chunks, on_token) when is_list(chunks) do
+    st =
+      Enum.reduce(chunks, %{buf: "", content: "", tools: %{}, finish: nil}, fn chunk, acc ->
+        consume_sse(acc.buf <> chunk, on_token, %{acc | buf: ""})
+      end)
+
+    %{content: st.content, tool_calls: assemble_tools(st.tools), finish: st.finish || "stop"}
+  end
+
+  # Streaming POST: receive Server-Sent Events (`data: {…}\n\n`), fire `on_token` per content delta, and
+  # accumulate the full turn (content + streamed tool-call fragments) into the SAME shape `parse/1` returns.
+  # Uses :httpc async streaming (no extra dep). Falls back to a synchronous parse on any stream error.
+  defp post_stream(url, body, key, timeout, on_token) do
+    :inets.start()
+    :ssl.start()
+    headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}, {~c"accept", ~c"text/event-stream"}]
+    req = {String.to_charlist(url), headers, ~c"application/json", body}
+
+    case :httpc.request(:post, req, [timeout: timeout], [sync: false, stream: :self, body_format: :binary]) do
+      {:ok, ref} -> stream_recv(ref, timeout, on_token, %{buf: "", content: "", tools: %{}, finish: nil})
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp stream_recv(ref, timeout, on_token, st) do
+    receive do
+      {:http, {^ref, :stream_start, _headers}} -> stream_recv(ref, timeout, on_token, st)
+
+      {:http, {^ref, :stream, chunk}} ->
+        st = consume_sse(st.buf <> chunk, on_token, %{st | buf: ""})
+        stream_recv(ref, timeout, on_token, st)
+
+      {:http, {^ref, :stream_end, _headers}} ->
+        {:ok, %{content: st.content, tool_calls: assemble_tools(st.tools),
+                annotations: [], finish: st.finish || "stop", usage: %{}}}
+
+      {:http, {^ref, {:error, reason}}} ->
+        {:error, reason}
+
+      {:http, {^ref, {{_, status, _}, _h, resp}}} ->
+        {:error, {:http, status, String.slice(to_string(resp), 0, 200)}}
+    after
+      timeout -> :httpc.cancel_request(ref); {:error, :stream_timeout}
+    end
+  end
+
+  # Split the buffer into complete SSE events (`\n\n`-delimited), parse each `data:` line, keep the
+  # trailing partial in `buf` for the next chunk.
+  defp consume_sse(data, on_token, st) do
+    parts = String.split(data, "\n\n")
+    {complete, [rest]} = Enum.split(parts, -1)
+    st = Enum.reduce(complete, st, fn ev, acc -> apply_sse_event(ev, on_token, acc) end)
+    %{st | buf: rest}
+  end
+
+  defp apply_sse_event(event, on_token, st) do
+    event
+    |> String.split("\n", trim: true)
+    |> Enum.reduce(st, fn line, acc ->
+      case String.trim(line) do
+        "data: [DONE]" -> acc
+        "data: " <> json -> apply_delta(json, on_token, acc)
+        _ -> acc
+      end
+    end)
+  end
+
+  defp apply_delta(json, on_token, st) do
+    case Jason.decode(json) do
+      {:ok, %{"choices" => [%{} = choice | _]}} ->
+        delta = choice["delta"] || %{}
+        st = if choice["finish_reason"], do: %{st | finish: choice["finish_reason"]}, else: st
+
+        st =
+          case delta["content"] do
+            c when is_binary(c) and c != "" -> on_token.(c); %{st | content: st.content <> c}
+            _ -> st
+          end
+
+        Enum.reduce(delta["tool_calls"] || [], st, &accumulate_tool_delta/2)
+
+      _ ->
+        st
+    end
+  end
+
+  # Tool calls stream as fragments keyed by `index`: id/name arrive once, `arguments` concatenate.
+  defp accumulate_tool_delta(tc, st) do
+    idx = tc["index"] || 0
+    fun = tc["function"] || %{}
+    cur = Map.get(st.tools, idx, %{id: nil, name: nil, args: ""})
+    merged = %{
+      id: tc["id"] || cur.id,
+      name: fun["name"] || cur.name,
+      args: cur.args <> (fun["arguments"] || "")
+    }
+    %{st | tools: Map.put(st.tools, idx, merged)}
+  end
+
+  defp assemble_tools(tools) do
+    tools
+    |> Enum.sort_by(fn {idx, _} -> idx end)
+    |> Enum.map(fn {_idx, %{id: id, name: name, args: args}} ->
+      parsed = case Jason.decode(args) do
+        {:ok, m} when is_map(m) -> m
+        _ -> %{}
+      end
+      %{id: id, name: name, args: parsed}
+    end)
   end
 
   defp post(url, body, retries, key, timeout) do
