@@ -49,10 +49,11 @@ defmodule Nexus.Compilers.Shared do
       depth: 3
     ]
 
-    req = {String.to_charlist(url), browser_headers()}
-    http_opts = [ssl: ssl_opts, timeout: 30_000, connect_timeout: 15_000, autoredirect: true]
+    build_req = fn _m, u -> {String.to_charlist(u), browser_headers()} end
+    http_opts = [ssl: ssl_opts, timeout: 30_000, connect_timeout: 15_000]
 
-    case :httpc.request(:get, req, http_opts, body_format: :binary) do
+    # SSRF: re-guard every redirect hop (wb-6vb9) — this is a guest-influenced fetch.
+    case Nexus.Net.Ssrf.request(:get, url, build_req, http_opts) do
       {:ok, {{_v, 200, _}, headers, body}} ->
         decoded = decode_body(headers, body)
         # Fast path unchanged, UNLESS the 200 is a CF-challenge/anti-bot interstitial (tiny/challenge

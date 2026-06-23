@@ -124,10 +124,11 @@ defmodule Nexus.Dock do
       ]
 
       hdrs = Enum.map(headers, fn {k, v} -> {String.to_charlist(to_string(k)), String.to_charlist(to_string(v))} end)
-      req = {String.to_charlist(url), hdrs}
-      http_opts = [ssl: ssl_opts, timeout: 30_000, connect_timeout: 15_000, autoredirect: true]
+      build_req = fn _m, u -> {String.to_charlist(u), hdrs} end
+      http_opts = [ssl: ssl_opts, timeout: 30_000, connect_timeout: 15_000]
 
-      case :httpc.request(:get, req, http_opts, body_format: :binary) do
+      # SSRF: re-guard every redirect hop (wb-6vb9), not just the initial URL.
+      case Nexus.Net.Ssrf.request(:get, url, build_req, http_opts) do
         {:ok, {{_v, 200, _}, _h, body}} -> {:ok, body}
         {:ok, {{_v, code, _}, _h, _body}} -> {:error, {:http_status, code}}
         {:error, reason} -> {:error, reason}

@@ -138,15 +138,15 @@ defmodule Nexus.Browse.Session do
       cookie_hdr = cookie_header(cookies)
       ua = ~c"Mozilla/5.0 (nexus-browse)"
       headers = [{~c"user-agent", ua}, {~c"accept", ~c"text/html"} | cookie_hdr]
-      http_opts = [ssl: ssl_opts, timeout: 30_000, autoredirect: true]
+      http_opts = [ssl: ssl_opts, timeout: 30_000]
 
-      req =
-        case method do
-          :get -> {String.to_charlist(url), headers}
-          :post -> {String.to_charlist(url), headers, ~c"application/x-www-form-urlencoded", body}
-        end
+      build_req = fn
+        :get, u -> {String.to_charlist(u), headers}
+        :post, u -> {String.to_charlist(u), headers, ~c"application/x-www-form-urlencoded", body}
+      end
 
-      case :httpc.request(method, req, http_opts, body_format: :binary) do
+      # SSRF: re-guard every redirect hop (wb-6vb9) — this URL is guest/LLM-chosen (NAVIGATE).
+      case Nexus.Net.Ssrf.request(method, url, build_req, http_opts) do
         {:ok, {{_, status, _}, resp_headers, resp}} when status in 200..399 ->
           {:ok, resp, merge_cookies(cookies, resp_headers)}
 

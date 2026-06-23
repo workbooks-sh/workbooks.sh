@@ -71,4 +71,19 @@ defmodule Nexus.Net.SsrfTest do
       assert Ssrf.allowed?("http://8.8.8.8/")
     end
   end
+
+  describe "request/5 re-guards every hop (wb-6vb9)" do
+    test "an internal initial URL is blocked before any connection" do
+      build = fn _m, u -> {String.to_charlist(u), []} end
+      # 169.254.169.254 / loopback must short-circuit to :ssrf_blocked — no egress attempted.
+      assert Ssrf.request(:get, "http://169.254.169.254/latest/", build, []) == {:error, :ssrf_blocked}
+      assert Ssrf.request(:get, "http://127.0.0.1/", build, []) == {:error, :ssrf_blocked}
+      assert Ssrf.request(:get, "http://10.0.0.1/", build, []) == {:error, :ssrf_blocked}
+    end
+
+    test "a redirect-hop budget that underflows fails closed" do
+      build = fn _m, u -> {String.to_charlist(u), []} end
+      assert Ssrf.request(:get, "https://1.1.1.1/", build, [], -1) == {:error, :ssrf_blocked}
+    end
+  end
 end

@@ -34,6 +34,49 @@ defmodule Nexus.Net.Ssrf do
 
   def allowed?(_), do: false
 
+  @redirect_codes [301, 302, 303, 307, 308]
+  @max_redirects 5
+
+  @doc """
+  Like `:httpc.request/4` (returns the same result tuple) but **re-guards every hop** (wb-6vb9): it
+  disables `autoredirect` and follows 3xx redirects MANUALLY, running `allowed?/1` on each `Location`
+  before connecting — so a public host can't `302` a guarded fetch into an internal target (the
+  autoredirect TOCTOU). `build_req.(method, url)` rebuilds the request tuple for a hop so headers/body
+  carry across; redirects are followed as GET (browser behaviour, and method is irrelevant to the SSRF
+  check). A blocked hop or redirect loop returns `{:error, :ssrf_blocked}`.
+  """
+  def request(method, url, build_req, http_opts, hops \\ @max_redirects) do
+    cond do
+      hops < 0 ->
+        {:error, :ssrf_blocked}
+
+      not allowed?(url) ->
+        {:error, :ssrf_blocked}
+
+      true ->
+        opts = Keyword.put(http_opts, :autoredirect, false)
+
+        case :httpc.request(method, build_req.(method, url), opts, body_format: :binary) do
+          {:ok, {{_, code, _}, headers, _body}} = res when code in @redirect_codes ->
+            case redirect_location(headers, url) do
+              nil -> res
+              loc -> request(:get, loc, build_req, http_opts, hops - 1)
+            end
+
+          other ->
+            other
+        end
+    end
+  end
+
+  # The Location header (case-insensitive), resolved against the current URL for relative redirects.
+  defp redirect_location(headers, base) do
+    case Enum.find(headers, fn {k, _} -> :string.lowercase(k) == ~c"location" end) do
+      {_, loc} -> base |> URI.parse() |> URI.merge(to_string(loc)) |> URI.to_string()
+      _ -> nil
+    end
+  end
+
   # Resolve the host to all A + AAAA addresses; deny if NONE resolve (fail closed) or ANY is internal.
   defp host_resolves_public?(host) do
     case resolve(host) do
