@@ -126,27 +126,31 @@ defmodule Nexus.Literate do
   defp note(line, n) do
     cond do
       caps = Regex.named_captures(@note_re, line) ->
+        text = String.trim(caps["text"])
+
         %{
           type: :note,
           polarity: if(caps["marker"] == "+", do: :pin, else: :drawer),
           state: :live,
           hash: nil,
           indent: String.length(caps["indent"]),
-          text: caps["text"],
+          text: text,
           line: n,
-          refs: refs(caps["text"])
+          refs: refs(text)
         }
 
       caps = Regex.named_captures(@handle_re, line) ->
+        summary = String.trim(caps["summary"])
+
         %{
           type: :note,
           polarity: nil,
           state: :collapsed,
           hash: caps["hash"],
           indent: String.length(caps["indent"]),
-          text: caps["summary"],
+          text: summary,
           line: n,
-          refs: refs(caps["summary"])
+          refs: refs(summary)
         }
 
       true ->

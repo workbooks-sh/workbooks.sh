@@ -34,6 +34,20 @@ pub fn parse(alloc: std.mem.Allocator, src: []const u8) ![]Node {
     while (lines.next()) |line| {
         const trimmed = std.mem.trim(u8, line, " \t\r");
 
+        // A ``` fenced block is consumed WHOLE as prose (matching nexus Nexus.Literate) — so a
+        // fenced example (`+# …`, or a `… do` line) is never mis-parsed as a note or a unit.
+        if (std.mem.startsWith(u8, trimmed, "```")) {
+            try flushProse(alloc, &prose, &nodes);
+            var fence: std.ArrayList([]const u8) = .empty;
+            try fence.append(alloc, line);
+            while (lines.next()) |fl| {
+                try fence.append(alloc, fl);
+                if (std.mem.startsWith(u8, std.mem.trim(u8, fl, " \t\r"), "```")) break;
+            }
+            try nodes.append(alloc, Node{ .type = .prose, .text = try std.mem.join(alloc, "\n", fence.items) });
+            continue;
+        }
+
         if (trimmed.len == 0) {
             try flushProse(alloc, &prose, &nodes);
             continue;
@@ -304,4 +318,16 @@ test "recognizes hash notes (+#/-#/≡hash) as a stripped lane" {
     try std.testing.expectEqual(NodeType.note, nodes[3].type);
     try std.testing.expect(nodes[3].collapsed);
     try std.testing.expectEqualStrings("a3f9", nodes[3].hash);
+}
+
+test "fenced examples are NOT parsed as notes or units (parity with nexus)" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const src = "intro\n\n```\n+# example, not a real note\nserver :x do\n```\n\nout";
+    const nodes = try parse(a, src);
+    for (nodes) |n| {
+        try std.testing.expect(n.type != .note);
+        try std.testing.expect(n.type != .code);
+    }
 }
