@@ -236,6 +236,11 @@ defmodule Wasmex.Components do
   end
 
   defp build_store(opts) do
+    # ⚠️ FOOTGUN (nexus wb-qre6): an empty %Wasmex.StoreLimits{} = UNLIMITED memory, and this store is
+    # built on the DEFAULT (non-epoch) engine — so a `start_link` without an explicit `:store_limits`
+    # (or a prebuilt `:store`) silently runs the guest with NO memory cap and NO CPU deadline. In nexus,
+    # ALWAYS go through `Nexus.Sandbox` (it passes a bounded epoch store); never call this raw. A
+    # guardrail test (sandbox_guardrail_test.exs) fails the build if an unguarded call site appears.
     store_limits = Keyword.get(opts, :store_limits, %Wasmex.StoreLimits{})
 
     if wasi_options = Keyword.get(opts, :wasi) do
