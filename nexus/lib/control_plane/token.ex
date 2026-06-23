@@ -72,7 +72,11 @@ defmodule Nexus.ControlPlane.Token do
           true ->
             # row-guarded write-back: a concurrent revoke (DELETE) wins, never resurrected (wb-m6oz)
             TokenStore.touch(@store, h, %{rec | last_used_at: now})
-            {:ok, %{org: org, role: Map.get(rec, :role, "member"), user: Map.get(rec, :user)}}
+            # Re-validate authority against the LIVE account: a user demoted since the token was minted
+            # must not keep their old role via the frozen record. Effective role = the lower of the
+            # minted role (a ceiling) and the user's current role. A token with no backing account row
+            # (service/legacy) keeps the minted role; account REMOVAL is handled by explicit revoke. (wb-mjsz)
+            {:ok, %{org: org, role: effective_role(Map.get(rec, :user), Map.get(rec, :role, "member")), user: Map.get(rec, :user)}}
         end
 
       _ ->
@@ -83,6 +87,19 @@ defmodule Nexus.ControlPlane.Token do
   # Legacy records (no expires_at) are non-expiring; a present expires_at is enforced.
   defp expired?(%{expires_at: exp}, now) when is_integer(exp), do: exp <= now
   defp expired?(_, _), do: false
+
+  # The minted role is a CEILING; the live account role can only lower it (demotion takes effect). No
+  # backing account (service/legacy token) ⇒ minted role unchanged.
+  @rank %{"owner" => 3, "admin" => 2, "member" => 1, "viewer" => 0}
+  defp effective_role(user, minted) when is_binary(user) do
+    case Nexus.Auth.Accounts.role(user) do
+      current when is_binary(current) -> if rank(current) < rank(minted), do: current, else: minted
+      _ -> minted
+    end
+  end
+
+  defp effective_role(_user, minted), do: minted
+  defp rank(r), do: Map.get(@rank, to_string(r), 0)
 
   def resolve(_), do: :error
 
