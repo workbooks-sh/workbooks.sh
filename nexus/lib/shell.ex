@@ -1,9 +1,9 @@
 defmodule Nexus.Shell do
   @moduledoc """
-  **worgsh** — our own featured shell, compiled to ONE wasm command module and run in the in-house wasm
+  **washy** — our own featured shell, compiled to ONE wasm command module and run in the in-house wasm
   lane (clang.wasm → wasm32-wasip1 → AOT `.cwasm` → wasmtime, per-invocation). This is "bash in WASM":
   the agent's shell with NO wasmer, NO WASIX, NO fork. A real shell needs fork/exec only for pipes
-  between processes — worgsh does pipes by BUFFERED CHAINING inside one module (`grep(cat(x))`), so it
+  between processes — washy does pipes by BUFFERED CHAINING inside one module (`grep(cat(x))`), so it
   runs as a single dense, AOT-precompiled command. Tools are builtins compiled in; files are read/written
   over the agent's `/work` (mounted into the module). Featured, not real-bash — enough grammar for an
   agent's batch work (pipes `|`, `;`/`&&`/`||`, redirects `>`/`>>`, quoting, a coreutils-ish builtin set).
@@ -39,7 +39,7 @@ defmodule Nexus.Shell do
 
   @doc "The compiled shell wasm path (built + cached on first use; nil if the lane is unavailable)."
   def wasm do
-    cache = Path.join(System.tmp_dir!(), "wb_worgsh.wasm")
+    cache = Path.join(System.tmp_dir!(), "wb_washy.wasm")
     src = src()
 
     cond do

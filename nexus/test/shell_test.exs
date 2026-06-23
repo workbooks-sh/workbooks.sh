@@ -1,6 +1,6 @@
 defmodule Nexus.ShellTest do
   @moduledoc """
-  worgsh — our featured shell compiled to ONE wasm command module (clang.wasm → wasm32-wasip1 → AOT →
+  washy — our featured shell compiled to ONE wasm command module (clang.wasm → wasm32-wasip1 → AOT →
   wasmtime), NO wasmer/WASIX/fork. Pipes are buffered chaining in one process. Runs only when the C wasm
   lane is built; skips otherwise.
   """
